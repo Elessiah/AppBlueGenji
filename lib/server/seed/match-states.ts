@@ -167,7 +167,7 @@ export async function applyLiveStreams(
 
 /**
  * Lancement des matchs (`lib/shared/match-launch.ts`) : sur chaque tournoi
- * casté du jeu de test, la première manche jouable reçoit le caster de test,
+ * casté du jeu de test à phase de lancement (`match_launch_phase`), la première manche jouable reçoit le caster de test,
  * l'équipe 2 comme hôte (le cas où l'arbitrage a changé le défaut) et un
  * « Prêt » de l'équipe 1 — de quoi voir la modale avec ses trois parties, dont
  * une prête et deux attendues. Les autres manches jouables restent en
@@ -185,6 +185,7 @@ export async function applyMatchLaunchCases(db: Pool, casterId: number | null): 
        JOIN bg_tournaments t ON t.id = m2.tournament_id
        WHERE t.name LIKE 'Test - %'
          AND t.state = 'RUNNING'
+         AND t.match_launch_phase = 1
          AND m2.status = 'READY'
          AND m2.team1_id IS NOT NULL AND m2.team2_id IS NOT NULL
          AND m2.live_trigger IS NOT NULL

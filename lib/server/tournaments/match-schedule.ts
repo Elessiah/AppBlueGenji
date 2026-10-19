@@ -46,7 +46,8 @@ type MatchScheduleRow = RowDataPacket & {
 
 /**
  * Le match quitte-t-il le lancement avec cette nouvelle date ? Vrai quand,
- * non lancé, il repasse **à planifier** (date effacée, option allumée) ou **en
+ * non lancé (ou lancé d'office, sans score, sur un tournoi sans phase de
+ * lancement), il repasse **à planifier** (date effacée, option allumée) ou **en
  * attente de départ** (date reportée dans le futur).
  *
  * Son état de lancement (ouverture, « Prêt ») appartenait alors à l'horaire
@@ -54,11 +55,21 @@ type MatchScheduleRow = RowDataPacket & {
  * dès sa nouvelle heure (le délai de quinze minutes étant déjà écoulé), sur des
  * « Prêt » donnés pour un autre créneau.
  */
-function leavesLaunch(row: MatchScheduleRow, startAt: string | null, refereeScheduling: boolean): boolean {
+function leavesLaunch(
+  row: MatchScheduleRow,
+  startAt: string | null,
+  options: { refereeScheduling: boolean; launchPhase: boolean; scoreNoted: boolean },
+): boolean {
+  const { refereeScheduling, launchPhase, scoreNoted } = options;
   const team1Id = row.team1_id === null ? null : Number(row.team1_id);
   const team2Id = row.team2_id === null ? null : Number(row.team2_id);
-  const launchedAt =
+  // Sans phase de lancement, le départ ne tient qu'à l'horaire : un match lancé
+  // d'office à son heure, puis reporté (ou rendu à planifier) sans score noté,
+  // n'a pas eu lieu — gardé lancé, il laisserait saisir un score avant sa
+  // nouvelle heure. Il quitte donc le lancement comme un match en salon.
+  const currentLaunch =
     launchPairingKey(team1Id, team2Id) === (row.launch_pairing ?? null) ? toIso(row.launched_at) : null;
+  const launchedAt = !launchPhase && !scoreNoted ? null : currentLaunch;
   const phase = matchLaunchPhase(
     { status: row.status, team1Id, team2Id, startAt, launchedAt, refereeScheduling },
     Date.now(),
@@ -81,7 +92,7 @@ function scheduleUpdateSql(leaving: boolean, scoreNoted: boolean): string {
             WHERE id = ?`;
   }
   return `UPDATE bg_matches
-          SET start_at = ?, lobby_opened_at = NULL, team1_ready_at = NULL,
+          SET start_at = ?, launched_at = NULL, lobby_opened_at = NULL, team1_ready_at = NULL,
               team2_ready_at = NULL, caster_ready_at = NULL
           WHERE id = ?`;
 }
@@ -119,11 +130,17 @@ async function matchTournamentId(connection: PoolConnection, matchId: number): P
 async function lockScheduleTournament(
   connection: PoolConnection,
   tournamentId: number,
-): Promise<{ refereeScheduling: boolean; finished: boolean }> {
+): Promise<{ refereeScheduling: boolean; launchPhase: boolean; finished: boolean }> {
   const [rows] = await connection.execute<
-    (RowDataPacket & { referee_scheduling: number | null; state: string | null })[]
-  >(`SELECT referee_scheduling, state FROM bg_tournaments WHERE id = ? LIMIT 1 FOR UPDATE`, [tournamentId]);
-  return { refereeScheduling: Number(rows[0]?.referee_scheduling ?? 0) === 1, finished: rows[0]?.state === "FINISHED" };
+    (RowDataPacket & { referee_scheduling: number | null; match_launch_phase: number | null; state: string | null })[]
+  >(`SELECT referee_scheduling, match_launch_phase, state FROM bg_tournaments WHERE id = ? LIMIT 1 FOR UPDATE`, [
+    tournamentId,
+  ]);
+  return {
+    refereeScheduling: Number(rows[0]?.referee_scheduling ?? 0) === 1,
+    launchPhase: Number(rows[0]?.match_launch_phase ?? 0) === 1,
+    finished: rows[0]?.state === "FINISHED",
+  };
 }
 
 async function lockScheduleRow(connection: PoolConnection, matchId: number): Promise<MatchScheduleRow | null> {
@@ -338,7 +355,7 @@ export async function setMatchStartAt(
       // les marques de rappel d'une manche voisine (verrou d'intervalle) puis
       // met à jour celle-ci, et cette programmation qui tient la manche puis
       // pose sa marque, s'attendraient l'une l'autre — un interblocage.
-      const { refereeScheduling, finished } = await lockScheduleTournament(connection, tournamentId);
+      const { refereeScheduling, launchPhase, finished } = await lockScheduleTournament(connection, tournamentId);
       const row = await lockScheduleRow(connection, matchId);
       if (!row) throw new Error("MATCH_NOT_FOUND");
 
@@ -350,8 +367,8 @@ export async function setMatchStartAt(
       // a déjà noté un score : la rencontre a eu lieu, elle est tenue pour
       // lancée (un score ne peut rester en base sur un match où plus personne ne
       // peut le saisir, `MATCH_NOT_IN_LAUNCH`).
-      const leaving = leavesLaunch(row, startAt, refereeScheduling);
       const scoreNoted = row.team1_score !== null || row.team2_score !== null;
+      const leaving = leavesLaunch(row, startAt, { refereeScheduling, launchPhase, scoreNoted });
       await connection.execute(scheduleUpdateSql(leaving, scoreNoted), [
         startAt === null ? null : new Date(startAt),
         matchId,

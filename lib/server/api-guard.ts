@@ -88,6 +88,19 @@ export const MATCH_LAUNCH_READ_RULE: RateLimitRule = {
 };
 
 /**
+ * Contacts d'un match, ouverts depuis sa carte (bouton « Contacts »). Compteur
+ * propre : partagé avec l'interrogation de la modale, quelques ouvertures
+ * épuiseraient le quota de plusieurs onglets en plein lancement (429 sur la
+ * modale comme sur les contacts). Trente par minute couvrent largement un
+ * usage humain.
+ */
+export const MATCH_CONTACTS_READ_RULE: RateLimitRule = {
+  name: "match-contacts-read",
+  limit: 30,
+  windowMs: 60_000,
+};
+
+/**
  * Horaires de match posés, changés ou retirés par un arbitre : chaque geste
  * écrit aux joueurs des deux engagées (message privé Discord, push) et pousse
  * aux arbitres. Trois cents gestes en cinq minutes (un par seconde) laissent

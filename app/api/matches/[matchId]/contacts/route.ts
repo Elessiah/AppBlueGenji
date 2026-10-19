@@ -1,5 +1,5 @@
 import { getCurrentUser } from "@/lib/server/auth";
-import { enforceRateLimit, MATCH_LAUNCH_READ_RULE } from "@/lib/server/api-guard";
+import { enforceRateLimit, MATCH_CONTACTS_READ_RULE } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
 import { loadViewerMatchContacts } from "@/lib/server/tournaments/match-launch-info";
 import { parseMatchIdParam } from "@/lib/server/tournaments/match-launch-routes";
@@ -20,7 +20,7 @@ export async function GET(_req: Request, context: { params: Promise<{ matchId: s
   const matchId = parseMatchIdParam((await context.params).matchId);
   if (matchId === null) return fail("INVALID_MATCH_ID", 400);
 
-  const throttled = enforceRateLimit(MATCH_LAUNCH_READ_RULE, user.id);
+  const throttled = enforceRateLimit(MATCH_CONTACTS_READ_RULE, user.id);
   if (throttled) return throttled;
 
   try {

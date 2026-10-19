@@ -42,6 +42,14 @@ const TO_PLAN_CANDIDATES_SQL = `tournament_id = ? AND status = 'READY' AND start
   AND team1_id IS NOT NULL AND team2_id IS NOT NULL
   AND (launched_at IS NULL OR NOT (launch_pairing <=> CONCAT(team1_id, ':', team2_id)))`;
 
+/**
+ * Sans phase de lancement (`match_launch_phase = 0`), un match sans date est
+ * lancé d'office : l'allumage le rend aussi à planifier (sans score noté),
+ * sans quoi il resterait lancé, sans date, score ouvert.
+ */
+const TO_PLAN_CANDIDATES_DIRECT_SQL = `tournament_id = ? AND status = 'READY' AND start_at IS NULL
+  AND team1_id IS NOT NULL AND team2_id IS NOT NULL`;
+
 /** Un score est déjà noté : la rencontre a eu lieu. */
 const SCORE_NOTED_SQL = `(team1_score IS NOT NULL OR team2_score IS NOT NULL)`;
 
@@ -59,9 +67,14 @@ export async function setRefereeScheduling(
       // première lecture ordinaire figerait l'instantané avant l'attente). Il
       // sérialise la bascule avec l'entretien du tournoi, qui le prend aussi.
       const [rows] = await connection.execute<
-        (RowDataPacket & { name: string; state: TournamentState; referee_scheduling: number })[]
+        (RowDataPacket & {
+          name: string;
+          state: TournamentState;
+          referee_scheduling: number;
+          match_launch_phase: number | null;
+        })[]
       >(
-        `SELECT name, state, referee_scheduling FROM bg_tournaments WHERE id = ? LIMIT 1 FOR UPDATE`,
+        `SELECT name, state, referee_scheduling, match_launch_phase FROM bg_tournaments WHERE id = ? LIMIT 1 FOR UPDATE`,
         [tournamentId],
       );
       const tournament = rows[0];
@@ -85,6 +98,8 @@ export async function setRefereeScheduling(
 
       let movedToPlanning = 0;
       if (enabled) {
+        const resetCandidates =
+          Number(tournament.match_launch_phase ?? 0) === 1 ? TO_PLAN_CANDIDATES_SQL : TO_PLAN_CANDIDATES_DIRECT_SQL;
         // D'abord les rencontres déjà notées : elles se jouent, on les tient
         // pour lancées (empreinte d'appariement comprise, sans quoi le
         // lancement ne vaudrait pas pour la paire courante).
@@ -103,7 +118,7 @@ export async function setRefereeScheduling(
         await connection.execute(
           `DELETE FROM bg_match_start_notices
            WHERE match_id IN (SELECT id FROM bg_matches
-                              WHERE ${TO_PLAN_CANDIDATES_SQL} AND NOT ${SCORE_NOTED_SQL})`,
+                              WHERE ${resetCandidates} AND NOT ${SCORE_NOTED_SQL})`,
           [tournamentId],
         );
         // Puis le reste — mêmes conditions que la phase `TO_PLAN` : jouable,
@@ -114,7 +129,7 @@ export async function setRefereeScheduling(
           `UPDATE bg_matches
            SET lobby_opened_at = NULL, launched_at = NULL, team1_ready_at = NULL,
                team2_ready_at = NULL, caster_ready_at = NULL
-           WHERE ${TO_PLAN_CANDIDATES_SQL} AND NOT ${SCORE_NOTED_SQL}`,
+           WHERE ${resetCandidates} AND NOT ${SCORE_NOTED_SQL}`,
           [tournamentId],
         );
         movedToPlanning = Number(update.affectedRows ?? 0);

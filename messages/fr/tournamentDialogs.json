@@ -146,6 +146,8 @@
     "hintDirect": "Sans jour ni mois = aucun horaire : le match est alors lancé tout de suite, sans retour possible. Sinon, à l'heure dite, il est lancé directement.",
     "hintDirectTbd": "Sans jour ni mois = aucun horaire : le match sera lancé dès que ses deux adversaires seront connus, sans retour possible. Sinon, à l'heure dite, il est lancé directement.",
     "hintLaunched": "Le match est déjà lancé : changer sa date ne le relance pas, le score reste ouvert.",
+    "hintLaunchedDirect": "Le match est déjà lancé, sans score : une heure à venir le remet « En attente de départ » (score refermé jusque-là) ; une heure passée ou aucune date le laisse lancé.",
+    "hintLaunchedPlanningDirect": "Le match est déjà lancé, sans score : une heure à venir le remet « En attente de départ » (score refermé jusque-là), vider la date le renvoie « À planifier » ; une heure passée le laisse lancé.",
     "notice": "Pour un match à jouer, un horaire à venir posé ou changé est annoncé aux joueurs du match (notification push, et message privé Discord aux joueurs dont le tag Discord est certifié, sauf s'ils ont coupé ceux de leurs matchs).",
     "noticePlanning": "Pour un match à jouer, un horaire à venir posé ou changé, ou un horaire retiré, est annoncé aux joueurs du match (notification push, et message privé Discord aux joueurs dont le tag Discord est certifié, sauf s'ils ont coupé ceux de leurs matchs).",
     "noticeTbd": "Une place est encore vide : l'horaire sera annoncé aux joueurs quand les deux adversaires seront connus, dans les 48 h qui précèdent le coup d'envoi.",

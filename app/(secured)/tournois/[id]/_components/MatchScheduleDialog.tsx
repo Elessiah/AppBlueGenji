@@ -76,10 +76,16 @@ export function startAtHint(
   launchPhase = true,
   launched = false,
 ): string {
-  // Déjà lancé (un match sans date part d'emblée, option éteinte) : une date
-  // posée ensuite ne le fait pas attendre.
+  // Déjà lancé : option allumée, une date posée ensuite ne le fait pas
+  // attendre. Option éteinte, le départ ne tient qu'à l'horaire : sans score,
+  // une heure à venir (ou une date vidée, planification par l'arbitrage) le
+  // fait quitter le lancement (`leavesLaunch`, serveur).
   if (launched && !played) {
-    return `${text.t("schedule.hintLaunched")} ${scheduleNotice(text, refereeScheduling, entrantsKnown)}`;
+    const directLaunchedKey = refereeScheduling
+      ? "schedule.hintLaunchedPlanningDirect"
+      : "schedule.hintLaunchedDirect";
+    const launchedKey = launchPhase ? "schedule.hintLaunched" : directLaunchedKey;
+    return `${text.t(launchedKey)} ${scheduleNotice(text, refereeScheduling, entrantsKnown)}`;
   }
   const planningKey = launchPhase ? "schedule.hintPlanning" : "schedule.hintPlanningDirect";
   // Option éteinte, un match sans date part d'emblée — mais seulement une fois
