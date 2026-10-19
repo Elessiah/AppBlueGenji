@@ -233,7 +233,7 @@ async function loadEveningMatches(evening: LiveEvening): Promise<LiveCandidateRo
   return selectMatches(
     `m.live_trigger IS NOT NULL AND m.is_bye = 0
         AND (EXISTS (SELECT 1 FROM bg_live_announcements a
-                      WHERE a.match_id = m.id AND a.sent_at >= ? AND a.sent_at <= ? AND a.refused = 0
+                      WHERE a.match_id = m.id AND a.sent_at >= ? AND a.sent_at < ? AND a.refused = 0
                         AND a.pairing = CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id)))
              OR (t.state = 'RUNNING' AND m.live_trigger = 'START_TIME' AND m.status IN ('PENDING', 'READY')
                  AND m.start_at > NOW() AND m.start_at <= ${until}))`,
@@ -1169,10 +1169,12 @@ async function refreshEvening(evening: RefreshableEvening, now: number): Promise
     return "dropped";
   }
   if (outcome in ABANDONED_OUTCOMES) {
-    // Refusé ou peut-être parti : le même texte n'est pas renvoyé — la fin de
-    // match suivante, ou le prochain direct, rédigera le suivant.
-    rememberEveningText(evening, message, urls);
-    console.error(`[live-announce] soirée ${Number(evening.id)} : mise à jour non confirmée (${outcome}), non réessayée`);
+    // Refusé (bot, AutoMod) : le même texte n'est pas renvoyé — il le serait
+    // de nouveau. Peut-être parti (`uncertain`, `timed-out`, `interrupted`) :
+    // pas retenu, la mise à jour suivante le renvoie — une modification ne
+    // notifie jamais, et une soirée finie n'aurait sinon plus de quoi se corriger.
+    if (REFUSED_OUTCOMES.has(outcome)) rememberEveningText(evening, message, urls);
+    console.error(`[live-announce] soirée ${Number(evening.id)} : mise à jour non confirmée (${outcome}), non réessayée tout de suite`);
     return "dropped";
   }
   const postponed: PostponedOutcome = outcome in POSTPONED_CAUSES ? (outcome as PostponedOutcome) : "unavailable";
