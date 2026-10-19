@@ -5,8 +5,9 @@
  * la main.
  *
  * **Exposition bornée.** Les contacts (tag Discord certifié, BattleTag) ne sont
- * rendus que pour un match **en lancement ou lancé**, et seulement à ses
- * parties : c'est la clause `sharesMatchLobby` de `canViewDiscordTag` et
+ * rendus qu'aux parties d'un match : dans la modale, **en lancement ou lancé** ;
+ * par le bouton « Contacts » d'une carte, dès que ses deux adversaires sont
+ * connus (`exposesContacts`). C'est la clause `sharesMatchLobby` de `canViewDiscordTag` et
  * `sharesLiveMatch` de `canViewBattletag`, que ce module est seul à établir.
  * Un match terminé sort de la liste, et ses contacts avec lui.
  *
