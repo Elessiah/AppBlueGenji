@@ -509,7 +509,7 @@ describe("langue du compte (lot 9-3)", () => {
     expect(page).toContain("discordReachable={matchDmReachable(discordState, data?.profile.discordVerified)}");
     // Figé à l'ouverture : le texte ne bascule pas pendant « Retrait… ».
     expect(page).toContain("<TagRemovalBody verified={tagRemovalVerified} dms={tagRemovalDms} />");
-    expect(page).toMatch(/setTagRemovalVerified\(discordState\.verified\);\s*setTagRemovalDms\(\(matchDmShown \?\? data\?\.matchDmEnabled\) !== false\);\s*setConfirmingTagRemoval\(true\);/);
+    expect(page).toMatch(/setTagRemovalVerified\(discordState\.verified\);\s*setTagRemovalDms\(\(matchDmShown\.current \?\? data\?\.matchDmEnabled\) !== false\);\s*setConfirmingTagRemoval\(true\);/);
     // Case décochée : la fin des messages privés de match ne se promet pas à qui
     // ne les reçoit plus ; la valeur enregistrée sur la page remonte à la fiche.
     // Détacher Discord ou changer de pseudo retire la certification : l'écran
@@ -517,7 +517,9 @@ describe("langue du compte (lot 9-3)", () => {
     expect(page).toContain("setDiscordState((prev) => (prev.tag === tag ? prev : { ...prev, tag, verified: false }));");
     expect(page).toMatch(/onDiscordUnlinked=\{\(\) => \{\s*setDiscordState\(\(prev\) => \(\{ \.\.\.prev, linked: false, verified: false, attested: false \}\)\)/);
     const apps = readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/ConnectedAppsSection.tsx"), "utf8");
-    expect(apps).toMatch(/await reload\(\);\s*if \(provider === "DISCORD"\) onDiscordUnlinked\?\.\(\);\s*onChanged\?\.\(\);/);
+    // Perf : la certification tombe sans attendre la relecture de la liste, et
+    // l'état Discord se relit en parallèle de celle-ci, pas après.
+    expect(apps).toMatch(/if \(provider === "DISCORD"\) onDiscordUnlinked\?\.\(\);\s*onChanged\?\.\(\);\s*await reload\(\);/);
     // Le dialogue du code du bot dit aussi la conséquence sur les messages de match (FR et EN).
     const [frBot, enBot] = [(await import("@/messages/fr/profile.json")).default.botHandle, (await import("@/messages/en/profile.json")).default.botHandle];
     expect([frBot.matchDms, enBot.matchDms]).toEqual(["Sans certification, le bot ne t'envoie aucun message privé de match.", "Without verification, the bot sends you no match direct messages."]);
@@ -525,7 +527,10 @@ describe("langue du compte (lot 9-3)", () => {
       effects.armed = true;
       expect(inEnglish(<DiscordBotHandleDialog mode={mode} onClose={() => undefined} onUpdated={() => undefined} />)).toContain(enBot.matchDms);
     }
-    expect(page).toContain("onChoice={setMatchDmShown}");
+    // Perf : le choix affiché remonte dans une référence, sans rendre la page.
+    expect(page).toContain("onChoice={reportMatchDmChoice}");
+    expect(page).toContain("const matchDmShown = useRef<boolean | undefined>(undefined);");
+    expect(page).not.toMatch(/useState<boolean \| undefined>\(undefined\)/);
     // Le repli du profil chargé suit aussi (lecture de l'état Discord en échec).
     expect(page).toContain("? { ...prev, profile: { ...prev.profile, discordVerified: false } }");
     expect(page).toContain("setData((prev) => (prev ? { ...prev, profile: { ...prev.profile, discordVerified: false } } : prev));");
