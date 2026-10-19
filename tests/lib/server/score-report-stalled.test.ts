@@ -106,6 +106,9 @@ describe("resolveExpiredScoreReports", () => {
 
     const claim = calls.find((c) => c.sql.startsWith("UPDATE bg_matches"));
     expect(claim?.sql).toContain("status = 'COMPLETED'");
+    // Un forfait noté par l'arbitre (« Enregistrer ») ne survit pas au score retenu :
+    // sinon la ligne close porterait le score du déclarant et un drapeau de forfait.
+    expect(claim?.sql).toContain("forfeit_team_id = NULL");
     expect(claim?.sql).toContain("AND status = 'AWAITING_CONFIRMATION'");
     expect(claim?.sql).toContain("AND score_deadline_at <= NOW()");
     expect(claim?.sql).toContain("AND team1_reported_at <=> ?");

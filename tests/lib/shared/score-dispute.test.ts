@@ -66,8 +66,11 @@ describe("textes FR + EN", () => {
     // pour l'équipe restée muette, et une équipe dans un tournoi individuel.
     expect(fr.body).not.toMatch(/autre équipe/);
     expect(en.body).not.toMatch(/other team/);
-    expect(fr.body).toContain("ni contesté dans les 2 h");
-    expect(en.body).toContain("confirmed or disputed it within 2 hours");
+    // L'échéance dépasse 2 h sur un format long (fin de série plausible) : pas de durée.
+    expect(fr.body).toContain("ni contesté avant l'échéance");
+    expect(fr.body).not.toMatch(/2 h/);
+    expect(en.body).toContain("confirmed or disputed it before the deadline");
+    expect(en.body).not.toMatch(/2 hours/);
     expect(fr.url).not.toMatch(/^\/en/);
     expect(en.url).toMatch(/^\/en\//);
     // Même étiquette que « score à confirmer » : elle le remplace sur l'appareil.
