@@ -39,7 +39,12 @@ Le défaut **est** la migration : tout tournoi existant passe sans lancement.
   `GET /api/me/match-launches` ne présente que les tournois à `1`), pas de
   pastille ni de section « Lancement », pas de « Prêt » (`MATCH_ALREADY_LAUNCHED`),
   pas d'« Infos du match » (`showOpen`). Le report d'un score s'ouvre dès
-  l'heure.
+  l'heure. Les textes qui parlaient de « Prêt » ont leur variante sans
+  lancement (FR + EN) : avis de la modale de score avant l'heure
+  (`score.player.closed.scheduled*Direct`), aide de la modale d'horaire
+  (`schedule.hint*Direct`), confirmation de « Forcer le lancement »
+  (`forceConfirm.bodyDirect` — forcer n'y avance que l'heure), et `/regles`
+  précise que la phase dépend du tournoi.
 - **Allumée** : exactement le comportement décrit ci-dessous.
 - **Absente** d'un appel (`launchPhase` non passé) : allumée — la règle
   d'origine ; au pire un instant de « Lancement » affiché, que l'entretien
@@ -75,7 +80,16 @@ contacts y sortent **dès que le match est programmé**, et plus seulement au
 lancement — les parties s'organisent avant l'heure, surtout sans phase de
 lancement. Qui n'est pas partie du match, ou un match sans contacts (à
 planifier, terminé), reçoit `MATCH_CONTACTS_UNAVAILABLE` (404), un seul code :
-la réponse ne dit pas qui joue quoi. Déclaré : `PRIVACY_CHANGES`
+la réponse ne dit pas qui joue quoi. Un refus reste écrit dans la modale (pas
+« aucun contact »). Chargée à la demande (`next/dynamic`) : ses textes FR + EN
+ne pèsent pas sur la page de tournoi. Noms cliquables : équipe par `TeamLink`,
+entrée solo par `PlayerLink` (son unique contact), contacts et caster par
+`PlayerLink` — fiches partagées avec la modale de lancement, montée hors du
+contexte d'engagés de la page de tournoi. La modale de lancement **ne s'ouvre
+pas d'office par-dessus** une autre modale (`anotherModalOpen`) : elle attend la
+relève suivante, que « Contacts » demande à sa fermeture. Dans la modale de
+lancement, un match programmé renvoie au bouton « Contacts » (`contactsAtLaunch`).
+Déclaré : `PRIVACY_CHANGES`
 `2026-10-contacts-de-match-avant-le-depart`, `/rgpd` et le registre (T04).
 
 ## L'état n'est pas un statut
