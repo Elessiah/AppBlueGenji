@@ -72,11 +72,16 @@ d'office, exactement comme si l'autre l'avait confirmé.
   `flushBotLogs`, jeté avec `discardBotLogs`), push « Score validé
   automatiquement » aux responsables de match des **deux** équipes
   (`notifyScoreAutoValidated`, sujet existant `SCORE_TO_CONFIRM`, rédacteur
-  `scoreAutoValidatedPush`, FR + EN, sans nommer personne). Rien sur Discord de
+  `scoreAutoValidatedPush`, FR + EN, sans nommer personne ni « l'autre équipe » :
+  le même texte part aux deux camps — « personne ne l'a confirmé ni contesté
+  dans les 2 h »). Rien sur Discord de
   plus que la ligne `match_finished` habituelle.
-- **Écran** : « Validé automatiquement à HH:MM » à l'**heure de Paris**
-  (`autoValidateTimeText`) sur la carte (lisible de tous) et dans la modale des
-  deux équipes (« (Paris time) » en anglais).
+- **Écran** : « validé automatiquement à HH:MM (heure de Paris) » / « confirmed
+  automatically at HH:MM (Paris time) » (`autoValidateTimeText`, mention du
+  fuseau dans les deux langues) sur la carte (lisible de tous) et dans la modale
+  des deux équipes.
+- **Pendant un envoi** (score, forfait) : boutons `aria-disabled` + `aria-busy`,
+  jamais `disabled` natif (le focus resterait sur un bouton éteint).
 
 ## Règles du tournoi
 
@@ -99,6 +104,7 @@ pas du report de score : inchangées.
 (UPDATE conditionnel, idempotence, course perdue), `tournaments-service.matches.test.ts`
 (verrou des deux équipes, confirmation refusée, propagation `resultWritten`),
 `player-forfeit.test.ts`, `auto-validated-notices.test.ts` ;
+`tests/app/tournament-actions-i18n.test.tsx` (modale verrouillée et heure de Paris, FR + EN) ;
 `tests/app/api/tournaments/report-score.test.ts`, `match-forfeit.test.ts`,
 `tests/app/api/admin/dispute-resolution.test.ts` (arbitre et admin tranchent,
 capitaine refusé).
