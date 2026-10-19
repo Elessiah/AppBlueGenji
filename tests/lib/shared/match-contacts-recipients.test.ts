@@ -115,11 +115,9 @@ describe("registre et avis — tout ce que montre une fiche de contact", () => {
 });
 
 describe("caster et équipes entre eux, fiches de contact", () => {
-  it("T01 compte le caster et les équipes du match casté, une seule fois chaque catégorie de T04 (FR et EN)", () => {
-    const t01 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T01");
-    const t01En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T01");
-    expect(t01?.recipients.join("\n")).toMatch(/Caster inscrit d'un match et membres des deux équipes de ce match, entre eux/);
-    expect(t01En?.recipients.join("\n")).toMatch(/Signed-up caster of a match and members of both teams of that match, between them/);
+  it("T04 donne la finalité de mise en relation des parties, une seule fois chaque catégorie (FR et EN)", () => {
+    expect(T04?.purpose).toMatch(/et aux parties d'un match \(membres des deux équipes, caster inscrit\) de se joindre pour l'organiser/);
+    expect(T04_EN?.purpose).toMatch(/and the parties to a match \(members of both teams, signed-up caster\) to reach each other to organise it/);
     for (const list of [T04?.dataCategories ?? [], T04_EN?.dataCategories ?? []]) {
       expect(new Set(list).size).toBe(list.length);
     }
@@ -143,13 +141,6 @@ describe("caster et équipes entre eux, fiches de contact", () => {
   });
 });
 
-describe("T01 — base légale du BattleTag masqué lu entre parties d'un match", () => {
-  it("ajoute l'exécution du service, renvoyant à T04 (FR et EN)", () => {
-    expect(PROCESSING_ACTIVITIES.find((a) => a.ref === "T01")?.legalBasis).toMatch(/exécution du service \(contrat\) pour la lecture du BattleTag, même masqué, entre parties d'un même match .*voir T04/);
-    expect(PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T01")?.legalBasis).toMatch(/performance of the service \(contract\) for the reading of the BattleTag, even when hidden, between parties to the same match .*see T04/);
-  });
-});
-
 describe("certification Discord et caster retiré", () => {
   it("l'avis de confidentialité du profil compte les parties du match parmi les lecteurs du tag certifié (FR et EN)", () => {
     expect(frProfile.privacy.discordNotice).toContain("et, comme contact, aux membres des deux équipes et au caster de ton match dès que ses deux adversaires sont connus");
@@ -157,7 +148,7 @@ describe("certification Discord et caster retiré", () => {
   });
 
   it("T04 dit qu'un caster devenu inéligible est retiré à la lecture des contacts (FR et EN)", () => {
-    expect(T04?.retention.join("\n")).toMatch(/un caster qui ne remplit plus les conditions de son inscription .* en est retiré à la lecture suivante des contacts/);
-    expect(T04_EN?.retention.join("\n")).toMatch(/a caster who no longer meets the conditions of their sign-up .* is removed at the next read of the contacts/);
+    expect(T04?.retention.join("\n")).toMatch(/un caster qui ne remplit plus les conditions de son inscription .* en est retiré, tant que le match n'est pas lancé, dès que le site le constate/);
+    expect(T04_EN?.retention.join("\n")).toMatch(/a caster who no longer meets the conditions of their sign-up .* is removed, as long as the match is not launched, as soon as the site notices it/);
   });
 });
