@@ -34,6 +34,7 @@ describe("liveMentionTarget", () => {
       "https://twitch.tv/BlueGenjiEsport",
       "https://m.twitch.tv/bluegenjiesport/",
       "https://www.twitch.tv/bluegenjiesport?ref=x",
+      "https://www.twitch.tv/bluegenjiesport///",
     ]) {
       expect(liveMentionTarget(url)).toBe("everyone");
     }
@@ -50,6 +51,14 @@ describe("liveMentionTarget", () => {
     ]) {
       expect(liveMentionTarget(url)).toBe("stream-viewer");
     }
+  });
+
+  it("une longue suite de barres finales se rogne en temps linéaire (SonarCloud S8786)", () => {
+    const started = Date.now();
+    expect(liveMentionTarget(`${OFFICIAL_LIVE_CHANNEL_URL}${"/".repeat(50_000)}`)).toBe("everyone");
+    expect(liveMentionTarget(`https://www.twitch.tv/${"/".repeat(50_000)}x`)).toBe("stream-viewer");
+    expect(liveMentionTarget("https://www.twitch.tv/")).toBe("stream-viewer");
+    expect(Date.now() - started).toBeLessThan(1_000);
   });
 });
 
