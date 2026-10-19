@@ -887,7 +887,9 @@ describe("soirées d'annonces", () => {
       "INSERT INTO bg_live_evenings (target, started_at, window_end) VALUES (?, NOW(), NOW() + INTERVAL 4 HOUR)",
     );
     const update = execute.mock.calls.find(([text]) => text.startsWith("UPDATE bg_live_evenings"));
-    expect(update?.[1]).toEqual(["123456789012345678", 3]);
+    expect(update?.[1]).toEqual(["123456789012345678", 0, 3]);
+    // Premier message qui notifie : la fenêtre part de son envoi, pas d'un essai reporté.
+    expect(update?.[0]).toContain("window_end = GREATEST(window_end, NOW() + INTERVAL 4 HOUR)");
     // Les soirées finies depuis un jour sont oubliées.
     expect(sqls).toContain("DELETE FROM bg_live_evenings WHERE window_end < NOW() - INTERVAL 1 DAY");
   });
@@ -996,6 +998,48 @@ describe("soirées d'annonces", () => {
     const [request] = jest.mocked(pushLiveEvening).mock.calls[0];
     expect(request.message).not.toContain("Fini");
     expect(request.message).toContain("Renards contre Nova");
+  });
+
+  it("message de soirée parti sans mention : gardé `silent`, sa modification n'en écrit pas, la fenêtre ne bouge pas", async () => {
+    // Envoi muet (soirée déjà annoncée sans identifiant) : marqué sans mention.
+    const joined = { ...AUTO_LIVE, id: 41, pairing: "3:4", launch_pairing: "3:4" };
+    const first = mockDb([joined]);
+    first.evening.mockImplementation(async (sql) =>
+      sql.includes("FROM bg_live_evenings") ? [[EVENING]] : [[{ ...AUTO_LIVE, evening_announced: 1 }, joined]],
+    );
+    await runLiveAnnouncementSweep(NOW);
+    const quietUpdate = first.execute.mock.calls.find(([text]) => text.startsWith("UPDATE bg_live_evenings"));
+    expect(quietUpdate?.[1]).toEqual(["123456789012345678", 1, 3]);
+    expect(quietUpdate?.[0]).not.toContain("window_end");
+
+    // Match suivant : le message gardé est muet → `notify: false` avec la modification.
+    resetLiveAnnouncementThrottle();
+    jest.mocked(pushLiveEvening).mockClear();
+    const next = { ...AUTO_LIVE, id: 43, pairing: "7:8", launch_pairing: "7:8" };
+    const second = mockDb([next]);
+    second.evening.mockImplementation(async (sql) =>
+      sql.includes("FROM bg_live_evenings")
+        ? [[{ ...EVENING, discord_message_id: "123456789012345678", silent: 1 }]]
+        : [[next]],
+    );
+    await runLiveAnnouncementSweep(NOW);
+    const [request] = jest.mocked(pushLiveEvening).mock.calls[0];
+    expect(request.editMessageId).toBe("123456789012345678");
+    expect(request.notify).toBe(false);
+    // Modifié en place (même identifiant) : rien à réécrire.
+    expect(second.execute.mock.calls.some(([text]) => text.startsWith("UPDATE bg_live_evenings"))).toBe(false);
+  });
+
+  it("suite d'un message disparu : nouvel identifiant gardé `silent`, sans toucher à la fenêtre", async () => {
+    const { execute, evening } = mockDb([AUTO_LIVE]);
+    evening.mockImplementation(async (sql) =>
+      sql.includes("FROM bg_live_evenings") ? [[{ ...EVENING, discord_message_id: "999999999999999999" }]] : [[AUTO_LIVE]],
+    );
+    await runLiveAnnouncementSweep(NOW);
+    expect(jest.mocked(pushLiveEvening).mock.calls[0][0].notify).toBeUndefined();
+    const update = execute.mock.calls.find(([text]) => text.startsWith("UPDATE bg_live_evenings"));
+    expect(update?.[1]).toEqual(["123456789012345678", 1, 3]);
+    expect(update?.[0]).not.toContain("window_end");
   });
 
   it("soirée illisible : réservation rendue, annonce reportée", async () => {
