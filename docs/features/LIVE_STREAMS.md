@@ -160,13 +160,20 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
 - **Texte** (français, `formatLiveEvening`) : « 🔴 **Les lives de la
   soirée** », puis un bloc par match séparé par une ligne vide — l'heure de
   Paris en gras (`**21:00**`), suivie de « · En direct » pour un match à
-  l'antenne ; l'affiche et le tournoi ; le lien seul sur sa ligne. Les directs
-  d'abord, puis les matchs **programmés** (`START_TIME`, castés, d'ici la fin
-  de la fenêtre) par heure : l'heure des streams à venir se lit d'un coup
-  d'œil. Un match fini depuis son annonce, ou sorti de l'antenne (rouvert pour
-  une autre affiche, antenne fermée en `MANUAL`), n'est plus listé : seul un
-  match `START_TIME` figure avant son direct, à son heure — jamais un match à
-  une heure inventée. Une annonce ne fait relire un match que pour son
+  l'antenne, de « · Terminé · 2-1 » pour un match **terminé** (score lu sur
+  le match, dans l'ordre de l'affiche) ou de « · Terminé » seul sans score
+  (forfait, score en attente de confirmation, antenne fermée en `MANUAL`) ;
+  l'affiche et le tournoi ; le lien seul sur sa ligne. Les directs d'abord,
+  puis les matchs **programmés** (`START_TIME`, castés, d'ici la fin de la
+  fenêtre) par heure, puis les matchs terminés par heure : l'heure des streams
+  à venir se lit d'un coup d'œil, et une soirée trop longue compte ses matchs
+  finis avant ceux à venir. Un match annoncé **reste** au message une fois
+  terminé (décision de l'utilisateur, 2026-10-19), même si son tournoi s'est
+  clos avec lui (les matchs annoncés se lisent sur un tournoi `RUNNING` ou
+  `FINISHED`, les programmés sur un tournoi `RUNNING` seulement). Un match
+  rouvert pour une autre affiche, ou revenu en attente, n'est plus listé :
+  seul un match `START_TIME` figure avant son direct, à son heure — jamais un
+  match à une heure inventée. Une annonce ne fait relire un match que pour son
   affiche **courante** (`pairing`) : un match rouvert pour d'autres engagés n'y
   revient que par l'annonce de sa nouvelle affiche. Les liens partent
   à part (`streamUrls`, dix au plus) et le texte les place par des jetons
@@ -198,6 +205,33 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   que `LIVE_ANNOUNCEMENTS_ENABLED` est posé. Une publication incertaine
   (`uncertain`, `timed-out`, `interrupted`) ne laisse pas d'identifiant : un
   match suivant de la même soirée repart dans un nouveau message.
+- **Mise à jour aux fins de match** (`requestLiveEveningRefresh`,
+  `refreshLiveEvenings`) : un score rendu ou arbitré, un match ou un tournoi
+  changé (antenne fermée, forfait) — les évènements `score_reported`,
+  `score_resolved`, `match_updated` et `updated` de
+  `lib/server/tournaments/notifications.ts` — demandent la mise à jour des
+  soirées ouvertes, sans rien lire sur le moment (aucune requête ajoutée à une
+  lecture de page) et rien si les annonces sont désactivées. La première
+  demande programme **une** mise à jour une minute plus tard
+  (`LIVE_EVENING_REFRESH_DELAY_MS`) ; toutes celles de la minute la
+  rejoignent : une ronde qui se termine d'un coup donne une modification par
+  public. La mise à jour lit les soirées dont la fenêtre court, qui ont un
+  message gardé et ne sont pas closes (`window_end > NOW()`, `closed = 0`) —
+  rien n'est modifié après la fin de la fenêtre —, rédige leur texte et ne
+  l'envoie que s'il diffère du **dernier texte publié** (retenu par
+  processus, annonces de direct comprises ; perdu au redémarrage, au pire une
+  modification à l'identique). Toujours une **modification**
+  (`editMessageId`, `refresh: true`, étiquette `live-refresh soiree-N …`) :
+  jamais de notification, mention de tête gardée comme le message l'a publiée
+  (`notify: false` pour un message `silent`). Mêmes chemins que la
+  modification d'une annonce : suite sans mention si le message ne se modifie
+  plus (`30046`, `50005`, identifiant remplacé), soirée close si le message a
+  été supprimé (`10008`). Un refus ou une issue incertaine ne renvoie pas le
+  même texte ; un report (bot injoignable, salon fermé, Discord réticent) est
+  relancé une minute plus tard, trois fois au plus, puis attend la fin de match
+  suivante — le coupe-circuit du bot ouvert, rien n'est lu. Balayage et mise à
+  jour passent par une **file unique** : une mise à jour ne rédige jamais en
+  même temps qu'une annonce (elle effacerait son match du message).
 - **Jamais deux notifications par public et par soirée** : le premier envoi
   qui notifie **prend** la marque `notified` juste avant l'appel au bot, en une
   instruction (`UPDATE … SET notified = 1 … WHERE id = ? AND notified = 0` +
