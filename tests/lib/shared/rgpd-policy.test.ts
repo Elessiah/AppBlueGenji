@@ -109,7 +109,7 @@ describe("DONNEES_PROFIL", () => {
 
   it("dit qui lit encore un BattleTag masqué, et jusqu'à quand", () => {
     const overwatch = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo Overwatch");
-    expect(overwatch?.finalite).toMatch(/Masqué, il reste lisible des joueurs de tes matchs tant que le tournoi n'est pas terminé/);
+    expect(overwatch?.finalite).toMatch(/Masqué, il reste lisible des membres des deux équipes de tes matchs tant que le tournoi n'est pas terminé/);
     // Le caster ne le reçoit que comme contact de lancement (`/api/me/match-launches`).
     expect(overwatch?.finalite).toMatch(/du caster de ton match dès que ses deux adversaires sont connus et jusqu'à sa fin/);
     expect(overwatch?.finalite).toMatch(/tant que le tournoi n'est pas terminé/);

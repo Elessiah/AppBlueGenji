@@ -51,3 +51,22 @@ describe("BattleTag masqué d'un caster", () => {
     expect(readSource("app/(secured)/profil/BattletagVisibilityNotice.tsx")).toContain('"battletagNotice.asCaster"');
   });
 });
+
+describe("BattleTag masqué — lecteurs d'un même match", () => {
+  it("la politique et la notice nomment les membres des deux équipes, pas seulement les joueurs (FR et EN)", () => {
+    expect(frProfile.battletagNotice.players).toMatch(/Les membres des deux équipes de chaque match de ton équipe/);
+    expect(enProfile.battletagNotice.players).toMatch(/The members of both teams of every match your team plays/);
+    expect(readSource("lib/shared/rgpd-policy.ts")).toContain("lisible des membres des deux équipes de tes matchs");
+    expect(readSource("lib/shared/rgpd-policy-en.ts")).toContain("readable by the members of both teams of your matches");
+  });
+});
+
+describe("modale « Contacts » — fermée quand l'action disparaît", () => {
+  const source = readSource("app/(secured)/tournois/[id]/_components/MatchCardActions.tsx");
+  const reset = 'if (contactsOpen && !actions.some((a) => a.id === "contacts")) setContactsOpen(false);';
+
+  it("un instantané qui retire l'action (match terminé) ferme la modale avant son rendu", () => {
+    expect(source).toContain(reset);
+    expect(source.indexOf(reset)).toBeLessThan(source.indexOf("{contactsOpen && ("));
+  });
+});
