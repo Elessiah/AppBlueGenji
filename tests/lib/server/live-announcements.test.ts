@@ -1046,6 +1046,10 @@ describe("soirées d'annonces", () => {
     const update = execute.mock.calls.find(([text]) => text.startsWith("UPDATE bg_live_evenings"));
     expect(update?.[1]).toEqual(["123456789012345678", 1, 3]);
     expect(update?.[0]).not.toContain("window_end");
+    // pm2 dit qu'une suite est partie, pas une modification.
+    expect(console.info).toHaveBeenCalledWith(
+      "[live-announce] match 40 (tournoi 4) annoncé dans #live (soirée 3, dans une suite sans notifier, le message de la soirée ayant disparu ou ne se modifiant plus)",
+    );
   });
 
   it("soirée illisible : réservation rendue, annonce reportée", async () => {
