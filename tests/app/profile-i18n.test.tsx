@@ -509,7 +509,7 @@ describe("langue du compte (lot 9-3)", () => {
     expect(page).toContain("discordReachable={matchDmReachable(discordState, data?.profile.discordVerified)}");
     // Figé à l'ouverture : le texte ne bascule pas pendant « Retrait… ».
     expect(page).toContain("<TagRemovalBody verified={tagRemovalVerified} dms={tagRemovalDms} />");
-    expect(page).toMatch(/setTagRemovalVerified\(matchDmReachable\(discordState, data\?\.profile\.discordVerified\) === true\);\s*setTagRemovalDms\(\(matchDmShown\.current \?\? data\?\.matchDmEnabled\) !== false\);\s*setConfirmingTagRemoval\(true\);/);
+    expect(page).toMatch(/setTagRemovalVerified\(discordState\.verified\);\s*setTagRemovalDms\(\(matchDmShown\.current \?\? data\?\.matchDmEnabled\) !== false\);\s*setConfirmingTagRemoval\(true\);/);
     // Case décochée : la fin des messages privés de match ne se promet pas à qui
     // ne les reçoit plus ; la valeur enregistrée sur la page remonte à la fiche.
     // Détacher Discord ou changer de pseudo retire la certification : l'écran
