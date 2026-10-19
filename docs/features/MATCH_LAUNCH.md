@@ -44,7 +44,12 @@ Le défaut **est** la migration : tout tournoi existant passe sans lancement.
   (`score.player.closed.scheduled*Direct`), aide de la modale d'horaire
   (`schedule.hint*Direct`), confirmation de « Forcer le lancement »
   (`forceConfirm.bodyDirect` — forcer n'y avance que l'heure), et `/regles`
-  précise que la phase dépend du tournoi.
+  précise que la phase dépend du tournoi. L'heure passée avant la mise à jour
+  du flux, la modale de score dit « le match démarre » (`startingDirect`). La
+  page passe la planification à `canPlayersReportScore` : option éteinte, un
+  match sans date d'un tournoi planifié par l'arbitrage reste « À planifier »,
+  sans score offert. Sur un match déjà lancé, l'aide de la modale d'horaire dit
+  qu'une date ne le relance pas (`schedule.hintLaunched`, les deux options).
 - **Allumée** : exactement le comportement décrit ci-dessous.
 - **Absente** d'un appel (`launchPhase` non passé) : allumée — la règle
   d'origine ; au pire un instant de « Lancement » affiché, que l'entretien
