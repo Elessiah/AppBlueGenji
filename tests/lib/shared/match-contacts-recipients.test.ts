@@ -152,3 +152,11 @@ describe("certification Discord et caster retiré", () => {
     expect(T04_EN?.retention.join("\n")).toMatch(/a caster who no longer meets the conditions of their sign-up .* is removed, as long as the match is not launched, at the next read of the contacts or when another caster signs up; a caster whose team joins the match is removed too/);
   });
 });
+
+describe("T04 — caster d'un compte supprimé", () => {
+  it("est retiré de tout match non terminé, comme le fait l'effacement (FR et EN)", () => {
+    expect(T04?.retention.join("\n")).toContain("le caster d'un compte supprimé est retiré des matchs non terminés");
+    expect(T04_EN?.retention.join("\n")).toContain("the caster of a deleted account is removed from matches that are not over");
+    expect(readSource("lib/server/users/account-erasure.ts")).toContain("WHERE caster_user_id = ? AND status <> 'COMPLETED'");
+  });
+});
