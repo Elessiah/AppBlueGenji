@@ -322,9 +322,13 @@ export function MatchContactsDialog({
   useEffect(() => {
     let alive = true;
     const controller = new AbortController();
-    // Une relecture (départ, horaire changé) qui échoue passagèrement garde à
-    // l'écran ce qui est déjà lu : seuls les contacts du caster y manquaient.
-    const reread = readKey > 0;
+    // Un échec passager garde à l'écran ce qui est déjà lu (seuls les contacts
+    // du caster y manquaient) ; sans rien de lu, la modale reste en chargement
+    // tant qu'une nouvelle tentative suit. Notification et « non affichés »
+    // seulement au refus définitif ou aux tentatives épuisées.
+    const shown = state.kind === "ready";
+    const keepWaiting = (transient: boolean) =>
+      transient && (shown || shouldRetryReread(rereadFailures + 1));
     void (async () => {
       try {
         const read = await readMatchContacts(matchId, {
@@ -339,7 +343,7 @@ export function MatchContactsDialog({
             setRereadWait(read.retryAfterMs ?? 0);
             setRereadFailures((count) => count + 1);
           }
-          if (reread && transient) return;
+          if (keepWaiting(transient)) return;
           setState({ kind: "failed" });
           showError(contactsErrorText(text, read.error));
           return;
@@ -351,7 +355,7 @@ export function MatchContactsDialog({
         if (!alive) return;
         setRereadWait(0);
         setRereadFailures((count) => count + 1);
-        if (reread) return;
+        if (keepWaiting(true)) return;
         setState({ kind: "failed" });
         showError(contactsErrorText(text, null));
       }
