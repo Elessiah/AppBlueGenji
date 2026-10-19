@@ -312,7 +312,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Rédiger les notifications push dans la langue du compte : celle de la page du site d'où part la dernière connexion (une connexion lancée d'ailleurs, ou par le bouton Google, Discord ou Blizzard depuis un navigateur qui ne l'indique pas (trop ancien, ou qui retire cette indication), ne la change pas ; français par défaut), ou celle choisie dans « Mon profil »",
     ],
     legalBasis:
-      "Exécution du service demandé par le joueur (contrat) pour le compte ; consentement pour les données facultatives que le joueur renseigne et choisit de rendre visibles ; exécution du service (contrat) pour la lecture du BattleTag, même masqué, entre parties d'un même match (membres des deux équipes, caster inscrit — voir T04)",
+      "Exécution du service demandé par le joueur (contrat) pour le compte ; consentement pour les données facultatives que le joueur renseigne et choisit de rendre visibles",
     dataSubjects: ["Joueurs inscrits sur le site"],
     dataCategories: [
       "Pseudo du site (depuis le 30 septembre 2026, jamais tiré du nom du compte Google : pseudo neutre à la création ; un compte Google antérieur a pu recevoir ce nom), avatar (copié sur nos serveurs ; depuis la même date, masqué par défaut quand il vient du fournisseur de connexion)",
@@ -331,7 +331,6 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     recipients: [
       "Public du site (seules les données que le joueur rend visibles)",
       "Membres des deux équipes d'un même match, tant que le tournoi n'est pas terminé (BattleTag même masqué, pour s'ajouter en jeu)",
-      "Caster inscrit d'un match et membres des deux équipes de ce match, entre eux, dès que ses deux adversaires sont connus et jusqu'à sa fin (BattleTag même masqué des contacts présentés et du caster)",
       "Joueurs connectés du site : pseudo Discord certifié, si le joueur le rend visible",
       "Staff de l'association selon son rôle (administration, arbitrage)",
     ],
@@ -419,7 +418,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
   {
     ref: "T04",
     name: "Contact des joueurs pendant un tournoi",
-    purpose: "Permettre à l'organisation de joindre un joueur engagé (reprogrammer, trancher un litige, confirmer un forfait)",
+    purpose: "Permettre à l'organisation de joindre un joueur engagé (reprogrammer, trancher un litige, confirmer un forfait), et aux parties d'un match (membres des deux équipes, caster inscrit) de se joindre pour l'organiser",
     subPurposes: [
       "Exposer le pseudo Discord certifié aux administrateurs, à tout moment, et aux arbitres tant que le joueur est inscrit à un tournoi qui n'est pas terminé (dès la phase d'inscription)",
       "Ouvrir aux administrateurs et aux arbitres le BattleTag masqué d'un joueur, tant qu'il est inscrit à un tournoi qui n'est pas terminé",
@@ -452,7 +451,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Pseudo certifié : jusqu'à sa modification ou la suppression du compte",
       "Choix des messages privés de match : jusqu'à sa modification ; remis au défaut à la suppression du compte",
       "Traces d'envoi des rappels, alertes et programmes d'arbitrage (match, palier et horaire annoncé, sans le texte du message) : conservées avec le match, donc sans limite de durée",
-      "« Prêt » et caster d'un match : conservés avec le match ; le caster d'un compte supprimé est retiré des matchs non joués ; un caster qui ne remplit plus les conditions de son inscription (permission de diffusion, tag Discord certifié, compte Battle.net) en est retiré à la lecture suivante des contacts, tant que le match n'est pas lancé",
+      "« Prêt » et caster d'un match : conservés avec le match ; le caster d'un compte supprimé est retiré des matchs non joués ; un caster qui ne remplit plus les conditions de son inscription (permission de diffusion, tag Discord certifié, compte Battle.net) en est retiré, tant que le match n'est pas lancé, dès que le site le constate (lecture des contacts, inscription d'un autre caster, mise à jour du match)",
     ],
     recipients: [
       "Administrateurs et arbitres de l'association",

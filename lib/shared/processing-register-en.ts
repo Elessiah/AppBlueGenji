@@ -135,7 +135,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Writing push notifications in the account's language: the language of the site page the last login started from (a login started elsewhere, or a login through the Google, Discord or Blizzard button from a browser that does not tell (too old, or one that strips this information), does not change it; French by default), or the one chosen in “My profile”",
     ],
     legalBasis:
-      "Performance of the service requested by the player (contract) for the account; consent for the optional data the player fills in and chooses to make visible; performance of the service (contract) for the reading of the BattleTag, even when hidden, between parties to the same match (members of both teams, signed-up caster — see T04)",
+      "Performance of the service requested by the player (contract) for the account; consent for the optional data the player fills in and chooses to make visible",
     dataSubjects: ["Players registered on the site"],
     dataCategories: [
       "Site username (since September 30, 2026, never taken from the name of the Google account: neutral username at creation; an earlier Google account may have received that name), avatar (copied to our servers; since the same date, hidden by default when it comes from the login provider)",
@@ -154,7 +154,6 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     recipients: [
       "The site's public (only the data the player makes visible)",
       "Members of both teams of the same match, until the tournament is over (BattleTag even when hidden, to add each other in game)",
-      "Signed-up caster of a match and members of both teams of that match, between them, from the moment both its opponents are known to its end (BattleTag even when hidden, of the contacts presented and of the caster)",
       "Logged-in players of the site: certified Discord username, if the player makes it visible",
       "The association's staff according to their role (administration, refereeing)",
     ],
@@ -242,7 +241,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
   {
     ref: "T04",
     name: "Contacting players during a tournament",
-    purpose: "Allowing the organizers to reach a player taking part (rescheduling, settling a dispute, confirming a forfeit)",
+    purpose: "Allowing the organizers to reach a player taking part (rescheduling, settling a dispute, confirming a forfeit), and the parties to a match (members of both teams, signed-up caster) to reach each other to organise it",
     subPurposes: [
       "Exposing the certified Discord username to administrators, at any time, and to referees while the player is registered for a tournament that is not over (from the registration phase)",
       "Opening a player's hidden BattleTag to administrators and referees, while they are registered for a tournament that is not over",
@@ -275,7 +274,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Certified username: until it is changed or the account is deleted",
       "Choice of match direct messages: until it is changed; reset to the default when the account is deleted",
       "Records of reminders, alerts and refereeing schedules sent (match, step and announced time, without the message text): kept with the match, so with no time limit",
-      "“Ready” and caster of a match: kept with the match; the caster of a deleted account is removed from matches not yet played; a caster who no longer meets the conditions of their sign-up (broadcast permission, certified Discord tag, Battle.net account) is removed at the next read of the contacts, as long as the match is not launched",
+      "“Ready” and caster of a match: kept with the match; the caster of a deleted account is removed from matches not yet played; a caster who no longer meets the conditions of their sign-up (broadcast permission, certified Discord tag, Battle.net account) is removed, as long as the match is not launched, as soon as the site notices it (reading the contacts, another caster signing up, an update of the match)",
     ],
     recipients: [
       "The association's administrators and referees",
