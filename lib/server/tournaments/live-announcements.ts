@@ -50,6 +50,7 @@
  * `https` : il faut en plus `LIVE_ANNOUNCEMENTS_ENABLED=1`, que seul le `.env`
  * de production pose, et un `APP_URL` en `https` sur un nom de domaine.
  */
+import { createHash } from "node:crypto";
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { siteBaseUrl } from "@/lib/server/site-url";
@@ -993,19 +994,21 @@ async function settleUnposted(
 }
 
 /**
- * Dernier texte publié de chaque soirée (texte et liens), par processus : une
- * mise à jour qui le rendrait à l'identique n'appelle pas le bot. Perdu au
- * redémarrage — la mise à jour suivante modifie alors une fois pour rien, sans
- * notifier.
+ * Empreinte du dernier texte publié de chaque soirée (texte et liens), par
+ * processus : une mise à jour qui le rendrait à l'identique n'appelle pas le
+ * bot. Une empreinte, jamais le texte : la mémoire du serveur ne garde aucun
+ * pseudo au-delà de la soirée (le site ne garde que l'identifiant du message).
+ * Perdu au redémarrage — la mise à jour suivante modifie alors une fois pour
+ * rien, sans notifier.
  */
 const lastEveningText = new Map<number, string>();
 
 /** Taille au-delà de laquelle les textes retenus sont oubliés (soirées finies). */
 const LAST_EVENING_TEXT_MAX = 50;
 
-/** Clé d'un texte de soirée : le texte et ses liens. */
-function eveningTextKey(message: string, urls: readonly string[]): string {
-  return `${message}\n${urls.join("\n")}`;
+/** Clé d'un texte de soirée : l'empreinte SHA-256 du texte et de ses liens. */
+export function eveningTextKey(message: string, urls: readonly string[]): string {
+  return createHash("sha256").update(`${message}\n${urls.join("\n")}`).digest("hex");
 }
 
 /** Retient le texte publié (ou modifié) d'une soirée. */
