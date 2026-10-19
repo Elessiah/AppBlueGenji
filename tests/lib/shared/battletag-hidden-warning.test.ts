@@ -70,6 +70,14 @@ describe("conditions d'utilisation — contacts de match (version 5)", () => {
     expect(text).toContain("celles du caster le sont aux deux équipes sur ce même temps du match");
   });
 
+  // La section renvoie là où la politique dit qui lit le BattleTag (tableau des données).
+  it("renvoie à la section « Données collectées » de la politique, ancre présente en FR et EN", () => {
+    expect(fr?.links?.[0]?.href).toBe("/rgpd#donnees-collectees");
+    expect(en?.links?.[0]?.href).toBe("/rgpd#donnees-collectees");
+    expect(readSource("app/rgpd/page.tsx")).toContain('<section id="donnees-collectees"');
+    expect(readSource("app/rgpd/RgpdEn.tsx")).toContain('<section id="donnees-collectees"');
+  });
+
   it("se traduit en anglais, à la même place", () => {
     expect(TERMS_SECTIONS_EN.map((s) => s.id)).toEqual(TERMS_SECTIONS.map((s) => s.id));
     const text = en?.paragraphs.join(" ") ?? "";

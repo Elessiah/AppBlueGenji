@@ -259,4 +259,25 @@ describe("fiches de contact — noms cliquables", () => {
     );
     expect(html).toContain('href="/joueurs/9"');
   });
+
+  // Avant le départ, le serveur tait les contacts du caster : une note, pas deux « — ».
+  it("caster avant le départ → une note au lieu de contacts vides", () => {
+    const caster = { userId: 9, pseudo: "Voix", discordTag: null, battletag: null, battletagVerified: false, ready: false };
+    const later = FR_LAUNCH_TEXT.t("contacts.casterLater");
+    const before = renderToStaticMarkup(
+      <CasterCard caster={caster} phase="TO_PLAN" onCopy={noop} contactsShown={false} contactsLaterText={later} />,
+    );
+    expect(before).toContain("Ses contacts s&#x27;afficheront au départ du match.");
+    expect(before).not.toContain("BattleTag");
+    const during = renderToStaticMarkup(
+      <CasterCard caster={caster} phase="LOBBY" onCopy={noop} contactsShown contactsLaterText={later} />,
+    );
+    expect(during).not.toContain("afficheront");
+  });
+
+  it("la modale « Contacts » ne montre les contacts du caster que le temps du match", () => {
+    const source = readFileSync(join(process.cwd(), "components/match-launch/MatchContactsDialog.tsx"), "utf8");
+    expect(source).toContain('contactsShown={launch.phase === "LOBBY" || launch.phase === "LAUNCHED"}');
+    expect(source).toContain('contactsLaterText={t("contacts.casterLater")}');
+  });
 });
