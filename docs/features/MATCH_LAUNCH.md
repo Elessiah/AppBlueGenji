@@ -130,9 +130,13 @@ sinon un refus à l'heure du départ. Ce refus est donc relu **une fois**
 (`contactsRetryDelay`, `CONTACTS_RETRY_MAX_WAIT_MS`), à l'heure du départ plus
 une seconde ; tout autre refus (match terminé, sans heure, tiers) part aussitôt.
 Fermer la modale coupe l'attente et la lecture (`AbortSignal`). Ouverte avant
-le départ, la modale relit **une** fois quand la carte passe au lancement ou au
-lancé (`rereadOnPhaseChange`, phase de la carte) : les contacts du caster
-remplacent alors sa note d'attente ; rien n'est relu à la fin du match. Un refus part en notification ; le corps
+le départ sur un match qui a un caster (`casterContactsPending`), la modale
+relit à l'heure de départ **du serveur** (en-tête `Date` de sa réponse, plus une
+seconde — `casterRereadDelay`), et quand la carte part par une écriture
+(lancement forcé, `rereadOnPhaseChange`) : les contacts du caster remplacent
+alors sa note d'attente. Sans caster, rien n'est relu ; une relecture qui échoue
+garde ce qui est affiché, sans notification. Si la carte revient avant son
+départ (match reprogrammé), les contacts du caster sont de nouveau masqués. Un refus part en notification ; le corps
 reste neutre (« Contacts non affichés », pas « aucun contact »). Chargée à la
 demande (`next/dynamic`) : ses textes FR + EN ne pèsent pas sur la page de
 tournoi. Dans l'ordre de l'action principale, « Contacts » vient **après** les
