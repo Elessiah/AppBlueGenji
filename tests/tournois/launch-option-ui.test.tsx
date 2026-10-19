@@ -74,6 +74,11 @@ describe("modale d'horaire — ce que la date produit", () => {
     }
   });
 
+  it("option éteinte : vider la date lance le match tout de suite — l'aide le dit (FR et EN)", () => {
+    expect(frDialogs.schedule.hintDirect).toMatch(/lancé tout de suite, sans retour possible/);
+    expect(enDialogs.schedule.hintDirect).toMatch(/launched right away, with no going back/);
+  });
+
   it("match déjà lancé : la date ne le fait pas attendre (FR et EN)", () => {
     expect(startAtHint(FR, false, true, false, false, true)).toBe(
       `${frDialogs.schedule.hintLaunched} ${frDialogs.schedule.notice}`,
