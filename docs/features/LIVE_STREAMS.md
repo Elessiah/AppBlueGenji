@@ -157,7 +157,8 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   d'œil. Un match fini depuis son annonce n'est plus listé. Les liens partent
   à part (`streamUrls`, dix au plus) et le texte les place par des jetons
   `{{lien:N}}` que le bot remplace après ses neutralisations ; un nom ne peut
-  pas forger de jeton.
+  pas forger de jeton (une espace de largeur nulle suit chaque accolade suivie
+  d'une autre : `{{{lien:1}}` n'en forge pas non plus).
 - **Modifier plutôt que reposter** : le bot rend l'identifiant du message
   (`messageId`), gardé dans `bg_live_evenings`. Le match suivant de la soirée
   envoie `editMessageId` : le bot **modifie** le message — aucune nouvelle
@@ -180,7 +181,12 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   annonce réservée depuis son ouverture (`evening_announced` : publication
   incertaine, bot trop ancien, identifiant non enregistré, refus abandonné) —
   le site envoie `notify: false` et le bot poste un nouveau message **sans
-  mention écrite ni notification**. Revers assumé : un premier envoi refusé
+  mention écrite ni notification**. Les réservations d'un passage, prises
+  avant l'ouverture de la soirée (parfois de plusieurs secondes, quand l'envoi
+  de l'autre public passe d'abord), sont datées dans la soirée
+  (`sent_at = GREATEST(sent_at, started_at)`) avant la lecture de ses matchs :
+  sinon le match sortirait du message à la modification suivante, et ce
+  garde-fou ne le verrait pas. Revers assumé : un premier envoi refusé
   (`rejected`, AutoMod) laisse la soirée sans notification.
 - **Longueur** : le texte, liens comptés en entier, tient dans
   `LIVE_ANNOUNCEMENT_MAX_LENGTH` (1 500) ; au-delà, la liste s'arrête **à la
@@ -302,7 +308,9 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   fantôme nommé par le staff) — seul un pseudo de compte part. Plusieurs affiches d'un tournoi individuel s'énumèrent comme
   celles d'équipes. Si aucune ne porte de nom publiable, le texte compte les
   matchs (« N matchs »). Une entrée individuelle dans le groupe fait lire le
-  tournoi comme individuel, même au type illisible. **Inscriptions d'avant** :
+  tournoi comme individuel, même au type illisible — dans l'annonce de soirée,
+  toute entrée individuelle d'un match lu du même tournoi : un match entre deux
+  invités y reste « un joueur contre un joueur ». **Inscriptions d'avant** :
   le pseudo n'est lu que pour une inscription (`bg_tournament_registrations.registered_at`)
   faite depuis la publication du changement de confidentialité qui l'annonce
   (`soloPseudoRegisteredSince`, `publishedAt` de `2026-10-pseudo-live-et-messages-de-match`) :
