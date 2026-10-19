@@ -135,7 +135,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Writing push notifications in the account's language: the language of the site page the last login started from (a login started elsewhere, or a login through the Google, Discord or Blizzard button from a browser that does not tell (too old, or one that strips this information), does not change it; French by default), or the one chosen in “My profile”",
     ],
     legalBasis:
-      "Performance of the service requested by the player (contract) for the account; consent for the optional data the player fills in and chooses to make visible; performance of the service (contract — terms of use, “Match contacts”) for the BattleTag being read, even when hidden, only in a match's “Contacts” window (record T04) — when hidden, it is readable nowhere else, referees and administrators included",
+      "Performance of the service requested by the player (contract) for the account; consent for the optional data the player fills in and chooses to make visible; performance of the service (contract — terms of use, “Match contacts”) for the BattleTag being read, even when hidden, only in a match's “Contacts” window and its launch window (record T04) — when hidden, it is readable nowhere else, referees and administrators included",
     dataSubjects: ["Players registered on the site"],
     dataCategories: [
       "Site username (since September 30, 2026, never taken from the name of the Google account: neutral username at creation; an earlier Google account may have received that name), avatar (copied to our servers; since the same date, hidden by default when it comes from the login provider)",
@@ -153,7 +153,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     ],
     recipients: [
       "The site's public (only the data the player makes visible)",
-      "Parties to the same match, only in its “Contacts” window (BattleTag even when hidden, to add each other in game; durations of record T04)",
+      "Parties to the same match, only in its “Contacts” window and its launch window (BattleTag even when hidden, to add each other in game; durations of record T04)",
       "Logged-in players of the site: certified Discord username, if the player makes it visible",
       "The association's staff according to their role (administration, refereeing)",
     ],
@@ -244,7 +244,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     purpose: "Allowing the organizers to reach a player taking part (rescheduling, settling a dispute, confirming a forfeit), and the parties to a match (members of both teams, signed-up caster) to reach each other to organise it",
     subPurposes: [
       "Exposing the certified Discord username to administrators, at any time, and to referees while the player is registered for a tournament that is not over (from the registration phase)",
-      "Presenting a player's hidden BattleTag to administrators and referees only in the “Contacts” window of a tournament match, over the same durations as for both its teams — never elsewhere",
+      "Presenting a player's hidden BattleTag to administrators and referees only in the “Contacts” window of a tournament match, over the same durations as for both its teams (the launch window, which repeats it at the start of the match, only opens for the teams and the caster) — never elsewhere",
       "When a match is launched — and as soon as both its opponents are known, through the “Contacts” button on its card —, presenting to the members of both teams (players, coaches, managers, owners) and to the referees the certified Discord username and the BattleTag (even when hidden) of one or two members per team, with their team role, until the end of the match; presenting the same contacts to the registered caster, and the caster's to both teams and the referees, only while the match is being played (from its start — launch window opened or match launched — to its end)",
       "Collecting the “Ready” of each party to a match (teams, caster) before it is launched, only in tournaments that have the launch phase (an option of each tournament, off by default)",
       "Sending by Discord direct message and by push the announcement of a match's time (set, changed or removed), the notice that a match leaves their schedule and match reminders 24 h and 10 h before kickoff (the latter — or the announcement of a match scheduled less than 10 h ahead — with the invite link to the check-in Discord server); direct messages only go to accounts with a certified Discord tag (an uncertified tag, even one linked by signing in with Discord, receives none, to avoid spam); the player can turn these direct messages off from “My profile” (notifications), their push notifications keeping their own settings",
@@ -252,7 +252,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Sending the referees, about 10 hours ahead, the schedule of upcoming matches (times, tournaments, team names; “a player” in a solo tournament) to the Discord log channel and by push",
     ],
     legalBasis:
-      "Consent for exposing the certified Discord username to the organizers (certification, a separate action taken by the player from their profile — never acquired by logging in alone — and withdrawable by removing their tag); performance of the service requested by the player (contract — terms of use) for presenting the contacts to the parties to a match in its “Contacts” window (to both its teams and the referees as soon as both its opponents are known, to and from its caster while the match is being played), hidden BattleTag included — referees and administrators have no other access to it, on the same basis —, and collecting the “Ready”; legitimate interest (smooth running of tournaments) for match time notices, the notice that a match leaves their schedule and match reminders sent to players, with a right to object (art. 21) honoured by a switch in “My profile” that turns off all their match direct messages; performance of the service (contract — terms of use, referees and administrators acting for the association) for referee alerts and the refereeing schedule sent to staff, legitimate interest (smooth running of tournaments) remaining the basis with regard to the players and teams they mention; legitimate interest, the player's own, for keeping their choice about match direct messages (keeping it is what allows their objection to be honoured)",
+      "Consent for exposing the certified Discord username to the organizers (certification, a separate action taken by the player from their profile — never acquired by logging in alone — and withdrawable by removing their tag); performance of the service requested by the player (contract — terms of use) for presenting the contacts to the parties to a match in its “Contacts” window and its launch window (to both its teams and the referees as soon as both its opponents are known, to and from its caster while the match is being played; the launch window, at the start of the match, only opens for both teams and the caster), hidden BattleTag included — referees and administrators have no other access to it, on the same basis —, and collecting the “Ready”; legitimate interest (smooth running of tournaments) for match time notices, the notice that a match leaves their schedule and match reminders sent to players, with a right to object (art. 21) honoured by a switch in “My profile” that turns off all their match direct messages; performance of the service (contract — terms of use, referees and administrators acting for the association) for referee alerts and the refereeing schedule sent to staff, legitimate interest (smooth running of tournaments) remaining the basis with regard to the players and teams they mention; legitimate interest, the player's own, for keeping their choice about match direct messages (keeping it is what allows their objection to be honoured)",
     dataSubjects: [
       "Players taking part in a tournament",
       "Other members of the teams taking part (coaches, managers, owners)",
@@ -591,12 +591,12 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     name: "Acceptance of the terms of use",
     purpose: "Keeping proof that the site's terms of use have been accepted, and which version of them",
     subPurposes: [
-      "Collecting acceptance when the account is created, when a team is created, when the management of a team is received and at a login started from the login page (click on Google, Discord or Blizzard, or submission of the code received on Discord) within ten minutes of accepting the terms there (an acceptance only kept by the browser is not carried over to an existing account)",
+      "Collecting acceptance when the account is created, when a team is created, when the management of a team is received, in the acceptance window shown to any logged-in account that has not accepted the version in force (since version 6) and at a login started from the login page (click on Google, Discord or Blizzard, or submission of the code received on Discord) within ten minutes of accepting the terms there (an acceptance only kept by the browser is not carried over to an existing account)",
       "Asking for acceptance again when the terms change version",
     ],
     legalBasis: "Performance of the service requested by the player (contract)",
     dataSubjects: ["Players registered on the site"],
-    dataCategories: ["Version accepted, context of the acceptance (account creation, login, team creation or management), date"],
+    dataCategories: ["Version accepted, context of the acceptance (account creation, login, team creation or management, acceptance window of a logged-in account), date"],
     sensitiveData: "None",
     retention: [
       "Lifetime of the account",

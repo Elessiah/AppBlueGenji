@@ -68,6 +68,7 @@ const NO_BACKDROP_DISMISS: Record<string, string> = {
   "components/match-launch/MatchLaunchCenter.tsx": "le lancement d'un match ne se ferme pas par inadvertance",
   "components/cyber/RgpdConsentModal.tsx": "un consentement se tranche par un bouton",
   "app/(secured)/profil/BattletagVisibilityNotice.tsx": "information à un seul bouton, qui doit être lue",
+  "components/legal/TermsAcceptanceModal.tsx": "bloquante depuis les conditions v6 : accepter ou se déconnecter",
 };
 
 describe("modales du site", () => {

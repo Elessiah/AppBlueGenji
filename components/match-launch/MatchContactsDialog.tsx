@@ -91,6 +91,17 @@ export const REREAD_RETRIES = 3;
 /** Attente entre deux de ces relectures. */
 export const REREAD_RETRY_MS = 10_000;
 
+/**
+ * Taire un échec de lecture ? Un refus définitif se dit toujours. Un échec
+ * passager se tait quand des contacts sont déjà affichés ; sans rien de lu, il
+ * se tait à la première lecture (la modale reste en chargement le temps d'une
+ * nouvelle tentative), se dit **une** fois à l'échec de cette tentative, puis
+ * se tait pour les suivantes. `failuresBefore` : échecs consécutifs avant celui-ci.
+ */
+export function failureIsSilent(transient: boolean, shown: boolean, failuresBefore: number): boolean {
+  return transient && (shown || failuresBefore !== 1);
+}
+
 /** Relancer une relecture après `failures` échecs consécutifs ? */
 export function shouldRetryReread(failures: number): boolean {
   return failures > 0 && failures <= REREAD_RETRIES;
@@ -322,9 +333,12 @@ export function MatchContactsDialog({
   useEffect(() => {
     let alive = true;
     const controller = new AbortController();
-    // Une relecture (départ, horaire changé) qui échoue passagèrement garde à
-    // l'écran ce qui est déjà lu : seuls les contacts du caster y manquaient.
-    const reread = readKey > 0;
+    // Un échec passager garde à l'écran ce qui est déjà lu (seuls les contacts
+    // du caster y manquaient) ; sans rien de lu, la modale reste en chargement
+    // le temps de la **première** nouvelle tentative (un raté isolé), puis
+    // notifie l'échec — les tentatives suivantes continuent sans bruit.
+    const shown = state.kind === "ready";
+    const keepWaiting = (transient: boolean) => failureIsSilent(transient, shown, rereadFailures);
     void (async () => {
       try {
         const read = await readMatchContacts(matchId, {
@@ -339,7 +353,7 @@ export function MatchContactsDialog({
             setRereadWait(read.retryAfterMs ?? 0);
             setRereadFailures((count) => count + 1);
           }
-          if (reread && transient) return;
+          if (keepWaiting(transient)) return;
           setState({ kind: "failed" });
           showError(contactsErrorText(text, read.error));
           return;
@@ -351,7 +365,7 @@ export function MatchContactsDialog({
         if (!alive) return;
         setRereadWait(0);
         setRereadFailures((count) => count + 1);
-        if (reread) return;
+        if (keepWaiting(true)) return;
         setState({ kind: "failed" });
         showError(contactsErrorText(text, null));
       }

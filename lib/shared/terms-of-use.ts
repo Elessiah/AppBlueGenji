@@ -17,7 +17,10 @@
  * - en **recevant la main sur une équipe** (propriété transférée, rôle de
  *   gérant, équipe fantôme confiée) : celui qui la reçoit n'a rien fait, il
  *   accepte donc au premier passage sur le site ensuite, et la gestion lui est
- *   refusée tant qu'il ne l'a pas fait.
+ *   refusée tant qu'il ne l'a pas fait ;
+ * - **connecté**, dans la fenêtre bloquante de la mise en page racine, pour
+ *   tout compte en retard d'une version (`SIGNED_IN`, depuis la version 6 ;
+ *   `TEAM_MANAGEMENT` si le compte gère une équipe).
  *
  * Module pur, importable partout.
  */
@@ -52,8 +55,16 @@ import { STREAM_NOTICE_LIVE, STREAM_NOTICE_OBJECTION, STREAM_NOTICE_PRIVACY_PATH
  * communiquées aux deux équipes d'un match et à son caster le temps du match,
  * au titre de l'organisation du tournoi (base « exécution du contrat » du
  * registre T04) ; en vigueur au 19 octobre 2026 (décision de l'utilisateur).
+ *
+ * Version 6 : section « Acceptation » — tout compte connecté en retard d'une
+ * version accepte les conditions dans une fenêtre bloquante pour continuer à
+ * utiliser le site (plus seulement les gérants d'équipe, plus de report) ;
+ * section « Contacts de match » — le BattleTag masqué se lit aussi dans la
+ * fenêtre de lancement du match. La version 5, déjà en ligne, ne se réécrit
+ * pas : d'où une nouvelle version, annoncée par sa propre entrée de
+ * `PRIVACY_CHANGES` ; en vigueur au 19 octobre 2026.
  */
-export const TERMS_VERSION = 5;
+export const TERMS_VERSION = 6;
 
 /** Âge minimum pour créer un compte (défini dans `lib/shared/legal-durations.ts`). */
 export { SITE_MINIMUM_AGE };
@@ -72,13 +83,14 @@ export const TERMS_UPDATED_AT = "2026-10-19";
 export const TERMS_PATH = "/conditions-utilisation";
 
 /** Où une acceptation a été donnée. */
-export type TermsAcceptanceContext = "SIGNUP" | "LOGIN" | "TEAM_CREATION" | "TEAM_MANAGEMENT";
+export type TermsAcceptanceContext = "SIGNUP" | "LOGIN" | "TEAM_CREATION" | "TEAM_MANAGEMENT" | "SIGNED_IN";
 
 export const TERMS_ACCEPTANCE_CONTEXTS: readonly TermsAcceptanceContext[] = [
   "SIGNUP",
   "LOGIN",
   "TEAM_CREATION",
   "TEAM_MANAGEMENT",
+  "SIGNED_IN",
 ];
 
 export function isTermsAcceptanceContext(value: unknown): value is TermsAcceptanceContext {
@@ -194,8 +206,8 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
     id: "acceptation",
     title: "Acceptation",
     paragraphs: [
-      "Les conditions s'acceptent en **créant un compte**, en **créant une équipe** et en **recevant la gestion d'une équipe** (propriété transférée ou rôle de gérant), ainsi qu'en les acceptant sur la **page de connexion**, qui les présente tant qu'elles n'ont pas été acceptées dans le navigateur. Sans cette acceptation, le compte ne peut pas être créé et l'équipe ne peut pas être gérée.",
-      "L'association peut modifier ces conditions. Une modification de fond donne lieu à une **nouvelle version**, présentée à l'acceptation des utilisateurs concernés avant qu'ils puissent continuer à gérer une équipe.",
+      "Les conditions s'acceptent en **créant un compte**, en **créant une équipe** et en **recevant la gestion d'une équipe** (propriété transférée ou rôle de gérant), ainsi qu'en les acceptant sur la **page de connexion**, qui les présente tant qu'elles n'ont pas été acceptées dans le navigateur, ou dans la **fenêtre d'acceptation** présentée à tout compte connecté qui n'a pas accepté la version en vigueur. Sans cette acceptation, le compte ne peut pas être créé, l'équipe ne peut pas être gérée, et un compte existant ne peut continuer à utiliser le site qu'après les avoir acceptées — il peut toujours se déconnecter, lire les pages légales du site et du bot (politique de confidentialité, mentions légales, déclaration d'accessibilité) et les règles des tournois, suivre ou contester ses signalements depuis leur page, signaler un contenu par le bouton « Signaler un problème » de ces pages, et ouvrir son profil, notamment pour exporter ses données ou supprimer son compte. Ne pas les accepter ne retire le compte ni de ses équipes ni de ses inscriptions : ses contacts restent communiqués aux parties de ses matchs et les messages de match continuent ; pour y mettre fin sans les accepter, il peut supprimer son compte depuis son profil.",
+      "L'association peut modifier ces conditions. Une modification de fond donne lieu à une **nouvelle version**, présentée à l'acceptation de chaque compte connecté avant qu'il puisse continuer à utiliser le site.",
     ],
   },
   {
@@ -242,7 +254,8 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
     ],
     links: [{ href: STREAM_NOTICE_PRIVACY_PATH, label: "Politique de confidentialité — retransmission des matchs" }],
   },
-  // Version 5 (2026-10-19) : la base « exécution du contrat » des contacts de
+  // Version 5 (2026-10-19, précisée en version 6 : fenêtre de lancement) : la
+  // base « exécution du contrat » des contacts de
   // match (registre T04, `/rgpd`) renvoie à cette section. Elle suit le code :
   // `match-launch-info.ts` (qui, quand) et `battletag-visibility.ts`.
   {
@@ -250,7 +263,7 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
     title: "Contacts de match",
     paragraphs: [
       "Pour qu'un match de tournoi se joue, ses parties doivent pouvoir se joindre et s'ajouter en jeu. Au titre de l'organisation du tournoi, les **coordonnées de contact** d'un ou deux membres de chaque équipe — **tag Discord** certifié, **BattleTag**, **même masqué**, et **rôle d'équipe** — sont communiquées aux **membres des deux équipes** du match et aux **arbitres** (administrateurs compris), dès que ses deux adversaires sont connus et jusqu'à sa fin, et à son **caster** inscrit **le temps du match** seulement, de son départ à sa fin ; celles du caster le sont aux deux équipes et aux arbitres sur ce même temps du match.",
-      "Ce partage passe par la seule fenêtre « Contacts » du match, que reprend sa fenêtre de lancement au départ du match : un BattleTag masqué n'est lisible nulle part ailleurs sur le site, pour personne — arbitres et administrateurs compris. Le jeu, lui, affiche les identifiants de jeu des joueurs : le code de replay d'une map, visible de tout utilisateur connecté sur la fiche du tournoi, permet de revoir la partie et de les y lire. Masquer son BattleTag ne le retire donc pas de cette fenêtre : pour ne pas le communiquer, il faut le retirer de son profil (un BattleTag reçu de Battle.net ne s'efface qu'une fois le compte Battle.net détaché, ce qui suppose un autre moyen de connexion). Un tag Discord non certifié n'est jamais communiqué.",
+      "Ce partage passe par la seule fenêtre « Contacts » du match et par sa fenêtre de lancement, qui la reprend au départ du match : un BattleTag masqué n'est lisible nulle part ailleurs sur le site, pour personne — arbitres et administrateurs compris. Le jeu, lui, affiche les identifiants de jeu des joueurs : le code de replay d'une map, visible de tout utilisateur connecté sur la fiche du tournoi, permet de revoir la partie et de les y lire. Masquer son BattleTag ne le retire donc pas de ces fenêtres : pour ne pas le communiquer, il faut le retirer de son profil (un BattleTag reçu de Battle.net ne s'efface qu'une fois le compte Battle.net détaché, ce qui suppose un autre moyen de connexion). Un tag Discord non certifié n'est jamais communiqué.",
     ],
     links: [{ href: "/rgpd#donnees-collectees", label: "Politique de confidentialité — données collectées" }],
   },

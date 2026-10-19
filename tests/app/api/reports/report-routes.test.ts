@@ -42,7 +42,7 @@ import {
   purgeQuarantinedLogo,
   restoreReportedImage,
 } from "@/lib/server/logo-quarantine";
-import { recordTermsAcceptance } from "@/lib/server/terms-acceptance";
+import { managesTeam, recordTermsAcceptance } from "@/lib/server/terms-acceptance";
 import { removeTeamLogoAsModerator } from "@/lib/server/teams/identity";
 import { removeUserAvatarAsModerator } from "@/lib/server/users/avatar";
 import { deleteStoredImage } from "@/lib/server/image-upload";
@@ -510,10 +510,21 @@ describe("POST /api/profile/terms", () => {
 
   it("enregistre l'acceptation d'un gérant d'équipe", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(member);
+    jest.mocked(managesTeam).mockResolvedValue(true);
     jest.mocked(recordTermsAcceptance).mockResolvedValue(true);
     const res = await acceptTerms(json("http://localhost", "POST", { version: TERMS_VERSION }));
     expect(res.status).toBe(200);
+    expect(managesTeam).toHaveBeenCalledWith(5);
     expect(recordTermsAcceptance).toHaveBeenCalledWith(5, "TEAM_MANAGEMENT");
+  });
+
+  it("conditions v6 : enregistre aussi l'acceptation d'un compte qui ne gère rien (SIGNED_IN)", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(member);
+    jest.mocked(managesTeam).mockResolvedValue(false);
+    jest.mocked(recordTermsAcceptance).mockResolvedValue(true);
+    const res = await acceptTerms(json("http://localhost", "POST", { version: TERMS_VERSION }));
+    expect(res.status).toBe(200);
+    expect(recordTermsAcceptance).toHaveBeenCalledWith(5, "SIGNED_IN");
   });
 
   it("répond 404 pour un compte disparu", async () => {

@@ -246,6 +246,10 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
        LEFT JOIN bg_match_reminders o ON o.match_id = r.match_id AND o.offset_key NOT IN ('SEEN', 'STAFF', 'REFS')
       WHERE r.offset_key = 'SEEN' AND o.id IS NULL
         AND r.sent_at < '2026-10-31' AND m.start_at > NOW()`,
+    // Conditions v6 — acceptation dans la fenêtre bloquante par un compte
+    // qui ne gère aucune équipe (`SIGNED_IN`).
+    `ALTER TABLE bg_terms_acceptances MODIFY COLUMN context
+       ENUM('SIGNUP', 'LOGIN', 'TEAM_CREATION', 'TEAM_MANAGEMENT', 'SIGNED_IN') NOT NULL`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

@@ -12,7 +12,7 @@ règle de fond = avancer `TERMS_VERSION`**, ce qui redemande l'acceptation.
 | Création du compte | case de la modale d'entrée de `/connexion` (avec le consentement RGPD) | `SIGNUP` |
 | Connexion suivante, modale acceptée **dans la page** | idem, si la version courante n'était pas encore acceptée — une acceptation seulement relue du navigateur (`bg_terms_consent`, peut-être celle d'une autre personne sur un ordinateur partagé) n'est pas attribuée à un compte existant | `LOGIN` |
 | Création d'une équipe | case du formulaire `/equipes/creer`, exigée par `POST /api/teams` | `TEAM_CREATION` |
-| Réception de la gestion d'une équipe | modale `TermsAcceptanceModal` (mise en page racine) | `TEAM_MANAGEMENT` |
+| Compte connecté en retard d'une version (depuis la v6 : **tout compte**) | fenêtre bloquante `TermsAcceptanceModal` (mise en page racine) | `TEAM_MANAGEMENT` s'il gère une équipe (`managesTeam`), `SIGNED_IN` sinon |
 
 Le site n'a pas de formulaire d'inscription : un compte naît à la première
 connexion. L'acceptation voyage donc avec la connexion — `terms=<version>` scellé dans le
@@ -41,25 +41,41 @@ acceptation que personne n'a donnée. **Un compte
 neuf sans acceptation est refusé** (`TERMS_REQUIRED`) ; un compte existant se
 connecte toujours.
 
-Recevoir la main sur une équipe (propriété transférée, rôle de gérant, fantôme
-confiée) ne passe par aucun geste de celui qui la reçoit. La mise en page racine
-pose donc la question à chaque chargement (`needsTermsForTeamManagement`) et
-présente les conditions. « Plus tard » ferme la fenêtre pour **douze heures au
-plus** ; les gestes de gestion restent refusés en **409
-`TERMS_ACCEPTANCE_REQUIRED`**, et ce refus rouvre la fenêtre
-(`TERMS_REQUIRED_EVENT`), report ou non.
+**Tout compte connecté** dont la version acceptée est antérieure à
+`TERMS_VERSION` (ou nulle) reçoit les conditions — décision de l'utilisateur du
+2026-10-19 pour la version 6 ; jusqu'à la version 5, seuls les gérants d'équipe
+étaient concernés. La mise en page racine pose la question à chaque chargement
+(`needsTermsAcceptance` : une requête sur `bg_users`, gardée 30 s par compte,
+vidée à l'acceptation) et présente une fenêtre **bloquante** : ni « Plus tard »,
+ni Échap, ni clic sur le voile (exception `NO_BACKDROP_DISMISS` de
+`modal-dialogs.test.ts`) — « J'accepte » ou « Me déconnecter » (`useLogout`).
+Une session de 30 jours ne repasse pas par `/connexion` : c'est donc cette
+fenêtre qui atteint chaque compte. Les gestes de gestion restent en outre
+refusés en **409 `TERMS_ACCEPTANCE_REQUIRED`** côté serveur, et ce refus la
+rouvre (`TERMS_REQUIRED_EVENT`). Limite : le blocage des autres gestes est
+celui de la fenêtre (côté client) ; seul le serveur des gestes de gestion
+refuse de lui-même.
 
-Le report vit dans un cookie `bg_terms_later` (valeur `1`), lu par la mise en
-page : gardé dans le seul état React, il tombait à chaque F5, nouvel onglet ou
-lien ouvert depuis Discord. Trois réglages le tiennent :
+Qui refuse doit pouvoir partir : la fenêtre laisse passer `/rgpd` (et
+`/rgpd/registre`), `/mentions-legales`, `/accessibilite`, les pages légales du
+bot (`/privacy-policy-bot`, `/terms-of-service-bot`), `/regles` (règles des
+tournois, que les conditions complètent), `/signalements` (suivre ou contester
+un signalement : recours interne) et `/profil` (export
+des données, suppression du compte — la page entière reste ouverte, ce que
+disent les conditions : « ouvrir son profil »). La fenêtre le dit elle-même (`shell.termsModal.exits`, FR et EN) et
+lie `/rgpd` et `/profil`, sans quoi seul qui connaît les adresses partirait. Les conditions et l'entrée v6 disent aussi que le bouton « Signaler un
+problème » reste utilisable depuis ces pages, et qu'un refus ne retire le
+compte ni de ses équipes ni de ses inscriptions (contacts de match et messages
+de match continuent, sauf suppression du compte) — `TERMS_FREE_PATHS` de
+`lib/shared/global-modals.ts`, en plus de `/conditions-utilisation` et
+`/connexion`. Les conditions (« Acceptation », FR et EN), l'entrée v6 de
+`PRIVACY_CHANGES`, `/rgpd` (FR et EN) et la fiche T13 du registre décrivent
+cette fenêtre et son contexte `SIGNED_IN`.
 
-- `max-age` **posé** (12 h) — un cookie sans durée revient au redémarrage du
-  navigateur quand la restauration de session est active ;
-- `SameSite=Lax` — un lien ouvert depuis Discord est une navigation venue d'un
-  autre site, qui n'emporte pas un cookie `Strict` ;
-- **effacé à chaque connexion et déconnexion** (`createSession` /
-  `clearSession`) — il n'est lié à aucun compte, et le report d'un joueur ne
-  doit pas valoir pour le suivant sur un ordinateur partagé.
+L'ancien report « Plus tard » (cookie `bg_terms_later`, 12 h) n'est plus posé
+ni lu ; connexion et déconnexion (`createSession` / `clearSession`) effacent
+encore un cookie resté d'avant (`TERMS_POSTPONED_COOKIE`), et `/rgpd` (FR et
+EN) le dit.
 
 La fenêtre se tait sur `/conditions-utilisation` et sur `/connexion`, et fait
 taire la modale d'arrivée du recrutement tant qu'elle s'ouvre d'elle-même :
@@ -79,13 +95,12 @@ Le contrôle est posé geste par geste (`assertTermsAccepted`), **après** celui
 rôle, et non dans `userCanManageTeam` : ce dernier sert aussi à la **lecture**
 (`canManage` de la fiche), qu'une case non cochée ne doit pas fermer.
 
-La question « ce compte doit-il accepter ? » que pose la mise en page racine
-tient en **une** requête (version acceptée et rôles, par jointure) et sa réponse
-est gardée 30 s par compte, vidée à l'acceptation. Elle rend **pourquoi** on
-demande (`termsRequestFor`, module pur) : `FIRST` à qui n'a jamais accepté,
-`UPDATED` à qui a accepté une version antérieure — la modale titre alors « Les
-conditions d'utilisation ont changé » et nomme la version et sa date, au lieu du
-« Tu gères désormais une équipe » qui serait faux pour un gérant de longue date.
+La question « ce compte doit-il accepter ? » rend **pourquoi** on demande
+(`termsRequestFor`, module pur) : `FIRST` à qui n'a jamais accepté (titre
+« Accepte les conditions d'utilisation »), `UPDATED` à qui a accepté une version
+antérieure — la modale titre alors « Les conditions d'utilisation ont changé »
+et nomme la version et sa date. Les textes valent pour tout compte, gérant ou
+non (`shell.termsModal`, FR et EN).
 Rouverte par un geste refusé (409 `TERMS_ACCEPTANCE_REQUIRED`) sans réponse de
 la mise en page, elle garde le texte d'une première acceptation.
 
@@ -97,19 +112,22 @@ la mise en page, elle garde le texte d'une première acceptation.
 | 2 | 1er octobre 2026 | Changements de fond : âge minimum, licence, responsabilité des gérants, juridiction. Tout compte qui avait accepté la version 1 la réaccepte — à la connexion par la case de `/connexion`, ou par la modale s'il gère une équipe ; ses gestes de gestion sont refusés en 409 d'ici là. |
 | 3 | 1er octobre 2026 | Suspension d'un compte, voies de recours, base légale de la modération, absence de médiateur. |
 | 4 | 14 octobre 2026 | Annonce #live d'un tournoi individuel : le pseudo public du joueur y figure au titre de l'exécution du service (pas de nom neutre ; ne pas y être nommé = ne pas s'inscrire). Date d'entrée en vigueur fixée par l'association (décision du 2026-10-14), non le lendemain de la mise en ligne. |
-| 5 | 19 octobre 2026 | Section « Contacts de match » : contacts (BattleTag même masqué compris) communiqués aux deux équipes et aux arbitres d'un match, et à son caster le temps du match, par la seule fenêtre « Contacts » (détail ci-dessous). |
+| 5 | 19 octobre 2026 | Section « Contacts de match » : contacts (BattleTag même masqué compris) communiqués aux deux équipes et aux arbitres d'un match, et à son caster le temps du match, par la fenêtre « Contacts » du match (détail ci-dessous). Redemandée comme la version 4 (connexion, gestion d'équipe). |
+| 6 | 19 octobre 2026 | « Acceptation » : **tout compte connecté** les accepte dans une fenêtre bloquante pour continuer à utiliser le site (plus de report « Plus tard ») ; « Contacts de match » : le BattleTag masqué se lit aussi dans la fenêtre de lancement. La version 5, déjà en ligne, n'est pas réécrite : nouvelle version et nouvelle entrée `PRIVACY_CHANGES` (`2026-10-conditions-v6-acceptation-pour-tous`). |
 
 **Redemander, et le dire** : à la connexion, la modale d'entrée de `/connexion`
 revient dès que la version gardée par le navigateur (`bg_terms_consent`) n'est
 plus la courante ; si c'était une version **antérieure**, elle l'annonce en tête
 (`login.consent.termsUpdated` : « Les conditions d'utilisation ont changé
-(version N, en vigueur depuis le …) », FR et EN). Le gérant d'une équipe voit en
-plus la modale `TermsAcceptanceModal` titrée « Les conditions d'utilisation ont
-changé » (`UPDATED`). Un compte qui ne gère rien n'est pas bloqué : ses gestes
-n'exigent pas les conditions.
+(version N, en vigueur depuis le …) », FR et EN). Depuis la version 6, **tout**
+compte connecté voit en plus la fenêtre bloquante `TermsAcceptanceModal` titrée
+« Les conditions d'utilisation ont changé » (`UPDATED`) ; jusqu'à la version 5,
+seul le gérant d'une équipe la voyait.
 
-**Prévenir tout le monde** (version 4, demande de l'association) : ni l'une ni
-l'autre modale n'atteint un compte connecté qui ne gère rien — sa session dure
+**Prévenir tout le monde** (version 4, demande de l'association) : jusqu'à la
+version 5, ni l'une ni l'autre modale n'atteignait un compte connecté qui ne
+gérait rien (depuis la version 6, la fenêtre bloquante l'atteint, mais n'explique
+pas ce qui change) — sa session dure
 30 jours sans repasser par `/connexion`. L'annonce passe donc par le registre
 `PRIVACY_CHANGES` (`PRIVACY_CHANGES_CONSENT.md`), le seul canal qui touche
 **chaque** compte une fois et le garde par compte : l'entrée
@@ -124,12 +142,36 @@ refaire à chaque version qui change une règle de fond pour tous les comptes.
 et rôle d'équipe communiqués aux deux équipes d'un match et à ses arbitres
 (permission `tournaments`, administrateurs compris) dès que ses adversaires
 sont connus, et à son caster le temps du match seulement (ceux du caster aux
-équipes sur ce même temps), par la seule fenêtre « Contacts » du match — un
+équipes sur ce même temps), par la fenêtre « Contacts » du match et par sa
+fenêtre de lancement, qui la reprend au départ du match (précision de la
+version 6) — un
 BattleTag masqué n'est lisible nulle part ailleurs, arbitres et administrateurs
 compris —, au titre de l'organisation du tournoi. C'est la clause que citent la base « exécution du
 contrat » du registre T01 / T04 et de `/rgpd` (`MATCH_CONTACTS_SCOPE`,
 `BATTLETAG_MATCH_SCOPE`). Annoncée une fois à tous par l'entrée
-`2026-10-contacts-de-match-caster-et-conditions-v5`, comme la version 4.
+`2026-10-contacts-de-match-caster-et-conditions-v5`, comme la version 4, qui dit
+comment la réaccepter (connexion, prochain geste de gestion). Cette entrée,
+déployée avec #451, est figée.
+
+**Version 6** (2026-10-19, CONTACTS-FOLLOWUP-2) : section « Acceptation » —
+**tout compte connecté** en retard d'une version accepte dans la fenêtre
+bloquante (contexte `SIGNED_IN` s'il ne gère aucune équipe), sans report ;
+section « Contacts de match » — la fenêtre de lancement est nommée à côté de
+la fenêtre « Contacts ». Annoncée par l'entrée
+`2026-10-conditions-v6-acceptation-pour-tous` (FR et EN), qui dit aussi la
+fin du cookie `bg_terms_later` et la phrase d'avertissement du BattleTag
+masqué. **Tout compte la réaccepte** dans la fenêtre bloquante (décision du
+2026-10-19).
+
+Tout texte qui dit où se lit un BattleTag masqué (avertissement, modale de
+masquage, fiche joueur, conditions v6, `/rgpd`, registre, `PRIVACY_CHANGES`)
+nomme **les deux** fenêtres : « Contacts » de la carte du match et fenêtre de
+lancement (équipes et caster ; les arbitres n'ont que la première). La phrase
+d'avertissement (profil, rattachement et connexion Battle.net, modale de
+masquage) suit la formulation de l'utilisateur : « il reste visible pour tes
+adversaires, les admins et les arbitres pendant un match de tournoi » / “it
+stays visible to your opponents, admins and referees during a tournament match”
+(`battletag-hidden-warning.test.ts`).
 
 `TERMS_UPDATED_AT` est daté du **lendemain** de la mise en ligne quand l'heure
 du déploiement n'est pas connue, comme `PRIVACY_CHANGES`.

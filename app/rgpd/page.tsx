@@ -579,11 +579,11 @@ function RgpdFr({
               votre visite.
             </li>
             <li>
-              <strong>bg_terms_later</strong> — déposé uniquement <strong>si vous reportez
-              l&apos;acceptation des conditions d&apos;utilisation</strong> (bouton « Plus tard »),
-              pour ne pas vous la redemander à chaque page. Il ne contient que la valeur « 1 »,
-              jamais d&apos;identifiant de personne, dure douze heures au plus, et disparaît plus
-              tôt à chaque connexion ou déconnexion, ou dès que vous acceptez.
+              <strong>bg_terms_later</strong> — <strong>n&apos;est plus déposé</strong> depuis la
+              version 6 des conditions d&apos;utilisation : leur acceptation ne se reporte
+              plus. Un cookie déposé auparavant (valeur « 1 », jamais d&apos;identifiant de
+              personne) expire au plus douze heures après son dépôt, et est effacé plus tôt à la
+              connexion ou à la déconnexion.
             </li>
             <li>
               <strong>bg_a11y</strong> — déposé uniquement <strong>si vous activez un réglage
@@ -635,8 +635,9 @@ function RgpdFr({
               d&apos;utilisation, pour ne pas vous les représenter. Elles ne contiennent qu&apos;un
               numéro de version : une nouvelle version vous les présente de nouveau.
               L&apos;acceptation des conditions est aussi conservée sur nos serveurs, avec son
-              numéro de version, quand vous les acceptez : à la création de votre compte ou d&apos;une
-              équipe, pour gérer une équipe, ou à une connexion lancée depuis la page de connexion
+              numéro de version, sa date et l&apos;endroit où vous l&apos;avez donnée, quand vous les acceptez : à la création de votre compte ou d&apos;une
+              équipe, pour gérer une équipe, dans la fenêtre d&apos;acceptation présentée à tout
+              compte connecté qui n&apos;a pas accepté la version en vigueur, ou à une connexion lancée depuis la page de connexion
               (clic sur Google, Discord ou Blizzard, ou envoi du code reçu sur Discord) dans les dix
               minutes où vous les y avez acceptées (une acceptation seulement gardée par le navigateur,
               peut-être celle d&apos;une autre personne, n&apos;est pas reportée sur un compte existant).

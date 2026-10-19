@@ -8,7 +8,10 @@ import { afterAll, beforeAll, describe, expect, it, jest } from "@jest/globals";
  */
 const flags = { runEffects: false };
 
-jest.mock("next/navigation", () => ({ usePathname: () => "/en/tournois" }));
+jest.mock("next/navigation", () => ({
+  usePathname: () => "/en/tournois",
+  useRouter: () => ({ push: () => undefined, refresh: () => undefined }),
+}));
 jest.mock("react-dom", () => {
   const actual = jest.requireActual<typeof import("react-dom")>("react-dom");
   return { ...actual, createPortal: (node: unknown) => node };
@@ -74,7 +77,7 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     expect(text).toContain("CONDITIONS D'UTILISATION");
     expect(text).toContain("Les conditions d'utilisation ont changé");
     expect(text).toContain(
-      `Tu es propriétaire ou gérant d'une équipe. Les conditions d'utilisation du site ont été mises à jour (version ${TERMS_VERSION}, en vigueur depuis le ${formatTermsDate()}) : accepte-les pour continuer à gérer ton équipe — logo, membres, invitations.`,
+      `Les conditions d'utilisation du site ont été mises à jour (version ${TERMS_VERSION}, en vigueur depuis le ${formatTermsDate()}) : accepte-les pour continuer à utiliser le site.`,
     );
     expect(text).toContain(`${TERMS_CHECKBOX_LABEL} (lire les conditions).`);
     expect(html).toContain('href="/conditions-utilisation"');
@@ -84,7 +87,7 @@ describe("TermsAcceptanceModal — langue de la page", () => {
 
   it("le français des messages est celui des constantes partagées", () => {
     expect(frShell.termsModal.checkbox.startsWith(`${TERMS_CHECKBOX_LABEL} (`)).toBe(true);
-    expect(frShell.termsModal.titleFirst).toBe("Tu gères désormais une équipe");
+    expect(frShell.termsModal.titleFirst).toBe("Accepte les conditions d'utilisation");
   });
 
   it("sous /en : anglais, conditions anglaises liées, note « French text prevails » vers la page française", () => {
@@ -106,9 +109,31 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     expect(readSource("app/layout.tsx")).toContain("translationNote={locale === DEFAULT_LOCALE ? null : TERMS_TRANSLATION_NOTE}");
   });
 
-  it("première acceptation : le titre de qui reçoit la main sur une équipe", () => {
-    expect(legalPageText(render("en"))).toContain("You now manage a team");
-    expect(legalPageText(render("fr"))).toContain("Tu gères désormais une équipe");
+  it("première acceptation : un titre valable pour tout compte, gérant d'équipe ou non", () => {
+    expect(legalPageText(render("en"))).toContain("Accept the terms of use");
+    expect(legalPageText(render("fr"))).toContain("Accepte les conditions d'utilisation");
+    expect(legalPageText(render("fr", "UPDATED"))).not.toContain("gérant");
+    expect(legalPageText(render("en", "UPDATED"))).not.toContain("manage a team");
+  });
+
+  it("bloquante : « Me déconnecter » à la place de « Plus tard » (FR et EN)", () => {
+    const fr = legalPageText(render("fr"));
+    expect(fr).toContain("Me déconnecter");
+    expect(fr).not.toContain("Plus tard");
+    const en = legalPageText(render("en"));
+    expect(en).toContain("Log me out");
+    expect(en).not.toContain("Later");
+  });
+
+  it("dit comment partir sans accepter et lie la politique de confidentialité et le profil, dans la langue de la page", () => {
+    const fr = render("fr");
+    expect(legalPageText(fr)).toContain("Tu ne veux pas les accepter ? Tu peux te déconnecter, lire la politique de confidentialité ou ouvrir ton profil pour exporter tes données ou supprimer ton compte.");
+    expect(fr).toContain('href="/rgpd"');
+    expect(fr).toContain('href="/profil"');
+    const en = render("en");
+    expect(legalPageText(en)).toContain("Don't want to accept them? You can log out, read the privacy policy or open your profile to export your data or delete your account.");
+    expect(en).toContain('href="/en/rgpd"');
+    expect(en).toContain('href="/en/profil"');
   });
 
   it("pendant l'enregistrement, les boutons gardent le focus : aria-disabled + aria-busy, jamais disabled natif", () => {
@@ -116,7 +141,10 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     // Aucun bouton nativement désactivé pendant l'envoi (la case, elle, peut l'être).
     expect(modal).not.toMatch(/<CyberButton[^>]*[^-]disabled=\{busy/);
     expect(modal).not.toContain("disabled={busy || !checked}");
-    expect(modal.match(/aria-disabled=\{busy \|\| undefined\}/g)).toHaveLength(2);
+    expect(modal).not.toMatch(/aria-disabled=\{busy \|\| undefined\}/);
+    // Les deux boutons : ni envoi pendant une déconnexion, ni l'inverse.
+    expect(modal.match(/aria-disabled=\{busy \|\| leaving \|\| undefined\}/g)).toHaveLength(2);
+    expect(modal).toContain("if (busy || leaving || !checked) return;");
     expect(modal).toContain("aria-busy={busy || undefined}");
     // La case (sans le focus, qui est sur « J'accepte ») est figée pendant l'envoi, avec l'aspect éteint
     // de `:disabled` : « J'accepte » ne peut pas devenir nativement désactivé sous le focus.

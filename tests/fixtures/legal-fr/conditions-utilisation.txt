@@ -1,7 +1,7 @@
 LÉGAL · CONDITIONS GÉNÉRALES
 Conditions d'utilisation
 Ce que chacun s'engage à respecter en utilisant le site, en y créant une équipe et en y publiant un logo ou un avatar. Le traitement des données personnelles est décrit dans la politique de confidentialité. Les règles des tournois, que ces conditions complètent, sont publiées sur la page Règles des tournois.
-VERSION 5EN VIGUEUR DEPUIS LE 19 OCTOBRE 2026
+VERSION 6EN VIGUEUR DEPUIS LE 19 OCTOBRE 2026
 SOMMAIRE
 1. Objet
 2. Acceptation
@@ -19,8 +19,8 @@ Les présentes conditions encadrent l'utilisation du site BlueGenji Esport, édi
 Elles complètent le règlement de chaque tournoi et la politique de confidentialité, qui décrit le traitement des données personnelles. En cas de contradiction sur le déroulement d'un tournoi, son règlement prévaut.
 ARTICLE 02
 Acceptation
-Les conditions s'acceptent en créant un compte, en créant une équipe et en recevant la gestion d'une équipe (propriété transférée ou rôle de gérant), ainsi qu'en les acceptant sur la page de connexion, qui les présente tant qu'elles n'ont pas été acceptées dans le navigateur. Sans cette acceptation, le compte ne peut pas être créé et l'équipe ne peut pas être gérée.
-L'association peut modifier ces conditions. Une modification de fond donne lieu à une nouvelle version, présentée à l'acceptation des utilisateurs concernés avant qu'ils puissent continuer à gérer une équipe.
+Les conditions s'acceptent en créant un compte, en créant une équipe et en recevant la gestion d'une équipe (propriété transférée ou rôle de gérant), ainsi qu'en les acceptant sur la page de connexion, qui les présente tant qu'elles n'ont pas été acceptées dans le navigateur, ou dans la fenêtre d'acceptation présentée à tout compte connecté qui n'a pas accepté la version en vigueur. Sans cette acceptation, le compte ne peut pas être créé, l'équipe ne peut pas être gérée, et un compte existant ne peut continuer à utiliser le site qu'après les avoir acceptées — il peut toujours se déconnecter, lire les pages légales du site et du bot (politique de confidentialité, mentions légales, déclaration d'accessibilité) et les règles des tournois, suivre ou contester ses signalements depuis leur page, signaler un contenu par le bouton « Signaler un problème » de ces pages, et ouvrir son profil, notamment pour exporter ses données ou supprimer son compte. Ne pas les accepter ne retire le compte ni de ses équipes ni de ses inscriptions : ses contacts restent communiqués aux parties de ses matchs et les messages de match continuent ; pour y mettre fin sans les accepter, il peut supprimer son compte depuis son profil.
+L'association peut modifier ces conditions. Une modification de fond donne lieu à une nouvelle version, présentée à l'acceptation de chaque compte connecté avant qu'il puisse continuer à utiliser le site.
 ARTICLE 03
 Compte
 Un compte se crée par une connexion Google, Discord ou Battle.net, ou par un code reçu en message privé Discord. Il est personnel : il ne se prête pas, ne se partage pas et ne se revend pas.
@@ -47,7 +47,7 @@ Politique de confidentialité — retransmission des matchs
 ARTICLE 07
 Contacts de match
 Pour qu'un match de tournoi se joue, ses parties doivent pouvoir se joindre et s'ajouter en jeu. Au titre de l'organisation du tournoi, les coordonnées de contact d'un ou deux membres de chaque équipe — tag Discord certifié, BattleTag, même masqué, et rôle d'équipe — sont communiquées aux membres des deux équipes du match et aux arbitres (administrateurs compris), dès que ses deux adversaires sont connus et jusqu'à sa fin, et à son caster inscrit le temps du match seulement, de son départ à sa fin ; celles du caster le sont aux deux équipes et aux arbitres sur ce même temps du match.
-Ce partage passe par la seule fenêtre « Contacts » du match, que reprend sa fenêtre de lancement au départ du match : un BattleTag masqué n'est lisible nulle part ailleurs sur le site, pour personne — arbitres et administrateurs compris. Le jeu, lui, affiche les identifiants de jeu des joueurs : le code de replay d'une map, visible de tout utilisateur connecté sur la fiche du tournoi, permet de revoir la partie et de les y lire. Masquer son BattleTag ne le retire donc pas de cette fenêtre : pour ne pas le communiquer, il faut le retirer de son profil (un BattleTag reçu de Battle.net ne s'efface qu'une fois le compte Battle.net détaché, ce qui suppose un autre moyen de connexion). Un tag Discord non certifié n'est jamais communiqué.
+Ce partage passe par la seule fenêtre « Contacts » du match et par sa fenêtre de lancement, qui la reprend au départ du match : un BattleTag masqué n'est lisible nulle part ailleurs sur le site, pour personne — arbitres et administrateurs compris. Le jeu, lui, affiche les identifiants de jeu des joueurs : le code de replay d'une map, visible de tout utilisateur connecté sur la fiche du tournoi, permet de revoir la partie et de les y lire. Masquer son BattleTag ne le retire donc pas de ces fenêtres : pour ne pas le communiquer, il faut le retirer de son profil (un BattleTag reçu de Battle.net ne s'efface qu'une fois le compte Battle.net détaché, ce qui suppose un autre moyen de connexion). Un tag Discord non certifié n'est jamais communiqué.
 Politique de confidentialité — données collectées
 ARTICLE 08
 Signalement et modération

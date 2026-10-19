@@ -39,9 +39,9 @@ const PROFIL_DUREE_EN: Record<string, string> = {
 /** French scope of an additional legal basis -> English. */
 const SCOPE_EN: Record<string, string> = {
   [MATCH_CONTACTS_SCOPE]:
-    "presentation, in the match's “Contacts” window, to the members of both its teams and to the referees as soon as both its opponents are known, and to its caster while the match is being played; the caster's contacts to both teams and to the referees while the match is being played (terms of use, “Match contacts”)",
+    "presentation, in the match's “Contacts” window and its launch window, to the members of both its teams and to the referees as soon as both its opponents are known, and to its caster while the match is being played (the launch window, at the start of the match, only opens for both teams and the caster); the caster's contacts to both teams and to the referees while the match is being played (terms of use, “Match contacts”)",
   [BATTLETAG_MATCH_SCOPE]:
-    "reading, even when hidden, only in the “Contacts” window of a match where you are presented as a contact: by both its teams and the referees as soon as both its opponents are known, by its caster while the match is being played — referees and administrators have no other access to it (terms of use, “Match contacts”)",
+    "reading, even when hidden, only in the “Contacts” window of a match where you are presented as a contact and in its launch window: by both its teams and the referees as soon as both its opponents are known, by its caster while the match is being played (the launch window, at the start of the match, only opens for both teams and the caster) — referees and administrators have no other access to it (terms of use, “Match contacts”)",
   [MATCH_TIME_DM_SCOPE]: "match time notices, reminders and match removal notices by direct message",
   [MODERATION_DM_SCOPE]: "suspension or moderation notices by direct message",
   [DATA_NOTICE_DM_SCOPE]: "information about your data by direct message",
@@ -58,7 +58,7 @@ const PROFIL_TEXT_EN: readonly (readonly [donnee: string, finalite: string])[] =
   ],
   [
     "Overwatch username",
-    "Putting players in touch (adding each other in game) — no statistics. Entered by you, or filled in by Blizzard at each login if you have linked your Battle.net account. When hidden, it is readable by no one — referees and administrators included — except in the “Contacts” window of a match where you are one of the contacts presented: by the members of both its teams and the referees from the moment both its opponents are known to its end, by its caster only while the match is being played (from its start to its end); if you cast a match, by both its teams and the referees while the match is being played; when presented as a match contact, it is shown with your team role and whether it comes from a linked Battle.net account",
+    "Putting players in touch (adding each other in game) — no statistics. Entered by you, or filled in by Blizzard at each login if you have linked your Battle.net account. When hidden, it is readable by no one — referees and administrators included — except in the “Contacts” window of a match where you are one of the contacts presented and in its launch window: by the members of both its teams and the referees from the moment both its opponents are known to its end, by its caster only while the match is being played (from its start to its end) (the launch window, at the start of the match, only opens for both teams and the caster); if you cast a match, by both its teams and the referees while the match is being played; when presented as a match contact, it is shown with your team role and whether it comes from a linked Battle.net account",
   ],
   [
     "Discord username",

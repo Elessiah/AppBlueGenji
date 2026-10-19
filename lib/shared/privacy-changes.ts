@@ -841,6 +841,28 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       { href: "/rgpd#donnees-collectees", label: "Lire la section « Données collectées »" },
     ],
   },
+  // CONTACTS-FOLLOWUP-2 (décision de l'utilisateur du 2026-10-19) : l'entrée
+  // précédente (conditions v5) est déjà en ligne et ne se réécrit pas. Celle-ci
+  // annonce la version 6 : acceptation demandée à tout compte connecté dans une
+  // fenêtre bloquante (contexte `SIGNED_IN`, plus de cookie `bg_terms_later`),
+  // et BattleTag masqué lisible aussi dans la fenêtre de lancement du match.
+  // Datée du jour de la fusion prévue.
+  {
+    id: "2026-10-conditions-v6-acceptation-pour-tous",
+    title: "Conditions d'utilisation : version 6, à accepter par chaque compte",
+    publishedAt: "2026-10-19",
+    summary:
+      "Les conditions d'utilisation passent en version 6 : chaque compte connecté doit désormais les accepter pour continuer à utiliser le site, plus seulement les gérants d'équipe. Elles précisent aussi que ton BattleTag masqué se lit dans la fenêtre « Contacts » d'un match et dans sa fenêtre de lancement.",
+    details: [
+      "Acceptation : tant que tu n'as pas accepté la version en vigueur, une fenêtre te les présente à chaque page, que tu gères une équipe ou non. Elle ne se reporte plus : le bouton « Plus tard » et son cookie bg_terms_later disparaissent. Sans accepter, tu peux te déconnecter, lire cette politique, les mentions légales, la déclaration d'accessibilité, les pages légales du bot et les règles des tournois, suivre ou contester tes signalements depuis leur page, signaler un contenu par le bouton « Signaler un problème » de ces pages, et ouvrir ton profil, notamment pour exporter tes données ou supprimer ton compte. Refuser ne te retire ni de tes équipes ni de tes inscriptions : tes contacts restent communiqués aux parties de tes matchs et les messages de match continuent, sauf si tu supprimes ton compte. Ton acceptation est enregistrée avec la version, la date et l'endroit où tu l'as donnée (cette fenêtre, si tu ne gères aucune équipe).",
+      "BattleTag masqué : il reste visible pour tes adversaires, les admins et les arbitres pendant un match de tournoi, ainsi que pour son caster, dans la fenêtre « Contacts » du match et dans sa fenêtre de lancement, si tu fais partie des contacts présentés. La fenêtre de lancement, qui reprend ces contacts au départ du match, ne s'ouvre qu'aux deux équipes et au caster. Mêmes données, mêmes durées, même base : l'exécution du service.",
+      "Conditions d'utilisation : la version 6, en vigueur depuis le 19 octobre 2026, le dit dans ses sections « Acceptation » et « Contacts de match ».",
+    ],
+    links: [
+      { href: "/conditions-utilisation#acceptation", label: "Lire la section « Acceptation »" },
+      { href: "/conditions-utilisation#contacts-de-match", label: "Lire la section « Contacts de match »" },
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

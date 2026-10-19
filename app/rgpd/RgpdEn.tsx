@@ -448,10 +448,10 @@ export function RgpdEn({
               first lasts seven days, the second the duration of your visit.
             </li>
             <li>
-              <strong>bg_terms_later</strong> — set only <strong>if you postpone accepting the terms of
-              use</strong> (“Later” button), so as not to ask you again on every page. It only contains the value
-              “1”, never a personal identifier, lasts twelve hours at most, and disappears earlier at each login or
-              logout, or as soon as you accept.
+              <strong>bg_terms_later</strong> — <strong>no longer set</strong> since version 6 of the terms of use: accepting
+              them can no longer be postponed. A cookie set earlier (value “1”, never a
+              personal identifier) expires twelve hours at most after it was set, and is cleared earlier at login or
+              logout.
             </li>
             <li>
               <strong>bg_a11y</strong> — set only <strong>if you turn on an accessibility setting</strong> (button
@@ -494,8 +494,9 @@ export function RgpdEn({
               set on the login page <strong>when you continue</strong> after reading the information about your
               data and accepting the terms of use, so as not to present them to you again. They only contain a
               version number: a new version presents them to you again. The acceptance of the terms is also kept
-              on our servers, with its version number, when you accept them: when your account or a team is created,
-              to manage a team, or at a login started from the login page (click on Google, Discord or Blizzard, or
+              on our servers, with its version number, its date and where you gave it, when you accept them: when your account or a team is created,
+              to manage a team, in the acceptance window shown to any logged-in account that has not accepted
+              the version in force, or at a login started from the login page (click on Google, Discord or Blizzard, or
               submission of the code received on Discord) within ten minutes of accepting them
               there (an acceptance only kept by the browser, possibly another person&apos;s, is not carried
               over to an existing account).
