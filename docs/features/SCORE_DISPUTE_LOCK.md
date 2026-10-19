@@ -38,7 +38,19 @@ secours, sans droit de lecteur à câbler. La carte dit « Score en litige ·
 saisie verrouillée, arbitrage attendu » ; son bouton devient « Voir le litige » ;
 la modale garde l'état du désaccord et le détail adverse, retire la saisie, le
 bouton d'envoi et le forfait, et dit qui peut trancher (arbitre ou
-administrateur du tournoi).
+administrateur — la permission de plateforme `tournaments`, pas l'organisateur).
+Le bouton dit « Voir le litige » même à qui ne peut que déclarer forfait
+(`playerScoreButtonKey` lit le litige d'abord) : la modale n'offre plus ce
+geste. Litige arrivé par le flux pendant une saisie : le focus, resté sur un
+champ qui disparaît, revient à la modale.
+
+**Avant l'envoi.** Une contre-proposition ne se corrige plus : face à la
+proposition adverse, toute saisie qui en diffère affiche, au-dessus des
+actions, « Ce score diffère de la proposition de … : l'envoyer ouvre un litige
+et verrouille la saisie des deux équipes jusqu'à l'arbitrage » (FR + EN,
+`score.player.counterWarning`), et la phrase d'état (`theirs.withMaps` /
+`withoutMaps`) le dit dès l'ouverture. Pendant un envoi, les boutons
+`aria-disabled` se grisent comme `:disabled` (`ScoreDialog.module.css`).
 
 ## 2. Validation d'office après 2 h de silence
 
