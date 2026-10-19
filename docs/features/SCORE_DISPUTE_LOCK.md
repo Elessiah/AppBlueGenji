@@ -42,8 +42,9 @@ administrateur — la permission de plateforme `tournaments`, pas l'organisateur
 Le bouton dit « Voir le litige » même à qui ne peut que déclarer forfait
 (`playerScoreButtonKey` lit le litige d'abord) : la modale n'offre plus ce
 geste. Litige arrivé par le flux pendant une saisie : le focus, resté sur un
-champ qui disparaît, revient à la modale, décrite alors par l'avis de verrou
-(`aria-describedby`). L'avis dit ce que l'arbitrage peut faire depuis la carte :
+champ qui disparaît, revient à la modale (l'avis s'annonce par sa région
+d'état, une seule fois). La modale en litige montre **les deux** propositions,
+codes de replay compris : la saisie retirée, c'est la seule trace des siens. L'avis dit ce que l'arbitrage peut faire depuis la carte :
 fixer le score final ou prononcer un forfait (aucune remise à zéro par match
 n'existe ; le retour en arrière du tournoi en est une, plus large).
 
@@ -106,10 +107,12 @@ d'office, exactement comme si l'autre l'avait confirmé.
   le même texte part aux deux camps — « personne ne l'a confirmé ni contesté
   dans les 2 h »). Rien sur Discord de
   plus que la ligne `match_finished` habituelle.
-- **Écran** : « validé automatiquement à HH:MM (heure de Paris) » / « confirmed
-  automatically at HH:MM (Paris time) » (`autoValidateTimeText`, mention du
-  fuseau dans les deux langues) sur la carte (lisible de tous) et dans la modale
-  des deux équipes.
+- **Écran** : sur la carte (lisible de tous), « validation automatique à HH:MM
+  (heure de Paris) sans réponse » / « automatic confirmation at HH:MM (Paris
+  time) without an answer » — un nom, pas un participe qui se lirait « déjà
+  validé » ; dans la modale des deux équipes, « sera validé automatiquement à
+  HH:MM (heure de Paris) » / « will be confirmed automatically at HH:MM (Paris
+  time) » (`autoValidateTimeText`, mention du fuseau dans les deux langues).
 - **Pendant un envoi** (score, forfait) : boutons `aria-disabled` + `aria-busy`,
   jamais `disabled` natif (le focus resterait sur un bouton éteint).
 
