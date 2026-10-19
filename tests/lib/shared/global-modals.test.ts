@@ -14,6 +14,15 @@ describe("termsModalSilencedOn", () => {
     expect(termsModalSilencedOn(LOGIN_PATH)).toBe(true);
   });
 
+  it("conditions v5 : laisse lire les pages légales, exporter ou supprimer son compte sans accepter", () => {
+    for (const path of ["/rgpd", "/rgpd/registre", "/mentions-legales", "/accessibilite", "/profil"]) {
+      expect(termsModalSilencedOn(path)).toBe(true);
+    }
+    // Préfixe exact : une autre page qui commencerait pareil reste bloquée.
+    expect(termsModalSilencedOn("/profilage")).toBe(false);
+    expect(termsModalSilencedOn("/rgpdx")).toBe(false);
+  });
+
   it("s'affiche ailleurs, chemin inconnu compris", () => {
     expect(termsModalSilencedOn("/")).toBe(false);
     expect(termsModalSilencedOn("/equipes/12")).toBe(false);

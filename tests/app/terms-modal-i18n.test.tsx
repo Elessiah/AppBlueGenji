@@ -130,8 +130,10 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     // Aucun bouton nativement désactivé pendant l'envoi (la case, elle, peut l'être).
     expect(modal).not.toMatch(/<CyberButton[^>]*[^-]disabled=\{busy/);
     expect(modal).not.toContain("disabled={busy || !checked}");
-    expect(modal.match(/aria-disabled=\{busy \|\| undefined\}/g)).toHaveLength(1);
-    expect(modal).toContain("aria-disabled={busy || leaving || undefined}");
+    expect(modal).not.toMatch(/aria-disabled=\{busy \|\| undefined\}/);
+    // Les deux boutons : ni envoi pendant une déconnexion, ni l'inverse.
+    expect(modal.match(/aria-disabled=\{busy \|\| leaving \|\| undefined\}/g)).toHaveLength(2);
+    expect(modal).toContain("if (busy || leaving || !checked) return;");
     expect(modal).toContain("aria-busy={busy || undefined}");
     // La case (sans le focus, qui est sur « J'accepte ») est figée pendant l'envoi, avec l'aspect éteint
     // de `:disabled` : « J'accepte » ne peut pas devenir nativement désactivé sous le focus.
