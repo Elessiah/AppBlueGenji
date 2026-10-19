@@ -21,31 +21,72 @@ export function contactsErrorText(text: LaunchText, code: string | null | undefi
 type LoadState = { kind: "loading" } | { kind: "ready"; launch: MatchLaunchInfo } | { kind: "failed" };
 
 /**
- * Délai avant l'unique relecture d'un refus `MATCH_CONTACTS_UNAVAILABLE`. La
- * carte décide du bouton à l'horloge du navigateur, le serveur à la sienne :
- * un caster dont l'horloge avance de quelques secondes voit « Contacts » à
- * l'heure du départ, avant que le serveur ne tienne le match pour parti.
+ * Attente la plus longue avant l'unique relecture d'un refus
+ * `MATCH_CONTACTS_UNAVAILABLE` : au-delà, l'écart d'horloge n'explique plus le
+ * refus.
  */
-export const CONTACTS_RETRY_DELAY_MS = 3_000;
+export const CONTACTS_RETRY_MAX_WAIT_MS = 30_000;
+
+/**
+ * Attente avant de relire un refus « indisponible », `null` sans relecture.
+ * La carte décide du bouton à l'horloge du navigateur, le serveur à la sienne :
+ * un caster dont l'horloge avance voit « Contacts » à l'heure du départ, avant
+ * que le serveur ne tienne le match pour parti. Relu seulement quand l'heure du
+ * serveur (en-tête `Date` du refus) précède le départ d'au plus
+ * `CONTACTS_RETRY_MAX_WAIT_MS` ; un match sans heure, déjà lancé (`startAt`
+ * `null`) ou dont le départ est passé au serveur garde son refus.
+ */
+export function contactsRetryDelay(startAt: string | null, serverDate: string | null): number | null {
+  if (startAt === null || serverDate === null) return null;
+  const start = Date.parse(startAt);
+  const server = Date.parse(serverDate);
+  if (!Number.isFinite(start) || !Number.isFinite(server) || start <= server) return null;
+  // L'en-tête est tronqué à la seconde : une seconde de marge.
+  const delay = start - server + 1_000;
+  return delay <= CONTACTS_RETRY_MAX_WAIT_MS ? delay : null;
+}
 
 type ContactsRead = { launch: MatchLaunchInfo } | { error: string | null };
 
+type ReadOptions = {
+  /** Heure de départ d'un match **pas encore lancé** ; `null` sinon. */
+  startAt: string | null;
+  signal?: AbortSignal;
+  wait?: (ms: number, signal?: AbortSignal) => Promise<void>;
+};
+
+function abortableWait(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        reject(signal.reason);
+      },
+      { once: true },
+    );
+  });
+}
+
 /**
- * Lit les contacts d'un match ; un refus « indisponible » est relu **une**
- * fois après `CONTACTS_RETRY_DELAY_MS` (écart d'horloge à la frontière du
- * départ), tout autre échec est rendu tel quel.
+ * Lit les contacts d'un match ; un refus « indisponible » à la frontière du
+ * départ (`contactsRetryDelay`) est relu **une** fois, tout autre échec est
+ * rendu tel quel. `signal` coupe l'attente et la lecture à la fermeture.
  */
-export async function readMatchContacts(
-  matchId: number,
-  wait: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-): Promise<ContactsRead> {
+export async function readMatchContacts(matchId: number, options: ReadOptions): Promise<ContactsRead> {
+  const { startAt, signal, wait = abortableWait } = options;
   for (let attempt = 0; ; attempt += 1) {
-    const response = await fetch(`/api/matches/${matchId}/contacts`, { cache: "no-store" });
+    const response = await fetch(`/api/matches/${matchId}/contacts`, { cache: "no-store", signal });
     const payload = (await response.json().catch(() => ({}))) as { launch?: MatchLaunchInfo; error?: string };
     if (response.ok && payload.launch) return { launch: payload.launch };
     const error = payload.error ?? null;
-    if (attempt > 0 || error !== "MATCH_CONTACTS_UNAVAILABLE") return { error };
-    await wait(CONTACTS_RETRY_DELAY_MS);
+    const delay =
+      attempt === 0 && error === "MATCH_CONTACTS_UNAVAILABLE"
+        ? contactsRetryDelay(startAt, response.headers.get("date"))
+        : null;
+    if (delay === null) return { error };
+    await wait(delay, signal);
   }
 }
 
@@ -64,7 +105,16 @@ export function MatchContactsDialog({
   matchId,
   matchLabel,
   onClose,
-}: Readonly<{ matchId: number; matchLabel: string; onClose: () => void }>) {
+  startAt = null,
+  launchedAt = null,
+}: Readonly<{
+  matchId: number;
+  matchLabel: string;
+  onClose: () => void;
+  /** Heure de départ du match : un match pas encore lancé est relu à la frontière. */
+  startAt?: string | null;
+  launchedAt?: string | null;
+}>) {
   const text = useLaunchText();
   const { t } = text;
   const { showError, showSuccess } = useToast();
@@ -83,9 +133,13 @@ export function MatchContactsDialog({
 
   useEffect(() => {
     let alive = true;
+    const controller = new AbortController();
     void (async () => {
       try {
-        const read = await readMatchContacts(matchId);
+        const read = await readMatchContacts(matchId, {
+          startAt: launchedAt === null ? startAt : null,
+          signal: controller.signal,
+        });
         if (!alive) return;
         if ("error" in read) {
           setState({ kind: "failed" });
@@ -101,6 +155,7 @@ export function MatchContactsDialog({
     })();
     return () => {
       alive = false;
+      controller.abort();
     };
     // Une lecture par ouverture : la langue ou la notification ne relancent rien.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -167,7 +222,11 @@ export function MatchContactsDialog({
                   caster={launch.caster}
                   phase={launch.phase}
                   onCopy={copy}
-                  contactsShown
+                  // Les contacts du caster ne sortent que le temps du match
+                  // (`exposesCaster`) : avant, une note plutôt que deux « — »
+                  // qui laisseraient croire qu'il n'en a pas.
+                  contactsShown={launch.phase === "LOBBY" || launch.phase === "LAUNCHED"}
+                  contactsLaterText={t("contacts.casterLater")}
                   noCasterText={t("contacts.noCaster")}
                   linkNames
                 />

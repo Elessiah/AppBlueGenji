@@ -506,7 +506,13 @@ export function MatchCardActions({
         </ConfirmActionDialog>
       )}
       {contactsOpen && (
-        <MatchContactsDialog matchId={match.id} matchLabel={matchLabel} onClose={() => setContactsOpen(false)} />
+        <MatchContactsDialog
+          matchId={match.id}
+          matchLabel={matchLabel}
+          startAt={match.startAt}
+          launchedAt={match.launchedAt}
+          onClose={() => setContactsOpen(false)}
+        />
       )}
     </div>
   );
