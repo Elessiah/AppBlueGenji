@@ -113,3 +113,32 @@ describe("registre et avis — tout ce que montre une fiche de contact", () => {
     expect(PRIVACY_CHANGES_EN[ENTRY_ID]?.details.join("\n")).toMatch(/Our texts said “the players”/);
   });
 });
+
+describe("caster et équipes entre eux, fiches de contact", () => {
+  it("T01 compte le caster et les équipes du match casté, une seule fois chaque catégorie de T04 (FR et EN)", () => {
+    const t01 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T01");
+    const t01En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T01");
+    expect(t01?.recipients.join("\n")).toMatch(/Caster inscrit d'un match et membres des deux équipes de ce match, entre eux/);
+    expect(t01En?.recipients.join("\n")).toMatch(/Signed-up caster of a match and members of both teams of that match, between them/);
+    for (const list of [T04?.dataCategories ?? [], T04_EN?.dataCategories ?? []]) {
+      expect(new Set(list).size).toBe(list.length);
+    }
+  });
+
+  it("les publics du tag Discord comptent les équipes d'un match casté (FR et EN)", () => {
+    expect(readSource("lib/shared/identity-sharing.ts")).toContain("jusqu'à sa fin (et, si tu castes un match, ses deux équipes) ;");
+    for (const file of ["messages/fr/profile.json", "messages/fr/login.json"]) {
+      expect(readSource(file)).toContain("(et, si tu castes un match, ses deux équipes) ;");
+    }
+    for (const file of ["messages/en/profile.json", "messages/en/login.json"]) {
+      expect(readSource(file)).toContain("(and, if you cast a match, both its teams);");
+    }
+  });
+
+  it("/rgpd et l'avis disent le rôle d'équipe et l'origine Battle.net montrés sur une fiche (FR et EN)", () => {
+    expect(readSource("lib/shared/rgpd-policy.ts")).toContain("il est montré avec ton rôle d'équipe et l'indication qu'il vient ou non d'un compte Battle.net rattaché");
+    expect(readSource("lib/shared/rgpd-policy-en.ts")).toContain("it is shown with your team role and whether it comes from a linked Battle.net account");
+    expect(PRIVACY_CHANGES.find((c) => c.id === ENTRY_ID)?.details.join("\n")).toContain("avec le rôle d'équipe et l'indication d'un BattleTag tiré d'un compte Battle.net rattaché");
+    expect(PRIVACY_CHANGES_EN[ENTRY_ID]?.details.join("\n")).toContain("with the team role and whether the BattleTag comes from a linked Battle.net account");
+  });
+});
