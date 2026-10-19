@@ -878,7 +878,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Les noms ne changent pas : le nom des équipes, ou, en tournoi individuel, ton pseudo public BlueGenji. Ce qui change, c'est le moment : un match diffusé programmé dans la soirée figure dans le message avant même de commencer, avec son heure.",
       "Le message de la soirée est modifié quand un autre match commence ou se termine, et reprend alors le pseudo public du moment : un pseudo changé avant cette modification y apparaît à la place de l'ancien. Ces modifications se poursuivent jusqu'à quatre heures après la fin de la soirée ; quand le message ne peut plus être modifié, un nouveau message sans mention prend le relais, et l'ancien reste dans le salon.",
       "Seule une diffusion sur la chaîne officielle BlueGenji notifie tout le serveur (@everyone) ; une autre chaîne ne notifie que les membres qui ont le rôle StreamViewer. Le message reste lisible par tous les membres du salon, comme avant.",
-      "Le site garde l'identifiant du message de la soirée (aucune donnée te concernant), effacé un jour après la fin de la soirée.",
+      "Le site garde l'identifiant du message de la soirée (aucune donnée te concernant), effacé un jour après la fin de la soirée. Sur la trace de l'annonce d'un match, il note en plus si elle n'a pas été publiée (refus du bot ou d'AutoMod, ou soirée close après suppression de son message) : cette trace est gardée, sans nouvel essai, jusqu'à l'effacement du match, et figure dans l'export de tes données.",
     ],
   },
 ];

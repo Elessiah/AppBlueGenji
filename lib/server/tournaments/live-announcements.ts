@@ -843,12 +843,15 @@ function eveningEntrant(
 
 /**
  * Soirée close (message supprimé de #live) : rien n'est publié, réservations
- * gardées — le match n'est pas réessayé —, et pm2 le dit, une fois par heure.
+ * gardées — le match n'est pas réessayé — et marquées refusées comme celles
+ * du groupe qui a fermé la soirée (non publiées, ce que dit l'export RGPD), et
+ * pm2 le dit, une fois par heure.
  */
-function skipClosedEvening(
+async function skipClosedEvening(
   group: AnnouncementGroup,
   evening: LiveEvening,
-): { posted: number; postponed: PostponedOutcome | null } {
+): Promise<{ posted: number; postponed: PostponedOutcome | null }> {
+  await forgetEveningSend(evening, group.rows, false);
   const { label, context } = describeGroup(group, Number(evening.id));
   warnOnce(
     `closed ${context}`,
