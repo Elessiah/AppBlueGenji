@@ -17,7 +17,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `MATCH_DRAWS.md` — Matchs nuls et plafond de maps : `isMatchPlayed`, `isMatchDrawn`, `matchWinnerSide`.
 - `REGISTRATION_FILTERS.md` — Conditions d'inscription : effectif minimal, Discord certifié, compte Blizzard.
 - `UNDERFILLED_TOURNAMENTS.md` — Tournoi sans adversaires : 0 ou 1 engagée au coup d'envoi → clos.
-- `MATCH_LAUNCH.md` — Lancement d'un match : lobby, trois « Prêt », contacts, inscription du caster.
+- `MATCH_LAUNCH.md` — Lancement d'un match : lobby, trois « Prêt », contacts, inscription du caster ; option du tournoi (éteinte par défaut) et bouton « Contacts » de la carte.
 - `MATCH_PLANNING.md` — Planification des matchs par l'arbitrage (`TO_PLAN`).
 - `SCORE_EDIT_LOCK.md` — Verrouillage d'un score dès que la manche suivante porte une saisie, **y compris pour un admin**.
 - `DOUBLE_FORFEIT.md` — Double forfait et ses cascades dans un arbre.

@@ -19,6 +19,65 @@ Tant qu'il n'est pas lancé, les engagés ne peuvent pas y reporter de score
 (`MATCH_NOT_LAUNCHED` → 409). L'arbitrage garde la main (forfait d'une partie
 absente, correction) : son chemin n'est pas concerné.
 
+## Option du tournoi — éteinte par défaut
+
+Décision de l'utilisateur (2026-10-13) : la phase de lancement est une **option
+du tournoi**, `bg_tournaments.match_launch_phase` (`TINYINT(1)`, défaut `0`).
+Le défaut **est** la migration : tout tournoi existant passe sans lancement.
+
+- **Éteinte** : un match jouable dont l'heure est atteinte (ou sans heure, hors
+  planification par l'arbitrage) est **lancé** d'emblée. La règle pure le dit
+  (`matchLaunchPhase` rend `LAUNCHED` là où elle rendait `LOBBY`, champ
+  `launchPhase` de `MatchLaunchInput`), et l'entretien l'écrit :
+  `maintainMatchLaunches` juge la phase « comme si l'option était allumée » et,
+  sur un tournoi qui l'a éteinte, pose `launched_at` (et `lobby_opened_at`) à la
+  première passe, comme un lancement d'office sans délai. Rien d'autre ne
+  change : diffusions `AUTO`, annonces `#live`, notifications de départ
+  (`player-pushes`, phase `LAUNCHED`), rappels et flux SSE lisent `launched_at`
+  comme avant ; le balayage passif (`DUE_LAUNCH_SQL`) et le réveil de la salle à
+  l'heure de départ rattrapent le match sans lecteur. Pas de modale (la lecture
+  `GET /api/me/match-launches` ne présente que les tournois à `1`), pas de
+  pastille ni de section « Lancement », pas de « Prêt » (`MATCH_ALREADY_LAUNCHED`),
+  pas d'« Infos du match » (`showOpen`). Le report d'un score s'ouvre dès
+  l'heure.
+- **Allumée** : exactement le comportement décrit ci-dessous.
+- **Absente** d'un appel (`launchPhase` non passé) : allumée — la règle
+  d'origine ; au pire un instant de « Lancement » affiché, que l'entretien
+  referme en posant `launched_at`.
+
+Réglée dans le formulaire de création et d'édition (case « Phase de lancement
+des matchs », FR + EN), montrée dans les réglages du tournoi (« Oui » / « Non »).
+**Modifiable jusqu'au départ, figée ensuite** : un champ de `RESTRICTED_FIELDS`,
+refusé dans la fenêtre `LOCKED` (tournoi en cours ou terminé). La basculer en
+plein tournoi ferait rentrer en lancement des matchs que la règle tenait déjà
+pour lancés (score ouvert, puis refermé), ou l'inverse ; avant le départ, aucun
+match n'existe, rien n'est à défaire. Refus d'une valeur non booléenne :
+`INVALID_LAUNCH_PHASE`, rattaché à la case.
+
+## Bouton « Contacts » de la carte de match
+
+Action **« Contacts »** (FR et EN) du pied de carte (`MatchCardActions`),
+offerte aux **parties du match** — joueurs des deux engagées, caster inscrit —
+quand il est **programmé** (`SCHEDULED`), en lancement ou lancé
+(`launchStripControls().showContacts`), que l'option soit allumée ou non. Action
+principale d'un joueur qui n'a ni score à saisir ni lancement à suivre.
+
+Elle ouvre `MatchContactsDialog` (portail `document.body`,
+`useDialogBehavior`, `useBackdropDismiss`, `ScrollArea`, focus sur « Fermer »),
+qui lit `GET /api/matches/[id]/contacts` et rend les mêmes fiches que la modale
+de lancement (`LaunchContactCards` : équipes, hôte, contacts, caster). La
+lecture est **celle de la modale** (`loadViewerMatchContacts` →
+`readViewerLaunches` de `match-launch-info.ts`) restreinte à un match : mêmes
+destinataires (`viewerRole`, éligibilité du caster rejouée), mêmes contacts
+(`pickLaunchContacts`, `canViewDiscordTag` / `canViewBattletag`), sans la
+fenêtre d'une heure ni le filtre de l'option. Une différence, voulue : les
+contacts y sortent **dès que le match est programmé**, et plus seulement au
+lancement — les parties s'organisent avant l'heure, surtout sans phase de
+lancement. Qui n'est pas partie du match, ou un match sans contacts (à
+planifier, terminé), reçoit `MATCH_CONTACTS_UNAVAILABLE` (404), un seul code :
+la réponse ne dit pas qui joue quoi. Déclaré : `PRIVACY_CHANGES`
+`2026-10-contacts-de-match-avant-le-depart`, `/rgpd` et le registre (T04).
+
 ## L'état n'est pas un statut
 
 `bg_matches.status` garde ses quatre valeurs (`PENDING → READY →
@@ -158,12 +217,15 @@ l'effacement complet la retire par la clé étrangère (`SET NULL`).
    avec son BattleTag marqué « non vérifié ». Un tag Discord **non certifié**
    n'est jamais montré (`canViewDiscordTag`).
 
-Une fantôme n'a pas de contact. Un match `SCHEDULED` n'expose encore rien.
+Une fantôme n'a pas de contact. Dans la modale de lancement, un match
+`SCHEDULED` n'expose encore rien ; le bouton « Contacts » de la carte, lui,
+les expose dès cette phase (voir plus haut).
 
 ## Exposition
 
-Les contacts ne sortent que par `GET /api/me/match-launches`, pour les seules
-parties du match, et seulement **en lancement ou lancé** : c'est la clause
+Les contacts ne sortent que par `GET /api/me/match-launches` et
+`GET /api/matches/[id]/contacts`, pour les seules parties du match, et
+seulement **en lancement ou lancé** — programmé aussi, pour la seconde : c'est la clause
 `sharesMatchLobby` de `canViewDiscordTag` (ajoutée pour l'occasion, après
 « non certifié → personne ») et `sharesLiveMatch` de `canViewBattletag`, que
 seul ce module établit. Rien n'entre dans `TournamentSnapshot`, diffusé à tous
@@ -216,7 +278,8 @@ Changement déclaré dans `PRIVACY_CHANGES` (`2026-09-lancement-des-matchs`),
 
 | Route | Qui | Effet |
 |---|---|---|
-| `GET /api/me/match-launches` | connecté | matchs du lecteur à présenter (voir coût ci-dessous) |
+| `GET /api/me/match-launches` | connecté | matchs du lecteur à présenter (voir coût ci-dessous) — tournois à phase de lancement seulement |
+| `GET /api/matches/[id]/contacts` | partie du match | fiches et contacts d'un match programmé, en lancement ou lancé |
 | `POST /api/matches/[id]/ready` | partie du match | `{ ready }` |
 | `POST /api/matches/[id]/caster` | `live` + identité vérifiée | s'inscrire |
 | `DELETE /api/matches/[id]/caster` | le caster, ou `tournaments` | se retirer / retirer |
