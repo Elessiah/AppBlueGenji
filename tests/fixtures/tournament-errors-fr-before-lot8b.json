@@ -1,5 +1,5 @@
 {
-  "count": 166,
+  "count": 168,
   "unknown": "L'action n'a pas abouti pour une raison inattendue. Si le problème persiste, préviens le staff.",
   "errors": {
     "MATCH_NOT_FOUND": "Match introuvable.",
@@ -7,6 +7,7 @@
     "MATCH_NOT_LAUNCHABLE": "Ce match ne peut pas être lancé : ses deux engagées ne sont pas connues ou il est terminé.",
     "MATCH_ALREADY_LAUNCHED": "Ce match est déjà lancé.",
     "MATCH_NOT_LAUNCHED": "Le match n'est pas encore lancé : toutes les parties doivent se déclarer prêtes.",
+    "MATCH_NOT_STARTED": "Le match n'a pas encore commencé : le score s'ouvre à son heure de départ.",
     "MATCH_NOT_IN_LAUNCH": "Le score ne se saisit qu'à partir du lancement du match : planifie-le ou attends son heure de début. Un forfait reste possible.",
     "NOT_MATCH_PARTY": "Tu ne joues ni ne castes ce match.",
     "NOT_TEAM_READY_ROLE": "Seul le capitaine, un manager ou le propriétaire peut déclarer l'équipe prête.",
@@ -97,6 +98,7 @@
     "INVALID_SURVIVAL_FIRST_CUT": "Première coupe de survie invalide : 1 à 50 manches avant elle.",
     "INVALID_ENDURANCE_SETTINGS": "Réglages d'endurance invalides : capital de 1 à 99, gain et perte de 1 à 20, play-offs de 2 à 32 équipes, plafond de 1 à 50 manches.",
     "INVALID_ENDURANCE_EARLY_EXIT": "Valeur invalide pour la sortie anticipée « hors course » : cochez ou décochez la case.",
+    "INVALID_LAUNCH_PHASE": "Valeur invalide pour la phase de lancement des matchs : cochez ou décochez la case.",
     "MISSING_PHASES": "Un tournoi multi-phases doit décrire ses phases.",
     "INVALID_PHASE_COUNT": "Nombre de phases invalide : 2 à 8 phases attendues.",
     "INVALID_PHASE_POSITIONS": "Positions des phases invalides.",

@@ -22,14 +22,16 @@ import {
   nextLaunchMatchId,
   MATCH_LAUNCH_REFRESH_EVENT,
   readyCount,
-  type LaunchCaster,
-  type LaunchContact,
-  type LaunchSide,
   type MatchLaunchInfo,
 } from "@/lib/shared/match-launch";
 import { PRIVACY_CHANGES_ANSWERED_EVENT } from "@/lib/shared/privacy-changes";
-import type { TeamRole } from "@/lib/shared/types";
 import styles from "./MatchLaunchCenter.module.css";
+
+/** Une modale (`aria-modal`) est déjà ouverte : l'ouverture d'office attend. */
+export function anotherModalOpen(root: ParentNode = document): boolean {
+  return root.querySelector('[aria-modal="true"]') !== null;
+}
+import { CasterCard, SideCard } from "./LaunchContactCards";
 
 /** Cadences d'interrogation : serrée pendant un lancement, lâche sinon. */
 const POLL_LOBBY_MS = 8_000;
@@ -41,12 +43,11 @@ const POLL_IDLE_MS = 60_000;
  * qu'une rafale d'instantanés ne vaille qu'une lecture.
  */
 const REFRESH_EVENT_COALESCE_MS = 300;
+/** Cadence du guet d'une autre modale qui retient l'ouverture d'office. */
+const MODAL_RECHECK_MS = 1_000;
 /** Un match lancé depuis moins longtemps que cela est annoncé d'office. */
 const LAUNCH_ANNOUNCE_WINDOW_MS = 10 * 60_000;
 const DISMISSED_STORAGE_KEY = "bg_match_launch_dismissed";
-
-/** Rôles affichés sur un contact, dans l'ordre de la priorité de choix (`roles.*`). */
-const CONTACT_ROLES = ["CAPITAINE", "MANAGER", "OWNER"] as const satisfies readonly TeamRole[];
 
 function readDismissed(): Set<string> {
   try {
@@ -166,6 +167,8 @@ export function MatchLaunchCenter({
   const readyRef = useRef<HTMLButtonElement>(null);
   const [busy, setBusy] = useState(false);
   const dismissedRef = useRef<Set<string> | null>(null);
+  // Relance de l'ouverture d'office, retenue par une autre modale ouverte.
+  const [modalRecheck, setModalRecheck] = useState(0);
 
   // Ouverture demandée ailleurs (carte du match).
   useEffect(() => {
@@ -196,11 +199,20 @@ export function MatchLaunchCenter({
     const next = launches.find(
       (info) => wantsAutoOpen(info, now) && !dismissedRef.current?.has(launchModalKey(info)),
     );
-    if (next) {
-      setConfirming(false);
-      setOpenMatchId(next.matchId);
+    if (!next) return;
+    // Jamais par-dessus une autre modale (« Contacts », score…) : deux pièges
+    // de focus se disputeraient Tab et Échap. L'annonce attend sa fermeture,
+    // guettée chaque seconde (horloges actives), sinon la relève suivante.
+    if (anotherModalOpen()) {
+      if (!clocks) return;
+      const timer = setInterval(() => {
+        if (!anotherModalOpen()) setModalRecheck((n) => n + 1);
+      }, MODAL_RECHECK_MS);
+      return () => clearInterval(timer);
     }
-  }, [launches, current, waiting]);
+    setConfirming(false);
+    setOpenMatchId(next.matchId);
+  }, [launches, current, waiting, clocks, modalRecheck]);
 
   useEffect(() => {
     if (!privacyPending) return;
@@ -665,177 +677,5 @@ function LaunchStatus({
         <>{t("status.startsAt")} <span className="num">{startAt ?? "—"}</span></>
       )}
     </>
-  );
-}
-
-type CopyFn = (value: string, label: string) => Promise<void>;
-
-function ReadyChip({ ready, phase }: Readonly<{ ready: boolean; phase: MatchLaunchInfo["phase"] }>) {
-  const { t } = useLaunchText();
-  if (phase !== "LOBBY") return null;
-  return (
-    <span className={ready ? styles.chipReady : styles.chipWaiting}>
-      {ready ? t("chipReady") : t("chipWaiting")}
-    </span>
-  );
-}
-
-function IdentityLine({
-  kind,
-  value,
-  verified,
-  onCopy,
-}: Readonly<{
-  kind: "Discord" | "BattleTag";
-  value: string | null;
-  verified: boolean;
-  onCopy: CopyFn;
-}>) {
-  const { t } = useLaunchText();
-  return (
-    <div className={styles.identity}>
-      <span className={styles.identityKind}>{kind}</span>
-      {value ? (
-        <>
-          <span className={`mono ${styles.identityValue}`}>{value}</span>
-          {verified ? (
-            <span className={styles.verified} title={t("verifiedTitle")}>
-              ✓<span className="sr-only"> {t("verified")}</span>
-            </span>
-          ) : (
-            <span className={styles.unverified}>{t("unverified")}</span>
-          )}
-          <button
-            type="button"
-            className={`${styles.copy} tap-target`}
-            onClick={() => void onCopy(value, kind)}
-            aria-label={t("copyAria", { kind, value })}
-          >
-            {t("copy")}
-          </button>
-        </>
-      ) : (
-        <span className={styles.missing}>—</span>
-      )}
-    </div>
-  );
-}
-
-function ContactRow({ contact, onCopy }: Readonly<{ contact: LaunchContact; onCopy: CopyFn }>) {
-  const { t } = useLaunchText();
-  // Dans l'ordre de la priorité de choix (capitaine, manager, propriétaire),
-  // pas dans l'ordre de saisie : la pastille la plus parlante vient en tête.
-  const roles = CONTACT_ROLES.filter((role) => contact.roles.includes(role)).map((role) => t(`roles.${role}`));
-  return (
-    <li className={styles.contact}>
-      <div className={styles.contactHead}>
-        <span className={styles.pseudo}>{contact.pseudo}</span>
-        {roles.map((label) => (
-          <span key={label} className={styles.role}>
-            {label}
-          </span>
-        ))}
-      </div>
-      <IdentityLine kind="Discord" value={contact.discordTag} verified={contact.discordTag !== null} onCopy={onCopy} />
-      <IdentityLine kind="BattleTag" value={contact.battletag} verified={contact.battletagVerified} onCopy={onCopy} />
-    </li>
-  );
-}
-
-function SideCard({
-  side,
-  isHost,
-  phase,
-  onCopy,
-}: Readonly<{
-  side: LaunchSide;
-  isHost: boolean;
-  phase: MatchLaunchInfo["phase"];
-  onCopy: CopyFn;
-}>) {
-  const { t } = useLaunchText();
-  return (
-    <section className={styles.side} data-host={isHost ? "true" : undefined} aria-label={side.name}>
-      <div className={styles.sideHead}>
-        <span className={styles.emblem} aria-hidden="true">
-          {side.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- fichier du site, déjà optimisé au téléversement
-            <img src={side.logoUrl} alt="" />
-          ) : (
-            Array.from(side.name.trim())[0]?.toUpperCase() ?? "?"
-          )}
-        </span>
-        <span className={styles.sideName}>{side.name}</span>
-        <ReadyChip ready={side.ready} phase={phase} />
-      </div>
-      {isHost && (
-        <p className={styles.hostBadge}>
-          <span aria-hidden="true">🏠</span> {t("host")}
-        </p>
-      )}
-      <SideContacts side={side} phase={phase} onCopy={onCopy} />
-    </section>
-  );
-}
-
-function SideContacts({
-  side,
-  phase,
-  onCopy,
-}: Readonly<{
-  side: LaunchSide;
-  phase: MatchLaunchInfo["phase"];
-  onCopy: CopyFn;
-}>) {
-  const { t } = useLaunchText();
-  if (side.isGhost) return <p className={styles.note}>{t("ghost")}</p>;
-  if (phase === "SCHEDULED") return <p className={styles.note}>{t("contactsAtLaunch")}</p>;
-  if (side.contacts.length === 0) return <p className={styles.note}>{t("noContact")}</p>;
-  return (
-    <ul className={styles.contacts}>
-      {side.contacts.map((contact) => (
-        <ContactRow key={contact.userId} contact={contact} onCopy={onCopy} />
-      ))}
-    </ul>
-  );
-}
-
-function CasterCard({
-  caster,
-  phase,
-  onCopy,
-}: Readonly<{
-  caster: LaunchCaster | null;
-  phase: MatchLaunchInfo["phase"];
-  onCopy: CopyFn;
-}>) {
-  const { t } = useLaunchText();
-  if (!caster) {
-    return (
-      <section className={styles.caster} aria-label={t("caster")}>
-        <p className={styles.note}>
-          <span aria-hidden="true">🎙</span> {t("noCaster")}
-        </p>
-      </section>
-    );
-  }
-  return (
-    <section className={styles.caster} aria-label={t("caster")}>
-      <div className={styles.sideHead}>
-        <span className={styles.emblem} aria-hidden="true">
-          🎙
-        </span>
-        <span className={styles.sideName}>
-          <span className={styles.casterLabel}>{t("caster")}</span> {caster.pseudo}
-        </span>
-        <ReadyChip ready={caster.ready} phase={phase} />
-      </div>
-      {phase !== "SCHEDULED" && (
-        <div className={styles.casterIds}>
-          <IdentityLine kind="Discord" value={caster.discordTag} verified={caster.discordTag !== null} onCopy={onCopy} />
-          <IdentityLine kind="BattleTag" value={caster.battletag} verified={caster.battletagVerified} onCopy={onCopy} />
-        </div>
-      )}
-    </section>
   );
 }

@@ -24,6 +24,7 @@ import { bracketMatch } from "../helpers/bracket-match";
 const NO_LAUNCH: LaunchStripControls = {
   isCaster: false,
   showOpen: false,
+  showContacts: false,
   showClaim: false,
   showRelease: false,
   showPlan: false,
@@ -61,6 +62,7 @@ describe("matchCardActionList — chaque drapeau donne son action, rien de plus"
       launch: {
         isCaster: true,
         showOpen: true,
+        showContacts: true,
         showClaim: true,
         showRelease: true,
         showPlan: true,
@@ -78,6 +80,7 @@ describe("matchCardActionList — chaque drapeau donne son action, rien de plus"
     expect(all).toEqual([
       "playerScore",
       "openLaunch",
+      "contacts",
       "plan",
       "adminScore",
       "schedule",
@@ -178,6 +181,7 @@ function renderFooter(actions: Partial<MatchCardActionInput>, castBlock: CastBlo
         canManage
         canSchedule
         refereeScheduling={false}
+        launchPhase
         openConfig={() => undefined}
         openSchedule={() => undefined}
         openReplay={() => undefined}

@@ -93,9 +93,11 @@ export function matchSectionOf(
   match: SectionMatch,
   refereeScheduling: boolean,
   now: number | null,
+  /** Option « phase de lancement » ; éteinte, la section « Lancement » reste vide. */
+  launchPhase = true,
 ): MatchSectionKey {
   if (match.status === "COMPLETED") return "DONE";
-  const phase = matchLaunchPhase({ ...match, refereeScheduling }, now ?? Number.NEGATIVE_INFINITY);
+  const phase = matchLaunchPhase({ ...match, refereeScheduling, launchPhase }, now ?? Number.NEGATIVE_INFINITY);
   if (phase === "LAUNCHED") return "PLAYING";
   if (phase === "LOBBY") return "LOBBY";
   if (phase === "SCHEDULED") return "WAITING";
@@ -128,11 +130,11 @@ export type MatchSection<T> = { key: MatchSectionKey; label: string; matches: T[
 /** Sections non vides, dans l'ordre fixe, chacune triée. */
 export function sectionRoundMatches<T extends SectionMatch>(
   matches: readonly T[],
-  options: { refereeScheduling: boolean; now: number | null; seeds: SeedMap },
+  options: { refereeScheduling: boolean; launchPhase?: boolean; now: number | null; seeds: SeedMap },
 ): MatchSection<T>[] {
   const buckets = new Map<MatchSectionKey, T[]>();
   for (const match of matches) {
-    const key = matchSectionOf(match, options.refereeScheduling, options.now);
+    const key = matchSectionOf(match, options.refereeScheduling, options.now, options.launchPhase);
     const bucket = buckets.get(key);
     if (bucket) bucket.push(match);
     else buckets.set(key, [match]);

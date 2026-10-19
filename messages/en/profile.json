@@ -94,7 +94,7 @@
     "reading": "Reading…",
     "unverifiedHint": "Unverified tag: {audience} Verify it so they can.",
     "unverifiedAudience": "nobody sees it, not even the administrators. So the organizers can't reach you during a tournament.",
-    "audience": "the administrators see it at any time, the referees as long as you're registered for a tournament that isn't over (from the moment registration opens), and the players and caster of your match for the duration of the match, from its launch; other players only if you make it visible in your privacy settings. Nobody else, ever.",
+    "audience": "the administrators see it at any time, the referees as long as you're registered for a tournament that isn't over (from the moment registration opens), and the members of both teams and the caster of your match from the moment both opponents of the match are known until its end (and, if you cast a match, both its teams); other players only if you make it visible in your privacy settings. Nobody else, ever.",
     "removed": "Discord tag removed.",
     "lock": {
       "pending": "Reading your Discord account status… The field stays read-only until we know whether Discord provided this username.",
@@ -125,7 +125,7 @@
       "major": "Of legal age"
     },
     "pseudoAlwaysVisible": "Your username is always visible: it's what identifies you in brackets, rosters and match sheets.",
-    "discordNotice": "Verification opens your Discord tag to the organizers (administrators at any time, referees as long as you're registered for a tournament that isn't over), not to other players: tick “Discord tag” so they can see it on your profile. An unverified tag stays hidden, box ticked or not.",
+    "discordNotice": "Verification opens your Discord tag to the organizers (administrators at any time, referees as long as you're registered for a tournament that isn't over) and, as a contact, to the members of both teams and the caster of your match from the moment both its opponents are known (and, if you cast a match, to both its teams); not to other players: tick “Discord tag” so they can see it on your profile. An unverified tag stays hidden, box ticked or not.",
     "discordPending": "Your tag isn't verified: it will stay hidden from other players until you verify it.",
     "discordNoTag": "You don't have a Discord tag yet: save it, then verify it so other players can see it.",
     "recruitmentTitle": "Recruitment",
@@ -341,8 +341,9 @@
     "eyebrow": "VISIBILITY · BATTLETAG",
     "title": "Hidden, but not from everyone",
     "intro": "Your BattleTag will no longer appear on your public profile or in the player directory. It stays readable, however, where it's needed to play:",
-    "players": "<strong>The other players of every match you play</strong>, for the duration of the tournament — it's how you add each other in game to start the match.",
-    "caster": "<strong>The caster of your match</strong>, from its launch to its end, if you're among the contacts shown.",
+    "players": "<strong>The members of both teams of every match your team plays</strong>, for the duration of the tournament — it's how you add each other in game to start the match.",
+    "caster": "<strong>The caster of your match</strong>, from the moment both its opponents are known to its end, if you're among the contacts shown.",
+    "asCaster": "<strong>Both teams of a match you cast</strong>, from the moment both its opponents are known to its end.",
     "staff": "<strong>Referees and administrators</strong>, as long as you're registered for a tournament that isn't over — from the moment registration opens.",
     "outro": "To stop sharing it entirely, you have to clear the field — but your opponents will then no longer be able to add you in game. And if a Blizzard account is linked, it controls this field: you have to remove it first.",
     "ok": "Got it"
@@ -357,7 +358,7 @@
     "exposure": {
       "admins": "The site's administrators can see your Discord tag at all times.",
       "referees": "Referees can see it only while you're entered in an ongoing or upcoming tournament — not after.",
-      "match": "The players and caster of your match can see it for the duration of the match, from its launch — to add each other and create the channel.",
+      "match": "The members of both teams and the caster of your match can see it from the moment both opponents of the match are known until its end — to add each other and create the channel. If you cast a match, both its teams see yours for the same period.",
       "players": "Other players on the site only see it if you make it visible in your privacy settings. It doesn't appear on any public page.",
       "undo": "You can cancel at any time by removing your tag from “My profile”: the verification is lost, and the exposure with it. Logging in with Discord then saves your username again, but without verifying it: only this step verifies it."
     },

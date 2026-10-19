@@ -68,6 +68,7 @@ const LABELED_FIELDS = [
   "registrationDiscordRequirement",
   "registrationBlizzardRequirement",
   "registrationMinPlayers",
+  "launchPhase",
   "phases",
 ] as const satisfies readonly TournamentField[];
 

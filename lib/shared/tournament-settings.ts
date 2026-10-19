@@ -42,6 +42,7 @@ export type TournamentSettingsInput = {
     | "matchFormat"
     | "endurancePlayoffFormat"
     | "registrationFilters"
+    | "launchPhase"
   >;
   phases: TournamentPhase[] | null;
   swiss: Pick<SwissMeta, "totalRounds" | "pointsForWin" | "pointsForDraw" | "pointsForLoss" | "pointsForBye"> | null;
@@ -187,6 +188,7 @@ export function tournamentSettingsGroups(input: TournamentSettingsInput): Tourna
     { label: "Effectif maximal", value: plural(card.maxTeams, solo ? "joueur" : "équipe") },
     { label: "Format des matchs", value: matchFormatSettingLabel(card.matchFormat) },
     { label: "Ordre de départ", value: SEEDING_LABELS[input.seedingSource] },
+    { label: "Phase de lancement des matchs", value: yesNo(card.launchPhase) },
   ];
 
   const conditions: TournamentSetting[] = [];

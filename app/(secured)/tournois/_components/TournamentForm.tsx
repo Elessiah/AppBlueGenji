@@ -32,6 +32,7 @@ import { useErrorsText } from "../[id]/_lib/error-map";
 import { EARLY_EXIT_FIELD_ID, EARLY_EXIT_HINT_ID, FormatSettings } from "./FormatSettings";
 import { TournamentImagePicker } from "./TournamentImagePicker";
 import { RefereeSchedulingField } from "./RefereeSchedulingField";
+import { LAUNCH_PHASE_FIELD_ID, LAUNCH_PHASE_HINT_ID, LaunchPhaseField } from "./LaunchPhaseField";
 import { initialImagePickerValue, type ImagePickerValue } from "../_lib/image-picker";
 import {
   sectionEyebrow,
@@ -67,6 +68,7 @@ const FIELD_IDS: Readonly<Record<TournamentFormField, string>> = {
   registrationCloseAt: "registration-close-at",
   startAt: "start-at",
   enduranceEarlyExit: EARLY_EXIT_FIELD_ID,
+  launchPhase: LAUNCH_PHASE_FIELD_ID,
 };
 
 // Les valeurs et leurs conversions vivent dans `_lib/tournament-form-values`.
@@ -667,7 +669,16 @@ export function TournamentForm({
             warnUndoesLaunches={
               tournamentState === "RUNNING" && values.refereeScheduling && !initialValues.refereeScheduling
             }
+            launchPhase={values.launchPhase}
             onChange={(checked) => set("refereeScheduling", checked)}
+          />
+
+          <LaunchPhaseField
+            checked={values.launchPhase}
+            locked={locked("launchPhase")}
+            aria={fieldAttrs("launchPhase", LAUNCH_PHASE_HINT_ID)}
+            error={fieldErrors.message("launchPhase")}
+            onChange={(checked) => set("launchPhase", checked)}
           />
         </section>
 

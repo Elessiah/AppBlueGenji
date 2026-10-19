@@ -97,6 +97,10 @@
         "toPlan": "Ce match attend que l'arbitrage fixe sa date : le score se saisira une fois le match lancé.",
         "scheduledAt": "Ce match démarre le {date} : le score se saisit une fois lancé, quand les parties se sont déclarées prêtes.",
         "scheduled": "Ce match n'a pas encore démarré : le score se saisit une fois lancé, quand les parties se sont déclarées prêtes.",
+        "scheduledAtDirect": "Ce match démarre le {date} : le score se saisit dès qu'il a démarré.",
+        "scheduledDirect": "Ce match n'a pas encore démarré : le score se saisit dès qu'il a démarré.",
+        "startingDirect": "Le match démarre : le score se saisit dans un instant.",
+        "unavailable": "Le score ne peut pas être saisi pour l'instant.",
         "lobby": "Le score se saisit une fois le match lancé : toutes les parties doivent s'être déclarées prêtes."
       },
       "theirs": {
@@ -138,6 +142,12 @@
     "pendingInvalid": "Aucune date possible : ce jour n'existe pas dans ce mois.",
     "hintPlanning": "Le match reste « En attente de départ » jusqu'à cette heure, puis entre en lancement : les deux équipes se déclarent prêtes.",
     "hint": "Sans jour ni mois = aucun horaire annoncé. À l'heure dite, le match entre en lancement : les deux équipes se déclarent prêtes.",
+    "hintPlanningDirect": "Le match reste « En attente de départ » jusqu'à cette heure, puis il est lancé directement.",
+    "hintDirect": "Sans jour ni mois = aucun horaire : le match est alors lancé tout de suite, sans retour possible. Sinon, à l'heure dite, il est lancé directement.",
+    "hintDirectTbd": "Sans jour ni mois = aucun horaire : le match sera lancé dès que ses deux adversaires seront connus, sans retour possible. Sinon, à l'heure dite, il est lancé directement.",
+    "hintLaunched": "Le match est déjà lancé : changer sa date ne le relance pas, le score reste ouvert.",
+    "hintLaunchedDirect": "Le match est déjà lancé, sans score : une heure à venir le remet « En attente de départ » (score refermé jusque-là) ; une heure passée ou aucune date le laisse lancé.",
+    "hintLaunchedPlanningDirect": "Le match est déjà lancé, sans score : une heure à venir le remet « En attente de départ » (score refermé jusque-là), vider la date le renvoie « À planifier » ; une heure passée le laisse lancé.",
     "notice": "Pour un match à jouer, un horaire à venir posé ou changé est annoncé aux joueurs du match (notification push, et message privé Discord aux joueurs dont le tag Discord est certifié, sauf s'ils ont coupé ceux de leurs matchs).",
     "noticePlanning": "Pour un match à jouer, un horaire à venir posé ou changé, ou un horaire retiré, est annoncé aux joueurs du match (notification push, et message privé Discord aux joueurs dont le tag Discord est certifié, sauf s'ils ont coupé ceux de leurs matchs).",
     "noticeTbd": "Une place est encore vide : l'horaire sera annoncé aux joueurs quand les deux adversaires seront connus, dans les 48 h qui précèdent le coup d'envoi.",

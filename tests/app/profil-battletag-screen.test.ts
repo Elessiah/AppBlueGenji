@@ -162,7 +162,7 @@ describe("modale de visibilité du BattleTag", () => {
 
   it("nomme les publics qui continuent de lire le tag, comme la politique", () => {
     const notice = Object.values(frProfile.battletagNotice).join(" ");
-    expect(notice).toContain("de chaque match que tu disputes");
+    expect(notice).toContain("de chaque match de ton équipe");
     expect(notice).toContain("Le caster de ton match");
     expect(notice).toContain("arbitres");
     expect(notice).toContain("administrateurs");

@@ -187,6 +187,7 @@ export function settingsGroupsFrom(
     },
     { label: text.t("settings.general.matchFormat"), value: matchFormatSetting(text, card.matchFormat) },
     { label: text.t("settings.general.seeding"), value: text.t(`settings.seeding.${input.seedingSource}`) },
+    { label: text.t("settings.general.launchPhase"), value: yesNo(text, card.launchPhase) },
   ];
 
   const conditions: TournamentSetting[] = [];

@@ -39,7 +39,7 @@ describe("zones de tap étendues", () => {
     // panneau et bouton « Plus d'actions ».
     ["app/(secured)/tournois/[id]/_components/MatchCardActions.tsx", /"tap-target",\s*inMenu \? styles\.item/],
     ["app/(secured)/tournois/[id]/_components/MatchCardActions.tsx", /`tap-target \$\{styles\.toggle\}/],
-    ["components/match-launch/MatchLaunchCenter.tsx", /\$\{styles\.copy\} tap-target/],
+    ["components/match-launch/LaunchContactCards.tsx", /\$\{styles\.copy\} tap-target/],
     ["app/(secured)/joueurs/cards/PlayerCard.tsx", /\$\{s\.aboveOverlay\} tap-target/],
     ["app/recrutement/RecruitmentSection.tsx", /\$\{styles\.readMore\} tap-target/],
   ])("%s porte la zone étendue", (file, pattern) => {

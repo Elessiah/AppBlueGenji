@@ -33,7 +33,7 @@ export const AUTOMOD_ALERT_SCOPE = "alerte AutoMod d'une telle annonce bloquée 
  * Bases légales citées par la politique — les mêmes que le registre
  * (`processing-register.ts`). Une donnée a une base principale ; quand une
  * partie de sa finalité repose sur une autre (le tag certifié et le BattleTag,
- * exposés sur consentement mais présentés au lancement d'un match en exécution
+ * exposés sur consentement mais présentés aux parties d'un match en exécution
  * des conditions d'utilisation), `extraBases` la nomme avec sa portée.
  *
  * **Le compte et l'authentification reposent sur le contrat** (art. 6.1.b) : un
@@ -85,9 +85,9 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // seconde écrase la première à chaque connexion : le dire est la condition
     // pour que le joueur comprenne pourquoi sa saisie a changé.
     finalite:
-      "Mise en relation entre joueurs (s'ajouter en jeu) — aucune statistique. Saisi par toi, ou renseigné par Blizzard à chaque connexion si tu as rattaché ton compte Battle.net. Masqué, il reste lisible des joueurs de tes matchs tant que le tournoi n'est pas terminé, du caster de ton match de son lancement à sa fin si tu fais partie des contacts présentés, et de l'arbitrage tant que tu es inscrit à un tournoi qui n'est pas terminé",
+      "Mise en relation entre joueurs (s'ajouter en jeu) — aucune statistique. Saisi par toi, ou renseigné par Blizzard à chaque connexion si tu as rattaché ton compte Battle.net. Masqué, il reste lisible des membres des deux équipes de tes matchs tant que le tournoi n'est pas terminé, du caster de ton match dès que ses deux adversaires sont connus et jusqu'à sa fin si tu fais partie des contacts présentés (et, si tu castes un match, de ses deux équipes sur la même durée), et de l'arbitrage tant que tu es inscrit à un tournoi qui n'est pas terminé; présenté comme contact d'un match, il est montré avec ton rôle d'équipe et l'indication qu'il vient ou non d'un compte Battle.net rattaché",
     base: "Consentement",
-    extraBases: [{ base: "Exécution du contrat", scope: "présentation aux joueurs et au caster de ton match, à son lancement" }],
+    extraBases: [{ base: "Exécution du contrat", scope: "présentation aux membres des deux équipes et au caster de ton match, dès que ses deux adversaires sont connus" }],
     duree: "Durée du compte",
   },
   {
@@ -116,12 +116,12 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // ne doit pas coûter la porte Discord. D'où une base « Consentement » qui
     // tient — le geste est libre, spécifique, et se retire.
     finalite:
-      "Ouvre ton tag Discord à l'organisation pour te joindre : administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), joueurs et caster de ton match de son lancement à sa fin ; les autres joueurs connectés seulement si tu coches « Tag Discord ». Sans elle, le bot ne t'envoie aucun message privé de match. Donnée seulement par toi, depuis Mon profil (un clic si ton Discord est rattaché, un code en message privé sinon) — se connecter par Discord ne la donne pas. Retirée en retirant ton tag ; perdue si ton pseudo change",
+      "Ouvre ton tag Discord à l'organisation pour te joindre : administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), membres des deux équipes et caster de ton match dès que ses deux adversaires sont connus et jusqu'à sa fin (et, si tu castes un match, ses deux équipes sur la même durée) ; les autres joueurs connectés seulement si tu coches « Tag Discord ». Sans elle, le bot ne t'envoie aucun message privé de match. Donnée seulement par toi, depuis Mon profil (un clic si ton Discord est rattaché, un code en message privé sinon) — se connecter par Discord ne la donne pas. Retirée en retirant ton tag ; perdue si ton pseudo change",
     base: "Consentement",
     // La certification décide aussi qui reçoit les messages privés de match,
     // qui reposent sur l'intérêt légitime (opposition par la case du profil).
     extraBases: [
-      { base: "Exécution du contrat", scope: "présentation aux joueurs et au caster de ton match, à son lancement" },
+      { base: "Exécution du contrat", scope: "présentation aux membres des deux équipes et au caster de ton match, dès que ses deux adversaires sont connus" },
       { base: "Intérêt légitime", scope: MATCH_TIME_DM_SCOPE },
     ],
     duree: "Jusqu'au retrait ou au changement du tag, ou durée du compte",

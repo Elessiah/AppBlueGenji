@@ -16,6 +16,7 @@ import { FR_ACTIONS_TEXT } from "./actions-text";
 export type MatchCardActionId =
   | "playerScore"
   | "openLaunch"
+  | "contacts"
   | "plan"
   | "adminScore"
   | "schedule"
@@ -64,7 +65,9 @@ export type MatchCardActionInput = {
  * lecteur sur **ce** match. Un engagé a son score à reporter ou son lancement à
  * suivre ; l'arbitrage, un match à planifier avant d'en trancher le score.
  */
-const PRIMARY_ORDER: readonly MatchCardActionId[] = ["playerScore", "openLaunch", "plan", "adminScore"];
+// « Contacts » (lecture seule) vient après les gestes d'arbitrage : un arbitre
+// qui caste ou joue le match garde « Score » en principal.
+const PRIMARY_ORDER: readonly MatchCardActionId[] = ["playerScore", "openLaunch", "plan", "adminScore", "contacts"];
 
 /** Toutes les actions offertes, dans l'ordre du menu. */
 export function matchCardActionList(
@@ -78,6 +81,7 @@ export function matchCardActionList(
   const rows: [boolean, MatchCardActionId, string, MatchCardActionTone][] = [
     [input.playerScoreLabel !== null, "playerScore", input.playerScoreLabel ?? "", "primary"],
     [launch.showOpen, "openLaunch", either(input.inLobby, t("cardActions.openLaunch"), t("cardActions.matchInfo")), "primary"],
+    [launch.showContacts, "contacts", t("cardActions.contacts"), "neutral"],
     [launch.showPlan, "plan", t("cardActions.plan"), "warn"],
     [input.adminScoreLabel !== null, "adminScore", input.adminScoreLabel ?? "", "staff"],
     [input.showSchedule, "schedule", either(input.hasStartAt, t("cardActions.editDate"), t("cardActions.setDate")), "staff"],

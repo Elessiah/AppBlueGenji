@@ -47,6 +47,7 @@ export const ALL_TOURNAMENT_FIELDS = [
   "registrationDiscordRequirement",
   "registrationBlizzardRequirement",
   "registrationMinPlayers",
+  "launchPhase",
   "phases",
 ] as const;
 
@@ -77,6 +78,12 @@ export const RESTRICTED_FIELDS: readonly TournamentField[] = [
   "registrationDiscordRequirement",
   "registrationBlizzardRequirement",
   "registrationMinPlayers",
+  // La phase de lancement survit à la publication, jusqu'au départ : aucun
+  // match n'existe avant, rien n'est donc à défaire. Une fois le tournoi en
+  // cours (fenêtre `LOCKED`), elle est figée — basculer en plein tournoi
+  // ferait rentrer en lancement des matchs que la règle tenait déjà pour
+  // lancés, ou l'inverse (`docs/features/MATCH_LAUNCH.md`).
+  "launchPhase",
 ];
 
 /**

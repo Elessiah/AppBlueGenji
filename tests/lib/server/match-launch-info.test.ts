@@ -6,7 +6,7 @@ jest.mock("@/lib/server/tournaments/notifications");
 import type { PoolConnection } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
-import { listViewerMatchLaunches } from "@/lib/server/tournaments/match-launch-info";
+import { listViewerMatchLaunches, loadViewerMatchContacts } from "@/lib/server/tournaments/match-launch-info";
 import { invalidateTournamentLists } from "@/lib/server/tournaments/list-cache";
 import { fakeConnection } from "../../helpers/sql-double";
 
@@ -29,6 +29,7 @@ function candidate(overrides: Candidate = {}): Candidate {
     id: 42,
     tournament_id: 7,
     tournament_state: "RUNNING",
+    match_launch_phase: 1,
     status: "READY",
     is_bye: 0,
     team1_id: TEAM1,
@@ -90,6 +91,8 @@ function casterUser(id: number, overrides: Record<string, unknown> = {}) {
 type World = {
   /** Un tournoi est-il en cours sur le site ? */
   running: boolean;
+  /** Un tournoi en cours a-t-il la phase de lancement ? (défaut : `running`) */
+  runningWithLaunchPhase?: boolean;
   /** Requêtes reçues, dans l'ordre. */
   reads: string[];
   viewerMemberships: { team_id: number; roles_json: string }[];
@@ -109,24 +112,31 @@ let state: World;
  * statut fantôme) : le tournoi est passé deux fois.
  */
 function candidateContextRows(world: World, params: unknown[]) {
-  const [tournamentId, , team1Id] = params.map(Number);
+  const [tournamentId, , , team1Id] = params.map(Number);
   const c = world.candidates.find((x) => x.tournament_id === tournamentId && x.team1_id === team1Id);
   if (!c) return [];
   return [
     {
       tournament_state: c.tournament_state,
       referee_scheduling: c.referee_scheduling ?? 0,
+      match_launch_phase: c.match_launch_phase ?? 1,
       team1_is_ghost: c.team1_is_ghost,
       team2_is_ghost: c.team2_is_ghost,
     },
   ];
 }
 
+/** Drapeau « un tournoi est en cours » ; la modale ne compte que la phase de lancement. */
+function runningFlag(world: World, sql: string): boolean {
+  if (!sql.includes("match_launch_phase = 1")) return world.running;
+  return world.runningWithLaunchPhase ?? world.running;
+}
+
 function connectionFor(world: World): PoolConnection {
   const execute = async (rawSql: string, params: unknown[] = []) => {
     const sql = rawSql.replace(/\s+/g, " ").trim();
     world.reads.push(sql);
-    if (sql.includes("AS running")) return [[{ running: Number(world.running) }], []];
+    if (sql.includes("AS running")) return [[{ running: Number(runningFlag(world, sql)) }], []];
     if (sql.startsWith("UPDATE")) {
       world.writes.push(sql);
       return [{ affectedRows: 1 }, []];
@@ -284,8 +294,28 @@ describe("listViewerMatchLaunches — coût de l'interrogation", () => {
     await expect(listViewerMatchLaunches(viewer)).resolves.toEqual([]);
 
     expect(state.reads).toEqual([
-      expect.stringContaining("SELECT EXISTS (SELECT 1 FROM bg_tournaments WHERE state = 'RUNNING')"),
+      expect.stringContaining("SELECT EXISTS (SELECT 1 FROM bg_tournaments WHERE state = 'RUNNING'"),
     ]);
+  });
+
+  // Option désactivée par défaut : un tournoi en cours sans phase de lancement
+  // n'a rien à présenter dans la modale, la lecture complète serait vaine.
+  it("ne lit que le drapeau quand aucun tournoi en cours n'a la phase de lancement", async () => {
+    state.runningWithLaunchPhase = false;
+
+    await expect(listViewerMatchLaunches(viewer)).resolves.toEqual([]);
+
+    expect(state.reads).toEqual([expect.stringContaining("WHERE state = 'RUNNING' AND match_launch_phase = 1")]);
+  });
+
+  it("garde le bouton « Contacts » sur un tournoi en cours sans phase de lancement", async () => {
+    state.runningWithLaunchPhase = false;
+    state.candidates = [candidate({ match_launch_phase: 0 })];
+
+    await expect(loadViewerMatchContacts(viewer, 42)).resolves.not.toBeNull();
+
+    const flag = state.reads.find((sql) => sql.includes("AS running"));
+    expect(flag).not.toContain("match_launch_phase");
   });
 
   it("mutualise le drapeau entre les lecteurs", async () => {
@@ -538,5 +568,104 @@ describe("listViewerMatchLaunches — planification par l'arbitrage", () => {
     await listViewerMatchLaunches(viewer);
     const read = state.reads.find((sql) => sql.includes("t.name AS tournament_name"));
     expect(read).toContain("(m.start_at IS NOT NULL OR t.referee_scheduling = 0)");
+  });
+});
+
+describe("listViewerMatchLaunches — option « phase de lancement »", () => {
+  it("ne présente à la modale que les tournois qui ont la phase de lancement", async () => {
+    await listViewerMatchLaunches(viewer);
+    const read = state.reads.find((sql) => sql.includes("t.name AS tournament_name"));
+    expect(read).toContain("AND t.match_launch_phase = 1");
+    expect(read).toContain(`INTERVAL ${60} MINUTE`);
+  });
+});
+
+describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => {
+  const scheduled = () => new Date(Date.now() + 3 * 3_600_000).toISOString();
+  const verifiedCaptain = () =>
+    member(TEAM2, 5, { roles_json: JSON.stringify(["CAPITAINE"]), discord_pseudo: "cap2", discord_verified_at: OPENED });
+
+  it("expose les contacts d'un match programmé, même hors de la fenêtre de la modale", async () => {
+    state.candidates = [candidate({ match_launch_phase: 0, start_at: scheduled(), caster_user_id: CASTER })];
+    state.members = [verifiedCaptain()];
+    state.users = [casterUser(CASTER)];
+    const info = await loadViewerMatchContacts(viewer, 42);
+    expect(info?.phase).toBe("SCHEDULED");
+    expect(info?.team2.contacts).toEqual([expect.objectContaining({ userId: 5, discordTag: "cap2" })]);
+    expect(info?.caster).toMatchObject({ pseudo: "Caster", discordTag: "caster" });
+  });
+
+  it("lit un seul match, sans le filtre de l'option ni la fenêtre de la modale", async () => {
+    await loadViewerMatchContacts(viewer, 42);
+    const read = state.reads.find((sql) => sql.includes("t.name AS tournament_name"));
+    expect(read).toContain("AND m.id = ?");
+    expect(read).not.toContain("t.match_launch_phase = 1");
+    expect(read).not.toContain("INTERVAL 60 MINUTE");
+    // « À planifier » n'est écarté que de la modale.
+    expect(read).not.toContain("m.start_at IS NOT NULL OR t.referee_scheduling = 0");
+  });
+
+  it("expose les contacts d'un match lancé d'emblée sur un tournoi sans phase de lancement", async () => {
+    state.candidates = [candidate({ match_launch_phase: 0 })];
+    state.members = [verifiedCaptain()];
+    const info = await loadViewerMatchContacts(viewer, 42);
+    expect(info?.phase).toBe("LAUNCHED");
+    expect(info?.team2.contacts).toHaveLength(1);
+  });
+
+  it("sans phase de lancement, heure passée mais lancement pas encore écrit : retire le caster devenu inéligible", async () => {
+    state.candidates = [candidate({ match_launch_phase: 0, caster_user_id: CASTER })];
+    state.members = [verifiedCaptain()];
+    state.users = [casterUser(CASTER, { platform_roles_json: null })];
+    const info = await loadViewerMatchContacts(viewer, 42);
+    expect(info?.phase).toBe("LAUNCHED");
+    expect(info?.caster).toBeNull();
+    expect(state.writes.filter((sql) => sql.includes("SET caster_user_id = NULL"))).toHaveLength(1);
+  });
+
+  it("ne met pas en file le retrait du caster d'un match au report en attente", async () => {
+    state.candidates = [candidate({ status: "AWAITING_CONFIRMATION", caster_user_id: CASTER })];
+    state.members = [verifiedCaptain()];
+    state.users = [casterUser(CASTER, { platform_roles_json: null })];
+    const info = await loadViewerMatchContacts(viewer, 42);
+    expect(info?.caster).toBeNull();
+    expect(state.writes.filter((sql) => sql.includes("SET caster_user_id = NULL"))).toEqual([]);
+    expect(state.reads.filter((sql) => sql.includes("FOR UPDATE"))).toEqual([]);
+  });
+
+  it("garde la phase de lancement d'un tournoi qui l'a allumée", async () => {
+    state.members = [verifiedCaptain()];
+    const info = await loadViewerMatchContacts(viewer, 42);
+    expect(info?.phase).toBe("LOBBY");
+    expect(info?.team2.contacts).toHaveLength(1);
+  });
+
+  it("ne rend rien à qui n'est ni joueur ni caster du match", async () => {
+    state.viewerMemberships = [];
+    state.members = [verifiedCaptain()];
+    await expect(loadViewerMatchContacts(viewer, 42)).resolves.toBeNull();
+  });
+
+  it("ne rend rien d'un match terminé", async () => {
+    state.candidates = [candidate({ status: "COMPLETED" })];
+    await expect(loadViewerMatchContacts(viewer, 42)).resolves.toBeNull();
+  });
+
+  it("expose les contacts d'un match à planifier, dès que ses deux adversaires sont connus (option allumée ou non)", async () => {
+    for (const launchPhase of [0, 1]) {
+      state.candidates = [candidate({ referee_scheduling: 1, start_at: null, match_launch_phase: launchPhase })];
+      state.members = [verifiedCaptain()];
+      const info = await loadViewerMatchContacts(viewer, 42);
+      expect(info?.phase).toBe("TO_PLAN");
+      expect(info?.team2.contacts).toEqual([expect.objectContaining({ userId: 5, discordTag: "cap2" })]);
+    }
+    // Sans adversaire connu, rien.
+    state.candidates = [candidate({ referee_scheduling: 1, start_at: null, team2_id: null })];
+    await expect(loadViewerMatchContacts(viewer, 42)).resolves.toBeNull();
+  });
+
+  it("ne rend rien quand aucun tournoi n'est en cours", async () => {
+    state.running = false;
+    await expect(loadViewerMatchContacts(viewer, 42)).resolves.toBeNull();
   });
 });

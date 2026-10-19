@@ -192,6 +192,7 @@
     "more": "Plus d'actions",
     "openLaunch": "Ouvrir le lancement",
     "matchInfo": "Infos du match",
+    "contacts": "Contacts",
     "plan": "Planifier",
     "editDate": "Modifier la date",
     "setDate": "Programmer une date",
@@ -234,6 +235,7 @@
       "pending": "Lancement…",
       "success": "Match lancé.",
       "body": "Le match démarre sans attendre les « Prêt » manquants : les engagés peuvent reporter leur score dès maintenant.",
+      "bodyDirect": "Le match démarre sans attendre son heure : les engagés peuvent reporter leur score dès maintenant.",
       "unplanned": "Ce match n'est pas encore planifié : il démarre maintenant, sans heure annoncée aux engagés."
     }
   },
@@ -252,6 +254,7 @@
       "confirm": "Activer",
       "pending": "Activation…",
       "consequence": "{count, plural, =1 {1 match, sans date et pas encore lancé, quitte le lancement — ses « Prêt » sont effacés — et attend qu'un arbitre fixe son horaire.} other {# matchs, sans date et pas encore lancés, quittent le lancement — leurs « Prêt » sont effacés — et attendent qu'un arbitre fixe leur horaire.}}",
+      "consequenceDirect": "{count, plural, =1 {1 match, sans date et pas encore lancé, attend qu'un arbitre fixe son horaire.} other {# matchs, sans date et pas encore lancés, attendent qu'un arbitre fixe leur horaire.}}",
       "next": "Les matchs déjà lancés continuent, et les manches suivantes naîtront à planifier."
     },
     "errors": {

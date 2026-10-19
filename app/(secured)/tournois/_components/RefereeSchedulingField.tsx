@@ -26,6 +26,7 @@ export function RefereeSchedulingField({
   checked,
   editable,
   warnUndoesLaunches,
+  launchPhase = true,
   onChange,
 }: Readonly<{
   mode: "create" | "edit";
@@ -34,6 +35,8 @@ export function RefereeSchedulingField({
   editable: boolean;
   /** Cocher défera des lancements à l'enregistrement (tournoi en cours). */
   warnUndoesLaunches: boolean;
+  /** Option « phase de lancement » : éteinte, aucun « Prêt » n'est effacé. Absente = allumée. */
+  launchPhase?: boolean;
   onChange: (checked: boolean) => void;
 }>) {
   const text = useFormText();
@@ -104,7 +107,7 @@ export function RefereeSchedulingField({
             color: "var(--ink-soft, #c3ccd8)",
           }}
         >
-          {t("form.referee.warning")}
+          {t(launchPhase ? "form.referee.warning" : "form.referee.warningDirect")}
         </output>
       )}
     </>

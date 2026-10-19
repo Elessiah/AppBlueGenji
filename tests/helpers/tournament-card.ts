@@ -33,6 +33,9 @@ export function tournamentCard(overrides: Partial<TournamentCard> = {}): Tournam
     endurancePlayoffFormat: null,
     registrationFilters: { ...DEFAULT_REGISTRATION_FILTERS },
     refereeScheduling: false,
+    // Allumée : les tests du lancement décrivent la règle d'origine ; l'option
+    // éteinte (le défaut de la colonne) a ses propres tests.
+    launchPhase: true,
     liveUrl: null,
     image: null,
     finishedAt: null,

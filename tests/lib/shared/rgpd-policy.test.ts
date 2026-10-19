@@ -36,7 +36,7 @@ describe("contacts du lancement d'un match — base légale", () => {
       const entry = DONNEES_PROFIL.find((d) => d.donnee === donnee);
       expect(entry?.base).toBe("Consentement");
       expect(entry?.extraBases?.[0]).toEqual(
-        { base: "Exécution du contrat", scope: "présentation aux joueurs et au caster de ton match, à son lancement" },
+        { base: "Exécution du contrat", scope: "présentation aux membres des deux équipes et au caster de ton match, dès que ses deux adversaires sont connus" },
       );
       expect(entry?.finalite).not.toMatch(/non sur ce consentement/);
     }
@@ -109,9 +109,9 @@ describe("DONNEES_PROFIL", () => {
 
   it("dit qui lit encore un BattleTag masqué, et jusqu'à quand", () => {
     const overwatch = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo Overwatch");
-    expect(overwatch?.finalite).toMatch(/Masqué, il reste lisible des joueurs de tes matchs tant que le tournoi n'est pas terminé/);
+    expect(overwatch?.finalite).toMatch(/Masqué, il reste lisible des membres des deux équipes de tes matchs tant que le tournoi n'est pas terminé/);
     // Le caster ne le reçoit que comme contact de lancement (`/api/me/match-launches`).
-    expect(overwatch?.finalite).toMatch(/du caster de ton match de son lancement à sa fin/);
+    expect(overwatch?.finalite).toMatch(/du caster de ton match dès que ses deux adversaires sont connus et jusqu'à sa fin/);
     expect(overwatch?.finalite).toMatch(/tant que le tournoi n'est pas terminé/);
     // L'arbitrage le lit dès l'inscription (`isInActiveTournament` : tout état
     // sauf `FINISHED`), pas seulement pendant le tournoi.

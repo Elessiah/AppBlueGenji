@@ -216,7 +216,7 @@ describe("français inchangé — les messages égalent les textes d'origine", (
     expect(frForm.form.referee.description).toBe(REFEREE_SCHEDULING_DESCRIPTION);
     expect(frForm.form.referee.warning).toBe(ENABLE_PLANNING_WHILE_RUNNING_WARNING);
     expect(frForm.edit.fields.maxTeams).toBe("Nombre de places");
-    expect(Object.keys(frForm.edit.fields)).toHaveLength(29);
+    expect(Object.keys(frForm.edit.fields)).toHaveLength(30);
   });
 
   it("image : modes, refus, réussites", () => {

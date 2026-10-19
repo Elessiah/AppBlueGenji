@@ -150,6 +150,7 @@ export async function loadTournamentRow(
       registration_blizzard_requirement,
       registration_min_players,
       referee_scheduling,
+      match_launch_phase,
       live_url
      FROM bg_tournaments
      WHERE id = ?
@@ -397,6 +398,7 @@ export async function getTournamentListRow(
       t.registration_blizzard_requirement,
       t.registration_min_players,
       t.referee_scheduling,
+      t.match_launch_phase,
       t.live_url,
       t.image_url,
       t.image_fit,
@@ -438,6 +440,7 @@ export async function getTournamentListRow(
       t.registration_blizzard_requirement,
       t.registration_min_players,
       t.referee_scheduling,
+      t.match_launch_phase,
       t.live_url,
       t.image_url,
       t.image_fit,

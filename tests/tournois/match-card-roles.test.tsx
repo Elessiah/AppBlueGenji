@@ -41,6 +41,7 @@ function wrap(viewer: Viewer, child: ReactNode) {
         canManage={viewer.canManage ?? false}
         canSchedule={viewer.canSchedule ?? false}
         refereeScheduling={false}
+        launchPhase
         openConfig={() => undefined}
         openSchedule={() => undefined}
         openReplay={() => undefined}

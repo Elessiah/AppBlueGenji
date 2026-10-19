@@ -271,7 +271,7 @@ describe("les textes de consentement", () => {
   it("nomment les parties d'un match et la durée de l'exposition", () => {
     const joined = DISCORD_VERIFICATION_EXPOSURE.join(" ").toLowerCase();
     expect(joined).toContain("caster de ton match");
-    expect(joined).toContain("le temps de la rencontre");
+    expect(joined).toContain("dès que les deux adversaires du match sont connus et jusqu'à sa fin");
   });
 
   it("disent que rien n'est public", () => {

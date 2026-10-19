@@ -179,7 +179,7 @@ describe("PROCESSING_ACTIVITIES", () => {
 
   it("compte les joueurs d'un même match parmi les destinataires des profils", () => {
     // Un BattleTag masqué leur reste lisible (`lib/shared/battletag-visibility.ts`).
-    expect(byRef("T01").recipients.join(" ")).toMatch(/Joueurs d'un même match.*BattleTag même masqué/);
+    expect(byRef("T01").recipients.join(" ")).toMatch(/Membres des deux équipes d'un même match.*BattleTag même masqué/);
   });
 
   it("ne déclare aucune adresse e-mail collectée", () => {
@@ -403,7 +403,7 @@ describe("bases légales : le registre et la politique disent la même chose", (
 
   it("fonde les contacts du lancement d'un match sur l'exécution des conditions d'utilisation", () => {
     expect(byRef("T04").legalBasis).toMatch(
-      /exécution du service demandé par le joueur \(contrat — conditions d'utilisation\) pour la présentation des contacts aux parties d'un match à son lancement/,
+      /exécution du service demandé par le joueur \(contrat — conditions d'utilisation\) pour la présentation des contacts aux parties d'un match, dès que ses deux adversaires sont connus,/,
     );
   });
 

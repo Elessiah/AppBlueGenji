@@ -99,11 +99,32 @@ function deadlineText(iso: string | null, locale: Locale): string | null {
   return date.toLocaleTimeString(INTL_LOCALE[locale], { hour: "2-digit", minute: "2-digit", ...(locale === "fr" ? {} : { hourCycle: "h23" as const }) });
 }
 
-/** Pourquoi le score ne se saisit pas encore (`playerScoreClosedNotice`), dans la langue du texte. */
-function closedNoticeText(text: TournamentDialogsText, phase: MatchLaunchPhase, startAtFull: string | null): string {
+/**
+ * Pourquoi le score ne se saisit pas encore (`playerScoreClosedNotice`), dans
+ * la langue du texte. Sans phase de lancement (option du tournoi), aucun
+ * « Prêt » n'est attendu : le match part à son heure.
+ */
+export function closedNoticeText(
+  text: TournamentDialogsText,
+  phase: MatchLaunchPhase,
+  startAtFull: string | null,
+  launchPhaseEnabled = true,
+  launchedAt: string | null = null,
+): string {
   if (phase === "TO_PLAN") return text.t("score.player.closed.toPlan");
   if (phase === "SCHEDULED") {
+    if (!launchPhaseEnabled) {
+      return startAtFull
+        ? text.t("score.player.closed.scheduledAtDirect", { date: startAtFull })
+        : text.t("score.player.closed.scheduledDirect");
+    }
     return startAtFull ? text.t("score.player.closed.scheduledAt", { date: startAtFull }) : text.t("score.player.closed.scheduled");
+  }
+  // Sans lancement, l'heure passée : le match part, le score suit à la
+  // prochaine mise à jour — jamais de « Prêt » à attendre. Déjà lancé (page
+  // figée, droits retirés…), rien n'arrivera « dans un instant » : avis neutre.
+  if (!launchPhaseEnabled) {
+    return text.t(launchedAt === null ? "score.player.closed.startingDirect" : "score.player.closed.unavailable");
   }
   return text.t("score.player.closed.lobby");
 }
@@ -197,8 +218,8 @@ export function PlayerScoreDialog({
   const matchFormat = useMatchFormat(match);
   // Phase de lancement, pour dire **pourquoi** le score n'est pas encore
   // saisissable (à planifier, en attente de départ, en lancement).
-  const { refereeScheduling } = useLiveControls();
-  const launchPhase = useMatchLaunchPhase({ ...match, refereeScheduling });
+  const { refereeScheduling, launchPhase: launchPhaseEnabled } = useLiveControls();
+  const launchPhase = useMatchLaunchPhase({ ...match, refereeScheduling, launchPhase: launchPhaseEnabled });
   const [submitting, setSubmitting] = useState(false);
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: submitting });
   const backdrop = useBackdropDismiss(onClose, submitting);
@@ -452,7 +473,7 @@ export function PlayerScoreDialog({
             </>
           ) : (
             <p className={styles.formatHint}>
-              {closedNoticeText(text, launchPhase, formatMatchStartAtFull(match.startAt, text.locale))}
+              {closedNoticeText(text, launchPhase, formatMatchStartAtFull(match.startAt, text.locale), launchPhaseEnabled, match.launchedAt)}
             </p>
           )}
 

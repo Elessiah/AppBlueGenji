@@ -8,15 +8,18 @@ import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { setRefereeScheduling } from "@/lib/server/tournaments/referee-scheduling";
 import { connectionMock, fakeConnection } from "../../helpers/sql-double";
 
-function world(tournament: { state: string; referee_scheduling?: number } | null, moved = 2) {
+function world(
+  tournament: { state: string; referee_scheduling?: number; match_launch_phase?: number } | null,
+  moved = 2,
+) {
   const connection = connectionMock();
   connection.rollback.mockResolvedValue(undefined);
   const statements: { sql: string; params: unknown[] }[] = [];
   connection.execute.mockImplementation(async (raw: string, params?: unknown) => {
     const sql = raw.replace(/\s+/g, " ").trim();
     statements.push({ sql, params: (params as unknown[]) ?? [] });
-    if (sql.startsWith("SELECT name, state, referee_scheduling FROM bg_tournaments")) {
-      return [tournament ? [{ name: "Coupe", referee_scheduling: 0, ...tournament }] : []];
+    if (sql.startsWith("SELECT name, state, referee_scheduling, match_launch_phase FROM bg_tournaments")) {
+      return [tournament ? [{ name: "Coupe", referee_scheduling: 0, match_launch_phase: 1, ...tournament }] : []];
     }
     if (sql.startsWith("UPDATE bg_matches")) return [{ affectedRows: moved }];
     return [{ affectedRows: 1 }];
@@ -33,7 +36,7 @@ describe("setRefereeScheduling", () => {
   it("verrouille la ligne du tournoi en toute première instruction", async () => {
     const { statements } = world({ state: "RUNNING" });
     await setRefereeScheduling(7, true);
-    expect(statements[0].sql).toMatch(/^SELECT name, state, referee_scheduling FROM bg_tournaments .*FOR UPDATE$/);
+    expect(statements[0].sql).toMatch(/^SELECT name, state, referee_scheduling, match_launch_phase FROM bg_tournaments .*FOR UPDATE$/);
     expect(statements[0].params).toEqual([7]);
   });
 
@@ -68,6 +71,24 @@ describe("setRefereeScheduling", () => {
     expect(reset?.sql).toContain("NOT (team1_score IS NOT NULL OR team2_score IS NOT NULL)");
     expect(connection.commit).toHaveBeenCalled();
     expect(publishUpdatedEvent).toHaveBeenCalledWith(7);
+  });
+
+  it("sans phase de lancement, rend aussi à planifier les matchs sans date lancés d'office, sans score", async () => {
+    const { statements } = world({ state: "RUNNING", match_launch_phase: 0 }, 4);
+    const result = await setRefereeScheduling(7, true);
+    expect(result.movedToPlanning).toBe(4);
+    const reset = statements.find(
+      (s) => s.sql.startsWith("UPDATE bg_matches") && s.sql.includes("lobby_opened_at = NULL"),
+    );
+    expect(reset?.sql).toContain("launched_at = NULL");
+    expect(reset?.sql).toContain("start_at IS NULL");
+    expect(reset?.sql).not.toContain("launched_at IS NULL");
+    expect(reset?.sql).toContain("NOT (team1_score IS NOT NULL OR team2_score IS NOT NULL)");
+    const notices = statements.find((s) => s.sql.startsWith("DELETE FROM bg_match_start_notices"));
+    expect(notices?.sql).not.toContain("launched_at IS NULL");
+    // Les rencontres notées restent tenues pour lancées, sans y toucher deux fois.
+    const launch = statements.find((s) => s.sql.includes("launched_at = NOW()"));
+    expect(launch?.sql).toContain("launched_at IS NULL");
   });
 
   it("tient pour lancé un match en lancement dont un score est déjà noté", async () => {

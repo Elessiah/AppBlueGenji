@@ -32,6 +32,8 @@ type MatchState = {
   id: number;
   tournament_id: number;
   tournament_state: string;
+  /** Option du tournoi : 1 = phase de lancement allumée. */
+  match_launch_phase: number;
   status: string;
   is_bye: number;
   team1_id: number | null;
@@ -66,6 +68,7 @@ function matchState(overrides: Partial<MatchState> = {}): MatchState {
     id: 42,
     tournament_id: 7,
     tournament_state: "RUNNING",
+    match_launch_phase: 1,
     status: "READY",
     is_bye: 0,
     team1_id: TEAM1,
@@ -138,6 +141,7 @@ function matchContextRows(state: World) {
   if (!match) return [];
   return [{
     tournament_state: match.tournament_state,
+    match_launch_phase: match.match_launch_phase,
     team1_is_ghost: match.team1_is_ghost,
     team2_is_ghost: match.team2_is_ghost,
   }];
@@ -465,6 +469,18 @@ describe("claimMatchCast", () => {
     expect(state.match?.caster_ready_at).toBeNull();
   });
 
+  it("sans phase de lancement, reprend la place à l'heure passée tant que le lancement n'est pas écrit", async () => {
+    state.users[CASTER] = verified;
+    state.users[901] = { ...ELIGIBLE_CASTER, platform_roles_json: null };
+    state.match = matchState({
+      match_launch_phase: 0,
+      caster_user_id: 901,
+      start_at: new Date(Date.now() - 5_000).toISOString(),
+    });
+    await claimMatchCast(42, CASTER, true);
+    expect(state.match?.caster_user_id).toBe(CASTER);
+  });
+
   it("ne remplace jamais le caster d'un match lancé", async () => {
     state.users[CASTER] = verified;
     state.users[901] = { ...ELIGIBLE_CASTER, discord_verified_at: null };
@@ -686,5 +702,53 @@ describe("releaseIneligibleCast", () => {
     state.match = matchState({ caster_user_id: CASTER });
     await expect(releaseIneligibleCast(42, CASTER)).resolves.toBe(false);
     expect(state.match?.caster_user_id).toBe(CASTER);
+  });
+});
+
+describe("phase de lancement éteinte (`match_launch_phase = 0`)", () => {
+  const connection = () => connectionFor(state);
+
+  it("lance aussitôt un match jouable, sans attendre aucun « Prêt »", async () => {
+    state.match = matchState({ match_launch_phase: 0 });
+    await expect(maintainMatchLaunches(connection(), 7)).resolves.toBe(1);
+    expect(state.match?.launched_at).toBe(STAMP);
+    expect(state.match?.lobby_opened_at).toBe(STAMP);
+    expect(state.match?.team1_ready_at).toBeNull();
+  });
+
+  it("lance un match dont l'heure vient de passer", async () => {
+    state.match = matchState({ match_launch_phase: 0, start_at: new Date(Date.now() - 60_000).toISOString() });
+    await expect(maintainMatchLaunches(connection(), 7)).resolves.toBe(1);
+    expect(state.match?.launched_at).toBe(STAMP);
+  });
+
+  it("ne touche pas un match programmé plus tard", async () => {
+    state.match = matchState({ match_launch_phase: 0, start_at: new Date(Date.now() + 3_600_000).toISOString() });
+    await expect(maintainMatchLaunches(connection(), 7)).resolves.toBe(0);
+    expect(state.writes).toEqual([]);
+  });
+
+  it("refuse le « Prêt » : la règle tient déjà le match pour lancé", async () => {
+    state.match = matchState({ match_launch_phase: 0 });
+    await expect(setMatchReady(42, 1, true)).rejects.toThrow("MATCH_ALREADY_LAUNCHED");
+    expect(state.match?.team1_ready_at).toBeNull();
+  });
+
+  it("forcer un match à l'heure passée que l'entretien n'a pas encore écrit l'enregistre", async () => {
+    state.match = matchState({ match_launch_phase: 0, start_at: new Date(Date.now() - 5_000).toISOString() });
+    await forceLaunchMatch(42);
+    expect(state.match?.launched_at).toBe(STAMP);
+  });
+
+  it("forcer un match dont le lancement est déjà écrit reste refusé", async () => {
+    state.match = matchState({ match_launch_phase: 0, launched_at: STAMP });
+    await expect(forceLaunchMatch(42)).rejects.toThrow("MATCH_ALREADY_LAUNCHED");
+  });
+
+  it("allumée, le même match entre en lancement sans partir", async () => {
+    state.match = matchState({ match_launch_phase: 1 });
+    await expect(maintainMatchLaunches(connection(), 7)).resolves.toBe(1);
+    expect(state.match?.launched_at).toBeNull();
+    expect(state.match?.lobby_opened_at).toBe(STAMP);
   });
 });

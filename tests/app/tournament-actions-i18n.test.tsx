@@ -208,7 +208,7 @@ function expectNoFrench(html: string): void {
 }
 
 /** Toutes les commandes de lancement offertes (`launchStripControls`). */
-const LAUNCH_ALL = { showOpen: true, showClaim: true, showRelease: true, showPlan: true, showForce: true, showHost: true, showHostSwap: true };
+const LAUNCH_ALL = { showOpen: true, showContacts: true, showClaim: true, showRelease: true, showPlan: true, showForce: true, showHost: true, showHostSwap: true };
 
 const BO3: MatchFormat = { type: "BO", value: 3 };
 const FT3: MatchFormat = { type: "FT", value: 3 };
@@ -323,7 +323,7 @@ describe("français inchangé — les messages égalent les textes d'origine", (
     const launch: Parameters<typeof matchCardActionList>[0]["launch"] = { ...LAUNCH_ALL, isCaster: false };
     const input: Parameters<typeof matchCardActionList>[0] = { playerScoreLabel: null, launch, inLobby: true, adminScoreLabel: null, showSchedule: true, hasStartAt: true, showOnAir: true, onAir: false, showLiveConfig: true, liveConfigured: false, showReplay: true, hasReplay: false, canReport: true };
     expect(matchCardActionList(input).map((a) => a.label)).toEqual([
-      "Ouvrir le lancement", "Planifier", "Modifier la date", "Forcer le lancement", "Changer l'équipe hôte", "Caster ce match", "Retirer le caster", "Lancer le direct", "Diffuser ce match", "Ajouter la rediff", "Signaler un problème",
+      "Ouvrir le lancement", "Contacts", "Planifier", "Modifier la date", "Forcer le lancement", "Changer l'équipe hôte", "Caster ce match", "Retirer le caster", "Lancer le direct", "Diffuser ce match", "Ajouter la rediff", "Signaler un problème",
     ]);
     expect(matchCardActionName("Planifier", "Alpha vs Bravo")).toBe("Planifier : Alpha vs Bravo");
   });

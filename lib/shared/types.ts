@@ -432,6 +432,12 @@ export type TournamentCard = {
    */
   refereeScheduling: boolean;
   /**
+   * Phase de lancement des matchs (`docs/features/MATCH_LAUNCH.md`) : allumée,
+   * un match jouable attend les « Prêt » de ses parties ; éteinte (le défaut),
+   * il part dès son heure. Public : c'est une règle du tournoi.
+   */
+  launchPhase: boolean;
+  /**
    * Chaîne officielle du tournoi (Twitch, YouTube, Kick). `null` = pas de
    * diffusion annoncée. Les matchs n'en héritent jamais (`lib/shared/live-streams.ts`).
    */

@@ -281,6 +281,44 @@ describe("updateTournament", () => {
   });
 });
 
+describe("phase de lancement des matchs", () => {
+  const indexOf = (sql: string) => sql.split("?").findIndex((part) => /match_launch_phase = $/.test(part));
+
+  it("se lit éteinte sur une ligne migrée (défaut 0)", async () => {
+    rowToReturn = hiddenRow({ match_launch_phase: 0 });
+    expect((await loadEditableTournament(1))?.values.launchPhase).toBe(false);
+    expect(executed.some((q) => /match_launch_phase/.test(q.sql))).toBe(true);
+  });
+
+  it("se lit allumée", async () => {
+    rowToReturn = hiddenRow({ match_launch_phase: 1 });
+    expect((await loadEditableTournament(1))?.values.launchPhase).toBe(true);
+  });
+
+  it("s'allume et s'éteint à l'édition", async () => {
+    rowToReturn = hiddenRow({ match_launch_phase: 0 });
+    await updateTournament(1, { launchPhase: true });
+    let update = executed.find((q) => /UPDATE bg_tournaments/i.test(q.sql));
+    expect(update!.params[indexOf(update!.sql)]).toBe(1);
+    executed.length = 0;
+    rowToReturn = hiddenRow({ match_launch_phase: 1 });
+    await updateTournament(1, { launchPhase: false });
+    update = executed.find((q) => /UPDATE bg_tournaments/i.test(q.sql));
+    expect(update!.params[indexOf(update!.sql)]).toBe(0);
+  });
+
+  it("reste modifiable sur un tournoi publié, avant son départ", async () => {
+    rowToReturn = hiddenRow({ start_visibility_at: past });
+    await expect(updateTournament(1, { launchPhase: true })).resolves.toBeUndefined();
+  });
+
+  it.each(["RUNNING", "FINISHED"])("est figée sur un tournoi %s, sans rien écrire", async (state) => {
+    rowToReturn = hiddenRow({ state, start_visibility_at: past });
+    await expect(updateTournament(1, { launchPhase: true })).rejects.toThrow("TOURNAMENT_LOCKED");
+    expect(executed.some((q) => /UPDATE bg_tournaments/i.test(q.sql))).toBe(false);
+  });
+});
+
 describe("sortie anticipée « hors course » (BG Survie)", () => {
   const bgsRow = (over: Record<string, unknown> = {}) =>
     hiddenRow({ format: "BG_SURVIE", endurance_max_rounds: 5, ...over });

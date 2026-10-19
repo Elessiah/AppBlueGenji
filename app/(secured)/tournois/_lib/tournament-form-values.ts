@@ -121,6 +121,11 @@ export type TournamentFormValues = {
    * les états sauf « terminé » — ce formulaire se fermant au coup d'envoi.
    */
   refereeScheduling: boolean;
+  /**
+   * Phase de lancement des matchs (« Prêt », modale — `MATCH_LAUNCH.md`).
+   * Décochée par défaut : un match part dès son heure.
+   */
+  launchPhase: boolean;
   phases: PhaseConfig[];
 };
 
@@ -154,6 +159,7 @@ export type TournamentApiValues = {
   endurancePlayoffSize: number | null;
   enduranceMaxRounds: number | null;
   enduranceEarlyExit: boolean;
+  launchPhase: boolean;
   matchFormat: MatchFormat | null;
   endurancePlayoffFormat: MatchFormat | null;
   registrationDiscordRequirement: PlayerRequirement;
@@ -206,6 +212,8 @@ export function defaultTournamentFormValues(): TournamentFormValues {
     registrationDiscordRequirement: DEFAULT_REGISTRATION_FILTERS.discordRequirement,
     registrationBlizzardRequirement: DEFAULT_REGISTRATION_FILTERS.blizzardRequirement,
     registrationMinPlayers: DEFAULT_REGISTRATION_FILTERS.minPlayers,
+    // Éteinte : la phase de lancement n'est pas proposée d'office.
+    launchPhase: false,
     // Éteinte : un match entre en lancement dès que ses deux engagés sont connus.
     refereeScheduling: false,
     phases: [createDefaultPhase(1, "SWISS"), createDefaultPhase(2, "DOUBLE")],
@@ -311,6 +319,9 @@ export function toApiPayload(values: TournamentFormValues): Record<string, unkno
     // Lu par la création seulement : la liste blanche de l'édition ne connaît
     // pas ce champ (il se règle depuis la fiche, `referee-scheduling`).
     refereeScheduling: values.refereeScheduling,
+    // Toujours envoyé (jamais `undefined`) : décocher doit éteindre l'option,
+    // la liste blanche de l'édition ignorant un champ absent.
+    launchPhase: values.launchPhase,
   };
 }
 
@@ -358,6 +369,7 @@ export function toFormValues(apiValues: TournamentApiValues): TournamentFormValu
         ? (apiValues.enduranceMaxRounds ?? 0)
         : defaults.enduranceMaxRounds,
     enduranceEarlyExit: apiValues.format === "BG_SURVIE" && apiValues.enduranceEarlyExit,
+    launchPhase: apiValues.launchPhase,
     // Même règle pour les égalités : hors BG Survie, la valeur stockée est
     // toujours fermée (le serveur la ferme), elle ne dit pas un choix — une
     // bascule vers le mode présente donc le défaut de création, comme le

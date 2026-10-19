@@ -28,7 +28,7 @@ export function RoundMatchSections({
   children,
 }: Readonly<RoundMatchSectionsProps>) {
   const { t } = useTournamentPageText();
-  const { refereeScheduling } = useLiveControls();
+  const { refereeScheduling, launchPhase } = useLiveControls();
   const seeds = useEntrantSeeds();
   // Bascule « En attente » → « Lancement » à la seconde où la carte de match
   // bascule elle-même (`useMatchLaunchPhase`) : un seul minuteur, armé sur la
@@ -47,7 +47,7 @@ export function RoundMatchSections({
   // Données nouvelles : l'instant se relit **pendant le rendu** (état ajusté au
   // rendu, motif documenté de React), pas dans un effet qui peindrait d'abord
   // la carte dans sa section périmée avant de la déplacer.
-  const dataKey = `${refereeScheduling}|${signature}`;
+  const dataKey = `${refereeScheduling}|${launchPhase}|${signature}`;
   const [seenDataKey, setSeenDataKey] = useState(dataKey);
   if (seenDataKey !== dataKey) {
     setSeenDataKey(dataKey);
@@ -68,8 +68,8 @@ export function RoundMatchSections({
     return () => clearTimeout(timer);
   }, [nextAt, now]);
   const sections = useMemo(
-    () => sectionRoundMatches(matches, { refereeScheduling, now, seeds }),
-    [matches, refereeScheduling, now, seeds],
+    () => sectionRoundMatches(matches, { refereeScheduling, launchPhase, now, seeds }),
+    [matches, refereeScheduling, launchPhase, now, seeds],
   );
 
   // Filets et cartes sont **frères** dans un seul conteneur, chaque carte

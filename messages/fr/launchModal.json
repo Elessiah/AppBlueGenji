@@ -20,6 +20,7 @@
     "MATCH_NOT_LAUNCHABLE": "Ce match ne peut pas être lancé : ses deux engagées ne sont pas connues ou il est terminé.",
     "MATCH_ALREADY_LAUNCHED": "Ce match est déjà lancé.",
     "MATCH_NOT_LAUNCHED": "Le match n'est pas encore lancé : toutes les parties doivent se déclarer prêtes.",
+    "MATCH_NOT_STARTED": "Le match n'a pas encore commencé : le score s'ouvre à son heure de départ.",
     "MATCH_NOT_IN_LAUNCH": "Le score ne se saisit qu'à partir du lancement du match : planifie-le ou attends son heure de début. Un forfait reste possible.",
     "NOT_MATCH_PARTY": "Tu ne joues ni ne castes ce match.",
     "NOT_TEAM_READY_ROLE": "Seul le capitaine, un manager ou le propriétaire peut déclarer l'équipe prête.",
@@ -67,11 +68,21 @@
   "copy": "Copier",
   "host": "Héberge la partie — crée le salon",
   "ghost": "Équipe invitée : pas de contact.",
-  "contactsAtLaunch": "Les contacts s'affichent au lancement.",
+  "contactsAtLaunch": "Les contacts s'affichent au lancement — ou dès maintenant par l'action « Contacts » du match, sur la page du tournoi (menu « Plus d'actions » au besoin).",
   "noContact": "Aucun contact disponible.",
   "caster": "Caster",
   "noCaster": "Aucun caster inscrit : le match part dès que les deux équipes sont prêtes.",
   "vs": "VS",
   "fabTeams": "{team1} vs {team2}",
-  "pushLead": "Sois prévenu du départ de tes prochains matchs, même le site fermé."
+  "pushLead": "Sois prévenu du départ de tes prochains matchs, même le site fermé.",
+  "contacts": {
+    "title": "Contacts — {match}",
+    "lead": "Fiches montrées aux membres des deux équipes et au caster de ce match, pour s'ajouter en jeu et s'organiser.",
+    "scrollAria": "Contacts du match",
+    "loading": "Chargement des contacts…",
+    "notShown": "Contacts non affichés.",
+    "noCaster": "Aucun caster inscrit sur ce match.",
+    "unavailable": "Les contacts ne sont visibles que des membres des deux équipes et du caster d'un match dont les deux adversaires sont connus, jusqu'à sa fin.",
+    "failed": "Les contacts n'ont pas pu être chargés. Réessaie dans un instant."
+  }
 }

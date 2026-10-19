@@ -20,6 +20,7 @@
     "MATCH_NOT_LAUNCHABLE": "This match can't be launched: its two entrants aren't known yet, or it's over.",
     "MATCH_ALREADY_LAUNCHED": "This match has already been launched.",
     "MATCH_NOT_LAUNCHED": "The match hasn't been launched yet: every party must declare itself ready.",
+    "MATCH_NOT_STARTED": "The match hasn't started yet: the score opens at its start time.",
     "MATCH_NOT_IN_LAUNCH": "The score can only be reported once the match is launched: schedule it or wait for its start time. A forfeit is still possible.",
     "NOT_MATCH_PARTY": "You're neither playing nor casting this match.",
     "NOT_TEAM_READY_ROLE": "Only the captain, a manager or the owner can declare the team ready.",
@@ -67,11 +68,21 @@
   "copy": "Copy",
   "host": "Hosts the game — creates the lobby",
   "ghost": "Guest team: no contact.",
-  "contactsAtLaunch": "Contacts show up at launch.",
+  "contactsAtLaunch": "Contacts show up at launch — or right now through the match's “Contacts” action on the tournament page (under “More actions” if needed).",
   "noContact": "No contact available.",
   "caster": "Caster",
   "noCaster": "No caster signed up: the match starts as soon as both teams are ready.",
   "vs": "VS",
   "fabTeams": "{team1} vs {team2}",
-  "pushLead": "Get notified when your next matches start, even with the site closed."
+  "pushLead": "Get notified when your next matches start, even with the site closed.",
+  "contacts": {
+    "title": "Contacts — {match}",
+    "lead": "Shown to the members of both teams and the caster of this match, to add each other in game and get organised.",
+    "scrollAria": "Match contacts",
+    "loading": "Loading contacts…",
+    "notShown": "Contacts not shown.",
+    "noCaster": "No caster signed up for this match.",
+    "unavailable": "Contacts are only available to the members of both teams and the caster of a match whose two opponents are known, until it ends.",
+    "failed": "Contacts could not be loaded. Try again in a moment."
+  }
 }

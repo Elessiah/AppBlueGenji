@@ -97,12 +97,13 @@ export const MatchRow = memo(function MatchRow({
   // Engagé du lecteur : déjà porté par `LiveContext` (diffusion, casting) — on
   // le relit ici plutôt que d'en garder une seconde copie sur le contexte de
   // signalement, qui décrirait la même donnée depuis deux sources.
-  const { myTeamId, refereeScheduling, canManage, canSchedule, viewerUserId } = useLiveControls();
+  const { myTeamId, refereeScheduling, launchPhase: launchPhaseEnabled, canManage, canSchedule, viewerUserId } =
+    useLiveControls();
   // Phase de lancement, calculée **une fois par carte** et transmise aux deux
   // bandeaux : chacun posait sinon sa propre minuterie sur l'heure de départ —
   // trois `setTimeout` par match programmé, sur un plateau qui en compte 254.
   // Une chaîne : la prop reste stable, la mémorisation des bandeaux tient.
-  const launchPhase = useMatchLaunchPhase({ ...match, refereeScheduling });
+  const launchPhase = useMatchLaunchPhase({ ...match, refereeScheduling, launchPhase: launchPhaseEnabled });
   // Avant le lancement (à planifier, en attente de départ), l'arbitrage ne
   // saisit aucun score : le seul geste du dialogue est le forfait, et le bouton
   // le dit plutôt que d'annoncer une édition refusée.
@@ -163,7 +164,13 @@ export const MatchRow = memo(function MatchRow({
   // État de diffusion, calculé une fois ici : le bandeau d'horaire l'affiche,
   // le pied d'action en tire le bouton d'antenne — une seule minuterie.
   const liveState = useMatchLiveState(match);
-  const launch = launchStripControls(match, launchPhase, { canManage, canSchedule, viewerUserId, myTeamId });
+  const launch = launchStripControls(match, launchPhase, {
+    canManage,
+    canSchedule,
+    viewerUserId,
+    myTeamId,
+    launchPhase: launchPhaseEnabled,
+  });
   const actionMatchLabel = versusText(text, team1Display, team2Display);
   // Toutes les actions de la carte, rangées par `MatchCardActions` : une
   // principale visible, le reste derrière « Plus d'actions »

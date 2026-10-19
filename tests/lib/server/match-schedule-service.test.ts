@@ -43,18 +43,31 @@ function matchRow(overrides: Partial<Row> = {}): Row {
 function lockReply(
   sql: string,
   params: unknown,
-  { row, refereeScheduling, finished }: { row: Row | null; refereeScheduling: boolean; finished?: boolean },
+  {
+    row,
+    refereeScheduling,
+    launchPhase,
+    finished,
+  }: { row: Row | null; refereeScheduling: boolean; launchPhase: boolean; finished?: boolean },
   order: string[],
 ): [unknown[]] | null {
   if (sql.startsWith("SELECT tournament_id FROM bg_matches")) {
     order.push("tournament_id");
     return [row ? [{ tournament_id: row.tournament_id }] : []];
   }
-  if (sql.startsWith("SELECT referee_scheduling, state FROM bg_tournaments")) {
+  if (sql.startsWith("SELECT referee_scheduling, match_launch_phase, state FROM bg_tournaments")) {
     order.push("lock_tournament");
     expect(sql).toContain("FOR UPDATE");
     expect(params).toEqual([7]);
-    return [[{ referee_scheduling: refereeScheduling ? 1 : 0, state: finished ? "FINISHED" : "RUNNING" }]];
+    return [
+      [
+        {
+          referee_scheduling: refereeScheduling ? 1 : 0,
+          match_launch_phase: launchPhase ? 1 : 0,
+          state: finished ? "FINISHED" : "RUNNING",
+        },
+      ],
+    ];
   }
   if (sql.startsWith("SELECT id, tournament_id, status")) {
     order.push("lock_match");
@@ -72,6 +85,8 @@ function world(
   options: {
     row?: Row | null;
     refereeScheduling?: boolean;
+    /** Phase de lancement du tournoi (allumée par défaut). */
+    launchPhase?: boolean;
     failReminders?: boolean;
     missingReminders?: boolean;
     announced?: boolean;
@@ -93,7 +108,12 @@ function world(
     const locked = lockReply(
       sql,
       params,
-      { row, refereeScheduling: options.refereeScheduling === true, finished: options.finished === true },
+      {
+        row,
+        refereeScheduling: options.refereeScheduling === true,
+        launchPhase: options.launchPhase !== false,
+        finished: options.finished === true,
+      },
       order,
     );
     if (locked) return locked;
@@ -525,6 +545,87 @@ describe("setMatchStartAt", () => {
       const { writes } = world({ row: matchRow({ launched_at: new Date("2026-01-01T10:00:00Z") }) });
       await setMatchStartAt(42, FUTURE);
       expect(resets(writes)).toBe(false);
+    });
+
+    it("sans phase de lancement, match lancé d'office puis reporté : lancement défait, score refermé", async () => {
+      const { writes } = world({
+        row: matchRow({ launched_at: new Date("2026-01-01T10:00:00Z") }),
+        launchPhase: false,
+      });
+      await setMatchStartAt(42, FUTURE);
+      const update = writes.find((w) => w.sql.startsWith("UPDATE bg_matches"));
+      expect(update?.sql).toContain("launched_at = NULL");
+      expect(resets(writes)).toBe(true);
+      expect(writes.some((w) => w.sql.startsWith("DELETE FROM bg_match_start_notices"))).toBe(true);
+    });
+
+    it("sans phase de lancement, date effacée et option allumée : le match lancé repasse à planifier", async () => {
+      const { writes } = world({
+        row: matchRow({ start_at: new Date("2020-01-01T10:00:00Z"), launched_at: new Date("2020-01-01T10:00:00Z") }),
+        refereeScheduling: true,
+        launchPhase: false,
+      });
+      await setMatchStartAt(42, null);
+      expect(resets(writes)).toBe(true);
+    });
+
+    it("sans phase de lancement, lancement forcé avant l'heure puis reporté : la nouvelle heure l'emporte", async () => {
+      const { writes } = world({
+        row: matchRow({ start_at: new Date("2099-08-28T21:00:00Z"), launched_at: new Date("2099-08-28T20:30:00Z") }),
+        launchPhase: false,
+      });
+      await setMatchStartAt(42, FUTURE);
+      expect(resets(writes)).toBe(true);
+    });
+
+    it("sans phase de lancement, heure déjà retouchée dans le passé puis reportée : lancement défait", async () => {
+      // Lancé à 20:00, heure corrigée à 20:25 (toujours passée), puis reporté :
+      // `launched_at` antérieur à l'heure d'avant ne le fait pas passer pour forcé.
+      const { writes } = world({
+        row: matchRow({ start_at: new Date("2026-01-01T20:25:00Z"), launched_at: new Date("2026-01-01T20:00:00Z") }),
+        launchPhase: false,
+      });
+      await setMatchStartAt(42, FUTURE);
+      expect(resets(writes)).toBe(true);
+    });
+
+    it("sans phase de lancement, même date réenregistrée : rien n'est défait", async () => {
+      const { writes } = world({
+        row: matchRow({ start_at: new Date(FUTURE), launched_at: new Date("2099-08-29T18:00:00Z") }),
+        launchPhase: false,
+      });
+      await setMatchStartAt(42, FUTURE);
+      expect(resets(writes)).toBe(false);
+    });
+
+    it("sans phase de lancement, match à planifier lancé de force puis daté à venir : en attente de départ", async () => {
+      const { writes } = world({
+        row: matchRow({ launched_at: new Date("2026-01-01T10:00:00Z") }),
+        refereeScheduling: true,
+        launchPhase: false,
+      });
+      await setMatchStartAt(42, FUTURE);
+      expect(resets(writes)).toBe(true);
+    });
+
+    it("sans phase de lancement, date passée : le match lancé le reste", async () => {
+      const { writes } = world({
+        row: matchRow({ launched_at: new Date("2026-01-01T10:00:00Z") }),
+        launchPhase: false,
+      });
+      await setMatchStartAt(42, "2020-06-01T12:00:00Z");
+      expect(resets(writes)).toBe(false);
+    });
+
+    it("sans phase de lancement, score noté : le match lancé n'est jamais défait", async () => {
+      const { writes } = world({
+        row: matchRow({ launched_at: new Date("2026-01-01T10:00:00Z"), team1_score: 2, team2_score: 0 }),
+        launchPhase: false,
+      });
+      await setMatchStartAt(42, FUTURE);
+      expect(resets(writes)).toBe(false);
+      const update = writes.find((w) => w.sql.startsWith("UPDATE bg_matches"));
+      expect(update?.sql).not.toContain("launched_at");
     });
 
     it("lancement posé pour un autre appariement : il ne compte pas, le report le défait", async () => {

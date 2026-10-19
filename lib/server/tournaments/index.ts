@@ -339,6 +339,8 @@ export async function createTournament(
     registrationFilters?: RegistrationFilters | null;
     /** Matchs planifiés par l'arbitrage ; absent = option éteinte. */
     refereeScheduling?: boolean | null;
+    /** Phase de lancement des matchs ; absente = option éteinte (le défaut). */
+    launchPhase?: boolean | null;
   },
 ): Promise<number> {
   const db = await getDatabase();
@@ -467,8 +469,9 @@ export async function createTournament(
         registration_discord_requirement,
         registration_blizzard_requirement,
         registration_min_players,
-        referee_scheduling
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        referee_scheduling,
+        match_launch_phase
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         organizerUserId,
         payload.name.trim(),
@@ -513,7 +516,8 @@ export async function createTournament(
         registrationFilters.discordRequirement,
         registrationFilters.blizzardRequirement,
         registrationFilters.minPlayers,
-        payload.refereeScheduling === true ? 1 : 0,
+        Number(payload.refereeScheduling === true),
+        Number(payload.launchPhase === true),
       ],
     );
 
@@ -728,6 +732,7 @@ async function loadTournamentBuckets(
       t.registration_blizzard_requirement,
       t.registration_min_players,
       t.referee_scheduling,
+      t.match_launch_phase,
       t.live_url,
       t.image_url,
       t.image_fit,
@@ -768,6 +773,7 @@ async function loadTournamentBuckets(
       t.registration_blizzard_requirement,
       t.registration_min_players,
       t.referee_scheduling,
+      t.match_launch_phase,
       t.live_url,
       t.image_url,
       t.image_fit,

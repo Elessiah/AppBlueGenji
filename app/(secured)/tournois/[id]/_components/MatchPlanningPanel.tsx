@@ -163,7 +163,9 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: Readonly<MatchPla
           onConfirm={() => toggle(true)}
         >
           <p>
-            {a("planning.confirm.consequence", { count: moving.length })}{" "}
+            {a(detail.card.launchPhase ? "planning.confirm.consequence" : "planning.confirm.consequenceDirect", {
+              count: moving.length,
+            })}{" "}
             {a("planning.confirm.next")}
           </p>
         </ConfirmActionDialog>

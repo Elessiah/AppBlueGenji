@@ -153,7 +153,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     ],
     recipients: [
       "The site's public (only the data the player makes visible)",
-      "Players of the same match, until the tournament is over (BattleTag even when hidden, to add each other in game)",
+      "Members of both teams of the same match, until the tournament is over (BattleTag even when hidden, to add each other in game)",
       "Logged-in players of the site: certified Discord username, if the player makes it visible",
       "The association's staff according to their role (administration, refereeing)",
     ],
@@ -241,18 +241,18 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
   {
     ref: "T04",
     name: "Contacting players during a tournament",
-    purpose: "Allowing the organizers to reach a player taking part (rescheduling, settling a dispute, confirming a forfeit)",
+    purpose: "Allowing the organizers to reach a player taking part (rescheduling, settling a dispute, confirming a forfeit), and the parties to a match (members of both teams, signed-up caster) to reach each other to organise it",
     subPurposes: [
       "Exposing the certified Discord username to administrators, at any time, and to referees while the player is registered for a tournament that is not over (from the registration phase)",
       "Opening a player's hidden BattleTag to administrators and referees, while they are registered for a tournament that is not over",
-      "When a match is launched, presenting to the players of both teams and to the registered caster the certified Discord username and the BattleTag of one or two players per team, and those of the caster, until the end of the match",
-      "Collecting the “Ready” of each party to a match (teams, caster) before it is launched",
+      "When a match is launched — and as soon as both its opponents are known, through the “Contacts” button on its card —, presenting to the members of both teams (players, coaches, managers, owners) and to the registered caster the certified Discord username and the BattleTag of one or two members per team, and those of the caster, until the end of the match",
+      "Collecting the “Ready” of each party to a match (teams, caster) before it is launched, only in tournaments that have the launch phase (an option of each tournament, off by default)",
       "Sending by Discord direct message and by push the announcement of a match's time (set, changed or removed), the notice that a match leaves their schedule and match reminders 24 h and 10 h before kickoff (the latter — or the announcement of a match scheduled less than 10 h ahead — with the invite link to the check-in Discord server); direct messages only go to accounts with a certified Discord tag (an uncertified tag, even one linked by signing in with Discord, receives none, to avoid spam); the player can turn these direct messages off from “My profile” (notifications), their push notifications keeping their own settings",
       "Alerting the referee role (score conflict, score left unconfirmed for too long, report on a player)",
       "Sending the referees, about 10 hours ahead, the schedule of upcoming matches (times, tournaments, team names; “a player” in a solo tournament) to the Discord log channel and by push",
     ],
     legalBasis:
-      "Consent for exposing the certified Discord username to the organizers (certification, a separate action taken by the player from their profile — never acquired by logging in alone — and withdrawable by removing their tag); performance of the service requested by the player (contract — terms of use) for presenting the contacts to the parties to a match at its launch and collecting the “Ready”; legitimate interest (smooth running of tournaments) for match time notices, the notice that a match leaves their schedule and match reminders sent to players, with a right to object (art. 21) honoured by a switch in “My profile” that turns off all their match direct messages; performance of the service (contract — terms of use, referees and administrators acting for the association) for referee alerts and the refereeing schedule sent to staff, legitimate interest (smooth running of tournaments) remaining the basis with regard to the players and teams they mention; legitimate interest, the player's own, for keeping their choice about match direct messages (keeping it is what allows their objection to be honoured)",
+      "Consent for exposing the certified Discord username to the organizers (certification, a separate action taken by the player from their profile — never acquired by logging in alone — and withdrawable by removing their tag); performance of the service requested by the player (contract — terms of use) for presenting the contacts to the parties to a match, as soon as both its opponents are known, and collecting the “Ready”; legitimate interest (smooth running of tournaments) for match time notices, the notice that a match leaves their schedule and match reminders sent to players, with a right to object (art. 21) honoured by a switch in “My profile” that turns off all their match direct messages; performance of the service (contract — terms of use, referees and administrators acting for the association) for referee alerts and the refereeing schedule sent to staff, legitimate interest (smooth running of tournaments) remaining the basis with regard to the players and teams they mention; legitimate interest, the player's own, for keeping their choice about match direct messages (keeping it is what allows their objection to be honoured)",
     dataSubjects: [
       "Players taking part in a tournament",
       "Other members of the teams taking part (coaches, managers, owners)",
@@ -265,6 +265,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "BattleTag",
       "Date and opponent of the match",
       "Time at which each party declared itself ready, registered caster",
+      "Team roles and certification status (Discord username, BattleTag taken from a linked Battle.net account) of the contacts presented",
       "Reason for a report",
       "The player's choice to receive or not the Discord direct messages about their matches",
     ],
@@ -273,11 +274,11 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Certified username: until it is changed or the account is deleted",
       "Choice of match direct messages: until it is changed; reset to the default when the account is deleted",
       "Records of reminders, alerts and refereeing schedules sent (match, step and announced time, without the message text): kept with the match, so with no time limit",
-      "“Ready” and caster of a match: kept with the match; the caster of a deleted account is removed from matches not yet played",
+      "“Ready” and caster of a match: kept with the match; the caster of a deleted account is removed from matches that are not over; a caster who no longer meets the conditions of their sign-up (broadcast permission, certified Discord tag, Battle.net account) no longer receives the contacts and is no longer shown; the sign-up is erased if this is noticed before the match is launched (reading the contacts, another caster signing up), otherwise it stays with the match; a caster whose team joins the match is removed at the latest when it starts",
     ],
     recipients: [
       "The association's administrators and referees",
-      "Players and caster of the same match, from its launch to its end",
+      "Members of both teams and caster of the same match, from the moment both its opponents are known to its end",
       "Discord, which delivers the messages",
       "The association's staff with access to the Discord log channel (refereeing schedule, processing activity T05)",
       "The push service of the browser of each subscribed recipient (player: match announcements and reminders; referee or administrator: refereeing schedule; processing activity T12), which delivers an encrypted message it cannot read",

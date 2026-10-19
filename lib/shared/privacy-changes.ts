@@ -799,6 +799,24 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Aucune donnée nouvelle n'est collectée : moins de pseudos et d'identifiants Discord sont transmis au bot.",
     ],
   },
+  // LAUNCH-OPTION : le bouton « Contacts » d'une carte de match montre les
+  // contacts du lancement (`2026-09-lancement-des-matchs`) dès que ses deux
+  // adversaires sont connus (à planifier compris), et plus seulement à son lancement — mêmes destinataires (les
+  // parties du match), mêmes données, mais **plus tôt** : un changement de
+  // « quand », à annoncer. La phase de lancement devient aussi une option du
+  // tournoi : sans elle, aucun « Prêt » n'est plus enregistré.
+  {
+    id: "2026-10-contacts-de-match-avant-le-depart",
+    title: "Contacts de ton match : visibles dès que tes adversaires sont connus",
+    publishedAt: "2026-10-19",
+    summary:
+      "Les membres des deux équipes et le caster de ton match peuvent voir les contacts présentés au lancement dès que les deux adversaires du match sont connus, avant même que son horaire soit fixé, par le bouton « Contacts » de la carte du match.",
+    details: [
+      "Ce sont les mêmes informations qu'au lancement d'un match — le tag Discord certifié et le BattleTag, même masqué, d'un ou deux membres par équipe (joueur, coach, manager ou propriétaire), et ceux du caster inscrit, avec le rôle d'équipe et l'indication d'un BattleTag tiré d'un compte Battle.net rattaché —, montrées aux mêmes personnes : les seules parties du match (membres des deux équipes et caster inscrit). Nos textes disaient « les joueurs » : ce sont en fait, comme jusqu'ici, tous les membres en cours des deux équipes, coachs, managers et propriétaires compris — ce qui vaut aussi pour le BattleTag masqué lu sur une fiche pendant le tournoi.",
+      "Ce qui change, c'est le moment : dès que le match a ses deux adversaires, horaire fixé ou non, et non plus seulement à son lancement, pour pouvoir s'organiser avant l'heure. Elles cessent d'être visibles quand le match est terminé.",
+      "La phase de lancement (« Prêt » et fenêtre de lancement) devient une option de chaque tournoi, éteinte par défaut : sans elle, un match part à son heure et aucun « Prêt » n'est enregistré.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

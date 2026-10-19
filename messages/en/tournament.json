@@ -349,7 +349,8 @@
       "maxSolo": "{count, plural, one {# player} other {# players}}",
       "maxLabel": "Maximum entrants",
       "matchFormat": "Match format",
-      "seeding": "Starting order"
+      "seeding": "Starting order",
+      "launchPhase": "Match launch phase"
     },
     "conditions": {
       "minRoster": "Minimum roster size",

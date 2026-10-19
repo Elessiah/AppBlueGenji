@@ -330,7 +330,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     ],
     recipients: [
       "Public du site (seules les données que le joueur rend visibles)",
-      "Joueurs d'un même match, tant que le tournoi n'est pas terminé (BattleTag même masqué, pour s'ajouter en jeu)",
+      "Membres des deux équipes d'un même match, tant que le tournoi n'est pas terminé (BattleTag même masqué, pour s'ajouter en jeu)",
       "Joueurs connectés du site : pseudo Discord certifié, si le joueur le rend visible",
       "Staff de l'association selon son rôle (administration, arbitrage)",
     ],
@@ -418,18 +418,18 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
   {
     ref: "T04",
     name: "Contact des joueurs pendant un tournoi",
-    purpose: "Permettre à l'organisation de joindre un joueur engagé (reprogrammer, trancher un litige, confirmer un forfait)",
+    purpose: "Permettre à l'organisation de joindre un joueur engagé (reprogrammer, trancher un litige, confirmer un forfait), et aux parties d'un match (membres des deux équipes, caster inscrit) de se joindre pour l'organiser",
     subPurposes: [
       "Exposer le pseudo Discord certifié aux administrateurs, à tout moment, et aux arbitres tant que le joueur est inscrit à un tournoi qui n'est pas terminé (dès la phase d'inscription)",
       "Ouvrir aux administrateurs et aux arbitres le BattleTag masqué d'un joueur, tant qu'il est inscrit à un tournoi qui n'est pas terminé",
-      "Au lancement d'un match, présenter aux joueurs des deux équipes et au caster inscrit le pseudo Discord certifié et le BattleTag d'un ou deux joueurs par équipe, et ceux du caster, jusqu'à la fin du match",
-      "Recueillir les « Prêt » de chaque partie d'un match (équipes, caster) avant son lancement",
+      "Au lancement d'un match — et dès que ses deux adversaires sont connus, par le bouton « Contacts » de sa carte —, présenter aux membres des deux équipes (joueurs, coachs, managers, propriétaires) et au caster inscrit le pseudo Discord certifié et le BattleTag d'un ou deux membres par équipe, et ceux du caster, jusqu'à la fin du match",
+      "Recueillir les « Prêt » de chaque partie d'un match (équipes, caster) avant son lancement, dans les seuls tournois qui ont la phase de lancement (option de chaque tournoi, éteinte par défaut)",
       "Envoyer en message privé Discord et en push l'annonce de l'horaire d'un match (posé, changé ou retiré), l'avis qu'un match quitte son programme et les rappels de match 24 h et 10 h avant le coup d'envoi (le second — ou l'annonce d'un match programmé moins de 10 h avant — avec le lien d'invitation au serveur Discord du check-in) ; les messages privés ne partent qu'aux comptes dont le tag Discord est certifié (un tag non certifié, même rattaché par la connexion Discord, n'en reçoit aucun, pour éviter le spam) ; le joueur peut couper ces messages privés depuis « Mon profil » (notifications), ses notifications push gardant leurs propres réglages",
       "Alerter le rôle arbitre (conflit de score, score resté trop longtemps sans confirmation, signalement d'un joueur)",
       "Envoyer aux arbitres, environ 10 h à l'avance, le programme des matchs à venir (horaires, tournois, noms d'équipe ; « un joueur » en tournoi individuel) au canal de logs Discord et en push",
     ],
     legalBasis:
-      "Consentement pour l'exposition du pseudo Discord certifié à l'organisation (certification, geste distinct fait par le joueur depuis son profil — jamais acquise par la seule connexion — et retirable en retirant son tag) ; exécution du service demandé par le joueur (contrat — conditions d'utilisation) pour la présentation des contacts aux parties d'un match à son lancement et le recueil des « Prêt » ; intérêt légitime (bon déroulement des tournois) pour l'annonce des horaires de match, l'avis qu'un match quitte son programme et les rappels de match envoyés aux joueurs, avec un droit d'opposition (art. 21) honoré par un interrupteur de « Mon profil » qui coupe tous leurs messages privés de match ; exécution du service (contrat — conditions d'utilisation, les arbitres et administrateurs agissant pour l'association) pour les alertes d'arbitrage et le programme d'arbitrage adressés au staff, l'intérêt légitime (bon déroulement des tournois) restant la base à l'égard des joueurs et équipes qu'ils citent ; intérêt légitime, celui du joueur lui-même, pour la conservation de son choix des messages privés de match (le garder est ce qui permet d'honorer son opposition)",
+      "Consentement pour l'exposition du pseudo Discord certifié à l'organisation (certification, geste distinct fait par le joueur depuis son profil — jamais acquise par la seule connexion — et retirable en retirant son tag) ; exécution du service demandé par le joueur (contrat — conditions d'utilisation) pour la présentation des contacts aux parties d'un match, dès que ses deux adversaires sont connus, et le recueil des « Prêt » ; intérêt légitime (bon déroulement des tournois) pour l'annonce des horaires de match, l'avis qu'un match quitte son programme et les rappels de match envoyés aux joueurs, avec un droit d'opposition (art. 21) honoré par un interrupteur de « Mon profil » qui coupe tous leurs messages privés de match ; exécution du service (contrat — conditions d'utilisation, les arbitres et administrateurs agissant pour l'association) pour les alertes d'arbitrage et le programme d'arbitrage adressés au staff, l'intérêt légitime (bon déroulement des tournois) restant la base à l'égard des joueurs et équipes qu'ils citent ; intérêt légitime, celui du joueur lui-même, pour la conservation de son choix des messages privés de match (le garder est ce qui permet d'honorer son opposition)",
     dataSubjects: [
       "Joueurs engagés dans un tournoi",
       "Autres membres des équipes engagées (coachs, managers, propriétaires)",
@@ -442,6 +442,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "BattleTag",
       "Date et adversaire du match",
       "Heure à laquelle chaque partie s'est déclarée prête, caster inscrit",
+      "Rôles d'équipe et statut de certification (tag Discord, BattleTag tiré d'un compte Battle.net rattaché) des contacts présentés",
       "Motif d'un signalement",
       "Choix du joueur de recevoir ou non les messages privés Discord de ses matchs",
     ],
@@ -450,11 +451,11 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Pseudo certifié : jusqu'à sa modification ou la suppression du compte",
       "Choix des messages privés de match : jusqu'à sa modification ; remis au défaut à la suppression du compte",
       "Traces d'envoi des rappels, alertes et programmes d'arbitrage (match, palier et horaire annoncé, sans le texte du message) : conservées avec le match, donc sans limite de durée",
-      "« Prêt » et caster d'un match : conservés avec le match ; le caster d'un compte supprimé est retiré des matchs non joués",
+      "« Prêt » et caster d'un match : conservés avec le match ; le caster d'un compte supprimé est retiré des matchs non terminés ; un caster qui ne remplit plus les conditions de son inscription (permission de diffusion, tag Discord certifié, compte Battle.net) ne reçoit plus les contacts et n'est plus montré ; son inscription est effacée si c'est constaté avant le lancement du match (lecture des contacts, inscription d'un autre caster), sinon elle reste avec le match ; un caster dont l'équipe entre dans le match en est retiré au plus tard à son départ",
     ],
     recipients: [
       "Administrateurs et arbitres de l'association",
-      "Joueurs et caster d'un même match, de son lancement à sa fin",
+      "Membres des deux équipes et caster d'un même match, dès que ses deux adversaires sont connus et jusqu'à sa fin",
       "Discord, qui achemine les messages",
       "Staff de l'association ayant accès au canal de logs Discord (programme d'arbitrage, traitement T05)",
       "Service de push du navigateur de chaque destinataire abonné (joueur : annonces et rappels de match ; arbitre ou administrateur : programme d'arbitrage ; traitement T12), qui achemine un message chiffré qu'il ne peut pas lire",

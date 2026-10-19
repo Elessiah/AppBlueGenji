@@ -689,3 +689,23 @@ describe("validateTournamentInput — sortie anticipée « hors course » (BG Su
     expect(validateTournamentInput(body)).toEqual({ error: "INVALID_ENDURANCE_EARLY_EXIT" });
   });
 });
+
+describe("validateTournamentInput — phase de lancement des matchs", () => {
+  it("éteinte quand elle est absente ou nulle (le défaut)", () => {
+    for (const launchPhase of [undefined, null, false]) {
+      const result = validateTournamentInput({ ...base, launchPhase });
+      expect("value" in result && result.value.launchPhase).toBe(false);
+    }
+  });
+
+  it("allumée sur un `true` strict, quel que soit le format", () => {
+    const result = validateTournamentInput({ ...base, launchPhase: true });
+    expect("value" in result && result.value.launchPhase).toBe(true);
+  });
+
+  it.each(["true", 1, "1", {}])("refuse une valeur qui n'est pas un booléen (%j)", (raw) => {
+    const body: Parameters<typeof validateTournamentInput>[0] = { ...base };
+    Object.assign(body, { launchPhase: raw });
+    expect(validateTournamentInput(body)).toEqual({ error: "INVALID_LAUNCH_PHASE" });
+  });
+});

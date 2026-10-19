@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -16,6 +17,7 @@ import {
   Radio,
   Settings,
   TriangleAlert,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
@@ -37,7 +39,15 @@ import {
   type MatchCardAction,
   type MatchCardActionId,
 } from "../_lib/match-card-actions";
+import { orReload } from "@/lib/shared/lazy-component";
 import styles from "./MatchCardActions.module.css";
+
+// Chargée au premier clic sur « Contacts » : seules les parties du match
+// l'ouvrent, et elle embarque les textes de la modale de lancement (FR + EN).
+const MatchContactsDialog = dynamic(
+  () => orReload(import("@/components/match-launch/MatchContactsDialog").then((m) => m.MatchContactsDialog)),
+  { ssr: false },
+);
 
 async function send(url: string, method: string, body?: unknown): Promise<void> {
   const response = await fetch(url, {
@@ -54,6 +64,7 @@ async function send(url: string, method: string, body?: unknown): Promise<void> 
 const ICONS: Record<MatchCardActionId, LucideIcon> = {
   playerScore: Pencil,
   openLaunch: Info,
+  contacts: Users,
   plan: CalendarPlus,
   adminScore: Pencil,
   schedule: CalendarClock,
@@ -181,7 +192,7 @@ export function MatchCardActions({
   onAdminScore: () => void;
   onReport: () => void;
 }>) {
-  const { openSchedule, openConfig, openReplay, castBlock } = useLiveControls();
+  const { openSchedule, openConfig, openReplay, castBlock, launchPhase: launchPhaseEnabled } = useLiveControls();
   const { showError, showSuccess } = useToast();
   const mapError = useMapError();
   const errorsText = useErrorsText();
@@ -193,6 +204,7 @@ export function MatchCardActions({
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
   const [confirmForce, setConfirmForce] = useState(false);
+  const [contactsOpen, setContactsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const panelId = useId();
@@ -203,6 +215,10 @@ export function MatchCardActions({
   // sans cette remise à zéro, la modale se rouvrirait seule au retour de
   // « Forcer » (instantané du flux), sans clic.
   if (confirmForce && !hasForce) setConfirmForce(false);
+  // Les contacts ne restent pas affichés quand le match ne les offre plus
+  // (terminé, caster retiré, tournoi clos) : l'instantané du flux retire
+  // l'action, et la modale se ferme avec elle.
+  if (contactsOpen && !actions.some((a) => a.id === "contacts")) setContactsOpen(false);
   // Ouvert **et** encore quelque chose à montrer : un instantané du flux qui
   // retire le panneau ne doit pas le laisser « ouvert » en mémoire, prêt à
   // reparaître déplié sans clic au retour d'une action.
@@ -337,6 +353,7 @@ export function MatchCardActions({
     playerScore: onPlayerScore,
     openLaunch: () =>
       window.dispatchEvent(new CustomEvent(MATCH_LAUNCH_OPEN_EVENT, { detail: { matchId: match.id } })),
+    contacts: () => setContactsOpen(true),
     plan: () => openSchedule(match),
     adminScore: onAdminScore,
     schedule: () => openSchedule(match),
@@ -479,11 +496,17 @@ export function MatchCardActions({
           onClose={() => setConfirmForce(false)}
           onConfirm={() => run(() => send(`/api/admin/matches/${match.id}/launch`, "POST"), t("cardActions.forceConfirm.success"))}
         >
-          <p>{t("cardActions.forceConfirm.body")}</p>
+          {/* Sans phase de lancement, aucun « Prêt » n'est attendu : forcer
+              n'avance que l'heure (et, à planifier, seul l'avis suit). */}
+          {launchPhaseEnabled && <p>{t("cardActions.forceConfirm.body")}</p>}
+          {!launchPhaseEnabled && phase !== "TO_PLAN" && <p>{t("cardActions.forceConfirm.bodyDirect")}</p>}
           {phase === "TO_PLAN" && (
             <p>{t("cardActions.forceConfirm.unplanned")}</p>
           )}
         </ConfirmActionDialog>
+      )}
+      {contactsOpen && (
+        <MatchContactsDialog matchId={match.id} matchLabel={matchLabel} onClose={() => setContactsOpen(false)} />
       )}
     </div>
   );

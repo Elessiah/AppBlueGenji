@@ -19,6 +19,11 @@ type LiveControls = {
    * dépend (`TO_PLAN`), et chaque carte la lit ici plutôt qu'en prop.
    */
   refereeScheduling: boolean;
+  /**
+   * Option du tournoi « phase de lancement » (`docs/features/MATCH_LAUNCH.md`) :
+   * éteinte, un match part dès son heure — ni « Lancement » ni « Prêt ».
+   */
+  launchPhase: boolean;
   /** Ouvre la configuration de diffusion d'un match. */
   openConfig: (match: BracketMatch) => void;
   /** Ouvre la date de début d'un match. */
@@ -40,6 +45,8 @@ const LiveContext = createContext<LiveControls>({
   canManage: false,
   canSchedule: false,
   refereeScheduling: false,
+  // Hors fournisseur, la règle d'origine (`MatchLaunchInput.launchPhase` absent).
+  launchPhase: true,
   openConfig: () => undefined,
   openSchedule: () => undefined,
   viewerUserId: null,
@@ -62,6 +69,7 @@ export function LiveProvider({
   canManage,
   canSchedule,
   refereeScheduling,
+  launchPhase,
   openConfig,
   openSchedule,
   viewerUserId,
@@ -75,6 +83,7 @@ export function LiveProvider({
       canManage,
       canSchedule,
       refereeScheduling,
+      launchPhase,
       openConfig,
       openSchedule,
       viewerUserId,
@@ -86,6 +95,7 @@ export function LiveProvider({
       canManage,
       canSchedule,
       refereeScheduling,
+      launchPhase,
       openConfig,
       openSchedule,
       viewerUserId,

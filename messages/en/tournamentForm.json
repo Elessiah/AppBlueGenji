@@ -64,6 +64,7 @@
       "registrationDiscordRequirement": "Verified Discord at registration",
       "registrationBlizzardRequirement": "Blizzard account at registration",
       "registrationMinPlayers": "Minimum players on the team",
+      "launchPhase": "Match launch phase",
       "phases": "Tournament stages"
     }
   },
@@ -177,7 +178,14 @@
       "finished": "The tournament is finished: this option can no longer be changed.",
       "create": "Can be changed later, until the tournament closes — even while it's in progress.",
       "edit": "Can be changed until the tournament closes — even while it's in progress.",
-      "warning": "On saving, matches with no date that haven't launched yet leave the launch — their “Ready” calls are cleared — and wait for a referee to set their time. Matches already launched carry on."
+      "warning": "On saving, matches with no date that haven't launched yet leave the launch — their “Ready” calls are cleared — and wait for a referee to set their time. Matches already launched carry on.",
+      "warningDirect": "On saving, matches with no date that haven't launched yet wait for a referee to set their time. Matches already launched carry on."
+    },
+    "launchPhase": {
+      "label": "Match launch phase",
+      "description": "With this option on, at its start time each match opens a launch window: both teams (and the caster) click “Ready”, and the match starts once everyone is ready, when a referee forces it, or automatically after {launchDelay} minutes. Off (default), a match starts as soon as its time comes, with no “Ready” or launch window — and a match with no time, as soon as both its opponents are known (unless referees schedule the matches).",
+      "scope": "Can be changed until the tournament starts, then locked.",
+      "locked": "The tournament has started: this option can no longer be changed."
     },
     "games": {
       "OW": "Overwatch",

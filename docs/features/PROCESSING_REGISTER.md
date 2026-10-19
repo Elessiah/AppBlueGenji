@@ -52,7 +52,7 @@ l'hébergeur et dans `T09`. Le courriel de l'association est une messagerie
 Gmail : Google en est destinataire (`T11`, `ASSOCIATION_GMAIL_FRAMEWORK`), et
 une demande reçue par ce courriel ou par le téléphone de l'association suit la
 règle des demandes RGPD (durée du traitement, puis 30 jours après la clôture).
-Les contacts présentés au lancement d'un match reposent sur l'exécution des
+Les contacts présentés aux parties d'un match (dès que ses deux adversaires sont connus) reposent sur l'exécution des
 conditions d'utilisation (`T04`), l'exposition du tag certifié à
 l'organisation restant fondée sur le consentement.
 

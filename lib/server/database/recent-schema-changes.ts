@@ -213,6 +213,12 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // les 48 heures) à chaque lecture de `/tournois`, une fois par minute au plus :
     // sans index, toute l'histoire des matchs était relue à chaque passage.
     `ALTER TABLE bg_matches ADD INDEX idx_bg_matches_start_at (start_at)`,
+    // Phase de lancement des matchs devenue une option du tournoi
+    // (`docs/features/MATCH_LAUNCH.md`). Décision de l'utilisateur
+    // (2026-10-13) : défaut 0, si bien que tout tournoi existant passe sans
+    // lancement — un match part dès son heure, sans « Prêt » ni modale.
+    `ALTER TABLE bg_tournaments ADD COLUMN match_launch_phase TINYINT(1) NOT NULL DEFAULT 0
+       AFTER referee_scheduling`,
     // PR #441 — marque `TOLD` (un horaire reçu, `lib/shared/discord-notifications.ts`).
     // Données seulement, rejouées à chaque démarrage sans effet une seconde fois.
     // 1. Un palier posé par l'ancien code l'était toujours avec un message :

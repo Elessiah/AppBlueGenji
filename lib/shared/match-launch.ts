@@ -61,6 +61,15 @@ export type MatchLaunchInput = {
    * d'un match que l'arbitrage n'a pas encore planifié.
    */
   refereeScheduling: boolean;
+  /**
+   * Option du tournoi « phase de lancement » (`bg_tournaments.match_launch_phase`).
+   * `false` : ni « Prêt » ni modale — un match jouable dont l'heure est
+   * atteinte (ou sans heure) est **lancé** d'emblée, comme parti d'office.
+   * Absent = allumée (le comportement d'origine) : un appelant qui l'oublie
+   * montre au pire un lancement que l'entretien serveur
+   * (`maintainMatchLaunches`) referme aussitôt en posant `launched_at`.
+   */
+  launchPhase?: boolean;
 };
 
 function isoTime(iso: string | null | undefined): number | null {
@@ -84,7 +93,7 @@ export function matchLaunchPhase(match: MatchLaunchInput, now: number): MatchLau
   const start = isoTime(match.startAt);
   if (start === null && match.refereeScheduling) return "TO_PLAN";
   if (start !== null && start > now) return "SCHEDULED";
-  return "LOBBY";
+  return match.launchPhase === false ? "LAUNCHED" : "LOBBY";
 }
 
 /**
@@ -100,16 +109,19 @@ export function nextLaunchPhaseChangeAt(match: MatchLaunchInput, now: number): n
 /**
  * Les engagés peuvent-ils reporter un score sur ce match ? Seulement lancé.
  *
- * L'option de planification n'y change rien — `LAUNCHED` ne dépend que de
- * `launched_at` et du statut —, d'où une entrée qui ne la demande pas : le
- * report d'un joueur ne lit pas le tournoi pour une réponse qu'elle ne peut
- * pas modifier.
+ * Phase de lancement allumée (ou absente, comme au serveur), l'option de
+ * planification n'y change rien — `LAUNCHED` ne dépend que de `launched_at`
+ * et du statut. Éteinte, `LAUNCHED` se déduit aussi de l'heure : la page passe
+ * alors la planification, sans quoi un match « À planifier » offrirait le score.
  */
 export function canPlayersReportScore(
-  match: Omit<MatchLaunchInput, "refereeScheduling">,
+  match: Omit<MatchLaunchInput, "refereeScheduling"> & { refereeScheduling?: boolean },
   now: number,
 ): boolean {
-  return matchLaunchPhase({ ...match, refereeScheduling: false }, now) === "LAUNCHED";
+  // Planification par l'arbitrage : sans effet allumée (à planifier ou en
+  // lancement, jamais lancé sans écriture) ; **décisive** option éteinte, où un
+  // match sans date serait sinon lancé d'emblée alors qu'il attend sa date.
+  return matchLaunchPhase({ ...match, refereeScheduling: match.refereeScheduling ?? false }, now) === "LAUNCHED";
 }
 
 /**
@@ -458,6 +470,7 @@ export const LAUNCH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   MATCH_NOT_LAUNCHABLE: "Ce match ne peut pas être lancé : ses deux engagées ne sont pas connues ou il est terminé.",
   MATCH_ALREADY_LAUNCHED: "Ce match est déjà lancé.",
   MATCH_NOT_LAUNCHED: "Le match n'est pas encore lancé : toutes les parties doivent se déclarer prêtes.",
+  MATCH_NOT_STARTED: "Le match n'a pas encore commencé : le score s'ouvre à son heure de départ.",
   MATCH_NOT_IN_LAUNCH:
     "Le score ne se saisit qu'à partir du lancement du match : planifie-le ou attends son heure de début. Un forfait reste possible.",
   NOT_MATCH_PARTY: "Tu ne joues ni ne castes ce match.",

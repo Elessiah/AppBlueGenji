@@ -17,7 +17,9 @@ import {
   setMatchHost,
   setMatchReady,
 } from "@/lib/server/tournaments/match-launch";
-import { listViewerMatchLaunches } from "@/lib/server/tournaments/match-launch-info";
+import { listViewerMatchLaunches, loadViewerMatchContacts } from "@/lib/server/tournaments/match-launch-info";
+import { GET as contactsGet } from "@/app/api/matches/[matchId]/contacts/route";
+import type { LaunchSide, MatchLaunchInfo } from "@/lib/shared/match-launch";
 import { authUser } from "../../helpers/auth-user";
 
 const player = authUser({ id: 2, roles: [] });
@@ -203,5 +205,81 @@ describe("GET /api/me/match-launches", () => {
     const res = await launchesGet();
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toMatchObject({ error: "MATCH_LAUNCH_READ_FAILED" });
+  });
+});
+
+describe("GET /api/matches/[matchId]/contacts", () => {
+  const side = (teamId: number, name: string): LaunchSide => ({
+    teamId,
+    name,
+    logoUrl: null,
+    isGhost: false,
+    isSolo: false,
+    ready: false,
+    contacts: [],
+  });
+  const info: MatchLaunchInfo = {
+    matchId: 42,
+    tournamentId: 7,
+    tournamentName: "Coupe",
+    phase: "SCHEDULED",
+    startAt: "2026-10-20T18:00:00.000Z",
+    lobbyOpenedAt: null,
+    autoLaunchAt: null,
+    launchedAt: null,
+    hostTeamId: 10,
+    team1: side(10, "Alpha"),
+    team2: side(20, "Bravo"),
+    caster: null,
+    viewer: { role: "TEAM1", canDeclareReady: true, ready: false },
+  };
+  const request = () => new Request("http://localhost/api/matches/42/contacts");
+
+  it("rejette un visiteur anonyme", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
+    expect((await contactsGet(request(), params("42"))).status).toBe(401);
+    expect(loadViewerMatchContacts).not.toHaveBeenCalled();
+  });
+
+  it("valide l'identifiant du match", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 81 }));
+    expect((await contactsGet(request(), params("abc"))).status).toBe(400);
+    expect(loadViewerMatchContacts).not.toHaveBeenCalled();
+  });
+
+  it("rend la présentation du match à une de ses parties", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 82 }));
+    jest.mocked(loadViewerMatchContacts).mockResolvedValue(info);
+    const res = await contactsGet(request(), params("42"));
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ launch: info });
+    expect(loadViewerMatchContacts).toHaveBeenCalledWith(expect.objectContaining({ id: 82 }), 42);
+  });
+
+  it("refuse par un seul code qui n'est pas partie du match, ou un match sans contacts", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 83 }));
+    jest.mocked(loadViewerMatchContacts).mockResolvedValue(null);
+    const res = await contactsGet(request(), params("42"));
+    expect(res.status).toBe(404);
+    await expect(res.json()).resolves.toEqual({ error: "MATCH_CONTACTS_UNAVAILABLE" });
+  });
+
+  it("a son propre quota : la modale qui interroge ne l'épuise pas, et il plafonne à trente par minute", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 85 }));
+    jest.mocked(listViewerMatchLaunches).mockResolvedValue([]);
+    jest.mocked(loadViewerMatchContacts).mockResolvedValue(info);
+    for (let i = 0; i < 60; i++) await launchesGet();
+    expect((await launchesGet()).status).toBe(429);
+    for (let i = 0; i < 30; i++) expect((await contactsGet(request(), params("42"))).status).toBe(200);
+    expect((await contactsGet(request(), params("42"))).status).toBe(429);
+  });
+
+  it("répond 500 sans détail sur une panne de lecture", async () => {
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 84 }));
+    jest.mocked(loadViewerMatchContacts).mockRejectedValue(new Error("ECONNREFUSED"));
+    const res = await contactsGet(request(), params("42"));
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toEqual({ error: "MATCH_CONTACTS_READ_FAILED" });
   });
 });

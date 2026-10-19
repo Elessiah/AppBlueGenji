@@ -527,12 +527,16 @@ export function TournamentSheet({ tournamentId, source }: Readonly<{ tournamentI
   // descendent dans chaque `MatchRow` par `PlayerScoreProvider`, et deux
   // flèches neuves à chaque rendu changeraient la valeur du contexte à chaque
   // instantané — toutes les cartes, pourtant mémorisées, se redessineraient.
-  // Leurs dépendances tiennent au lecteur, pas au plateau : l'horloge n'y joue
-  // aucun rôle (`canPlayersReportScore` ne rend `LAUNCHED` que sur une
-  // écriture, que le flux apporte avec un nouvel objet de match).
+  // Leurs dépendances tiennent au lecteur et aux options du tournoi, pas au
+  // plateau ni à l'horloge : avec la phase de lancement, `canPlayersReportScore`
+  // ne rend `LAUNCHED` que sur une écriture ; sans elle, il le déduit aussi de
+  // l'heure, mais le serveur écrit `launched_at` à l'entretien qui suit — le flux
+  // apporte alors un nouvel objet de match, qui relance le calcul.
   const viewerMyTeamId = detail?.myTeamId ?? null;
   const viewerReportTeamIds = detail?.canCreateReportsForTeamIds;
   const viewerCanActForEntrant = detail?.canRegisterEntrant ?? false;
+  const launchPhaseEnabled = detail?.card.launchPhase ?? false;
+  const refereeSchedulingEnabled = detail?.card.refereeScheduling ?? false;
   /**
    * Le suivi est arrêté : ce qui est affiché ne bouge plus. On retire donc les
    * actions plutôt que de les laisser échouer une par une — une équipe qui
@@ -545,8 +549,11 @@ export function TournamentSheet({ tournamentId, source }: Readonly<{ tournamentI
       !frozen &&
       viewerMyTeamId !== null &&
       (viewerReportTeamIds?.includes(viewerMyTeamId) ?? false) &&
-      canPlayersReportScore(match, Date.now()),
-    [frozen, viewerMyTeamId, viewerReportTeamIds],
+      canPlayersReportScore(
+        { ...match, launchPhase: launchPhaseEnabled, refereeScheduling: refereeSchedulingEnabled },
+        Date.now(),
+      ),
+    [frozen, viewerMyTeamId, viewerReportTeamIds, launchPhaseEnabled, refereeSchedulingEnabled],
   );
   const canOpenPlayerScore = useCallback(
     (match: BracketMatch): boolean =>
@@ -1020,6 +1027,7 @@ export function TournamentSheet({ tournamentId, source }: Readonly<{ tournamentI
         canManage={detail.canManageLive}
         canSchedule={detail.isAdmin}
         refereeScheduling={detail.card.refereeScheduling}
+        launchPhase={detail.card.launchPhase}
         openConfig={openMatchLive}
         openSchedule={openMatchSchedule}
         viewerUserId={detail.viewerUserId}
@@ -1179,6 +1187,7 @@ export function TournamentSheet({ tournamentId, source }: Readonly<{ tournamentI
           tournamentStartAt={detail.card.startAt}
           tournamentFinished={detail.card.state === "FINISHED"}
           refereeScheduling={detail.card.refereeScheduling}
+          launchPhase={detail.card.launchPhase}
           onClose={() => setMatchForScheduleId(null)}
           onSaved={() => void refresh()}
         />
