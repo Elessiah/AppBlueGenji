@@ -322,6 +322,16 @@ async function openEvening(target: LiveMentionTarget): Promise<LiveEvening> {
   return created[0];
 }
 
+/** Trace pm2 : comment le groupe a rejoint #live (nouveau message, modification, suite). */
+function howPosted(evening: LiveEvening, quiet: boolean, messageId: string | null): string {
+  if (isFollowUp(evening, messageId)) {
+    return "dans une suite sans notifier, le message de la soirée ayant disparu ou ne se modifiant plus";
+  }
+  if (evening.discord_message_id) return "ajoutés au message de la soirée";
+  if (quiet) return "dans un nouveau message sans notifier, la soirée ayant déjà une annonce";
+  return "dans un nouveau message";
+}
+
 /** Vrai si le message gardé de la soirée est parti sans mention : sa modification n'en écrit pas. */
 function editsSilentMessage(evening: LiveEvening): boolean {
   return Boolean(evening.discord_message_id) && Number(evening.silent) === 1;
@@ -720,9 +730,7 @@ async function announce(
     // Trace pm2 pour le staff : identifiants seulement, aucun nom.
     const silent = outcome === "posted-silent" ? " sans notifier (permission de mentionner absente)" : "";
     const announced = plural ? "annoncés" : "annoncé";
-    let how = "dans un nouveau message";
-    if (evening.discord_message_id) how = "ajoutés au message de la soirée";
-    else if (quiet) how = "dans un nouveau message sans notifier, la soirée ayant déjà une annonce";
+    const how = howPosted(evening, quiet, messageId);
     console.info(`[live-announce] ${label} ${announced} dans #live (soirée ${Number(evening.id)}, ${how})${silent}`);
     return { posted: group.rows.length, postponed: null };
   }
