@@ -574,11 +574,12 @@ export async function reportMatchScore(
       // le saura que par le canal Discord — d'où une alerte, résolue après le
       // commit comme les lignes de journal (`./bot-logs`).
       //
-      // Réservée, et pas seulement mise en file : rien n'interdit aux deux
-      // engagées de resaisir leur score tant que la manche n'est pas tranchée,
-      // et chaque désaccord ferait sinon sonner le téléphone de tous les
-      // arbitres. La réservation est effacée par `finalizeMatch`, si bien qu'un
-      // désaccord qui renaît après un arbitrage alerte de nouveau.
+      // Réservée, et pas seulement mise en file : le litige verrouille désormais
+      // toute resaisie (`assertNoOpenDispute`), mais un litige peut renaître
+      // après une remise à zéro (retour en arrière, réappariement) ou un
+      // arbitrage — une alerte par litige, pas une de plus. La réservation est
+      // effacée par `finalizeMatch`, si bien qu'un désaccord qui renaît après un
+      // arbitrage alerte de nouveau.
       await queueRefereeAlert(connection, { kind: "score_conflict", matchId });
     }
   }

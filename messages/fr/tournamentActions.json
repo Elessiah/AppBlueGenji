@@ -220,7 +220,7 @@
     "reportConflict": "Score en litige · saisie verrouillée, arbitrage attendu",
     "reportSide": "Équipe {side}",
     "reportPending": "{score1} – {score2} proposé par {reporter} · à confirmer",
-    "reportPendingDeadline": "{score1} – {score2} proposé par {reporter} · validé automatiquement à {deadline} (heure de Paris) sans réponse",
+    "reportPendingDeadline": "{score1} – {score2} proposé par {reporter} · validation automatique à {deadline} (heure de Paris) sans réponse",
     "locked": "Score verrouillé",
     "lockedTitle": "La manche suivante a déjà des scores : le résultat de ce match ne peut plus être modifié.",
     "lockedReason": ": la manche suivante a déjà des scores, le résultat de ce match ne peut plus être modifié.",

@@ -1,9 +1,9 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
-import { SCORE_LOCKED_DISPUTE, isScoreDisputed, reportPresent } from "@/lib/shared/score-dispute";
 import type { MatchStatus } from "@/lib/shared/types";
 import { adminResolveMatch } from "./admin";
 import { resolveUserEntrant } from "./registration";
+import { assertNoOpenDispute } from "./scoring";
 import { syncTournamentState } from "./state";
 
 /**
@@ -72,15 +72,12 @@ export async function forfeitOwnMatch(
 
   // Litige ouvert : le forfait est un score comme un autre (0-3 contre soi),
   // verrouillé avec la saisie jusqu'à l'arbitrage (`SCORE_DISPUTE_LOCK.md`).
-  if (
-    isScoreDisputed({
-      status: match.status,
-      team1Reported: reportPresent(match.team1_report_score),
-      team2Reported: reportPresent(match.team2_report_score),
-    })
-  ) {
-    throw new Error(SCORE_LOCKED_DISPUTE);
-  }
+  // Même règle que le report (`assertNoOpenDispute`) : une seule définition du litige.
+  assertNoOpenDispute({
+    status: match.status,
+    team1_report_score: match.team1_report_score ?? null,
+    team2_report_score: match.team2_report_score ?? null,
+  });
 
   await adminResolveMatch(connection, matchId, { forfeitTeamId: teamId });
   return { forfeitTeamId: teamId };

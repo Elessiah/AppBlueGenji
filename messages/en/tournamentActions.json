@@ -220,7 +220,7 @@
     "reportConflict": "Score disputed · entry locked, awaiting a referee",
     "reportSide": "Team {side}",
     "reportPending": "{score1} – {score2} proposed by {reporter} · awaiting confirmation",
-    "reportPendingDeadline": "{score1} – {score2} proposed by {reporter} · confirmed automatically at {deadline} (Paris time) without an answer",
+    "reportPendingDeadline": "{score1} – {score2} proposed by {reporter} · automatic confirmation at {deadline} (Paris time) without an answer",
     "locked": "Score locked",
     "lockedTitle": "The next round already has scores: this match's result can no longer be changed.",
     "lockedReason": ": the next round already has scores, this match's result can no longer be changed.",

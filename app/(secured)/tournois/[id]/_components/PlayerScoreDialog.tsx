@@ -452,8 +452,6 @@ export function PlayerScoreDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="player-score-title"
-        // Verrou : le focus rendu à la modale lit aussi pourquoi la saisie a disparu.
-        aria-describedby={disputeLocked ? "player-score-locked" : undefined}
         tabIndex={-1}
       >
         <form onSubmit={onSubmitForm}>
@@ -481,6 +479,21 @@ export function PlayerScoreDialog({
               (saisie déjà commencée à son arrivée) : le détail adverse, codes de
               replay compris — sans lui, une faute de frappe ne se retrouverait
               pas, et « Confirme-le » n'aurait rien à montrer. */}
+          {/* Litige : sa propre proposition aussi — la saisie retirée, c'est la
+              seule trace de ses codes, à comparer aux adverses (à score égal,
+              ce sont eux qui diffèrent) et à citer à l'arbitre. */}
+          {disputeLocked && view?.mine && view.mine.maps.length > 0 && (
+            <div className={mapStyles.proposals}>
+              <p className={mapStyles.proposalTitle}>{t("score.admin.proposalOf", { name: myName })}</p>
+              <MapResultList
+                maps={view.mine.maps}
+                team1Name={team1}
+                team2Name={team2}
+                label={t("score.admin.proposalMaps", { name: myName })}
+              />
+            </div>
+          )}
+
           {showTheirMaps && view?.theirs && (
             <div className={mapStyles.proposals}>
               <p className={mapStyles.proposalTitle}>{t("score.admin.proposalOf", { name: opponentName })}</p>
