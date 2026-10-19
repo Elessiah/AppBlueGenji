@@ -1084,8 +1084,8 @@ function RgpdFr({
             responsable de son propre traitement (<Link href="/rgpd/registre#t16">registre, T16</Link>). Au
             début d&apos;un match diffusé, le bot l&apos;annonce dans le salon #live du serveur Discord de
             l&apos;association, en un message par soirée (quatre heures depuis le premier direct) qui liste à
-            leur heure les matchs en direct et ceux programmés d&apos;ici la fin de la soirée, et qui est
-            modifié à chaque nouveau match ; il mentionne @everyone pour la chaîne officielle de
+            leur heure les matchs en direct, ceux programmés d&apos;ici la fin de la soirée et ceux terminés
+            (« Terminé », avec leur score), et qui est modifié à chaque début et à chaque fin de match ; il mentionne @everyone pour la chaîne officielle de
             l&apos;association, le seul rôle StreamViewer pour toute autre chaîne. Il donne le nom des deux équipes (jamais le pseudo
             de leurs joueurs) ou, en tournoi individuel, le <strong>pseudo public BlueGenji</strong> des
             deux joueurs (le pseudo de sa fiche, modifiable dans Mon profil, sans effet sur un message de soirée qui n'est plus modifié : sans changement, le pseudo Discord ou le

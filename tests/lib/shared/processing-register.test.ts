@@ -138,7 +138,7 @@ describe("PROCESSING_ACTIVITIES", () => {
     // T05 ne contredit pas T04 sur la base du programme d'arbitrage envoyé au staff.
     expect(t04.legalBasis).toMatch(/l'intérêt légitime \(bon déroulement des tournois\) restant la base à l'égard des joueurs et équipes qu'ils citent/);
     expect(byRef("T01").retention.join(" ")).toMatch(/annonces #live d'un tournoi individuel gardent le pseudo dans le salon Discord jusqu'à leur suppression sur demande, et l'alerte AutoMod d'une telle annonce bloquée ou signalée le garde dans le salon d'alertes des modérateurs jusqu'à sa suppression par eux ou sur demande \(T16\)/);
-    expect(byRef("T08").subPurposes.join(" ")).toMatch(/salon #live du serveur de l'association, en un message par soirée modifié à chaque nouveau match, avec une mention @everyone pour la chaîne officielle ou du seul rôle StreamViewer pour toute autre chaîne \(noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs/);
+    expect(byRef("T08").subPurposes.join(" ")).toMatch(/salon #live du serveur de l'association, en un message par soirée modifié à chaque début et fin de match, avec une mention @everyone pour la chaîne officielle ou du seul rôle StreamViewer pour toute autre chaîne \(noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs/);
     expect(byRef("T08").retention.join(" ")).toMatch(/Annonces #live : dans le salon tant qu'il existe, même après la suppression du compte du joueur/);
     expect(byRef("T08").dataCategories.join(" ")).toMatch(/l'annonce #live, elle, reste publiée dans le salon \(traitement T16\)/);
     expect(byRef("T16").subPurposes.join(" ")).toMatch(/modifiable dans Mon profil, sans effet sur un message de soirée qui n'est plus modifié/);

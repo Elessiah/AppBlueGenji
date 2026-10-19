@@ -897,8 +897,8 @@ export function RgpdEn({
             of its own processing (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>). When a
             streamed match starts, the bot announces it in the #live channel of the association&apos;s Discord
             server, in one message per evening (four hours from the first live stream) that lists with their times
-            the matches live and those scheduled until the end of the evening, and that is edited at each new
-            match; it mentions @everyone for the association&apos;s official channel, only the StreamViewer role for
+            the matches live, those scheduled until the end of the evening and those finished (“<span lang="fr">Terminé</span>”, with
+            their score), and that is edited at each match start and end; it mentions @everyone for the association&apos;s official channel, only the StreamViewer role for
             any other channel. It gives the names of both teams (never their players&apos; usernames) or, in a
             solo tournament, the <strong>public BlueGenji username</strong> of both players (the username on their page, editable in My profile, with no effect on an evening message that is no longer edited: unless changed, the Discord username or BattleTag
             taken when the account was created, or even the Google account name for a Google account created before
