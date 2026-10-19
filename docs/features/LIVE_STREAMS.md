@@ -142,19 +142,25 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
 - **Soirée** : `LIVE_EVENING_WINDOW_HOURS` = **4 h**, comptées depuis le
   premier direct annoncé pour ce public (`bg_live_evenings` : public, ouverture,
   fin de fenêtre, identifiant du message Discord, `silent` si ce message est
-  parti sans mention ; aucune donnée personnelle, effacée un jour après la fin
-  de la fenêtre). Quatre heures couvrent une soirée de tournoi (19 h – 23 h)
-  sans fondre deux soirées. La fenêtre repart de l'envoi du **premier message
-  gardé** de la soirée : des essais reportés avant lui (bot injoignable) ne la
-  raccourcissent pas, et ce premier message liste déjà les matchs programmés
-  jusqu'à cette nouvelle fin.
+  parti sans mention, `notified` si un envoi qui notifie est parti vers le
+  bot ; aucune donnée personnelle, effacée un jour après la fin de la
+  fenêtre). Quatre heures couvrent une soirée de tournoi (19 h – 23 h) sans
+  fondre deux soirées. La fenêtre repart du **premier envoi qui notifie** (posé
+  juste avant l'appel au bot, quelle qu'en soit l'issue) et du premier message
+  gardé : des essais reportés avant lui (bot injoignable) ne la raccourcissent
+  pas — un premier envoi incertain juste avant la fin de la fenêtre ne laisse
+  pas une nouvelle soirée notifier une minute plus tard —, et ce premier
+  message liste déjà les matchs programmés jusqu'à cette nouvelle fin.
 - **Texte** (français, `formatLiveEvening`) : « 🔴 **Les lives de la
   soirée** », puis un bloc par match séparé par une ligne vide — l'heure de
   Paris en gras (`**21:00**`), suivie de « · En direct » pour un match à
   l'antenne ; l'affiche et le tournoi ; le lien seul sur sa ligne. Les directs
   d'abord, puis les matchs **programmés** (`START_TIME`, castés, d'ici la fin
   de la fenêtre) par heure : l'heure des streams à venir se lit d'un coup
-  d'œil. Un match fini depuis son annonce n'est plus listé. Les liens partent
+  d'œil. Un match fini depuis son annonce, ou sorti de l'antenne (rouvert pour
+  une autre affiche, antenne fermée en `MANUAL`), n'est plus listé : seul un
+  match `START_TIME` figure avant son direct, à son heure — jamais un match à
+  une heure inventée. Les liens partent
   à part (`streamUrls`, dix au plus) et le texte les place par des jetons
   `{{lien:N}}` que le bot remplace après ses neutralisations ; un nom ne peut
   pas forger de jeton (une espace de largeur nulle suit chaque accolade suivie
@@ -177,17 +183,22 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   (`uncertain`, `timed-out`, `interrupted`) ne laisse pas d'identifiant : un
   match suivant de la même soirée repart dans un nouveau message.
 - **Jamais deux notifications par public et par soirée** : soirée sans
-  identifiant gardé, mais dont un autre match du même public a déjà une
-  annonce réservée depuis son ouverture (`evening_announced` : publication
-  incertaine, bot trop ancien, identifiant non enregistré, refus abandonné) —
-  le site envoie `notify: false` et le bot poste un nouveau message **sans
+  identifiant gardé, mais marquée `notified` (premier envoi d'issue incertaine,
+  bot trop ancien, identifiant non enregistré — même si le tournoi de ce match
+  est fini depuis) ou dont un autre match du même public a déjà une annonce
+  réservée depuis son ouverture (`evening_announced`) — le site envoie
+  `notify: false` et le bot poste un nouveau message **sans
   mention écrite ni notification**. Les réservations d'un passage, prises
   avant l'ouverture de la soirée (parfois de plusieurs secondes, quand l'envoi
   de l'autre public passe d'abord), sont datées dans la soirée
   (`sent_at = GREATEST(sent_at, started_at)`) avant la lecture de ses matchs :
   sinon le match sortirait du message à la modification suivante, et ce
-  garde-fou ne le verrait pas. Revers assumé : un premier envoi refusé
-  (`rejected`, AutoMod) laisse la soirée sans notification.
+  garde-fou ne le verrait pas. Un envoi **refusé** (`rejected`, AutoMod) ou
+  **reporté** n'a rien publié : la marque `notified` qu'il avait posée est
+  retirée, et un refus (réservation gardée, jamais réessayé) sort de la soirée
+  (`sent_at` daté juste avant son ouverture) — sinon chaque match suivant
+  reprendrait le nom bloqué et serait refusé à son tour, et la soirée se
+  croirait notifiée.
 - **Longueur** : le texte, liens comptés en entier, tient dans
   `LIVE_ANNOUNCEMENT_MAX_LENGTH` (1 500) ; au-delà, la liste s'arrête **à la
   fin d'un bloc** et une dernière ligne compte le reste (« … et 3 autres matchs
