@@ -183,7 +183,7 @@
     },
     "launchPhase": {
       "label": "Match launch phase",
-      "description": "With this option on, at its start time each match opens a launch window: both teams (and the caster) click “Ready”, and the match starts once everyone is ready, when a referee forces it, or automatically after {launchDelay} minutes. Off (default), a match starts as soon as its time comes, with no “Ready” or launch window.",
+      "description": "With this option on, at its start time each match opens a launch window: both teams (and the caster) click “Ready”, and the match starts once everyone is ready, when a referee forces it, or automatically after {launchDelay} minutes. Off (default), a match starts as soon as its time comes, with no “Ready” or launch window — and a match with no time, as soon as both its opponents are known (unless referees schedule the matches).",
       "scope": "Can be changed until the tournament starts, then locked.",
       "locked": "The tournament has started: this option can no longer be changed."
     },

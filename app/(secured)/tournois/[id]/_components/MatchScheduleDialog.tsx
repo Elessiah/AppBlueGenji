@@ -82,7 +82,10 @@ export function startAtHint(
     return `${text.t("schedule.hintLaunched")} ${scheduleNotice(text, refereeScheduling, entrantsKnown)}`;
   }
   const planningKey = launchPhase ? "schedule.hintPlanning" : "schedule.hintPlanningDirect";
-  const plainKey = launchPhase ? "schedule.hint" : "schedule.hintDirect";
+  // Option éteinte, un match sans date part d'emblée — mais seulement une fois
+  // ses deux adversaires connus.
+  const directKey = entrantsKnown ? "schedule.hintDirect" : "schedule.hintDirectTbd";
+  const plainKey = launchPhase ? "schedule.hint" : directKey;
   const base = text.t(refereeScheduling ? planningKey : plainKey);
   // Un match joué (ou au score saisi) n'annonce rien : la date n'est qu'une
   // correction d'archive.
