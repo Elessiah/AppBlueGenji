@@ -272,6 +272,22 @@ export async function createOrGetDiscordUser(
     acceptedNow?: boolean;
   },
 ): Promise<number> {
+  return resolveDiscordSignIn(discordId, pseudoInput, verifiedHandle, door, false);
+}
+
+/**
+ * Corps de {@link createOrGetDiscordUser}. `retried` : la lecture a déjà été
+ * refaite une fois parce que le compte trouvé ne portait plus ce Discord au
+ * moment d'écrire (détaché entre-temps, peut-être rattaché ailleurs) — on ne
+ * lui ouvre pas de session par une porte qu'il n'a plus.
+ */
+async function resolveDiscordSignIn(
+  discordId: string,
+  pseudoInput: string | undefined,
+  verifiedHandle: string | null | undefined,
+  door: Parameters<typeof createOrGetDiscordUser>[3],
+  retried: boolean,
+): Promise<number> {
   const db = await getDatabase();
   const handle = normalizeDiscordHandle(verifiedHandle);
   const avatarUrl = door.avatarUrl;
@@ -308,7 +324,7 @@ export async function createOrGetDiscordUser(
     // que Discord ait nommé un pseudo affichable ou pas. Les deux dans la même
     // instruction, plutôt qu'une seconde écriture qui laisserait un `await`
     // entre elles.
-    await db.execute(
+    const [refreshed] = await db.execute<ResultSetHeader>(
       // `discord_id = ?` : le compte a pu détacher ce Discord (et en rattacher
       // un autre) depuis la lecture — son pseudo, alors nommé « par Discord »,
       // deviendrait certifiable d'un clic sur l'identifiant de l'autre.
@@ -322,6 +338,11 @@ export async function createOrGetDiscordUser(
            WHERE id = ? AND is_deleted = 0 AND discord_id = ?`,
       handle ? [handle, handle, userId, discordId] : [userId, discordId],
     );
+    // Rien d'écrit : ce compte n'a plus ce Discord (ou vient d'être supprimé).
+    // Une seconde lecture dit à qui il appartient désormais — ou à personne.
+    if (Number(refreshed.affectedRows) === 0 && !retried) {
+      return resolveDiscordSignIn(discordId, pseudoInput, verifiedHandle, door, true);
+    }
     await adoptRemoteAvatar(userId, avatarUrl ?? undefined);
     await settleTermsAfterLogin(userId, false, door);
     return userId;
