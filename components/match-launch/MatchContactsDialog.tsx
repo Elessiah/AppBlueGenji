@@ -21,6 +21,35 @@ export function contactsErrorText(text: LaunchText, code: string | null | undefi
 type LoadState = { kind: "loading" } | { kind: "ready"; launch: MatchLaunchInfo } | { kind: "failed" };
 
 /**
+ * Délai avant l'unique relecture d'un refus `MATCH_CONTACTS_UNAVAILABLE`. La
+ * carte décide du bouton à l'horloge du navigateur, le serveur à la sienne :
+ * un caster dont l'horloge avance de quelques secondes voit « Contacts » à
+ * l'heure du départ, avant que le serveur ne tienne le match pour parti.
+ */
+export const CONTACTS_RETRY_DELAY_MS = 3_000;
+
+type ContactsRead = { launch: MatchLaunchInfo } | { error: string | null };
+
+/**
+ * Lit les contacts d'un match ; un refus « indisponible » est relu **une**
+ * fois après `CONTACTS_RETRY_DELAY_MS` (écart d'horloge à la frontière du
+ * départ), tout autre échec est rendu tel quel.
+ */
+export async function readMatchContacts(
+  matchId: number,
+  wait: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+): Promise<ContactsRead> {
+  for (let attempt = 0; ; attempt += 1) {
+    const response = await fetch(`/api/matches/${matchId}/contacts`, { cache: "no-store" });
+    const payload = (await response.json().catch(() => ({}))) as { launch?: MatchLaunchInfo; error?: string };
+    if (response.ok && payload.launch) return { launch: payload.launch };
+    const error = payload.error ?? null;
+    if (attempt > 0 || error !== "MATCH_CONTACTS_UNAVAILABLE") return { error };
+    await wait(CONTACTS_RETRY_DELAY_MS);
+  }
+}
+
+/**
  * Modale « Contacts » d'une carte de match (`docs/features/MATCH_LAUNCH.md`
  * § Contacts hors lancement) : les fiches de la modale de lancement — équipes,
  * hôte, contacts, caster —, lues pour **ce** match par
@@ -56,15 +85,14 @@ export function MatchContactsDialog({
     let alive = true;
     void (async () => {
       try {
-        const response = await fetch(`/api/matches/${matchId}/contacts`, { cache: "no-store" });
-        const payload = (await response.json().catch(() => ({}))) as { launch?: MatchLaunchInfo; error?: string };
+        const read = await readMatchContacts(matchId);
         if (!alive) return;
-        if (!response.ok || !payload.launch) {
+        if ("error" in read) {
           setState({ kind: "failed" });
-          showError(contactsErrorText(text, payload.error));
+          showError(contactsErrorText(text, read.error));
           return;
         }
-        setState({ kind: "ready", launch: payload.launch });
+        setState({ kind: "ready", launch: read.launch });
       } catch {
         if (!alive) return;
         setState({ kind: "failed" });
