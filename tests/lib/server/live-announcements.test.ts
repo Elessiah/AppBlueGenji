@@ -14,6 +14,7 @@ import {
   dispatchLiveAnnouncements,
   liveAnnouncementsEnabled,
   liveEntrantName,
+  purgeEndedEvenings,
   resetLiveAnnouncementThrottle,
   runLiveAnnouncementSweep,
   soloPseudoRegisteredSince,
@@ -736,6 +737,35 @@ describe("dispatchLiveAnnouncements", () => {
     expect(notices).toHaveLength(1);
   });
 
+  it("purge les soirées finies depuis un jour à chaque évènement, annonces désactivées comprises, une fois par heure", async () => {
+    jest.replaceProperty(process, "env", { ...process.env, LIVE_ANNOUNCEMENTS_ENABLED: undefined });
+    const { execute } = mockDb([]);
+    const purges = () =>
+      execute.mock.calls.filter(([sql]) => sql === "DELETE FROM bg_live_evenings WHERE window_end < NOW() - INTERVAL 1 DAY");
+    expect(await dispatchLiveAnnouncements()).toBe(0);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(purges()).toHaveLength(1);
+    await dispatchLiveAnnouncements();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(purges()).toHaveLength(1);
+  });
+
+  it("purgeEndedEvenings : un échec se retente au passage suivant, un succès attend une heure", async () => {
+    const { execute } = mockDb([]);
+    const base = execute.getMockImplementation()!;
+    execute.mockImplementationOnce(async () => {
+      throw new Error("DB_DOWN");
+    });
+    await expect(purgeEndedEvenings(NOW)).rejects.toThrow("DB_DOWN");
+    execute.mockImplementation(base);
+    await purgeEndedEvenings(NOW + 1);
+    await purgeEndedEvenings(NOW + 30 * 60 * 1000);
+    await purgeEndedEvenings(NOW + 61 * 60 * 1000);
+    expect(execute.mock.calls.filter(([sql]) => sql.startsWith("DELETE FROM bg_live_evenings"))).toHaveLength(3);
+  });
+
   it("est étranglé : un second appel immédiat ne relit pas la base", async () => {
     const { query } = mockDb([]);
     await dispatchLiveAnnouncements();
@@ -891,8 +921,8 @@ describe("soirées d'annonces", () => {
     expect(update?.[1]).toEqual(["123456789012345678", 0, 3]);
     // Premier message qui notifie : la fenêtre part de son envoi, pas d'un essai reporté.
     expect(update?.[0]).toContain("window_end = GREATEST(window_end, NOW() + INTERVAL 4 HOUR)");
-    // Les soirées finies depuis un jour sont oubliées.
-    expect(sqls).toContain("DELETE FROM bg_live_evenings WHERE window_end < NOW() - INTERVAL 1 DAY");
+    // La purge des soirées finies ne passe pas par l'annonce.
+    expect(sqls.some((sql) => sql.startsWith("DELETE FROM bg_live_evenings"))).toBe(false);
   });
 
   it("soirée déjà annoncée : modifie son message, sans nouvelle notification, et le dit dans pm2", async () => {
