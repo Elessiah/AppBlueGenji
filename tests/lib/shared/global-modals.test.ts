@@ -22,6 +22,10 @@ describe("termsModalSilencedOn", () => {
       "/accessibilite",
       "/privacy-policy-bot",
       "/terms-of-service-bot",
+      "/regles",
+      "/regles/marvel-rivals",
+      "/signalements",
+      "/signalements/12",
       "/profil",
     ]) {
       expect(termsModalSilencedOn(path)).toBe(true);
