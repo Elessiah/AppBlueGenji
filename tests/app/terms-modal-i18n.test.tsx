@@ -125,6 +125,17 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     expect(en).not.toContain("Later");
   });
 
+  it("dit comment partir sans accepter et lie la politique de confidentialité et le profil, dans la langue de la page", () => {
+    const fr = render("fr");
+    expect(legalPageText(fr)).toContain("Tu ne veux pas les accepter ? Tu peux te déconnecter, lire la politique de confidentialité ou ouvrir ton profil pour exporter tes données ou supprimer ton compte.");
+    expect(fr).toContain('href="/rgpd"');
+    expect(fr).toContain('href="/profil"');
+    const en = render("en");
+    expect(legalPageText(en)).toContain("Don't want to accept them? You can log out, read the privacy policy or open your profile to export your data or delete your account.");
+    expect(en).toContain('href="/en/rgpd"');
+    expect(en).toContain('href="/en/profil"');
+  });
+
   it("pendant l'enregistrement, les boutons gardent le focus : aria-disabled + aria-busy, jamais disabled natif", () => {
     const modal = readSource("components/legal/TermsAcceptanceModal.tsx");
     // Aucun bouton nativement désactivé pendant l'envoi (la case, elle, peut l'être).
