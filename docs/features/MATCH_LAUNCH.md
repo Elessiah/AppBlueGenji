@@ -144,17 +144,22 @@ relue une seconde plus tard — `casterRereadDelay`), et quand la carte reçoit
 une écriture qui touche ce qu'elle montre (lancement forcé, match reprogrammé
 ou remis à planifier, caster qui s'inscrit ou se retire, adversaire corrigé,
 hôte changé, « Prêt » — empreinte `contactsCardKey`, `rereadOnCardChange`), une
-lecture par écriture, jamais à l'horloge du navigateur : les contacts du
+lecture par écriture — sauf le `launched_at` posé après l'heure sur un match que
+la lecture disait déjà lancé (tournoi sans phase de lancement) —, jamais à
+l'horloge du navigateur : les contacts du
 caster remplacent alors sa note d'attente, ou sont de nouveau masqués, pour le
 caster du moment. Leur affichage suit la phase **du serveur** à la lecture.
 Sans caster, ou pour le caster lui-même (arbitre qui caste), rien n'est relu.
 Une relecture qui échoue passagèrement (réseau, 5xx, quota) garde ce qui est
 affiché, sans notification, et se retente jusqu'à 3 fois toutes les 10 s
-(`shouldRetryReread`, compteur remis à zéro par chaque nouvelle relecture) ; un refus définitif (`isFinalRefusal` : plus partie du
+(`shouldRetryReread`, compteur remis à zéro par chaque nouvelle relecture ;
+jamais avant l'attente qu'un refus de quota demande, `Retry-After`) ; un refus définitif (`isFinalRefusal` : plus partie du
 match, déconnecté) retire les contacts affichés. Un refus part en notification ; le corps
 reste neutre (« Contacts non affichés », pas « aucun contact »). Chargée à la
 demande (`next/dynamic`) : ses textes FR + EN ne pèsent pas sur la page de
-tournoi. Dans l'ordre de l'action principale, « Contacts » vient **après** les
+tournoi. Sa fermeture fait relire la modale de lancement
+(`MATCH_LAUNCH_REFRESH_EVENT`), sauf pour un arbitre, à qui elle ne présente
+rien. Dans l'ordre de l'action principale, « Contacts » vient **après** les
 gestes d'arbitrage (`PRIMARY_ORDER`). Noms cliquables **dans cette modale
 seulement** (`linkNames`) : équipe par `TeamLink`, entrée solo par `PlayerLink`
 (son unique contact), contacts et caster par `PlayerLink` ; la modale de
