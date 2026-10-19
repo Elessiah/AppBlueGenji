@@ -36,7 +36,7 @@ describe("modale de score — pourquoi le score attend", () => {
       "Ce match démarre le lundi 19 octobre à 21:00 : le score se saisit dès qu'il a démarré.",
     );
     expect(closedNoticeText(FR, "SCHEDULED", null, false)).not.toMatch(/prêt/i);
-    expect(closedNoticeText(EN, "SCHEDULED", "Monday", false)).not.toMatch(/ready/i);
+    expect(closedNoticeText(EN, "SCHEDULED", "Monday", false)).not.toMatch(/breadyb/i);
     expect(closedNoticeText(EN, "SCHEDULED", null, false)).toBe(enDialogs.score.player.closed.scheduledDirect);
   });
 
@@ -56,7 +56,7 @@ describe("modale d'horaire — ce que la date produit", () => {
       expect(text).not.toMatch(/prêt/i);
     }
     for (const text of [enDialogs.schedule.hintDirect, enDialogs.schedule.hintPlanningDirect]) {
-      expect(text).not.toMatch(/ready/i);
+      expect(text).not.toMatch(/breadyb/i);
     }
   });
 
@@ -69,11 +69,26 @@ describe("modale d'horaire — ce que la date produit", () => {
 describe("forcer le lancement — confirmation", () => {
   it("a sa phrase sans « Prêt », en FR et en EN", () => {
     expect(frActions.cardActions.forceConfirm.bodyDirect).not.toMatch(/prêt/i);
-    expect(enActions.cardActions.forceConfirm.bodyDirect).not.toMatch(/ready/i);
+    expect(enActions.cardActions.forceConfirm.bodyDirect).not.toMatch(/breadyb/i);
     const source = read("app/(secured)/tournois/[id]/_components/MatchCardActions.tsx");
     expect(source).toContain('{launchPhaseEnabled && <p>{t("cardActions.forceConfirm.body")}</p>}');
     expect(source).toContain(
       '{!launchPhaseEnabled && phase !== "TO_PLAN" && <p>{t("cardActions.forceConfirm.bodyDirect")}</p>}',
+    );
+  });
+});
+
+describe("planification par l'arbitrage — option éteinte", () => {
+  it("avertissements sans « Prêt » (FR et EN)", () => {
+    expect(frForm.form.referee.warningDirect).not.toMatch(/prêt/i);
+    expect(enForm.form.referee.warningDirect).not.toMatch(/breadyb/i);
+    expect(frActions.planning.confirm.consequenceDirect).not.toMatch(/prêt/i);
+    expect(enActions.planning.confirm.consequenceDirect).not.toMatch(/breadyb/i);
+    expect(read("app/(secured)/tournois/_components/RefereeSchedulingField.tsx")).toContain(
+      '{t(launchPhase ? "form.referee.warning" : "form.referee.warningDirect")}',
+    );
+    expect(read("app/(secured)/tournois/[id]/_components/MatchPlanningPanel.tsx")).toContain(
+      'detail.card.launchPhase ? "planning.confirm.consequence" : "planning.confirm.consequenceDirect"',
     );
   });
 });
@@ -98,9 +113,10 @@ describe("formulaire et règles", () => {
 });
 
 describe("modale « Contacts »", () => {
-  it("écrit le refus dans la modale, pas « aucun contact »", () => {
+  it("refus : notification, et un corps neutre (pas « aucun contact »)", () => {
     const source = read("components/match-launch/MatchContactsDialog.tsx");
-    expect(source).toContain("{contactsErrorText(text, state.code)}");
+    expect(source).toContain('{state.kind === "failed" && <p className={styles.note}>{t("contacts.notShown")}</p>}');
+    expect(FR_LAUNCH_TEXT.t("contacts.notShown")).toBe("Contacts non affichés.");
     expect(contactsErrorText(FR_LAUNCH_TEXT, "MATCH_CONTACTS_UNAVAILABLE")).toBe(
       FR_LAUNCH_TEXT.t("contacts.unavailable"),
     );
@@ -115,6 +131,12 @@ describe("modale « Contacts »", () => {
     // …et « Contacts » relance la lecture à sa fermeture.
     expect(read("components/match-launch/MatchContactsDialog.tsx")).toContain(
       "window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));",
+    );
+  });
+
+  it("« Contacts » ne prend pas la place principale d'un geste d'arbitrage", () => {
+    expect(read("app/(secured)/tournois/[id]/_lib/match-card-actions.ts")).toContain(
+      '["playerScore", "openLaunch", "plan", "adminScore", "contacts"]',
     );
   });
 
@@ -146,20 +168,27 @@ describe("fiches de contact — noms cliquables", () => {
   });
   const noop = async () => {};
 
-  it("équipe → sa fiche, contact → son profil", () => {
+  it("modale de lancement (par défaut) : aucun lien — elle survit à la navigation", () => {
     const html = renderToStaticMarkup(<SideCard side={side()} isHost={false} phase="LAUNCHED" onCopy={noop} />);
+    expect(html).not.toContain("href=");
+  });
+
+  it("équipe → sa fiche, contact → son profil", () => {
+    const html = renderToStaticMarkup(
+      <SideCard side={side()} isHost={false} phase="LAUNCHED" onCopy={noop} linkNames />,
+    );
     expect(html).toContain('href="/equipes/42"');
     expect(html).toContain('href="/joueurs/7"');
   });
 
   it("entrée solo → le profil du joueur, jamais une fiche d'équipe", () => {
     const html = renderToStaticMarkup(
-      <SideCard side={side({ isSolo: true })} isHost={false} phase="LAUNCHED" onCopy={noop} />,
+      <SideCard side={side({ isSolo: true })} isHost={false} phase="LAUNCHED" onCopy={noop} linkNames />,
     );
     expect(html).not.toContain("/equipes/");
     expect(html).toContain('href="/joueurs/7"');
     const hidden = renderToStaticMarkup(
-      <SideCard side={side({ isSolo: true, contacts: [] })} isHost={false} phase="SCHEDULED" onCopy={noop} />,
+      <SideCard side={side({ isSolo: true, contacts: [] })} isHost={false} phase="SCHEDULED" onCopy={noop} linkNames />,
     );
     expect(hidden).not.toContain("href=");
   });
@@ -170,6 +199,7 @@ describe("fiches de contact — noms cliquables", () => {
         caster={{ userId: 9, pseudo: "Voix", discordTag: null, battletag: null, battletagVerified: false, ready: false }}
         phase="LAUNCHED"
         onCopy={noop}
+        linkNames
       />,
     );
     expect(html).toContain('href="/joueurs/9"');
