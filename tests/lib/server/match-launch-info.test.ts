@@ -693,6 +693,22 @@ describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => 
     }
   });
 
+  it("la modale, elle, ne relit pas le caster d'un match encore à planifier", async () => {
+    state.viewerMemberships = [];
+    state.users = [casterUser(VIEWER, { platform_roles_json: null })];
+    state.candidates = [candidate({ referee_scheduling: 1, start_at: null, caster_user_id: VIEWER })];
+    expect(await listViewerMatchLaunches(viewer)).toEqual([]);
+    expect(state.reads.some((sql) => sql.includes("FROM bg_users WHERE id IN"))).toBe(false);
+    expect(state.writes).toEqual([]);
+  });
+
+  it("un arbitre ne lit, par la modale, aucun match dont il n'est pas partie", async () => {
+    state.viewerMemberships = [];
+    const referee = { id: VIEWER, roles: ["ARBITRE" as const] };
+    expect(await listViewerMatchLaunches(referee)).toEqual([]);
+    expect(state.reads.find((sql) => sql.includes("t.name AS tournament_name"))).not.toContain("1 = 1 OR");
+  });
+
   it("ne retire rien au caster éligible qui ouvre la carte avant l'heure", async () => {
     state.viewerMemberships = [];
     state.users = [casterUser(VIEWER)];

@@ -67,7 +67,7 @@ describe("conditions d'utilisation — contacts de match (version 5)", () => {
     expect(text).toContain("Un tag Discord non certifié n'est jamais communiqué.");
     // Seule porte d'un BattleTag masqué, staff compris ; contacts du caster le temps du match.
     expect(text).toContain("Ce partage passe par la seule fenêtre « Contacts » du match : un BattleTag masqué n'est lisible nulle part ailleurs, pour personne — arbitres et administrateurs compris.");
-    expect(text).toContain("celles du caster le sont aux deux équipes sur ce même temps du match");
+    expect(text).toContain("celles du caster le sont aux deux équipes et aux arbitres sur ce même temps du match");
   });
 
   // La section renvoie là où la politique dit qui lit le BattleTag (tableau des données).
@@ -84,7 +84,7 @@ describe("conditions d'utilisation — contacts de match (version 5)", () => {
     expect(text).toContain("**even when hidden**");
     expect(text).toContain("**only while the match is being played**, from its start to its end");
     expect(text).toContain("a hidden BattleTag is readable nowhere else, by anyone — referees and administrators included");
-    expect(text).toContain("the caster's is shared with both teams over that same match time");
+    expect(text).toContain("the caster's is shared with both teams and the referees over that same match time");
     expect(en?.paragraphs).toHaveLength(fr?.paragraphs.length ?? -1);
   });
 });
