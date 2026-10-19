@@ -446,9 +446,12 @@ export async function claimMatchCast(
       // Une inscription dont le titulaire ne remplit plus la condition du cast
       // ne retient pas le match : sans quoi elle le bloquerait jusqu'à ce qu'un
       // joueur ouvre la modale de lancement. Jamais sur un match lancé, où l'on
-      // ne remplace pas un caster en pleine diffusion.
+      // ne remplace pas un caster en pleine diffusion — lancé s'entend
+      // `launched_at` posé (phase jugée allumée), comme au retrait d'un caster
+      // inéligible et à l'instantané : sans phase de lancement, l'heure passée
+      // avant l'entretien ne fige pas encore l'inscription.
       const displaceable =
-        matchLaunchPhase(toLaunchInput(row), Date.now()) !== "LAUNCHED" &&
+        matchLaunchPhase({ ...toLaunchInput(row), launchPhase: true }, Date.now()) !== "LAUNCHED" &&
         (await loadCastEligibility(connection, holder)) !== null;
       if (!displaceable) throw new Error("MATCH_ALREADY_CASTED");
     }
