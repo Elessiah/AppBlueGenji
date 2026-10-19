@@ -544,6 +544,7 @@ function buildLaunchInfo(
     viewer: {
       role: party.role,
       canDeclareReady: party.canDeclareReady,
+      isCaster: caster !== null && caster.userId === ctx.viewer.id,
       ready: {
         CASTER: readiness.casterReady,
         TEAM1: readiness.team1Ready,

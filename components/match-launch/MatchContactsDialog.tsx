@@ -67,13 +67,21 @@ export function matchUnderway(phase: MatchLaunchPhase | null): boolean {
 }
 
 /**
+ * Le lecteur est-il le caster inscrit ? Son rôle le dit, sauf pour un joueur
+ * du match qui caste aussi (`viewer.isCaster`, le rôle de joueur primant).
+ */
+export function viewerIsCaster(launch: MatchLaunchInfo): boolean {
+  return launch.viewer.role === "CASTER" || launch.viewer.isCaster === true;
+}
+
+/**
  * Les contacts du caster attendent-ils le départ ? Un caster inscrit, sur un
  * match pas encore parti à l'heure du serveur (`launch.phase`) : sa fiche porte
  * alors une note plutôt que ses contacts. Pas pour le caster lui-même (arbitre
  * qui caste) : rien à attendre sur sa propre fiche.
  */
 export function casterContactsPending(launch: MatchLaunchInfo): boolean {
-  return launch.caster !== null && launch.viewer.role !== "CASTER" && !matchUnderway(launch.phase);
+  return launch.caster !== null && !viewerIsCaster(launch) && !matchUnderway(launch.phase);
 }
 
 /** Relectures supplémentaires d'une relecture qui échoue (réseau, 5xx, 429). */
@@ -376,7 +384,7 @@ export function MatchContactsDialog({
                   // Pas au caster lui-même (arbitre compris) : la note parle de lui.
                   // Hors de là, toujours, même quand la phase de la carte et celle
                   // du serveur divergent : jamais une fiche vide.
-                  contactsLaterText={launch.viewer.role === "CASTER" ? undefined : t("contacts.casterLater")}
+                  contactsLaterText={viewerIsCaster(launch) ? undefined : t("contacts.casterLater")}
                   noCasterText={t("contacts.noCaster")}
                   linkNames
                 />

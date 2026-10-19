@@ -457,6 +457,12 @@ export type MatchLaunchInfo = {
     role: MatchLaunchViewerRole;
     /** Le lecteur peut-il cliquer « Prêt » pour sa partie ? */
     canDeclareReady: boolean;
+    /**
+     * Le lecteur est-il le caster inscrit, quel que soit `role` (un joueur du
+     * match qui caste reste `TEAM1`/`TEAM2`) ? La modale « Contacts » ne lui
+     * parle pas de ses propres contacts.
+     */
+    isCaster: boolean;
     /** Sa partie est-elle déjà déclarée prête ? */
     ready: boolean;
   };
