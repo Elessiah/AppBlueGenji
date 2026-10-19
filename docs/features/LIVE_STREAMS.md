@@ -146,7 +146,8 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   de la fenêtre). Quatre heures couvrent une soirée de tournoi (19 h – 23 h)
   sans fondre deux soirées. La fenêtre repart de l'envoi du **premier message
   qui notifie** : des essais reportés avant lui (bot injoignable) ne la
-  raccourcissent pas.
+  raccourcissent pas, et ce premier message liste déjà les matchs programmés
+  jusqu'à cette nouvelle fin.
 - **Texte** (français, `formatLiveEvening`) : « 🔴 **Les lives de la
   soirée** », puis un bloc par match séparé par une ligne vide — l'heure de
   Paris en gras (`**21:00**`), suivie de « · En direct » pour un match à
@@ -159,8 +160,9 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   pas forger de jeton.
 - **Modifier plutôt que reposter** : le bot rend l'identifiant du message
   (`messageId`), gardé dans `bg_live_evenings`. Le match suivant de la soirée
-  envoie `editMessageId` : le bot **modifie** le message, `allowedMentions`
-  vides — aucune nouvelle notification —, en un seul appel à Discord (aucune
+  envoie `editMessageId` : le bot **modifie** le message — aucune nouvelle
+  notification (Discord ne notifie jamais sur une modification ; la mention de
+  tête reste autorisée pour garder son surlignage) —, en un seul appel à Discord (aucune
   lecture préalable du message). Message supprimé entre-temps, pas du bot, ou
   qui ne se modifie plus (plafond de modifications de Discord sur un message
   vieux d'une heure, code `30046`) : une **suite** part, sans mention ni
