@@ -68,7 +68,8 @@ match n'existe, rien n'est à défaire. Refus d'une valeur non booléenne :
 
 Action **« Contacts »** (FR et EN) du pied de carte (`MatchCardActions`),
 offerte aux **parties du match** — joueurs des deux engagées, caster inscrit —
-quand il est **programmé** (`SCHEDULED`), en lancement ou lancé
+dès que ses deux adversaires sont connus : **à planifier** (`TO_PLAN`),
+**programmé** (`SCHEDULED`), en lancement ou lancé
 (`launchStripControls().showContacts`), que l'option soit allumée ou non. Action
 principale d'un joueur qui n'a ni score à saisir ni lancement à suivre.
 
@@ -81,10 +82,11 @@ lecture est **celle de la modale** (`loadViewerMatchContacts` →
 destinataires (`viewerRole`, éligibilité du caster rejouée), mêmes contacts
 (`pickLaunchContacts`, `canViewDiscordTag` / `canViewBattletag`), sans la
 fenêtre d'une heure ni le filtre de l'option. Une différence, voulue : les
-contacts y sortent **dès que le match est programmé**, et plus seulement au
-lancement — les parties s'organisent avant l'heure, surtout sans phase de
-lancement. Qui n'est pas partie du match, ou un match sans contacts (à
-planifier, terminé), reçoit `MATCH_CONTACTS_UNAVAILABLE` (404), un seul code :
+contacts y sortent **dès que les deux adversaires du match sont connus** — à
+planifier (décision de l'utilisateur, 2026-10-19), programmé, en lancement ou
+lancé —, et plus seulement au lancement : les parties s'organisent avant
+l'heure, surtout sans phase de lancement. Qui n'est pas partie du match, ou un
+match sans contacts (adversaire inconnu, terminé), reçoit `MATCH_CONTACTS_UNAVAILABLE` (404), un seul code :
 la réponse ne dit pas qui joue quoi. Un refus part en notification ; le corps
 reste neutre (« Contacts non affichés », pas « aucun contact »). Chargée à la
 demande (`next/dynamic`) : ses textes FR + EN ne pèsent pas sur la page de
@@ -243,7 +245,7 @@ l'effacement complet la retire par la clé étrangère (`SET NULL`).
 
 Une fantôme n'a pas de contact. Dans la modale de lancement, un match
 `SCHEDULED` n'expose encore rien ; le bouton « Contacts » de la carte, lui,
-les expose dès cette phase (voir plus haut).
+les expose dès cette phase, et même « À planifier » (voir plus haut).
 
 ## Exposition
 
@@ -303,7 +305,7 @@ Changement déclaré dans `PRIVACY_CHANGES` (`2026-09-lancement-des-matchs`),
 | Route | Qui | Effet |
 |---|---|---|
 | `GET /api/me/match-launches` | connecté | matchs du lecteur à présenter (voir coût ci-dessous) — tournois à phase de lancement seulement |
-| `GET /api/matches/[id]/contacts` | partie du match | fiches et contacts d'un match programmé, en lancement ou lancé |
+| `GET /api/matches/[id]/contacts` | partie du match | fiches et contacts d'un match aux deux adversaires connus (à planifier, programmé, en lancement ou lancé) |
 | `POST /api/matches/[id]/ready` | partie du match | `{ ready }` |
 | `POST /api/matches/[id]/caster` | `live` + identité vérifiée | s'inscrire |
 | `DELETE /api/matches/[id]/caster` | le caster, ou `tournaments` | se retirer / retirer |
