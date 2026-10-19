@@ -63,7 +63,10 @@ tournois, que les conditions complètent), `/signalements` (suivre ou contester
 un signalement : recours interne) et `/profil` (export
 des données, suppression du compte — la page entière reste ouverte, ce que
 disent les conditions : « ouvrir son profil »). La fenêtre le dit elle-même (`shell.termsModal.exits`, FR et EN) et
-lie `/rgpd` et `/profil`, sans quoi seul qui connaît les adresses partirait — `TERMS_FREE_PATHS` de
+lie `/rgpd` et `/profil`, sans quoi seul qui connaît les adresses partirait. Les conditions et l'entrée v6 disent aussi que le bouton « Signaler un
+problème » reste utilisable depuis ces pages, et qu'un refus ne retire le
+compte ni de ses équipes ni de ses inscriptions (contacts de match et messages
+de match continuent, sauf suppression du compte) — `TERMS_FREE_PATHS` de
 `lib/shared/global-modals.ts`, en plus de `/conditions-utilisation` et
 `/connexion`. Les conditions (« Acceptation », FR et EN), l'entrée v6 de
 `PRIVACY_CHANGES`, `/rgpd` (FR et EN) et la fiche T13 du registre décrivent
