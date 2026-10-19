@@ -182,7 +182,7 @@
     },
     "launchPhase": {
       "label": "Phase de lancement des matchs",
-      "description": "Cochée, chaque match ouvre à son heure une fenêtre de lancement : les deux équipes (et le caster) cliquent « Prêt », et le match part quand tout le monde l'est, quand l'arbitrage le force, ou d'office après 15 minutes. Décochée (par défaut), un match part dès son heure, sans « Prêt » ni fenêtre de lancement.",
+      "description": "Option allumée, chaque match ouvre à son heure une fenêtre de lancement : les deux équipes (et le caster) cliquent « Prêt », et le match part quand tout le monde l'est, quand l'arbitrage le force, ou d'office après 15 minutes. Éteinte (par défaut), un match part dès son heure, sans « Prêt » ni fenêtre de lancement.",
       "scope": "Modifiable jusqu'au début du tournoi, puis figée.",
       "locked": "Le tournoi a commencé : l'option n'est plus modifiable."
     },
