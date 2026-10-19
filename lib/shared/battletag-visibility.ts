@@ -4,9 +4,10 @@
  * Décocher « BattleTag OW » sur `/profil` le retire de **partout** — fiche,
  * annuaire, rosters —, pour tout le monde, arbitres et administrateurs compris,
  * **sauf** dans la fenêtre « Contacts » d'un match, quand elle est ouverte au
- * lecteur (décision de l'utilisateur, 2026-10-19) : membres des deux équipes dès
- * que les deux adversaires sont connus, caster inscrit le temps du match
- * seulement. C'est la clause `sharesLiveMatch`, que seul
+ * lecteur (décision de l'utilisateur, 2026-10-19) : membres des deux équipes et
+ * arbitres (permission `tournaments`) dès que les deux adversaires sont connus,
+ * caster inscrit le temps du match seulement ; ceux du caster, aux équipes et
+ * aux arbitres le temps du match. C'est la clause `sharesLiveMatch`, que seul
  * `lib/server/tournaments/match-launch-info.ts` pose, au moment de présenter ces
  * contacts. La modale ouverte à la bascule (`BattletagVisibilityNotice.tsx`) le
  * dit au joueur. Base : l'exécution du service (registre T04, conditions
