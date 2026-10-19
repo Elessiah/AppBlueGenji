@@ -157,9 +157,11 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
 - **Modifier plutôt que reposter** : le bot rend l'identifiant du message
   (`messageId`), gardé dans `bg_live_evenings`. Le match suivant de la soirée
   envoie `editMessageId` : le bot **modifie** le message, `allowedMentions`
-  vides — aucune nouvelle notification. Message supprimé entre-temps (ou pas
-  du bot) : une **suite** part, sans mention ni notification, et son
-  identifiant remplace l'ancien. Un bot d'une version antérieure ne rend pas
+  vides — aucune nouvelle notification —, en un seul appel à Discord (aucune
+  lecture préalable du message). Message supprimé entre-temps, pas du bot, ou
+  qui ne se modifie plus (plafond de modifications de Discord sur un message
+  vieux d'une heure, code `30046`) : une **suite** part, sans mention ni
+  notification, et son identifiant remplace l'ancien. Un bot d'une version antérieure ne rend pas
   d'identifiant : chaque match repart alors dans un nouveau message (d'où
   l'ordre de déploiement : **bot d'abord**). Une publication incertaine
   (`uncertain`, `timed-out`, `interrupted`) ne laisse pas d'identifiant : un
@@ -198,6 +200,11 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   non), quels que soient leur tournoi et leur lien, partent dans le message de
   la soirée, une seule notification. Chaque affiche garde sa réservation. Une
   pause après un refus de Discord vaut pour la soirée de ce public seulement.
+  Une soirée **illisible** (`bg_live_evenings` absente ou lecture en échec)
+  rend les réservations du groupe et ne met en pause que ce public : l'autre
+  part quand même, et pm2 le dit (« soirée … illisible ») sans accuser le bot.
+  Les traces pm2 et l'étiquette envoyée au bot nomment **tous** les tournois
+  du groupe (`tournoi-4,5`).
 - **Une annonce par match et par affiche** : `bg_live_announcements`
   (clé unique `(match_id, pairing)`, `pairing` = les deux engagés **sans
   ordre**, `5:7` pour `7:5` : un plateau réécrit qui inverse les deux mêmes
@@ -214,9 +221,9 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   fermé ou Discord muet en lisant le salon (`discord-unreachable`), la pause
   vaut pour tout le processus et les groupes suivants du même passage sont
   rendus sans appel au bot ; après un refus de Discord (`discord-held`, qui
-  peut tenir au message), elle ne vaut que pour cette diffusion (tournoi et
-  lien) — un match qui la rejoint pendant la pause attend avec elle, un seul
-  message part — et les autres tournois partent sans attendre. Une relève
+  peut tenir au message), elle ne vaut que pour ce public (sa soirée) — un
+  match qui la rejoint pendant la pause attend avec elle, un seul message
+  part — et l'autre public part sans attendre. Une relève
   tombe au terme de la pause, sans attendre un nouvel évènement. Le tout tant que
   le match a commencé depuis moins de deux heures ; un
   succès (même sans mention), un refus du corps (`400`) ou un blocage par
