@@ -14,6 +14,7 @@ import {
   LIVE_EVENING_REFRESH_DELAY_MS,
   LIVE_EVENING_REFRESH_MAX_RETRIES,
   dispatchLiveAnnouncements,
+  eveningTextKey,
   liveAnnouncementsEnabled,
   liveEntrantName,
   purgeEndedEvenings,
@@ -1635,4 +1636,21 @@ describe("mise à jour de la soirée — reprises", () => {
     const { evening } = mockDb([]);
     evening.mockImplementation(async (sql) => (sql.includes("FROM bg_live_evenings") ? [evenings] : [matches]));
   }
+});
+
+describe("eveningTextKey (texte retenu en mémoire)", () => {
+  it("ne retient qu'une empreinte, jamais le texte ni le pseudo qu'il porte", () => {
+    const key = eveningTextKey("**21:00** Pseudo_Solo vs Autre_Joueur", ["https://twitch.tv/bluegenjiesport"]);
+    expect(key).toMatch(/^[0-9a-f]{64}$/);
+    expect(key).not.toContain("Pseudo_Solo");
+  });
+
+  it("distingue un texte ou des liens changés, et rend la même clé pour le même texte", () => {
+    const base = eveningTextKey("texte", ["https://a.example"]);
+    expect(eveningTextKey("texte", ["https://a.example"])).toBe(base);
+    expect(eveningTextKey("texte modifié", ["https://a.example"])).not.toBe(base);
+    expect(eveningTextKey("texte", ["https://b.example"])).not.toBe(base);
+    // Le séparateur entre texte et liens ne laisse pas deux découpages se confondre.
+    expect(eveningTextKey("texte", [])).not.toBe(eveningTextKey("texte\n", []));
+  });
 });
