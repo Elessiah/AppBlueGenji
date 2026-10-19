@@ -613,6 +613,16 @@ describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => 
     expect(info?.team2.contacts).toHaveLength(1);
   });
 
+  it("sans phase de lancement, heure passée mais lancement pas encore écrit : retire le caster devenu inéligible", async () => {
+    state.candidates = [candidate({ match_launch_phase: 0, caster_user_id: CASTER })];
+    state.members = [verifiedCaptain()];
+    state.users = [casterUser(CASTER, { platform_roles_json: null })];
+    const info = await loadViewerMatchContacts(viewer, 42);
+    expect(info?.phase).toBe("LAUNCHED");
+    expect(info?.caster).toBeNull();
+    expect(state.writes.filter((sql) => sql.includes("SET caster_user_id = NULL"))).toHaveLength(1);
+  });
+
   it("garde la phase de lancement d'un tournoi qui l'a allumée", async () => {
     state.members = [verifiedCaptain()];
     const info = await loadViewerMatchContacts(viewer, 42);

@@ -569,13 +569,24 @@ describe("setMatchStartAt", () => {
       expect(resets(writes)).toBe(true);
     });
 
-    it("sans phase de lancement, lancement forcé avant l'heure puis reporté : il reste lancé", async () => {
+    it("sans phase de lancement, lancement forcé avant l'heure puis reporté : la nouvelle heure l'emporte", async () => {
       const { writes } = world({
         row: matchRow({ start_at: new Date("2099-08-28T21:00:00Z"), launched_at: new Date("2099-08-28T20:30:00Z") }),
         launchPhase: false,
       });
       await setMatchStartAt(42, FUTURE);
-      expect(resets(writes)).toBe(false);
+      expect(resets(writes)).toBe(true);
+    });
+
+    it("sans phase de lancement, heure déjà retouchée dans le passé puis reportée : lancement défait", async () => {
+      // Lancé à 20:00, heure corrigée à 20:25 (toujours passée), puis reporté :
+      // `launched_at` antérieur à l'heure d'avant ne le fait pas passer pour forcé.
+      const { writes } = world({
+        row: matchRow({ start_at: new Date("2026-01-01T20:25:00Z"), launched_at: new Date("2026-01-01T20:00:00Z") }),
+        launchPhase: false,
+      });
+      await setMatchStartAt(42, FUTURE);
+      expect(resets(writes)).toBe(true);
     });
 
     it("sans phase de lancement, même date réenregistrée : rien n'est défait", async () => {
@@ -587,14 +598,14 @@ describe("setMatchStartAt", () => {
       expect(resets(writes)).toBe(false);
     });
 
-    it("sans phase de lancement, match à planifier lancé de force puis daté : il reste lancé", async () => {
+    it("sans phase de lancement, match à planifier lancé de force puis daté à venir : en attente de départ", async () => {
       const { writes } = world({
         row: matchRow({ launched_at: new Date("2026-01-01T10:00:00Z") }),
         refereeScheduling: true,
         launchPhase: false,
       });
       await setMatchStartAt(42, FUTURE);
-      expect(resets(writes)).toBe(false);
+      expect(resets(writes)).toBe(true);
     });
 
     it("sans phase de lancement, date passée : le match lancé le reste", async () => {
