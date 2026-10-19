@@ -816,7 +816,9 @@ programme d'arbitrage) relèvent de l'exécution du service, sans interrupteur.
   La confirmation « Retirer mon tag » ne dit l'arrêt de ces messages
   (`discord.removalBodyDms`) qu'à un tag certifié dont la case est cochée à
   l'ouverture (ce que montre la case remonte à la page par `onChoice`, envoi en cours et fiche relue compris, dans une référence : un état ferait rendre toute la page à chaque coche) ; un tag
-  qui ne l'est pas lit `discord.removalBodyUnverified`.
+  qui ne l'est pas lit `discord.removalBodyUnverified`. La certification y suit
+  le même repli (`matchDmReachable`) : une lecture de l'état Discord en échec ne
+  fait pas annoncer « vu de personne » un tag certifié.
   Le dialogue de certification le dit aussi (`verify.matchDms`, sous
   l'introduction), et l'avis de changement mène à `/profil#discord` par « Voir
   mon tag Discord » (il part aussi aux tags déjà certifiés).
