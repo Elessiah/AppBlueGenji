@@ -11,7 +11,13 @@ import { resolveUserEntrant } from "@/lib/server/tournaments/registration";
 import { adminResolveMatch } from "@/lib/server/tournaments/admin";
 import { tournamentRow } from "../../helpers/tournament-rows";
 
-type MatchLine = { team1_id: number | null; team2_id: number | null; status: string };
+type MatchLine = {
+  team1_id: number | null;
+  team2_id: number | null;
+  status: string;
+  team1_report_score?: number | null;
+  team2_report_score?: number | null;
+};
 
 /** Connexion factice : la seule lecture du service est la ligne du match, verrouillée. */
 function connection(match: MatchLine | null): { conn: PoolConnection; queries: string[] } {
@@ -93,6 +99,24 @@ describe("forfeitOwnMatch", () => {
     const { conn } = connection(match);
     await expect(forfeitOwnMatch(conn, 1, 42, 7)).rejects.toThrow(code);
     expect(adminResolveMatch).not.toHaveBeenCalled();
+  });
+
+  // Litige ouvert (`SCORE_DISPUTE_LOCK.md`) : le forfait est verrouillé avec la saisie.
+  it("refuse le forfait sur un match en litige (SCORE_LOCKED_DISPUTE)", async () => {
+    const { conn, queries } = connection({
+      ...readyMatch,
+      status: "AWAITING_CONFIRMATION",
+      team1_report_score: 2,
+      team2_report_score: 0,
+    });
+    await expect(forfeitOwnMatch(conn, 1, 42, 7)).rejects.toThrow("SCORE_LOCKED_DISPUTE");
+    expect(queries.find((q) => q.includes("FROM bg_matches"))).toContain("team1_report_score, team2_report_score");
+    expect(adminResolveMatch).not.toHaveBeenCalled();
+  });
+
+  it("accepte le forfait quand une seule équipe a proposé un score", async () => {
+    const { conn } = connection({ ...readyMatch, status: "AWAITING_CONFIRMATION", team1_report_score: 2, team2_report_score: null });
+    await expect(forfeitOwnMatch(conn, 1, 42, 7)).resolves.toEqual({ forfeitTeamId: 20 });
   });
 
   it("rend TOURNAMENT_NOT_FOUND sur un tournoi inconnu", async () => {

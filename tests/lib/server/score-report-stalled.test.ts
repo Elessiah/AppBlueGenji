@@ -4,11 +4,13 @@ import type { PoolConnection } from "mysql2/promise";
 jest.mock("@/lib/server/tournaments/scoring");
 jest.mock("@/lib/server/tournaments/bot-logs");
 jest.mock("@/lib/server/tournaments/match-maps");
+jest.mock("@/lib/server/tournaments/auto-validated-notices");
 
 import { resolveExpiredScoreReports } from "@/lib/server/tournaments/finalization";
 import { finalizeMatch } from "@/lib/server/tournaments/scoring";
 import { queueBotLog, queueRefereeAlert } from "@/lib/server/tournaments/bot-logs";
 import { promoteReportedMaps } from "@/lib/server/tournaments/match-maps";
+import { queueAutoValidatedNotice } from "@/lib/server/tournaments/auto-validated-notices";
 
 /** Connexion factice : `rows` répond aux SELECT, les écritures sont comptées. */
 function fakeConnection(options: {
@@ -59,73 +61,94 @@ beforeEach(() => {
 describe("resolveExpiredScoreReports", () => {
   // Un seul report : le silence de l'adversaire vaut accord, le moteur
   // tranche seul. Rien à arbitrer, donc aucune alerte.
-  it("ne clôt pas deux fois un report qu'une clôture concurrente vient de trancher (MAP_SCORES.md)", async () => {
+  // Validation d'office (`SCORE_DISPUTE_LOCK.md`) : un seul `UPDATE`
+  // conditionnel tranche, son `affectedRows` dit qui l'a fait.
+  it("ne clôt pas une manche que l'UPDATE conditionnel n'a pas réclamée (balayage concurrent, confirmation tardive)", async () => {
     const seen: string[] = [];
     const connection = fakeConnection({
       seen,
-      rows: (q) => {
-        if (q.startsWith("SELECT status,")) return [{ status: "COMPLETED" }];
-        if (q.includes("FROM bg_matches")) return [expiredRow({ id: 31, team2_report_score: null, team2_report_opponent_score: null })];
-        return [];
-      },
+      affectedRows: 0,
+      rows: (q) =>
+        q.includes("FROM bg_matches")
+          ? [expiredRow({ id: 31, team2_report_score: null, team2_report_opponent_score: null })]
+          : [],
     });
 
-    await resolveExpiredScoreReports(connection, 12);
+    expect(await resolveExpiredScoreReports(connection, 12)).toBe(0);
 
-    expect(seen.some((q) => q.startsWith("SELECT status,") && q.endsWith("FOR UPDATE"))).toBe(true);
+    expect(seen.filter((q) => q.startsWith("UPDATE bg_matches"))).toHaveLength(1);
     expect(promoteReportedMaps).not.toHaveBeenCalled();
     expect(finalizeMatch).not.toHaveBeenCalled();
+    expect(queueAutoValidatedNotice).not.toHaveBeenCalled();
   });
 
-  it("clôt sur le report relu sous verrou, pas sur la copie lue avant (MAP_SCORES.md)", async () => {
-    const connection = fakeConnection({
-      rows: (q) => {
-        if (q.startsWith("SELECT status,")) {
-          // L'équipe 1 a corrigé 2-1 en 2-0 entre la sélection et le verrou.
-          return [{
-            status: "AWAITING_CONFIRMATION",
-            team1_report_score: 2,
-            team1_report_opponent_score: 0,
+  it("réclame la manche en une instruction : même saisie, adversaire muet, échéance passée", async () => {
+    const calls: { sql: string; params: unknown[] }[] = [];
+    const connection = {
+      execute: async (sql: string, params: unknown[] = []) => {
+        const q = sql.replace(/\s+/g, " ").trim();
+        calls.push({ sql: q, params });
+        if (q.startsWith("UPDATE")) return [{ affectedRows: 1 }, []];
+        if (q.includes("FROM bg_matches")) {
+          return [[expiredRow({
+            id: 31,
+            team1_reported_at: "2026-10-20 20:00:00",
             team2_report_score: null,
             team2_report_opponent_score: null,
-          }];
+            team2_reported_at: null,
+          })], []];
         }
-        if (q.includes("FROM bg_matches")) return [expiredRow({ id: 31, team2_report_score: null, team2_report_opponent_score: null })];
-        return [];
+        return [[], []];
       },
-    });
+    } as unknown as PoolConnection;
 
-    await resolveExpiredScoreReports(connection, 12);
+    expect(await resolveExpiredScoreReports(connection, 12)).toBe(1);
 
+    const claim = calls.find((c) => c.sql.startsWith("UPDATE bg_matches"));
+    expect(claim?.sql).toContain("status = 'COMPLETED'");
+    expect(claim?.sql).toContain("AND status = 'AWAITING_CONFIRMATION'");
+    expect(claim?.sql).toContain("AND score_deadline_at <= NOW()");
+    expect(claim?.sql).toContain("AND team1_reported_at <=> ?");
+    expect(claim?.sql).toContain("AND team1_report_score <=> ?");
+    expect(claim?.sql).toContain("AND team2_report_score IS NULL");
+    expect(claim?.sql).toContain("AND team2_reported_at IS NULL");
+    // Pas de jointure ni de verrou sur deux tables (MariaDB).
+    expect(claim?.sql).not.toMatch(/JOIN|FOR UPDATE/);
+    expect(claim?.params).toEqual([2, 1, 101, 102, 31, "2026-10-20 20:00:00", 2, 1]);
+    // Aucune autre lecture verrouillante de la ligne : l'instruction suffit.
+    expect(calls.some((c) => c.sql.startsWith("SELECT status,"))).toBe(false);
+    // Même suite qu'une confirmation, le résultat déjà écrit.
     expect(finalizeMatch).toHaveBeenCalledWith(
       connection,
       12,
       expect.objectContaining({ id: 31 }),
-      expect.objectContaining({ team1Score: 2, team2Score: 0 }),
+      { team1Score: 2, team2Score: 1, winnerTeamId: 101, loserTeamId: 102 },
+      { resultWritten: true },
     );
+    expect(queueAutoValidatedNotice).toHaveBeenCalledWith(connection, 31);
   });
 
-  it("ne tranche pas d'office un report contesté entre-temps (MAP_SCORES.md)", async () => {
-    const connection = fakeConnection({
-      rows: (q) => {
-        if (q.startsWith("SELECT status,")) {
-          return [{
-            status: "AWAITING_CONFIRMATION",
-            team1_report_score: 2,
-            team1_report_opponent_score: 1,
-            team2_report_score: 2,
-            team2_report_opponent_score: 1,
-          }];
+  it("est idempotente : un second passage ne réclame plus rien", async () => {
+    let claimed = false;
+    const connection = {
+      execute: async (sql: string) => {
+        const q = sql.replace(/\s+/g, " ").trim();
+        if (q.startsWith("UPDATE")) {
+          const first = !claimed;
+          claimed = true;
+          return [{ affectedRows: first ? 1 : 0 }, []];
         }
-        if (q.includes("FROM bg_matches")) return [expiredRow({ id: 31, team2_report_score: null, team2_report_opponent_score: null })];
-        return [];
+        if (q.includes("FROM bg_matches")) {
+          return [[expiredRow({ id: 31, team2_report_score: null, team2_report_opponent_score: null })], []];
+        }
+        return [[], []];
       },
-    });
+    } as unknown as PoolConnection;
 
-    await resolveExpiredScoreReports(connection, 12);
-
-    expect(promoteReportedMaps).not.toHaveBeenCalled();
-    expect(finalizeMatch).not.toHaveBeenCalled();
+    expect(await resolveExpiredScoreReports(connection, 12)).toBe(1);
+    expect(await resolveExpiredScoreReports(connection, 12)).toBe(0);
+    expect(finalizeMatch).toHaveBeenCalledTimes(1);
+    expect(queueAutoValidatedNotice).toHaveBeenCalledTimes(1);
   });
 
   it("résout un report expiré quand seul team1 a saisi le score", async () => {
@@ -169,6 +192,7 @@ describe("resolveExpiredScoreReports", () => {
         team2Score: 1,
         winnerTeamId: 101,
       }),
+      { resultWritten: true },
     );
 
     expect(promoteReportedMaps).toHaveBeenCalledWith(connection, expect.any(Number), "TEAM1");
@@ -218,6 +242,7 @@ describe("resolveExpiredScoreReports", () => {
         team2Score: 3,
         winnerTeamId: 102,
       }),
+      { resultWritten: true },
     );
 
     // Le détail map par map du report qui fait foi devient le résultat retenu.
