@@ -30,7 +30,7 @@
  * un visiteur sans compte, et c'est la seule phrase qui le dise au joueur.
  */
 export const DISCORD_TAG_AUDIENCE =
-  "les administrateurs le voient à tout moment, les arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), et les joueurs et le caster de ton match dès que les deux adversaires du match sont connus et jusqu'à sa fin ; les autres joueurs, seulement si tu le rends visible dans tes réglages de confidentialité. Jamais personne d'autre.";
+  "les administrateurs le voient à tout moment, les arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), et les membres des deux équipes et le caster de ton match dès que les deux adversaires du match sont connus et jusqu'à sa fin ; les autres joueurs, seulement si tu le rends visible dans tes réglages de confidentialité. Jamais personne d'autre.";
 
 /**
  * Ce que la connexion par Discord fait du pseudo — dit **sous le bouton**, avant

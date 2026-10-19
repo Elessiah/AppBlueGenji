@@ -29,7 +29,7 @@
     "continueWith": "Continuer avec {provider}",
     "discordNote": "Enregistre ton pseudo Discord sans le certifier : il reste invisible de tous, administrateurs compris. Si tu le certifies ensuite d'un clic dans « Mon profil », {audience}",
     "blizzardNote": "Renseigne ton BattleTag automatiquement.",
-    "tagAudience": "les administrateurs le voient à tout moment, les arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), et les joueurs et le caster de ton match dès que les deux adversaires du match sont connus et jusqu'à sa fin ; les autres joueurs, seulement si tu le rends visible dans tes réglages de confidentialité. Jamais personne d'autre."
+    "tagAudience": "les administrateurs le voient à tout moment, les arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), et les membres des deux équipes et le caster de ton match dès que les deux adversaires du match sont connus et jusqu'à sa fin ; les autres joueurs, seulement si tu le rends visible dans tes réglages de confidentialité. Jamais personne d'autre."
   },
   "environment": {
     "notice": {

@@ -245,8 +245,8 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     subPurposes: [
       "Exposing the certified Discord username to administrators, at any time, and to referees while the player is registered for a tournament that is not over (from the registration phase)",
       "Opening a player's hidden BattleTag to administrators and referees, while they are registered for a tournament that is not over",
-      "When a match is launched — and as soon as both its opponents are known, through the “Contacts” button on its card —, presenting to the players of both teams and to the registered caster the certified Discord username and the BattleTag of one or two players per team, and those of the caster, until the end of the match",
-      "Collecting the “Ready” of each party to a match (teams, caster) before it is launched",
+      "When a match is launched — and as soon as both its opponents are known, through the “Contacts” button on its card —, presenting to the members of both teams (players, coaches, managers, owners) and to the registered caster the certified Discord username and the BattleTag of one or two members per team, and those of the caster, until the end of the match",
+      "Collecting the “Ready” of each party to a match (teams, caster) before it is launched, only in tournaments that have the launch phase (an option of each tournament, off by default)",
       "Sending by Discord direct message and by push the announcement of a match's time (set, changed or removed), the notice that a match leaves their schedule and match reminders 24 h and 10 h before kickoff (the latter — or the announcement of a match scheduled less than 10 h ahead — with the invite link to the check-in Discord server); direct messages only go to accounts with a certified Discord tag (an uncertified tag, even one linked by signing in with Discord, receives none, to avoid spam); the player can turn these direct messages off from “My profile” (notifications), their push notifications keeping their own settings",
       "Alerting the referee role (score conflict, score left unconfirmed for too long, report on a player)",
       "Sending the referees, about 10 hours ahead, the schedule of upcoming matches (times, tournaments, team names; “a player” in a solo tournament) to the Discord log channel and by push",
@@ -277,7 +277,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     ],
     recipients: [
       "The association's administrators and referees",
-      "Players and caster of the same match, from the moment both its opponents are known to its end",
+      "Members of both teams and caster of the same match, from the moment both its opponents are known to its end",
       "Discord, which delivers the messages",
       "The association's staff with access to the Discord log channel (refereeing schedule, processing activity T05)",
       "The push service of the browser of each subscribed recipient (player: match announcements and reminders; referee or administrator: refereeing schedule; processing activity T12), which delivers an encrypted message it cannot read",

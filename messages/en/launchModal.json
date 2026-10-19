@@ -77,12 +77,12 @@
   "pushLead": "Get notified when your next matches start, even with the site closed.",
   "contacts": {
     "title": "Contacts — {match}",
-    "lead": "Shown to the players and the caster of this match, to add each other in game and get organised.",
+    "lead": "Shown to the members of both teams and the caster of this match, to add each other in game and get organised.",
     "scrollAria": "Match contacts",
     "loading": "Loading contacts…",
     "notShown": "Contacts not shown.",
     "noCaster": "No caster signed up for this match.",
-    "unavailable": "Contacts are only available to the players and the caster of a match whose two opponents are known, until it ends.",
+    "unavailable": "Contacts are only available to the members of both teams and the caster of a match whose two opponents are known, until it ends.",
     "failed": "Contacts could not be loaded. Try again in a moment."
   }
 }

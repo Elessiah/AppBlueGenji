@@ -77,12 +77,12 @@
   "pushLead": "Sois prévenu du départ de tes prochains matchs, même le site fermé.",
   "contacts": {
     "title": "Contacts — {match}",
-    "lead": "Fiches montrées aux joueurs et au caster de ce match, pour s'ajouter en jeu et s'organiser.",
+    "lead": "Fiches montrées aux membres des deux équipes et au caster de ce match, pour s'ajouter en jeu et s'organiser.",
     "scrollAria": "Contacts du match",
     "loading": "Chargement des contacts…",
     "notShown": "Contacts non affichés.",
     "noCaster": "Aucun caster inscrit sur ce match.",
-    "unavailable": "Les contacts ne sont visibles que des joueurs et du caster d'un match dont les deux adversaires sont connus, jusqu'à sa fin.",
+    "unavailable": "Les contacts ne sont visibles que des membres des deux équipes et du caster d'un match dont les deux adversaires sont connus, jusqu'à sa fin.",
     "failed": "Les contacts n'ont pas pu être chargés. Réessaie dans un instant."
   }
 }
