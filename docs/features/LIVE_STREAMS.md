@@ -162,7 +162,11 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   Paris en gras (`**21:00**`), suivie de « · En direct » pour un match à
   l'antenne, de « · Terminé · 2-1 » pour un match **terminé** (score lu sur
   le match, dans l'ordre de l'affiche) ou de « · Terminé » seul sans score
-  (forfait, score en attente de confirmation, antenne fermée en `MANUAL`) ;
+  (forfait, score en attente de confirmation) ; un match `MANUAL` annoncé dont
+  l'antenne est fermée sans score (coupure, pause) n'a ni « En direct » ni
+  « Terminé », à l'heure de son annonce (`live_started_at` effacé, l'heure
+  vient de sa réservation — jamais celle de la relecture, qui changerait le
+  texte à chaque minute) ;
   l'affiche et le tournoi ; le lien seul sur sa ligne. Les directs d'abord,
   puis les matchs **programmés** (`START_TIME`, castés, d'ici la fin de la
   fenêtre) par heure, puis les matchs terminés par heure : l'heure des streams
@@ -227,9 +231,12 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   modification d'une annonce : suite sans mention si le message ne se modifie
   plus (`30046`, `50005`, identifiant remplacé), soirée close si le message a
   été supprimé (`10008`). Un refus ou une issue incertaine ne renvoie pas le
-  même texte ; un report (bot injoignable, salon fermé, Discord réticent) est
-  relancé une minute plus tard, trois fois au plus, puis attend la fin de match
-  suivante — le coupe-circuit du bot ouvert, rien n'est lu. Balayage et mise à
+  même texte ; un report (bot injoignable, salon fermé, Discord réticent, soirée
+  en pause, coupe-circuit du bot ouvert — rien n'est alors lu —, lecture en
+  échec) est relancé une minute plus tard, trois fois au plus depuis la
+  dernière fin de match (chaque nouvelle fin de match en redonne trois). Un
+  report qui tient au bot ou au salon arrête le passage : l'autre public
+  n'essuie pas le même refus ; une soirée illisible n'empêche pas l'autre. Balayage et mise à
   jour passent par une **file unique** : une mise à jour ne rédige jamais en
   même temps qu'une annonce (elle effacerait son match du message).
 - **Jamais deux notifications par public et par soirée** : le premier envoi
