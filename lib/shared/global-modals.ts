@@ -31,7 +31,8 @@ export const TERMS_POSTPONED_COOKIE = "bg_terms_later";
  * Pages où la fenêtre bloquante des conditions laisse passer, depuis la
  * version 6 (2026-10-19) : qui refuse les conditions doit encore pouvoir lire
  * la politique de confidentialité et les pages légales (celles du bot
- * comprises), exporter ses
+ * comprises), les règles des tournois que les conditions complètent, suivre
+ * ou contester un signalement (recours interne), exporter ses
  * données ou supprimer son compte (« Mon profil »), sans accepter d'abord.
  */
 export const TERMS_FREE_PATHS: readonly string[] = [
@@ -40,6 +41,8 @@ export const TERMS_FREE_PATHS: readonly string[] = [
   "/accessibilite",
   "/privacy-policy-bot",
   "/terms-of-service-bot",
+  "/regles",
+  "/signalements",
   "/profil",
 ];
 
