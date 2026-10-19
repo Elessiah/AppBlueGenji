@@ -101,7 +101,7 @@
     "hidden": "Hidden",
     "adultYes": "Yes (18+)",
     "adultNo": "No (minor)",
-    "battletagHiddenSelf": "Hidden from the public: only the members of both teams in your matches and the referees can read it, until the tournament is over, as well as the caster of a match where you are shown as a contact, while the match is being played, and both teams of a match you cast, from the moment both opponents are known to the end of the match.",
+    "battletagHiddenSelf": "Hidden from everyone, referees included: it can only be read in the “Contacts” window of your matches — by both teams, from the moment both opponents are known to the end of the match, if you are shown as a contact, and by the caster while the match is being played.",
     "battletagHiddenOther": "Hidden from the public: you can read it to play or referee a tournament that isn't over. Don't share it.",
     "verifiedAlt": "Verified Discord tag",
     "verifiedTitle": "Verified Discord tag: this player proved they own this Discord account.",

@@ -82,7 +82,7 @@
     "loading": "Loading contacts…",
     "notShown": "Contacts not shown.",
     "noCaster": "No caster signed up for this match.",
-    "unavailable": "Contacts are only available to the members of both teams of a match whose two opponents are known, and to its caster while the match is being played, until it ends.",
+    "unavailable": "Contacts are only available to the members of both teams of a match whose two opponents are known, until it ends; the caster's, and the teams' for the caster, only while the match is being played.",
     "failed": "Contacts could not be loaded. Try again in a moment."
   }
 }

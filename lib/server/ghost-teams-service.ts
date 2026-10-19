@@ -62,8 +62,8 @@ export async function createGhostTeam(
  *
  * **Pourquoi une invitation et plus une attribution directe** : faire d'un
  * joueur l'OWNER d'une fantôme inscrite à un tournoi vivant le rend « engagé »,
- * ce qui ouvre à la permission `tournaments` son tag Discord certifié et son
- * BattleTag même masqué (`isInActiveTournament`, `canViewBattletag`). Sans son
+ * ce qui ouvre à la permission `tournaments` son tag Discord certifié
+ * (`isInActiveTournament`). Sans son
  * consentement, n'importe quel free agent pouvait ainsi être exposé par un
  * arbitre. Engagé, il ne l'est désormais que s'il l'a accepté.
  *

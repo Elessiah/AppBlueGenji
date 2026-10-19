@@ -304,6 +304,13 @@ type LaunchContext = {
   readiness: ReturnType<typeof rowReadiness>;
   /** Contacts : seulement pour les matchs où `exposesContacts` les ouvre. */
   exposes: boolean;
+  /**
+   * Contacts **du caster** : le temps du match seulement (lancement ouvert, ou
+   * lancé), pour tout lecteur — symétrique de ce que le caster reçoit des
+   * équipes (décision de l'utilisateur, 2026-10-19). Avant, la carte présente
+   * les contacts des équipes sans les siens.
+   */
+  exposesCaster: boolean;
 };
 
 /**
@@ -478,7 +485,7 @@ function buildLaunchCaster(row: CandidateRow, ctx: LaunchContext): LaunchCaster 
   const user = ctx.users.get(Number(row.caster_user_id));
   if (!user || Number(user.is_deleted) !== 0) return null;
   const discordTag = user.discord_verified_at !== null ? user.discord_pseudo : null;
-  const contact = ctx.exposes
+  const contact = ctx.exposes && ctx.exposesCaster
     ? filterContact(
         {
           userId: Number(user.id),
@@ -609,6 +616,7 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
           castRevoked,
           readiness: rowReadiness(row),
           exposes,
+          exposesCaster: phase === "LOBBY" || phase === "LAUNCHED",
         }),
       );
     }
