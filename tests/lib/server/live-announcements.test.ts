@@ -1299,6 +1299,8 @@ describe("soirées d'annonces", () => {
     expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
     expect(pushLiveEvening).not.toHaveBeenCalled();
     expect(releasesOf(execute)).toEqual([]);
+    // Non publiée : la réservation est marquée refusée, comme le rend l'export RGPD.
+    expect(execute.mock.calls.some(([sql]) => sql.startsWith("UPDATE bg_live_announcements SET refused = 1"))).toBe(true);
     expect(String(jest.mocked(console.warn).mock.calls[0][0])).toContain("soirée 3 close (message supprimé de #live)");
     // Ni datation des réservations ni lecture des matchs : la soirée est close.
     expect(execute.mock.calls.some(([sql]) => sql.startsWith("UPDATE bg_live_announcements SET sent_at"))).toBe(false);
