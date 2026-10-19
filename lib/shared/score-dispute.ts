@@ -37,12 +37,24 @@ export function autoValidateTimeText(iso: string | null | undefined, locale: Loc
   if (!iso) return null;
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleTimeString(INTL_LOCALE[locale], {
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-    timeZone: SITE_TIME_ZONE,
-  });
+  return autoValidateFormatter(locale).format(date);
+}
+
+/** Un formateur par langue : chaque carte en attente le relit à chaque instantané. */
+const AUTO_VALIDATE_FORMATTERS = new Map<Locale, Intl.DateTimeFormat>();
+
+function autoValidateFormatter(locale: Locale): Intl.DateTimeFormat {
+  let formatter = AUTO_VALIDATE_FORMATTERS.get(locale);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(INTL_LOCALE[locale], {
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+      timeZone: SITE_TIME_ZONE,
+    });
+    AUTO_VALIDATE_FORMATTERS.set(locale, formatter);
+  }
+  return formatter;
 }
 
 /** Une colonne de report est-elle renseignée ? (`null` / `undefined` : non). */

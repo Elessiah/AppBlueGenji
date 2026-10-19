@@ -114,7 +114,7 @@
       "forfeitRecorded": "Forfait enregistré : {opponent} remporte le match.",
       "minePending": "Tu as proposé {score}. En attente de la confirmation de {opponent}.",
       "minePendingDeadline": "Tu as proposé {score}. En attente de la confirmation de {opponent} — sans réponse, ce score sera validé automatiquement à {deadline} (heure de Paris).",
-      "locked": "Score en litige : la saisie est verrouillée pour les deux équipes, forfait compris. Seul un arbitre ou un administrateur peut trancher ce match — fixer le score final ou le remettre à zéro.",
+      "locked": "Score en litige : la saisie est verrouillée pour les deux équipes, forfait compris. Seul un arbitre ou un administrateur peut trancher ce match — fixer le score final ou prononcer un forfait.",
       "counterWarning": "Ce score diffère de la proposition de {opponent} : l'envoyer ouvre un litige et verrouille la saisie des deux équipes jusqu'à l'arbitrage.",
       "autoValidateAt": "Sans réponse, ce score sera validé automatiquement à {deadline} (heure de Paris).",
       "willConfirm": "{opponent} devra confirmer le score que tu envoies.",

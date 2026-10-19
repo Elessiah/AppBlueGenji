@@ -181,7 +181,7 @@
       "bullets": [
         "Two matching reports validate the match immediately.",
         "A single report is confirmed automatically if the opponent does nothing (no confirmation, no other score) for {autoValidate} hours after the latest entry, and never before a plausible series duration has passed since the launch ({minutesPerMap} minutes per map the format allows, plus {reportTimeout} minutes): the score then stands as if the opponent had confirmed it. The time of this confirmation is shown to both teams.",
-        "Two conflicting reports put the match in dispute: score entry is then locked for both teams (no score, no correction, no confirmation and no forfeit), and only a referee or an administrator settles it, by recording the official score or resetting the match.",
+        "Two conflicting reports put the match in dispute: score entry is then locked for both teams (no score, no correction, no confirmation and no forfeit of the match), and only a referee or an administrator settles it, by recording the official score or a forfeit.",
         "A referee or an admin can correct a score as long as the next round has no score entered; after that, the score is locked, for them too."
       ]
     },

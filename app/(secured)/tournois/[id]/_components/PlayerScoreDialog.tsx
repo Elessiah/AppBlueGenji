@@ -188,6 +188,16 @@ function theirsPendingStatus(
   return text.t("score.player.theirs.withoutMaps", values);
 }
 
+/** Envoyer la saisie ouvrirait-il un litige ? Face à la proposition adverse, une saisie valide qui en diffère. */
+function sendingOpensDispute(
+  canEnterScore: boolean,
+  phase: string | undefined,
+  form: { entered: unknown; confirmsAsIs: boolean; error: unknown },
+): boolean {
+  if (!canEnterScore || phase !== "THEIRS_PENDING") return false;
+  return form.entered !== null && !form.confirmsAsIs && !form.error;
+}
+
 export function PlayerScoreDialog({
   tournamentId,
   match: liveMatch,
@@ -297,7 +307,7 @@ export function PlayerScoreDialog({
   }, [disputeLocked, dialogRef]);
   // Contre-proposition : l'envoyer ouvre un litige sans retour possible côté
   // joueurs — le dire avant l'envoi, pas après.
-  const opensDispute = canEnterScore && view?.phase === "THEIRS_PENDING" && entered !== null && !confirmsAsIs && !check.error;
+  const opensDispute = sendingOpensDispute(canEnterScore, view?.phase, { entered, confirmsAsIs, error: check.error });
 
   // Un refus qui désigne une map est rattaché à son champ, en plus de la
   // notification — avant l'envoi comme après un refus du serveur, qui ne rend
@@ -426,6 +436,8 @@ export function PlayerScoreDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="player-score-title"
+        // Verrou : le focus rendu à la modale lit aussi pourquoi la saisie a disparu.
+        aria-describedby={disputeLocked ? "player-score-locked" : undefined}
         tabIndex={-1}
       >
         <form onSubmit={onSubmitForm}>
@@ -466,7 +478,7 @@ export function PlayerScoreDialog({
           )}
 
           {disputeLocked && (
-            <output className={`${styles.conflict} ${styles.notice}`}>
+            <output id="player-score-locked" className={`${styles.conflict} ${styles.notice}`}>
               {t("score.player.locked")}
             </output>
           )}
@@ -538,7 +550,7 @@ export function PlayerScoreDialog({
           )}
 
           {opensDispute && (
-            <output className={`${styles.conflict} ${styles.notice}`}>
+            <output id="player-score-counter-warning" className={`${styles.conflict} ${styles.notice}`}>
               {t("score.player.counterWarning", { opponent: opponentName })}
             </output>
           )}
@@ -566,6 +578,9 @@ export function PlayerScoreDialog({
                 className="btn"
                 disabled={nothingEntered || unchangedMine}
                 aria-disabled={submitting || undefined}
+                // Un avertissement monté déjà rempli n'est pas toujours annoncé :
+                // rattaché au bouton, il se lit au moment d'envoyer.
+                aria-describedby={opensDispute ? "player-score-counter-warning" : undefined}
                 aria-busy={submitting || undefined}
               >
                 {submitting ? "…" : submitLabel}
