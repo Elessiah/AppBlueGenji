@@ -579,9 +579,9 @@ function RgpdFr({
               votre visite.
             </li>
             <li>
-              <strong>bg_terms_later</strong> — <strong>n&apos;est plus déposé</strong> depuis le
-              19 octobre 2026 : l&apos;acceptation des conditions d&apos;utilisation ne se reporte
-              plus. Un cookie déposé avant cette date (valeur « 1 », jamais d&apos;identifiant de
+              <strong>bg_terms_later</strong> — <strong>n&apos;est plus déposé</strong> depuis la
+              version 6 des conditions d&apos;utilisation : leur acceptation ne se reporte
+              plus. Un cookie déposé auparavant (valeur « 1 », jamais d&apos;identifiant de
               personne) expire au plus douze heures après son dépôt, et est effacé plus tôt à la
               connexion ou à la déconnexion.
             </li>
@@ -635,7 +635,7 @@ function RgpdFr({
               d&apos;utilisation, pour ne pas vous les représenter. Elles ne contiennent qu&apos;un
               numéro de version : une nouvelle version vous les présente de nouveau.
               L&apos;acceptation des conditions est aussi conservée sur nos serveurs, avec son
-              numéro de version, quand vous les acceptez : à la création de votre compte ou d&apos;une
+              numéro de version, sa date et l&apos;endroit où vous l&apos;avez donnée, quand vous les acceptez : à la création de votre compte ou d&apos;une
               équipe, pour gérer une équipe, dans la fenêtre d&apos;acceptation présentée à tout
               compte connecté qui n&apos;a pas accepté la version en vigueur, ou à une connexion lancée depuis la page de connexion
               (clic sur Google, Discord ou Blizzard, ou envoi du code reçu sur Discord) dans les dix

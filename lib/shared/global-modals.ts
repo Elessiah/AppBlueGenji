@@ -30,10 +30,18 @@ export const TERMS_POSTPONED_COOKIE = "bg_terms_later";
 /**
  * Pages où la fenêtre bloquante des conditions laisse passer, depuis la
  * version 6 (2026-10-19) : qui refuse les conditions doit encore pouvoir lire
- * la politique de confidentialité et les pages légales, exporter ses
+ * la politique de confidentialité et les pages légales (celles du bot
+ * comprises), exporter ses
  * données ou supprimer son compte (« Mon profil »), sans accepter d'abord.
  */
-export const TERMS_FREE_PATHS: readonly string[] = ["/rgpd", "/mentions-legales", "/accessibilite", "/profil"];
+export const TERMS_FREE_PATHS: readonly string[] = [
+  "/rgpd",
+  "/mentions-legales",
+  "/accessibilite",
+  "/privacy-policy-bot",
+  "/terms-of-service-bot",
+  "/profil",
+];
 
 /**
  * Pages où la modale des conditions se tait : celle des conditions elle-même

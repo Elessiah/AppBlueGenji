@@ -448,8 +448,8 @@ export function RgpdEn({
               first lasts seven days, the second the duration of your visit.
             </li>
             <li>
-              <strong>bg_terms_later</strong> — <strong>no longer set</strong> since 19 October 2026: accepting
-              the terms of use can no longer be postponed. A cookie set before that date (value “1”, never a
+              <strong>bg_terms_later</strong> — <strong>no longer set</strong> since version 6 of the terms of use: accepting
+              them can no longer be postponed. A cookie set earlier (value “1”, never a
               personal identifier) expires twelve hours at most after it was set, and is cleared earlier at login or
               logout.
             </li>
@@ -494,7 +494,7 @@ export function RgpdEn({
               set on the login page <strong>when you continue</strong> after reading the information about your
               data and accepting the terms of use, so as not to present them to you again. They only contain a
               version number: a new version presents them to you again. The acceptance of the terms is also kept
-              on our servers, with its version number, when you accept them: when your account or a team is created,
+              on our servers, with its version number, its date and where you gave it, when you accept them: when your account or a team is created,
               to manage a team, in the acceptance window shown to any logged-in account that has not accepted
               the version in force, or at a login started from the login page (click on Google, Discord or Blizzard, or
               submission of the code received on Discord) within ten minutes of accepting them
