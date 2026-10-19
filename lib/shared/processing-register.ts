@@ -312,7 +312,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Rédiger les notifications push dans la langue du compte : celle de la page du site d'où part la dernière connexion (une connexion lancée d'ailleurs, ou par le bouton Google, Discord ou Blizzard depuis un navigateur qui ne l'indique pas (trop ancien, ou qui retire cette indication), ne la change pas ; français par défaut), ou celle choisie dans « Mon profil »",
     ],
     legalBasis:
-      "Exécution du service demandé par le joueur (contrat) pour le compte ; consentement pour les données facultatives que le joueur renseigne et choisit de rendre visibles",
+      "Exécution du service demandé par le joueur (contrat) pour le compte ; consentement pour les données facultatives que le joueur renseigne et choisit de rendre visibles ; exécution du service (contrat) pour la lecture du BattleTag, même masqué, entre parties d'un même match (membres des deux équipes, caster inscrit — voir T04)",
     dataSubjects: ["Joueurs inscrits sur le site"],
     dataCategories: [
       "Pseudo du site (depuis le 30 septembre 2026, jamais tiré du nom du compte Google : pseudo neutre à la création ; un compte Google antérieur a pu recevoir ce nom), avatar (copié sur nos serveurs ; depuis la même date, masqué par défaut quand il vient du fournisseur de connexion)",

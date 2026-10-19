@@ -135,7 +135,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Writing push notifications in the account's language: the language of the site page the last login started from (a login started elsewhere, or a login through the Google, Discord or Blizzard button from a browser that does not tell (too old, or one that strips this information), does not change it; French by default), or the one chosen in “My profile”",
     ],
     legalBasis:
-      "Performance of the service requested by the player (contract) for the account; consent for the optional data the player fills in and chooses to make visible",
+      "Performance of the service requested by the player (contract) for the account; consent for the optional data the player fills in and chooses to make visible; performance of the service (contract) for the reading of the BattleTag, even when hidden, between parties to the same match (members of both teams, signed-up caster — see T04)",
     dataSubjects: ["Players registered on the site"],
     dataCategories: [
       "Site username (since September 30, 2026, never taken from the name of the Google account: neutral username at creation; an earlier Google account may have received that name), avatar (copied to our servers; since the same date, hidden by default when it comes from the login provider)",
