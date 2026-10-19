@@ -43,9 +43,14 @@ describe("contactsRetryDelay", () => {
     expect(contactsRetryDelay(START, SERVER_BEFORE)).toBe(11_000);
   });
 
-  it("départ passé au serveur (match terminé, tournoi clos…) : aucune relecture", () => {
+  it("départ passé au serveur depuis plus de deux secondes (match terminé, tournoi clos…) : aucune relecture", () => {
     expect(contactsRetryDelay(START, SERVER_AFTER)).toBeNull();
-    expect(contactsRetryDelay(START, "Mon, 19 Oct 2026 18:00:00 GMT")).toBeNull();
+    expect(contactsRetryDelay(START, "Mon, 19 Oct 2026 18:00:02 GMT")).toBeNull();
+  });
+
+  it("en-tête à la seconde du départ (tronqué, posé après la décision) : relu une seconde plus tard", () => {
+    expect(contactsRetryDelay(START, "Mon, 19 Oct 2026 18:00:00 GMT")).toBe(1_000);
+    expect(contactsRetryDelay(START, "Mon, 19 Oct 2026 18:00:01 GMT")).toBe(1_000);
   });
 
   it("sans heure (à planifier, déjà lancé), sans en-tête ou illisible : aucune relecture", () => {
@@ -182,6 +187,11 @@ describe("contacts du caster en attente, modale ouverte", () => {
     expect(isFinalRefusal(null)).toBe(false);
   });
 
+  it("le serveur a dit « programmé » mais son en-tête est déjà à l'heure : relu une seconde plus tard", () => {
+    expect(casterRereadDelay(info("SCHEDULED"), "Mon, 19 Oct 2026 18:00:00 GMT")).toBe(1_000);
+    expect(casterRereadDelay(info("SCHEDULED"), SERVER_AFTER)).toBe(1_000);
+  });
+
   it("relecture à l'heure de départ du serveur, plus une seconde (horloge du navigateur en avance)", () => {
     expect(casterRereadDelay(info("SCHEDULED"), SERVER_BEFORE)).toBe(11_000);
     expect(casterRereadDelay(info("SCHEDULED"), "Mon, 19 Oct 2026 16:00:00 GMT")).toBe(2 * 3_600_000 + 1_000);
@@ -190,13 +200,12 @@ describe("contacts du caster en attente, modale ouverte", () => {
   it("aucune relecture sans caster, sans heure, départ passé au serveur, ou contacts déjà là", () => {
     expect(casterRereadDelay(info("SCHEDULED", null), SERVER_BEFORE)).toBeNull();
     expect(casterRereadDelay(info("TO_PLAN", CASTER, null), SERVER_BEFORE)).toBeNull();
-    expect(casterRereadDelay(info("SCHEDULED"), SERVER_AFTER)).toBeNull();
     expect(casterRereadDelay(info("SCHEDULED"), null)).toBeNull();
     expect(casterRereadDelay(info("LOBBY"), SERVER_BEFORE)).toBeNull();
   });
 
   it("horaire changé par une écriture (lancement forcé, reprogrammé, remis à planifier) : relu", () => {
-    const at = (startAt: string | null, launchedAt: string | null = null) => ({ startAt, launchedAt });
+    const at = (startAt: string | null, launchedAt: string | null = null) => ({ startAt, launchedAt, casterUserId: 9 });
     const pending = info("SCHEDULED");
     expect(rereadOnScheduleChange(at(START), at(START, "2026-10-19T17:50:00.000Z"), pending)).toBe(true);
     expect(rereadOnScheduleChange(at(START), at("2026-10-19T18:30:00.000Z"), pending)).toBe(true);
@@ -206,23 +215,31 @@ describe("contacts du caster en attente, modale ouverte", () => {
   });
 
   it("rien sans caster, sans lecture, ni sans changement (l'horloge du navigateur ne relit rien)", () => {
-    const same = { startAt: START, launchedAt: null };
+    const same = { startAt: START, launchedAt: null, casterUserId: null };
     expect(rereadOnScheduleChange(same, { ...same }, info("SCHEDULED"))).toBe(false);
-    expect(rereadOnScheduleChange(same, { startAt: null, launchedAt: null }, info("SCHEDULED", null))).toBe(false);
-    expect(rereadOnScheduleChange(same, { startAt: null, launchedAt: null }, null)).toBe(false);
+    expect(rereadOnScheduleChange(same, { ...same, startAt: null }, info("SCHEDULED", null))).toBe(false);
+    expect(rereadOnScheduleChange(same, { ...same, startAt: null }, null)).toBe(false);
+  });
+
+  it("caster qui s'inscrit ou se retire, modale ouverte : relu, avec ou sans caster déjà lu", () => {
+    const base = { startAt: START, launchedAt: null, casterUserId: null };
+    expect(rereadOnScheduleChange(base, { ...base, casterUserId: 9 }, info("SCHEDULED", null))).toBe(true);
+    expect(rereadOnScheduleChange({ ...base, casterUserId: 9 }, base, info("LOBBY"))).toBe(true);
+    expect(rereadOnScheduleChange(base, { ...base, casterUserId: 9 }, null)).toBe(false);
   });
 
   it("câblage : horaire de la carte transmis, relecture passagère silencieuse, affichage à la phase du serveur", () => {
     const dialog = readSource("components/match-launch/MatchContactsDialog.tsx");
     expect(dialog).toContain("}, [matchId, readKey]);");
     expect(dialog).toContain("rereadOnScheduleChange(previousSchedule.current, schedule, launch)");
-    expect(dialog).toContain("}, [startAt, launchedAt, launch]);");
+    expect(dialog).toContain("}, [startAt, launchedAt, casterUserId, launch]);");
+    expect(dialog).toContain("const timer = setTimeout(rereadNow, delay);");
     expect(dialog).toContain("if (reread && !isFinalRefusal(read.error)) {");
     expect(dialog).toContain("shouldRetryReread(rereadFailures)");
     expect(dialog).toContain("casterRereadDelay(launch, serverDate)");
     expect(dialog).toMatch(/if \(reread\) \{\n\s*setRereadFailures\(\(count\) => count \+ 1\);\n\s*return;/);
     expect(dialog).toContain("contactsShown={matchUnderway(launch.phase)}");
     const card = readSource("app/(secured)/tournois/[id]/_components/MatchCardActions.tsx");
-    expect(card).toMatch(/<MatchContactsDialog[\s\S]*?startAt=\{match\.startAt\}[\s\S]*?launchedAt=\{match\.launchedAt\}[\s\S]*?\/>/);
+    expect(card).toMatch(/<MatchContactsDialog[\s\S]*?startAt=\{match\.startAt\}[\s\S]*?launchedAt=\{match\.launchedAt\}[\s\S]*?casterUserId=\{match\.casterUserId\}[\s\S]*?\/>/);
   });
 });
