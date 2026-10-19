@@ -205,7 +205,7 @@ describe("listViewerMatchLaunches — le match et la place du lecteur", () => {
       hostTeamId: TEAM1,
       team1: { teamId: TEAM1, name: "Alpha", ready: false, isGhost: false, isSolo: false },
       team2: { teamId: TEAM2, name: "Bravo" },
-      viewer: { role: "TEAM1", canDeclareReady: true, ready: false },
+      viewer: { role: "TEAM1", canDeclareReady: true, ready: false, isCaster: false },
     });
     expect(info.autoLaunchAt).toBe(new Date(Date.parse(OPENED) + 15 * 60_000).toISOString());
   });
@@ -225,7 +225,7 @@ describe("listViewerMatchLaunches — le match et la place du lecteur", () => {
   it("refuse le bouton « Prêt » à un joueur sans rôle d'engagement", async () => {
     state.viewerMemberships = [{ team_id: TEAM1, roles_json: JSON.stringify(["DPS"]) }];
     const [info] = await listViewerMatchLaunches(viewer);
-    expect(info.viewer).toEqual({ role: "TEAM1", canDeclareReady: false, ready: false });
+    expect(info.viewer).toEqual({ role: "TEAM1", canDeclareReady: false, ready: false, isCaster: false });
   });
 
   it("reconnaît le caster et son « Prêt »", async () => {
@@ -233,7 +233,7 @@ describe("listViewerMatchLaunches — le match et la place du lecteur", () => {
     state.candidates = [candidate({ caster_user_id: VIEWER, caster_ready_at: OPENED })];
     state.users = [casterUser(VIEWER)];
     const [info] = await listViewerMatchLaunches(viewer);
-    expect(info.viewer).toEqual({ role: "CASTER", canDeclareReady: true, ready: true });
+    expect(info.viewer).toEqual({ role: "CASTER", canDeclareReady: true, ready: true, isCaster: true });
     expect(info.caster).toMatchObject({
       userId: VIEWER,
       discordTag: "caster",
@@ -266,7 +266,7 @@ describe("listViewerMatchLaunches — le match et la place du lecteur", () => {
       },
     ];
     const [info] = await listViewerMatchLaunches(viewer);
-    expect(info.viewer).toEqual({ role: "TEAM2", canDeclareReady: true, ready: false });
+    expect(info.viewer).toEqual({ role: "TEAM2", canDeclareReady: true, ready: false, isCaster: false });
     expect(info.team2.isSolo).toBe(true);
     expect(info.team2.contacts).toEqual([
       expect.objectContaining({ userId: VIEWER, discordTag: "solo" }),
@@ -757,7 +757,7 @@ describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => 
       state.users = [casterUser(CASTER)];
       const info = await loadViewerMatchContacts(referee, 42);
       expect(info?.phase).toBe("TO_PLAN");
-      expect(info?.viewer).toEqual({ role: "REFEREE", canDeclareReady: false, ready: false });
+      expect(info?.viewer).toEqual({ role: "REFEREE", canDeclareReady: false, ready: false, isCaster: false });
       expect(info?.team2.contacts).toEqual([expect.objectContaining({ userId: 5, discordTag: "cap2", battletag: "Cap#2" })]);
       // Comme pour les équipes : les contacts du caster le temps du match seulement.
       expect(info?.caster).toMatchObject({ discordTag: null, battletag: null });
@@ -794,6 +794,17 @@ describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => 
     it("ne rend rien d'un match terminé", async () => {
       state.candidates = [candidate({ status: "COMPLETED" })];
       await expect(loadViewerMatchContacts(referee, 42)).resolves.toBeNull();
+    });
+
+    it("dit au lecteur qu'il est le caster, même quand il est aussi joueur du match", async () => {
+      state.viewerMemberships = [{ team_id: TEAM1, roles_json: JSON.stringify(["DPS"]) }];
+      state.candidates = [candidate({ referee_scheduling: 1, start_at: null, caster_user_id: VIEWER })];
+      state.users = [casterUser(VIEWER)];
+      const info = await loadViewerMatchContacts(viewer, 42);
+      expect(info?.viewer).toMatchObject({ role: "TEAM1", isCaster: true });
+      state.candidates = [candidate({ referee_scheduling: 1, start_at: null, caster_user_id: CASTER })];
+      state.users = [casterUser(CASTER)];
+      await expect(loadViewerMatchContacts(viewer, 42)).resolves.toMatchObject({ viewer: { isCaster: false } });
     });
   });
 
