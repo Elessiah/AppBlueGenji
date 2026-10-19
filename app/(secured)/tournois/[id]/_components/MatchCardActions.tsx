@@ -511,6 +511,7 @@ export function MatchCardActions({
           matchLabel={matchLabel}
           startAt={match.startAt}
           launchedAt={match.launchedAt}
+          phase={phase}
           onClose={() => setContactsOpen(false)}
         />
       )}

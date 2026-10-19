@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ScrollArea } from "@/components/cyber/ScrollArea";
 import { useToast } from "@/components/ui/toast";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
-import { MATCH_LAUNCH_REFRESH_EVENT, type MatchLaunchInfo } from "@/lib/shared/match-launch";
+import { MATCH_LAUNCH_REFRESH_EVENT, type MatchLaunchInfo, type MatchLaunchPhase } from "@/lib/shared/match-launch";
 import { CasterCard, SideCard } from "./LaunchContactCards";
 import { useLaunchText, type LaunchText } from "./launch-text";
 import launchStyles from "./MatchLaunchCenter.module.css";
@@ -44,6 +44,23 @@ export function contactsRetryDelay(startAt: string | null, serverDate: string | 
   // L'en-tête est tronqué à la seconde : une seconde de marge.
   const delay = start - server + 1_000;
   return delay <= CONTACTS_RETRY_MAX_WAIT_MS ? delay : null;
+}
+
+/**
+ * Le match est-il parti (lancement ouvert, ou lancé) ? C'est alors seulement
+ * que les contacts du caster sortent (`exposesCaster`, serveur).
+ */
+export function matchUnderway(phase: MatchLaunchPhase | null): boolean {
+  return phase === "LOBBY" || phase === "LAUNCHED";
+}
+
+/**
+ * Relire la modale ouverte ? Une fois, quand la carte passe au départ : la
+ * note « contacts du caster au départ » laisse alors place à ses contacts. Pas
+ * à la fin du match (un refus non demandé), ni à chaque rendu.
+ */
+export function rereadOnPhaseChange(previous: MatchLaunchPhase | null, next: MatchLaunchPhase | null): boolean {
+  return matchUnderway(next) && !matchUnderway(previous);
 }
 
 type ContactsRead = { launch: MatchLaunchInfo } | { error: string | null };
@@ -107,6 +124,7 @@ export function MatchContactsDialog({
   onClose,
   startAt = null,
   launchedAt = null,
+  phase = null,
 }: Readonly<{
   matchId: number;
   matchLabel: string;
@@ -114,6 +132,12 @@ export function MatchContactsDialog({
   /** Heure de départ du match : un match pas encore lancé est relu à la frontière. */
   startAt?: string | null;
   launchedAt?: string | null;
+  /**
+   * Phase de la carte : la modale relit **une** fois quand le match part
+   * (lancement ouvert, ou lancé) pendant qu'elle est ouverte, pour que les
+   * contacts du caster, qui ne sortent qu'alors, remplacent la note d'attente.
+   */
+  phase?: MatchLaunchPhase | null;
 }>) {
   const text = useLaunchText();
   const { t } = text;
@@ -130,6 +154,12 @@ export function MatchContactsDialog({
   useEffect(() => setMounted(true), []);
   const dialogRef = useDialogBehavior({ open: mounted, onClose: close });
   const backdrop = useBackdropDismiss(close);
+  const previousPhase = useRef(phase);
+  const [readKey, setReadKey] = useState(0);
+  useEffect(() => {
+    if (rereadOnPhaseChange(previousPhase.current, phase)) setReadKey((key) => key + 1);
+    previousPhase.current = phase;
+  }, [phase]);
 
   useEffect(() => {
     let alive = true;
@@ -157,9 +187,10 @@ export function MatchContactsDialog({
       alive = false;
       controller.abort();
     };
-    // Une lecture par ouverture : la langue ou la notification ne relancent rien.
+    // Une lecture par ouverture, et une au départ du match : la langue ou la
+    // notification ne relancent rien.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [matchId]);
+  }, [matchId, readKey]);
 
   const copy = async (value: string, label: string) => {
     try {
