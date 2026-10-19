@@ -177,17 +177,21 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   mention (suite, envoi `notify: false`, permission absente) est gardé
   `silent` : ses modifications envoient `notify: false` et n'écrivent pas de
   mention de tête — une mention grise qui n'a notifié personne aurait l'air
-  d'une panne. Un bot d'une version antérieure ne rend pas
-  d'identifiant : chaque match repart alors dans un nouveau message (d'où
-  l'ordre de déploiement : **bot d'abord**). Une publication incertaine
+  d'une panne. Un bot d'une version antérieure ignore `mention`,
+  `streamUrls`, `editMessageId` et `notify`, et ne rend pas d'identifiant :
+  chaque match repart dans un nouveau message **`@everyone`**, public
+  StreamViewer compris, jetons `{{lien:N}}` laissés bruts. D'où l'ordre de
+  déploiement : **bot d'abord**, et jamais de retour à un bot antérieur tant
+  que `LIVE_ANNOUNCEMENTS_ENABLED` est posé. Une publication incertaine
   (`uncertain`, `timed-out`, `interrupted`) ne laisse pas d'identifiant : un
   match suivant de la même soirée repart dans un nouveau message.
-- **Jamais deux notifications par public et par soirée** : soirée sans
-  identifiant gardé, mais marquée `notified` (premier envoi d'issue incertaine,
-  bot trop ancien, identifiant non enregistré — même si le tournoi de ce match
-  est fini depuis) ou dont un autre match du même public a déjà une annonce
-  réservée depuis son ouverture (`evening_announced`) — le site envoie
-  `notify: false` et le bot poste un nouveau message **sans
+- **Jamais deux notifications par public et par soirée** : le premier envoi
+  qui notifie **prend** la marque `notified` juste avant l'appel au bot, en une
+  instruction (`UPDATE … SET notified = 1 … WHERE id = ? AND notified = 0` +
+  `affectedRows`). Soirée sans identifiant gardé mais déjà marquée (premier
+  envoi d'issue incertaine, bot trop ancien, identifiant non enregistré — même
+  si le tournoi de ce match est fini depuis, ou si son lien a changé de public)
+  — le site envoie `notify: false` et le bot poste un nouveau message **sans
   mention écrite ni notification**. Les réservations d'un passage, prises
   avant l'ouverture de la soirée (parfois de plusieurs secondes, quand l'envoi
   de l'autre public passe d'abord), sont datées dans la soirée
