@@ -592,7 +592,9 @@ describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => 
     const info = await loadViewerMatchContacts(viewer, 42);
     expect(info?.phase).toBe("SCHEDULED");
     expect(info?.team2.contacts).toEqual([expect.objectContaining({ userId: 5, discordTag: "cap2" })]);
-    expect(info?.caster).toMatchObject({ pseudo: "Caster", discordTag: "caster" });
+    // Avant l'heure, les contacts du caster sont tus aux équipes : symétrique
+    // de ce qu'il reçoit d'elles (décision de l'utilisateur, 2026-10-19).
+    expect(info?.caster).toMatchObject({ pseudo: "Caster", discordTag: null, battletag: null });
   });
 
   it("lit un seul match, sans le filtre de l'option ni la fenêtre de la modale", async () => {

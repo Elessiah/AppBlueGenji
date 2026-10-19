@@ -44,15 +44,15 @@ describe("contacts du lancement d'un match — base légale", () => {
       expect(entry?.finalite).not.toMatch(/non sur ce consentement/);
     }
     expect(MATCH_CONTACTS_SCOPE).toBe(
-      "présentation aux membres des deux équipes de ton match, dès que ses deux adversaires sont connus, et à son caster le temps du match (conditions d'utilisation, « Contacts de match »)",
+      "présentation, dans la fenêtre « Contacts » du match, aux membres de ses deux équipes dès que ses deux adversaires sont connus, et à son caster le temps du match ; les contacts du caster aux deux équipes le temps du match (conditions d'utilisation, « Contacts de match »)",
     );
   });
 
   // Décision du 2026-10-19 : masqué, le BattleTag reste lu par les parties de
   // tes matchs au titre du service, pas du consentement (le réglage n'y peut rien).
   it("fonde la lecture du BattleTag masqué par les parties d'un match sur le contrat, pas le consentement", () => {
-    expect(BATTLETAG_MATCH_SCOPE).toMatch(/^lecture, même masqué, par les membres des deux équipes de tes matchs tant que le tournoi n'est pas terminé/);
-    expect(BATTLETAG_MATCH_SCOPE).toMatch(/à son caster le temps du match \(conditions d'utilisation, « Contacts de match »\)$/);
+    expect(BATTLETAG_MATCH_SCOPE).toMatch(/^lecture, même masqué, dans la seule fenêtre « Contacts » d'un match où tu es présenté comme contact/);
+    expect(BATTLETAG_MATCH_SCOPE).toMatch(/arbitres et administrateurs compris, qui n'y ont pas d'autre accès \(conditions d'utilisation, « Contacts de match »\)$/);
   });
 });
 
@@ -122,13 +122,10 @@ describe("DONNEES_PROFIL", () => {
 
   it("dit qui lit encore un BattleTag masqué, et jusqu'à quand", () => {
     const overwatch = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo Overwatch");
-    expect(overwatch?.finalite).toMatch(/Masqué, il reste lisible des membres des deux équipes de tes matchs tant que le tournoi n'est pas terminé/);
-    // Le caster ne le reçoit que comme contact de lancement (`/api/me/match-launches`).
-    expect(overwatch?.finalite).toMatch(/du caster de ton match le temps du match seulement \(de son départ à sa fin\)/);
-    expect(overwatch?.finalite).toMatch(/tant que le tournoi n'est pas terminé/);
-    // L'arbitrage le lit dès l'inscription (`isInActiveTournament` : tout état
-    // sauf `FINISHED`), pas seulement pendant le tournoi.
-    expect(overwatch?.finalite).toMatch(/de l'arbitrage tant que tu es inscrit à un tournoi qui n'est pas terminé/);
+    // Décision du 2026-10-19 : la seule fenêtre « Contacts » d'un match, staff compris.
+    expect(overwatch?.finalite).toMatch(/Masqué, il n'est lisible de personne — arbitres et administrateurs compris — sauf dans la fenêtre « Contacts » d'un match où tu fais partie des contacts présentés/);
+    expect(overwatch?.finalite).toMatch(/de son caster le temps du match seulement \(de son départ à sa fin\)/);
+    expect(overwatch?.finalite).not.toMatch(/de l'arbitrage tant que tu es inscrit/);
   });
 
   it("dit que le tag Discord enregistré à la connexion n'est pas certifié, donc privé", () => {

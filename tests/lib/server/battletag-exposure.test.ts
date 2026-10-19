@@ -11,11 +11,11 @@ import { getPlayerEntityStats } from "@/lib/server/stats-service";
 import { emptyDeepStats } from "@/lib/shared/stats";
 
 /**
- * Ce qui sort d'une fiche quand le BattleTag est **masqué** : le lecteur
- * quelconque n'a rien, les joueurs d'un même match et l'arbitrage d'un tournoi
- * vivant ont le tag — ce que la modale de `/profil` promet au joueur qui le
- * masque. Les questions de tournoi ne sont posées que quand elles peuvent
- * changer la réponse.
+ * Ce qui sort d'une fiche quand le BattleTag est **masqué** : rien, pour
+ * personne d'autre que son titulaire — adversaires, arbitres et administrateurs
+ * compris, même pendant un tournoi vivant. Un BattleTag masqué ne se lit que
+ * dans la fenêtre « Contacts » d'un match (décision de l'utilisateur du
+ * 2026-10-19), et la fiche ne pose plus aucune question de match pour lui.
  */
 
 type Query = { sql: string; params: unknown[] };
@@ -71,89 +71,17 @@ beforeEach(() => {
 });
 
 describe("getFullProfile — BattleTag masqué", () => {
-  it("le cache à un joueur qui ne partage aucun match avec le titulaire", async () => {
-    profileDb(userRow());
+  it.each<[string, { id: number; isAdmin?: boolean; roles?: ("ARBITRE")[] }]>([
+    ["joueur d'un même match", { id: 20 }],
+    ["arbitre", { id: 30, roles: ["ARBITRE"] }],
+    ["administrateur", { id: 40, isAdmin: true }],
+  ])("le cache sur la fiche au lecteur %s, même pendant un tournoi vivant", async (_label, viewer) => {
+    const { queries } = profileDb(userRow(), { sharesMatch: true, inTournament: true });
 
-    const profile = await getFullProfile({ id: 20 }, 7);
-
-    expect(profile?.profile.overwatchBattletag).toBeNull();
-  });
-
-  it("le rend à un joueur engagé dans un même match de tournoi vivant", async () => {
-    const { queries } = profileDb(userRow(), { sharesMatch: true });
-
-    const profile = await getFullProfile({ id: 20 }, 7);
-
-    expect(profile?.profile.overwatchBattletag).toBe("Nova#1234");
-    // Le titulaire d'abord, le lecteur ensuite : la requête part des engagés du
-    // titulaire, et deux paramètres par sous-requête (équipe, entrée solo).
-    const match = queries.find((q) => q.sql.includes(MATCH_QUERY));
-    expect(match?.params).toEqual([7, 7, 20, 20]);
-    expect(match?.sql).toContain("t.state <> 'FINISHED'");
-    expect(match?.sql).toContain("tm.left_at IS NULL");
-    expect(match?.sql).toContain("te.solo_user_id = ?");
-    // Une branche par côté du match : une jointure en `OR` n'utilise aucun
-    // index et balaie `bg_matches` en entier.
-    expect(match?.sql).toContain("JOIN bg_matches m ON m.team1_id = mine.team_id");
-    expect(match?.sql).toContain("JOIN bg_matches m ON m.team2_id = mine.team_id");
-    expect(match?.sql).not.toMatch(/ON m\.team1_id = \w+\.team_id OR/);
-  });
-
-  it("ne pose pas la question du tournoi à un joueur ordinaire", async () => {
-    const { queries } = profileDb(userRow(), { inTournament: true });
-
-    const profile = await getFullProfile({ id: 20 }, 7);
+    const profile = await getFullProfile(viewer, 7);
 
     expect(profile?.profile.overwatchBattletag).toBeNull();
-    expect(count(queries, TOURNAMENT_QUERY)).toBe(0);
-  });
-
-  it("le rend à l'arbitrage quand le titulaire est engagé dans un tournoi vivant", async () => {
-    profileDb(userRow(), { inTournament: true });
-
-    const profile = await getFullProfile({ id: 30, roles: ["ARBITRE"] }, 7);
-
-    expect(profile?.profile.overwatchBattletag).toBe("Nova#1234");
-  });
-
-  it("le cache à l'arbitrage hors tournoi vivant", async () => {
-    profileDb(userRow(), { inTournament: false });
-
-    const profile = await getFullProfile({ id: 30, roles: ["ARBITRE"] }, 7);
-
-    expect(profile?.profile.overwatchBattletag).toBeNull();
-  });
-
-  it("le cache à un administrateur hors tournoi : aucun passe-droit", async () => {
-    profileDb(userRow(), { inTournament: false });
-
-    const profile = await getFullProfile({ id: 40, isAdmin: true }, 7);
-
-    expect(profile?.profile.overwatchBattletag).toBeNull();
-  });
-
-  it("pose ensemble les deux questions pour l'arbitrage, chacune une fois", async () => {
-    // Indépendantes : les enchaîner doublerait l'attente sur chaque fiche.
-    const { queries } = profileDb(userRow(), { sharesMatch: true, inTournament: false });
-
-    const profile = await getFullProfile({ id: 30, roles: ["ARBITRE"] }, 7);
-
-    expect(profile?.profile.overwatchBattletag).toBe("Nova#1234");
-    expect(count(queries, MATCH_QUERY)).toBe(1);
-    expect(count(queries, TOURNAMENT_QUERY)).toBe(1);
-  });
-
-  it("pose la question du tournoi une seule fois, partagée avec le tag Discord", async () => {
-    const { queries } = profileDb(
-      userRow({ discord_pseudo: "keryan", discord_verified_at: new Date("2026-09-01T00:00:00Z") }),
-      { inTournament: true },
-    );
-
-    const profile = await getFullProfile({ id: 30, roles: ["ARBITRE"] }, 7);
-
-    expect(profile?.profile.discordPseudo).toBe("keryan");
-    expect(profile?.profile.overwatchBattletag).toBe("Nova#1234");
-    expect(count(queries, TOURNAMENT_QUERY)).toBe(1);
+    expect(count(queries, MATCH_QUERY)).toBe(0);
   });
 });
 
@@ -184,17 +112,5 @@ describe("getFullProfile — quand la réponse est acquise, aucune requête", ()
     expect(profile?.profile.overwatchBattletag).toBeNull();
     expect(count(queries, MATCH_QUERY)).toBe(0);
     expect(count(queries, TOURNAMENT_QUERY)).toBe(0);
-  });
-
-  it("n'ouvre pas les autres champs masqués au joueur d'un même match", async () => {
-    profileDb(userRow({ marvel_rivals_tag: "Nova", visible_marvel: 0, visible_major: 0 }), {
-      sharesMatch: true,
-    });
-
-    const profile = await getFullProfile({ id: 20 }, 7);
-
-    expect(profile?.profile.overwatchBattletag).toBe("Nova#1234");
-    expect(profile?.profile.marvelRivalsTag).toBeNull();
-    expect(profile?.profile.isAdult).toBeNull();
   });
 });

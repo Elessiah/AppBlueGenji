@@ -1147,12 +1147,14 @@ describe("PRIVACY_CHANGES — caster le temps du match, BattleTag masqué et con
     expect(english.details.at(-1)).toContain(`version ${TERMS_VERSION}, in force since 19 October 2026`);
   });
 
-  it("dit que le caster n'a les contacts que le temps du match, et que le BattleTag masqué reste vu des adversaires (FR et EN)", () => {
+  it("dit que le caster n'a les contacts que le temps du match, et que le BattleTag masqué ne se lit que dans « Contacts » (FR et EN)", () => {
     const fr = [entry.summary, ...entry.details].join(" ");
-    expect(fr).toMatch(/que le temps du match — dès son départ \(fenêtre de lancement ouverte, ou match lancé\) et jusqu'à sa fin —/);
-    expect(fr).toContain("tu peux le masquer aux yeux de tous, mais il reste visible pour tes adversaires pendant un match de tournoi");
-    expect(fr).toMatch(/repose sur l'exécution du service — l'organisation du tournoi —, et non sur ton consentement/);
     const en = [english.summary, ...english.details].join(" ");
+    expect(fr).toMatch(/que le temps du match — dès son départ \(fenêtre de lancement ouverte, ou match lancé\) et jusqu'à sa fin —/);
+    expect(fr).toContain("Il ne se lit plus que dans la fenêtre « Contacts » d'un match où tu es présenté comme contact");
+    expect(fr).toContain("les membres des deux équipes ne voient plus les contacts du caster que le temps du match");
+    expect(en).toContain("It can now only be read in the “Contacts” window of a match where you are presented as a contact");
+    expect(fr).toMatch(/repose sur l'exécution du service — l'organisation du tournoi —, et non sur ton consentement/);
     expect(en).toMatch(/only see .* while the match is being played — from its start \(launch window opened, or match launched\) to its end —/);
     expect(en).toMatch(/based on the performance of the service — running the tournament —, not on your consent/);
     expect([english.details.length, english.linkLabels?.length ?? 0]).toEqual([entry.details.length, entry.links?.length ?? 0]);
