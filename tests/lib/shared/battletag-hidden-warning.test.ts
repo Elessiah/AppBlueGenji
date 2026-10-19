@@ -18,7 +18,7 @@ import { TERMS_SECTIONS_EN } from "@/lib/shared/terms-of-use-en";
 const FR =
   "Tu peux masquer ton BattleTag : il ne reste alors visible que dans la fenêtre « Contacts » de tes matchs de tournoi, si tu fais partie des contacts présentés : pour les deux équipes et les arbitres dès que les deux adversaires sont connus, et pour le caster le temps du match. Si tu ne veux pas qu'ils le voient, retire-le de ton profil (s'il vient de Battle.net, détache d'abord ton compte Battle.net — après avoir ajouté un autre moyen de connexion si c'est le seul).";
 const EN =
-  "You can hide your BattleTag: it then only stays visible in the “Contacts” window of your tournament matches, if you're among the contacts shown: to both teams and the referees from the moment both opponents are known, and to the caster while the match is being played. If you don't want them to see it, remove it from your profile (if it comes from Battle.net, unlink your Battle.net account first — after adding another way to sign in if it is your only one).";
+  "You can hide your BattleTag: it then only stays visible in the “Contacts” window of your tournament matches, if you're among the contacts shown: to both teams and the referees from the moment both opponents are known, and to the caster while the match is being played. If you don't want them to see it, remove it from your profile (if it comes from Battle.net, unlink your Battle.net account first — after adding another way to log in if it is your only one).";
 
 const readSource = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 
