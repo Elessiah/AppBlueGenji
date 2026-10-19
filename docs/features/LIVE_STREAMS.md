@@ -164,6 +164,13 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   l'ordre de déploiement : **bot d'abord**). Une publication incertaine
   (`uncertain`, `timed-out`, `interrupted`) ne laisse pas d'identifiant : un
   match suivant de la même soirée repart dans un nouveau message.
+- **Jamais deux notifications par public et par soirée** : soirée sans
+  identifiant gardé, mais dont un autre match du même public a déjà une
+  annonce réservée depuis son ouverture (`evening_announced` : publication
+  incertaine, bot trop ancien, identifiant non enregistré, refus abandonné) —
+  le site envoie `notify: false` et le bot poste un nouveau message **sans
+  mention écrite ni notification**. Revers assumé : un premier envoi refusé
+  (`rejected`, AutoMod) laisse la soirée sans notification.
 - **Longueur** : le texte, liens comptés en entier, tient dans
   `LIVE_ANNOUNCEMENT_MAX_LENGTH` (1 500) ; au-delà, la liste s'arrête **à la
   fin d'un bloc** et une dernière ligne compte le reste (« … et 3 autres matchs
