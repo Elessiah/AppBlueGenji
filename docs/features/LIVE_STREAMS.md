@@ -395,7 +395,10 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   annonce de soirée (le signalement du bot le dit) : une modification ou un
   envoi `notify: false` suivent un message qui a pu notifier, et après un
   premier message refusé le site rend la marque `notified` — le prochain
-  direct de la soirée notifiera. Côté bot, voir ci-dessus (une fois par
+  direct de la soirée notifiera. Si le site avait déjà cessé d'attendre la
+  réponse (`timed-out`), il garde la marque et reprend le match au direct
+  suivant : un premier message se poste alors à la main **avec** la mention de
+  son public, une modification ou un envoi muet ne se postent pas. Côté bot, voir ci-dessus (une fois par
   heure par cause réessayée ; chaque blocage AutoMod, envoi incertain ou
   requête coupée par le site ; un `400` n'est pas signalé au canal de logs). Deux pannes de la base sont tracées (une fois par heure et par
   match) : une réservation refusée (`réservation impossible` — rien n'est
