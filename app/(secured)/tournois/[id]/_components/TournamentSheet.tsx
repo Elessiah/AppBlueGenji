@@ -530,7 +530,7 @@ export function TournamentSheet({ tournamentId, source }: Readonly<{ tournamentI
   // Leurs dépendances tiennent au lecteur et aux options du tournoi, pas au
   // plateau ni à l'horloge : avec la phase de lancement, `canPlayersReportScore`
   // ne rend `LAUNCHED` que sur une écriture ; sans elle, il le déduit aussi de
-  // l'heure, mais le serveur écrit `launched_at` à cette heure-là — le flux
+  // l'heure, mais le serveur écrit `launched_at` à l'entretien qui suit — le flux
   // apporte alors un nouvel objet de match, qui relance le calcul.
   const viewerMyTeamId = detail?.myTeamId ?? null;
   const viewerReportTeamIds = detail?.canCreateReportsForTeamIds;
