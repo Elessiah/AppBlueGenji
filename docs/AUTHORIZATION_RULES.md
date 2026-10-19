@@ -354,13 +354,18 @@ comme partout ailleurs.
 fiche publique et l'annuaire, mais reste lisible là où il sert à jouer — ce que
 la modale ouverte à la bascule (`BattletagVisibilityNotice.tsx`) annonce au
 joueur. `canViewBattletag` (`lib/shared/battletag-visibility.ts`) le repose sur
-la fiche (`getFullProfile`), dans cet ordre :
+la fiche (`getFullProfile`), dans cet ordre. Cette lecture repose sur l'exécution
+du service — section « Contacts de match » des conditions d'utilisation (v5) —,
+pas sur le consentement : le réglage ne vaut que pour le public, et l'avertir
+est dit là où le BattleTag se renseigne et se masque (`games.hiddenWarning`,
+`battletagNotice.warning`, notes Blizzard de `/connexion` et du profil).
+
 
 | Lecteur                                                           | Voit un BattleTag masqué |
 | ----------------------------------------------------------------- | :----------------------: |
 | Le propriétaire du compte                                         | ✅                        |
 | Un joueur engagé dans un **même match** d'un tournoi vivant       | ✅ (coéquipiers compris)  |
-| Le **caster inscrit** sur ce match, en lancement ou lancé         | ✅ (contacts de la modale seulement) |
+| Le **caster inscrit** sur ce match, en lancement ou lancé         | ✅ (contacts de la modale ou du bouton « Contacts », le temps du match seulement) |
 | Permission `tournaments`, titulaire engagé dans un tournoi vivant | ✅                        |
 | Administrateur hors de ce cas, `casting`, joueur, visiteur        | ❌                        |
 

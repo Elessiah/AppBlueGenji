@@ -83,11 +83,14 @@ match n'existe, rien n'est à défaire. Refus d'une valeur non booléenne :
 ## Bouton « Contacts » de la carte de match
 
 Action **« Contacts »** (FR et EN) du pied de carte (`MatchCardActions`),
-offerte aux **parties du match** — joueurs des deux engagées, caster inscrit —
-dès que ses deux adversaires sont connus : **à planifier** (`TO_PLAN`),
-**programmé** (`SCHEDULED`), en lancement ou lancé
-(`launchStripControls().showContacts`), que l'option soit allumée ou non. Action
-principale d'un joueur qui n'a ni score à saisir ni lancement à suivre.
+offerte aux **parties du match** (`launchStripControls().showContacts`), que
+l'option soit allumée ou non : aux **joueurs des deux engagées** dès que ses deux
+adversaires sont connus — **à planifier** (`TO_PLAN`), **programmé**
+(`SCHEDULED`), en lancement ou lancé — ; au **caster inscrit**, **le temps du
+match** seulement — en lancement (`LOBBY`) ou lancé (`LAUNCHED`), jusqu'à la fin
+(décision de l'utilisateur, 2026-10-19 : il n'a rien à organiser avec les équipes
+avant l'heure). Action principale d'un joueur qui n'a ni score à saisir ni
+lancement à suivre.
 
 Elle ouvre `MatchContactsDialog` (portail `document.body`,
 `useDialogBehavior`, `useBackdropDismiss`, `ScrollArea`, focus sur « Fermer »),
@@ -97,12 +100,16 @@ lecture est **celle de la modale** (`loadViewerMatchContacts` →
 `readViewerLaunches` de `match-launch-info.ts`) restreinte à un match : mêmes
 destinataires (`viewerRole`, éligibilité du caster rejouée), mêmes contacts
 (`pickLaunchContacts`, `canViewDiscordTag` / `canViewBattletag`), sans la
-fenêtre d'une heure ni le filtre de l'option. Une différence, voulue : les
-contacts y sortent **dès que les deux adversaires du match sont connus** — à
-planifier (décision de l'utilisateur, 2026-10-19), programmé, en lancement ou
-lancé —, et plus seulement au lancement : les parties s'organisent avant
-l'heure, surtout sans phase de lancement. Qui n'est pas partie du match, ou un
-match sans contacts (adversaire inconnu, terminé), reçoit `MATCH_CONTACTS_UNAVAILABLE` (404), un seul code :
+fenêtre d'une heure ni le filtre de l'option. Une différence, voulue : pour un
+**joueur** du match, les contacts y sortent **dès que les deux adversaires du
+match sont connus** — à planifier (décision de l'utilisateur, 2026-10-19),
+programmé, en lancement ou lancé —, et plus seulement au lancement : les parties
+s'organisent avant l'heure, surtout sans phase de lancement. Le **caster**, lui,
+garde la borne de la modale — en lancement ou lancé (`exposesContacts`, lu avec
+`viewerPlaysMatch`) — : avant, la route le traite comme un tiers. Les équipes
+voient en revanche les contacts du caster dès que les deux adversaires sont
+connus. Qui n'est pas partie du match, le caster d'un match pas encore parti, ou
+un match sans contacts (adversaire inconnu, terminé), reçoit `MATCH_CONTACTS_UNAVAILABLE` (404), un seul code :
 la réponse ne dit pas qui joue quoi. Un refus part en notification ; le corps
 reste neutre (« Contacts non affichés », pas « aucun contact »). Chargée à la
 demande (`next/dynamic`) : ses textes FR + EN ne pèsent pas sur la page de

@@ -118,6 +118,15 @@ version, sa date d'entrée en vigueur et lie `/conditions-utilisation` (FR et EN
 informe sans faire accepter : l'acceptation reste celle du tableau ci-dessus. À
 refaire à chaque version qui change une règle de fond pour tous les comptes.
 
+**Version 5** (2026-10-19, CONTACTS-FOLLOWUP) : section **« Contacts de match »**
+(`contacts-de-match`, FR et EN) — tag Discord certifié, BattleTag **même masqué**
+et rôle d'équipe communiqués aux deux équipes d'un match dès que ses adversaires
+sont connus, et à son caster le temps du match seulement, au titre de
+l'organisation du tournoi. C'est la clause que citent la base « exécution du
+contrat » du registre T01 / T04 et de `/rgpd` (`MATCH_CONTACTS_SCOPE`,
+`BATTLETAG_MATCH_SCOPE`). Annoncée une fois à tous par l'entrée
+`2026-10-contacts-de-match-caster-et-conditions-v5`, comme la version 4.
+
 `TERMS_UPDATED_AT` est daté du **lendemain** de la mise en ligne quand l'heure
 du déploiement n'est pas connue, comme `PRIVACY_CHANGES`.
 
