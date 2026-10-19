@@ -33,7 +33,7 @@ export const AUTOMOD_ALERT_SCOPE = "alerte AutoMod d'une telle annonce bloquée 
  * Bases légales citées par la politique — les mêmes que le registre
  * (`processing-register.ts`). Une donnée a une base principale ; quand une
  * partie de sa finalité repose sur une autre (le tag certifié et le BattleTag,
- * exposés sur consentement mais présentés au lancement d'un match en exécution
+ * exposés sur consentement mais présentés aux parties d'un match en exécution
  * des conditions d'utilisation), `extraBases` la nomme avec sa portée.
  *
  * **Le compte et l'authentification reposent sur le contrat** (art. 6.1.b) : un

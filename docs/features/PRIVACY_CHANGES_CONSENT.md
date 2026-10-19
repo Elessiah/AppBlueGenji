@@ -203,7 +203,7 @@ nouvelle, le bot n'écrit qu'aux membres du serveur BlueGenji.
 
   **Le revers, assumé** : un joueur qui ne revient pas sur le site apprend un
   changement jusqu'à un mois plus tard, y compris un changement qui élargit qui
-  lit ses données (les contacts présentés au lancement d'un match, par
+  lit ses données (les contacts présentés aux parties d'un match dès que ses deux adversaires sont connus, par
   exemple). La modale reste l'information de référence et n'attend jamais ;
   le message privé n'est qu'un rappel pour qui ne la verra pas. Le choix
   inverse — un drapeau par entrée qui court-circuite délai et intervalle —
