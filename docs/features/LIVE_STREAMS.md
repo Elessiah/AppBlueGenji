@@ -178,10 +178,15 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   envoie `editMessageId` : le bot **modifie** le message — aucune nouvelle
   notification (Discord ne notifie jamais sur une modification ; la mention de
   tête reste autorisée pour garder son surlignage) —, en un seul appel à Discord (aucune
-  lecture préalable du message). Message supprimé entre-temps, pas du bot, ou
+  lecture préalable du message). Message pas du bot, ou
   qui ne se modifie plus (plafond de modifications de Discord sur un message
   vieux d'une heure, code `30046`) : une **suite** part, sans mention ni
-  notification, et son identifiant remplace l'ancien. Un message parti sans
+  notification, et son identifiant remplace l'ancien. Message **supprimé** de
+  #live (`10008`, souvent par le staff sur demande, par exemple d'un joueur
+  nommé) : rien ne le republie — le bot répond `503` `message-deleted`
+  (issue `evening-deleted`), le site ferme la soirée de ce public
+  (`bg_live_evenings.closed`) jusqu'à la fin de sa fenêtre, réservations
+  gardées et marquées refusées ; pm2 le dit pour chaque match non publié. Un message parti sans
   mention (suite, envoi `notify: false`, permission absente) est gardé
   `silent` : ses modifications envoient `notify: false` et n'écrivent pas de
   mention de tête — une mention grise qui n'a notifié personne aurait l'air
