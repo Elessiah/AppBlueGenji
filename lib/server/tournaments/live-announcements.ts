@@ -318,6 +318,19 @@ async function openEvening(target: LiveMentionTarget): Promise<LiveEvening> {
   return created[0];
 }
 
+/** Vrai si le message gardé de la soirée est parti sans mention : sa modification n'en écrit pas. */
+function editsSilentMessage(evening: LiveEvening): boolean {
+  return Boolean(evening.discord_message_id) && Number(evening.silent) === 1;
+}
+
+/**
+ * Vrai si le bot a posté une suite (message disparu ou plus modifiable) : il
+ * rend un autre identifiant que celui à modifier, et la suite part sans mention.
+ */
+function isFollowUp(evening: LiveEvening, messageId: string | null): boolean {
+  return Boolean(evening.discord_message_id) && messageId !== null && messageId !== evening.discord_message_id;
+}
+
 /**
  * Garde l'identifiant du message publié (ou de la suite qui le remplace), et
  * s'il est parti sans mention. Le premier message qui notifie fait partir la
@@ -697,14 +710,10 @@ async function announce(
     context,
     ...(logMessage === message ? {} : { logMessage }),
     ...(evening.discord_message_id ? { editMessageId: String(evening.discord_message_id) } : {}),
-    // Un message parti sans mention n'en reçoit pas à sa modification.
-    ...(quiet || (evening.discord_message_id && Number(evening.silent) === 1) ? { notify: false as const } : {}),
+    ...(quiet || editsSilentMessage(evening) ? { notify: false as const } : {}),
   });
   if (outcome === "posted" || outcome === "posted-silent") {
-    // Sans mention : envoi muet, permission absente, ou suite d'un message
-    // disparu (le bot rend un autre identifiant que celui à modifier).
-    const followUp = Boolean(evening.discord_message_id) && messageId !== null && messageId !== evening.discord_message_id;
-    await rememberEveningMessage(evening, messageId, quiet || outcome === "posted-silent" || followUp);
+    await rememberEveningMessage(evening, messageId, quiet || outcome === "posted-silent" || isFollowUp(evening, messageId));
     // Trace pm2 pour le staff : identifiants seulement, aucun nom.
     const silent = outcome === "posted-silent" ? " sans notifier (permission de mentionner absente)" : "";
     const announced = plural ? "annoncés" : "annoncé";
