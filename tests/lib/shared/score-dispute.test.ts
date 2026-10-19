@@ -9,6 +9,8 @@ import frErrors from "@/messages/fr/tournamentErrors.json";
 import enErrors from "@/messages/en/tournamentErrors.json";
 import frActions from "@/messages/fr/tournamentActions.json";
 import enActions from "@/messages/en/tournamentActions.json";
+import frRules from "@/messages/fr/rules.json";
+import enRules from "@/messages/en/rules.json";
 
 /** Litige de score et validation d'office (`docs/features/SCORE_DISPUTE_LOCK.md`). */
 describe("isScoreDisputed", () => {
@@ -96,6 +98,19 @@ describe("textes FR + EN", () => {
     expect(enDialogs.score.player.theirs.withMaps).toMatch(/locks score entry for both teams/);
     expect(frDialogs.score.player.theirs.withoutMaps).toMatch(/verrouille la saisie des deux équipes/);
     expect(enDialogs.score.player.theirs.withoutMaps).toMatch(/locks score entry for both teams/);
+    // L'arbitrage n'a pas de remise à zéro par match : ne pas la promettre.
+    expect(frDialogs.score.player.locked).not.toMatch(/remettre à zéro/);
+    expect(enDialogs.score.player.locked).not.toMatch(/reset/);
+    expect(frDialogs.score.player.locked).toMatch(/prononcer un forfait/);
+    expect(enDialogs.score.player.locked).toMatch(/declare a forfeit/);
+    // /regles : le verrou vise le forfait **du match** (l'abandon du tournoi reste
+    // possible et vaut défaite), et ne promet pas de remise à zéro par match.
+    const fr = JSON.stringify(frRules);
+    const en = JSON.stringify(enRules);
+    expect(fr).toContain("ni aucun forfait sur ce match), et seul un arbitre ou un administrateur tranche, en enregistrant le score officiel ou un forfait.");
+    expect(en).toContain("and no forfeit of the match), and only a referee or an administrator settles it, by recording the official score or a forfeit.");
+    expect(fr).not.toContain("en remettant le match à zéro");
+    expect(en).not.toContain("resetting the match");
     // Plus d'invitation à « corriger » une proposition en litige.
     expect(frDialogs.score.player.conflictScores).not.toMatch(/corriger/);
     expect(enDialogs.score.player.conflictScores).not.toMatch(/correct/);

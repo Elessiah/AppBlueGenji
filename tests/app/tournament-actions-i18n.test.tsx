@@ -529,6 +529,7 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     const ui = () => <PlayerScoreDialog tournamentId={1} match={disputed} myTeamId={10} canReportScore canForfeit proposals={[]} onClose={noop} onSubmitted={noop} onRefresh={noop} />;
     const fr = render("fr", ui());
     expect(fr).toContain("la saisie est verrouillée pour les deux équipes, forfait compris");
+    expect(fr).toContain('aria-describedby="player-score-locked"');
     expect(fr).not.toContain('type="submit"');
     expect(fr).not.toContain("player-score-forfeit");
     expect(fr).not.toContain("player-score-map-");
@@ -567,8 +568,12 @@ describe("rendu anglais — aucun français dans les gestes", () => {
 
   it("score (engagé) : une contre-proposition s'annonce comme un litige, le focus suit le verrou", () => {
     const source = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx"), "utf8");
-    expect(source).toContain('view?.phase === "THEIRS_PENDING" && entered !== null && !confirmsAsIs');
+    expect(source).toContain('if (!canEnterScore || phase !== "THEIRS_PENDING") return false;');
+    expect(source).toContain("return form.entered !== null && !form.confirmsAsIs && !form.error;");
     expect(source).toContain('t("score.player.counterWarning", { opponent: opponentName })');
+    // Avertissement et verrou rattachés : lus au bouton d'envoi, et avec la modale quand le focus y revient.
+    expect(source).toContain('aria-describedby={opensDispute ? "player-score-counter-warning" : undefined}');
+    expect(source).toContain('aria-describedby={disputeLocked ? "player-score-locked" : undefined}');
     // Litige arrivé par le flux : focus rendu à la modale si l'élément focalisé a disparu.
     expect(source).toMatch(/disputeLocked && !wasLocked\.current && dialog && !dialog\.contains\(document\.activeElement\)\) dialog\.focus\(\)/);
     // À l'ouverture, la proposition adverse pré-remplie se confirme telle quelle : pas d'avertissement.

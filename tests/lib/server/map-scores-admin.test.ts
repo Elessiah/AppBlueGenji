@@ -82,6 +82,23 @@ describe("arbitrage — détail map par map", () => {
     expect(maps.some((m) => m.sql.startsWith("INSERT INTO bg_match_maps"))).toBe(true);
   });
 
+  it("« Enregistrer » (maps ou forfait) arrête la validation d'office d'un report seul", async () => {
+    // Sans cela, le report attendu réécrivait deux heures plus tard le score
+    // que l'arbitre venait de noter (`SCORE_DISPUTE_LOCK.md`).
+    for (const entry of [{ maps: [{ replayCode: "AAA111", team1Score: 2, team2Score: 0 }], userId: 3 }, { forfeitTeamId: 200 }]) {
+      const { conn } = fakeConnection({ type: "BO", value: 5 });
+      const sqls: string[] = [];
+      const execute = conn.execute.bind(conn) as (sql: string, params?: unknown[]) => Promise<unknown>;
+      (conn as unknown as { execute: typeof execute }).execute = (sql: string, params?: unknown[]) => {
+        sqls.push(sql.replace(/\s+/g, " "));
+        return execute(sql, params);
+      };
+      await adminSaveMatchScores(conn, 10, entry);
+      const update = sqls.find((q) => q.trim().startsWith("UPDATE bg_matches SET team1_score"));
+      expect(update).toContain("score_deadline_at = NULL");
+    }
+  });
+
   it("un forfait enregistré efface le détail, même sans maps envoyées", async () => {
     const { conn, maps } = fakeConnection({ type: "BO", value: 1 });
     await adminSaveMatchScores(conn, 10, { forfeitTeamId: 200 });
