@@ -68,13 +68,16 @@ function pendingPreview(text: TournamentDialogsText, state: MatchStartEntryState
 }
 
 /** Aide sous les champs : ce que la date va produire. */
-function startAtHint(
+export function startAtHint(
   text: TournamentDialogsText,
   refereeScheduling: boolean,
   entrantsKnown: boolean,
   played: boolean,
+  launchPhase = true,
 ): string {
-  const base = text.t(refereeScheduling ? "schedule.hintPlanning" : "schedule.hint");
+  const planningKey = launchPhase ? "schedule.hintPlanning" : "schedule.hintPlanningDirect";
+  const plainKey = launchPhase ? "schedule.hint" : "schedule.hintDirect";
+  const base = text.t(refereeScheduling ? planningKey : plainKey);
   // Un match joué (ou au score saisi) n'annonce rien : la date n'est qu'une
   // correction d'archive.
   return played ? base : `${base} ${scheduleNotice(text, refereeScheduling, entrantsKnown)}`;
@@ -143,6 +146,11 @@ interface MatchScheduleDialogProps {
    * renvoie le match « À planifier » (`lib/shared/match-planning.ts`).
    */
   refereeScheduling: boolean;
+  /**
+   * Option « phase de lancement » du tournoi : éteinte, le match est lancé
+   * directement à son heure, sans « Prêt » — l'aide le dit. Absente = allumée.
+   */
+  launchPhase?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -169,6 +177,7 @@ export function MatchScheduleDialog({
   tournamentStartAt,
   tournamentFinished,
   refereeScheduling,
+  launchPhase = true,
   onClose,
   onSaved,
 }: Readonly<MatchScheduleDialogProps>) {
@@ -483,6 +492,7 @@ export function MatchScheduleDialog({
               match.team1Id !== null && match.team2Id !== null,
               // Tournoi clos : ses manches comptent pour jouées, rien n'est annoncé.
               isMatchOver(match.status, tournamentFinished),
+              launchPhase,
             )}
           </p>
 

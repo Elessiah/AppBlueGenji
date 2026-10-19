@@ -8,6 +8,7 @@
  * seule de ce qui est exposé : ces fiches ne font que le montrer.
  */
 
+import { PlayerLink, TeamLink } from "@/components/entity-link";
 import { useLaunchText } from "./launch-text";
 import type { LaunchCaster, LaunchContact, LaunchSide, MatchLaunchInfo } from "@/lib/shared/match-launch";
 import type { TeamRole } from "@/lib/shared/types";
@@ -76,7 +77,9 @@ function ContactRow({ contact, onCopy }: Readonly<{ contact: LaunchContact; onCo
   return (
     <li className={styles.contact}>
       <div className={styles.contactHead}>
-        <span className={styles.pseudo}>{contact.pseudo}</span>
+        <PlayerLink userId={contact.userId} className={styles.pseudo}>
+          {contact.pseudo}
+        </PlayerLink>
         {roles.map((label) => (
           <span key={label} className={styles.role}>
             {label}
@@ -115,7 +118,9 @@ export function SideCard({
             Array.from(side.name.trim())[0]?.toUpperCase() ?? "?"
           )}
         </span>
-        <span className={styles.sideName}>{side.name}</span>
+        <span className={styles.sideName}>
+          <SideName side={side} />
+        </span>
         <ReadyChip ready={side.ready} phase={phase} />
       </div>
       {isHost && (
@@ -126,6 +131,17 @@ export function SideCard({
       <SideContacts side={side} onCopy={onCopy} shown={contactsShown} />
     </section>
   );
+}
+
+/**
+ * Nom de l'engagé, cliquable vers sa fiche (`ENTITY_LINKS.md`) : l'équipe, ou
+ * — entrée solo, qui n'a pas de fiche d'équipe — le joueur, connu par son
+ * unique contact ; sans contact exposé, le nom reste un nom.
+ */
+function SideName({ side }: Readonly<{ side: LaunchSide }>) {
+  if (!side.isSolo) return <TeamLink teamId={side.teamId}>{side.name}</TeamLink>;
+  const player = side.contacts.length === 1 ? side.contacts[0] : null;
+  return player ? <PlayerLink userId={player.userId}>{side.name}</PlayerLink> : <>{side.name}</>;
 }
 
 function SideContacts({
@@ -181,7 +197,8 @@ export function CasterCard({
           🎙
         </span>
         <span className={styles.sideName}>
-          <span className={styles.casterLabel}>{t("caster")}</span> {caster.pseudo}
+          <span className={styles.casterLabel}>{t("caster")}</span>{" "}
+          <PlayerLink userId={caster.userId}>{caster.pseudo}</PlayerLink>
         </span>
         <ReadyChip ready={caster.ready} phase={phase} />
       </div>

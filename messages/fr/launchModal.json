@@ -67,7 +67,7 @@
   "copy": "Copier",
   "host": "Héberge la partie — crée le salon",
   "ghost": "Équipe invitée : pas de contact.",
-  "contactsAtLaunch": "Les contacts s'affichent au lancement.",
+  "contactsAtLaunch": "Les contacts s'affichent au lancement — ou dès maintenant par le bouton « Contacts » de la carte du match.",
   "noContact": "Aucun contact disponible.",
   "caster": "Caster",
   "noCaster": "Aucun caster inscrit : le match part dès que les deux équipes sont prêtes.",
@@ -79,7 +79,6 @@
     "lead": "Visibles des seuls joueurs et du caster de ce match, pour s'organiser avant le départ.",
     "scrollAria": "Contacts du match",
     "loading": "Chargement des contacts…",
-    "empty": "Aucun contact à afficher.",
     "noCaster": "Aucun caster inscrit sur ce match.",
     "unavailable": "Les contacts ne sont visibles que des joueurs et du caster d'un match programmé ou en cours.",
     "failed": "Les contacts n'ont pas pu être chargés. Réessaie dans un instant."

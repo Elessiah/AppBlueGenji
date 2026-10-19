@@ -154,7 +154,8 @@
     {
       "title": "Match launch",
       "body": [
-        "A playable match doesn't start right away: at its start time (or as soon as it becomes playable if it has no schedule), it enters <b>launch</b>. A window then opens for the players of both teams, showing the host team and the useful contacts."
+        "A playable match doesn't start right away: at its start time (or as soon as it becomes playable if it has no schedule), it enters <b>launch</b>. A window then opens for the players of both teams, showing the host team and the useful contacts.",
+        "This phase only happens if the tournament turns it on (see its settings): otherwise, the match is launched directly at its start time, with no “Ready”."
       ],
       "bullets": [
         "Each team confirms it's ready — captain, manager or owner; in a solo tournament, the player themselves. The assigned caster confirms too.",

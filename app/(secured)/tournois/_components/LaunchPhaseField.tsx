@@ -1,6 +1,7 @@
 "use client";
 
 import { FieldErrorText } from "@/components/ui/field-error-text";
+import { LAUNCH_AUTO_DELAY_MINUTES } from "@/lib/shared/match-launch";
 import type { FieldAria } from "@/lib/shared/field-errors";
 import { checkboxCardChrome, HINT } from "../_lib/form-styles";
 import { useFormText } from "../_lib/form-text";
@@ -68,7 +69,7 @@ export function LaunchPhaseField({
             {t("form.launchPhase.label")}
           </span>
           <span id={LAUNCH_PHASE_HINT_ID} style={{ ...HINT, display: "block", margin: 0 }}>
-            {t("form.launchPhase.description")}{" "}
+            {t("form.launchPhase.description", { launchDelay: LAUNCH_AUTO_DELAY_MINUTES })}{" "}
             {locked ? t("form.launchPhase.locked") : t("form.launchPhase.scope")}
           </span>
         </span>

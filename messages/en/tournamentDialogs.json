@@ -97,6 +97,8 @@
         "toPlan": "This match is waiting for the referee to set its date: the score can be entered once the match is launched.",
         "scheduledAt": "This match starts on {date}: the score can be entered once it's launched, when the parties have declared themselves ready.",
         "scheduled": "This match hasn't started yet: the score can be entered once it's launched, when the parties have declared themselves ready.",
+        "scheduledAtDirect": "This match starts on {date}: the score can be entered as soon as it has started.",
+        "scheduledDirect": "This match hasn't started yet: the score can be entered as soon as it has started.",
         "lobby": "The score can be entered once the match is launched: every party must have declared itself ready."
       },
       "theirs": {
@@ -138,6 +140,8 @@
     "pendingInvalid": "No possible date: this day doesn't exist in this month.",
     "hintPlanning": "The match stays “Waiting to start” until that time, then moves into launch: both teams declare themselves ready.",
     "hint": "No day and no month = no time announced. At the set time, the match moves into launch: both teams declare themselves ready.",
+    "hintPlanningDirect": "The match stays “Waiting to start” until that time, then it is launched directly.",
+    "hintDirect": "No day and no month = no time announced. At the set time, the match is launched directly.",
     "notice": "For a match still to be played, a future time set or changed is announced to the match's players (push notification, and Discord direct message to players with a verified Discord tag, unless they turned off those about their matches).",
     "noticePlanning": "For a match still to be played, a future time set or changed, or a time removed, is announced to the match's players (push notification, and Discord direct message to players with a verified Discord tag, unless they turned off those about their matches).",
     "noticeTbd": "A slot is still empty: the time will be announced to the players once both entrants are known, within the 48 h before kickoff.",

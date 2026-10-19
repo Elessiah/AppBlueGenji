@@ -235,6 +235,7 @@
       "pending": "Lancement…",
       "success": "Match lancé.",
       "body": "Le match démarre sans attendre les « Prêt » manquants : les engagés peuvent reporter leur score dès maintenant.",
+      "bodyDirect": "Le match démarre sans attendre son heure : les engagés peuvent reporter leur score dès maintenant.",
       "unplanned": "Ce match n'est pas encore planifié : il démarre maintenant, sans heure annoncée aux engagés."
     }
   },

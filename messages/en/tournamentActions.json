@@ -235,6 +235,7 @@
       "pending": "Launching…",
       "success": "Match launched.",
       "body": "The match starts without waiting for the missing “Ready” calls: the entrants can report their score right away.",
+      "bodyDirect": "The match starts without waiting for its time: the entrants can report their score right away.",
       "unplanned": "This match isn't scheduled yet: it starts now, with no time announced to the entrants."
     }
   },

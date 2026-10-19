@@ -6,7 +6,7 @@ import { ScrollArea } from "@/components/cyber/ScrollArea";
 import { useToast } from "@/components/ui/toast";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
-import type { MatchLaunchInfo } from "@/lib/shared/match-launch";
+import { MATCH_LAUNCH_REFRESH_EVENT, type MatchLaunchInfo } from "@/lib/shared/match-launch";
 import { CasterCard, SideCard } from "./LaunchContactCards";
 import { useLaunchText, type LaunchText } from "./launch-text";
 import launchStyles from "./MatchLaunchCenter.module.css";
@@ -18,7 +18,12 @@ export function contactsErrorText(text: LaunchText, code: string | null | undefi
   return text.t("contacts.failed");
 }
 
-type LoadState = { kind: "loading" } | { kind: "ready"; launch: MatchLaunchInfo } | { kind: "failed" };
+type LoadState =
+  | { kind: "loading" }
+  | { kind: "ready"; launch: MatchLaunchInfo }
+  // Le refus reste écrit dans la modale : « Aucun contact » laisserait croire,
+  // une fois la notification partie, que les adversaires n'en ont pas.
+  | { kind: "failed"; code: string | null };
 
 /**
  * Modale « Contacts » d'une carte de match (`docs/features/MATCH_LAUNCH.md`
@@ -40,11 +45,17 @@ export function MatchContactsDialog({
   const { t } = text;
   const { showError, showSuccess } = useToast();
   const titleId = useId();
+  // À la fermeture, la modale de lancement relit ses matchs : une ouverture
+  // d'office retenue pendant que « Contacts » était ouverte part alors.
+  const close = () => {
+    onClose();
+    window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
+  };
   const [mounted, setMounted] = useState(false);
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   useEffect(() => setMounted(true), []);
-  const dialogRef = useDialogBehavior({ open: mounted, onClose });
-  const backdrop = useBackdropDismiss(onClose);
+  const dialogRef = useDialogBehavior({ open: mounted, onClose: close });
+  const backdrop = useBackdropDismiss(close);
 
   useEffect(() => {
     let alive = true;
@@ -54,14 +65,14 @@ export function MatchContactsDialog({
         const payload = (await response.json().catch(() => ({}))) as { launch?: MatchLaunchInfo; error?: string };
         if (!alive) return;
         if (!response.ok || !payload.launch) {
-          setState({ kind: "failed" });
+          setState({ kind: "failed", code: payload.error ?? null });
           showError(contactsErrorText(text, payload.error));
           return;
         }
         setState({ kind: "ready", launch: payload.launch });
       } catch {
         if (!alive) return;
-        setState({ kind: "failed" });
+        setState({ kind: "failed", code: null });
         showError(contactsErrorText(text, null));
       }
     })();
@@ -102,7 +113,7 @@ export function MatchContactsDialog({
         <ScrollArea orientation="y" className={styles.scroll} ariaLabel={t("contacts.scrollAria")}>
           <div className={styles.content}>
             {state.kind === "loading" && <p className={styles.note}>{t("contacts.loading")}</p>}
-            {state.kind === "failed" && <p className={styles.note}>{t("contacts.empty")}</p>}
+            {state.kind === "failed" && <p className={styles.note}>{contactsErrorText(text, state.code)}</p>}
             {launch && (
               <>
                 <div className={launchStyles.sides}>
@@ -136,7 +147,7 @@ export function MatchContactsDialog({
           </div>
         </ScrollArea>
         <div className={styles.actions}>
-          <button type="button" className="btn ghost" onClick={onClose} data-autofocus>
+          <button type="button" className="btn ghost" onClick={close} data-autofocus>
             {t("close")}
           </button>
         </div>

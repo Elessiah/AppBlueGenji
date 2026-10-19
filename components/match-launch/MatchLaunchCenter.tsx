@@ -26,6 +26,11 @@ import {
 } from "@/lib/shared/match-launch";
 import { PRIVACY_CHANGES_ANSWERED_EVENT } from "@/lib/shared/privacy-changes";
 import styles from "./MatchLaunchCenter.module.css";
+
+/** Une modale (`aria-modal`) est déjà ouverte : l'ouverture d'office attend. */
+export function anotherModalOpen(root: ParentNode = document): boolean {
+  return root.querySelector('[aria-modal="true"]') !== null;
+}
 import { CasterCard, SideCard } from "./LaunchContactCards";
 
 /** Cadences d'interrogation : serrée pendant un lancement, lâche sinon. */
@@ -185,6 +190,10 @@ export function MatchLaunchCenter({
 
   useEffect(() => {
     if (waiting || current !== null) return;
+    // Jamais par-dessus une autre modale (« Contacts », score…) : deux pièges
+    // de focus se disputeraient Tab et Échap. L'annonce attend la relève
+    // suivante — la modale « Contacts » en demande une à sa fermeture.
+    if (anotherModalOpen()) return;
     dismissedRef.current ??= readDismissed();
     const now = Date.now();
     const next = launches.find(

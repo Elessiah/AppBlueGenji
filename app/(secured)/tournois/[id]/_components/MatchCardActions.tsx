@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -19,7 +20,6 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
-import { MatchContactsDialog } from "@/components/match-launch/MatchContactsDialog";
 import { useToast } from "@/components/ui/toast";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import {
@@ -39,7 +39,15 @@ import {
   type MatchCardAction,
   type MatchCardActionId,
 } from "../_lib/match-card-actions";
+import { orReload } from "@/lib/shared/lazy-component";
 import styles from "./MatchCardActions.module.css";
+
+// Chargée au premier clic sur « Contacts » : seules les parties du match
+// l'ouvrent, et elle embarque les textes de la modale de lancement (FR + EN).
+const MatchContactsDialog = dynamic(
+  () => orReload(import("@/components/match-launch/MatchContactsDialog").then((m) => m.MatchContactsDialog)),
+  { ssr: false },
+);
 
 async function send(url: string, method: string, body?: unknown): Promise<void> {
   const response = await fetch(url, {
@@ -184,7 +192,7 @@ export function MatchCardActions({
   onAdminScore: () => void;
   onReport: () => void;
 }>) {
-  const { openSchedule, openConfig, openReplay, castBlock } = useLiveControls();
+  const { openSchedule, openConfig, openReplay, castBlock, launchPhase: launchPhaseEnabled } = useLiveControls();
   const { showError, showSuccess } = useToast();
   const mapError = useMapError();
   const errorsText = useErrorsText();
@@ -484,7 +492,10 @@ export function MatchCardActions({
           onClose={() => setConfirmForce(false)}
           onConfirm={() => run(() => send(`/api/admin/matches/${match.id}/launch`, "POST"), t("cardActions.forceConfirm.success"))}
         >
-          <p>{t("cardActions.forceConfirm.body")}</p>
+          {/* Sans phase de lancement, aucun « Prêt » n'est attendu : forcer
+              n'avance que l'heure (et, à planifier, seul l'avis suit). */}
+          {launchPhaseEnabled && <p>{t("cardActions.forceConfirm.body")}</p>}
+          {!launchPhaseEnabled && phase !== "TO_PLAN" && <p>{t("cardActions.forceConfirm.bodyDirect")}</p>}
           {phase === "TO_PLAN" && (
             <p>{t("cardActions.forceConfirm.unplanned")}</p>
           )}

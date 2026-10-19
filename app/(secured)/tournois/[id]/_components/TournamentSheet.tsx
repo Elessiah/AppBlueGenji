@@ -1181,6 +1181,7 @@ export function TournamentSheet({ tournamentId, source }: Readonly<{ tournamentI
           tournamentStartAt={detail.card.startAt}
           tournamentFinished={detail.card.state === "FINISHED"}
           refereeScheduling={detail.card.refereeScheduling}
+          launchPhase={detail.card.launchPhase}
           onClose={() => setMatchForScheduleId(null)}
           onSaved={() => void refresh()}
         />

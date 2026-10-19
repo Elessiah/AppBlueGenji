@@ -99,10 +99,24 @@ function deadlineText(iso: string | null, locale: Locale): string | null {
   return date.toLocaleTimeString(INTL_LOCALE[locale], { hour: "2-digit", minute: "2-digit", ...(locale === "fr" ? {} : { hourCycle: "h23" as const }) });
 }
 
-/** Pourquoi le score ne se saisit pas encore (`playerScoreClosedNotice`), dans la langue du texte. */
-function closedNoticeText(text: TournamentDialogsText, phase: MatchLaunchPhase, startAtFull: string | null): string {
+/**
+ * Pourquoi le score ne se saisit pas encore (`playerScoreClosedNotice`), dans
+ * la langue du texte. Sans phase de lancement (option du tournoi), aucun
+ * « Prêt » n'est attendu : le match part à son heure.
+ */
+export function closedNoticeText(
+  text: TournamentDialogsText,
+  phase: MatchLaunchPhase,
+  startAtFull: string | null,
+  launchPhaseEnabled = true,
+): string {
   if (phase === "TO_PLAN") return text.t("score.player.closed.toPlan");
   if (phase === "SCHEDULED") {
+    if (!launchPhaseEnabled) {
+      return startAtFull
+        ? text.t("score.player.closed.scheduledAtDirect", { date: startAtFull })
+        : text.t("score.player.closed.scheduledDirect");
+    }
     return startAtFull ? text.t("score.player.closed.scheduledAt", { date: startAtFull }) : text.t("score.player.closed.scheduled");
   }
   return text.t("score.player.closed.lobby");
@@ -452,7 +466,7 @@ export function PlayerScoreDialog({
             </>
           ) : (
             <p className={styles.formatHint}>
-              {closedNoticeText(text, launchPhase, formatMatchStartAtFull(match.startAt, text.locale))}
+              {closedNoticeText(text, launchPhase, formatMatchStartAtFull(match.startAt, text.locale), launchPhaseEnabled)}
             </p>
           )}
 
