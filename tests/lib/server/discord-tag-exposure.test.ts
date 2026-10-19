@@ -241,6 +241,44 @@ describe("createOrGetDiscordUser — entrer par Discord enregistre le tag, sans 
     expect(update.sql).not.toContain("discord_verified_at");
   });
 
+  it("relit le Discord quand le compte trouvé l'a détaché entre-temps : la session va à son nouveau titulaire", async () => {
+    // Première lecture : compte 7 ; il détache ce Discord, que le compte 8
+    // rattache ; l'écriture bornée à `discord_id = ?` ne touche rien sur 7.
+    let lookups = 0;
+    const { queries } = fakeDb((q, params) => {
+      if (q.startsWith("SELECT id FROM bg_users WHERE discord_id")) {
+        lookups += 1;
+        return [[{ id: lookups === 1 ? 7 : 8 }]];
+      }
+      if (q.startsWith("UPDATE bg_users")) return [{ affectedRows: params[2] === 7 ? 0 : 1 }];
+      return undefined;
+    });
+
+    const userId = await createOrGetDiscordUser("900000000000000001", undefined, "keryan", {
+      method: "OAUTH", termsAccepted: true,
+    });
+
+    expect(userId).toBe(8);
+    expect(queries.filter((q) => q.sql.startsWith("UPDATE bg_users"))).toHaveLength(2);
+  });
+
+  it("ne relit qu'une fois : une seconde écriture vide rend le compte relu, sans boucler", async () => {
+    let lookups = 0;
+    fakeDb((q) => {
+      if (q.startsWith("SELECT id FROM bg_users WHERE discord_id")) {
+        lookups += 1;
+        return [[{ id: 7 }]];
+      }
+      if (q.startsWith("UPDATE bg_users")) return [{ affectedRows: 0 }];
+      return undefined;
+    });
+
+    await expect(
+      createOrGetDiscordUser("900000000000000001", undefined, "keryan", { method: "OAUTH", termsAccepted: true }),
+    ).resolves.toBe(7);
+    expect(lookups).toBe(2);
+  });
+
   it("crée un compte neuf avec son tag enregistré, jamais certifié", async () => {
     const { queries } = fakeDb((q) => {
       if (q.startsWith("SELECT id FROM bg_users WHERE discord_id")) return [[]];

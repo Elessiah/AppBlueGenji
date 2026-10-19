@@ -295,6 +295,25 @@ describe("linkOAuthIdentity — on ne déplace jamais une porte", () => {
     await expect(linkOAuthIdentity(7, identity())).rejects.toThrow("PROVIDER_ALREADY_LINKED");
   });
 
+  it.each<[string, Parameters<typeof identity>[0], string]>([
+    ["Google", { provider: "GOOGLE", subject: "sub-1", handle: null }, "(google_sub IS NULL OR google_sub = ?)"],
+    ["Blizzard", { provider: "BLIZZARD", subject: "bz-1", handle: "Nova#2143" }, "(blizzard_sub IS NULL OR blizzard_sub = ?)"],
+  ])("refuse de même un %s posé depuis la lecture", async (_label, overrides, guard) => {
+    const { execute } = fakeDb(emptyRow);
+    let update: { sql: string; params: unknown[] } | undefined;
+    execute.mockImplementation(async (sql: string, params: unknown[] = []) => {
+      const q = String(sql).replace(/\s+/g, " ").trim();
+      if (q.startsWith("SELECT google_sub")) return [[emptyRow], []];
+      if (q.startsWith("SELECT id FROM bg_users WHERE")) return [[], []];
+      update = { sql: q, params };
+      return [{ affectedRows: 0 }, []];
+    });
+
+    await expect(linkOAuthIdentity(7, identity(overrides))).rejects.toThrow("PROVIDER_ALREADY_LINKED");
+    expect(update!.sql).toContain(guard);
+    expect(update!.params.at(-1)).toBe(overrides!.subject);
+  });
+
   it("enregistre le tag Discord en le rattachant, sans le certifier", async () => {
     // Rattacher une porte n'est pas consentir à l'exposition du tag.
     const { statements } = fakeDb(emptyRow);
