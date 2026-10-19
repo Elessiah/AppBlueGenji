@@ -435,6 +435,20 @@ async function closeEvening(evening: LiveEvening, rows: readonly LiveCandidateRo
   await forgetEveningSend(evening, rows, false);
 }
 
+/**
+ * Envoi parti sans identifiant de message : seul un bot antérieur aux soirées
+ * répond ainsi (il ignore `editMessageId`, `notify` et `mention`, et préfixe
+ * toujours `@everyone`). Chaque direct ou fin de match suivant posterait un
+ * nouveau message qui notifie tout le serveur : la soirée est close (plus rien
+ * pour ce public jusqu'à la fin de sa fenêtre). Rien n'est marqué refusé.
+ */
+async function closeForOldBot(evening: LiveEvening): Promise<void> {
+  console.error(
+    `[live-announce] soirée ${Number(evening.id)} : le bot n'a rendu aucun identifiant de message (version antérieure aux soirées ?), soirée close pour ne pas notifier de nouveau`,
+  );
+  await closeEvening(evening, []);
+}
+
 /** Vrai si le message gardé de la soirée est parti sans mention : sa modification n'en écrit pas. */
 function editsSilentMessage(evening: LiveEvening): boolean {
   return Boolean(evening.discord_message_id) && Number(evening.silent) === 1;
@@ -849,7 +863,7 @@ function skipClosedEvening(
   const { label, context } = describeGroup(group, Number(evening.id));
   warnOnce(
     `closed ${context}`,
-    `[live-announce] ${label} : soirée ${Number(evening.id)} close (message supprimé de #live), annonce non publiée`,
+    `[live-announce] ${label} : soirée ${Number(evening.id)} close (message supprimé de #live, ou bot trop ancien), annonce non publiée`,
   );
   return { posted: 0, postponed: null };
 }
@@ -956,6 +970,7 @@ async function announce(
     const announced = plural ? "annoncés" : "annoncé";
     const how = howPosted(evening, quiet, messageId);
     console.info(`[live-announce] ${label} ${announced} dans #live (soirée ${Number(evening.id)}, ${how})${silent}`);
+    if (!messageId) await closeForOldBot(evening);
     return { posted: group.rows.length, postponed: null };
   }
   return settleUnposted(group, evening, outcome, notifying, label);
@@ -1144,6 +1159,10 @@ async function refreshEvening(evening: RefreshableEvening, now: number): Promise
     await rememberEveningMessage(evening, messageId, editsSilentMessage(evening) || isFollowUp(evening, messageId));
     rememberEveningText(evening, message, urls);
     console.info(`[live-announce] soirée ${Number(evening.id)} mise à jour dans #live (${label}, fins de match)`);
+    if (!messageId) {
+      await closeForOldBot(evening);
+      return "dropped";
+    }
     return "edited";
   }
   if (outcome === "evening-deleted") {
