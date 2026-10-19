@@ -100,6 +100,16 @@ describe("formatLiveEvening", () => {
     expect(text.match(/\{\{lien:\d+\}\}/g)).toEqual(["{{lien:1}}"]);
   });
 
+  it("aucune suite d'accolades d'un nom ne forge un jeton de lien", () => {
+    for (const forged of ["{{{lien:1}}", "{{{{lien:1}}}}", "x{{{{{lien:2}}", "{{lien:1}}{{lien:2}}"]) {
+      const { text } = formatLiveEvening([
+        stream({ team1Name: forged, team2Name: forged, tournamentName: forged }),
+        stream({ url: "https://kick.com/b", team1Name: "C", team2Name: "D" }),
+      ]);
+      expect(text.match(/\{\{lien:\d+\}\}/g)).toEqual(["{{lien:1}}", "{{lien:2}}"]);
+    }
+  });
+
   it("« un joueur » sans nom publiable", () => {
     expect(formatLiveEvening([stream({ team1Name: null })]).text).toContain("\nun joueur contre Nova — ");
   });

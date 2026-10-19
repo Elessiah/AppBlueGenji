@@ -88,6 +88,7 @@ function mockDb(candidates: unknown[], claims: boolean[] = []): Db {
       return [{ affectedRows: (queue.length > 0 ? queue.shift() : true) ? 1 : 0 }];
     }
     if (sql.startsWith("DELETE FROM bg_live_announcements WHERE (match_id, pairing) IN (")) return [{ affectedRows: 1 }];
+    if (sql.startsWith("UPDATE bg_live_announcements SET sent_at")) return [{ affectedRows: 1 }];
     throw new Error(`requête inattendue : ${sql}`);
   });
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ query: route, execute }));
@@ -493,7 +494,7 @@ describe("runLiveAnnouncementSweep", () => {
     jest.mocked(pushLiveAnnouncement).mockResolvedValue("unavailable");
     const { execute } = mockDb([AUTO_LIVE]);
     execute.mockImplementation(async (sql) => {
-      if (sql.startsWith("INSERT IGNORE")) return [{ affectedRows: 1 }];
+      if (sql.startsWith("INSERT IGNORE") || sql.startsWith("UPDATE bg_live_announcements")) return [{ affectedRows: 1 }];
       throw new Error("DB_DOWN");
     });
     await runLiveAnnouncementSweep(NOW);
@@ -1050,6 +1051,52 @@ describe("soirées d'annonces", () => {
     expect(console.info).toHaveBeenCalledWith(
       "[live-announce] match 40 (tournoi 4) annoncé dans #live (soirée 3, dans une suite sans notifier, le message de la soirée ayant disparu ou ne se modifiant plus)",
     );
+  });
+
+  it("date les réservations du groupe dans la soirée avant de lire ses matchs (réservées avant son ouverture)", async () => {
+    // Réservation prise avant l'ouverture de la soirée (autre public envoyé
+    // d'abord, seconde franchie) : sans cette date, elle ne compterait pas
+    // parmi les annonces de la soirée — sortie du message, seconde notification.
+    const { execute, evening } = mockDb([AUTO_LIVE]);
+    await runLiveAnnouncementSweep(NOW);
+    const stamp = execute.mock.calls.find(([sql]) => sql.startsWith("UPDATE bg_live_announcements SET sent_at"));
+    expect(stamp?.[0]).toBe(
+      "UPDATE bg_live_announcements SET sent_at = GREATEST(sent_at, ?) WHERE (match_id, pairing) IN ((?, ?))",
+    );
+    expect(stamp?.[1]).toEqual([EVENING.started_at, 40, "1:2"]);
+    const stampOrder = execute.mock.invocationCallOrder[execute.mock.calls.indexOf(stamp!)];
+    const readIndex = evening.mock.calls.findIndex(([sql]) => sql.includes("a.sent_at >= ?"));
+    expect(stampOrder).toBeLessThan(evening.mock.invocationCallOrder[readIndex]);
+  });
+
+  it("réservations non datées dans la soirée : rendues, annonce reportée", async () => {
+    const { execute } = mockDb([AUTO_LIVE]);
+    const base = execute.getMockImplementation()!;
+    execute.mockImplementation(async (sql, params) => {
+      if (sql.startsWith("UPDATE bg_live_announcements SET sent_at")) throw new Error("DB_DOWN");
+      return base(sql, params);
+    });
+    expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
+    expect(pushLiveEvening).not.toHaveBeenCalled();
+    expect(releasesOf(execute)).toEqual([[40, "1:2"]]);
+  });
+
+  it("type illisible : un match entre deux invités d'un tournoi qui compte une entrée individuelle reste anonyme", async () => {
+    const solo = { ...AUTO_LIVE, participant_type: null, team2_solo_user_id: 8, team2_pseudo: "Bravo" };
+    const guests = {
+      ...AUTO_LIVE,
+      id: 41,
+      pairing: "3:4",
+      launch_pairing: "3:4",
+      participant_type: null,
+      team1_name: "Lucas Martin",
+      team2_name: "Emma Petit",
+    };
+    mockDb([solo, guests]);
+    await runLiveAnnouncementSweep(NOW);
+    const message = jest.mocked(pushLiveAnnouncement).mock.calls[0][0];
+    expect(message).toContain("un joueur contre un joueur — Coupe d'hiver");
+    expect(message).not.toMatch(/Lucas|Emma/);
   });
 
   it("soirée illisible : réservation rendue, annonce reportée", async () => {
