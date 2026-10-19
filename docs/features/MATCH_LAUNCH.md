@@ -50,6 +50,13 @@ Le défaut **est** la migration : tout tournoi existant passe sans lancement.
   match sans date d'un tournoi planifié par l'arbitrage reste « À planifier »,
   sans score offert. Sur un match déjà lancé, l'aide de la modale d'horaire dit
   qu'une date ne le relance pas (`schedule.hintLaunched`, les deux options).
+  Exception propre à l'option éteinte : le départ n'y tient qu'à l'horaire, donc
+  un match lancé d'office **sans score noté** que l'arbitre reporte dans le
+  futur (ou rend à planifier) quitte le lancement — `launched_at` effacé
+  (`leavesLaunch`, `match-schedule.ts`), sans quoi un score se saisirait avant
+  la nouvelle heure. De même, allumer la planification par l'arbitrage rend à
+  planifier les matchs sans date lancés d'office, sans score
+  (`setRefereeScheduling`).
 - **Allumée** : exactement le comportement décrit ci-dessous.
 - **Absente** d'un appel (`launchPhase` non passé) : allumée — la règle
   d'origine ; au pire un instant de « Lancement » affiché, que l'entretien
