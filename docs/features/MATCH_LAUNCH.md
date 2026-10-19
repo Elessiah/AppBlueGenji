@@ -62,8 +62,8 @@ Le défaut **est** la migration : tout tournoi existant passe sans lancement.
   inéligible jugent la phase allumée (lancé = `launched_at` posé) : à l'heure
   passée, avant la passe de l'entretien, forcer enregistre le lancement au lieu
   de le refuser, et une lecture (modale, « Contacts ») retire encore le caster
-  devenu inéligible (`revokeIneligibleCasters` lit `launched_at`, pas la phase
-  affichée). Un report de score refusé faute de `launched_at` (horloge de
+  devenu inéligible (`revokeIneligibleCasters` juge la phase allumée, comme
+  `releaseIneligibleCast`, pas la phase affichée). Un report de score refusé faute de `launched_at` (horloge de
   l'appareil en avance) rend `MATCH_NOT_STARTED` (« le match n'a pas encore
   commencé », FR + EN), jamais la phrase des « Prêt » (`MATCH_NOT_LAUNCHED`).
 - **Allumée** : exactement le comportement décrit ci-dessous.
