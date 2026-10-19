@@ -227,7 +227,8 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   Une soirée finie n'est modifiée que si ce processus a publié son texte
   (après un redémarrage, rien ne dit ce qui y manque — une modification pour
   rien d'un vieux message pourrait poster une suite) ; ses matchs sont ceux
-  réservés **dans** sa fenêtre (`a.sent_at <= window_end`), jamais ceux de la
+  réservés **dans** sa fenêtre (`a.sent_at < window_end`, strict : une réservation datée de la seconde
+  d'ouverture de la soirée suivante n'est qu'à celle-ci), jamais ceux de la
   soirée suivante. Elle rédige leur texte et ne
   l'envoie que s'il diffère du **dernier texte publié** (retenu par
   processus, annonces de direct comprises ; perdu au redémarrage, au pire une
@@ -237,8 +238,11 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   (`notify: false` pour un message `silent`). Mêmes chemins que la
   modification d'une annonce : suite sans mention si le message ne se modifie
   plus (`30046`, `50005`, identifiant remplacé), soirée close si le message a
-  été supprimé (`10008`). Un refus ou une issue incertaine ne renvoie pas le
-  même texte ; un report (bot injoignable, salon fermé, Discord réticent, soirée
+  été supprimé (`10008`). Un refus (bot, AutoMod) ne renvoie pas le même
+  texte ; une issue incertaine (`uncertain`, `timed-out`, `interrupted`) ne le
+  retient pas : la mise à jour suivante le renvoie (une modification ne
+  notifie jamais ; une soirée finie n'aurait sinon plus de quoi se corriger),
+  sans relance immédiate ; un report (bot injoignable, salon fermé, Discord réticent, soirée
   en pause, coupe-circuit du bot ouvert — rien n'est alors lu —, lecture en
   échec) est relancé une minute plus tard, trente fois au plus depuis la
   dernière fin de match (`LIVE_EVENING_REFRESH_MAX_RETRIES` : une demi-heure,
