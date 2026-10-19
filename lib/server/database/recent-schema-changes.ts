@@ -253,6 +253,9 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // Soirées #live — message parti sans mention : ses modifications n'en
     // écrivent pas (bases de dev créées avant la colonne).
     `ALTER TABLE bg_live_evenings ADD COLUMN silent BOOLEAN NOT NULL DEFAULT FALSE`,
+    // Soirées #live — envoi qui notifie parti (issue incertaine comprise) : le
+    // match suivant ne notifie pas une seconde fois.
+    `ALTER TABLE bg_live_evenings ADD COLUMN notified BOOLEAN NOT NULL DEFAULT FALSE`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

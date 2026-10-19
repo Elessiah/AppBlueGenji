@@ -272,6 +272,12 @@ interface LiveEvening extends RowDataPacket {
   discord_message_id: string | null;
   /** `1` : le message gardé est parti sans mention (ses modifications n'en écrivent pas). */
   silent?: number | boolean | null;
+  /**
+   * `1` : un envoi qui notifie est parti vers le bot pour cette soirée (posé
+   * **avant** l'envoi, retiré si rien n'est parti) — même sans identifiant
+   * gardé, son public a peut-être déjà été notifié.
+   */
+  notified?: number | boolean | null;
 }
 
 /** Instant d'une colonne `DATETIME`, en millisecondes ; `null` si vide. */
@@ -308,7 +314,7 @@ async function openEvening(target: LiveMentionTarget): Promise<LiveEvening> {
   } catch {
     // Ménage seulement : réessayé au passage suivant.
   }
-  const select = `SELECT id, started_at, window_end, discord_message_id, silent FROM bg_live_evenings
+  const select = `SELECT id, started_at, window_end, discord_message_id, silent, notified FROM bg_live_evenings
                    WHERE target = ? AND window_end > NOW() ORDER BY id DESC LIMIT 1`;
   const [open] = await db.query<LiveEvening[]>(select, [target]);
   if (open[0]) return open[0];
@@ -330,6 +336,48 @@ function howPosted(evening: LiveEvening, quiet: boolean, messageId: string | nul
   if (evening.discord_message_id) return "ajoutés au message de la soirée";
   if (quiet) return "dans un nouveau message sans notifier, la soirée ayant déjà une annonce";
   return "dans un nouveau message";
+}
+
+/**
+ * Marque la soirée notifiée juste avant l'envoi qui notifie, et fait repartir
+ * sa fenêtre de cet envoi : une issue incertaine (délai écoulé, bot tombé) ne
+ * laisse pas d'identifiant, mais le public a pu être notifié — le match suivant
+ * part sans notification, même si son tournoi est fini depuis ou s'il passe à
+ * l'antenne juste après la fin de la fenêtre d'avant.
+ */
+async function markEveningNotified(evening: LiveEvening): Promise<void> {
+  const db = await getDatabase();
+  await db.execute(
+    `UPDATE bg_live_evenings SET notified = 1, window_end = GREATEST(window_end, NOW() + INTERVAL ${LIVE_EVENING_WINDOW_HOURS} HOUR) WHERE id = ?`,
+    [Number(evening.id)],
+  );
+}
+
+/**
+ * Rien n'est parti (refus, report) : la soirée n'est plus notifiée, et les
+ * réservations du groupe sortent de la soirée (datées juste avant son
+ * ouverture). Un refus gardé ne revient pas dans le message de la soirée — il y
+ * ferait refuser chaque match suivant — et ne la fait pas croire notifiée.
+ */
+async function forgetEveningSend(
+  evening: LiveEvening,
+  rows: readonly LiveCandidateRow[],
+  wasNotifying: boolean,
+): Promise<void> {
+  try {
+    const db = await getDatabase();
+    if (wasNotifying) await db.execute(`UPDATE bg_live_evenings SET notified = 0 WHERE id = ?`, [Number(evening.id)]);
+    if (rows.length === 0) return;
+    const placeholders = rows.map(() => "(?, ?)").join(", ");
+    const params = rows.flatMap((row) => [Number(row.id), announceKey(String(row.pairing))]);
+    await db.execute(
+      `UPDATE bg_live_announcements SET sent_at = ? - INTERVAL 1 SECOND WHERE (match_id, pairing) IN (${placeholders})`,
+      [evening.started_at, ...params],
+    );
+  } catch (error) {
+    // Au pire, le match suivant de la soirée part sans notification.
+    console.error(`[live-announce] soirée ${Number(evening.id)} : envoi refusé non retiré de la soirée`, error);
+  }
 }
 
 /** Vrai si le message gardé de la soirée est parti sans mention : sa modification n'en écrit pas. */
@@ -554,6 +602,9 @@ const ABANDONED_OUTCOMES: Partial<Record<LiveAnnouncementOutcome, string>> = {
     "bot tombé avant sa réponse (connexion coupée, redémarrage ?), annonce peut-être publiée, non réessayée — vérifier #live",
 };
 
+/** Issues abandonnées où rien n'est parti (refus du bot ou d'AutoMod). */
+const REFUSED_OUTCOMES: ReadonlySet<LiveAnnouncementOutcome> = new Set(["rejected", "discord-refused"]);
+
 /** Cause pm2 d'un refus ou d'un silence de Discord rapporté par le bot. */
 const DISCORD_HELD_CAUSE =
   "Discord a refusé l'annonce (état du salon) ou n'a pas répondu au bot — cause au canal de logs ou dans les journaux du bot";
@@ -651,8 +702,10 @@ function eveningStreams(
     seen.add(id);
     const live = isOnAir(row, now);
     const at = streamTime(row, now);
-    // Un match fini, ou repoussé hors de la soirée, n'y figure plus.
-    if (!live && (row.status !== "PENDING" && row.status !== "READY")) continue;
+    // Un match fini, repoussé hors de la soirée, ou sorti de l'antenne (rouvert
+    // pour une autre affiche, antenne fermée) n'y figure plus : seul un match
+    // programmé (`START_TIME`) y est listé avant son direct, à son heure.
+    if (!live && !(row.live_trigger === "START_TIME" && (row.status === "PENDING" || row.status === "READY"))) continue;
     streams.push({ row, url, live, at });
   }
   return streams;
@@ -693,6 +746,54 @@ function eveningEntrant(
 }
 
 /**
+ * Soirée illisible ou non marquable : la base est en cause, pas le bot — seul
+ * ce public attend (l'autre est essayé), ses réservations sont rendues, et pm2
+ * ne parle pas d'un bot injoignable.
+ */
+async function holdUnreadableEvening(
+  group: AnnouncementGroup,
+  error: unknown,
+): Promise<{ posted: number; postponed: PostponedOutcome | null }> {
+  warnOnce(`evening ${group.target}`, `[live-announce] soirée ${group.target} illisible, annonce reportée`, error);
+  holdGroup(group);
+  await releaseAnnouncements(group.rows, describeGroup(group).label);
+  return { posted: 0, postponed: null };
+}
+
+/**
+ * Texte de la soirée (pseudos compris, pour #live) et sa version de logs
+ * (pseudos ôtés : ce que le bot cite à son canal de logs si l'annonce échoue —
+ * l'exception vaut pour #live seulement).
+ */
+function eveningTexts(
+  group: AnnouncementGroup,
+  others: readonly LiveCandidateRow[],
+  now: number,
+): { message: string; urls: string[]; logMessage: string } {
+  const streams = eveningStreams(group, others, now);
+  const soloTournaments = new Set(
+    [...group.rows, ...others]
+      .filter((row) => row.team1_solo_user_id != null || row.team2_solo_user_id != null)
+      .map((row) => Number(row.tournament_id)),
+  );
+  const text = (withPseudo: boolean) =>
+    formatLiveEvening(
+      streams.map(
+        ({ row, url, live, at }): LiveEveningStream => ({
+          startsAt: at,
+          live,
+          tournamentName: String(row.tournament_name),
+          team1Name: eveningEntrant(row, 1, withPseudo, soloTournaments),
+          team2Name: eveningEntrant(row, 2, withPseudo, soloTournaments),
+          url,
+        }),
+      ),
+    );
+  const { text: message, urls } = text(true);
+  return { message, urls, logMessage: text(false).text };
+}
+
+/**
  * Annonce un groupe réservé : ouvre ou reprend la soirée de son public, puis
  * publie le message de la soirée (premier direct : notification) ou le modifie
  * (matchs suivants : aucune nouvelle notification).
@@ -710,41 +811,26 @@ async function announce(
     await stampClaims(group.rows, evening.started_at);
     others = await loadEveningMatches(evening);
   } catch (error) {
-    // La base est en cause, pas le bot : seul ce public attend (l'autre est
-    // essayé), et pm2 ne parle pas d'un bot injoignable.
-    warnOnce(`evening ${group.target}`, `[live-announce] soirée ${group.target} illisible, annonce reportée`, error);
-    holdGroup(group);
-    await releaseAnnouncements(group.rows, describeGroup(group).label);
-    return { posted: 0, postponed: null };
+    return holdUnreadableEvening(group, error);
   }
-  const streams = eveningStreams(group, others, now);
-  const soloTournaments = new Set(
-    [...group.rows, ...others]
-      .filter((row) => row.team1_solo_user_id != null || row.team2_solo_user_id != null)
-      .map((row) => Number(row.tournament_id)),
-  );
   // Soirée sans message connu, mais dont un autre match a déjà une annonce
   // (issue incertaine, bot trop ancien, identifiant non gardé) : son public a
   // peut-être déjà été notifié — un nouveau message part, sans notification.
-  const quiet = !evening.discord_message_id && alreadyAnnounced(group, others);
-  // `withPseudo: false` : ce que le bot cite à son canal de logs si l'annonce
-  // échoue — le même texte, pseudos ôtés : l'exception vaut pour #live seulement.
-  const text = (withPseudo: boolean) =>
-    formatLiveEvening(
-      streams.map(
-        ({ row, url, live, at }): LiveEveningStream => ({
-          startsAt: at,
-          live,
-          tournamentName: String(row.tournament_name),
-          team1Name: eveningEntrant(row, 1, withPseudo, soloTournaments),
-          team2Name: eveningEntrant(row, 2, withPseudo, soloTournaments),
-          url,
-        }),
-      ),
-    );
-  const { text: message, urls } = text(true);
-  const { text: logMessage } = text(false);
+  const quiet =
+    !evening.discord_message_id && (Number(evening.notified) === 1 || alreadyAnnounced(group, others));
+  // Premier message de la soirée, qui notifie : la soirée est marquée avant
+  // l'envoi, pour qu'une issue incertaine ne laisse pas notifier deux fois.
+  const notifying = !evening.discord_message_id && !quiet;
+  const { message, urls, logMessage } = eveningTexts(group, others, now);
   const { label, context, plural } = describeGroup(group, Number(evening.id));
+  if (notifying) {
+    try {
+      await markEveningNotified(evening);
+    } catch (error) {
+      // Sans la marque, une issue incertaine laisserait notifier deux fois.
+      return holdUnreadableEvening(group, error);
+    }
+  }
   const { outcome, messageId } = await pushLiveEvening({
     message,
     streamUrls: urls,
@@ -763,14 +849,33 @@ async function announce(
     console.info(`[live-announce] ${label} ${announced} dans #live (soirée ${Number(evening.id)}, ${how})${silent}`);
     return { posted: group.rows.length, postponed: null };
   }
+  return settleUnposted(group, evening, outcome, notifying, label);
+}
+
+/**
+ * Issue d'une annonce qui n'est pas (sûrement) partie : abandonnée, ou
+ * reportée. Rien n'est parti après un refus ou un report : la soirée n'est
+ * alors plus tenue pour notifiée.
+ */
+async function settleUnposted(
+  group: AnnouncementGroup,
+  evening: LiveEvening,
+  outcome: LiveAnnouncementOutcome,
+  notifying: boolean,
+  label: string,
+): Promise<{ posted: number; postponed: PostponedOutcome | null }> {
   const abandoned = ABANDONED_OUTCOMES[outcome];
   if (abandoned) {
     // Rien à renvoyer : refusé tel quel, ou peut-être déjà publié (un second
-    // `@everyone` serait pire qu'une annonce perdue). Réservations gardées.
+    // `@everyone` serait pire qu'une annonce perdue). Réservations gardées ;
+    // un refus (rien n'est parti) sort de la soirée.
+    if (REFUSED_OUTCOMES.has(outcome)) await forgetEveningSend(evening, group.rows, notifying);
     console.error(`[live-announce] ${label} : ${abandoned}`);
     return { posted: 0, postponed: null };
   }
   const postponed: PostponedOutcome = outcome in POSTPONED_CAUSES ? (outcome as PostponedOutcome) : "unavailable";
+  // Rien n'est parti : la soirée n'est pas notifiée (réservations rendues par le report).
+  if (notifying) await forgetEveningSend(evening, [], true);
   await postpone(group, postponed, Number(evening.id));
   return { posted: 0, postponed };
 }
