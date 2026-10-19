@@ -143,7 +143,7 @@
     "hintPlanning": "Le match reste « En attente de départ » jusqu'à cette heure, puis entre en lancement : les deux équipes se déclarent prêtes.",
     "hint": "Sans jour ni mois = aucun horaire annoncé. À l'heure dite, le match entre en lancement : les deux équipes se déclarent prêtes.",
     "hintPlanningDirect": "Le match reste « En attente de départ » jusqu'à cette heure, puis il est lancé directement.",
-    "hintDirect": "Sans jour ni mois = aucun horaire annoncé. À l'heure dite, le match est lancé directement.",
+    "hintDirect": "Sans jour ni mois = aucun horaire : le match est alors lancé tout de suite, sans retour possible. Sinon, à l'heure dite, il est lancé directement.",
     "hintLaunched": "Le match est déjà lancé : changer sa date ne le relance pas, le score reste ouvert.",
     "notice": "Pour un match à jouer, un horaire à venir posé ou changé est annoncé aux joueurs du match (notification push, et message privé Discord aux joueurs dont le tag Discord est certifié, sauf s'ils ont coupé ceux de leurs matchs).",
     "noticePlanning": "Pour un match à jouer, un horaire à venir posé ou changé, ou un horaire retiré, est annoncé aux joueurs du match (notification push, et message privé Discord aux joueurs dont le tag Discord est certifié, sauf s'ils ont coupé ceux de leurs matchs).",

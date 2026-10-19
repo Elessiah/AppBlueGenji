@@ -143,7 +143,7 @@
     "hintPlanning": "The match stays “Waiting to start” until that time, then moves into launch: both teams declare themselves ready.",
     "hint": "No day and no month = no time announced. At the set time, the match moves into launch: both teams declare themselves ready.",
     "hintPlanningDirect": "The match stays “Waiting to start” until that time, then it is launched directly.",
-    "hintDirect": "No day and no month = no time announced. At the set time, the match is launched directly.",
+    "hintDirect": "No day and no month = no time: the match is then launched right away, with no going back. Otherwise, at the set time, it is launched directly.",
     "hintLaunched": "The match has already launched: changing its date doesn't restart it, and the score stays open.",
     "notice": "For a match still to be played, a future time set or changed is announced to the match's players (push notification, and Discord direct message to players with a verified Discord tag, unless they turned off those about their matches).",
     "noticePlanning": "For a match still to be played, a future time set or changed, or a time removed, is announced to the match's players (push notification, and Discord direct message to players with a verified Discord tag, unless they turned off those about their matches).",
