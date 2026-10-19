@@ -99,6 +99,7 @@
         "scheduled": "Ce match n'a pas encore démarré : le score se saisit une fois lancé, quand les parties se sont déclarées prêtes.",
         "scheduledAtDirect": "Ce match démarre le {date} : le score se saisit dès qu'il a démarré.",
         "scheduledDirect": "Ce match n'a pas encore démarré : le score se saisit dès qu'il a démarré.",
+        "startingDirect": "Le match démarre : le score se saisit dans un instant.",
         "lobby": "Le score se saisit une fois le match lancé : toutes les parties doivent s'être déclarées prêtes."
       },
       "theirs": {
@@ -142,6 +143,7 @@
     "hint": "Sans jour ni mois = aucun horaire annoncé. À l'heure dite, le match entre en lancement : les deux équipes se déclarent prêtes.",
     "hintPlanningDirect": "Le match reste « En attente de départ » jusqu'à cette heure, puis il est lancé directement.",
     "hintDirect": "Sans jour ni mois = aucun horaire annoncé. À l'heure dite, le match est lancé directement.",
+    "hintLaunched": "Le match est déjà lancé : changer sa date ne le relance pas, le score reste ouvert.",
     "notice": "Pour un match à jouer, un horaire à venir posé ou changé est annoncé aux joueurs du match (notification push, et message privé Discord aux joueurs dont le tag Discord est certifié, sauf s'ils ont coupé ceux de leurs matchs).",
     "noticePlanning": "Pour un match à jouer, un horaire à venir posé ou changé, ou un horaire retiré, est annoncé aux joueurs du match (notification push, et message privé Discord aux joueurs dont le tag Discord est certifié, sauf s'ils ont coupé ceux de leurs matchs).",
     "noticeTbd": "Une place est encore vide : l'horaire sera annoncé aux joueurs quand les deux adversaires seront connus, dans les 48 h qui précèdent le coup d'envoi.",

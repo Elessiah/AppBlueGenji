@@ -76,7 +76,7 @@
   "pushLead": "Sois prévenu du départ de tes prochains matchs, même le site fermé.",
   "contacts": {
     "title": "Contacts — {match}",
-    "lead": "Fiches montrées aux joueurs et au caster de ce match, pour s'organiser avant le départ.",
+    "lead": "Fiches montrées aux joueurs et au caster de ce match, pour s'ajouter en jeu et s'organiser.",
     "scrollAria": "Contacts du match",
     "loading": "Chargement des contacts…",
     "notShown": "Contacts non affichés.",

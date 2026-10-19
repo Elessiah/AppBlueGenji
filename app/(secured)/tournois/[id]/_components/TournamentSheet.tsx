@@ -534,6 +534,7 @@ export function TournamentSheet({ tournamentId, source }: Readonly<{ tournamentI
   const viewerReportTeamIds = detail?.canCreateReportsForTeamIds;
   const viewerCanActForEntrant = detail?.canRegisterEntrant ?? false;
   const launchPhaseEnabled = detail?.card.launchPhase ?? false;
+  const refereeSchedulingEnabled = detail?.card.refereeScheduling ?? false;
   /**
    * Le suivi est arrêté : ce qui est affiché ne bouge plus. On retire donc les
    * actions plutôt que de les laisser échouer une par une — une équipe qui
@@ -546,8 +547,11 @@ export function TournamentSheet({ tournamentId, source }: Readonly<{ tournamentI
       !frozen &&
       viewerMyTeamId !== null &&
       (viewerReportTeamIds?.includes(viewerMyTeamId) ?? false) &&
-      canPlayersReportScore({ ...match, launchPhase: launchPhaseEnabled }, Date.now()),
-    [frozen, viewerMyTeamId, viewerReportTeamIds, launchPhaseEnabled],
+      canPlayersReportScore(
+        { ...match, launchPhase: launchPhaseEnabled, refereeScheduling: refereeSchedulingEnabled },
+        Date.now(),
+      ),
+    [frozen, viewerMyTeamId, viewerReportTeamIds, launchPhaseEnabled, refereeSchedulingEnabled],
   );
   const canOpenPlayerScore = useCallback(
     (match: BracketMatch): boolean =>

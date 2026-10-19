@@ -74,7 +74,13 @@ export function startAtHint(
   entrantsKnown: boolean,
   played: boolean,
   launchPhase = true,
+  launched = false,
 ): string {
+  // Déjà lancé (un match sans date part d'emblée, option éteinte) : une date
+  // posée ensuite ne le fait pas attendre.
+  if (launched && !played) {
+    return `${text.t("schedule.hintLaunched")} ${scheduleNotice(text, refereeScheduling, entrantsKnown)}`;
+  }
   const planningKey = launchPhase ? "schedule.hintPlanning" : "schedule.hintPlanningDirect";
   const plainKey = launchPhase ? "schedule.hint" : "schedule.hintDirect";
   const base = text.t(refereeScheduling ? planningKey : plainKey);
@@ -493,6 +499,7 @@ export function MatchScheduleDialog({
               // Tournoi clos : ses manches comptent pour jouées, rien n'est annoncé.
               isMatchOver(match.status, tournamentFinished),
               launchPhase,
+              match.launchedAt !== null,
             )}
           </p>
 

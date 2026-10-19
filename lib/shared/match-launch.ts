@@ -109,16 +109,19 @@ export function nextLaunchPhaseChangeAt(match: MatchLaunchInput, now: number): n
 /**
  * Les engagés peuvent-ils reporter un score sur ce match ? Seulement lancé.
  *
- * L'option de planification n'y change rien — `LAUNCHED` ne dépend que de
- * `launched_at` et du statut —, d'où une entrée qui ne la demande pas : le
- * report d'un joueur ne lit pas le tournoi pour une réponse qu'elle ne peut
- * pas modifier.
+ * Phase de lancement allumée (ou absente, comme au serveur), l'option de
+ * planification n'y change rien — `LAUNCHED` ne dépend que de `launched_at`
+ * et du statut. Éteinte, `LAUNCHED` se déduit aussi de l'heure : la page passe
+ * alors la planification, sans quoi un match « À planifier » offrirait le score.
  */
 export function canPlayersReportScore(
-  match: Omit<MatchLaunchInput, "refereeScheduling">,
+  match: Omit<MatchLaunchInput, "refereeScheduling"> & { refereeScheduling?: boolean },
   now: number,
 ): boolean {
-  return matchLaunchPhase({ ...match, refereeScheduling: false }, now) === "LAUNCHED";
+  // Planification par l'arbitrage : sans effet allumée (à planifier ou en
+  // lancement, jamais lancé sans écriture) ; **décisive** option éteinte, où un
+  // match sans date serait sinon lancé d'emblée alors qu'il attend sa date.
+  return matchLaunchPhase({ ...match, refereeScheduling: match.refereeScheduling ?? false }, now) === "LAUNCHED";
 }
 
 /**

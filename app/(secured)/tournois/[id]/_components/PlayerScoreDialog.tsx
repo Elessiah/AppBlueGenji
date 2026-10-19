@@ -119,6 +119,9 @@ export function closedNoticeText(
     }
     return startAtFull ? text.t("score.player.closed.scheduledAt", { date: startAtFull }) : text.t("score.player.closed.scheduled");
   }
+  // Sans lancement, l'heure passée : le match part, le score suit à la
+  // prochaine mise à jour — jamais de « Prêt » à attendre.
+  if (!launchPhaseEnabled) return text.t("score.player.closed.startingDirect");
   return text.t("score.player.closed.lobby");
 }
 
