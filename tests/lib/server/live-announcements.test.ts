@@ -461,7 +461,8 @@ describe("runLiveAnnouncementSweep", () => {
       "🔴 **Les lives de la soirée**\n\n**21:58** · En direct\nRenards contre Nova — Coupe d'hiver\n{{lien:1}}" +
         "\n\n**21:58** · En direct\nOrques contre Lynx — Coupe d'été\n{{lien:2}}",
       "https://twitch.tv/bluegenji",
-      "live-announce soiree-3 tournoi-4 match-40,41",
+      // Deux tournois dans le groupe : tous deux nommés, pas le seul premier.
+      "live-announce soiree-3 tournoi-4,5 match-40,41",
     );
     expect(jest.mocked(pushLiveEvening).mock.calls[0][0]).toMatchObject({
       mention: "stream-viewer",
@@ -469,7 +470,9 @@ describe("runLiveAnnouncementSweep", () => {
     });
     // Première annonce de la soirée : aucun message à modifier.
     expect(jest.mocked(pushLiveEvening).mock.calls[0][0].editMessageId).toBeUndefined();
-    expect(console.info).toHaveBeenCalledWith("[live-announce] matchs 40, 41 (tournoi 4) annoncés dans #live (soirée 3, dans un nouveau message)");
+    expect(console.info).toHaveBeenCalledWith(
+      "[live-announce] matchs 40, 41 (tournois 4, 5) annoncés dans #live (soirée 3, dans un nouveau message)",
+    );
   });
 
   it("la chaîne officielle (@everyone) et les autres chaînes (StreamViewer) font deux messages", async () => {
@@ -1001,6 +1004,25 @@ describe("soirées d'annonces", () => {
     expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
     expect(pushLiveEvening).not.toHaveBeenCalled();
     expect(releasesOf(execute)).toEqual([[40, "1:2"]]);
+  });
+
+  it("soirée illisible pour un public : l'autre public est annoncé quand même, sans accuser le bot", async () => {
+    const official = { ...AUTO_LIVE, id: 42, tournament_id: 5, pairing: "5:6", launch_pairing: "5:6", live_url: OFFICIAL };
+    const { execute, evening } = mockDb([AUTO_LIVE, official]);
+    evening.mockImplementation(async (sql, params) => {
+      if (!sql.includes("FROM bg_live_evenings")) return [[official]];
+      if ((params as unknown[])[0] === "stream-viewer") throw new Error("DB_DOWN");
+      return [[EVENING]];
+    });
+    expect(await runLiveAnnouncementSweep(NOW)).toBe(1);
+    expect(jest.mocked(pushLiveEvening).mock.calls.map(([request]) => request.mention)).toEqual(["everyone"]);
+    expect(releasesOf(execute)).toEqual([[40, "1:2"]]);
+    const warnings = jest.mocked(console.warn).mock.calls.map(([text]) => String(text));
+    expect(warnings.some((text) => text.includes("bot injoignable"))).toBe(false);
+    // Seul le public en cause attend : le passage suivant ne le réserve pas de nouveau.
+    execute.mockClear();
+    await runLiveAnnouncementSweep(NOW);
+    expect(claimsOf(execute)).not.toContainEqual([40, "1:2"]);
   });
 
   it("la version de logs d'une soirée ôte les pseudos", async () => {
