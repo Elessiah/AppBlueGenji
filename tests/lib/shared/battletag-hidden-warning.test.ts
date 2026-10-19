@@ -72,8 +72,9 @@ describe("conditions d'utilisation — contacts de match (version 5)", () => {
     expect(enProfile.battletagNotice.outro).toContain("after adding another way to log in if it is your only one");
     expect(frProfile.battletagLock.change).toContain("après avoir ajouté un autre moyen de connexion si c'est le seul");
     expect(enProfile.battletagLock.change).toContain("after adding another way to log in if it is your only one");
-    expect(text).toContain("Ce partage passe par la seule fenêtre « Contacts » du match, que reprend sa fenêtre de lancement au départ du match : un BattleTag masqué n'est lisible nulle part ailleurs, pour personne — arbitres et administrateurs compris.");
+    expect(text).toContain("Ce partage passe par la seule fenêtre « Contacts » du match, que reprend sa fenêtre de lancement au départ du match : un BattleTag masqué n'est lisible nulle part ailleurs sur le site, pour personne — arbitres et administrateurs compris.");
     expect(text).toContain("celles du caster le sont aux deux équipes et aux arbitres sur ce même temps du match");
+    expect(text).toContain("le code de replay d'une map, visible de tout utilisateur connecté sur la fiche du tournoi");
   });
 
   // La section renvoie là où la politique dit qui lit le BattleTag (tableau des données).
@@ -90,7 +91,9 @@ describe("conditions d'utilisation — contacts de match (version 5)", () => {
     expect(text).toContain("**even when hidden**");
     expect(text).toContain("once the Battle.net account is unlinked, which requires another means of logging in)");
     expect(text).toContain("**only while the match is being played**, from its start to its end");
-    expect(text).toContain("a hidden BattleTag is readable nowhere else, by anyone — referees and administrators included");
+    expect(text).toContain("a hidden BattleTag is readable nowhere else on the site, by anyone — referees and administrators included");
+    // Le jeu affiche les identifiants : le code de replay le dit (FR et EN), comme /rgpd.
+    expect(text).toContain("a map's replay code, visible to any logged-in user on the tournament page");
     expect(text).toContain("the caster's is shared with both teams and the referees over that same match time");
     expect(en?.paragraphs).toHaveLength(fr?.paragraphs.length ?? -1);
   });
