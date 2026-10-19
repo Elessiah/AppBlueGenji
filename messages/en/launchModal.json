@@ -67,7 +67,7 @@
   "copy": "Copy",
   "host": "Hosts the game — creates the lobby",
   "ghost": "Guest team: no contact.",
-  "contactsAtLaunch": "Contacts show up at launch — or right now through the “Contacts” button on the match card.",
+  "contactsAtLaunch": "Contacts show up at launch — or right now through the match's “Contacts” action on the tournament page (under “More actions” if needed).",
   "noContact": "No contact available.",
   "caster": "Caster",
   "noCaster": "No caster signed up: the match starts as soon as both teams are ready.",
@@ -81,7 +81,7 @@
     "loading": "Loading contacts…",
     "notShown": "Contacts not shown.",
     "noCaster": "No caster signed up for this match.",
-    "unavailable": "Contacts are only available to the players and the caster of a scheduled or ongoing match.",
+    "unavailable": "Contacts are only available to the players and the caster of a match whose two opponents are known, until it ends.",
     "failed": "Contacts could not be loaded. Try again in a moment."
   }
 }

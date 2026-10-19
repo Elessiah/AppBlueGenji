@@ -30,7 +30,7 @@ export type LaunchStripControls = {
   isCaster: boolean;
   /** Ouvrir la modale de lancement (parties du match seulement). */
   showOpen: boolean;
-  /** Ouvrir les contacts du match (parties du match, programmé ou en cours). */
+  /** Ouvrir les contacts du match (parties du match, deux adversaires connus, pas terminé). */
   showContacts: boolean;
   /** S'inscrire comme caster. */
   showClaim: boolean;
@@ -50,10 +50,11 @@ export type LaunchStripControls = {
 const FORCEABLE_PHASES: ReadonlySet<MatchLaunchPhase> = new Set(["TO_PLAN", "SCHEDULED", "LOBBY"]);
 
 /**
- * Phases où le bouton « Contacts » est offert : match programmé, en lancement
- * ou lancé — celles où la lecture serveur les expose (`match-launch-info.ts`).
+ * Phases où le bouton « Contacts » est offert : dès que les deux adversaires
+ * sont connus — à planifier, programmé, en lancement ou lancé —, celles où la
+ * lecture serveur les expose (`match-launch-info.ts`).
  */
-const CONTACT_PHASES: ReadonlySet<MatchLaunchPhase> = new Set(["SCHEDULED", "LOBBY", "LAUNCHED"]);
+const CONTACT_PHASES: ReadonlySet<MatchLaunchPhase> = new Set(["TO_PLAN", "SCHEDULED", "LOBBY", "LAUNCHED"]);
 
 export function launchStripControls(
   match: StripMatch,

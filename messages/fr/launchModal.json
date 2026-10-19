@@ -67,7 +67,7 @@
   "copy": "Copier",
   "host": "Héberge la partie — crée le salon",
   "ghost": "Équipe invitée : pas de contact.",
-  "contactsAtLaunch": "Les contacts s'affichent au lancement — ou dès maintenant par le bouton « Contacts » de la carte du match.",
+  "contactsAtLaunch": "Les contacts s'affichent au lancement — ou dès maintenant par l'action « Contacts » du match, sur la page du tournoi (menu « Plus d'actions » au besoin).",
   "noContact": "Aucun contact disponible.",
   "caster": "Caster",
   "noCaster": "Aucun caster inscrit : le match part dès que les deux équipes sont prêtes.",
@@ -81,7 +81,7 @@
     "loading": "Chargement des contacts…",
     "notShown": "Contacts non affichés.",
     "noCaster": "Aucun caster inscrit sur ce match.",
-    "unavailable": "Les contacts ne sont visibles que des joueurs et du caster d'un match programmé ou en cours.",
+    "unavailable": "Les contacts ne sont visibles que des joueurs et du caster d'un match dont les deux adversaires sont connus, jusqu'à sa fin.",
     "failed": "Les contacts n'ont pas pu être chargés. Réessaie dans un instant."
   }
 }

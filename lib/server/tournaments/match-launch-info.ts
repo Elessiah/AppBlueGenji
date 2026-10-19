@@ -147,11 +147,15 @@ async function loadCandidates(
   // Deux lectures : la modale de lancement (tous les matchs du lecteur qui
   // approchent, sur les seuls tournois qui ont la phase de lancement), et le
   // bouton « Contacts » d'une carte (un seul match, quelle que soit l'option et
-  // quel que soit son horaire). La règle de qui en est partie ne change pas.
+  // quel que soit son horaire, « À planifier » compris : dès que les deux
+  // adversaires sont connus). La règle de qui en est partie ne change pas.
+  // Pour la modale, un match à planifier n'a rien à présenter : ni heure à
+  // guetter, ni « Prêt » à donner.
   const scope =
     matchId === null
       ? `AND (m.start_at IS NULL OR m.start_at <= NOW() + INTERVAL ${LAUNCH_LOOKAHEAD_MINUTES} MINUTE)
-         AND t.match_launch_phase = 1`
+         AND t.match_launch_phase = 1
+         AND (m.start_at IS NOT NULL OR t.referee_scheduling = 0)`
       : `AND m.id = ?`;
   const viewerTeams = `(SELECT tm.team_id FROM bg_team_members tm
                         WHERE tm.user_id = ? AND tm.left_at IS NULL
@@ -175,9 +179,6 @@ async function loadCandidates(
        AND m.status IN ('READY', 'AWAITING_CONFIRMATION')
        AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL
        ${scope}
-       -- Un match à planifier n'a rien à présenter : ni heure à guetter, ni
-       -- « Prêt » à donner, ni contacts à exposer.
-       AND (m.start_at IS NOT NULL OR t.referee_scheduling = 0)
        AND (m.caster_user_id = ?
             OR m.team1_id IN ${viewerTeams}
             OR m.team2_id IN ${viewerTeams})
@@ -301,13 +302,14 @@ type LaunchContext = {
 
 /**
  * Les contacts sortent-ils pour ce match ? Dans la modale de lancement, en
- * lancement ou lancé ; par le bouton « Contacts » d'une carte, dès qu'il est
- * **programmé** (heure fixée, deux engagées connues) — les parties
- * s'organisent avant l'heure, surtout sans phase de lancement. Mêmes
- * destinataires dans les deux cas : les seules parties du match.
+ * lancement ou lancé ; par le bouton « Contacts » d'une carte, **dès que les
+ * deux adversaires sont connus** — à planifier (décision de l'utilisateur,
+ * 2026-10-19) ou programmé — : les parties s'organisent avant l'heure, surtout
+ * sans phase de lancement. Mêmes destinataires dans les deux cas : les seules
+ * parties du match.
  */
 function exposesContacts(phase: LaunchPhase, forCard: boolean): boolean {
-  return phase === "LOBBY" || phase === "LAUNCHED" || (forCard && phase === "SCHEDULED");
+  return phase === "LOBBY" || phase === "LAUNCHED" || (forCard && (phase === "SCHEDULED" || phase === "TO_PLAN"));
 }
 
 /** Un côté du match tel que la ligne le décrit. */
@@ -524,11 +526,13 @@ export function listViewerMatchLaunches(viewer: LaunchViewer): Promise<MatchLaun
 /**
  * Contacts d'**un** match pour le bouton « Contacts » de sa carte : la même
  * présentation que la modale de lancement, aux mêmes destinataires (les
- * parties du match, caster éligible compris), mais dès que le match est
- * programmé et que le tournoi ait ou non la phase de lancement.
+ * parties du match, caster éligible compris), mais dès que les deux
+ * adversaires sont connus (à planifier compris), que le tournoi ait ou non la
+ * phase de lancement.
  *
  * @returns `null` quand le lecteur n'est pas partie du match, ou que le match
- *   n'est ni programmé, ni en lancement, ni lancé (`MATCH_CONTACTS_UNAVAILABLE`).
+ *   n'a pas ses deux adversaires, est terminé, ou son tournoi n'est pas en
+ *   cours (`MATCH_CONTACTS_UNAVAILABLE`).
  */
 export async function loadViewerMatchContacts(
   viewer: LaunchViewer,
@@ -558,7 +562,7 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
         const phase = matchLaunchPhase(toLaunchInput(row), now);
         return { row, phase, exposes: exposesContacts(phase, forCard) };
       })
-      .filter(({ phase }) => phase !== "NONE" && phase !== "TO_PLAN");
+      .filter(({ phase }) => phase !== "NONE" && (forCard || phase !== "TO_PLAN"));
     if (visible.length === 0) return [];
 
     const { rosterTeamIds, userIds } = collectContactIds(visible);

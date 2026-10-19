@@ -425,12 +425,12 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     linkLabels: ["See my Discord tag", "Read the “Match Discord direct messages” paragraph"],
   },
   "2026-10-contacts-de-match-avant-le-depart": {
-    title: "Your match contacts: visible as soon as the match is scheduled",
+    title: "Your match contacts: visible as soon as your opponents are known",
     summary:
-      "The players and the caster of your match can see the contacts shown at launch as soon as the match time is set, through the “Contacts” button on the match card.",
+      "The players and the caster of your match can see the contacts shown at launch as soon as both opponents of the match are known, even before its time is set, through the “Contacts” button on the match card.",
     details: [
       "It's the same information as at a match launch — the certified Discord tag and the BattleTag of one or two players per team, and those of the signed-up caster —, shown to the same people: only the parties to the match.",
-      "What changes is when: as soon as the match has its time and both teams, no longer only at its launch, so you can get organised ahead of time. They stop being visible once the match is over.",
+      "What changes is when: as soon as the match has both its opponents, with or without a set time, no longer only at its launch, so you can get organised ahead of time. They stop being visible once the match is over.",
       "The launch phase (“Ready” and the launch window) becomes an option of each tournament, off by default: without it, a match starts at its time and no “Ready” is recorded.",
     ],
   },
