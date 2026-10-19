@@ -156,10 +156,27 @@ export function contactsCardKey(card: ContactsCard | null): string {
  * ce qu'elle montre — lancement forcé, match reprogrammé ou remis à planifier,
  * caster qui s'inscrit ou se retire, adversaire corrigé, hôte changé, « Prêt » —,
  * une lecture par écriture ; jamais à l'horloge du navigateur, que la relecture
- * à l'heure du serveur couvre. Rien tant que la première lecture n'a pas abouti.
+ * à l'heure du serveur couvre. Rien tant que la première lecture n'a pas abouti,
+ * ni pour un `launchedAt` posé sur un match que la lecture disait déjà lancé
+ * (tournoi sans phase de lancement : l'écriture suit l'heure).
  */
-export function rereadOnCardChange(previousKey: string, nextKey: string, launch: MatchLaunchInfo | null): boolean {
-  return launch !== null && previousKey !== nextKey;
+export function rereadOnCardChange(
+  previous: ContactsCard | null,
+  next: ContactsCard | null,
+  launch: MatchLaunchInfo | null,
+): boolean {
+  if (launch === null || previous === null || next === null) return false;
+  return CARD_FIELDS.some((field) => {
+    if (previous[field] === next[field]) return false;
+    return field !== "launchedAt" || launch.phase !== "LAUNCHED";
+  });
+}
+
+/** Attente demandée par un refus de quota (`Retry-After`, en secondes), `null` sans. */
+export function parseRetryAfter(header: string | null): number | null {
+  if (header === null) return null;
+  const seconds = Number(header);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds * 1_000 : null;
 }
 
 /**
@@ -171,7 +188,9 @@ export function isFinalRefusal(code: string | null): boolean {
   return code === "MATCH_CONTACTS_UNAVAILABLE" || code === "UNAUTHORIZED" || code === "INVALID_MATCH_ID";
 }
 
-type ContactsRead = { launch: MatchLaunchInfo; serverDate: string | null } | { error: string | null };
+type ContactsRead =
+  | { launch: MatchLaunchInfo; serverDate: string | null }
+  | { error: string | null; retryAfterMs: number | null };
 
 type ReadOptions = {
   /** Heure de départ d'un match **pas encore lancé** ; `null` sinon. */
@@ -210,7 +229,7 @@ export async function readMatchContacts(matchId: number, options: ReadOptions): 
       attempt === 0 && error === "MATCH_CONTACTS_UNAVAILABLE"
         ? contactsRetryDelay(startAt, response.headers.get("date"))
         : null;
-    if (delay === null) return { error };
+    if (delay === null) return { error, retryAfterMs: parseRetryAfter(response.headers.get("retry-after")) };
     await wait(delay, signal);
   }
 }
@@ -245,27 +264,30 @@ export function MatchContactsDialog({
   const { t } = text;
   const { showError, showSuccess } = useToast();
   const titleId = useId();
-  // À la fermeture, la modale de lancement relit ses matchs : une ouverture
-  // d'office retenue pendant que « Contacts » était ouverte part alors.
-  const close = () => {
-    onClose();
-    window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
-  };
   const [mounted, setMounted] = useState(false);
   const [state, setState] = useState<LoadState>({ kind: "loading" });
+  const launch = state.kind === "ready" ? state.launch : null;
+  // À la fermeture, la modale de lancement relit ses matchs : une ouverture
+  // d'office retenue pendant que « Contacts » était ouverte part alors. Pas
+  // pour un arbitre : la modale de lancement ne lui présente rien.
+  const close = () => {
+    onClose();
+    if (launch?.viewer.role !== "REFEREE") window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
+  };
   useEffect(() => setMounted(true), []);
   const dialogRef = useDialogBehavior({ open: mounted, onClose: close });
   const backdrop = useBackdropDismiss(close);
   const [readKey, setReadKey] = useState(0);
   const [serverDate, setServerDate] = useState<string | null>(null);
-  const launch = state.kind === "ready" ? state.launch : null;
   const [rereadFailures, setRereadFailures] = useState(0);
+  // Attente demandée par le dernier refus de quota (`Retry-After`), 0 sans.
+  const [rereadWait, setRereadWait] = useState(0);
   const startAt = card?.startAt ?? null;
   const launchedAt = card?.launchedAt ?? null;
   // Empreinte de la carte vue par la dernière lecture réussie : un changement
   // survenu pendant la première lecture compte à son arrivée.
   const cardKey = contactsCardKey(card);
-  const previousCardKey = useRef(cardKey);
+  const previousCard = useRef(card);
   // Nouvelle relecture (départ, carte changée) : ses échecs se
   // comptent de zéro, quels qu'aient été ceux d'une relecture précédente.
   const rereadNow = () => {
@@ -274,16 +296,19 @@ export function MatchContactsDialog({
   };
   useEffect(() => {
     if (!launch) return;
-    if (rereadOnCardChange(previousCardKey.current, cardKey, launch)) rereadNow();
-    previousCardKey.current = cardKey;
+    if (rereadOnCardChange(previousCard.current, card, launch)) rereadNow();
+    previousCard.current = card;
+    // L'empreinte suit les champs de la carte, pas l'identité de l'objet.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cardKey, launch]);
 
-  // Relecture échouée : quelques nouvelles tentatives espacées.
+  // Relecture échouée : quelques nouvelles tentatives espacées, jamais avant
+  // l'attente qu'un refus de quota demande.
   useEffect(() => {
     if (!shouldRetryReread(rereadFailures)) return;
-    const timer = setTimeout(() => setReadKey((key) => key + 1), REREAD_RETRY_MS);
+    const timer = setTimeout(() => setReadKey((key) => key + 1), Math.max(REREAD_RETRY_MS, rereadWait));
     return () => clearTimeout(timer);
-  }, [rereadFailures]);
+  }, [rereadFailures, rereadWait]);
 
   // Contacts du caster en attente : une relecture à l'heure de départ du serveur.
   useEffect(() => {
@@ -309,6 +334,7 @@ export function MatchContactsDialog({
         if (!alive) return;
         if ("error" in read) {
           if (reread && !isFinalRefusal(read.error)) {
+            setRereadWait(read.retryAfterMs ?? 0);
             setRereadFailures((count) => count + 1);
             return;
           }
@@ -322,6 +348,7 @@ export function MatchContactsDialog({
       } catch {
         if (!alive) return;
         if (reread) {
+          setRereadWait(0);
           setRereadFailures((count) => count + 1);
           return;
         }
