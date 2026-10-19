@@ -406,17 +406,20 @@ function revokeIneligibleCasters(
   users: Map<number, UserRow>,
   revokedCasts: { matchId: number; casterId: number }[],
 ): Set<number> {
+  const now = Date.now();
   const revoked = new Set<number>();
   for (const { row } of visible) {
     if (row.caster_user_id === null) continue;
     const casterId = Number(row.caster_user_id);
     if (castEligibilityBlock(users.get(casterId)) !== null) {
       revoked.add(Number(row.id));
-      // Lancement **enregistré** (`launched_at`), pas la phase affichée : sur un
-      // tournoi sans phase de lancement, un match à l'heure passée se lit lancé
-      // avant que l'entretien ne l'écrive — c'est la dernière occasion de
-      // retirer l'inscription, qu'un match lancé garde ensuite.
-      if (rowLaunchState(row).launchedAt === null) revokedCasts.push({ matchId: Number(row.id), casterId });
+      // Phase jugée **allumée** — la règle même de `releaseIneligibleCast` : sur
+      // un tournoi sans phase de lancement, un match à l'heure passée se lit
+      // lancé avant que l'entretien ne l'écrive, et c'est la dernière occasion
+      // de retirer l'inscription, qu'un match lancé garde ensuite. Un report en
+      // attente vaut lancé, des deux côtés : rien n'est mis en file pour rien.
+      const recorded = matchLaunchPhase({ ...toLaunchInput(row), launchPhase: true }, now);
+      if (recorded !== "LAUNCHED") revokedCasts.push({ matchId: Number(row.id), casterId });
     }
   }
   return revoked;
