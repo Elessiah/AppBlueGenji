@@ -121,7 +121,7 @@ export async function createSession(userId: number, event: ConnectionLogEvent): 
 
 /**
  * L'ancien report « Plus tard » des conditions (`bg_terms_later`, plus posé
- * depuis la version 5 : la fenêtre est bloquante) n'est lié à aucun compte :
+ * depuis la version 6 : la fenêtre est bloquante) n'est lié à aucun compte :
  * un cookie resté d'avant tombe à chaque ouverture et fermeture de session.
  */
 function forgetTermsPostponement(cookieStore: Awaited<ReturnType<typeof cookies>>): void {

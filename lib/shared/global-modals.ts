@@ -20,7 +20,7 @@ export const LOGIN_PATH = "/connexion";
 
 /**
  * Ancien cookie de report « Plus tard » de la modale des conditions (douze
- * heures). Depuis la version 5 (2026-10-19), la modale est **bloquante** pour
+ * heures). Depuis la version 6 (2026-10-19), la modale est **bloquante** pour
  * tout compte connecté : plus aucun report n'est posé ni lu. Le nom reste
  * pour que connexion et déconnexion effacent un cookie déjà posé par un
  * navigateur (`lib/server/auth.ts`).
@@ -29,7 +29,7 @@ export const TERMS_POSTPONED_COOKIE = "bg_terms_later";
 
 /**
  * Pages où la fenêtre bloquante des conditions laisse passer, depuis la
- * version 5 (2026-10-19) : qui refuse les conditions doit encore pouvoir lire
+ * version 6 (2026-10-19) : qui refuse les conditions doit encore pouvoir lire
  * la politique de confidentialité et les pages légales, exporter ses
  * données ou supprimer son compte (« Mon profil »), sans accepter d'abord.
  */

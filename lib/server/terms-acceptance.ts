@@ -89,7 +89,7 @@ export async function assertTermsAccepted(userId: number, executor?: Executor): 
 /**
  * Ce compte connecté doit-il accepter les conditions en vigueur ?
  *
- * Depuis la version 5 (décision du 2026-10-19), **tout** compte en retard
+ * Depuis la version 6 (décision du 2026-10-19), **tout** compte en retard
  * d'une version les réaccepte, gérant d'équipe ou non : la mise en page racine
  * pose la question à chaque page et présente une fenêtre bloquante
  * (`TermsAcceptanceModal`). Avant, seuls les gérants d'équipe étaient

@@ -19,7 +19,7 @@
  *   accepte donc au premier passage sur le site ensuite, et la gestion lui est
  *   refusée tant qu'il ne l'a pas fait ;
  * - **connecté**, dans la fenêtre bloquante de la mise en page racine, pour
- *   tout compte en retard d'une version (`SIGNED_IN`, depuis la version 5 ;
+ *   tout compte en retard d'une version (`SIGNED_IN`, depuis la version 6 ;
  *   `TEAM_MANAGEMENT` si le compte gère une équipe).
  *
  * Module pur, importable partout.
@@ -55,8 +55,16 @@ import { STREAM_NOTICE_LIVE, STREAM_NOTICE_OBJECTION, STREAM_NOTICE_PRIVACY_PATH
  * communiquées aux deux équipes d'un match et à son caster le temps du match,
  * au titre de l'organisation du tournoi (base « exécution du contrat » du
  * registre T04) ; en vigueur au 19 octobre 2026 (décision de l'utilisateur).
+ *
+ * Version 6 : section « Acceptation » — tout compte connecté en retard d'une
+ * version accepte les conditions dans une fenêtre bloquante pour continuer à
+ * utiliser le site (plus seulement les gérants d'équipe, plus de report) ;
+ * section « Contacts de match » — le BattleTag masqué se lit aussi dans la
+ * fenêtre de lancement du match. La version 5, déjà en ligne, ne se réécrit
+ * pas : d'où une nouvelle version, annoncée par sa propre entrée de
+ * `PRIVACY_CHANGES` ; en vigueur au 19 octobre 2026.
  */
-export const TERMS_VERSION = 5;
+export const TERMS_VERSION = 6;
 
 /** Âge minimum pour créer un compte (défini dans `lib/shared/legal-durations.ts`). */
 export { SITE_MINIMUM_AGE };
@@ -246,7 +254,8 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
     ],
     links: [{ href: STREAM_NOTICE_PRIVACY_PATH, label: "Politique de confidentialité — retransmission des matchs" }],
   },
-  // Version 5 (2026-10-19) : la base « exécution du contrat » des contacts de
+  // Version 5 (2026-10-19, précisée en version 6 : fenêtre de lancement) : la
+  // base « exécution du contrat » des contacts de
   // match (registre T04, `/rgpd`) renvoie à cette section. Elle suit le code :
   // `match-launch-info.ts` (qui, quand) et `battletag-visibility.ts`.
   {

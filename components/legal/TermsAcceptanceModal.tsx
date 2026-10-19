@@ -45,7 +45,7 @@ interface TermsAcceptanceModalProps {
 
 /**
  * Conditions d'utilisation présentées à **tout compte connecté** qui n'a pas
- * accepté la version en vigueur (version 5 : décision du 2026-10-19, tous les
+ * accepté la version en vigueur (version 6 : décision du 2026-10-19, tous les
  * comptes la réacceptent, pas seulement les gérants d'équipe).
  *
  * La fenêtre est **bloquante** : ni « Plus tard », ni Échap, ni clic sur le

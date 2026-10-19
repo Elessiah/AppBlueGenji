@@ -830,15 +830,37 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     title: "Contacts de match : le caster seulement pendant le match, conditions d'utilisation mises à jour",
     publishedAt: "2026-10-19",
     summary:
-      "Le caster inscrit d'un match ne voit plus ses contacts que le temps du match, de son départ à sa fin, et les équipes les siens sur ce même temps ; ton BattleTag masqué ne se lit plus que dans la fenêtre « Contacts » de tes matchs, que les arbitres et les administrateurs ouvrent aux mêmes moments que les équipes, et dans leur fenêtre de lancement, au départ du match. Les conditions d'utilisation passent en version 5 pour le dire : chaque compte devra les accepter à sa prochaine visite.",
+      "Le caster inscrit d'un match ne voit plus ses contacts que le temps du match, de son départ à sa fin, et les équipes les siens sur ce même temps ; ton BattleTag masqué ne se lit plus que dans la fenêtre « Contacts » de tes matchs, que les arbitres et les administrateurs ouvrent aux mêmes moments que les équipes. Les conditions d'utilisation passent en version 5 pour le dire.",
     details: [
       "Caster : il ne voit le tag Discord certifié, le BattleTag (même masqué) et le rôle d'équipe des contacts d'un match que le temps du match — dès son départ (fenêtre de lancement ouverte, ou match lancé) et jusqu'à sa fin —, et plus dès que les deux adversaires sont connus. Symétriquement, les membres des deux équipes ne voient plus les contacts du caster que le temps du match ; ils gardent ceux des équipes dès que les deux adversaires sont connus, « À planifier » compris.",
-      "BattleTag masqué : il n'est plus lisible sur ta fiche par les joueurs de tes matchs, ni par les arbitres et les administrateurs pendant un tournoi. Il ne se lit plus que dans la fenêtre « Contacts » d'un match où tu es présenté comme contact, et dans sa fenêtre de lancement — par les deux équipes et par les arbitres et les administrateurs dès que les deux adversaires sont connus, par le caster le temps du match. Si tu ne veux pas qu'ils le voient, retire-le de ton profil (s'il vient de Battle.net, détache d'abord ton compte Battle.net — après avoir ajouté un autre moyen de connexion si c'est le seul). Cette lecture repose sur l'exécution du service — l'organisation du tournoi —, et non sur ton consentement.",
-      "Conditions d'utilisation : la version 5, en vigueur depuis le 19 octobre 2026, ajoute la section « Contacts de match », qui prévoit ce partage. Relis-les : chaque compte connecté doit les accepter pour continuer à utiliser le site — une fenêtre te les présente à ta prochaine page (tu peux aussi te déconnecter, lire cette politique, exporter tes données ou supprimer ton compte depuis ton profil), et la page de connexion te les présente de nouveau tant qu'elles n'ont pas été acceptées dans ton navigateur.",
+      "BattleTag masqué : il n'est plus lisible sur ta fiche par les joueurs de tes matchs, ni par les arbitres et les administrateurs pendant un tournoi. Il ne se lit plus que dans la fenêtre « Contacts » d'un match où tu es présenté comme contact — par les deux équipes et par les arbitres et les administrateurs dès que les deux adversaires sont connus, par le caster le temps du match. Si tu ne veux pas qu'ils le voient, retire-le de ton profil (s'il vient de Battle.net, détache d'abord ton compte Battle.net — après avoir ajouté un autre moyen de connexion si c'est le seul). Cette lecture repose sur l'exécution du service — l'organisation du tournoi —, et non sur ton consentement.",
+      "Conditions d'utilisation : la version 5, en vigueur depuis le 19 octobre 2026, ajoute la section « Contacts de match », qui prévoit ce partage. Relis-les : la page de connexion te les présente de nouveau tant qu'elles n'ont pas été acceptées dans ton navigateur et, si tu gères une équipe sans les avoir déjà acceptées, avant ton prochain geste de gestion.",
     ],
     links: [
       { href: "/conditions-utilisation#contacts-de-match", label: "Lire la section « Contacts de match »" },
       { href: "/rgpd#donnees-collectees", label: "Lire la section « Données collectées »" },
+    ],
+  },
+  // CONTACTS-FOLLOWUP-2 (décision de l'utilisateur du 2026-10-19) : l'entrée
+  // précédente (conditions v5) est déjà en ligne et ne se réécrit pas. Celle-ci
+  // annonce la version 6 : acceptation demandée à tout compte connecté dans une
+  // fenêtre bloquante (contexte `SIGNED_IN`, plus de cookie `bg_terms_later`),
+  // et BattleTag masqué lisible aussi dans la fenêtre de lancement du match.
+  // Datée du jour de la fusion prévue.
+  {
+    id: "2026-10-conditions-v6-acceptation-pour-tous",
+    title: "Conditions d'utilisation : version 6, à accepter par chaque compte",
+    publishedAt: "2026-10-19",
+    summary:
+      "Les conditions d'utilisation passent en version 6 : chaque compte connecté doit désormais les accepter pour continuer à utiliser le site, plus seulement les gérants d'équipe. Elles précisent aussi que ton BattleTag masqué se lit dans la fenêtre « Contacts » d'un match et dans sa fenêtre de lancement.",
+    details: [
+      "Acceptation : tant que tu n'as pas accepté la version en vigueur, une fenêtre te les présente à chaque page, que tu gères une équipe ou non. Elle ne se reporte plus : le bouton « Plus tard » et son cookie bg_terms_later disparaissent. Sans accepter, tu peux te déconnecter, lire cette politique, les mentions légales et la déclaration d'accessibilité, ou, depuis ton profil, exporter tes données ou supprimer ton compte. Ton acceptation est enregistrée avec la version, la date et l'endroit où tu l'as donnée (cette fenêtre, si tu ne gères aucune équipe).",
+      "BattleTag masqué : il reste visible pour tes adversaires, les admins et les arbitres pendant un match de tournoi, ainsi que pour son caster, dans la fenêtre « Contacts » du match et dans sa fenêtre de lancement, si tu fais partie des contacts présentés. La fenêtre de lancement, qui reprend ces contacts au départ du match, ne s'ouvre qu'aux deux équipes et au caster. Mêmes données, mêmes durées, même base : l'exécution du service.",
+      "Conditions d'utilisation : la version 6, en vigueur depuis le 19 octobre 2026, le dit dans ses sections « Acceptation » et « Contacts de match ».",
+    ],
+    links: [
+      { href: "/conditions-utilisation#acceptation", label: "Lire la section « Acceptation »" },
+      { href: "/conditions-utilisation#contacts-de-match", label: "Lire la section « Contacts de match »" },
     ],
   },
 ];

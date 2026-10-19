@@ -437,13 +437,24 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
   "2026-10-contacts-de-match-caster-et-conditions-v5": {
     title: "Match contacts: the caster only during the match, terms of use updated",
     summary:
-      "A match's registered caster now only sees its contacts while the match is being played, from its start to its end, and the teams see the caster's over that same time; your hidden BattleTag can now only be read in the “Contacts” window of your matches, which referees and administrators open at the same times as the teams, and in their launch window, at the start of the match. The terms of use move to version 5 to say so: every account will be asked to accept them on its next visit.",
+      "A match's registered caster now only sees its contacts while the match is being played, from its start to its end, and the teams see the caster's over that same time; your hidden BattleTag can now only be read in the “Contacts” window of your matches, which referees and administrators open at the same times as the teams. The terms of use move to version 5 to say so.",
     details: [
       "Caster: they only see the certified Discord tag, the BattleTag (even when hidden) and the team role of a match's contacts while the match is being played — from its start (launch window opened, or match launched) to its end —, no longer as soon as both opponents are known. Symmetrically, the members of both teams now only see the caster's contacts while the match is being played; they keep the teams' contacts as soon as both opponents are known, “To schedule” included.",
-      "Hidden BattleTag: it can no longer be read on your profile by the players of your matches, nor by referees and administrators during a tournament. It can now only be read in the “Contacts” window of a match where you are presented as a contact, and in its launch window — by both teams and by referees and administrators as soon as both opponents are known, by the caster while the match is being played. If you don't want them to see it, remove it from your profile (if it comes from Battle.net, unlink your Battle.net account first — after adding another way to log in if it is your only one). This reading is based on the performance of the service — running the tournament —, not on your consent.",
-      "Terms of use: version 5, in force since 19 October 2026, adds the “Match contacts” section, which provides for this sharing. Read them again: every logged-in account must accept them to keep using the site — a window shows them to you on your next page (you can also log out, read this policy, export your data or delete your account from your profile), and the login page shows them to you anew as long as they have not been accepted in your browser.",
+      "Hidden BattleTag: it can no longer be read on your profile by the players of your matches, nor by referees and administrators during a tournament. It can now only be read in the “Contacts” window of a match where you are presented as a contact — by both teams and by referees and administrators as soon as both opponents are known, by the caster while the match is being played. If you don't want them to see it, remove it from your profile (if it comes from Battle.net, unlink your Battle.net account first — after adding another way to log in if it is your only one). This reading is based on the performance of the service — running the tournament —, not on your consent.",
+      "Terms of use: version 5, in force since 19 October 2026, adds the “Match contacts” section, which provides for this sharing. Read them again: the login page shows them to you anew as long as they have not been accepted in your browser and, if you manage a team and have not already accepted them, before your next management action.",
     ],
     linkLabels: ["Read the “Match contacts” section", "Read the “Data collected” section"],
+  },
+  "2026-10-conditions-v6-acceptation-pour-tous": {
+    title: "Terms of use: version 6, to be accepted by every account",
+    summary:
+      "The terms of use move to version 6: every logged-in account must now accept them to keep using the site, no longer only team managers. They also specify that your hidden BattleTag can be read in a match's “Contacts” window and in its launch window.",
+    details: [
+      "Acceptance: as long as you have not accepted the version in force, a window shows them to you on every page, whether you manage a team or not. It can no longer be postponed: the “Later” button and its bg_terms_later cookie are gone. Without accepting, you can log out, read this policy, the legal notice and the accessibility statement, or, from your profile, export your data or delete your account. Your acceptance is recorded with the version, the date and where you gave it (this window, if you manage no team).",
+      "Hidden BattleTag: it remains visible to your opponents, admins and referees during a tournament match, and to its caster, in the match's “Contacts” window and in its launch window, if you are one of the contacts shown. The launch window, which repeats these contacts at the start of the match, only opens to both teams and the caster. Same data, same durations, same basis: the performance of the service.",
+      "Terms of use: version 6, in force since 19 October 2026, says so in its “Acceptance” and “Match contacts” sections.",
+    ],
+    linkLabels: ["Read the “Acceptance” section", "Read the “Match contacts” section"],
   },
 };
 

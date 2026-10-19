@@ -7,7 +7,7 @@ import { readJsonBody } from "@/lib/server/request-body";
 /**
  * Acceptation des conditions d'utilisation par un compte connecté — la fenêtre
  * bloquante présentée à tout compte en retard d'une version (depuis la
- * version 5). Contexte de la preuve : `TEAM_MANAGEMENT` si le compte gère une
+ * version 6). Contexte de la preuve : `TEAM_MANAGEMENT` si le compte gère une
  * équipe, `SIGNED_IN` sinon.
  *
  * Corps : `{ version: number }`, la version **montrée**. Une autre que la

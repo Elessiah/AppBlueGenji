@@ -126,7 +126,7 @@ async function pendingChangesFor(userId: number | undefined): Promise<PrivacyCha
 
 /**
  * Le compte a-t-il accepté les conditions en vigueur ? (Tout compte connecté,
- * gérant d'équipe ou non, depuis la version 5.)
+ * gérant d'équipe ou non, depuis la version 6.)
  * Même tolérance que la lecture des changements de confidentialité : une panne
  * ne fait pas tomber la page, la question sera reposée au chargement suivant —
  * et les gestes de gestion restent refusés côté serveur entre-temps.
