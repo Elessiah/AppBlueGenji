@@ -134,8 +134,8 @@ Permettre à l'organisation de joindre un joueur engagé (reprogrammer, trancher
 Sous-finalités
 Exposer le pseudo Discord certifié aux administrateurs, à tout moment, et aux arbitres tant que le joueur est inscrit à un tournoi qui n'est pas terminé (dès la phase d'inscription)
 Ouvrir aux administrateurs et aux arbitres le BattleTag masqué d'un joueur, tant qu'il est inscrit à un tournoi qui n'est pas terminé
-Au lancement d'un match — et dès que ses deux adversaires sont connus, par le bouton « Contacts » de sa carte —, présenter aux joueurs des deux équipes et au caster inscrit le pseudo Discord certifié et le BattleTag d'un ou deux joueurs par équipe, et ceux du caster, jusqu'à la fin du match
-Recueillir les « Prêt » de chaque partie d'un match (équipes, caster) avant son lancement
+Au lancement d'un match — et dès que ses deux adversaires sont connus, par le bouton « Contacts » de sa carte —, présenter aux membres des deux équipes (joueurs, coachs, managers, propriétaires) et au caster inscrit le pseudo Discord certifié et le BattleTag d'un ou deux membres par équipe, et ceux du caster, jusqu'à la fin du match
+Recueillir les « Prêt » de chaque partie d'un match (équipes, caster) avant son lancement, dans les seuls tournois qui ont la phase de lancement (option de chaque tournoi, éteinte par défaut)
 Envoyer en message privé Discord et en push l'annonce de l'horaire d'un match (posé, changé ou retiré), l'avis qu'un match quitte son programme et les rappels de match 24 h et 10 h avant le coup d'envoi (le second — ou l'annonce d'un match programmé moins de 10 h avant — avec le lien d'invitation au serveur Discord du check-in) ; les messages privés ne partent qu'aux comptes dont le tag Discord est certifié (un tag non certifié, même rattaché par la connexion Discord, n'en reçoit aucun, pour éviter le spam) ; le joueur peut couper ces messages privés depuis « Mon profil » (notifications), ses notifications push gardant leurs propres réglages
 Alerter le rôle arbitre (conflit de score, score resté trop longtemps sans confirmation, signalement d'un joueur)
 Envoyer aux arbitres, environ 10 h à l'avance, le programme des matchs à venir (horaires, tournois, noms d'équipe ; « un joueur » en tournoi individuel) au canal de logs Discord et en push
@@ -163,7 +163,7 @@ Traces d'envoi des rappels, alertes et programmes d'arbitrage (match, palier et 
 « Prêt » et caster d'un match : conservés avec le match ; le caster d'un compte supprimé est retiré des matchs non joués
 Destinataires
 Administrateurs et arbitres de l'association
-Joueurs et caster d'un même match, dès que ses deux adversaires sont connus et jusqu'à sa fin
+Membres des deux équipes et caster d'un même match, dès que ses deux adversaires sont connus et jusqu'à sa fin
 Discord, qui achemine les messages
 Staff de l'association ayant accès au canal de logs Discord (programme d'arbitrage, traitement T05)
 Service de push du navigateur de chaque destinataire abonné (joueur : annonces et rappels de match ; arbitre ou administrateur : programme d'arbitrage ; traitement T12), qui achemine un message chiffré qu'il ne peut pas lire

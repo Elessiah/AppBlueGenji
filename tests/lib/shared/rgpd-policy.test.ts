@@ -36,7 +36,7 @@ describe("contacts du lancement d'un match — base légale", () => {
       const entry = DONNEES_PROFIL.find((d) => d.donnee === donnee);
       expect(entry?.base).toBe("Consentement");
       expect(entry?.extraBases?.[0]).toEqual(
-        { base: "Exécution du contrat", scope: "présentation aux joueurs et au caster de ton match, dès que ses deux adversaires sont connus" },
+        { base: "Exécution du contrat", scope: "présentation aux membres des deux équipes et au caster de ton match, dès que ses deux adversaires sont connus" },
       );
       expect(entry?.finalite).not.toMatch(/non sur ce consentement/);
     }
