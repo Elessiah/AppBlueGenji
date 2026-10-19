@@ -203,7 +203,8 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   mention de tête — une mention grise qui n'a notifié personne aurait l'air
   d'une panne. Un bot d'une version antérieure ignore `mention`,
   `streamUrls`, `editMessageId` et `notify`, et ne rend pas d'identifiant :
-  chaque match repart dans un nouveau message **`@everyone`**, public
+  chaque direct et chaque fin de match (mise à jour) repartent dans un nouveau
+  message **`@everyone`**, public
   StreamViewer compris, jetons `{{lien:N}}` laissés bruts. D'où l'ordre de
   déploiement : **bot d'abord**, et jamais de retour à un bot antérieur tant
   que `LIVE_ANNOUNCEMENTS_ENABLED` est posé. Une publication incertaine
