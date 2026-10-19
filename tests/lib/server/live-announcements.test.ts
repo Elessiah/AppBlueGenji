@@ -11,10 +11,13 @@ import { isBotCircuitOpen, pushLiveEvening, type LiveAnnouncementOutcome } from 
 import {
   LIVE_ANNOUNCE_MAX_AGE_MINUTES,
   LIVE_ANNOUNCE_RETRY_DELAY_MS,
+  LIVE_EVENING_REFRESH_DELAY_MS,
   dispatchLiveAnnouncements,
   liveAnnouncementsEnabled,
   liveEntrantName,
   purgeEndedEvenings,
+  refreshLiveEvenings,
+  requestLiveEveningRefresh,
   resetLiveAnnouncementThrottle,
   runLiveAnnouncementSweep,
   soloPseudoRegisteredSince,
@@ -1034,14 +1037,14 @@ describe("soirées d'annonces", () => {
     expect(request.notify).toBeUndefined();
   });
 
-  it("un match fini depuis son annonce n'est plus listé, un match réservé par ce passage l'est toujours", async () => {
+  it("un match fini depuis son annonce reste listé, « Terminé » avec son score, après le match réservé par ce passage", async () => {
     const { evening } = mockDb([AUTO_LIVE]);
-    const finished = { ...AUTO_LIVE, id: 39, status: "COMPLETED", team1_name: "Fini" };
+    const finished = { ...AUTO_LIVE, id: 39, status: "COMPLETED", team1_name: "Fini", team1_score: 2, team2_score: 1 };
     evening.mockImplementation(async (sql) => (sql.includes("FROM bg_live_evenings") ? [[EVENING]] : [[finished]]));
     await runLiveAnnouncementSweep(NOW);
     const [request] = jest.mocked(pushLiveEvening).mock.calls[0];
-    expect(request.message).not.toContain("Fini");
-    expect(request.message).toContain("Renards contre Nova");
+    expect(request.message).toContain("· Terminé · 2-1\nFini contre Nova");
+    expect(request.message.indexOf("Renards contre Nova")).toBeLessThan(request.message.indexOf("Fini contre Nova"));
   });
 
   it("message de soirée parti sans mention : gardé `silent`, sa modification n'en écrit pas", async () => {
@@ -1234,7 +1237,7 @@ describe("soirées d'annonces", () => {
     expect(execute.mock.calls.some(([sql]) => sql.includes("SET refused = 1"))).toBe(true);
   });
 
-  it("un match annoncé puis sorti de l'antenne (AUTO rouvert, MANUAL fermé) n'est plus listé, à aucune heure", async () => {
+  it("un match annoncé puis rouvert (AUTO) n'est plus listé ; antenne fermée (MANUAL) : « Terminé » sans score", async () => {
     const joined = { ...AUTO_LIVE, id: 41, pairing: "3:4", launch_pairing: "3:4" };
     const { evening } = mockDb([joined]);
     // Annoncé plus tôt, puis rouvert pour une autre affiche : plus de lancement pour la courante.
@@ -1247,7 +1250,8 @@ describe("soirées d'annonces", () => {
     );
     await runLiveAnnouncementSweep(NOW);
     const [request] = jest.mocked(pushLiveEvening).mock.calls[0];
-    expect(request.message).not.toMatch(/Remplaçants|Fermés/);
+    expect(request.message).not.toContain("Remplaçants");
+    expect(request.message).toMatch(/· Terminé\nFermés contre Nova/);
     expect(request.message).toContain("Renards contre Nova");
   });
 
@@ -1327,5 +1331,157 @@ describe("soirées d'annonces", () => {
     expect(request.message).toContain("Kiro contre Ayla");
     expect(request.logMessage).toContain("un joueur contre un joueur");
     expect(request.logMessage).not.toMatch(/Kiro|Ayla/);
+  });
+});
+
+describe("mise à jour de la soirée aux fins de match", () => {
+  /** Soirée ouverte au message publié, public StreamViewer (chaîne du caster). */
+  const OPEN = { ...EVENING, target: "stream-viewer", discord_message_id: "123456789012345678", notified: 1 };
+  const DONE = { ...AUTO_LIVE, status: "COMPLETED", team1_score: 2, team2_score: 1 };
+
+  /** Soirées lues par la mise à jour, puis matchs de chacune. */
+  function mockRefresh(evenings: unknown[], matches: unknown[]): Db {
+    const db = mockDb([]);
+    db.evening.mockImplementation(async (sql) => (sql.includes("FROM bg_live_evenings") ? [evenings] : [matches]));
+    return db;
+  }
+
+  it("un match fini : le message de la soirée est modifié, « Terminé » avec le score, sans notification ni nouveau message", async () => {
+    const { evening } = mockRefresh([OPEN], [DONE]);
+    expect(await refreshLiveEvenings(NOW)).toBe(1);
+    expect(pushLiveEvening).toHaveBeenCalledTimes(1);
+    const [request] = jest.mocked(pushLiveEvening).mock.calls[0];
+    expect(request.editMessageId).toBe("123456789012345678");
+    expect(request.refresh).toBe(true);
+    expect(request.mention).toBe("stream-viewer");
+    // Message qui a notifié : sa mention reste écrite (une modification ne notifie jamais).
+    expect(request.notify).toBeUndefined();
+    expect(request.message).toContain("**21:58** · Terminé · 2-1\nRenards contre Nova");
+    expect(request.message).not.toContain("En direct");
+    expect(request.context).toBe("live-refresh soiree-3 tournoi-4 match-40");
+    // Fenêtre en cours, message gardé, soirée non close ; le tournoi clos par ce match reste lu.
+    const [select] = evening.mock.calls[0];
+    expect(select).toContain("window_end > NOW() AND closed = 0 AND discord_message_id IS NOT NULL");
+    const read = evening.mock.calls.find(([sql]) => sql.includes("a.sent_at >= ?"));
+    expect(read?.[0]).toContain("t.state IN ('RUNNING', 'FINISHED')");
+    expect(read?.[0]).toContain("OR (t.state = 'RUNNING' AND m.live_trigger = 'START_TIME'");
+  });
+
+  it("forfait ou score en attente : « Terminé » seul", async () => {
+    const forfeit = { ...DONE, forfeit_team_id: 2, team1_score: null, team2_score: null };
+    const pending = { ...AUTO_LIVE, id: 41, status: "AWAITING_CONFIRMATION", team1_score: 3, team2_score: 0, team1_name: "Attente" };
+    mockRefresh([OPEN], [forfeit, pending]);
+    await refreshLiveEvenings(NOW);
+    const [request] = jest.mocked(pushLiveEvening).mock.calls[0];
+    expect(request.message).toContain("**21:58** · Terminé\nRenards contre Nova");
+    expect(request.message).toContain("**21:58** · Terminé\nAttente contre Nova");
+    expect(request.message).not.toMatch(/\d-\d/);
+  });
+
+  it("message de la soirée parti sans mention : la modification n'en écrit pas (`notify: false`)", async () => {
+    mockRefresh([{ ...OPEN, silent: 1 }], [DONE]);
+    await refreshLiveEvenings(NOW);
+    expect(jest.mocked(pushLiveEvening).mock.calls[0][0].notify).toBe(false);
+  });
+
+  it("texte inchangé depuis la dernière publication : aucune modification", async () => {
+    mockRefresh([OPEN], [DONE]);
+    expect(await refreshLiveEvenings(NOW)).toBe(1);
+    expect(await refreshLiveEvenings(NOW)).toBe(0);
+    expect(pushLiveEvening).toHaveBeenCalledTimes(1);
+  });
+
+  it("texte déjà publié par l'annonce d'un direct : la mise à jour ne le renvoie pas", async () => {
+    const { evening } = mockDb([AUTO_LIVE]);
+    evening.mockImplementation(async (sql) => (sql.includes("FROM bg_live_evenings") ? [[OPEN]] : [[AUTO_LIVE]]));
+    await runLiveAnnouncementSweep(NOW);
+    expect(pushLiveEvening).toHaveBeenCalledTimes(1);
+    expect(await refreshLiveEvenings(NOW)).toBe(0);
+    expect(pushLiveEvening).toHaveBeenCalledTimes(1);
+  });
+
+  it("fenêtre finie (aucune soirée ouverte lue) : rien n'est modifié", async () => {
+    mockRefresh([], [DONE]);
+    expect(await refreshLiveEvenings(NOW)).toBe(0);
+    expect(pushLiveEvening).not.toHaveBeenCalled();
+  });
+
+  it("bot en panne : ni lecture ni envoi ; bot injoignable : aucune exception, une relance programmée", async () => {
+    jest.mocked(isBotCircuitOpen).mockReturnValue(true);
+    const { evening } = mockRefresh([OPEN], [DONE]);
+    expect(await refreshLiveEvenings(NOW)).toBe(0);
+    expect(evening).not.toHaveBeenCalled();
+    jest.mocked(isBotCircuitOpen).mockReturnValue(false);
+    pushLiveAnnouncement.mockResolvedValue("unavailable");
+    jest.useFakeTimers();
+    try {
+      expect(await refreshLiveEvenings(NOW)).toBe(0);
+      expect(jest.getTimerCount()).toBe(1);
+      // Le texte n'a pas été retenu : la relance le renvoie.
+      pushLiveAnnouncement.mockResolvedValue("posted");
+      await jest.advanceTimersByTimeAsync(LIVE_EVENING_REFRESH_DELAY_MS);
+      expect(pushLiveEvening).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("refus du bot : le même texte n'est pas renvoyé, rien n'est relancé", async () => {
+    pushLiveAnnouncement.mockResolvedValue("rejected");
+    mockRefresh([OPEN], [DONE]);
+    jest.useFakeTimers();
+    try {
+      await refreshLiveEvenings(NOW);
+      expect(jest.getTimerCount()).toBe(0);
+      await refreshLiveEvenings(NOW);
+      expect(pushLiveEvening).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("message supprimé de #live : la soirée est close, rien n'est reposté", async () => {
+    pushLiveAnnouncement.mockResolvedValue("evening-deleted");
+    const { execute } = mockRefresh([OPEN], [DONE]);
+    await refreshLiveEvenings(NOW);
+    expect(execute.mock.calls.some(([sql]) => sql === "UPDATE bg_live_evenings SET closed = 1 WHERE id = ?")).toBe(true);
+  });
+
+  it("suite postée (message plus modifiable) : son identifiant remplace l'ancien, marquée sans mention", async () => {
+    jest.mocked(pushLiveEvening).mockResolvedValue({ outcome: "posted", messageId: "223456789012345678" });
+    const { execute } = mockRefresh([OPEN], [DONE]);
+    await refreshLiveEvenings(NOW);
+    const update = execute.mock.calls.find(([sql]) => sql.startsWith("UPDATE bg_live_evenings SET discord_message_id"));
+    expect(update?.[1]).toEqual(["223456789012345678", 1, 3]);
+  });
+
+  it("rafale de fins de match : une seule mise à jour par public au bout d'une minute", async () => {
+    const viewer = { ...AUTO_LIVE, status: "COMPLETED", team1_score: 1, team2_score: 0 };
+    const official = { ...DONE, id: 50, live_url: OFFICIAL };
+    mockRefresh([OPEN, { ...OPEN, id: 4, target: "everyone" }], [viewer, official]);
+    jest.useFakeTimers();
+    try {
+      for (let i = 0; i < 5; i++) requestLiveEveningRefresh();
+      expect(jest.getTimerCount()).toBe(1);
+      await jest.advanceTimersByTimeAsync(LIVE_EVENING_REFRESH_DELAY_MS - 1);
+      expect(pushLiveEvening).not.toHaveBeenCalled();
+      await jest.advanceTimersByTimeAsync(1);
+      expect(pushLiveEvening).toHaveBeenCalledTimes(2);
+      const mentions = jest.mocked(pushLiveEvening).mock.calls.map(([request]) => request.mention);
+      expect(mentions).toEqual(["stream-viewer", "everyone"]);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("annonces désactivées : aucune mise à jour programmée", () => {
+    jest.replaceProperty(process, "env", { ...process.env, LIVE_ANNOUNCEMENTS_ENABLED: undefined });
+    jest.useFakeTimers();
+    try {
+      requestLiveEveningRefresh();
+      expect(jest.getTimerCount()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

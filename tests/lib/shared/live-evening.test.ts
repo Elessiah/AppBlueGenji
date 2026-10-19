@@ -147,3 +147,37 @@ describe("formatLiveEvening", () => {
     expect(LIVE_EVENING_WINDOW_HOURS).toBe(4);
   });
 });
+
+describe("formatLiveEvening — matchs terminés", () => {
+  const AT_22 = AT_21 + 60 * 60 * 1000;
+
+  it("« Terminé · 2-1 » avec le score, « Terminé » seul sans score, jamais « En direct »", () => {
+    const { text } = formatLiveEvening([
+      stream({ live: false, finished: { score: [2, 1] } }),
+      stream({ live: false, finished: { score: null }, team1Name: "Forfait" }),
+    ]);
+    expect(text).toContain("**21:00** · Terminé · 2-1\nRenards contre Nova — Coupe d'hiver\n{{lien:1}}");
+    expect(text).toContain("**21:00** · Terminé\nForfait contre Nova");
+    expect(text).not.toContain("En direct");
+  });
+
+  it("à l'antenne, puis programmés, puis terminés, chacun par heure", () => {
+    const { text } = formatLiveEvening([
+      stream({ live: false, finished: { score: [0, 2] }, team1Name: "Fini" }),
+      stream({ live: false, startsAt: AT_22, team1Name: "Plus tard" }),
+      stream({ team1Name: "Direct" }),
+    ]);
+    const order = ["Direct", "Plus tard", "Fini"].map((name) => text.indexOf(`${name} contre`));
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+  });
+
+  it("trop long : les matchs terminés sont comptés avant les matchs à venir", () => {
+    const finished = Array.from({ length: 30 }, (_, i) =>
+      stream({ live: false, finished: { score: [1, 0] }, team1Name: `Fini${i}`, startsAt: AT_21 - i }),
+    );
+    const { text } = formatLiveEvening([...finished, stream({ live: false, startsAt: AT_22, team1Name: "Ensuite" })]);
+    expect(text.length).toBeLessThanOrEqual(LIVE_ANNOUNCEMENT_MAX_LENGTH);
+    expect(text).toContain("Ensuite contre Nova");
+    expect(text).toMatch(/… et \d+ autres matchs ce soir$/);
+  });
+});
