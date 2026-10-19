@@ -529,7 +529,9 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     const ui = () => <PlayerScoreDialog tournamentId={1} match={disputed} myTeamId={10} canReportScore canForfeit proposals={[]} onClose={noop} onSubmitted={noop} onRefresh={noop} />;
     const fr = render("fr", ui());
     expect(fr).toContain("la saisie est verrouillée pour les deux équipes, forfait compris");
-    expect(fr).toContain('aria-describedby="player-score-locked"');
+    // Région d'état remplie, pas de description de modale en plus : le verrou ne s'annonce qu'une fois.
+    expect(fr).toMatch(/<output id="player-score-locked" class="[^"]+">Score en litige/);
+    expect(fr).not.toContain('aria-describedby="player-score-locked"');
     expect(fr).not.toContain('type="submit"');
     expect(fr).not.toContain("player-score-forfeit");
     expect(fr).not.toContain("player-score-map-");
@@ -540,12 +542,28 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     expectNoFrench(en);
   });
 
+  it("score (engagé) en litige : sa propre proposition reste lisible, codes compris", () => {
+    // À score égal, ce sont les codes qui diffèrent : sans les siens, rien à comparer ni à citer à l'arbitre.
+    const withMaps = {
+      ...disputed,
+      team1Report: { ...disputed.team1Report, team1Score: 1, team2Score: 0, maps: [{ mapNumber: 1, team1Score: 2, team2Score: 0, replayCode: "MINE11" }] },
+      team2Report: { ...disputed.team2Report, team1Score: 1, team2Score: 0, maps: [{ mapNumber: 1, team1Score: 2, team2Score: 0, replayCode: "THEIR2" }] },
+    };
+    const ui = () => <PlayerScoreDialog tournamentId={1} match={withMaps} myTeamId={10} canReportScore canForfeit proposals={[]} onClose={noop} onSubmitted={noop} onRefresh={noop} />;
+    for (const locale of ["fr", "en"] as const) {
+      const html = render(locale, ui());
+      expect(html).toContain("MINE11");
+      expect(html).toContain("THEIR2");
+    }
+    expectNoFrench(render("en", ui()));
+  });
+
   it("validation d'office : l'heure de Paris, mentionnée, sur la carte et dans la fenêtre", () => {
     // 12:30 UTC = 14:30 à Paris (heure d'été), quel que soit le fuseau de la machine.
     const pending = { ...versus, status: "AWAITING_CONFIRMATION" as const, team1Report: disputeReport(2, 1, "2026-05-05T10:00:00.000Z"), scoreDeadlineAt: "2026-05-05T12:30:00.000Z" };
     const card = (locale: "fr" | "en") => renderPage(locale, <MatchRow match={pending} adminResolvable={false} onOpenAdminModal={noop} scoreLocked={false} roundNumber={2} />);
-    expect(card("fr")).toContain("2 – 1 proposé par Alpha · validé automatiquement à 14:30 (heure de Paris) sans réponse");
-    expect(card("en")).toContain("2 – 1 proposed by Alpha · confirmed automatically at 14:30 (Paris time) without an answer");
+    expect(card("fr")).toContain("2 – 1 proposé par Alpha · validation automatique à 14:30 (heure de Paris) sans réponse");
+    expect(card("en")).toContain("2 – 1 proposed by Alpha · automatic confirmation at 14:30 (Paris time) without an answer");
     const dialog = (myTeamId: number) => <PlayerScoreDialog tournamentId={1} match={pending} myTeamId={myTeamId} canReportScore canForfeit proposals={[]} onClose={noop} onSubmitted={noop} onRefresh={noop} />;
     expect(render("fr", dialog(11))).toContain("Sans réponse, ce score sera validé automatiquement à 14:30 (heure de Paris).");
     expect(render("en", dialog(11))).toContain("With no answer, this score will be confirmed automatically at 14:30 (Paris time).");
@@ -573,7 +591,6 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     expect(source).toContain('t("score.player.counterWarning", { opponent: opponentName })');
     // Avertissement et verrou rattachés : lus au bouton d'envoi, et avec la modale quand le focus y revient.
     expect(source).toContain('aria-describedby={opensDispute ? "player-score-counter-warning" : undefined}');
-    expect(source).toContain('aria-describedby={disputeLocked ? "player-score-locked" : undefined}');
     // Refus « litige ouvert » : la modale relit l'état, à l'envoi comme au forfait.
     expect(source).toContain('new Set(["PROPOSAL_STALE", SCORE_LOCKED_DISPUTE])');
     expect(source.match(/if \(REFRESH_ON_REFUSAL\.has\(code\)\)/g)).toHaveLength(2);
