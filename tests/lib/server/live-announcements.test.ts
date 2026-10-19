@@ -494,7 +494,7 @@ describe("runLiveAnnouncementSweep", () => {
     jest.mocked(pushLiveAnnouncement).mockResolvedValue("unavailable");
     const { execute } = mockDb([AUTO_LIVE]);
     execute.mockImplementation(async (sql) => {
-      if (sql.startsWith("INSERT IGNORE") || sql.startsWith("UPDATE bg_live_announcements")) return [{ affectedRows: 1 }];
+      if (/^(INSERT IGNORE|UPDATE bg_live_)/.test(sql)) return [{ affectedRows: 1 }];
       throw new Error("DB_DOWN");
     });
     await runLiveAnnouncementSweep(NOW);
@@ -887,7 +887,7 @@ describe("soirées d'annonces", () => {
     expect(sqls).toContain(
       "INSERT INTO bg_live_evenings (target, started_at, window_end) VALUES (?, NOW(), NOW() + INTERVAL 4 HOUR)",
     );
-    const update = execute.mock.calls.find(([text]) => text.startsWith("UPDATE bg_live_evenings"));
+    const update = execute.mock.calls.find(([text]) => text.startsWith("UPDATE bg_live_evenings SET discord_message_id"));
     expect(update?.[1]).toEqual(["123456789012345678", 0, 3]);
     // Premier message qui notifie : la fenêtre part de son envoi, pas d'un essai reporté.
     expect(update?.[0]).toContain("window_end = GREATEST(window_end, NOW() + INTERVAL 4 HOUR)");
@@ -1097,6 +1097,103 @@ describe("soirées d'annonces", () => {
     const message = jest.mocked(pushLiveAnnouncement).mock.calls[0][0];
     expect(message).toContain("un joueur contre un joueur — Coupe d'hiver");
     expect(message).not.toMatch(/Lucas|Emma/);
+  });
+
+  it("premier message qui notifie : la soirée est marquée notifiée, fenêtre repartie, avant l'envoi", async () => {
+    const { execute } = mockDb([AUTO_LIVE]);
+    await runLiveAnnouncementSweep(NOW);
+    const mark = execute.mock.calls.find(([sql]) => sql.startsWith("UPDATE bg_live_evenings SET notified = 1"));
+    expect(mark?.[0]).toBe(
+      "UPDATE bg_live_evenings SET notified = 1, window_end = GREATEST(window_end, NOW() + INTERVAL 4 HOUR) WHERE id = ?",
+    );
+    expect(mark?.[1]).toEqual([3]);
+    const markOrder = execute.mock.invocationCallOrder[execute.mock.calls.indexOf(mark!)];
+    expect(markOrder).toBeLessThan(jest.mocked(pushLiveEvening).mock.invocationCallOrder[0]);
+    expect(jest.mocked(pushLiveEvening).mock.calls[0][0].notify).toBeUndefined();
+  });
+
+  it("soirée marquée notifiée sans identifiant gardé (tournoi fini depuis) : nouveau message sans notification", async () => {
+    // Premier envoi d'issue incertaine pour un tournoi fini depuis : sa réservation
+    // n'est plus lue, la marque de la soirée suffit — jamais deux notifications.
+    const { execute, evening } = mockDb([AUTO_LIVE]);
+    evening.mockImplementation(async (sql) =>
+      sql.includes("FROM bg_live_evenings") ? [[{ ...EVENING, notified: 1 }]] : [[AUTO_LIVE]],
+    );
+    await runLiveAnnouncementSweep(NOW);
+    expect(jest.mocked(pushLiveEvening).mock.calls[0][0].notify).toBe(false);
+    expect(execute.mock.calls.some(([sql]) => sql.includes("SET notified"))).toBe(false);
+  });
+
+  it("marque de la soirée impossible : rien ne part, réservation rendue", async () => {
+    const { execute } = mockDb([AUTO_LIVE]);
+    const base = execute.getMockImplementation()!;
+    execute.mockImplementation(async (sql, params) => {
+      if (sql.startsWith("UPDATE bg_live_evenings SET notified = 1")) throw new Error("DB_DOWN");
+      return base(sql, params);
+    });
+    expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
+    expect(pushLiveEvening).not.toHaveBeenCalled();
+    expect(releasesOf(execute)).toEqual([[40, "1:2"]]);
+  });
+
+  it.each(["rejected", "discord-refused"] satisfies LiveAnnouncementOutcome[])(
+    "premier envoi refusé (%s) : la soirée n'est plus notifiée et le refus sort de la soirée, réservation gardée",
+    async (outcome) => {
+      jest.mocked(pushLiveAnnouncement).mockResolvedValue(outcome);
+      const { execute } = mockDb([AUTO_LIVE]);
+      await runLiveAnnouncementSweep(NOW);
+      expect(execute.mock.calls).toContainEqual(["UPDATE bg_live_evenings SET notified = 0 WHERE id = ?", [3]]);
+      const unstamp = execute.mock.calls.find(([sql]) => sql.includes("SET sent_at = ? - INTERVAL 1 SECOND"));
+      expect(unstamp?.[1]).toEqual([EVENING.started_at, 40, "1:2"]);
+      expect(releasesOf(execute)).toEqual([]);
+    },
+  );
+
+  it("premier envoi reporté (bot injoignable) : la soirée n'est plus notifiée, réservation rendue", async () => {
+    jest.mocked(pushLiveAnnouncement).mockResolvedValue("unavailable");
+    const { execute } = mockDb([AUTO_LIVE]);
+    await runLiveAnnouncementSweep(NOW);
+    expect(execute.mock.calls).toContainEqual(["UPDATE bg_live_evenings SET notified = 0 WHERE id = ?", [3]]);
+    expect(execute.mock.calls.some(([sql]) => sql.includes("- INTERVAL 1 SECOND"))).toBe(false);
+    expect(releasesOf(execute)).toEqual([[40, "1:2"]]);
+  });
+
+  it("premier envoi d'issue incertaine (délai écoulé) : la soirée reste notifiée", async () => {
+    jest.mocked(pushLiveAnnouncement).mockResolvedValue("timed-out");
+    const { execute } = mockDb([AUTO_LIVE]);
+    await runLiveAnnouncementSweep(NOW);
+    expect(execute.mock.calls.some(([sql]) => sql.includes("SET notified = 0"))).toBe(false);
+    expect(execute.mock.calls.some(([sql]) => sql.includes("- INTERVAL 1 SECOND"))).toBe(false);
+  });
+
+  it("refus d'une modification de la soirée : la marque reste, le refus sort de la soirée", async () => {
+    jest.mocked(pushLiveAnnouncement).mockResolvedValue("rejected");
+    const { execute, evening } = mockDb([AUTO_LIVE]);
+    evening.mockImplementation(async (sql) =>
+      sql.includes("FROM bg_live_evenings")
+        ? [[{ ...EVENING, discord_message_id: "123456789012345678", notified: 1 }]]
+        : [[AUTO_LIVE]],
+    );
+    await runLiveAnnouncementSweep(NOW);
+    expect(execute.mock.calls.some(([sql]) => sql.includes("SET notified"))).toBe(false);
+    expect(execute.mock.calls.some(([sql]) => sql.includes("- INTERVAL 1 SECOND"))).toBe(true);
+  });
+
+  it("un match annoncé puis sorti de l'antenne (AUTO rouvert, MANUAL fermé) n'est plus listé, à aucune heure", async () => {
+    const joined = { ...AUTO_LIVE, id: 41, pairing: "3:4", launch_pairing: "3:4" };
+    const { evening } = mockDb([joined]);
+    // Annoncé plus tôt, puis rouvert pour une autre affiche : plus de lancement pour la courante.
+    const reopened = { ...AUTO_LIVE, pairing: "1:9", launch_pairing: "1:2", team2_name: "Remplaçants" };
+    const closed = { ...AUTO_LIVE, id: 42, live_trigger: "MANUAL", live_started_at: null, team1_name: "Fermés" };
+    evening.mockImplementation(async (sql) =>
+      sql.includes("FROM bg_live_evenings")
+        ? [[{ ...EVENING, discord_message_id: "123456789012345678" }]]
+        : [[reopened, closed, joined]],
+    );
+    await runLiveAnnouncementSweep(NOW);
+    const [request] = jest.mocked(pushLiveEvening).mock.calls[0];
+    expect(request.message).not.toMatch(/Remplaçants|Fermés/);
+    expect(request.message).toContain("Renards contre Nova");
   });
 
   it("soirée illisible : réservation rendue, annonce reportée", async () => {
