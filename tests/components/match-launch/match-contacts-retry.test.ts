@@ -9,6 +9,7 @@ import {
   REREAD_RETRY_MS,
   isFinalRefusal,
   contactsCardKey,
+  parseRetryAfter,
   rereadOnCardChange,
   type ContactsCard,
   shouldRetryReread,
@@ -92,7 +93,7 @@ describe("readMatchContacts", () => {
   it("toujours indisponible : le refus est rendu, sans troisième lecture", async () => {
     const fetchMock = jest.spyOn(globalThis, "fetch").mockImplementation(async () => unavailable(SERVER_BEFORE));
     const wait = noWait();
-    await expect(readMatchContacts(7, { startAt: START, wait })).resolves.toEqual({
+    await expect(readMatchContacts(7, { startAt: START, wait })).resolves.toMatchObject({
       error: "MATCH_CONTACTS_UNAVAILABLE",
     });
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -105,10 +106,10 @@ describe("readMatchContacts", () => {
       .mockResolvedValueOnce(unavailable(SERVER_AFTER))
       .mockResolvedValueOnce(unavailable(SERVER_BEFORE));
     const wait = noWait();
-    await expect(readMatchContacts(7, { startAt: START, wait })).resolves.toEqual({
+    await expect(readMatchContacts(7, { startAt: START, wait })).resolves.toMatchObject({
       error: "MATCH_CONTACTS_UNAVAILABLE",
     });
-    await expect(readMatchContacts(7, { startAt: null, wait })).resolves.toEqual({
+    await expect(readMatchContacts(7, { startAt: null, wait })).resolves.toMatchObject({
       error: "MATCH_CONTACTS_UNAVAILABLE",
     });
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -121,8 +122,8 @@ describe("readMatchContacts", () => {
       .mockResolvedValueOnce(json(401, { error: "UNAUTHORIZED" }, SERVER_BEFORE))
       .mockResolvedValueOnce(new Response("oops", { status: 500 }));
     const wait = noWait();
-    await expect(readMatchContacts(7, { startAt: START, wait })).resolves.toEqual({ error: "UNAUTHORIZED" });
-    await expect(readMatchContacts(7, { startAt: START, wait })).resolves.toEqual({ error: null });
+    await expect(readMatchContacts(7, { startAt: START, wait })).resolves.toEqual({ error: "UNAUTHORIZED", retryAfterMs: null });
+    await expect(readMatchContacts(7, { startAt: START, wait })).resolves.toEqual({ error: null, retryAfterMs: null });
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(wait).not.toHaveBeenCalled();
   });
@@ -218,6 +219,7 @@ describe("contacts du caster en attente, modale ouverte", () => {
     casterReady: false,
   };
   const key = (patch: Partial<ContactsCard> = {}) => contactsCardKey({ ...CARD, ...patch });
+  const card = (patch: Partial<ContactsCard> = {}): ContactsCard => ({ ...CARD, ...patch });
 
   it("chaque écriture qui touche la modale la fait relire, une fois", () => {
     const writes: Partial<ContactsCard>[] = [
@@ -233,14 +235,39 @@ describe("contacts du caster en attente, modale ouverte", () => {
       { casterReady: true },
     ];
     for (const patch of writes) {
-      expect(rereadOnCardChange(key(), key(patch), info("SCHEDULED"))).toBe(true);
-      expect(rereadOnCardChange(key(), key(patch), info("LOBBY", null))).toBe(true);
+      expect(rereadOnCardChange(card(), card(patch), info("SCHEDULED"))).toBe(true);
+      expect(rereadOnCardChange(card(), card(patch), info("LOBBY", null))).toBe(true);
     }
   });
 
   it("rien sans changement, ni avant la première lecture (l'horloge du navigateur ne relit rien)", () => {
-    expect(rereadOnCardChange(key(), key(), info("SCHEDULED"))).toBe(false);
-    expect(rereadOnCardChange(key(), key({ hostTeamId: 2 }), null)).toBe(false);
+    expect(rereadOnCardChange(card(), card(), info("SCHEDULED"))).toBe(false);
+    expect(rereadOnCardChange(card(), card({ hostTeamId: 2 }), null)).toBe(false);
+    expect(rereadOnCardChange(null, card(), info("SCHEDULED"))).toBe(false);
+  });
+
+  it("sans phase de lancement : le `launchedAt` posé après l'heure ne relit pas un match déjà lu lancé", () => {
+    const launched = { launchedAt: "2026-10-19T18:00:05.000Z" };
+    expect(rereadOnCardChange(card(), card(launched), info("LAUNCHED"))).toBe(false);
+    expect(rereadOnCardChange(card(), card(launched), info("LOBBY"))).toBe(true);
+    expect(rereadOnCardChange(card(), card({ ...launched, team1Ready: true }), info("LAUNCHED"))).toBe(true);
+  });
+
+  it("refus de quota : l'attente de `Retry-After` est lue, en secondes", () => {
+    expect(parseRetryAfter("40")).toBe(40_000);
+    expect(parseRetryAfter(null)).toBeNull();
+    expect(parseRetryAfter("0")).toBeNull();
+    expect(parseRetryAfter("Wed, 21 Oct 2026 07:28:00 GMT")).toBeNull();
+  });
+
+  it("refus de quota : rendu avec son attente", async () => {
+    jest.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ error: "RATE_LIMITED" }), { status: 429, headers: { "Retry-After": "40" } }),
+    );
+    await expect(readMatchContacts(7, { startAt: START, wait: noWait() })).resolves.toEqual({
+      error: "RATE_LIMITED",
+      retryAfterMs: 40_000,
+    });
   });
 
   it("empreinte : vide sans carte, stable pour les mêmes valeurs", () => {
@@ -252,13 +279,15 @@ describe("contacts du caster en attente, modale ouverte", () => {
   it("câblage : carte transmise, relecture passagère silencieuse, affichage à la phase du serveur", () => {
     const dialog = readSource("components/match-launch/MatchContactsDialog.tsx");
     expect(dialog).toContain("}, [matchId, readKey]);");
-    expect(dialog).toContain("rereadOnCardChange(previousCardKey.current, cardKey, launch)");
+    expect(dialog).toContain("rereadOnCardChange(previousCard.current, card, launch)");
+    expect(dialog).toContain("Math.max(REREAD_RETRY_MS, rereadWait)");
+    expect(dialog).toContain('if (launch?.viewer.role !== "REFEREE") window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));');
     expect(dialog).toContain("}, [cardKey, launch]);");
     expect(dialog).toContain("const timer = setTimeout(rereadNow, delay);");
     expect(dialog).toContain("if (reread && !isFinalRefusal(read.error)) {");
     expect(dialog).toContain("shouldRetryReread(rereadFailures)");
     expect(dialog).toContain("casterRereadDelay(launch, serverDate)");
-    expect(dialog).toMatch(/if \(reread\) \{\n\s*setRereadFailures\(\(count\) => count \+ 1\);\n\s*return;/);
+    expect(dialog).toMatch(/if \(reread\) \{\n\s*setRereadWait\(0\);\n\s*setRereadFailures\(\(count\) => count \+ 1\);\n\s*return;/);
     expect(dialog).toContain("contactsShown={matchUnderway(launch.phase)}");
     const card = readSource("app/(secured)/tournois/[id]/_components/MatchCardActions.tsx");
     expect(card).toMatch(/<MatchContactsDialog[\s\S]*?card=\{match\}[\s\S]*?\/>/);
