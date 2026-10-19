@@ -221,7 +221,11 @@ rattacher entre-temps ; l'écriture le redit dans son `WHERE`
 (`discord_id IS NULL OR discord_id = ?`), une connexion Discord dans un autre
 onglet pouvant se glisser entre cette relecture et elle — sans quoi le tag du
 défi serait certifié sur l'identifiant d'un autre compte Discord, où partiraient
-les messages privés de match.
+les messages privés de match. Les deux autres écrivains de `discord_id` portent
+la même garde : le rattachement OAuth (`UNMOVED_SUBJECT_SQL`, pour les trois
+fournisseurs — 0 ligne → `PROVIDER_ALREADY_LINKED`) et le rafraîchissement du
+pseudo à la connexion Discord (`AND discord_id = ?`), qui sinon nommerait « par
+Discord » sur un autre identifiant le pseudo d'un Discord détaché entre-temps.
 
 Un Discord déjà certifié par un **autre compte du site** est refusé de même
 (`DISCORD_ALREADY_LINKED`, 409) — mais **à la confirmation seulement**, par
