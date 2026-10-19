@@ -56,7 +56,7 @@ export const DISCORD_LOGIN_TAG_NOTICE = `Enregistre ton pseudo Discord sans le c
  * (`canViewDiscordTag`), ce que le joueur doit lire avant de la cocher.
  */
 export const DISCORD_PLAYER_VISIBILITY_NOTICE =
-  "La certification ouvre ton tag Discord à l'organisation (administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé), pas aux autres joueurs : coche « Tag Discord » pour qu'ils le voient sur ta fiche. Un tag non certifié reste masqué, case cochée ou non.";
+  "La certification ouvre ton tag Discord à l'organisation (administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé) et, comme contact, aux membres des deux équipes et au caster de ton match dès que ses deux adversaires sont connus (et, si tu castes un match, à ses deux équipes) ; pas aux autres joueurs : coche « Tag Discord » pour qu'ils le voient sur ta fiche. Un tag non certifié reste masqué, case cochée ou non.";
 
 /**
  * Ajout à la phrase précédente quand la case est cochée sur un tag **non**

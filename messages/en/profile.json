@@ -125,7 +125,7 @@
       "major": "Of legal age"
     },
     "pseudoAlwaysVisible": "Your username is always visible: it's what identifies you in brackets, rosters and match sheets.",
-    "discordNotice": "Verification opens your Discord tag to the organizers (administrators at any time, referees as long as you're registered for a tournament that isn't over), not to other players: tick “Discord tag” so they can see it on your profile. An unverified tag stays hidden, box ticked or not.",
+    "discordNotice": "Verification opens your Discord tag to the organizers (administrators at any time, referees as long as you're registered for a tournament that isn't over) and, as a contact, to the members of both teams and the caster of your match from the moment both its opponents are known (and, if you cast a match, to both its teams); not to other players: tick “Discord tag” so they can see it on your profile. An unverified tag stays hidden, box ticked or not.",
     "discordPending": "Your tag isn't verified: it will stay hidden from other players until you verify it.",
     "discordNoTag": "You don't have a Discord tag yet: save it, then verify it so other players can see it.",
     "recruitmentTitle": "Recruitment",

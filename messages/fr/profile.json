@@ -125,7 +125,7 @@
       "major": "Majorité"
     },
     "pseudoAlwaysVisible": "Ton pseudo reste toujours visible : c'est lui qui t'identifie dans les brackets, les rosters et les feuilles de match.",
-    "discordNotice": "La certification ouvre ton tag Discord à l'organisation (administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé), pas aux autres joueurs : coche « Tag Discord » pour qu'ils le voient sur ta fiche. Un tag non certifié reste masqué, case cochée ou non.",
+    "discordNotice": "La certification ouvre ton tag Discord à l'organisation (administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé) et, comme contact, aux membres des deux équipes et au caster de ton match dès que ses deux adversaires sont connus (et, si tu castes un match, à ses deux équipes) ; pas aux autres joueurs : coche « Tag Discord » pour qu'ils le voient sur ta fiche. Un tag non certifié reste masqué, case cochée ou non.",
     "discordPending": "Ton tag n'est pas certifié : il restera masqué aux autres joueurs tant que tu ne l'auras pas certifié.",
     "discordNoTag": "Tu n'as pas encore de tag Discord : enregistre-le puis certifie-le pour que les autres joueurs le voient.",
     "recruitmentTitle": "Recrutement",

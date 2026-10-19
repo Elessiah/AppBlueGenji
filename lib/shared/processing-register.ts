@@ -452,7 +452,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Pseudo certifié : jusqu'à sa modification ou la suppression du compte",
       "Choix des messages privés de match : jusqu'à sa modification ; remis au défaut à la suppression du compte",
       "Traces d'envoi des rappels, alertes et programmes d'arbitrage (match, palier et horaire annoncé, sans le texte du message) : conservées avec le match, donc sans limite de durée",
-      "« Prêt » et caster d'un match : conservés avec le match ; le caster d'un compte supprimé est retiré des matchs non joués",
+      "« Prêt » et caster d'un match : conservés avec le match ; le caster d'un compte supprimé est retiré des matchs non joués ; un caster qui ne remplit plus les conditions de son inscription (permission de diffusion, tag Discord certifié, compte Battle.net) en est retiré à la lecture suivante des contacts, tant que le match n'est pas lancé",
     ],
     recipients: [
       "Administrateurs et arbitres de l'association",
