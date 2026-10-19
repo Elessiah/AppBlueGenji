@@ -80,14 +80,19 @@ contacts y sortent **dès que le match est programmé**, et plus seulement au
 lancement — les parties s'organisent avant l'heure, surtout sans phase de
 lancement. Qui n'est pas partie du match, ou un match sans contacts (à
 planifier, terminé), reçoit `MATCH_CONTACTS_UNAVAILABLE` (404), un seul code :
-la réponse ne dit pas qui joue quoi. Un refus reste écrit dans la modale (pas
-« aucun contact »). Chargée à la demande (`next/dynamic`) : ses textes FR + EN
-ne pèsent pas sur la page de tournoi. Noms cliquables : équipe par `TeamLink`,
-entrée solo par `PlayerLink` (son unique contact), contacts et caster par
-`PlayerLink` — fiches partagées avec la modale de lancement, montée hors du
-contexte d'engagés de la page de tournoi. La modale de lancement **ne s'ouvre
-pas d'office par-dessus** une autre modale (`anotherModalOpen`) : elle attend la
-relève suivante, que « Contacts » demande à sa fermeture. Dans la modale de
+la réponse ne dit pas qui joue quoi. Un refus part en notification ; le corps
+reste neutre (« Contacts non affichés », pas « aucun contact »). Chargée à la
+demande (`next/dynamic`) : ses textes FR + EN ne pèsent pas sur la page de
+tournoi. Dans l'ordre de l'action principale, « Contacts » vient **après** les
+gestes d'arbitrage (`PRIMARY_ORDER`). Noms cliquables **dans cette modale
+seulement** (`linkNames`) : équipe par `TeamLink`, entrée solo par `PlayerLink`
+(son unique contact), contacts et caster par `PlayerLink` ; la modale de
+lancement, qui survit à la navigation, garde des noms simples. Elle **ne s'ouvre
+pas d'office par-dessus** une autre modale (`anotherModalOpen`) : elle guette sa
+fermeture chaque seconde (horloges actives, `useClientPower`), sinon la relève
+suivante — que « Contacts » demande à sa fermeture. Option éteinte, les
+avertissements de la planification par l'arbitrage ont leur variante sans
+« Prêt » (`form.referee.warningDirect`, `planning.confirm.consequenceDirect`). Dans la modale de
 lancement, un match programmé renvoie au bouton « Contacts » (`contactsAtLaunch`).
 Déclaré : `PRIVACY_CHANGES`
 `2026-10-contacts-de-match-avant-le-depart`, `/rgpd` et le registre (T04).
