@@ -8,7 +8,8 @@ import { parseMatchIdParam } from "@/lib/server/tournaments/match-launch-routes"
  * Contacts d'un match pour le bouton « Contacts » de sa carte
  * (`docs/features/MATCH_LAUNCH.md` § Contacts hors lancement) : la présentation
  * de la modale de lancement — engagées, hôte, contacts, caster —, aux seules
- * parties du match, dès qu'il est programmé. Un lecteur qui n'en est pas
+ * parties du match, dès que ses deux adversaires sont connus (« À planifier »
+ * compris). Un lecteur qui n'en est pas
  * partie reçoit le même refus qu'un match sans contacts : la réponse ne dit
  * pas qui joue quoi au-delà de ce que montre le plateau.
  */
