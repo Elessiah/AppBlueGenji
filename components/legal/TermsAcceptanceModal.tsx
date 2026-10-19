@@ -143,6 +143,16 @@ export function TermsAcceptanceModal({
           <p className={styles.text}>
             {richNodes(rich("termsModal.rights", {}, { strong: (children) => <strong>{richNodes(children)}</strong> }))}
           </p>
+          {/* Ce que les conditions laissent faire sans les accepter (`TERMS_FREE_PATHS`) :
+              sans ces liens, seul qui connaît les adresses exporterait ou supprimerait son compte. */}
+          <p className={styles.text}>
+            {richNodes(
+              rich("termsModal.exits", {}, {
+                privacy: (children) => <LocaleLink href="/rgpd">{richNodes(children)}</LocaleLink>,
+                profile: (children) => <LocaleLink href="/profil">{richNodes(children)}</LocaleLink>,
+              }),
+            )}
+          </p>
         </ScrollArea>
         <label className={styles.check}>
           <input

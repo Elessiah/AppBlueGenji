@@ -178,6 +178,7 @@
     "textFirst": "Avant de continuer à utiliser le site, accepte ses conditions d'utilisation.",
     "rights": "Elles disent notamment à qui sont communiqués tes contacts pendant un match de tournoi, et rappellent que <strong>tu garantis détenir les droits</strong> sur les logos et contenus que tu publies, pour ton équipe notamment : un logo de club, de marque ou d'éditeur de jeu ne se reprend pas sans l'accord de son titulaire.",
     "checkbox": "J'ai lu et j'accepte les conditions d'utilisation (<terms>lire les conditions</terms>).",
+    "exits": "Tu ne veux pas les accepter ? Tu peux te déconnecter, <privacy>lire la politique de confidentialité</privacy> ou <profile>ouvrir ton profil</profile> pour exporter tes données ou supprimer ton compte.",
     "logout": "Me déconnecter",
     "accept": "J'accepte",
     "saving": "Enregistrement…",
