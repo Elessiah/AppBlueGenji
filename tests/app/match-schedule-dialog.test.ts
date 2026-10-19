@@ -59,7 +59,7 @@ describe("MatchScheduleDialog — heure", () => {
 describe("MatchScheduleDialog — qui l'horaire prévient", () => {
   it("dit aux arbitres que l'horaire est annoncé, et quand", () => {
     expect(SOURCE).toMatch(
-      /startAtHint\(\s*text,\s*refereeScheduling,\s*match\.team1Id !== null && match\.team2Id !== null,\s*(\/\/[^\n]*\s*)?isMatchOver\(match\.status, tournamentFinished\),\s*\)/,
+      /startAtHint\(\s*text,\s*refereeScheduling,\s*match\.team1Id !== null && match\.team2Id !== null,\s*(\/\/[^\n]*\s*)?isMatchOver\(match\.status, tournamentFinished\),\s*launchPhase,\s*\)/,
     );
     // Un match joué n'annonce rien : l'aide s'en tient à la date.
     expect(SOURCE).toContain("return played ? base : `${base} ${scheduleNotice(text, refereeScheduling, entrantsKnown)}`;");
