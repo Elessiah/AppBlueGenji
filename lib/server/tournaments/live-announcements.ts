@@ -1,7 +1,8 @@
 /**
  * Annonce des lives sur Discord : au **début** d'un match diffusé, le bot poste
- * dans le salon #live du serveur BlueGenji un message `@everyone` qui nomme les
- * deux engagés, le tournoi, et donne le lien de la diffusion.
+ * dans le salon #live du serveur BlueGenji le message de la soirée (`@everyone`
+ * pour la chaîne officielle, rôle StreamViewer sinon) qui nomme les deux
+ * engagés, le tournoi, l'heure, et donne le lien de la diffusion.
  *
  * **« Début du match » = passage à l'antenne**, tel que le site le dérive
  * (`isMatchLive`, `lib/shared/live-streams.ts`) : au lancement du match en
@@ -27,11 +28,14 @@
  * relancé est annoncé de nouveau. Une affiche changée (ré-appariement) est une
  * autre rencontre, donc une autre annonce.
  *
- * **Un message par diffusion, pas par match.** Les matchs d'un même tournoi
- * qu'un même passage trouve à l'antenne sur le même lien (une ronde lancée
- * d'un coup, repliée sur la chaîne officielle) partent en un seul message :
- * le serveur ne reçoit pas quatre `@everyone` en quelques secondes vers la
- * même chaîne. Chaque affiche garde sa propre réservation.
+ * **Un message par soirée et par public, pas par match.** Le premier direct
+ * ouvre une soirée de `LIVE_EVENING_WINDOW_HOURS` heures (`bg_live_evenings`)
+ * pour son public : la chaîne officielle notifie `@everyone`, toute autre
+ * chaîne le seul rôle StreamViewer. Le message liste les matchs de la soirée
+ * — à l'antenne, puis programmés, chacun à son heure (Paris). Un match qui
+ * passe ensuite à l'antenne dans la fenêtre **modifie** ce message (le bot
+ * rend son identifiant), sans nouvelle notification ; si le message a disparu,
+ * le bot poste une suite sans mention. Chaque affiche garde sa réservation.
  *
  * **Fraîcheur : deux heures.** Un match n'est annoncé que dans les deux heures
  * qui suivent son passage à l'antenne (`LIVE_ANNOUNCE_MAX_AGE_MINUTES`) : un
@@ -49,9 +53,17 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { siteBaseUrl } from "@/lib/server/site-url";
-import { isBotCircuitOpen, pushLiveAnnouncement, type LiveAnnouncementOutcome } from "@/lib/server/bot-integration";
+import { isBotCircuitOpen, pushLiveEvening, type LiveAnnouncementOutcome } from "@/lib/server/bot-integration";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
-import { formatLiveAnnouncementGroup, liveAnnouncementUrl } from "@/lib/shared/live-announcements";
+import { toIso } from "@/lib/server/serialization";
+import {
+  formatLiveEvening,
+  LIVE_EVENING_WINDOW_HOURS,
+  liveAnnouncementUrl,
+  liveMentionTarget,
+  type LiveEveningStream,
+  type LiveMentionTarget,
+} from "@/lib/shared/live-announcements";
 import { isMatchLive, type MatchLiveTrigger } from "@/lib/shared/live-streams";
 import { parisInstant } from "@/lib/shared/match-start-entry";
 import { isSoloTournament, toParticipantType } from "@/lib/shared/participants";
@@ -180,6 +192,33 @@ const NEVER_REGISTERED_SINCE = 253_402_300_799;
  * marginal, et aucune requête ne réimplémente la règle en SQL.
  */
 async function loadCandidates(): Promise<LiveCandidateRow[]> {
+  return selectMatches(
+    `m.live_trigger IS NOT NULL AND m.status = 'READY' AND m.is_bye = 0
+        AND ${FRESH_ON_AIR_SQL}
+        AND NOT EXISTS (SELECT 1 FROM bg_live_announcements a
+                         WHERE a.match_id = m.id
+                           AND a.pairing = CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id)))`,
+    [],
+  );
+}
+
+/**
+ * Matchs castés d'une soirée : ceux annoncés depuis son ouverture, et ceux
+ * programmés (`START_TIME`) d'ici sa fin — leur heure figure dans le message.
+ * Le public (chaîne officielle ou non) se trie ensuite en mémoire.
+ */
+async function loadEveningMatches(evening: LiveEvening): Promise<LiveCandidateRow[]> {
+  return selectMatches(
+    `m.live_trigger IS NOT NULL AND m.is_bye = 0
+        AND (EXISTS (SELECT 1 FROM bg_live_announcements a WHERE a.match_id = m.id AND a.sent_at >= ?)
+             OR (m.live_trigger = 'START_TIME' AND m.status IN ('PENDING', 'READY')
+                 AND m.start_at > NOW() AND m.start_at <= ?))`,
+    [evening.started_at, evening.window_end],
+  );
+}
+
+/** Lecture commune des matchs annonçables : affiche, tournoi, pseudos publiables. */
+async function selectMatches(where: string, params: readonly unknown[]): Promise<LiveCandidateRow[]> {
   const db = await getDatabase();
   // Le pseudo n'est lu que pour une inscription faite sous la mention qui
   // l'annonce (`soloPseudoRegisteredSince`) ; sinon `NULL`, « un joueur ».
@@ -202,15 +241,79 @@ async function loadCandidates(): Promise<LiveCandidateRow[]> {
        JOIN bg_teams t2 ON t2.id = m.team2_id
        LEFT JOIN bg_users u1 ON u1.id = t1.solo_user_id AND u1.is_deleted = 0 AND ${registeredSince("t1")}
        LEFT JOIN bg_users u2 ON u2.id = t2.solo_user_id AND u2.is_deleted = 0 AND ${registeredSince("t2")}
-      WHERE m.live_trigger IS NOT NULL AND m.status = 'READY' AND m.is_bye = 0
-        AND ${FRESH_ON_AIR_SQL}
-        AND NOT EXISTS (SELECT 1 FROM bg_live_announcements a
-                         WHERE a.match_id = m.id
-                           AND a.pairing = CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id)))
+      WHERE ${where}
       ORDER BY m.id`,
-    [since, since],
+    [since, since, ...params],
   );
   return rows;
+}
+
+/** Soirée d'annonces ouverte pour un public (`bg_live_evenings`). */
+interface LiveEvening extends RowDataPacket {
+  id: number;
+  started_at: Date | string;
+  window_end: Date | string;
+  discord_message_id: string | null;
+}
+
+/** Instant d'une colonne `DATETIME`, en millisecondes ; `null` si vide. */
+function instant(value: Date | string | null): number | null {
+  const iso = toIso(value);
+  if (!iso) return null;
+  const at = Date.parse(iso);
+  return Number.isNaN(at) ? null : at;
+}
+
+/**
+ * Heure affichée d'un match de la soirée : son passage à l'antenne (lancement
+ * en `AUTO`, heure dite en `START_TIME`, ouverture d'antenne en `MANUAL`), ou
+ * l'heure prévue d'un match à venir.
+ */
+function streamTime(row: LiveCandidateRow, now: number): number {
+  const launched = row.launch_pairing === row.pairing ? instant(row.launched_at) : null;
+  if (row.live_trigger === "MANUAL") return instant(row.live_started_at) ?? now;
+  if (row.live_trigger === "AUTO") return launched ?? now;
+  const start = instant(row.start_at) ?? now;
+  // Devenu jouable après son heure : il passe à l'antenne à son lancement.
+  return launched !== null && launched > start ? launched : start;
+}
+
+/**
+ * Ouvre — ou reprend — la soirée d'un public : la dernière dont la fenêtre
+ * ({@link LIVE_EVENING_WINDOW_HOURS} heures depuis le premier direct annoncé)
+ * court encore. Les soirées finies depuis un jour sont oubliées au passage.
+ */
+async function openEvening(target: LiveMentionTarget): Promise<LiveEvening> {
+  const db = await getDatabase();
+  try {
+    await db.execute(`DELETE FROM bg_live_evenings WHERE window_end < NOW() - INTERVAL 1 DAY`);
+  } catch {
+    // Ménage seulement : réessayé au passage suivant.
+  }
+  const select = `SELECT id, started_at, window_end, discord_message_id FROM bg_live_evenings
+                   WHERE target = ? AND window_end > NOW() ORDER BY id DESC LIMIT 1`;
+  const [open] = await db.query<LiveEvening[]>(select, [target]);
+  if (open[0]) return open[0];
+  await db.execute(
+    `INSERT INTO bg_live_evenings (target, started_at, window_end)
+     VALUES (?, NOW(), NOW() + INTERVAL ${LIVE_EVENING_WINDOW_HOURS} HOUR)`,
+    [target],
+  );
+  const [created] = await db.query<LiveEvening[]>(select, [target]);
+  if (!created[0]) throw new Error("soirée d'annonces introuvable après sa création");
+  return created[0];
+}
+
+/** Garde l'identifiant du message publié (ou de la suite qui le remplace). */
+async function rememberEveningMessage(evening: LiveEvening, messageId: string | null): Promise<void> {
+  if (!messageId || messageId === evening.discord_message_id) return;
+  try {
+    const db = await getDatabase();
+    await db.execute(`UPDATE bg_live_evenings SET discord_message_id = ? WHERE id = ?`, [messageId, Number(evening.id)]);
+  } catch (error) {
+    // Le prochain match de la soirée partira dans un nouveau message.
+    console.error(`[live-announce] soirée ${Number(evening.id)} : identifiant du message non gardé`, error);
+  }
 }
 
 /** Vrai si le match est à l'antenne maintenant, lancement de l'affiche courante seulement. */
@@ -270,9 +373,9 @@ async function releaseAnnouncements(rows: readonly LiveCandidateRow[], label: st
   }
 }
 
-/** Matchs réservés d'un même tournoi, à l'antenne sur un même lien. */
+/** Matchs réservés par un passage pour un même public (chaîne officielle ou non). */
 interface AnnouncementGroup {
-  url: string;
+  target: LiveMentionTarget;
   rows: LiveCandidateRow[];
 }
 
@@ -408,15 +511,19 @@ const SHARED_POSTPONEMENTS: ReadonlySet<PostponedOutcome> = new Set<PostponedOut
 ]);
 
 /** Ce que les traces pm2 et le bot disent d'un groupe : ses matchs et son tournoi. */
-function describeGroup(group: AnnouncementGroup): { label: string; context: string; plural: boolean } {
+function describeGroup(
+  group: AnnouncementGroup,
+  eveningId?: number,
+): { label: string; context: string; plural: boolean } {
   const [first] = group.rows;
   const ids = matchIdsOf(group);
   const plural = ids.length > 1;
   const noun = plural ? "matchs" : "match";
+  const evening = eveningId === undefined ? "" : `soiree-${eveningId} `;
   return {
     label: `${noun} ${ids.join(", ")} (tournoi ${Number(first.tournament_id)})`,
     // Le tournoi en tête : le staff ouvre `/tournois/<id>` depuis le canal de logs.
-    context: `live-announce tournoi-${Number(first.tournament_id)} match-${contextIds(ids)}`,
+    context: `live-announce ${evening}tournoi-${Number(first.tournament_id)} match-${contextIds(ids)}`,
     plural,
   };
 }
@@ -446,32 +553,105 @@ async function postpone(group: AnnouncementGroup, outcome: PostponedOutcome): Pr
  *
  * @returns Le nombre de matchs publiés, et l'issue si l'annonce est reportée.
  */
-async function announce(group: AnnouncementGroup): Promise<{ posted: number; postponed: PostponedOutcome | null }> {
-  const [first] = group.rows;
-  // Un groupe qui compte une entrée individuelle est un tournoi individuel,
-  // même au type illisible : son invité sans compte ne part pas sous son nom.
-  const participantType = group.rows.some((row) => row.team1_solo_user_id != null || row.team2_solo_user_id != null)
-    ? "SOLO"
-    : first.participant_type;
+/**
+ * Matchs d'une soirée pour le public du groupe : les matchs réservés par ce
+ * passage (même si leur trace date d'avant l'ouverture de la soirée), puis
+ * ceux déjà annoncés ou programmés d'ici la fin de la fenêtre, sur une chaîne
+ * du même public.
+ */
+function eveningStreams(
+  group: AnnouncementGroup,
+  others: readonly LiveCandidateRow[],
+  now: number,
+): { row: LiveCandidateRow; url: string; live: boolean; at: number }[] {
+  const seen = new Set<number>();
+  const streams: { row: LiveCandidateRow; url: string; live: boolean; at: number }[] = [];
+  for (const row of [...group.rows, ...others]) {
+    const id = Number(row.id);
+    if (seen.has(id)) continue;
+    const url = liveAnnouncementUrl(row.live_url, row.tournament_live_url);
+    if (!url || liveMentionTarget(url) !== group.target) continue;
+    seen.add(id);
+    const live = isOnAir(row, now);
+    const at = streamTime(row, now);
+    // Un match fini, ou repoussé hors de la soirée, n'y figure plus.
+    if (!live && (row.status !== "PENDING" && row.status !== "READY")) continue;
+    streams.push({ row, url, live, at });
+  }
+  return streams;
+}
+
+/**
+ * Un engagé d'une ligne de soirée : un tournoi qui compte une entrée
+ * individuelle est un tournoi individuel, même au type illisible — son invité
+ * sans compte ne part pas sous son nom.
+ */
+function eveningEntrant(row: LiveCandidateRow, side: 1 | 2, withPseudo: boolean): string | null {
+  const solo = row.team1_solo_user_id != null || row.team2_solo_user_id != null;
+  const participantType = solo ? "SOLO" : row.participant_type;
+  if (side === 1) {
+    const pseudo = withPseudo ? row.team1_pseudo : null;
+    return liveEntrantName(row.team1_solo_user_id, row.team1_name, pseudo, participantType);
+  }
+  const pseudo = withPseudo ? row.team2_pseudo : null;
+  return liveEntrantName(row.team2_solo_user_id, row.team2_name, pseudo, participantType);
+}
+
+/**
+ * Annonce un groupe réservé : ouvre ou reprend la soirée de son public, puis
+ * publie le message de la soirée (premier direct : notification) ou le modifie
+ * (matchs suivants : aucune nouvelle notification).
+ *
+ * @returns Le nombre de matchs publiés, et l'issue si l'annonce est reportée.
+ */
+async function announce(
+  group: AnnouncementGroup,
+  now: number,
+): Promise<{ posted: number; postponed: PostponedOutcome | null }> {
+  let evening: LiveEvening;
+  let others: LiveCandidateRow[];
+  try {
+    evening = await openEvening(group.target);
+    others = await loadEveningMatches(evening);
+  } catch (error) {
+    warnOnce(`evening ${group.target}`, `[live-announce] soirée ${group.target} illisible, annonce reportée`, error);
+    await postpone(group, "unavailable");
+    return { posted: 0, postponed: "unavailable" };
+  }
+  const streams = eveningStreams(group, others, now);
   // `withPseudo: false` : ce que le bot cite à son canal de logs si l'annonce
   // échoue — le même texte, pseudos ôtés : l'exception vaut pour #live seulement.
   const text = (withPseudo: boolean) =>
-    formatLiveAnnouncementGroup({
-      tournamentName: String(first.tournament_name),
-      pairings: group.rows.map((row) => ({
-        team1Name: liveEntrantName(row.team1_solo_user_id, row.team1_name, withPseudo ? row.team1_pseudo : null, participantType),
-        team2Name: liveEntrantName(row.team2_solo_user_id, row.team2_name, withPseudo ? row.team2_pseudo : null, participantType),
-      })),
-    });
-  const message = text(true);
-  const logMessage = text(false);
-  const { label, context, plural } = describeGroup(group);
-  const outcome = await pushLiveAnnouncement(message, group.url, context, ...(logMessage === message ? [] : [logMessage]));
+    formatLiveEvening(
+      streams.map(
+        ({ row, url, live, at }): LiveEveningStream => ({
+          startsAt: at,
+          live,
+          tournamentName: String(row.tournament_name),
+          team1Name: eveningEntrant(row, 1, withPseudo),
+          team2Name: eveningEntrant(row, 2, withPseudo),
+          url,
+        }),
+      ),
+    );
+  const { text: message, urls } = text(true);
+  const { text: logMessage } = text(false);
+  const { label, context, plural } = describeGroup(group, Number(evening.id));
+  const { outcome, messageId } = await pushLiveEvening({
+    message,
+    streamUrls: urls,
+    mention: group.target,
+    context,
+    ...(logMessage === message ? {} : { logMessage }),
+    ...(evening.discord_message_id ? { editMessageId: String(evening.discord_message_id) } : {}),
+  });
   if (outcome === "posted" || outcome === "posted-silent") {
+    await rememberEveningMessage(evening, messageId);
     // Trace pm2 pour le staff : identifiants seulement, aucun nom.
-    const silent = outcome === "posted-silent" ? " sans notifier (permission de mentionner @everyone absente)" : "";
+    const silent = outcome === "posted-silent" ? " sans notifier (permission de mentionner absente)" : "";
     const announced = plural ? "annoncés" : "annoncé";
-    console.info(`[live-announce] ${label} ${announced} dans #live${silent}`);
+    const how = evening.discord_message_id ? "ajoutés au message de la soirée" : "dans un nouveau message";
+    console.info(`[live-announce] ${label} ${announced} dans #live (soirée ${Number(evening.id)}, ${how})${silent}`);
     return { posted: group.rows.length, postponed: null };
   }
   const abandoned = ABANDONED_OUTCOMES[outcome];
@@ -527,18 +707,18 @@ export async function runLiveAnnouncementSweep(now: number = Date.now()): Promis
       );
       continue;
     }
-    const key = groupKey(Number(row.tournament_id), url);
-    // Diffusion refusée par Discord il y a moins d'une minute : elle attend,
-    // et tout match qui la rejoint attend avec elle (un seul `@everyone`).
-    if (isHeld(key)) continue;
+    const target = liveMentionTarget(url);
+    // Soirée refusée par Discord il y a moins d'une minute : elle attend, et
+    // tout match qui la rejoint attend avec elle (une seule notification).
+    if (isHeld(target)) continue;
     // Bot en panne : ne rien réserver qu'on sait ne pas pouvoir envoyer.
     if (isBotCircuitOpen()) break;
     if (!(await tryClaim(row))) continue;
-    const group = groups.get(key);
+    const group = groups.get(target);
     if (group) group.rows.push(row);
-    else groups.set(key, { url, rows: [row] });
+    else groups.set(target, { target, rows: [row] });
   }
-  return announceGroups(groups.values());
+  return announceGroups(groups.values(), now);
 }
 
 
@@ -549,7 +729,7 @@ export async function runLiveAnnouncementSweep(now: number = Date.now()): Promis
  *
  * @returns Le nombre de matchs publiés.
  */
-async function announceGroups(groups: Iterable<AnnouncementGroup>): Promise<number> {
+async function announceGroups(groups: Iterable<AnnouncementGroup>, now: number): Promise<number> {
   let posted = 0;
   let postponed: PostponedOutcome | null = null;
   for (const group of groups) {
@@ -557,7 +737,7 @@ async function announceGroups(groups: Iterable<AnnouncementGroup>): Promise<numb
       await postpone(group, postponed);
       continue;
     }
-    const result = await announce(group);
+    const result = await announce(group, now);
     posted += result.posted;
     if (result.postponed && SHARED_POSTPONEMENTS.has(result.postponed)) postponed = result.postponed;
   }
@@ -585,17 +765,12 @@ let retryNotBefore = 0;
  */
 const heldUntil = new Map<string, number>();
 
-/** Clé d'une diffusion : un message par tournoi et par lien. */
-function groupKey(tournamentId: number, url: string): string {
-  return `${tournamentId} ${url}`;
-}
-
-/** Met en pause la seule diffusion d'un groupe refusé. */
+/** Met en pause la seule soirée (le public) d'un groupe refusé. */
 function holdGroup(group: AnnouncementGroup): void {
   const now = Date.now();
-  // Une diffusion terminée n'est plus relue : sa pause échue s'oublie ici.
+  // Une pause échue s'oublie ici.
   for (const [key, at] of heldUntil) if (at <= now) heldUntil.delete(key);
-  heldUntil.set(groupKey(Number(group.rows[0].tournament_id), group.url), now + LIVE_ANNOUNCE_RETRY_DELAY_MS);
+  heldUntil.set(group.target, now + LIVE_ANNOUNCE_RETRY_DELAY_MS);
   scheduleTrailingSweep(LIVE_ANNOUNCE_RETRY_DELAY_MS);
 }
 

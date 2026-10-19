@@ -129,4 +129,22 @@ export async function createSentNotificationTables(db: Pool): Promise<void> {
   } catch {
     // Table déjà présente, ou création refusée : les lives ne sont pas annoncés.
   }
+  try {
+    // Une ligne par soirée d'annonces #live et par public (`everyone` pour la
+    // chaîne officielle, `stream-viewer` sinon) : l'identifiant du message
+    // Discord à modifier quand un autre match de la soirée passe à l'antenne.
+    // Aucune donnée personnelle ; effacée un jour après la fin de la soirée.
+    await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_live_evenings (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        target VARCHAR(16) NOT NULL,
+        started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        window_end DATETIME NOT NULL,
+        discord_message_id VARCHAR(20) NULL,
+        KEY idx_bg_live_evenings_target (target, window_end)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+  } catch {
+    // Table déjà présente, ou création refusée : les lives ne sont pas annoncés.
+  }
 }
