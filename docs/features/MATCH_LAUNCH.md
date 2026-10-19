@@ -243,7 +243,7 @@ Le motif voyage dans `TournamentViewerContext.castBlock`, par les deux portes
 qui ouvrait la configuration du stream, devient « ＋ Live » (aujourd'hui « Diffuser ce match ») : deux boutons
 « Caster » sur la même carte auraient désigné deux gestes différents.
 
-Un compte supprimé (anonymisé) perd son inscription sur les matchs non joués ;
+Un compte supprimé (anonymisé) perd son inscription sur les matchs non terminés ;
 l'effacement complet la retire par la clé étrangère (`SET NULL`).
 
 ## Les contacts présentés
