@@ -389,10 +389,11 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   aboutir »). Les deux dernières ne demandent pas de poster l'annonce à la
   main : l'envoi du bot a pu partir, ou partir encore. Après un `400` ou un
   blocage par AutoMod, rien n'est parti : la poster à la main (règle
-  corrigée) ne fait pas de doublon — avec la mention de son public (tout le
-  serveur, ou le rôle StreamViewer), et **sans aucune mention** pour une
-  modification de la soirée ou un envoi `notify: false` (le signalement du bot
-  le dit). Côté bot, voir ci-dessus (une fois par
+  corrigée) ne fait pas de doublon — **sans aucune mention** pour une
+  annonce de soirée (le signalement du bot le dit) : une modification ou un
+  envoi `notify: false` suivent un message qui a pu notifier, et après un
+  premier message refusé le site rend la marque `notified` — le prochain
+  direct de la soirée notifiera. Côté bot, voir ci-dessus (une fois par
   heure par cause réessayée ; chaque blocage AutoMod, envoi incertain ou
   requête coupée par le site ; un `400` n'est pas signalé au canal de logs). Deux pannes de la base sont tracées (une fois par heure et par
   match) : une réservation refusée (`réservation impossible` — rien n'est
