@@ -1087,7 +1087,7 @@ describe("soirées d'annonces", () => {
     expect(update?.[0]).not.toContain("window_end");
     // pm2 dit qu'une suite est partie, pas une modification.
     expect(console.info).toHaveBeenCalledWith(
-      "[live-announce] match 40 (tournoi 4) annoncé dans #live (soirée 3, dans une suite sans notifier, le message de la soirée ayant disparu ou ne se modifiant plus)",
+      "[live-announce] match 40 (tournoi 4) annoncé dans #live (soirée 3, dans une suite sans notifier, le message de la soirée ne se modifiant plus)",
     );
   });
 
@@ -1258,6 +1258,34 @@ describe("soirées d'annonces", () => {
     expect(read?.[0].replace(/\s+/g, " ")).toContain(
       "a.match_id = m.id AND a.sent_at >= ? AND a.refused = 0 AND a.pairing = CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id))",
     );
+  });
+
+  it("message de la soirée supprimé de #live : la soirée se ferme, réservation gardée et marquée refusée", async () => {
+    jest.mocked(pushLiveAnnouncement).mockResolvedValue("evening-deleted");
+    const { execute, evening } = mockDb([AUTO_LIVE]);
+    evening.mockImplementation(async (sql) =>
+      sql.includes("FROM bg_live_evenings")
+        ? [[{ ...EVENING, discord_message_id: "123456789012345678", notified: 1 }]]
+        : [[AUTO_LIVE]],
+    );
+    expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
+    expect(execute.mock.calls).toContainEqual(["UPDATE bg_live_evenings SET closed = 1 WHERE id = ?", [3]]);
+    expect(execute.mock.calls.some(([sql]) => sql.startsWith("UPDATE bg_live_announcements SET refused = 1"))).toBe(true);
+    expect(releasesOf(execute)).toEqual([]);
+    expect(String(jest.mocked(console.error).mock.calls[0][0])).toContain("suppression respectée");
+  });
+
+  it("soirée close : rien n'est envoyé au bot, réservation gardée", async () => {
+    const { execute, evening } = mockDb([AUTO_LIVE]);
+    evening.mockImplementation(async (sql) =>
+      sql.includes("FROM bg_live_evenings")
+        ? [[{ ...EVENING, discord_message_id: "123456789012345678", closed: 1 }]]
+        : [[AUTO_LIVE]],
+    );
+    expect(await runLiveAnnouncementSweep(NOW)).toBe(0);
+    expect(pushLiveEvening).not.toHaveBeenCalled();
+    expect(releasesOf(execute)).toEqual([]);
+    expect(String(jest.mocked(console.warn).mock.calls[0][0])).toContain("soirée 3 close (message supprimé de #live)");
   });
 
   it("soirée illisible : réservation rendue, annonce reportée", async () => {

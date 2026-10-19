@@ -67,4 +67,14 @@ describe("pushLiveEvening", () => {
       .mockResolvedValueOnce(Response.json({ error: "LIVE_CHANNEL_UNAVAILABLE", reason: "no-send" }, { status: 503 }));
     await expect(pushLiveEvening(REQUEST)).resolves.toEqual({ outcome: "channel-closed", messageId: null });
   });
+
+  it("message de la soirée supprimé de #live (`message-deleted`) : issue `evening-deleted`", async () => {
+    jest
+      .spyOn(global, "fetch")
+      .mockResolvedValueOnce(Response.json({ error: "LIVE_CHANNEL_UNAVAILABLE", reason: "message-deleted" }, { status: 503 }));
+    await expect(pushLiveEvening({ ...REQUEST, editMessageId: "123456789012345678" })).resolves.toEqual({
+      outcome: "evening-deleted",
+      messageId: null,
+    });
+  });
 });
