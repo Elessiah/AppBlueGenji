@@ -203,10 +203,12 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   mention de tête — une mention grise qui n'a notifié personne aurait l'air
   d'une panne. Un bot d'une version antérieure ignore `mention`,
   `streamUrls`, `editMessageId` et `notify`, et ne rend pas d'identifiant :
-  chaque match repart dans un nouveau message **`@everyone`**, public
-  StreamViewer compris, jetons `{{lien:N}}` laissés bruts. D'où l'ordre de
-  déploiement : **bot d'abord**, et jamais de retour à un bot antérieur tant
-  que `LIVE_ANNOUNCEMENTS_ENABLED` est posé. Une publication incertaine
+  son message part **`@everyone`**, public StreamViewer compris, jetons
+  `{{lien:N}}` laissés bruts. Un envoi réussi **sans identifiant** ne vient
+  que d'un tel bot : la soirée est alors **close** (`closeForOldBot`), sans
+  quoi chaque direct et chaque fin de match suivants reposteraient un message
+  `@everyone`. D'où l'ordre de déploiement : **bot d'abord**, et jamais de
+  retour à un bot antérieur tant que `LIVE_ANNOUNCEMENTS_ENABLED` est posé. Une publication incertaine
   (`uncertain`, `timed-out`, `interrupted`) ne laisse pas d'identifiant : un
   match suivant de la même soirée repart dans un nouveau message.
 - **Mise à jour aux fins de match** (`requestLiveEveningRefresh`,
@@ -243,7 +245,7 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   qui notifie **prend** la marque `notified` juste avant l'appel au bot, en une
   instruction (`UPDATE … SET notified = 1 … WHERE id = ? AND notified = 0` +
   `affectedRows`). Soirée sans identifiant gardé mais déjà marquée (premier
-  envoi d'issue incertaine, bot trop ancien, identifiant non enregistré — même
+  envoi d'issue incertaine, identifiant non enregistré — même
   si le tournoi de ce match est fini depuis, ou si son lien a changé de public)
   — le site envoie `notify: false` et le bot poste un nouveau message **sans
   mention écrite ni notification**. Les réservations d'un passage, prises
