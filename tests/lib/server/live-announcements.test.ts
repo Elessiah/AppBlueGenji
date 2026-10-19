@@ -12,6 +12,7 @@ import {
   LIVE_ANNOUNCE_MAX_AGE_MINUTES,
   LIVE_ANNOUNCE_RETRY_DELAY_MS,
   LIVE_EVENING_REFRESH_DELAY_MS,
+  LIVE_EVENING_REFRESH_MAX_RETRIES,
   dispatchLiveAnnouncements,
   liveAnnouncementsEnabled,
   liveEntrantName,
@@ -989,7 +990,7 @@ describe("soirées d'annonces", () => {
     // sans message encore parti, jusqu'à la fin de la fenêtre qui repartira de cet envoi.
     const read = evening.mock.calls.find(([sql]) => sql.includes("a.sent_at >= ?"));
     expect(read?.[0]).toContain("m.start_at <= GREATEST(?, NOW() + INTERVAL 4 HOUR)");
-    expect(read?.[1]).toEqual([expect.any(Number), expect.any(Number), EVENING.started_at, EVENING.window_end]);
+    expect(read?.[1]).toEqual([expect.any(Number), expect.any(Number), EVENING.started_at, EVENING.window_end, EVENING.window_end]);
   });
 
   it("soirée marquée notifiée sans message connu : nouveau message sans notification", async () => {
@@ -1268,7 +1269,7 @@ describe("soirées d'annonces", () => {
     await runLiveAnnouncementSweep(NOW);
     const read = evening.mock.calls.find(([sql]) => sql.includes("a.sent_at >= ?"));
     expect(read?.[0].replace(/\s+/g, " ")).toContain(
-      "a.match_id = m.id AND a.sent_at >= ? AND a.refused = 0 AND a.pairing = CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id))",
+      "a.match_id = m.id AND a.sent_at >= ? AND a.sent_at <= ? AND a.refused = 0 AND a.pairing = CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id))",
     );
   });
 
@@ -1369,7 +1370,8 @@ describe("mise à jour de la soirée aux fins de match", () => {
     expect(request.context).toBe("live-refresh soiree-3 tournoi-4 match-40");
     // Fenêtre en cours, message gardé, soirée non close ; le tournoi clos par ce match reste lu.
     const [select] = evening.mock.calls[0];
-    expect(select).toContain("window_end > NOW() AND closed = 0 AND discord_message_id IS NOT NULL");
+    expect(select).toContain("window_end > NOW() - INTERVAL 4 HOUR AND closed = 0 AND discord_message_id IS NOT NULL");
+    expect(select).toContain("window_end <= NOW() AS ended");
     const read = evening.mock.calls.find(([sql]) => sql.includes("a.sent_at >= ?"));
     expect(read?.[0]).toContain("t.state IN ('RUNNING', 'FINISHED')");
     expect(read?.[0]).toContain("OR (t.state = 'RUNNING' AND m.live_trigger = 'START_TIME'");
@@ -1463,6 +1465,26 @@ describe("mise à jour de la soirée aux fins de match", () => {
     await refreshLiveEvenings(NOW);
     const update = execute.mock.calls.find(([sql]) => sql.startsWith("UPDATE bg_live_evenings SET discord_message_id"));
     expect(update?.[1]).toEqual(["223456789012345678", 1, 3]);
+  });
+
+  it("fenêtre finie depuis peu, texte publié par ce processus : le match fini après la fenêtre passe « Terminé »", async () => {
+    const LIVE = { ...AUTO_LIVE };
+    mockRefresh([OPEN], [LIVE]);
+    expect(await refreshLiveEvenings(NOW)).toBe(1);
+    // La fenêtre s'est fermée pendant le match ; il se termine ensuite.
+    const { evening } = mockRefresh([{ ...OPEN, ended: 1 }], [DONE]);
+    expect(await refreshLiveEvenings(NOW)).toBe(1);
+    expect(jest.mocked(pushLiveEvening).mock.calls[1][0].message).toContain("· Terminé · 2-1");
+    // Réservations de la fenêtre seulement : la soirée suivante n'y est pas reprise.
+    const read = evening.mock.calls.find(([sql]) => sql.includes("a.sent_at >= ?"));
+    expect(read?.[0]).toContain("a.sent_at >= ? AND a.sent_at <= ?");
+  });
+
+  it("fenêtre finie sans texte publié par ce processus (redémarrage) : rien n'est modifié", async () => {
+    const { evening } = mockRefresh([{ ...OPEN, ended: 1 }], [DONE]);
+    expect(await refreshLiveEvenings(NOW)).toBe(0);
+    expect(pushLiveEvening).not.toHaveBeenCalled();
+    expect(evening.mock.calls.some(([sql]) => sql.includes("a.sent_at >= ?"))).toBe(false);
   });
 
   it("rafale de fins de match : une seule mise à jour par public au bout d'une minute", async () => {
@@ -1567,13 +1589,16 @@ describe("mise à jour de la soirée — reprises", () => {
       pushLiveAnnouncement.mockResolvedValue("unavailable");
       mockRefresh0([OPEN], [DONE]);
       requestLiveEveningRefresh();
-      // Premier essai puis trois relances, une par minute ; ensuite plus rien.
-      for (let i = 0; i < 5; i++) await jest.advanceTimersByTimeAsync(LIVE_EVENING_REFRESH_DELAY_MS);
-      expect(pushLiveEvening).toHaveBeenCalledTimes(4);
+      // Premier essai puis une relance par minute pendant une demi-heure (un
+      // redémarrage du bot passe) ; ensuite plus rien.
+      expect(LIVE_EVENING_REFRESH_MAX_RETRIES).toBe(30);
+      const attempts = LIVE_EVENING_REFRESH_MAX_RETRIES + 1;
+      for (let i = 0; i < attempts + 2; i++) await jest.advanceTimersByTimeAsync(LIVE_EVENING_REFRESH_DELAY_MS);
+      expect(pushLiveEvening).toHaveBeenCalledTimes(attempts);
       expect(jest.getTimerCount()).toBe(0);
       requestLiveEveningRefresh();
       await jest.advanceTimersByTimeAsync(LIVE_EVENING_REFRESH_DELAY_MS);
-      expect(pushLiveEvening).toHaveBeenCalledTimes(5);
+      expect(pushLiveEvening).toHaveBeenCalledTimes(attempts + 1);
       expect(jest.getTimerCount()).toBe(1);
     } finally {
       jest.useRealTimers();
