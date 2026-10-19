@@ -58,7 +58,9 @@ refuse de lui-même.
 
 Qui refuse doit pouvoir partir : la fenêtre laisse passer `/rgpd` (et
 `/rgpd/registre`), `/mentions-legales`, `/accessibilite`, les pages légales du
-bot (`/privacy-policy-bot`, `/terms-of-service-bot`) et `/profil` (export
+bot (`/privacy-policy-bot`, `/terms-of-service-bot`), `/regles` (règles des
+tournois, que les conditions complètent), `/signalements` (suivre ou contester
+un signalement : recours interne) et `/profil` (export
 des données, suppression du compte — la page entière reste ouverte, ce que
 disent les conditions : « ouvrir son profil ») — `TERMS_FREE_PATHS` de
 `lib/shared/global-modals.ts`, en plus de `/conditions-utilisation` et
