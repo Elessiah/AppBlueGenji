@@ -279,6 +279,7 @@ describe("fiches de contact — noms cliquables", () => {
     const source = readFileSync(join(process.cwd(), "components/match-launch/MatchContactsDialog.tsx"), "utf8");
     // Phase du serveur à la lecture, et de la carte depuis (match reprogrammé).
     expect(source).toContain("contactsShown={matchUnderway(launch.phase) && (phase === null || matchUnderway(phase))}");
-    expect(source).toContain('contactsLaterText={t("contacts.casterLater")}');
+    // La note parle du caster : jamais montrée au caster lui-même (arbitre qui caste compris).
+    expect(source).toContain('contactsLaterText={casterContactsPending(launch) ? t("contacts.casterLater") : undefined}');
   });
 });
