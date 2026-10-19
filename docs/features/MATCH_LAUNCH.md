@@ -106,11 +106,15 @@ match sont connus** — à planifier (décision de l'utilisateur, 2026-10-19),
 programmé, en lancement ou lancé —, et plus seulement au lancement : les parties
 s'organisent avant l'heure, surtout sans phase de lancement. Le **caster**, lui,
 garde la borne de la modale — en lancement ou lancé (`exposesContacts`, lu avec
-`viewerPlaysMatch`) — : avant, la route le traite comme un tiers. Les équipes
-voient en revanche les contacts du caster dès que les deux adversaires sont
-connus. Qui n'est pas partie du match, le caster d'un match pas encore parti, ou
+`viewerPlaysMatch`) — : avant, la route le traite comme un tiers. Symétrie :
+les équipes ne reçoivent les contacts **du caster** que le temps du match
+(`exposesCaster`) ; avant, la carte montre leurs contacts sans les siens. Qui
+n'est pas partie du match, le caster d'un match pas encore parti, ou
 un match sans contacts (adversaire inconnu, terminé), reçoit `MATCH_CONTACTS_UNAVAILABLE` (404), un seul code :
-la réponse ne dit pas qui joue quoi. Un refus part en notification ; le corps
+la réponse ne dit pas qui joue quoi. Ce refus est relu **une fois** après
+3 s (`readMatchContacts`, `CONTACTS_RETRY_DELAY_MS`) : la carte décide du bouton
+à l'horloge du navigateur, le serveur à la sienne, et un caster dont l'horloge
+avance verrait sinon un refus à l'heure du départ. Un refus part en notification ; le corps
 reste neutre (« Contacts non affichés », pas « aucun contact »). Chargée à la
 demande (`next/dynamic`) : ses textes FR + EN ne pèsent pas sur la page de
 tournoi. Dans l'ordre de l'action principale, « Contacts » vient **après** les
