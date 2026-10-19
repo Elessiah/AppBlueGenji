@@ -208,7 +208,8 @@ au lieu d'en poster un autre (demande de l'association, 2026-10-19).
   garde-fou ne le verrait pas. Un envoi **refusé** (`rejected`, AutoMod) ou
   **reporté** n'a rien publié : la marque `notified` qu'il avait posée est
   retirée, et un refus (réservation gardée, jamais réessayé) sort de la soirée
-  (`sent_at` daté juste avant son ouverture) — sinon chaque match suivant
+  (`bg_live_announcements.refused`, sa date `sent_at` — donnée à l'export
+  RGPD — restant vraie) — sinon chaque match suivant
   reprendrait le nom bloqué et serait refusé à son tour, et la soirée se
   croirait notifiée.
 - **Longueur** : le texte, liens comptés en entier, tient dans
