@@ -516,8 +516,8 @@ export async function createTournament(
         registrationFilters.discordRequirement,
         registrationFilters.blizzardRequirement,
         registrationFilters.minPlayers,
-        payload.refereeScheduling === true ? 1 : 0,
-        payload.launchPhase === true ? 1 : 0,
+        Number(payload.refereeScheduling === true),
+        Number(payload.launchPhase === true),
       ],
     );
 
