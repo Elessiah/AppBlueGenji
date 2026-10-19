@@ -94,7 +94,7 @@
     "reading": "Lecture…",
     "unverifiedHint": "Tag non certifié : {audience} Certifie-le pour qu'elle puisse le faire.",
     "unverifiedAudience": "personne ne le voit, pas même les administrateurs. L'organisation ne peut donc pas te joindre pendant un tournoi.",
-    "audience": "les administrateurs le voient à tout moment, les arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), et les joueurs et le caster de ton match le temps de la rencontre, à partir de son lancement ; les autres joueurs, seulement si tu le rends visible dans tes réglages de confidentialité. Jamais personne d'autre.",
+    "audience": "les administrateurs le voient à tout moment, les arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), et les joueurs et le caster de ton match dès que la rencontre est programmée et jusqu'à sa fin ; les autres joueurs, seulement si tu le rends visible dans tes réglages de confidentialité. Jamais personne d'autre.",
     "removed": "Tag Discord retiré.",
     "lock": {
       "pending": "Lecture de l'état de ton compte Discord… Le champ reste en lecture seule le temps de savoir si Discord a nommé ce pseudo.",
@@ -342,7 +342,7 @@
     "title": "Masqué, mais pas pour tout le monde",
     "intro": "Ton BattleTag n'apparaîtra plus sur ta fiche publique ni dans l'annuaire des joueurs. Il reste en revanche lisible là où il sert à jouer :",
     "players": "<strong>Les autres joueurs de chaque match que tu disputes</strong>, le temps du tournoi — c'est par lui qu'on s'ajoute en jeu pour lancer la partie.",
-    "caster": "<strong>Le caster de ton match</strong>, de son lancement à sa fin, si tu fais partie des contacts présentés.",
+    "caster": "<strong>Le caster de ton match</strong>, dès sa programmation et jusqu'à sa fin, si tu fais partie des contacts présentés.",
     "staff": "<strong>Les arbitres et les administrateurs</strong>, tant que tu es inscrit à un tournoi qui n'est pas terminé — dès l'ouverture des inscriptions.",
     "outro": "Pour ne plus le communiquer du tout, il faut effacer le champ — mais tes adversaires ne pourront alors plus t'ajouter en jeu. Et si un compte Blizzard est rattaché, c'est lui qui tient ce champ : il faut le retirer d'abord.",
     "ok": "J'ai compris"
@@ -357,7 +357,7 @@
     "exposure": {
       "admins": "Les administrateurs du site voient ton tag Discord en permanence.",
       "referees": "Les arbitres le voient uniquement quand tu es engagé dans un tournoi en cours ou à venir — plus après.",
-      "match": "Les joueurs et le caster de ton match le voient le temps de la rencontre, à partir de son lancement — pour s'ajouter et créer le salon.",
+      "match": "Les joueurs et le caster de ton match le voient dès que la rencontre est programmée et jusqu'à sa fin — pour s'ajouter et créer le salon.",
       "players": "Les autres joueurs du site ne le voient que si tu le rends visible dans tes réglages de confidentialité. Il n'apparaît sur aucune page publique.",
       "undo": "Tu peux annuler à tout moment en retirant ton tag depuis « Mon profil » : la certification est perdue, et l'exposition avec elle. Une connexion par Discord réenregistre ensuite ton pseudo, mais sans le certifier : seul ce geste-ci le certifie."
     },

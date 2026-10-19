@@ -799,6 +799,24 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Aucune donnée nouvelle n'est collectée : moins de pseudos et d'identifiants Discord sont transmis au bot.",
     ],
   },
+  // LAUNCH-OPTION : le bouton « Contacts » d'une carte de match montre les
+  // contacts du lancement (`2026-09-lancement-des-matchs`) dès que le match est
+  // programmé, et plus seulement à son lancement — mêmes destinataires (les
+  // parties du match), mêmes données, mais **plus tôt** : un changement de
+  // « quand », à annoncer. La phase de lancement devient aussi une option du
+  // tournoi : sans elle, aucun « Prêt » n'est plus enregistré.
+  {
+    id: "2026-10-contacts-de-match-avant-le-depart",
+    title: "Contacts de ton match : visibles dès que le match est programmé",
+    publishedAt: "2026-10-19",
+    summary:
+      "Les joueurs et le caster de ton match peuvent voir les contacts présentés au lancement dès que l'horaire du match est fixé, par le bouton « Contacts » de la carte du match.",
+    details: [
+      "Ce sont les mêmes informations qu'au lancement d'un match — le tag Discord certifié et le BattleTag d'un ou deux joueurs par équipe, et ceux du caster inscrit —, montrées aux mêmes personnes : les seules parties du match.",
+      "Ce qui change, c'est le moment : dès que le match a son horaire et ses deux équipes, et non plus seulement à son lancement, pour pouvoir s'organiser avant l'heure. Elles cessent d'être visibles quand le match est terminé.",
+      "La phase de lancement (« Prêt » et fenêtre de lancement) devient une option de chaque tournoi, éteinte par défaut : sans elle, un match part à son heure et aucun « Prêt » n'est enregistré.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */
