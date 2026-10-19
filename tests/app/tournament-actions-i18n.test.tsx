@@ -87,6 +87,8 @@ import { MatchPlanningPanel } from "@/app/(secured)/tournois/[id]/_components/Ma
 import { MatchReplayDialog } from "@/app/(secured)/tournois/[id]/_components/MatchReplayDialog";
 import { MatchRow } from "@/app/(secured)/tournois/[id]/_components/MatchRow";
 import { MatchScheduleDialog } from "@/app/(secured)/tournois/[id]/_components/MatchScheduleDialog";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { PlayerScoreDialog } from "@/app/(secured)/tournois/[id]/_components/PlayerScoreDialog";
 import { RegistrationsPanel } from "@/app/(secured)/tournois/[id]/_components/RegistrationsPanel";
 import { RemoveEntrantDialog } from "@/app/(secured)/tournois/[id]/_components/RemoveEntrantDialog";
@@ -512,6 +514,49 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     expect(fr).toContain("Code de replay");
     expect(fr).not.toContain("(facultatif)");
     expect(fr).not.toContain("le code de replay est facultatif");
+  });
+
+  // Litige et validation d'office (`SCORE_DISPUTE_LOCK.md`), dans les deux langues.
+  const disputeReport = (team1Score: number, team2Score: number, reportedAt: string) => ({ team1Score, team2Score, maps: [], reportedAt });
+  const disputed = {
+    ...versus,
+    status: "AWAITING_CONFIRMATION" as const,
+    team1Report: disputeReport(2, 1, "2026-05-05T09:00:00.000Z"),
+    team2Report: disputeReport(1, 2, "2026-05-05T09:05:00.000Z"),
+  };
+
+  it("score (engagé) en litige : saisie, envoi et forfait retirés, arbitrage nommé", () => {
+    const ui = () => <PlayerScoreDialog tournamentId={1} match={disputed} myTeamId={10} canReportScore canForfeit proposals={[]} onClose={noop} onSubmitted={noop} onRefresh={noop} />;
+    const fr = render("fr", ui());
+    expect(fr).toContain("la saisie est verrouillée pour les deux équipes, forfait compris");
+    expect(fr).not.toContain('type="submit"');
+    expect(fr).not.toContain("player-score-forfeit");
+    expect(fr).not.toContain("player-score-map-");
+    const en = render("en", ui());
+    expect(en).toContain("score entry is locked for both teams, forfeits included");
+    expect(en).not.toContain('type="submit"');
+    expect(en).not.toContain("player-score-forfeit");
+    expectNoFrench(en);
+  });
+
+  it("validation d'office : l'heure de Paris, mentionnée, sur la carte et dans la fenêtre", () => {
+    // 12:30 UTC = 14:30 à Paris (heure d'été), quel que soit le fuseau de la machine.
+    const pending = { ...versus, status: "AWAITING_CONFIRMATION" as const, team1Report: disputeReport(2, 1, "2026-05-05T10:00:00.000Z"), scoreDeadlineAt: "2026-05-05T12:30:00.000Z" };
+    const card = (locale: "fr" | "en") => renderPage(locale, <MatchRow match={pending} adminResolvable={false} onOpenAdminModal={noop} scoreLocked={false} roundNumber={2} />);
+    expect(card("fr")).toContain("2 – 1 proposé par Alpha · validé automatiquement à 14:30 (heure de Paris) sans réponse");
+    expect(card("en")).toContain("2 – 1 proposed by Alpha · confirmed automatically at 14:30 (Paris time) without an answer");
+    const dialog = (myTeamId: number) => <PlayerScoreDialog tournamentId={1} match={pending} myTeamId={myTeamId} canReportScore canForfeit proposals={[]} onClose={noop} onSubmitted={noop} onRefresh={noop} />;
+    expect(render("fr", dialog(11))).toContain("Sans réponse, ce score sera validé automatiquement à 14:30 (heure de Paris).");
+    expect(render("en", dialog(11))).toContain("With no answer, this score will be confirmed automatically at 14:30 (Paris time).");
+    expect(render("fr", dialog(10))).toContain("ce score sera validé automatiquement à 14:30 (heure de Paris).");
+    expect(render("en", dialog(10))).toContain("this score will be confirmed automatically at 14:30 (Paris time).");
+  });
+
+  it("score (engagé) pendant l'envoi : boutons aria-disabled, jamais disabled natif (le focus reste)", () => {
+    const source = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx"), "utf8");
+    // Seuls les champs de maps (`MapScoreList`) se figent pendant l'envoi ; les boutons gardent le focus.
+    expect(source.match(/(?<![-\w])disabled=\{[^}]*submitting/g)).toEqual(["disabled={submitting"]);
+    expect(source.match(/aria-busy=\{submitting \|\| undefined\}/g)).toHaveLength(2);
   });
 
   it.each<[string, () => ReactElement]>([

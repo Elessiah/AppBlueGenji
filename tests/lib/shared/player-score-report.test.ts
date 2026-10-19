@@ -184,7 +184,7 @@ describe("pendingReportNotice", () => {
   it("annonce l'heure de la validation d'office quand l'échéance est connue", () => {
     expect(
       pendingReportNotice({ ...base, scoreDeadlineAt: "2026-10-20T18:05:00.000Z", team2Report: report(0, 2) }),
-    ).toBe("0 – 2 proposé par Bravo · validé automatiquement à 20:05 sans réponse");
+    ).toBe("0 – 2 proposé par Bravo · validé automatiquement à 20:05 (heure de Paris) sans réponse");
   });
 
   it("annonce un désaccord sans prendre parti", () => {
