@@ -1,4 +1,4 @@
-import type { PoolConnection } from "mysql2/promise";
+import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { matchWinnerSide, sideTeamIds } from "@/lib/shared/match-format";
 import { checkMapList, sameMapLists, type MatchMapInput } from "@/lib/shared/match-maps";
@@ -205,7 +205,11 @@ async function resolveReportingTeamId(
  * (`lib/shared/match-launch.ts`). Le report d'un joueur n'y déroge pas ;
  * l'arbitrage, qui passe par un autre chemin, garde la main.
  */
-function assertMatchLaunchedForPlayers(match: MatchRow): void {
+async function assertMatchLaunchedForPlayers(
+  connection: PoolConnection,
+  tournamentId: number,
+  match: MatchRow,
+): Promise<void> {
   if (
     !canPlayersReportScore(
       {
@@ -223,7 +227,16 @@ function assertMatchLaunchedForPlayers(match: MatchRow): void {
       Date.now(),
     )
   ) {
-    throw new Error("MATCH_NOT_LAUNCHED");
+    // Refus seulement : l'option du tournoi n'est lue qu'ici. Sans phase de
+    // lancement, aucun « Prêt » n'est attendu — un report parti juste avant
+    // l'heure (horloge de l'appareil en avance) apprend que le match n'a pas
+    // commencé, pas qu'il faudrait se déclarer prêt. L'option est figée une
+    // fois le tournoi en cours : une lecture ordinaire suffit.
+    const [rows] = await connection.execute<(RowDataPacket & { match_launch_phase: number | null })[]>(
+      `SELECT match_launch_phase FROM bg_tournaments WHERE id = ? LIMIT 1`,
+      [tournamentId],
+    );
+    throw new Error(Number(rows[0]?.match_launch_phase ?? 1) === 1 ? "MATCH_NOT_LAUNCHED" : "MATCH_NOT_STARTED");
   }
 }
 
@@ -360,7 +373,7 @@ export async function reportMatchScore(
     throw new Error("NOT_IN_MATCH");
   }
 
-  assertMatchLaunchedForPlayers(match);
+  await assertMatchLaunchedForPlayers(connection, tournamentId, match);
 
   // Un report d'équipe **clôt** la rencontre : le score doit donc constituer un
   // résultat final, et pas seulement respecter le plafond. Ce qu'est un

@@ -8,6 +8,7 @@
     "MATCH_NOT_LAUNCHABLE": "This match can't be launched: its two entrants aren't known yet, or it's over.",
     "MATCH_ALREADY_LAUNCHED": "This match has already been launched.",
     "MATCH_NOT_LAUNCHED": "The match hasn't been launched yet: every party must declare itself ready.",
+    "MATCH_NOT_STARTED": "The match hasn't started yet: the score opens at its start time.",
     "MATCH_NOT_IN_LAUNCH": "The score can only be reported once the match is launched: schedule it or wait for its start time. A forfeit is still possible.",
     "NOT_MATCH_PARTY": "You're neither playing nor casting this match.",
     "NOT_TEAM_READY_ROLE": "Only the captain, a manager or the owner can declare the team ready.",

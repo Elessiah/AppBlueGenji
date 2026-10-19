@@ -79,6 +79,8 @@ const REPORT_ERROR_STATUS: ReadonlyMap<string, number> = new Map([
   // Le match existe et le score est bien formé : c'est son état qui refuse,
   // le temps que les parties se déclarent prêtes (`lib/shared/match-launch.ts`).
   ["MATCH_NOT_LAUNCHED", 409],
+  // Sans phase de lancement : report parti avant l'heure de départ.
+  ["MATCH_NOT_STARTED", 409],
   // La proposition confirmée a changé ou n'existe plus : la modale se recharge.
   ["PROPOSAL_STALE", 409],
   ["TOURNAMENT_NOT_FOUND", 404],

@@ -373,7 +373,11 @@ export async function forceLaunchMatch(matchId: number): Promise<void> {
     const row = await lockLaunchMatch(connection, matchId);
     if (!row) throw new Error("MATCH_NOT_FOUND");
     if (row.tournament_state !== "RUNNING") throw new Error("TOURNAMENT_NOT_RUNNING");
-    const phase = matchLaunchPhase(toLaunchInput(row), Date.now());
+    // Jugé phase **allumée** : « déjà lancé » veut dire `launched_at` posé. Sur
+    // un tournoi sans lancement, un match à l'heure passée que l'entretien n'a
+    // pas encore écrit serait sinon refusé (`MATCH_ALREADY_LAUNCHED`) sans que
+    // rien ne soit enregistré ; forcer l'enregistre.
+    const phase = matchLaunchPhase({ ...toLaunchInput(row), launchPhase: true }, Date.now());
     if (phase === "LAUNCHED") throw new Error("MATCH_ALREADY_LAUNCHED");
     if (phase === "NONE") throw new Error("MATCH_NOT_LAUNCHABLE");
     await adoptCurrentPairing(connection, row);
@@ -507,7 +511,9 @@ export async function releaseIneligibleCast(matchId: number, casterId: number): 
     // des contacts la tait) ; un match joué entre la lecture et ce verrou est
     // de l'histoire, qu'on ne réécrit pas.
     if (row.status === "COMPLETED") return;
-    const phase = matchLaunchPhase(toLaunchInput(row), Date.now());
+    // Phase allumée : lancé = `launched_at` posé, y compris sans phase de
+    // lancement (heure passée, entretien pas encore passé : pas encore lancé).
+    const phase = matchLaunchPhase({ ...toLaunchInput(row), launchPhase: true }, Date.now());
     if (phase !== "TO_PLAN" && phase !== "SCHEDULED" && phase !== "LOBBY") return;
     if ((await loadCastEligibility(connection, casterId)) === null) return;
 
