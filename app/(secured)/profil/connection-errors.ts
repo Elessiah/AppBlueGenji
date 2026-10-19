@@ -42,7 +42,12 @@ export function connectionSuccessMessage(
   const { t } = text;
   if (!provider) return refreshed ? t("connections.success.refreshedAny") : t("connections.success.linkedAny");
   const label = OAUTH_PROVIDER_LABELS[provider];
-  if (!refreshed) return t("connections.success.linked", { label });
+  // Rattacher Discord ne certifie pas le tag : sans « Certifier mon tag »,
+  // aucun message privé de match (portée `certified`) — le toast le rappelle.
+  if (!refreshed) {
+    const linked = t("connections.success.linked", { label });
+    return provider === "DISCORD" ? `${linked} ${t("botHandle.certifyForDms")}` : linked;
+  }
   return provider === "DISCORD" ? t("connections.success.refreshedDiscord") : t("connections.success.refreshed", { label });
 }
 
@@ -72,7 +77,9 @@ export function sessionsRevokedMessage(count: number, text: ProfileText = FR_PRO
  * retrait lui-même est acquis.
  */
 export function unlinkSuccessMessage(provider: OAuthProvider, revoked: number | null, text: ProfileText = FR_PROFILE): string {
-  const removed = text.t("connections.unlinked", { label: OAUTH_PROVIDER_LABELS[provider] });
+  const unlinked = text.t("connections.unlinked", { label: OAUTH_PROVIDER_LABELS[provider] });
+  // Détacher Discord retire la certification, donc les messages privés de match.
+  const removed = provider === "DISCORD" ? `${unlinked} ${text.t("botHandle.matchDms")}` : unlinked;
   if (revoked === null) return text.t("connections.unlinkedSessionsFailed", { removed });
   if (revoked === 0) return removed;
   return `${removed} ${sessionsRevokedMessage(revoked, text)}`;

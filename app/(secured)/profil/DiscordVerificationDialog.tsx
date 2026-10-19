@@ -363,7 +363,7 @@ export function DiscordVerificationDialog({
         // Le lecteur d'écran doit entendre **ce que la certification expose**
         // avant d'atteindre le champ : c'est le consentement, pas une
         // décoration.
-        aria-describedby="discord-verify-exposure"
+        aria-describedby="discord-verify-match-dms discord-verify-exposure"
         tabIndex={-1}
         style={{
           width: "min(520px, calc(100vw - 32px))",
@@ -395,7 +395,9 @@ export function DiscordVerificationDialog({
         </p>
         {/* Seul un tag certifié reçoit les messages privés de match (portée
             `certified`) : le joueur le lit avant de renoncer. */}
-        <p style={{ color: "var(--ink-mute)", fontSize: 13.5, lineHeight: 1.7, margin: "0 0 14px" }}>{t("verify.matchDms")}</p>
+        <p id="discord-verify-match-dms" style={{ color: "var(--ink-mute)", fontSize: 13.5, lineHeight: 1.7, margin: "0 0 14px" }}>
+          {t("verify.matchDms")}
+        </p>
 
         <p
           style={{
