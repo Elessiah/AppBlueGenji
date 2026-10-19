@@ -1187,10 +1187,12 @@ describe("PRIVACY_CHANGES — conditions v6 : acceptation par chaque compte (CON
     const en = [english.summary, ...english.details].join(" ");
     expect(fr).toContain("chaque compte connecté doit désormais les accepter pour continuer à utiliser le site");
     expect(fr).toContain("le bouton « Plus tard » et son cookie bg_terms_later disparaissent");
-    expect(fr).toMatch(/te déconnecter, lire cette politique, les mentions légales, la déclaration d'accessibilité, les pages légales du bot et les règles des tournois, suivre ou contester tes signalements depuis leur page, et ouvrir ton profil, notamment pour exporter tes données ou supprimer ton compte/);
+    expect(fr).toMatch(/te déconnecter, lire cette politique, les mentions légales, la déclaration d'accessibilité, les pages légales du bot et les règles des tournois, suivre ou contester tes signalements depuis leur page, signaler un contenu par le bouton « Signaler un problème » de ces pages, et ouvrir ton profil, notamment pour exporter tes données ou supprimer ton compte/);
+    expect(fr).toContain("Refuser ne te retire ni de tes équipes ni de tes inscriptions");
     expect(en).toContain("every logged-in account must now accept them to keep using the site");
     expect(en).toContain("the “Later” button and its bg_terms_later cookie are gone");
-    expect(en).toMatch(/log out, read this policy, the legal notice, the accessibility statement, the bot's legal pages and the tournament rules, follow or contest your reports from their page, and open your profile, notably to export your data or delete your account/);
+    expect(en).toMatch(/log out, read this policy, the legal notice, the accessibility statement, the bot's legal pages and the tournament rules, follow or contest your reports from their page, report content through the “Report a problem” button of these pages, and open your profile, notably to export your data or delete your account/);
+    expect(en).toContain("Refusing does not remove you from your teams or registrations");
   });
 
   it("dit que la fenêtre de lancement montre aussi le BattleTag masqué, aux équipes et au caster seulement (FR et EN)", () => {

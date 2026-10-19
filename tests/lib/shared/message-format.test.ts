@@ -98,12 +98,15 @@ describe("coquille — équivalence avec next-intl, message par message", () => 
           terms: (chunks: string) => `<terms>${chunks}</terms>`,
           // Lien de la politique (`privacyModal.policy`, lot 7b-2).
           policy: (chunks: string) => `<policy>${chunks}</policy>`,
+          // Lien du profil (`termsModal.exits`).
+          profile: (chunks: string) => `<profile>${chunks}</profile>`,
         });
         const actual = ours
           .rich<string>(key as ShellKey, values, {
             strong: (children) => `<strong>${children.join("")}</strong>`,
             terms: (children) => `<terms>${children.join("")}</terms>`,
             policy: (children) => `<policy>${children.join("")}</policy>`,
+            profile: (children) => `<profile>${children.join("")}</profile>`,
           })
           .join("");
         expect(`${key}: ${actual}`).toBe(`${key}: ${expected}`);
