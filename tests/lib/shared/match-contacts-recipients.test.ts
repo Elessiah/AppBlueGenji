@@ -161,3 +161,14 @@ describe("T04 — caster d'un compte supprimé", () => {
     expect(readSource("lib/server/users/account-erasure.ts")).toContain("WHERE caster_user_id = ? AND status <> 'COMPLETED'");
   });
 });
+
+describe("tag Discord d'un caster — arbitres", () => {
+  it("la liste d'exposition dit que les arbitres le lisent le temps d'un match casté (FR et EN)", () => {
+    const fr = "Les arbitres le voient uniquement quand tu es engagé dans un tournoi en cours ou à venir — plus après —, ou le temps d'un match que tu castes.";
+    expect(readSource("lib/shared/discord-identity.ts")).toContain(fr);
+    expect(frProfile.verify.exposure.referees).toBe(fr);
+    expect(enProfile.verify.exposure.referees).toBe(
+      "Referees can see it only while you're entered in an ongoing or upcoming tournament — not after —, or while a match you cast is being played.",
+    );
+  });
+});
