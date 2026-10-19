@@ -188,6 +188,7 @@ export function CasterCard({
   onCopy,
   contactsShown = phase !== "SCHEDULED",
   noCasterText,
+  contactsLaterText,
   linkNames = false,
 }: Readonly<{
   caster: LaunchCaster | null;
@@ -196,6 +197,11 @@ export function CasterCard({
   contactsShown?: boolean;
   /** Texte sans caster ; par défaut, celui de la modale de lancement. */
   noCasterText?: string;
+  /**
+   * Texte à la place des contacts tus (`contactsShown` faux) : sans lui, la
+   * fiche ne montre que le pseudo.
+   */
+  contactsLaterText?: string;
   /** Pseudo cliquable (modale « Contacts » seulement, voir `SideCard`). */
   linkNames?: boolean;
 }>) {
@@ -227,6 +233,7 @@ export function CasterCard({
           <IdentityLine kind="BattleTag" value={caster.battletag} verified={caster.battletagVerified} onCopy={onCopy} />
         </div>
       )}
+      {!contactsShown && contactsLaterText && <p className={styles.note}>{contactsLaterText}</p>}
     </section>
   );
 }

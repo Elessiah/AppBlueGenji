@@ -229,7 +229,7 @@ function RgpdFr({
       </section>
 
       {/* SECTION 02 — DONNÉES COLLECTÉES */}
-      <section className={styles.section}>
+      <section id="donnees-collectees" className={styles.section}>
         <header className={styles.head}>
           <div>
             <span className="eyebrow">SECTION 02</span>

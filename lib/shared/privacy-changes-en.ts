@@ -443,7 +443,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "Hidden BattleTag: it can no longer be read on your profile by the players of your matches, nor by referees and administrators during a tournament. It can now only be read in the “Contacts” window of a match where you are presented as a contact — by both teams and by referees and administrators as soon as both opponents are known, by the caster while the match is being played. If you don't want them to see it, remove it from your profile. This reading is based on the performance of the service — running the tournament —, not on your consent.",
       "Terms of use: version 5, in force since 19 October 2026, adds the “Match contacts” section, which provides for this sharing. Read them again: the login page shows them to you anew as long as they have not been accepted in your browser and, if you manage a team and have not already accepted them, before your next management action.",
     ],
-    linkLabels: ["Read the “Match contacts” section", "Read the “Recipients and transfers” section"],
+    linkLabels: ["Read the “Match contacts” section", "Read the “Data collected” section"],
   },
 };
 

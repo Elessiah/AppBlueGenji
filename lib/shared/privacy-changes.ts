@@ -838,7 +838,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     ],
     links: [
       { href: "/conditions-utilisation#contacts-de-match", label: "Lire la section « Contacts de match »" },
-      { href: "/rgpd#destinataires", label: "Lire la section « Destinataires et transferts »" },
+      { href: "/rgpd#donnees-collectees", label: "Lire la section « Données collectées »" },
     ],
   },
 ];
