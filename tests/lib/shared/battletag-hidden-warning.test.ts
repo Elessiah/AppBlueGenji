@@ -16,9 +16,9 @@ import { TERMS_SECTIONS_EN } from "@/lib/shared/terms-of-use-en";
  * de la case « BattleTag OW »), avec la même phrase en français et en anglais.
  */
 const FR =
-  "Tu peux masquer ton BattleTag : il ne reste alors visible que dans la fenêtre « Contacts » de tes matchs de tournoi, pour les deux équipes et les arbitres dès que les deux adversaires sont connus, et pour le caster le temps du match. Si tu ne veux pas qu'ils le voient, retire-le de ton profil (s'il vient de Battle.net, détache d'abord ton compte Battle.net).";
+  "Tu peux masquer ton BattleTag : il ne reste alors visible que dans la fenêtre « Contacts » de tes matchs de tournoi, si tu fais partie des contacts présentés : pour les deux équipes et les arbitres dès que les deux adversaires sont connus, et pour le caster le temps du match. Si tu ne veux pas qu'ils le voient, retire-le de ton profil (s'il vient de Battle.net, détache d'abord ton compte Battle.net).";
 const EN =
-  "You can hide your BattleTag: it then only stays visible in the “Contacts” window of your tournament matches, to both teams and the referees from the moment both opponents are known, and to the caster while the match is being played. If you don't want them to see it, remove it from your profile (if it comes from Battle.net, unlink your Battle.net account first).";
+  "You can hide your BattleTag: it then only stays visible in the “Contacts” window of your tournament matches, if you're among the contacts shown: to both teams and the referees from the moment both opponents are known, and to the caster while the match is being played. If you don't want them to see it, remove it from your profile (if it comes from Battle.net, unlink your Battle.net account first).";
 
 const readSource = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 
@@ -66,7 +66,7 @@ describe("conditions d'utilisation — contacts de match (version 5)", () => {
     expect(text).toContain("Au titre de l'organisation du tournoi");
     expect(text).toContain("Un tag Discord non certifié n'est jamais communiqué.");
     // Seule porte d'un BattleTag masqué, staff compris ; contacts du caster le temps du match.
-    expect(text).toContain("Ce partage passe par la seule fenêtre « Contacts » du match : un BattleTag masqué n'est lisible nulle part ailleurs, pour personne — arbitres et administrateurs compris.");
+    expect(text).toContain("Ce partage passe par la seule fenêtre « Contacts » du match, que reprend sa fenêtre de lancement au départ du match : un BattleTag masqué n'est lisible nulle part ailleurs, pour personne — arbitres et administrateurs compris.");
     expect(text).toContain("celles du caster le sont aux deux équipes et aux arbitres sur ce même temps du match");
   });
 
