@@ -62,7 +62,8 @@ bot (`/privacy-policy-bot`, `/terms-of-service-bot`), `/regles` (règles des
 tournois, que les conditions complètent), `/signalements` (suivre ou contester
 un signalement : recours interne) et `/profil` (export
 des données, suppression du compte — la page entière reste ouverte, ce que
-disent les conditions : « ouvrir son profil ») — `TERMS_FREE_PATHS` de
+disent les conditions : « ouvrir son profil »). La fenêtre le dit elle-même (`shell.termsModal.exits`, FR et EN) et
+lie `/rgpd` et `/profil`, sans quoi seul qui connaît les adresses partirait — `TERMS_FREE_PATHS` de
 `lib/shared/global-modals.ts`, en plus de `/conditions-utilisation` et
 `/connexion`. Les conditions (« Acceptation », FR et EN), l'entrée v6 de
 `PRIVACY_CHANGES`, `/rgpd` (FR et EN) et la fiche T13 du registre décrivent
