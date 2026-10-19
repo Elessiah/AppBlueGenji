@@ -36,7 +36,7 @@ ait un producteur côté serveur.
 | Sujet | Déclencheur | Discord aussi ? |
 |---|---|---|
 | `MATCH_START` | Match entré en lancement (« déclare-toi prêt »), ou lancé sans être passé par là (lancement forcé) | Non |
-| `SCORE_TO_CONFIRM` | L'adversaire a saisi un score | Non |
+| `SCORE_TO_CONFIRM` | L'adversaire a saisi un score ; ou un score seul a été validé d'office après 2 h (`SCORE_DISPUTE_LOCK.md`, aux deux équipes) | Non |
 | `TOURNAMENT_START` | Coup d'envoi d'un tournoi où l'on est engagé | Non |
 | `MATCH_REMINDER` (« Horaires et rappels de match ») | Annonce de l'horaire posé, changé ou retiré par l'arbitrage (« Match programmé / reprogrammé », avec l'ancienne date ; « Horaire du match retiré »), « Match retiré de ton programme » quand une mise à jour du tournoi (correction de score, retour en arrière, ronde réappariée, plateau refait avant le départ, finales BG Survie réécrites) sort l'engagée de la manche, puis rappels H-24 et H-10 — ce dernier avec le lien du check-in, porté par l'annonce quand la manche est programmée moins de 10 h avant (les rappels J-7 et H-1 sont retirés) ; le push qui porte le check-in ouvre l'invitation au toucher (`/check-in`, redirection vers `CHECK_IN_INVITE_URL`). Un seul sujet pour les deux rappels : le check-in fait partie des rappels de match | Oui |
 | `TEAM_JOIN_REQUEST` | Demande d'adhésion (gestion de l'équipe) | Oui |

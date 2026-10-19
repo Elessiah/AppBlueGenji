@@ -22,10 +22,14 @@ porte côté joueur.
 2. **Confirmer.** L'adversaire voit « Confirmer le score » sur la carte ; la
    modale s'ouvre sur la proposition, un clic la valide et tranche le match.
 3. **Contester.** Il peut aussi saisir un autre score : les deux propositions se
-   contredisent, l'arbitrage est alerté (`REFEREE_ALERTS.md`), et chacun peut
-   encore corriger la sienne (« Revoir le score »).
+   contredisent, l'arbitrage est alerté (`REFEREE_ALERTS.md`), et la saisie est
+   **verrouillée pour les deux équipes** jusqu'à ce qu'un arbitre tranche
+   (« Voir le litige », `409 SCORE_LOCKED_DISPUTE` — `SCORE_DISPUTE_LOCK.md`).
 4. **Sans réponse**, la proposition fait foi à l'échéance du délai
-   (`score_deadline_at`, rappelé dans la modale). Ce délai ne court qu'après une
+   (`score_deadline_at`, « validé automatiquement à HH:MM », heure de Paris, sur
+   la carte et dans la modale) : **deux heures** après la dernière saisie du
+   déclarant (`SCORE_AUTO_VALIDATE_MINUTES`, `SCORE_DISPUTE_LOCK.md`), et jamais
+   avant une fin de série plausible. Cette dernière ne court qu'après une
    fin de série plausible — une série **complète** au format de la manche,
    15 min par map de son plafond (BO5 en saisie libre), depuis le lancement
    (`lib/shared/score-report-deadline.ts`) : un « 3-0 » envoyé à la seconde du
