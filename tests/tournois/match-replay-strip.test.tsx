@@ -33,6 +33,7 @@ function render(match: BracketMatch, canManage = false): string {
       canManage={canManage}
       canSchedule={false}
       refereeScheduling={false}
+      launchPhase
       openConfig={noop}
       openSchedule={noop}
       openReplay={noop}

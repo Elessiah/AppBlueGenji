@@ -6,7 +6,7 @@ jest.mock("@/lib/server/tournaments/notifications");
 import type { PoolConnection } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
-import { listViewerMatchLaunches } from "@/lib/server/tournaments/match-launch-info";
+import { listViewerMatchLaunches, loadViewerMatchContacts } from "@/lib/server/tournaments/match-launch-info";
 import { invalidateTournamentLists } from "@/lib/server/tournaments/list-cache";
 import { fakeConnection } from "../../helpers/sql-double";
 
@@ -29,6 +29,7 @@ function candidate(overrides: Candidate = {}): Candidate {
     id: 42,
     tournament_id: 7,
     tournament_state: "RUNNING",
+    match_launch_phase: 1,
     status: "READY",
     is_bye: 0,
     team1_id: TEAM1,
@@ -109,13 +110,14 @@ let state: World;
  * statut fantôme) : le tournoi est passé deux fois.
  */
 function candidateContextRows(world: World, params: unknown[]) {
-  const [tournamentId, , team1Id] = params.map(Number);
+  const [tournamentId, , , team1Id] = params.map(Number);
   const c = world.candidates.find((x) => x.tournament_id === tournamentId && x.team1_id === team1Id);
   if (!c) return [];
   return [
     {
       tournament_state: c.tournament_state,
       referee_scheduling: c.referee_scheduling ?? 0,
+      match_launch_phase: c.match_launch_phase ?? 1,
       team1_is_ghost: c.team1_is_ghost,
       team2_is_ghost: c.team2_is_ghost,
     },
@@ -538,5 +540,71 @@ describe("listViewerMatchLaunches — planification par l'arbitrage", () => {
     await listViewerMatchLaunches(viewer);
     const read = state.reads.find((sql) => sql.includes("t.name AS tournament_name"));
     expect(read).toContain("(m.start_at IS NOT NULL OR t.referee_scheduling = 0)");
+  });
+});
+
+describe("listViewerMatchLaunches — option « phase de lancement »", () => {
+  it("ne présente à la modale que les tournois qui ont la phase de lancement", async () => {
+    await listViewerMatchLaunches(viewer);
+    const read = state.reads.find((sql) => sql.includes("t.name AS tournament_name"));
+    expect(read).toContain("AND t.match_launch_phase = 1");
+    expect(read).toContain(`INTERVAL ${60} MINUTE`);
+  });
+});
+
+describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => {
+  const scheduled = () => new Date(Date.now() + 3 * 3_600_000).toISOString();
+  const verifiedCaptain = () =>
+    member(TEAM2, 5, { roles_json: JSON.stringify(["CAPITAINE"]), discord_pseudo: "cap2", discord_verified_at: OPENED });
+
+  it("expose les contacts d'un match programmé, même hors de la fenêtre de la modale", async () => {
+    state.candidates = [candidate({ match_launch_phase: 0, start_at: scheduled(), caster_user_id: CASTER })];
+    state.members = [verifiedCaptain()];
+    state.users = [casterUser(CASTER)];
+    const info = await loadViewerMatchContacts(viewer, 42);
+    expect(info?.phase).toBe("SCHEDULED");
+    expect(info?.team2.contacts).toEqual([expect.objectContaining({ userId: 5, discordTag: "cap2" })]);
+    expect(info?.caster).toMatchObject({ pseudo: "Caster", discordTag: "caster" });
+  });
+
+  it("lit un seul match, sans le filtre de l'option ni la fenêtre de la modale", async () => {
+    await loadViewerMatchContacts(viewer, 42);
+    const read = state.reads.find((sql) => sql.includes("t.name AS tournament_name"));
+    expect(read).toContain("AND m.id = ?");
+    expect(read).not.toContain("t.match_launch_phase = 1");
+    expect(read).not.toContain("INTERVAL 60 MINUTE");
+  });
+
+  it("expose les contacts d'un match lancé d'emblée sur un tournoi sans phase de lancement", async () => {
+    state.candidates = [candidate({ match_launch_phase: 0 })];
+    state.members = [verifiedCaptain()];
+    const info = await loadViewerMatchContacts(viewer, 42);
+    expect(info?.phase).toBe("LAUNCHED");
+    expect(info?.team2.contacts).toHaveLength(1);
+  });
+
+  it("garde la phase de lancement d'un tournoi qui l'a allumée", async () => {
+    state.members = [verifiedCaptain()];
+    const info = await loadViewerMatchContacts(viewer, 42);
+    expect(info?.phase).toBe("LOBBY");
+    expect(info?.team2.contacts).toHaveLength(1);
+  });
+
+  it("ne rend rien à qui n'est ni joueur ni caster du match", async () => {
+    state.viewerMemberships = [];
+    state.members = [verifiedCaptain()];
+    await expect(loadViewerMatchContacts(viewer, 42)).resolves.toBeNull();
+  });
+
+  it("ne rend rien d'un match terminé ou à planifier", async () => {
+    state.candidates = [candidate({ status: "COMPLETED" })];
+    await expect(loadViewerMatchContacts(viewer, 42)).resolves.toBeNull();
+    state.candidates = [candidate({ referee_scheduling: 1, start_at: null })];
+    await expect(loadViewerMatchContacts(viewer, 42)).resolves.toBeNull();
+  });
+
+  it("ne rend rien quand aucun tournoi n'est en cours", async () => {
+    state.running = false;
+    await expect(loadViewerMatchContacts(viewer, 42)).resolves.toBeNull();
   });
 });

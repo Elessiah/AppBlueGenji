@@ -403,7 +403,7 @@ describe("bases légales : le registre et la politique disent la même chose", (
 
   it("fonde les contacts du lancement d'un match sur l'exécution des conditions d'utilisation", () => {
     expect(byRef("T04").legalBasis).toMatch(
-      /exécution du service demandé par le joueur \(contrat — conditions d'utilisation\) pour la présentation des contacts aux parties d'un match à son lancement/,
+      /exécution du service demandé par le joueur \(contrat — conditions d'utilisation\) pour la présentation des contacts aux parties d'un match, dès sa programmation,/,
     );
   });
 

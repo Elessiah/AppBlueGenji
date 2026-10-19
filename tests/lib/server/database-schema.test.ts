@@ -215,6 +215,15 @@ describe("Schéma — la règle des deux endroits", () => {
     );
   });
 
+  // Même règle : le défaut 0 éteint la phase de lancement sur tout tournoi
+  // existant (décision du 2026-10-13), sans remplissage.
+  it("ajoute la phase de lancement des matchs éteinte, aux deux endroits", () => {
+    expect(table("bg_tournaments")).toMatch(/match_launch_phase TINYINT\(1\) NOT NULL DEFAULT 0/);
+    expect(migrations).toMatch(
+      /ALTER TABLE bg_tournaments ADD COLUMN match_launch_phase TINYINT\(1\) NOT NULL DEFAULT 0/,
+    );
+  });
+
   it("porte des instructions entières, et non des triplets table/colonne/type", () => {
     // Un triplet ne sait dire qu'`ADD COLUMN` : la règle des deux endroits ne
     // s'appliquait alors ni à un `ENUM` élargi, ni à un index posé, ni à une clé

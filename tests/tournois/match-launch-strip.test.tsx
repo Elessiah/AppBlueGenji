@@ -28,6 +28,7 @@ type Viewer = {
   canManage?: boolean;
   canSchedule?: boolean;
   refereeScheduling?: boolean;
+  launchPhase?: boolean;
   viewerUserId?: number | null;
   myTeamId?: number | null;
   castBlock?: CastBlock | null;
@@ -40,6 +41,7 @@ function providers(viewer: Viewer, child: ReactNode) {
         canManage={viewer.canManage ?? false}
         canSchedule={viewer.canSchedule ?? false}
         refereeScheduling={viewer.refereeScheduling ?? false}
+        launchPhase={viewer.launchPhase ?? true}
         openConfig={() => undefined}
         openSchedule={() => undefined}
         openReplay={() => undefined}

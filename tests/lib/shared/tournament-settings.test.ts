@@ -67,6 +67,7 @@ describe("tournamentSettingsGroups — réglages généraux", () => {
       "Effectif maximal": "16 équipes",
       "Format des matchs": "FT3",
       "Ordre de départ": "Fixé par l'arbitrage",
+      "Phase de lancement des matchs": "Oui",
     });
   });
 

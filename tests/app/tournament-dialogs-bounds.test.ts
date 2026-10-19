@@ -106,6 +106,8 @@ describe("champs de score sur un petit écran", () => {
 
 describe("modale de lancement sur un petit écran", () => {
   const tsx = read(join(ROOT, "components", "match-launch", "MatchLaunchCenter.tsx"));
+  // Fiches (contacts, « Copier ») partagées avec la modale « Contacts » d'une carte.
+  const cards = read(join(ROOT, "components", "match-launch", "LaunchContactCards.tsx"));
   const css = stripComments(read(join(ROOT, "components", "match-launch", "MatchLaunchCenter.module.css")));
 
   it("la barre d'actions et la confirmation restent sous la zone qui défile", () => {
@@ -143,7 +145,8 @@ describe("modale de lancement sur un petit écran", () => {
     // Lot 8b-2 : les libellés viennent de `shell.launchModal`, cités par clé.
     expect(openingOf('t("cancelReady")')).not.toContain("data-autofocus");
     expect(openingOf('{t("viewMatch")}')).not.toContain("data-autofocus");
-    expect(openingOf('{t("copy")}')).not.toContain("data-autofocus");
+    expect(cards).toContain('{t("copy")}');
+    expect(cards).not.toContain("data-autofocus");
     expect(tsx.match(/^\s*data-autofocus$/gm)).toHaveLength(1);
   });
 
