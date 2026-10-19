@@ -742,7 +742,10 @@ export default function ProfilePage() {
       loadDiscordState={loadDiscordState}
       discordTagBusy={discordTagBusy}
       onDiscordTagRemove={() => {
-        setTagRemovalVerified(discordState.verified);
+        // Même repli que la ligne des messages de match : si la lecture de
+        // l'état Discord a échoué, le profil chargé dit la certification —
+        // sinon un tag certifié serait annoncé « vu de personne ».
+        setTagRemovalVerified(matchDmReachable(discordState, data?.profile.discordVerified) === true);
         setTagRemovalDms((matchDmShown.current ?? data?.matchDmEnabled) !== false);
         setConfirmingTagRemoval(true);
       }}
