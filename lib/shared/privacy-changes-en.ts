@@ -429,7 +429,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     summary:
       "The members of both teams and the caster of your match can see the contacts shown at launch as soon as both opponents of the match are known, even before its time is set, through the “Contacts” button on the match card.",
     details: [
-      "It's the same information as at a match launch — the certified Discord tag and the BattleTag, even if hidden, of one or two members per team (player, coach, manager or owner), and those of the signed-up caster —, shown to the same people: only the parties to the match (members of both teams and the signed-up caster).",
+      "It's the same information as at a match launch — the certified Discord tag and the BattleTag, even if hidden, of one or two members per team (player, coach, manager or owner), and those of the signed-up caster —, shown to the same people: only the parties to the match (members of both teams and the signed-up caster). Our texts said “the players”: as before, it is in fact every current member of both teams, coaches, managers and owners included — which also applies to the hidden BattleTag read on a profile during the tournament.",
       "What changes is when: as soon as the match has both its opponents, with or without a set time, no longer only at its launch, so you can get organised ahead of time. They stop being visible once the match is over.",
       "The launch phase (“Ready” and the launch window) becomes an option of each tournament, off by default: without it, a match starts at its time and no “Ready” is recorded.",
     ],

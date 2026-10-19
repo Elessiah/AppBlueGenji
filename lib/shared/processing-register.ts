@@ -330,7 +330,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     ],
     recipients: [
       "Public du site (seules les données que le joueur rend visibles)",
-      "Joueurs d'un même match, tant que le tournoi n'est pas terminé (BattleTag même masqué, pour s'ajouter en jeu)",
+      "Membres des deux équipes d'un même match, tant que le tournoi n'est pas terminé (BattleTag même masqué, pour s'ajouter en jeu)",
       "Joueurs connectés du site : pseudo Discord certifié, si le joueur le rend visible",
       "Staff de l'association selon son rôle (administration, arbitrage)",
     ],
@@ -442,6 +442,8 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "BattleTag",
       "Date et adversaire du match",
       "Heure à laquelle chaque partie s'est déclarée prête, caster inscrit",
+      "Rôles d'équipe et statut de certification (tag Discord, BattleTag tiré d'un compte Battle.net rattaché) des contacts présentés",
+      "Rôles d'équipe et statut de certification (tag Discord, BattleTag tiré d'un compte Battle.net rattaché) des contacts présentés",
       "Motif d'un signalement",
       "Choix du joueur de recevoir ou non les messages privés Discord de ses matchs",
     ],

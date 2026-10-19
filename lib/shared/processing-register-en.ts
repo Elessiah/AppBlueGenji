@@ -153,7 +153,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     ],
     recipients: [
       "The site's public (only the data the player makes visible)",
-      "Players of the same match, until the tournament is over (BattleTag even when hidden, to add each other in game)",
+      "Members of both teams of the same match, until the tournament is over (BattleTag even when hidden, to add each other in game)",
       "Logged-in players of the site: certified Discord username, if the player makes it visible",
       "The association's staff according to their role (administration, refereeing)",
     ],
@@ -265,6 +265,8 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "BattleTag",
       "Date and opponent of the match",
       "Time at which each party declared itself ready, registered caster",
+      "Team roles and certification status (Discord username, BattleTag taken from a linked Battle.net account) of the contacts presented",
+      "Team roles and certification status (Discord username, BattleTag taken from a linked Battle.net account) of the contacts presented",
       "Reason for a report",
       "The player's choice to receive or not the Discord direct messages about their matches",
     ],
