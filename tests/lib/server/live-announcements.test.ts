@@ -1269,7 +1269,7 @@ describe("soirées d'annonces", () => {
     await runLiveAnnouncementSweep(NOW);
     const read = evening.mock.calls.find(([sql]) => sql.includes("a.sent_at >= ?"));
     expect(read?.[0].replace(/\s+/g, " ")).toContain(
-      "a.match_id = m.id AND a.sent_at >= ? AND a.sent_at <= ? AND a.refused = 0 AND a.pairing = CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id))",
+      "a.match_id = m.id AND a.sent_at >= ? AND a.sent_at < ? AND a.refused = 0 AND a.pairing = CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id))",
     );
   });
 
@@ -1452,6 +1452,31 @@ describe("mise à jour de la soirée aux fins de match", () => {
     }
   });
 
+  it("mise à jour peut-être partie (incertaine, sans réponse à temps) : la suivante renvoie le texte, sans relance immédiate", async () => {
+    const outcomes: LiveAnnouncementOutcome[] = ["uncertain", "timed-out", "interrupted"];
+    for (const outcome of outcomes) {
+      resetLiveAnnouncementThrottle();
+      jest.mocked(pushLiveEvening).mockClear();
+      pushLiveAnnouncement.mockResolvedValue(outcome);
+      jest.useFakeTimers();
+      try {
+        // Soirée finie au texte publié par ce processus, puis une fin de match.
+        pushLiveAnnouncement.mockResolvedValueOnce("posted");
+        mockRefresh([OPEN], [AUTO_LIVE]);
+        await refreshLiveEvenings(NOW);
+        mockRefresh([{ ...OPEN, ended: 1 }], [DONE]);
+        expect(await refreshLiveEvenings(NOW)).toBe(0);
+        expect(jest.getTimerCount()).toBe(0);
+        pushLiveAnnouncement.mockResolvedValue("posted");
+        expect(await refreshLiveEvenings(NOW)).toBe(1);
+        expect(pushLiveEvening).toHaveBeenCalledTimes(3);
+        expect(jest.mocked(pushLiveEvening).mock.calls[2][0].message).toContain("· Terminé · 2-1");
+      } finally {
+        jest.useRealTimers();
+      }
+    }
+  });
+
   it("message supprimé de #live : la soirée est close, rien n'est reposté", async () => {
     pushLiveAnnouncement.mockResolvedValue("evening-deleted");
     const { execute } = mockRefresh([OPEN], [DONE]);
@@ -1477,7 +1502,7 @@ describe("mise à jour de la soirée aux fins de match", () => {
     expect(jest.mocked(pushLiveEvening).mock.calls[1][0].message).toContain("· Terminé · 2-1");
     // Réservations de la fenêtre seulement : la soirée suivante n'y est pas reprise.
     const read = evening.mock.calls.find(([sql]) => sql.includes("a.sent_at >= ?"));
-    expect(read?.[0]).toContain("a.sent_at >= ? AND a.sent_at <= ?");
+    expect(read?.[0]).toContain("a.sent_at >= ? AND a.sent_at < ?");
   });
 
   it("fenêtre finie sans texte publié par ce processus (redémarrage) : rien n'est modifié", async () => {
