@@ -91,6 +91,8 @@ function casterUser(id: number, overrides: Record<string, unknown> = {}) {
 type World = {
   /** Un tournoi est-il en cours sur le site ? */
   running: boolean;
+  /** Un tournoi en cours a-t-il la phase de lancement ? (défaut : `running`) */
+  runningWithLaunchPhase?: boolean;
   /** Requêtes reçues, dans l'ordre. */
   reads: string[];
   viewerMemberships: { team_id: number; roles_json: string }[];
@@ -128,7 +130,12 @@ function connectionFor(world: World): PoolConnection {
   const execute = async (rawSql: string, params: unknown[] = []) => {
     const sql = rawSql.replace(/\s+/g, " ").trim();
     world.reads.push(sql);
-    if (sql.includes("AS running")) return [[{ running: Number(world.running) }], []];
+    if (sql.includes("AS running")) {
+      const running = sql.includes("match_launch_phase = 1")
+        ? (world.runningWithLaunchPhase ?? world.running)
+        : world.running;
+      return [[{ running: Number(running) }], []];
+    }
     if (sql.startsWith("UPDATE")) {
       world.writes.push(sql);
       return [{ affectedRows: 1 }, []];
@@ -286,8 +293,28 @@ describe("listViewerMatchLaunches — coût de l'interrogation", () => {
     await expect(listViewerMatchLaunches(viewer)).resolves.toEqual([]);
 
     expect(state.reads).toEqual([
-      expect.stringContaining("SELECT EXISTS (SELECT 1 FROM bg_tournaments WHERE state = 'RUNNING')"),
+      expect.stringContaining("SELECT EXISTS (SELECT 1 FROM bg_tournaments WHERE state = 'RUNNING'"),
     ]);
+  });
+
+  // Option désactivée par défaut : un tournoi en cours sans phase de lancement
+  // n'a rien à présenter dans la modale, la lecture complète serait vaine.
+  it("ne lit que le drapeau quand aucun tournoi en cours n'a la phase de lancement", async () => {
+    state.runningWithLaunchPhase = false;
+
+    await expect(listViewerMatchLaunches(viewer)).resolves.toEqual([]);
+
+    expect(state.reads).toEqual([expect.stringContaining("WHERE state = 'RUNNING' AND match_launch_phase = 1")]);
+  });
+
+  it("garde le bouton « Contacts » sur un tournoi en cours sans phase de lancement", async () => {
+    state.runningWithLaunchPhase = false;
+    state.candidates = [candidate({ match_launch_phase: 0 })];
+
+    await expect(loadViewerMatchContacts(viewer, 42)).resolves.not.toBeNull();
+
+    const flag = state.reads.find((sql) => sql.includes("AS running"));
+    expect(flag).not.toContain("match_launch_phase");
   });
 
   it("mutualise le drapeau entre les lecteurs", async () => {
