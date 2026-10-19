@@ -239,6 +239,15 @@ export interface LiveEveningStream {
   startsAt: number;
   /** `true` : à l'antenne maintenant. */
   live: boolean;
+  /**
+   * Match annoncé dans la soirée puis terminé (score rendu, ou antenne
+   * fermée) : il reste au message, marqué « Terminé ». Absent : à l'antenne
+   * ou programmé.
+   */
+  finished?: {
+    /** Score dans l'ordre de l'affiche (`[2, 1]` : « 2-1 ») ; `null` sans score (forfait, en attente). */
+    score: readonly [number, number] | null;
+  };
   tournamentName: string;
   team1Name: string | null;
   team2Name: string | null;
@@ -287,9 +296,24 @@ function noLinkTokens(text: string): string {
  */
 const ORDERED_LIST_START = /^(\d+)([.)])/;
 
-/** Bloc d'un match, sans son jeton de lien : heure (et « En direct »), affiche et tournoi. */
+/** État d'un bloc après l'heure : « · En direct », « · Terminé · 2-1 », « · Terminé », ou rien (programmé). */
+function eveningState(stream: LiveEveningStream): string {
+  if (stream.finished) {
+    const score = stream.finished.score;
+    return score ? ` · Terminé · ${score[0]}-${score[1]}` : " · Terminé";
+  }
+  return stream.live ? " · En direct" : "";
+}
+
+/** Rang d'un bloc : à l'antenne, puis programmé, puis terminé. */
+function eveningRank(stream: LiveEveningStream): number {
+  if (stream.finished) return 2;
+  return stream.live ? 0 : 1;
+}
+
+/** Bloc d'un match, sans son jeton de lien : heure (et son état), affiche et tournoi. */
 function eveningBlock(stream: LiveEveningStream): string {
-  const when = `**${parisClock(stream.startsAt)}**${stream.live ? " · En direct" : ""}`;
+  const when = `**${parisClock(stream.startsAt)}**${eveningState(stream)}`;
   const pairing = pairingLine(publishableName(stream.team1Name), publishableName(stream.team2Name)).replace(
     ORDERED_LIST_START,
     (_match, digits: string, mark: string) => `${digits}\\${mark}`,
@@ -307,7 +331,9 @@ function eveningRest(count: number): string {
  * l'en-tête, puis un bloc par match — l'heure en gras (Paris) et « En direct »
  * pour un match à l'antenne, l'affiche et le tournoi, le lien seul sur sa
  * ligne — séparés par une ligne vide. Les matchs à l'antenne d'abord, puis les
- * suivants par heure. Au-delà de {@link LIVE_ANNOUNCEMENT_MAX_LENGTH} (liens
+ * programmés par heure, puis les terminés (« · Terminé · 2-1 », « · Terminé »
+ * sans score) par heure : une soirée trop longue perd ses matchs finis avant
+ * ceux à venir. Au-delà de {@link LIVE_ANNOUNCEMENT_MAX_LENGTH} (liens
  * comptés en entier) ou de {@link LIVE_EVENING_MAX_LINKS} liens, la liste
  * s'arrête **à la fin d'un bloc** et une dernière ligne compte le reste.
  *
@@ -315,7 +341,7 @@ function eveningRest(count: number): string {
  * @returns Le texte, avec ses jetons de lien, et les liens dans l'ordre des jetons.
  */
 export function formatLiveEvening(streams: readonly LiveEveningStream[]): LiveEveningText {
-  const ordered = [...streams].sort((a, b) => Number(b.live) - Number(a.live) || a.startsAt - b.startsAt);
+  const ordered = [...streams].sort((a, b) => eveningRank(a) - eveningRank(b) || a.startsAt - b.startsAt);
   const urls: string[] = [];
   let text = EVENING_HEADER;
   let realLength = text.length;

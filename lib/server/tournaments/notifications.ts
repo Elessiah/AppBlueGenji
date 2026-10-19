@@ -37,6 +37,18 @@ function scheduleMatchStartNotices(): void {
 }
 
 /**
+ * Une fin de match (score rendu ou arbitré, antenne fermée, forfait) remet à
+ * jour le message #live de la soirée (`./live-announcements`) : le match y
+ * passe « Terminé ». Regroupé sur une minute et sans lecture immédiate ; rien
+ * si les annonces sont désactivées.
+ */
+function scheduleLiveEveningRefresh(): void {
+  void import("./live-announcements")
+    .then(({ requestLiveEveningRefresh }) => requestLiveEveningRefresh())
+    .catch(() => undefined);
+}
+
+/**
  * Le tournoi lui-même a changé : plateau, inscrites, état.
  *
  * Seul cet événement vide la liste publique — c'est le seul dont le contenu s'y
@@ -45,6 +57,7 @@ function scheduleMatchStartNotices(): void {
  */
 export function publishUpdatedEvent(tournamentId: number): void {
   scheduleMatchStartNotices();
+  scheduleLiveEveningRefresh();
   invalidateTournamentSnapshot(tournamentId);
   // Une inscription change le tirage prévisible : l'aperçu suit.
   invalidateTournamentPreview(tournamentId);
@@ -89,6 +102,7 @@ export function publishMatchUpdatedEvent(
   options: { landingLive?: boolean } = {},
 ): void {
   scheduleMatchStartNotices();
+  scheduleLiveEveningRefresh();
   invalidateTournamentSnapshot(tournamentId);
   if (options.landingLive) invalidateLandingLive();
   publishTournamentEvent({
@@ -118,6 +132,7 @@ export function publishMatchUpdatedEvent(
  */
 export function publishScoreReportedEvent(tournamentId: number, matchId: number): void {
   scheduleMatchStartNotices();
+  scheduleLiveEveningRefresh();
   invalidateTournamentSnapshot(tournamentId);
   invalidateTeamRanking();
   // Les bilans des fiches et de l'annuaire se lisent sur les mêmes matchs.
@@ -133,6 +148,7 @@ export function publishScoreReportedEvent(tournamentId: number, matchId: number)
 /** Idem : l'arbitrage d'un score ne déplace pas un tournoi dans la liste. */
 export function publishScoreResolvedEvent(tournamentId: number, matchId: number): void {
   scheduleMatchStartNotices();
+  scheduleLiveEveningRefresh();
   invalidateTournamentSnapshot(tournamentId);
   invalidateTeamRanking();
   // Les bilans des fiches et de l'annuaire se lisent sur les mêmes matchs.

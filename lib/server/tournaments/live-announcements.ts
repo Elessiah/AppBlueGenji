@@ -91,6 +91,11 @@ type LiveCandidateRow = RowDataPacket & {
   /** Pseudo public du joueur d'une entrée individuelle (`null` : équipe, ou compte supprimé). */
   team1_pseudo: string | null;
   team2_pseudo: string | null;
+  /** Score rendu (« Terminé · 2-1 » une fois le match `COMPLETED`). */
+  team1_score: number | null;
+  team2_score: number | null;
+  forfeit_team_id: number | null;
+  double_forfeit: number | boolean | null;
 };
 
 /**
@@ -185,6 +190,12 @@ export function soloPseudoRegisteredSince(): number | null {
 /** Seuil d'un changement introuvable : aucune inscription ne l'atteint (9999-12-31). */
 const NEVER_REGISTERED_SINCE = 253_402_300_799;
 
+/** Tournois lus par les annonces : en cours. */
+const RUNNING_TOURNAMENTS = "t.state = 'RUNNING'";
+
+/** Tournois lus par une soirée : en cours, ou clos depuis (son dernier match y reste, terminé). */
+const EVENING_TOURNAMENT_STATES = "t.state IN ('RUNNING', 'FINISHED')";
+
 /**
  * Matchs castés, jouables, d'un tournoi en cours, passés à l'antenne depuis
  * moins de deux heures, dont l'affiche courante n'a pas encore été annoncée. Le passage à l'antenne se décide ensuite **en
@@ -214,14 +225,18 @@ async function loadEveningMatches(evening: LiveEvening): Promise<LiveCandidateRo
   // de son envoi (`rememberEveningMessage`), il liste donc les matchs
   // programmés jusqu'à cette fin-là.
   const until = evening.discord_message_id ? "?" : `GREATEST(?, ${WINDOW_FROM_NOW})`;
+  // Un match annoncé reste au message une fois terminé, même si son tournoi
+  // s'est clos avec lui (dernier match) ; un match programmé, seulement d'un
+  // tournoi en cours.
   return selectMatches(
     `m.live_trigger IS NOT NULL AND m.is_bye = 0
         AND (EXISTS (SELECT 1 FROM bg_live_announcements a
                       WHERE a.match_id = m.id AND a.sent_at >= ? AND a.refused = 0
                         AND a.pairing = CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id)))
-             OR (m.live_trigger = 'START_TIME' AND m.status IN ('PENDING', 'READY')
+             OR (t.state = 'RUNNING' AND m.live_trigger = 'START_TIME' AND m.status IN ('PENDING', 'READY')
                  AND m.start_at > NOW() AND m.start_at <= ${until}))`,
     [evening.started_at, evening.window_end],
+    EVENING_TOURNAMENT_STATES,
   );
 }
 
@@ -229,6 +244,7 @@ async function loadEveningMatches(evening: LiveEvening): Promise<LiveCandidateRo
 async function selectMatches(
   where: string,
   params: readonly unknown[],
+  tournamentStates: string = RUNNING_TOURNAMENTS,
 ): Promise<LiveCandidateRow[]> {
   const db = await getDatabase();
   // Le pseudo n'est lu que pour une inscription faite sous la mention qui
@@ -244,10 +260,11 @@ async function selectMatches(
             CONCAT(m.team1_id, ':', m.team2_id) AS pairing,
             t1.name AS team1_name, t2.name AS team2_name,
             t1.solo_user_id AS team1_solo_user_id, t2.solo_user_id AS team2_solo_user_id,
-            u1.pseudo AS team1_pseudo, u2.pseudo AS team2_pseudo
+            u1.pseudo AS team1_pseudo, u2.pseudo AS team2_pseudo,
+            m.team1_score, m.team2_score, m.forfeit_team_id, m.double_forfeit
        FROM bg_matches m
        JOIN bg_tournaments t ON t.id = m.tournament_id
-                            AND t.state = 'RUNNING' AND t.start_visibility_at <= NOW()
+                            AND ${tournamentStates} AND t.start_visibility_at <= NOW()
        JOIN bg_teams t1 ON t1.id = m.team1_id
        JOIN bg_teams t2 ON t2.id = m.team2_id
        LEFT JOIN bg_users u1 ON u1.id = t1.solo_user_id AND u1.is_deleted = 0 AND ${registeredSince("t1")}
@@ -720,9 +737,9 @@ function eveningStreams(
   group: AnnouncementGroup,
   others: readonly LiveCandidateRow[],
   now: number,
-): { row: LiveCandidateRow; url: string; live: boolean; at: number }[] {
+): EveningStreamRow[] {
   const seen = new Set<number>();
-  const streams: { row: LiveCandidateRow; url: string; live: boolean; at: number }[] = [];
+  const streams: EveningStreamRow[] = [];
   for (const row of [...group.rows, ...others]) {
     const id = Number(row.id);
     if (seen.has(id)) continue;
@@ -730,14 +747,54 @@ function eveningStreams(
     if (!url || liveMentionTarget(url) !== group.target) continue;
     seen.add(id);
     const live = isOnAir(row, now);
+    const state = eveningRowState(row, live, now);
+    // Un match rouvert pour une autre affiche n'est plus lu (réservation de
+    // l'affiche courante seulement) ; un match revenu en attente n'y figure plus.
+    if (state === null) continue;
     const at = streamTime(row, now);
-    // Un match fini, repoussé hors de la soirée, ou sorti de l'antenne (rouvert
-    // pour une autre affiche, antenne fermée) n'y figure plus : seul un match
-    // programmé (`START_TIME`) y est listé avant son direct, à son heure.
-    if (!live && !(row.live_trigger === "START_TIME" && (row.status === "PENDING" || row.status === "READY"))) continue;
-    streams.push({ row, url, live, at });
+    streams.push(state === "finished" ? { row, url, live: false, at, finished: { score: finalScore(row) } } : { row, url, live, at });
   }
   return streams;
+}
+
+/** Un match de la soirée, prêt à rédiger. */
+interface EveningStreamRow {
+  row: LiveCandidateRow;
+  url: string;
+  live: boolean;
+  at: number;
+  finished?: { score: readonly [number, number] | null };
+}
+
+/**
+ * Place d'un match dans la soirée : à l'antenne ; programmé (`START_TIME` à
+ * venir) ; **terminé** — score rendu (`COMPLETED`, ou en attente de
+ * confirmation) ou antenne fermée d'un match annoncé (`MANUAL`), il reste au
+ * message, marqué « Terminé » ; `null` sinon (revenu en attente, rouvert).
+ */
+function eveningRowState(row: LiveCandidateRow, live: boolean, now: number): "live" | "scheduled" | "finished" | null {
+  if (live) return "live";
+  if (row.status === "COMPLETED" || row.status === "AWAITING_CONFIRMATION") return "finished";
+  const startsLater = (instant(row.start_at) ?? 0) > now;
+  if (row.live_trigger === "START_TIME" && (row.status === "PENDING" || row.status === "READY") && startsLater) {
+    return "scheduled";
+  }
+  // Antenne fermée (`MANUAL`) d'un match annoncé : son direct est fini. Un
+  // match `AUTO` sans lancement de l'affiche courante a été rouvert : il
+  // n'est plus listé, il reviendra à son prochain lancement.
+  return row.status === "READY" && row.live_trigger === "MANUAL" ? "finished" : null;
+}
+
+/**
+ * Score d'un match terminé, dans l'ordre de l'affiche ; `null` pour un forfait
+ * (aucun score joué), un score en attente de confirmation ou incomplet.
+ */
+function finalScore(row: LiveCandidateRow): readonly [number, number] | null {
+  if (row.status !== "COMPLETED" || row.forfeit_team_id != null || Number(row.double_forfeit) === 1) return null;
+  if (row.team1_score == null || row.team2_score == null) return null;
+  const first = Number(row.team1_score);
+  const second = Number(row.team2_score);
+  return Number.isInteger(first) && Number.isInteger(second) ? [first, second] : null;
 }
 
 /**
@@ -811,9 +868,10 @@ function eveningTexts(
   const text = (withPseudo: boolean) =>
     formatLiveEvening(
       streams.map(
-        ({ row, url, live, at }): LiveEveningStream => ({
+        ({ row, url, live, at, finished }): LiveEveningStream => ({
           startsAt: at,
           live,
+          ...(finished ? { finished } : {}),
           tournamentName: String(row.tournament_name),
           team1Name: eveningEntrant(row, 1, withPseudo, soloTournaments),
           team2Name: eveningEntrant(row, 2, withPseudo, soloTournaments),
@@ -872,6 +930,7 @@ async function announce(
   });
   if (outcome === "posted" || outcome === "posted-silent") {
     await rememberEveningMessage(evening, messageId, quiet || outcome === "posted-silent" || isFollowUp(evening, messageId));
+    rememberEveningText(evening, message, urls);
     // Trace pm2 pour le staff : identifiants seulement, aucun nom.
     const silent = outcome === "posted-silent" ? " sans notifier (permission de mentionner absente)" : "";
     const announced = plural ? "annoncés" : "annoncé";
@@ -909,6 +968,163 @@ async function settleUnposted(
   if (notifying) await forgetEveningSend(evening, [], true);
   await postpone(group, postponed, Number(evening.id));
   return { posted: 0, postponed };
+}
+
+/**
+ * Dernier texte publié de chaque soirée (texte et liens), par processus : une
+ * mise à jour qui le rendrait à l'identique n'appelle pas le bot. Perdu au
+ * redémarrage — la mise à jour suivante modifie alors une fois pour rien, sans
+ * notifier.
+ */
+const lastEveningText = new Map<number, string>();
+
+/** Taille au-delà de laquelle les textes retenus sont oubliés (soirées finies). */
+const LAST_EVENING_TEXT_MAX = 50;
+
+/** Clé d'un texte de soirée : le texte et ses liens. */
+function eveningTextKey(message: string, urls: readonly string[]): string {
+  return `${message}\n${urls.join("\n")}`;
+}
+
+/** Retient le texte publié (ou modifié) d'une soirée. */
+function rememberEveningText(evening: LiveEvening, message: string, urls: readonly string[]): void {
+  if (lastEveningText.size >= LAST_EVENING_TEXT_MAX) lastEveningText.clear();
+  lastEveningText.set(Number(evening.id), eveningTextKey(message, urls));
+}
+
+/** Soirée ouverte qui a un message à tenir à jour. */
+interface RefreshableEvening extends LiveEvening {
+  target: LiveMentionTarget;
+}
+
+/**
+ * Délai de regroupement des mises à jour de fin de match : la première fin de
+ * match programme **une** mise à jour une minute plus tard, et toutes celles
+ * de la minute la rejoignent — une ronde qui se termine d'un coup donne une
+ * modification par public, pas une par match.
+ */
+export const LIVE_EVENING_REFRESH_DELAY_MS = 60_000;
+
+/** Essais d'une mise à jour reportée (bot injoignable, Discord réticent) avant d'attendre l'évènement suivant. */
+const LIVE_EVENING_REFRESH_MAX_RETRIES = 3;
+
+let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+let refreshRetries = 0;
+
+/**
+ * Demande la mise à jour des soirées ouvertes après une fin de match (score
+ * rendu ou arbitré, antenne fermée) : regroupée sur
+ * {@link LIVE_EVENING_REFRESH_DELAY_MS}, jamais attendue, rien si les annonces
+ * sont désactivées. Ne lit rien : la lecture vient au terme du délai.
+ */
+export function requestLiveEveningRefresh(): void {
+  if (refreshTimer || !liveAnnouncementsEnabled()) return;
+  refreshTimer = setTimeout(() => {
+    refreshTimer = null;
+    void exclusive(() => refreshLiveEvenings()).catch((error: unknown) => {
+      if (!isMissingTableError(error)) console.error("[live-announce] mise à jour des soirées en échec", error);
+    });
+  }, LIVE_EVENING_REFRESH_DELAY_MS);
+  refreshTimer.unref?.();
+}
+
+/**
+ * Remet à jour le message de chaque soirée ouverte (fenêtre en cours, message
+ * gardé, non close) : un match fini y passe « Terminé » avec son score. Une
+ * **modification** seulement — jamais de notification, mention gardée telle
+ * que le message l'a publiée (`silent`) — et seulement si le texte change.
+ * Après la fin de la fenêtre, plus rien n'est modifié.
+ *
+ * @param now Instant de référence, injectable pour les tests.
+ * @returns Le nombre de messages modifiés.
+ */
+export async function refreshLiveEvenings(now: number = Date.now()): Promise<number> {
+  if (!liveAnnouncementsEnabled() || isBotCircuitOpen()) return 0;
+  const db = await getDatabase();
+  const [evenings] = await db.query<RefreshableEvening[]>(
+    `SELECT id, target, started_at, window_end, discord_message_id, silent, notified, closed FROM bg_live_evenings
+      WHERE window_end > NOW() AND closed = 0 AND discord_message_id IS NOT NULL
+      ORDER BY id`,
+  );
+  let edited = 0;
+  let retry = false;
+  for (const evening of evenings) {
+    // Soirée en pause (refus de Discord, base illisible) : le balayage la reprend.
+    if (isHeld(evening.target)) continue;
+    const result = await refreshEvening(evening, now);
+    if (result === "edited") edited += 1;
+    if (result === "retry") retry = true;
+  }
+  if (!retry) refreshRetries = 0;
+  else if (refreshRetries < LIVE_EVENING_REFRESH_MAX_RETRIES) {
+    refreshRetries += 1;
+    requestLiveEveningRefresh();
+  }
+  return edited;
+}
+
+/** Remet à jour une soirée ; `retry` si l'envoi est reporté (rien n'est parti). */
+async function refreshEvening(
+  evening: RefreshableEvening,
+  now: number,
+): Promise<"edited" | "unchanged" | "retry" | "dropped"> {
+  const group: AnnouncementGroup = { target: evening.target, rows: [] };
+  const others = await loadEveningMatches(evening);
+  const { message, urls, logMessage } = eveningTexts(group, others, now);
+  // Plus aucun match lisible (tournoi supprimé) : le message reste tel quel.
+  if (urls.length === 0) return "unchanged";
+  if (lastEveningText.get(Number(evening.id)) === eveningTextKey(message, urls)) return "unchanged";
+  const listed: AnnouncementGroup = {
+    target: evening.target,
+    rows: eveningStreams(group, others, now).map(({ row }) => row),
+  };
+  const { label, context } = describeGroup(listed, Number(evening.id));
+  const { outcome, messageId } = await pushLiveEvening({
+    message,
+    streamUrls: urls,
+    mention: evening.target,
+    context: context.replace(/^live-announce /, "live-refresh "),
+    ...(logMessage === message ? {} : { logMessage }),
+    editMessageId: String(evening.discord_message_id),
+    ...(editsSilentMessage(evening) ? { notify: false as const } : {}),
+    refresh: true,
+  });
+  if (outcome === "posted" || outcome === "posted-silent") {
+    // Suite (message plus modifiable) : sans mention, son identifiant remplace l'ancien.
+    await rememberEveningMessage(evening, messageId, editsSilentMessage(evening) || isFollowUp(evening, messageId));
+    rememberEveningText(evening, message, urls);
+    console.info(`[live-announce] soirée ${Number(evening.id)} mise à jour dans #live (${label}, fins de match)`);
+    return "edited";
+  }
+  if (outcome === "evening-deleted") {
+    await closeEvening(evening, []);
+    console.error(`[live-announce] soirée ${Number(evening.id)} : message supprimé de #live, soirée close`);
+    return "dropped";
+  }
+  if (outcome in ABANDONED_OUTCOMES) {
+    // Refusé ou peut-être parti : le même texte n'est pas renvoyé — la fin de
+    // match suivante, ou le prochain direct, rédigera le suivant.
+    rememberEveningText(evening, message, urls);
+    console.error(`[live-announce] soirée ${Number(evening.id)} : mise à jour non confirmée (${outcome}), non réessayée`);
+    return "dropped";
+  }
+  const cause = POSTPONED_CAUSES[outcome as PostponedOutcome] ?? POSTPONED_CAUSES.unavailable;
+  warnOnce(`refresh ${outcome} ${Number(evening.id)}`, `[live-announce] soirée ${Number(evening.id)} : mise à jour reportée (${cause})`);
+  return "retry";
+}
+
+/**
+ * File unique des envois de soirée : un balayage et une mise à jour ne
+ * rédigent jamais en même temps — la seconde relit la base après le premier,
+ * sans quoi une mise à jour lue avant une annonce effacerait son match.
+ */
+let eveningQueue: Promise<unknown> = Promise.resolve();
+
+/** Exécute `task` après les envois de soirée en cours. */
+function exclusive<T>(task: () => Promise<T>): Promise<T> {
+  const run = eveningQueue.then(task, task);
+  eveningQueue = run.catch(() => undefined);
+  return run;
 }
 
 /**
@@ -1143,7 +1359,7 @@ export async function dispatchLiveAnnouncements(): Promise<number> {
     scheduleTrailingSweep(LIVE_ANNOUNCE_THROTTLE_MS - sinceLast);
     return 0;
   }
-  pendingSweep = runLiveAnnouncementSweep().catch((error: unknown) => {
+  pendingSweep = exclusive(() => runLiveAnnouncementSweep()).catch((error: unknown) => {
     if (!isMissingTableError(error)) console.error("[live-announce] balayage en échec", error);
     return 0;
   });
@@ -1163,6 +1379,11 @@ export function resetLiveAnnouncementThrottle(): void {
   disabledNoticeShown = false;
   heldUntil.clear();
   lastWarnAt.clear();
+  lastEveningText.clear();
+  refreshRetries = 0;
+  if (refreshTimer) clearTimeout(refreshTimer);
+  refreshTimer = null;
+  eveningQueue = Promise.resolve();
   pendingSweep = null;
   if (trailingTimer) clearTimeout(trailingTimer);
   trailingTimer = null;

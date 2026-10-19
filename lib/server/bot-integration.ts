@@ -766,6 +766,12 @@ export interface LiveEveningPush {
    * public a peut-être déjà été notifié, sans message connu à modifier).
    */
   notify?: false;
+  /**
+   * `true` : simple mise à jour (fins de match) d'un message déjà publié,
+   * avec `editMessageId` — le bot n'invite pas le staff à la poster à la main
+   * si elle échoue. Un bot plus ancien ignore le champ.
+   */
+  refresh?: true;
 }
 
 /** Issue d'une annonce de soirée, et l'identifiant du message publié ou modifié. */
