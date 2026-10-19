@@ -19,10 +19,10 @@ const ENTRY_ID = "2026-10-contacts-de-match-avant-le-depart";
 
 describe("contacts d'un match — destinataires et personnes présentées", () => {
   it("le registre T04 nomme les membres des deux équipes, pas seulement les joueurs", () => {
-    expect(T04?.recipients).toContain("Membres des deux équipes et caster d'un même match, dès que ses deux adversaires sont connus et jusqu'à sa fin");
+    expect(T04?.recipients).toContain("Membres des deux équipes d'un même match et arbitres, dès que ses deux adversaires sont connus et jusqu'à sa fin, et son caster inscrit le temps du match (de son départ à sa fin) ; contacts du caster aux deux équipes et aux arbitres le temps du match");
     expect(T04?.subPurposes.join("\n")).toMatch(/membres des deux équipes \(joueurs, coachs, managers, propriétaires\)/);
     expect(T04?.subPurposes.join("\n")).toMatch(/d'un ou deux membres par équipe/);
-    expect(T04_EN?.recipients.join("\n")).toMatch(/Members of both teams and caster of the same match/);
+    expect(T04_EN?.recipients.join("\n")).toMatch(/Members of both teams of the same match and referees, from the moment both its opponents are known to its end, and its registered caster while the match is being played/);
     expect(T04_EN?.subPurposes.join("\n")).toMatch(/members of both teams \(players, coaches, managers, owners\)/);
     expect(T04_EN?.subPurposes.join("\n")).toMatch(/one or two members per team/);
   });
@@ -46,18 +46,18 @@ describe("contacts d'un match — destinataires et personnes présentées", () =
 
 describe("BattleTag masqué d'un caster", () => {
   it("la notice du profil dit que les deux équipes d'un match casté le voient (FR et EN)", () => {
-    expect(frProfile.battletagNotice.asCaster).toMatch(/Les deux équipes d'un match que tu castes/);
-    expect(enProfile.battletagNotice.asCaster).toMatch(/Both teams of a match you cast/);
+    expect(frProfile.battletagNotice.asCaster).toMatch(/Les deux équipes et les arbitres d'un match que tu castes/);
+    expect(enProfile.battletagNotice.asCaster).toMatch(/Both teams and the referees of a match you cast/);
     expect(readSource("app/(secured)/profil/BattletagVisibilityNotice.tsx")).toContain('"battletagNotice.asCaster"');
   });
 });
 
 describe("BattleTag masqué — lecteurs d'un même match", () => {
   it("la politique et la notice nomment les membres des deux équipes, pas seulement les joueurs (FR et EN)", () => {
-    expect(frProfile.battletagNotice.players).toMatch(/Les membres des deux équipes de chaque match de ton équipe/);
-    expect(enProfile.battletagNotice.players).toMatch(/The members of both teams of every match your team plays/);
-    expect(readSource("lib/shared/rgpd-policy.ts")).toContain("lisible des membres des deux équipes de tes matchs");
-    expect(readSource("lib/shared/rgpd-policy-en.ts")).toContain("readable by the members of both teams of your matches");
+    expect(frProfile.battletagNotice.players).toMatch(/Les membres des deux équipes de ton match/);
+    expect(enProfile.battletagNotice.players).toMatch(/The members of both teams of your match/);
+    expect(readSource("lib/shared/rgpd-policy.ts")).toContain("des membres de ses deux équipes et des arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin");
+    expect(readSource("lib/shared/rgpd-policy-en.ts")).toContain("by the members of both its teams and the referees from the moment both its opponents are known to its end");
   });
 });
 
@@ -73,8 +73,8 @@ describe("modale « Contacts » — fermée quand l'action disparaît", () => {
 
 describe("textes joueur et règles — mêmes lecteurs que le code", () => {
   it("l'indication du BattleTag masqué compte le caster, en français et en anglais", () => {
-    expect(readSource("messages/fr/players.json")).toContain("ainsi que le caster d'un match où tu es présenté comme contact et les deux équipes d'un match que tu castes");
-    expect(readSource("messages/en/players.json")).toContain("as well as the caster of a match where you are shown as a contact and both teams of a match you cast");
+    expect(readSource("messages/fr/players.json")).toContain("il ne se lit que dans la fenêtre « Contacts » de tes matchs — par les deux équipes et les arbitres, de la connaissance des deux adversaires à la fin du match, si tu es présenté comme contact, et par le caster le temps du match.");
+    expect(readSource("messages/en/players.json")).toContain("it can only be read in the “Contacts” window of your matches — by both teams and the referees, from the moment both opponents are known to the end of the match, if you are shown as a contact, and by the caster while the match is being played.");
   });
 
   it("la règle « Lancement d'un match » renvoie au bouton « Contacts » ouvert dès que les adversaires sont connus", () => {
@@ -85,11 +85,12 @@ describe("textes joueur et règles — mêmes lecteurs que le code", () => {
 
 describe("tag Discord d'un caster et BattleTag masqué dans l'avis", () => {
   it("les textes de certification disent que les équipes d'un match casté voient le tag du caster (FR et EN)", () => {
-    expect(readSource("lib/shared/discord-identity.ts")).toContain("Si tu castes un match, ses deux équipes voient le tien sur la même durée.");
-    expect(frProfile.verify.exposure.match).toContain("Si tu castes un match, ses deux équipes voient le tien sur la même durée.");
-    expect(enProfile.verify.exposure.match).toContain("If you cast a match, both its teams see yours for the same period.");
-    expect(readSource("lib/shared/rgpd-policy.ts")).toContain("jusqu'à sa fin (et, si tu castes un match, ses deux équipes sur la même durée) ;");
-    expect(readSource("lib/shared/rgpd-policy-en.ts")).toContain("to its end (and, if you cast a match, both its teams for the same period);");
+    // Décision du 2026-10-19 : les contacts du caster, le temps du match seulement.
+    expect(readSource("lib/shared/discord-identity.ts")).toContain("Si tu castes un match, ses deux équipes et les arbitres voient le tien le temps du match seulement.");
+    expect(frProfile.verify.exposure.match).toContain("Si tu castes un match, ses deux équipes et les arbitres voient le tien le temps du match seulement.");
+    expect(enProfile.verify.exposure.match).toContain("If you cast a match, both its teams and the referees see yours only while the match is being played.");
+    expect(readSource("lib/shared/rgpd-policy.ts")).toContain("son caster le temps du match seulement (et, si tu castes un match, ses deux équipes et les arbitres le temps du match) ;");
+    expect(readSource("lib/shared/rgpd-policy-en.ts")).toContain("its caster only while the match is being played (and, if you cast a match, both its teams and the referees while the match is being played);");
   });
 
   it("l'avis de changement dit que le BattleTag présenté peut être masqué (FR et EN)", () => {
@@ -104,8 +105,8 @@ describe("registre et avis — tout ce que montre une fiche de contact", () => {
     expect(T04_EN?.dataCategories.join("\n")).toMatch(/Team roles and certification status/);
     const t01 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T01");
     const t01En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T01");
-    expect(t01?.recipients.join("\n")).toMatch(/Membres des deux équipes d'un même match, tant que le tournoi/);
-    expect(t01En?.recipients.join("\n")).toMatch(/Members of both teams of the same match, until/);
+    expect(t01?.recipients.join("\n")).toMatch(/Parties d'un même match, dans sa seule fenêtre « Contacts »/);
+    expect(t01En?.recipients.join("\n")).toMatch(/Parties to the same match, only in its “Contacts” window/);
   });
 
   it("l'avis dit que « les joueurs » des anciens textes étaient tous les membres des deux équipes (FR et EN)", () => {
@@ -124,12 +125,12 @@ describe("caster et équipes entre eux, fiches de contact", () => {
   });
 
   it("les publics du tag Discord comptent les équipes d'un match casté (FR et EN)", () => {
-    expect(readSource("lib/shared/identity-sharing.ts")).toContain("jusqu'à sa fin (et, si tu castes un match, ses deux équipes) ;");
+    expect(readSource("lib/shared/identity-sharing.ts")).toContain("et son caster le temps du match seulement (et, si tu castes un match, ses deux équipes et les arbitres, le temps du match seulement) ;");
     for (const file of ["messages/fr/profile.json", "messages/fr/login.json"]) {
-      expect(readSource(file)).toContain("(et, si tu castes un match, ses deux équipes) ;");
+      expect(readSource(file)).toContain("(et, si tu castes un match, ses deux équipes et les arbitres, le temps du match seulement) ;");
     }
     for (const file of ["messages/en/profile.json", "messages/en/login.json"]) {
-      expect(readSource(file)).toContain("(and, if you cast a match, both its teams);");
+      expect(readSource(file)).toContain("(and, if you cast a match, both its teams and the referees, only while the match is being played);");
     }
   });
 
@@ -143,8 +144,8 @@ describe("caster et équipes entre eux, fiches de contact", () => {
 
 describe("certification Discord et caster retiré", () => {
   it("l'avis de confidentialité du profil compte les parties du match parmi les lecteurs du tag certifié (FR et EN)", () => {
-    expect(frProfile.privacy.discordNotice).toContain("et, comme contact, aux membres des deux équipes et au caster de ton match dès que ses deux adversaires sont connus");
-    expect(enProfile.privacy.discordNotice).toContain("and, as a contact, to the members of both teams and the caster of your match from the moment both its opponents are known");
+    expect(frProfile.privacy.discordNotice).toContain("et, comme contact, aux membres des deux équipes de ton match dès que ses deux adversaires sont connus, et à son caster le temps du match seulement");
+    expect(enProfile.privacy.discordNotice).toContain("and, as a contact, to the members of both teams of your match from the moment both its opponents are known, and to its caster only while the match is being played");
   });
 
   it("T04 dit qu'un caster devenu inéligible est retiré à la lecture des contacts (FR et EN)", () => {
@@ -158,5 +159,16 @@ describe("T04 — caster d'un compte supprimé", () => {
     expect(T04?.retention.join("\n")).toContain("le caster d'un compte supprimé est retiré des matchs non terminés");
     expect(T04_EN?.retention.join("\n")).toContain("the caster of a deleted account is removed from matches that are not over");
     expect(readSource("lib/server/users/account-erasure.ts")).toContain("WHERE caster_user_id = ? AND status <> 'COMPLETED'");
+  });
+});
+
+describe("tag Discord d'un caster — arbitres", () => {
+  it("la liste d'exposition dit que les arbitres le lisent le temps d'un match casté (FR et EN)", () => {
+    const fr = "Les arbitres le voient uniquement quand tu es engagé dans un tournoi en cours ou à venir — plus après —, ou le temps d'un match que tu castes.";
+    expect(readSource("lib/shared/discord-identity.ts")).toContain(fr);
+    expect(frProfile.verify.exposure.referees).toBe(fr);
+    expect(enProfile.verify.exposure.referees).toBe(
+      "Referees can see it only while you're entered in an ongoing or upcoming tournament — not after —, or while a match you cast is being played.",
+    );
   });
 });

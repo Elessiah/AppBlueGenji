@@ -99,11 +99,13 @@ export default function PlayerDetailPage() {
 
   if (!data) return null;
 
-  // Un BattleTag masqué au public n'arrive jusqu'ici que pour son titulaire, ou
-  // pour un lecteur que la règle d'exposition autorise (même match, arbitrage).
-  const hiddenBattletagHint = data.isSelf ? t("page.battletagHiddenSelf") : t("page.battletagHiddenOther");
+  // Un BattleTag masqué n'arrive jusqu'ici que pour son titulaire : pour tout
+  // autre lecteur, il ne se lit que dans la fenêtre « Contacts » d'un match
+  // (`lib/shared/battletag-visibility.ts`).
   const battletagHint =
-    data.profile.overwatchBattletag && !data.profile.visibility.overwatch ? hiddenBattletagHint : null;
+    data.isSelf && data.profile.overwatchBattletag && !data.profile.visibility.overwatch
+      ? t("page.battletagHiddenSelf")
+      : null;
 
   // Un compte supprimé garde sa fiche — ses résultats appartiennent aussi à
   // ceux qu'il a affrontés —, mais sous un pseudo d'emprunt qui se lit comme

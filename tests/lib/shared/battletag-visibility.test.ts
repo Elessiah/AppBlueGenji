@@ -1,6 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
 import {
-  battletagNeedsTournamentContext,
   canViewBattletag,
   visibleBattletag,
   type BattletagSubject,
@@ -8,10 +7,10 @@ import {
 } from "@/lib/shared/battletag-visibility";
 
 /**
- * Masquer son BattleTag le retire de la fiche publique et de l'annuaire, pas de
- * là où il sert à jouer : les joueurs d'un même match et l'arbitrage d'un
- * tournoi vivant le lisent encore. La modale de `/profil` l'annonce au joueur ;
- * ces tests tiennent la promesse.
+ * Masquer son BattleTag le retire de partout, arbitres et administrateurs
+ * compris, sauf de la fenêtre « Contacts » d'un match ouverte au lecteur
+ * (`sharesLiveMatch`, posé par `match-launch-info.ts` seul — décision de
+ * l'utilisateur du 2026-10-19).
  */
 
 const OWNER = 7;
@@ -35,52 +34,20 @@ describe("canViewBattletag", () => {
   });
 
   it("cache un tag masqué à un visiteur sans compte, quoi qu'on lui prête", () => {
-    const everything = { ...hidden, sharesLiveMatch: true, inActiveTournament: true };
-    expect(canViewBattletag(null, everything)).toBe(false);
-    expect(canViewBattletag(undefined, everything)).toBe(false);
+    expect(canViewBattletag(null, { ...hidden, sharesLiveMatch: true })).toBe(false);
+    expect(canViewBattletag(undefined, { ...hidden, sharesLiveMatch: true })).toBe(false);
   });
 
-  it("rend un tag masqué aux autres joueurs d'un même match de tournoi vivant", () => {
+  it("rend un tag masqué dans la fenêtre « Contacts » d'un match ouverte au lecteur", () => {
     expect(canViewBattletag(player, { ...hidden, sharesLiveMatch: true })).toBe(true);
+    expect(canViewBattletag(referee, { ...hidden, sharesLiveMatch: true })).toBe(true);
   });
 
-  it("cache un tag masqué à un joueur quelconque, même engagé ailleurs", () => {
-    expect(canViewBattletag(player, hidden)).toBe(false);
-    // Le titulaire engagé dans un tournoi n'ouvre rien à qui ne l'affronte pas.
-    expect(canViewBattletag(player, { ...hidden, inActiveTournament: true })).toBe(false);
-  });
-
-  it("rend un tag masqué à l'arbitrage seulement pendant un tournoi vivant du titulaire", () => {
-    expect(canViewBattletag(referee, { ...hidden, inActiveTournament: true })).toBe(true);
-    expect(canViewBattletag(referee, { ...hidden, inActiveTournament: false })).toBe(false);
-    expect(canViewBattletag(referee, hidden)).toBe(false);
-  });
-
-  it("ne donne aucun passe-droit à l'administrateur hors tournoi, à l'inverse du tag Discord", () => {
-    expect(canViewBattletag(admin, hidden)).toBe(false);
-    expect(canViewBattletag(admin, { ...hidden, inActiveTournament: true })).toBe(true);
-  });
-
-  it("ne donne rien au cast : diffuser n'est pas jouer", () => {
-    expect(canViewBattletag(caster, { ...hidden, inActiveTournament: true })).toBe(false);
-  });
-});
-
-describe("battletagNeedsTournamentContext", () => {
-  it("ne pose la question que pour un tag masqué lu par un tiers connecté", () => {
-    expect(battletagNeedsTournamentContext("Nova#1234", player, hidden)).toBe(true);
-    expect(battletagNeedsTournamentContext("Nova#1234", referee, hidden)).toBe(true);
-  });
-
-  it.each<[string, string | null | undefined, BattletagViewer | null, BattletagSubject]>([
-    ["sans tag", null, player, hidden],
-    ["tag vide", "", player, hidden],
-    ["tag absent", undefined, player, hidden],
-    ["lecteur titulaire", "Nova#1234", { id: OWNER }, hidden],
-    ["tag visible", "Nova#1234", player, { ...hidden, visible: true }],
-    ["visiteur sans compte", "Nova#1234", null, hidden],
-  ])("ne la pose pas quand la réponse est acquise (%s)", (_label, tag, viewer, subject) => {
-    expect(battletagNeedsTournamentContext(tag, viewer, subject)).toBe(false);
+  it("cache un tag masqué partout ailleurs, arbitres et administrateurs compris", () => {
+    for (const viewer of [player, referee, admin, caster]) {
+      expect(canViewBattletag(viewer, hidden)).toBe(false);
+      expect(canViewBattletag(viewer, { ...hidden, sharesLiveMatch: false })).toBe(false);
+    }
   });
 });
 

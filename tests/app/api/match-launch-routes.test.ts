@@ -231,7 +231,7 @@ describe("GET /api/matches/[matchId]/contacts", () => {
     team1: side(10, "Alpha"),
     team2: side(20, "Bravo"),
     caster: null,
-    viewer: { role: "TEAM1", canDeclareReady: true, ready: false },
+    viewer: { role: "TEAM1", canDeclareReady: true, ready: false, isCaster: false },
   };
   const request = () => new Request("http://localhost/api/matches/42/contacts");
 

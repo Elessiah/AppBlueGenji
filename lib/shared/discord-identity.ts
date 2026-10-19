@@ -90,8 +90,8 @@ export type DiscordTagSubject = {
   inActiveTournament?: boolean;
   /**
    * Lecteur et cible sont-ils **parties d'un même match** — membres des deux
-   * engagées, ou caster inscrit — dès que ses deux adversaires sont connus
-   * (bouton « Contacts » ; la modale, elle, attend le lancement) et tant qu'il
+   * engagées dès que ses deux adversaires sont connus (bouton « Contacts » ; la
+   * modale, elle, attend le lancement), caster inscrit le temps du match seulement et tant qu'il
    * n'est pas terminé ? Relatif au lecteur, établi par l'appelant
    * (`lib/server/tournaments/match-launch-info.ts`). C'est ce qui permet aux
    * équipes de s'ajouter et d'inviter leur caster (`lib/shared/match-launch.ts`).
@@ -114,7 +114,8 @@ export type DiscordTagSubject = {
  *    protège les comptes d'avant, et elle passe **avant** les rôles pour qu'on
  *    ne puisse pas l'oublier en ajoutant un rôle demain ;
  * 3. **même match** — les parties d'un match (membres des deux engagées,
- *    caster) se voient dès que ses deux adversaires sont connus, jusqu'à sa fin ;
+ *    caster) se voient jusqu'à sa fin — les équipes dès que ses deux
+ *    adversaires sont connus, le caster le temps du match seulement ;
  * 4. **visible des autres joueurs** — tout lecteur connecté, si le titulaire l'a
  *    choisi. La clause vient **après** « non vérifié » : le réglage n'ouvre
  *    jamais un tag que personne n'a prouvé ;
@@ -217,8 +218,8 @@ export function discordVerificationNeedsCode(linkedDiscordId: string | null | un
  */
 export const DISCORD_VERIFICATION_EXPOSURE: readonly string[] = [
   "Les administrateurs du site voient ton tag Discord en permanence.",
-  "Les arbitres le voient uniquement quand tu es engagé dans un tournoi en cours ou à venir — plus après.",
-  "Les membres des deux équipes et le caster de ton match le voient dès que les deux adversaires du match sont connus et jusqu'à sa fin — pour s'ajouter et créer le salon. Si tu castes un match, ses deux équipes voient le tien sur la même durée.",
+  "Les arbitres le voient uniquement quand tu es engagé dans un tournoi en cours ou à venir — plus après —, ou le temps d'un match que tu castes.",
+  "Les membres des deux équipes de ton match le voient dès que ses deux adversaires sont connus et jusqu'à sa fin, son caster le temps du match seulement (de son départ à sa fin) — pour s'ajouter et créer le salon. Si tu castes un match, ses deux équipes et les arbitres voient le tien le temps du match seulement.",
   "Les autres joueurs du site ne le voient que si tu le rends visible dans tes réglages de confidentialité. Il n'apparaît sur aucune page publique.",
   "Tu peux annuler à tout moment en retirant ton tag depuis « Mon profil » : la certification est perdue, et l'exposition avec elle. Une connexion par Discord réenregistre ensuite ton pseudo, mais sans le certifier : seul ce geste-ci le certifie.",
 ];

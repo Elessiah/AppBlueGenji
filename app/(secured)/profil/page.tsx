@@ -915,7 +915,9 @@ export default function ProfilePage() {
               <FieldErrorText fieldId={PROFILE_FIELD_IDS.battletag} message={fieldErrors.message("battletag")} />
               {/* Verrouillé, la phrase du module **remplace** l'annonce : celle-ci
                   prévient de ce qui arrivera si un compte Blizzard est rattaché,
-                  et il l'est déjà. */}
+                  et il l'est déjà. L'avertissement sur le masquage suit dans les
+                  deux cas : c'est en renseignant le BattleTag qu'il faut savoir
+                  que le masquer ne le cache pas aux adversaires d'un match. */}
               <p id="profile-battletag-hint" className={s.hint}>
                 {battletagLocked
                   ? battletagLockText(text, {
@@ -923,7 +925,8 @@ export default function ProfilePage() {
                       linked: blizzardLinked,
                       pending: connectionsPending,
                     })
-                  : `${t("games.gameTagNotice")} ${t("games.blizzardNotice")}`}
+                  : `${t("games.gameTagNotice")} ${t("games.blizzardNotice")}`}{" "}
+                {t("games.hiddenWarning")}
               </p>
             </div>
             <div className="field">

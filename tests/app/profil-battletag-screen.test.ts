@@ -162,12 +162,13 @@ describe("modale de visibilité du BattleTag", () => {
 
   it("nomme les publics qui continuent de lire le tag, comme la politique", () => {
     const notice = Object.values(frProfile.battletagNotice).join(" ");
-    expect(notice).toContain("de chaque match de ton équipe");
+    expect(notice).toContain("Les membres des deux équipes de ton match");
     expect(notice).toContain("Le caster de ton match");
-    expect(notice).toContain("arbitres");
-    expect(notice).toContain("administrateurs");
-    // `isInActiveTournament` : dès l'inscription, pas seulement « le temps du tournoi ».
-    expect(notice).toContain("tant que tu es inscrit à un");
+    // Décision du 2026-10-19 : l'arbitrage n'a plus d'accès propre, seule la
+    // fenêtre « Contacts » d'un match ouvre un BattleTag masqué.
+    expect(notice).toContain("pas même pour les arbitres et les administrateurs");
+    expect(notice).toContain("dans la seule fenêtre « Contacts » d'un match");
+    expect(notice).not.toContain("tant que tu es inscrit à un");
   });
 
   it("prend le focus et se ferme par Échap, par la pile commune des modales", () => {

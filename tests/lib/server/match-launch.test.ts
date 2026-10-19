@@ -703,6 +703,16 @@ describe("releaseIneligibleCast", () => {
     await expect(releaseIneligibleCast(42, CASTER)).resolves.toBe(false);
     expect(state.match?.caster_user_id).toBe(CASTER);
   });
+
+  // Inscrit puis entré dans un roster du match : son « Prêt » de caster ne viendrait jamais.
+  it("retire un caster éligible devenu joueur du match, et lance ce qui n'attendait que lui", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.memberships.push({ userId: CASTER, teamId: TEAM1, roles: ["DPS"] });
+    state.match = matchState({ caster_user_id: CASTER, team1_ready_at: STAMP, team2_ready_at: STAMP });
+    await expect(releaseIneligibleCast(42, CASTER)).resolves.toBe(true);
+    expect(state.match?.caster_user_id).toBeNull();
+    expect(state.match?.launched_at).toBe(STAMP);
+  });
 });
 
 describe("phase de lancement éteinte (`match_launch_phase = 0`)", () => {

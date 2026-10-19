@@ -63,7 +63,14 @@ Le défaut **est** la migration : tout tournoi existant passe sans lancement.
   passée, avant la passe de l'entretien, forcer enregistre le lancement au lieu
   de le refuser, et une lecture (modale, « Contacts ») retire encore le caster
   devenu inéligible (`revokeIneligibleCasters` juge la phase allumée, comme
-  `releaseIneligibleCast`, pas la phase affichée). Un report de score refusé faute de `launched_at` (horloge de
+  `releaseIneligibleCast`, pas la phase affichée). Un caster **devenu joueur** du
+  match (roster rejoint après l'inscription, `CASTER_IS_PLAYER` n'étant contrôlé
+  qu'à l'inscription) est traité de même **avant le lancement**, dès qu'une
+  lecture le constate (la sienne, ou les rosters lus pour les contacts) : tu,
+  inscription retirée (`casterPlays`, rejoué sous verrou par
+  `releaseIneligibleCast`) — son « Prêt » de caster ne viendrait jamais. Lancé,
+  il garde sa place (`viewer.isCaster` le dit caster malgré son rôle de joueur).
+  Comme pour un caster inéligible, le retrait n'est notifié à personne. Un report de score refusé faute de `launched_at` (horloge de
   l'appareil en avance) rend `MATCH_NOT_STARTED` (« le match n'a pas encore
   commencé », FR + EN), jamais la phrase des « Prêt » (`MATCH_NOT_LAUNCHED`).
 - **Allumée** : exactement le comportement décrit ci-dessous.
@@ -83,11 +90,25 @@ match n'existe, rien n'est à défaire. Refus d'une valeur non booléenne :
 ## Bouton « Contacts » de la carte de match
 
 Action **« Contacts »** (FR et EN) du pied de carte (`MatchCardActions`),
-offerte aux **parties du match** — joueurs des deux engagées, caster inscrit —
-dès que ses deux adversaires sont connus : **à planifier** (`TO_PLAN`),
-**programmé** (`SCHEDULED`), en lancement ou lancé
-(`launchStripControls().showContacts`), que l'option soit allumée ou non. Action
-principale d'un joueur qui n'a ni score à saisir ni lancement à suivre.
+offerte aux **parties du match** (`launchStripControls().showContacts`), que
+l'option soit allumée ou non : aux **joueurs des deux engagées** dès que ses deux
+adversaires sont connus — **à planifier** (`TO_PLAN`), **programmé**
+(`SCHEDULED`), en lancement ou lancé — ; au **caster inscrit**, **le temps du
+match** seulement — en lancement (`LOBBY`) ou lancé (`LAUNCHED`), jusqu'à la fin
+(décision de l'utilisateur, 2026-10-19 : il n'a rien à organiser avec les équipes
+avant l'heure) ; aux **arbitres** (permission `tournaments`, administrateurs
+compris : `canSchedule` de la carte) aux mêmes phases que les joueurs
+(décision de l'utilisateur, 2026-10-19). Action principale d'un joueur qui n'a
+ni score à saisir ni lancement à suivre.
+
+**Arbitre** : `readViewerLaunches` pose `referee` (`can(viewer, "tournaments")`)
+pour la seule lecture d'une carte ; la requête du match lève alors la clause
+« partie du match » (`1 = 1 OR …`), `exposesContacts` le traite comme un joueur,
+et `viewerRole` lui rend le rôle `REFEREE` (`MatchLaunchViewerRole`), sans
+« Prêt ». La modale de lancement ne lui présente rien. Les contacts du caster
+lui sont tus avant le départ comme aux équipes ; la modale « Contacts » dit
+alors « Ses contacts s'afficheront au départ du match » (`contacts.casterLater`)
+au lieu de deux « — ».
 
 Elle ouvre `MatchContactsDialog` (portail `document.body`,
 `useDialogBehavior`, `useBackdropDismiss`, `ScrollArea`, focus sur « Fermer »),
@@ -97,16 +118,49 @@ lecture est **celle de la modale** (`loadViewerMatchContacts` →
 `readViewerLaunches` de `match-launch-info.ts`) restreinte à un match : mêmes
 destinataires (`viewerRole`, éligibilité du caster rejouée), mêmes contacts
 (`pickLaunchContacts`, `canViewDiscordTag` / `canViewBattletag`), sans la
-fenêtre d'une heure ni le filtre de l'option. Une différence, voulue : les
-contacts y sortent **dès que les deux adversaires du match sont connus** — à
-planifier (décision de l'utilisateur, 2026-10-19), programmé, en lancement ou
-lancé —, et plus seulement au lancement : les parties s'organisent avant
-l'heure, surtout sans phase de lancement. Qui n'est pas partie du match, ou un
-match sans contacts (adversaire inconnu, terminé), reçoit `MATCH_CONTACTS_UNAVAILABLE` (404), un seul code :
-la réponse ne dit pas qui joue quoi. Un refus part en notification ; le corps
+fenêtre d'une heure ni le filtre de l'option. Une différence, voulue : pour un
+**joueur** du match, les contacts y sortent **dès que les deux adversaires du
+match sont connus** — à planifier (décision de l'utilisateur, 2026-10-19),
+programmé, en lancement ou lancé —, et plus seulement au lancement : les parties
+s'organisent avant l'heure, surtout sans phase de lancement. Le **caster**, lui,
+garde la borne de la modale — en lancement ou lancé (`exposesContacts`, lu avec
+`viewerPlaysMatch`) — : avant, la route le traite comme un tiers. Symétrie :
+les équipes ne reçoivent les contacts **du caster** que le temps du match
+(`exposesCaster`) ; avant, la carte montre leurs contacts sans les siens. Qui
+n'est pas partie du match, le caster d'un match pas encore parti, ou
+un match sans contacts (adversaire inconnu, terminé), reçoit `MATCH_CONTACTS_UNAVAILABLE` (404), un seul code :
+la réponse ne dit pas qui joue quoi. La carte décide du bouton à l'horloge du
+navigateur, le serveur à la sienne : un caster dont l'horloge avance verrait
+sinon un refus à l'heure du départ. Ce refus est donc relu **une fois**
+(`readMatchContacts`) quand le match n'est pas lancé et que l'heure du serveur
+(en-tête `Date` du refus) précède son départ d'au plus 30 s
+(`contactsRetryDelay`, `CONTACTS_RETRY_MAX_WAIT_MS`), à l'heure du départ plus
+une seconde ; tout autre refus (match terminé, sans heure, tiers) part aussitôt.
+Fermer la modale coupe l'attente et la lecture (`AbortSignal`). Ouverte avant
+le départ sur un match qui a un caster (`casterContactsPending`), la modale
+relit à l'heure de départ **du serveur** (en-tête `Date` de sa réponse, plus une
+seconde ; une réponse « programmé » dont l'en-tête est déjà à l'heure est
+relue une seconde plus tard — `casterRereadDelay`), et quand la carte reçoit
+une écriture qui touche ce qu'elle montre (lancement forcé, match reprogrammé
+ou remis à planifier, caster qui s'inscrit ou se retire, adversaire corrigé,
+hôte changé, « Prêt » — empreinte `contactsCardKey`, `rereadOnCardChange`), une
+lecture par écriture — sauf le `launched_at` posé après l'heure sur un match que
+la lecture disait déjà lancé (tournoi sans phase de lancement) —, jamais à
+l'horloge du navigateur : les contacts du
+caster remplacent alors sa note d'attente, ou sont de nouveau masqués, pour le
+caster du moment. Leur affichage suit la phase **du serveur** à la lecture.
+Sans caster, ou pour le caster lui-même (arbitre qui caste), rien n'est relu.
+Une relecture qui échoue passagèrement (réseau, 5xx, quota) garde ce qui est
+affiché, sans notification, et se retente jusqu'à 3 fois toutes les 10 s
+(`shouldRetryReread`, compteur remis à zéro par chaque nouvelle relecture ;
+jamais avant l'attente qu'un refus de quota demande, `Retry-After`) ; un échec
+passager de la première lecture est notifié une fois, puis retenté de même ; un refus définitif (`isFinalRefusal` : plus partie du
+match, déconnecté) retire les contacts affichés. Un refus part en notification ; le corps
 reste neutre (« Contacts non affichés », pas « aucun contact »). Chargée à la
 demande (`next/dynamic`) : ses textes FR + EN ne pèsent pas sur la page de
-tournoi. Dans l'ordre de l'action principale, « Contacts » vient **après** les
+tournoi. Sa fermeture fait relire la modale de lancement
+(`MATCH_LAUNCH_REFRESH_EVENT`), sauf pour un arbitre, à qui elle ne présente
+rien. Dans l'ordre de l'action principale, « Contacts » vient **après** les
 gestes d'arbitrage (`PRIMARY_ORDER`). Noms cliquables **dans cette modale
 seulement** (`linkNames`) : équipe par `TeamLink`, entrée solo par `PlayerLink`
 (son unique contact), contacts et caster par `PlayerLink` ; la modale de
@@ -275,7 +329,11 @@ les abonnés du flux : l'instantané ne porte que les « Prêt », l'hôte et le
 **pseudo** du caster, publics comme tout pseudo du site.
 
 Le caster compte parmi les parties : il reçoit le BattleTag **masqué** des
-contacts, et les équipes le sien. `docs/AUTHORIZATION_RULES.md` §2.3 l'écrit
+contacts, et les équipes le sien — dans les deux sens **le temps du match
+seulement** (`exposesCaster`, lancement ouvert ou lancé) ; avant, la carte
+montre aux équipes leurs contacts sans ceux du caster. Hors de cette fenêtre, un
+BattleTag masqué n'est lisible de personne, arbitres et administrateurs compris
+(`battletag-visibility.ts`). `docs/AUTHORIZATION_RULES.md` §2.3 l'écrit
 comme une ligne à part, distincte de la permission `casting`, qui n'ouvre
 rien sur la fiche d'un joueur.
 

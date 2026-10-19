@@ -7,7 +7,9 @@
  * **Exposition bornée.** Les contacts (tag Discord certifié, BattleTag) ne sont
  * rendus qu'aux parties d'un match : dans la modale, **en lancement ou lancé** ;
  * par le bouton « Contacts » d'une carte, dès que ses deux adversaires sont
- * connus (`exposesContacts`). C'est la clause `sharesMatchLobby` de `canViewDiscordTag` et
+ * connus pour ses joueurs et pour les arbitres (permission `tournaments`), le
+ * temps du match seulement pour son caster
+ * (`exposesContacts`). C'est la clause `sharesMatchLobby` de `canViewDiscordTag` et
  * `sharesLiveMatch` de `canViewBattletag`, que ce module est seul à établir.
  * Un match terminé sort de la liste, et ses contacts avec lui.
  *
@@ -29,10 +31,10 @@ import {
   type LaunchCaster,
   type LaunchContact,
   type LaunchSide,
-  type LaunchViewerRole,
   type MatchLaunchInfo,
+  type MatchLaunchViewerRole,
 } from "@/lib/shared/match-launch";
-import type { PlatformRole } from "@/lib/shared/permissions";
+import { can, type PlatformRole } from "@/lib/shared/permissions";
 import type { TeamRole } from "@/lib/shared/types";
 import { localUploadUrl } from "@/lib/shared/uploads";
 import {
@@ -148,6 +150,7 @@ async function loadCandidates(
   connection: PoolConnection,
   userId: number,
   matchId: number | null,
+  referee = false,
 ): Promise<CandidateRow[]> {
   // Deux lectures : la modale de lancement (tous les matchs du lecteur qui
   // approchent, sur les seuls tournois qui ont la phase de lancement), et le
@@ -184,7 +187,7 @@ async function loadCandidates(
        AND m.status IN ('READY', 'AWAITING_CONFIRMATION')
        AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL
        ${scope}
-       AND (m.caster_user_id = ?
+       AND (${referee && matchId !== null ? "1 = 1 OR " : ""}m.caster_user_id = ?
             OR m.team1_id IN ${viewerTeams}
             OR m.team2_id IN ${viewerTeams})
      ORDER BY m.start_at IS NULL, m.start_at, m.id`,
@@ -245,7 +248,8 @@ function viewerRole(
   userId: number,
   teams: ViewerTeams,
   castRevoked: boolean,
-): { role: LaunchViewerRole; canDeclareReady: boolean } | null {
+  referee: boolean,
+): { role: MatchLaunchViewerRole; canDeclareReady: boolean } | null {
   // Le rôle de joueur prime, comme dans `resolveMatchParty`.
   for (const [role, teamId] of [
     ["TEAM1", row.team1_id],
@@ -259,6 +263,8 @@ function viewerRole(
   if (!castRevoked && row.caster_user_id !== null && Number(row.caster_user_id) === userId) {
     return { role: "CASTER", canDeclareReady: true };
   }
+  // Un arbitre n'a pas de « Prêt » à donner : il lit les contacts, rien de plus.
+  if (referee) return { role: "REFEREE", canDeclareReady: false };
   return null;
 }
 
@@ -303,18 +309,35 @@ type LaunchContext = {
   readiness: ReturnType<typeof rowReadiness>;
   /** Contacts : seulement pour les matchs où `exposesContacts` les ouvre. */
   exposes: boolean;
+  /**
+   * Contacts **du caster** : le temps du match seulement (lancement ouvert, ou
+   * lancé), pour tout lecteur — symétrique de ce que le caster reçoit des
+   * équipes (décision de l'utilisateur, 2026-10-19). Avant, la carte présente
+   * les contacts des équipes sans les siens.
+   */
+  exposesCaster: boolean;
 };
 
 /**
  * Les contacts sortent-ils pour ce match ? Dans la modale de lancement, en
- * lancement ou lancé ; par le bouton « Contacts » d'une carte, **dès que les
- * deux adversaires sont connus** — à planifier (décision de l'utilisateur,
- * 2026-10-19) ou programmé — : les parties s'organisent avant l'heure, surtout
- * sans phase de lancement. Mêmes destinataires dans les deux cas : les seules
- * parties du match.
+ * lancement ou lancé ; par le bouton « Contacts » d'une carte, pour un
+ * **joueur** (membre d'une des deux engagées), dès que les deux adversaires
+ * sont connus — à planifier (décision de l'utilisateur, 2026-10-19) ou
+ * programmé — : les parties s'organisent avant l'heure, surtout sans phase de
+ * lancement. Le **caster** inscrit, lui, ne les reçoit que **le temps du
+ * match** — du départ (lancement ouvert, ou lancé) à sa fin —, par la modale
+ * comme par la carte (décision de l'utilisateur, 2026-10-19) : il n'a rien à
+ * organiser avec les équipes avant l'heure.
  */
-function exposesContacts(phase: LaunchPhase, forCard: boolean): boolean {
-  return phase === "LOBBY" || phase === "LAUNCHED" || (forCard && (phase === "SCHEDULED" || phase === "TO_PLAN"));
+function exposesContacts(phase: LaunchPhase, cardForPlayer: boolean): boolean {
+  return (
+    phase === "LOBBY" || phase === "LAUNCHED" || (cardForPlayer && (phase === "SCHEDULED" || phase === "TO_PLAN"))
+  );
+}
+
+/** Le lecteur représente-t-il une des deux engagées du match ? */
+function viewerPlaysMatch(row: CandidateRow, teams: ViewerTeams): boolean {
+  return [row.team1_id, row.team2_id].some((teamId) => teamId !== null && teams.has(Number(teamId)));
 }
 
 /** Un côté du match tel que la ligne le décrit. */
@@ -406,20 +429,27 @@ function revokeIneligibleCasters(
   visible: readonly VisibleLaunch[],
   users: Map<number, UserRow>,
   revokedCasts: { matchId: number; casterId: number }[],
+  casterPlays: (row: CandidateRow, casterId: number) => boolean = () => false,
 ): Set<number> {
   const now = Date.now();
   const revoked = new Set<number>();
   for (const { row } of visible) {
     if (row.caster_user_id === null) continue;
     const casterId = Number(row.caster_user_id);
-    if (castEligibilityBlock(users.get(casterId)) !== null) {
+    // Phase jugée **allumée** — la règle même de `releaseIneligibleCast` : sur
+    // un tournoi sans phase de lancement, un match à l'heure passée se lit
+    // lancé avant que l'entretien ne l'écrive, et c'est la dernière occasion
+    // de retirer l'inscription, qu'un match lancé garde ensuite. Un report en
+    // attente vaut lancé, des deux côtés : rien n'est mis en file pour rien.
+    const recorded = matchLaunchPhase({ ...toLaunchInput(row), launchPhase: true }, now);
+    // Un caster devenu joueur du match ne donnera jamais son « Prêt » de
+    // caster : avant le lancement, dès qu'une lecture le constate (le sien,
+    // ou les rosters lus pour les contacts), il est tu et son inscription
+    // retirée, comme un caster inéligible — sous verrou, `releaseIneligibleCast`
+    // rejoue la même règle. Lancé, il garde sa place.
+    const playsMatch = recorded !== "LAUNCHED" && casterPlays(row, casterId);
+    if (castEligibilityBlock(users.get(casterId)) !== null || playsMatch) {
       revoked.add(Number(row.id));
-      // Phase jugée **allumée** — la règle même de `releaseIneligibleCast` : sur
-      // un tournoi sans phase de lancement, un match à l'heure passée se lit
-      // lancé avant que l'entretien ne l'écrive, et c'est la dernière occasion
-      // de retirer l'inscription, qu'un match lancé garde ensuite. Un report en
-      // attente vaut lancé, des deux côtés : rien n'est mis en file pour rien.
-      const recorded = matchLaunchPhase({ ...toLaunchInput(row), launchPhase: true }, now);
       if (recorded !== "LAUNCHED") revokedCasts.push({ matchId: Number(row.id), casterId });
     }
   }
@@ -467,7 +497,7 @@ function buildLaunchCaster(row: CandidateRow, ctx: LaunchContext): LaunchCaster 
   const user = ctx.users.get(Number(row.caster_user_id));
   if (!user || Number(user.is_deleted) !== 0) return null;
   const discordTag = user.discord_verified_at !== null ? user.discord_pseudo : null;
-  const contact = ctx.exposes
+  const contact = ctx.exposes && ctx.exposesCaster
     ? filterContact(
         {
           userId: Number(user.id),
@@ -494,7 +524,7 @@ function buildLaunchCaster(row: CandidateRow, ctx: LaunchContext): LaunchCaster 
 function buildLaunchInfo(
   row: CandidateRow,
   phase: LaunchPhase,
-  party: { role: LaunchViewerRole; canDeclareReady: boolean },
+  party: { role: MatchLaunchViewerRole; canDeclareReady: boolean },
   ctx: LaunchContext,
 ): MatchLaunchInfo {
   const { readiness } = ctx;
@@ -521,10 +551,12 @@ function buildLaunchInfo(
     viewer: {
       role: party.role,
       canDeclareReady: party.canDeclareReady,
+      isCaster: caster !== null && caster.userId === ctx.viewer.id,
       ready: {
         CASTER: readiness.casterReady,
         TEAM1: readiness.team1Ready,
         TEAM2: readiness.team2Ready,
+        REFEREE: false,
       }[party.role],
     },
   };
@@ -538,11 +570,12 @@ export function listViewerMatchLaunches(viewer: LaunchViewer): Promise<MatchLaun
 /**
  * Contacts d'**un** match pour le bouton « Contacts » de sa carte : la même
  * présentation que la modale de lancement, aux mêmes destinataires (les
- * parties du match, caster éligible compris), mais dès que les deux
- * adversaires sont connus (à planifier compris), que le tournoi ait ou non la
- * phase de lancement.
+ * parties du match, caster éligible compris), que le tournoi ait ou non la
+ * phase de lancement : dès que les deux adversaires sont connus (à planifier
+ * compris) pour un joueur, le temps du match seulement pour le caster.
  *
- * @returns `null` quand le lecteur n'est pas partie du match, ou que le match
+ * @returns `null` quand le lecteur n'est pas partie du match, qu'il en est le
+ *   caster et que le match n'est pas encore parti, ou que le match
  *   n'a pas ses deux adversaires, est terminé, ou son tournoi n'est pas en
  *   cours (`MATCH_CONTACTS_UNAVAILABLE`).
  */
@@ -557,35 +590,56 @@ export async function loadViewerMatchContacts(
 async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null): Promise<MatchLaunchInfo[]> {
   const forCard = matchId !== null;
   if (!(await hasRunningTournament(!forCard))) return [];
+  // Arbitre (permission `tournaments`) : par la carte seulement, les mêmes
+  // contacts, à la même heure, que les joueurs du match (décision de
+  // l'utilisateur, 2026-10-19). La modale de lancement ne lui présente rien.
+  const referee = forCard && can(viewer, "tournaments");
 
   const revokedCasts: { matchId: number; casterId: number }[] = [];
   const launches = await withConnection(async (connection) => {
-    let rows = await loadCandidates(connection, viewer.id, matchId);
+    let rows = await loadCandidates(connection, viewer.id, matchId, referee);
     if (rows.length === 0) return [];
     if (await maintainIfDue(connection, rows)) {
-      rows = await loadCandidates(connection, viewer.id, matchId);
+      rows = await loadCandidates(connection, viewer.id, matchId, referee);
       if (rows.length === 0) return [];
     }
     const teams = await loadViewerTeams(connection, viewer.id);
 
     const now = Date.now();
-    const visible = rows
+    const read = rows
       .map((row) => {
         const phase = matchLaunchPhase(toLaunchInput(row), now);
-        return { row, phase, exposes: exposesContacts(phase, forCard) };
+        return { row, phase, exposes: exposesContacts(phase, forCard && (referee || viewerPlaysMatch(row, teams))) };
       })
-      .filter(({ phase }) => phase !== "NONE" && (forCard || phase !== "TO_PLAN"));
-    if (visible.length === 0) return [];
+      .filter(({ phase }) => phase !== "NONE");
+    // Par la carte, un match sans contacts à montrer n'est pas rendu : le
+    // caster d'un match pas encore parti reçoit le même refus qu'un tiers.
+    const visible = read.filter(({ phase, exposes }) => (forCard ? exposes : phase !== "TO_PLAN"));
+    // Par la carte, son éligibilité est pourtant rejouée sur tout ce qui a été
+    // lu : un caster devenu inéligible qui l'ouvre avant l'heure perd son
+    // inscription à cette lecture-là, sans attendre celle d'un joueur. La
+    // modale, qui interroge en boucle, n'en paie pas le coût.
+    const checked = forCard ? read : visible;
+    if (visible.length === 0 && !checked.some(({ row }) => row.caster_user_id !== null)) return [];
 
-    const { rosterTeamIds, userIds } = collectContactIds(visible);
+    const { rosterTeamIds, userIds } = collectContactIds(checked);
     const rosters = await loadRosters(connection, rosterTeamIds);
     const users = await loadUsers(connection, userIds);
-    const revoked = revokeIneligibleCasters(visible, users, revokedCasts);
+    // Le caster joue-t-il le match ? Pour le lecteur, ses équipes ; pour un
+    // autre, les rosters et entrées solo lus pour les contacts.
+    const casterPlays = (row: CandidateRow, casterId: number) =>
+      (casterId === viewer.id && viewerPlaysMatch(row, teams)) ||
+      ([1, 2] as const).some((index) => {
+        const side = rowSide(row, index);
+        if (side.soloUserId !== null) return Number(side.soloUserId) === casterId;
+        return (rosters.get(Number(side.teamId)) ?? []).some((member) => Number(member.user_id) === casterId);
+      });
+    const revoked = revokeIneligibleCasters(checked, users, revokedCasts, casterPlays);
 
     const result: MatchLaunchInfo[] = [];
     for (const { row, phase, exposes } of visible) {
       const castRevoked = revoked.has(Number(row.id));
-      const party = viewerRole(row, viewer.id, teams, castRevoked);
+      const party = viewerRole(row, viewer.id, teams, castRevoked, referee);
       if (!party) continue;
       result.push(
         buildLaunchInfo(row, phase, party, {
@@ -595,6 +649,7 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
           castRevoked,
           readiness: rowReadiness(row),
           exposes,
+          exposesCaster: phase === "LOBBY" || phase === "LAUNCHED",
         }),
       );
     }

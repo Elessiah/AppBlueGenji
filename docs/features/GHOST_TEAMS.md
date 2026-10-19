@@ -67,8 +67,8 @@ création (staff)  →  inscription à un tournoi  →  reprise par un joueur (q
    **Pourquoi une invitation.** L'attribution était directe : un arbitre faisait
    d'un joueur sans équipe l'`OWNER` d'une fantôme sans qu'il ait rien demandé.
    Inscrite à un tournoi vivant, la fantôme faisait de lui un **engagé**, ce qui
-   ouvre à la permission `tournaments` son tag Discord certifié et son BattleTag
-   même masqué (`isInActiveTournament`, `canViewBattletag`) — un moyen de lire
+   ouvre à la permission `tournaments` son tag Discord certifié
+   (`isInActiveTournament`) — un moyen de lire
    le contact de n'importe quel free agent, que la règle réserve aux joueurs
    réellement engagés. Il ne l'est désormais que s'il l'a accepté.
 

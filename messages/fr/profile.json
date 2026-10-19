@@ -66,6 +66,7 @@
   "games": {
     "battletag": "BattleTag Overwatch",
     "battletagPlaceholder": "Pseudo#1234",
+    "hiddenWarning": "Tu peux masquer ton BattleTag : il ne reste alors visible que dans la fenêtre « Contacts » de tes matchs de tournoi, si tu fais partie des contacts présentés : pour les deux équipes et les arbitres dès que les deux adversaires sont connus, et pour le caster le temps du match. Si tu ne veux pas qu'ils le voient, retire-le de ton profil (s'il vient de Battle.net, détache d'abord ton compte Battle.net — après avoir ajouté un autre moyen de connexion si c'est le seul).",
     "marvel": "Tag Marvel Rivals",
     "gameTagNotice": "Sert uniquement à ce que les autres joueurs puissent t'ajouter en jeu — jamais pour des statistiques.",
     "blizzardNotice": "Si tu rattaches Battle.net, Blizzard renseigne ce BattleTag et le remet à jour à chaque connexion — ta saisie est alors remplacée par celle de la source."
@@ -73,7 +74,7 @@
   "battletagLock": {
     "pending": "Lecture de tes applications connectées… Le champ reste en lecture seule le temps de savoir si Blizzard renseigne ce BattleTag.",
     "unknown": "Impossible de lire tes applications connectées pour l'instant : le champ reste en lecture seule, pour ne pas écraser un BattleTag que Blizzard aurait renseigné. Recharge la page pour réessayer.",
-    "change": "Pour en changer, retire Blizzard depuis « Applications connectées », puis rattache le bon compte.",
+    "change": "Pour en changer, retire Blizzard depuis « Applications connectées » (après avoir ajouté un autre moyen de connexion si c'est le seul), puis rattache le bon compte.",
     "noTag": "Ton compte Blizzard est rattaché, mais il n'a donné aucun BattleTag. Le champ reste en lecture seule : Blizzard le renseignera à ta prochaine connexion, et écraserait une saisie faite ici. {change}",
     "tagged": "Ton compte Blizzard est rattaché : c'est lui qui donne ce BattleTag, et Blizzard le remet à jour à chaque connexion — une correction saisie ici serait effacée au passage suivant. {change} Pour cesser de le publier, décoche « BattleTag OW » plus bas."
   },
@@ -94,7 +95,7 @@
     "reading": "Lecture…",
     "unverifiedHint": "Tag non certifié : {audience} Certifie-le pour qu'elle puisse le faire.",
     "unverifiedAudience": "personne ne le voit, pas même les administrateurs. L'organisation ne peut donc pas te joindre pendant un tournoi.",
-    "audience": "les administrateurs le voient à tout moment, les arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), et les membres des deux équipes et le caster de ton match dès que les deux adversaires du match sont connus et jusqu'à sa fin (et, si tu castes un match, ses deux équipes) ; les autres joueurs, seulement si tu le rends visible dans tes réglages de confidentialité. Jamais personne d'autre.",
+    "audience": "les administrateurs le voient à tout moment, les arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), les membres des deux équipes de ton match dès que ses deux adversaires sont connus et jusqu'à sa fin, et son caster le temps du match seulement (et, si tu castes un match, ses deux équipes et les arbitres, le temps du match seulement) ; les autres joueurs, seulement si tu le rends visible dans tes réglages de confidentialité. Jamais personne d'autre.",
     "removed": "Tag Discord retiré.",
     "lock": {
       "pending": "Lecture de l'état de ton compte Discord… Le champ reste en lecture seule le temps de savoir si Discord a nommé ce pseudo.",
@@ -125,7 +126,7 @@
       "major": "Majorité"
     },
     "pseudoAlwaysVisible": "Ton pseudo reste toujours visible : c'est lui qui t'identifie dans les brackets, les rosters et les feuilles de match.",
-    "discordNotice": "La certification ouvre ton tag Discord à l'organisation (administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé) et, comme contact, aux membres des deux équipes et au caster de ton match dès que ses deux adversaires sont connus (et, si tu castes un match, à ses deux équipes) ; pas aux autres joueurs : coche « Tag Discord » pour qu'ils le voient sur ta fiche. Un tag non certifié reste masqué, case cochée ou non.",
+    "discordNotice": "La certification ouvre ton tag Discord à l'organisation (administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé) et, comme contact, aux membres des deux équipes de ton match dès que ses deux adversaires sont connus, et à son caster le temps du match seulement (et, si tu castes un match, à ses deux équipes et aux arbitres le temps du match) ; pas aux autres joueurs : coche « Tag Discord » pour qu'ils le voient sur ta fiche. Un tag non certifié reste masqué, case cochée ou non.",
     "discordPending": "Ton tag n'est pas certifié : il restera masqué aux autres joueurs tant que tu ne l'auras pas certifié.",
     "discordNoTag": "Tu n'as pas encore de tag Discord : enregistre-le puis certifie-le pour que les autres joueurs le voient.",
     "recruitmentTitle": "Recrutement",
@@ -265,7 +266,7 @@
     "notes": {
       "GOOGLE": "Connexion en un clic. Aucune adresse n'est enregistrée.",
       "DISCORD": "Connexion, certification de ton tag, et annonce des horaires et rappels de match en message privé.",
-      "BLIZZARD": "Connexion, et ton BattleTag tenu à jour par Blizzard."
+      "BLIZZARD": "Connexion, et ton BattleTag tenu à jour par Blizzard. Tu peux masquer ton BattleTag : il ne reste alors visible que dans la fenêtre « Contacts » de tes matchs de tournoi, si tu fais partie des contacts présentés : pour les deux équipes et les arbitres dès que les deux adversaires sont connus, et pour le caster le temps du match. Si tu ne veux pas qu'ils le voient, retire-le de ton profil (s'il vient de Battle.net, détache d'abord ton compte Battle.net — après avoir ajouté un autre moyen de connexion si c'est le seul)."
     },
     "linked": "Rattaché",
     "handleLine": "{label} : {handle}",
@@ -339,13 +340,14 @@
   },
   "battletagNotice": {
     "eyebrow": "VISIBILITÉ · BATTLETAG",
+    "warning": "Tu peux masquer ton BattleTag : il ne reste alors visible que dans la fenêtre « Contacts » de tes matchs de tournoi, si tu fais partie des contacts présentés : pour les deux équipes et les arbitres dès que les deux adversaires sont connus, et pour le caster le temps du match. Si tu ne veux pas qu'ils le voient, retire-le de ton profil (s'il vient de Battle.net, détache d'abord ton compte Battle.net — après avoir ajouté un autre moyen de connexion si c'est le seul).",
     "title": "Masqué, mais pas pour tout le monde",
-    "intro": "Ton BattleTag n'apparaîtra plus sur ta fiche publique ni dans l'annuaire des joueurs. Il reste en revanche lisible là où il sert à jouer :",
-    "players": "<strong>Les membres des deux équipes de chaque match de ton équipe</strong>, le temps du tournoi — c'est par lui qu'on s'ajoute en jeu pour lancer la partie.",
-    "caster": "<strong>Le caster de ton match</strong>, dès que ses deux adversaires sont connus et jusqu'à sa fin, si tu fais partie des contacts présentés.",
-    "asCaster": "<strong>Les deux équipes d'un match que tu castes</strong>, dès que ses deux adversaires sont connus et jusqu'à sa fin.",
-    "staff": "<strong>Les arbitres et les administrateurs</strong>, tant que tu es inscrit à un tournoi qui n'est pas terminé — dès l'ouverture des inscriptions.",
-    "outro": "Pour ne plus le communiquer du tout, il faut effacer le champ — mais tes adversaires ne pourront alors plus t'ajouter en jeu. Et si un compte Blizzard est rattaché, c'est lui qui tient ce champ : il faut le retirer d'abord.",
+    "intro": "Ton BattleTag n'apparaîtra plus nulle part — fiche, annuaire, rosters —, pas même pour les arbitres et les administrateurs. Il reste lisible dans la seule fenêtre « Contacts » d'un match, là où il sert à s'ajouter en jeu :",
+    "players": "<strong>Les membres des deux équipes de ton match</strong>, dès que ses deux adversaires sont connus et jusqu'à sa fin, si tu fais partie des contacts présentés — c'est par lui qu'on s'ajoute en jeu pour lancer la partie.",
+    "caster": "<strong>Le caster de ton match</strong>, le temps du match seulement (de son départ à sa fin), si tu fais partie des contacts présentés.",
+    "asCaster": "<strong>Les deux équipes et les arbitres d'un match que tu castes</strong>, le temps du match seulement (de son départ à sa fin).",
+    "staff": "<strong>Les arbitres et les administrateurs</strong>, dans la même fenêtre « Contacts » des matchs du tournoi, aux mêmes moments que les deux équipes — jamais ailleurs.",
+    "outro": "Pour ne plus le communiquer du tout, il faut effacer le champ — mais tes adversaires ne pourront alors plus t'ajouter en jeu. Et si un compte Blizzard est rattaché, c'est lui qui tient ce champ : il faut le retirer d'abord (après avoir ajouté un autre moyen de connexion si c'est le seul).",
     "ok": "J'ai compris"
   },
   "verify": {
@@ -357,8 +359,8 @@
     "exposureTitle": "Ce que la certification expose",
     "exposure": {
       "admins": "Les administrateurs du site voient ton tag Discord en permanence.",
-      "referees": "Les arbitres le voient uniquement quand tu es engagé dans un tournoi en cours ou à venir — plus après.",
-      "match": "Les membres des deux équipes et le caster de ton match le voient dès que les deux adversaires du match sont connus et jusqu'à sa fin — pour s'ajouter et créer le salon. Si tu castes un match, ses deux équipes voient le tien sur la même durée.",
+      "referees": "Les arbitres le voient uniquement quand tu es engagé dans un tournoi en cours ou à venir — plus après —, ou le temps d'un match que tu castes.",
+      "match": "Les membres des deux équipes de ton match le voient dès que ses deux adversaires sont connus et jusqu'à sa fin, son caster le temps du match seulement (de son départ à sa fin) — pour s'ajouter et créer le salon. Si tu castes un match, ses deux équipes et les arbitres voient le tien le temps du match seulement.",
       "players": "Les autres joueurs du site ne le voient que si tu le rends visible dans tes réglages de confidentialité. Il n'apparaît sur aucune page publique.",
       "undo": "Tu peux annuler à tout moment en retirant ton tag depuis « Mon profil » : la certification est perdue, et l'exposition avec elle. Une connexion par Discord réenregistre ensuite ton pseudo, mais sans le certifier : seul ce geste-ci le certifie."
     },

@@ -13,7 +13,9 @@ import {
   AUTOMOD_ALERT_SCOPE,
   DATA_NOTICE_DM_SCOPE,
   DONNEES_PROFIL,
+  BATTLETAG_MATCH_SCOPE,
   LIVE_PSEUDO_SCOPE,
+  MATCH_CONTACTS_SCOPE,
   MATCH_TIME_DM_SCOPE,
   MODERATION_DM_SCOPE,
 } from "@/lib/shared/rgpd-policy";
@@ -36,8 +38,10 @@ const PROFIL_DUREE_EN: Record<string, string> = {
 
 /** French scope of an additional legal basis -> English. */
 const SCOPE_EN: Record<string, string> = {
-  "présentation aux membres des deux équipes et au caster de ton match, dès que ses deux adversaires sont connus":
-    "presentation to the members of both teams and the caster of your match, as soon as both its opponents are known",
+  [MATCH_CONTACTS_SCOPE]:
+    "presentation, in the match's “Contacts” window, to the members of both its teams and to the referees as soon as both its opponents are known, and to its caster while the match is being played; the caster's contacts to both teams and to the referees while the match is being played (terms of use, “Match contacts”)",
+  [BATTLETAG_MATCH_SCOPE]:
+    "reading, even when hidden, only in the “Contacts” window of a match where you are presented as a contact: by both its teams and the referees as soon as both its opponents are known, by its caster while the match is being played — referees and administrators have no other access to it (terms of use, “Match contacts”)",
   [MATCH_TIME_DM_SCOPE]: "match time notices, reminders and match removal notices by direct message",
   [MODERATION_DM_SCOPE]: "suspension or moderation notices by direct message",
   [DATA_NOTICE_DM_SCOPE]: "information about your data by direct message",
@@ -54,7 +58,7 @@ const PROFIL_TEXT_EN: readonly (readonly [donnee: string, finalite: string])[] =
   ],
   [
     "Overwatch username",
-    "Putting players in touch (adding each other in game) — no statistics. Entered by you, or filled in by Blizzard at each login if you have linked your Battle.net account. When hidden, it remains readable by the members of both teams of your matches until the tournament is over, by the caster of your match from the moment both its opponents are known to its end if you are one of the contacts presented (and, if you cast a match, by both its teams for the same period), and by the referees while you are registered for a tournament that is not over; when presented as a match contact, it is shown with your team role and whether it comes from a linked Battle.net account",
+    "Putting players in touch (adding each other in game) — no statistics. Entered by you, or filled in by Blizzard at each login if you have linked your Battle.net account. When hidden, it is readable by no one — referees and administrators included — except in the “Contacts” window of a match where you are one of the contacts presented: by the members of both its teams and the referees from the moment both its opponents are known to its end, by its caster only while the match is being played (from its start to its end); if you cast a match, by both its teams and the referees while the match is being played; when presented as a match contact, it is shown with your team role and whether it comes from a linked Battle.net account",
   ],
   [
     "Discord username",
@@ -62,7 +66,7 @@ const PROFIL_TEXT_EN: readonly (readonly [donnee: string, finalite: string])[] =
   ],
   [
     "Certification of the Discord username",
-    "Opens your Discord tag to the organizers so they can reach you: administrators at any time, referees while you are registered for a tournament that is not over (from the opening of registration), members of both teams and caster of your match from the moment both its opponents are known to its end (and, if you cast a match, both its teams for the same period); other logged-in players only if you tick “Discord tag” (« Tag Discord »). Without it, the bot sends you no match direct message. Given only by you, from My profile (one click if your Discord is linked, a code by direct message otherwise) — logging in through Discord does not give it. Withdrawn by removing your tag; lost if your username changes",
+    "Opens your Discord tag to the organizers so they can reach you: administrators at any time, referees while you are registered for a tournament that is not over (from the opening of registration), members of both teams of your match from the moment both its opponents are known to its end, its caster only while the match is being played (and, if you cast a match, both its teams and the referees while the match is being played); other logged-in players only if you tick “Discord tag” (« Tag Discord »). Without it, the bot sends you no match direct message. Given only by you, from My profile (one click if your Discord is linked, a code by direct message otherwise) — logging in through Discord does not give it. Withdrawn by removing your tag; lost if your username changes",
   ],
   [
     "Discord ID",

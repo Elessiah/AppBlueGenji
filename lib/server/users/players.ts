@@ -63,9 +63,9 @@ export function mapPublicUser(row: UserRow): PublicUserProfile {
  * Le **pseudo n'est jamais masqué** : il identifie le joueur dans les brackets,
  * les rosters et les feuilles de match, où l'anonymat n'a pas de sens.
  *
- * Le BattleTag masqué ne l'est ici que pour le lecteur **quelconque** : la
- * fonction ne connaît que `isSelf`. Son public restreint (joueurs d'un même
- * match, arbitrage d'un tournoi vivant) est reposé par `getFullProfile` —
+ * Le BattleTag masqué l'est ici pour tout lecteur autre que son titulaire,
+ * arbitres et administrateurs compris : il ne se lit que dans la fenêtre
+ * « Contacts » d'un match (`match-launch-info.ts`), jamais par une fiche —
  * voir `lib/shared/battletag-visibility.ts`.
  */
 export function applyVisibility<T extends PublicUserProfile>(profile: T, isSelf: boolean): T {

@@ -105,11 +105,13 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(terms.transfers).toEqual(["Aucun"]);
   });
 
-  it("ouvre le tag certifié et le BattleTag masqué aux arbitres dès l'inscription, pas au seul tournoi en cours", () => {
+  it("ouvre le tag certifié aux arbitres dès l'inscription, et le BattleTag masqué par la seule fenêtre « Contacts »", () => {
     const subPurposes = byRef("T04").subPurposes.join(" ");
     expect(subPurposes).not.toMatch(/tournoi en cours/);
     expect(subPurposes).toMatch(/aux arbitres tant que le joueur est inscrit à un tournoi qui n'est pas terminé/);
-    expect(subPurposes).toMatch(/aux administrateurs et aux arbitres le BattleTag masqué/);
+    // Décisions du 2026-10-19 : plus d'accès propre au BattleTag masqué pour le staff,
+    // seulement la fenêtre « Contacts », aux mêmes durées que les équipes.
+    expect(subPurposes).toMatch(/Ne présenter aux administrateurs et aux arbitres le BattleTag masqué d'un joueur que dans la fenêtre « Contacts » d'un match du tournoi, aux mêmes durées que pour ses deux équipes/);
   });
 
   it("déclare les transferts vers Discord partout où Discord achemine des messages", () => {
@@ -179,7 +181,7 @@ describe("PROCESSING_ACTIVITIES", () => {
 
   it("compte les joueurs d'un même match parmi les destinataires des profils", () => {
     // Un BattleTag masqué leur reste lisible (`lib/shared/battletag-visibility.ts`).
-    expect(byRef("T01").recipients.join(" ")).toMatch(/Membres des deux équipes d'un même match.*BattleTag même masqué/);
+    expect(byRef("T01").recipients.join(" ")).toMatch(/Parties d'un même match, dans sa seule fenêtre « Contacts ».*BattleTag même masqué/);
   });
 
   it("ne déclare aucune adresse e-mail collectée", () => {
@@ -403,7 +405,7 @@ describe("bases légales : le registre et la politique disent la même chose", (
 
   it("fonde les contacts du lancement d'un match sur l'exécution des conditions d'utilisation", () => {
     expect(byRef("T04").legalBasis).toMatch(
-      /exécution du service demandé par le joueur \(contrat — conditions d'utilisation\) pour la présentation des contacts aux parties d'un match, dès que ses deux adversaires sont connus,/,
+      /exécution du service demandé par le joueur \(contrat — conditions d'utilisation, section « Contacts de match »\) pour la présentation des contacts aux parties d'un match dans sa fenêtre « Contacts » \(à ses deux équipes et aux arbitres dès que ses deux adversaires sont connus, à son caster et du caster le temps du match\), BattleTag masqué compris — arbitres et administrateurs n'y ont pas d'autre accès, sur la même base —,/,
     );
   });
 

@@ -817,6 +817,30 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "La phase de lancement (« Prêt » et fenêtre de lancement) devient une option de chaque tournoi, éteinte par défaut : sans elle, un match part à son heure et aucun « Prêt » n'est enregistré.",
     ],
   },
+  // CONTACTS-FOLLOWUP (décisions de l'utilisateur du 2026-10-19) : le caster
+  // inscrit ne reçoit plus les contacts d'un match que le temps du match (moins
+  // tôt qu'annoncé par l'entrée précédente, publiée le même jour et désormais
+  // figée) ; BattleTag masqué lu par les parties d'un match = exécution du
+  // service, plus le consentement ; conditions d'utilisation en version 5
+  // (section « Contacts de match »). Annoncées une fois à tous par ce registre,
+  // comme la version 4 (`2026-10-base-pseudo-live-et-automod`). Datée du jour
+  // de la fusion prévue.
+  {
+    id: "2026-10-contacts-de-match-caster-et-conditions-v5",
+    title: "Contacts de match : le caster seulement pendant le match, conditions d'utilisation mises à jour",
+    publishedAt: "2026-10-19",
+    summary:
+      "Le caster inscrit d'un match ne voit plus ses contacts que le temps du match, de son départ à sa fin, et les équipes les siens sur ce même temps ; ton BattleTag masqué ne se lit plus que dans la fenêtre « Contacts » de tes matchs, que les arbitres et les administrateurs ouvrent aux mêmes moments que les équipes. Les conditions d'utilisation passent en version 5 pour le dire.",
+    details: [
+      "Caster : il ne voit le tag Discord certifié, le BattleTag (même masqué) et le rôle d'équipe des contacts d'un match que le temps du match — dès son départ (fenêtre de lancement ouverte, ou match lancé) et jusqu'à sa fin —, et plus dès que les deux adversaires sont connus. Symétriquement, les membres des deux équipes ne voient plus les contacts du caster que le temps du match ; ils gardent ceux des équipes dès que les deux adversaires sont connus, « À planifier » compris.",
+      "BattleTag masqué : il n'est plus lisible sur ta fiche par les joueurs de tes matchs, ni par les arbitres et les administrateurs pendant un tournoi. Il ne se lit plus que dans la fenêtre « Contacts » d'un match où tu es présenté comme contact — par les deux équipes et par les arbitres et les administrateurs dès que les deux adversaires sont connus, par le caster le temps du match. Si tu ne veux pas qu'ils le voient, retire-le de ton profil (s'il vient de Battle.net, détache d'abord ton compte Battle.net — après avoir ajouté un autre moyen de connexion si c'est le seul). Cette lecture repose sur l'exécution du service — l'organisation du tournoi —, et non sur ton consentement.",
+      "Conditions d'utilisation : la version 5, en vigueur depuis le 19 octobre 2026, ajoute la section « Contacts de match », qui prévoit ce partage. Relis-les : la page de connexion te les présente de nouveau tant qu'elles n'ont pas été acceptées dans ton navigateur et, si tu gères une équipe sans les avoir déjà acceptées, avant ton prochain geste de gestion.",
+    ],
+    links: [
+      { href: "/conditions-utilisation#contacts-de-match", label: "Lire la section « Contacts de match »" },
+      { href: "/rgpd#donnees-collectees", label: "Lire la section « Données collectées »" },
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

@@ -433,6 +433,13 @@ export type LaunchCaster = {
 
 export type LaunchViewerRole = "TEAM1" | "TEAM2" | "CASTER";
 
+/**
+ * Rôle du lecteur dans une présentation de match : une partie, ou un arbitre
+ * (permission `tournaments`), qui ne lit que les contacts de la carte et n'a
+ * pas de « Prêt » à donner.
+ */
+export type MatchLaunchViewerRole = LaunchViewerRole | "REFEREE";
+
 export type MatchLaunchInfo = {
   matchId: number;
   tournamentId: number;
@@ -447,9 +454,15 @@ export type MatchLaunchInfo = {
   team2: LaunchSide;
   caster: LaunchCaster | null;
   viewer: {
-    role: LaunchViewerRole;
+    role: MatchLaunchViewerRole;
     /** Le lecteur peut-il cliquer « Prêt » pour sa partie ? */
     canDeclareReady: boolean;
+    /**
+     * Le lecteur est-il le caster inscrit, quel que soit `role` (un joueur du
+     * match qui caste reste `TEAM1`/`TEAM2`) ? La modale « Contacts » ne lui
+     * parle pas de ses propres contacts.
+     */
+    isCaster: boolean;
     /** Sa partie est-elle déjà déclarée prête ? */
     ready: boolean;
   };

@@ -180,7 +180,7 @@ export function RgpdEn({
       </section>
 
       {/* SECTION 02 — DATA COLLECTED */}
-      <section className={styles.section}>
+      <section id="donnees-collectees" className={styles.section}>
         <header className={styles.head}>
           <div>
             <span className="eyebrow">SECTION 02</span>

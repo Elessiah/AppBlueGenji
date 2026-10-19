@@ -1,7 +1,7 @@
 LÉGAL · CONDITIONS GÉNÉRALES
 Conditions d'utilisation
 Ce que chacun s'engage à respecter en utilisant le site, en y créant une équipe et en y publiant un logo ou un avatar. Le traitement des données personnelles est décrit dans la politique de confidentialité. Les règles des tournois, que ces conditions complètent, sont publiées sur la page Règles des tournois.
-VERSION 4EN VIGUEUR DEPUIS LE 14 OCTOBRE 2026
+VERSION 5EN VIGUEUR DEPUIS LE 19 OCTOBRE 2026
 SOMMAIRE
 1. Objet
 2. Acceptation
@@ -9,9 +9,10 @@ SOMMAIRE
 4. Comportement
 5. Contenus publiés par les utilisateurs
 6. Retransmission des matchs
-7. Signalement et modération
-8. Responsabilité
-9. Droit applicable
+7. Contacts de match
+8. Signalement et modération
+9. Responsabilité
+10. Droit applicable
 ARTICLE 01
 Objet
 Les présentes conditions encadrent l'utilisation du site BlueGenji Esport, édité par l'association Bluegenji Esport (loi 1901), qui organise des tournois amateurs Overwatch et Marvel Rivals et met à disposition des joueurs des fiches de profil, d'équipe et de tournoi.
@@ -44,6 +45,11 @@ Un match de tournoi peut être diffusé en direct et enregistré (YouTube, Twitc
 Chaque joueur peut s'y opposer : il apparaît alors sous un nom neutre. La demande se fait par le bouton « Signaler un problème », catégorie RGPD. Au début d'un match diffusé, une annonce publiée dans le salon #live du Discord de l'association nomme les équipes et, en tournoi individuel, les joueurs par leur pseudo public. Cette annonce fait partie du tournoi individuel auquel le joueur s'inscrit (exécution du service, et non intérêt légitime) : le nom neutre ne s'y applique pas, et un joueur qui ne veut pas y être nommé ne s'inscrit pas au tournoi individuel. Une annonce est supprimée sur demande, par le même bouton. La diffusion se regarde sur la plateforme qui la publie : le site ne fait que lier la chaîne.
 Politique de confidentialité — retransmission des matchs
 ARTICLE 07
+Contacts de match
+Pour qu'un match de tournoi se joue, ses parties doivent pouvoir se joindre et s'ajouter en jeu. Au titre de l'organisation du tournoi, les coordonnées de contact d'un ou deux membres de chaque équipe — tag Discord certifié, BattleTag, même masqué, et rôle d'équipe — sont communiquées aux membres des deux équipes du match et aux arbitres (administrateurs compris), dès que ses deux adversaires sont connus et jusqu'à sa fin, et à son caster inscrit le temps du match seulement, de son départ à sa fin ; celles du caster le sont aux deux équipes et aux arbitres sur ce même temps du match.
+Ce partage passe par la seule fenêtre « Contacts » du match, que reprend sa fenêtre de lancement au départ du match : un BattleTag masqué n'est lisible nulle part ailleurs sur le site, pour personne — arbitres et administrateurs compris. Le jeu, lui, affiche les identifiants de jeu des joueurs : le code de replay d'une map, visible de tout utilisateur connecté sur la fiche du tournoi, permet de revoir la partie et de les y lire. Masquer son BattleTag ne le retire donc pas de cette fenêtre : pour ne pas le communiquer, il faut le retirer de son profil (un BattleTag reçu de Battle.net ne s'efface qu'une fois le compte Battle.net détaché, ce qui suppose un autre moyen de connexion). Un tag Discord non certifié n'est jamais communiqué.
+Politique de confidentialité — données collectées
+ARTICLE 08
 Signalement et modération
 Toute personne, titulaire d'un compte ou non, peut signaler un contenu illicite ou contraire à ces conditions par le bouton « Signaler un problème » présent en bas de chaque page. Un signalement de droit d'auteur doit indiquer le nom ou la raison sociale de son auteur, son adresse électronique, sa qualité (titulaire des droits, représentant ou tiers), le contenu visé et où le voir sur le site, la raison de la demande et une déclaration de bonne foi. L'auteur d'une notification reçoit, à l'adresse qu'il indique (exigée en droit d'auteur, facultative ailleurs), un accusé de réception, puis la décision prise à son sujet et les voies de recours qui lui sont ouvertes. S'il a signalé depuis son compte, il peut contester cette décision — y compris celle de ne pas agir — par la catégorie « Contestation » du même formulaire, une fois le signalement archivé.
 L'association agit comme hébergeur des contenus de ses utilisateurs : elle ne les contrôle pas avant publication, mais retire promptement tout contenu manifestement illicite qui lui est signalé.
@@ -53,11 +59,11 @@ Recours : toute décision de modération peut d'abord être contestée auprès d
 Le traitement des données qu'exige la modération des contenus et des comptes contraires à ces conditions (examen d'un contenu, masquage, retrait, suspension, conservation de la décision le temps de sa contestation) repose sur l'intérêt légitime de l'association à faire respecter ses règles ; la politique de confidentialité en détaille les durées.
 Les joueurs visés par un signalement, et les membres des équipes visées, en sont prévenus en message privé Discord (s'ils ont rattaché leur compte Discord ou certifié leur tag). Ils lisent sur la page du signalement ce qui est reproché — jamais qui l'a signalé — et peuvent le contester depuis cette page ou par la catégorie « Contestation » du même formulaire ; contester un signalement archivé le rouvre.
 Un logo d'équipe ou un avatar de joueur signalé peut être masqué plutôt que supprimé : il n'est plus en ligne, et l'équipe ou le joueur dispose de 6 mois pour contester. Sans contestation, l'image est supprimée définitivement à l'échéance ; si la contestation aboutit, elle est rétablie. Un contenu manifestement illicite peut être supprimé sans délai : l'équipe ou le joueur en est prévenu de la même façon et peut contester la décision.
-ARTICLE 08
+ARTICLE 09
 Responsabilité
 Le site est fourni par une association de bénévoles, sans garantie de disponibilité. L'association ne peut être tenue responsable d'une interruption, d'une perte de données de jeu ou d'un résultat faussé par une panne, dans les limites permises par la loi.
 Les marques et visuels Overwatch (Blizzard Entertainment) et Marvel Rivals (NetEase, Marvel) appartiennent à leurs titulaires ; le site n'est ni affilié à ces éditeurs ni approuvé par eux.
-ARTICLE 09
+ARTICLE 10
 Droit applicable
 Ces conditions sont soumises au droit français. Un différend est d'abord porté devant l'association, par son serveur Discord ou par l'adresse électronique de l'association indiquée dans les mentions légales, en vue d'une solution amiable ; à défaut, les tribunaux français sont compétents, sans préjudice des règles qui permettent à un consommateur de saisir la juridiction de son domicile ou de se prévaloir des dispositions impératives du droit de son pays de résidence.
 Le service est gratuit et l'association ne vend rien sur le site : aucun contrat de vente ni de prestation de services n'y est conclu avec un consommateur, si bien qu'aucun médiateur de la consommation n'est désigné.

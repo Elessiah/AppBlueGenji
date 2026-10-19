@@ -97,6 +97,7 @@ la mise en page, elle garde le texte d'une première acceptation.
 | 2 | 1er octobre 2026 | Changements de fond : âge minimum, licence, responsabilité des gérants, juridiction. Tout compte qui avait accepté la version 1 la réaccepte — à la connexion par la case de `/connexion`, ou par la modale s'il gère une équipe ; ses gestes de gestion sont refusés en 409 d'ici là. |
 | 3 | 1er octobre 2026 | Suspension d'un compte, voies de recours, base légale de la modération, absence de médiateur. |
 | 4 | 14 octobre 2026 | Annonce #live d'un tournoi individuel : le pseudo public du joueur y figure au titre de l'exécution du service (pas de nom neutre ; ne pas y être nommé = ne pas s'inscrire). Date d'entrée en vigueur fixée par l'association (décision du 2026-10-14), non le lendemain de la mise en ligne. |
+| 5 | 19 octobre 2026 | Section « Contacts de match » : contacts (BattleTag même masqué compris) communiqués aux deux équipes et aux arbitres d'un match, et à son caster le temps du match, par la seule fenêtre « Contacts » (détail ci-dessous). |
 
 **Redemander, et le dire** : à la connexion, la modale d'entrée de `/connexion`
 revient dès que la version gardée par le navigateur (`bg_terms_consent`) n'est
@@ -117,6 +118,18 @@ version, sa date d'entrée en vigueur et lie `/conditions-utilisation` (FR et EN
 — modale à la page suivante, message privé Discord à qui ne l'a pas lue. Elle
 informe sans faire accepter : l'acceptation reste celle du tableau ci-dessus. À
 refaire à chaque version qui change une règle de fond pour tous les comptes.
+
+**Version 5** (2026-10-19, CONTACTS-FOLLOWUP) : section **« Contacts de match »**
+(`contacts-de-match`, FR et EN) — tag Discord certifié, BattleTag **même masqué**
+et rôle d'équipe communiqués aux deux équipes d'un match et à ses arbitres
+(permission `tournaments`, administrateurs compris) dès que ses adversaires
+sont connus, et à son caster le temps du match seulement (ceux du caster aux
+équipes sur ce même temps), par la seule fenêtre « Contacts » du match — un
+BattleTag masqué n'est lisible nulle part ailleurs, arbitres et administrateurs
+compris —, au titre de l'organisation du tournoi. C'est la clause que citent la base « exécution du
+contrat » du registre T01 / T04 et de `/rgpd` (`MATCH_CONTACTS_SCOPE`,
+`BATTLETAG_MATCH_SCOPE`). Annoncée une fois à tous par l'entrée
+`2026-10-contacts-de-match-caster-et-conditions-v5`, comme la version 4.
 
 `TERMS_UPDATED_AT` est daté du **lendemain** de la mise en ligne quand l'heure
 du déploiement n'est pas connue, comme `PRIVACY_CHANGES`.

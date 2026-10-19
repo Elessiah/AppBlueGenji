@@ -30,6 +30,24 @@ export const LIVE_PSEUDO_SCOPE = "annonce #live d'un tournoi individuel, gardée
 export const AUTOMOD_ALERT_SCOPE = "alerte AutoMod d'une telle annonce bloquée ou signalée, gardée dans le salon d'alertes des modérateurs jusqu'à sa suppression par eux ou sur demande";
 
 /**
+ * Contacts d'un match (registre T04) : exécution du service, que les
+ * conditions d'utilisation prévoient (section « Contacts de match », version 5).
+ * Les équipes les ont dès que les deux adversaires sont connus, le caster le
+ * temps du match seulement (`match-launch-info.ts`).
+ */
+export const MATCH_CONTACTS_SCOPE =
+  "présentation, dans la fenêtre « Contacts » du match, aux membres de ses deux équipes et aux arbitres dès que ses deux adversaires sont connus, et à son caster le temps du match ; les contacts du caster aux deux équipes et aux arbitres le temps du match (conditions d'utilisation, « Contacts de match »)";
+
+/**
+ * BattleTag masqué : le masquer ne le retire pas des parties de tes matchs
+ * (`battletag-visibility.ts`). Cette lecture-là n'est pas un consentement —
+ * le réglage n'y peut rien — mais l'exécution du service (décision du
+ * 2026-10-19), prévue par les conditions d'utilisation.
+ */
+export const BATTLETAG_MATCH_SCOPE =
+  "lecture, même masqué, dans la seule fenêtre « Contacts » d'un match où tu es présenté comme contact : par ses deux équipes et les arbitres dès que ses deux adversaires sont connus, par son caster le temps du match — arbitres et administrateurs n'y ont pas d'autre accès (conditions d'utilisation, « Contacts de match »)";
+
+/**
  * Bases légales citées par la politique — les mêmes que le registre
  * (`processing-register.ts`). Une donnée a une base principale ; quand une
  * partie de sa finalité repose sur une autre (le tag certifié et le BattleTag,
@@ -85,9 +103,14 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // seconde écrase la première à chaque connexion : le dire est la condition
     // pour que le joueur comprenne pourquoi sa saisie a changé.
     finalite:
-      "Mise en relation entre joueurs (s'ajouter en jeu) — aucune statistique. Saisi par toi, ou renseigné par Blizzard à chaque connexion si tu as rattaché ton compte Battle.net. Masqué, il reste lisible des membres des deux équipes de tes matchs tant que le tournoi n'est pas terminé, du caster de ton match dès que ses deux adversaires sont connus et jusqu'à sa fin si tu fais partie des contacts présentés (et, si tu castes un match, de ses deux équipes sur la même durée), et de l'arbitrage tant que tu es inscrit à un tournoi qui n'est pas terminé; présenté comme contact d'un match, il est montré avec ton rôle d'équipe et l'indication qu'il vient ou non d'un compte Battle.net rattaché",
+      "Mise en relation entre joueurs (s'ajouter en jeu) — aucune statistique. Saisi par toi, ou renseigné par Blizzard à chaque connexion si tu as rattaché ton compte Battle.net. Masqué, il n'est lisible de personne — arbitres et administrateurs compris — sauf dans la fenêtre « Contacts » d'un match où tu fais partie des contacts présentés : des membres de ses deux équipes et des arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, de son caster le temps du match seulement (de son départ à sa fin) ; si tu castes un match, de ses deux équipes et des arbitres le temps du match ; présenté comme contact d'un match, il est montré avec ton rôle d'équipe et l'indication qu'il vient ou non d'un compte Battle.net rattaché",
+    // Masqué, le BattleTag reste lu par les parties de tes matchs : ce n'est
+    // pas un consentement (le masquer n'y change rien), mais l'exécution du
+    // service — les conditions d'utilisation le prévoient (« Contacts de
+    // match », version 5). Le consentement ne vaut que pour le renseigner et
+    // l'afficher au public.
     base: "Consentement",
-    extraBases: [{ base: "Exécution du contrat", scope: "présentation aux membres des deux équipes et au caster de ton match, dès que ses deux adversaires sont connus" }],
+    extraBases: [{ base: "Exécution du contrat", scope: BATTLETAG_MATCH_SCOPE }],
     duree: "Durée du compte",
   },
   {
@@ -116,12 +139,12 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // ne doit pas coûter la porte Discord. D'où une base « Consentement » qui
     // tient — le geste est libre, spécifique, et se retire.
     finalite:
-      "Ouvre ton tag Discord à l'organisation pour te joindre : administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), membres des deux équipes et caster de ton match dès que ses deux adversaires sont connus et jusqu'à sa fin (et, si tu castes un match, ses deux équipes sur la même durée) ; les autres joueurs connectés seulement si tu coches « Tag Discord ». Sans elle, le bot ne t'envoie aucun message privé de match. Donnée seulement par toi, depuis Mon profil (un clic si ton Discord est rattaché, un code en message privé sinon) — se connecter par Discord ne la donne pas. Retirée en retirant ton tag ; perdue si ton pseudo change",
+      "Ouvre ton tag Discord à l'organisation pour te joindre : administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), membres des deux équipes de ton match dès que ses deux adversaires sont connus et jusqu'à sa fin, son caster le temps du match seulement (et, si tu castes un match, ses deux équipes et les arbitres le temps du match) ; les autres joueurs connectés seulement si tu coches « Tag Discord ». Sans elle, le bot ne t'envoie aucun message privé de match. Donnée seulement par toi, depuis Mon profil (un clic si ton Discord est rattaché, un code en message privé sinon) — se connecter par Discord ne la donne pas. Retirée en retirant ton tag ; perdue si ton pseudo change",
     base: "Consentement",
     // La certification décide aussi qui reçoit les messages privés de match,
     // qui reposent sur l'intérêt légitime (opposition par la case du profil).
     extraBases: [
-      { base: "Exécution du contrat", scope: "présentation aux membres des deux équipes et au caster de ton match, dès que ses deux adversaires sont connus" },
+      { base: "Exécution du contrat", scope: MATCH_CONTACTS_SCOPE },
       { base: "Intérêt légitime", scope: MATCH_TIME_DM_SCOPE },
     ],
     duree: "Jusqu'au retrait ou au changement du tag, ou durée du compte",

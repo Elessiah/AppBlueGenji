@@ -46,8 +46,11 @@ describe("conditions d'utilisation — âge minimum", () => {
   });
 
   it("n'appelle plus « membre » un titulaire de compte", () => {
-    // Deux emplois restent justes : l'adhérent de l'association et le joueur d'une équipe.
-    const rest = ALL_TEXT.replace(/membre de l'association/g, "").replace(/membres des équipes/g, "");
+    // Deux emplois restent justes : l'adhérent de l'association et le joueur d'une équipe
+    // (dont les contacts de match, section « Contacts de match »).
+    const rest = ALL_TEXT.replace(/membre de l'association/g, "")
+      .replace(/membres des (deux )?équipes/g, "")
+      .replace(/membres de chaque équipe/g, "");
     expect(rest).not.toMatch(/\bmembres?\b/i);
   });
 

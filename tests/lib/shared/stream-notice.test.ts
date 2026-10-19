@@ -58,7 +58,7 @@ describe("conditions d'utilisation — retransmission des matchs", () => {
     expect(section!.links?.map((l) => l.href)).toEqual([STREAM_NOTICE_PRIVACY_PATH]);
   });
 
-  it("sa base légale (exécution du service) est une règle de fond du tournoi : version 4", () => {
-    expect(TERMS_VERSION).toBe(4);
+  it("sa base légale (exécution du service) est une règle de fond du tournoi : version 4 au moins", () => {
+    expect(TERMS_VERSION).toBeGreaterThanOrEqual(4);
   });
 });
