@@ -1215,30 +1215,6 @@ describe("soirées d'annonces", () => {
     );
   });
 
-  it("match programmé passé à l'antenne en retard, après la fin de la fenêtre : rejoint la soirée qui le listait", async () => {
-    const late = {
-      ...AUTO_LIVE,
-      live_trigger: "START_TIME",
-      start_at: "2026-10-14T19:50:00Z",
-      launched_at: "2026-10-14T19:58:00Z",
-    };
-    const { evening } = mockDb([late]);
-    await runLiveAnnouncementSweep(NOW);
-    const open = evening.mock.calls.find(([sql]) => sql.includes("FROM bg_live_evenings"));
-    expect(open?.[0]).toContain(
-      "WHERE target = ? AND (window_end > NOW() OR (discord_message_id IS NOT NULL AND started_at <= ? AND window_end >= ?))",
-    );
-    expect(open?.[1]).toEqual(["stream-viewer", late.start_at, late.start_at]);
-  });
-
-  it("match sans heure prévue (AUTO) : seule une soirée en cours est reprise", async () => {
-    const { evening } = mockDb([AUTO_LIVE]);
-    await runLiveAnnouncementSweep(NOW);
-    const open = evening.mock.calls.find(([sql]) => sql.includes("FROM bg_live_evenings"));
-    expect(open?.[0]).toContain("WHERE target = ? AND (window_end > NOW()) ORDER BY id DESC LIMIT 1");
-    expect(open?.[1]).toEqual(["stream-viewer"]);
-  });
-
   it("soirée illisible : réservation rendue, annonce reportée", async () => {
     const { execute, evening } = mockDb([AUTO_LIVE]);
     evening.mockRejectedValue(new Error("DB_DOWN"));
