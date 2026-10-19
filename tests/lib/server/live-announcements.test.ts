@@ -1286,6 +1286,9 @@ describe("soirées d'annonces", () => {
     expect(pushLiveEvening).not.toHaveBeenCalled();
     expect(releasesOf(execute)).toEqual([]);
     expect(String(jest.mocked(console.warn).mock.calls[0][0])).toContain("soirée 3 close (message supprimé de #live)");
+    // Ni datation des réservations ni lecture des matchs : la soirée est close.
+    expect(execute.mock.calls.some(([sql]) => sql.startsWith("UPDATE bg_live_announcements SET sent_at"))).toBe(false);
+    expect(evening.mock.calls.some(([sql]) => sql.includes("a.sent_at >= ?"))).toBe(false);
   });
 
   it("soirée illisible : réservation rendue, annonce reportée", async () => {
