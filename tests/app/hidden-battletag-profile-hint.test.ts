@@ -3,6 +3,7 @@
  * fenêtre qui l'expose est « Contacts » d'un match. L'ancienne indication pour
  * un lecteur tiers (« tu le lis pour jouer ou arbitrer ») ne doit pas revenir.
  */
+import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -16,7 +17,7 @@ describe("indication du BattleTag masqué sur la fiche", () => {
     expect(page).not.toContain("battletagHiddenOther");
   });
 
-  it.each(["fr", "en"])("n'a plus de texte pour un lecteur tiers (%s)", (locale) => {
+  it.each(["fr", "en"])("n'a plus de texte pour un lecteur tiers (%s)", (locale: string) => {
     const messages = JSON.parse(read(`messages/${locale}/players.json`)) as { page: Record<string, string> };
     expect(messages.page.battletagHiddenSelf).toEqual(expect.any(String));
     expect(messages.page).not.toHaveProperty("battletagHiddenOther");

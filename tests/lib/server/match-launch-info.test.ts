@@ -679,6 +679,28 @@ describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => 
     }
   });
 
+  it("retire, par sa propre lecture de la carte avant l'heure, le caster devenu inéligible", async () => {
+    state.viewerMemberships = [];
+    state.users = [casterUser(VIEWER, { platform_roles_json: null })];
+    for (const row of [
+      candidate({ match_launch_phase: 0, start_at: scheduled(), caster_user_id: VIEWER }),
+      candidate({ referee_scheduling: 1, start_at: null, caster_user_id: VIEWER }),
+    ]) {
+      state.candidates = [row];
+      state.writes = [];
+      await expect(loadViewerMatchContacts(viewer, 42)).resolves.toBeNull();
+      expect(state.writes.filter((sql) => sql.includes("SET caster_user_id = NULL"))).toHaveLength(1);
+    }
+  });
+
+  it("ne retire rien au caster éligible qui ouvre la carte avant l'heure", async () => {
+    state.viewerMemberships = [];
+    state.users = [casterUser(VIEWER)];
+    state.candidates = [candidate({ referee_scheduling: 1, start_at: null, caster_user_id: VIEWER })];
+    await expect(loadViewerMatchContacts(viewer, 42)).resolves.toBeNull();
+    expect(state.writes.filter((sql) => sql.includes("SET caster_user_id = NULL"))).toEqual([]);
+  });
+
   it("rend au caster inscrit les contacts le temps du match (lancement ouvert, puis lancé)", async () => {
     state.viewerMemberships = [];
     state.members = [verifiedCaptain()];
