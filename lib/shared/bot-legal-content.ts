@@ -89,8 +89,8 @@ const LAST_UPDATED_EN = "15 October 2026";
 // base du pseudo solo, AutoMod et avis « Match retiré » (LEGAL-FOLLOWUP-444),
 // les deux (l'avis « Match retiré » est aussi cité à l'article 01 des conditions) ;
 // messages de match aux seuls tags certifiés (DM-CERTIFIED-ONLY), la politique seule.
-const PRIVACY_LAST_UPDATED_FR = "15 octobre 2026";
-const PRIVACY_LAST_UPDATED_EN = "15 October 2026";
+const PRIVACY_LAST_UPDATED_FR = "19 octobre 2026";
+const PRIVACY_LAST_UPDATED_EN = "19 October 2026";
 
 const CONTACT_ITEMS_FR = [
   `Formulaire **« ${REPORT_FORM_NAME} »** en bas de chaque page du site (catégorie « RGPD » pour vos données)`,

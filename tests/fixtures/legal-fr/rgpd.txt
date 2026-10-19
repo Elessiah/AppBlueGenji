@@ -26,7 +26,7 @@ FinalitéMise en relation entre joueurs (s'ajouter en jeu) — aucune statistiqu
 Base légaleConsentementExécution du contrat présentation aux joueurs et au caster de ton match, à son lancement
 ConservationDurée du compte
 DonnéePseudo Discord
-FinalitéAuthentification Discord, notifications bot (messages privés de match : tag certifié seulement). Enregistré à ta connexion par Discord, ou saisi par toi (compte sans Discord rattaché) ; sans certification, invisible de tous, administrateurs compris
+FinalitéAuthentification Discord, notifications bot (tag certifié seulement). Enregistré à ta connexion par Discord, ou saisi par toi (compte sans Discord rattaché) ; sans certification, invisible de tous, administrateurs compris
 Base légaleExécution du contratIntérêt légitime annonces d'horaire, rappels et avis de retrait de match en message privé
 ConservationDurée du compte
 DonnéeCertification du pseudo Discord

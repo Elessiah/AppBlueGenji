@@ -98,7 +98,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // connexion (contrat), son **exposition** repose sur la certification
     // (consentement, ligne suivante).
     finalite:
-      "Authentification Discord, notifications bot (messages privés de match : tag certifié seulement). Enregistré à ta connexion par Discord, ou saisi par toi (compte sans Discord rattaché) ; sans certification, invisible de tous, administrateurs compris",
+      "Authentification Discord, notifications bot (tag certifié seulement). Enregistré à ta connexion par Discord, ou saisi par toi (compte sans Discord rattaché) ; sans certification, invisible de tous, administrateurs compris",
     base: "Exécution du contrat",
     extraBases: [{ base: "Intérêt légitime", scope: MATCH_TIME_DM_SCOPE }],
     duree: "Durée du compte",

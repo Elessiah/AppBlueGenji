@@ -782,11 +782,11 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
   // tags Discord certifiés (décision du 2026-10-15, contre le spam). Le
   // destinataire Discord reçoit moins de données — mais un joueur au tag saisi
   // cesse de recevoir ces messages : il doit le savoir pour certifier son tag.
-  // Publiée le lendemain de la mise en ligne.
+  // Datée du jour de la fusion et de la mise en ligne (19 octobre 2026).
   {
     id: "2026-10-messages-de-match-tags-certifies",
     title: "Messages privés de match : seulement avec un tag Discord certifié",
-    publishedAt: "2026-10-16",
+    publishedAt: "2026-10-19",
     summary:
       "Pour éviter le spam, le bot n'envoie plus les messages privés de tes matchs qu'aux comptes dont le tag Discord est certifié ; tes notifications push ne changent pas.",
     links: [
@@ -796,7 +796,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     details: [
       "Horaire posé, changé ou retiré, rappels (24 h et 10 h avant) et « Match retiré » : ces messages privés Discord ne partent plus qu'à un tag Discord certifié dans « Mon profil ». Un tag non certifié n'en reçoit plus aucun, qu'il soit saisi à la main ou rattaché par la connexion Discord — un tag saisi peut désigner par erreur le compte Discord de quelqu'un d'autre, et seule la certification confirme que tu acceptes d'y être joint.",
       "Si ton tag est déjà certifié, rien ne change pour toi ; sinon, certifie-le dans « Mon profil », section Discord, pour les recevoir. Tes notifications push, la case « Messages privés Discord de mes matchs » et les messages du staff (arbitres, administration) ne changent pas.",
-      "Aucune donnée nouvelle n'est collectée : moins de pseudos Discord sont transmis au bot.",
+      "Aucune donnée nouvelle n'est collectée : moins de pseudos et d'identifiants Discord sont transmis au bot.",
     ],
   },
 ];
