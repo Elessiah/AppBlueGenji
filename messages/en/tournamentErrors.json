@@ -41,6 +41,7 @@
     "MAP_AFTER_DECISION": "A map comes after the end of the match: the result was already settled.",
     "MAP_LIST_INCOMPLETE": "Unfinished match: without a winner, every map of the format is played (a drawn map counts as one).",
     "INVALID_MAPS": "Unreadable map details.",
+    "SCORE_LOCKED_DISPUTE": "Score disputed: score entry is locked for both teams. Only a referee or an administrator can settle this match.",
     "PROPOSAL_STALE": "The opponent's proposal changed or is no longer pending: the window now shows the latest version.",
     "INVALID_MATCH_FORMAT": "Invalid match format.",
     "INVALID_MATCH_FORMAT_MAX_MAPS": "Invalid map cap: it must stay between the format's target and its natural maximum.",

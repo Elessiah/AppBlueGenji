@@ -48,7 +48,9 @@ export async function POST(_req: Request, context: { params: Promise<{ id: strin
     // (l'adversaire vient de confirmer, l'arbitrage vient de trancher).
     if (
       message === "MATCH_ALREADY_COMPLETED" ||
-      message === "CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES"
+      message === "CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES" ||
+      // Litige de score ouvert : seul l'arbitrage tranche (`SCORE_DISPUTE_LOCK.md`).
+      message === "SCORE_LOCKED_DISPUTE"
     ) {
       return fail(message, 409);
     }

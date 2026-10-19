@@ -6,7 +6,7 @@
     },
     "SCORE_TO_CONFIRM": {
       "label": "Score à confirmer",
-      "description": "L'équipe adverse a saisi un score que tu dois confirmer ou contester."
+      "description": "L'équipe adverse a saisi un score que tu dois confirmer ou contester, ou un score saisi a été validé automatiquement faute de réponse sous 2 h."
     },
     "TOURNAMENT_START": {
       "label": "Coup d'envoi d'un tournoi",

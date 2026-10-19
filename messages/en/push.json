@@ -6,7 +6,7 @@
     },
     "SCORE_TO_CONFIRM": {
       "label": "Score to confirm",
-      "description": "The opposing team entered a score that you need to confirm or dispute."
+      "description": "The opposing team entered a score that you need to confirm or dispute, or an entered score was confirmed automatically after 2 hours without an answer."
     },
     "TOURNAMENT_START": {
       "label": "Tournament kickoff",

@@ -1,10 +1,11 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
-import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
+import { SCORE_AUTO_VALIDATE_MINUTES, SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { matchWinnerSide, sideTeamIds } from "@/lib/shared/match-format";
 import { checkMapList, sameMapLists, type MatchMapInput } from "@/lib/shared/match-maps";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import { canPlayersReportScore, launchPairingKey } from "@/lib/shared/match-launch";
 import { plausibleSeriesMinutes } from "@/lib/shared/score-report-deadline";
+import { SCORE_LOCKED_DISPUTE, isScoreDisputed, reportPresent } from "@/lib/shared/score-dispute";
 import { toIso } from "@/lib/server/serialization";
 import { MatchRow } from "./_internal";
 import { pushTeamToTarget } from "./target-slot";
@@ -46,10 +47,17 @@ export async function finalizeMatch(
     winnerTeamId: number | null;
     loserTeamId: number | null;
   },
+  options: { resultWritten?: boolean } = {},
 ): Promise<void> {
-  await connection.execute(
-    `UPDATE bg_matches
-     SET team1_score = ?,
+  // `resultWritten` : la validation d'office (`./finalization`) a déjà écrit
+  // ce résultat par son `UPDATE` conditionnel, seul garant qu'elle ne tranche
+  // qu'une fois ; il ne reste que la propagation.
+  if (!options.resultWritten) await writeMatchResult(connection, match.id, result);
+  await propagateMatchResult(connection, match, result);
+}
+
+/** Colonnes d'un match tranché : le score retenu, propositions et échéance effacées. */
+const MATCH_RESULT_SET_SQL = `team1_score = ?,
          team2_score = ?,
          winner_team_id = ?,
          loser_team_id = ?,
@@ -60,16 +68,35 @@ export async function finalizeMatch(
          team2_report_score = NULL,
          team2_report_opponent_score = NULL,
          team2_reported_at = NULL,
-         score_deadline_at = NULL
+         score_deadline_at = NULL`;
+
+async function writeMatchResult(
+  connection: PoolConnection,
+  matchId: number,
+  result: {
+    team1Score: number | null;
+    team2Score: number | null;
+    winnerTeamId: number | null;
+    loserTeamId: number | null;
+  },
+): Promise<void> {
+  await connection.execute(
+    `UPDATE bg_matches
+     SET ${MATCH_RESULT_SET_SQL}
      WHERE id = ?`,
-    [
-      result.team1Score,
-      result.team2Score,
-      result.winnerTeamId,
-      result.loserTeamId,
-      match.id,
-    ],
+    [result.team1Score, result.team2Score, result.winnerTeamId, result.loserTeamId, matchId],
   );
+}
+
+/** Ce qui suit l'écriture d'un résultat : journal, alertes, propagation, maps. */
+async function propagateMatchResult(
+  connection: PoolConnection,
+  match: Pick<
+    MatchRow,
+    "id" | "next_winner_match_id" | "next_winner_slot" | "next_loser_match_id" | "next_loser_slot"
+  >,
+  result: { winnerTeamId: number | null; loserTeamId: number | null },
+): Promise<void> {
 
   // Seul point de passage des matchs réellement tranchés — accord des deux
   // engagés, délai de report expiré, arbitrage. Les byes et matchs fantômes
@@ -142,11 +169,16 @@ const SCORE_DEADLINE_SQL = `DATE_ADD(
 
 /**
  * Affectation de `score_deadline_at` par le report d'un camp, `otherSide`
- * désignant l'adversaire. Paramètres, dans l'ordre : délai, délai, minutes de
- * série, délai.
+ * désignant l'adversaire. Paramètres, dans l'ordre : délai, délai, validation
+ * d'office, minutes de série, délai.
  *
- * · **Report seul** : l'échéance est posée une fois, au premier report
- *   (`COALESCE`), après une fin de série plausible (`SCORE_DEADLINE_SQL`).
+ * · **Report seul** : l'échéance de la validation d'office est la plus
+ *   lointaine de `maintenant + SCORE_AUTO_VALIDATE_MINUTES` (deux heures de
+ *   silence de l'adversaire) et de la fin de série plausible
+ *   (`SCORE_DEADLINE_SQL`). Elle est **recalculée** à chaque saisie de l'équipe
+ *   seule à avoir reporté : l'adversaire dispose toujours de deux heures face
+ *   à la version qu'il lit, et le déclarant ne peut que retarder la sienne —
+ *   la durée ne dépend jamais du score déclaré.
  * · **L'adversaire a déjà reporté** : les deux ont parlé, la série est finie —
  *   l'échéance est ramenée à `maintenant + délai` si elle était plus lointaine,
  *   jamais repoussée (`LEAST`). C'est sur elle que se mesure l'escalade d'un
@@ -161,8 +193,28 @@ function scoreDeadlineAssignment(otherSide: "team1" | "team2"): string {
                COALESCE(score_deadline_at, DATE_ADD(NOW(), INTERVAL ? MINUTE)),
                DATE_ADD(NOW(), INTERVAL ? MINUTE)
              )
-             ELSE COALESCE(score_deadline_at, ${SCORE_DEADLINE_SQL})
+             ELSE GREATEST(DATE_ADD(NOW(), INTERVAL ? MINUTE), ${SCORE_DEADLINE_SQL})
            END`;
+}
+
+/**
+ * Refuse tout geste d'une engagée sur un match en litige
+ * (`SCORE_LOCKED_DISPUTE`, `lib/shared/score-dispute.ts`) : ni proposer, ni
+ * corriger, ni confirmer, ni déclarer forfait. Seul l'arbitrage
+ * (`can(user, "tournaments")`) le tranche, par `adminResolveMatch`.
+ */
+export function assertNoOpenDispute(
+  match: Pick<MatchRow, "status" | "team1_report_score" | "team2_report_score">,
+): void {
+  if (
+    isScoreDisputed({
+      status: match.status,
+      team1Reported: reportPresent(match.team1_report_score),
+      team2Reported: reportPresent(match.team2_report_score),
+    })
+  ) {
+    throw new Error(SCORE_LOCKED_DISPUTE);
+  }
 }
 
 /**
@@ -373,6 +425,10 @@ export async function reportMatchScore(
     throw new Error("NOT_IN_MATCH");
   }
 
+  // Litige ouvert : la saisie est verrouillée pour les **deux** équipes
+  // (`docs/features/SCORE_DISPUTE_LOCK.md`). Lu sur la ligne verrouillée.
+  assertNoOpenDispute(match);
+
   await assertMatchLaunchedForPlayers(connection, tournamentId, match);
 
   // Un report d'équipe **clôt** la rencontre : le score doit donc constituer un
@@ -422,6 +478,7 @@ export async function reportMatchScore(
         opponentScore,
         SCORE_REPORT_TIMEOUT_MINUTES,
         SCORE_REPORT_TIMEOUT_MINUTES,
+        SCORE_AUTO_VALIDATE_MINUTES,
         seriesMinutes,
         SCORE_REPORT_TIMEOUT_MINUTES,
         matchId,
@@ -443,6 +500,7 @@ export async function reportMatchScore(
         opponentScore,
         SCORE_REPORT_TIMEOUT_MINUTES,
         SCORE_REPORT_TIMEOUT_MINUTES,
+        SCORE_AUTO_VALIDATE_MINUTES,
         seriesMinutes,
         SCORE_REPORT_TIMEOUT_MINUTES,
         matchId,

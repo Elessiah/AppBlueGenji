@@ -91,8 +91,8 @@
     },
     "player": {
       "title": "My match score",
-      "conflictMaps": "Same score ({score}), but the map details differ from {opponent}'s: replay codes or map scores. The referee has been alerted; you can still correct your proposal.",
-      "conflictScores": "The scores contradict each other — you: {mine}, {opponent}: {theirs}. The referee has been alerted; you can still correct your proposal.",
+      "conflictMaps": "Same score ({score}), but the map details differ from {opponent}'s: replay codes or map scores. The referee has been alerted.",
+      "conflictScores": "The scores contradict each other — you: {mine}, {opponent}: {theirs}. The referee has been alerted.",
       "closed": {
         "toPlan": "This match is waiting for the referee to set its date: the score can be entered once the match is launched.",
         "scheduledAt": "This match starts on {date}: the score can be entered once it's launched, when the parties have declared themselves ready.",
@@ -113,7 +113,9 @@
       "submitted": "Score sent: {team1} {score1} – {score2} {team2}",
       "forfeitRecorded": "Forfeit recorded: {opponent} wins the match.",
       "minePending": "You proposed {score}. Waiting for {opponent} to confirm.",
-      "minePendingDeadline": "You proposed {score}. Waiting for {opponent} to confirm — with no answer, this score will be confirmed at {deadline}.",
+      "minePendingDeadline": "You proposed {score}. Waiting for {opponent} to confirm — with no answer, this score will be confirmed automatically at {deadline} (Paris time).",
+      "locked": "Score disputed: score entry is locked for both teams, forfeits included. Only a referee or a tournament administrator can settle this match — set the final score or reset it.",
+      "autoValidateAt": "With no answer, this score will be confirmed automatically at {deadline} (Paris time).",
       "willConfirm": "{opponent} will have to confirm the score you send.",
       "confirm": "Confirm the score",
       "send": "Send the score",

@@ -541,6 +541,24 @@ export function scoreToConfirmPush(side: MatchSide, locale: Locale = DEFAULT_LOC
   };
 }
 
+/**
+ * Le score saisi par une seule équipe a été validé d'office, l'autre n'ayant
+ * rien répondu en deux heures (`docs/features/SCORE_DISPUTE_LOCK.md`). Envoyé
+ * aux deux équipes ; ne nomme personne (écran verrouillé, tournoi individuel).
+ */
+export function scoreAutoValidatedPush(
+  input: { tournamentId: number; tournamentName: string; matchId: number },
+  locale: Locale = DEFAULT_LOCALE,
+): PushContent {
+  const text = TEXT[locale];
+  return {
+    title: text.t("scoreAutoValidated.title"),
+    body: text.t("scoreAutoValidated.body", { tournament: input.tournamentName }),
+    url: localeHref(tournamentMatchHref(input.tournamentId, input.matchId), locale),
+    tag: `${matchTag(input.matchId)}-score`,
+  };
+}
+
 /** Un tournoi où l'équipe du joueur est engagée vient d'être lancé. */
 export function tournamentStartPush(
   input: { tournamentId: number; tournamentName: string },

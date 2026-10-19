@@ -4,7 +4,7 @@ import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { useToast } from "@/components/ui/toast";
 import { localizedPlaceholder, matchFormatDescriptionText, matchFormatText } from "@/lib/shared/tournament-page-text";
 import type { TournamentDialogsText } from "@/lib/shared/tournament-actions-text";
-import { INTL_LOCALE, type Locale } from "@/lib/shared/locales";
+import { autoValidateTimeText } from "@/lib/shared/score-dispute";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Pill } from "@/components/cyber";
@@ -91,13 +91,6 @@ function conflictText(text: TournamentDialogsText, mine: MatchScoreReport, their
     : text.t("score.player.conflictScores", { mine: scoreText(mine), opponent: opponentName, theirs: scoreText(theirs) });
 }
 
-/** Heure d'échéance du délai de confirmation, dans le fuseau du lecteur (24 h). */
-function deadlineText(iso: string | null, locale: Locale): string | null {
-  if (!iso) return null;
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleTimeString(INTL_LOCALE[locale], { hour: "2-digit", minute: "2-digit", ...(locale === "fr" ? {} : { hourCycle: "h23" as const }) });
-}
 
 /**
  * Pourquoi le score ne se saisit pas encore (`playerScoreClosedNotice`), dans
@@ -286,7 +279,13 @@ export function PlayerScoreDialog({
   const showTheirMaps = theirMapsWorthShowing(view?.phase, view?.theirs?.maps ?? [], { missedProposal, confirmsAsIs });
 
   const forfeitMaps = forfeitMapCount(matchFormat);
-  const deadline = deadlineText(match.scoreDeadlineAt, text.locale);
+  // Validation d'office, à l'heure de Paris (`SCORE_DISPUTE_LOCK.md`).
+  const deadline = autoValidateTimeText(match.scoreDeadlineAt, text.locale);
+  // Litige ouvert : saisie verrouillée pour les deux équipes, forfait compris —
+  // le serveur refuse (`SCORE_LOCKED_DISPUTE`), la modale le reflète.
+  const disputeLocked = view?.phase === "CONFLICT";
+  const canEnterScore = canReportScore && !disputeLocked;
+  const canDeclareForfeit = canForfeit && !disputeLocked;
 
   // Un refus qui désigne une map est rattaché à son champ, en plus de la
   // notification — avant l'envoi comme après un refus du serveur, qui ne rend
@@ -382,8 +381,10 @@ export function PlayerScoreDialog({
         return deadline
           ? t("score.player.minePendingDeadline", { score: scoreText(view.mine!), opponent: opponentName, deadline })
           : t("score.player.minePending", { score: scoreText(view.mine!), opponent: opponentName });
-      case "THEIRS_PENDING":
-        return theirsPendingStatus(text, { opponentName, myName }, view.theirs!, { canReport: canReportScore, detailLoading });
+      case "THEIRS_PENDING": {
+        const pending = theirsPendingStatus(text, { opponentName, myName }, view.theirs!, { canReport: canReportScore, detailLoading });
+        return deadline ? `${pending} ${t("score.player.autoValidateAt", { deadline })}` : pending;
+      }
       case "CONFLICT":
         return conflictText(text, view.mine!, view.theirs!, opponentName);
       default:
@@ -452,7 +453,13 @@ export function PlayerScoreDialog({
             </div>
           )}
 
-          {canReportScore ? (
+          {disputeLocked && (
+            <output className={`${styles.conflict} ${styles.notice}`}>
+              {t("score.player.locked")}
+            </output>
+          )}
+
+          {canEnterScore ? (
             <>
               <MapScoreList
                 idPrefix="player-score"
@@ -471,13 +478,13 @@ export function PlayerScoreDialog({
                 <p className={styles.formatHint}>{matchFormatDescriptionText(pageText, matchFormat)}</p>
               )}
             </>
-          ) : (
+          ) : !disputeLocked && (
             <p className={styles.formatHint}>
               {closedNoticeText(text, launchPhase, formatMatchStartAtFull(match.startAt, text.locale), launchPhaseEnabled, match.launchedAt)}
             </p>
           )}
 
-          {canForfeit ? (
+          {canDeclareForfeit && (
             <div className={styles.forfeitZone}>
               <button
                 type="button"
@@ -508,13 +515,14 @@ export function PlayerScoreDialog({
                 </div>
               )}
             </div>
-          ) : (
+          )}
+          {!canForfeit && !disputeLocked && (
             <p className={styles.formatHint}>
               {t("score.player.forfeit.notAllowed")}
             </p>
           )}
 
-          {canReportScore && showBlocker && (
+          {canEnterScore && showBlocker && (
             <output className={`${styles.blocker} ${styles.notice}`}>
               {blocker}
             </output>
@@ -529,7 +537,7 @@ export function PlayerScoreDialog({
             >
               {t("score.close")}
             </button>
-            {canReportScore && (
+            {canEnterScore && (
               <button
                 type="submit"
                 className="btn"

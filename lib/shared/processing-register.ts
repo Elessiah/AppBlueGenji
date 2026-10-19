@@ -733,7 +733,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     name: "Notifications push",
     purpose: "Prévenir un joueur sur ses appareils, à sa demande, de ce qui le concerne sur le site",
     subPurposes: [
-      "Départ de ses matchs, score à confirmer, coup d'envoi d'un tournoi, horaires de match (posés, changés ou retirés) et rappels de match",
+      "Départ de ses matchs, score à confirmer ou validé automatiquement faute de réponse, coup d'envoi d'un tournoi, horaires de match (posés, changés ou retirés) et rappels de match",
       "Demandes d'adhésion à une équipe qu'il gère, signalements et décisions de modération le concernant, changements de la politique de données",
       "Alertes d'arbitrage, matchs planifiés, programme d'arbitrage et alertes de modération pour le staff qui détient ces rôles",
     ],

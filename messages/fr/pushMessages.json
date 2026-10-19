@@ -42,6 +42,10 @@
     "body": "{opponent} a saisi le score de votre match ({tournament}). Confirme-le, ou conteste-le.",
     "soloOpponent": "Ton adversaire"
   },
+  "scoreAutoValidated": {
+    "title": "Score validé automatiquement",
+    "body": "Le score saisi pour votre match ({tournament}) a été validé automatiquement : l'autre équipe n'a pas répondu dans les 2 h."
+  },
   "tournamentStart": {
     "title": "Le tournoi commence",
     "body": "{tournament} est lancé. Retrouve ton premier match sur la page du tournoi."

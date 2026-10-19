@@ -1,6 +1,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { MIN_ENTRANTS_FOR_MATCHES, SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { queueBotLog, queueRefereeAlert } from "./bot-logs";
+import { queueAutoValidatedNotice } from "./auto-validated-notices";
 import {
   loadTournamentMatchFormat,
   resetRegistrationRanks,
@@ -473,8 +474,10 @@ export async function resolveExpiredScoreReports(
       team2_id,
       team1_report_score,
       team1_report_opponent_score,
+      team1_reported_at,
       team2_report_score,
       team2_report_opponent_score,
+      team2_reported_at,
       next_winner_match_id,
       next_winner_slot,
       next_loser_match_id,
@@ -508,39 +511,38 @@ export async function resolveExpiredScoreReports(
     // la règle vit dans `matchWinnerSide`, partagée avec l'arbitrage et
     // l'accord des deux engagés.
     if (team1Reported !== team2Reported) {
-      // Verrou du match et relecture de son statut avant de le clore : la
-      // sélection ci-dessus ne verrouille rien, et l'entretien tourne à chaque
-      // écriture comme à chaque chargement. Deux clôtures concurrentes du même
-      // report réécrivaient le même score sans dommage ; avec le détail map par
-      // map, la seconde effaçait celui que la première venait de retenir.
-      const fresh = await stillSingleReport(connection, match, team1Reported);
-      if (!fresh) continue;
-      // Scores relus sous verrou : une correction du report validée entre la
-      // sélection et le verrou fait foi, pas la copie lue sans verrou.
-      const { team1Score, team2Score } = singleReportScores(fresh);
-
+      // Validation d'office (`docs/features/SCORE_DISPUTE_LOCK.md`) : le score
+      // saisi par une seule équipe fait foi après deux heures de silence de
+      // l'autre, **exactement** comme si elle l'avait confirmé.
+      const { team1Score, team2Score } = singleReportScores(match);
       const format = await loadTournamentMatchFormat(
         connection,
         tournamentId,
         Number(match.round_number),
       );
-      const { winnerTeamId, loserTeamId } = resolveSides(match, format, team1Score, team2Score);
+      const result = { team1Score, team2Score, ...resolveSides(match, format, team1Score, team2Score) };
+
+      // Un seul `UPDATE` conditionnel tranche, et son `affectedRows` dit qui l'a
+      // fait : la sélection ci-dessus ne verrouille rien, et l'entretien tourne
+      // à chaque écriture, à chaque chargement et dans chaque balayage — en
+      // parallèle, et de nouveau après un redémarrage. La ligne n'est close que
+      // si elle attend toujours **la même** saisie (même dépôt, même score), que
+      // l'adversaire n'a toujours rien dit (ni confirmation, ni contre-score,
+      // donc ni litige) et que l'échéance est passée — une confirmation tardive
+      // gagne la course ou la perd, jamais les deux.
+      if (!(await claimAutoValidation(connection, match, team1Reported, result))) continue;
 
       // Le détail map par map du report qui fait foi devient le résultat
       // retenu (`docs/features/MAP_SCORES.md`), avant que la clôture n'efface
-      // les propositions.
+      // les propositions. Lecture verrouillante : les lignes existent (un
+      // report attendait), le verrou porte sur elles.
       const { promoteReportedMaps } = await import("./match-maps");
-      // Lecture verrouillante de la proposition : une lecture cohérente verrait
-      // l'instantané de la transaction, pris avant le verrou du match, et
-      // promouvrait des codes de replay périmés par une correction. Les lignes existent
-      // (un report attend) : le verrou porte sur elles, pas sur un intervalle vide.
       await promoteReportedMaps(connection, Number(match.id), team1Reported ? "TEAM1" : "TEAM2");
-      await finalizeMatch(connection, tournamentId, match, {
-        team1Score,
-        team2Score,
-        winnerTeamId,
-        loserTeamId,
-      });
+      // Même suite qu'une confirmation : journal, propagation dans le plateau,
+      // nettoyage des maps proposées — le résultat, lui, vient d'être écrit.
+      await finalizeMatch(connection, tournamentId, match, result, { resultWritten: true });
+      // Les deux équipes l'apprennent après le commit (push `SCORE_TO_CONFIRM`).
+      queueAutoValidatedNotice(connection, Number(match.id));
       resolved += 1;
       continue;
     }
@@ -564,30 +566,70 @@ export async function resolveExpiredScoreReports(
 }
 
 /**
- * Le match attend-il toujours la confirmation d'un **seul** report — le même
- * que celui lu sans verrou —, une fois sa ligne verrouillée (table seule, sans
- * jointure — MariaDB) ? Une contestation arrivée entre-temps fait deux reports :
- * la clôture d'office la trancherait au profit du premier, et effacerait la
- * seconde avec son détail. Une ligne introuvable, ou un double de test qui ne
- * la décrit pas, ne bloque rien : la suite n'écrira rien de plus qu'avant.
+ * Écrit d'office le résultat d'une manche à **un seul** report, si — et
+ * seulement si — elle l'attend toujours : statut `AWAITING_CONFIRMATION`,
+ * échéance passée, la même saisie (instant de dépôt et score) que celle lue
+ * sans verrou, et toujours rien du côté adverse. Une seule instruction (table
+ * seule, sans jointure — MariaDB) : deux balayages concurrents, ou un balayage
+ * et une confirmation tardive, ne peuvent pas trancher deux fois ; celui qui
+ * arrive second ne touche aucune ligne et s'arrête là.
+ *
+ * Une resaisie du déclarant repousse l'échéance (`scoreDeadlineAssignment`) :
+ * elle échoue donc aussi la condition, même dans la seconde de son dépôt.
  */
-async function stillSingleReport(
+async function claimAutoValidation(
   connection: PoolConnection,
   match: ExpiredMatchRow,
   team1Reported: boolean,
-): Promise<ExpiredMatchRow | null> {
-  const matchId = Number(match.id);
-  const result = await connection.execute<(RowDataPacket & Partial<ExpiredMatchRow> & { status?: string })[]>(
-    `SELECT status, team1_report_score, team1_report_opponent_score,
-            team2_report_score, team2_report_opponent_score
-     FROM bg_matches WHERE id = ? LIMIT 1 FOR UPDATE`,
-    [matchId],
+  result: { team1Score: number; team2Score: number; winnerTeamId: number | null; loserTeamId: number | null },
+): Promise<boolean> {
+  const [reporter, silent] = team1Reported ? ["team1", "team2"] : ["team2", "team1"];
+  const reportedAt = team1Reported ? match.team1_reported_at : match.team2_reported_at;
+  const myScore = team1Reported ? match.team1_report_score : match.team2_report_score;
+  const opponentScore = team1Reported ? match.team1_report_opponent_score : match.team2_report_opponent_score;
+  const outcome = await connection.execute(
+    `UPDATE bg_matches
+     SET team1_score = ?,
+         team2_score = ?,
+         winner_team_id = ?,
+         loser_team_id = ?,
+         status = 'COMPLETED',
+         team1_report_score = NULL,
+         team1_report_opponent_score = NULL,
+         team1_reported_at = NULL,
+         team2_report_score = NULL,
+         team2_report_opponent_score = NULL,
+         team2_reported_at = NULL,
+         score_deadline_at = NULL
+     WHERE id = ?
+       AND status = 'AWAITING_CONFIRMATION'
+       AND winner_team_id IS NULL
+       AND score_deadline_at IS NOT NULL
+       AND score_deadline_at <= NOW()
+       AND ${reporter}_reported_at <=> ?
+       AND ${reporter}_report_score <=> ?
+       AND ${reporter}_report_opponent_score <=> ?
+       AND ${silent}_report_score IS NULL
+       AND ${silent}_report_opponent_score IS NULL
+       AND ${silent}_reported_at IS NULL`,
+    [
+      result.team1Score,
+      result.team2Score,
+      result.winnerTeamId,
+      result.loserTeamId,
+      Number(match.id),
+      reportedAt ?? null,
+      myScore,
+      opponentScore,
+    ],
   );
-  const fresh = Array.isArray(result) && Array.isArray(result[0]) ? result[0][0] : undefined;
-  if (fresh?.status === undefined) return match;
-  if (fresh.status !== "AWAITING_CONFIRMATION") return null;
-  const row = { ...match, ...fresh } as ExpiredMatchRow;
-  return hasTeam1Report(row) === team1Reported && hasTeam2Report(row) === !team1Reported ? row : null;
+  return affectedRowsOf(outcome) === 1;
+}
+
+/** `affectedRows` d'une écriture — 0 pour un double de test qui n'en rend pas. */
+function affectedRowsOf(outcome: unknown): number {
+  const header = Array.isArray(outcome) ? (outcome[0] as { affectedRows?: unknown } | undefined) : undefined;
+  return Number(header?.affectedRows ?? 0);
 }
 
 /** L'engagé 1 a-t-il déposé son report (son score et celui de l'adversaire) ? */

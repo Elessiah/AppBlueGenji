@@ -22,7 +22,7 @@
  * texte — c'est le cas du bouton d'aide des pages de tournoi.
  */
 import frRules from "@/messages/fr/rules.json";
-import { SCORE_REPORT_TIMEOUT_MINUTES } from "./constants";
+import { SCORE_AUTO_VALIDATE_MINUTES, SCORE_REPORT_TIMEOUT_MINUTES } from "./constants";
 import type { Messages } from "./i18n-messages";
 import type { Locale } from "./locales";
 import { formatMessage, type MessageValues } from "./message-format";
@@ -85,6 +85,7 @@ export function ruleTextValues(locale: Locale, messages: RulesMessages): Message
   return {
     launchDelay: LAUNCH_AUTO_DELAY_MINUTES,
     reportTimeout: SCORE_REPORT_TIMEOUT_MINUTES,
+    autoValidate: SCORE_AUTO_VALIDATE_MINUTES / 60,
     minutesPerMap: MIN_MINUTES_PER_REPORTED_MAP,
     seedingRule: formatMessage(locale, messages.seedingRule, { basePoints: RANKING_BASE_POINTS }),
   };

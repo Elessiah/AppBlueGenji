@@ -1,4 +1,4 @@
-import { SCORE_REPORT_TIMEOUT_MINUTES } from "./constants";
+import { SCORE_AUTO_VALIDATE_MINUTES, SCORE_REPORT_TIMEOUT_MINUTES } from "./constants";
 import { DEFAULT_MATCH_FORMAT, type MatchFormat, matchMaxMaps } from "./match-format";
 
 /**
@@ -44,9 +44,11 @@ export function plausibleSeriesMinutes(format: MatchFormat | null): number {
 /**
  * Échéance d'un report unilatéral (ms), en pur — la même règle que l'`UPDATE`
  * de `reportMatchScore`, qui la calcule en SQL pour rester dans le référentiel
- * d'horloge de la base : `max(maintenant, lancement + série plausible)` plus
- * `SCORE_REPORT_TIMEOUT_MINUTES`. Sans lancement connu, la série court depuis
- * maintenant.
+ * d'horloge de la base : la plus lointaine de `maintenant +
+ * SCORE_AUTO_VALIDATE_MINUTES` (deux heures de silence de l'adversaire) et de
+ * `max(maintenant, lancement + série plausible) + SCORE_REPORT_TIMEOUT_MINUTES`.
+ * Sans lancement connu, la série court depuis maintenant. `now` est l'instant
+ * de la **dernière** saisie de l'équipe qui a reporté.
  */
 export function scoreReportDeadline(input: {
   now: number;
@@ -55,5 +57,8 @@ export function scoreReportDeadline(input: {
 }): number {
   const series = plausibleSeriesMinutes(input.format) * 60_000;
   const plausibleEnd = (input.launchedAt ?? input.now) + series;
-  return Math.max(input.now, plausibleEnd) + SCORE_REPORT_TIMEOUT_MINUTES * 60_000;
+  return Math.max(
+    input.now + SCORE_AUTO_VALIDATE_MINUTES * 60_000,
+    Math.max(input.now, plausibleEnd) + SCORE_REPORT_TIMEOUT_MINUTES * 60_000,
+  );
 }

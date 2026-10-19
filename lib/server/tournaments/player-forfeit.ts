@@ -1,5 +1,6 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
+import { SCORE_LOCKED_DISPUTE, isScoreDisputed, reportPresent } from "@/lib/shared/score-dispute";
 import type { MatchStatus } from "@/lib/shared/types";
 import { adminResolveMatch } from "./admin";
 import { resolveUserEntrant } from "./registration";
@@ -44,9 +45,15 @@ export async function forfeitOwnMatch(
   // Verrou de la ligne, table seule et sans jointure (MariaDB) : deux reports ou
   // un report et un forfait simultanés ne doivent pas trancher deux fois.
   const [rows] = await connection.execute<
-    (RowDataPacket & { team1_id: number | null; team2_id: number | null; status: MatchStatus })[]
+    (RowDataPacket & {
+      team1_id: number | null;
+      team2_id: number | null;
+      status: MatchStatus;
+      team1_report_score?: number | null;
+      team2_report_score?: number | null;
+    })[]
   >(
-    `SELECT team1_id, team2_id, status
+    `SELECT team1_id, team2_id, status, team1_report_score, team2_report_score
      FROM bg_matches
      WHERE id = ? AND tournament_id = ?
      LIMIT 1
@@ -61,6 +68,18 @@ export async function forfeitOwnMatch(
   const teamId = entrant.teamId;
   if (Number(match.team1_id) !== teamId && Number(match.team2_id) !== teamId) {
     throw new Error("NOT_IN_MATCH");
+  }
+
+  // Litige ouvert : le forfait est un score comme un autre (0-3 contre soi),
+  // verrouillé avec la saisie jusqu'à l'arbitrage (`SCORE_DISPUTE_LOCK.md`).
+  if (
+    isScoreDisputed({
+      status: match.status,
+      team1Reported: reportPresent(match.team1_report_score),
+      team2Reported: reportPresent(match.team2_report_score),
+    })
+  ) {
+    throw new Error(SCORE_LOCKED_DISPUTE);
   }
 
   await adminResolveMatch(connection, matchId, { forfeitTeamId: teamId });

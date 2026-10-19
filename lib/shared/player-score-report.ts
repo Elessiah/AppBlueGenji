@@ -15,6 +15,7 @@
 import type { BracketMatch, MatchProposalMaps, MatchScoreReport, ProposalMaps } from "./types";
 import { isMatchPlayed } from "./match-outcome";
 import { sameMapLists, type MatchMapInput } from "./match-maps";
+import { autoValidateTimeText } from "./score-dispute";
 
 /** Où en est le cycle de report, **vu par un engagé du match**. */
 export type PlayerReportPhase =
@@ -24,7 +25,10 @@ export type PlayerReportPhase =
   | "MINE_PENDING"
   /** L'adversaire a proposé : le lecteur confirme ou conteste. */
   | "THEIRS_PENDING"
-  /** Les deux propositions se contredisent : l'arbitrage est alerté. */
+  /**
+   * Les deux propositions se contredisent : litige ouvert, saisie verrouillée
+   * pour les deux équipes jusqu'à l'arbitrage (`SCORE_DISPUTE_LOCK.md`).
+   */
   | "CONFLICT";
 
 export interface PlayerReportView {
@@ -196,7 +200,7 @@ const PLAYER_SCORE_BUTTON_LABELS: Record<PlayerScoreButtonKey, string> = {
   forfeit: "Déclarer forfait",
   confirm: "Confirmer le score",
   edit: "Modifier mon score",
-  review: "Revoir le score",
+  review: "Voir le litige",
   enter: "Saisir le score",
 };
 
@@ -211,7 +215,21 @@ export function playerScoreButtonLabel(
 /** Ce que dit la ligne d'état d'une proposition en attente — l'écran la rédige. */
 export type PendingReportState =
   | { kind: "conflict" }
-  | { kind: "proposed"; team1Score: number; team2Score: number; reporter: string | null; side: 1 | 2 };
+  | {
+      kind: "proposed";
+      team1Score: number;
+      team2Score: number;
+      reporter: string | null;
+      side: 1 | 2;
+      /** Échéance de la validation d'office (ISO), `null` si inconnue. */
+      deadlineAt: string | null;
+    };
+
+/** Le match tel que la ligne d'état le lit ; l'échéance est facultative. */
+type PendingReportMatch = Pick<
+  BracketMatch,
+  "status" | "team1Report" | "team2Report" | "team1Name" | "team2Name"
+> & { scoreDeadlineAt?: string | null };
 
 /**
  * Ligne d'état posée sous la carte, lisible par **tous** : une proposition
@@ -219,12 +237,7 @@ export type PendingReportState =
  * distinguer « pas encore joué » de « joué, en attente de confirmation ».
  * `null` quand il n'y a rien à dire.
  */
-export function pendingReportState(
-  match: Pick<
-    BracketMatch,
-    "status" | "team1Report" | "team2Report" | "team1Name" | "team2Name"
-  >,
-): PendingReportState | null {
+export function pendingReportState(match: PendingReportMatch): PendingReportState | null {
   if (isMatchPlayed(match)) return null;
   const { team1Report, team2Report } = match;
   // Deux propositions sur un match ouvert se contredisent toujours (voir
@@ -234,21 +247,26 @@ export function pendingReportState(
   if (!report) return null;
   const side = team1Report ? 1 : 2;
   const reporter = side === 1 ? match.team1Name : match.team2Name;
-  return { kind: "proposed", team1Score: report.team1Score, team2Score: report.team2Score, reporter, side };
+  return {
+    kind: "proposed",
+    team1Score: report.team1Score,
+    team2Score: report.team2Score,
+    reporter,
+    side,
+    deadlineAt: match.scoreDeadlineAt ?? null,
+  };
 }
 
 /** Ligne d'état française ({@link pendingReportState}). */
-export function pendingReportNotice(
-  match: Pick<
-    BracketMatch,
-    "status" | "team1Report" | "team2Report" | "team1Name" | "team2Name"
-  >,
-): string | null {
+export function pendingReportNotice(match: PendingReportMatch): string | null {
   const state = pendingReportState(match);
   if (state === null) return null;
-  if (state.kind === "conflict") return "Scores contradictoires · arbitrage alerté";
+  if (state.kind === "conflict") return "Score en litige · saisie verrouillée, arbitrage attendu";
   const reporter = state.reporter ?? `Équipe ${state.side}`;
-  return `${state.team1Score} – ${state.team2Score} proposé par ${reporter} · à confirmer`;
+  const deadline = autoValidateTimeText(state.deadlineAt, "fr");
+  return deadline
+    ? `${state.team1Score} – ${state.team2Score} proposé par ${reporter} · validé automatiquement à ${deadline} sans réponse`
+    : `${state.team1Score} – ${state.team2Score} proposé par ${reporter} · à confirmer`;
 }
 
 /**

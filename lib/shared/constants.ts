@@ -13,6 +13,15 @@ export const TEAM_ROLES: TeamRole[] = [
 export const SCORE_REPORT_TIMEOUT_MINUTES = 10;
 
 /**
+ * Silence de l'adversaire, en minutes, au bout duquel un score saisi par **une
+ * seule** équipe est validé d'office, comme si l'autre l'avait confirmé
+ * (`docs/features/SCORE_DISPUTE_LOCK.md`). Compté depuis la dernière saisie de
+ * l'équipe qui a reporté — jamais avant une fin de série plausible
+ * (`lib/shared/score-report-deadline.ts`).
+ */
+export const SCORE_AUTO_VALIDATE_MINUTES = 120;
+
+/**
  * Tournois terminés portés par la liste publique mutualisée : les plus
  * récents seulement, autant que la section « Terminés » de `/tournois` en
  * montre repliée.

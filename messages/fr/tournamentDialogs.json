@@ -91,8 +91,8 @@
     },
     "player": {
       "title": "Score de mon match",
-      "conflictMaps": "Même score ({score}), mais le détail des maps diffère de celui de {opponent} : codes de replay ou scores de map. L'arbitrage est alerté ; tu peux encore corriger ta proposition.",
-      "conflictScores": "Les scores se contredisent — toi : {mine}, {opponent} : {theirs}. L'arbitrage est alerté ; tu peux encore corriger ta proposition.",
+      "conflictMaps": "Même score ({score}), mais le détail des maps diffère de celui de {opponent} : codes de replay ou scores de map. L'arbitrage est alerté.",
+      "conflictScores": "Les scores se contredisent — toi : {mine}, {opponent} : {theirs}. L'arbitrage est alerté.",
       "closed": {
         "toPlan": "Ce match attend que l'arbitrage fixe sa date : le score se saisira une fois le match lancé.",
         "scheduledAt": "Ce match démarre le {date} : le score se saisit une fois lancé, quand les parties se sont déclarées prêtes.",
@@ -113,7 +113,9 @@
       "submitted": "Score transmis : {team1} {score1} – {score2} {team2}",
       "forfeitRecorded": "Forfait enregistré : {opponent} remporte le match.",
       "minePending": "Tu as proposé {score}. En attente de la confirmation de {opponent}.",
-      "minePendingDeadline": "Tu as proposé {score}. En attente de la confirmation de {opponent} — sans réponse, ce score sera validé à {deadline}.",
+      "minePendingDeadline": "Tu as proposé {score}. En attente de la confirmation de {opponent} — sans réponse, ce score sera validé automatiquement à {deadline}.",
+      "locked": "Score en litige : la saisie est verrouillée pour les deux équipes, forfait compris. Seul un arbitre ou un administrateur du tournoi peut trancher ce match — fixer le score final ou le remettre à zéro.",
+      "autoValidateAt": "Sans réponse, ce score sera validé automatiquement à {deadline}.",
       "willConfirm": "{opponent} devra confirmer le score que tu envoies.",
       "confirm": "Confirmer le score",
       "send": "Envoyer le score",

@@ -42,6 +42,10 @@
     "body": "{opponent} entered the score of your match ({tournament}). Confirm it, or review it.",
     "soloOpponent": "Your opponent"
   },
+  "scoreAutoValidated": {
+    "title": "Score confirmed automatically",
+    "body": "The score entered for your match ({tournament}) was confirmed automatically: the other team did not answer within 2 hours."
+  },
   "tournamentStart": {
     "title": "The tournament is starting",
     "body": "{tournament} has started. Find your first match on the tournament page."
