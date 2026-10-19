@@ -322,7 +322,11 @@ jouait sur le site. Désormais :
 - **aucun tournoi en cours** → aucune lecture propre au lecteur : le drapeau
   « un tournoi est-il en cours ? » est mutualisé avec les listes de tournois
   (`cachedTournamentList("running-exists")`) et vidé avec elles à chaque
-  écriture sur un tournoi — un tournoi qui démarre est donc vu aussitôt ;
+  écriture sur un tournoi — un tournoi qui démarre est donc vu aussitôt. La
+  modale ne compte que les tournois qui ont la **phase de lancement**
+  (`cachedTournamentList("running-launch-phase-exists")`) : l'option étant
+  désactivée par défaut, un tournoi en cours sans elle ne coûte rien de plus ;
+  le bouton « Contacts » d'une carte garde le drapeau sans filtre ;
 - **tournois en cours, lecteur sans match** — le cas courant → **une** lecture :
   ses équipes sont lues dans la requête des matchs candidats, et ses rôles ne
   sont relus que s'il en a un.
