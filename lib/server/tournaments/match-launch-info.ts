@@ -433,12 +433,16 @@ function revokeIneligibleCasters(
 ): Set<number> {
   const now = Date.now();
   const revoked = new Set<number>();
-  for (const { row } of visible) {
+  for (const { row, phase } of visible) {
     if (row.caster_user_id === null) continue;
     const casterId = Number(row.caster_user_id);
     // Un caster devenu joueur du match ne donnera jamais son « Prêt » de
-    // caster : comme un caster inéligible, il est tu et son inscription retirée.
-    if (castEligibilityBlock(users.get(casterId)) !== null || casterPlays(row, casterId)) {
+    // caster : en lancement — seule phase où ce « Prêt » compte, et où tout
+    // lecteur lit les rosters, modale comme carte —, il est tu et son
+    // inscription retirée, comme un caster inéligible. Avant, il reste
+    // présenté (il est inscrit) ; lancé, il garde sa place.
+    const playsMatch = phase === "LOBBY" && casterPlays(row, casterId);
+    if (castEligibilityBlock(users.get(casterId)) !== null || playsMatch) {
       revoked.add(Number(row.id));
       // Phase jugée **allumée** — la règle même de `releaseIneligibleCast` : sur
       // un tournoi sans phase de lancement, un match à l'heure passée se lit
