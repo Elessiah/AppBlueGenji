@@ -93,6 +93,9 @@ describe("textes FR + EN", () => {
       expect(dialogs.score.player.theirs.withMaps).not.toMatch(/alerte l'arbitrage\.|alerts the referee\./);
     }
     expect(frDialogs.score.player.counterWarning).toMatch(/litige/);
+    // À score égal, ce sont les maps qui diffèrent : l'avis ne dit pas « ce score ».
+    expect(frDialogs.score.player.counterWarning).toMatch(/^Cette saisie diffère .*\(score ou détail des maps\)/);
+    expect(enDialogs.score.player.counterWarning).toMatch(/^This entry differs .*\(score or map details\)/);
     expect(enDialogs.score.player.counterWarning).toMatch(/dispute/);
     expect(frDialogs.score.player.theirs.withMaps).toMatch(/verrouille la saisie des deux équipes/);
     expect(enDialogs.score.player.theirs.withMaps).toMatch(/locks score entry for both teams/);

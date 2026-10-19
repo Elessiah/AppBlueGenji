@@ -574,6 +574,9 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     // Avertissement et verrou rattachés : lus au bouton d'envoi, et avec la modale quand le focus y revient.
     expect(source).toContain('aria-describedby={opensDispute ? "player-score-counter-warning" : undefined}');
     expect(source).toContain('aria-describedby={disputeLocked ? "player-score-locked" : undefined}');
+    // Refus « litige ouvert » : la modale relit l'état, à l'envoi comme au forfait.
+    expect(source).toContain('new Set(["PROPOSAL_STALE", SCORE_LOCKED_DISPUTE])');
+    expect(source.match(/if \(REFRESH_ON_REFUSAL\.has\(code\)\)/g)).toHaveLength(2);
     // Litige arrivé par le flux : focus rendu à la modale si l'élément focalisé a disparu.
     expect(source).toMatch(/disputeLocked && !wasLocked\.current && dialog && !dialog\.contains\(document\.activeElement\)\) dialog\.focus\(\)/);
     // À l'ouverture, la proposition adverse pré-remplie se confirme telle quelle : pas d'avertissement.
@@ -581,6 +584,8 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     const dialog = <PlayerScoreDialog tournamentId={1} match={pending} myTeamId={11} canReportScore canForfeit proposals={[]} onClose={noop} onSubmitted={noop} onRefresh={noop} />;
     expect(render("fr", dialog)).not.toContain("ouvre un litige et verrouille");
     expect(render("en", dialog)).not.toContain("opens a dispute and locks");
+    // La région du verrou est montée, vide, avant tout litige : son remplissage s'annonce.
+    expect(render("fr", dialog)).toMatch(/<output id="player-score-locked"><\/output>/);
   });
 
   it.each<[string, () => ReactElement]>([
