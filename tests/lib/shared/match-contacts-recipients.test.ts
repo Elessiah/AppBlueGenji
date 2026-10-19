@@ -148,7 +148,7 @@ describe("certification Discord et caster retiré", () => {
   });
 
   it("T04 dit qu'un caster devenu inéligible est retiré à la lecture des contacts (FR et EN)", () => {
-    expect(T04?.retention.join("\n")).toMatch(/un caster qui ne remplit plus les conditions de son inscription .* en est retiré, tant que le match n'est pas lancé, dès que le site le constate/);
-    expect(T04_EN?.retention.join("\n")).toMatch(/a caster who no longer meets the conditions of their sign-up .* is removed, as long as the match is not launched, as soon as the site notices it/);
+    expect(T04?.retention.join("\n")).toMatch(/un caster qui ne remplit plus les conditions de son inscription .* en est retiré, tant que le match n'est pas lancé, à la lecture suivante des contacts ou à l'inscription d'un autre caster ; un caster dont l'équipe entre dans le match en est aussi retiré/);
+    expect(T04_EN?.retention.join("\n")).toMatch(/a caster who no longer meets the conditions of their sign-up .* is removed, as long as the match is not launched, at the next read of the contacts or when another caster signs up; a caster whose team joins the match is removed too/);
   });
 });
