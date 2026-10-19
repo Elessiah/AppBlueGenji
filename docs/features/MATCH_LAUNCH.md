@@ -134,9 +134,12 @@ le départ sur un match qui a un caster (`casterContactsPending`), la modale
 relit à l'heure de départ **du serveur** (en-tête `Date` de sa réponse, plus une
 seconde — `casterRereadDelay`), et quand la carte part par une écriture
 (lancement forcé, `rereadOnPhaseChange`) : les contacts du caster remplacent
-alors sa note d'attente. Sans caster, rien n'est relu ; une relecture qui échoue
-garde ce qui est affiché, sans notification. Si la carte revient avant son
-départ (match reprogrammé), les contacts du caster sont de nouveau masqués. Un refus part en notification ; le corps
+alors sa note d'attente. Sans caster, ou pour le caster lui-même (arbitre qui
+caste), rien n'est relu ; une relecture qui échoue garde ce qui est affiché,
+sans notification, et se retente jusqu'à 3 fois toutes les 10 s
+(`shouldRetryReread`). Si la carte revient avant son départ (match
+reprogrammé), les contacts du caster sont de nouveau masqués et la modale est
+relue, pour que le nouveau départ porte sur le caster du moment. Un refus part en notification ; le corps
 reste neutre (« Contacts non affichés », pas « aucun contact »). Chargée à la
 demande (`next/dynamic`) : ses textes FR + EN ne pèsent pas sur la page de
 tournoi. Dans l'ordre de l'action principale, « Contacts » vient **après** les
