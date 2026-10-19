@@ -333,11 +333,13 @@ export function MatchContactsDialog({
         });
         if (!alive) return;
         if ("error" in read) {
-          if (reread && !isFinalRefusal(read.error)) {
+          // Échec passager, à l'ouverture comme en relecture : retenté.
+          const transient = !isFinalRefusal(read.error);
+          if (transient) {
             setRereadWait(read.retryAfterMs ?? 0);
             setRereadFailures((count) => count + 1);
-            return;
           }
+          if (reread && transient) return;
           setState({ kind: "failed" });
           showError(contactsErrorText(text, read.error));
           return;
@@ -347,11 +349,9 @@ export function MatchContactsDialog({
         setState({ kind: "ready", launch: read.launch });
       } catch {
         if (!alive) return;
-        if (reread) {
-          setRereadWait(0);
-          setRereadFailures((count) => count + 1);
-          return;
-        }
+        setRereadWait(0);
+        setRereadFailures((count) => count + 1);
+        if (reread) return;
         setState({ kind: "failed" });
         showError(contactsErrorText(text, null));
       }
