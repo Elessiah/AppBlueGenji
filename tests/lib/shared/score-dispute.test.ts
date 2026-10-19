@@ -100,10 +100,10 @@ describe("textes FR + EN", () => {
     expect(frDialogs.score.player.counterWarning).toMatch(/^Cette saisie diffère .*\(score ou détail des maps\)/);
     expect(enDialogs.score.player.counterWarning).toMatch(/^This entry differs .*\(score or map details\)/);
     expect(enDialogs.score.player.counterWarning).toMatch(/dispute/);
-    expect(frDialogs.score.player.theirs.withMaps).toMatch(/verrouille la saisie des deux équipes/);
-    expect(enDialogs.score.player.theirs.withMaps).toMatch(/locks score entry for both teams/);
-    expect(frDialogs.score.player.theirs.withoutMaps).toMatch(/verrouille la saisie des deux équipes/);
-    expect(enDialogs.score.player.theirs.withoutMaps).toMatch(/locks score entry for both teams/);
+    expect(frDialogs.score.player.theirs.withMaps).toMatch(/verrouille la saisie des deux adversaires/);
+    expect(enDialogs.score.player.theirs.withMaps).toMatch(/locks score entry for both opponents/);
+    expect(frDialogs.score.player.theirs.withoutMaps).toMatch(/verrouille la saisie des deux adversaires/);
+    expect(enDialogs.score.player.theirs.withoutMaps).toMatch(/locks score entry for both opponents/);
     // L'arbitrage n'a pas de remise à zéro par match : ne pas la promettre.
     expect(frDialogs.score.player.locked).not.toMatch(/remettre à zéro/);
     expect(enDialogs.score.player.locked).not.toMatch(/reset/);
@@ -117,6 +117,13 @@ describe("textes FR + EN", () => {
     expect(en).toContain("and no forfeit of the match), and only a referee or an administrator settles it, by recording the official score or a forfeit.");
     expect(fr).not.toContain("en remettant le match à zéro");
     expect(en).not.toContain("resetting the match");
+    // Tournoi individuel : même modale, même refus — jamais « équipes » dans le verrou.
+    for (const text of [frDialogs.score.player.locked, frDialogs.score.player.counterWarning, frDialogs.score.player.theirs.withMaps, frDialogs.score.player.theirs.withoutMaps, frErrors.codes.SCORE_LOCKED_DISPUTE]) {
+      expect(text).not.toMatch(/équipes/);
+    }
+    for (const text of [enDialogs.score.player.locked, enDialogs.score.player.counterWarning, enDialogs.score.player.theirs.withMaps, enDialogs.score.player.theirs.withoutMaps, enErrors.codes.SCORE_LOCKED_DISPUTE]) {
+      expect(text).not.toMatch(/teams/);
+    }
     // Plus d'invitation à « corriger » une proposition en litige.
     expect(frDialogs.score.player.conflictScores).not.toMatch(/corriger/);
     expect(enDialogs.score.player.conflictScores).not.toMatch(/correct/);

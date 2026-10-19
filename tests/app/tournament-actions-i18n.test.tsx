@@ -528,7 +528,7 @@ describe("rendu anglais — aucun français dans les gestes", () => {
   it("score (engagé) en litige : saisie, envoi et forfait retirés, arbitrage nommé", () => {
     const ui = () => <PlayerScoreDialog tournamentId={1} match={disputed} myTeamId={10} canReportScore canForfeit proposals={[]} onClose={noop} onSubmitted={noop} onRefresh={noop} />;
     const fr = render("fr", ui());
-    expect(fr).toContain("la saisie est verrouillée pour les deux équipes, forfait compris");
+    expect(fr).toContain("la saisie est verrouillée pour les deux adversaires, forfait compris");
     // Région d'état remplie, pas de description de modale en plus : le verrou ne s'annonce qu'une fois.
     expect(fr).toMatch(/<output id="player-score-locked" class="[^"]+">Score en litige/);
     expect(fr).not.toContain('aria-describedby="player-score-locked"');
@@ -536,7 +536,7 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     expect(fr).not.toContain("player-score-forfeit");
     expect(fr).not.toContain("player-score-map-");
     const en = render("en", ui());
-    expect(en).toContain("score entry is locked for both teams, forfeits included");
+    expect(en).toContain("score entry is locked for both opponents, forfeits included");
     expect(en).not.toContain('type="submit"');
     expect(en).not.toContain("player-score-forfeit");
     expectNoFrench(en);
