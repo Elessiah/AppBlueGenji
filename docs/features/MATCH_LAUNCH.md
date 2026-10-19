@@ -65,10 +65,12 @@ Le défaut **est** la migration : tout tournoi existant passe sans lancement.
   devenu inéligible (`revokeIneligibleCasters` juge la phase allumée, comme
   `releaseIneligibleCast`, pas la phase affichée). Un caster **devenu joueur** du
   match (roster rejoint après l'inscription, `CASTER_IS_PLAYER` n'étant contrôlé
-  qu'à l'inscription) est traité de même **en lancement** (`LOBBY`, où tout
-  lecteur lit les rosters) : tu, inscription retirée — son « Prêt » de caster ne
-  viendrait jamais (`casterPlays`). Avant, il reste présenté ; lancé, il garde
-  sa place (`viewer.isCaster` le dit caster malgré son rôle de joueur). Un report de score refusé faute de `launched_at` (horloge de
+  qu'à l'inscription) est traité de même **avant le lancement**, dès qu'une
+  lecture le constate (la sienne, ou les rosters lus pour les contacts) : tu,
+  inscription retirée (`casterPlays`, rejoué sous verrou par
+  `releaseIneligibleCast`) — son « Prêt » de caster ne viendrait jamais. Lancé,
+  il garde sa place (`viewer.isCaster` le dit caster malgré son rôle de joueur).
+  Comme pour un caster inéligible, le retrait n'est notifié à personne. Un report de score refusé faute de `launched_at` (horloge de
   l'appareil en avance) rend `MATCH_NOT_STARTED` (« le match n'a pas encore
   commencé », FR + EN), jamais la phrase des « Prêt » (`MATCH_NOT_LAUNCHED`).
 - **Allumée** : exactement le comportement décrit ci-dessous.
