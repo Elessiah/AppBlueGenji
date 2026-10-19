@@ -306,15 +306,11 @@ function streamTime(row: LiveCandidateRow, now: number): number {
 /**
  * Ouvre — ou reprend — la soirée d'un public : la dernière dont la fenêtre
  * ({@link LIVE_EVENING_WINDOW_HOURS} heures depuis le premier direct annoncé)
- * court encore. Les soirées finies depuis un jour sont oubliées au passage.
+ * court encore. Les soirées finies depuis un jour sont oubliées par
+ * {@link purgeEndedEvenings}.
  */
 async function openEvening(target: LiveMentionTarget): Promise<LiveEvening> {
   const db = await getDatabase();
-  try {
-    await db.execute(`DELETE FROM bg_live_evenings WHERE window_end < NOW() - INTERVAL 1 DAY`);
-  } catch {
-    // Ménage seulement : réessayé au passage suivant.
-  }
   const select = `SELECT id, started_at, window_end, discord_message_id, silent, notified FROM bg_live_evenings
                    WHERE target = ? AND window_end > NOW() ORDER BY id DESC LIMIT 1`;
   const [open] = await db.query<LiveEvening[]>(select, [target]);
@@ -1008,6 +1004,26 @@ function postponeRetries(): void {
 
 let lastSweepAt = 0;
 let pendingSweep: Promise<number> | null = null;
+
+/** Délai entre deux purges des soirées finies, par processus. */
+const EVENING_PURGE_INTERVAL_MS = 60 * 60 * 1000;
+
+let lastEveningPurgeAt = 0;
+
+/**
+ * Efface les soirées finies depuis un jour (`bg_live_evenings`), comme
+ * l'annoncent la page RGPD et le registre — au plus une fois par heure, à
+ * chaque évènement qui appelle {@link dispatchLiveAnnouncements}, annonces
+ * activées ou non : sans annonce pendant des semaines, une soirée ne reste pas
+ * des semaines. Notée après le succès seulement : un échec se retente au
+ * passage suivant.
+ */
+export async function purgeEndedEvenings(now: number = Date.now()): Promise<void> {
+  if (now - lastEveningPurgeAt < EVENING_PURGE_INTERVAL_MS) return;
+  const db = await getDatabase();
+  await db.execute(`DELETE FROM bg_live_evenings WHERE window_end < NOW() - INTERVAL 1 DAY`);
+  lastEveningPurgeAt = now;
+}
 let trailingTimer: ReturnType<typeof setTimeout> | null = null;
 /** Instant visé par `trailingTimer`. */
 let trailingAt = 0;
@@ -1049,6 +1065,9 @@ function rearmPendingRetries(): void {
  * @returns Le nombre d'annonces publiées (0 si étranglé ou désactivé).
  */
 export async function dispatchLiveAnnouncements(): Promise<number> {
+  purgeEndedEvenings().catch((error: unknown) => {
+    if (!isMissingTableError(error)) console.error("[live-announce] purge des soirées finies impossible", error);
+  });
   if (!liveAnnouncementsEnabled()) {
     // En production, une variable oubliée au déploiement se lit dans pm2.
     if (process.env.NODE_ENV === "production" && !disabledNoticeShown) {
@@ -1089,6 +1108,7 @@ export async function dispatchLiveAnnouncements(): Promise<number> {
 /** Remet l'étranglement à zéro. Réservé aux tests. */
 export function resetLiveAnnouncementThrottle(): void {
   lastSweepAt = 0;
+  lastEveningPurgeAt = 0;
   retryNotBefore = 0;
   disabledNoticeShown = false;
   heldUntil.clear();
