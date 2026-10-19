@@ -1005,7 +1005,7 @@ describe("soirées d'annonces", () => {
     expect(request.message).toContain("Renards contre Nova");
   });
 
-  it("message de soirée parti sans mention : gardé `silent`, sa modification n'en écrit pas, la fenêtre ne bouge pas", async () => {
+  it("message de soirée parti sans mention : gardé `silent`, sa modification n'en écrit pas", async () => {
     // Envoi muet (soirée déjà annoncée sans identifiant) : marqué sans mention.
     const joined = { ...AUTO_LIVE, id: 41, pairing: "3:4", launch_pairing: "3:4" };
     const first = mockDb([joined]);
@@ -1015,7 +1015,8 @@ describe("soirées d'annonces", () => {
     await runLiveAnnouncementSweep(NOW);
     const quietUpdate = first.execute.mock.calls.find(([text]) => text.startsWith("UPDATE bg_live_evenings"));
     expect(quietUpdate?.[1]).toEqual(["123456789012345678", 1, 3]);
-    expect(quietUpdate?.[0]).not.toContain("window_end");
+    // Premier message gardé, même muet : la fenêtre part de son envoi (elle couvre ce qu'il liste).
+    expect(quietUpdate?.[0]).toContain("window_end = GREATEST(window_end, NOW() + INTERVAL 4 HOUR)");
 
     // Match suivant : le message gardé est muet → `notify: false` avec la modification.
     resetLiveAnnouncementThrottle();
