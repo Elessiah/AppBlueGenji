@@ -56,6 +56,14 @@ rouvre (`TERMS_REQUIRED_EVENT`). Limite : le blocage des autres gestes est
 celui de la fenêtre (côté client) ; seul le serveur des gestes de gestion
 refuse de lui-même.
 
+Qui refuse doit pouvoir partir : la fenêtre laisse passer `/rgpd` (et
+`/rgpd/registre`), `/mentions-legales`, `/accessibilite` et `/profil` (export
+des données, suppression du compte) — `TERMS_FREE_PATHS` de
+`lib/shared/global-modals.ts`, en plus de `/conditions-utilisation` et
+`/connexion`. Les conditions (« Acceptation », FR et EN), l'entrée v5 de
+`PRIVACY_CHANGES`, `/rgpd` (FR et EN) et la fiche T13 du registre décrivent
+cette fenêtre et son contexte `SIGNED_IN`.
+
 L'ancien report « Plus tard » (cookie `bg_terms_later`, 12 h) n'est plus posé
 ni lu ; connexion et déconnexion (`createSession` / `clearSession`) effacent
 encore un cookie resté d'avant (`TERMS_POSTPONED_COOKIE`), et `/rgpd` (FR et
