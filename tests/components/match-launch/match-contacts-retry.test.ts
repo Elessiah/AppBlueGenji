@@ -3,8 +3,10 @@ import {
   CONTACTS_RETRY_MAX_WAIT_MS,
   contactsRetryDelay,
   readMatchContacts,
+  rereadOnPhaseChange,
 } from "@/components/match-launch/MatchContactsDialog";
 import type { MatchLaunchInfo } from "@/lib/shared/match-launch";
+import { readSource } from "../../helpers/read-source";
 
 /**
  * Relecture d'un refus « indisponible » à la frontière du départ (écart
@@ -131,5 +133,29 @@ describe("readMatchContacts", () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+});
+
+describe("relecture au départ du match, modale ouverte", () => {
+  it("une fois, quand la carte passe au lancement ou au lancé", () => {
+    expect(rereadOnPhaseChange("SCHEDULED", "LOBBY")).toBe(true);
+    expect(rereadOnPhaseChange("SCHEDULED", "LAUNCHED")).toBe(true);
+    expect(rereadOnPhaseChange("TO_PLAN", "LAUNCHED")).toBe(true);
+  });
+
+  it("jamais à la fin du match, ni entre deux phases du match parti, ni sans changement", () => {
+    expect(rereadOnPhaseChange("LAUNCHED", "NONE")).toBe(false);
+    expect(rereadOnPhaseChange("LOBBY", "LAUNCHED")).toBe(false);
+    expect(rereadOnPhaseChange("SCHEDULED", "SCHEDULED")).toBe(false);
+    expect(rereadOnPhaseChange("TO_PLAN", "SCHEDULED")).toBe(false);
+    expect(rereadOnPhaseChange(null, null)).toBe(false);
+  });
+
+  it("la carte donne sa phase, et la lecture dépend du compteur de relecture", () => {
+    const dialog = readSource("components/match-launch/MatchContactsDialog.tsx");
+    expect(dialog).toContain("}, [matchId, readKey]);");
+    expect(dialog).toContain("rereadOnPhaseChange(previousPhase.current, phase)");
+    const card = readSource("app/(secured)/tournois/[id]/_components/MatchCardActions.tsx");
+    expect(card).toMatch(/<MatchContactsDialog[\s\S]*?phase=\{phase\}[\s\S]*?\/>/);
   });
 });
