@@ -10,15 +10,15 @@ import { TERMS_SECTIONS_EN } from "@/lib/shared/terms-of-use-en";
 
 /**
  * CONTACTS-FOLLOWUP (décisions du 2026-10-19) : masqué, le BattleTag ne se lit
- * plus que dans la fenêtre « Contacts » d'un match, arbitres et administrateurs
- * compris — dit là où on le renseigne (champ du
+ * plus que dans la fenêtre « Contacts » d'un match, ouverte aux deux équipes et
+ * aux arbitres — dit là où on le renseigne (champ du
  * profil, connexion et rattachement Battle.net) et là où on le masque (modale
  * de la case « BattleTag OW »), avec la même phrase en français et en anglais.
  */
 const FR =
-  "Tu peux masquer ton BattleTag aux yeux de tous, arbitres et administrateurs compris : il ne reste visible que dans la fenêtre « Contacts » de tes matchs de tournoi, pour les deux équipes dès que les deux adversaires sont connus et pour le caster le temps du match. Si tu ne veux pas qu'ils le voient, retire-le de ton profil.";
+  "Tu peux masquer ton BattleTag : il ne reste alors visible que dans la fenêtre « Contacts » de tes matchs de tournoi, pour les deux équipes et les arbitres dès que les deux adversaires sont connus, et pour le caster le temps du match. Si tu ne veux pas qu'ils le voient, retire-le de ton profil (s'il vient de Battle.net, détache d'abord ton compte Battle.net).";
 const EN =
-  "You can hide your BattleTag from everyone, referees and administrators included: it then only stays visible in the “Contacts” window of your tournament matches, to both teams from the moment both opponents are known and to the caster while the match is being played. If you don't want them to see it, remove it from your profile.";
+  "You can hide your BattleTag: it then only stays visible in the “Contacts” window of your tournament matches, to both teams and the referees from the moment both opponents are known, and to the caster while the match is being played. If you don't want them to see it, remove it from your profile (if it comes from Battle.net, unlink your Battle.net account first).";
 
 const readSource = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 
@@ -61,7 +61,7 @@ describe("conditions d'utilisation — contacts de match (version 5)", () => {
   it("prévoit le partage des contacts aux deux équipes, et au caster le temps du match seulement", () => {
     const text = fr?.paragraphs.join(" ") ?? "";
     expect(text).toContain("**tag Discord** certifié, **BattleTag**, **même masqué**, et **rôle d'équipe**");
-    expect(text).toContain("aux **membres des deux équipes** du match, dès que ses deux adversaires sont connus et jusqu'à sa fin");
+    expect(text).toContain("aux **membres des deux équipes** du match et aux **arbitres** (administrateurs compris), dès que ses deux adversaires sont connus et jusqu'à sa fin");
     expect(text).toContain("à son **caster** inscrit **le temps du match** seulement, de son départ à sa fin");
     expect(text).toContain("Au titre de l'organisation du tournoi");
     expect(text).toContain("Un tag Discord non certifié n'est jamais communiqué.");

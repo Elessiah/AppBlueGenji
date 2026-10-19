@@ -56,8 +56,8 @@ describe("BattleTag masqué — lecteurs d'un même match", () => {
   it("la politique et la notice nomment les membres des deux équipes, pas seulement les joueurs (FR et EN)", () => {
     expect(frProfile.battletagNotice.players).toMatch(/Les membres des deux équipes de ton match/);
     expect(enProfile.battletagNotice.players).toMatch(/The members of both teams of your match/);
-    expect(readSource("lib/shared/rgpd-policy.ts")).toContain("des membres de ses deux équipes dès que ses deux adversaires sont connus et jusqu'à sa fin");
-    expect(readSource("lib/shared/rgpd-policy-en.ts")).toContain("by the members of both its teams from the moment both its opponents are known to its end");
+    expect(readSource("lib/shared/rgpd-policy.ts")).toContain("des membres de ses deux équipes et des arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin");
+    expect(readSource("lib/shared/rgpd-policy-en.ts")).toContain("by the members of both its teams and the referees from the moment both its opponents are known to its end");
   });
 });
 
@@ -73,8 +73,8 @@ describe("modale « Contacts » — fermée quand l'action disparaît", () => {
 
 describe("textes joueur et règles — mêmes lecteurs que le code", () => {
   it("l'indication du BattleTag masqué compte le caster, en français et en anglais", () => {
-    expect(readSource("messages/fr/players.json")).toContain("il ne se lit que dans la fenêtre « Contacts » de tes matchs — par les deux équipes, de la connaissance des deux adversaires à la fin du match, si tu es présenté comme contact, et par le caster le temps du match.");
-    expect(readSource("messages/en/players.json")).toContain("it can only be read in the “Contacts” window of your matches — by both teams, from the moment both opponents are known to the end of the match, if you are shown as a contact, and by the caster while the match is being played.");
+    expect(readSource("messages/fr/players.json")).toContain("il ne se lit que dans la fenêtre « Contacts » de tes matchs — par les deux équipes et les arbitres, de la connaissance des deux adversaires à la fin du match, si tu es présenté comme contact, et par le caster le temps du match.");
+    expect(readSource("messages/en/players.json")).toContain("it can only be read in the “Contacts” window of your matches — by both teams and the referees, from the moment both opponents are known to the end of the match, if you are shown as a contact, and by the caster while the match is being played.");
   });
 
   it("la règle « Lancement d'un match » renvoie au bouton « Contacts » ouvert dès que les adversaires sont connus", () => {

@@ -119,11 +119,22 @@ describe("bouton « Contacts » de la carte", () => {
     }
   });
 
-  it("jamais offert à qui n'est pas partie du match, arbitrage compris", () => {
+  it("jamais offert à qui n'est ni partie du match ni arbitre", () => {
     expect(launchStripControls(match, "LAUNCHED", viewer({ myTeamId: 30 })).showContacts).toBe(false);
-    expect(
-      launchStripControls(match, "LAUNCHED", viewer({ myTeamId: null, canSchedule: true, canManage: true })).showContacts,
-    ).toBe(false);
+    // Permission `live` seule (caster potentiel) : pas d'arbitrage, pas de contacts.
+    expect(launchStripControls(match, "LAUNCHED", viewer({ myTeamId: null, canManage: true })).showContacts).toBe(false);
+  });
+
+  // Décision du 2026-10-19 : l'arbitre lit les contacts comme un joueur du match.
+  it("offert à l'arbitre aux mêmes phases qu'aux joueurs, à planifier compris", () => {
+    const referee = viewer({ myTeamId: null, canSchedule: true });
+    for (const phase of ["TO_PLAN", "SCHEDULED", "LOBBY", "LAUNCHED"] as const) {
+      expect(launchStripControls(match, phase, referee).showContacts).toBe(true);
+      expect(launchStripControls(match, phase, { ...referee, launchPhase: false }).showContacts).toBe(true);
+    }
+    expect(launchStripControls(match, "NONE", referee).showContacts).toBe(false);
+    // Arbitre et caster du même match : la règle de l'arbitre l'emporte.
+    expect(launchStripControls(match, "TO_PLAN", { ...referee, viewerUserId: 900 }).showContacts).toBe(true);
   });
 
   it("offert dès que les deux adversaires sont connus (à planifier compris), jamais sur un match fini", () => {

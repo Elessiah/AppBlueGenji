@@ -470,7 +470,7 @@ describe("anglais", () => {
     expect(html).toContain("Referee");
     expect(html).toContain("Owner, Support");
     expect(html).toContain("In progress");
-    expect(html).toContain("Hidden from everyone, referees included");
+    expect(html).toContain("Hidden from everyone: it can only be read");
     expect(html).toContain("Verified Discord tag");
     expect(html).toContain("Statistics");
     expectEnglish(html);

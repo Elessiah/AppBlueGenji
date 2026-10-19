@@ -52,7 +52,7 @@ describe("contacts du lancement d'un match — base légale", () => {
   // tes matchs au titre du service, pas du consentement (le réglage n'y peut rien).
   it("fonde la lecture du BattleTag masqué par les parties d'un match sur le contrat, pas le consentement", () => {
     expect(BATTLETAG_MATCH_SCOPE).toMatch(/^lecture, même masqué, dans la seule fenêtre « Contacts » d'un match où tu es présenté comme contact/);
-    expect(BATTLETAG_MATCH_SCOPE).toMatch(/arbitres et administrateurs compris, qui n'y ont pas d'autre accès \(conditions d'utilisation, « Contacts de match »\)$/);
+    expect(BATTLETAG_MATCH_SCOPE).toMatch(/arbitres et administrateurs n'y ont pas d'autre accès \(conditions d'utilisation, « Contacts de match »\)$/);
   });
 });
 

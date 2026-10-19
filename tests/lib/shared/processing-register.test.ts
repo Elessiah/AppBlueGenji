@@ -109,8 +109,9 @@ describe("PROCESSING_ACTIVITIES", () => {
     const subPurposes = byRef("T04").subPurposes.join(" ");
     expect(subPurposes).not.toMatch(/tournoi en cours/);
     expect(subPurposes).toMatch(/aux arbitres tant que le joueur est inscrit à un tournoi qui n'est pas terminé/);
-    // Décision du 2026-10-19 : plus d'accès propre au BattleTag masqué pour le staff.
-    expect(subPurposes).toMatch(/Ne présenter aux administrateurs et aux arbitres le BattleTag masqué d'un joueur que dans la fenêtre « Contacts » d'un match dont ils sont partie/);
+    // Décisions du 2026-10-19 : plus d'accès propre au BattleTag masqué pour le staff,
+    // seulement la fenêtre « Contacts », aux mêmes durées que les équipes.
+    expect(subPurposes).toMatch(/Ne présenter aux administrateurs et aux arbitres le BattleTag masqué d'un joueur que dans la fenêtre « Contacts » d'un match du tournoi, aux mêmes durées que pour ses deux équipes/);
   });
 
   it("déclare les transferts vers Discord partout où Discord achemine des messages", () => {
@@ -404,7 +405,7 @@ describe("bases légales : le registre et la politique disent la même chose", (
 
   it("fonde les contacts du lancement d'un match sur l'exécution des conditions d'utilisation", () => {
     expect(byRef("T04").legalBasis).toMatch(
-      /exécution du service demandé par le joueur \(contrat — conditions d'utilisation, section « Contacts de match »\) pour la présentation des contacts aux parties d'un match dans sa fenêtre « Contacts » \(à ses deux équipes dès que ses deux adversaires sont connus, à son caster et du caster le temps du match\), BattleTag masqué compris — arbitres et administrateurs n'y ont pas d'autre accès, sur la même base —,/,
+      /exécution du service demandé par le joueur \(contrat — conditions d'utilisation, section « Contacts de match »\) pour la présentation des contacts aux parties d'un match dans sa fenêtre « Contacts » \(à ses deux équipes et aux arbitres dès que ses deux adversaires sont connus, à son caster et du caster le temps du match\), BattleTag masqué compris — arbitres et administrateurs n'y ont pas d'autre accès, sur la même base —,/,
     );
   });
 

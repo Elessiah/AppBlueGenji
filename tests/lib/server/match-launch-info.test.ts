@@ -696,6 +696,69 @@ describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => 
     }
   });
 
+  // Décision du 2026-10-19 : l'arbitre (permission `tournaments`) lit, par la
+  // carte, les mêmes contacts que les joueurs du match, aux mêmes moments.
+  describe("arbitre", () => {
+    const referee = { id: VIEWER, roles: ["ARBITRE" as const] };
+    const hiddenCaptain = () =>
+      member(TEAM2, 5, {
+        roles_json: JSON.stringify(["CAPITAINE"]),
+        discord_pseudo: "cap2",
+        discord_verified_at: OPENED,
+        overwatch_battletag: "Cap#2",
+        visible_overwatch: 0,
+      });
+
+    beforeEach(() => {
+      state.viewerMemberships = [];
+      state.members = [hiddenCaptain()];
+    });
+
+    it("rend dès « À planifier » les contacts, BattleTag masqué compris, sans « Prêt » à donner", async () => {
+      state.candidates = [candidate({ referee_scheduling: 1, start_at: null, caster_user_id: CASTER })];
+      state.users = [casterUser(CASTER)];
+      const info = await loadViewerMatchContacts(referee, 42);
+      expect(info?.phase).toBe("TO_PLAN");
+      expect(info?.viewer).toEqual({ role: "REFEREE", canDeclareReady: false, ready: false });
+      expect(info?.team2.contacts).toEqual([expect.objectContaining({ userId: 5, discordTag: "cap2", battletag: "Cap#2" })]);
+      // Comme pour les équipes : les contacts du caster le temps du match seulement.
+      expect(info?.caster).toMatchObject({ discordTag: null, battletag: null });
+    });
+
+    it("rend aussi les contacts du caster une fois le match parti", async () => {
+      state.candidates = [candidate({ caster_user_id: CASTER })];
+      state.users = [casterUser(CASTER)];
+      const info = await loadViewerMatchContacts(referee, 42);
+      expect(info?.phase).toBe("LOBBY");
+      expect(info?.caster).toMatchObject({ discordTag: "caster", battletag: "Caster#1" });
+    });
+
+    it("lit le match sans exiger d'en être partie", async () => {
+      await loadViewerMatchContacts(referee, 42);
+      expect(state.reads.find((sql) => sql.includes("t.name AS tournament_name"))).toContain("AND (1 = 1 OR m.caster_user_id = ?");
+      await loadViewerMatchContacts(viewer, 42);
+      const last = state.reads.filter((sql) => sql.includes("t.name AS tournament_name")).at(-1);
+      expect(last).not.toContain("1 = 1");
+    });
+
+    it("vaut pour un administrateur, pas pour un caster sans arbitrage", async () => {
+      await expect(loadViewerMatchContacts({ id: VIEWER, isAdmin: true }, 42)).resolves.toMatchObject({
+        viewer: { role: "REFEREE" },
+      });
+      await expect(loadViewerMatchContacts({ id: VIEWER, roles: ["CASTER"] }, 42)).resolves.toBeNull();
+    });
+
+    it("ne présente rien à l'arbitre dans la modale de lancement", async () => {
+      await expect(listViewerMatchLaunches(referee)).resolves.toEqual([]);
+      expect(state.reads.find((sql) => sql.includes("t.name AS tournament_name"))).not.toContain("1 = 1");
+    });
+
+    it("ne rend rien d'un match terminé", async () => {
+      state.candidates = [candidate({ status: "COMPLETED" })];
+      await expect(loadViewerMatchContacts(referee, 42)).resolves.toBeNull();
+    });
+  });
+
   it("ne rend rien quand aucun tournoi n'est en cours", async () => {
     state.running = false;
     await expect(loadViewerMatchContacts(viewer, 42)).resolves.toBeNull();
