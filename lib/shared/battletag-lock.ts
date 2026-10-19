@@ -119,7 +119,7 @@ export function battletagLockNotice(state: {
     return "Impossible de lire tes applications connectées pour l'instant : le champ reste en lecture seule, pour ne pas écraser un BattleTag que Blizzard aurait renseigné. Recharge la page pour réessayer.";
   }
   const change =
-    "Pour en changer, retire Blizzard depuis « Applications connectées », puis rattache le bon compte.";
+    "Pour en changer, retire Blizzard depuis « Applications connectées » (après avoir ajouté un autre moyen de connexion si c'est le seul), puis rattache le bon compte.";
   if (!state.tag) {
     // Rattaché sans BattleTag : le cas existe (un compte Battle.net peut n'en
     // porter aucun), et le champ reste fermé parce que la prochaine connexion

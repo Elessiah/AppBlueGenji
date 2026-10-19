@@ -74,7 +74,7 @@
   "battletagLock": {
     "pending": "Lecture de tes applications connectées… Le champ reste en lecture seule le temps de savoir si Blizzard renseigne ce BattleTag.",
     "unknown": "Impossible de lire tes applications connectées pour l'instant : le champ reste en lecture seule, pour ne pas écraser un BattleTag que Blizzard aurait renseigné. Recharge la page pour réessayer.",
-    "change": "Pour en changer, retire Blizzard depuis « Applications connectées », puis rattache le bon compte.",
+    "change": "Pour en changer, retire Blizzard depuis « Applications connectées » (après avoir ajouté un autre moyen de connexion si c'est le seul), puis rattache le bon compte.",
     "noTag": "Ton compte Blizzard est rattaché, mais il n'a donné aucun BattleTag. Le champ reste en lecture seule : Blizzard le renseignera à ta prochaine connexion, et écraserait une saisie faite ici. {change}",
     "tagged": "Ton compte Blizzard est rattaché : c'est lui qui donne ce BattleTag, et Blizzard le remet à jour à chaque connexion — une correction saisie ici serait effacée au passage suivant. {change} Pour cesser de le publier, décoche « BattleTag OW » plus bas."
   },
@@ -347,7 +347,7 @@
     "caster": "<strong>Le caster de ton match</strong>, le temps du match seulement (de son départ à sa fin), si tu fais partie des contacts présentés.",
     "asCaster": "<strong>Les deux équipes et les arbitres d'un match que tu castes</strong>, le temps du match seulement (de son départ à sa fin).",
     "staff": "<strong>Les arbitres et les administrateurs</strong>, dans la même fenêtre « Contacts » des matchs du tournoi, aux mêmes moments que les deux équipes — jamais ailleurs.",
-    "outro": "Pour ne plus le communiquer du tout, il faut effacer le champ — mais tes adversaires ne pourront alors plus t'ajouter en jeu. Et si un compte Blizzard est rattaché, c'est lui qui tient ce champ : il faut le retirer d'abord.",
+    "outro": "Pour ne plus le communiquer du tout, il faut effacer le champ — mais tes adversaires ne pourront alors plus t'ajouter en jeu. Et si un compte Blizzard est rattaché, c'est lui qui tient ce champ : il faut le retirer d'abord (après avoir ajouté un autre moyen de connexion si c'est le seul).",
     "ok": "J'ai compris"
   },
   "verify": {

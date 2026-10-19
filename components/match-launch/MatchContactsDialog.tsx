@@ -341,7 +341,8 @@ export function MatchContactsDialog({
                   // (`exposesCaster`) : avant, une note plutôt que deux « — »
                   // qui laisseraient croire qu'il n'en a pas.
                   contactsShown={matchUnderway(launch.phase) && (phase === null || matchUnderway(phase))}
-                  contactsLaterText={t("contacts.casterLater")}
+                  // Pas au caster lui-même (arbitre compris) : la note parle de lui.
+                  contactsLaterText={casterContactsPending(launch) ? t("contacts.casterLater") : undefined}
                   noCasterText={t("contacts.noCaster")}
                   linkNames
                 />
