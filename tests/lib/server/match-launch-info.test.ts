@@ -664,6 +664,36 @@ describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => 
     await expect(loadViewerMatchContacts(viewer, 42)).resolves.toBeNull();
   });
 
+  it("ne rend rien au caster inscrit tant que le match n'est pas parti (programmé ou à planifier)", async () => {
+    state.viewerMemberships = [];
+    state.members = [verifiedCaptain()];
+    state.users = [casterUser(VIEWER)];
+    for (const row of [
+      candidate({ match_launch_phase: 0, start_at: scheduled(), caster_user_id: VIEWER }),
+      candidate({ referee_scheduling: 1, start_at: null, caster_user_id: VIEWER }),
+    ]) {
+      state.candidates = [row];
+      await expect(loadViewerMatchContacts(viewer, 42)).resolves.toBeNull();
+    }
+  });
+
+  it("rend au caster inscrit les contacts le temps du match (lancement ouvert, puis lancé)", async () => {
+    state.viewerMemberships = [];
+    state.members = [verifiedCaptain()];
+    state.users = [casterUser(VIEWER)];
+    const cases: [ReturnType<typeof candidate>, string][] = [
+      [candidate({ caster_user_id: VIEWER }), "LOBBY"],
+      [candidate({ match_launch_phase: 0, caster_user_id: VIEWER }), "LAUNCHED"],
+    ];
+    for (const [row, phase] of cases) {
+      state.candidates = [row];
+      const info = await loadViewerMatchContacts(viewer, 42);
+      expect(info?.viewer.role).toBe("CASTER");
+      expect(info?.phase).toBe(phase);
+      expect(info?.team2.contacts).toEqual([expect.objectContaining({ userId: 5, discordTag: "cap2" })]);
+    }
+  });
+
   it("ne rend rien quand aucun tournoi n'est en cours", async () => {
     state.running = false;
     await expect(loadViewerMatchContacts(viewer, 42)).resolves.toBeNull();

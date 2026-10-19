@@ -1,0 +1,76 @@
+import { describe, expect, it } from "@jest/globals";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import frProfile from "@/messages/fr/profile.json";
+import enProfile from "@/messages/en/profile.json";
+import frLogin from "@/messages/fr/login.json";
+import enLogin from "@/messages/en/login.json";
+import { TERMS_SECTIONS } from "@/lib/shared/terms-of-use";
+import { TERMS_SECTIONS_EN } from "@/lib/shared/terms-of-use-en";
+
+/**
+ * CONTACTS-FOLLOWUP (décision du 2026-10-19) : masquer le BattleTag ne le
+ * cache pas aux adversaires d'un match — dit là où on le renseigne (champ du
+ * profil, connexion et rattachement Battle.net) et là où on le masque (modale
+ * de la case « BattleTag OW »), avec la même phrase en français et en anglais.
+ */
+const FR =
+  "Tu peux masquer ton BattleTag aux yeux de tous, mais il reste visible pour tes adversaires pendant un match de tournoi. Si tu ne veux pas qu'ils le voient, retire-le de ton profil.";
+const EN =
+  "You can hide your BattleTag from everyone, but it stays visible to your opponents during a tournament match. If you don't want them to see it, remove it from your profile.";
+
+const readSource = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
+
+describe("avertissement du BattleTag masqué", () => {
+  it("se lit sous le champ BattleTag du profil, verrouillé ou non", () => {
+    expect(frProfile.games.hiddenWarning).toBe(FR);
+    expect(enProfile.games.hiddenWarning).toBe(EN);
+    const page = readSource("app/(secured)/profil/page.tsx");
+    const hint = page.slice(page.indexOf('<p id="profile-battletag-hint"'), page.indexOf("</p>", page.indexOf('<p id="profile-battletag-hint"')));
+    expect(hint).toContain('{t("games.hiddenWarning")}');
+    // Hors du ternaire : les deux branches (verrouillé par Blizzard ou saisi) le portent.
+    expect(hint.lastIndexOf('t("games.hiddenWarning")')).toBeGreaterThan(hint.lastIndexOf('t("games.blizzardNotice")'));
+  });
+
+  it("se lit au rattachement de Battle.net (profil) et à la connexion par Blizzard", () => {
+    expect(frProfile.connections.notes.BLIZZARD).toContain(FR);
+    expect(enProfile.connections.notes.BLIZZARD).toContain(EN);
+    expect(frLogin.oauth.blizzardNote).toContain(FR);
+    expect(enLogin.oauth.blizzardNote).toContain(EN);
+  });
+
+  it("ouvre la modale affichée quand on masque le BattleTag", () => {
+    expect(frProfile.battletagNotice.warning).toBe(FR);
+    expect(enProfile.battletagNotice.warning).toBe(EN);
+    const notice = readSource("app/(secured)/profil/BattletagVisibilityNotice.tsx");
+    expect(notice.indexOf('t("battletagNotice.warning")')).toBeGreaterThan(-1);
+    expect(notice.indexOf('t("battletagNotice.warning")')).toBeLessThan(notice.indexOf('t("battletagNotice.intro")'));
+  });
+
+  it("dit au caster qu'il n'a les contacts que le temps du match (FR et EN)", () => {
+    expect(frProfile.battletagNotice.caster).toContain("le temps du match seulement (de son départ à sa fin)");
+    expect(enProfile.battletagNotice.caster).toContain("only while the match is being played (from its start to its end)");
+  });
+});
+
+describe("conditions d'utilisation — contacts de match (version 5)", () => {
+  const fr = TERMS_SECTIONS.find((s) => s.id === "contacts-de-match");
+  const en = TERMS_SECTIONS_EN.find((s) => s.id === "contacts-de-match");
+
+  it("prévoit le partage des contacts aux deux équipes, et au caster le temps du match seulement", () => {
+    const text = fr?.paragraphs.join(" ") ?? "";
+    expect(text).toContain("**tag Discord** certifié, **BattleTag**, **même masqué**, et **rôle d'équipe**");
+    expect(text).toContain("aux **membres des deux équipes** du match, dès que ses deux adversaires sont connus et jusqu'à sa fin");
+    expect(text).toContain("à son **caster** inscrit **le temps du match** seulement, de son départ à sa fin");
+    expect(text).toContain("Au titre de l'organisation du tournoi");
+    expect(text).toContain("Un tag Discord non certifié n'est jamais communiqué.");
+  });
+
+  it("se traduit en anglais, à la même place", () => {
+    expect(TERMS_SECTIONS_EN.map((s) => s.id)).toEqual(TERMS_SECTIONS.map((s) => s.id));
+    const text = en?.paragraphs.join(" ") ?? "";
+    expect(text).toContain("**even when hidden**");
+    expect(text).toContain("**only while the match is being played**, from its start to its end");
+    expect(en?.paragraphs).toHaveLength(fr?.paragraphs.length ?? -1);
+  });
+});

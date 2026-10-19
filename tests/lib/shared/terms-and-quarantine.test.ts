@@ -52,13 +52,14 @@ describe("conditions d'utilisation", () => {
     expect(termsRequestFor(TERMS_VERSION + 1)).toBeNull();
   });
 
-  it("version 4 en vigueur le 14 octobre 2026 (décision de l'association) : les versions 1 à 3 sont redemandées", () => {
-    expect(TERMS_VERSION).toBe(4);
-    expect(TERMS_UPDATED_AT).toBe("2026-10-14");
+  it("version 5 en vigueur le 19 octobre 2026 (contacts de match) : les versions 1 à 4 sont redemandées", () => {
+    expect(TERMS_VERSION).toBe(5);
+    expect(TERMS_UPDATED_AT).toBe("2026-10-19");
     expect(termsRequestFor(1)).toBe("UPDATED");
     expect(termsRequestFor(2)).toBe("UPDATED");
     expect(termsRequestFor(3)).toBe("UPDATED");
-    expect(termsRequestFor(4)).toBeNull();
+    expect(termsRequestFor(4)).toBe("UPDATED");
+    expect(termsRequestFor(5)).toBeNull();
   });
 
   it("reconnaît les quatre écrans d'acceptation", () => {

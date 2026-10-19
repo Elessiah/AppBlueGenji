@@ -108,8 +108,15 @@ describe("bouton « Contacts » de la carte", () => {
     }
   });
 
-  it("offert au caster inscrit", () => {
-    expect(launchStripControls(match, "SCHEDULED", viewer({ viewerUserId: 900, myTeamId: null })).showContacts).toBe(true);
+  it("offert au caster inscrit le temps du match seulement", () => {
+    const caster = viewer({ viewerUserId: 900, myTeamId: null });
+    for (const phase of ["LOBBY", "LAUNCHED"] as const) {
+      expect(launchStripControls(match, phase, caster).showContacts).toBe(true);
+      expect(launchStripControls(match, phase, { ...caster, launchPhase: false }).showContacts).toBe(true);
+    }
+    for (const phase of ["TO_PLAN", "SCHEDULED", "NONE"] as const) {
+      expect(launchStripControls(match, phase, caster).showContacts).toBe(false);
+    }
   });
 
   it("jamais offert à qui n'est pas partie du match, arbitrage compris", () => {

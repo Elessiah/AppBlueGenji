@@ -8,6 +8,8 @@ import {
   DONNEE_TOURNOIS,
   DROITS,
   AUTOMOD_ALERT_SCOPE,
+  BATTLETAG_MATCH_SCOPE,
+  MATCH_CONTACTS_SCOPE,
   LIVE_PSEUDO_SCOPE,
   MATCH_TIME_DM_SCOPE,
   MODERATION_DM_SCOPE,
@@ -32,14 +34,25 @@ describe("clés de rendu de /rgpd", () => {
 
 describe("contacts du lancement d'un match — base légale", () => {
   it("affiche l'exécution du contrat à côté du consentement, sans que la finalité les oppose", () => {
-    for (const donnee of ["Certification du pseudo Discord", "Pseudo Overwatch"]) {
+    for (const [donnee, scope] of [
+      ["Certification du pseudo Discord", MATCH_CONTACTS_SCOPE],
+      ["Pseudo Overwatch", BATTLETAG_MATCH_SCOPE],
+    ] as const) {
       const entry = DONNEES_PROFIL.find((d) => d.donnee === donnee);
       expect(entry?.base).toBe("Consentement");
-      expect(entry?.extraBases?.[0]).toEqual(
-        { base: "Exécution du contrat", scope: "présentation aux membres des deux équipes et au caster de ton match, dès que ses deux adversaires sont connus" },
-      );
+      expect(entry?.extraBases?.[0]).toEqual({ base: "Exécution du contrat", scope });
       expect(entry?.finalite).not.toMatch(/non sur ce consentement/);
     }
+    expect(MATCH_CONTACTS_SCOPE).toBe(
+      "présentation aux membres des deux équipes de ton match, dès que ses deux adversaires sont connus, et à son caster le temps du match (conditions d'utilisation, « Contacts de match »)",
+    );
+  });
+
+  // Décision du 2026-10-19 : masqué, le BattleTag reste lu par les parties de
+  // tes matchs au titre du service, pas du consentement (le réglage n'y peut rien).
+  it("fonde la lecture du BattleTag masqué par les parties d'un match sur le contrat, pas le consentement", () => {
+    expect(BATTLETAG_MATCH_SCOPE).toMatch(/^lecture, même masqué, par les membres des deux équipes de tes matchs tant que le tournoi n'est pas terminé/);
+    expect(BATTLETAG_MATCH_SCOPE).toMatch(/à son caster le temps du match \(conditions d'utilisation, « Contacts de match »\)$/);
   });
 });
 
@@ -111,7 +124,7 @@ describe("DONNEES_PROFIL", () => {
     const overwatch = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo Overwatch");
     expect(overwatch?.finalite).toMatch(/Masqué, il reste lisible des membres des deux équipes de tes matchs tant que le tournoi n'est pas terminé/);
     // Le caster ne le reçoit que comme contact de lancement (`/api/me/match-launches`).
-    expect(overwatch?.finalite).toMatch(/du caster de ton match dès que ses deux adversaires sont connus et jusqu'à sa fin/);
+    expect(overwatch?.finalite).toMatch(/du caster de ton match le temps du match seulement \(de son départ à sa fin\)/);
     expect(overwatch?.finalite).toMatch(/tant que le tournoi n'est pas terminé/);
     // L'arbitrage le lit dès l'inscription (`isInActiveTournament` : tout état
     // sauf `FINISHED`), pas seulement pendant le tournoi.
@@ -141,7 +154,7 @@ describe("DONNEES_PROFIL", () => {
     expect(certification?.finalite).toMatch(/administrateurs à tout moment/i);
     expect(certification?.finalite).toMatch(/arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé/i);
     expect(certification?.finalite).not.toMatch(/tournoi en cours/i);
-    expect(certification?.finalite).toMatch(/caster de ton match/i);
+    expect(certification?.finalite).toMatch(/son caster le temps du match seulement/i);
     expect(certification?.finalite).toMatch(/autres joueurs connectés/i);
     expect(certification?.finalite).toContain("« Tag Discord »");
   });
