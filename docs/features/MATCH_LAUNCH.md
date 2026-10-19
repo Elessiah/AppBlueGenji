@@ -139,9 +139,10 @@ le départ sur un match qui a un caster (`casterContactsPending`), la modale
 relit à l'heure de départ **du serveur** (en-tête `Date` de sa réponse, plus une
 seconde ; une réponse « programmé » dont l'en-tête est déjà à l'heure est
 relue une seconde plus tard — `casterRereadDelay`), et quand la carte reçoit
-une écriture (lancement forcé, match reprogrammé ou remis à planifier, caster
-qui s'inscrit ou se retire — `rereadOnScheduleChange`), jamais à l'horloge du
-navigateur : les contacts du
+une écriture qui touche ce qu'elle montre (lancement forcé, match reprogrammé
+ou remis à planifier, caster qui s'inscrit ou se retire, adversaire corrigé,
+hôte changé, « Prêt » — empreinte `contactsCardKey`, `rereadOnCardChange`), une
+lecture par écriture, jamais à l'horloge du navigateur : les contacts du
 caster remplacent alors sa note d'attente, ou sont de nouveau masqués, pour le
 caster du moment. Leur affichage suit la phase **du serveur** à la lecture.
 Sans caster, ou pour le caster lui-même (arbitre qui caste), rien n'est relu.
