@@ -205,7 +205,7 @@ describe("createOrGetDiscordUser — entrer par Discord enregistre le tag, sans 
     // Une certification déjà donnée survit au même pseudo, tombe s'il change.
     expect(update!.sql).toContain("WHEN discord_pseudo <=> ? THEN discord_verified_at ELSE NULL END");
     expect(update!.sql).toContain("discord_pseudo_from_discord = 1");
-    expect(update!.params).toEqual(["keryan", "keryan", 7]);
+    expect(update!.params).toEqual(["keryan", "keryan", 7, "900000000000000001"]);
     // La porte est notée au passage, et le code en message privé ne dégrade
     // jamais un rattachement déjà noué par le bouton.
     expect(update!.sql).toContain("discord_link_method = COALESCE(discord_link_method, 'DM_CODE')");
@@ -235,7 +235,7 @@ describe("createOrGetDiscordUser — entrer par Discord enregistre le tag, sans 
     });
 
     const update = find(queries, "UPDATE bg_users")!;
-    expect(update.params).toEqual([7]);
+    expect(update.params).toEqual([7, "900000000000000001"]);
     expect(update.sql).toContain("discord_link_method = 'OAUTH'");
     expect(update.sql).not.toContain("discord_pseudo");
     expect(update.sql).not.toContain("discord_verified_at");
