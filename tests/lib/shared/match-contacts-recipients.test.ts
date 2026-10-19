@@ -73,8 +73,8 @@ describe("modale « Contacts » — fermée quand l'action disparaît", () => {
 
 describe("textes joueur et règles — mêmes lecteurs que le code", () => {
   it("l'indication du BattleTag masqué compte le caster, en français et en anglais", () => {
-    expect(readSource("messages/fr/players.json")).toContain("seuls les membres des deux équipes de tes matchs, leur caster et l'arbitrage le lisent");
-    expect(readSource("messages/en/players.json")).toContain("only the members of both teams in your matches, their caster and the referees can read it");
+    expect(readSource("messages/fr/players.json")).toContain("ainsi que le caster d'un match où tu es présenté comme contact et les deux équipes d'un match que tu castes");
+    expect(readSource("messages/en/players.json")).toContain("as well as the caster of a match where you are shown as a contact and both teams of a match you cast");
   });
 
   it("la règle « Lancement d'un match » renvoie au bouton « Contacts » ouvert dès que les adversaires sont connus", () => {
