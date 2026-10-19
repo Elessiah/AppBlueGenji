@@ -1206,6 +1206,39 @@ describe("soirées d'annonces", () => {
     expect(request.message).toContain("Renards contre Nova");
   });
 
+  it("ne relit une soirée que par l'annonce de l'affiche courante d'un match (rouvert : l'ancienne ne compte plus)", async () => {
+    const { evening } = mockDb([AUTO_LIVE]);
+    await runLiveAnnouncementSweep(NOW);
+    const read = evening.mock.calls.find(([sql]) => sql.includes("a.sent_at >= ?"));
+    expect(read?.[0].replace(/\s+/g, " ")).toContain(
+      "a.match_id = m.id AND a.sent_at >= ? AND a.pairing = CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id))",
+    );
+  });
+
+  it("match programmé passé à l'antenne en retard, après la fin de la fenêtre : rejoint la soirée qui le listait", async () => {
+    const late = {
+      ...AUTO_LIVE,
+      live_trigger: "START_TIME",
+      start_at: "2026-10-14T19:50:00Z",
+      launched_at: "2026-10-14T19:58:00Z",
+    };
+    const { evening } = mockDb([late]);
+    await runLiveAnnouncementSweep(NOW);
+    const open = evening.mock.calls.find(([sql]) => sql.includes("FROM bg_live_evenings"));
+    expect(open?.[0]).toContain(
+      "WHERE target = ? AND (window_end > NOW() OR (discord_message_id IS NOT NULL AND started_at <= ? AND window_end >= ?))",
+    );
+    expect(open?.[1]).toEqual(["stream-viewer", late.start_at, late.start_at]);
+  });
+
+  it("match sans heure prévue (AUTO) : seule une soirée en cours est reprise", async () => {
+    const { evening } = mockDb([AUTO_LIVE]);
+    await runLiveAnnouncementSweep(NOW);
+    const open = evening.mock.calls.find(([sql]) => sql.includes("FROM bg_live_evenings"));
+    expect(open?.[0]).toContain("WHERE target = ? AND (window_end > NOW()) ORDER BY id DESC LIMIT 1");
+    expect(open?.[1]).toEqual(["stream-viewer"]);
+  });
+
   it("soirée illisible : réservation rendue, annonce reportée", async () => {
     const { execute, evening } = mockDb([AUTO_LIVE]);
     evening.mockRejectedValue(new Error("DB_DOWN"));
