@@ -906,6 +906,9 @@ describe("soirées d'annonces", () => {
     expect(await runLiveAnnouncementSweep(NOW)).toBe(1);
     const [request] = jest.mocked(pushLiveEvening).mock.calls[0];
     expect(request.editMessageId).toBe("123456789012345678");
+    // Message déjà parti : la fenêtre ne bouge plus, la lecture s'arrête à sa fin.
+    const read = evening.mock.calls.find(([sql]) => sql.includes("a.sent_at >= ?"));
+    expect(read?.[0]).toContain("m.start_at <= ?))");
     // Le match déjà annoncé reste dans le message, à son heure.
     expect(request.message).toContain("**21:00** · En direct\nRenards contre Nova");
     expect(request.message).toContain("**21:58** · En direct\nRenards contre Nova");
@@ -936,8 +939,10 @@ describe("soirées d'annonces", () => {
       "🔴 **Les lives de la soirée**\n\n**21:58** · En direct\nRenards contre Nova — Coupe d'hiver\n{{lien:1}}" +
         "\n\n**23:30**\nOrques contre Lynx — Coupe d'hiver\n{{lien:1}}",
     );
-    // La lecture de la soirée prend les annonces depuis son ouverture et les matchs jusqu'à sa fin.
+    // La lecture de la soirée prend les annonces depuis son ouverture et les matchs jusqu'à sa fin —
+    // sans message encore parti, jusqu'à la fin de la fenêtre qui repartira de cet envoi.
     const read = evening.mock.calls.find(([sql]) => sql.includes("a.sent_at >= ?"));
+    expect(read?.[0]).toContain("m.start_at <= GREATEST(?, NOW() + INTERVAL 4 HOUR)");
     expect(read?.[1]).toEqual([
       EVENING.started_at,
       expect.any(Number),
