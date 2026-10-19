@@ -826,6 +826,9 @@ programme d'arbitrage) relèvent de l'exécution du service, sans interrupteur.
   cocher la case sans tag certifié affiche `matchDms.enabledNotCertified`
   (état Discord lu à la fin de l'envoi). Un rattachement par code rappelle
   de certifier le tag dans son toast (`botHandle.certifyForDms`).
+  Le rattachement par le bouton Discord fait de même, et le retrait de Discord
+  dans « Applications connectées » ajoute `botHandle.matchDms` à son toast
+  (`connection-errors.ts`).
 - **Côté staff** : la fenêtre d'horaire de match (`schedule.notice`,
   `schedule.noticePlanning`, FR + EN) précise que le message privé ne part
   qu'aux joueurs au tag certifié qui n'ont pas coupé ces messages, pour qu'un
