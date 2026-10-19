@@ -56,7 +56,10 @@ personne d'autre n'y perd. /regles le dit « aucun forfait sur ce match ».
 **Arbitre et report seul.** « Enregistrer » (avancement, sans trancher) ne
 touche ni les propositions ni l'échéance : la règle des 2 h s'applique toujours,
 et l'arbitre qui veut retenir un autre score le **valide** (« Valider le
-résultat »).
+résultat »). À l'échéance, le score du déclarant remplace ce qui a été noté —
+forfait compris (`forfeit_team_id` remis à `NULL` : jamais un score de
+déclarant sous un drapeau de forfait). Suspendre la validation d'office dès
+qu'un arbitre enregistre reste une décision à prendre.
 
 **Avant l'envoi.** Une contre-proposition ne se corrige plus : face à la
 proposition adverse, toute saisie qui en diffère (score, ou seulement le détail
@@ -105,7 +108,8 @@ d'office, exactement comme si l'autre l'avait confirmé.
   (`notifyScoreAutoValidated`, sujet existant `SCORE_TO_CONFIRM`, rédacteur
   `scoreAutoValidatedPush`, FR + EN, sans nommer personne ni « l'autre équipe » :
   le même texte part aux deux camps — « personne ne l'a confirmé ni contesté
-  dans les 2 h »). Rien sur Discord de
+  avant l'échéance » — sans durée : sur un format long, l'échéance dépasse 2 h ;
+  le sujet du profil dit « après au moins 2 h »). Rien sur Discord de
   plus que la ligne `match_finished` habituelle.
 - **Écran** : sur la carte (lisible de tous), « validation automatique à HH:MM
   (heure de Paris) sans réponse » / « automatic confirmation at HH:MM (Paris
