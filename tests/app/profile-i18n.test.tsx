@@ -78,7 +78,7 @@ import {
   FR_PROFILE,
 } from "@/app/(secured)/profil/_lib/profile-text";
 import { avatarUploadErrorMessage, profileErrorMessage } from "@/app/(secured)/profil/profile-errors";
-import { connectionErrorMessage, otherSessionsSummary, sessionsRevokedMessage, unlinkSuccessMessage } from "@/app/(secured)/profil/connection-errors";
+import { connectionErrorMessage, connectionSuccessMessage, otherSessionsSummary, sessionsRevokedMessage, unlinkSuccessMessage } from "@/app/(secured)/profil/connection-errors";
 import { discordVerificationErrorMessage } from "@/app/(secured)/profil/discord-errors";
 import { ReportProblemDialog } from "@/components/reports/ReportProblemDialog";
 import { TargetThumb } from "@/components/reports/TargetPicker";
@@ -540,6 +540,23 @@ describe("langue du compte (lot 9-3)", () => {
     // n'a ni l'un ni l'autre, et un lien du gris de l'aide ne se voit pas.
     const css = readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/profil.module.css"), "utf8");
     expect(css).toMatch(/\.hintLink \{[^}]*color: var\(--blue-300\);[^}]*text-decoration: underline;/);
+  });
+
+  it("rattacher ou détacher Discord : le toast dit l'effet sur les messages privés de match (FR et EN)", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    expect(connectionSuccessMessage("DISCORD", false)).toBe(
+      "Discord est maintenant rattaché à ton compte. Certifie ton tag (section Discord) : sans certification, aucun message privé de match ne te parvient.",
+    );
+    expect(connectionSuccessMessage("DISCORD", false, EN_PROFILE)).toMatch(/ Verify your tag \(Discord section\): without verification, no match direct message reaches you\.$/);
+    expect(connectionSuccessMessage("GOOGLE", false)).not.toMatch(/Certifie/);
+    expect(unlinkSuccessMessage("DISCORD", 0)).toBe("Discord a été retiré de ton compte. Sans certification, le bot ne t'envoie aucun message privé de match.");
+    expect(unlinkSuccessMessage("DISCORD", 0, EN_PROFILE)).toMatch(/ Without verification, the bot sends you no match direct messages\.$/);
+    expect(unlinkSuccessMessage("GOOGLE", 0)).toBe("Google a été retiré de ton compte.");
+    // Le dialogue de certification fait lire la conséquence aux lecteurs d'écran.
+    const dialog = readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/DiscordVerificationDialog.tsx"), "utf8");
+    expect(dialog).toContain('aria-describedby="discord-verify-match-dms discord-verify-exposure"');
+    expect(dialog).toContain('<p id="discord-verify-match-dms"');
   });
 
   it("interrupteur des messages privés de match : un clic pendant l'envoi part à la suite, jamais ignoré", async () => {
