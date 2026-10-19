@@ -469,6 +469,18 @@ describe("claimMatchCast", () => {
     expect(state.match?.caster_ready_at).toBeNull();
   });
 
+  it("sans phase de lancement, reprend la place à l'heure passée tant que le lancement n'est pas écrit", async () => {
+    state.users[CASTER] = verified;
+    state.users[901] = { ...ELIGIBLE_CASTER, platform_roles_json: null };
+    state.match = matchState({
+      match_launch_phase: 0,
+      caster_user_id: 901,
+      start_at: new Date(Date.now() - 5_000).toISOString(),
+    });
+    await claimMatchCast(42, CASTER, true);
+    expect(state.match?.caster_user_id).toBe(CASTER);
+  });
+
   it("ne remplace jamais le caster d'un match lancé", async () => {
     state.users[CASTER] = verified;
     state.users[901] = { ...ELIGIBLE_CASTER, discord_verified_at: null };
