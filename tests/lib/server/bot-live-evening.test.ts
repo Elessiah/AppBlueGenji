@@ -44,6 +44,14 @@ describe("pushLiveEvening", () => {
     });
   });
 
+  it("transmet `notify: false` (nouveau message sans notification) au bot", async () => {
+    const fetchMock = jest
+      .spyOn(global, "fetch")
+      .mockResolvedValue(Response.json({ posted: true, mentionEveryone: true, messageId: "123456789012345678", edited: false }));
+    await pushLiveEvening({ ...REQUEST, notify: false });
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toMatchObject({ notify: false });
+  });
+
   it("un bot sans identifiant de message (version antérieure), ou un identifiant illisible, rend null", async () => {
     jest.spyOn(global, "fetch").mockResolvedValueOnce(Response.json({ posted: true, mentionEveryone: true }));
     await expect(pushLiveEvening(REQUEST)).resolves.toEqual({ outcome: "posted", messageId: null });

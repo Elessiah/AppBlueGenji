@@ -933,7 +933,56 @@ describe("soirées d'annonces", () => {
     );
     // La lecture de la soirée prend les annonces depuis son ouverture et les matchs jusqu'à sa fin.
     const read = evening.mock.calls.find(([sql]) => sql.includes("a.sent_at >= ?"));
-    expect(read?.[1]).toEqual([expect.any(Number), expect.any(Number), EVENING.started_at, EVENING.window_end]);
+    expect(read?.[1]).toEqual([
+      EVENING.started_at,
+      expect.any(Number),
+      expect.any(Number),
+      EVENING.started_at,
+      EVENING.window_end,
+    ]);
+  });
+
+  it("soirée sans message connu dont un autre match du même public a déjà une annonce : nouveau message sans notification", async () => {
+    // Premier envoi d'issue incertaine (délai écoulé) : aucun identifiant gardé,
+    // mais le public a peut-être déjà été notifié — jamais deux fois par soirée.
+    const joined = { ...AUTO_LIVE, id: 41, pairing: "3:4", launch_pairing: "3:4" };
+    const { evening } = mockDb([joined]);
+    const announced = { ...AUTO_LIVE, launched_at: "2026-10-14T19:00:00Z", evening_announced: 1 };
+    evening.mockImplementation(async (sql) =>
+      sql.includes("FROM bg_live_evenings") ? [[EVENING]] : [[announced, { ...joined, evening_announced: 1 }]],
+    );
+    expect(await runLiveAnnouncementSweep(NOW)).toBe(1);
+    const [request] = jest.mocked(pushLiveEvening).mock.calls[0];
+    expect(request.notify).toBe(false);
+    expect(request.editMessageId).toBeUndefined();
+    expect(console.info).toHaveBeenCalledWith(
+      "[live-announce] match 41 (tournoi 4) annoncé dans #live (soirée 3, dans un nouveau message sans notifier, la soirée ayant déjà une annonce)",
+    );
+  });
+
+  it("notifie quand seul le groupe lui-même, ou un match d'un autre public, a une annonce dans la soirée", async () => {
+    const { evening } = mockDb([AUTO_LIVE]);
+    const otherAudience = { ...AUTO_LIVE, id: 42, live_url: OFFICIAL, pairing: "5:6", launch_pairing: "5:6", evening_announced: 1 };
+    evening.mockImplementation(async (sql) =>
+      sql.includes("FROM bg_live_evenings") ? [[EVENING]] : [[{ ...AUTO_LIVE, evening_announced: 1 }, otherAudience]],
+    );
+    await runLiveAnnouncementSweep(NOW);
+    const [request] = jest.mocked(pushLiveEvening).mock.calls[0];
+    expect(request.notify).toBeUndefined();
+  });
+
+  it("soirée au message connu : modification, jamais `notify: false`", async () => {
+    const joined = { ...AUTO_LIVE, id: 41, pairing: "3:4", launch_pairing: "3:4" };
+    const { evening } = mockDb([joined]);
+    evening.mockImplementation(async (sql) =>
+      sql.includes("FROM bg_live_evenings")
+        ? [[{ ...EVENING, discord_message_id: "123456789012345678" }]]
+        : [[{ ...AUTO_LIVE, evening_announced: 1 }, joined]],
+    );
+    await runLiveAnnouncementSweep(NOW);
+    const [request] = jest.mocked(pushLiveEvening).mock.calls[0];
+    expect(request.editMessageId).toBe("123456789012345678");
+    expect(request.notify).toBeUndefined();
   });
 
   it("un match fini depuis son annonce n'est plus listé, un match réservé par ce passage l'est toujours", async () => {
