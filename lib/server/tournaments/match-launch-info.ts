@@ -407,12 +407,16 @@ function revokeIneligibleCasters(
   revokedCasts: { matchId: number; casterId: number }[],
 ): Set<number> {
   const revoked = new Set<number>();
-  for (const { row, phase } of visible) {
+  for (const { row } of visible) {
     if (row.caster_user_id === null) continue;
     const casterId = Number(row.caster_user_id);
     if (castEligibilityBlock(users.get(casterId)) !== null) {
       revoked.add(Number(row.id));
-      if (phase !== "LAUNCHED") revokedCasts.push({ matchId: Number(row.id), casterId });
+      // Lancement **enregistré** (`launched_at`), pas la phase affichée : sur un
+      // tournoi sans phase de lancement, un match à l'heure passée se lit lancé
+      // avant que l'entretien ne l'écrive — c'est la dernière occasion de
+      // retirer l'inscription, qu'un match lancé garde ensuite.
+      if (rowLaunchState(row).launchedAt === null) revokedCasts.push({ matchId: Number(row.id), casterId });
     }
   }
   return revoked;

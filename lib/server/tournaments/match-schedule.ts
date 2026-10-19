@@ -46,7 +46,7 @@ type MatchScheduleRow = RowDataPacket & {
 
 /**
  * Le match quitte-t-il le lancement avec cette nouvelle date ? Vrai quand,
- * non lancé (ou lancé d'office, sans score, sur un tournoi sans phase de
+ * non lancé (ou lancé sans score, date changée, sur un tournoi sans phase de
  * lancement), il repasse **à planifier** (date effacée, option allumée) ou **en
  * attente de départ** (date reportée dans le futur).
  *
@@ -63,15 +63,13 @@ function leavesLaunch(
   const { refereeScheduling, launchPhase, scoreNoted } = options;
   const team1Id = row.team1_id === null ? null : Number(row.team1_id);
   const team2Id = row.team2_id === null ? null : Number(row.team2_id);
-  // Sans phase de lancement, le départ ne tient qu'à l'horaire : un match lancé
-  // d'office à son heure (pas forcé), puis reporté (ou rendu à planifier) sans
-  // score noté, n'a pas eu lieu — gardé lancé, il laisserait saisir un score avant sa
-  // nouvelle heure. Il quitte donc le lancement comme un match en salon.
+  // Sans phase de lancement (`dateMoved`), un match lancé puis reporté (ou rendu
+  // à planifier) sans score noté n'a pas eu lieu : gardé lancé, il laisserait
+  // saisir un score avant sa nouvelle heure. Il quitte le lancement comme un
+  // match en salon.
   const currentLaunch =
     launchPairingKey(team1Id, team2Id) === (row.launch_pairing ?? null) ? toIso(row.launched_at) : null;
-  const clockLaunchMoved =
-    !launchPhase && !scoreNoted && launchedByClock(row, startAt, refereeScheduling, currentLaunch);
-  const launchedAt = clockLaunchMoved ? null : currentLaunch;
+  const launchedAt = !launchPhase && !scoreNoted && dateMoved(row, startAt) ? null : currentLaunch;
   const phase = matchLaunchPhase(
     { status: row.status, team1Id, team2Id, startAt, launchedAt, refereeScheduling },
     Date.now(),
@@ -80,24 +78,14 @@ function leavesLaunch(
 }
 
 /**
- * Sans phase de lancement, le lancement en place vient-il de l'horaire — et
- * la date change-t-elle ? Vrai quand le match est parti à son ancienne heure
- * ou après (`launched_at` ≥ ancienne heure ; sans heure ni planification par
- * l'arbitrage, il part d'emblée) et que la nouvelle date diffère. Un lancement
- * **forcé** avant l'heure (ou d'un match à planifier) est un geste
- * d'arbitrage : il reste, comme un réenregistrement de la même date.
+ * Sans phase de lancement, le départ ne tient qu'à l'horaire : un match lancé,
+ * sans score, dont l'arbitre **change** la date pour une heure à venir (ou la
+ * vide, planification par l'arbitrage) n'a pas eu lieu et quitte le lancement —
+ * forcé ou non, la nouvelle heure est la décision la plus récente. La même
+ * date réenregistrée ne défait rien.
  */
-function launchedByClock(
-  row: MatchScheduleRow,
-  startAt: string | null,
-  refereeScheduling: boolean,
-  launchedAt: string | null,
-): boolean {
-  if (launchedAt === null) return false;
-  const previous = toIso(row.start_at);
-  if (previous === startAt) return false;
-  if (previous === null) return !refereeScheduling;
-  return Date.parse(launchedAt) >= Date.parse(previous);
+function dateMoved(row: MatchScheduleRow, startAt: string | null): boolean {
+  return toIso(row.start_at) !== startAt;
 }
 
 /**
