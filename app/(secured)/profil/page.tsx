@@ -516,7 +516,12 @@ export default function ProfilePage() {
   const [tagRemovalDms, setTagRemovalDms] = useState(false);
   // Ce que montre la case « Messages privés Discord de mes matchs » : la fiche
   // relue par une sauvegarde du profil peut retarder sur un envoi en cours.
-  const [matchDmShown, setMatchDmShown] = useState<boolean | undefined>(undefined);
+  // Une référence, pas un état : seul le clic « Retirer » la lit, et un état
+  // ferait rendre toute la page à chaque coche (et au chargement de la fiche).
+  const matchDmShown = useRef<boolean | undefined>(undefined);
+  const reportMatchDmChoice = useRef((enabled: boolean) => {
+    matchDmShown.current = enabled;
+  }).current;
 
   /**
    * Retirer son tag Discord — l'annulation de l'exposition.
@@ -738,7 +743,7 @@ export default function ProfilePage() {
       discordTagBusy={discordTagBusy}
       onDiscordTagRemove={() => {
         setTagRemovalVerified(discordState.verified);
-        setTagRemovalDms((matchDmShown ?? data?.matchDmEnabled) !== false);
+        setTagRemovalDms((matchDmShown.current ?? data?.matchDmEnabled) !== false);
         setConfirmingTagRemoval(true);
       }}
       setVerifyOpen={setVerifyOpen}
@@ -1090,7 +1095,7 @@ export default function ProfilePage() {
         <MatchDmField
           initial={data?.matchDmEnabled}
           discordReachable={matchDmReachable(discordState, data?.profile.discordVerified)}
-          onChoice={setMatchDmShown}
+          onChoice={reportMatchDmChoice}
         />
       </ProfileSection>
 

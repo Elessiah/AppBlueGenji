@@ -152,9 +152,11 @@ export function ConnectedAppsSection({
       if (!res.ok) throw new Error(payload.error ?? "");
       showSuccess(unlinkSuccessMessage(provider, payload.revokedSessions ?? null, text));
       setSessionsVersion((version) => version + 1);
-      await reload();
+      // La certification tombe tout de suite à l'écran, et l'état Discord se
+      // relit en même temps que la liste, pas après elle.
       if (provider === "DISCORD") onDiscordUnlinked?.();
       onChanged?.();
+      await reload();
     } catch (e) {
       // Traduit ici et non au `throw` : une coupure réseau lève un `TypeError`
       // dont le message anglais partait sinon tel quel dans la notification.
