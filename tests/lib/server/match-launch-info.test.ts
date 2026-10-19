@@ -812,20 +812,20 @@ describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => 
       expect(seen?.caster).toBeNull();
     });
 
-    it("hors lancement, garde présenté le caster devenu joueur (programmé, puis lancé)", async () => {
+    it("retire dès « programmé » le caster devenu joueur ; lancé, le garde", async () => {
       state.viewerMemberships = [{ team_id: TEAM1, roles_json: JSON.stringify(["DPS"]) }];
       state.users = [casterUser(VIEWER)];
       const later = new Date(Date.now() + 3 * 3_600_000).toISOString();
-      for (const row of [
-        candidate({ match_launch_phase: 0, start_at: later, lobby_opened_at: null, caster_user_id: VIEWER }),
-        candidate({ match_launch_phase: 0, caster_user_id: VIEWER, launched_at: OPENED }),
-      ]) {
-        state.candidates = [row];
-        const info = await loadViewerMatchContacts(viewer, 42);
-        expect(info?.viewer).toMatchObject({ role: "TEAM1", isCaster: true });
-        expect(info?.caster).toMatchObject({ userId: VIEWER });
-      }
-      expect(state.writes.filter((sql) => sql.includes("SET caster_user_id = NULL"))).toEqual([]);
+      state.candidates = [candidate({ match_launch_phase: 0, start_at: later, lobby_opened_at: null, caster_user_id: VIEWER })];
+      const scheduled = await loadViewerMatchContacts(viewer, 42);
+      expect(scheduled?.caster).toBeNull();
+      expect(state.writes.filter((sql) => sql.includes("SET caster_user_id = NULL"))).toHaveLength(1);
+      state.writes = [];
+      state.candidates = [candidate({ match_launch_phase: 0, caster_user_id: VIEWER, launched_at: OPENED })];
+      const launched = await loadViewerMatchContacts(viewer, 42);
+      expect(launched?.viewer).toMatchObject({ role: "TEAM1", isCaster: true });
+      expect(launched?.caster).toMatchObject({ userId: VIEWER });
+      expect(state.writes).toEqual([]);
     });
 
     it("dit au lecteur qu'il est le caster", async () => {
