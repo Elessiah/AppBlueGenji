@@ -607,20 +607,17 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
     // Par la carte, un match sans contacts à montrer n'est pas rendu : le
     // caster d'un match pas encore parti reçoit le même refus qu'un tiers.
     const visible = read.filter(({ phase, exposes }) => (forCard ? exposes : phase !== "TO_PLAN"));
-    // Par la carte, son éligibilité est pourtant rejouée sur ce qui a été lu :
-    // un caster devenu inéligible qui l'ouvre avant l'heure perd son
+    // Par la carte, son éligibilité est pourtant rejouée sur tout ce qui a été
+    // lu : un caster devenu inéligible qui l'ouvre avant l'heure perd son
     // inscription à cette lecture-là, sans attendre celle d'un joueur. La
     // modale, qui interroge en boucle, n'en paie pas le coût.
-    const dropped = forCard ? read.filter(({ exposes }) => !exposes) : [];
-    if (visible.length === 0 && !dropped.some(({ row }) => row.caster_user_id !== null)) return [];
+    const checked = forCard ? read : visible;
+    if (visible.length === 0 && !checked.some(({ row }) => row.caster_user_id !== null)) return [];
 
-    const { rosterTeamIds, userIds } = collectContactIds(visible);
-    for (const { row } of dropped) {
-      if (row.caster_user_id !== null) userIds.add(Number(row.caster_user_id));
-    }
+    const { rosterTeamIds, userIds } = collectContactIds(checked);
     const rosters = await loadRosters(connection, rosterTeamIds);
     const users = await loadUsers(connection, userIds);
-    const revoked = revokeIneligibleCasters([...visible, ...dropped], users, revokedCasts);
+    const revoked = revokeIneligibleCasters(checked, users, revokedCasts);
 
     const result: MatchLaunchInfo[] = [];
     for (const { row, phase, exposes } of visible) {
