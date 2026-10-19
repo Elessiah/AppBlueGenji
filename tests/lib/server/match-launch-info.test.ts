@@ -796,15 +796,30 @@ describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => 
       await expect(loadViewerMatchContacts(referee, 42)).resolves.toBeNull();
     });
 
-    it("dit au lecteur qu'il est le caster, même quand il est aussi joueur du match", async () => {
+    it("tait et retire le caster devenu joueur du match", async () => {
       state.viewerMemberships = [{ team_id: TEAM1, roles_json: JSON.stringify(["DPS"]) }];
-      state.candidates = [candidate({ referee_scheduling: 1, start_at: null, caster_user_id: VIEWER })];
+      state.candidates = [candidate({ caster_user_id: VIEWER })];
       state.users = [casterUser(VIEWER)];
       const info = await loadViewerMatchContacts(viewer, 42);
-      expect(info?.viewer).toMatchObject({ role: "TEAM1", isCaster: true });
+      expect(info?.viewer).toMatchObject({ role: "TEAM1", isCaster: false });
+      expect(info?.caster).toBeNull();
+      expect(state.writes.filter((sql) => sql.includes("SET caster_user_id = NULL"))).toHaveLength(1);
+      // Vu d'un autre lecteur (arbitre), par le roster lu pour les contacts.
+      state.writes = [];
+      state.viewerMemberships = [];
+      state.members = [member(TEAM1, VIEWER)];
+      const seen = await loadViewerMatchContacts({ id: 1234, roles: ["ARBITRE"] }, 42);
+      expect(seen?.caster).toBeNull();
+    });
+
+    it("dit au lecteur qu'il est le caster", async () => {
+      state.candidates = [candidate({ referee_scheduling: 1, start_at: null, caster_user_id: VIEWER })];
+      state.users = [casterUser(VIEWER)];
+      const info = await loadViewerMatchContacts(referee, 42);
+      expect(info?.viewer).toMatchObject({ role: "CASTER", isCaster: true });
       state.candidates = [candidate({ referee_scheduling: 1, start_at: null, caster_user_id: CASTER })];
       state.users = [casterUser(CASTER)];
-      await expect(loadViewerMatchContacts(viewer, 42)).resolves.toMatchObject({ viewer: { isCaster: false } });
+      await expect(loadViewerMatchContacts(referee, 42)).resolves.toMatchObject({ viewer: { role: "REFEREE", isCaster: false } });
     });
   });
 
