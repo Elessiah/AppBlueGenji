@@ -679,7 +679,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     subPurposes: [
       "Streaming a match live on the association's channel or a caster's (YouTube, Twitch or Kick)",
       "Publishing the link to its YouTube replay on the match page",
-      "Announcing streamed matches in the #live channel of the association's Discord server, in one message per evening (four hours from the first live stream) that lists with their times the matches live, those scheduled until the end of the evening and those finished (“Terminé”, with their score), edited at each match start and end, with an @everyone mention for the association's official channel and a mention of the StreamViewer role only for any other channel: names of both teams (for a team match, never their players' usernames) or, in a solo tournament, the public BlueGenji username of both players (the username on their page, editable in My profile, with no effect on an evening message that is no longer edited: unless changed, the Discord username or BattleTag taken when the account was created, or even the Google account name for a Google account created before September 30, 2026; never the numeric Discord identifier; “a player” for a deleted account, an entry without an account or a registration made before 16 October 2026), tournament name and stream link",
+      "Announcing streamed matches in the #live channel of the association's Discord server, in one message per evening (four hours from the first live stream) that lists with their times the matches live, those scheduled until the end of the evening and those finished (“Terminé”, with their score), edited at each match start and end up to four hours after the evening ends (a new message without a mention takes over when it can no longer be edited), with an @everyone mention for the association's official channel and a mention of the StreamViewer role only for any other channel: names of both teams (for a team match, never their players' usernames) or, in a solo tournament, the public BlueGenji username of both players (the username on their page, editable in My profile, with no effect on an evening message that is no longer edited: unless changed, the Discord username or BattleTag taken when the account was created, or even the Google account name for a Google account created before September 30, 2026; never the numeric Discord identifier; “a player” for a deleted account, an entry without an account or a registration made before 16 October 2026), tournament name and stream link",
       "Moderating the association's Discord server: a Discord AutoMod rule that blocks or flags a #live announcement copies its text (including the public username in a solo tournament) to the moderators' alert channel",
     ],
     legalBasis:
@@ -690,7 +690,8 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Voice and username of the casters",
       "Link to the stream and replay of a match",
       "Public BlueGenji username of the players of a solo tournament, posted in the #live announcement on Discord",
-      "Record of a match's Discord announcement: the match, the identifiers of its two entrants (teams or solo entries) and the date of the announcement",
+      "Time, state (scheduled, live, “Terminé”) and score of the matches listed in the evening's #live message, with the team names or public usernames above",
+      "Record of a match's Discord announcement: the match, the identifiers of its two entrants (teams or solo entries), the date of the announcement and, where applicable, the refusal of its sending; ID of the evening's Discord message and its sending state (no personal data)",
     ],
     sensitiveData: "None",
     retention: [
