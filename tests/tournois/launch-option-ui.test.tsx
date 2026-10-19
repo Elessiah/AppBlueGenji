@@ -36,7 +36,7 @@ describe("modale de score — pourquoi le score attend", () => {
       "Ce match démarre le lundi 19 octobre à 21:00 : le score se saisit dès qu'il a démarré.",
     );
     expect(closedNoticeText(FR, "SCHEDULED", null, false)).not.toMatch(/prêt/i);
-    expect(closedNoticeText(EN, "SCHEDULED", "Monday", false)).not.toMatch(/breadyb/i);
+    expect(closedNoticeText(EN, "SCHEDULED", "Monday", false)).not.toMatch(/\bready\b/i);
     expect(closedNoticeText(EN, "SCHEDULED", null, false)).toBe(enDialogs.score.player.closed.scheduledDirect);
   });
 
@@ -44,6 +44,13 @@ describe("modale de score — pourquoi le score attend", () => {
     expect(closedNoticeText(FR, "LAUNCHED", null, false)).toBe(frDialogs.score.player.closed.startingDirect);
     expect(closedNoticeText(EN, "LAUNCHED", null, false)).toBe(enDialogs.score.player.closed.startingDirect);
     expect(enDialogs.score.player.closed.startingDirect).not.toMatch(/\bready\b/i);
+  });
+
+  it("option éteinte, déjà lancé mais score fermé (page figée…) : avis neutre", () => {
+    expect(closedNoticeText(FR, "LAUNCHED", null, false, "2026-10-19T19:00:00.000Z")).toBe(
+      frDialogs.score.player.closed.unavailable,
+    );
+    expect(enDialogs.score.player.closed.unavailable).toBe("The score can't be entered right now.");
   });
 
   it("option allumée ou absente : la règle d'origine", () => {
@@ -63,7 +70,7 @@ describe("modale d'horaire — ce que la date produit", () => {
       expect(text).not.toMatch(/prêt/i);
     }
     for (const text of [enDialogs.schedule.hintDirect, enDialogs.schedule.hintPlanningDirect]) {
-      expect(text).not.toMatch(/breadyb/i);
+      expect(text).not.toMatch(/\bready\b/i);
     }
   });
 
@@ -85,7 +92,7 @@ describe("modale d'horaire — ce que la date produit", () => {
 describe("forcer le lancement — confirmation", () => {
   it("a sa phrase sans « Prêt », en FR et en EN", () => {
     expect(frActions.cardActions.forceConfirm.bodyDirect).not.toMatch(/prêt/i);
-    expect(enActions.cardActions.forceConfirm.bodyDirect).not.toMatch(/breadyb/i);
+    expect(enActions.cardActions.forceConfirm.bodyDirect).not.toMatch(/\bready\b/i);
     const source = read("app/(secured)/tournois/[id]/_components/MatchCardActions.tsx");
     expect(source).toContain('{launchPhaseEnabled && <p>{t("cardActions.forceConfirm.body")}</p>}');
     expect(source).toContain(
@@ -97,9 +104,9 @@ describe("forcer le lancement — confirmation", () => {
 describe("planification par l'arbitrage — option éteinte", () => {
   it("avertissements sans « Prêt » (FR et EN)", () => {
     expect(frForm.form.referee.warningDirect).not.toMatch(/prêt/i);
-    expect(enForm.form.referee.warningDirect).not.toMatch(/breadyb/i);
+    expect(enForm.form.referee.warningDirect).not.toMatch(/\bready\b/i);
     expect(frActions.planning.confirm.consequenceDirect).not.toMatch(/prêt/i);
-    expect(enActions.planning.confirm.consequenceDirect).not.toMatch(/breadyb/i);
+    expect(enActions.planning.confirm.consequenceDirect).not.toMatch(/\bready\b/i);
     expect(read("app/(secured)/tournois/_components/RefereeSchedulingField.tsx")).toContain(
       '{t(launchPhase ? "form.referee.warning" : "form.referee.warningDirect")}',
     );

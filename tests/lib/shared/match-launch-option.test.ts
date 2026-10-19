@@ -119,10 +119,10 @@ describe("bouton « Contacts » de la carte", () => {
     ).toBe(false);
   });
 
-  it("pas offert avant la programmation, ni sur un match fini", () => {
-    for (const phase of ["NONE", "TO_PLAN"] as const) {
-      expect(launchStripControls(match, phase, viewer()).showContacts).toBe(false);
-    }
+  it("offert dès que les deux adversaires sont connus (à planifier compris), jamais sur un match fini", () => {
+    expect(launchStripControls(match, "NONE", viewer()).showContacts).toBe(false);
+    expect(launchStripControls(match, "TO_PLAN", viewer()).showContacts).toBe(true);
+    expect(launchStripControls(match, "TO_PLAN", viewer({ launchPhase: false })).showContacts).toBe(true);
   });
 
   it("option éteinte : « Infos du match » disparaît, « Contacts » reste", () => {

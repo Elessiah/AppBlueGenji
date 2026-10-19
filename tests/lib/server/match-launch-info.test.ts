@@ -573,6 +573,8 @@ describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => 
     expect(read).toContain("AND m.id = ?");
     expect(read).not.toContain("t.match_launch_phase = 1");
     expect(read).not.toContain("INTERVAL 60 MINUTE");
+    // « À planifier » n'est écarté que de la modale.
+    expect(read).not.toContain("m.start_at IS NOT NULL OR t.referee_scheduling = 0");
   });
 
   it("expose les contacts d'un match lancé d'emblée sur un tournoi sans phase de lancement", async () => {
@@ -596,10 +598,21 @@ describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => 
     await expect(loadViewerMatchContacts(viewer, 42)).resolves.toBeNull();
   });
 
-  it("ne rend rien d'un match terminé ou à planifier", async () => {
+  it("ne rend rien d'un match terminé", async () => {
     state.candidates = [candidate({ status: "COMPLETED" })];
     await expect(loadViewerMatchContacts(viewer, 42)).resolves.toBeNull();
-    state.candidates = [candidate({ referee_scheduling: 1, start_at: null })];
+  });
+
+  it("expose les contacts d'un match à planifier, dès que ses deux adversaires sont connus (option allumée ou non)", async () => {
+    for (const launchPhase of [0, 1]) {
+      state.candidates = [candidate({ referee_scheduling: 1, start_at: null, match_launch_phase: launchPhase })];
+      state.members = [verifiedCaptain()];
+      const info = await loadViewerMatchContacts(viewer, 42);
+      expect(info?.phase).toBe("TO_PLAN");
+      expect(info?.team2.contacts).toEqual([expect.objectContaining({ userId: 5, discordTag: "cap2" })]);
+    }
+    // Sans adversaire connu, rien.
+    state.candidates = [candidate({ referee_scheduling: 1, start_at: null, team2_id: null })];
     await expect(loadViewerMatchContacts(viewer, 42)).resolves.toBeNull();
   });
 

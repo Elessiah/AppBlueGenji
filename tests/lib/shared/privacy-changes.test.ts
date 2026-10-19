@@ -1104,7 +1104,7 @@ describe("PRIVACY_CHANGES — base du pseudo #live, AutoMod et fin des messages 
   });
 });
 
-describe("PRIVACY_CHANGES — contacts de match dès la programmation (LAUNCH-OPTION)", () => {
+describe("PRIVACY_CHANGES — contacts de match dès que les adversaires sont connus (LAUNCH-OPTION)", () => {
   const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-contacts-de-match-avant-le-depart")!;
   const english = PRIVACY_CHANGES_EN["2026-10-contacts-de-match-avant-le-depart"];
 
@@ -1118,11 +1118,11 @@ describe("PRIVACY_CHANGES — contacts de match dès la programmation (LAUNCH-OP
   it("dit que les données et leurs destinataires ne changent pas, seulement le moment (FR et EN)", () => {
     const fr = [entry.title, entry.summary, ...entry.details].join(" ");
     expect(fr).toMatch(/montrées aux mêmes personnes : les seules parties du match/);
-    expect(fr).toMatch(/dès que le match a son horaire et ses deux équipes, et non plus seulement à son lancement/);
+    expect(fr).toMatch(/dès que le match a ses deux adversaires, horaire fixé ou non, et non plus seulement à son lancement/);
     expect(fr).toMatch(/éteinte par défaut/);
     const en = [english.title, english.summary, ...english.details].join(" ");
     expect(en).toMatch(/shown to the same people: only the parties to the match/);
-    expect(en).toMatch(/as soon as the match has its time and both teams, no longer only at its launch/);
+    expect(en).toMatch(/as soon as the match has both its opponents, with or without a set time, no longer only at its launch/);
     expect(english.details).toHaveLength(entry.details.length);
   });
 });
