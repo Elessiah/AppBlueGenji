@@ -11,6 +11,7 @@ import {
   contactsCardKey,
   parseRetryAfter,
   rereadOnCardChange,
+  failureIsSilent,
   type ContactsCard,
   shouldRetryReread,
 } from "@/components/match-launch/MatchContactsDialog";
@@ -174,6 +175,25 @@ describe("contacts du caster en attente, modale ouverte", () => {
     expect(casterContactsPending(info("SCHEDULED", CASTER, START, "REFEREE"))).toBe(true);
   });
 
+  it("échecs passagers en rafale sans rien de lu : une seule notification", () => {
+    // Première lecture puis REREAD_RETRIES tentatives, toutes en échec passager.
+    let toasts = 0;
+    for (let failuresBefore = 0; failuresBefore <= REREAD_RETRIES; failuresBefore += 1) {
+      if (!failureIsSilent(true, false, failuresBefore)) toasts += 1;
+    }
+    expect(toasts).toBe(1);
+    expect(failureIsSilent(true, false, 0)).toBe(true); // chargement maintenu
+    expect(failureIsSilent(true, false, 1)).toBe(false); // la tentative échoue aussi : dit
+  });
+
+  it("contacts déjà affichés : échec passager tu ; refus définitif toujours dit", () => {
+    for (let failuresBefore = 0; failuresBefore <= REREAD_RETRIES; failuresBefore += 1) {
+      expect(failureIsSilent(true, true, failuresBefore)).toBe(true);
+      expect(failureIsSilent(false, true, failuresBefore)).toBe(false);
+      expect(failureIsSilent(false, false, failuresBefore)).toBe(false);
+    }
+  });
+
   it("relecture échouée : retentée au plus REREAD_RETRIES fois", () => {
     expect(shouldRetryReread(0)).toBe(false);
     for (let failures = 1; failures <= REREAD_RETRIES; failures += 1) expect(shouldRetryReread(failures)).toBe(true);
@@ -291,7 +311,7 @@ describe("contacts du caster en attente, modale ouverte", () => {
     // tentative, puis notification une fois ; les tentatives suivantes continuent.
     expect(dialog).toMatch(/if \(transient\) \{\n\s*setRereadWait\(read\.retryAfterMs \?\? 0\);\n\s*setRereadFailures\(\(count\) => count \+ 1\);\n\s*\}\n\s*if \(keepWaiting\(transient\)\) return;/);
     expect(dialog).toMatch(/setRereadWait\(0\);\n\s*setRereadFailures\(\(count\) => count \+ 1\);\n\s*if \(keepWaiting\(true\)\) return;/);
-    expect(dialog).toContain("transient && (shown || rereadFailures === 0);");
+    expect(dialog).toContain("failureIsSilent(transient, shown, rereadFailures)");
     expect(dialog).toContain("contactsShown={matchUnderway(launch.phase)}");
     const card = readSource("app/(secured)/tournois/[id]/_components/MatchCardActions.tsx");
     expect(card).toMatch(/<MatchContactsDialog[\s\S]*?card=\{match\}[\s\S]*?\/>/);
