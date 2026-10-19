@@ -1140,11 +1140,11 @@ describe("PRIVACY_CHANGES — caster le temps du match, BattleTag masqué et con
 
   it("annonce à chaque compte les conditions en version 5, avec leur date d'entrée en vigueur (FR et EN) — texte déployé, figé", () => {
     expect(entry.summary).toMatch(/conditions d'utilisation passent en version 5/);
-    expect(entry.details.at(-2)).toContain("version 5, en vigueur depuis le 19 octobre 2026");
-    expect(entry.details.at(-2)).toContain("si tu gères une équipe sans les avoir déjà acceptées, avant ton prochain geste de gestion");
+    expect(entry.details.at(-1)).toContain("version 5, en vigueur depuis le 19 octobre 2026");
+    expect(entry.details.at(-1)).toContain("si tu gères une équipe sans les avoir déjà acceptées, avant ton prochain geste de gestion");
     expect(entry.links?.[0]).toEqual({ href: `${TERMS_PATH}#contacts-de-match`, label: "Lire la section « Contacts de match »" });
     expect(english.summary).toMatch(/terms of use move to version 5/);
-    expect(english.details.at(-2)).toContain("version 5, in force since 19 October 2026");
+    expect(english.details.at(-1)).toContain("version 5, in force since 19 October 2026");
   });
 
   it("dit que le caster n'a les contacts que le temps du match, et que le BattleTag masqué ne se lit que dans « Contacts » (FR et EN)", () => {
@@ -1175,10 +1175,10 @@ describe("PRIVACY_CHANGES — conditions v6 : acceptation par chaque compte (CON
   it("annonce la version en vigueur et sa date, et lie ses deux sections (FR et EN)", () => {
     expect(TERMS_VERSION).toBe(6);
     expect(entry.summary).toMatch(new RegExp(`conditions d'utilisation passent en version ${TERMS_VERSION}`));
-    expect(entry.details.at(-2)).toContain(`version ${TERMS_VERSION}, en vigueur depuis le ${formatTermsDate(TERMS_UPDATED_AT)}`);
+    expect(entry.details.at(-1)).toContain(`version ${TERMS_VERSION}, en vigueur depuis le ${formatTermsDate(TERMS_UPDATED_AT)}`);
     expect(entry.links?.map((link) => link.href)).toEqual([`${TERMS_PATH}#acceptation`, `${TERMS_PATH}#contacts-de-match`]);
     expect(english.summary).toMatch(new RegExp(`terms of use move to version ${TERMS_VERSION}`));
-    expect(english.details.at(-2)).toContain(`version ${TERMS_VERSION}, in force since 19 October 2026`);
+    expect(english.details.at(-1)).toContain(`version ${TERMS_VERSION}, in force since 19 October 2026`);
     expect([english.details.length, english.linkLabels?.length ?? 0]).toEqual([entry.details.length, entry.links?.length ?? 0]);
   });
 
