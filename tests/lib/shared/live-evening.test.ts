@@ -110,6 +110,13 @@ describe("formatLiveEvening", () => {
     }
   });
 
+  it("un nom en tête de ligne ne fait pas une liste numérotée", () => {
+    const { text } = formatLiveEvening([stream({ team1Name: "1. Champions" }), stream({ team1Name: "2) Kev", startsAt: AT_21 + 1 })]);
+    expect(text).toContain("\n1\\. Champions contre Nova — ");
+    expect(text).toContain("\n2\\) Kev contre Nova — ");
+    expect(text).not.toMatch(/\n\d+[.)] /);
+  });
+
   it("« un joueur » sans nom publiable", () => {
     expect(formatLiveEvening([stream({ team1Name: null })]).text).toContain("\nun joueur contre Nova — ");
   });

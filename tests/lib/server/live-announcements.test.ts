@@ -89,7 +89,7 @@ function mockDb(candidates: unknown[], claims: boolean[] = []): Db {
       return [{ affectedRows: (queue.length > 0 ? queue.shift() : true) ? 1 : 0 }];
     }
     if (sql.startsWith("DELETE FROM bg_live_announcements WHERE (match_id, pairing) IN (")) return [{ affectedRows: 1 }];
-    if (sql.startsWith("UPDATE bg_live_announcements SET sent_at")) return [{ affectedRows: 1 }];
+    if (/^UPDATE bg_live_announcements SET (sent_at|refused)/.test(sql)) return [{ affectedRows: 1 }];
     throw new Error(`requête inattendue : ${sql}`);
   });
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ query: route, execute }));
@@ -752,18 +752,30 @@ describe("dispatchLiveAnnouncements", () => {
     expect(purges()).toHaveLength(1);
   });
 
-  it("purgeEndedEvenings : un échec se retente au passage suivant, un succès attend une heure", async () => {
+  it("purgeEndedEvenings : un échec se retente cinq minutes plus tard, pas à chaque appel ; un succès attend une heure", async () => {
     const { execute } = mockDb([]);
     const base = execute.getMockImplementation()!;
     execute.mockImplementationOnce(async () => {
       throw new Error("DB_DOWN");
     });
+    const deletes = () => execute.mock.calls.filter(([sql]) => sql.startsWith("DELETE FROM bg_live_evenings")).length;
     await expect(purgeEndedEvenings(NOW)).rejects.toThrow("DB_DOWN");
     execute.mockImplementation(base);
     await purgeEndedEvenings(NOW + 1);
+    await purgeEndedEvenings(NOW + 4 * 60 * 1000);
+    expect(deletes()).toBe(1);
+    await purgeEndedEvenings(NOW + 5 * 60 * 1000);
+    expect(deletes()).toBe(2);
     await purgeEndedEvenings(NOW + 30 * 60 * 1000);
-    await purgeEndedEvenings(NOW + 61 * 60 * 1000);
-    expect(execute.mock.calls.filter(([sql]) => sql.startsWith("DELETE FROM bg_live_evenings"))).toHaveLength(3);
+    expect(deletes()).toBe(2);
+    await purgeEndedEvenings(NOW + 66 * 60 * 1000);
+    expect(deletes()).toBe(3);
+  });
+
+  it("purgeEndedEvenings : deux appels simultanés ne lancent qu'une purge", async () => {
+    const { execute } = mockDb([]);
+    await Promise.all([purgeEndedEvenings(NOW), purgeEndedEvenings(NOW)]);
+    expect(execute.mock.calls.filter(([sql]) => sql.startsWith("DELETE FROM bg_live_evenings"))).toHaveLength(1);
   });
 
   it("est étranglé : un second appel immédiat ne relit pas la base", async () => {
@@ -1183,8 +1195,11 @@ describe("soirées d'annonces", () => {
       const { execute } = mockDb([AUTO_LIVE]);
       await runLiveAnnouncementSweep(NOW);
       expect(execute.mock.calls).toContainEqual(["UPDATE bg_live_evenings SET notified = 0 WHERE id = ?", [3]]);
-      const unstamp = execute.mock.calls.find(([sql]) => sql.includes("SET sent_at = ? - INTERVAL 1 SECOND"));
-      expect(unstamp?.[1]).toEqual([EVENING.started_at, 40, "1:2"]);
+      const refused = execute.mock.calls.find(([sql]) => sql.startsWith("UPDATE bg_live_announcements SET refused = 1"));
+      expect(refused?.[0]).toBe("UPDATE bg_live_announcements SET refused = 1 WHERE (match_id, pairing) IN ((?, ?))");
+      expect(refused?.[1]).toEqual([40, "1:2"]);
+      // La date de la trace (export RGPD) n'est pas réécrite.
+      expect(execute.mock.calls.some(([sql]) => sql.includes("INTERVAL 1 SECOND"))).toBe(false);
       expect(releasesOf(execute)).toEqual([]);
     },
   );
@@ -1194,7 +1209,7 @@ describe("soirées d'annonces", () => {
     const { execute } = mockDb([AUTO_LIVE]);
     await runLiveAnnouncementSweep(NOW);
     expect(execute.mock.calls).toContainEqual(["UPDATE bg_live_evenings SET notified = 0 WHERE id = ?", [3]]);
-    expect(execute.mock.calls.some(([sql]) => sql.includes("- INTERVAL 1 SECOND"))).toBe(false);
+    expect(execute.mock.calls.some(([sql]) => sql.includes("SET refused = 1"))).toBe(false);
     expect(releasesOf(execute)).toEqual([[40, "1:2"]]);
   });
 
@@ -1203,7 +1218,7 @@ describe("soirées d'annonces", () => {
     const { execute } = mockDb([AUTO_LIVE]);
     await runLiveAnnouncementSweep(NOW);
     expect(execute.mock.calls.some(([sql]) => sql.includes("SET notified = 0"))).toBe(false);
-    expect(execute.mock.calls.some(([sql]) => sql.includes("- INTERVAL 1 SECOND"))).toBe(false);
+    expect(execute.mock.calls.some(([sql]) => sql.includes("SET refused = 1"))).toBe(false);
   });
 
   it("refus d'une modification de la soirée : la marque reste, le refus sort de la soirée", async () => {
@@ -1216,7 +1231,7 @@ describe("soirées d'annonces", () => {
     );
     await runLiveAnnouncementSweep(NOW);
     expect(execute.mock.calls.some(([sql]) => sql.includes("SET notified"))).toBe(false);
-    expect(execute.mock.calls.some(([sql]) => sql.includes("- INTERVAL 1 SECOND"))).toBe(true);
+    expect(execute.mock.calls.some(([sql]) => sql.includes("SET refused = 1"))).toBe(true);
   });
 
   it("un match annoncé puis sorti de l'antenne (AUTO rouvert, MANUAL fermé) n'est plus listé, à aucune heure", async () => {
@@ -1241,7 +1256,7 @@ describe("soirées d'annonces", () => {
     await runLiveAnnouncementSweep(NOW);
     const read = evening.mock.calls.find(([sql]) => sql.includes("a.sent_at >= ?"));
     expect(read?.[0].replace(/\s+/g, " ")).toContain(
-      "a.match_id = m.id AND a.sent_at >= ? AND a.pairing = CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id))",
+      "a.match_id = m.id AND a.sent_at >= ? AND a.refused = 0 AND a.pairing = CONCAT(LEAST(m.team1_id, m.team2_id), ':', GREATEST(m.team1_id, m.team2_id))",
     );
   });
 
