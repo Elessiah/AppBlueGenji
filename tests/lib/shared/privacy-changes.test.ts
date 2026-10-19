@@ -1187,10 +1187,10 @@ describe("PRIVACY_CHANGES — conditions v6 : acceptation par chaque compte (CON
     const en = [english.summary, ...english.details].join(" ");
     expect(fr).toContain("chaque compte connecté doit désormais les accepter pour continuer à utiliser le site");
     expect(fr).toContain("le bouton « Plus tard » et son cookie bg_terms_later disparaissent");
-    expect(fr).toMatch(/te déconnecter, lire cette politique, les mentions légales et la déclaration d'accessibilité, ou, depuis ton profil, exporter tes données ou supprimer ton compte/);
+    expect(fr).toMatch(/te déconnecter, lire cette politique, les mentions légales, la déclaration d'accessibilité et les pages légales du bot, et ouvrir ton profil, notamment pour exporter tes données ou supprimer ton compte/);
     expect(en).toContain("every logged-in account must now accept them to keep using the site");
     expect(en).toContain("the “Later” button and its bg_terms_later cookie are gone");
-    expect(en).toMatch(/log out, read this policy, the legal notice and the accessibility statement, or, from your profile, export your data or delete your account/);
+    expect(en).toMatch(/log out, read this policy, the legal notice, the accessibility statement and the bot's legal pages, and open your profile, notably to export your data or delete your account/);
   });
 
   it("dit que la fenêtre de lancement montre aussi le BattleTag masqué, aux équipes et au caster seulement (FR et EN)", () => {

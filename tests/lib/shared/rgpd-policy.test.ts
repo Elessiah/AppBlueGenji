@@ -44,7 +44,7 @@ describe("contacts du lancement d'un match — base légale", () => {
       expect(entry?.finalite).not.toMatch(/non sur ce consentement/);
     }
     expect(MATCH_CONTACTS_SCOPE).toBe(
-      "présentation, dans la fenêtre « Contacts » du match et dans sa fenêtre de lancement, aux membres de ses deux équipes et aux arbitres dès que ses deux adversaires sont connus, et à son caster le temps du match ; les contacts du caster aux deux équipes et aux arbitres le temps du match (conditions d'utilisation, « Contacts de match »)",
+      "présentation, dans la fenêtre « Contacts » du match et dans sa fenêtre de lancement, aux membres de ses deux équipes et aux arbitres dès que ses deux adversaires sont connus, et à son caster le temps du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes et au caster) ; les contacts du caster aux deux équipes et aux arbitres le temps du match (conditions d'utilisation, « Contacts de match »)",
     );
   });
 

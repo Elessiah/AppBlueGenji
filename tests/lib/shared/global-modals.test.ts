@@ -15,7 +15,15 @@ describe("termsModalSilencedOn", () => {
   });
 
   it("conditions v6 : laisse lire les pages légales, exporter ou supprimer son compte sans accepter", () => {
-    for (const path of ["/rgpd", "/rgpd/registre", "/mentions-legales", "/accessibilite", "/profil"]) {
+    for (const path of [
+      "/rgpd",
+      "/rgpd/registre",
+      "/mentions-legales",
+      "/accessibilite",
+      "/privacy-policy-bot",
+      "/terms-of-service-bot",
+      "/profil",
+    ]) {
       expect(termsModalSilencedOn(path)).toBe(true);
     }
     // Préfixe exact : une autre page qui commencerait pareil reste bloquée.
