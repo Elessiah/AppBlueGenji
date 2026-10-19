@@ -187,12 +187,23 @@ export const OFFICIAL_LIVE_CHANNEL_URL = "https://www.twitch.tv/bluegenjiesport"
 /** Public notifié par une annonce de soirée. */
 export type LiveMentionTarget = "everyone" | "stream-viewer";
 
+/**
+ * Chemin sans ses barres finales — boucle plutôt qu'une expression `/\/+$/`,
+ * dont le retour arrière est quadratique sur un chemin fait de barres
+ * (SonarCloud S8786).
+ */
+function trimTrailingSlashes(path: string): string {
+  let end = path.length;
+  while (end > 0 && path.charCodeAt(end - 1) === 47 /* "/" */) end -= 1;
+  return path.slice(0, end);
+}
+
 /** Hôte sans `www.` ni `m.`, chemin sans barre finale, le tout en minuscules. */
 function channelKey(url: string): string | null {
   try {
     const parsed = new URL(url);
     const host = parsed.hostname.toLowerCase().replace(/^(www|m)\./, "");
-    const path = parsed.pathname.toLowerCase().replace(/\/+$/, "");
+    const path = trimTrailingSlashes(parsed.pathname.toLowerCase());
     return `${host}${path}`;
   } catch {
     return null;
