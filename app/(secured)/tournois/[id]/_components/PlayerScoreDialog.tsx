@@ -286,6 +286,18 @@ export function PlayerScoreDialog({
   const disputeLocked = view?.phase === "CONFLICT";
   const canEnterScore = canReportScore && !disputeLocked;
   const canDeclareForfeit = canForfeit && !disputeLocked;
+  // Litige ouvert par le flux pendant la saisie : les champs et boutons sous le
+  // focus disparaissent — le focus revient à la modale, qui garde le lecteur
+  // d'écran dans le dialogue plutôt que de le perdre sur `body`.
+  const wasLocked = useRef(disputeLocked);
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (disputeLocked && !wasLocked.current && dialog && !dialog.contains(document.activeElement)) dialog.focus();
+    wasLocked.current = disputeLocked;
+  }, [disputeLocked, dialogRef]);
+  // Contre-proposition : l'envoyer ouvre un litige sans retour possible côté
+  // joueurs — le dire avant l'envoi, pas après.
+  const opensDispute = canEnterScore && view?.phase === "THEIRS_PENDING" && entered !== null && !confirmsAsIs && !check.error;
 
   // Un refus qui désigne une map est rattaché à son champ, en plus de la
   // notification — avant l'envoi comme après un refus du serveur, qui ne rend
@@ -523,6 +535,12 @@ export function PlayerScoreDialog({
             <p className={styles.formatHint}>
               {t("score.player.forfeit.notAllowed")}
             </p>
+          )}
+
+          {opensDispute && (
+            <output className={`${styles.conflict} ${styles.notice}`}>
+              {t("score.player.counterWarning", { opponent: opponentName })}
+            </output>
           )}
 
           {canEnterScore && showBlocker && (

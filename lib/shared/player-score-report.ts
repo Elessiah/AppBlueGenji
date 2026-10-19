@@ -183,14 +183,15 @@ export type PlayerScoreButtonKey = "forfeit" | "confirm" | "edit" | "review" | "
  * avait un score à confirmer.
  */
 export function playerScoreButtonKey(view: PlayerReportView | null, canReportScore: boolean): PlayerScoreButtonKey {
+  // Litige d'abord : la modale n'y offre plus le forfait, le bouton ne
+  // l'annonce donc pas — même à qui ne peut que déclarer forfait.
+  if (view?.phase === "CONFLICT") return "review";
   if (!canReportScore) return "forfeit";
   switch (view?.phase) {
     case "THEIRS_PENDING":
       return "confirm";
     case "MINE_PENDING":
       return "edit";
-    case "CONFLICT":
-      return "review";
     default:
       return "enter";
   }

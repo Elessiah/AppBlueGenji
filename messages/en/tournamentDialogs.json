@@ -105,16 +105,17 @@
       },
       "theirs": {
         "readOnly": "{opponent} proposes {score}. Waiting for confirmation from someone in charge of {mine}.",
-        "withMaps": "{opponent} proposes {score}. Confirm it, or enter the score you saw: a disagreement alerts the referee.",
+        "withMaps": "{opponent} proposes {score}. Confirm it, or enter the score you saw: a disagreement opens a dispute, which locks score entry for both teams until a referee settles it.",
         "loading": "{opponent} proposes {score}. Loading their map details… Refresh the page if they don't arrive.",
-        "withoutMaps": "{opponent} proposes {score}, but their map details could not be loaded. Refresh the page to confirm it: entering a score instead alerts the referee."
+        "withoutMaps": "{opponent} proposes {score}, but their map details could not be loaded. Refresh the page to confirm it: entering a score instead opens a dispute, which locks score entry for both teams until a referee settles it."
       },
       "confirmed": "Score confirmed: {team1} {score1} – {score2} {team2}",
       "submitted": "Score sent: {team1} {score1} – {score2} {team2}",
       "forfeitRecorded": "Forfeit recorded: {opponent} wins the match.",
       "minePending": "You proposed {score}. Waiting for {opponent} to confirm.",
       "minePendingDeadline": "You proposed {score}. Waiting for {opponent} to confirm — with no answer, this score will be confirmed automatically at {deadline} (Paris time).",
-      "locked": "Score disputed: score entry is locked for both teams, forfeits included. Only a referee or a tournament administrator can settle this match — set the final score or reset it.",
+      "locked": "Score disputed: score entry is locked for both teams, forfeits included. Only a referee or an administrator can settle this match — set the final score or reset it.",
+      "counterWarning": "This score differs from {opponent}'s proposal: sending it opens a dispute and locks score entry for both teams until a referee settles it.",
       "autoValidateAt": "With no answer, this score will be confirmed automatically at {deadline} (Paris time).",
       "willConfirm": "{opponent} will have to confirm the score you send.",
       "confirm": "Confirm the score",
