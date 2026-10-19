@@ -28,21 +28,33 @@ type LoadState = { kind: "loading" } | { kind: "ready"; launch: MatchLaunchInfo 
 export const CONTACTS_RETRY_MAX_WAIT_MS = 30_000;
 
 /**
+ * Marge sur l'en-tête `Date` : tronqué à la seconde, et posé après que le
+ * serveur a décidé de la phase — un départ à la seconde même de l'en-tête peut
+ * encore être à venir pour lui.
+ */
+const HEADER_SLACK_MS = 2_000;
+
+/** Attente jusqu'au départ à l'heure du serveur, plus une seconde (au moins une seconde). */
+function untilServerStart(start: number, server: number): number {
+  return Math.max(start - server + 1_000, 1_000);
+}
+
+/**
  * Attente avant de relire un refus « indisponible », `null` sans relecture.
  * La carte décide du bouton à l'horloge du navigateur, le serveur à la sienne :
  * un caster dont l'horloge avance voit « Contacts » à l'heure du départ, avant
  * que le serveur ne tienne le match pour parti. Relu seulement quand l'heure du
  * serveur (en-tête `Date` du refus) précède le départ d'au plus
  * `CONTACTS_RETRY_MAX_WAIT_MS` ; un match sans heure, déjà lancé (`startAt`
- * `null`) ou dont le départ est passé au serveur garde son refus.
+ * `null`) ou dont le départ est passé au serveur depuis plus de
+ * `HEADER_SLACK_MS` garde son refus.
  */
 export function contactsRetryDelay(startAt: string | null, serverDate: string | null): number | null {
   if (startAt === null || serverDate === null) return null;
   const start = Date.parse(startAt);
   const server = Date.parse(serverDate);
-  if (!Number.isFinite(start) || !Number.isFinite(server) || start <= server) return null;
-  // L'en-tête est tronqué à la seconde : une seconde de marge.
-  const delay = start - server + 1_000;
+  if (!Number.isFinite(start) || !Number.isFinite(server) || start <= server - HEADER_SLACK_MS) return null;
+  const delay = untilServerStart(start, server);
   return delay <= CONTACTS_RETRY_MAX_WAIT_MS ? delay : null;
 }
 
@@ -86,15 +98,18 @@ const MAX_TIMER_MS = 2_147_483_647;
  * sans heure ou départ déjà passé au serveur, rien n'est relu.
  */
 export function casterRereadDelay(launch: MatchLaunchInfo, serverDate: string | null): number | null {
-  if (!casterContactsPending(launch) || launch.startAt === null || serverDate === null) return null;
+  if (!casterContactsPending(launch) || launch.phase !== "SCHEDULED") return null;
+  if (launch.startAt === null || serverDate === null) return null;
   const start = Date.parse(launch.startAt);
   const server = Date.parse(serverDate);
-  if (!Number.isFinite(start) || !Number.isFinite(server) || start <= server) return null;
-  return Math.min(start - server + 1_000, MAX_TIMER_MS);
+  if (!Number.isFinite(start) || !Number.isFinite(server)) return null;
+  // `SCHEDULED` dit que le départ était à venir quand le serveur a lu : un
+  // en-tête déjà à l'heure (tronqué, posé après) ne fait qu'avancer la relecture.
+  return Math.min(untilServerStart(start, server), MAX_TIMER_MS);
 }
 
-/** Horaire du match tel que la carte le reçoit (écritures annoncées par le flux). */
-export type CardSchedule = { startAt: string | null; launchedAt: string | null };
+/** Horaire et caster du match tels que la carte les reçoit (écritures annoncées par le flux). */
+export type CardSchedule = { startAt: string | null; launchedAt: string | null; casterUserId: number | null };
 
 /**
  * Relire la modale ouverte quand l'horaire de la carte change ? Un lancement
@@ -108,7 +123,10 @@ export function rereadOnScheduleChange(
   next: CardSchedule,
   launch: MatchLaunchInfo | null,
 ): boolean {
-  if (launch === null || launch.caster === null) return false;
+  if (launch === null) return false;
+  // Un caster qui s'inscrit ou se retire : sa fiche (contacts, note) change.
+  if (previous.casterUserId !== next.casterUserId) return true;
+  if (launch.caster === null) return false;
   return previous.startAt !== next.startAt || previous.launchedAt !== next.launchedAt;
 }
 
@@ -182,6 +200,7 @@ export function MatchContactsDialog({
   onClose,
   startAt = null,
   launchedAt = null,
+  casterUserId = null,
 }: Readonly<{
   matchId: number;
   matchLabel: string;
@@ -192,6 +211,8 @@ export function MatchContactsDialog({
    */
   startAt?: string | null;
   launchedAt?: string | null;
+  /** Caster inscrit selon la carte : une inscription ou un retrait fait relire. */
+  casterUserId?: number | null;
 }>) {
   const text = useLaunchText();
   const { t } = text;
@@ -214,13 +235,19 @@ export function MatchContactsDialog({
   const [rereadFailures, setRereadFailures] = useState(0);
   // Horaire de la carte vu par la dernière lecture réussie : un changement
   // survenu pendant la première lecture compte à son arrivée.
-  const previousSchedule = useRef<CardSchedule>({ startAt, launchedAt });
+  const previousSchedule = useRef<CardSchedule>({ startAt, launchedAt, casterUserId });
+  // Nouvelle relecture (départ, horaire ou caster changé) : ses échecs se
+  // comptent de zéro, quels qu'aient été ceux d'une relecture précédente.
+  const rereadNow = () => {
+    setRereadFailures(0);
+    setReadKey((key) => key + 1);
+  };
   useEffect(() => {
     if (!launch) return;
-    const schedule = { startAt, launchedAt };
-    if (rereadOnScheduleChange(previousSchedule.current, schedule, launch)) setReadKey((key) => key + 1);
+    const schedule = { startAt, launchedAt, casterUserId };
+    if (rereadOnScheduleChange(previousSchedule.current, schedule, launch)) rereadNow();
     previousSchedule.current = schedule;
-  }, [startAt, launchedAt, launch]);
+  }, [startAt, launchedAt, casterUserId, launch]);
 
   // Relecture échouée : quelques nouvelles tentatives espacées.
   useEffect(() => {
@@ -234,7 +261,7 @@ export function MatchContactsDialog({
     if (!launch) return;
     const delay = casterRereadDelay(launch, serverDate);
     if (delay === null) return;
-    const timer = setTimeout(() => setReadKey((key) => key + 1), delay);
+    const timer = setTimeout(rereadNow, delay);
     return () => clearTimeout(timer);
   }, [launch, serverDate]);
 
