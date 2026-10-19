@@ -557,6 +557,25 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     // Seuls les champs de maps (`MapScoreList`) se figent pendant l'envoi ; les boutons gardent le focus.
     expect(source.match(/(?<![-\w])disabled=\{[^}]*submitting/g)).toEqual(["disabled={submitting"]);
     expect(source.match(/aria-busy=\{submitting \|\| undefined\}/g)).toHaveLength(2);
+    // Un bouton aria-disabled doit aussi s'en voir : la feuille le grise comme `:disabled`.
+    const css = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/ScoreDialog.module.css"), "utf8");
+    for (const selector of ['.forfeit[aria-disabled="true"]', '.link[aria-disabled="true"]', '.actions :global(.btn[aria-disabled="true"])']) {
+      expect(css).toContain(selector);
+    }
+    expect(css).toContain(':hover:not(:disabled, [aria-disabled="true"])');
+  });
+
+  it("score (engagé) : une contre-proposition s'annonce comme un litige, le focus suit le verrou", () => {
+    const source = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx"), "utf8");
+    expect(source).toContain('view?.phase === "THEIRS_PENDING" && entered !== null && !confirmsAsIs');
+    expect(source).toContain('t("score.player.counterWarning", { opponent: opponentName })');
+    // Litige arrivé par le flux : focus rendu à la modale si l'élément focalisé a disparu.
+    expect(source).toMatch(/disputeLocked && !wasLocked\.current && dialog && !dialog\.contains\(document\.activeElement\)\) dialog\.focus\(\)/);
+    // À l'ouverture, la proposition adverse pré-remplie se confirme telle quelle : pas d'avertissement.
+    const pending = { ...versus, status: "AWAITING_CONFIRMATION" as const, team1Report: disputeReport(2, 1, "2026-05-05T10:00:00.000Z") };
+    const dialog = <PlayerScoreDialog tournamentId={1} match={pending} myTeamId={11} canReportScore canForfeit proposals={[]} onClose={noop} onSubmitted={noop} onRefresh={noop} />;
+    expect(render("fr", dialog)).not.toContain("ouvre un litige et verrouille");
+    expect(render("en", dialog)).not.toContain("opens a dispute and locks");
   });
 
   it.each<[string, () => ReactElement]>([

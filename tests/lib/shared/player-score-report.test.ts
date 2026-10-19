@@ -158,6 +158,13 @@ describe("playerScoreButtonLabel", () => {
   it("n'offre que le forfait tant que le match n'est pas lancé", () => {
     expect(playerScoreButtonLabel(playerReportView(base, 10), false)).toBe("Déclarer forfait");
   });
+
+  it("annonce le litige, pas le forfait, à qui ne peut pas reporter", () => {
+    // En litige, la modale n'offre plus le forfait : le bouton ne doit pas le promettre.
+    const conflict = { ...base, team1Report: report(2, 1), team2Report: report(0, 2) };
+    expect(playerScoreButtonLabel(playerReportView(conflict, 10), false)).toBe("Voir le litige");
+    expect(playerScoreButtonLabel(playerReportView(conflict, 20), false)).toBe("Voir le litige");
+  });
 });
 
 describe("pendingReportNotice", () => {

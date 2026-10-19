@@ -74,13 +74,28 @@ describe("textes FR + EN", () => {
 
   it("le verrou, l'échéance et le refus sont traduits", () => {
     expect(frDialogs.score.player.locked).toMatch(/arbitre ou un administrateur/);
-    expect(enDialogs.score.player.locked).toMatch(/referee or a tournament administrator/);
+    expect(enDialogs.score.player.locked).toMatch(/referee or an administrator/);
+    // Le règlement passe par la permission de plateforme `tournaments`, pas par
+    // l'organisateur du tournoi : le texte ne l'y renvoie pas.
+    expect(frDialogs.score.player.locked).not.toMatch(/administrateur du tournoi/);
+    expect(enDialogs.score.player.locked).not.toMatch(/tournament administrator/);
     expect(frDialogs.score.player.autoValidateAt).toContain("{deadline}");
     expect(enDialogs.score.player.autoValidateAt).toContain("{deadline}");
     expect(frErrors.codes.SCORE_LOCKED_DISPUTE).toBeTruthy();
     expect(enErrors.codes.SCORE_LOCKED_DISPUTE).toBeTruthy();
     expect(frActions.cardActions.reportPendingDeadline).toContain("{deadline}");
     expect(enActions.cardActions.reportPendingDeadline).toContain("{deadline}");
+    // Une contre-proposition verrouille : l'avertir avant l'envoi, dans les deux langues.
+    for (const dialogs of [frDialogs, enDialogs]) {
+      expect(dialogs.score.player.counterWarning).toContain("{opponent}");
+      expect(dialogs.score.player.theirs.withMaps).not.toMatch(/alerte l'arbitrage\.|alerts the referee\./);
+    }
+    expect(frDialogs.score.player.counterWarning).toMatch(/litige/);
+    expect(enDialogs.score.player.counterWarning).toMatch(/dispute/);
+    expect(frDialogs.score.player.theirs.withMaps).toMatch(/verrouille la saisie des deux équipes/);
+    expect(enDialogs.score.player.theirs.withMaps).toMatch(/locks score entry for both teams/);
+    expect(frDialogs.score.player.theirs.withoutMaps).toMatch(/verrouille la saisie des deux équipes/);
+    expect(enDialogs.score.player.theirs.withoutMaps).toMatch(/locks score entry for both teams/);
     // Plus d'invitation à « corriger » une proposition en litige.
     expect(frDialogs.score.player.conflictScores).not.toMatch(/corriger/);
     expect(enDialogs.score.player.conflictScores).not.toMatch(/correct/);
