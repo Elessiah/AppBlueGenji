@@ -122,14 +122,52 @@ Une seule boucle de sondage alimente les deux : `useLandingLive`, appelé par le
 `Hero` (`components/cyber/landing/`). Deux sondages séparés les feraient diverger
 le temps d'un tick — une carte annonçant un direct au-dessus d'un bouton absent.
 
-## Annonce sur Discord (#live, `@everyone`)
+## Annonce sur Discord (#live, par soirée)
 
 Au **début** d'un match diffusé, le bot poste dans le salon #live du serveur
 BlueGenji esport (constante `LIVE_ANNOUNCE_CHANNEL_ID` côté bot,
-`src/notifications/liveAnnouncement.ts`) un message qui mentionne `@everyone`,
-nomme les deux engagés et le tournoi, et donne le lien de la diffusion —
-demande de l'association : deux matchs à la suite font donc deux annonces.
+`src/notifications/liveAnnouncement.ts`) le **message de la soirée** : il
+nomme les engagés et le tournoi de chaque match, son heure, et donne le lien
+de chaque diffusion. Les matchs suivants de la soirée **modifient** ce message
+au lieu d'en poster un autre (demande de l'association, 2026-10-19).
 
+- **Qui est notifié** : seule une diffusion sur la chaîne officielle
+  (`OFFICIAL_LIVE_CHANNEL_URL`, `https://www.twitch.tv/bluegenjiesport` —
+  hôte et chemin comparés sans casse, `www.`/`m.` et barre finale ignorés,
+  `liveMentionTarget`) mentionne `@everyone`. Toute autre chaîne (caster,
+  Kick, YouTube) mentionne le seul rôle **StreamViewer**
+  (`STREAM_VIEWER_ROLE_ID` côté bot, `1210173681771479060`) :
+  `allowedMentions` n'autorise que `everyone` pour l'une, que ce rôle pour
+  l'autre. Les deux publics ont chacun leur message de soirée.
+- **Soirée** : `LIVE_EVENING_WINDOW_HOURS` = **4 h**, comptées depuis le
+  premier direct annoncé pour ce public (`bg_live_evenings` : public, ouverture,
+  fin de fenêtre, identifiant du message Discord ; aucune donnée personnelle,
+  effacée un jour après la fin de la fenêtre). Quatre heures couvrent une
+  soirée de tournoi (19 h – 23 h) sans fondre deux soirées.
+- **Texte** (français, `formatLiveEvening`) : « 🔴 **Les lives de la
+  soirée** », puis un bloc par match séparé par une ligne vide — l'heure de
+  Paris en gras (`**21:00**`), suivie de « · En direct » pour un match à
+  l'antenne ; l'affiche et le tournoi ; le lien seul sur sa ligne. Les directs
+  d'abord, puis les matchs **programmés** (`START_TIME`, castés, d'ici la fin
+  de la fenêtre) par heure : l'heure des streams à venir se lit d'un coup
+  d'œil. Un match fini depuis son annonce n'est plus listé. Les liens partent
+  à part (`streamUrls`, dix au plus) et le texte les place par des jetons
+  `{{lien:N}}` que le bot remplace après ses neutralisations ; un nom ne peut
+  pas forger de jeton.
+- **Modifier plutôt que reposter** : le bot rend l'identifiant du message
+  (`messageId`), gardé dans `bg_live_evenings`. Le match suivant de la soirée
+  envoie `editMessageId` : le bot **modifie** le message, `allowedMentions`
+  vides — aucune nouvelle notification. Message supprimé entre-temps (ou pas
+  du bot) : une **suite** part, sans mention ni notification, et son
+  identifiant remplace l'ancien. Un bot d'une version antérieure ne rend pas
+  d'identifiant : chaque match repart alors dans un nouveau message (d'où
+  l'ordre de déploiement : **bot d'abord**). Une publication incertaine
+  (`uncertain`, `timed-out`, `interrupted`) ne laisse pas d'identifiant : un
+  match suivant de la même soirée repart dans un nouveau message.
+- **Longueur** : le texte, liens comptés en entier, tient dans
+  `LIVE_ANNOUNCEMENT_MAX_LENGTH` (1 500) ; au-delà, la liste s'arrête **à la
+  fin d'un bloc** et une dernière ligne compte le reste (« … et 3 autres matchs
+  ce soir ») — pas de second message : un seul message par soirée se modifie.
 - **Début du match = passage à l'antenne**, tel que `isMatchLive` le dérive :
   lancement en `AUTO`, heure dite en `START_TIME`, clic « Lancer le direct » en
   `MANUAL`. Le lancement compte pour l'**affiche courante** seulement
@@ -148,16 +186,11 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   les dix secondes au plus, quel que soit le nombre de spectateurs ; aucune
   tant que le coupe-circuit du bot est ouvert. Un `START_TIME` dont l'heure
   n'est pas venue n'est pas lu.
-- **Un message par diffusion, pas par match** : les matchs d'un même tournoi
-  qu'un même balayage trouve à l'antenne sur le **même lien** (une ronde
-  lancée d'un coup, repliée sur la chaîne officielle) partent en un seul
-  message : « 🔴 En direct — Tournoi : » puis une affiche par ligne
-  (« • A contre B ») — un nom d'équipe peut contenir « et » ou une virgule,
-  jamais un saut de ligne ; passé 1 500 caractères
-  (`LIVE_ANNOUNCEMENT_MAX_LENGTH`), une dernière ligne compte le reste
-  (« • et 3 autres matchs ») plutôt que de laisser le bot couper un nom. Un
-  tournoi individuel énumère ses affiches de pseudos de la même façon. Chaque affiche
-  garde sa réservation. Deux matchs **à la suite** restent deux annonces.
+- **Un message par soirée et par public, pas par match** : les matchs qu'un
+  même balayage trouve à l'antenne pour un même public (chaîne officielle ou
+  non), quels que soient leur tournoi et leur lien, partent dans le message de
+  la soirée, une seule notification. Chaque affiche garde sa réservation. Une
+  pause après un refus de Discord vaut pour la soirée de ce public seulement.
 - **Une annonce par match et par affiche** : `bg_live_announcements`
   (clé unique `(match_id, pairing)`, `pairing` = les deux engagés **sans
   ordre**, `5:7` pour `7:5` : un plateau réécrit qui inverse les deux mêmes
@@ -266,8 +299,8 @@ demande de l'association : deux matchs à la suite font donc deux annonces.
   en catégorie de données), `/rgpd`, et la fenêtre de suppression du compte
   (`deletion.residual`), qui le rappelle au joueur ; les conditions d'utilisation
   (section « Retransmission des matchs », `STREAM_NOTICE_LIVE` / `_EN`) disent que
-  le nom neutre ne couvre pas cette annonce. Le bot préfixe `@everyone` et n'autorise que cette mention
-  (`allowedMentions: { parse: ["everyone"] }`) pour ce seul message ; sans la
+  le nom neutre ne couvre pas cette annonce. Le bot préfixe la mention du public (`@everyone` ou le rôle StreamViewer) et n'autorise qu'elle
+  (`{ parse: ["everyone"] }` ou `{ roles: [StreamViewer] }`) pour ce seul message ; sans la
   permission de mentionner, il n'écrit pas la mention (un « @everyone » gris
   qui ne notifie personne aurait l'air d'une panne).
 - **Production seulement, activée explicitement, sur le site public**
