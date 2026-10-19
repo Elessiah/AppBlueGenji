@@ -226,6 +226,9 @@ la même garde : le rattachement OAuth (`UNMOVED_SUBJECT_SQL`, pour les trois
 fournisseurs — 0 ligne → `PROVIDER_ALREADY_LINKED`) et le rafraîchissement du
 pseudo à la connexion Discord (`AND discord_id = ?`), qui sinon nommerait « par
 Discord » sur un autre identifiant le pseudo d'un Discord détaché entre-temps.
+Ce rafraîchissement sans effet relit une fois le titulaire du Discord : la
+session va à son nouveau titulaire (ou à une inscription), jamais au compte qui
+vient de le détacher.
 
 Un Discord déjà certifié par un **autre compte du site** est refusé de même
 (`DISCORD_ALREADY_LINKED`, 409) — mais **à la confirmation seulement**, par
