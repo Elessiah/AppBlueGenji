@@ -264,6 +264,16 @@ describe("GET /api/matches/[matchId]/contacts", () => {
     await expect(res.json()).resolves.toEqual({ error: "MATCH_CONTACTS_UNAVAILABLE" });
   });
 
+  it("a son propre quota : la modale qui interroge ne l'épuise pas, et il plafonne à trente par minute", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 85 }));
+    jest.mocked(listViewerMatchLaunches).mockResolvedValue([]);
+    jest.mocked(loadViewerMatchContacts).mockResolvedValue(info);
+    for (let i = 0; i < 60; i++) await launchesGet();
+    expect((await launchesGet()).status).toBe(429);
+    for (let i = 0; i < 30; i++) expect((await contactsGet(request(), params("42"))).status).toBe(200);
+    expect((await contactsGet(request(), params("42"))).status).toBe(429);
+  });
+
   it("répond 500 sans détail sur une panne de lecture", async () => {
     jest.spyOn(console, "error").mockImplementation(() => undefined);
     jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 84 }));

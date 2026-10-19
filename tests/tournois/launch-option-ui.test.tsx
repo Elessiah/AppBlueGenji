@@ -82,11 +82,33 @@ describe("modale d'horaire — ce que la date produit", () => {
     expect(enDialogs.schedule.hintDirectTbd).toMatch(/as soon as both its opponents are known/);
   });
 
-  it("match déjà lancé : la date ne le fait pas attendre (FR et EN)", () => {
-    expect(startAtHint(FR, false, true, false, false, true)).toBe(
+  it("match déjà lancé, option allumée : la date ne le fait pas attendre (FR et EN)", () => {
+    expect(startAtHint(FR, false, true, false, true, true)).toBe(
       `${frDialogs.schedule.hintLaunched} ${frDialogs.schedule.notice}`,
     );
-    expect(startAtHint(EN, false, true, false, true, true)).toMatch(/^The match has already launched/);
+    expect(startAtHint(EN, false, true, false, true, true)).toMatch(/^The match has already launched:/);
+  });
+
+  it("match lancé d'office, option éteinte : une heure à venir le remet en attente (FR et EN)", () => {
+    expect(startAtHint(FR, false, true, false, false, true)).toBe(
+      `${frDialogs.schedule.hintLaunchedDirect} ${frDialogs.schedule.notice}`,
+    );
+    expect(startAtHint(EN, false, true, false, false, true)).toBe(
+      `${enDialogs.schedule.hintLaunchedDirect} ${enDialogs.schedule.notice}`,
+    );
+    expect(startAtHint(FR, true, true, false, false, true)).toBe(
+      `${frDialogs.schedule.hintLaunchedPlanningDirect} ${frDialogs.schedule.noticePlanning}`,
+    );
+    for (const text of [frDialogs.schedule.hintLaunchedDirect, frDialogs.schedule.hintLaunchedPlanningDirect]) {
+      expect(text).toMatch(/En attente de départ/);
+      expect(text).not.toMatch(/prêt/i);
+    }
+    for (const text of [enDialogs.schedule.hintLaunchedDirect, enDialogs.schedule.hintLaunchedPlanningDirect]) {
+      expect(text).toMatch(/Waiting to start/);
+      expect(text).not.toMatch(/\bready\b/i);
+    }
+    expect(frDialogs.schedule.hintLaunchedPlanningDirect).toMatch(/À planifier/);
+    expect(enDialogs.schedule.hintLaunchedPlanningDirect).toMatch(/To schedule/);
     // Joué : l'archive seule.
     expect(startAtHint(FR, false, true, true, false, true)).toBe(frDialogs.schedule.hintDirect);
   });
