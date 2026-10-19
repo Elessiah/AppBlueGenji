@@ -91,6 +91,17 @@ export const REREAD_RETRIES = 3;
 /** Attente entre deux de ces relectures. */
 export const REREAD_RETRY_MS = 10_000;
 
+/**
+ * Taire un échec de lecture ? Un refus définitif se dit toujours. Un échec
+ * passager se tait quand des contacts sont déjà affichés ; sans rien de lu, il
+ * se tait à la première lecture (la modale reste en chargement le temps d'une
+ * nouvelle tentative), se dit **une** fois à l'échec de cette tentative, puis
+ * se tait pour les suivantes. `failuresBefore` : échecs consécutifs avant celui-ci.
+ */
+export function failureIsSilent(transient: boolean, shown: boolean, failuresBefore: number): boolean {
+  return transient && (shown || failuresBefore !== 1);
+}
+
 /** Relancer une relecture après `failures` échecs consécutifs ? */
 export function shouldRetryReread(failures: number): boolean {
   return failures > 0 && failures <= REREAD_RETRIES;
@@ -327,7 +338,7 @@ export function MatchContactsDialog({
     // le temps de la **première** nouvelle tentative (un raté isolé), puis
     // notifie l'échec — les tentatives suivantes continuent sans bruit.
     const shown = state.kind === "ready";
-    const keepWaiting = (transient: boolean) => transient && (shown || rereadFailures === 0);
+    const keepWaiting = (transient: boolean) => failureIsSilent(transient, shown, rereadFailures);
     void (async () => {
       try {
         const read = await readMatchContacts(matchId, {
