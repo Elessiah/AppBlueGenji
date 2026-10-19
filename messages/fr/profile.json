@@ -94,7 +94,7 @@
     "reading": "Lecture…",
     "unverifiedHint": "Tag non certifié : {audience} Certifie-le pour qu'elle puisse le faire.",
     "unverifiedAudience": "personne ne le voit, pas même les administrateurs. L'organisation ne peut donc pas te joindre pendant un tournoi.",
-    "audience": "les administrateurs le voient à tout moment, les arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), et les membres des deux équipes et le caster de ton match dès que les deux adversaires du match sont connus et jusqu'à sa fin ; les autres joueurs, seulement si tu le rends visible dans tes réglages de confidentialité. Jamais personne d'autre.",
+    "audience": "les administrateurs le voient à tout moment, les arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), et les membres des deux équipes et le caster de ton match dès que les deux adversaires du match sont connus et jusqu'à sa fin (et, si tu castes un match, ses deux équipes) ; les autres joueurs, seulement si tu le rends visible dans tes réglages de confidentialité. Jamais personne d'autre.",
     "removed": "Tag Discord retiré.",
     "lock": {
       "pending": "Lecture de l'état de ton compte Discord… Le champ reste en lecture seule le temps de savoir si Discord a nommé ce pseudo.",

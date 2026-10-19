@@ -94,7 +94,7 @@
     "reading": "Reading…",
     "unverifiedHint": "Unverified tag: {audience} Verify it so they can.",
     "unverifiedAudience": "nobody sees it, not even the administrators. So the organizers can't reach you during a tournament.",
-    "audience": "the administrators see it at any time, the referees as long as you're registered for a tournament that isn't over (from the moment registration opens), and the members of both teams and the caster of your match from the moment both opponents of the match are known until its end; other players only if you make it visible in your privacy settings. Nobody else, ever.",
+    "audience": "the administrators see it at any time, the referees as long as you're registered for a tournament that isn't over (from the moment registration opens), and the members of both teams and the caster of your match from the moment both opponents of the match are known until its end (and, if you cast a match, both its teams); other players only if you make it visible in your privacy settings. Nobody else, ever.",
     "removed": "Discord tag removed.",
     "lock": {
       "pending": "Reading your Discord account status… The field stays read-only until we know whether Discord provided this username.",
