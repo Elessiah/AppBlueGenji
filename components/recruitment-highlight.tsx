@@ -36,6 +36,9 @@ const OPT_OUT_TIMEOUT_MS = 10_000;
 
 const OPT_OUT_URL = "/api/recruitment/modal-dismiss";
 
+/** Attente avant la seconde tentative d'un « Ne plus afficher » qui n'a pas abouti. */
+const OPT_OUT_RETRY_DELAY_MS = 2_000;
+
 /** Aperçu plus généreux qu'en carte : la modale a la place, mais pas un mur de texte. */
 const MODAL_PREVIEW_MAX = 320;
 
@@ -99,28 +102,40 @@ export async function recordRecruitmentModalOptOut(
     writeCookie = writeSeenCookie,
     post = postOptOut,
     cookieKept = optOutCookieKept,
+    wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
   }: Readonly<{
     writeCookie?: (name: string, value: string, maxAge?: number) => boolean;
     post?: (url: string) => Promise<Pick<Response, "ok" | "status" | "json">>;
     /** Relu après la réponse : son `Set-Cookie` peut avoir gardé le choix là où le script a été refusé. */
     cookieKept?: () => boolean;
+    wait?: (ms: number) => Promise<void>;
   }> = {},
 ): Promise<RecruitmentModalOptOutResult> {
   const written = writeCookie(RECRUITMENT_MODAL_OFF_COOKIE, RECRUITMENT_MODAL_OFF_VALUE, RECRUITMENT_MODAL_OFF_MAX_AGE);
   // Cookie posé par le script : l'issue hors compte est acquise. Refusé, seul
   // le `Set-Cookie` de la réponse peut encore le garder — relu après elle.
   const kept = () => written || cookieKept();
+  // Une seconde tentative, en arrière-plan et après un court délai (bascule
+  // Wi-Fi / 4G, redémarrage du serveur), quand la première n'a pas abouti :
+  // réseau, délai dépassé ou réponse 5xx (un 502 du proxy ne repose pas le
+  // cookie). Sous Safari / iOS, seul ce `Set-Cookie` garde le choix au-delà de
+  // sept jours ; connecté, elle écrit aussi le compte. Le toast n'en dépend pas.
+  const retryLater = () => {
+    wait(OPT_OUT_RETRY_DELAY_MS)
+      .then(() => post(OPT_OUT_URL))
+      .catch(() => undefined);
+  };
   if (!signedIn && written) {
     // Le cookie du script tient : le serveur ne fait que le renouveler, le
     // toast n'attend pas (une connexion faite depuis dans un autre onglet
     // garderait aussi le choix sur le compte ; le toast « ce navigateur » dit
     // alors moins que vrai, jamais faux).
-    // Une seconde tentative si la première n'aboutit pas (réseau, délai
-    // dépassé) : sous Safari / iOS, seul ce `Set-Cookie` garde le choix au-delà
-    // de sept jours.
-    post(OPT_OUT_URL)
-      .catch(() => post(OPT_OUT_URL))
-      .catch(() => undefined);
+    post(OPT_OUT_URL).then(
+      (response) => {
+        if (response.status >= 500) retryLater();
+      },
+      retryLater,
+    );
     return "BROWSER";
   }
   let account: "ACCOUNT" | "GONE" | "FAILED";
@@ -137,6 +152,7 @@ export async function recordRecruitmentModalOptOut(
     account = "FAILED";
   }
   if (account === "ACCOUNT") return "ACCOUNT";
+  if (account === "FAILED") retryLater();
   if (!kept()) return "NONE";
   // Un échec n'est « compte injoignable » que pour qui se croyait connecté.
   return account === "FAILED" && signedIn ? "BROWSER_ONLY" : "BROWSER";
