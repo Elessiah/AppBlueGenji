@@ -255,5 +255,10 @@ pas du report de score : inchangées.
 capitaine refusé, arbitre transmis au service) ;
 `tests/lib/server/dispute-self-resolution.test.ts` (alerte aux autres
 seulement, rien hors litige ni pour un arbitre qui ne joue pas, journal) ;
-`tests/lib/server/admin-save-pauses-auto-validation.test.ts` (suspension,
-balayage muet, course, fin de suspension).
+`tournaments-public-writes.test.ts` (litige lu sous verrou, alerte après le
+commit, rien hors litige) ; suspension : `admin-score-guards.test.ts`
+(« Enregistrer » la pose sur un report seul), `score-report-stalled.test.ts`
+(balayage muet, course perdue), `tournaments-service.matches.test.ts` (resaisie
+qui la garde, report neuf qui la lève), `tournament-broadcast-wake.test.ts`,
+`player-score-report.test.ts` et `tournament-actions-i18n.test.tsx` (écran,
+FR + EN) ; `dispute-withdrawal.test.ts` (abandon inchangé, /regles).
