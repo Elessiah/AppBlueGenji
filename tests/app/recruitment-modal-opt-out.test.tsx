@@ -158,9 +158,9 @@ describe("modale d'arrivée — bouton « Ne plus afficher »", () => {
 });
 
 describe("recordRecruitmentModalOptOut", () => {
-  it("non connecté : pose le cookie du navigateur, puis le fait reposer par le serveur (ITP), sans attendre", async () => {
+  it("non connecté : pose le cookie du navigateur, puis le fait reposer par le serveur (ITP)", async () => {
     const writeCookie = jest.fn<(name: string, value: string, maxAge?: number) => boolean>(() => true);
-    const post = jest.fn(async (_url: string) => ({ ok: true, status: 200, json: async () => ({ account: true }) }));
+    const post = jest.fn(async (_url: string) => ({ ok: true, status: 200, json: async () => ({ account: false }) }));
     expect(await recordRecruitmentModalOptOut(false, { writeCookie, post })).toBe("BROWSER");
     expect(writeCookie).toHaveBeenCalledWith(RECRUITMENT_MODAL_OFF_COOKIE, "1", RECRUITMENT_MODAL_OFF_MAX_AGE);
     expect(post).toHaveBeenCalledWith("/api/recruitment/modal-dismiss");
@@ -204,20 +204,29 @@ describe("recordRecruitmentModalOptOut", () => {
     }
   });
 
-  it("non connecté : n'attend pas le serveur, et son échec ne change rien à l'issue", async () => {
-    const hanging = jest.fn(() => new Promise<never>(() => undefined));
-    expect(await recordRecruitmentModalOptOut(false, { writeCookie: () => true, post: hanging })).toBe("BROWSER");
+  it("non connecté : un échec du serveur ne change rien à l'issue (le cookie du script tient)", async () => {
     const failing = jest.fn(async () => {
       throw new Error("offline");
     });
-    expect(await recordRecruitmentModalOptOut(false, { writeCookie: () => false, cookieKept: () => false, post: failing })).toBe("NONE");
-    expect(failing).toHaveBeenCalledTimes(1);
+    expect(await recordRecruitmentModalOptOut(false, { writeCookie: () => true, post: failing })).toBe("BROWSER");
+    expect(
+      await recordRecruitmentModalOptOut(false, {
+        writeCookie: () => true,
+        post: async () => ({ ok: false, status: 500, json: async () => ({}) }),
+      }),
+    ).toBe("BROWSER");
+    expect(await recordRecruitmentModalOptOut(false, { writeCookie: () => false, post: failing })).toBe("NONE");
+  });
+
+  it("non connecté au rendu, connecté depuis dans un autre onglet : le toast dit que le choix est sur le compte", async () => {
+    const post = async () => ({ ok: true, status: 200, json: async () => ({ account: true }) });
+    expect(await recordRecruitmentModalOptOut(false, { writeCookie: () => true, post })).toBe("ACCOUNT");
   });
 
   it("borne l'attente du serveur sans AbortSignal.timeout (absent de Safari 15)", () => {
     const source = readSource("components/recruitment-highlight.tsx");
     expect(source).toContain("setTimeout(() => controller.abort(), OPT_OUT_TIMEOUT_MS)");
-    expect(source).toContain('fetch(url, { method: "POST", signal: controller.signal })');
+    expect(source).toContain('fetch(url, { method: "POST", keepalive: true, signal: controller.signal })');
     expect(source).not.toMatch(/AbortSignal\.timeout\(/);
     expect(source).toContain("const OPT_OUT_TIMEOUT_MS = 10_000;");
   });
