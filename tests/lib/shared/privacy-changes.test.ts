@@ -1288,9 +1288,11 @@ describe("PRIVACY_CHANGES — arbitre qui joue le match (DISPUTE-FOLLOWUP, #456)
     expect(en).toMatch(/topic “Refereeing by a staff player”, which you can turn off in “My profile”\), never to the author/);
     expect(en).toMatch(/without the username of the author or of any player/);
     expect(en).toMatch(/gives on Discord only the tournament and the kind of action, unnamed/);
-    expect(fr).toMatch(/les noms d'équipe \(aucun en tournoi individuel\), et le pseudo et l'identifiant de compte de son auteur/);
+    expect(fr).toMatch(/la manche et, sauf pour une suspension, l'issue retenue avec les noms d'équipe/);
+    expect(fr).toMatch(/la manche, l'issue et les noms d'équipe \(ni l'une ni les autres pour une suspension, aucun nom en tournoi individuel\), et le pseudo et l'identifiant de compte de son auteur/);
     expect(fr).toMatch(/que son auteur joue le match ou non, laisse aussi dans les journaux du serveur une trace courte/);
-    expect(en).toMatch(/the team names \(none in a solo tournament\), and the username and account ID of its author/);
+    expect(en).toMatch(/the round and, except for a pause, the retained outcome with the team names/);
+    expect(en).toMatch(/the round, the outcome and the team names \(neither for a pause, no names in a solo tournament\), and the username and account ID of its author/);
     expect(en).toMatch(/whether or not its author plays in the match, also leaves a short trace in the server logs/);
     expect(english.details).toHaveLength(entry.details.length);
     expect(english.linkLabels).toHaveLength(entry.links?.length ?? 0);

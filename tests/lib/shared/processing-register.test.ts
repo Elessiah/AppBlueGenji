@@ -198,8 +198,11 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(t04En.legalBasis).toMatch(/legitimate interest \(impartial refereeing\) with regard to the staff member who referees a match they play in/);
     const t05 = byRef("T05").dataCategories.join(" ");
     const t05En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T05")!.dataCategories.join(" ");
-    expect(t05).toMatch(/pour un arbitre qui joue le match, en plus : tournoi, manche, issue et noms d'équipe/);
-    expect(t05En).toMatch(/for a referee who plays in the match, also: tournament, round, outcome and team names/);
+    expect(t05).toMatch(/pour un arbitre qui joue le match, en plus : tournoi, manche et, sauf pour une suspension, issue et noms d'équipe/);
+    expect(byRef("T05").legalBasis).toMatch(/et du membre du staff auteur d'un geste, nommé dans les journaux du serveur/);
+    expect(byRef("T05").subPurposes.join(" ")).toMatch(/une trace courte dans les seuls journaux du serveur/);
+    expect(t05En).toMatch(/for a referee who plays in the match, also: tournament, round and, except for a pause, outcome and team names/);
+    expect(PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T05")!.legalBasis).toMatch(/and to the staff member who carried out an action, named in the server logs/);
   });
 
   it("déclare l'information sur les changements de politique et leur annonce Discord", () => {
