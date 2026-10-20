@@ -212,6 +212,7 @@ passent au gris système en contraste élevé (`forced-colors`), et l'attente
 non armé (`disabled` natif : texte à recopier) y est éteint — bordure
 pointillée (rouge pour un geste destructeur, jamais plus vive qu'armée), fond
 vide —, curseur interdit, gris système en contraste élevé (règle en fin de feuille) ;
+le texte à recopier est figé (`readOnly`) pendant l'envoi ;
 les règles de survol désarmé que `/profil`, `ScoreDialog` et
 `GhostRegistrationDialog` recopiaient sont retirées. La fenêtre des conditions
 passe ses gestes désarmés (« J'accepte » en vol compris) au gris système en
