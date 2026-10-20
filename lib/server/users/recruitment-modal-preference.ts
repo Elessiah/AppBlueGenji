@@ -10,6 +10,7 @@
  * rendue dans l'export des données.
  */
 import { getDatabase } from "@/lib/server/database";
+import { isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { recruitmentModalOffInBrowser } from "@/lib/shared/recruitment";
 
 /** Une valeur lue en base ramenée à un booléen ; absente : la modale s'ouvre (défaut). */
@@ -42,20 +43,36 @@ export async function recordRecruitmentModalOff(userId: number): Promise<boolean
  */
 export const RECRUITMENT_MODAL_HEAL_WINDOW_MS = 10 * 60 * 1000;
 
-/** Au-delà, les tentatives échues sont oubliées (mémoire bornée). */
-const HEAL_ATTEMPTS_PRUNE_AT = 5000;
+/**
+ * Plafond de la mémoire des tentatives : atteint avec des tentatives toutes
+ * récentes, le rattrapage attend qu'une sorte de la fenêtre (rien n'est perdu,
+ * le cookie reste et le compte est rattrapé plus tard).
+ */
+export const RECRUITMENT_MODAL_HEAL_MAX_TRACKED = 5000;
 
-/** Dernière tentative de rattrapage, par compte (ce processus seulement). */
+/**
+ * Dernière tentative de rattrapage, par compte (ce processus seulement), dans
+ * l'ordre des tentatives : une entrée est retirée avant d'être reposée, si bien
+ * que les plus anciennes sont en tête et que l'élagage s'arrête à la première
+ * encore dans la fenêtre.
+ */
 const healAttempts = new Map<number, number>();
+
+/**
+ * Colonne absente (son `ALTER` a échoué au démarrage) : chaque rattrapage
+ * échouerait à coup sûr. Éteint jusqu'au redémarrage, qui rejoue l'`ALTER`.
+ */
+let healColumnMissing = false;
 
 function healAttemptedRecently(userId: number, now: number): boolean {
   const last = healAttempts.get(userId);
   if (last !== undefined && now - last < RECRUITMENT_MODAL_HEAL_WINDOW_MS) return true;
-  if (healAttempts.size >= HEAL_ATTEMPTS_PRUNE_AT) {
-    for (const [id, at] of healAttempts) {
-      if (now - at >= RECRUITMENT_MODAL_HEAL_WINDOW_MS) healAttempts.delete(id);
-    }
+  healAttempts.delete(userId);
+  for (const [id, at] of healAttempts) {
+    if (now - at < RECRUITMENT_MODAL_HEAL_WINDOW_MS) break;
+    healAttempts.delete(id);
   }
+  if (healAttempts.size >= RECRUITMENT_MODAL_HEAL_MAX_TRACKED) return true;
   healAttempts.set(userId, now);
   return false;
 }
@@ -69,8 +86,9 @@ function healAttemptedRecently(userId: number, now: number): boolean {
  * règle que le report de `createSession` ; jamais attendu ni bloquant. Une
  * fois posé, le drapeau lu avec la session éteint le rattrapage ; d'ici là,
  * au plus une tentative par compte et par
- * {@link RECRUITMENT_MODAL_HEAL_WINDOW_MS}. Rend `true` si une écriture est
- * partie.
+ * {@link RECRUITMENT_MODAL_HEAL_WINDOW_MS} (mémoire bornée à
+ * {@link RECRUITMENT_MODAL_HEAL_MAX_TRACKED} comptes), et plus aucune si la
+ * colonne manque. Rend `true` si une écriture est partie.
  */
 export function healRecruitmentModalOff(
   {
@@ -80,10 +98,15 @@ export function healRecruitmentModalOff(
   }: Readonly<{ userId: number | undefined; accountOff: boolean | undefined; browserCookie: string | undefined }>,
   now: number = Date.now(),
 ): boolean {
+  if (healColumnMissing) return false;
   if (userId === undefined || accountOff === true || !recruitmentModalOffInBrowser(browserCookie)) return false;
   if (healAttemptedRecently(userId, now)) return false;
-  void recordRecruitmentModalOff(userId).catch((error) =>
-    console.error("[recruitment] recruitment modal opt-out catch-up failed:", error),
-  );
+  void recordRecruitmentModalOff(userId).catch((error) => {
+    if (isUnknownColumnError(error)) {
+      healColumnMissing = true;
+      return;
+    }
+    console.error("[recruitment] recruitment modal opt-out catch-up failed:", error);
+  });
   return true;
 }
