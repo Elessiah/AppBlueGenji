@@ -223,6 +223,10 @@ describe("MatchCardActions — rendu du pied", () => {
     const { primary, more } = groupMatchCardActions(actions);
     expect(primary?.id).toBe("adminScore");
     expect(more.map((a) => a.id)).toEqual(["playerScore"]);
+    // Engagé sans arbitrage : le litige reste visible, même face à « Infos du match ».
+    const launch = { ...NOTHING.launch, showOpen: true, showContacts: true };
+    const player = groupMatchCardActions(matchCardActionList({ ...NOTHING, launch, playerScoreLabel: "Voir le litige", playerScoreReadOnly: true }));
+    expect(player.primary?.id).toBe("playerScore");
     // Seule, la lecture reste visible.
     const alone = groupMatchCardActions(matchCardActionList({ ...NOTHING, playerScoreLabel: "Voir le litige", playerScoreReadOnly: true, canReport: true }));
     expect(alone.primary?.id).toBe("playerScore");

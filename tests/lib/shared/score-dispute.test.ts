@@ -130,6 +130,9 @@ describe("textes FR + EN", () => {
     expect(frPush.scoreToConfirm.body).toContain("sans réponse, il sera validé automatiquement");
     expect(enPush.scoreToConfirm.body).toContain("with no answer, it will be confirmed automatically");
     expect(enPush.scoreToConfirm.body).toContain("dispute it");
+    // Avant toute saisie, la modale annonce déjà la validation d'office.
+    expect(frDialogs.score.player.willConfirm).toContain("sans réponse, il sera validé automatiquement après au moins 2 h");
+    expect(enDialogs.score.player.willConfirm).toContain("with no answer, it will be confirmed automatically after at least 2 hours");
     // Tournoi individuel : même modale, même refus — jamais « équipes » dans le verrou.
     for (const text of [frDialogs.score.player.locked, frDialogs.score.player.counterWarning, frDialogs.score.player.theirs.withMaps, frDialogs.score.player.theirs.withoutMaps, frErrors.codes.SCORE_LOCKED_DISPUTE]) {
       expect(text).not.toMatch(/équipes/);
