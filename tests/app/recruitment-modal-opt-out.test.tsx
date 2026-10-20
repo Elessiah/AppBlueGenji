@@ -101,6 +101,14 @@ describe("modale d'arrivée — bouton « Ne plus afficher »", () => {
     }
   });
 
+  it("dit « openings » en anglais, jamais « ads » (glossaire I18N.md : Annonces → Openings)", () => {
+    const highlight = messagesFor("en").recruitment.highlight;
+    for (const text of [highlight.dontShowAgain, highlight.dontShowAgainDone, highlight.dontShowAgainFailed]) {
+      expect(text).not.toMatch(/ads?/i);
+    }
+    expect(highlight.dontShowAgainDone).toContain("openings");
+  });
+
   it("laisse la modale s'ouvrir tant que rien n'est posé", () => {
     expect(renderToStaticMarkup(<RecruitmentHighlight {...props({ modalOptedOut: false })} />)).toContain('role="dialog"');
   });
