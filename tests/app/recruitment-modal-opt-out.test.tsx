@@ -322,9 +322,12 @@ describe("cookies de la mise en avant — envoyés aussi quand la visite vient d
     expect(source).not.toMatch(/samesite=strict/i);
   });
 
-  it("sont posés Secure sous HTTPS, comme le Set-Cookie du serveur en production", () => {
+  it("sont posés Secure en production, même règle que le Set-Cookie du serveur (jamais rétrogradés par lui)", () => {
     const source = readSource("components/recruitment-highlight.tsx");
-    expect(source).toContain('(globalThis.location?.protocol === "https:" ? "; secure" : "")');
+    expect(source).toContain('(process.env.NODE_ENV === "production" ? "; secure" : "")');
+    expect(readSource("app/api/recruitment/modal-dismiss/route.ts")).toContain(
+      'secure: process.env.NODE_ENV === "production",',
+    );
   });
 
   it("sont décrits en lax sur /rgpd, en français et en anglais", () => {
