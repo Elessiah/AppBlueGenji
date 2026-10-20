@@ -203,7 +203,10 @@ et le geste se retente au clavier — vrai de toutes les confirmations
 (`ConfirmActionDialog`, qui les éteint : ni soulèvement au survol, « Annuler »
 grisé, curseur d'attente). Ses toasts portent la même langue (`lang="fr"`) que
 la confirmation retombée sur le français. Le bouton de la fenêtre n'est
-`aria-busy` que pendant la préparation.
+`aria-busy` que pendant la préparation, annoncée par une région `role="status"`
+(le libellé d'un bouton focalisé qui change n'est pas lu). Les boutons en vol
+de la confirmation gardent leur fond de repos au survol et passent au gris
+système en contraste élevé (`forced-colors`).
 
 Aucune des routes du geste (`GET /api/profile/deletion`, `DELETE /api/profile`,
 ni `GET /api/profile/export` pour l'art. 15) ne consulte l'acceptation des
