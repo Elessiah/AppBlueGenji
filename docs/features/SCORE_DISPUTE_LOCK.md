@@ -67,13 +67,34 @@ une défaite de l'équipe qui abandonne — elle concède, personne d'autre n'y
 perd. Comportement inchangé, voulu ; /regles le dit (FR + EN : « Abandonner le
 tournoi, là où le format le permet, reste possible pendant un litige… »).
 
-**Arbitre qui joue** (décision du 2026-10-20). Un membre du staff
-(`tournaments`) qui joue la manche en litige — membre actuel d'une des deux
-équipes, ou joueur de l'entrée solo (`loadEntrantPlayerIds`) — peut la
-trancher : une petite organisation n'a pas toujours un arbitre neutre. Mais les
-**autres** sont avertis, après le commit et au meilleur effort
-(`lib/server/tournaments/dispute-self-resolution.ts`, appelé par
-`adminResolveMatchPublic` avec l'arbitre de la session) :
+**Arbitre qui joue** (décisions du 2026-10-20). Un membre du staff
+(`tournaments`) qui joue la manche — membre d'une des deux équipes (encore
+membre, **ou parti depuis que la manche existe** : `left_at >= m.created_at`,
+pour que quitter l'équipe juste avant de trancher n'efface pas l'alerte), ou
+joueur de l'entrée solo (`actorPlaysMatch`) — peut agir : une petite
+organisation n'a pas toujours un arbitre neutre. Mais les **autres** sont
+avertis, après le commit et au meilleur effort
+(`lib/server/tournaments/dispute-self-resolution.ts`, avec l'arbitre de la
+session), dans trois cas :
+
+1. il **tranche un litige** par « Valider le résultat »
+   (`adminResolveMatchPublic` → `alertSelfResolvedDispute`) ;
+2. il **impose l'abandon** d'une équipe (route d'abandon, chemin arbitrage :
+   `forfeitTournamentTeamPublic` avec `actor`) et cet abandon clôt un litige
+   de la manche : les litiges ouverts de l'engagé se lisent **sous verrou**
+   (`lockOpenDisputes`, après `lockTournamentRow` en première instruction),
+   ceux que l'abandon a clos (`COMPLETED`) partent à `alertSelfResolvedDispute`
+   — issue « forfait de Équipe X » ;
+3. son « Enregistrer » **suspend** la validation d'office d'un report seul
+   (`adminSaveMatchScoresPublic` → `alertSelfPausedValidation`), une fois : à
+   la saisie qui pose la suspension (`pausedNow`, état d'avant lu sous le
+   verrou du match), pas à chaque nouvelle saisie d'une manche déjà suspendue.
+
+Hors litige, « Valider le résultat » d'un arbitre qui joue n'avertit personne
+(la règle vise les litiges, `/regles` le dit). Seul membre du staff : personne
+à prévenir (`notifyStaff` sans destinataire), la ligne du journal reste.
+
+Pour un litige tranché :
 
 - push `REFEREE_SELF_RESOLUTION` (`notifyStaff`, l'auteur exclu ; rédacteur
   `selfResolvedDisputePush`, FR + EN) : « Un membre du staff qui joue ce match a
@@ -84,10 +105,15 @@ trancher : une petite organisation n'a pas toujours un arbitre neutre. Mais les
   anonyme et noms d'équipe neutralisés (`discordInline`), et nominative dans
   pm2 (`[staff-audit] … — auteur : <pseudo> (#id)`).
 
+Pour une suspension : push « Un membre du staff qui joue ce match en a
+suspendu la validation automatique · tournoi, manche. » (`selfPausedValidationPush`,
+FR + EN, aucun nom d'engagé) et ligne de journal « ⚠️ Validation automatique
+suspendue par un membre du staff qui joue ce match · « tournoi », manche. »
+(`selfPausedValidationLog`), même sujet `REFEREE_SELF_RESOLUTION`.
+
 Le litige se lit **sous le verrou** de la manche, avant l'arbitrage (deux
 propositions sur un match ouvert, `isScoreDisputed`) : un arbitrage hors litige
-— ou par un arbitre qui ne joue pas — n'avertit personne. Seul « Valider le
-résultat » est concerné : « Enregistrer » ne tranche rien.
+— ou par un arbitre qui ne joue pas — n'avertit personne.
 
 **Arbitre et report seul** (décision du 2026-10-20). « Enregistrer »
 (avancement ou forfait noté, sans trancher) sur une manche où **une seule**
