@@ -163,6 +163,7 @@ import {
   type UserEntrant,
 } from "./registration";
 import { BOTH_REPORTED_SQL } from "./score-report-sql";
+import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
 import { resolveExpiredScoreReports, finalizeTournamentIfDone } from "./finalization";
 import { tryAutoResolveByes } from "./byes";
 import { mapCard } from "./_internal";
@@ -1582,7 +1583,7 @@ async function lockOpenDisputes(
     `SELECT m.id, m.team1_id, m.team2_id,
             (m.status = 'AWAITING_CONFIRMATION' AND ${BOTH_REPORTED_SQL}) AS disputed
        FROM bg_matches m
-      WHERE m.id IN (${open.map(() => "?").join(", ")})
+      WHERE m.id IN (${sqlPlaceholders(open.length)})
       FOR UPDATE`,
     open.map((row) => Number(row.id)),
   );
@@ -1603,7 +1604,7 @@ async function keepSettled(
 ): Promise<DisputeBeforeResolution[]> {
   if (disputes.length === 0) return [];
   const [rows] = await connection.execute<(RowDataPacket & { id: number })[]>(
-    `SELECT id FROM bg_matches WHERE id IN (${disputes.map(() => "?").join(", ")}) AND status = 'COMPLETED'`,
+    `SELECT id FROM bg_matches WHERE id IN (${sqlPlaceholders(disputes.length)}) AND status = 'COMPLETED'`,
     disputes.map((dispute) => dispute.matchId),
   );
   const settled = new Set(rows.map((row) => Number(row.id)));

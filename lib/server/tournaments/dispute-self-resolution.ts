@@ -14,7 +14,7 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { notifyStaff } from "@/lib/server/notify";
-import { publishStaffAction } from "@/lib/server/staff-audit";
+import { auditStaffAction, publishStaffAction } from "@/lib/server/staff-audit";
 import { matchRoundLabel } from "@/lib/shared/discord-notifications";
 import { discordInline } from "@/lib/shared/discord-text";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
@@ -154,12 +154,18 @@ async function alertSelfAction(
   actor: StaffActor,
   sides: readonly number[] = [match.team1Id, match.team2Id],
 ): Promise<boolean> {
+  // Trace courte **avant** toute lecture (`auditStaffAction`, partie avant le
+  // premier `await`, donc avant la réponse de la route) : un arrêt du serveur
+  // entre le commit et la ligne détaillée ne laisse pas le geste sans auteur.
+  auditStaffAction(`${SELF_ACTION_TRACE[kind]} — match #${match.matchId}`, actor);
+  let logged = false;
   try {
     if (!(await actorPlaysMatch(match, actor.id, sides))) return false;
     const input = await loadAlertMatch(match);
     if (!input) return false;
 
     publishStaffAction(kind === "resolved" ? selfResolvedDisputeLog(input) : selfPausedValidationLog(input), actor);
+    logged = true;
     await notifyStaff({
       topic: "REFEREE_SELF_RESOLUTION",
       excludeUserIds: [actor.id],
@@ -168,12 +174,18 @@ async function alertSelfAction(
     });
     return true;
   } catch (error) {
-    // Le geste est acquis mais n'a pu être ni annoncé ni journalisé : au moins
-    // une trace dans pm2, avec la manche et l'auteur (`[staff-audit]` n'est pas parti).
-    console.error(`[staff-audit] alerte d'arbitre qui joue non envoyée (${kind}) — match #${match.matchId}, auteur #${actor.id}`, error);
+    // Le geste est acquis ; dire ce qui manque, la manche et l'auteur (par son id).
+    const missing = logged ? "push non envoyé" : "ni journalisée ni envoyée";
+    console.error(`[staff-audit] alerte d'arbitre qui joue ${missing} (${kind}) — match #${match.matchId}, auteur #${actor.id}`, error);
     return false;
   }
 }
+
+/** Trace pm2 d'avant lecture, par geste. */
+const SELF_ACTION_TRACE: Record<SelfActionKind, string> = {
+  resolved: "Litige clos par l'arbitrage (vérification « arbitre qui joue »)",
+  paused: "Validation automatique suspendue par l'arbitrage (vérification « arbitre qui joue »)",
+};
 
 /**
  * Litige tranché — « Valider le résultat », ou abandon forcé par l'arbitrage
