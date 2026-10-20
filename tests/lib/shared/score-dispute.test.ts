@@ -120,6 +120,13 @@ describe("textes FR + EN", () => {
     expect(en).toContain("and no forfeit of the match), and only a referee or an administrator settles it, by confirming the official result (score or forfeit).");
     expect(fr).not.toContain("en remettant le match à zéro");
     expect(en).not.toContain("resetting the match");
+    // Détail adverse en lecture : l'avis du litige est déjà dans la phrase d'état.
+    expect(frDialogs.score.player.theirs.loading).toMatch(/ouvre un litige/);
+    expect(enDialogs.score.player.theirs.loading).toMatch(/opens a dispute/);
+    // « Score à confirmer » prévient de la validation d'office (sans heure : l'échéance peut dépasser 2 h).
+    expect(frPush.scoreToConfirm.body).toContain("sans réponse, il sera validé automatiquement");
+    expect(enPush.scoreToConfirm.body).toContain("with no answer, it will be confirmed automatically");
+    expect(enPush.scoreToConfirm.body).toContain("dispute it");
     // Tournoi individuel : même modale, même refus — jamais « équipes » dans le verrou.
     for (const text of [frDialogs.score.player.locked, frDialogs.score.player.counterWarning, frDialogs.score.player.theirs.withMaps, frDialogs.score.player.theirs.withoutMaps, frErrors.codes.SCORE_LOCKED_DISPUTE]) {
       expect(text).not.toMatch(/équipes/);
