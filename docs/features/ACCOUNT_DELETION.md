@@ -215,8 +215,9 @@ already have been deleted…" (`deletion.errors.sessionGone`,
 `SESSION_GONE_CODES`) puis recharge l'accueil, au lieu de redire « échec »
 sous la fenêtre des conditions. Côté serveur, une panne de `clearSession()`
 **après** la suppression (sessions déjà parties avec la transaction) est
-journalisée sans changer la réponse (`deleted: true`), et `clearSession`
-expire le cookie même quand la base ne répond pas.
+journalisée sans changer la réponse (`deleted: true`) : un cookie resté n'ouvre
+plus rien. La liste des codes vit une fois, dans `lib/shared/account-deletion.ts`,
+lue par l'écran et par `deletionErrorText`.
 
 L'aperçu est **borné** (`ACCOUNT_DELETION_PREVIEW_TIMEOUT_MS`, 8 s,
 `AbortController` + minuterie, pas `AbortSignal.timeout` absent avant Safari 16 : chaque essai y laissait une requête ouverte, assez pour épuiser les connexions HTTP/1.1 du site) : un aperçu qui ne répond jamais laissait la fenêtre
