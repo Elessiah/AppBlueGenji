@@ -87,4 +87,25 @@ describe("auto-validated-notices", () => {
     expect(notifyScoreAutoValidated).toHaveBeenCalledTimes(300);
     expect(notifyScoreAutoValidated).toHaveBeenLastCalledWith(300);
   });
+  it("enchaîne les flushs de plusieurs transactions dans une seule file", async () => {
+    const first = connection();
+    const second = connection();
+    let release: ((value: number) => void) | undefined;
+    jest.mocked(notifyScoreAutoValidated).mockImplementationOnce(
+      () => new Promise<number>((resolve) => { release = resolve; }),
+    );
+    queueAutoValidatedNotice(first, 41);
+    queueAutoValidatedNotice(second, 42);
+
+    flushAutoValidatedNotices(first);
+    flushAutoValidatedNotices(second);
+    await flushMicrotasks();
+    expect(notifyScoreAutoValidated).toHaveBeenCalledTimes(1);
+    expect(notifyScoreAutoValidated).toHaveBeenCalledWith(41);
+
+    release?.(1);
+    await flushMicrotasks();
+    expect(notifyScoreAutoValidated).toHaveBeenCalledTimes(2);
+    expect(notifyScoreAutoValidated).toHaveBeenLastCalledWith(42);
+  });
 });
