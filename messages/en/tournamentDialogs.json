@@ -50,6 +50,7 @@
     "admin": {
       "title": "Match score",
       "saved": "Score saved: the match is still in progress.",
+        "disputeNotice": "Dispute: score entry stays locked for both opponents until you use “Confirm the result” (score or forfeit). “Save” records progress without settling the match.",
       "resolved": "Result confirmed: the board is up to date.",
       "awaitingDetail": "Loading the proposed map details… Refresh the page if they don't arrive.",
       "proposal": "Score proposed by {author} ({score1} – {score2}), awaiting confirmation from {other}. Check it, then confirm the result to approve it.",
@@ -91,8 +92,8 @@
     },
     "player": {
       "title": "My match score",
-      "conflictMaps": "Same score ({score}), but the map details differ from {opponent}'s: replay codes or map scores. The referee has been alerted; you can still correct your proposal.",
-      "conflictScores": "The scores contradict each other — you: {mine}, {opponent}: {theirs}. The referee has been alerted; you can still correct your proposal.",
+      "conflictMaps": "Same score ({score}), but the map details differ from {opponent}'s: replay codes or map scores. The referee has been alerted.",
+      "conflictScores": "The scores contradict each other — you: {mine}, {opponent}: {theirs}. The referee has been alerted.",
       "closed": {
         "toPlan": "This match is waiting for the referee to set its date: the score can be entered once the match is launched.",
         "scheduledAt": "This match starts on {date}: the score can be entered once it's launched, when the parties have declared themselves ready.",
@@ -105,16 +106,20 @@
       },
       "theirs": {
         "readOnly": "{opponent} proposes {score}. Waiting for confirmation from someone in charge of {mine}.",
-        "withMaps": "{opponent} proposes {score}. Confirm it, or enter the score you saw: a disagreement alerts the referee.",
-        "loading": "{opponent} proposes {score}. Loading their map details… Refresh the page if they don't arrive.",
-        "withoutMaps": "{opponent} proposes {score}, but their map details could not be loaded. Refresh the page to confirm it: entering a score instead alerts the referee."
+        "withMaps": "{opponent} proposes {score}. Confirm it, or enter the score you saw: a disagreement opens a dispute, which locks score entry for both opponents until a referee settles it.",
+        "loading": "{opponent} proposes {score}. Loading their map details… Refresh the page if they don't arrive. An entry that differs from theirs (score or map details) opens a dispute, which locks score entry for both opponents until a referee settles it.",
+        "withoutMaps": "{opponent} proposes {score}, but their map details could not be loaded. Refresh the page to confirm it: entering a score instead opens a dispute, which locks score entry for both opponents until a referee settles it."
       },
       "confirmed": "Score confirmed: {team1} {score1} – {score2} {team2}",
       "submitted": "Score sent: {team1} {score1} – {score2} {team2}",
       "forfeitRecorded": "Forfeit recorded: {opponent} wins the match.",
       "minePending": "You proposed {score}. Waiting for {opponent} to confirm.",
-      "minePendingDeadline": "You proposed {score}. Waiting for {opponent} to confirm — with no answer, this score will be confirmed at {deadline}.",
-      "willConfirm": "{opponent} will have to confirm the score you send.",
+      "minePendingDeadline": "You proposed {score}. Waiting for {opponent} to confirm — with no answer, this score will be confirmed automatically at {deadline} (Paris time).",
+      "locked": "Score disputed: score entry is locked for both opponents, forfeits included. Only a referee or an administrator can settle this match — confirm the final score or a forfeit.",
+      "conflictLoading": "Loading the map details… Refresh the page if they don't arrive.",
+      "counterWarning": "This entry differs from {opponent}'s proposal (score or map details): sending it opens a dispute and locks score entry for both opponents until a referee settles it.",
+      "autoValidateAt": "With no answer, this score will be confirmed automatically at {deadline} (Paris time).",
+      "willConfirm": "{opponent} will have to confirm the score you send: with no answer, it will be confirmed automatically after at least 2 hours.",
       "confirm": "Confirm the score",
       "send": "Send the score",
       "alreadySent": "Score already sent: waiting for {opponent}.",

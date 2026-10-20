@@ -83,6 +83,9 @@ const REPORT_ERROR_STATUS: ReadonlyMap<string, number> = new Map([
   ["MATCH_NOT_STARTED", 409],
   // La proposition confirmée a changé ou n'existe plus : la modale se recharge.
   ["PROPOSAL_STALE", 409],
+  // Litige ouvert : la saisie est verrouillée pour les deux équipes, seul
+  // l'arbitrage tranche (`docs/features/SCORE_DISPUTE_LOCK.md`).
+  ["SCORE_LOCKED_DISPUTE", 409],
   ["TOURNAMENT_NOT_FOUND", 404],
   ["MATCH_NOT_FOUND", 404],
 ]);

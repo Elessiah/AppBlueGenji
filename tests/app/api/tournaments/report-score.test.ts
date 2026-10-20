@@ -80,6 +80,14 @@ describe("POST .../report — « Confirmer » la proposition adverse (MAP_SCORES
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: "PROPOSAL_STALE" });
   });
+
+  // Litige ouvert (`SCORE_DISPUTE_LOCK.md`) : un code seul, jamais une phrase.
+  it("rend un match en litige en 409 SCORE_LOCKED_DISPUTE", async () => {
+    jest.mocked(reportMatchScore).mockRejectedValue(new Error("SCORE_LOCKED_DISPUTE"));
+    const res = await POST(req({ maps: MAPS }), params);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "SCORE_LOCKED_DISPUTE" });
+  });
 });
 
 describe("POST .../report — détail map par map (MAP_SCORES.md)", () => {

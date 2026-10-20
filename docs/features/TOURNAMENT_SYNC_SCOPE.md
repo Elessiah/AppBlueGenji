@@ -68,7 +68,14 @@ résolution) est écoulé **et** sans ligne `SCORE_REPORT_STALLED`. C'est le
 pendant, côté balayage, du réveil de salle de `nextRoomWakeAt`, qui ne relit un
 conflit expiré qu'à l'instant de son escalade. Coupe-circuit du bot ouvert, rien
 n'est réservé et le tournoi reste retenu : l'escalade doit partir une fois le bot
-revenu.
+revenu. Ce prédicat (`ACTIONABLE_EXPIRED_REPORT_SQL`,
+`lib/server/tournaments/score-report-sql.ts`, module feuille) est **le même** pour
+la lecture de l'instantané (`hasDueRunningMaintenance`, `./snapshot.ts`) et pour
+la sélection de `resolveExpiredScoreReports` : depuis que le litige verrouille la
+saisie (`SCORE_DISPUTE_LOCK.md`), il dure jusqu'à l'arbitrage, et l'ancienne
+condition (« délai passé ») ouvrait une transaction d'entretien inutile à chaque
+reconstruction de l'instantané, et relisait le litige à chaque écriture d'un
+joueur du tournoi, pendant tout ce temps.
 
 **La précondition des byes est celle de la résolution, mot pour mot.** Elle
 disait d'abord « une case est vide sur un match ouvert », ce qui attrape toute

@@ -60,7 +60,7 @@ describe("playerReportView", () => {
     const match = { ...base, team1Report: report(2, 1), team2Report: report(2, 1) };
     // Concordantes, elles auraient clos le match dans la même transaction.
     expect(playerReportView(match, 10)?.phase).toBe("CONFLICT");
-    expect(pendingReportNotice(match)).toBe("Scores contradictoires · arbitrage alerté");
+    expect(pendingReportNotice(match)).toBe("Score en litige · saisie verrouillée, arbitrage attendu");
   });
 });
 
@@ -152,11 +152,18 @@ describe("playerScoreButtonLabel", () => {
     expect(playerScoreButtonLabel(playerReportView(pending, 10), true)).toBe("Modifier mon score");
     expect(playerScoreButtonLabel(playerReportView(pending, 20), true)).toBe("Confirmer le score");
     const conflict = { ...pending, team2Report: report(0, 2) };
-    expect(playerScoreButtonLabel(playerReportView(conflict, 10), true)).toBe("Revoir le score");
+    expect(playerScoreButtonLabel(playerReportView(conflict, 10), true)).toBe("Voir le litige");
   });
 
   it("n'offre que le forfait tant que le match n'est pas lancé", () => {
     expect(playerScoreButtonLabel(playerReportView(base, 10), false)).toBe("Déclarer forfait");
+  });
+
+  it("annonce le litige, pas le forfait, à qui ne peut pas reporter", () => {
+    // En litige, la modale n'offre plus le forfait : le bouton ne doit pas le promettre.
+    const conflict = { ...base, team1Report: report(2, 1), team2Report: report(0, 2) };
+    expect(playerScoreButtonLabel(playerReportView(conflict, 10), false)).toBe("Voir le litige");
+    expect(playerScoreButtonLabel(playerReportView(conflict, 20), false)).toBe("Voir le litige");
   });
 });
 
@@ -180,9 +187,16 @@ describe("pendingReportNotice", () => {
     );
   });
 
+  // Validation d'office (`SCORE_DISPUTE_LOCK.md`) : l'heure, à l'heure de Paris, pour tous.
+  it("annonce l'heure de la validation d'office quand l'échéance est connue", () => {
+    expect(
+      pendingReportNotice({ ...base, scoreDeadlineAt: "2026-10-20T18:05:00.000Z", team2Report: report(0, 2) }),
+    ).toBe("0 – 2 proposé par Bravo · validation automatique à 20:05 (heure de Paris) sans réponse");
+  });
+
   it("annonce un désaccord sans prendre parti", () => {
     expect(
       pendingReportNotice({ ...base, team1Report: report(2, 0), team2Report: report(0, 2) }),
-    ).toBe("Scores contradictoires · arbitrage alerté");
+    ).toBe("Score en litige · saisie verrouillée, arbitrage attendu");
   });
 });

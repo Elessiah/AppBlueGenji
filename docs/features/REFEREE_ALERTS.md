@@ -118,7 +118,7 @@ ce qui permet d'agir :
 
 ```
 ⚠️ Arbitrage requis — « Coupe BlueGenji » (#12) · Manche 2 : Les Renards vs Team Nova (match #31) — reports de score contradictoires. https://…/tournois/12
-⏱️ Arbitrage requis — « Coupe BlueGenji » (#12) · Manche 2 : Les Renards vs Team Nova (match #31) — délai de report dépassé depuis plus de 10 minutes, toujours pas tranché. https://…/tournois/12
+⏱️ Arbitrage requis — « Coupe BlueGenji » (#12) · Manche 2 : Les Renards vs Team Nova (match #31) — litige toujours pas tranché, délai dépassé depuis plus de 10 minutes — saisie verrouillée. https://…/tournois/12
 ```
 
 Nature de l'intervention en tête, tournoi et identifiant, manche, les deux
@@ -322,7 +322,11 @@ Rien de tout cela ne peut faire échouer une transaction du moteur.
   pas (match effacé entre-temps, engagé manquant) est ignorée.
 - `pushRefereeAlert` rend `null` quand le bot est injoignable : c'est un
   résultat, pas une exception — et un résultat **lu**, qui fait rendre la
-  réservation de l'escalade (voir ci-dessus).
+  réservation de l'escalade (voir ci-dessus) **sauf si le push a joint au moins
+  un arbitre** (`report.pushed > 0`) : l'alerte est alors remise, la réservation
+  gardée. Sans quoi, bot éteint, l'escalade d'un litige — qui, la saisie étant
+  verrouillée (`SCORE_DISPUTE_LOCK.md`), dure jusqu'à l'arbitrage — repartait à
+  chaque passage d'entretien, un push à chaque arbitre à chaque fois.
 - **Rôle arbitre non configuré** : le bot répond quand même 200 et se contente du
   log. Le site n'a rien de particulier à prévoir — et c'est bien la trace de
   l'incident qui compte, plus que le message privé.

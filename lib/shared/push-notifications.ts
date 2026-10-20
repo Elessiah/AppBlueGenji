@@ -47,7 +47,7 @@ export const PUSH_TOPICS = {
   },
   SCORE_TO_CONFIRM: {
     label: "Score à confirmer",
-    description: "L'équipe adverse a saisi un score que tu dois confirmer ou contester.",
+    description: "L'équipe adverse a saisi un score que tu dois confirmer ou contester, ou un score saisi a été validé automatiquement faute de réponse après au moins 2 h.",
     audience: null,
   },
   TOURNAMENT_START: {
@@ -82,7 +82,7 @@ export const PUSH_TOPICS = {
   },
   REFEREE_ALERT: {
     label: "Alertes d'arbitrage",
-    description: "Un conflit de score, un score resté trop longtemps sans confirmation ou un problème signalé attend un arbitre.",
+    description: "Un conflit de score, un litige de score resté trop longtemps sans arbitrage ou un problème signalé attend un arbitre.",
     audience: "tournaments",
   },
   MATCH_SCHEDULED: {

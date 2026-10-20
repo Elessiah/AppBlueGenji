@@ -4,7 +4,7 @@ import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { useToast } from "@/components/ui/toast";
 import { localizedPlaceholder, matchFormatDescriptionText, matchFormatText } from "@/lib/shared/tournament-page-text";
 import type { TournamentDialogsText } from "@/lib/shared/tournament-actions-text";
-import { INTL_LOCALE, type Locale } from "@/lib/shared/locales";
+import { SCORE_LOCKED_DISPUTE, autoValidateTimeText } from "@/lib/shared/score-dispute";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Pill } from "@/components/cyber";
@@ -66,6 +66,12 @@ interface PlayerScoreDialogProps {
   onSubmitted: () => void;
   /** Relit le contexte du lecteur (lecture REST) : une proposition a changé. */
   onRefresh: () => void | Promise<unknown>;
+  /**
+   * Le geste du lecteur peut trancher le match (envoi, forfait) : `true` dès
+   * l'envoi, et le reste sauf refus étranger à la clôture — la page ne dit
+   * alors pas « tranché sous tes yeux » par-dessus son propre toast.
+   */
+  onOwnSettle?: (settling: boolean) => void;
 }
 
 /** Empreinte des propositions en attente : ce que le flux peut changer sous la saisie. */
@@ -91,13 +97,6 @@ function conflictText(text: TournamentDialogsText, mine: MatchScoreReport, their
     : text.t("score.player.conflictScores", { mine: scoreText(mine), opponent: opponentName, theirs: scoreText(theirs) });
 }
 
-/** Heure d'échéance du délai de confirmation, dans le fuseau du lecteur (24 h). */
-function deadlineText(iso: string | null, locale: Locale): string | null {
-  if (!iso) return null;
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleTimeString(INTL_LOCALE[locale], { hour: "2-digit", minute: "2-digit", ...(locale === "fr" ? {} : { hourCycle: "h23" as const }) });
-}
 
 /**
  * Pourquoi le score ne se saisit pas encore (`playerScoreClosedNotice`), dans
@@ -137,8 +136,10 @@ export function closedNoticeText(
  * Ce que l'arbitrage n'a pas, et qui fait tout le cycle : les **propositions**.
  * Un score envoyé ici n'écrit pas le résultat, il le propose ; l'adversaire le
  * confirme d'un clic (la modale s'ouvre sur sa proposition), ou en saisit un
- * autre — ce qui alerte l'arbitrage. Sans réponse, la proposition fait foi à
- * l'échéance du délai. La modale dit donc toujours **où en est le cycle**, ce
+ * autre — ce qui ouvre un **litige** : saisie verrouillée pour les deux équipes,
+ * forfait compris, jusqu'à l'arbitrage (`SCORE_DISPUTE_LOCK.md`). Sans réponse,
+ * la proposition est validée d'office à l'échéance (au moins 2 h après la
+ * dernière saisie). La modale dit donc toujours **où en est le cycle**, ce
  * que l'ancien formulaire en ligne taisait : un score envoyé n'y laissait
  * aucune trace, ni chez qui l'avait envoyé, ni chez qui devait le confirmer.
  *
@@ -195,6 +196,40 @@ function theirsPendingStatus(
   return text.t("score.player.theirs.withoutMaps", values);
 }
 
+/** Classe de la région d'état : aucune sans phrase, l'avertissement en litige. */
+function statusClassName(status: string | null, locked: boolean): string | undefined {
+  if (status === null) return undefined;
+  return `${locked ? styles.conflict : styles.stored} ${styles.notice}`;
+}
+
+/** Refus qui disent que l'état lu est périmé : la modale relit le serveur. */
+// `MATCH_ALREADY_COMPLETED` : la validation d'office a pu passer à l'heure dite.
+const REFRESH_ON_REFUSAL: ReadonlySet<string> = new Set(["PROPOSAL_STALE", SCORE_LOCKED_DISPUTE, "MATCH_ALREADY_COMPLETED"]);
+
+/**
+ * Après un échec, le geste du lecteur a-t-il pu trancher ? Oui sans code du
+ * serveur (issue inconnue) et sur `MATCH_ALREADY_COMPLETED` (déjà dit par son
+ * toast) ; non sur tout autre refus rendu.
+ */
+function ownSettleAfterFailure(refusedCode: string | null): boolean {
+  return refusedCode === null || refusedCode === "MATCH_ALREADY_COMPLETED";
+}
+
+/** Envoyer la saisie ouvrirait-il un litige ? Face à la proposition adverse, une saisie valide qui en diffère. */
+function sendingOpensDispute(
+  canEnterScore: boolean,
+  view: { phase: string; theirs: MatchScoreReport | null } | null,
+  form: { entered: { team1Score: number; team2Score: number } | null; confirmsAsIs: boolean; error: unknown },
+): boolean {
+  if (!canEnterScore || view?.phase !== "THEIRS_PENDING" || !view.theirs) return false;
+  if (form.entered === null || form.error) return false;
+  // Détail adverse connu : toute retouche le contredit. Encore en lecture ou
+  // illisible, seul un **score** différent se sait contradictoire — le serveur
+  // compare lui-même le détail, et une saisie identique y confirmerait.
+  if ((view.theirs.maps ?? []).length > 0) return !form.confirmsAsIs;
+  return form.entered.team1Score !== view.theirs.team1Score || form.entered.team2Score !== view.theirs.team2Score;
+}
+
 export function PlayerScoreDialog({
   tournamentId,
   match: liveMatch,
@@ -205,6 +240,7 @@ export function PlayerScoreDialog({
   onClose,
   onSubmitted,
   onRefresh,
+  onOwnSettle,
 }: Readonly<PlayerScoreDialogProps>) {
   const pageText = useTournamentPageText();
   const text = useDialogsText();
@@ -286,7 +322,28 @@ export function PlayerScoreDialog({
   const showTheirMaps = theirMapsWorthShowing(view?.phase, view?.theirs?.maps ?? [], { missedProposal, confirmsAsIs });
 
   const forfeitMaps = forfeitMapCount(matchFormat);
-  const deadline = deadlineText(match.scoreDeadlineAt, text.locale);
+  // Validation d'office, à l'heure de Paris (`SCORE_DISPUTE_LOCK.md`).
+  const deadline = autoValidateTimeText(match.scoreDeadlineAt, text.locale);
+  // Litige ouvert : saisie verrouillée pour les deux équipes, forfait compris —
+  // le serveur refuse (`SCORE_LOCKED_DISPUTE`), la modale le reflète.
+  const disputeLocked = view?.phase === "CONFLICT";
+  const canEnterScore = canReportScore && !disputeLocked;
+  const canDeclareForfeit = canForfeit && !disputeLocked;
+  // Litige ouvert par le flux pendant la saisie : les champs et boutons sous le
+  // focus disparaissent — le focus revient à la modale, qui garde le lecteur
+  // d'écran dans le dialogue plutôt que de le perdre sur `body`.
+  const wasLocked = useRef(disputeLocked);
+  useEffect(() => {
+    // Zone de forfait repliée au verrou : levé sans clore (retour en arrière),
+    // elle ne revient pas dépliée, « Confirmer le forfait » prêt au clic.
+    if (disputeLocked) setForfeitOpen(false);
+    const dialog = dialogRef.current;
+    if (disputeLocked && !wasLocked.current && dialog && !dialog.contains(document.activeElement)) dialog.focus();
+    wasLocked.current = disputeLocked;
+  }, [disputeLocked, dialogRef]);
+  // Contre-proposition : l'envoyer ouvre un litige sans retour possible côté
+  // joueurs — le dire avant l'envoi, pas après.
+  const opensDispute = sendingOpensDispute(canEnterScore, view, { entered, confirmsAsIs, error: check.error });
 
   // Un refus qui désigne une map est rattaché à son champ, en plus de la
   // notification — avant l'envoi comme après un refus du serveur, qui ne rend
@@ -310,6 +367,11 @@ export function PlayerScoreDialog({
     const entered2 = check.score.team2;
     const body = toReporterScores(myTeamIsTeam1, entered1, entered2);
     setSubmitting(true);
+    onOwnSettle?.(true);
+    // Refus **rendu par le serveur** (un code) : le geste n'a rien tranché. Sans
+    // réponse lisible (réseau coupé, 502), l'issue est inconnue — l'envoi a pu
+    // passer, la page ne dira pas « tranché par un autre ».
+    let refusedCode: string | null = null;
     try {
       const response = await fetch(
         `/api/tournaments/${tournamentId}/matches/${match.id}/report`,
@@ -324,7 +386,10 @@ export function PlayerScoreDialog({
         },
       );
       const payload = (await response.json().catch(() => ({}))) as { error?: string };
-      if (!response.ok) throw new Error(payload.error || "SCORE_SUBMIT_FAILED");
+      if (!response.ok) {
+        refusedCode = payload.error ?? null;
+        throw new Error(payload.error || "SCORE_SUBMIT_FAILED");
+      }
       showSuccess(
         confirmsAsIs
           ? t("score.player.confirmed", { team1, team2, score1: entered1, score2: entered2 })
@@ -339,10 +404,14 @@ export function PlayerScoreDialog({
       onClose();
     } catch (error) {
       const code = (error as Error).message;
+      // Déjà tranché : le refus le dit, l'avis de la page serait de trop.
+      onOwnSettle?.(ownSettleAfterFailure(refusedCode));
       flagRefusal(code);
       showError(mapError(code));
-      // Proposition changée ou expirée : la modale se recharge sur la nouvelle.
-      if (code === "PROPOSAL_STALE") void Promise.resolve(onRefresh()).catch(() => undefined);
+      // Proposition changée ou expirée, ou litige ouvert entre-temps : la modale
+      // se recharge sur l'état du serveur sans attendre le flux (peut-être en
+      // reconnexion), plutôt que de laisser réessayer en vain.
+      if (REFRESH_ON_REFUSAL.has(code)) void Promise.resolve(onRefresh()).catch(() => undefined);
     } finally {
       setSubmitting(false);
     }
@@ -351,18 +420,30 @@ export function PlayerScoreDialog({
   const submitForfeit = async () => {
     if (submitting) return;
     setSubmitting(true);
+    onOwnSettle?.(true);
+    // Refus **rendu par le serveur** (un code) : le geste n'a rien tranché. Sans
+    // réponse lisible (réseau coupé, 502), l'issue est inconnue — l'envoi a pu
+    // passer, la page ne dira pas « tranché par un autre ».
+    let refusedCode: string | null = null;
     try {
       const response = await fetch(
         `/api/tournaments/${tournamentId}/matches/${match.id}/forfeit`,
         { method: "POST" },
       );
       const payload = (await response.json().catch(() => ({}))) as { error?: string };
-      if (!response.ok) throw new Error(payload.error || "MATCH_FORFEIT_FAILED");
+      if (!response.ok) {
+        refusedCode = payload.error ?? null;
+        throw new Error(payload.error || "MATCH_FORFEIT_FAILED");
+      }
       showSuccess(t("score.player.forfeitRecorded", { opponent: opponentName }));
       onSubmitted();
       onClose();
     } catch (error) {
-      showError(mapError((error as Error).message));
+      const code = (error as Error).message;
+      // Déjà tranché : le refus le dit, l'avis de la page serait de trop.
+      onOwnSettle?.(ownSettleAfterFailure(refusedCode));
+      showError(mapError(code));
+      if (REFRESH_ON_REFUSAL.has(code)) void Promise.resolve(onRefresh()).catch(() => undefined);
     } finally {
       setSubmitting(false);
     }
@@ -382,10 +463,19 @@ export function PlayerScoreDialog({
         return deadline
           ? t("score.player.minePendingDeadline", { score: scoreText(view.mine!), opponent: opponentName, deadline })
           : t("score.player.minePending", { score: scoreText(view.mine!), opponent: opponentName });
-      case "THEIRS_PENDING":
-        return theirsPendingStatus(text, { opponentName, myName }, view.theirs!, { canReport: canReportScore, detailLoading });
-      case "CONFLICT":
-        return conflictText(text, view.mine!, view.theirs!, opponentName);
+      case "THEIRS_PENDING": {
+        const pending = theirsPendingStatus(text, { opponentName, myName }, view.theirs!, { canReport: canReportScore, detailLoading });
+        return deadline ? `${pending} ${t("score.player.autoValidateAt", { deadline })}` : pending;
+      }
+      // Désaccord et verrou dans **la même** région d'état : un litige arrivé
+      // par le flux s'annonce une fois, où que soit le focus — la région est
+      // déjà montée (une proposition l'avait remplie).
+      case "CONFLICT": {
+        const conflict = `${conflictText(text, view.mine!, view.theirs!, opponentName)} ${t("score.player.locked")}`;
+        // Détail des propositions encore en lecture : les deux blocs de maps
+        // n'ont rien à montrer — le dire, et dire quoi faire s'il n'arrive pas.
+        return detailLoading ? `${conflict} ${t("score.player.conflictLoading")}` : conflict;
+      }
       default:
         return canReportScore
           ? t("score.player.willConfirm", { opponent: opponentName })
@@ -430,16 +520,30 @@ export function PlayerScoreDialog({
 
           {/* `<output>` (région d'état native) : l'adversaire peut répondre pendant que la modale
               est ouverte, et le flux change alors cette phrase. */}
-          {status && (
-            <output className={`${styles.stored} ${styles.notice}`}>
-              {status}
-            </output>
-          )}
+          {/* Toujours montée, vide sans phrase : un litige arrivé d'un bloc (les
+              deux reports dans un même instantané) remplit une région existante,
+              et ce remplissage s'annonce. */}
+          <output className={statusClassName(status, disputeLocked)}>{status}</output>
 
           {/* Désaccord, ou proposition adverse que le formulaire ne reprend pas
               (saisie déjà commencée à son arrivée) : le détail adverse, codes de
               replay compris — sans lui, une faute de frappe ne se retrouverait
               pas, et « Confirme-le » n'aurait rien à montrer. */}
+          {/* Litige : sa propre proposition aussi — la saisie retirée, c'est la
+              seule trace de ses codes, à comparer aux adverses (à score égal,
+              ce sont eux qui diffèrent) et à citer à l'arbitre. */}
+          {disputeLocked && view?.mine && view.mine.maps.length > 0 && (
+            <div className={mapStyles.proposals}>
+              <p className={mapStyles.proposalTitle}>{t("score.admin.proposalOf", { name: myName })}</p>
+              <MapResultList
+                maps={view.mine.maps}
+                team1Name={team1}
+                team2Name={team2}
+                label={t("score.admin.proposalMaps", { name: myName })}
+              />
+            </div>
+          )}
+
           {showTheirMaps && view?.theirs && (
             <div className={mapStyles.proposals}>
               <p className={mapStyles.proposalTitle}>{t("score.admin.proposalOf", { name: opponentName })}</p>
@@ -452,7 +556,8 @@ export function PlayerScoreDialog({
             </div>
           )}
 
-          {canReportScore ? (
+
+          {canEnterScore ? (
             <>
               <MapScoreList
                 idPrefix="player-score"
@@ -471,21 +576,23 @@ export function PlayerScoreDialog({
                 <p className={styles.formatHint}>{matchFormatDescriptionText(pageText, matchFormat)}</p>
               )}
             </>
-          ) : (
+          ) : !disputeLocked && (
             <p className={styles.formatHint}>
               {closedNoticeText(text, launchPhase, formatMatchStartAtFull(match.startAt, text.locale), launchPhaseEnabled, match.launchedAt)}
             </p>
           )}
 
-          {canForfeit ? (
+          {canDeclareForfeit && (
             <div className={styles.forfeitZone}>
               <button
                 type="button"
                 className={styles.link}
-                onClick={() => setForfeitOpen(!forfeitOpen)}
+                onClick={() => {
+                  if (!submitting) setForfeitOpen(!forfeitOpen);
+                }}
                 aria-expanded={forfeitOpen}
                 aria-controls="player-score-forfeit"
-                disabled={submitting}
+                aria-disabled={submitting || undefined}
               >
                 {forfeitOpen ? t("score.player.forfeit.close") : t("score.player.forfeit.open")}
               </button>
@@ -500,7 +607,8 @@ export function PlayerScoreDialog({
                       className={styles.forfeit}
                       aria-describedby="player-score-forfeit-hint"
                       onClick={() => void submitForfeit()}
-                      disabled={submitting}
+                      aria-disabled={submitting || undefined}
+                      aria-busy={submitting || undefined}
                     >
                       {submitting ? "…" : t("score.player.forfeit.confirm", { name: myName })}
                     </button>
@@ -508,13 +616,20 @@ export function PlayerScoreDialog({
                 </div>
               )}
             </div>
-          ) : (
+          )}
+          {!canForfeit && !disputeLocked && (
             <p className={styles.formatHint}>
               {t("score.player.forfeit.notAllowed")}
             </p>
           )}
 
-          {canReportScore && showBlocker && (
+          {opensDispute && (
+            <output id="player-score-counter-warning" className={`${styles.conflict} ${styles.notice}`}>
+              {t("score.player.counterWarning", { opponent: opponentName })}
+            </output>
+          )}
+
+          {canEnterScore && showBlocker && (
             <output className={`${styles.blocker} ${styles.notice}`}>
               {blocker}
             </output>
@@ -524,16 +639,23 @@ export function PlayerScoreDialog({
             <button
               type="button"
               className={`${styles.link} ${styles.close}`}
-              onClick={onClose}
-              disabled={submitting}
+              onClick={() => {
+                if (!submitting) onClose();
+              }}
+              aria-disabled={submitting || undefined}
             >
               {t("score.close")}
             </button>
-            {canReportScore && (
+            {canEnterScore && (
               <button
                 type="submit"
                 className="btn"
-                disabled={nothingEntered || unchangedMine || submitting}
+                disabled={nothingEntered || unchangedMine}
+                aria-disabled={submitting || undefined}
+                // Un avertissement monté déjà rempli n'est pas toujours annoncé :
+                // rattaché au bouton, il se lit au moment d'envoyer.
+                aria-describedby={opensDispute ? "player-score-counter-warning" : undefined}
+                aria-busy={submitting || undefined}
               >
                 {submitting ? "…" : submitLabel}
               </button>

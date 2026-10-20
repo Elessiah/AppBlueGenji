@@ -87,6 +87,8 @@ import { MatchPlanningPanel } from "@/app/(secured)/tournois/[id]/_components/Ma
 import { MatchReplayDialog } from "@/app/(secured)/tournois/[id]/_components/MatchReplayDialog";
 import { MatchRow } from "@/app/(secured)/tournois/[id]/_components/MatchRow";
 import { MatchScheduleDialog } from "@/app/(secured)/tournois/[id]/_components/MatchScheduleDialog";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { PlayerScoreDialog } from "@/app/(secured)/tournois/[id]/_components/PlayerScoreDialog";
 import { RegistrationsPanel } from "@/app/(secured)/tournois/[id]/_components/RegistrationsPanel";
 import { RemoveEntrantDialog } from "@/app/(secured)/tournois/[id]/_components/RemoveEntrantDialog";
@@ -512,6 +514,133 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     expect(fr).toContain("Code de replay");
     expect(fr).not.toContain("(facultatif)");
     expect(fr).not.toContain("le code de replay est facultatif");
+  });
+
+  // Litige et validation d'office (`SCORE_DISPUTE_LOCK.md`), dans les deux langues.
+  const disputeReport = (team1Score: number, team2Score: number, reportedAt: string) => ({ team1Score, team2Score, maps: [], reportedAt });
+  const disputed = {
+    ...versus,
+    status: "AWAITING_CONFIRMATION" as const,
+    team1Report: disputeReport(2, 1, "2026-05-05T09:00:00.000Z"),
+    team2Report: disputeReport(1, 2, "2026-05-05T09:05:00.000Z"),
+  };
+
+  it("score (engagé) en litige : saisie, envoi et forfait retirés, arbitrage nommé", () => {
+    const ui = () => <PlayerScoreDialog tournamentId={1} match={disputed} myTeamId={10} canReportScore canForfeit proposals={[]} onClose={noop} onSubmitted={noop} onRefresh={noop} />;
+    const fr = render("fr", ui());
+    expect(fr).toContain("la saisie est verrouillée pour les deux adversaires, forfait compris");
+    // Région d'état remplie, pas de description de modale en plus : le verrou ne s'annonce qu'une fois.
+    // Désaccord et verrou dans une seule région d'état : annoncés une fois.
+    expect(fr.match(/<output[^>]*>[^<]*Score en litige/g)).toHaveLength(1);
+    expect(fr).toMatch(/<output[^>]*>Les scores se contredisent[^<]*arbitrage est alerté\. Score en litige/);
+    expect(fr).not.toContain('type="submit"');
+    expect(fr).not.toContain("player-score-forfeit");
+    expect(fr).not.toContain("player-score-map-");
+    const en = render("en", ui());
+    expect(en).toContain("score entry is locked for both opponents, forfeits included");
+    expect(en).not.toContain('type="submit"');
+    expect(en).not.toContain("player-score-forfeit");
+    expectNoFrench(en);
+  });
+
+  it("modale du joueur tranchée sous ses yeux : refermée avec un avis, dans les deux langues", () => {
+    const source = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/TournamentSheet.tsx"), "utf8");
+    expect(source).toContain("const settled = open !== null && isMatchPlayed(open);");
+    expect(source).toContain('showSuccess(a("cardActions.playerScoreSettled"))');
+    // Appelé avant les retours anticipés (règle des hooks).
+    expect(source.indexOf("useCloseSettledPlayerScore(detail?.matches")).toBeLessThan(source.indexOf("return <TournamentFatal"));
+    // Pas d'avis pour une modale déjà disparue, ni par-dessus le toast du geste du lecteur.
+    expect(source).toContain("if (wasShown.current && !ownSettle.current) notify();");
+    expect(source).toContain("onOwnSettle={markOwnSettle}");
+    const dialogSource = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx"), "utf8");
+    expect(dialogSource.match(/onOwnSettle\?\.\(true\);/g)).toHaveLength(2);
+    expect(dialogSource.match(/onOwnSettle\?\.\(ownSettleAfterFailure\(refusedCode\)\);/g)).toHaveLength(2);
+    // Sans code rendu (réseau coupé, 502), l'issue est inconnue : pas d'avis « tranché par un autre ».
+    expect(dialogSource).toContain('return refusedCode === null || refusedCode === "MATCH_ALREADY_COMPLETED";');
+    expect(dialogSource.match(/refusedCode = payload\.error \?\? null;/g)).toHaveLength(2);
+    const frA = JSON.parse(readFileSync(join(process.cwd(), "messages/fr/tournamentActions.json"), "utf8"));
+    const enA = JSON.parse(readFileSync(join(process.cwd(), "messages/en/tournamentActions.json"), "utf8"));
+    expect(frA.cardActions.playerScoreSettled).toBe("Ce match vient d'être tranché : la fenêtre de score s'est refermée.");
+    expect(enA.cardActions.playerScoreSettled).toBe("This match has just been settled: the score window has closed.");
+    // Région d'état montée même sans phrase (lecteur qui ne peut pas reporter) : un litige d'un bloc s'y annonce.
+    const readOnly = <PlayerScoreDialog tournamentId={1} match={versus} myTeamId={10} canReportScore={false} canForfeit proposals={[]} onClose={noop} onSubmitted={noop} onRefresh={noop} />;
+    expect(render("fr", readOnly)).toContain("<output></output>");
+  });
+
+  it("score (arbitrage) en litige : seule la validation lève le verrou, dans les deux langues", () => {
+    const ui = () => <AdminScoreDialog match={disputed} onClose={noop} onSubmitted={noop} />;
+    expect(render("fr", ui())).toContain("reste verrouillée jusqu&#x27;à « Valider le résultat » (score ou forfait)");
+    const en = render("en", ui());
+    expect(en).toContain("stays locked for both opponents until you use “Confirm the result”");
+    expectNoFrench(en);
+  });
+
+  it("score (engagé) en litige : sa propre proposition reste lisible, codes compris", () => {
+    // À score égal, ce sont les codes qui diffèrent : sans les siens, rien à comparer ni à citer à l'arbitre.
+    const withMaps = {
+      ...disputed,
+      team1Report: { ...disputed.team1Report, team1Score: 1, team2Score: 0, maps: [{ mapNumber: 1, team1Score: 2, team2Score: 0, replayCode: "MINE11" }] },
+      team2Report: { ...disputed.team2Report, team1Score: 1, team2Score: 0, maps: [{ mapNumber: 1, team1Score: 2, team2Score: 0, replayCode: "THEIR2" }] },
+    };
+    const ui = () => <PlayerScoreDialog tournamentId={1} match={withMaps} myTeamId={10} canReportScore canForfeit proposals={[]} onClose={noop} onSubmitted={noop} onRefresh={noop} />;
+    for (const locale of ["fr", "en"] as const) {
+      const html = render(locale, ui());
+      expect(html).toContain("MINE11");
+      expect(html).toContain("THEIR2");
+    }
+    expectNoFrench(render("en", ui()));
+  });
+
+  it("validation d'office : l'heure de Paris, mentionnée, sur la carte et dans la fenêtre", () => {
+    // 12:30 UTC = 14:30 à Paris (heure d'été), quel que soit le fuseau de la machine.
+    const pending = { ...versus, status: "AWAITING_CONFIRMATION" as const, team1Report: disputeReport(2, 1, "2026-05-05T10:00:00.000Z"), scoreDeadlineAt: "2026-05-05T12:30:00.000Z" };
+    const card = (locale: "fr" | "en") => renderPage(locale, <MatchRow match={pending} adminResolvable={false} onOpenAdminModal={noop} scoreLocked={false} roundNumber={2} />);
+    expect(card("fr")).toContain("2 – 1 proposé par Alpha · validation automatique à 14:30 (heure de Paris) sans réponse");
+    expect(card("en")).toContain("2 – 1 proposed by Alpha · automatic confirmation at 14:30 (Paris time) without an answer");
+    const dialog = (myTeamId: number) => <PlayerScoreDialog tournamentId={1} match={pending} myTeamId={myTeamId} canReportScore canForfeit proposals={[]} onClose={noop} onSubmitted={noop} onRefresh={noop} />;
+    expect(render("fr", dialog(11))).toContain("Sans réponse, ce score sera validé automatiquement à 14:30 (heure de Paris).");
+    expect(render("en", dialog(11))).toContain("With no answer, this score will be confirmed automatically at 14:30 (Paris time).");
+    expect(render("fr", dialog(10))).toContain("ce score sera validé automatiquement à 14:30 (heure de Paris).");
+    expect(render("en", dialog(10))).toContain("this score will be confirmed automatically at 14:30 (Paris time).");
+  });
+
+  it("score (engagé) pendant l'envoi : boutons aria-disabled, jamais disabled natif (le focus reste)", () => {
+    const source = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx"), "utf8");
+    // Seuls les champs de maps (`MapScoreList`) se figent pendant l'envoi ; les boutons gardent le focus.
+    expect(source.match(/(?<![-\w])disabled=\{[^}]*submitting/g)).toEqual(["disabled={submitting"]);
+    expect(source.match(/aria-busy=\{submitting \|\| undefined\}/g)).toHaveLength(2);
+    // Un bouton aria-disabled doit aussi s'en voir : la feuille le grise comme `:disabled`.
+    const css = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/ScoreDialog.module.css"), "utf8");
+    for (const selector of ['.forfeit[aria-disabled="true"]', '.link[aria-disabled="true"]', '.actions :global(.btn[aria-disabled="true"])']) {
+      expect(css).toContain(selector);
+    }
+    expect(css).toContain(':hover:not(:disabled, [aria-disabled="true"])');
+  });
+
+  it("score (engagé) : une contre-proposition s'annonce comme un litige, le focus suit le verrou", () => {
+    const source = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx"), "utf8");
+    expect(source).toContain('if (!canEnterScore || view?.phase !== "THEIRS_PENDING" || !view.theirs) return false;');
+    // Détail adverse inconnu (en lecture, illisible) : seul un score différent s'annonce comme un litige.
+    expect(source).toContain("if ((view.theirs.maps ?? []).length > 0) return !form.confirmsAsIs;");
+    expect(source).toContain("return form.entered.team1Score !== view.theirs.team1Score || form.entered.team2Score !== view.theirs.team2Score;");
+    expect(source).toContain('t("score.player.counterWarning", { opponent: opponentName })');
+    // Avertissement et verrou rattachés : lus au bouton d'envoi, et avec la modale quand le focus y revient.
+    expect(source).toContain('aria-describedby={opensDispute ? "player-score-counter-warning" : undefined}');
+    // Refus « litige ouvert » : la modale relit l'état, à l'envoi comme au forfait.
+    expect(source).toContain('new Set(["PROPOSAL_STALE", SCORE_LOCKED_DISPUTE, "MATCH_ALREADY_COMPLETED"])');
+    expect(source.match(/if \(REFRESH_ON_REFUSAL\.has\(code\)\)/g)).toHaveLength(2);
+    expect(source).toContain('return detailLoading ? `${conflict} ${t("score.player.conflictLoading")}` : conflict;');
+    // Verrou : la zone de forfait se replie, pour ne pas revenir dépliée si le litige est levé sans clore.
+    expect(source).toContain("if (disputeLocked) setForfeitOpen(false);");
+    // Litige arrivé par le flux : focus rendu à la modale si l'élément focalisé a disparu.
+    expect(source).toMatch(/disputeLocked && !wasLocked\.current && dialog && !dialog\.contains\(document\.activeElement\)\) dialog\.focus\(\)/);
+    // À l'ouverture, la proposition adverse pré-remplie se confirme telle quelle : pas d'avertissement.
+    const pending = { ...versus, status: "AWAITING_CONFIRMATION" as const, team1Report: disputeReport(2, 1, "2026-05-05T10:00:00.000Z") };
+    const dialog = <PlayerScoreDialog tournamentId={1} match={pending} myTeamId={11} canReportScore canForfeit proposals={[]} onClose={noop} onSubmitted={noop} onRefresh={noop} />;
+    expect(render("fr", dialog)).not.toContain("ouvre un litige et verrouille");
+    expect(render("en", dialog)).not.toContain("opens a dispute and locks");
+    // La région d'état est montée dès la proposition adverse : le litige qui la remplace s'y annonce.
+    expect(render("fr", dialog)).toMatch(/<output class="[^"]+">[^<]*propose 2 – 1/);
   });
 
   it.each<[string, () => ReactElement]>([

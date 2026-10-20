@@ -180,8 +180,8 @@
       ],
       "bullets": [
         "Deux déclarations concordantes valident le match immédiatement.",
-        "Une seule déclaration ouvre un délai de confirmation de {reportTimeout} minutes, qui ne court qu'après une durée de série plausible depuis le lancement ({minutesPerMap} minutes par map que le format autorise) : sans contestation de l'adversaire, le score est retenu.",
-        "Deux déclarations contradictoires mettent le match en litige : un arbitre tranche et enregistre le score officiel.",
+        "Une seule déclaration est validée automatiquement si l'adversaire ne fait rien (ni confirmation, ni autre score) pendant {autoValidate} heures après la dernière saisie, et jamais avant une durée de série plausible depuis le lancement ({minutesPerMap} minutes par map que le format autorise, plus {reportTimeout} minutes) : le score est alors retenu comme si l'adversaire l'avait confirmé. L'heure de cette validation est affichée aux deux équipes.",
+        "Deux déclarations contradictoires (par le score, ou à score égal par le détail des maps et les codes de replay) mettent le match en litige : la saisie est alors verrouillée pour les deux équipes (aucun score, aucune correction, aucune confirmation ni aucun forfait sur ce match), et seul un arbitre ou un administrateur tranche, en validant le résultat officiel (score ou forfait).",
         "Un arbitre ou un administrateur peut corriger un score tant que la manche suivante n'a reçu aucune saisie ; au-delà, le score est verrouillé, y compris pour lui."
       ]
     },

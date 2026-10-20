@@ -155,7 +155,7 @@ test.describe("Parcours joueur dans un tournoi", () => {
 
     // Le résultat est acquis : plus de bouton, le score s'affiche sur la carte.
     await expect(matchCard(pageB, matchId).getByRole("button", { name: /score/i })).toHaveCount(0);
-    await expect(matchCard(pageB, matchId)).not.toContainText("à confirmer");
+    await expect(matchCard(pageB, matchId)).not.toContainText("proposé par");
 
     // Et côté serveur : le vainqueur est bien l'équipe A.
     const api = await apiAs(f.baseURL, f.playerA.token);
@@ -193,13 +193,21 @@ test.describe("Parcours joueur dans un tournoi", () => {
     // B réécrit les deux maps à son avantage.
     await fillMap(dialog, 0, "BBBB01", { [f.playerA.teamName]: 0, [f.playerB.teamName]: 2 });
     await fillMap(dialog, 1, "BBBB02", { [f.playerA.teamName]: 0, [f.playerB.teamName]: 2 });
-    // Le score diffère de la proposition : le bouton redevient un envoi.
+    // Le score diffère de la proposition : le bouton redevient un envoi, et
+    // l'avis dit qu'il ouvre un litige verrouillé.
+    await expect(dialog).toContainText("ouvre un litige et verrouille la saisie des deux adversaires");
     await dialog.getByRole("button", { name: "Envoyer le score" }).click();
     await expect(dialog).toHaveCount(0);
 
-    await expect(matchCard(pageB, matchId)).toContainText("Scores contradictoires");
-    await matchCard(pageB, matchId).getByRole("button", { name: /Revoir le score/ }).click();
-    await expect(scoreDialog(pageB)).toContainText("Les scores se contredisent");
+    await expect(matchCard(pageB, matchId)).toContainText("Score en litige · saisie verrouillée, arbitrage attendu");
+    await matchCard(pageB, matchId).getByRole("button", { name: /Voir le litige/ }).click();
+    const locked = scoreDialog(pageB);
+    await expect(locked).toContainText("Les scores se contredisent");
+    // Verrou : ni saisie, ni envoi, ni forfait — l'arbitrage seul tranche.
+    await expect(locked).toContainText("la saisie est verrouillée pour les deux adversaires");
+    await expect(locked.getByRole("textbox", { name: "Code de replay" })).toHaveCount(0);
+    await expect(locked.getByRole("button", { name: "Envoyer le score" })).toHaveCount(0);
+    await expect(locked.getByRole("button", { name: /forfait/i })).toHaveCount(0);
 
     await contextB.close();
   });

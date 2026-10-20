@@ -16,6 +16,7 @@ import { useMatchLiveState } from "@/lib/shared/hooks/useMatchLiveState";
 import { SCORE_ENTRY_CLOSED_PHASES } from "@/lib/shared/match-launch";
 import { canConfigureLive, canToggleOnAir } from "@/lib/shared/live-streams";
 import { formatMatchStartAt } from "@/lib/shared/match-schedule";
+import { autoValidateTimeText } from "@/lib/shared/score-dispute";
 import { usePlayerScore } from "../_lib/player-score-context";
 import { useIssueReport } from "../_lib/issue-report-context";
 import { useLiveControls } from "../_lib/live-context";
@@ -52,7 +53,13 @@ function pendingReportText(text: TournamentActionsText, state: PendingReportStat
   if (state === null) return null;
   if (state.kind === "conflict") return text.t("cardActions.reportConflict");
   const reporter = state.reporter ?? text.t("cardActions.reportSide", { side: state.side });
-  return text.t("cardActions.reportPending", { score1: state.team1Score, score2: state.team2Score, reporter });
+  // Échéance de la validation d'office, lisible des deux équipes (et de tous) :
+  // à l'heure de Paris, la même pour chacun (`SCORE_DISPUTE_LOCK.md`).
+  const deadline = autoValidateTimeText(state.deadlineAt, text.locale);
+  const values = { score1: state.team1Score, score2: state.team2Score, reporter };
+  return deadline
+    ? text.t("cardActions.reportPendingDeadline", { ...values, deadline })
+    : text.t("cardActions.reportPending", values);
 }
 
 interface MatchRowProps {
@@ -115,9 +122,11 @@ export const MatchRow = memo(function MatchRow({
   // confirmer la proposition adverse, corriger la sienne).
   const playerScore = usePlayerScore();
   const canOpenPlayerScore = playerScore.canOpen(match);
-  const playerScoreLabel = canOpenPlayerScore
-    ? actionText.t(`cardActions.playerScore.${playerScoreButtonKey(playerReportView(match, myTeamId), playerScore.canReportScore(match))}`)
+  // Calculé pour les seules cartes du lecteur : le reste du plateau n'a pas de bouton.
+  const playerScoreKey = canOpenPlayerScore
+    ? playerScoreButtonKey(playerReportView(match, myTeamId), playerScore.canReportScore(match))
     : null;
+  const playerScoreLabel = playerScoreKey === null ? null : actionText.t(`cardActions.playerScore.${playerScoreKey}`);
   // Proposition en attente, lisible de tous : sans elle, un match joué et
   // reporté se lisait exactement comme un match pas encore joué.
   const reportNotice = pendingReportText(actionText, pendingReportState(match));
@@ -178,6 +187,8 @@ export const MatchRow = memo(function MatchRow({
   // décidait déjà du bouton dans son ancien bandeau.
   const actions = matchCardActionList({
     playerScoreLabel,
+    // Litige : la modale n'est qu'une lecture, l'icône (œil) le dit.
+    playerScoreReadOnly: playerScoreKey === "review",
     launch,
     inLobby: launchPhase === "LOBBY",
     adminScoreLabel: adminResolvable && !scoreLocked ? adminScoreLabel : null,

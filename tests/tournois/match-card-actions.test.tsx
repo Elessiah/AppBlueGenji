@@ -206,6 +206,32 @@ function renderFooter(actions: Partial<MatchCardActionInput>, castBlock: CastBlo
 }
 
 describe("MatchCardActions — rendu du pied", () => {
+  it("« Voir le litige » s'ouvre en lecture : œil, pas de crayon", () => {
+    const list = matchCardActionList({ ...NOTHING, playerScoreLabel: "Voir le litige", playerScoreReadOnly: true });
+    expect(list[0]).toEqual({ id: "playerScore", label: "Voir le litige", tone: "neutral", readOnly: true });
+    const view = renderFooter({ playerScoreLabel: "Voir le litige", playerScoreReadOnly: true });
+    const edit = renderFooter({ playerScoreLabel: "Saisir le score" });
+    expect(view).toContain("lucide-eye");
+    expect(view).not.toContain("lucide-pencil");
+    expect(edit).toContain("lucide-pencil");
+    const row = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/MatchRow.tsx"), "utf8");
+    expect(row).toContain('playerScoreReadOnly: playerScoreKey === "review",');
+  });
+
+  it("« Voir le litige » cède la place visible au geste d'arbitrage", () => {
+    const actions = matchCardActionList({ ...NOTHING, playerScoreLabel: "Voir le litige", playerScoreReadOnly: true, adminScoreLabel: "Éditer le score" });
+    const { primary, more } = groupMatchCardActions(actions);
+    expect(primary?.id).toBe("adminScore");
+    expect(more.map((a) => a.id)).toEqual(["playerScore"]);
+    // Engagé sans arbitrage : le litige reste visible, même face à « Infos du match ».
+    const launch = { ...NOTHING.launch, showOpen: true, showContacts: true };
+    const player = groupMatchCardActions(matchCardActionList({ ...NOTHING, launch, playerScoreLabel: "Voir le litige", playerScoreReadOnly: true }));
+    expect(player.primary?.id).toBe("playerScore");
+    // Seule, la lecture reste visible.
+    const alone = groupMatchCardActions(matchCardActionList({ ...NOTHING, playerScoreLabel: "Voir le litige", playerScoreReadOnly: true, canReport: true }));
+    expect(alone.primary?.id).toBe("playerScore");
+  });
+
   it("ne rend rien sans action", () => {
     // Seules restent les régions d'annonce du `ToastProvider`.
     expect(renderFooter({})).not.toContain("<button");

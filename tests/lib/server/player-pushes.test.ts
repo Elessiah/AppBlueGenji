@@ -11,6 +11,7 @@ import { purgeStaleSubscriptions } from "@/lib/server/push-subscriptions";
 import { webPushConfig, type WebPushConfig } from "@/lib/server/web-push";
 import {
   dispatchMatchStartNotices,
+  notifyScoreAutoValidated,
   notifyScoreToConfirm,
   notifyTournamentStart,
   resetMatchStartNoticeThrottle,
@@ -283,6 +284,54 @@ describe("notifyScoreToConfirm", () => {
     jest.mocked(webPushConfig).mockReturnValue(null);
     expect(await notifyScoreToConfirm(40)).toBe(0);
     expect(getDatabase).not.toHaveBeenCalled();
+  });
+});
+
+describe("notifyScoreAutoValidated", () => {
+  const WRITTEN = { team1Score: 2, team2Score: 1 };
+
+  function settled(overrides: Record<string, unknown>) {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([
+      [
+        {
+          tournament_id: 4,
+          tournament_name: "Coupe",
+          status: "COMPLETED",
+          team1_id: 1,
+          team2_id: 2,
+          team1_score: 2,
+          team2_score: 1,
+          forfeit_team_id: null,
+          double_forfeit: 0,
+          ...overrides,
+        },
+      ],
+    ]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+  }
+
+  it("prévient ceux qui mènent le match, des deux côtés, quand le score écrit tient toujours", async () => {
+    settled({});
+    jest.mocked(loadEntrantMatchLeaderIds).mockResolvedValue(
+      new Map([
+        [1, [10]],
+        [2, [20]],
+      ]),
+    );
+    expect(await notifyScoreAutoValidated(40, WRITTEN)).toBe(2);
+    expect(pushes()[0].userIds).toEqual([10, 20]);
+  });
+
+  it.each([
+    ["rouvert entre-temps", { status: "AWAITING_CONFIRMATION" }],
+    ["retranché par un arbitre sur un autre score", { team1_score: 0, team2_score: 2 }],
+    ["retranché par un arbitre sur un forfait", { forfeit_team_id: 2 }],
+    ["retranché par un arbitre sur un double forfait", { double_forfeit: 1 }],
+  ])("se tait : %s", async (_, overrides) => {
+    settled(overrides);
+    jest.mocked(loadEntrantMatchLeaderIds).mockResolvedValue(new Map([[1, [10]]]));
+    expect(await notifyScoreAutoValidated(40, WRITTEN)).toBe(0);
+    expect(notifyUsers).not.toHaveBeenCalled();
   });
 });
 

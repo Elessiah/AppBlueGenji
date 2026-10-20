@@ -761,7 +761,7 @@ export function RgpdEn({
         </header>
         <div className={styles.prose}>
           <p>
-            You can be notified on your phone or computer of the start of your matches, of a score to confirm, of a
+            You can be notified on your phone or computer of the start of your matches, of a score to confirm or confirmed automatically without an answer, of a
             tournament&apos;s kickoff, of your match times (set, changed or removed) and their reminders, and of what
             concerns your account or your team; a staff member, also of the alerts of their role (referee alerts, scheduled
             matches, refereeing schedule, incoming reports).{" "}

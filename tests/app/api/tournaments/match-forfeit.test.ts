@@ -50,6 +50,7 @@ describe("POST .../matches/[matchId]/forfeit", () => {
     ["NOT_TEAM_MANAGER", 403],
     ["MATCH_ALREADY_COMPLETED", 409],
     ["CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES", 409],
+    ["SCORE_LOCKED_DISPUTE", 409],
     ["TOURNAMENT_NOT_FOUND", 404],
     ["MATCH_NOT_FOUND", 404],
     ["BOOM", 500],

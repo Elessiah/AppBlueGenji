@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
+import { SCORE_AUTO_VALIDATE_MINUTES, SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { DEFAULT_MATCH_FORMAT, matchMaxMaps, type MatchFormat } from "@/lib/shared/match-format";
 import {
   MIN_MINUTES_PER_REPORTED_MAP,
@@ -41,23 +41,28 @@ describe("plausibleSeriesMinutes", () => {
 });
 
 describe("scoreReportDeadline", () => {
-  it("un report posé dès le lancement ne fait pas foi avant la série plus le délai", () => {
-    const deadline = scoreReportDeadline({ now: LAUNCH + MINUTE, launchedAt: LAUNCH, format: FT3 });
-    expect(deadline).toBe(
-      LAUNCH + (plausibleSeriesMinutes(FT3) + SCORE_REPORT_TIMEOUT_MINUTES) * MINUTE,
-    );
-  });
-
-  it("une série déjà jouée garde le délai ordinaire depuis le report", () => {
+  // Validation d'office après deux heures de silence (`SCORE_DISPUTE_LOCK.md`).
+  it("un report seul est validé deux heures après sa saisie", () => {
     const now = LAUNCH + 240 * MINUTE;
     const deadline = scoreReportDeadline({ now, launchedAt: LAUNCH, format: FT3 });
-    expect(deadline).toBe(now + SCORE_REPORT_TIMEOUT_MINUTES * MINUTE);
+    expect(deadline).toBe(now + SCORE_AUTO_VALIDATE_MINUTES * MINUTE);
+    expect(SCORE_AUTO_VALIDATE_MINUTES).toBe(120);
   });
 
-  it("sans lancement connu, la série court depuis le report", () => {
+  it("un report posé dès le lancement attend aussi deux heures (plus long que la série et le délai)", () => {
+    const now = LAUNCH + MINUTE;
+    const deadline = scoreReportDeadline({ now, launchedAt: LAUNCH, format: FT3 });
+    expect(deadline).toBe(now + SCORE_AUTO_VALIDATE_MINUTES * MINUTE);
+    expect(deadline).toBeGreaterThan(LAUNCH + (plausibleSeriesMinutes(FT3) + SCORE_REPORT_TIMEOUT_MINUTES) * MINUTE);
+  });
+
+  it("garde la fin de série plausible quand elle dépasse les deux heures", () => {
+    const long: MatchFormat = { type: "BO", value: 9 };
     const now = LAUNCH;
-    const deadline = scoreReportDeadline({ now, launchedAt: null, format: BO3 });
-    expect(deadline).toBe(now + (plausibleSeriesMinutes(BO3) + SCORE_REPORT_TIMEOUT_MINUTES) * MINUTE);
+    const deadline = scoreReportDeadline({ now, launchedAt: null, format: long });
+    const series = now + (plausibleSeriesMinutes(long) + SCORE_REPORT_TIMEOUT_MINUTES) * MINUTE;
+    expect(series).toBeGreaterThan(now + SCORE_AUTO_VALIDATE_MINUTES * MINUTE);
+    expect(deadline).toBe(series);
   });
 
   it("n'est jamais antérieure au délai ordinaire", () => {

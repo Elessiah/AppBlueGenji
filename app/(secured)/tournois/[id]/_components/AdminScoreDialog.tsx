@@ -380,6 +380,9 @@ export function AdminScoreDialog({
                   )}
                 </section>
               ))}
+              {/* Seule la validation lève le verrou des engagées (`SCORE_DISPUTE_LOCK.md`) :
+                  « Enregistrer » garde les deux propositions, donc le litige. */}
+              <p className={styles.formatHint}>{t("score.admin.disputeNotice")}</p>
             </div>
           )}
 

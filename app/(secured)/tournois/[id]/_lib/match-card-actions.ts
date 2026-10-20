@@ -36,12 +36,16 @@ export type MatchCardAction = {
   /** Libellé visible — le nom accessible le reprend en tête (WCAG 2.5.3). */
   label: string;
   tone: MatchCardActionTone;
+  /** Ouvre une vue sans geste (litige : « Voir le litige ») — l'icône ne promet pas d'édition. */
+  readOnly?: true;
 };
 
 /** Ce que le lecteur peut faire sur la carte, tel que l'ont décidé les règles existantes. */
 export type MatchCardActionInput = {
   /** Libellé de la saisie joueur (`playerScoreButtonLabel`), `null` hors de son match. */
   playerScoreLabel: string | null;
+  /** La saisie joueur n'ouvre qu'une lecture (litige verrouillé). */
+  playerScoreReadOnly?: boolean;
   launch: LaunchStripControls;
   /** Phase de lancement `LOBBY` : l'ouverture dit « Ouvrir le lancement ». */
   inLobby: boolean;
@@ -99,7 +103,12 @@ export function matchCardActionList(
     [input.showReplay, "replay", either(input.hasReplay, t("cardActions.editReplay"), t("cardActions.addReplay")), "neutral"],
     [input.canReport, "report", t("header.reportIssue"), "neutral"],
   ];
-  return rows.filter(([offered]) => offered).map(([, id, label, tone]) => ({ id, label, tone }));
+  return rows
+    .filter(([offered]) => offered)
+    .map(([, id, label, tone]) =>
+      // Lecture seule : ni crayon ni bouton plein — rien n'y attend le lecteur.
+      id === "playerScore" && input.playerScoreReadOnly ? { id, label, tone: "neutral" as const, readOnly: true as const } : { id, label, tone },
+    );
 }
 
 export type MatchCardActionGroups = {
@@ -114,7 +123,15 @@ export type MatchCardActionGroups = {
  */
 export function groupMatchCardActions(actions: readonly MatchCardAction[]): MatchCardActionGroups {
   if (actions.length === 1) return { primary: actions[0], more: [] };
-  const primary = PRIMARY_ORDER.map((id) => actions.find((a) => a.id === id)).find(Boolean) ?? null;
+  // « Voir le litige » (lecture seule) ne cède sa place qu'à l'arbitrage :
+  // l'arbitre qui joue le match garde « trancher » visible, seul geste qui lève
+  // le verrou ; pour l'engagé, le litige reste le bouton visible.
+  const disputeView = actions.find((a) => a.id === "playerScore" && a.readOnly === true);
+  const adminScore = actions.find((a) => a.id === "adminScore");
+  const primary =
+    disputeView && adminScore
+      ? adminScore
+      : PRIMARY_ORDER.map((id) => actions.find((a) => a.id === id)).find(Boolean) ?? null;
   return { primary, more: actions.filter((a) => a !== primary) };
 }
 

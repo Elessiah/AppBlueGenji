@@ -425,7 +425,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Au lancement d'un match — et dès que ses deux adversaires sont connus, par le bouton « Contacts » de sa carte —, présenter aux membres des deux équipes (joueurs, coachs, managers, propriétaires) et aux arbitres le pseudo Discord certifié et le BattleTag (même masqué) d'un ou deux membres par équipe, avec leur rôle d'équipe, jusqu'à la fin du match ; présenter les mêmes contacts au caster inscrit, et ceux du caster aux deux équipes et aux arbitres, le temps du match seulement (de son départ — lancement ouvert ou match lancé — à sa fin)",
       "Recueillir les « Prêt » de chaque partie d'un match (équipes, caster) avant son lancement, dans les seuls tournois qui ont la phase de lancement (option de chaque tournoi, éteinte par défaut)",
       "Envoyer en message privé Discord et en push l'annonce de l'horaire d'un match (posé, changé ou retiré), l'avis qu'un match quitte son programme et les rappels de match 24 h et 10 h avant le coup d'envoi (le second — ou l'annonce d'un match programmé moins de 10 h avant — avec le lien d'invitation au serveur Discord du check-in) ; les messages privés ne partent qu'aux comptes dont le tag Discord est certifié (un tag non certifié, même rattaché par la connexion Discord, n'en reçoit aucun, pour éviter le spam) ; le joueur peut couper ces messages privés depuis « Mon profil » (notifications), ses notifications push gardant leurs propres réglages",
-      "Alerter le rôle arbitre (conflit de score, score resté trop longtemps sans confirmation, signalement d'un joueur)",
+      "Alerter le rôle arbitre (conflit de score, litige de score resté trop longtemps sans arbitrage, signalement d'un joueur)",
       "Envoyer aux arbitres, environ 10 h à l'avance, le programme des matchs à venir (horaires, tournois, noms d'équipe ; « un joueur » en tournoi individuel) au canal de logs Discord et en push",
     ],
     legalBasis:
@@ -733,7 +733,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     name: "Notifications push",
     purpose: "Prévenir un joueur sur ses appareils, à sa demande, de ce qui le concerne sur le site",
     subPurposes: [
-      "Départ de ses matchs, score à confirmer, coup d'envoi d'un tournoi, horaires de match (posés, changés ou retirés) et rappels de match",
+      "Départ de ses matchs, score à confirmer ou validé automatiquement faute de réponse, coup d'envoi d'un tournoi, horaires de match (posés, changés ou retirés) et rappels de match",
       "Demandes d'adhésion à une équipe qu'il gère, signalements et décisions de modération le concernant, changements de la politique de données",
       "Alertes d'arbitrage, matchs planifiés, programme d'arbitrage et alertes de modération pour le staff qui détient ces rôles",
     ],

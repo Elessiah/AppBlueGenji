@@ -50,6 +50,7 @@
     "admin": {
       "title": "Score du match",
       "saved": "Score enregistré : le match reste en cours.",
+        "disputeNotice": "Litige : la saisie des deux adversaires reste verrouillée jusqu'à « Valider le résultat » (score ou forfait). « Enregistrer » note l'avancement sans trancher.",
       "resolved": "Résultat validé : le plateau est à jour.",
       "awaitingDetail": "Lecture du détail des maps proposé… Actualise la page s'il n'arrive pas.",
       "proposal": "Score proposé par {author} ({score1} – {score2}), en attente de confirmation de {other}. Vérifie-le puis valide le résultat pour le confirmer.",
@@ -91,8 +92,8 @@
     },
     "player": {
       "title": "Score de mon match",
-      "conflictMaps": "Même score ({score}), mais le détail des maps diffère de celui de {opponent} : codes de replay ou scores de map. L'arbitrage est alerté ; tu peux encore corriger ta proposition.",
-      "conflictScores": "Les scores se contredisent — toi : {mine}, {opponent} : {theirs}. L'arbitrage est alerté ; tu peux encore corriger ta proposition.",
+      "conflictMaps": "Même score ({score}), mais le détail des maps diffère de celui de {opponent} : codes de replay ou scores de map. L'arbitrage est alerté.",
+      "conflictScores": "Les scores se contredisent — toi : {mine}, {opponent} : {theirs}. L'arbitrage est alerté.",
       "closed": {
         "toPlan": "Ce match attend que l'arbitrage fixe sa date : le score se saisira une fois le match lancé.",
         "scheduledAt": "Ce match démarre le {date} : le score se saisit une fois lancé, quand les parties se sont déclarées prêtes.",
@@ -105,16 +106,20 @@
       },
       "theirs": {
         "readOnly": "{opponent} propose {score}. En attente de la confirmation d'un responsable de {mine}.",
-        "withMaps": "{opponent} propose {score}. Confirme-le, ou saisis le score constaté : un désaccord alerte l'arbitrage.",
-        "loading": "{opponent} propose {score}. Lecture du détail de ses maps… Actualise la page s'il n'arrive pas.",
-        "withoutMaps": "{opponent} propose {score}, mais le détail de ses maps n'a pas pu être lu. Actualise la page pour le confirmer : un score saisi à la place alerte l'arbitrage."
+        "withMaps": "{opponent} propose {score}. Confirme-le, ou saisis le score constaté : un désaccord ouvre un litige, qui verrouille la saisie des deux adversaires jusqu'à l'arbitrage.",
+        "loading": "{opponent} propose {score}. Lecture du détail de ses maps… Actualise la page s'il n'arrive pas. Une saisie qui diffère de la sienne (score ou détail des maps) ouvre un litige, qui verrouille la saisie des deux adversaires jusqu'à l'arbitrage.",
+        "withoutMaps": "{opponent} propose {score}, mais le détail de ses maps n'a pas pu être lu. Actualise la page pour le confirmer : un score saisi à la place ouvre un litige, qui verrouille la saisie des deux adversaires jusqu'à l'arbitrage."
       },
       "confirmed": "Score confirmé : {team1} {score1} – {score2} {team2}",
       "submitted": "Score transmis : {team1} {score1} – {score2} {team2}",
       "forfeitRecorded": "Forfait enregistré : {opponent} remporte le match.",
       "minePending": "Tu as proposé {score}. En attente de la confirmation de {opponent}.",
-      "minePendingDeadline": "Tu as proposé {score}. En attente de la confirmation de {opponent} — sans réponse, ce score sera validé à {deadline}.",
-      "willConfirm": "{opponent} devra confirmer le score que tu envoies.",
+      "minePendingDeadline": "Tu as proposé {score}. En attente de la confirmation de {opponent} — sans réponse, ce score sera validé automatiquement à {deadline} (heure de Paris).",
+      "locked": "Score en litige : la saisie est verrouillée pour les deux adversaires, forfait compris. Seul un arbitre ou un administrateur peut trancher ce match — valider le score final ou un forfait.",
+      "conflictLoading": "Lecture du détail des maps… Actualise la page s'il n'arrive pas.",
+      "counterWarning": "Cette saisie diffère de la proposition de {opponent} (score ou détail des maps) : l'envoyer ouvre un litige et verrouille la saisie des deux adversaires jusqu'à l'arbitrage.",
+      "autoValidateAt": "Sans réponse, ce score sera validé automatiquement à {deadline} (heure de Paris).",
+      "willConfirm": "{opponent} devra confirmer le score que tu envoies : sans réponse, il sera validé automatiquement après au moins 2 h.",
       "confirm": "Confirmer le score",
       "send": "Envoyer le score",
       "alreadySent": "Score déjà envoyé : en attente de {opponent}.",

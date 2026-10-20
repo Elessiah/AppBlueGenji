@@ -42,6 +42,7 @@ import { notifyStaff } from "@/lib/server/notify";
 import { refereeAlertPush, type RefereeAlertKind, type RefereeAlertMatch } from "@/lib/shared/push-messages";
 import { notifyTournamentStart } from "./player-pushes";
 import { discardDepartedNotices, flushDepartedNotices } from "./departed-notices";
+import { discardAutoValidatedNotices, flushAutoValidatedNotices } from "./auto-validated-notices";
 import { getDatabase } from "@/lib/server/database";
 import { isTransactionAborted } from "@/lib/server/mysql-errors";
 import {
@@ -67,6 +68,7 @@ import {
   type RefereeAlertContext,
 } from "@/lib/shared/referee-alerts";
 import { tournamentPageUrl } from "./app-url";
+import { STALLED_ALERT_KEY } from "./score-report-sql";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 import { chunkIds, sqlPlaceholders } from "@/lib/server/sql-placeholders";
 
@@ -149,8 +151,8 @@ type ResolvedRefereeLine = { message: string; refereeMatch: RefereeAlertMatch };
  */
 export const CONFLICT_ALERT_KEY = "SCORE_CONFLICT";
 
-/** Clé de réservation de l'escalade « délai dépassé, toujours pas tranché ». */
-export const STALLED_ALERT_KEY = "SCORE_REPORT_STALLED";
+/** Clé de réservation de l'escalade « délai dépassé, toujours pas tranché » (`./score-report-sql`). */
+export { STALLED_ALERT_KEY };
 
 /**
  * Les entrées qui réservent une alerte arbitre.
@@ -275,6 +277,7 @@ export function discardBotLogs(connection: PoolConnection): void {
   pending.delete(connection);
   // Les avis aux engagées retirées suivent la même transaction.
   discardDepartedNotices(connection);
+  discardAutoValidatedNotices(connection);
   // Les manches notées tranchées ne l'ont pas été : leurs réservations gardent
   // tout leur objet, et le prochain entretien les retrouvera telles quelles.
   resolvedMatches.delete(connection);
@@ -292,6 +295,8 @@ export function discardBotLogs(connection: PoolConnection): void {
 export function flushBotLogs(connection: PoolConnection): void {
   // Les avis aux engagées retirées par une correction partent avec le journal.
   flushDepartedNotices(connection);
+  // Comme les avis de validation d'office d'un score (`./auto-validated-notices`).
+  flushAutoValidatedNotices(connection);
   const queue = pending.get(connection) ?? [];
   pending.delete(connection);
   const settled = resolvedMatches.get(connection) ?? new Set<number>();
@@ -348,8 +353,13 @@ export function flushBotLogs(connection: PoolConnection): void {
       // rôle : un bilan à `sent: 0` — rôle non configuré, messages privés
       // fermés — décrit une trace bel et bien posée, la seule qui soit durable.
       // Rejouer sur ce critère reposterait cette trace à chaque balayage, pour
-      // toujours. Seul un `null` (bot injoignable, coupe-circuit ouvert) dit que
-      // rien n'est parti.
+      // toujours. Un `null` (bot injoignable, coupe-circuit ouvert) dit que
+      // rien n'est parti sur Discord — mais si le push a joint au moins un
+      // arbitre, l'alerte est remise aussi : rendre la réservation la ferait
+      // repartir à chaque passage tant que le bot reste éteint, soit un push à
+      // chaque arbitre toutes les quelques secondes pour un litige qui, la
+      // saisie étant verrouillée (`docs/features/SCORE_DISPUTE_LOCK.md`), dure
+      // jusqu'à l'arbitrage.
       let sent = false;
       try {
         const report = await notifyStaff({
@@ -358,7 +368,7 @@ export function flushBotLogs(connection: PoolConnection): void {
           push: (locale) =>
             refereeAlertPush(message, refereePushKey(entry), locale, refereeAlertKind(entry), refereeMatch ?? null),
         });
-        sent = report.discord !== null;
+        sent = report.discord !== null || report.pushed > 0;
       } catch {
         sent = false;
       }

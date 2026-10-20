@@ -239,6 +239,10 @@ describe("formatStalledScoreReportAlert", () => {
     );
 
     expect(alert).not.toContain("\n");
+    // L'escalade ne part plus que pour un litige (un report seul est validé d'office).
+    expect(alert).toContain("litige toujours pas tranché");
+    expect(alert).toContain("saisie verrouillée");
+    expect(alert).not.toContain("délai de report");
   });
 
   it("cite le nombre de minutes écoulées", () => {

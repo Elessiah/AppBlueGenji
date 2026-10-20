@@ -16,6 +16,7 @@ import type {
 import { toParticipantType } from "@/lib/shared/participants";
 import { remainingSlots } from "@/lib/shared/ghost-registration";
 import { useToast } from "@/components/ui/toast";
+import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import { CyberButton } from "@/components/cyber";
 import { useSpectatorView } from "@/components/spectator-view";
 import { SPECTATOR_NOT_FOUND_RECHECK_MINUTES } from "@/lib/shared/spectator-view";
@@ -155,6 +156,34 @@ function TournamentFatal({ fatal }: Readonly<{ fatal: LiveFailure }>) {
 /** Rencontre désignée par un identifiant, relue dans la liste du moment. */
 function matchById(matches: readonly BracketMatch[], id: number | null): BracketMatch | null {
   return id === null ? null : matches.find((match) => match.id === id) ?? null;
+}
+
+/**
+ * Tranché sous la modale du joueur (validation d'office à l'heure dite,
+ * arbitrage, confirmation adverse) : elle se referme, et le dit — une saisie en
+ * cours disparaissait sinon sans un mot. Silencieux quand la modale n'était
+ * plus affichée (tournoi figé, droit retiré) ou quand c'est le geste du lecteur
+ * qui tranche (`ownSettle`, posé par la modale) : son propre toast suffit.
+ */
+function useCloseSettledPlayerScore(
+  matches: readonly BracketMatch[] | undefined,
+  openId: number | null,
+  canOpen: (match: BracketMatch) => boolean,
+  ownSettle: { readonly current: boolean },
+  actions: { close: () => void; notify: () => void },
+): void {
+  const open = matches ? matchById(matches, openId) : null;
+  const settled = open !== null && isMatchPlayed(open);
+  const shown = open !== null && !settled && canOpen(open);
+  const wasShown = useRef(false);
+  const { close, notify } = actions;
+  useEffect(() => {
+    if (settled) {
+      close();
+      if (wasShown.current && !ownSettle.current) notify();
+    }
+    wasShown.current = shown;
+  }, [settled, shown, close, notify, ownSettle]);
 }
 
 /** Retour en arrière : le plan du moment, son refus, et les rencontres qu'il efface. */
@@ -397,7 +426,15 @@ export function TournamentSheet({ tournamentId, source }: Readonly<{ tournamentI
   // Modale de score d'un engagé : identifiant, pas objet, comme l'arbitrage —
   // la proposition adverse arrive par le flux pendant qu'elle est ouverte.
   const [playerScoreMatchId, setPlayerScoreMatchId] = useState<number | null>(null);
-  const openPlayerScore = useCallback((match: BracketMatch) => setPlayerScoreMatchId(match.id), []);
+  // Le geste du lecteur tranche-t-il le match ? (`PlayerScoreDialog.onOwnSettle`)
+  const playerScoreOwnSettle = useRef(false);
+  const openPlayerScore = useCallback((match: BracketMatch) => {
+    playerScoreOwnSettle.current = false;
+    setPlayerScoreMatchId(match.id);
+  }, []);
+  const markOwnSettle = useCallback((settling: boolean) => {
+    playerScoreOwnSettle.current = settling;
+  }, []);
   const openMatchLive = useCallback((match: BracketMatch) => setMatchForLiveId(match.id), []);
   const openMatchSchedule = useCallback(
     (match: BracketMatch) => setMatchForScheduleId(match.id),
@@ -566,6 +603,14 @@ export function TournamentSheet({ tournamentId, source }: Readonly<{ tournamentI
       }),
     [canReportScore, viewerMyTeamId, viewerCanActForEntrant, frozen],
   );
+
+  const closePlayerScore = useCallback(() => setPlayerScoreMatchId(null), []);
+  const notifyPlayerScoreSettled = useCallback(() => showSuccess(a("cardActions.playerScoreSettled")), [showSuccess, a]);
+  const settledActions = useMemo(
+    () => ({ close: closePlayerScore, notify: notifyPlayerScoreSettled }),
+    [closePlayerScore, notifyPlayerScoreSettled],
+  );
+  useCloseSettledPlayerScore(detail?.matches, playerScoreMatchId, canOpenPlayerScore, playerScoreOwnSettle, settledActions);
 
   // Échec définitif avant même d'avoir reçu quoi que ce soit : sans ce cas, la
   // page resterait sur « Chargement… » pour toujours — le seul état où il ne
@@ -799,6 +844,7 @@ export function TournamentSheet({ tournamentId, source }: Readonly<{ tournamentI
   const playerScoreCandidate = matchById(detail.matches, playerScoreMatchId);
   const matchForPlayerScore =
     playerScoreCandidate && canOpenPlayerScore(playerScoreCandidate) ? playerScoreCandidate : null;
+
   const matchForLive = matchById(detail.matches, matchForLiveId);
   const matchForSchedule = matchById(detail.matches, matchForScheduleId);
   const matchForReplay = matchById(detail.matches, matchForReplayId);
@@ -1168,6 +1214,7 @@ export function TournamentSheet({ tournamentId, source }: Readonly<{ tournamentI
           onClose={() => setPlayerScoreMatchId(null)}
           onSubmitted={() => void refresh()}
           onRefresh={refreshProposals}
+          onOwnSettle={markOwnSettle}
         />
       )}
 

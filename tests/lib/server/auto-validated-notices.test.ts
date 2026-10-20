@@ -1,0 +1,113 @@
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import type { PoolConnection } from "mysql2/promise";
+
+jest.mock("@/lib/server/tournaments/player-pushes");
+
+import {
+  discardAutoValidatedNotices,
+  flushAutoValidatedNotices,
+  queueAutoValidatedNotice,
+} from "@/lib/server/tournaments/auto-validated-notices";
+import { notifyScoreAutoValidated } from "@/lib/server/tournaments/player-pushes";
+
+/** Avis « score validé automatiquement » : partis après le commit, jamais sans lui. */
+function connection(): PoolConnection {
+  return {} as unknown as PoolConnection;
+}
+
+const SCORE = { team1Score: 2, team2Score: 1 };
+
+/** Laisse la chaîne d'envoi avancer jusqu'au bout. */
+async function flushMicrotasks(): Promise<void> {
+  for (let i = 0; i < 20; i += 1) await Promise.resolve();
+}
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  jest.mocked(notifyScoreAutoValidated).mockResolvedValue(1);
+});
+
+describe("auto-validated-notices", () => {
+  it("prévient une fois par manche validée, après le commit", async () => {
+    const conn = connection();
+    queueAutoValidatedNotice(conn, 31, { team1Score: 1, team2Score: 0 });
+    queueAutoValidatedNotice(conn, 31, SCORE);
+    queueAutoValidatedNotice(conn, 32, SCORE);
+    expect(notifyScoreAutoValidated).not.toHaveBeenCalled();
+
+    flushAutoValidatedNotices(conn);
+    await flushMicrotasks();
+
+    expect(notifyScoreAutoValidated).toHaveBeenCalledTimes(2);
+    expect(notifyScoreAutoValidated).toHaveBeenCalledWith(31, SCORE);
+    expect(notifyScoreAutoValidated).toHaveBeenCalledWith(32, SCORE);
+  });
+
+  it("ne prévient de rien quand la transaction échoue", () => {
+    const conn = connection();
+    queueAutoValidatedNotice(conn, 31, SCORE);
+    discardAutoValidatedNotices(conn);
+    flushAutoValidatedNotices(conn);
+    expect(notifyScoreAutoValidated).not.toHaveBeenCalled();
+  });
+
+  it("ne rejoue rien d'une transaction à la suivante sur la même connexion", async () => {
+    const conn = connection();
+    queueAutoValidatedNotice(conn, 31, SCORE);
+    flushAutoValidatedNotices(conn);
+    flushAutoValidatedNotices(conn);
+    await flushMicrotasks();
+    expect(notifyScoreAutoValidated).toHaveBeenCalledTimes(1);
+  });
+  it("envoie les avis l'un après l'autre, sans rafale sur le pool", async () => {
+    const conn = connection();
+    let release: ((value: number) => void) | undefined;
+    jest.mocked(notifyScoreAutoValidated).mockImplementationOnce(
+      () => new Promise<number>((resolve) => { release = resolve; }),
+    );
+    queueAutoValidatedNotice(conn, 31, SCORE);
+    queueAutoValidatedNotice(conn, 32, SCORE);
+
+    flushAutoValidatedNotices(conn);
+    await flushMicrotasks();
+    expect(notifyScoreAutoValidated).toHaveBeenCalledTimes(1);
+
+    release?.(1);
+    await flushMicrotasks();
+    expect(notifyScoreAutoValidated).toHaveBeenCalledTimes(2);
+    expect(notifyScoreAutoValidated).toHaveBeenLastCalledWith(32, SCORE);
+  });
+
+  it("continue après un envoi en échec et n'en perd aucun, même au-delà de 256", async () => {
+    const conn = connection();
+    jest.mocked(notifyScoreAutoValidated).mockRejectedValueOnce(new Error("push"));
+    for (let id = 1; id <= 300; id += 1) queueAutoValidatedNotice(conn, id, SCORE);
+
+    flushAutoValidatedNotices(conn);
+    for (let i = 0; i < 50; i += 1) await flushMicrotasks();
+
+    expect(notifyScoreAutoValidated).toHaveBeenCalledTimes(300);
+    expect(notifyScoreAutoValidated).toHaveBeenLastCalledWith(300, SCORE);
+  });
+  it("enchaîne les flushs de plusieurs transactions dans une seule file", async () => {
+    const first = connection();
+    const second = connection();
+    let release: ((value: number) => void) | undefined;
+    jest.mocked(notifyScoreAutoValidated).mockImplementationOnce(
+      () => new Promise<number>((resolve) => { release = resolve; }),
+    );
+    queueAutoValidatedNotice(first, 41, SCORE);
+    queueAutoValidatedNotice(second, 42, SCORE);
+
+    flushAutoValidatedNotices(first);
+    flushAutoValidatedNotices(second);
+    await flushMicrotasks();
+    expect(notifyScoreAutoValidated).toHaveBeenCalledTimes(1);
+    expect(notifyScoreAutoValidated).toHaveBeenCalledWith(41, SCORE);
+
+    release?.(1);
+    await flushMicrotasks();
+    expect(notifyScoreAutoValidated).toHaveBeenCalledTimes(2);
+    expect(notifyScoreAutoValidated).toHaveBeenLastCalledWith(42, SCORE);
+  });
+});

@@ -198,7 +198,7 @@ export function formatStalledScoreReportAlert(
 ): string {
   return alertLine(
     "⏱️",
-    `délai de report dépassé depuis plus de ${minutesElapsed} minutes, toujours pas tranché`,
+    `litige toujours pas tranché, délai dépassé depuis plus de ${minutesElapsed} minutes — saisie verrouillée`,
     context,
   );
 }

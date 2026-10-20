@@ -22,18 +22,23 @@ porte côté joueur.
 2. **Confirmer.** L'adversaire voit « Confirmer le score » sur la carte ; la
    modale s'ouvre sur la proposition, un clic la valide et tranche le match.
 3. **Contester.** Il peut aussi saisir un autre score : les deux propositions se
-   contredisent, l'arbitrage est alerté (`REFEREE_ALERTS.md`), et chacun peut
-   encore corriger la sienne (« Revoir le score »).
+   contredisent, l'arbitrage est alerté (`REFEREE_ALERTS.md`), et la saisie est
+   **verrouillée pour les deux équipes** jusqu'à ce qu'un arbitre tranche
+   (« Voir le litige », `409 SCORE_LOCKED_DISPUTE` — `SCORE_DISPUTE_LOCK.md`).
 4. **Sans réponse**, la proposition fait foi à l'échéance du délai
-   (`score_deadline_at`, rappelé dans la modale). Ce délai ne court qu'après une
-   fin de série plausible — une série **complète** au format de la manche,
+   (`score_deadline_at`, « validation automatique à HH:MM (heure de Paris) sans
+   réponse » sur la carte, « sera validé automatiquement à HH:MM (heure de
+   Paris) » dans la modale) : **deux heures** après la dernière saisie du
+   déclarant (`SCORE_AUTO_VALIDATE_MINUTES`, `SCORE_DISPUTE_LOCK.md`), et jamais
+   avant une fin de série plausible — une série **complète** au format de la manche,
    15 min par map de son plafond (BO5 en saisie libre), depuis le lancement
    (`lib/shared/score-report-deadline.ts`) : un « 3-0 » envoyé à la seconde du
    lancement ne fait pas foi avant que la série ait pu se jouer. L'échéance se
    lit sur le format et non sur le score déclaré, qui la mettait à la main du
-   déclarant ; elle est posée une fois, au premier report, et seulement
-   rapprochée (à « maintenant + délai ») quand l'adversaire reporte à son tour —
-   un conflit est alors signalé à l'arbitrage depuis sa naissance.
+   déclarant ; elle est **recalculée à chaque saisie** de l'équipe seule à avoir
+   reporté (au moins « maintenant + 2 h »), et rapprochée (à « maintenant +
+   délai ») quand l'adversaire reporte à son tour — elle ne sert plus alors qu'à
+   l'escalade du litige, signalé à l'arbitrage depuis sa naissance.
 
 Proposer, confirmer et contester reviennent à **ceux qui mènent le match** :
 `CAPITAINE`, `MANAGER` ou `OWNER` — les rôles qui déclarent l'équipe prête
@@ -47,7 +52,8 @@ confirmer » ne prévient que ceux qui peuvent y répondre : le push
 lui, reste au propriétaire et aux managers.
 
 La carte porte une ligne d'état **lisible de tous** (« 2 – 1 proposé par Alpha ·
-à confirmer », « Scores contradictoires · arbitrage alerté ») : sans elle, un
+validation automatique à 14:30 (heure de Paris) sans réponse » — « · à
+confirmer » seulement sans échéance connue —, « Score en litige · saisie verrouillée, arbitrage attendu ») : sans elle, un
 match joué et reporté se lisait comme un match pas encore joué.
 
 ## Données
@@ -113,7 +119,7 @@ du tournoi (`POST /api/tournaments/[id]/forfeit`).
 
 Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
 
-- **Saisie du score par un joueur** (`lib/shared/player-score-report.ts` pur + `_components/PlayerScoreDialog.tsx` + `lib/server/tournaments/player-forfeit.ts`) : le formulaire en ligne sous la carte envoyait bien la proposition, mais l'instantané ne la transportait pas — un score envoyé ne laissait **aucune trace** à l'écran, ni chez l'expéditeur ni chez l'adversaire qui devait le confirmer. Les propositions voyagent désormais (`BracketMatch.team1Report` / `team2Report`, **orientées plateau** par `mapMatch`), la carte les annonce à tous, et une modale (même stepper et même gabarit que l'arbitrage, `ScoreStepper` + `ScoreDialog.module.css`) sert les trois gestes : proposer, **confirmer d'un clic** (elle s'ouvre sur la proposition adverse), contester. Le **forfait sur la manche** y vit aussi (`POST .../matches/[matchId]/forfeit`, sans corps : on ne déclare que le sien ; qualité `OWNER`/`MANAGER` ; offert **avant** le lancement) et délègue à `adminResolveMatch`. Droit et ouverture passent par un contexte (`player-score-context.tsx`) plutôt que par quatre props relayées par six vues. E2E à deux joueurs réels : `e2e/player-journey.spec.ts`. **Qui reporte, et quand un report seul fait foi** : proposer, confirmer ou contester revient à ceux qui mènent le match — `CAPITAINE`/`MANAGER`/`OWNER`, les rôles de « Prêt » (`canDeclareTeamReady`, `UserEntrant.canConductMatch`), le joueur en individuel ; `NOT_TEAM_MATCH_LEADER` → 403, et `canCreateReportsForTeamIds` vide pour un membre sportif — : un 0-3 déclaré contre soi *est* un forfait ; « score à confirmer » (push `loadEntrantMatchLeaderIds`, alerte de page) ne prévient donc qu'eux. Et l'échéance d'un report unilatéral (`score_deadline_at`) ne court qu'après une **fin de série plausible** — `max(maintenant, lancement + 15 min × plafond de maps du format — BO5 en saisie libre) + SCORE_REPORT_TIMEOUT_MINUTES` (`lib/shared/score-report-deadline.ts`, calculé en SQL dans `reportMatchScore`, posé une fois au premier report) — lue sur le **format** et jamais sur le score déclaré, qui la mettait à la main du déclarant (« 1-0 » pour l'abréger, « 99-98 » pour la repousser) : un « 3-0 » posé à la seconde du lancement l'emportait sinon dix minutes plus tard, l'adversaire encore en jeu. Voir `docs/features/PLAYER_SCORE_ENTRY.md`.
+- **Saisie du score par un joueur** (`lib/shared/player-score-report.ts` pur + `_components/PlayerScoreDialog.tsx` + `lib/server/tournaments/player-forfeit.ts`) : le formulaire en ligne sous la carte envoyait bien la proposition, mais l'instantané ne la transportait pas — un score envoyé ne laissait **aucune trace** à l'écran, ni chez l'expéditeur ni chez l'adversaire qui devait le confirmer. Les propositions voyagent désormais (`BracketMatch.team1Report` / `team2Report`, **orientées plateau** par `mapMatch`), la carte les annonce à tous, et une modale (même stepper et même gabarit que l'arbitrage, `ScoreStepper` + `ScoreDialog.module.css`) sert les trois gestes : proposer, **confirmer d'un clic** (elle s'ouvre sur la proposition adverse), contester. Le **forfait sur la manche** y vit aussi (`POST .../matches/[matchId]/forfeit`, sans corps : on ne déclare que le sien ; qualité `OWNER`/`MANAGER` ; offert **avant** le lancement) et délègue à `adminResolveMatch`. Droit et ouverture passent par un contexte (`player-score-context.tsx`) plutôt que par quatre props relayées par six vues. E2E à deux joueurs réels : `e2e/player-journey.spec.ts`. **Qui reporte, et quand un report seul fait foi** : proposer, confirmer ou contester revient à ceux qui mènent le match — `CAPITAINE`/`MANAGER`/`OWNER`, les rôles de « Prêt » (`canDeclareTeamReady`, `UserEntrant.canConductMatch`), le joueur en individuel ; `NOT_TEAM_MATCH_LEADER` → 403, et `canCreateReportsForTeamIds` vide pour un membre sportif — : un 0-3 déclaré contre soi *est* un forfait ; « score à confirmer » (push `loadEntrantMatchLeaderIds`, alerte de page) ne prévient donc qu'eux. Et l'échéance d'un report unilatéral (`score_deadline_at`) ne court qu'après une **fin de série plausible** — `max(maintenant, lancement + 15 min × plafond de maps du format — BO5 en saisie libre) + SCORE_REPORT_TIMEOUT_MINUTES` (`lib/shared/score-report-deadline.ts`, calculé en SQL dans `reportMatchScore`, recalculé à chaque saisie de l'équipe seule à avoir reporté et porté à au moins deux heures — `SCORE_DISPUTE_LOCK.md`) — lue sur le **format** et jamais sur le score déclaré, qui la mettait à la main du déclarant (« 1-0 » pour l'abréger, « 99-98 » pour la repousser) : un « 3-0 » posé à la seconde du lancement l'emportait sinon dix minutes plus tard, l'adversaire encore en jeu. Voir `docs/features/PLAYER_SCORE_ENTRY.md`.
 
 ## Saisie map par map
 

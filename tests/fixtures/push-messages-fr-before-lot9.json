@@ -145,13 +145,13 @@
   },
   "scoreToConfirm.team": {
     "title": "Score à confirmer",
-    "body": "Team Nova a saisi le score de votre match (Coupe BlueGenji). Confirme-le, ou conteste-le.",
+    "body": "Team Nova a saisi le score de votre match (Coupe BlueGenji). Confirme-le, ou conteste-le : sans réponse, il sera validé automatiquement.",
     "url": "/tournois/7#match-31",
     "tag": "rencontre-31-score"
   },
   "scoreToConfirm.solo": {
     "title": "Score à confirmer",
-    "body": "Ton adversaire a saisi le score de votre match (Coupe BlueGenji). Confirme-le, ou conteste-le.",
+    "body": "Ton adversaire a saisi le score de votre match (Coupe BlueGenji). Confirme-le, ou conteste-le : sans réponse, il sera validé automatiquement.",
     "url": "/tournois/7#match-31",
     "tag": "rencontre-31-score"
   },

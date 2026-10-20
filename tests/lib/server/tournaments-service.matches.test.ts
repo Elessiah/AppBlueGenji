@@ -11,7 +11,7 @@ import { finalizeMatch, reportMatchScore } from "@/lib/server/tournaments/scorin
 import { queueRefereeAlert } from "@/lib/server/tournaments/bot-logs";
 import { resolveUserEntrant } from "@/lib/server/tournaments/registration";
 import { syncTournamentState } from "@/lib/server/tournaments/state";
-import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
+import { SCORE_AUTO_VALIDATE_MINUTES, SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { plausibleSeriesMinutes } from "@/lib/shared/score-report-deadline";
 import { qualifyDestinationMatchId } from "@/app/(secured)/tournois/[id]/_lib/bracket-sections";
 import type { TournamentRow } from "@/lib/server/tournaments/_internal";
@@ -106,6 +106,23 @@ describe("tournaments-service: match state machine", () => {
       const { connection, calls } = makeConnection({ 10: { team1_id: 99, team2_id: 7 } });
       await finalizeMatch(connection, 1, { ...baseMatch, next_winner_slot: 2 }, baseResult);
       expect(calls).toContainEqual(placement(2, [7, 10]));
+    });
+
+    // Validation d'office (`SCORE_DISPUTE_LOCK.md`) : le résultat est déjà écrit
+    // par l'`UPDATE` conditionnel, seule la suite de la confirmation reste.
+    it("avec `resultWritten`, propage sans réécrire le résultat", async () => {
+      const { connection, calls } = makeConnection();
+      await finalizeMatch(connection, 1, baseMatch, baseResult, { resultWritten: true });
+      expect(calls.some((c) => c.sql.includes("status = 'COMPLETED'"))).toBe(false);
+      expect(calls).toContainEqual(placement(1, [7, 10]));
+    });
+
+    it("sans option, écrit le résultat puis le propage", async () => {
+      const { connection, calls } = makeConnection();
+      await finalizeMatch(connection, 1, baseMatch, baseResult);
+      const write = calls.find((c) => c.sql.includes("status = 'COMPLETED'"));
+      expect(write?.params).toEqual([3, 1, 7, 8, 5]);
+      expect(calls).toContainEqual(placement(1, [7, 10]));
     });
 
     // Cohérence UI ↔ moteur : la redirection du badge « Qualifié » vise exactement le
@@ -232,14 +249,15 @@ describe("tournaments-service: match state machine", () => {
     const writes = (calls: Call[]) => calls.filter((c) => c.sql.startsWith("UPDATE"));
     /**
      * Paramètres de l'écriture d'un report : scores, puis ceux de l'échéance —
-     * délai, délai (branche « l'adversaire a déjà reporté »), minutes de série,
-     * délai (branche « report seul ») —, puis le match.
+     * délai, délai (branche « l'adversaire a déjà reporté »), validation
+     * d'office, minutes de série, délai (branche « report seul ») —, puis le match.
      */
     const reportParams = (my: number, opp: number) => [
       my,
       opp,
       SCORE_REPORT_TIMEOUT_MINUTES,
       SCORE_REPORT_TIMEOUT_MINUTES,
+      SCORE_AUTO_VALIDATE_MINUTES,
       plausibleSeriesMinutes(null),
       SCORE_REPORT_TIMEOUT_MINUTES,
       10,
@@ -292,10 +310,13 @@ describe("tournaments-service: match state machine", () => {
       await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 0));
 
       const [report] = writes(calls);
-      // Calculée par la base et posée une fois (COALESCE) : max(maintenant,
-      // lancement + série) puis le délai — et le lancement ne compte que s'il
-      // appartient à cet appariement.
-      expect(report.sql).toMatch(/ELSE COALESCE\(score_deadline_at, DATE_ADD\( GREATEST\( NOW\(\),/);
+      // Calculée par la base, à chaque saisie de l'équipe seule à avoir
+      // reporté : la plus lointaine de « maintenant + 2 h » et de
+      // max(maintenant, lancement + série) puis le délai — et le lancement ne
+      // compte que s'il appartient à cet appariement (`SCORE_DISPUTE_LOCK.md`).
+      expect(report.sql).toMatch(
+        /ELSE GREATEST\(DATE_ADD\(NOW\(\), INTERVAL \? MINUTE\), DATE_ADD\( GREATEST\( NOW\(\),/,
+      );
       expect(report.sql).toMatch(
         /CASE WHEN launch_pairing = CONCAT\(team1_id, ':', team2_id\) THEN launched_at END/,
       );
@@ -310,8 +331,8 @@ describe("tournaments-service: match state machine", () => {
       const long = reportConnection();
       await reportMatchScore(long.connection, 1, 10, 42, mapsFor(3, 2));
 
-      expect(writes(short.calls)[0].params[4]).toBe(plausibleSeriesMinutes(null));
-      expect(writes(long.calls)[0].params[4]).toBe(plausibleSeriesMinutes(null));
+      expect(writes(short.calls)[0].params[5]).toBe(plausibleSeriesMinutes(null));
+      expect(writes(long.calls)[0].params[5]).toBe(plausibleSeriesMinutes(null));
     });
 
     it("le report de l'adversaire rapproche l'échéance, sans jamais la repousser", async () => {
@@ -366,6 +387,9 @@ describe("tournaments-service: match state machine", () => {
 
       // team1_score, team2_score, vainqueur, perdant, match.
       expect(completion(calls)?.params).toEqual([3, 1, 100, 200, 10]);
+      // Un forfait noté par l'arbitrage (« Enregistrer ») ne survit pas au score
+      // des joueurs : même clôture que la validation d'office.
+      expect(completion(calls)?.sql).toContain("forfeit_team_id = NULL");
       expect(queueRefereeAlert).not.toHaveBeenCalled();
       // Le détail de la proposition confirmée devient le résultat retenu.
       const promote = calls.find((c) => c.sql.includes("VALUES (?, 'FINAL'"));
@@ -506,6 +530,53 @@ describe("tournaments-service: match state machine", () => {
 
       expect(completion(calls)).toBeUndefined();
       expect(queueRefereeAlert).toHaveBeenCalledWith(connection, { kind: "score_conflict", matchId: 10 });
+    });
+
+    // Litige ouvert (`SCORE_DISPUTE_LOCK.md`) : deux propositions contradictoires
+    // verrouillent la saisie pour les deux équipes, jusqu'à l'arbitrage.
+    const disputed: Partial<Row> = {
+      status: "AWAITING_CONFIRMATION",
+      team1_report_score: 3,
+      team1_report_opponent_score: 1,
+      team2_report_score: 3,
+      team2_report_opponent_score: 1,
+    };
+
+    it.each([100, 200])("refuse toute saisie de l'équipe %i sur un match en litige (SCORE_LOCKED_DISPUTE)", async (teamId) => {
+      reporterIs(teamId);
+      const { connection, calls } = reportConnection(disputed);
+
+      await expect(reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1))).rejects.toThrow("SCORE_LOCKED_DISPUTE");
+      expect(writes(calls)).toHaveLength(0);
+      expect(queueRefereeAlert).not.toHaveBeenCalled();
+    });
+
+    it("refuse aussi la confirmation d'une proposition en litige", async () => {
+      const { connection, calls } = reportConnection(disputed);
+
+      await expect(
+        reportMatchScore(connection, 1, 10, 42, mapsFor(1, 3), { reportedAt: "2026-01-01T20:30:00.000Z" }),
+      ).rejects.toThrow("SCORE_LOCKED_DISPUTE");
+      expect(writes(calls)).toHaveLength(0);
+    });
+
+    it("le verrou se lit sur la ligne verrouillée du match", async () => {
+      const { connection, calls } = reportConnection(disputed);
+
+      await expect(reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1))).rejects.toThrow("SCORE_LOCKED_DISPUTE");
+      const read = calls.find((c) => c.sql.startsWith("SELECT") && c.sql.includes("FROM bg_matches"));
+      expect(read?.sql).toMatch(/FOR UPDATE$/);
+    });
+
+    it("une seule proposition ne verrouille rien : son auteur peut la corriger", async () => {
+      const { connection, calls } = reportConnection({
+        status: "AWAITING_CONFIRMATION",
+        team1_report_score: 3,
+        team1_report_opponent_score: 0,
+      });
+
+      await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1));
+      expect(writes(calls)[0].sql).toMatch(/SET team1_report_score = \?/);
     });
 
     it("deux reports contradictoires laissent la rencontre en attente et alertent l'arbitrage", async () => {
