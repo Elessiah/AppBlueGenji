@@ -285,10 +285,8 @@ export function TermsAcceptanceModal({
           </CyberButton>
         </div>
         {/* Le libellé d'un bouton déjà focalisé qui change n'est pas annoncé :
-            la préparation se dit ici, pour les lecteurs d'écran. */}
-        <p className="sr-only" role="status">
-          {preparing ? t("termsModal.deleting") : ""}
-        </p>
+            la préparation se dit ici (`<output>`, rôle `status` natif), pour les lecteurs d'écran. */}
+        <output className="sr-only">{preparing ? t("termsModal.deleting") : ""}</output>
         {deletionOpen ? (
           <TermsAccountDeletion
             onReady={() => setDeletionReady(true)}
