@@ -94,8 +94,8 @@ texte, effacée un jour après la fin de la soirée).
   anonyme — « ⚠️ Litige tranché par un membre du staff qui joue ce match ·
   « tournoi ». » (de même « Résultat corrigé », « Abandon imposé à son
   adversaire », « Validation automatique suspendue ») —, **ni manche, ni issue,
-  ni nom d'engagé**. La ligne détaillée (manche, issue, noms d'équipe, aucun en
-  individuel) et l'auteur ne vont que dans pm2 (`publishStaffAction(discord,
+  ni nom d'engagé**. La ligne détaillée (manche, et sauf pour une suspension issue et noms d'équipe,
+  aucun en individuel) et l'auteur ne vont que dans pm2 (`publishStaffAction(discord,
   actor, auditLine)`, `dispute-self-resolution.ts`). Avant de savoir si l'auteur
   joue la manche, chacun de ces quatre gestes laisse dans pm2 une trace courte
   — numéro du match et auteur nommé (`auditStaffAction`), **que l'arbitre joue
