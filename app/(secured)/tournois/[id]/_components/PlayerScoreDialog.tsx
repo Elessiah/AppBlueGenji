@@ -190,15 +190,6 @@ function theirsPendingStatus(
   return text.t("score.player.theirs.withoutMaps", values);
 }
 
-/** Avis de verrou dans sa région d'état, vide hors litige (`PlayerScoreDialog`). */
-function LockedNotice({ locked, text }: Readonly<{ locked: boolean; text: string }>) {
-  return (
-    <output id="player-score-locked" className={locked ? `${styles.conflict} ${styles.notice}` : undefined}>
-      {locked ? text : null}
-    </output>
-  );
-}
-
 /** Refus qui disent que l'état lu est périmé : la modale relit le serveur. */
 // `MATCH_ALREADY_COMPLETED` : la validation d'office a pu passer à l'heure dite.
 const REFRESH_ON_REFUSAL: ReadonlySet<string> = new Set(["PROPOSAL_STALE", SCORE_LOCKED_DISPUTE, "MATCH_ALREADY_COMPLETED"]);
@@ -431,8 +422,11 @@ export function PlayerScoreDialog({
         const pending = theirsPendingStatus(text, { opponentName, myName }, view.theirs!, { canReport: canReportScore, detailLoading });
         return deadline ? `${pending} ${t("score.player.autoValidateAt", { deadline })}` : pending;
       }
+      // Désaccord et verrou dans **la même** région d'état : un litige arrivé
+      // par le flux s'annonce une fois, où que soit le focus — la région est
+      // déjà montée (une proposition l'avait remplie).
       case "CONFLICT":
-        return conflictText(text, view.mine!, view.theirs!, opponentName);
+        return `${conflictText(text, view.mine!, view.theirs!, opponentName)} ${t("score.player.locked")}`;
       default:
         return canReportScore
           ? t("score.player.willConfirm", { opponent: opponentName })
@@ -478,7 +472,7 @@ export function PlayerScoreDialog({
           {/* `<output>` (région d'état native) : l'adversaire peut répondre pendant que la modale
               est ouverte, et le flux change alors cette phrase. */}
           {status && (
-            <output className={`${styles.stored} ${styles.notice}`}>
+            <output className={`${disputeLocked ? styles.conflict : styles.stored} ${styles.notice}`}>
               {status}
             </output>
           )}
@@ -514,10 +508,6 @@ export function PlayerScoreDialog({
             </div>
           )}
 
-          {/* Région d'état **toujours montée** : un litige arrivé par le flux la
-              remplit, et c'est ce remplissage qu'un lecteur d'écran annonce — où
-              que soit le focus. Montée déjà pleine, elle ne l'était pas toujours. */}
-          <LockedNotice locked={disputeLocked} text={t("score.player.locked")} />
 
           {canEnterScore ? (
             <>

@@ -50,6 +50,7 @@
     "admin": {
       "title": "Match score",
       "saved": "Score saved: the match is still in progress.",
+        "disputeNotice": "Dispute: score entry stays locked for both opponents until you use “Confirm the result” (score or forfeit). “Save” records progress without settling the match.",
       "resolved": "Result confirmed: the board is up to date.",
       "awaitingDetail": "Loading the proposed map details… Refresh the page if they don't arrive.",
       "proposal": "Score proposed by {author} ({score1} – {score2}), awaiting confirmation from {other}. Check it, then confirm the result to approve it.",
@@ -114,7 +115,7 @@
       "forfeitRecorded": "Forfeit recorded: {opponent} wins the match.",
       "minePending": "You proposed {score}. Waiting for {opponent} to confirm.",
       "minePendingDeadline": "You proposed {score}. Waiting for {opponent} to confirm — with no answer, this score will be confirmed automatically at {deadline} (Paris time).",
-      "locked": "Score disputed: score entry is locked for both opponents, forfeits included. Only a referee or an administrator can settle this match — set the final score or declare a forfeit.",
+      "locked": "Score disputed: score entry is locked for both opponents, forfeits included. Only a referee or an administrator can settle this match — confirm the final score or a forfeit.",
       "counterWarning": "This entry differs from {opponent}'s proposal (score or map details): sending it opens a dispute and locks score entry for both opponents until a referee settles it.",
       "autoValidateAt": "With no answer, this score will be confirmed automatically at {deadline} (Paris time).",
       "willConfirm": "{opponent} will have to confirm the score you send.",
