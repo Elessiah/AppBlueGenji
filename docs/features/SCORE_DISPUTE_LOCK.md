@@ -130,9 +130,9 @@ d'office, exactement comme si l'autre l'avait confirmé.
   2026-10-20) et a été retiré ensuite, le nouveau code n'écrivant jamais
   d'échéance plus proche. Le seed des reports expirés date toujours sa saisie
   de 2 h 10 (au-delà des deux heures). **Restauration d'une sauvegarde prise
-  avant ce déploiement** : rejouer ce rattrapage n'apporterait rien — la seule
-  archive concernée (hebdomadaire du 2026-10-19, 03:00) ne peut être restaurée
-  que plus de deux heures après chaque saisie qu'elle contient, si bien que
+  avant ce déploiement** : rejouer ce rattrapage n'apporterait rien — une telle
+  archive (hebdomadaire, la dernière du 2026-10-19 à 03:00) ne peut être
+  restaurée que plus de deux heures après chaque saisie qu'elle contient, si bien que
   « saisie + 2 h » est déjà passé et que ses reports seuls en attente sont
   validés d'office au premier démarrage, avec ou sans lui.
 - **Colonnes de clôture partagées** (`MATCH_RESULT_SET_SQL`,
