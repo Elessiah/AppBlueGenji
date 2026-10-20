@@ -594,6 +594,15 @@ describe("adminResolveMatchPublic", () => {
     expect(order(jest.mocked(alertSelfResolvedDispute))).toBeGreaterThan(order(connection.commit));
   });
 
+  it("rend la main sans attendre l'envoi de l'alerte (l'arbitre n'attend pas les notifications)", async () => {
+    connection.execute.mockResolvedValue([[disputedHead], undefined]);
+    // Une alerte qui ne finit jamais : l'arbitrage doit quand même aboutir.
+    jest.mocked(alertSelfResolvedDispute).mockReturnValueOnce(new Promise<boolean>(() => undefined));
+
+    await expect(adminResolveMatchPublic(70, { forfeitTeamId: 3 }, actor)).resolves.toBeUndefined();
+    expect(alertSelfResolvedDispute).toHaveBeenCalledTimes(1);
+  });
+
   it("n'alerte personne hors litige (report seul ou aucun)", async () => {
     for (const reports of [
       { team1_report_score: 2, team2_report_score: null },
