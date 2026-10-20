@@ -200,7 +200,15 @@ ferme la session —, toast puis accueil rechargé dans la langue de la page). D
   déploiement, réseau figé) : la fenêtre retrouve ses issues, un toast
   (`termsModal.deletionUnavailable`) dit de recharger. Une fenêtre qui se tait
   (`/rgpd`, `/profil`…) abandonne la préparation : rouverte, elle ne relance
-  pas seule la confirmation.
+  pas seule la confirmation. La minuterie est levée **avant la peinture** de
+  la confirmation (`onReady` joué en `useLayoutEffect`) : jamais une
+  confirmation affichée puis retirée par le délai.
+
+Un `DELETE /api/profile` en 2xx dont le corps est illisible (coupé par un
+proxy) reste un **succès** (`requestAccountDeletion`) : le compte est supprimé,
+la session fermée — l'issue annoncée retombe sur l'aperçu, et la personne est
+ramenée à l'accueil au lieu de rester sur un « échec » que chaque essai suivant
+refuserait en 401. Un refus illisible garde le code générique.
 
 L'aperçu est **borné** (`ACCOUNT_DELETION_PREVIEW_TIMEOUT_MS`, 8 s,
 `AbortController` + minuterie, pas `AbortSignal.timeout` absent avant Safari 16 : chaque essai y laissait une requête ouverte, assez pour épuiser les connexions HTTP/1.1 du site) : un aperçu qui ne répond jamais laissait la fenêtre
