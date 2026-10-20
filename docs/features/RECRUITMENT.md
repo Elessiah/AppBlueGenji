@@ -225,16 +225,24 @@ revient pour une prioritaire neuve).
 - **Compte** (connecté) : `bg_users.recruitment_modal_off` (`TINYINT(1)`,
   défaut `0`), posé par `POST /api/recruitment/modal-dismiss` et lu **avec la
   session** (`getCurrentUser` → `AuthUser.recruitmentModalOff`, aucune requête
-  de plus) : le choix suit la personne sur ses autres appareils.
+  de plus) : le choix suit la personne sur ses autres appareils. Colonne
+  absente (son `ALTER` de `RECENT_SCHEMA_CHANGES` a échoué) : la lecture de
+  session est rejouée sans elle (`selectUserRows`, drapeau à `false`) plutôt
+  que de faire tomber chaque page connectée.
 - **Report à la connexion** : `createSession` (point de passage des quatre
-  portes) lit le cookie et pose le drapeau sur le compte ; une erreur n'empêche
+  portes) lit le cookie et pose le drapeau sur le compte, en parallèle du
+  journal de connexion (aucun aller-retour de plus) ; une erreur n'empêche
   jamais la connexion. **Rattrapage** à chaque chargement complet d'une page connectée
   (`healRecruitmentModalOff`, `app/layout.tsx`) : cookie posé, drapeau à `0`
   (écriture du clic échouée) → écriture non attendue ; le drapeau lu avec la
-  session l'éteint ensuite.
+  session l'éteint ensuite. Au plus une tentative par compte et par processus
+  toutes les dix minutes (`RECRUITMENT_MODAL_HEAL_WINDOW_MS`) : une écriture qui
+  échoue n'est pas relancée à chaque page ni par chaque onglet restauré.
 - Décision : `recruitmentModalOptedOut({ accountOff, browserCookie })`
   (`lib/shared/recruitment.ts`), passée à part de `modalSilenced` (prop
-  `modalOptedOut`) par `app/layout.tsx`.
+  `modalOptedOut`) par `app/layout.tsx`, qui lit le cookie une fois et, pour
+  qui a refusé, n'envoie plus les annonces de la modale (`modalAds` vide — ni
+  leurs textes sous `/en` si la banderole n'a rien non plus).
 - Ordre du focus : le bouton vient **après** « Plus tard », « Lire » et
   « Postuler » dans le DOM (rangée à part, pas d'`order` CSS) — focus
   d'ouverture sur « Plus tard » sans pager, sur le pager sinon (comme avant),
