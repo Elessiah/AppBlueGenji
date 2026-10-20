@@ -62,7 +62,12 @@ par `docs/features/BACKUP_DATA_PROTECTION.md`. Ce qui concerne le site, en bref 
    mauvais sens effacerait la seule copie.
 5. **Suppressions de compte**, avant toute ouverture : journal recopié dans
    `data/`, puis `replay:deletions` avec le chemin du journal **en argument**
-   (`docs/features/BACKUP_DATA_PROTECTION.md`).
+   (`docs/features/BACKUP_DATA_PROTECTION.md`). **Archive antérieure au
+   2026-10-20** (avant la v1.39.0) : rejouer aussi
+   l'`UPDATE bg_matches` des échéances de report de
+   `docs/features/SCORE_DISPUTE_LOCK.md` (« Reports en vol au déploiement »),
+   sans quoi les reports seuls en attente seraient validés d'office en
+   quelques minutes au lieu de deux heures.
 6. **Démarrage** : la première fois, l'entrée pm2 se crée à la main (commande de
    « Se remettre d'une entrée perdue », plus bas) suivie de `pm2 save` —
    `./update.sh` (appelé par `~/apps/updateBlueGenji.sh`) ne fait que
