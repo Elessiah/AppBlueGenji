@@ -198,7 +198,7 @@ confidentialité est dû (`PrivacyChangesModal`).
 
 ### Ne plus afficher
 
-La modale porte, à gauche de ses actions, un bouton secondaire souligné
+La modale porte, sur sa propre rangée sous ses actions, un bouton secondaire souligné
 « Ne plus afficher » / “Don't show again” (`highlight.dontShowAgain`). Une fois
 cliqué, elle ne s'ouvre **plus jamais d'elle-même** pour cette personne ; les
 annonces restent sur `/recrutement` et dans la banderole, qui n'est pas
@@ -222,14 +222,17 @@ revient pour une prioritaire neuve).
 - Décision : `recruitmentModalOptedOut({ accountOff, browserCookie })`
   (`lib/shared/recruitment.ts`), passée à part de `modalSilenced` (prop
   `modalOptedOut`) par `app/layout.tsx`.
-- Focus d'ouverture : sur « Plus tard » (`data-autofocus`) quand il n'y a
-  qu'une annonce — sinon le premier focalisable serait « Ne plus afficher »,
-  et Entrée pour fermer couperait la modale pour de bon. Avec plusieurs
-  annonces, il reste sur le pager, comme avant.
+- Ordre du focus : le bouton vient **après** « Plus tard », « Lire » et
+  « Postuler » dans le DOM (rangée à part, pas d'`order` CSS) — focus
+  d'ouverture sur « Plus tard » sans pager, sur le pager sinon (comme avant),
+  et la première tabulation après le pager atteint « Plus tard » : Entrée pour
+  fermer ne coupe jamais la modale pour de bon.
 - Toasts (`recruitmentOptOutToast`) : connecté et compte écrit, succès « Cette
   fenêtre ne s'ouvrira plus d'elle-même… » ; non connecté, succès « … sur ce
   navigateur… » (le choix ne couvre que lui) ; compte injoignable, erreur
   « Choix gardé sur ce navigateur seulement… » (le cookie est posé d'abord) ;
+  session finie depuis le chargement (401), traité comme non connecté
+  (succès « … sur ce navigateur… », le cookie suivra au compte) ;
   cookie refusé sans compte écrit (relu dans `document.cookie`), erreur « Ce
   choix n'a pas pu être gardé… ».
 - Navigateur partagé : un cookie laissé par une personne non connectée est
