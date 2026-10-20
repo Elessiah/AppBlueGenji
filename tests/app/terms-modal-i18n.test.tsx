@@ -186,7 +186,7 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     expect(modal).toContain("aria-busy={preparing || undefined}");
     expect(modal).not.toContain("aria-busy={deletionOpen");
     // Annoncée aux lecteurs d'écran (le libellé d'un bouton focalisé qui change ne l'est pas).
-    expect(modal).toMatch(/<p className="sr-only" role="status">\s*\{preparing \? t\("termsModal\.deleting"\) : ""\}\s*<\/p>/);
+    expect(modal).toContain('<output className="sr-only">{preparing ? t("termsModal.deleting") : ""}</output>');
     expect(modal).toContain('<span data-hidden={preparing || undefined}>{t("termsModal.deleteAccount")}</span>');
     expect(modal).toContain('<span data-hidden={!preparing || undefined}>{t("termsModal.deleting")}</span>');
     // Fenêtre tue (page où elle se tait) : la préparation est abandonnée, rien ne se relance seul à la réouverture.
