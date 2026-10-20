@@ -447,8 +447,12 @@ export function PlayerScoreDialog({
       // Désaccord et verrou dans **la même** région d'état : un litige arrivé
       // par le flux s'annonce une fois, où que soit le focus — la région est
       // déjà montée (une proposition l'avait remplie).
-      case "CONFLICT":
-        return `${conflictText(text, view.mine!, view.theirs!, opponentName)} ${t("score.player.locked")}`;
+      case "CONFLICT": {
+        const conflict = `${conflictText(text, view.mine!, view.theirs!, opponentName)} ${t("score.player.locked")}`;
+        // Détail des propositions encore en lecture : les deux blocs de maps
+        // n'ont rien à montrer — le dire, et dire quoi faire s'il n'arrive pas.
+        return detailLoading ? `${conflict} ${t("score.player.conflictLoading")}` : conflict;
+      }
       default:
         return canReportScore
           ? t("score.player.willConfirm", { opponent: opponentName })

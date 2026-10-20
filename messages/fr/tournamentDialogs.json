@@ -116,6 +116,7 @@
       "minePending": "Tu as proposé {score}. En attente de la confirmation de {opponent}.",
       "minePendingDeadline": "Tu as proposé {score}. En attente de la confirmation de {opponent} — sans réponse, ce score sera validé automatiquement à {deadline} (heure de Paris).",
       "locked": "Score en litige : la saisie est verrouillée pour les deux adversaires, forfait compris. Seul un arbitre ou un administrateur peut trancher ce match — valider le score final ou un forfait.",
+      "conflictLoading": "Lecture du détail des maps… Actualise la page s'il n'arrive pas.",
       "counterWarning": "Cette saisie diffère de la proposition de {opponent} (score ou détail des maps) : l'envoyer ouvre un litige et verrouille la saisie des deux adversaires jusqu'à l'arbitrage.",
       "autoValidateAt": "Sans réponse, ce score sera validé automatiquement à {deadline} (heure de Paris).",
       "willConfirm": "{opponent} devra confirmer le score que tu envoies : sans réponse, il sera validé automatiquement après au moins 2 h.",
