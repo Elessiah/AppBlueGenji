@@ -589,8 +589,8 @@ function RgpdFr({
               reporté à la connexion ou à votre prochaine visite connectée. Sur le compte, il dure
               autant que lui, figure dans l&apos;export de vos données et revient au défaut à la
               suppression du compte. Vous pouvez revenir sur ce choix dans « Mon profil » : le
-              compte note alors que vous avez réaffiché la fenêtre (mention gardée le temps du
-              compte et présente dans l&apos;export) et le cookie de ce navigateur est effacé. Dès lors, plus aucun
+              compte note alors que vous avez réaffiché la fenêtre (mention gardée jusqu&apos;à un
+              nouveau « Ne plus afficher », présente dans l&apos;export) et le cookie de ce navigateur est effacé. Dès lors, plus aucun
               cookie n&apos;est reporté sur le compte : un navigateur qui le garde (posé avant, hors connexion, ou faute
               d&apos;avoir pu être enregistré sur le compte) n&apos;y tait la fenêtre que chez lui ; seul un nouveau « Ne plus afficher »
               fait connecté, ou la case de « Mon profil », la coupe de nouveau sur le compte.

@@ -144,7 +144,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Declared adulthood (yes / no / not specified)",
       "Visibility settings, availability for recruitment, roles on the platform",
       "Account language (French or English), reset to French on anonymization",
-      "“Don't show again” choice on the window of urgent recruitment announcements (never chosen / yes / turned back on from “My profile”; a choice made on the browser before logging in, or not saved right away, is carried over to an account that has never chosen, at login or on the next logged-in visit; turning it back on from “My profile” also deletes the bg_recr_off cookie of that browser), reset to “never chosen” on anonymization",
+      "“Don't show again” choice on the window of urgent recruitment announcements, made in that window or by unticking the “My profile” box (never chosen / yes / turned back on from “My profile”; a choice made on the browser before logging in, or not saved right away, is carried over to an account that has never chosen, at login or on the next logged-in visit; turning it back on from “My profile” also deletes the bg_recr_off cookie of that browser), reset to “never chosen” on anonymization",
       "No real name, no email address, no phone number, no postal address",
     ],
     sensitiveData: "None",

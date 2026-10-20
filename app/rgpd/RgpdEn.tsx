@@ -456,7 +456,7 @@ export function RgpdEn({
               or on your next visit while logged in. On the account, it lasts as long as the
               account, is included in the export of your data and returns to the default when the account is
               deleted. You can undo this choice in “My profile”: the account then records that you turned the window
-              back on (a mark kept as long as the account and included in the export) and the cookie of
+              back on (a mark kept until a new “Don&apos;t show again”, included in the export) and the cookie of
               that browser is deleted. From then on, no cookie is carried over to the account any more: a browser
               that holds it (set earlier, while logged out, or because it could not be saved to the account) only keeps the window closed there; only a new
               “Don&apos;t show again” made while logged in, or the “My profile” box, turns it off again on the

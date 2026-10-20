@@ -36,7 +36,7 @@ Pseudos Overwatch (BattleTag), Marvel Rivals et Discord ; certification du pseud
 Majorité déclarée (oui / non / non renseignée)
 Réglages de visibilité, disponibilité pour le recrutement, rôles sur la plateforme
 Langue du compte (français ou anglais), remise au français à l'anonymisation
-Choix « Ne plus afficher » de la fenêtre des annonces de recrutement urgentes (jamais choisi / oui / réaffichée depuis « Mon profil » ; un choix fait sur le navigateur avant la connexion, ou pas enregistré sur-le-champ, est reporté sur un compte qui n'a jamais choisi, à la connexion ou à la visite connectée suivante ; réafficher depuis « Mon profil » efface aussi le cookie bg_recr_off de ce navigateur), remis à « jamais choisi » à l'anonymisation
+Choix « Ne plus afficher » de la fenêtre des annonces de recrutement urgentes, fait dans cette fenêtre ou en décochant la case de « Mon profil » (jamais choisi / oui / réaffichée depuis « Mon profil » ; un choix fait sur le navigateur avant la connexion, ou pas enregistré sur-le-champ, est reporté sur un compte qui n'a jamais choisi, à la connexion ou à la visite connectée suivante ; réafficher depuis « Mon profil » efface aussi le cookie bg_recr_off de ce navigateur), remis à « jamais choisi » à l'anonymisation
 Aucun nom réel, aucune adresse e-mail, aucun numéro de téléphone, aucune adresse postale
 Données sensibles
 Aucune
