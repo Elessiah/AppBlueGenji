@@ -129,7 +129,7 @@ describe("resolveExpiredScoreReports", () => {
       { team1Score: 2, team2Score: 1, winnerTeamId: 101, loserTeamId: 102 },
       { resultWritten: true },
     );
-    expect(queueAutoValidatedNotice).toHaveBeenCalledWith(connection, 31);
+    expect(queueAutoValidatedNotice).toHaveBeenCalledWith(connection, 31, { team1Score: 2, team2Score: 1 });
   });
 
   it("est idempotente : un second passage ne réclame plus rien", async () => {
