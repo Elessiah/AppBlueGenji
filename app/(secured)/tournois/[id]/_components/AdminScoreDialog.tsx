@@ -6,7 +6,7 @@ import type { TournamentDialogsText } from "@/lib/shared/tournament-actions-text
 import { FormEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Pill } from "@/components/cyber";
-import type { BracketMatch, MatchProposalMaps, TournamentGame } from "@/lib/shared/types";
+import type { BracketMatch, MatchProposalMaps, MatchScoreReport, TournamentGame } from "@/lib/shared/types";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { isMatchDoubleForfeit, isMatchDrawn, isMatchPlayed } from "@/lib/shared/match-outcome";
@@ -150,6 +150,29 @@ function visibleBlocker(text: TournamentDialogsText, input: {
   if (input.blankMaps) return null;
   if (input.mapRefusal) return mapViolationText(text, input.mapRefusal, input.format, input.game);
   return input.blocker ? scoreBlockerText(text, input.blocker, input.format) : null;
+}
+
+/**
+ * Une proposition d'engagée telle que l'arbitre la vérifie : score, puis maps et
+ * codes de replay. Litige (les deux) ou report seul suspendu (`SCORE_DISPUTE_LOCK.md`).
+ */
+function ProposalSection({ text, report, by, team1, team2 }: Readonly<{
+  text: TournamentDialogsText;
+  report: MatchScoreReport;
+  by: string;
+  team1: string;
+  team2: string;
+}>) {
+  return (
+    <section aria-label={text.t("score.admin.proposalOf", { name: by })}>
+      <p className={mapStyles.proposalTitle}>
+        {text.t("score.admin.proposalTitle", { name: by, score1: report.team1Score, score2: report.team2Score })}
+      </p>
+      {report.maps.length > 0 && (
+        <MapResultList maps={report.maps} team1Name={team1} team2Name={team2} label={text.t("score.admin.proposalMaps", { name: by })} />
+      )}
+    </section>
+  );
 }
 
 export function AdminScoreDialog({
@@ -384,23 +407,7 @@ export function AdminScoreDialog({
               l'engagée a déclaré (score, maps, codes de replay) avant de trancher. */}
           {pausedReport && (
             <div className={mapStyles.proposals}>
-              <section aria-label={t("score.admin.proposalOf", { name: pausedReport.by })}>
-                <p className={mapStyles.proposalTitle}>
-                  {t("score.admin.proposalTitle", {
-                    name: pausedReport.by,
-                    score1: pausedReport.report.team1Score,
-                    score2: pausedReport.report.team2Score,
-                  })}
-                </p>
-                {pausedReport.report.maps.length > 0 && (
-                  <MapResultList
-                    maps={pausedReport.report.maps}
-                    team1Name={team1}
-                    team2Name={team2}
-                    label={t("score.admin.proposalMaps", { name: pausedReport.by })}
-                  />
-                )}
-              </section>
+              <ProposalSection text={text} report={pausedReport.report} by={pausedReport.by} team1={team1} team2={team2} />
             </div>
           )}
 
@@ -413,14 +420,7 @@ export function AdminScoreDialog({
                 { report: match.team1Report, by: team1 },
                 { report: match.team2Report, by: team2 },
               ].map(({ report, by }) => (
-                <section key={by} aria-label={t("score.admin.proposalOf", { name: by })}>
-                  <p className={mapStyles.proposalTitle}>
-                    {t("score.admin.proposalTitle", { name: by, score1: report.team1Score, score2: report.team2Score })}
-                  </p>
-                  {report.maps.length > 0 && (
-                    <MapResultList maps={report.maps} team1Name={team1} team2Name={team2} label={t("score.admin.proposalMaps", { name: by })} />
-                  )}
-                </section>
+                <ProposalSection key={by} text={text} report={report} by={by} team1={team1} team2={team2} />
               ))}
               {/* Seule la validation lève le verrou des engagées (`SCORE_DISPUTE_LOCK.md`) :
                   « Enregistrer » garde les deux propositions, donc le litige. */}
