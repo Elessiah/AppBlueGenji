@@ -78,16 +78,21 @@ describe("l'arbitre joue-t-il la manche ?", () => {
     expect(q).toContain("tm.team_id IN (?, ?) AND tm.user_id = ?");
     // Arrivé avant le match (pas après), parti après (quitter l'équipe juste
     // avant de trancher n'efface pas l'alerte ; un départ ancien n'accuse pas).
-    expect(q).toContain("tm.joined_at <= COALESCE(?, m.launched_at, NOW())");
-    expect(q).toContain("(tm.left_at IS NULL OR tm.left_at >= COALESCE(?, m.launched_at, m.created_at))");
+    // Arrivée jugée au premier report, sinon au lancement, sinon à la création
+    // (un membre arrivé après un match clos sans lancement n'est pas accusé).
+    expect(q).toContain("tm.joined_at <= COALESCE(?, m.launched_at, m.created_at)");
+    // Départ jugé au premier des deux, lancement ou report : partir en cours de match ne dispense pas.
+    expect(q).toContain(
+      "(tm.left_at IS NULL OR tm.left_at >= COALESCE(LEAST(COALESCE(m.launched_at, ?), COALESCE(?, m.launched_at)), m.created_at))",
+    );
     expect(q).toContain("st.solo_user_id = ?");
-    expect(params).toEqual([70, 3, 4, 9, playedAt, playedAt, 3, 4, 9]);
+    expect(params).toEqual([70, 3, 4, 9, playedAt, playedAt, playedAt, 3, 4, 9]);
   });
 
   it("sans report connu, juge l'appartenance au lancement, sinon à la création de la manche", async () => {
     await alertSelfResolvedDispute(dispute, actor);
 
-    expect(execute.mock.calls[0][1]).toEqual([70, 3, 4, 9, null, null, 3, 4, 9]);
+    expect(execute.mock.calls[0][1]).toEqual([70, 3, 4, 9, null, null, null, 3, 4, 9]);
   });
 
   it("date la manche par le plus ancien des deux reports", () => {
@@ -153,7 +158,7 @@ describe("alertSelfResolvedDispute", () => {
   it("abandon imposé : ne cherche l'arbitre que chez l'adversaire de l'équipe retirée", async () => {
     await expect(alertSelfImposedForfeit(dispute, actor, [4])).resolves.toBe(true);
 
-    expect(execute.mock.calls[0][1]).toEqual([70, 4, 4, 9, null, null, 4, 4, 9]);
+    expect(execute.mock.calls[0][1]).toEqual([70, 4, 4, 9, null, null, null, 4, 4, 9]);
     const [line] = jest.mocked(publishStaffAction).mock.calls[0];
     expect(line).toBe(
       "⚠️ Abandon imposé à son adversaire par un membre du staff qui joue ce match · « Coupe d'hiver », Manche 2 : Alpha 2 – 1 Bravo.",

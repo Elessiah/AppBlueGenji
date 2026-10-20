@@ -768,7 +768,8 @@ describe("forfeitTournamentTeamPublic — manche close par un abandon imposé", 
     expect(String(openSql)).not.toMatch(/FOR UPDATE/);
     expect(openParams).toEqual([5, 3, 3]);
     const [lockSql, lockParams] = connection.execute.mock.calls[1];
-    expect(String(lockSql)).toMatch(/WHERE id IN \(\?, \?, \?\)\s+FOR UPDATE$/);
+    // Revérifiée sous verrou : une manche close entre-temps par les joueurs n'est pas imputée à l'abandon.
+    expect(String(lockSql)).toMatch(/WHERE id IN \(\?, \?, \?\) AND status <> 'COMPLETED'\s+FOR UPDATE$/);
     expect(String(lockSql)).not.toMatch(/JOIN/);
     expect(lockParams).toEqual([70, 71, 72]);
     const [settledSql, settledParams] = connection.execute.mock.calls[3];
