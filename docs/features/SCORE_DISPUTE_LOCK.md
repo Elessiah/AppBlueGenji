@@ -79,12 +79,15 @@ session), dans trois cas :
 
 1. il **tranche un litige** par « Valider le résultat »
    (`adminResolveMatchPublic` → `alertSelfResolvedDispute`) ;
-2. il **impose l'abandon** d'une équipe (route d'abandon, chemin arbitrage :
-   `forfeitTournamentTeamPublic` avec `actor`) et cet abandon clôt un litige
-   de la manche : les litiges ouverts de l'engagé se lisent **sous verrou**
-   (`lockOpenDisputes`, après `lockTournamentRow` en première instruction),
-   ceux que l'abandon a clos (`COMPLETED`) partent à `alertSelfResolvedDispute`
-   — issue « forfait de Équipe X » ;
+2. il **impose l'abandon** de l'équipe adverse (route d'abandon, chemin
+   arbitrage : `forfeitTournamentTeamPublic` avec `actor`) et cet abandon clôt
+   un litige de la manche : les manches ouvertes de l'engagé se lisent sans
+   verrou puis se verrouillent **par clé primaire** (`lockOpenDisputes`, après
+   `lockTournamentRow` en première instruction ; tout rejoué sur interblocage,
+   `retryOnDeadlock`), et celles que l'abandon a closes (`COMPLETED`) partent à
+   `alertSelfResolvedDispute` — issue « forfait de Équipe X ». Seul compte
+   l'arbitre qui joue chez l'**adversaire** de l'équipe retirée : retirer sa
+   propre équipe est une concession, qu'un joueur peut faire lui-même ;
 3. son « Enregistrer » **suspend** la validation d'office d'un report seul
    (`adminSaveMatchScoresPublic` → `alertSelfPausedValidation`), une fois : à
    la saisie qui pose la suspension (`pausedNow`, état d'avant lu sous le
