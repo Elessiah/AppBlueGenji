@@ -121,11 +121,14 @@ d'office, exactement comme si l'autre l'avait confirmé.
   Puis la suite d'une confirmation : `promoteReportedMaps`, `finalizeMatch(…,
   { resultWritten: true })` (journal `match_finished`, propagation dans le
   plateau, nettoyage des maps), réconciliation des modes à classement et
-  annonce SSE par l'entretien existant (`./state.ts`, `contentChanged`).
+  annonce SSE par l'entretien existant (`./state.ts`, `contentChanged`). Le
+  format de manche se lit une fois par ronde dans un balayage, pas par match.
 - **Aucun processus nouveau** : l'entretien passif et les balayages existants
   (`findDueMaintenance`, `./sync-scope.ts`) repèrent déjà `score_deadline_at <= NOW()`.
 - **Notification** : après le commit (`auto-validated-notices.ts`, vidé avec
-  `flushBotLogs`, jeté avec `discardBotLogs`), push « Score validé
+  `flushBotLogs`, jeté avec `discardBotLogs` ; avis envoyés **l'un après
+  l'autre**, sans plafond, pour qu'une ronde entière validée d'un coup n'occupe
+  qu'une connexion du pool), push « Score validé
   automatiquement » aux responsables de match des **deux** équipes
   (`notifyScoreAutoValidated`, sujet existant `SCORE_TO_CONFIRM`, rédacteur
   `scoreAutoValidatedPush`, FR + EN, sans nommer personne ni « l'autre équipe » :
