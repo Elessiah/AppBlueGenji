@@ -205,8 +205,12 @@ grisé, curseur d'attente). Ses toasts portent la même langue (`lang="fr"`) que
 la confirmation retombée sur le français. Le bouton de la fenêtre n'est
 `aria-busy` que pendant la préparation, annoncée par un `<output>` caché (rôle `status`)
 (le libellé d'un bouton focalisé qui change n'est pas lu). Les boutons en vol
-de la confirmation gardent leur fond de repos au survol et passent au gris
-système en contraste élevé (`forced-colors`).
+de la confirmation ne s'éclairent plus au survol (`.btn:hover` de
+`globals.css` exclut tout bouton désarmé, `:where()` gardant sa spécificité),
+passent au gris système en contraste élevé (`forced-colors`), et l'attente
+(`pendingLabel`) est annoncée par un `<output aria-live="polite">` caché. Le
+délai de préparation ne rend le focus au bouton que s'il y est resté ou s'est
+perdu sur `<body>`.
 
 Aucune des routes du geste (`GET /api/profile/deletion`, `DELETE /api/profile`,
 ni `GET /api/profile/export` pour l'art. 15) ne consulte l'acceptation des
