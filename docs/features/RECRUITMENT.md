@@ -216,7 +216,9 @@ revient pour une prioritaire neuve).
   n'aboutit pas (réseau, délai dépassé, 5xx — un 502 du proxy ne repose pas le
   cookie ; connecté : tout échec du compte) est retenté **une fois**, 2 s plus
   tard — en arrière-plan quand le toast est déjà acquis (non connecté, cookie
-  du script posé), attendu sinon, pour que le toast dise l'issue réelle. Lu par la mise en page racine — la décision se prend avant le
+  du script posé) ou quand la première a été abandonnée au délai (un seul
+  budget d'attente pour le toast), attendu sinon, pour que le toast dise
+  l'issue réelle. Lu par la mise en page racine — la décision se prend avant le
   rendu, d'où un cookie et non `localStorage`. **Lax, pas strict** (comme
   `bg_recr_modal` / `bg_recr_banner`) : un cookie strict n'est pas envoyé quand
   la visite part d'un autre site (lien Discord, résultat de recherche, retour
@@ -228,7 +230,10 @@ revient pour une prioritaire neuve).
   de plus) : le choix suit la personne sur ses autres appareils.
 - **Report à la connexion** : `createSession` (point de passage des quatre
   portes) lit le cookie et pose le drapeau sur le compte ; une erreur n'empêche
-  jamais la connexion.
+  jamais la connexion. **Rattrapage** à chaque page connectée
+  (`healRecruitmentModalOff`, `app/layout.tsx`) : cookie posé, drapeau à `0`
+  (écriture du clic échouée) → écriture non attendue ; le drapeau lu avec la
+  session l'éteint ensuite.
 - Décision : `recruitmentModalOptedOut({ accountOff, browserCookie })`
   (`lib/shared/recruitment.ts`), passée à part de `modalSilenced` (prop
   `modalOptedOut`) par `app/layout.tsx`.
