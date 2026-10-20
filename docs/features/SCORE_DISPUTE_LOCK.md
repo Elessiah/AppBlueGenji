@@ -55,7 +55,8 @@ Le bouton dit « Voir le litige » même à qui ne peut que déclarer forfait
 geste. Litige arrivé par le flux pendant une saisie : le focus, resté sur un
 champ qui disparaît, revient à la modale (l'avis s'annonce par la région
 d'état, une seule fois). La modale en litige montre **les deux** propositions,
-codes de replay compris : la saisie retirée, c'est la seule trace des siens. L'avis dit ce que l'arbitrage peut faire depuis la carte :
+codes de replay compris : la saisie retirée, c'est la seule trace des siens (détail
+encore en lecture : la phrase d'état le dit, `conflictLoading`, FR + EN). L'avis dit ce que l'arbitrage peut faire depuis la carte :
 valider le score final ou un forfait (aucune remise à zéro par match
 n'existe ; le retour en arrière du tournoi en est une, plus large).
 
