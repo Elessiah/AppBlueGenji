@@ -1101,7 +1101,7 @@ export default function ProfilePage() {
           discordReachable={matchDmReachable(discordState, data?.profile.discordVerified)}
           onChoice={reportMatchDmChoice}
         />
-        <RecruitmentModalField initialOff={data?.recruitmentModalOff} />
+        <RecruitmentModalField initialOff={data?.recruitmentModalOff} onSaved={() => router.refresh()} />
       </ProfileSection>
 
       {invitations.length > 0 && (

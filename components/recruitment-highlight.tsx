@@ -113,12 +113,20 @@ export async function recordRecruitmentModalOptOut(
     post = postOptOut,
     cookieKept = optOutCookieKept,
     wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
+    accountCatchUp = true,
   }: Readonly<{
     writeCookie?: (name: string, value: string, maxAge?: number) => boolean;
     post?: (url: string) => Promise<Pick<Response, "ok" | "status" | "json">>;
     /** Relu après la réponse : son `Set-Cookie` peut avoir gardé le choix là où le script a été refusé. */
     cookieKept?: () => boolean;
     wait?: (ms: number) => Promise<void>;
+    /**
+     * Le cookie sera-t-il reporté sur le compte si l'écriture échoue ? Non
+     * pour un compte qui a réaffiché la fenêtre depuis « Mon profil » (le
+     * rattrapage ne touche qu'un compte jamais décidé) : le toast ne promet
+     * alors que ce navigateur.
+     */
+    accountCatchUp?: boolean;
   }> = {},
 ): Promise<RecruitmentModalOptOutResult> {
   const written = writeCookie(RECRUITMENT_MODAL_OFF_COOKIE, RECRUITMENT_MODAL_OFF_VALUE, RECRUITMENT_MODAL_OFF_MAX_AGE);
@@ -160,8 +168,9 @@ export async function recordRecruitmentModalOptOut(
   if (account) return "ACCOUNT";
   // Refusé au script, le cookie a pu être posé par le `Set-Cookie` de la réponse.
   if (!written && !cookieKept()) return "NONE";
-  // Connecté, compte non écrit : rattrapé à la page suivante, depuis le cookie.
-  return signedIn && !accountUnavailable ? "ACCOUNT" : "BROWSER";
+  // Connecté, compte non écrit : rattrapé à la page suivante, depuis le cookie
+  // (sauf compte réaffiché depuis « Mon profil » : ce navigateur seulement).
+  return signedIn && !accountUnavailable && accountCatchUp ? "ACCOUNT" : "BROWSER";
 }
 
 /** Le cookie « Ne plus afficher » est-il lisible sur ce navigateur ? */
@@ -259,6 +268,7 @@ export function RecruitmentHighlight({
   onAdPage,
   modalOptedOut = false,
   signedIn = false,
+  accountBackOn = false,
 }: Readonly<{
   /** Prioritaires publiées : les pages de la modale d'arrivée. */
   modalAds: readonly RecruitmentAd[];
@@ -280,6 +290,8 @@ export function RecruitmentHighlight({
   modalOptedOut?: boolean;
   /** Lecteur connecté : « Ne plus afficher » est aussi gardé sur son compte. */
   signedIn?: boolean;
+  /** Compte qui a réaffiché la fenêtre depuis « Mon profil » : aucun rattrapage depuis le cookie. */
+  accountBackOn?: boolean;
 }>) {
   // Ouverte sur la première prioritaire jamais vue ; toutes vues, elle se tait.
   const modalStart = recruitmentModalStart(modalAds.map((ad) => ad.id), modalSeen);
@@ -296,6 +308,7 @@ export function RecruitmentHighlight({
           keptIds={modalSeenKept}
           startIndex={modalStart}
           signedIn={signedIn}
+          accountBackOn={accountBackOn}
         />
       )}
     </>
@@ -489,12 +502,14 @@ function RecruitmentArrivalModal({
   keptIds,
   startIndex,
   signedIn,
+  accountBackOn,
 }: Readonly<{
   ads: readonly RecruitmentAd[];
   seenIds: readonly number[];
   keptIds: readonly number[];
   startIndex: number;
   signedIn: boolean;
+  accountBackOn: boolean;
 }>) {
   const [open, setOpen] = useState(true);
   const [index, setIndex] = useState(startIndex);
@@ -530,7 +545,7 @@ function RecruitmentArrivalModal({
    */
   async function optOut() {
     // Le cookie est posé dès l'appel, avant la fermeture.
-    const saved = recordRecruitmentModalOptOut(signedIn);
+    const saved = recordRecruitmentModalOptOut(signedIn, { accountCatchUp: !accountBackOn });
     dismiss();
     const { kind, key } = recruitmentOptOutToast(await saved);
     if (kind === "error") toast?.showError(t(`highlight.${key}`));

@@ -456,8 +456,10 @@ export function RgpdEn({
               or on your next visit while logged in. On the account, it lasts as long as the
               account, is included in the export of your data and returns to the default when the account is
               deleted. You can undo this choice in “My profile”: the account no longer keeps it and the cookie of
-              that browser is deleted; another browser that still holds it only keeps the window closed there,
-              without carrying it over to the account any more.
+              that browser is deleted. From then on, no cookie is carried over to the account any more: a browser
+              that holds it (set earlier, or while logged out) only keeps the window closed there; only a new
+              “Don&apos;t show again” made while logged in, or the “My profile” box, turns it off again on the
+              account.
             </li>
             <li>
               <strong>bg_terms_later</strong> — <strong>no longer set</strong> since version 6 of the terms of use: accepting

@@ -19,13 +19,23 @@ import {
  */
 function withOptOutCookie<T>(response: NextResponse<T>): NextResponse<T> {
   response.cookies.set(RECRUITMENT_MODAL_OFF_COOKIE, RECRUITMENT_MODAL_OFF_VALUE, {
-    path: "/",
+    ...optOutCookieAttributes(),
     maxAge: RECRUITMENT_MODAL_OFF_MAX_AGE,
+  });
+  return response;
+}
+
+/**
+ * Attributs communs à la pose et à l'effacement du cookie : un effacement qui
+ * n'aurait pas les mêmes (chemin, `Secure`…) laisserait l'autre en place.
+ */
+function optOutCookieAttributes() {
+  return {
+    path: "/",
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     httpOnly: false,
-  });
-  return response;
+  } as const;
 }
 
 /**
@@ -33,13 +43,7 @@ function withOptOutCookie<T>(response: NextResponse<T>): NextResponse<T> {
  * {@link withOptOutCookie}, faute de quoi le navigateur garderait l'autre).
  */
 function withoutOptOutCookie<T>(response: NextResponse<T>): NextResponse<T> {
-  response.cookies.set(RECRUITMENT_MODAL_OFF_COOKIE, "", {
-    path: "/",
-    maxAge: 0,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    httpOnly: false,
-  });
+  response.cookies.set(RECRUITMENT_MODAL_OFF_COOKIE, "", { ...optOutCookieAttributes(), maxAge: 0 });
   return response;
 }
 
@@ -83,6 +87,8 @@ export async function DELETE() {
   try {
     const user = await getCurrentUser();
     if (!user) return fail("UNAUTHORIZED", 401);
+    // Déjà réaffichée (lu avec la session) : seul le cookie d'ici est effacé.
+    if (user.recruitmentModalBackOn) return withoutOptOutCookie(ok({ account: true }));
     if (!(await recordRecruitmentModalBackOn(user.id))) return fail(ACCOUNT_DELETED_ERROR, 409);
     return withoutOptOutCookie(ok({ account: true }));
   } catch (error) {

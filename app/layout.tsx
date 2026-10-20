@@ -309,6 +309,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             })}
             modalOptedOut={modalOptedOut}
             signedIn={user !== null}
+            accountBackOn={user?.recruitmentModalBackOn === true}
             modalSeen={modalSeen}
             modalSeenKept={modalSeenKept}
             bannerAds={spotlight.banner}

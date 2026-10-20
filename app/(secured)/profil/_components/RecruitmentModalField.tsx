@@ -70,7 +70,15 @@ export function recruitmentModalShownHere(accountOff: boolean | undefined, cooki
  */
 export function RecruitmentModalField({
   initialOff,
-}: Readonly<{ initialOff: boolean | undefined }>): React.ReactElement | null {
+  onSaved,
+}: Readonly<{
+  initialOff: boolean | undefined;
+  /**
+   * Choix enregistré : la page relit la mise en page racine (`router.refresh()`),
+   * seule à décider de la modale — sans quoi rien ne change avant un rechargement.
+   */
+  onSaved?: () => void;
+}>): React.ReactElement | null {
   const text = useProfileText();
   const { t } = text;
   const { showError, showSuccess } = useToast();
@@ -95,7 +103,7 @@ export function RecruitmentModalField({
   }
 
   // « Ne plus afficher » cliqué dans la modale ouverte par-dessus cette page :
-  // la case se décoche (hors envoi en cours, qui a le dernier mot).
+  // la case se décoche (pendant un envoi, le cookie est relu à sa fin).
   useEffect(() => {
     const onOptOut = () => {
       if (!busyRef.current) setShown(false);
@@ -133,8 +141,13 @@ export function RecruitmentModalField({
     });
     if (outcome.stored) setChosenHere(true);
     if (outcome.confirmed) showSuccess(t(outcome.saved ? "recruitmentModal.shown" : "recruitmentModal.hidden"));
+    // Ce navigateur a le dernier mot sur la case : un `POST` refusé repose
+    // quand même le cookie, et un « Ne plus afficher » de la modale arrivé
+    // pendant l'envoi a pu le poser — cochée, elle mentirait.
+    if (shownRef.current && browserOptedOut()) setShown(false);
     busyRef.current = false;
     setBusy(false);
+    if (outcome.stored) onSaved?.();
   };
 
   if (initialOff === undefined) return null;
