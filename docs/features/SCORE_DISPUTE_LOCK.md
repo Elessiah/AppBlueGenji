@@ -140,7 +140,9 @@ remplace plus, à l'échéance, ce que l'arbitre a noté.
   retire quand les champs la portent déjà.
   La notification d'« Enregistrer » dit la suspension quand elle a eu lieu
   (`autoValidationPaused` dans la réponse de `PATCH …/scores`,
-  `score.admin.savedPaused`). Une resaisie du déclarant pendant la suspension
+  `score.admin.savedPaused` ; forfait noté : `savedForfeit` / `savedForfeitPaused`).
+  /regles le borne : « Un arbitre qui, après cette déclaration, enregistre… » —
+  un « Enregistrer » antérieur au report ne suspend rien. Une resaisie du déclarant pendant la suspension
   prévient l'adversaire sans promettre de validation automatique
   (`scoreToConfirm.bodyPaused`). Le réveil du flux ignore une échéance suspendue
   (`tournament-broadcast.ts`).
