@@ -214,8 +214,9 @@ revient pour une prioritaire neuve).
   toast n'attend pas cet appel, sauf si le script n'a pas pu poser le cookie
   (seul le `Set-Cookie` de la réponse peut alors le garder). Un appel qui
   n'aboutit pas (réseau, délai dépassé, 5xx — un 502 du proxy ne repose pas le
-  cookie ; connecté : tout échec du compte) est retenté **une fois**, en
-  arrière-plan, 2 s plus tard ; le toast n'en dépend pas. Lu par la mise en page racine — la décision se prend avant le
+  cookie ; connecté : tout échec du compte) est retenté **une fois**, 2 s plus
+  tard — en arrière-plan quand le toast est déjà acquis (non connecté, cookie
+  du script posé), attendu sinon, pour que le toast dise l'issue réelle. Lu par la mise en page racine — la décision se prend avant le
   rendu, d'où un cookie et non `localStorage`. **Lax, pas strict** (comme
   `bg_recr_modal` / `bg_recr_banner`) : un cookie strict n'est pas envoyé quand
   la visite part d'un autre site (lien Discord, résultat de recherche, retour
