@@ -315,10 +315,20 @@ rechargement (hors envoi en cours).
   non) mais ne le **reporte plus** sur le compte. La case y apparaît
   décochée ; la cocher là-bas efface ce cookie-là. Le compte, lui, n'est plus
   refusé que par un nouveau clic (modale ou case).
-- Limite acceptée : réaffichée puis refusée de nouveau dans la modale avec une
-  écriture du compte qui échoue — le cookie tait la modale ici, mais le
-  compte reste à `2` et le rattrapage ne le corrige pas (les autres appareils
-  la montrent encore ; un nouveau clic suffit).
+- Limites acceptées (le cookie ne dit pas quand il a été posé) : sur un
+  compte à `2`, un « Ne plus afficher » fait **hors connexion** reste sur ce
+  navigateur (pas de report à la connexion), et un clic connecté dont
+  l'écriture du compte échoue aussi — la modale reçoit alors
+  `accountBackOn` (`app/layout.tsx`) et le toast ne promet que « … sur ce
+  navigateur… » (`recordRecruitmentModalOptOut(…, { accountCatchUp: false })`).
+  Un nouveau clic connecté, ou la case, remet le compte à `1`. `/rgpd`,
+  `PRIVACY_CHANGES` et le registre le disent.
+- La case relit le cookie à la fin de chaque envoi (un `POST` refusé le
+  repose quand même ; un « Ne plus afficher » arrivé pendant l'envoi aussi) et,
+  un choix enregistré, appelle `onSaved` → `router.refresh()` : la mise en page
+  racine, seule à décider de la modale, est relue sans rechargement complet.
+  Déjà réaffichée (session), `DELETE` n'écrit rien et efface seulement le
+  cookie.
 
 ### Banderole : les annonces défilent
 
