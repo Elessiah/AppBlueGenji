@@ -1588,7 +1588,9 @@ export async function adminResolveMatchPublic(
 ): Promise<void> {
   // Même risque d'interblocage que le report d'un engagé (`retryOnDeadlock`).
   const dispute = await retryOnDeadlock(() => adminResolveMatchOnce(matchId, entry));
-  if (dispute && actor) await alertSelfResolvedDispute(dispute, actor);
+  // Sans attendre : l'arbitre voit « Résultat validé » sans patienter derrière
+  // l'envoi des notifications au staff (meilleur effort, ne lève jamais).
+  if (dispute && actor) void alertSelfResolvedDispute(dispute, actor);
 }
 
 type ResolvedMatchHead = RowDataPacket & {
