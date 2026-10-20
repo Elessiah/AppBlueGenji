@@ -56,6 +56,7 @@ import { invalidateStats } from "@/lib/server/stats-cache";
 import { hasPendingStateTransition, syncTournamentState } from "./state";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
 import { DUE_LAUNCH_SQL } from "./sync-scope";
+import { ACTIONABLE_EXPIRED_REPORT_SQL } from "./score-report-sql";
 import { localUploadUrl } from "@/lib/shared/uploads";
 import { pickChampion } from "@/lib/shared/tournament-card-summary";
 import { computeRunningRatio } from "@/lib/shared/tournament-progress";
@@ -137,7 +138,11 @@ export function invalidateSpectatorSnapshot(tournamentId: number): void {
 /**
  * Un entretien de tournoi en cours est-il dû ? Deux questions, **une requête** :
  *
- * - un report de score dont le délai est expiré ;
+ * - un report de score expiré que la résolution peut faire avancer
+ *   (`ACTIONABLE_EXPIRED_REPORT_SQL`, le prédicat même du balayage passif) :
+ *   un litige déjà escaladé attend un arbitre, et le retenir ouvrait une
+ *   transaction d'entretien inutile à chaque reconstruction de l'instantané,
+ *   pendant tout le litige ;
  * - un lancement dû (`DUE_LAUNCH_SQL`) : heure de départ atteinte sans
  *   ouverture, ou lancement d'office échu. Sans elle, la relecture que la salle
  *   du flux fait **à l'heure dite** (`nextRoomWakeAt`) rendait un plateau
@@ -153,8 +158,7 @@ async function hasDueRunningMaintenance(
 ): Promise<boolean> {
   const [rows] = await db.execute<(RowDataPacket & { due: number | null })[]>(
     `SELECT (EXISTS (SELECT 1 FROM bg_matches m
-                     WHERE m.tournament_id = t.id AND m.status = 'AWAITING_CONFIRMATION'
-                       AND m.score_deadline_at <= NOW())
+                     WHERE m.tournament_id = t.id AND ${ACTIONABLE_EXPIRED_REPORT_SQL})
              OR EXISTS (SELECT 1 FROM bg_matches m
                         WHERE m.tournament_id = t.id AND ${DUE_LAUNCH_SQL})) AS due
      FROM bg_tournaments t WHERE t.id = ? LIMIT 1`,

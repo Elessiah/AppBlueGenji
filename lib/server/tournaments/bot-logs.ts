@@ -68,6 +68,7 @@ import {
   type RefereeAlertContext,
 } from "@/lib/shared/referee-alerts";
 import { tournamentPageUrl } from "./app-url";
+import { STALLED_ALERT_KEY } from "./score-report-sql";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 import { chunkIds, sqlPlaceholders } from "@/lib/server/sql-placeholders";
 
@@ -150,8 +151,8 @@ type ResolvedRefereeLine = { message: string; refereeMatch: RefereeAlertMatch };
  */
 export const CONFLICT_ALERT_KEY = "SCORE_CONFLICT";
 
-/** Clé de réservation de l'escalade « délai dépassé, toujours pas tranché ». */
-export const STALLED_ALERT_KEY = "SCORE_REPORT_STALLED";
+/** Clé de réservation de l'escalade « délai dépassé, toujours pas tranché » (`./score-report-sql`). */
+export { STALLED_ALERT_KEY };
 
 /**
  * Les entrées qui réservent une alerte arbitre.

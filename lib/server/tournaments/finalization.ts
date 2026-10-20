@@ -2,6 +2,7 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { MIN_ENTRANTS_FOR_MATCHES, SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { queueBotLog, queueRefereeAlert } from "./bot-logs";
 import { queueAutoValidatedNotice } from "./auto-validated-notices";
+import { ACTIONABLE_EXPIRED_REPORT_SQL } from "./score-report-sql";
 import {
   loadTournamentMatchFormat,
   resetRegistrationRanks,
@@ -466,6 +467,9 @@ export async function resolveExpiredScoreReports(
   connection: PoolConnection,
   tournamentId: number,
 ): Promise<number> {
+  // Seuls les reports que la résolution peut faire avancer : un litige déjà
+  // escaladé attend un arbitre, et chaque écriture d'un joueur du tournoi le
+  // relirait (avec sa réservation d'alerte) pendant tout le litige.
   const [rows] = await connection.execute<ExpiredMatchRow[]>(
     `SELECT
       id,
@@ -484,12 +488,9 @@ export async function resolveExpiredScoreReports(
       next_loser_slot,
       round_number,
       (score_deadline_at <= DATE_SUB(NOW(), INTERVAL ? MINUTE)) AS conflict_stalled
-     FROM bg_matches
-     WHERE tournament_id = ?
-       AND status = 'AWAITING_CONFIRMATION'
-       AND score_deadline_at IS NOT NULL
-       AND score_deadline_at <= NOW()
-       AND winner_team_id IS NULL`,
+     FROM bg_matches m
+     WHERE m.tournament_id = ?
+       AND ${ACTIONABLE_EXPIRED_REPORT_SQL}`,
     [SCORE_REPORT_TIMEOUT_MINUTES, tournamentId],
   );
 
