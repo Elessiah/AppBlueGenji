@@ -81,7 +81,12 @@ export function selfResolvedDisputeLog(input: SelfResolvedDispute): string {
  * l'équipe juste avant de trancher, puis la rejoindre, n'efface pas l'alerte —,
  * ou joueur d'une entrée solo.
  */
-async function actorPlaysMatch(match: DisputeBeforeResolution, actorId: number): Promise<boolean> {
+async function actorPlaysMatch(
+  match: DisputeBeforeResolution,
+  actorId: number,
+  sides: readonly number[],
+): Promise<boolean> {
+  const [first, second = first] = sides;
   const db = await getDatabase();
   const [rows] = await db.execute<RowDataPacket[]>(
     `SELECT 1 FROM bg_matches m
@@ -92,7 +97,7 @@ async function actorPlaysMatch(match: DisputeBeforeResolution, actorId: number):
              OR EXISTS (SELECT 1 FROM bg_teams st
                          WHERE st.id IN (?, ?) AND st.solo_user_id = ?))
       LIMIT 1`,
-    [match.matchId, match.team1Id, match.team2Id, actorId, match.team1Id, match.team2Id, actorId],
+    [match.matchId, first, second, actorId, first, second, actorId],
   );
   return rows.length > 0;
 }
@@ -147,9 +152,10 @@ async function alertSelfAction(
   kind: SelfActionKind,
   match: DisputeBeforeResolution,
   actor: StaffActor,
+  sides: readonly number[] = [match.team1Id, match.team2Id],
 ): Promise<boolean> {
   try {
-    if (!(await actorPlaysMatch(match, actor.id))) return false;
+    if (!(await actorPlaysMatch(match, actor.id, sides))) return false;
     const input = await loadAlertMatch(match);
     if (!input) return false;
 
@@ -171,10 +177,16 @@ async function alertSelfAction(
 
 /**
  * Litige tranché — « Valider le résultat », ou abandon forcé par l'arbitrage
- * (`forfeitTournamentTeamPublic`) qui clôt la manche en litige.
+ * (`forfeitTournamentTeamPublic`) qui clôt la manche en litige. `sides` : les
+ * engagées où l'arbitre « joue » compte (les deux par défaut ; l'abandon ne
+ * retient que l'adversaire de l'équipe retirée, à qui il profite).
  */
-export function alertSelfResolvedDispute(dispute: DisputeBeforeResolution, actor: StaffActor): Promise<boolean> {
-  return alertSelfAction("resolved", dispute, actor);
+export function alertSelfResolvedDispute(
+  dispute: DisputeBeforeResolution,
+  actor: StaffActor,
+  sides?: readonly number[],
+): Promise<boolean> {
+  return alertSelfAction("resolved", dispute, actor, sides);
 }
 
 /** « Enregistrer » qui vient de suspendre la validation d'office d'un report seul. */

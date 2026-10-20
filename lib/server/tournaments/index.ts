@@ -1437,7 +1437,14 @@ export async function forfeitTournamentTeamPublic(
     forfeitTournamentTeamOnce(tournamentId, teamId, actingUserId, actor),
   );
   // Sans attendre (meilleur effort, ne lève jamais), une fois l'abandon acquis.
-  if (actor) for (const dispute of settledDisputes) void alertSelfResolvedDispute(dispute, actor);
+  // Seul l'abandon imposé à l'**adversaire** de l'arbitre le sert : retirer sa
+  // propre équipe est une concession, qu'un joueur peut faire lui-même.
+  if (actor) {
+    for (const dispute of settledDisputes) {
+      const opponent = dispute.team1Id === teamId ? dispute.team2Id : dispute.team1Id;
+      void alertSelfResolvedDispute(dispute, actor, [opponent]);
+    }
+  }
 }
 
 /** Une tentative d'abandon ; rend les litiges qu'il a clos. */
@@ -1552,23 +1559,36 @@ async function runForfeitEngine(connection: PoolConnection, tournamentId: number
 /**
  * Les litiges ouverts de l'engagé qui abandonne, lus **sous verrou** (table
  * seule, MariaDB) : l'état que l'abandon va clore, qu'un report concurrent ne
- * change plus d'ici le commit.
+ * change plus d'ici le commit. Deux temps : ses manches ouvertes, lues sans
+ * verrou, puis celles-là seules verrouillées **par clé primaire** — un
+ * `FOR UPDATE` filtré sur des colonnes sans index verrouillerait toutes les
+ * manches parcourues du tournoi, et les reports des autres engagés
+ * attendraient l'abandon.
  */
 async function lockOpenDisputes(
   connection: PoolConnection,
   tournamentId: number,
   teamId: number,
 ): Promise<DisputeBeforeResolution[]> {
-  const [rows] = await connection.execute<(RowDataPacket & { id: number; team1_id: number; team2_id: number })[]>(
-    `SELECT m.id, m.team1_id, m.team2_id FROM bg_matches m
-      WHERE m.tournament_id = ? AND m.status = 'AWAITING_CONFIRMATION'
-        AND (m.team1_id = ? OR m.team2_id = ?)
-        AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL
-        AND ${BOTH_REPORTED_SQL}
-      FOR UPDATE`,
+  const [open] = await connection.execute<(RowDataPacket & { id: number })[]>(
+    `SELECT id FROM bg_matches
+      WHERE tournament_id = ? AND status <> 'COMPLETED' AND (team1_id = ? OR team2_id = ?)`,
     [tournamentId, teamId, teamId],
   );
-  return rows.map((row) => ({
+  if (open.length === 0) return [];
+  const [rows] = await connection.execute<
+    (RowDataPacket & { id: number; team1_id: number | null; team2_id: number | null; disputed: number })[]
+  >(
+    `SELECT m.id, m.team1_id, m.team2_id,
+            (m.status = 'AWAITING_CONFIRMATION' AND ${BOTH_REPORTED_SQL}) AS disputed
+       FROM bg_matches m
+      WHERE m.id IN (${open.map(() => "?").join(", ")})
+      FOR UPDATE`,
+    open.map((row) => Number(row.id)),
+  );
+  return rows
+    .filter((row) => Number(row.disputed) === 1 && row.team1_id !== null && row.team2_id !== null)
+    .map((row) => ({
     matchId: Number(row.id),
     tournamentId,
     team1Id: Number(row.team1_id),
