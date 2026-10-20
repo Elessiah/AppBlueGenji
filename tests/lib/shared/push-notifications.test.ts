@@ -295,6 +295,27 @@ describe("déclaration du traitement", () => {
     const change = PRIVACY_CHANGES.find((entry) => entry.id === "2026-09-notifications-push");
     expect(change?.details.join(" ")).toContain(`${PUSH_SUBSCRIPTION_RETENTION_DAYS} jours`);
   });
+
+  // Un report unique se valide d'office après 2 h (SCORE_DISPUTE_LOCK.md) :
+  // l'escalade « délai dépassé » ne vise plus qu'un litige sans arbitrage, et le
+  // réglage comme le registre doivent dire ce qui part réellement.
+  it("décrit l'alerte d'arbitrage comme un litige sans arbitrage, plus un score sans confirmation (FR et EN)", async () => {
+    const { PROCESSING_ACTIVITIES } = await import("@/lib/shared/processing-register");
+    const { PROCESSING_ACTIVITIES_EN } = await import("@/lib/shared/processing-register-en");
+    const fr = (await import("@/messages/fr/push.json")).default;
+    const en = (await import("@/messages/en/push.json")).default;
+    const frTexts = [
+      PUSH_TOPICS.REFEREE_ALERT.description,
+      fr.topics.REFEREE_ALERT.description,
+      JSON.stringify(PROCESSING_ACTIVITIES),
+    ].join(" ");
+    const enTexts = [en.topics.REFEREE_ALERT.description, JSON.stringify(PROCESSING_ACTIVITIES_EN)].join(" ");
+    expect(PUSH_TOPICS.REFEREE_ALERT.description).toBe(fr.topics.REFEREE_ALERT.description);
+    expect(fr.topics.REFEREE_ALERT.description).toContain("litige de score resté trop longtemps sans arbitrage");
+    expect(en.topics.REFEREE_ALERT.description).toContain("score dispute left too long without a referee");
+    expect(frTexts).not.toContain("sans confirmation");
+    expect(enTexts).not.toContain("unconfirmed for too long");
+  });
 });
 
 describe("isSameServerKey", () => {
