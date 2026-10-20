@@ -234,7 +234,9 @@ revient pour une prioritaire neuve).
 - **Report à la connexion** : `createSession` (point de passage des quatre
   portes) lit le cookie et pose le drapeau sur le compte, en parallèle du
   journal de connexion (aucun aller-retour de plus) ; une erreur n'empêche
-  jamais la connexion. **Rattrapage** à chaque chargement complet d'une page connectée
+  jamais la connexion, et l'attente est bornée à 2 s
+  (`RECRUITMENT_MODAL_CARRY_WAIT_MS` : une ligne de compte verrouillée ne
+  retient pas la réponse de connexion, l'écriture continue seule). **Rattrapage** à chaque chargement complet d'une page connectée
   (`healRecruitmentModalOff`, `app/layout.tsx`) : cookie posé, drapeau à `0`
   (écriture du clic échouée) → écriture non attendue ; le drapeau lu avec la
   session l'éteint ensuite. Au plus une tentative par compte et par processus
@@ -343,7 +345,7 @@ ou que la source est déjà partie.
 | `DELETE /api/recruitment/[id]`     | admin  | Supprime une annonce |
 | `PUT /api/recruitment/reorder`     | admin  | Réordonne (`{ ids: number[] }`) — `409 RECRUITMENT_ORDER_MIXES_PRIORITIES` si l'ordre mêle les statuts |
 | `GET /api/recruitment/highlight`   | public | Mise en avant : `{ modal, banner }` (listes d'annonces) |
-| `POST /api/recruitment/modal-dismiss` | tous | « Ne plus afficher » : repose toujours le cookie `bg_recr_off` (`Set-Cookie`) ; connecté, l'écrit sur le compte (`{ account: true }`), sans session `{ account: false }` — `409 ACCOUNT_DELETED`, `503 RECRUITMENT_MODAL_ACCOUNT_UNAVAILABLE` (colonne absente), `500 RECRUITMENT_MODAL_DISMISS_FAILED` |
+| `POST /api/recruitment/modal-dismiss` | tous | « Ne plus afficher » : repose toujours le cookie `bg_recr_off` (`Set-Cookie`) ; connecté, l'écrit sur le compte (`{ account: true }`), sans session `{ account: false }` — `409 ACCOUNT_DELETED`, `503 RECRUITMENT_MODAL_ACCOUNT_UNAVAILABLE` (colonne absente), `500 RECRUITMENT_MODAL_DISMISS_FAILED` (lecture de session comprise ; cookie toujours reposé) |
 
 Les mutations vérifient la session (`401` si anonyme, `403` si non-admin) et la
 validation partagée `validateRecruitmentAdInput` (`lib/shared/recruitment.ts`,
