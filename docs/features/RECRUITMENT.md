@@ -209,8 +209,10 @@ revient pour une prioritaire neuve).
   le client sur-le-champ **puis reposé par le serveur** (`Set-Cookie` de
   `POST /api/recruitment/modal-dismiss`, appelée connecté **ou non**) : Safari
   et tout navigateur iOS (ITP) bornent à sept jours un cookie posé par script,
-  le choix n'y aurait pas duré plus que « Plus tard ». Non connecté, le toast
-  n'attend pas cet appel. Lu par la mise en page racine — la décision se prend avant le
+  le choix n'y aurait pas duré plus que « Plus tard ». Appel en `keepalive`
+  (un onglet fermé juste après le clic ne l'annule pas) ; sa réponse est lue
+  même non connecté au rendu (connexion faite depuis dans un autre onglet :
+  le choix est alors sur le compte, et le toast le dit). Lu par la mise en page racine — la décision se prend avant le
   rendu, d'où un cookie et non `localStorage`. **Lax, pas strict** (comme
   `bg_recr_modal` / `bg_recr_banner`) : un cookie strict n'est pas envoyé quand
   la visite part d'un autre site (lien Discord, résultat de recherche, retour
