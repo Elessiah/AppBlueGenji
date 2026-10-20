@@ -103,23 +103,6 @@
   cursor: progress;
 }
 
-/* Contraste élevé (Windows) : les couleurs posées ici sont ignorées. Le geste
-   à l'allure de lien prend la couleur système des liens, comme ses voisins ; le
-   gris système dit que le lien et les boutons (« J'accepte » pendant l'envoi
-   compris) attendent. */
-@media (forced-colors: active) {
-  .textButton {
-    color: LinkText;
-    background: transparent;
-  }
-
-  .textButton[aria-disabled="true"],
-  .actions [aria-disabled="true"] {
-    color: GrayText;
-    border-color: GrayText;
-  }
-}
-
 .check {
   display: flex;
   align-items: flex-start;
@@ -211,4 +194,23 @@
 
 .labelStack > [data-hidden] {
   visibility: hidden;
+}
+
+/* Contraste élevé (Windows) : les couleurs posées ici sont ignorées. Le geste
+   à l'allure de lien prend la couleur système des liens, comme ses voisins ; le
+   gris système dit que le lien et les boutons (« J'accepte » pendant l'envoi
+   compris) attendent. En fin de feuille : à spécificité égale, il l'emporte sur
+   `.actions .deleteButton`. */
+@media (forced-colors: active) {
+  .textButton {
+    color: LinkText;
+    background: transparent;
+  }
+
+  .textButton[aria-disabled="true"],
+  .actions [aria-disabled="true"],
+  .actions .deleteButton[aria-disabled="true"] {
+    color: GrayText;
+    border-color: GrayText;
+  }
 }

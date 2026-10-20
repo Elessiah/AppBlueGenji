@@ -86,20 +86,10 @@
   background: transparent;
 }
 
-/* Un geste destructeur non armé reste lisible comme tel : texte rouge de danger. */
+/* Un geste destructeur non armé reste lisible comme tel — bordure pointillée
+   rouge —, sans être plus vif que le même bouton armé : texte éteint. */
 .actions > :global(.btn.danger):disabled {
-  color: var(--danger);
-  border-color: rgba(var(--danger-rgb), 0.45);
-}
-
-/* Contraste élevé (Windows) : les couleurs posées plus haut sont ignorées ; le
-   gris système dit, comme le `disabled` natif d'avant, que le bouton attend. */
-@media (forced-colors: active) {
-  .actions > :global(.btn)[aria-disabled="true"],
-  .actions > :global(.btn):disabled {
-    color: GrayText;
-    border-color: GrayText;
-  }
+  border-color: rgba(var(--danger-rgb), 0.32);
 }
 
 .confirmField {
@@ -109,4 +99,16 @@
 .body ul {
   margin: 6px 0 10px;
   padding-left: 18px;
+}
+
+/* Contraste élevé (Windows) : les couleurs posées plus haut sont ignorées ; le
+   gris système dit, comme le `disabled` natif d'avant, que le bouton attend
+   (ou n'est pas armé). En fin de feuille, la variante de danger comprise. */
+@media (forced-colors: active) {
+  .actions > :global(.btn)[aria-disabled="true"],
+  .actions > :global(.btn):disabled,
+  .actions > :global(.btn.danger):disabled {
+    color: GrayText;
+    border-color: GrayText;
+  }
 }
