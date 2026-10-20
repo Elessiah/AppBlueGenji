@@ -101,9 +101,13 @@ describe("modale d'arrivée — bouton « Ne plus afficher »", () => {
     }
   });
 
-  it("disparaît avec la modale une fois le choix fait (silence décidé par la mise en page), la banderole restant", () => {
+  it("laisse la modale s'ouvrir tant que rien n'est posé", () => {
+    expect(renderToStaticMarkup(<RecruitmentHighlight {...props({ modalOptedOut: false })} />)).toContain('role="dialog"');
+  });
+
+  it("disparaît avec la modale une fois le choix fait (décidé par la mise en page), la banderole restant", () => {
     const markup = renderToStaticMarkup(
-      <RecruitmentHighlight {...props({ modalSilenced: true, bannerAds: [ad({ id: 44, priority: "IMPORTANT" })] })} />,
+      <RecruitmentHighlight {...props({ modalOptedOut: true, bannerAds: [ad({ id: 44, priority: "IMPORTANT" })] })} />,
     );
     expect(markup).not.toContain('role="dialog"');
     expect(markup).not.toContain("Ne plus afficher");
