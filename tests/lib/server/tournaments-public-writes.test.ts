@@ -67,6 +67,7 @@ import { reconcilePhases } from "@/lib/server/tournaments/phases";
 import { insertPhases } from "@/lib/server/tournaments/phases-repository";
 import {
   alertSelfCorrectedResult,
+  alertSelfImposedForfeit,
   alertSelfPausedValidation,
   alertSelfResolvedDispute,
 } from "@/lib/server/tournaments/dispute-self-resolution";
@@ -593,7 +594,7 @@ describe("adminResolveMatchPublic", () => {
     await adminResolveMatchPublic(70, { forfeitTeamId: 3 }, actor);
 
     expect(alertSelfResolvedDispute).toHaveBeenCalledWith(
-      { matchId: 70, tournamentId: 8, team1Id: 3, team2Id: 4 },
+      { matchId: 70, tournamentId: 8, team1Id: 3, team2Id: 4, playedAt: null },
       actor,
     );
     expect(order(jest.mocked(alertSelfResolvedDispute))).toBeGreaterThan(order(connection.commit));
@@ -629,15 +630,41 @@ describe("adminResolveMatchPublic", () => {
 
   // Renverser un résultat acquis (un litige tranché par un arbitre neutre, par
   // exemple) n'est pas plus silencieux que trancher le litige.
+  const outcome = { team1_score: 2, team2_score: 1, winner_team_id: 3, forfeit_team_id: null, double_forfeit: 0 };
+  const completed = {
+    ...disputedHead,
+    ...outcome,
+    status: "COMPLETED",
+    team1_report_score: null,
+    team2_report_score: null,
+    team1_reported_at: null,
+    team2_reported_at: null,
+  };
+
   it("transmet la correction d'un match déjà tranché à l'alerte de correction, après le commit", async () => {
-    const completed = { ...disputedHead, status: "COMPLETED", team1_report_score: null, team2_report_score: null };
-    connection.execute.mockResolvedValue([[completed], undefined]);
+    connection.execute.mockResolvedValueOnce([[completed], undefined]);
+    // Après l'arbitrage : l'issue a changé (vainqueur renversé).
+    connection.execute.mockResolvedValueOnce([[{ ...outcome, team1_score: 1, team2_score: 2, winner_team_id: 4 }], undefined]);
+    connection.execute.mockResolvedValue([[{ tournament_id: 8 }], undefined]);
 
     await adminResolveMatchPublic(70, { forfeitTeamId: 3 }, actor);
 
-    expect(alertSelfCorrectedResult).toHaveBeenCalledWith({ matchId: 70, tournamentId: 8, team1Id: 3, team2Id: 4 }, actor);
+    expect(alertSelfCorrectedResult).toHaveBeenCalledWith(
+      { matchId: 70, tournamentId: 8, team1Id: 3, team2Id: 4, playedAt: null },
+      actor,
+    );
     expect(alertSelfResolvedDispute).not.toHaveBeenCalled();
     expect(order(jest.mocked(alertSelfCorrectedResult))).toBeGreaterThan(order(connection.commit));
+  });
+
+  it("revalider le même résultat n'est pas une correction : aucune alerte", async () => {
+    connection.execute.mockResolvedValueOnce([[completed], undefined]);
+    connection.execute.mockResolvedValueOnce([[{ ...outcome, double_forfeit: null }], undefined]);
+    connection.execute.mockResolvedValue([[{ tournament_id: 8 }], undefined]);
+
+    await adminResolveMatchPublic(70, { forfeitTeamId: 3 }, actor);
+
+    expect(alertSelfCorrectedResult).not.toHaveBeenCalled();
   });
 
   it("n'alerte personne quand l'arbitrage est défait", async () => {
@@ -672,7 +699,7 @@ describe("adminSaveMatchScoresPublic — suspension de la validation d'office", 
     await adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 9 }, actor);
 
     expect(alertSelfPausedValidation).toHaveBeenCalledWith(
-      { matchId: 70, tournamentId: 8, team1Id: 3, team2Id: 4 },
+      { matchId: 70, tournamentId: 8, team1Id: 3, team2Id: 4, playedAt: null },
       actor,
     );
     expect(order(jest.mocked(alertSelfPausedValidation))).toBeGreaterThan(order(connection.commit));
@@ -706,18 +733,17 @@ describe("adminSaveMatchScoresPublic — suspension de la validation d'office", 
   });
 });
 
-describe("forfeitTournamentTeamPublic — litige clos par un abandon forcé", () => {
+describe("forfeitTournamentTeamPublic — manche close par un abandon imposé", () => {
   const actor = { id: 9, pseudo: "Sifflet" };
-  const disputed = { id: 70, team1_id: 3, team2_id: 4, disputed: 1 };
+  const reportedAt = new Date("2026-10-20T18:00:00Z");
+  const match70 = { id: 70, team1_id: 3, team2_id: 4, team1_reported_at: null, team2_reported_at: reportedAt };
 
-  /** Réponses : manches ouvertes, leur verrou par clé, format, puis litiges clos. */
+  /** Réponses : manches ouvertes, leur verrou par clé, format, puis manches closes. */
   function script(open: unknown[], locked: unknown[], settled: unknown[]): void {
     connection.execute.mockResolvedValueOnce([open, undefined]);
     if (open.length > 0) connection.execute.mockResolvedValueOnce([locked, undefined]);
     connection.execute.mockResolvedValueOnce([[{ format: "SWISS" }], undefined]);
-    if (locked.some((row) => (row as { disputed: number }).disputed === 1)) {
-      connection.execute.mockResolvedValueOnce([settled, undefined]);
-    }
+    if (locked.length > 0) connection.execute.mockResolvedValueOnce([settled, undefined]);
   }
 
   it("verrouille le tournoi en toute première instruction", async () => {
@@ -729,10 +755,10 @@ describe("forfeitTournamentTeamPublic — litige clos par un abandon forcé", ()
     expect(lockTournamentRow).toHaveBeenCalledWith(expect.anything(), 5);
   });
 
-  it("verrouille les seules manches ouvertes de l'engagé, par clé primaire, et alerte sur les litiges clos après le commit", async () => {
+  it("verrouille les seules manches ouvertes de l'engagé, par clé primaire, et alerte sur celles que l'abandon clôt, après le commit", async () => {
     script(
       [{ id: 70 }, { id: 71 }, { id: 72 }],
-      [disputed, { id: 71, team1_id: 6, team2_id: 3, disputed: 1 }, { id: 72, team1_id: 3, team2_id: 8, disputed: 0 }],
+      [match70, { id: 71, team1_id: 6, team2_id: 3, team1_reported_at: null, team2_reported_at: null }, { id: 72, team1_id: 3, team2_id: null }],
       [{ id: 70 }],
     );
 
@@ -742,53 +768,55 @@ describe("forfeitTournamentTeamPublic — litige clos par un abandon forcé", ()
     expect(String(openSql)).not.toMatch(/FOR UPDATE/);
     expect(openParams).toEqual([5, 3, 3]);
     const [lockSql, lockParams] = connection.execute.mock.calls[1];
-    expect(String(lockSql)).toMatch(/WHERE m\.id IN \(\?, \?, \?\)\s+FOR UPDATE$/);
+    expect(String(lockSql)).toMatch(/WHERE id IN \(\?, \?, \?\)\s+FOR UPDATE$/);
     expect(String(lockSql)).not.toMatch(/JOIN/);
     expect(lockParams).toEqual([70, 71, 72]);
     const [settledSql, settledParams] = connection.execute.mock.calls[3];
     expect(String(settledSql)).toContain("status = 'COMPLETED'");
+    // Une manche sans adversaire connu (72) n'est pas retenue.
     expect(settledParams).toEqual([70, 71]);
-    expect(alertSelfResolvedDispute).toHaveBeenCalledTimes(1);
-    // Seul l'adversaire de l'équipe retirée (4) profite de l'abandon.
-    expect(alertSelfResolvedDispute).toHaveBeenCalledWith(
-      { matchId: 70, tournamentId: 5, team1Id: 3, team2Id: 4 },
+    expect(alertSelfImposedForfeit).toHaveBeenCalledTimes(1);
+    // Seul l'adversaire de l'équipe retirée (4) profite de l'abandon ; la
+    // manche est datée par son report, lu avant que l'abandon ne l'efface.
+    expect(alertSelfImposedForfeit).toHaveBeenCalledWith(
+      { matchId: 70, tournamentId: 5, team1Id: 3, team2Id: 4, playedAt: reportedAt },
       actor,
       [4],
     );
-    expect(order(jest.mocked(alertSelfResolvedDispute))).toBeGreaterThan(order(connection.commit));
+    expect(order(jest.mocked(alertSelfImposedForfeit))).toBeGreaterThan(order(connection.commit));
   });
 
-  it("ne cherche aucun litige pour l'abandon d'un joueur (pas d'arbitrage)", async () => {
+  it("ne cherche aucune manche pour l'abandon d'un joueur (pas d'arbitrage)", async () => {
     connection.execute.mockResolvedValueOnce([[{ format: "SWISS" }], undefined]);
 
     await forfeitTournamentTeamPublic(5, 3, 12).catch(() => undefined);
 
-    for (const [sql] of connection.execute.mock.calls) expect(String(sql)).not.toMatch(/FOR UPDATE|AWAITING_CONFIRMATION/);
-    expect(alertSelfResolvedDispute).not.toHaveBeenCalled();
+    for (const [sql] of connection.execute.mock.calls) expect(String(sql)).not.toMatch(/FOR UPDATE/);
+    expect(alertSelfImposedForfeit).not.toHaveBeenCalled();
   });
 
   it("n'alerte personne quand l'abandon est défait", async () => {
-    script([{ id: 70 }], [disputed], []);
+    script([{ id: 70 }], [match70], []);
     jest.mocked(forfeitSwissTeam).mockRejectedValueOnce(new Error("TEAM_ALREADY_OUT"));
 
     await expect(forfeitTournamentTeamPublic(5, 3, null, actor)).rejects.toThrow("TEAM_ALREADY_OUT");
-    expect(alertSelfResolvedDispute).not.toHaveBeenCalled();
+    expect(alertSelfImposedForfeit).not.toHaveBeenCalled();
     expectRolledBack();
   });
 
   it("rejoue un abandon annulé par un interblocage, et n'alerte qu'une fois", async () => {
     const deadlock = Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK" });
     connection.execute.mockResolvedValueOnce([[{ id: 70 }], undefined]);
-    connection.execute.mockResolvedValueOnce([[disputed], undefined]);
+    connection.execute.mockResolvedValueOnce([[match70], undefined]);
     connection.execute.mockResolvedValueOnce([[{ format: "SWISS" }], undefined]);
     jest.mocked(forfeitSwissTeam).mockRejectedValueOnce(deadlock);
-    script([{ id: 70 }], [disputed], [{ id: 70 }]);
+    script([{ id: 70 }], [match70], [{ id: 70 }]);
 
     await forfeitTournamentTeamPublic(5, 3, null, actor);
 
     expect(forfeitSwissTeam).toHaveBeenCalledTimes(2);
     expect(connection.rollback).toHaveBeenCalledTimes(1);
-    expect(alertSelfResolvedDispute).toHaveBeenCalledTimes(1);
+    expect(alertSelfImposedForfeit).toHaveBeenCalledTimes(1);
   });
 
   it("sans manche ouverte, ni verrou de manche ni alerte", async () => {
@@ -797,16 +825,15 @@ describe("forfeitTournamentTeamPublic — litige clos par un abandon forcé", ()
     await forfeitTournamentTeamPublic(5, 3, null, actor);
 
     expect(connection.execute).toHaveBeenCalledTimes(2);
-    expect(alertSelfResolvedDispute).not.toHaveBeenCalled();
+    expect(alertSelfImposedForfeit).not.toHaveBeenCalled();
   });
 
-  it("sans litige parmi les manches ouvertes, aucune lecture des issues", async () => {
-    script([{ id: 72 }], [{ id: 72, team1_id: 3, team2_id: 8, disputed: 0 }], []);
+  it("n'alerte pas pour une manche que l'abandon ne clôt pas", async () => {
+    script([{ id: 70 }], [match70], []);
 
     await forfeitTournamentTeamPublic(5, 3, null, actor);
 
-    expect(connection.execute).toHaveBeenCalledTimes(3);
-    expect(alertSelfResolvedDispute).not.toHaveBeenCalled();
+    expect(alertSelfImposedForfeit).not.toHaveBeenCalled();
   });
 });
 

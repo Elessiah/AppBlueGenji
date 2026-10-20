@@ -9,6 +9,7 @@ import { notifyStaff } from "@/lib/server/notify";
 import { auditStaffAction, publishStaffAction } from "@/lib/server/staff-audit";
 import {
   alertSelfCorrectedResult,
+  alertSelfImposedForfeit,
   alertSelfPausedValidation,
   alertSelfResolvedDispute,
   resolvedOutcome,
@@ -21,6 +22,7 @@ import {
   type SelfResolvedDispute,
 } from "@/lib/shared/push-messages";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
+import { earliestReport } from "@/lib/shared/score-dispute";
 
 /**
  * Arbitre qui tranche le litige d'une manche qu'il joue
@@ -67,16 +69,37 @@ beforeEach(() => {
 });
 
 describe("l'arbitre joue-t-il la manche ?", () => {
-  it("membre d'une des deux équipes, ou parti depuis que la manche existe, ou joueur solo", async () => {
-    await alertSelfResolvedDispute(dispute, actor);
+  it("membre d'une des deux équipes au moment où la manche s'est jouée, ou joueur solo", async () => {
+    const playedAt = new Date("2026-10-20T18:00:00Z");
+    await alertSelfResolvedDispute({ ...dispute, playedAt }, actor);
 
     const [sql, params] = execute.mock.calls[0];
     const q = String(sql).replace(/\s+/g, " ");
     expect(q).toContain("tm.team_id IN (?, ?) AND tm.user_id = ?");
-    // Quitter l'équipe juste avant de trancher n'efface pas l'alerte.
-    expect(q).toContain("(tm.left_at IS NULL OR tm.left_at >= m.created_at)");
+    // Arrivé avant le match (pas après), parti après (quitter l'équipe juste
+    // avant de trancher n'efface pas l'alerte ; un départ ancien n'accuse pas).
+    expect(q).toContain("tm.joined_at <= COALESCE(?, m.launched_at, NOW())");
+    expect(q).toContain("(tm.left_at IS NULL OR tm.left_at >= COALESCE(?, m.launched_at, m.created_at))");
     expect(q).toContain("st.solo_user_id = ?");
-    expect(params).toEqual([70, 3, 4, 9, 3, 4, 9]);
+    expect(params).toEqual([70, 3, 4, 9, playedAt, playedAt, 3, 4, 9]);
+  });
+
+  it("sans report connu, juge l'appartenance au lancement, sinon à la création de la manche", async () => {
+    await alertSelfResolvedDispute(dispute, actor);
+
+    expect(execute.mock.calls[0][1]).toEqual([70, 3, 4, 9, null, null, 3, 4, 9]);
+  });
+
+  it("date la manche par le plus ancien des deux reports", () => {
+    const a = new Date("2026-10-20T18:00:00Z");
+    const b = new Date("2026-10-20T18:05:00Z");
+    expect(earliestReport(a, b)).toBe(a);
+    expect(earliestReport(b, a)).toBe(a);
+    expect(earliestReport(null, b)).toBe(b);
+    expect(earliestReport(a, null)).toBe(a);
+    expect(earliestReport(null, undefined)).toBeNull();
+    // Chaînes de la base (`dateStrings`), rendues telles quelles.
+    expect(earliestReport("2026-10-20 18:05:00", "2026-10-20 18:00:00")).toBe("2026-10-20 18:00:00");
   });
 });
 
@@ -127,10 +150,28 @@ describe("alertSelfResolvedDispute", () => {
     expect(notification.push("en").body).toContain("Coupe d'hiver, Round 3:");
   });
 
-  it("restreint, sur demande, la recherche à certaines engagées (abandon : l'adversaire)", async () => {
-    await alertSelfResolvedDispute(dispute, actor, [4]);
+  it("abandon imposé : ne cherche l'arbitre que chez l'adversaire de l'équipe retirée", async () => {
+    await expect(alertSelfImposedForfeit(dispute, actor, [4])).resolves.toBe(true);
 
-    expect(execute.mock.calls[0][1]).toEqual([70, 4, 4, 9, 4, 4, 9]);
+    expect(execute.mock.calls[0][1]).toEqual([70, 4, 4, 9, null, null, 4, 4, 9]);
+    const [line] = jest.mocked(publishStaffAction).mock.calls[0];
+    expect(line).toBe(
+      "⚠️ Abandon imposé à son adversaire par un membre du staff qui joue ce match · « Coupe d'hiver », Manche 2 : Alpha 2 – 1 Bravo.",
+    );
+    expect(line).not.toContain("Sifflet");
+    const [notification] = jest.mocked(notifyStaff).mock.calls[0];
+    expect(notification.excludeUserIds).toEqual([9]);
+    const fr = notification.push("fr");
+    expect(fr.title).toBe("Abandon imposé par un joueur du match");
+    expect(fr.body).toBe(
+      "Un membre du staff qui joue ce match a imposé l'abandon de son adversaire · Coupe d'hiver, Manche 2 : Alpha 2 – 1 Bravo.",
+    );
+    const en = notification.push("en");
+    expect(en.title).toBe("Withdrawal imposed by a player of the match");
+    expect(en.body).toBe(
+      "A staff member who plays in this match imposed their opponent's withdrawal · Coupe d'hiver, Round 2: Alpha 2 – 1 Bravo.",
+    );
+    expect(fr.tag).toBe("self-forfeit-70");
   });
 
   it("ne dit rien quand l'arbitre ne joue pas la manche", async () => {
