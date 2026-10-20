@@ -41,7 +41,7 @@ validé d'office.
 secours, sans droit de lecteur à câbler. La carte dit « Score en litige ·
 saisie verrouillée, arbitrage attendu » ; son bouton devient « Voir le litige »,
 icône œil et ton neutre (`readOnly`, `match-card-actions.ts`), ni crayon ni bouton plein : rien ne s'y édite — et elle cède la place visible au
-geste d'arbitrage quand le lecteur en a un (`groupMatchCardActions`) ;
+geste d'arbitrage — et à lui seul — quand le lecteur en a un (`groupMatchCardActions`) ;
 la modale garde l'état du désaccord et le détail adverse, retire la saisie, le
 bouton d'envoi et le forfait, et dit qui peut trancher (arbitre ou
 administrateur — la permission de plateforme `tournaments`, pas l'organisateur),
@@ -129,7 +129,7 @@ d'office, exactement comme si l'autre l'avait confirmé.
   `scoreAutoValidatedPush`, FR + EN, sans nommer personne ni « l'autre équipe » :
   le même texte part aux deux camps — « personne ne l'a confirmé ni contesté
   avant l'échéance » — sans durée : sur un format long, l'échéance dépasse 2 h ;
-  le sujet du profil dit « après au moins 2 h »). Le push « Score à confirmer »
+  le sujet du profil et la modale avant toute saisie (`willConfirm`) disent « après au moins 2 h »). Le push « Score à confirmer »
   prévient d'avance : « sans réponse, il sera validé automatiquement » (sans heure). Rien sur Discord de
   plus que la ligne `match_finished` habituelle.
 - **Écran** : sur la carte (lisible de tous), « validation automatique à HH:MM
