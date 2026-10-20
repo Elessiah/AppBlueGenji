@@ -590,4 +590,9 @@ describe("T01 : « Ne plus afficher » de la fenêtre du recrutement (MODAL-DISM
     );
     expect(enT01().subPurposes).toHaveLength(byRef("T01").subPurposes.length);
   });
+
+  it("dit que décocher la case de « Mon profil » pose aussi le choix (FR et EN)", () => {
+    expect(byRef("T01").dataCategories.join(" ")).toMatch(/urgentes, fait dans cette fenêtre ou en décochant la case de « Mon profil »/);
+    expect(enT01().dataCategories.join(" ")).toMatch(/announcements, made in that window or by unticking the “My profile” box/);
+  });
 });
