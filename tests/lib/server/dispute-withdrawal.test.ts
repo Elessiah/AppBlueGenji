@@ -42,7 +42,8 @@ describe("abandon du tournoi pendant un litige", () => {
     expect(fr).toContain("Un arbitre qui joue ce match peut le trancher, mais les autres membres du staff en sont avertis.");
     expect(en).toContain("A referee who plays in this match may settle it, but the other staff members are warned.");
     expect(fr).toContain("Un arbitre qui enregistre l'avancement du match sans le trancher la suspend");
-    expect(en).toContain("A referee who saves the match's progress without settling it pauses it");
+    // « this automatic confirmation » : c'est elle, pas le match, qui est suspendue (FR « la suspend »).
+    expect(en).toContain("A referee who saves the match's progress without settling it pauses this automatic confirmation");
     // Contester ne tranche pas : cela ouvre un litige, que seul un arbitre règle.
     expect(fr).toContain("à moins que l'adversaire ne le confirme ; le contester ouvre un litige.");
     expect(en).toContain("unless the opponent confirms it; disputing it opens a dispute.");

@@ -693,6 +693,10 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     // Détail encore en lecture (aucune proposition chargée) : dit, plutôt qu'un panneau muet.
     expect(render("fr", <AdminScoreDialog match={bare} proposals={[]} onClose={noop} onSubmitted={noop} />)).toContain("Lecture du détail des maps proposé…");
     expect(render("en", <AdminScoreDialog match={bare} proposals={[]} onClose={noop} onSubmitted={noop} />)).toContain("Loading the proposed map details…");
+    // Détail lu, mais vide : rien à reprendre, et c'est dit (FR + EN).
+    const loaded = [{ matchId: bare.id, team1: { reportedAt: bare.team1Report.reportedAt, maps: [] }, team2: null }];
+    expect(render("fr", <AdminScoreDialog match={bare} proposals={loaded} onClose={noop} onSubmitted={noop} />)).toContain("Cette proposition n&#x27;a pas de détail de maps à reprendre : saisis les maps jouées pour la valider.");
+    expect(render("en", <AdminScoreDialog match={bare} proposals={loaded} onClose={noop} onSubmitted={noop} />)).toContain("This proposal has no map details to reuse: enter the maps played to confirm it.");
     // Inactif à l'œil pendant un envoi (aria-disabled), sans `opacity`.
     const css = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/ScoreDialog.module.css"), "utf8");
     expect(css).toMatch(/\.conflictAction\[aria-disabled="true"\] \{[^}]*cursor: not-allowed;[^}]*color: var\(--ink-soft/);
