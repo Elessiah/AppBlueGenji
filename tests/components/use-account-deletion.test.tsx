@@ -144,6 +144,18 @@ describe("requestAccountDeletion", () => {
     expect(await requestAccountDeletion(null, unreadable)).toEqual({ ok: false, code: "ACCOUNT_DELETE_FAILED" });
     expect(await requestAccountDeletion(null, fakeFetch({}, []))).toEqual({ ok: false, code: "ACCOUNT_DELETE_FAILED" });
   });
+
+  it("un 2xx au corps illisible reste un succès (compte supprimé, session fermée) : l'aperçu tient lieu de plan", async () => {
+    const truncated = fakeFetch({ "DELETE /api/profile": () => new Response("{\"deleted\":tr", { status: 200 }) }, []);
+    expect(await requestAccountDeletion("TOURNAMENTS", truncated)).toEqual({ ok: true, applied: "TOURNAMENTS" });
+    const empty = fakeFetch({ "DELETE /api/profile": () => new Response(null, { status: 204 }) }, []);
+    expect(await requestAccountDeletion(null, empty)).toEqual({ ok: true, applied: null });
+  });
+
+  it("un refus au corps illisible n'est jamais pris pour un succès", async () => {
+    const unauthorized = fakeFetch({ "DELETE /api/profile": () => new Response("", { status: 401 }) }, []);
+    expect(await requestAccountDeletion("TOURNAMENTS", unauthorized)).toEqual({ ok: false, code: "ACCOUNT_DELETE_FAILED" });
+  });
 });
 
 describe("useAccountDeletion", () => {

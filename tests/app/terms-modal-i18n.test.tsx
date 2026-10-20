@@ -205,7 +205,9 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     expect(readSource("components/legal/TermsAcceptanceModal.module.css")).toMatch(/\.textButton\[aria-busy="true"\] \{\s*cursor: progress;/);
     expect(modal).toContain('unavailableRef.current = t("termsModal.deletionUnavailable");');
     // Rappel lu par une ref : un rendu de la fenêtre (rappel neuf) ne rejoue pas l'effet.
-    expect(flowSource()).toMatch(/useEffect\(\(\) => \{\s*if \(confirming\) onReadyRef\.current\?\.\(\);\s*\}, \[confirming\]\);/);
+    // Avant la peinture : la minuterie de préparation tombe dans le même rendu que la confirmation (jamais une confirmation affichée puis retirée).
+    expect(flowSource()).toMatch(/useLayoutEffect\(\(\) => \{\s*if \(confirming\) onReadyRef\.current\?\.\(\);\s*\}, \[confirming\]\);/);
+    expect(flowSource()).not.toMatch(/useEffect\(\(\) => \{\s*if \(confirming\)/);
     // Chargée au clic seulement : ni son code ni l'espace `profile` dans chaque page.
     expect(modal).toContain('onceLoader<ComponentType<TermsAccountDeletionProps>>(() =>\n  import("./TermsAccountDeletion")');
     expect(modal).toContain('import type { TermsAccountDeletionProps } from "./TermsAccountDeletion";');
