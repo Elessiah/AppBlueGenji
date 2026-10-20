@@ -30,15 +30,15 @@ porte côté joueur.
    réponse » sur la carte, « sera validé automatiquement à HH:MM (heure de
    Paris) » dans la modale) : **deux heures** après la dernière saisie du
    déclarant (`SCORE_AUTO_VALIDATE_MINUTES`, `SCORE_DISPUTE_LOCK.md`), et jamais
-   avant une fin de série plausible. Cette dernière ne court qu'après une
-   fin de série plausible — une série **complète** au format de la manche,
+   avant une fin de série plausible — une série **complète** au format de la manche,
    15 min par map de son plafond (BO5 en saisie libre), depuis le lancement
    (`lib/shared/score-report-deadline.ts`) : un « 3-0 » envoyé à la seconde du
    lancement ne fait pas foi avant que la série ait pu se jouer. L'échéance se
    lit sur le format et non sur le score déclaré, qui la mettait à la main du
-   déclarant ; elle est posée une fois, au premier report, et seulement
-   rapprochée (à « maintenant + délai ») quand l'adversaire reporte à son tour —
-   un conflit est alors signalé à l'arbitrage depuis sa naissance.
+   déclarant ; elle est **recalculée à chaque saisie** de l'équipe seule à avoir
+   reporté (au moins « maintenant + 2 h »), et rapprochée (à « maintenant +
+   délai ») quand l'adversaire reporte à son tour — elle ne sert plus alors qu'à
+   l'escalade du litige, signalé à l'arbitrage depuis sa naissance.
 
 Proposer, confirmer et contester reviennent à **ceux qui mènent le match** :
 `CAPITAINE`, `MANAGER` ou `OWNER` — les rôles qui déclarent l'équipe prête
@@ -52,7 +52,8 @@ confirmer » ne prévient que ceux qui peuvent y répondre : le push
 lui, reste au propriétaire et aux managers.
 
 La carte porte une ligne d'état **lisible de tous** (« 2 – 1 proposé par Alpha ·
-à confirmer », « Score en litige · saisie verrouillée, arbitrage attendu ») : sans elle, un
+validation automatique à 14:30 (heure de Paris) sans réponse » — « · à
+confirmer » seulement sans échéance connue —, « Score en litige · saisie verrouillée, arbitrage attendu ») : sans elle, un
 match joué et reporté se lisait comme un match pas encore joué.
 
 ## Données

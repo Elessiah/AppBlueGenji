@@ -38,14 +38,19 @@ secours, sans droit de lecteur à câbler. La carte dit « Score en litige ·
 saisie verrouillée, arbitrage attendu » ; son bouton devient « Voir le litige » ;
 la modale garde l'état du désaccord et le détail adverse, retire la saisie, le
 bouton d'envoi et le forfait, et dit qui peut trancher (arbitre ou
-administrateur — la permission de plateforme `tournaments`, pas l'organisateur).
+administrateur — la permission de plateforme `tournaments`, pas l'organisateur),
+en **validant** le score final ou un forfait. La fenêtre d'arbitrage le rappelle
+sous les deux propositions (`score.admin.disputeNotice`) : « Enregistrer » garde
+les propositions, donc le verrou ; seul « Valider le résultat » le lève.
+Désaccord et verrou partagent la région d'état de la modale joueur (une seule
+annonce).
 Le bouton dit « Voir le litige » même à qui ne peut que déclarer forfait
 (`playerScoreButtonKey` lit le litige d'abord) : la modale n'offre plus ce
 geste. Litige arrivé par le flux pendant une saisie : le focus, resté sur un
-champ qui disparaît, revient à la modale (l'avis s'annonce par sa région
+champ qui disparaît, revient à la modale (l'avis s'annonce par la région
 d'état, une seule fois). La modale en litige montre **les deux** propositions,
 codes de replay compris : la saisie retirée, c'est la seule trace des siens. L'avis dit ce que l'arbitrage peut faire depuis la carte :
-fixer le score final ou prononcer un forfait (aucune remise à zéro par match
+valider le score final ou un forfait (aucune remise à zéro par match
 n'existe ; le retour en arrière du tournoi en est une, plus large).
 
 **Abandon du tournoi.** Le verrou vise le forfait **du match** ; l'abandon du
@@ -70,8 +75,9 @@ et verrouille la saisie des deux équipes jusqu'à l'arbitrage » (FR + EN,
 `score.player.counterWarning`, rattaché au bouton d'envoi par `aria-describedby`), et la phrase d'état (`theirs.withMaps` /
 `withoutMaps`) le dit dès l'ouverture. Pendant un envoi, les boutons
 `aria-disabled` se grisent comme `:disabled` (`ScoreDialog.module.css`).
-L'avis de verrou vit dans une région d'état **toujours montée**, vide hors
-litige : un litige arrivé par le flux est annoncé où que soit le focus. Un refus
+L'avis de verrou suit le désaccord dans **la** région d'état de la modale,
+déjà montée par la proposition qui précédait : un litige arrivé par le flux est
+annoncé une fois, où que soit le focus. Un refus
 `SCORE_LOCKED_DISPUTE` ou `MATCH_ALREADY_COMPLETED` (validation d'office passée
 à l'heure dite ; envoi ou forfait) relit l'état comme `PROPOSAL_STALE`,
 sans attendre un flux peut-être en reconnexion.
