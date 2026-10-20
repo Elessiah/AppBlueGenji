@@ -181,7 +181,9 @@ ferme la session —, toast puis accueil rechargé dans la langue de la page). D
   `orReload`, qui n'aurait jamais rechargé sous une fenêtre toujours modale et
   aurait gardé un composant vide : un code introuvable se dit aussitôt par le
   toast ci-dessous, le clic suivant retente ; sous `/en`, textes anglais et code
-  partent ensemble)
+  partent ensemble ; le chargeur `englishProfile` vit seul dans
+  `components/i18n/english-loader-profile.ts`, réexporté par `english-loaders-account.ts`,
+  pour que la fenêtre ne tire pas les autres chargeurs)
   — ses textes sont ceux de l'espace `profile` (`deletion.*`), chargés sous
   `/en` à ce moment —, et sa confirmation s'empile sur la fenêtre
   (`layer="overBlocking"` de `ConfirmActionDialog`, z-index 1270 contre 1260) :
@@ -198,7 +200,7 @@ ferme la session —, toast puis accueil rechargé dans la langue de la page). D
   pas seule la confirmation.
 
 L'aperçu est **borné** (`ACCOUNT_DELETION_PREVIEW_TIMEOUT_MS`, 8 s,
-`AbortSignal.timeout`, non borné avant Safari 16 où il manque) : un aperçu qui ne répond jamais laissait la fenêtre
+`AbortController` + minuterie, pas `AbortSignal.timeout` absent avant Safari 16 : chaque essai y laissait une requête ouverte, assez pour épuiser les connexions HTTP/1.1 du site) : un aperçu qui ne répond jamais laissait la fenêtre
 bloquante sans issue ; passé le délai, la confirmation s'ouvre sur la phrase de
 l'incertitude. Sous `/en`, des textes `profile` retombés sur le français font
 déclarer la confirmation française (`contentLang="fr"`, coquille comprise).
