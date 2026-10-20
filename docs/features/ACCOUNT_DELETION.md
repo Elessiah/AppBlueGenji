@@ -181,7 +181,15 @@ ferme la session —, toast puis accueil rechargé dans la langue de la page). D
   `/en` à ce moment —, et sa confirmation s'empile sur la fenêtre
   (`layer="overBlocking"` de `ConfirmActionDialog`, z-index 1270 contre 1260) :
   Échap et « Annuler » ne ferment que la confirmation, le focus revient au
-  bouton.
+  bouton. Pendant la préparation (code, textes, aperçu), le bouton dit
+  « Préparation… » / "Preparing…" (`termsModal.deleting`) ; au survol il reste
+  rouge (sa règle l'emporte sur le survol bleu de `CyberButton` ghost).
+
+L'aperçu est **borné** (`ACCOUNT_DELETION_PREVIEW_TIMEOUT_MS`, 8 s,
+`AbortSignal.timeout`) : un aperçu qui ne répond jamais laissait la fenêtre
+bloquante sans issue ; passé le délai, la confirmation s'ouvre sur la phrase de
+l'incertitude. Sous `/en`, des textes `profile` retombés sur le français font
+déclarer la confirmation française (`contentLang="fr"`, coquille comprise).
 
 Aucune des routes du geste (`GET /api/profile/deletion`, `DELETE /api/profile`,
 ni `GET /api/profile/export` pour l'art. 15) ne consulte l'acceptation des
