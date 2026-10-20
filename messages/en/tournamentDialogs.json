@@ -107,7 +107,7 @@
       "theirs": {
         "readOnly": "{opponent} proposes {score}. Waiting for confirmation from someone in charge of {mine}.",
         "withMaps": "{opponent} proposes {score}. Confirm it, or enter the score you saw: a disagreement opens a dispute, which locks score entry for both opponents until a referee settles it.",
-        "loading": "{opponent} proposes {score}. Loading their map details… Refresh the page if they don't arrive.",
+        "loading": "{opponent} proposes {score}. Loading their map details… Refresh the page if they don't arrive. An entry that differs from theirs (score or map details) opens a dispute, which locks score entry for both opponents until a referee settles it.",
         "withoutMaps": "{opponent} proposes {score}, but their map details could not be loaded. Refresh the page to confirm it: entering a score instead opens a dispute, which locks score entry for both opponents until a referee settles it."
       },
       "confirmed": "Score confirmed: {team1} {score1} – {score2} {team2}",

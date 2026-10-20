@@ -107,7 +107,7 @@
       "theirs": {
         "readOnly": "{opponent} propose {score}. En attente de la confirmation d'un responsable de {mine}.",
         "withMaps": "{opponent} propose {score}. Confirme-le, ou saisis le score constaté : un désaccord ouvre un litige, qui verrouille la saisie des deux adversaires jusqu'à l'arbitrage.",
-        "loading": "{opponent} propose {score}. Lecture du détail de ses maps… Actualise la page s'il n'arrive pas.",
+        "loading": "{opponent} propose {score}. Lecture du détail de ses maps… Actualise la page s'il n'arrive pas. Une saisie qui diffère de la sienne (score ou détail des maps) ouvre un litige, qui verrouille la saisie des deux adversaires jusqu'à l'arbitrage.",
         "withoutMaps": "{opponent} propose {score}, mais le détail de ses maps n'a pas pu être lu. Actualise la page pour le confirmer : un score saisi à la place ouvre un litige, qui verrouille la saisie des deux adversaires jusqu'à l'arbitrage."
       },
       "confirmed": "Score confirmé : {team1} {score1} – {score2} {team2}",
