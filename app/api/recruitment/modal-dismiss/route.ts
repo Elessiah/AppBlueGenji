@@ -38,6 +38,8 @@ function withOptOutCookie<T>(response: NextResponse<T>): NextResponse<T> {
 export async function POST() {
   const user = await getCurrentUser();
   if (!user) return withOptOutCookie(ok({ account: false }));
+  // Déjà posé (lu avec la session) : aucune écriture de plus sur la ligne du compte.
+  if (user.recruitmentModalOff) return withOptOutCookie(ok({ account: true }));
   try {
     if (!(await recordRecruitmentModalOff(user.id))) return withOptOutCookie(fail(ACCOUNT_DELETED_ERROR, 409));
     return withOptOutCookie(ok({ account: true }));

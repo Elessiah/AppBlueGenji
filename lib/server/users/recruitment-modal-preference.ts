@@ -96,7 +96,9 @@ export function healRecruitmentModalOff(
     accountOff,
     browserCookie,
   }: Readonly<{ userId: number | undefined; accountOff: boolean | undefined; browserCookie: string | undefined }>,
-  now: number = Date.now(),
+  // Horloge monotone : un recul de l'heure système (NTP, reprise de VM) ne
+  // fige pas la fenêtre ni l'élagage.
+  now: number = performance.now(),
 ): boolean {
   if (healColumnMissing) return false;
   if (userId === undefined || accountOff === true || !recruitmentModalOffInBrowser(browserCookie)) return false;

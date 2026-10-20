@@ -266,9 +266,11 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const locale = pageLocale;
   const shellMessages = locale === DEFAULT_LOCALE ? undefined : messagesFor(locale).shell;
   // Textes de la mise en avant du recrutement : l'anglais ne voyage que sous
-  // `/en`, et seulement s'il y a une annonce à montrer.
+  // `/en`, et seulement s'il y a une annonce à montrer (banderole déjà fermée
+  // et modale refusée : rien ne se rend).
+  const bannerShown = !bannerDismissed && spotlight.banner.length > 0;
   const recruitmentMessages =
-    locale === DEFAULT_LOCALE || (spotlight.banner.length === 0 && modalAds.length === 0)
+    locale === DEFAULT_LOCALE || (!bannerShown && modalAds.length === 0)
       ? undefined
       : recruitmentClientMessages(messagesFor(locale).recruitment);
 
