@@ -65,7 +65,11 @@ import {
 import { reconcileEndurance } from "@/lib/server/tournaments/bg-survie/reconcile";
 import { reconcilePhases } from "@/lib/server/tournaments/phases";
 import { insertPhases } from "@/lib/server/tournaments/phases-repository";
-import { alertSelfPausedValidation, alertSelfResolvedDispute } from "@/lib/server/tournaments/dispute-self-resolution";
+import {
+  alertSelfCorrectedResult,
+  alertSelfPausedValidation,
+  alertSelfResolvedDispute,
+} from "@/lib/server/tournaments/dispute-self-resolution";
 import { connectionMock, fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 import { tournamentRow } from "../../helpers/tournament-rows";
 import { mapsFor } from "../../helpers/match-maps";
@@ -615,13 +619,25 @@ describe("adminResolveMatchPublic", () => {
     expect(alertSelfResolvedDispute).not.toHaveBeenCalled();
   });
 
-  it("n'alerte personne sur un match déjà tranché ni sans arbitre transmis", async () => {
-    connection.execute.mockResolvedValue([[{ ...disputedHead, status: "COMPLETED" }], undefined]);
-    await adminResolveMatchPublic(70, { forfeitTeamId: 3 }, actor);
+  it("n'alerte personne sans arbitre transmis", async () => {
     connection.execute.mockResolvedValue([[disputedHead], undefined]);
     await adminResolveMatchPublic(70, { forfeitTeamId: 3 });
 
     expect(alertSelfResolvedDispute).not.toHaveBeenCalled();
+    expect(alertSelfCorrectedResult).not.toHaveBeenCalled();
+  });
+
+  // Renverser un résultat acquis (un litige tranché par un arbitre neutre, par
+  // exemple) n'est pas plus silencieux que trancher le litige.
+  it("transmet la correction d'un match déjà tranché à l'alerte de correction, après le commit", async () => {
+    const completed = { ...disputedHead, status: "COMPLETED", team1_report_score: null, team2_report_score: null };
+    connection.execute.mockResolvedValue([[completed], undefined]);
+
+    await adminResolveMatchPublic(70, { forfeitTeamId: 3 }, actor);
+
+    expect(alertSelfCorrectedResult).toHaveBeenCalledWith({ matchId: 70, tournamentId: 8, team1Id: 3, team2Id: 4 }, actor);
+    expect(alertSelfResolvedDispute).not.toHaveBeenCalled();
+    expect(order(jest.mocked(alertSelfCorrectedResult))).toBeGreaterThan(order(connection.commit));
   });
 
   it("n'alerte personne quand l'arbitrage est défait", async () => {

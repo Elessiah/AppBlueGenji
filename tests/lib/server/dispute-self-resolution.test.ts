@@ -8,6 +8,7 @@ import { getDatabase } from "@/lib/server/database";
 import { notifyStaff } from "@/lib/server/notify";
 import { auditStaffAction, publishStaffAction } from "@/lib/server/staff-audit";
 import {
+  alertSelfCorrectedResult,
   alertSelfPausedValidation,
   alertSelfResolvedDispute,
   resolvedOutcome,
@@ -196,6 +197,36 @@ describe("alertSelfResolvedDispute", () => {
     row = null;
 
     await expect(alertSelfResolvedDispute(dispute, actor)).resolves.toBe(false);
+    expect(publishStaffAction).not.toHaveBeenCalled();
+  });
+});
+
+describe("alertSelfCorrectedResult — correction d'un résultat acquis par un arbitre qui joue", () => {
+  it("avertit les autres membres du staff et journalise l'issue, sans pseudo (FR + EN)", async () => {
+    await expect(alertSelfCorrectedResult(dispute, actor)).resolves.toBe(true);
+
+    const [line, author] = jest.mocked(publishStaffAction).mock.calls[0];
+    expect(line).toBe(
+      "⚠️ Résultat corrigé par un membre du staff qui joue ce match · « Coupe d'hiver », Manche 2 : Alpha 2 – 1 Bravo.",
+    );
+    expect(line).not.toContain("Sifflet");
+    expect(author).toEqual(actor);
+    const [notification] = jest.mocked(notifyStaff).mock.calls[0];
+    expect(notification.topic).toBe("REFEREE_SELF_RESOLUTION");
+    expect(notification.excludeUserIds).toEqual([9]);
+    const fr = notification.push("fr");
+    expect(fr.title).toBe("Résultat corrigé par un joueur du match");
+    expect(fr.body).toBe("Un membre du staff qui joue ce match en a corrigé le résultat · Coupe d'hiver, Manche 2 : Alpha 2 – 1 Bravo.");
+    const en = notification.push("en");
+    expect(en.title).toBe("Result corrected by a player of the match");
+    expect(en.body).toBe("A staff member who plays in this match corrected its result · Coupe d'hiver, Round 2: Alpha 2 – 1 Bravo.");
+    expect(fr.tag).toBe("self-corrected-70");
+  });
+
+  it("ne dit rien quand l'arbitre ne joue pas la manche", async () => {
+    plays = false;
+
+    await expect(alertSelfCorrectedResult(dispute, actor)).resolves.toBe(false);
     expect(publishStaffAction).not.toHaveBeenCalled();
   });
 });

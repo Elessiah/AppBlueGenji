@@ -47,6 +47,9 @@ describe("abandon du tournoi pendant un litige", () => {
     expect(en).toContain(
       "A referee who plays in this match may settle it, including by imposing the opposing team's withdrawal, but the other staff members are warned (if they are the only staff member, their action is still recorded in the refereeing log). Outside a dispute, a referee who plays in a match confirms it without anyone being warned.",
     );
+    // Corriger un résultat acquis d'un match qu'il joue avertit aussi (revue sécurité, passe 4).
+    expect(fr).toContain("Corriger le résultat d'un match qu'il joue avertit les autres membres du staff, comme trancher un litige.");
+    expect(en).toContain("Correcting the result of a match they play in warns the other staff members, like settling a dispute.");
     // La suspension posée par un arbitre qui joue avertit aussi.
     expect(fr).toContain("le contester ouvre un litige. Si cet arbitre joue ce match, les autres membres du staff en sont avertis (s'il est le seul membre du staff, son geste reste consigné au journal de l'arbitrage).");
     expect(en).toContain("disputing it opens a dispute. If this referee plays in this match, the other staff members are warned (if they are the only staff member, their action is still recorded in the refereeing log).");
