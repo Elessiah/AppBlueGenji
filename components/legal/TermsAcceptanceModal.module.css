@@ -98,6 +98,16 @@
   color: var(--ink-mute);
 }
 
+/* Contraste élevé (Windows) : les couleurs posées ici sont ignorées ; le gris
+   système dit que le lien et le bouton de suppression attendent. */
+@media (forced-colors: active) {
+  .textButton[aria-disabled="true"],
+  .actions .deleteButton[aria-disabled="true"] {
+    color: GrayText;
+    border-color: GrayText;
+  }
+}
+
 .check {
   display: flex;
   align-items: flex-start;

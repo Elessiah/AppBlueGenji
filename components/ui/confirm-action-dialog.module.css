@@ -75,10 +75,20 @@
   color: var(--ink-mute);
 }
 
+/* Non armé (texte à recopier, champ requis) : `disabled` natif, éteint — sans
+   quoi « Dissoudre » paraissait armé et refusait le clic sans un mot. */
+.actions > :global(.btn):disabled {
+  cursor: not-allowed;
+  color: var(--ink-mute);
+  border-color: var(--line-strong);
+  background: rgba(255, 255, 255, 0.04);
+}
+
 /* Contraste élevé (Windows) : les couleurs posées plus haut sont ignorées ; le
    gris système dit, comme le `disabled` natif d'avant, que le bouton attend. */
 @media (forced-colors: active) {
-  .actions > :global(.btn)[aria-disabled="true"] {
+  .actions > :global(.btn)[aria-disabled="true"],
+  .actions > :global(.btn):disabled {
     color: GrayText;
     border-color: GrayText;
   }

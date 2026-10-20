@@ -136,13 +136,10 @@ export function TermsAcceptanceModal({
     const timer = window.setTimeout(() => {
       setDeletionOpen(false);
       showError(unavailableRef.current);
-      // Le focus ne revient au bouton que s'il y est resté ou s'est perdu : un
-      // lecteur parti lire la politique ou cocher la case n'est pas déplacé.
+      // Le focus ne revient au bouton que s'il s'est perdu (resté dessus, il y
+      // est déjà) : un lecteur parti lire la politique ou cocher la case n'est pas déplacé.
       requestAnimationFrame(() => {
-        const active = document.activeElement;
-        if (active === null || active === document.body || active === deleteButtonRef.current) {
-          deleteButtonRef.current?.focus();
-        }
+        if (document.activeElement === document.body) deleteButtonRef.current?.focus();
       });
     }, TERMS_DELETION_PREPARE_TIMEOUT_MS);
     return () => window.clearTimeout(timer);
