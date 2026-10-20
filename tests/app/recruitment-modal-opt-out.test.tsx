@@ -200,7 +200,7 @@ describe("recordRecruitmentModalOptOut", () => {
     ];
     for (const gone of answers) {
       expect(await recordRecruitmentModalOptOut(true, { writeCookie: () => true, post: gone })).toBe("BROWSER");
-      expect(await recordRecruitmentModalOptOut(true, { writeCookie: () => false, post: gone })).toBe("NONE");
+      expect(await recordRecruitmentModalOptOut(true, { writeCookie: () => false, cookieKept: () => false, post: gone })).toBe("NONE");
     }
   });
 
@@ -210,7 +210,7 @@ describe("recordRecruitmentModalOptOut", () => {
     const failing = jest.fn(async () => {
       throw new Error("offline");
     });
-    expect(await recordRecruitmentModalOptOut(false, { writeCookie: () => false, post: failing })).toBe("NONE");
+    expect(await recordRecruitmentModalOptOut(false, { writeCookie: () => false, cookieKept: () => false, post: failing })).toBe("NONE");
     expect(failing).toHaveBeenCalledTimes(1);
   });
 
@@ -229,7 +229,7 @@ describe("recordRecruitmentModalOptOut", () => {
 
   it("cookies refusés : rien n'est gardé sans compte écrit, le compte suffit sinon", async () => {
     const writeCookie = jest.fn(() => false);
-    expect(await recordRecruitmentModalOptOut(false, { writeCookie })).toBe("NONE");
+    expect(await recordRecruitmentModalOptOut(false, { writeCookie, cookieKept: () => false, post: async () => { throw new Error("offline"); } })).toBe("NONE");
     expect(await recordRecruitmentModalOptOut(true, { writeCookie, post: async () => ({ ok: false, status: 500, json: async () => ({}) }) })).toBe("NONE");
     expect(
       await recordRecruitmentModalOptOut(true, {
@@ -240,6 +240,24 @@ describe("recordRecruitmentModalOptOut", () => {
       }),
     ).toBe("NONE");
     expect(await recordRecruitmentModalOptOut(true, { writeCookie, post: async () => ({ ok: true, status: 200, json: async () => ({ account: true }) }) })).toBe("ACCOUNT");
+  });
+
+  it("script refusé mais Set-Cookie du serveur accepté : le choix est gardé, pas d'erreur « cookies refusés »", async () => {
+    let serverCookie = false;
+    const post = async () => {
+      serverCookie = true;
+      return { ok: true, status: 200, json: async () => ({ account: false }) };
+    };
+    const failingPost = async () => {
+      serverCookie = true;
+      return { ok: false, status: 500, json: async () => ({}) };
+    };
+    const cookieKept = () => serverCookie;
+    expect(await recordRecruitmentModalOptOut(false, { writeCookie: () => false, cookieKept, post })).toBe("BROWSER");
+    serverCookie = false;
+    expect(await recordRecruitmentModalOptOut(true, { writeCookie: () => false, cookieKept, post: failingPost })).toBe(
+      "BROWSER_ONLY",
+    );
   });
 
   it("pose le cookie de façon synchrone, avant tout await (la modale se ferme aussitôt)", () => {
