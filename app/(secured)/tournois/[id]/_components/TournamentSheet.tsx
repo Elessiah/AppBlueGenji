@@ -158,7 +158,6 @@ function matchById(matches: readonly BracketMatch[], id: number | null): Bracket
   return id === null ? null : matches.find((match) => match.id === id) ?? null;
 }
 
-/** Retour en arrière : le plan du moment, son refus, et les rencontres qu'il efface. */
 /**
  * Tranché sous la modale du joueur (validation d'office à l'heure dite,
  * arbitrage, confirmation adverse) : elle se referme, et le dit — une saisie en
@@ -187,6 +186,7 @@ function useCloseSettledPlayerScore(
   }, [settled, shown, close, notify, ownSettle]);
 }
 
+/** Retour en arrière : le plan du moment, son refus, et les rencontres qu'il efface. */
 function rollbackView(detail: TournamentDetail, frozen: boolean) {
   const rollbackTargetState =
     detail.card.state === "RUNNING" || detail.card.state === "FINISHED";

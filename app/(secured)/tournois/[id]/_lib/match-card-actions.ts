@@ -106,7 +106,8 @@ export function matchCardActionList(
   return rows
     .filter(([offered]) => offered)
     .map(([, id, label, tone]) =>
-      id === "playerScore" && input.playerScoreReadOnly ? { id, label, tone, readOnly: true as const } : { id, label, tone },
+      // Lecture seule : ni crayon ni bouton plein — rien n'y attend le lecteur.
+      id === "playerScore" && input.playerScoreReadOnly ? { id, label, tone: "neutral" as const, readOnly: true as const } : { id, label, tone },
     );
 }
 

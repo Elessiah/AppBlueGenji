@@ -122,8 +122,11 @@ export const MatchRow = memo(function MatchRow({
   // confirmer la proposition adverse, corriger la sienne).
   const playerScore = usePlayerScore();
   const canOpenPlayerScore = playerScore.canOpen(match);
-  const playerScoreKey = playerScoreButtonKey(playerReportView(match, myTeamId), playerScore.canReportScore(match));
-  const playerScoreLabel = canOpenPlayerScore ? actionText.t(`cardActions.playerScore.${playerScoreKey}`) : null;
+  // Calculé pour les seules cartes du lecteur : le reste du plateau n'a pas de bouton.
+  const playerScoreKey = canOpenPlayerScore
+    ? playerScoreButtonKey(playerReportView(match, myTeamId), playerScore.canReportScore(match))
+    : null;
+  const playerScoreLabel = playerScoreKey === null ? null : actionText.t(`cardActions.playerScore.${playerScoreKey}`);
   // Proposition en attente, lisible de tous : sans elle, un match joué et
   // reporté se lisait exactement comme un match pas encore joué.
   const reportNotice = pendingReportText(actionText, pendingReportState(match));
