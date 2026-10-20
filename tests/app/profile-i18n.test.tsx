@@ -59,6 +59,7 @@ import ProfilePage from "@/app/(secured)/profil/page";
 import { ProfileSection } from "@/app/(secured)/profil/_components/ProfileSection";
 import { AccountLocaleField } from "@/app/(secured)/profil/_components/AccountLocaleField";
 import { MatchDmField } from "@/app/(secured)/profil/_components/MatchDmField";
+import { RecruitmentModalField } from "@/app/(secured)/profil/_components/RecruitmentModalField";
 import { ConnectedAppsSection } from "@/app/(secured)/profil/ConnectedAppsSection";
 import { OtherSessionsPanel } from "@/app/(secured)/profil/OtherSessionsPanel";
 import { BattletagVisibilityNotice } from "@/app/(secured)/profil/BattletagVisibilityNotice";
@@ -459,6 +460,36 @@ describe("langue du compte (lot 9-3)", () => {
     expectEnglish(on);
     const off = inEnglish(<MatchDmField initial={false} />);
     expect(off).not.toMatch(/checked=""/);
+  });
+
+  it("fenêtre de recrutement : libellé et aide en anglais, case liée à son aide, cochée sauf refus du compte", () => {
+    const on = inEnglish(<RecruitmentModalField initialOff={false} />);
+    expect(on).toContain("Window of urgent recruitment announcements");
+    expect(on).toContain("Untick so that it no longer opens on its own");
+    expect(on).toContain("another browser where you had turned it down keeps it closed");
+    expect(on).toContain('id="profile-recruitment-modal"');
+    expect(on).toContain('aria-describedby="profile-recruitment-modal-hint"');
+    expect(on).toMatch(/type="checkbox"[^>]*checked=""|checked=""[^>]*type="checkbox"/);
+    expectEnglish(on);
+    expect(inEnglish(<RecruitmentModalField initialOff />)).not.toMatch(/checked=""/);
+    // Fiche pas encore lue : rien.
+    expect(inEnglish(<RecruitmentModalField initialOff={undefined} />)).toBe("");
+  });
+
+  it("fenêtre de recrutement : le français dit le défaut, le réaffichage et l'autre navigateur", async () => {
+    const fr = (await import("@/messages/fr/profile.json")).default.recruitmentModal;
+    expect(fr.label).toBe("Fenêtre des annonces de recrutement urgentes");
+    expect(fr.hint).toMatch(/^Cochée par défaut/);
+    expect(fr.hint).toMatch(/un autre navigateur où tu l'avais refusée la garde fermée/);
+    expect(fr.shown).toMatch(/réactivée/);
+    expect(fr.hidden).toMatch(/ne s'ouvrira plus d'elle-même/);
+    const en = (await import("@/messages/en/profile.json")).default.recruitmentModal;
+    expect(Object.keys(en).sort()).toEqual(Object.keys(fr).sort());
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    expect(readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/page.tsx"), "utf8")).toContain(
+      "<RecruitmentModalField initialOff={data?.recruitmentModalOff} />",
+    );
   });
 
   it("interrupteur des messages privés de match : le français dit l'opposition et les push à part", async () => {

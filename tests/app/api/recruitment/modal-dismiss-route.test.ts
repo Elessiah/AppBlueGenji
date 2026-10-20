@@ -3,11 +3,12 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/users/recruitment-modal-preference", () => ({
   recordRecruitmentModalOff: jest.fn(),
+  recordRecruitmentModalBackOn: jest.fn(),
 }));
 
-import { POST } from "@/app/api/recruitment/modal-dismiss/route";
+import { DELETE, POST } from "@/app/api/recruitment/modal-dismiss/route";
 import { getCurrentUser } from "@/lib/server/auth";
-import { recordRecruitmentModalOff } from "@/lib/server/users/recruitment-modal-preference";
+import { recordRecruitmentModalBackOn, recordRecruitmentModalOff } from "@/lib/server/users/recruitment-modal-preference";
 import { authUser } from "../../../helpers/auth-user";
 
 /** `POST /api/recruitment/modal-dismiss` : « Ne plus afficher » gardé sur le compte, cookie reposé par le serveur. */
@@ -26,6 +27,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7 }));
   jest.mocked(recordRecruitmentModalOff).mockResolvedValue(true);
+  jest.mocked(recordRecruitmentModalBackOn).mockResolvedValue(true);
 });
 
 describe("POST /api/recruitment/modal-dismiss", () => {
@@ -93,6 +95,75 @@ describe("POST /api/recruitment/modal-dismiss", () => {
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({ error: "RECRUITMENT_MODAL_ACCOUNT_UNAVAILABLE" });
     expectOptOutCookie(response);
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+});
+
+/** L'effacement du cookie : mêmes attributs que sa pose (sinon le navigateur garde l'autre), `Max-Age=0`. */
+function expectOptOutCookieCleared(response: Response) {
+  const header = response.headers.get("set-cookie") ?? "";
+  expect(header).toMatch(/bg_recr_off=;/);
+  expect(header).toMatch(/Max-Age=0/i);
+  expect(header).toMatch(/SameSite=lax/i);
+  expect(header).toMatch(/Path=\//i);
+  expect(header).not.toMatch(/HttpOnly/i);
+}
+
+describe("DELETE /api/recruitment/modal-dismiss — réafficher depuis « Mon profil »", () => {
+  it("passe le compte à « réaffichée » et efface le cookie de ce navigateur", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7, recruitmentModalOff: true }));
+    const response = await DELETE();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ account: true });
+    expect(recordRecruitmentModalBackOn).toHaveBeenCalledWith(7);
+    expect(recordRecruitmentModalOff).not.toHaveBeenCalled();
+    expectOptOutCookieCleared(response);
+  });
+
+  it("puis POST le recoupe : compte posé, cookie reposé (aller-retour du réglage)", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7, recruitmentModalBackOn: true }));
+    const response = await POST();
+    expect(response.status).toBe(200);
+    expect(recordRecruitmentModalOff).toHaveBeenCalledWith(7);
+    expectOptOutCookie(response);
+  });
+
+  it("sans session : 401, rien d'écrit ni d'effacé", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
+    const response = await DELETE();
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: "UNAUTHORIZED" });
+    expect(recordRecruitmentModalBackOn).not.toHaveBeenCalled();
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("compte supprimé : 409, cookie gardé", async () => {
+    jest.mocked(recordRecruitmentModalBackOn).mockResolvedValue(false);
+    const response = await DELETE();
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: "ACCOUNT_DELETED" });
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("panne de base : un code, sans phrase, cookie gardé", async () => {
+    jest.mocked(recordRecruitmentModalBackOn).mockRejectedValue(new Error("down"));
+    const spy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const response = await DELETE();
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: "RECRUITMENT_MODAL_RESTORE_FAILED" });
+    expect(response.headers.get("set-cookie")).toBeNull();
+    spy.mockRestore();
+  });
+
+  it("colonne absente : 503 à code propre, sans bruit au journal", async () => {
+    jest.mocked(recordRecruitmentModalBackOn).mockRejectedValue(
+      Object.assign(new Error("Unknown column"), { code: "ER_BAD_FIELD_ERROR" }),
+    );
+    const spy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const response = await DELETE();
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: "RECRUITMENT_MODAL_ACCOUNT_UNAVAILABLE" });
     expect(spy).not.toHaveBeenCalled();
     spy.mockRestore();
   });

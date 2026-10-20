@@ -158,9 +158,12 @@ describe("auth", () => {
     it("reporte sur le compte le choix fait sur ce navigateur avant la connexion", async () => {
       const execute = await setUp("1");
       await createSession(5, "LOGIN_GOOGLE");
-      expect(carried(execute)).toEqual([
-        ["UPDATE bg_users SET recruitment_modal_off = 1 WHERE id = ? AND is_deleted = 0", [5]],
-      ]);
+      expect(carried(execute)).toHaveLength(1);
+      expect(carried(execute)[0][1]).toEqual([5]);
+      // Compte jamais décidé seulement : un « réafficher » de « Mon profil » n'est pas recouvert.
+      expect(String(carried(execute)[0][0]).replace(/\s+/g, " ")).toBe(
+        "UPDATE bg_users SET recruitment_modal_off = 1 WHERE id = ? AND is_deleted = 0 AND recruitment_modal_off = 0",
+      );
     });
 
     it("n'écrit rien sans le cookie, ou sur une valeur forgée", async () => {
@@ -268,6 +271,7 @@ describe("auth", () => {
       const user = await getCurrentUser();
 
       expect(user?.recruitmentModalOff).toBe(true);
+      expect(user?.recruitmentModalBackOn).toBe(false);
       expect(execute).toHaveBeenCalledTimes(1);
       expect(String(execute.mock.calls[0][0])).toMatch(/u\.recruitment_modal_off/);
     });

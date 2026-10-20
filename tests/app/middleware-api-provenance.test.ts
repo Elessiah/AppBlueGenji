@@ -52,6 +52,12 @@ describe("middleware — provenance des écritures sous /api/", () => {
     expect(passedThrough(middleware(request(path, "POST", { "sec-fetch-site": "same-origin" })))).toBe(true);
   });
 
+  it("refuse un « réafficher » du recrutement (DELETE, « Mon profil ») venu d'un sous-domaine voisin", () => {
+    const path = "/api/recruitment/modal-dismiss";
+    expect(middleware(request(path, "DELETE", { "sec-fetch-site": "same-site" })).status).toBe(403);
+    expect(passedThrough(middleware(request(path, "DELETE", { "sec-fetch-site": "same-origin" })))).toBe(true);
+  });
+
   it("refuse sur `Origin` quand le navigateur ne pose pas `Sec-Fetch-Site`", () => {
     const response = middleware(
       request("/api/teams/3/leave", "POST", { origin: "https://voisin.bluegenji.example" }),

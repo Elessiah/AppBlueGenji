@@ -23,6 +23,7 @@ export function authUser(overrides: Partial<AuthUser> = {}): AuthUser {
     isAdmin,
     roles: isAdmin ? ["ADMIN"] : [],
     recruitmentModalOff: false,
+    recruitmentModalBackOn: false,
     ...overrides,
   };
 }

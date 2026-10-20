@@ -215,11 +215,13 @@ describe("exportOwnData", () => {
       await mockDb(execute);
       const data = await exportOwnData(42);
       expect(execute.mock.calls[0][0]).toMatch(/\brecruitment_modal_off\b/);
-      return data.account.recruitmentModalOff;
+      return [data.account.recruitmentModalOff, data.account.recruitmentModalBackOn];
     };
-    expect(await run(1)).toBe(true);
-    expect(await run(0)).toBe(false);
-    expect(await run(null)).toBe(false);
+    expect(await run(1)).toEqual([true, false]);
+    expect(await run(0)).toEqual([false, false]);
+    expect(await run(null)).toEqual([false, false]);
+    // Réaffichée depuis « Mon profil » : rendue aussi.
+    expect(await run(2)).toEqual([false, true]);
   });
 
   it("colonne recruitment_modal_off absente (ALTER échoué) : l'export est rendu quand même, drapeau au défaut", async () => {
