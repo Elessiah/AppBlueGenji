@@ -83,7 +83,7 @@ describe("l'arbitre joue-t-il la manche ?", () => {
     expect(q).not.toContain("joined_at");
     // Départ jugé au premier des deux, lancement ou report : partir en cours de match ne dispense pas.
     expect(q).toContain(
-      "(tm.left_at IS NULL OR tm.left_at >= COALESCE(LEAST(COALESCE(m.launched_at, ?), COALESCE(?, m.launched_at)), m.created_at))",
+      "(tm.left_at IS NULL OR tm.left_at >= COALESCE(LEAST(COALESCE(CASE WHEN m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id) THEN m.launched_at END, ?), COALESCE(?, CASE WHEN m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id) THEN m.launched_at END)), m.created_at))",
     );
     expect(q).toContain("st.solo_user_id = ?");
     expect(params).toEqual([70, 3, 4, 9, playedAt, playedAt, 3, 4, 9]);
@@ -182,6 +182,14 @@ describe("alertSelfResolvedDispute", () => {
       "A staff member who plays in this match imposed their opponent's withdrawal · Coupe d'hiver, Round 2: Alpha 2 – 1 Bravo.",
     );
     expect(fr.tag).toBe("self-forfeit-70");
+  });
+
+  it("ne date la manche par son lancement que s'il vaut pour l'appariement actuel", async () => {
+    await alertSelfResolvedDispute(dispute, actor);
+
+    const sql = String(execute.mock.calls[0][0]);
+    expect(sql).toContain("CASE WHEN m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id) THEN m.launched_at END");
+    expect(sql).not.toMatch(/COALESCE\(m\.launched_at/);
   });
 
   it("ne dit rien quand l'arbitre ne joue pas la manche", async () => {
