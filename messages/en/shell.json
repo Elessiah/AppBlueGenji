@@ -181,6 +181,7 @@
     "exits": "Don't want to accept them? You can delete your account right here, <logout>log out</logout>, <policy>read the privacy policy</policy> or <profile>open your profile</profile> to export your data.",
     "deleteAccount": "Delete my account",
     "deleting": "Preparing…",
+    "deletionUnavailable": "Account deletion could not be prepared. Reload the page, then try again.",
     "accept": "I accept",
     "saving": "Saving…",
     "accepted": "Thanks, you can carry on.",

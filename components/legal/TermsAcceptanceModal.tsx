@@ -26,6 +26,13 @@ import styles from "./TermsAcceptanceModal.module.css";
 const KEEP_OPEN = () => undefined;
 
 /**
+ * Au-delà, la préparation de la suppression (code chargé au clic, textes
+ * anglais, aperçu) est abandonnée : un morceau disparu après un déploiement ou
+ * un réseau figé laissaient tous les gestes de la fenêtre désarmés, sans issue.
+ */
+export const TERMS_DELETION_PREPARE_TIMEOUT_MS = 15_000;
+
+/**
  * La suppression du compte (celle de « Mon profil »), chargée au clic : ni son
  * code ni ses textes (espace `profile`) ne pèsent sur chaque page.
  */
@@ -112,10 +119,33 @@ export function TermsAcceptanceModal({
   }, [privacyPending]);
 
   const open = mounted && requested && privacyAnswered && !termsModalSilencedOn(pathname);
+
+  // La fenêtre se tait (page des conditions, `/rgpd`, `/profil`…) : une
+  // suppression en préparation est abandonnée — rouverte plus tard, elle
+  // aurait relancé d'elle-même la confirmation, sans un clic.
+  useEffect(() => {
+    if (open) return;
+    setDeletionOpen(false);
+    setDeletionReady(false);
+  }, [open]);
+
+  const unavailableRef = useRef("");
+  unavailableRef.current = t("termsModal.deletionUnavailable");
+  useEffect(() => {
+    if (!deletionOpen || deletionReady) return;
+    const timer = window.setTimeout(() => {
+      setDeletionOpen(false);
+      showError(unavailableRef.current);
+      requestAnimationFrame(() => deleteButtonRef.current?.focus());
+    }, TERMS_DELETION_PREPARE_TIMEOUT_MS);
+    return () => window.clearTimeout(timer);
+  }, [deletionOpen, deletionReady, showError]);
   const { leaving, logout } = useLogout();
   const dialogRef = useDialogBehavior({ open, onClose: KEEP_OPEN, locked: busy });
 
   if (!open) return null;
+
+  const preparing = deletionOpen && !deletionReady;
 
   const accept = async () => {
     if (busy || leaving || deletionOpen || !checked) return;
@@ -235,7 +265,13 @@ export function TermsAcceptanceModal({
           >
             {/* Pendant la préparation, le bouton dit qu'il travaille (« Préparation… ») :
                 sur un réseau lent, la fenêtre ne paraît pas figée. */}
-            {deletionOpen && !deletionReady ? t("termsModal.deleting") : t("termsModal.deleteAccount")}
+            {/* Les deux libellés occupent la même case (le plus large fixe la
+                largeur) : la ligne d'actions ne se replie pas d'un état à l'autre.
+                Le libellé caché (`visibility: hidden`) sort du nom accessible. */}
+            <span className={styles.labelStack}>
+              <span data-hidden={preparing || undefined}>{t("termsModal.deleteAccount")}</span>
+              <span data-hidden={!preparing || undefined}>{t("termsModal.deleting")}</span>
+            </span>
           </CyberButton>
           <CyberButton
             type="button"

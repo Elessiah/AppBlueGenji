@@ -179,16 +179,28 @@ export function ConfirmActionDialog({
             </div>
           )}
           <div className={styles.actions}>
+            {/* En vol, `aria-disabled` + `aria-busy` plutôt que `disabled` natif : le
+                focus reste sur le bouton pressé — un refus (toast) se retente au
+                clavier au lieu de laisser le focus tomber sur `<body>`, derrière la
+                modale. `submit` et ce clic ignorent déjà un geste tant que `busy`. */}
             <button
               type="button"
               className="btn ghost"
-              onClick={onClose}
-              disabled={busy}
+              onClick={() => {
+                if (!busy) onClose();
+              }}
+              aria-disabled={busy || undefined}
               data-autofocus={requireText === undefined && !focusContent ? true : undefined}
             >
               {t("confirmDialog.cancel")}
             </button>
-            <button type="submit" className={tone === "danger" ? "btn danger" : "btn"} disabled={busy || !armed}>
+            <button
+              type="submit"
+              className={tone === "danger" ? "btn danger" : "btn"}
+              disabled={!armed}
+              aria-disabled={busy || undefined}
+              aria-busy={busy || undefined}
+            >
               {busy ? pendingLabel : confirmLabel}
             </button>
           </div>

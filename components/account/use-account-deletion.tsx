@@ -62,7 +62,9 @@ export async function previewAccountDeletion(fetchImpl: typeof fetch = fetch): P
     // s'ouvre sur la phrase de l'incertitude.
     const preview = await fetchImpl("/api/profile/deletion", {
       cache: "no-store",
-      signal: AbortSignal.timeout(ACCOUNT_DELETION_PREVIEW_TIMEOUT_MS),
+      // Absent avant Safari 16 : sans lui l'aperçu part quand même, non borné
+      // (la fenêtre des conditions a son propre délai de préparation).
+      signal: typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(ACCOUNT_DELETION_PREVIEW_TIMEOUT_MS) : undefined,
     });
     if (preview.ok) {
       previewed = ((await preview.json()) as AccountDeletionPlan).reason;

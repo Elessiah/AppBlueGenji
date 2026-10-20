@@ -181,6 +181,7 @@
     "exits": "Tu ne veux pas les accepter ? Tu peux supprimer ton compte directement d'ici, <logout>te déconnecter</logout>, <policy>lire la politique de confidentialité</policy> ou <profile>ouvrir ton profil</profile> pour exporter tes données.",
     "deleteAccount": "Supprimer mon compte",
     "deleting": "Préparation…",
+    "deletionUnavailable": "La suppression n'a pas pu être préparée. Recharge la page, puis réessaie.",
     "accept": "J'accepte",
     "saving": "Enregistrement…",
     "accepted": "Merci, tu peux continuer.",

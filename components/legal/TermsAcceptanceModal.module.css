@@ -165,5 +165,27 @@
   color: var(--danger);
   background: rgba(var(--danger-rgb), 0.1);
   border-color: rgba(var(--danger-rgb), 0.6);
-  box-shadow: 0 0 18px rgba(var(--danger-rgb), 0.25);
+  box-shadow: none;
+}
+
+/* Le halo, comme celui de `CyberButton`, au seul pointeur fin : au toucher, un
+   survol collé après « Annuler » le laisserait allumé, comme un geste par défaut. */
+@media (hover: hover) and (pointer: fine) {
+  .actions .deleteButton:hover:not(:disabled):not([aria-disabled="true"]) {
+    box-shadow: 0 0 18px rgba(var(--danger-rgb), 0.25);
+  }
+}
+
+/* Deux libellés dans la même case de grille (« Supprimer mon compte » /
+   « Préparation… ») : le bouton garde la largeur du plus long. */
+.labelStack {
+  display: inline-grid;
+}
+
+.labelStack > span {
+  grid-area: 1 / 1;
+}
+
+.labelStack > [data-hidden] {
+  visibility: hidden;
 }
