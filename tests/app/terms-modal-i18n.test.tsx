@@ -214,7 +214,7 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     expect(modal).not.toContain("orReload(");
     // Un échec du code se dit tout de suite (pas au bout du délai) ; le chargement d'une tentative abandonnée est ignoré.
     expect(modal).toMatch(/termsDeletionLoader\.load\(\)\.then\(\s*\(flow\) => \{\s*if \(deletionAttempt\.current === attempt\) setDeletionFlow\(\(\) => flow\);\s*\},\s*\(\) => \{\s*if \(deletionAttempt\.current === attempt\) abandonDeletion\(\);/);
-    // Préchargé au survol et au focus ; sous `/en`, les textes anglais partent avec le code, pas après lui.
+    // Sous `/en`, les textes anglais partent avec le code, pas après lui.
     // L'aperçu part au clic avec le code (pas après lui), sans embarquer le code de la suppression dans la fenêtre.
     expect(modal).toMatch(/deletionPreview\.current = previewAccountDeletion\(\);\s*if \(locale === "en"\) englishProfile\.load\(\)/);
     expect(modal).toContain('import { previewAccountDeletion, type PendingAccountDeletion } from "@/components/account/account-deletion-preview";');
@@ -222,10 +222,8 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     expect(readSource("components/legal/TermsAccountDeletion.tsx")).toMatch(/void start\(preview\);\s*\}, \[start, preview\]\);/);
     expect(readSource("components/i18n/profile-text-provider.tsx")).toContain('import { englishProfile } from "./english-loader-profile";');
     expect(readSource("components/legal/TermsAccountDeletion.tsx")).not.toContain("english-loaders-account");
-    expect(modal).toContain("onPointerEnter={preloadDeletion}");
-    expect(modal).toContain("onFocus={preloadDeletion}");
-    expect(modal).toContain("const preloadTermsDeletion = preloadMissing([termsDeletionLoader]);");
-    expect(modal).toContain("const preloadTermsDeletionEnglish = preloadMissing([englishProfile]);");
+    // Aucun préchargement au survol ni au focus : le bouton précède « J'accepte », chaque lecteur qui accepte téléchargerait l'espace `profile`.
+    expect(modal).not.toMatch(/onPointerEnter|onFocus=|preloadMissing|quietPreload/);
     expect(modal).toMatch(/if \(locale === "en"\) englishProfile\.load\(\)\.catch\(\(\) => undefined\);\s*termsDeletionLoader\.load\(\)/);
     // Le chargeur anglais reste un import dynamique, dans son module à lui : la fenêtre ne tire ni le JSON ni les autres chargeurs.
     expect(modal).toContain('import { englishProfile } from "@/components/i18n/english-loader-profile";');
