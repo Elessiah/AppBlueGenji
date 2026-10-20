@@ -247,8 +247,11 @@ describe("alertSelfResolvedDispute", () => {
 
     await expect(alertSelfResolvedDispute(dispute, actor)).resolves.toBe(false);
     expect(notifyStaff).not.toHaveBeenCalled();
-    // Ni alerte ni journal : une trace pm2 garde la manche et l'auteur (par son id).
+    // Ni alerte ni journal : une trace pm2 garde la manche et l'auteur (par son id),
+    // sans dire qu'il joue — la vérification n'a pas abouti.
     expect(String(error.mock.calls[0][0])).toContain("match #70, auteur #9");
+    expect(String(error.mock.calls[0][0])).toContain("vérification « arbitre qui joue » interrompue");
+    expect(String(error.mock.calls[0][0])).not.toContain("alerte d'arbitre qui joue");
     expect(String(error.mock.calls[0][0])).not.toContain("Sifflet");
     error.mockRestore();
   });
