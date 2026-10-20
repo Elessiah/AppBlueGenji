@@ -167,7 +167,11 @@ describe("Balises natives plutôt que rôles ARIA (S6819)", () => {
       "app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx",
     ]) {
       const source = read(path);
-      expect(source).toContain("<output className={`${styles.stored} ${styles.notice}`}>");
+      // Modale joueur : la même région d'état passe en avertissement au litige
+      // (une seule annonce, `SCORE_DISPUTE_LOCK.md`) — toujours un `<output>` natif.
+      expect(source).toMatch(
+        /<output className=\{`\$\{(?:styles\.stored|disputeLocked \? styles\.conflict : styles\.stored)\} \$\{styles\.notice\}`\}>/,
+      );
       expect(source).toContain("<output className={`${styles.blocker} ${styles.notice}`}>");
     }
     expect(read("app/(secured)/tournois/[id]/_components/ScoreDialog.module.css")).toMatch(
