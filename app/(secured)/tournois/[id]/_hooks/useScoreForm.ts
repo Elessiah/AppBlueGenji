@@ -35,6 +35,12 @@ import type { MatchFormat } from "@/lib/shared/match-format";
 // d'enregistrement en réécrivait les scores sans toucher au vainqueur.
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
 
+/** Notification d'un « Enregistrer » : score ou forfait noté, validation d'office suspendue ou non. */
+export function savedToastKey(forfeit: boolean, paused: boolean) {
+  if (forfeit) return paused ? "score.admin.savedForfeitPaused" : "score.admin.savedForfeit";
+  return paused ? "score.admin.savedPaused" : "score.admin.saved";
+}
+
 /** L'arbitrage peut se passer du code de replay (replay perdu) : « Pas de code de replay ». */
 const ADMIN_MAP_RULES: MapEntryRules = { requireReplayCode: false };
 
@@ -231,8 +237,10 @@ export function useScoreForm(
       if (!response.ok) throw new Error(payload.error || "API_ERROR");
 
       // « Enregistrer » sur un report seul suspend sa validation d'office
-      // (`SCORE_DISPUTE_LOCK.md`) : la notification le dit.
-      const savedKey = payload.autoValidationPaused === true ? "score.admin.savedPaused" : "score.admin.saved";
+      // (`SCORE_DISPUTE_LOCK.md`) : la notification le dit — et dit « forfait »
+      // quand c'est un forfait, non un score, qui a été noté.
+      const forfeitSaved = state.forfeitTeamId !== undefined || state.doubleForfeit === true;
+      const savedKey = savedToastKey(forfeitSaved, payload.autoValidationPaused === true);
       showSuccess(dialogText.t(action === "save" ? savedKey : "score.admin.resolved"));
       return true;
     } catch (e) {

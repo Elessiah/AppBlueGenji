@@ -51,6 +51,8 @@
       "title": "Match score",
       "saved": "Score saved: the match is still in progress.",
       "savedPaused": "Score saved: the match is still in progress, and the proposal's automatic confirmation is paused.",
+      "savedForfeit": "Forfeit saved: the match is still in progress.",
+      "savedForfeitPaused": "Forfeit saved: the match is still in progress, and the proposal's automatic confirmation is paused.",
       "autoValidationPaused": "Automatic confirmation paused by a referee: without an answer from the opponent, only “Confirm the result” settles the match.",
         "disputeNotice": "Dispute: score entry stays locked for both opponents until you use “Confirm the result” (score or forfeit). “Save” records progress without settling the match.",
       "resolved": "Result confirmed: the board is up to date.",

@@ -507,7 +507,7 @@ export function AdminScoreDialog({
               team2={team2}
               paused={match.scoreAutoValidationPaused}
               loading={proposalsNeedRefresh(liveMatch, proposals)}
-              adopted={formHoldsReport(form.maps, pendingReport.report)}
+              adopted={form.forfeitTeamId === undefined && !form.doubleForfeit && formHoldsReport(form.maps, pendingReport.report)}
               submitting={form.submitting}
               onAdopt={() => {
                 setForfeitOpen(false);
