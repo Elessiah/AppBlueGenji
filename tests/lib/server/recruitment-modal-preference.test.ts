@@ -4,6 +4,7 @@ jest.mock("@/lib/server/database");
 
 import { getDatabase } from "@/lib/server/database";
 import {
+  RECRUITMENT_MODAL_HEAL_MAX_TRACKED,
   RECRUITMENT_MODAL_HEAL_WINDOW_MS,
   healRecruitmentModalOff,
   recordRecruitmentModalOff,
@@ -122,5 +123,48 @@ describe("healRecruitmentModalOff — le compte rattrape le cookie du navigateur
     const t0 = 2_000_000_000_000;
     expect(healRecruitmentModalOff({ userId: 31, accountOff: true, browserCookie: "1" }, t0)).toBe(false);
     expect(healRecruitmentModalOff({ userId: 31, accountOff: false, browserCookie: "1" }, t0)).toBe(true);
+  });
+
+  it("garde sa mémoire bornée : pleine de tentatives récentes, elle diffère le rattrapage sans grossir", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    const heal = (userId: number, now: number) =>
+      healRecruitmentModalOff({ userId, accountOff: false, browserCookie: "1" }, now);
+    // Bien après les tentatives des tests précédents : elles sont toutes échues.
+    const t0 = 3_000_000_000_000;
+    const base = 100_000;
+    for (let i = 0; i < RECRUITMENT_MODAL_HEAL_MAX_TRACKED; i += 1) expect(heal(base + i, t0)).toBe(true);
+    // Plein : un compte de plus attend, sans écriture.
+    expect(heal(base - 1, t0 + 1)).toBe(false);
+    // La fenêtre passée, les anciennes sortent et il passe.
+    expect(heal(base - 1, t0 + RECRUITMENT_MODAL_HEAL_WINDOW_MS)).toBe(true);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(execute).toHaveBeenCalledTimes(RECRUITMENT_MODAL_HEAL_MAX_TRACKED + 1);
+  });
+
+  it("colonne absente : s'éteint sans rien journaliser, jusqu'au redémarrage", async () => {
+    await jest.isolateModulesAsync(async () => {
+      const database = await import("@/lib/server/database");
+      const preference = await import("@/lib/server/users/recruitment-modal-preference");
+      const execute = jest.fn<SqlQuery>().mockRejectedValue(
+        Object.assign(new Error("Unknown column 'recruitment_modal_off'"), { code: "ER_BAD_FIELD_ERROR" }),
+      );
+      jest.mocked(database.getDatabase).mockResolvedValue(fakePool({ execute }));
+      const spy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+      expect(preference.healRecruitmentModalOff({ userId: 41, accountOff: false, browserCookie: "1" })).toBe(true);
+      await new Promise((resolve) => setImmediate(resolve));
+      // Un autre compte, la fenêtre de 41 passée : plus aucune écriture vouée à l'échec.
+      expect(preference.healRecruitmentModalOff({ userId: 42, accountOff: false, browserCookie: "1" })).toBe(false);
+      expect(
+        preference.healRecruitmentModalOff(
+          { userId: 41, accountOff: false, browserCookie: "1" },
+          Date.now() + preference.RECRUITMENT_MODAL_HEAL_WINDOW_MS,
+        ),
+      ).toBe(false);
+      expect(execute).toHaveBeenCalledTimes(1);
+      expect(spy).not.toHaveBeenCalled();
+      spy.mockRestore();
+    });
   });
 });
