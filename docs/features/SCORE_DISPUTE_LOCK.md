@@ -130,20 +130,11 @@ d'office, exactement comme si l'autre l'avait confirmé.
   2026-10-20) et a été retiré ensuite, le nouveau code n'écrivant jamais
   d'échéance plus proche. Le seed des reports expirés date toujours sa saisie
   de 2 h 10 (au-delà des deux heures). **Restauration d'une sauvegarde prise
-  avant ce déploiement** : ses reports seuls en attente reviennent avec
-  l'ancienne échéance — rejouer à la main, avant de rouvrir le site, le
-  rattrapage de la PR #453 (2 h = `SCORE_AUTO_VALIDATE_MINUTES`) :
-
-  ```sql
-  UPDATE bg_matches m
-     SET m.score_deadline_at = DATE_ADD(COALESCE(m.team1_reported_at, m.team2_reported_at), INTERVAL 120 MINUTE)
-   WHERE m.status = 'AWAITING_CONFIRMATION'
-     AND m.winner_team_id IS NULL
-     AND m.score_deadline_at IS NOT NULL
-     AND ((m.team1_report_score IS NOT NULL AND m.team1_report_opponent_score IS NOT NULL)
-          <> (m.team2_report_score IS NOT NULL AND m.team2_report_opponent_score IS NOT NULL))
-     AND m.score_deadline_at < DATE_ADD(COALESCE(m.team1_reported_at, m.team2_reported_at), INTERVAL 120 MINUTE);
-  ```
+  avant ce déploiement** : rejouer ce rattrapage n'apporterait rien — la seule
+  archive concernée (hebdomadaire du 2026-10-19, 03:00) ne peut être restaurée
+  que plus de deux heures après chaque saisie qu'elle contient, si bien que
+  « saisie + 2 h » est déjà passé et que ses reports seuls en attente sont
+  validés d'office au premier démarrage, avec ou sans lui.
 - **Colonnes de clôture partagées** (`MATCH_RESULT_SET_SQL`,
   `score-report-sql.ts`) : la validation d'office et l'accord des deux engagés
   écrivent la même liste, `forfeit_team_id = NULL` compris — un forfait noté
