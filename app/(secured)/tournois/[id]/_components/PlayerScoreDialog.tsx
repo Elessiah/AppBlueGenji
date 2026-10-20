@@ -206,6 +206,15 @@ function statusClassName(status: string | null, locked: boolean): string | undef
 // `MATCH_ALREADY_COMPLETED` : la validation d'office a pu passer à l'heure dite.
 const REFRESH_ON_REFUSAL: ReadonlySet<string> = new Set(["PROPOSAL_STALE", SCORE_LOCKED_DISPUTE, "MATCH_ALREADY_COMPLETED"]);
 
+/**
+ * Après un échec, le geste du lecteur a-t-il pu trancher ? Oui sans code du
+ * serveur (issue inconnue) et sur `MATCH_ALREADY_COMPLETED` (déjà dit par son
+ * toast) ; non sur tout autre refus rendu.
+ */
+function ownSettleAfterFailure(refusedCode: string | null): boolean {
+  return refusedCode === null || refusedCode === "MATCH_ALREADY_COMPLETED";
+}
+
 /** Envoyer la saisie ouvrirait-il un litige ? Face à la proposition adverse, une saisie valide qui en diffère. */
 function sendingOpensDispute(
   canEnterScore: boolean,
@@ -359,6 +368,10 @@ export function PlayerScoreDialog({
     const body = toReporterScores(myTeamIsTeam1, entered1, entered2);
     setSubmitting(true);
     onOwnSettle?.(true);
+    // Refus **rendu par le serveur** (un code) : le geste n'a rien tranché. Sans
+    // réponse lisible (réseau coupé, 502), l'issue est inconnue — l'envoi a pu
+    // passer, la page ne dira pas « tranché par un autre ».
+    let refusedCode: string | null = null;
     try {
       const response = await fetch(
         `/api/tournaments/${tournamentId}/matches/${match.id}/report`,
@@ -373,7 +386,10 @@ export function PlayerScoreDialog({
         },
       );
       const payload = (await response.json().catch(() => ({}))) as { error?: string };
-      if (!response.ok) throw new Error(payload.error || "SCORE_SUBMIT_FAILED");
+      if (!response.ok) {
+        refusedCode = payload.error ?? null;
+        throw new Error(payload.error || "SCORE_SUBMIT_FAILED");
+      }
       showSuccess(
         confirmsAsIs
           ? t("score.player.confirmed", { team1, team2, score1: entered1, score2: entered2 })
@@ -389,7 +405,7 @@ export function PlayerScoreDialog({
     } catch (error) {
       const code = (error as Error).message;
       // Déjà tranché : le refus le dit, l'avis de la page serait de trop.
-      onOwnSettle?.(code === "MATCH_ALREADY_COMPLETED");
+      onOwnSettle?.(ownSettleAfterFailure(refusedCode));
       flagRefusal(code);
       showError(mapError(code));
       // Proposition changée ou expirée, ou litige ouvert entre-temps : la modale
@@ -405,20 +421,27 @@ export function PlayerScoreDialog({
     if (submitting) return;
     setSubmitting(true);
     onOwnSettle?.(true);
+    // Refus **rendu par le serveur** (un code) : le geste n'a rien tranché. Sans
+    // réponse lisible (réseau coupé, 502), l'issue est inconnue — l'envoi a pu
+    // passer, la page ne dira pas « tranché par un autre ».
+    let refusedCode: string | null = null;
     try {
       const response = await fetch(
         `/api/tournaments/${tournamentId}/matches/${match.id}/forfeit`,
         { method: "POST" },
       );
       const payload = (await response.json().catch(() => ({}))) as { error?: string };
-      if (!response.ok) throw new Error(payload.error || "MATCH_FORFEIT_FAILED");
+      if (!response.ok) {
+        refusedCode = payload.error ?? null;
+        throw new Error(payload.error || "MATCH_FORFEIT_FAILED");
+      }
       showSuccess(t("score.player.forfeitRecorded", { opponent: opponentName }));
       onSubmitted();
       onClose();
     } catch (error) {
       const code = (error as Error).message;
       // Déjà tranché : le refus le dit, l'avis de la page serait de trop.
-      onOwnSettle?.(code === "MATCH_ALREADY_COMPLETED");
+      onOwnSettle?.(ownSettleAfterFailure(refusedCode));
       showError(mapError(code));
       if (REFRESH_ON_REFUSAL.has(code)) void Promise.resolve(onRefresh()).catch(() => undefined);
     } finally {
