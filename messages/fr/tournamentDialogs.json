@@ -56,7 +56,7 @@
       "resolved": "Résultat validé : le plateau est à jour.",
       "awaitingDetail": "Lecture du détail des maps proposé… Actualise la page s'il n'arrive pas.",
       "proposal": "Score proposé par {author} ({score1} – {score2}), en attente de confirmation de {other}. Vérifie-le puis valide le résultat pour le confirmer.",
-      "proposalDirty": "Score proposé par {author} ({score1} – {score2}), en attente de confirmation de {other}. « Enregistrer » note ta saisie et suspend la validation automatique de cette proposition ; seul « Valider le résultat » tranche.",
+      "proposalDirty": "Score proposé par {author} ({score1} – {score2}), en attente de confirmation de {other}. « Enregistrer » note ta saisie et suspend la validation automatique de cette proposition ; seul « Valider le résultat » tranche, à moins que {other} ne la confirme.",
       "stored": {
         "doubleForfeit": "Double forfait enregistré : {team1} et {team2} perdent toutes les deux.",
         "forfeit": "Forfait enregistré : {forfeiting}, {beneficiary} l'emporte.",

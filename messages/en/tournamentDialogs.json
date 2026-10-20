@@ -56,7 +56,7 @@
       "resolved": "Result confirmed: the board is up to date.",
       "awaitingDetail": "Loading the proposed map details… Refresh the page if they don't arrive.",
       "proposal": "Score proposed by {author} ({score1} – {score2}), awaiting confirmation from {other}. Check it, then confirm the result to approve it.",
-      "proposalDirty": "Score proposed by {author} ({score1} – {score2}), awaiting confirmation from {other}. “Save” records your entry and pauses this proposal's automatic confirmation; only “Confirm the result” settles the match.",
+      "proposalDirty": "Score proposed by {author} ({score1} – {score2}), awaiting confirmation from {other}. “Save” records your entry and pauses this proposal's automatic confirmation; only “Confirm the result” settles the match, unless {other} confirms it.",
       "stored": {
         "doubleForfeit": "Double forfeit recorded: {team1} and {team2} both lose.",
         "forfeit": "Forfeit recorded: {forfeiting}, {beneficiary} wins.",

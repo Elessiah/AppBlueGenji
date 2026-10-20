@@ -249,14 +249,24 @@ export function AdminScoreDialog({
   // déplié plutôt que derrière un lien.
   const showForfeit = forfeitOpen || anyForfeit || scoreEntryClosed;
 
+  // Report seul suspendu par un « Enregistrer » : la proposition, effacée de
+  // l'avis par la saisie de l'arbitre, reste lisible (`SCORE_DISPUTE_LOCK.md`).
+  const pausedReport = (() => {
+    if (!match.scoreAutoValidationPaused || isMatchPlayed(match)) return null;
+    if (match.team1Report && !match.team2Report) return { report: match.team1Report, by: team1 };
+    if (match.team2Report && !match.team1Report) return { report: match.team2Report, by: team2 };
+    return null;
+  })();
   // Ce qui est en base ne se rappelle que s'il ne se lit pas déjà dans les
-  // champs : un match tranché (les champs ne disent pas qui a gagné), ou une
-  // saisie en cours qui recouvre l'ancienne valeur.
+  // champs : un match tranché (les champs ne disent pas qui a gagné), une
+  // saisie en cours qui recouvre l'ancienne valeur, ou un report suspendu —
+  // les champs y portent la saisie d'un arbitre, pas la proposition affichée.
   const stored =
     match.winnerTeamId !== null ||
     isMatchDrawn(match) ||
     isMatchDoubleForfeit(match) ||
-    form.dirty
+    form.dirty ||
+    pausedReport !== null
       ? storedResultLabel(text, match, team1, team2)
       : null;
   // Avant le lancement, la raison est déjà dite en tête du dialogue : la
@@ -279,14 +289,6 @@ export function AdminScoreDialog({
   // vérifier puis à le valider, sans le recopier.
   const proposal = pendingScoreProposal(match);
   const proposalNotice = adminProposalText(text, proposal, team1, team2, form.dirty);
-  // Report seul suspendu par un « Enregistrer » : la proposition, effacée de
-  // l'avis par la saisie de l'arbitre, reste lisible (`SCORE_DISPUTE_LOCK.md`).
-  const pausedReport = (() => {
-    if (!match.scoreAutoValidationPaused || isMatchPlayed(match)) return null;
-    if (match.team1Report && !match.team2Report) return { report: match.team1Report, by: team1 };
-    if (match.team2Report && !match.team1Report) return { report: match.team2Report, by: team2 };
-    return null;
-  })();
   const forfeitToggleLabel = showForfeit ? t("score.cancel") : t("score.admin.forfeit.open");
 
   // Correction d'un match déjà tranché : l'écriture attend la confirmation
