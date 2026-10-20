@@ -117,7 +117,8 @@ d'office, exactement comme si l'autre l'avait confirmé.
   `scoreAutoValidatedPush`, FR + EN, sans nommer personne ni « l'autre équipe » :
   le même texte part aux deux camps — « personne ne l'a confirmé ni contesté
   avant l'échéance » — sans durée : sur un format long, l'échéance dépasse 2 h ;
-  le sujet du profil dit « après au moins 2 h »). Rien sur Discord de
+  le sujet du profil dit « après au moins 2 h »). Le push « Score à confirmer »
+  prévient d'avance : « sans réponse, il sera validé automatiquement » (sans heure). Rien sur Discord de
   plus que la ligne `match_finished` habituelle.
 - **Écran** : sur la carte (lisible de tous), « validation automatique à HH:MM
   (heure de Paris) sans réponse » / « automatic confirmation at HH:MM (Paris
