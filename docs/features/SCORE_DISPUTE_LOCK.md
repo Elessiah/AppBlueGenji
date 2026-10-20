@@ -40,7 +40,8 @@ validé d'office.
 `team2Report`) : il voyage par le flux SSE **et** par la lecture REST de
 secours, sans droit de lecteur à câbler. La carte dit « Score en litige ·
 saisie verrouillée, arbitrage attendu » ; son bouton devient « Voir le litige »,
-icône œil et ton neutre (`readOnly`, `match-card-actions.ts`), ni crayon ni bouton plein : rien ne s'y édite ;
+icône œil et ton neutre (`readOnly`, `match-card-actions.ts`), ni crayon ni bouton plein : rien ne s'y édite — et elle cède la place visible au
+geste d'arbitrage quand le lecteur en a un (`groupMatchCardActions`) ;
 la modale garde l'état du désaccord et le détail adverse, retire la saisie, le
 bouton d'envoi et le forfait, et dit qui peut trancher (arbitre ou
 administrateur — la permission de plateforme `tournaments`, pas l'organisateur),
