@@ -60,6 +60,7 @@
       "stored": {
         "doubleForfeit": "Double forfeit recorded: {team1} and {team2} both lose.",
         "forfeit": "Forfeit recorded: {forfeiting}, {beneficiary} wins.",
+        "forfeitUndecided": "Forfeit recorded: {forfeiting}, not decided.",
         "draw": "Decided: {score}, draw.",
         "undecided": "Saved: {score}, not decided.",
         "decided": "Decided: {score}, {winner} wins."

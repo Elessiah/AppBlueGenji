@@ -30,7 +30,13 @@ import { useMatchFormat } from "../_lib/match-format-context";
 import { MapScoreList, mapFieldIds } from "./MapScoreList";
 import { MapResultList } from "./MatchMapDetails";
 import mapStyles from "./MatchMapDetails.module.css";
-import { isMapTouched, mapFieldKey, type MapListViolation } from "@/lib/shared/match-maps";
+import {
+  isMapTouched,
+  mapFieldKey,
+  trimTrailingBlankMaps,
+  type MapListViolation,
+  type MatchMapInput,
+} from "@/lib/shared/match-maps";
 import { adminProposalText, mapViolationText, scoreBlockerText, useDialogsText } from "../_lib/dialogs-text";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import styles from "./ScoreDialog.module.css";
@@ -78,6 +84,9 @@ function storedResultLabel(text: TournamentDialogsText, match: BracketMatch, tea
   if (match.forfeitTeamId !== null) {
     const forfeiting = match.forfeitTeamId === match.team1Id ? team1 : team2;
     const beneficiary = match.forfeitTeamId === match.team1Id ? team2 : team1;
+    // Forfait **noté** par « Enregistrer » sur un match non tranché (report
+    // suspendu) : personne ne l'emporte encore.
+    if (!isMatchPlayed(match)) return t("score.admin.stored.forfeitUndecided", { forfeiting });
     return t("score.admin.stored.forfeit", { forfeiting, beneficiary });
   }
   if (match.team1Score === null && match.team2Score === null) return null;
@@ -178,6 +187,13 @@ function ProposalSection({ text, report, by, team1, team2 }: Readonly<{
 
 type PendingReport = { report: MatchScoreReport; by: string; other: string };
 
+/** Les champs de maps disent-ils déjà la proposition (codes et scores) ? */
+function formHoldsReport(maps: ReadonlyArray<MatchMapInput>, report: MatchScoreReport): boolean {
+  const key = (rows: ReadonlyArray<MatchMapInput>) =>
+    JSON.stringify(rows.map(({ replayCode, team1Score, team2Score }) => [replayCode, team1Score, team2Score]));
+  return key(trimTrailingBlankMaps(maps)) === key(report.maps);
+}
+
 /**
  * Proposition seule sur laquelle le formulaire ne s'ouvre pas — l'arbitrage y a
  * déjà noté un avancement (`pendingScoreProposal` est alors nul) : elle reste
@@ -198,7 +214,7 @@ function pendingReportFor(match: BracketMatch, team1: string, team2: string): Pe
  * codes de replay), peut le reprendre, et sait avant d'« Enregistrer » que ce
  * geste en suspend la validation.
  */
-function PendingReportPanel({ text, pending, team1, team2, paused, loading, submitting, onAdopt }: Readonly<{
+function PendingReportPanel({ text, pending, team1, team2, paused, loading, adopted, submitting, onAdopt }: Readonly<{
   text: TournamentDialogsText;
   pending: PendingReport;
   team1: string;
@@ -206,6 +222,8 @@ function PendingReportPanel({ text, pending, team1, team2, paused, loading, subm
   paused: boolean;
   /** Détail map par map de la proposition encore en lecture (`proposalsNeedRefresh`). */
   loading: boolean;
+  /** Les champs portent déjà cette proposition : « Reprendre » ne changerait rien. */
+  adopted: boolean;
   submitting: boolean;
   onAdopt: () => void;
 }>) {
@@ -218,7 +236,7 @@ function PendingReportPanel({ text, pending, team1, team2, paused, loading, subm
         </p>
       )}
       {/* NOSONAR S6772 — le bouton est en `display: block`, il passe à la ligne */}
-      {pending.report.maps.length > 0 && (
+      {pending.report.maps.length > 0 && !adopted && (
         <button
           type="button"
           className={styles.conflictAction}
@@ -489,6 +507,7 @@ export function AdminScoreDialog({
               team2={team2}
               paused={match.scoreAutoValidationPaused}
               loading={proposalsNeedRefresh(liveMatch, proposals)}
+              adopted={formHoldsReport(form.maps, pendingReport.report)}
               submitting={form.submitting}
               onAdopt={() => {
                 setForfeitOpen(false);

@@ -60,6 +60,7 @@
       "stored": {
         "doubleForfeit": "Double forfait enregistré : {team1} et {team2} perdent toutes les deux.",
         "forfeit": "Forfait enregistré : {forfeiting}, {beneficiary} l'emporte.",
+        "forfeitUndecided": "Forfait enregistré : {forfeiting}, non tranché.",
         "draw": "Tranché : {score}, match nul.",
         "undecided": "Enregistré : {score}, non tranché.",
         "decided": "Tranché : {score}, {winner} l'emporte."
