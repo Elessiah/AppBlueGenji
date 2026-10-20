@@ -258,6 +258,12 @@ export const RECRUITMENT_MODAL_OFF_VALUE = "1";
 /** Un an : un choix « ne plus afficher » n'a pas vocation à expirer vite (et les navigateurs plafonnent à 400 jours). */
 export const RECRUITMENT_MODAL_OFF_MAX_AGE = 365 * 24 * 60 * 60;
 
+/**
+ * Code de `POST /api/recruitment/modal-dismiss` (503) quand le compte ne peut
+ * pas garder le choix (colonne absente) : seul ce navigateur le garde.
+ */
+export const RECRUITMENT_MODAL_ACCOUNT_UNAVAILABLE = "RECRUITMENT_MODAL_ACCOUNT_UNAVAILABLE";
+
 /** Le cookie du navigateur porte-t-il le choix « Ne plus afficher » ? */
 export function recruitmentModalOffInBrowser(cookieValue: string | undefined | null): boolean {
   return cookieValue === RECRUITMENT_MODAL_OFF_VALUE;

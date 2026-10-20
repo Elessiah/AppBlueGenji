@@ -15,6 +15,7 @@ import {
   RECRUITMENT_BANNER_ROTATION_MS,
   RECRUITMENT_MODAL_COOKIE,
   RECRUITMENT_MODAL_COOKIE_MAX_AGE,
+  RECRUITMENT_MODAL_ACCOUNT_UNAVAILABLE,
   RECRUITMENT_MODAL_OFF_COOKIE,
   RECRUITMENT_MODAL_OFF_MAX_AGE,
   RECRUITMENT_MODAL_OFF_VALUE,
@@ -50,13 +51,16 @@ const MODAL_PREVIEW_MAX = 320;
  * visite part d'un autre site (lien Discord, résultat de recherche, retour
  * d'OAuth) — la modale se rouvrirait alors malgré le choix. Lax n'est toujours
  * envoyé à aucune requête tierce embarquée. Rend `false` si le navigateur a
- * refusé le cookie (cookies bloqués).
+ * refusé le cookie (cookies bloqués). `Secure` sous HTTPS.
  */
 function writeSeenCookie(name: string, value: string, maxAge?: number): boolean {
   try {
     document.cookie =
       `${name}=${value}; path=/; samesite=lax` +
-      (maxAge === undefined ? "" : `; max-age=${maxAge}`);
+      (maxAge === undefined ? "" : `; max-age=${maxAge}`) +
+      // Comme le `Set-Cookie` du serveur en production : jamais posé ni
+      // remplacé depuis une page en clair.
+      (globalThis.location?.protocol === "https:" ? "; secure" : "");
     return document.cookie.split("; ").includes(`${name}=${value}`);
   } catch {
     // Cookies refusés : la fermeture reste effective pour la vue courante.
@@ -135,20 +139,27 @@ export async function recordRecruitmentModalOptOut(
     return "BROWSER";
   }
   let account = false;
+  let accountUnavailable = false;
   try {
     const response = await post(OPT_OUT_URL);
     // 409 (compte supprimé depuis le chargement) ou `account: false` (session
     // finie, déconnexion dans un autre onglet) : hors connexion, le cookie
     // reportera le choix au compte à la prochaine connexion.
     if (response.ok) account = ((await response.json()) as { account?: unknown }).account === true;
+    else if (response.status === 503) {
+      // Le compte ne peut pas garder le choix (et rien ne le rattrapera) :
+      // ce navigateur seulement.
+      accountUnavailable =
+        ((await response.json()) as { error?: unknown }).error === RECRUITMENT_MODAL_ACCOUNT_UNAVAILABLE;
+    }
   } catch {
-    // Réseau, délai dépassé : le cookie décide de l'issue, ci-dessous.
+    // Réseau, délai dépassé, corps illisible : le cookie décide de l'issue, ci-dessous.
   }
   if (account) return "ACCOUNT";
   // Refusé au script, le cookie a pu être posé par le `Set-Cookie` de la réponse.
   if (!written && !cookieKept()) return "NONE";
   // Connecté, compte non écrit : rattrapé à la page suivante, depuis le cookie.
-  return signedIn ? "ACCOUNT" : "BROWSER";
+  return signedIn && !accountUnavailable ? "ACCOUNT" : "BROWSER";
 }
 
 /** Le cookie « Ne plus afficher » est-il lisible sur ce navigateur ? */
