@@ -198,18 +198,23 @@ function pendingReportFor(match: BracketMatch, team1: string, team2: string): Pe
  * codes de replay), peut le reprendre, et sait avant d'« Enregistrer » que ce
  * geste en suspend la validation.
  */
-function PendingReportPanel({ text, pending, team1, team2, paused, submitting, onAdopt }: Readonly<{
+function PendingReportPanel({ text, pending, team1, team2, paused, loading, submitting, onAdopt }: Readonly<{
   text: TournamentDialogsText;
   pending: PendingReport;
   team1: string;
   team2: string;
   paused: boolean;
+  /** Détail map par map de la proposition encore en lecture (`proposalsNeedRefresh`). */
+  loading: boolean;
   submitting: boolean;
   onAdopt: () => void;
 }>) {
   return (
     <div className={mapStyles.proposals}>
       <ProposalSection text={text} report={pending.report} by={pending.by} team1={team1} team2={team2} />
+      {loading && pending.report.maps.length === 0 && (
+        <p className={styles.formatHint}>{text.t("score.admin.awaitingDetail")}</p>
+      )}
       {/* NOSONAR S6772 — le bouton est en `display: block`, il passe à la ligne */}
       {pending.report.maps.length > 0 && (
         <button
@@ -449,6 +454,18 @@ export function AdminScoreDialog({
             </output>
           )}
 
+          {/* Proposition pré-remplie, intacte : « Enregistrer » reste permis et
+              suspend sa validation — dit avant le clic (la saisie modifiée le
+              dit dans l'avis même, `proposalDirty`). */}
+          {proposal && !form.dirty && (
+            <p className={styles.formatHint}>
+              {t("score.admin.saveWillPause", {
+                author: proposal.proposedBy === "team1" ? team1 : team2,
+                other: proposal.proposedBy === "team1" ? team2 : team1,
+              })}
+            </p>
+          )}
+
           {/* Suspendue par un « Enregistrer » d'arbitrage (`SCORE_DISPUTE_LOCK.md`) :
               un avis à part, car la saisie de l'arbitre qui l'a posée efface
               l'avis de proposition (`pendingScoreProposal`). */}
@@ -469,6 +486,7 @@ export function AdminScoreDialog({
               team1={team1}
               team2={team2}
               paused={match.scoreAutoValidationPaused}
+              loading={proposalsNeedRefresh(liveMatch, proposals)}
               submitting={form.submitting}
               onAdopt={() => {
                 setForfeitOpen(false);
