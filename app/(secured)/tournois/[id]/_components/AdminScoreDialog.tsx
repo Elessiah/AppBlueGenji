@@ -359,8 +359,15 @@ export function AdminScoreDialog({
           {proposalNotice && (
             <output className={`${styles.stored} ${styles.notice}`}>
               {proposalNotice}
-              {/* Suspendue par un « Enregistrer » d'arbitrage (`SCORE_DISPUTE_LOCK.md`). */}
-              {match.scoreAutoValidationPaused && ` ${t("score.admin.autoValidationPaused")}`}
+            </output>
+          )}
+
+          {/* Suspendue par un « Enregistrer » d'arbitrage (`SCORE_DISPUTE_LOCK.md`) :
+              un avis à part, car la saisie de l'arbitre qui l'a posée efface
+              l'avis de proposition (`pendingScoreProposal`). */}
+          {match.scoreAutoValidationPaused && !isMatchPlayed(match) && (
+            <output className={`${styles.stored} ${styles.notice}`}>
+              {t("score.admin.autoValidationPaused")}
             </output>
           )}
 
