@@ -31,6 +31,9 @@ export interface PendingAccountDeletion {
 /** Délai entre le toast de réussite et le retour à l'accueil (le temps de le lire). */
 export const ACCOUNT_DELETED_REDIRECT_MS = 1200;
 
+/** Au-delà, l'aperçu est abandonné : la confirmation s'ouvre sans lui. */
+export const ACCOUNT_DELETION_PREVIEW_TIMEOUT_MS = 8000;
+
 /**
  * Le motif est demandé avant la confirmation : « effacé » et « anonymisé »
  * ne sont pas la même promesse, et « tes statistiques restent » ne veut
@@ -53,7 +56,14 @@ export async function previewAccountDeletion(fetchImpl: typeof fetch = fetch): P
   let subject: ConfirmationSubject = RETENTION_UNKNOWN;
   let previewed: ConfirmationSubject = RETENTION_UNKNOWN;
   try {
-    const preview = await fetchImpl("/api/profile/deletion", { cache: "no-store" });
+    // Borné : un aperçu qui ne répond jamais (réseau mobile instable) laissait
+    // la fenêtre bloquante des conditions sans aucune issue — tous ses gestes
+    // désarmés le temps de la préparation. Passé le délai, la confirmation
+    // s'ouvre sur la phrase de l'incertitude.
+    const preview = await fetchImpl("/api/profile/deletion", {
+      cache: "no-store",
+      signal: AbortSignal.timeout(ACCOUNT_DELETION_PREVIEW_TIMEOUT_MS),
+    });
     if (preview.ok) {
       previewed = ((await preview.json()) as AccountDeletionPlan).reason;
       subject = previewed;
@@ -144,6 +154,10 @@ export function useAccountDeletion({ text, onCancel, layer = "default" }: UseAcc
     return true;
   };
 
+  // Textes retombés sur le français sous `/en` (espace `profile` anglais
+  // injoignable) : la modale le dit (`lang="fr"`), sa coquille reste française.
+  const contentLang = text.locale === "fr" && pageLocale !== "fr" ? "fr" : undefined;
+
   const dialog = pendingDeletion ? (
     <ConfirmActionDialog
       title={text.t("deletion.question")}
@@ -151,6 +165,7 @@ export function useAccountDeletion({ text, onCancel, layer = "default" }: UseAcc
       pendingLabel={text.t("deletion.pending")}
       closeOnSuccess={false}
       layer={layer}
+      contentLang={contentLang}
       onClose={() => {
         setPendingDeletion(null);
         setDeleting(false);

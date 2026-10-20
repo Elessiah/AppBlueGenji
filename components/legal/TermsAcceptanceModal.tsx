@@ -92,6 +92,8 @@ export function TermsAcceptanceModal({
   const [busy, setBusy] = useState(false);
   /** La suppression du compte est lancée (aperçu, puis confirmation par-dessus). */
   const [deletionOpen, setDeletionOpen] = useState(false);
+  /** Sa confirmation est ouverte : la préparation (code, textes, aperçu) est finie. */
+  const [deletionReady, setDeletionReady] = useState(false);
   const deleteButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => setMounted(true), []);
@@ -231,7 +233,9 @@ export function TermsAcceptanceModal({
             aria-disabled={busy || leaving || deletionOpen || undefined}
             aria-busy={deletionOpen || undefined}
           >
-            {t("termsModal.deleteAccount")}
+            {/* Pendant la préparation, le bouton dit qu'il travaille (« Préparation… ») :
+                sur un réseau lent, la fenêtre ne paraît pas figée. */}
+            {deletionOpen && !deletionReady ? t("termsModal.deleting") : t("termsModal.deleteAccount")}
           </CyberButton>
           <CyberButton
             type="button"
@@ -246,8 +250,10 @@ export function TermsAcceptanceModal({
         </div>
         {deletionOpen ? (
           <TermsAccountDeletion
+            onReady={() => setDeletionReady(true)}
             onClose={() => {
               setDeletionOpen(false);
+              setDeletionReady(false);
               requestAnimationFrame(() => deleteButtonRef.current?.focus());
             }}
           />

@@ -180,6 +180,7 @@
     "checkbox": "I have read and accept the terms of use (<terms>read the terms</terms>).",
     "exits": "Don't want to accept them? You can delete your account right here, <logout>log out</logout>, <policy>read the privacy policy</policy> or <profile>open your profile</profile> to export your data.",
     "deleteAccount": "Delete my account",
+    "deleting": "Preparing…",
     "accept": "I accept",
     "saving": "Saving…",
     "accepted": "Thanks, you can carry on.",

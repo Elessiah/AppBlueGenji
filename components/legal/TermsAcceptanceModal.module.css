@@ -158,7 +158,12 @@
   border-color: rgba(var(--danger-rgb), 0.4);
 }
 
-.actions .deleteButton:hover:not([aria-disabled="true"]) {
+/* Le survol de `CyberButton` ghost (bleu glacier, halo bleu) est plus
+   spécifique que la règle de base : sans ces deux sélecteurs `:not`, le geste
+   destructeur virait au bleu de marque juste avant d'être pressé. */
+.actions .deleteButton:hover:not(:disabled):not([aria-disabled="true"]) {
+  color: var(--danger);
   background: rgba(var(--danger-rgb), 0.1);
   border-color: rgba(var(--danger-rgb), 0.6);
+  box-shadow: 0 0 18px rgba(var(--danger-rgb), 0.25);
 }

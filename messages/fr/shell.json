@@ -180,6 +180,7 @@
     "checkbox": "J'ai lu et j'accepte les conditions d'utilisation (<terms>lire les conditions</terms>).",
     "exits": "Tu ne veux pas les accepter ? Tu peux supprimer ton compte directement d'ici, <logout>te déconnecter</logout>, <policy>lire la politique de confidentialité</policy> ou <profile>ouvrir ton profil</profile> pour exporter tes données.",
     "deleteAccount": "Supprimer mon compte",
+    "deleting": "Préparation…",
     "accept": "J'accepte",
     "saving": "Enregistrement…",
     "accepted": "Merci, tu peux continuer.",
