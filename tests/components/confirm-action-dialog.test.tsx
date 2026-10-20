@@ -188,7 +188,9 @@ describe("geste en vol : le focus reste sur le bouton pressé", () => {
     expect(css).toMatch(/\.actions > :global\(\.btn\)\[aria-disabled="true"\] \{\s*cursor: progress;/);
     expect(css).toMatch(/\.actions > :global\(\.btn\.ghost\)\[aria-disabled="true"\] \{\s*color: var\(--ink-mute\);/);
     // Contraste élevé : le gris système, comme le `disabled` natif.
-    expect(css).toMatch(/@media \(forced-colors: active\) \{\s*\.actions > :global\(\.btn\)\[aria-disabled="true"\] \{\s*color: GrayText;\s*border-color: GrayText;/);
+    expect(css).toMatch(/@media \(forced-colors: active\) \{\s*\.actions > :global\(\.btn\)\[aria-disabled="true"\],\s*\.actions > :global\(\.btn\):disabled \{\s*color: GrayText;\s*border-color: GrayText;/);
+    // Non armé (`disabled` natif) : éteint, curseur interdit.
+    expect(css).toMatch(/\.actions > :global\(\.btn\):disabled \{\s*cursor: not-allowed;\s*color: var\(--ink-mute\);/);
     // L'attente est annoncée (le libellé d'un bouton focalisé qui change ne l'est pas).
     expect(source).toMatch(/<output className="sr-only" aria-live="polite">\s*\{busy \? pendingLabel : ""\}\s*<\/output>/);
   });

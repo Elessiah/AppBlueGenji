@@ -195,7 +195,9 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     expect(modal).toContain("export const TERMS_DELETION_PREPARE_TIMEOUT_MS = 20_000;");
     expect(modal).toMatch(/if \(!deletionOpen \|\| deletionReady\) return;\s*const timer = window\.setTimeout\(\(\) => \{\s*setDeletionOpen\(false\);\s*showError\(unavailableRef\.current\);/);
     // Le focus n'y revient que s'il y est resté ou s'est perdu (lecteur parti lire la politique : pas déplacé).
-    expect(modal).toContain("if (active === null || active === document.body || active === deleteButtonRef.current) {");
+    expect(modal).toContain("if (document.activeElement === document.body) deleteButtonRef.current?.focus();");
+    // Contraste élevé : lien et bouton désarmés au gris système.
+    expect(readSource("components/legal/TermsAcceptanceModal.module.css")).toMatch(/@media \(forced-colors: active\) \{\s*\.textButton\[aria-disabled="true"\],\s*\.actions \.deleteButton\[aria-disabled="true"\] \{\s*color: GrayText;/);
     expect(modal).toContain('unavailableRef.current = t("termsModal.deletionUnavailable");');
     expect(flowSource()).toMatch(/useEffect\(\(\) => \{\s*if \(confirming\) onReady\?\.\(\);\s*\}, \[confirming, onReady\]\);/);
     // Chargée au clic seulement : ni son code ni l'espace `profile` dans chaque page.

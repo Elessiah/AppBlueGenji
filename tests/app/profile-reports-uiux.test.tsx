@@ -525,15 +525,10 @@ describe("revue UI/UX, seizième passe", () => {
 describe("revue UI/UX, dix-septième passe", () => {
   it("/profil : un bouton en `aria-disabled` a l'air désactivé, comme `:disabled`", () => {
     const css = source("app/(secured)/profil/profil.module.css");
-    for (const selector of [
-      '.page :global(.btn[aria-disabled="true"])',
-      '.page :global(.btn[aria-disabled="true"]:hover)',
-      '.page :global(.btn.ghost[aria-disabled="true"]:hover)',
-      '.page :global(.btn.danger[aria-disabled="true"]:hover)',
-      '.page :global(.btn[aria-disabled="true"]:hover)::before',
-    ]) {
-      expect(css).toContain(selector);
-    }
+    expect(css).toContain('.page :global(.btn[aria-disabled="true"])');
+    // Le survol est éteint pour tout le site par le `.btn:hover` global (désarmés exclus) : chaque variante garde son fond de repos.
+    expect(source("app/globals.css")).toContain('.btn:hover:where(:not(:disabled):not([aria-disabled="true"])) {');
+    expect(source("app/globals.css")).toContain('.btn:hover:where(:not(:disabled):not([aria-disabled="true"]))::before {');
   });
 });
 
