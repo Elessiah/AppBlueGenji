@@ -206,6 +206,18 @@ function renderFooter(actions: Partial<MatchCardActionInput>, castBlock: CastBlo
 }
 
 describe("MatchCardActions — rendu du pied", () => {
+  it("« Voir le litige » s'ouvre en lecture : œil, pas de crayon", () => {
+    const list = matchCardActionList({ ...NOTHING, playerScoreLabel: "Voir le litige", playerScoreReadOnly: true });
+    expect(list[0]).toEqual({ id: "playerScore", label: "Voir le litige", tone: "primary", readOnly: true });
+    const view = renderFooter({ playerScoreLabel: "Voir le litige", playerScoreReadOnly: true });
+    const edit = renderFooter({ playerScoreLabel: "Saisir le score" });
+    expect(view).toContain("lucide-eye");
+    expect(view).not.toContain("lucide-pencil");
+    expect(edit).toContain("lucide-pencil");
+    const row = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/MatchRow.tsx"), "utf8");
+    expect(row).toContain('playerScoreReadOnly: playerScoreKey === "review",');
+  });
+
   it("ne rend rien sans action", () => {
     // Seules restent les régions d'annonce du `ToastProvider`.
     expect(renderFooter({})).not.toContain("<button");
