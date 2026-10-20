@@ -483,8 +483,8 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     summary:
       "When a staff member who plays in a match settles its score dispute, corrects its result, imposes their opponent's withdrawal or pauses its automatic confirmation, the other staff members are warned, and the action is recorded in the staff activity log.",
     details: [
-      "The alert goes as a push notification to the other referees and administrators who turned it on (topic “Refereeing by a staff player”, which you can turn off in “My profile”), never to the author. It gives the tournament, the round and the retained outcome (none for a pause), with the team names (none in a solo tournament), without the username of the author or of any player.",
-      "The staff activity log gives on Discord only the tournament and the kind of action, unnamed; the server logs also keep the round, the outcome, the team names (none in a solo tournament), and the username and account ID of its author.",
+      "The alert goes as a push notification to the other referees and administrators who turned it on (topic “Refereeing by a staff player”, which you can turn off in “My profile”), never to the author. It gives the tournament, the round and, except for a pause, the retained outcome with the team names (none in a solo tournament), without the username of the author or of any player.",
+      "The staff activity log gives on Discord only the tournament and the kind of action, unnamed; the server logs also keep the round, the outcome and the team names (neither for a pause, no names in a solo tournament), and the username and account ID of its author.",
       "Each of these four actions, whether or not its author plays in the match, also leaves a short trace in the server logs: the match number, and the username and account ID of its author.",
     ],
     linkLabels: ["Read the “Push notifications” section", "Read the “Exercising your rights” section"],

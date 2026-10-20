@@ -428,7 +428,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Recueillir les « Prêt » de chaque partie d'un match (équipes, caster) avant son lancement, dans les seuls tournois qui ont la phase de lancement (option de chaque tournoi, éteinte par défaut)",
       "Envoyer en message privé Discord et en push l'annonce de l'horaire d'un match (posé, changé ou retiré), l'avis qu'un match quitte son programme et les rappels de match 24 h et 10 h avant le coup d'envoi (le second — ou l'annonce d'un match programmé moins de 10 h avant — avec le lien d'invitation au serveur Discord du check-in) ; les messages privés ne partent qu'aux comptes dont le tag Discord est certifié (un tag non certifié, même rattaché par la connexion Discord, n'en reçoit aucun, pour éviter le spam) ; le joueur peut couper ces messages privés depuis « Mon profil » (notifications), ses notifications push gardant leurs propres réglages",
       "Alerter le rôle arbitre (conflit de score, litige de score resté trop longtemps sans arbitrage, signalement d'un joueur)",
-      "Avertir en push les autres arbitres et administrateurs quand un membre du staff qui joue un match (membre d'une des deux équipes — encore membre, ou parti depuis le début du match —, ou joueur de l'entrée en tournoi individuel) en tranche lui-même le litige de score (« Valider le résultat »), en corrige le résultat déjà acquis, impose l'abandon de son adversaire, ou en suspend la validation automatique d'un score proposé (« Enregistrer ») : tournoi, manche et issue retenue (aucune pour une suspension), avec les noms d'équipe (aucun en tournoi individuel), sans le pseudo de l'auteur ni d'aucun joueur",
+      "Avertir en push les autres arbitres et administrateurs quand un membre du staff qui joue un match (membre d'une des deux équipes — encore membre, ou parti depuis le début du match —, ou joueur de l'entrée en tournoi individuel) en tranche lui-même le litige de score (« Valider le résultat »), en corrige le résultat déjà acquis, impose l'abandon de son adversaire, ou en suspend la validation automatique d'un score proposé (« Enregistrer ») : tournoi et manche, et — sauf pour une suspension — l'issue retenue avec les noms d'équipe (aucun en tournoi individuel), sans le pseudo de l'auteur ni d'aucun joueur",
       "Envoyer aux arbitres, environ 10 h à l'avance, le programme des matchs à venir (horaires, tournois, noms d'équipe ; « un joueur » en tournoi individuel) au canal de logs Discord et en push",
     ],
     legalBasis:
@@ -480,15 +480,15 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     purpose: "Tenir le staff informé des faits marquants de la plateforme",
     subPurposes: [
       "Arrivées de joueurs, inscriptions et abandons en tournoi, fins de match, clôtures",
-      "Traçabilité des gestes d'arbitrage (pénalités, retraits d'engagés, retours en arrière, horaires de match posés, changés ou retirés, litige tranché, résultat corrigé, abandon imposé à l'adversaire ou validation automatique suspendue — signalés comme tels quand leur auteur joue le match), pour la modération",
+      "Traçabilité des gestes d'arbitrage (pénalités, retraits d'engagés, retours en arrière, horaires de match posés, changés ou retirés, et, quand leur auteur joue le match, litige tranché, résultat corrigé, abandon imposé à l'adversaire ou validation automatique suspendue — ces quatre gestes laissant aussi, que leur auteur joue ou non, une trace courte dans les seuls journaux du serveur), pour la modération",
       "Programme d'arbitrage : environ 10 h à l'avance, les matchs à venir (horaires, tournois, noms d'équipe ; « un joueur » en tournoi individuel)",
     ],
     legalBasis:
-      "Intérêt légitime (administration et contrôle de l'arbitrage) à l'égard des joueurs et équipes cités ; l'envoi du programme d'arbitrage aux arbitres et administrateurs relève de l'exécution du service (T04)",
+      "Intérêt légitime (administration et contrôle de l'arbitrage) à l'égard des joueurs et équipes cités et du membre du staff auteur d'un geste, nommé dans les journaux du serveur ; l'envoi du programme d'arbitrage aux arbitres et administrateurs relève de l'exécution du service (T04)",
     dataSubjects: ["Staff", "Joueurs et équipes engagés dans un tournoi (désignés par le nom d'équipe, jamais par leur pseudo)"],
     dataCategories: [
       "Sur Discord : noms d'équipe, scores, noms des tournois, horaires et manches des matchs — aucun pseudo de joueur (« un joueur », y compris en tournoi individuel) et aucun membre du staff nommé (« le staff »)",
-      "Dans les journaux du serveur : pseudo et identifiant du membre du staff auteur d'un geste d'arbitrage, avec le geste (numéro du match ; pour un arbitre qui joue le match, en plus : tournoi, manche, issue et noms d'équipe, aucun en tournoi individuel)",
+      "Dans les journaux du serveur : pseudo et identifiant du membre du staff auteur d'un geste d'arbitrage, avec le geste (numéro du match ; pour un arbitre qui joue le match, en plus : tournoi, manche et, sauf pour une suspension, issue et noms d'équipe, aucun en tournoi individuel)",
     ],
     sensitiveData: "Aucune",
     retention: [

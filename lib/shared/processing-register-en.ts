@@ -251,7 +251,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Collecting the “Ready” of each party to a match (teams, caster) before it is launched, only in tournaments that have the launch phase (an option of each tournament, off by default)",
       "Sending by Discord direct message and by push the announcement of a match's time (set, changed or removed), the notice that a match leaves their schedule and match reminders 24 h and 10 h before kickoff (the latter — or the announcement of a match scheduled less than 10 h ahead — with the invite link to the check-in Discord server); direct messages only go to accounts with a certified Discord tag (an uncertified tag, even one linked by signing in with Discord, receives none, to avoid spam); the player can turn these direct messages off from “My profile” (notifications), their push notifications keeping their own settings",
       "Alerting the referee role (score conflict, score dispute left too long without a referee, report on a player)",
-      "Warning the other referees and administrators by push when a staff member who plays in a match (member of one of both teams — still a member, or gone since the match began —, or the player of the entry in a solo tournament) settles its score dispute themselves (“Confirm the result”), corrects its already decided result, imposes their opponent's withdrawal, or pauses the automatic confirmation of a proposed score (“Save”): tournament, round and retained outcome (none for a pause), with the team names (none in a solo tournament), without the pseudo of the author or of any player",
+      "Warning the other referees and administrators by push when a staff member who plays in a match (member of one of both teams — still a member, or gone since the match began —, or the player of the entry in a solo tournament) settles its score dispute themselves (“Confirm the result”), corrects its already decided result, imposes their opponent's withdrawal, or pauses the automatic confirmation of a proposed score (“Save”): tournament and round, and — except for a pause — the retained outcome with the team names (none in a solo tournament), without the pseudo of the author or of any player",
       "Sending the referees, about 10 hours ahead, the schedule of upcoming matches (times, tournaments, team names; “a player” in a solo tournament) to the Discord log channel and by push",
     ],
     legalBasis:
@@ -303,15 +303,15 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     purpose: "Keeping the staff informed of notable events on the platform",
     subPurposes: [
       "New players, tournament registrations and withdrawals, match results, closings",
-      "Traceability of refereeing actions (penalties, removal of participants, rollbacks, match times set, changed or removed, dispute settled, result corrected, opponent's withdrawal imposed or automatic confirmation paused — flagged as such when their author plays in the match), for moderation",
+      "Traceability of refereeing actions (penalties, removal of participants, rollbacks, match times set, changed or removed, and, when their author plays in the match, dispute settled, result corrected, opponent's withdrawal imposed or automatic confirmation paused — these four actions also leaving, whether or not their author plays, a short trace in the server logs only), for moderation",
       "Refereeing schedule: about 10 hours ahead, the upcoming matches (times, tournaments, team names; “a player” in a solo tournament)",
     ],
     legalBasis:
-      "Legitimate interest (administration and oversight of refereeing) with regard to the players and teams mentioned; sending the refereeing schedule to referees and administrators falls under performance of the service (T04)",
+      "Legitimate interest (administration and oversight of refereeing) with regard to the players and teams mentioned and to the staff member who carried out an action, named in the server logs; sending the refereeing schedule to referees and administrators falls under performance of the service (T04)",
     dataSubjects: ["Staff", "Players and teams taking part in a tournament (referred to by team name, never by their username)"],
     dataCategories: [
       "On Discord: team names, scores, tournament names, match times and rounds — no player username (“a player”, including in solo tournaments) and no staff member named (“the staff”)",
-      "In the server logs: username and identifier of the staff member who carried out a refereeing action, with the action (match number; for a referee who plays in the match, also: tournament, round, outcome and team names, none in a solo tournament)",
+      "In the server logs: username and identifier of the staff member who carried out a refereeing action, with the action (match number; for a referee who plays in the match, also: tournament, round and, except for a pause, outcome and team names, none in a solo tournament)",
     ],
     sensitiveData: "None",
     retention: [
