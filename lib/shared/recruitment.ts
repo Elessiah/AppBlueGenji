@@ -264,6 +264,13 @@ export const RECRUITMENT_MODAL_OFF_MAX_AGE = 365 * 24 * 60 * 60;
  */
 export const RECRUITMENT_MODAL_ACCOUNT_UNAVAILABLE = "RECRUITMENT_MODAL_ACCOUNT_UNAVAILABLE";
 
+/**
+ * Événement de `window` émis quand « Ne plus afficher » vient d'être gardé
+ * depuis la modale : la case de « Mon profil », si elle est à l'écran sous la
+ * modale, se décoche sans attendre un rechargement.
+ */
+export const RECRUITMENT_MODAL_OFF_EVENT = "bg:recruitment-modal-off";
+
 /** Le cookie du navigateur porte-t-il le choix « Ne plus afficher » ? */
 export function recruitmentModalOffInBrowser(cookieValue: string | undefined | null): boolean {
   return cookieValue === RECRUITMENT_MODAL_OFF_VALUE;

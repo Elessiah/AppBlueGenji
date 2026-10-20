@@ -17,6 +17,7 @@ import {
   RECRUITMENT_MODAL_COOKIE_MAX_AGE,
   RECRUITMENT_MODAL_ACCOUNT_UNAVAILABLE,
   RECRUITMENT_MODAL_OFF_COOKIE,
+  RECRUITMENT_MODAL_OFF_EVENT,
   RECRUITMENT_MODAL_OFF_MAX_AGE,
   RECRUITMENT_MODAL_OFF_VALUE,
   RECRUITMENT_PRIORITY_EXPOSURE,
@@ -533,7 +534,11 @@ function RecruitmentArrivalModal({
     dismiss();
     const { kind, key } = recruitmentOptOutToast(await saved);
     if (kind === "error") toast?.showError(t(`highlight.${key}`));
-    else toast?.showSuccess(t(`highlight.${key}`));
+    else {
+      toast?.showSuccess(t(`highlight.${key}`));
+      // « Mon profil » ouvert sous la modale : sa case suit sans rechargement.
+      window.dispatchEvent(new Event(RECRUITMENT_MODAL_OFF_EVENT));
+    }
   }
 
   // Le hook doit être appelé à chaque rendu : il ne s'active que si `open`.

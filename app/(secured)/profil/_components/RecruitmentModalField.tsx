@@ -1,10 +1,14 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Coche } from "@/components/Coche";
 import { useProfileText } from "@/components/i18n/profile-text";
 import { useToast } from "@/components/ui/toast";
-import { RECRUITMENT_MODAL_OFF_COOKIE, recruitmentModalOffInBrowser } from "@/lib/shared/recruitment";
+import {
+  RECRUITMENT_MODAL_OFF_COOKIE,
+  RECRUITMENT_MODAL_OFF_EVENT,
+  recruitmentModalOffInBrowser,
+} from "@/lib/shared/recruitment";
 import { profileErrorMessage } from "../profile-errors";
 import { runQueuedSaves } from "../_lib/queued-saves";
 import s from "../profil.module.css";
@@ -89,6 +93,16 @@ export function RecruitmentModalField({
     setSeen(initialOff);
     if (initialOff !== undefined) setShown(readShown(initialOff));
   }
+
+  // « Ne plus afficher » cliqué dans la modale ouverte par-dessus cette page :
+  // la case se décoche (hors envoi en cours, qui a le dernier mot).
+  useEffect(() => {
+    const onOptOut = () => {
+      if (!busyRef.current) setShown(false);
+    };
+    window.addEventListener(RECRUITMENT_MODAL_OFF_EVENT, onOptOut);
+    return () => window.removeEventListener(RECRUITMENT_MODAL_OFF_EVENT, onOptOut);
+  }, []);
 
   const put = async (next: boolean): Promise<boolean> => {
     const error = await sendRecruitmentModalChoice(next);
