@@ -228,7 +228,7 @@ revient pour une prioritaire neuve).
   de plus) : le choix suit la personne sur ses autres appareils.
 - **Report à la connexion** : `createSession` (point de passage des quatre
   portes) lit le cookie et pose le drapeau sur le compte ; une erreur n'empêche
-  jamais la connexion. **Rattrapage** à chaque page connectée
+  jamais la connexion. **Rattrapage** à chaque chargement complet d'une page connectée
   (`healRecruitmentModalOff`, `app/layout.tsx`) : cookie posé, drapeau à `0`
   (écriture du clic échouée) → écriture non attendue ; le drapeau lu avec la
   session l'éteint ensuite.
