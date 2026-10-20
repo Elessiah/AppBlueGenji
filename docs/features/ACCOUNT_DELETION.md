@@ -204,11 +204,19 @@ ferme la session —, toast puis accueil rechargé dans la langue de la page). D
   la confirmation (`onReady` joué en `useLayoutEffect`) : jamais une
   confirmation affichée puis retirée par le délai.
 
-Un `DELETE /api/profile` en 2xx dont le corps est illisible (coupé par un
-proxy) reste un **succès** (`requestAccountDeletion`) : le compte est supprimé,
-la session fermée — l'issue annoncée retombe sur l'aperçu, et la personne est
-ramenée à l'accueil au lieu de rester sur un « échec » que chaque essai suivant
-refuserait en 401. Un refus illisible garde le code générique.
+Seule la réponse de la route fait foi : un succès est un 2xx **avec**
+`deleted: true` (`requestAccountDeletion`) — un 200 étranger (portail captif,
+proxy) ou un corps illisible reste un échec, jamais une suppression annoncée à
+tort. Une réponse perdue après une suppression faite se rattrape au nouvel
+essai : la session est fermée, la route répond `UNAUTHORIZED` (ou
+`USER_NOT_FOUND`), et l'écran dit « Ta session est fermée — ton compte a
+peut-être déjà été supprimé… » / "Your session has ended — your account may
+already have been deleted…" (`deletion.errors.sessionGone`,
+`SESSION_GONE_CODES`) puis recharge l'accueil, au lieu de redire « échec »
+sous la fenêtre des conditions. Côté serveur, une panne de `clearSession()`
+**après** la suppression (sessions déjà parties avec la transaction) est
+journalisée sans changer la réponse (`deleted: true`), et `clearSession`
+expire le cookie même quand la base ne répond pas.
 
 L'aperçu est **borné** (`ACCOUNT_DELETION_PREVIEW_TIMEOUT_MS`, 8 s,
 `AbortController` + minuterie, pas `AbortSignal.timeout` absent avant Safari 16 : chaque essai y laissait une requête ouverte, assez pour épuiser les connexions HTTP/1.1 du site) : un aperçu qui ne répond jamais laissait la fenêtre
