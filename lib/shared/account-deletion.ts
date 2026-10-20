@@ -218,6 +218,14 @@ export function accountDeletionOutcome(
 }
 
 /**
+ * Refus de `DELETE /api/profile` qui disent que la session ou le compte n'est
+ * plus là — typiquement un nouvel essai après une suppression faite dont la
+ * réponse s'est perdue (la route a fermé la session). Réessayer n'y changerait
+ * rien : l'écran le dit (`deletion.errors.sessionGone`) et recharge la page.
+ */
+export const SESSION_GONE_CODES: ReadonlySet<string> = new Set(["UNAUTHORIZED", "USER_NOT_FOUND"]);
+
+/**
  * Le refus, en français.
  *
  * La suppression ne peut échouer que de deux façons, et l'une d'elles est une
@@ -233,11 +241,6 @@ export function accountDeletionOutcome(
 export function accountDeletionErrorMessage(code: string | undefined): string {
   if (code === "ACCOUNT_STILL_REFERENCED") {
     return "Ton compte a été rattaché à un tournoi ou à une équipe pendant la suppression. Réessaie : il sera alors anonymisé plutôt qu'effacé.";
-  }
-  // Session ou compte déjà partis : typiquement un nouvel essai après une
-  // suppression faite dont la réponse s'est perdue — l'écran recharge la page.
-  if (code === "UNAUTHORIZED" || code === "USER_NOT_FOUND") {
-    return "Ta session est fermée — ton compte a peut-être déjà été supprimé. La page se recharge : reconnecte-toi pour vérifier.";
   }
   return "La suppression du compte a échoué. Réessaie dans un instant.";
 }

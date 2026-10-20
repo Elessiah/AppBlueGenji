@@ -10,7 +10,7 @@ import {
   deletionOutcomeText,
   type ProfileText,
 } from "@/app/(secured)/profil/_lib/profile-text";
-import type { AccountDeletionPlan, ConfirmationSubject } from "@/lib/shared/account-deletion";
+import { SESSION_GONE_CODES, type AccountDeletionPlan, type ConfirmationSubject } from "@/lib/shared/account-deletion";
 import { previewAccountDeletion, type PendingAccountDeletion } from "./account-deletion-preview";
 import { localeHref } from "@/lib/shared/locales";
 
@@ -68,13 +68,6 @@ export async function requestAccountDeletion(
   return { ok: true, applied: payload.mode ? payload.reason ?? null : previewed };
 }
 
-/**
- * Refus qui disent que la session ou le compte n'est plus là — typiquement un
- * nouvel essai après une suppression faite dont la réponse s'est perdue (la
- * route a fermé la session). Réessayer n'y changerait rien : la page se
- * recharge, sans session, au lieu de redire « échec » sous la fenêtre des conditions.
- */
-export const SESSION_GONE_CODES: ReadonlySet<string> = new Set(["UNAUTHORIZED", "USER_NOT_FOUND"]);
 
 interface UseAccountDeletionOptions {
   /** Textes de `/profil` (`profile.deletion`) dans la langue de la page. */

@@ -106,8 +106,9 @@ export async function DELETE() {
     return fail("ACCOUNT_DELETE_FAILED", 400);
   }
   // La suppression est faite (les sessions du compte sont parties avec sa
-  // transaction) : une panne en fermant celle-ci ne la change pas en échec —
-  // l'écran annoncerait un refus, et chaque nouvel essai répondrait 401.
+  // transaction : un cookie resté n'ouvre plus rien) : une panne en fermant
+  // celle-ci ne la change pas en échec — l'écran annoncerait un refus, et
+  // chaque nouvel essai répondrait 401.
   try {
     await clearSession();
   } catch (error) {
