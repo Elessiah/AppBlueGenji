@@ -826,7 +826,7 @@ export function RgpdEn({
             under <strong>performance of the service</strong> and are not turned off this way (
             <LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>). When a staff member settles a
             dispute, corrects a decided result, imposes a withdrawal or pauses an automatic confirmation, the site
-            checks whether they are a member of one of the match&apos;s teams (for a withdrawal, of the opponent of the
+            checks whether they are a member of one of the match&apos;s teams, or left it since the match was launched, its first report or, failing these, its creation (for a withdrawal, of the opponent of the
             team they withdraw) and, if they play in it, warns their
             colleagues: this check rests on the association&apos;s <strong>legitimate interest</strong> in impartial
             refereeing, and this staff member may object to it (section{" "}

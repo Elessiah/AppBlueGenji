@@ -303,7 +303,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     purpose: "Keeping the staff informed of notable events on the platform",
     subPurposes: [
       "New players, tournament registrations and withdrawals, match results, closings",
-      "Traceability of refereeing actions (penalties, removal of participants, rollbacks, match times set, changed or removed, and, when their author plays in the match, dispute settled, result corrected, opponent's withdrawal imposed or automatic confirmation paused — these four actions — any withdrawal imposed by the referees that closes a match included, one trace per match closed, whichever team is withdrawn — also leaving, whether or not their author plays, a short trace in the server logs only), for moderation",
+      "Traceability of refereeing actions (penalties, removal of participants, rollbacks, match times set, changed or removed, and, when their author plays in the match, dispute settled, result corrected, opponent's withdrawal imposed or automatic confirmation paused — these four actions — any withdrawal imposed by the referees that closes a match included, one trace per match closed against a known opponent, whichever team is withdrawn — also leaving, whether or not their author plays, a short trace in the server logs only), for moderation",
       "Refereeing schedule: about 10 hours ahead, the upcoming matches (times, tournaments, team names; “a player” in a solo tournament)",
     ],
     legalBasis:

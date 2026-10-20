@@ -480,7 +480,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     purpose: "Tenir le staff informé des faits marquants de la plateforme",
     subPurposes: [
       "Arrivées de joueurs, inscriptions et abandons en tournoi, fins de match, clôtures",
-      "Traçabilité des gestes d'arbitrage (pénalités, retraits d'engagés, retours en arrière, horaires de match posés, changés ou retirés, et, quand leur auteur joue le match, litige tranché, résultat corrigé, abandon imposé à l'adversaire ou validation automatique suspendue — ces quatre gestes — tout abandon imposé par l'arbitrage qui clôt une manche compris, une trace par manche close, quelle que soit l'équipe retirée — laissant aussi, que leur auteur joue ou non, une trace courte dans les seuls journaux du serveur), pour la modération",
+      "Traçabilité des gestes d'arbitrage (pénalités, retraits d'engagés, retours en arrière, horaires de match posés, changés ou retirés, et, quand leur auteur joue le match, litige tranché, résultat corrigé, abandon imposé à l'adversaire ou validation automatique suspendue — ces quatre gestes — tout abandon imposé par l'arbitrage qui clôt une manche compris, une trace par manche close face à un adversaire connu, quelle que soit l'équipe retirée — laissant aussi, que leur auteur joue ou non, une trace courte dans les seuls journaux du serveur), pour la modération",
       "Programme d'arbitrage : environ 10 h à l'avance, les matchs à venir (horaires, tournois, noms d'équipe ; « un joueur » en tournoi individuel)",
     ],
     legalBasis:
