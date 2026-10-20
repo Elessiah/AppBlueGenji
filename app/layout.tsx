@@ -198,6 +198,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const onRecruitmentPage = requestedPath === RECRUITMENT_PAGE;
   const modalCookie = cookieStore.get(RECRUITMENT_MODAL_COOKIE)?.value;
   const bannerCookie = cookieStore.get(RECRUITMENT_BANNER_COOKIE)?.value;
+  const modalOffCookie = cookieStore.get(RECRUITMENT_MODAL_OFF_COOKIE)?.value;
   const adIds = (ads: readonly { id: number }[]) => ads.map((ad) => ad.id);
   const modalSeen = recruitmentSeenAmong(modalCookie, adIds(spotlight.modal));
   const bannerDismissed = recruitmentDismissed(bannerCookie, adIds(spotlight.banner));
@@ -238,8 +239,13 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   healRecruitmentModalOff({
     userId: user?.id,
     accountOff: user?.recruitmentModalOff,
-    browserCookie: cookieStore.get(RECRUITMENT_MODAL_OFF_COOKIE)?.value,
+    browserCookie: modalOffCookie,
   });
+  // « Ne plus afficher » : sur le compte (lu avec la session), ou sur ce
+  // navigateur. La modale ne s'ouvrant plus, ses annonces ne partent pas dans
+  // la page (ni, sous `/en`, ses textes quand la banderole n'a rien non plus).
+  const modalOptedOut = recruitmentModalOptedOut({ accountOff: user?.recruitmentModalOff, browserCookie: modalOffCookie });
+  const modalAds = modalOptedOut ? [] : spotlight.modal;
   const termsRequest = await termsRequestFor(user?.id);
   const termsRequired = termsRequest !== null;
   // Bloquante pour tout compte connecté en retard d'une version (pas de report).
@@ -262,7 +268,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   // Textes de la mise en avant du recrutement : l'anglais ne voyage que sous
   // `/en`, et seulement s'il y a une annonce à montrer.
   const recruitmentMessages =
-    locale === DEFAULT_LOCALE || (spotlight.banner.length === 0 && spotlight.modal.length === 0)
+    locale === DEFAULT_LOCALE || (spotlight.banner.length === 0 && modalAds.length === 0)
       ? undefined
       : recruitmentClientMessages(messagesFor(locale).recruitment);
 
@@ -292,17 +298,13 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
               Voir `lib/shared/global-modals.ts`. */}
           <RecruitmentTextProvider locale={locale} messages={recruitmentMessages}>
           <RecruitmentHighlight
-            modalAds={spotlight.modal}
+            modalAds={modalAds}
             modalSilenced={recruitmentModalSilenced({
               privacyPending: privacyChanges.length > 0,
               termsModalDue: termsDueOnLoad,
               pathname: requestedPath,
             })}
-            // « Ne plus afficher » : sur le compte (lu avec la session), ou sur ce navigateur.
-            modalOptedOut={recruitmentModalOptedOut({
-              accountOff: user?.recruitmentModalOff,
-              browserCookie: cookieStore.get(RECRUITMENT_MODAL_OFF_COOKIE)?.value,
-            })}
+            modalOptedOut={modalOptedOut}
             signedIn={user !== null}
             modalSeen={modalSeen}
             modalSeenKept={modalSeenKept}

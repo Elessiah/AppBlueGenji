@@ -12,6 +12,7 @@ import { recordConnection } from "@/lib/server/connection-logs";
 import { closeSessionStreams, closeUserStreams } from "@/lib/server/session-streams";
 import { activeSuspensionSql, assertNotSuspended, purgeEndedSuspensions } from "@/lib/server/account-suspensions";
 import type { ConnectionLogEvent } from "@/lib/shared/connection-logs";
+import { isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { RECRUITMENT_MODAL_OFF_COOKIE, recruitmentModalOffInBrowser } from "@/lib/shared/recruitment";
 import { recordRecruitmentModalOff, recruitmentModalOff } from "@/lib/server/users/recruitment-modal-preference";
 
@@ -122,8 +123,8 @@ export async function createSession(userId: number, event: ConnectionLogEvent): 
     maxAge: SESSION_TTL_DAYS * 24 * 60 * 60,
   });
   forgetTermsPostponement(cookieStore);
-  await carryRecruitmentModalOff(userId, cookieStore);
-  await recordConnection(userId, event);
+  // En parallèle : le report ne rallonge pas la connexion d'un aller-retour.
+  await Promise.all([carryRecruitmentModalOff(userId, cookieStore), recordConnection(userId, event)]);
 }
 
 /**
@@ -261,6 +262,25 @@ async function ensureFreshTestUser(): Promise<number> {
   }
 }
 
+/**
+ * Lecture de l'utilisateur de la session, `bg_users.recruitment_modal_off`
+ * compris. Colonne d'un changement récent (`RECENT_SCHEMA_CHANGES`) : si son
+ * `ALTER` a échoué au démarrage (`reportSchemaFailure` ne fait que
+ * journaliser), la lecture est rejouée sans elle — la modale reste ouverte
+ * par défaut — plutôt que de faire tomber chaque page connectée.
+ */
+async function selectUserRows(sql: (withModalOff: boolean) => string, params: (string | number)[]): Promise<UserRow[]> {
+  const db = await getDatabase();
+  try {
+    const [rows] = await db.execute<UserRow[]>(sql(true), params);
+    return rows;
+  } catch (error) {
+    if (!isUnknownColumnError(error)) throw error;
+    const [rows] = await db.execute<UserRow[]>(sql(false), params);
+    return rows;
+  }
+}
+
 async function getDevBypassUser(): Promise<AuthUser | null> {
   // Liste blanche stricte : le bypass n'est actif QUE lorsqu'on est explicitement
   // en développement (`next dev` → NODE_ENV="development"). Toute autre valeur
@@ -279,9 +299,8 @@ async function getDevBypassUser(): Promise<AuthUser | null> {
     if (!Number.isInteger(userId) || userId <= 0) return null;
   }
 
-  const db = await getDatabase();
-  const [rows] = await db.execute<UserRow[]>(
-    `SELECT id, pseudo, avatar_url, discord_id, google_sub, is_adult, is_admin, platform_roles_json, recruitment_modal_off
+  const rows = await selectUserRows(
+    (modalOff) => `SELECT id, pseudo, avatar_url, discord_id, google_sub, is_adult, is_admin, platform_roles_json${modalOff ? ", recruitment_modal_off" : ""}
      FROM bg_users
      WHERE id = ?
        AND is_deleted = 0
@@ -316,10 +335,8 @@ export const getCurrentUser = requestCache(async (): Promise<AuthUser | null> =>
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   if (!token) return null;
 
-  const db = await getDatabase();
-  const [rows] = await db.execute<UserRow[]>(
-    `SELECT u.id, u.pseudo, u.avatar_url, u.discord_id, u.google_sub, u.is_adult, u.is_admin, u.platform_roles_json,
-            u.recruitment_modal_off
+  const rows = await selectUserRows(
+    (modalOff) => `SELECT u.id, u.pseudo, u.avatar_url, u.discord_id, u.google_sub, u.is_adult, u.is_admin, u.platform_roles_json${modalOff ? ", u.recruitment_modal_off" : ""}
      FROM bg_user_sessions s
      JOIN bg_users u ON u.id = s.user_id
      WHERE s.token_hash = ?

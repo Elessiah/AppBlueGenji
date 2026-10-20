@@ -35,21 +35,53 @@ export async function recordRecruitmentModalOff(userId: number): Promise<boolean
 }
 
 /**
+ * Fenêtre pendant laquelle un même compte n'est rattrapé qu'une fois par
+ * processus : tant que l'écriture échoue (verrou, base en lecture seule),
+ * chaque chargement complet — et chaque onglet restauré au démarrage du
+ * navigateur — en relancerait une, avec son erreur au journal.
+ */
+export const RECRUITMENT_MODAL_HEAL_WINDOW_MS = 10 * 60 * 1000;
+
+/** Au-delà, les tentatives échues sont oubliées (mémoire bornée). */
+const HEAL_ATTEMPTS_PRUNE_AT = 5000;
+
+/** Dernière tentative de rattrapage, par compte (ce processus seulement). */
+const healAttempts = new Map<number, number>();
+
+function healAttemptedRecently(userId: number, now: number): boolean {
+  const last = healAttempts.get(userId);
+  if (last !== undefined && now - last < RECRUITMENT_MODAL_HEAL_WINDOW_MS) return true;
+  if (healAttempts.size >= HEAL_ATTEMPTS_PRUNE_AT) {
+    for (const [id, at] of healAttempts) {
+      if (now - at >= RECRUITMENT_MODAL_HEAL_WINDOW_MS) healAttempts.delete(id);
+    }
+  }
+  healAttempts.set(userId, now);
+  return false;
+}
+
+/**
  * Rattrapage, à chaque chargement complet d'une page connectée (la mise en
  * page racine ne se rend pas à la navigation client) : le cookie porte le
  * choix mais le compte ne l'a pas (l'écriture du clic, tentée une fois, a échoué :
  * réseau coupé). Sans lui, le compte n'en saurait rien avant la prochaine
  * connexion — jusqu'à trente jours de modale sur les autres appareils. Même
  * règle que le report de `createSession` ; jamais attendu ni bloquant. Une
- * fois posé, le drapeau lu avec la session éteint le rattrapage. Rend `true`
- * si une écriture est partie.
+ * fois posé, le drapeau lu avec la session éteint le rattrapage ; d'ici là,
+ * au plus une tentative par compte et par
+ * {@link RECRUITMENT_MODAL_HEAL_WINDOW_MS}. Rend `true` si une écriture est
+ * partie.
  */
-export function healRecruitmentModalOff({
-  userId,
-  accountOff,
-  browserCookie,
-}: Readonly<{ userId: number | undefined; accountOff: boolean | undefined; browserCookie: string | undefined }>): boolean {
+export function healRecruitmentModalOff(
+  {
+    userId,
+    accountOff,
+    browserCookie,
+  }: Readonly<{ userId: number | undefined; accountOff: boolean | undefined; browserCookie: string | undefined }>,
+  now: number = Date.now(),
+): boolean {
   if (userId === undefined || accountOff === true || !recruitmentModalOffInBrowser(browserCookie)) return false;
+  if (healAttemptedRecently(userId, now)) return false;
   void recordRecruitmentModalOff(userId).catch((error) =>
     console.error("[recruitment] recruitment modal opt-out catch-up failed:", error),
   );
