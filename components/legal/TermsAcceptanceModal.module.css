@@ -59,7 +59,20 @@
   color: var(--ink);
 }
 
-/* « te déconnecter » : un geste dans la phrase des issues, souligné comme un lien. */
+/* Les liens de la phrase des issues (politique, profil) se distinguent du texte
+   autrement que par la couleur seule (WCAG 1.4.1) ; « te déconnecter », un
+   geste, est dessiné comme eux. */
+.text a {
+  color: var(--blue-300);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.text a:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+
 .textButton {
   display: inline;
   padding: 0;
