@@ -43,18 +43,27 @@ export async function requestAccountDeletion(
   previewed: ConfirmationSubject,
   fetchImpl: typeof fetch = fetch,
 ): Promise<AccountDeletionResult> {
+  let response: Response;
   try {
-    const response = await fetchImpl("/api/profile", { method: "DELETE" });
-    const payload = (await response.json()) as { error?: string } & Partial<AccountDeletionPlan>;
-    if (!response.ok) return { ok: false, code: payload.error || "ACCOUNT_DELETE_FAILED" };
-    // `reason` vaut `null` sur un effacement complet : c'est une réponse, pas
-    // une absence de réponse. Le `mode` sert donc de témoin — il dit que le
-    // serveur a bien répondu, là où un `??` sur le motif retomberait sur
-    // l'aperçu au moment précis où le serveur annonce qu'il n'a rien gardé.
-    return { ok: true, applied: payload.mode ? payload.reason ?? null : previewed };
+    response = await fetchImpl("/api/profile", { method: "DELETE" });
   } catch {
     return { ok: false, code: "ACCOUNT_DELETE_FAILED" };
   }
+  // Un 2xx dont le corps est illisible (coupé par un proxy) reste un **succès** :
+  // le compte est supprimé et la session fermée — annoncer un échec laissait la
+  // personne sur la fenêtre des conditions, et chaque nouvel essai répondait 401.
+  let payload: { error?: string } & Partial<AccountDeletionPlan> = {};
+  try {
+    payload = (await response.json()) as typeof payload;
+  } catch {
+    // Corps illisible : le statut seul tranche (un refus retombe sur le code générique).
+  }
+  if (!response.ok) return { ok: false, code: payload.error || "ACCOUNT_DELETE_FAILED" };
+  // `reason` vaut `null` sur un effacement complet : c'est une réponse, pas
+  // une absence de réponse. Le `mode` sert donc de témoin — il dit que le
+  // serveur a bien répondu, là où un `??` sur le motif retomberait sur
+  // l'aperçu au moment précis où le serveur annonce qu'il n'a rien gardé.
+  return { ok: true, applied: payload.mode ? payload.reason ?? null : previewed };
 }
 
 interface UseAccountDeletionOptions {

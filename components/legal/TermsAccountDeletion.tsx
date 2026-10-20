@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { useAccountDeletion } from "@/components/account/use-account-deletion";
 import { englishProfile } from "@/components/i18n/english-loader-profile";
 import type { PendingAccountDeletion } from "@/components/account/account-deletion-preview";
@@ -46,7 +46,11 @@ function TermsAccountDeletionFlow({ onClose, onReady, preview }: Readonly<TermsA
   // doit pas rejouer l'effet (et re-rendre la fenêtre) tant que la confirmation est ouverte.
   const onReadyRef = useRef(onReady);
   onReadyRef.current = onReady;
-  useEffect(() => {
+  // Avant la peinture (`useLayoutEffect`) : la minuterie de préparation de la
+  // fenêtre est levée dans le même rendu que la confirmation — un effet passif,
+  // joué après la peinture, laissait un instant où elle pouvait encore se
+  // déclencher et retirer une confirmation déjà affichée (clic perdu).
+  useLayoutEffect(() => {
     if (confirming) onReadyRef.current?.();
   }, [confirming]);
   // Montée par le clic : l'aperçu part une fois (le double effet du mode strict n'en lance pas deux).
