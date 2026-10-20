@@ -322,7 +322,11 @@ Rien de tout cela ne peut faire échouer une transaction du moteur.
   pas (match effacé entre-temps, engagé manquant) est ignorée.
 - `pushRefereeAlert` rend `null` quand le bot est injoignable : c'est un
   résultat, pas une exception — et un résultat **lu**, qui fait rendre la
-  réservation de l'escalade (voir ci-dessus).
+  réservation de l'escalade (voir ci-dessus) **sauf si le push a joint au moins
+  un arbitre** (`report.pushed > 0`) : l'alerte est alors remise, la réservation
+  gardée. Sans quoi, bot éteint, l'escalade d'un litige — qui, la saisie étant
+  verrouillée (`SCORE_DISPUTE_LOCK.md`), dure jusqu'à l'arbitrage — repartait à
+  chaque passage d'entretien, un push à chaque arbitre à chaque fois.
 - **Rôle arbitre non configuré** : le bot répond quand même 200 et se contente du
   log. Le site n'a rien de particulier à prévoir — et c'est bien la trace de
   l'incident qui compte, plus que le message privé.

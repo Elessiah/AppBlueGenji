@@ -130,8 +130,9 @@ d'office, exactement comme si l'autre l'avait confirmé.
   rien coûter d'autre que sa lecture (`TOURNAMENT_SYNC_SCOPE.md`).
 - **Notification** : après le commit (`auto-validated-notices.ts`, vidé avec
   `flushBotLogs`, jeté avec `discardBotLogs` ; avis envoyés **l'un après
-  l'autre**, sans plafond, pour qu'une ronde entière validée d'un coup n'occupe
-  qu'une connexion du pool), push « Score validé
+  l'autre** dans une file unique au processus, sans plafond, pour qu'une ronde
+  entière — ou plusieurs tournois d'un même balayage — n'occupe qu'une connexion
+  du pool), push « Score validé
   automatiquement » aux responsables de match des **deux** équipes
   (`notifyScoreAutoValidated`, sujet existant `SCORE_TO_CONFIRM`, rédacteur
   `scoreAutoValidatedPush`, FR + EN, sans nommer personne ni « l'autre équipe » :
