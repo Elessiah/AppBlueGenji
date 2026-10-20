@@ -129,7 +129,11 @@ d'office, exactement comme si l'autre l'avait confirmé.
   à la saisie + 2 h ; il a tourné au déploiement de la PR #453 (production,
   2026-10-20) et a été retiré ensuite, le nouveau code n'écrivant jamais
   d'échéance plus proche. Le seed des reports expirés date toujours sa saisie
-  de 2 h 10 (au-delà des deux heures).
+  de 2 h 10 (au-delà des deux heures). **Restauration d'une sauvegarde prise
+  avant ce déploiement** : ses reports seuls en attente reviennent avec
+  l'ancienne échéance — rejouer à la main l'`UPDATE bg_matches` de la PR #453
+  (`git show a457733d:lib/server/database/recent-schema-changes.ts`) avant de
+  rouvrir le site.
 - **Colonnes de clôture partagées** (`MATCH_RESULT_SET_SQL`,
   `score-report-sql.ts`) : la validation d'office et l'accord des deux engagés
   écrivent la même liste, `forfeit_team_id = NULL` compris — un forfait noté

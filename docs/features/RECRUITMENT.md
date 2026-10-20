@@ -205,7 +205,8 @@ annonces restent sur `/recrutement` et dans la banderole, qui n'est pas
 concernée. « Plus tard », Échap et le voile gardent leur règle (la modale
 revient pour une prioritaire neuve).
 
-- **Navigateur** : cookie `bg_recr_off=1` (un an, `sameSite=lax`), posé par
+- **Navigateur** : cookie `bg_recr_off=1` (un an, `sameSite=lax`, `Secure`
+  sous HTTPS — script comme serveur : jamais posé depuis une page en clair), posé par
   le client sur-le-champ **puis reposé par le serveur** (`Set-Cookie` de
   `POST /api/recruitment/modal-dismiss`, appelée connecté **ou non**) : Safari
   et tout navigateur iOS (ITP) bornent à sept jours un cookie posé par script,
@@ -262,7 +263,10 @@ revient pour une prioritaire neuve).
   succès (le cookie suivra au compte) ; non connecté, succès « … sur ce
   navigateur… » sans attendre le serveur ; cookie refusé au script et absent
   après la réponse (relu dans `document.cookie`), sans compte écrit : erreur
-  « Ce choix n'a pas pu être gardé… ».
+  « Ce choix n'a pas pu être gardé… ». Colonne absente (`503
+  RECRUITMENT_MODAL_ACCOUNT_UNAVAILABLE`, rattrapage éteint) : connecté, le
+  toast ne promet que « … sur ce navigateur… » (un 503 sans ce code, du proxy,
+  reste traité comme un 5xx).
 - Navigateur partagé : un cookie laissé par une personne non connectée est
   reporté sur le compte de qui se connecte ensuite sur ce navigateur (choix
   du lot : le report suit le navigateur, pas la personne).
@@ -338,7 +342,7 @@ ou que la source est déjà partie.
 | `DELETE /api/recruitment/[id]`     | admin  | Supprime une annonce |
 | `PUT /api/recruitment/reorder`     | admin  | Réordonne (`{ ids: number[] }`) — `409 RECRUITMENT_ORDER_MIXES_PRIORITIES` si l'ordre mêle les statuts |
 | `GET /api/recruitment/highlight`   | public | Mise en avant : `{ modal, banner }` (listes d'annonces) |
-| `POST /api/recruitment/modal-dismiss` | tous | « Ne plus afficher » : repose toujours le cookie `bg_recr_off` (`Set-Cookie`) ; connecté, l'écrit sur le compte (`{ account: true }`), sans session `{ account: false }` — `409 ACCOUNT_DELETED`, `500 RECRUITMENT_MODAL_DISMISS_FAILED` |
+| `POST /api/recruitment/modal-dismiss` | tous | « Ne plus afficher » : repose toujours le cookie `bg_recr_off` (`Set-Cookie`) ; connecté, l'écrit sur le compte (`{ account: true }`), sans session `{ account: false }` — `409 ACCOUNT_DELETED`, `503 RECRUITMENT_MODAL_ACCOUNT_UNAVAILABLE` (colonne absente), `500 RECRUITMENT_MODAL_DISMISS_FAILED` |
 
 Les mutations vérifient la session (`401` si anonyme, `403` si non-admin) et la
 validation partagée `validateRecruitmentAdInput` (`lib/shared/recruitment.ts`,
