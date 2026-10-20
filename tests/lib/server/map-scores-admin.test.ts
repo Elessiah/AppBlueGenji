@@ -30,6 +30,8 @@ function fakeConnection(matchFormat: { type: string; value: number }) {
         maps.push({ sql: q, params });
         return [[], []];
       }
+      // Suspension de la validation d'office (`admin-score-guards.test.ts`) : sans report seul ici, rien à suspendre.
+      if (q.startsWith("UPDATE bg_matches m SET m.score_validation_paused_at")) return [{ affectedRows: 0 }, []];
       if (q.startsWith("UPDATE")) {
         updates.push(params);
         return [{ affectedRows: 1 }, []];

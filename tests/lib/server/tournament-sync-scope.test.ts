@@ -6,6 +6,7 @@ import {
   findTournamentsNeedingSync,
 } from "@/lib/server/tournaments/sync-scope";
 import { STALLED_ALERT_KEY } from "@/lib/server/tournaments/bot-logs";
+import { AUTO_VALIDATION_RUNNING_SQL } from "@/lib/server/tournaments/score-report-sql";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { RESOLVABLE_BYE_SQL, RESOLVABLE_GHOST_SQL } from "@/lib/server/tournaments/byes";
 
@@ -165,7 +166,7 @@ describe("findTournamentsNeedingSync — entretien dû", () => {
   // jusqu'à l'arbitrage (3 tournois sur une base seedée).
   it("ne retient d'un report expiré que ce que la résolution peut faire avancer", async () => {
     const sql = (await maintenanceSql()).replace(/\s+/g, " ");
-    expect(sql).toContain(`AND (${SINGLE_REPORT_SQL} OR (${BOTH_REPORTED_SQL}`);
+    expect(sql).toContain(`AND ((${SINGLE_REPORT_SQL} AND ${AUTO_VALIDATION_RUNNING_SQL}) OR (${BOTH_REPORTED_SQL}`);
     expect(sql).toContain(
       `m.score_deadline_at <= NOW() - INTERVAL ${SCORE_REPORT_TIMEOUT_MINUTES} MINUTE`,
     );

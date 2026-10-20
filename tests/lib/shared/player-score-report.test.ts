@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   canOpenPlayerScoreDialog,
   pendingReportNotice,
+  pendingReportState,
   playerReportInitialScores,
   playerReportView,
   playerScoreButtonLabel,
@@ -192,6 +193,20 @@ describe("pendingReportNotice", () => {
     expect(
       pendingReportNotice({ ...base, scoreDeadlineAt: "2026-10-20T18:05:00.000Z", team2Report: report(0, 2) }),
     ).toBe("0 – 2 proposé par Bravo · validation automatique à 20:05 (heure de Paris) sans réponse");
+  });
+
+  // Suspendue par un « Enregistrer » d'arbitrage : l'heure ne vaut plus, elle n'est pas dite.
+  it("dit la validation d'office suspendue à la place de l'heure", () => {
+    const paused = { ...base, scoreDeadlineAt: "2026-10-20T18:05:00.000Z", scoreAutoValidationPaused: true, team2Report: report(0, 2) };
+    expect(pendingReportNotice(paused)).toBe("0 – 2 proposé par Bravo · validation automatique suspendue par l'arbitrage");
+    expect(pendingReportState(paused)).toMatchObject({ kind: "proposed", paused: true });
+    expect(pendingReportState({ ...paused, scoreAutoValidationPaused: false })).toMatchObject({ paused: false });
+  });
+
+  it("une suspension ne change rien à un litige", () => {
+    expect(
+      pendingReportNotice({ ...base, scoreAutoValidationPaused: true, team1Report: report(2, 0), team2Report: report(0, 2) }),
+    ).toBe("Score en litige · saisie verrouillée, arbitrage attendu");
   });
 
   it("annonce un désaccord sans prendre parti", () => {

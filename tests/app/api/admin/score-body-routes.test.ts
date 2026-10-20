@@ -26,7 +26,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
   jest.mocked(adminResolveMatch).mockResolvedValue(undefined);
-  jest.mocked(adminSaveMatchScores).mockResolvedValue(undefined);
+  jest.mocked(adminSaveMatchScores).mockResolvedValue(false);
 });
 
 async function errorOf(res: Response): Promise<string> {
@@ -42,13 +42,13 @@ describe.each(routes)("$name — lecture du corps", ({ call, service }) => {
   it("transmet le détail map par map avec l'arbitre courant", async () => {
     const res = await call({ maps: mapsFor(3, 1) });
     expect(res.status).toBe(200);
-    expect(service).toHaveBeenCalledWith(42, { maps: mapsFor(3, 1), userId: 3 });
+    expect(jest.mocked(service).mock.calls[0].slice(0, 2)).toEqual([42, { maps: mapsFor(3, 1), userId: 3 }]);
   });
 
   it("transmet un forfait nominatif, qui l'emporte sur les maps", async () => {
     const res = await call({ forfeitTeamId: "7", maps: mapsFor(2, 0) });
     expect(res.status).toBe(200);
-    expect(service).toHaveBeenCalledWith(42, { forfeitTeamId: 7 });
+    expect(jest.mocked(service).mock.calls[0].slice(0, 2)).toEqual([42, { forfeitTeamId: 7 }]);
   });
 
   it.each<[unknown]>([[0], [-2], [1.5], ["abc"]])("refuse le forfait %p", async (forfeitTeamId) => {

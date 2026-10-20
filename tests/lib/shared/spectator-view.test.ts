@@ -405,6 +405,7 @@ const MATCH_FIELDS = {
   replayUrl: "public",
   roundNumber: "public",
   scoreDeadlineAt: "public",
+  scoreAutoValidationPaused: "public",
   startAt: "public",
   status: "public",
   team1Id: "public",

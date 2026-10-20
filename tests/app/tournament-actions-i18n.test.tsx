@@ -604,6 +604,36 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     expect(render("en", dialog(10))).toContain("this score will be confirmed automatically at 14:30 (Paris time).");
   });
 
+  it("validation d'office suspendue par l'arbitrage : dite à la place de l'heure, partout (FR + EN)", () => {
+    const paused = {
+      ...versus,
+      status: "AWAITING_CONFIRMATION" as const,
+      team1Report: disputeReport(2, 1, "2026-05-05T10:00:00.000Z"),
+      scoreDeadlineAt: "2026-05-05T12:30:00.000Z",
+      scoreAutoValidationPaused: true,
+    };
+    const card = (locale: "fr" | "en") => renderPage(locale, <MatchRow match={paused} adminResolvable={false} onOpenAdminModal={noop} scoreLocked={false} roundNumber={2} />);
+    expect(card("fr")).toContain("2 – 1 proposé par Alpha · validation automatique suspendue par l&#x27;arbitrage");
+    expect(card("en")).toContain("2 – 1 proposed by Alpha · automatic confirmation paused by a referee");
+    for (const locale of ["fr", "en"] as const) expect(card(locale)).not.toContain("14:30");
+
+    const dialog = (myTeamId: number) => <PlayerScoreDialog tournamentId={1} match={paused} myTeamId={myTeamId} canReportScore canForfeit proposals={[]} onClose={noop} onSubmitted={noop} onRefresh={noop} />;
+    // Les deux camps : l'adversaire qui doit répondre (11) et le déclarant (10).
+    for (const myTeamId of [10, 11]) {
+      expect(render("fr", dialog(myTeamId))).toContain("Validation automatique suspendue par l&#x27;arbitrage : sans réponse, un arbitre validera le résultat.");
+      expect(render("en", dialog(myTeamId))).toContain("Automatic confirmation paused by a referee: with no answer, a referee will confirm the result.");
+      expect(render("fr", dialog(myTeamId))).not.toContain("14:30");
+      expectNoFrench(render("en", dialog(myTeamId)));
+    }
+
+    // L'arbitrage le lit aussi, sous l'avis de proposition.
+    const admin = (locale: "fr" | "en") => render(locale, <AdminScoreDialog match={paused} onClose={noop} onSubmitted={noop} />);
+    expect(admin("fr")).toContain("Validation automatique suspendue par l&#x27;arbitrage : sans réponse de l&#x27;adversaire, seul « Valider le résultat » tranche.");
+    expect(admin("en")).toContain("Automatic confirmation paused by a referee: without an answer from the opponent, only “Confirm the result” settles the match.");
+    // Sans suspension, l'avis n'en dit rien.
+    expect(render("fr", <AdminScoreDialog match={{ ...paused, scoreAutoValidationPaused: false }} onClose={noop} onSubmitted={noop} />)).not.toContain("suspendue");
+  });
+
   it("score (engagé) pendant l'envoi : boutons aria-disabled, jamais disabled natif (le focus reste)", () => {
     const source = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx"), "utf8");
     // Seuls les champs de maps (`MapScoreList`) se figent pendant l'envoi ; les boutons gardent le focus.

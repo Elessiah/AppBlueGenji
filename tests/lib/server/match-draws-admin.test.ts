@@ -274,6 +274,6 @@ describe("adminSaveMatchScores — un match nul est tranché", () => {
     // 1-1 pendant que le match se joue.
     await expect(
       adminSaveMatchScores(fakeConnection({ round: 3 }), 10, { maps: mapsFor(1, 1), userId: 1 }),
-    ).resolves.toBeUndefined();
+    ).resolves.toEqual(expect.any(Boolean));
   });
 });

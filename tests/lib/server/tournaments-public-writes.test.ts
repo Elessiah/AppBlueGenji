@@ -19,6 +19,7 @@ jest.mock("@/lib/server/tournaments/bg-survie/forfeit");
 jest.mock("@/lib/server/tournaments/bg-survie/penalties");
 jest.mock("@/lib/server/tournaments/phases");
 jest.mock("@/lib/server/tournaments/phases-repository");
+jest.mock("@/lib/server/tournaments/dispute-self-resolution");
 
 import {
   adminResolveMatchPublic,
@@ -63,6 +64,7 @@ import {
 import { reconcileEndurance } from "@/lib/server/tournaments/bg-survie/reconcile";
 import { reconcilePhases } from "@/lib/server/tournaments/phases";
 import { insertPhases } from "@/lib/server/tournaments/phases-repository";
+import { alertSelfResolvedDispute } from "@/lib/server/tournaments/dispute-self-resolution";
 import { connectionMock, fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 import { tournamentRow } from "../../helpers/tournament-rows";
 import { mapsFor } from "../../helpers/match-maps";
@@ -553,7 +555,83 @@ describe("adminResolveMatchPublic", () => {
     await expect(adminResolveMatchPublic(70, { maps: mapsFor(1, 0), userId: 1 })).rejects.toThrow("MATCH_NOT_FOUND");
 
     expect(adminResolveMatch).not.toHaveBeenCalled();
+    expect(alertSelfResolvedDispute).not.toHaveBeenCalled();
     expectRolledBack();
+  });
+
+  // Arbitre qui joue (`SCORE_DISPUTE_LOCK.md`) : le litige se lit sous verrou,
+  // l'alerte part après le commit, avec l'arbitre de la session.
+  const actor = { id: 9, pseudo: "Sifflet" };
+  const disputedHead = {
+    tournament_id: 8,
+    team1_id: 3,
+    team2_id: 4,
+    status: "AWAITING_CONFIRMATION",
+    team1_report_score: 2,
+    team2_report_score: 1,
+  };
+
+  it("lit le litige sous verrou, sans jointure, avant de trancher", async () => {
+    connection.execute.mockResolvedValue([[disputedHead], undefined]);
+
+    await adminResolveMatchPublic(70, { forfeitTeamId: 3 }, actor);
+
+    const [sql] = connection.execute.mock.calls[0];
+    expect(String(sql)).toMatch(/FROM bg_matches WHERE id = \? LIMIT 1 FOR UPDATE$/);
+    expect(String(sql)).not.toMatch(/JOIN/);
+    expect(order(connection.execute)).toBeLessThan(order(jest.mocked(adminResolveMatch)));
+  });
+
+  it("transmet un litige tranché à l'alerte, après le commit", async () => {
+    connection.execute.mockResolvedValue([[disputedHead], undefined]);
+
+    await adminResolveMatchPublic(70, { forfeitTeamId: 3 }, actor);
+
+    expect(alertSelfResolvedDispute).toHaveBeenCalledWith(
+      { matchId: 70, tournamentId: 8, team1Id: 3, team2Id: 4 },
+      actor,
+    );
+    expect(order(jest.mocked(alertSelfResolvedDispute))).toBeGreaterThan(order(connection.commit));
+  });
+
+  it("n'alerte personne hors litige (report seul ou aucun)", async () => {
+    for (const reports of [
+      { team1_report_score: 2, team2_report_score: null },
+      { team1_report_score: null, team2_report_score: null },
+    ]) {
+      connection.execute.mockResolvedValue([[{ ...disputedHead, ...reports }], undefined]);
+      await adminResolveMatchPublic(70, { forfeitTeamId: 3 }, actor);
+    }
+    expect(alertSelfResolvedDispute).not.toHaveBeenCalled();
+  });
+
+  it("n'alerte personne sur un match déjà tranché ni sans arbitre transmis", async () => {
+    connection.execute.mockResolvedValue([[{ ...disputedHead, status: "COMPLETED" }], undefined]);
+    await adminResolveMatchPublic(70, { forfeitTeamId: 3 }, actor);
+    connection.execute.mockResolvedValue([[disputedHead], undefined]);
+    await adminResolveMatchPublic(70, { forfeitTeamId: 3 });
+
+    expect(alertSelfResolvedDispute).not.toHaveBeenCalled();
+  });
+
+  it("n'alerte personne quand l'arbitrage est défait", async () => {
+    connection.execute.mockResolvedValue([[disputedHead], undefined]);
+    jest.mocked(adminResolveMatch).mockRejectedValueOnce(new Error("DRAW_NOT_ALLOWED"));
+
+    await expect(adminResolveMatchPublic(70, { forfeitTeamId: 3 }, actor)).rejects.toThrow("DRAW_NOT_ALLOWED");
+    expect(alertSelfResolvedDispute).not.toHaveBeenCalled();
+    expectRolledBack();
+  });
+});
+
+describe("adminSaveMatchScoresPublic — suspension de la validation d'office", () => {
+  it("rend ce que le moteur dit de la suspension", async () => {
+    connection.execute.mockResolvedValue([[{ tournament_id: 8 }], undefined]);
+
+    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce(true);
+    await expect(adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 })).resolves.toBe(true);
+    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce(false);
+    await expect(adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 })).resolves.toBe(false);
   });
 });
 
