@@ -56,6 +56,10 @@ même route, empilée sur la fenêtre — `ACCOUNT_DELETION.md`). La déconnexio
 (`useLogout`) reste un lien-bouton de la phrase des issues (« te
 déconnecter »). Les trois gestes s'excluent (`aria-disabled`, jamais
 `disabled` natif sous le focus).
+Le texte des conditions v6 et son entrée `PRIVACY_CHANGES`, déjà publiés,
+ne sont **pas** réécrits en place : ils citent toujours la déconnexion et la
+suppression depuis le profil (toujours offertes). La mention de la suppression
+depuis la fenêtre attend la prochaine version des conditions.
 Une session de 30 jours ne repasse pas par `/connexion` : c'est donc cette
 fenêtre qui atteint chaque compte. Les gestes de gestion restent en outre
 refusés en **409 `TERMS_ACCEPTANCE_REQUIRED`** côté serveur, et ce refus la
