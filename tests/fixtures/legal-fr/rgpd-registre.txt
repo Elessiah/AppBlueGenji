@@ -25,6 +25,7 @@ Afficher un profil public (pseudo, avatar, pseudos de jeu selon les réglages de
 Mettre les joueurs en relation (s'ajouter en jeu, recrutement d'équipe)
 Exporter ses données et supprimer son compte depuis « Mon profil »
 Rédiger les notifications push dans la langue du compte : celle de la page du site d'où part la dernière connexion (une connexion lancée d'ailleurs, ou par le bouton Google, Discord ou Blizzard depuis un navigateur qui ne l'indique pas (trop ancien, ou qui retire cette indication), ne la change pas ; français par défaut), ou celle choisie dans « Mon profil »
+Garder sur le compte le choix « Ne plus afficher » de la fenêtre des annonces de recrutement urgentes, pour qu'elle ne s'ouvre plus d'elle-même sur les autres appareils du joueur
 Base légale
 Exécution du service demandé par le joueur (contrat) pour le compte ; consentement pour les données facultatives que le joueur renseigne et choisit de rendre visibles ; exécution du service (contrat — conditions d'utilisation, « Contacts de match ») pour la lecture du BattleTag, même masqué, dans la seule fenêtre « Contacts » d'un match et dans sa fenêtre de lancement (registre T04) — masqué, il n'est lisible nulle part ailleurs, arbitres et administrateurs compris
 Personnes concernées

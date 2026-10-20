@@ -65,6 +65,10 @@ DonnéeChoix des messages privés de match
 FinalitéCoché par défaut : le bot t'écrit en privé pour l'horaire, les rappels et le retrait de tes matchs, si ton tag Discord est certifié ; décoché dans Mon profil (ton opposition), il ne le fait plus. Gardé dans ton intérêt légitime : c'est ce qui permet d'honorer ton opposition. Figure dans l'export de tes données, remis au défaut si le compte est anonymisé
 Base légaleIntérêt légitime
 ConservationDurée du compte
+DonnéeChoix « Ne plus afficher » du recrutement
+FinalitéNon par défaut : la fenêtre des annonces de recrutement urgentes s'ouvre d'elle-même. « Ne plus afficher » dans cette fenêtre : elle ne s'ouvre plus d'elle-même sur tes autres appareils (un choix fait sur ce navigateur avant la connexion y est reporté à la connexion ou à ta prochaine visite connectée). Figure dans l'export de tes données, remis au défaut si le compte est anonymisé
+Base légaleExécution du contrat
+ConservationDurée du compte
 DonnéeRésultats de tournois
 FinalitéHistorique compétitif, classements, palmarès
 Base légaleIntérêt légitime

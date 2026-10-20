@@ -133,6 +133,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Putting players in touch (adding each other in game, team recruitment)",
       "Exporting one's data and deleting one's account from “My profile”",
       "Writing push notifications in the account's language: the language of the site page the last login started from (a login started elsewhere, or a login through the Google, Discord or Blizzard button from a browser that does not tell (too old, or one that strips this information), does not change it; French by default), or the one chosen in “My profile”",
+      "Keeping on the account the “Don't show again” choice of the window of urgent recruitment announcements, so that it no longer opens on its own on the player's other devices",
     ],
     legalBasis:
       "Performance of the service requested by the player (contract) for the account; consent for the optional data the player fills in and chooses to make visible; performance of the service (contract — terms of use, “Match contacts”) for the BattleTag being read, even when hidden, only in a match's “Contacts” window and its launch window (record T04) — when hidden, it is readable nowhere else, referees and administrators included",
