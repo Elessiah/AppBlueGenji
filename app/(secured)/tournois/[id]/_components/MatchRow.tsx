@@ -21,7 +21,7 @@ import { usePlayerScore } from "../_lib/player-score-context";
 import { useIssueReport } from "../_lib/issue-report-context";
 import { useLiveControls } from "../_lib/live-context";
 import { useHighlightedMatch } from "../_lib/match-anchor-context";
-import { pendingScoreProposal } from "../_lib/score-form";
+import { singlePendingReport } from "../_lib/score-form";
 import { matchSideViews } from "../_lib/match-row-sides";
 import { launchStripControls } from "../_lib/launch-strip";
 import { matchCardActionList } from "../_lib/match-card-actions";
@@ -170,14 +170,10 @@ export const MatchRow = memo(function MatchRow({
   const team1Display = teamLabel(match.team1Name, localizedPlaceholder(text, match.team1Placeholder), side1.emptyLabel);
   const team2Display = teamLabel(match.team2Name, localizedPlaceholder(text, match.team2Placeholder), side2.emptyLabel);
 
-  // Suspendue par un « Enregistrer » : la saisie de l'arbitre efface la
-  // proposition (`pendingScoreProposal`), mais seul « Valider le résultat »
-  // tranche désormais — la carte garde l'appel à valider.
-  const adminScoreLabel = adminScoreButtonLabel(
-    actionText,
-    scoreEntryClosed,
-    pendingScoreProposal(match) !== null || match.scoreAutoValidationPaused === true,
-  );
+  // Une proposition seule attend, même quand l'arbitrage a déjà noté un
+  // avancement (suspendue ou non) : la carte garde l'appel à valider, et la
+  // fenêtre d'arbitrage permet de la reprendre (`singlePendingReport`).
+  const adminScoreLabel = adminScoreButtonLabel(actionText, scoreEntryClosed, singlePendingReport(match) !== null);
 
   // État de diffusion, calculé une fois ici : le bandeau d'horaire l'affiche,
   // le pied d'action en tire le bouton d'antenne — une seule minuterie.

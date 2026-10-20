@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { BracketMatch, TournamentGame } from "@/lib/shared/types";
+import type { BracketMatch, MatchScoreReport, TournamentGame } from "@/lib/shared/types";
 import { useMapError } from "../_lib/error-map";
 import { mapViolationText, scoreBlockerText, useDialogsText } from "../_lib/dialogs-text";
 import {
@@ -134,6 +134,23 @@ export function useScoreForm(
     setConflict(false);
   };
 
+  /**
+   * Reprendre la proposition d'une engagée — score et maps, codes de replay
+   * compris — quand le formulaire s'ouvre sur un avancement noté par
+   * l'arbitrage : « Valider le résultat » la confirme alors sans recopie.
+   */
+  const adoptReport = (report: MatchScoreReport) => {
+    const rows = progressiveMapRows(
+      matchFormat,
+      game,
+      report.maps.map(({ replayCode, team1Score, team2Score }) => ({ replayCode, team1Score, team2Score })),
+      ADMIN_MAP_RULES,
+    );
+    setMaps(rows);
+    setState((s) => ({ ...s, forfeitTeamId: undefined, doubleForfeit: undefined, ...scoresFromMaps(rows) }));
+    options.onMapsReset?.();
+  };
+
   // Le serveur ne rend qu'un code : la même règle, rejouée ici, retrouve le
   // champ qu'il désigne.
   const flagMapRefusal = (code: string, decisive: boolean) => {
@@ -247,6 +264,7 @@ export function useScoreForm(
     /** Le résultat enregistré a changé pendant qu'une saisie était en cours. */
     conflict,
     adoptStoredResult,
+    adoptReport,
     /** Une saisie est en cours, non enregistrée. */
     dirty: !sameScoreFormState(state, openingState()) || !sameMaps(maps, openingRows()),
     // Forfait nominatif et double forfait s'excluent : en choisir un retire
