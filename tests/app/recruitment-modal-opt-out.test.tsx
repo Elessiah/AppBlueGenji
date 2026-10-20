@@ -288,6 +288,16 @@ describe("rattrapage du compte depuis le cookie, à chaque page connectée", () 
     expect(layout).toContain("healRecruitmentModalOff({");
     expect(layout).toContain("accountOff: user?.recruitmentModalOff,");
   });
+
+  it("n'envoie pas les annonces de la modale à qui l'a refusée, et lit le cookie une fois", () => {
+    const layout = readSource("app/layout.tsx");
+    expect(layout).toContain("const modalAds = modalOptedOut ? [] : spotlight.modal;");
+    expect(layout).toContain("modalAds={modalAds}");
+    expect(layout).not.toContain("modalAds={spotlight.modal}");
+    // Sous `/en`, les textes ne partent que s'il reste une annonce à montrer.
+    expect(layout).toContain("spotlight.banner.length === 0 && modalAds.length === 0");
+    expect(layout.match(/cookieStore\.get\(RECRUITMENT_MODAL_OFF_COOKIE\)/g)).toHaveLength(1);
+  });
 });
 
 describe("cookies de la mise en avant — envoyés aussi quand la visite vient d'un autre site", () => {

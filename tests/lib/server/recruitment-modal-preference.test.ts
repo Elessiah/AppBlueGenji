@@ -4,6 +4,7 @@ jest.mock("@/lib/server/database");
 
 import { getDatabase } from "@/lib/server/database";
 import {
+  RECRUITMENT_MODAL_HEAL_WINDOW_MS,
   healRecruitmentModalOff,
   recordRecruitmentModalOff,
   recruitmentModalOff,
@@ -87,9 +88,39 @@ describe("healRecruitmentModalOff — le compte rattrape le cookie du navigateur
   it("n'est jamais bloquant : une panne de base est seulement journalisée", async () => {
     jest.mocked(getDatabase).mockRejectedValue(new Error("down"));
     const spy = jest.spyOn(console, "error").mockImplementation(() => undefined);
-    expect(healRecruitmentModalOff({ userId: 7, accountOff: false, browserCookie: "1" })).toBe(true);
+    expect(healRecruitmentModalOff({ userId: 8, accountOff: false, browserCookie: "1" })).toBe(true);
     await new Promise((resolve) => setImmediate(resolve));
     expect(spy).toHaveBeenCalled();
     spy.mockRestore();
+  });
+
+  it("au plus une tentative par compte et par fenêtre, même pages et onglets en rafale", async () => {
+    const execute = jest.fn<SqlQuery>().mockRejectedValue(new Error("Lock wait timeout exceeded"));
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    const spy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const heal = (userId: number, now: number) =>
+      healRecruitmentModalOff({ userId, accountOff: false, browserCookie: "1" }, now);
+    const t0 = 1_000_000_000_000;
+
+    expect(heal(21, t0)).toBe(true);
+    // Onglets restaurés au démarrage, rechargements : l'écriture en échec n'est pas relancée.
+    expect(heal(21, t0)).toBe(false);
+    expect(heal(21, t0 + RECRUITMENT_MODAL_HEAL_WINDOW_MS - 1)).toBe(false);
+    // Un autre compte n'attend pas celui-ci.
+    expect(heal(22, t0)).toBe(true);
+    // La fenêtre passée, une nouvelle tentative part.
+    expect(heal(21, t0 + RECRUITMENT_MODAL_HEAL_WINDOW_MS)).toBe(true);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(execute).toHaveBeenCalledTimes(3);
+    expect(spy).toHaveBeenCalledTimes(3);
+    spy.mockRestore();
+  });
+
+  it("ne compte pas comme tentative un appel qui n'écrivait rien", () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    const t0 = 2_000_000_000_000;
+    expect(healRecruitmentModalOff({ userId: 31, accountOff: true, browserCookie: "1" }, t0)).toBe(false);
+    expect(healRecruitmentModalOff({ userId: 31, accountOff: false, browserCookie: "1" }, t0)).toBe(true);
   });
 });

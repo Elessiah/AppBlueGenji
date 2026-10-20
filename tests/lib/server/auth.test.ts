@@ -171,6 +171,25 @@ describe("auth", () => {
       expect(carried(forged)).toEqual([]);
     });
 
+    it("le report ne rallonge pas la connexion : il part en même temps que le journal de connexion", async () => {
+      const { recordConnection } = await import("@/lib/server/connection-logs");
+      let releaseUpdate: () => void = () => undefined;
+      const execute = jest.fn<SqlQuery>((sql) =>
+        sql.includes("recruitment_modal_off")
+          ? new Promise((resolve) => {
+              releaseUpdate = () => resolve([{ affectedRows: 1 }, []]);
+            })
+          : Promise.resolve([{ affectedRows: 1 }, []]),
+      );
+      await setUp("1", execute);
+      const session = createSession(5, "LOGIN_GOOGLE");
+      await new Promise((resolve) => setImmediate(resolve));
+      // L'UPDATE du report est encore en vol, le journal est déjà parti.
+      expect(recordConnection).toHaveBeenCalledWith(5, "LOGIN_GOOGLE");
+      releaseUpdate();
+      await expect(session).resolves.toBeUndefined();
+    });
+
     it("n'empêche jamais la connexion quand le report échoue", async () => {
       const { recordConnection } = await import("@/lib/server/connection-logs");
       const execute = jest.fn<SqlQuery>(async (sql) => {
@@ -211,6 +230,60 @@ describe("auth", () => {
       jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: jest.fn<SqlQuery>().mockResolvedValue([[row], []]) }));
 
       expect((await getCurrentUser())?.recruitmentModalOff).toBe(false);
+    });
+
+    const unknownColumn = () =>
+      Object.assign(new Error("Unknown column 'u.recruitment_modal_off'"), { code: "ER_BAD_FIELD_ERROR" });
+    const plainRow = {
+      id: 3, pseudo: "P", avatar_url: null, discord_id: null, google_sub: null,
+      is_adult: 1, is_admin: 0, platform_roles_json: null,
+    };
+
+    it("colonne absente (migration en échec) : relit sans elle plutôt que de faire tomber la page", async () => {
+      const { getDatabase } = await import("@/lib/server/database");
+      const { cookies } = await import("next/headers");
+      jest.mocked(cookies).mockResolvedValue(fakeCookieStore({ get: jest.fn().mockReturnValue({ value: "tok" }) }));
+      const execute = jest.fn<SqlQuery>(async (sql) => {
+        if (sql.includes("recruitment_modal_off")) throw unknownColumn();
+        return [[plainRow], []];
+      });
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+      const user = await getCurrentUser();
+
+      expect(user?.id).toBe(3);
+      expect(user?.recruitmentModalOff).toBe(false);
+      expect(execute).toHaveBeenCalledTimes(2);
+      expect(String(execute.mock.calls[1][0])).toContain("FROM bg_user_sessions s");
+      expect(String(execute.mock.calls[1][0])).not.toContain("recruitment_modal_off");
+    });
+
+    it("toute autre erreur de base remonte, sans seconde lecture", async () => {
+      const { getDatabase } = await import("@/lib/server/database");
+      const { cookies } = await import("next/headers");
+      jest.mocked(cookies).mockResolvedValue(fakeCookieStore({ get: jest.fn().mockReturnValue({ value: "tok" }) }));
+      const execute = jest.fn<SqlQuery>().mockRejectedValue(
+        Object.assign(new Error("gone"), { code: "PROTOCOL_CONNECTION_LOST" }),
+      );
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+      await expect(getCurrentUser()).rejects.toThrow("gone");
+      expect(execute).toHaveBeenCalledTimes(1);
+    });
+
+    it("même repli pour l'utilisateur de développement (DEV_AUTH_USER_ID)", async () => {
+      const env = process.env as Record<string, string | undefined>;
+      env.NODE_ENV = "development";
+      env.DEV_AUTH_USER_ID = "3";
+      const { getDatabase } = await import("@/lib/server/database");
+      const execute = jest.fn<SqlQuery>(async (sql) => {
+        if (sql.includes("recruitment_modal_off")) throw unknownColumn();
+        return [[plainRow], []];
+      });
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+      expect((await getCurrentUser())?.recruitmentModalOff).toBe(false);
+      expect(execute).toHaveBeenCalledTimes(2);
     });
   });
 
