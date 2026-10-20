@@ -65,11 +65,11 @@ function writeSeenCookie(name: string, value: string, maxAge?: number): boolean 
 }
 
 /**
- * Où le « Ne plus afficher » a été gardé : ce navigateur seul (non connecté),
- * le compte, le navigateur faute de compte joignable, ou nulle part (cookie
- * refusé et pas de compte où l'écrire).
+ * Où le « Ne plus afficher » a été gardé : ce navigateur (non connecté), le
+ * compte (connecté — écrit, ou rattrapé à la page suivante), ou nulle part
+ * (cookie refusé et pas de compte écrit).
  */
-export type RecruitmentModalOptOutResult = "BROWSER" | "ACCOUNT" | "BROWSER_ONLY" | "NONE";
+export type RecruitmentModalOptOutResult = "BROWSER" | "ACCOUNT" | "NONE";
 
 /**
  * Écriture du « Ne plus afficher » au serveur, d'attente bornée : la modale est
@@ -93,8 +93,12 @@ function postOptOut(url: string): Promise<Response> {
  * tout `await`), puis appelle le serveur — **connecté ou non** : la réponse
  * repose le cookie par `Set-Cookie`, seul moyen de lui garder un an sous
  * Safari / iOS, qui borne à sept jours un cookie posé par script (ITP) ; et,
- * connecté, la route écrit le choix sur le compte. Les dépendances sont
- * injectables pour les tests (Jest tourne sans DOM).
+ * connecté, la route écrit le choix sur le compte. Une écriture du compte qui
+ * échoue n'est **pas** un échec pour le lecteur : le cookie posé, la mise en
+ * page racine la rattrape à la page connectée suivante
+ * (`healRecruitmentModalOff`). Une seule tentative attendue, donc un toast au
+ * plus `OPT_OUT_TIMEOUT_MS` après le clic. Les dépendances sont injectables
+ * pour les tests (Jest tourne sans DOM).
  */
 export async function recordRecruitmentModalOptOut(
   signedIn: boolean,
@@ -103,76 +107,48 @@ export async function recordRecruitmentModalOptOut(
     post = postOptOut,
     cookieKept = optOutCookieKept,
     wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
-    now = Date.now,
   }: Readonly<{
     writeCookie?: (name: string, value: string, maxAge?: number) => boolean;
     post?: (url: string) => Promise<Pick<Response, "ok" | "status" | "json">>;
     /** Relu après la réponse : son `Set-Cookie` peut avoir gardé le choix là où le script a été refusé. */
     cookieKept?: () => boolean;
     wait?: (ms: number) => Promise<void>;
-    now?: () => number;
   }> = {},
 ): Promise<RecruitmentModalOptOutResult> {
   const written = writeCookie(RECRUITMENT_MODAL_OFF_COOKIE, RECRUITMENT_MODAL_OFF_VALUE, RECRUITMENT_MODAL_OFF_MAX_AGE);
-  // Cookie posé par le script : l'issue hors compte est acquise. Refusé, seul
-  // le `Set-Cookie` de la réponse peut encore le garder — relu après elle.
-  const kept = () => written || cookieKept();
-  // Une seconde tentative après un court délai (bascule Wi-Fi / 4G,
-  // redémarrage du serveur), quand la première n'a pas abouti : réseau, délai
-  // dépassé ou réponse 5xx (un 502 du proxy ne repose pas le cookie). Sous
-  // Safari / iOS, seul ce `Set-Cookie` garde le choix au-delà de sept jours.
-  // En arrière-plan quand le toast est déjà acquis (non connecté, cookie du
-  // script posé) ; **attendue** sinon, pour que le toast dise l'issue réelle.
-  const retryLater = () => {
-    wait(OPT_OUT_RETRY_DELAY_MS)
-      .then(() => post(OPT_OUT_URL))
-      .catch(() => undefined);
-  };
   if (!signedIn && written) {
     // Le cookie du script tient : le serveur ne fait que le renouveler, le
     // toast n'attend pas (une connexion faite depuis dans un autre onglet
     // garderait aussi le choix sur le compte ; le toast « ce navigateur » dit
-    // alors moins que vrai, jamais faux).
-    post(OPT_OUT_URL).then(
-      (response) => {
-        if (response.status >= 500) retryLater();
-      },
-      retryLater,
-    );
+    // alors moins que vrai, jamais faux). Une seconde tentative, en
+    // arrière-plan et 2 s plus tard (bascule Wi-Fi / 4G, redémarrage), si la
+    // première n'aboutit pas — réseau, délai dépassé ou 5xx (un 502 du proxy
+    // ne repose pas le cookie).
+    const retryLater = () => {
+      wait(OPT_OUT_RETRY_DELAY_MS)
+        .then(() => post(OPT_OUT_URL))
+        .catch(() => undefined);
+    };
+    post(OPT_OUT_URL).then((response) => {
+      if (response.status >= 500) retryLater();
+    }, retryLater);
     return "BROWSER";
   }
-  const attempt = async (): Promise<"ACCOUNT" | "GONE" | "FAILED"> => {
-    try {
-      const response = await post(OPT_OUT_URL);
-      // Plus de compte derrière la page depuis son chargement — session finie
-      // (expirée, déconnexion dans un autre onglet : `account: false`) ou
-      // compte supprimé (409) : le lecteur est hors connexion, ce n'est pas un
-      // échec ; le cookie reportera le choix au compte à la prochaine connexion.
-      if (response.status === 409) return "GONE";
-      if (!response.ok) return "FAILED";
-      return ((await response.json()) as { account?: unknown }).account === true ? "ACCOUNT" : "GONE";
-    } catch {
-      return "FAILED";
-    }
-  };
-  const startedAt = now();
-  let account = await attempt();
-  if (account === "FAILED") {
-    // Un seul budget d'attente pour le toast : la seconde tentative n'est
-    // attendue que si la première a échoué vite (coupure, 5xx). Abandonnée au
-    // bout du délai, elle part en arrière-plan — un toast vingt secondes après
-    // le clic arriverait sur une autre page, sans lien visible avec le geste.
-    if (now() - startedAt >= OPT_OUT_TIMEOUT_MS / 2) {
-      retryLater();
-    } else {
-      await wait(OPT_OUT_RETRY_DELAY_MS);
-      account = await attempt();
-    }
+  let account = false;
+  try {
+    const response = await post(OPT_OUT_URL);
+    // 409 (compte supprimé depuis le chargement) ou `account: false` (session
+    // finie, déconnexion dans un autre onglet) : hors connexion, le cookie
+    // reportera le choix au compte à la prochaine connexion.
+    if (response.ok) account = ((await response.json()) as { account?: unknown }).account === true;
+  } catch {
+    // Réseau, délai dépassé : le cookie décide de l'issue, ci-dessous.
   }
-  if (account === "ACCOUNT") return "ACCOUNT";
-  if (!kept()) return "NONE";
-  // Un échec n'est « compte injoignable » que pour qui se croyait connecté.
-  return account === "FAILED" && signedIn ? "BROWSER_ONLY" : "BROWSER";
+  if (account) return "ACCOUNT";
+  // Refusé au script, le cookie a pu être posé par le `Set-Cookie` de la réponse.
+  if (!written && !cookieKept()) return "NONE";
+  // Connecté, compte non écrit : rattrapé à la page suivante, depuis le cookie.
+  return signedIn ? "ACCOUNT" : "BROWSER";
 }
 
 /** Le cookie « Ne plus afficher » est-il lisible sur ce navigateur ? */
@@ -187,15 +163,13 @@ function optOutCookieKept(): boolean {
 /** Clé du toast qui rend compte d'un « Ne plus afficher » : chaque issue dit où le choix a été gardé. */
 export function recruitmentOptOutToast(result: RecruitmentModalOptOutResult): Readonly<{
   kind: "success" | "error";
-  key: "dontShowAgainDone" | "dontShowAgainDoneBrowser" | "dontShowAgainFailed" | "dontShowAgainUnsaved";
+  key: "dontShowAgainDone" | "dontShowAgainDoneBrowser" | "dontShowAgainUnsaved";
 }> {
   switch (result) {
     case "ACCOUNT":
       return { kind: "success", key: "dontShowAgainDone" };
     case "BROWSER":
       return { kind: "success", key: "dontShowAgainDoneBrowser" };
-    case "BROWSER_ONLY":
-      return { kind: "error", key: "dontShowAgainFailed" };
     default:
       return { kind: "error", key: "dontShowAgainUnsaved" };
   }
