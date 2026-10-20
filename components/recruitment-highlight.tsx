@@ -110,9 +110,14 @@ export async function recordRecruitmentModalOptOut(
   // Cookie posé par le script : l'issue hors compte est acquise. Refusé, seul
   // le `Set-Cookie` de la réponse peut encore le garder — relu après elle.
   const kept = () => written || cookieKept();
-  // Non connecté au rendu, la réponse est lue quand même : une connexion faite
-  // depuis dans un autre onglet envoie sa session, et le choix est alors sur
-  // le compte — le toast doit le dire.
+  if (!signedIn && written) {
+    // Le cookie du script tient : le serveur ne fait que le renouveler, le
+    // toast n'attend pas (une connexion faite depuis dans un autre onglet
+    // garderait aussi le choix sur le compte ; le toast « ce navigateur » dit
+    // alors moins que vrai, jamais faux).
+    post(OPT_OUT_URL).catch(() => undefined);
+    return "BROWSER";
+  }
   let account: "ACCOUNT" | "GONE" | "FAILED";
   try {
     const response = await post(OPT_OUT_URL);
