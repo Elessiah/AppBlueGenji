@@ -690,6 +690,29 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     // Sans maps proposées, rien à reprendre : pas de bouton.
     const bare = { ...match, team1Report: { ...match.team1Report, maps: [] } };
     expect(render("fr", <AdminScoreDialog match={bare} onClose={noop} onSubmitted={noop} />)).not.toContain("Reprendre la proposition");
+    // Détail encore en lecture (aucune proposition chargée) : dit, plutôt qu'un panneau muet.
+    expect(render("fr", <AdminScoreDialog match={bare} proposals={[]} onClose={noop} onSubmitted={noop} />)).toContain("Lecture du détail des maps proposé…");
+    expect(render("en", <AdminScoreDialog match={bare} proposals={[]} onClose={noop} onSubmitted={noop} />)).toContain("Loading the proposed map details…");
+    // Inactif à l'œil pendant un envoi (aria-disabled), sans `opacity`.
+    const css = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/ScoreDialog.module.css"), "utf8");
+    expect(css).toMatch(/\.conflictAction\[aria-disabled="true"\] \{[^}]*cursor: not-allowed;[^}]*color: var\(--ink-soft/);
+  });
+
+  it("proposition pré-remplie, intacte : « Enregistrer » prévient AVANT le clic qu'il suspend la validation (FR + EN)", () => {
+    const fresh = {
+      ...versus,
+      status: "AWAITING_CONFIRMATION" as const,
+      team1Report: { team1Score: 2, team2Score: 1, maps: [], reportedAt: "2026-05-05T10:00:00.000Z" },
+      scoreDeadlineAt: "2026-05-05T12:30:00.000Z",
+      scoreAutoValidationPaused: false,
+    };
+    const admin = (locale: "fr" | "en") => render(locale, <AdminScoreDialog match={fresh} onClose={noop} onSubmitted={noop} />);
+    expect(admin("fr")).toContain("Vérifie-le puis valide le résultat pour le confirmer.");
+    expect(admin("fr")).toContain("« Enregistrer » suspend la validation automatique de la proposition de Alpha : seul « Valider le résultat » tranche alors, à moins que Bravo ne la confirme.");
+    expect(admin("en")).toContain("“Save” pauses the automatic confirmation of Alpha&#x27;s proposal: only “Confirm the result” then settles the match, unless Bravo confirms it.");
+    expectNoFrench(admin("en"));
+    // Aucune proposition : aucun avertissement.
+    expect(render("fr", <AdminScoreDialog match={versus} onClose={noop} onSubmitted={noop} />)).not.toContain("« Enregistrer » suspend");
   });
 
   it("score (engagé) pendant l'envoi : boutons aria-disabled, jamais disabled natif (le focus reste)", () => {
