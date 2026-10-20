@@ -738,7 +738,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     subPurposes: [
       "Départ de ses matchs, score à confirmer ou validé automatiquement faute de réponse, coup d'envoi d'un tournoi, horaires de match (posés, changés ou retirés) et rappels de match",
       "Demandes d'adhésion à une équipe qu'il gère, signalements et décisions de modération le concernant, changements de la politique de données",
-      "Alertes d'arbitrage, matchs planifiés, programme d'arbitrage et alertes de modération pour le staff qui détient ces rôles",
+      "Alertes d'arbitrage, litiges tranchés par un membre du staff qui joue le match, matchs planifiés, programme d'arbitrage et alertes de modération pour le staff qui détient ces rôles",
     ],
     legalBasis: "Consentement (activation sur chaque appareil, retirable à tout moment, sujet par sujet)",
     dataSubjects: ["Joueurs inscrits qui activent les notifications sur un appareil"],
