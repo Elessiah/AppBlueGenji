@@ -743,6 +743,20 @@ describe("forfeitTournamentTeamPublic — litige clos par un abandon forcé", ()
     expectRolledBack();
   });
 
+  it("rejoue un abandon annulé par un interblocage, et n'alerte qu'une fois", async () => {
+    const deadlock = Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK" });
+    connection.execute.mockResolvedValueOnce([[{ id: 70, team1_id: 3, team2_id: 4 }], undefined]);
+    connection.execute.mockResolvedValueOnce([[{ format: "SWISS" }], undefined]);
+    jest.mocked(forfeitSwissTeam).mockRejectedValueOnce(deadlock);
+    script([{ id: 70, team1_id: 3, team2_id: 4 }], [{ id: 70 }]);
+
+    await forfeitTournamentTeamPublic(5, 3, null, actor);
+
+    expect(forfeitSwissTeam).toHaveBeenCalledTimes(2);
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
+    expect(alertSelfResolvedDispute).toHaveBeenCalledTimes(1);
+  });
+
   it("sans litige ouvert, ni lecture des issues ni alerte", async () => {
     connection.execute.mockResolvedValueOnce([[], undefined]);
     connection.execute.mockResolvedValueOnce([[{ format: "SWISS" }], undefined]);

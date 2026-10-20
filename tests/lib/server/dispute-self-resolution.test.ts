@@ -157,9 +157,14 @@ describe("alertSelfResolvedDispute", () => {
 
   it("ne lève jamais : l'arbitrage est acquis, une alerte perdue ne le défait pas", async () => {
     execute.mockRejectedValue(new Error("ECONNRESET"));
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
 
     await expect(alertSelfResolvedDispute(dispute, actor)).resolves.toBe(false);
     expect(notifyStaff).not.toHaveBeenCalled();
+    // Ni alerte ni journal : une trace pm2 garde la manche et l'auteur (par son id).
+    expect(String(error.mock.calls[0][0])).toContain("match #70, auteur #9");
+    expect(String(error.mock.calls[0][0])).not.toContain("Sifflet");
+    error.mockRestore();
   });
 
   it("se tait si la manche a disparu entre-temps", async () => {
