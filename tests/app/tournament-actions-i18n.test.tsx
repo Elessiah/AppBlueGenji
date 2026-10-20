@@ -554,7 +554,10 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     expect(source).toContain("onOwnSettle={markOwnSettle}");
     const dialogSource = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx"), "utf8");
     expect(dialogSource.match(/onOwnSettle\?\.\(true\);/g)).toHaveLength(2);
-    expect(dialogSource.match(/onOwnSettle\?\.\(code === "MATCH_ALREADY_COMPLETED"\);/g)).toHaveLength(2);
+    expect(dialogSource.match(/onOwnSettle\?\.\(ownSettleAfterFailure\(refusedCode\)\);/g)).toHaveLength(2);
+    // Sans code rendu (réseau coupé, 502), l'issue est inconnue : pas d'avis « tranché par un autre ».
+    expect(dialogSource).toContain('return refusedCode === null || refusedCode === "MATCH_ALREADY_COMPLETED";');
+    expect(dialogSource.match(/refusedCode = payload\.error \?\? null;/g)).toHaveLength(2);
     const frA = JSON.parse(readFileSync(join(process.cwd(), "messages/fr/tournamentActions.json"), "utf8"));
     const enA = JSON.parse(readFileSync(join(process.cwd(), "messages/en/tournamentActions.json"), "utf8"));
     expect(frA.cardActions.playerScoreSettled).toBe("Ce match vient d'être tranché : la fenêtre de score s'est refermée.");
