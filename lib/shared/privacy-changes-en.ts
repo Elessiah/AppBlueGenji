@@ -478,6 +478,16 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "The announcements stay on the Recruitment page and in the banner; “Later” does not change: the window comes back for an urgent announcement you have not seen yet.",
     ],
   },
+  "2026-10-arbitre-qui-joue-le-match": {
+    title: "Referee who plays in the match: the rest of the staff warned",
+    summary:
+      "When a staff member who plays in a match settles its score dispute, corrects its result, imposes their opponent's withdrawal or pauses its automatic confirmation, the other staff members are warned, and the action is recorded in the staff activity log.",
+    details: [
+      "The alert goes as a push notification to the other referees and administrators who turned it on (topic “Refereeing by a staff player”, which you can turn off in “My profile”), never to the author. It gives the tournament, the round and the retained outcome (none for a pause), with the team names (none in a solo tournament), without the username of the author or of any player.",
+      "The staff activity log gives on Discord only the tournament and the kind of action, unnamed; the server logs also keep the round, the outcome, and the username and account ID of its author.",
+    ],
+    linkLabels: ["Read the “Push notifications” section", "Read the “Exercising your rights” section"],
+  },
 };
 
 /**
