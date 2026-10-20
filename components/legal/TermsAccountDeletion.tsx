@@ -2,7 +2,8 @@
 
 import { useEffect, useRef } from "react";
 import { useAccountDeletion } from "@/components/account/use-account-deletion";
-import { englishProfile } from "@/components/i18n/english-loaders-account";
+import { englishProfile } from "@/components/i18n/english-loader-profile";
+import type { PendingAccountDeletion } from "@/components/account/account-deletion-preview";
 import { useAppLocale } from "@/components/i18n/locale-context";
 import { ProfileTextProvider, useProfileText } from "@/components/i18n/profile-text";
 import { useEnglishMessagesUntilRemount } from "@/components/i18n/use-english-messages";
@@ -12,6 +13,8 @@ export interface TermsAccountDeletionProps {
   onClose: () => void;
   /** La confirmation s'ouvre : le bouton de la fenêtre quitte son libellé d'attente. */
   onReady?: () => void;
+  /** L'aperçu, lancé par la fenêtre au clic (en parallèle du chargement de ce code). */
+  preview?: Promise<PendingAccountDeletion>;
 }
 
 /**
@@ -25,18 +28,18 @@ export interface TermsAccountDeletionProps {
  * l'espace `profile`, que la mise en page racine ne sert pas — l'anglais est
  * chargé ici sous `/en` (un échec retombe sur le français).
  */
-export function TermsAccountDeletion({ onClose, onReady }: Readonly<TermsAccountDeletionProps>) {
+export function TermsAccountDeletion({ onClose, onReady, preview }: Readonly<TermsAccountDeletionProps>) {
   const locale = useAppLocale();
   const english = useEnglishMessagesUntilRemount(locale, englishProfile);
   if (english.waiting) return null;
   return (
     <ProfileTextProvider locale={locale} messages={english.english ?? undefined}>
-      <TermsAccountDeletionFlow onClose={onClose} onReady={onReady} />
+      <TermsAccountDeletionFlow onClose={onClose} onReady={onReady} preview={preview} />
     </ProfileTextProvider>
   );
 }
 
-function TermsAccountDeletionFlow({ onClose, onReady }: Readonly<TermsAccountDeletionProps>) {
+function TermsAccountDeletionFlow({ onClose, onReady, preview }: Readonly<TermsAccountDeletionProps>) {
   const text = useProfileText();
   const { start, dialog, confirming } = useAccountDeletion({ text, onCancel: onClose, layer: "overBlocking" });
   // Lu par une ref : la fenêtre passe un rappel neuf à chaque rendu, qui ne
@@ -51,7 +54,7 @@ function TermsAccountDeletionFlow({ onClose, onReady }: Readonly<TermsAccountDel
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    void start();
-  }, [start]);
+    void start(preview);
+  }, [start, preview]);
   return <>{dialog}</>;
 }

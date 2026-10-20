@@ -10,7 +10,8 @@ import {
   deletionOutcomeText,
   type ProfileText,
 } from "@/app/(secured)/profil/_lib/profile-text";
-import { RETENTION_UNKNOWN, type AccountDeletionPlan, type ConfirmationSubject } from "@/lib/shared/account-deletion";
+import type { AccountDeletionPlan, ConfirmationSubject } from "@/lib/shared/account-deletion";
+import { previewAccountDeletion, type PendingAccountDeletion } from "./account-deletion-preview";
 import { localeHref } from "@/lib/shared/locales";
 
 /**
@@ -22,61 +23,14 @@ import { localeHref } from "@/lib/shared/locales";
  * qui ferme la session), même issue (toast puis accueil, rechargé).
  */
 
-/** Ce que la modale annonce (`subject`) et ce que l'aperçu a répondu (`previewed`). */
-export interface PendingAccountDeletion {
-  subject: ConfirmationSubject;
-  previewed: ConfirmationSubject;
-}
+export {
+  ACCOUNT_DELETION_PREVIEW_TIMEOUT_MS,
+  previewAccountDeletion,
+  type PendingAccountDeletion,
+} from "./account-deletion-preview";
 
 /** Délai entre le toast de réussite et le retour à l'accueil (le temps de le lire). */
 export const ACCOUNT_DELETED_REDIRECT_MS = 1200;
-
-/** Au-delà, l'aperçu est abandonné : la confirmation s'ouvre sans lui. */
-export const ACCOUNT_DELETION_PREVIEW_TIMEOUT_MS = 8000;
-
-/**
- * Le motif est demandé avant la confirmation : « effacé » et « anonymisé »
- * ne sont pas la même promesse, et « tes statistiques restent » ne veut
- * rien dire à qui n'en a aucune. Le serveur repose la question à l'écriture
- * — ceci informe, cela tranche.
- *
- * Tant que l'aperçu n'a pas répondu, l'écran ne sait **rien** — pas même
- * lequel des deux modes s'appliquera. Il partait d'une hypothèse
- * (`TOURNAMENTS`), qu'il gardait quand la requête échouait : le joueur
- * consentait alors à devenir anonyme et pouvait être effacé entièrement.
- * Sur un geste irréversible, on décrit l'incertitude plutôt que d'inventer
- * la moitié rassurante.
- *
- * `previewed` part de la **même** valeur que `subject`, et non de `null` :
- * sur ce type, `null` n'est pas « je ne sais pas » mais « il ne restera
- * rien ». Initialisé à `null`, un aperçu en échec faisait annoncer un
- * effacement complet dès que la réponse du serveur devenait illisible.
- */
-export async function previewAccountDeletion(fetchImpl: typeof fetch = fetch): Promise<PendingAccountDeletion> {
-  let subject: ConfirmationSubject = RETENTION_UNKNOWN;
-  let previewed: ConfirmationSubject = RETENTION_UNKNOWN;
-  // Borné : un aperçu qui ne répond jamais (réseau mobile instable) laissait
-  // la fenêtre bloquante des conditions sans aucune issue — tous ses gestes
-  // désarmés le temps de la préparation. Passé le délai, la requête est
-  // **coupée** et la confirmation s'ouvre sur la phrase de l'incertitude.
-  // `AbortController` + minuterie plutôt que `AbortSignal.timeout`, absent
-  // avant Safari 16 : là, chaque essai abandonné laissait une requête ouverte,
-  // et quelques essais épuisaient les connexions HTTP/1.1 du site (flux compris).
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), ACCOUNT_DELETION_PREVIEW_TIMEOUT_MS);
-  try {
-    const preview = await fetchImpl("/api/profile/deletion", { cache: "no-store", signal: controller.signal });
-    if (preview.ok) {
-      previewed = ((await preview.json()) as AccountDeletionPlan).reason;
-      subject = previewed;
-    }
-  } catch {
-    // Injoignable ou coupé : la phrase qui ne promet ni conservation ni effacement.
-  } finally {
-    clearTimeout(timer);
-  }
-  return { subject, previewed };
-}
 
 export type AccountDeletionResult = { ok: true; applied: ConfirmationSubject } | { ok: false; code: string };
 
@@ -117,8 +71,12 @@ export interface AccountDeletionFlow {
   deleting: boolean;
   /** Confirmation ouverte. */
   confirming: boolean;
-  /** Lance l'aperçu puis ouvre la confirmation (ignoré si déjà en cours). */
-  start: () => Promise<void>;
+  /**
+   * Lance l'aperçu puis ouvre la confirmation (ignoré si déjà en cours).
+   * `preview` : un aperçu déjà parti (la fenêtre des conditions le lance au
+   * clic, en même temps que le chargement de ce code) — sinon il part ici.
+   */
+  start: (preview?: Promise<PendingAccountDeletion>) => Promise<void>;
   /** La confirmation, à rendre par l'écran (`null` fermée). */
   dialog: ReactNode;
 }
@@ -135,7 +93,7 @@ export function useAccountDeletion({ text, onCancel, layer = "default" }: UseAcc
   // injoignable) : la modale et ses toasts le disent (`lang="fr"`), sa coquille reste française.
   const contentLang = text.locale === "fr" && pageLocale !== "fr" ? "fr" : undefined;
 
-  const start = async () => {
+  const start = async (preview?: Promise<PendingAccountDeletion>) => {
     // Le bouton se ferme **avant** l'aller-retour d'aperçu, et non après la
     // confirmation : un `await` posé devant la question rouvrirait la fenêtre
     // — deux clics, deux confirmations, deux `DELETE`, dont le second échoue
@@ -143,7 +101,7 @@ export function useAccountDeletion({ text, onCancel, layer = "default" }: UseAcc
     // l'annulation de la modale.
     if (deleting) return;
     setDeleting(true);
-    setPendingDeletion(await previewAccountDeletion());
+    setPendingDeletion(await (preview ?? previewAccountDeletion()));
   };
 
   /** Joué par la modale : rend `false` sur un refus, qui la laisse ouverte. */

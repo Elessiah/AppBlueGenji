@@ -2,7 +2,7 @@
 
 import type { ProfileMessages } from "./profile-text";
 import { primeEnglish } from "./english-loaders";
-import { englishProfile } from "./english-loaders-account";
+import { englishProfile } from "./english-loader-profile";
 import { createScopedTextSlot, type ScopedTextProvider } from "./scoped-text-context";
 
 /**

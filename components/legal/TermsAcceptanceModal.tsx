@@ -21,6 +21,7 @@ import { termsModalSilencedOn } from "@/lib/shared/global-modals";
 import { onceLoader, preloadMissing } from "@/lib/shared/lazy-component";
 import { englishProfile } from "@/components/i18n/english-loader-profile";
 import type { TermsAccountDeletionProps } from "./TermsAccountDeletion";
+import { previewAccountDeletion, type PendingAccountDeletion } from "@/components/account/account-deletion-preview";
 import styles from "./TermsAcceptanceModal.module.css";
 
 /** Échap et le voile ne ferment pas une fenêtre bloquante. */
@@ -115,6 +116,8 @@ export function TermsAcceptanceModal({
   const [DeletionFlow, setDeletionFlow] = useState<ComponentType<TermsAccountDeletionProps> | null>(null);
   /** Le lancement en cours : un chargement qui répond après un abandon (délai, fenêtre tue) est ignoré. */
   const deletionAttempt = useRef(0);
+  /** L'aperçu de la tentative en cours, lancé au clic avec le chargement du code. */
+  const deletionPreview = useRef<Promise<PendingAccountDeletion> | undefined>(undefined);
   const deleteButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => setMounted(true), []);
@@ -172,7 +175,9 @@ export function TermsAcceptanceModal({
     setDeletionOpen(true);
     deletionAttempt.current += 1;
     const attempt = deletionAttempt.current;
-    // Ensemble : les textes anglais n'attendent pas le code (`TermsAccountDeletion` les relira, déjà là).
+    // Ensemble : ni l'aperçu ni les textes anglais n'attendent le code
+    // (`TermsAccountDeletion` reprend l'aperçu en vol et relit les textes, déjà là).
+    deletionPreview.current = previewAccountDeletion();
     if (locale === "en") englishProfile.load().catch(() => undefined);
     termsDeletionLoader.load().then(
       (flow) => {
@@ -333,6 +338,7 @@ export function TermsAcceptanceModal({
         </output>
         {deletionOpen && DeletionFlow ? (
           <DeletionFlow
+            preview={deletionPreview.current}
             onReady={() => setDeletionReady(true)}
             onClose={() => {
               setDeletionOpen(false);
