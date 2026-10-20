@@ -19,7 +19,10 @@ import { matchRoundLabel } from "@/lib/shared/discord-notifications";
 import { discordInline } from "@/lib/shared/discord-text";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 import type { StaffActor } from "@/lib/shared/log-privacy";
+import type { Locale } from "@/lib/shared/locales";
+import type { PushContent } from "@/lib/shared/push-notifications";
 import {
+  selfCorrectedResultPush,
   selfPausedValidationPush,
   selfResolvedDisputePush,
   selfResolvedOutcomeText,
@@ -134,6 +137,16 @@ async function loadAlertMatch(match: DisputeBeforeResolution): Promise<SelfResol
 }
 
 /**
+ * Ligne du journal Discord d'une correction de résultat acquis (français) :
+ * mêmes règles que le litige tranché.
+ */
+export function selfCorrectedResultLog(input: SelfResolvedDispute): string {
+  const round = matchRoundLabel(input.bracket, input.roundNumber, input.swiss);
+  const outcome = selfResolvedOutcomeText(input, "fr", discordInline);
+  return `⚠️ Résultat corrigé par un membre du staff qui joue ce match · « ${discordInline(input.tournamentName)} », ${round} : ${outcome}.`;
+}
+
+/**
  * Ligne du journal Discord d'une suspension (français, `publishStaffAction`) :
  * staff anonyme, aucun nom d'engagé — le tournoi et la manche suffisent.
  */
@@ -142,7 +155,7 @@ export function selfPausedValidationLog(input: SelfResolvedDispute): string {
   return `⚠️ Validation automatique suspendue par un membre du staff qui joue ce match · « ${discordInline(input.tournamentName)} », ${round}.`;
 }
 
-type SelfActionKind = "resolved" | "paused";
+type SelfActionKind = "resolved" | "corrected" | "paused";
 
 /**
  * Avertit les autres membres du staff si l'arbitre qui vient d'agir joue la
@@ -164,13 +177,12 @@ async function alertSelfAction(
     const input = await loadAlertMatch(match);
     if (!input) return false;
 
-    publishStaffAction(kind === "resolved" ? selfResolvedDisputeLog(input) : selfPausedValidationLog(input), actor);
+    publishStaffAction(SELF_ACTION_LOG[kind](input), actor);
     logged = true;
     await notifyStaff({
       topic: "REFEREE_SELF_RESOLUTION",
       excludeUserIds: [actor.id],
-      push: (locale) =>
-        kind === "resolved" ? selfResolvedDisputePush(input, locale) : selfPausedValidationPush(input, locale),
+      push: (locale) => SELF_ACTION_PUSH[kind](input, locale),
     });
     return true;
   } catch (error) {
@@ -181,9 +193,24 @@ async function alertSelfAction(
   }
 }
 
+/** Ligne du journal Discord, par geste. */
+const SELF_ACTION_LOG: Record<SelfActionKind, (input: SelfResolvedDispute) => string> = {
+  resolved: selfResolvedDisputeLog,
+  corrected: selfCorrectedResultLog,
+  paused: selfPausedValidationLog,
+};
+
+/** Rédacteur du push, par geste. */
+const SELF_ACTION_PUSH: Record<SelfActionKind, (input: SelfResolvedDispute, locale: Locale) => PushContent> = {
+  resolved: selfResolvedDisputePush,
+  corrected: selfCorrectedResultPush,
+  paused: selfPausedValidationPush,
+};
+
 /** Trace pm2 d'avant lecture, par geste. */
 const SELF_ACTION_TRACE: Record<SelfActionKind, string> = {
   resolved: "Litige clos par l'arbitrage (vérification « arbitre qui joue »)",
+  corrected: "Résultat acquis corrigé par l'arbitrage (vérification « arbitre qui joue »)",
   paused: "Validation automatique suspendue par l'arbitrage (vérification « arbitre qui joue »)",
 };
 
@@ -199,6 +226,15 @@ export function alertSelfResolvedDispute(
   sides?: readonly number[],
 ): Promise<boolean> {
   return alertSelfAction("resolved", dispute, actor, sides);
+}
+
+/**
+ * « Valider le résultat » sur un match **déjà tranché** (correction) : renverser
+ * un résultat acquis — un litige tranché par un arbitre neutre, par exemple —
+ * avertit comme trancher le litige.
+ */
+export function alertSelfCorrectedResult(match: DisputeBeforeResolution, actor: StaffActor): Promise<boolean> {
+  return alertSelfAction("corrected", match, actor);
 }
 
 /** « Enregistrer » qui vient de suspendre la validation d'office d'un report seul. */

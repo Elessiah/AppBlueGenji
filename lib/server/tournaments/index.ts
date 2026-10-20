@@ -195,6 +195,7 @@ import { FINISHED_TOURNAMENTS_LIST_LIMIT } from "@/lib/shared/constants";
 import { isScoreDisputed } from "@/lib/shared/score-dispute";
 import type { StaffActor } from "@/lib/shared/log-privacy";
 import {
+  alertSelfCorrectedResult,
   alertSelfPausedValidation,
   alertSelfResolvedDispute,
   type DisputeBeforeResolution,
@@ -1715,10 +1716,13 @@ export async function adminResolveMatchPublic(
   actor?: StaffActor,
 ): Promise<void> {
   // Même risque d'interblocage que le report d'un engagé (`retryOnDeadlock`).
-  const dispute = await retryOnDeadlock(() => adminResolveMatchOnce(matchId, entry));
+  const settled = await retryOnDeadlock(() => adminResolveMatchOnce(matchId, entry));
   // Sans attendre : l'arbitre voit « Résultat validé » sans patienter derrière
   // l'envoi des notifications au staff (meilleur effort, ne lève jamais).
-  if (dispute && actor) void alertSelfResolvedDispute(dispute, actor);
+  if (settled && actor) {
+    if (settled.kind === "corrected") void alertSelfCorrectedResult(settled.match, actor);
+    else void alertSelfResolvedDispute(settled.match, actor);
+  }
 }
 
 type ResolvedMatchHead = RowDataPacket & {
@@ -1730,11 +1734,18 @@ type ResolvedMatchHead = RowDataPacket & {
   team2_report_score: number | null;
 };
 
-/** Le litige que l'arbitrage vient de trancher, `null` si la manche n'en avait pas. */
+/**
+ * Ce que l'arbitrage vient de trancher et qu'un arbitre qui joue ne fait pas en
+ * silence : un **litige**, ou la **correction** d'un résultat déjà acquis (un
+ * litige tranché par un arbitre neutre ne se renverse pas sans avertir).
+ * `null` sinon — première validation hors litige.
+ */
+type SettledByReferee = { kind: "resolved" | "corrected"; match: DisputeBeforeResolution };
+
 async function adminResolveMatchOnce(
   matchId: number,
   entry: AdminResolveEntry,
-): Promise<DisputeBeforeResolution | null> {
+): Promise<SettledByReferee | null> {
   const db = await getDatabase();
   const connection = await db.getConnection();
 
@@ -1758,9 +1769,13 @@ async function adminResolveMatchOnce(
       team1Reported: head.team1_report_score !== null,
       team2Reported: head.team2_report_score !== null,
     });
-    const dispute: DisputeBeforeResolution | null =
-      disputed && head.team1_id !== null && head.team2_id !== null
-        ? { matchId, tournamentId, team1Id: Number(head.team1_id), team2Id: Number(head.team2_id) }
+    const corrected = head.status === "COMPLETED";
+    const dispute: SettledByReferee | null =
+      (disputed || corrected) && head.team1_id !== null && head.team2_id !== null
+        ? {
+            kind: corrected ? "corrected" : "resolved",
+            match: { matchId, tournamentId, team1Id: Number(head.team1_id), team2Id: Number(head.team2_id) },
+          }
         : null;
 
     const { adminResolveMatch } = await import("./admin");

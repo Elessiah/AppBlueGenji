@@ -87,7 +87,7 @@ export const PUSH_TOPICS = {
   },
   REFEREE_SELF_RESOLUTION: {
     label: "Arbitrage par un joueur du staff",
-    description: "Un autre membre du staff, qui joue le match, vient d'en trancher le litige de score ou d'en suspendre la validation automatique.",
+    description: "Un autre membre du staff, qui joue le match, vient d'en trancher le litige de score, d'en corriger le résultat ou d'en suspendre la validation automatique.",
     audience: "tournaments",
   },
   MATCH_SCHEDULED: {

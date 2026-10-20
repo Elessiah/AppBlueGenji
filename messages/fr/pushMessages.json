@@ -105,6 +105,10 @@
     "forfeitSolo": "forfait d'un joueur",
     "doubleForfeit": "double forfait"
   },
+  "selfCorrected": {
+    "title": "Résultat corrigé par un joueur du match",
+    "body": "Un membre du staff qui joue ce match en a corrigé le résultat · {tournament}, {round} : {outcome}."
+  },
   "selfPaused": {
     "title": "Validation suspendue par un joueur du match",
     "body": "Un membre du staff qui joue ce match en a suspendu la validation automatique · {tournament}, {round}."

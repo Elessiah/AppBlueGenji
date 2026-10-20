@@ -105,6 +105,10 @@
     "forfeitSolo": "forfeit by a player",
     "doubleForfeit": "double forfeit"
   },
+  "selfCorrected": {
+    "title": "Result corrected by a player of the match",
+    "body": "A staff member who plays in this match corrected its result · {tournament}, {round}: {outcome}."
+  },
   "selfPaused": {
     "title": "Confirmation paused by a player of the match",
     "body": "A staff member who plays in this match paused its automatic confirmation · {tournament}, {round}."

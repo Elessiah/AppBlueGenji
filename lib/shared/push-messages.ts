@@ -805,6 +805,24 @@ export function selfResolvedDisputePush(input: SelfResolvedDispute, locale: Loca
 
 /**
  * Alerte aux **autres** membres du staff (`REFEREE_SELF_RESOLUTION`) : un des
+ * leurs, qui joue la manche, vient d'en **corriger** le résultat déjà acquis.
+ */
+export function selfCorrectedResultPush(input: SelfResolvedDispute, locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
+  return {
+    title: text.t("selfCorrected.title"),
+    body: text.t("selfCorrected.body", {
+      tournament: input.tournamentName,
+      round: pushRoundLabel(input.bracket, input.roundNumber, locale, input.swiss),
+      outcome: selfResolvedOutcomeText(input, locale),
+    }),
+    url: localeHref(tournamentMatchHref(input.tournamentId, input.matchId), locale),
+    tag: `self-corrected-${input.matchId}`,
+  };
+}
+
+/**
+ * Alerte aux **autres** membres du staff (`REFEREE_SELF_RESOLUTION`) : un des
  * leurs, qui joue la manche, vient d'en suspendre la validation automatique
  * (« Enregistrer » sur un report seul). Ni pseudo ni nom d'engagé.
  */

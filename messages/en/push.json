@@ -38,7 +38,7 @@
     },
     "REFEREE_SELF_RESOLUTION": {
       "label": "Refereeing by a staff player",
-      "description": "Another staff member, who plays in the match, has just settled its score dispute or paused its automatic confirmation."
+      "description": "Another staff member, who plays in the match, has just settled its score dispute, corrected its result or paused its automatic confirmation."
     },
     "MATCH_SCHEDULED": {
       "label": "Scheduled matches",
