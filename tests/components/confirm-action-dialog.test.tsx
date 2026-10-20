@@ -183,6 +183,11 @@ describe("geste en vol : le focus reste sur le bouton pressé", () => {
     const css = readSource("components/ui/confirm-action-dialog.module.css");
     expect(css).toMatch(/\.actions > :global\(\.btn\)\[aria-disabled="true"\]:hover \{\s*cursor: progress;\s*transform: none;\s*box-shadow: none;/);
     expect(css).toMatch(/\.actions > :global\(\.btn\.ghost\)\[aria-disabled="true"\] \{\s*color: var\(--ink-mute\);/);
+    // Fond du repos au survol, pour chaque variante (le survol de `.btn` l'éclaircirait).
+    expect(css).toMatch(/\.actions > :global\(\.btn\)\[aria-disabled="true"\]:hover \{\s*background: rgba\(89, 212, 255, 0\.14\);/);
+    expect(css).toMatch(/\.actions > :global\(\.btn\.danger\)\[aria-disabled="true"\]:hover \{\s*background: rgba\(var\(--danger-rgb\), 0\.14\);/);
+    // Contraste élevé : le gris système, comme le `disabled` natif.
+    expect(css).toMatch(/@media \(forced-colors: active\) \{\s*\.actions > :global\(\.btn\)\[aria-disabled="true"\] \{\s*color: GrayText;\s*border-color: GrayText;/);
   });
 });
 

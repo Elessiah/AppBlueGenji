@@ -166,7 +166,9 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     expect(rules[0]).toContain("color: var(--danger);");
     // Au toucher, pas de halo (un survol collé après « Annuler ») : le halo rouge est réservé au pointeur fin.
     expect(rules[0]).toContain("box-shadow: none;");
-    expect(css).toMatch(/@media \(hover: hover\) and \(pointer: fine\) \{\s*\.actions \.deleteButton:hover[^{]*\{\s*box-shadow: [^;]*--danger-rgb/);
+    expect(rules[0]).not.toContain("background:");
+    expect(css).toMatch(/@media \(hover: hover\) and \(pointer: fine\) \{\s*\.actions \.deleteButton:hover[^{]*\{\s*background: rgba\(var\(--danger-rgb\), 0\.1\);/);
+    expect(css).toMatch(/@media \(hover: hover\) and \(pointer: fine\) \{\s*\.actions \.deleteButton:hover[^{]*\{[^}]*box-shadow: [^;]*--danger-rgb/);
     expect(css).toMatch(/\.labelStack > \[data-hidden\] \{\s*visibility: hidden;/);
     // Plus spécifique que le survol ghost (une classe de plus) : la règle rouge gagne quel que soit l'ordre des feuilles.
     expect(readSource("components/cyber/CyberButton.module.css")).toContain('.ghost:hover:not(:disabled):not([aria-disabled="true"])');
@@ -183,6 +185,8 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     // Occupé pendant la préparation seulement : derrière la confirmation ouverte, le bouton est désarmé, pas « en attente ».
     expect(modal).toContain("aria-busy={preparing || undefined}");
     expect(modal).not.toContain("aria-busy={deletionOpen");
+    // Annoncée aux lecteurs d'écran (le libellé d'un bouton focalisé qui change ne l'est pas).
+    expect(modal).toMatch(/<p className="sr-only" role="status">\s*\{preparing \? t\("termsModal\.deleting"\) : ""\}\s*<\/p>/);
     expect(modal).toContain('<span data-hidden={preparing || undefined}>{t("termsModal.deleteAccount")}</span>');
     expect(modal).toContain('<span data-hidden={!preparing || undefined}>{t("termsModal.deleting")}</span>');
     // Fenêtre tue (page où elle se tait) : la préparation est abandonnée, rien ne se relance seul à la réouverture.
