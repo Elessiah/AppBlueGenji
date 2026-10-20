@@ -40,6 +40,7 @@
   "scoreToConfirm": {
     "title": "Score to confirm",
     "body": "{opponent} entered the score of your match ({tournament}). Confirm it, or dispute it: with no answer, it will be confirmed automatically.",
+    "bodyPaused": "{opponent} entered the score of your match ({tournament}). Confirm it, or dispute it: automatic confirmation is paused by a referee, and a referee will decide if there is no answer.",
     "soloOpponent": "Your opponent"
   },
   "scoreAutoValidated": {

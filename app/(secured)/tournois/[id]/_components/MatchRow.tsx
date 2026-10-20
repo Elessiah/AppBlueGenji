@@ -170,7 +170,14 @@ export const MatchRow = memo(function MatchRow({
   const team1Display = teamLabel(match.team1Name, localizedPlaceholder(text, match.team1Placeholder), side1.emptyLabel);
   const team2Display = teamLabel(match.team2Name, localizedPlaceholder(text, match.team2Placeholder), side2.emptyLabel);
 
-  const adminScoreLabel = adminScoreButtonLabel(actionText, scoreEntryClosed, pendingScoreProposal(match) !== null);
+  // Suspendue par un « Enregistrer » : la saisie de l'arbitre efface la
+  // proposition (`pendingScoreProposal`), mais seul « Valider le résultat »
+  // tranche désormais — la carte garde l'appel à valider.
+  const adminScoreLabel = adminScoreButtonLabel(
+    actionText,
+    scoreEntryClosed,
+    pendingScoreProposal(match) !== null || match.scoreAutoValidationPaused === true,
+  );
 
   // État de diffusion, calculé une fois ici : le bandeau d'horaire l'affiche,
   // le pied d'action en tire le bouton d'antenne — une seule minuterie.

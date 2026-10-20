@@ -256,6 +256,14 @@ export function AdminScoreDialog({
   // vérifier puis à le valider, sans le recopier.
   const proposal = pendingScoreProposal(match);
   const proposalNotice = adminProposalText(text, proposal, team1, team2, form.dirty);
+  // Report seul suspendu par un « Enregistrer » : la proposition, effacée de
+  // l'avis par la saisie de l'arbitre, reste lisible (`SCORE_DISPUTE_LOCK.md`).
+  const pausedReport = (() => {
+    if (!match.scoreAutoValidationPaused || isMatchPlayed(match)) return null;
+    if (match.team1Report && !match.team2Report) return { report: match.team1Report, by: team1 };
+    if (match.team2Report && !match.team1Report) return { report: match.team2Report, by: team2 };
+    return null;
+  })();
   const forfeitToggleLabel = showForfeit ? t("score.cancel") : t("score.admin.forfeit.open");
 
   // Correction d'un match déjà tranché : l'écriture attend la confirmation
@@ -369,6 +377,31 @@ export function AdminScoreDialog({
             <output className={`${styles.stored} ${styles.notice}`}>
               {t("score.admin.autoValidationPaused")}
             </output>
+          )}
+
+          {/* La proposition en attente, que la saisie de l'arbitre ne montre
+              plus : un autre arbitre qui rouvre le match doit voir ce que
+              l'engagée a déclaré (score, maps, codes de replay) avant de trancher. */}
+          {pausedReport && (
+            <div className={mapStyles.proposals}>
+              <section aria-label={t("score.admin.proposalOf", { name: pausedReport.by })}>
+                <p className={mapStyles.proposalTitle}>
+                  {t("score.admin.proposalTitle", {
+                    name: pausedReport.by,
+                    score1: pausedReport.report.team1Score,
+                    score2: pausedReport.report.team2Score,
+                  })}
+                </p>
+                {pausedReport.report.maps.length > 0 && (
+                  <MapResultList
+                    maps={pausedReport.report.maps}
+                    team1Name={team1}
+                    team2Name={team2}
+                    label={t("score.admin.proposalMaps", { name: pausedReport.by })}
+                  />
+                )}
+              </section>
+            </div>
           )}
 
           {/* Désaccord : le détail des deux propositions, codes de replay

@@ -40,6 +40,7 @@
   "scoreToConfirm": {
     "title": "Score à confirmer",
     "body": "{opponent} a saisi le score de votre match ({tournament}). Confirme-le, ou conteste-le : sans réponse, il sera validé automatiquement.",
+    "bodyPaused": "{opponent} a saisi le score de votre match ({tournament}). Confirme-le, ou conteste-le : la validation automatique est suspendue par l'arbitrage, un arbitre tranchera sans réponse.",
     "soloOpponent": "Ton adversaire"
   },
   "scoreAutoValidated": {

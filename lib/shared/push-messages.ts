@@ -528,11 +528,17 @@ function fitDigestBody(lines: readonly DigestLine[], total: number, text: PushTe
 }
 
 /** L'adversaire a saisi un score : à confirmer, ou à contester. */
-export function scoreToConfirmPush(side: MatchSide, locale: Locale = DEFAULT_LOCALE): PushContent {
+export function scoreToConfirmPush(
+  side: MatchSide & { autoValidationPaused?: boolean },
+  locale: Locale = DEFAULT_LOCALE,
+): PushContent {
   const text = TEXT[locale];
   return {
     title: text.t("scoreToConfirm.title"),
-    body: text.t("scoreToConfirm.body", {
+    // Validation d'office suspendue par l'arbitrage (resaisie du déclarant
+    // après un « Enregistrer » d'arbitre) : ne pas promettre une validation
+    // qui n'aura pas lieu (`SCORE_DISPUTE_LOCK.md`).
+    body: text.t(side.autoValidationPaused ? "scoreToConfirm.bodyPaused" : "scoreToConfirm.body", {
       opponent: side.solo ? text.t("scoreToConfirm.soloOpponent") : side.opponentName,
       tournament: side.tournamentName,
     }),
