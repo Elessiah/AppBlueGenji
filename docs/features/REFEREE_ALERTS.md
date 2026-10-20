@@ -118,7 +118,7 @@ ce qui permet d'agir :
 
 ```
 ⚠️ Arbitrage requis — « Coupe BlueGenji » (#12) · Manche 2 : Les Renards vs Team Nova (match #31) — reports de score contradictoires. https://…/tournois/12
-⏱️ Arbitrage requis — « Coupe BlueGenji » (#12) · Manche 2 : Les Renards vs Team Nova (match #31) — délai de report dépassé depuis plus de 10 minutes, toujours pas tranché. https://…/tournois/12
+⏱️ Arbitrage requis — « Coupe BlueGenji » (#12) · Manche 2 : Les Renards vs Team Nova (match #31) — litige toujours pas tranché, délai dépassé depuis plus de 10 minutes — saisie verrouillée. https://…/tournois/12
 ```
 
 Nature de l'intervention en tête, tournoi et identifiant, manche, les deux

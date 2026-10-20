@@ -31,14 +31,16 @@ prononce un forfait, et `adminResolveMatch` → `finalizeMatch` efface les
 propositions. L'alerte « conflit de score » aux arbitres (`REFEREE_ALERTS.md`,
 push `REFEREE_ALERT` + Discord, staff anonymisé) part comme avant à
 l'ouverture du litige, et l'escalade « toujours pas tranché » aussi — son texte
-(`refereeAlert.score_report_stalled`, FR + EN) dit un **litige** sans arbitrage,
+(`refereeAlert.score_report_stalled`, FR + EN ; ligne Discord « litige toujours pas
+tranché, délai dépassé depuis plus de N minutes — saisie verrouillée ») dit un **litige** sans arbitrage,
 saisie verrouillée : elle ne part plus que pour un litige, un report seul étant
 validé d'office.
 
 **Écran.** Le litige se déduit de l'instantané commun (`team1Report` /
 `team2Report`) : il voyage par le flux SSE **et** par la lecture REST de
 secours, sans droit de lecteur à câbler. La carte dit « Score en litige ·
-saisie verrouillée, arbitrage attendu » ; son bouton devient « Voir le litige » ;
+saisie verrouillée, arbitrage attendu » ; son bouton devient « Voir le litige »,
+icône œil (`readOnly`, `match-card-actions.ts`) et non crayon : rien ne s'y édite ;
 la modale garde l'état du désaccord et le détail adverse, retire la saisie, le
 bouton d'envoi et le forfait, et dit qui peut trancher (arbitre ou
 administrateur — la permission de plateforme `tournaments`, pas l'organisateur),
