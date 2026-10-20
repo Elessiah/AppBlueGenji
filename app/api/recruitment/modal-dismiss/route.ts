@@ -34,15 +34,16 @@ function withOptOutCookie<T>(response: NextResponse<T>): NextResponse<T> {
  * connecté ou non : elle repose toujours le cookie du navigateur
  * (`RECRUITMENT_MODAL_OFF_COOKIE`) et, connecté, écrit le choix sur le compte
  * (`{ account: true }` ; sans session, `{ account: false }` — le choix suivra
- * le compte à la connexion). Écriture de `/api/` : la provenance est vérifiée
+ * le compte à la connexion). Une panne — lecture de la session comprise — rend
+ * un code, cookie reposé. Écriture de `/api/` : la provenance est vérifiée
  * par le middleware, comme pour toute autre.
  */
 export async function POST() {
-  const user = await getCurrentUser();
-  if (!user) return withOptOutCookie(ok({ account: false }));
-  // Déjà posé (lu avec la session) : aucune écriture de plus sur la ligne du compte.
-  if (user.recruitmentModalOff) return withOptOutCookie(ok({ account: true }));
   try {
+    const user = await getCurrentUser();
+    if (!user) return withOptOutCookie(ok({ account: false }));
+    // Déjà posé (lu avec la session) : aucune écriture de plus sur la ligne du compte.
+    if (user.recruitmentModalOff) return withOptOutCookie(ok({ account: true }));
     if (!(await recordRecruitmentModalOff(user.id))) return withOptOutCookie(fail(ACCOUNT_DELETED_ERROR, 409));
     return withOptOutCookie(ok({ account: true }));
   } catch (error) {

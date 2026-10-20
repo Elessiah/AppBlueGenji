@@ -140,11 +140,27 @@ async function carryRecruitmentModalOff(
 ): Promise<void> {
   try {
     if (!recruitmentModalOffInBrowser(cookieStore.get(RECRUITMENT_MODAL_OFF_COOKIE)?.value)) return;
-    await recordRecruitmentModalOff(userId);
   } catch (error) {
     console.error("[auth] recruitment modal opt-out carry-over failed:", error);
+    return;
   }
+  const write = recordRecruitmentModalOff(userId).then(
+    () => undefined,
+    (error: unknown) => console.error("[auth] recruitment modal opt-out carry-over failed:", error),
+  );
+  // Attente bornée : une ligne de compte verrouillée (attente de verrou
+  // jusqu'à `innodb_lock_wait_timeout`) ne fait pas patienter la connexion ;
+  // l'écriture continue seule, et le rattrapage de la mise en page la relaie.
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const bound = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, RECRUITMENT_MODAL_CARRY_WAIT_MS);
+  });
+  await Promise.race([write, bound]);
+  clearTimeout(timer);
 }
+
+/** Attente maximale du report « Ne plus afficher » à la connexion. */
+export const RECRUITMENT_MODAL_CARRY_WAIT_MS = 2_000;
 
 /**
  * L'ancien report « Plus tard » des conditions (`bg_terms_later`, plus posé
