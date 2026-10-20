@@ -147,6 +147,7 @@ export function RecruitmentHighlight({
   bannerDismissed,
   bannerSeenKept = [],
   onAdPage,
+  modalOptedOut = false,
   signedIn = false,
 }: Readonly<{
   /** Prioritaires publiées : les pages de la modale d'arrivée. */
@@ -166,11 +167,13 @@ export function RecruitmentHighlight({
   /** On est sur `/recrutement`, où la modale se tait (le visiteur y lit déjà les annonces). */
   onAdPage: boolean;
   /** Lecteur connecté : « Ne plus afficher » est aussi gardé sur son compte. */
+  /** « Ne plus afficher » posé (compte ou navigateur) : la modale ne s'ouvre plus d'elle-même. */
+  modalOptedOut?: boolean;
   signedIn?: boolean;
 }>) {
   // Ouverte sur la première prioritaire jamais vue ; toutes vues, elle se tait.
   const modalStart = recruitmentModalStart(modalAds.map((ad) => ad.id), modalSeen);
-  const showModal = modalStart !== null && !modalSilenced && !onAdPage;
+  const showModal = modalStart !== null && !modalSilenced && !modalOptedOut && !onAdPage;
   return (
     <>
       {!bannerDismissed && bannerAds.length > 0 && (

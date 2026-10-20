@@ -285,18 +285,16 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           <RecruitmentTextProvider locale={locale} messages={recruitmentMessages}>
           <RecruitmentHighlight
             modalAds={spotlight.modal}
-            modalSilenced={
-              // « Ne plus afficher » : sur le compte, ou sur ce navigateur.
-              recruitmentModalOptedOut({
-                accountOff: user?.recruitmentModalOff,
-                browserCookie: cookieStore.get(RECRUITMENT_MODAL_OFF_COOKIE)?.value,
-              }) ||
-              recruitmentModalSilenced({
-                privacyPending: privacyChanges.length > 0,
-                termsModalDue: termsDueOnLoad,
-                pathname: requestedPath,
-              })
-            }
+            modalSilenced={recruitmentModalSilenced({
+              privacyPending: privacyChanges.length > 0,
+              termsModalDue: termsDueOnLoad,
+              pathname: requestedPath,
+            })}
+            // « Ne plus afficher » : sur le compte (lu avec la session), ou sur ce navigateur.
+            modalOptedOut={recruitmentModalOptedOut({
+              accountOff: user?.recruitmentModalOff,
+              browserCookie: cookieStore.get(RECRUITMENT_MODAL_OFF_COOKIE)?.value,
+            })}
             signedIn={user !== null}
             modalSeen={modalSeen}
             modalSeenKept={modalSeenKept}
