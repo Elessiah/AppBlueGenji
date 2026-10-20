@@ -204,7 +204,7 @@
     "errors": {
       "ACCOUNT_STILL_REFERENCED": "Your account was linked to a tournament or a team during the deletion. Try again: it will then be anonymized rather than erased.",
       "fallback": "Account deletion failed. Try again in a moment.",
-      "sessionGone": "Your session has ended — your account may already have been deleted. The page is reloading: sign in again to check."
+      "sessionGone": "Your session has ended — your account may already have been deleted. The page is reloading: log in again to check."
     }
   },
   "errors": {
