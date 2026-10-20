@@ -178,8 +178,8 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     const modal = readSource("components/legal/TermsAcceptanceModal.tsx");
     expect(modal).toContain("const { leaving, logout } = useLogout();");
     expect(modal).toMatch(/if \(!busy && !deletionOpen\) void logout\(\);/);
-    expect(modal).toMatch(/if \(!busy && !leaving\) setDeletionOpen\(true\);/);
-    expect(modal).toMatch(/\{deletionOpen \? \(\s*<TermsAccountDeletion\s+onReady=\{\(\) => setDeletionReady\(true\)\}\s+onClose=\{\(\) => \{\s*setDeletionOpen\(false\);\s*setDeletionReady\(false\);\s*requestAnimationFrame\(\(\) => deleteButtonRef\.current\?\.focus\(\)\);/);
+    expect(modal).toMatch(/if \(busy \|\| leaving \|\| deletionOpen\) return;\s*setDeletionOpen\(true\);/);
+    expect(modal).toMatch(/\{deletionOpen && DeletionFlow \? \(\s*<DeletionFlow\s+onReady=\{\(\) => setDeletionReady\(true\)\}\s+onClose=\{\(\) => \{\s*setDeletionOpen\(false\);\s*setDeletionReady\(false\);\s*requestAnimationFrame\(\(\) => deleteButtonRef\.current\?\.focus\(\)\);/);
     // Préparation (code, textes, aperçu) : le bouton dit qu'il travaille, jusqu'à l'ouverture de la confirmation.
     expect(modal).toContain("const preparing = deletionOpen && !deletionReady;");
     // Occupé pendant la préparation seulement : derrière la confirmation ouverte, le bouton est désarmé, pas « en attente ».
@@ -190,10 +190,11 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     expect(modal).toContain('<span data-hidden={preparing || undefined}>{t("termsModal.deleteAccount")}</span>');
     expect(modal).toContain('<span data-hidden={!preparing || undefined}>{t("termsModal.deleting")}</span>');
     // Fenêtre tue (page où elle se tait) : la préparation est abandonnée, rien ne se relance seul à la réouverture.
-    expect(modal).toMatch(/useEffect\(\(\) => \{\s*if \(open\) return;\s*setDeletionOpen\(false\);\s*setDeletionReady\(false\);\s*\}, \[open\]\);/);
+    expect(modal).toMatch(/useEffect\(\(\) => \{\s*if \(open\) return;\s*deletionAttempt\.current \+= 1;\s*setDeletionOpen\(false\);\s*setDeletionReady\(false\);\s*\}, \[open\]\);/);
     // Préparation bornée (morceau disparu, réseau figé) : la fenêtre retrouve ses issues, un toast le dit, le focus revient au bouton.
     expect(modal).toContain("export const TERMS_DELETION_PREPARE_TIMEOUT_MS = 20_000;");
-    expect(modal).toMatch(/if \(!deletionOpen \|\| deletionReady\) return;\s*const timer = window\.setTimeout\(\(\) => \{\s*setDeletionOpen\(false\);\s*showError\(unavailableRef\.current\);/);
+    expect(modal).toMatch(/if \(!deletionOpen \|\| deletionReady\) return;\s*const timer = window\.setTimeout\(\(\) => abandonDeletion\(\), TERMS_DELETION_PREPARE_TIMEOUT_MS\);/);
+    expect(modal).toMatch(/const abandonDeletion = useCallback\(\(\) => \{\s*deletionAttempt\.current \+= 1;\s*setDeletionOpen\(false\);\s*showError\(unavailableRef\.current\);/);
     // Le focus n'y revient que s'il y est resté ou s'est perdu (lecteur parti lire la politique : pas déplacé).
     expect(modal).toContain("if (document.activeElement === document.body) deleteButtonRef.current?.focus();");
     // Contraste élevé : lien et bouton désarmés au gris système.
@@ -203,9 +204,24 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     expect(termsCss.indexOf("@media (forced-colors: active)")).toBeGreaterThan(termsCss.lastIndexOf(".actions .deleteButton {"));
     expect(readSource("components/legal/TermsAcceptanceModal.module.css")).toMatch(/\.textButton\[aria-busy="true"\] \{\s*cursor: progress;/);
     expect(modal).toContain('unavailableRef.current = t("termsModal.deletionUnavailable");');
-    expect(flowSource()).toMatch(/useEffect\(\(\) => \{\s*if \(confirming\) onReady\?\.\(\);\s*\}, \[confirming, onReady\]\);/);
+    // Rappel lu par une ref : un rendu de la fenêtre (rappel neuf) ne rejoue pas l'effet.
+    expect(flowSource()).toMatch(/useEffect\(\(\) => \{\s*if \(confirming\) onReadyRef\.current\?\.\(\);\s*\}, \[confirming\]\);/);
     // Chargée au clic seulement : ni son code ni l'espace `profile` dans chaque page.
-    expect(modal).toContain('dynamic(\n  () => orReload(import("./TermsAccountDeletion")');
+    expect(modal).toContain('onceLoader<ComponentType<TermsAccountDeletionProps>>(() =>\n  import("./TermsAccountDeletion")');
+    expect(modal).toContain('import type { TermsAccountDeletionProps } from "./TermsAccountDeletion";');
+    // Ni `next/dynamic` (composant vide gardé : chaque clic suivant muet) ni `orReload` (jamais sûr sous cette fenêtre, toujours modale).
+    expect(modal).not.toContain('from "next/dynamic"');
+    expect(modal).not.toContain("orReload(");
+    // Un échec du code se dit tout de suite (pas au bout du délai) ; le chargement d'une tentative abandonnée est ignoré.
+    expect(modal).toMatch(/termsDeletionLoader\.load\(\)\.then\(\s*\(flow\) => \{\s*if \(deletionAttempt\.current === attempt\) setDeletionFlow\(\(\) => flow\);\s*\},\s*\(\) => \{\s*if \(deletionAttempt\.current === attempt\) abandonDeletion\(\);/);
+    // Préchargé au survol et au focus ; sous `/en`, les textes anglais partent avec le code, pas après lui.
+    expect(modal).toContain("onPointerEnter={preloadDeletion}");
+    expect(modal).toContain("onFocus={preloadDeletion}");
+    expect(modal).toContain("const preloadTermsDeletion = preloadMissing([termsDeletionLoader]);");
+    expect(modal).toContain("const preloadTermsDeletionEnglish = preloadMissing([englishProfile]);");
+    expect(modal).toMatch(/if \(locale === "en"\) englishProfile\.load\(\)\.catch\(\(\) => undefined\);\s*termsDeletionLoader\.load\(\)/);
+    // Le chargeur anglais reste un import dynamique : la fenêtre (chaque page) ne tire pas le JSON.
+    expect(readSource("components/i18n/english-loaders-account.ts")).toContain('export const englishProfile = /* @__PURE__ */ onceLoader<Messages["profile"]>(() => import("@/messages/en/profile.json")');
     expect(modal).not.toMatch(/^import .*use-account-deletion/m);
     // La fenêtre reste bloquante pendant la confirmation : Échap ne ferme que celle-ci (pile des modales).
     expect(modal).toContain("onClose: KEEP_OPEN");
