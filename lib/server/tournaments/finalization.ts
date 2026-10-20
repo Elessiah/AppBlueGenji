@@ -498,6 +498,18 @@ export async function resolveExpiredScoreReports(
 
   let resolved = 0;
 
+  // Format lu une fois par ronde, pas une fois par match : les
+  // matchs expirés d'une même ronde partagent le même.
+  const formats = new Map<number, Promise<MatchFormat | null>>();
+  const formatOfRound = (round: number): Promise<MatchFormat | null> => {
+    let format = formats.get(round);
+    if (!format) {
+      format = loadTournamentMatchFormat(connection, tournamentId, round);
+      formats.set(round, format);
+    }
+    return format;
+  };
+
   for (const match of rows) {
     if (match.team1_id === null || match.team2_id === null) {
       continue;
@@ -515,11 +527,7 @@ export async function resolveExpiredScoreReports(
       // saisi par une seule équipe fait foi après deux heures de silence de
       // l'autre, **exactement** comme si elle l'avait confirmé.
       const { team1Score, team2Score } = singleReportScores(match);
-      const format = await loadTournamentMatchFormat(
-        connection,
-        tournamentId,
-        Number(match.round_number),
-      );
+      const format = await formatOfRound(Number(match.round_number));
       const result = { team1Score, team2Score, ...resolveSides(match, format, team1Score, team2Score) };
 
       // Un seul `UPDATE` conditionnel tranche, et son `affectedRows` dit qui l'a

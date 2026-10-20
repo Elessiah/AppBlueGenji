@@ -9,9 +9,6 @@
 import type { PoolConnection } from "mysql2/promise";
 import { notifyScoreAutoValidated } from "./player-pushes";
 
-/** Plafond par transaction : ne borne que la mémoire d'un balayage hors norme. */
-const MAX_PENDING = 256;
-
 const pending = new WeakMap<PoolConnection, Set<number>>();
 
 /** Note qu'une manche vient d'être validée d'office dans la transaction en cours. */
@@ -21,7 +18,7 @@ export function queueAutoValidatedNotice(connection: PoolConnection, matchId: nu
     pending.set(connection, new Set([matchId]));
     return;
   }
-  if (queued.size < MAX_PENDING) queued.add(matchId);
+  queued.add(matchId);
 }
 
 /** La transaction n'a pas abouti : rien ne part. */
@@ -29,10 +26,21 @@ export function discardAutoValidatedNotices(connection: PoolConnection): void {
   pending.delete(connection);
 }
 
-/** Envoie les avis de la transaction qui vient d'aboutir, sans attendre. Ne lève jamais. */
+/**
+ * Envoie les avis de la transaction qui vient d'aboutir, sans attendre. Ne lève
+ * jamais. Les avis partent **l'un après l'autre**, en une seule chaîne : un
+ * balayage qui valide toute une ronde d'un coup n'occupe ainsi qu'une connexion
+ * du pool à la fois, au lieu d'une rafale de lectures et d'envois en parallèle.
+ */
 export function flushAutoValidatedNotices(connection: PoolConnection): void {
   const queued = pending.get(connection);
   pending.delete(connection);
   if (!queued) return;
-  for (const matchId of queued) void notifyScoreAutoValidated(matchId).catch(() => undefined);
+  void sendInSequence([...queued]);
+}
+
+async function sendInSequence(matchIds: readonly number[]): Promise<void> {
+  for (const matchId of matchIds) {
+    await notifyScoreAutoValidated(matchId).catch(() => undefined);
+  }
 }
