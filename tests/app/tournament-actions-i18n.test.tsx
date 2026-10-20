@@ -650,9 +650,46 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     const adminCard = (locale: "fr" | "en") => renderPage(locale, <MatchRow match={saved} adminResolvable onOpenAdminModal={noop} scoreLocked={false} roundNumber={2} />);
     expect(adminCard("fr")).toContain("Valider le score proposé");
     expect(adminCard("en")).toContain("Confirm the proposed score");
-    expect(renderPage("fr", <MatchRow match={{ ...saved, scoreAutoValidationPaused: false }} adminResolvable onOpenAdminModal={noop} scoreLocked={false} roundNumber={2} />)).toContain("Éditer le score");
+    expect(renderPage("fr", <MatchRow match={{ ...versus, team1Score: 1, team2Score: 0 }} adminResolvable onOpenAdminModal={noop} scoreLocked={false} roundNumber={2} />)).toContain("Éditer le score");
+    // Suspendue : la proposition se reprend d'un clic, et l'avis « Enregistrer suspend » n'a plus lieu d'être.
+    expect(adminSaved("fr")).not.toContain("« Enregistrer » suspend la validation automatique de la proposition");
     // Sans suspension, l'avis n'en dit rien.
     expect(render("fr", <AdminScoreDialog match={{ ...paused, scoreAutoValidationPaused: false }} onClose={noop} onSubmitted={noop} />)).not.toContain("suspendue");
+  });
+
+  it("avancement noté AVANT la proposition : proposition lisible, reprenable, et « Enregistrer » prévient de la suspension (FR + EN)", () => {
+    const maps = [
+      { mapNumber: 1, replayCode: "AAA111", team1Score: 2, team2Score: 0 },
+      { mapNumber: 2, replayCode: "BBB222", team1Score: 0, team2Score: 2 },
+      { mapNumber: 3, replayCode: "CCC333", team1Score: 2, team2Score: 1 },
+    ];
+    const match = {
+      ...versus,
+      status: "AWAITING_CONFIRMATION" as const,
+      team1Score: 1,
+      team2Score: 0,
+      team1Report: { team1Score: 2, team2Score: 1, maps, reportedAt: "2026-05-05T10:00:00.000Z" },
+      scoreDeadlineAt: "2026-05-05T12:30:00.000Z",
+      scoreAutoValidationPaused: false,
+    };
+    const admin = (locale: "fr" | "en") => render(locale, <AdminScoreDialog match={match} onClose={noop} onSubmitted={noop} />);
+    expect(admin("fr")).toContain("Proposition de Alpha : 2 – 1");
+    expect(admin("fr")).toContain("Reprendre la proposition de Alpha");
+    expect(admin("fr")).toContain("Enregistré : 1 – 0, non tranché.");
+    expect(admin("fr")).toContain("« Enregistrer » suspend la validation automatique de la proposition de Alpha : seul « Valider le résultat » tranche alors, à moins que Bravo ne la confirme.");
+    expect(admin("en")).toContain("Use Alpha&#x27;s proposal");
+    expect(admin("en")).toContain("“Save” pauses the automatic confirmation of Alpha&#x27;s proposal: only “Confirm the result” then settles the match, unless Bravo confirms it.");
+    expectNoFrench(admin("en"));
+    // Le bouton garde le focus pendant un envoi (aria-disabled), et reprend les maps de la proposition.
+    const source = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx"), "utf8");
+    expect(source).toMatch(/aria-disabled=\{submitting\}[\s\S]{0,120}if \(!submitting\) onAdopt\(\);/);
+    const hook = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_hooks/useScoreForm.ts"), "utf8");
+    expect(hook).toMatch(/const adoptReport = \(report: MatchScoreReport\) => \{[\s\S]{0,400}forfeitTeamId: undefined, doubleForfeit: undefined, \.\.\.scoresFromMaps\(rows\)/);
+    // La carte invite à valider la proposition.
+    expect(renderPage("fr", <MatchRow match={match} adminResolvable onOpenAdminModal={noop} scoreLocked={false} roundNumber={2} />)).toContain("Valider le score proposé");
+    // Sans maps proposées, rien à reprendre : pas de bouton.
+    const bare = { ...match, team1Report: { ...match.team1Report, maps: [] } };
+    expect(render("fr", <AdminScoreDialog match={bare} onClose={noop} onSubmitted={noop} />)).not.toContain("Reprendre la proposition");
   });
 
   it("score (engagé) pendant l'envoi : boutons aria-disabled, jamais disabled natif (le focus reste)", () => {

@@ -6,6 +6,7 @@ import {
   pendingProposalSignature,
   pendingScoreProposal,
   scoreFormStateFor,
+  singlePendingReport,
   storedResultSignature,
 } from "@/app/(secured)/tournois/[id]/_lib/score-form";
 import type { BracketMatch, MatchScoreReport } from "@/lib/shared/types";
@@ -128,5 +129,26 @@ describe("signatures — proposition et résultat enregistré sont distincts", (
     expect(pendingProposalSignature(match({ team1Report: report(2, 0) }))).not.toBe(
       pendingProposalSignature(match({ team1Report: report(2, 1) })),
     );
+  });
+});
+
+describe("singlePendingReport — proposition seule, avancement d'arbitrage noté ou non", () => {
+  it("reste lisible quand l'arbitrage a noté un score (là où pendingScoreProposal se tait)", () => {
+    const m = match({ team1Report: report(2, 1), team1Score: 1, team2Score: 0 });
+    expect(pendingScoreProposal(m)).toBeNull();
+    expect(singlePendingReport(m)).toEqual({ report: report(2, 1), proposedBy: "team1" });
+  });
+
+  it("côté équipe 2, et forfait noté compris", () => {
+    const m = match({ team2Report: report(0, 2), forfeitTeamId: 10 });
+    expect(singlePendingReport(m)?.proposedBy).toBe("team2");
+  });
+
+  it.each<[string, Partial<BracketMatch>]>([
+    ["litige : deux propositions", { team1Report: report(2, 1), team2Report: report(1, 2) }],
+    ["aucune proposition", {}],
+    ["match tranché", { team1Report: report(2, 1), status: "COMPLETED", winnerTeamId: 10, team1Score: 2, team2Score: 1 }],
+  ])("nulle : %s", (_, overrides) => {
+    expect(singlePendingReport(match(overrides))).toBeNull();
   });
 });
