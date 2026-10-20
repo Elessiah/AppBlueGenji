@@ -626,6 +626,7 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     // Refus « litige ouvert » : la modale relit l'état, à l'envoi comme au forfait.
     expect(source).toContain('new Set(["PROPOSAL_STALE", SCORE_LOCKED_DISPUTE, "MATCH_ALREADY_COMPLETED"])');
     expect(source.match(/if \(REFRESH_ON_REFUSAL\.has\(code\)\)/g)).toHaveLength(2);
+    expect(source).toContain('return detailLoading ? `${conflict} ${t("score.player.conflictLoading")}` : conflict;');
     // Verrou : la zone de forfait se replie, pour ne pas revenir dépliée si le litige est levé sans clore.
     expect(source).toContain("if (disputeLocked) setForfeitOpen(false);");
     // Litige arrivé par le flux : focus rendu à la modale si l'élément focalisé a disparu.
