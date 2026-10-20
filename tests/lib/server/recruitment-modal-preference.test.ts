@@ -142,6 +142,12 @@ describe("healRecruitmentModalOff — le compte rattrape le cookie du navigateur
     expect(execute).toHaveBeenCalledTimes(RECRUITMENT_MODAL_HEAL_MAX_TRACKED + 1);
   });
 
+  it("compte la fenêtre sur une horloge monotone, pas sur l'heure système", () => {
+    const source = readSource("lib/server/users/recruitment-modal-preference.ts");
+    expect(source).toContain("now: number = performance.now(),");
+    expect(source).not.toContain("Date.now()");
+  });
+
   it("colonne absente : s'éteint sans rien journaliser, jusqu'au redémarrage", async () => {
     await jest.isolateModulesAsync(async () => {
       const database = await import("@/lib/server/database");
@@ -159,7 +165,7 @@ describe("healRecruitmentModalOff — le compte rattrape le cookie du navigateur
       expect(
         preference.healRecruitmentModalOff(
           { userId: 41, accountOff: false, browserCookie: "1" },
-          Date.now() + preference.RECRUITMENT_MODAL_HEAL_WINDOW_MS,
+          performance.now() + preference.RECRUITMENT_MODAL_HEAL_WINDOW_MS,
         ),
       ).toBe(false);
       expect(execute).toHaveBeenCalledTimes(1);

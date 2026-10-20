@@ -294,8 +294,10 @@ describe("rattrapage du compte depuis le cookie, à chaque page connectée", () 
     expect(layout).toContain("const modalAds = modalOptedOut ? [] : spotlight.modal;");
     expect(layout).toContain("modalAds={modalAds}");
     expect(layout).not.toContain("modalAds={spotlight.modal}");
-    // Sous `/en`, les textes ne partent que s'il reste une annonce à montrer.
-    expect(layout).toContain("spotlight.banner.length === 0 && modalAds.length === 0");
+    // Sous `/en`, les textes ne partent que s'il reste une annonce à montrer :
+    // banderole déjà fermée et modale refusée, rien ne se rend.
+    expect(layout).toContain("const bannerShown = !bannerDismissed && spotlight.banner.length > 0;");
+    expect(layout).toContain("(!bannerShown && modalAds.length === 0)");
     expect(layout.match(/cookieStore\.get\(RECRUITMENT_MODAL_OFF_COOKIE\)/g)).toHaveLength(1);
   });
 });

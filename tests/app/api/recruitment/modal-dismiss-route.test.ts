@@ -37,6 +37,15 @@ describe("POST /api/recruitment/modal-dismiss", () => {
     expectOptOutCookie(response);
   });
 
+  it("déjà posé sur le compte (lu avec la session) : aucune écriture, cookie reposé", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7, recruitmentModalOff: true }));
+    const response = await POST();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ account: true });
+    expect(recordRecruitmentModalOff).not.toHaveBeenCalled();
+    expectOptOutCookie(response);
+  });
+
   it("sans session : repose seulement le cookie, sans toucher à aucun compte", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(null);
     const response = await POST();
