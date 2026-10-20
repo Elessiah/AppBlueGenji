@@ -186,7 +186,7 @@ ferme la session —, toast puis accueil rechargé dans la langue de la page). D
   dans la même case : sa largeur ne bouge pas) ; au survol il reste rouge (sa
   règle l'emporte sur le survol bleu de `CyberButton` ghost), halo au seul
   pointeur fin. La préparation entière est bornée
-  (`TERMS_DELETION_PREPARE_TIMEOUT_MS`, 15 s — morceau disparu après un
+  (`TERMS_DELETION_PREPARE_TIMEOUT_MS`, 20 s — au-delà des 8 s de l'aperçu, — morceau disparu après un
   déploiement, réseau figé) : la fenêtre retrouve ses issues, un toast
   (`termsModal.deletionUnavailable`) dit de recharger. Une fenêtre qui se tait
   (`/rgpd`, `/profil`…) abandonne la préparation : rouverte, elle ne relance
@@ -200,7 +200,10 @@ déclarer la confirmation française (`contentLang="fr"`, coquille comprise).
 En vol, ses boutons passent en `aria-disabled` + `aria-busy` (plus de
 `disabled` natif) : après un refus, le focus reste sur « Supprimer mon compte »
 et le geste se retente au clavier — vrai de toutes les confirmations
-(`ConfirmActionDialog`).
+(`ConfirmActionDialog`, qui les éteint : ni soulèvement au survol, « Annuler »
+grisé, curseur d'attente). Ses toasts portent la même langue (`lang="fr"`) que
+la confirmation retombée sur le français. Le bouton de la fenêtre n'est
+`aria-busy` que pendant la préparation.
 
 Aucune des routes du geste (`GET /api/profile/deletion`, `DELETE /api/profile`,
 ni `GET /api/profile/export` pour l'art. 15) ne consulte l'acceptation des
