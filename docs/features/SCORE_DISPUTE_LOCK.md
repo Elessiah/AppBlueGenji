@@ -125,6 +125,9 @@ d'office, exactement comme si l'autre l'avait confirmé.
   format de manche se lit une fois par ronde dans un balayage, pas par match.
 - **Aucun processus nouveau** : l'entretien passif et les balayages existants
   (`findDueMaintenance`, `./sync-scope.ts`) repèrent déjà `score_deadline_at <= NOW()`.
+  Un litige **déjà escaladé** n'y compte plus (`ACTIONABLE_EXPIRED_REPORT_SQL`,
+  partagé avec l'instantané et la résolution) : il peut durer des heures sans
+  rien coûter d'autre que sa lecture (`TOURNAMENT_SYNC_SCOPE.md`).
 - **Notification** : après le commit (`auto-validated-notices.ts`, vidé avec
   `flushBotLogs`, jeté avec `discardBotLogs` ; avis envoyés **l'un après
   l'autre**, sans plafond, pour qu'une ronde entière validée d'un coup n'occupe
