@@ -211,7 +211,7 @@ describe("RecruitmentHighlight — ce qui ne doit plus exister", () => {
     // visiteur, pour ne presque jamais rien rapporter.
     // Seul appel restant : l'écriture du « Ne plus afficher », au clic.
     expect(code.match(/fetch\(/g) ?? []).toHaveLength(1);
-    expect(code).toContain('fetch(url, { method: "POST" })');
+    expect(code).toContain('fetch(url, { method: "POST", signal: controller.signal })');
     expect(code).not.toContain("/api/recruitment/highlight");
   });
 

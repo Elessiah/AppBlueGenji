@@ -158,12 +158,12 @@ describe("modale d'arrivée — bouton « Ne plus afficher »", () => {
 });
 
 describe("recordRecruitmentModalOptOut", () => {
-  it("non connecté : pose le cookie du navigateur, sans appel au serveur", async () => {
+  it("non connecté : pose le cookie du navigateur, puis le fait reposer par le serveur (ITP), sans attendre", async () => {
     const writeCookie = jest.fn<(name: string, value: string, maxAge?: number) => boolean>(() => true);
-    const post = jest.fn(async () => ({ ok: true, status: 200 }));
+    const post = jest.fn(async (_url: string) => ({ ok: true, status: 200, json: async () => ({ account: true }) }));
     expect(await recordRecruitmentModalOptOut(false, { writeCookie, post })).toBe("BROWSER");
     expect(writeCookie).toHaveBeenCalledWith(RECRUITMENT_MODAL_OFF_COOKIE, "1", RECRUITMENT_MODAL_OFF_MAX_AGE);
-    expect(post).not.toHaveBeenCalled();
+    expect(post).toHaveBeenCalledWith("/api/recruitment/modal-dismiss");
   });
 
   it("connecté : pose le cookie d'abord, puis le choix sur le compte", async () => {
@@ -171,7 +171,7 @@ describe("recordRecruitmentModalOptOut", () => {
     const writeCookie = jest.fn(() => order.push("cookie") > 0);
     const post = jest.fn(async (url: string) => {
       order.push(url);
-      return { ok: true, status: 200 };
+      return { ok: true, status: 200, json: async () => ({ account: true }) };
     });
     expect(await recordRecruitmentModalOptOut(true, { writeCookie, post })).toBe("ACCOUNT");
     expect(order).toEqual(["cookie", "/api/recruitment/modal-dismiss"]);
@@ -179,7 +179,7 @@ describe("recordRecruitmentModalOptOut", () => {
 
   it("connecté, compte injoignable ou refus : le choix reste au moins sur ce navigateur", async () => {
     const writeCookie = jest.fn(() => true);
-    expect(await recordRecruitmentModalOptOut(true, { writeCookie, post: async () => ({ ok: false, status: 500 }) })).toBe(
+    expect(await recordRecruitmentModalOptOut(true, { writeCookie, post: async () => ({ ok: false, status: 500, json: async () => ({}) }) })).toBe(
       "BROWSER_ONLY",
     );
     expect(
@@ -193,17 +193,32 @@ describe("recordRecruitmentModalOptOut", () => {
     expect(writeCookie).toHaveBeenCalledTimes(2);
   });
 
-  it("connecté au chargement, session finie (401) ou compte supprimé (409) depuis : traité comme non connecté", async () => {
-    for (const status of [401, 409]) {
-      const gone = async () => ({ ok: false, status });
+  it("connecté au chargement, session finie (account: false) ou compte supprimé (409) depuis : traité comme non connecté", async () => {
+    const answers = [
+      async () => ({ ok: true, status: 200, json: async () => ({ account: false }) }),
+      async () => ({ ok: false, status: 409, json: async () => ({ error: "ACCOUNT_DELETED" }) }),
+    ];
+    for (const gone of answers) {
       expect(await recordRecruitmentModalOptOut(true, { writeCookie: () => true, post: gone })).toBe("BROWSER");
       expect(await recordRecruitmentModalOptOut(true, { writeCookie: () => false, post: gone })).toBe("NONE");
     }
   });
 
-  it("borne l'attente du serveur : l'appel par défaut porte un délai d'abandon", () => {
+  it("non connecté : n'attend pas le serveur, et son échec ne change rien à l'issue", async () => {
+    const hanging = jest.fn(() => new Promise<never>(() => undefined));
+    expect(await recordRecruitmentModalOptOut(false, { writeCookie: () => true, post: hanging })).toBe("BROWSER");
+    const failing = jest.fn(async () => {
+      throw new Error("offline");
+    });
+    expect(await recordRecruitmentModalOptOut(false, { writeCookie: () => false, post: failing })).toBe("NONE");
+    expect(failing).toHaveBeenCalledTimes(1);
+  });
+
+  it("borne l'attente du serveur sans AbortSignal.timeout (absent de Safari 15)", () => {
     const source = readSource("components/recruitment-highlight.tsx");
-    expect(source).toContain('fetch(url, { method: "POST", signal: AbortSignal.timeout(OPT_OUT_TIMEOUT_MS) })');
+    expect(source).toContain("setTimeout(() => controller.abort(), OPT_OUT_TIMEOUT_MS)");
+    expect(source).toContain('fetch(url, { method: "POST", signal: controller.signal })');
+    expect(source).not.toMatch(/AbortSignal\.timeout\(/);
     expect(source).toContain("const OPT_OUT_TIMEOUT_MS = 10_000;");
   });
 
@@ -215,7 +230,7 @@ describe("recordRecruitmentModalOptOut", () => {
   it("cookies refusés : rien n'est gardé sans compte écrit, le compte suffit sinon", async () => {
     const writeCookie = jest.fn(() => false);
     expect(await recordRecruitmentModalOptOut(false, { writeCookie })).toBe("NONE");
-    expect(await recordRecruitmentModalOptOut(true, { writeCookie, post: async () => ({ ok: false, status: 500 }) })).toBe("NONE");
+    expect(await recordRecruitmentModalOptOut(true, { writeCookie, post: async () => ({ ok: false, status: 500, json: async () => ({}) }) })).toBe("NONE");
     expect(
       await recordRecruitmentModalOptOut(true, {
         writeCookie,
@@ -224,7 +239,7 @@ describe("recordRecruitmentModalOptOut", () => {
         },
       }),
     ).toBe("NONE");
-    expect(await recordRecruitmentModalOptOut(true, { writeCookie, post: async () => ({ ok: true, status: 200 }) })).toBe("ACCOUNT");
+    expect(await recordRecruitmentModalOptOut(true, { writeCookie, post: async () => ({ ok: true, status: 200, json: async () => ({ account: true }) }) })).toBe("ACCOUNT");
   });
 
   it("pose le cookie de façon synchrone, avant tout await (la modale se ferme aussitôt)", () => {
