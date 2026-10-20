@@ -34,7 +34,7 @@
     },
     "REFEREE_ALERT": {
       "label": "Referee alerts",
-      "description": "A score conflict, a score left unconfirmed for too long or a reported problem is waiting for a referee."
+      "description": "A score conflict, a score dispute left too long without a referee or a reported problem is waiting for a referee."
     },
     "MATCH_SCHEDULED": {
       "label": "Scheduled matches",

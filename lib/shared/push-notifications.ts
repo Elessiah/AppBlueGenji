@@ -82,7 +82,7 @@ export const PUSH_TOPICS = {
   },
   REFEREE_ALERT: {
     label: "Alertes d'arbitrage",
-    description: "Un conflit de score, un score resté trop longtemps sans confirmation ou un problème signalé attend un arbitre.",
+    description: "Un conflit de score, un litige de score resté trop longtemps sans arbitrage ou un problème signalé attend un arbitre.",
     audience: "tournaments",
   },
   MATCH_SCHEDULED: {
