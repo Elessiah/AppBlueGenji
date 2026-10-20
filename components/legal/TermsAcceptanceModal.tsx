@@ -30,7 +30,7 @@ const KEEP_OPEN = () => undefined;
  * anglais, aperçu) est abandonnée : un morceau disparu après un déploiement ou
  * un réseau figé laissaient tous les gestes de la fenêtre désarmés, sans issue.
  */
-export const TERMS_DELETION_PREPARE_TIMEOUT_MS = 15_000;
+export const TERMS_DELETION_PREPARE_TIMEOUT_MS = 20_000;
 
 /**
  * La suppression du compte (celle de « Mon profil »), chargée au clic : ni son
@@ -261,7 +261,7 @@ export function TermsAcceptanceModal({
               if (!busy && !leaving) setDeletionOpen(true);
             }}
             aria-disabled={busy || leaving || deletionOpen || undefined}
-            aria-busy={deletionOpen || undefined}
+            aria-busy={preparing || undefined}
           >
             {/* Pendant la préparation, le bouton dit qu'il travaille (« Préparation… ») :
                 sur un réseau lent, la fenêtre ne paraît pas figée. */}

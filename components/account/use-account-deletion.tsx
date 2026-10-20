@@ -129,6 +129,10 @@ export function useAccountDeletion({ text, onCancel, layer = "default" }: UseAcc
   /** Aperçu reçu, modale de suppression ouverte. */
   const [pendingDeletion, setPendingDeletion] = useState<PendingAccountDeletion | null>(null);
 
+  // Textes retombés sur le français sous `/en` (espace `profile` anglais
+  // injoignable) : la modale et ses toasts le disent (`lang="fr"`), sa coquille reste française.
+  const contentLang = text.locale === "fr" && pageLocale !== "fr" ? "fr" : undefined;
+
   const start = async () => {
     // Le bouton se ferme **avant** l'aller-retour d'aperçu, et non après la
     // confirmation : un `await` posé devant la question rouvrirait la fenêtre
@@ -144,10 +148,10 @@ export function useAccountDeletion({ text, onCancel, layer = "default" }: UseAcc
   const performAccountDeletion = async (previewed: ConfirmationSubject): Promise<boolean> => {
     const result = await requestAccountDeletion(previewed);
     if (!result.ok) {
-      showError(deletionErrorText(text, result.code));
+      showError(deletionErrorText(text, result.code), { lang: contentLang });
       return false;
     }
-    showSuccess(deletionOutcomeText(text, result.applied));
+    showSuccess(deletionOutcomeText(text, result.applied), { lang: contentLang });
     // La route a fermé la session : l'accueil, rechargé en entier, dans la
     // langue de la page (`/en` sous `/en/profil`), se lit sans compte.
     setTimeout(() => {
@@ -155,10 +159,6 @@ export function useAccountDeletion({ text, onCancel, layer = "default" }: UseAcc
     }, ACCOUNT_DELETED_REDIRECT_MS);
     return true;
   };
-
-  // Textes retombés sur le français sous `/en` (espace `profile` anglais
-  // injoignable) : la modale le dit (`lang="fr"`), sa coquille reste française.
-  const contentLang = text.locale === "fr" && pageLocale !== "fr" ? "fr" : undefined;
 
   const dialog = pendingDeletion ? (
     <ConfirmActionDialog

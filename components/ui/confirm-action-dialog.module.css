@@ -65,6 +65,23 @@
   }
 }
 
+/* En vol (`aria-disabled`, focus gardé) : ni soulèvement ni halo au survol,
+   « Annuler » éteint, curseur d'attente — le bouton ne paraît plus pressable. */
+.actions > :global(.btn)[aria-disabled="true"],
+.actions > :global(.btn)[aria-disabled="true"]:hover {
+  cursor: progress;
+  transform: none;
+  box-shadow: none;
+}
+
+.actions > :global(.btn.ghost)[aria-disabled="true"] {
+  color: var(--ink-mute);
+}
+
+.actions > :global(.btn)[aria-disabled="true"]::before {
+  display: none;
+}
+
 .confirmField {
   margin-top: 12px;
 }
