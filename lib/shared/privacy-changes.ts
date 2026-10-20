@@ -910,7 +910,8 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Quand un membre du staff qui joue un match en tranche le litige de score, en corrige le résultat, impose l'abandon de son adversaire ou en suspend la validation automatique, les autres membres du staff en sont avertis, et le geste est consigné au journal d'activité du staff.",
     details: [
       "L'alerte part en notification push aux autres arbitres et administrateurs qui l'ont activée (sujet « Arbitrage par un joueur du staff », que tu peux couper dans « Mon profil »), jamais à l'auteur. Elle dit le tournoi, la manche et l'issue retenue (aucune pour une suspension), avec les noms d'équipe (aucun en tournoi individuel), sans le pseudo de l'auteur ni d'aucun joueur.",
-      "Le journal d'activité du staff ne dit sur Discord que le tournoi et la nature du geste, sans nom ; les journaux du serveur gardent en plus la manche, l'issue, et le pseudo et l'identifiant de compte de son auteur.",
+      "Le journal d'activité du staff ne dit sur Discord que le tournoi et la nature du geste, sans nom ; les journaux du serveur gardent en plus la manche, l'issue, les noms d'équipe (aucun en tournoi individuel), et le pseudo et l'identifiant de compte de son auteur.",
+      "Chacun de ces quatre gestes, que son auteur joue le match ou non, laisse aussi dans les journaux du serveur une trace courte : le numéro du match, et le pseudo et l'identifiant de compte de son auteur.",
     ],
     links: [
       { href: "/rgpd#notifications", label: "Lire la section « Notifications push »" },

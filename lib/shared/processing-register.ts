@@ -428,15 +428,15 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Recueillir les « Prêt » de chaque partie d'un match (équipes, caster) avant son lancement, dans les seuls tournois qui ont la phase de lancement (option de chaque tournoi, éteinte par défaut)",
       "Envoyer en message privé Discord et en push l'annonce de l'horaire d'un match (posé, changé ou retiré), l'avis qu'un match quitte son programme et les rappels de match 24 h et 10 h avant le coup d'envoi (le second — ou l'annonce d'un match programmé moins de 10 h avant — avec le lien d'invitation au serveur Discord du check-in) ; les messages privés ne partent qu'aux comptes dont le tag Discord est certifié (un tag non certifié, même rattaché par la connexion Discord, n'en reçoit aucun, pour éviter le spam) ; le joueur peut couper ces messages privés depuis « Mon profil » (notifications), ses notifications push gardant leurs propres réglages",
       "Alerter le rôle arbitre (conflit de score, litige de score resté trop longtemps sans arbitrage, signalement d'un joueur)",
-      "Avertir en push les autres arbitres et administrateurs quand un membre du staff qui joue un match (membre d'une des deux équipes, ou joueur de l'entrée en tournoi individuel) en tranche lui-même le litige de score (« Valider le résultat »), en corrige le résultat déjà acquis, impose l'abandon de son adversaire, ou en suspend la validation automatique d'un score proposé (« Enregistrer ») : tournoi, manche et issue retenue (aucune pour une suspension), avec les noms d'équipe (aucun en tournoi individuel), sans le pseudo de l'auteur ni d'aucun joueur",
+      "Avertir en push les autres arbitres et administrateurs quand un membre du staff qui joue un match (membre d'une des deux équipes — encore membre, ou parti depuis le début du match —, ou joueur de l'entrée en tournoi individuel) en tranche lui-même le litige de score (« Valider le résultat »), en corrige le résultat déjà acquis, impose l'abandon de son adversaire, ou en suspend la validation automatique d'un score proposé (« Enregistrer ») : tournoi, manche et issue retenue (aucune pour une suspension), avec les noms d'équipe (aucun en tournoi individuel), sans le pseudo de l'auteur ni d'aucun joueur",
       "Envoyer aux arbitres, environ 10 h à l'avance, le programme des matchs à venir (horaires, tournois, noms d'équipe ; « un joueur » en tournoi individuel) au canal de logs Discord et en push",
     ],
     legalBasis:
-      "Consentement pour l'exposition du pseudo Discord certifié à l'organisation (certification, geste distinct fait par le joueur depuis son profil — jamais acquise par la seule connexion — et retirable en retirant son tag) ; exécution du service demandé par le joueur (contrat — conditions d'utilisation, section « Contacts de match ») pour la présentation des contacts aux parties d'un match dans sa fenêtre « Contacts » et dans sa fenêtre de lancement (à ses deux équipes et aux arbitres dès que ses deux adversaires sont connus, à son caster et du caster le temps du match ; la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes et au caster), BattleTag masqué compris — arbitres et administrateurs n'y ont pas d'autre accès, sur la même base —, et le recueil des « Prêt » ; intérêt légitime (bon déroulement des tournois) pour l'annonce des horaires de match, l'avis qu'un match quitte son programme et les rappels de match envoyés aux joueurs, avec un droit d'opposition (art. 21) honoré par un interrupteur de « Mon profil » qui coupe tous leurs messages privés de match ; exécution du service (contrat — conditions d'utilisation, les arbitres et administrateurs agissant pour l'association) pour les alertes d'arbitrage et le programme d'arbitrage adressés au staff, l'intérêt légitime (bon déroulement des tournois) restant la base à l'égard des joueurs et équipes qu'ils citent ; intérêt légitime, celui du joueur lui-même, pour la conservation de son choix des messages privés de match (le garder est ce qui permet d'honorer son opposition)",
+      "Consentement pour l'exposition du pseudo Discord certifié à l'organisation (certification, geste distinct fait par le joueur depuis son profil — jamais acquise par la seule connexion — et retirable en retirant son tag) ; exécution du service demandé par le joueur (contrat — conditions d'utilisation, section « Contacts de match ») pour la présentation des contacts aux parties d'un match dans sa fenêtre « Contacts » et dans sa fenêtre de lancement (à ses deux équipes et aux arbitres dès que ses deux adversaires sont connus, à son caster et du caster le temps du match ; la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes et au caster), BattleTag masqué compris — arbitres et administrateurs n'y ont pas d'autre accès, sur la même base —, et le recueil des « Prêt » ; intérêt légitime (bon déroulement des tournois) pour l'annonce des horaires de match, l'avis qu'un match quitte son programme et les rappels de match envoyés aux joueurs, avec un droit d'opposition (art. 21) honoré par un interrupteur de « Mon profil » qui coupe tous leurs messages privés de match ; exécution du service (contrat — conditions d'utilisation, les arbitres et administrateurs agissant pour l'association) pour les alertes d'arbitrage et le programme d'arbitrage adressés au staff, l'intérêt légitime (bon déroulement des tournois) restant la base à l'égard des joueurs et équipes qu'ils citent ; intérêt légitime (impartialité de l'arbitrage) à l'égard du membre du staff qui arbitre un match qu'il joue, dont l'appartenance aux équipes du match est vérifiée et les autres membres du staff avertis ; intérêt légitime, celui du joueur lui-même, pour la conservation de son choix des messages privés de match (le garder est ce qui permet d'honorer son opposition)",
     dataSubjects: [
       "Joueurs engagés dans un tournoi",
       "Autres membres des équipes engagées (coachs, managers, propriétaires)",
-      "Arbitres",
+      "Arbitres et administrateurs",
       "Casters inscrits sur un match",
       "Tout titulaire de compte, pour son choix des messages privés de match",
     ],
@@ -448,6 +448,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Rôles d'équipe et statut de certification (tag Discord, BattleTag tiré d'un compte Battle.net rattaché) des contacts présentés",
       "Motif d'un signalement",
       "Choix du joueur de recevoir ou non les messages privés Discord de ses matchs",
+      "Appartenance d'un membre du staff aux équipes d'un match qu'il arbitre (membre actuel, ou date de départ comparée au début du match), vérifiée à chaque litige tranché, résultat corrigé, abandon imposé ou validation automatique suspendue",
     ],
     sensitiveData: "Aucune",
     retention: [
@@ -479,7 +480,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     purpose: "Tenir le staff informé des faits marquants de la plateforme",
     subPurposes: [
       "Arrivées de joueurs, inscriptions et abandons en tournoi, fins de match, clôtures",
-      "Traçabilité des gestes d'arbitrage (pénalités, retraits d'engagés, retours en arrière, horaires de match posés, changés ou retirés, litige tranché, résultat corrigé, abandon imposé à l'adversaire ou validation automatique suspendue par un membre du staff qui joue le match), pour la modération",
+      "Traçabilité des gestes d'arbitrage (pénalités, retraits d'engagés, retours en arrière, horaires de match posés, changés ou retirés, litige tranché, résultat corrigé, abandon imposé à l'adversaire ou validation automatique suspendue — signalés comme tels quand leur auteur joue le match), pour la modération",
       "Programme d'arbitrage : environ 10 h à l'avance, les matchs à venir (horaires, tournois, noms d'équipe ; « un joueur » en tournoi individuel)",
     ],
     legalBasis:
@@ -487,7 +488,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     dataSubjects: ["Staff", "Joueurs et équipes engagés dans un tournoi (désignés par le nom d'équipe, jamais par leur pseudo)"],
     dataCategories: [
       "Sur Discord : noms d'équipe, scores, noms des tournois, horaires et manches des matchs — aucun pseudo de joueur (« un joueur », y compris en tournoi individuel) et aucun membre du staff nommé (« le staff »)",
-      "Dans les journaux du serveur : pseudo et identifiant du membre du staff auteur d'un geste d'arbitrage",
+      "Dans les journaux du serveur : pseudo et identifiant du membre du staff auteur d'un geste d'arbitrage, avec le geste (numéro du match ; pour un arbitre qui joue le match, en plus : tournoi, manche, issue et noms d'équipe, aucun en tournoi individuel)",
     ],
     sensitiveData: "Aucune",
     retention: [
