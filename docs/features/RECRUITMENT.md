@@ -240,12 +240,15 @@ revient pour une prioritaire neuve).
   échoue n'est pas relancée à chaque page ni par chaque onglet restauré.
   Mémoire bornée (`RECRUITMENT_MODAL_HEAL_MAX_TRACKED` comptes ; pleine, le
   rattrapage attend), et plus aucune tentative si la colonne manque (jusqu'au
-  redémarrage, qui rejoue l'`ALTER`).
+  redémarrage, qui rejoue l'`ALTER`). Fenêtre comptée sur une horloge
+  monotone (`performance.now()`) : un recul de l'heure système ne la fige pas.
 - Décision : `recruitmentModalOptedOut({ accountOff, browserCookie })`
   (`lib/shared/recruitment.ts`), passée à part de `modalSilenced` (prop
   `modalOptedOut`) par `app/layout.tsx`, qui lit le cookie une fois et, pour
   qui a refusé, n'envoie plus les annonces de la modale (`modalAds` vide — ni
-  leurs textes sous `/en` si la banderole n'a rien non plus).
+  leurs textes sous `/en` si la banderole n'a rien non plus ou est déjà
+  fermée). Déjà posé sur le compte, `POST /api/recruitment/modal-dismiss`
+  n'écrit rien (il repose seulement le cookie).
 - Ordre du focus : le bouton vient **après** « Plus tard », « Lire » et
   « Postuler » dans le DOM (rangée à part, pas d'`order` CSS) — focus
   d'ouverture sur « Plus tard » sans pager, sur le pager sinon (comme avant),
