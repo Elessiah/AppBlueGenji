@@ -51,7 +51,7 @@
       "title": "Score du match",
       "saved": "Score enregistré : le match reste en cours.",
       "savedPaused": "Score enregistré : le match reste en cours, et la validation automatique de la proposition est suspendue.",
-      "savedForfeit": "Forfait enregistré : le match reste en cours.",
+      "savedForfeit": "Forfait enregistré : le match n'est pas encore tranché.",
       "savedForfeitPaused": "Forfait enregistré : le match reste en cours, et la validation automatique de la proposition est suspendue.",
       "autoValidationPaused": "Validation automatique suspendue par l'arbitrage : sans réponse de l'adversaire, seul « Valider le résultat » tranche.",
         "disputeNotice": "Litige : la saisie des deux adversaires reste verrouillée jusqu'à « Valider le résultat » (score ou forfait). « Enregistrer » note l'avancement sans trancher.",

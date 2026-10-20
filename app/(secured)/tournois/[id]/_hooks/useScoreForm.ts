@@ -238,8 +238,10 @@ export function useScoreForm(
 
       // « Enregistrer » sur un report seul suspend sa validation d'office
       // (`SCORE_DISPUTE_LOCK.md`) : la notification le dit — et dit « forfait »
-      // quand c'est un forfait, non un score, qui a été noté.
-      const forfeitSaved = state.forfeitTeamId !== undefined || state.doubleForfeit === true;
+      // quand c'est un forfait, non un score, qui a été noté (un double forfait
+      // ne s'enregistre pas : `DOUBLE_FORFEIT`). Un forfait se note aussi avant
+      // le lancement : sa notification ne dit pas « en cours ».
+      const forfeitSaved = state.forfeitTeamId !== undefined;
       const savedKey = savedToastKey(forfeitSaved, payload.autoValidationPaused === true);
       showSuccess(dialogText.t(action === "save" ? savedKey : "score.admin.resolved"));
       return true;
