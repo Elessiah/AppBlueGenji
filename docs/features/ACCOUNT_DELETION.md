@@ -181,7 +181,9 @@ ferme la session —, toast puis accueil rechargé dans la langue de la page). D
   `orReload`, qui n'aurait jamais rechargé sous une fenêtre toujours modale et
   aurait gardé un composant vide : un code introuvable se dit aussitôt par le
   toast ci-dessous, le clic suivant retente ; sous `/en`, textes anglais et code
-  partent ensemble ; le chargeur `englishProfile` vit seul dans
+  partent ensemble, avec l'aperçu — lancé par la fenêtre au clic
+  (`components/account/account-deletion-preview.ts`, sans le code de la
+  suppression) et repris en vol par `useAccountDeletion().start(preview)` ; le chargeur `englishProfile` vit seul dans
   `components/i18n/english-loader-profile.ts`, réexporté par `english-loaders-account.ts`,
   pour que la fenêtre ne tire pas les autres chargeurs)
   — ses textes sont ceux de l'espace `profile` (`deletion.*`), chargés sous
