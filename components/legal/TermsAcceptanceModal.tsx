@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
-import dynamic from "next/dynamic";
+import { useCallback, useEffect, useId, useRef, useState, type ComponentType } from "react";
 import { LocaleLink, useLocalePathname } from "@/components/i18n/locale-navigation";
 import { richNodes, useShellText } from "@/components/i18n/shell-text";
 import { createPortal } from "react-dom";
@@ -19,7 +18,9 @@ import {
   type TermsRequest,
 } from "@/lib/shared/terms-of-use";
 import { termsModalSilencedOn } from "@/lib/shared/global-modals";
-import { orReload } from "@/lib/shared/lazy-component";
+import { onceLoader, preloadMissing } from "@/lib/shared/lazy-component";
+import { englishProfile } from "@/components/i18n/english-loaders-account";
+import type { TermsAccountDeletionProps } from "./TermsAccountDeletion";
 import styles from "./TermsAcceptanceModal.module.css";
 
 /** Échap et le voile ne ferment pas une fenêtre bloquante. */
@@ -35,11 +36,20 @@ export const TERMS_DELETION_PREPARE_TIMEOUT_MS = 20_000;
 /**
  * La suppression du compte (celle de « Mon profil »), chargée au clic : ni son
  * code ni ses textes (espace `profile`) ne pèsent sur chaque page.
+ *
+ * Chargement **à la main** (`onceLoader`) plutôt que `next/dynamic` + `orReload` :
+ * `orReload` n'aurait jamais rechargé la page (il attend qu'aucune modale ne
+ * soit ouverte, et cette fenêtre l'est toujours) et `next/dynamic` aurait gardé
+ * un composant vide — chaque clic suivant restait muet jusqu'au délai de
+ * préparation. Ici, un échec est dit tout de suite (toast) et le clic suivant
+ * retente. Le survol et le focus du bouton préchargent le code (et, sous `/en`,
+ * les textes anglais) ; le clic lance les deux ensemble, pas l'un après l'autre.
  */
-const TermsAccountDeletion = dynamic(
-  () => orReload(import("./TermsAccountDeletion").then((module) => module.TermsAccountDeletion)),
-  { ssr: false },
+const termsDeletionLoader = onceLoader<ComponentType<TermsAccountDeletionProps>>(() =>
+  import("./TermsAccountDeletion").then((module) => module.TermsAccountDeletion),
 );
+const preloadTermsDeletion = preloadMissing([termsDeletionLoader]);
+const preloadTermsDeletionEnglish = preloadMissing([englishProfile]);
 
 interface TermsAcceptanceModalProps {
   /** Le compte n'a pas accepté les conditions en vigueur. */
@@ -101,6 +111,10 @@ export function TermsAcceptanceModal({
   const [deletionOpen, setDeletionOpen] = useState(false);
   /** Sa confirmation est ouverte : la préparation (code, textes, aperçu) est finie. */
   const [deletionReady, setDeletionReady] = useState(false);
+  /** Le code de la suppression, une fois chargé (`termsDeletionLoader`). */
+  const [DeletionFlow, setDeletionFlow] = useState<ComponentType<TermsAccountDeletionProps> | null>(null);
+  /** Le lancement en cours : un chargement qui répond après un abandon (délai, fenêtre tue) est ignoré. */
+  const deletionAttempt = useRef(0);
   const deleteButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => setMounted(true), []);
@@ -125,26 +139,50 @@ export function TermsAcceptanceModal({
   // aurait relancé d'elle-même la confirmation, sans un clic.
   useEffect(() => {
     if (open) return;
+    deletionAttempt.current += 1;
     setDeletionOpen(false);
     setDeletionReady(false);
   }, [open]);
 
   const unavailableRef = useRef("");
   unavailableRef.current = t("termsModal.deletionUnavailable");
+  /** La préparation échoue (code introuvable) ou dépasse son délai : la fenêtre retrouve ses issues. */
+  const abandonDeletion = useCallback(() => {
+    deletionAttempt.current += 1;
+    setDeletionOpen(false);
+    showError(unavailableRef.current);
+    // Le focus ne revient au bouton que s'il s'est perdu (resté dessus, il y
+    // est déjà) : un lecteur parti lire la politique ou cocher la case n'est pas déplacé.
+    requestAnimationFrame(() => {
+      if (document.activeElement === document.body) deleteButtonRef.current?.focus();
+    });
+  }, [showError]);
   useEffect(() => {
     if (!deletionOpen || deletionReady) return;
-    const timer = window.setTimeout(() => {
-      setDeletionOpen(false);
-      showError(unavailableRef.current);
-      // Le focus ne revient au bouton que s'il s'est perdu (resté dessus, il y
-      // est déjà) : un lecteur parti lire la politique ou cocher la case n'est pas déplacé.
-      requestAnimationFrame(() => {
-        if (document.activeElement === document.body) deleteButtonRef.current?.focus();
-      });
-    }, TERMS_DELETION_PREPARE_TIMEOUT_MS);
+    const timer = window.setTimeout(() => abandonDeletion(), TERMS_DELETION_PREPARE_TIMEOUT_MS);
     return () => window.clearTimeout(timer);
-  }, [deletionOpen, deletionReady, showError]);
+  }, [deletionOpen, deletionReady, abandonDeletion]);
   const { leaving, logout } = useLogout();
+  const preloadDeletion = () => {
+    preloadTermsDeletion();
+    if (locale === "en") preloadTermsDeletionEnglish();
+  };
+  const startDeletion = () => {
+    if (busy || leaving || deletionOpen) return;
+    setDeletionOpen(true);
+    deletionAttempt.current += 1;
+    const attempt = deletionAttempt.current;
+    // Ensemble : les textes anglais n'attendent pas le code (`TermsAccountDeletion` les relira, déjà là).
+    if (locale === "en") englishProfile.load().catch(() => undefined);
+    termsDeletionLoader.load().then(
+      (flow) => {
+        if (deletionAttempt.current === attempt) setDeletionFlow(() => flow);
+      },
+      () => {
+        if (deletionAttempt.current === attempt) abandonDeletion();
+      },
+    );
+  };
   const dialogRef = useDialogBehavior({ open, onClose: KEEP_OPEN, locked: busy });
 
   if (!open) return null;
@@ -261,9 +299,9 @@ export function TermsAcceptanceModal({
             type="button"
             variant="ghost"
             className={styles.deleteButton}
-            onClick={() => {
-              if (!busy && !leaving) setDeletionOpen(true);
-            }}
+            onClick={startDeletion}
+            onPointerEnter={preloadDeletion}
+            onFocus={preloadDeletion}
             aria-disabled={busy || leaving || deletionOpen || undefined}
             aria-busy={preparing || undefined}
           >
@@ -293,8 +331,8 @@ export function TermsAcceptanceModal({
         <output className="sr-only" aria-live="polite">
           {preparing ? t("termsModal.deleting") : ""}
         </output>
-        {deletionOpen ? (
-          <TermsAccountDeletion
+        {deletionOpen && DeletionFlow ? (
+          <DeletionFlow
             onReady={() => setDeletionReady(true)}
             onClose={() => {
               setDeletionOpen(false);
