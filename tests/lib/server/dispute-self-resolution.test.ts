@@ -126,6 +126,12 @@ describe("alertSelfResolvedDispute", () => {
     expect(notification.push("en").body).toContain("Coupe d'hiver, Round 3:");
   });
 
+  it("restreint, sur demande, la recherche à certaines engagées (abandon : l'adversaire)", async () => {
+    await alertSelfResolvedDispute(dispute, actor, [4]);
+
+    expect(execute.mock.calls[0][1]).toEqual([70, 4, 4, 9, 4, 4, 9]);
+  });
+
   it("ne dit rien quand l'arbitre ne joue pas la manche", async () => {
     plays = false;
 

@@ -177,9 +177,9 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(t12).toMatch(/Alertes d'arbitrage, litiges tranchés ou validations automatiques suspendues par un membre du staff qui joue le match, matchs planifiés/);
     const t12En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T12")!.subPurposes.join(" ");
     // La suspension de la validation automatique par un arbitre qui joue (« Enregistrer ») et l'abandon imposé sont nommés en T04.
-    expect(byRef("T04").subPurposes.join(" ")).toMatch(/abandon imposé à une équipe\) ou en suspend la validation automatique d'un score proposé \(« Enregistrer »\)/);
+    expect(byRef("T04").subPurposes.join(" ")).toMatch(/abandon imposé à l'équipe adverse\) ou en suspend la validation automatique d'un score proposé \(« Enregistrer »\)/);
     expect(PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T04")!.subPurposes.join(" ")).toMatch(
-      /withdrawal imposed on a team\) or pauses the automatic confirmation of a proposed score \(“Save”\)/,
+      /withdrawal imposed on the opposing team\) or pauses the automatic confirmation of a proposed score \(“Save”\)/,
     );
     expect(t12En).toMatch(/Referee alerts, disputes settled, or automatic confirmations paused, by a staff member who plays in the match, scheduled matches/);
   });
