@@ -210,7 +210,8 @@ de la confirmation ne s'éclairent plus au survol (`.btn:hover` de
 passent au gris système en contraste élevé (`forced-colors`), et l'attente
 (`pendingLabel`) est annoncée par un `<output aria-live="polite">` caché. Un bouton
 non armé (`disabled` natif : texte à recopier) y est éteint — bordure
-pointillée, fond vide, rouge gardé pour un geste destructeur —, curseur interdit ;
+pointillée (rouge pour un geste destructeur, jamais plus vive qu'armée), fond
+vide —, curseur interdit, gris système en contraste élevé (règle en fin de feuille) ;
 les règles de survol désarmé que `/profil`, `ScoreDialog` et
 `GhostRegistrationDialog` recopiaient sont retirées. La fenêtre des conditions
 passe ses gestes désarmés (« J'accepte » en vol compris) au gris système en
