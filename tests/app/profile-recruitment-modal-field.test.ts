@@ -1,6 +1,7 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import {
   browserOptedOut,
+  recruitmentModalSaveOutcome,
   recruitmentModalShownHere,
   sendRecruitmentModalChoice,
 } from "@/app/(secured)/profil/_components/RecruitmentModalField";
@@ -38,6 +39,32 @@ describe("recruitmentModalShownHere", () => {
     expect(recruitmentModalShownHere(true, false)).toBe(false);
     // Vieux cookie d'ici, compte réaffiché ailleurs : fermée ici, la case le dit.
     expect(recruitmentModalShownHere(false, true)).toBe(false);
+  });
+});
+
+describe("recruitmentModalSaveOutcome", () => {
+  it("enregistré sur le compte : ACCOUNT, quel que soit le cookie", () => {
+    expect(recruitmentModalSaveOutcome(null, false, true)).toBe("ACCOUNT");
+    expect(recruitmentModalSaveOutcome(null, true, false)).toBe("ACCOUNT");
+  });
+
+  it("décochée refusée mais cookie posé : BROWSER (jamais un « échec » pour un choix qui tient ici)", () => {
+    for (const code of ["RECRUITMENT_MODAL_DISMISS_FAILED", "RECRUITMENT_MODAL_ACCOUNT_UNAVAILABLE", "UNAUTHORIZED", "PROFILE_UPDATE_FAILED"]) {
+      expect(recruitmentModalSaveOutcome(code, false, true)).toBe("BROWSER");
+    }
+  });
+
+  it("décochée refusée sans cookie, ou recochée refusée : FAILED", () => {
+    expect(recruitmentModalSaveOutcome("RECRUITMENT_MODAL_DISMISS_FAILED", false, false)).toBe("FAILED");
+    expect(recruitmentModalSaveOutcome("RECRUITMENT_MODAL_DISMISS_FAILED", true, true)).toBe("FAILED");
+    expect(recruitmentModalSaveOutcome("RECRUITMENT_MODAL_DISMISS_FAILED", true, false)).toBe("FAILED");
+  });
+
+  it("la case dit « sur ce navigateur » dans ce cas, en français et en anglais", () => {
+    const source = readSource("app/(secured)/profil/_components/RecruitmentModalField.tsx");
+    expect(source).toContain('"recruitmentModal.hiddenBrowser"');
+    expect(readSource("messages/fr/profile.json")).toContain("Fenêtre de recrutement coupée sur ce navigateur");
+    expect(readSource("messages/en/profile.json")).toContain("Recruitment window turned off on this browser");
   });
 });
 
