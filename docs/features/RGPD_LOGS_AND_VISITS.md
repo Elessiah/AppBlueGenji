@@ -96,7 +96,11 @@ texte, effacée un jour après la fin de la soirée).
   adversaire », « Validation automatique suspendue ») —, **ni manche, ni issue,
   ni nom d'engagé**. La ligne détaillée (manche, issue, noms d'équipe, aucun en
   individuel) et l'auteur ne vont que dans pm2 (`publishStaffAction(discord,
-  actor, auditLine)`, `dispute-self-resolution.ts`).
+  actor, auditLine)`, `dispute-self-resolution.ts`). Avant de savoir si l'auteur
+  joue la manche, chacun de ces quatre gestes laisse dans pm2 une trace courte
+  — numéro du match et auteur nommé (`auditStaffAction`), **que l'arbitre joue
+  ou non** ; un échec ensuite s'y dit avec l'auteur par son seul identifiant
+  (« auteur #id »). Registre T05, entrée `2026-10-arbitre-qui-joue-le-match`.
 
 - Le **motif d'une pénalité** est saisi librement par l'arbitre et repris tel
   quel : il ne doit pas nommer de joueur.
