@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { LocaleLink, useLocalePathname } from "@/components/i18n/locale-navigation";
 import { richNodes, useShellText } from "@/components/i18n/shell-text";
 import { createPortal } from "react-dom";
@@ -18,10 +19,20 @@ import {
   type TermsRequest,
 } from "@/lib/shared/terms-of-use";
 import { termsModalSilencedOn } from "@/lib/shared/global-modals";
+import { orReload } from "@/lib/shared/lazy-component";
 import styles from "./TermsAcceptanceModal.module.css";
 
 /** Échap et le voile ne ferment pas une fenêtre bloquante. */
 const KEEP_OPEN = () => undefined;
+
+/**
+ * La suppression du compte (celle de « Mon profil »), chargée au clic : ni son
+ * code ni ses textes (espace `profile`) ne pèsent sur chaque page.
+ */
+const TermsAccountDeletion = dynamic(
+  () => orReload(import("./TermsAccountDeletion").then((module) => module.TermsAccountDeletion)),
+  { ssr: false },
+);
 
 interface TermsAcceptanceModalProps {
   /** Le compte n'a pas accepté les conditions en vigueur. */
@@ -49,7 +60,9 @@ interface TermsAcceptanceModalProps {
  * comptes la réacceptent, pas seulement les gérants d'équipe).
  *
  * La fenêtre est **bloquante** : ni « Plus tard », ni Échap, ni clic sur le
- * voile — on accepte, ou on se déconnecte. Les gestes de gestion restent en
+ * voile — on accepte, on supprime son compte (« Supprimer mon compte » : la
+ * suppression de « Mon profil », confirmation empilée sur la fenêtre) ou on se
+ * déconnecte (lien de la phrase des issues). Les gestes de gestion restent en
  * outre refusés côté serveur (`TERMS_ACCEPTANCE_REQUIRED`), et ce refus la
  * rouvre (`TERMS_REQUIRED_EVENT`).
  *
@@ -77,6 +90,9 @@ export function TermsAcceptanceModal({
   const [privacyAnswered, setPrivacyAnswered] = useState(!privacyPending);
   const [checked, setChecked] = useState(false);
   const [busy, setBusy] = useState(false);
+  /** La suppression du compte est lancée (aperçu, puis confirmation par-dessus). */
+  const [deletionOpen, setDeletionOpen] = useState(false);
+  const deleteButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => setMounted(true), []);
 
@@ -100,7 +116,7 @@ export function TermsAcceptanceModal({
   if (!open) return null;
 
   const accept = async () => {
-    if (busy || leaving || !checked) return;
+    if (busy || leaving || deletionOpen || !checked) return;
     setBusy(true);
     try {
       const response = await fetch("/api/profile/terms", {
@@ -148,6 +164,20 @@ export function TermsAcceptanceModal({
           <p className={styles.text}>
             {richNodes(
               rich("termsModal.exits", {}, {
+                // Un geste, pas une adresse : un bouton à l'allure de lien (`useLogout`).
+                logout: (children) => (
+                  <button
+                    type="button"
+                    className={styles.textButton}
+                    onClick={() => {
+                      if (!busy && !deletionOpen) void logout();
+                    }}
+                    aria-disabled={busy || leaving || deletionOpen || undefined}
+                    aria-busy={leaving || undefined}
+                  >
+                    {richNodes(children)}
+                  </button>
+                ),
                 policy: (children) => <LocaleLink href="/rgpd">{richNodes(children)}</LocaleLink>,
                 profile: (children) => <LocaleLink href="/profil">{richNodes(children)}</LocaleLink>,
               }),
@@ -188,30 +218,40 @@ export function TermsAcceptanceModal({
         {/* Pendant la requête, `aria-disabled` + `aria-busy` plutôt que `disabled` :
             le focus reste sur le bouton pressé (un échec se retente au clavier) ;
             `accept` ignore déjà un geste tant que `busy`, la déconnexion un
-            second clic (`useLogout`). */}
+            second clic (`useLogout`), la suppression un second lancement. */}
         <div className={styles.actions}>
           <CyberButton
+            ref={deleteButtonRef}
             type="button"
             variant="ghost"
+            className={styles.deleteButton}
             onClick={() => {
-              if (!busy) void logout();
+              if (!busy && !leaving) setDeletionOpen(true);
             }}
-            aria-disabled={busy || leaving || undefined}
-            aria-busy={leaving || undefined}
+            aria-disabled={busy || leaving || deletionOpen || undefined}
+            aria-busy={deletionOpen || undefined}
           >
-            {t("termsModal.logout")}
+            {t("termsModal.deleteAccount")}
           </CyberButton>
           <CyberButton
             type="button"
             variant="primary"
             onClick={accept}
             disabled={!checked}
-            aria-disabled={busy || leaving || undefined}
+            aria-disabled={busy || leaving || deletionOpen || undefined}
             aria-busy={busy || undefined}
           >
             {busy ? t("termsModal.saving") : t("termsModal.accept")}
           </CyberButton>
         </div>
+        {deletionOpen ? (
+          <TermsAccountDeletion
+            onClose={() => {
+              setDeletionOpen(false);
+              requestAnimationFrame(() => deleteButtonRef.current?.focus());
+            }}
+          />
+        ) : null}
       </div>
     </div>,
     document.body,

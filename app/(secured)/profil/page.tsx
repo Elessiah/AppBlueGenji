@@ -6,11 +6,7 @@ import { LogoutButton } from "@/components/logout-button";
 import { appendCroppedImage, useImageCropper, preloadImageCropDialog } from "@/components/ui/image-crop-dialog";
 import { Coche } from "@/components/Coche";
 import type { FullProfileResponse } from "@/lib/shared/types";
-import {
-  RETENTION_UNKNOWN,
-  type AccountDeletionPlan,
-  type ConfirmationSubject,
-} from "@/lib/shared/account-deletion";
+import { useAccountDeletion } from "@/components/account/use-account-deletion";
 import { useToast } from "@/components/ui/toast";
 import { TeamLink } from "@/components/entity-link";
 import { VerifiedBadge } from "@/components/discord-tag";
@@ -34,9 +30,6 @@ import {
 } from "./_lib/profile-sections";
 import {
   battletagLockText,
-  deletionConsequencesText,
-  deletionErrorText,
-  deletionOutcomeText,
   discordTagLockText,
   verifiedBadgeLabels,
   type ProfileText,
@@ -44,8 +37,6 @@ import {
 import { useProfileText } from "@/components/i18n/profile-text";
 import { useTeamErrorsText } from "@/components/i18n/team-errors-text";
 import { useLocaleRouter } from "@/components/i18n/locale-navigation";
-import { useAppLocale } from "@/components/i18n/locale-context";
-import { localeHref } from "@/lib/shared/locales";
 import { ProfileSection } from "./_components/ProfileSection";
 import { AccountLocaleField } from "./_components/AccountLocaleField";
 import { MatchDmField } from "./_components/MatchDmField";
@@ -161,8 +152,6 @@ export default function ProfilePage() {
   const { showError, showSuccess } = useToast();
   const text = useProfileText();
   const { t } = text;
-  // Langue de l'adresse (le texte peut retomber sur le français) : après la suppression du compte, l'accueil de cette langue.
-  const pageLocale = useAppLocale();
   const teamErrorsText = useTeamErrorsText();
   const { cropImage, cropDialog } = useImageCropper();
   const fieldErrors = useFieldErrors(PROFILE_FIELD_ERRORS, PROFILE_FIELD_IDS);
@@ -205,17 +194,16 @@ export default function ProfilePage() {
   const [savedDiscordPseudo, setSavedDiscordPseudo] = useState("");
   const [verifyOpen, setVerifyOpen] = useState(false);
   const [isAdult, setIsAdult] = useState<string>("unknown");
-  const [deleting, setDeleting] = useState(false);
-  /** Aperçu reçu, modale de suppression ouverte. */
-  const [pendingDeletion, setPendingDeletion] = useState<{
-    subject: ConfirmationSubject;
-    previewed: ConfirmationSubject;
-  } | null>(null);
   /**
    * Le bouton se désarme avant l'aperçu, focus encore dessus : le navigateur le
    * renvoie sur `body`, que la modale restaurerait. Annuler le rend au bouton.
    */
   const deleteButtonRef = useRef<HTMLButtonElement>(null);
+  // La suppression commune avec la fenêtre des conditions (`useAccountDeletion`).
+  const accountDeletion = useAccountDeletion({
+    text,
+    onCancel: () => requestAnimationFrame(() => deleteButtonRef.current?.focus()),
+  });
   const [openToRecruitment, setOpenToRecruitment] = useState(false);
   const [visibility, setVisibility] = useState({
     avatar: false,
@@ -567,72 +555,6 @@ export default function ProfilePage() {
       return false;
     } finally {
       setDiscordTagBusy(false);
-    }
-  };
-
-  const onDeleteAccount = async () => {
-    // Le bouton se ferme **avant** l'aller-retour d'aperçu, et non après la
-    // confirmation : un `await` posé devant la question rouvrirait la fenêtre
-    // — deux clics, deux confirmations, deux `DELETE`, dont le second échoue
-    // en 400 et affiche une erreur juste après le succès. Il ne se rouvre qu'à
-    // l'annulation de la modale.
-    if (deleting) return;
-    setDeleting(true);
-
-    // Le motif est demandé avant la confirmation : « effacé » et « anonymisé »
-    // ne sont pas la même promesse, et « tes statistiques restent » ne veut
-    // rien dire à qui n'en a aucune. Le serveur repose la question à l'écriture
-    // — ceci informe, cela tranche.
-    //
-    // Tant que l'aperçu n'a pas répondu, l'écran ne sait **rien** — pas même
-    // lequel des deux modes s'appliquera. Il partait d'une hypothèse
-    // (`TOURNAMENTS`), qu'il gardait quand la requête échouait : le joueur
-    // consentait alors à devenir anonyme et pouvait être effacé entièrement.
-    // Sur un geste irréversible, on décrit l'incertitude plutôt que d'inventer
-    // la moitié rassurante.
-    //
-    // `previewed` part de la **même** valeur que `subject`, et non de `null` :
-    // sur ce type, `null` n'est pas « je ne sais pas » mais « il ne restera
-    // rien ». Initialisé à `null`, un aperçu en échec faisait annoncer un
-    // effacement complet dès que la réponse du serveur devenait illisible —
-    // l'unique endroit du fichier où l'inconnu redevenait une promesse.
-    let subject: ConfirmationSubject = RETENTION_UNKNOWN;
-    let previewed: ConfirmationSubject = RETENTION_UNKNOWN;
-    try {
-      const preview = await fetch("/api/profile/deletion", { cache: "no-store" });
-      if (preview.ok) {
-        previewed = ((await preview.json()) as AccountDeletionPlan).reason;
-        subject = previewed;
-      }
-    } catch {
-      // Injoignable : la phrase qui ne promet ni conservation ni effacement.
-    }
-    setPendingDeletion({ subject, previewed });
-  };
-
-  /** Joué par la modale : rend `false` sur un refus, qui la laisse ouverte. */
-  const performAccountDeletion = async (previewed: ConfirmationSubject): Promise<boolean> => {
-    try {
-      const response = await fetch("/api/profile", { method: "DELETE" });
-      const payload = (await response.json()) as { error?: string } & Partial<AccountDeletionPlan>;
-      // Le corps porte un **code**, pas une phrase : la traduction vit dans le
-      // module pur, et un code inconnu retombe sur la phrase générique plutôt
-      // que de s'afficher tel quel.
-      if (!response.ok) throw new Error(payload.error || "ACCOUNT_DELETE_FAILED");
-      // `reason` vaut `null` sur un effacement complet : c'est une réponse, pas
-      // une absence de réponse. Le `mode` sert donc de témoin — il dit que le
-      // serveur a bien répondu, là où un `??` sur le motif retomberait sur
-      // l'aperçu au moment précis où le serveur annonce qu'il n'a rien gardé.
-      const applied: ConfirmationSubject = payload.mode ? payload.reason ?? null : previewed;
-      showSuccess(deletionOutcomeText(text, applied));
-      setTimeout(() => {
-        // L'accueil dans la langue de la page (`/en` sous `/en/profil`).
-        window.location.href = localeHref("/", pageLocale);
-      }, 1200);
-      return true;
-    } catch (e) {
-      showError(deletionErrorText(text, (e as Error).message));
-      return false;
     }
   };
 
@@ -1173,10 +1095,10 @@ export default function ProfilePage() {
               type="button"
               className={`btn ghost ${s.accountButton} ${s.deleteButton}`}
               ref={deleteButtonRef}
-              onClick={onDeleteAccount}
-              disabled={deleting}
+              onClick={() => void accountDeletion.start()}
+              disabled={accountDeletion.deleting}
             >
-              {deleteAccountLabel(text, deleting, pendingDeletion !== null)}
+              {deleteAccountLabel(text, accountDeletion.deleting, accountDeletion.confirming)}
             </button>
           </div>
           <LogoutButton />
@@ -1193,22 +1115,7 @@ export default function ProfilePage() {
           <TagRemovalBody verified={tagRemovalVerified} dms={tagRemovalDms} />
         </ConfirmActionDialog>
       ) : null}
-      {pendingDeletion ? (
-        <ConfirmActionDialog
-          title={t("deletion.question")}
-          confirmLabel={t("deletion.confirm")}
-          pendingLabel={t("deletion.pending")}
-          closeOnSuccess={false}
-          onClose={() => {
-            setPendingDeletion(null);
-            setDeleting(false);
-            requestAnimationFrame(() => deleteButtonRef.current?.focus());
-          }}
-          onConfirm={() => performAccountDeletion(pendingDeletion.previewed)}
-        >
-          <p>{deletionConsequencesText(text, pendingDeletion.subject)}</p>
-        </ConfirmActionDialog>
-      ) : null}
+      {accountDeletion.dialog}
     </section>
   );
 }

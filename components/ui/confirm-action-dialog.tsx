@@ -51,6 +51,12 @@ export interface ConfirmActionDialogProps {
    * Sans effet sur une page française.
    */
   contentLang?: "fr";
+  /**
+   * `overBlocking` : la confirmation s'empile sur une fenêtre bloquante plus
+   * haute que les modales ordinaires (conditions d'utilisation, 1260) — sans
+   * quoi elle s'ouvrirait dessous, focus piégé hors de vue.
+   */
+  layer?: "default" | "overBlocking";
 }
 
 /**
@@ -109,6 +115,7 @@ export function ConfirmActionDialog({
   onClose,
   onConfirm,
   contentLang,
+  layer = "default",
 }: Readonly<ConfirmActionDialogProps>) {
   const pageText = useShellText();
   const foreign = contentLang !== undefined && contentLang !== pageText.locale;
@@ -133,7 +140,7 @@ export function ConfirmActionDialog({
   if (!mounted) return null;
 
   return createPortal(
-    <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */ role="presentation" className={styles.backdrop} {...backdrop}>
+    <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */ role="presentation" className={layer === "overBlocking" ? `${styles.backdrop} ${styles.overBlocking}` : styles.backdrop} {...backdrop}>
       <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
         ref={dialogRef}
         role="alertdialog"

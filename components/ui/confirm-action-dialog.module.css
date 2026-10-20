@@ -9,6 +9,12 @@
   background: rgba(6, 8, 12, 0.72);
 }
 
+/* Empilée sur la fenêtre bloquante des conditions (1260), sous la modale des
+   changements de confidentialité (1300), qui passe avant elle. */
+.backdrop.overBlocking {
+  z-index: 1270;
+}
+
 .dialog {
   width: 100%;
   max-width: 440px;
