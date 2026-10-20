@@ -193,10 +193,23 @@ describe("recordRecruitmentModalOptOut", () => {
     expect(writeCookie).toHaveBeenCalledTimes(2);
   });
 
-  it("connecté au chargement, session finie depuis (401) : traité comme non connecté, pas comme un échec", async () => {
-    const unauthorized = async () => ({ ok: false, status: 401 });
-    expect(await recordRecruitmentModalOptOut(true, { writeCookie: () => true, post: unauthorized })).toBe("BROWSER");
-    expect(await recordRecruitmentModalOptOut(true, { writeCookie: () => false, post: unauthorized })).toBe("NONE");
+  it("connecté au chargement, session finie (401) ou compte supprimé (409) depuis : traité comme non connecté", async () => {
+    for (const status of [401, 409]) {
+      const gone = async () => ({ ok: false, status });
+      expect(await recordRecruitmentModalOptOut(true, { writeCookie: () => true, post: gone })).toBe("BROWSER");
+      expect(await recordRecruitmentModalOptOut(true, { writeCookie: () => false, post: gone })).toBe("NONE");
+    }
+  });
+
+  it("borne l'attente du serveur : l'appel par défaut porte un délai d'abandon", () => {
+    const source = readSource("components/recruitment-highlight.tsx");
+    expect(source).toContain('fetch(url, { method: "POST", signal: AbortSignal.timeout(OPT_OUT_TIMEOUT_MS) })');
+    expect(source).toContain("const OPT_OUT_TIMEOUT_MS = 10_000;");
+  });
+
+  it("garde le bas de la modale visible sous les barres du navigateur mobile (dvh)", () => {
+    const css = readSource("components/recruitment-highlight.module.css");
+    expect(css).toMatch(/\.modal \{[^}]*max-height: 90vh;\s*max-height: 90dvh;/);
   });
 
   it("cookies refusés : rien n'est gardé sans compte écrit, le compte suffit sinon", async () => {
