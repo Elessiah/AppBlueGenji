@@ -205,8 +205,12 @@ annonces restent sur `/recrutement` et dans la banderole, qui n'est pas
 concernée. « Plus tard », Échap et le voile gardent leur règle (la modale
 revient pour une prioritaire neuve).
 
-- **Navigateur** : cookie `bg_recr_off=1` (un an, `sameSite=lax`, posé par
-  le client), lu par la mise en page racine — la décision se prend avant le
+- **Navigateur** : cookie `bg_recr_off=1` (un an, `sameSite=lax`), posé par
+  le client sur-le-champ **puis reposé par le serveur** (`Set-Cookie` de
+  `POST /api/recruitment/modal-dismiss`, appelée connecté **ou non**) : Safari
+  et tout navigateur iOS (ITP) bornent à sept jours un cookie posé par script,
+  le choix n'y aurait pas duré plus que « Plus tard ». Non connecté, le toast
+  n'attend pas cet appel. Lu par la mise en page racine — la décision se prend avant le
   rendu, d'où un cookie et non `localStorage`. **Lax, pas strict** (comme
   `bg_recr_modal` / `bg_recr_banner`) : un cookie strict n'est pas envoyé quand
   la visite part d'un autre site (lien Discord, résultat de recherche, retour
@@ -231,7 +235,7 @@ revient pour une prioritaire neuve).
   fenêtre ne s'ouvrira plus d'elle-même… » ; non connecté, succès « … sur ce
   navigateur… » (le choix ne couvre que lui) ; compte injoignable, erreur
   « Choix gardé sur ce navigateur seulement… » (le cookie est posé d'abord) ;
-  session finie (401) ou compte supprimé (409) depuis le chargement, traité
+  session finie (`account: false`) ou compte supprimé (409) depuis le chargement, traité
   comme non connecté (succès « … sur ce navigateur… », le cookie suivra au
   compte) ; sans réponse en 10 s, l'appel est abandonné (repli « compte
   injoignable ») ;
@@ -312,7 +316,7 @@ ou que la source est déjà partie.
 | `DELETE /api/recruitment/[id]`     | admin  | Supprime une annonce |
 | `PUT /api/recruitment/reorder`     | admin  | Réordonne (`{ ids: number[] }`) — `409 RECRUITMENT_ORDER_MIXES_PRIORITIES` si l'ordre mêle les statuts |
 | `GET /api/recruitment/highlight`   | public | Mise en avant : `{ modal, banner }` (listes d'annonces) |
-| `POST /api/recruitment/modal-dismiss` | connecté | « Ne plus afficher » sur le compte — `401 UNAUTHORIZED`, `409 ACCOUNT_DELETED`, `500 RECRUITMENT_MODAL_DISMISS_FAILED` |
+| `POST /api/recruitment/modal-dismiss` | tous | « Ne plus afficher » : repose toujours le cookie `bg_recr_off` (`Set-Cookie`) ; connecté, l'écrit sur le compte (`{ account: true }`), sans session `{ account: false }` — `409 ACCOUNT_DELETED`, `500 RECRUITMENT_MODAL_DISMISS_FAILED` |
 
 Les mutations vérifient la session (`401` si anonyme, `403` si non-admin) et la
 validation partagée `validateRecruitmentAdInput` (`lib/shared/recruitment.ts`,
