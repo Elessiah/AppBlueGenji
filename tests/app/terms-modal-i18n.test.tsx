@@ -220,8 +220,10 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     expect(modal).toContain("const preloadTermsDeletion = preloadMissing([termsDeletionLoader]);");
     expect(modal).toContain("const preloadTermsDeletionEnglish = preloadMissing([englishProfile]);");
     expect(modal).toMatch(/if \(locale === "en"\) englishProfile\.load\(\)\.catch\(\(\) => undefined\);\s*termsDeletionLoader\.load\(\)/);
-    // Le chargeur anglais reste un import dynamique : la fenêtre (chaque page) ne tire pas le JSON.
-    expect(readSource("components/i18n/english-loaders-account.ts")).toContain('export const englishProfile = /* @__PURE__ */ onceLoader<Messages["profile"]>(() => import("@/messages/en/profile.json")');
+    // Le chargeur anglais reste un import dynamique, dans son module à lui : la fenêtre ne tire ni le JSON ni les autres chargeurs.
+    expect(modal).toContain('import { englishProfile } from "@/components/i18n/english-loader-profile";');
+    expect(modal).not.toContain("english-loaders-account");
+    expect(readSource("components/i18n/english-loader-profile.ts")).toContain('export const englishProfile = /* @__PURE__ */ onceLoader<Messages["profile"]>(() => import("@/messages/en/profile.json")');
     expect(modal).not.toMatch(/^import .*use-account-deletion/m);
     // La fenêtre reste bloquante pendant la confirmation : Échap ne ferme que celle-ci (pile des modales).
     expect(modal).toContain("onClose: KEEP_OPEN");

@@ -74,35 +74,41 @@ describe("previewAccountDeletion", () => {
     expect(calls[0].init?.signal).toBeInstanceOf(AbortSignal);
   });
 
-  it("sans `AbortSignal.timeout` (Safari < 16), l'aperçu part quand même, non borné", async () => {
+  it("sans `AbortSignal.timeout` (Safari < 16), l'aperçu reste borné : la requête est coupée au délai, pas laissée ouverte", async () => {
     const signal = AbortSignal as { timeout?: typeof AbortSignal.timeout };
     const original = signal.timeout;
     delete signal.timeout;
+    jest.useFakeTimers();
     try {
-      const calls: FetchCall[] = [];
-      const fetchImpl = fakeFetch({ "GET /api/profile/deletion": () => jsonResponse(200, { mode: "ERASE", reason: null }) }, calls);
-      expect(await previewAccountDeletion(fetchImpl)).toEqual({ subject: null, previewed: null });
-      expect(calls[0].init?.signal).toBeUndefined();
+      let seen: AbortSignal | undefined;
+      const hanging = (async (_input: string | URL | Request, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          seen = init?.signal ?? undefined;
+          init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+        })) as typeof fetch;
+      const pending = previewAccountDeletion(hanging);
+      expect(seen?.aborted).toBe(false);
+      jest.advanceTimersByTime(ACCOUNT_DELETION_PREVIEW_TIMEOUT_MS - 1);
+      expect(seen?.aborted).toBe(false);
+      jest.advanceTimersByTime(1);
+      expect(seen?.aborted).toBe(true);
+      expect(await pending).toEqual({ subject: RETENTION_UNKNOWN, previewed: RETENTION_UNKNOWN });
     } finally {
+      jest.useRealTimers();
       signal.timeout = original;
     }
   });
 
-  it("un aperçu qui ne répond jamais est abandonné au délai : la confirmation s'ouvre sur l'incertitude", async () => {
-    // Le délai lui-même (`AbortSignal.timeout`) : remplacé par un signal que le test déclenche.
-    const controller = new AbortController();
-    const timeout = jest.spyOn(AbortSignal, "timeout").mockReturnValue(controller.signal);
+  it("un aperçu qui répond à temps éteint sa minuterie : rien n'est coupé après coup", async () => {
+    jest.useFakeTimers();
     try {
-      const hanging = (async (_input: string | URL | Request, init?: RequestInit) =>
-        new Promise<Response>((_resolve, reject) => {
-          init?.signal?.addEventListener("abort", () => reject(new DOMException("timeout", "TimeoutError")));
-        })) as typeof fetch;
-      const pending = previewAccountDeletion(hanging);
-      expect(timeout).toHaveBeenCalledWith(ACCOUNT_DELETION_PREVIEW_TIMEOUT_MS);
-      controller.abort();
-      expect(await pending).toEqual({ subject: RETENTION_UNKNOWN, previewed: RETENTION_UNKNOWN });
+      const calls: FetchCall[] = [];
+      const fetchImpl = fakeFetch({ "GET /api/profile/deletion": () => jsonResponse(200, { mode: "ERASE", reason: null }) }, calls);
+      expect(await previewAccountDeletion(fetchImpl)).toEqual({ subject: null, previewed: null });
+      expect(jest.getTimerCount()).toBe(0);
+      expect(calls[0].init?.signal?.aborted).toBe(false);
     } finally {
-      timeout.mockRestore();
+      jest.useRealTimers();
     }
   });
 
