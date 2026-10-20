@@ -10,7 +10,9 @@ import type { StatsPanelMessages } from "@/lib/shared/stats-text";
  * espace, pour la session, amorcé par les fournisseurs), à part pour ne pas
  * peser sur le pied de page des écrans publics.
  */
-export const englishProfile = /* @__PURE__ */ onceLoader<Messages["profile"]>(() => import("@/messages/en/profile.json").then((module) => module.default));
+// Dans un module à lui (`english-loader-profile.ts`) : la fenêtre des conditions,
+// montée sur chaque page, le précharge sans tirer les autres chargeurs.
+export { englishProfile } from "./english-loader-profile";
 export const englishTeamErrors = /* @__PURE__ */ onceLoader<Messages["teamErrors"]>(() =>
   import("@/messages/en/teamErrors.json").then((module) => module.default),
 );

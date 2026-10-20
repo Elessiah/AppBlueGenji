@@ -19,7 +19,7 @@ import {
 } from "@/lib/shared/terms-of-use";
 import { termsModalSilencedOn } from "@/lib/shared/global-modals";
 import { onceLoader, preloadMissing } from "@/lib/shared/lazy-component";
-import { englishProfile } from "@/components/i18n/english-loaders-account";
+import { englishProfile } from "@/components/i18n/english-loader-profile";
 import type { TermsAccountDeletionProps } from "./TermsAccountDeletion";
 import styles from "./TermsAcceptanceModal.module.css";
 

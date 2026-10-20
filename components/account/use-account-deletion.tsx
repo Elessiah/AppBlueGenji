@@ -55,23 +55,25 @@ export const ACCOUNT_DELETION_PREVIEW_TIMEOUT_MS = 8000;
 export async function previewAccountDeletion(fetchImpl: typeof fetch = fetch): Promise<PendingAccountDeletion> {
   let subject: ConfirmationSubject = RETENTION_UNKNOWN;
   let previewed: ConfirmationSubject = RETENTION_UNKNOWN;
+  // Borné : un aperçu qui ne répond jamais (réseau mobile instable) laissait
+  // la fenêtre bloquante des conditions sans aucune issue — tous ses gestes
+  // désarmés le temps de la préparation. Passé le délai, la requête est
+  // **coupée** et la confirmation s'ouvre sur la phrase de l'incertitude.
+  // `AbortController` + minuterie plutôt que `AbortSignal.timeout`, absent
+  // avant Safari 16 : là, chaque essai abandonné laissait une requête ouverte,
+  // et quelques essais épuisaient les connexions HTTP/1.1 du site (flux compris).
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ACCOUNT_DELETION_PREVIEW_TIMEOUT_MS);
   try {
-    // Borné : un aperçu qui ne répond jamais (réseau mobile instable) laissait
-    // la fenêtre bloquante des conditions sans aucune issue — tous ses gestes
-    // désarmés le temps de la préparation. Passé le délai, la confirmation
-    // s'ouvre sur la phrase de l'incertitude.
-    const preview = await fetchImpl("/api/profile/deletion", {
-      cache: "no-store",
-      // Absent avant Safari 16 : sans lui l'aperçu part quand même, non borné
-      // (la fenêtre des conditions a son propre délai de préparation).
-      signal: typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(ACCOUNT_DELETION_PREVIEW_TIMEOUT_MS) : undefined,
-    });
+    const preview = await fetchImpl("/api/profile/deletion", { cache: "no-store", signal: controller.signal });
     if (preview.ok) {
       previewed = ((await preview.json()) as AccountDeletionPlan).reason;
       subject = previewed;
     }
   } catch {
-    // Injoignable : la phrase qui ne promet ni conservation ni effacement.
+    // Injoignable ou coupé : la phrase qui ne promet ni conservation ni effacement.
+  } finally {
+    clearTimeout(timer);
   }
   return { subject, previewed };
 }
