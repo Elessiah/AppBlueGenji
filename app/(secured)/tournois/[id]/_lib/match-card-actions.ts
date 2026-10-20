@@ -36,12 +36,16 @@ export type MatchCardAction = {
   /** Libellé visible — le nom accessible le reprend en tête (WCAG 2.5.3). */
   label: string;
   tone: MatchCardActionTone;
+  /** Ouvre une vue sans geste (litige : « Voir le litige ») — l'icône ne promet pas d'édition. */
+  readOnly?: true;
 };
 
 /** Ce que le lecteur peut faire sur la carte, tel que l'ont décidé les règles existantes. */
 export type MatchCardActionInput = {
   /** Libellé de la saisie joueur (`playerScoreButtonLabel`), `null` hors de son match. */
   playerScoreLabel: string | null;
+  /** La saisie joueur n'ouvre qu'une lecture (litige verrouillé). */
+  playerScoreReadOnly?: boolean;
   launch: LaunchStripControls;
   /** Phase de lancement `LOBBY` : l'ouverture dit « Ouvrir le lancement ». */
   inLobby: boolean;
@@ -99,7 +103,11 @@ export function matchCardActionList(
     [input.showReplay, "replay", either(input.hasReplay, t("cardActions.editReplay"), t("cardActions.addReplay")), "neutral"],
     [input.canReport, "report", t("header.reportIssue"), "neutral"],
   ];
-  return rows.filter(([offered]) => offered).map(([, id, label, tone]) => ({ id, label, tone }));
+  return rows
+    .filter(([offered]) => offered)
+    .map(([, id, label, tone]) =>
+      id === "playerScore" && input.playerScoreReadOnly ? { id, label, tone, readOnly: true as const } : { id, label, tone },
+    );
 }
 
 export type MatchCardActionGroups = {

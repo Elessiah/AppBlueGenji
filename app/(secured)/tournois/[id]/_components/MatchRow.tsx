@@ -122,9 +122,8 @@ export const MatchRow = memo(function MatchRow({
   // confirmer la proposition adverse, corriger la sienne).
   const playerScore = usePlayerScore();
   const canOpenPlayerScore = playerScore.canOpen(match);
-  const playerScoreLabel = canOpenPlayerScore
-    ? actionText.t(`cardActions.playerScore.${playerScoreButtonKey(playerReportView(match, myTeamId), playerScore.canReportScore(match))}`)
-    : null;
+  const playerScoreKey = playerScoreButtonKey(playerReportView(match, myTeamId), playerScore.canReportScore(match));
+  const playerScoreLabel = canOpenPlayerScore ? actionText.t(`cardActions.playerScore.${playerScoreKey}`) : null;
   // Proposition en attente, lisible de tous : sans elle, un match joué et
   // reporté se lisait exactement comme un match pas encore joué.
   const reportNotice = pendingReportText(actionText, pendingReportState(match));
@@ -185,6 +184,8 @@ export const MatchRow = memo(function MatchRow({
   // décidait déjà du bouton dans son ancien bandeau.
   const actions = matchCardActionList({
     playerScoreLabel,
+    // Litige : la modale n'est qu'une lecture, l'icône (œil) le dit.
+    playerScoreReadOnly: playerScoreKey === "review",
     launch,
     inLobby: launchPhase === "LOBBY",
     adminScoreLabel: adminResolvable && !scoreLocked ? adminScoreLabel : null,

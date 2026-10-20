@@ -459,9 +459,10 @@ export async function reportMatchScore(
 
   // Durée d'une série complète au format de la manche : l'échéance d'un report
   // seul ne court qu'après sa fin plausible (`lib/shared/score-report-deadline.ts`).
-  // Elle se lit sur le format et non sur le score déclaré, si bien qu'elle est
-  // posée **une fois**, au premier report ; seul le report de l'adversaire la
-  // rapproche (`scoreDeadlineAssignment`).
+  // Elle se lit sur le format et non sur le score déclaré ; elle est recalculée
+  // à chaque saisie de l'équipe seule à avoir reporté (au moins maintenant +
+  // 2 h, `SCORE_DISPUTE_LOCK.md`), et le report de l'adversaire la rapproche
+  // (`scoreDeadlineAssignment`) — elle ne sert plus alors qu'à l'escalade.
   const seriesMinutes = plausibleSeriesMinutes(matchFormat);
 
   if (isTeam1Reporter) {

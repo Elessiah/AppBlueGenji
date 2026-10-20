@@ -325,6 +325,9 @@ export function PlayerScoreDialog({
   // d'écran dans le dialogue plutôt que de le perdre sur `body`.
   const wasLocked = useRef(disputeLocked);
   useEffect(() => {
+    // Zone de forfait repliée au verrou : levé sans clore (retour en arrière),
+    // elle ne revient pas dépliée, « Confirmer le forfait » prêt au clic.
+    if (disputeLocked) setForfeitOpen(false);
     const dialog = dialogRef.current;
     if (disputeLocked && !wasLocked.current && dialog && !dialog.contains(document.activeElement)) dialog.focus();
     wasLocked.current = disputeLocked;

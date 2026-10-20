@@ -8,6 +8,7 @@ import {
   CalendarClock,
   CalendarPlus,
   Ellipsis,
+  Eye,
   Film,
   Info,
   Mic,
@@ -392,7 +393,7 @@ export function MatchCardActions({
     id === "hostSwap" || id === "claimCast" || id === "releaseCast" || id === "onAir" || id === "force";
 
   const renderButton = (action: MatchCardAction, inMenu: boolean) => {
-    const Icon = ICONS[action.id];
+    const Icon = action.readOnly ? Eye : ICONS[action.id];
     const blocked = action.id === "claimCast" && castBlock !== null;
     return (
       <button
