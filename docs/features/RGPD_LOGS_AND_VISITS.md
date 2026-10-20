@@ -83,7 +83,8 @@ texte, effacée un jour après la fin de la soirée).
   joue la manche — « ⚠️ Litige tranché par un membre du staff qui joue ce
   match · « tournoi », manche : issue. », noms d'équipe seulement, « forfait
   d'un joueur » ou score nu en individuel ; même ligne « ⚠️ Résultat corrigé
-  par … » pour un résultat acquis qu'il corrige ; validation automatique suspendue
+  par … » pour un résultat acquis qu'il corrige, « ⚠️ Abandon imposé à son
+  adversaire par … » pour un abandon qu'il impose ; validation automatique suspendue
   par un membre du staff qui joue la manche — « ⚠️ Validation automatique
   suspendue par un membre du staff qui joue ce match · « tournoi », manche. »,
   aucun nom d'engagé) : « par le staff » sur Discord, et la même

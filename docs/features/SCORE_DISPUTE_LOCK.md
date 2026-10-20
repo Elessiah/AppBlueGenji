@@ -68,10 +68,13 @@ perd. Comportement inchangé, voulu ; /regles le dit (FR + EN : « Abandonner le
 tournoi, là où le format le permet, reste possible pendant un litige… »).
 
 **Arbitre qui joue** (décisions du 2026-10-20). Un membre du staff
-(`tournaments`) qui joue la manche — membre d'une des deux équipes (encore
-membre, **ou parti depuis que la manche existe** : `left_at >= m.created_at`,
-pour que quitter l'équipe juste avant de trancher n'efface pas l'alerte), ou
-joueur de l'entrée solo (`actorPlaysMatch`) — peut agir : une petite
+(`tournaments`) qui joue la manche — membre d'une des deux équipes **au moment
+où elle s'est jouée** (`actorPlaysMatch` : arrivé au plus tard, parti au plus
+tôt à cet instant — premier report lu sous verrou avant que l'arbitrage ne
+l'efface, `playedAt` ; sinon lancement ; sinon création de la manche pour le
+départ, maintenant pour l'arrivée), si bien que quitter l'équipe juste avant de
+trancher n'efface pas l'alerte et qu'un ancien membre parti avant le match, ou
+arrivé après, n'est pas accusé à tort ; ou joueur de l'entrée solo — peut agir : une petite
 organisation n'a pas toujours un arbitre neutre. Mais les **autres** sont
 avertis, après le commit et au meilleur effort
 (`lib/server/tournaments/dispute-self-resolution.ts`, avec l'arbitre de la
@@ -79,13 +82,17 @@ session), dans quatre cas :
 
 1. il **tranche un litige** par « Valider le résultat »
    (`adminResolveMatchPublic` → `alertSelfResolvedDispute`) ;
-2. il **impose l'abandon** de l'équipe adverse (route d'abandon, chemin
+2. il **impose l'abandon** de son adversaire (route d'abandon, chemin
    arbitrage : `forfeitTournamentTeamPublic` avec `actor`) et cet abandon clôt
-   un litige de la manche : les manches ouvertes de l'engagé se lisent sans
-   verrou puis se verrouillent **par clé primaire** (`lockOpenDisputes`, après
-   `lockTournamentRow` en première instruction ; tout rejoué sur interblocage,
-   `retryOnDeadlock`), et celles que l'abandon a closes (`COMPLETED`) partent à
-   `alertSelfResolvedDispute` — issue « forfait de Équipe X ». Seul compte
+   la manche qu'il joue — **litige ou non** : clore ainsi un report gagnant de
+   l'adversaire en attente n'est pas plus discret que suspendre sa validation.
+   Les manches ouvertes de l'engagé se lisent sans verrou puis se verrouillent
+   **par clé primaire** (`lockOpenMatches`, après `lockTournamentRow` en
+   première instruction ; tout rejoué sur interblocage, `retryOnDeadlock`), et
+   celles que l'abandon a closes (`COMPLETED`) partent à
+   `alertSelfImposedForfeit` — push « Un membre du staff qui joue ce match a
+   imposé l'abandon de son adversaire · tournoi, manche : forfait de X. »,
+   ligne « ⚠️ Abandon imposé à son adversaire par … ». Seul compte
    l'arbitre qui joue chez l'**adversaire** de l'équipe retirée : retirer sa
    propre équipe est une concession, qu'un joueur peut faire lui-même ;
 3. son « Enregistrer » **suspend** la validation d'office d'un report seul
@@ -93,7 +100,10 @@ session), dans quatre cas :
    la saisie qui pose la suspension (`pausedNow`, état d'avant lu sous le
    verrou du match), pas à chaque nouvelle saisie d'une manche déjà suspendue ;
 4. il **corrige un résultat acquis** (« Valider le résultat » sur une manche
-   `COMPLETED`, lue sous le même verrou que le litige) : renverser un litige
+   `COMPLETED`, lue sous le même verrou que le litige, **et dont l'issue
+   change** : score, vainqueur, forfait ou double forfait relus après
+   l'arbitrage, `sameOutcome` — revalider le même résultat n'avertit
+   personne) : renverser un litige
    tranché par un arbitre neutre ne doit pas être plus discret que le trancher
    (`alertSelfCorrectedResult` : push « Un membre du staff qui joue ce match en
    a corrigé le résultat · tournoi, manche : issue. », ligne « ⚠️ Résultat
