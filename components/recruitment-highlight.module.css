@@ -327,11 +327,17 @@
   margin-top: 12px;
 }
 
-/* « Ne plus afficher » : secondaire, rejeté à gauche des actions, en lien
-   souligné plutôt qu'en bouton plein — il ne doit pas concurrencer « Lire ».
-   Cible de 44 px de haut au toucher (WCAG 2.5.8). */
+/* « Ne plus afficher » : secondaire, sur sa propre rangée sous les actions
+   (et après elles dans l'ordre du focus), en lien souligné plutôt qu'en bouton
+   plein — il ne doit pas concurrencer « Lire ». Cible de 44 px de haut au
+   toucher (WCAG 2.5.8). */
+.optOutRow {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 4px;
+}
+
 .optOut {
-  margin-right: auto;
   min-height: 44px;
   padding: 0 4px;
   font-family: inherit;
