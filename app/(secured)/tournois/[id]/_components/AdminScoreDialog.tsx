@@ -212,8 +212,10 @@ function PendingReportPanel({ text, pending, team1, team2, paused, loading, subm
   return (
     <div className={mapStyles.proposals}>
       <ProposalSection text={text} report={pending.report} by={pending.by} team1={team1} team2={team2} />
-      {loading && pending.report.maps.length === 0 && (
-        <p className={styles.formatHint}>{text.t("score.admin.awaitingDetail")}</p>
+      {pending.report.maps.length === 0 && (
+        <p className={styles.formatHint}>
+          {text.t(loading ? "score.admin.awaitingDetail" : "score.admin.proposalWithoutMaps")}
+        </p>
       )}
       {/* NOSONAR S6772 — le bouton est en `display: block`, il passe à la ligne */}
       {pending.report.maps.length > 0 && (

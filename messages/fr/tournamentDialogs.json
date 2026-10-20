@@ -70,6 +70,7 @@
       "proposalTitle": "Proposition de {name} : {score1} – {score2}",
       "proposalMaps": "Maps proposées par {name}",
       "adoptProposal": "Reprendre la proposition de {name}",
+      "proposalWithoutMaps": "Cette proposition n'a pas de détail de maps à reprendre : saisis les maps jouées pour la valider.",
       "saveWillPause": "« Enregistrer » suspend la validation automatique de la proposition de {author} : seul « Valider le résultat » tranche alors, à moins que {other} ne la confirme.",
       "conflict": "Ce match a été modifié pendant ta saisie — quelqu'un d'autre a enregistré un résultat. Envoyer maintenant écraserait le sien.",
       "adoptStored": "Reprendre la valeur à jour",

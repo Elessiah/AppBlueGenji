@@ -70,6 +70,7 @@
       "proposalTitle": "{name}'s proposal: {score1} – {score2}",
       "proposalMaps": "Maps proposed by {name}",
       "adoptProposal": "Use {name}'s proposal",
+      "proposalWithoutMaps": "This proposal has no map details to reuse: enter the maps played to confirm it.",
       "saveWillPause": "“Save” pauses the automatic confirmation of {author}'s proposal: only “Confirm the result” then settles the match, unless {other} confirms it.",
       "conflict": "This match changed while you were entering it — someone else saved a result. Sending now would overwrite theirs.",
       "adoptStored": "Use the latest value",
