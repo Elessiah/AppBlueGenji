@@ -211,8 +211,10 @@ async function alertSelfAction(
   // entre le commit et la ligne détaillée ne laisse pas le geste sans auteur.
   auditStaffAction(`${SELF_ACTION_TRACE[kind]} — match #${match.matchId}`, actor);
   let logged = false;
+  let plays = false;
   try {
     if (!(await actorPlaysMatch(match, actor.id, sides))) return false;
+    plays = true;
     const input = await loadAlertMatch(match);
     if (!input) return false;
 
@@ -226,6 +228,12 @@ async function alertSelfAction(
     return true;
   } catch (error) {
     // Le geste est acquis ; dire ce qui manque, la manche et l'auteur (par son id).
+    // Avant la réponse de `actorPlaysMatch`, rien ne dit que l'auteur joue : la
+    // ligne ne doit pas l'en accuser.
+    if (!plays) {
+      console.error(`[staff-audit] vérification « arbitre qui joue » interrompue (${kind}) — match #${match.matchId}, auteur #${actor.id}`, error);
+      return false;
+    }
     const missing = logged ? "push non envoyé" : "ni journalisée ni envoyée";
     console.error(`[staff-audit] alerte d'arbitre qui joue ${missing} (${kind}) — match #${match.matchId}, auteur #${actor.id}`, error);
     return false;
