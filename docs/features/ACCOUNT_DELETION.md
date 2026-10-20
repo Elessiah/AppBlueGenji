@@ -226,13 +226,15 @@ ne reste pas sur l'appareil.
 
 Depuis la fenêtre des conditions, le conseil du motif `OWNED_TEAMS`
 (« transfère-la ou dissous-la d'abord pour un effacement complet ») n'est pas
-réalisable sans accepter : la fenêtre bloque `/equipes`, et le transfert exige
-les conditions (`TERMS_ACCEPTANCE_REQUIRED`). La confirmation y ajoute donc
+réalisable sans accepter : la fenêtre bloque `/equipes` (seule barrière de la
+dissolution, que le serveur ne lie pas aux conditions), et le transfert exige
+en plus les conditions (`TERMS_ACCEPTANCE_REQUIRED`). La confirmation y ajoute donc
 `deletion.ownedTeamsFromTerms` (FR + EN, `useAccountDeletion({ fromTerms: true })`
 → `deletionConsequencesText(…, fromTerms)`) : il faut d'abord accepter, sinon
 demander l'effacement complet à l'association (« Exercer vos droits »). « Mon
 profil » ne change pas. `/rgpd` (« Droit à l'effacement », FR + EN) dit que la
-suppression se fait aussi soi-même, dans Mon profil ou depuis cette fenêtre. La liste des codes vit une fois, dans `lib/shared/account-deletion.ts`,
+suppression se fait aussi soi-même, dans Mon profil ou depuis cette fenêtre,
+comme le registre (T01, FR + EN). La liste des codes vit une fois, dans `lib/shared/account-deletion.ts`,
 lue par l'écran et par `deletionErrorText`.
 
 L'aperçu est **borné** (`ACCOUNT_DELETION_PREVIEW_TIMEOUT_MS`, 8 s,
