@@ -101,7 +101,6 @@ describe("modale d'arrivée — bouton « Ne plus afficher »", () => {
       const highlight = messagesFor(locale).recruitment.highlight;
       expect(highlight.dontShowAgain).toBeTruthy();
       expect(highlight.dontShowAgainDone).toBeTruthy();
-      expect(highlight.dontShowAgainFailed).toBeTruthy();
       expect(highlight.dontShowAgainDoneBrowser).toBeTruthy();
       expect(highlight.dontShowAgainUnsaved).toBeTruthy();
     }
@@ -135,7 +134,6 @@ describe("modale d'arrivée — bouton « Ne plus afficher »", () => {
       highlight.dontShowAgain,
       highlight.dontShowAgainDone,
       highlight.dontShowAgainDoneBrowser,
-      highlight.dontShowAgainFailed,
       highlight.dontShowAgainUnsaved,
     ]) {
       expect(text).not.toMatch(/\bads?\b/i);
@@ -158,78 +156,19 @@ describe("modale d'arrivée — bouton « Ne plus afficher »", () => {
 });
 
 describe("recordRecruitmentModalOptOut", () => {
+  type Post = (url: string) => Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }>;
   /** Le délai de la seconde tentative, sans attente réelle. */
   const noWait = async (_ms: number) => undefined;
-
-  it("non connecté : pose le cookie du navigateur, puis le fait reposer par le serveur (ITP)", async () => {
-    const writeCookie = jest.fn<(name: string, value: string, maxAge?: number) => boolean>(() => true);
-    const post = jest.fn(async (_url: string) => ({ ok: true, status: 200, json: async () => ({ account: false }) }));
-    expect(await recordRecruitmentModalOptOut(false, { wait: noWait, writeCookie, post })).toBe("BROWSER");
-    expect(writeCookie).toHaveBeenCalledWith(RECRUITMENT_MODAL_OFF_COOKIE, "1", RECRUITMENT_MODAL_OFF_MAX_AGE);
-    expect(post).toHaveBeenCalledWith("/api/recruitment/modal-dismiss");
-  });
-
-  it("connecté : pose le cookie d'abord, puis le choix sur le compte", async () => {
-    const order: string[] = [];
-    const writeCookie = jest.fn(() => order.push("cookie") > 0);
-    const post = jest.fn(async (url: string) => {
-      order.push(url);
-      return { ok: true, status: 200, json: async () => ({ account: true }) };
-    });
-    expect(await recordRecruitmentModalOptOut(true, { wait: noWait, writeCookie, post })).toBe("ACCOUNT");
-    expect(order).toEqual(["cookie", "/api/recruitment/modal-dismiss"]);
-  });
-
-  it("connecté, compte injoignable ou refus : le choix reste au moins sur ce navigateur", async () => {
-    const writeCookie = jest.fn(() => true);
-    expect(await recordRecruitmentModalOptOut(true, { wait: noWait, writeCookie, post: async () => ({ ok: false, status: 500, json: async () => ({}) }) })).toBe(
-      "BROWSER_ONLY",
-    );
-    expect(
-      await recordRecruitmentModalOptOut(true, { wait: noWait,
-        writeCookie,
-        post: async () => {
-          throw new Error("offline");
-        },
-      }),
-    ).toBe("BROWSER_ONLY");
-    expect(writeCookie).toHaveBeenCalledTimes(2);
-  });
-
-  it("connecté au chargement, session finie (account: false) ou compte supprimé (409) depuis : traité comme non connecté", async () => {
-    const answers = [
-      async () => ({ ok: true, status: 200, json: async () => ({ account: false }) }),
-      async () => ({ ok: false, status: 409, json: async () => ({ error: "ACCOUNT_DELETED" }) }),
-    ];
-    for (const gone of answers) {
-      expect(await recordRecruitmentModalOptOut(true, { wait: noWait, writeCookie: () => true, post: gone })).toBe("BROWSER");
-      expect(await recordRecruitmentModalOptOut(true, { wait: noWait, writeCookie: () => false, cookieKept: () => false, post: gone })).toBe("NONE");
-    }
-  });
-
-  it("non connecté : un échec du serveur ne change rien à l'issue (le cookie du script tient)", async () => {
-    const failing = jest.fn(async () => {
-      throw new Error("offline");
-    });
-    expect(await recordRecruitmentModalOptOut(false, { wait: noWait, writeCookie: () => true, post: failing })).toBe("BROWSER");
-    expect(
-      await recordRecruitmentModalOptOut(false, { wait: noWait,
-        writeCookie: () => true,
-        post: async () => ({ ok: false, status: 500, json: async () => ({}) }),
-      }),
-    ).toBe("BROWSER");
-    expect(await recordRecruitmentModalOptOut(false, { wait: noWait, writeCookie: () => false, post: failing })).toBe("NONE");
-  });
-
-  it("non connecté, cookie du script posé : le toast n'attend pas le serveur", async () => {
-    const hanging = jest.fn((_url: string) => new Promise<never>(() => undefined));
-    expect(await recordRecruitmentModalOptOut(false, { wait: noWait, writeCookie: () => true, post: hanging })).toBe("BROWSER");
-    expect(hanging).toHaveBeenCalledWith("/api/recruitment/modal-dismiss");
-  });
-
-  type Post = (url: string) => Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }>;
   const flush = () => new Promise((resolve) => setImmediate(resolve));
   const reply = (status: number, body: unknown = {}) => ({ ok: status < 400, status, json: async () => body });
+
+  it("non connecté : pose le cookie du navigateur, puis le fait reposer par le serveur (ITP), sans attendre", async () => {
+    const writeCookie = jest.fn<(name: string, value: string, maxAge?: number) => boolean>(() => true);
+    const hanging = jest.fn<Post>(() => new Promise<never>(() => undefined));
+    expect(await recordRecruitmentModalOptOut(false, { writeCookie, post: hanging, wait: noWait })).toBe("BROWSER");
+    expect(writeCookie).toHaveBeenCalledWith(RECRUITMENT_MODAL_OFF_COOKIE, "1", RECRUITMENT_MODAL_OFF_MAX_AGE);
+    expect(hanging).toHaveBeenCalledWith("/api/recruitment/modal-dismiss");
+  });
 
   it("non connecté : retente une fois, après un délai, un renouvellement qui n'aboutit pas (réseau ou 5xx)", async () => {
     for (const first of [() => Promise.reject(new Error("offline")), () => Promise.resolve(reply(502))]) {
@@ -255,33 +194,64 @@ describe("recordRecruitmentModalOptOut", () => {
     expect(down).toHaveBeenCalledTimes(2);
   });
 
-  it("connecté : un échec du compte est retenté une fois, et le toast dit l'issue de la seconde tentative", async () => {
-    const wait = jest.fn(async (_ms: number) => undefined);
-    const recovers = jest.fn<Post>().mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce(reply(200, { account: true }));
-    expect(await recordRecruitmentModalOptOut(true, { writeCookie: () => true, post: recovers, wait })).toBe("ACCOUNT");
-    expect(wait).toHaveBeenCalledWith(2_000);
-    const proxy = jest.fn<Post>().mockResolvedValueOnce(reply(502)).mockResolvedValueOnce(reply(502));
-    expect(await recordRecruitmentModalOptOut(true, { writeCookie: () => true, post: proxy, wait })).toBe("BROWSER_ONLY");
-    expect(proxy).toHaveBeenCalledTimes(2);
-    const gone = jest.fn<Post>().mockResolvedValue(reply(409));
-    expect(await recordRecruitmentModalOptOut(true, { writeCookie: () => true, post: gone, wait })).toBe("BROWSER");
-    expect(gone).toHaveBeenCalledTimes(1);
+  it("connecté : pose le cookie d'abord, puis le choix sur le compte, en une seule tentative", async () => {
+    const order: string[] = [];
+    const writeCookie = jest.fn(() => order.push("cookie") > 0);
+    const post = jest.fn<Post>(async (url: string) => {
+      order.push(url);
+      return reply(200, { account: true });
+    });
+    expect(await recordRecruitmentModalOptOut(true, { writeCookie, post, wait: noWait })).toBe("ACCOUNT");
+    expect(order).toEqual(["cookie", "/api/recruitment/modal-dismiss"]);
   });
 
-  it("connecté : une première tentative abandonnée au délai n'est pas suivie d'une seconde attendue (toast sans retard)", async () => {
-    let clock = 0;
-    const wait = jest.fn(async (_ms: number) => undefined);
-    const stalled = jest.fn<Post>().mockImplementationOnce(async () => {
-      clock += 10_000;
-      throw new Error("AbortError");
-    });
-    stalled.mockResolvedValue(reply(200, { account: true }));
+  it("connecté, compte non écrit (réseau, délai, 5xx) : succès « compte », rattrapé à la page suivante — aucune seconde tentative attendue", async () => {
+    for (const fails of [() => Promise.reject(new Error("offline")), () => Promise.resolve(reply(500)), () => Promise.resolve(reply(502))]) {
+      const wait = jest.fn(async (_ms: number) => undefined);
+      const post = jest.fn<Post>().mockImplementation(fails);
+      expect(await recordRecruitmentModalOptOut(true, { writeCookie: () => true, post, wait })).toBe("ACCOUNT");
+      await flush();
+      expect(post).toHaveBeenCalledTimes(1);
+      expect(wait).not.toHaveBeenCalled();
+    }
+  });
+
+  it("connecté au chargement, session finie (account: false) ou compte supprimé (409) depuis : traité comme non connecté", async () => {
+    for (const gone of [reply(200, { account: false }), reply(409, { error: "ACCOUNT_DELETED" })]) {
+      expect(await recordRecruitmentModalOptOut(true, { writeCookie: () => true, post: async () => gone, wait: noWait })).toBe(
+        "ACCOUNT",
+      );
+    }
+  });
+
+  it("cookie refusé au script : relu après la réponse, dont le Set-Cookie a pu le garder", async () => {
+    let serverCookie = false;
+    const sets = async () => {
+      serverCookie = true;
+      return reply(200, { account: false });
+    };
+    const cookieKept = () => serverCookie;
+    expect(await recordRecruitmentModalOptOut(false, { writeCookie: () => false, cookieKept, post: sets, wait: noWait })).toBe(
+      "BROWSER",
+    );
+    serverCookie = false;
+    const down = async () => {
+      throw new Error("offline");
+    };
+    expect(await recordRecruitmentModalOptOut(false, { writeCookie: () => false, cookieKept, post: down, wait: noWait })).toBe(
+      "NONE",
+    );
+    expect(await recordRecruitmentModalOptOut(true, { writeCookie: () => false, cookieKept, post: down, wait: noWait })).toBe(
+      "NONE",
+    );
     expect(
-      await recordRecruitmentModalOptOut(true, { writeCookie: () => true, post: stalled, wait, now: () => clock }),
-    ).toBe("BROWSER_ONLY");
-    await flush();
-    expect(wait).toHaveBeenCalledWith(2_000);
-    expect(stalled).toHaveBeenCalledTimes(2);
+      await recordRecruitmentModalOptOut(true, {
+        writeCookie: () => false,
+        cookieKept,
+        post: async () => reply(200, { account: true }),
+        wait: noWait,
+      }),
+    ).toBe("ACCOUNT");
   });
 
   it("borne l'attente du serveur sans AbortSignal.timeout (absent de Safari 15)", () => {
@@ -297,51 +267,17 @@ describe("recordRecruitmentModalOptOut", () => {
     expect(css).toMatch(/\.modal \{[^}]*max-height: 90vh;\s*max-height: 90dvh;/);
   });
 
-  it("cookies refusés : rien n'est gardé sans compte écrit, le compte suffit sinon", async () => {
-    const writeCookie = jest.fn(() => false);
-    expect(await recordRecruitmentModalOptOut(false, { wait: noWait, writeCookie, cookieKept: () => false, post: async () => { throw new Error("offline"); } })).toBe("NONE");
-    expect(await recordRecruitmentModalOptOut(true, { wait: noWait, writeCookie, post: async () => ({ ok: false, status: 500, json: async () => ({}) }) })).toBe("NONE");
-    expect(
-      await recordRecruitmentModalOptOut(true, { wait: noWait,
-        writeCookie,
-        post: async () => {
-          throw new Error("offline");
-        },
-      }),
-    ).toBe("NONE");
-    expect(await recordRecruitmentModalOptOut(true, { wait: noWait, writeCookie, post: async () => ({ ok: true, status: 200, json: async () => ({ account: true }) }) })).toBe("ACCOUNT");
-  });
-
-  it("script refusé mais Set-Cookie du serveur accepté : le choix est gardé, pas d'erreur « cookies refusés »", async () => {
-    let serverCookie = false;
-    const post = async () => {
-      serverCookie = true;
-      return { ok: true, status: 200, json: async () => ({ account: false }) };
-    };
-    const failingPost = async () => {
-      serverCookie = true;
-      return { ok: false, status: 500, json: async () => ({}) };
-    };
-    const cookieKept = () => serverCookie;
-    expect(await recordRecruitmentModalOptOut(false, { wait: noWait, writeCookie: () => false, cookieKept, post })).toBe("BROWSER");
-    serverCookie = false;
-    expect(await recordRecruitmentModalOptOut(true, { wait: noWait, writeCookie: () => false, cookieKept, post: failingPost })).toBe(
-      "BROWSER_ONLY",
-    );
-  });
-
   it("pose le cookie de façon synchrone, avant tout await (la modale se ferme aussitôt)", () => {
     const writeCookie = jest.fn(() => true);
-    void recordRecruitmentModalOptOut(true, { wait: noWait, writeCookie, post: () => new Promise(() => undefined) });
+    void recordRecruitmentModalOptOut(true, { writeCookie, post: () => new Promise(() => undefined), wait: noWait });
     expect(writeCookie).toHaveBeenCalledTimes(1);
   });
 });
 
 describe("recruitmentOptOutToast — le toast dit où le choix a été gardé", () => {
-  it("succès sur le compte, succès « ce navigateur » non connecté, erreur sinon", () => {
+  it("succès sur le compte, succès « ce navigateur » non connecté, erreur si rien n'a pu être gardé", () => {
     expect(recruitmentOptOutToast("ACCOUNT")).toEqual({ kind: "success", key: "dontShowAgainDone" });
     expect(recruitmentOptOutToast("BROWSER")).toEqual({ kind: "success", key: "dontShowAgainDoneBrowser" });
-    expect(recruitmentOptOutToast("BROWSER_ONLY")).toEqual({ kind: "error", key: "dontShowAgainFailed" });
     expect(recruitmentOptOutToast("NONE")).toEqual({ kind: "error", key: "dontShowAgainUnsaved" });
   });
 });
