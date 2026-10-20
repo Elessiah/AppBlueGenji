@@ -209,6 +209,16 @@ describe("useAccountDeletion", () => {
     expect(props.title).toBe(text.t("deletion.question"));
   });
 
+  it("un aperçu déjà en vol (lancé par la fenêtre des conditions au clic) est repris : aucune seconde requête", async () => {
+    globalThis.fetch = fakeFetch({}, calls);
+    await useAccountDeletion({ text: FR_PROFILE }).start(Promise.resolve({ subject: "OWNED_TEAMS", previewed: "OWNED_TEAMS" }));
+    expect(calls).toHaveLength(0);
+    rerender();
+    const opened = useAccountDeletion({ text: FR_PROFILE });
+    expect(opened.confirming).toBe(true);
+    expect(dialogProps(opened).children).toBeDefined();
+  });
+
   it("un second lancement pendant l'aperçu n'envoie rien de plus", async () => {
     globalThis.fetch = fakeFetch({ "GET /api/profile/deletion": () => jsonResponse(200, { mode: "ERASE", reason: null }) }, calls);
     const flow = useAccountDeletion({ text: FR_PROFILE });
