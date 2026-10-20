@@ -121,9 +121,15 @@ remplace plus, à l'échéance, ce que l'arbitre a noté.
   l'heure ; la modale des deux équipes « Validation automatique suspendue par
   l'arbitrage : sans réponse, un arbitre validera le résultat. » ; la fenêtre
   d'arbitrage le dit dans un avis à part (la saisie de l'arbitre efface l'avis
-  de proposition) et garde la proposition en attente lisible — score, maps,
-  codes de replay — pour l'arbitre qui rouvre le match ; le bouton de la carte
-  reste « Valider le score proposé » ; l'avis « proposition
+  de proposition). Dès qu'un avancement d'arbitrage est noté sur un report
+  seul — avant ou après la proposition, suspendu ou non
+  (`singlePendingReport`) —, la fenêtre garde la proposition lisible (score,
+  maps, codes de replay), offre « Reprendre la proposition de X » / « Use X's
+  proposal » (maps chargées dans le formulaire, `adoptReport`) et, tant que
+  rien n'est suspendu, prévient que « Enregistrer » suspendra la validation
+  (`score.admin.saveWillPause`) ; le bouton de la carte reste « Valider le
+  score proposé ». L'alerte au staff nomme une ronde suisse, phase d'un
+  `MULTI` comprise, par `swissRoundSql` ; l'avis « proposition
   modifiée » dit « « Enregistrer » note ta saisie et suspend la validation
   automatique de cette proposition ; seul « Valider le résultat » tranche, à
   moins que {adversaire} ne la confirme. ». Rouvert sur un report suspendu,
