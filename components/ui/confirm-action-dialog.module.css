@@ -65,35 +65,14 @@
   }
 }
 
-/* En vol (`aria-disabled`, focus gardé) : ni soulèvement ni halo au survol,
-   « Annuler » éteint, curseur d'attente — le bouton ne paraît plus pressable. */
-.actions > :global(.btn)[aria-disabled="true"],
-.actions > :global(.btn)[aria-disabled="true"]:hover {
+/* En vol (`aria-disabled`, focus gardé) : « Annuler » éteint, curseur
+   d'attente — le survol de `.btn` ne l'éclaire déjà plus (`globals.css`). */
+.actions > :global(.btn)[aria-disabled="true"] {
   cursor: progress;
-  transform: none;
-  box-shadow: none;
 }
 
 .actions > :global(.btn.ghost)[aria-disabled="true"] {
   color: var(--ink-mute);
-}
-
-.actions > :global(.btn)[aria-disabled="true"]::before {
-  display: none;
-}
-
-/* Le fond reste celui du repos (`globals.css`) : le survol de `.btn` ne
-   l'éclaircit plus comme celui d'un bouton pressable. */
-.actions > :global(.btn)[aria-disabled="true"]:hover {
-  background: rgba(89, 212, 255, 0.14);
-}
-
-.actions > :global(.btn.ghost)[aria-disabled="true"]:hover {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.actions > :global(.btn.danger)[aria-disabled="true"]:hover {
-  background: rgba(var(--danger-rgb), 0.14);
 }
 
 /* Contraste élevé (Windows) : les couleurs posées plus haut sont ignorées ; le

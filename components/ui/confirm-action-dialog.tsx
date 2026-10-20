@@ -203,6 +203,12 @@ export function ConfirmActionDialog({
             >
               {busy ? pendingLabel : confirmLabel}
             </button>
+            {/* Le libellé d'un bouton focalisé qui change n'est pas annoncé : l'attente
+                se dit ici (`<output>`, rôle `status` natif ; `aria-live` explicite pour
+                VoiceOver/WebKit). */}
+            <output className="sr-only" aria-live="polite">
+              {busy ? pendingLabel : ""}
+            </output>
           </div>
         </form>
       </div>
