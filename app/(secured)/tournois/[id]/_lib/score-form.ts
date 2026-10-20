@@ -388,7 +388,7 @@ export function adminProposalNotice(
 ): string | null {
   if (!proposal) return null;
   const [author, other] = proposal.proposedBy === "team1" ? [team1, team2] : [team2, team1];
-  const next = dirty ? "« Enregistrer » note ta saisie et suspend la validation automatique de cette proposition ; seul « Valider le résultat » tranche, à moins que ${other} ne la confirme." : "Vérifie-le puis valide le résultat pour le confirmer.";
+  const next = dirty ? `« Enregistrer » note ta saisie et suspend la validation automatique de cette proposition ; seul « Valider le résultat » tranche, à moins que ${other} ne la confirme.` : "Vérifie-le puis valide le résultat pour le confirmer.";
   return `Score proposé par ${author} (${proposal.team1Score} – ${proposal.team2Score}), en attente de confirmation de ${other}. ${next}`;
 }
 
