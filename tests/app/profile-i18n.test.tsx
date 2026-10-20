@@ -108,6 +108,7 @@ import {
   accountDeletionErrorMessage,
   accountDeletionOutcome,
   RETENTION_UNKNOWN,
+  SESSION_GONE_CODES,
 } from "@/lib/shared/account-deletion";
 import {
   connectionMethodLabel,
@@ -309,9 +310,15 @@ describe("français inchangé — profil", () => {
       expect(accountDeletionConsequences(subject)).toMatch(/salon #live du Discord \(et l'alerte de modération d'une annonce bloquée ou signalée par AutoMod\), qui gardent ton pseudo jusqu'à leur suppression sur demande/);
       expect(deletionConsequencesText(EN_PROFILE, subject)).toMatch(/Discord #live channel \(and the moderation alert for an announcement blocked or flagged by AutoMod\), which keep your username until they are deleted on request/);
     }
-    for (const code of ["ACCOUNT_STILL_REFERENCED", "UNAUTHORIZED", "USER_NOT_FOUND", "X", undefined]) {
+    for (const code of ["ACCOUNT_STILL_REFERENCED", "X", undefined]) {
       expect(deletionErrorText(FR_PROFILE, code)).toBe(accountDeletionErrorMessage(code));
     }
+    // Session ou compte déjà partis : la phrase du rechargement, dans les deux langues (même liste que l'écran).
+    for (const code of SESSION_GONE_CODES) {
+      expect(deletionErrorText(FR_PROFILE, code)).toMatch(/^Ta session est fermée — ton compte a peut-être déjà été supprimé\./);
+      expect(deletionErrorText(EN_PROFILE, code)).toMatch(/^Your session has ended — your account may already have been deleted\./);
+    }
+    expect([...SESSION_GONE_CODES]).toEqual(["UNAUTHORIZED", "USER_NOT_FOUND"]);
   });
 
   it("applications connectées : refus, porte, ligne du bot", () => {
