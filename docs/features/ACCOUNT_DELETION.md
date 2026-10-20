@@ -209,10 +209,12 @@ de la confirmation ne s'éclairent plus au survol (`.btn:hover` de
 `globals.css` exclut tout bouton désarmé, `:where()` gardant sa spécificité),
 passent au gris système en contraste élevé (`forced-colors`), et l'attente
 (`pendingLabel`) est annoncée par un `<output aria-live="polite">` caché. Un bouton
-non armé (`disabled` natif : texte à recopier) y est éteint, curseur interdit ;
+non armé (`disabled` natif : texte à recopier) y est éteint — bordure
+pointillée, fond vide, rouge gardé pour un geste destructeur —, curseur interdit ;
 les règles de survol désarmé que `/profil`, `ScoreDialog` et
 `GhostRegistrationDialog` recopiaient sont retirées. La fenêtre des conditions
-passe ses gestes désarmés au gris système en contraste élevé. Le délai de
+passe ses gestes désarmés (« J'accepte » en vol compris) au gris système en
+contraste élevé, où « te déconnecter » prend la couleur système des liens. Le délai de
 préparation ne rend le focus au bouton que s'il s'est perdu sur `<body>`.
 
 Aucune des routes du geste (`GET /api/profile/deletion`, `DELETE /api/profile`,
