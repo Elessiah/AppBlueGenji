@@ -196,7 +196,8 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(t04En.dataSubjects).toContain("Referees and administrators");
     expect(t04.legalBasis).toMatch(/intérêt légitime \(impartialité de l'arbitrage\) à l'égard du membre du staff qui arbitre, dont l'appartenance aux équipes du match est vérifiée à chacun de ces gestes[^;]*il peut s'y opposer \(art. 21\)/);
     expect(t04.dataCategories.join(" ")).toMatch(/comparée au lancement du match, à son premier report ou, à défaut, à sa création/);
-    expect(byRef("T05").subPurposes.join(" ")).toMatch(/tout abandon imposé par l'arbitrage compris, quelle que soit l'équipe retirée/);
+    expect(byRef("T05").subPurposes.join(" ")).toMatch(/tout abandon imposé par l'arbitrage qui clôt une manche compris, une trace par manche close, quelle que soit l'équipe retirée/);
+    expect(t04.dataCategories.join(" ")).toMatch(/pour un abandon imposé, à la seule équipe adverse de l'équipe retirée/);
     expect(t04En.legalBasis).toMatch(/legitimate interest \(impartial refereeing\) with regard to the staff member who referees, whose membership of the match's teams is checked at each of these actions[^;]*they may object to it \(art. 21\)/);
     const t05 = byRef("T05").dataCategories.join(" ");
     const t05En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T05")!.dataCategories.join(" ");
