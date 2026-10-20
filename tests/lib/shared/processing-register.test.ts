@@ -1,7 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register-en";
 import { PUSH_TOPICS } from "@/lib/shared/push-notifications";
 import {
   ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS,
