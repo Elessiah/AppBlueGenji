@@ -95,32 +95,48 @@ export async function recordRecruitmentModalOptOut(
   {
     writeCookie = writeSeenCookie,
     post = postOptOut,
+    cookieKept = optOutCookieKept,
   }: Readonly<{
     writeCookie?: (name: string, value: string, maxAge?: number) => boolean;
     post?: (url: string) => Promise<Pick<Response, "ok" | "status" | "json">>;
+    /** Relu après la réponse : son `Set-Cookie` peut avoir gardé le choix là où le script a été refusé. */
+    cookieKept?: () => boolean;
   }> = {},
 ): Promise<RecruitmentModalOptOutResult> {
-  const kept = writeCookie(RECRUITMENT_MODAL_OFF_COOKIE, RECRUITMENT_MODAL_OFF_VALUE, RECRUITMENT_MODAL_OFF_MAX_AGE);
-  const signedOut = kept ? "BROWSER" : "NONE";
-  const fallback = kept ? "BROWSER_ONLY" : "NONE";
+  const written = writeCookie(RECRUITMENT_MODAL_OFF_COOKIE, RECRUITMENT_MODAL_OFF_VALUE, RECRUITMENT_MODAL_OFF_MAX_AGE);
+  // Cookie posé par le script : l'issue hors compte est acquise. Refusé, seul
+  // le `Set-Cookie` de la réponse peut encore le garder — relu après elle.
+  const kept = () => written || cookieKept();
   if (!signedIn) {
-    // Renouvellement du cookie par le serveur seulement : un échec laisse
-    // celui du script, rien à en dire.
-    post(OPT_OUT_URL).catch(() => undefined);
-    return signedOut;
+    const renewal = post(OPT_OUT_URL).catch(() => undefined);
+    // Script accepté : le serveur ne fait que renouveler, le toast n'attend pas.
+    if (!written) await renewal;
+    return kept() ? "BROWSER" : "NONE";
   }
+  let account: "ACCOUNT" | "GONE" | "FAILED";
   try {
     const response = await post(OPT_OUT_URL);
     // Plus de compte derrière la page depuis son chargement — session finie
     // (expirée, déconnexion dans un autre onglet : `account: false`) ou compte
     // supprimé (409) : le lecteur est hors connexion, ce n'est pas un échec ;
     // le cookie reportera le choix au compte à la prochaine connexion.
-    if (response.status === 409) return signedOut;
-    if (!response.ok) return fallback;
-    const body = (await response.json()) as { account?: unknown };
-    return body.account === true ? "ACCOUNT" : signedOut;
+    if (response.status === 409) account = "GONE";
+    else if (!response.ok) account = "FAILED";
+    else account = ((await response.json()) as { account?: unknown }).account === true ? "ACCOUNT" : "GONE";
   } catch {
-    return fallback;
+    account = "FAILED";
+  }
+  if (account === "ACCOUNT") return "ACCOUNT";
+  if (!kept()) return "NONE";
+  return account === "GONE" ? "BROWSER" : "BROWSER_ONLY";
+}
+
+/** Le cookie « Ne plus afficher » est-il lisible sur ce navigateur ? */
+function optOutCookieKept(): boolean {
+  try {
+    return document.cookie.split("; ").includes(`${RECRUITMENT_MODAL_OFF_COOKIE}=${RECRUITMENT_MODAL_OFF_VALUE}`);
+  } catch {
+    return false;
   }
 }
 
