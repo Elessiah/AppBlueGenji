@@ -48,7 +48,14 @@ connecte toujours.
 (`needsTermsAcceptance` : une requête sur `bg_users`, gardée 30 s par compte,
 vidée à l'acceptation) et présente une fenêtre **bloquante** : ni « Plus tard »,
 ni Échap, ni clic sur le voile (exception `NO_BACKDROP_DISMISS` de
-`modal-dialogs.test.ts`) — « J'accepte » ou « Me déconnecter » (`useLogout`).
+`modal-dialogs.test.ts`) — « J'accepte » ou « Supprimer mon compte » (demande
+du 2026-10-20, à la place de « Me déconnecter » : un compte qui doute de la
+gestion de ses données doit pouvoir se retirer directement). Ce bouton ouvre
+**la** suppression de « Mon profil » (`useAccountDeletion`, même confirmation,
+même route, empilée sur la fenêtre — `ACCOUNT_DELETION.md`). La déconnexion
+(`useLogout`) reste un lien-bouton de la phrase des issues (« te
+déconnecter »). Les trois gestes s'excluent (`aria-disabled`, jamais
+`disabled` natif sous le focus).
 Une session de 30 jours ne repasse pas par `/connexion` : c'est donc cette
 fenêtre qui atteint chaque compte. Les gestes de gestion restent en outre
 refusés en **409 `TERMS_ACCEPTANCE_REQUIRED`** côté serveur, et ce refus la
@@ -62,7 +69,8 @@ bot (`/privacy-policy-bot`, `/terms-of-service-bot`), `/regles` (règles des
 tournois, que les conditions complètent), `/signalements` (suivre ou contester
 un signalement : recours interne) et `/profil` (export
 des données, suppression du compte — la page entière reste ouverte, ce que
-disent les conditions : « ouvrir son profil »). La fenêtre le dit elle-même (`shell.termsModal.exits`, FR et EN) et
+disent les conditions : « ouvrir son profil »). La fenêtre le dit elle-même (`shell.termsModal.exits`, FR et EN : supprimer
+son compte d'ici, se déconnecter, la politique, le profil pour l'export) et
 lie `/rgpd` et `/profil`, sans quoi seul qui connaît les adresses partirait. Les conditions et l'entrée v6 disent aussi que le bouton « Signaler un
 problème » reste utilisable depuis ces pages, et qu'un refus ne retire le
 compte ni de ses équipes ni de ses inscriptions (contacts de match et messages

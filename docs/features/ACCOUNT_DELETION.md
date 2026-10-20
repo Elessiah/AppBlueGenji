@@ -164,6 +164,29 @@ rouvre la fenêtre — deux clics, deux confirmations, deux `DELETE`, dont le se
 échoue en 400 et affiche une erreur juste après le succès. Une annulation le
 rouvre.
 
+### Deux écrans, une seule suppression
+
+Le geste vit dans `components/account/use-account-deletion.tsx`
+(`useAccountDeletion` : aperçu `previewAccountDeletion`, confirmation
+`ConfirmActionDialog`, `requestAccountDeletion` sur `DELETE /api/profile` — qui
+ferme la session —, toast puis accueil rechargé dans la langue de la page). Deux
+écrans l'offrent, sans copie :
+
+- **« Mon profil »**, section « Compte » ;
+- la **fenêtre bloquante des conditions d'utilisation** (« Supprimer mon
+  compte », `TERMS_OF_USE.md`) : qui refuse les conditions, ou doute de la
+  gestion de ses données, se retire d'ici sans les accepter. La partie de
+  l'écran (`components/legal/TermsAccountDeletion.tsx`) se charge **au clic**
+  — ses textes sont ceux de l'espace `profile` (`deletion.*`), chargés sous
+  `/en` à ce moment —, et sa confirmation s'empile sur la fenêtre
+  (`layer="overBlocking"` de `ConfirmActionDialog`, z-index 1270 contre 1260) :
+  Échap et « Annuler » ne ferment que la confirmation, le focus revient au
+  bouton.
+
+Aucune des routes du geste (`GET /api/profile/deletion`, `DELETE /api/profile`,
+ni `GET /api/profile/export` pour l'art. 15) ne consulte l'acceptation des
+conditions (`deletion-without-terms.test.ts`).
+
 ## Le pseudo d'emprunt
 
 Un compte conservé l'est **sous un faux nom** : c'est le droit à l'oubli tel
