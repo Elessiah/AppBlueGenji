@@ -1280,12 +1280,14 @@ describe("PRIVACY_CHANGES — arbitre qui joue le match (DISPUTE-FOLLOWUP, #456)
 
   it("dit les destinataires, le sujet refusable, le contenu sans pseudo et le journal (FR et EN)", () => {
     const fr = [entry.title, entry.summary, ...entry.details].join(" ");
-    expect(fr).toMatch(/aux autres arbitres et administrateurs qui l'ont activée \(sujet « Arbitrage par un joueur du staff », que tu peux couper dans « Mon profil »\), jamais à l'auteur/);
+    expect(fr).toMatch(/aux autres arbitres et administrateurs abonnés aux notifications push \(sujet « Arbitrage par un joueur du staff », actif par défaut, que tu peux couper dans « Mon profil »\), jamais à l'auteur/);
+    expect(fr).toMatch(/si son auteur est membre d'une des deux équipes du match, ou l'a quittée depuis le lancement du match, son premier report ou, à défaut, sa création/);
     expect(fr).toMatch(/sans le pseudo de l'auteur ni d'aucun joueur/);
     expect(fr).toMatch(/ne dit sur Discord que le tournoi et la nature du geste, sans nom/);
     expect(fr).toMatch(/le pseudo et l'identifiant de compte de son auteur/);
     const en = [english.title, english.summary, ...english.details].join(" ");
-    expect(en).toMatch(/topic “Refereeing by a staff player”, which you can turn off in “My profile”\), never to the author/);
+    expect(en).toMatch(/topic “Refereeing by a staff player”, on by default, which you can turn off in “My profile”\), never to the author/);
+    expect(en).toMatch(/whether its author is a member of one of the two teams of the match, or left it since the match was launched, its first report or, failing these, its creation/);
     expect(en).toMatch(/without the username of the author or of any player/);
     expect(en).toMatch(/gives on Discord only the tournament and the kind of action, unnamed/);
     expect(fr).toMatch(/la manche et, sauf pour une suspension, l'issue retenue avec les noms d'équipe/);
