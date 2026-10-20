@@ -488,4 +488,24 @@ describe("resolveExpiredScoreReports — ce qu'elle rapporte", () => {
 
     expect(await resolveExpiredScoreReports(connection, 12)).toBe(0);
   });
+  it("lit le format une fois par ronde, pas une fois par match expiré", async () => {
+    const seen: string[] = [];
+    const single = { team2_report_score: null, team2_report_opponent_score: null, team2_reported_at: null };
+    const connection = fakeConnection({
+      seen,
+      rows: (q) =>
+        q.includes("FROM bg_matches")
+          ? [
+              expiredRow({ id: 31, round_number: 1, ...single }),
+              expiredRow({ id: 32, round_number: 1, ...single }),
+              expiredRow({ id: 33, round_number: 2, ...single }),
+            ]
+          : [],
+    });
+
+    expect(await resolveExpiredScoreReports(connection, 12)).toBe(3);
+
+    expect(seen.filter((q) => q.includes("FROM bg_tournaments"))).toHaveLength(2);
+    expect(queueAutoValidatedNotice).toHaveBeenCalledTimes(3);
+  });
 });
