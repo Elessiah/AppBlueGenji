@@ -630,6 +630,14 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     const admin = (locale: "fr" | "en") => render(locale, <AdminScoreDialog match={paused} onClose={noop} onSubmitted={noop} />);
     expect(admin("fr")).toContain("Validation automatique suspendue par l&#x27;arbitrage : sans réponse de l&#x27;adversaire, seul « Valider le résultat » tranche.");
     expect(admin("en")).toContain("Automatic confirmation paused by a referee: without an answer from the opponent, only “Confirm the result” settles the match.");
+    // Cas réel : la suspension suit un « Enregistrer », donc un score noté par
+    // l'arbitre — l'avis de proposition s'efface, celui de la suspension reste.
+    const saved = { ...paused, team1Score: 1, team2Score: 0 };
+    const adminSaved = (locale: "fr" | "en") => render(locale, <AdminScoreDialog match={saved} onClose={noop} onSubmitted={noop} />);
+    expect(adminSaved("fr")).not.toContain("Score proposé par");
+    expect(adminSaved("fr")).toContain("Validation automatique suspendue par l&#x27;arbitrage : sans réponse de l&#x27;adversaire, seul « Valider le résultat » tranche.");
+    expect(adminSaved("en")).toContain("Automatic confirmation paused by a referee: without an answer from the opponent, only “Confirm the result” settles the match.");
+    expectNoFrench(adminSaved("en"));
     // Sans suspension, l'avis n'en dit rien.
     expect(render("fr", <AdminScoreDialog match={{ ...paused, scoreAutoValidationPaused: false }} onClose={noop} onSubmitted={noop} />)).not.toContain("suspendue");
   });
