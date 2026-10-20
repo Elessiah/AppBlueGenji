@@ -224,23 +224,44 @@ describe("recordRecruitmentModalOptOut", () => {
     expect(hanging).toHaveBeenCalledWith("/api/recruitment/modal-dismiss");
   });
 
-  it("non connecté : retente une fois le renouvellement par le serveur s'il n'aboutit pas (ITP)", async () => {
-    const post = jest
-      .fn<(url: string) => Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }>>()
-      .mockRejectedValueOnce(new Error("offline"))
-      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ account: false }) });
-    expect(await recordRecruitmentModalOptOut(false, { writeCookie: () => true, post })).toBe("BROWSER");
-    await new Promise((resolve) => setImmediate(resolve));
-    expect(post).toHaveBeenCalledTimes(2);
+  type Post = (url: string) => Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }>;
+  const flush = () => new Promise((resolve) => setImmediate(resolve));
+  const reply = (status: number, body: unknown = {}) => ({ ok: status < 400, status, json: async () => body });
+
+  it("non connecté : retente une fois, après un délai, un renouvellement qui n'aboutit pas (réseau ou 5xx)", async () => {
+    for (const first of [() => Promise.reject(new Error("offline")), () => Promise.resolve(reply(502))]) {
+      const wait = jest.fn(async (_ms: number) => undefined);
+      const post = jest.fn<Post>().mockImplementationOnce(first).mockResolvedValueOnce(reply(200, { account: false }));
+      expect(await recordRecruitmentModalOptOut(false, { writeCookie: () => true, post, wait })).toBe("BROWSER");
+      await flush();
+      expect(wait).toHaveBeenCalledWith(2_000);
+      expect(post).toHaveBeenCalledTimes(2);
+    }
   });
 
-  it("non connecté : deux échecs du renouvellement restent silencieux", async () => {
-    const post = jest
-      .fn<(url: string) => Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }>>()
-      .mockRejectedValue(new Error("offline"));
-    expect(await recordRecruitmentModalOptOut(false, { writeCookie: () => true, post })).toBe("BROWSER");
-    await new Promise((resolve) => setImmediate(resolve));
+  it("non connecté : pas de seconde tentative quand le serveur a répondu, et deux échecs restent silencieux", async () => {
+    const wait = jest.fn(async (_ms: number) => undefined);
+    const ok = jest.fn<Post>().mockResolvedValue(reply(200, { account: false }));
+    await recordRecruitmentModalOptOut(false, { writeCookie: () => true, post: ok, wait });
+    await flush();
+    expect(ok).toHaveBeenCalledTimes(1);
+    expect(wait).not.toHaveBeenCalled();
+    const down = jest.fn<Post>().mockRejectedValue(new Error("offline"));
+    expect(await recordRecruitmentModalOptOut(false, { writeCookie: () => true, post: down, wait })).toBe("BROWSER");
+    await flush();
+    expect(down).toHaveBeenCalledTimes(2);
+  });
+
+  it("connecté : un échec du compte est retenté en arrière-plan, le toast n'attend pas la seconde tentative", async () => {
+    const wait = jest.fn(async (_ms: number) => undefined);
+    const post = jest.fn<Post>().mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce(reply(200, { account: true }));
+    expect(await recordRecruitmentModalOptOut(true, { writeCookie: () => true, post, wait })).toBe("BROWSER_ONLY");
+    await flush();
     expect(post).toHaveBeenCalledTimes(2);
+    const gone = jest.fn<Post>().mockResolvedValue(reply(409));
+    await recordRecruitmentModalOptOut(true, { writeCookie: () => true, post: gone, wait });
+    await flush();
+    expect(gone).toHaveBeenCalledTimes(1);
   });
 
   it("borne l'attente du serveur sans AbortSignal.timeout (absent de Safari 15)", () => {
