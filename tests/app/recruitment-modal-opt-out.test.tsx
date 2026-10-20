@@ -216,6 +216,20 @@ describe("recordRecruitmentModalOptOut", () => {
     }
   });
 
+  it("compte réaffiché depuis « Mon profil » (aucun rattrapage) : écriture échouée → « ce navigateur », jamais « compte »", async () => {
+    for (const fails of [() => Promise.reject(new Error("offline")), () => Promise.resolve(reply(500))]) {
+      const post = jest.fn<Post>().mockImplementation(fails);
+      expect(
+        await recordRecruitmentModalOptOut(true, { writeCookie: () => true, post, wait: noWait, accountCatchUp: false }),
+      ).toBe("BROWSER");
+    }
+    // Écrit sur le compte : « compte », réaffiché ou non.
+    const done = async () => reply(200, { account: true });
+    expect(
+      await recordRecruitmentModalOptOut(true, { writeCookie: () => true, post: done, wait: noWait, accountCatchUp: false }),
+    ).toBe("ACCOUNT");
+  });
+
   it("connecté au chargement, session finie (account: false) ou compte supprimé (409) depuis : traité comme non connecté", async () => {
     for (const gone of [reply(200, { account: false }), reply(409, { error: "ACCOUNT_DELETED" })]) {
       expect(await recordRecruitmentModalOptOut(true, { writeCookie: () => true, post: async () => gone, wait: noWait })).toBe(
@@ -355,7 +369,7 @@ describe("fermer ≠ ne plus afficher", () => {
   });
 
   it("seul « Ne plus afficher » appelle le refus", () => {
-    expect(source.match(/recordRecruitmentModalOptOut\(signedIn\)/g)).toHaveLength(1);
+    expect(source.match(/recordRecruitmentModalOptOut\(signedIn, \{ accountCatchUp: !accountBackOn \}\)/g)).toHaveLength(1);
     expect(source).toContain("onClick={() => void optOut()}");
   });
 
@@ -364,5 +378,7 @@ describe("fermer ≠ ne plus afficher", () => {
     expect(layout).toContain("accountOff: user?.recruitmentModalOff");
     expect(layout).toContain("cookieStore.get(RECRUITMENT_MODAL_OFF_COOKIE)?.value");
     expect(layout).toContain("signedIn={user !== null}");
+    expect(layout).toContain("accountBackOn={user?.recruitmentModalBackOn === true}");
+    expect(layout).toContain("accountBackOn: user?.recruitmentModalBackOn");
   });
 });

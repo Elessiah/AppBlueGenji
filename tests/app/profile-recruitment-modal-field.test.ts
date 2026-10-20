@@ -76,6 +76,10 @@ describe("modale ouverte sur « Mon profil »", () => {
     const field = readSource("app/(secured)/profil/_components/RecruitmentModalField.tsx");
     expect(field).toMatch(/addEventListener\(RECRUITMENT_MODAL_OFF_EVENT/);
     expect(field).toMatch(/removeEventListener\(RECRUITMENT_MODAL_OFF_EVENT/);
+    // Fin d'envoi : le cookie d'ici a le dernier mot (POST refusé qui le repose, opt-out arrivé pendant l'envoi).
+    expect(field).toContain("if (shownRef.current && browserOptedOut()) setShown(false);");
+    // Choix enregistré : la mise en page racine est relue (`router.refresh()` passé par la page).
+    expect(field).toContain("if (outcome.stored) onSaved?.();");
     expect(RECRUITMENT_MODAL_OFF_EVENT).toBe("bg:recruitment-modal-off");
   });
 });

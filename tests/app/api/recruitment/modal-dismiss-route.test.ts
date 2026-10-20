@@ -129,6 +129,15 @@ describe("DELETE /api/recruitment/modal-dismiss — réafficher depuis « Mon pr
     expectOptOutCookie(response);
   });
 
+  it("déjà réaffichée (lu avec la session) : aucune écriture, cookie d'ici effacé", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7, recruitmentModalBackOn: true }));
+    const response = await DELETE();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ account: true });
+    expect(recordRecruitmentModalBackOn).not.toHaveBeenCalled();
+    expectOptOutCookieCleared(response);
+  });
+
   it("sans session : 401, rien d'écrit ni d'effacé", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(null);
     const response = await DELETE();

@@ -488,7 +488,7 @@ describe("langue du compte (lot 9-3)", () => {
     const { readFileSync } = await import("node:fs");
     const { join } = await import("node:path");
     expect(readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/page.tsx"), "utf8")).toContain(
-      "<RecruitmentModalField initialOff={data?.recruitmentModalOff} />",
+      "<RecruitmentModalField initialOff={data?.recruitmentModalOff} onSaved={() => router.refresh()} />",
     );
   });
 
