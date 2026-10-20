@@ -149,6 +149,12 @@
     "enabledNotCertified": "Match direct messages turned on: they'll be sent once your Discord tag is verified.",
     "disabled": "Match direct messages turned off."
   },
+  "recruitmentModal": {
+    "label": "Window of urgent recruitment announcements",
+    "hint": "Ticked by default: when you arrive, a window shows the urgent recruitment announcements you have not seen yet. Untick so that it no longer opens on its own, like “Don't show again”. Ticked again, it comes back on your account and on this browser; another browser where you had turned it down keeps it closed until you tick it again from that browser. The announcements stay on the Recruitment page.",
+    "shown": "Recruitment window turned back on: it will open again for an urgent announcement.",
+    "hidden": "Recruitment window turned off: it will no longer open on its own."
+  },
   "avatarUpdated": "Avatar updated.",
   "avatarDeleted": "Avatar deleted.",
   "invitations": {

@@ -230,7 +230,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // exportée et remise au défaut à l'anonymisation. Le cookie du navigateur
     // (`bg_recr_off`) est décrit à la section des cookies.
     finalite:
-      "Non par défaut : la fenêtre des annonces de recrutement urgentes s'ouvre d'elle-même. « Ne plus afficher » dans cette fenêtre : elle ne s'ouvre plus d'elle-même sur tes autres appareils (un choix fait sur ce navigateur avant la connexion y est reporté à la connexion ou à ta prochaine visite connectée). Figure dans l'export de tes données, remis au défaut si le compte est anonymisé",
+      "Non par défaut : la fenêtre des annonces de recrutement urgentes s'ouvre d'elle-même. « Ne plus afficher » dans cette fenêtre : elle ne s'ouvre plus d'elle-même sur tes autres appareils (un choix fait sur ce navigateur avant la connexion y est reporté à la connexion ou à ta prochaine visite connectée). Réversible dans Mon profil : le compte ne garde plus le choix et le cookie bg_recr_off de ce navigateur est effacé. Figure dans l'export de tes données, remis au défaut si le compte est anonymisé",
     base: "Exécution du contrat",
     duree: "Durée du compte",
   },

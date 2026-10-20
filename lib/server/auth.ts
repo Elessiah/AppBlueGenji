@@ -14,7 +14,11 @@ import { activeSuspensionSql, assertNotSuspended, purgeEndedSuspensions } from "
 import type { ConnectionLogEvent } from "@/lib/shared/connection-logs";
 import { isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { RECRUITMENT_MODAL_OFF_COOKIE, recruitmentModalOffInBrowser } from "@/lib/shared/recruitment";
-import { recordRecruitmentModalOff, recruitmentModalOff } from "@/lib/server/users/recruitment-modal-preference";
+import {
+  carryRecruitmentModalOffFromBrowser,
+  recruitmentModalBackOn,
+  recruitmentModalOff,
+} from "@/lib/server/users/recruitment-modal-preference";
 
 export type AuthUser = {
   id: number;
@@ -28,6 +32,8 @@ export type AuthUser = {
   roles: PlatformRole[];
   /** « Ne plus afficher » posé sur la modale d'arrivée du recrutement (`bg_users.recruitment_modal_off`). */
   recruitmentModalOff: boolean;
+  /** Modale réaffichée depuis « Mon profil » : aucun cookie n'est plus reporté sur le compte. */
+  recruitmentModalBackOn: boolean;
 };
 
 type UserRow = RowDataPacket & {
@@ -89,6 +95,7 @@ function fromRow(row: UserRow): AuthUser {
     isAdmin: Boolean(row.is_admin),
     roles: resolveRoles(Boolean(row.is_admin), row.platform_roles_json),
     recruitmentModalOff: recruitmentModalOff(row.recruitment_modal_off),
+    recruitmentModalBackOn: recruitmentModalBackOn(row.recruitment_modal_off),
   };
 }
 
@@ -144,7 +151,9 @@ async function carryRecruitmentModalOff(
     console.error("[auth] recruitment modal opt-out carry-over failed:", error);
     return;
   }
-  const write = recordRecruitmentModalOff(userId).then(
+  // Compte jamais décidé seulement : un « réafficher » fait dans « Mon
+  // profil » n'est pas recouvert par le vieux cookie d'un autre navigateur.
+  const write = carryRecruitmentModalOffFromBrowser(userId).then(
     () => undefined,
     (error: unknown) => console.error("[auth] recruitment modal opt-out carry-over failed:", error),
   );

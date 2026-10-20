@@ -239,6 +239,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   healRecruitmentModalOff({
     userId: user?.id,
     accountOff: user?.recruitmentModalOff,
+    accountBackOn: user?.recruitmentModalBackOn,
     browserCookie: modalOffCookie,
   });
   // « Ne plus afficher » : sur le compte (lu avec la session), ou sur ce

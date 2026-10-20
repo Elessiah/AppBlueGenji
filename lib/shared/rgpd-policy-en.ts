@@ -102,7 +102,7 @@ const PROFIL_TEXT_EN: readonly (readonly [donnee: string, finalite: string])[] =
   ],
   [
     "Recruitment “Don't show again” choice",
-    "No by default: the window of urgent recruitment announcements opens on its own. “Don't show again” in that window: it no longer opens on its own on your other devices (a choice made on this browser before logging in is carried over to the account at login or on your next visit while logged in). Included in the export of your data, reset to the default if the account is anonymized",
+    "No by default: the window of urgent recruitment announcements opens on its own. “Don't show again” in that window: it no longer opens on its own on your other devices (a choice made on this browser before logging in is carried over to the account at login or on your next visit while logged in). Can be undone in My profile: the account no longer keeps the choice and the bg_recr_off cookie of that browser is deleted. Included in the export of your data, reset to the default if the account is anonymized",
   ],
 ];
 

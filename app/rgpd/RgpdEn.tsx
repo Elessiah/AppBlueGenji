@@ -455,7 +455,9 @@ export function RgpdEn({
               before logging in (or could not be saved to it right away), it is carried over to the account at login
               or on your next visit while logged in. On the account, it lasts as long as the
               account, is included in the export of your data and returns to the default when the account is
-              deleted.
+              deleted. You can undo this choice in “My profile”: the account no longer keeps it and the cookie of
+              that browser is deleted; another browser that still holds it only keeps the window closed there,
+              without carrying it over to the account any more.
             </li>
             <li>
               <strong>bg_terms_later</strong> — <strong>no longer set</strong> since version 6 of the terms of use: accepting

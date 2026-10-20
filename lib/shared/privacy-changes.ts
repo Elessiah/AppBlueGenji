@@ -889,10 +889,11 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     title: "Fenêtre de recrutement : « Ne plus afficher »",
     publishedAt: "2026-10-20",
     summary:
-      "La fenêtre des annonces de recrutement urgentes qui s'ouvre d'elle-même porte un bouton « Ne plus afficher ». Le site garde ce choix pour ne plus te l'ouvrir : sur ce navigateur et, si tu es connecté, sur ton compte.",
+      "La fenêtre des annonces de recrutement urgentes qui s'ouvre d'elle-même porte un bouton « Ne plus afficher ». Le site garde ce choix pour ne plus te l'ouvrir : sur ce navigateur et, si tu es connecté, sur ton compte. Tu peux revenir dessus dans « Mon profil ».",
     details: [
       "Sur le navigateur, le choix tient dans le cookie bg_recr_off (valeur « 1 », sans identifiant de personne), gardé un an.",
       "Sur le compte, il suit tes autres appareils. Fait avant la connexion (ou pas enregistré sur-le-champ), il est reporté sur ton compte à ta connexion suivante ou à ta prochaine visite connecté. Il est gardé le temps du compte, figure dans l'export de tes données et revient au défaut à la suppression du compte.",
+      "Tu peux revenir sur ce choix dans « Mon profil » : ton compte ne le garde plus et le cookie de ce navigateur est effacé. Un autre navigateur qui garde encore le cookie n'y tait la fenêtre que chez lui, sans plus le reporter sur ton compte.",
       "Les annonces restent sur la page Recrutement et dans la banderole ; « Plus tard » ne change pas : la fenêtre revient pour une annonce urgente que tu n'as pas encore vue.",
     ],
   },

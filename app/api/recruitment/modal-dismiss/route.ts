@@ -2,7 +2,7 @@ import type { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { isUnknownColumnError } from "@/lib/server/mysql-errors";
-import { recordRecruitmentModalOff } from "@/lib/server/users/recruitment-modal-preference";
+import { recordRecruitmentModalBackOn, recordRecruitmentModalOff } from "@/lib/server/users/recruitment-modal-preference";
 import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
 import {
   RECRUITMENT_MODAL_ACCOUNT_UNAVAILABLE,
@@ -21,6 +21,21 @@ function withOptOutCookie<T>(response: NextResponse<T>): NextResponse<T> {
   response.cookies.set(RECRUITMENT_MODAL_OFF_COOKIE, RECRUITMENT_MODAL_OFF_VALUE, {
     path: "/",
     maxAge: RECRUITMENT_MODAL_OFF_MAX_AGE,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    httpOnly: false,
+  });
+  return response;
+}
+
+/**
+ * Efface le cookie de ce navigateur (`maxAge` 0, mêmes attributs que
+ * {@link withOptOutCookie}, faute de quoi le navigateur garderait l'autre).
+ */
+function withoutOptOutCookie<T>(response: NextResponse<T>): NextResponse<T> {
+  response.cookies.set(RECRUITMENT_MODAL_OFF_COOKIE, "", {
+    path: "/",
+    maxAge: 0,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     httpOnly: false,
@@ -53,5 +68,26 @@ export async function POST() {
     if (isUnknownColumnError(error)) return withOptOutCookie(fail(RECRUITMENT_MODAL_ACCOUNT_UNAVAILABLE, 503));
     console.error("[recruitment] POST modal-dismiss failed:", error);
     return withOptOutCookie(fail("RECRUITMENT_MODAL_DISMISS_FAILED", 500));
+  }
+}
+
+/**
+ * Réafficher la modale, depuis « Mon profil » (`docs/features/RECRUITMENT.md`
+ * § Réafficher). Connecté seulement (401 sinon). Le compte passe à « réaffichée »
+ * (`recordRecruitmentModalBackOn`) et le cookie **de ce navigateur** est
+ * effacé ; un autre navigateur qui le garde ne tait la modale que chez lui et
+ * ne le reporte plus sur le compte. Rien n'est effacé si l'écriture échoue
+ * (le profil garde l'ancien état). Provenance vérifiée par le middleware.
+ */
+export async function DELETE() {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return fail("UNAUTHORIZED", 401);
+    if (!(await recordRecruitmentModalBackOn(user.id))) return fail(ACCOUNT_DELETED_ERROR, 409);
+    return withoutOptOutCookie(ok({ account: true }));
+  } catch (error) {
+    if (isUnknownColumnError(error)) return fail(RECRUITMENT_MODAL_ACCOUNT_UNAVAILABLE, 503);
+    console.error("[recruitment] DELETE modal-dismiss failed:", error);
+    return fail("RECRUITMENT_MODAL_RESTORE_FAILED", 500);
   }
 }

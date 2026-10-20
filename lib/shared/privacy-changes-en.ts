@@ -470,10 +470,11 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
   "2026-10-recrutement-ne-plus-afficher": {
     title: "Recruitment window: “Don't show again”",
     summary:
-      "The window of urgent recruitment announcements that opens on its own has a “Don't show again” button. The site keeps this choice so as not to open it for you again: on this browser and, if you are logged in, on your account.",
+      "The window of urgent recruitment announcements that opens on its own has a “Don't show again” button. The site keeps this choice so as not to open it for you again: on this browser and, if you are logged in, on your account. You can undo it in “My profile”.",
     details: [
       "On the browser, the choice is held in the bg_recr_off cookie (value “1”, no personal identifier), kept for one year.",
       "On the account, it follows you to your other devices. Made before logging in (or not saved right away), it is carried over to your account at your next login or on your next visit while logged in. It is kept as long as the account, appears in the export of your data and returns to the default when the account is deleted.",
+      "You can undo this choice in “My profile”: your account no longer keeps it and the cookie of that browser is deleted. Another browser that still holds the cookie only keeps the window closed there, without carrying it over to your account any more.",
       "The announcements stay on the Recruitment page and in the banner; “Later” does not change: the window comes back for an urgent announcement you have not seen yet.",
     ],
   },

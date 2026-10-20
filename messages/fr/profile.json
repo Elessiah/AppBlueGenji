@@ -149,6 +149,12 @@
     "enabledNotCertified": "Messages privés de match activés : ils partiront une fois ton tag Discord certifié.",
     "disabled": "Messages privés de match coupés."
   },
+  "recruitmentModal": {
+    "label": "Fenêtre des annonces de recrutement urgentes",
+    "hint": "Cochée par défaut : à ton arrivée, une fenêtre présente les annonces de recrutement urgentes que tu n'as pas encore vues. Décoche pour qu'elle ne s'ouvre plus d'elle-même, comme « Ne plus afficher ». Recochée, elle revient sur ton compte et sur ce navigateur ; un autre navigateur où tu l'avais refusée la garde fermée jusqu'à ce que tu la recoches depuis lui. Les annonces restent sur la page Recrutement.",
+    "shown": "Fenêtre de recrutement réactivée : elle s'ouvrira de nouveau pour une annonce urgente.",
+    "hidden": "Fenêtre de recrutement coupée : elle ne s'ouvrira plus d'elle-même."
+  },
   "avatarUpdated": "Avatar mis à jour.",
   "avatarDeleted": "Avatar supprimé.",
   "invitations": {

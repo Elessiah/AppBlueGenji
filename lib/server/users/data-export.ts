@@ -15,7 +15,7 @@ import { getFullProfile } from "./full-profile";
 import { accountLocaleFromRow } from "./account-locale";
 import { listOwnLiveAnnouncements } from "./live-announcement-export";
 import { matchDmEnabled } from "./match-dm-preference";
-import { recruitmentModalOff } from "./recruitment-modal-preference";
+import { recruitmentModalBackOn, recruitmentModalOff } from "./recruitment-modal-preference";
 
 /**
  * Rassemble l'intégralité des données personnelles du propriétaire du compte
@@ -108,6 +108,7 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
       matchDmEnabled: matchDmEnabled(row.match_dm_enabled),
       // « Ne plus afficher » la modale d'arrivée du recrutement : donnée détenue, rendue.
       recruitmentModalOff: recruitmentModalOff(row.recruitment_modal_off),
+      recruitmentModalBackOn: recruitmentModalBackOn(row.recruitment_modal_off),
       createdAt: toIso(row.created_at) ?? new Date().toISOString(),
     },
     profile: {

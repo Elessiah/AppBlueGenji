@@ -49,6 +49,7 @@ import { localeHref } from "@/lib/shared/locales";
 import { ProfileSection } from "./_components/ProfileSection";
 import { AccountLocaleField } from "./_components/AccountLocaleField";
 import { MatchDmField } from "./_components/MatchDmField";
+import { RecruitmentModalField } from "./_components/RecruitmentModalField";
 import { DiscordVerificationDialog } from "./DiscordVerificationDialog";
 import { ConnectedAppsSection } from "./ConnectedAppsSection";
 import { PushNotificationsPanel } from "@/components/notifications/PushNotificationsPanel";
@@ -1100,6 +1101,7 @@ export default function ProfilePage() {
           discordReachable={matchDmReachable(discordState, data?.profile.discordVerified)}
           onChoice={reportMatchDmChoice}
         />
+        <RecruitmentModalField initialOff={data?.recruitmentModalOff} />
       </ProfileSection>
 
       {invitations.length > 0 && (

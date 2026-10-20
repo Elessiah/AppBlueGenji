@@ -587,7 +587,10 @@ function RgpdFr({
               a été fait avant la connexion (ou n&apos;a pas pu y être enregistré sur-le-champ), il y est
               reporté à la connexion ou à votre prochaine visite connectée. Sur le compte, il dure
               autant que lui, figure dans l&apos;export de vos données et revient au défaut à la
-              suppression du compte.
+              suppression du compte. Vous pouvez revenir sur ce choix dans « Mon profil » : le
+              compte ne le garde plus et le cookie de ce navigateur est effacé ; un autre navigateur
+              qui le garde encore n&apos;y tait la fenêtre que chez lui, sans plus le reporter sur le
+              compte.
             </li>
             <li>
               <strong>bg_terms_later</strong> — <strong>n&apos;est plus déposé</strong> depuis la

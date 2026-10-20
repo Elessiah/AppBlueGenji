@@ -921,6 +921,12 @@ export type FullProfileResponse = {
    * pour son **seul titulaire** (`isSelf`) : absent de toute autre fiche.
    */
   matchDmEnabled?: boolean;
+  /**
+   * « Ne plus afficher » posé sur le compte pour la modale d'arrivée du
+   * recrutement (`bg_users.recruitment_modal_off`), lu avec la session par
+   * `GET`/`PATCH /api/profile` : absent de toute autre fiche.
+   */
+  recruitmentModalOff?: boolean;
 };
 
 /**
@@ -961,6 +967,8 @@ export type PersonalDataExport = {
     matchDmEnabled: boolean;
     /** « Ne plus afficher » posé sur la modale d'arrivée du recrutement. */
     recruitmentModalOff: boolean;
+    /** Modale réaffichée depuis « Mon profil » (plus aucun cookie reporté sur le compte). */
+    recruitmentModalBackOn: boolean;
     createdAt: string;
   };
   profile: {
