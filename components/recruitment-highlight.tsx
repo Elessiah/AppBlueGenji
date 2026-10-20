@@ -115,11 +115,12 @@ export async function recordRecruitmentModalOptOut(
   // Cookie posé par le script : l'issue hors compte est acquise. Refusé, seul
   // le `Set-Cookie` de la réponse peut encore le garder — relu après elle.
   const kept = () => written || cookieKept();
-  // Une seconde tentative, en arrière-plan et après un court délai (bascule
-  // Wi-Fi / 4G, redémarrage du serveur), quand la première n'a pas abouti :
-  // réseau, délai dépassé ou réponse 5xx (un 502 du proxy ne repose pas le
-  // cookie). Sous Safari / iOS, seul ce `Set-Cookie` garde le choix au-delà de
-  // sept jours ; connecté, elle écrit aussi le compte. Le toast n'en dépend pas.
+  // Une seconde tentative après un court délai (bascule Wi-Fi / 4G,
+  // redémarrage du serveur), quand la première n'a pas abouti : réseau, délai
+  // dépassé ou réponse 5xx (un 502 du proxy ne repose pas le cookie). Sous
+  // Safari / iOS, seul ce `Set-Cookie` garde le choix au-delà de sept jours.
+  // En arrière-plan quand le toast est déjà acquis (non connecté, cookie du
+  // script posé) ; **attendue** sinon, pour que le toast dise l'issue réelle.
   const retryLater = () => {
     wait(OPT_OUT_RETRY_DELAY_MS)
       .then(() => post(OPT_OUT_URL))
@@ -138,21 +139,26 @@ export async function recordRecruitmentModalOptOut(
     );
     return "BROWSER";
   }
-  let account: "ACCOUNT" | "GONE" | "FAILED";
-  try {
-    const response = await post(OPT_OUT_URL);
-    // Plus de compte derrière la page depuis son chargement — session finie
-    // (expirée, déconnexion dans un autre onglet : `account: false`) ou compte
-    // supprimé (409) : le lecteur est hors connexion, ce n'est pas un échec ;
-    // le cookie reportera le choix au compte à la prochaine connexion.
-    if (response.status === 409) account = "GONE";
-    else if (!response.ok) account = "FAILED";
-    else account = ((await response.json()) as { account?: unknown }).account === true ? "ACCOUNT" : "GONE";
-  } catch {
-    account = "FAILED";
+  const attempt = async (): Promise<"ACCOUNT" | "GONE" | "FAILED"> => {
+    try {
+      const response = await post(OPT_OUT_URL);
+      // Plus de compte derrière la page depuis son chargement — session finie
+      // (expirée, déconnexion dans un autre onglet : `account: false`) ou
+      // compte supprimé (409) : le lecteur est hors connexion, ce n'est pas un
+      // échec ; le cookie reportera le choix au compte à la prochaine connexion.
+      if (response.status === 409) return "GONE";
+      if (!response.ok) return "FAILED";
+      return ((await response.json()) as { account?: unknown }).account === true ? "ACCOUNT" : "GONE";
+    } catch {
+      return "FAILED";
+    }
+  };
+  let account = await attempt();
+  if (account === "FAILED") {
+    await wait(OPT_OUT_RETRY_DELAY_MS);
+    account = await attempt();
   }
   if (account === "ACCOUNT") return "ACCOUNT";
-  if (account === "FAILED") retryLater();
   if (!kept()) return "NONE";
   // Un échec n'est « compte injoignable » que pour qui se croyait connecté.
   return account === "FAILED" && signedIn ? "BROWSER_ONLY" : "BROWSER";
