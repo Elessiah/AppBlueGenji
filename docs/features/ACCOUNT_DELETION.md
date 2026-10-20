@@ -177,7 +177,8 @@ ferme la session —, toast puis accueil rechargé dans la langue de la page). D
   compte », `TERMS_OF_USE.md`) : qui refuse les conditions, ou doute de la
   gestion de ses données, se retire d'ici sans les accepter. La partie de
   l'écran (`components/legal/TermsAccountDeletion.tsx`) se charge **au clic**
-  (préchargée au survol ou au focus du bouton ; `onceLoader`, pas `next/dynamic` +
+  (sans préchargement au survol ni au focus : le bouton précède « J'accepte », chaque
+  lecteur qui accepte l'aurait téléchargée ; `onceLoader`, pas `next/dynamic` +
   `orReload`, qui n'aurait jamais rechargé sous une fenêtre toujours modale et
   aurait gardé un composant vide : un code introuvable se dit aussitôt par le
   toast ci-dessous, le clic suivant retente ; sous `/en`, textes anglais et code
