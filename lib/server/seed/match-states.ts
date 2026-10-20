@@ -59,8 +59,7 @@ export async function applyReportStates(
       `UPDATE bg_matches SET
          team1_report_score = 2, team1_report_opponent_score = 1, team1_reported_at = DATE_SUB(NOW(), INTERVAL ${SCORE_AUTO_VALIDATE_MINUTES + 10} MINUTE),
          -- Échéance passée, deux heures au moins après la saisie (règle de la
-         -- validation d'office) : le rattrapage manuel des échéances après
-         -- restauration (SCORE_DISPUTE_LOCK.md) n'y touche pas.
+         -- validation d'office, SCORE_DISPUTE_LOCK.md).
          score_deadline_at = DATE_SUB(NOW(), INTERVAL 10 MINUTE),
          status = 'AWAITING_CONFIRMATION'
        WHERE id = ?`,
