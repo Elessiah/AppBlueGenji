@@ -212,13 +212,11 @@ revient pour une prioritaire neuve).
   le choix n'y aurait pas duré plus que « Plus tard ». Appel en `keepalive`
   (un onglet fermé juste après le clic ne l'annule pas). Non connecté, le
   toast n'attend pas cet appel, sauf si le script n'a pas pu poser le cookie
-  (seul le `Set-Cookie` de la réponse peut alors le garder). Un appel qui
-  n'aboutit pas (réseau, délai dépassé, 5xx — un 502 du proxy ne repose pas le
-  cookie ; connecté : tout échec du compte) est retenté **une fois**, 2 s plus
-  tard — en arrière-plan quand le toast est déjà acquis (non connecté, cookie
-  du script posé) ou quand la première a été abandonnée au délai (un seul
-  budget d'attente pour le toast), attendu sinon, pour que le toast dise
-  l'issue réelle. Lu par la mise en page racine — la décision se prend avant le
+  (seul le `Set-Cookie` de la réponse peut alors le garder). Non connecté,
+  un renouvellement qui n'aboutit pas (réseau, délai dépassé, 5xx — un 502 du
+  proxy ne repose pas le cookie) est retenté **une fois**, en arrière-plan,
+  2 s plus tard. Connecté, aucune seconde tentative : le rattrapage par la
+  mise en page en tient lieu. Lu par la mise en page racine — la décision se prend avant le
   rendu, d'où un cookie et non `localStorage`. **Lax, pas strict** (comme
   `bg_recr_modal` / `bg_recr_banner`) : un cookie strict n'est pas envoyé quand
   la visite part d'un autre site (lien Discord, résultat de recherche, retour
@@ -242,17 +240,15 @@ revient pour une prioritaire neuve).
   d'ouverture sur « Plus tard » sans pager, sur le pager sinon (comme avant),
   et la première tabulation après le pager atteint « Plus tard » : Entrée pour
   fermer ne coupe jamais la modale pour de bon.
-- Toasts (`recruitmentOptOutToast`) : connecté et compte écrit, succès « Cette
-  fenêtre ne s'ouvrira plus d'elle-même… » ; non connecté, succès « … sur ce
-  navigateur… » (le choix ne couvre que lui) ; compte injoignable, erreur
-  « Choix gardé sur ce navigateur seulement… » (le cookie est posé d'abord) ;
-  session finie (`account: false`) ou compte supprimé (409) depuis le chargement, traité
-  comme non connecté (succès « … sur ce navigateur… », le cookie suivra au
-  compte) ; sans réponse en 10 s, l'appel est abandonné (repli « compte
-  injoignable ») ;
-  cookie refusé sans compte écrit (relu dans `document.cookie`, aussi après la
-  réponse, dont le `Set-Cookie` a pu le garder), erreur « Ce
-  choix n'a pas pu être gardé… ».
+- Toasts (`recruitmentOptOutToast`) : connecté, succès « Cette fenêtre ne
+  s'ouvrira plus d'elle-même… » — compte écrit, **ou** pas (réseau, délai, 5xx :
+  une seule tentative attendue, toast au plus 10 s après le clic), puisque le
+  cookie posé le fait rattraper à la page connectée suivante ; session finie
+  (`account: false`) ou compte supprimé (409) depuis le chargement : même
+  succès (le cookie suivra au compte) ; non connecté, succès « … sur ce
+  navigateur… » sans attendre le serveur ; cookie refusé au script et absent
+  après la réponse (relu dans `document.cookie`), sans compte écrit : erreur
+  « Ce choix n'a pas pu être gardé… ».
 - Navigateur partagé : un cookie laissé par une personne non connectée est
   reporté sur le compte de qui se connecte ensuite sur ce navigateur (choix
   du lot : le report suit le navigateur, pas la personne).
