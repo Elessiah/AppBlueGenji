@@ -172,6 +172,9 @@ export function ConfirmActionDialog({
                 id={inputId}
                 value={typed}
                 onChange={(e) => setTyped(e.target.value)}
+                // Figé pendant l'envoi : une frappe désarmerait le bouton en plein vol
+                // (`disabled` natif, focus perdu) et un échec ne se retenterait plus.
+                readOnly={busy}
                 autoComplete="off"
                 spellCheck={false}
                 data-autofocus
