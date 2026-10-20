@@ -30,7 +30,7 @@ let execute: jest.Mock<SqlQuery>;
 function matchRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     tournament_name: "Coupe d'hiver",
-    tournament_format: "SINGLE",
+    swiss_round: 0,
     participant_type: "TEAM",
     bracket: "UPPER",
     round_number: 2,
@@ -84,6 +84,21 @@ describe("alertSelfResolvedDispute", () => {
     );
     expect(line).not.toContain("Sifflet");
     expect(author).toEqual(actor);
+  });
+
+  it("phase suisse d'un MULTI : « Ronde N », comme la page et les autres alertes (FR + EN)", async () => {
+    execute.mockResolvedValue([[matchRow({ swiss_round: 1, round_number: 3 })], undefined]);
+
+    await alertSelfResolvedDispute(dispute, actor);
+
+    // La ronde se lit par `swissRoundSql` (tournoi SWISS ou phase suisse), pas par le seul format.
+    expect(String(execute.mock.calls[0][0])).toContain("AS swiss_round");
+    const [line] = jest.mocked(publishStaffAction).mock.calls[0];
+    expect(line).toContain("Ronde 3");
+    const [notification] = jest.mocked(notifyStaff).mock.calls[0];
+    expect(notification.push("fr").body).toContain("Ronde 3");
+    // L'anglais dit « Round » dans les deux cas (`round.swiss` = `round.default`).
+    expect(notification.push("en").body).toContain("Coupe d'hiver, Round 3:");
   });
 
   it("reconnaît le joueur d'une entrée solo", async () => {
