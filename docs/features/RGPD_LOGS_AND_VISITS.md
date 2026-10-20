@@ -79,15 +79,7 @@ texte, effacée un jour après la fin de la soirée).
 - **Signalements** : l'auteur est « un joueur de l'équipe X » (« un joueur » en
   individuel) ; la requête ne lit même plus `bg_users`.
 - **Gestes du staff** (retrait d'un engagé, retour en arrière, suppression d'un
-  tournoi, création d'un tournoi, litige tranché par un membre du staff qui
-  joue la manche — « ⚠️ Litige tranché par un membre du staff qui joue ce
-  match · « tournoi », manche : issue. », noms d'équipe seulement, « forfait
-  d'un joueur » ou score nu en individuel ; même ligne « ⚠️ Résultat corrigé
-  par … » pour un résultat acquis qu'il corrige, « ⚠️ Abandon imposé à son
-  adversaire par … » pour un abandon qu'il impose ; validation automatique suspendue
-  par un membre du staff qui joue la manche — « ⚠️ Validation automatique
-  suspendue par un membre du staff qui joue ce match · « tournoi », manche. »,
-  aucun nom d'engagé) : « par le staff » sur Discord, et la même
+  tournoi, création d'un tournoi) : « par le staff » sur Discord, et la même
   ligne avec l'auteur sur la sortie standard, que pm2 range dans ses journaux —
   `publishStaffAction` (`lib/server/staff-audit.ts`) écrit l'audit **avant**
   l'envoi, qui reste au meilleur effort. Pour la modération :
@@ -95,6 +87,16 @@ texte, effacée un jour après la fin de la soirée).
   ```bash
   pm2 logs bluegenji --lines 1000 | grep staff-audit
   ```
+
+- **Arbitre qui joue la manche** (litige tranché, résultat corrigé, abandon
+  imposé à l'adversaire, validation automatique suspendue — décision du
+  2026-10-20) : Discord ne reçoit que le tournoi et la nature du geste, staff
+  anonyme — « ⚠️ Litige tranché par un membre du staff qui joue ce match ·
+  « tournoi ». » (de même « Résultat corrigé », « Abandon imposé à son
+  adversaire », « Validation automatique suspendue ») —, **ni manche, ni issue,
+  ni nom d'engagé**. La ligne détaillée (manche, issue, noms d'équipe, aucun en
+  individuel) et l'auteur ne vont que dans pm2 (`publishStaffAction(discord,
+  actor, auditLine)`, `dispute-self-resolution.ts`).
 
 - Le **motif d'une pénalité** est saisi librement par l'arbitre et repris tel
   quel : il ne doit pas nommer de joueur.

@@ -120,6 +120,11 @@ Hors litige, la **première** validation d'un arbitre qui joue n'avertit personn
 (la règle vise les litiges, `/regles` le dit). Seul membre du staff : personne
 à prévenir (`notifyStaff` sans destinataire), la ligne du journal reste.
 
+Information (registre T04 et T05, `/rgpd` § Notifications push) : entrée
+`PRIVACY_CHANGES` `2026-10-arbitre-qui-joue-le-match` (FR + EN) — finalité
+nouvelle (avertir le reste du staff) et gestes nouveaux au journal du staff,
+nominatifs dans pm2.
+
 Pour un litige tranché :
 
 - push `REFEREE_SELF_RESOLUTION` (`notifyStaff`, l'auteur exclu ; rédacteur
@@ -127,15 +132,20 @@ Pour un litige tranché :
   tranché son litige · tournoi, manche : issue. » — issue = « Équipe A 2 – 1
   Équipe B », « forfait de Équipe B », « double forfait » ; en individuel,
   aucun nom (« 2 – 1 », « forfait d'un joueur ») ;
-- journal (`publishStaffAction`) : la même ligne en français sur Discord, staff
-  anonyme et noms d'équipe neutralisés (`discordInline`), et nominative dans
-  pm2 (`[staff-audit] … — auteur : <pseudo> (#id)`).
+- journal (`publishStaffAction`) : sur Discord, le tournoi et la nature du
+  geste seulement, staff anonyme (« ⚠️ Litige tranché par un membre du staff
+  qui joue ce match · « tournoi ». », `selfActionDiscordLine`, nom du tournoi
+  neutralisé par `discordInline`) — ni manche, ni issue, ni nom d'engagé ; la
+  ligne détaillée (manche, issue) va, avec l'auteur, dans pm2 seulement
+  (`[staff-audit] … — auteur : <pseudo> (#id)`). Même règle pour les trois
+  autres gestes.
 
 Pour une suspension : push « Un membre du staff qui joue ce match en a
 suspendu la validation automatique · tournoi, manche. » (`selfPausedValidationPush`,
 FR + EN, aucun nom d'engagé) et ligne de journal « ⚠️ Validation automatique
-suspendue par un membre du staff qui joue ce match · « tournoi », manche. »
-(`selfPausedValidationLog`), même sujet `REFEREE_SELF_RESOLUTION`.
+suspendue par un membre du staff qui joue ce match · « tournoi ». » sur Discord,
+manche en plus dans pm2 (`selfPausedValidationLog`), même sujet
+`REFEREE_SELF_RESOLUTION`.
 
 Le litige se lit **sous le verrou** de la manche, avant l'arbitrage (deux
 propositions sur un match ouvert, `isScoreDisputed`) : un arbitrage hors litige
