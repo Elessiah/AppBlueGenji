@@ -107,14 +107,17 @@ describe("textes FR + EN", () => {
     // L'arbitrage n'a pas de remise à zéro par match : ne pas la promettre.
     expect(frDialogs.score.player.locked).not.toMatch(/remettre à zéro/);
     expect(enDialogs.score.player.locked).not.toMatch(/reset/);
-    expect(frDialogs.score.player.locked).toMatch(/prononcer un forfait/);
-    expect(enDialogs.score.player.locked).toMatch(/declare a forfeit/);
+    expect(frDialogs.score.player.locked).toMatch(/valider le score final ou un forfait/);
+    expect(enDialogs.score.player.locked).toMatch(/confirm the final score or a forfeit/);
+    // « Enregistrer » ne lève pas le litige : l'arbitre le lit dans sa fenêtre.
+    expect(frDialogs.score.admin.disputeNotice).toContain("« Valider le résultat »");
+    expect(enDialogs.score.admin.disputeNotice).toContain("“Confirm the result”");
     // /regles : le verrou vise le forfait **du match** (l'abandon du tournoi reste
     // possible et vaut défaite), et ne promet pas de remise à zéro par match.
     const fr = JSON.stringify(frRules);
     const en = JSON.stringify(enRules);
-    expect(fr).toContain("ni aucun forfait sur ce match), et seul un arbitre ou un administrateur tranche, en enregistrant le score officiel ou un forfait.");
-    expect(en).toContain("and no forfeit of the match), and only a referee or an administrator settles it, by recording the official score or a forfeit.");
+    expect(fr).toContain("ni aucun forfait sur ce match), et seul un arbitre ou un administrateur tranche, en validant le résultat officiel (score ou forfait).");
+    expect(en).toContain("and no forfeit of the match), and only a referee or an administrator settles it, by confirming the official result (score or forfeit).");
     expect(fr).not.toContain("en remettant le match à zéro");
     expect(en).not.toContain("resetting the match");
     // Tournoi individuel : même modale, même refus — jamais « équipes » dans le verrou.

@@ -530,8 +530,9 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     const fr = render("fr", ui());
     expect(fr).toContain("la saisie est verrouillée pour les deux adversaires, forfait compris");
     // Région d'état remplie, pas de description de modale en plus : le verrou ne s'annonce qu'une fois.
-    expect(fr).toMatch(/<output id="player-score-locked" class="[^"]+">Score en litige/);
-    expect(fr).not.toContain('aria-describedby="player-score-locked"');
+    // Désaccord et verrou dans une seule région d'état : annoncés une fois.
+    expect(fr.match(/<output[^>]*>[^<]*Score en litige/g)).toHaveLength(1);
+    expect(fr).toMatch(/<output[^>]*>Les scores se contredisent[^<]*arbitrage est alerté\. Score en litige/);
     expect(fr).not.toContain('type="submit"');
     expect(fr).not.toContain("player-score-forfeit");
     expect(fr).not.toContain("player-score-map-");
@@ -539,6 +540,14 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     expect(en).toContain("score entry is locked for both opponents, forfeits included");
     expect(en).not.toContain('type="submit"');
     expect(en).not.toContain("player-score-forfeit");
+    expectNoFrench(en);
+  });
+
+  it("score (arbitrage) en litige : seule la validation lève le verrou, dans les deux langues", () => {
+    const ui = () => <AdminScoreDialog match={disputed} onClose={noop} onSubmitted={noop} />;
+    expect(render("fr", ui())).toContain("reste verrouillée jusqu&#x27;à « Valider le résultat » (score ou forfait)");
+    const en = render("en", ui());
+    expect(en).toContain("stays locked for both opponents until you use “Confirm the result”");
     expectNoFrench(en);
   });
 
@@ -603,8 +612,8 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     const dialog = <PlayerScoreDialog tournamentId={1} match={pending} myTeamId={11} canReportScore canForfeit proposals={[]} onClose={noop} onSubmitted={noop} onRefresh={noop} />;
     expect(render("fr", dialog)).not.toContain("ouvre un litige et verrouille");
     expect(render("en", dialog)).not.toContain("opens a dispute and locks");
-    // La région du verrou est montée, vide, avant tout litige : son remplissage s'annonce.
-    expect(render("fr", dialog)).toMatch(/<output id="player-score-locked"><\/output>/);
+    // La région d'état est montée dès la proposition adverse : le litige qui la remplace s'y annonce.
+    expect(render("fr", dialog)).toMatch(/<output class="[^"]+">[^<]*propose 2 – 1/);
   });
 
   it.each<[string, () => ReactElement]>([
