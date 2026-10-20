@@ -449,13 +449,14 @@ export function RgpdEn({
             </li>
             <li>
               <strong>bg_recr_off</strong> — set only <strong>if you choose “Don&apos;t show again”</strong> in the
-              window of urgent recruitment announcements, so that it no longer opens on its own on this browser. It
+              window of urgent recruitment announcements (or if you untick the “My profile” box that controls it), so that it no longer opens on its own on this browser. It
               only contains the value “1”, never a personal identifier (sameSite=lax), and lasts one year. When
               you are logged in, the same choice is kept on your account, for your other devices; if it was made
               before logging in (or could not be saved to it right away), it is carried over to the account at login
               or on your next visit while logged in. On the account, it lasts as long as the
               account, is included in the export of your data and returns to the default when the account is
-              deleted. You can undo this choice in “My profile”: the account no longer keeps it and the cookie of
+              deleted. You can undo this choice in “My profile”: the account then records that you turned the window
+              back on (a mark kept as long as the account and included in the export) and the cookie of
               that browser is deleted. From then on, no cookie is carried over to the account any more: a browser
               that holds it (set earlier, or while logged out) only keeps the window closed there; only a new
               “Don&apos;t show again” made while logged in, or the “My profile” box, turns it off again on the

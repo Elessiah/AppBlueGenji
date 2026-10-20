@@ -472,9 +472,9 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     summary:
       "The window of urgent recruitment announcements that opens on its own has a “Don't show again” button. The site keeps this choice so as not to open it for you again: on this browser and, if you are logged in, on your account. You can undo it in “My profile”.",
     details: [
-      "On the browser, the choice is held in the bg_recr_off cookie (value “1”, no personal identifier), kept for one year.",
+      "On the browser, the choice is held in the bg_recr_off cookie (value “1”, no personal identifier), kept for one year; unticking the “My profile” box sets it too.",
       "On the account, it follows you to your other devices. Made before logging in (or not saved right away), it is carried over to your account at your next login or on your next visit while logged in. It is kept as long as the account, appears in the export of your data and returns to the default when the account is deleted.",
-      "You can undo this choice in “My profile”: your account no longer keeps it and the cookie of that browser is deleted. From then on, no cookie is carried over to your account any more: a browser that holds it (set earlier, or while logged out) only keeps the window closed there; only a new “Don't show again” made while logged in, or the “My profile” box, turns it off again on your account.",
+      "You can undo this choice in “My profile”: your account then records that you turned the window back on (a mark kept as long as the account and included in the export) and the cookie of that browser is deleted. From then on, no cookie is carried over to your account any more: a browser that holds it (set earlier, or while logged out) only keeps the window closed there; only a new “Don't show again” made while logged in, or the “My profile” box, turns it off again on your account.",
       "The announcements stay on the Recruitment page and in the banner; “Later” does not change: the window comes back for an urgent announcement you have not seen yet.",
     ],
   },

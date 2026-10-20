@@ -580,7 +580,8 @@ function RgpdFr({
             </li>
             <li>
               <strong>bg_recr_off</strong> — déposé uniquement <strong>si vous choisissez « Ne plus
-              afficher »</strong> dans la fenêtre des annonces de recrutement urgentes, pour
+              afficher »</strong> dans la fenêtre des annonces de recrutement urgentes (ou si vous
+              décochez la case de « Mon profil » qui la commande), pour
               qu&apos;elle ne s&apos;ouvre plus d&apos;elle-même sur ce navigateur. Il ne contient que
               la valeur « 1 », jamais d&apos;identifiant de personne (sameSite=lax), et dure un an.
               Connecté, le même choix est gardé sur votre compte, pour vos autres appareils ; s&apos;il
@@ -588,7 +589,8 @@ function RgpdFr({
               reporté à la connexion ou à votre prochaine visite connectée. Sur le compte, il dure
               autant que lui, figure dans l&apos;export de vos données et revient au défaut à la
               suppression du compte. Vous pouvez revenir sur ce choix dans « Mon profil » : le
-              compte ne le garde plus et le cookie de ce navigateur est effacé. Dès lors, plus aucun
+              compte note alors que vous avez réaffiché la fenêtre (mention gardée le temps du
+              compte et présente dans l&apos;export) et le cookie de ce navigateur est effacé. Dès lors, plus aucun
               cookie n&apos;est reporté sur le compte : un navigateur qui le garde (posé avant, ou hors
               connexion) n&apos;y tait la fenêtre que chez lui ; seul un nouveau « Ne plus afficher »
               fait connecté, ou la case de « Mon profil », la coupe de nouveau sur le compte.
