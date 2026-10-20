@@ -12,9 +12,10 @@ import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 export const STALLED_ALERT_KEY = "SCORE_REPORT_STALLED";
 
 /**
- * Colonnes d'un match tranché, partagées par toutes ses clôtures — accord des
- * deux engagés (`writeMatchResult`, `./scoring`) et validation d'office
- * (`claimAutoValidation`, `./finalization`) : le score retenu, propositions et
+ * Colonnes d'un match tranché par ses joueurs, partagées par ses deux
+ * clôtures — accord des deux engagés (`writeMatchResult`, `./scoring`) et validation d'office
+ * (`claimAutoValidation`, `./finalization`) ; les exemptions (`./byes`) et
+ * les forfaits d'un tournoi gardent leurs propres écritures. Le score retenu, propositions et
  * échéance effacées. Un forfait noté par l'arbitrage (« Enregistrer ») ne
  * survit pas au score des joueurs — sans quoi la ligne close porterait leur
  * score **et** un drapeau de forfait, que les fiches et le live lisent comme
