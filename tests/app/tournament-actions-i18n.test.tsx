@@ -549,6 +549,12 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     expect(source).toContain('showSuccess(a("cardActions.playerScoreSettled"))');
     // Appelé avant les retours anticipés (règle des hooks).
     expect(source.indexOf("useCloseSettledPlayerScore(detail?.matches")).toBeLessThan(source.indexOf("return <TournamentFatal"));
+    // Pas d'avis pour une modale déjà disparue, ni par-dessus le toast du geste du lecteur.
+    expect(source).toContain("if (wasShown.current && !ownSettle.current) notify();");
+    expect(source).toContain("onOwnSettle={markOwnSettle}");
+    const dialogSource = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx"), "utf8");
+    expect(dialogSource.match(/onOwnSettle\?\.\(true\);/g)).toHaveLength(2);
+    expect(dialogSource.match(/onOwnSettle\?\.\(code === "MATCH_ALREADY_COMPLETED"\);/g)).toHaveLength(2);
     const frA = JSON.parse(readFileSync(join(process.cwd(), "messages/fr/tournamentActions.json"), "utf8"));
     const enA = JSON.parse(readFileSync(join(process.cwd(), "messages/en/tournamentActions.json"), "utf8"));
     expect(frA.cardActions.playerScoreSettled).toBe("Ce match vient d'être tranché : la fenêtre de score s'est refermée.");
