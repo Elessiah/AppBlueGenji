@@ -82,6 +82,29 @@
   display: none;
 }
 
+/* Le fond reste celui du repos (`globals.css`) : le survol de `.btn` ne
+   l'éclaircit plus comme celui d'un bouton pressable. */
+.actions > :global(.btn)[aria-disabled="true"]:hover {
+  background: rgba(89, 212, 255, 0.14);
+}
+
+.actions > :global(.btn.ghost)[aria-disabled="true"]:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.actions > :global(.btn.danger)[aria-disabled="true"]:hover {
+  background: rgba(var(--danger-rgb), 0.14);
+}
+
+/* Contraste élevé (Windows) : les couleurs posées plus haut sont ignorées ; le
+   gris système dit, comme le `disabled` natif d'avant, que le bouton attend. */
+@media (forced-colors: active) {
+  .actions > :global(.btn)[aria-disabled="true"] {
+    color: GrayText;
+    border-color: GrayText;
+  }
+}
+
 .confirmField {
   margin-top: 12px;
 }

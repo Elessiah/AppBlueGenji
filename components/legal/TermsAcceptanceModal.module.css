@@ -163,15 +163,16 @@
    destructeur virait au bleu de marque juste avant d'être pressé. */
 .actions .deleteButton:hover:not(:disabled):not([aria-disabled="true"]) {
   color: var(--danger);
-  background: rgba(var(--danger-rgb), 0.1);
-  border-color: rgba(var(--danger-rgb), 0.6);
+  border-color: rgba(var(--danger-rgb), 0.4);
   box-shadow: none;
 }
 
-/* Le halo, comme celui de `CyberButton`, au seul pointeur fin : au toucher, un
-   survol collé après « Annuler » le laisserait allumé, comme un geste par défaut. */
+/* Fond, bordure et halo au seul pointeur fin : au toucher, un survol collé
+   après « Annuler » laisserait le bouton allumé, comme un geste par défaut. */
 @media (hover: hover) and (pointer: fine) {
   .actions .deleteButton:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: rgba(var(--danger-rgb), 0.1);
+    border-color: rgba(var(--danger-rgb), 0.6);
     box-shadow: 0 0 18px rgba(var(--danger-rgb), 0.25);
   }
 }
