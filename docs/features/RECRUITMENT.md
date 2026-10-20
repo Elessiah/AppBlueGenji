@@ -239,7 +239,8 @@ revient pour une prioritaire neuve).
   comme non connecté (succès « … sur ce navigateur… », le cookie suivra au
   compte) ; sans réponse en 10 s, l'appel est abandonné (repli « compte
   injoignable ») ;
-  cookie refusé sans compte écrit (relu dans `document.cookie`), erreur « Ce
+  cookie refusé sans compte écrit (relu dans `document.cookie`, aussi après la
+  réponse, dont le `Set-Cookie` a pu le garder), erreur « Ce
   choix n'a pas pu être gardé… ».
 - Navigateur partagé : un cookie laissé par une personne non connectée est
   reporté sur le compte de qui se connecte ensuite sur ce navigateur (choix
