@@ -5,8 +5,8 @@
  * 2026-10-20) : le geste reste permis — une petite organisation n'a pas
  * toujours un arbitre neutre sous la main —, mais les **autres** membres du
  * staff en sont avertis (push `REFEREE_SELF_RESOLUTION`, l'auteur exclu) et le
- * geste est journalisé (`publishStaffAction` : anonyme sur Discord, nommé dans
- * pm2). Seul membre du staff : personne à prévenir, le journal reste.
+ * geste est journalisé (`publishStaffAction` : sur Discord, le tournoi et la
+ * nature du geste seulement, staff anonyme ; dans pm2, manche, issue et auteur). Seul membre du staff : personne à prévenir, le journal reste.
  *
  * Tout part **après** le commit et au meilleur effort : l'arbitrage est acquis,
  * une alerte perdue ne le défait pas.
@@ -77,8 +77,9 @@ export function resolvedOutcome(
 }
 
 /**
- * Ligne du journal Discord (français, `publishStaffAction`) : le staff y reste
- * anonyme, aucun joueur n'est nommé ; les noms d'équipe sont permis, neutralisés.
+ * Ligne **détaillée** (manche, issue) d'un litige tranché, pour pm2 seulement
+ * (`publishStaffAction`, `auditLine`) : Discord ne reçoit que
+ * {@link selfActionDiscordLine}. Aucun joueur n'y est nommé.
  */
 export function selfResolvedDisputeLog(input: SelfResolvedDispute): string {
   const round = matchRoundLabel(input.bracket, input.roundNumber, input.swiss);
@@ -150,33 +151,45 @@ async function loadAlertMatch(match: DisputeBeforeResolution): Promise<SelfResol
   };
 }
 
-/**
- * Ligne du journal Discord d'une correction de résultat acquis (français) :
- * mêmes règles que le litige tranché.
- */
+/** Ligne détaillée (pm2) d'une correction de résultat acquis : mêmes règles que le litige tranché. */
 export function selfCorrectedResultLog(input: SelfResolvedDispute): string {
   const round = matchRoundLabel(input.bracket, input.roundNumber, input.swiss);
   const outcome = selfResolvedOutcomeText(input, "fr", discordInline);
   return `⚠️ Résultat corrigé par un membre du staff qui joue ce match · « ${discordInline(input.tournamentName)} », ${round} : ${outcome}.`;
 }
 
-/** Ligne du journal Discord d'un abandon imposé à l'adversaire (français). */
+/** Ligne détaillée (pm2) d'un abandon imposé à l'adversaire. */
 export function selfImposedForfeitLog(input: SelfResolvedDispute): string {
   const round = matchRoundLabel(input.bracket, input.roundNumber, input.swiss);
   const outcome = selfResolvedOutcomeText(input, "fr", discordInline);
   return `⚠️ Abandon imposé à son adversaire par un membre du staff qui joue ce match · « ${discordInline(input.tournamentName)} », ${round} : ${outcome}.`;
 }
 
-/**
- * Ligne du journal Discord d'une suspension (français, `publishStaffAction`) :
- * staff anonyme, aucun nom d'engagé — le tournoi et la manche suffisent.
- */
+/** Ligne détaillée (pm2) d'une suspension : aucun nom d'engagé, le tournoi et la manche. */
 export function selfPausedValidationLog(input: SelfResolvedDispute): string {
   const round = matchRoundLabel(input.bracket, input.roundNumber, input.swiss);
   return `⚠️ Validation automatique suspendue par un membre du staff qui joue ce match · « ${discordInline(input.tournamentName)} », ${round}.`;
 }
 
-type SelfActionKind = "resolved" | "corrected" | "forfeited" | "paused";
+export type SelfActionKind = "resolved" | "corrected" | "forfeited" | "paused";
+
+/** Ce que dit la ligne Discord, par geste. */
+const SELF_ACTION_DISCORD: Record<SelfActionKind, string> = {
+  resolved: "Litige tranché",
+  corrected: "Résultat corrigé",
+  forfeited: "Abandon imposé à son adversaire",
+  paused: "Validation automatique suspendue",
+};
+
+/**
+ * Ligne du journal **Discord** (français) : le tournoi et la nature du geste,
+ * rien d'autre — ni manche, ni issue, ni nom d'engagé, et le staff anonyme
+ * (décision du 2026-10-20, `RGPD_LOGS_AND_VISITS.md`). Le détail et l'auteur
+ * ne vivent que dans pm2.
+ */
+export function selfActionDiscordLine(kind: SelfActionKind, tournamentName: string): string {
+  return `⚠️ ${SELF_ACTION_DISCORD[kind]} par un membre du staff qui joue ce match · « ${discordInline(tournamentName)} ».`;
+}
 
 /**
  * Avertit les autres membres du staff si l'arbitre qui vient d'agir joue la
@@ -198,7 +211,7 @@ async function alertSelfAction(
     const input = await loadAlertMatch(match);
     if (!input) return false;
 
-    publishStaffAction(SELF_ACTION_LOG[kind](input), actor);
+    publishStaffAction(selfActionDiscordLine(kind, input.tournamentName), actor, SELF_ACTION_LOG[kind](input));
     logged = true;
     await notifyStaff({
       topic: "REFEREE_SELF_RESOLUTION",
@@ -214,7 +227,7 @@ async function alertSelfAction(
   }
 }
 
-/** Ligne du journal Discord, par geste. */
+/** Ligne détaillée du journal pm2, par geste. */
 const SELF_ACTION_LOG: Record<SelfActionKind, (input: SelfResolvedDispute) => string> = {
   resolved: selfResolvedDisputeLog,
   corrected: selfCorrectedResultLog,
