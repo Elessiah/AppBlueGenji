@@ -36,6 +36,7 @@ const locale: { current: "fr" | "en" } = { current: "fr" };
 
 import {
   ACCOUNT_DELETED_REDIRECT_MS,
+  ACCOUNT_DELETION_PREVIEW_TIMEOUT_MS,
   previewAccountDeletion,
   requestAccountDeletion,
   useAccountDeletion,
@@ -44,6 +45,8 @@ import { FR_PROFILE } from "@/app/(secured)/profil/_lib/profile-text";
 import type { ConfirmActionDialogProps } from "@/components/ui/confirm-action-dialog";
 import { RETENTION_UNKNOWN } from "@/lib/shared/account-deletion";
 import { readSource } from "../helpers/read-source";
+import { scopedText } from "@/lib/shared/scoped-text";
+import enProfile from "@/messages/en/profile.json";
 
 type FetchCall = { url: string; init?: RequestInit };
 
@@ -67,7 +70,26 @@ describe("previewAccountDeletion", () => {
     const calls: FetchCall[] = [];
     const fetchImpl = fakeFetch({ "GET /api/profile/deletion": () => jsonResponse(200, { mode: "ANONYMIZE", reason: "OWNED_TEAMS" }) }, calls);
     expect(await previewAccountDeletion(fetchImpl)).toEqual({ subject: "OWNED_TEAMS", previewed: "OWNED_TEAMS" });
-    expect(calls[0].init).toEqual({ cache: "no-store" });
+    expect(calls[0].init?.cache).toBe("no-store");
+    expect(calls[0].init?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("un aperçu qui ne répond jamais est abandonné au délai : la confirmation s'ouvre sur l'incertitude", async () => {
+    // Le délai lui-même (`AbortSignal.timeout`) : remplacé par un signal que le test déclenche.
+    const controller = new AbortController();
+    const timeout = jest.spyOn(AbortSignal, "timeout").mockReturnValue(controller.signal);
+    try {
+      const hanging = (async (_input: string | URL | Request, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(new DOMException("timeout", "TimeoutError")));
+        })) as typeof fetch;
+      const pending = previewAccountDeletion(hanging);
+      expect(timeout).toHaveBeenCalledWith(ACCOUNT_DELETION_PREVIEW_TIMEOUT_MS);
+      controller.abort();
+      expect(await pending).toEqual({ subject: RETENTION_UNKNOWN, previewed: RETENTION_UNKNOWN });
+    } finally {
+      timeout.mockRestore();
+    }
   });
 
   it("un effacement complet annoncé reste `null` (« il ne restera rien »)", async () => {
@@ -149,6 +171,22 @@ describe("useAccountDeletion", () => {
     expect(props.confirmLabel).toBe("Supprimer mon compte");
     expect(props.layer).toBe("overBlocking");
     expect(props.closeOnSuccess).toBe(false);
+  });
+
+  const englishProfileText: typeof FR_PROFILE = scopedText("en", enProfile);
+  const fallbackCases: Array<{ name: string; page: "fr" | "en"; text: typeof FR_PROFILE; lang: "fr" | undefined }> = [
+    { name: "sous /en, textes retombés sur le français : la confirmation se déclare française", page: "en", text: FR_PROFILE, lang: "fr" },
+    { name: "sous /en, textes anglais : aucune langue à déclarer", page: "en", text: englishProfileText, lang: undefined },
+    { name: "page française : aucune langue à déclarer", page: "fr", text: FR_PROFILE, lang: undefined },
+  ];
+  it.each(fallbackCases)("contentLang — $name", async ({ page, text, lang }) => {
+    globalThis.fetch = fakeFetch({ "GET /api/profile/deletion": () => jsonResponse(200, { mode: "ERASE", reason: null }) }, calls);
+    locale.current = page;
+    await useAccountDeletion({ text }).start();
+    rerender();
+    const props = dialogProps(useAccountDeletion({ text }));
+    expect(props.contentLang).toBe(lang);
+    expect(props.title).toBe(text.t("deletion.question"));
   });
 
   it("un second lancement pendant l'aperçu n'envoie rien de plus", async () => {

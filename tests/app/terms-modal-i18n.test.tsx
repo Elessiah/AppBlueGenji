@@ -149,12 +149,31 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     expect(en).toContain('href="/en/profil"');
   });
 
+  const flowSource = () => readSource("components/legal/TermsAccountDeletion.tsx");
+
+  it("« Préparation… » / \"Preparing…\" : le libellé d'attente du bouton de suppression existe en français et en anglais", async () => {
+    expect((await import("@/messages/fr/shell.json")).default.termsModal.deleting).toBe("Préparation…");
+    expect((await import("@/messages/en/shell.json")).default.termsModal.deleting).toBe("Preparing…");
+  });
+
+  it("au survol, le bouton de suppression reste rouge : il l'emporte sur le survol bleu de `CyberButton` ghost", () => {
+    const css = readSource("components/legal/TermsAcceptanceModal.module.css");
+    const rule = /\.actions \.deleteButton:hover:not\(:disabled\):not\(\[aria-disabled="true"\]\) \{([^}]*)\}/.exec(css)?.[1] ?? "";
+    expect(rule).toContain("color: var(--danger);");
+    expect(rule).toMatch(/box-shadow: [^;]*--danger-rgb/);
+    // Plus spécifique que le survol ghost (une classe de plus) : la règle rouge gagne quel que soit l'ordre des feuilles.
+    expect(readSource("components/cyber/CyberButton.module.css")).toContain('.ghost:hover:not(:disabled):not([aria-disabled="true"])');
+  });
+
   it("la déconnexion garde `useLogout` ; la suppression ouvre celle du profil, empilée, et rend le focus à son bouton à l'annulation", () => {
     const modal = readSource("components/legal/TermsAcceptanceModal.tsx");
     expect(modal).toContain("const { leaving, logout } = useLogout();");
     expect(modal).toMatch(/if \(!busy && !deletionOpen\) void logout\(\);/);
     expect(modal).toMatch(/if \(!busy && !leaving\) setDeletionOpen\(true\);/);
-    expect(modal).toMatch(/\{deletionOpen \? \(\s*<TermsAccountDeletion\s+onClose=\{\(\) => \{\s*setDeletionOpen\(false\);\s*requestAnimationFrame\(\(\) => deleteButtonRef\.current\?\.focus\(\)\);/);
+    expect(modal).toMatch(/\{deletionOpen \? \(\s*<TermsAccountDeletion\s+onReady=\{\(\) => setDeletionReady\(true\)\}\s+onClose=\{\(\) => \{\s*setDeletionOpen\(false\);\s*setDeletionReady\(false\);\s*requestAnimationFrame\(\(\) => deleteButtonRef\.current\?\.focus\(\)\);/);
+    // Préparation (code, textes, aperçu) : le bouton dit qu'il travaille, jusqu'à l'ouverture de la confirmation.
+    expect(modal).toContain('{deletionOpen && !deletionReady ? t("termsModal.deleting") : t("termsModal.deleteAccount")}');
+    expect(flowSource()).toMatch(/useEffect\(\(\) => \{\s*if \(confirming\) onReady\?\.\(\);\s*\}, \[confirming, onReady\]\);/);
     // Chargée au clic seulement : ni son code ni l'espace `profile` dans chaque page.
     expect(modal).toContain('dynamic(\n  () => orReload(import("./TermsAccountDeletion")');
     expect(modal).not.toMatch(/^import .*use-account-deletion/m);
