@@ -1252,4 +1252,15 @@ describe("PRIVACY_CHANGES — « Ne plus afficher » de la fenêtre de recruteme
     expect(en).toMatch(/carried over to your account at your next login/);
     expect(english.details).toHaveLength(entry.details.length);
   });
+
+  it("dit que décocher « Mon profil » pose le cookie et que le compte garde la mention « réaffichée » (FR et EN)", () => {
+    const fr = entry.details.join(" ");
+    expect(fr).toMatch(/décocher la case de « Mon profil » le pose aussi/);
+    expect(fr).toMatch(/ton compte note alors que tu as réaffiché la fenêtre \(mention gardée le temps du compte et présente dans l'export\)/);
+    expect(fr).not.toMatch(/ton compte ne le garde plus/);
+    const en = english.details.join(" ");
+    expect(en).toMatch(/unticking the “My profile” box sets it too/);
+    expect(en).toMatch(/your account then records that you turned the window back on \(a mark kept as long as the account and included in the export\)/);
+    expect(en).not.toMatch(/your account no longer keeps it/);
+  });
 });

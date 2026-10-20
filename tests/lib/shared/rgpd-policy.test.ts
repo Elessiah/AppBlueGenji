@@ -102,6 +102,8 @@ describe("DONNEES_PROFIL", () => {
     expect(en.base).toBe(row.base);
     expect(en.finalite).toMatch(/carried over to the account at login or on your next visit while logged in/);
     expect(en.finalite).toMatch(/Included in the export of your data, reset to the default if the account is anonymized/);
+    expect(row.finalite).toMatch(/Réversible dans Mon profil : le compte note alors que la fenêtre a été réaffichée/);
+    expect(en.finalite).toMatch(/Can be undone in My profile: the account then records that the window was turned back on/);
   });
 
   it("déclare la majorité, facultative et affichée seulement sur choix du joueur", () => {
