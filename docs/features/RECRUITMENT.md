@@ -205,9 +205,13 @@ annonces restent sur `/recrutement` et dans la banderole, qui n'est pas
 concernée. « Plus tard », Échap et le voile gardent leur règle (la modale
 revient pour une prioritaire neuve).
 
-- **Navigateur** : cookie `bg_recr_off=1` (un an, `sameSite=strict`, posé par
+- **Navigateur** : cookie `bg_recr_off=1` (un an, `sameSite=lax`, posé par
   le client), lu par la mise en page racine — la décision se prend avant le
-  rendu, d'où un cookie et non `localStorage`.
+  rendu, d'où un cookie et non `localStorage`. **Lax, pas strict** (comme
+  `bg_recr_modal` / `bg_recr_banner`) : un cookie strict n'est pas envoyé quand
+  la visite part d'un autre site (lien Discord, résultat de recherche, retour
+  d'OAuth Google/Discord/Blizzard) — la modale se rouvrait alors, et le report
+  à la connexion OAuth ne voyait pas le choix.
 - **Compte** (connecté) : `bg_users.recruitment_modal_off` (`TINYINT(1)`,
   défaut `0`), posé par `POST /api/recruitment/modal-dismiss` et lu **avec la
   session** (`getCurrentUser` → `AuthUser.recruitmentModalOff`, aucune requête
@@ -218,9 +222,19 @@ revient pour une prioritaire neuve).
 - Décision : `recruitmentModalOptedOut({ accountOff, browserCookie })`
   (`lib/shared/recruitment.ts`), passée à part de `modalSilenced` (prop
   `modalOptedOut`) par `app/layout.tsx`.
-- Toasts : succès « Cette fenêtre ne s'ouvrira plus d'elle-même… » ; si le
-  compte n'a pas pu être écrit, erreur « Choix gardé sur ce navigateur
-  seulement… » (le cookie est posé d'abord).
+- Focus d'ouverture : sur « Plus tard » (`data-autofocus`) quand il n'y a
+  qu'une annonce — sinon le premier focalisable serait « Ne plus afficher »,
+  et Entrée pour fermer couperait la modale pour de bon. Avec plusieurs
+  annonces, il reste sur le pager, comme avant.
+- Toasts (`recruitmentOptOutToast`) : connecté et compte écrit, succès « Cette
+  fenêtre ne s'ouvrira plus d'elle-même… » ; non connecté, succès « … sur ce
+  navigateur… » (le choix ne couvre que lui) ; compte injoignable, erreur
+  « Choix gardé sur ce navigateur seulement… » (le cookie est posé d'abord) ;
+  cookie refusé sans compte écrit (relu dans `document.cookie`), erreur « Ce
+  choix n'a pas pu être gardé… ».
+- Navigateur partagé : un cookie laissé par une personne non connectée est
+  reporté sur le compte de qui se connecte ensuite sur ce navigateur (choix
+  du lot : le report suit le navigateur, pas la personne).
 - RGPD : rendu dans l'export (`account.recruitmentModalOff`), remis à `0` à
   l'anonymisation, registre T01, cookie décrit sur `/rgpd`, entrée
   `2026-10-recrutement-ne-plus-afficher` de `PRIVACY_CHANGES`.
