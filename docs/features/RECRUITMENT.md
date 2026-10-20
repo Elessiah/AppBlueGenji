@@ -216,8 +216,8 @@ revient pour une prioritaire neuve).
   portes) lit le cookie et pose le drapeau sur le compte ; une erreur n'empêche
   jamais la connexion.
 - Décision : `recruitmentModalOptedOut({ accountOff, browserCookie })`
-  (`lib/shared/recruitment.ts`), ajoutée au silence de `modalSilenced` dans
-  `app/layout.tsx`.
+  (`lib/shared/recruitment.ts`), passée à part de `modalSilenced` (prop
+  `modalOptedOut`) par `app/layout.tsx`.
 - Toasts : succès « Cette fenêtre ne s'ouvrira plus d'elle-même… » ; si le
   compte n'a pas pu être écrit, erreur « Choix gardé sur ce navigateur
   seulement… » (le cookie est posé d'abord).
