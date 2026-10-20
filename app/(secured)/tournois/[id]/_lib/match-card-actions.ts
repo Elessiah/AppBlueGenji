@@ -123,7 +123,11 @@ export type MatchCardActionGroups = {
  */
 export function groupMatchCardActions(actions: readonly MatchCardAction[]): MatchCardActionGroups {
   if (actions.length === 1) return { primary: actions[0], more: [] };
-  const primary = PRIMARY_ORDER.map((id) => actions.find((a) => a.id === id)).find(Boolean) ?? null;
+  // Une lecture seule (« Voir le litige ») cède la place à un geste : l'arbitre
+  // qui joue le match garde « trancher » visible, seul geste qui lève le verrou.
+  const pick = (readOnly: boolean) =>
+    PRIMARY_ORDER.map((id) => actions.find((a) => a.id === id && (a.readOnly === true) === readOnly)).find(Boolean);
+  const primary = pick(false) ?? pick(true) ?? null;
   return { primary, more: actions.filter((a) => a !== primary) };
 }
 
