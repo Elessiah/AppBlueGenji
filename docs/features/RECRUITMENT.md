@@ -196,6 +196,38 @@ l'ouverture taisait pour sept jours celles que le visiteur n'avait jamais
 feuilletées. Une fois toutes vues, elle se tait sept jours. Elle se tait sur `/recrutement` et tant qu'un choix de
 confidentialité est dû (`PrivacyChangesModal`).
 
+### Ne plus afficher
+
+La modale porte, à gauche de ses actions, un bouton secondaire souligné
+« Ne plus afficher » / “Don't show again” (`highlight.dontShowAgain`). Une fois
+cliqué, elle ne s'ouvre **plus jamais d'elle-même** pour cette personne ; les
+annonces restent sur `/recrutement` et dans la banderole, qui n'est pas
+concernée. « Plus tard », Échap et le voile gardent leur règle (la modale
+revient pour une prioritaire neuve).
+
+- **Navigateur** : cookie `bg_recr_off=1` (un an, `sameSite=strict`, posé par
+  le client), lu par la mise en page racine — la décision se prend avant le
+  rendu, d'où un cookie et non `localStorage`.
+- **Compte** (connecté) : `bg_users.recruitment_modal_off` (`TINYINT(1)`,
+  défaut `0`), posé par `POST /api/recruitment/modal-dismiss` et lu **avec la
+  session** (`getCurrentUser` → `AuthUser.recruitmentModalOff`, aucune requête
+  de plus) : le choix suit la personne sur ses autres appareils.
+- **Report à la connexion** : `createSession` (point de passage des quatre
+  portes) lit le cookie et pose le drapeau sur le compte ; une erreur n'empêche
+  jamais la connexion.
+- Décision : `recruitmentModalOptedOut({ accountOff, browserCookie })`
+  (`lib/shared/recruitment.ts`), ajoutée au silence de `modalSilenced` dans
+  `app/layout.tsx`.
+- Toasts : succès « Cette fenêtre ne s'ouvrira plus d'elle-même… » ; si le
+  compte n'a pas pu être écrit, erreur « Choix gardé sur ce navigateur
+  seulement… » (le cookie est posé d'abord).
+- RGPD : rendu dans l'export (`account.recruitmentModalOff`), remis à `0` à
+  l'anonymisation, registre T01, cookie décrit sur `/rgpd`, entrée
+  `2026-10-recrutement-ne-plus-afficher` de `PRIVACY_CHANGES`.
+- Pas encore de réglage pour revenir en arrière depuis le site (le drapeau du
+  compte ne se lève qu'en base) — à ajouter à « Mon profil » si le besoin se
+  présente.
+
 ### Banderole : les annonces défilent
 
 La banderole porte prioritaires puis importantes, **une à la fois**, la suivante
@@ -233,6 +265,7 @@ initial (voir l'historique du LCP dans `components/recruitment-highlight.tsx`).
 | ------ | ----- | ---------- | ------ |
 | `bg_recr_modal` | 7 jours | une page de la modale est **affichée** (même sans être fermée) | identifiants des prioritaires réellement affichées, `12.15.3` |
 | `bg_recr_banner` | la visite | la banderole est **fermée** | identifiants des annonces qu'elle portait |
+| `bg_recr_off` | 1 an | « Ne plus afficher » est cliqué dans la modale | `1` (voir § Ne plus afficher) |
 
 `parseRecruitmentSeen` ignore tout ce qui n'est pas un entier positif (une valeur
 forgée ne tait que ce qu'elle nomme exactement) et lit encore l'ancienne forme à
@@ -260,6 +293,7 @@ ou que la source est déjà partie.
 | `DELETE /api/recruitment/[id]`     | admin  | Supprime une annonce |
 | `PUT /api/recruitment/reorder`     | admin  | Réordonne (`{ ids: number[] }`) — `409 RECRUITMENT_ORDER_MIXES_PRIORITIES` si l'ordre mêle les statuts |
 | `GET /api/recruitment/highlight`   | public | Mise en avant : `{ modal, banner }` (listes d'annonces) |
+| `POST /api/recruitment/modal-dismiss` | connecté | « Ne plus afficher » sur le compte — `401 UNAUTHORIZED`, `409 ACCOUNT_DELETED`, `500 RECRUITMENT_MODAL_DISMISS_FAILED` |
 
 Les mutations vérifient la session (`401` si anonyme, `403` si non-admin) et la
 validation partagée `validateRecruitmentAdInput` (`lib/shared/recruitment.ts`,

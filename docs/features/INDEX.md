@@ -156,7 +156,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `SPONSOR_LOGO_PROXY.md` — Logos de partenaires servis depuis notre origine.
 - `SPONSOR_CARDS.md` — Cartes partenaires.
 - `DISCORD_COMMUNITY.md` — Invitation Discord unique et compteur de membres.
-- `RECRUITMENT.md` — Annonces de recrutement et statut d'importance.
+- `RECRUITMENT.md` — Annonces de recrutement et statut d'importance ; « Ne plus afficher » de la modale d'arrivée (compte ou navigateur).
 - `SEO.md` — `robots.txt`, sitemap, JSON-LD.
 - `SHARE_METADATA.md` — Aperçu des liens partagés (image néon : halos, pastille d'état, logo ; une carte par page et par langue, podium de `/classement`, carte nominative d'une équipe).
 - `WEB_APP_MANIFEST.md` — Manifeste, `minimal-ui`, écrans de lancement iOS.
