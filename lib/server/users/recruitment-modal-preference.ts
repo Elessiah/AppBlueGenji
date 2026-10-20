@@ -35,8 +35,9 @@ export async function recordRecruitmentModalOff(userId: number): Promise<boolean
 }
 
 /**
- * Rattrapage, à chaque page connectée : le cookie du navigateur porte le
- * choix mais le compte ne l'a pas (l'écriture du clic a échoué deux fois,
+ * Rattrapage, à chaque chargement complet d'une page connectée (la mise en
+ * page racine ne se rend pas à la navigation client) : le cookie porte le
+ * choix mais le compte ne l'a pas (l'écriture du clic, tentée une fois, a échoué :
  * réseau coupé). Sans lui, le compte n'en saurait rien avant la prochaine
  * connexion — jusqu'à trente jours de modale sur les autres appareils. Même
  * règle que le report de `createSession` ; jamais attendu ni bloquant. Une
