@@ -224,6 +224,25 @@ describe("recordRecruitmentModalOptOut", () => {
     expect(hanging).toHaveBeenCalledWith("/api/recruitment/modal-dismiss");
   });
 
+  it("non connecté : retente une fois le renouvellement par le serveur s'il n'aboutit pas (ITP)", async () => {
+    const post = jest
+      .fn<(url: string) => Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }>>()
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ account: false }) });
+    expect(await recordRecruitmentModalOptOut(false, { writeCookie: () => true, post })).toBe("BROWSER");
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(post).toHaveBeenCalledTimes(2);
+  });
+
+  it("non connecté : deux échecs du renouvellement restent silencieux", async () => {
+    const post = jest
+      .fn<(url: string) => Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }>>()
+      .mockRejectedValue(new Error("offline"));
+    expect(await recordRecruitmentModalOptOut(false, { writeCookie: () => true, post })).toBe("BROWSER");
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(post).toHaveBeenCalledTimes(2);
+  });
+
   it("borne l'attente du serveur sans AbortSignal.timeout (absent de Safari 15)", () => {
     const source = readSource("components/recruitment-highlight.tsx");
     expect(source).toContain("setTimeout(() => controller.abort(), OPT_OUT_TIMEOUT_MS)");
