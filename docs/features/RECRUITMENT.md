@@ -238,6 +238,9 @@ revient pour une prioritaire neuve).
   session l'éteint ensuite. Au plus une tentative par compte et par processus
   toutes les dix minutes (`RECRUITMENT_MODAL_HEAL_WINDOW_MS`) : une écriture qui
   échoue n'est pas relancée à chaque page ni par chaque onglet restauré.
+  Mémoire bornée (`RECRUITMENT_MODAL_HEAL_MAX_TRACKED` comptes ; pleine, le
+  rattrapage attend), et plus aucune tentative si la colonne manque (jusqu'au
+  redémarrage, qui rejoue l'`ALTER`).
 - Décision : `recruitmentModalOptedOut({ accountOff, browserCookie })`
   (`lib/shared/recruitment.ts`), passée à part de `modalSilenced` (prop
   `modalOptedOut`) par `app/layout.tsx`, qui lit le cookie une fois et, pour
