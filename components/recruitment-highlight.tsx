@@ -166,9 +166,9 @@ export function RecruitmentHighlight({
   bannerSeenKept?: readonly number[];
   /** On est sur `/recrutement`, où la modale se tait (le visiteur y lit déjà les annonces). */
   onAdPage: boolean;
-  /** Lecteur connecté : « Ne plus afficher » est aussi gardé sur son compte. */
   /** « Ne plus afficher » posé (compte ou navigateur) : la modale ne s'ouvre plus d'elle-même. */
   modalOptedOut?: boolean;
+  /** Lecteur connecté : « Ne plus afficher » est aussi gardé sur son compte. */
   signedIn?: boolean;
 }>) {
   // Ouverte sur la première prioritaire jamais vue ; toutes vues, elle se tait.
