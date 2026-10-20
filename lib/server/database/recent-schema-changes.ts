@@ -271,7 +271,8 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // suivent, alors que les règles promettent deux heures à l'adversaire.
     // Données seulement, rejouées à chaque démarrage sans effet une seconde
     // fois : le nouveau code n'écrit jamais d'échéance plus proche que la
-    // saisie + deux heures.
+    // saisie + deux heures. Se retire au déploiement suivant celui de la PR
+    // #453 (plus aucun report de l'ancienne règle en attente).
     `UPDATE bg_matches m
         SET m.score_deadline_at = DATE_ADD(
               COALESCE(m.team1_reported_at, m.team2_reported_at),

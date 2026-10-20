@@ -2,7 +2,7 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { MIN_ENTRANTS_FOR_MATCHES, SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { queueBotLog, queueRefereeAlert } from "./bot-logs";
 import { queueAutoValidatedNotice } from "./auto-validated-notices";
-import { ACTIONABLE_EXPIRED_REPORT_SQL } from "./score-report-sql";
+import { ACTIONABLE_EXPIRED_REPORT_SQL, MATCH_RESULT_SET_SQL } from "./score-report-sql";
 import {
   loadTournamentMatchFormat,
   resetRegistrationRanks,
@@ -598,19 +598,7 @@ async function claimAutoValidation(
   const opponentScore = team1Reported ? match.team1_report_opponent_score : match.team2_report_opponent_score;
   const outcome = await connection.execute(
     `UPDATE bg_matches
-     SET team1_score = ?,
-         team2_score = ?,
-         winner_team_id = ?,
-         loser_team_id = ?,
-         status = 'COMPLETED',
-         forfeit_team_id = NULL,
-         team1_report_score = NULL,
-         team1_report_opponent_score = NULL,
-         team1_reported_at = NULL,
-         team2_report_score = NULL,
-         team2_report_opponent_score = NULL,
-         team2_reported_at = NULL,
-         score_deadline_at = NULL
+     SET ${MATCH_RESULT_SET_SQL}
      WHERE id = ?
        AND status = 'AWAITING_CONFIRMATION'
        AND winner_team_id IS NULL

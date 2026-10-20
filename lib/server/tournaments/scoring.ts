@@ -8,6 +8,7 @@ import { plausibleSeriesMinutes } from "@/lib/shared/score-report-deadline";
 import { SCORE_LOCKED_DISPUTE, isScoreDisputed, reportPresent } from "@/lib/shared/score-dispute";
 import { toIso } from "@/lib/server/serialization";
 import { MatchRow } from "./_internal";
+import { MATCH_RESULT_SET_SQL } from "./score-report-sql";
 import { pushTeamToTarget } from "./target-slot";
 import {
   dropQueuedRefereeAlerts,
@@ -55,20 +56,6 @@ export async function finalizeMatch(
   if (!options.resultWritten) await writeMatchResult(connection, match.id, result);
   await propagateMatchResult(connection, match, result);
 }
-
-/** Colonnes d'un match tranché : le score retenu, propositions et échéance effacées. */
-const MATCH_RESULT_SET_SQL = `team1_score = ?,
-         team2_score = ?,
-         winner_team_id = ?,
-         loser_team_id = ?,
-         status = 'COMPLETED',
-         team1_report_score = NULL,
-         team1_report_opponent_score = NULL,
-         team1_reported_at = NULL,
-         team2_report_score = NULL,
-         team2_report_opponent_score = NULL,
-         team2_reported_at = NULL,
-         score_deadline_at = NULL`;
 
 async function writeMatchResult(
   connection: PoolConnection,

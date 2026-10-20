@@ -11,6 +11,31 @@ import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 /** Clé de réservation de l'escalade « délai dépassé, toujours pas tranché ». */
 export const STALLED_ALERT_KEY = "SCORE_REPORT_STALLED";
 
+/**
+ * Colonnes d'un match tranché, partagées par toutes ses clôtures — accord des
+ * deux engagés (`writeMatchResult`, `./scoring`) et validation d'office
+ * (`claimAutoValidation`, `./finalization`) : le score retenu, propositions et
+ * échéance effacées. Un forfait noté par l'arbitrage (« Enregistrer ») ne
+ * survit pas au score des joueurs — sans quoi la ligne close porterait leur
+ * score **et** un drapeau de forfait, que les fiches et le live lisent comme
+ * un forfait. L'arbitrage qui tranche sur un forfait le repose après
+ * (`adminResolveMatch`). Paramètres, dans l'ordre : score 1, score 2,
+ * vainqueur, perdant.
+ */
+export const MATCH_RESULT_SET_SQL = `team1_score = ?,
+         team2_score = ?,
+         winner_team_id = ?,
+         loser_team_id = ?,
+         status = 'COMPLETED',
+         forfeit_team_id = NULL,
+         team1_report_score = NULL,
+         team1_report_opponent_score = NULL,
+         team1_reported_at = NULL,
+         team2_report_score = NULL,
+         team2_report_opponent_score = NULL,
+         team2_reported_at = NULL,
+         score_deadline_at = NULL`;
+
 /** Le report d'un engagé est complet quand ses deux scores sont posés. */
 const TEAM1_REPORTED_SQL =
   "(m.team1_report_score IS NOT NULL AND m.team1_report_opponent_score IS NOT NULL)";
