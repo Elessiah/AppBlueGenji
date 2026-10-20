@@ -219,7 +219,7 @@ describe("recordRecruitmentModalOptOut", () => {
   });
 
   it("non connecté, cookie du script posé : le toast n'attend pas le serveur", async () => {
-    const hanging = jest.fn(() => new Promise<never>(() => undefined));
+    const hanging = jest.fn((_url: string) => new Promise<never>(() => undefined));
     expect(await recordRecruitmentModalOptOut(false, { writeCookie: () => true, post: hanging })).toBe("BROWSER");
     expect(hanging).toHaveBeenCalledWith("/api/recruitment/modal-dismiss");
   });
