@@ -221,6 +221,7 @@
     "playerScoreSettled": "Ce match vient d'être tranché : la fenêtre de score s'est refermée.",
     "reportSide": "Équipe {side}",
     "reportPending": "{score1} – {score2} proposé par {reporter} · à confirmer",
+    "reportPendingPaused": "{score1} – {score2} proposé par {reporter} · validation automatique suspendue par l'arbitrage",
     "reportPendingDeadline": "{score1} – {score2} proposé par {reporter} · validation automatique à {deadline} (heure de Paris) sans réponse",
     "locked": "Score verrouillé",
     "lockedTitle": "La manche suivante a déjà des scores : le résultat de ce match ne peut plus être modifié.",

@@ -251,14 +251,15 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Collecting the “Ready” of each party to a match (teams, caster) before it is launched, only in tournaments that have the launch phase (an option of each tournament, off by default)",
       "Sending by Discord direct message and by push the announcement of a match's time (set, changed or removed), the notice that a match leaves their schedule and match reminders 24 h and 10 h before kickoff (the latter — or the announcement of a match scheduled less than 10 h ahead — with the invite link to the check-in Discord server); direct messages only go to accounts with a certified Discord tag (an uncertified tag, even one linked by signing in with Discord, receives none, to avoid spam); the player can turn these direct messages off from “My profile” (notifications), their push notifications keeping their own settings",
       "Alerting the referee role (score conflict, score dispute left too long without a referee, report on a player)",
+      "Warning the other referees and administrators by push when a staff member who plays in a match (member of one of both teams — still a member, or gone since the match was launched, its first report or, failing these, its creation —, or the player of the entry in a solo tournament) settles its score dispute themselves (“Confirm the result”), corrects its already decided result, imposes their opponent's withdrawal, or pauses the automatic confirmation of a proposed score (“Save”): tournament and round, and — except for a pause — the retained outcome with the team names (none in a solo tournament), without the pseudo of the author or of any player",
       "Sending the referees, about 10 hours ahead, the schedule of upcoming matches (times, tournaments, team names; “a player” in a solo tournament) to the Discord log channel and by push",
     ],
     legalBasis:
-      "Consent for exposing the certified Discord username to the organizers (certification, a separate action taken by the player from their profile — never acquired by logging in alone — and withdrawable by removing their tag); performance of the service requested by the player (contract — terms of use) for presenting the contacts to the parties to a match in its “Contacts” window and its launch window (to both its teams and the referees as soon as both its opponents are known, to and from its caster while the match is being played; the launch window, at the start of the match, only opens for both teams and the caster), hidden BattleTag included — referees and administrators have no other access to it, on the same basis —, and collecting the “Ready”; legitimate interest (smooth running of tournaments) for match time notices, the notice that a match leaves their schedule and match reminders sent to players, with a right to object (art. 21) honoured by a switch in “My profile” that turns off all their match direct messages; performance of the service (contract — terms of use, referees and administrators acting for the association) for referee alerts and the refereeing schedule sent to staff, legitimate interest (smooth running of tournaments) remaining the basis with regard to the players and teams they mention; legitimate interest, the player's own, for keeping their choice about match direct messages (keeping it is what allows their objection to be honoured)",
+      "Consent for exposing the certified Discord username to the organizers (certification, a separate action taken by the player from their profile — never acquired by logging in alone — and withdrawable by removing their tag); performance of the service requested by the player (contract — terms of use) for presenting the contacts to the parties to a match in its “Contacts” window and its launch window (to both its teams and the referees as soon as both its opponents are known, to and from its caster while the match is being played; the launch window, at the start of the match, only opens for both teams and the caster), hidden BattleTag included — referees and administrators have no other access to it, on the same basis —, and collecting the “Ready”; legitimate interest (smooth running of tournaments) for match time notices, the notice that a match leaves their schedule and match reminders sent to players, with a right to object (art. 21) honoured by a switch in “My profile” that turns off all their match direct messages; performance of the service (contract — terms of use, referees and administrators acting for the association) for referee alerts and the refereeing schedule sent to staff, legitimate interest (smooth running of tournaments) remaining the basis with regard to the players and teams they mention; legitimate interest (impartial refereeing) with regard to the staff member who referees, whose membership of the match's teams is checked at each of these actions and, if they play in the match, the other staff members warned — they may object to it (art. 21); legitimate interest, the player's own, for keeping their choice about match direct messages (keeping it is what allows their objection to be honoured)",
     dataSubjects: [
       "Players taking part in a tournament",
       "Other members of the teams taking part (coaches, managers, owners)",
-      "Referees",
+      "Referees and administrators",
       "Casters registered on a match",
       "Any account holder, for their match direct messages choice",
     ],
@@ -270,6 +271,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Team roles and certification status (Discord username, BattleTag taken from a linked Battle.net account) of the contacts presented",
       "Reason for a report",
       "The player's choice to receive or not the Discord direct messages about their matches",
+      "Membership of a staff member in the teams of a match they referee — for an imposed withdrawal, in the withdrawn team's opponent only — (current member, or leaving date compared with the launch of the match, its first report or, failing these, its creation), checked at each dispute settled, result corrected, withdrawal imposed or automatic confirmation paused",
     ],
     sensitiveData: "None",
     retention: [
@@ -282,8 +284,8 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "The association's administrators and referees",
       "Members of both teams of the same match and referees, from the moment both its opponents are known to its end, and its registered caster while the match is being played (from its start to its end); the caster's contacts to both teams and the referees while the match is being played",
       "Discord, which delivers the messages",
-      "The association's staff with access to the Discord log channel (refereeing schedule, processing activity T05)",
-      "The push service of the browser of each subscribed recipient (player: match announcements and reminders; referee or administrator: refereeing schedule; processing activity T12), which delivers an encrypted message it cannot read",
+      "The association's staff with access to the Discord log channel (refereeing schedule, actions of a staff member who plays in the match, processing activity T05)",
+      "The push service of the browser of each subscribed recipient (player: match announcements and reminders; referee or administrator: refereeing schedule, dispute settled, result corrected, opponent's withdrawal imposed or automatic confirmation paused by a staff member who plays in the match; processing activity T12), which delivers an encrypted message it cannot read",
     ],
     transfers: [
       `United States: Discord (delivery of direct messages and of the log channel) — ${transferBasisEn(["DISCORD"])}`,
@@ -301,15 +303,15 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     purpose: "Keeping the staff informed of notable events on the platform",
     subPurposes: [
       "New players, tournament registrations and withdrawals, match results, closings",
-      "Traceability of refereeing actions (penalties, removal of participants, rollbacks, match times set, changed or removed), for moderation",
+      "Traceability of refereeing actions (penalties, removal of participants, rollbacks, match times set, changed or removed, and, when their author plays in the match, dispute settled, result corrected, opponent's withdrawal imposed or automatic confirmation paused — these four actions — any withdrawal imposed by the referees that closes a match included, one trace per match closed against a known opponent, whichever team is withdrawn — also leaving, whether or not their author plays, a short trace in the server logs only), for moderation",
       "Refereeing schedule: about 10 hours ahead, the upcoming matches (times, tournaments, team names; “a player” in a solo tournament)",
     ],
     legalBasis:
-      "Legitimate interest (administration and oversight of refereeing) with regard to the players and teams mentioned; sending the refereeing schedule to referees and administrators falls under performance of the service (T04)",
+      "Legitimate interest (administration and oversight of refereeing) with regard to the players and teams mentioned and to the staff member who carried out an action, named in the server logs; sending the refereeing schedule to referees and administrators falls under performance of the service (T04)",
     dataSubjects: ["Staff", "Players and teams taking part in a tournament (referred to by team name, never by their username)"],
     dataCategories: [
-      "On Discord: team names, scores, tournament names, match times and rounds — no player username (“a player”, including in solo tournaments) and no staff member named (“the staff”)",
-      "In the server logs: username and identifier of the staff member who carried out a refereeing action",
+      "On Discord: team names, scores, tournament names, match times and rounds — no player username (“a player”, including in solo tournaments) and no staff member named (“the staff”; “a staff member who plays in this match”, with the tournament name only, for a dispute settled, a result corrected, a withdrawal imposed or an automatic confirmation paused by them)",
+      "In the server logs: username and identifier of the staff member who carried out a refereeing action, with the action (match number; for a referee who plays in the match, also: tournament, round and, except for a pause, outcome and team names, none in a solo tournament)",
     ],
     sensitiveData: "None",
     retention: [
@@ -558,7 +560,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     subPurposes: [
       "Start of their matches, score to confirm or confirmed automatically without an answer, tournament kickoff, match times (set, changed or removed) and match reminders",
       "Requests to join a team they manage, reports and moderation decisions concerning them, changes to the data policy",
-      "Referee alerts, scheduled matches, refereeing schedule and moderation alerts for the staff holding these roles",
+      "Referee alerts, disputes settled, results corrected, opponents' withdrawals imposed or automatic confirmations paused by a staff member who plays in the match, scheduled matches, refereeing schedule and moderation alerts for the staff holding these roles",
     ],
     legalBasis: "Consent (activation on each device, withdrawable at any time, topic by topic)",
     dataSubjects: ["Registered players who turn on notifications on a device"],

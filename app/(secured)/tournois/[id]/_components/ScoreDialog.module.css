@@ -116,6 +116,14 @@
   opacity: 0.6;
 }
 
+/* « Reprendre la proposition » pendant un envoi : `aria-disabled` (le focus
+   reste), inactif à l'œil par la couleur et le curseur. */
+.conflictAction[aria-disabled="true"] {
+  cursor: not-allowed;
+  color: var(--ink-soft, #c3ccd8);
+  text-decoration: none;
+}
+
 /* ---------- Rappel de format, puis forfait replié ---------- */
 
 .formatHint {

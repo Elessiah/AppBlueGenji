@@ -119,6 +119,8 @@ export type MatchRow = RowDataPacket & {
   team2_report_opponent_score: number | null;
   team2_reported_at: Date | null;
   score_deadline_at: Date | null;
+  /** Validation d'office d'un report seul suspendue par l'arbitrage (`AUTO_VALIDATION_PAUSED_SQL`). */
+  score_validation_paused?: number | null;
   updated_at: Date;
   phase_id: number;
   phase_position: number | null;
@@ -298,6 +300,7 @@ export function mapMatch(row: MatchRow): BracketMatch {
     nextLoserMatchId: row.next_loser_match_id === null ? null : Number(row.next_loser_match_id),
     nextLoserSlot: row.next_loser_slot === null ? null : Number(row.next_loser_slot),
     scoreDeadlineAt: toIso(row.score_deadline_at),
+    scoreAutoValidationPaused: Number(row.score_validation_paused ?? 0) === 1,
     team1Report: mapScoreReport(
       row.team1_report_score,
       row.team1_report_opponent_score,

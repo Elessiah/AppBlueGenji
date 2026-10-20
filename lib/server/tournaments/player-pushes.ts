@@ -296,6 +296,7 @@ type ReportedMatchRow = RowDataPacket & {
   team2_name: string | null;
   team1_reported_at: Date | string | null;
   team2_reported_at: Date | string | null;
+  score_validation_paused_at?: Date | string | null;
 };
 
 /**
@@ -312,7 +313,8 @@ export async function notifyScoreToConfirm(matchId: number): Promise<number> {
     const db = await getDatabase();
     const [rows] = await db.execute<ReportedMatchRow[]>(
       `SELECT m.tournament_id, t.name AS tournament_name, t.participant_type, m.status, m.team1_id, m.team2_id,
-              t1.name AS team1_name, t2.name AS team2_name, m.team1_reported_at, m.team2_reported_at
+              t1.name AS team1_name, t2.name AS team2_name, m.team1_reported_at, m.team2_reported_at,
+              m.score_validation_paused_at
          FROM bg_matches m
          JOIN bg_tournaments t ON t.id = m.tournament_id
          LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
@@ -342,6 +344,7 @@ export async function notifyScoreToConfirm(matchId: number): Promise<number> {
             teamName: String(team1Reported ? row.team2_name : row.team1_name),
             opponentName: String(team1Reported ? row.team1_name : row.team2_name),
             solo: row.participant_type === "SOLO",
+            autoValidationPaused: row.score_validation_paused_at != null,
           },
           locale,
         ),

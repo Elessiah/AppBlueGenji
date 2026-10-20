@@ -101,6 +101,7 @@ Ce qu'elle contient aujourd'hui :
 | — (image de tournoi) | `bg_tournaments` | `image_focus_x` |
 | — (image de tournoi) | `bg_tournaments` | `image_focus_y` |
 | — (fiche d'équipe) | `bg_team_invitations` | `roles_json` — rôles proposés avec une invitation, posés à l'arrivée du joueur (`NULL` sur une demande, et sur les invitations d'avant la colonne : DPS) |
+| — (litige, validation d'office) | `bg_matches` | `score_validation_paused_at` — « Enregistrer » d'arbitrage sur un report seul : validation d'office suspendue (`SCORE_DISPUTE_LOCK.md`) |
 | — (lancement des matchs) | `bg_matches` | `host_team_id` (+ clé étrangère `SET NULL`) — équipe hôte désignée par l'arbitrage, `NULL` = équipe 1 |
 | — (lancement des matchs) | `bg_matches` | `caster_user_id` (+ index et clé étrangère `SET NULL`) — caster inscrit |
 | — (lancement des matchs) | `bg_matches` | `lobby_opened_at`, `launch_pairing`, `team1_ready_at`, `team2_ready_at`, `caster_ready_at` |

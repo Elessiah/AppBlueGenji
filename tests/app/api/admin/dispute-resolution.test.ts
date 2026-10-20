@@ -41,7 +41,7 @@ describe("POST /api/admin/matches/[matchId]/resolve — litige de score", () => 
     jest.mocked(getCurrentUser).mockResolvedValue(user);
     const res = await resolveRoute(req({ maps: mapsFor(2, 1) }), params);
     expect(res.status).toBe(200);
-    expect(adminResolveMatch).toHaveBeenCalledWith(42, expect.objectContaining({ userId: user.id }));
+    expect(adminResolveMatch).toHaveBeenCalledWith(42, expect.objectContaining({ userId: user.id }), { id: user.id, pseudo: user.pseudo });
   });
 
   it("un capitaine engagé dans le match ne peut pas trancher son propre litige", async () => {

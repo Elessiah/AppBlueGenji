@@ -178,6 +178,14 @@ describe("nextRoomWakeAt", () => {
     expect(nextRoomWakeAt(snapshot, NOW)).toBe(NOW + 45_000 + SCORE_DEADLINE_MARGIN_MS);
   });
 
+  it("ne se réveille pas sur l'échéance d'une validation d'office suspendue par l'arbitrage", () => {
+    const snapshot = snapshotOf({ state: "RUNNING" }, [
+      { status: "AWAITING_CONFIRMATION", scoreDeadlineAt: iso(NOW + 120_000) },
+      { status: "AWAITING_CONFIRMATION", scoreDeadlineAt: iso(NOW + 45_000), scoreAutoValidationPaused: true },
+    ]);
+    expect(nextRoomWakeAt(snapshot, NOW)).toBe(NOW + 120_000 + SCORE_DEADLINE_MARGIN_MS);
+  });
+
   it("rattrape un report unique expiré que la lecture n'a pas tranché, sans boucler", () => {
     // Lecture servie par le cache juste avant le délai : rattrapage une fois le
     // cache expiré, puis au pas lent si le retard persiste.

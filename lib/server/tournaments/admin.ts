@@ -1,4 +1,4 @@
-import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import type { MatchStatus, PhaseFormat, TournamentFormat } from "@/lib/shared/types";
 import { dependentMatches, hasScoreInput, type MatchScoreState } from "@/lib/shared/match-lock";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
@@ -12,6 +12,7 @@ import { clearMapSets, replaceMatchMaps } from "./match-maps";
 import { finalizeMatch } from "./scoring";
 import { tryAutoResolveByes } from "./byes";
 import { detachDownstreamOutcome } from "./bracket-cascade";
+import { SINGLE_REPORT_SQL } from "./score-report-sql";
 
 interface DependentMatchRow extends RowDataPacket {
   id: number;
@@ -379,11 +380,24 @@ async function checkAdminMaps(
   return { format, score: check.score };
 }
 
+/**
+ * Effet d'un « Enregistrer » sur la validation d'office d'un report seul :
+ * `paused`, elle est suspendue ; `pausedNow`, c'est **cette** saisie qui l'a
+ * suspendue (elle ne l'était pas) — l'alerte d'un arbitre qui joue la manche
+ * ne part qu'à ce moment-là, pas à chaque nouvelle saisie.
+ */
+export type AutoValidationPause = { paused: boolean; pausedNow: boolean };
+
+/**
+ * Note l'avancement d'une rencontre (« Enregistrer ») sans la trancher. Dit si
+ * la saisie **suspend** la validation d'office d'un report seul
+ * ({@link pauseAutoValidation}).
+ */
 export async function adminSaveMatchScores(
   connection: PoolConnection,
   matchId: number,
   entry: AdminScoreEntry,
-): Promise<void> {
+): Promise<AutoValidationPause> {
   const [matches] = await connection.execute<MatchRow[]>(
     `SELECT
       id,
@@ -397,7 +411,8 @@ export async function adminSaveMatchScores(
       winner_team_id,
       start_at,
       launched_at,
-      launch_pairing
+      launch_pairing,
+      score_validation_paused_at IS NOT NULL AS score_validation_paused
      FROM bg_matches
      WHERE id = ?
      LIMIT 1
@@ -454,7 +469,7 @@ export async function adminSaveMatchScores(
     // Un forfait n'a pas de maps jouées : un détail noté plus tôt ne le décrit
     // plus, que le client ait envoyé des maps ou non.
     await clearMapSets(connection, [matchId], ["FINAL"]);
-    return;
+    return pauseAutoValidation(connection, match);
   }
 
   // Sauvegarde **map par map** : le score se dérive des maps, contrôlées sans
@@ -471,6 +486,32 @@ export async function adminSaveMatchScores(
     [derived.team1, derived.team2, matchId],
   );
   await replaceMatchMaps(connection, matchId, "FINAL", maps, userId);
+  return pauseAutoValidation(connection, match);
+}
+
+/**
+ * « Enregistrer » sur un match où **une seule** engagée a reporté : la
+ * validation d'office est suspendue, sans quoi le score du déclarant
+ * remplaçait à l'échéance ce que l'arbitre venait de noter (décision du
+ * 2026-10-20, `docs/features/SCORE_DISPUTE_LOCK.md` § Arbitre et report seul).
+ * Rien ailleurs : un litige garde son escalade, un match sans proposition n'a
+ * rien à suspendre. Ligne déjà verrouillée par l'appelant : un balayage
+ * concurrent attend ce commit, puis sa condition (`claimAutoValidation`) relit
+ * la suspension et ne touche rien.
+ */
+async function pauseAutoValidation(connection: PoolConnection, match: MatchRow): Promise<AutoValidationPause> {
+  const [result] = await connection.execute<ResultSetHeader>(
+    `UPDATE bg_matches m
+        SET m.score_validation_paused_at = NOW()
+      WHERE m.id = ?
+        AND m.status = 'AWAITING_CONFIRMATION'
+        AND m.winner_team_id IS NULL
+        AND ${SINGLE_REPORT_SQL}`,
+    [match.id],
+  );
+  const paused = result.affectedRows > 0;
+  // Ligne lue sous verrou par l'appelant : l'état d'avant ne bouge pas d'ici là.
+  return { paused, pausedNow: paused && Number(match.score_validation_paused ?? 0) !== 1 };
 }
 
 /**

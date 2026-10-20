@@ -40,6 +40,7 @@
   "scoreToConfirm": {
     "title": "Score à confirmer",
     "body": "{opponent} a saisi le score de votre match ({tournament}). Confirme-le, ou conteste-le : sans réponse, il sera validé automatiquement.",
+    "bodyPaused": "{opponent} a saisi le score de votre match ({tournament}). Confirme-le, ou conteste-le : la validation automatique est suspendue par l'arbitrage, un arbitre tranchera sans réponse.",
     "soloOpponent": "Ton adversaire"
   },
   "scoreAutoValidated": {
@@ -94,6 +95,27 @@
     "score_conflictMatch": "Conflit de score · {tournament}, {round} : un arbitre est attendu.",
     "score_report_stalledMatch": "Litige sans arbitrage depuis trop longtemps · {tournament}, {round} : saisie verrouillée, un arbitre doit trancher.",
     "otherMatch": "Alerte · {tournament}, {round} : un arbitre est attendu."
+  },
+  "selfResolved": {
+    "title": "Litige tranché par un joueur du match",
+    "body": "Un membre du staff qui joue ce match a tranché son litige · {tournament}, {round} : {outcome}.",
+    "score": "{team1} {score1} – {score2} {team2}",
+    "scoreSolo": "{score1} – {score2}",
+    "forfeit": "forfait de {team}",
+    "forfeitSolo": "forfait d'un joueur",
+    "doubleForfeit": "double forfait"
+  },
+  "selfCorrected": {
+    "title": "Résultat corrigé par un joueur du match",
+    "body": "Un membre du staff qui joue ce match en a corrigé le résultat · {tournament}, {round} : {outcome}."
+  },
+  "selfForfeit": {
+    "title": "Abandon imposé par un joueur du match",
+    "body": "Un membre du staff qui joue ce match a imposé l'abandon de son adversaire · {tournament}, {round} : {outcome}."
+  },
+  "selfPaused": {
+    "title": "Validation suspendue par un joueur du match",
+    "body": "Un membre du staff qui joue ce match en a suspendu la validation automatique · {tournament}, {round}."
   },
   "issueReport": {
     "body": "Problème signalé · {tournament}.",

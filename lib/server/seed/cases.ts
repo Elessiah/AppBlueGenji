@@ -31,6 +31,8 @@ export interface ReportStateCounts {
   pendingReports?: number;
   conflicts?: number;
   expiredReports?: number;
+  /** Report seul expiré dont un « Enregistrer » d'arbitrage a suspendu la validation d'office. */
+  pausedReports?: number;
 }
 
 export type SeedFormat = "SINGLE" | "DOUBLE" | "SWISS" | "SURVIVAL" | "MULTI" | "BG_SURVIE";
@@ -251,7 +253,7 @@ export const TOURNAMENTS: TournamentDef[] = [
   // ---- RUNNING · ronde suisse ---------------------------------------------
   { name: "Suisse 8 Équipes", game: "OW", state: "RUNNING", format: "SWISS", teamCount: 8, maxTeams: 8, daysOffset: -2, swissTotalRounds: 3, playWaves: 1 },
   { name: "Suisse 9 Équipes (bye)", game: "MR", state: "RUNNING", format: "SWISS", teamCount: 9, maxTeams: 16, daysOffset: -3, swissTotalRounds: 4, playWaves: 2, teamOffset: 14 },
-  { name: "Suisse 16 Équipes (reports)", game: "OW", state: "RUNNING", format: "SWISS", teamCount: 16, maxTeams: 16, daysOffset: -4, swissTotalRounds: 4, playWaves: 1, pendingReports: 2, conflicts: 1 },
+  { name: "Suisse 16 Équipes (reports)", game: "OW", state: "RUNNING", format: "SWISS", teamCount: 16, maxTeams: 16, daysOffset: -4, swissTotalRounds: 4, playWaves: 1, pendingReports: 2, conflicts: 1, pausedReports: 1 },
   // Ronde **entièrement** tranchée par le délai : les deux matchs de la ronde 1
   // portent un report unique dont le délai a expiré, et aucun n'est joué. Rien
   // ne rapportera donc plus de score ici — seul l'entretien passif peut faire

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { PUSH_TOPICS } from "@/lib/shared/push-notifications";
 import {
   ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS,
   BACKUP_RETENTION_DAYS,
@@ -157,7 +158,7 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(t04.dataCategories.join(" ")).toMatch(/recevoir ou non les messages privés Discord de ses matchs/);
     expect(t04.retention.join(" ")).toMatch(/Choix des messages privés de match : jusqu'à sa modification/);
     expect(t04.retention.join(" ")).toMatch(/Traces d'envoi des rappels, alertes et programmes d'arbitrage/);
-    expect(t04.recipients.join(" ")).toMatch(/Service de push du navigateur de chaque destinataire abonné \(joueur : [^;]*; arbitre ou administrateur : programme d'arbitrage ; traitement T12\), qui/);
+    expect(t04.recipients.join(" ")).toMatch(/Service de push du navigateur de chaque destinataire abonné \(joueur : [^;]*; arbitre ou administrateur : programme d'arbitrage, litige tranché, résultat corrigé, abandon imposé à l'adversaire ou validation automatique suspendue par un membre du staff qui joue le match ; traitement T12\), qui/);
     expect(t04.subPurposes.join(" ")).toMatch(/en message privé Discord et en push l'annonce/);
     expect(t04.recipients.join(" ")).toMatch(/Staff de l'association ayant accès au canal de logs Discord/);
     expect(byRef("T05").dataCategories.join(" ")).toMatch(/Sur Discord : [^—]*horaires et manches des matchs/);
@@ -166,6 +167,59 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(byRef("T05").dataSubjects).toContain(
       "Joueurs et équipes engagés dans un tournoi (désignés par le nom d'équipe, jamais par leur pseudo)",
     );
+  });
+
+  // Sujet push du staff ajouté par DISPUTE-FOLLOWUP : T12 (les notifications
+  // push) le nomme comme /rgpd, en français et en anglais.
+  it("nomme en T12 l'alerte d'un litige tranché par un membre du staff qui joue", () => {
+    expect(PUSH_TOPICS.REFEREE_SELF_RESOLUTION.audience).toBe("tournaments");
+    const t12 = byRef("T12").subPurposes.join(" ");
+    expect(t12).toMatch(/Alertes d'arbitrage, litiges tranchés, résultats corrigés, abandons imposés à l'adversaire ou validations automatiques suspendues par un membre du staff qui joue le match, matchs planifiés/);
+    const t12En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T12")!.subPurposes.join(" ");
+    // La suspension de la validation automatique par un arbitre qui joue (« Enregistrer ») et l'abandon imposé sont nommés en T04.
+    expect(byRef("T04").subPurposes.join(" ")).toMatch(/« Valider le résultat »\), en corrige le résultat déjà acquis, impose l'abandon de son adversaire, ou en suspend la validation automatique d'un score proposé \(« Enregistrer »\)/);
+    expect(PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T04")!.subPurposes.join(" ")).toMatch(
+      /“Confirm the result”\), corrects its already decided result, imposes their opponent's withdrawal, or pauses the automatic confirmation of a proposed score \(“Save”\)/,
+    );
+    expect(t12En).toMatch(/Referee alerts, disputes settled, results corrected, opponents' withdrawals imposed or automatic confirmations paused by a staff member who plays in the match, scheduled matches/);
+  });
+
+  // Revue juridique DISPUTE-FOLLOWUP : la vérification « arbitre qui joue » lit
+  // l'appartenance du staff aux équipes du match (T04) ; chaque geste laisse une
+  // trace nominative dans pm2, détaillée pour l'arbitre qui joue (T05).
+  it("déclare la vérification de l'arbitre qui joue et ce que gardent les journaux du serveur (FR + EN)", () => {
+    const t04 = byRef("T04");
+    const t04En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T04")!;
+    expect(t04.dataCategories.join(" ")).toMatch(/Appartenance d'un membre du staff aux équipes d'un match qu'il arbitre/);
+    expect(t04En.dataCategories.join(" ")).toMatch(/Membership of a staff member in the teams of a match they referee/);
+    expect(t04.dataSubjects).toContain("Arbitres et administrateurs");
+    expect(t04En.dataSubjects).toContain("Referees and administrators");
+    expect(t04.legalBasis).toMatch(/intérêt légitime \(impartialité de l'arbitrage\) à l'égard du membre du staff qui arbitre, dont l'appartenance aux équipes du match est vérifiée à chacun de ces gestes[^;]*il peut s'y opposer \(art. 21\)/);
+    expect(t04.dataCategories.join(" ")).toMatch(/comparée au lancement du match, à son premier report ou, à défaut, à sa création/);
+    expect(byRef("T05").subPurposes.join(" ")).toMatch(/tout abandon imposé par l'arbitrage qui clôt une manche compris, une trace par manche close face à un adversaire connu, quelle que soit l'équipe retirée/);
+    expect(t04.dataCategories.join(" ")).toMatch(/pour un abandon imposé, à la seule équipe adverse de l'équipe retirée/);
+    expect(t04En.legalBasis).toMatch(/legitimate interest \(impartial refereeing\) with regard to the staff member who referees, whose membership of the match's teams is checked at each of these actions[^;]*they may object to it \(art. 21\)/);
+    const t05 = byRef("T05").dataCategories.join(" ");
+    expect(t05).toMatch(/« un membre du staff qui joue ce match », avec le seul nom du tournoi/);
+    expect(PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T05")!.dataCategories.join(" ")).toMatch(/“a staff member who plays in this match”, with the tournament name only/);
+    expect(t04.recipients.join(" ")).toMatch(/canal de logs Discord \(programme d'arbitrage, gestes d'un membre du staff qui joue le match, traitement T05\)/);
+    expect(t04En.recipients.join(" ")).toMatch(/Discord log channel \(refereeing schedule, actions of a staff member who plays in the match, processing activity T05\)/);
+    const t05En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T05")!.dataCategories.join(" ");
+    expect(t05).toMatch(/pour un arbitre qui joue le match, en plus : tournoi, manche et, sauf pour une suspension, issue et noms d'équipe/);
+    expect(byRef("T05").legalBasis).toMatch(/et du membre du staff auteur d'un geste, nommé dans les journaux du serveur/);
+    expect(byRef("T05").subPurposes.join(" ")).toMatch(/une trace courte dans les seuls journaux du serveur/);
+    expect(t05En).toMatch(/for a referee who plays in the match, also: tournament, round and, except for a pause, outcome and team names/);
+    expect(PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T05")!.legalBasis).toMatch(/and to the staff member who carried out an action, named in the server logs/);
+  });
+
+  it("/rgpd (FR + EN) dit l'intérêt légitime du contrôle de l'arbitre qui joue et le droit de s'y opposer", () => {
+    const appDir = join(__dirname, "..", "..", "..", "app", "rgpd");
+    const fr = readFileSync(join(appDir, "page.tsx"), "utf8").replace(/\s+/g, " ");
+    const en = readFileSync(join(appDir, "RgpdEn.tsx"), "utf8").replace(/\s+/g, " ");
+    expect(fr).toContain("ce contrôle repose sur l&apos;<strong>intérêt légitime</strong> de l&apos;association à l&apos;impartialité de l&apos;arbitrage, et ce membre du staff peut s&apos;y opposer");
+    expect(fr).toContain("ou l&apos;a quittée depuis son lancement, son premier report ou, à défaut, sa création");
+    expect(en).toContain("or left it since the match was launched, its first report or, failing these, its creation");
+    expect(en).toContain("this check rests on the association&apos;s <strong>legitimate interest</strong> in impartial refereeing, and this staff member may object to it");
   });
 
   it("déclare l'information sur les changements de politique et leur annonce Discord", () => {

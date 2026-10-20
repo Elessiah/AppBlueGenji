@@ -11,7 +11,13 @@ import { finalizeMatch } from "@/lib/server/tournaments/scoring";
 import { queueBotLog, queueRefereeAlert } from "@/lib/server/tournaments/bot-logs";
 import { promoteReportedMaps } from "@/lib/server/tournaments/match-maps";
 import { queueAutoValidatedNotice } from "@/lib/server/tournaments/auto-validated-notices";
-import { ACTIONABLE_EXPIRED_REPORT_SQL, STALLED_ALERT_KEY } from "@/lib/server/tournaments/score-report-sql";
+import {
+  ACTIONABLE_EXPIRED_REPORT_SQL,
+  AUTO_VALIDATION_PAUSED_SQL,
+  AUTO_VALIDATION_RUNNING_SQL,
+  SINGLE_REPORT_SQL,
+  STALLED_ALERT_KEY,
+} from "@/lib/server/tournaments/score-report-sql";
 
 /** Connexion factice : `rows` répond aux SELECT, les écritures sont comptées. */
 function fakeConnection(options: {
@@ -116,6 +122,10 @@ describe("resolveExpiredScoreReports", () => {
     expect(claim?.sql).toContain("AND team1_report_score <=> ?");
     expect(claim?.sql).toContain("AND team2_report_score IS NULL");
     expect(claim?.sql).toContain("AND team2_reported_at IS NULL");
+    // Suspendue par un « Enregistrer » d'arbitrage : la même instruction relit
+    // la suspension, si bien que l'arbitre qui enregistre pendant le balayage
+    // gagne la course ou la perd — jamais le score du déclarant ne l'écrase.
+    expect(claim?.sql).toContain("AND score_validation_paused_at IS NULL");
     // Pas de jointure ni de verrou sur deux tables (MariaDB).
     expect(claim?.sql).not.toMatch(/JOIN|FOR UPDATE/);
     expect(claim?.params).toEqual([2, 1, 101, 102, 31, "2026-10-20 20:00:00", 2, 1]);
@@ -518,5 +528,43 @@ describe("resolveExpiredScoreReports — ce qu'elle rapporte", () => {
     const select = seen.find((q) => q.startsWith("SELECT") && q.includes("FROM bg_matches m"));
     expect(select).toContain(ACTIONABLE_EXPIRED_REPORT_SQL.replace(/\s+/g, " "));
     expect(select).toContain(`a.alert_key = '${STALLED_ALERT_KEY}'`);
+  });
+});
+
+/** Suspension par l'arbitrage (`SCORE_DISPUTE_LOCK.md` § Arbitre et report seul). */
+describe("validation d'office suspendue par l'arbitrage", () => {
+  it("la sélection n'en retient plus le report seul, mais garde l'escalade des litiges", () => {
+    const sql = ACTIONABLE_EXPIRED_REPORT_SQL.replace(/\s+/g, " ");
+    expect(sql).toContain(`(${SINGLE_REPORT_SQL} AND ${AUTO_VALIDATION_RUNNING_SQL})`);
+    expect(AUTO_VALIDATION_RUNNING_SQL).toBe("m.score_validation_paused_at IS NULL");
+    // La branche du litige ne lit pas la suspension.
+    expect(sql.slice(sql.indexOf(" OR ("))).not.toContain("score_validation_paused_at");
+  });
+
+  it("l'écran ne la dit suspendue que sur un report seul en attente", () => {
+    const sql = AUTO_VALIDATION_PAUSED_SQL.replace(/\s+/g, " ");
+    expect(sql).toContain("m.status = 'AWAITING_CONFIRMATION'");
+    expect(sql).toContain("m.score_validation_paused_at IS NOT NULL");
+    expect(sql).toContain(SINGLE_REPORT_SQL);
+  });
+
+  it("course perdue : l'arbitre a suspendu entre la lecture et la réclamation, rien n'est clos", async () => {
+    const seen: string[] = [];
+    // La lecture (sans verrou) voyait encore le report actionnable ; la
+    // réclamation, qui relit la suspension, ne touche plus aucune ligne.
+    const connection = fakeConnection({
+      seen,
+      affectedRows: 0,
+      rows: (q) =>
+        q.includes("FROM bg_matches")
+          ? [expiredRow({ id: 31, team2_report_score: null, team2_report_opponent_score: null })]
+          : [],
+    });
+
+    expect(await resolveExpiredScoreReports(connection, 12)).toBe(0);
+    const claim = seen.find((q) => q.startsWith("UPDATE bg_matches"));
+    expect(claim).toContain("AND score_validation_paused_at IS NULL");
+    expect(finalizeMatch).not.toHaveBeenCalled();
+    expect(queueAutoValidatedNotice).not.toHaveBeenCalled();
   });
 });

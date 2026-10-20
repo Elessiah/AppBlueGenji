@@ -549,6 +549,12 @@ export type BracketMatch = {
   nextLoserMatchId: number | null;
   nextLoserSlot: number | null;
   scoreDeadlineAt: string | null;
+  /**
+   * Report seul dont la validation d'office est **suspendue** par un
+   * « Enregistrer » de l'arbitrage (`docs/features/SCORE_DISPUTE_LOCK.md`) :
+   * l'écran le dit au lieu de l'heure de `scoreDeadlineAt`.
+   */
+  scoreAutoValidationPaused: boolean;
   /** Proposition de score de l'équipe 1 en attente ; `null` = aucune. */
   team1Report: MatchScoreReport | null;
   /** Proposition de score de l'équipe 2 en attente ; `null` = aucune. */

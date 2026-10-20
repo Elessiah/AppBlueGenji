@@ -221,6 +221,7 @@
     "playerScoreSettled": "This match has just been settled: the score window has closed.",
     "reportSide": "Team {side}",
     "reportPending": "{score1} – {score2} proposed by {reporter} · awaiting confirmation",
+    "reportPendingPaused": "{score1} – {score2} proposed by {reporter} · automatic confirmation paused by a referee",
     "reportPendingDeadline": "{score1} – {score2} proposed by {reporter} · automatic confirmation at {deadline} (Paris time) without an answer",
     "locked": "Score locked",
     "lockedTitle": "The next round already has scores: this match's result can no longer be changed.",

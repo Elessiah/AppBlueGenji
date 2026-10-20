@@ -21,6 +21,14 @@ describe("staff-audit", () => {
     info.mockRestore();
   });
 
+  it("publishStaffAction : un détail réservé à pm2 n'atteint pas Discord", () => {
+    const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
+    publishStaffAction("geste par le staff.", ACTOR, "geste par le staff, manche 2 : 2 – 1.");
+    expect(info).toHaveBeenCalledWith("[staff-audit] geste par le staff, manche 2 : 2 – 1. — auteur : ArbitreZelé (#9)");
+    expect(sendBotLog).toHaveBeenCalledWith("geste par le staff.");
+    info.mockRestore();
+  });
+
   it("auditStaffAction n'écrit que la trace pm2, sans rien envoyer à Discord", () => {
     const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
     auditStaffAction("🗓️ Horaire du match #42 retiré (était vide)", ACTOR);

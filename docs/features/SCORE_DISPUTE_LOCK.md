@@ -60,18 +60,155 @@ encore en lecture : la phrase d'état le dit, `conflictLoading`, FR + EN). L'avi
 valider le score final ou un forfait (aucune remise à zéro par match
 n'existe ; le retour en arrière du tournoi en est une, plus large).
 
-**Abandon du tournoi.** Le verrou vise le forfait **du match** ; l'abandon du
-tournoi (Survie, Ronde suisse, BG Survie, phase MULTI) reste ouvert et clôt la
-manche en litige comme une défaite de l'équipe qui abandonne — elle concède,
-personne d'autre n'y perd. /regles le dit « aucun forfait sur ce match ».
+**Abandon du tournoi** (décision du 2026-10-20, close). Le verrou vise le
+forfait **du match** ; l'abandon du tournoi (Survie, Ronde suisse, BG Survie,
+phase MULTI) reste ouvert pendant un litige et clôt la manche en litige comme
+une défaite de l'équipe qui abandonne — elle concède, personne d'autre n'y
+perd. Comportement inchangé, voulu ; /regles le dit (FR + EN : « Abandonner le
+tournoi, là où le format le permet, reste possible pendant un litige… »).
 
-**Arbitre et report seul.** « Enregistrer » (avancement, sans trancher) ne
-touche ni les propositions ni l'échéance : la règle des 2 h s'applique toujours,
-et l'arbitre qui veut retenir un autre score le **valide** (« Valider le
-résultat »). À l'échéance, le score du déclarant remplace ce qui a été noté —
-forfait compris (`forfeit_team_id` remis à `NULL` : jamais un score de
-déclarant sous un drapeau de forfait). Suspendre la validation d'office dès
-qu'un arbitre enregistre reste une décision à prendre.
+**Arbitre qui joue** (décisions du 2026-10-20). Un membre du staff
+(`tournaments`) qui joue la manche — membre d'une des deux équipes
+(`actorPlaysMatch`) : **encore membre**, quelle que soit sa date d'arrivée
+(l'issue engage son équipe ; une date de report, que la resaisie déplace et que
+la clôture efface, ne borne pas sûrement l'arrivée), ou **parti depuis que la
+manche a commencé** — au premier des deux, lancement (s'il vaut pour l'appariement
+actuel, `launch_pairing`) ou premier report (lu sous
+verrou avant que l'arbitrage ne l'efface, `playedAt`), sinon à sa création —,
+si bien que quitter l'équipe en cours de match ou juste avant d'agir n'efface
+pas l'alerte et qu'un ancien membre parti avant le match n'est pas visé ; ou
+joueur de l'entrée solo — peut agir : une petite
+organisation n'a pas toujours un arbitre neutre. Mais les **autres** sont
+avertis, après le commit et au meilleur effort
+(`lib/server/tournaments/dispute-self-resolution.ts`, avec l'arbitre de la
+session), dans quatre cas :
+
+1. il **tranche un litige** par « Valider le résultat »
+   (`adminResolveMatchPublic` → `alertSelfResolvedDispute`) ;
+2. il **impose l'abandon** de son adversaire (route d'abandon, chemin
+   arbitrage : `forfeitTournamentTeamPublic` avec `actor`) et cet abandon clôt
+   la manche qu'il joue — **litige ou non** : clore ainsi un report gagnant de
+   l'adversaire en attente n'est pas plus discret que suspendre sa validation.
+   Les manches ouvertes de l'engagé se lisent sans verrou puis se verrouillent
+   **par clé primaire**, statut revérifié sous verrou (`lockOpenMatches`, après `lockTournamentRow` en
+   première instruction ; tout rejoué sur interblocage, `retryOnDeadlock`), et
+   celles que l'abandon a closes (`COMPLETED`) partent à
+   `alertSelfImposedForfeit` — push « Un membre du staff qui joue ce match a
+   imposé l'abandon de son adversaire · tournoi, manche : forfait de X. »,
+   ligne « ⚠️ Abandon imposé à son adversaire par … ». Seul compte
+   l'arbitre qui joue chez l'**adversaire** de l'équipe retirée : retirer sa
+   propre équipe est une concession, qu'un joueur peut faire lui-même ;
+3. son « Enregistrer » **suspend** la validation d'office d'un report seul
+   (`adminSaveMatchScoresPublic` → `alertSelfPausedValidation`), une fois : à
+   la saisie qui pose la suspension (`pausedNow`, état d'avant lu sous le
+   verrou du match), pas à chaque nouvelle saisie d'une manche déjà suspendue ;
+4. il **corrige un résultat acquis** (« Valider le résultat » sur une manche
+   `COMPLETED`, lue sous le même verrou que le litige, **et dont l'issue
+   change** : score, vainqueur, forfait ou double forfait relus après
+   l'arbitrage, `sameOutcome` — revalider le même résultat n'avertit
+   personne) : renverser un litige
+   tranché par un arbitre neutre ne doit pas être plus discret que le trancher
+   (`alertSelfCorrectedResult` : push « Un membre du staff qui joue ce match en
+   a corrigé le résultat · tournoi, manche : issue. », ligne « ⚠️ Résultat
+   corrigé par un membre du staff qui joue ce match · … »).
+
+Avant toute lecture, une trace pm2 courte nomme l'auteur et la manche
+(`auditStaffAction`, écrite avant la réponse de la route) : un arrêt du serveur
+entre le commit et l'alerte ne laisse pas le geste sans auteur ; un échec
+ensuite se dit dans pm2 (« push non envoyé » ou « ni journalisée ni envoyée » ; avant la fin de la vérification, « vérification « arbitre qui joue » interrompue », sans dire que l'auteur joue).
+
+Hors litige, la **première** validation d'un arbitre qui joue n'avertit personne
+(la règle vise les litiges, `/regles` le dit). Seul membre du staff : personne
+à prévenir (`notifyStaff` sans destinataire), la ligne du journal reste.
+
+Information (registre T04 et T05, `/rgpd` § Notifications push) : entrée
+`PRIVACY_CHANGES` `2026-10-arbitre-qui-joue-le-match` (FR + EN) — finalité
+nouvelle (avertir le reste du staff) et gestes nouveaux au journal du staff,
+nominatifs dans pm2.
+
+Pour un litige tranché :
+
+- push `REFEREE_SELF_RESOLUTION` (`notifyStaff`, l'auteur exclu ; rédacteur
+  `selfResolvedDisputePush`, FR + EN) : « Un membre du staff qui joue ce match a
+  tranché son litige · tournoi, manche : issue. » — issue = « Équipe A 2 – 1
+  Équipe B », « forfait de Équipe B », « double forfait » ; en individuel,
+  aucun nom (« 2 – 1 », « forfait d'un joueur ») ;
+- journal (`publishStaffAction`) : sur Discord, le tournoi et la nature du
+  geste seulement, staff anonyme (« ⚠️ Litige tranché par un membre du staff
+  qui joue ce match · « tournoi ». », `selfActionDiscordLine`, nom du tournoi
+  neutralisé par `discordInline`) — ni manche, ni issue, ni nom d'engagé ; la
+  ligne détaillée (manche, issue) va, avec l'auteur, dans pm2 seulement
+  (`[staff-audit] … — auteur : <pseudo> (#id)`). Même règle pour les trois
+  autres gestes.
+
+Pour une suspension : push « Un membre du staff qui joue ce match en a
+suspendu la validation automatique · tournoi, manche. » (`selfPausedValidationPush`,
+FR + EN, aucun nom d'engagé) et ligne de journal « ⚠️ Validation automatique
+suspendue par un membre du staff qui joue ce match · « tournoi ». » sur Discord,
+manche en plus dans pm2 (`selfPausedValidationLog`), même sujet
+`REFEREE_SELF_RESOLUTION`.
+
+Le litige se lit **sous le verrou** de la manche, avant l'arbitrage (deux
+propositions sur un match ouvert, `isScoreDisputed`) : un arbitrage hors litige
+— ou par un arbitre qui ne joue pas — n'avertit personne.
+
+**Arbitre et report seul** (décision du 2026-10-20). « Enregistrer »
+(avancement ou forfait noté, sans trancher) sur une manche où **une seule**
+engagée a reporté **suspend** la validation d'office : le score du déclarant ne
+remplace plus, à l'échéance, ce que l'arbitre a noté.
+
+- **Suspension** : `bg_matches.score_validation_paused_at = NOW()`, posée par
+  `pauseAutoValidation` (`admin.ts`) dans la transaction d'« Enregistrer », sur
+  la ligne déjà verrouillée, si le match est `AWAITING_CONFIRMATION` avec un
+  report seul (`SINGLE_REPORT_SQL`). Un litige garde son escalade ; un match
+  sans proposition n'a rien à suspendre.
+- **Balayage** : la validation d'office reste **un seul `UPDATE`
+  conditionnel** (`claimAutoValidation`), sa condition ajoute
+  `score_validation_paused_at IS NULL` ; la sélection partagée
+  (`ACTIONABLE_EXPIRED_REPORT_SQL`) aussi (`AUTO_VALIDATION_RUNNING_SQL`), si
+  bien qu'un report suspendu ne rend plus le tournoi « dû ». Course avec
+  l'arbitre : le balayage qui passe avant ferme la manche et « Enregistrer »
+  reçoit `MATCH_ALREADY_COMPLETED` ; sinon son `UPDATE` attend le commit de
+  l'arbitre et ne touche plus rien. Idempotent.
+- **Fin de la suspension** : seul l'arbitrage la lève — « Valider le résultat »
+  tranche. La réponse de l'adversaire referme le report seul comme avant
+  (confirmation : match clos ; contre-score : litige, avec son escalade). Une
+  **resaisie du déclarant ne relance pas** le délai (sans quoi il annulerait
+  d'un clic l'arrêt décidé par l'arbitre) ; un report **neuf** — aucune
+  proposition en cours, après un arbitrage ou un retour en arrière qui les a
+  effacées — efface la marque restée (`pauseResetAssignment`, `scoring.ts`).
+- **Écran** (FR + EN, instantané commun : `scoreAutoValidationPaused`, calculé
+  par `AUTO_VALIDATION_PAUSED_SQL`, donc par le flux et la lecture REST) : la
+  carte dit « … proposé par X · validation automatique suspendue par
+  l'arbitrage » / « … automatic confirmation paused by a referee » au lieu de
+  l'heure ; la modale des deux équipes « Validation automatique suspendue par
+  l'arbitrage : sans réponse, un arbitre validera le résultat. » ; la fenêtre
+  d'arbitrage le dit dans un avis à part (la saisie de l'arbitre efface l'avis
+  de proposition). Dès qu'un avancement d'arbitrage est noté sur un report
+  seul — avant ou après la proposition, suspendu ou non
+  (`singlePendingReport`) —, la fenêtre garde la proposition lisible (score,
+  maps, codes de replay), offre « Reprendre la proposition de X » / « Use X's
+  proposal » (maps chargées dans le formulaire, `adoptReport`) et, tant que
+  rien n'est suspendu, prévient que « Enregistrer » suspendra la validation
+  (`score.admin.saveWillPause`, dit aussi sous une proposition pré-remplie
+  intacte ; détail des maps en lecture : `score.admin.awaitingDetail`) ; le bouton de la carte reste « Valider le
+  score proposé ». L'alerte au staff nomme une ronde suisse, phase d'un
+  `MULTI` comprise, par `swissRoundSql` ; l'avis « proposition
+  modifiée » dit « « Enregistrer » note ta saisie et suspend la validation
+  automatique de cette proposition ; seul « Valider le résultat » tranche, à
+  moins que {adversaire} ne la confirme. ». Rouvert sur un report suspendu,
+  l'avis « Enregistré : X, non tranché » (forfait noté : « Forfait enregistré :
+  X, non tranché », `stored.forfeitUndecided`) dit que les champs portent la
+  saisie d'un arbitre, et non la proposition ; « Reprendre la proposition » se
+  retire quand les champs la portent déjà.
+  La notification d'« Enregistrer » dit la suspension quand elle a eu lieu
+  (`autoValidationPaused` dans la réponse de `PATCH …/scores`,
+  `score.admin.savedPaused` ; forfait noté : `savedForfeit` / `savedForfeitPaused`).
+  /regles le borne : « Un arbitre qui, après cette déclaration, enregistre… » —
+  un « Enregistrer » antérieur au report ne suspend rien. Une resaisie du déclarant pendant la suspension
+  prévient l'adversaire sans promettre de validation automatique
+  (`scoreToConfirm.bodyPaused`). Le réveil du flux ignore une échéance suspendue
+  (`tournament-broadcast.ts`).
 
 **Avant l'envoi.** Une contre-proposition ne se corrige plus : face à la
 proposition adverse, toute saisie qui en diffère (score, ou seulement le détail
@@ -180,6 +317,8 @@ pas du report de score : inchangées.
 - `lib/shared/score-dispute.ts` — prédicat du litige, code, heure de Paris.
 - `lib/server/tournaments/scoring.ts` — verrou, échéance, `finalizeMatch` scindé.
 - `lib/server/tournaments/finalization.ts` — `claimAutoValidation`.
+- `lib/server/tournaments/score-report-sql.ts` — prédicats partagés, suspension comprise.
+- `lib/server/tournaments/admin.ts` — `pauseAutoValidation` ; `dispute-self-resolution.ts` — arbitre qui joue.
 - `lib/server/tournaments/player-forfeit.ts`, `auto-validated-notices.ts`, `player-pushes.ts`.
 - `app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx`, `MatchRow.tsx`.
 
@@ -195,4 +334,13 @@ pas du report de score : inchangées.
 `tests/app/tournament-actions-i18n.test.tsx` (modale verrouillée et heure de Paris, FR + EN) ;
 `tests/app/api/tournaments/report-score.test.ts`, `match-forfeit.test.ts`,
 `tests/app/api/admin/dispute-resolution.test.ts` (arbitre et admin tranchent,
-capitaine refusé).
+capitaine refusé, arbitre transmis au service) ;
+`tests/lib/server/dispute-self-resolution.test.ts` (alerte aux autres
+seulement, rien hors litige ni pour un arbitre qui ne joue pas, journal) ;
+`tournaments-public-writes.test.ts` (litige lu sous verrou, alerte après le
+commit, rien hors litige) ; suspension : `admin-score-guards.test.ts`
+(« Enregistrer » la pose sur un report seul), `score-report-stalled.test.ts`
+(balayage muet, course perdue), `tournaments-service.matches.test.ts` (resaisie
+qui la garde, report neuf qui la lève), `tournament-broadcast-wake.test.ts`,
+`player-score-report.test.ts` et `tournament-actions-i18n.test.tsx` (écran,
+FR + EN) ; `dispute-withdrawal.test.ts` (abandon inchangé, /regles).

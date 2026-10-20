@@ -897,6 +897,28 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Les annonces restent sur la page Recrutement et dans la banderole ; « Plus tard » ne change pas : la fenêtre revient pour une annonce urgente que tu n'as pas encore vue.",
     ],
   },
+  // DISPUTE-FOLLOWUP (PR #456) : finalité nouvelle (registre T04) — avertir les
+  // autres membres du staff quand un arbitre qui joue la manche tranche son
+  // litige, corrige son résultat, impose l'abandon de son adversaire ou en
+  // suspend la validation automatique — et gestes nouveaux au journal du staff
+  // (T05), nominatifs dans pm2. Même forme que `2026-10-horaires-de-match`.
+  {
+    id: "2026-10-arbitre-qui-joue-le-match",
+    title: "Arbitre qui joue le match : le reste du staff averti",
+    publishedAt: "2026-10-20",
+    summary:
+      "Quand un membre du staff qui joue un match en tranche le litige de score, en corrige le résultat, impose l'abandon de son adversaire ou en suspend la validation automatique, les autres membres du staff en sont avertis, et le geste est consigné au journal d'activité du staff.",
+    details: [
+      "Pour le savoir, le site vérifie, à chacun de ces gestes, si son auteur est membre d'une des deux équipes du match, ou l'a quittée depuis le lancement du match, son premier report ou, à défaut, sa création (ou s'il en est le joueur, en tournoi individuel) ; pour un abandon imposé, seule l'équipe adverse de l'équipe retirée est regardée.",
+      "L'alerte part en notification push aux autres arbitres et administrateurs abonnés aux notifications push (sujet « Arbitrage par un joueur du staff », actif par défaut, que tu peux couper dans « Mon profil »), jamais à l'auteur. Elle dit le tournoi, la manche et, sauf pour une suspension, l'issue retenue avec les noms d'équipe (aucun en tournoi individuel), sans le pseudo de l'auteur ni d'aucun joueur.",
+      "Le journal d'activité du staff ne dit sur Discord que le tournoi et la nature du geste, sans nom ; les journaux du serveur gardent en plus la manche, l'issue et les noms d'équipe (ni l'une ni les autres pour une suspension, aucun nom en tournoi individuel), et le pseudo et l'identifiant de compte de son auteur.",
+      "Chacun de ces quatre gestes (tout abandon imposé par l'arbitrage qui clôt une manche compris, une trace par manche close face à un adversaire connu, quelle que soit l'équipe retirée), que son auteur joue le match ou non, laisse aussi dans les journaux du serveur une trace courte : le numéro du match, et le pseudo et l'identifiant de compte de son auteur.",
+    ],
+    links: [
+      { href: "/rgpd#notifications", label: "Lire la section « Notifications push »" },
+      { href: "/rgpd#exercer-vos-droits", label: "Lire la section « Exercer vos droits »" },
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

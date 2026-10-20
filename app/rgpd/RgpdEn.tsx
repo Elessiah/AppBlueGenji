@@ -778,8 +778,8 @@ export function RgpdEn({
           <p>
             You can be notified on your phone or computer of the start of your matches, of a score to confirm or confirmed automatically without an answer, of a
             tournament&apos;s kickoff, of your match times (set, changed or removed) and their reminders, and of what
-            concerns your account or your team; a staff member, also of the alerts of their role (referee alerts, scheduled
-            matches, refereeing schedule, incoming reports).{" "}
+            concerns your account or your team; a staff member, also of the alerts of their role (referee alerts, disputes settled, results corrected,
+            opponents&apos; withdrawals imposed or automatic confirmations paused by a staff member who plays in the match, scheduled matches, refereeing schedule, incoming reports).{" "}
             <strong>Nothing is sent without your action</strong>: notifications are turned on device by device,
             from <EnglishLegalLink href="/profil#notifications">My profile</EnglishLegalLink>, where you also choose the topics.
           </p>
@@ -824,7 +824,13 @@ export function RgpdEn({
             interest (that is what lets it honour the choice); it appears in the
             export of your data. Referee alerts and the refereeing schedule sent to referees and administrators fall
             under <strong>performance of the service</strong> and are not turned off this way (
-            <LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>).
+            <LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>). When a staff member settles a
+            dispute, corrects a decided result, imposes a withdrawal or pauses an automatic confirmation, the site
+            checks whether they are a member of one of the match&apos;s teams, or left it since the match was launched, its first report or, failing these, its creation (for a withdrawal, of the opponent of the
+            team they withdraw) and, if they play in it, warns their
+            colleagues: this check rests on the association&apos;s <strong>legitimate interest</strong> in impartial
+            refereeing, and this staff member may object to it (section{" "}
+            <a href="#exercer-vos-droits">“Exercising your rights”</a>).
           </p>
         </div>
       </section>

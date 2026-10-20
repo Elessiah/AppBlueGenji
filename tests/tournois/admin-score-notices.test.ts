@@ -17,7 +17,7 @@ describe("adminProposalNotice", () => {
 
   it("proposition de l'équipe 2, saisie en cours", () => {
     expect(adminProposalNotice({ ...proposal, proposedBy: "team2" }, "A", "B", true)).toBe(
-      "Score proposé par B (3 – 1), en attente de confirmation de A. Ta saisie le remplace.",
+      "Score proposé par B (3 – 1), en attente de confirmation de A. « Enregistrer » note ta saisie et suspend la validation automatique de cette proposition ; seul « Valider le résultat » tranche, à moins que A ne la confirme.",
     );
   });
 });

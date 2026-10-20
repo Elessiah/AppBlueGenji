@@ -21,7 +21,7 @@ import { usePlayerScore } from "../_lib/player-score-context";
 import { useIssueReport } from "../_lib/issue-report-context";
 import { useLiveControls } from "../_lib/live-context";
 import { useHighlightedMatch } from "../_lib/match-anchor-context";
-import { pendingScoreProposal } from "../_lib/score-form";
+import { singlePendingReport } from "../_lib/score-form";
 import { matchSideViews } from "../_lib/match-row-sides";
 import { launchStripControls } from "../_lib/launch-strip";
 import { matchCardActionList } from "../_lib/match-card-actions";
@@ -55,8 +55,10 @@ function pendingReportText(text: TournamentActionsText, state: PendingReportStat
   const reporter = state.reporter ?? text.t("cardActions.reportSide", { side: state.side });
   // Échéance de la validation d'office, lisible des deux équipes (et de tous) :
   // à l'heure de Paris, la même pour chacun (`SCORE_DISPUTE_LOCK.md`).
-  const deadline = autoValidateTimeText(state.deadlineAt, text.locale);
   const values = { score1: state.team1Score, score2: state.team2Score, reporter };
+  // Suspendue par un « Enregistrer » d'arbitrage : aucune heure ne vaut plus.
+  if (state.paused) return text.t("cardActions.reportPendingPaused", values);
+  const deadline = autoValidateTimeText(state.deadlineAt, text.locale);
   return deadline
     ? text.t("cardActions.reportPendingDeadline", { ...values, deadline })
     : text.t("cardActions.reportPending", values);
@@ -168,7 +170,10 @@ export const MatchRow = memo(function MatchRow({
   const team1Display = teamLabel(match.team1Name, localizedPlaceholder(text, match.team1Placeholder), side1.emptyLabel);
   const team2Display = teamLabel(match.team2Name, localizedPlaceholder(text, match.team2Placeholder), side2.emptyLabel);
 
-  const adminScoreLabel = adminScoreButtonLabel(actionText, scoreEntryClosed, pendingScoreProposal(match) !== null);
+  // Une proposition seule attend, même quand l'arbitrage a déjà noté un
+  // avancement (suspendue ou non) : la carte garde l'appel à valider, et la
+  // fenêtre d'arbitrage permet de la reprendre (`singlePendingReport`).
+  const adminScoreLabel = adminScoreButtonLabel(actionText, scoreEntryClosed, singlePendingReport(match) !== null);
 
   // État de diffusion, calculé une fois ici : le bandeau d'horaire l'affiche,
   // le pied d'action en tire le bouton d'antenne — une seule minuterie.

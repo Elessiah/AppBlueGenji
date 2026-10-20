@@ -88,6 +88,21 @@ texte, effacée un jour après la fin de la soirée).
   pm2 logs bluegenji --lines 1000 | grep staff-audit
   ```
 
+- **Arbitre qui joue la manche** (litige tranché, résultat corrigé, abandon
+  imposé à l'adversaire, validation automatique suspendue — décision du
+  2026-10-20) : Discord ne reçoit que le tournoi et la nature du geste, staff
+  anonyme — « ⚠️ Litige tranché par un membre du staff qui joue ce match ·
+  « tournoi ». » (de même « Résultat corrigé », « Abandon imposé à son
+  adversaire », « Validation automatique suspendue ») —, **ni manche, ni issue,
+  ni nom d'engagé**. La ligne détaillée (manche, et sauf pour une suspension issue et noms d'équipe,
+  aucun en individuel) et l'auteur ne vont que dans pm2 (`publishStaffAction(discord,
+  actor, auditLine)`, `dispute-self-resolution.ts`). Avant de savoir si l'auteur
+  joue la manche, chacun de ces quatre gestes (abandon imposé : une trace par
+  manche qu'il clôt face à un adversaire connu, quelle que soit l'équipe retirée) laisse dans pm2 une trace courte
+  — numéro du match et auteur nommé (`auditStaffAction`), **que l'arbitre joue
+  ou non** ; un échec ensuite s'y dit avec l'auteur par son seul identifiant
+  (« auteur #id »). Registre T05, entrée `2026-10-arbitre-qui-joue-le-match`.
+
 - Le **motif d'une pénalité** est saisi librement par l'arbitre et repris tel
   quel : il ne doit pas nommer de joueur.
 

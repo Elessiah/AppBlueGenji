@@ -224,13 +224,15 @@ export type PendingReportState =
       side: 1 | 2;
       /** Échéance de la validation d'office (ISO), `null` si inconnue. */
       deadlineAt: string | null;
+      /** Validation d'office suspendue par l'arbitrage : l'heure ne vaut plus. */
+      paused: boolean;
     };
 
 /** Le match tel que la ligne d'état le lit ; l'échéance est facultative. */
 type PendingReportMatch = Pick<
   BracketMatch,
   "status" | "team1Report" | "team2Report" | "team1Name" | "team2Name"
-> & { scoreDeadlineAt?: string | null };
+> & { scoreDeadlineAt?: string | null; scoreAutoValidationPaused?: boolean };
 
 /**
  * Ligne d'état posée sous la carte, lisible par **tous** : une proposition
@@ -255,6 +257,7 @@ export function pendingReportState(match: PendingReportMatch): PendingReportStat
     reporter,
     side,
     deadlineAt: match.scoreDeadlineAt ?? null,
+    paused: match.scoreAutoValidationPaused === true,
   };
 }
 
@@ -264,6 +267,9 @@ export function pendingReportNotice(match: PendingReportMatch): string | null {
   if (state === null) return null;
   if (state.kind === "conflict") return "Score en litige · saisie verrouillée, arbitrage attendu";
   const reporter = state.reporter ?? `Équipe ${state.side}`;
+  if (state.paused) {
+    return `${state.team1Score} – ${state.team2Score} proposé par ${reporter} · validation automatique suspendue par l'arbitrage`;
+  }
   const deadline = autoValidateTimeText(state.deadlineAt, "fr");
   return deadline
     ? `${state.team1Score} – ${state.team2Score} proposé par ${reporter} · validation automatique à ${deadline} (heure de Paris) sans réponse`

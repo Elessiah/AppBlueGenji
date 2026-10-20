@@ -528,11 +528,17 @@ function fitDigestBody(lines: readonly DigestLine[], total: number, text: PushTe
 }
 
 /** L'adversaire a saisi un score : à confirmer, ou à contester. */
-export function scoreToConfirmPush(side: MatchSide, locale: Locale = DEFAULT_LOCALE): PushContent {
+export function scoreToConfirmPush(
+  side: MatchSide & { autoValidationPaused?: boolean },
+  locale: Locale = DEFAULT_LOCALE,
+): PushContent {
   const text = TEXT[locale];
   return {
     title: text.t("scoreToConfirm.title"),
-    body: text.t("scoreToConfirm.body", {
+    // Validation d'office suspendue par l'arbitrage (resaisie du déclarant
+    // après un « Enregistrer » d'arbitre) : ne pas promettre une validation
+    // qui n'aura pas lieu (`SCORE_DISPUTE_LOCK.md`).
+    body: text.t(side.autoValidationPaused ? "scoreToConfirm.bodyPaused" : "scoreToConfirm.body", {
       opponent: side.solo ? text.t("scoreToConfirm.soloOpponent") : side.opponentName,
       tournament: side.tournamentName,
     }),
@@ -738,6 +744,117 @@ export function issueReportPush(
       : text.t("issueReport.body", { tournament: input.tournamentName }),
     url: localeHref(tournamentMatchHref(input.tournamentId, input.match?.id ?? null), locale),
     tag: `issue-${input.tournamentId}-${input.match?.id ?? 0}`,
+  };
+}
+
+/** Issue retenue par l'arbitrage d'un litige (`SCORE_DISPUTE_LOCK.md` § Arbitre qui joue). */
+export type SelfResolvedOutcome =
+  | { kind: "score"; team1Score: number; team2Score: number }
+  | { kind: "forfeit"; forfeitSide: 1 | 2 }
+  | { kind: "doubleForfeit" };
+
+/** Litige tranché par un membre du staff qui joue la manche. */
+export type SelfResolvedDispute = RefereeAlertMatch & {
+  team1Name: string;
+  team2Name: string;
+  /** Tournoi individuel : aucun nom d'engagé n'est cité (ce serait un pseudo). */
+  solo: boolean;
+  outcome: SelfResolvedOutcome;
+};
+
+/**
+ * L'issue en quelques mots, dans la langue voulue. `name` met en forme un nom
+ * d'équipe (le journal Discord le neutralise, `discordInline`) ; en tournoi
+ * individuel, aucun nom : un nom d'engagé y serait un pseudo de joueur.
+ */
+export function selfResolvedOutcomeText(
+  input: Pick<SelfResolvedDispute, "team1Name" | "team2Name" | "solo" | "outcome">,
+  locale: Locale = DEFAULT_LOCALE,
+  name: (value: string) => string = (value) => value,
+): string {
+  const text = TEXT[locale];
+  const { outcome } = input;
+  if (outcome.kind === "doubleForfeit") return text.t("selfResolved.doubleForfeit");
+  if (outcome.kind === "forfeit") {
+    if (input.solo) return text.t("selfResolved.forfeitSolo");
+    return text.t("selfResolved.forfeit", { team: name(outcome.forfeitSide === 1 ? input.team1Name : input.team2Name) });
+  }
+  const scores = { score1: outcome.team1Score, score2: outcome.team2Score };
+  if (input.solo) return text.t("selfResolved.scoreSolo", scores);
+  return text.t("selfResolved.score", { ...scores, team1: name(input.team1Name), team2: name(input.team2Name) });
+}
+
+/**
+ * Alerte aux **autres** membres du staff (`REFEREE_SELF_RESOLUTION`) : un des
+ * leurs, qui joue la manche, vient d'en trancher le litige. Ni son pseudo ni
+ * celui d'un joueur : le tournoi, la manche et l'issue suffisent à aller voir.
+ */
+export function selfResolvedDisputePush(input: SelfResolvedDispute, locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
+  return {
+    title: text.t("selfResolved.title"),
+    body: text.t("selfResolved.body", {
+      tournament: input.tournamentName,
+      round: pushRoundLabel(input.bracket, input.roundNumber, locale, input.swiss),
+      outcome: selfResolvedOutcomeText(input, locale),
+    }),
+    url: localeHref(tournamentMatchHref(input.tournamentId, input.matchId), locale),
+    tag: `self-resolved-${input.matchId}`,
+  };
+}
+
+/**
+ * Alerte aux **autres** membres du staff (`REFEREE_SELF_RESOLUTION`) : un des
+ * leurs, qui joue la manche, vient d'en **corriger** le résultat déjà acquis.
+ */
+export function selfCorrectedResultPush(input: SelfResolvedDispute, locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
+  return {
+    title: text.t("selfCorrected.title"),
+    body: text.t("selfCorrected.body", {
+      tournament: input.tournamentName,
+      round: pushRoundLabel(input.bracket, input.roundNumber, locale, input.swiss),
+      outcome: selfResolvedOutcomeText(input, locale),
+    }),
+    url: localeHref(tournamentMatchHref(input.tournamentId, input.matchId), locale),
+    tag: `self-corrected-${input.matchId}`,
+  };
+}
+
+/**
+ * Alerte aux **autres** membres du staff (`REFEREE_SELF_RESOLUTION`) : un des
+ * leurs, qui joue la manche, vient de la clore en imposant l'abandon de son
+ * adversaire (route d'abandon, chemin arbitrage).
+ */
+export function selfImposedForfeitPush(input: SelfResolvedDispute, locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
+  return {
+    title: text.t("selfForfeit.title"),
+    body: text.t("selfForfeit.body", {
+      tournament: input.tournamentName,
+      round: pushRoundLabel(input.bracket, input.roundNumber, locale, input.swiss),
+      outcome: selfResolvedOutcomeText(input, locale),
+    }),
+    url: localeHref(tournamentMatchHref(input.tournamentId, input.matchId), locale),
+    tag: `self-forfeit-${input.matchId}`,
+  };
+}
+
+/**
+ * Alerte aux **autres** membres du staff (`REFEREE_SELF_RESOLUTION`) : un des
+ * leurs, qui joue la manche, vient d'en suspendre la validation automatique
+ * (« Enregistrer » sur un report seul). Ni pseudo ni nom d'engagé.
+ */
+export function selfPausedValidationPush(input: RefereeAlertMatch, locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
+  return {
+    title: text.t("selfPaused.title"),
+    body: text.t("selfPaused.body", {
+      tournament: input.tournamentName,
+      round: pushRoundLabel(input.bracket, input.roundNumber, locale, input.swiss),
+    }),
+    url: localeHref(tournamentMatchHref(input.tournamentId, input.matchId), locale),
+    tag: `self-paused-${input.matchId}`,
   };
 }
 

@@ -40,6 +40,7 @@
   "scoreToConfirm": {
     "title": "Score to confirm",
     "body": "{opponent} entered the score of your match ({tournament}). Confirm it, or dispute it: with no answer, it will be confirmed automatically.",
+    "bodyPaused": "{opponent} entered the score of your match ({tournament}). Confirm it, or dispute it: automatic confirmation is paused by a referee, and a referee will decide if there is no answer.",
     "soloOpponent": "Your opponent"
   },
   "scoreAutoValidated": {
@@ -94,6 +95,27 @@
     "score_conflictMatch": "Conflicting scores · {tournament}, {round}: a referee is needed.",
     "score_report_stalledMatch": "Dispute without a referee for too long · {tournament}, {round}: entry locked, a referee needs to decide.",
     "otherMatch": "Alert · {tournament}, {round}: a referee is needed."
+  },
+  "selfResolved": {
+    "title": "Dispute settled by a player of the match",
+    "body": "A staff member who plays in this match settled its dispute · {tournament}, {round}: {outcome}.",
+    "score": "{team1} {score1} – {score2} {team2}",
+    "scoreSolo": "{score1} – {score2}",
+    "forfeit": "forfeit by {team}",
+    "forfeitSolo": "forfeit by a player",
+    "doubleForfeit": "double forfeit"
+  },
+  "selfCorrected": {
+    "title": "Result corrected by a player of the match",
+    "body": "A staff member who plays in this match corrected its result · {tournament}, {round}: {outcome}."
+  },
+  "selfForfeit": {
+    "title": "Withdrawal imposed by a player of the match",
+    "body": "A staff member who plays in this match imposed their opponent's withdrawal · {tournament}, {round}: {outcome}."
+  },
+  "selfPaused": {
+    "title": "Confirmation paused by a player of the match",
+    "body": "A staff member who plays in this match paused its automatic confirmation · {tournament}, {round}."
   },
   "issueReport": {
     "body": "Problem reported · {tournament}.",

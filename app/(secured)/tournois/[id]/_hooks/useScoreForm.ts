@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { BracketMatch, TournamentGame } from "@/lib/shared/types";
+import type { BracketMatch, MatchScoreReport, TournamentGame } from "@/lib/shared/types";
 import { useMapError } from "../_lib/error-map";
 import { mapViolationText, scoreBlockerText, useDialogsText } from "../_lib/dialogs-text";
 import {
@@ -34,6 +34,12 @@ import type { MatchFormat } from "@/lib/shared/match-format";
 // « Enregistrer » restait actif sur une rencontre finie, et la route
 // d'enregistrement en réécrivait les scores sans toucher au vainqueur.
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
+
+/** Notification d'un « Enregistrer » : score ou forfait noté, validation d'office suspendue ou non. */
+export function savedToastKey(forfeit: boolean, paused: boolean) {
+  if (forfeit) return paused ? "score.admin.savedForfeitPaused" : "score.admin.savedForfeit";
+  return paused ? "score.admin.savedPaused" : "score.admin.saved";
+}
 
 /** L'arbitrage peut se passer du code de replay (replay perdu) : « Pas de code de replay ». */
 const ADMIN_MAP_RULES: MapEntryRules = { requireReplayCode: false };
@@ -134,6 +140,23 @@ export function useScoreForm(
     setConflict(false);
   };
 
+  /**
+   * Reprendre la proposition d'une engagée — score et maps, codes de replay
+   * compris — quand le formulaire s'ouvre sur un avancement noté par
+   * l'arbitrage : « Valider le résultat » la confirme alors sans recopie.
+   */
+  const adoptReport = (report: MatchScoreReport) => {
+    const rows = progressiveMapRows(
+      matchFormat,
+      game,
+      report.maps.map(({ replayCode, team1Score, team2Score }) => ({ replayCode, team1Score, team2Score })),
+      ADMIN_MAP_RULES,
+    );
+    setMaps(rows);
+    setState((s) => ({ ...s, forfeitTeamId: undefined, doubleForfeit: undefined, ...scoresFromMaps(rows) }));
+    options.onMapsReset?.();
+  };
+
   // Le serveur ne rend qu'un code : la même règle, rejouée ici, retrouve le
   // champ qu'il désigne.
   const flagMapRefusal = (code: string, decisive: boolean) => {
@@ -210,14 +233,17 @@ export function useScoreForm(
         body: JSON.stringify(body),
       });
 
-      const payload = (await response.json()) as { error?: string };
+      const payload = (await response.json()) as { error?: string; autoValidationPaused?: boolean };
       if (!response.ok) throw new Error(payload.error || "API_ERROR");
 
-      showSuccess(
-        action === "save"
-          ? dialogText.t("score.admin.saved")
-          : dialogText.t("score.admin.resolved"),
-      );
+      // « Enregistrer » sur un report seul suspend sa validation d'office
+      // (`SCORE_DISPUTE_LOCK.md`) : la notification le dit — et dit « forfait »
+      // quand c'est un forfait, non un score, qui a été noté (un double forfait
+      // ne s'enregistre pas : `DOUBLE_FORFEIT`). Un forfait se note aussi avant
+      // le lancement : sa notification ne dit pas « en cours ».
+      const forfeitSaved = state.forfeitTeamId !== undefined;
+      const savedKey = savedToastKey(forfeitSaved, payload.autoValidationPaused === true);
+      showSuccess(dialogText.t(action === "save" ? savedKey : "score.admin.resolved"));
       return true;
     } catch (e) {
       const code = (e as Error).message;
@@ -248,6 +274,7 @@ export function useScoreForm(
     /** Le résultat enregistré a changé pendant qu'une saisie était en cours. */
     conflict,
     adoptStoredResult,
+    adoptReport,
     /** Une saisie est en cours, non enregistrée. */
     dirty: !sameScoreFormState(state, openingState()) || !sameMaps(maps, openingRows()),
     // Forfait nominatif et double forfait s'excluent : en choisir un retire

@@ -165,6 +165,7 @@ function match(overrides: Partial<BracketMatch> = {}): BracketMatch {
     nextLoserMatchId: null,
     nextLoserSlot: null,
     scoreDeadlineAt: null,
+    scoreAutoValidationPaused: false,
     team1Report: null,
     team2Report: null,
     maps: [],

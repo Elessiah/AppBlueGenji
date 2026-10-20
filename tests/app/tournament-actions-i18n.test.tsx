@@ -45,6 +45,7 @@ import { createTranslator } from "next-intl";
 import referenceErrors from "../fixtures/tournament-errors-fr-before-lot8b.json";
 import enActions from "@/messages/en/tournamentActions.json";
 import enDialogs from "@/messages/en/tournamentDialogs.json";
+import { savedToastKey } from "@/app/(secured)/tournois/[id]/_hooks/useScoreForm";
 import frActions from "@/messages/fr/tournamentActions.json";
 import frDialogs from "@/messages/fr/tournamentDialogs.json";
 import {
@@ -602,6 +603,145 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     expect(render("en", dialog(11))).toContain("With no answer, this score will be confirmed automatically at 14:30 (Paris time).");
     expect(render("fr", dialog(10))).toContain("ce score sera validé automatiquement à 14:30 (heure de Paris).");
     expect(render("en", dialog(10))).toContain("this score will be confirmed automatically at 14:30 (Paris time).");
+  });
+
+  it("validation d'office suspendue par l'arbitrage : dite à la place de l'heure, partout (FR + EN)", () => {
+    const paused = {
+      ...versus,
+      status: "AWAITING_CONFIRMATION" as const,
+      team1Report: disputeReport(2, 1, "2026-05-05T10:00:00.000Z"),
+      scoreDeadlineAt: "2026-05-05T12:30:00.000Z",
+      scoreAutoValidationPaused: true,
+    };
+    const card = (locale: "fr" | "en") => renderPage(locale, <MatchRow match={paused} adminResolvable={false} onOpenAdminModal={noop} scoreLocked={false} roundNumber={2} />);
+    expect(card("fr")).toContain("2 – 1 proposé par Alpha · validation automatique suspendue par l&#x27;arbitrage");
+    expect(card("en")).toContain("2 – 1 proposed by Alpha · automatic confirmation paused by a referee");
+    for (const locale of ["fr", "en"] as const) expect(card(locale)).not.toContain("14:30");
+
+    const dialog = (myTeamId: number) => <PlayerScoreDialog tournamentId={1} match={paused} myTeamId={myTeamId} canReportScore canForfeit proposals={[]} onClose={noop} onSubmitted={noop} onRefresh={noop} />;
+    // Les deux camps : l'adversaire qui doit répondre (11) et le déclarant (10).
+    for (const myTeamId of [10, 11]) {
+      expect(render("fr", dialog(myTeamId))).toContain("Validation automatique suspendue par l&#x27;arbitrage : sans réponse, un arbitre validera le résultat.");
+      expect(render("en", dialog(myTeamId))).toContain("Automatic confirmation paused by a referee: with no answer, a referee will confirm the result.");
+      expect(render("fr", dialog(myTeamId))).not.toContain("14:30");
+      expectNoFrench(render("en", dialog(myTeamId)));
+    }
+
+    // L'arbitrage le lit aussi, sous l'avis de proposition.
+    const admin = (locale: "fr" | "en") => render(locale, <AdminScoreDialog match={paused} onClose={noop} onSubmitted={noop} />);
+    expect(admin("fr")).toContain("Validation automatique suspendue par l&#x27;arbitrage : sans réponse de l&#x27;adversaire, seul « Valider le résultat » tranche.");
+    expect(admin("en")).toContain("Automatic confirmation paused by a referee: without an answer from the opponent, only “Confirm the result” settles the match.");
+    // Cas réel : la suspension suit un « Enregistrer », donc un score noté par
+    // l'arbitre — l'avis de proposition s'efface, celui de la suspension reste.
+    const saved = { ...paused, team1Score: 1, team2Score: 0 };
+    const adminSaved = (locale: "fr" | "en") => render(locale, <AdminScoreDialog match={saved} onClose={noop} onSubmitted={noop} />);
+    expect(adminSaved("fr")).not.toContain("Score proposé par");
+    expect(adminSaved("fr")).toContain("Validation automatique suspendue par l&#x27;arbitrage : sans réponse de l&#x27;adversaire, seul « Valider le résultat » tranche.");
+    expect(adminSaved("en")).toContain("Automatic confirmation paused by a referee: without an answer from the opponent, only “Confirm the result” settles the match.");
+    expectNoFrench(adminSaved("en"));
+    // « Enregistrer » ne tranche pas seul : l'adversaire peut encore confirmer.
+    expect(enDialogs.score.admin.proposalDirty).toContain("only “Confirm the result” settles the match, unless {other} confirms it.");
+    // Les champs portent la saisie d'un arbitre, pas la proposition : dit.
+    expect(adminSaved("fr")).toContain("Enregistré : 1 – 0, non tranché.");
+    expect(adminSaved("en")).toContain("Saved: 1 – 0, not decided.");
+    // Un autre arbitre qui rouvre le match lit encore la proposition en attente.
+    expect(adminSaved("fr")).toContain("Proposition de Alpha : 2 – 1");
+    expect(adminSaved("en")).toContain("Alpha&#x27;s proposal: 2 – 1");
+    // La carte garde l'appel à valider : seul « Valider le résultat » tranche.
+    const adminCard = (locale: "fr" | "en") => renderPage(locale, <MatchRow match={saved} adminResolvable onOpenAdminModal={noop} scoreLocked={false} roundNumber={2} />);
+    expect(adminCard("fr")).toContain("Valider le score proposé");
+    expect(adminCard("en")).toContain("Confirm the proposed score");
+    expect(renderPage("fr", <MatchRow match={{ ...versus, team1Score: 1, team2Score: 0 }} adminResolvable onOpenAdminModal={noop} scoreLocked={false} roundNumber={2} />)).toContain("Éditer le score");
+    // Suspendue : la proposition se reprend d'un clic, et l'avis « Enregistrer suspend » n'a plus lieu d'être.
+    expect(adminSaved("fr")).not.toContain("« Enregistrer » suspend la validation automatique de la proposition");
+    // Sans suspension, l'avis n'en dit rien.
+    expect(render("fr", <AdminScoreDialog match={{ ...paused, scoreAutoValidationPaused: false }} onClose={noop} onSubmitted={noop} />)).not.toContain("suspendue");
+  });
+
+  it("avancement noté AVANT la proposition : proposition lisible, reprenable, et « Enregistrer » prévient de la suspension (FR + EN)", () => {
+    const maps = [
+      { mapNumber: 1, replayCode: "AAA111", team1Score: 2, team2Score: 0 },
+      { mapNumber: 2, replayCode: "BBB222", team1Score: 0, team2Score: 2 },
+      { mapNumber: 3, replayCode: "CCC333", team1Score: 2, team2Score: 1 },
+    ];
+    const match = {
+      ...versus,
+      status: "AWAITING_CONFIRMATION" as const,
+      team1Score: 1,
+      team2Score: 0,
+      team1Report: { team1Score: 2, team2Score: 1, maps, reportedAt: "2026-05-05T10:00:00.000Z" },
+      scoreDeadlineAt: "2026-05-05T12:30:00.000Z",
+      scoreAutoValidationPaused: false,
+    };
+    const admin = (locale: "fr" | "en") => render(locale, <AdminScoreDialog match={match} onClose={noop} onSubmitted={noop} />);
+    expect(admin("fr")).toContain("Proposition de Alpha : 2 – 1");
+    expect(admin("fr")).toContain("Reprendre la proposition de Alpha");
+    expect(admin("fr")).toContain("Enregistré : 1 – 0, non tranché.");
+    expect(admin("fr")).toContain("« Enregistrer » suspend la validation automatique de la proposition de Alpha : seul « Valider le résultat » tranche alors, à moins que Bravo ne la confirme.");
+    expect(admin("en")).toContain("Use Alpha&#x27;s proposal");
+    expect(admin("en")).toContain("“Save” pauses the automatic confirmation of Alpha&#x27;s proposal: only “Confirm the result” then settles the match, unless Bravo confirms it.");
+    expectNoFrench(admin("en"));
+    // Le bouton garde le focus pendant un envoi (aria-disabled), et reprend les maps de la proposition.
+    const source = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx"), "utf8");
+    expect(source).toMatch(/aria-disabled=\{submitting\}[\s\S]{0,120}if \(!submitting\) onAdopt\(\);/);
+    const hook = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_hooks/useScoreForm.ts"), "utf8");
+    expect(hook).toMatch(/const adoptReport = \(report: MatchScoreReport\) => \{[\s\S]{0,400}forfeitTeamId: undefined, doubleForfeit: undefined, \.\.\.scoresFromMaps\(rows\)/);
+    // Les champs portent déjà la proposition (enregistrée telle quelle) : rien à reprendre.
+    const asIs = { ...match, team1Score: 2, team2Score: 1, maps, scoreAutoValidationPaused: true };
+    expect(render("fr", <AdminScoreDialog match={asIs} onClose={noop} onSubmitted={noop} />)).toContain("Proposition de Alpha : 2 – 1");
+    expect(render("fr", <AdminScoreDialog match={asIs} onClose={noop} onSubmitted={noop} />)).not.toContain("Reprendre la proposition");
+    // Forfait noté par « Enregistrer », match non tranché : personne ne l'emporte encore (FR + EN).
+    const forfeitNoted = { ...match, team1Score: null, team2Score: null, forfeitTeamId: 11, scoreAutoValidationPaused: true };
+    expect(render("fr", <AdminScoreDialog match={forfeitNoted} onClose={noop} onSubmitted={noop} />)).toContain("Forfait enregistré : Bravo, non tranché.");
+    expect(render("fr", <AdminScoreDialog match={forfeitNoted} onClose={noop} onSubmitted={noop} />)).not.toContain("Forfait enregistré : Bravo, Alpha l&#x27;emporte.");
+    expect(render("en", <AdminScoreDialog match={forfeitNoted} onClose={noop} onSubmitted={noop} />)).toContain("Forfeit recorded: Bravo, not decided.");
+    // La carte invite à valider la proposition.
+    expect(renderPage("fr", <MatchRow match={match} adminResolvable onOpenAdminModal={noop} scoreLocked={false} roundNumber={2} />)).toContain("Valider le score proposé");
+    // Sans maps proposées, rien à reprendre : pas de bouton.
+    const bare = { ...match, team1Report: { ...match.team1Report, maps: [] } };
+    expect(render("fr", <AdminScoreDialog match={bare} onClose={noop} onSubmitted={noop} />)).not.toContain("Reprendre la proposition");
+    // Détail encore en lecture (aucune proposition chargée) : dit, plutôt qu'un panneau muet.
+    expect(render("fr", <AdminScoreDialog match={bare} proposals={[]} onClose={noop} onSubmitted={noop} />)).toContain("Lecture du détail des maps proposé…");
+    expect(render("en", <AdminScoreDialog match={bare} proposals={[]} onClose={noop} onSubmitted={noop} />)).toContain("Loading the proposed map details…");
+    // Détail lu, mais vide : rien à reprendre, et c'est dit (FR + EN).
+    const loaded = [{ matchId: bare.id, team1: { reportedAt: bare.team1Report.reportedAt, maps: [] }, team2: null }];
+    expect(render("fr", <AdminScoreDialog match={bare} proposals={loaded} onClose={noop} onSubmitted={noop} />)).toContain("Cette proposition n&#x27;a pas de détail de maps à reprendre : saisis les maps jouées pour la valider.");
+    expect(render("en", <AdminScoreDialog match={bare} proposals={loaded} onClose={noop} onSubmitted={noop} />)).toContain("This proposal has no map details to reuse: enter the maps played to confirm it.");
+    // Inactif à l'œil pendant un envoi (aria-disabled), sans `opacity`.
+    const css = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/ScoreDialog.module.css"), "utf8");
+    expect(css).toMatch(/\.conflictAction\[aria-disabled="true"\] \{[^}]*cursor: not-allowed;[^}]*color: var\(--ink-soft/);
+  });
+
+  it("notification d'« Enregistrer » : score ou forfait, suspendu ou non (FR + EN)", () => {
+    expect(savedToastKey(false, false)).toBe("score.admin.saved");
+    expect(savedToastKey(false, true)).toBe("score.admin.savedPaused");
+    expect(savedToastKey(true, false)).toBe("score.admin.savedForfeit");
+    expect(savedToastKey(true, true)).toBe("score.admin.savedForfeitPaused");
+    expect(frDialogs.score.admin.savedForfeitPaused).toBe("Forfait enregistré : le match reste en cours, et la validation automatique de la proposition est suspendue.");
+    expect(enDialogs.score.admin.savedForfeitPaused).toBe("Forfeit saved: the match is still in progress, and the proposal's automatic confirmation is paused.");
+    // Un forfait se note aussi avant le lancement : jamais « en cours ».
+    expect(frDialogs.score.admin.savedForfeit).toBe("Forfait enregistré : le match n'est pas encore tranché.");
+    expect(enDialogs.score.admin.savedForfeit).toBe("Forfeit saved: the match is not settled yet.");
+    // Un forfait choisi dans le formulaire n'est plus la proposition : « Reprendre » revient.
+    const source = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx"), "utf8");
+    expect(source).toContain("adopted={form.forfeitTeamId === undefined && !form.doubleForfeit && formHoldsReport(form.maps, pendingReport.report)}");
+  });
+
+  it("proposition pré-remplie, intacte : « Enregistrer » prévient AVANT le clic qu'il suspend la validation (FR + EN)", () => {
+    const fresh = {
+      ...versus,
+      status: "AWAITING_CONFIRMATION" as const,
+      team1Report: { team1Score: 2, team2Score: 1, maps: [], reportedAt: "2026-05-05T10:00:00.000Z" },
+      scoreDeadlineAt: "2026-05-05T12:30:00.000Z",
+      scoreAutoValidationPaused: false,
+    };
+    const admin = (locale: "fr" | "en") => render(locale, <AdminScoreDialog match={fresh} onClose={noop} onSubmitted={noop} />);
+    expect(admin("fr")).toContain("Vérifie-le puis valide le résultat pour le confirmer.");
+    expect(admin("fr")).toContain("« Enregistrer » suspend la validation automatique de la proposition de Alpha : seul « Valider le résultat » tranche alors, à moins que Bravo ne la confirme.");
+    expect(admin("en")).toContain("“Save” pauses the automatic confirmation of Alpha&#x27;s proposal: only “Confirm the result” then settles the match, unless Bravo confirms it.");
+    expectNoFrench(admin("en"));
+    // Aucune proposition : aucun avertissement.
+    expect(render("fr", <AdminScoreDialog match={versus} onClose={noop} onSubmitted={noop} />)).not.toContain("« Enregistrer » suspend");
   });
 
   it("score (engagé) pendant l'envoi : boutons aria-disabled, jamais disabled natif (le focus reste)", () => {

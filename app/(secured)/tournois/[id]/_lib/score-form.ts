@@ -1,4 +1,4 @@
-import type { BracketMatch } from "@/lib/shared/types";
+import type { BracketMatch, MatchScoreReport } from "@/lib/shared/types";
 import {
   checkMatchScores,
   matchScoreViolationMessage,
@@ -47,21 +47,34 @@ export interface PendingScoreProposal {
 
 export function pendingScoreProposal(match: BracketMatch | null): PendingScoreProposal | null {
   if (!match) return null;
-  if (isMatchPlayed(match)) return null;
   if (match.team1Score !== null || match.team2Score !== null) return null;
   if (match.forfeitTeamId !== null || match.doubleForfeit === true) return null;
 
+  const single = singlePendingReport(match);
+  if (!single) return null;
+  return {
+    team1Score: single.report.team1Score,
+    team2Score: single.report.team2Score,
+    proposedBy: single.proposedBy,
+  };
+}
+
+/**
+ * La proposition d'**une seule** engagée sur un match non tranché, que
+ * l'arbitrage ait déjà noté un avancement ou non — c'est elle que
+ * « Enregistrer » suspend (`SCORE_DISPUTE_LOCK.md` § Arbitre et report seul).
+ * `null` sur un litige (deux propositions) ou sans proposition.
+ */
+export function singlePendingReport(
+  match: BracketMatch | null,
+): { report: MatchScoreReport; proposedBy: "team1" | "team2" } | null {
+  if (!match || isMatchPlayed(match)) return null;
   const team1Report = match.team1Report ?? null;
   const team2Report = match.team2Report ?? null;
   if ((team1Report === null) === (team2Report === null)) return null;
-
   const report = team1Report ?? team2Report;
   if (!report) return null;
-  return {
-    team1Score: report.team1Score,
-    team2Score: report.team2Score,
-    proposedBy: team1Report ? "team1" : "team2",
-  };
+  return { report, proposedBy: team1Report ? "team1" : "team2" };
 }
 
 /**
@@ -388,7 +401,7 @@ export function adminProposalNotice(
 ): string | null {
   if (!proposal) return null;
   const [author, other] = proposal.proposedBy === "team1" ? [team1, team2] : [team2, team1];
-  const next = dirty ? "Ta saisie le remplace." : "Vérifie-le puis valide le résultat pour le confirmer.";
+  const next = dirty ? `« Enregistrer » note ta saisie et suspend la validation automatique de cette proposition ; seul « Valider le résultat » tranche, à moins que ${other} ne la confirme.` : "Vérifie-le puis valide le résultat pour le confirmer.";
   return `Score proposé par ${author} (${proposal.team1Score} – ${proposal.team2Score}), en attente de confirmation de ${other}. ${next}`;
 }
 

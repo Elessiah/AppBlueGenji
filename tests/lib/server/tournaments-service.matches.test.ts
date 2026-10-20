@@ -579,6 +579,43 @@ describe("tournaments-service: match state machine", () => {
       expect(writes(calls)[0].sql).toMatch(/SET team1_report_score = \?/);
     });
 
+    // Suspension par un « Enregistrer » d'arbitrage (`SCORE_DISPUTE_LOCK.md`) :
+    // une resaisie du déclarant ne relance pas le délai que l'arbitre a arrêté…
+    it("une resaisie du déclarant garde la validation d'office suspendue", async () => {
+      const { connection, calls } = reportConnection({
+        status: "AWAITING_CONFIRMATION",
+        team1_report_score: 3,
+        team1_report_opponent_score: 0,
+      });
+
+      await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1));
+      expect(writes(calls)[0].sql).not.toContain("score_validation_paused_at");
+    });
+
+    // … l'adversaire qui répond non plus (il confirme ou ouvre un litige)…
+    it("la réponse de l'adversaire ne touche pas à la suspension", async () => {
+      const { connection, calls } = reportConnection({
+        status: "AWAITING_CONFIRMATION",
+        team2_report_score: 3,
+        team2_report_opponent_score: 2,
+      });
+
+      await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1));
+      expect(writes(calls)[0].sql).not.toContain("score_validation_paused_at");
+    });
+
+    // … mais un report neuf (aucune proposition en cours) efface une marque
+    // restée d'un report effacé depuis (arbitrage, retour en arrière).
+    it("un report neuf lève une suspension restée d'un report effacé", async () => {
+      const { connection, calls } = reportConnection();
+
+      await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1));
+      const [report] = writes(calls);
+      expect(report.sql).toContain("status = 'AWAITING_CONFIRMATION', score_validation_paused_at = NULL WHERE id = ?");
+      // Texte constant : les paramètres ne changent pas.
+      expect(report.params).toEqual(reportParams(3, 1));
+    });
+
     it("deux reports contradictoires laissent la rencontre en attente et alertent l'arbitrage", async () => {
       const { connection, calls } = reportConnection({
         status: "AWAITING_CONFIRMATION",

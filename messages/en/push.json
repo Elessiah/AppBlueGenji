@@ -36,6 +36,10 @@
       "label": "Referee alerts",
       "description": "A score conflict, a score dispute left too long without a referee or a reported problem is waiting for a referee."
     },
+    "REFEREE_SELF_RESOLUTION": {
+      "label": "Refereeing by a staff player",
+      "description": "Another staff member, who plays in the match, has just settled its score dispute, corrected its result, imposed their opponent's withdrawal or paused its automatic confirmation."
+    },
     "MATCH_SCHEDULED": {
       "label": "Scheduled matches",
       "description": "Another referee schedules a match, or changes or removes its time — or a tournament update deletes a scheduled match."
