@@ -1002,7 +1002,8 @@ function RgpdFr({
             arbitres et administrateurs relèvent de l&apos;<strong>exécution du service</strong> et ne
             se coupent pas ainsi (<Link href="/rgpd/registre#t04">registre, T04</Link>). Quand un membre du
             staff tranche un litige, corrige un résultat acquis, impose un abandon ou suspend une validation
-            automatique, le site vérifie s&apos;il est membre d&apos;une des équipes du match et, s&apos;il le joue, en
+            automatique, le site vérifie s&apos;il est membre d&apos;une des équipes du match (pour un abandon, de
+            l&apos;équipe adverse de celle qu&apos;il retire) et, s&apos;il le joue, en
             avertit ses collègues : ce contrôle repose sur l&apos;<strong>intérêt légitime</strong> de
             l&apos;association à l&apos;impartialité de l&apos;arbitrage, et ce membre du staff peut s&apos;y opposer
             (section <a href="#exercer-vos-droits">« Exercer vos droits »</a>).
