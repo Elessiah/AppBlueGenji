@@ -73,6 +73,17 @@ describe("POST /api/recruitment/modal-dismiss", () => {
     spy.mockRestore();
   });
 
+  it("lecture de la session en panne : un code, cookie reposé, jamais la page d'erreur par défaut", async () => {
+    jest.mocked(getCurrentUser).mockRejectedValue(new Error("pool exhausted"));
+    const spy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const response = await POST();
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: "RECRUITMENT_MODAL_DISMISS_FAILED" });
+    expectOptOutCookie(response);
+    expect(recordRecruitmentModalOff).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
   it("colonne absente (ALTER échoué) : 503 à code propre, sans bruit au journal, cookie reposé", async () => {
     jest.mocked(recordRecruitmentModalOff).mockRejectedValue(
       Object.assign(new Error("Unknown column 'recruitment_modal_off'"), { code: "ER_BAD_FIELD_ERROR" }),

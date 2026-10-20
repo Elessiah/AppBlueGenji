@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 import crypto from "node:crypto";
 import {
   createSession,
+  RECRUITMENT_MODAL_CARRY_WAIT_MS,
   getCurrentUser,
   clearSession,
   countOtherSessions,
@@ -188,6 +189,55 @@ describe("auth", () => {
       expect(recordConnection).toHaveBeenCalledWith(5, "LOGIN_GOOGLE");
       releaseUpdate();
       await expect(session).resolves.toBeUndefined();
+    });
+
+    it("une ligne de compte verrouillée ne fait pas attendre la connexion plus de RECRUITMENT_MODAL_CARRY_WAIT_MS", async () => {
+      jest.useFakeTimers();
+      try {
+        const execute = jest.fn<SqlQuery>((sql) =>
+          sql.includes("recruitment_modal_off")
+            ? new Promise<never>(() => undefined)
+            : Promise.resolve([{ affectedRows: 1 }, []]),
+        );
+        await setUp("1", execute);
+        let settled = false;
+        const session = createSession(5, "LOGIN_GOOGLE").then(() => {
+          settled = true;
+        });
+        await jest.advanceTimersByTimeAsync(RECRUITMENT_MODAL_CARRY_WAIT_MS - 1);
+        expect(settled).toBe(false);
+        await jest.advanceTimersByTimeAsync(1);
+        await session;
+        expect(settled).toBe(true);
+        expect(RECRUITMENT_MODAL_CARRY_WAIT_MS).toBe(2_000);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it("un report qui échoue après l'attente reste journalisé, sans rejet non géré", async () => {
+      jest.useFakeTimers();
+      const spy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+      try {
+        let failUpdate: (error: Error) => void = () => undefined;
+        const execute = jest.fn<SqlQuery>((sql) =>
+          sql.includes("recruitment_modal_off")
+            ? new Promise((_resolve, reject) => {
+                failUpdate = reject;
+              })
+            : Promise.resolve([{ affectedRows: 1 }, []]),
+        );
+        await setUp("1", execute);
+        const session = createSession(5, "LOGIN_GOOGLE");
+        await jest.advanceTimersByTimeAsync(RECRUITMENT_MODAL_CARRY_WAIT_MS);
+        await expect(session).resolves.toBeUndefined();
+        failUpdate(new Error("Lock wait timeout exceeded"));
+        await jest.advanceTimersByTimeAsync(0);
+        expect(spy).toHaveBeenCalledWith("[auth] recruitment modal opt-out carry-over failed:", expect.any(Error));
+      } finally {
+        jest.useRealTimers();
+        spy.mockRestore();
+      }
     });
 
     it("n'empêche jamais la connexion quand le report échoue", async () => {
