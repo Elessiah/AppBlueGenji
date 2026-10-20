@@ -129,7 +129,11 @@ d'office, exactement comme si l'autre l'avait confirmé.
   (`RECENT_SCHEMA_CHANGES`, `recent-schema-changes.ts`) porte son échéance à la
   saisie + 2 h ; sans effet ensuite, le nouveau code n'écrivant jamais d'échéance
   plus proche (le seed des reports expirés date sa saisie de 2 h 10 pour ne pas
-  être rattrapé).
+  être rattrapé). À retirer au déploiement suivant.
+- **Colonnes de clôture partagées** (`MATCH_RESULT_SET_SQL`,
+  `score-report-sql.ts`) : la validation d'office et l'accord des deux engagés
+  écrivent la même liste, `forfeit_team_id = NULL` compris — un forfait noté
+  par l'arbitrage (« Enregistrer ») ne survit pas au score des joueurs.
 - **Aucun processus nouveau** : l'entretien passif et les balayages existants
   (`findDueMaintenance`, `./sync-scope.ts`) repèrent déjà `score_deadline_at <= NOW()`.
   Un litige **déjà escaladé** n'y compte plus (`ACTIONABLE_EXPIRED_REPORT_SQL`,
