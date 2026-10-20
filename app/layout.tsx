@@ -25,6 +25,7 @@ import { scheduleAccountDeletionJournalPrune } from "@/lib/server/account-deleti
 import { schedulePurgeExpiredReports } from "@/lib/server/content-reports";
 import { getRecruitmentSpotlight } from "@/lib/server/recruitment-service";
 import { getCurrentUser } from "@/lib/server/auth";
+import { healRecruitmentModalOff } from "@/lib/server/users/recruitment-modal-preference";
 import { loadPendingPrivacyChanges } from "@/lib/server/privacy-consent";
 import { dispatchPrivacyChangeNotifications } from "@/lib/server/privacy-change-notifications";
 import type { PrivacyChange } from "@/lib/shared/privacy-changes";
@@ -232,6 +233,13 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   // Même régime pour le journal des suppressions de compte : une ligne ne doit
   // pas attendre la suppression suivante pour partir à son échéance.
   scheduleAccountDeletionJournalPrune();
+  // « Ne plus afficher » gardé sur ce navigateur mais pas encore sur le compte
+  // (écriture du clic échouée) : rattrapé ici, jamais attendu.
+  healRecruitmentModalOff({
+    userId: user?.id,
+    accountOff: user?.recruitmentModalOff,
+    browserCookie: cookieStore.get(RECRUITMENT_MODAL_OFF_COOKIE)?.value,
+  });
   const termsRequest = await termsRequestFor(user?.id);
   const termsRequired = termsRequest !== null;
   // Bloquante pour tout compte connecté en retard d'une version (pas de report).

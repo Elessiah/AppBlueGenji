@@ -103,12 +103,14 @@ export async function recordRecruitmentModalOptOut(
     post = postOptOut,
     cookieKept = optOutCookieKept,
     wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
+    now = Date.now,
   }: Readonly<{
     writeCookie?: (name: string, value: string, maxAge?: number) => boolean;
     post?: (url: string) => Promise<Pick<Response, "ok" | "status" | "json">>;
     /** Relu après la réponse : son `Set-Cookie` peut avoir gardé le choix là où le script a été refusé. */
     cookieKept?: () => boolean;
     wait?: (ms: number) => Promise<void>;
+    now?: () => number;
   }> = {},
 ): Promise<RecruitmentModalOptOutResult> {
   const written = writeCookie(RECRUITMENT_MODAL_OFF_COOKIE, RECRUITMENT_MODAL_OFF_VALUE, RECRUITMENT_MODAL_OFF_MAX_AGE);
@@ -153,10 +155,19 @@ export async function recordRecruitmentModalOptOut(
       return "FAILED";
     }
   };
+  const startedAt = now();
   let account = await attempt();
   if (account === "FAILED") {
-    await wait(OPT_OUT_RETRY_DELAY_MS);
-    account = await attempt();
+    // Un seul budget d'attente pour le toast : la seconde tentative n'est
+    // attendue que si la première a échoué vite (coupure, 5xx). Abandonnée au
+    // bout du délai, elle part en arrière-plan — un toast vingt secondes après
+    // le clic arriverait sur une autre page, sans lien visible avec le geste.
+    if (now() - startedAt >= OPT_OUT_TIMEOUT_MS / 2) {
+      retryLater();
+    } else {
+      await wait(OPT_OUT_RETRY_DELAY_MS);
+      account = await attempt();
+    }
   }
   if (account === "ACCOUNT") return "ACCOUNT";
   if (!kept()) return "NONE";
