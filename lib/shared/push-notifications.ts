@@ -86,8 +86,8 @@ export const PUSH_TOPICS = {
     audience: "tournaments",
   },
   REFEREE_SELF_RESOLUTION: {
-    label: "Litiges tranchés par un joueur du staff",
-    description: "Un autre membre du staff, qui joue le match, vient d'en trancher le litige de score.",
+    label: "Arbitrage par un joueur du staff",
+    description: "Un autre membre du staff, qui joue le match, vient d'en trancher le litige de score ou d'en suspendre la validation automatique.",
     audience: "tournaments",
   },
   MATCH_SCHEDULED: {

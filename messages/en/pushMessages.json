@@ -105,6 +105,10 @@
     "forfeitSolo": "forfeit by a player",
     "doubleForfeit": "double forfeit"
   },
+  "selfPaused": {
+    "title": "Confirmation paused by a player of the match",
+    "body": "A staff member who plays in this match paused its automatic confirmation · {tournament}, {round}."
+  },
   "issueReport": {
     "body": "Problem reported · {tournament}.",
     "bodyRound": "Problem reported · {tournament}, {round}."

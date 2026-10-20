@@ -37,8 +37,8 @@
       "description": "A score conflict, a score dispute left too long without a referee or a reported problem is waiting for a referee."
     },
     "REFEREE_SELF_RESOLUTION": {
-      "label": "Disputes settled by a staff player",
-      "description": "Another staff member, who plays in the match, has just settled its score dispute."
+      "label": "Refereeing by a staff player",
+      "description": "Another staff member, who plays in the match, has just settled its score dispute or paused its automatic confirmation."
     },
     "MATCH_SCHEDULED": {
       "label": "Scheduled matches",

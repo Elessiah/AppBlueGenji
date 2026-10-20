@@ -35,8 +35,9 @@ export async function PATCH(req: Request, context: { params: Promise<{ matchId: 
 
   try {
     // `autoValidationPaused` : la saisie suspend la validation d'office d'un
-    // report seul (`SCORE_DISPUTE_LOCK.md`) — la notification le dit.
-    const autoValidationPaused = await adminSaveMatchScores(matchId_, entry);
+    // report seul (`SCORE_DISPUTE_LOCK.md`) — la notification le dit. L'arbitre
+    // passé : s'il joue ce match, les autres membres du staff sont avertis.
+    const autoValidationPaused = await adminSaveMatchScores(matchId_, entry, { id: user.id, pseudo: user.pseudo });
     return ok({ autoValidationPaused });
   } catch (e) {
     const msg = (e as Error).message;

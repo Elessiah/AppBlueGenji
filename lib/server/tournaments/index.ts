@@ -157,10 +157,12 @@ import { syncTournamentState } from "./state";
 import {
   registerCurrentUserTeam as registerTeamInternal,
   registerTeamsByIds as registerTeamsByIdsInternal,
+  lockTournamentRow,
   resolveUserEntrant,
   resolveUserEntrantTeamId,
   type UserEntrant,
 } from "./registration";
+import { BOTH_REPORTED_SQL } from "./score-report-sql";
 import { resolveExpiredScoreReports, finalizeTournamentIfDone } from "./finalization";
 import { tryAutoResolveByes } from "./byes";
 import { mapCard } from "./_internal";
@@ -171,7 +173,7 @@ import { loadViewerProposals, proposalMatches } from "./match-maps";
 import type { MatchMapInput } from "@/lib/shared/match-maps";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { retryOnDeadlock } from "./deadlock-retry";
-import type { AdminResolveEntry, AdminScoreEntry } from "./admin";
+import type { AdminResolveEntry, AdminScoreEntry, AutoValidationPause } from "./admin";
 import {
   publishMatchUpdatedEvent,
   publishUpdatedEvent,
@@ -191,7 +193,11 @@ import { findTournamentsNeedingSync } from "./sync-scope";
 import { FINISHED_TOURNAMENTS_LIST_LIMIT } from "@/lib/shared/constants";
 import { isScoreDisputed } from "@/lib/shared/score-dispute";
 import type { StaffActor } from "@/lib/shared/log-privacy";
-import { alertSelfResolvedDispute, type DisputeBeforeResolution } from "./dispute-self-resolution";
+import {
+  alertSelfPausedValidation,
+  alertSelfResolvedDispute,
+  type DisputeBeforeResolution,
+} from "./dispute-self-resolution";
 import { loadViewerCastBlock } from "./match-launch";
 
 let pendingSync: Promise<void> | null = null;
@@ -1329,14 +1335,27 @@ async function runPlayerMatchWrite(
 
 /**
  * « Enregistrer » d'arbitrage. Rend `true` quand la saisie suspend la
- * validation d'office d'un report seul (`SCORE_DISPUTE_LOCK.md`).
+ * validation d'office d'un report seul (`SCORE_DISPUTE_LOCK.md`). `actor`,
+ * l'arbitre qui enregistre : si c'est sa saisie qui suspend la validation d'un
+ * match qu'il joue, les autres membres du staff en sont avertis après le
+ * commit (`./dispute-self-resolution`).
  */
-export async function adminSaveMatchScoresPublic(matchId: number, entry: AdminScoreEntry): Promise<boolean> {
+export async function adminSaveMatchScoresPublic(
+  matchId: number,
+  entry: AdminScoreEntry,
+  actor?: StaffActor,
+): Promise<boolean> {
   // Même risque d'interblocage que le report d'un engagé (`retryOnDeadlock`).
-  return retryOnDeadlock(() => adminSaveMatchScoresOnce(matchId, entry));
+  const saved = await retryOnDeadlock(() => adminSaveMatchScoresOnce(matchId, entry));
+  // Sans attendre, comme l'alerte d'un litige tranché (meilleur effort, ne lève jamais).
+  if (saved.pausedNow && saved.match && actor) void alertSelfPausedValidation(saved.match, actor);
+  return saved.paused;
 }
 
-async function adminSaveMatchScoresOnce(matchId: number, entry: AdminScoreEntry): Promise<boolean> {
+async function adminSaveMatchScoresOnce(
+  matchId: number,
+  entry: AdminScoreEntry,
+): Promise<AutoValidationPause & { match: DisputeBeforeResolution | null }> {
   const db = await getDatabase();
   const connection = await db.getConnection();
 
@@ -1344,14 +1363,22 @@ async function adminSaveMatchScoresOnce(matchId: number, entry: AdminScoreEntry)
     await connection.beginTransaction();
 
     const { adminSaveMatchScores: adminSaveInternal } = await import("./admin");
-    const paused = await adminSaveInternal(connection, matchId, entry);
+    const pause = await adminSaveInternal(connection, matchId, entry);
 
     // Need to get tournament ID for event + Survival reconciliation
-    const [matchData] = await connection.execute<(RowDataPacket & { tournament_id: number })[]>(
-      `SELECT tournament_id FROM bg_matches WHERE id = ? LIMIT 1`,
-      [matchId],
-    );
+    const [matchData] = await connection.execute<
+      (RowDataPacket & { tournament_id: number; team1_id: number | null; team2_id: number | null })[]
+    >(`SELECT tournament_id, team1_id, team2_id FROM bg_matches WHERE id = ? LIMIT 1`, [matchId]);
     const savedTournamentId = matchData.length > 0 ? Number(matchData[0].tournament_id) : null;
+    const savedMatch: DisputeBeforeResolution | null =
+      savedTournamentId !== null && matchData[0].team1_id !== null && matchData[0].team2_id !== null
+        ? {
+            matchId,
+            tournamentId: savedTournamentId,
+            team1Id: Number(matchData[0].team1_id),
+            team2Id: Number(matchData[0].team2_id),
+          }
+        : null;
 
     if (savedTournamentId !== null) {
       const { reconcileSurvival } = await import("./survival");
@@ -1375,7 +1402,7 @@ async function adminSaveMatchScoresOnce(matchId: number, entry: AdminScoreEntry)
       // arbitrage reste rare, contrairement au report de score.
       invalidateTournamentLists();
     }
-    return paused;
+    return { ...pause, match: savedMatch };
   } catch (error) {
     await connection.rollback();
     throw error;
@@ -1391,17 +1418,29 @@ async function adminSaveMatchScoresOnce(matchId: number, entry: AdminScoreEntry)
  * suffit à sortir une équipe, il n'y a rien à abandonner.
  *
  * Ouvre sa propre transaction et publie l'évènement de mise à jour.
+ *
+ * `actor`, l'arbitre qui force l'abandon (`actingUserId` à `null`) : si
+ * l'abandon clôt un litige d'un match qu'il joue, les autres membres du staff
+ * en sont avertis après le commit, comme pour « Valider le résultat »
+ * (`./dispute-self-resolution`, `SCORE_DISPUTE_LOCK.md` § Arbitre qui joue).
  */
 export async function forfeitTournamentTeamPublic(
   tournamentId: number,
   teamId: number,
   actingUserId: number | null = null,
+  actor?: StaffActor,
 ): Promise<void> {
   const db = await getDatabase();
   const connection = await db.getConnection();
+  let settledDisputes: DisputeBeforeResolution[] = [];
 
   try {
     await connection.beginTransaction();
+    // Verrou du tournoi **en premier** (`lockTournamentRow`) : les litiges lus
+    // ci-dessous et le droit relu ensuite le sont sur l'état que l'abandon
+    // écrit, pas sur un instantané figé avant l'attente du verrou.
+    await lockTournamentRow(connection, tournamentId);
+    const openDisputes = actingUserId === null && actor ? await lockOpenDisputes(connection, tournamentId, teamId) : [];
 
     // Droit relu **dans la transaction**, comme à l'inscription
     // (`registerCurrentUserTeam`) : la route l'a déjà lu pour décider quoi
@@ -1422,53 +1461,12 @@ export async function forfeitTournamentTeamPublic(
       if (!entrant.canActForEntrant) throw new Error("NOT_TEAM_MANAGER");
     }
 
-    const [formatRows] = await connection.execute<(RowDataPacket & { format: string })[]>(
-      `SELECT format FROM bg_tournaments WHERE id = ? LIMIT 1`,
-      [tournamentId],
-    );
-    const format = formatRows[0]?.format ?? null;
-
-    // En multi-phases, c'est le format de la PHASE COURANTE qui décide : un
-    // abandon garde tout son sens pendant une phase de survie ou de ronde
-    // suisse, même si le tournoi lui-même porte le format « MULTI ».
-    let engineFormat = format;
-    let forfeitPhaseId = 0;
-
-    if (format === "MULTI") {
-      const [phaseRows] = await connection.execute<
-        (RowDataPacket & { id: number; format: string })[]
-      >(
-        `SELECT p.id, p.format
-         FROM bg_tournament_phases p
-         JOIN bg_tournaments t ON t.current_phase_id = p.id
-         WHERE t.id = ? LIMIT 1`,
-        [tournamentId],
-      );
-      engineFormat = phaseRows[0]?.format ?? null;
-      forfeitPhaseId = Number(phaseRows[0]?.id ?? 0);
-    }
-
-    if (engineFormat === "SURVIVAL") {
-      const { forfeitSurvivalTeam } = await import("./survival");
-      await forfeitSurvivalTeam(tournamentId, teamId, connection, forfeitPhaseId);
-    } else if (engineFormat === "SWISS") {
-      const { forfeitSwissTeam } = await import("./swiss");
-      await forfeitSwissTeam(tournamentId, teamId, connection, forfeitPhaseId);
-    } else if (engineFormat === "BG_SURVIE") {
-      const { forfeitEnduranceTeam } = await import("./bg-survie/forfeit");
-      await forfeitEnduranceTeam(tournamentId, teamId, connection);
-    } else {
-      throw new Error("FORMAT_WITHOUT_FORFEIT");
-    }
-
-    if (format === "MULTI") {
-      const { reconcilePhases } = await import("./phases");
-      await reconcilePhases(tournamentId, connection);
-    }
+    await runForfeitEngine(connection, tournamentId, teamId);
 
     // La ligne d'abandon est réservée par le moteur du format concerné
     // (survie, suisse, endurance) : elle ne part qu'une fois l'abandon écrit.
     queueBotLog(connection, { kind: "forfeit", tournamentId, teamId });
+    settledDisputes = await keepSettled(connection, openDisputes);
 
     await connection.commit();
     flushBotLogs(connection);
@@ -1481,6 +1479,99 @@ export async function forfeitTournamentTeamPublic(
     discardBotLogs(connection);
     connection.release();
   }
+  // Sans attendre (meilleur effort, ne lève jamais), une fois l'abandon acquis.
+  if (actor) for (const dispute of settledDisputes) void alertSelfResolvedDispute(dispute, actor);
+}
+
+/**
+ * L'abandon écrit par le moteur du format — celui de la **phase courante** en
+ * multi-phases —, puis la réconciliation des phases.
+ */
+async function runForfeitEngine(connection: PoolConnection, tournamentId: number, teamId: number): Promise<void> {
+  const [formatRows] = await connection.execute<(RowDataPacket & { format: string })[]>(
+    `SELECT format FROM bg_tournaments WHERE id = ? LIMIT 1`,
+    [tournamentId],
+  );
+  const format = formatRows[0]?.format ?? null;
+
+  // En multi-phases, c'est le format de la PHASE COURANTE qui décide : un
+  // abandon garde tout son sens pendant une phase de survie ou de ronde
+  // suisse, même si le tournoi lui-même porte le format « MULTI ».
+  let engineFormat = format;
+  let forfeitPhaseId = 0;
+
+  if (format === "MULTI") {
+    const [phaseRows] = await connection.execute<
+      (RowDataPacket & { id: number; format: string })[]
+    >(
+      `SELECT p.id, p.format
+       FROM bg_tournament_phases p
+       JOIN bg_tournaments t ON t.current_phase_id = p.id
+       WHERE t.id = ? LIMIT 1`,
+      [tournamentId],
+    );
+    engineFormat = phaseRows[0]?.format ?? null;
+    forfeitPhaseId = Number(phaseRows[0]?.id ?? 0);
+  }
+
+  if (engineFormat === "SURVIVAL") {
+    const { forfeitSurvivalTeam } = await import("./survival");
+    await forfeitSurvivalTeam(tournamentId, teamId, connection, forfeitPhaseId);
+  } else if (engineFormat === "SWISS") {
+    const { forfeitSwissTeam } = await import("./swiss");
+    await forfeitSwissTeam(tournamentId, teamId, connection, forfeitPhaseId);
+  } else if (engineFormat === "BG_SURVIE") {
+    const { forfeitEnduranceTeam } = await import("./bg-survie/forfeit");
+    await forfeitEnduranceTeam(tournamentId, teamId, connection);
+  } else {
+    throw new Error("FORMAT_WITHOUT_FORFEIT");
+  }
+
+  if (format === "MULTI") {
+    const { reconcilePhases } = await import("./phases");
+    await reconcilePhases(tournamentId, connection);
+  }
+}
+
+/**
+ * Les litiges ouverts de l'engagé qui abandonne, lus **sous verrou** (table
+ * seule, MariaDB) : l'état que l'abandon va clore, qu'un report concurrent ne
+ * change plus d'ici le commit.
+ */
+async function lockOpenDisputes(
+  connection: PoolConnection,
+  tournamentId: number,
+  teamId: number,
+): Promise<DisputeBeforeResolution[]> {
+  const [rows] = await connection.execute<(RowDataPacket & { id: number; team1_id: number; team2_id: number })[]>(
+    `SELECT m.id, m.team1_id, m.team2_id FROM bg_matches m
+      WHERE m.tournament_id = ? AND m.status = 'AWAITING_CONFIRMATION'
+        AND (m.team1_id = ? OR m.team2_id = ?)
+        AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL
+        AND ${BOTH_REPORTED_SQL}
+      FOR UPDATE`,
+    [tournamentId, teamId, teamId],
+  );
+  return rows.map((row) => ({
+    matchId: Number(row.id),
+    tournamentId,
+    team1Id: Number(row.team1_id),
+    team2Id: Number(row.team2_id),
+  }));
+}
+
+/** Parmi ces litiges, ceux que l'abandon vient de clore. */
+async function keepSettled(
+  connection: PoolConnection,
+  disputes: DisputeBeforeResolution[],
+): Promise<DisputeBeforeResolution[]> {
+  if (disputes.length === 0) return [];
+  const [rows] = await connection.execute<(RowDataPacket & { id: number })[]>(
+    `SELECT id FROM bg_matches WHERE id IN (${disputes.map(() => "?").join(", ")}) AND status = 'COMPLETED'`,
+    disputes.map((dispute) => dispute.matchId),
+  );
+  const settled = new Set(rows.map((row) => Number(row.id)));
+  return disputes.filter((dispute) => settled.has(dispute.matchId));
 }
 
 /**

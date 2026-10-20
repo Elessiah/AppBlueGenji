@@ -45,7 +45,10 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   if (!Number.isInteger(teamId) || teamId <= 0) return fail("INVALID_TEAM", 400);
 
   try {
-    await forfeitTournamentTeam(tournamentId, teamId, actingUserId);
+    // Abandon forcé par l'arbitrage : l'arbitre est passé, pour avertir les
+    // autres membres du staff s'il clôt ainsi le litige d'un match qu'il joue.
+    const actor = actingUserId === null ? { id: user.id, pseudo: user.pseudo } : undefined;
+    await forfeitTournamentTeam(tournamentId, teamId, actingUserId, actor);
     return ok({ success: true });
   } catch (error) {
     const message = (error as Error).message;

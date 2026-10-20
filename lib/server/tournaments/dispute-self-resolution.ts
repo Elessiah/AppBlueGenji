@@ -1,30 +1,36 @@
 /**
- * Arbitre qui tranche **son propre** litige (`docs/features/SCORE_DISPUTE_LOCK.md`
- * § Arbitre qui joue, décision du 2026-10-20) : le geste reste permis — une
- * petite organisation n'a pas toujours un arbitre neutre sous la main —, mais
- * les **autres** membres du staff en sont avertis (push
- * `REFEREE_SELF_RESOLUTION`, l'auteur exclu) et le geste est journalisé
- * (`publishStaffAction` : anonyme sur Discord, nommé dans pm2).
+ * Arbitre qui tranche **son propre** litige, ou qui suspend la validation
+ * d'office d'un report seul sur un match qu'il joue
+ * (`docs/features/SCORE_DISPUTE_LOCK.md` § Arbitre qui joue, décisions du
+ * 2026-10-20) : le geste reste permis — une petite organisation n'a pas
+ * toujours un arbitre neutre sous la main —, mais les **autres** membres du
+ * staff en sont avertis (push `REFEREE_SELF_RESOLUTION`, l'auteur exclu) et le
+ * geste est journalisé (`publishStaffAction` : anonyme sur Discord, nommé dans
+ * pm2). Seul membre du staff : personne à prévenir, le journal reste.
  *
  * Tout part **après** le commit et au meilleur effort : l'arbitrage est acquis,
  * une alerte perdue ne le défait pas.
  */
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
-import { loadEntrantPlayerIds, notifyStaff } from "@/lib/server/notify";
+import { notifyStaff } from "@/lib/server/notify";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { matchRoundLabel } from "@/lib/shared/discord-notifications";
 import { discordInline } from "@/lib/shared/discord-text";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 import type { StaffActor } from "@/lib/shared/log-privacy";
 import {
+  selfPausedValidationPush,
   selfResolvedDisputePush,
   selfResolvedOutcomeText,
   type SelfResolvedDispute,
   type SelfResolvedOutcome,
 } from "@/lib/shared/push-messages";
 
-/** Le litige tel que l'arbitrage l'a trouvé, lu sous verrou avant de trancher. */
+/**
+ * La manche telle que l'arbitrage l'a trouvée, lue sous verrou avant d'écrire :
+ * le litige à trancher, ou le report seul dont la validation est suspendue.
+ */
 export type DisputeBeforeResolution = {
   matchId: number;
   tournamentId: number;
@@ -70,56 +76,105 @@ export function selfResolvedDisputeLog(input: SelfResolvedDispute): string {
 }
 
 /**
- * Avertit les autres membres du staff si l'arbitre qui vient de trancher un
- * litige joue la manche (membre actuel d'une des deux équipes, ou joueur d'une
- * entrée solo). Rien sinon. Ne lève jamais.
+ * L'arbitre joue-t-il la manche ? Membre d'une des deux équipes — **encore**
+ * membre, ou parti depuis que la manche existe (`m.created_at`) : quitter
+ * l'équipe juste avant de trancher, puis la rejoindre, n'efface pas l'alerte —,
+ * ou joueur d'une entrée solo.
  */
-export async function alertSelfResolvedDispute(
-  dispute: DisputeBeforeResolution,
+async function actorPlaysMatch(match: DisputeBeforeResolution, actorId: number): Promise<boolean> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT 1 FROM bg_matches m
+      WHERE m.id = ?
+        AND (EXISTS (SELECT 1 FROM bg_team_members tm
+                      WHERE tm.team_id IN (?, ?) AND tm.user_id = ?
+                        AND (tm.left_at IS NULL OR tm.left_at >= m.created_at))
+             OR EXISTS (SELECT 1 FROM bg_teams st
+                         WHERE st.id IN (?, ?) AND st.solo_user_id = ?))
+      LIMIT 1`,
+    [match.matchId, match.team1Id, match.team2Id, actorId, match.team1Id, match.team2Id, actorId],
+  );
+  return rows.length > 0;
+}
+
+/** Tournoi, manche, noms et issue écrite de la manche, pour l'alerte. */
+async function loadAlertMatch(match: DisputeBeforeResolution): Promise<SelfResolvedDispute | null> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<ResolvedMatchRow[]>(
+    `SELECT t.name AS tournament_name, ${swissRoundSql("m", "t")}, t.participant_type,
+            m.bracket, m.round_number, m.team1_score, m.team2_score, m.forfeit_team_id, m.double_forfeit,
+            t1.name AS team1_name, t2.name AS team2_name
+       FROM bg_matches m
+       JOIN bg_tournaments t ON t.id = m.tournament_id
+       LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
+       LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
+      WHERE m.id = ?
+      LIMIT 1`,
+    [match.matchId],
+  );
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    tournamentId: match.tournamentId,
+    tournamentName: String(row.tournament_name),
+    matchId: match.matchId,
+    bracket: String(row.bracket),
+    roundNumber: Number(row.round_number),
+    swiss: isSwissRound(row),
+    team1Name: String(row.team1_name ?? ""),
+    team2Name: String(row.team2_name ?? ""),
+    solo: row.participant_type === "SOLO",
+    outcome: resolvedOutcome(row, match.team1Id),
+  };
+}
+
+/**
+ * Ligne du journal Discord d'une suspension (français, `publishStaffAction`) :
+ * staff anonyme, aucun nom d'engagé — le tournoi et la manche suffisent.
+ */
+export function selfPausedValidationLog(input: SelfResolvedDispute): string {
+  const round = matchRoundLabel(input.bracket, input.roundNumber, input.swiss);
+  return `⚠️ Validation automatique suspendue par un membre du staff qui joue ce match · « ${discordInline(input.tournamentName)} », ${round}.`;
+}
+
+type SelfActionKind = "resolved" | "paused";
+
+/**
+ * Avertit les autres membres du staff si l'arbitre qui vient d'agir joue la
+ * manche. Rien sinon. Ne lève jamais.
+ */
+async function alertSelfAction(
+  kind: SelfActionKind,
+  match: DisputeBeforeResolution,
   actor: StaffActor,
 ): Promise<boolean> {
   try {
-    const players = await loadEntrantPlayerIds([dispute.team1Id, dispute.team2Id]);
-    const plays = [dispute.team1Id, dispute.team2Id].some((teamId) => players.get(teamId)?.includes(actor.id));
-    if (!plays) return false;
+    if (!(await actorPlaysMatch(match, actor.id))) return false;
+    const input = await loadAlertMatch(match);
+    if (!input) return false;
 
-    const db = await getDatabase();
-    const [rows] = await db.execute<ResolvedMatchRow[]>(
-      `SELECT t.name AS tournament_name, ${swissRoundSql("m", "t")}, t.participant_type,
-              m.bracket, m.round_number, m.team1_score, m.team2_score, m.forfeit_team_id, m.double_forfeit,
-              t1.name AS team1_name, t2.name AS team2_name
-         FROM bg_matches m
-         JOIN bg_tournaments t ON t.id = m.tournament_id
-         LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
-         LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
-        WHERE m.id = ?
-        LIMIT 1`,
-      [dispute.matchId],
-    );
-    const row = rows[0];
-    if (!row) return false;
-
-    const input: SelfResolvedDispute = {
-      tournamentId: dispute.tournamentId,
-      tournamentName: String(row.tournament_name),
-      matchId: dispute.matchId,
-      bracket: String(row.bracket),
-      roundNumber: Number(row.round_number),
-      swiss: isSwissRound(row),
-      team1Name: String(row.team1_name ?? ""),
-      team2Name: String(row.team2_name ?? ""),
-      solo: row.participant_type === "SOLO",
-      outcome: resolvedOutcome(row, dispute.team1Id),
-    };
-
-    publishStaffAction(selfResolvedDisputeLog(input), actor);
+    publishStaffAction(kind === "resolved" ? selfResolvedDisputeLog(input) : selfPausedValidationLog(input), actor);
     await notifyStaff({
       topic: "REFEREE_SELF_RESOLUTION",
       excludeUserIds: [actor.id],
-      push: (locale) => selfResolvedDisputePush(input, locale),
+      push: (locale) =>
+        kind === "resolved" ? selfResolvedDisputePush(input, locale) : selfPausedValidationPush(input, locale),
     });
     return true;
   } catch {
     return false;
   }
+}
+
+/**
+ * Litige tranché — « Valider le résultat », ou abandon forcé par l'arbitrage
+ * (`forfeitTournamentTeamPublic`) qui clôt la manche en litige.
+ */
+export function alertSelfResolvedDispute(dispute: DisputeBeforeResolution, actor: StaffActor): Promise<boolean> {
+  return alertSelfAction("resolved", dispute, actor);
+}
+
+/** « Enregistrer » qui vient de suspendre la validation d'office d'un report seul. */
+export function alertSelfPausedValidation(match: DisputeBeforeResolution, actor: StaffActor): Promise<boolean> {
+  return alertSelfAction("paused", match, actor);
 }

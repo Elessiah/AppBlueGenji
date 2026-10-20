@@ -381,15 +381,23 @@ async function checkAdminMaps(
 }
 
 /**
- * Note l'avancement d'une rencontre (« Enregistrer ») sans la trancher. Rend
- * `true` quand la saisie **suspend** la validation d'office d'un report seul
+ * Effet d'un « Enregistrer » sur la validation d'office d'un report seul :
+ * `paused`, elle est suspendue ; `pausedNow`, c'est **cette** saisie qui l'a
+ * suspendue (elle ne l'était pas) — l'alerte d'un arbitre qui joue la manche
+ * ne part qu'à ce moment-là, pas à chaque nouvelle saisie.
+ */
+export type AutoValidationPause = { paused: boolean; pausedNow: boolean };
+
+/**
+ * Note l'avancement d'une rencontre (« Enregistrer ») sans la trancher. Dit si
+ * la saisie **suspend** la validation d'office d'un report seul
  * ({@link pauseAutoValidation}).
  */
 export async function adminSaveMatchScores(
   connection: PoolConnection,
   matchId: number,
   entry: AdminScoreEntry,
-): Promise<boolean> {
+): Promise<AutoValidationPause> {
   const [matches] = await connection.execute<MatchRow[]>(
     `SELECT
       id,
@@ -403,7 +411,8 @@ export async function adminSaveMatchScores(
       winner_team_id,
       start_at,
       launched_at,
-      launch_pairing
+      launch_pairing,
+      score_validation_paused_at IS NOT NULL AS score_validation_paused
      FROM bg_matches
      WHERE id = ?
      LIMIT 1
@@ -460,7 +469,7 @@ export async function adminSaveMatchScores(
     // Un forfait n'a pas de maps jouées : un détail noté plus tôt ne le décrit
     // plus, que le client ait envoyé des maps ou non.
     await clearMapSets(connection, [matchId], ["FINAL"]);
-    return pauseAutoValidation(connection, matchId);
+    return pauseAutoValidation(connection, match);
   }
 
   // Sauvegarde **map par map** : le score se dérive des maps, contrôlées sans
@@ -477,7 +486,7 @@ export async function adminSaveMatchScores(
     [derived.team1, derived.team2, matchId],
   );
   await replaceMatchMaps(connection, matchId, "FINAL", maps, userId);
-  return pauseAutoValidation(connection, matchId);
+  return pauseAutoValidation(connection, match);
 }
 
 /**
@@ -490,7 +499,7 @@ export async function adminSaveMatchScores(
  * concurrent attend ce commit, puis sa condition (`claimAutoValidation`) relit
  * la suspension et ne touche rien.
  */
-async function pauseAutoValidation(connection: PoolConnection, matchId: number): Promise<boolean> {
+async function pauseAutoValidation(connection: PoolConnection, match: MatchRow): Promise<AutoValidationPause> {
   const [result] = await connection.execute<ResultSetHeader>(
     `UPDATE bg_matches m
         SET m.score_validation_paused_at = NOW()
@@ -498,9 +507,11 @@ async function pauseAutoValidation(connection: PoolConnection, matchId: number):
         AND m.status = 'AWAITING_CONFIRMATION'
         AND m.winner_team_id IS NULL
         AND ${SINGLE_REPORT_SQL}`,
-    [matchId],
+    [match.id],
   );
-  return result.affectedRows > 0;
+  const paused = result.affectedRows > 0;
+  // Ligne lue sous verrou par l'appelant : l'état d'avant ne bouge pas d'ici là.
+  return { paused, pausedNow: paused && Number(match.score_validation_paused ?? 0) !== 1 };
 }
 
 /**
