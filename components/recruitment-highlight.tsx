@@ -51,16 +51,17 @@ const MODAL_PREVIEW_MAX = 320;
  * visite part d'un autre site (lien Discord, résultat de recherche, retour
  * d'OAuth) — la modale se rouvrirait alors malgré le choix. Lax n'est toujours
  * envoyé à aucune requête tierce embarquée. Rend `false` si le navigateur a
- * refusé le cookie (cookies bloqués). `Secure` sous HTTPS.
+ * refusé le cookie (cookies bloqués). `Secure` en production.
  */
 function writeSeenCookie(name: string, value: string, maxAge?: number): boolean {
   try {
     document.cookie =
       `${name}=${value}; path=/; samesite=lax` +
       (maxAge === undefined ? "" : `; max-age=${maxAge}`) +
-      // Comme le `Set-Cookie` du serveur en production : jamais posé ni
-      // remplacé depuis une page en clair.
-      (globalThis.location?.protocol === "https:" ? "; secure" : "");
+      // Même règle que le `Set-Cookie` du serveur (et le cookie de session) :
+      // `Secure` en production, jamais posé ni remplacé depuis une page en
+      // clair — et jamais rétrogradé par la réponse du serveur.
+      (process.env.NODE_ENV === "production" ? "; secure" : "");
     return document.cookie.split("; ").includes(`${name}=${value}`);
   } catch {
     // Cookies refusés : la fermeture reste effective pour la vue courante.
