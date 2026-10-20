@@ -31,6 +31,9 @@ import { FR_RECRUITMENT_TEXT, type RecruitmentText } from "@/lib/shared/recruitm
 import { DEFAULT_LOCALE } from "@/lib/shared/locales";
 import styles from "./recruitment-highlight.module.css";
 
+/** « Ne plus afficher » connecté : au-delà, le choix est rendu comme gardé sur ce navigateur seulement. */
+const OPT_OUT_TIMEOUT_MS = 10_000;
+
 /** Aperçu plus généreux qu'en carte : la modale a la place, mais pas un mur de texte. */
 const MODAL_PREVIEW_MAX = 320;
 
@@ -72,22 +75,26 @@ export async function recordRecruitmentModalOptOut(
   signedIn: boolean,
   {
     writeCookie = writeSeenCookie,
-    post = (url: string) => fetch(url, { method: "POST" }),
+    // Délai borné : la modale est déjà fermée, le toast ne doit pas attendre
+    // indéfiniment une connexion bloquée (l'abandon tombe dans le repli).
+    post = (url: string) => fetch(url, { method: "POST", signal: AbortSignal.timeout(OPT_OUT_TIMEOUT_MS) }),
   }: Readonly<{
     writeCookie?: (name: string, value: string, maxAge?: number) => boolean;
     post?: (url: string) => Promise<Pick<Response, "ok" | "status">>;
   }> = {},
 ): Promise<RecruitmentModalOptOutResult> {
   const kept = writeCookie(RECRUITMENT_MODAL_OFF_COOKIE, RECRUITMENT_MODAL_OFF_VALUE, RECRUITMENT_MODAL_OFF_MAX_AGE);
+  const signedOut = kept ? "BROWSER" : "NONE";
   const fallback = kept ? "BROWSER_ONLY" : "NONE";
-  if (!signedIn) return kept ? "BROWSER" : "NONE";
+  if (!signedIn) return signedOut;
   try {
     const response = await post("/api/recruitment/modal-dismiss");
     if (response.ok) return "ACCOUNT";
-    // Session finie depuis le chargement (expirée, déconnexion dans un autre
-    // onglet) : le lecteur n'est plus connecté — le cookie reportera le choix
-    // au compte à la prochaine connexion, ce n'est pas un échec.
-    if (response.status === 401) return kept ? "BROWSER" : "NONE";
+    // Plus de compte derrière la page depuis son chargement — session finie
+    // (401 : expirée, déconnexion dans un autre onglet) ou compte supprimé
+    // (409) : le lecteur est hors connexion, ce n'est pas un échec ; le cookie
+    // reportera le choix au compte à la prochaine connexion.
+    if (response.status === 401 || response.status === 409) return signedOut;
     return fallback;
   } catch {
     return fallback;
