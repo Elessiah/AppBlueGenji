@@ -15,6 +15,7 @@ import { loadEntrantPlayerIds, notifyStaff } from "@/lib/server/notify";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { matchRoundLabel } from "@/lib/shared/discord-notifications";
 import { discordInline } from "@/lib/shared/discord-text";
+import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 import type { StaffActor } from "@/lib/shared/log-privacy";
 import {
   selfResolvedDisputePush,
@@ -33,7 +34,8 @@ export type DisputeBeforeResolution = {
 
 type ResolvedMatchRow = RowDataPacket & {
   tournament_name: string;
-  tournament_format: string;
+  /** Ronde suisse — tournoi `SWISS` ou phase suisse d'un `MULTI` (`swissRoundSql`). */
+  swiss_round?: number | boolean | null;
   participant_type: string;
   bracket: string;
   round_number: number;
@@ -83,7 +85,7 @@ export async function alertSelfResolvedDispute(
 
     const db = await getDatabase();
     const [rows] = await db.execute<ResolvedMatchRow[]>(
-      `SELECT t.name AS tournament_name, t.format AS tournament_format, t.participant_type,
+      `SELECT t.name AS tournament_name, ${swissRoundSql("m", "t")}, t.participant_type,
               m.bracket, m.round_number, m.team1_score, m.team2_score, m.forfeit_team_id, m.double_forfeit,
               t1.name AS team1_name, t2.name AS team2_name
          FROM bg_matches m
@@ -103,7 +105,7 @@ export async function alertSelfResolvedDispute(
       matchId: dispute.matchId,
       bracket: String(row.bracket),
       roundNumber: Number(row.round_number),
-      swiss: row.tournament_format === "SWISS",
+      swiss: isSwissRound(row),
       team1Name: String(row.team1_name ?? ""),
       team2Name: String(row.team2_name ?? ""),
       solo: row.participant_type === "SOLO",
