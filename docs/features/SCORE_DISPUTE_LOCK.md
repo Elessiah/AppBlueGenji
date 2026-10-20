@@ -93,7 +93,8 @@ confirmation adverse) : elle se referme avec « Ce match vient d'être tranché 
 la fenêtre de score s'est refermée » (`useCloseSettledPlayerScore`,
 `TournamentSheet.tsx`) — jamais pour une modale déjà disparue, ni quand c'est
 l'envoi ou le forfait du lecteur qui tranche (`onOwnSettle`, y compris un refus
-`MATCH_ALREADY_COMPLETED`, qui a déjà son toast).
+`MATCH_ALREADY_COMPLETED`, qui a déjà son toast, et un échec sans code rendu —
+réseau coupé, 502 — dont l'issue est inconnue).
 
 ## 2. Validation d'office après 2 h de silence
 
