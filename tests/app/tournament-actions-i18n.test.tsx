@@ -638,6 +638,11 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     expect(adminSaved("fr")).toContain("Validation automatique suspendue par l&#x27;arbitrage : sans réponse de l&#x27;adversaire, seul « Valider le résultat » tranche.");
     expect(adminSaved("en")).toContain("Automatic confirmation paused by a referee: without an answer from the opponent, only “Confirm the result” settles the match.");
     expectNoFrench(adminSaved("en"));
+    // « Enregistrer » ne tranche pas seul : l'adversaire peut encore confirmer.
+    expect(enDialogs.score.admin.proposalDirty).toContain("only “Confirm the result” settles the match, unless {other} confirms it.");
+    // Les champs portent la saisie d'un arbitre, pas la proposition : dit.
+    expect(adminSaved("fr")).toContain("Enregistré : 1 – 0, non tranché.");
+    expect(adminSaved("en")).toContain("Saved: 1 – 0, not decided.");
     // Un autre arbitre qui rouvre le match lit encore la proposition en attente.
     expect(adminSaved("fr")).toContain("Proposition de Alpha : 2 – 1");
     expect(adminSaved("en")).toContain("Alpha&#x27;s proposal: 2 – 1");
