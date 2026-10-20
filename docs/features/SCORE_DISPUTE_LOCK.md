@@ -84,6 +84,12 @@ annoncé une fois, où que soit le focus. Un refus
 `SCORE_LOCKED_DISPUTE` ou `MATCH_ALREADY_COMPLETED` (validation d'office passée
 à l'heure dite ; envoi ou forfait) relit l'état comme `PROPOSAL_STALE`,
 sans attendre un flux peut-être en reconnexion.
+Match tranché sous la modale ouverte (validation d'office, arbitrage,
+confirmation adverse) : elle se referme avec « Ce match vient d'être tranché :
+la fenêtre de score s'est refermée » (`useCloseSettledPlayerScore`,
+`TournamentSheet.tsx`) — jamais pour une modale déjà disparue, ni quand c'est
+l'envoi ou le forfait du lecteur qui tranche (`onOwnSettle`, y compris un refus
+`MATCH_ALREADY_COMPLETED`, qui a déjà son toast).
 
 ## 2. Validation d'office après 2 h de silence
 
