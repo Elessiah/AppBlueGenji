@@ -584,7 +584,8 @@ function RgpdFr({
               qu&apos;elle ne s&apos;ouvre plus d&apos;elle-même sur ce navigateur. Il ne contient que
               la valeur « 1 », jamais d&apos;identifiant de personne (sameSite=lax), et dure un an.
               Connecté, le même choix est gardé sur votre compte, pour vos autres appareils ; s&apos;il
-              a été fait avant la connexion, il y est reporté à la connexion. Sur le compte, il dure
+              a été fait avant la connexion (ou n&apos;a pas pu y être enregistré sur-le-champ), il y est
+              reporté à la connexion ou à votre prochaine visite connectée. Sur le compte, il dure
               autant que lui, figure dans l&apos;export de vos données et revient au défaut à la
               suppression du compte.
             </li>

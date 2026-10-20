@@ -143,7 +143,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Declared adulthood (yes / no / not specified)",
       "Visibility settings, availability for recruitment, roles on the platform",
       "Account language (French or English), reset to French on anonymization",
-      "“Don't show again” choice on the window of urgent recruitment announcements (yes / no; a choice made on the browser before logging in is carried over to the account at login), reset to “no” on anonymization",
+      "“Don't show again” choice on the window of urgent recruitment announcements (yes / no; a choice made on the browser before logging in, or not saved right away, is carried over to the account at login or on the next logged-in visit), reset to “no” on anonymization",
       "No real name, no email address, no phone number, no postal address",
     ],
     sensitiveData: "None",
