@@ -72,7 +72,8 @@ tournoi, là où le format le permet, reste possible pendant un litige… »).
 (`actorPlaysMatch`) : **encore membre**, quelle que soit sa date d'arrivée
 (l'issue engage son équipe ; une date de report, que la resaisie déplace et que
 la clôture efface, ne borne pas sûrement l'arrivée), ou **parti depuis que la
-manche a commencé** — au premier des deux, lancement ou premier report (lu sous
+manche a commencé** — au premier des deux, lancement (s'il vaut pour l'appariement
+actuel, `launch_pairing`) ou premier report (lu sous
 verrou avant que l'arbitrage ne l'efface, `playedAt`), sinon à sa création —,
 si bien que quitter l'équipe en cours de match ou juste avant d'agir n'efface
 pas l'alerte et qu'un ancien membre parti avant le match n'est pas visé ; ou
