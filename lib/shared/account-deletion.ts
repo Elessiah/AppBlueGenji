@@ -234,6 +234,11 @@ export function accountDeletionErrorMessage(code: string | undefined): string {
   if (code === "ACCOUNT_STILL_REFERENCED") {
     return "Ton compte a été rattaché à un tournoi ou à une équipe pendant la suppression. Réessaie : il sera alors anonymisé plutôt qu'effacé.";
   }
+  // Session ou compte déjà partis : typiquement un nouvel essai après une
+  // suppression faite dont la réponse s'est perdue — l'écran recharge la page.
+  if (code === "UNAUTHORIZED" || code === "USER_NOT_FOUND") {
+    return "Ta session est fermée — ton compte a peut-être déjà été supprimé. La page se recharge : reconnecte-toi pour vérifier.";
+  }
   return "La suppression du compte a échoué. Réessaie dans un instant.";
 }
 

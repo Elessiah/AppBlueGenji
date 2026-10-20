@@ -49,22 +49,32 @@ export async function requestAccountDeletion(
   } catch {
     return { ok: false, code: "ACCOUNT_DELETE_FAILED" };
   }
-  // Un 2xx dont le corps est illisible (coupé par un proxy) reste un **succès** :
-  // le compte est supprimé et la session fermée — annoncer un échec laissait la
-  // personne sur la fenêtre des conditions, et chaque nouvel essai répondait 401.
-  let payload: { error?: string } & Partial<AccountDeletionPlan> = {};
+  let payload: { error?: string; deleted?: boolean } & Partial<AccountDeletionPlan> = {};
   try {
     payload = (await response.json()) as typeof payload;
   } catch {
-    // Corps illisible : le statut seul tranche (un refus retombe sur le code générique).
+    // Corps illisible : rien ne confirme la suppression (ci-dessous).
   }
   if (!response.ok) return { ok: false, code: payload.error || "ACCOUNT_DELETE_FAILED" };
+  // Seule la réponse de la route fait foi (`deleted: true`) : un 200 qui n'est
+  // pas le sien (portail captif, proxy) annoncerait une suppression qui n'a pas
+  // eu lieu. Une réponse perdue après coup se rattrape à l'essai suivant, que
+  // la session fermée refuse (`SESSION_GONE_CODES`).
+  if (payload.deleted !== true) return { ok: false, code: "ACCOUNT_DELETE_FAILED" };
   // `reason` vaut `null` sur un effacement complet : c'est une réponse, pas
   // une absence de réponse. Le `mode` sert donc de témoin — il dit que le
   // serveur a bien répondu, là où un `??` sur le motif retomberait sur
   // l'aperçu au moment précis où le serveur annonce qu'il n'a rien gardé.
   return { ok: true, applied: payload.mode ? payload.reason ?? null : previewed };
 }
+
+/**
+ * Refus qui disent que la session ou le compte n'est plus là — typiquement un
+ * nouvel essai après une suppression faite dont la réponse s'est perdue (la
+ * route a fermé la session). Réessayer n'y changerait rien : la page se
+ * recharge, sans session, au lieu de redire « échec » sous la fenêtre des conditions.
+ */
+export const SESSION_GONE_CODES: ReadonlySet<string> = new Set(["UNAUTHORIZED", "USER_NOT_FOUND"]);
 
 interface UseAccountDeletionOptions {
   /** Textes de `/profil` (`profile.deletion`) dans la langue de la page. */
@@ -116,13 +126,15 @@ export function useAccountDeletion({ text, onCancel, layer = "default" }: UseAcc
   /** Joué par la modale : rend `false` sur un refus, qui la laisse ouverte. */
   const performAccountDeletion = async (previewed: ConfirmationSubject): Promise<boolean> => {
     const result = await requestAccountDeletion(previewed);
-    if (!result.ok) {
+    if (!result.ok && !SESSION_GONE_CODES.has(result.code)) {
       showError(deletionErrorText(text, result.code), { lang: contentLang });
       return false;
     }
-    showSuccess(deletionOutcomeText(text, result.applied), { lang: contentLang });
-    // La route a fermé la session : l'accueil, rechargé en entier, dans la
-    // langue de la page (`/en` sous `/en/profil`), se lit sans compte.
+    if (result.ok) showSuccess(deletionOutcomeText(text, result.applied), { lang: contentLang });
+    else showError(deletionErrorText(text, result.code), { lang: contentLang });
+    // La session est fermée (par cette suppression, ou avant elle) : l'accueil,
+    // rechargé en entier, dans la langue de la page (`/en` sous `/en/profil`),
+    // se lit sans compte. La confirmation reste « en cours » jusque-là.
     setTimeout(() => {
       window.location.href = localeHref("/", pageLocale);
     }, ACCOUNT_DELETED_REDIRECT_MS);

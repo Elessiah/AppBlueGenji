@@ -203,7 +203,8 @@
     },
     "errors": {
       "ACCOUNT_STILL_REFERENCED": "Ton compte a été rattaché à un tournoi ou à une équipe pendant la suppression. Réessaie : il sera alors anonymisé plutôt qu'effacé.",
-      "fallback": "La suppression du compte a échoué. Réessaie dans un instant."
+      "fallback": "La suppression du compte a échoué. Réessaie dans un instant.",
+      "sessionGone": "Ta session est fermée — ton compte a peut-être déjà été supprimé. La page se recharge : reconnecte-toi pour vérifier."
     }
   },
   "errors": {

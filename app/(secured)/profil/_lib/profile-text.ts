@@ -89,7 +89,10 @@ export function deletionOutcomeText(text: ProfileText, subject: ConfirmationSubj
 
 /** `accountDeletionErrorMessage` dans la langue du texte. */
 export function deletionErrorText(text: ProfileText, code: string | undefined): string {
-  return text.t(code === "ACCOUNT_STILL_REFERENCED" ? "deletion.errors.ACCOUNT_STILL_REFERENCED" : "deletion.errors.fallback");
+  if (code === "ACCOUNT_STILL_REFERENCED") return text.t("deletion.errors.ACCOUNT_STILL_REFERENCED");
+  // Session ou compte déjà partis (une suppression faite dont la réponse s'est perdue) : la page se recharge.
+  if (code === "UNAUTHORIZED" || code === "USER_NOT_FOUND") return text.t("deletion.errors.sessionGone");
+  return text.t("deletion.errors.fallback");
 }
 
 // ─── Applications connectées ────────────────────────────────────────────────

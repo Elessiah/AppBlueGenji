@@ -183,19 +183,24 @@ function forgetTermsPostponement(cookieStore: Awaited<ReturnType<typeof cookies>
 export async function clearSession(): Promise<void> {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
-  if (token) {
-    const db = await getDatabase();
-    const tokenHash = hashToken(token);
-    await db.execute(`DELETE FROM bg_user_sessions WHERE token_hash = ?`, [tokenHash]);
-    // Les onglets de cette session gardaient sinon leurs flux de tournoi
-    // ouverts, avec le contexte d'un lecteur qui vient de se déconnecter.
-    closeSessionStreams(tokenHash);
+  try {
+    if (token) {
+      const db = await getDatabase();
+      const tokenHash = hashToken(token);
+      await db.execute(`DELETE FROM bg_user_sessions WHERE token_hash = ?`, [tokenHash]);
+      // Les onglets de cette session gardaient sinon leurs flux de tournoi
+      // ouverts, avec le contexte d'un lecteur qui vient de se déconnecter.
+      closeSessionStreams(tokenHash);
+    }
+  } finally {
+    // Le cookie expire **même** si la base n'a pas répondu : le navigateur ne
+    // garde pas un jeton dont la fin a été demandée.
+    cookieStore.set(SESSION_COOKIE, "", {
+      ...baseCookieOptions(),
+      maxAge: 0,
+    });
+    forgetTermsPostponement(cookieStore);
   }
-  cookieStore.set(SESSION_COOKIE, "", {
-    ...baseCookieOptions(),
-    maxAge: 0,
-  });
-  forgetTermsPostponement(cookieStore);
 }
 
 /**
