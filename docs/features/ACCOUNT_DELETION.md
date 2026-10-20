@@ -182,14 +182,25 @@ ferme la session —, toast puis accueil rechargé dans la langue de la page). D
   (`layer="overBlocking"` de `ConfirmActionDialog`, z-index 1270 contre 1260) :
   Échap et « Annuler » ne ferment que la confirmation, le focus revient au
   bouton. Pendant la préparation (code, textes, aperçu), le bouton dit
-  « Préparation… » / "Preparing…" (`termsModal.deleting`) ; au survol il reste
-  rouge (sa règle l'emporte sur le survol bleu de `CyberButton` ghost).
+  « Préparation… » / "Preparing…" (`termsModal.deleting`, les deux libellés
+  dans la même case : sa largeur ne bouge pas) ; au survol il reste rouge (sa
+  règle l'emporte sur le survol bleu de `CyberButton` ghost), halo au seul
+  pointeur fin. La préparation entière est bornée
+  (`TERMS_DELETION_PREPARE_TIMEOUT_MS`, 15 s — morceau disparu après un
+  déploiement, réseau figé) : la fenêtre retrouve ses issues, un toast
+  (`termsModal.deletionUnavailable`) dit de recharger. Une fenêtre qui se tait
+  (`/rgpd`, `/profil`…) abandonne la préparation : rouverte, elle ne relance
+  pas seule la confirmation.
 
 L'aperçu est **borné** (`ACCOUNT_DELETION_PREVIEW_TIMEOUT_MS`, 8 s,
-`AbortSignal.timeout`) : un aperçu qui ne répond jamais laissait la fenêtre
+`AbortSignal.timeout`, non borné avant Safari 16 où il manque) : un aperçu qui ne répond jamais laissait la fenêtre
 bloquante sans issue ; passé le délai, la confirmation s'ouvre sur la phrase de
 l'incertitude. Sous `/en`, des textes `profile` retombés sur le français font
 déclarer la confirmation française (`contentLang="fr"`, coquille comprise).
+En vol, ses boutons passent en `aria-disabled` + `aria-busy` (plus de
+`disabled` natif) : après un refus, le focus reste sur « Supprimer mon compte »
+et le geste se retente au clavier — vrai de toutes les confirmations
+(`ConfirmActionDialog`).
 
 Aucune des routes du geste (`GET /api/profile/deletion`, `DELETE /api/profile`,
 ni `GET /api/profile/export` pour l'art. 15) ne consulte l'acceptation des
