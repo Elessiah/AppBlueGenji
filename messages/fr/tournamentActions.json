@@ -218,6 +218,7 @@
     "adminValidate": "Valider le score proposé",
     "adminEdit": "Éditer le score",
     "reportConflict": "Score en litige · saisie verrouillée, arbitrage attendu",
+    "playerScoreSettled": "Ce match vient d'être tranché : la fenêtre de score s'est refermée.",
     "reportSide": "Équipe {side}",
     "reportPending": "{score1} – {score2} proposé par {reporter} · à confirmer",
     "reportPendingDeadline": "{score1} – {score2} proposé par {reporter} · validation automatique à {deadline} (heure de Paris) sans réponse",

@@ -89,10 +89,10 @@
   "refereeAlert": {
     "title": "Referee needed",
     "score_conflict": "Conflicting scores are waiting for a referee.",
-    "score_report_stalled": "A score has been waiting too long for confirmation: a referee needs to decide.",
+    "score_report_stalled": "A disputed score has been waiting too long for a referee: score entry stays locked for both opponents, a referee needs to decide.",
     "other": "An alert is waiting for a referee.",
     "score_conflictMatch": "Conflicting scores · {tournament}, {round}: a referee is needed.",
-    "score_report_stalledMatch": "Score awaiting confirmation for too long · {tournament}, {round}: a referee needs to decide.",
+    "score_report_stalledMatch": "Dispute without a referee for too long · {tournament}, {round}: entry locked, a referee needs to decide.",
     "otherMatch": "Alert · {tournament}, {round}: a referee is needed."
   },
   "issueReport": {

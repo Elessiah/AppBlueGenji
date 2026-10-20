@@ -89,10 +89,10 @@
   "refereeAlert": {
     "title": "Arbitrage requis",
     "score_conflict": "Un conflit de score attend un arbitre.",
-    "score_report_stalled": "Un score attend sa confirmation depuis trop longtemps : un arbitre doit trancher.",
+    "score_report_stalled": "Un score en litige attend l'arbitrage depuis trop longtemps : la saisie des deux adversaires reste verrouillée, un arbitre doit trancher.",
     "other": "Une alerte attend un arbitre.",
     "score_conflictMatch": "Conflit de score · {tournament}, {round} : un arbitre est attendu.",
-    "score_report_stalledMatch": "Score en attente de confirmation depuis trop longtemps · {tournament}, {round} : un arbitre doit trancher.",
+    "score_report_stalledMatch": "Litige sans arbitrage depuis trop longtemps · {tournament}, {round} : saisie verrouillée, un arbitre doit trancher.",
     "otherMatch": "Alerte · {tournament}, {round} : un arbitre est attendu."
   },
   "issueReport": {

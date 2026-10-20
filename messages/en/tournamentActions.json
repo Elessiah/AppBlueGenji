@@ -218,6 +218,7 @@
     "adminValidate": "Confirm the proposed score",
     "adminEdit": "Edit the score",
     "reportConflict": "Score disputed · entry locked, awaiting a referee",
+    "playerScoreSettled": "This match has just been settled: the score window has closed.",
     "reportSide": "Team {side}",
     "reportPending": "{score1} – {score2} proposed by {reporter} · awaiting confirmation",
     "reportPendingDeadline": "{score1} – {score2} proposed by {reporter} · automatic confirmation at {deadline} (Paris time) without an answer",

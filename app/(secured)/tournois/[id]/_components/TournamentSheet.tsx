@@ -16,6 +16,7 @@ import type {
 import { toParticipantType } from "@/lib/shared/participants";
 import { remainingSlots } from "@/lib/shared/ghost-registration";
 import { useToast } from "@/components/ui/toast";
+import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import { CyberButton } from "@/components/cyber";
 import { useSpectatorView } from "@/components/spectator-view";
 import { SPECTATOR_NOT_FOUND_RECHECK_MINUTES } from "@/lib/shared/spectator-view";
@@ -158,6 +159,27 @@ function matchById(matches: readonly BracketMatch[], id: number | null): Bracket
 }
 
 /** Retour en arrière : le plan du moment, son refus, et les rencontres qu'il efface. */
+/**
+ * Tranché sous la modale du joueur (validation d'office à l'heure dite,
+ * arbitrage, confirmation adverse) : elle se referme, et le dit — une saisie en
+ * cours disparaissait sinon sans un mot. Son propre envoi la ferme avant
+ * (`onClose`), si bien que l'avis ne double jamais son toast.
+ */
+function useCloseSettledPlayerScore(
+  matches: readonly BracketMatch[] | undefined,
+  openId: number | null,
+  close: () => void,
+  notify: () => void,
+): void {
+  const open = matches ? matchById(matches, openId) : null;
+  const settled = open !== null && isMatchPlayed(open);
+  useEffect(() => {
+    if (!settled) return;
+    close();
+    notify();
+  }, [settled, close, notify]);
+}
+
 function rollbackView(detail: TournamentDetail, frozen: boolean) {
   const rollbackTargetState =
     detail.card.state === "RUNNING" || detail.card.state === "FINISHED";
@@ -567,6 +589,10 @@ export function TournamentSheet({ tournamentId, source }: Readonly<{ tournamentI
     [canReportScore, viewerMyTeamId, viewerCanActForEntrant, frozen],
   );
 
+  const closePlayerScore = useCallback(() => setPlayerScoreMatchId(null), []);
+  const notifyPlayerScoreSettled = useCallback(() => showSuccess(a("cardActions.playerScoreSettled")), [showSuccess, a]);
+  useCloseSettledPlayerScore(detail?.matches, playerScoreMatchId, closePlayerScore, notifyPlayerScoreSettled);
+
   // Échec définitif avant même d'avoir reçu quoi que ce soit : sans ce cas, la
   // page resterait sur « Chargement… » pour toujours — le seul état où il ne
   // reste que le F5, et où il ne sert à rien.
@@ -799,6 +825,7 @@ export function TournamentSheet({ tournamentId, source }: Readonly<{ tournamentI
   const playerScoreCandidate = matchById(detail.matches, playerScoreMatchId);
   const matchForPlayerScore =
     playerScoreCandidate && canOpenPlayerScore(playerScoreCandidate) ? playerScoreCandidate : null;
+
   const matchForLive = matchById(detail.matches, matchForLiveId);
   const matchForSchedule = matchById(detail.matches, matchForScheduleId);
   const matchForReplay = matchById(detail.matches, matchForReplayId);

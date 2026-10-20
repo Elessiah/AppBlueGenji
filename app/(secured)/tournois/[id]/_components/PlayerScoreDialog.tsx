@@ -190,6 +190,12 @@ function theirsPendingStatus(
   return text.t("score.player.theirs.withoutMaps", values);
 }
 
+/** Classe de la région d'état : aucune sans phrase, l'avertissement en litige. */
+function statusClassName(status: string | null, locked: boolean): string | undefined {
+  if (status === null) return undefined;
+  return `${locked ? styles.conflict : styles.stored} ${styles.notice}`;
+}
+
 /** Refus qui disent que l'état lu est périmé : la modale relit le serveur. */
 // `MATCH_ALREADY_COMPLETED` : la validation d'office a pu passer à l'heure dite.
 const REFRESH_ON_REFUSAL: ReadonlySet<string> = new Set(["PROPOSAL_STALE", SCORE_LOCKED_DISPUTE, "MATCH_ALREADY_COMPLETED"]);
@@ -471,11 +477,10 @@ export function PlayerScoreDialog({
 
           {/* `<output>` (région d'état native) : l'adversaire peut répondre pendant que la modale
               est ouverte, et le flux change alors cette phrase. */}
-          {status && (
-            <output className={`${disputeLocked ? styles.conflict : styles.stored} ${styles.notice}`}>
-              {status}
-            </output>
-          )}
+          {/* Toujours montée, vide sans phrase : un litige arrivé d'un bloc (les
+              deux reports dans un même instantané) remplit une région existante,
+              et ce remplissage s'annonce. */}
+          <output className={statusClassName(status, disputeLocked)}>{status}</output>
 
           {/* Désaccord, ou proposition adverse que le formulaire ne reprend pas
               (saisie déjà commencée à son arrivée) : le détail adverse, codes de
