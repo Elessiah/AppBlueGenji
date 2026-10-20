@@ -188,11 +188,13 @@ describe("geste en vol : le focus reste sur le bouton pressé", () => {
     expect(css).toMatch(/\.actions > :global\(\.btn\)\[aria-disabled="true"\] \{\s*cursor: progress;/);
     expect(css).toMatch(/\.actions > :global\(\.btn\.ghost\)\[aria-disabled="true"\] \{\s*color: var\(--ink-mute\);/);
     // Contraste élevé : le gris système, comme le `disabled` natif.
-    expect(css).toMatch(/@media \(forced-colors: active\) \{\s*\.actions > :global\(\.btn\)\[aria-disabled="true"\],\s*\.actions > :global\(\.btn\):disabled \{\s*color: GrayText;\s*border-color: GrayText;/);
+    expect(css).toMatch(/@media \(forced-colors: active\) \{\s*\.actions > :global\(\.btn\)\[aria-disabled="true"\],\s*\.actions > :global\(\.btn\):disabled,\s*\.actions > :global\(\.btn\.danger\):disabled \{\s*color: GrayText;\s*border-color: GrayText;/);
+    // Placé après toute règle de couleur (sans quoi une règle plus loin, à spécificité égale, l'emporterait).
+    expect(css.lastIndexOf("@media (forced-colors: active)")).toBeGreaterThan(css.indexOf(".actions > :global(.btn.danger):disabled {"));
     // Non armé (`disabled` natif) : éteint, curseur interdit.
     expect(css).toMatch(/\.actions > :global\(\.btn\):disabled \{\s*cursor: not-allowed;\s*color: var\(--ink-mute\);\s*border-color: var\(--line-strong\);\s*border-style: dashed;\s*background: transparent;/);
     // Un geste destructeur non armé garde son rouge (distinct d'« Annuler » et d'un bouton principal non armé).
-    expect(css).toMatch(/\.actions > :global\(\.btn\.danger\):disabled \{\s*color: var\(--danger\);/);
+    expect(css).toMatch(/\.actions > :global\(\.btn\.danger\):disabled \{\s*border-color: rgba\(var\(--danger-rgb\), 0\.32\);\s*\}/);
     // L'attente est annoncée (le libellé d'un bouton focalisé qui change ne l'est pas).
     expect(source).toMatch(/<output className="sr-only" aria-live="polite">\s*\{busy \? pendingLabel : ""\}\s*<\/output>/);
   });

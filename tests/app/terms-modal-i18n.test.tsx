@@ -197,7 +197,10 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     // Le focus n'y revient que s'il y est resté ou s'est perdu (lecteur parti lire la politique : pas déplacé).
     expect(modal).toContain("if (document.activeElement === document.body) deleteButtonRef.current?.focus();");
     // Contraste élevé : lien et bouton désarmés au gris système.
-    expect(readSource("components/legal/TermsAcceptanceModal.module.css")).toMatch(/@media \(forced-colors: active\) \{\s*\.textButton \{\s*color: LinkText;\s*background: transparent;\s*\}\s*\.textButton\[aria-disabled="true"\],\s*\.actions \[aria-disabled="true"\] \{\s*color: GrayText;/);
+    expect(readSource("components/legal/TermsAcceptanceModal.module.css")).toMatch(/@media \(forced-colors: active\) \{\s*\.textButton \{\s*color: LinkText;\s*background: transparent;\s*\}\s*\.textButton\[aria-disabled="true"\],\s*\.actions \[aria-disabled="true"\],\s*\.actions \.deleteButton\[aria-disabled="true"\] \{\s*color: GrayText;/);
+    // En fin de feuille : à spécificité égale, il l'emporte sur `.actions .deleteButton`.
+    const termsCss = readSource("components/legal/TermsAcceptanceModal.module.css");
+    expect(termsCss.indexOf("@media (forced-colors: active)")).toBeGreaterThan(termsCss.lastIndexOf(".actions .deleteButton {"));
     expect(readSource("components/legal/TermsAcceptanceModal.module.css")).toMatch(/\.textButton\[aria-busy="true"\] \{\s*cursor: progress;/);
     expect(modal).toContain('unavailableRef.current = t("termsModal.deletionUnavailable");');
     expect(flowSource()).toMatch(/useEffect\(\(\) => \{\s*if \(confirming\) onReady\?\.\(\);\s*\}, \[confirming, onReady\]\);/);
