@@ -638,6 +638,14 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     expect(adminSaved("fr")).toContain("Validation automatique suspendue par l&#x27;arbitrage : sans réponse de l&#x27;adversaire, seul « Valider le résultat » tranche.");
     expect(adminSaved("en")).toContain("Automatic confirmation paused by a referee: without an answer from the opponent, only “Confirm the result” settles the match.");
     expectNoFrench(adminSaved("en"));
+    // Un autre arbitre qui rouvre le match lit encore la proposition en attente.
+    expect(adminSaved("fr")).toContain("Proposition de Alpha : 2 – 1");
+    expect(adminSaved("en")).toContain("Alpha&#x27;s proposal: 2 – 1");
+    // La carte garde l'appel à valider : seul « Valider le résultat » tranche.
+    const adminCard = (locale: "fr" | "en") => renderPage(locale, <MatchRow match={saved} adminResolvable onOpenAdminModal={noop} scoreLocked={false} roundNumber={2} />);
+    expect(adminCard("fr")).toContain("Valider le score proposé");
+    expect(adminCard("en")).toContain("Confirm the proposed score");
+    expect(renderPage("fr", <MatchRow match={{ ...saved, scoreAutoValidationPaused: false }} adminResolvable onOpenAdminModal={noop} scoreLocked={false} roundNumber={2} />)).toContain("Éditer le score");
     // Sans suspension, l'avis n'en dit rien.
     expect(render("fr", <AdminScoreDialog match={{ ...paused, scoreAutoValidationPaused: false }} onClose={noop} onSubmitted={noop} />)).not.toContain("suspendue");
   });

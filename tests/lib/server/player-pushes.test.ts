@@ -263,6 +263,24 @@ describe("notifyScoreToConfirm", () => {
     expect(resolvePush(push.notification.push).url).toBe("/tournois/4#match-40");
   });
 
+  it("validation d'office suspendue par l'arbitrage : ne promet plus de validation automatique (FR + EN)", async () => {
+    reported({ score_validation_paused_at: new Date() });
+    jest.mocked(loadEntrantMatchLeaderIds).mockResolvedValue(new Map([[2, [20]]]));
+    await notifyScoreToConfirm(40);
+    const push = pushes()[0].notification.push;
+    expect(resolvePush(push).body).toContain("la validation automatique est suspendue par l'arbitrage, un arbitre tranchera sans réponse");
+    expect(resolvePush(push).body).not.toContain("il sera validé automatiquement");
+    expect(resolvePush(push, "en").body).toContain("automatic confirmation is paused by a referee");
+    expect(resolvePush(push, "en").body).not.toContain("it will be confirmed automatically");
+  });
+
+  it("sans suspension (colonne nulle) : l'avis habituel", async () => {
+    reported({ score_validation_paused_at: null });
+    jest.mocked(loadEntrantMatchLeaderIds).mockResolvedValue(new Map([[2, [20]]]));
+    await notifyScoreToConfirm(40);
+    expect(resolvePush(pushes()[0].notification.push).body).toContain("sans réponse, il sera validé automatiquement");
+  });
+
   it("ne nomme pas l'adversaire en tournoi individuel", async () => {
     reported({ participant_type: "SOLO", team1_name: "Kiro", team2_name: "Nova" });
     jest.mocked(loadEntrantMatchLeaderIds).mockResolvedValue(new Map([[2, [20]]]));
