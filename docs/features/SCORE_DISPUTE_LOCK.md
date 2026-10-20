@@ -120,12 +120,17 @@ remplace plus, à l'échéance, ce que l'arbitre a noté.
   l'arbitrage » / « … automatic confirmation paused by a referee » au lieu de
   l'heure ; la modale des deux équipes « Validation automatique suspendue par
   l'arbitrage : sans réponse, un arbitre validera le résultat. » ; la fenêtre
-  d'arbitrage l'ajoute à l'avis de proposition, et l'avis « proposition
+  d'arbitrage le dit dans un avis à part (la saisie de l'arbitre efface l'avis
+  de proposition) et garde la proposition en attente lisible — score, maps,
+  codes de replay — pour l'arbitre qui rouvre le match ; le bouton de la carte
+  reste « Valider le score proposé » ; l'avis « proposition
   modifiée » dit « « Enregistrer » note ta saisie et suspend la validation
   automatique de cette proposition ; seul « Valider le résultat » tranche. ».
   La notification d'« Enregistrer » dit la suspension quand elle a eu lieu
   (`autoValidationPaused` dans la réponse de `PATCH …/scores`,
-  `score.admin.savedPaused`). Le réveil du flux ignore une échéance suspendue
+  `score.admin.savedPaused`). Une resaisie du déclarant pendant la suspension
+  prévient l'adversaire sans promettre de validation automatique
+  (`scoreToConfirm.bodyPaused`). Le réveil du flux ignore une échéance suspendue
   (`tournament-broadcast.ts`).
 
 **Avant l'envoi.** Une contre-proposition ne se corrige plus : face à la
