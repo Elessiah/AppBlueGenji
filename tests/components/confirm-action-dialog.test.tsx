@@ -179,15 +179,18 @@ describe("geste en vol : le focus reste sur le bouton pressé", () => {
     expect(source).toMatch(/disabled=\{!armed\}\s*aria-disabled=\{busy \|\| undefined\}\s*aria-busy=\{busy \|\| undefined\}/);
     // `submit` ignore déjà un geste tant que `busy`.
     expect(source).toContain("if (busy || !armed) return;");
-    // Et il ne paraît plus pressable : ni soulèvement ni halo, « Annuler » éteint, curseur d'attente.
+    // Et il ne paraît plus pressable : le survol de `.btn` (globals) l'exclut, sans hausser sa spécificité ; « Annuler » éteint, curseur d'attente.
+    const globals = readSource("app/globals.css");
+    expect(globals).toContain('.btn:hover:where(:not(:disabled):not([aria-disabled="true"])) {');
+    expect(globals).toContain('.btn:hover:where(:not(:disabled):not([aria-disabled="true"]))::before {');
+    expect(globals).not.toMatch(/^\.btn:hover(::before)? \{/m);
     const css = readSource("components/ui/confirm-action-dialog.module.css");
-    expect(css).toMatch(/\.actions > :global\(\.btn\)\[aria-disabled="true"\]:hover \{\s*cursor: progress;\s*transform: none;\s*box-shadow: none;/);
+    expect(css).toMatch(/\.actions > :global\(\.btn\)\[aria-disabled="true"\] \{\s*cursor: progress;/);
     expect(css).toMatch(/\.actions > :global\(\.btn\.ghost\)\[aria-disabled="true"\] \{\s*color: var\(--ink-mute\);/);
-    // Fond du repos au survol, pour chaque variante (le survol de `.btn` l'éclaircirait).
-    expect(css).toMatch(/\.actions > :global\(\.btn\)\[aria-disabled="true"\]:hover \{\s*background: rgba\(89, 212, 255, 0\.14\);/);
-    expect(css).toMatch(/\.actions > :global\(\.btn\.danger\)\[aria-disabled="true"\]:hover \{\s*background: rgba\(var\(--danger-rgb\), 0\.14\);/);
     // Contraste élevé : le gris système, comme le `disabled` natif.
     expect(css).toMatch(/@media \(forced-colors: active\) \{\s*\.actions > :global\(\.btn\)\[aria-disabled="true"\] \{\s*color: GrayText;\s*border-color: GrayText;/);
+    // L'attente est annoncée (le libellé d'un bouton focalisé qui change ne l'est pas).
+    expect(source).toMatch(/<output className="sr-only" aria-live="polite">\s*\{busy \? pendingLabel : ""\}\s*<\/output>/);
   });
 });
 
