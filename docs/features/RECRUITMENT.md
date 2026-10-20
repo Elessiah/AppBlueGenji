@@ -290,6 +290,10 @@ cookie d'ici (lu dans `document.cookie`, la fiche n'arrivant qu'après le
 montage) ne l'ont refusée. Même conduite que `MatchDmField` : enregistré au
 clic, clic pendant l'envoi mis en file (`runQueuedSaves`), `aria-busy`, toasts
 `recruitmentModal.shown` / `.hidden`, refus par code (`profileErrorMessage`).
+Décochée refusée par le serveur mais cookie posé quand même
+(`recruitmentModalSaveOutcome` → `BROWSER`) : succès `.hiddenBrowser` (« sur ce
+navigateur »), jamais « échec » — le choix tient ici et le rattrapage le porte
+au compte s'il est à `0`.
 Modale ouverte par-dessus « Mon profil » : un « Ne plus afficher » gardé émet
 `RECRUITMENT_MODAL_OFF_EVENT` sur `window`, et la case se décoche sans
 rechargement (hors envoi en cours).
