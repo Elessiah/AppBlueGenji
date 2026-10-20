@@ -107,6 +107,8 @@ describe("seed — couverture du cycle de report des scores", () => {
     expect(TOURNAMENTS.some((t) => (t.pendingReports ?? 0) > 0)).toBe(true);
     expect(TOURNAMENTS.some((t) => (t.conflicts ?? 0) > 0)).toBe(true);
     expect(TOURNAMENTS.some((t) => (t.expiredReports ?? 0) > 0)).toBe(true);
+    // Validation d'office suspendue par l'arbitrage (SCORE_DISPUTE_LOCK.md).
+    expect(TOURNAMENTS.some((t) => (t.pausedReports ?? 0) > 0)).toBe(true);
   });
 
   it("place ces états sur des tournois en cours uniquement", () => {

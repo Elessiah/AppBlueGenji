@@ -16,13 +16,18 @@ import type { ReportStateCounts, TournamentDef } from "./cases";
 //  · conflicts       → les deux équipes ont reporté des scores contradictoires
 //  · expiredReports  → un report unique dont le délai est dépassé (la prochaine
 //                      lecture de l'API doit le résoudre automatiquement)
+//  · pausedReports   → le même, validation d'office suspendue par un
+//                      « Enregistrer » d'arbitrage : il doit rester en attente
 export async function applyReportStates(
   db: Pool,
   tournamentId: number,
   counts: ReportStateCounts
 ): Promise<void> {
   const wanted =
-    (counts.pendingReports ?? 0) + (counts.conflicts ?? 0) + (counts.expiredReports ?? 0);
+    (counts.pendingReports ?? 0) +
+    (counts.conflicts ?? 0) +
+    (counts.expiredReports ?? 0) +
+    (counts.pausedReports ?? 0);
   if (wanted === 0) return;
 
   const [rows] = await db.execute<(RowDataPacket & { id: number })[]>(
@@ -61,6 +66,23 @@ export async function applyReportStates(
          -- Échéance passée, deux heures au moins après la saisie (règle de la
          -- validation d'office, SCORE_DISPUTE_LOCK.md).
          score_deadline_at = DATE_SUB(NOW(), INTERVAL 10 MINUTE),
+         status = 'AWAITING_CONFIRMATION'
+       WHERE id = ?`,
+      [id]
+    );
+  }
+
+  for (let i = 0; i < (counts.pausedReports ?? 0); i++) {
+    const id = next();
+    if (id === null) break;
+    await db.execute(
+      `UPDATE bg_matches SET
+         team1_report_score = 2, team1_report_opponent_score = 1, team1_reported_at = DATE_SUB(NOW(), INTERVAL ${SCORE_AUTO_VALIDATE_MINUTES + 10} MINUTE),
+         team1_score = 1, team2_score = 0,
+         -- Échéance passée, mais suspendue par l'arbitrage (SCORE_DISPUTE_LOCK.md) :
+         -- l'entretien ne la valide pas, l'écran dit « suspendue ».
+         score_deadline_at = DATE_SUB(NOW(), INTERVAL 10 MINUTE),
+         score_validation_paused_at = DATE_SUB(NOW(), INTERVAL 5 MINUTE),
          status = 'AWAITING_CONFIRMATION'
        WHERE id = ?`,
       [id]
