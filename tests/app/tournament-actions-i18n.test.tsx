@@ -543,6 +543,21 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     expectNoFrench(en);
   });
 
+  it("modale du joueur tranchée sous ses yeux : refermée avec un avis, dans les deux langues", () => {
+    const source = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/TournamentSheet.tsx"), "utf8");
+    expect(source).toContain("const settled = open !== null && isMatchPlayed(open);");
+    expect(source).toContain('showSuccess(a("cardActions.playerScoreSettled"))');
+    // Appelé avant les retours anticipés (règle des hooks).
+    expect(source.indexOf("useCloseSettledPlayerScore(detail?.matches")).toBeLessThan(source.indexOf("return <TournamentFatal"));
+    const frA = JSON.parse(readFileSync(join(process.cwd(), "messages/fr/tournamentActions.json"), "utf8"));
+    const enA = JSON.parse(readFileSync(join(process.cwd(), "messages/en/tournamentActions.json"), "utf8"));
+    expect(frA.cardActions.playerScoreSettled).toBe("Ce match vient d'être tranché : la fenêtre de score s'est refermée.");
+    expect(enA.cardActions.playerScoreSettled).toBe("This match has just been settled: the score window has closed.");
+    // Région d'état montée même sans phrase (lecteur qui ne peut pas reporter) : un litige d'un bloc s'y annonce.
+    const readOnly = <PlayerScoreDialog tournamentId={1} match={versus} myTeamId={10} canReportScore={false} canForfeit proposals={[]} onClose={noop} onSubmitted={noop} onRefresh={noop} />;
+    expect(render("fr", readOnly)).toContain("<output></output>");
+  });
+
   it("score (arbitrage) en litige : seule la validation lève le verrou, dans les deux langues", () => {
     const ui = () => <AdminScoreDialog match={disputed} onClose={noop} onSubmitted={noop} />;
     expect(render("fr", ui())).toContain("reste verrouillée jusqu&#x27;à « Valider le résultat » (score ou forfait)");

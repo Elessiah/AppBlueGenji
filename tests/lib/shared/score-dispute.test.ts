@@ -119,6 +119,9 @@ describe("textes FR + EN", () => {
     expect(fr).toContain("ni aucun forfait sur ce match), et seul un arbitre ou un administrateur tranche, en validant le résultat officiel (score ou forfait).");
     expect(en).toContain("and no forfeit of the match), and only a referee or an administrator settles it, by confirming the official result (score or forfeit).");
     expect(fr).not.toContain("en remettant le match à zéro");
+    // À score égal, des codes de replay différents font aussi un litige : la règle le dit.
+    expect(fr).toContain("par le détail des maps et les codes de replay) mettent le match en litige");
+    expect(en).toContain("by the map details and replay codes) put the match in dispute");
     expect(en).not.toContain("resetting the match");
     // Détail adverse en lecture : l'avis du litige est déjà dans la phrase d'état.
     expect(frDialogs.score.player.theirs.loading).toMatch(/ouvre un litige/);

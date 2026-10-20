@@ -202,7 +202,7 @@ describe("notifications push — anglais", () => {
 
   it("ne reprend pas en anglais le texte Discord, resté français (D6)", () => {
     expect(en["refereeAlert.url"].body).toBe("Conflicting scores are waiting for a referee.");
-    expect(en["refereeAlert.nourl"].body).toBe("A score has been waiting too long for confirmation: a referee needs to decide.");
+    expect(en["refereeAlert.nourl"].body).toBe("A disputed score has been waiting too long for a referee: score entry stays locked for both opponents, a referee needs to decide.");
     expect(refereeAlertPush(REFEREE_LINE, "k", "en").body).toBe("An alert is waiting for a referee.");
   });
 
@@ -223,7 +223,7 @@ describe("notifications push — anglais", () => {
     expect(conflict.body).toBe("Conflicting scores · Spring Cup, Lower bracket · round 2: a referee is needed.");
     expect(conflict.url).toBe("/en/tournois/7#match-31");
     expect(refereeAlertPush(REFEREE_LINE, "k", "en", "score_report_stalled", match).body).toBe(
-      "Score awaiting confirmation for too long · Spring Cup, Lower bracket · round 2: a referee needs to decide.",
+      "Dispute without a referee for too long · Spring Cup, Lower bracket · round 2: entry locked, a referee needs to decide.",
     );
     expect(refereeAlertPush(REFEREE_LINE, "k", "en", "other", match).body).toBe("Alert · Spring Cup, Lower bracket · round 2: a referee is needed.");
     // Le français garde la ligne Discord, et mène à la manche.

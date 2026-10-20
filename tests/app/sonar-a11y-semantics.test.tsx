@@ -170,7 +170,7 @@ describe("Balises natives plutôt que rôles ARIA (S6819)", () => {
       // Modale joueur : la même région d'état passe en avertissement au litige
       // (une seule annonce, `SCORE_DISPUTE_LOCK.md`) — toujours un `<output>` natif.
       expect(source).toMatch(
-        /<output className=\{`\$\{(?:styles\.stored|disputeLocked \? styles\.conflict : styles\.stored)\} \$\{styles\.notice\}`\}>/,
+        /<output className=\{`\$\{(?:styles\.stored|locked \? styles\.conflict : styles\.stored)\} \$\{styles\.notice\}`\}>|return `\$\{locked \? styles\.conflict : styles\.stored\} \$\{styles\.notice\}`;/,
       );
       expect(source).toContain("<output className={`${styles.blocker} ${styles.notice}`}>");
     }
