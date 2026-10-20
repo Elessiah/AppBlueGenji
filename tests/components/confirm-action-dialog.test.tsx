@@ -177,6 +177,8 @@ describe("geste en vol : le focus reste sur le bouton pressé", () => {
     expect(source).not.toMatch(/[^-]disabled=\{busy/);
     expect(source).toMatch(/onClick=\{\(\) => \{\s*if \(!busy\) onClose\(\);\s*\}\}\s*aria-disabled=\{busy \|\| undefined\}/);
     expect(source).toMatch(/disabled=\{!armed\}\s*aria-disabled=\{busy \|\| undefined\}\s*aria-busy=\{busy \|\| undefined\}/);
+    // Le texte à recopier est figé pendant l'envoi : une frappe ne désarme pas le bouton en vol.
+    expect(source).toMatch(/onChange=\{\(e\) => setTyped\(e\.target\.value\)\}[\s\S]{0,200}readOnly=\{busy\}/);
     // `submit` ignore déjà un geste tant que `busy`.
     expect(source).toContain("if (busy || !armed) return;");
     // Et il ne paraît plus pressable : le survol de `.btn` (globals) l'exclut, sans hausser sa spécificité ; « Annuler » éteint, curseur d'attente.
