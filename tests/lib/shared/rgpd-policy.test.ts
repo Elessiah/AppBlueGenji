@@ -74,8 +74,8 @@ describe("DONNEES_PROFIL", () => {
     expect(names).toContain("Identifiant Blizzard");
   });
 
-  it("has exactly 12 entries", () => {
-    expect(DONNEES_PROFIL).toHaveLength(12);
+  it("has exactly 13 entries", () => {
+    expect(DONNEES_PROFIL).toHaveLength(13);
   });
 
   it("déclare la langue du compte (lot 9-3) : exécution du contrat, durée du compte, remise au français", () => {
@@ -87,6 +87,21 @@ describe("DONNEES_PROFIL", () => {
     expect(locale?.finalite).toMatch(/Mon profil/);
     expect(locale?.finalite).toMatch(/sauf les exceptions détaillées à la section Notifications push/);
     expect(locale?.finalite).toMatch(/français par défaut, remis au français si le compte est anonymisé/);
+  });
+
+  it("déclare le « Ne plus afficher » du recrutement gardé sur le compte : base, durée, export, anonymisation, report (FR et EN)", () => {
+    const index = DONNEES_PROFIL.findIndex((d) => d.donnee === "Choix « Ne plus afficher » du recrutement");
+    expect(index).toBeGreaterThanOrEqual(0);
+    const row = DONNEES_PROFIL[index];
+    expect(row.base).toBe("Exécution du contrat");
+    expect(row.duree).toBe("Durée du compte");
+    expect(row.finalite).toMatch(/reporté à la connexion ou à ta prochaine visite connectée/);
+    expect(row.finalite).toMatch(/Figure dans l'export de tes données, remis au défaut si le compte est anonymisé/);
+    const en = DONNEES_PROFIL_EN[index];
+    expect(en.donnee).toBe("Recruitment “Don't show again” choice");
+    expect(en.base).toBe(row.base);
+    expect(en.finalite).toMatch(/carried over to the account at login or on your next visit while logged in/);
+    expect(en.finalite).toMatch(/Included in the export of your data, reset to the default if the account is anonymized/);
   });
 
   it("déclare la majorité, facultative et affichée seulement sur choix du joueur", () => {
