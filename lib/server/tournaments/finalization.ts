@@ -551,7 +551,7 @@ export async function resolveExpiredScoreReports(
       // nettoyage des maps proposées — le résultat, lui, vient d'être écrit.
       await finalizeMatch(connection, tournamentId, match, result, { resultWritten: true });
       // Les deux équipes l'apprennent après le commit (push `SCORE_TO_CONFIRM`).
-      queueAutoValidatedNotice(connection, Number(match.id));
+      queueAutoValidatedNotice(connection, Number(match.id), { team1Score, team2Score });
       resolved += 1;
       continue;
     }

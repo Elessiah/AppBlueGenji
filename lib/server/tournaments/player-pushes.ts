@@ -357,10 +357,16 @@ export async function notifyScoreToConfirm(matchId: number): Promise<number> {
  * Prévient les **deux** engagées qu'un score saisi par l'une a été validé
  * d'office faute de réponse de l'autre (`docs/features/SCORE_DISPUTE_LOCK.md`) —
  * ceux qui mènent le match, comme « score à confirmer », sous le même sujet.
- * Appelé après le commit de la validation (`./auto-validated-notices`) ; ne fait
- * rien si la manche n'est plus close entre-temps (arbitrage, retour en arrière).
+ * Appelé après le commit de la validation (`./auto-validated-notices`), qui
+ * passe le score qu'elle a écrit ; ne fait rien si la manche ne porte plus ce
+ * résultat entre-temps — plus close (retour en arrière), ou retranchée par un
+ * arbitre sur un autre score ou un forfait : l'avis aurait attribué à la
+ * validation d'office une décision de l'arbitrage.
  */
-export async function notifyScoreAutoValidated(matchId: number): Promise<number> {
+export async function notifyScoreAutoValidated(
+  matchId: number,
+  expected: { team1Score: number; team2Score: number },
+): Promise<number> {
   if (!webPushConfig()) return 0;
   try {
     const db = await getDatabase();
@@ -371,9 +377,14 @@ export async function notifyScoreAutoValidated(matchId: number): Promise<number>
         status: string;
         team1_id: number | null;
         team2_id: number | null;
+        team1_score: number | null;
+        team2_score: number | null;
+        forfeit_team_id: number | null;
+        double_forfeit: number | boolean | null;
       })[]
     >(
-      `SELECT m.tournament_id, t.name AS tournament_name, m.status, m.team1_id, m.team2_id
+      `SELECT m.tournament_id, t.name AS tournament_name, m.status, m.team1_id, m.team2_id,
+              m.team1_score, m.team2_score, m.forfeit_team_id, m.double_forfeit
          FROM bg_matches m
          JOIN bg_tournaments t ON t.id = m.tournament_id
         WHERE m.id = ? LIMIT 1`,
@@ -381,6 +392,14 @@ export async function notifyScoreAutoValidated(matchId: number): Promise<number>
     );
     const row = rows[0];
     if (row?.status !== "COMPLETED" || row.team1_id === null || row.team2_id === null) return 0;
+    if (
+      Number(row.team1_score) !== expected.team1Score ||
+      Number(row.team2_score) !== expected.team2Score ||
+      row.forfeit_team_id !== null ||
+      Boolean(Number(row.double_forfeit ?? 0))
+    ) {
+      return 0;
+    }
     const teamIds = [Number(row.team1_id), Number(row.team2_id)];
     const leaders = await loadEntrantMatchLeaderIds(teamIds);
     const recipients = [...new Set(teamIds.flatMap((teamId) => leaders.get(teamId) ?? []))];

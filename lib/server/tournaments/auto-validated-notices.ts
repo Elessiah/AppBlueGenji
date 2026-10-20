@@ -9,16 +9,26 @@
 import type { PoolConnection } from "mysql2/promise";
 import { notifyScoreAutoValidated } from "./player-pushes";
 
-const pending = new WeakMap<PoolConnection, Set<number>>();
+/** Score écrit par la validation d'office : l'avis ne part que s'il tient toujours. */
+export interface AutoValidatedScore {
+  team1Score: number;
+  team2Score: number;
+}
+
+const pending = new WeakMap<PoolConnection, Map<number, AutoValidatedScore>>();
 
 /** Note qu'une manche vient d'être validée d'office dans la transaction en cours. */
-export function queueAutoValidatedNotice(connection: PoolConnection, matchId: number): void {
+export function queueAutoValidatedNotice(
+  connection: PoolConnection,
+  matchId: number,
+  score: AutoValidatedScore,
+): void {
   const queued = pending.get(connection);
   if (!queued) {
-    pending.set(connection, new Set([matchId]));
+    pending.set(connection, new Map([[matchId, score]]));
     return;
   }
-  queued.add(matchId);
+  queued.set(matchId, score);
 }
 
 /** La transaction n'a pas abouti : rien ne part. */
@@ -44,12 +54,12 @@ export function flushAutoValidatedNotices(connection: PoolConnection): void {
   const queued = pending.get(connection);
   pending.delete(connection);
   if (!queued) return;
-  const matchIds = [...queued];
-  sending = sending.then(() => sendInSequence(matchIds));
+  const notices = [...queued];
+  sending = sending.then(() => sendInSequence(notices));
 }
 
-async function sendInSequence(matchIds: readonly number[]): Promise<void> {
-  for (const matchId of matchIds) {
-    await notifyScoreAutoValidated(matchId).catch(() => undefined);
+async function sendInSequence(notices: readonly (readonly [number, AutoValidatedScore])[]): Promise<void> {
+  for (const [matchId, score] of notices) {
+    await notifyScoreAutoValidated(matchId, score).catch(() => undefined);
   }
 }

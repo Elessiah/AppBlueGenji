@@ -57,8 +57,11 @@ export async function applyReportStates(
     if (id === null) break;
     await db.execute(
       `UPDATE bg_matches SET
-         team1_report_score = 2, team1_report_opponent_score = 1, team1_reported_at = DATE_SUB(NOW(), INTERVAL 30 MINUTE),
-         score_deadline_at = DATE_SUB(NOW(), INTERVAL 20 MINUTE),
+         team1_report_score = 2, team1_report_opponent_score = 1, team1_reported_at = DATE_SUB(NOW(), INTERVAL ${SCORE_AUTO_VALIDATE_MINUTES + 10} MINUTE),
+         -- Échéance passée, deux heures au moins après la saisie (règle de la
+         -- validation d'office) : le rattrapage des échéances au démarrage
+         -- (recent-schema-changes.ts) n'y touche pas.
+         score_deadline_at = DATE_SUB(NOW(), INTERVAL 10 MINUTE),
          status = 'AWAITING_CONFIRMATION'
        WHERE id = ?`,
       [id]
