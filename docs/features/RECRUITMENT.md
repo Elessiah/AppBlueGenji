@@ -231,8 +231,10 @@ revient pour une prioritaire neuve).
   fenêtre ne s'ouvrira plus d'elle-même… » ; non connecté, succès « … sur ce
   navigateur… » (le choix ne couvre que lui) ; compte injoignable, erreur
   « Choix gardé sur ce navigateur seulement… » (le cookie est posé d'abord) ;
-  session finie depuis le chargement (401), traité comme non connecté
-  (succès « … sur ce navigateur… », le cookie suivra au compte) ;
+  session finie (401) ou compte supprimé (409) depuis le chargement, traité
+  comme non connecté (succès « … sur ce navigateur… », le cookie suivra au
+  compte) ; sans réponse en 10 s, l'appel est abandonné (repli « compte
+  injoignable ») ;
   cookie refusé sans compte écrit (relu dans `document.cookie`), erreur « Ce
   choix n'a pas pu être gardé… ».
 - Navigateur partagé : un cookie laissé par une personne non connectée est
