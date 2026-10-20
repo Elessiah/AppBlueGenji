@@ -179,6 +179,10 @@ describe("geste en vol : le focus reste sur le bouton pressé", () => {
     expect(source).toMatch(/disabled=\{!armed\}\s*aria-disabled=\{busy \|\| undefined\}\s*aria-busy=\{busy \|\| undefined\}/);
     // `submit` ignore déjà un geste tant que `busy`.
     expect(source).toContain("if (busy || !armed) return;");
+    // Et il ne paraît plus pressable : ni soulèvement ni halo, « Annuler » éteint, curseur d'attente.
+    const css = readSource("components/ui/confirm-action-dialog.module.css");
+    expect(css).toMatch(/\.actions > :global\(\.btn\)\[aria-disabled="true"\]:hover \{\s*cursor: progress;\s*transform: none;\s*box-shadow: none;/);
+    expect(css).toMatch(/\.actions > :global\(\.btn\.ghost\)\[aria-disabled="true"\] \{\s*color: var\(--ink-mute\);/);
   });
 });
 

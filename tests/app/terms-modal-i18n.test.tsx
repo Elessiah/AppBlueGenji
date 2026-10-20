@@ -180,12 +180,15 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     expect(modal).toMatch(/\{deletionOpen \? \(\s*<TermsAccountDeletion\s+onReady=\{\(\) => setDeletionReady\(true\)\}\s+onClose=\{\(\) => \{\s*setDeletionOpen\(false\);\s*setDeletionReady\(false\);\s*requestAnimationFrame\(\(\) => deleteButtonRef\.current\?\.focus\(\)\);/);
     // Préparation (code, textes, aperçu) : le bouton dit qu'il travaille, jusqu'à l'ouverture de la confirmation.
     expect(modal).toContain("const preparing = deletionOpen && !deletionReady;");
+    // Occupé pendant la préparation seulement : derrière la confirmation ouverte, le bouton est désarmé, pas « en attente ».
+    expect(modal).toContain("aria-busy={preparing || undefined}");
+    expect(modal).not.toContain("aria-busy={deletionOpen");
     expect(modal).toContain('<span data-hidden={preparing || undefined}>{t("termsModal.deleteAccount")}</span>');
     expect(modal).toContain('<span data-hidden={!preparing || undefined}>{t("termsModal.deleting")}</span>');
     // Fenêtre tue (page où elle se tait) : la préparation est abandonnée, rien ne se relance seul à la réouverture.
     expect(modal).toMatch(/useEffect\(\(\) => \{\s*if \(open\) return;\s*setDeletionOpen\(false\);\s*setDeletionReady\(false\);\s*\}, \[open\]\);/);
     // Préparation bornée (morceau disparu, réseau figé) : la fenêtre retrouve ses issues, un toast le dit, le focus revient au bouton.
-    expect(modal).toContain("export const TERMS_DELETION_PREPARE_TIMEOUT_MS = 15_000;");
+    expect(modal).toContain("export const TERMS_DELETION_PREPARE_TIMEOUT_MS = 20_000;");
     expect(modal).toMatch(/if \(!deletionOpen \|\| deletionReady\) return;\s*const timer = window\.setTimeout\(\(\) => \{\s*setDeletionOpen\(false\);\s*showError\(unavailableRef\.current\);\s*requestAnimationFrame\(\(\) => deleteButtonRef\.current\?\.focus\(\)\);\s*\}, TERMS_DELETION_PREPARE_TIMEOUT_MS\);/);
     expect(modal).toContain('unavailableRef.current = t("termsModal.deletionUnavailable");');
     expect(flowSource()).toMatch(/useEffect\(\(\) => \{\s*if \(confirming\) onReady\?\.\(\);\s*\}, \[confirming, onReady\]\);/);

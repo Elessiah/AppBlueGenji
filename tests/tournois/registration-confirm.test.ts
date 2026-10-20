@@ -45,6 +45,7 @@ describe("confirmation d'inscription", () => {
     expect(page).toContain("run: performRegister");
     const dialog = read("components/ui/confirm-action-dialog.tsx");
     expect(dialog).toMatch(/if \(busy \|\| !armed\) return;/);
-    expect(dialog).toMatch(/type="submit"[^>]*disabled=\{busy \|\| !armed\}/);
+    // Bloqué tant que non armé (`disabled`) ou en vol (`aria-disabled` + la garde de `submit` ci-dessus : le focus reste sur le bouton).
+    expect(dialog).toMatch(/type="submit"[^>]*disabled=\{!armed\}\s+aria-disabled=\{busy \|\| undefined\}\s+aria-busy=\{busy \|\| undefined\}/);
   });
 });

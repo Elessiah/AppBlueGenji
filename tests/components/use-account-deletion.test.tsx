@@ -28,8 +28,8 @@ jest.mock("react", () => {
   };
 });
 
-const showError = jest.fn<(message: string) => void>();
-const showSuccess = jest.fn<(message: string) => void>();
+const showError = jest.fn<(message: string, options?: { lang?: string }) => void>();
+const showSuccess = jest.fn<(message: string, options?: { lang?: string }) => void>();
 jest.mock("@/components/ui/toast", () => ({ useToast: () => ({ showError, showSuccess }) }));
 jest.mock("@/components/i18n/locale-context", () => ({ useAppLocale: () => locale.current }));
 const locale: { current: "fr" | "en" } = { current: "fr" };
@@ -240,7 +240,8 @@ describe("useAccountDeletion", () => {
     const ok = await dialogProps(useAccountDeletion({ text: FR_PROFILE })).onConfirm();
     expect(ok).toBe(true);
     expect(calls.at(-1)).toEqual({ url: "/api/profile", init: { method: "DELETE" } });
-    expect(showSuccess).toHaveBeenCalledWith(expect.stringMatching(/^Compte effacé\./));
+    // Textes retombés sur le français sous /en : le toast le déclare aussi.
+    expect(showSuccess).toHaveBeenCalledWith(expect.stringMatching(/^Compte effacé\./), { lang: "fr" });
     expect(fakeWindow.location.href).toBe("/tournois");
     jest.advanceTimersByTime(ACCOUNT_DELETED_REDIRECT_MS);
     expect(fakeWindow.location.href).toBe("/en");
@@ -257,7 +258,7 @@ describe("useAccountDeletion", () => {
     await useAccountDeletion({ text: FR_PROFILE }).start();
     rerender();
     expect(await dialogProps(useAccountDeletion({ text: FR_PROFILE })).onConfirm()).toBe(false);
-    expect(showError).toHaveBeenCalledWith(expect.stringMatching(/rattaché à un tournoi ou à une équipe/));
+    expect(showError).toHaveBeenCalledWith(expect.stringMatching(/rattaché à un tournoi ou à une équipe/), { lang: undefined });
     jest.advanceTimersByTime(ACCOUNT_DELETED_REDIRECT_MS * 2);
     expect(fakeWindow.location.href).toBe("/tournois");
   });
