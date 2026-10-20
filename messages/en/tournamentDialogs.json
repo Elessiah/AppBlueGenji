@@ -50,11 +50,13 @@
     "admin": {
       "title": "Match score",
       "saved": "Score saved: the match is still in progress.",
+      "savedPaused": "Score saved: the match is still in progress, and the proposal's automatic confirmation is paused.",
+      "autoValidationPaused": "Automatic confirmation paused by a referee: without an answer from the opponent, only “Confirm the result” settles the match.",
         "disputeNotice": "Dispute: score entry stays locked for both opponents until you use “Confirm the result” (score or forfeit). “Save” records progress without settling the match.",
       "resolved": "Result confirmed: the board is up to date.",
       "awaitingDetail": "Loading the proposed map details… Refresh the page if they don't arrive.",
       "proposal": "Score proposed by {author} ({score1} – {score2}), awaiting confirmation from {other}. Check it, then confirm the result to approve it.",
-      "proposalDirty": "Score proposed by {author} ({score1} – {score2}), awaiting confirmation from {other}. Your entry replaces it.",
+      "proposalDirty": "Score proposed by {author} ({score1} – {score2}), awaiting confirmation from {other}. “Save” records your entry and pauses this proposal's automatic confirmation; only “Confirm the result” settles the match.",
       "stored": {
         "doubleForfeit": "Double forfeit recorded: {team1} and {team2} both lose.",
         "forfeit": "Forfeit recorded: {forfeiting}, {beneficiary} wins.",
@@ -119,6 +121,7 @@
       "conflictLoading": "Loading the map details… Refresh the page if they don't arrive.",
       "counterWarning": "This entry differs from {opponent}'s proposal (score or map details): sending it opens a dispute and locks score entry for both opponents until a referee settles it.",
       "autoValidateAt": "With no answer, this score will be confirmed automatically at {deadline} (Paris time).",
+      "autoValidatePaused": "Automatic confirmation paused by a referee: with no answer, a referee will confirm the result.",
       "willConfirm": "{opponent} will have to confirm the score you send: with no answer, it will be confirmed automatically after at least 2 hours.",
       "confirm": "Confirm the score",
       "send": "Send the score",

@@ -148,6 +148,7 @@ export async function createTournamentTables(db: Pool): Promise<void> {
       team2_report_opponent_score INT NULL,
       team2_reported_at DATETIME NULL,
       score_deadline_at DATETIME NULL,
+      score_validation_paused_at DATETIME NULL,
       start_at DATETIME NULL,
       live_trigger ENUM('AUTO', 'START_TIME', 'MANUAL') NULL,
       live_url VARCHAR(255) NULL,

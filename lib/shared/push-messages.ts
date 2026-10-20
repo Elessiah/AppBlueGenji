@@ -741,6 +741,62 @@ export function issueReportPush(
   };
 }
 
+/** Issue retenue par l'arbitrage d'un litige (`SCORE_DISPUTE_LOCK.md` § Arbitre qui joue). */
+export type SelfResolvedOutcome =
+  | { kind: "score"; team1Score: number; team2Score: number }
+  | { kind: "forfeit"; forfeitSide: 1 | 2 }
+  | { kind: "doubleForfeit" };
+
+/** Litige tranché par un membre du staff qui joue la manche. */
+export type SelfResolvedDispute = RefereeAlertMatch & {
+  team1Name: string;
+  team2Name: string;
+  /** Tournoi individuel : aucun nom d'engagé n'est cité (ce serait un pseudo). */
+  solo: boolean;
+  outcome: SelfResolvedOutcome;
+};
+
+/**
+ * L'issue en quelques mots, dans la langue voulue. `name` met en forme un nom
+ * d'équipe (le journal Discord le neutralise, `discordInline`) ; en tournoi
+ * individuel, aucun nom : un nom d'engagé y serait un pseudo de joueur.
+ */
+export function selfResolvedOutcomeText(
+  input: Pick<SelfResolvedDispute, "team1Name" | "team2Name" | "solo" | "outcome">,
+  locale: Locale = DEFAULT_LOCALE,
+  name: (value: string) => string = (value) => value,
+): string {
+  const text = TEXT[locale];
+  const { outcome } = input;
+  if (outcome.kind === "doubleForfeit") return text.t("selfResolved.doubleForfeit");
+  if (outcome.kind === "forfeit") {
+    if (input.solo) return text.t("selfResolved.forfeitSolo");
+    return text.t("selfResolved.forfeit", { team: name(outcome.forfeitSide === 1 ? input.team1Name : input.team2Name) });
+  }
+  const scores = { score1: outcome.team1Score, score2: outcome.team2Score };
+  if (input.solo) return text.t("selfResolved.scoreSolo", scores);
+  return text.t("selfResolved.score", { ...scores, team1: name(input.team1Name), team2: name(input.team2Name) });
+}
+
+/**
+ * Alerte aux **autres** membres du staff (`REFEREE_SELF_RESOLUTION`) : un des
+ * leurs, qui joue la manche, vient d'en trancher le litige. Ni son pseudo ni
+ * celui d'un joueur : le tournoi, la manche et l'issue suffisent à aller voir.
+ */
+export function selfResolvedDisputePush(input: SelfResolvedDispute, locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
+  return {
+    title: text.t("selfResolved.title"),
+    body: text.t("selfResolved.body", {
+      tournament: input.tournamentName,
+      round: pushRoundLabel(input.bracket, input.roundNumber, locale, input.swiss),
+      outcome: selfResolvedOutcomeText(input, locale),
+    }),
+    url: localeHref(tournamentMatchHref(input.tournamentId, input.matchId), locale),
+    tag: `self-resolved-${input.matchId}`,
+  };
+}
+
 /** Nouveau signalement, ou contestation, reçu par la modération. */
 export function staffReportPush(input: { reportId: number; contest: boolean }, locale: Locale = DEFAULT_LOCALE): PushContent {
   const text = TEXT[locale];

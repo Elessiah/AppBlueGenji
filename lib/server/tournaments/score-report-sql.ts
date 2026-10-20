@@ -50,8 +50,29 @@ export const SINGLE_REPORT_SQL = `(${TEAM1_REPORTED_SQL} <> ${TEAM2_REPORTED_SQL
 export const BOTH_REPORTED_SQL = `(${TEAM1_REPORTED_SQL} AND ${TEAM2_REPORTED_SQL})`;
 
 /**
+ * La validation d'office d'un report seul n'est pas **suspendue** par
+ * l'arbitrage : un « Enregistrer » d'arbitre sur un report seul la suspend
+ * (`score_validation_paused_at`, `adminSaveMatchScores`), et le score du
+ * déclarant ne remplace plus ce qui a été noté. Elle ne reprend qu'avec un
+ * report **neuf** (aucune proposition en cours : `reportMatchScore` l'efface) —
+ * ni une resaisie du déclarant, ni le temps qui passe ne la relancent. Seuls
+ * « Valider le résultat », la réponse de l'adversaire ou une remise à zéro des
+ * propositions referment la manche ou le report seul.
+ * (`docs/features/SCORE_DISPUTE_LOCK.md` § Arbitre et report seul).
+ */
+export const AUTO_VALIDATION_RUNNING_SQL = "m.score_validation_paused_at IS NULL";
+
+/**
+ * Report seul dont la validation d'office est suspendue : l'écran dit
+ * « suspendue par l'arbitrage » au lieu de l'heure (`snapshot`, `mapMatch`).
+ */
+export const AUTO_VALIDATION_PAUSED_SQL = `(m.status = 'AWAITING_CONFIRMATION'
+  AND m.score_validation_paused_at IS NOT NULL
+  AND ${SINGLE_REPORT_SQL})`;
+
+/**
  * Un report expiré que la résolution peut **faire avancer** : un report unique,
- * qu'elle valide d'office, ou un litige dont l'escalade à l'arbitrage est due
+ * qu'elle valide d'office (sauf suspension), ou un litige dont l'escalade à l'arbitrage est due
  * et pas encore réservée (`bg_referee_alerts`). Un litige déjà escaladé attend
  * un arbitre, rien d'autre — et, la saisie des joueurs étant verrouillée
  * (`docs/features/SCORE_DISPUTE_LOCK.md`), il peut attendre des heures : le
@@ -66,7 +87,7 @@ export const ACTIONABLE_EXPIRED_REPORT_SQL = `(m.status = 'AWAITING_CONFIRMATION
   AND m.score_deadline_at <= NOW()
   AND m.winner_team_id IS NULL
   AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL
-  AND (${SINGLE_REPORT_SQL}
+  AND ((${SINGLE_REPORT_SQL} AND ${AUTO_VALIDATION_RUNNING_SQL})
        OR (${BOTH_REPORTED_SQL}
            AND m.score_deadline_at <= NOW() - INTERVAL ${SCORE_REPORT_TIMEOUT_MINUTES} MINUTE
            AND NOT EXISTS (SELECT 1 FROM bg_referee_alerts a

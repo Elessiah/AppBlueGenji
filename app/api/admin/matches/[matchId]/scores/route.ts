@@ -34,8 +34,10 @@ export async function PATCH(req: Request, context: { params: Promise<{ matchId: 
   const entry = "maps" in parsed.value ? { maps: parsed.value.maps, userId: user.id } : parsed.value;
 
   try {
-    await adminSaveMatchScores(matchId_, entry);
-    return ok({});
+    // `autoValidationPaused` : la saisie suspend la validation d'office d'un
+    // report seul (`SCORE_DISPUTE_LOCK.md`) — la notification le dit.
+    const autoValidationPaused = await adminSaveMatchScores(matchId_, entry);
+    return ok({ autoValidationPaused });
   } catch (e) {
     const msg = (e as Error).message;
     const status = MAP_LIST_ERROR_CODES.has(msg) ? 400 : SAVE_SCORES_ERROR_STATUS.get(msg);

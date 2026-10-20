@@ -1,4 +1,4 @@
-import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import type { MatchStatus, PhaseFormat, TournamentFormat } from "@/lib/shared/types";
 import { dependentMatches, hasScoreInput, type MatchScoreState } from "@/lib/shared/match-lock";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
@@ -12,6 +12,7 @@ import { clearMapSets, replaceMatchMaps } from "./match-maps";
 import { finalizeMatch } from "./scoring";
 import { tryAutoResolveByes } from "./byes";
 import { detachDownstreamOutcome } from "./bracket-cascade";
+import { SINGLE_REPORT_SQL } from "./score-report-sql";
 
 interface DependentMatchRow extends RowDataPacket {
   id: number;
@@ -379,11 +380,16 @@ async function checkAdminMaps(
   return { format, score: check.score };
 }
 
+/**
+ * Note l'avancement d'une rencontre (« Enregistrer ») sans la trancher. Rend
+ * `true` quand la saisie **suspend** la validation d'office d'un report seul
+ * ({@link pauseAutoValidation}).
+ */
 export async function adminSaveMatchScores(
   connection: PoolConnection,
   matchId: number,
   entry: AdminScoreEntry,
-): Promise<void> {
+): Promise<boolean> {
   const [matches] = await connection.execute<MatchRow[]>(
     `SELECT
       id,
@@ -454,7 +460,7 @@ export async function adminSaveMatchScores(
     // Un forfait n'a pas de maps jouées : un détail noté plus tôt ne le décrit
     // plus, que le client ait envoyé des maps ou non.
     await clearMapSets(connection, [matchId], ["FINAL"]);
-    return;
+    return pauseAutoValidation(connection, matchId);
   }
 
   // Sauvegarde **map par map** : le score se dérive des maps, contrôlées sans
@@ -471,6 +477,30 @@ export async function adminSaveMatchScores(
     [derived.team1, derived.team2, matchId],
   );
   await replaceMatchMaps(connection, matchId, "FINAL", maps, userId);
+  return pauseAutoValidation(connection, matchId);
+}
+
+/**
+ * « Enregistrer » sur un match où **une seule** engagée a reporté : la
+ * validation d'office est suspendue, sans quoi le score du déclarant
+ * remplaçait à l'échéance ce que l'arbitre venait de noter (décision du
+ * 2026-10-20, `docs/features/SCORE_DISPUTE_LOCK.md` § Arbitre et report seul).
+ * Rien ailleurs : un litige garde son escalade, un match sans proposition n'a
+ * rien à suspendre. Ligne déjà verrouillée par l'appelant : un balayage
+ * concurrent attend ce commit, puis sa condition (`claimAutoValidation`) relit
+ * la suspension et ne touche rien.
+ */
+async function pauseAutoValidation(connection: PoolConnection, matchId: number): Promise<boolean> {
+  const [result] = await connection.execute<ResultSetHeader>(
+    `UPDATE bg_matches m
+        SET m.score_validation_paused_at = NOW()
+      WHERE m.id = ?
+        AND m.status = 'AWAITING_CONFIRMATION'
+        AND m.winner_team_id IS NULL
+        AND ${SINGLE_REPORT_SQL}`,
+    [matchId],
+  );
+  return result.affectedRows > 0;
 }
 
 /**

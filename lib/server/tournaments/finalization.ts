@@ -583,6 +583,11 @@ export async function resolveExpiredScoreReports(
  * et une confirmation tardive, ne peuvent pas trancher deux fois ; celui qui
  * arrive second ne touche aucune ligne et s'arrête là.
  *
+ * Un « Enregistrer » de l'arbitrage pris sous le verrou du match, avant ou
+ * pendant le balayage, suspend la validation (`score_validation_paused_at`) :
+ * la condition le relit, si bien que l'arbitre gagne la course ou la perd —
+ * jamais le score du déclarant n'écrase une saisie d'arbitre déjà validée.
+ *
  * Une resaisie du déclarant repousse l'échéance (`scoreDeadlineAssignment`) :
  * elle échoue donc aussi la condition, même dans la seconde de son dépôt.
  */
@@ -604,6 +609,7 @@ async function claimAutoValidation(
        AND winner_team_id IS NULL
        AND score_deadline_at IS NOT NULL
        AND score_deadline_at <= NOW()
+       AND score_validation_paused_at IS NULL
        AND ${reporter}_reported_at <=> ?
        AND ${reporter}_report_score <=> ?
        AND ${reporter}_report_opponent_score <=> ?

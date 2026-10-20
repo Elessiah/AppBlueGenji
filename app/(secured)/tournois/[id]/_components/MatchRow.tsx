@@ -55,8 +55,10 @@ function pendingReportText(text: TournamentActionsText, state: PendingReportStat
   const reporter = state.reporter ?? text.t("cardActions.reportSide", { side: state.side });
   // Échéance de la validation d'office, lisible des deux équipes (et de tous) :
   // à l'heure de Paris, la même pour chacun (`SCORE_DISPUTE_LOCK.md`).
-  const deadline = autoValidateTimeText(state.deadlineAt, text.locale);
   const values = { score1: state.team1Score, score2: state.team2Score, reporter };
+  // Suspendue par un « Enregistrer » d'arbitrage : aucune heure ne vaut plus.
+  if (state.paused) return text.t("cardActions.reportPendingPaused", values);
+  const deadline = autoValidateTimeText(state.deadlineAt, text.locale);
   return deadline
     ? text.t("cardActions.reportPendingDeadline", { ...values, deadline })
     : text.t("cardActions.reportPending", values);

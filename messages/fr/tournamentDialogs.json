@@ -50,11 +50,13 @@
     "admin": {
       "title": "Score du match",
       "saved": "Score enregistré : le match reste en cours.",
+      "savedPaused": "Score enregistré : le match reste en cours, et la validation automatique de la proposition est suspendue.",
+      "autoValidationPaused": "Validation automatique suspendue par l'arbitrage : sans réponse de l'adversaire, seul « Valider le résultat » tranche.",
         "disputeNotice": "Litige : la saisie des deux adversaires reste verrouillée jusqu'à « Valider le résultat » (score ou forfait). « Enregistrer » note l'avancement sans trancher.",
       "resolved": "Résultat validé : le plateau est à jour.",
       "awaitingDetail": "Lecture du détail des maps proposé… Actualise la page s'il n'arrive pas.",
       "proposal": "Score proposé par {author} ({score1} – {score2}), en attente de confirmation de {other}. Vérifie-le puis valide le résultat pour le confirmer.",
-      "proposalDirty": "Score proposé par {author} ({score1} – {score2}), en attente de confirmation de {other}. Ta saisie le remplace.",
+      "proposalDirty": "Score proposé par {author} ({score1} – {score2}), en attente de confirmation de {other}. « Enregistrer » note ta saisie et suspend la validation automatique de cette proposition ; seul « Valider le résultat » tranche.",
       "stored": {
         "doubleForfeit": "Double forfait enregistré : {team1} et {team2} perdent toutes les deux.",
         "forfeit": "Forfait enregistré : {forfeiting}, {beneficiary} l'emporte.",
@@ -119,6 +121,7 @@
       "conflictLoading": "Lecture du détail des maps… Actualise la page s'il n'arrive pas.",
       "counterWarning": "Cette saisie diffère de la proposition de {opponent} (score ou détail des maps) : l'envoyer ouvre un litige et verrouille la saisie des deux adversaires jusqu'à l'arbitrage.",
       "autoValidateAt": "Sans réponse, ce score sera validé automatiquement à {deadline} (heure de Paris).",
+      "autoValidatePaused": "Validation automatique suspendue par l'arbitrage : sans réponse, un arbitre validera le résultat.",
       "willConfirm": "{opponent} devra confirmer le score que tu envoies : sans réponse, il sera validé automatiquement après au moins 2 h.",
       "confirm": "Confirmer le score",
       "send": "Envoyer le score",

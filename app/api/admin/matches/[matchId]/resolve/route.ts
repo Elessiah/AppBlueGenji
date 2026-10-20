@@ -5,6 +5,7 @@ import { can } from "@/lib/shared/permissions";
 import { readJsonBody } from "@/lib/server/request-body";
 import { parseAdminScoreBody } from "@/lib/shared/admin-score-body";
 import { MAP_LIST_ERROR_CODES } from "@/lib/shared/match-maps";
+import type { StaffActor } from "@/lib/shared/log-privacy";
 
 export async function POST(req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();
@@ -34,7 +35,7 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
       (value) => value !== undefined && value !== null,
     );
     if (mixed) return fail("DOUBLE_FORFEIT_EXCLUSIVE", 400);
-    return resolve(matchId_, { doubleForfeit: true });
+    return resolve(matchId_, { doubleForfeit: true }, user);
   }
 
   // Un forfait, ou le détail map par map dont le score se dérive
@@ -43,12 +44,14 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
   // (`checkMatchScores` sur le score dérivé), en `DRAW_NOT_ALLOWED`.
   const parsed = parseAdminScoreBody(body);
   if (!parsed.ok) return fail(parsed.error, 400);
-  return resolve(matchId_, "maps" in parsed.value ? { maps: parsed.value.maps, userId: user.id } : parsed.value);
+  return resolve(matchId_, "maps" in parsed.value ? { maps: parsed.value.maps, userId: user.id } : parsed.value, user);
 }
 
-async function resolve(matchId: number, entry: AdminResolveEntry) {
+// L'arbitre qui tranche : s'il joue la manche en litige, les autres membres du
+// staff en sont avertis (`SCORE_DISPUTE_LOCK.md` § Arbitre qui joue).
+async function resolve(matchId: number, entry: AdminResolveEntry, actor: StaffActor) {
   try {
-    await adminResolveMatch(matchId, entry);
+    await adminResolveMatch(matchId, entry, { id: actor.id, pseudo: actor.pseudo });
     return ok({});
   } catch (e) {
     const msg = (e as Error).message;

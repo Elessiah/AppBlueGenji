@@ -85,6 +85,11 @@ export const PUSH_TOPICS = {
     description: "Un conflit de score, un litige de score resté trop longtemps sans arbitrage ou un problème signalé attend un arbitre.",
     audience: "tournaments",
   },
+  REFEREE_SELF_RESOLUTION: {
+    label: "Litiges tranchés par un joueur du staff",
+    description: "Un autre membre du staff, qui joue le match, vient d'en trancher le litige de score.",
+    audience: "tournaments",
+  },
   MATCH_SCHEDULED: {
     label: "Matchs planifiés",
     description: "Un autre arbitre planifie un match, ou en change ou en retire l'horaire — ou une mise à jour du tournoi supprime un match planifié.",

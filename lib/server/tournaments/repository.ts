@@ -4,6 +4,7 @@ import { forfeitMapCount, parseMatchFormat, type MatchFormat } from "@/lib/share
 import { tournamentMatchFormat } from "@/lib/shared/bg-survie/rounds";
 import { TournamentRow, RegistrationRow, MatchRow, TournamentListRow } from "./_internal";
 import { queueBotLog } from "./bot-logs";
+import { AUTO_VALIDATION_PAUSED_SQL } from "./score-report-sql";
 
 /**
  * Format de match applicable à une manche (`null` = saisie libre).
@@ -318,6 +319,7 @@ export async function getMatchRows(
       m.team2_report_opponent_score,
       m.team2_reported_at,
       m.score_deadline_at,
+      ${AUTO_VALIDATION_PAUSED_SQL} AS score_validation_paused,
       m.updated_at,
       m.phase_id,
       m.start_at,

@@ -189,6 +189,9 @@ import { purgeExpiredConnectionLogs } from "@/lib/server/connection-logs";
 import { maintainSiteVisitRetention } from "@/lib/server/site-visits-service";
 import { findTournamentsNeedingSync } from "./sync-scope";
 import { FINISHED_TOURNAMENTS_LIST_LIMIT } from "@/lib/shared/constants";
+import { isScoreDisputed } from "@/lib/shared/score-dispute";
+import type { StaffActor } from "@/lib/shared/log-privacy";
+import { alertSelfResolvedDispute, type DisputeBeforeResolution } from "./dispute-self-resolution";
 import { loadViewerCastBlock } from "./match-launch";
 
 let pendingSync: Promise<void> | null = null;
@@ -1324,12 +1327,16 @@ async function runPlayerMatchWrite(
   }
 }
 
-export async function adminSaveMatchScoresPublic(matchId: number, entry: AdminScoreEntry): Promise<void> {
+/**
+ * « Enregistrer » d'arbitrage. Rend `true` quand la saisie suspend la
+ * validation d'office d'un report seul (`SCORE_DISPUTE_LOCK.md`).
+ */
+export async function adminSaveMatchScoresPublic(matchId: number, entry: AdminScoreEntry): Promise<boolean> {
   // Même risque d'interblocage que le report d'un engagé (`retryOnDeadlock`).
-  await retryOnDeadlock(() => adminSaveMatchScoresOnce(matchId, entry));
+  return retryOnDeadlock(() => adminSaveMatchScoresOnce(matchId, entry));
 }
 
-async function adminSaveMatchScoresOnce(matchId: number, entry: AdminScoreEntry): Promise<void> {
+async function adminSaveMatchScoresOnce(matchId: number, entry: AdminScoreEntry): Promise<boolean> {
   const db = await getDatabase();
   const connection = await db.getConnection();
 
@@ -1337,7 +1344,7 @@ async function adminSaveMatchScoresOnce(matchId: number, entry: AdminScoreEntry)
     await connection.beginTransaction();
 
     const { adminSaveMatchScores: adminSaveInternal } = await import("./admin");
-    await adminSaveInternal(connection, matchId, entry);
+    const paused = await adminSaveInternal(connection, matchId, entry);
 
     // Need to get tournament ID for event + Survival reconciliation
     const [matchData] = await connection.execute<(RowDataPacket & { tournament_id: number })[]>(
@@ -1368,6 +1375,7 @@ async function adminSaveMatchScoresOnce(matchId: number, entry: AdminScoreEntry)
       // arbitrage reste rare, contrairement au report de score.
       invalidateTournamentLists();
     }
+    return paused;
   } catch (error) {
     await connection.rollback();
     throw error;
@@ -1568,26 +1576,62 @@ export async function liftEndurancePenaltyPublic(
   }
 }
 
-export async function adminResolveMatchPublic(matchId: number, entry: AdminResolveEntry): Promise<void> {
+/**
+ * Tranche une rencontre par l'arbitrage. `actor`, l'arbitre qui tranche : s'il
+ * joue une manche **en litige**, les autres membres du staff en sont avertis
+ * après le commit (`./dispute-self-resolution`, `SCORE_DISPUTE_LOCK.md`).
+ */
+export async function adminResolveMatchPublic(
+  matchId: number,
+  entry: AdminResolveEntry,
+  actor?: StaffActor,
+): Promise<void> {
   // Même risque d'interblocage que le report d'un engagé (`retryOnDeadlock`).
-  await retryOnDeadlock(() => adminResolveMatchOnce(matchId, entry));
+  const dispute = await retryOnDeadlock(() => adminResolveMatchOnce(matchId, entry));
+  if (dispute && actor) await alertSelfResolvedDispute(dispute, actor);
 }
 
-async function adminResolveMatchOnce(matchId: number, entry: AdminResolveEntry): Promise<void> {
+type ResolvedMatchHead = RowDataPacket & {
+  tournament_id: number;
+  team1_id: number | null;
+  team2_id: number | null;
+  status: string;
+  team1_report_score: number | null;
+  team2_report_score: number | null;
+};
+
+/** Le litige que l'arbitrage vient de trancher, `null` si la manche n'en avait pas. */
+async function adminResolveMatchOnce(
+  matchId: number,
+  entry: AdminResolveEntry,
+): Promise<DisputeBeforeResolution | null> {
   const db = await getDatabase();
   const connection = await db.getConnection();
 
   try {
     await connection.beginTransaction();
 
-    // Get tournament ID from match
-    const [matchData] = await connection.execute<(RowDataPacket & { tournament_id: number })[]>(
-      `SELECT tournament_id FROM bg_matches WHERE id = ? LIMIT 1`,
+    // Lecture **verrouillante** (table seule, MariaDB) — la même ligne que
+    // `adminResolveMatch` verrouille ensuite : le litige se lit sur l'état que
+    // l'arbitrage tranche, pas sur un état qu'une saisie concurrente change.
+    const [matchData] = await connection.execute<ResolvedMatchHead[]>(
+      `SELECT tournament_id, team1_id, team2_id, status, team1_report_score, team2_report_score
+         FROM bg_matches WHERE id = ? LIMIT 1 FOR UPDATE`,
       [matchId],
     );
 
     if (matchData.length === 0) throw new Error("MATCH_NOT_FOUND");
-    const tournamentId = Number(matchData[0].tournament_id);
+    const head = matchData[0];
+    const tournamentId = Number(head.tournament_id);
+    const disputed = isScoreDisputed({
+      status: head.status,
+      team1Reported: head.team1_report_score !== null,
+      team2Reported: head.team2_report_score !== null,
+    });
+    const dispute: DisputeBeforeResolution | null =
+      disputed && head.team1_id !== null && head.team2_id !== null
+        ? { matchId, tournamentId, team1Id: Number(head.team1_id), team2Id: Number(head.team2_id) }
+        : null;
 
     const { adminResolveMatch } = await import("./admin");
     await adminResolveMatch(connection, matchId, entry);
@@ -1614,6 +1658,7 @@ async function adminResolveMatchOnce(matchId: number, entry: AdminResolveEntry):
     // être lu, l'id du tournoi ne se découvrant qu'en cours de transaction. Un
     // arbitrage reste rare, contrairement au report de score.
     invalidateTournamentLists();
+    return dispute;
   } catch (error) {
     await connection.rollback();
     throw error;

@@ -359,6 +359,8 @@ export function AdminScoreDialog({
           {proposalNotice && (
             <output className={`${styles.stored} ${styles.notice}`}>
               {proposalNotice}
+              {/* Suspendue par un « Enregistrer » d'arbitrage (`SCORE_DISPUTE_LOCK.md`). */}
+              {match.scoreAutoValidationPaused && ` ${t("score.admin.autoValidationPaused")}`}
             </output>
           )}
 

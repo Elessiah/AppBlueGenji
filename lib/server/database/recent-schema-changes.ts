@@ -265,6 +265,9 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // « Ne plus afficher » sur la modale d'arrivée du recrutement, gardé sur le
     // compte (`docs/features/RECRUITMENT.md` § Ne plus afficher).
     `ALTER TABLE bg_users ADD COLUMN recruitment_modal_off TINYINT(1) NOT NULL DEFAULT 0`,
+    // Validation d'office suspendue par un « Enregistrer » de l'arbitrage sur
+    // un report seul (`docs/features/SCORE_DISPUTE_LOCK.md` § Arbitre et report seul).
+    `ALTER TABLE bg_matches ADD COLUMN score_validation_paused_at DATETIME NULL`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

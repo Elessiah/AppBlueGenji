@@ -323,7 +323,10 @@ export function PlayerScoreDialog({
 
   const forfeitMaps = forfeitMapCount(matchFormat);
   // Validation d'office, à l'heure de Paris (`SCORE_DISPUTE_LOCK.md`).
-  const deadline = autoValidateTimeText(match.scoreDeadlineAt, text.locale);
+  // Suspendue par un « Enregistrer » d'arbitrage : la modale le dit à la place
+  // de l'heure (`scoreAutoValidationPaused`).
+  const autoValidationPaused = match.scoreAutoValidationPaused === true;
+  const deadline = autoValidationPaused ? null : autoValidateTimeText(match.scoreDeadlineAt, text.locale);
   // Litige ouvert : saisie verrouillée pour les deux équipes, forfait compris —
   // le serveur refuse (`SCORE_LOCKED_DISPUTE`), la modale le reflète.
   const disputeLocked = view?.phase === "CONFLICT";
@@ -459,12 +462,14 @@ export function PlayerScoreDialog({
   const status = (() => {
     if (!view) return null;
     switch (view.phase) {
-      case "MINE_PENDING":
-        return deadline
-          ? t("score.player.minePendingDeadline", { score: scoreText(view.mine!), opponent: opponentName, deadline })
-          : t("score.player.minePending", { score: scoreText(view.mine!), opponent: opponentName });
+      case "MINE_PENDING": {
+        const mine = { score: scoreText(view.mine!), opponent: opponentName };
+        if (autoValidationPaused) return `${t("score.player.minePending", mine)} ${t("score.player.autoValidatePaused")}`;
+        return deadline ? t("score.player.minePendingDeadline", { ...mine, deadline }) : t("score.player.minePending", mine);
+      }
       case "THEIRS_PENDING": {
         const pending = theirsPendingStatus(text, { opponentName, myName }, view.theirs!, { canReport: canReportScore, detailLoading });
+        if (autoValidationPaused) return `${pending} ${t("score.player.autoValidatePaused")}`;
         return deadline ? `${pending} ${t("score.player.autoValidateAt", { deadline })}` : pending;
       }
       // Désaccord et verrou dans **la même** région d'état : un litige arrivé

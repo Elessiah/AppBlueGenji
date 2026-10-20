@@ -155,6 +155,19 @@ const SCORE_DEADLINE_SQL = `DATE_ADD(
            )`;
 
 /**
+ * Suspension de la validation d'office (`score_validation_paused_at`, posée
+ * par un « Enregistrer » d'arbitre sur un report seul) : un report **neuf** —
+ * aucune proposition en cours, lu sous le verrou du match — la lève, puisqu'elle
+ * visait un report effacé depuis (arbitrage, retour en arrière). Une resaisie
+ * du déclarant, elle, la garde : sans quoi il relancerait d'un clic le délai
+ * que l'arbitrage a arrêté. Texte constant, aucune entrée.
+ */
+function pauseResetAssignment(match: Pick<MatchRow, "team1_report_score" | "team2_report_score">): string {
+  const fresh = match.team1_report_score === null && match.team2_report_score === null;
+  return fresh ? ", score_validation_paused_at = NULL" : "";
+}
+
+/**
  * Affectation de `score_deadline_at` par le report d'un camp, `otherSide`
  * désignant l'adversaire. Paramètres, dans l'ordre : délai, délai, validation
  * d'office, minutes de série, délai.
@@ -459,7 +472,7 @@ export async function reportMatchScore(
            team1_report_opponent_score = ?,
            team1_reported_at = NOW(),
            ${scoreDeadlineAssignment("team2")},
-           status = 'AWAITING_CONFIRMATION'
+           status = 'AWAITING_CONFIRMATION'${pauseResetAssignment(match)}
        WHERE id = ?`,
       [
         myScore,
@@ -481,7 +494,7 @@ export async function reportMatchScore(
            team2_report_opponent_score = ?,
            team2_reported_at = NOW(),
            ${scoreDeadlineAssignment("team1")},
-           status = 'AWAITING_CONFIRMATION'
+           status = 'AWAITING_CONFIRMATION'${pauseResetAssignment(match)}
        WHERE id = ?`,
       [
         myScore,

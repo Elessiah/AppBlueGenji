@@ -210,14 +210,13 @@ export function useScoreForm(
         body: JSON.stringify(body),
       });
 
-      const payload = (await response.json()) as { error?: string };
+      const payload = (await response.json()) as { error?: string; autoValidationPaused?: boolean };
       if (!response.ok) throw new Error(payload.error || "API_ERROR");
 
-      showSuccess(
-        action === "save"
-          ? dialogText.t("score.admin.saved")
-          : dialogText.t("score.admin.resolved"),
-      );
+      // « Enregistrer » sur un report seul suspend sa validation d'office
+      // (`SCORE_DISPUTE_LOCK.md`) : la notification le dit.
+      const savedKey = payload.autoValidationPaused === true ? "score.admin.savedPaused" : "score.admin.saved";
+      showSuccess(dialogText.t(action === "save" ? savedKey : "score.admin.resolved"));
       return true;
     } catch (e) {
       const code = (e as Error).message;

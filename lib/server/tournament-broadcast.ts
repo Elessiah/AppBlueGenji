@@ -103,9 +103,14 @@ export function isStateOverdue(card: TournamentSnapshot["card"], now: number): b
 
 type DeadlineMatch = TournamentSnapshot["matches"][number];
 
-/** Délai de report d'un match en attente de confirmation, ou `null`. */
+/**
+ * Délai de report d'un match en attente de confirmation, ou `null` — aussi
+ * quand l'arbitrage a suspendu la validation d'office : l'échéance n'y
+ * tranche plus rien, s'y réveiller relirait le tournoi pour rien.
+ */
 function scoreDeadlineOf(match: DeadlineMatch): number | null {
   if (match.status !== "AWAITING_CONFIRMATION" || !match.scoreDeadlineAt) return null;
+  if (match.scoreAutoValidationPaused) return null;
   const deadline = Date.parse(match.scoreDeadlineAt);
   return Number.isFinite(deadline) ? deadline : null;
 }

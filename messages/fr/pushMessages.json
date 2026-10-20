@@ -95,6 +95,15 @@
     "score_report_stalledMatch": "Litige sans arbitrage depuis trop longtemps · {tournament}, {round} : saisie verrouillée, un arbitre doit trancher.",
     "otherMatch": "Alerte · {tournament}, {round} : un arbitre est attendu."
   },
+  "selfResolved": {
+    "title": "Litige tranché par un joueur du match",
+    "body": "Un membre du staff qui joue ce match a tranché son litige · {tournament}, {round} : {outcome}.",
+    "score": "{team1} {score1} – {score2} {team2}",
+    "scoreSolo": "{score1} – {score2}",
+    "forfeit": "forfait de {team}",
+    "forfeitSolo": "forfait d'un joueur",
+    "doubleForfeit": "double forfait"
+  },
   "issueReport": {
     "body": "Problème signalé · {tournament}.",
     "bodyRound": "Problème signalé · {tournament}, {round}."
