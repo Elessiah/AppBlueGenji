@@ -719,8 +719,9 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     expect(savedToastKey(true, true)).toBe("score.admin.savedForfeitPaused");
     expect(frDialogs.score.admin.savedForfeitPaused).toBe("Forfait enregistré : le match reste en cours, et la validation automatique de la proposition est suspendue.");
     expect(enDialogs.score.admin.savedForfeitPaused).toBe("Forfeit saved: the match is still in progress, and the proposal's automatic confirmation is paused.");
-    expect(frDialogs.score.admin.savedForfeit).toBe("Forfait enregistré : le match reste en cours.");
-    expect(enDialogs.score.admin.savedForfeit).toBe("Forfeit saved: the match is still in progress.");
+    // Un forfait se note aussi avant le lancement : jamais « en cours ».
+    expect(frDialogs.score.admin.savedForfeit).toBe("Forfait enregistré : le match n'est pas encore tranché.");
+    expect(enDialogs.score.admin.savedForfeit).toBe("Forfeit saved: the match is not settled yet.");
     // Un forfait choisi dans le formulaire n'est plus la proposition : « Reprendre » revient.
     const source = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx"), "utf8");
     expect(source).toContain("adopted={form.forfeitTeamId === undefined && !form.doubleForfeit && formHoldsReport(form.maps, pendingReport.report)}");
