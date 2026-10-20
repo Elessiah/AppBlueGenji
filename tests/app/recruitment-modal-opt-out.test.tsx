@@ -113,16 +113,20 @@ describe("modale d'arrivée — bouton « Ne plus afficher »", () => {
     expect(messagesFor("fr").recruitment.highlight.dontShowAgainDone).not.toContain("navigateur");
   });
 
-  it("met le focus d'ouverture sur « Plus tard », pas sur « Ne plus afficher », quand il n'y a qu'une annonce", () => {
-    const markup = renderToStaticMarkup(<RecruitmentHighlight {...props()} />);
-    expect(markup).toMatch(/<button[^>]*data-autofocus=""[^>]*>Plus tard<\/button>/);
-    expect(markup.match(/data-autofocus/g)).toHaveLength(1);
+  it("vient après « Plus tard », « Lire » et « Postuler » dans l'ordre du focus (Entrée pour fermer ne coupe jamais la modale)", () => {
+    for (const modalAds of [[ad({ contactUrl: "https://example.test/postuler" })], [ad(), ad({ id: 43 })]]) {
+      const markup = renderToStaticMarkup(<RecruitmentHighlight {...props({ modalAds })} />);
+      const optOut = markup.indexOf(">Ne plus afficher</button>");
+      expect(optOut).toBeGreaterThan(markup.indexOf(">Plus tard</button>"));
+      expect(optOut).toBeGreaterThan(markup.indexOf("Lire l&#x27;annonce"));
+      if (modalAds.length > 1) expect(markup.indexOf("← Précédente")).toBeLessThan(markup.indexOf(">Plus tard</button>"));
+    }
   });
 
-  it("laisse le focus d'ouverture au pager quand il y a plusieurs annonces", () => {
-    const markup = renderToStaticMarkup(<RecruitmentHighlight {...props({ modalAds: [ad(), ad({ id: 43 })] })} />);
+  it("n'impose aucun focus d'ouverture : le premier focalisable reste « Plus tard » sans pager, le pager sinon", () => {
+    const markup = renderToStaticMarkup(<RecruitmentHighlight {...props()} />);
     expect(markup).not.toContain("data-autofocus");
-    expect(markup.indexOf("← Précédente")).toBeLessThan(markup.indexOf("Ne plus afficher"));
+    expect(markup.indexOf(">Plus tard</button>")).toBeLessThan(markup.indexOf(">Ne plus afficher</button>"));
   });
 
   it("dit « openings » en anglais, jamais « ads » (glossaire I18N.md : Annonces → Openings)", () => {
@@ -156,7 +160,7 @@ describe("modale d'arrivée — bouton « Ne plus afficher »", () => {
 describe("recordRecruitmentModalOptOut", () => {
   it("non connecté : pose le cookie du navigateur, sans appel au serveur", async () => {
     const writeCookie = jest.fn<(name: string, value: string, maxAge?: number) => boolean>(() => true);
-    const post = jest.fn(async () => ({ ok: true }));
+    const post = jest.fn(async () => ({ ok: true, status: 200 }));
     expect(await recordRecruitmentModalOptOut(false, { writeCookie, post })).toBe("BROWSER");
     expect(writeCookie).toHaveBeenCalledWith(RECRUITMENT_MODAL_OFF_COOKIE, "1", RECRUITMENT_MODAL_OFF_MAX_AGE);
     expect(post).not.toHaveBeenCalled();
@@ -167,7 +171,7 @@ describe("recordRecruitmentModalOptOut", () => {
     const writeCookie = jest.fn(() => order.push("cookie") > 0);
     const post = jest.fn(async (url: string) => {
       order.push(url);
-      return { ok: true };
+      return { ok: true, status: 200 };
     });
     expect(await recordRecruitmentModalOptOut(true, { writeCookie, post })).toBe("ACCOUNT");
     expect(order).toEqual(["cookie", "/api/recruitment/modal-dismiss"]);
@@ -175,7 +179,7 @@ describe("recordRecruitmentModalOptOut", () => {
 
   it("connecté, compte injoignable ou refus : le choix reste au moins sur ce navigateur", async () => {
     const writeCookie = jest.fn(() => true);
-    expect(await recordRecruitmentModalOptOut(true, { writeCookie, post: async () => ({ ok: false }) })).toBe(
+    expect(await recordRecruitmentModalOptOut(true, { writeCookie, post: async () => ({ ok: false, status: 500 }) })).toBe(
       "BROWSER_ONLY",
     );
     expect(
@@ -189,10 +193,16 @@ describe("recordRecruitmentModalOptOut", () => {
     expect(writeCookie).toHaveBeenCalledTimes(2);
   });
 
+  it("connecté au chargement, session finie depuis (401) : traité comme non connecté, pas comme un échec", async () => {
+    const unauthorized = async () => ({ ok: false, status: 401 });
+    expect(await recordRecruitmentModalOptOut(true, { writeCookie: () => true, post: unauthorized })).toBe("BROWSER");
+    expect(await recordRecruitmentModalOptOut(true, { writeCookie: () => false, post: unauthorized })).toBe("NONE");
+  });
+
   it("cookies refusés : rien n'est gardé sans compte écrit, le compte suffit sinon", async () => {
     const writeCookie = jest.fn(() => false);
     expect(await recordRecruitmentModalOptOut(false, { writeCookie })).toBe("NONE");
-    expect(await recordRecruitmentModalOptOut(true, { writeCookie, post: async () => ({ ok: false }) })).toBe("NONE");
+    expect(await recordRecruitmentModalOptOut(true, { writeCookie, post: async () => ({ ok: false, status: 500 }) })).toBe("NONE");
     expect(
       await recordRecruitmentModalOptOut(true, {
         writeCookie,
@@ -201,7 +211,7 @@ describe("recordRecruitmentModalOptOut", () => {
         },
       }),
     ).toBe("NONE");
-    expect(await recordRecruitmentModalOptOut(true, { writeCookie, post: async () => ({ ok: true }) })).toBe("ACCOUNT");
+    expect(await recordRecruitmentModalOptOut(true, { writeCookie, post: async () => ({ ok: true, status: 200 }) })).toBe("ACCOUNT");
   });
 
   it("pose le cookie de façon synchrone, avant tout await (la modale se ferme aussitôt)", () => {
