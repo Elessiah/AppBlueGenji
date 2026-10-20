@@ -273,12 +273,49 @@ revient pour une prioritaire neuve).
 - Navigateur partagé : un cookie laissé par une personne non connectée est
   reporté sur le compte de qui se connecte ensuite sur ce navigateur (choix
   du lot : le report suit le navigateur, pas la personne).
-- RGPD : rendu dans l'export (`account.recruitmentModalOff`), remis à `0` à
-  l'anonymisation, registre T01, cookie décrit sur `/rgpd`, entrée
+- RGPD : rendu dans l'export (`account.recruitmentModalOff`,
+  `account.recruitmentModalBackOn`), remis à `0` à l'anonymisation, registre
+  T01, cookie et réglage décrits sur `/rgpd`, entrée
   `2026-10-recrutement-ne-plus-afficher` de `PRIVACY_CHANGES`.
-- Pas encore de réglage pour revenir en arrière depuis le site (le drapeau du
-  compte ne se lève qu'en base) — à ajouter à « Mon profil » si le besoin se
-  présente.
+
+### Réafficher (« Mon profil »)
+
+Section Notifications de « Mon profil », sous les messages privés de match :
+case « Fenêtre des annonces de recrutement urgentes » / “Window of urgent
+recruitment announcements” (`RecruitmentModalField`, clés
+`profile.recruitmentModal.*`). Cochée = la modale s'ouvre **sur ce
+navigateur** : ni le compte (`recruitmentModalOff`, joint à
+`GET`/`PATCH /api/profile` depuis la session, aucune requête de plus) ni le
+cookie d'ici (lu dans `document.cookie`, la fiche n'arrivant qu'après le
+montage) ne l'ont refusée. Même conduite que `MatchDmField` : enregistré au
+clic, clic pendant l'envoi mis en file (`runQueuedSaves`), `aria-busy`, toasts
+`recruitmentModal.shown` / `.hidden`, refus par code (`profileErrorMessage`).
+
+- **Cocher** → `DELETE /api/recruitment/modal-dismiss` (connecté, `401`
+  sinon) : le compte passe à `2` (« réaffichée »,
+  `recordRecruitmentModalBackOn`) **et** le cookie `bg_recr_off` de ce
+  navigateur est effacé (`Set-Cookie` `Max-Age=0`, mêmes attributs que sa
+  pose). Écriture refusée (`409 ACCOUNT_DELETED`, `503
+  RECRUITMENT_MODAL_ACCOUNT_UNAVAILABLE`, `500
+  RECRUITMENT_MODAL_RESTORE_FAILED`) : rien n'est effacé.
+- **Décocher** → `POST` habituel : compte à `1`, cookie reposé — comme le
+  bouton de la modale.
+- **Trois valeurs** de `bg_users.recruitment_modal_off` : `0` jamais choisi,
+  `1` refusée, `2` réaffichée. Le report à la connexion et le rattrapage de la
+  mise en page (`carryRecruitmentModalOffFromBrowser`) n'écrivent **que sur
+  un compte à `0`** (condition dans l'`UPDATE` même — un « réafficher » écrit
+  entre la lecture de session et le report n'est pas recouvert), et le
+  rattrapage ne part pas du tout pour un compte à `2`
+  (`AuthUser.recruitmentModalBackOn`).
+- **Autre appareil** (décision du lot) : un navigateur qui garde encore un
+  vieux `bg_recr_off` y tait la modale (le cookie seul suffit, connecté ou
+  non) mais ne le **reporte plus** sur le compte. La case y apparaît
+  décochée ; la cocher là-bas efface ce cookie-là. Le compte, lui, n'est plus
+  refusé que par un nouveau clic (modale ou case).
+- Limite acceptée : réaffichée puis refusée de nouveau dans la modale avec une
+  écriture du compte qui échoue — le cookie tait la modale ici, mais le
+  compte reste à `2` et le rattrapage ne le corrige pas (les autres appareils
+  la montrent encore ; un nouveau clic suffit).
 
 ### Banderole : les annonces défilent
 
@@ -345,6 +382,7 @@ ou que la source est déjà partie.
 | `DELETE /api/recruitment/[id]`     | admin  | Supprime une annonce |
 | `PUT /api/recruitment/reorder`     | admin  | Réordonne (`{ ids: number[] }`) — `409 RECRUITMENT_ORDER_MIXES_PRIORITIES` si l'ordre mêle les statuts |
 | `GET /api/recruitment/highlight`   | public | Mise en avant : `{ modal, banner }` (listes d'annonces) |
+| `DELETE /api/recruitment/modal-dismiss` | connecté | Réafficher depuis « Mon profil » : compte à `2`, cookie `bg_recr_off` de ce navigateur effacé (`{ account: true }`) — `401 UNAUTHORIZED`, `409 ACCOUNT_DELETED`, `503 RECRUITMENT_MODAL_ACCOUNT_UNAVAILABLE`, `500 RECRUITMENT_MODAL_RESTORE_FAILED` (cookie gardé en cas d'échec) |
 | `POST /api/recruitment/modal-dismiss` | tous | « Ne plus afficher » : repose toujours le cookie `bg_recr_off` (`Set-Cookie`) ; connecté, l'écrit sur le compte (`{ account: true }`), sans session `{ account: false }` — `409 ACCOUNT_DELETED`, `503 RECRUITMENT_MODAL_ACCOUNT_UNAVAILABLE` (colonne absente), `500 RECRUITMENT_MODAL_DISMISS_FAILED` (lecture de session comprise ; cookie toujours reposé) |
 
 Les mutations vérifient la session (`401` si anonyme, `403` si non-admin) et la

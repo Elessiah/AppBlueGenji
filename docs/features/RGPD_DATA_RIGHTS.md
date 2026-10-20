@@ -72,7 +72,7 @@ affichées dans le tableau « Données collectées ») :
   rattachement, tag et date de certification, identifiants Google et Blizzard,
   langue du compte `account.locale`, choix des messages privés de match
   `account.matchDmEnabled`, « Ne plus afficher » de la modale du recrutement
-  `account.recruitmentModalOff`), les traces d'annonce #live des matchs de ses
+  `account.recruitmentModalOff`, `account.recruitmentModalBackOn`), les traces d'annonce #live des matchs de ses
   entrées en tournoi individuel (`liveAnnouncements` : match, tournoi, date —
   `live-announcement-export.ts` ; une trace = une annonce tentée, nommant le
   joueur seulement pour une inscription faite depuis le 16 octobre 2026 ; la
