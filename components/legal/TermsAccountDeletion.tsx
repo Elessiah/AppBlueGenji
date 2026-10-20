@@ -41,7 +41,7 @@ export function TermsAccountDeletion({ onClose, onReady, preview }: Readonly<Ter
 
 function TermsAccountDeletionFlow({ onClose, onReady, preview }: Readonly<TermsAccountDeletionProps>) {
   const text = useProfileText();
-  const { start, dialog, confirming } = useAccountDeletion({ text, onCancel: onClose, layer: "overBlocking" });
+  const { start, dialog, confirming } = useAccountDeletion({ text, onCancel: onClose, layer: "overBlocking", fromTerms: true });
   // Lu par une ref : la fenêtre passe un rappel neuf à chaque rendu, qui ne
   // doit pas rejouer l'effet (et re-rendre la fenêtre) tant que la confirmation est ouverte.
   const onReadyRef = useRef(onReady);

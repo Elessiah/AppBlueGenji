@@ -185,6 +185,7 @@
     "pending": "Deleting…",
     "residual": "As with any deleted account, what remains is: the site's encrypted backups ({backupDays} days), the record of your deletion in the log used to replay it after a restore (at least {journalDays} days), the audience-measurement fingerprint described in the privacy policy, your connection data (IP address, date, login method), which the law requires us to keep for {logDays} days, the announcements of your solo-tournament matches posted in the Discord #live channel (and the moderation alert for an announcement blocked or flagged by AutoMod), which keep your username until they are deleted on request, and, if you're a staff member, the trace of your actions in the server logs.",
     "irreversible": "This can't be undone.",
+    "ownedTeamsFromTerms": "From this window, transferring or disbanding your team first requires accepting the terms of use. Without accepting them, you can ask the association for a complete erasure (“Exercising your rights”, in the privacy policy).",
     "consequences": {
       "TOURNAMENTS": "Your personal information will be erased and your username replaced with a placeholder one, but your tournament statistics will be kept — they also belong to the teams you played against.",
       "SOLO_REGISTRATIONS": "Your personal information will be erased and your username replaced with a placeholder one, but your record will remain: you're registered for a solo tournament, where your username serves as the entrant's name and will be replaced by that placeholder.",
@@ -204,7 +205,7 @@
     "errors": {
       "ACCOUNT_STILL_REFERENCED": "Your account was linked to a tournament or a team during the deletion. Try again: it will then be anonymized rather than erased.",
       "fallback": "Account deletion failed. Try again in a moment.",
-      "sessionGone": "Your session has ended — your account may already have been deleted. The page is reloading: log in again to check."
+      "sessionGone": "Your session has ended: either your account has just been deleted, or your session expired. The page is reloading. If your account still exists, log in again to restart the deletion; if it was deleted, logging in again would create a new account."
     }
   },
   "errors": {

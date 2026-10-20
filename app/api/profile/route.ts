@@ -1,4 +1,4 @@
-﻿import { type AuthUser, clearSession, getCurrentUser } from "@/lib/server/auth";
+﻿import { type AuthUser, clearSession, expireSessionCookies, getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { deleteOwnAccount } from "@/lib/server/users/account-deletion";
 import { getFullProfile } from "@/lib/server/users/full-profile";
@@ -113,6 +113,9 @@ export async function DELETE() {
     await clearSession();
   } catch (error) {
     console.error("[profile] DELETE: session cleanup failed after deletion:", error);
+    // Le cookie part quand même (`bg_session` : « supprimé à la déconnexion »,
+    // dit /rgpd) — seule l'écriture en base a échoué.
+    await expireSessionCookies();
   }
   return ok({ deleted: true, ...plan });
 }

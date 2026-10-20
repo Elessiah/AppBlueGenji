@@ -76,6 +76,8 @@ interface UseAccountDeletionOptions {
   onCancel?: () => void;
   /** `overBlocking` : la confirmation s'empile sur une fenêtre bloquante (conditions). */
   layer?: "default" | "overBlocking";
+  /** Ouverte depuis la fenêtre des conditions (non acceptées) : `deletionConsequencesText(…, fromTerms)`. */
+  fromTerms?: boolean;
 }
 
 export interface AccountDeletionFlow {
@@ -93,7 +95,12 @@ export interface AccountDeletionFlow {
   dialog: ReactNode;
 }
 
-export function useAccountDeletion({ text, onCancel, layer = "default" }: UseAccountDeletionOptions): AccountDeletionFlow {
+export function useAccountDeletion({
+  text,
+  onCancel,
+  layer = "default",
+  fromTerms = false,
+}: UseAccountDeletionOptions): AccountDeletionFlow {
   const { showError, showSuccess } = useToast();
   // Langue de l'adresse (le texte peut retomber sur le français) : après la suppression, l'accueil de cette langue.
   const pageLocale = useAppLocale();
@@ -149,7 +156,7 @@ export function useAccountDeletion({ text, onCancel, layer = "default" }: UseAcc
       }}
       onConfirm={() => performAccountDeletion(pendingDeletion.previewed)}
     >
-      <p>{deletionConsequencesText(text, pendingDeletion.subject)}</p>
+      <p>{deletionConsequencesText(text, pendingDeletion.subject, fromTerms)}</p>
     </ConfirmActionDialog>
   ) : null;
 
