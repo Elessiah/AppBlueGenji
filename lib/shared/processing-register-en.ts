@@ -131,7 +131,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     subPurposes: [
       "Displaying a public profile (username, avatar, in-game usernames according to visibility settings)",
       "Putting players in touch (adding each other in game, team recruitment)",
-      "Exporting one's data and deleting one's account from “My profile”",
+      "Exporting one's data and deleting one's account from “My profile” (deletion also from the terms of use acceptance window, without accepting them)",
       "Writing push notifications in the account's language: the language of the site page the last login started from (a login started elsewhere, or a login through the Google, Discord or Blizzard button from a browser that does not tell (too old, or one that strips this information), does not change it; French by default), or the one chosen in “My profile”",
       "Keeping on the account the “Don't show again” choice of the window of urgent recruitment announcements, so that it no longer opens on its own on the player's other devices — a choice that can be undone in “My profile”",
     ],
