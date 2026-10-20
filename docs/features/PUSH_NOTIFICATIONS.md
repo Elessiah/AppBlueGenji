@@ -43,7 +43,7 @@ ait un producteur côté serveur.
 | `CONTENT_REPORT` | Signalement qui vise le compte ou son équipe | Oui |
 | `MODERATION` | Avatar ou logo masqué, supprimé, rétabli | Oui |
 | `PRIVACY_CHANGE` | Changement du traitement des données | Oui |
-| `REFEREE_ALERT` | Conflit de score, score resté trop longtemps sans confirmation, problème signalé (`tournaments`) | Oui (rôle arbitre) |
+| `REFEREE_ALERT` | Conflit de score, litige de score resté trop longtemps sans arbitrage, problème signalé (`tournaments`) | Oui (rôle arbitre) |
 | `MATCH_SCHEDULED` (« Matchs planifiés ») | Un autre arbitre planifie un match, ou en change ou en retire l'horaire — l'auteur du geste n'est pas prévenu ; un retrait d'un horaire encore devant donne « Horaire du match retiré » ; une manche planifiée supprimée par le moteur (ronde réappariée, retour en arrière) donne aussi « Horaire du match retiré », à **tout** le staff (personne n'est exclu : c'est le moteur qui l'a retirée) ; étiquette distincte de l'annonce aux joueurs (un arbitre qui joue reçoit les deux) (`tournaments`) | Ligne au journal Discord (`publishStaffAction`) pour un geste d'arbitre, aucune pour une suppression par le moteur ; pas de message privé |
 | `REFEREE_DIGEST` (« Programme d'arbitrage ») | Environ 10 h avant, la liste des matchs à venir non encore cités (horaire, affiche, tournoi et manche ; « Un match » en solo), lien vers le tournoi s'il n'y en a qu'un, un message par balayage (`referee-digest.ts`) (`tournaments`) | Ligne au journal Discord (`sendBotLog`), sans auteur ; pas de message privé |
 | `STAFF_REPORT` | Signalement ou contestation reçu (`moderation`) | Oui (direction) |
