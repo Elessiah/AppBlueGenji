@@ -387,6 +387,9 @@ describe("tournaments-service: match state machine", () => {
 
       // team1_score, team2_score, vainqueur, perdant, match.
       expect(completion(calls)?.params).toEqual([3, 1, 100, 200, 10]);
+      // Un forfait noté par l'arbitrage (« Enregistrer ») ne survit pas au score
+      // des joueurs : même clôture que la validation d'office.
+      expect(completion(calls)?.sql).toContain("forfeit_team_id = NULL");
       expect(queueRefereeAlert).not.toHaveBeenCalled();
       // Le détail de la proposition confirmée devient le résultat retenu.
       const promote = calls.find((c) => c.sql.includes("VALUES (?, 'FINAL'"));
