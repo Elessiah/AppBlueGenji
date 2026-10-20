@@ -134,8 +134,10 @@ remplace plus, à l'échéance, ce que l'arbitre a noté.
   modifiée » dit « « Enregistrer » note ta saisie et suspend la validation
   automatique de cette proposition ; seul « Valider le résultat » tranche, à
   moins que {adversaire} ne la confirme. ». Rouvert sur un report suspendu,
-  l'avis « Enregistré : X, non tranché » dit que les champs portent la saisie
-  d'un arbitre, et non la proposition.
+  l'avis « Enregistré : X, non tranché » (forfait noté : « Forfait enregistré :
+  X, non tranché », `stored.forfeitUndecided`) dit que les champs portent la
+  saisie d'un arbitre, et non la proposition ; « Reprendre la proposition » se
+  retire quand les champs la portent déjà.
   La notification d'« Enregistrer » dit la suspension quand elle a eu lieu
   (`autoValidationPaused` dans la réponse de `PATCH …/scores`,
   `score.admin.savedPaused`). Une resaisie du déclarant pendant la suspension
