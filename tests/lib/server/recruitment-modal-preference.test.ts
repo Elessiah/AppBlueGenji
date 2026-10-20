@@ -3,7 +3,11 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 jest.mock("@/lib/server/database");
 
 import { getDatabase } from "@/lib/server/database";
-import { recordRecruitmentModalOff, recruitmentModalOff } from "@/lib/server/users/recruitment-modal-preference";
+import {
+  healRecruitmentModalOff,
+  recordRecruitmentModalOff,
+  recruitmentModalOff,
+} from "@/lib/server/users/recruitment-modal-preference";
 import { readSource } from "../../helpers/read-source";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 
@@ -61,5 +65,31 @@ describe("schéma — les deux endroits", () => {
     expect(readSource("lib/server/database/recent-schema-changes.ts")).toContain(
       `ALTER TABLE bg_users ADD COLUMN ${definition}`,
     );
+  });
+});
+
+describe("healRecruitmentModalOff — le compte rattrape le cookie du navigateur", () => {
+  it("écrit le compte connecté dont le cookie porte le choix et le drapeau non", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    expect(healRecruitmentModalOff({ userId: 7, accountOff: false, browserCookie: "1" })).toBe(true);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(execute).toHaveBeenCalledWith(expect.stringContaining("SET recruitment_modal_off = 1"), [7]);
+  });
+
+  it("ne fait rien sans session, déjà posé, ou sans cookie valide", () => {
+    expect(healRecruitmentModalOff({ userId: undefined, accountOff: undefined, browserCookie: "1" })).toBe(false);
+    expect(healRecruitmentModalOff({ userId: 7, accountOff: true, browserCookie: "1" })).toBe(false);
+    expect(healRecruitmentModalOff({ userId: 7, accountOff: false, browserCookie: undefined })).toBe(false);
+    expect(healRecruitmentModalOff({ userId: 7, accountOff: false, browserCookie: "0" })).toBe(false);
+  });
+
+  it("n'est jamais bloquant : une panne de base est seulement journalisée", async () => {
+    jest.mocked(getDatabase).mockRejectedValue(new Error("down"));
+    const spy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    expect(healRecruitmentModalOff({ userId: 7, accountOff: false, browserCookie: "1" })).toBe(true);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
   });
 });

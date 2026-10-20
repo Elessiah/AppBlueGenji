@@ -268,6 +268,22 @@ describe("recordRecruitmentModalOptOut", () => {
     expect(gone).toHaveBeenCalledTimes(1);
   });
 
+  it("connecté : une première tentative abandonnée au délai n'est pas suivie d'une seconde attendue (toast sans retard)", async () => {
+    let clock = 0;
+    const wait = jest.fn(async (_ms: number) => undefined);
+    const stalled = jest.fn<Post>().mockImplementationOnce(async () => {
+      clock += 10_000;
+      throw new Error("AbortError");
+    });
+    stalled.mockResolvedValue(reply(200, { account: true }));
+    expect(
+      await recordRecruitmentModalOptOut(true, { writeCookie: () => true, post: stalled, wait, now: () => clock }),
+    ).toBe("BROWSER_ONLY");
+    await flush();
+    expect(wait).toHaveBeenCalledWith(2_000);
+    expect(stalled).toHaveBeenCalledTimes(2);
+  });
+
   it("borne l'attente du serveur sans AbortSignal.timeout (absent de Safari 15)", () => {
     const source = readSource("components/recruitment-highlight.tsx");
     expect(source).toContain("setTimeout(() => controller.abort(), OPT_OUT_TIMEOUT_MS)");
@@ -327,6 +343,14 @@ describe("recruitmentOptOutToast — le toast dit où le choix a été gardé", 
     expect(recruitmentOptOutToast("BROWSER")).toEqual({ kind: "success", key: "dontShowAgainDoneBrowser" });
     expect(recruitmentOptOutToast("BROWSER_ONLY")).toEqual({ kind: "error", key: "dontShowAgainFailed" });
     expect(recruitmentOptOutToast("NONE")).toEqual({ kind: "error", key: "dontShowAgainUnsaved" });
+  });
+});
+
+describe("rattrapage du compte depuis le cookie, à chaque page connectée", () => {
+  it("la mise en page racine l'appelle avec la session et le cookie du navigateur", () => {
+    const layout = readSource("app/layout.tsx");
+    expect(layout).toContain("healRecruitmentModalOff({");
+    expect(layout).toContain("accountOff: user?.recruitmentModalOff,");
   });
 });
 
