@@ -214,7 +214,10 @@
 
 .modal {
   width: min(480px, 100%);
+  /* dvh : sur téléphone, vh compte la fenêtre sans barres du navigateur — le
+     bas de la modale (« Ne plus afficher ») passerait sous la barre d'outils. */
   max-height: 90vh;
+  max-height: 90dvh;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -321,9 +324,42 @@
 .modalActions {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   flex-wrap: wrap;
   gap: 10px;
   margin-top: 12px;
+}
+
+/* « Ne plus afficher » : secondaire, sur sa propre rangée sous les actions
+   (et après elles dans l'ordre du focus), en lien souligné plutôt qu'en bouton
+   plein — il ne doit pas concurrencer « Lire ». Cible de 44 px de haut au
+   toucher (WCAG 2.5.8). */
+.optOutRow {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 4px;
+}
+
+.optOut {
+  min-height: 44px;
+  padding: 0 4px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--ink-dim);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.optOut:hover {
+  color: var(--ink);
+}
+
+.optOut:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
 }
 
 /* Sur un téléphone, deux rangées fixes : l'annonce sur toute la largeur, les

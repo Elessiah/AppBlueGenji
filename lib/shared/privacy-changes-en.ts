@@ -467,6 +467,17 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "The site keeps the ID of the evening's message (not its text), deleted one day after the evening ends. On the record of a match's announcement, it also notes whether its going live was not announced (refused by the bot or AutoMod, or evening closed after its message was deleted; the match may have appeared in the message before as scheduled): that record is kept, without a new attempt, until the match is deleted, and appears in the export of your data.",
     ],
   },
+  "2026-10-recrutement-ne-plus-afficher": {
+    title: "Recruitment window: “Don't show again”",
+    summary:
+      "The window of urgent recruitment announcements that opens on its own has a “Don't show again” button. The site keeps this choice so as not to open it for you again: on this browser and, if you are logged in, on your account. You can undo it in “My profile”.",
+    details: [
+      "On the browser, the choice is held in the bg_recr_off cookie (value “1”, no personal identifier), kept for one year; unticking the “My profile” box sets it too.",
+      "On the account, it follows you to your other devices. Made before logging in (or not saved right away), it is carried over to your account at your next login or on your next visit while logged in. It is kept as long as the account, appears in the export of your data and returns to the default when the account is deleted.",
+      "You can undo this choice in “My profile”: your account then records that you turned the window back on (a mark kept until a new “Don't show again”, included in the export) and the cookie of that browser is deleted. From then on, no cookie is carried over to your account any more: a browser that holds it (set earlier, while logged out, or because it could not be saved to your account) only keeps the window closed there; only a new “Don't show again” made while logged in, or the “My profile” box, turns it off again on your account.",
+      "The announcements stay on the Recruitment page and in the banner; “Later” does not change: the window comes back for an urgent announcement you have not seen yet.",
+    ],
+  },
 };
 
 /**

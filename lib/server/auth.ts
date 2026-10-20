@@ -12,6 +12,13 @@ import { recordConnection } from "@/lib/server/connection-logs";
 import { closeSessionStreams, closeUserStreams } from "@/lib/server/session-streams";
 import { activeSuspensionSql, assertNotSuspended, purgeEndedSuspensions } from "@/lib/server/account-suspensions";
 import type { ConnectionLogEvent } from "@/lib/shared/connection-logs";
+import { isUnknownColumnError } from "@/lib/server/mysql-errors";
+import { RECRUITMENT_MODAL_OFF_COOKIE, recruitmentModalOffInBrowser } from "@/lib/shared/recruitment";
+import {
+  carryRecruitmentModalOffFromBrowser,
+  recruitmentModalBackOn,
+  recruitmentModalOff,
+} from "@/lib/server/users/recruitment-modal-preference";
 
 export type AuthUser = {
   id: number;
@@ -23,6 +30,10 @@ export type AuthUser = {
   isAdmin: boolean;
   /** Rôles de permission cumulables (inclut `ADMIN` si `isAdmin`). */
   roles: PlatformRole[];
+  /** « Ne plus afficher » posé sur la modale d'arrivée du recrutement (`bg_users.recruitment_modal_off`). */
+  recruitmentModalOff: boolean;
+  /** Modale réaffichée depuis « Mon profil » : aucun cookie n'est plus reporté sur le compte. */
+  recruitmentModalBackOn: boolean;
 };
 
 type UserRow = RowDataPacket & {
@@ -34,6 +45,7 @@ type UserRow = RowDataPacket & {
   is_adult: 0 | 1 | null;
   is_admin: 0 | 1;
   platform_roles_json: string | null;
+  recruitment_modal_off?: number | null;
 };
 
 /**
@@ -82,6 +94,8 @@ function fromRow(row: UserRow): AuthUser {
     isAdult: row.is_adult === null ? null : Boolean(row.is_adult),
     isAdmin: Boolean(row.is_admin),
     roles: resolveRoles(Boolean(row.is_admin), row.platform_roles_json),
+    recruitmentModalOff: recruitmentModalOff(row.recruitment_modal_off),
+    recruitmentModalBackOn: recruitmentModalBackOn(row.recruitment_modal_off),
   };
 }
 
@@ -116,8 +130,46 @@ export async function createSession(userId: number, event: ConnectionLogEvent): 
     maxAge: SESSION_TTL_DAYS * 24 * 60 * 60,
   });
   forgetTermsPostponement(cookieStore);
-  await recordConnection(userId, event);
+  // En parallèle : le report ne rallonge pas la connexion d'un aller-retour.
+  await Promise.all([carryRecruitmentModalOff(userId, cookieStore), recordConnection(userId, event)]);
 }
+
+/**
+ * « Ne plus afficher » choisi sur ce navigateur avant la connexion : reporté
+ * sur le compte, pour qu'il suive la personne sur ses autres appareils
+ * (`docs/features/RECRUITMENT.md` § Ne plus afficher). Jamais bloquant : une
+ * erreur (colonne absente, base occupée) laisse la connexion se faire, et le
+ * cookie continue de taire la modale ici.
+ */
+async function carryRecruitmentModalOff(
+  userId: number,
+  cookieStore: Awaited<ReturnType<typeof cookies>>,
+): Promise<void> {
+  try {
+    if (!recruitmentModalOffInBrowser(cookieStore.get(RECRUITMENT_MODAL_OFF_COOKIE)?.value)) return;
+  } catch (error) {
+    console.error("[auth] recruitment modal opt-out carry-over failed:", error);
+    return;
+  }
+  // Compte jamais décidé seulement : un « réafficher » fait dans « Mon
+  // profil » n'est pas recouvert par le vieux cookie d'un autre navigateur.
+  const write = carryRecruitmentModalOffFromBrowser(userId).then(
+    () => undefined,
+    (error: unknown) => console.error("[auth] recruitment modal opt-out carry-over failed:", error),
+  );
+  // Attente bornée : une ligne de compte verrouillée (attente de verrou
+  // jusqu'à `innodb_lock_wait_timeout`) ne fait pas patienter la connexion ;
+  // l'écriture continue seule, et le rattrapage de la mise en page la relaie.
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const bound = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, RECRUITMENT_MODAL_CARRY_WAIT_MS);
+  });
+  await Promise.race([write, bound]);
+  clearTimeout(timer);
+}
+
+/** Attente maximale du report « Ne plus afficher » à la connexion. */
+export const RECRUITMENT_MODAL_CARRY_WAIT_MS = 2_000;
 
 /**
  * L'ancien report « Plus tard » des conditions (`bg_terms_later`, plus posé
@@ -235,6 +287,25 @@ async function ensureFreshTestUser(): Promise<number> {
   }
 }
 
+/**
+ * Lecture de l'utilisateur de la session, `bg_users.recruitment_modal_off`
+ * compris. Colonne d'un changement récent (`RECENT_SCHEMA_CHANGES`) : si son
+ * `ALTER` a échoué au démarrage (`reportSchemaFailure` ne fait que
+ * journaliser), la lecture est rejouée sans elle — la modale reste ouverte
+ * par défaut — plutôt que de faire tomber chaque page connectée.
+ */
+async function selectUserRows(sql: (withModalOff: boolean) => string, params: (string | number)[]): Promise<UserRow[]> {
+  const db = await getDatabase();
+  try {
+    const [rows] = await db.execute<UserRow[]>(sql(true), params);
+    return rows;
+  } catch (error) {
+    if (!isUnknownColumnError(error)) throw error;
+    const [rows] = await db.execute<UserRow[]>(sql(false), params);
+    return rows;
+  }
+}
+
 async function getDevBypassUser(): Promise<AuthUser | null> {
   // Liste blanche stricte : le bypass n'est actif QUE lorsqu'on est explicitement
   // en développement (`next dev` → NODE_ENV="development"). Toute autre valeur
@@ -253,9 +324,8 @@ async function getDevBypassUser(): Promise<AuthUser | null> {
     if (!Number.isInteger(userId) || userId <= 0) return null;
   }
 
-  const db = await getDatabase();
-  const [rows] = await db.execute<UserRow[]>(
-    `SELECT id, pseudo, avatar_url, discord_id, google_sub, is_adult, is_admin, platform_roles_json
+  const rows = await selectUserRows(
+    (modalOff) => `SELECT id, pseudo, avatar_url, discord_id, google_sub, is_adult, is_admin, platform_roles_json${modalOff ? ", recruitment_modal_off" : ""}
      FROM bg_users
      WHERE id = ?
        AND is_deleted = 0
@@ -290,9 +360,8 @@ export const getCurrentUser = requestCache(async (): Promise<AuthUser | null> =>
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   if (!token) return null;
 
-  const db = await getDatabase();
-  const [rows] = await db.execute<UserRow[]>(
-    `SELECT u.id, u.pseudo, u.avatar_url, u.discord_id, u.google_sub, u.is_adult, u.is_admin, u.platform_roles_json
+  const rows = await selectUserRows(
+    (modalOff) => `SELECT u.id, u.pseudo, u.avatar_url, u.discord_id, u.google_sub, u.is_adult, u.is_admin, u.platform_roles_json${modalOff ? ", u.recruitment_modal_off" : ""}
      FROM bg_user_sessions s
      JOIN bg_users u ON u.id = s.user_id
      WHERE s.token_hash = ?

@@ -1,4 +1,4 @@
-﻿import { clearSession, getCurrentUser } from "@/lib/server/auth";
+﻿import { type AuthUser, clearSession, getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { deleteOwnAccount } from "@/lib/server/users/account-deletion";
 import { getFullProfile } from "@/lib/server/users/full-profile";
@@ -8,12 +8,22 @@ import { BATTLETAG_LOCKED } from "@/lib/shared/battletag-lock";
 import { DISCORD_TAG_LOCKED } from "@/lib/shared/discord-tag-lock";
 import { isProfileInputError } from "@/lib/shared/profile-input-errors";
 import { readJsonBody } from "@/lib/server/request-body";
+import type { FullProfileResponse } from "@/lib/shared/types";
 
 /** Les refus de `deleteOwnAccount` qui sortent tels quels : ils ont un sens pour l'écran. */
 const ACCOUNT_DELETION_REFUSALS: ReadonlySet<string> = new Set([
   "ACCOUNT_STILL_REFERENCED",
   "USER_NOT_FOUND",
 ]);
+
+/**
+ * Ce que « Mon profil » lit de la session, sans requête de plus : le « Ne
+ * plus afficher » de la modale de recrutement (`bg_users.recruitment_modal_off`,
+ * déjà lu par `getCurrentUser`).
+ */
+function withSessionPreferences(profile: FullProfileResponse, user: AuthUser): FullProfileResponse {
+  return { ...profile, recruitmentModalOff: user.recruitmentModalOff };
+}
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -22,7 +32,7 @@ export async function GET() {
   const profile = await getFullProfile({ id: user.id }, user.id);
   if (!profile) return fail("PROFILE_NOT_FOUND", 404);
 
-  return ok(profile);
+  return ok(withSessionPreferences(profile, user));
 }
 
 export async function PATCH(req: Request) {
@@ -50,7 +60,7 @@ export async function PATCH(req: Request) {
 
     await updateOwnProfile(user.id, body);
     const profile = await getFullProfile({ id: user.id }, user.id);
-    return ok(profile);
+    return ok(profile && withSessionPreferences(profile, user));
   } catch (error) {
     const message = (error as Error).message;
     if (message === "PSEUDO_ALREADY_USED") return fail(message, 409);

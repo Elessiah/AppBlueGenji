@@ -5,6 +5,7 @@ import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { useRecruitmentText } from "@/components/i18n/recruitment-text";
 import { CyberButton } from "@/components/cyber";
 import { UrgentPill } from "@/components/recruitment/UrgentPill";
+import { useOptionalToast } from "@/components/ui/toast";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { useClientPower } from "@/lib/shared/hooks/useClientPower";
@@ -14,6 +15,11 @@ import {
   RECRUITMENT_BANNER_ROTATION_MS,
   RECRUITMENT_MODAL_COOKIE,
   RECRUITMENT_MODAL_COOKIE_MAX_AGE,
+  RECRUITMENT_MODAL_ACCOUNT_UNAVAILABLE,
+  RECRUITMENT_MODAL_OFF_COOKIE,
+  RECRUITMENT_MODAL_OFF_EVENT,
+  RECRUITMENT_MODAL_OFF_MAX_AGE,
+  RECRUITMENT_MODAL_OFF_VALUE,
   RECRUITMENT_PRIORITY_EXPOSURE,
   type RecruitmentAd,
   buildRecruitmentPreview,
@@ -27,22 +33,167 @@ import { FR_RECRUITMENT_TEXT, type RecruitmentText } from "@/lib/shared/recruitm
 import { DEFAULT_LOCALE } from "@/lib/shared/locales";
 import styles from "./recruitment-highlight.module.css";
 
+/** « Ne plus afficher » connecté : au-delà, le choix est rendu comme gardé sur ce navigateur seulement. */
+const OPT_OUT_TIMEOUT_MS = 10_000;
+
+const OPT_OUT_URL = "/api/recruitment/modal-dismiss";
+
+/** Attente avant la seconde tentative d'un « Ne plus afficher » qui n'a pas abouti. */
+const OPT_OUT_RETRY_DELAY_MS = 2_000;
+
 /** Aperçu plus généreux qu'en carte : la modale a la place, mais pas un mur de texte. */
 const MODAL_PREVIEW_MAX = 320;
 
 /**
  * Pose un cookie de mise en avant. `document.cookie` plutôt qu'un aller-retour :
  * la fermeture est locale, le serveur n'a rien à en faire avant le prochain
- * chargement. `SameSite` strict — ce cookie ne dit rien d'utile à une requête
- * tierce. La valeur ne porte que des identifiants d'annonce.
+ * chargement. La valeur ne porte que des identifiants d'annonce (ou « 1 »).
+ * `SameSite` lax et non strict : un cookie strict n'est pas envoyé quand la
+ * visite part d'un autre site (lien Discord, résultat de recherche, retour
+ * d'OAuth) — la modale se rouvrirait alors malgré le choix. Lax n'est toujours
+ * envoyé à aucune requête tierce embarquée. Rend `false` si le navigateur a
+ * refusé le cookie (cookies bloqués). `Secure` en production.
  */
-function writeSeenCookie(name: string, value: string, maxAge?: number): void {
+function writeSeenCookie(name: string, value: string, maxAge?: number): boolean {
   try {
     document.cookie =
-      `${name}=${value}; path=/; samesite=strict` +
-      (maxAge === undefined ? "" : `; max-age=${maxAge}`);
+      `${name}=${value}; path=/; samesite=lax` +
+      (maxAge === undefined ? "" : `; max-age=${maxAge}`) +
+      // Même règle que le `Set-Cookie` du serveur (et le cookie de session) :
+      // `Secure` en production, jamais posé ni remplacé depuis une page en
+      // clair — et jamais rétrogradé par la réponse du serveur.
+      (process.env.NODE_ENV === "production" ? "; secure" : "");
+    return document.cookie.split("; ").includes(`${name}=${value}`);
   } catch {
     // Cookies refusés : la fermeture reste effective pour la vue courante.
+    return false;
+  }
+}
+
+/**
+ * Où le « Ne plus afficher » a été gardé : ce navigateur (non connecté), le
+ * compte (connecté — écrit, ou rattrapé à la page suivante), ou nulle part
+ * (cookie refusé et pas de compte écrit).
+ */
+export type RecruitmentModalOptOutResult = "BROWSER" | "ACCOUNT" | "NONE";
+
+/**
+ * Écriture du « Ne plus afficher » au serveur, d'attente bornée : la modale est
+ * déjà fermée, le toast ne doit pas attendre indéfiniment une connexion
+ * bloquée (l'abandon tombe dans le repli). `AbortController` + minuterie
+ * plutôt que `AbortSignal.timeout`, absent des navigateurs plus anciens
+ * (Safari 15) où il ferait échouer chaque appel.
+ */
+function postOptOut(url: string): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), OPT_OUT_TIMEOUT_MS);
+  // `keepalive` : un onglet fermé ou un lien suivi juste après le clic
+  // n'annule pas l'écriture (comme `PrivacyChangesModal`).
+  return fetch(url, { method: "POST", keepalive: true, signal: controller.signal }).finally(() =>
+    clearTimeout(timer),
+  );
+}
+
+/**
+ * « Ne plus afficher » : pose le cookie du navigateur **sur-le-champ** (avant
+ * tout `await`), puis appelle le serveur — **connecté ou non** : la réponse
+ * repose le cookie par `Set-Cookie`, seul moyen de lui garder un an sous
+ * Safari / iOS, qui borne à sept jours un cookie posé par script (ITP) ; et,
+ * connecté, la route écrit le choix sur le compte. Une écriture du compte qui
+ * échoue n'est **pas** un échec pour le lecteur : le cookie posé, la mise en
+ * page racine la rattrape à la page connectée suivante
+ * (`healRecruitmentModalOff`). Une seule tentative attendue, donc un toast au
+ * plus `OPT_OUT_TIMEOUT_MS` après le clic. Les dépendances sont injectables
+ * pour les tests (Jest tourne sans DOM).
+ */
+export async function recordRecruitmentModalOptOut(
+  signedIn: boolean,
+  {
+    writeCookie = writeSeenCookie,
+    post = postOptOut,
+    cookieKept = optOutCookieKept,
+    wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
+    accountCatchUp = true,
+  }: Readonly<{
+    writeCookie?: (name: string, value: string, maxAge?: number) => boolean;
+    post?: (url: string) => Promise<Pick<Response, "ok" | "status" | "json">>;
+    /** Relu après la réponse : son `Set-Cookie` peut avoir gardé le choix là où le script a été refusé. */
+    cookieKept?: () => boolean;
+    wait?: (ms: number) => Promise<void>;
+    /**
+     * Le cookie sera-t-il reporté sur le compte si l'écriture échoue ? Non
+     * pour un compte qui a réaffiché la fenêtre depuis « Mon profil » (le
+     * rattrapage ne touche qu'un compte jamais décidé) : le toast ne promet
+     * alors que ce navigateur.
+     */
+    accountCatchUp?: boolean;
+  }> = {},
+): Promise<RecruitmentModalOptOutResult> {
+  const written = writeCookie(RECRUITMENT_MODAL_OFF_COOKIE, RECRUITMENT_MODAL_OFF_VALUE, RECRUITMENT_MODAL_OFF_MAX_AGE);
+  if (!signedIn && written) {
+    // Le cookie du script tient : le serveur ne fait que le renouveler, le
+    // toast n'attend pas (une connexion faite depuis dans un autre onglet
+    // garderait aussi le choix sur le compte ; le toast « ce navigateur » dit
+    // alors moins que vrai, jamais faux). Une seconde tentative, en
+    // arrière-plan et 2 s plus tard (bascule Wi-Fi / 4G, redémarrage), si la
+    // première n'aboutit pas — réseau, délai dépassé ou 5xx (un 502 du proxy
+    // ne repose pas le cookie).
+    const retryLater = () => {
+      wait(OPT_OUT_RETRY_DELAY_MS)
+        .then(() => post(OPT_OUT_URL))
+        .catch(() => undefined);
+    };
+    post(OPT_OUT_URL).then((response) => {
+      if (response.status >= 500) retryLater();
+    }, retryLater);
+    return "BROWSER";
+  }
+  let account = false;
+  let accountUnavailable = false;
+  try {
+    const response = await post(OPT_OUT_URL);
+    // 409 (compte supprimé depuis le chargement) ou `account: false` (session
+    // finie, déconnexion dans un autre onglet) : hors connexion, le cookie
+    // reportera le choix au compte à la prochaine connexion.
+    if (response.ok) account = ((await response.json()) as { account?: unknown }).account === true;
+    else if (response.status === 503) {
+      // Le compte ne peut pas garder le choix (et rien ne le rattrapera) :
+      // ce navigateur seulement.
+      accountUnavailable =
+        ((await response.json()) as { error?: unknown }).error === RECRUITMENT_MODAL_ACCOUNT_UNAVAILABLE;
+    }
+  } catch {
+    // Réseau, délai dépassé, corps illisible : le cookie décide de l'issue, ci-dessous.
+  }
+  if (account) return "ACCOUNT";
+  // Refusé au script, le cookie a pu être posé par le `Set-Cookie` de la réponse.
+  if (!written && !cookieKept()) return "NONE";
+  // Connecté, compte non écrit : rattrapé à la page suivante, depuis le cookie
+  // (sauf compte réaffiché depuis « Mon profil » : ce navigateur seulement).
+  return signedIn && !accountUnavailable && accountCatchUp ? "ACCOUNT" : "BROWSER";
+}
+
+/** Le cookie « Ne plus afficher » est-il lisible sur ce navigateur ? */
+function optOutCookieKept(): boolean {
+  try {
+    return document.cookie.split("; ").includes(`${RECRUITMENT_MODAL_OFF_COOKIE}=${RECRUITMENT_MODAL_OFF_VALUE}`);
+  } catch {
+    return false;
+  }
+}
+
+/** Clé du toast qui rend compte d'un « Ne plus afficher » : chaque issue dit où le choix a été gardé. */
+export function recruitmentOptOutToast(result: RecruitmentModalOptOutResult): Readonly<{
+  kind: "success" | "error";
+  key: "dontShowAgainDone" | "dontShowAgainDoneBrowser" | "dontShowAgainUnsaved";
+}> {
+  switch (result) {
+    case "ACCOUNT":
+      return { kind: "success", key: "dontShowAgainDone" };
+    case "BROWSER":
+      return { kind: "success", key: "dontShowAgainDoneBrowser" };
+    default:
+      return { kind: "error", key: "dontShowAgainUnsaved" };
   }
 }
 
@@ -115,6 +266,9 @@ export function RecruitmentHighlight({
   bannerDismissed,
   bannerSeenKept = [],
   onAdPage,
+  modalOptedOut = false,
+  signedIn = false,
+  accountBackOn = false,
 }: Readonly<{
   /** Prioritaires publiées : les pages de la modale d'arrivée. */
   modalAds: readonly RecruitmentAd[];
@@ -132,10 +286,16 @@ export function RecruitmentHighlight({
   bannerSeenKept?: readonly number[];
   /** On est sur `/recrutement`, où la modale se tait (le visiteur y lit déjà les annonces). */
   onAdPage: boolean;
+  /** « Ne plus afficher » posé (compte ou navigateur) : la modale ne s'ouvre plus d'elle-même. */
+  modalOptedOut?: boolean;
+  /** Lecteur connecté : « Ne plus afficher » est aussi gardé sur son compte. */
+  signedIn?: boolean;
+  /** Compte qui a réaffiché la fenêtre depuis « Mon profil » : aucun rattrapage depuis le cookie. */
+  accountBackOn?: boolean;
 }>) {
   // Ouverte sur la première prioritaire jamais vue ; toutes vues, elle se tait.
   const modalStart = recruitmentModalStart(modalAds.map((ad) => ad.id), modalSeen);
-  const showModal = modalStart !== null && !modalSilenced && !onAdPage;
+  const showModal = modalStart !== null && !modalSilenced && !modalOptedOut && !onAdPage;
   return (
     <>
       {!bannerDismissed && bannerAds.length > 0 && (
@@ -147,6 +307,8 @@ export function RecruitmentHighlight({
           seenIds={modalSeen}
           keptIds={modalSeenKept}
           startIndex={modalStart}
+          signedIn={signedIn}
+          accountBackOn={accountBackOn}
         />
       )}
     </>
@@ -339,11 +501,15 @@ function RecruitmentArrivalModal({
   seenIds,
   keptIds,
   startIndex,
+  signedIn,
+  accountBackOn,
 }: Readonly<{
   ads: readonly RecruitmentAd[];
   seenIds: readonly number[];
   keptIds: readonly number[];
   startIndex: number;
+  signedIn: boolean;
+  accountBackOn: boolean;
 }>) {
   const [open, setOpen] = useState(true);
   const [index, setIndex] = useState(startIndex);
@@ -370,11 +536,32 @@ function RecruitmentArrivalModal({
     setOpen(false);
   }
 
+  /**
+   * « Ne plus afficher » : la modale ne s'ouvrira plus d'elle-même — sur ce
+   * navigateur (cookie, lu par la mise en page racine) et, connecté, sur le
+   * compte. Les annonces restent sur la page de recrutement et la banderole.
+   * Le cookie est posé d'abord : un compte injoignable laisse au moins ce
+   * navigateur tranquille, et le toast le dit.
+   */
+  async function optOut() {
+    // Le cookie est posé dès l'appel, avant la fermeture.
+    const saved = recordRecruitmentModalOptOut(signedIn, { accountCatchUp: !accountBackOn });
+    dismiss();
+    const { kind, key } = recruitmentOptOutToast(await saved);
+    if (kind === "error") toast?.showError(t(`highlight.${key}`));
+    else {
+      toast?.showSuccess(t(`highlight.${key}`));
+      // « Mon profil » ouvert sous la modale : sa case suit sans rechargement.
+      window.dispatchEvent(new Event(RECRUITMENT_MODAL_OFF_EVENT));
+    }
+  }
+
   // Le hook doit être appelé à chaque rendu : il ne s'active que si `open`.
   const dialogRef = useDialogBehavior({ open, onClose: dismiss });
   const text = useRecruitmentText();
   const { t } = text;
   const backdrop = useBackdropDismiss(dismiss);
+  const toast = useOptionalToast();
 
   // Une page « compte » comme vue dès qu'elle est affichée, même si le visiteur
   // quitte le site sans fermer la modale. La marque n'est posée qu'ici, à
@@ -458,6 +645,15 @@ function RecruitmentArrivalModal({
               </a>
             </CyberButton>
           )}
+        </div>
+        {/* Secondaire, sous les actions et **après** elles dans l'ordre du
+            focus : « Plus tard » reste le premier geste atteint (focus
+            d'ouverture sans pager, première tabulation après le pager), et
+            Entrée pour fermer ne coupe jamais la modale pour de bon. */}
+        <div className={styles.optOutRow}>
+          <button type="button" className={styles.optOut} onClick={() => void optOut()}>
+            {t("highlight.dontShowAgain")}
+          </button>
         </div>
       </div>
     </div>

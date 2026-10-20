@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 import crypto from "node:crypto";
 import {
   createSession,
+  RECRUITMENT_MODAL_CARRY_WAIT_MS,
   getCurrentUser,
   clearSession,
   countOtherSessions,
@@ -139,6 +140,204 @@ describe("auth", () => {
 
       await expect(createSession(1, "LOGIN_GOOGLE")).rejects.toThrow();
       expect(recordConnection).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("createSession — « Ne plus afficher » du recrutement", () => {
+    const setUp = async (cookie: string | undefined, execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []])) => {
+      const { getDatabase } = await import("@/lib/server/database");
+      const { cookies } = await import("next/headers");
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+      const get = jest.fn((name: string) => (name === "bg_recr_off" && cookie !== undefined ? { name, value: cookie } : undefined));
+      jest.mocked(cookies).mockResolvedValue(fakeCookieStore({ set: jest.fn(), get }));
+      return execute;
+    };
+    const carried = (execute: ReturnType<typeof jest.fn<SqlQuery>>) =>
+      execute.mock.calls.filter(([sql]) => String(sql).includes("recruitment_modal_off"));
+
+    it("reporte sur le compte le choix fait sur ce navigateur avant la connexion", async () => {
+      const execute = await setUp("1");
+      await createSession(5, "LOGIN_GOOGLE");
+      expect(carried(execute)).toHaveLength(1);
+      expect(carried(execute)[0][1]).toEqual([5]);
+      // Compte jamais décidé seulement : un « réafficher » de « Mon profil » n'est pas recouvert.
+      expect(String(carried(execute)[0][0]).replace(/\s+/g, " ")).toBe(
+        "UPDATE bg_users SET recruitment_modal_off = 1 WHERE id = ? AND is_deleted = 0 AND recruitment_modal_off = 0",
+      );
+    });
+
+    it("n'écrit rien sans le cookie, ou sur une valeur forgée", async () => {
+      const none = await setUp(undefined);
+      await createSession(5, "LOGIN_GOOGLE");
+      expect(carried(none)).toEqual([]);
+      const forged = await setUp("yes");
+      await createSession(5, "LOGIN_GOOGLE");
+      expect(carried(forged)).toEqual([]);
+    });
+
+    it("le report ne rallonge pas la connexion : il part en même temps que le journal de connexion", async () => {
+      const { recordConnection } = await import("@/lib/server/connection-logs");
+      let releaseUpdate: () => void = () => undefined;
+      const execute = jest.fn<SqlQuery>((sql) =>
+        sql.includes("recruitment_modal_off")
+          ? new Promise((resolve) => {
+              releaseUpdate = () => resolve([{ affectedRows: 1 }, []]);
+            })
+          : Promise.resolve([{ affectedRows: 1 }, []]),
+      );
+      await setUp("1", execute);
+      const session = createSession(5, "LOGIN_GOOGLE");
+      await new Promise((resolve) => setImmediate(resolve));
+      // L'UPDATE du report est encore en vol, le journal est déjà parti.
+      expect(recordConnection).toHaveBeenCalledWith(5, "LOGIN_GOOGLE");
+      releaseUpdate();
+      await expect(session).resolves.toBeUndefined();
+    });
+
+    it("une ligne de compte verrouillée ne fait pas attendre la connexion plus de RECRUITMENT_MODAL_CARRY_WAIT_MS", async () => {
+      jest.useFakeTimers();
+      try {
+        const execute = jest.fn<SqlQuery>((sql) =>
+          sql.includes("recruitment_modal_off")
+            ? new Promise<never>(() => undefined)
+            : Promise.resolve([{ affectedRows: 1 }, []]),
+        );
+        await setUp("1", execute);
+        let settled = false;
+        const session = createSession(5, "LOGIN_GOOGLE").then(() => {
+          settled = true;
+        });
+        await jest.advanceTimersByTimeAsync(RECRUITMENT_MODAL_CARRY_WAIT_MS - 1);
+        expect(settled).toBe(false);
+        await jest.advanceTimersByTimeAsync(1);
+        await session;
+        expect(settled).toBe(true);
+        expect(RECRUITMENT_MODAL_CARRY_WAIT_MS).toBe(2_000);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it("un report qui échoue après l'attente reste journalisé, sans rejet non géré", async () => {
+      jest.useFakeTimers();
+      const spy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+      try {
+        let failUpdate: ((error: Error) => void) | undefined;
+        const execute = jest.fn<SqlQuery>((sql) =>
+          sql.includes("recruitment_modal_off")
+            ? new Promise((_resolve, reject) => {
+                failUpdate = reject;
+              })
+            : Promise.resolve([{ affectedRows: 1 }, []]),
+        );
+        await setUp("1", execute);
+        const session = createSession(5, "LOGIN_GOOGLE");
+        await jest.advanceTimersByTimeAsync(RECRUITMENT_MODAL_CARRY_WAIT_MS);
+        await expect(session).resolves.toBeUndefined();
+        failUpdate?.(new Error("Lock wait timeout exceeded"));
+        await jest.advanceTimersByTimeAsync(0);
+        expect(spy).toHaveBeenCalledWith("[auth] recruitment modal opt-out carry-over failed:", expect.any(Error));
+      } finally {
+        jest.useRealTimers();
+        spy.mockRestore();
+      }
+    });
+
+    it("n'empêche jamais la connexion quand le report échoue", async () => {
+      const { recordConnection } = await import("@/lib/server/connection-logs");
+      const execute = jest.fn<SqlQuery>(async (sql) => {
+        if (sql.includes("recruitment_modal_off")) throw new Error("Unknown column");
+        return [{ affectedRows: 1 }, []];
+      });
+      await setUp("1", execute);
+      jest.spyOn(console, "error").mockImplementation(() => undefined);
+      await expect(createSession(5, "LOGIN_DISCORD")).resolves.toBeUndefined();
+      expect(recordConnection).toHaveBeenCalledWith(5, "LOGIN_DISCORD");
+    });
+  });
+
+  describe("getCurrentUser — « Ne plus afficher » du recrutement", () => {
+    it("lit le choix avec la session, dans la même requête", async () => {
+      const { getDatabase } = await import("@/lib/server/database");
+      const { cookies } = await import("next/headers");
+      jest.mocked(cookies).mockResolvedValue(fakeCookieStore({ get: jest.fn().mockReturnValue({ value: "tok" }) }));
+      const row = {
+        id: 3, pseudo: "P", avatar_url: null, discord_id: null, google_sub: null,
+        is_adult: 1, is_admin: 0, platform_roles_json: null, recruitment_modal_off: 1,
+      };
+      const execute = jest.fn<SqlQuery>().mockResolvedValue([[row], []]);
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+      const user = await getCurrentUser();
+
+      expect(user?.recruitmentModalOff).toBe(true);
+      expect(user?.recruitmentModalBackOn).toBe(false);
+      expect(execute).toHaveBeenCalledTimes(1);
+      expect(String(execute.mock.calls[0][0])).toMatch(/u\.recruitment_modal_off/);
+    });
+
+    it("le tient pour non posé sur une ligne qui ne le porte pas", async () => {
+      const { getDatabase } = await import("@/lib/server/database");
+      const { cookies } = await import("next/headers");
+      jest.mocked(cookies).mockResolvedValue(fakeCookieStore({ get: jest.fn().mockReturnValue({ value: "tok" }) }));
+      const row = { id: 3, pseudo: "P", avatar_url: null, discord_id: null, google_sub: null, is_adult: 1, is_admin: 0, platform_roles_json: null };
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: jest.fn<SqlQuery>().mockResolvedValue([[row], []]) }));
+
+      expect((await getCurrentUser())?.recruitmentModalOff).toBe(false);
+    });
+
+    const unknownColumn = () =>
+      Object.assign(new Error("Unknown column 'u.recruitment_modal_off'"), { code: "ER_BAD_FIELD_ERROR" });
+    const plainRow = {
+      id: 3, pseudo: "P", avatar_url: null, discord_id: null, google_sub: null,
+      is_adult: 1, is_admin: 0, platform_roles_json: null,
+    };
+
+    it("colonne absente (migration en échec) : relit sans elle plutôt que de faire tomber la page", async () => {
+      const { getDatabase } = await import("@/lib/server/database");
+      const { cookies } = await import("next/headers");
+      jest.mocked(cookies).mockResolvedValue(fakeCookieStore({ get: jest.fn().mockReturnValue({ value: "tok" }) }));
+      const execute = jest.fn<SqlQuery>(async (sql) => {
+        if (sql.includes("recruitment_modal_off")) throw unknownColumn();
+        return [[plainRow], []];
+      });
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+      const user = await getCurrentUser();
+
+      expect(user?.id).toBe(3);
+      expect(user?.recruitmentModalOff).toBe(false);
+      expect(execute).toHaveBeenCalledTimes(2);
+      expect(String(execute.mock.calls[1][0])).toContain("FROM bg_user_sessions s");
+      expect(String(execute.mock.calls[1][0])).not.toContain("recruitment_modal_off");
+    });
+
+    it("toute autre erreur de base remonte, sans seconde lecture", async () => {
+      const { getDatabase } = await import("@/lib/server/database");
+      const { cookies } = await import("next/headers");
+      jest.mocked(cookies).mockResolvedValue(fakeCookieStore({ get: jest.fn().mockReturnValue({ value: "tok" }) }));
+      const execute = jest.fn<SqlQuery>().mockRejectedValue(
+        Object.assign(new Error("gone"), { code: "PROTOCOL_CONNECTION_LOST" }),
+      );
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+      await expect(getCurrentUser()).rejects.toThrow("gone");
+      expect(execute).toHaveBeenCalledTimes(1);
+    });
+
+    it("même repli pour l'utilisateur de développement (DEV_AUTH_USER_ID)", async () => {
+      const env = process.env as Record<string, string | undefined>;
+      env.NODE_ENV = "development";
+      env.DEV_AUTH_USER_ID = "3";
+      const { getDatabase } = await import("@/lib/server/database");
+      const execute = jest.fn<SqlQuery>(async (sql) => {
+        if (sql.includes("recruitment_modal_off")) throw unknownColumn();
+        return [[plainRow], []];
+      });
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+      expect((await getCurrentUser())?.recruitmentModalOff).toBe(false);
+      expect(execute).toHaveBeenCalledTimes(2);
     });
   });
 

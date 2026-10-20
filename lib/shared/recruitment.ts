@@ -242,6 +242,53 @@ export function recruitmentModalStart(
 export const RECRUITMENT_MODAL_COOKIE_MAX_AGE = Math.floor(RECRUITMENT_MODAL_INTERVAL_MS / 1000);
 
 /**
+ * « Ne plus afficher » sur la modale d'arrivée, pour ce navigateur
+ * (`docs/features/RECRUITMENT.md` § Ne plus afficher). Un cookie et non
+ * `localStorage` : la décision d'afficher se prend côté serveur, avant le
+ * rendu. Connecté, le choix est **aussi** gardé sur le compte
+ * (`bg_users.recruitment_modal_off`) ; non connecté, il y est reporté à la
+ * connexion suivante (`createSession`). La valeur ne dit rien d'autre que le
+ * choix.
+ */
+export const RECRUITMENT_MODAL_OFF_COOKIE = "bg_recr_off";
+
+/** Seule valeur posée — toute autre est ignorée. */
+export const RECRUITMENT_MODAL_OFF_VALUE = "1";
+
+/** Un an : un choix « ne plus afficher » n'a pas vocation à expirer vite (et les navigateurs plafonnent à 400 jours). */
+export const RECRUITMENT_MODAL_OFF_MAX_AGE = 365 * 24 * 60 * 60;
+
+/**
+ * Code de `POST /api/recruitment/modal-dismiss` (503) quand le compte ne peut
+ * pas garder le choix (colonne absente) : seul ce navigateur le garde.
+ */
+export const RECRUITMENT_MODAL_ACCOUNT_UNAVAILABLE = "RECRUITMENT_MODAL_ACCOUNT_UNAVAILABLE";
+
+/**
+ * Événement de `window` émis quand « Ne plus afficher » vient d'être gardé
+ * depuis la modale : la case de « Mon profil », si elle est à l'écran sous la
+ * modale, se décoche sans attendre un rechargement.
+ */
+export const RECRUITMENT_MODAL_OFF_EVENT = "bg:recruitment-modal-off";
+
+/** Le cookie du navigateur porte-t-il le choix « Ne plus afficher » ? */
+export function recruitmentModalOffInBrowser(cookieValue: string | undefined | null): boolean {
+  return cookieValue === RECRUITMENT_MODAL_OFF_VALUE;
+}
+
+/**
+ * La modale d'arrivée est-elle refusée pour de bon par ce lecteur — sur son
+ * compte (connecté) ou sur ce navigateur ? Indépendant des silences
+ * ponctuels (`recruitmentModalSilenced`) et du « Plus tard » de sept jours.
+ */
+export function recruitmentModalOptedOut({
+  accountOff,
+  browserCookie,
+}: Readonly<{ accountOff: boolean | undefined; browserCookie: string | undefined | null }>): boolean {
+  return accountOff === true || recruitmentModalOffInBrowser(browserCookie);
+}
+
+/**
  * Durée d'affichage d'une annonce dans la banderole avant la suivante. Sept
  * secondes : de quoi lire un titre et son pôle. Au-delà de cinq secondes,
  * WCAG 2.2.2 exige un moyen de pause — la banderole en porte un.

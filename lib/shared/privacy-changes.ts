@@ -881,6 +881,22 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Le site garde l'identifiant du message de la soirée (pas son texte), effacé un jour après la fin de la soirée. Sur la trace de l'annonce d'un match, il note en plus si son passage à l'antenne n'a pas été annoncé (refus du bot ou d'AutoMod, ou soirée close après suppression de son message ; le match a pu figurer avant dans le message comme programmé) : cette trace est gardée, sans nouvel essai, jusqu'à l'effacement du match, et figure dans l'export de tes données.",
     ],
   },
+  // MODAL-DISMISS : « Ne plus afficher » sur la fenêtre des annonces de
+  // recrutement urgentes — un choix nouveau gardé sur le compte (et un cookie
+  // nouveau sur le navigateur), reporté du navigateur au compte à la connexion.
+  {
+    id: "2026-10-recrutement-ne-plus-afficher",
+    title: "Fenêtre de recrutement : « Ne plus afficher »",
+    publishedAt: "2026-10-20",
+    summary:
+      "La fenêtre des annonces de recrutement urgentes qui s'ouvre d'elle-même porte un bouton « Ne plus afficher ». Le site garde ce choix pour ne plus te l'ouvrir : sur ce navigateur et, si tu es connecté, sur ton compte. Tu peux revenir dessus dans « Mon profil ».",
+    details: [
+      "Sur le navigateur, le choix tient dans le cookie bg_recr_off (valeur « 1 », sans identifiant de personne), gardé un an ; décocher la case de « Mon profil » le pose aussi.",
+      "Sur le compte, il suit tes autres appareils. Fait avant la connexion (ou pas enregistré sur-le-champ), il est reporté sur ton compte à ta connexion suivante ou à ta prochaine visite connecté. Il est gardé le temps du compte, figure dans l'export de tes données et revient au défaut à la suppression du compte.",
+      "Tu peux revenir sur ce choix dans « Mon profil » : ton compte note alors que tu as réaffiché la fenêtre (mention gardée jusqu'à un nouveau « Ne plus afficher », présente dans l'export) et le cookie de ce navigateur est effacé. Dès lors, plus aucun cookie n'est reporté sur ton compte : un navigateur qui le garde (posé avant, hors connexion, ou faute d'avoir pu être enregistré sur ton compte) n'y tait la fenêtre que chez lui ; seul un nouveau « Ne plus afficher » fait connecté, ou la case de « Mon profil », la coupe de nouveau sur ton compte.",
+      "Les annonces restent sur la page Recrutement et dans la banderole ; « Plus tard » ne change pas : la fenêtre revient pour une annonce urgente que tu n'as pas encore vue.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

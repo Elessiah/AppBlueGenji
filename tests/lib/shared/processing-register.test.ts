@@ -576,3 +576,23 @@ describe("décisions de l'association du 2026-09-30", () => {
     );
   });
 });
+
+describe("T01 : « Ne plus afficher » de la fenêtre du recrutement (MODAL-DISMISS)", () => {
+  const enT01 = () => PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T01") as ProcessingActivity;
+
+  it("la donnée gardée sur le compte a sa finalité, en français et en anglais", () => {
+    expect(byRef("T01").dataCategories.join(" ")).toMatch(/Choix « Ne plus afficher » de la fenêtre des annonces de recrutement urgentes/);
+    expect(byRef("T01").subPurposes.join(" ")).toMatch(
+      /Garder sur le compte le choix « Ne plus afficher » de la fenêtre des annonces de recrutement urgentes, pour qu'elle ne s'ouvre plus d'elle-même sur les autres appareils du joueur/,
+    );
+    expect(enT01().subPurposes.join(" ")).toMatch(
+      /Keeping on the account the “Don't show again” choice of the window of urgent recruitment announcements, so that it no longer opens on its own on the player's other devices/,
+    );
+    expect(enT01().subPurposes).toHaveLength(byRef("T01").subPurposes.length);
+  });
+
+  it("dit que décocher la case de « Mon profil » pose aussi le choix (FR et EN)", () => {
+    expect(byRef("T01").dataCategories.join(" ")).toMatch(/urgentes, fait dans cette fenêtre ou en décochant la case de « Mon profil »/);
+    expect(enT01().dataCategories.join(" ")).toMatch(/announcements, made in that window or by unticking the “My profile” box/);
+  });
+});

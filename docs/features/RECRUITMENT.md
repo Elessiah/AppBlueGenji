@@ -196,6 +196,144 @@ l'ouverture taisait pour sept jours celles que le visiteur n'avait jamais
 feuilletées. Une fois toutes vues, elle se tait sept jours. Elle se tait sur `/recrutement` et tant qu'un choix de
 confidentialité est dû (`PrivacyChangesModal`).
 
+### Ne plus afficher
+
+La modale porte, sur sa propre rangée sous ses actions, un bouton secondaire souligné
+« Ne plus afficher » / “Don't show again” (`highlight.dontShowAgain`). Une fois
+cliqué, elle ne s'ouvre **plus jamais d'elle-même** pour cette personne ; les
+annonces restent sur `/recrutement` et dans la banderole, qui n'est pas
+concernée. « Plus tard », Échap et le voile gardent leur règle (la modale
+revient pour une prioritaire neuve).
+
+- **Navigateur** : cookie `bg_recr_off=1` (un an, `sameSite=lax`, `Secure`
+  en production — script comme serveur, même règle : jamais posé depuis une
+  page en clair ni rétrogradé par la réponse), posé par
+  le client sur-le-champ **puis reposé par le serveur** (`Set-Cookie` de
+  `POST /api/recruitment/modal-dismiss`, appelée connecté **ou non**) : Safari
+  et tout navigateur iOS (ITP) bornent à sept jours un cookie posé par script,
+  le choix n'y aurait pas duré plus que « Plus tard ». Appel en `keepalive`
+  (un onglet fermé juste après le clic ne l'annule pas). Non connecté, le
+  toast n'attend pas cet appel, sauf si le script n'a pas pu poser le cookie
+  (seul le `Set-Cookie` de la réponse peut alors le garder). Non connecté,
+  un renouvellement qui n'aboutit pas (réseau, délai dépassé, 5xx — un 502 du
+  proxy ne repose pas le cookie) est retenté **une fois**, en arrière-plan,
+  2 s plus tard. Connecté, aucune seconde tentative : le rattrapage par la
+  mise en page en tient lieu. Lu par la mise en page racine — la décision se prend avant le
+  rendu, d'où un cookie et non `localStorage`. **Lax, pas strict** (comme
+  `bg_recr_modal` / `bg_recr_banner`) : un cookie strict n'est pas envoyé quand
+  la visite part d'un autre site (lien Discord, résultat de recherche, retour
+  d'OAuth Google/Discord/Blizzard) — la modale se rouvrait alors, et le report
+  à la connexion OAuth ne voyait pas le choix.
+- **Compte** (connecté) : `bg_users.recruitment_modal_off` (`TINYINT(1)`,
+  défaut `0`), posé par `POST /api/recruitment/modal-dismiss` et lu **avec la
+  session** (`getCurrentUser` → `AuthUser.recruitmentModalOff`, aucune requête
+  de plus) : le choix suit la personne sur ses autres appareils. Colonne
+  absente (son `ALTER` de `RECENT_SCHEMA_CHANGES` a échoué) : la lecture de
+  session est rejouée sans elle (`selectUserRows`, drapeau à `false`) plutôt
+  que de faire tomber chaque page connectée.
+- **Report à la connexion** : `createSession` (point de passage des quatre
+  portes) lit le cookie et pose le drapeau sur le compte, en parallèle du
+  journal de connexion (aucun aller-retour de plus) ; une erreur n'empêche
+  jamais la connexion, et l'attente est bornée à 2 s
+  (`RECRUITMENT_MODAL_CARRY_WAIT_MS` : une ligne de compte verrouillée ne
+  retient pas la réponse de connexion, l'écriture continue seule). **Rattrapage** à chaque chargement complet d'une page connectée
+  (`healRecruitmentModalOff`, `app/layout.tsx`) : cookie posé, drapeau à `0`
+  (écriture du clic échouée) → écriture non attendue ; le drapeau lu avec la
+  session l'éteint ensuite. Au plus une tentative par compte et par processus
+  toutes les dix minutes (`RECRUITMENT_MODAL_HEAL_WINDOW_MS`) : une écriture qui
+  échoue n'est pas relancée à chaque page ni par chaque onglet restauré.
+  Mémoire bornée (`RECRUITMENT_MODAL_HEAL_MAX_TRACKED` comptes ; pleine, le
+  rattrapage attend), et plus aucune tentative si la colonne manque (jusqu'au
+  redémarrage, qui rejoue l'`ALTER`). Fenêtre comptée sur une horloge
+  monotone (`performance.now()`) : un recul de l'heure système ne la fige pas.
+- Décision : `recruitmentModalOptedOut({ accountOff, browserCookie })`
+  (`lib/shared/recruitment.ts`), passée à part de `modalSilenced` (prop
+  `modalOptedOut`) par `app/layout.tsx`, qui lit le cookie une fois et, pour
+  qui a refusé, n'envoie plus les annonces de la modale (`modalAds` vide — ni
+  leurs textes sous `/en` si la banderole n'a rien non plus ou est déjà
+  fermée). Déjà posé sur le compte, `POST /api/recruitment/modal-dismiss`
+  n'écrit rien (il repose seulement le cookie).
+- Ordre du focus : le bouton vient **après** « Plus tard », « Lire » et
+  « Postuler » dans le DOM (rangée à part, pas d'`order` CSS) — focus
+  d'ouverture sur « Plus tard » sans pager, sur le pager sinon (comme avant),
+  et la première tabulation après le pager atteint « Plus tard » : Entrée pour
+  fermer ne coupe jamais la modale pour de bon.
+- Toasts (`recruitmentOptOutToast`) : connecté, succès « Cette fenêtre ne
+  s'ouvrira plus d'elle-même… » — compte écrit, **ou** pas (réseau, délai, 5xx :
+  une seule tentative attendue, toast au plus 10 s après le clic), puisque le
+  cookie posé le fait rattraper à la page connectée suivante ; session finie
+  (`account: false`) ou compte supprimé (409) depuis le chargement : même
+  succès (le cookie suivra au compte) ; non connecté, succès « … sur ce
+  navigateur… » sans attendre le serveur ; cookie refusé au script et absent
+  après la réponse (relu dans `document.cookie`), sans compte écrit : erreur
+  « Ce choix n'a pas pu être gardé… ». Colonne absente (`503
+  RECRUITMENT_MODAL_ACCOUNT_UNAVAILABLE`, rattrapage éteint) : connecté, le
+  toast ne promet que « … sur ce navigateur… » (un 503 sans ce code, du proxy,
+  reste traité comme un 5xx).
+- Navigateur partagé : un cookie laissé par une personne non connectée est
+  reporté sur le compte de qui se connecte ensuite sur ce navigateur (choix
+  du lot : le report suit le navigateur, pas la personne).
+- RGPD : rendu dans l'export (`account.recruitmentModalOff`,
+  `account.recruitmentModalBackOn`), remis à `0` à l'anonymisation, registre
+  T01, cookie et réglage décrits sur `/rgpd`, entrée
+  `2026-10-recrutement-ne-plus-afficher` de `PRIVACY_CHANGES`.
+
+### Réafficher (« Mon profil »)
+
+Section Notifications de « Mon profil », sous les messages privés de match :
+case « Fenêtre des annonces de recrutement urgentes » / “Window of urgent
+recruitment announcements” (`RecruitmentModalField`, clés
+`profile.recruitmentModal.*`). Cochée = la modale s'ouvre **sur ce
+navigateur** : ni le compte (`recruitmentModalOff`, joint à
+`GET`/`PATCH /api/profile` depuis la session, aucune requête de plus) ni le
+cookie d'ici (lu dans `document.cookie`, la fiche n'arrivant qu'après le
+montage) ne l'ont refusée. Même conduite que `MatchDmField` : enregistré au
+clic, clic pendant l'envoi mis en file (`runQueuedSaves`), `aria-busy`, toasts
+`recruitmentModal.shown` / `.hidden`, refus par code (`profileErrorMessage`).
+Décochée refusée par le serveur mais cookie posé quand même
+(`recruitmentModalSaveOutcome` → `BROWSER`) : succès `.hiddenBrowser` (« sur ce
+navigateur »), jamais « échec » — le choix tient ici et le rattrapage le porte
+au compte s'il est à `0`.
+Modale ouverte par-dessus « Mon profil » : un « Ne plus afficher » gardé émet
+`RECRUITMENT_MODAL_OFF_EVENT` sur `window`, et la case se décoche sans
+rechargement (hors envoi en cours).
+
+- **Cocher** → `DELETE /api/recruitment/modal-dismiss` (connecté, `401`
+  sinon) : le compte passe à `2` (« réaffichée »,
+  `recordRecruitmentModalBackOn`) **et** le cookie `bg_recr_off` de ce
+  navigateur est effacé (`Set-Cookie` `Max-Age=0`, mêmes attributs que sa
+  pose). Écriture refusée (`409 ACCOUNT_DELETED`, `503
+  RECRUITMENT_MODAL_ACCOUNT_UNAVAILABLE`, `500
+  RECRUITMENT_MODAL_RESTORE_FAILED`) : rien n'est effacé.
+- **Décocher** → `POST` habituel : compte à `1`, cookie reposé — comme le
+  bouton de la modale.
+- **Trois valeurs** de `bg_users.recruitment_modal_off` : `0` jamais choisi,
+  `1` refusée, `2` réaffichée. Le report à la connexion et le rattrapage de la
+  mise en page (`carryRecruitmentModalOffFromBrowser`) n'écrivent **que sur
+  un compte à `0`** (condition dans l'`UPDATE` même — un « réafficher » écrit
+  entre la lecture de session et le report n'est pas recouvert), et le
+  rattrapage ne part pas du tout pour un compte à `2`
+  (`AuthUser.recruitmentModalBackOn`).
+- **Autre appareil** (décision du lot) : un navigateur qui garde encore un
+  vieux `bg_recr_off` y tait la modale (le cookie seul suffit, connecté ou
+  non) mais ne le **reporte plus** sur le compte. La case y apparaît
+  décochée ; la cocher là-bas efface ce cookie-là. Le compte, lui, n'est plus
+  refusé que par un nouveau clic (modale ou case).
+- Limites acceptées (le cookie ne dit pas quand il a été posé) : sur un
+  compte à `2`, un « Ne plus afficher » fait **hors connexion** reste sur ce
+  navigateur (pas de report à la connexion), et un clic connecté dont
+  l'écriture du compte échoue aussi — la modale reçoit alors
+  `accountBackOn` (`app/layout.tsx`) et le toast ne promet que « … sur ce
+  navigateur… » (`recordRecruitmentModalOptOut(…, { accountCatchUp: false })`).
+  Un nouveau clic connecté, ou la case, remet le compte à `1`. `/rgpd`,
+  `PRIVACY_CHANGES` et le registre le disent.
+- La case relit le cookie à la fin de chaque envoi (un `POST` refusé le
+  repose quand même ; un « Ne plus afficher » arrivé pendant l'envoi aussi) et,
+  un choix enregistré, appelle `onSaved` → `router.refresh()` : la mise en page
+  racine, seule à décider de la modale, est relue sans rechargement complet.
+  Déjà réaffichée (session), `DELETE` n'écrit rien et efface seulement le
+  cookie.
+
 ### Banderole : les annonces défilent
 
 La banderole porte prioritaires puis importantes, **une à la fois**, la suivante
@@ -233,6 +371,7 @@ initial (voir l'historique du LCP dans `components/recruitment-highlight.tsx`).
 | ------ | ----- | ---------- | ------ |
 | `bg_recr_modal` | 7 jours | une page de la modale est **affichée** (même sans être fermée) | identifiants des prioritaires réellement affichées, `12.15.3` |
 | `bg_recr_banner` | la visite | la banderole est **fermée** | identifiants des annonces qu'elle portait |
+| `bg_recr_off` | 1 an | « Ne plus afficher » est cliqué dans la modale | `1` (voir § Ne plus afficher) |
 
 `parseRecruitmentSeen` ignore tout ce qui n'est pas un entier positif (une valeur
 forgée ne tait que ce qu'elle nomme exactement) et lit encore l'ancienne forme à
@@ -260,6 +399,8 @@ ou que la source est déjà partie.
 | `DELETE /api/recruitment/[id]`     | admin  | Supprime une annonce |
 | `PUT /api/recruitment/reorder`     | admin  | Réordonne (`{ ids: number[] }`) — `409 RECRUITMENT_ORDER_MIXES_PRIORITIES` si l'ordre mêle les statuts |
 | `GET /api/recruitment/highlight`   | public | Mise en avant : `{ modal, banner }` (listes d'annonces) |
+| `DELETE /api/recruitment/modal-dismiss` | connecté | Réafficher depuis « Mon profil » : compte à `2`, cookie `bg_recr_off` de ce navigateur effacé (`{ account: true }`) — `401 UNAUTHORIZED`, `409 ACCOUNT_DELETED`, `503 RECRUITMENT_MODAL_ACCOUNT_UNAVAILABLE`, `500 RECRUITMENT_MODAL_RESTORE_FAILED` (cookie gardé en cas d'échec) |
+| `POST /api/recruitment/modal-dismiss` | tous | « Ne plus afficher » : repose toujours le cookie `bg_recr_off` (`Set-Cookie`) ; connecté, l'écrit sur le compte (`{ account: true }`), sans session `{ account: false }` — `409 ACCOUNT_DELETED`, `503 RECRUITMENT_MODAL_ACCOUNT_UNAVAILABLE` (colonne absente), `500 RECRUITMENT_MODAL_DISMISS_FAILED` (lecture de session comprise ; cookie toujours reposé) |
 
 Les mutations vérifient la session (`401` si anonyme, `403` si non-admin) et la
 validation partagée `validateRecruitmentAdInput` (`lib/shared/recruitment.ts`,

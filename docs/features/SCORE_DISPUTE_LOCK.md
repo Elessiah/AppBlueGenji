@@ -125,11 +125,16 @@ d'office, exactement comme si l'autre l'avait confirmé.
   format de manche se lit une fois par ronde dans un balayage, pas par match.
 - **Reports en vol au déploiement** : un report seul déposé sous l'ancienne
   règle (fin de série plausible + 10 min) aurait été validé dans les minutes
-  suivant le déploiement. Un rattrapage rejoué à chaque démarrage
-  (`RECENT_SCHEMA_CHANGES`, `recent-schema-changes.ts`) porte son échéance à la
-  saisie + 2 h ; sans effet ensuite, le nouveau code n'écrivant jamais d'échéance
-  plus proche (le seed des reports expirés date sa saisie de 2 h 10 pour ne pas
-  être rattrapé). À retirer au déploiement suivant.
+  suivant le déploiement. Un rattrapage joué au démarrage a porté son échéance
+  à la saisie + 2 h ; il a tourné au déploiement de la PR #453 (production,
+  2026-10-20) et a été retiré ensuite, le nouveau code n'écrivant jamais
+  d'échéance plus proche. Le seed des reports expirés date toujours sa saisie
+  de 2 h 10 (au-delà des deux heures). **Restauration d'une sauvegarde prise
+  avant ce déploiement** : rejouer ce rattrapage n'apporterait rien — une telle
+  archive (hebdomadaire, la dernière du 2026-10-19 à 03:00) ne peut être
+  restaurée que plus de deux heures après chaque saisie qu'elle contient, si bien que
+  « saisie + 2 h » est déjà passé et que ses reports seuls en attente sont
+  validés d'office au premier démarrage, avec ou sans lui.
 - **Colonnes de clôture partagées** (`MATCH_RESULT_SET_SQL`,
   `score-report-sql.ts`) : la validation d'office et l'accord des deux engagés
   écrivent la même liste, `forfeit_team_id = NULL` compris — un forfait noté

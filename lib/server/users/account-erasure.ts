@@ -118,6 +118,12 @@ export async function anonymizeAccount(connection: PoolConnection, userId: numbe
   } catch (error) {
     if (!isUnknownColumnError(error)) throw error;
   }
+  // Même régime pour le « Ne plus afficher » de la modale du recrutement.
+  try {
+    await connection.execute(`UPDATE bg_users SET recruitment_modal_off = 0 WHERE id = ? AND is_deleted = 1`, [userId]);
+  } catch (error) {
+    if (!isUnknownColumnError(error)) throw error;
+  }
   // Les consentements aux changements de traitement et la trace des messages
   // privés envoyés : ils ne concernent plus personne, et le compte ne sera plus
   // jamais sollicité (`is_deleted = 0` borne les deux lectures).

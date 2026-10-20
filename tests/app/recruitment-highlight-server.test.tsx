@@ -209,7 +209,9 @@ describe("RecruitmentHighlight — ce qui ne doit plus exister", () => {
   it("ne va plus chercher son annonce lui-même", () => {
     // C'est l'aller-retour qui partait de **chaque page** du site, à chaque
     // visiteur, pour ne presque jamais rien rapporter.
-    expect(code).not.toMatch(/fetch\(/);
+    // Seul appel restant : l'écriture du « Ne plus afficher », au clic.
+    expect(code.match(/fetch\(/g) ?? []).toHaveLength(1);
+    expect(code).toContain('fetch(url, { method: "POST", keepalive: true, signal: controller.signal })');
     expect(code).not.toContain("/api/recruitment/highlight");
   });
 

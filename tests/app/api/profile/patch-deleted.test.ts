@@ -61,7 +61,7 @@ describe("PATCH /api/profile — course avec la suppression du compte", () => {
 
     const res = await PATCH(profilePatchRequest({ pseudo: "Nova" }));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual(JSON.parse(JSON.stringify(profile)));
+    expect(await res.json()).toEqual(JSON.parse(JSON.stringify({ ...profile, recruitmentModalOff: false })));
   });
 });
 

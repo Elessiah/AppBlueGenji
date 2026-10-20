@@ -1,5 +1,6 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { isUnknownColumnError } from "@/lib/server/mysql-errors";
 import type { ConnectionMethod } from "@/lib/shared/account-connections";
 import { toIso } from "@/lib/server/serialization";
 import { listPrivacyAcknowledgments } from "@/lib/server/privacy-consent";
@@ -14,6 +15,7 @@ import { getFullProfile } from "./full-profile";
 import { accountLocaleFromRow } from "./account-locale";
 import { listOwnLiveAnnouncements } from "./live-announcement-export";
 import { matchDmEnabled } from "./match-dm-preference";
+import { recruitmentModalBackOn, recruitmentModalOff } from "./recruitment-modal-preference";
 
 /**
  * Rassemble l'intégralité des données personnelles du propriétaire du compte
@@ -23,42 +25,54 @@ import { matchDmEnabled } from "./match-dm-preference";
  */
 export async function exportOwnData(userId: number): Promise<PersonalDataExport> {
   const db = await getDatabase();
-  const [rows] = await db.execute<
-    (RowDataPacket & {
-      id: number;
-      pseudo: string;
-      avatar_url: string | null;
-      overwatch_battletag: string | null;
-      marvel_rivals_tag: string | null;
-      discord_pseudo: string | null;
-      discord_verified_at: Date | null;
-      discord_id: string | null;
-      discord_link_method: ConnectionMethod | null;
-      google_sub: string | null;
-      blizzard_sub: string | null;
-      is_adult: 0 | 1 | null;
-      is_admin: 0 | 1;
-      visible_avatar: 0 | 1;
-      visible_overwatch: 0 | 1;
-      visible_marvel: 0 | 1;
-      visible_major: 0 | 1;
-      visible_discord: 0 | 1;
-      open_to_recruitment: 0 | 1;
-      locale: string | null;
-      match_dm_enabled: number | null;
-      created_at: Date;
-    })[]
-  >(
-    `SELECT id, pseudo, avatar_url, overwatch_battletag, marvel_rivals_tag,
-            discord_pseudo, discord_verified_at, discord_id, discord_link_method,
-            google_sub, blizzard_sub, is_adult, is_admin,
-            visible_avatar, visible_overwatch, visible_marvel, visible_major, visible_discord,
-            open_to_recruitment, locale, match_dm_enabled, created_at
-     FROM bg_users
-     WHERE id = ? AND is_deleted = 0
-     LIMIT 1`,
-    [userId],
-  );
+  type AccountRow = RowDataPacket & {
+    id: number;
+    pseudo: string;
+    avatar_url: string | null;
+    overwatch_battletag: string | null;
+    marvel_rivals_tag: string | null;
+    discord_pseudo: string | null;
+    discord_verified_at: Date | null;
+    discord_id: string | null;
+    discord_link_method: ConnectionMethod | null;
+    google_sub: string | null;
+    blizzard_sub: string | null;
+    is_adult: 0 | 1 | null;
+    is_admin: 0 | 1;
+    visible_avatar: 0 | 1;
+    visible_overwatch: 0 | 1;
+    visible_marvel: 0 | 1;
+    visible_major: 0 | 1;
+    visible_discord: 0 | 1;
+    open_to_recruitment: 0 | 1;
+    locale: string | null;
+    match_dm_enabled: number | null;
+    /** Absente si son `ALTER` de `RECENT_SCHEMA_CHANGES` a échoué. */
+    recruitment_modal_off?: number | null;
+    created_at: Date;
+  };
+  const selectAccount = (withModalOff: boolean) =>
+    db.execute<AccountRow[]>(
+      `SELECT id, pseudo, avatar_url, overwatch_battletag, marvel_rivals_tag,
+              discord_pseudo, discord_verified_at, discord_id, discord_link_method,
+              google_sub, blizzard_sub, is_adult, is_admin,
+              visible_avatar, visible_overwatch, visible_marvel, visible_major, visible_discord,
+              open_to_recruitment, locale, match_dm_enabled${withModalOff ? ", recruitment_modal_off" : ""}, created_at
+       FROM bg_users
+       WHERE id = ? AND is_deleted = 0
+       LIMIT 1`,
+      [userId],
+    );
+  // Colonne d'un changement récent : son `ALTER` échoué au démarrage ne doit
+  // pas priver le titulaire de son export (droit d'accès) — relu sans elle,
+  // drapeau au défaut, comme la lecture de session (`selectUserRows`).
+  let rows: AccountRow[];
+  try {
+    [rows] = await selectAccount(true);
+  } catch (error) {
+    if (!isUnknownColumnError(error)) throw error;
+    [rows] = await selectAccount(false);
+  }
 
   if (rows.length === 0) throw new Error("PROFILE_NOT_FOUND");
   const row = rows[0];
@@ -92,6 +106,9 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
       locale: accountLocaleFromRow(row.locale),
       // L'opposition aux messages privés de match est une donnée détenue : rendue.
       matchDmEnabled: matchDmEnabled(row.match_dm_enabled),
+      // « Ne plus afficher » la modale d'arrivée du recrutement : donnée détenue, rendue.
+      recruitmentModalOff: recruitmentModalOff(row.recruitment_modal_off),
+      recruitmentModalBackOn: recruitmentModalBackOn(row.recruitment_modal_off),
       createdAt: toIso(row.created_at) ?? new Date().toISOString(),
     },
     profile: {

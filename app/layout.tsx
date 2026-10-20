@@ -25,6 +25,7 @@ import { scheduleAccountDeletionJournalPrune } from "@/lib/server/account-deleti
 import { schedulePurgeExpiredReports } from "@/lib/server/content-reports";
 import { getRecruitmentSpotlight } from "@/lib/server/recruitment-service";
 import { getCurrentUser } from "@/lib/server/auth";
+import { healRecruitmentModalOff } from "@/lib/server/users/recruitment-modal-preference";
 import { loadPendingPrivacyChanges } from "@/lib/server/privacy-consent";
 import { dispatchPrivacyChangeNotifications } from "@/lib/server/privacy-change-notifications";
 import type { PrivacyChange } from "@/lib/shared/privacy-changes";
@@ -38,7 +39,9 @@ import {
 import {
   RECRUITMENT_BANNER_COOKIE,
   RECRUITMENT_MODAL_COOKIE,
+  RECRUITMENT_MODAL_OFF_COOKIE,
   recruitmentDismissed,
+  recruitmentModalOptedOut,
   recruitmentSeenAmong,
   recruitmentSeenKept,
 } from "@/lib/shared/recruitment";
@@ -195,6 +198,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const onRecruitmentPage = requestedPath === RECRUITMENT_PAGE;
   const modalCookie = cookieStore.get(RECRUITMENT_MODAL_COOKIE)?.value;
   const bannerCookie = cookieStore.get(RECRUITMENT_BANNER_COOKIE)?.value;
+  const modalOffCookie = cookieStore.get(RECRUITMENT_MODAL_OFF_COOKIE)?.value;
   const adIds = (ads: readonly { id: number }[]) => ads.map((ad) => ad.id);
   const modalSeen = recruitmentSeenAmong(modalCookie, adIds(spotlight.modal));
   const bannerDismissed = recruitmentDismissed(bannerCookie, adIds(spotlight.banner));
@@ -230,6 +234,19 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   // Même régime pour le journal des suppressions de compte : une ligne ne doit
   // pas attendre la suppression suivante pour partir à son échéance.
   scheduleAccountDeletionJournalPrune();
+  // « Ne plus afficher » gardé sur ce navigateur mais pas encore sur le compte
+  // (écriture du clic échouée) : rattrapé ici, jamais attendu.
+  healRecruitmentModalOff({
+    userId: user?.id,
+    accountOff: user?.recruitmentModalOff,
+    accountBackOn: user?.recruitmentModalBackOn,
+    browserCookie: modalOffCookie,
+  });
+  // « Ne plus afficher » : sur le compte (lu avec la session), ou sur ce
+  // navigateur. La modale ne s'ouvrant plus, ses annonces ne partent pas dans
+  // la page (ni, sous `/en`, ses textes quand la banderole n'a rien non plus).
+  const modalOptedOut = recruitmentModalOptedOut({ accountOff: user?.recruitmentModalOff, browserCookie: modalOffCookie });
+  const modalAds = modalOptedOut ? [] : spotlight.modal;
   const termsRequest = await termsRequestFor(user?.id);
   const termsRequired = termsRequest !== null;
   // Bloquante pour tout compte connecté en retard d'une version (pas de report).
@@ -250,9 +267,11 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const locale = pageLocale;
   const shellMessages = locale === DEFAULT_LOCALE ? undefined : messagesFor(locale).shell;
   // Textes de la mise en avant du recrutement : l'anglais ne voyage que sous
-  // `/en`, et seulement s'il y a une annonce à montrer.
+  // `/en`, et seulement s'il y a une annonce à montrer (banderole déjà fermée
+  // et modale refusée : rien ne se rend).
+  const bannerShown = !bannerDismissed && spotlight.banner.length > 0;
   const recruitmentMessages =
-    locale === DEFAULT_LOCALE || (spotlight.banner.length === 0 && spotlight.modal.length === 0)
+    locale === DEFAULT_LOCALE || (!bannerShown && modalAds.length === 0)
       ? undefined
       : recruitmentClientMessages(messagesFor(locale).recruitment);
 
@@ -282,12 +301,15 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
               Voir `lib/shared/global-modals.ts`. */}
           <RecruitmentTextProvider locale={locale} messages={recruitmentMessages}>
           <RecruitmentHighlight
-            modalAds={spotlight.modal}
+            modalAds={modalAds}
             modalSilenced={recruitmentModalSilenced({
               privacyPending: privacyChanges.length > 0,
               termsModalDue: termsDueOnLoad,
               pathname: requestedPath,
             })}
+            modalOptedOut={modalOptedOut}
+            signedIn={user !== null}
+            accountBackOn={user?.recruitmentModalBackOn === true}
             modalSeen={modalSeen}
             modalSeenKept={modalSeenKept}
             bannerAds={spotlight.banner}

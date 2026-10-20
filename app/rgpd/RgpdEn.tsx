@@ -444,8 +444,23 @@ export function RgpdEn({
               <strong>when the window of urgent recruitment announcements is shown to you</strong> (the first) or{" "}
               <strong>if you close the recruitment banner</strong> (the second), so as not to show them to you
               again. They only contain the numbers of the announcements concerned, never a personal identifier:
-              they allow neither recognizing you nor following you from one site to another (sameSite=strict). The
+              they allow neither recognizing you nor following you from one site to another (sameSite=lax). The
               first lasts seven days, the second the duration of your visit.
+            </li>
+            <li>
+              <strong>bg_recr_off</strong> — set only <strong>if you choose “Don&apos;t show again”</strong> in the
+              window of urgent recruitment announcements (or if you untick the “My profile” box that controls it), so that it no longer opens on its own on this browser. It
+              only contains the value “1”, never a personal identifier (sameSite=lax), and lasts one year. When
+              you are logged in, the same choice is kept on your account, for your other devices; if it was made
+              before logging in (or could not be saved to it right away), it is carried over to the account at login
+              or on your next visit while logged in. On the account, it lasts as long as the
+              account, is included in the export of your data and returns to the default when the account is
+              deleted. You can undo this choice in “My profile”: the account then records that you turned the window
+              back on (a mark kept until a new “Don&apos;t show again”, included in the export) and the cookie of
+              that browser is deleted. From then on, no cookie is carried over to the account any more: a browser
+              that holds it (set earlier, while logged out, or because it could not be saved to the account) only keeps the window closed there; only a new
+              “Don&apos;t show again” made while logged in, or the “My profile” box, turns it off again on the
+              account.
             </li>
             <li>
               <strong>bg_terms_later</strong> — <strong>no longer set</strong> since version 6 of the terms of use: accepting

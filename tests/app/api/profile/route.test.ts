@@ -45,9 +45,19 @@ describe("GET /api/profile", () => {
     const res = await GET();
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual(profile);
+    expect(await res.json()).toEqual({ ...profile, recruitmentModalOff: false });
     // Lecteur = titulaire : c'est ce qui lui rend ses champs masqués.
     expect(getFullProfile).toHaveBeenCalledWith({ id: 42 }, 42);
+  });
+
+  it("joint le « Ne plus afficher » du recrutement lu avec la session, sans autre lecture", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 42, recruitmentModalOff: true }));
+    jest.mocked(getFullProfile).mockResolvedValue(profile);
+
+    const res = await GET();
+
+    expect(((await res.json()) as { recruitmentModalOff?: boolean }).recruitmentModalOff).toBe(true);
+    expect(getFullProfile).toHaveBeenCalledTimes(1);
   });
 
   it("rend 404 quand le compte n'existe plus", async () => {
@@ -81,5 +91,15 @@ describe("PATCH /api/profile — compte visé", () => {
 
     expect(updateOwnProfile).toHaveBeenCalledWith(42, body);
     expect(getFullProfile).toHaveBeenCalledWith({ id: 42 }, 42);
+  });
+
+  it("rend le réglage du recrutement avec la fiche relue (la case ne disparaît pas après une sauvegarde)", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(user);
+    jest.mocked(updateOwnProfile).mockResolvedValue(undefined);
+    jest.mocked(getFullProfile).mockResolvedValue(profile);
+
+    const res = await PATCH(profilePatchRequest({ pseudo: "Nova" }));
+
+    expect(((await res.json()) as { recruitmentModalOff?: boolean }).recruitmentModalOff).toBe(false);
   });
 });

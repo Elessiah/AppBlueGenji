@@ -575,8 +575,25 @@ function RgpdFr({
               recrutement</strong> (le second), pour ne pas vous les réafficher. Ils ne
               contiennent que les numéros des annonces concernées, jamais d'identifiant de
               personne : ils ne permettent ni de vous reconnaître, ni de vous suivre d'un site
-              à l'autre (sameSite=strict). Le premier dure sept jours, le second le temps de
+              à l'autre (sameSite=lax). Le premier dure sept jours, le second le temps de
               votre visite.
+            </li>
+            <li>
+              <strong>bg_recr_off</strong> — déposé uniquement <strong>si vous choisissez « Ne plus
+              afficher »</strong> dans la fenêtre des annonces de recrutement urgentes (ou si vous
+              décochez la case de « Mon profil » qui la commande), pour
+              qu&apos;elle ne s&apos;ouvre plus d&apos;elle-même sur ce navigateur. Il ne contient que
+              la valeur « 1 », jamais d&apos;identifiant de personne (sameSite=lax), et dure un an.
+              Connecté, le même choix est gardé sur votre compte, pour vos autres appareils ; s&apos;il
+              a été fait avant la connexion (ou n&apos;a pas pu y être enregistré sur-le-champ), il y est
+              reporté à la connexion ou à votre prochaine visite connectée. Sur le compte, il dure
+              autant que lui, figure dans l&apos;export de vos données et revient au défaut à la
+              suppression du compte. Vous pouvez revenir sur ce choix dans « Mon profil » : le
+              compte note alors que vous avez réaffiché la fenêtre (mention gardée jusqu&apos;à un
+              nouveau « Ne plus afficher », présente dans l&apos;export) et le cookie de ce navigateur est effacé. Dès lors, plus aucun
+              cookie n&apos;est reporté sur le compte : un navigateur qui le garde (posé avant, hors connexion, ou faute
+              d&apos;avoir pu être enregistré sur le compte) n&apos;y tait la fenêtre que chez lui ; seul un nouveau « Ne plus afficher »
+              fait connecté, ou la case de « Mon profil », la coupe de nouveau sur le compte.
             </li>
             <li>
               <strong>bg_terms_later</strong> — <strong>n&apos;est plus déposé</strong> depuis la

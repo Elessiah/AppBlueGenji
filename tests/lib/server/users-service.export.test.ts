@@ -205,6 +205,47 @@ describe("exportOwnData", () => {
     expect(await run(null)).toBe("fr");
   });
 
+  it("rend le « Ne plus afficher » de la modale du recrutement, non posé par défaut", async () => {
+    const run = async (value: unknown) => {
+      const execute = jest
+        .fn<SqlQuery>()
+        .mockResolvedValueOnce([[exportRow({ recruitment_modal_off: value })]])
+        .mockResolvedValueOnce([[fullProfileRow({})]])
+        .mockResolvedValue([[]]);
+      await mockDb(execute);
+      const data = await exportOwnData(42);
+      expect(execute.mock.calls[0][0]).toMatch(/\brecruitment_modal_off\b/);
+      return [data.account.recruitmentModalOff, data.account.recruitmentModalBackOn];
+    };
+    expect(await run(1)).toEqual([true, false]);
+    expect(await run(0)).toEqual([false, false]);
+    expect(await run(null)).toEqual([false, false]);
+    // Réaffichée depuis « Mon profil » : rendue aussi.
+    expect(await run(2)).toEqual([false, true]);
+  });
+
+  it("colonne recruitment_modal_off absente (ALTER échoué) : l'export est rendu quand même, drapeau au défaut", async () => {
+    const unknownColumn = Object.assign(new Error("Unknown column 'recruitment_modal_off'"), { code: "ER_BAD_FIELD_ERROR" });
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockRejectedValueOnce(unknownColumn)
+      .mockResolvedValueOnce([[exportRow({ recruitment_modal_off: undefined })]])
+      .mockResolvedValueOnce([[fullProfileRow({})]])
+      .mockResolvedValue([[]]);
+    await mockDb(execute);
+    const data = await exportOwnData(42);
+    expect(data.account.recruitmentModalOff).toBe(false);
+    expect(execute.mock.calls[0][0]).toMatch(/recruitment_modal_off/);
+    expect(execute.mock.calls[1][0]).not.toMatch(/recruitment_modal_off/);
+  });
+
+  it("une autre panne de la lecture du compte n'est pas masquée par le repli", async () => {
+    const execute = jest.fn<SqlQuery>().mockRejectedValueOnce(new Error("down"));
+    await mockDb(execute);
+    await expect(exportOwnData(42)).rejects.toThrow("down");
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
   it("throws PROFILE_NOT_FOUND when the account does not exist or is deleted", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[]]);
     await mockDb(execute);
