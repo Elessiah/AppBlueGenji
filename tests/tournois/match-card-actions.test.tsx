@@ -218,6 +218,16 @@ describe("MatchCardActions — rendu du pied", () => {
     expect(row).toContain('playerScoreReadOnly: playerScoreKey === "review",');
   });
 
+  it("« Voir le litige » cède la place visible au geste d'arbitrage", () => {
+    const actions = matchCardActionList({ ...NOTHING, playerScoreLabel: "Voir le litige", playerScoreReadOnly: true, adminScoreLabel: "Éditer le score" });
+    const { primary, more } = groupMatchCardActions(actions);
+    expect(primary?.id).toBe("adminScore");
+    expect(more.map((a) => a.id)).toEqual(["playerScore"]);
+    // Seule, la lecture reste visible.
+    const alone = groupMatchCardActions(matchCardActionList({ ...NOTHING, playerScoreLabel: "Voir le litige", playerScoreReadOnly: true, canReport: true }));
+    expect(alone.primary?.id).toBe("playerScore");
+  });
+
   it("ne rend rien sans action", () => {
     // Seules restent les régions d'annonce du `ToastProvider`.
     expect(renderFooter({})).not.toContain("<button");
