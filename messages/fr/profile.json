@@ -185,6 +185,7 @@
     "pending": "Suppression…",
     "residual": "Comme pour tout compte supprimé, resteront les sauvegardes chiffrées du site ({backupDays} jours), la mention de ta suppression dans le journal qui permet de la rejouer après une restauration (au moins {journalDays} jours), l'empreinte de mesure d'audience décrite par la politique de confidentialité, tes données de connexion (adresse IP, date, moyen de connexion), que la loi impose de garder {logDays} jours, les annonces de tes matchs de tournoi individuel publiées dans le salon #live du Discord (et l'alerte de modération d'une annonce bloquée ou signalée par AutoMod), qui gardent ton pseudo jusqu'à leur suppression sur demande, et, si tu es membre du staff, la trace de tes gestes dans les journaux du serveur.",
     "irreversible": "Cette action est irréversible.",
+    "ownedTeamsFromTerms": "Depuis cette fenêtre, transférer ou dissoudre ton équipe demande d'abord d'accepter les conditions d'utilisation. Sans les accepter, tu peux demander à l'association un effacement complet (« Exercer vos droits », dans la politique de confidentialité).",
     "consequences": {
       "TOURNAMENTS": "Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais tes statistiques de tournoi resteront conservées — elles appartiennent aussi aux équipes que tu as affrontées.",
       "SOLO_REGISTRATIONS": "Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es inscrit à un tournoi individuel, où ton pseudo sert de nom d'engagé et sera remplacé par ce pseudo d'emprunt.",
@@ -203,7 +204,8 @@
     },
     "errors": {
       "ACCOUNT_STILL_REFERENCED": "Ton compte a été rattaché à un tournoi ou à une équipe pendant la suppression. Réessaie : il sera alors anonymisé plutôt qu'effacé.",
-      "fallback": "La suppression du compte a échoué. Réessaie dans un instant."
+      "fallback": "La suppression du compte a échoué. Réessaie dans un instant.",
+      "sessionGone": "Ta session est fermée : soit ton compte vient d'être supprimé, soit ta session a expiré. La page se recharge. Si ton compte existe encore, reconnecte-toi pour relancer la suppression ; s'il a été supprimé, une nouvelle connexion créerait un nouveau compte."
     }
   },
   "errors": {

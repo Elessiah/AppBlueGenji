@@ -59,6 +59,50 @@
   color: var(--ink);
 }
 
+/* Les liens de la phrase des issues (politique, profil) se distinguent du texte
+   autrement que par la couleur seule (WCAG 1.4.1) ; « te déconnecter », un
+   geste, est dessiné comme eux. */
+.text a {
+  color: var(--blue-300);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.text a:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+
+.textButton {
+  display: inline;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  line-height: inherit;
+  color: var(--blue-300);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.textButton:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+
+.textButton[aria-disabled="true"] {
+  cursor: default;
+  color: var(--ink-mute);
+}
+
+/* Déconnexion en cours : le curseur d'attente des autres gestes en vol. */
+.textButton[aria-busy="true"] {
+  cursor: progress;
+}
+
 .check {
   display: flex;
   align-items: flex-start;
@@ -110,4 +154,63 @@
   justify-content: flex-end;
   gap: 10px;
   margin-top: 6px;
+}
+
+/* Geste destructeur : le rouge de danger, comme « Supprimer mon compte » de
+   « Mon profil » (jamais l'ambre, réservé aux avertissements). */
+.actions .deleteButton {
+  color: var(--danger);
+  border-color: rgba(var(--danger-rgb), 0.4);
+}
+
+/* Le survol de `CyberButton` ghost (bleu glacier, halo bleu) est plus
+   spécifique que la règle de base : sans ces deux sélecteurs `:not`, le geste
+   destructeur virait au bleu de marque juste avant d'être pressé. */
+.actions .deleteButton:hover:not(:disabled):not([aria-disabled="true"]) {
+  color: var(--danger);
+  border-color: rgba(var(--danger-rgb), 0.4);
+  box-shadow: none;
+}
+
+/* Fond, bordure et halo au seul pointeur fin : au toucher, un survol collé
+   après « Annuler » laisserait le bouton allumé, comme un geste par défaut. */
+@media (hover: hover) and (pointer: fine) {
+  .actions .deleteButton:hover:not(:disabled):not([aria-disabled="true"]) {
+    background: rgba(var(--danger-rgb), 0.1);
+    border-color: rgba(var(--danger-rgb), 0.6);
+    box-shadow: 0 0 18px rgba(var(--danger-rgb), 0.25);
+  }
+}
+
+/* Deux libellés dans la même case de grille (« Supprimer mon compte » /
+   « Préparation… ») : le bouton garde la largeur du plus long. */
+.labelStack {
+  display: inline-grid;
+}
+
+.labelStack > span {
+  grid-area: 1 / 1;
+}
+
+.labelStack > [data-hidden] {
+  visibility: hidden;
+}
+
+/* Contraste élevé (Windows) : les couleurs posées ici sont ignorées. Le geste
+   à l'allure de lien prend la couleur système des liens, comme ses voisins ; le
+   gris système dit que le lien et les boutons (« J'accepte » pendant l'envoi
+   compris) attendent. En fin de feuille : à spécificité égale, il l'emporte sur
+   `.actions .deleteButton`. */
+@media (forced-colors: active) {
+  .textButton {
+    color: LinkText;
+    background: transparent;
+  }
+
+  .textButton[aria-disabled="true"],
+  .actions [aria-disabled="true"],
+  .actions .deleteButton[aria-disabled="true"] {
+    color: GrayText;
+    border-color: GrayText;
+  }
 }

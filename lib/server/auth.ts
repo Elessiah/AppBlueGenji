@@ -191,6 +191,17 @@ export async function clearSession(): Promise<void> {
     // ouverts, avec le contexte d'un lecteur qui vient de se déconnecter.
     closeSessionStreams(tokenHash);
   }
+  await expireSessionCookies();
+}
+
+/**
+ * Expire le cookie de session (et celui du report des conditions) **sans**
+ * toucher la base : la fin de `clearSession`, que la suppression du compte
+ * rejoue seule quand `clearSession` a échoué après coup — la session est déjà
+ * partie avec le compte, le cookie ne doit pas rester sur l'appareil.
+ */
+export async function expireSessionCookies(): Promise<void> {
+  const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE, "", {
     ...baseCookieOptions(),
     maxAge: 0,

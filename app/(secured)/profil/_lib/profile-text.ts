@@ -11,7 +11,7 @@
  */
 import frProfile from "@/messages/fr/profile.json";
 import { ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS, BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
-import type { ConfirmationSubject } from "@/lib/shared/account-deletion";
+import { SESSION_GONE_CODES, type ConfirmationSubject } from "@/lib/shared/account-deletion";
 import type {
   AccountConnection,
   ConnectionUnlinkRefusal,
@@ -70,16 +70,25 @@ function deletionCase(subject: ConfirmationSubject): (typeof RETENTION_REASONS)[
   return reason ?? "UNKNOWN";
 }
 
-/** `accountDeletionConsequences` (corps de la modale, sans la question) dans la langue du texte. */
-export function deletionConsequencesText(text: ProfileText, subject: ConfirmationSubject): string {
+/**
+ * `accountDeletionConsequences` (corps de la modale, sans la question) dans la langue du texte.
+ *
+ * `fromTerms` : la confirmation s'ouvre depuis la fenêtre bloquante des
+ * conditions, où transférer ou dissoudre une équipe n'est pas possible sans
+ * les accepter — le conseil « transfère-la ou dissous-la d'abord » le dit, et
+ * nomme le recours qui reste (une demande d'effacement à l'association).
+ */
+export function deletionConsequencesText(text: ProfileText, subject: ConfirmationSubject, fromTerms = false): string {
   const { t } = text;
   const residual = t("deletion.residual", {
     backupDays: BACKUP_RETENTION_DAYS,
     journalDays: ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS,
     logDays: CONNECTION_LOG_RETENTION_DAYS,
   });
-  const consequence = t(`deletion.consequences.${deletionCase(subject)}`);
-  return [consequence, residual, t("deletion.irreversible")].join(" ");
+  const kind = deletionCase(subject);
+  const consequence = t(`deletion.consequences.${kind}`);
+  const termsNote = fromTerms && kind === "OWNED_TEAMS" ? [t("deletion.ownedTeamsFromTerms")] : [];
+  return [consequence, ...termsNote, residual, t("deletion.irreversible")].join(" ");
 }
 
 /** `accountDeletionOutcome` dans la langue du texte. */
@@ -89,7 +98,11 @@ export function deletionOutcomeText(text: ProfileText, subject: ConfirmationSubj
 
 /** `accountDeletionErrorMessage` dans la langue du texte. */
 export function deletionErrorText(text: ProfileText, code: string | undefined): string {
-  return text.t(code === "ACCOUNT_STILL_REFERENCED" ? "deletion.errors.ACCOUNT_STILL_REFERENCED" : "deletion.errors.fallback");
+  if (code === "ACCOUNT_STILL_REFERENCED") return text.t("deletion.errors.ACCOUNT_STILL_REFERENCED");
+  // Session ou compte déjà partis (une suppression faite dont la réponse s'est
+  // perdue) : la page se recharge — cas propre à l'écran, sans sœur française.
+  if (code !== undefined && SESSION_GONE_CODES.has(code)) return text.t("deletion.errors.sessionGone");
+  return text.t("deletion.errors.fallback");
 }
 
 // ─── Applications connectées ────────────────────────────────────────────────

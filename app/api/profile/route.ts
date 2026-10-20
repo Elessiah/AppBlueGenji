@@ -1,4 +1,4 @@
-﻿import { type AuthUser, clearSession, getCurrentUser } from "@/lib/server/auth";
+﻿import { type AuthUser, clearSession, expireSessionCookies, getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { deleteOwnAccount } from "@/lib/server/users/account-deletion";
 import { getFullProfile } from "@/lib/server/users/full-profile";
@@ -89,13 +89,12 @@ export async function DELETE() {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
 
+  let plan: Awaited<ReturnType<typeof deleteOwnAccount>>;
   try {
     // Le plan voyage jusqu'à l'écran : « effacé » et « anonymisé » ne sont pas
     // la même promesse, et le motif de la conservation encore moins — c'est le
     // serveur qui vient de trancher les deux.
-    const plan = await deleteOwnAccount(user.id);
-    await clearSession();
-    return ok({ deleted: true, ...plan });
+    plan = await deleteOwnAccount(user.id);
   } catch (error) {
     // Deux refus nommés — la course sur une clé étrangère (le second essai
     // anonymisera) et un compte déjà introuvable. Tout le reste est une panne
@@ -106,4 +105,17 @@ export async function DELETE() {
     console.error("[profile] DELETE failed:", error);
     return fail("ACCOUNT_DELETE_FAILED", 400);
   }
+  // La suppression est faite (les sessions du compte sont parties avec sa
+  // transaction : un cookie resté n'ouvre plus rien) : une panne en fermant
+  // celle-ci ne la change pas en échec — l'écran annoncerait un refus, et
+  // chaque nouvel essai répondrait 401.
+  try {
+    await clearSession();
+  } catch (error) {
+    console.error("[profile] DELETE: session cleanup failed after deletion:", error);
+    // Le cookie part quand même (`bg_session` : « supprimé à la déconnexion »,
+    // dit /rgpd) — seule l'écriture en base a échoué.
+    await expireSessionCookies();
+  }
+  return ok({ deleted: true, ...plan });
 }

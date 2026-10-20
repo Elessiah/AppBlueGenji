@@ -164,6 +164,110 @@ rouvre la fenêtre — deux clics, deux confirmations, deux `DELETE`, dont le se
 échoue en 400 et affiche une erreur juste après le succès. Une annulation le
 rouvre.
 
+### Deux écrans, une seule suppression
+
+Le geste vit dans `components/account/use-account-deletion.tsx`
+(`useAccountDeletion` : aperçu `previewAccountDeletion`, confirmation
+`ConfirmActionDialog`, `requestAccountDeletion` sur `DELETE /api/profile` — qui
+ferme la session —, toast puis accueil rechargé dans la langue de la page). Deux
+écrans l'offrent, sans copie :
+
+- **« Mon profil »**, section « Compte » ;
+- la **fenêtre bloquante des conditions d'utilisation** (« Supprimer mon
+  compte », `TERMS_OF_USE.md`) : qui refuse les conditions, ou doute de la
+  gestion de ses données, se retire d'ici sans les accepter. La partie de
+  l'écran (`components/legal/TermsAccountDeletion.tsx`) se charge **au clic**
+  (sans préchargement au survol ni au focus : le bouton précède « J'accepte », chaque
+  lecteur qui accepte l'aurait téléchargée ; `onceLoader`, pas `next/dynamic` +
+  `orReload`, qui n'aurait jamais rechargé sous une fenêtre toujours modale et
+  aurait gardé un composant vide : un code introuvable se dit aussitôt par le
+  toast ci-dessous, le clic suivant retente ; sous `/en`, textes anglais et code
+  partent ensemble, avec l'aperçu — lancé par la fenêtre au clic
+  (`components/account/account-deletion-preview.ts`, sans le code de la
+  suppression) et repris en vol par `useAccountDeletion().start(preview)` ; le chargeur `englishProfile` vit seul dans
+  `components/i18n/english-loader-profile.ts`, réexporté par `english-loaders-account.ts`,
+  pour que la fenêtre ne tire pas les autres chargeurs)
+  — ses textes sont ceux de l'espace `profile` (`deletion.*`), chargés sous
+  `/en` à ce moment —, et sa confirmation s'empile sur la fenêtre
+  (`layer="overBlocking"` de `ConfirmActionDialog`, z-index 1270 contre 1260) :
+  Échap et « Annuler » ne ferment que la confirmation, le focus revient au
+  bouton. Pendant la préparation (code, textes, aperçu), le bouton dit
+  « Préparation… » / "Preparing…" (`termsModal.deleting`, les deux libellés
+  dans la même case : sa largeur ne bouge pas) ; au survol il reste rouge (sa
+  règle l'emporte sur le survol bleu de `CyberButton` ghost), halo au seul
+  pointeur fin. La préparation entière est bornée
+  (`TERMS_DELETION_PREPARE_TIMEOUT_MS`, 20 s — au-delà des 8 s de l'aperçu, — morceau disparu après un
+  déploiement, réseau figé) : la fenêtre retrouve ses issues, un toast
+  (`termsModal.deletionUnavailable`) dit de recharger. Une fenêtre qui se tait
+  (`/rgpd`, `/profil`…) abandonne la préparation : rouverte, elle ne relance
+  pas seule la confirmation. La minuterie est levée **avant la peinture** de
+  la confirmation (`onReady` joué en `useLayoutEffect`) : jamais une
+  confirmation affichée puis retirée par le délai.
+
+Seule la réponse de la route fait foi : un succès est un 2xx **avec**
+`deleted: true` (`requestAccountDeletion`) — un 200 étranger (portail captif,
+proxy) ou un corps illisible reste un échec, jamais une suppression annoncée à
+tort. Une réponse perdue après une suppression faite se rattrape au nouvel
+essai : la session est fermée, la route répond `UNAUTHORIZED` (ou
+`USER_NOT_FOUND`), et l'écran dit « Ta session est fermée : soit ton compte
+vient d'être supprimé, soit ta session a expiré… » / "Your session has ended:
+either your account has just been deleted, or your session expired…"
+(`deletion.errors.sessionGone`, `SESSION_GONE_CODES`) puis recharge l'accueil,
+au lieu de redire « échec » sous la fenêtre des conditions. Un 401 ne
+distingue pas une suppression faite d'une session expirée ou révoquée : la
+phrase ne promet donc pas l'effacement, et ne dit **pas** « reconnecte-toi pour
+vérifier » — après une suppression, les identifiants Google/Discord/Blizzard
+sont partis, et une connexion **crée un nouveau compte** (et recollecte les
+données du fournisseur) ; elle le dit. Côté serveur, une panne de
+`clearSession()` **après** la suppression (sessions déjà parties avec la
+transaction) est journalisée sans changer la réponse (`deleted: true`), et le
+cookie expire quand même (`expireSessionCookies`, sans la base) : `bg_session`
+ne reste pas sur l'appareil.
+
+Depuis la fenêtre des conditions, le conseil du motif `OWNED_TEAMS`
+(« transfère-la ou dissous-la d'abord pour un effacement complet ») n'est pas
+réalisable sans accepter : la fenêtre bloque `/equipes` (seule barrière de la
+dissolution, que le serveur ne lie pas aux conditions), et le transfert exige
+en plus les conditions (`TERMS_ACCEPTANCE_REQUIRED`). La confirmation y ajoute donc
+`deletion.ownedTeamsFromTerms` (FR + EN, `useAccountDeletion({ fromTerms: true })`
+→ `deletionConsequencesText(…, fromTerms)`) : il faut d'abord accepter, sinon
+demander l'effacement complet à l'association (« Exercer vos droits »). « Mon
+profil » ne change pas. `/rgpd` (« Droit à l'effacement », FR + EN) dit que la
+suppression se fait aussi soi-même, dans Mon profil ou depuis cette fenêtre,
+comme le registre (T01, FR + EN). La liste des codes vit une fois, dans `lib/shared/account-deletion.ts`,
+lue par l'écran et par `deletionErrorText`.
+
+L'aperçu est **borné** (`ACCOUNT_DELETION_PREVIEW_TIMEOUT_MS`, 8 s,
+`AbortController` + minuterie, pas `AbortSignal.timeout` absent avant Safari 16 : chaque essai y laissait une requête ouverte, assez pour épuiser les connexions HTTP/1.1 du site) : un aperçu qui ne répond jamais laissait la fenêtre
+bloquante sans issue ; passé le délai, la confirmation s'ouvre sur la phrase de
+l'incertitude. Sous `/en`, des textes `profile` retombés sur le français font
+déclarer la confirmation française (`contentLang="fr"`, coquille comprise).
+En vol, ses boutons passent en `aria-disabled` + `aria-busy` (plus de
+`disabled` natif) : après un refus, le focus reste sur « Supprimer mon compte »
+et le geste se retente au clavier — vrai de toutes les confirmations
+(`ConfirmActionDialog`, qui les éteint : ni soulèvement au survol, « Annuler »
+grisé, curseur d'attente). Ses toasts portent la même langue (`lang="fr"`) que
+la confirmation retombée sur le français. Le bouton de la fenêtre n'est
+`aria-busy` que pendant la préparation, annoncée par un `<output>` caché (rôle `status`)
+(le libellé d'un bouton focalisé qui change n'est pas lu). Les boutons en vol
+de la confirmation ne s'éclairent plus au survol (`.btn:hover` de
+`globals.css` exclut tout bouton désarmé, `:where()` gardant sa spécificité),
+passent au gris système en contraste élevé (`forced-colors`), et l'attente
+(`pendingLabel`) est annoncée par un `<output aria-live="polite">` caché. Un bouton
+non armé (`disabled` natif : texte à recopier) y est éteint — bordure
+pointillée (rouge pour un geste destructeur, jamais plus vive qu'armée), fond
+vide —, curseur interdit, gris système en contraste élevé (règle en fin de feuille) ;
+le texte à recopier est figé (`readOnly`) pendant l'envoi ;
+les règles de survol désarmé que `/profil`, `ScoreDialog` et
+`GhostRegistrationDialog` recopiaient sont retirées. La fenêtre des conditions
+passe ses gestes désarmés (« J'accepte » en vol compris) au gris système en
+contraste élevé, où « te déconnecter » prend la couleur système des liens. Le délai de
+préparation ne rend le focus au bouton que s'il s'est perdu sur `<body>`.
+
+Aucune des routes du geste (`GET /api/profile/deletion`, `DELETE /api/profile`,
+ni `GET /api/profile/export` pour l'art. 15) ne consulte l'acceptation des
+conditions (`deletion-without-terms.test.ts`).
+
 ## Le pseudo d'emprunt
 
 Un compte conservé l'est **sous un faux nom** : c'est le droit à l'oubli tel

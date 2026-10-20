@@ -5,6 +5,7 @@ import {
   RECRUITMENT_MODAL_CARRY_WAIT_MS,
   getCurrentUser,
   clearSession,
+  expireSessionCookies,
   countOtherSessions,
   ensureUniquePseudo,
   revokeOtherSessions,
@@ -634,6 +635,26 @@ describe("auth", () => {
       await clearSession();
 
       expect(mockCookieSet).toHaveBeenCalledWith("bg_session", "", expect.any(Object));
+    });
+  });
+
+  describe("expireSessionCookies", () => {
+    it("expires the session cookie without touching the database (deletion done, clearSession failed)", async () => {
+      const { getDatabase } = await import("@/lib/server/database");
+      const { cookies } = await import("next/headers");
+      jest.mocked(getDatabase).mockClear();
+
+      const mockCookieSet = jest.fn();
+      const mockCookieStore = {
+        get: jest.fn().mockReturnValue({ value: "test-token" }),
+        set: mockCookieSet,
+      };
+      jest.mocked(cookies).mockResolvedValue(fakeCookieStore(mockCookieStore));
+
+      await expireSessionCookies();
+
+      expect(mockCookieSet).toHaveBeenCalledWith("bg_session", "", expect.objectContaining({ maxAge: 0 }));
+      expect(getDatabase).not.toHaveBeenCalled();
     });
   });
 

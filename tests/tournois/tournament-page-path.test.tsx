@@ -134,7 +134,8 @@ describe("confirmations des gestes sans retour", () => {
     expect(dialog).toContain("createPortal(");
     expect(dialog).toContain("if (!ok) setBusy(false);");
     expect(dialog).toContain("if (ok && closeOnSuccess) onClose();");
-    expect(dialog).toMatch(/onClick=\{onClose\}\s+disabled=\{busy\}\s+data-autofocus=/);
+    // Pas de fermeture pendant l'envoi (garde du clic, `aria-disabled` : le focus reste sur le bouton), « Annuler » focalisé d'abord.
+    expect(dialog).toMatch(/onClick=\{\(\) => \{\s*if \(!busy\) onClose\(\);\s*\}\}\s+aria-disabled=\{busy \|\| undefined\}\s+data-autofocus=/);
   });
 
   it("les gestes rendent leur issue plutôt que de l'avaler", () => {

@@ -51,6 +51,12 @@ export interface ConfirmActionDialogProps {
    * Sans effet sur une page française.
    */
   contentLang?: "fr";
+  /**
+   * `overBlocking` : la confirmation s'empile sur une fenêtre bloquante plus
+   * haute que les modales ordinaires (conditions d'utilisation, 1260) — sans
+   * quoi elle s'ouvrirait dessous, focus piégé hors de vue.
+   */
+  layer?: "default" | "overBlocking";
 }
 
 /**
@@ -109,6 +115,7 @@ export function ConfirmActionDialog({
   onClose,
   onConfirm,
   contentLang,
+  layer = "default",
 }: Readonly<ConfirmActionDialogProps>) {
   const pageText = useShellText();
   const foreign = contentLang !== undefined && contentLang !== pageText.locale;
@@ -133,7 +140,7 @@ export function ConfirmActionDialog({
   if (!mounted) return null;
 
   return createPortal(
-    <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */ role="presentation" className={styles.backdrop} {...backdrop}>
+    <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */ role="presentation" className={layer === "overBlocking" ? `${styles.backdrop} ${styles.overBlocking}` : styles.backdrop} {...backdrop}>
       <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
         ref={dialogRef}
         role="alertdialog"
@@ -165,6 +172,9 @@ export function ConfirmActionDialog({
                 id={inputId}
                 value={typed}
                 onChange={(e) => setTyped(e.target.value)}
+                // Figé pendant l'envoi : une frappe désarmerait le bouton en plein vol
+                // (`disabled` natif, focus perdu) et un échec ne se retenterait plus.
+                readOnly={busy}
                 autoComplete="off"
                 spellCheck={false}
                 data-autofocus
@@ -172,18 +182,36 @@ export function ConfirmActionDialog({
             </div>
           )}
           <div className={styles.actions}>
+            {/* En vol, `aria-disabled` + `aria-busy` plutôt que `disabled` natif : le
+                focus reste sur le bouton pressé — un refus (toast) se retente au
+                clavier au lieu de laisser le focus tomber sur `<body>`, derrière la
+                modale. `submit` et ce clic ignorent déjà un geste tant que `busy`. */}
             <button
               type="button"
               className="btn ghost"
-              onClick={onClose}
-              disabled={busy}
+              onClick={() => {
+                if (!busy) onClose();
+              }}
+              aria-disabled={busy || undefined}
               data-autofocus={requireText === undefined && !focusContent ? true : undefined}
             >
               {t("confirmDialog.cancel")}
             </button>
-            <button type="submit" className={tone === "danger" ? "btn danger" : "btn"} disabled={busy || !armed}>
+            <button
+              type="submit"
+              className={tone === "danger" ? "btn danger" : "btn"}
+              disabled={!armed}
+              aria-disabled={busy || undefined}
+              aria-busy={busy || undefined}
+            >
               {busy ? pendingLabel : confirmLabel}
             </button>
+            {/* Le libellé d'un bouton focalisé qui change n'est pas annoncé : l'attente
+                se dit ici (`<output>`, rôle `status` natif ; `aria-live` explicite pour
+                VoiceOver/WebKit). */}
+            <output className="sr-only" aria-live="polite">
+              {busy ? pendingLabel : ""}
+            </output>
           </div>
         </form>
       </div>

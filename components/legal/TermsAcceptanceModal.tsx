@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ComponentType } from "react";
 import { LocaleLink, useLocalePathname } from "@/components/i18n/locale-navigation";
 import { richNodes, useShellText } from "@/components/i18n/shell-text";
 import { createPortal } from "react-dom";
@@ -18,10 +18,40 @@ import {
   type TermsRequest,
 } from "@/lib/shared/terms-of-use";
 import { termsModalSilencedOn } from "@/lib/shared/global-modals";
+import { onceLoader } from "@/lib/shared/lazy-component";
+import { englishProfile } from "@/components/i18n/english-loader-profile";
+import type { TermsAccountDeletionProps } from "./TermsAccountDeletion";
+import { previewAccountDeletion, type PendingAccountDeletion } from "@/components/account/account-deletion-preview";
 import styles from "./TermsAcceptanceModal.module.css";
 
 /** Échap et le voile ne ferment pas une fenêtre bloquante. */
 const KEEP_OPEN = () => undefined;
+
+/**
+ * Au-delà, la préparation de la suppression (code chargé au clic, textes
+ * anglais, aperçu) est abandonnée : un morceau disparu après un déploiement ou
+ * un réseau figé laissaient tous les gestes de la fenêtre désarmés, sans issue.
+ */
+export const TERMS_DELETION_PREPARE_TIMEOUT_MS = 20_000;
+
+/**
+ * La suppression du compte (celle de « Mon profil »), chargée au clic : ni son
+ * code ni ses textes (espace `profile`) ne pèsent sur chaque page.
+ *
+ * Chargement **à la main** (`onceLoader`) plutôt que `next/dynamic` + `orReload` :
+ * `orReload` n'aurait jamais rechargé la page (il attend qu'aucune modale ne
+ * soit ouverte, et cette fenêtre l'est toujours) et `next/dynamic` aurait gardé
+ * un composant vide — chaque clic suivant restait muet jusqu'au délai de
+ * préparation. Ici, un échec est dit tout de suite (toast) et le clic suivant
+ * retente. Le clic lance ensemble le code, l'aperçu et, sous `/en`, les textes
+ * anglais — pas l'un après l'autre. **Aucun préchargement** au survol ni au
+ * focus : le bouton précède « J'accepte » (ordre de tabulation, trajet de la
+ * souris), presque chaque lecteur qui accepte aurait téléchargé l'espace
+ * `profile` (~35 Ko, ~65 Ko sous `/en`) pour un geste qu'il ne fait pas.
+ */
+const termsDeletionLoader = onceLoader<ComponentType<TermsAccountDeletionProps>>(() =>
+  import("./TermsAccountDeletion").then((module) => module.TermsAccountDeletion),
+);
 
 interface TermsAcceptanceModalProps {
   /** Le compte n'a pas accepté les conditions en vigueur. */
@@ -49,7 +79,9 @@ interface TermsAcceptanceModalProps {
  * comptes la réacceptent, pas seulement les gérants d'équipe).
  *
  * La fenêtre est **bloquante** : ni « Plus tard », ni Échap, ni clic sur le
- * voile — on accepte, ou on se déconnecte. Les gestes de gestion restent en
+ * voile — on accepte, on supprime son compte (« Supprimer mon compte » : la
+ * suppression de « Mon profil », confirmation empilée sur la fenêtre) ou on se
+ * déconnecte (lien de la phrase des issues). Les gestes de gestion restent en
  * outre refusés côté serveur (`TERMS_ACCEPTANCE_REQUIRED`), et ce refus la
  * rouvre (`TERMS_REQUIRED_EVENT`).
  *
@@ -77,6 +109,17 @@ export function TermsAcceptanceModal({
   const [privacyAnswered, setPrivacyAnswered] = useState(!privacyPending);
   const [checked, setChecked] = useState(false);
   const [busy, setBusy] = useState(false);
+  /** La suppression du compte est lancée (aperçu, puis confirmation par-dessus). */
+  const [deletionOpen, setDeletionOpen] = useState(false);
+  /** Sa confirmation est ouverte : la préparation (code, textes, aperçu) est finie. */
+  const [deletionReady, setDeletionReady] = useState(false);
+  /** Le code de la suppression, une fois chargé (`termsDeletionLoader`). */
+  const [DeletionFlow, setDeletionFlow] = useState<ComponentType<TermsAccountDeletionProps> | null>(null);
+  /** Le lancement en cours : un chargement qui répond après un abandon (délai, fenêtre tue) est ignoré. */
+  const deletionAttempt = useRef(0);
+  /** L'aperçu de la tentative en cours, lancé au clic avec le chargement du code. */
+  const deletionPreview = useRef<Promise<PendingAccountDeletion> | undefined>(undefined);
+  const deleteButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => setMounted(true), []);
 
@@ -94,13 +137,62 @@ export function TermsAcceptanceModal({
   }, [privacyPending]);
 
   const open = mounted && requested && privacyAnswered && !termsModalSilencedOn(pathname);
+
+  // La fenêtre se tait (page des conditions, `/rgpd`, `/profil`…) : une
+  // suppression en préparation est abandonnée — rouverte plus tard, elle
+  // aurait relancé d'elle-même la confirmation, sans un clic.
+  useEffect(() => {
+    if (open) return;
+    deletionAttempt.current += 1;
+    setDeletionOpen(false);
+    setDeletionReady(false);
+  }, [open]);
+
+  const unavailableRef = useRef("");
+  unavailableRef.current = t("termsModal.deletionUnavailable");
+  /** La préparation échoue (code introuvable) ou dépasse son délai : la fenêtre retrouve ses issues. */
+  const abandonDeletion = useCallback(() => {
+    deletionAttempt.current += 1;
+    setDeletionOpen(false);
+    showError(unavailableRef.current);
+    // Le focus ne revient au bouton que s'il s'est perdu (resté dessus, il y
+    // est déjà) : un lecteur parti lire la politique ou cocher la case n'est pas déplacé.
+    requestAnimationFrame(() => {
+      if (document.activeElement === document.body) deleteButtonRef.current?.focus();
+    });
+  }, [showError]);
+  useEffect(() => {
+    if (!deletionOpen || deletionReady) return;
+    const timer = window.setTimeout(() => abandonDeletion(), TERMS_DELETION_PREPARE_TIMEOUT_MS);
+    return () => window.clearTimeout(timer);
+  }, [deletionOpen, deletionReady, abandonDeletion]);
   const { leaving, logout } = useLogout();
+  const startDeletion = () => {
+    if (busy || leaving || deletionOpen) return;
+    setDeletionOpen(true);
+    deletionAttempt.current += 1;
+    const attempt = deletionAttempt.current;
+    // Ensemble : ni l'aperçu ni les textes anglais n'attendent le code
+    // (`TermsAccountDeletion` reprend l'aperçu en vol et relit les textes, déjà là).
+    deletionPreview.current = previewAccountDeletion();
+    if (locale === "en") englishProfile.load().catch(() => undefined);
+    termsDeletionLoader.load().then(
+      (flow) => {
+        if (deletionAttempt.current === attempt) setDeletionFlow(() => flow);
+      },
+      () => {
+        if (deletionAttempt.current === attempt) abandonDeletion();
+      },
+    );
+  };
   const dialogRef = useDialogBehavior({ open, onClose: KEEP_OPEN, locked: busy });
 
   if (!open) return null;
 
+  const preparing = deletionOpen && !deletionReady;
+
   const accept = async () => {
-    if (busy || leaving || !checked) return;
+    if (busy || leaving || deletionOpen || !checked) return;
     setBusy(true);
     try {
       const response = await fetch("/api/profile/terms", {
@@ -148,6 +240,20 @@ export function TermsAcceptanceModal({
           <p className={styles.text}>
             {richNodes(
               rich("termsModal.exits", {}, {
+                // Un geste, pas une adresse : un bouton à l'allure de lien (`useLogout`).
+                logout: (children) => (
+                  <button
+                    type="button"
+                    className={styles.textButton}
+                    onClick={() => {
+                      if (!busy && !deletionOpen) void logout();
+                    }}
+                    aria-disabled={busy || leaving || deletionOpen || undefined}
+                    aria-busy={leaving || undefined}
+                  >
+                    {richNodes(children)}
+                  </button>
+                ),
                 policy: (children) => <LocaleLink href="/rgpd">{richNodes(children)}</LocaleLink>,
                 profile: (children) => <LocaleLink href="/profil">{richNodes(children)}</LocaleLink>,
               }),
@@ -188,30 +294,54 @@ export function TermsAcceptanceModal({
         {/* Pendant la requête, `aria-disabled` + `aria-busy` plutôt que `disabled` :
             le focus reste sur le bouton pressé (un échec se retente au clavier) ;
             `accept` ignore déjà un geste tant que `busy`, la déconnexion un
-            second clic (`useLogout`). */}
+            second clic (`useLogout`), la suppression un second lancement. */}
         <div className={styles.actions}>
           <CyberButton
+            ref={deleteButtonRef}
             type="button"
             variant="ghost"
-            onClick={() => {
-              if (!busy) void logout();
-            }}
-            aria-disabled={busy || leaving || undefined}
-            aria-busy={leaving || undefined}
+            className={styles.deleteButton}
+            onClick={startDeletion}
+            aria-disabled={busy || leaving || deletionOpen || undefined}
+            aria-busy={preparing || undefined}
           >
-            {t("termsModal.logout")}
+            {/* Pendant la préparation, le bouton dit qu'il travaille (« Préparation… ») :
+                sur un réseau lent, la fenêtre ne paraît pas figée. */}
+            {/* Les deux libellés occupent la même case (le plus large fixe la
+                largeur) : la ligne d'actions ne se replie pas d'un état à l'autre.
+                Le libellé caché (`visibility: hidden`) sort du nom accessible. */}
+            <span className={styles.labelStack}>
+              <span data-hidden={preparing || undefined}>{t("termsModal.deleteAccount")}</span>
+              <span data-hidden={!preparing || undefined}>{t("termsModal.deleting")}</span>
+            </span>
           </CyberButton>
           <CyberButton
             type="button"
             variant="primary"
             onClick={accept}
             disabled={!checked}
-            aria-disabled={busy || leaving || undefined}
+            aria-disabled={busy || leaving || deletionOpen || undefined}
             aria-busy={busy || undefined}
           >
             {busy ? t("termsModal.saving") : t("termsModal.accept")}
           </CyberButton>
         </div>
+        {/* Le libellé d'un bouton déjà focalisé qui change n'est pas annoncé :
+            la préparation se dit ici (`<output>`, rôle `status` natif), pour les lecteurs d'écran. */}
+        <output className="sr-only" aria-live="polite">
+          {preparing ? t("termsModal.deleting") : ""}
+        </output>
+        {deletionOpen && DeletionFlow ? (
+          <DeletionFlow
+            preview={deletionPreview.current}
+            onReady={() => setDeletionReady(true)}
+            onClose={() => {
+              setDeletionOpen(false);
+              setDeletionReady(false);
+              requestAnimationFrame(() => deleteButtonRef.current?.focus());
+            }}
+          />
+        ) : null}
       </div>
     </div>,
     document.body,

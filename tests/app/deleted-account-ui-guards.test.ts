@@ -15,6 +15,9 @@ const read = (path: string) => readFileSync(join(ROOT, path), "utf8");
 // l'attribution d'une fantôme.
 const MEMBERS = read("app/(secured)/equipes/[id]/_components/PlayerPseudoCombobox.tsx");
 const PROFIL = read("app/(secured)/profil/page.tsx");
+// La suppression du compte, commune au profil et à la fenêtre des conditions.
+const DELETION = read("components/account/use-account-deletion.tsx");
+const DELETION_PREVIEW = read("components/account/account-deletion-preview.ts");
 
 /**
  * Deux écrans que la suppression de compte touche sans qu'aucun rendu ne le
@@ -82,8 +85,10 @@ describe("interface — un compte supprimé ne se propose ni ne se raconte en co
    * accord donné à la moitié rassurante d'un geste irréversible.
    */
   it("n'invente aucun sort de compte avant que l'aperçu ait répondu", () => {
-    expect(PROFIL).toContain("ConfirmationSubject = RETENTION_UNKNOWN");
+    expect(DELETION_PREVIEW).toContain("ConfirmationSubject = RETENTION_UNKNOWN");
     // L'hypothèse initiale a disparu : plus aucun motif codé en dur.
+    expect(DELETION).not.toContain('= "TOURNAMENTS"');
+    expect(DELETION_PREVIEW).not.toContain('= "TOURNAMENTS"');
     expect(PROFIL).not.toContain('= "TOURNAMENTS"');
   });
 });

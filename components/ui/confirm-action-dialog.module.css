@@ -9,6 +9,12 @@
   background: rgba(6, 8, 12, 0.72);
 }
 
+/* Empilée sur la fenêtre bloquante des conditions (1260), sous la modale des
+   changements de confidentialité (1300), qui passe avant elle. */
+.backdrop.overBlocking {
+  z-index: 1270;
+}
+
 .dialog {
   width: 100%;
   max-width: 440px;
@@ -59,6 +65,33 @@
   }
 }
 
+/* En vol (`aria-disabled`, focus gardé) : « Annuler » éteint, curseur
+   d'attente — le survol de `.btn` ne l'éclaire déjà plus (`globals.css`). */
+.actions > :global(.btn)[aria-disabled="true"] {
+  cursor: progress;
+}
+
+.actions > :global(.btn.ghost)[aria-disabled="true"] {
+  color: var(--ink-mute);
+}
+
+/* Non armé (texte à recopier, champ requis) : `disabled` natif, éteint — sans
+   quoi « Dissoudre » paraissait armé et refusait le clic sans un mot. Bordure
+   pointillée et fond vide : il ne se confond pas avec « Annuler », plein à côté. */
+.actions > :global(.btn):disabled {
+  cursor: not-allowed;
+  color: var(--ink-mute);
+  border-color: var(--line-strong);
+  border-style: dashed;
+  background: transparent;
+}
+
+/* Un geste destructeur non armé reste lisible comme tel — bordure pointillée
+   rouge —, sans être plus vif que le même bouton armé : texte éteint. */
+.actions > :global(.btn.danger):disabled {
+  border-color: rgba(var(--danger-rgb), 0.32);
+}
+
 .confirmField {
   margin-top: 12px;
 }
@@ -66,4 +99,16 @@
 .body ul {
   margin: 6px 0 10px;
   padding-left: 18px;
+}
+
+/* Contraste élevé (Windows) : les couleurs posées plus haut sont ignorées ; le
+   gris système dit, comme le `disabled` natif d'avant, que le bouton attend
+   (ou n'est pas armé). En fin de feuille, la variante de danger comprise. */
+@media (forced-colors: active) {
+  .actions > :global(.btn)[aria-disabled="true"],
+  .actions > :global(.btn):disabled,
+  .actions > :global(.btn.danger):disabled {
+    color: GrayText;
+    border-color: GrayText;
+  }
 }

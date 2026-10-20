@@ -384,35 +384,9 @@
   transform: none;
 }
 
-/* Le survol du `.btn` global éclaircit le fond : il faut le rendre à chaque
-   variante, et non poser le bleu du bouton principal pour tout le monde — la
-   règle, plus spécifique que `.btn.ghost`, **bleuissait** au survol les boutons
-   en retrait (« Retirer mon tag », « Supprimer » l'avatar, « Retirer » une
-   application), c'est-à-dire qu'un bouton refusé se faisait plus voyant que le
-   même bouton actif. */
-.page :global(.btn:disabled:hover),
-.page :global(.btn[aria-disabled="true"]:hover) {
-  background: rgba(89, 212, 255, 0.14);
-  transform: none;
-  box-shadow: none;
-}
-
-.page :global(.btn.ghost:disabled:hover),
-.page :global(.btn.ghost[aria-disabled="true"]:hover) {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.page :global(.btn.danger:disabled:hover),
-.page :global(.btn.danger[aria-disabled="true"]:hover) {
-  background: rgba(var(--danger-rgb), 0.14);
-}
-
-/* Le reflet balayant du `.btn` global se déclenche au survol : il donne, seul,
-   l'impression d'un bouton vivant. */
-.page :global(.btn:disabled:hover)::before,
-.page :global(.btn[aria-disabled="true"]:hover)::before {
-  left: -100%;
-}
+/* Survol d'un bouton désarmé : rien à éteindre ici, le `.btn:hover` global
+   exclut déjà `:disabled` et `[aria-disabled="true"]` (`globals.css`) — chaque
+   variante garde son fond de repos. */
 
 /* La seule sauvegarde de la page : le bouton principal du site, en dégradé de
    marque et texte sombre (`--cyber-bg`, AA sur chaque arrêt du dégradé). */

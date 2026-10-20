@@ -23,7 +23,7 @@ Permettre aux joueurs de disposer d'un compte sur la plateforme de tournois
 Sous-finalités
 Afficher un profil public (pseudo, avatar, pseudos de jeu selon les réglages de visibilité)
 Mettre les joueurs en relation (s'ajouter en jeu, recrutement d'équipe)
-Exporter ses données et supprimer son compte depuis « Mon profil »
+Exporter ses données et supprimer son compte depuis « Mon profil » (la suppression aussi depuis la fenêtre d'acceptation des conditions d'utilisation, sans les accepter)
 Rédiger les notifications push dans la langue du compte : celle de la page du site d'où part la dernière connexion (une connexion lancée d'ailleurs, ou par le bouton Google, Discord ou Blizzard depuis un navigateur qui ne l'indique pas (trop ancien, ou qui retire cette indication), ne la change pas ; français par défaut), ou celle choisie dans « Mon profil »
 Garder sur le compte le choix « Ne plus afficher » de la fenêtre des annonces de recrutement urgentes, pour qu'elle ne s'ouvre plus d'elle-même sur les autres appareils du joueur — choix réversible dans « Mon profil »
 Base légale

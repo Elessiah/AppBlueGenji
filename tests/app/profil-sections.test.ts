@@ -115,7 +115,7 @@ describe("La page descend du registre", () => {
 
   it("isole la suppression du compte dans sa propre section", () => {
     const danger = page.slice(page.indexOf("sectionById.compte"));
-    expect(danger).toContain("onDeleteAccount");
+    expect(danger).toContain("accountDeletion.start()");
     expect(danger).toContain("dangerSection");
   });
 });
@@ -327,8 +327,10 @@ describe("Un contrôle désactivé se voit", () => {
     expect(css).toContain("cursor: not-allowed");
   });
 
-  it("éteint aussi son survol", () => {
-    expect(css).toContain(":global(.btn:disabled:hover)");
+  it("éteint aussi son survol : le `.btn:hover` global exclut tout bouton désarmé, sans règle à recopier par page", () => {
+    const globals = readFileSync(join(process.cwd(), "app/globals.css"), "utf8");
+    expect(globals).toContain('.btn:hover:where(:not(:disabled):not([aria-disabled="true"])) {');
+    expect(css).not.toContain(":global(.btn:disabled:hover)");
   });
 });
 

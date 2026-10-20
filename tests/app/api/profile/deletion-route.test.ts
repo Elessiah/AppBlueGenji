@@ -8,7 +8,7 @@ jest.mock("@/lib/server/users/profile-update");
 import { GET } from "@/app/api/profile/deletion/route";
 import { DELETE } from "@/app/api/profile/route";
 import { getCurrentUser } from "@/lib/server/auth";
-import { clearSession } from "@/lib/server/auth";
+import { clearSession, expireSessionCookies } from "@/lib/server/auth";
 import { deleteOwnAccount, getAccountDeletionPlan } from "@/lib/server/users/account-deletion";
 import { authUser } from "../../../helpers/auth-user";
 
@@ -82,6 +82,26 @@ describe("DELETE /api/profile", () => {
     await DELETE();
 
     expect(clearSession).toHaveBeenCalled();
+    // `clearSession` expire déjà le cookie : pas de second Set-Cookie.
+    expect(expireSessionCookies).not.toHaveBeenCalled();
+  });
+
+  it("une panne en fermant la session après coup ne change pas la suppression faite en échec", async () => {
+    const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    deleteMock.mockResolvedValue({ mode: "ERASE", reason: null });
+    jest.mocked(clearSession).mockRejectedValue(new Error("Connection lost: The server closed the connection."));
+
+    const res = await DELETE();
+
+    expect(res.status).toBe(200);
+    const payload = await res.json();
+    expect(payload).toEqual({ deleted: true, mode: "ERASE", reason: null });
+    // Le message interne reste au journal, jamais dans la réponse.
+    expect(JSON.stringify(payload)).not.toContain("Connection lost");
+    expect(log).toHaveBeenCalled();
+    // Le cookie part quand même : seule l'écriture en base a échoué.
+    expect(expireSessionCookies).toHaveBeenCalledTimes(1);
+    log.mockRestore();
   });
 
   it("refuse l'appel anonyme sans rien écrire", async () => {

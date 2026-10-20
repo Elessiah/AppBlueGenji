@@ -95,8 +95,11 @@ describe("profil : fournisseurs sans français, anglais une seule fois", () => {
     const dynamic = (path: string) => [...source(path).matchAll(/import\("([^"]+)"\)/g)].map((m) => m[1]);
     for (const path of [loaders, account]) expect(importsOf(path).filter((spec) => spec.startsWith("@/messages/"))).toEqual([]);
     expect(dynamic(loaders)).toEqual(["@/messages/en/reports.json", "@/messages/en/imageCrop.json"]);
+    // `profile` dans son module (la fenêtre des conditions, chaque page, le précharge seul), réexporté : une instance.
+    expect(dynamic("components/i18n/english-loader-profile.ts")).toEqual(["@/messages/en/profile.json"]);
+    expect(importsOf("components/i18n/english-loader-profile.ts").filter((spec) => spec.startsWith("@/messages/"))).toEqual([]);
+    expect(source(account)).toContain('export { englishProfile } from "./english-loader-profile";');
     expect(dynamic(account)).toEqual([
-      "@/messages/en/profile.json",
       "@/messages/en/teamErrors.json",
       "@/messages/en/push.json",
       "@/messages/en/teams.json",

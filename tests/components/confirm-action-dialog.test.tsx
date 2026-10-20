@@ -171,6 +171,37 @@ describe("ConfirmActionDialog — balisage", () => {
   });
 });
 
+describe("geste en vol : le focus reste sur le bouton pressé", () => {
+  it("`aria-disabled` + `aria-busy` pendant l'envoi, jamais `disabled` natif sous le focus (un refus se retente au clavier)", () => {
+    const source = readSource("components/ui/confirm-action-dialog.tsx");
+    expect(source).not.toMatch(/[^-]disabled=\{busy/);
+    expect(source).toMatch(/onClick=\{\(\) => \{\s*if \(!busy\) onClose\(\);\s*\}\}\s*aria-disabled=\{busy \|\| undefined\}/);
+    expect(source).toMatch(/disabled=\{!armed\}\s*aria-disabled=\{busy \|\| undefined\}\s*aria-busy=\{busy \|\| undefined\}/);
+    // Le texte à recopier est figé pendant l'envoi : une frappe ne désarme pas le bouton en vol.
+    expect(source).toMatch(/onChange=\{\(e\) => setTyped\(e\.target\.value\)\}[\s\S]{0,200}readOnly=\{busy\}/);
+    // `submit` ignore déjà un geste tant que `busy`.
+    expect(source).toContain("if (busy || !armed) return;");
+    // Et il ne paraît plus pressable : le survol de `.btn` (globals) l'exclut, sans hausser sa spécificité ; « Annuler » éteint, curseur d'attente.
+    const globals = readSource("app/globals.css");
+    expect(globals).toContain('.btn:hover:where(:not(:disabled):not([aria-disabled="true"])) {');
+    expect(globals).toContain('.btn:hover:where(:not(:disabled):not([aria-disabled="true"]))::before {');
+    expect(globals).not.toMatch(/^\.btn:hover(::before)? \{/m);
+    const css = readSource("components/ui/confirm-action-dialog.module.css");
+    expect(css).toMatch(/\.actions > :global\(\.btn\)\[aria-disabled="true"\] \{\s*cursor: progress;/);
+    expect(css).toMatch(/\.actions > :global\(\.btn\.ghost\)\[aria-disabled="true"\] \{\s*color: var\(--ink-mute\);/);
+    // Contraste élevé : le gris système, comme le `disabled` natif.
+    expect(css).toMatch(/@media \(forced-colors: active\) \{\s*\.actions > :global\(\.btn\)\[aria-disabled="true"\],\s*\.actions > :global\(\.btn\):disabled,\s*\.actions > :global\(\.btn\.danger\):disabled \{\s*color: GrayText;\s*border-color: GrayText;/);
+    // Placé après toute règle de couleur (sans quoi une règle plus loin, à spécificité égale, l'emporterait).
+    expect(css.lastIndexOf("@media (forced-colors: active)")).toBeGreaterThan(css.indexOf(".actions > :global(.btn.danger):disabled {"));
+    // Non armé (`disabled` natif) : éteint, curseur interdit.
+    expect(css).toMatch(/\.actions > :global\(\.btn\):disabled \{\s*cursor: not-allowed;\s*color: var\(--ink-mute\);\s*border-color: var\(--line-strong\);\s*border-style: dashed;\s*background: transparent;/);
+    // Un geste destructeur non armé garde son rouge (distinct d'« Annuler » et d'un bouton principal non armé).
+    expect(css).toMatch(/\.actions > :global\(\.btn\.danger\):disabled \{\s*border-color: rgba\(var\(--danger-rgb\), 0\.32\);\s*\}/);
+    // L'attente est annoncée (le libellé d'un bouton focalisé qui change ne l'est pas).
+    expect(source).toMatch(/<output className="sr-only" aria-live="polite">\s*\{busy \? pendingLabel : ""\}\s*<\/output>/);
+  });
+});
+
 describe("rôles de plateforme — écart annoncé", () => {
   it("liste ce qui est accordé et retiré, dans l'ordre d'affichage", () => {
     expect(diffPlatformRoles(["CASTER", "ARBITRE"], ["RECRUTEUR", "ADMIN", "ARBITRE"])).toEqual({
@@ -240,15 +271,20 @@ describe("plus de window.confirm", () => {
     const page = readSource("app/(secured)/profil/page.tsx");
     expect(page).toMatch(/onDiscordTagRemove=\{\(\) => \{\s*setTagRemovalVerified\(discordState\.verified\);\s*setTagRemovalDms\(\(matchDmShown\.current \?\? data\?\.matchDmEnabled\) !== false\);\s*setConfirmingTagRemoval\(true\);\s*\}\}/);
     expect(page).toContain("onConfirm={onDiscordTagRemove}");
-    expect(page).toContain("setPendingDeletion({ subject, previewed });");
+    // La suppression est celle, commune, de `useAccountDeletion` (aussi offerte
+    // par la fenêtre des conditions).
+    const deletion = readSource("components/account/use-account-deletion.tsx");
+    expect(page).toContain("const accountDeletion = useAccountDeletion({");
+    expect(page).toContain("{accountDeletion.dialog}");
+    expect(deletion).toContain("setPendingDeletion(await (preview ?? previewAccountDeletion()));");
     // Lot 9-2 : textes de la langue de la page (`profile.deletion`).
-    expect(page).toContain('title={t("deletion.question")}');
-    expect(page).toContain("{deletionConsequencesText(text, pendingDeletion.subject)}");
-    expect(page).toContain("{deleteAccountLabel(text, deleting, pendingDeletion !== null)}");
+    expect(deletion).toContain('title={text.t("deletion.question")}');
+    expect(deletion).toContain("{deletionConsequencesText(text, pendingDeletion.subject, fromTerms)}");
+    expect(page).toContain("{deleteAccountLabel(text, accountDeletion.deleting, accountDeletion.confirming)}");
     // Annuler rouvre le bouton « Supprimer mon compte ».
-    expect(page).toMatch(/setPendingDeletion\(null\);\s*setDeleting\(false\);/);
+    expect(deletion).toMatch(/setPendingDeletion\(null\);\s*setDeleting\(false\);\s*onCancel\?\.\(\);/);
     // … et lui rend le focus, perdu sur `body` quand il s'est désarmé.
-    expect(page).toContain("requestAnimationFrame(() => deleteButtonRef.current?.focus());");
+    expect(page).toContain("onCancel: () => requestAnimationFrame(() => deleteButtonRef.current?.focus()),");
     expect(page).toContain("ref={deleteButtonRef}");
   });
 });

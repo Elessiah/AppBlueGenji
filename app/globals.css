@@ -654,11 +654,14 @@ textarea,
   pointer-events: none;
 }
 
-.btn:hover::before {
+/* Un bouton désarmé (`disabled`, ou `aria-disabled` qui garde le focus) ne
+   s'éclaire pas au survol comme un bouton pressable. `:where()` : la
+   spécificité reste celle de `.btn:hover`, que les modules surchargent. */
+.btn:hover:where(:not(:disabled):not([aria-disabled="true"]))::before {
   left: 150%;
 }
 
-.btn:hover {
+.btn:hover:where(:not(:disabled):not([aria-disabled="true"])) {
   background: rgba(89, 212, 255, 0.22);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(89, 212, 255, 0.15);
