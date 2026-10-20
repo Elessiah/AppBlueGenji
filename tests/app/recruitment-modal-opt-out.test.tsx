@@ -1,6 +1,10 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import { renderToStaticMarkup } from "react-dom/server";
-import { RecruitmentHighlight, recordRecruitmentModalOptOut } from "@/components/recruitment-highlight";
+import {
+  RecruitmentHighlight,
+  recordRecruitmentModalOptOut,
+  recruitmentOptOutToast,
+} from "@/components/recruitment-highlight";
 import { RecruitmentTextProvider } from "@/components/i18n/recruitment-text";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import {
@@ -98,12 +102,38 @@ describe("modale d'arrivée — bouton « Ne plus afficher »", () => {
       expect(highlight.dontShowAgain).toBeTruthy();
       expect(highlight.dontShowAgainDone).toBeTruthy();
       expect(highlight.dontShowAgainFailed).toBeTruthy();
+      expect(highlight.dontShowAgainDoneBrowser).toBeTruthy();
+      expect(highlight.dontShowAgainUnsaved).toBeTruthy();
     }
+  });
+
+  it("dit au lecteur non connecté que le choix ne vaut que pour ce navigateur (FR et EN)", () => {
+    expect(messagesFor("fr").recruitment.highlight.dontShowAgainDoneBrowser).toContain("sur ce navigateur");
+    expect(messagesFor("en").recruitment.highlight.dontShowAgainDoneBrowser).toContain("on this browser");
+    expect(messagesFor("fr").recruitment.highlight.dontShowAgainDone).not.toContain("navigateur");
+  });
+
+  it("met le focus d'ouverture sur « Plus tard », pas sur « Ne plus afficher », quand il n'y a qu'une annonce", () => {
+    const markup = renderToStaticMarkup(<RecruitmentHighlight {...props()} />);
+    expect(markup).toMatch(/<button[^>]*data-autofocus=""[^>]*>Plus tard<\/button>/);
+    expect(markup.match(/data-autofocus/g)).toHaveLength(1);
+  });
+
+  it("laisse le focus d'ouverture au pager quand il y a plusieurs annonces", () => {
+    const markup = renderToStaticMarkup(<RecruitmentHighlight {...props({ modalAds: [ad(), ad({ id: 43 })] })} />);
+    expect(markup).not.toContain("data-autofocus");
+    expect(markup.indexOf("← Précédente")).toBeLessThan(markup.indexOf("Ne plus afficher"));
   });
 
   it("dit « openings » en anglais, jamais « ads » (glossaire I18N.md : Annonces → Openings)", () => {
     const highlight = messagesFor("en").recruitment.highlight;
-    for (const text of [highlight.dontShowAgain, highlight.dontShowAgainDone, highlight.dontShowAgainFailed]) {
+    for (const text of [
+      highlight.dontShowAgain,
+      highlight.dontShowAgainDone,
+      highlight.dontShowAgainDoneBrowser,
+      highlight.dontShowAgainFailed,
+      highlight.dontShowAgainUnsaved,
+    ]) {
       expect(text).not.toMatch(/\bads?\b/i);
     }
     expect(highlight.dontShowAgainDone).toContain("openings");
@@ -125,7 +155,7 @@ describe("modale d'arrivée — bouton « Ne plus afficher »", () => {
 
 describe("recordRecruitmentModalOptOut", () => {
   it("non connecté : pose le cookie du navigateur, sans appel au serveur", async () => {
-    const writeCookie = jest.fn();
+    const writeCookie = jest.fn<(name: string, value: string, maxAge?: number) => boolean>(() => true);
     const post = jest.fn(async () => ({ ok: true }));
     expect(await recordRecruitmentModalOptOut(false, { writeCookie, post })).toBe("BROWSER");
     expect(writeCookie).toHaveBeenCalledWith(RECRUITMENT_MODAL_OFF_COOKIE, "1", RECRUITMENT_MODAL_OFF_MAX_AGE);
@@ -134,7 +164,7 @@ describe("recordRecruitmentModalOptOut", () => {
 
   it("connecté : pose le cookie d'abord, puis le choix sur le compte", async () => {
     const order: string[] = [];
-    const writeCookie = jest.fn(() => order.push("cookie"));
+    const writeCookie = jest.fn(() => order.push("cookie") > 0);
     const post = jest.fn(async (url: string) => {
       order.push(url);
       return { ok: true };
@@ -144,7 +174,7 @@ describe("recordRecruitmentModalOptOut", () => {
   });
 
   it("connecté, compte injoignable ou refus : le choix reste au moins sur ce navigateur", async () => {
-    const writeCookie = jest.fn();
+    const writeCookie = jest.fn(() => true);
     expect(await recordRecruitmentModalOptOut(true, { writeCookie, post: async () => ({ ok: false }) })).toBe(
       "BROWSER_ONLY",
     );
@@ -159,10 +189,50 @@ describe("recordRecruitmentModalOptOut", () => {
     expect(writeCookie).toHaveBeenCalledTimes(2);
   });
 
+  it("cookies refusés : rien n'est gardé sans compte écrit, le compte suffit sinon", async () => {
+    const writeCookie = jest.fn(() => false);
+    expect(await recordRecruitmentModalOptOut(false, { writeCookie })).toBe("NONE");
+    expect(await recordRecruitmentModalOptOut(true, { writeCookie, post: async () => ({ ok: false }) })).toBe("NONE");
+    expect(
+      await recordRecruitmentModalOptOut(true, {
+        writeCookie,
+        post: async () => {
+          throw new Error("offline");
+        },
+      }),
+    ).toBe("NONE");
+    expect(await recordRecruitmentModalOptOut(true, { writeCookie, post: async () => ({ ok: true }) })).toBe("ACCOUNT");
+  });
+
   it("pose le cookie de façon synchrone, avant tout await (la modale se ferme aussitôt)", () => {
-    const writeCookie = jest.fn();
+    const writeCookie = jest.fn(() => true);
     void recordRecruitmentModalOptOut(true, { writeCookie, post: () => new Promise(() => undefined) });
     expect(writeCookie).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("recruitmentOptOutToast — le toast dit où le choix a été gardé", () => {
+  it("succès sur le compte, succès « ce navigateur » non connecté, erreur sinon", () => {
+    expect(recruitmentOptOutToast("ACCOUNT")).toEqual({ kind: "success", key: "dontShowAgainDone" });
+    expect(recruitmentOptOutToast("BROWSER")).toEqual({ kind: "success", key: "dontShowAgainDoneBrowser" });
+    expect(recruitmentOptOutToast("BROWSER_ONLY")).toEqual({ kind: "error", key: "dontShowAgainFailed" });
+    expect(recruitmentOptOutToast("NONE")).toEqual({ kind: "error", key: "dontShowAgainUnsaved" });
+  });
+});
+
+describe("cookies de la mise en avant — envoyés aussi quand la visite vient d'un autre site", () => {
+  it("sont posés en SameSite lax, jamais strict (lien Discord, recherche, retour d'OAuth)", () => {
+    const source = readSource("components/recruitment-highlight.tsx");
+    expect(source).toContain("path=/; samesite=lax");
+    expect(source).not.toMatch(/samesite=strict/i);
+  });
+
+  it("sont décrits en lax sur /rgpd, en français et en anglais", () => {
+    for (const file of ["app/rgpd/page.tsx", "app/rgpd/RgpdEn.tsx"]) {
+      const page = readSource(file);
+      expect(page).not.toContain("sameSite=strict");
+      expect(page.match(/\(sameSite=lax\)/g)?.length).toBeGreaterThanOrEqual(2);
+    }
   });
 });
 
