@@ -209,14 +209,30 @@ Seule la réponse de la route fait foi : un succès est un 2xx **avec**
 proxy) ou un corps illisible reste un échec, jamais une suppression annoncée à
 tort. Une réponse perdue après une suppression faite se rattrape au nouvel
 essai : la session est fermée, la route répond `UNAUTHORIZED` (ou
-`USER_NOT_FOUND`), et l'écran dit « Ta session est fermée — ton compte a
-peut-être déjà été supprimé… » / "Your session has ended — your account may
-already have been deleted…" (`deletion.errors.sessionGone`,
-`SESSION_GONE_CODES`) puis recharge l'accueil, au lieu de redire « échec »
-sous la fenêtre des conditions. Côté serveur, une panne de `clearSession()`
-**après** la suppression (sessions déjà parties avec la transaction) est
-journalisée sans changer la réponse (`deleted: true`) : un cookie resté n'ouvre
-plus rien. La liste des codes vit une fois, dans `lib/shared/account-deletion.ts`,
+`USER_NOT_FOUND`), et l'écran dit « Ta session est fermée : soit ton compte
+vient d'être supprimé, soit ta session a expiré… » / "Your session has ended:
+either your account has just been deleted, or your session expired…"
+(`deletion.errors.sessionGone`, `SESSION_GONE_CODES`) puis recharge l'accueil,
+au lieu de redire « échec » sous la fenêtre des conditions. Un 401 ne
+distingue pas une suppression faite d'une session expirée ou révoquée : la
+phrase ne promet donc pas l'effacement, et ne dit **pas** « reconnecte-toi pour
+vérifier » — après une suppression, les identifiants Google/Discord/Blizzard
+sont partis, et une connexion **crée un nouveau compte** (et recollecte les
+données du fournisseur) ; elle le dit. Côté serveur, une panne de
+`clearSession()` **après** la suppression (sessions déjà parties avec la
+transaction) est journalisée sans changer la réponse (`deleted: true`), et le
+cookie expire quand même (`expireSessionCookies`, sans la base) : `bg_session`
+ne reste pas sur l'appareil.
+
+Depuis la fenêtre des conditions, le conseil du motif `OWNED_TEAMS`
+(« transfère-la ou dissous-la d'abord pour un effacement complet ») n'est pas
+réalisable sans accepter : la fenêtre bloque `/equipes`, et le transfert exige
+les conditions (`TERMS_ACCEPTANCE_REQUIRED`). La confirmation y ajoute donc
+`deletion.ownedTeamsFromTerms` (FR + EN, `useAccountDeletion({ fromTerms: true })`
+→ `deletionConsequencesText(…, fromTerms)`) : il faut d'abord accepter, sinon
+demander l'effacement complet à l'association (« Exercer vos droits »). « Mon
+profil » ne change pas. `/rgpd` (« Droit à l'effacement », FR + EN) dit que la
+suppression se fait aussi soi-même, dans Mon profil ou depuis cette fenêtre. La liste des codes vit une fois, dans `lib/shared/account-deletion.ts`,
 lue par l'écran et par `deletionErrorText`.
 
 L'aperçu est **borné** (`ACCOUNT_DELETION_PREVIEW_TIMEOUT_MS`, 8 s,
