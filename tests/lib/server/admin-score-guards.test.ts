@@ -48,20 +48,22 @@ function fakeConnection(
   const writes: string[] = [];
   const pauses: { sql: string; params: unknown[] }[] = [];
 
+  // Suspension de la validation d'office (report seul), comptée à part : elle
+  // ne touche une ligne que si le match n'a qu'un report.
+  const update = (q: string, params: unknown[]) => {
+    if (q.startsWith("UPDATE bg_matches m SET m.score_validation_paused_at")) {
+      pauses.push({ sql: q, params });
+      return [{ affectedRows: options.singleReport ? 1 : 0 }, []];
+    }
+    writes.push(q);
+    return [{ affectedRows: 1 }, []];
+  };
+
   const conn = {
     execute: async (sql: string, params: unknown[] = []) => {
       const q = sql.replace(/\s+/g, " ").trim();
 
-      // Suspension de la validation d'office (report seul), comptée à part :
-      // elle ne touche une ligne que si le match n'a qu'un report.
-      if (q.startsWith("UPDATE bg_matches m SET m.score_validation_paused_at")) {
-        pauses.push({ sql: q, params });
-        return [{ affectedRows: options.singleReport ? 1 : 0 }, []];
-      }
-      if (q.startsWith("UPDATE")) {
-        writes.push(q);
-        return [{ affectedRows: 1 }, []];
-      }
+      if (q.startsWith("UPDATE")) return update(q, params);
 
       // Verrou aval, premier temps : le match édité, avec le format du tournoi.
       if (q.includes("FROM bg_matches m JOIN bg_tournaments t")) {
