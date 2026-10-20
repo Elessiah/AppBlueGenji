@@ -59,7 +59,7 @@ describe("auto-validated-notices", () => {
   });
   it("envoie les avis l'un après l'autre, sans rafale sur le pool", async () => {
     const conn = connection();
-    let release: (value: number) => void = () => undefined;
+    let release: ((value: number) => void) | undefined;
     jest.mocked(notifyScoreAutoValidated).mockImplementationOnce(
       () => new Promise<number>((resolve) => { release = resolve; }),
     );
@@ -70,7 +70,7 @@ describe("auto-validated-notices", () => {
     await flushMicrotasks();
     expect(notifyScoreAutoValidated).toHaveBeenCalledTimes(1);
 
-    release(1);
+    release?.(1);
     await flushMicrotasks();
     expect(notifyScoreAutoValidated).toHaveBeenCalledTimes(2);
     expect(notifyScoreAutoValidated).toHaveBeenLastCalledWith(32);
