@@ -34,6 +34,8 @@ import styles from "./recruitment-highlight.module.css";
 /** « Ne plus afficher » connecté : au-delà, le choix est rendu comme gardé sur ce navigateur seulement. */
 const OPT_OUT_TIMEOUT_MS = 10_000;
 
+const OPT_OUT_URL = "/api/recruitment/modal-dismiss";
+
 /** Aperçu plus généreux qu'en carte : la modale a la place, mais pas un mur de texte. */
 const MODAL_PREVIEW_MAX = 320;
 
@@ -67,35 +69,56 @@ function writeSeenCookie(name: string, value: string, maxAge?: number): boolean 
 export type RecruitmentModalOptOutResult = "BROWSER" | "ACCOUNT" | "BROWSER_ONLY" | "NONE";
 
 /**
+ * Écriture du « Ne plus afficher » au serveur, d'attente bornée : la modale est
+ * déjà fermée, le toast ne doit pas attendre indéfiniment une connexion
+ * bloquée (l'abandon tombe dans le repli). `AbortController` + minuterie
+ * plutôt que `AbortSignal.timeout`, absent des navigateurs plus anciens
+ * (Safari 15) où il ferait échouer chaque appel.
+ */
+function postOptOut(url: string): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), OPT_OUT_TIMEOUT_MS);
+  return fetch(url, { method: "POST", signal: controller.signal }).finally(() => clearTimeout(timer));
+}
+
+/**
  * « Ne plus afficher » : pose le cookie du navigateur **sur-le-champ** (avant
- * tout `await`), puis, connecté, l'écrit sur le compte. Les dépendances sont
+ * tout `await`), puis appelle le serveur — **connecté ou non** : la réponse
+ * repose le cookie par `Set-Cookie`, seul moyen de lui garder un an sous
+ * Safari / iOS, qui borne à sept jours un cookie posé par script (ITP) ; et,
+ * connecté, la route écrit le choix sur le compte. Non connecté, l'issue ne
+ * dépend pas de cet appel : le toast n'attend pas. Les dépendances sont
  * injectables pour les tests (Jest tourne sans DOM).
  */
 export async function recordRecruitmentModalOptOut(
   signedIn: boolean,
   {
     writeCookie = writeSeenCookie,
-    // Délai borné : la modale est déjà fermée, le toast ne doit pas attendre
-    // indéfiniment une connexion bloquée (l'abandon tombe dans le repli).
-    post = (url: string) => fetch(url, { method: "POST", signal: AbortSignal.timeout(OPT_OUT_TIMEOUT_MS) }),
+    post = postOptOut,
   }: Readonly<{
     writeCookie?: (name: string, value: string, maxAge?: number) => boolean;
-    post?: (url: string) => Promise<Pick<Response, "ok" | "status">>;
+    post?: (url: string) => Promise<Pick<Response, "ok" | "status" | "json">>;
   }> = {},
 ): Promise<RecruitmentModalOptOutResult> {
   const kept = writeCookie(RECRUITMENT_MODAL_OFF_COOKIE, RECRUITMENT_MODAL_OFF_VALUE, RECRUITMENT_MODAL_OFF_MAX_AGE);
   const signedOut = kept ? "BROWSER" : "NONE";
   const fallback = kept ? "BROWSER_ONLY" : "NONE";
-  if (!signedIn) return signedOut;
+  if (!signedIn) {
+    // Renouvellement du cookie par le serveur seulement : un échec laisse
+    // celui du script, rien à en dire.
+    post(OPT_OUT_URL).catch(() => undefined);
+    return signedOut;
+  }
   try {
-    const response = await post("/api/recruitment/modal-dismiss");
-    if (response.ok) return "ACCOUNT";
+    const response = await post(OPT_OUT_URL);
     // Plus de compte derrière la page depuis son chargement — session finie
-    // (401 : expirée, déconnexion dans un autre onglet) ou compte supprimé
-    // (409) : le lecteur est hors connexion, ce n'est pas un échec ; le cookie
-    // reportera le choix au compte à la prochaine connexion.
-    if (response.status === 401 || response.status === 409) return signedOut;
-    return fallback;
+    // (expirée, déconnexion dans un autre onglet : `account: false`) ou compte
+    // supprimé (409) : le lecteur est hors connexion, ce n'est pas un échec ;
+    // le cookie reportera le choix au compte à la prochaine connexion.
+    if (response.status === 409) return signedOut;
+    if (!response.ok) return fallback;
+    const body = (await response.json()) as { account?: unknown };
+    return body.account === true ? "ACCOUNT" : signedOut;
   } catch {
     return fallback;
   }
