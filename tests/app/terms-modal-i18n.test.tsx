@@ -165,13 +165,17 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     expect(flow).toContain("useEnglishMessagesUntilRemount(locale, englishProfile)");
   });
 
-  it("les textes légaux disent que le compte se supprime directement depuis la fenêtre (FR et EN)", () => {
-    expect(readSource("lib/shared/terms-of-use.ts")).toContain("il peut toujours supprimer son compte directement depuis la fenêtre d'acceptation, se déconnecter,");
-    expect(readSource("lib/shared/terms-of-use.ts")).toContain("il peut supprimer son compte depuis la fenêtre d'acceptation ou depuis son profil.");
-    expect(readSource("lib/shared/terms-of-use-en.ts")).toContain("it can still delete its account directly from the acceptance window, log out,");
-    expect(readSource("lib/shared/terms-of-use-en.ts")).toContain("it can delete its account from the acceptance window or from its profile.");
-    expect(readSource("lib/shared/privacy-changes.ts")).toContain("Sans accepter, tu peux supprimer ton compte directement depuis cette fenêtre, te déconnecter,");
-    expect(readSource("lib/shared/privacy-changes-en.ts")).toContain("Without accepting, you can delete your account directly from that window, log out,");
+  it("les textes publiés (conditions v6, entrée v6) restent tels quels : la mention des issues attend la prochaine version (FR et EN)", () => {
+    // Un texte déjà publié en production ne se réécrit pas en place ; la déconnexion qu'il cite reste offerte (lien des issues).
+    expect(readSource("lib/shared/terms-of-use.ts")).toContain("il peut toujours se déconnecter, lire les pages légales");
+    expect(readSource("lib/shared/terms-of-use.ts")).toContain("il peut supprimer son compte depuis son profil.");
+    expect(readSource("lib/shared/terms-of-use-en.ts")).toContain("it can still log out, read the legal pages");
+    expect(readSource("lib/shared/terms-of-use-en.ts")).toContain("it can delete its account from its profile.");
+    expect(readSource("lib/shared/privacy-changes.ts")).toContain("Sans accepter, tu peux te déconnecter, lire cette politique");
+    expect(readSource("lib/shared/privacy-changes-en.ts")).toContain("Without accepting, you can log out, read this policy");
+    for (const path of ["lib/shared/terms-of-use.ts", "lib/shared/terms-of-use-en.ts", "lib/shared/privacy-changes.ts", "lib/shared/privacy-changes-en.ts"]) {
+      expect(readSource(path)).not.toMatch(/directement depuis (?:la|cette) fenêtre|directly from (?:the acceptance|that) window/);
+    }
   });
 
   it("aucun texte de la fenêtre n'est perdu : FR et EN ont les mêmes clés, sans « logout » orphelin", () => {
