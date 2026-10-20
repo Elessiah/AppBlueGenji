@@ -208,9 +208,12 @@ la confirmation retombée sur le français. Le bouton de la fenêtre n'est
 de la confirmation ne s'éclairent plus au survol (`.btn:hover` de
 `globals.css` exclut tout bouton désarmé, `:where()` gardant sa spécificité),
 passent au gris système en contraste élevé (`forced-colors`), et l'attente
-(`pendingLabel`) est annoncée par un `<output aria-live="polite">` caché. Le
-délai de préparation ne rend le focus au bouton que s'il y est resté ou s'est
-perdu sur `<body>`.
+(`pendingLabel`) est annoncée par un `<output aria-live="polite">` caché. Un bouton
+non armé (`disabled` natif : texte à recopier) y est éteint, curseur interdit ;
+les règles de survol désarmé que `/profil`, `ScoreDialog` et
+`GhostRegistrationDialog` recopiaient sont retirées. La fenêtre des conditions
+passe ses gestes désarmés au gris système en contraste élevé. Le délai de
+préparation ne rend le focus au bouton que s'il s'est perdu sur `<body>`.
 
 Aucune des routes du geste (`GET /api/profile/deletion`, `DELETE /api/profile`,
 ni `GET /api/profile/export` pour l'art. 15) ne consulte l'acceptation des
