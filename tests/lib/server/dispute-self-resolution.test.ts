@@ -6,7 +6,7 @@ jest.mock("@/lib/server/staff-audit");
 
 import { getDatabase } from "@/lib/server/database";
 import { notifyStaff } from "@/lib/server/notify";
-import { publishStaffAction } from "@/lib/server/staff-audit";
+import { auditStaffAction, publishStaffAction } from "@/lib/server/staff-audit";
 import {
   alertSelfPausedValidation,
   alertSelfResolvedDispute,
@@ -139,6 +139,25 @@ describe("alertSelfResolvedDispute", () => {
     expect(notifyStaff).not.toHaveBeenCalled();
     expect(publishStaffAction).not.toHaveBeenCalled();
     expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("laisse une trace pm2 de l'auteur avant toute lecture (arrêt du serveur entre le commit et l'alerte)", async () => {
+    plays = false;
+    const pending = alertSelfResolvedDispute(dispute, actor);
+    // Synchrone, avant le premier `await` : la route n'a pas encore répondu.
+    expect(auditStaffAction).toHaveBeenCalledWith(expect.stringContaining("match #70"), actor);
+    expect(execute).not.toHaveBeenCalled();
+    await pending;
+  });
+
+  it("dit ce qui manque quand le push échoue après le journal", async () => {
+    jest.mocked(notifyStaff).mockRejectedValue(new Error("boom"));
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(alertSelfResolvedDispute(dispute, actor)).resolves.toBe(false);
+    expect(publishStaffAction).toHaveBeenCalledTimes(1);
+    expect(String(error.mock.calls[0][0])).toContain("push non envoyé");
+    error.mockRestore();
   });
 
   it("seul membre du staff : personne à prévenir, le geste reste journalisé", async () => {
