@@ -78,7 +78,11 @@ export type RecruitmentModalOptOutResult = "BROWSER" | "ACCOUNT" | "BROWSER_ONLY
 function postOptOut(url: string): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), OPT_OUT_TIMEOUT_MS);
-  return fetch(url, { method: "POST", signal: controller.signal }).finally(() => clearTimeout(timer));
+  // `keepalive` : un onglet fermé ou un lien suivi juste après le clic
+  // n'annule pas l'écriture (comme `PrivacyChangesModal`).
+  return fetch(url, { method: "POST", keepalive: true, signal: controller.signal }).finally(() =>
+    clearTimeout(timer),
+  );
 }
 
 /**
@@ -86,8 +90,7 @@ function postOptOut(url: string): Promise<Response> {
  * tout `await`), puis appelle le serveur — **connecté ou non** : la réponse
  * repose le cookie par `Set-Cookie`, seul moyen de lui garder un an sous
  * Safari / iOS, qui borne à sept jours un cookie posé par script (ITP) ; et,
- * connecté, la route écrit le choix sur le compte. Non connecté, l'issue ne
- * dépend pas de cet appel : le toast n'attend pas. Les dépendances sont
+ * connecté, la route écrit le choix sur le compte. Les dépendances sont
  * injectables pour les tests (Jest tourne sans DOM).
  */
 export async function recordRecruitmentModalOptOut(
@@ -107,12 +110,9 @@ export async function recordRecruitmentModalOptOut(
   // Cookie posé par le script : l'issue hors compte est acquise. Refusé, seul
   // le `Set-Cookie` de la réponse peut encore le garder — relu après elle.
   const kept = () => written || cookieKept();
-  if (!signedIn) {
-    const renewal = post(OPT_OUT_URL).catch(() => undefined);
-    // Script accepté : le serveur ne fait que renouveler, le toast n'attend pas.
-    if (!written) await renewal;
-    return kept() ? "BROWSER" : "NONE";
-  }
+  // Non connecté au rendu, la réponse est lue quand même : une connexion faite
+  // depuis dans un autre onglet envoie sa session, et le choix est alors sur
+  // le compte — le toast doit le dire.
   let account: "ACCOUNT" | "GONE" | "FAILED";
   try {
     const response = await post(OPT_OUT_URL);
@@ -128,7 +128,8 @@ export async function recordRecruitmentModalOptOut(
   }
   if (account === "ACCOUNT") return "ACCOUNT";
   if (!kept()) return "NONE";
-  return account === "GONE" ? "BROWSER" : "BROWSER_ONLY";
+  // Un échec n'est « compte injoignable » que pour qui se croyait connecté.
+  return account === "FAILED" && signedIn ? "BROWSER_ONLY" : "BROWSER";
 }
 
 /** Le cookie « Ne plus afficher » est-il lisible sur ce navigateur ? */
