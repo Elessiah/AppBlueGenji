@@ -75,7 +75,7 @@ joueur de l'entrée solo (`actorPlaysMatch`) — peut agir : une petite
 organisation n'a pas toujours un arbitre neutre. Mais les **autres** sont
 avertis, après le commit et au meilleur effort
 (`lib/server/tournaments/dispute-self-resolution.ts`, avec l'arbitre de la
-session), dans trois cas :
+session), dans quatre cas :
 
 1. il **tranche un litige** par « Valider le résultat »
    (`adminResolveMatchPublic` → `alertSelfResolvedDispute`) ;
@@ -91,14 +91,20 @@ session), dans trois cas :
 3. son « Enregistrer » **suspend** la validation d'office d'un report seul
    (`adminSaveMatchScoresPublic` → `alertSelfPausedValidation`), une fois : à
    la saisie qui pose la suspension (`pausedNow`, état d'avant lu sous le
-   verrou du match), pas à chaque nouvelle saisie d'une manche déjà suspendue.
+   verrou du match), pas à chaque nouvelle saisie d'une manche déjà suspendue ;
+4. il **corrige un résultat acquis** (« Valider le résultat » sur une manche
+   `COMPLETED`, lue sous le même verrou que le litige) : renverser un litige
+   tranché par un arbitre neutre ne doit pas être plus discret que le trancher
+   (`alertSelfCorrectedResult` : push « Un membre du staff qui joue ce match en
+   a corrigé le résultat · tournoi, manche : issue. », ligne « ⚠️ Résultat
+   corrigé par un membre du staff qui joue ce match · … »).
 
 Avant toute lecture, une trace pm2 courte nomme l'auteur et la manche
 (`auditStaffAction`, écrite avant la réponse de la route) : un arrêt du serveur
 entre le commit et l'alerte ne laisse pas le geste sans auteur ; un échec
 ensuite se dit dans pm2 (« push non envoyé » ou « ni journalisée ni envoyée »).
 
-Hors litige, « Valider le résultat » d'un arbitre qui joue n'avertit personne
+Hors litige, la **première** validation d'un arbitre qui joue n'avertit personne
 (la règle vise les litiges, `/regles` le dit). Seul membre du staff : personne
 à prévenir (`notifyStaff` sans destinataire), la ligne du journal reste.
 
