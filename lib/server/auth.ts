@@ -137,8 +137,8 @@ async function carryRecruitmentModalOff(
   userId: number,
   cookieStore: Awaited<ReturnType<typeof cookies>>,
 ): Promise<void> {
-  if (!recruitmentModalOffInBrowser(cookieStore.get(RECRUITMENT_MODAL_OFF_COOKIE)?.value)) return;
   try {
+    if (!recruitmentModalOffInBrowser(cookieStore.get(RECRUITMENT_MODAL_OFF_COOKIE)?.value)) return;
     await recordRecruitmentModalOff(userId);
   } catch (error) {
     console.error("[auth] recruitment modal opt-out carry-over failed:", error);

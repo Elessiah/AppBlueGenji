@@ -50,6 +50,34 @@ function writeSeenCookie(name: string, value: string, maxAge?: number): void {
   }
 }
 
+/** Où le « Ne plus afficher » a été gardé : ce navigateur seul (non connecté), le compte aussi, ou le navigateur faute de compte joignable. */
+export type RecruitmentModalOptOutResult = "BROWSER" | "ACCOUNT" | "BROWSER_ONLY";
+
+/**
+ * « Ne plus afficher » : pose le cookie du navigateur **sur-le-champ** (avant
+ * tout `await`), puis, connecté, l'écrit sur le compte. Les dépendances sont
+ * injectables pour les tests (Jest tourne sans DOM).
+ */
+export async function recordRecruitmentModalOptOut(
+  signedIn: boolean,
+  {
+    writeCookie = writeSeenCookie,
+    post = (url: string) => fetch(url, { method: "POST" }),
+  }: Readonly<{
+    writeCookie?: (name: string, value: string, maxAge?: number) => void;
+    post?: (url: string) => Promise<Pick<Response, "ok">>;
+  }> = {},
+): Promise<RecruitmentModalOptOutResult> {
+  writeCookie(RECRUITMENT_MODAL_OFF_COOKIE, RECRUITMENT_MODAL_OFF_VALUE, RECRUITMENT_MODAL_OFF_MAX_AGE);
+  if (!signedIn) return "BROWSER";
+  try {
+    const response = await post("/api/recruitment/modal-dismiss");
+    return response.ok ? "ACCOUNT" : "BROWSER_ONLY";
+  } catch {
+    return "BROWSER_ONLY";
+  }
+}
+
 /**
  * Le focus vient-il du clavier ? Un clic de souris donne aussi le focus à un
  * bouton : compté comme un focus, il figerait la banderole jusqu'au clic
@@ -388,18 +416,11 @@ function RecruitmentArrivalModal({
    * navigateur tranquille, et le toast le dit.
    */
   async function optOut() {
-    writeSeenCookie(RECRUITMENT_MODAL_OFF_COOKIE, RECRUITMENT_MODAL_OFF_VALUE, RECRUITMENT_MODAL_OFF_MAX_AGE);
+    // Le cookie est posé dès l'appel, avant la fermeture.
+    const saved = recordRecruitmentModalOptOut(signedIn);
     dismiss();
-    if (signedIn) {
-      try {
-        const response = await fetch("/api/recruitment/modal-dismiss", { method: "POST" });
-        if (!response.ok) throw new Error("RECRUITMENT_MODAL_DISMISS_FAILED");
-      } catch {
-        toast?.showError(t("highlight.dontShowAgainFailed"));
-        return;
-      }
-    }
-    toast?.showSuccess(t("highlight.dontShowAgainDone"));
+    if ((await saved) === "BROWSER_ONLY") toast?.showError(t("highlight.dontShowAgainFailed"));
+    else toast?.showSuccess(t("highlight.dontShowAgainDone"));
   }
 
   // Le hook doit être appelé à chaque rendu : il ne s'active que si `open`.
