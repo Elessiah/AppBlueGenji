@@ -218,9 +218,10 @@ describe("recordRecruitmentModalOptOut", () => {
     expect(await recordRecruitmentModalOptOut(false, { writeCookie: () => false, post: failing })).toBe("NONE");
   });
 
-  it("non connecté au rendu, connecté depuis dans un autre onglet : le toast dit que le choix est sur le compte", async () => {
-    const post = async () => ({ ok: true, status: 200, json: async () => ({ account: true }) });
-    expect(await recordRecruitmentModalOptOut(false, { writeCookie: () => true, post })).toBe("ACCOUNT");
+  it("non connecté, cookie du script posé : le toast n'attend pas le serveur", async () => {
+    const hanging = jest.fn(() => new Promise<never>(() => undefined));
+    expect(await recordRecruitmentModalOptOut(false, { writeCookie: () => true, post: hanging })).toBe("BROWSER");
+    expect(hanging).toHaveBeenCalledWith("/api/recruitment/modal-dismiss");
   });
 
   it("borne l'attente du serveur sans AbortSignal.timeout (absent de Safari 15)", () => {
