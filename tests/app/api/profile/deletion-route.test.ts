@@ -84,6 +84,22 @@ describe("DELETE /api/profile", () => {
     expect(clearSession).toHaveBeenCalled();
   });
 
+  it("une panne en fermant la session après coup ne change pas la suppression faite en échec", async () => {
+    const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    deleteMock.mockResolvedValue({ mode: "ERASE", reason: null });
+    jest.mocked(clearSession).mockRejectedValue(new Error("Connection lost: The server closed the connection."));
+
+    const res = await DELETE();
+
+    expect(res.status).toBe(200);
+    const payload = await res.json();
+    expect(payload).toEqual({ deleted: true, mode: "ERASE", reason: null });
+    // Le message interne reste au journal, jamais dans la réponse.
+    expect(JSON.stringify(payload)).not.toContain("Connection lost");
+    expect(log).toHaveBeenCalled();
+    log.mockRestore();
+  });
+
   it("refuse l'appel anonyme sans rien écrire", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(null);
 

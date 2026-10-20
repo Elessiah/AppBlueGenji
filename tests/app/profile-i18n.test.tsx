@@ -309,7 +309,7 @@ describe("français inchangé — profil", () => {
       expect(accountDeletionConsequences(subject)).toMatch(/salon #live du Discord \(et l'alerte de modération d'une annonce bloquée ou signalée par AutoMod\), qui gardent ton pseudo jusqu'à leur suppression sur demande/);
       expect(deletionConsequencesText(EN_PROFILE, subject)).toMatch(/Discord #live channel \(and the moderation alert for an announcement blocked or flagged by AutoMod\), which keep your username until they are deleted on request/);
     }
-    for (const code of ["ACCOUNT_STILL_REFERENCED", "X", undefined]) {
+    for (const code of ["ACCOUNT_STILL_REFERENCED", "UNAUTHORIZED", "USER_NOT_FOUND", "X", undefined]) {
       expect(deletionErrorText(FR_PROFILE, code)).toBe(accountDeletionErrorMessage(code));
     }
   });

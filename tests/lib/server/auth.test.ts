@@ -635,6 +635,21 @@ describe("auth", () => {
 
       expect(mockCookieSet).toHaveBeenCalledWith("bg_session", "", expect.any(Object));
     });
+
+    it("expire le cookie même quand la base ne répond pas (la panne remonte quand même)", async () => {
+      const { getDatabase } = await import("@/lib/server/database");
+      const { cookies } = await import("next/headers");
+
+      const mockCookieSet = jest.fn();
+      jest.mocked(cookies).mockResolvedValue(
+        fakeCookieStore({ get: jest.fn().mockReturnValue({ value: "test-token" }), set: mockCookieSet }),
+      );
+      const mockExecute = jest.fn<SqlQuery>().mockRejectedValue(new Error("ECONNRESET"));
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: mockExecute }));
+
+      await expect(clearSession()).rejects.toThrow("ECONNRESET");
+      expect(mockCookieSet).toHaveBeenCalledWith("bg_session", "", expect.objectContaining({ maxAge: 0 }));
+    });
   });
 
   describe("ensureUniquePseudo", () => {

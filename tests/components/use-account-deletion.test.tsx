@@ -145,11 +145,13 @@ describe("requestAccountDeletion", () => {
     expect(await requestAccountDeletion(null, fakeFetch({}, []))).toEqual({ ok: false, code: "ACCOUNT_DELETE_FAILED" });
   });
 
-  it("un 2xx au corps illisible reste un succès (compte supprimé, session fermée) : l'aperçu tient lieu de plan", async () => {
+  it("un 2xx qui ne confirme pas la suppression (corps illisible, page d'un portail captif) n'est jamais pris pour un succès", async () => {
     const truncated = fakeFetch({ "DELETE /api/profile": () => new Response("{\"deleted\":tr", { status: 200 }) }, []);
-    expect(await requestAccountDeletion("TOURNAMENTS", truncated)).toEqual({ ok: true, applied: "TOURNAMENTS" });
-    const empty = fakeFetch({ "DELETE /api/profile": () => new Response(null, { status: 204 }) }, []);
-    expect(await requestAccountDeletion(null, empty)).toEqual({ ok: true, applied: null });
+    expect(await requestAccountDeletion("TOURNAMENTS", truncated)).toEqual({ ok: false, code: "ACCOUNT_DELETE_FAILED" });
+    const portal = fakeFetch({ "DELETE /api/profile": () => new Response("<html>Wi-Fi</html>", { status: 200, headers: { "content-type": "text/html" } }) }, []);
+    expect(await requestAccountDeletion(null, portal)).toEqual({ ok: false, code: "ACCOUNT_DELETE_FAILED" });
+    const foreignJson = fakeFetch({ "DELETE /api/profile": () => jsonResponse(200, { mode: "ERASE", reason: null }) }, []);
+    expect(await requestAccountDeletion(null, foreignJson)).toEqual({ ok: false, code: "ACCOUNT_DELETE_FAILED" });
   });
 
   it("un refus au corps illisible n'est jamais pris pour un succès", async () => {
@@ -273,6 +275,38 @@ describe("useAccountDeletion", () => {
     expect(fakeWindow.location.href).toBe("/tournois");
     jest.advanceTimersByTime(ACCOUNT_DELETED_REDIRECT_MS);
     expect(fakeWindow.location.href).toBe("/en");
+  });
+
+  const sessionGoneCases: Array<{ name: string; status: number; code: string }> = [
+    { name: "session fermée (réponse de la suppression perdue, puis nouvel essai)", status: 401, code: "UNAUTHORIZED" },
+    { name: "compte déjà introuvable (supprimé dans un autre onglet)", status: 400, code: "USER_NOT_FOUND" },
+  ];
+  it.each(sessionGoneCases)("$name : le dit puis recharge l'accueil, sans boucle de « réessaie »", async ({ status, code }) => {
+    globalThis.fetch = fakeFetch(
+      {
+        "GET /api/profile/deletion": () => jsonResponse(200, { mode: "ERASE", reason: null }),
+        "DELETE /api/profile": () => jsonResponse(status, { error: code }),
+      },
+      calls,
+    );
+    await useAccountDeletion({ text: FR_PROFILE }).start();
+    rerender();
+    // `true` : la confirmation reste « en cours » (aucun second envoi) jusqu'au rechargement.
+    expect(await dialogProps(useAccountDeletion({ text: FR_PROFILE })).onConfirm()).toBe(true);
+    expect(showError).toHaveBeenCalledWith(expect.stringMatching(/^Ta session est fermée/), { lang: undefined });
+    expect(showSuccess).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(ACCOUNT_DELETED_REDIRECT_MS);
+    expect(fakeWindow.location.href).toBe("/");
+  });
+
+  it("une réponse perdue (réseau coupé) reste un échec à retenter : rien n'est annoncé supprimé", async () => {
+    globalThis.fetch = fakeFetch({ "GET /api/profile/deletion": () => jsonResponse(200, { mode: "ERASE", reason: null }) }, calls);
+    await useAccountDeletion({ text: FR_PROFILE }).start();
+    rerender();
+    expect(await dialogProps(useAccountDeletion({ text: FR_PROFILE })).onConfirm()).toBe(false);
+    expect(showError).toHaveBeenCalledWith("La suppression du compte a échoué. Réessaie dans un instant.", { lang: undefined });
+    jest.advanceTimersByTime(ACCOUNT_DELETED_REDIRECT_MS * 2);
+    expect(fakeWindow.location.href).toBe("/tournois");
   });
 
   it("un refus le dit et laisse la confirmation ouverte, sans quitter la page", async () => {
