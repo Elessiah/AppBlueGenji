@@ -105,13 +105,18 @@ async function actorPlaysMatch(
   const [first, second = first] = sides;
   const playedAt = match.playedAt ?? null;
   const db = await getDatabase();
+  // Un lancement ne date la manche que s'il vaut pour l'appariement actuel
+  // (`launch_pairing`, comme `SCORE_DEADLINE_SQL`) : celui d'un appariement
+  // remplacé depuis n'avancerait pas la borne de départ d'un membre de la
+  // nouvelle équipe, qui ne jouait pas encore ce match.
+  const launchedAt = "CASE WHEN m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id) THEN m.launched_at END";
   const [rows] = await db.execute<RowDataPacket[]>(
     `SELECT 1 FROM bg_matches m
       WHERE m.id = ?
         AND (EXISTS (SELECT 1 FROM bg_team_members tm
                       WHERE tm.team_id IN (?, ?) AND tm.user_id = ?
                         AND (tm.left_at IS NULL
-                             OR tm.left_at >= COALESCE(LEAST(COALESCE(m.launched_at, ?), COALESCE(?, m.launched_at)), m.created_at)))
+                             OR tm.left_at >= COALESCE(LEAST(COALESCE(${launchedAt}, ?), COALESCE(?, ${launchedAt})), m.created_at)))
              OR EXISTS (SELECT 1 FROM bg_teams st
                          WHERE st.id IN (?, ?) AND st.solo_user_id = ?))
       LIMIT 1`,
