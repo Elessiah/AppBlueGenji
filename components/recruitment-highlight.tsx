@@ -75,7 +75,7 @@ export async function recordRecruitmentModalOptOut(
     post = (url: string) => fetch(url, { method: "POST" }),
   }: Readonly<{
     writeCookie?: (name: string, value: string, maxAge?: number) => boolean;
-    post?: (url: string) => Promise<Pick<Response, "ok">>;
+    post?: (url: string) => Promise<Pick<Response, "ok" | "status">>;
   }> = {},
 ): Promise<RecruitmentModalOptOutResult> {
   const kept = writeCookie(RECRUITMENT_MODAL_OFF_COOKIE, RECRUITMENT_MODAL_OFF_VALUE, RECRUITMENT_MODAL_OFF_MAX_AGE);
@@ -83,7 +83,12 @@ export async function recordRecruitmentModalOptOut(
   if (!signedIn) return kept ? "BROWSER" : "NONE";
   try {
     const response = await post("/api/recruitment/modal-dismiss");
-    return response.ok ? "ACCOUNT" : fallback;
+    if (response.ok) return "ACCOUNT";
+    // Session finie depuis le chargement (expirée, déconnexion dans un autre
+    // onglet) : le lecteur n'est plus connecté — le cookie reportera le choix
+    // au compte à la prochaine connexion, ce n'est pas un échec.
+    if (response.status === 401) return kept ? "BROWSER" : "NONE";
+    return fallback;
   } catch {
     return fallback;
   }
@@ -527,15 +532,7 @@ function RecruitmentArrivalModal({
         )}
 
         <div className={styles.modalActions}>
-          {/* Secondaire, à l'écart des actions : « Plus tard » reste le geste
-              ordinaire (la modale revient pour une annonce neuve). */}
-          <button type="button" className={styles.optOut} onClick={() => void optOut()}>
-            {t("highlight.dontShowAgain")}
-          </button>
-          {/* Focus d'ouverture sur « Plus tard » quand il n'y a pas de pages à
-              tourner : sinon il tomberait sur « Ne plus afficher », premier dans
-              l'ordre, et Entrée pour fermer couperait la modale pour de bon. */}
-          <CyberButton variant="ghost" onClick={dismiss} data-autofocus={count > 1 ? undefined : ""}>
+          <CyberButton variant="ghost" onClick={dismiss}>
             {t("highlight.later")}
           </CyberButton>
           {/* La lecture complète se fait toujours sur la page de recrutement :
@@ -552,6 +549,15 @@ function RecruitmentArrivalModal({
               </a>
             </CyberButton>
           )}
+        </div>
+        {/* Secondaire, sous les actions et **après** elles dans l'ordre du
+            focus : « Plus tard » reste le premier geste atteint (focus
+            d'ouverture sans pager, première tabulation après le pager), et
+            Entrée pour fermer ne coupe jamais la modale pour de bon. */}
+        <div className={styles.optOutRow}>
+          <button type="button" className={styles.optOut} onClick={() => void optOut()}>
+            {t("highlight.dontShowAgain")}
+          </button>
         </div>
       </div>
     </div>
