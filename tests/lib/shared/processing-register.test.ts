@@ -1,6 +1,8 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register-en";
+import { PUSH_TOPICS } from "@/lib/shared/push-notifications";
 import {
   ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS,
   BACKUP_RETENTION_DAYS,
@@ -166,6 +168,16 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(byRef("T05").dataSubjects).toContain(
       "Joueurs et équipes engagés dans un tournoi (désignés par le nom d'équipe, jamais par leur pseudo)",
     );
+  });
+
+  // Sujet push du staff ajouté par DISPUTE-FOLLOWUP : T12 (les notifications
+  // push) le nomme comme /rgpd, en français et en anglais.
+  it("nomme en T12 l'alerte d'un litige tranché par un membre du staff qui joue", () => {
+    expect(PUSH_TOPICS.REFEREE_SELF_RESOLUTION.audience).toBe("tournaments");
+    const t12 = byRef("T12").subPurposes.join(" ");
+    expect(t12).toMatch(/Alertes d'arbitrage, litiges tranchés par un membre du staff qui joue le match, matchs planifiés/);
+    const t12En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T12")!.subPurposes.join(" ");
+    expect(t12En).toMatch(/Referee alerts, disputes settled by a staff member who plays in the match, scheduled matches/);
   });
 
   it("déclare l'information sur les changements de politique et leur annonce Discord", () => {
