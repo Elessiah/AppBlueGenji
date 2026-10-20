@@ -87,12 +87,13 @@ export function selfResolvedDisputeLog(input: SelfResolvedDispute): string {
 }
 
 /**
- * L'arbitre joue-t-il la manche ? Membre d'une des deux équipes **au moment où
- * elle s'est jouée** — premier report (`playedAt`), sinon lancement, sinon
- * création de la manche : arrivé avant, parti après (ou toujours là). Quitter
- * l'équipe juste avant de trancher n'efface donc pas l'alerte, et un ancien
- * membre parti avant le match, ou un membre arrivé après, n'est pas accusé à
- * tort. Ou joueur d'une entrée solo.
+ * L'arbitre joue-t-il la manche ? Membre d'une des deux équipes **pendant
+ * qu'elle se jouait** : arrivé au plus tard au premier report (`playedAt`),
+ * sinon au lancement, sinon à la création de la manche ; parti au plus tôt au
+ * premier des deux — lancement ou premier report —, sinon à la création (ou
+ * toujours là). Quitter l'équipe en cours de match, ou juste avant de
+ * trancher, n'efface donc pas l'alerte, et un ancien membre parti avant le
+ * match, ou arrivé après, n'est pas accusé à tort. Ou joueur d'une entrée solo.
  */
 async function actorPlaysMatch(
   match: DisputeBeforeResolution,
@@ -107,12 +108,13 @@ async function actorPlaysMatch(
       WHERE m.id = ?
         AND (EXISTS (SELECT 1 FROM bg_team_members tm
                       WHERE tm.team_id IN (?, ?) AND tm.user_id = ?
-                        AND tm.joined_at <= COALESCE(?, m.launched_at, NOW())
-                        AND (tm.left_at IS NULL OR tm.left_at >= COALESCE(?, m.launched_at, m.created_at)))
+                        AND tm.joined_at <= COALESCE(?, m.launched_at, m.created_at)
+                        AND (tm.left_at IS NULL
+                             OR tm.left_at >= COALESCE(LEAST(COALESCE(m.launched_at, ?), COALESCE(?, m.launched_at)), m.created_at)))
              OR EXISTS (SELECT 1 FROM bg_teams st
                          WHERE st.id IN (?, ?) AND st.solo_user_id = ?))
       LIMIT 1`,
-    [match.matchId, first, second, actorId, playedAt, playedAt, first, second, actorId],
+    [match.matchId, first, second, actorId, playedAt, playedAt, playedAt, first, second, actorId],
   );
   return rows.length > 0;
 }

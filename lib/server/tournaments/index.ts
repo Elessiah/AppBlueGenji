@@ -1601,7 +1601,7 @@ async function lockOpenMatches(
   >(
     `SELECT id, team1_id, team2_id, team1_reported_at, team2_reported_at
        FROM bg_matches
-      WHERE id IN (${sqlPlaceholders(open.length)})
+      WHERE id IN (${sqlPlaceholders(open.length)}) AND status <> 'COMPLETED'
       FOR UPDATE`,
     open.map((row) => Number(row.id)),
   );
