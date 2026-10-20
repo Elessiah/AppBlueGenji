@@ -279,7 +279,7 @@ describe("plus de window.confirm", () => {
     expect(deletion).toContain("setPendingDeletion(await (preview ?? previewAccountDeletion()));");
     // Lot 9-2 : textes de la langue de la page (`profile.deletion`).
     expect(deletion).toContain('title={text.t("deletion.question")}');
-    expect(deletion).toContain("{deletionConsequencesText(text, pendingDeletion.subject)}");
+    expect(deletion).toContain("{deletionConsequencesText(text, pendingDeletion.subject, fromTerms)}");
     expect(page).toContain("{deleteAccountLabel(text, accountDeletion.deleting, accountDeletion.confirming)}");
     // Annuler rouvre le bouton « Supprimer mon compte ».
     expect(deletion).toMatch(/setPendingDeletion\(null\);\s*setDeleting\(false\);\s*onCancel\?\.\(\);/);

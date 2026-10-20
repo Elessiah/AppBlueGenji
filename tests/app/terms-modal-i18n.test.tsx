@@ -224,6 +224,8 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     expect(readSource("components/legal/TermsAccountDeletion.tsx")).toMatch(/void start\(preview\);\s*\}, \[start, preview\]\);/);
     expect(readSource("components/i18n/profile-text-provider.tsx")).toContain('import { englishProfile } from "./english-loader-profile";');
     expect(readSource("components/legal/TermsAccountDeletion.tsx")).not.toContain("english-loaders-account");
+    // Depuis la fenêtre, la confirmation nuance « transfère ou dissous ton équipe d'abord » (impossible sans accepter).
+    expect(readSource("app/(secured)/profil/page.tsx")).not.toContain("fromTerms");
     // Aucun préchargement au survol ni au focus : le bouton précède « J'accepte », chaque lecteur qui accepte téléchargerait l'espace `profile`.
     expect(modal).not.toMatch(/onPointerEnter|onFocus=|preloadMissing|quietPreload/);
     expect(modal).toMatch(/if \(locale === "en"\) englishProfile\.load\(\)\.catch\(\(\) => undefined\);\s*termsDeletionLoader\.load\(\)/);
@@ -235,7 +237,7 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     // La fenêtre reste bloquante pendant la confirmation : Échap ne ferme que celle-ci (pile des modales).
     expect(modal).toContain("onClose: KEEP_OPEN");
     const flow = readSource("components/legal/TermsAccountDeletion.tsx");
-    expect(flow).toContain('useAccountDeletion({ text, onCancel: onClose, layer: "overBlocking" })');
+    expect(flow).toContain('useAccountDeletion({ text, onCancel: onClose, layer: "overBlocking", fromTerms: true })');
     expect(flow).toContain("useEnglishMessagesUntilRemount(locale, englishProfile)");
   });
 

@@ -112,7 +112,10 @@ describe("câblage des modales globales", () => {
     const create = auth.match(/export async function createSession[\s\S]*?\n\}/)?.[0] ?? "";
     const clear = auth.match(/export async function clearSession[\s\S]*?\n\}/)?.[0] ?? "";
     expect(create).toContain("forgetTermsPostponement(cookieStore)");
-    expect(clear).toContain("forgetTermsPostponement(cookieStore)");
+    // La fermeture passe par `expireSessionCookies` (que la suppression du compte rejoue seule si `clearSession` échoue).
+    const expire = auth.match(/export async function expireSessionCookies[\s\S]*?\n\}/)?.[0] ?? "";
+    expect(clear).toContain("await expireSessionCookies();");
+    expect(expire).toContain("forgetTermsPostponement(cookieStore)");
     expect(auth).toMatch(/cookieStore\.set\(TERMS_POSTPONED_COOKIE, "", \{[^}]*maxAge: 0/);
   });
 

@@ -315,8 +315,8 @@ describe("français inchangé — profil", () => {
     }
     // Session ou compte déjà partis : la phrase du rechargement, dans les deux langues (même liste que l'écran).
     for (const code of SESSION_GONE_CODES) {
-      expect(deletionErrorText(FR_PROFILE, code)).toMatch(/^Ta session est fermée — ton compte a peut-être déjà été supprimé\./);
-      expect(deletionErrorText(EN_PROFILE, code)).toMatch(/^Your session has ended — your account may already have been deleted\./);
+      expect(deletionErrorText(FR_PROFILE, code)).toMatch(/^Ta session est fermée : soit ton compte vient d'être supprimé, soit ta session a expiré\./);
+      expect(deletionErrorText(EN_PROFILE, code)).toMatch(/^Your session has ended: either your account has just been deleted, or your session expired\./);
     }
     expect([...SESSION_GONE_CODES]).toEqual(["UNAUTHORIZED", "USER_NOT_FOUND"]);
   });
@@ -432,6 +432,37 @@ describe("anglais — phrases", () => {
     );
     expect(deletionConsequencesText(EN_PROFILE, null)).toMatch(/^You haven't played any match/);
     expect(discordTagLockText(EN_PROFILE, { tag: "nova", verified: true, linked: true })).toContain("Nobody else, ever.");
+  });
+
+  it("suppression depuis la fenêtre des conditions : le conseil « transfère ou dissous » dit qu'il demande d'accepter, et le recours qui reste", () => {
+    const frNote = FR_PROFILE.t("deletion.ownedTeamsFromTerms");
+    const enNote = EN_PROFILE.t("deletion.ownedTeamsFromTerms");
+    expect(frNote).toMatch(/demande d'abord d'accepter les conditions d'utilisation/);
+    expect(frNote).toContain("« Exercer vos droits »");
+    expect(enNote).toMatch(/first requires accepting the terms of use/);
+    expect(enNote).toContain("“Exercising your rights”");
+    for (const [text, note] of [[FR_PROFILE, frNote], [EN_PROFILE, enNote]] as const) {
+      const owner = deletionConsequencesText(text, "OWNED_TEAMS", true);
+      // Juste après le conseil qu'il nuance, avant les traces qui restent.
+      expect(owner.startsWith(`${text.t("deletion.consequences.OWNED_TEAMS")} ${note} `)).toBe(true);
+      // Hors fenêtre (Mon profil), et pour tout autre motif, rien ne change.
+      expect(deletionConsequencesText(text, "OWNED_TEAMS")).not.toContain(note);
+      for (const subject of ["TOURNAMENTS", "SOLO_REGISTRATIONS", "ORGANIZED_TOURNAMENTS", null, RETENTION_UNKNOWN] as const) {
+        expect(deletionConsequencesText(text, subject, true)).toBe(deletionConsequencesText(text, subject));
+      }
+    }
+  });
+
+  it("session fermée pendant la suppression : ni certitude d'effacement, ni « reconnecte-toi pour vérifier » (une connexion après suppression crée un compte)", () => {
+    const fr = deletionErrorText(FR_PROFILE, "UNAUTHORIZED");
+    const en = deletionErrorText(EN_PROFILE, "USER_NOT_FOUND");
+    expect(fr).toBe(FR_PROFILE.t("deletion.errors.sessionGone"));
+    expect(fr).toMatch(/soit ton compte vient d'être supprimé, soit ta session a expiré/);
+    expect(fr).toMatch(/une nouvelle connexion créerait un nouveau compte/);
+    expect(fr).not.toMatch(/pour vérifier/);
+    expect(en).toMatch(/either your account has just been deleted, or your session expired/);
+    expect(en).toMatch(/logging in again would create a new account/);
+    expect(en).not.toMatch(/to check/);
   });
 
   it("aucun refus anglais n'est un code ni ne garde d'accent", () => {
