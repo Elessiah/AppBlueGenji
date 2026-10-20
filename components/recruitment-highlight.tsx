@@ -115,7 +115,12 @@ export async function recordRecruitmentModalOptOut(
     // toast n'attend pas (une connexion faite depuis dans un autre onglet
     // garderait aussi le choix sur le compte ; le toast « ce navigateur » dit
     // alors moins que vrai, jamais faux).
-    post(OPT_OUT_URL).catch(() => undefined);
+    // Une seconde tentative si la première n'aboutit pas (réseau, délai
+    // dépassé) : sous Safari / iOS, seul ce `Set-Cookie` garde le choix au-delà
+    // de sept jours.
+    post(OPT_OUT_URL)
+      .catch(() => post(OPT_OUT_URL))
+      .catch(() => undefined);
     return "BROWSER";
   }
   let account: "ACCOUNT" | "GONE" | "FAILED";
