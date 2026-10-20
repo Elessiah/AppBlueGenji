@@ -685,6 +685,15 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     expect(source).toMatch(/aria-disabled=\{submitting\}[\s\S]{0,120}if \(!submitting\) onAdopt\(\);/);
     const hook = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_hooks/useScoreForm.ts"), "utf8");
     expect(hook).toMatch(/const adoptReport = \(report: MatchScoreReport\) => \{[\s\S]{0,400}forfeitTeamId: undefined, doubleForfeit: undefined, \.\.\.scoresFromMaps\(rows\)/);
+    // Les champs portent déjà la proposition (enregistrée telle quelle) : rien à reprendre.
+    const asIs = { ...match, team1Score: 2, team2Score: 1, maps, scoreAutoValidationPaused: true };
+    expect(render("fr", <AdminScoreDialog match={asIs} onClose={noop} onSubmitted={noop} />)).toContain("Proposition de Alpha : 2 – 1");
+    expect(render("fr", <AdminScoreDialog match={asIs} onClose={noop} onSubmitted={noop} />)).not.toContain("Reprendre la proposition");
+    // Forfait noté par « Enregistrer », match non tranché : personne ne l'emporte encore (FR + EN).
+    const forfeitNoted = { ...match, team1Score: null, team2Score: null, forfeitTeamId: 11, scoreAutoValidationPaused: true };
+    expect(render("fr", <AdminScoreDialog match={forfeitNoted} onClose={noop} onSubmitted={noop} />)).toContain("Forfait enregistré : Bravo, non tranché.");
+    expect(render("fr", <AdminScoreDialog match={forfeitNoted} onClose={noop} onSubmitted={noop} />)).not.toContain("Forfait enregistré : Bravo, Alpha l&#x27;emporte.");
+    expect(render("en", <AdminScoreDialog match={forfeitNoted} onClose={noop} onSubmitted={noop} />)).toContain("Forfeit recorded: Bravo, not decided.");
     // La carte invite à valider la proposition.
     expect(renderPage("fr", <MatchRow match={match} adminResolvable onOpenAdminModal={noop} scoreLocked={false} roundNumber={2} />)).toContain("Valider le score proposé");
     // Sans maps proposées, rien à reprendre : pas de bouton.
