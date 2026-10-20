@@ -575,14 +575,14 @@ function RgpdFr({
               recrutement</strong> (le second), pour ne pas vous les réafficher. Ils ne
               contiennent que les numéros des annonces concernées, jamais d'identifiant de
               personne : ils ne permettent ni de vous reconnaître, ni de vous suivre d'un site
-              à l'autre (sameSite=strict). Le premier dure sept jours, le second le temps de
+              à l'autre (sameSite=lax). Le premier dure sept jours, le second le temps de
               votre visite.
             </li>
             <li>
               <strong>bg_recr_off</strong> — déposé uniquement <strong>si vous choisissez « Ne plus
               afficher »</strong> dans la fenêtre des annonces de recrutement urgentes, pour
               qu&apos;elle ne s&apos;ouvre plus d&apos;elle-même sur ce navigateur. Il ne contient que
-              la valeur « 1 », jamais d&apos;identifiant de personne (sameSite=strict), et dure un an.
+              la valeur « 1 », jamais d&apos;identifiant de personne (sameSite=lax), et dure un an.
               Connecté, le même choix est gardé sur votre compte, pour vos autres appareils ; s&apos;il
               a été fait avant la connexion, il y est reporté à la connexion. Sur le compte, il dure
               autant que lui, figure dans l&apos;export de vos données et revient au défaut à la

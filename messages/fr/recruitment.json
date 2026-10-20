@@ -79,6 +79,8 @@
     "dontShowAgain": "Ne plus afficher",
     "dontShowAgainDone": "Cette fenêtre ne s'ouvrira plus d'elle-même. Les annonces restent sur la page Recrutement.",
     "dontShowAgainFailed": "Choix gardé sur ce navigateur seulement : il n'a pas pu être enregistré sur ton compte.",
+    "dontShowAgainDoneBrowser": "Cette fenêtre ne s'ouvrira plus d'elle-même sur ce navigateur. Les annonces restent sur la page Recrutement.",
+    "dontShowAgainUnsaved": "Ce choix n'a pas pu être gardé : ton navigateur refuse les cookies de ce site.",
     "read": "Lire l'annonce →",
     "apply": "Postuler →"
   }

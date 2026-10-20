@@ -37,21 +37,31 @@ const MODAL_PREVIEW_MAX = 320;
 /**
  * Pose un cookie de mise en avant. `document.cookie` plutôt qu'un aller-retour :
  * la fermeture est locale, le serveur n'a rien à en faire avant le prochain
- * chargement. `SameSite` strict — ce cookie ne dit rien d'utile à une requête
- * tierce. La valeur ne porte que des identifiants d'annonce.
+ * chargement. La valeur ne porte que des identifiants d'annonce (ou « 1 »).
+ * `SameSite` lax et non strict : un cookie strict n'est pas envoyé quand la
+ * visite part d'un autre site (lien Discord, résultat de recherche, retour
+ * d'OAuth) — la modale se rouvrirait alors malgré le choix. Lax n'est toujours
+ * envoyé à aucune requête tierce embarquée. Rend `false` si le navigateur a
+ * refusé le cookie (cookies bloqués).
  */
-function writeSeenCookie(name: string, value: string, maxAge?: number): void {
+function writeSeenCookie(name: string, value: string, maxAge?: number): boolean {
   try {
     document.cookie =
-      `${name}=${value}; path=/; samesite=strict` +
+      `${name}=${value}; path=/; samesite=lax` +
       (maxAge === undefined ? "" : `; max-age=${maxAge}`);
+    return document.cookie.split("; ").includes(`${name}=${value}`);
   } catch {
     // Cookies refusés : la fermeture reste effective pour la vue courante.
+    return false;
   }
 }
 
-/** Où le « Ne plus afficher » a été gardé : ce navigateur seul (non connecté), le compte aussi, ou le navigateur faute de compte joignable. */
-export type RecruitmentModalOptOutResult = "BROWSER" | "ACCOUNT" | "BROWSER_ONLY";
+/**
+ * Où le « Ne plus afficher » a été gardé : ce navigateur seul (non connecté),
+ * le compte, le navigateur faute de compte joignable, ou nulle part (cookie
+ * refusé et pas de compte où l'écrire).
+ */
+export type RecruitmentModalOptOutResult = "BROWSER" | "ACCOUNT" | "BROWSER_ONLY" | "NONE";
 
 /**
  * « Ne plus afficher » : pose le cookie du navigateur **sur-le-champ** (avant
@@ -64,17 +74,35 @@ export async function recordRecruitmentModalOptOut(
     writeCookie = writeSeenCookie,
     post = (url: string) => fetch(url, { method: "POST" }),
   }: Readonly<{
-    writeCookie?: (name: string, value: string, maxAge?: number) => void;
+    writeCookie?: (name: string, value: string, maxAge?: number) => boolean;
     post?: (url: string) => Promise<Pick<Response, "ok">>;
   }> = {},
 ): Promise<RecruitmentModalOptOutResult> {
-  writeCookie(RECRUITMENT_MODAL_OFF_COOKIE, RECRUITMENT_MODAL_OFF_VALUE, RECRUITMENT_MODAL_OFF_MAX_AGE);
-  if (!signedIn) return "BROWSER";
+  const kept = writeCookie(RECRUITMENT_MODAL_OFF_COOKIE, RECRUITMENT_MODAL_OFF_VALUE, RECRUITMENT_MODAL_OFF_MAX_AGE);
+  const fallback = kept ? "BROWSER_ONLY" : "NONE";
+  if (!signedIn) return kept ? "BROWSER" : "NONE";
   try {
     const response = await post("/api/recruitment/modal-dismiss");
-    return response.ok ? "ACCOUNT" : "BROWSER_ONLY";
+    return response.ok ? "ACCOUNT" : fallback;
   } catch {
-    return "BROWSER_ONLY";
+    return fallback;
+  }
+}
+
+/** Clé du toast qui rend compte d'un « Ne plus afficher » : chaque issue dit où le choix a été gardé. */
+export function recruitmentOptOutToast(result: RecruitmentModalOptOutResult): Readonly<{
+  kind: "success" | "error";
+  key: "dontShowAgainDone" | "dontShowAgainDoneBrowser" | "dontShowAgainFailed" | "dontShowAgainUnsaved";
+}> {
+  switch (result) {
+    case "ACCOUNT":
+      return { kind: "success", key: "dontShowAgainDone" };
+    case "BROWSER":
+      return { kind: "success", key: "dontShowAgainDoneBrowser" };
+    case "BROWSER_ONLY":
+      return { kind: "error", key: "dontShowAgainFailed" };
+    default:
+      return { kind: "error", key: "dontShowAgainUnsaved" };
   }
 }
 
@@ -422,8 +450,9 @@ function RecruitmentArrivalModal({
     // Le cookie est posé dès l'appel, avant la fermeture.
     const saved = recordRecruitmentModalOptOut(signedIn);
     dismiss();
-    if ((await saved) === "BROWSER_ONLY") toast?.showError(t("highlight.dontShowAgainFailed"));
-    else toast?.showSuccess(t("highlight.dontShowAgainDone"));
+    const { kind, key } = recruitmentOptOutToast(await saved);
+    if (kind === "error") toast?.showError(t(`highlight.${key}`));
+    else toast?.showSuccess(t(`highlight.${key}`));
   }
 
   // Le hook doit être appelé à chaque rendu : il ne s'active que si `open`.
@@ -503,7 +532,10 @@ function RecruitmentArrivalModal({
           <button type="button" className={styles.optOut} onClick={() => void optOut()}>
             {t("highlight.dontShowAgain")}
           </button>
-          <CyberButton variant="ghost" onClick={dismiss}>
+          {/* Focus d'ouverture sur « Plus tard » quand il n'y a pas de pages à
+              tourner : sinon il tomberait sur « Ne plus afficher », premier dans
+              l'ordre, et Entrée pour fermer couperait la modale pour de bon. */}
+          <CyberButton variant="ghost" onClick={dismiss} data-autofocus={count > 1 ? undefined : ""}>
             {t("highlight.later")}
           </CyberButton>
           {/* La lecture complète se fait toujours sur la page de recrutement :
