@@ -69,10 +69,10 @@ tournoi, là où le format le permet, reste possible pendant un litige… »).
 
 **Arbitre qui joue** (décisions du 2026-10-20). Un membre du staff
 (`tournaments`) qui joue la manche — membre d'une des deux équipes **au moment
-où elle s'est jouée** (`actorPlaysMatch` : arrivé au plus tard, parti au plus
-tôt à cet instant — premier report lu sous verrou avant que l'arbitrage ne
-l'efface, `playedAt` ; sinon lancement ; sinon création de la manche pour le
-départ, maintenant pour l'arrivée), si bien que quitter l'équipe juste avant de
+où elle s'est jouée** (`actorPlaysMatch` : arrivé au plus tard au premier
+report — lu sous verrou avant que l'arbitrage ne l'efface, `playedAt` —, sinon
+au lancement, sinon à la création de la manche ; parti au plus tôt au premier
+des deux, lancement ou premier report, sinon à la création), si bien que quitter l'équipe juste avant de
 trancher n'efface pas l'alerte et qu'un ancien membre parti avant le match, ou
 arrivé après, n'est pas accusé à tort ; ou joueur de l'entrée solo — peut agir : une petite
 organisation n'a pas toujours un arbitre neutre. Mais les **autres** sont
@@ -87,7 +87,7 @@ session), dans quatre cas :
    la manche qu'il joue — **litige ou non** : clore ainsi un report gagnant de
    l'adversaire en attente n'est pas plus discret que suspendre sa validation.
    Les manches ouvertes de l'engagé se lisent sans verrou puis se verrouillent
-   **par clé primaire** (`lockOpenMatches`, après `lockTournamentRow` en
+   **par clé primaire**, statut revérifié sous verrou (`lockOpenMatches`, après `lockTournamentRow` en
    première instruction ; tout rejoué sur interblocage, `retryOnDeadlock`), et
    celles que l'abandon a closes (`COMPLETED`) partent à
    `alertSelfImposedForfeit` — push « Un membre du staff qui joue ce match a
