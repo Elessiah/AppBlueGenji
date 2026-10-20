@@ -68,13 +68,15 @@ perd. Comportement inchangé, voulu ; /regles le dit (FR + EN : « Abandonner le
 tournoi, là où le format le permet, reste possible pendant un litige… »).
 
 **Arbitre qui joue** (décisions du 2026-10-20). Un membre du staff
-(`tournaments`) qui joue la manche — membre d'une des deux équipes **au moment
-où elle s'est jouée** (`actorPlaysMatch` : arrivé au plus tard au premier
-report — lu sous verrou avant que l'arbitrage ne l'efface, `playedAt` —, sinon
-au lancement, sinon à la création de la manche ; parti au plus tôt au premier
-des deux, lancement ou premier report, sinon à la création), si bien que quitter l'équipe juste avant de
-trancher n'efface pas l'alerte et qu'un ancien membre parti avant le match, ou
-arrivé après, n'est pas accusé à tort ; ou joueur de l'entrée solo — peut agir : une petite
+(`tournaments`) qui joue la manche — membre d'une des deux équipes
+(`actorPlaysMatch`) : **encore membre**, quelle que soit sa date d'arrivée
+(l'issue engage son équipe ; une date de report, que la resaisie déplace et que
+la clôture efface, ne borne pas sûrement l'arrivée), ou **parti depuis que la
+manche a commencé** — au premier des deux, lancement ou premier report (lu sous
+verrou avant que l'arbitrage ne l'efface, `playedAt`), sinon à sa création —,
+si bien que quitter l'équipe en cours de match ou juste avant d'agir n'efface
+pas l'alerte et qu'un ancien membre parti avant le match n'est pas visé ; ou
+joueur de l'entrée solo — peut agir : une petite
 organisation n'a pas toujours un arbitre neutre. Mais les **autres** sont
 avertis, après le commit et au meilleur effort
 (`lib/server/tournaments/dispute-self-resolution.ts`, avec l'arbitre de la
