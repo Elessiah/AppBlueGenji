@@ -224,6 +224,19 @@ describe("recordRecruitmentModalOptOut", () => {
     }
   });
 
+  it("connecté, compte incapable de garder le choix (503 RECRUITMENT_MODAL_ACCOUNT_UNAVAILABLE) : « ce navigateur », jamais « compte »", async () => {
+    const unavailable = async () => reply(503, { error: "RECRUITMENT_MODAL_ACCOUNT_UNAVAILABLE" });
+    expect(await recordRecruitmentModalOptOut(true, { writeCookie: () => true, post: unavailable, wait: noWait })).toBe(
+      "BROWSER",
+    );
+    // Un 503 d'une autre origine (proxy) reste rattrapé par la page suivante.
+    const proxy = async () => ({ ok: false, status: 503, json: async () => Promise.reject(new SyntaxError("html")) });
+    expect(await recordRecruitmentModalOptOut(true, { writeCookie: () => true, post: proxy, wait: noWait })).toBe("ACCOUNT");
+    expect(
+      await recordRecruitmentModalOptOut(true, { writeCookie: () => false, cookieKept: () => false, post: unavailable, wait: noWait }),
+    ).toBe("NONE");
+  });
+
   it("cookie refusé au script : relu après la réponse, dont le Set-Cookie a pu le garder", async () => {
     let serverCookie = false;
     const sets = async () => {
@@ -307,6 +320,11 @@ describe("cookies de la mise en avant — envoyés aussi quand la visite vient d
     const source = readSource("components/recruitment-highlight.tsx");
     expect(source).toContain("path=/; samesite=lax");
     expect(source).not.toMatch(/samesite=strict/i);
+  });
+
+  it("sont posés Secure sous HTTPS, comme le Set-Cookie du serveur en production", () => {
+    const source = readSource("components/recruitment-highlight.tsx");
+    expect(source).toContain('(globalThis.location?.protocol === "https:" ? "; secure" : "")');
   });
 
   it("sont décrits en lax sur /rgpd, en français et en anglais", () => {
