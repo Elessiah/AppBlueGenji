@@ -27,16 +27,25 @@ export function discardAutoValidatedNotices(connection: PoolConnection): void {
 }
 
 /**
+ * File d'envoi **unique au processus** : chaque flush s'y enchaîne. Un balayage
+ * commite tournoi par tournoi (`syncVisibleTournaments`) ; une chaîne par flush
+ * referait, après un redémarrage qui valide des rondes dans plusieurs tournois,
+ * la rafale parallèle sur le pool que la file évite.
+ */
+let sending: Promise<void> = Promise.resolve();
+
+/**
  * Envoie les avis de la transaction qui vient d'aboutir, sans attendre. Ne lève
- * jamais. Les avis partent **l'un après l'autre**, en une seule chaîne : un
- * balayage qui valide toute une ronde d'un coup n'occupe ainsi qu'une connexion
- * du pool à la fois, au lieu d'une rafale de lectures et d'envois en parallèle.
+ * jamais. Les avis partent **l'un après l'autre**, à la suite de ceux des
+ * transactions précédentes : une ronde entière validée d'un coup, ou plusieurs
+ * tournois dans le même balayage, n'occupent qu'une connexion du pool à la fois.
  */
 export function flushAutoValidatedNotices(connection: PoolConnection): void {
   const queued = pending.get(connection);
   pending.delete(connection);
   if (!queued) return;
-  void sendInSequence([...queued]);
+  const matchIds = [...queued];
+  sending = sending.then(() => sendInSequence(matchIds));
 }
 
 async function sendInSequence(matchIds: readonly number[]): Promise<void> {

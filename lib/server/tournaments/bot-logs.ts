@@ -353,8 +353,13 @@ export function flushBotLogs(connection: PoolConnection): void {
       // rôle : un bilan à `sent: 0` — rôle non configuré, messages privés
       // fermés — décrit une trace bel et bien posée, la seule qui soit durable.
       // Rejouer sur ce critère reposterait cette trace à chaque balayage, pour
-      // toujours. Seul un `null` (bot injoignable, coupe-circuit ouvert) dit que
-      // rien n'est parti.
+      // toujours. Un `null` (bot injoignable, coupe-circuit ouvert) dit que
+      // rien n'est parti sur Discord — mais si le push a joint au moins un
+      // arbitre, l'alerte est remise aussi : rendre la réservation la ferait
+      // repartir à chaque passage tant que le bot reste éteint, soit un push à
+      // chaque arbitre toutes les quelques secondes pour un litige qui, la
+      // saisie étant verrouillée (`docs/features/SCORE_DISPUTE_LOCK.md`), dure
+      // jusqu'à l'arbitrage.
       let sent = false;
       try {
         const report = await notifyStaff({
@@ -363,7 +368,7 @@ export function flushBotLogs(connection: PoolConnection): void {
           push: (locale) =>
             refereeAlertPush(message, refereePushKey(entry), locale, refereeAlertKind(entry), refereeMatch ?? null),
         });
-        sent = report.discord !== null;
+        sent = report.discord !== null || report.pushed > 0;
       } catch {
         sent = false;
       }
