@@ -158,7 +158,7 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(t04.dataCategories.join(" ")).toMatch(/recevoir ou non les messages privés Discord de ses matchs/);
     expect(t04.retention.join(" ")).toMatch(/Choix des messages privés de match : jusqu'à sa modification/);
     expect(t04.retention.join(" ")).toMatch(/Traces d'envoi des rappels, alertes et programmes d'arbitrage/);
-    expect(t04.recipients.join(" ")).toMatch(/Service de push du navigateur de chaque destinataire abonné \(joueur : [^;]*; arbitre ou administrateur : programme d'arbitrage, litige tranché par un membre du staff qui joue le match ; traitement T12\), qui/);
+    expect(t04.recipients.join(" ")).toMatch(/Service de push du navigateur de chaque destinataire abonné \(joueur : [^;]*; arbitre ou administrateur : programme d'arbitrage, litige tranché ou validation automatique suspendue par un membre du staff qui joue le match ; traitement T12\), qui/);
     expect(t04.subPurposes.join(" ")).toMatch(/en message privé Discord et en push l'annonce/);
     expect(t04.recipients.join(" ")).toMatch(/Staff de l'association ayant accès au canal de logs Discord/);
     expect(byRef("T05").dataCategories.join(" ")).toMatch(/Sur Discord : [^—]*horaires et manches des matchs/);
@@ -174,9 +174,14 @@ describe("PROCESSING_ACTIVITIES", () => {
   it("nomme en T12 l'alerte d'un litige tranché par un membre du staff qui joue", () => {
     expect(PUSH_TOPICS.REFEREE_SELF_RESOLUTION.audience).toBe("tournaments");
     const t12 = byRef("T12").subPurposes.join(" ");
-    expect(t12).toMatch(/Alertes d'arbitrage, litiges tranchés par un membre du staff qui joue le match, matchs planifiés/);
+    expect(t12).toMatch(/Alertes d'arbitrage, litiges tranchés ou validations automatiques suspendues par un membre du staff qui joue le match, matchs planifiés/);
     const t12En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T12")!.subPurposes.join(" ");
-    expect(t12En).toMatch(/Referee alerts, disputes settled by a staff member who plays in the match, scheduled matches/);
+    // La suspension de la validation automatique par un arbitre qui joue (« Enregistrer ») et l'abandon imposé sont nommés en T04.
+    expect(byRef("T04").subPurposes.join(" ")).toMatch(/abandon imposé à une équipe\) ou en suspend la validation automatique d'un score proposé \(« Enregistrer »\)/);
+    expect(PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T04")!.subPurposes.join(" ")).toMatch(
+      /withdrawal imposed on a team\) or pauses the automatic confirmation of a proposed score \(“Save”\)/,
+    );
+    expect(t12En).toMatch(/Referee alerts, disputes settled, or automatic confirmations paused, by a staff member who plays in the match, scheduled matches/);
   });
 
   it("déclare l'information sur les changements de politique et leur annonce Discord", () => {

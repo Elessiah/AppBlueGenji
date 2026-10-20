@@ -41,6 +41,7 @@ import {
   publishUpdatedEvent,
 } from "@/lib/server/tournaments/notifications";
 import {
+  lockTournamentRow,
   registerCurrentUserTeam as registerTeamInternal,
   registerTeamsByIds,
   resolveUserEntrant,
@@ -64,7 +65,7 @@ import {
 import { reconcileEndurance } from "@/lib/server/tournaments/bg-survie/reconcile";
 import { reconcilePhases } from "@/lib/server/tournaments/phases";
 import { insertPhases } from "@/lib/server/tournaments/phases-repository";
-import { alertSelfResolvedDispute } from "@/lib/server/tournaments/dispute-self-resolution";
+import { alertSelfPausedValidation, alertSelfResolvedDispute } from "@/lib/server/tournaments/dispute-self-resolution";
 import { connectionMock, fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 import { tournamentRow } from "../../helpers/tournament-rows";
 import { mapsFor } from "../../helpers/match-maps";
@@ -634,13 +635,122 @@ describe("adminResolveMatchPublic", () => {
 });
 
 describe("adminSaveMatchScoresPublic — suspension de la validation d'office", () => {
-  it("rend ce que le moteur dit de la suspension", async () => {
-    connection.execute.mockResolvedValue([[{ tournament_id: 8 }], undefined]);
+  const actor = { id: 9, pseudo: "Sifflet" };
+  const savedRow = { tournament_id: 8, team1_id: 3, team2_id: 4 };
 
-    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce(true);
+  it("rend ce que le moteur dit de la suspension", async () => {
+    connection.execute.mockResolvedValue([[savedRow], undefined]);
+
+    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ paused: true, pausedNow: true });
     await expect(adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 })).resolves.toBe(true);
-    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce(false);
+    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ paused: false, pausedNow: false });
     await expect(adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 1 })).resolves.toBe(false);
+  });
+
+  // Arbitre qui joue (`SCORE_DISPUTE_LOCK.md`, décision du 2026-10-20) : la
+  // suspension qu'il pose avertit les autres membres du staff, après le commit.
+  it("transmet la suspension posée par cette saisie à l'alerte, après le commit", async () => {
+    connection.execute.mockResolvedValue([[savedRow], undefined]);
+    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ paused: true, pausedNow: true });
+
+    await adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 9 }, actor);
+
+    expect(alertSelfPausedValidation).toHaveBeenCalledWith(
+      { matchId: 70, tournamentId: 8, team1Id: 3, team2Id: 4 },
+      actor,
+    );
+    expect(order(jest.mocked(alertSelfPausedValidation))).toBeGreaterThan(order(connection.commit));
+  });
+
+  it("n'alerte pas à chaque saisie d'une validation déjà suspendue, ni sans suspension", async () => {
+    connection.execute.mockResolvedValue([[savedRow], undefined]);
+    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ paused: true, pausedNow: false });
+    await adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 9 }, actor);
+    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ paused: false, pausedNow: false });
+    await adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 9 }, actor);
+
+    expect(alertSelfPausedValidation).not.toHaveBeenCalled();
+  });
+
+  it("n'alerte personne quand la saisie est défaite", async () => {
+    jest.mocked(adminSaveMatchScores).mockRejectedValueOnce(new Error("MATCH_ALREADY_COMPLETED"));
+
+    await expect(adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 9 }, actor)).rejects.toThrow(
+      "MATCH_ALREADY_COMPLETED",
+    );
+    expect(alertSelfPausedValidation).not.toHaveBeenCalled();
+  });
+
+  it("rend la main sans attendre l'envoi de l'alerte", async () => {
+    connection.execute.mockResolvedValue([[savedRow], undefined]);
+    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce({ paused: true, pausedNow: true });
+    jest.mocked(alertSelfPausedValidation).mockReturnValueOnce(new Promise<boolean>(() => undefined));
+
+    await expect(adminSaveMatchScoresPublic(70, { maps: mapsFor(2, 1), userId: 9 }, actor)).resolves.toBe(true);
+  });
+});
+
+describe("forfeitTournamentTeamPublic — litige clos par un abandon forcé", () => {
+  const actor = { id: 9, pseudo: "Sifflet" };
+
+  /** Réponses : litiges ouverts verrouillés, format, puis litiges clos. */
+  function script(open: unknown[], settled: unknown[]): void {
+    connection.execute.mockResolvedValueOnce([open, undefined]);
+    connection.execute.mockResolvedValueOnce([[{ format: "SWISS" }], undefined]);
+    connection.execute.mockResolvedValueOnce([settled, undefined]);
+  }
+
+  it("verrouille le tournoi en toute première instruction", async () => {
+    connection.execute.mockResolvedValueOnce([[{ format: "SWISS" }], undefined]);
+
+    await forfeitTournamentTeamPublic(5, 3);
+
+    expect(order(jest.mocked(lockTournamentRow))).toBeLessThan(order(connection.execute));
+    expect(lockTournamentRow).toHaveBeenCalledWith(expect.anything(), 5);
+  });
+
+  it("lit sous verrou les litiges de l'engagé, et alerte sur ceux que l'abandon clôt, après le commit", async () => {
+    script([{ id: 70, team1_id: 3, team2_id: 4 }, { id: 71, team1_id: 6, team2_id: 3 }], [{ id: 70 }]);
+
+    await forfeitTournamentTeamPublic(5, 3, null, actor);
+
+    const [sql, params] = connection.execute.mock.calls[0];
+    expect(String(sql)).toMatch(/FOR UPDATE$/);
+    expect(String(sql)).not.toMatch(/JOIN/);
+    expect(params).toEqual([5, 3, 3]);
+    expect(alertSelfResolvedDispute).toHaveBeenCalledTimes(1);
+    expect(alertSelfResolvedDispute).toHaveBeenCalledWith({ matchId: 70, tournamentId: 5, team1Id: 3, team2Id: 4 }, actor);
+    expect(order(jest.mocked(alertSelfResolvedDispute))).toBeGreaterThan(order(connection.commit));
+  });
+
+  it("ne cherche aucun litige pour l'abandon d'un joueur (pas d'arbitrage)", async () => {
+    jest.mocked(loadTournamentRow).mockResolvedValueOnce(tournamentRow({ id: 5 }));
+    connection.execute.mockResolvedValueOnce([[{ format: "SWISS" }], undefined]);
+
+    await forfeitTournamentTeamPublic(5, 3, 12).catch(() => undefined);
+
+    expect(String(connection.execute.mock.calls[0]?.[0] ?? "")).not.toMatch(/AWAITING_CONFIRMATION/);
+    expect(alertSelfResolvedDispute).not.toHaveBeenCalled();
+  });
+
+  it("n'alerte personne quand l'abandon est défait", async () => {
+    connection.execute.mockResolvedValueOnce([[{ id: 70, team1_id: 3, team2_id: 4 }], undefined]);
+    connection.execute.mockResolvedValueOnce([[{ format: "SWISS" }], undefined]);
+    jest.mocked(forfeitSwissTeam).mockRejectedValueOnce(new Error("TEAM_ALREADY_OUT"));
+
+    await expect(forfeitTournamentTeamPublic(5, 3, null, actor)).rejects.toThrow("TEAM_ALREADY_OUT");
+    expect(alertSelfResolvedDispute).not.toHaveBeenCalled();
+    expectRolledBack();
+  });
+
+  it("sans litige ouvert, ni lecture des issues ni alerte", async () => {
+    connection.execute.mockResolvedValueOnce([[], undefined]);
+    connection.execute.mockResolvedValueOnce([[{ format: "SWISS" }], undefined]);
+
+    await forfeitTournamentTeamPublic(5, 3, null, actor);
+
+    expect(connection.execute).toHaveBeenCalledTimes(2);
+    expect(alertSelfResolvedDispute).not.toHaveBeenCalled();
   });
 });
 

@@ -39,8 +39,17 @@ describe("abandon du tournoi pendant un litige", () => {
       "Withdrawing from the tournament, where the format allows it, remains possible during a dispute: the disputed match is then lost by the withdrawing team.",
     );
     // Les deux autres décisions du 2026-10-20, même page.
-    expect(fr).toContain("Un arbitre qui joue ce match peut le trancher, mais les autres membres du staff en sont avertis.");
-    expect(en).toContain("A referee who plays in this match may settle it, but the other staff members are warned.");
+    // Arbitre qui joue (décision du 2026-10-20, 15:02) : vrai dans tous les cas —
+    // abandon imposé compris, seul membre du staff (journal seul), hors litige (aucune alerte).
+    expect(fr).toContain(
+      "Un arbitre qui joue ce match peut le trancher, y compris en imposant l'abandon d'une équipe, mais les autres membres du staff en sont avertis (s'il est le seul membre du staff, son geste reste consigné au journal de l'arbitrage). Hors litige, un arbitre qui joue un match le valide sans que personne n'en soit averti.",
+    );
+    expect(en).toContain(
+      "A referee who plays in this match may settle it, including by imposing a team's withdrawal, but the other staff members are warned (if they are the only staff member, their action is still recorded in the refereeing log). Outside a dispute, a referee who plays in a match confirms it without anyone being warned.",
+    );
+    // La suspension posée par un arbitre qui joue avertit aussi.
+    expect(fr).toContain("le contester ouvre un litige. Si cet arbitre joue ce match, les autres membres du staff en sont avertis (s'il est le seul membre du staff, son geste reste consigné au journal de l'arbitrage).");
+    expect(en).toContain("disputing it opens a dispute. If this referee plays in this match, the other staff members are warned (if they are the only staff member, their action is still recorded in the refereeing log).");
     // « après cette déclaration » : un « Enregistrer » antérieur au report ne suspend rien (`pauseAutoValidation`).
     expect(fr).toContain("Un arbitre qui, après cette déclaration, enregistre l'avancement du match sans le trancher la suspend");
     // « this automatic confirmation » : c'est elle, pas le match, qui est suspendue (FR « la suspend »).

@@ -46,7 +46,7 @@ describe("arbitrage — détail map par map (MAP_SCORES.md)", () => {
   it("« Enregistrer » transmet les maps et l'arbitre courant", async () => {
     const res = await scoresRoute(req("PATCH", { maps: MAPS }), params);
     expect(res.status).toBe(200);
-    expect(adminSaveMatchScores).toHaveBeenCalledWith(42, { maps: NORMALIZED, userId: 3 });
+    expect(adminSaveMatchScores).toHaveBeenCalledWith(42, { maps: NORMALIZED, userId: 3 }, expect.objectContaining({ id: 3 }));
   });
 
   it("l'arbitre transmis est celui de la session, jamais un champ du corps", async () => {
@@ -54,14 +54,14 @@ describe("arbitrage — détail map par map (MAP_SCORES.md)", () => {
     await resolveRoute(req("POST", { maps: MAPS, userId: 1 }), params);
     expect(adminResolveMatch).toHaveBeenCalledWith(42, { maps: NORMALIZED, userId: 9 }, expect.anything());
     await scoresRoute(req("PATCH", { maps: MAPS, userId: 1 }), params);
-    expect(adminSaveMatchScores).toHaveBeenCalledWith(42, { maps: NORMALIZED, userId: 9 });
+    expect(adminSaveMatchScores).toHaveBeenCalledWith(42, { maps: NORMALIZED, userId: 9 }, expect.objectContaining({ id: 9 }));
   });
 
   it("un forfait l'emporte sur des maps présentes : entrée de forfait, sans maps ni arbitre", async () => {
     await resolveRoute(req("POST", { forfeitTeamId: 7, maps: MAPS }), params);
     expect(adminResolveMatch).toHaveBeenCalledWith(42, { forfeitTeamId: 7 }, expect.anything());
     await scoresRoute(req("PATCH", { forfeitTeamId: 7, maps: MAPS }), params);
-    expect(adminSaveMatchScores).toHaveBeenCalledWith(42, { forfeitTeamId: 7 });
+    expect(adminSaveMatchScores).toHaveBeenCalledWith(42, { forfeitTeamId: 7 }, expect.objectContaining({ id: expect.any(Number) }));
   });
 
   it("refuse une liste vide en 400 MAP_LIST_EMPTY : plus de score posé à la main", async () => {

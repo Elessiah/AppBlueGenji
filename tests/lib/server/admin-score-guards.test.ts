@@ -38,6 +38,8 @@ function fakeConnection(
      * validation d'office touche une ligne. Par défaut, aucun report seul.
      */
     singleReport?: boolean;
+    /** La validation d'office était déjà suspendue avant cette saisie. */
+    alreadyPaused?: boolean;
   } = {},
 ): {
   conn: PoolConnection;
@@ -58,6 +60,9 @@ function fakeConnection(
     writes.push(q);
     return [{ affectedRows: 1 }, []];
   };
+
+  // État d'avant la saisie, lu par la lecture verrouillante du match.
+  const pausedFlag = options.alreadyPaused ? 1 : 0;
 
   const conn = {
     execute: async (sql: string, params: unknown[] = []) => {
@@ -131,6 +136,7 @@ function fakeConnection(
               start_at: options.startAt ?? null,
               launched_at: options.launchedAt ?? null,
               launch_pairing: "100:200",
+              score_validation_paused: pausedFlag,
             },
           ],
           [],
@@ -171,7 +177,7 @@ describe("adminSaveMatchScores — match déjà tranché", () => {
   it("laisse enregistrer tant que le match n'est pas tranché", async () => {
     const { conn, writes } = fakeConnection();
 
-    await expect(adminSaveMatchScores(conn, 10, { maps: mapsFor(1, 0), userId: 1 })).resolves.toBe(false);
+    await expect(adminSaveMatchScores(conn, 10, { maps: mapsFor(1, 0), userId: 1 })).resolves.toEqual({ paused: false, pausedNow: false });
     expect(writes).toHaveLength(1);
   });
 
@@ -212,7 +218,7 @@ describe("forfait — l'équipe doit jouer le match", () => {
       const { conn, writes } = fakeConnection();
       await expect(
         adminSaveMatchScores(conn, 10, { forfeitTeamId: teamId }),
-      ).resolves.toBe(false);
+      ).resolves.toEqual({ paused: false, pausedNow: false });
       expect(writes).toHaveLength(1);
     }
   });
@@ -362,7 +368,7 @@ describe("aucun score avant le lancement — arbitrage compris", () => {
 
   it("laisse prononcer un forfait avant le lancement (enregistrement et validation)", async () => {
     const save = fakeConnection({ refereeScheduling: true });
-    await expect(adminSaveMatchScores(save.conn, 10, { forfeitTeamId: 200 })).resolves.toBe(false);
+    await expect(adminSaveMatchScores(save.conn, 10, { forfeitTeamId: 200 })).resolves.toEqual({ paused: false, pausedNow: false });
 
     const resolve = fakeConnection({ startAt: FUTURE });
     await expect(adminResolveMatch(resolve.conn, 10, { forfeitTeamId: 200 })).resolves.toBeUndefined();
@@ -375,10 +381,10 @@ describe("aucun score avant le lancement — arbitrage compris", () => {
 
   it("laisse saisir dès le lancement, et sur un match lancé avant son heure", async () => {
     const lobby = fakeConnection({ startAt: new Date(Date.now() - 60_000), refereeScheduling: true });
-    await expect(adminSaveMatchScores(lobby.conn, 10, { maps: mapsFor(1, 0), userId: 1 })).resolves.toBe(false);
+    await expect(adminSaveMatchScores(lobby.conn, 10, { maps: mapsFor(1, 0), userId: 1 })).resolves.toEqual({ paused: false, pausedNow: false });
 
     const forced = fakeConnection({ startAt: FUTURE, launchedAt: new Date() });
-    await expect(adminSaveMatchScores(forced.conn, 10, { maps: mapsFor(1, 0), userId: 1 })).resolves.toBe(false);
+    await expect(adminSaveMatchScores(forced.conn, 10, { maps: mapsFor(1, 0), userId: 1 })).resolves.toEqual({ paused: false, pausedNow: false });
   });
 
   it("laisse corriger un match terminé, même à planifier ou daté dans le futur", async () => {
@@ -395,7 +401,7 @@ describe("adminSaveMatchScores — suspension de la validation d'office", () => 
   it("suspend la validation d'un report seul et le rend (maps)", async () => {
     const { conn, writes, pauses } = fakeConnection({ singleReport: true });
 
-    await expect(adminSaveMatchScores(conn, 10, { maps: mapsFor(1, 0), userId: 1 })).resolves.toBe(true);
+    await expect(adminSaveMatchScores(conn, 10, { maps: mapsFor(1, 0), userId: 1 })).resolves.toEqual({ paused: true, pausedNow: true });
 
     expect(writes).toHaveLength(1);
     expect(pauses).toHaveLength(1);
@@ -408,17 +414,26 @@ describe("adminSaveMatchScores — suspension de la validation d'office", () => 
     expect(pauses[0].sql).not.toMatch(/JOIN/);
   });
 
+  it("lit l'état d'avant sous le verrou du match, et ne dit « posée maintenant » qu'une fois", async () => {
+    const { conn } = fakeConnection({ singleReport: true, alreadyPaused: true });
+
+    await expect(adminSaveMatchScores(conn, 10, { maps: mapsFor(1, 0), userId: 1 })).resolves.toEqual({
+      paused: true,
+      pausedNow: false,
+    });
+  });
+
   it("suspend aussi sur un forfait noté sans trancher", async () => {
     const { conn, pauses } = fakeConnection({ singleReport: true });
 
-    await expect(adminSaveMatchScores(conn, 10, { forfeitTeamId: 200 })).resolves.toBe(true);
+    await expect(adminSaveMatchScores(conn, 10, { forfeitTeamId: 200 })).resolves.toEqual({ paused: true, pausedNow: true });
     expect(pauses).toHaveLength(1);
   });
 
   it("ne suspend rien sans report seul (aucune proposition, ou litige)", async () => {
     const { conn, pauses } = fakeConnection({ singleReport: false });
 
-    await expect(adminSaveMatchScores(conn, 10, { maps: mapsFor(1, 0), userId: 1 })).resolves.toBe(false);
+    await expect(adminSaveMatchScores(conn, 10, { maps: mapsFor(1, 0), userId: 1 })).resolves.toEqual({ paused: false, pausedNow: false });
     // Tentée, mais sa condition ne retient pas la ligne : un litige garde son escalade.
     expect(pauses).toHaveLength(1);
   });

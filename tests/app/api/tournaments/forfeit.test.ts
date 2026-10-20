@@ -53,7 +53,7 @@ describe("POST /api/tournaments/[id]/forfeit", () => {
     jest.mocked(service.getUserEntrant).mockResolvedValue(entrant(77));
     const res = await POST(req(), params);
     expect(res.status).toBe(200);
-    expect(service.forfeitTournamentTeam).toHaveBeenCalledWith(5, 77, 2);
+    expect(service.forfeitTournamentTeam).toHaveBeenCalledWith(5, 77, 2, undefined);
   });
 
   it("refuse un membre sans engagé dans ce tournoi (400)", async () => {
@@ -70,7 +70,7 @@ describe("POST /api/tournaments/[id]/forfeit", () => {
     jest.mocked(service.getUserEntrant).mockResolvedValue(entrant(77));
     const res = await POST(req({ teamId: 77 }), params);
     expect(res.status).toBe(200);
-    expect(service.forfeitTournamentTeam).toHaveBeenCalledWith(5, 77, 2);
+    expect(service.forfeitTournamentTeam).toHaveBeenCalledWith(5, 77, 2, undefined);
   });
 
   it("empêche un membre de forfaiter une autre équipe (403)", async () => {
@@ -105,7 +105,7 @@ describe("POST /api/tournaments/[id]/forfeit", () => {
     const res = await POST(req({ teamId: 88 }), params);
     expect(res.status).toBe(200);
     // `null` : l'arbitrage ne se revérifie pas contre un engagé à lui.
-    expect(service.forfeitTournamentTeam).toHaveBeenCalledWith(5, 88, null);
+    expect(service.forfeitTournamentTeam).toHaveBeenCalledWith(5, 88, null, { id: expect.any(Number), pseudo: expect.any(String) });
   });
 
   // Un tournoi inconnu ne doit pas être maquillé en problème d'équipe : le

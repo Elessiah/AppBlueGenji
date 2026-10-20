@@ -5,14 +5,20 @@ jest.mock("@/lib/server/notify");
 jest.mock("@/lib/server/staff-audit");
 
 import { getDatabase } from "@/lib/server/database";
-import { loadEntrantPlayerIds, notifyStaff } from "@/lib/server/notify";
+import { notifyStaff } from "@/lib/server/notify";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import {
+  alertSelfPausedValidation,
   alertSelfResolvedDispute,
   resolvedOutcome,
+  selfPausedValidationLog,
   selfResolvedDisputeLog,
 } from "@/lib/server/tournaments/dispute-self-resolution";
-import { selfResolvedDisputePush, type SelfResolvedDispute } from "@/lib/shared/push-messages";
+import {
+  selfPausedValidationPush,
+  selfResolvedDisputePush,
+  type SelfResolvedDispute,
+} from "@/lib/shared/push-messages";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 /**
@@ -26,6 +32,9 @@ const dispute = { matchId: 70, tournamentId: 8, team1Id: 3, team2Id: 4 };
 const actor = { id: 9, pseudo: "Sifflet" };
 
 let execute: jest.Mock<SqlQuery>;
+/** L'arbitre joue-t-il la manche ? Première requête (`actorPlaysMatch`). */
+let plays: boolean;
+let row: Record<string, unknown> | null;
 
 function matchRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -46,18 +55,34 @@ function matchRow(overrides: Record<string, unknown> = {}): Record<string, unkno
 
 beforeEach(() => {
   jest.clearAllMocks();
-  execute = jest.fn<SqlQuery>().mockResolvedValue([[matchRow()], undefined]);
+  plays = true;
+  row = matchRow();
+  execute = jest.fn<SqlQuery>().mockImplementation(async (sql) => {
+    if (String(sql).includes("bg_team_members")) return [plays ? [{ one: 1 }] : [], undefined];
+    return [row ? [row] : [], undefined];
+  });
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   jest.mocked(notifyStaff).mockResolvedValue({ discord: null, pushed: 2 });
-  // L'arbitre 9 joue dans l'équipe 3.
-  jest.mocked(loadEntrantPlayerIds).mockResolvedValue(new Map([[3, [9, 10]], [4, [11]]]));
+});
+
+describe("l'arbitre joue-t-il la manche ?", () => {
+  it("membre d'une des deux équipes, ou parti depuis que la manche existe, ou joueur solo", async () => {
+    await alertSelfResolvedDispute(dispute, actor);
+
+    const [sql, params] = execute.mock.calls[0];
+    const q = String(sql).replace(/\s+/g, " ");
+    expect(q).toContain("tm.team_id IN (?, ?) AND tm.user_id = ?");
+    // Quitter l'équipe juste avant de trancher n'efface pas l'alerte.
+    expect(q).toContain("(tm.left_at IS NULL OR tm.left_at >= m.created_at)");
+    expect(q).toContain("st.solo_user_id = ?");
+    expect(params).toEqual([70, 3, 4, 9, 3, 4, 9]);
+  });
 });
 
 describe("alertSelfResolvedDispute", () => {
   it("avertit les autres membres du staff, jamais l'auteur", async () => {
     await expect(alertSelfResolvedDispute(dispute, actor)).resolves.toBe(true);
 
-    expect(loadEntrantPlayerIds).toHaveBeenCalledWith([3, 4]);
     expect(notifyStaff).toHaveBeenCalledTimes(1);
     const [notification] = jest.mocked(notifyStaff).mock.calls[0];
     expect(notification.topic).toBe("REFEREE_SELF_RESOLUTION");
@@ -87,12 +112,12 @@ describe("alertSelfResolvedDispute", () => {
   });
 
   it("phase suisse d'un MULTI : « Ronde N », comme la page et les autres alertes (FR + EN)", async () => {
-    execute.mockResolvedValue([[matchRow({ swiss_round: 1, round_number: 3 })], undefined]);
+    row = matchRow({ swiss_round: 1, round_number: 3 });
 
     await alertSelfResolvedDispute(dispute, actor);
 
     // La ronde se lit par `swissRoundSql` (tournoi SWISS ou phase suisse), pas par le seul format.
-    expect(String(execute.mock.calls[0][0])).toContain("AS swiss_round");
+    expect(String(execute.mock.calls[1][0])).toContain("AS swiss_round");
     const [line] = jest.mocked(publishStaffAction).mock.calls[0];
     expect(line).toContain("Ronde 3");
     const [notification] = jest.mocked(notifyStaff).mock.calls[0];
@@ -101,24 +126,24 @@ describe("alertSelfResolvedDispute", () => {
     expect(notification.push("en").body).toContain("Coupe d'hiver, Round 3:");
   });
 
-  it("reconnaît le joueur d'une entrée solo", async () => {
-    jest.mocked(loadEntrantPlayerIds).mockResolvedValue(new Map([[3, [12]], [4, [9]]]));
-
-    await expect(alertSelfResolvedDispute(dispute, actor)).resolves.toBe(true);
-    expect(notifyStaff).toHaveBeenCalledTimes(1);
-  });
-
   it("ne dit rien quand l'arbitre ne joue pas la manche", async () => {
-    jest.mocked(loadEntrantPlayerIds).mockResolvedValue(new Map([[3, [10]], [4, [11]]]));
+    plays = false;
 
     await expect(alertSelfResolvedDispute(dispute, actor)).resolves.toBe(false);
     expect(notifyStaff).not.toHaveBeenCalled();
     expect(publishStaffAction).not.toHaveBeenCalled();
-    expect(execute).not.toHaveBeenCalled();
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("seul membre du staff : personne à prévenir, le geste reste journalisé", async () => {
+    jest.mocked(notifyStaff).mockResolvedValue({ discord: null, pushed: 0 });
+
+    await expect(alertSelfResolvedDispute(dispute, actor)).resolves.toBe(true);
+    expect(publishStaffAction).toHaveBeenCalledTimes(1);
   });
 
   it("ne nomme aucun engagé en tournoi individuel (ce serait un pseudo)", async () => {
-    execute.mockResolvedValue([[matchRow({ participant_type: "SOLO", team1_name: "Joueur1", team2_name: "Joueur2" })], undefined]);
+    row = matchRow({ participant_type: "SOLO", team1_name: "Joueur1", team2_name: "Joueur2" });
 
     await alertSelfResolvedDispute(dispute, actor);
 
@@ -131,17 +156,68 @@ describe("alertSelfResolvedDispute", () => {
   });
 
   it("ne lève jamais : l'arbitrage est acquis, une alerte perdue ne le défait pas", async () => {
-    jest.mocked(loadEntrantPlayerIds).mockRejectedValue(new Error("ECONNRESET"));
+    execute.mockRejectedValue(new Error("ECONNRESET"));
 
     await expect(alertSelfResolvedDispute(dispute, actor)).resolves.toBe(false);
     expect(notifyStaff).not.toHaveBeenCalled();
   });
 
   it("se tait si la manche a disparu entre-temps", async () => {
-    execute.mockResolvedValue([[], undefined]);
+    row = null;
 
     await expect(alertSelfResolvedDispute(dispute, actor)).resolves.toBe(false);
     expect(publishStaffAction).not.toHaveBeenCalled();
+  });
+});
+
+describe("alertSelfPausedValidation — « Enregistrer » d'un arbitre qui joue", () => {
+  it("avertit les autres membres du staff et journalise, sans pseudo ni nom d'engagé", async () => {
+    await expect(alertSelfPausedValidation(dispute, actor)).resolves.toBe(true);
+
+    const [line, author] = jest.mocked(publishStaffAction).mock.calls[0];
+    expect(line).toBe(
+      "⚠️ Validation automatique suspendue par un membre du staff qui joue ce match · « Coupe d'hiver », Manche 2.",
+    );
+    expect(line).not.toMatch(/Sifflet|Alpha|Bravo/);
+    expect(author).toEqual(actor);
+    const [notification] = jest.mocked(notifyStaff).mock.calls[0];
+    expect(notification.topic).toBe("REFEREE_SELF_RESOLUTION");
+    expect(notification.excludeUserIds).toEqual([9]);
+    const fr = notification.push("fr");
+    expect(fr.title).toBe("Validation suspendue par un joueur du match");
+    expect(fr.body).toBe(
+      "Un membre du staff qui joue ce match en a suspendu la validation automatique · Coupe d'hiver, Manche 2.",
+    );
+    const en = notification.push("en");
+    expect(en.title).toBe("Confirmation paused by a player of the match");
+    expect(en.body).toBe("A staff member who plays in this match paused its automatic confirmation · Coupe d'hiver, Round 2.");
+    expect(en.url).toMatch(/^\/en\/tournois\/8/);
+    expect(fr.tag).toBe("self-paused-70");
+  });
+
+  it("ne dit rien quand l'arbitre ne joue pas la manche", async () => {
+    plays = false;
+
+    await expect(alertSelfPausedValidation(dispute, actor)).resolves.toBe(false);
+    expect(publishStaffAction).not.toHaveBeenCalled();
+    expect(notifyStaff).not.toHaveBeenCalled();
+  });
+
+  it("neutralise le nom du tournoi dans le journal Discord", () => {
+    const line = selfPausedValidationLog({
+      tournamentId: 8,
+      tournamentName: "**@everyone**",
+      matchId: 70,
+      bracket: "UPPER",
+      roundNumber: 1,
+      team1Name: "",
+      team2Name: "",
+      solo: false,
+      outcome: { kind: "doubleForfeit" },
+    });
+    expect(line).not.toContain("**@everyone**");
+    const push = selfPausedValidationPush({ tournamentId: 8, tournamentName: "C", matchId: 70, bracket: "UPPER", roundNumber: 1 });
+    expect(push.body).toContain("C, Manche 1");
   });
 });
 
