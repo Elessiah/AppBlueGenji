@@ -240,15 +240,20 @@ describe("plus de window.confirm", () => {
     const page = readSource("app/(secured)/profil/page.tsx");
     expect(page).toMatch(/onDiscordTagRemove=\{\(\) => \{\s*setTagRemovalVerified\(discordState\.verified\);\s*setTagRemovalDms\(\(matchDmShown\.current \?\? data\?\.matchDmEnabled\) !== false\);\s*setConfirmingTagRemoval\(true\);\s*\}\}/);
     expect(page).toContain("onConfirm={onDiscordTagRemove}");
-    expect(page).toContain("setPendingDeletion({ subject, previewed });");
+    // La suppression est celle, commune, de `useAccountDeletion` (aussi offerte
+    // par la fenêtre des conditions).
+    const deletion = readSource("components/account/use-account-deletion.tsx");
+    expect(page).toContain("const accountDeletion = useAccountDeletion({");
+    expect(page).toContain("{accountDeletion.dialog}");
+    expect(deletion).toContain("setPendingDeletion(await previewAccountDeletion());");
     // Lot 9-2 : textes de la langue de la page (`profile.deletion`).
-    expect(page).toContain('title={t("deletion.question")}');
-    expect(page).toContain("{deletionConsequencesText(text, pendingDeletion.subject)}");
-    expect(page).toContain("{deleteAccountLabel(text, deleting, pendingDeletion !== null)}");
+    expect(deletion).toContain('title={text.t("deletion.question")}');
+    expect(deletion).toContain("{deletionConsequencesText(text, pendingDeletion.subject)}");
+    expect(page).toContain("{deleteAccountLabel(text, accountDeletion.deleting, accountDeletion.confirming)}");
     // Annuler rouvre le bouton « Supprimer mon compte ».
-    expect(page).toMatch(/setPendingDeletion\(null\);\s*setDeleting\(false\);/);
+    expect(deletion).toMatch(/setPendingDeletion\(null\);\s*setDeleting\(false\);\s*onCancel\?\.\(\);/);
     // … et lui rend le focus, perdu sur `body` quand il s'est désarmé.
-    expect(page).toContain("requestAnimationFrame(() => deleteButtonRef.current?.focus());");
+    expect(page).toContain("onCancel: () => requestAnimationFrame(() => deleteButtonRef.current?.focus()),");
     expect(page).toContain("ref={deleteButtonRef}");
   });
 });

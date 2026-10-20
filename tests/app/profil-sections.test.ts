@@ -115,7 +115,7 @@ describe("La page descend du registre", () => {
 
   it("isole la suppression du compte dans sa propre section", () => {
     const danger = page.slice(page.indexOf("sectionById.compte"));
-    expect(danger).toContain("onDeleteAccount");
+    expect(danger).toContain("accountDeletion.start()");
     expect(danger).toContain("dangerSection");
   });
 });

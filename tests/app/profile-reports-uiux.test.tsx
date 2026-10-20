@@ -61,8 +61,10 @@ describe("langue de la page dans les gestes du profil", () => {
   });
 
   it("la suppression du compte ramène à l'accueil de la langue de la page", () => {
-    const page = source("app/(secured)/profil/page.tsx");
+    // La suppression commune au profil et à la fenêtre des conditions.
+    const page = source("components/account/use-account-deletion.tsx");
     // Langue de l'adresse, pas du texte (repli français possible) — revue de sécurité du lot 9-2.
+    expect(page).toContain("const pageLocale = useAppLocale();");
     expect(page).toContain('window.location.href = localeHref("/", pageLocale);');
     expect(page).not.toContain('window.location.href = "/";');
   });
@@ -271,7 +273,7 @@ describe("revue UI/UX, quatrième passe", () => {
   });
 
   it("profil : la langue des retours (OAuth, suppression du compte) vient de l'adresse, pas du texte", () => {
-    expect(source("app/(secured)/profil/page.tsx")).toContain('window.location.href = localeHref("/", pageLocale);');
+    expect(source("components/account/use-account-deletion.tsx")).toContain('window.location.href = localeHref("/", pageLocale);');
     expect(source("app/(secured)/profil/DiscordVerificationDialog.tsx")).toContain('oauthStartPath("DISCORD", { intent: "LINK", locale: pageLocale })');
   });
 

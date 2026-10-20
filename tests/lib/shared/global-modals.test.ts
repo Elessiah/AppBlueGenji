@@ -95,13 +95,16 @@ describe("câblage des modales globales", () => {
     expect(layout).not.toContain("isTermsPostponed");
   });
 
-  it("la fenêtre est bloquante : ni « Plus tard », ni Échap, ni voile — accepter ou se déconnecter", () => {
+  it("la fenêtre est bloquante : ni « Plus tard », ni Échap, ni voile — accepter, supprimer son compte ou se déconnecter", () => {
     expect(terms).not.toContain("writePostponedCookie");
     expect(terms).not.toContain("useBackdropDismiss");
     expect(terms).not.toContain('t("termsModal.later")');
     expect(terms).toContain("onClose: KEEP_OPEN");
-    expect(terms).toContain('t("termsModal.logout")');
+    expect(terms).toContain('t("termsModal.deleteAccount")');
+    expect(terms).not.toContain('t("termsModal.logout")');
+    // La déconnexion reste, en lien de la phrase des issues.
     expect(terms).toContain("useLogout()");
+    expect(terms).toMatch(/logout: \(children\) => \(\s*<button\s+type="button"/);
   });
 
   it("un ancien cookie de report tombe à l'ouverture et à la fermeture d'une session", () => {
