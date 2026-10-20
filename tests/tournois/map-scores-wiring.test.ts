@@ -55,7 +55,9 @@ describe("détail map par map — affichage", () => {
 
   it("l'arbitrage voit le détail des deux propositions en désaccord", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");
-    expect(dialog).toMatch(/match\.team1Report && match\.team2Report[\s\S]{0,600}<MapResultList maps=\{report\.maps\}/);
+    expect(dialog).toMatch(/match\.team1Report && match\.team2Report[\s\S]{0,600}<ProposalSection key=\{by\} text=\{text\} report=\{report\}/);
+    // Chaque proposition rend son détail de maps (litige, ou report seul suspendu).
+    expect(dialog).toMatch(/function ProposalSection[\s\S]{0,800}<MapResultList maps=\{report\.maps\}/);
   });
 });
 
