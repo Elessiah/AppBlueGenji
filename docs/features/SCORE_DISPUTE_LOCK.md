@@ -125,7 +125,10 @@ remplace plus, à l'échéance, ce que l'arbitre a noté.
   codes de replay — pour l'arbitre qui rouvre le match ; le bouton de la carte
   reste « Valider le score proposé » ; l'avis « proposition
   modifiée » dit « « Enregistrer » note ta saisie et suspend la validation
-  automatique de cette proposition ; seul « Valider le résultat » tranche. ».
+  automatique de cette proposition ; seul « Valider le résultat » tranche, à
+  moins que {adversaire} ne la confirme. ». Rouvert sur un report suspendu,
+  l'avis « Enregistré : X, non tranché » dit que les champs portent la saisie
+  d'un arbitre, et non la proposition.
   La notification d'« Enregistrer » dit la suspension quand elle a eu lieu
   (`autoValidationPaused` dans la réponse de `PATCH …/scores`,
   `score.admin.savedPaused`). Une resaisie du déclarant pendant la suspension
