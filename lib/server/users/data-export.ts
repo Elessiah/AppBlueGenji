@@ -14,6 +14,7 @@ import { getFullProfile } from "./full-profile";
 import { accountLocaleFromRow } from "./account-locale";
 import { listOwnLiveAnnouncements } from "./live-announcement-export";
 import { matchDmEnabled } from "./match-dm-preference";
+import { recruitmentModalOff } from "./recruitment-modal-preference";
 
 /**
  * Rassemble l'intégralité des données personnelles du propriétaire du compte
@@ -46,6 +47,7 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
       open_to_recruitment: 0 | 1;
       locale: string | null;
       match_dm_enabled: number | null;
+      recruitment_modal_off: number | null;
       created_at: Date;
     })[]
   >(
@@ -53,7 +55,7 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
             discord_pseudo, discord_verified_at, discord_id, discord_link_method,
             google_sub, blizzard_sub, is_adult, is_admin,
             visible_avatar, visible_overwatch, visible_marvel, visible_major, visible_discord,
-            open_to_recruitment, locale, match_dm_enabled, created_at
+            open_to_recruitment, locale, match_dm_enabled, recruitment_modal_off, created_at
      FROM bg_users
      WHERE id = ? AND is_deleted = 0
      LIMIT 1`,
@@ -92,6 +94,8 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
       locale: accountLocaleFromRow(row.locale),
       // L'opposition aux messages privés de match est une donnée détenue : rendue.
       matchDmEnabled: matchDmEnabled(row.match_dm_enabled),
+      // « Ne plus afficher » la modale d'arrivée du recrutement : donnée détenue, rendue.
+      recruitmentModalOff: recruitmentModalOff(row.recruitment_modal_off),
       createdAt: toIso(row.created_at) ?? new Date().toISOString(),
     },
     profile: {

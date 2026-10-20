@@ -959,6 +959,8 @@ export type PersonalDataExport = {
     locale: Locale;
     /** Messages privés Discord de match activés (`bg_users.match_dm_enabled`). */
     matchDmEnabled: boolean;
+    /** « Ne plus afficher » posé sur la modale d'arrivée du recrutement. */
+    recruitmentModalOff: boolean;
     createdAt: string;
   };
   profile: {

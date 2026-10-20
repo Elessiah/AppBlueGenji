@@ -76,6 +76,9 @@
     "previousPage": "← Previous",
     "nextPage": "Next →",
     "later": "Later",
+    "dontShowAgain": "Don't show again",
+    "dontShowAgainDone": "This window will no longer open on its own. The ads stay on the Recruitment page.",
+    "dontShowAgainFailed": "Choice kept on this browser only: it could not be saved to your account.",
     "read": "Read the opening →",
     "apply": "Apply →"
   }

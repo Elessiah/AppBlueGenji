@@ -76,6 +76,9 @@
     "previousPage": "← Précédente",
     "nextPage": "Suivante →",
     "later": "Plus tard",
+    "dontShowAgain": "Ne plus afficher",
+    "dontShowAgainDone": "Cette fenêtre ne s'ouvrira plus d'elle-même. Les annonces restent sur la page Recrutement.",
+    "dontShowAgainFailed": "Choix gardé sur ce navigateur seulement : il n'a pas pu être enregistré sur ton compte.",
     "read": "Lire l'annonce →",
     "apply": "Postuler →"
   }

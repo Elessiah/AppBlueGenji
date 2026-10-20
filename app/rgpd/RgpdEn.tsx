@@ -448,6 +448,15 @@ export function RgpdEn({
               first lasts seven days, the second the duration of your visit.
             </li>
             <li>
+              <strong>bg_recr_off</strong> — set only <strong>if you choose “Don&apos;t show again”</strong> in the
+              window of urgent recruitment announcements, so that it no longer opens on its own on this browser. It
+              only contains the value “1”, never a personal identifier (sameSite=strict), and lasts one year. When
+              you are logged in, the same choice is kept on your account, for your other devices; if it was made
+              before logging in, it is carried over to the account at login. On the account, it lasts as long as the
+              account, is included in the export of your data and returns to the default when the account is
+              deleted.
+            </li>
+            <li>
               <strong>bg_terms_later</strong> — <strong>no longer set</strong> since version 6 of the terms of use: accepting
               them can no longer be postponed. A cookie set earlier (value “1”, never a
               personal identifier) expires twelve hours at most after it was set, and is cleared earlier at login or

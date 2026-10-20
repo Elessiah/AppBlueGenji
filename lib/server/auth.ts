@@ -12,6 +12,8 @@ import { recordConnection } from "@/lib/server/connection-logs";
 import { closeSessionStreams, closeUserStreams } from "@/lib/server/session-streams";
 import { activeSuspensionSql, assertNotSuspended, purgeEndedSuspensions } from "@/lib/server/account-suspensions";
 import type { ConnectionLogEvent } from "@/lib/shared/connection-logs";
+import { RECRUITMENT_MODAL_OFF_COOKIE, recruitmentModalOffInBrowser } from "@/lib/shared/recruitment";
+import { recordRecruitmentModalOff, recruitmentModalOff } from "@/lib/server/users/recruitment-modal-preference";
 
 export type AuthUser = {
   id: number;
@@ -23,6 +25,8 @@ export type AuthUser = {
   isAdmin: boolean;
   /** Rôles de permission cumulables (inclut `ADMIN` si `isAdmin`). */
   roles: PlatformRole[];
+  /** « Ne plus afficher » posé sur la modale d'arrivée du recrutement (`bg_users.recruitment_modal_off`). */
+  recruitmentModalOff: boolean;
 };
 
 type UserRow = RowDataPacket & {
@@ -34,6 +38,7 @@ type UserRow = RowDataPacket & {
   is_adult: 0 | 1 | null;
   is_admin: 0 | 1;
   platform_roles_json: string | null;
+  recruitment_modal_off?: number | null;
 };
 
 /**
@@ -82,6 +87,7 @@ function fromRow(row: UserRow): AuthUser {
     isAdult: row.is_adult === null ? null : Boolean(row.is_adult),
     isAdmin: Boolean(row.is_admin),
     roles: resolveRoles(Boolean(row.is_admin), row.platform_roles_json),
+    recruitmentModalOff: recruitmentModalOff(row.recruitment_modal_off),
   };
 }
 
@@ -116,7 +122,27 @@ export async function createSession(userId: number, event: ConnectionLogEvent): 
     maxAge: SESSION_TTL_DAYS * 24 * 60 * 60,
   });
   forgetTermsPostponement(cookieStore);
+  await carryRecruitmentModalOff(userId, cookieStore);
   await recordConnection(userId, event);
+}
+
+/**
+ * « Ne plus afficher » choisi sur ce navigateur avant la connexion : reporté
+ * sur le compte, pour qu'il suive la personne sur ses autres appareils
+ * (`docs/features/RECRUITMENT.md` § Ne plus afficher). Jamais bloquant : une
+ * erreur (colonne absente, base occupée) laisse la connexion se faire, et le
+ * cookie continue de taire la modale ici.
+ */
+async function carryRecruitmentModalOff(
+  userId: number,
+  cookieStore: Awaited<ReturnType<typeof cookies>>,
+): Promise<void> {
+  if (!recruitmentModalOffInBrowser(cookieStore.get(RECRUITMENT_MODAL_OFF_COOKIE)?.value)) return;
+  try {
+    await recordRecruitmentModalOff(userId);
+  } catch (error) {
+    console.error("[auth] recruitment modal opt-out carry-over failed:", error);
+  }
 }
 
 /**
@@ -255,7 +281,7 @@ async function getDevBypassUser(): Promise<AuthUser | null> {
 
   const db = await getDatabase();
   const [rows] = await db.execute<UserRow[]>(
-    `SELECT id, pseudo, avatar_url, discord_id, google_sub, is_adult, is_admin, platform_roles_json
+    `SELECT id, pseudo, avatar_url, discord_id, google_sub, is_adult, is_admin, platform_roles_json, recruitment_modal_off
      FROM bg_users
      WHERE id = ?
        AND is_deleted = 0
@@ -292,7 +318,8 @@ export const getCurrentUser = requestCache(async (): Promise<AuthUser | null> =>
 
   const db = await getDatabase();
   const [rows] = await db.execute<UserRow[]>(
-    `SELECT u.id, u.pseudo, u.avatar_url, u.discord_id, u.google_sub, u.is_adult, u.is_admin, u.platform_roles_json
+    `SELECT u.id, u.pseudo, u.avatar_url, u.discord_id, u.google_sub, u.is_adult, u.is_admin, u.platform_roles_json,
+            u.recruitment_modal_off
      FROM bg_user_sessions s
      JOIN bg_users u ON u.id = s.user_id
      WHERE s.token_hash = ?

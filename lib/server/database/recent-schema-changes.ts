@@ -1,6 +1,4 @@
 import type { Pool } from "mysql2/promise";
-import { SCORE_AUTO_VALIDATE_MINUTES } from "@/lib/shared/constants";
-import { SINGLE_REPORT_SQL } from "../tournaments/score-report-sql";
 import { reportSchemaFailure } from "./report-schema-failure";
 
 /** Migrations : les changements trop récents pour être repliés (`RECENT_SCHEMA_CHANGES`). */
@@ -264,26 +262,9 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // Soirées #live — message supprimé de #live : la soirée se ferme, rien ne
     // le republie.
     `ALTER TABLE bg_live_evenings ADD COLUMN closed BOOLEAN NOT NULL DEFAULT FALSE`,
-    // PR #453 — validation d'office au plus tôt deux heures après la saisie
-    // (`docs/features/SCORE_DISPUTE_LOCK.md`). Un report seul déposé avant le
-    // déploiement garde l'échéance de l'ancienne règle (fin de série plausible
-    // + 10 min) : sans rattrapage, il serait validé dans les minutes qui
-    // suivent, alors que les règles promettent deux heures à l'adversaire.
-    // Données seulement, rejouées à chaque démarrage sans effet une seconde
-    // fois : le nouveau code n'écrit jamais d'échéance plus proche que la
-    // saisie + deux heures. Se retire au déploiement suivant celui de la PR
-    // #453 (plus aucun report de l'ancienne règle en attente).
-    `UPDATE bg_matches m
-        SET m.score_deadline_at = DATE_ADD(
-              COALESCE(m.team1_reported_at, m.team2_reported_at),
-              INTERVAL ${SCORE_AUTO_VALIDATE_MINUTES} MINUTE)
-      WHERE m.status = 'AWAITING_CONFIRMATION'
-        AND m.winner_team_id IS NULL
-        AND m.score_deadline_at IS NOT NULL
-        AND ${SINGLE_REPORT_SQL}
-        AND m.score_deadline_at < DATE_ADD(
-              COALESCE(m.team1_reported_at, m.team2_reported_at),
-              INTERVAL ${SCORE_AUTO_VALIDATE_MINUTES} MINUTE)`,
+    // « Ne plus afficher » sur la modale d'arrivée du recrutement, gardé sur le
+    // compte (`docs/features/RECRUITMENT.md` § Ne plus afficher).
+    `ALTER TABLE bg_users ADD COLUMN recruitment_modal_off TINYINT(1) NOT NULL DEFAULT 0`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

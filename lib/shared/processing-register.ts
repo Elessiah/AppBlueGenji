@@ -320,6 +320,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Majorité déclarée (oui / non / non renseignée)",
       "Réglages de visibilité, disponibilité pour le recrutement, rôles sur la plateforme",
       "Langue du compte (français ou anglais), remise au français à l'anonymisation",
+      "Choix « Ne plus afficher » de la fenêtre des annonces de recrutement urgentes (oui / non ; un choix fait sur le navigateur avant la connexion est reporté sur le compte à la connexion), remis à « non » à l'anonymisation",
       "Aucun nom réel, aucune adresse e-mail, aucun numéro de téléphone, aucune adresse postale",
     ],
     sensitiveData: "Aucune",

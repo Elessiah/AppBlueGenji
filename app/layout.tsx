@@ -38,7 +38,9 @@ import {
 import {
   RECRUITMENT_BANNER_COOKIE,
   RECRUITMENT_MODAL_COOKIE,
+  RECRUITMENT_MODAL_OFF_COOKIE,
   recruitmentDismissed,
+  recruitmentModalOptedOut,
   recruitmentSeenAmong,
   recruitmentSeenKept,
 } from "@/lib/shared/recruitment";
@@ -283,11 +285,19 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           <RecruitmentTextProvider locale={locale} messages={recruitmentMessages}>
           <RecruitmentHighlight
             modalAds={spotlight.modal}
-            modalSilenced={recruitmentModalSilenced({
-              privacyPending: privacyChanges.length > 0,
-              termsModalDue: termsDueOnLoad,
-              pathname: requestedPath,
-            })}
+            modalSilenced={
+              // « Ne plus afficher » : sur le compte, ou sur ce navigateur.
+              recruitmentModalOptedOut({
+                accountOff: user?.recruitmentModalOff,
+                browserCookie: cookieStore.get(RECRUITMENT_MODAL_OFF_COOKIE)?.value,
+              }) ||
+              recruitmentModalSilenced({
+                privacyPending: privacyChanges.length > 0,
+                termsModalDue: termsDueOnLoad,
+                pathname: requestedPath,
+              })
+            }
+            signedIn={user !== null}
             modalSeen={modalSeen}
             modalSeenKept={modalSeenKept}
             bannerAds={spotlight.banner}

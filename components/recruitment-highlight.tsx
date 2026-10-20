@@ -5,6 +5,7 @@ import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { useRecruitmentText } from "@/components/i18n/recruitment-text";
 import { CyberButton } from "@/components/cyber";
 import { UrgentPill } from "@/components/recruitment/UrgentPill";
+import { useOptionalToast } from "@/components/ui/toast";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { useClientPower } from "@/lib/shared/hooks/useClientPower";
@@ -14,6 +15,9 @@ import {
   RECRUITMENT_BANNER_ROTATION_MS,
   RECRUITMENT_MODAL_COOKIE,
   RECRUITMENT_MODAL_COOKIE_MAX_AGE,
+  RECRUITMENT_MODAL_OFF_COOKIE,
+  RECRUITMENT_MODAL_OFF_MAX_AGE,
+  RECRUITMENT_MODAL_OFF_VALUE,
   RECRUITMENT_PRIORITY_EXPOSURE,
   type RecruitmentAd,
   buildRecruitmentPreview,
@@ -115,6 +119,7 @@ export function RecruitmentHighlight({
   bannerDismissed,
   bannerSeenKept = [],
   onAdPage,
+  signedIn = false,
 }: Readonly<{
   /** Prioritaires publiées : les pages de la modale d'arrivée. */
   modalAds: readonly RecruitmentAd[];
@@ -132,6 +137,8 @@ export function RecruitmentHighlight({
   bannerSeenKept?: readonly number[];
   /** On est sur `/recrutement`, où la modale se tait (le visiteur y lit déjà les annonces). */
   onAdPage: boolean;
+  /** Lecteur connecté : « Ne plus afficher » est aussi gardé sur son compte. */
+  signedIn?: boolean;
 }>) {
   // Ouverte sur la première prioritaire jamais vue ; toutes vues, elle se tait.
   const modalStart = recruitmentModalStart(modalAds.map((ad) => ad.id), modalSeen);
@@ -147,6 +154,7 @@ export function RecruitmentHighlight({
           seenIds={modalSeen}
           keptIds={modalSeenKept}
           startIndex={modalStart}
+          signedIn={signedIn}
         />
       )}
     </>
@@ -339,11 +347,13 @@ function RecruitmentArrivalModal({
   seenIds,
   keptIds,
   startIndex,
+  signedIn,
 }: Readonly<{
   ads: readonly RecruitmentAd[];
   seenIds: readonly number[];
   keptIds: readonly number[];
   startIndex: number;
+  signedIn: boolean;
 }>) {
   const [open, setOpen] = useState(true);
   const [index, setIndex] = useState(startIndex);
@@ -370,11 +380,34 @@ function RecruitmentArrivalModal({
     setOpen(false);
   }
 
+  /**
+   * « Ne plus afficher » : la modale ne s'ouvrira plus d'elle-même — sur ce
+   * navigateur (cookie, lu par la mise en page racine) et, connecté, sur le
+   * compte. Les annonces restent sur la page de recrutement et la banderole.
+   * Le cookie est posé d'abord : un compte injoignable laisse au moins ce
+   * navigateur tranquille, et le toast le dit.
+   */
+  async function optOut() {
+    writeSeenCookie(RECRUITMENT_MODAL_OFF_COOKIE, RECRUITMENT_MODAL_OFF_VALUE, RECRUITMENT_MODAL_OFF_MAX_AGE);
+    dismiss();
+    if (signedIn) {
+      try {
+        const response = await fetch("/api/recruitment/modal-dismiss", { method: "POST" });
+        if (!response.ok) throw new Error("RECRUITMENT_MODAL_DISMISS_FAILED");
+      } catch {
+        toast?.showError(t("highlight.dontShowAgainFailed"));
+        return;
+      }
+    }
+    toast?.showSuccess(t("highlight.dontShowAgainDone"));
+  }
+
   // Le hook doit être appelé à chaque rendu : il ne s'active que si `open`.
   const dialogRef = useDialogBehavior({ open, onClose: dismiss });
   const text = useRecruitmentText();
   const { t } = text;
   const backdrop = useBackdropDismiss(dismiss);
+  const toast = useOptionalToast();
 
   // Une page « compte » comme vue dès qu'elle est affichée, même si le visiteur
   // quitte le site sans fermer la modale. La marque n'est posée qu'ici, à
@@ -441,6 +474,11 @@ function RecruitmentArrivalModal({
         )}
 
         <div className={styles.modalActions}>
+          {/* Secondaire, à l'écart des actions : « Plus tard » reste le geste
+              ordinaire (la modale revient pour une annonce neuve). */}
+          <button type="button" className={styles.optOut} onClick={() => void optOut()}>
+            {t("highlight.dontShowAgain")}
+          </button>
           <CyberButton variant="ghost" onClick={dismiss}>
             {t("highlight.later")}
           </CyberButton>

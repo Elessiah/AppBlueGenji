@@ -579,6 +579,16 @@ function RgpdFr({
               votre visite.
             </li>
             <li>
+              <strong>bg_recr_off</strong> — déposé uniquement <strong>si vous choisissez « Ne plus
+              afficher »</strong> dans la fenêtre des annonces de recrutement urgentes, pour
+              qu&apos;elle ne s&apos;ouvre plus d&apos;elle-même sur ce navigateur. Il ne contient que
+              la valeur « 1 », jamais d&apos;identifiant de personne (sameSite=strict), et dure un an.
+              Connecté, le même choix est gardé sur votre compte, pour vos autres appareils ; s&apos;il
+              a été fait avant la connexion, il y est reporté à la connexion. Sur le compte, il dure
+              autant que lui, figure dans l&apos;export de vos données et revient au défaut à la
+              suppression du compte.
+            </li>
+            <li>
               <strong>bg_terms_later</strong> — <strong>n&apos;est plus déposé</strong> depuis la
               version 6 des conditions d&apos;utilisation : leur acceptation ne se reporte
               plus. Un cookie déposé auparavant (valeur « 1 », jamais d&apos;identifiant de

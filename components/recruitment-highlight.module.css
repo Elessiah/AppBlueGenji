@@ -321,9 +321,36 @@
 .modalActions {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   flex-wrap: wrap;
   gap: 10px;
   margin-top: 12px;
+}
+
+/* « Ne plus afficher » : secondaire, rejeté à gauche des actions, en lien
+   souligné plutôt qu'en bouton plein — il ne doit pas concurrencer « Lire ».
+   Cible de 44 px de haut au toucher (WCAG 2.5.8). */
+.optOut {
+  margin-right: auto;
+  min-height: 44px;
+  padding: 0 4px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--ink-dim);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.optOut:hover {
+  color: var(--ink);
+}
+
+.optOut:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
 }
 
 /* Sur un téléphone, deux rangées fixes : l'annonce sur toute la largeur, les
