@@ -184,6 +184,24 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(t12En).toMatch(/Referee alerts, disputes settled, results corrected, opponents' withdrawals imposed or automatic confirmations paused by a staff member who plays in the match, scheduled matches/);
   });
 
+  // Revue juridique DISPUTE-FOLLOWUP : la vérification « arbitre qui joue » lit
+  // l'appartenance du staff aux équipes du match (T04) ; chaque geste laisse une
+  // trace nominative dans pm2, détaillée pour l'arbitre qui joue (T05).
+  it("déclare la vérification de l'arbitre qui joue et ce que gardent les journaux du serveur (FR + EN)", () => {
+    const t04 = byRef("T04");
+    const t04En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T04")!;
+    expect(t04.dataCategories.join(" ")).toMatch(/Appartenance d'un membre du staff aux équipes d'un match qu'il arbitre/);
+    expect(t04En.dataCategories.join(" ")).toMatch(/Membership of a staff member in the teams of a match they referee/);
+    expect(t04.dataSubjects).toContain("Arbitres et administrateurs");
+    expect(t04En.dataSubjects).toContain("Referees and administrators");
+    expect(t04.legalBasis).toMatch(/intérêt légitime \(impartialité de l'arbitrage\) à l'égard du membre du staff qui arbitre un match qu'il joue/);
+    expect(t04En.legalBasis).toMatch(/legitimate interest \(impartial refereeing\) with regard to the staff member who referees a match they play in/);
+    const t05 = byRef("T05").dataCategories.join(" ");
+    const t05En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T05")!.dataCategories.join(" ");
+    expect(t05).toMatch(/pour un arbitre qui joue le match, en plus : tournoi, manche, issue et noms d'équipe/);
+    expect(t05En).toMatch(/for a referee who plays in the match, also: tournament, round, outcome and team names/);
+  });
+
   it("déclare l'information sur les changements de politique et leur annonce Discord", () => {
     const t10 = byRef("T10");
     expect(t10.dataCategories.join(" ")).toMatch(/pris connaissance/i);
