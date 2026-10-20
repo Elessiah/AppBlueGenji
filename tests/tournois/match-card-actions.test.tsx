@@ -208,7 +208,7 @@ function renderFooter(actions: Partial<MatchCardActionInput>, castBlock: CastBlo
 describe("MatchCardActions — rendu du pied", () => {
   it("« Voir le litige » s'ouvre en lecture : œil, pas de crayon", () => {
     const list = matchCardActionList({ ...NOTHING, playerScoreLabel: "Voir le litige", playerScoreReadOnly: true });
-    expect(list[0]).toEqual({ id: "playerScore", label: "Voir le litige", tone: "primary", readOnly: true });
+    expect(list[0]).toEqual({ id: "playerScore", label: "Voir le litige", tone: "neutral", readOnly: true });
     const view = renderFooter({ playerScoreLabel: "Voir le litige", playerScoreReadOnly: true });
     const edit = renderFooter({ playerScoreLabel: "Saisir le score" });
     expect(view).toContain("lucide-eye");
