@@ -162,7 +162,6 @@ import {
   resolveUserEntrantTeamId,
   type UserEntrant,
 } from "./registration";
-import { BOTH_REPORTED_SQL } from "./score-report-sql";
 import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
 import { resolveExpiredScoreReports, finalizeTournamentIfDone } from "./finalization";
 import { tryAutoResolveByes } from "./byes";
@@ -192,10 +191,11 @@ import { purgeExpiredConnectionLogs } from "@/lib/server/connection-logs";
 import { maintainSiteVisitRetention } from "@/lib/server/site-visits-service";
 import { findTournamentsNeedingSync } from "./sync-scope";
 import { FINISHED_TOURNAMENTS_LIST_LIMIT } from "@/lib/shared/constants";
-import { isScoreDisputed } from "@/lib/shared/score-dispute";
+import { earliestReport, isScoreDisputed, type ReportInstant } from "@/lib/shared/score-dispute";
 import type { StaffActor } from "@/lib/shared/log-privacy";
 import {
   alertSelfCorrectedResult,
+  alertSelfImposedForfeit,
   alertSelfPausedValidation,
   alertSelfResolvedDispute,
   type DisputeBeforeResolution,
@@ -1369,8 +1369,17 @@ async function adminSaveMatchScoresOnce(
 
     // Need to get tournament ID for event + Survival reconciliation
     const [matchData] = await connection.execute<
-      (RowDataPacket & { tournament_id: number; team1_id: number | null; team2_id: number | null })[]
-    >(`SELECT tournament_id, team1_id, team2_id FROM bg_matches WHERE id = ? LIMIT 1`, [matchId]);
+      (RowDataPacket & {
+        tournament_id: number;
+        team1_id: number | null;
+        team2_id: number | null;
+        team1_reported_at: ReportInstant | null;
+        team2_reported_at: ReportInstant | null;
+      })[]
+    >(
+      `SELECT tournament_id, team1_id, team2_id, team1_reported_at, team2_reported_at FROM bg_matches WHERE id = ? LIMIT 1`,
+      [matchId],
+    );
     const savedTournamentId = matchData.length > 0 ? Number(matchData[0].tournament_id) : null;
     const savedMatch: DisputeBeforeResolution | null =
       savedTournamentId !== null && matchData[0].team1_id !== null && matchData[0].team2_id !== null
@@ -1379,6 +1388,7 @@ async function adminSaveMatchScoresOnce(
             tournamentId: savedTournamentId,
             team1Id: Number(matchData[0].team1_id),
             team2Id: Number(matchData[0].team2_id),
+            playedAt: earliestReport(matchData[0].team1_reported_at, matchData[0].team2_reported_at),
           }
         : null;
 
@@ -1440,11 +1450,13 @@ export async function forfeitTournamentTeamPublic(
   );
   // Sans attendre (meilleur effort, ne lève jamais), une fois l'abandon acquis.
   // Seul l'abandon imposé à l'**adversaire** de l'arbitre le sert : retirer sa
-  // propre équipe est une concession, qu'un joueur peut faire lui-même.
+  // propre équipe est une concession, qu'un joueur peut faire lui-même. Litige
+  // ou non : clore ainsi la manche qu'on joue (report gagnant de l'adversaire
+  // en attente compris) n'est pas plus discret que la trancher.
   if (actor) {
-    for (const dispute of settledDisputes) {
-      const opponent = dispute.team1Id === teamId ? dispute.team2Id : dispute.team1Id;
-      void alertSelfResolvedDispute(dispute, actor, [opponent]);
+    for (const match of settledDisputes) {
+      const opponent = match.team1Id === teamId ? match.team2Id : match.team1Id;
+      void alertSelfImposedForfeit(match, actor, [opponent]);
     }
   }
 }
@@ -1466,7 +1478,7 @@ async function forfeitTournamentTeamOnce(
     // ci-dessous et le droit relu ensuite le sont sur l'état que l'abandon
     // écrit, pas sur un instantané figé avant l'attente du verrou.
     await lockTournamentRow(connection, tournamentId);
-    const openDisputes = actingUserId === null && actor ? await lockOpenDisputes(connection, tournamentId, teamId) : [];
+    const openMatches = actingUserId === null && actor ? await lockOpenMatches(connection, tournamentId, teamId) : [];
 
     // Droit relu **dans la transaction**, comme à l'inscription
     // (`registerCurrentUserTeam`) : la route l'a déjà lu pour décider quoi
@@ -1492,7 +1504,7 @@ async function forfeitTournamentTeamOnce(
     // La ligne d'abandon est réservée par le moteur du format concerné
     // (survie, suisse, endurance) : elle ne part qu'une fois l'abandon écrit.
     queueBotLog(connection, { kind: "forfeit", tournamentId, teamId });
-    settledDisputes = await keepSettled(connection, openDisputes);
+    settledDisputes = await keepSettled(connection, openMatches);
 
     await connection.commit();
     flushBotLogs(connection);
@@ -1559,15 +1571,15 @@ async function runForfeitEngine(connection: PoolConnection, tournamentId: number
 }
 
 /**
- * Les litiges ouverts de l'engagé qui abandonne, lus **sous verrou** (table
- * seule, MariaDB) : l'état que l'abandon va clore, qu'un report concurrent ne
- * change plus d'ici le commit. Deux temps : ses manches ouvertes, lues sans
- * verrou, puis celles-là seules verrouillées **par clé primaire** — un
+ * Les manches ouvertes de l'engagé qui abandonne (deux engagées connues),
+ * verrouillées : l'état que l'abandon va clore, qu'un report concurrent ne
+ * change plus d'ici le commit. Deux temps : lues sans verrou, puis celles-là
+ * seules verrouillées **par clé primaire** (table seule, MariaDB) — un
  * `FOR UPDATE` filtré sur des colonnes sans index verrouillerait toutes les
- * manches parcourues du tournoi, et les reports des autres engagés
- * attendraient l'abandon.
+ * manches parcourues du tournoi. Le premier report, lu avant que l'abandon ne
+ * l'efface, date la manche (`playedAt`).
  */
-async function lockOpenDisputes(
+async function lockOpenMatches(
   connection: PoolConnection,
   tournamentId: number,
   teamId: number,
@@ -1579,26 +1591,32 @@ async function lockOpenDisputes(
   );
   if (open.length === 0) return [];
   const [rows] = await connection.execute<
-    (RowDataPacket & { id: number; team1_id: number | null; team2_id: number | null; disputed: number })[]
+    (RowDataPacket & {
+      id: number;
+      team1_id: number | null;
+      team2_id: number | null;
+      team1_reported_at: ReportInstant | null;
+      team2_reported_at: ReportInstant | null;
+    })[]
   >(
-    `SELECT m.id, m.team1_id, m.team2_id,
-            (m.status = 'AWAITING_CONFIRMATION' AND ${BOTH_REPORTED_SQL}) AS disputed
-       FROM bg_matches m
-      WHERE m.id IN (${sqlPlaceholders(open.length)})
+    `SELECT id, team1_id, team2_id, team1_reported_at, team2_reported_at
+       FROM bg_matches
+      WHERE id IN (${sqlPlaceholders(open.length)})
       FOR UPDATE`,
     open.map((row) => Number(row.id)),
   );
   return rows
-    .filter((row) => Number(row.disputed) === 1 && row.team1_id !== null && row.team2_id !== null)
+    .filter((row) => row.team1_id !== null && row.team2_id !== null)
     .map((row) => ({
-    matchId: Number(row.id),
-    tournamentId,
-    team1Id: Number(row.team1_id),
-    team2Id: Number(row.team2_id),
-  }));
+      matchId: Number(row.id),
+      tournamentId,
+      team1Id: Number(row.team1_id),
+      team2Id: Number(row.team2_id),
+      playedAt: earliestReport(row.team1_reported_at, row.team2_reported_at),
+    }));
 }
 
-/** Parmi ces litiges, ceux que l'abandon vient de clore. */
+/** Parmi ces manches, celles que l'abandon vient de clore. */
 async function keepSettled(
   connection: PoolConnection,
   disputes: DisputeBeforeResolution[],
@@ -1725,14 +1743,35 @@ export async function adminResolveMatchPublic(
   }
 }
 
-type ResolvedMatchHead = RowDataPacket & {
+type ResolvedMatchHead = RowDataPacket & MatchOutcomeColumns & {
   tournament_id: number;
   team1_id: number | null;
   team2_id: number | null;
   status: string;
   team1_report_score: number | null;
   team2_report_score: number | null;
+  team1_reported_at: ReportInstant | null;
+  team2_reported_at: ReportInstant | null;
 };
+
+/** Ce qu'un arbitrage écrit d'une manche : une correction qui n'y change rien n'en est pas une. */
+type MatchOutcomeColumns = {
+  team1_score: number | null;
+  team2_score: number | null;
+  winner_team_id: number | null;
+  forfeit_team_id: number | null;
+  double_forfeit: number | null;
+};
+
+const MATCH_OUTCOME_COLUMNS = "team1_score, team2_score, winner_team_id, forfeit_team_id, double_forfeit";
+
+function sameOutcome(a: MatchOutcomeColumns, b: MatchOutcomeColumns): boolean {
+  const key = (row: MatchOutcomeColumns) =>
+    [row.team1_score, row.team2_score, row.winner_team_id, row.forfeit_team_id, Number(row.double_forfeit ?? 0)]
+      .map((value) => (value === null ? "" : String(Number(value))))
+      .join("|");
+  return key(a) === key(b);
+}
 
 /**
  * Ce que l'arbitrage vient de trancher et qu'un arbitre qui joue ne fait pas en
@@ -1756,7 +1795,8 @@ async function adminResolveMatchOnce(
     // `adminResolveMatch` verrouille ensuite : le litige se lit sur l'état que
     // l'arbitrage tranche, pas sur un état qu'une saisie concurrente change.
     const [matchData] = await connection.execute<ResolvedMatchHead[]>(
-      `SELECT tournament_id, team1_id, team2_id, status, team1_report_score, team2_report_score
+      `SELECT tournament_id, team1_id, team2_id, status, team1_report_score, team2_report_score,
+              team1_reported_at, team2_reported_at, ${MATCH_OUTCOME_COLUMNS}
          FROM bg_matches WHERE id = ? LIMIT 1 FOR UPDATE`,
       [matchId],
     );
@@ -1769,17 +1809,33 @@ async function adminResolveMatchOnce(
       team1Reported: head.team1_report_score !== null,
       team2Reported: head.team2_report_score !== null,
     });
-    const corrected = head.status === "COMPLETED";
-    const dispute: SettledByReferee | null =
-      (disputed || corrected) && head.team1_id !== null && head.team2_id !== null
+    const wasCompleted = head.status === "COMPLETED";
+    let dispute: SettledByReferee | null =
+      (disputed || wasCompleted) && head.team1_id !== null && head.team2_id !== null
         ? {
-            kind: corrected ? "corrected" : "resolved",
-            match: { matchId, tournamentId, team1Id: Number(head.team1_id), team2Id: Number(head.team2_id) },
+            kind: wasCompleted ? "corrected" : "resolved",
+            match: {
+              matchId,
+              tournamentId,
+              team1Id: Number(head.team1_id),
+              team2Id: Number(head.team2_id),
+              playedAt: earliestReport(head.team1_reported_at, head.team2_reported_at),
+            },
           }
         : null;
 
     const { adminResolveMatch } = await import("./admin");
     await adminResolveMatch(connection, matchId, entry);
+
+    // Correction : seule une issue **changée** en est une (revalider le même
+    // résultat, pour relancer la propagation par exemple, n'avertit personne).
+    if (dispute?.kind === "corrected") {
+      const [after] = await connection.execute<(RowDataPacket & MatchOutcomeColumns)[]>(
+        `SELECT ${MATCH_OUTCOME_COLUMNS} FROM bg_matches WHERE id = ? LIMIT 1`,
+        [matchId],
+      );
+      if (after.length === 0 || sameOutcome(head, after[0])) dispute = null;
+    }
 
     await tryAutoResolveByes(connection, tournamentId);
 

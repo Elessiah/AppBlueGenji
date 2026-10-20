@@ -109,6 +109,10 @@
     "title": "Result corrected by a player of the match",
     "body": "A staff member who plays in this match corrected its result · {tournament}, {round}: {outcome}."
   },
+  "selfForfeit": {
+    "title": "Withdrawal imposed by a player of the match",
+    "body": "A staff member who plays in this match imposed their opponent's withdrawal · {tournament}, {round}: {outcome}."
+  },
   "selfPaused": {
     "title": "Confirmation paused by a player of the match",
     "body": "A staff member who plays in this match paused its automatic confirmation · {tournament}, {round}."

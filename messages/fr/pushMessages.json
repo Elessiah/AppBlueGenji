@@ -109,6 +109,10 @@
     "title": "Résultat corrigé par un joueur du match",
     "body": "Un membre du staff qui joue ce match en a corrigé le résultat · {tournament}, {round} : {outcome}."
   },
+  "selfForfeit": {
+    "title": "Abandon imposé par un joueur du match",
+    "body": "Un membre du staff qui joue ce match a imposé l'abandon de son adversaire · {tournament}, {round} : {outcome}."
+  },
   "selfPaused": {
     "title": "Validation suspendue par un joueur du match",
     "body": "Un membre du staff qui joue ce match en a suspendu la validation automatique · {tournament}, {round}."

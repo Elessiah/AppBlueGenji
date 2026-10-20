@@ -28,6 +28,25 @@ export function isScoreDisputed(match: {
   return !isMatchPlayed({ status: match.status as MatchStatus }) && match.team1Reported && match.team2Reported;
 }
 
+/** Un instant de report, tel que la base le rend (`dateStrings` : « AAAA-MM-JJ HH:MM:SS »). */
+export type ReportInstant = Date | string;
+
+/**
+ * Le plus ancien des deux reports d'une manche, `null` sans report : l'instant
+ * où elle s'est jouée (`dispute-self-resolution.ts`, appartenance à l'équipe).
+ * Rendu tel quel, pour repartir en paramètre SQL dans le format lu.
+ */
+export function earliestReport(
+  a: ReportInstant | null | undefined,
+  b: ReportInstant | null | undefined,
+): ReportInstant | null {
+  if (!a) return b ?? null;
+  if (!b) return a;
+  if (a instanceof Date && b instanceof Date) return a.getTime() <= b.getTime() ? a : b;
+  // Chaînes de la base, de même format : l'ordre lexical est l'ordre du temps.
+  return String(a) <= String(b) ? a : b;
+}
+
 /**
  * Heure de la validation d'office (`scoreDeadlineAt`), « HH:MM » à l'heure de
  * Paris — l'heure du site, la même pour les deux équipes. `null` sans échéance

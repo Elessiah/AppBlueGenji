@@ -19,10 +19,12 @@ import { matchRoundLabel } from "@/lib/shared/discord-notifications";
 import { discordInline } from "@/lib/shared/discord-text";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 import type { StaffActor } from "@/lib/shared/log-privacy";
+import type { ReportInstant } from "@/lib/shared/score-dispute";
 import type { Locale } from "@/lib/shared/locales";
 import type { PushContent } from "@/lib/shared/push-notifications";
 import {
   selfCorrectedResultPush,
+  selfImposedForfeitPush,
   selfPausedValidationPush,
   selfResolvedDisputePush,
   selfResolvedOutcomeText,
@@ -39,6 +41,12 @@ export type DisputeBeforeResolution = {
   tournamentId: number;
   team1Id: number;
   team2Id: number;
+  /**
+   * Premier report de la manche, lu sous verrou **avant** que l'arbitrage ne
+   * l'efface : l'instant où elle s'est jouée, auquel se juge l'appartenance à
+   * l'équipe. Absent : lancement, sinon création de la manche.
+   */
+  playedAt?: ReportInstant | null;
 };
 
 type ResolvedMatchRow = RowDataPacket & {
@@ -79,10 +87,12 @@ export function selfResolvedDisputeLog(input: SelfResolvedDispute): string {
 }
 
 /**
- * L'arbitre joue-t-il la manche ? Membre d'une des deux équipes — **encore**
- * membre, ou parti depuis que la manche existe (`m.created_at`) : quitter
- * l'équipe juste avant de trancher, puis la rejoindre, n'efface pas l'alerte —,
- * ou joueur d'une entrée solo.
+ * L'arbitre joue-t-il la manche ? Membre d'une des deux équipes **au moment où
+ * elle s'est jouée** — premier report (`playedAt`), sinon lancement, sinon
+ * création de la manche : arrivé avant, parti après (ou toujours là). Quitter
+ * l'équipe juste avant de trancher n'efface donc pas l'alerte, et un ancien
+ * membre parti avant le match, ou un membre arrivé après, n'est pas accusé à
+ * tort. Ou joueur d'une entrée solo.
  */
 async function actorPlaysMatch(
   match: DisputeBeforeResolution,
@@ -90,17 +100,19 @@ async function actorPlaysMatch(
   sides: readonly number[],
 ): Promise<boolean> {
   const [first, second = first] = sides;
+  const playedAt = match.playedAt ?? null;
   const db = await getDatabase();
   const [rows] = await db.execute<RowDataPacket[]>(
     `SELECT 1 FROM bg_matches m
       WHERE m.id = ?
         AND (EXISTS (SELECT 1 FROM bg_team_members tm
                       WHERE tm.team_id IN (?, ?) AND tm.user_id = ?
-                        AND (tm.left_at IS NULL OR tm.left_at >= m.created_at))
+                        AND tm.joined_at <= COALESCE(?, m.launched_at, NOW())
+                        AND (tm.left_at IS NULL OR tm.left_at >= COALESCE(?, m.launched_at, m.created_at)))
              OR EXISTS (SELECT 1 FROM bg_teams st
                          WHERE st.id IN (?, ?) AND st.solo_user_id = ?))
       LIMIT 1`,
-    [match.matchId, first, second, actorId, first, second, actorId],
+    [match.matchId, first, second, actorId, playedAt, playedAt, first, second, actorId],
   );
   return rows.length > 0;
 }
@@ -146,6 +158,13 @@ export function selfCorrectedResultLog(input: SelfResolvedDispute): string {
   return `⚠️ Résultat corrigé par un membre du staff qui joue ce match · « ${discordInline(input.tournamentName)} », ${round} : ${outcome}.`;
 }
 
+/** Ligne du journal Discord d'un abandon imposé à l'adversaire (français). */
+export function selfImposedForfeitLog(input: SelfResolvedDispute): string {
+  const round = matchRoundLabel(input.bracket, input.roundNumber, input.swiss);
+  const outcome = selfResolvedOutcomeText(input, "fr", discordInline);
+  return `⚠️ Abandon imposé à son adversaire par un membre du staff qui joue ce match · « ${discordInline(input.tournamentName)} », ${round} : ${outcome}.`;
+}
+
 /**
  * Ligne du journal Discord d'une suspension (français, `publishStaffAction`) :
  * staff anonyme, aucun nom d'engagé — le tournoi et la manche suffisent.
@@ -155,7 +174,7 @@ export function selfPausedValidationLog(input: SelfResolvedDispute): string {
   return `⚠️ Validation automatique suspendue par un membre du staff qui joue ce match · « ${discordInline(input.tournamentName)} », ${round}.`;
 }
 
-type SelfActionKind = "resolved" | "corrected" | "paused";
+type SelfActionKind = "resolved" | "corrected" | "forfeited" | "paused";
 
 /**
  * Avertit les autres membres du staff si l'arbitre qui vient d'agir joue la
@@ -197,6 +216,7 @@ async function alertSelfAction(
 const SELF_ACTION_LOG: Record<SelfActionKind, (input: SelfResolvedDispute) => string> = {
   resolved: selfResolvedDisputeLog,
   corrected: selfCorrectedResultLog,
+  forfeited: selfImposedForfeitLog,
   paused: selfPausedValidationLog,
 };
 
@@ -204,6 +224,7 @@ const SELF_ACTION_LOG: Record<SelfActionKind, (input: SelfResolvedDispute) => st
 const SELF_ACTION_PUSH: Record<SelfActionKind, (input: SelfResolvedDispute, locale: Locale) => PushContent> = {
   resolved: selfResolvedDisputePush,
   corrected: selfCorrectedResultPush,
+  forfeited: selfImposedForfeitPush,
   paused: selfPausedValidationPush,
 };
 
@@ -211,21 +232,27 @@ const SELF_ACTION_PUSH: Record<SelfActionKind, (input: SelfResolvedDispute, loca
 const SELF_ACTION_TRACE: Record<SelfActionKind, string> = {
   resolved: "Litige clos par l'arbitrage (vérification « arbitre qui joue »)",
   corrected: "Résultat acquis corrigé par l'arbitrage (vérification « arbitre qui joue »)",
+  forfeited: "Manche close par un abandon imposé par l'arbitrage (vérification « arbitre qui joue »)",
   paused: "Validation automatique suspendue par l'arbitrage (vérification « arbitre qui joue »)",
 };
 
+/** Litige tranché par « Valider le résultat ». */
+export function alertSelfResolvedDispute(dispute: DisputeBeforeResolution, actor: StaffActor): Promise<boolean> {
+  return alertSelfAction("resolved", dispute, actor);
+}
+
 /**
- * Litige tranché — « Valider le résultat », ou abandon forcé par l'arbitrage
- * (`forfeitTournamentTeamPublic`) qui clôt la manche en litige. `sides` : les
- * engagées où l'arbitre « joue » compte (les deux par défaut ; l'abandon ne
- * retient que l'adversaire de l'équipe retirée, à qui il profite).
+ * Manche close par un abandon que l'arbitrage impose à une équipe
+ * (`forfeitTournamentTeamPublic`), litige ou non : l'arbitre ne « joue » que du
+ * côté de l'**adversaire** de l'équipe retirée (`sides`), à qui l'abandon
+ * profite — retirer sa propre équipe est une concession.
  */
-export function alertSelfResolvedDispute(
-  dispute: DisputeBeforeResolution,
+export function alertSelfImposedForfeit(
+  match: DisputeBeforeResolution,
   actor: StaffActor,
-  sides?: readonly number[],
+  sides: readonly number[],
 ): Promise<boolean> {
-  return alertSelfAction("resolved", dispute, actor, sides);
+  return alertSelfAction("forfeited", match, actor, sides);
 }
 
 /**
