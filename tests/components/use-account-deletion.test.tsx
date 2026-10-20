@@ -74,6 +74,20 @@ describe("previewAccountDeletion", () => {
     expect(calls[0].init?.signal).toBeInstanceOf(AbortSignal);
   });
 
+  it("sans `AbortSignal.timeout` (Safari < 16), l'aperçu part quand même, non borné", async () => {
+    const signal = AbortSignal as { timeout?: typeof AbortSignal.timeout };
+    const original = signal.timeout;
+    delete signal.timeout;
+    try {
+      const calls: FetchCall[] = [];
+      const fetchImpl = fakeFetch({ "GET /api/profile/deletion": () => jsonResponse(200, { mode: "ERASE", reason: null }) }, calls);
+      expect(await previewAccountDeletion(fetchImpl)).toEqual({ subject: null, previewed: null });
+      expect(calls[0].init?.signal).toBeUndefined();
+    } finally {
+      signal.timeout = original;
+    }
+  });
+
   it("un aperçu qui ne répond jamais est abandonné au délai : la confirmation s'ouvre sur l'incertitude", async () => {
     // Le délai lui-même (`AbortSignal.timeout`) : remplacé par un signal que le test déclenche.
     const controller = new AbortController();

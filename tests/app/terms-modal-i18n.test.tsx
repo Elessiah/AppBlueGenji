@@ -119,12 +119,13 @@ describe("TermsAcceptanceModal — langue de la page", () => {
   it("bloquante : « Supprimer mon compte » à la place de « Me déconnecter » (FR et EN), en bouton de danger", () => {
     const frHtml = render("fr");
     const fr = legalPageText(frHtml);
-    expect(frHtml).toMatch(/<button class="[^"]*deleteButton[^"]*" type="button">Supprimer mon compte<\/button>/);
+    // Au repos, le libellé d'attente occupe la même case, caché (hors du nom accessible) : le bouton ne change pas de largeur.
+    expect(frHtml).toMatch(/<button class="[^"]*deleteButton[^"]*" type="button"><span class="[^"]*labelStack[^"]*"><span>Supprimer mon compte<\/span><span data-hidden="true">Préparation…<\/span><\/span><\/button>/);
     expect(fr).not.toContain("Me déconnecter");
     expect(fr).not.toContain("Plus tard");
     const enHtml = render("en");
     const en = legalPageText(enHtml);
-    expect(enHtml).toMatch(/<button[^>]*class="[^"]*deleteButton[^"]*"[^>]*>Delete my account<\/button>/);
+    expect(enHtml).toMatch(/<button[^>]*class="[^"]*deleteButton[^"]*"[^>]*><span class="[^"]*labelStack[^"]*"><span>Delete my account<\/span><span data-hidden="true">Preparing…<\/span><\/span><\/button>/);
     expect(en).not.toContain("Log me out");
     expect(en).not.toContain("Later");
     // Au repos, la suppression n'est ni lancée ni montée.
@@ -154,13 +155,19 @@ describe("TermsAcceptanceModal — langue de la page", () => {
   it("« Préparation… » / \"Preparing…\" : le libellé d'attente du bouton de suppression existe en français et en anglais", async () => {
     expect((await import("@/messages/fr/shell.json")).default.termsModal.deleting).toBe("Préparation…");
     expect((await import("@/messages/en/shell.json")).default.termsModal.deleting).toBe("Preparing…");
+    expect((await import("@/messages/fr/shell.json")).default.termsModal.deletionUnavailable).toBe("La suppression n'a pas pu être préparée. Recharge la page, puis réessaie.");
+    expect((await import("@/messages/en/shell.json")).default.termsModal.deletionUnavailable).toBe("Account deletion could not be prepared. Reload the page, then try again.");
   });
 
   it("au survol, le bouton de suppression reste rouge : il l'emporte sur le survol bleu de `CyberButton` ghost", () => {
     const css = readSource("components/legal/TermsAcceptanceModal.module.css");
-    const rule = /\.actions \.deleteButton:hover:not\(:disabled\):not\(\[aria-disabled="true"\]\) \{([^}]*)\}/.exec(css)?.[1] ?? "";
-    expect(rule).toContain("color: var(--danger);");
-    expect(rule).toMatch(/box-shadow: [^;]*--danger-rgb/);
+    const rules = [...css.matchAll(/\.actions \.deleteButton:hover:not\(:disabled\):not\(\[aria-disabled="true"\]\) \{([^}]*)\}/g)].map((match) => match[1]);
+    expect(rules).toHaveLength(2);
+    expect(rules[0]).toContain("color: var(--danger);");
+    // Au toucher, pas de halo (un survol collé après « Annuler ») : le halo rouge est réservé au pointeur fin.
+    expect(rules[0]).toContain("box-shadow: none;");
+    expect(css).toMatch(/@media \(hover: hover\) and \(pointer: fine\) \{\s*\.actions \.deleteButton:hover[^{]*\{\s*box-shadow: [^;]*--danger-rgb/);
+    expect(css).toMatch(/\.labelStack > \[data-hidden\] \{\s*visibility: hidden;/);
     // Plus spécifique que le survol ghost (une classe de plus) : la règle rouge gagne quel que soit l'ordre des feuilles.
     expect(readSource("components/cyber/CyberButton.module.css")).toContain('.ghost:hover:not(:disabled):not([aria-disabled="true"])');
   });
@@ -172,7 +179,15 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     expect(modal).toMatch(/if \(!busy && !leaving\) setDeletionOpen\(true\);/);
     expect(modal).toMatch(/\{deletionOpen \? \(\s*<TermsAccountDeletion\s+onReady=\{\(\) => setDeletionReady\(true\)\}\s+onClose=\{\(\) => \{\s*setDeletionOpen\(false\);\s*setDeletionReady\(false\);\s*requestAnimationFrame\(\(\) => deleteButtonRef\.current\?\.focus\(\)\);/);
     // Préparation (code, textes, aperçu) : le bouton dit qu'il travaille, jusqu'à l'ouverture de la confirmation.
-    expect(modal).toContain('{deletionOpen && !deletionReady ? t("termsModal.deleting") : t("termsModal.deleteAccount")}');
+    expect(modal).toContain("const preparing = deletionOpen && !deletionReady;");
+    expect(modal).toContain('<span data-hidden={preparing || undefined}>{t("termsModal.deleteAccount")}</span>');
+    expect(modal).toContain('<span data-hidden={!preparing || undefined}>{t("termsModal.deleting")}</span>');
+    // Fenêtre tue (page où elle se tait) : la préparation est abandonnée, rien ne se relance seul à la réouverture.
+    expect(modal).toMatch(/useEffect\(\(\) => \{\s*if \(open\) return;\s*setDeletionOpen\(false\);\s*setDeletionReady\(false\);\s*\}, \[open\]\);/);
+    // Préparation bornée (morceau disparu, réseau figé) : la fenêtre retrouve ses issues, un toast le dit, le focus revient au bouton.
+    expect(modal).toContain("export const TERMS_DELETION_PREPARE_TIMEOUT_MS = 15_000;");
+    expect(modal).toMatch(/if \(!deletionOpen \|\| deletionReady\) return;\s*const timer = window\.setTimeout\(\(\) => \{\s*setDeletionOpen\(false\);\s*showError\(unavailableRef\.current\);\s*requestAnimationFrame\(\(\) => deleteButtonRef\.current\?\.focus\(\)\);\s*\}, TERMS_DELETION_PREPARE_TIMEOUT_MS\);/);
+    expect(modal).toContain('unavailableRef.current = t("termsModal.deletionUnavailable");');
     expect(flowSource()).toMatch(/useEffect\(\(\) => \{\s*if \(confirming\) onReady\?\.\(\);\s*\}, \[confirming, onReady\]\);/);
     // Chargée au clic seulement : ni son code ni l'espace `profile` dans chaque page.
     expect(modal).toContain('dynamic(\n  () => orReload(import("./TermsAccountDeletion")');

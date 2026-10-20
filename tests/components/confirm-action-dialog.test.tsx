@@ -171,6 +171,17 @@ describe("ConfirmActionDialog — balisage", () => {
   });
 });
 
+describe("geste en vol : le focus reste sur le bouton pressé", () => {
+  it("`aria-disabled` + `aria-busy` pendant l'envoi, jamais `disabled` natif sous le focus (un refus se retente au clavier)", () => {
+    const source = readSource("components/ui/confirm-action-dialog.tsx");
+    expect(source).not.toMatch(/[^-]disabled=\{busy/);
+    expect(source).toMatch(/onClick=\{\(\) => \{\s*if \(!busy\) onClose\(\);\s*\}\}\s*aria-disabled=\{busy \|\| undefined\}/);
+    expect(source).toMatch(/disabled=\{!armed\}\s*aria-disabled=\{busy \|\| undefined\}\s*aria-busy=\{busy \|\| undefined\}/);
+    // `submit` ignore déjà un geste tant que `busy`.
+    expect(source).toContain("if (busy || !armed) return;");
+  });
+});
+
 describe("rôles de plateforme — écart annoncé", () => {
   it("liste ce qui est accordé et retiré, dans l'ordre d'affichage", () => {
     expect(diffPlatformRoles(["CASTER", "ARBITRE"], ["RECRUTEUR", "ADMIN", "ARBITRE"])).toEqual({
