@@ -206,7 +206,8 @@ concernée. « Plus tard », Échap et le voile gardent leur règle (la modale
 revient pour une prioritaire neuve).
 
 - **Navigateur** : cookie `bg_recr_off=1` (un an, `sameSite=lax`, `Secure`
-  sous HTTPS — script comme serveur : jamais posé depuis une page en clair), posé par
+  en production — script comme serveur, même règle : jamais posé depuis une
+  page en clair ni rétrogradé par la réponse), posé par
   le client sur-le-champ **puis reposé par le serveur** (`Set-Cookie` de
   `POST /api/recruitment/modal-dismiss`, appelée connecté **ou non**) : Safari
   et tout navigateur iOS (ITP) bornent à sept jours un cookie posé par script,
