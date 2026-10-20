@@ -76,12 +76,20 @@
 }
 
 /* Non armé (texte à recopier, champ requis) : `disabled` natif, éteint — sans
-   quoi « Dissoudre » paraissait armé et refusait le clic sans un mot. */
+   quoi « Dissoudre » paraissait armé et refusait le clic sans un mot. Bordure
+   pointillée et fond vide : il ne se confond pas avec « Annuler », plein à côté. */
 .actions > :global(.btn):disabled {
   cursor: not-allowed;
   color: var(--ink-mute);
   border-color: var(--line-strong);
-  background: rgba(255, 255, 255, 0.04);
+  border-style: dashed;
+  background: transparent;
+}
+
+/* Un geste destructeur non armé reste lisible comme tel : texte rouge de danger. */
+.actions > :global(.btn.danger):disabled {
+  color: var(--danger);
+  border-color: rgba(var(--danger-rgb), 0.45);
 }
 
 /* Contraste élevé (Windows) : les couleurs posées plus haut sont ignorées ; le

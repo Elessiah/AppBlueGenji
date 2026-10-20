@@ -98,11 +98,23 @@
   color: var(--ink-mute);
 }
 
-/* Contraste élevé (Windows) : les couleurs posées ici sont ignorées ; le gris
-   système dit que le lien et le bouton de suppression attendent. */
+/* Déconnexion en cours : le curseur d'attente des autres gestes en vol. */
+.textButton[aria-busy="true"] {
+  cursor: progress;
+}
+
+/* Contraste élevé (Windows) : les couleurs posées ici sont ignorées. Le geste
+   à l'allure de lien prend la couleur système des liens, comme ses voisins ; le
+   gris système dit que le lien et les boutons (« J'accepte » pendant l'envoi
+   compris) attendent. */
 @media (forced-colors: active) {
+  .textButton {
+    color: LinkText;
+    background: transparent;
+  }
+
   .textButton[aria-disabled="true"],
-  .actions .deleteButton[aria-disabled="true"] {
+  .actions [aria-disabled="true"] {
     color: GrayText;
     border-color: GrayText;
   }
