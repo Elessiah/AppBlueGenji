@@ -24,7 +24,7 @@ export interface TermsAccountDeletionProps {
  * (`layer="overBlocking"`). Échap et « Annuler » ne ferment que la
  * confirmation (pile des modales) ; la fenêtre des conditions reste.
  *
- * Chargée au clic seulement (`TermsAcceptanceModal`, préchargée au survol ou au focus du bouton) : ses textes vivent dans
+ * Chargée au clic seulement (`TermsAcceptanceModal`, avec l'aperçu et l'anglais en parallèle) : ses textes vivent dans
  * l'espace `profile`, que la mise en page racine ne sert pas — l'anglais est
  * chargé ici sous `/en` (un échec retombe sur le français).
  */

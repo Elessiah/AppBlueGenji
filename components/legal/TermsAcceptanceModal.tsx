@@ -18,7 +18,7 @@ import {
   type TermsRequest,
 } from "@/lib/shared/terms-of-use";
 import { termsModalSilencedOn } from "@/lib/shared/global-modals";
-import { onceLoader, preloadMissing } from "@/lib/shared/lazy-component";
+import { onceLoader } from "@/lib/shared/lazy-component";
 import { englishProfile } from "@/components/i18n/english-loader-profile";
 import type { TermsAccountDeletionProps } from "./TermsAccountDeletion";
 import { previewAccountDeletion, type PendingAccountDeletion } from "@/components/account/account-deletion-preview";
@@ -43,14 +43,15 @@ export const TERMS_DELETION_PREPARE_TIMEOUT_MS = 20_000;
  * soit ouverte, et cette fenêtre l'est toujours) et `next/dynamic` aurait gardé
  * un composant vide — chaque clic suivant restait muet jusqu'au délai de
  * préparation. Ici, un échec est dit tout de suite (toast) et le clic suivant
- * retente. Le survol et le focus du bouton préchargent le code (et, sous `/en`,
- * les textes anglais) ; le clic lance les deux ensemble, pas l'un après l'autre.
+ * retente. Le clic lance ensemble le code, l'aperçu et, sous `/en`, les textes
+ * anglais — pas l'un après l'autre. **Aucun préchargement** au survol ni au
+ * focus : le bouton précède « J'accepte » (ordre de tabulation, trajet de la
+ * souris), presque chaque lecteur qui accepte aurait téléchargé l'espace
+ * `profile` (~35 Ko, ~65 Ko sous `/en`) pour un geste qu'il ne fait pas.
  */
 const termsDeletionLoader = onceLoader<ComponentType<TermsAccountDeletionProps>>(() =>
   import("./TermsAccountDeletion").then((module) => module.TermsAccountDeletion),
 );
-const preloadTermsDeletion = preloadMissing([termsDeletionLoader]);
-const preloadTermsDeletionEnglish = preloadMissing([englishProfile]);
 
 interface TermsAcceptanceModalProps {
   /** Le compte n'a pas accepté les conditions en vigueur. */
@@ -166,10 +167,6 @@ export function TermsAcceptanceModal({
     return () => window.clearTimeout(timer);
   }, [deletionOpen, deletionReady, abandonDeletion]);
   const { leaving, logout } = useLogout();
-  const preloadDeletion = () => {
-    preloadTermsDeletion();
-    if (locale === "en") preloadTermsDeletionEnglish();
-  };
   const startDeletion = () => {
     if (busy || leaving || deletionOpen) return;
     setDeletionOpen(true);
@@ -305,8 +302,6 @@ export function TermsAcceptanceModal({
             variant="ghost"
             className={styles.deleteButton}
             onClick={startDeletion}
-            onPointerEnter={preloadDeletion}
-            onFocus={preloadDeletion}
             aria-disabled={busy || leaving || deletionOpen || undefined}
             aria-busy={preparing || undefined}
           >
