@@ -3,7 +3,7 @@
 Deux règles du cycle proposer / confirmer / contester (`PLAYER_SCORE_ENTRY.md`),
 décidées le 2026-10-13.
 
-## 1. Litige : saisie verrouillée pour les deux équipes
+## 1. Litige : saisie verrouillée pour les deux adversaires
 
 Deux propositions **ensemble** sur un match ouvert se contredisent toujours —
 deux propositions concordantes le tranchent dans la transaction même
@@ -30,7 +30,10 @@ pas d'affectation d'arbitre par match dans le code) fixe le score final ou
 prononce un forfait, et `adminResolveMatch` → `finalizeMatch` efface les
 propositions. L'alerte « conflit de score » aux arbitres (`REFEREE_ALERTS.md`,
 push `REFEREE_ALERT` + Discord, staff anonymisé) part comme avant à
-l'ouverture du litige, et l'escalade « toujours pas tranché » aussi.
+l'ouverture du litige, et l'escalade « toujours pas tranché » aussi — son texte
+(`refereeAlert.score_report_stalled`, FR + EN) dit un **litige** sans arbitrage,
+saisie verrouillée : elle ne part plus que pour un litige, un report seul étant
+validé d'office.
 
 **Écran.** Le litige se déduit de l'instantané commun (`team1Report` /
 `team2Report`) : il voyage par le flux SSE **et** par la lecture REST de
@@ -71,7 +74,7 @@ proposition adverse, toute saisie qui en diffère (score, ou seulement le détai
 des maps ; détail adverse encore en lecture ou illisible : seulement un score
 différent, le serveur comparant lui-même le détail) affiche, au-dessus des actions, « Cette saisie diffère de la
 proposition de … (score ou détail des maps) : l'envoyer ouvre un litige
-et verrouille la saisie des deux équipes jusqu'à l'arbitrage » (FR + EN,
+et verrouille la saisie des deux adversaires jusqu'à l'arbitrage » (FR + EN,
 `score.player.counterWarning`, rattaché au bouton d'envoi par `aria-describedby`), et la phrase d'état (`theirs.withMaps` /
 `withoutMaps`) le dit dès l'ouverture. Pendant un envoi, les boutons
 `aria-disabled` se grisent comme `:disabled` (`ScoreDialog.module.css`).
