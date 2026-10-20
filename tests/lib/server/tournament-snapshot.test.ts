@@ -58,6 +58,7 @@ import { clearCache } from "@/lib/server/cache";
 import { dispatchMatchStartNotices } from "@/lib/server/tournaments/player-pushes";
 import type { TournamentListRow, TournamentRow } from "@/lib/server/tournaments/_internal";
 import { fakePool } from "../../helpers/sql-double";
+import { ACTIONABLE_EXPIRED_REPORT_SQL } from "@/lib/server/tournaments/score-report-sql";
 import type { RowOverrides } from "../../helpers/row-overrides";
 import {
   matchRow,
@@ -294,6 +295,8 @@ describe("getTournamentSnapshotFrame — entretien à la lecture", () => {
     // tournoi ; même condition de lancement que le balayage passif.
     expect(dueQueries).toHaveLength(1);
     expect(dueQueries[0]).toContain("score_deadline_at <= NOW()");
+    // Un litige déjà escaladé n'ouvre pas d'entretien : il attend un arbitre.
+    expect(dueQueries[0]).toContain(ACTIONABLE_EXPIRED_REPORT_SQL);
     expect(dueQueries[0]).toContain("t.referee_scheduling = 0");
     expect(dueQueries[0]).toContain("lobby_opened_at IS NULL");
     expect(dueQueries[0]).not.toContain("JOIN");

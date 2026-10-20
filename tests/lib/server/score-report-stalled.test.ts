@@ -11,6 +11,7 @@ import { finalizeMatch } from "@/lib/server/tournaments/scoring";
 import { queueBotLog, queueRefereeAlert } from "@/lib/server/tournaments/bot-logs";
 import { promoteReportedMaps } from "@/lib/server/tournaments/match-maps";
 import { queueAutoValidatedNotice } from "@/lib/server/tournaments/auto-validated-notices";
+import { ACTIONABLE_EXPIRED_REPORT_SQL, STALLED_ALERT_KEY } from "@/lib/server/tournaments/score-report-sql";
 
 /** Connexion factice : `rows` répond aux SELECT, les écritures sont comptées. */
 function fakeConnection(options: {
@@ -507,5 +508,15 @@ describe("resolveExpiredScoreReports — ce qu'elle rapporte", () => {
 
     expect(seen.filter((q) => q.includes("FROM bg_tournaments"))).toHaveLength(2);
     expect(queueAutoValidatedNotice).toHaveBeenCalledTimes(3);
+  });
+  // Un litige déjà escaladé attend un arbitre : la sélection ne le relit plus à
+  // chaque écriture d'un joueur du tournoi, ni sa réservation d'alerte.
+  it("ne sélectionne que les reports que la résolution peut faire avancer", async () => {
+    const seen: string[] = [];
+    await resolveExpiredScoreReports(fakeConnection({ seen, rows: () => [] }), 12);
+
+    const select = seen.find((q) => q.startsWith("SELECT") && q.includes("FROM bg_matches m"));
+    expect(select).toContain(ACTIONABLE_EXPIRED_REPORT_SQL.replace(/\s+/g, " "));
+    expect(select).toContain(`a.alert_key = '${STALLED_ALERT_KEY}'`);
   });
 });
