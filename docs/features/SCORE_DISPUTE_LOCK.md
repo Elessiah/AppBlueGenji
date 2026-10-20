@@ -93,6 +93,11 @@ session), dans trois cas :
    la saisie qui pose la suspension (`pausedNow`, état d'avant lu sous le
    verrou du match), pas à chaque nouvelle saisie d'une manche déjà suspendue.
 
+Avant toute lecture, une trace pm2 courte nomme l'auteur et la manche
+(`auditStaffAction`, écrite avant la réponse de la route) : un arrêt du serveur
+entre le commit et l'alerte ne laisse pas le geste sans auteur ; un échec
+ensuite se dit dans pm2 (« push non envoyé » ou « ni journalisée ni envoyée »).
+
 Hors litige, « Valider le résultat » d'un arbitre qui joue n'avertit personne
 (la règle vise les litiges, `/regles` le dit). Seul membre du staff : personne
 à prévenir (`notifyStaff` sans destinataire), la ligne du journal reste.
