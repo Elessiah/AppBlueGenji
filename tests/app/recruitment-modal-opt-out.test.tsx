@@ -1,0 +1,183 @@
+import { describe, expect, it, jest } from "@jest/globals";
+import { renderToStaticMarkup } from "react-dom/server";
+import { RecruitmentHighlight, recordRecruitmentModalOptOut } from "@/components/recruitment-highlight";
+import { RecruitmentTextProvider } from "@/components/i18n/recruitment-text";
+import { messagesFor } from "@/lib/server/i18n-messages";
+import {
+  RECRUITMENT_MODAL_OFF_COOKIE,
+  RECRUITMENT_MODAL_OFF_MAX_AGE,
+  recruitmentModalOffInBrowser,
+  recruitmentModalOptedOut,
+  type RecruitmentAd,
+} from "@/lib/shared/recruitment";
+import { recruitmentClientMessages } from "@/lib/shared/recruitment-text";
+import { readSource } from "../helpers/read-source";
+
+/**
+ * « Ne plus afficher » sur la modale d'arrivée du recrutement
+ * (`docs/features/RECRUITMENT.md` § Ne plus afficher) : gardé sur le compte
+ * connecté, sinon sur ce navigateur, reporté au compte à la connexion
+ * (`tests/lib/server/auth.test.ts`).
+ */
+
+function ad(overrides: Partial<RecruitmentAd> = {}): RecruitmentAd {
+  return {
+    id: 42,
+    title: "Cherche coach Overwatch",
+    titleEn: null,
+    rolesEn: null,
+    bodyEn: null,
+    teamName: "Test - Eclipse",
+    domain: "AUTRE",
+    roles: "Coach",
+    body: "Description de l'annonce.",
+    contactUrl: null,
+    contactDiscord: null,
+    contactDiscordId: null,
+    contactPreferred: "AUTO",
+    priority: "PRIORITY",
+    active: true,
+    ...overrides,
+  };
+}
+
+type Props = Parameters<typeof RecruitmentHighlight>[0];
+
+const props = (overrides: Partial<Props> = {}): Props => ({
+  modalAds: [ad()],
+  modalSilenced: false,
+  modalSeen: [],
+  bannerAds: [],
+  bannerDismissed: false,
+  onAdPage: false,
+  ...overrides,
+});
+
+describe("recruitmentModalOptedOut — qui a dit « Ne plus afficher »", () => {
+  it("tait la modale pour un compte qui l'a posé, quel que soit le navigateur (autres appareils)", () => {
+    expect(recruitmentModalOptedOut({ accountOff: true, browserCookie: undefined })).toBe(true);
+  });
+
+  it("tait la modale sur le navigateur qui porte le cookie, connecté ou non", () => {
+    expect(recruitmentModalOptedOut({ accountOff: undefined, browserCookie: "1" })).toBe(true);
+    expect(recruitmentModalOptedOut({ accountOff: false, browserCookie: "1" })).toBe(true);
+  });
+
+  it("laisse la modale s'ouvrir sans aucun des deux, ou sur une valeur forgée", () => {
+    expect(recruitmentModalOptedOut({ accountOff: false, browserCookie: undefined })).toBe(false);
+    expect(recruitmentModalOptedOut({ accountOff: undefined, browserCookie: null })).toBe(false);
+    for (const forged of ["", "0", "true", "1 ", "11"]) expect(recruitmentModalOffInBrowser(forged)).toBe(false);
+  });
+
+  it("garde le cookie un an au plus (plafond des navigateurs : 400 jours)", () => {
+    expect(RECRUITMENT_MODAL_OFF_MAX_AGE).toBe(365 * 24 * 60 * 60);
+  });
+});
+
+describe("modale d'arrivée — bouton « Ne plus afficher »", () => {
+  it("est rendu en français, en bouton distinct de « Plus tard »", () => {
+    const markup = renderToStaticMarkup(<RecruitmentHighlight {...props()} />);
+    expect(markup).toContain(">Ne plus afficher</button>");
+    expect(markup).toContain("Plus tard");
+  });
+
+  it("est rendu en anglais sous /en", () => {
+    const messages = recruitmentClientMessages(messagesFor("en").recruitment);
+    const markup = renderToStaticMarkup(
+      <RecruitmentTextProvider locale="en" messages={messages}>
+        <RecruitmentHighlight {...props()} />
+      </RecruitmentTextProvider>,
+    );
+    expect(markup).toContain(">Don&#x27;t show again</button>");
+    expect(markup).not.toContain("Ne plus afficher");
+  });
+
+  it("a ses textes de toast dans les deux langues", () => {
+    for (const locale of ["fr", "en"] as const) {
+      const highlight = messagesFor(locale).recruitment.highlight;
+      expect(highlight.dontShowAgain).toBeTruthy();
+      expect(highlight.dontShowAgainDone).toBeTruthy();
+      expect(highlight.dontShowAgainFailed).toBeTruthy();
+    }
+  });
+
+  it("disparaît avec la modale une fois le choix fait (silence décidé par la mise en page), la banderole restant", () => {
+    const markup = renderToStaticMarkup(
+      <RecruitmentHighlight {...props({ modalSilenced: true, bannerAds: [ad({ id: 44, priority: "IMPORTANT" })] })} />,
+    );
+    expect(markup).not.toContain('role="dialog"');
+    expect(markup).not.toContain("Ne plus afficher");
+    expect(markup).toContain("Annonces de recrutement");
+  });
+});
+
+describe("recordRecruitmentModalOptOut", () => {
+  it("non connecté : pose le cookie du navigateur, sans appel au serveur", async () => {
+    const writeCookie = jest.fn();
+    const post = jest.fn(async () => ({ ok: true }));
+    expect(await recordRecruitmentModalOptOut(false, { writeCookie, post })).toBe("BROWSER");
+    expect(writeCookie).toHaveBeenCalledWith(RECRUITMENT_MODAL_OFF_COOKIE, "1", RECRUITMENT_MODAL_OFF_MAX_AGE);
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it("connecté : pose le cookie d'abord, puis le choix sur le compte", async () => {
+    const order: string[] = [];
+    const writeCookie = jest.fn(() => order.push("cookie"));
+    const post = jest.fn(async (url: string) => {
+      order.push(url);
+      return { ok: true };
+    });
+    expect(await recordRecruitmentModalOptOut(true, { writeCookie, post })).toBe("ACCOUNT");
+    expect(order).toEqual(["cookie", "/api/recruitment/modal-dismiss"]);
+  });
+
+  it("connecté, compte injoignable ou refus : le choix reste au moins sur ce navigateur", async () => {
+    const writeCookie = jest.fn();
+    expect(await recordRecruitmentModalOptOut(true, { writeCookie, post: async () => ({ ok: false }) })).toBe(
+      "BROWSER_ONLY",
+    );
+    expect(
+      await recordRecruitmentModalOptOut(true, {
+        writeCookie,
+        post: async () => {
+          throw new Error("offline");
+        },
+      }),
+    ).toBe("BROWSER_ONLY");
+    expect(writeCookie).toHaveBeenCalledTimes(2);
+  });
+
+  it("pose le cookie de façon synchrone, avant tout await (la modale se ferme aussitôt)", () => {
+    const writeCookie = jest.fn();
+    void recordRecruitmentModalOptOut(true, { writeCookie, post: () => new Promise(() => undefined) });
+    expect(writeCookie).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("fermer ≠ ne plus afficher", () => {
+  const source = readSource("components/recruitment-highlight.tsx");
+  const body = (name: string) => {
+    // La dernière occurrence : celle de la modale (la banderole a son propre `dismiss`).
+    const start = source.lastIndexOf(`function ${name}()`);
+    return source.slice(start, source.indexOf("\n  }\n", start));
+  };
+
+  it("« Plus tard », Échap et le voile gardent leur règle : ils ne posent pas le cookie de refus", () => {
+    expect(body("dismiss")).toContain("RECRUITMENT_MODAL_COOKIE,");
+    expect(body("dismiss")).not.toContain("RECRUITMENT_MODAL_OFF_COOKIE");
+    expect(source).toContain("useDialogBehavior({ open, onClose: dismiss })");
+    expect(source).toContain("useBackdropDismiss(dismiss)");
+  });
+
+  it("seul « Ne plus afficher » appelle le refus", () => {
+    expect(source.match(/recordRecruitmentModalOptOut\(signedIn\)/g)).toHaveLength(1);
+    expect(source).toContain("onClick={() => void optOut()}");
+  });
+
+  it("la mise en page racine lit le choix du compte avec la session et le cookie du navigateur", () => {
+    const layout = readSource("app/layout.tsx");
+    expect(layout).toContain("accountOff: user?.recruitmentModalOff");
+    expect(layout).toContain("cookieStore.get(RECRUITMENT_MODAL_OFF_COOKIE)?.value");
+    expect(layout).toContain("signedIn={user !== null}");
+  });
+});

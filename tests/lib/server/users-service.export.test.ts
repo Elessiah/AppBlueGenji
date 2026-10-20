@@ -205,6 +205,23 @@ describe("exportOwnData", () => {
     expect(await run(null)).toBe("fr");
   });
 
+  it("rend le « Ne plus afficher » de la modale du recrutement, non posé par défaut", async () => {
+    const run = async (value: unknown) => {
+      const execute = jest
+        .fn<SqlQuery>()
+        .mockResolvedValueOnce([[exportRow({ recruitment_modal_off: value })]])
+        .mockResolvedValueOnce([[fullProfileRow({})]])
+        .mockResolvedValue([[]]);
+      await mockDb(execute);
+      const data = await exportOwnData(42);
+      expect(execute.mock.calls[0][0]).toMatch(/\brecruitment_modal_off\b/);
+      return data.account.recruitmentModalOff;
+    };
+    expect(await run(1)).toBe(true);
+    expect(await run(0)).toBe(false);
+    expect(await run(null)).toBe(false);
+  });
+
   it("throws PROFILE_NOT_FOUND when the account does not exist or is deleted", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[]]);
     await mockDb(execute);

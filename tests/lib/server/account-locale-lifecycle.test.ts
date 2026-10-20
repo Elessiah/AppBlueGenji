@@ -107,6 +107,26 @@ describe("messages privés de match — anonymisation", () => {
   });
 });
 
+describe("« Ne plus afficher » du recrutement — anonymisation", () => {
+  it("remet le choix au défaut par une instruction à part, sur la ligne supprimée", async () => {
+    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(undefined);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
+    await anonymizeAccount(fakeConnection({ execute }), 42);
+    const reset = execute.mock.calls.find(([sql]) => String(sql).includes("recruitment_modal_off"));
+    expect(reset).toEqual(["UPDATE bg_users SET recruitment_modal_off = 0 WHERE id = ? AND is_deleted = 1", [42]]);
+  });
+
+  it("n'empêche pas l'effacement quand la colonne manque (migration en échec)", async () => {
+    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(undefined);
+    const missing = Object.assign(new Error("Unknown column"), { code: "ER_BAD_FIELD_ERROR" });
+    const execute = jest.fn<SqlQuery>(async (sql) => {
+      if (sql.includes("recruitment_modal_off")) throw missing;
+      return [[], []];
+    });
+    await expect(anonymizeAccount(fakeConnection({ execute }), 42)).resolves.not.toThrow();
+  });
+});
+
 describe("langue du compte — défaut de la colonne", () => {
   // L'anonymisation et accountLocaleFromRow écrivent DEFAULT_LOCALE : la
   // colonne (base neuve et base existante) doit avoir le même défaut.

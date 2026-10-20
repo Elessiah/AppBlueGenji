@@ -142,6 +142,78 @@ describe("auth", () => {
     });
   });
 
+  describe("createSession — « Ne plus afficher » du recrutement", () => {
+    const setUp = async (cookie: string | undefined, execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []])) => {
+      const { getDatabase } = await import("@/lib/server/database");
+      const { cookies } = await import("next/headers");
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+      const get = jest.fn((name: string) => (name === "bg_recr_off" && cookie !== undefined ? { name, value: cookie } : undefined));
+      jest.mocked(cookies).mockResolvedValue(fakeCookieStore({ set: jest.fn(), get }));
+      return execute;
+    };
+    const carried = (execute: ReturnType<typeof jest.fn<SqlQuery>>) =>
+      execute.mock.calls.filter(([sql]) => String(sql).includes("recruitment_modal_off"));
+
+    it("reporte sur le compte le choix fait sur ce navigateur avant la connexion", async () => {
+      const execute = await setUp("1");
+      await createSession(5, "LOGIN_GOOGLE");
+      expect(carried(execute)).toEqual([
+        ["UPDATE bg_users SET recruitment_modal_off = 1 WHERE id = ? AND is_deleted = 0", [5]],
+      ]);
+    });
+
+    it("n'écrit rien sans le cookie, ou sur une valeur forgée", async () => {
+      const none = await setUp(undefined);
+      await createSession(5, "LOGIN_GOOGLE");
+      expect(carried(none)).toEqual([]);
+      const forged = await setUp("yes");
+      await createSession(5, "LOGIN_GOOGLE");
+      expect(carried(forged)).toEqual([]);
+    });
+
+    it("n'empêche jamais la connexion quand le report échoue", async () => {
+      const { recordConnection } = await import("@/lib/server/connection-logs");
+      const execute = jest.fn<SqlQuery>(async (sql) => {
+        if (sql.includes("recruitment_modal_off")) throw new Error("Unknown column");
+        return [{ affectedRows: 1 }, []];
+      });
+      await setUp("1", execute);
+      jest.spyOn(console, "error").mockImplementation(() => undefined);
+      await expect(createSession(5, "LOGIN_DISCORD")).resolves.toBeUndefined();
+      expect(recordConnection).toHaveBeenCalledWith(5, "LOGIN_DISCORD");
+    });
+  });
+
+  describe("getCurrentUser — « Ne plus afficher » du recrutement", () => {
+    it("lit le choix avec la session, dans la même requête", async () => {
+      const { getDatabase } = await import("@/lib/server/database");
+      const { cookies } = await import("next/headers");
+      jest.mocked(cookies).mockResolvedValue(fakeCookieStore({ get: jest.fn().mockReturnValue({ value: "tok" }) }));
+      const row = {
+        id: 3, pseudo: "P", avatar_url: null, discord_id: null, google_sub: null,
+        is_adult: 1, is_admin: 0, platform_roles_json: null, recruitment_modal_off: 1,
+      };
+      const execute = jest.fn<SqlQuery>().mockResolvedValue([[row], []]);
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+      const user = await getCurrentUser();
+
+      expect(user?.recruitmentModalOff).toBe(true);
+      expect(execute).toHaveBeenCalledTimes(1);
+      expect(String(execute.mock.calls[0][0])).toMatch(/u\.recruitment_modal_off/);
+    });
+
+    it("le tient pour non posé sur une ligne qui ne le porte pas", async () => {
+      const { getDatabase } = await import("@/lib/server/database");
+      const { cookies } = await import("next/headers");
+      jest.mocked(cookies).mockResolvedValue(fakeCookieStore({ get: jest.fn().mockReturnValue({ value: "tok" }) }));
+      const row = { id: 3, pseudo: "P", avatar_url: null, discord_id: null, google_sub: null, is_adult: 1, is_admin: 0, platform_roles_json: null };
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: jest.fn<SqlQuery>().mockResolvedValue([[row], []]) }));
+
+      expect((await getCurrentUser())?.recruitmentModalOff).toBe(false);
+    });
+  });
+
   describe("getCurrentUser", () => {
     it("returns null when no session cookie", async () => {
       const { getDatabase } = await import("@/lib/server/database");
