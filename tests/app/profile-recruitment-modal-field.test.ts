@@ -4,6 +4,8 @@ import {
   recruitmentModalShownHere,
   sendRecruitmentModalChoice,
 } from "@/app/(secured)/profil/_components/RecruitmentModalField";
+import { RECRUITMENT_MODAL_OFF_EVENT } from "@/lib/shared/recruitment";
+import { readSource } from "../helpers/read-source";
 
 /** « Mon profil » : réglage de la fenêtre d'arrivée du recrutement (`RecruitmentModalField`). */
 
@@ -64,5 +66,16 @@ describe("sendRecruitmentModalChoice", () => {
   it("réseau coupé : repli de sauvegarde", async () => {
     const down = jest.fn<Request>().mockRejectedValue(new TypeError("Failed to fetch"));
     expect(await sendRecruitmentModalChoice(true, down)).toBe("PROFILE_UPDATE_FAILED");
+  });
+});
+
+describe("modale ouverte sur « Mon profil »", () => {
+  it("le « Ne plus afficher » gardé émet l'événement que la case écoute (décochée sans rechargement)", () => {
+    const modal = readSource("components/recruitment-highlight.tsx");
+    expect(modal).toMatch(/window\.dispatchEvent\(new Event\(RECRUITMENT_MODAL_OFF_EVENT\)\)/);
+    const field = readSource("app/(secured)/profil/_components/RecruitmentModalField.tsx");
+    expect(field).toMatch(/addEventListener\(RECRUITMENT_MODAL_OFF_EVENT/);
+    expect(field).toMatch(/removeEventListener\(RECRUITMENT_MODAL_OFF_EVENT/);
+    expect(RECRUITMENT_MODAL_OFF_EVENT).toBe("bg:recruitment-modal-off");
   });
 });
