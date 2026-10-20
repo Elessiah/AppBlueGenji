@@ -66,6 +66,12 @@ interface PlayerScoreDialogProps {
   onSubmitted: () => void;
   /** Relit le contexte du lecteur (lecture REST) : une proposition a changé. */
   onRefresh: () => void | Promise<unknown>;
+  /**
+   * Le geste du lecteur peut trancher le match (envoi, forfait) : `true` dès
+   * l'envoi, et le reste sauf refus étranger à la clôture — la page ne dit
+   * alors pas « tranché sous tes yeux » par-dessus son propre toast.
+   */
+  onOwnSettle?: (settling: boolean) => void;
 }
 
 /** Empreinte des propositions en attente : ce que le flux peut changer sous la saisie. */
@@ -225,6 +231,7 @@ export function PlayerScoreDialog({
   onClose,
   onSubmitted,
   onRefresh,
+  onOwnSettle,
 }: Readonly<PlayerScoreDialogProps>) {
   const pageText = useTournamentPageText();
   const text = useDialogsText();
@@ -348,6 +355,7 @@ export function PlayerScoreDialog({
     const entered2 = check.score.team2;
     const body = toReporterScores(myTeamIsTeam1, entered1, entered2);
     setSubmitting(true);
+    onOwnSettle?.(true);
     try {
       const response = await fetch(
         `/api/tournaments/${tournamentId}/matches/${match.id}/report`,
@@ -377,6 +385,8 @@ export function PlayerScoreDialog({
       onClose();
     } catch (error) {
       const code = (error as Error).message;
+      // Déjà tranché : le refus le dit, l'avis de la page serait de trop.
+      onOwnSettle?.(code === "MATCH_ALREADY_COMPLETED");
       flagRefusal(code);
       showError(mapError(code));
       // Proposition changée ou expirée, ou litige ouvert entre-temps : la modale
@@ -391,6 +401,7 @@ export function PlayerScoreDialog({
   const submitForfeit = async () => {
     if (submitting) return;
     setSubmitting(true);
+    onOwnSettle?.(true);
     try {
       const response = await fetch(
         `/api/tournaments/${tournamentId}/matches/${match.id}/forfeit`,
@@ -403,6 +414,8 @@ export function PlayerScoreDialog({
       onClose();
     } catch (error) {
       const code = (error as Error).message;
+      // Déjà tranché : le refus le dit, l'avis de la page serait de trop.
+      onOwnSettle?.(code === "MATCH_ALREADY_COMPLETED");
       showError(mapError(code));
       if (REFRESH_ON_REFUSAL.has(code)) void Promise.resolve(onRefresh()).catch(() => undefined);
     } finally {
