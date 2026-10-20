@@ -127,7 +127,8 @@ remplace plus, à l'échéance, ce que l'arbitre a noté.
   maps, codes de replay), offre « Reprendre la proposition de X » / « Use X's
   proposal » (maps chargées dans le formulaire, `adoptReport`) et, tant que
   rien n'est suspendu, prévient que « Enregistrer » suspendra la validation
-  (`score.admin.saveWillPause`) ; le bouton de la carte reste « Valider le
+  (`score.admin.saveWillPause`, dit aussi sous une proposition pré-remplie
+  intacte ; détail des maps en lecture : `score.admin.awaitingDetail`) ; le bouton de la carte reste « Valider le
   score proposé ». L'alerte au staff nomme une ronde suisse, phase d'un
   `MULTI` comprise, par `swissRoundSql` ; l'avis « proposition
   modifiée » dit « « Enregistrer » note ta saisie et suspend la validation
