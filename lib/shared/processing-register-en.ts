@@ -284,7 +284,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "The association's administrators and referees",
       "Members of both teams of the same match and referees, from the moment both its opponents are known to its end, and its registered caster while the match is being played (from its start to its end); the caster's contacts to both teams and the referees while the match is being played",
       "Discord, which delivers the messages",
-      "The association's staff with access to the Discord log channel (refereeing schedule, processing activity T05)",
+      "The association's staff with access to the Discord log channel (refereeing schedule, actions of a staff member who plays in the match, processing activity T05)",
       "The push service of the browser of each subscribed recipient (player: match announcements and reminders; referee or administrator: refereeing schedule, dispute settled, result corrected, opponent's withdrawal imposed or automatic confirmation paused by a staff member who plays in the match; processing activity T12), which delivers an encrypted message it cannot read",
     ],
     transfers: [
@@ -310,7 +310,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Legitimate interest (administration and oversight of refereeing) with regard to the players and teams mentioned and to the staff member who carried out an action, named in the server logs; sending the refereeing schedule to referees and administrators falls under performance of the service (T04)",
     dataSubjects: ["Staff", "Players and teams taking part in a tournament (referred to by team name, never by their username)"],
     dataCategories: [
-      "On Discord: team names, scores, tournament names, match times and rounds — no player username (“a player”, including in solo tournaments) and no staff member named (“the staff”)",
+      "On Discord: team names, scores, tournament names, match times and rounds — no player username (“a player”, including in solo tournaments) and no staff member named (“the staff”; “a staff member who plays in this match”, with the tournament name only, for a dispute settled, a result corrected, a withdrawal imposed or an automatic confirmation paused by them)",
       "In the server logs: username and identifier of the staff member who carried out a refereeing action, with the action (match number; for a referee who plays in the match, also: tournament, round and, except for a pause, outcome and team names, none in a solo tournament)",
     ],
     sensitiveData: "None",

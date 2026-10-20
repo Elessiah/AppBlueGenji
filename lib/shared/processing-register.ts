@@ -461,7 +461,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Administrateurs et arbitres de l'association",
       "Membres des deux équipes d'un même match et arbitres, dès que ses deux adversaires sont connus et jusqu'à sa fin, et son caster inscrit le temps du match (de son départ à sa fin) ; contacts du caster aux deux équipes et aux arbitres le temps du match",
       "Discord, qui achemine les messages",
-      "Staff de l'association ayant accès au canal de logs Discord (programme d'arbitrage, traitement T05)",
+      "Staff de l'association ayant accès au canal de logs Discord (programme d'arbitrage, gestes d'un membre du staff qui joue le match, traitement T05)",
       "Service de push du navigateur de chaque destinataire abonné (joueur : annonces et rappels de match ; arbitre ou administrateur : programme d'arbitrage, litige tranché, résultat corrigé, abandon imposé à l'adversaire ou validation automatique suspendue par un membre du staff qui joue le match ; traitement T12), qui achemine un message chiffré qu'il ne peut pas lire",
     ],
     transfers: [
@@ -487,7 +487,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Intérêt légitime (administration et contrôle de l'arbitrage) à l'égard des joueurs et équipes cités et du membre du staff auteur d'un geste, nommé dans les journaux du serveur ; l'envoi du programme d'arbitrage aux arbitres et administrateurs relève de l'exécution du service (T04)",
     dataSubjects: ["Staff", "Joueurs et équipes engagés dans un tournoi (désignés par le nom d'équipe, jamais par leur pseudo)"],
     dataCategories: [
-      "Sur Discord : noms d'équipe, scores, noms des tournois, horaires et manches des matchs — aucun pseudo de joueur (« un joueur », y compris en tournoi individuel) et aucun membre du staff nommé (« le staff »)",
+      "Sur Discord : noms d'équipe, scores, noms des tournois, horaires et manches des matchs — aucun pseudo de joueur (« un joueur », y compris en tournoi individuel) et aucun membre du staff nommé (« le staff » ; « un membre du staff qui joue ce match », avec le seul nom du tournoi, pour un litige tranché, un résultat corrigé, un abandon imposé ou une validation automatique suspendue par lui)",
       "Dans les journaux du serveur : pseudo et identifiant du membre du staff auteur d'un geste d'arbitrage, avec le geste (numéro du match ; pour un arbitre qui joue le match, en plus : tournoi, manche et, sauf pour une suspension, issue et noms d'équipe, aucun en tournoi individuel)",
     ],
     sensitiveData: "Aucune",
