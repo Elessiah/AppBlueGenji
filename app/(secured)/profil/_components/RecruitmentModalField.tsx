@@ -51,6 +51,21 @@ export async function sendRecruitmentModalChoice(
   }
 }
 
+/**
+ * Issue d'un envoi : `ACCOUNT` enregistré sur le compte ; `BROWSER` décochée
+ * refusée par le serveur mais le cookie de ce navigateur posé quand même (la
+ * réponse le repose quelle que soit l'issue) — le choix tient ici, il ne faut
+ * pas dire « échec » ; `FAILED` sinon.
+ */
+export function recruitmentModalSaveOutcome(
+  error: string | null,
+  shown: boolean,
+  cookieOff: boolean,
+): "ACCOUNT" | "BROWSER" | "FAILED" {
+  if (error === null) return "ACCOUNT";
+  return !shown && cookieOff ? "BROWSER" : "FAILED";
+}
+
 /** Ce que montre la case : la fenêtre s'ouvre-t-elle **sur ce navigateur** ? */
 export function recruitmentModalShownHere(accountOff: boolean | undefined, cookieOff: boolean): boolean {
   return accountOff !== true && !cookieOff;
@@ -93,6 +108,7 @@ export function RecruitmentModalField({
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   const queued = useRef<boolean | null>(null);
+  const keptHereOnly = useRef(false);
   // La fiche arrive après le premier rendu, ou est relue : la case reprend
   // l'état lu tant que rien n'a été enregistré ici (comme `MatchDmField`).
   const [seen, setSeen] = useState(initialOff);
@@ -114,8 +130,10 @@ export function RecruitmentModalField({
 
   const put = async (next: boolean): Promise<boolean> => {
     const error = await sendRecruitmentModalChoice(next);
-    if (error === null) return true;
-    showError(profileErrorMessage(error, text));
+    const result = recruitmentModalSaveOutcome(error, next, browserOptedOut());
+    keptHereOnly.current = result === "BROWSER";
+    if (result !== "FAILED") return true;
+    showError(profileErrorMessage(error ?? "PROFILE_UPDATE_FAILED", text));
     return false;
   };
 
@@ -140,7 +158,10 @@ export function RecruitmentModalField({
       show: setShown,
     });
     if (outcome.stored) setChosenHere(true);
-    if (outcome.confirmed) showSuccess(t(outcome.saved ? "recruitmentModal.shown" : "recruitmentModal.hidden"));
+    if (outcome.confirmed) {
+      const hidden = keptHereOnly.current ? "recruitmentModal.hiddenBrowser" : "recruitmentModal.hidden";
+      showSuccess(t(outcome.saved ? "recruitmentModal.shown" : hidden));
+    }
     // Ce navigateur a le dernier mot sur la case : un `POST` refusé repose
     // quand même le cookie, et un « Ne plus afficher » de la modale arrivé
     // pendant l'envoi a pu le poser — cochée, elle mentirait.
