@@ -79,7 +79,10 @@ texte, effacée un jour après la fin de la soirée).
 - **Signalements** : l'auteur est « un joueur de l'équipe X » (« un joueur » en
   individuel) ; la requête ne lit même plus `bg_users`.
 - **Gestes du staff** (retrait d'un engagé, retour en arrière, suppression d'un
-  tournoi, création d'un tournoi) : « par le staff » sur Discord, et la même
+  tournoi, création d'un tournoi, litige tranché par un membre du staff qui
+  joue la manche — « ⚠️ Litige tranché par un membre du staff qui joue ce
+  match · « tournoi », manche : issue. », noms d'équipe seulement, « forfait
+  d'un joueur » ou score nu en individuel) : « par le staff » sur Discord, et la même
   ligne avec l'auteur sur la sortie standard, que pm2 range dans ses journaux —
   `publishStaffAction` (`lib/server/staff-audit.ts`) écrit l'audit **avant**
   l'envoi, qui reste au meilleur effort. Pour la modération :

@@ -428,6 +428,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Recueillir les « Prêt » de chaque partie d'un match (équipes, caster) avant son lancement, dans les seuls tournois qui ont la phase de lancement (option de chaque tournoi, éteinte par défaut)",
       "Envoyer en message privé Discord et en push l'annonce de l'horaire d'un match (posé, changé ou retiré), l'avis qu'un match quitte son programme et les rappels de match 24 h et 10 h avant le coup d'envoi (le second — ou l'annonce d'un match programmé moins de 10 h avant — avec le lien d'invitation au serveur Discord du check-in) ; les messages privés ne partent qu'aux comptes dont le tag Discord est certifié (un tag non certifié, même rattaché par la connexion Discord, n'en reçoit aucun, pour éviter le spam) ; le joueur peut couper ces messages privés depuis « Mon profil » (notifications), ses notifications push gardant leurs propres réglages",
       "Alerter le rôle arbitre (conflit de score, litige de score resté trop longtemps sans arbitrage, signalement d'un joueur)",
+      "Avertir en push les autres arbitres et administrateurs quand un membre du staff qui joue un match (membre d'une des deux équipes, ou joueur de l'entrée en tournoi individuel) en tranche lui-même le litige de score : tournoi, manche et issue retenue, avec les noms d'équipe (aucun en tournoi individuel), sans le pseudo de l'auteur ni d'aucun joueur",
       "Envoyer aux arbitres, environ 10 h à l'avance, le programme des matchs à venir (horaires, tournois, noms d'équipe ; « un joueur » en tournoi individuel) au canal de logs Discord et en push",
     ],
     legalBasis:
@@ -460,7 +461,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Membres des deux équipes d'un même match et arbitres, dès que ses deux adversaires sont connus et jusqu'à sa fin, et son caster inscrit le temps du match (de son départ à sa fin) ; contacts du caster aux deux équipes et aux arbitres le temps du match",
       "Discord, qui achemine les messages",
       "Staff de l'association ayant accès au canal de logs Discord (programme d'arbitrage, traitement T05)",
-      "Service de push du navigateur de chaque destinataire abonné (joueur : annonces et rappels de match ; arbitre ou administrateur : programme d'arbitrage ; traitement T12), qui achemine un message chiffré qu'il ne peut pas lire",
+      "Service de push du navigateur de chaque destinataire abonné (joueur : annonces et rappels de match ; arbitre ou administrateur : programme d'arbitrage, litige tranché par un membre du staff qui joue le match ; traitement T12), qui achemine un message chiffré qu'il ne peut pas lire",
     ],
     transfers: [
       `États-Unis : Discord (acheminement des messages privés et du canal de logs) — ${transferBasis(["DISCORD"])}`,
@@ -478,7 +479,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     purpose: "Tenir le staff informé des faits marquants de la plateforme",
     subPurposes: [
       "Arrivées de joueurs, inscriptions et abandons en tournoi, fins de match, clôtures",
-      "Traçabilité des gestes d'arbitrage (pénalités, retraits d'engagés, retours en arrière, horaires de match posés, changés ou retirés), pour la modération",
+      "Traçabilité des gestes d'arbitrage (pénalités, retraits d'engagés, retours en arrière, horaires de match posés, changés ou retirés, litige tranché par un membre du staff qui joue le match), pour la modération",
       "Programme d'arbitrage : environ 10 h à l'avance, les matchs à venir (horaires, tournois, noms d'équipe ; « un joueur » en tournoi individuel)",
     ],
     legalBasis:

@@ -251,6 +251,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Collecting the “Ready” of each party to a match (teams, caster) before it is launched, only in tournaments that have the launch phase (an option of each tournament, off by default)",
       "Sending by Discord direct message and by push the announcement of a match's time (set, changed or removed), the notice that a match leaves their schedule and match reminders 24 h and 10 h before kickoff (the latter — or the announcement of a match scheduled less than 10 h ahead — with the invite link to the check-in Discord server); direct messages only go to accounts with a certified Discord tag (an uncertified tag, even one linked by signing in with Discord, receives none, to avoid spam); the player can turn these direct messages off from “My profile” (notifications), their push notifications keeping their own settings",
       "Alerting the referee role (score conflict, score dispute left too long without a referee, report on a player)",
+      "Warning the other referees and administrators by push when a staff member who plays in a match (member of one of both teams, or the player of the entry in a solo tournament) settles its score dispute themselves: tournament, round and retained outcome, with the team names (none in a solo tournament), without the pseudo of the author or of any player",
       "Sending the referees, about 10 hours ahead, the schedule of upcoming matches (times, tournaments, team names; “a player” in a solo tournament) to the Discord log channel and by push",
     ],
     legalBasis:
@@ -283,7 +284,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Members of both teams of the same match and referees, from the moment both its opponents are known to its end, and its registered caster while the match is being played (from its start to its end); the caster's contacts to both teams and the referees while the match is being played",
       "Discord, which delivers the messages",
       "The association's staff with access to the Discord log channel (refereeing schedule, processing activity T05)",
-      "The push service of the browser of each subscribed recipient (player: match announcements and reminders; referee or administrator: refereeing schedule; processing activity T12), which delivers an encrypted message it cannot read",
+      "The push service of the browser of each subscribed recipient (player: match announcements and reminders; referee or administrator: refereeing schedule, dispute settled by a staff member who plays in the match; processing activity T12), which delivers an encrypted message it cannot read",
     ],
     transfers: [
       `United States: Discord (delivery of direct messages and of the log channel) — ${transferBasisEn(["DISCORD"])}`,
@@ -301,7 +302,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     purpose: "Keeping the staff informed of notable events on the platform",
     subPurposes: [
       "New players, tournament registrations and withdrawals, match results, closings",
-      "Traceability of refereeing actions (penalties, removal of participants, rollbacks, match times set, changed or removed), for moderation",
+      "Traceability of refereeing actions (penalties, removal of participants, rollbacks, match times set, changed or removed, dispute settled by a staff member who plays in the match), for moderation",
       "Refereeing schedule: about 10 hours ahead, the upcoming matches (times, tournaments, team names; “a player” in a solo tournament)",
     ],
     legalBasis:
