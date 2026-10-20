@@ -1430,6 +1430,23 @@ export async function forfeitTournamentTeamPublic(
   actingUserId: number | null = null,
   actor?: StaffActor,
 ): Promise<void> {
+  // Verrous tournoi puis manches, quand « Valider le résultat » prend la manche
+  // puis le tournoi (réconciliation) : un interblocage se rejoue
+  // (`retryOnDeadlock`) au lieu de renvoyer l'arbitre à son clic.
+  const settledDisputes = await retryOnDeadlock(() =>
+    forfeitTournamentTeamOnce(tournamentId, teamId, actingUserId, actor),
+  );
+  // Sans attendre (meilleur effort, ne lève jamais), une fois l'abandon acquis.
+  if (actor) for (const dispute of settledDisputes) void alertSelfResolvedDispute(dispute, actor);
+}
+
+/** Une tentative d'abandon ; rend les litiges qu'il a clos. */
+async function forfeitTournamentTeamOnce(
+  tournamentId: number,
+  teamId: number,
+  actingUserId: number | null,
+  actor: StaffActor | undefined,
+): Promise<DisputeBeforeResolution[]> {
   const db = await getDatabase();
   const connection = await db.getConnection();
   let settledDisputes: DisputeBeforeResolution[] = [];
@@ -1479,8 +1496,7 @@ export async function forfeitTournamentTeamPublic(
     discardBotLogs(connection);
     connection.release();
   }
-  // Sans attendre (meilleur effort, ne lève jamais), une fois l'abandon acquis.
-  if (actor) for (const dispute of settledDisputes) void alertSelfResolvedDispute(dispute, actor);
+  return settledDisputes;
 }
 
 /**

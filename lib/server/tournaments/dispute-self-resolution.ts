@@ -161,7 +161,10 @@ async function alertSelfAction(
         kind === "resolved" ? selfResolvedDisputePush(input, locale) : selfPausedValidationPush(input, locale),
     });
     return true;
-  } catch {
+  } catch (error) {
+    // Le geste est acquis mais n'a pu être ni annoncé ni journalisé : au moins
+    // une trace dans pm2, avec la manche et l'auteur (`[staff-audit]` n'est pas parti).
+    console.error(`[staff-audit] alerte d'arbitre qui joue non envoyée (${kind}) — match #${match.matchId}, auteur #${actor.id}`, error);
     return false;
   }
 }
