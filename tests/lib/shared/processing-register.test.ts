@@ -200,6 +200,10 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(t04.dataCategories.join(" ")).toMatch(/pour un abandon imposé, à la seule équipe adverse de l'équipe retirée/);
     expect(t04En.legalBasis).toMatch(/legitimate interest \(impartial refereeing\) with regard to the staff member who referees, whose membership of the match's teams is checked at each of these actions[^;]*they may object to it \(art. 21\)/);
     const t05 = byRef("T05").dataCategories.join(" ");
+    expect(t05).toMatch(/« un membre du staff qui joue ce match », avec le seul nom du tournoi/);
+    expect(PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T05")!.dataCategories.join(" ")).toMatch(/“a staff member who plays in this match”, with the tournament name only/);
+    expect(t04.recipients.join(" ")).toMatch(/canal de logs Discord \(programme d'arbitrage, gestes d'un membre du staff qui joue le match, traitement T05\)/);
+    expect(t04En.recipients.join(" ")).toMatch(/Discord log channel \(refereeing schedule, actions of a staff member who plays in the match, processing activity T05\)/);
     const t05En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T05")!.dataCategories.join(" ");
     expect(t05).toMatch(/pour un arbitre qui joue le match, en plus : tournoi, manche et, sauf pour une suspension, issue et noms d'équipe/);
     expect(byRef("T05").legalBasis).toMatch(/et du membre du staff auteur d'un geste, nommé dans les journaux du serveur/);
