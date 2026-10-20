@@ -123,6 +123,13 @@ d'office, exactement comme si l'autre l'avait confirmé.
   plateau, nettoyage des maps), réconciliation des modes à classement et
   annonce SSE par l'entretien existant (`./state.ts`, `contentChanged`). Le
   format de manche se lit une fois par ronde dans un balayage, pas par match.
+- **Reports en vol au déploiement** : un report seul déposé sous l'ancienne
+  règle (fin de série plausible + 10 min) aurait été validé dans les minutes
+  suivant le déploiement. Un rattrapage rejoué à chaque démarrage
+  (`RECENT_SCHEMA_CHANGES`, `recent-schema-changes.ts`) porte son échéance à la
+  saisie + 2 h ; sans effet ensuite, le nouveau code n'écrivant jamais d'échéance
+  plus proche (le seed des reports expirés date sa saisie de 2 h 10 pour ne pas
+  être rattrapé).
 - **Aucun processus nouveau** : l'entretien passif et les balayages existants
   (`findDueMaintenance`, `./sync-scope.ts`) repèrent déjà `score_deadline_at <= NOW()`.
   Un litige **déjà escaladé** n'y compte plus (`ACTIONABLE_EXPIRED_REPORT_SQL`,
@@ -139,7 +146,10 @@ d'office, exactement comme si l'autre l'avait confirmé.
   le même texte part aux deux camps — « personne ne l'a confirmé ni contesté
   avant l'échéance » — sans durée : sur un format long, l'échéance dépasse 2 h ;
   le sujet du profil et la modale avant toute saisie (`willConfirm`) disent « après au moins 2 h »). Le push « Score à confirmer »
-  prévient d'avance : « sans réponse, il sera validé automatiquement » (sans heure). Rien sur Discord de
+  prévient d'avance : « sans réponse, il sera validé automatiquement » (sans heure). L'avis porte le score écrit par la validation : il se tait si la manche, au
+  moment de partir, n'est plus close ou porte un autre résultat (arbitre qui a
+  retranché sur un autre score ou un forfait après un retour en arrière) — il
+  aurait attribué à la validation d'office une décision de l'arbitrage. Rien sur Discord de
   plus que la ligne `match_finished` habituelle.
 - **Écran** : sur la carte (lisible de tous), « validation automatique à HH:MM
   (heure de Paris) sans réponse » / « automatic confirmation at HH:MM (Paris
@@ -170,7 +180,9 @@ pas du report de score : inchangées.
 `player-score-report.test.ts` ; `tests/lib/server/score-report-stalled.test.ts`
 (UPDATE conditionnel, idempotence, course perdue), `tournaments-service.matches.test.ts`
 (verrou des deux équipes, confirmation refusée, propagation `resultWritten`),
-`player-forfeit.test.ts`, `auto-validated-notices.test.ts` ;
+`player-forfeit.test.ts`, `auto-validated-notices.test.ts`,
+`player-pushes.test.ts` (avis muet sur un résultat retranché),
+`auto-validate-deadline-migration.test.ts` (rattrapage des échéances) ;
 `tests/app/tournament-actions-i18n.test.tsx` (modale verrouillée et heure de Paris, FR + EN) ;
 `tests/app/api/tournaments/report-score.test.ts`, `match-forfeit.test.ts`,
 `tests/app/api/admin/dispute-resolution.test.ts` (arbitre et admin tranchent,
