@@ -486,7 +486,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "To know this, at each of these actions the site checks whether its author is a member of one of the two teams of the match, or left it since the match was launched, its first report or, failing these, its creation (or whether they are its player, in a solo tournament).",
       "The alert goes as a push notification to the other referees and administrators subscribed to push notifications (topic “Refereeing by a staff player”, on by default, which you can turn off in “My profile”), never to the author. It gives the tournament, the round and, except for a pause, the retained outcome with the team names (none in a solo tournament), without the username of the author or of any player.",
       "The staff activity log gives on Discord only the tournament and the kind of action, unnamed; the server logs also keep the round, the outcome and the team names (neither for a pause, no names in a solo tournament), and the username and account ID of its author.",
-      "Each of these four actions, whether or not its author plays in the match, also leaves a short trace in the server logs: the match number, and the username and account ID of its author.",
+      "Each of these four actions (any withdrawal imposed by the referees included, whichever team is withdrawn), whether or not its author plays in the match, also leaves a short trace in the server logs: the match number, and the username and account ID of its author.",
     ],
     linkLabels: ["Read the “Push notifications” section", "Read the “Exercising your rights” section"],
   },

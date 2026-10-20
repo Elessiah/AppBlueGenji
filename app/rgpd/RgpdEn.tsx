@@ -824,7 +824,12 @@ export function RgpdEn({
             interest (that is what lets it honour the choice); it appears in the
             export of your data. Referee alerts and the refereeing schedule sent to referees and administrators fall
             under <strong>performance of the service</strong> and are not turned off this way (
-            <LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>).
+            <LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>). When a staff member settles a
+            dispute, corrects a decided result, imposes a withdrawal or pauses an automatic confirmation, the site
+            checks whether they are a member of one of the match&apos;s teams and, if they play in it, warns their
+            colleagues: this check rests on the association&apos;s <strong>legitimate interest</strong> in impartial
+            refereeing, and this staff member may object to it (section{" "}
+            <a href="#exercer-vos-droits">“Exercising your rights”</a>).
           </p>
         </div>
       </section>
