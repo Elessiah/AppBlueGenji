@@ -28,9 +28,14 @@
     0 0 40px rgba(90, 200, 255, calc(0.12 * var(--glow, 1)));
 }
 
-/* Le focus d'ouverture est sur la fenêtre : un anneau discret le montre
-   (jamais `outline: none` seul — l'utilisateur au clavier ne saurait pas où il est). */
+/* Le focus d'ouverture est sur la fenêtre : un anneau discret le montre au
+   clavier (`:focus-visible`), jamais au clic — un clic sur le texte, ou sur un
+   bouton sous Safari, focalise aussi le conteneur. */
 .modal:focus {
+  outline: none;
+}
+
+.modal:focus-visible {
   outline: 2px solid var(--blue-500);
   outline-offset: -2px;
 }

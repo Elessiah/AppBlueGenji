@@ -72,7 +72,7 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
     expect(SOURCE).toContain("tabIndex={-1}");
     // Focus visible sur la fenêtre (pas d'`outline: none`).
     const css = readSource("components/discord/DiscordCertifyPrompt.module.css");
-    expect(css).toMatch(/\.modal:focus \{\s*outline: 2px solid var\(--blue-500\);/);
+    expect(css).toMatch(/\.modal:focus-visible \{\s*outline: 2px solid var\(--blue-500\);/);
     const hook = readSource("lib/shared/hooks/useDialogBehavior.ts");
     expect(hook).toContain('if (initialFocusRef.current === "container") containerRef.current?.focus({ preventScroll: true });');
     expect(SOURCE).toContain('<span aria-hidden="true"> →</span>');

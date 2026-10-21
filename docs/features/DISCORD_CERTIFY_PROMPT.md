@@ -108,7 +108,7 @@ dessous, dans l'ordre de tabulation). Le corps défilant garde un plancher (`min
 zoom, le tableau reste lisible au lieu de s'écraser sous les boutons, et la
 fenêtre (`.dialog-bounded`) défile alors en entier, boutons compris. Focus
 d'ouverture sur la fenêtre elle-même (`useDialogBehavior({ initialFocus:
-"container" })`, sans défilement, anneau discret visible), ouverte en haut :
+"container" })`, sans défilement, anneau discret au clavier — `:focus-visible`, pas au clic), ouverte en haut :
 son titre est annoncé et en vue, et Entrée n'y certifie ni ne ferme pour de
 bon ; `Maj+Tab` depuis la fenêtre reboucle sur son dernier bouton
 (`focusTrapTarget`, `onContainer`). Un `DISCORD_CERTIFIED_EVENT` après
