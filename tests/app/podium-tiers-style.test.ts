@@ -231,28 +231,23 @@ describe("marches du podium — outils du staff et comptes supprimés", () => {
 
 describe("marches du podium — pastille de l'équipe active (fiche joueur)", () => {
   // Fond de la pastille `.badge` (10 % de cyan) sur le fond le plus clair, sous
-  // le halo de l'en-tête (`.ds-header::before`, 8 % de bleu, côté du nom).
+  // le halo de l'en-tête (`.ds-header::before`, 8 % de bleu, côté du nom). Les
+  // marches, sous leur lueur, y tombent sous 4,5:1 : la pastille les éteint.
   const BADGE = blend(blend(SURFACE, [89, 212, 255], 0.08), [89, 212, 255], 0.1);
   const profile = readSource("app/(secured)/joueurs/[id]/page.tsx");
 
-  it.each([1, 2, 3])("la marche %i passerait sous 4,5:1 sur le fond de la pastille, sous sa lueur", (tier) => {
-    expect(css).toMatch(/\.badge \{[^}]*background: rgba\(89, 212, 255, 0\.1\);/);
-    expect(css).toMatch(/\.ds-header \{\s*--header-rgb: var\(--blue-rgb\);/);
+  it("le nom éteint, à la couleur de la pastille, tient 4,5:1 sur son fond", () => {
+    expect(css).toMatch(/\.badge \{[^}]*background: rgba\(89, 212, 255, 0\.1\);[^}]*color: var\(--accent-blue\);/);
     expect(css).toMatch(/\.ds-header::before \{[^}]*rgba\(var\(--header-rgb\), 0\.08\)/);
-    const body = rule(`.podium-tier-${tier}`);
-    const lowest = Math.min(
-      ...[.../background-image:([^;]*);/.exec(body)![1].matchAll(/var\((--[a-z0-9-]+)\)/g)].map(([, name]) =>
-        contrastRatio(hexOf(name)!, litSurface(body, BADGE)),
-      ),
-    );
-    expect(lowest).toBeLessThan(4.5);
+    expect(contrastRatio(hexOf("--accent-blue")!, BADGE)).toBeGreaterThanOrEqual(4.5);
   });
 
-  it("éteint donc la marche dans la pastille (repère conservé), le lien couvrant toute la pastille", () => {
-    const badge = /<span className="badge" data-podium-muted=""[^>]*>\s*<TeamLink\s+teamId=\{activeTeam\.teamId\}([^>]*)>/.exec(profile);
-    expect(badge).not.toBeNull();
-    expect(badge![0]).toMatch(/padding: 0/);
-    expect(badge![1]).toMatch(/padding: "var\(--badge-padding\)"/);
-    expect(css).toMatch(/\.badge \{[^}]*--badge-padding: [^;]+;[^}]*padding: var\(--badge-padding\);/);
+  it("éteint la marche dans la pastille (repère conservé), le lien couvrant toute la pastille", () => {
+    expect(profile).toMatch(/<span className="badge badge-link" data-podium-muted=""[^>]*>\s*<TeamLink\s+teamId=\{activeTeam\.teamId\}/);
+    expect(css).toMatch(/\.badge\.badge-link \{\s*padding: 0;\s*border: 0;/);
+    const relay = /\.badge-link > \* \{([^}]*)\}/.exec(css)?.[1];
+    expect(relay).toMatch(/padding: var\(--badge-padding\);/);
+    expect(relay).toMatch(/border: var\(--badge-border\);/);
+    expect(css).toMatch(/\.badge \{[^}]*padding: var\(--badge-padding\);[^}]*border: var\(--badge-border\);/);
   });
 });

@@ -31,10 +31,29 @@ const TIER_LINKS = new Map([
 ]);
 const PAINT = /(?:^|;)\s*background(?:-image|-clip)?\s*:/;
 
+/** Découpe une liste de sélecteurs aux virgules de premier niveau (pas dans `:is(.a, .b)`). */
+function splitSelectors(list: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = "";
+  for (const char of list) {
+    if (char === "(") depth += 1;
+    if (char === ")") depth -= 1;
+    if (char === "," && depth === 0) {
+      parts.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  return [...parts, current];
+}
+
 /**
  * Classes d'une règle qui pose un fond sur l'élément qu'elle vise : toute
  * classe du dernier sélecteur composé (`.badge`, `.badge:hover`,
- * `.pill.pill-blue`, `.row .chip`). Commentaires et at-rules sans bloc
+ * `.pill.pill-blue`, `.row .chip`), hors pseudo-classes fonctionnelles
+ * (`:not(.ghost)` ne peint pas `.ghost`). Commentaires et at-rules sans bloc
  * (`@import …;`) sont retirés avant la lecture ; les règles propres à la
  * marche (`.entity-link.podium-tier:hover`…) sont écartées.
  */
@@ -43,8 +62,11 @@ function surfaceClasses(css: string): Set<string> {
   const cleaned = css.replaceAll(/\/\*[\s\S]*?\*\//g, "").replaceAll(/@[^;{}]*;/g, "");
   for (const [, selectors, body] of cleaned.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
     if (!PAINT.test(body)) continue;
-    for (const selector of selectors.split(",")) {
-      const target = selector.trim().split(/\s*[\s>+~]\s*/).at(-1) ?? "";
+    for (const selector of splitSelectors(selectors)) {
+      let bare = selector.trim();
+      // Pseudo-classes fonctionnelles, imbriquées comprises : retirées de l'intérieur vers l'extérieur.
+      while (/:[\w-]+\([^()]*\)/.test(bare)) bare = bare.replaceAll(/:[\w-]+\([^()]*\)/g, "");
+      const target = bare.split(/\s*[\s>+~]\s*/).at(-1) ?? "";
       // Les règles de la marche elle-même (survol, ligne en retrait) ne sont pas des surfaces.
       if (target.includes(".podium-")) continue;
       for (const [, name] of target.matchAll(/\.([\w-]+)/g)) surfaces.add(name);
@@ -53,13 +75,18 @@ function surfaceClasses(css: string): Set<string> {
   return surfaces;
 }
 
-const GLOBAL_SURFACES = surfaceClasses(readFileSync(join(ROOT, "app", "globals.css"), "utf8"));
-
-function sources(dir: string): string[] {
+function sources(dir: string, keep: (name: string) => boolean): string[] {
   return readdirSync(join(ROOT, dir), { withFileTypes: true, recursive: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".tsx"))
+    .filter((entry) => entry.isFile() && keep(entry.name))
     .map((entry) => join(entry.parentPath, entry.name));
 }
+
+/** Feuilles globales (tout `.css` hors module) de `app/` et `components/`. */
+const GLOBAL_SHEETS = ["app", "components"].flatMap((dir) =>
+  sources(dir, (name) => name.endsWith(".css") && !name.endsWith(".module.css")),
+);
+const GLOBAL_SURFACES = new Set(GLOBAL_SHEETS.flatMap((path) => [...surfaceClasses(readFileSync(path, "utf8"))]));
+const tsx = (name: string) => name.endsWith(".tsx");
 
 /** Modules CSS importés (`import styles from "./x.module.css"`) : identifiant → classes peintes. */
 function moduleSurfaces(file: ts.SourceFile, path: string | undefined): Map<string, Set<string>> {
@@ -78,26 +105,32 @@ function moduleSurfaces(file: ts.SourceFile, path: string | undefined): Map<stri
 }
 
 /** Classes nommées par une expression de classe : littéraux, gabarits, appels (`cn(...)`), `styles.x`. */
-function classesOf(node: ts.Node, modules: Map<string, Set<string>>): string[] {
-  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text.split(/\s+/);
-  if (ts.isTemplateExpression(node)) {
-    return [node.head.text, ...node.templateSpans.map((span) => span.literal.text)]
-      .flatMap((text) => text.split(/\s+/))
-      .concat(node.templateSpans.flatMap((span) => classesOf(span.expression, modules)));
+interface Named {
+  /** Classes globales écrites en toutes lettres. */
+  global: string[];
+  /** Classes de module CSS qui posent un fond (`styles.x`). */
+  painted: string[];
+}
+
+function classesOf(node: ts.Node, modules: Map<string, Set<string>>, named: Named = { global: [], painted: [] }): Named {
+  const moduleClass = (holder: ts.Expression, name: string) => {
+    if (ts.isIdentifier(holder) && modules.get(holder.text)?.has(name)) named.painted.push(`${holder.text}.${name}`);
+  };
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+    named.global.push(...node.text.split(/\s+/));
+  } else if (ts.isTemplateExpression(node)) {
+    for (const text of [node.head.text, ...node.templateSpans.map((span) => span.literal.text)]) named.global.push(...text.split(/\s+/));
+    for (const span of node.templateSpans) classesOf(span.expression, modules, named);
+  } else if (ts.isPropertyAccessExpression(node)) {
+    moduleClass(node.expression, node.name.text);
+  } else if (ts.isElementAccessExpression(node) && ts.isStringLiteral(node.argumentExpression)) {
+    moduleClass(node.expression, node.argumentExpression.text);
+  } else {
+    ts.forEachChild(node, (child) => {
+      classesOf(child, modules, named);
+    });
   }
-  if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression)) {
-    const painted = modules.get(node.expression.text);
-    return painted?.has(node.name.text) ? [`${node.expression.text}.${node.name.text}`] : [];
-  }
-  if (ts.isElementAccessExpression(node) && ts.isIdentifier(node.expression) && ts.isStringLiteral(node.argumentExpression)) {
-    const painted = modules.get(node.expression.text);
-    return painted?.has(node.argumentExpression.text) ? [`${node.expression.text}.${node.argumentExpression.text}`] : [];
-  }
-  const nested: string[] = [];
-  ts.forEachChild(node, (child) => {
-    nested.push(...classesOf(child, modules));
-  });
-  return nested;
+  return named;
 }
 
 /** Liens d'entité dont la classe porte une surface peinte. */
@@ -120,9 +153,8 @@ function paintedLinks(code: string, path?: string): string[] {
     if (opening && paintedAttribute && !tierless) {
       for (const attribute of opening.attributes.properties) {
         if (!ts.isJsxAttribute(attribute) || attribute.name.getText(file) !== paintedAttribute || !attribute.initializer) continue;
-        const painted = classesOf(attribute.initializer, modules).filter(
-          (name) => name.includes(".") || GLOBAL_SURFACES.has(name),
-        );
+        const named = classesOf(attribute.initializer, modules);
+        const painted = [...named.global.filter((name) => GLOBAL_SURFACES.has(name)), ...named.painted];
         if (painted.length > 0) offenders.push(`<${opening.tagName.getText(file)}> ${painted.join(" ")}`);
       }
     }
@@ -160,6 +192,22 @@ describe("lien d'entité et marche du podium", () => {
     expect([...surfaces].sort((a, b) => a.localeCompare(b))).toEqual(["cell", "chip", "on", "tag"]);
   });
 
+  it("ignore les classes des pseudo-classes fonctionnelles et ne coupe pas `:is(.a, .b)`", () => {
+    const surfaces = surfaceClasses(`.btn:not(.ghost) { background: red; }\n.card:is(.a, .b), .chip { background: red; }`);
+    expect([...surfaces].sort((a, b) => a.localeCompare(b))).toEqual(["btn", "card", "chip"]);
+  });
+
+  it("lit toutes les feuilles globales, pas seulement globals.css", () => {
+    expect(GLOBAL_SHEETS.map((path) => relative(ROOT, path).replaceAll("\\", "/")).sort((a, b) => a.localeCompare(b))).toEqual(
+      expect.arrayContaining(["app/bot/bot.css", "app/bot/docs/docs.css", "app/globals.css"]),
+    );
+  });
+
+  it("ne prend pas pour une classe de module une chaîne qui contient un point", () => {
+    expect(paintedLinks(`<TeamLink teamId={1} className={cn("x", t("a.b"))} />`)).toEqual([]);
+    expect(paintedLinks(`<TeamLink teamId={1} className="v1.2" />`)).toEqual([]);
+  });
+
   it("résout les classes d'un module CSS importé", () => {
     const path = join(ROOT, "app", "(secured)", "tournois", "[id]", "_components", "EntrantName.tsx");
     const code = (className: string) => `import styles from "./EntrantName.module.css";\n<TeamLink teamId={1} className={${className}} />`;
@@ -178,7 +226,7 @@ describe("lien d'entité et marche du podium", () => {
   });
 
   it("aucun écran ne pose une surface sur le lien lui-même (classes globales et modules)", () => {
-    const offenders = [...sources("app"), ...sources("components")].flatMap((path) =>
+    const offenders = [...sources("app", tsx), ...sources("components", tsx)].flatMap((path) =>
       paintedLinks(readFileSync(path, "utf8"), path).map((tag) => `${relative(ROOT, path)}: ${tag}`),
     );
     expect(offenders).toEqual([]);
