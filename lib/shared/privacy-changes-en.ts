@@ -491,6 +491,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     linkLabels: ["Read the “Push notifications” section", "Read the “Exercising your rights” section"],
   },
   "2026-10-contacts-du-caster-aux-arbitres": {
+    linkLabels: ["Read the “Match contacts” section"],
     title: "Caster contacts: visible to referees before the match",
     summary:
       "If you cast a match, referees and administrators see your contacts as soon as both its opponents are known, no longer only while the match is being played; both its teams still only see them while the match is being played.",
@@ -499,7 +500,6 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "Nothing changes for players: their contacts stay visible to referees as soon as both opponents are known, and to the caster only while the match is being played.",
       "As before, this reading is based on the performance of the service — running the tournament. The terms of use (“Match contacts” section) say so, with no new version to accept.",
     ],
-    linkLabels: ["Read the “Match contacts” section"],
   },
 };
 
