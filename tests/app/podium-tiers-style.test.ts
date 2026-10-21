@@ -130,7 +130,7 @@ describe("marches du podium — accessibilité et impression", () => {
     // Le texte transparent est celui du `<span>` intérieur : le trait, tracé par
     // le lien, prend la couleur du lien — aucune couleur de trait à imposer.
     expect(rule(".podium-tier,\n.podium-member")).not.toMatch(/text-decoration/);
-    expect(readSource("components/entity-link.tsx")).toContain("<span className={podiumClass}>{children}</span>");
+    expect(readSource("components/entity-link.tsx")).toContain("<PodiumPaint className={podiumClass}>{children}</PodiumPaint>");
   });
 
   it("rogne un nom tronqué sur le nom peint, pas sur le lien (lueur entière, ellipse en dégradé)", () => {
@@ -267,32 +267,43 @@ function activeTeamLink(): { attributes: Record<string, string> } {
 }
 
 describe("marches du podium — pastille de l'équipe active (fiche joueur)", () => {
-  // Fond de la pastille `.badge` (10 % de cyan) sur le fond le plus clair, sous
-  // le halo de l'en-tête (`.ds-header::before`, 8 % de bleu, côté du nom). Les
-  // marches, sous leur lueur, y tombent sous 4,5:1 : la pastille les éteint.
-  const BADGE = blend(blend(SURFACE, [89, 212, 255], 0.08), [89, 212, 255], 0.1);
+  // Fond de la pastille `.badge` sur le fond le plus clair, sous le halo de
+  // l'en-tête (`.ds-header::before`, côté du nom) — lus dans la feuille. Les
+  // marches, sous leur lueur, y tombent sous 4,5:1 : le lien les éteint.
+  const badge = /\n\.badge \{([^}]*)\}/.exec(css)![1];
+  const [, badgeRgb, badgeAlpha] = /background: rgba\((\d+, \d+, \d+), ([\d.]+)\);/.exec(badge)!;
+  const header = /\n\.ds-header \{\s*--header-rgb: var\((--[a-z0-9-]+)\);/.exec(css)![1];
+  const headerAlpha = /\n\.ds-header::before \{[^}]*rgba\(var\(--header-rgb\), ([\d.]+)\)/.exec(css)![1];
+  const BADGE = blend(
+    blend(SURFACE, rgbOf(header), Number(headerAlpha)),
+    badgeRgb.split(", ").map(Number) as [number, number, number],
+    Number(badgeAlpha),
+  );
 
   it("le nom éteint, à la couleur de la pastille, tient 4,5:1 sur son fond", () => {
-    expect(css).toMatch(/\.badge \{[^}]*background: rgba\(89, 212, 255, 0\.1\);[^}]*color: var\(--accent-blue\);/);
-    expect(css).toMatch(/\.ds-header::before \{[^}]*rgba\(var\(--header-rgb\), 0\.08\)/);
-    expect(contrastRatio(hexOf("--accent-blue")!, BADGE)).toBeGreaterThanOrEqual(4.5);
+    const color = /color: var\((--[a-z0-9-]+)\);/.exec(badge)![1];
+    expect(contrastRatio(hexOf(color)!, BADGE)).toBeGreaterThanOrEqual(4.5);
   });
 
-  it("éteint la marche de tout lien en pastille, la pastille restant le lien entier", () => {
-    const muted = /((?:[^{}]*,\s*)?)\[data-podium-muted\] \.podium-member \{([^}]*)\}/.exec(block);
-    expect(muted).not.toBeNull();
-    for (const surface of ["badge", "pill", "cy-tag"]) {
-      expect(muted![1]).toContain(`.${surface} > .podium-tier,`);
-      expect(muted![1]).toContain(`.${surface} > .podium-member,`);
-    }
-    expect(muted![2]).toContain("color: inherit");
-    expect(activeTeamLink().attributes.className).toBe('"badge"');
+  it("éteint la marche du lien en pastille, la pastille restant le lien entier", () => {
+    const { attributes } = activeTeamLink();
+    expect(attributes.className).toBe('"badge"');
+    expect(attributes.podiumMuted).toBe("true");
   });
 
   it("donne au nom éteint la couleur de la pastille, et non celle héritée par `.entity-link`", () => {
     // Même spécificité : la pastille l'emporte parce qu'elle vient après.
     expect(css.indexOf("\n.badge {")).toBeGreaterThan(css.indexOf("\n.entity-link {"));
-    expect(css.indexOf("\n.pill {")).toBeGreaterThan(css.indexOf("\n.entity-link {"));
-    expect(css.indexOf("\n.cy-tag {")).toBeGreaterThan(css.indexOf("\n.entity-link {"));
+  });
+});
+
+describe("marches du podium — graisse d'un lien d'entité", () => {
+  it("pose la graisse sur le lien à spécificité d'une classe, le nom peint en hérite", () => {
+    expect(block).toMatch(
+      /\n:where\(\.entity-link, \.entity-name\):where\(:not\(\[data-podium-muted\], \[data-podium-muted\] \*\)\):has\(> \.podium-tier\) \{\s*font-weight: 700;\s*\}/,
+    );
+    expect(block).toMatch(/\n:where\(\.entity-link, \.entity-name\) > \.podium-tier \{\s*font-weight: inherit;\s*\}/);
+    // Après `.podium-tier { font-weight: 700 }`, à spécificité égale : l'héritage l'emporte.
+    expect(block.indexOf(":where(.entity-link, .entity-name) > .podium-tier")).toBeGreaterThan(block.indexOf("\n.podium-tier {"));
   });
 });

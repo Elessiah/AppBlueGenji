@@ -78,6 +78,12 @@ describe("marche peinte dans le lien, jamais sur le lien", () => {
     );
   });
 
+  it("éteint la marche d'un lien en pastille teintée (`podiumMuted`), repère conservé", () => {
+    expect(render(<TeamLink teamId={10} className="badge" podiumMuted>Alpha</TeamLink>)).toBe(
+      '<a class="entity-link badge" data-podium-muted="" href="/equipes/10"><span class="podium-tier podium-tier-1">Alpha</span></a>',
+    );
+  });
+
   it("n'ajoute aucun élément hors podium", () => {
     expect(render(<TeamLink teamId={40} className="badge">Delta</TeamLink>)).toBe(
       '<a class="entity-link badge" href="/equipes/40">Delta</a>',
