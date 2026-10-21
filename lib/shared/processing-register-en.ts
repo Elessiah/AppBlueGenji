@@ -140,7 +140,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     dataSubjects: ["Players registered on the site"],
     dataCategories: [
       "Site username (since September 30, 2026, never taken from the name of the Google account: neutral username at creation; an earlier Google account may have received that name), avatar (copied to our servers; since the same date, hidden by default when it comes from the login provider)",
-      "Overwatch (BattleTag), Marvel Rivals and Discord usernames; certification of the Discord username",
+      "Overwatch (BattleTag), Marvel Rivals and Discord usernames; certification of the Discord username; whether the BattleTag comes from a linked Battle.net account (player page badge, shown even when the BattleTag is hidden)",
       "Declared adulthood (yes / no / not specified)",
       "Visibility settings, availability for recruitment, roles on the platform",
       "Account language (French or English), reset to French on anonymization",

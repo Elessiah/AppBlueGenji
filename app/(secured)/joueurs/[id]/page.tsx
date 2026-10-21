@@ -2,7 +2,7 @@
 
 import { TeamLink } from "@/components/entity-link";
 import { PlayerPodiumName } from "@/components/podium-tiers";
-import { DiscordTag } from "@/components/discord-tag";
+import { DiscordTag, VerifiedBadge } from "@/components/discord-tag";
 import { useParams } from "next/navigation";
 import { useEffect } from "react";
 import { UserX } from "lucide-react";
@@ -228,12 +228,22 @@ export default function PlayerDetailPage() {
           <div className="form-grid">
             <div className="field">
               <label htmlFor="player-battletag">{t("page.battletag")}</label>
-              <input
-                id="player-battletag"
-                value={data.profile.overwatchBattletag || t("page.hidden")}
-                readOnly
-                aria-describedby={battletagHint ? "player-battletag-hint" : undefined}
-              />
+              {/* La pastille ne suit pas le tag : « Masqué ✅ » dit qu'un
+                  BattleTag est prouvé par Battle.net sans dire lequel. */}
+              <div className={styles.taggedInput}>
+                <input
+                  id="player-battletag"
+                  className={styles.taggedInputField}
+                  value={data.profile.overwatchBattletag || t("page.hidden")}
+                  readOnly
+                  aria-describedby={battletagHint ? "player-battletag-hint" : undefined}
+                />
+                {data.profile.battletagVerified ? (
+                  <VerifiedBadge
+                    labels={{ alt: t("page.battletagVerifiedAlt"), title: t("page.battletagVerifiedTitle") }}
+                  />
+                ) : null}
+              </div>
               {/*
                 Un BattleTag masqué qui s'affiche quand même doit le dire : sans
                 cette phrase, le lecteur à qui un match l'ouvre le croirait public,

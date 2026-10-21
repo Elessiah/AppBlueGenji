@@ -49,7 +49,7 @@ import {
 } from "@/lib/shared/legal-contact";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
-export const REGISTER_UPDATED_AT = "2026-10-20";
+export const REGISTER_UPDATED_AT = "2026-10-21";
 
 /**
  * Durées appliquées par le serveur, et déclarées ici : `lib/server/auth.ts` et
@@ -317,7 +317,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     dataSubjects: ["Joueurs inscrits sur le site"],
     dataCategories: [
       "Pseudo du site (depuis le 30 septembre 2026, jamais tiré du nom du compte Google : pseudo neutre à la création ; un compte Google antérieur a pu recevoir ce nom), avatar (copié sur nos serveurs ; depuis la même date, masqué par défaut quand il vient du fournisseur de connexion)",
-      "Pseudos Overwatch (BattleTag), Marvel Rivals et Discord ; certification du pseudo Discord",
+      "Pseudos Overwatch (BattleTag), Marvel Rivals et Discord ; certification du pseudo Discord ; indication d'un BattleTag tiré d'un compte Battle.net rattaché (pastille de la fiche, montrée même BattleTag masqué)",
       "Majorité déclarée (oui / non / non renseignée)",
       "Réglages de visibilité, disponibilité pour le recrutement, rôles sur la plateforme",
       "Langue du compte (français ou anglais), remise au français à l'anonymisation",

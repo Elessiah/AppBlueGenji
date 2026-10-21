@@ -919,6 +919,22 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       { href: "/rgpd#exercer-vos-droits", label: "Lire la section « Exercer vos droits »" },
     ],
   },
+  // PROFILE-BATTLETAG-BADGE : donnée nouvellement montrée (registre T01) — la
+  // fiche d'un joueur montre à tout lecteur connecté si son BattleTag vient
+  // d'un compte Battle.net rattaché, BattleTag masqué compris (comme la
+  // pastille du tag Discord certifié). Le BattleTag masqué reste caché.
+  {
+    id: "2026-10-pastille-battletag-fiche",
+    title: "Fiche joueur : pastille « BattleTag vérifié »",
+    publishedAt: "2026-10-21",
+    summary:
+      "Si ton BattleTag vient d'un compte Battle.net rattaché, ta fiche joueur affiche une pastille « BattleTag vérifié » à tout joueur connecté qui la consulte — y compris quand ton BattleTag est masqué : la fiche dit alors « Masqué » avec la pastille, sans jamais montrer le BattleTag.",
+    details: [
+      "La pastille dit seulement que ton BattleTag a été prouvé par Battle.net, comme celle du tag Discord certifié dit que ton tag a été prouvé : elle ne nomme ni ton BattleTag ni ton compte Battle.net, dont l'identifiant ne quitte jamais nos serveurs.",
+      "Elle disparaît si tu détaches ton compte Battle.net dans « Mon profil » (Applications connectées). Aucune donnée nouvelle n'est collectée.",
+    ],
+    links: [{ href: "/rgpd#donnees-collectees", label: "Lire la section « Données collectées »" }],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

@@ -490,6 +490,16 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     ],
     linkLabels: ["Read the “Push notifications” section", "Read the “Exercising your rights” section"],
   },
+  "2026-10-pastille-battletag-fiche": {
+    title: "Player page: “Verified BattleTag” badge",
+    summary:
+      "If your BattleTag comes from a linked Battle.net account, your player page shows a “Verified BattleTag” badge to any logged-in player who opens it — including when your BattleTag is hidden: the page then says “Hidden” with the badge, never showing the BattleTag.",
+    details: [
+      "The badge only says that your BattleTag was proven by Battle.net, just as the certified Discord tag badge says your tag was proven: it names neither your BattleTag nor your Battle.net account, whose identifier never leaves our servers.",
+      "It disappears if you unlink your Battle.net account in “My profile” (Connected apps). No new data is collected.",
+    ],
+    linkLabels: ["Read the “Data collected” section"],
+  },
 };
 
 /**
