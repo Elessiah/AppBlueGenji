@@ -106,7 +106,8 @@ const PROFIL_TEXT_EN: readonly (readonly [donnee: string, finalite: string])[] =
   [
     "Recruitment “Don't show again” choice",
     "No by default: the window of urgent recruitment announcements opens on its own. “Don't show again” in that window: it no longer opens on its own on your other devices (a choice made on this browser before logging in, or not saved right away, is carried over to the account at login or on your next visit while logged in). Can be undone in My profile: the account then records that the window was turned back on and the bg_recr_off cookie of that browser is deleted; from then on, no cookie is carried over to the account any more (a new “Don't show again” made while logged in, or the My profile box, puts it back). Included in the export of your data, reset to the default if the account is anonymized",
-  ],  [
+  ],
+  [
     "Discord verification “Don't show again” choice",
     "No by default: after logging in with Discord or Blizzard, a window suggests once that you verify your Discord tag if it isn't verified (the login session only records that it still needs to be suggested, a mark erased with the session). “Don't show again”: it no longer opens, on any device (date of the choice kept); verification remains possible in My profile. Included in the export of your data, erased if the account is anonymized",
   ],
