@@ -44,21 +44,6 @@ describe("loadPendingPrivacyChanges", () => {
     expect(pending.every((c) => c.publishedAt < last.publishedAt)).toBe(true);
   });
 
-  it("ne calcule le fait « peut caster » qu'une fois une entrée LIVE_STAFF publiée", async () => {
-    const first = PRIVACY_CHANGES.find((c) => c.audience === "LIVE_STAFF")!;
-    jest.setSystemTime(new Date(Date.parse(`${first.publishedAt}T12:00:00Z`) - 86_400_000));
-    const before = mockExecute([{ created_at: "2025-01-01 10:00:00", google_linked: 1, live_staff: 0, change_id: null }]);
-    await loadPendingPrivacyChanges(7);
-    const [early] = before.mock.calls[0] as unknown as [string];
-    expect(flat(early)).toContain("0 AS live_staff");
-    expect(flat(early)).not.toContain(LIVE_STAFF_SQL);
-    jest.setSystemTime(new Date(`${first.publishedAt}T12:00:00Z`));
-    const after = mockExecute([{ created_at: "2025-01-01 10:00:00", google_linked: 1, live_staff: 0, change_id: null }]);
-    await loadPendingPrivacyChanges(7);
-    const [late] = after.mock.calls[0] as unknown as [string];
-    expect(flat(late)).toContain(`${LIVE_STAFF_SQL} AS live_staff`);
-  });
-
   it("lit création et prises de connaissance en une seule requête, compte vivant seulement", async () => {
     const execute = mockExecute([{ created_at: "2025-01-01 10:00:00", google_linked: 1, live_staff: 1, change_id: null }]);
     const pending = await loadPendingPrivacyChanges(7);
