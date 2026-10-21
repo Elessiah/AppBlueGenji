@@ -83,7 +83,8 @@
     "notShown": "Contacts not shown.",
     "noCaster": "No caster signed up for this match.",
     "casterLater": "Their contacts will show once the match starts.",
-    "unavailable": "Contacts unavailable: they open once both opponents are known, until the match ends — between the teams and the caster, when the match starts.",
+    "casterShown": "The caster's contacts are now shown.",
+    "unavailable": "This match's contacts aren't available to you right now.",
     "failed": "Contacts could not be loaded. Try again in a moment."
   }
 }

@@ -337,12 +337,6 @@
   outline-offset: 2px;
 }
 
-/* Contacts ou note du caster (région aria-live) : vide (le caster sur sa
-   propre fiche avant le départ), elle ne creuse pas l'écart de la colonne. */
-.casterLive:empty {
-  display: none;
-}
-
 .casterIds {
   display: flex;
   flex-direction: column;

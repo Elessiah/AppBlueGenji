@@ -12,6 +12,7 @@ import { PlayerLink, TeamLink } from "@/components/entity-link";
 import { useLaunchText } from "./launch-text";
 import {
   casterContactsPending,
+  viewerIsCaster,
   type LaunchCaster,
   type LaunchContact,
   type LaunchSide,
@@ -231,19 +232,21 @@ export function CasterCard({
         </span>
         <ReadyChip ready={caster.ready} phase={phase} />
       </div>
-      {/* Région polie : à la relecture de l'heure de départ, la note cède la
-          place aux contacts — un lecteur d'écran l'apprend sans chercher. */}
-      <div className={styles.casterLive} aria-live="polite">
-        {caster.contactsShown && (
-          <div className={styles.casterIds}>
-            <IdentityLine kind="Discord" value={caster.discordTag} verified={caster.discordTag !== null} onCopy={onCopy} />
-            <IdentityLine kind="BattleTag" value={caster.battletag} verified={caster.battletagVerified} onCopy={onCopy} />
-          </div>
-        )}
-        {/* Contacts tus : une note plutôt que deux « — » qui laisseraient croire
-            qu'il n'en a pas — jamais au caster lui-même, dont elle parle. */}
-        {casterContactsPending({ caster, viewer }) && <p className={styles.note}>{t("contacts.casterLater")}</p>}
-      </div>
+      {caster.contactsShown && (
+        <div className={styles.casterIds}>
+          <IdentityLine kind="Discord" value={caster.discordTag} verified={caster.discordTag !== null} onCopy={onCopy} />
+          <IdentityLine kind="BattleTag" value={caster.battletag} verified={caster.battletagVerified} onCopy={onCopy} />
+        </div>
+      )}
+      {/* Contacts tus : une note plutôt que deux « — » qui laisseraient croire
+          qu'il n'en a pas — jamais au caster lui-même, dont elle parle. */}
+      {casterContactsPending({ caster, viewer }) && <p className={styles.note}>{t("contacts.casterLater")}</p>}
+      {/* Statut toujours présent, hors flux : quand la relecture de l'heure de
+          départ remplace la note par les contacts, une phrase courte l'annonce
+          (pas les boutons « Copier »). Vide tant que la note est là. */}
+      <output className="sr-only" aria-live="polite">
+        {caster.contactsShown && !viewerIsCaster({ viewer }) ? t("contacts.casterShown") : ""}
+      </output>
     </section>
   );
 }

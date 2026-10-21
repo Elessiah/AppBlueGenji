@@ -1359,10 +1359,13 @@ describe("PRIVACY_CHANGES — contacts du caster aux arbitres (CASTER-CONTACTS-R
     expect(fr).toMatch(/les arbitres et les administrateurs voient tes contacts dès que ses deux adversaires sont connus/);
     expect(fr).toMatch(/ses deux équipes ne les voient toujours que le temps du match/);
     expect(fr).toMatch(/sans nouvelle version à accepter/);
+    // Les administrateurs voyaient déjà le tag Discord certifié : seul le BattleTag change pour eux.
+    expect(fr).toMatch(/pour eux, seul ton BattleTag est concerné/);
     const en = [english.title, english.summary, ...english.details].join(" ");
     expect(en).toMatch(/referees and administrators see your contacts as soon as both its opponents are known/);
     expect(en).toMatch(/both its teams still only see them while the match is being played/);
     expect(en).toMatch(/with no new version to accept/);
+    expect(en).toMatch(/for them, only your BattleTag is affected/);
     expect(english.details).toHaveLength(entry.details.length);
     expect(english.linkLabels).toHaveLength(entry.links?.length ?? 0);
   });

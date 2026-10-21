@@ -281,8 +281,8 @@ describe("fiches de contact — noms cliquables", () => {
       for (const phase of ["TO_PLAN", "SCHEDULED"] as const) {
         const html = render(phase, TEAM_VIEWER);
         expect(html).toContain(NOTE);
-        // Région polie : la relecture au départ remplace la note, et le dit.
-        expect(html).toMatch(/aria-live="polite"[^>]*><p[^>]*>Ses contacts/);
+        // Statut présent mais vide : rien à annoncer tant que la note est là.
+        expect(html).toContain('<output class="sr-only" aria-live="polite"></output>');
         expect(html).not.toContain("BattleTag");
       }
     });
@@ -291,6 +291,8 @@ describe("fiches de contact — noms cliquables", () => {
       for (const phase of ["LOBBY", "LAUNCHED"] as const) {
         const html = render(phase, { role: "TEAM2", isCaster: false });
         expect(html).toContain("BattleTag");
+        // La relecture au départ remplace la note : une phrase courte l'annonce.
+        expect(html).toContain('aria-live="polite">Les contacts du caster sont maintenant affichés.</output>');
         expect(html).not.toContain("afficheront");
       }
     });
