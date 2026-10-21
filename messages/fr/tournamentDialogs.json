@@ -382,12 +382,12 @@
         "topic": "Tes matchs",
         "does": "Tu peux être présenté comme contact de ton équipe à l'adversaire, au caster et aux arbitres de vos matchs, avec ton tag Discord certifié ou ton BattleTag vérifié.",
         "doesDiscordOnly": "Tu peux être présenté comme contact de ton équipe à l'adversaire, au caster et aux arbitres de vos matchs, avec ton tag Discord certifié.",
-        "doesNot": "Ne publie pas ton tag sur ta fiche : les autres joueurs n'y voient qu'une pastille de certification, et ton tag y reste soumis à tes réglages de visibilité. Présenté comme contact d'un match, ton BattleTag y est montré même masqué, comme pour tout contact.",
+        "doesNot": "Ne publie pas ton tag sur ta fiche : les autres joueurs n'y voient qu'une pastille de certification, et ton tag y reste soumis à tes réglages de visibilité. Présenté comme contact d'un match, ton BattleTag est montré au lancement du match même masqué, comme pour tout contact.",
         "doesNotDiscordOnly": "Ne publie pas ton tag sur ta fiche : les autres joueurs n'y voient qu'une pastille de certification, et ton tag y reste soumis à tes réglages de visibilité."
       },
       "staff": {
         "topic": "L'organisation",
-        "does": "Les admins, et les arbitres tant que tu joues un tournoi en cours, peuvent te joindre en cas de souci.",
+        "does": "Les admins peuvent te joindre en cas de souci, et les arbitres aussi tant que tu es engagé dans un tournoi en cours ou à venir.",
         "doesNot": "Ne publie rien en ton nom et ne change pas ton pseudo sur le site."
       },
       "later": {

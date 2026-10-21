@@ -382,12 +382,12 @@
         "topic": "Your matches",
         "does": "You can be shown as your team's contact to the opponent, the caster and the referees of your matches, with your verified Discord tag or your verified BattleTag.",
         "doesDiscordOnly": "You can be shown as your team's contact to the opponent, the caster and the referees of your matches, with your verified Discord tag.",
-        "doesNot": "Does not publish your tag on your profile: other players only see a verification badge there, and your tag there still follows your visibility settings. Shown as a match contact, your BattleTag appears there even if hidden, as for any contact.",
+        "doesNot": "Does not publish your tag on your profile: other players only see a verification badge there, and your tag there still follows your visibility settings. Shown as a match contact, your BattleTag appears at match launch even if hidden, as for any contact.",
         "doesNotDiscordOnly": "Does not publish your tag on your profile: other players only see a verification badge there, and your tag there still follows your visibility settings."
       },
       "staff": {
         "topic": "The organisers",
-        "does": "Admins, and referees while you play an ongoing tournament, can reach you if something goes wrong.",
+        "does": "Admins can reach you if something goes wrong, and so can referees while you are entered in an ongoing or upcoming tournament.",
         "doesNot": "Posts nothing on your behalf and does not change your username on the site."
       },
       "later": {
