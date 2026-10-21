@@ -84,6 +84,12 @@ describe("marche peinte dans le lien, jamais sur le lien", () => {
     );
   });
 
+  it("un compte supprimé (`podiumTier={null}`) ne peint rien, même éteint", () => {
+    expect(render(<TeamLink teamId={10} className="badge" podiumTier={null} podiumMuted>Alpha</TeamLink>)).toBe(
+      '<a class="entity-link badge" data-podium-muted="" href="/equipes/10">Alpha</a>',
+    );
+  });
+
   it("n'ajoute aucun élément hors podium", () => {
     expect(render(<TeamLink teamId={40} className="badge">Delta</TeamLink>)).toBe(
       '<a class="entity-link badge" href="/equipes/40">Delta</a>',

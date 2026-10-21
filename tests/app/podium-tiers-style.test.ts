@@ -133,11 +133,16 @@ describe("marches du podium — accessibilité et impression", () => {
     expect(readSource("components/entity-link.tsx")).toContain("<PodiumPaint className={podiumClass}>{children}</PodiumPaint>");
   });
 
-  it("rogne un nom tronqué sur le nom peint, pas sur le lien (lueur entière, ellipse en dégradé)", () => {
-    const module = readSource("app/(secured)/tournois/[id]/_components/EntrantName.module.css");
-    expect(module).toMatch(/\.truncate:has\(> :global\(\.podium-tier\), > :global\(\.podium-member\)\) \{\s*overflow: visible;\s*\}/);
+  it.each([
+    ["app/(secured)/tournois/[id]/_components/EntrantName.module.css", "truncate"],
+    ["app/(secured)/equipes/[id]/team.module.css", "playerName"],
+  ])("rogne un nom tronqué sur le nom peint, pas sur le lien (%s)", (path, name) => {
+    const module = readSource(path);
+    expect(module).toContain(`.${name}:has(> :global(.podium-tier), > :global(.podium-member)) {\n  overflow: visible;\n}`);
     expect(module).toMatch(
-      /\.truncate > :global\(\.podium-tier\),\s*\.truncate > :global\(\.podium-member\) \{\s*display: block;\s*overflow: hidden;\s*text-overflow: ellipsis;\s*\}/,
+      new RegExp(
+        String.raw`\.${name} > :global\(\.podium-tier\),\s*\.${name} > :global\(\.podium-member\) \{\s*display: block;\s*overflow: hidden;\s*text-overflow: ellipsis;\s*\}`,
+      ),
     );
   });
 
@@ -298,11 +303,12 @@ describe("marches du podium — pastille de l'équipe active (fiche joueur)", ()
 });
 
 describe("marches du podium — graisse d'un lien d'entité", () => {
-  it("pose la graisse sur le lien à spécificité d'une classe, le nom peint en hérite", () => {
-    expect(block).toMatch(
-      /\n:where\(\.entity-link, \.entity-name\):where\(:not\(\[data-podium-muted\], \[data-podium-muted\] \*\)\):has\(> \.podium-tier\) \{\s*font-weight: 700;\s*\}/,
+  it("pose la graisse sur le lien à spécificité d'une classe, le nom peint en hérite (navigateurs à `:has()`)", () => {
+    const supported = /@supports selector\(:has\(\*\)\) \{([\s\S]*?)\n\}/.exec(block)![1];
+    expect(supported).toMatch(
+      /:where\(\.entity-link, \.entity-name\):where\(:not\(\[data-podium-muted\], \[data-podium-muted\] \*\)\):has\(> \.podium-tier\) \{\s*font-weight: 700;\s*\}/,
     );
-    expect(block).toMatch(/\n:where\(\.entity-link, \.entity-name\) > \.podium-tier \{\s*font-weight: inherit;\s*\}/);
+    expect(supported).toMatch(/:where\(\.entity-link, \.entity-name\) > \.podium-tier \{\s*font-weight: inherit;\s*\}/);
     // Après `.podium-tier { font-weight: 700 }`, à spécificité égale : l'héritage l'emporte.
     expect(block.indexOf(":where(.entity-link, .entity-name) > .podium-tier")).toBeGreaterThan(block.indexOf("\n.podium-tier {"));
   });
