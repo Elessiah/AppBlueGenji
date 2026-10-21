@@ -306,11 +306,11 @@ describe("auth", () => {
       const inserts = sessionInserts(execute);
       expect(inserts).toHaveLength(2);
       expect(String(inserts[1][0])).not.toContain("certify_prompt_due");
-      // Retenu pour le processus : la connexion suivante ne repaie pas l'essai.
+      // Non retenu : la connexion suivante retente (colonne peut-être ajoutée entre-temps).
       await expect(createSession(4, "LOGIN_DISCORD")).resolves.toBeUndefined();
       const after = sessionInserts(execute);
-      expect(after).toHaveLength(3);
-      expect(String(after[2][0])).not.toContain("certify_prompt_due");
+      expect(after).toHaveLength(4);
+      expect(String(after[2][0])).toContain("certify_prompt_due");
     });
 
     it("toute autre erreur d'écriture remonte (pas de session ouverte en silence)", async () => {

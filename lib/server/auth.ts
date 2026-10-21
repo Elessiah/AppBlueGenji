@@ -156,9 +156,10 @@ async function insertSession(tokenHash: string, userId: number, certifyPromptDue
        VALUES (?, ?, DATE_ADD(NOW(), INTERVAL ? DAY))`,
       [tokenHash, userId, SESSION_TTL_DAYS],
     );
-  // Colonnes absentes (`ALTER` échoué) : retenu pour le processus, aucune
-  // connexion ne repaie l'essai voué à l'échec.
-  if (!certifyPromptDue || CERTIFY_INSERT_UNAVAILABLE.value) {
+  // Pas de mémoire de l'échec : une colonne ajoutée ensuite (autre processus
+  // sur la même base) doit reprendre effet sans redémarrage — l'essai raté ne
+  // coûte qu'un aller-retour, à la connexion seulement.
+  if (!certifyPromptDue) {
     await plain();
     return;
   }
@@ -176,13 +177,9 @@ async function insertSession(tokenHash: string, userId: number, certifyPromptDue
     );
   } catch (error) {
     if (!isUnknownColumnError(error)) throw error;
-    CERTIFY_INSERT_UNAVAILABLE.value = true;
     await plain();
   }
 }
-
-/** L'écriture de session avec la marque est tombée sur une colonne absente, pour ce processus. */
-const CERTIFY_INSERT_UNAVAILABLE = { value: false };
 
 /**
  * « Ne plus afficher » choisi sur ce navigateur avant la connexion : reporté
@@ -388,7 +385,6 @@ const UNKNOWN_COLUMN_SQL = new Set<string>();
 /** Tests : oublie les lectures mémorisées comme en échec. */
 export function resetUnknownColumnMemoForTests(): void {
   UNKNOWN_COLUMN_SQL.clear();
-  CERTIFY_INSERT_UNAVAILABLE.value = false;
 }
 
 async function getDevBypassUser(): Promise<AuthUser | null> {
