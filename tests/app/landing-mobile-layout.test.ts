@@ -118,7 +118,7 @@ describe("partenaires", () => {
 describe("classement", () => {
   it("borne le nom de l'équipe à deux lignes — le lien, dernier enfant de la cellule", () => {
     // Même règle pour le nom peint d'une marche du podium (`PODIUM_TIERS.md`).
-    const name = blockFor(/\.team > :last-child,\s*\.team > \[data-podium\]:last-child > :global\(\.podium-tier\)\s*\{/, leaderboard);
+    const name = blockFor(/\.team > :last-child,\s*\.team > \[data-podium="podium-tier"\]:last-child > :global\(\.podium-tier\)\s*\{/, leaderboard);
     expect(name).toMatch(/min-width:\s*0\s*;/);
     expect(name).toMatch(/-webkit-line-clamp:\s*2\s*;/);
     expect(name).toMatch(/overflow:\s*hidden\s*;/);

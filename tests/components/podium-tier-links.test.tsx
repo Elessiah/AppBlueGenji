@@ -78,12 +78,6 @@ describe("marche peinte dans le lien, jamais sur le lien", () => {
     );
   });
 
-  it("éteint la marche d'un lien en pastille teintée (`podiumMuted`), repère conservé", () => {
-    expect(render(<TeamLink teamId={10} className="badge" podiumMuted>Alpha</TeamLink>)).toBe(
-      '<a class="entity-link badge" data-podium="podium-tier" data-podium-muted="" href="/equipes/10"><span class="podium-tier podium-tier-1">Alpha</span></a>',
-    );
-  });
-
   it("tronque par `truncate` (`.entity-truncate`), repère de la marche posé pour la feuille", () => {
     expect(render(<TeamLink teamId={10} truncate>Alpha</TeamLink>)).toBe(
       '<a class="entity-link entity-truncate" data-podium="podium-tier" href="/equipes/10"><span class="podium-tier podium-tier-1">Alpha</span></a>',
@@ -100,9 +94,9 @@ describe("marche peinte dans le lien, jamais sur le lien", () => {
     expect(render(<EntityLink href="/x" podium={{ tier: 1, kind: "member" }}>N</EntityLink>)).toContain('data-podium="podium-member"');
   });
 
-  it("un compte supprimé (`podiumTier={null}`) ne peint rien, même éteint", () => {
-    expect(render(<TeamLink teamId={10} className="badge" podiumTier={null} podiumMuted>Alpha</TeamLink>)).toBe(
-      '<a class="entity-link badge" data-podium-muted="" href="/equipes/10">Alpha</a>',
+  it("un compte supprimé (`podiumTier={null}`) ne peint rien dans sa pastille", () => {
+    expect(render(<TeamLink teamId={10} className="badge" podiumTier={null}>Alpha</TeamLink>)).toBe(
+      '<a class="entity-link badge" href="/equipes/10">Alpha</a>',
     );
   });
 

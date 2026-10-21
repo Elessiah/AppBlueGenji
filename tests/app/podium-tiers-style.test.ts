@@ -146,8 +146,8 @@ describe("marches du podium — accessibilité et impression", () => {
 
   it("coupe à deux lignes le nom peint, pas le lien, au classement de l'accueil", () => {
     const leaderboard = readSource("components/cyber/landing/Leaderboard.module.css");
-    expect(leaderboard).toMatch(/\.team > :last-child,\s*\.team > \[data-podium\]:last-child > :global\(\.podium-tier\) \{[^}]*overflow: hidden;[^}]*-webkit-line-clamp: 2;/);
-    expect(leaderboard).toMatch(/\.team > \[data-podium\]:last-child \{\s*display: block;\s*overflow: visible;\s*-webkit-line-clamp: none;\s*line-clamp: none;\s*\}/);
+    expect(leaderboard).toMatch(/\.team > :last-child,\s*\.team > \[data-podium="podium-tier"\]:last-child > :global\(\.podium-tier\) \{[^}]*overflow: hidden;[^}]*-webkit-line-clamp: 2;/);
+    expect(leaderboard).toMatch(/\.team > \[data-podium="podium-tier"\]:last-child \{\s*display: block;\s*overflow: visible;\s*-webkit-line-clamp: none;\s*line-clamp: none;\s*\}/);
   });
 
   it("ne tronque jamais un lien d'entité par une classe de l'appelant", () => {
@@ -324,8 +324,11 @@ describe("marches du podium — pastille de l'équipe active (fiche joueur)", ()
     expect(muted[1]).toContain(":is(.badge, .pill, .cy-tag) > .podium-tier,");
     expect(muted[1]).toContain(":is(.badge, .pill, .cy-tag) > .podium-member,");
     expect(muted[2]).toContain("color: inherit");
-    // Aucune graisse imposée à une pastille : elle garde la sienne.
-    expect(block).toContain(":where(:not([data-podium-muted], [data-podium-muted] *, .badge, .pill, .cy-tag))");
+    // Aucune graisse imposée à une pastille : elle garde la sienne. Les deux
+    // listes de surfaces (extinction, graisse) restent identiques.
+    const mutedSurfaces = /:is\(([^)]*)\) > \.podium-tier,/.exec(muted[1])![1];
+    const weightSurfaces = /:where\(:not\(\[data-podium-muted\], \[data-podium-muted\] \*, ([^)]*)\)\)\[data-podium="podium-tier"\]/.exec(block)![1];
+    expect(weightSurfaces).toBe(mutedSurfaces);
   });
 
   it("donne au nom éteint la couleur de la pastille, et non celle héritée par `.entity-link`", () => {
