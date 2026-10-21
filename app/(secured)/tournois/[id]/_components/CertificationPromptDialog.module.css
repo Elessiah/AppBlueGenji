@@ -47,7 +47,9 @@
 
 .row {
   display: grid;
-  grid-template-columns: 22% 1fr 1fr;
+  /* Le sujet ne descend jamais sous son plus long mot (« L’organisation ») :
+     une piste fixe le laisserait déborder sur la colonne voisine. */
+  grid-template-columns: minmax(min-content, 22%) 1fr 1fr;
 }
 
 .row > * {

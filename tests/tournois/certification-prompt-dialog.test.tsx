@@ -74,14 +74,22 @@ afterAll(() => {
 });
 
 describe("CertificationPromptDialog", () => {
-  it("Overwatch, Discord certifié : titre, deux pastilles, lien vers « Applications connectées »", () => {
+  it("Overwatch, Discord certifié : titre sur le BattleTag seul, deux pastilles, lien vers « Applications connectées »", () => {
     const html = render(OW_MANAGER);
-    expect(html).toContain("Certifie ton Discord et ton BattleTag");
+    expect(html).toContain("Certifie ton BattleTag<");
+    expect(html).not.toContain("Certifie ton Discord");
     expect(html).toContain("Certifie ce qui te manque encore.");
     expect(html).toContain("pill-success");
     expect(html).toContain("pill-warning");
     expect(html).toContain('href="/profil#connexions"');
     expect(html).toContain("Ne plus voir");
+  });
+
+  it("le titre ne demande que ce qui manque", () => {
+    const none = { ...OW_MANAGER, discordVerified: false };
+    expect(render(none)).toContain("Certifie ton Discord et ton BattleTag<");
+    expect(render({ ...none, battletagVerified: true })).toContain("Certifie ton Discord<");
+    expect(render(none, "en")).toContain("Verify your Discord and your BattleTag<");
   });
 
   it("cède sa place à une modale urgente (`yields` sur le cadre)", () => {
@@ -130,7 +138,7 @@ describe("CertificationPromptDialog", () => {
 
   it("en anglais, ni français ni lien sans préfixe de langue", () => {
     const html = render(OW_MANAGER, "en");
-    expect(html).toContain("Verify your Discord and your BattleTag");
+    expect(html).toContain("Verify your BattleTag<");
     expect(html).toContain("Don&#x27;t show again");
     expect(html).toContain('href="/en/profil#connexions"');
     expect(html).not.toContain("Certifie");

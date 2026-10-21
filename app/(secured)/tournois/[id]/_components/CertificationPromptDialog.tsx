@@ -72,6 +72,12 @@ function CertificationPromptDialogView({
     if (!withBattletag && cell in DISCORD_ONLY_CELLS) return t(DISCORD_ONLY_CELLS[cell as DiscordOnlyCell]);
     return t(`certification.rows.${row}.${column}`);
   };
+  // Le titre ne demande que ce qui manque : Discord déjà certifié, il ne parle
+  // plus que du BattleTag, et inversement.
+  let title = t("certification.titleDiscordOnly");
+  if (withBattletag && !prompt.battletagVerified) {
+    title = t(prompt.discordVerified ? "certification.titleBattletagOnly" : "certification.title");
+  }
   let lead = t("certification.leadManager");
   if (prompt.reason === "TEAM_WITHOUT_CONTACT") {
     lead = t(withBattletag ? "certification.leadTeam" : "certification.leadTeamDiscordOnly");
@@ -93,7 +99,7 @@ function CertificationPromptDialogView({
       onClose={onClose}
     >
       <h3 id="certification-prompt-title" className={s.title}>
-        {t(withBattletag ? "certification.title" : "certification.titleDiscordOnly")}
+        {title}
       </h3>
       <p id="certification-prompt-lead" className={s.lead}>
         {lead}

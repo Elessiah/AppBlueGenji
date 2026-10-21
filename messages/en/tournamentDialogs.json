@@ -359,6 +359,7 @@
   "certification": {
     "title": "Verify your Discord and your BattleTag",
     "titleDiscordOnly": "Verify your Discord",
+    "titleBattletagOnly": "Verify your BattleTag",
     "leadManager": "You lead a team entered in this tournament: when a match launches, you are among those the opponent, the caster and the referees will try to reach. Verify what you are still missing.",
     "leadTeam": "Your team has no contact to show when its matches launch: nobody on it has verified their Discord tag or their BattleTag. The opponent and the referees have no way to reach you.",
     "leadTeamDiscordOnly": "Your team has no contact to show when its matches launch: nobody on it has verified their Discord tag. The opponent and the referees have no way to reach you.",

@@ -69,6 +69,7 @@ Une équipe a un contact dès qu'un membre a l'un ou l'autre ; en **Marvel
 Rivals**, un Discord certifié seulement (`teamHasContact(members,
 battletagRelevant)`) : un BattleTag n'y sert pas à joindre l'équipe.
 
+Son titre ne nomme que ce qui manque (Discord, BattleTag, ou les deux).
 La modale dit pourquoi elle s'ouvre, où en est le lecteur (pastilles
 « Certifié » / « À certifier »), puis un **tableau « Ce que ça fait / Ce que ça
 ne fait pas »** — chaque promesse a sa limite en face, sur la même ligne
