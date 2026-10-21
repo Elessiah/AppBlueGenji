@@ -113,10 +113,14 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
     };
     const onTermsAccepted = () => setTermsAccepted(true);
     const onTermsRequired = () => setTermsAccepted(false);
+    // Certifié ailleurs (dialogue de `/profil`) : plus rien à proposer.
+    const onCertified = () => setClosed(true);
+    window.addEventListener(DISCORD_CERTIFIED_EVENT, onCertified);
     window.addEventListener(PRIVACY_CHANGES_ANSWERED_EVENT, onPrivacy);
     window.addEventListener(TERMS_ACCEPTED_EVENT, onTermsAccepted);
     window.addEventListener(TERMS_REQUIRED_EVENT, onTermsRequired);
     return () => {
+      window.removeEventListener(DISCORD_CERTIFIED_EVENT, onCertified);
       window.removeEventListener(PRIVACY_CHANGES_ANSWERED_EVENT, onPrivacy);
       window.removeEventListener(TERMS_ACCEPTED_EVENT, onTermsAccepted);
       window.removeEventListener(TERMS_REQUIRED_EVENT, onTermsRequired);
@@ -133,17 +137,35 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
       pathname,
     });
 
-  /** « Plus tard » : fermée tout de suite ; un échec d'écriture la fera seulement revenir au prochain chargement. */
-  const postpone = () => {
-    if (inFlight.current) return;
+  /**
+   * Close pour la session (`LATER`, avec `keepalive`) : fermée tout de suite ;
+   * un échec d'écriture la fera seulement revenir au prochain chargement.
+   */
+  const closeForSession = () => {
     setClosed(true);
     answerPrompt("LATER").catch(() => undefined);
+  };
+
+  /** « Plus tard », Échap, voile. */
+  const postpone = () => {
+    if (inFlight.current) return;
+    closeForSession();
   };
 
   const dialogRef = useDialogBehavior({ open, onClose: postpone, locked: busy !== null });
   const backdrop = useBackdropDismiss(postpone, busy !== null);
 
   if (!open || !prompt) return null;
+
+  /** Refus sans issue (compte supprimé, session close) : fermée, toast, page relue. `false` sinon. */
+  const closeOnDeadEnd = (code: string): boolean => {
+    const deadEnd = deadEndText(code);
+    if (!deadEnd) return false;
+    setClosed(true);
+    showError(t(deadEnd));
+    router.refresh();
+    return true;
+  };
 
   const neverShow = async () => {
     if (inFlight.current) return;
@@ -154,14 +176,7 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
       setClosed(true);
       showSuccess(t("certifyPrompt.neverSaved"));
     } catch (error) {
-      const deadEnd = deadEndText((error as Error).message);
-      if (deadEnd) {
-        setClosed(true);
-        showError(t(deadEnd));
-        router.refresh();
-      } else {
-        showError(t("certifyPrompt.neverFailed"));
-      }
+      if (!closeOnDeadEnd((error as Error).message)) showError(t("certifyPrompt.neverFailed"));
     } finally {
       inFlight.current = false;
       setBusy(null);
@@ -173,8 +188,7 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
     if (prompt.mode === "DIALOG") {
       // Le dialogue de `/profil` fait la suite (code ou passage par Discord) :
       // la proposition est close pour la session, rien n'est certifié ici.
-      setClosed(true);
-      answerPrompt("LATER").catch(() => undefined);
+      closeForSession();
       if (pathname === "/profil") window.dispatchEvent(new Event(CERTIFY_DIALOG_EVENT));
       else router.push(CERTIFY_PROFILE_HREF);
       return;
@@ -194,22 +208,16 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
       if (payload.status !== "VERIFIED") throw new Error("DISCORD_TAG_CHANGED");
       // La proposition est close pour la session : une sauvegarde de tag plus
       // tard (non certifié) ne la ferait pas revenir au rafraîchissement.
-      setClosed(true);
-      answerPrompt("LATER").catch(() => undefined);
+      closeForSession();
       showSuccess(t("certifyPrompt.certified"));
       window.dispatchEvent(new Event(DISCORD_CERTIFIED_EVENT));
       router.refresh();
     } catch (error) {
       const code = (error as Error).message;
-      const deadEnd = deadEndText(code);
-      if (deadEnd) {
-        setClosed(true);
-        showError(t(deadEnd));
-        router.refresh();
-      } else if (STATE_CHANGED.has(code)) {
+      if (closeOnDeadEnd(code)) return;
+      if (STATE_CHANGED.has(code)) {
         // Le tag montré n'est plus le bon : la fenêtre n'a plus rien à offrir.
-        setClosed(true);
-        answerPrompt("LATER").catch(() => undefined);
+        closeForSession();
         showError(t("certifyPrompt.certifyChanged"));
       } else {
         showError(t("certifyPrompt.certifyFailed"));

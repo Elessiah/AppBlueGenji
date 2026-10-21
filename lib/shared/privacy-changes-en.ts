@@ -505,7 +505,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     title: "Discord tag verification suggested at login",
     linkLabels: ["Read the “Data collected” section"],
     summary:
-      "After logging in with Discord or with Blizzard (Battle.net), a window suggests, once, that you verify your Discord tag if it isn't verified yet, with a table of what verification changes. Logging in still verifies nothing: only your click on “Verify my tag” does.",
+      "After logging in with Discord or with Blizzard (Battle.net), a window suggests, once, that you verify your Discord tag if it isn't verified yet (or add one, if you have none), with a table of what verification changes. Logging in still verifies nothing: only your explicit confirmation does.",
     details: [
       "“Later” (or closing the window) keeps nothing on your account: your login session only records that the window no longer needs to be suggested, and this mark goes with the session. The window comes back at your next login with Discord or Blizzard.",
       "“Don't show again” is kept on your account, with its date: the window no longer opens, on any device. This choice lasts as long as the account, is included in the export of your data and is erased if the account is anonymized. Verification remains possible at any time in “My profile”.",

@@ -64,8 +64,11 @@ export async function loadDiscordCertifyPrompt(userId: number, tokenHash: string
       pseudoFromDiscord: Number(row.discord_pseudo_from_discord ?? 0) === 1,
     });
   } catch (error) {
-    if (isUnknownColumnError(error)) return null;
-    throw error;
+    if (!isUnknownColumnError(error)) throw error;
+    // Colonne du compte absente : lever la marque (colonne de session, elle,
+    // présente puisque lue) évite une lecture vouée à l'échec à chaque page.
+    await markDiscordCertifyPromptSeen(userId, tokenHash).catch(() => undefined);
+    return null;
   }
 }
 

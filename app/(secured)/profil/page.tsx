@@ -43,6 +43,7 @@ import { MatchDmField } from "./_components/MatchDmField";
 import { RecruitmentModalField } from "./_components/RecruitmentModalField";
 import { DiscordVerificationDialog } from "./DiscordVerificationDialog";
 import { useCertifyRequest } from "./useCertifyRequest";
+import { DISCORD_CERTIFIED_EVENT } from "@/lib/shared/discord-certify-prompt";
 import { ConnectedAppsSection } from "./ConnectedAppsSection";
 import { PushNotificationsPanel } from "@/components/notifications/PushNotificationsPanel";
 import { BattletagVisibilityNotice } from "./BattletagVisibilityNotice";
@@ -710,6 +711,9 @@ export default function ProfilePage() {
             // empêcher.
             setSavedDiscordPseudo(tag);
             setDiscordState((prev) => ({ ...prev, tag, verified: true, linked: true, attested: true }));
+            // Une fenêtre de proposition encore en attente (conditions à
+            // accepter) ne doit plus s'ouvrir pour un tag désormais certifié.
+            window.dispatchEvent(new Event(DISCORD_CERTIFIED_EVENT));
           }}
         />
       )}

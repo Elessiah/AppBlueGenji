@@ -28,14 +28,6 @@ export const LOGIN_PATH = "/connexion";
 export const TERMS_POSTPONED_COOKIE = "bg_terms_later";
 
 /**
- * Pages où la fenêtre bloquante des conditions laisse passer, depuis la
- * version 6 (2026-10-19) : qui refuse les conditions doit encore pouvoir lire
- * la politique de confidentialité et les pages légales (celles du bot
- * comprises), les règles des tournois que les conditions complètent, suivre
- * ou contester un signalement (recours interne), exporter ses
- * données ou supprimer son compte (« Mon profil »), sans accepter d'abord.
- */
-/**
  * Pages légales (et leurs sous-pages) : aucune fenêtre d'arrivée ne s'y pose
  * sur le texte qu'on lit. Une page légale nouvelle s'ajoute **ici**, et
  * conditions comme certification s'y taisent d'un coup.
@@ -48,6 +40,14 @@ export const LEGAL_PAGE_PATHS: readonly string[] = [
   "/terms-of-service-bot",
 ];
 
+/**
+ * Pages où la fenêtre bloquante des conditions laisse passer, depuis la
+ * version 6 (2026-10-19) : qui refuse les conditions doit encore pouvoir lire
+ * la politique de confidentialité et les pages légales (celles du bot
+ * comprises), les règles des tournois que les conditions complètent, suivre
+ * ou contester un signalement (recours interne), exporter ses
+ * données ou supprimer son compte (« Mon profil »), sans accepter d'abord.
+ */
 export const TERMS_FREE_PATHS: readonly string[] = [...LEGAL_PAGE_PATHS, "/regles", "/signalements", "/profil"];
 
 /** La connexion, la page des conditions, et `paths` avec leurs sous-pages. */

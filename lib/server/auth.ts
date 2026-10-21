@@ -352,7 +352,7 @@ async function selectUserRows(
   params: (string | number)[],
 ): Promise<UserRow[]> {
   const db = await getDatabase();
-  const attempts = [...new Set([sql(true, true), sql(true, false), sql(false, false)])];
+  const attempts = [...new Set([sql(true, true), sql(true, false), sql(false, true), sql(false, false)])];
   for (const [index, text] of attempts.entries()) {
     try {
       const [rows] = await db.execute<UserRow[]>(text, params);

@@ -31,9 +31,12 @@
 }
 
 /* Seul le corps défile : les trois boutons restent en vue sur un petit écran. */
+/* Plancher : à fort zoom ou sur un écran court, le tableau garde une hauteur
+   lisible (il défile) au lieu de s'écraser à 0 px sous les boutons — on ne
+   certifie pas sans pouvoir lire ce que ça change (WCAG 1.4.10). */
 .body {
   flex: 1 1 auto;
-  min-height: 0;
+  min-height: min(120px, 22dvh);
   display: flex;
   flex-direction: column;
   gap: 10px;

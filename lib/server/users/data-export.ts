@@ -70,16 +70,21 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
   // drapeau au défaut, comme la lecture de session (`selectUserRows`).
   // Un repli par colonne : la plus récente tombe seule d'abord, sans emporter
   // `recruitment_modal_off` (l'export doit dire le choix réellement gardé).
-  let rows: AccountRow[];
-  try {
-    [rows] = await selectAccount(true, true);
-  } catch (error) {
-    if (!isUnknownColumnError(error)) throw error;
+  // Chaque combinaison est tentée : l'absence de l'une ne fait jamais taire
+  // l'autre, présente.
+  const attempts: readonly (readonly [boolean, boolean])[] = [
+    [true, true],
+    [true, false],
+    [false, true],
+    [false, false],
+  ];
+  let rows: AccountRow[] = [];
+  for (const [index, [modalOff, certifyOff]] of attempts.entries()) {
     try {
-      [rows] = await selectAccount(true, false);
-    } catch (retryError) {
-      if (!isUnknownColumnError(retryError)) throw retryError;
-      [rows] = await selectAccount(false, false);
+      [rows] = await selectAccount(modalOff, certifyOff);
+      break;
+    } catch (error) {
+      if (!isUnknownColumnError(error) || index === attempts.length - 1) throw error;
     }
   }
 

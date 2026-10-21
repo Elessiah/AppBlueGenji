@@ -20,6 +20,16 @@ beforeEach(() => {
   jest.clearAllMocks();
 });
 
+describe("loadDiscordCertifyPrompt — colonne du compte absente", () => {
+  it("rend null et lève la marque de la session : pas de lecture vouée à l'échec à chaque page", async () => {
+    const execute = jest.fn<SqlQuery>().mockRejectedValueOnce(unknownColumn()).mockResolvedValue([{ affectedRows: 1 }, []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    expect(await loadDiscordCertifyPrompt(7, HASH)).toBeNull();
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(flat(execute.mock.calls[1][0])).toContain("SET certify_prompt_due = 0");
+  });
+});
+
 describe("loadDiscordCertifyPrompt — due, et pour qui", () => {
   const setUp = (rows: unknown[]) => {
     const execute = jest.fn<SqlQuery>().mockResolvedValue([rows, []]);

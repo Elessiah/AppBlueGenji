@@ -258,6 +258,8 @@ describe("exportOwnData", () => {
     expect(execute.mock.calls[1][0]).toMatch(/recruitment_modal_off/);
     expect(execute.mock.calls[1][0]).not.toMatch(/discord_certify_prompt_dismissed_at/);
     expect(execute.mock.calls[2][0]).not.toMatch(/recruitment_modal_off/);
+    // …sans emporter « Ne plus voir » de la certification, présente.
+    expect(execute.mock.calls[2][0]).toMatch(/discord_certify_prompt_dismissed_at/);
   });
 
   it("seule discord_certify_prompt_dismissed_at absente : l'export garde le vrai « Ne plus afficher » du recrutement", async () => {

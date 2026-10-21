@@ -963,7 +963,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     title: "Certification du tag Discord proposée à la connexion",
     links: [{ href: "/rgpd#donnees-collectees", label: "Lire la section « Données collectées »" }],
     summary:
-      "Après une connexion par Discord ou par Blizzard (Battle.net), une fenêtre te propose, une fois, de certifier ton tag Discord s'il ne l'est pas encore, avec un tableau de ce que la certification change. Se connecter ne certifie toujours rien : seul ton clic sur « Certifier mon tag » le fait.",
+      "Après une connexion par Discord ou par Blizzard (Battle.net), une fenêtre te propose, une fois, de certifier ton tag Discord s'il ne l'est pas encore (ou de l'ajouter, si tu n'en as pas), avec un tableau de ce que la certification change. Se connecter ne certifie toujours rien : seule ta confirmation explicite le fait.",
     details: [
       "« Plus tard » (ou fermer la fenêtre) ne garde rien sur ton compte : ta session de connexion note seulement que la fenêtre n'est plus à proposer, et cette marque part avec la session. La fenêtre revient à ta prochaine connexion par Discord ou Blizzard.",
       "« Ne plus voir » est gardé sur ton compte, avec sa date : la fenêtre ne s'ouvre plus, sur aucun appareil. Ce choix dure le temps du compte, figure dans l'export de tes données et est effacé si le compte est anonymisé. La certification reste possible à tout moment dans « Mon profil ».",

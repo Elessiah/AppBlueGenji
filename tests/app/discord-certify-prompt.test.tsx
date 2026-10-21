@@ -47,18 +47,23 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
     expect(SOURCE).toContain('if (payload.status !== "VERIFIED") throw new Error("DISCORD_TAG_CHANGED");');
     // Succès : close pour la session (LATER), toast, /profil relit son état, rafraîchissement.
     expect(SOURCE).toMatch(
-      /setClosed\(true\);\s*answerPrompt\("LATER"\)\.catch\(\(\) => undefined\);\s*showSuccess\(t\("certifyPrompt\.certified"\)\);\s*window\.dispatchEvent\(new Event\(DISCORD_CERTIFIED_EVENT\)\);\s*router\.refresh\(\);/,
+      /closeForSession\(\);\s*showSuccess\(t\("certifyPrompt\.certified"\)\);\s*window\.dispatchEvent\(new Event\(DISCORD_CERTIFIED_EVENT\)\);\s*router\.refresh\(\);/,
     );
     // État changé : la fenêtre se ferme (plus rien à offrir) ; autre refus : elle reste.
     expect(SOURCE).toMatch(
-      /else if \(STATE_CHANGED\.has\(code\)\) \{\s*\/\/[^\n]*\n\s*setClosed\(true\);\s*answerPrompt\("LATER"\)[^;]*;\s*showError\(t\("certifyPrompt\.certifyChanged"\)\);\s*\} else \{\s*showError\(t\("certifyPrompt\.certifyFailed"\)\);/,
+      /if \(closeOnDeadEnd\(code\)\) return;\s*if \(STATE_CHANGED\.has\(code\)\) \{\s*\/\/[^\n]*\n\s*closeForSession\(\);\s*showError\(t\("certifyPrompt\.certifyChanged"\)\);\s*\} else \{\s*showError\(t\("certifyPrompt\.certifyFailed"\)\);/,
     );
   });
 
   it("compte supprimé ou session close : fermée, toast dédié, pas de « Réessaie » sans fin (deux boutons)", () => {
     expect(SOURCE).toContain('if (code === ACCOUNT_DELETED_ERROR || code === "PROFILE_NOT_FOUND") return "certifyPrompt.accountDeleted";');
     expect(SOURCE).toContain('if (code === "UNAUTHORIZED") return "certifyPrompt.sessionEnded";');
-    expect(SOURCE.match(/if \(deadEnd\) \{\s*setClosed\(true\);\s*showError\(t\(deadEnd\)\);\s*router\.refresh\(\);/g)).toHaveLength(2);
+    expect(SOURCE).toMatch(/if \(!deadEnd\) return false;\s*setClosed\(true\);\s*showError\(t\(deadEnd\)\);\s*router\.refresh\(\);/);
+    // Les deux boutons (« Ne plus voir », « Certifier ») passent par le même garde.
+    expect(SOURCE.match(/closeOnDeadEnd\(/g)).toHaveLength(2);
+    // « Close pour la session » écrit une seule fois : LATER, avec keepalive.
+    expect(SOURCE).toMatch(/const closeForSession = \(\) => \{\s*setClosed\(true\);\s*answerPrompt\("LATER"\)\.catch\(\(\) => undefined\);/);
+    expect(SOURCE.match(/answerPrompt\("LATER"\)/g)).toHaveLength(1);
   });
 
   it("focus d'ouverture sur « Plus tard », flèche décorative hors du nom accessible", () => {
@@ -102,6 +107,18 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
     expect(SOURCE).toMatch(/body: JSON\.stringify\(\{ action \}\),[\s\S]*?keepalive: true,/);
     expect(SOURCE).toMatch(/const due = prompt !== null;\s*useEffect\(\(\) => \{\s*if \(due\) setClosed\(false\);\s*\}, \[due\]\);/);
     expect(SOURCE).not.toContain("[prompt?.mode]");
+  });
+
+  it("certifié depuis le dialogue de /profil : la fenêtre encore en attente se ferme", () => {
+    expect(SOURCE).toContain("window.addEventListener(DISCORD_CERTIFIED_EVENT, onCertified)");
+    expect(SOURCE).toContain("const onCertified = () => setClosed(true);");
+    const profile = readSource("app/(secured)/profil/page.tsx");
+    expect(profile).toMatch(/setDiscordState\(\(prev\) => \(\{ \.\.\.prev, tag, verified: true[^\n]*\n(?:\s*\/\/[^\n]*\n)*\s*window\.dispatchEvent\(new Event\(DISCORD_CERTIFIED_EVENT\)\);/);
+  });
+
+  it("le corps défilant garde un plancher : le tableau reste lisible à fort zoom", () => {
+    const css = readSource("components/discord/DiscordCertifyPrompt.module.css");
+    expect(css).toContain("min-height: min(120px, 22dvh);");
   });
 
   it("ne couvre pas l'écran où un lien de la modale de confidentialité envoie agir", () => {

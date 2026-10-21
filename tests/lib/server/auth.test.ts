@@ -395,11 +395,12 @@ describe("auth", () => {
 
       expect(user?.id).toBe(3);
       expect(user?.recruitmentModalOff).toBe(false);
-      // Repli par colonne : sans la certification d'abord, puis sans le recrutement.
+      // Repli par colonne : sans la certification d'abord, puis sans le
+      // recrutement — la marque de certification, présente, reste lue.
       expect(execute).toHaveBeenCalledTimes(3);
       expect(String(execute.mock.calls[2][0])).toContain("FROM bg_user_sessions s");
       expect(String(execute.mock.calls[2][0])).not.toContain("recruitment_modal_off");
-      expect(String(execute.mock.calls[2][0])).not.toContain("certify_prompt_due");
+      expect(String(execute.mock.calls[2][0])).toContain("s.certify_prompt_due");
     });
 
     it("seule la marque de certification absente : « Ne plus afficher » du recrutement reste lu", async () => {
