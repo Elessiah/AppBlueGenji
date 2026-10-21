@@ -258,7 +258,6 @@
     "undo": "Retirer ton tag ou changer de pseudo Discord retire la certification.",
     "later": "Tu pourras toujours certifier depuis « Mon profil ».",
     "certify": "Certifier mon tag",
-    "certifyElsewhere": "Certifier mon tag →",
     "certifying": "Certification…",
     "postpone": "Plus tard",
     "never": "Ne plus voir",
@@ -268,6 +267,8 @@
     "certifyChanged": "Ton tag a changé depuis ta connexion : certifie-le depuis « Mon profil ».",
     "certifyFailed": "La certification a échoué. Réessaie, ou passe par « Mon profil ».",
     "neverFailed": "Ton choix n'a pas pu être enregistré. Réessaie.",
-    "bodyLabel": "Proposition de certification du tag Discord"
+    "bodyLabel": "Proposition de certification du tag Discord",
+    "accountDeleted": "Ce compte a été supprimé.",
+    "alreadyVerified": "Ton tag Discord est déjà certifié."
   }
 }

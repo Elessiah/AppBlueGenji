@@ -128,7 +128,7 @@
 }
 
 /* À la largeur d'un téléphone : le tableau garde ses trois colonnes, serrées,
-   et les boutons s'empilent, le principal en tête. */
+   et les boutons s'empilent, le principal en dessous. */
 @media (max-width: 480px) {
   .modal {
     padding: 18px 16px;
@@ -139,8 +139,9 @@
     padding: 6px 4px;
   }
 
-  /* Le principal pleine largeur en tête, les deux refus côte à côte dessous :
-     une rangée de boutons de moins, plus de tableau en vue. */
+  /* Les deux refus côte à côte, le principal pleine largeur dessous : une
+     rangée de boutons de moins, et l'ordre visuel reste celui de la
+     tabulation (jamais de `grid-row` qui le déplacerait — WCAG 2.4.3). */
   .actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -148,6 +149,5 @@
 
   .actions > :last-child {
     grid-column: 1 / -1;
-    grid-row: 1;
   }
 }

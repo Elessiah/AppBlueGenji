@@ -258,7 +258,6 @@
     "undo": "Removing your tag or changing your Discord username removes the verification.",
     "later": "You can always verify from “My profile”.",
     "certify": "Verify my tag",
-    "certifyElsewhere": "Verify my tag →",
     "certifying": "Verifying…",
     "postpone": "Later",
     "never": "Don't show again",
@@ -268,6 +267,8 @@
     "certifyChanged": "Your tag changed since you logged in: verify it from “My profile”.",
     "certifyFailed": "Verification failed. Try again, or go through “My profile”.",
     "neverFailed": "Your choice couldn't be saved. Try again.",
-    "bodyLabel": "Discord tag verification suggestion"
+    "bodyLabel": "Discord tag verification suggestion",
+    "accountDeleted": "This account has been deleted.",
+    "alreadyVerified": "Your Discord tag is already verified."
   }
 }

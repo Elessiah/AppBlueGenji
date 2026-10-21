@@ -41,9 +41,29 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
     expect(SOURCE).toContain('fetch("/api/profile/discord", {');
     expect(SOURCE).toContain("JSON.stringify({ handle: prompt.tag })");
     expect(SOURCE.match(/fetch\("\/api\/profile\/discord"/g)).toHaveLength(1);
-    // Succès : toast + rafraîchissement ; refus : toast.
-    expect(SOURCE).toMatch(/showSuccess\(t\("certifyPrompt\.certified"\)\);\s*router\.refresh\(\);/);
-    expect(SOURCE).toContain('showError(STATE_CHANGED.has(code) ? t("certifyPrompt.certifyChanged") : t("certifyPrompt.certifyFailed"))');
+    // Seul `VERIFIED` vaut succès (un code envoyé n'est pas une certification).
+    expect(SOURCE).toContain('if (payload.status !== "VERIFIED") throw new Error("DISCORD_TAG_CHANGED");');
+    // Succès : close pour la session (LATER), toast, /profil relit son état, rafraîchissement.
+    expect(SOURCE).toMatch(
+      /setClosed\(true\);\s*answerPrompt\("LATER"\)\.catch\(\(\) => undefined\);\s*showSuccess\(t\("certifyPrompt\.certified"\)\);\s*window\.dispatchEvent\(new Event\(DISCORD_CERTIFIED_EVENT\)\);\s*router\.refresh\(\);/,
+    );
+    // État changé : la fenêtre se ferme (plus rien à offrir) ; autre refus : elle reste.
+    expect(SOURCE).toMatch(
+      /if \(STATE_CHANGED\.has\(code\)\) \{\s*\/\/[^\n]*\n\s*setClosed\(true\);\s*answerPrompt\("LATER"\)[^;]*;\s*showError\(t\("certifyPrompt\.certifyChanged"\)\);\s*\} else \{\s*showError\(t\("certifyPrompt\.certifyFailed"\)\);/,
+    );
+  });
+
+  it("« Ne plus voir » sur un compte supprimé : fermée, toast dédié, pas de « Réessaie » sans fin", () => {
+    expect(SOURCE).toMatch(
+      /\.message === ACCOUNT_DELETED_ERROR\) \{\s*\/\/[^\n]*\n\s*setClosed\(true\);\s*showError\(t\("certifyPrompt\.accountDeleted"\)\);/,
+    );
+  });
+
+  it("focus d'ouverture sur « Plus tard », flèche décorative hors du nom accessible", () => {
+    expect(SOURCE).toMatch(/onClick=\{postpone\} data-autofocus>/);
+    expect(SOURCE).toContain('<span aria-hidden="true"> →</span>');
+    const css = readSource("components/discord/DiscordCertifyPrompt.module.css");
+    expect(css).not.toMatch(/grid-row:/);
   });
 
   it("parcours DIALOG : mène au dialogue de /profil, sans en recopier la logique", () => {
@@ -51,7 +71,13 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
     expect(SOURCE).toContain("window.dispatchEvent(new Event(CERTIFY_DIALOG_EVENT))");
     expect(SOURCE).not.toMatch(/method: "PUT"/);
     const profile = readSource("app/(secured)/profil/page.tsx");
-    expect(profile).toMatch(/useCertifyRequest\(\{\s*ready: !discordStateBusy && discordState\.linked !== null,\s*verified: discordState\.verified,\s*open: openVerifyDialog,/);
+    expect(profile).toMatch(
+      /useCertifyRequest\(\{\s*ready: !discordStateBusy && discordState\.linked !== null,\s*verified: discordState\.verified,\s*open: openVerifyDialog,\s*refresh: \(\) => void loadDiscordState\(\),/,
+    );
+    const hook = readSource("app/(secured)/profil/useCertifyRequest.ts");
+    // Tag déjà certifié : un toast le dit, au lieu d'un clic resté sans suite.
+    expect(hook).toContain('if (verified) showSuccess(t("certifyPrompt.alreadyVerified"));');
+    expect(hook).toContain("window.addEventListener(DISCORD_CERTIFIED_EVENT, onCertified)");
   });
 
   it("« Plus tard », Échap et le voile : LATER ; « Ne plus voir » : NEVER", () => {
@@ -87,7 +113,8 @@ describe("mise en page racine", () => {
     expect(LAYOUT).toContain("user?.certifyPromptDue ? await certifyPromptFor(user.id) : null");
   });
 
-  it("fait taire le recrutement tant qu'elle est due", () => {
+  it("fait taire le recrutement tant qu'elle est due, quelle que soit la page", () => {
+    expect(LAYOUT).toContain("const certifyPromptDue = certifyPrompt !== null;");
     expect(LAYOUT).toMatch(/termsModalDue: termsDueOnLoad,\s*certifyPromptDue,/);
   });
 });

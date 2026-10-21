@@ -289,6 +289,7 @@ export default function ProfilePage() {
     ready: !discordStateBusy && discordState.linked !== null,
     verified: discordState.verified,
     open: openVerifyDialog,
+    refresh: () => void loadDiscordState(),
   });
 
   const [respondingInvitation, setRespondingInvitation] = useState<number | null>(null);

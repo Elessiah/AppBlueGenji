@@ -11,10 +11,12 @@ import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
   CERTIFY_DIALOG_EVENT,
   CERTIFY_PROFILE_HREF,
+  DISCORD_CERTIFIED_EVENT,
   type CertifyPrompt,
   type CertifyPromptAction,
 } from "@/lib/shared/discord-certify-prompt";
 import { certifyPromptOpen } from "@/lib/shared/global-modals";
+import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
 import { PRIVACY_CHANGES_ANSWERED_EVENT } from "@/lib/shared/privacy-changes";
 import { TERMS_ACCEPTED_EVENT, TERMS_REQUIRED_EVENT } from "@/lib/shared/terms-of-use";
 import { visibleText } from "@/lib/shared/visible-text";
@@ -50,7 +52,10 @@ async function answerPrompt(action: CertifyPromptAction): Promise<void> {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ action }),
   });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(payload.error ?? `HTTP ${response.status}`);
+  }
 }
 
 /**
@@ -126,8 +131,15 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
       await answerPrompt("NEVER");
       setClosed(true);
       showSuccess(t("certifyPrompt.neverSaved"));
-    } catch {
-      showError(t("certifyPrompt.neverFailed"));
+    } catch (error) {
+      if ((error as Error).message === ACCOUNT_DELETED_ERROR) {
+        // Compte supprimé entre-temps (autre onglet) : réessayer n'y changerait rien.
+        setClosed(true);
+        showError(t("certifyPrompt.accountDeleted"));
+        router.refresh();
+      } else {
+        showError(t("certifyPrompt.neverFailed"));
+      }
     } finally {
       inFlight.current = false;
       setBusy(null);
@@ -153,21 +165,34 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ handle: prompt.tag }),
       });
-      const payload = (await response.json().catch(() => ({}))) as { error?: string };
+      const payload = (await response.json().catch(() => ({}))) as { error?: string; status?: string };
       if (!response.ok) throw new Error(payload.error ?? "");
+      // Un 2xx sans `VERIFIED` (code envoyé en message privé) : le tag n'est
+      // plus celui que Discord a nommé, la suite se fait depuis « Mon profil ».
+      if (payload.status !== "VERIFIED") throw new Error("DISCORD_TAG_CHANGED");
+      // La proposition est close pour la session : une sauvegarde de tag plus
+      // tard (non certifié) ne la ferait pas revenir au rafraîchissement.
       setClosed(true);
+      answerPrompt("LATER").catch(() => undefined);
       showSuccess(t("certifyPrompt.certified"));
+      window.dispatchEvent(new Event(DISCORD_CERTIFIED_EVENT));
       router.refresh();
     } catch (error) {
       const code = (error as Error).message;
-      showError(STATE_CHANGED.has(code) ? t("certifyPrompt.certifyChanged") : t("certifyPrompt.certifyFailed"));
+      if (STATE_CHANGED.has(code)) {
+        // Le tag montré n'est plus le bon : la fenêtre n'a plus rien à offrir.
+        setClosed(true);
+        answerPrompt("LATER").catch(() => undefined);
+        showError(t("certifyPrompt.certifyChanged"));
+      } else {
+        showError(t("certifyPrompt.certifyFailed"));
+      }
     } finally {
       inFlight.current = false;
       setBusy(null);
     }
   };
 
-  const certifyLabel = prompt.mode === "ONE_CLICK" ? "certifyPrompt.certify" : "certifyPrompt.certifyElsewhere";
   const strong = { strong: (chunks: readonly ReactNode[]) => <strong>{richNodes(chunks)}</strong> };
 
   return createPortal(
@@ -231,7 +256,8 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
           >
             {busy === "never" ? t("certifyPrompt.neverSaving") : t("certifyPrompt.never")}
           </CyberButton>
-          <CyberButton variant="ghost" type="button" aria-disabled={busy !== null || undefined} onClick={postpone}>
+          {/* Focus d'ouverture sur le geste sans effet : Entrée ne certifie ni ne ferme pour de bon. */}
+          <CyberButton variant="ghost" type="button" aria-disabled={busy !== null || undefined} onClick={postpone} data-autofocus>
             {t("certifyPrompt.postpone")}
           </CyberButton>
           <CyberButton
@@ -241,7 +267,14 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
             aria-busy={busy === "certify" || undefined}
             onClick={() => void certify()}
           >
-            {busy === "certify" ? t("certifyPrompt.certifying") : t(certifyLabel)}
+            {busy === "certify" ? (
+              t("certifyPrompt.certifying")
+            ) : (
+              <>
+                {t("certifyPrompt.certify")}
+                {prompt.mode === "DIALOG" && <span aria-hidden="true"> →</span>}
+              </>
+            )}
           </CyberButton>
         </div>
       </div>

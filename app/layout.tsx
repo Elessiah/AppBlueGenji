@@ -36,7 +36,6 @@ import { localizedPrivacyChanges } from "@/lib/shared/privacy-changes-en";
 import { siteMetadataBase } from "@/lib/server/site-url";
 import { PATHNAME_HEADER } from "@/lib/shared/csp";
 import {
-  certifyPromptOpen,
   recruitmentModalSilenced,
   termsModalDueOnLoad,
 } from "@/lib/shared/global-modals";
@@ -278,12 +277,10 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   // lue quand même, la fenêtre s'ouvre dès leur réponse, sans rechargement.
   // Aucune requête de plus quand la session n'a rien à proposer (lu avec elle).
   const certifyPrompt = user?.certifyPromptDue ? await certifyPromptFor(user.id) : null;
-  const certifyPromptDue = certifyPromptOpen({
-    due: certifyPrompt !== null,
-    privacyPending: privacyChanges.length > 0,
-    termsPending: termsRequired,
-    pathname: requestedPath,
-  });
+  // Le recrutement se tait tant qu'elle est due, **quelle que soit la page** :
+  // muette sur une page légale, elle s'ouvrira à la navigation suivante, côté
+  // client, sans que la mise en avant du recrutement ne soit rejugée.
+  const certifyPromptDue = certifyPrompt !== null;
   // Réglages d'accessibilité du lecteur : posés **dans le HTML initial**, sans
   // quoi un contraste renforcé ferait d'abord clignoter la page dans ses
   // couleurs d'origine. Voir `lib/shared/accessibility-settings.ts`.

@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useShellText } from "@/components/i18n/shell-text";
+import { useToast } from "@/components/ui/toast";
 import {
   CERTIFY_DIALOG_EVENT,
   CERTIFY_QUERY_PARAM,
+  DISCORD_CERTIFIED_EVENT,
   wantsCertifyDialog,
 } from "@/lib/shared/discord-certify-prompt";
 
@@ -12,15 +15,27 @@ import {
  * (`DiscordCertifyPrompt`, parcours `DIALOG`) l'a demandé : par l'adresse
  * (`/profil?certifier=discord`, retirée dès qu'elle est lue) ou, déjà sur
  * `/profil`, par un événement. Attend que l'état Discord soit **lu** (`ready`)
- * — le dialogue choisit son parcours d'après lui — et n'ouvre rien sur un tag
- * déjà certifié.
+ * — le dialogue choisit son parcours d'après lui — et, sur un tag déjà
+ * certifié, le dit par un toast au lieu d'ouvrir le dialogue. Quand la fenêtre
+ * certifie d'un clic, `refresh` relit l'état Discord affiché.
  */
 export function useCertifyRequest({
   ready,
   verified,
   open,
-}: Readonly<{ ready: boolean; verified: boolean; open: () => void }>): void {
+  refresh,
+}: Readonly<{ ready: boolean; verified: boolean; open: () => void; refresh: () => void }>): void {
   const [requested, setRequested] = useState(false);
+  const { t } = useShellText();
+  const { showSuccess } = useToast();
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
+
+  useEffect(() => {
+    const onCertified = () => refreshRef.current();
+    window.addEventListener(DISCORD_CERTIFIED_EVENT, onCertified);
+    return () => window.removeEventListener(DISCORD_CERTIFIED_EVENT, onCertified);
+  }, []);
 
   useEffect(() => {
     if (wantsCertifyDialog(window.location.search)) {
@@ -37,6 +52,7 @@ export function useCertifyRequest({
   useEffect(() => {
     if (!requested || !ready) return;
     setRequested(false);
-    if (!verified) open();
-  }, [requested, ready, verified, open]);
+    if (verified) showSuccess(t("certifyPrompt.alreadyVerified"));
+    else open();
+  }, [requested, ready, verified, open, showSuccess, t]);
 }

@@ -24,7 +24,7 @@ sur « Certifier mon tag » certifie, par la route existante.
 | Compte vivant, tag **non certifié**, pas de « Ne plus voir » | `loadDiscordCertifyPrompt`, une requête, toutes conditions dans le `WHERE` |
 | Après la confidentialité et les conditions, jamais par-dessus | `certifyPromptOpen` (`lib/shared/global-modals.ts`) ; la fenêtre suit `PRIVACY_CHANGES_ANSWERED_EVENT` et `TERMS_ACCEPTED_EVENT` (émis par `TermsAcceptanceModal`) et s'ouvre sans rechargement |
 | Pas sur `/connexion`, `/conditions-utilisation`, `/rgpd`, `/mentions-legales`, `/accessibilite`, pages légales du bot | `certifyPromptSilencedOn` |
-| Fait taire la modale d'arrivée du recrutement | `recruitmentModalSilenced({ certifyPromptDue })` — ordre : confidentialité → conditions → certification → recrutement |
+| Fait taire la modale d'arrivée du recrutement | `recruitmentModalSilenced({ certifyPromptDue })`, dès qu'elle est due, **quelle que soit la page** (muette sur une page légale, elle s'ouvre à la navigation suivante) — ordre : confidentialité → conditions → certification → recrutement |
 
 **Montée par la mise en page racine**, comme `TermsAcceptanceModal`, et non par
 l'espace connecté : c'est la seule qui rend la **première page après la
@@ -44,9 +44,12 @@ Discord ou Blizzard (ou poser la marque à la main sur sa ligne de session).
 
 - **`ONE_CLICK`** — mêmes conditions que `certifyLinkedDiscordTag` (Discord
   rattaché, pseudo nommé par Discord, certifiable). La fenêtre montre le tag et
-  appelle `POST /api/profile/discord { handle }` : succès → `showSuccess` +
-  `router.refresh()` ; refus → `showError` (les quatre codes d'état changé
-  renvoient vers « Mon profil »).
+  appelle `POST /api/profile/discord { handle }`. Seul `status: "VERIFIED"`
+  vaut succès → proposition close pour la session (`LATER`), `showSuccess`,
+  `DISCORD_CERTIFIED_EVENT` (un `/profil` ouvert relit son état Discord) et
+  `router.refresh()`. Un code envoyé à la place, ou l'un des quatre codes
+  d'état changé, ferme la fenêtre (`LATER`) et renvoie vers « Mon profil » ;
+  tout autre refus la garde ouverte, en toast.
 - **`DIALOG`** — tout autre compte non certifié, le plus souvent une connexion
   Blizzard sans Discord. Le bouton (« Certifier mon tag → ») clôt la
   proposition pour la session et mène à `/profil?certifier=discord` (ou, déjà
@@ -54,6 +57,7 @@ Discord ou Blizzard (ou poser la marque à la main sur sa ligne de session).
   **le** `DiscordVerificationDialog` une fois l'état Discord lu — code en
   message privé, ou passage par Discord pour un compte rattaché sans pseudo
   nommé. Rien du dialogue n'est recopié ; le paramètre est retiré de l'adresse.
+  Tag certifié entre-temps : un toast le dit au lieu d'ouvrir le dialogue.
 
 Le BattleTag n'y figure pas : il est vérifié par Battle.net au rattachement
 (`OAUTH_PROVIDERS.md`), sans geste à proposer.
@@ -64,7 +68,7 @@ Le BattleTag n'y figure pas : il est vérifié par Battle.net au rattachement
 | --- | --- |
 | « Certifier mon tag » | certifie (`ONE_CLICK`) ou mène au dialogue (`DIALOG`, la proposition est close pour la session) |
 | « Plus tard », Échap, clic sur le voile | `POST … { action: "LATER" }` — fermée tout de suite ; un échec d'écriture la fait seulement revenir au prochain chargement |
-| « Ne plus voir » | `POST … { action: "NEVER" }` — `bg_users.discord_certify_prompt_dismissed_at` (date du premier choix, `COALESCE`) puis la session ; succès en toast, échec en toast et fenêtre gardée |
+| « Ne plus voir » | `POST … { action: "NEVER" }` — `bg_users.discord_certify_prompt_dismissed_at` (date du premier choix, `COALESCE`) puis la session ; succès en toast, échec en toast et fenêtre gardée (compte supprimé entre-temps : fenêtre fermée, toast dédié) |
 
 Route : 401 sans session, 400 `INVALID_ACTION`, 409 `ACCOUNT_DELETED` (compte
 supprimé entre-temps), 503 `CERTIFY_PROMPT_UNAVAILABLE` (colonne absente), 500
@@ -88,7 +92,10 @@ Textes `shell.certifyPrompt` (FR et EN) ; le détail complet reste dans le
 dialogue (`DISCORD_VERIFICATION_EXPOSURE`, qui nomme aussi l'arbitre d'un match
 que le joueur caste). Tableau natif (`th` `scope`, titres de groupe en `rowgroup`), colonnes
 « Sans » / « Avec », trois colonnes serrées sous
-480 px, boutons empilés.
+480 px, boutons empilés (les deux refus côte à côte, le principal pleine largeur
+dessous, dans l'ordre de tabulation). Focus d'ouverture sur « Plus tard »
+(`data-autofocus`) : Entrée n'y certifie ni ne ferme pour de bon. La flèche
+du parcours `DIALOG` est décorative (`aria-hidden`).
 
 ## Données
 

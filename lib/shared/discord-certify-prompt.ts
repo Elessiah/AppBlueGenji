@@ -80,6 +80,12 @@ export const CERTIFY_PROFILE_HREF = `/profil?${CERTIFY_QUERY_PARAM}=${CERTIFY_QU
  */
 export const CERTIFY_DIALOG_EVENT = "bg:certify-dialog";
 
+/**
+ * Événement de fenêtre émis quand la proposition a certifié le tag d'un clic :
+ * `/profil`, s'il est ouvert, relit son état Discord (pastille, bouton).
+ */
+export const DISCORD_CERTIFIED_EVENT = "bg:discord-certified";
+
 /** L'adresse demande-t-elle d'ouvrir le dialogue de certification ? */
 export function wantsCertifyDialog(search: string | null | undefined): boolean {
   if (!search) return false;
