@@ -16,6 +16,7 @@ import {
   PRIVACY_CHANGES,
   PRIVACY_DM_MIN_INTERVAL_DAYS,
   PRIVACY_DM_SETTLE_DAYS,
+  PRIVACY_DM_WINDOW_DAYS,
   privacyChangesForOneMessage,
 } from "@/lib/shared/privacy-changes";
 import { siteBaseUrl } from "@/lib/server/site-url";
@@ -154,6 +155,14 @@ describe("dispatchPrivacyChangeNotifications", () => {
     expect(select.sql).toContain("u.created_at < ? AND u.google_sub IS NOT NULL AND NOT EXISTS");
     expect(select.sql).toContain(`${LIVE_STAFF_SQL} AS live_staff`);
     expect(select.sql).toContain(`u.created_at < ? AND ${LIVE_STAFF_SQL} AND NOT EXISTS`);
+  });
+
+  it("ne calcule pas le fait LIVE_STAFF quand aucune entrée annonçable ne le lit", async () => {
+    const last = PRIVACY_CHANGES.filter((c) => c.audience === "LIVE_STAFF").at(-1)!;
+    // Fenêtre d'annonce de l'entrée passée : plus rien ne lit le fait.
+    const calls = fakeDb();
+    await dispatchPrivacyChangeNotifications(at(last.publishedAt, PRIVACY_DM_WINDOW_DAYS + 1));
+    for (const call of calls) expect(call.sql).not.toContain("JSON_CONTAINS");
   });
 
   it("n'annonce pas une entrée ciblée Google à un compte qui n'y est pas relié", async () => {

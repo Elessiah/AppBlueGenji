@@ -16,6 +16,7 @@ import { useClientPower } from "@/lib/shared/hooks/useClientPower";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { tournamentMatchHref } from "@/lib/shared/match-anchor";
 import {
+  exposesCasterContacts,
   launchModalKey,
   launchModalWaits,
   MATCH_LAUNCH_OPEN_EVENT,
@@ -366,7 +367,14 @@ export function MatchLaunchCenter({
               <SideCard side={current.team2} isHost={current.hostTeamId === current.team2.teamId} phase={current.phase} onCopy={copy} />
             </div>
 
-            <CasterCard caster={current.caster} phase={current.phase} onCopy={copy} />
+            <CasterCard
+              caster={current.caster}
+              phase={current.phase}
+              onCopy={copy}
+              // La règle du serveur, pas le défaut de la carte (qui tient
+              // `TO_PLAN` pour ouvert) : une seule règle des contacts du caster.
+              contactsShown={exposesCasterContacts(current.phase, current.viewer.role)}
+            />
           </div>
 
           {/* Le même réglage que sur /profil, sous sa forme compacte : c'est ici

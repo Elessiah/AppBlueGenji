@@ -201,6 +201,10 @@ describe("contacts du caster en attente, modale ouverte", () => {
     expect(readSource("lib/server/tournaments/match-launch-info.ts")).toContain(
       "exposesCaster: exposes && exposesCasterContacts(phase, party.role)",
     );
+    // La modale de lancement aussi, plutôt que le défaut de la carte.
+    expect(readSource("components/match-launch/MatchLaunchCenter.tsx")).toContain(
+      "contactsShown={exposesCasterContacts(current.phase, current.viewer.role)}",
+    );
   });
 
   it("échecs passagers en rafale sans rien de lu : une seule notification", () => {
