@@ -50,7 +50,9 @@ ne soit ouverte (`anotherModalOpen`, `lib/shared/dialog-focus.ts`) : centre de
 lancement, invitation à certifier. Chargée à la demande, sa place est tenue
 dès sa décision par le `loading` de son `dynamic()` (`<span data-modal-pending
 hidden />`, compté par `anotherModalOpen`) ; pour attendre sans minuterie,
-`watchModalsClosed` (observateur du DOM, relectures espacées de 250 ms). Une
+`watchModalsClosed` (observateur du DOM, relectures espacées de 250 ms) ; pour
+s'effacer sans délai devant une urgente, `watchUrgentModalOpened` (nœuds
+ajoutés seulement). Une
 modale sans urgence porte `data-modal-yields` sur sa racine (prop `yields` de
 `TournamentDialogFrame`) : une ouverture urgente
 (`overYielding`) passe par-dessus et elle s'efface. Une modale **recouverte**

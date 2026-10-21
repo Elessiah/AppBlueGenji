@@ -7,6 +7,7 @@ import {
   handOffRestoreTargets,
   watchModals,
   watchModalsClosed,
+  watchUrgentModalOpened,
   type FocusTrapState,
 } from "@/lib/shared/dialog-focus";
 
@@ -127,10 +128,10 @@ describe("watchModals / watchModalsClosed", () => {
   /** DOM et observateur simulés : `mutate()` joue une mutation. */
   function fakeDom(initiallyOpen = true) {
     const state = { modal: initiallyOpen, disconnected: 0, observed: null as unknown };
-    let callback: (() => void) | null = null;
+    let callback: ((records: unknown[]) => void) | null = null;
     globals.document = { querySelectorAll: () => (state.modal ? [modal()] : []) };
     globals.MutationObserver = class {
-      constructor(cb: () => void) {
+      constructor(cb: (records: unknown[]) => void) {
         callback = cb;
       }
       observe(_root: unknown, options: unknown) {
@@ -140,7 +141,7 @@ describe("watchModals / watchModalsClosed", () => {
         state.disconnected += 1;
       }
     };
-    return { state, mutate: () => callback?.() };
+    return { state, mutate: (records: unknown[] = []) => callback?.(records) };
   }
 
   it("prévient une fois la dernière modale fermée, relectures espacées, puis se débranche", () => {
@@ -161,14 +162,27 @@ describe("watchModals / watchModalsClosed", () => {
     expect(state.disconnected).toBe(1);
   });
 
-  it("sans délai (`throttleMs: 0`), prévient dès le lot de mutations", () => {
-    const { state, mutate } = fakeDom();
+  it("watchUrgentModalOpened : réagit sans délai à une modale ajoutée, ignore le reste du plateau", () => {
+    const { state, mutate } = fakeDom(false);
     const calls: number[] = [];
-    watchModals(() => !state.modal, () => calls.push(1), { root: {} as Node, throttleMs: 0 });
-    state.modal = false;
-    mutate();
+    watchUrgentModalOpened(() => calls.push(1), {} as Node);
+    const cell = { matches: () => false, querySelector: () => null };
+    const launch = { matches: () => true, querySelector: () => null };
+    // Une case du plateau re-rendue : la page n'est pas relue.
+    state.modal = true;
+    mutate([{ type: "childList", addedNodes: [cell] }]);
+    expect(calls).toHaveLength(0);
+    mutate([{ type: "childList", addedNodes: [launch] }]);
     expect(calls).toHaveLength(1);
     expect(state.disconnected).toBe(1);
+  });
+
+  it("watchUrgentModalOpened : une urgente déjà ouverte prévient aussitôt", () => {
+    const { state } = fakeDom(true);
+    const calls: number[] = [];
+    watchUrgentModalOpened(() => calls.push(1), {} as Node);
+    expect(calls).toHaveLength(1);
+    expect(state.observed).toBeNull();
   });
 
   it("prévient aussitôt si la condition tient déjà, sans observer", () => {
@@ -183,7 +197,7 @@ describe("watchModals / watchModalsClosed", () => {
     jest.useFakeTimers();
     const { state, mutate } = fakeDom();
     const calls: number[] = [];
-    const stop = watchModals(() => !state.modal, () => calls.push(1), { root: {} as Node });
+    const stop = watchModals(() => !state.modal, () => calls.push(1), {} as Node);
     state.modal = false;
     mutate();
     stop();

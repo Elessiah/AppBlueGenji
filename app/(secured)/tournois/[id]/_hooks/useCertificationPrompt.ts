@@ -7,7 +7,7 @@ import {
   shouldOpenCertificationPrompt,
   type CertificationPrompt,
 } from "@/lib/shared/certification-prompt";
-import { anotherModalOpen, watchModals, watchModalsClosed } from "@/lib/shared/dialog-focus";
+import { anotherModalOpen, watchModalsClosed, watchUrgentModalOpened } from "@/lib/shared/dialog-focus";
 import { useClientPower } from "@/lib/shared/hooks/useClientPower";
 
 /** Un stockage du navigateur, `null` s'il est inaccessible (accès refusé, rendu serveur). */
@@ -74,12 +74,14 @@ export function useCertificationPrompt(prompt: CertificationPrompt | null | unde
   const shown = open && prompt != null && !frozen;
 
   // Une modale urgente s'ouvre par-dessus (lancement d'un match) : place nette
-  // sans délai (`throttleMs: 0`), avant que le morceau ne se monte au-dessus
-  // d'elle dans la pile.
+  // sans délai, avant que le morceau ne se monte au-dessus d'elle dans la pile.
+  // Armé même onglet caché : un observateur sans minuterie, qui n'examine que
+  // les nœuds ajoutés — sans quoi une annonce ouverte onglet caché laisserait
+  // l'invitation, devancée, ni affichée ni effacée.
   useEffect(() => {
-    if (!shown || !clocks) return;
-    return watchModals(() => anotherModalOpen(document, { overYielding: true }), yieldPlace, { throttleMs: 0 });
-  }, [shown, clocks, yieldPlace]);
+    if (!shown) return;
+    return watchUrgentModalOpened(yieldPlace);
+  }, [shown, yieldPlace]);
 
   return {
     prompt: shown ? prompt : null,

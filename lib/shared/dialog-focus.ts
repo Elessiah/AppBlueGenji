@@ -115,18 +115,21 @@ export function anotherModalOpen(root: ModalRoot = document, { overYielding = fa
 /** Délai minimal entre deux relectures d'un guet : un plateau en direct mute sans cesse. */
 const WATCH_THROTTLE_MS = 250;
 
+/** Ce que les guets observent : arrivée, départ ou marquage d'une modale. */
+const MODAL_OBSERVATION: MutationObserverInit = {
+  childList: true,
+  subtree: true,
+  attributes: true,
+  attributeFilter: ["aria-modal", "data-modal-pending"],
+};
+
 /**
  * Prévient (une fois) dès que `condition` est vraie — tout de suite si elle
  * l'est déjà —, sans minuterie de fond : un observateur du DOM, actif le temps
- * du guet seulement, ses relectures espacées d'au moins `throttleMs`
- * (`WATCH_THROTTLE_MS` par défaut ; `0` : à chaque lot de mutations, pour
- * céder sa place sans délai). Renvoie l'arrêt.
+ * du guet seulement, ses relectures espacées d'au moins `WATCH_THROTTLE_MS`.
+ * Renvoie l'arrêt.
  */
-export function watchModals(
-  condition: () => boolean,
-  onMet: () => void,
-  { root = document.body, throttleMs = WATCH_THROTTLE_MS }: { root?: Node; throttleMs?: number } = {},
-): () => void {
+export function watchModals(condition: () => boolean, onMet: () => void, root: Node = document.body): () => void {
   let timer: ReturnType<typeof setTimeout> | null = null;
   let stopped = false;
   const stop = () => {
@@ -141,20 +144,46 @@ export function watchModals(
     onMet();
   };
   const observer = new MutationObserver(() => {
-    if (throttleMs === 0) check();
-    else timer ??= setTimeout(check, throttleMs);
+    timer ??= setTimeout(check, WATCH_THROTTLE_MS);
   });
   if (condition()) {
     onMet();
     return () => undefined;
   }
-  observer.observe(root, {
-    childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ["aria-modal", "data-modal-pending"],
-  });
+  observer.observe(root, MODAL_OBSERVATION);
   return stop;
+}
+
+/** Une mutation peut-elle avoir ouvert une modale ? Nœud ajouté qui en est ou en contient une, ou marquage changé. */
+function mayOpenModal(record: Pick<MutationRecord, "type" | "addedNodes">): boolean {
+  if (record.type === "attributes") return true;
+  return Array.from(record.addedNodes).some((node) => {
+    const element = node as Partial<Element>;
+    if (typeof element.matches !== "function" || typeof element.querySelector !== "function") return false;
+    return element.matches(MODAL_OR_PENDING_SELECTOR) || element.querySelector(MODAL_OR_PENDING_SELECTOR) !== null;
+  });
+}
+
+/**
+ * Prévient (une fois), **sans délai**, quand une modale qui ne cède pas sa
+ * place s'ouvre — tout de suite si c'est déjà le cas : pour qu'une modale qui
+ * cède la sienne s'efface avant de se monter au-dessus d'elle. Seuls les nœuds
+ * ajoutés sont examinés ; la page n'est relue que si l'un d'eux est une modale.
+ * Renvoie l'arrêt.
+ */
+export function watchUrgentModalOpened(onOpened: () => void, root: Node = document.body): () => void {
+  const urgentOpen = () => anotherModalOpen(document, { overYielding: true });
+  if (urgentOpen()) {
+    onOpened();
+    return () => undefined;
+  }
+  const observer = new MutationObserver((records) => {
+    if (!records.some(mayOpenModal) || !urgentOpen()) return;
+    observer.disconnect();
+    onOpened();
+  });
+  observer.observe(root, MODAL_OBSERVATION);
+  return () => observer.disconnect();
 }
 
 /** Prévient (une fois) quand plus aucune modale n'est ouverte (`watchModals`). */

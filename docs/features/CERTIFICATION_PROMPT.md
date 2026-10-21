@@ -37,8 +37,9 @@ sa place** (prop `yields` de `TournamentDialogFrame` → `data-modal-yields` sur
 sa racine, `anotherModalOpen(…, { overYielding: true })`,
 `lib/shared/dialog-focus.ts`) : l'annonce d'un match qui se lance, urgente,
 passe par-dessus — comme toute autre modale qui s'ouvrirait sur elle ; le guet
-réagit sans délai (`throttleMs: 0`), et un morceau arrivé après l'urgente ne se
-monte pas (lecture au montage ; le guet l'efface ensuite). L'invitation s'efface **pour le reste de la page**, sans rien retenir dans le
+(`watchUrgentModalOpened`) réagit sans délai, n'examine que les nœuds ajoutés et
+reste armé onglet caché (aucune minuterie) ; un morceau arrivé après l'urgente
+ne se monte pas (lecture au montage ; le guet l'efface ensuite). L'invitation s'efface **pour le reste de la page**, sans rien retenir dans le
 navigateur (elle n'a peut-être pas été lue) : revenue à chaque fermeture d'une
 annonce de lancement, elle couvrirait le plateau en plein match. Elle revient
 à la prochaine fiche ouverte. La modale
@@ -105,7 +106,9 @@ donnée sur une personne, déposées à la demande du lecteur.
   `certificationPromptStep`, `shouldOpenCertificationPrompt`,
   `rememberCertificationPromptClosed`).
 - Lecture : `lib/server/tournaments/certification-prompt.ts`
-  (`loadCertificationPrompt`, une requête sur le roster en cours), appelée par
+  (`loadCertificationPrompt`, une requête sur le roster en cours — `loadRosters`
+  et `toCandidate` du lancement, `match-launch-info.ts` : l'invitation et les
+  contacts présentés ne peuvent pas diverger), appelée par
   `getTournamentViewerContext` — **porte commune** du flux SSE et de la lecture
   REST de secours — seulement pour une équipe engagée dans un tournoi non clos :
   une requête indexée par connexion du flux (pas par instantané). « Ne plus

@@ -74,7 +74,7 @@ jest.mock("@/lib/shared/dialog-focus", () => ({
       modals.stopped += 1;
     };
   },
-  watchModals: (_condition: () => boolean, onMet: () => void) => {
+  watchUrgentModalOpened: (onMet: () => void) => {
     modals.yieldWatchers.push(onMet);
     return () => {
       modals.stopped += 1;
@@ -230,6 +230,14 @@ describe("useCertificationPrompt", () => {
     render(PROMPT);
     expect(render(null).prompt).toBeNull();
     expect(render(PROMPT).prompt).toBe(PROMPT);
+  });
+
+  it("onglet caché : le guet de l'urgente reste armé (sans minuterie)", () => {
+    render(PROMPT);
+    power.clocks = false;
+    render(PROMPT);
+    expect(modals.yieldWatchers.length).toBeGreaterThan(0);
+    expect(act(() => modals.yieldWatchers.at(-1)?.(), PROMPT).prompt).toBeNull();
   });
 
   it("une fiche figée masque la modale et n'ouvre rien", () => {

@@ -9,6 +9,9 @@ import { fakeConnection, type SqlQuery } from "../../helpers/sql-double";
  */
 
 type Member = {
+  team_id?: number;
+  pseudo?: string;
+  roles_json?: string;
   user_id: number;
   discord_verified_at: string | null;
   discord_pseudo: string | null;
@@ -26,7 +29,8 @@ const DISCORD = { discord_verified_at: "2026-10-01 10:00:00", discord_pseudo: "p
 const BATTLETAG = { blizzard_sub: "sub", overwatch_battletag: "Joueur#1234" };
 
 function rosterOf(members: Member[]) {
-  const execute = jest.fn<SqlQuery>().mockResolvedValue([members, []]);
+  const rows = members.map((member) => ({ team_id: 42, pseudo: `J${member.user_id}`, roles_json: "[]", ...member }));
+  const execute = jest.fn<SqlQuery>().mockResolvedValue([rows, []]);
   return { execute, executor: fakeConnection({ execute }) };
 }
 

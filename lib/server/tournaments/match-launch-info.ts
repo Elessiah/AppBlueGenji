@@ -69,7 +69,7 @@ type CandidateRow = LaunchMatchRow & {
   team2_solo_user_id: number | null;
 };
 
-type MemberRow = RowDataPacket & {
+export type MemberRow = RowDataPacket & {
   team_id: number;
   user_id: number;
   pseudo: string;
@@ -198,7 +198,8 @@ async function loadCandidates(
   return rows;
 }
 
-function toCandidate(row: {
+/** Membre lu → candidat contact (aussi lu par l'invitation à certifier, `certification-prompt.ts`). */
+export function toCandidate(row: {
   user_id: number;
   pseudo: string;
   roles: TeamRole[];
@@ -377,8 +378,9 @@ function collectContactIds(visible: readonly VisibleLaunch[]): {
   return { rosterTeamIds, userIds };
 }
 
-async function loadRosters(
-  connection: PoolConnection,
+/** Rosters en cours des équipes, comptes supprimés exclus (aussi lus par `certification-prompt.ts`). */
+export async function loadRosters(
+  connection: Pick<PoolConnection, "execute">,
   rosterTeamIds: Set<number>,
 ): Promise<Map<number, MemberRow[]>> {
   const rosters = new Map<number, MemberRow[]>();

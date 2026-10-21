@@ -4,40 +4,27 @@
  *
  * Voir `docs/features/CERTIFICATION_PROMPT.md`.
  */
-import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import type { PoolConnection } from "mysql2/promise";
+import { parseRoles } from "@/lib/server/serialization";
 import {
   certificationPromptFor,
   teamHasContact,
   type CertificationIdentity,
   type CertificationPrompt,
 } from "@/lib/shared/certification-prompt";
-import { hasVerifiedBattletag, hasVerifiedDiscord } from "@/lib/shared/match-launch";
-
-type RosterIdentityRow = RowDataPacket & {
-  user_id: number;
-  discord_verified_at: Date | string | null;
-  discord_pseudo: string | null;
-  blizzard_sub: string | null;
-  overwatch_battletag: string | null;
-};
+import { hasVerifiedBattletag, hasVerifiedDiscord, type ContactCandidate } from "@/lib/shared/match-launch";
+import { loadRosters, toCandidate } from "./match-launch-info";
 
 /** Certifications d'un membre, par les règles mêmes de `pickLaunchContacts`. */
-function identityOf(row: RosterIdentityRow): CertificationIdentity {
-  return {
-    discordVerified: hasVerifiedDiscord({
-      discordVerified: row.discord_verified_at !== null,
-      discordTag: row.discord_pseudo,
-    }),
-    battletagVerified: hasVerifiedBattletag({
-      blizzardLinked: row.blizzard_sub !== null,
-      battletag: row.overwatch_battletag,
-    }),
-  };
+function identityOf(member: ContactCandidate): CertificationIdentity {
+  return { discordVerified: hasVerifiedDiscord(member), battletagVerified: hasVerifiedBattletag(member) };
 }
 
 /**
  * Invitation due au lecteur, membre de l'équipe `teamId` ; `null` s'il n'en a
  * pas besoin, ou s'il n'est plus dans le roster (départ entre deux lectures).
+ * Le roster est lu comme le lancement le lit (`loadRosters`, `toCandidate`) :
+ * l'invitation et les contacts présentés ne peuvent pas diverger.
  */
 export async function loadCertificationPrompt(
   executor: Pick<PoolConnection, "execute">,
@@ -46,19 +33,14 @@ export async function loadCertificationPrompt(
   isManager: boolean,
   battletagRelevant: boolean,
 ): Promise<CertificationPrompt | null> {
-  const [rows] = await executor.execute<RosterIdentityRow[]>(
-    `SELECT u.id AS user_id, u.discord_verified_at, u.discord_pseudo, u.blizzard_sub, u.overwatch_battletag
-     FROM bg_team_members tm
-     JOIN bg_users u ON u.id = tm.user_id
-     WHERE tm.team_id = ? AND tm.left_at IS NULL AND u.is_deleted = 0`,
-    [teamId],
-  );
-  const viewer = rows.find((row) => Number(row.user_id) === userId);
+  const rosters = await loadRosters(executor, new Set([teamId]));
+  const members = (rosters.get(teamId) ?? []).map((row) => toCandidate({ ...row, roles: parseRoles(row.roles_json) }));
+  const viewer = members.find((member) => member.userId === userId);
   if (!viewer) return null;
   return certificationPromptFor({
     isManager,
     viewer: identityOf(viewer),
-    teamHasContact: teamHasContact(rows.map(identityOf), battletagRelevant),
+    teamHasContact: teamHasContact(members.map(identityOf), battletagRelevant),
     battletagRelevant,
   });
 }
