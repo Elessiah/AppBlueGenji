@@ -171,9 +171,17 @@ export default function PlayerDetailPage() {
                     // La pastille habille un conteneur, pas le lien : son fond
                     // (`background`) effacerait le dégradé de la marche du podium,
                     // peint dans un texte transparent — le nom ne paraîtrait qu'au
-                    // survol (`PODIUM_TIERS.md`).
-                    <span className="badge" style={{ fontSize: 11 }}>
-                      <TeamLink teamId={activeTeam.teamId} title={t("page.viewTeam", { name: activeTeam.teamName })}>
+                    // survol. Sur ce fond teinté, la marche s'éteint
+                    // (`data-podium-muted`, repère conservé) ; le lien reprend le
+                    // rembourrage pour que toute la pastille reste cliquable
+                    // (`PODIUM_TIERS.md`).
+                    <span className="badge" data-podium-muted="" style={{ fontSize: 11, padding: 0 }}>
+                      <TeamLink
+                        teamId={activeTeam.teamId}
+                        podiumTier={deleted ? null : undefined}
+                        style={{ display: "inline-block", padding: "4px 12px", borderRadius: "inherit" }}
+                        title={t("page.viewTeam", { name: activeTeam.teamName })}
+                      >
                         {activeTeam.teamName}
                       </TeamLink>
                     </span>
