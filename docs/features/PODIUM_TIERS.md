@@ -80,6 +80,12 @@ Exceptions :
   Endurance, et dans l'historique manche par manche de l'Endurance) : la marche garde son repère (couronne, losange) mais quitte
   dégradé, lueur, mouvement et graisse — sinon le nom distancé brillerait plus
   fort que les autres.
+- **Équipe active de la fiche joueur** (pastille `.badge`) : la pastille
+  habille un `<span data-podium-muted>` autour du lien — son fond à 10 % de
+  cyan ferait tomber la 3e marche sous 4,5:1, la marche s'y éteint donc
+  (repère conservé) ; le lien reprend le rembourrage de la pastille pour que
+  toute la pastille reste cliquable. Compte supprimé : `podiumTier` à `null`,
+  comme son historique d'équipes.
 - **Vainqueur d'un match** : sans lueur — le fond teinté turquoise de la ligne
   ferait tomber violets et rose sous 4,5:1 sous la lueur.
 - **Graisse en ligne** des classements Suisse et Survie : `standingNameWeight`
@@ -107,10 +113,14 @@ seulement devenir **nettement visible** et suivre l'équipe partout.
   transparent`, robuste dans un titre `.ds-title` déjà en dégradé) ; repères en
   `::before` sans texte : **nom accessible inchangé**.
 - **Aucune surface peinte sur le lien lui-même** : une classe qui pose un
-  `background` (`.badge`, `.pill`) sur le même élément efface le dégradé — le
-  nom, transparent, n'apparaît plus qu'au survol (fiche joueur, v1.41.0). La
-  pastille habille un conteneur autour du lien —
-  `tests/app/podium-link-surfaces.test.ts` balaie `app/` et `components/`.
+  `background` (`.badge`, `.pill`, `.cy-tag`, une classe de module…) sur le
+  même élément efface le dégradé — le nom, transparent, n'apparaît plus qu'au
+  survol (fiche joueur, v1.41.0). La pastille habille un conteneur autour du
+  lien — `tests/app/podium-link-surfaces.test.ts` lit `app/` et `components/`
+  par le compilateur TypeScript (`className` de `TeamLink`, `PlayerLink`,
+  `EntrantLink`, `textClassName` d'`EntrantName`) et tire les surfaces des
+  règles de `globals.css` et des modules CSS importés. Une classe passée par
+  une variable n'y est pas résolue.
 - Lueur par `drop-shadow`, jamais `text-shadow` (sous un texte peint par son
   fond, l'ombre recouvrirait le dégradé).
 - **Contraste** : chaque arrêt est un jeton de texte qui tient **4,5:1** sur le
@@ -139,3 +149,5 @@ seulement devenir **nettement visible** et suivre l'équipe partout.
   `PodiumTiersOff` sur les écrans d'administration.
 - `tests/app/podium-tiers-style.test.ts` — contraste sous la lueur, teintes
   froides, hiérarchie, mouvement en pause, accessibilité, impression.
+- `tests/app/podium-link-surfaces.test.ts` — aucune surface peinte (classe
+  globale ou de module) sur un lien d'entité.
