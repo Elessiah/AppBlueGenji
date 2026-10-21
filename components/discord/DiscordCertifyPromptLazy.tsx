@@ -78,8 +78,6 @@ export function DiscordCertifyPromptLazy({ prompt, privacyPending, termsPending 
   const [done, setDone] = useState(false);
   /** Même fait, lu sans attendre un rendu : un seul `LATER`. */
   const answered = useRef(false);
-  /** Lecture de la mise en page : celle du chargement de ce relais. */
-  const [loadedAt] = useState(() => Date.now());
   const { locale, path: pathname } = useLocalePathname();
 
   const markAnswered = useCallback(() => {
@@ -127,11 +125,6 @@ export function DiscordCertifyPromptLazy({ prompt, privacyPending, termsPending 
       termsPending: termsAccepted === null ? termsPending : !termsAccepted,
       pathname,
     });
-  /**
-   * Ouvrable dès le chargement ? Seule cette lecture-là vaut sans relecture :
-   * une fenêtre armée plus tard n'a écouté aucun autre onglet entre-temps.
-   */
-  const [openAtLoad] = useState(canOpen);
   // Le morceau part dès que la fenêtre peut s'ouvrir, puis reste (verrou posé au rendu).
   if (canOpen && !armed) setArmed(true);
 
@@ -144,7 +137,6 @@ export function DiscordCertifyPromptLazy({ prompt, privacyPending, termsPending 
       onProfile={pathname === "/profil"}
       answered={answered}
       onAnswered={markAnswered}
-      loadedAt={openAtLoad ? loadedAt : 0}
     />
   );
 }

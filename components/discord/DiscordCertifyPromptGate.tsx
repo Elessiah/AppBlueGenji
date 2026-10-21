@@ -25,12 +25,6 @@ export type DiscordCertifyPromptGateProps = {
   answered: { readonly current: boolean };
   /** Répondue ici ou dans un autre onglet : le relais démonte le morceau. */
   onAnswered: () => void;
-  /**
-   * Instant de la lecture de la mise en page **si** la fenêtre a pu s'ouvrir
-   * dès le chargement, `0` sinon : avant le morceau, aucun canal n'écoute les
-   * autres onglets, une lecture d'avant ne vaut donc rien.
-   */
-  loadedAt: number;
   text: CertifyPromptText;
 };
 
@@ -54,7 +48,6 @@ export function DiscordCertifyPromptGate({
   onProfile,
   answered,
   onAnswered,
-  loadedAt,
   text,
 }: Readonly<DiscordCertifyPromptGateProps>) {
   const [current, setCurrent] = useState(prompt);
@@ -78,8 +71,13 @@ export function DiscordCertifyPromptGate({
   }
   if (!canOpen && confirmed) setConfirmed(false);
 
-  /** Dernière lecture tranchée de la proposition. */
-  const readAt = useRef(loadedAt);
+  /**
+   * Dernière lecture tranchée **observée canal ouvert** : aucune au montage —
+   * la lecture de la mise en page date d'avant le canal (morceau en route,
+   * réponse d'un autre onglet perdue), la première ouverture relit donc
+   * toujours (un `GET` par connexion).
+   */
+  const readAt = useRef(0);
   /** Dernière tentative de relecture, tranchée ou non (écart minimal entre deux). */
   const triedAt = useRef(0);
   const seenLayout = useRef(prompt);

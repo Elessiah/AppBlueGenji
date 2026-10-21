@@ -214,9 +214,9 @@ describe("mise en page racine", () => {
     expect(GATE).toContain("if (!canOpen && confirmed) setConfirmed(false);");
     expect(GATE).toMatch(/if \(!canOpen \|\| confirmed \|\| revoked \|\| answered\.current\) return;\s*if \(Date\.now\(\) - readAt\.current < RECHECK_AFTER_MS\) \{\s*setConfirmed\(true\);\s*return;\s*\}\s*const abort = new AbortController\(\);/);
     expect(GATE).toMatch(/if \(result === "UNKNOWN"\) \{\s*setRevoked\("doubt"\);\s*\} else if \(result\.prompt\) \{\s*readAt\.current = Date\.now\(\);\s*setCurrent\(result\.prompt\);\s*setConfirmed\(true\);\s*\} else \{\s*setRevoked\("decided"\);/);
-    // Seule une lecture faite quand la fenêtre pouvait s'ouvrir dès le chargement vaut sans relecture.
-    expect(LAZY).toContain("const [openAtLoad] = useState(canOpen);");
-    expect(LAZY).toContain("loadedAt={openAtLoad ? loadedAt : 0}");
+    // Aucune lecture d'avant le canal ne vaut : la première ouverture relit toujours.
+    expect(GATE).toContain("const readAt = useRef(0);");
+    expect(LAZY).not.toContain("loadedAt");
     expect(GATE).toContain("return () => abort.abort();");
     // Une proposition fraîche de la mise en page (router.refresh) annule la relecture en cours et la rouvre.
     expect(GATE).toContain("}, [canOpen, confirmed, revoked, layoutPrompt, answered]);");

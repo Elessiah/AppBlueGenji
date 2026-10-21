@@ -55,11 +55,11 @@ conditions acceptées ou de nouveau exigées). Le toast « déjà certifié » d
 **Jamais sur un état périmé** (« sur aucun appareil », `/rgpd`) — garde
 `DiscordCertifyPromptGate`, **dans le morceau** (rien de plus sur les pages sans
 proposition) : une lecture de la proposition ne vaut que `RECHECK_AFTER_MS`
-(30 s), et seulement si le canal des autres onglets écoutait depuis — la
-lecture du chargement quand la fenêtre peut s'ouvrir aussitôt, un
-`router.refresh()` ou une relecture une fois le morceau monté. Toute autre
-ouverture — confidentialité ou conditions répondues, retour d'une page qui la
-tait — relit d'abord la proposition (`GET
+(30 s), et seulement si le canal des autres onglets écoutait déjà — un
+`router.refresh()` ou une relecture une fois le morceau monté. La lecture de
+la mise en page, elle, date d'avant le canal (une réponse donnée dans un autre
+onglet pendant le chargement du morceau serait perdue) : la **première**
+ouverture, et toute ouverture au-delà du délai, relit d'abord la proposition (`GET
 /api/profile/discord/certify-prompt` → `{ prompt }`, `recheckCertifyPrompt`),
 **fermée en cas de doute** (panne : la marque reste, elle revient au chargement
 suivant ou au prochain `router.refresh()` qui la dit due, lequel annule aussi
