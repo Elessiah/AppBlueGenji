@@ -80,7 +80,39 @@ function layerEdgeTarget<T>(extra: readonly T[], active: unknown, shiftKey: bool
   return null;
 }
 
-/** Une modale (`aria-modal`) est déjà ouverte : une ouverture d'office attend. */
+/**
+ * Modales ouvertes d'office et décidées, mais pas encore dans le DOM (morceau
+ * chargé à la demande) : elles comptent déjà, sans quoi une autre ouverture
+ * d'office s'y glisserait pendant le chargement.
+ */
+let pendingAutoOpenModals = 0;
+
+/** Réserve la place d'une modale ouverte d'office ; renvoie sa libération (idempotente). */
+export function claimAutoOpenModal(): () => void {
+  pendingAutoOpenModals += 1;
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    pendingAutoOpenModals -= 1;
+  };
+}
+
+/** Une modale (`aria-modal`, ou réservée) est déjà ouverte : une ouverture d'office attend. */
 export function anotherModalOpen(root: ParentNode = document): boolean {
-  return root.querySelector('[aria-modal="true"]') !== null;
+  return pendingAutoOpenModals > 0 || root.querySelector('[aria-modal="true"]') !== null;
+}
+
+/**
+ * Prévient (une fois) quand plus aucune modale n'est ouverte, sans minuterie :
+ * un observateur du DOM, actif le temps de l'attente. Renvoie l'arrêt.
+ */
+export function watchModalsClosed(onClosed: () => void, root: Node = document.body): () => void {
+  const observer = new MutationObserver(() => {
+    if (anotherModalOpen()) return;
+    observer.disconnect();
+    onClosed();
+  });
+  observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-modal"] });
+  return () => observer.disconnect();
 }

@@ -73,12 +73,10 @@ export function useDialogBehavior({ open, onClose, locked = false }: DialogBehav
     // le conteneur (rendu focalisable par `tabIndex={-1}` côté appelant). Le
     // champ marqué est pris **parmi** les focalisables : désactivé ou masqué,
     // `focus()` échouerait en silence et laisserait le focus derrière le voile.
+    const visible = (el: HTMLElement) =>
+      (el.offsetParent !== null && getComputedStyle(el).visibility !== "hidden") || el === document.activeElement;
     const focusablesIn = (root: Element | null) =>
-      Array.from(root?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? []).filter(
-        (el) =>
-          (el.offsetParent !== null && getComputedStyle(el).visibility !== "hidden") ||
-          el === document.activeElement,
-      );
+      Array.from(root?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? []).filter(visible);
     const focusables = () => focusablesIn(containerRef.current);
     const candidates = focusables();
     // Un titre `tabIndex={-1}` marqué `data-autofocus` compte aussi : une modale
@@ -86,7 +84,9 @@ export function useDialogBehavior({ open, onClose, locked = false }: DialogBehav
     // contrôle, tout en bas, la ferait s'ouvrir défilée sur un petit écran.
     const preferred =
       candidates.find((el) => el.dataset.autofocus !== undefined) ??
-      containerRef.current?.querySelector<HTMLElement>('[data-autofocus][tabindex="-1"]');
+      Array.from(containerRef.current?.querySelectorAll<HTMLElement>('[data-autofocus][tabindex="-1"]') ?? []).find(
+        visible,
+      );
     // Un bouton « × » d'en-tête (`data-dialog-close`) vient en tête du DOM pour
     // rester collé en haut du panneau : il n'est pas ce qu'on vient faire dans
     // la modale, le focus d'ouverture va au premier contrôle qui suit.

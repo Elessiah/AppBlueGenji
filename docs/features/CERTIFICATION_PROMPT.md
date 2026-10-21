@@ -27,10 +27,19 @@ prend ses variantes « Discord seul » (titre, motif d'équipe, ligne
 
 La modale ne s'ouvre **jamais par-dessus une autre** (`aria-modal` présent :
 lancement de match, changements de confidentialité…) — deux pièges à focus se
-disputeraient Tab et Échap. Elle attend sa fermeture, guettée chaque seconde
-tant que les horloges tournent (`useClientPower().clocks`) ; la décision pure
-est `certificationPromptStep`. Réciproquement, le centre de lancement attend
-la sienne (`anotherModalOpen`, `lib/shared/dialog-focus.ts`).
+disputeraient Tab et Échap. Elle attend sa fermeture, guettée par un
+observateur du DOM (`watchModalsClosed`, sans minuterie : l'économie d'énergie
+ne la bloque pas) ; la décision pure est `certificationPromptStep`. Décidée,
+elle **réserve sa place** (`claimAutoOpenModal`) pendant le chargement de son
+morceau : le centre de lancement, qui attend toute modale ouverte
+(`anotherModalOpen`, `lib/shared/dialog-focus.ts`), ne s'ouvre pas en même
+temps. La réservation se libère à la fermeture ou au démontage.
+
+Un membre est certifié par les règles mêmes du lancement
+(`hasVerifiedDiscord` / `hasVerifiedBattletag`, `lib/shared/match-launch.ts`).
+Une équipe a un contact dès qu'un membre a l'un ou l'autre, **Marvel Rivals
+compris** : `pickLaunchContacts` présente alors ce BattleTag, l'équipe n'est
+pas injoignable.
 
 La modale dit pourquoi elle s'ouvre, où en est le lecteur (pastilles
 « Certifié » / « À certifier »), puis un **tableau « Ce que ça fait / Ce que ça

@@ -11,6 +11,7 @@ import {
   type CertificationIdentity,
   type CertificationPrompt,
 } from "@/lib/shared/certification-prompt";
+import { hasVerifiedBattletag, hasVerifiedDiscord } from "@/lib/shared/match-launch";
 
 type RosterIdentityRow = RowDataPacket & {
   user_id: number;
@@ -20,11 +21,17 @@ type RosterIdentityRow = RowDataPacket & {
   overwatch_battletag: string | null;
 };
 
-/** Certifications d'un membre, lues comme `pickLaunchContacts` les lit. */
+/** Certifications d'un membre, par les règles mêmes de `pickLaunchContacts`. */
 function identityOf(row: RosterIdentityRow): CertificationIdentity {
   return {
-    discordVerified: row.discord_verified_at !== null && Boolean(row.discord_pseudo),
-    battletagVerified: row.blizzard_sub !== null && Boolean(row.overwatch_battletag),
+    discordVerified: hasVerifiedDiscord({
+      discordVerified: row.discord_verified_at !== null,
+      discordTag: row.discord_pseudo,
+    }),
+    battletagVerified: hasVerifiedBattletag({
+      blizzardLinked: row.blizzard_sub !== null,
+      battletag: row.overwatch_battletag,
+    }),
   };
 }
 

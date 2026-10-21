@@ -1325,8 +1325,8 @@ export function TournamentSheet({ tournamentId, source }: Readonly<{ tournamentI
         />
       )}
 
-      {certificationPrompt.open && detail.certificationPrompt && (
-        <CertificationPromptDialog prompt={detail.certificationPrompt} onClose={certificationPrompt.close} />
+      {certificationPrompt.prompt && (
+        <CertificationPromptDialog prompt={certificationPrompt.prompt} onClose={certificationPrompt.close} />
       )}
 
       {/*

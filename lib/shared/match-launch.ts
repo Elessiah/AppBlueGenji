@@ -340,11 +340,13 @@ function roleRank(roles: readonly TeamRole[]): number {
   return 3;
 }
 
-function hasVerifiedDiscord(member: ContactCandidate): boolean {
+/** Tag Discord certifié : une date de certification **et** un tag (aussi lu par `CERTIFICATION_PROMPT.md`). */
+export function hasVerifiedDiscord(member: Pick<ContactCandidate, "discordVerified" | "discordTag">): boolean {
   return member.discordVerified && Boolean(member.discordTag);
 }
 
-function hasVerifiedBattletag(member: ContactCandidate): boolean {
+/** BattleTag vérifié : un compte Battle.net rattaché **et** un BattleTag. */
+export function hasVerifiedBattletag(member: Pick<ContactCandidate, "blizzardLinked" | "battletag">): boolean {
   return member.blizzardLinked && Boolean(member.battletag);
 }
 

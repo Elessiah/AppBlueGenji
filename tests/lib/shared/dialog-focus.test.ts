@@ -1,6 +1,13 @@
-import { describe, expect, it } from "@jest/globals";
+import { afterEach, describe, expect, it } from "@jest/globals";
 
-import { escapeBelongsElsewhere, focusTrapTarget, type FocusTrapState } from "@/lib/shared/dialog-focus";
+import {
+  anotherModalOpen,
+  claimAutoOpenModal,
+  escapeBelongsElsewhere,
+  focusTrapTarget,
+  watchModalsClosed,
+  type FocusTrapState,
+} from "@/lib/shared/dialog-focus";
 
 const layer = (expanded: boolean) => ({ querySelector: () => (expanded ? {} : null) });
 const target = (attrs: Record<string, string>) => ({ getAttribute: (name: string) => attrs[name] ?? null });
@@ -70,5 +77,75 @@ describe("focusTrapTarget", () => {
     const outside = { ...base, active: "z", inModal: false };
     expect(focusTrapTarget(outside)).toBe("a");
     expect(focusTrapTarget({ ...outside, shiftKey: true })).toBe("c");
+  });
+});
+
+const withModal = { querySelector: () => ({}) } as unknown as ParentNode;
+const withoutModal = { querySelector: () => null } as unknown as ParentNode;
+
+describe("anotherModalOpen et réservation d'une ouverture d'office", () => {
+  it("lit une modale `aria-modal` du DOM", () => {
+    expect(anotherModalOpen(withModal)).toBe(true);
+    expect(anotherModalOpen(withoutModal)).toBe(false);
+  });
+
+  it("compte une modale réservée, pas encore montée, jusqu'à sa libération (idempotente)", () => {
+    const release = claimAutoOpenModal();
+    expect(anotherModalOpen(withoutModal)).toBe(true);
+    const other = claimAutoOpenModal();
+    release();
+    release();
+    expect(anotherModalOpen(withoutModal)).toBe(true);
+    other();
+    expect(anotherModalOpen(withoutModal)).toBe(false);
+  });
+});
+
+describe("watchModalsClosed", () => {
+  const globals = globalThis as unknown as { document?: unknown; MutationObserver?: unknown };
+  const saved = { document: globals.document, MutationObserver: globals.MutationObserver };
+
+  afterEach(() => {
+    globals.document = saved.document;
+    globals.MutationObserver = saved.MutationObserver;
+  });
+
+  /** DOM et observateur simulés : `mutate()` joue une mutation. */
+  function fakeDom() {
+    const state = { modal: true, disconnected: 0, observed: null as unknown };
+    let callback: (() => void) | null = null;
+    globals.document = { querySelector: () => (state.modal ? {} : null) };
+    globals.MutationObserver = class {
+      constructor(cb: () => void) {
+        callback = cb;
+      }
+      observe(_root: unknown, options: unknown) {
+        state.observed = options;
+      }
+      disconnect() {
+        state.disconnected += 1;
+      }
+    };
+    return { state, mutate: () => callback?.() };
+  }
+
+  it("prévient une fois la dernière modale fermée, puis se débranche", () => {
+    const { state, mutate } = fakeDom();
+    const calls: number[] = [];
+    watchModalsClosed(() => calls.push(1), {} as Node);
+    expect(state.observed).toEqual(expect.objectContaining({ childList: true, subtree: true }));
+    mutate();
+    expect(calls).toHaveLength(0);
+    state.modal = false;
+    mutate();
+    expect(calls).toHaveLength(1);
+    expect(state.disconnected).toBe(1);
+  });
+
+  it("l'arrêt débranche l'observateur", () => {
+    const { state } = fakeDom();
+    const stop = watchModalsClosed(() => undefined, {} as Node);
+    stop();
+    expect(state.disconnected).toBe(1);
   });
 });
