@@ -88,7 +88,9 @@ describe("Composants de lien d'entité", () => {
   it("concatènent la classe reçue plutôt que de l'écraser", () => {
     // Les appelants passent des classes de mise en page (ellipse, grille) : les
     // perdre casserait le gabarit qui les entoure.
-    expect(source).toContain('className ? `entity-link ${className}` : "entity-link"');
+    // (Rendu vérifié dans tests/components/podium-tier-links.test.tsx.)
+    expect(source).toContain('[base, truncate ? "entity-truncate" : "", className ?? ""]');
+    expect(source).toContain('className={classes("entity-link")}');
   });
 });
 

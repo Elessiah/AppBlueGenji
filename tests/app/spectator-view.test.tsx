@@ -255,7 +255,7 @@ describe("fiche commune sous SpectatorViewProvider", () => {
       </PodiumTiersProvider>,
     );
     expect(html).not.toContain("<a");
-    expect(html).toMatch(/class="entity-name"[^>]*><span class="podium-member podium-member-\d">/);
+    expect(html).toMatch(/class="entity-name"[^>]*data-podium="podium-member"[^>]*><span class="podium-member podium-member-\d">/);
   });
 
   it("ne laisse pas de case vide pour le motif d'une sanction retiré au public", () => {

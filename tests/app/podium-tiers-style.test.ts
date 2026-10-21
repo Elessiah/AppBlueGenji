@@ -133,17 +133,18 @@ describe("marches du podium — accessibilité et impression", () => {
     expect(readSource("components/entity-link.tsx")).toContain("<PodiumPaint className={podiumClass}>{children}</PodiumPaint>");
   });
 
-  it.each([
-    ["app/(secured)/tournois/[id]/_components/EntrantName.module.css", "truncate"],
-    ["app/(secured)/equipes/[id]/team.module.css", "playerName"],
-  ])("rogne un nom tronqué sur le nom peint, pas sur le lien (%s)", (path, name) => {
-    const module = readSource(path);
-    expect(module).toContain(`.${name}:has(> :global(.podium-tier), > :global(.podium-member)) {\n  overflow: visible;\n}`);
-    expect(module).toMatch(
-      new RegExp(
-        String.raw`\.${name} > :global\(\.podium-tier\),\s*\.${name} > :global\(\.podium-member\) \{\s*display: block;\s*overflow: hidden;\s*text-overflow: ellipsis;\s*\}`,
-      ),
+  it("rogne un nom tronqué sur le nom peint, pas sur le lien (lueur entière, ellipse en dégradé)", () => {
+    expect(block).toMatch(/\n\.entity-truncate \{\s*overflow: hidden;\s*text-overflow: ellipsis;\s*white-space: nowrap;\s*\}/);
+    expect(block).toMatch(/\n\.entity-truncate\[data-podium\] \{\s*overflow: visible;\s*\}/);
+    expect(block).toMatch(
+      /\n\.entity-truncate\[data-podium\] > \.podium-tier,\s*\.entity-truncate\[data-podium\] > \.podium-member \{\s*display: block;\s*overflow: hidden;\s*text-overflow: ellipsis;\s*\}/,
     );
+  });
+
+  it("ne tronque jamais un lien d'entité par une classe de l'appelant", () => {
+    expect(readSource("app/(secured)/equipes/[id]/team.module.css")).not.toMatch(/\.playerName \{[^}]*overflow/);
+    expect(readSource("app/(secured)/equipes/[id]/_components/MembersSection.tsx")).toMatch(/<PlayerLink [^>]*\btruncate>/);
+    expect(readSource("app/(secured)/tournois/[id]/_components/EntrantName.tsx")).toContain("truncate={truncate}");
   });
 
   it("rend une couleur pleine au survol et au focus d'un lien", () => {
@@ -290,6 +291,12 @@ describe("marches du podium — pastille de l'équipe active (fiche joueur)", ()
     expect(contrastRatio(hexOf(color)!, BADGE)).toBeGreaterThanOrEqual(4.5);
   });
 
+  it("au survol et au focus, la couleur pleine du lien tient aussi 4,5:1 sur la pastille", () => {
+    const hover = /\.entity-link:hover > \.podium-tier,[\s\S]*?\{([^}]*)\}/.exec(block)![1];
+    const color = /-webkit-text-fill-color: var\((--[a-z0-9-]+)\);/.exec(hover)![1];
+    expect(contrastRatio(hexOf(color)!, BADGE)).toBeGreaterThanOrEqual(4.5);
+  });
+
   it("éteint la marche du lien en pastille, la pastille restant le lien entier", () => {
     const { attributes } = activeTeamLink();
     expect(attributes.className).toBe('"badge"');
@@ -303,13 +310,11 @@ describe("marches du podium — pastille de l'équipe active (fiche joueur)", ()
 });
 
 describe("marches du podium — graisse d'un lien d'entité", () => {
-  it("pose la graisse sur le lien à spécificité d'une classe, le nom peint en hérite (navigateurs à `:has()`)", () => {
-    const supported = /@supports selector\(:has\(\*\)\) \{([\s\S]*?)\n\}/.exec(block)![1];
-    expect(supported).toMatch(
-      /:where\(\.entity-link, \.entity-name\):where\(:not\(\[data-podium-muted\], \[data-podium-muted\] \*\)\):has\(> \.podium-tier\) \{\s*font-weight: 700;\s*\}/,
+  it("pose la graisse sur le lien à spécificité d'une classe, le nom peint en hérite — sans `:has()`", () => {
+    expect(block).toMatch(
+      /\n:where\(\.entity-link, \.entity-name\):where\(:not\(\[data-podium-muted\], \[data-podium-muted\] \*\)\)\[data-podium="podium-tier"\] \{\s*font-weight: 700;\s*\}/,
     );
-    expect(supported).toMatch(/:where\(\.entity-link, \.entity-name\) > \.podium-tier \{\s*font-weight: inherit;\s*\}/);
-    // Après `.podium-tier { font-weight: 700 }`, à spécificité égale : l'héritage l'emporte.
-    expect(block.indexOf(":where(.entity-link, .entity-name) > .podium-tier")).toBeGreaterThan(block.indexOf("\n.podium-tier {"));
+    expect(block).toMatch(/\n\[data-podium\] > \.podium-tier \{\s*font-weight: inherit;\s*\}/);
+    expect(block).not.toContain(":has(");
   });
 });
