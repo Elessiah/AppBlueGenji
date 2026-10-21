@@ -154,7 +154,8 @@ refaire à chaque version qui change une règle de fond pour tous les comptes.
 et rôle d'équipe communiqués aux deux équipes d'un match et à ses arbitres
 (permission `tournaments`, administrateurs compris) dès que ses adversaires
 sont connus, et à son caster le temps du match seulement (ceux du caster aux
-équipes sur ce même temps), par la fenêtre « Contacts » du match et par sa
+équipes sur ce même temps ; aux arbitres, depuis le 2026-10-21, dès que les
+adversaires sont connus), par la fenêtre « Contacts » du match et par sa
 fenêtre de lancement, qui la reprend au départ du match (précision de la
 version 6) — un
 BattleTag masqué n'est lisible nulle part ailleurs, arbitres et administrateurs
@@ -174,6 +175,13 @@ la fenêtre « Contacts ». Annoncée par l'entrée
 fin du cookie `bg_terms_later` et la phrase d'avertissement du BattleTag
 masqué. **Tout compte la réaccepte** dans la fenêtre bloquante (décision du
 2026-10-19).
+
+**Retouche de la version 6** (2026-10-21, sans nouvelle version — décision de
+l'utilisateur) : « Contacts de match » ouvre aux arbitres les contacts **du
+caster** dès que les deux adversaires sont connus, comme ceux des équipes ; les
+équipes ne les lisent toujours que le temps du match. Seuls les casters
+(membres du staff porteurs de `live`) sont concernés : annoncé par l'entrée
+`2026-10-contacts-du-caster-aux-arbitres`, sans réacceptation.
 
 Tout texte qui dit où se lit un BattleTag masqué (avertissement, modale de
 masquage, fiche joueur, conditions v6, `/rgpd`, registre, `PRIVACY_CHANGES`)

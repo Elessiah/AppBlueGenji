@@ -369,7 +369,7 @@ dit là où le BattleTag se renseigne et se masque (`games.hiddenWarning`,
 | Le propriétaire du compte                                                   | ✅                        |
 | Membre d'une des deux équipes, fenêtre « Contacts » (deux adversaires connus → fin du match), contact présenté | ✅ |
 | **Caster inscrit**, fenêtre « Contacts », en lancement ou lancé              | ✅ (le temps du match seulement) |
-| **Arbitre / administrateur** (permission `tournaments`), fenêtre « Contacts » de la carte, aux mêmes moments que les équipes | ✅ |
+| **Arbitre / administrateur** (permission `tournaments`), fenêtre « Contacts » de la carte, aux mêmes moments que les équipes — caster compris | ✅ |
 | Arbitre, administrateur, `casting`, joueur, visiteur — partout ailleurs     | ❌                        |
 
 **L'arbitre lit les contacts comme un joueur du match** (décision de
@@ -377,7 +377,9 @@ l'utilisateur, 2026-10-19) : la carte lui offre le bouton « Contacts » aux mê
 phases (dès « À planifier », les deux adversaires connus — `launchStripControls`,
 `canSchedule`), et `loadViewerMatchContacts` lui rend la même présentation, rôle
 `REFEREE`, sans « Prêt » ; la modale de lancement ne lui présente rien. Les
-contacts du caster lui sont tus avant le départ, comme aux équipes.
+contacts du caster lui sont rendus dès que les deux adversaires sont connus
+(décision de l'utilisateur, 2026-10-21), quand les équipes ne les lisent que le
+temps du match. Un arbitre qui joue le match lit en joueur (rôle `TEAM1`/`TEAM2`).
 
 Les contacts **du caster** (tag Discord certifié, BattleTag) ne sont présentés
 aux équipes que le temps du match, symétriquement ; avant, la carte montre les

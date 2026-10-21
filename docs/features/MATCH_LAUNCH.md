@@ -106,9 +106,14 @@ pour la seule lecture d'une carte ; la requête du match lève alors la clause
 « partie du match » (`1 = 1 OR …`), `exposesContacts` le traite comme un joueur,
 et `viewerRole` lui rend le rôle `REFEREE` (`MatchLaunchViewerRole`), sans
 « Prêt ». La modale de lancement ne lui présente rien. Les contacts du caster
-lui sont tus avant le départ comme aux équipes ; la modale « Contacts » dit
-alors « Ses contacts s'afficheront au départ du match » (`contacts.casterLater`)
-au lieu de deux « — ».
+lui sont rendus dès que les deux adversaires sont connus (décision de
+l'utilisateur, 2026-10-21 : `exposesCaster` ouvert au rôle `REFEREE`,
+`casterContactsOpen` côté modale, sans relecture à l'heure de départ). Un arbitre
+qui **joue** le match lit en joueur (rôle `TEAM1`/`TEAM2`) : pour lui, comme pour
+les équipes, la modale « Contacts » dit avant le départ « Ses contacts
+s'afficheront au départ du match » (`contacts.casterLater`) au lieu de deux « — ».
+Déclaré : `PRIVACY_CHANGES` `2026-10-contacts-du-caster-aux-arbitres`, `/rgpd`,
+le registre (T04) et les conditions (v6 retouchée, sans nouvelle version).
 
 Elle ouvre `MatchContactsDialog` (portail `document.body`,
 `useDialogBehavior`, `useBackdropDismiss`, `ScrollArea`, focus sur « Fermer »),
@@ -126,7 +131,8 @@ s'organisent avant l'heure, surtout sans phase de lancement. Le **caster**, lui,
 garde la borne de la modale — en lancement ou lancé (`exposesContacts`, lu avec
 `viewerPlaysMatch`) — : avant, la route le traite comme un tiers. Symétrie :
 les équipes ne reçoivent les contacts **du caster** que le temps du match
-(`exposesCaster`) ; avant, la carte montre leurs contacts sans les siens. Qui
+(`exposesCaster`) ; avant, la carte montre leurs contacts sans les siens (un
+arbitre, lui, les reçoit dès que les adversaires sont connus). Qui
 n'est pas partie du match, le caster d'un match pas encore parti, ou
 un match sans contacts (adversaire inconnu, terminé), reçoit `MATCH_CONTACTS_UNAVAILABLE` (404), un seul code :
 la réponse ne dit pas qui joue quoi. La carte décide du bouton à l'horloge du
@@ -334,9 +340,10 @@ les abonnés du flux : l'instantané ne porte que les « Prêt », l'hôte et le
 Le caster compte parmi les parties : il reçoit le BattleTag **masqué** des
 contacts, et les équipes le sien — dans les deux sens **le temps du match
 seulement** (`exposesCaster`, lancement ouvert ou lancé) ; avant, la carte
-montre aux équipes leurs contacts sans ceux du caster. Hors de cette fenêtre, un
-BattleTag masqué n'est lisible de personne, arbitres et administrateurs compris
-(`battletag-visibility.ts`). `docs/AUTHORIZATION_RULES.md` §2.3 l'écrit
+montre aux équipes leurs contacts sans ceux du caster. Les arbitres lisent ceux
+du caster, comme ceux des équipes, dès que les deux adversaires sont connus
+(2026-10-21). Hors de la fenêtre « Contacts », un BattleTag masqué n'est lisible
+de personne, arbitres et administrateurs compris (`battletag-visibility.ts`). `docs/AUTHORIZATION_RULES.md` §2.3 l'écrit
 comme une ligne à part, distincte de la permission `casting`, qui n'ouvre
 rien sur la fiche d'un joueur.
 
