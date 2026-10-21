@@ -13,6 +13,7 @@ import {
 import { type SqlQuery, fakePool } from "../../helpers/sql-double";
 import { fakeCookieStore } from "../../helpers/cookie-store";
 import { registerSessionStream, registeredStreamCount } from "@/lib/server/session-streams";
+import type { ConnectionLogEvent } from "@/lib/shared/connection-logs";
 
 const originalEnv = { ...process.env };
 
@@ -254,6 +255,92 @@ describe("auth", () => {
       jest.spyOn(console, "error").mockImplementation(() => undefined);
       await expect(createSession(5, "LOGIN_DISCORD")).resolves.toBeUndefined();
       expect(recordConnection).toHaveBeenCalledWith(5, "LOGIN_DISCORD");
+    });
+  });
+
+  describe("createSession — certification Discord proposée (CERTIFY-PROMPT)", () => {
+    const sessionInserts = (execute: ReturnType<typeof jest.fn<SqlQuery>>) =>
+      execute.mock.calls.filter(([sql]) => String(sql).includes("INSERT INTO bg_user_sessions"));
+    const setUp = async (execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []])) => {
+      const { getDatabase } = await import("@/lib/server/database");
+      const { cookies } = await import("next/headers");
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+      jest.mocked(cookies).mockResolvedValue(fakeCookieStore({ set: jest.fn(), get: jest.fn() }));
+      return execute;
+    };
+
+    const doors: ConnectionLogEvent[] = ["LOGIN_DISCORD", "LOGIN_DISCORD_CODE", "LOGIN_BLIZZARD"];
+    for (const event of doors) {
+      it(`${event} : la session porte la proposition`, async () => {
+        const execute = await setUp();
+        await createSession(4, event);
+        const inserts = sessionInserts(execute);
+        expect(inserts).toHaveLength(1);
+        expect(String(inserts[0][0]).replace(/\s+/g, " ")).toContain(
+          "(token_hash, user_id, expires_at, certify_prompt_due) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL ? DAY), 1)",
+        );
+        expect(inserts[0][1]).toEqual([expect.stringMatching(/^[0-9a-f]{64}$/), 4, 30]);
+      });
+    }
+
+    it("LOGIN_GOOGLE (One Tap compris) : session sans proposition", async () => {
+      const execute = await setUp();
+      await createSession(4, "LOGIN_GOOGLE");
+      const inserts = sessionInserts(execute);
+      expect(inserts).toHaveLength(1);
+      expect(String(inserts[0][0])).not.toContain("certify_prompt_due");
+    });
+
+    it("colonne absente (migration en échec) : la session s'ouvre quand même, sans la marque", async () => {
+      const unknownColumn = Object.assign(new Error("Unknown column"), { code: "ER_BAD_FIELD_ERROR" });
+      const execute = await setUp(
+        jest.fn<SqlQuery>(async (sql) => {
+          if (sql.includes("certify_prompt_due")) throw unknownColumn;
+          return [{ affectedRows: 1 }, []];
+        }),
+      );
+      await expect(createSession(4, "LOGIN_DISCORD")).resolves.toBeUndefined();
+      const inserts = sessionInserts(execute);
+      expect(inserts).toHaveLength(2);
+      expect(String(inserts[1][0])).not.toContain("certify_prompt_due");
+    });
+
+    it("toute autre erreur d'écriture remonte (pas de session ouverte en silence)", async () => {
+      await setUp(
+        jest.fn<SqlQuery>(async (sql) => {
+          if (sql.includes("INSERT INTO bg_user_sessions")) throw Object.assign(new Error("lock"), { code: "ER_LOCK_WAIT_TIMEOUT" });
+          return [{ affectedRows: 1 }, []];
+        }),
+      );
+      await expect(createSession(4, "LOGIN_BLIZZARD")).rejects.toThrow("lock");
+    });
+  });
+
+  describe("getCurrentUser — proposition de certification lue avec la session", () => {
+    it("lit la marque de la session dans la même requête", async () => {
+      const { getDatabase } = await import("@/lib/server/database");
+      const { cookies } = await import("next/headers");
+      jest.mocked(cookies).mockResolvedValue(fakeCookieStore({ get: jest.fn().mockReturnValue({ value: "tok" }) }));
+      const row = {
+        id: 3, pseudo: "P", avatar_url: null, discord_id: null, google_sub: null,
+        is_adult: 1, is_admin: 0, platform_roles_json: null, recruitment_modal_off: 0, certify_prompt_due: 1,
+      };
+      const execute = jest.fn<SqlQuery>().mockResolvedValue([[row], []]);
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+      expect((await getCurrentUser())?.certifyPromptDue).toBe(true);
+      expect(execute).toHaveBeenCalledTimes(1);
+      expect(String(execute.mock.calls[0][0])).toMatch(/s\.certify_prompt_due/);
+    });
+
+    it("absente ou à 0 : rien à proposer", async () => {
+      const { getDatabase } = await import("@/lib/server/database");
+      const { cookies } = await import("next/headers");
+      jest.mocked(cookies).mockResolvedValue(fakeCookieStore({ get: jest.fn().mockReturnValue({ value: "tok" }) }));
+      for (const due of [0, null, undefined]) {
+        const row = { id: 3, pseudo: "P", avatar_url: null, discord_id: null, google_sub: null, is_adult: 1, is_admin: 0, platform_roles_json: null, certify_prompt_due: due };
+        jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: jest.fn<SqlQuery>().mockResolvedValue([[row], []]) }));
+        expect((await getCurrentUser())?.certifyPromptDue).toBe(false);
+      }
     });
   });
 

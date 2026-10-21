@@ -224,6 +224,23 @@ describe("exportOwnData", () => {
     expect(await run(2)).toEqual([false, true]);
   });
 
+  it("rend la date du « Ne plus voir » de la fenêtre de certification Discord, null par défaut", async () => {
+    const run = async (value: Date | null | undefined) => {
+      const execute = jest
+        .fn<SqlQuery>()
+        .mockResolvedValueOnce([[exportRow({ discord_certify_prompt_dismissed_at: value })]])
+        .mockResolvedValueOnce([[fullProfileRow({})]])
+        .mockResolvedValue([[]]);
+      await mockDb(execute);
+      const data = await exportOwnData(42);
+      expect(execute.mock.calls[0][0]).toMatch(/\bdiscord_certify_prompt_dismissed_at\b/);
+      return data.account.discordCertifyPromptDismissedAt;
+    };
+    expect(await run(new Date("2026-10-21T08:00:00.000Z"))).toBe("2026-10-21T08:00:00.000Z");
+    expect(await run(null)).toBeNull();
+    expect(await run(undefined)).toBeNull();
+  });
+
   it("colonne recruitment_modal_off absente (ALTER échoué) : l'export est rendu quand même, drapeau au défaut", async () => {
     const unknownColumn = Object.assign(new Error("Unknown column 'recruitment_modal_off'"), { code: "ER_BAD_FIELD_ERROR" });
     const execute = jest
