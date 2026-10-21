@@ -168,17 +168,15 @@ export default function PlayerDetailPage() {
                   style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 2 }}
                 >
                   {activeTeam ? (
-                    // La pastille habille un conteneur, pas le lien : son fond
-                    // (`background`) effacerait le dégradé de la marche du podium,
-                    // peint dans un texte transparent — le nom ne paraîtrait qu'au
-                    // survol. Sur ce fond teinté, les marches tomberaient sous
-                    // 4,5:1 : elles s'y éteignent (`data-podium-muted`, repère
-                    // conservé). `.badge-link` : le lien couvre toute la pastille
-                    // (`PODIUM_TIERS.md`).
-                    <span className="badge badge-link" data-podium-muted="" style={{ fontSize: 11 }}>
+                    // Sur le fond teinté de la pastille, la marche du podium
+                    // tomberait sous 4,5:1 : elle s'y éteint (`data-podium-muted`,
+                    // repère conservé, `PODIUM_TIERS.md`).
+                    <span data-podium-muted="">
                       <TeamLink
                         teamId={activeTeam.teamId}
                         podiumTier={deleted ? null : undefined}
+                        className="badge"
+                        style={{ fontSize: 11 }}
                         title={t("page.viewTeam", { name: activeTeam.teamName })}
                       >
                         {activeTeam.teamName}

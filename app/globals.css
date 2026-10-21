@@ -189,7 +189,9 @@ a {
    chaque nom rendu par les liens d'entité (`TeamLink`, `EntrantLink`,
    `EntrantName`, `TeamPodiumName`) ; leurs membres, une version adoucie sur
    `PlayerLink`. Posées par `podiumTierClass()` (`lib/shared/podium-tiers.ts`) :
-   `.podium-tier.podium-tier-N` (équipe), `.podium-member.podium-member-N`.
+   `.podium-tier.podium-tier-N` (équipe), `.podium-member.podium-member-N` — sur
+   un `<span>` dans le lien, jamais sur le lien, dont la classe de l'appelant
+   (`.badge`…) pourrait poser un `background` qui effacerait le dégradé.
    1re : dégradé irisé cyan → violet → rose, balayé d'un reflet clair, lueur
          néon et couronne — la plus brillante.
    2e  : chrome glacier (bleu → cyan, reflet plus lent), lueur froide, losange.
@@ -316,10 +318,10 @@ a {
 }
 
 /* Survol et focus : couleur pleine, comme tout lien d'entité (soulignement lisible). */
-.entity-link.podium-tier:hover,
-.entity-link.podium-tier:focus-visible,
-.entity-link.podium-member:hover,
-.entity-link.podium-member:focus-visible {
+.entity-link:hover > .podium-tier,
+.entity-link:focus-visible > .podium-tier,
+.entity-link:hover > .podium-member,
+.entity-link:focus-visible > .podium-member {
   background-image: none;
   color: var(--blue-100);
   -webkit-text-fill-color: var(--blue-100);
@@ -432,34 +434,16 @@ a {
 }
 
 .badge {
-  --badge-padding: 4px 12px;
-  --badge-border: 1px solid rgba(89, 212, 255, 0.35);
   display: inline-block;
-  padding: var(--badge-padding);
+  padding: 4px 12px;
   border-radius: 999px;
-  border: var(--badge-border);
+  border: 1px solid rgba(89, 212, 255, 0.35);
   background: rgba(89, 212, 255, 0.1);
   color: var(--accent-blue);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-}
-
-/* Pastille autour d'un lien d'entité (équipe active de la fiche joueur) : le
-   lien reprend rembourrage et bord, toute la pastille est cliquable. La
-   pastille habille le conteneur et non le lien — son `background` effacerait le
-   nom d'une marche du podium, peint dans un texte transparent (`PODIUM_TIERS.md`). */
-.badge.badge-link {
-  padding: 0;
-  border: 0;
-}
-
-.badge-link > * {
-  display: inline-block;
-  padding: var(--badge-padding);
-  border: var(--badge-border);
-  border-radius: inherit;
 }
 
 .grid-2 {
