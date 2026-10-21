@@ -126,8 +126,19 @@ describe("marches du podium — mouvement", () => {
 });
 
 describe("marches du podium — accessibilité et impression", () => {
-  it("garde un soulignement visible malgré le texte transparent (« Liens soulignés »)", () => {
-    expect(rule(".podium-tier,\n.podium-member")).toMatch(/text-decoration-color: var\(--blue-300\)/);
+  it("laisse le soulignement au lien, dont le texte reste coloré (« Liens soulignés »)", () => {
+    // Le texte transparent est celui du `<span>` intérieur : le trait, tracé par
+    // le lien, prend la couleur du lien — aucune couleur de trait à imposer.
+    expect(rule(".podium-tier,\n.podium-member")).not.toMatch(/text-decoration/);
+    expect(readSource("components/entity-link.tsx")).toContain("<span className={podiumClass}>{children}</span>");
+  });
+
+  it("rogne un nom tronqué sur le nom peint, pas sur le lien (lueur entière, ellipse en dégradé)", () => {
+    const module = readSource("app/(secured)/tournois/[id]/_components/EntrantName.module.css");
+    expect(module).toMatch(/\.truncate:has\(> :global\(\.podium-tier\), > :global\(\.podium-member\)\) \{\s*overflow: visible;\s*\}/);
+    expect(module).toMatch(
+      /\.truncate > :global\(\.podium-tier\),\s*\.truncate > :global\(\.podium-member\) \{\s*display: block;\s*overflow: hidden;\s*text-overflow: ellipsis;\s*\}/,
+    );
   });
 
   it("rend une couleur pleine au survol et au focus d'un lien", () => {
@@ -231,9 +242,9 @@ describe("marches du podium — outils du staff et comptes supprimés", () => {
 
 /**
  * Lien de l'équipe active de la fiche joueur, lu par le compilateur TypeScript
- * (indépendant de l'ordre des props) : ses attributs, et ceux de son parent.
+ * (indépendant de l'ordre des props) : ses attributs.
  */
-function activeTeamLink(): { attributes: Record<string, string>; parent: Record<string, string> } {
+function activeTeamLink(): { attributes: Record<string, string> } {
   const path = "app/(secured)/joueurs/[id]/page.tsx";
   const file = ts.createSourceFile(path, readSource(path), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const attributesOf = (opening: ts.JsxOpeningLikeElement) =>
@@ -242,13 +253,11 @@ function activeTeamLink(): { attributes: Record<string, string>; parent: Record<
         .filter(ts.isJsxAttribute)
         .map((attribute) => [attribute.name.getText(file), attribute.initializer?.getText(file) ?? "true"]),
     );
-  let found: { attributes: Record<string, string>; parent: Record<string, string> } | undefined;
+  let found: { attributes: Record<string, string> } | undefined;
   const visit = (node: ts.Node) => {
     if (ts.isJsxElement(node) && node.openingElement.tagName.getText(file) === "TeamLink") {
       const attributes = attributesOf(node.openingElement);
-      if (attributes.teamId === "{activeTeam.teamId}" && ts.isJsxElement(node.parent)) {
-        found = { attributes, parent: attributesOf(node.parent.openingElement) };
-      }
+      if (attributes.teamId === "{activeTeam.teamId}") found = { attributes };
     }
     ts.forEachChild(node, visit);
   };
@@ -269,9 +278,21 @@ describe("marches du podium — pastille de l'équipe active (fiche joueur)", ()
     expect(contrastRatio(hexOf("--accent-blue")!, BADGE)).toBeGreaterThanOrEqual(4.5);
   });
 
-  it("éteint la marche dans la pastille (repère conservé), la pastille restant le lien entier", () => {
-    const { attributes, parent } = activeTeamLink();
-    expect(attributes.className).toBe('"badge"');
-    expect(parent["data-podium-muted"]).toBe('""');
+  it("éteint la marche de tout lien en pastille, la pastille restant le lien entier", () => {
+    const muted = /((?:[^{}]*,\s*)?)\[data-podium-muted\] \.podium-member \{([^}]*)\}/.exec(block);
+    expect(muted).not.toBeNull();
+    for (const surface of ["badge", "pill", "cy-tag"]) {
+      expect(muted![1]).toContain(`.${surface} > .podium-tier,`);
+      expect(muted![1]).toContain(`.${surface} > .podium-member,`);
+    }
+    expect(muted![2]).toContain("color: inherit");
+    expect(activeTeamLink().attributes.className).toBe('"badge"');
+  });
+
+  it("donne au nom éteint la couleur de la pastille, et non celle héritée par `.entity-link`", () => {
+    // Même spécificité : la pastille l'emporte parce qu'elle vient après.
+    expect(css.indexOf("\n.badge {")).toBeGreaterThan(css.indexOf("\n.entity-link {"));
+    expect(css.indexOf("\n.pill {")).toBeGreaterThan(css.indexOf("\n.entity-link {"));
+    expect(css.indexOf("\n.cy-tag {")).toBeGreaterThan(css.indexOf("\n.entity-link {"));
   });
 });
