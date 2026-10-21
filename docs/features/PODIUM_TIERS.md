@@ -80,13 +80,11 @@ Exceptions :
   Endurance, et dans l'historique manche par manche de l'Endurance) : la marche garde son repère (couronne, losange) mais quitte
   dégradé, lueur, mouvement et graisse — sinon le nom distancé brillerait plus
   fort que les autres.
-- **Équipe active de la fiche joueur** (pastille `.badge`) : la pastille
-  habille un `<span data-podium-muted>` autour du lien — sous la lueur, son
-  fond à 10 % de cyan ferait tomber chacune des trois marches sous 4,5:1, la
-  marche s'y éteint donc (repère conservé) ; `.badge-link` relaie au lien le
-  rembourrage et le bord de la pastille (`--badge-padding`, `--badge-border`)
-  pour que toute la pastille reste cliquable. Compte supprimé : `podiumTier` à `null`,
-  comme son historique d'équipes.
+- **Équipe active de la fiche joueur** (lien en pastille `.badge`) : sous la
+  lueur, le fond de la pastille (10 % de cyan) ferait tomber chacune des trois
+  marches sous 4,5:1 ; un `<span data-podium-muted>` l'y éteint (repère
+  conservé). Compte supprimé : `podiumTier` à `null`, comme son historique
+  d'équipes.
 - **Vainqueur d'un match** : sans lueur — le fond teinté turquoise de la ligne
   ferait tomber violets et rose sous 4,5:1 sous la lueur.
 - **Graisse en ligne** des classements Suisse et Survie : `standingNameWeight`
@@ -113,23 +111,12 @@ seulement devenir **nettement visible** et suivre l'équipe partout.
 - Texte **réel** peint par `background-clip: text` (`-webkit-text-fill-color:
   transparent`, robuste dans un titre `.ds-title` déjà en dégradé) ; repères en
   `::before` sans texte : **nom accessible inchangé**.
-- **Aucune surface peinte sur le lien lui-même** : une classe qui pose un
-  `background` (`.badge`, `.pill`, `.cy-tag`, une classe de module…) sur le
-  même élément efface le dégradé — le nom, transparent, n'apparaît plus qu'au
-  survol (fiche joueur, v1.41.0). La pastille habille un conteneur autour du
-  lien — `tests/app/podium-link-surfaces.test.ts` lit `app/` et `components/`
-  par le compilateur TypeScript (`className` de `TeamLink`, `PlayerLink`,
-  `EntrantLink`, `textClassName` d'`EntrantName`) et tire les surfaces des
-  règles des feuilles globales (`globals.css`, `bot.css`, `docs.css`) et des
-  modules CSS importés (toute classe du dernier sélecteur composé d'une règle
-  qui pose un fond, `:hover` et classes jointes compris, hors `:not()` /
-  `:is()` / `:where()` / `:has()`). Une classe passée par une variable n'y est
-  pas résolue.
-- **Pourquoi pas une spécificité plus forte** sur la peinture de la marche :
-  `background-clip: text` découperait aussi le fond de la pastille dans les
-  lettres (pastille vidée), et les surcharges de module à spécificité égale
-  (`.winner :global(.podium-tier)`, `MatchRow`) ne gagneraient plus que par
-  l'ordre de chargement des feuilles.
+- **Peinte dans le lien, jamais sur le lien** : `TeamLink`, `PlayerLink` et
+  `EntrantLink` posent la marche sur un `<span>` intérieur ; la classe de
+  l'appelant reste sur le lien. Une classe qui pose un `background` (`.badge`,
+  `.pill`, une classe de module…) sur l'élément peint effacerait le dégradé —
+  le nom, transparent, n'apparaissait plus qu'au survol (fiche joueur,
+  v1.41.0). Aucune règle d'appel à tenir : toute classe est sûre sur le lien.
 - Lueur par `drop-shadow`, jamais `text-shadow` (sous un texte peint par son
   fond, l'ombre recouvrirait le dégradé).
 - **Contraste** : chaque arrêt est un jeton de texte qui tient **4,5:1** sur le
@@ -142,7 +129,8 @@ seulement devenir **nettement visible** et suivre l'équipe partout.
   périodique (pas de saut), en pause par `var(--deco-anim-state)` (régime de
   charge `useClientPower`, mouvement réduit, menu d'accessibilité). À l'arrêt,
   la moitié la plus colorée du dégradé reste peinte.
-- Survol / focus d'un lien : couleur pleine `--blue-100`, soulignement lisible ;
+- Survol / focus d'un lien (`.entity-link:hover > .podium-tier`) : couleur
+  pleine `--blue-100`, soulignement lisible ;
   « Liens soulignés » : trait `--blue-300` malgré le texte transparent.
 - Contraste renforcé : lueur effacée. Couleurs forcées : fond retiré, couleur
   du système. Impression : couleur pleine `--blue-500`, repère masqué.
@@ -154,9 +142,9 @@ seulement devenir **nettement visible** et suivre l'équipe partout.
 - `tests/lib/server/podium-tiers.test.ts` — classement « Général », une requête,
   cache et invalidation, panne.
 - `tests/components/podium-tier-links.test.tsx` — `TeamLink`, `PlayerLink`,
-  `EntrantLink` (solo compris), noms non cliquables, marche imposée,
+  `EntrantLink` (solo compris), marche sur le `<span>` intérieur et classe de
+  l'appelant sur le lien, noms non cliquables, marche imposée,
   `PodiumTiersOff` sur les écrans d'administration.
 - `tests/app/podium-tiers-style.test.ts` — contraste sous la lueur, teintes
-  froides, hiérarchie, mouvement en pause, accessibilité, impression.
-- `tests/app/podium-link-surfaces.test.ts` — aucune surface peinte (classe
-  globale ou de module) sur un lien d'entité.
+  froides, hiérarchie, mouvement en pause, accessibilité, impression, pastille
+  de l'équipe active de la fiche joueur.

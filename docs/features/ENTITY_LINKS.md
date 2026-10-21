@@ -149,7 +149,10 @@ qu'avec un lien mort.
 premières équipes du classement « Général » (`.podium-tier-N`), `PlayerLink`
 la version adoucie de l'équipe du joueur (`.podium-member-N`, la plus haute
 s'il en a plusieurs). La marche est lue dans un contexte posé par la mise en
-page racine (`components/podium-tiers.tsx`) — aucune requête par lien.
+page racine (`components/podium-tiers.tsx`) — aucune requête par lien. La marche se
+peint sur un `<span>` **dans** le lien, la classe de l'appelant restant sur
+le lien : une pastille (`.badge`) ou tout fond posé par l'appelant ne peut
+plus effacer le nom.
 
 - `podiumTier` impose une marche (`/classement`, onglet affiché) ; `null`
   n'en pose aucune (lien-avatar sans texte).
