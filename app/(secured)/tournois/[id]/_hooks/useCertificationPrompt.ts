@@ -34,9 +34,12 @@ function browserStorage(kind: "localStorage" | "sessionStorage"): Storage | null
  * par-dessus ; l'invitation s'efface sans rien retenir, case « Ne plus voir »
  * comprise (tenue ici, pas dans la modale), et revient à sa fermeture.
  *
- * Une invitation retirée (certifiée entre-temps, tournoi clos, lecture en
- * échec côté serveur) masque la modale sans la fermer : revenue à la lecture
- * suivante, elle réapparaît. Une fiche figée la masque aussi.
+ * Le serveur la calcule une fois par connexion du flux (ou lecture REST de
+ * secours) : une certification faite entre-temps ne la retire qu'à la lecture
+ * suivante. Retirée (ou lecture en échec côté serveur), elle masque la modale
+ * sans la fermer : revenue, elle réapparaît. Tournoi clos ou équipe retirée
+ * depuis : masquée sur-le-champ (`liveCertificationPrompt`, instantané à
+ * jour). Une fiche figée la masque aussi.
  */
 export function useCertificationPrompt(prompt: CertificationPrompt | null | undefined, frozen: boolean) {
   const { clocks } = useClientPower();
