@@ -481,7 +481,7 @@ que pour un tag **certifié** — publier un tag que personne n'a prouvé ferait
 | ------------------------------------ | ---------------------------------------------- |
 | Le propriétaire du compte            | Toujours, certifié ou non                      |
 | N'importe qui, tag **non certifié**  | **Jamais**, administrateur compris              |
-| Partie d'un même match lancé         | Du lancement à la fin du match (joueurs des deux engagées, caster inscrit) |
+| Partie d'un même match (`sharesMatchLobby`) | Joueurs des deux engagées : dès que les deux adversaires sont connus, jusqu'à la fin ; caster inscrit, et équipes pour le caster : le temps du match ; arbitres (`tournaments`) pour le caster : dès que les deux adversaires sont connus, jusqu'à la fin |
 | Administrateur                       | Toujours (tag certifié)                         |
 | Permission `tournaments`             | Si le joueur est engagé dans un tournoi vivant  |
 | Joueur connecté quelconque           | Si le propriétaire a coché « Tag Discord » (`visible_discord`) |
@@ -517,8 +517,9 @@ profil du titulaire lu par `GET /api/profile`), le panneau de contacts
 d'un tournoi (`GET /api/admin/tournaments/[id]/contacts`, qui n'a plus que la
 certification à appliquer, en SQL, puisque tout joueur listé est engagé dans *ce*
 tournoi) et la modale de lancement d'un match (`GET /api/me/match-launches`, qui
-seule établit `sharesMatchLobby` — lecteur partie du match, match en lancement ou
-lancé). Rien de tout cela n'entre dans
+seule établit `sharesMatchLobby` — lecteur partie du match aux durées du tableau
+ci-dessus : équipes et arbitres dès que les deux adversaires sont connus, caster le
+temps du match, contacts du caster aux arbitres dès que les adversaires sont connus). Rien de tout cela n'entre dans
 `TournamentSnapshot`, qui est diffusé tel quel à tous les abonnés du flux.
 
 ---
