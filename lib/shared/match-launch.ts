@@ -417,7 +417,10 @@ export type LaunchSide = {
   /** Entrée solo : l'engagé est un joueur, pas une équipe. */
   isSolo: boolean;
   ready: boolean;
-  /** Vide pour une fantôme, et tant que le match n'est pas en lancement. */
+  /**
+   * Vide pour une fantôme, et tant que le serveur ne les ouvre pas à ce
+   * lecteur — `contactsShown` le dit, jamais la longueur de cette liste.
+   */
   contacts: LaunchContact[];
   /**
    * Le serveur ouvre-t-il les contacts des engagées à ce lecteur (`exposes`) ?
@@ -498,8 +501,8 @@ export function matchUnderway(phase: MatchLaunchPhase): boolean {
 /**
  * Les contacts des engagées sortent-ils pour ce match ? Dans la modale de
  * lancement, en lancement ou lancé ; par le bouton « Contacts » d'une carte,
- * pour un **joueur** (membre d'une des deux engagées) ou un arbitre
- * (`cardForPlayer`), dès que les deux adversaires sont connus — à planifier
+ * pour un lecteur « précoce » (`earlyReader`, `readsContactsEarly` : joueur
+ * du match ou arbitre), dès que les deux adversaires sont connus — à planifier
  * (décision de l'utilisateur, 2026-10-19) ou programmé — : les parties
  * s'organisent avant l'heure, surtout sans phase de lancement. Le **caster**
  * inscrit, lui, ne les reçoit que **le temps du match** (`matchUnderway`), par
@@ -507,8 +510,17 @@ export function matchUnderway(phase: MatchLaunchPhase): boolean {
  * avant l'heure. Lue par le serveur (`match-launch-info.ts`) et par la carte du
  * match (`launch-strip.ts`), qui n'offre « Contacts » que là où il les rend.
  */
-export function exposesMatchContacts(phase: MatchLaunchPhase, cardForPlayer: boolean): boolean {
-  return matchUnderway(phase) || (cardForPlayer && (phase === "SCHEDULED" || phase === "TO_PLAN"));
+export function exposesMatchContacts(phase: MatchLaunchPhase, earlyReader: boolean): boolean {
+  return matchUnderway(phase) || (earlyReader && (phase === "SCHEDULED" || phase === "TO_PLAN"));
+}
+
+/**
+ * Le lecteur lit-il les contacts des engagées avant le départ ? Joueur du match,
+ * ou arbitre (permission `tournaments`), même inscrit comme caster. Une seule
+ * définition pour le serveur et la carte du match.
+ */
+export function readsContactsEarly(reader: { playsMatch: boolean; referee: boolean }): boolean {
+  return reader.playsMatch || reader.referee;
 }
 
 /**

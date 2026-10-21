@@ -3,7 +3,7 @@
  * montre et offre, décidé hors du composant : une règle pure se teste sans
  * rendu, et le composant ne garde que la mise en page.
  */
-import { exposesMatchContacts, matchUnderway, type MatchLaunchPhase } from "@/lib/shared/match-launch";
+import { exposesMatchContacts, matchUnderway, readsContactsEarly, type MatchLaunchPhase } from "@/lib/shared/match-launch";
 import type { BracketMatch } from "@/lib/shared/types";
 
 type StripMatch = Pick<
@@ -66,8 +66,8 @@ export function launchStripControls(
   const isByeLike = (match.team1Id === null) !== (match.team2Id === null) && match.status !== "PENDING";
   const castable = open && !isByeLike && !isPlayer;
   const showHost = phase !== "NONE";
-  // Contacts ouverts avant le départ : joueur du match ou arbitre.
-  const early = isPlayer || viewer.canSchedule;
+  // `canSchedule` : la permission `tournaments`, celle de l'arbitre au serveur.
+  const early = readsContactsEarly({ playsMatch: isPlayer, referee: viewer.canSchedule });
   return {
     isCaster,
     showOpen: (isCaster || isPlayer) && viewer.launchPhase !== false && matchUnderway(phase),

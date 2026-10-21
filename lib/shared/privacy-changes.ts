@@ -150,7 +150,7 @@ export function privacyChangeReachesAccount(change: PrivacyChange, facts: Privac
  * tous, seuls ceux qu'elle concerne sont avertis.
  */
 export function isPrivacyPolicyVersion(change: PrivacyChange): boolean {
-  return change.audience === undefined || AUDIENCE_IS_POLICY_VERSION[change.audience] === true;
+  return change.audience === undefined || AUDIENCE_IS_POLICY_VERSION[change.audience];
 }
 
 /**

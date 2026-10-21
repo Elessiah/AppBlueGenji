@@ -31,6 +31,7 @@ import {
   isAutoLaunchDue,
   exposesMatchContacts,
   matchLaunchPhase,
+  readsContactsEarly,
   pickLaunchContacts,
   resolveHostTeamId,
   type ContactCandidate,
@@ -607,9 +608,7 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
     const read = rows
       .map((row) => {
         const phase = matchLaunchPhase(toLaunchInput(row), now);
-        // Ce que la carte ouvrirait au lecteur avant le départ : joueur du
-        // match ou arbitre (permission `tournaments`, même inscrit comme caster).
-        const early = staff || viewerPlaysMatch(row, teams);
+        const early = readsContactsEarly({ playsMatch: viewerPlaysMatch(row, teams), referee: staff });
         return { row, phase, early, exposes: exposesMatchContacts(phase, forCard && early) };
       })
       .filter(({ phase }) => phase !== "NONE");

@@ -14,7 +14,7 @@ import {
   type ContactsCard,
   shouldRetryReread,
 } from "@/components/match-launch/MatchContactsDialog";
-import { casterContactsPending, exposesCasterContacts, exposesMatchContacts, matchUnderway, type MatchLaunchInfo } from "@/lib/shared/match-launch";
+import { casterContactsPending, exposesCasterContacts, exposesMatchContacts, matchUnderway, readsContactsEarly, type MatchLaunchInfo } from "@/lib/shared/match-launch";
 import { readSource } from "../../helpers/read-source";
 
 /**
@@ -213,7 +213,12 @@ describe("contacts du caster en attente, modale ouverte", () => {
     // Joueur ou arbitre par la carte : dès que les adversaires sont connus ; sinon le temps du match.
     expect(phases.filter((phase) => exposesMatchContacts(phase, true))).toEqual(["TO_PLAN", "SCHEDULED", "LOBBY", "LAUNCHED"]);
     expect(phases.filter((phase) => exposesMatchContacts(phase, false))).toEqual(["LOBBY", "LAUNCHED"]);
+    expect(readsContactsEarly({ playsMatch: true, referee: false })).toBe(true);
+    expect(readsContactsEarly({ playsMatch: false, referee: true })).toBe(true);
+    expect(readsContactsEarly({ playsMatch: false, referee: false })).toBe(false);
     // Le serveur et la carte du match lisent la même règle, sans copie.
+    expect(readSource("lib/server/tournaments/match-launch-info.ts")).toContain("readsContactsEarly({ playsMatch: viewerPlaysMatch(row, teams), referee: staff })");
+    expect(readSource("app/(secured)/tournois/[id]/_lib/launch-strip.ts")).toContain("readsContactsEarly({ playsMatch: isPlayer, referee: viewer.canSchedule })");
     expect(readSource("lib/server/tournaments/match-launch-info.ts")).toContain("exposes: exposesMatchContacts(phase,");
     expect(readSource("app/(secured)/tournois/[id]/_lib/launch-strip.ts")).toContain("(early || isCaster) && exposesMatchContacts(phase, early)");
   });
