@@ -94,6 +94,14 @@ La certification ne nomme personne, ne mène à personne et ne se retourne pas
 contre son titulaire : c'est une propriété de son compte, au même titre que son
 ancienneté.
 
+La pastille lit `discord_verified_at` seul, **quel que soit le chemin** qui l'a
+posé : certification d'un clic d'un tag nommé par Discord
+(`certifyLinkedDiscordTag`) ou code reçu en message privé
+(`confirmDiscordVerification`). Se connecter par code en message privé, sans
+passer par « Certifier mon tag », ne certifie pas — donc pas de pastille. Le
+BattleTag suit la même règle (`OAUTH_PROVIDERS.md`, « Pastille BattleTag
+vérifié »).
+
 « Tournoi vivant » = tout état sauf `FINISHED`. La bonne borne est le palmarès :
 un tournoi clos n'a plus de manche à reprogrammer. Le fait est **global** et non
 relatif au lecteur — un arbitre arbitre le site, pas un tournoi en particulier ;
