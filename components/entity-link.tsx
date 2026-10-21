@@ -33,6 +33,9 @@ import type { CSSProperties, ReactNode } from "react";
  * Elle se peint sur un `<span>` **dans** le lien, jamais sur le lien : la classe
  * de l'appelant (une pastille `.badge`, par exemple) pose souvent un
  * `background`, qui effacerait le dégradé peint dans le texte transparent.
+ * Ce `<span>` enveloppe tous les enfants : un lien qui dispose les siens
+ * (avatar et nom en flex, par exemple) passe `podiumTier={null}`, comme le
+ * roster des cartes d'équipe.
  *
  * **Sans compte** (`useSpectatorView`, `/suivre/tournois/[id]`), le nom reste
  * un nom : les fiches d'équipe et de joueur sont dans l'espace connecté, un

@@ -243,25 +243,32 @@ a {
   max-width: 100%;
   min-width: 0;
   vertical-align: text-bottom;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.entity-truncate[data-podium] {
-  overflow: visible;
+/* La coupe : sur le lien, ou — peint d'une marche (`data-podium`) — sur le nom
+   peint, le lien le laissant déborder. */
+.entity-truncate:not([data-podium]),
+.entity-truncate[data-podium] > .podium-tier,
+.entity-truncate[data-podium] > .podium-member {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .entity-truncate[data-podium] > .podium-tier,
 .entity-truncate[data-podium] > .podium-member {
   display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 /* Nom coupé à deux lignes (`truncate={2}` d'`EntityLink`), même partage : peint
-   d'une marche, c'est le nom qui se coupe, le lien le laisse déborder. */
-.entity-clamp-2,
+   d'une marche, c'est le nom qui se coupe ; le lien, bloc en ligne borné à son
+   conteneur, le laisse déborder. */
+.entity-clamp-2 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.entity-clamp-2:not([data-podium]),
 .entity-clamp-2[data-podium] > .podium-tier,
 .entity-clamp-2[data-podium] > .podium-member {
   display: -webkit-box;
@@ -271,18 +278,10 @@ a {
   overflow: hidden;
 }
 
-.entity-clamp-2 {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
 .entity-clamp-2[data-podium] {
   display: inline-block;
   max-width: 100%;
   vertical-align: top;
-  overflow: visible;
-  -webkit-line-clamp: none;
-  line-clamp: none;
 }
 
 .podium-tier-1 {
