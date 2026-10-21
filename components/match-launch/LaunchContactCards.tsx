@@ -14,7 +14,6 @@ import { useLaunchText } from "./launch-text";
 import {
   casterContactsArrived,
   casterContactsPending,
-  viewerIsCaster,
   type LaunchCaster,
   type LaunchContact,
   type LaunchSide,
@@ -122,10 +121,11 @@ export function SideCard({
   phase: MatchLaunchInfo["phase"];
   onCopy: CopyFn;
   /**
-   * Le lecteur : au caster, la note des contacts tus ne renvoie pas à l'action
-   * « Contacts », qui ne lui ouvre rien avant le départ.
+   * Le lecteur : au caster (rôle `CASTER` ; un joueur qui caste lit en joueur),
+   * la note des contacts tus ne renvoie pas à l'action « Contacts », qui ne lui
+   * ouvre rien avant le départ.
    */
-  viewer?: Pick<MatchLaunchInfo["viewer"], "role" | "isCaster">;
+  viewer: Pick<MatchLaunchInfo["viewer"], "role" | "isCaster">;
   /**
    * Noms cliquables vers leurs fiches — modale « Contacts » seulement : la
    * modale de lancement survit à la navigation et recouvrirait la fiche ouverte.
@@ -154,7 +154,7 @@ export function SideCard({
           <span aria-hidden="true">🏠</span> {t("host")}
         </p>
       )}
-      <SideContacts side={side} onCopy={onCopy} linkNames={linkNames} forCaster={viewer !== undefined && viewerIsCaster({ viewer })} />
+      <SideContacts side={side} onCopy={onCopy} linkNames={linkNames} forCaster={viewer.role === "CASTER"} />
     </section>
   );
 }
@@ -208,8 +208,9 @@ export const CASTER_ARRIVAL_ANNOUNCE_MS = 10_000;
 function useCasterArrival(caster: LaunchCaster | null, pending: boolean, enabled: boolean): boolean {
   const casterId = caster?.userId ?? null;
   const [seen, setSeen] = useState({ pending, casterId, arrived: false });
-  if (seen.pending !== pending || seen.casterId !== casterId) {
-    const arrived = enabled && caster !== null && seen.casterId === casterId && casterContactsArrived(seen.pending, caster);
+  // Sans annonce (modale de lancement), rien à suivre : aucun rendu de plus.
+  if (enabled && (seen.pending !== pending || seen.casterId !== casterId)) {
+    const arrived = caster !== null && seen.casterId === casterId && casterContactsArrived(seen.pending, caster);
     setSeen({ pending, casterId, arrived });
   }
   useEffect(() => {
@@ -281,11 +282,14 @@ export function CasterCard({
       {/* Contacts tus : une note plutôt que deux « — » qui laisseraient croire
           qu'il n'en a pas — jamais au caster lui-même, dont elle parle. */}
       {pending && <p className={styles.note}>{t("contacts.casterLater")}</p>}
-      {/* Statut toujours présent, hors flux : la phrase plutôt que les boutons
-          « Copier » ; muet si le caster n'a aucun contact à montrer. */}
-      <output className="sr-only" aria-live="polite">
-        {arrived ? t("contacts.casterShown") : ""}
-      </output>
+      {/* Statut hors flux, présent dès l'ouverture là où il peut parler : la
+          phrase plutôt que les boutons « Copier » ; muet si le caster n'a aucun
+          contact à montrer. */}
+      {announceArrival && (
+        <output className="sr-only" aria-live="polite">
+          {arrived ? t("contacts.casterShown") : ""}
+        </output>
+      )}
     </section>
   );
 }

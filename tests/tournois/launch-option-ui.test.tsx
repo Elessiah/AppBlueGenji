@@ -223,15 +223,16 @@ describe("fiches de contact — noms cliquables", () => {
     ...overrides,
   });
   const noop = async () => {};
+  const TEAM_VIEWER = { role: "TEAM1", isCaster: false } as const;
 
   it("modale de lancement (par défaut) : aucun lien — elle survit à la navigation", () => {
-    const html = renderToStaticMarkup(<SideCard side={side()} isHost={false} phase="LAUNCHED" onCopy={noop} />);
+    const html = renderToStaticMarkup(<SideCard side={side()} isHost={false} phase="LAUNCHED" onCopy={noop} viewer={TEAM_VIEWER} />);
     expect(html).not.toContain("href=");
   });
 
   it("équipe → sa fiche, contact → son profil", () => {
     const html = renderToStaticMarkup(
-      <SideCard side={side()} isHost={false} phase="LAUNCHED" onCopy={noop} linkNames />,
+      <SideCard side={side()} isHost={false} phase="LAUNCHED" onCopy={noop} viewer={TEAM_VIEWER} linkNames />,
     );
     expect(html).toContain('href="/equipes/42"');
     expect(html).toContain('href="/joueurs/7"');
@@ -250,21 +251,25 @@ describe("fiches de contact — noms cliquables", () => {
     );
     expect(forCaster).toContain("Les contacts s&#x27;affichent au lancement.</p>");
     expect(forCaster).not.toContain("« Contacts »");
+    // Un joueur qui caste lit en joueur : l'action « Contacts » lui ouvre bien ses contacts.
+    const forCastingPlayer = renderToStaticMarkup(
+      <SideCard side={closed} isHost={false} phase="SCHEDULED" onCopy={noop} viewer={{ role: "TEAM1", isCaster: true }} />,
+    );
+    expect(forCastingPlayer).toContain("ou dès maintenant par l&#x27;action « Contacts »");
   });
 
   it("entrée solo → le profil du joueur, jamais une fiche d'équipe", () => {
     const html = renderToStaticMarkup(
-      <SideCard side={side({ isSolo: true })} isHost={false} phase="LAUNCHED" onCopy={noop} linkNames />,
+      <SideCard side={side({ isSolo: true })} isHost={false} phase="LAUNCHED" onCopy={noop} viewer={TEAM_VIEWER} linkNames />,
     );
     expect(html).not.toContain("/equipes/");
     expect(html).toContain('href="/joueurs/7"');
     const hidden = renderToStaticMarkup(
-      <SideCard side={side({ isSolo: true, contacts: [], contactsShown: false })} isHost={false} phase="SCHEDULED" onCopy={noop} linkNames />,
+      <SideCard side={side({ isSolo: true, contacts: [], contactsShown: false })} isHost={false} phase="SCHEDULED" onCopy={noop} viewer={TEAM_VIEWER} linkNames />,
     );
     expect(hidden).not.toContain("href=");
   });
 
-  const TEAM_VIEWER = { role: "TEAM1", isCaster: false } as const;
 
   it("caster → son profil", () => {
     const html = renderToStaticMarkup(
@@ -282,7 +287,7 @@ describe("fiches de contact — noms cliquables", () => {
   // La carte rend la décision du serveur (`exposesCasterContacts`, portée par la réponse).
   describe("caster : contacts ou note, selon la phase et le lecteur", () => {
     const caster = { userId: 9, pseudo: "Voix", discordTag: "voix", battletag: null, battletagVerified: false, ready: false };
-    const NOTE = "Ses contacts s&#x27;afficheront au lancement.";
+    const NOTE = "Ses contacts s&#x27;afficheront au départ du match.";
     const render = (phase: MatchLaunchInfo["phase"], viewer: { role: MatchLaunchInfo["viewer"]["role"]; isCaster: boolean }) =>
       renderToStaticMarkup(
         <CasterCard
@@ -290,6 +295,7 @@ describe("fiches de contact — noms cliquables", () => {
           phase={phase}
           onCopy={noop}
           viewer={viewer}
+          announceArrival
         />,
       );
 

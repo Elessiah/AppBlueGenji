@@ -399,6 +399,7 @@ export function MatchContactsDialog({
                     isHost={launch.hostTeamId === launch.team1.teamId}
                     phase={launch.phase}
                     onCopy={copy}
+                    viewer={launch.viewer}
                     linkNames
                   />
                   <div className={launchStyles.divider} aria-hidden="true">
@@ -409,11 +410,11 @@ export function MatchContactsDialog({
                     isHost={launch.hostTeamId === launch.team2.teamId}
                     phase={launch.phase}
                     onCopy={copy}
+                    viewer={launch.viewer}
                     linkNames
                   />
                 </div>
                 <CasterCard
-                  key={launch.matchId}
                   caster={launch.caster}
                   phase={launch.phase}
                   onCopy={copy}

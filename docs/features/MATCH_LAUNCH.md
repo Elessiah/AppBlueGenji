@@ -111,7 +111,7 @@ l'utilisateur, 2026-10-21 : `exposesCaster` ouvert au rôle `REFEREE`,
 `CasterCard` côté modales, sans relecture à l'heure de départ). Un arbitre
 qui **joue** le match lit en joueur (rôle `TEAM1`/`TEAM2`) : pour lui, comme pour
 les équipes, la modale « Contacts » dit avant le départ « Ses contacts
-s'afficheront au lancement » (`contacts.casterLater`) au lieu de deux « — ».
+s'afficheront au départ du match » (`contacts.casterLater`) au lieu de deux « — ».
 Les deux modales rendent `CasterCard` sur la décision du serveur
 (`LaunchCaster.contactsShown`, issu d'`exposesCaster`), jamais recalculée côté
 client ; la note ne s'adresse jamais au caster lui-même (`viewerIsCaster`,
