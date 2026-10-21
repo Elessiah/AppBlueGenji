@@ -202,7 +202,7 @@ function SideContacts({
   const { t } = useLaunchText();
   if (side.isGhost) return <p className={styles.note}>{t("ghost")}</p>;
   if (!side.contactsShown) {
-    return <p className={styles.note}>{laterText ?? t(forCaster ? "contactsAtLaunchCaster" : "contactsAtLaunch")}</p>;
+    return <p className={styles.note}>{laterText ?? t(forCaster ? "contactsAtLaunchForCaster" : "contactsAtLaunch")}</p>;
   }
   if (side.contacts.length === 0) return <p className={styles.note}>{t("noContact")}</p>;
   return (
@@ -214,6 +214,9 @@ function SideContacts({
   );
 }
 
+/** Arrivée des contacts du caster : avec au moins un contact, sans, ou aucune. */
+type CasterArrival = "SHOWN" | "EMPTY" | null;
+
 /** Durée de l'annonce d'arrivée : lue, elle ne reste pas en statut périmé. */
 export const CASTER_ARRIVAL_ANNOUNCE_MS = 10_000;
 
@@ -223,20 +226,27 @@ export const CASTER_ARRIVAL_ANNOUNCE_MS = 10_000;
  * à l'ouverture ; un autre caster, ou plus de caster, l'efface, et l'annonce
  * se vide d'elle-même après `CASTER_ARRIVAL_ANNOUNCE_MS`.
  */
-function useCasterArrival(caster: LaunchCaster | null, pending: boolean, enabled: boolean): boolean {
+function useCasterArrival(caster: LaunchCaster | null, pending: boolean, enabled: boolean): CasterArrival {
   const casterId = caster?.userId ?? null;
-  const [seen, setSeen] = useState({ pending, casterId, arrived: false });
+  const [seen, setSeen] = useState<{ pending: boolean; casterId: number | null; arrival: CasterArrival }>({
+    pending,
+    casterId,
+    arrival: null,
+  });
   // Sans annonce (modale de lancement), rien à suivre : aucun rendu de plus.
   if (enabled && (seen.pending !== pending || seen.casterId !== casterId)) {
     const arrived = caster !== null && seen.casterId === casterId && casterContactsArrived(seen.pending, caster);
-    setSeen({ pending, casterId, arrived });
+    // Figée à l'arrivée : une relecture dans les dix secondes ne la réécrit pas.
+    let arrival: CasterArrival = null;
+    if (arrived) arrival = casterHasContacts(caster) ? "SHOWN" : "EMPTY";
+    setSeen({ pending, casterId, arrival });
   }
   useEffect(() => {
-    if (!seen.arrived) return;
-    const timer = setTimeout(() => setSeen((current) => ({ ...current, arrived: false })), CASTER_ARRIVAL_ANNOUNCE_MS);
+    if (seen.arrival === null) return;
+    const timer = setTimeout(() => setSeen((current) => ({ ...current, arrival: null })), CASTER_ARRIVAL_ANNOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [seen.arrived]);
-  return seen.arrived;
+  }, [seen.arrival]);
+  return seen.arrival;
 }
 
 export function CasterCard({
@@ -275,9 +285,8 @@ export function CasterCard({
 }>) {
   const { t } = useLaunchText();
   const pending = casterContactsPending({ caster, viewer });
-  const arrived = useCasterArrival(caster, pending, announceArrival);
+  const arrival = useCasterArrival(caster, pending, announceArrival);
   const hasContacts = caster !== null && casterHasContacts(caster);
-  const arrivalText = hasContacts ? t("contacts.casterShown") : t("contacts.casterShownEmpty");
   const self = viewerIsCaster({ viewer });
   if (!caster) {
     return (
@@ -311,13 +320,13 @@ export function CasterCard({
       )}
       {/* Contacts tus : une note plutôt que deux « — » qui laisseraient croire
           qu'il n'en a pas — jamais au caster lui-même, dont elle parle. */}
-      {pending && <p className={styles.note}>{laterText ?? t("casterAtLaunch")}</p>}
+      {pending && <p className={styles.note}>{laterText ?? t("casterContactsAtLaunch")}</p>}
       {/* Statut hors flux, présent dès l'ouverture là où il peut parler : une
           phrase plutôt que les boutons « Copier » — ou, sans contact, celle qui
           le dit. */}
       {announceArrival && (
         <output className="sr-only" aria-live="polite">
-          {arrived ? arrivalText : ""}
+          {arrival && t(arrival === "SHOWN" ? "contacts.casterShown" : "contacts.casterShownEmpty")}
         </output>
       )}
     </section>

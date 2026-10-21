@@ -357,6 +357,9 @@ export function MatchContactsDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [matchId, readKey]);
 
+  // Défensif : la route ne rend que des matchs aux contacts des engagées
+  // ouverts ; si cela changeait, leur note ne renverrait jamais à cette modale-ci.
+  const sidesLaterText = t("contacts.notShown");
   const copy = async (value: string, label: string) => {
     try {
       await navigator.clipboard.writeText(value);
@@ -399,9 +402,7 @@ export function MatchContactsDialog({
                     phase={launch.phase}
                     onCopy={copy}
                     viewer={launch.viewer}
-                    // Défensif : la route ne rend que des matchs aux contacts
-                    // ouverts ; si cela changeait, jamais un renvoi à cette modale-ci.
-                    laterText={t("contacts.notShown")}
+                    laterText={sidesLaterText}
                     linkNames
                   />
                   <div className={launchStyles.divider} aria-hidden="true">
@@ -413,9 +414,7 @@ export function MatchContactsDialog({
                     phase={launch.phase}
                     onCopy={copy}
                     viewer={launch.viewer}
-                    // Défensif : la route ne rend que des matchs aux contacts
-                    // ouverts ; si cela changeait, jamais un renvoi à cette modale-ci.
-                    laterText={t("contacts.notShown")}
+                    laterText={sidesLaterText}
                     linkNames
                   />
                 </div>
