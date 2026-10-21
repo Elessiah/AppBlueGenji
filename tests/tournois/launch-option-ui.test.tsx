@@ -223,7 +223,7 @@ describe("fiches de contact — noms cliquables", () => {
     ...overrides,
   });
   const noop = async () => {};
-  const TEAM_VIEWER = { role: "TEAM1", isCaster: false } as const;
+  const TEAM_VIEWER = { role: "TEAM1", isCaster: false, earlyContacts: true } as const;
 
   it("modale de lancement (par défaut) : aucun lien — elle survit à la navigation", () => {
     const html = renderToStaticMarkup(<SideCard side={side()} isHost={false} phase="LAUNCHED" onCopy={noop} viewer={TEAM_VIEWER} />);
@@ -243,17 +243,17 @@ describe("fiches de contact — noms cliquables", () => {
   it("contacts tus → note au lancement, sans renvoi à « Contacts » pour le caster", () => {
     const closed = side({ contacts: [], contactsShown: false });
     const forTeam = renderToStaticMarkup(
-      <SideCard side={closed} isHost={false} phase="SCHEDULED" onCopy={noop} viewer={{ role: "TEAM1" }} />,
+      <SideCard side={closed} isHost={false} phase="SCHEDULED" onCopy={noop} viewer={{ earlyContacts: true }} />,
     );
     expect(forTeam).toContain("ou dès maintenant par l&#x27;action « Contacts »");
     const forCaster = renderToStaticMarkup(
-      <SideCard side={closed} isHost={false} phase="SCHEDULED" onCopy={noop} viewer={{ role: "CASTER" }} />,
+      <SideCard side={closed} isHost={false} phase="SCHEDULED" onCopy={noop} viewer={{ earlyContacts: false }} />,
     );
     expect(forCaster).toContain("Les contacts s&#x27;affichent au lancement.</p>");
     expect(forCaster).not.toContain("« Contacts »");
     // La modale « Contacts » passe sa note : jamais un renvoi à elle-même.
     const inDialog = renderToStaticMarkup(
-      <SideCard side={closed} isHost={false} phase="SCHEDULED" onCopy={noop} viewer={{ role: "TEAM1" }} laterText="Contacts non affichés." />,
+      <SideCard side={closed} isHost={false} phase="SCHEDULED" onCopy={noop} viewer={{ earlyContacts: true }} laterText="Contacts non affichés." />,
     );
     expect(inDialog).toContain("Contacts non affichés.");
     expect(inDialog).not.toContain("« Contacts »");

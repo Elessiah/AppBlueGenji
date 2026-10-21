@@ -474,6 +474,13 @@ export type MatchLaunchInfo = {
      * parle pas de ses propres contacts.
      */
     isCaster: boolean;
+    /**
+     * L'action « Contacts » de la carte lui ouvre-t-elle les contacts des
+     * engagées avant le départ (joueur du match, ou arbitre — permission
+     * `tournaments` —, même inscrit comme caster) ? La modale de lancement ne
+     * renvoie à cette action que dans ce cas.
+     */
+    earlyContacts: boolean;
     /** Sa partie est-elle déjà déclarée prête ? */
     ready: boolean;
   };
@@ -486,10 +493,9 @@ export type MatchLaunchInfo = {
  * (décision de l'utilisateur, 2026-10-21). Jamais hors phase (`NONE` : match
  * terminé ou adversaire manquant), même si un appelant l'oubliait.
  *
- * Une seule règle, lue par le serveur (`exposesCaster`), par la modale
- * « Contacts » et par la modale de lancement, qui lisent sa décision
- * (`LaunchCaster.contactsShown`) : deux copies dériveraient, et la fiche
- * montrerait deux « — » ou une note à tort.
+ * Lue par le serveur seul (`exposesCaster`) : les deux modales n'en lisent que
+ * la décision (`LaunchCaster.contactsShown`) et ne la rejouent jamais — deux
+ * copies dériveraient, et la fiche montrerait deux « — » ou une note à tort.
  */
 export function exposesCasterContacts(phase: MatchLaunchPhase, role: MatchLaunchViewerRole): boolean {
   return phase === "LOBBY" || phase === "LAUNCHED" || (phase !== "NONE" && role === "REFEREE");

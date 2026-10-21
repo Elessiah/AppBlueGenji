@@ -535,7 +535,7 @@ function buildLaunchCaster(row: CandidateRow, ctx: LaunchContext): LaunchCaster 
 function buildLaunchInfo(
   row: CandidateRow,
   phase: LaunchPhase,
-  party: { role: MatchLaunchViewerRole; canDeclareReady: boolean },
+  party: { role: MatchLaunchViewerRole; canDeclareReady: boolean; earlyContacts: boolean },
   ctx: LaunchContext,
 ): MatchLaunchInfo {
   const { readiness } = ctx;
@@ -563,6 +563,7 @@ function buildLaunchInfo(
       role: party.role,
       canDeclareReady: party.canDeclareReady,
       isCaster: caster !== null && caster.userId === ctx.viewer.id,
+      earlyContacts: party.earlyContacts,
       ready: {
         CASTER: readiness.casterReady,
         TEAM1: readiness.team1Ready,
@@ -604,7 +605,8 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
   // Arbitre (permission `tournaments`) : par la carte seulement, les mêmes
   // contacts, à la même heure, que les joueurs du match (décision de
   // l'utilisateur, 2026-10-19). La modale de lancement ne lui présente rien.
-  const referee = forCard && can(viewer, "tournaments");
+  const staff = can(viewer, "tournaments");
+  const referee = forCard && staff;
 
   const revokedCasts: { matchId: number; casterId: number }[] = [];
   const launches = await withConnection(async (connection) => {
@@ -652,8 +654,11 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
       const castRevoked = revoked.has(Number(row.id));
       const party = viewerRole(row, viewer.id, teams, castRevoked, referee);
       if (!party) continue;
+      // Ce que lui ouvrirait la carte (`exposesContacts` côté carte) : à un
+      // arbitre qui caste, la modale de lancement renvoie aussi à « Contacts ».
+      const earlyContacts = staff || viewerPlaysMatch(row, teams);
       result.push(
-        buildLaunchInfo(row, phase, party, {
+        buildLaunchInfo(row, phase, { ...party, earlyContacts }, {
           viewer,
           users,
           rosters,

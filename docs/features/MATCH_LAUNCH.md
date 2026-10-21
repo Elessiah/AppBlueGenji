@@ -117,8 +117,9 @@ Les deux modales rendent `CasterCard` sur la décision du serveur
 client ; la note ne s'adresse jamais au caster lui-même (`viewerIsCaster`,
 `lib/shared/match-launch.ts`). Les fiches des engagées font de même
 (`LaunchSide.contactsShown`, issu d'`exposes`) ; tues, leur note renvoie à
-l'action « Contacts » — sauf pour le caster, qu'elle ne servirait pas avant le
-départ (`contactsAtLaunchForCaster`). La modale de lancement d'un match programmé
+l'action « Contacts » quand elle ouvre déjà quelque chose au lecteur
+(`viewer.earlyContacts` : joueur du match, ou arbitre même inscrit comme
+caster) — sinon, au seul caster, la note courte (`contactsAtLaunchForCaster`). La modale de lancement d'un match programmé
 montre donc aux équipes la note du caster sous celles des engagées, dans leurs
 mots (`casterContactsAtLaunch`, « au lancement ») ; la modale « Contacts », ouverte à
 tout tournoi, lancement ou non, garde « au départ du match » (`contacts.casterLater`).

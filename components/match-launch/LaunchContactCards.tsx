@@ -124,13 +124,11 @@ export function SideCard({
   phase: MatchLaunchInfo["phase"];
   onCopy: CopyFn;
   /**
-   * Le lecteur : au caster (rôle `CASTER` ; un joueur qui caste lit en joueur),
-   * la note des contacts tus ne renvoie pas à l'action « Contacts », qui ne lui
-   * ouvre rien avant le départ. Un arbitre qui caste (rôle `CASTER` aussi) l'a
-   * pourtant : le lecteur ne dit pas l'arbitrage, la note tait alors un
-   * raccourci sans rien dire de faux — un renvoi à tort serait pire.
+   * Le lecteur : la note des contacts tus ne renvoie à l'action « Contacts »
+   * que si elle lui ouvre déjà quelque chose (`earlyContacts` : joueur du match
+   * ou arbitre, même inscrit comme caster) — jamais au seul caster avant le départ.
    */
-  viewer: Pick<MatchLaunchInfo["viewer"], "role">;
+  viewer: Pick<MatchLaunchInfo["viewer"], "earlyContacts">;
   /**
    * Note des contacts tus ; par défaut, celle de la modale de lancement, qui
    * renvoie à l'action « Contacts » — la modale « Contacts » passe la sienne.
@@ -168,9 +166,7 @@ export function SideCard({
         side={side}
         onCopy={onCopy}
         linkNames={linkNames}
-        // Le rôle, pas `viewerIsCaster` : un joueur qui caste lit en joueur, et
-        // l'action « Contacts » lui ouvre bien les contacts avant le départ.
-        forCaster={viewer.role === "CASTER"}
+        earlyContacts={viewer.earlyContacts}
         laterText={laterText}
       />
     </section>
@@ -192,19 +188,19 @@ function SideContacts({
   side,
   onCopy,
   linkNames,
-  forCaster,
+  earlyContacts,
   laterText,
 }: Readonly<{
   side: LaunchSide;
   onCopy: CopyFn;
   linkNames: boolean;
-  forCaster: boolean;
+  earlyContacts: boolean;
   laterText: string | undefined;
 }>) {
   const { t } = useLaunchText();
   if (side.isGhost) return <p className={styles.note}>{t("ghost")}</p>;
   if (!side.contactsShown) {
-    return <p className={styles.note}>{laterText ?? t(forCaster ? "contactsAtLaunchForCaster" : "contactsAtLaunch")}</p>;
+    return <p className={styles.note}>{laterText ?? t(earlyContacts ? "contactsAtLaunch" : "contactsAtLaunchForCaster")}</p>;
   }
   if (side.contacts.length === 0) return <p className={styles.note}>{t("noContact")}</p>;
   return (

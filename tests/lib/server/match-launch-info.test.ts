@@ -205,7 +205,7 @@ describe("listViewerMatchLaunches — le match et la place du lecteur", () => {
       hostTeamId: TEAM1,
       team1: { teamId: TEAM1, name: "Alpha", ready: false, isGhost: false, isSolo: false },
       team2: { teamId: TEAM2, name: "Bravo" },
-      viewer: { role: "TEAM1", canDeclareReady: true, ready: false, isCaster: false },
+      viewer: { role: "TEAM1", canDeclareReady: true, ready: false, isCaster: false, earlyContacts: true },
     });
     expect(info.autoLaunchAt).toBe(new Date(Date.parse(OPENED) + 15 * 60_000).toISOString());
   });
@@ -225,7 +225,7 @@ describe("listViewerMatchLaunches — le match et la place du lecteur", () => {
   it("refuse le bouton « Prêt » à un joueur sans rôle d'engagement", async () => {
     state.viewerMemberships = [{ team_id: TEAM1, roles_json: JSON.stringify(["DPS"]) }];
     const [info] = await listViewerMatchLaunches(viewer);
-    expect(info.viewer).toEqual({ role: "TEAM1", canDeclareReady: false, ready: false, isCaster: false });
+    expect(info.viewer).toEqual({ role: "TEAM1", canDeclareReady: false, ready: false, isCaster: false, earlyContacts: true });
   });
 
   it("reconnaît le caster et son « Prêt »", async () => {
@@ -233,7 +233,7 @@ describe("listViewerMatchLaunches — le match et la place du lecteur", () => {
     state.candidates = [candidate({ caster_user_id: VIEWER, caster_ready_at: OPENED })];
     state.users = [casterUser(VIEWER)];
     const [info] = await listViewerMatchLaunches(viewer);
-    expect(info.viewer).toEqual({ role: "CASTER", canDeclareReady: true, ready: true, isCaster: true });
+    expect(info.viewer).toEqual({ role: "CASTER", canDeclareReady: true, ready: true, isCaster: true, earlyContacts: false });
     expect(info.caster).toMatchObject({
       userId: VIEWER,
       discordTag: "caster",
@@ -266,7 +266,7 @@ describe("listViewerMatchLaunches — le match et la place du lecteur", () => {
       },
     ];
     const [info] = await listViewerMatchLaunches(viewer);
-    expect(info.viewer).toEqual({ role: "TEAM2", canDeclareReady: true, ready: false, isCaster: false });
+    expect(info.viewer).toEqual({ role: "TEAM2", canDeclareReady: true, ready: false, isCaster: false, earlyContacts: true });
     expect(info.team2.isSolo).toBe(true);
     expect(info.team2.contacts).toEqual([
       expect.objectContaining({ userId: VIEWER, discordTag: "solo" }),
@@ -759,7 +759,7 @@ describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => 
       state.users = [casterUser(CASTER)];
       const info = await loadViewerMatchContacts(referee, 42);
       expect(info?.phase).toBe("TO_PLAN");
-      expect(info?.viewer).toEqual({ role: "REFEREE", canDeclareReady: false, ready: false, isCaster: false });
+      expect(info?.viewer).toEqual({ role: "REFEREE", canDeclareReady: false, ready: false, isCaster: false, earlyContacts: true });
       expect(info?.team2.contacts).toEqual([expect.objectContaining({ userId: 5, discordTag: "cap2", battletag: "Cap#2" })]);
       expect(info?.team2.contactsShown).toBe(true);
       // Décision du 2026-10-21 : ceux du caster aussi, dès « À planifier ».
@@ -857,6 +857,17 @@ describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => 
       state.candidates = [candidate({ referee_scheduling: 1, start_at: null, caster_user_id: CASTER })];
       state.users = [casterUser(CASTER)];
       await expect(loadViewerMatchContacts(referee, 42)).resolves.toMatchObject({ viewer: { role: "REFEREE", isCaster: false } });
+    });
+
+    // Un arbitre qui caste : la modale de lancement le lit en caster, mais la
+    // carte lui ouvre déjà les contacts — sa note y renvoie (`earlyContacts`).
+    it("dit à la modale de lancement que la carte lui ouvre déjà les contacts", async () => {
+      state.candidates = [candidate({ caster_user_id: VIEWER })];
+      state.users = [casterUser(VIEWER)];
+      const [asReferee] = await listViewerMatchLaunches(referee);
+      expect(asReferee?.viewer).toMatchObject({ role: "CASTER", isCaster: true, earlyContacts: true });
+      const [asCaster] = await listViewerMatchLaunches({ id: VIEWER });
+      expect(asCaster?.viewer).toMatchObject({ role: "CASTER", isCaster: true, earlyContacts: false });
     });
   });
 
