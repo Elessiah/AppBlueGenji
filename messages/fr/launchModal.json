@@ -70,6 +70,7 @@
   "ghost": "Équipe invitée : pas de contact.",
   "contactsAtLaunch": "Les contacts s'affichent au lancement — ou dès maintenant par l'action « Contacts » du match, sur la page du tournoi (menu « Plus d'actions » au besoin).",
   "contactsAtLaunchCaster": "Les contacts s'affichent au lancement.",
+  "casterAtLaunch": "Ses contacts s'affichent au lancement.",
   "noContact": "Aucun contact disponible.",
   "caster": "Caster",
   "noCaster": "Aucun caster inscrit : le match part dès que les deux équipes sont prêtes.",

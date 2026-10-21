@@ -70,6 +70,7 @@
   "ghost": "Guest team: no contact.",
   "contactsAtLaunch": "Contacts show up at launch — or right now through the match's “Contacts” action on the tournament page (under “More actions” if needed).",
   "contactsAtLaunchCaster": "Contacts show up at launch.",
+  "casterAtLaunch": "Their contacts show up at launch.",
   "noContact": "No contact available.",
   "caster": "Caster",
   "noCaster": "No caster signed up: the match starts as soon as both teams are ready.",

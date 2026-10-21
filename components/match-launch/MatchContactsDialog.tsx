@@ -420,6 +420,8 @@ export function MatchContactsDialog({
                   onCopy={copy}
                   viewer={launch.viewer}
                   noCasterText={t("contacts.noCaster")}
+                  // Tout tournoi, lancement ou non : « au départ du match ».
+                  laterText={t("contacts.casterLater")}
                   linkNames
                   announceArrival
                 />

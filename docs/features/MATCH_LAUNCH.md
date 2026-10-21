@@ -119,7 +119,9 @@ client ; la note ne s'adresse jamais au caster lui-même (`viewerIsCaster`,
 (`LaunchSide.contactsShown`, issu d'`exposes`) ; tues, leur note renvoie à
 l'action « Contacts » — sauf pour le caster, qu'elle ne servirait pas avant le
 départ (`contactsAtLaunchCaster`). La modale de lancement d'un match programmé
-montre donc aux équipes la note du caster sous celles des engagées.
+montre donc aux équipes la note du caster sous celles des engagées, dans leurs
+mots (`casterAtLaunch`, « au lancement ») ; la modale « Contacts », ouverte à
+tout tournoi, lancement ou non, garde « au départ du match » (`contacts.casterLater`).
 
 Quand la relecture de l'heure de départ remplace la note par les contacts, la
 modale « Contacts » (seule, `announceArrival`) l'annonce par une phrase courte

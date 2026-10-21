@@ -243,19 +243,14 @@ describe("fiches de contact — noms cliquables", () => {
   it("contacts tus → note au lancement, sans renvoi à « Contacts » pour le caster", () => {
     const closed = side({ contacts: [], contactsShown: false });
     const forTeam = renderToStaticMarkup(
-      <SideCard side={closed} isHost={false} phase="SCHEDULED" onCopy={noop} viewer={{ role: "TEAM1", isCaster: false }} />,
+      <SideCard side={closed} isHost={false} phase="SCHEDULED" onCopy={noop} viewer={{ role: "TEAM1" }} />,
     );
     expect(forTeam).toContain("ou dès maintenant par l&#x27;action « Contacts »");
     const forCaster = renderToStaticMarkup(
-      <SideCard side={closed} isHost={false} phase="SCHEDULED" onCopy={noop} viewer={{ role: "CASTER", isCaster: true }} />,
+      <SideCard side={closed} isHost={false} phase="SCHEDULED" onCopy={noop} viewer={{ role: "CASTER" }} />,
     );
     expect(forCaster).toContain("Les contacts s&#x27;affichent au lancement.</p>");
     expect(forCaster).not.toContain("« Contacts »");
-    // Un joueur qui caste lit en joueur : l'action « Contacts » lui ouvre bien ses contacts.
-    const forCastingPlayer = renderToStaticMarkup(
-      <SideCard side={closed} isHost={false} phase="SCHEDULED" onCopy={noop} viewer={{ role: "TEAM1", isCaster: true }} />,
-    );
-    expect(forCastingPlayer).toContain("ou dès maintenant par l&#x27;action « Contacts »");
   });
 
   it("entrée solo → le profil du joueur, jamais une fiche d'équipe", () => {
@@ -295,6 +290,7 @@ describe("fiches de contact — noms cliquables", () => {
           phase={phase}
           onCopy={noop}
           viewer={viewer}
+          laterText={FR_LAUNCH_TEXT.t("contacts.casterLater")}
           announceArrival
         />,
       );
@@ -343,6 +339,19 @@ describe("fiches de contact — noms cliquables", () => {
         expect(html).not.toContain("BattleTag");
       }
     });
+  });
+
+  // Modale de lancement : la note du caster reprend les mots de celle des engagées.
+  it("modale de lancement → note du caster « au lancement », comme celle des engagées", () => {
+    const html = renderToStaticMarkup(
+      <CasterCard
+        caster={{ userId: 9, pseudo: "Voix", discordTag: null, battletag: null, battletagVerified: false, ready: false, contactsShown: false }}
+        phase="SCHEDULED"
+        onCopy={noop}
+        viewer={TEAM_VIEWER}
+      />,
+    );
+    expect(html).toContain("Ses contacts s&#x27;affichent au lancement.");
   });
 
   // Un joueur du match qui caste aussi garde son rôle de joueur : le drapeau le dit caster.

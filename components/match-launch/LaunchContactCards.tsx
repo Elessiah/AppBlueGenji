@@ -125,7 +125,7 @@ export function SideCard({
    * la note des contacts tus ne renvoie pas à l'action « Contacts », qui ne lui
    * ouvre rien avant le départ.
    */
-  viewer: Pick<MatchLaunchInfo["viewer"], "role" | "isCaster">;
+  viewer: Pick<MatchLaunchInfo["viewer"], "role">;
   /**
    * Noms cliquables vers leurs fiches — modale « Contacts » seulement : la
    * modale de lancement survit à la navigation et recouvrirait la fiche ouverte.
@@ -227,6 +227,7 @@ export function CasterCard({
   onCopy,
   viewer,
   noCasterText,
+  laterText,
   linkNames = false,
   announceArrival = false,
 }: Readonly<{
@@ -240,6 +241,11 @@ export function CasterCard({
   viewer: Pick<MatchLaunchInfo["viewer"], "role" | "isCaster">;
   /** Texte sans caster ; par défaut, celui de la modale de lancement. */
   noCasterText?: string;
+  /**
+   * Note des contacts tus ; par défaut, celle de la modale de lancement, dans
+   * les mots de la note des engagées juste au-dessus (« au lancement »).
+   */
+  laterText?: string;
   /** Pseudo cliquable (modale « Contacts » seulement, voir `SideCard`). */
   linkNames?: boolean;
   /**
@@ -281,7 +287,7 @@ export function CasterCard({
       )}
       {/* Contacts tus : une note plutôt que deux « — » qui laisseraient croire
           qu'il n'en a pas — jamais au caster lui-même, dont elle parle. */}
-      {pending && <p className={styles.note}>{t("contacts.casterLater")}</p>}
+      {pending && <p className={styles.note}>{laterText ?? t("casterAtLaunch")}</p>}
       {/* Statut hors flux, présent dès l'ouverture là où il peut parler : la
           phrase plutôt que les boutons « Copier » ; muet si le caster n'a aucun
           contact à montrer. */}
