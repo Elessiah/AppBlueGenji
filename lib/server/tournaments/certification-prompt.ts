@@ -78,7 +78,9 @@ export async function loadCertificationPrompt(
   // est seul en cause — jamais l'alerte d'une équipe sans aucun contact. Lu
   // dans ce seul cas : la plupart des lecteurs n'en ont pas.
   if (prompt === null) return null;
-  const onlyDiscordMissing = !prompt.discordVerified && (prompt.battletagVerified || !prompt.battletagRelevant);
+  // Statut réel du BattleTag (pas la variante d'affichage d'un BattleTag
+  // inactionnable) : les déclarations promettent « seul Discord manque ».
+  const onlyDiscordMissing = !prompt.discordVerified && (own.battletagVerified || !battletagRelevant);
   if (teamReachable && onlyDiscordMissing && (await certificationNudgesDeclined(executor, userId))) {
     return null;
   }
@@ -92,8 +94,8 @@ export async function loadCertificationPrompt(
  * place du pool et une ou deux requêtes. Une certification faite entre-temps
  * se voit au plus une minute plus tard. Bornée ; la lecture **en cours** est
  * partagée (une vague de reconnexions ne vaut qu'une requête par lecteur) ; un
- * échec — ou une lecture de plus de trois secondes — est retenu dix secondes,
- * sans quoi chaque lecture le retenterait pendant la panne même.
+ * échec est retenu dix secondes, une lecture abandonnée après trois secondes
+ * une minute — sans quoi chaque relecture la retenterait pendant la panne même.
  */
 export const CERTIFICATION_PROMPT_TTL_MS = 60_000;
 export const CERTIFICATION_PROMPT_FAILURE_TTL_MS = 10_000;
@@ -132,32 +134,27 @@ export function cachedCertificationPrompt(
   const expired = new Promise<"TIMEOUT">((resolve) => {
     timer = setTimeout(() => resolve("TIMEOUT"), CERTIFICATION_PROMPT_READ_TIMEOUT_MS);
   });
-  // La lecture n'est pas annulable : abandonnée, elle garde sa clé occupée
-  // (« rien » servi tout de suite) jusqu'à ce qu'elle finisse, pour qu'une
-  // seule lecture réelle par lecteur soit en attente du pool.
+  // La lecture n'est pas annulable : abandonnée, sa clé reste occupée une
+  // minute (« rien » servi tout de suite), pour qu'une lecture qui pend ne
+  // soit pas doublée à chaque relecture ; finie tard mais réussie, elle sert
+  // quand même. Le compte des lectures en cours s'arrête à l'abandon : une
+  // lecture qui pendrait pour de bon (lien à demi ouvert) n'occupe pas la
+  // mémoire à jamais.
   const settled = reading.then(
     (prompt) => ({ ok: true as const, prompt }),
     (error: unknown) => ({ ok: false as const, error }),
   );
-  if (room) {
-    inFlightPrompts += 1;
-    void settled.then(() => {
-      inFlightPrompts = Math.max(0, inFlightPrompts - 1);
-    });
-  }
+  if (room) inFlightPrompts += 1;
   slot.value = Promise.race([settled, expired]).then((outcome) => {
     clearTimeout(timer);
+    if (room) inFlightPrompts = Math.max(0, inFlightPrompts - 1);
     if (outcome === "TIMEOUT") {
       logCertificationPromptFailure(now(), "lecture abandonnée après 3 s");
-      // Une lecture tardive mais réussie sert quand même, pour la minute
-      // ordinaire : sans quoi un pool saturé ferait relire en boucle.
+      slot.expiresAt = now() + CERTIFICATION_PROMPT_TTL_MS;
       void settled.then((late) => {
-        if (late.ok) {
-          slot.value = Promise.resolve(late.prompt);
-          slot.expiresAt = now() + CERTIFICATION_PROMPT_TTL_MS;
-        } else {
-          slot.expiresAt = now() + CERTIFICATION_PROMPT_FAILURE_TTL_MS;
-        }
+        if (!late.ok) return;
+        slot.value = Promise.resolve(late.prompt);
+        slot.expiresAt = now() + CERTIFICATION_PROMPT_TTL_MS;
       });
       return null;
     }

@@ -125,6 +125,14 @@ describe("loadCertificationPrompt", () => {
     expect(await loadCertificationPrompt(mr, 7, 42, true, false)).toBeNull();
   });
 
+  it("ce refus ne tait pas l'invitation d'un BattleTag inactionnable non plus (statut réel)", async () => {
+    const { executor } = rosterOf(
+      [{ user_id: 7, ...BARE, blizzard_sub: "sub", overwatch_battletag: null }, { user_id: 8, ...BARE, ...DISCORD }],
+      1,
+    );
+    expect((await loadCertificationPrompt(executor, 7, 42, true, true))?.reason).toBe("MANAGER");
+  });
+
   it("ce refus ne tait pas une invitation qui porte aussi sur le BattleTag", async () => {
     const { executor } = rosterOf([{ user_id: 7, ...BARE }], 1);
     expect((await loadCertificationPrompt(executor, 7, 42, true, true))?.reason).toBe("MANAGER");
@@ -204,36 +212,53 @@ describe("mémoire courte des invitations", () => {
     errors.mockRestore();
   });
 
-  it("une lecture qui pend est abandonnée : « rien », et sa clé reste occupée jusqu'à sa fin", async () => {
+  it("une lecture qui pend est abandonnée : « rien » pour une minute, puis relue ; tardive, elle sert", async () => {
+    forgetCertificationPrompts();
+    jest.useFakeTimers();
+    const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const PROMPT_LATE = { reason: "MANAGER", discordVerified: false, battletagVerified: true, battletagRelevant: true } as const;
+    try {
+      const control: { finish?: (value: typeof PROMPT_LATE) => void } = {};
+      const load = jest.fn(
+        () =>
+          new Promise<typeof PROMPT_LATE>((resolve) => {
+            control.finish = resolve;
+          }),
+      );
+      clock = 0;
+      const hung = cachedCertificationPrompt("10:42:0:1", load, now);
+      jest.advanceTimersByTime(CERTIFICATION_PROMPT_READ_TIMEOUT_MS);
+      expect(await hung).toBeNull();
+      // Pendant la minute : rien d'autre ne part.
+      clock = CERTIFICATION_PROMPT_TTL_MS - 1;
+      expect(await cachedCertificationPrompt("10:42:0:1", load, now)).toBeNull();
+      expect(load).toHaveBeenCalledTimes(1);
+      // Finie tard mais réussie : elle sert, pour une minute.
+      control.finish?.(PROMPT_LATE);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(await cachedCertificationPrompt("10:42:0:1", load, now)).toEqual(PROMPT_LATE);
+      expect(load).toHaveBeenCalledTimes(1);
+      jest.clearAllTimers();
+      forgetCertificationPrompts();
+    } finally {
+      errors.mockRestore();
+      jest.useRealTimers();
+    }
+  });
+
+  it("une lecture qui pend pour de bon libère la clé au bout d'une minute", async () => {
     forgetCertificationPrompts();
     jest.useFakeTimers();
     const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
     try {
-      const control: { finish?: (value: null) => void } = {};
-      const load = jest.fn(
-        () =>
-          new Promise<null>((resolve) => {
-            control.finish = resolve;
-          }),
-      );
-      const hung = cachedCertificationPrompt("10:42:0:1", load, now);
+      const load = jest.fn(() => new Promise<null>(() => undefined));
+      clock = 0;
+      const hung = cachedCertificationPrompt("11:42:0:1", load, now);
       jest.advanceTimersByTime(CERTIFICATION_PROMPT_READ_TIMEOUT_MS);
-      expect(await hung).toBeNull();
-      // Longtemps après : la lecture pend toujours, aucune autre ne part.
-      clock += 60_000;
-      expect(await cachedCertificationPrompt("10:42:0:1", load, now)).toBeNull();
-      expect(load).toHaveBeenCalledTimes(1);
-      // Finie (tard), son résultat sert la minute ordinaire.
-      control.finish?.(null);
-      await Promise.resolve();
-      await Promise.resolve();
-      await cachedCertificationPrompt("10:42:0:1", load, now);
-      expect(load).toHaveBeenCalledTimes(1);
-      clock += CERTIFICATION_PROMPT_FAILURE_TTL_MS;
-      void cachedCertificationPrompt("10:42:0:1", load, now);
-      expect(load).toHaveBeenCalledTimes(1);
-      clock += CERTIFICATION_PROMPT_TTL_MS;
-      void cachedCertificationPrompt("10:42:0:1", load, now);
+      await hung;
+      clock = CERTIFICATION_PROMPT_TTL_MS + 1;
+      void cachedCertificationPrompt("11:42:0:1", load, now);
       expect(load).toHaveBeenCalledTimes(2);
       jest.clearAllTimers();
       forgetCertificationPrompts();
