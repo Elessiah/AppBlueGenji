@@ -168,14 +168,15 @@ export default function PlayerDetailPage() {
                   style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 2 }}
                 >
                   {activeTeam ? (
-                    <TeamLink
-                      teamId={activeTeam.teamId}
-                      className="badge"
-                      style={{ fontSize: 11 }}
-                      title={t("page.viewTeam", { name: activeTeam.teamName })}
-                    >
-                      {activeTeam.teamName}
-                    </TeamLink>
+                    // La pastille habille un conteneur, pas le lien : son fond
+                    // (`background`) effacerait le dégradé de la marche du podium,
+                    // peint dans un texte transparent — le nom ne paraîtrait qu'au
+                    // survol (`PODIUM_TIERS.md`).
+                    <span className="badge" style={{ fontSize: 11 }}>
+                      <TeamLink teamId={activeTeam.teamId} title={t("page.viewTeam", { name: activeTeam.teamName })}>
+                        {activeTeam.teamName}
+                      </TeamLink>
+                    </span>
                   ) : (
                     <span className="badge" style={{ fontSize: 11, opacity: 0.7 }} title={t("page.noTeamTitle")}>
                       {t("page.noTeam")}
