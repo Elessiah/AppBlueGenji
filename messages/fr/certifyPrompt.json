@@ -1,7 +1,7 @@
 {
   "eyebrow": "CERTIFICATION · DISCORD",
   "title": "Certifier ton tag Discord ?",
-  "intro": "Ta connexion ne l'a pas certifié. Le certifier permet à l'organisation de te joindre pendant un tournoi. C'est facultatif, et refuser ne coûte rien.",
+  "intro": "Ta connexion ne l'a pas certifié. Le certifier permet à l'organisation de te joindre pendant un tournoi. C'est facultatif, mais certains tournois l'exigent pour s'inscrire, et caster un match aussi.",
   "tag": "Tag enregistré : <strong>{tag}</strong>",
   "tableCaption": "Ce que change la certification",
   "colWithout": "Sans",
@@ -63,6 +63,6 @@
   "accountDeleted": "Ce compte a été supprimé.",
   "sessionEnded": "Ta session a pris fin : reconnecte-toi.",
   "titleNoTag": "Ajouter et certifier ton tag Discord ?",
-  "introNoTag": "Ton compte n'a pas encore de tag Discord. L'ajouter et le certifier permet à l'organisation de te joindre pendant un tournoi. C'est facultatif, et refuser ne coûte rien.",
+  "introNoTag": "Ton compte n'a pas encore de tag Discord. L'ajouter et le certifier permet à l'organisation de te joindre pendant un tournoi. C'est facultatif, mais certains tournois l'exigent pour s'inscrire, et caster un match aussi.",
   "addTag": "Ajouter mon tag"
 }

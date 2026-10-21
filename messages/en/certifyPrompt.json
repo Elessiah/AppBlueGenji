@@ -1,7 +1,7 @@
 {
   "eyebrow": "VERIFICATION · DISCORD",
   "title": "Verify your Discord tag?",
-  "intro": "Logging in didn't verify it. Verifying lets the organizers reach you during a tournament. It's optional, and saying no costs nothing.",
+  "intro": "Logging in didn't verify it. Verifying lets the organizers reach you during a tournament. It's optional, but some tournaments require it to register, and so does casting a match.",
   "tag": "Saved tag: <strong>{tag}</strong>",
   "tableCaption": "What verification changes",
   "colWithout": "Without",
@@ -63,6 +63,6 @@
   "accountDeleted": "This account has been deleted.",
   "sessionEnded": "Your session has ended: log in again.",
   "titleNoTag": "Add and verify your Discord tag?",
-  "introNoTag": "Your account has no Discord tag yet. Adding and verifying it lets the organizers reach you during a tournament. It's optional, and saying no costs nothing.",
+  "introNoTag": "Your account has no Discord tag yet. Adding and verifying it lets the organizers reach you during a tournament. It's optional, but some tournaments require it to register, and so does casting a match.",
   "addTag": "Add my tag"
 }
