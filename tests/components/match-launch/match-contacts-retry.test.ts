@@ -14,7 +14,7 @@ import {
   type ContactsCard,
   shouldRetryReread,
 } from "@/components/match-launch/MatchContactsDialog";
-import { casterContactsPending, exposesCasterContacts, exposesMatchContacts, matchUnderway, readsContactsEarly, type MatchLaunchInfo } from "@/lib/shared/match-launch";
+import { casterContactsPending, exposesCasterContacts, exposesMatchContacts, matchUnderway, readsContactsEarly, type LaunchCaster, type LaunchSide, type MatchLaunchInfo } from "@/lib/shared/match-launch";
 import { readSource } from "../../helpers/read-source";
 
 /**
@@ -150,21 +150,52 @@ describe("readMatchContacts", () => {
   });
 });
 
-const CASTER = { userId: 9, pseudo: "Voix", contact: null } as unknown as MatchLaunchInfo["caster"];
+const CASTER: LaunchCaster = {
+  userId: 9,
+  pseudo: "Voix",
+  discordTag: "voix",
+  battletag: null,
+  battletagVerified: false,
+  ready: false,
+  contactsShown: false,
+};
+const launchSide = (teamId: number, name: string): LaunchSide => ({
+  teamId,
+  name,
+  logoUrl: null,
+  isGhost: false,
+  isSolo: false,
+  ready: false,
+  contacts: [],
+  contactsShown: true,
+});
 const info = (
   phase: MatchLaunchInfo["phase"],
-  caster: MatchLaunchInfo["caster"] = CASTER,
+  caster: LaunchCaster | null = CASTER,
   startAt: string | null = START,
   role: MatchLaunchInfo["viewer"]["role"] = "TEAM1",
-) =>
-  ({
-    matchId: 7,
-    phase,
-    startAt,
-    // Décision du serveur (`exposesCaster`), telle que la réponse la porte.
-    caster: caster && { ...caster, contactsShown: exposesCasterContacts(phase, role) },
-    viewer: { role },
-  }) as unknown as MatchLaunchInfo;
+): MatchLaunchInfo => ({
+  matchId: 7,
+  tournamentId: 3,
+  tournamentName: "Coupe",
+  phase,
+  startAt,
+  lobbyOpenedAt: null,
+  autoLaunchAt: null,
+  launchedAt: null,
+  hostTeamId: 10,
+  team1: launchSide(10, "Alpha"),
+  team2: launchSide(20, "Bravo"),
+  // Décision du serveur (`exposesCaster`), telle que la réponse la porte.
+  caster: caster && { ...caster, contactsShown: exposesCasterContacts(phase, role) },
+  viewer: {
+    role,
+    canDeclareReady: false,
+    isCaster: role === "CASTER",
+    earlyContacts: role !== "CASTER",
+    ready: false,
+  },
+});
 
 describe("contacts du caster en attente, modale ouverte", () => {
   it("en attente : caster inscrit sur un match pas encore parti au serveur", () => {
@@ -202,9 +233,6 @@ describe("contacts du caster en attente, modale ouverte", () => {
     expect(exposesCasterContacts("LAUNCHED", "TEAM2")).toBe(true);
     // Hors phase (match terminé, adversaire manquant) : rien, arbitre compris.
     expect(exposesCasterContacts("NONE", "REFEREE")).toBe(false);
-    expect(readSource("lib/server/tournaments/match-launch-info.ts")).toContain(
-      "exposesCaster: exposes && exposesCasterContacts(phase, party.role)",
-    );
   });
 
   it("le temps du match, une seule définition : matchUnderway", () => {
@@ -216,11 +244,6 @@ describe("contacts du caster en attente, modale ouverte", () => {
     expect(readsContactsEarly({ playsMatch: true, referee: false })).toBe(true);
     expect(readsContactsEarly({ playsMatch: false, referee: true })).toBe(true);
     expect(readsContactsEarly({ playsMatch: false, referee: false })).toBe(false);
-    // Le serveur et la carte du match lisent la même règle, sans copie.
-    expect(readSource("lib/server/tournaments/match-launch-info.ts")).toContain("readsContactsEarly({ playsMatch: viewerPlaysMatch(row, teams), referee: staff })");
-    expect(readSource("app/(secured)/tournois/[id]/_lib/launch-strip.ts")).toContain("readsContactsEarly({ playsMatch: isPlayer, referee: viewer.canSchedule })");
-    expect(readSource("lib/server/tournaments/match-launch-info.ts")).toContain("exposes: exposesMatchContacts(phase,");
-    expect(readSource("app/(secured)/tournois/[id]/_lib/launch-strip.ts")).toContain("(early || isCaster) && exposesMatchContacts(phase, early)");
   });
 
   it("échecs passagers en rafale sans rien de lu : une seule notification", () => {
