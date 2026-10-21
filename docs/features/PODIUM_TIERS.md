@@ -80,11 +80,11 @@ Exceptions :
   Endurance, et dans l'historique manche par manche de l'Endurance) : la marche garde son repère (couronne, losange) mais quitte
   dégradé, lueur, mouvement et graisse — sinon le nom distancé brillerait plus
   fort que les autres.
-- **Équipe active de la fiche joueur** (lien en pastille `.badge`) : sous la
-  lueur, le fond de la pastille (10 % de cyan) ferait tomber chacune des trois
-  marches sous 4,5:1 ; un `<span data-podium-muted>` l'y éteint (repère
-  conservé). Compte supprimé : `podiumTier` à `null`, comme son historique
-  d'équipes.
+- **Lien en pastille** (`.badge`, `.pill`, `.cy-tag` — l'équipe active de la
+  fiche joueur) : sous la lueur, le fond teinté de la pastille ferait tomber
+  les marches sous 4,5:1 ; la marche s'y éteint comme une ligne en retrait
+  (repère conservé), le nom prend la couleur de la pastille. Compte supprimé :
+  `podiumTier` à `null` sur la fiche, comme son historique d'équipes.
 - **Vainqueur d'un match** : sans lueur — le fond teinté turquoise de la ligne
   ferait tomber violets et rose sous 4,5:1 sous la lueur.
 - **Graisse en ligne** des classements Suisse et Survie : `standingNameWeight`
@@ -117,6 +117,8 @@ seulement devenir **nettement visible** et suivre l'équipe partout.
   `.pill`, une classe de module…) sur l'élément peint effacerait le dégradé —
   le nom, transparent, n'apparaissait plus qu'au survol (fiche joueur,
   v1.41.0). Aucune règle d'appel à tenir : toute classe est sûre sur le lien.
+  La marche porte sa propre graisse (700) : une graisse posée par l'appelant
+  sur le lien ne s'applique qu'à un nom hors podium ou éteint.
 - Lueur par `drop-shadow`, jamais `text-shadow` (sous un texte peint par son
   fond, l'ombre recouvrirait le dégradé).
 - **Contraste** : chaque arrêt est un jeton de texte qui tient **4,5:1** sur le
@@ -130,8 +132,12 @@ seulement devenir **nettement visible** et suivre l'équipe partout.
   charge `useClientPower`, mouvement réduit, menu d'accessibilité). À l'arrêt,
   la moitié la plus colorée du dégradé reste peinte.
 - Survol / focus d'un lien (`.entity-link:hover > .podium-tier`) : couleur
-  pleine `--blue-100`, soulignement lisible ;
-  « Liens soulignés » : trait `--blue-300` malgré le texte transparent.
+  pleine `--blue-100`, soulignement lisible ; « Liens soulignés » : le trait,
+  tracé par le lien, garde la couleur du lien (le texte transparent est celui
+  du `<span>` intérieur).
+- Nom tronqué (`EntrantName` `truncate`) : c'est le `<span>` peint qui rogne
+  et pose l'ellipse, le lien le laisse déborder — sa lueur n'est pas coupée et
+  l'ellipse garde le dégradé.
 - Contraste renforcé : lueur effacée. Couleurs forcées : fond retiré, couleur
   du système. Impression : couleur pleine `--blue-500`, repère masqué.
 
