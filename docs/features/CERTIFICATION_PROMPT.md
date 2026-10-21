@@ -58,6 +58,11 @@ en rôles ARIA (`role="table"`, comme le roster d'équipe) : sous 560 px ses
 lignes passent en cartes sans perdre leur sémantique, chaque cellule libellée
 par `data-label` (libellé visuel seulement, texte de remplacement vide).
 
+Battle.net rattaché **sans** BattleTag enregistré : rien à faire depuis le
+profil (rattachement déjà là, BattleTag tapé refusé) — le BattleTag n'est pas
+demandé au lecteur (pastille « Certifié »), mais il ne fait toujours pas un
+contact pour l'équipe.
+
 Un membre est certifié par les règles mêmes du lancement
 (`hasVerifiedDiscord` / `hasVerifiedBattletag`, `lib/shared/match-launch.ts`).
 Une équipe a un contact dès qu'un membre a l'un ou l'autre ; en **Marvel

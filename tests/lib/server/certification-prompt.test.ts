@@ -83,10 +83,12 @@ describe("loadCertificationPrompt", () => {
     const { executor } = rosterOf([
       { user_id: 7, ...BARE, discord_verified_at: "2026-10-01 10:00:00", discord_pseudo: null, blizzard_sub: "sub", overwatch_battletag: null },
     ]);
+    // L'équipe reste sans contact ; le BattleTag, inactionnable (Battle.net déjà
+    // rattaché), n'est pas demandé au lecteur.
     expect(await loadCertificationPrompt(executor, 7, 42, false, true)).toEqual({
       reason: "TEAM_WITHOUT_CONTACT",
       discordVerified: false,
-      battletagVerified: false,
+      battletagVerified: true,
       battletagRelevant: true,
     });
   });
@@ -132,6 +134,11 @@ describe("loadCertificationPrompt", () => {
     const { execute, executor } = rosterOf([{ user_id: 7, ...BARE, ...DISCORD, ...BATTLETAG }]);
     expect(await loadCertificationPrompt(executor, 7, 42, true, true)).toBeNull();
     expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("Battle.net rattaché sans BattleTag : rien à lui demander de ce côté (inactionnable)", async () => {
+    const { executor } = rosterOf([{ user_id: 7, ...BARE, ...DISCORD, blizzard_sub: "sub", overwatch_battletag: null }]);
+    expect(await loadCertificationPrompt(executor, 7, 42, true, true)).toBeNull();
   });
 
   it("rien pour un lecteur qui n'est plus dans le roster", async () => {

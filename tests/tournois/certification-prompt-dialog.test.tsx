@@ -9,19 +9,19 @@ jest.mock("@/app/(secured)/tournois/[id]/_components/TournamentDialogFrame", () 
       yields,
       initialFocus,
     }: {
-      children: unknown;
+      children: ReactNode;
       yields?: boolean;
       initialFocus?: string;
     }) =>
       createElement(
         "div",
         { "data-frame-yields": String(Boolean(yields)), "data-frame-focus": initialFocus ?? "first" },
-        children as never,
+        children,
       ),
   };
 });
 
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { CertificationPromptDialog } from "@/app/(secured)/tournois/[id]/_components/CertificationPromptDialog";
 import { AppLocaleProvider } from "@/components/i18n/locale-context";

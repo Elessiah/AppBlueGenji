@@ -60,9 +60,13 @@ export async function loadCertificationPrompt(
   const members = (rosters.get(teamId) ?? []).map((row) => toCandidate({ ...row, roles: parseRoles(row.roles_json) }));
   const viewer = members.find((member) => member.userId === userId);
   if (!viewer) return null;
+  // Battle.net rattaché sans BattleTag enregistré : rien à faire depuis le
+  // profil (le rattachement est déjà là, un BattleTag tapé y est refusé) — on
+  // ne le lui demande pas. Pour l'équipe, il ne fait toujours pas un contact.
+  const own = identityOf(viewer);
   const prompt = certificationPromptFor({
     isManager,
-    viewer: identityOf(viewer),
+    viewer: { ...own, battletagVerified: own.battletagVerified || viewer.blizzardLinked },
     teamHasContact: teamHasContact(members.map(identityOf), battletagRelevant),
     battletagRelevant,
   });
