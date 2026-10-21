@@ -65,8 +65,10 @@ Discord ou Blizzard (ou poser la marque à la main sur sa ligne de session).
   message privé, ou passage par Discord pour un compte rattaché sans pseudo
   nommé. Rien du dialogue n'est recopié ; le paramètre est retiré de l'adresse.
   Tag certifié entre-temps : un toast le dit au lieu d'ouvrir le dialogue.
-  Certifié depuis ce dialogue, `/profil` émet `DISCORD_CERTIFIED_EVENT` : une
-  fenêtre encore en attente (conditions à accepter) se ferme pour la page.
+  Certifié depuis ce dialogue, `/profil` émet `DISCORD_CERTIFIED_EVENT`
+  (`certifiedFromProfileEvent`, qu'il ne relit pas lui-même) : une fenêtre
+  encore en attente (conditions à accepter) se close pour la session
+  (`LATER`), comme après un succès d'un clic.
 
 Le BattleTag n'y figure pas : il est vérifié par Battle.net au rattachement
 (`OAUTH_PROVIDERS.md`), sans geste à proposer.
@@ -102,8 +104,9 @@ dialogue (`DISCORD_VERIFICATION_EXPOSURE`, qui nomme aussi l'arbitre d'un match
 que le joueur caste). Tableau natif (`th` `scope`, titres de groupe en `rowgroup`), colonnes
 « Sans » / « Avec », trois colonnes serrées sous
 480 px, boutons empilés (les deux refus côte à côte, le principal pleine largeur
-dessous, dans l'ordre de tabulation). Le corps défilant garde un plancher (`min(120px, 22dvh)`) : à fort zoom, le
-tableau reste lisible au lieu de s'écraser sous les boutons. Focus d'ouverture sur « Plus tard »
+dessous, dans l'ordre de tabulation). Le corps défilant garde un plancher (`min(120px, 22dvh)`, repli `vh`) : à fort
+zoom, le tableau reste lisible au lieu de s'écraser sous les boutons, et la
+fenêtre (`.dialog-bounded`) défile alors en entier, boutons compris. Focus d'ouverture sur « Plus tard »
 (`data-autofocus`) : Entrée n'y certifie ni ne ferme pour de bon. La flèche
 du parcours `DIALOG` est décorative (`aria-hidden`).
 
@@ -119,4 +122,5 @@ la marque, fenêtre muette, export et anonymisation intacts. Le repli se fait
 **colonne par colonne** (`selectUserRows`, `exportOwnData`, toutes les
 combinaisons) : l'absence de l'une n'efface jamais la lecture de l'autre.
 Colonne du compte absente : `loadDiscordCertifyPrompt` lève aussi la marque de
-session, sans relire à chaque page.
+session, sans relire à chaque page ; `selectUserRows` retient pour le processus
+la lecture tombée sur une colonne absente et ne la retente plus.

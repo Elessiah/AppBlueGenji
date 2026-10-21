@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { CyberButton, ScrollArea } from "@/components/cyber";
 import { useLocalePathname, useLocaleRouter } from "@/components/i18n/locale-navigation";
@@ -101,6 +101,17 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
   useEffect(() => {
     if (due) setClosed(false);
   }, [due]);
+  const dueRef = useRef(due);
+  dueRef.current = due;
+
+  /**
+   * Close pour la session (`LATER`, avec `keepalive`) : fermée tout de suite ;
+   * un échec d'écriture la fera seulement revenir au prochain chargement.
+   */
+  const closeForSession = useCallback(() => {
+    setClosed(true);
+    answerPrompt("LATER").catch(() => undefined);
+  }, []);
   useEffect(() => setPrivacyAnswered(!privacyPending), [privacyPending]);
   useEffect(() => setTermsAccepted(!termsPending), [termsPending]);
   useEffect(() => {
@@ -113,8 +124,11 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
     };
     const onTermsAccepted = () => setTermsAccepted(true);
     const onTermsRequired = () => setTermsAccepted(false);
-    // Certifié ailleurs (dialogue de `/profil`) : plus rien à proposer.
-    const onCertified = () => setClosed(true);
+    // Certifié — ici d'un clic, ou par le dialogue de `/profil` : close pour
+    // la session, qu'un tag changé ensuite ne la fasse pas revenir.
+    const onCertified = () => {
+      if (dueRef.current) closeForSession();
+    };
     window.addEventListener(DISCORD_CERTIFIED_EVENT, onCertified);
     window.addEventListener(PRIVACY_CHANGES_ANSWERED_EVENT, onPrivacy);
     window.addEventListener(TERMS_ACCEPTED_EVENT, onTermsAccepted);
@@ -125,7 +139,7 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
       window.removeEventListener(TERMS_ACCEPTED_EVENT, onTermsAccepted);
       window.removeEventListener(TERMS_REQUIRED_EVENT, onTermsRequired);
     };
-  }, []);
+  }, [closeForSession]);
 
   const open =
     mounted &&
@@ -136,15 +150,6 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
       termsPending: !termsAccepted,
       pathname,
     });
-
-  /**
-   * Close pour la session (`LATER`, avec `keepalive`) : fermée tout de suite ;
-   * un échec d'écriture la fera seulement revenir au prochain chargement.
-   */
-  const closeForSession = () => {
-    setClosed(true);
-    answerPrompt("LATER").catch(() => undefined);
-  };
 
   /** « Plus tard », Échap, voile. */
   const postpone = () => {
@@ -206,10 +211,9 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
       // Un 2xx sans `VERIFIED` (code envoyé en message privé) : le tag n'est
       // plus celui que Discord a nommé, la suite se fait depuis « Mon profil ».
       if (payload.status !== "VERIFIED") throw new Error("DISCORD_TAG_CHANGED");
-      // La proposition est close pour la session : une sauvegarde de tag plus
-      // tard (non certifié) ne la ferait pas revenir au rafraîchissement.
-      closeForSession();
       showSuccess(t("certifyPrompt.certified"));
+      // L'événement close la proposition pour la session (`onCertified`) et
+      // fait relire son état Discord à un `/profil` ouvert.
       window.dispatchEvent(new Event(DISCORD_CERTIFIED_EVENT));
       router.refresh();
     } catch (error) {
@@ -241,7 +245,7 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
         aria-labelledby={titleId}
         aria-describedby={`${titleId}-intro`}
         tabIndex={-1}
-        className={styles.modal}
+        className={`${styles.modal} dialog-bounded`}
       >
         <span className="eyebrow">{t("certifyPrompt.eyebrow")}</span>
         <h2 id={titleId} className={styles.title}>

@@ -84,10 +84,22 @@ export const CERTIFY_PROFILE_HREF = `/profil?${CERTIFY_QUERY_PARAM}=${CERTIFY_QU
 export const CERTIFY_DIALOG_EVENT = "bg:certify-dialog";
 
 /**
- * Événement de fenêtre émis quand la proposition a certifié le tag d'un clic :
- * `/profil`, s'il est ouvert, relit son état Discord (pastille, bouton).
+ * Événement de fenêtre émis quand le tag vient d'être certifié — d'un clic par
+ * la proposition, ou par le dialogue de `/profil` (`detail.fromProfile`). La
+ * proposition se close pour la session ; `/profil`, s'il est ouvert, relit son
+ * état Discord, sauf pour son propre événement (il le tient déjà à jour).
  */
 export const DISCORD_CERTIFIED_EVENT = "bg:discord-certified";
+
+/** L'événement émis par le dialogue de `/profil`. */
+export function certifiedFromProfileEvent(): CustomEvent<{ fromProfile: true }> {
+  return new CustomEvent(DISCORD_CERTIFIED_EVENT, { detail: { fromProfile: true } });
+}
+
+/** {@link DISCORD_CERTIFIED_EVENT} vient-il du dialogue de `/profil` ? */
+export function certifiedFromProfile(event: Event): boolean {
+  return (event as CustomEvent<{ fromProfile?: unknown } | null>).detail?.fromProfile === true;
+}
 
 /** L'adresse demande-t-elle d'ouvrir le dialogue de certification ? */
 export function wantsCertifyDialog(search: string | null | undefined): boolean {

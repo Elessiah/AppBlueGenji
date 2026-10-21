@@ -12,9 +12,11 @@
   backdrop-filter: blur(4px);
 }
 
+/* Hauteur bornée et repli de défilement : `.dialog-bounded` (globals.css),
+   posée sur l'élément — à fort zoom, le plancher du corps l'emporte et la
+   fenêtre entière défile, boutons compris. */
 .modal {
   width: min(560px, 100%);
-  max-height: calc(100dvh - 32px);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -36,6 +38,7 @@
    certifie pas sans pouvoir lire ce que ça change (WCAG 1.4.10). */
 .body {
   flex: 1 1 auto;
+  min-height: min(120px, 22vh);
   min-height: min(120px, 22dvh);
   display: flex;
   flex-direction: column;

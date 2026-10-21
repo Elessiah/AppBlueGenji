@@ -352,16 +352,28 @@ async function selectUserRows(
   params: (string | number)[],
 ): Promise<UserRow[]> {
   const db = await getDatabase();
-  const attempts = [...new Set([sql(true, true), sql(true, false), sql(false, true), sql(false, false)])];
+  const all = [...new Set([sql(true, true), sql(true, false), sql(false, true), sql(false, false)])];
+  // Une lecture déjà tombée sur une colonne absente n'est plus retentée : le
+  // schéma ne se rejoue qu'au redémarrage, qui vide aussi cette mémoire.
+  const attempts = all.filter((text, index) => index === all.length - 1 || !UNKNOWN_COLUMN_SQL.has(text));
   for (const [index, text] of attempts.entries()) {
     try {
       const [rows] = await db.execute<UserRow[]>(text, params);
       return rows;
     } catch (error) {
       if (!isUnknownColumnError(error) || index === attempts.length - 1) throw error;
+      UNKNOWN_COLUMN_SQL.add(text);
     }
   }
   return [];
+}
+
+/** Lectures de session tombées sur une colonne absente (`selectUserRows`), pour ce processus. */
+const UNKNOWN_COLUMN_SQL = new Set<string>();
+
+/** Tests : oublie les lectures mémorisées comme en échec. */
+export function resetUnknownColumnMemoForTests(): void {
+  UNKNOWN_COLUMN_SQL.clear();
 }
 
 async function getDevBypassUser(): Promise<AuthUser | null> {

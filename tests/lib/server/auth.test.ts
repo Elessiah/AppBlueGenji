@@ -9,6 +9,7 @@ import {
   countOtherSessions,
   ensureUniquePseudo,
   revokeOtherSessions,
+  resetUnknownColumnMemoForTests,
 } from "@/lib/server/auth";
 import { type SqlQuery, fakePool } from "../../helpers/sql-double";
 import { fakeCookieStore } from "../../helpers/cookie-store";
@@ -43,6 +44,7 @@ describe("auth", () => {
   beforeEach(() => {
     process.env = { ...originalEnv };
     jest.clearAllMocks();
+    resetUnknownColumnMemoForTests();
   });
 
   afterEach(() => {
@@ -420,6 +422,12 @@ describe("auth", () => {
       expect(execute).toHaveBeenCalledTimes(2);
       expect(String(execute.mock.calls[1][0])).toContain("u.recruitment_modal_off");
       expect(String(execute.mock.calls[1][0])).not.toContain("certify_prompt_due");
+
+      // La lecture en échec est retenue : la requête suivante ne la retente pas.
+      execute.mockClear();
+      await getCurrentUser();
+      expect(execute).toHaveBeenCalledTimes(1);
+      expect(String(execute.mock.calls[0][0])).not.toContain("certify_prompt_due");
     });
 
     it("toute autre erreur de base remonte, sans seconde lecture", async () => {

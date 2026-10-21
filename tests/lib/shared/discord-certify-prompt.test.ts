@@ -7,6 +7,9 @@ import {
   certifyPromptFor,
   parseCertifyPromptAction,
   wantsCertifyDialog,
+  DISCORD_CERTIFIED_EVENT,
+  certifiedFromProfile,
+  certifiedFromProfileEvent,
 } from "@/lib/shared/discord-certify-prompt";
 import { CONNECTION_LOG_EVENTS } from "@/lib/shared/connection-logs";
 import {
@@ -116,5 +119,13 @@ describe("fermeture de la modale de confidentialité par un lien d'action", () =
     expect(privacyFollowedLink(privacyAnsweredEvent(false))).toBe(false);
     // Un émetteur plus ancien (événement nu) : pas un lien suivi.
     expect(privacyFollowedLink(new Event(PRIVACY_CHANGES_ANSWERED_EVENT))).toBe(false);
+  });
+});
+
+describe("DISCORD_CERTIFIED_EVENT venu du dialogue de /profil", () => {
+  it("se reconnaît à son detail ; l'événement nu de la fenêtre, non", () => {
+    expect(certifiedFromProfileEvent().type).toBe(DISCORD_CERTIFIED_EVENT);
+    expect(certifiedFromProfile(certifiedFromProfileEvent())).toBe(true);
+    expect(certifiedFromProfile(new Event(DISCORD_CERTIFIED_EVENT))).toBe(false);
   });
 });

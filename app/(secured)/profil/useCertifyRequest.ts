@@ -7,6 +7,7 @@ import {
   CERTIFY_DIALOG_EVENT,
   CERTIFY_QUERY_PARAM,
   DISCORD_CERTIFIED_EVENT,
+  certifiedFromProfile,
   wantsCertifyDialog,
 } from "@/lib/shared/discord-certify-prompt";
 
@@ -32,7 +33,10 @@ export function useCertifyRequest({
   refreshRef.current = refresh;
 
   useEffect(() => {
-    const onCertified = () => refreshRef.current();
+    // Son propre événement (dialogue de cette page) : l'état est déjà à jour.
+    const onCertified = (event: Event) => {
+      if (!certifiedFromProfile(event)) refreshRef.current();
+    };
     window.addEventListener(DISCORD_CERTIFIED_EVENT, onCertified);
     return () => window.removeEventListener(DISCORD_CERTIFIED_EVENT, onCertified);
   }, []);
