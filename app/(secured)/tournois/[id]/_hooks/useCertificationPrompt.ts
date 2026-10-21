@@ -48,8 +48,16 @@ export function useCertificationPrompt(
   frozen: boolean,
 ) {
   const [open, setOpen] = useState(false);
-  const [neverAgain, setNeverAgain] = useState(false);
+  // Case « Ne plus voir » : tenue ici pour valoir aussi quand la modale
+  // s'efface, mais dans une référence — la cocher ne relance pas le rendu de
+  // toute la fiche, ni les rappels ci-dessous (l'affichage de la case est
+  // l'état local de la modale).
+  const neverAgain = useRef(false);
   const decided = useRef(false);
+  // Les effets lisent l'invitation par sa présence, pas par son identité : une
+  // relecture REST en renvoie une neuve au contenu identique.
+  const present = prompt != null;
+  const withdrawn = prompt === null;
   // Fermée par le lecteur, ou effacée devant une modale urgente : plus rien
   // sur cette page, même retirée puis revenue, stockage bloqué compris (le
   // drapeau d'onglet peut ne pas s'écrire).
@@ -61,25 +69,29 @@ export function useCertificationPrompt(
   useEffect(() => {
     decided.current = false;
     doneForPage.current = false;
+    neverAgain.current = false;
     setOpen(false);
-    setNeverAgain(false);
   }, [tournamentId]);
 
   useEffect(() => {
-    if (decided.current || doneForPage.current || prompt == null || frozen) return;
+    if (decided.current || doneForPage.current || !present || frozen) return;
     decided.current = true;
     // Ni « Ne plus voir », ni déjà fermée dans l'onglet, ni une autre modale
     // déjà ouverte — l'attendre la ferait surgir au départ d'un match, sur le
     // plateau : sinon, pas sur cette page, sans rien retenir.
     const allowed = shouldOpenCertificationPrompt(browserStorage("localStorage"), browserStorage("sessionStorage"));
     if (allowed && !anotherModalOpen()) setOpen(true);
-  }, [tournamentId, prompt, frozen]);
+  }, [tournamentId, present, frozen]);
 
   const close = useCallback(() => {
-    rememberCertificationPromptClosed(browserStorage("localStorage"), browserStorage("sessionStorage"), neverAgain);
+    rememberCertificationPromptClosed(
+      browserStorage("localStorage"),
+      browserStorage("sessionStorage"),
+      neverAgain.current,
+    );
     doneForPage.current = true;
     setOpen(false);
-  }, [neverAgain]);
+  }, []);
 
   // S'effacer devant une modale urgente, sans rien retenir dans le navigateur —
   // l'invitation n'a peut-être pas été lue — mais pour le reste de la page :
@@ -88,22 +100,22 @@ export function useCertificationPrompt(
   // « Ne plus voir » déjà cochée vaut pourtant : retenue pour de bon, sans le
   // drapeau d'onglet d'une fermeture.
   const yieldPlace = useCallback(() => {
-    if (neverAgain) rememberCertificationPromptClosed(browserStorage("localStorage"), null, true);
+    if (neverAgain.current) rememberCertificationPromptClosed(browserStorage("localStorage"), null, true);
     doneForPage.current = true;
     setOpen(false);
-  }, [neverAgain]);
+  }, []);
 
   // Invitation retirée (certifiée entre-temps, lecture en échec) : la modale se
   // ferme sans rien retenir, et la décision reprend à son retour — autre
   // modale ouverte entre-temps comprise.
   useEffect(() => {
-    if (prompt !== null) return;
+    if (!withdrawn) return;
     decided.current = false;
     setOpen(false);
-  }, [prompt]);
+  }, [withdrawn]);
 
   // Affichée seulement : invitation présente et fiche vivante.
-  const shown = open && prompt != null && !frozen;
+  const shown = open && present && !frozen;
 
   // Une modale urgente s'ouvre par-dessus (lancement d'un match) : place nette
   // sans délai, avant que le morceau ne se monte au-dessus d'elle dans la pile.
@@ -115,9 +127,12 @@ export function useCertificationPrompt(
     return watchUrgentModalOpened(yieldPlace);
   }, [shown, yieldPlace]);
 
+  const setNeverAgain = useCallback((value: boolean) => {
+    neverAgain.current = value;
+  }, []);
+
   return {
     prompt: shown ? prompt : null,
-    neverAgain,
     setNeverAgain,
     close,
   };

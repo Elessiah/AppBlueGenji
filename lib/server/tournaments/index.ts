@@ -201,7 +201,11 @@ import {
   type DisputeBeforeResolution,
 } from "./dispute-self-resolution";
 import { loadViewerCastBlock } from "./match-launch";
-import { loadCertificationPrompt } from "./certification-prompt";
+import {
+  loadCertificationPrompt,
+  recentCertificationPrompt,
+  rememberCertificationPrompt,
+} from "./certification-prompt";
 import { battletagRelevantFor, type CertificationPrompt } from "@/lib/shared/certification-prompt";
 
 let pendingSync: Promise<void> | null = null;
@@ -1005,7 +1009,10 @@ export type TournamentViewerRights = {
 /**
  * Invitation à certifier du lecteur (`CERTIFICATION_PROMPT.md`). Simple
  * invitation : une lecture en échec la tait (`null`, journal pm2), elle ne
- * fait pas tomber le contexte — et avec lui le flux — du joueur.
+ * fait pas tomber le contexte — et avec lui le flux — du joueur. Gardée une
+ * minute par lecteur (`CERTIFICATION_PROMPT_TTL_MS`) : le contexte se relit à
+ * chaque lecture REST (après chaque geste, proposition de score, repli du
+ * flux), et l'invitation ne change qu'avec une certification.
  */
 async function readCertificationPrompt(
   userId: number,
@@ -1013,10 +1020,15 @@ async function readCertificationPrompt(
   isManager: boolean,
   battletagRelevant: boolean,
 ): Promise<CertificationPrompt | null> {
+  const key = `${userId}:${teamId}:${isManager ? 1 : 0}:${battletagRelevant ? 1 : 0}`;
+  const hit = recentCertificationPrompt(key, Date.now());
+  if (hit !== undefined) return hit;
   try {
-    return await withConnection((connection) =>
+    const prompt = await withConnection((connection) =>
       loadCertificationPrompt(connection, userId, teamId, isManager, battletagRelevant),
     );
+    rememberCertificationPrompt(key, prompt ?? null, Date.now());
+    return prompt;
   } catch (error) {
     console.error("[tournaments] invitation à certifier indisponible :", error);
     return null;

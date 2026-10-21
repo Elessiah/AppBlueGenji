@@ -168,9 +168,8 @@ describe("useCertificationPrompt", () => {
 
   it("« Ne plus voir » cochée : la fermeture la tait pour de bon", () => {
     const first = render(PROMPT);
-    const ticked = act(() => first.setNeverAgain(true), PROMPT);
-    expect(ticked.neverAgain).toBe(true);
-    act(() => ticked.close(), PROMPT);
+    first.setNeverAgain(true);
+    act(() => first.close(), PROMPT);
     expect(local.values.get(CERTIFICATION_PROMPT_OFF_KEY)).toBe("1");
   });
 
@@ -210,7 +209,7 @@ describe("useCertificationPrompt", () => {
 
   it("cédant sa place, une case « Ne plus voir » cochée est retenue pour de bon", () => {
     const first = render(PROMPT);
-    act(() => first.setNeverAgain(true), PROMPT);
+    first.setNeverAgain(true);
     act(() => modals.yieldWatchers.at(-1)?.(), PROMPT);
     expect(local.values.get(CERTIFICATION_PROMPT_OFF_KEY)).toBe("1");
     expect(session.values.has(CERTIFICATION_PROMPT_CLOSED_KEY)).toBe(false);

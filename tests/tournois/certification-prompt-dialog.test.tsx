@@ -50,7 +50,6 @@ function render(prompt: CertificationPrompt, locale: "fr" | "en" = "fr"): string
   const ui: ReactElement = (
     <CertificationPromptDialog
       prompt={prompt}
-      neverAgain={false}
       onNeverAgainChange={() => undefined}
       onClose={() => undefined}
     />
@@ -125,16 +124,8 @@ describe("CertificationPromptDialog", () => {
     expect(html.match(/role="cell"/g)).toHaveLength(8);
   });
 
-  it("la case « Ne plus voir » reflète l'état tenu par le crochet", () => {
-    const html = renderToStaticMarkup(
-      <CertificationPromptDialog
-        prompt={OW_MANAGER}
-        neverAgain
-        onNeverAgainChange={() => undefined}
-        onClose={() => undefined}
-        />,
-    );
-    expect(html).toMatch(/<input type="checkbox" checked=""/);
+  it("la case « Ne plus voir » part décochée", () => {
+    expect(render(OW_MANAGER)).toContain('<input type="checkbox"/>');
   });
 
   it("en anglais, ni français ni lien sans préfixe de langue", () => {

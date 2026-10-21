@@ -84,3 +84,38 @@ export async function loadCertificationPrompt(
   }
   return prompt;
 }
+
+/**
+ * Mémoire courte des invitations calculées, par lecteur (utilisateur, équipe,
+ * rôle, jeu). Le contexte du lecteur se relit à chaque lecture REST de la
+ * fiche ; sans elle, chaque geste d'un meneur un soir de match coûterait une
+ * place du pool et une ou deux requêtes. Une certification faite entre-temps
+ * se voit au plus une minute plus tard. Bornée, échecs jamais retenus.
+ */
+export const CERTIFICATION_PROMPT_TTL_MS = 60_000;
+const CERTIFICATION_PROMPT_CACHE_MAX = 2_000;
+const recentPrompts = new Map<string, { prompt: CertificationPrompt | null; expiresAt: number }>();
+
+/** Invitation encore fraîche pour `key` ; `undefined` s'il faut la relire. */
+export function recentCertificationPrompt(key: string, now: number): CertificationPrompt | null | undefined {
+  const entry = recentPrompts.get(key);
+  if (!entry) return undefined;
+  if (entry.expiresAt > now) return entry.prompt;
+  recentPrompts.delete(key);
+  return undefined;
+}
+
+/** Retient une invitation lue ; la plus ancienne part si la mémoire est pleine. */
+export function rememberCertificationPrompt(key: string, prompt: CertificationPrompt | null, now: number): void {
+  recentPrompts.delete(key);
+  if (recentPrompts.size >= CERTIFICATION_PROMPT_CACHE_MAX) {
+    const oldest = recentPrompts.keys().next().value;
+    if (oldest !== undefined) recentPrompts.delete(oldest);
+  }
+  recentPrompts.set(key, { prompt, expiresAt: now + CERTIFICATION_PROMPT_TTL_MS });
+}
+
+/** Vide la mémoire (tests). */
+export function forgetCertificationPrompts(): void {
+  recentPrompts.clear();
+}

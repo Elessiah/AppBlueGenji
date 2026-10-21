@@ -4,7 +4,12 @@ jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/teams/roster");
 jest.mock("@/lib/server/tournaments/preview-cache");
 jest.mock("@/lib/server/tournaments/registration-eligibility");
-jest.mock("@/lib/server/tournaments/certification-prompt");
+jest.mock("@/lib/server/tournaments/certification-prompt", () => ({
+  loadCertificationPrompt: jest.fn(),
+  // Sans mémoire ici : chaque lecture du contexte relit.
+  recentCertificationPrompt: () => undefined,
+  rememberCertificationPrompt: () => undefined,
+}));
 jest.mock("@/lib/server/solo-entries-service");
 
 import { getTournamentViewerContext } from "@/lib/server/tournaments";

@@ -28,10 +28,9 @@ type DiscordOnlyCell = keyof typeof DISCORD_ONLY_CELLS;
 interface CertificationPromptDialogProps {
   prompt: CertificationPrompt;
   /**
-   * Case « Ne plus voir », tenue par `useCertificationPrompt` : cochée, elle
-   * vaut aussi quand la modale s'efface devant une modale urgente.
+   * Case « Ne plus voir » : affichée ici, retenue par `useCertificationPrompt`
+   * (cochée, elle vaut aussi quand la modale s'efface devant une urgente).
    */
-  neverAgain: boolean;
   onNeverAgainChange: (value: boolean) => void;
   /** Fermeture ; la case cochée vaut pour toute fermeture. */
   onClose: () => void;
@@ -48,11 +47,11 @@ interface CertificationPromptDialogProps {
  */
 export function CertificationPromptDialog({
   prompt,
-  neverAgain,
   onNeverAgainChange,
   onClose,
 }: Readonly<CertificationPromptDialogProps>) {
   const { t } = useDialogsText();
+  const [neverAgain, setNeverAgain] = useState(false);
   // Lu une fois, au montage (morceau chargé côté client seulement) : une
   // modale urgente ouverte entre la décision et l'arrivée du morceau garde la
   // main — celle-ci, montée après, prendrait sinon le dessus de la pile. Le
@@ -147,7 +146,10 @@ export function CertificationPromptDialog({
 
       <div className={s.footer}>
         <label className={s.neverAgain}>
-          <input type="checkbox" checked={neverAgain} onChange={(e) => onNeverAgainChange(e.target.checked)} />
+          <input type="checkbox" checked={neverAgain} onChange={(e) => {
+              setNeverAgain(e.target.checked);
+              onNeverAgainChange(e.target.checked);
+            }} />
           {/* NOSONAR S6772 — label en flex avec `gap` */}
           {t("certification.neverAgain")}
         </label>

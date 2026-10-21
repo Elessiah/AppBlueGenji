@@ -1,5 +1,11 @@
 import { describe, expect, it, jest } from "@jest/globals";
-import { loadCertificationPrompt } from "@/lib/server/tournaments/certification-prompt";
+import {
+  CERTIFICATION_PROMPT_TTL_MS,
+  forgetCertificationPrompts,
+  loadCertificationPrompt,
+  recentCertificationPrompt,
+  rememberCertificationPrompt,
+} from "@/lib/server/tournaments/certification-prompt";
 import { fakeConnection, type SqlQuery } from "../../helpers/sql-double";
 
 /**
@@ -151,5 +157,31 @@ describe("loadCertificationPrompt", () => {
   it("rien pour un lecteur qui n'est plus dans le roster", async () => {
     const { executor } = rosterOf([{ user_id: 8, ...BARE }]);
     expect(await loadCertificationPrompt(executor, 7, 42, true, true)).toBeNull();
+  });
+});
+
+describe("mémoire courte des invitations", () => {
+  const PROMPT = { reason: "MANAGER", discordVerified: false, battletagVerified: true, battletagRelevant: true } as const;
+
+  it("sert une invitation retenue, « rien » compris, pendant une minute", () => {
+    forgetCertificationPrompts();
+    rememberCertificationPrompt("7:42:1:1", PROMPT, 1_000);
+    rememberCertificationPrompt("8:42:0:1", null, 1_000);
+    expect(recentCertificationPrompt("7:42:1:1", 1_000 + CERTIFICATION_PROMPT_TTL_MS - 1)).toEqual(PROMPT);
+    expect(recentCertificationPrompt("8:42:0:1", 2_000)).toBeNull();
+    expect(recentCertificationPrompt("9:42:0:1", 2_000)).toBeUndefined();
+  });
+
+  it("l'oublie passé le délai", () => {
+    forgetCertificationPrompts();
+    rememberCertificationPrompt("7:42:1:1", PROMPT, 1_000);
+    expect(recentCertificationPrompt("7:42:1:1", 1_000 + CERTIFICATION_PROMPT_TTL_MS)).toBeUndefined();
+  });
+
+  it("reste bornée : la plus ancienne part", () => {
+    forgetCertificationPrompts();
+    for (let i = 0; i < 2_001; i += 1) rememberCertificationPrompt(`k${i}`, null, 0);
+    expect(recentCertificationPrompt("k0", 1)).toBeUndefined();
+    expect(recentCertificationPrompt("k2000", 1)).toBeNull();
   });
 });
