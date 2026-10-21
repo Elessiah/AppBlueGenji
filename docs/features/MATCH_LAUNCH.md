@@ -155,7 +155,8 @@ garde la borne de la modale — en lancement ou lancé (`exposesMatchContacts`, 
 les équipes ne reçoivent les contacts **du caster** que le temps du match
 (`exposesCaster`) ; avant, la carte montre leurs contacts sans les siens (un
 arbitre, lui, les reçoit dès que les adversaires sont connus). Qui
-n'est pas partie du match, le caster d'un match pas encore parti, ou
+n'est pas partie du match, le caster d'un match pas encore parti (sauf s'il
+est aussi arbitre : il lit alors en arbitre, dès que les adversaires sont connus), ou
 un match sans contacts (adversaire inconnu, terminé), reçoit `MATCH_CONTACTS_UNAVAILABLE` (404), un seul code :
 la réponse ne dit pas qui joue quoi. La carte décide du bouton à l'horloge du
 navigateur, le serveur à la sienne : un caster dont l'horloge avance verrait

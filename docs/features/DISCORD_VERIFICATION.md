@@ -52,7 +52,9 @@ d'écriture : placée après, elle serait oubliée le jour où un rôle s'ajoute
 ### Visible des autres joueurs : un choix, pas un effet de la certification
 
 La certification ouvre le tag à l'**organisation** — administrateurs, arbitres
-pendant un tournoi, parties d'un match lancé. Elle ne l'ouvre pas aux autres
+pendant un tournoi, parties d'un match (équipes dès que les deux adversaires
+sont connus, caster le temps du match ; celui du caster, aux arbitres dès que
+les adversaires sont connus — tableau ci-dessus). Elle ne l'ouvre pas aux autres
 joueurs, et `/profil` le disait mal : sous les réglages « Visible par les autres
 joueurs », une phrase renvoyait le tag à « ses propres réglages, ci-dessus »,
 comme si la certification décidait aussi pour eux. Un joueur qui voulait être
