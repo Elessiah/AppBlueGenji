@@ -147,6 +147,11 @@
     grid-template-columns: 1fr 1fr;
   }
 
+  /* Étirés à leur case : le libellé reste centré. */
+  .actions > * {
+    justify-content: center;
+  }
+
   .actions > :last-child {
     grid-column: 1 / -1;
   }

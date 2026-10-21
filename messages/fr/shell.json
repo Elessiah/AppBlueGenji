@@ -264,11 +264,12 @@
     "neverSaving": "Enregistrement…",
     "certified": "Tag Discord certifié.",
     "neverSaved": "Cette proposition ne s'affichera plus. Tu peux toujours certifier depuis « Mon profil ».",
-    "certifyChanged": "Ton tag a changé depuis ta connexion : certifie-le depuis « Mon profil ».",
+    "certifyChanged": "Ton compte Discord a changé depuis ta connexion : certifie ton tag depuis « Mon profil ».",
     "certifyFailed": "La certification a échoué. Réessaie, ou passe par « Mon profil ».",
     "neverFailed": "Ton choix n'a pas pu être enregistré. Réessaie.",
     "bodyLabel": "Proposition de certification du tag Discord",
     "accountDeleted": "Ce compte a été supprimé.",
-    "alreadyVerified": "Ton tag Discord est déjà certifié."
+    "alreadyVerified": "Ton tag Discord est déjà certifié.",
+    "sessionEnded": "Ta session a pris fin : reconnecte-toi."
   }
 }

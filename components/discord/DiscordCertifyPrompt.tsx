@@ -37,6 +37,17 @@ export const CERTIFY_PROMPT_ROWS = CERTIFY_PROMPT_GROUPS.flatMap(({ rows }) => r
 /** Refus de `POST /api/profile/discord` qui disent que l'état du tag a changé sous la fenêtre. */
 const STATE_CHANGED = new Set(["DISCORD_TAG_CHANGED", "DISCORD_NOT_LINKED", "DISCORD_TAG_MISSING", "DISCORD_TAG_NOT_ATTESTED"]);
 
+/**
+ * Refus sans issue depuis la fenêtre — compte supprimé, session close ailleurs :
+ * réessayer n'y changerait rien. La fenêtre se ferme, un toast dit pourquoi et
+ * la page se relit. `null` : refus ordinaire, la fenêtre reste.
+ */
+function deadEndText(code: string): "certifyPrompt.accountDeleted" | "certifyPrompt.sessionEnded" | null {
+  if (code === ACCOUNT_DELETED_ERROR || code === "PROFILE_NOT_FOUND") return "certifyPrompt.accountDeleted";
+  if (code === "UNAUTHORIZED") return "certifyPrompt.sessionEnded";
+  return null;
+}
+
 export type DiscordCertifyPromptProps = {
   /** Parcours offert, décidé par la mise en page racine ; `null` : rien à proposer. */
   prompt: CertifyPrompt | null;
@@ -132,10 +143,10 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
       setClosed(true);
       showSuccess(t("certifyPrompt.neverSaved"));
     } catch (error) {
-      if ((error as Error).message === ACCOUNT_DELETED_ERROR) {
-        // Compte supprimé entre-temps (autre onglet) : réessayer n'y changerait rien.
+      const deadEnd = deadEndText((error as Error).message);
+      if (deadEnd) {
         setClosed(true);
-        showError(t("certifyPrompt.accountDeleted"));
+        showError(t(deadEnd));
         router.refresh();
       } else {
         showError(t("certifyPrompt.neverFailed"));
@@ -163,7 +174,7 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
       const response = await fetch("/api/profile/discord", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ handle: prompt.tag }),
+        body: JSON.stringify({ handle: prompt.tag, linkedOnly: true }),
       });
       const payload = (await response.json().catch(() => ({}))) as { error?: string; status?: string };
       if (!response.ok) throw new Error(payload.error ?? "");
@@ -179,7 +190,12 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
       router.refresh();
     } catch (error) {
       const code = (error as Error).message;
-      if (STATE_CHANGED.has(code)) {
+      const deadEnd = deadEndText(code);
+      if (deadEnd) {
+        setClosed(true);
+        showError(t(deadEnd));
+        router.refresh();
+      } else if (STATE_CHANGED.has(code)) {
         // Le tag montré n'est plus le bon : la fenêtre n'a plus rien à offrir.
         setClosed(true);
         answerPrompt("LATER").catch(() => undefined);

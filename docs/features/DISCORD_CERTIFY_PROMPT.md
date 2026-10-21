@@ -44,11 +44,15 @@ Discord ou Blizzard (ou poser la marque à la main sur sa ligne de session).
 
 - **`ONE_CLICK`** — mêmes conditions que `certifyLinkedDiscordTag` (Discord
   rattaché, pseudo nommé par Discord, certifiable). La fenêtre montre le tag et
-  appelle `POST /api/profile/discord { handle }`. Seul `status: "VERIFIED"`
+  appelle `POST /api/profile/discord { handle, linkedOnly: true }` —
+  `linkedOnly` interdit le chemin à code (Discord détaché entre-temps :
+  `DISCORD_NOT_LINKED`, aucun message privé). Seul `status: "VERIFIED"`
   vaut succès → proposition close pour la session (`LATER`), `showSuccess`,
   `DISCORD_CERTIFIED_EVENT` (un `/profil` ouvert relit son état Discord) et
-  `router.refresh()`. Un code envoyé à la place, ou l'un des quatre codes
-  d'état changé, ferme la fenêtre (`LATER`) et renvoie vers « Mon profil » ;
+  `router.refresh()`. L'un des quatre codes d'état changé ferme la fenêtre
+  (`LATER`) et renvoie vers « Mon profil » ; compte supprimé
+  (`PROFILE_NOT_FOUND`, `ACCOUNT_DELETED`) ou session close (`UNAUTHORIZED`)
+  la ferment avec un toast dédié et relisent la page, sur les deux boutons ;
   tout autre refus la garde ouverte, en toast.
 - **`DIALOG`** — tout autre compte non certifié, le plus souvent une connexion
   Blizzard sans Discord. Le bouton (« Certifier mon tag → ») clôt la

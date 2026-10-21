@@ -264,11 +264,12 @@
     "neverSaving": "Saving…",
     "certified": "Discord tag verified.",
     "neverSaved": "You won't see this suggestion again. You can always verify from “My profile”.",
-    "certifyChanged": "Your tag changed since you logged in: verify it from “My profile”.",
+    "certifyChanged": "Your Discord account changed since you logged in: verify your tag from “My profile”.",
     "certifyFailed": "Verification failed. Try again, or go through “My profile”.",
     "neverFailed": "Your choice couldn't be saved. Try again.",
     "bodyLabel": "Discord tag verification suggestion",
     "accountDeleted": "This account has been deleted.",
-    "alreadyVerified": "Your Discord tag is already verified."
+    "alreadyVerified": "Your Discord tag is already verified.",
+    "sessionEnded": "Your session has ended: log in again."
   }
 }

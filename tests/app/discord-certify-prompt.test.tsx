@@ -39,7 +39,8 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
 
   it("ne certifie que par la route existante, au clic, avec le tag montré en garde", () => {
     expect(SOURCE).toContain('fetch("/api/profile/discord", {');
-    expect(SOURCE).toContain("JSON.stringify({ handle: prompt.tag })");
+    // Un clic seulement : jamais de code envoyé que la fenêtre ne saurait faire saisir.
+    expect(SOURCE).toContain("JSON.stringify({ handle: prompt.tag, linkedOnly: true })");
     expect(SOURCE.match(/fetch\("\/api\/profile\/discord"/g)).toHaveLength(1);
     // Seul `VERIFIED` vaut succès (un code envoyé n'est pas une certification).
     expect(SOURCE).toContain('if (payload.status !== "VERIFIED") throw new Error("DISCORD_TAG_CHANGED");');
@@ -49,14 +50,14 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
     );
     // État changé : la fenêtre se ferme (plus rien à offrir) ; autre refus : elle reste.
     expect(SOURCE).toMatch(
-      /if \(STATE_CHANGED\.has\(code\)\) \{\s*\/\/[^\n]*\n\s*setClosed\(true\);\s*answerPrompt\("LATER"\)[^;]*;\s*showError\(t\("certifyPrompt\.certifyChanged"\)\);\s*\} else \{\s*showError\(t\("certifyPrompt\.certifyFailed"\)\);/,
+      /else if \(STATE_CHANGED\.has\(code\)\) \{\s*\/\/[^\n]*\n\s*setClosed\(true\);\s*answerPrompt\("LATER"\)[^;]*;\s*showError\(t\("certifyPrompt\.certifyChanged"\)\);\s*\} else \{\s*showError\(t\("certifyPrompt\.certifyFailed"\)\);/,
     );
   });
 
-  it("« Ne plus voir » sur un compte supprimé : fermée, toast dédié, pas de « Réessaie » sans fin", () => {
-    expect(SOURCE).toMatch(
-      /\.message === ACCOUNT_DELETED_ERROR\) \{\s*\/\/[^\n]*\n\s*setClosed\(true\);\s*showError\(t\("certifyPrompt\.accountDeleted"\)\);/,
-    );
+  it("compte supprimé ou session close : fermée, toast dédié, pas de « Réessaie » sans fin (deux boutons)", () => {
+    expect(SOURCE).toContain('if (code === ACCOUNT_DELETED_ERROR || code === "PROFILE_NOT_FOUND") return "certifyPrompt.accountDeleted";');
+    expect(SOURCE).toContain('if (code === "UNAUTHORIZED") return "certifyPrompt.sessionEnded";');
+    expect(SOURCE.match(/if \(deadEnd\) \{\s*setClosed\(true\);\s*showError\(t\(deadEnd\)\);\s*router\.refresh\(\);/g)).toHaveLength(2);
   });
 
   it("focus d'ouverture sur « Plus tard », flèche décorative hors du nom accessible", () => {
