@@ -103,7 +103,7 @@ export function DiscordCertifyPromptGate({
     }
     const abort = new AbortController();
     triedAt.current = Date.now();
-    recheckCertifyPrompt(abort.signal).then((result) => {
+    void recheckCertifyPrompt(abort.signal).then((result) => {
       if (abort.signal.aborted) return;
       if (result === "UNKNOWN") {
         setRevoked("doubt");
@@ -133,7 +133,7 @@ export function DiscordCertifyPromptGate({
       triedAt.current = Date.now();
       const request = new AbortController();
       abort = request;
-      recheckCertifyPrompt(request.signal)
+      void recheckCertifyPrompt(request.signal)
         .then((result) => {
           if (request.signal.aborted || answered.current) return;
           if (result === "UNKNOWN") {

@@ -6,7 +6,7 @@ const PATH = "/api/profile/discord/certify-prompt";
 const CHANNEL_NAME = "bg:certify-prompt";
 
 /** Cet onglet : il n'agit pas sur sa propre annonce. */
-const TAB_ID = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+const TAB_ID = Array.from(crypto.getRandomValues(new Uint32Array(2)), (part) => part.toString(36)).join("-");
 
 type CertifyPromptMessage = { from: string };
 
