@@ -32,6 +32,11 @@ interface TournamentDialogFrameProps {
    * (`data-modal-yields`, `anotherModalOpen` de `lib/shared/dialog-focus.ts`).
    */
   yields?: boolean;
+  /**
+   * Focus d'ouverture : premier contrôle (défaut) ou le cadre lui-même — une
+   * modale qui se lit avant d'agir, ouverte par le haut (`useDialogBehavior`).
+   */
+  initialFocus?: "first" | "container";
   onClose: () => void;
   children: ReactNode;
 }
@@ -57,12 +62,13 @@ export function TournamentDialogFrame({
   deferMount = false,
   busy,
   yields = false,
+  initialFocus = "first",
   onClose,
   children,
 }: Readonly<TournamentDialogFrameProps>) {
   const [mounted, setMounted] = useState(!deferMount);
   useEffect(() => setMounted(true), []);
-  const dialogRef = useDialogBehavior({ open: mounted, onClose, locked: busy });
+  const dialogRef = useDialogBehavior({ open: mounted, onClose, locked: busy, initialFocus });
   const backdrop = useBackdropDismiss(onClose, busy);
 
   if (!mounted) return null;

@@ -18,13 +18,16 @@ import { SkipLink } from "@/components/accessibility/SkipLink";
 import { MatchLaunchCenterLazy } from "@/components/match-launch/MatchLaunchCenterLazy";
 import { EnglishLinkPreload } from "@/components/i18n/english-link-preload";
 import { TermsAcceptanceModal } from "@/components/legal/TermsAcceptanceModal";
+import { DiscordCertifyPromptLazy } from "@/components/discord/DiscordCertifyPromptLazy";
 import { TERMS_TRANSLATION_NOTE } from "@/lib/shared/french-version-prevails";
 import { needsTermsAcceptance } from "@/lib/server/terms-acceptance";
 import type { TermsRequest } from "@/lib/shared/terms-of-use";
 import { scheduleAccountDeletionJournalPrune } from "@/lib/server/account-deletion-journal";
 import { schedulePurgeExpiredReports } from "@/lib/server/content-reports";
 import { getRecruitmentSpotlight } from "@/lib/server/recruitment-service";
-import { getCurrentUser } from "@/lib/server/auth";
+import { currentTokenHash, getCurrentUser } from "@/lib/server/auth";
+import { loadDiscordCertifyPrompt } from "@/lib/server/users/discord-certify-prompt";
+import type { CertifyPrompt } from "@/lib/shared/discord-certify-prompt";
 import { healRecruitmentModalOff } from "@/lib/server/users/recruitment-modal-preference";
 import { loadPendingPrivacyChanges } from "@/lib/server/privacy-consent";
 import { dispatchPrivacyChangeNotifications } from "@/lib/server/privacy-change-notifications";
@@ -145,6 +148,21 @@ async function termsRequestFor(userId: number | undefined): Promise<TermsRequest
 }
 
 /**
+ * La fenêtre « Certifier ton tag Discord » est-elle due pour cette session
+ * (`docs/features/DISCORD_CERTIFY_PROMPT.md`) ? Une requête, compte connecté
+ * seulement ; une panne ne fait pas tomber la page, la question sera reposée
+ * au chargement suivant.
+ */
+async function loadCertifyPromptSafely(userId: number): Promise<CertifyPrompt | null> {
+  try {
+    return await loadDiscordCertifyPrompt(userId, await currentTokenHash());
+  } catch (error) {
+    console.error("[discord-certify-prompt] lecture impossible", error);
+    return null;
+  }
+}
+
+/**
  * Mise en page racine.
  *
  * Elle est `async` et lit les en-têtes de requête, et c'est **cette lecture**
@@ -212,6 +230,12 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   // appel ne coûte rien de plus sur les pages où `PublicHeader`/`PublicFooter`
   // le lisent déjà.
   const user = await getCurrentUser();
+  // Conditions et certification du tag Discord : ne dépendent que de la
+  // session, lancées tout de suite (en parallèle des lectures qui suivent),
+  // attendues plus bas ; aucune requête de certification quand la session n'a
+  // rien à proposer (marque lue avec elle). Ne lèvent jamais.
+  const termsLoad = termsRequestFor(user?.id);
+  const certifyPromptLoad = user?.certifyPromptDue ? loadCertifyPromptSafely(user.id) : Promise.resolve(null);
   // Lus sur **toutes** les pages, `/rgpd` comprise : la modale s'y tait côté
   // client. Décidé ici, le silence survivrait à la navigation — la mise en
   // page racine n'est pas re-rendue d'un lien à l'autre, et un joueur arrivé
@@ -246,14 +270,22 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   // navigateur. La modale ne s'ouvrant plus, ses annonces ne partent pas dans
   // la page (ni, sous `/en`, ses textes quand la banderole n'a rien non plus).
   const modalOptedOut = recruitmentModalOptedOut({ accountOff: user?.recruitmentModalOff, browserCookie: modalOffCookie });
-  const modalAds = modalOptedOut ? [] : spotlight.modal;
-  const termsRequest = await termsRequestFor(user?.id);
+  const [termsRequest, certifyPrompt] = await Promise.all([termsLoad, certifyPromptLoad]);
+  // Tenue par la certification (`modalHeld`, verrouillé pour la page), la
+  // modale ne s'ouvrira pas sur ce chargement : ses annonces n'y partent pas.
+  const modalAds = modalOptedOut || certifyPrompt !== null ? [] : spotlight.modal;
   const termsRequired = termsRequest !== null;
   // Bloquante pour tout compte connecté en retard d'une version (pas de report).
   const termsDueOnLoad = termsModalDueOnLoad({
     termsRequired,
     pathname: requestedPath,
   });
+  // Certification : proposée après la confidentialité et les conditions, jamais
+  // par-dessus ; lue quand même, la fenêtre s'ouvre dès leur réponse.
+  // Le recrutement se tait tant qu'elle est due, **quelle que soit la page** :
+  // muette sur une page légale, elle s'ouvrira à la navigation suivante, côté
+  // client, sans que la mise en avant du recrutement ne soit rejugée.
+  const certifyPromptDue = certifyPrompt !== null;
   // Réglages d'accessibilité du lecteur : posés **dans le HTML initial**, sans
   // quoi un contraste renforcé ferait d'abord clignoter la page dans ses
   // couleurs d'origine. Voir `lib/shared/accessibility-settings.ts`.
@@ -307,6 +339,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
               termsModalDue: termsDueOnLoad,
               pathname: requestedPath,
             })}
+            modalHeld={certifyPromptDue}
             modalOptedOut={modalOptedOut}
             signedIn={user !== null}
             accountBackOn={user?.recruitmentModalBackOn === true}
@@ -326,6 +359,17 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
               request={termsRequest}
               privacyPending={privacyChanges.length > 0}
               translationNote={locale === DEFAULT_LOCALE ? null : TERMS_TRANSLATION_NOTE}
+            />
+          )}
+          {/* Certification du tag Discord proposée une fois par connexion
+              Discord ou Blizzard, après la confidentialité et les conditions.
+              Chargée seulement quand elle est due : hors du premier
+              chargement de chaque page. */}
+          {certifyPrompt && (
+            <DiscordCertifyPromptLazy
+              prompt={certifyPrompt}
+              privacyPending={privacyChanges.length > 0}
+              termsPending={termsRequired}
             />
           )}
           {/* Lancement des matchs du joueur, sur toutes les pages : la modale

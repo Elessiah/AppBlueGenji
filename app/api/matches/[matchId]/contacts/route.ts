@@ -11,7 +11,9 @@ import { parseMatchIdParam } from "@/lib/server/tournaments/match-launch-routes"
  * parties du match : ses joueurs dès que ses deux adversaires sont connus
  * (« À planifier » compris), ses arbitres (permission `tournaments`) aux
  * mêmes moments, son caster le temps du match seulement (du départ à la
- * fin). Un lecteur qui n'en est pas
+ * fin). Les contacts **du caster** suivent la même borne pour les joueurs ;
+ * les arbitres les lisent dès que les deux adversaires sont connus
+ * (`exposesCasterContacts`). Un lecteur qui n'en est pas
  * partie reçoit le même refus qu'un match sans contacts : la réponse ne dit
  * pas qui joue quoi au-delà de ce que montre le plateau.
  */

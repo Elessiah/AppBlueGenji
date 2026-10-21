@@ -33,6 +33,7 @@ import type frTournamentDialogs from "@/messages/fr/tournamentDialogs.json";
 import type frTournamentImage from "@/messages/fr/tournamentImage.json";
 import type frTournamentForm from "@/messages/fr/tournamentForm.json";
 import type frLaunchModal from "@/messages/fr/launchModal.json";
+import type frCertifyPrompt from "@/messages/fr/certifyPrompt.json";
 import type frTeams from "@/messages/fr/teams.json";
 import type frTeam from "@/messages/fr/team.json";
 import type frTeamErrors from "@/messages/fr/teamErrors.json";
@@ -44,7 +45,7 @@ import type frImageCrop from "@/messages/fr/imageCrop.json";
 import type frPush from "@/messages/fr/push.json";
 import type frPushMessages from "@/messages/fr/pushMessages.json";
 
-export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot", "association", "volunteers", "recruitment", "legal", "tournaments", "tournament", "tournamentViews", "tournamentErrors", "tournamentActions", "tournamentDialogs", "tournamentImage", "tournamentForm", "launchModal", "teams", "team", "teamErrors", "teamRoles", "players", "profile", "reports", "imageCrop", "push", "pushMessages"] as const;
+export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot", "association", "volunteers", "recruitment", "legal", "tournaments", "tournament", "tournamentViews", "tournamentErrors", "tournamentActions", "tournamentDialogs", "tournamentImage", "tournamentForm", "launchModal", "certifyPrompt", "teams", "team", "teamErrors", "teamRoles", "players", "profile", "reports", "imageCrop", "push", "pushMessages"] as const;
 export type MessageNamespace = (typeof MESSAGE_NAMESPACES)[number];
 
 export type Messages = {
@@ -103,6 +104,12 @@ export type Messages = {
    * langues voyagent avec son morceau — `components/match-launch/launch-text.ts`.
    */
   launchModal: typeof frLaunchModal;
+  /**
+   * Fenêtre « Certifier ton tag Discord ? », montée par la mise en page racine
+   * mais chargée seulement quand elle est due, chaque langue dans son morceau
+   * — `components/discord/DiscordCertifyPromptLazy.tsx`.
+   */
+  certifyPrompt: typeof frCertifyPrompt;
   /** Annuaire `/equipes`, ses cartes et la création d'une équipe (lot 9) — `components/i18n/teams-text.tsx`. */
   teams: typeof frTeams;
   /** Fiche `/equipes/[id]` et ses fenêtres (lot 9) — `components/i18n/team-page-text.tsx`. */

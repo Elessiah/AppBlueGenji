@@ -147,7 +147,7 @@ export function MembersSection({
                         borderColor="rgba(var(--violet-400-rgb), 0.35)"
                         decorative
                       />
-                      <PlayerLink userId={member.userId} className={styles.playerName}>
+                      <PlayerLink userId={member.userId} className={styles.playerName} truncate>
                         {member.pseudo}
                       </PlayerLink>
                       {isViewer ? <span className={styles.youTag}>{t("members.you")}</span> : null}

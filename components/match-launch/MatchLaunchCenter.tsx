@@ -22,6 +22,7 @@ import {
   MATCH_LAUNCH_OPEN_EVENT,
   nextLaunchMatchId,
   MATCH_LAUNCH_REFRESH_EVENT,
+  matchUnderway,
   readyCount,
   type MatchLaunchInfo,
 } from "@/lib/shared/match-launch";
@@ -67,6 +68,16 @@ function formatTime(iso: string | null, locale: Locale): string | null {
   if (Number.isNaN(date.getTime())) return null;
   // 24 h dans les deux langues (le français l'applique de lui-même).
   return date.toLocaleTimeString(INTL_LOCALE[locale], { hour: "2-digit", minute: "2-digit", ...(locale === "fr" ? {} : { hourCycle: "h23" as const }) });
+}
+
+/**
+ * Note des contacts tus des engagées : elle ne renvoie à l'action « Contacts »
+ * que si celle-ci lui ouvre déjà quelque chose (`viewer.earlyContacts` : joueur
+ * du match, ou arbitre même inscrit comme caster) — jamais au seul caster
+ * avant le départ.
+ */
+export function launchSidesLaterText(text: LaunchText, viewer: Pick<MatchLaunchInfo["viewer"], "earlyContacts">): string {
+  return text.t(viewer.earlyContacts ? "contactsAtLaunch" : "contactsAtLaunchForCaster");
 }
 
 /** Libellés qui dépendent de qui déclare « Prêt » : une équipe, ou le caster. */
@@ -284,7 +295,7 @@ export function MatchLaunchCenter({
     (element ?? dialogRef.current)?.focus();
   });
 
-  const pending = launches.filter((info) => info.phase === "LOBBY" || info.phase === "LAUNCHED");
+  const pending = launches.filter((info) => matchUnderway(info.phase));
 
   if (!current) {
     if (waiting || pending.length === 0) return null;
@@ -315,6 +326,7 @@ export function MatchLaunchCenter({
     current.matchId,
   );
   const { partyWord, confirmQuestion } = viewerLaunchCopy(text, current.viewer.role);
+  const sidesLaterText = launchSidesLaterText(text, current.viewer);
 
   return (
     <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */ className={styles.overlay} role="presentation">
@@ -353,14 +365,19 @@ export function MatchLaunchCenter({
 
           <div className={styles.body}>
             <div className={styles.sides}>
-              <SideCard side={current.team1} isHost={current.hostTeamId === current.team1.teamId} phase={current.phase} onCopy={copy} />
+              <SideCard side={current.team1} isHost={current.hostTeamId === current.team1.teamId} phase={current.phase} onCopy={copy} laterText={sidesLaterText} />
               <div className={styles.divider} aria-hidden="true">
                 {t("vs")}
               </div>
-              <SideCard side={current.team2} isHost={current.hostTeamId === current.team2.teamId} phase={current.phase} onCopy={copy} />
+              <SideCard side={current.team2} isHost={current.hostTeamId === current.team2.teamId} phase={current.phase} onCopy={copy} laterText={sidesLaterText} />
             </div>
 
-            <CasterCard caster={current.caster} phase={current.phase} onCopy={copy} />
+            <CasterCard
+              caster={current.caster}
+              phase={current.phase}
+              onCopy={copy}
+              viewer={current.viewer}
+            />
           </div>
 
           {/* Le même réglage que sur /profil, sous sa forme compacte : c'est ici

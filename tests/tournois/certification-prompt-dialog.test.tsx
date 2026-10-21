@@ -4,8 +4,20 @@ import { afterAll, beforeEach, describe, expect, it, jest } from "@jest/globals"
 jest.mock("@/app/(secured)/tournois/[id]/_components/TournamentDialogFrame", () => {
   const { createElement } = jest.requireActual<typeof import("react")>("react");
   return {
-    TournamentDialogFrame: ({ children, yields }: { children: unknown; yields?: boolean }) =>
-      createElement("div", { "data-frame-yields": String(Boolean(yields)) }, children as never),
+    TournamentDialogFrame: ({
+      children,
+      yields,
+      initialFocus,
+    }: {
+      children: unknown;
+      yields?: boolean;
+      initialFocus?: string;
+    }) =>
+      createElement(
+        "div",
+        { "data-frame-yields": String(Boolean(yields)), "data-frame-focus": initialFocus ?? "first" },
+        children as never,
+      ),
   };
 });
 
@@ -77,8 +89,8 @@ describe("CertificationPromptDialog", () => {
     expect(render(OW_MANAGER)).toContain('data-frame-yields="true"');
   });
 
-  it("le titre prend le focus d'ouverture", () => {
-    expect(render(OW_MANAGER)).toMatch(/<h3[^>]*tabindex="-1"[^>]*data-autofocus/);
+  it("le cadre prend le focus d'ouverture : la modale s'ouvre par le haut", () => {
+    expect(render(OW_MANAGER)).toContain('data-frame-focus="container"');
   });
 
   it("ne se monte pas si une modale urgente l'a devancée pendant son chargement", () => {

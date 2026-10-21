@@ -62,7 +62,11 @@ import { STREAM_NOTICE_LIVE, STREAM_NOTICE_OBJECTION, STREAM_NOTICE_PRIVACY_PATH
  * section « Contacts de match » — le BattleTag masqué se lit aussi dans la
  * fenêtre de lancement du match. La version 5, déjà en ligne, ne se réécrit
  * pas : d'où une nouvelle version, annoncée par sa propre entrée de
- * `PRIVACY_CHANGES` ; en vigueur au 19 octobre 2026.
+ * `PRIVACY_CHANGES` ; en vigueur au 19 octobre 2026. Le 21 octobre 2026, la
+ * section « Contacts de match » ouvre aux arbitres les contacts du caster dès
+ * que les deux adversaires sont connus, sans nouvelle version (décision de
+ * l'utilisateur : seuls les casters, membres du staff, sont concernés),
+ * annoncé par sa propre entrée de `PRIVACY_CHANGES`.
  */
 export const TERMS_VERSION = 6;
 
@@ -128,6 +132,13 @@ export function termsRequestFor(acceptedVersion: number | null | undefined): Ter
  * refusé (`TERMS_ACCEPTANCE_REQUIRED`) la réclame depuis n'importe quel écran.
  */
 export const TERMS_REQUIRED_EVENT = "bg:terms-required";
+
+/**
+ * Événement de fenêtre émis quand la modale d'acceptation vient d'être
+ * acceptée : la fenêtre de certification du tag Discord, qui l'attendait, peut
+ * s'ouvrir sans rechargement.
+ */
+export const TERMS_ACCEPTED_EVENT = "bg:terms-accepted";
 
 /** Jeton de refus d'un geste de gestion sans acceptation. */
 export const TERMS_ACCEPTANCE_REQUIRED = "TERMS_ACCEPTANCE_REQUIRED";
@@ -262,7 +273,7 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
     id: "contacts-de-match",
     title: "Contacts de match",
     paragraphs: [
-      "Pour qu'un match de tournoi se joue, ses parties doivent pouvoir se joindre et s'ajouter en jeu. Au titre de l'organisation du tournoi, les **coordonnées de contact** d'un ou deux membres de chaque équipe — **tag Discord** certifié, **BattleTag**, **même masqué**, et **rôle d'équipe** — sont communiquées aux **membres des deux équipes** du match et aux **arbitres** (administrateurs compris), dès que ses deux adversaires sont connus et jusqu'à sa fin, et à son **caster** inscrit **le temps du match** seulement, de son départ à sa fin ; celles du caster le sont aux deux équipes et aux arbitres sur ce même temps du match.",
+      "Pour qu'un match de tournoi se joue, ses parties doivent pouvoir se joindre et s'ajouter en jeu. Au titre de l'organisation du tournoi, les **coordonnées de contact** d'un ou deux membres de chaque équipe — **tag Discord** certifié, **BattleTag**, **même masqué**, et **rôle d'équipe** — sont communiquées aux **membres des deux équipes** du match et aux **arbitres** (administrateurs compris), dès que ses deux adversaires sont connus et jusqu'à sa fin, et à son **caster** inscrit **le temps du match** seulement, de son départ à sa fin ; celles du caster le sont aux deux équipes sur ce même temps du match, et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin (en vigueur depuis le 21 octobre 2026 : auparavant, aux arbitres aussi le temps du match seulement).",
       "Ce partage passe par la seule fenêtre « Contacts » du match et par sa fenêtre de lancement, qui la reprend au départ du match : un BattleTag masqué n'est lisible nulle part ailleurs sur le site, pour personne — arbitres et administrateurs compris. Le jeu, lui, affiche les identifiants de jeu des joueurs : le code de replay d'une map, visible de tout utilisateur connecté sur la fiche du tournoi, permet de revoir la partie et de les y lire. Masquer son BattleTag ne le retire donc pas de ces fenêtres : pour ne pas le communiquer, il faut le retirer de son profil (un BattleTag reçu de Battle.net ne s'efface qu'une fois le compte Battle.net détaché, ce qui suppose un autre moyen de connexion). Un tag Discord non certifié n'est jamais communiqué.",
     ],
     links: [{ href: "/rgpd#donnees-collectees", label: "Politique de confidentialité — données collectées" }],

@@ -68,6 +68,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `AUTH_SYSTEM.md` — Sessions, portes d'entrée sans mot de passe, quotas du code Discord, provenance des écritures.
 - `OAUTH_PROVIDERS.md` — OAuth Google / Discord / Blizzard, une seule mécanique ; rattachement depuis le profil ; pastille « BattleTag vérifié » de la fiche.
 - `DISCORD_VERIFICATION.md` — Certification du tag Discord, visibilité du tag.
+- `DISCORD_CERTIFY_PROMPT.md` — Fenêtre qui propose la certification après une connexion Discord ou Blizzard, « Ne plus voir ».
 - `SESSION_REVOCATION.md` — Fermer ses autres sessions.
 - `SAFE_LOGIN_REDIRECT.md` — Destination d'après connexion : chemin du site seulement.
 - `SECURITY_HEADERS_CSP.md` — En-têtes de sécurité et CSP en application (page cassée : lire `/api/csp-report`).

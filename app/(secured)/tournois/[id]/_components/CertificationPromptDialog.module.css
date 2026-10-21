@@ -6,17 +6,6 @@
   color: var(--ink);
 }
 
-/* Le titre prend le focus d'ouverture : il le montre au clavier. */
-.title:focus {
-  outline: none;
-}
-
-.title:focus-visible {
-  outline: 2px solid var(--blue-300);
-  outline-offset: 4px;
-  border-radius: 4px;
-}
-
 .lead {
   margin: 10px 0 0;
   font-size: 13px;

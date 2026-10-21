@@ -189,6 +189,7 @@ export default function PlayerDetailPage() {
                   {activeTeam ? (
                     <TeamLink
                       teamId={activeTeam.teamId}
+                      podiumTier={deleted ? null : undefined}
                       className="badge"
                       style={{ fontSize: 11 }}
                       title={t("page.viewTeam", { name: activeTeam.teamName })}

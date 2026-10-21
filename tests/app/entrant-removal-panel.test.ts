@@ -226,7 +226,7 @@ describe("Dialogue de confirmation", () => {
     const shell = stripComments(read(SHELL));
     const frame = stripComments(read(FRAME));
     expect(frame).toMatch(/createPortal\(/);
-    expect(frame).toMatch(/useDialogBehavior\(\{ open: mounted, onClose, locked: busy \}\)/);
+    expect(frame).toMatch(/useDialogBehavior\(\{ open: mounted, onClose, locked: busy(, initialFocus)? \}\)/);
     expect(frame).toMatch(/aria-modal="true"/);
     expect(frame).toMatch(/aria-labelledby=\{titleId\}/);
     expect(frame).toMatch(/aria-describedby=\{describedBy\}/);

@@ -189,7 +189,9 @@ a {
    chaque nom rendu par les liens d'entité (`TeamLink`, `EntrantLink`,
    `EntrantName`, `TeamPodiumName`) ; leurs membres, une version adoucie sur
    `PlayerLink`. Posées par `podiumTierClass()` (`lib/shared/podium-tiers.ts`) :
-   `.podium-tier.podium-tier-N` (équipe), `.podium-member.podium-member-N`.
+   `.podium-tier.podium-tier-N` (équipe), `.podium-member.podium-member-N` — sur
+   un `<span>` dans le lien, jamais sur le lien, dont la classe de l'appelant
+   (`.badge`…) pourrait poser un `background` qui effacerait le dégradé.
    1re : dégradé irisé cyan → violet → rose, balayé d'un reflet clair, lueur
          néon et couronne — la plus brillante.
    2e  : chrome glacier (bleu → cyan, reflet plus lent), lueur froide, losange.
@@ -207,12 +209,79 @@ a {
   background-clip: text;
   color: transparent;
   -webkit-text-fill-color: transparent;
-  /* Soulignement visible malgré le texte transparent (« Liens soulignés »). */
-  text-decoration-color: var(--blue-300);
 }
 
 .podium-tier {
   font-weight: 700;
+}
+
+/* Dans un lien d'entité, la graisse de la marche se pose sur le lien (repère
+   `data-podium`, posé par `EntityLink`) et le nom peint en hérite : à
+   spécificité d'une classe (`:where`), la classe ou le style de l'appelant
+   l'emportent, comme quand la marche habillait le lien lui-même. Éteinte
+   (`data-podium-muted`, pastille — même liste que la règle d'extinction plus
+   bas), la marche n'impose aucune graisse. */
+:where(.entity-link, .entity-name):where(:not([data-podium-muted], [data-podium-muted] *, :is(.badge, .pill, .cy-tag), :is(.badge, .pill, .cy-tag) *))[data-podium="podium-tier"] {
+  font-weight: 700;
+}
+
+[data-podium] > .podium-tier {
+  font-weight: inherit;
+}
+
+/* Nom tronqué d'une ellipse (`truncate` d'`EntityLink`). Peint d'une marche,
+   c'est le nom qui rogne et pose l'ellipse — tracée dans le dégradé — et le
+   lien le laisse déborder : la lueur (`drop-shadow`) n'est pas coupée net. */
+/* Bloc en ligne borné à son conteneur : l'ellipse vaut aussi dans le flux en
+   ligne, et le nom peint (`display: block`) n'y crée pas de bloc dans une
+   ligne. `min-width: 0` : en élément flexible, le lien d'une marche (qui laisse
+   déborder) rétrécit quand même. `text-bottom` : dans une phrase, le nom reste
+   sur la ligne de base du texte voisin (un bloc rogné prend son bord bas pour
+   ligne de base). */
+.entity-truncate {
+  display: inline-block;
+  max-width: 100%;
+  min-width: 0;
+  vertical-align: text-bottom;
+  white-space: nowrap;
+}
+
+/* La coupe : sur le lien, ou — peint d'une marche (`data-podium`) — sur le nom
+   peint, le lien le laissant déborder. */
+.entity-truncate:not([data-podium]),
+.entity-truncate[data-podium] > .podium-tier,
+.entity-truncate[data-podium] > .podium-member {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.entity-truncate[data-podium] > .podium-tier,
+.entity-truncate[data-podium] > .podium-member {
+  display: block;
+}
+
+/* Nom coupé à deux lignes (`truncate={2}` d'`EntityLink`), même partage : peint
+   d'une marche, c'est le nom qui se coupe ; le lien, bloc en ligne borné à son
+   conteneur, le laisse déborder. */
+.entity-clamp-2 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.entity-clamp-2:not([data-podium]),
+.entity-clamp-2[data-podium] > .podium-tier,
+.entity-clamp-2[data-podium] > .podium-member {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+.entity-clamp-2[data-podium] {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: top;
 }
 
 .podium-tier-1 {
@@ -316,17 +385,24 @@ a {
 }
 
 /* Survol et focus : couleur pleine, comme tout lien d'entité (soulignement lisible). */
-.entity-link.podium-tier:hover,
-.entity-link.podium-tier:focus-visible,
-.entity-link.podium-member:hover,
-.entity-link.podium-member:focus-visible {
+.entity-link:hover > .podium-tier,
+.entity-link:focus-visible > .podium-tier,
+.entity-link:hover > .podium-member,
+.entity-link:focus-visible > .podium-member {
   background-image: none;
   color: var(--blue-100);
   -webkit-text-fill-color: var(--blue-100);
 }
 
 /* Ligne en retrait (perdant d'un match, éliminée, forfait) : le repère reste,
-   l'éclat s'éteint — sinon le nom distancé brillerait plus fort que les autres. */
+   l'éclat s'éteint — sinon le nom distancé brillerait plus fort que les autres.
+   De même un nom dans une pastille teintée — lien habillé en pastille, ou posé
+   dedans (`.badge`, `.pill`, `.cy-tag` : liste reprise, à l'identique, par la
+   règle de graisse plus haut) : la marche, sous
+   sa lueur, y tomberait sous 4,5:1 ; au repos, le nom prend la couleur de la
+   pastille (survol et focus : couleur pleine, comme tout lien d'entité). */
+:is(.badge, .pill, .cy-tag) .podium-tier,
+:is(.badge, .pill, .cy-tag) .podium-member,
 [data-podium-muted] .podium-tier,
 [data-podium-muted] .podium-member {
   background-image: none;

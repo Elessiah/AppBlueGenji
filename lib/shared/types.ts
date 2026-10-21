@@ -992,6 +992,8 @@ export type PersonalDataExport = {
     recruitmentModalOff: boolean;
     /** Modale réaffichée depuis « Mon profil » (plus aucun cookie reporté sur le compte). */
     recruitmentModalBackOn: boolean;
+    /** « Ne plus voir » posé sur la fenêtre de certification du tag Discord (ISO), sinon `null`. */
+    discordCertifyPromptDismissedAt: string | null;
     createdAt: string;
   };
   profile: {

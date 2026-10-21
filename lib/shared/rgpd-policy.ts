@@ -31,12 +31,14 @@ export const AUTOMOD_ALERT_SCOPE = "alerte AutoMod d'une telle annonce bloquée 
 
 /**
  * Contacts d'un match (registre T04) : exécution du service, que les
- * conditions d'utilisation prévoient (section « Contacts de match », version 5).
- * Les équipes les ont dès que les deux adversaires sont connus, le caster le
- * temps du match seulement (`match-launch-info.ts`).
+ * conditions d'utilisation prévoient (section « Contacts de match », version 6).
+ * Les équipes et les arbitres les ont dès que les deux adversaires sont connus,
+ * le caster le temps du match seulement ; ceux du caster, les équipes le temps
+ * du match et les arbitres dès que les adversaires sont connus
+ * (`lib/shared/match-launch.ts`, `exposesCasterContacts`).
  */
 export const MATCH_CONTACTS_SCOPE =
-  "présentation, dans la fenêtre « Contacts » du match et dans sa fenêtre de lancement, aux membres de ses deux équipes et aux arbitres dès que ses deux adversaires sont connus, et à son caster le temps du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes et au caster) ; les contacts du caster aux deux équipes et aux arbitres le temps du match (conditions d'utilisation, « Contacts de match »)";
+  "présentation, dans la fenêtre « Contacts » du match et dans sa fenêtre de lancement, aux membres de ses deux équipes et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, et à son caster le temps du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes et au caster) ; les contacts du caster aux deux équipes le temps du match, et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin (conditions d'utilisation, « Contacts de match »)";
 
 /**
  * BattleTag masqué : le masquer ne le retire pas des parties de tes matchs
@@ -45,7 +47,7 @@ export const MATCH_CONTACTS_SCOPE =
  * 2026-10-19), prévue par les conditions d'utilisation.
  */
 export const BATTLETAG_MATCH_SCOPE =
-  "lecture, même masqué, dans la seule fenêtre « Contacts » d'un match où tu es présenté comme contact et dans sa fenêtre de lancement : par ses deux équipes et les arbitres dès que ses deux adversaires sont connus, par son caster le temps du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes et au caster) — arbitres et administrateurs n'y ont pas d'autre accès (conditions d'utilisation, « Contacts de match »)";
+  "lecture, même masqué, dans la seule fenêtre « Contacts » d'un match où tu es présenté comme contact et dans sa fenêtre de lancement : par ses deux équipes et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, par son caster le temps du match ; celui du caster, par les deux équipes le temps du match et par les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes et au caster) — arbitres et administrateurs n'y ont pas d'autre accès (conditions d'utilisation, « Contacts de match »)";
 
 /**
  * Pastilles de certification de la fiche (tag Discord certifié, BattleTag tiré
@@ -115,11 +117,11 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // seconde écrase la première à chaque connexion : le dire est la condition
     // pour que le joueur comprenne pourquoi sa saisie a changé.
     finalite:
-      "Mise en relation entre joueurs (s'ajouter en jeu) — aucune statistique. Saisi par toi, ou renseigné par Blizzard à chaque connexion si tu as rattaché ton compte Battle.net. Masqué, il n'est lisible de personne — arbitres et administrateurs compris — sauf dans la fenêtre « Contacts » d'un match où tu fais partie des contacts présentés et dans sa fenêtre de lancement : des membres de ses deux équipes et des arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, de son caster le temps du match seulement (de son départ à sa fin) (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes et au caster) ; si tu castes un match, de ses deux équipes et des arbitres le temps du match ; présenté comme contact d'un match, il est montré avec ton rôle d'équipe et l'indication qu'il vient ou non d'un compte Battle.net rattaché. Visible ou masqué, ta fiche montre à tout joueur connecté qui la consulte une pastille « BattleTag vérifié » s'il vient d'un compte Battle.net rattaché — sans jamais dire un BattleTag masqué ; tu peux t'y opposer par le formulaire de signalement (catégorie RGPD)",
+      "Mise en relation entre joueurs (s'ajouter en jeu) — aucune statistique. Saisi par toi, ou renseigné par Blizzard à chaque connexion si tu as rattaché ton compte Battle.net. Masqué, il n'est lisible de personne — arbitres et administrateurs compris — sauf dans la fenêtre « Contacts » d'un match où tu fais partie des contacts présentés et dans sa fenêtre de lancement : des membres de ses deux équipes et des arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, de son caster le temps du match seulement (de son départ à sa fin) (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes et au caster) ; si tu castes un match, de ses deux équipes le temps du match et des arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin ; présenté comme contact d'un match, il est montré avec ton rôle d'équipe et l'indication qu'il vient ou non d'un compte Battle.net rattaché. Visible ou masqué, ta fiche montre à tout joueur connecté qui la consulte une pastille « BattleTag vérifié » s'il vient d'un compte Battle.net rattaché — sans jamais dire un BattleTag masqué ; tu peux t'y opposer par le formulaire de signalement (catégorie RGPD)",
     // Masqué, le BattleTag reste lu par les parties de tes matchs : ce n'est
     // pas un consentement (le masquer n'y change rien), mais l'exécution du
     // service — les conditions d'utilisation le prévoient (« Contacts de
-    // match », version 5). Le consentement ne vaut que pour le renseigner et
+    // match », version 6). Le consentement ne vaut que pour le renseigner et
     // l'afficher au public.
     base: "Consentement",
     extraBases: [
@@ -154,7 +156,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // ne doit pas coûter la porte Discord. D'où une base « Consentement » qui
     // tient — le geste est libre, spécifique, et se retire.
     finalite:
-      "Ouvre ton tag Discord à l'organisation pour te joindre : administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), membres des deux équipes de ton match dès que ses deux adversaires sont connus et jusqu'à sa fin, son caster le temps du match seulement (et, si tu castes un match, ses deux équipes et les arbitres le temps du match) ; les autres joueurs connectés seulement si tu coches « Tag Discord ». Que ton tag soit certifié (pastille ✅, sans le tag) se lit sur ta fiche par tout joueur connecté. Sans la certification, le bot ne t'envoie aucun message privé de match. Donnée seulement par toi, depuis Mon profil (un clic si ton Discord est rattaché, un code en message privé sinon) — se connecter par Discord ne la donne pas. Retirée en retirant ton tag ; perdue si ton pseudo change",
+      "Ouvre ton tag Discord à l'organisation pour te joindre : administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), membres des deux équipes de ton match dès que ses deux adversaires sont connus et jusqu'à sa fin, son caster le temps du match seulement (et, si tu castes un match, ses deux équipes le temps du match, et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin) ; les autres joueurs connectés seulement si tu coches « Tag Discord ». Que ton tag soit certifié (pastille ✅, sans le tag) se lit sur ta fiche par tout joueur connecté. Sans la certification, le bot ne t'envoie aucun message privé de match. Donnée seulement par toi, depuis Mon profil ou la fenêtre qui te la propose après une connexion par Discord ou Blizzard (un clic si ton Discord est rattaché, un code en message privé sinon) — se connecter par Discord ne la donne pas. Retirée en retirant ton tag ; perdue si ton pseudo change",
     base: "Consentement",
     // La certification décide aussi qui reçoit les messages privés de match,
     // qui reposent sur l'intérêt légitime (opposition par la case du profil).
@@ -247,6 +249,16 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // (`bg_recr_off`) est décrit à la section des cookies.
     finalite:
       "Non par défaut : la fenêtre des annonces de recrutement urgentes s'ouvre d'elle-même. « Ne plus afficher » dans cette fenêtre : elle ne s'ouvre plus d'elle-même sur tes autres appareils (un choix fait sur ce navigateur avant la connexion, ou pas enregistré sur-le-champ, y est reporté à la connexion ou à ta prochaine visite connectée). Réversible dans Mon profil : le compte note alors que la fenêtre a été réaffichée et le cookie bg_recr_off de ce navigateur est effacé ; dès lors, plus aucun cookie n'est reporté sur le compte (un nouveau « Ne plus afficher » fait connecté, ou la case de Mon profil, l'y remet). Figure dans l'export de tes données, remis au défaut si le compte est anonymisé",
+    base: "Exécution du contrat",
+    duree: "Durée du compte",
+  },
+  {
+    donnee: "Choix « Ne plus voir » de la certification Discord",
+    // `bg_users.discord_certify_prompt_dismissed_at` (registre T01) :
+    // préférence d'affichage, exportée et effacée à l'anonymisation. La marque
+    // de session (`bg_user_sessions.certify_prompt_due`) part avec la session.
+    finalite:
+      "Non par défaut : après une connexion par Discord ou Blizzard, une fenêtre te propose une fois de certifier ton tag Discord s'il ne l'est pas (la session de connexion note seulement qu'elle reste à proposer, marque effacée avec la session). « Ne plus voir » : elle ne s'ouvre plus, sur aucun appareil (date du choix gardée) ; la certification reste possible dans Mon profil. Figure dans l'export de tes données, effacé si le compte est anonymisé",
     base: "Exécution du contrat",
     duree: "Durée du compte",
   },

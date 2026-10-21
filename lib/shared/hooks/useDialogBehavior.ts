@@ -14,6 +14,12 @@ interface DialogBehaviorOptions {
    * formulaire) : on ne veut pas qu'Échap referme une modale en train d'écrire.
    */
   locked?: boolean;
+  /**
+   * `"container"` : le focus d'ouverture va au conteneur lui-même (sans
+   * défilement), pas au premier contrôle — le titre est annoncé et reste en
+   * vue, Entrée n'y déclenche rien. Le conteneur porte `tabIndex={-1}`.
+   */
+  initialFocus?: "first" | "container";
 }
 
 /**
@@ -59,12 +65,14 @@ const FOCUSABLE_SELECTOR =
  * une annonce ouverte en lecture, par exemple) : seule celle du dessus répond au
  * clavier, et le défilement n'est rendu qu'à la fermeture de la dernière.
  */
-export function useDialogBehavior({ open, onClose, locked = false }: DialogBehaviorOptions) {
+export function useDialogBehavior({ open, onClose, locked = false, initialFocus = "first" }: DialogBehaviorOptions) {
   const containerRef = useRef<HTMLDivElement>(null);
   // `onClose` est relu à chaque événement : une fonction recréée à chaque rendu
   // ne doit pas réabonner l'écouteur (ni relancer le verrou de défilement).
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
+  const initialFocusRef = useRef(initialFocus);
+  initialFocusRef.current = initialFocus;
   const lockedRef = useRef(locked);
   lockedRef.current = locked;
 
@@ -82,26 +90,22 @@ export function useDialogBehavior({ open, onClose, locked = false }: DialogBehav
     // le conteneur (rendu focalisable par `tabIndex={-1}` côté appelant). Le
     // champ marqué est pris **parmi** les focalisables : désactivé ou masqué,
     // `focus()` échouerait en silence et laisserait le focus derrière le voile.
-    const visible = (el: HTMLElement) =>
-      (el.offsetParent !== null && getComputedStyle(el).visibility !== "hidden") || el === document.activeElement;
     const focusablesIn = (root: Element | null) =>
-      Array.from(root?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? []).filter(visible);
+      Array.from(root?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? []).filter(
+        (el) =>
+          (el.offsetParent !== null && getComputedStyle(el).visibility !== "hidden") ||
+          el === document.activeElement,
+      );
     const focusables = () => focusablesIn(containerRef.current);
     const candidates = focusables();
-    // Un titre `tabIndex={-1}` marqué `data-autofocus` compte aussi : une modale
-    // longue qui se lit avant d'agir ouvre ainsi par le haut — le premier
-    // contrôle, tout en bas, la ferait s'ouvrir défilée sur un petit écran.
-    const preferred =
-      candidates.find((el) => el.dataset.autofocus !== undefined) ??
-      Array.from(containerRef.current?.querySelectorAll<HTMLElement>('[data-autofocus][tabindex="-1"]') ?? []).find(
-        visible,
-      );
+    const preferred = candidates.find((el) => el.dataset.autofocus !== undefined);
     // Un bouton « × » d'en-tête (`data-dialog-close`) vient en tête du DOM pour
     // rester collé en haut du panneau : il n'est pas ce qu'on vient faire dans
     // la modale, le focus d'ouverture va au premier contrôle qui suit.
     const firstContent = candidates.find((el) => el.dataset.dialogClose === undefined);
 
-    (preferred ?? firstContent ?? candidates[0] ?? containerRef.current)?.focus();
+    if (initialFocusRef.current === "container") containerRef.current?.focus({ preventScroll: true });
+    else (preferred ?? firstContent ?? candidates[0] ?? containerRef.current)?.focus();
 
     const onKeyDown = (event: KeyboardEvent) => {
       // Les écouteurs de toutes les couches vivent sur `window` : seule celle du
@@ -140,22 +144,8 @@ export function useDialogBehavior({ open, onClose, locked = false }: DialogBehav
       const inModal = containerRef.current?.contains(active as Node) ?? false;
       const inLayer = !inModal && extra.length > 0 && layers.some((layer) => layer.contains(active as Node));
 
-      // Focus sur un titre d'ouverture (`tabIndex={-1}`), hors des focalisables
-      // mais avant le premier : `Maj+Tab` doit reboucler, pas sortir.
-      const beforeStart =
-        inModal &&
-        active instanceof Node &&
-        !items.includes(active as HTMLElement) &&
-        (active.compareDocumentPosition(items[0]) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
-      const next = focusTrapTarget({
-        items,
-        extra,
-        active,
-        inModal,
-        inLayer,
-        beforeStart,
-        shiftKey: event.shiftKey,
-      });
+      const onContainer = active === containerRef.current;
+      const next = focusTrapTarget({ items, extra, active, inModal, onContainer, inLayer, shiftKey: event.shiftKey });
       if (next) {
         event.preventDefault();
         next.focus();
@@ -167,8 +157,8 @@ export function useDialogBehavior({ open, onClose, locked = false }: DialogBehav
       window.removeEventListener("keydown", onKeyDown, true);
       // Retour au déclencheur : sans ça, le focus repart en tête de document.
       // Seulement pour la modale du dessus : une modale recouverte qui se ferme
-      // (invitation qui cède sa place au lancement d'un match) ne doit pas
-      // arracher le focus à celle qui la couvre.
+      // ne doit pas arracher le focus à celle qui la couvre ; elle lui passe sa
+      // cible si celle du dessus visait un élément en son sein.
       const wasTop = dialogStack.isTop(token);
       dialogStack.pop(token);
       const target = restoreTargets.get(token) ?? null;

@@ -8,9 +8,22 @@
  * seule de ce qui est exposé : ces fiches ne font que le montrer.
  */
 
+import { useEffect, useState } from "react";
 import { PlayerLink, TeamLink } from "@/components/entity-link";
 import { useLaunchText } from "./launch-text";
-import type { LaunchCaster, LaunchContact, LaunchSide, MatchLaunchInfo } from "@/lib/shared/match-launch";
+import {
+  CASTER_ARRIVAL_ANNOUNCE_MS,
+  casterContactsPending,
+  casterHasContacts,
+  nextCasterArrival,
+  viewerIsCaster,
+  type CasterArrival,
+  type CasterArrivalSeen,
+  type LaunchCaster,
+  type LaunchContact,
+  type LaunchSide,
+  type MatchLaunchInfo,
+} from "@/lib/shared/match-launch";
 import type { TeamRole } from "@/lib/shared/types";
 import styles from "./MatchLaunchCenter.module.css";
 
@@ -105,15 +118,22 @@ export function SideCard({
   isHost,
   phase,
   onCopy,
-  contactsShown = phase !== "SCHEDULED",
   linkNames = false,
+  laterText,
 }: Readonly<{
   side: LaunchSide;
   isHost: boolean;
   phase: MatchLaunchInfo["phase"];
   onCopy: CopyFn;
-  /** Contacts montrés ; par défaut, pas avant le lancement (modale de lancement). */
-  contactsShown?: boolean;
+  /**
+   * Note des contacts tus : la modale de lancement passe la sienne
+   * (`launchSidesLaterText`, qui ne renvoie à l'action « Contacts » qu'à qui
+   * elle ouvre déjà quelque chose) ; par défaut, la note neutre de la modale
+   * « Contacts » (`contacts.notShown`, sa note d'échec), filet gardé exprès :
+   * sa route ne rend aujourd'hui que des matchs aux contacts des engagées
+   * ouverts, mais un changement de route n'y ferait jamais renvoyer à elle-même.
+   */
+  laterText?: string;
   /**
    * Noms cliquables vers leurs fiches — modale « Contacts » seulement : la
    * modale de lancement survit à la navigation et recouvrirait la fiche ouverte.
@@ -142,7 +162,12 @@ export function SideCard({
           <span aria-hidden="true">🏠</span> {t("host")}
         </p>
       )}
-      <SideContacts side={side} onCopy={onCopy} shown={contactsShown} linkNames={linkNames} />
+      <SideContacts
+        side={side}
+        onCopy={onCopy}
+        linkNames={linkNames}
+        laterText={laterText}
+      />
     </section>
   );
 }
@@ -161,17 +186,19 @@ function SideName({ side }: Readonly<{ side: LaunchSide }>) {
 function SideContacts({
   side,
   onCopy,
-  shown,
   linkNames,
+  laterText,
 }: Readonly<{
   side: LaunchSide;
   onCopy: CopyFn;
-  shown: boolean;
   linkNames: boolean;
+  laterText: string | undefined;
 }>) {
   const { t } = useLaunchText();
   if (side.isGhost) return <p className={styles.note}>{t("ghost")}</p>;
-  if (!shown) return <p className={styles.note}>{t("contactsAtLaunch")}</p>;
+  if (!side.contactsShown) {
+    return <p className={styles.note}>{laterText ?? t("contacts.notShown")}</p>;
+  }
   if (side.contacts.length === 0) return <p className={styles.note}>{t("noContact")}</p>;
   return (
     <ul className={styles.contacts}>
@@ -182,28 +209,75 @@ function SideContacts({
   );
 }
 
+/**
+ * Les contacts du caster viennent-ils d'arriver ? `nextCasterArrival` sur
+ * l'état précédent gardé au rendu ; l'annonce se vide d'elle-même après
+ * `CASTER_ARRIVAL_ANNOUNCE_MS`.
+ */
+function useCasterArrival(caster: LaunchCaster, pending: boolean): CasterArrival {
+  const [seen, setSeen] = useState<CasterArrivalSeen>({ pending, casterId: caster.userId, arrival: null });
+  const next = nextCasterArrival(seen, caster, pending);
+  if (next) setSeen(next);
+  useEffect(() => {
+    if (seen.arrival === null) return;
+    const timer = setTimeout(() => setSeen((current) => ({ ...current, arrival: null })), CASTER_ARRIVAL_ANNOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [seen.arrival]);
+  return seen.arrival;
+}
+
+/**
+ * Statut hors flux de l'arrivée des contacts du caster, présent dès
+ * l'ouverture là où il peut parler : une phrase plutôt que les boutons
+ * « Copier » — ou, sans contact, celle qui le dit. Pas un toast : rien n'a été
+ * demandé ni n'a réussi, le contenu de la fiche change sous les yeux — une
+ * région polie pour lecteur d'écran seulement, invisible à l'écran (la règle
+ * des toasts vise les retours d'un geste). Composant à part : la modale de
+ * lancement, relue à chaque interrogation, ne porte ni son état ni sa minuterie.
+ */
+function CasterArrivalStatus({ caster, pending }: Readonly<{ caster: LaunchCaster; pending: boolean }>) {
+  const { t } = useLaunchText();
+  const arrival = useCasterArrival(caster, pending);
+  return (
+    <output className="sr-only" aria-live="polite">
+      {arrival && t(arrival === "SHOWN" ? "contacts.casterShown" : "contacts.casterShownEmpty")}
+    </output>
+  );
+}
+
 export function CasterCard({
   caster,
   phase,
   onCopy,
-  contactsShown = phase !== "SCHEDULED",
+  viewer,
   noCasterText,
-  contactsLaterText,
+  laterText,
   linkNames = false,
+  announceArrival = false,
 }: Readonly<{
   caster: LaunchCaster | null;
   phase: MatchLaunchInfo["phase"];
   onCopy: CopyFn;
-  contactsShown?: boolean;
+  /**
+   * Le lecteur : la note « au départ » ne s'adresse jamais au caster lui-même.
+   * Que ses contacts sortent, c'est le serveur qui le dit (`caster.contactsShown`).
+   */
+  viewer: Pick<MatchLaunchInfo["viewer"], "role" | "isCaster">;
   /** Texte sans caster ; par défaut, celui de la modale de lancement. */
   noCasterText?: string;
   /**
-   * Texte à la place des contacts tus (`contactsShown` faux) : sans lui, la
-   * fiche ne montre que le pseudo.
+   * Note des contacts tus ; par défaut, celle de la modale de lancement, dans
+   * les mots de la note des engagées juste au-dessus (« au lancement »).
    */
-  contactsLaterText?: string;
+  laterText?: string;
   /** Pseudo cliquable (modale « Contacts » seulement, voir `SideCard`). */
   linkNames?: boolean;
+  /**
+   * Annoncer l'arrivée des contacts (modale « Contacts » seulement : dans la
+   * modale de lancement, ce passage coïncide avec le statut du lancement, qui
+   * s'annonce déjà — deux annonces polies s'y empileraient).
+   */
+  announceArrival?: boolean;
 }>) {
   const { t } = useLaunchText();
   if (!caster) {
@@ -215,6 +289,9 @@ export function CasterCard({
       </section>
     );
   }
+  const pending = casterContactsPending({ caster, viewer });
+  const self = viewerIsCaster({ viewer });
+  const hasContacts = casterHasContacts(caster);
   return (
     <section className={styles.caster} aria-label={t("caster")}>
       <div className={styles.sideHead}>
@@ -227,13 +304,19 @@ export function CasterCard({
         </span>
         <ReadyChip ready={caster.ready} phase={phase} />
       </div>
-      {contactsShown && (
+      {/* Ouverts mais vides : la phrase des engagées sans contact, pas deux
+          « — » — sauf au caster lui-même, sa propre fiche n'a rien à lui dire. */}
+      {caster.contactsShown && !hasContacts && !self && <p className={styles.note}>{t("noContact")}</p>}
+      {caster.contactsShown && hasContacts && (
         <div className={styles.casterIds}>
           <IdentityLine kind="Discord" value={caster.discordTag} verified={caster.discordTag !== null} onCopy={onCopy} />
           <IdentityLine kind="BattleTag" value={caster.battletag} verified={caster.battletagVerified} onCopy={onCopy} />
         </div>
       )}
-      {!contactsShown && contactsLaterText && <p className={styles.note}>{contactsLaterText}</p>}
+      {/* Contacts tus : une note plutôt que deux « — » qui laisseraient croire
+          qu'il n'en a pas — jamais au caster lui-même, dont elle parle. */}
+      {pending && <p className={styles.note}>{laterText ?? t("casterContactsAtLaunch")}</p>}
+      {announceArrival && <CasterArrivalStatus caster={caster} pending={pending} />}
     </section>
   );
 }

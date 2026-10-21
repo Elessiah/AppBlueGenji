@@ -57,6 +57,7 @@ export async function createAccountTables(db: Pool): Promise<void> {
       locale ENUM('fr', 'en') NOT NULL DEFAULT 'fr',
       match_dm_enabled TINYINT(1) NOT NULL DEFAULT 1,
       recruitment_modal_off TINYINT(1) NOT NULL DEFAULT 0,
+      discord_certify_prompt_dismissed_at DATETIME NULL,
       is_admin TINYINT(1) NOT NULL DEFAULT 0,
       is_deleted TINYINT(1) NOT NULL DEFAULT 0,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -71,6 +72,7 @@ export async function createAccountTables(db: Pool): Promise<void> {
       user_id BIGINT NOT NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       expires_at DATETIME NOT NULL,
+      certify_prompt_due TINYINT(1) NOT NULL DEFAULT 0,
       INDEX idx_bg_sessions_user_id (user_id),
       INDEX idx_bg_sessions_expires_at (expires_at),
       CONSTRAINT fk_bg_sessions_user FOREIGN KEY (user_id)

@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import {
   CONTACTS_RETRY_MAX_WAIT_MS,
   contactsRetryDelay,
-  casterContactsPending,
   casterRereadDelay,
   readMatchContacts,
   REREAD_RETRIES,
@@ -15,7 +14,7 @@ import {
   type ContactsCard,
   shouldRetryReread,
 } from "@/components/match-launch/MatchContactsDialog";
-import type { MatchLaunchInfo } from "@/lib/shared/match-launch";
+import { casterContactsPending, exposesCasterContacts, exposesMatchContacts, matchUnderway, readsContactsEarly, type LaunchCaster, type LaunchSide, type MatchLaunchInfo } from "@/lib/shared/match-launch";
 import { readSource } from "../../helpers/read-source";
 
 /**
@@ -151,13 +150,52 @@ describe("readMatchContacts", () => {
   });
 });
 
-const CASTER = { userId: 9, pseudo: "Voix", contact: null } as unknown as MatchLaunchInfo["caster"];
+const CASTER: LaunchCaster = {
+  userId: 9,
+  pseudo: "Voix",
+  discordTag: "voix",
+  battletag: null,
+  battletagVerified: false,
+  ready: false,
+  contactsShown: false,
+};
+const launchSide = (teamId: number, name: string): LaunchSide => ({
+  teamId,
+  name,
+  logoUrl: null,
+  isGhost: false,
+  isSolo: false,
+  ready: false,
+  contacts: [],
+  contactsShown: true,
+});
 const info = (
   phase: MatchLaunchInfo["phase"],
-  caster: MatchLaunchInfo["caster"] = CASTER,
+  caster: LaunchCaster | null = CASTER,
   startAt: string | null = START,
   role: MatchLaunchInfo["viewer"]["role"] = "TEAM1",
-) => ({ matchId: 7, phase, startAt, caster, viewer: { role } }) as unknown as MatchLaunchInfo;
+): MatchLaunchInfo => ({
+  matchId: 7,
+  tournamentId: 3,
+  tournamentName: "Coupe",
+  phase,
+  startAt,
+  lobbyOpenedAt: null,
+  autoLaunchAt: null,
+  launchedAt: null,
+  hostTeamId: 10,
+  team1: launchSide(10, "Alpha"),
+  team2: launchSide(20, "Bravo"),
+  // Décision du serveur (`exposesCaster`), telle que la réponse la porte.
+  caster: caster && { ...caster, contactsShown: exposesCasterContacts(phase, role) },
+  viewer: {
+    role,
+    canDeclareReady: false,
+    isCaster: role === "CASTER",
+    earlyContacts: role !== "CASTER",
+    ready: false,
+  },
+});
 
 describe("contacts du caster en attente, modale ouverte", () => {
   it("en attente : caster inscrit sur un match pas encore parti au serveur", () => {
@@ -172,7 +210,40 @@ describe("contacts du caster en attente, modale ouverte", () => {
     const own = info("SCHEDULED", CASTER, START, "CASTER");
     expect(casterContactsPending(own)).toBe(false);
     expect(casterRereadDelay(own, SERVER_BEFORE)).toBeNull();
-    expect(casterContactsPending(info("SCHEDULED", CASTER, START, "REFEREE"))).toBe(true);
+  });
+
+  // Décision du 2026-10-21 : l'arbitre lit les contacts du caster dès que les adversaires sont connus.
+  it("pas pour un arbitre : contacts du caster ouverts avant le départ, sans relecture", () => {
+    for (const phase of ["TO_PLAN", "SCHEDULED", "LOBBY", "LAUNCHED"] as const) {
+      const referee = info(phase, CASTER, START, "REFEREE");
+      expect(casterContactsPending(referee)).toBe(false);
+      expect(casterRereadDelay(referee, SERVER_BEFORE)).toBeNull();
+    }
+  });
+
+  it("une seule règle, serveur et modale : exposesCasterContacts", () => {
+    // En attente = caster tu à un lecteur qui n'est pas ce caster : la même règle.
+    for (const phase of ["NONE", "TO_PLAN", "SCHEDULED", "LOBBY", "LAUNCHED"] as const) {
+      for (const role of ["TEAM1", "TEAM2", "REFEREE"] as const) {
+        expect(casterContactsPending(info(phase, CASTER, START, role))).toBe(!exposesCasterContacts(phase, role));
+      }
+    }
+    expect(exposesCasterContacts("SCHEDULED", "TEAM1")).toBe(false);
+    expect(exposesCasterContacts("SCHEDULED", "REFEREE")).toBe(true);
+    expect(exposesCasterContacts("LAUNCHED", "TEAM2")).toBe(true);
+    // Hors phase (match terminé, adversaire manquant) : rien, arbitre compris.
+    expect(exposesCasterContacts("NONE", "REFEREE")).toBe(false);
+  });
+
+  it("le temps du match, une seule définition : matchUnderway", () => {
+    expect((["NONE", "TO_PLAN", "SCHEDULED", "LOBBY", "LAUNCHED"] as const).filter(matchUnderway)).toEqual(["LOBBY", "LAUNCHED"]);
+    const phases = ["NONE", "TO_PLAN", "SCHEDULED", "LOBBY", "LAUNCHED"] as const;
+    // Joueur ou arbitre par la carte : dès que les adversaires sont connus ; sinon le temps du match.
+    expect(phases.filter((phase) => exposesMatchContacts(phase, true))).toEqual(["TO_PLAN", "SCHEDULED", "LOBBY", "LAUNCHED"]);
+    expect(phases.filter((phase) => exposesMatchContacts(phase, false))).toEqual(["LOBBY", "LAUNCHED"]);
+    expect(readsContactsEarly({ playsMatch: true, referee: false })).toBe(true);
+    expect(readsContactsEarly({ playsMatch: false, referee: true })).toBe(true);
+    expect(readsContactsEarly({ playsMatch: false, referee: false })).toBe(false);
   });
 
   it("échecs passagers en rafale sans rien de lu : une seule notification", () => {
@@ -312,7 +383,7 @@ describe("contacts du caster en attente, modale ouverte", () => {
     expect(dialog).toMatch(/if \(transient\) \{\n\s*setRereadWait\(read\.retryAfterMs \?\? 0\);\n\s*setRereadFailures\(\(count\) => count \+ 1\);\n\s*\}\n\s*if \(keepWaiting\(transient\)\) return;/);
     expect(dialog).toMatch(/setRereadWait\(0\);\n\s*setRereadFailures\(\(count\) => count \+ 1\);\n\s*if \(keepWaiting\(true\)\) return;/);
     expect(dialog).toContain("failureIsSilent(transient, shown, rereadFailures)");
-    expect(dialog).toContain("contactsShown={matchUnderway(launch.phase)}");
+    expect(dialog).toContain("viewer={launch.viewer}");
     const card = readSource("app/(secured)/tournois/[id]/_components/MatchCardActions.tsx");
     expect(card).toMatch(/<MatchContactsDialog[\s\S]*?card=\{match\}[\s\S]*?\/>/);
   });

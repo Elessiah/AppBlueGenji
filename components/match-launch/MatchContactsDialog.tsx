@@ -6,7 +6,11 @@ import { ScrollArea } from "@/components/cyber/ScrollArea";
 import { useToast } from "@/components/ui/toast";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
-import { MATCH_LAUNCH_REFRESH_EVENT, type MatchLaunchInfo, type MatchLaunchPhase } from "@/lib/shared/match-launch";
+import {
+  MATCH_LAUNCH_REFRESH_EVENT,
+  casterContactsPending,
+  type MatchLaunchInfo,
+} from "@/lib/shared/match-launch";
 import type { BracketMatch } from "@/lib/shared/types";
 import { CasterCard, SideCard } from "./LaunchContactCards";
 import { useLaunchText, type LaunchText } from "./launch-text";
@@ -57,32 +61,6 @@ export function contactsRetryDelay(startAt: string | null, serverDate: string | 
   if (!Number.isFinite(start) || !Number.isFinite(server) || start <= server - HEADER_SLACK_MS) return null;
   const delay = untilServerStart(start, server);
   return delay <= CONTACTS_RETRY_MAX_WAIT_MS ? delay : null;
-}
-
-/**
- * Le match est-il parti (lancement ouvert, ou lancé) ? C'est alors seulement
- * que les contacts du caster sortent (`exposesCaster`, serveur).
- */
-export function matchUnderway(phase: MatchLaunchPhase | null): boolean {
-  return phase === "LOBBY" || phase === "LAUNCHED";
-}
-
-/**
- * Le lecteur est-il le caster inscrit ? Son rôle le dit, sauf pour un joueur
- * du match qui caste aussi (`viewer.isCaster`, le rôle de joueur primant).
- */
-export function viewerIsCaster(launch: MatchLaunchInfo): boolean {
-  return launch.viewer.role === "CASTER" || launch.viewer.isCaster === true;
-}
-
-/**
- * Les contacts du caster attendent-ils le départ ? Un caster inscrit, sur un
- * match pas encore parti à l'heure du serveur (`launch.phase`) : sa fiche porte
- * alors une note plutôt que ses contacts. Pas pour le caster lui-même (arbitre
- * qui caste) : rien à attendre sur sa propre fiche.
- */
-export function casterContactsPending(launch: MatchLaunchInfo): boolean {
-  return launch.caster !== null && !viewerIsCaster(launch) && !matchUnderway(launch.phase);
 }
 
 /** Relectures supplémentaires d'une relecture qui échoue (réseau, 5xx, 429). */
@@ -420,7 +398,6 @@ export function MatchContactsDialog({
                     isHost={launch.hostTeamId === launch.team1.teamId}
                     phase={launch.phase}
                     onCopy={copy}
-                    contactsShown
                     linkNames
                   />
                   <div className={launchStyles.divider} aria-hidden="true">
@@ -431,7 +408,6 @@ export function MatchContactsDialog({
                     isHost={launch.hostTeamId === launch.team2.teamId}
                     phase={launch.phase}
                     onCopy={copy}
-                    contactsShown
                     linkNames
                   />
                 </div>
@@ -439,16 +415,12 @@ export function MatchContactsDialog({
                   caster={launch.caster}
                   phase={launch.phase}
                   onCopy={copy}
-                  // Les contacts du caster ne sortent que le temps du match
-                  // (`exposesCaster`) : avant, une note plutôt que deux « — »
-                  // qui laisseraient croire qu'il n'en a pas.
-                  contactsShown={matchUnderway(launch.phase)}
-                  // Pas au caster lui-même (arbitre compris) : la note parle de lui.
-                  // Hors de là, toujours, même quand la phase de la carte et celle
-                  // du serveur divergent : jamais une fiche vide.
-                  contactsLaterText={viewerIsCaster(launch) ? undefined : t("contacts.casterLater")}
+                  viewer={launch.viewer}
                   noCasterText={t("contacts.noCaster")}
+                  // Tout tournoi, lancement ou non : « au départ du match ».
+                  laterText={t("contacts.casterLater")}
                   linkNames
+                  announceArrival
                 />
               </>
             )}

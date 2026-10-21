@@ -103,12 +103,39 @@ ni score à saisir ni lancement à suivre.
 
 **Arbitre** : `readViewerLaunches` pose `referee` (`can(viewer, "tournaments")`)
 pour la seule lecture d'une carte ; la requête du match lève alors la clause
-« partie du match » (`1 = 1 OR …`), `exposesContacts` le traite comme un joueur,
+« partie du match » (`1 = 1 OR …`), `exposesMatchContacts` le traite comme un joueur,
 et `viewerRole` lui rend le rôle `REFEREE` (`MatchLaunchViewerRole`), sans
 « Prêt ». La modale de lancement ne lui présente rien. Les contacts du caster
-lui sont tus avant le départ comme aux équipes ; la modale « Contacts » dit
-alors « Ses contacts s'afficheront au départ du match » (`contacts.casterLater`)
-au lieu de deux « — ».
+lui sont rendus dès que les deux adversaires sont connus (décision de
+l'utilisateur, 2026-10-21 : `exposesCaster` ouvert au rôle `REFEREE`,
+`CasterCard` côté modales, sans relecture à l'heure de départ). Un arbitre
+qui **joue** le match lit en joueur (rôle `TEAM1`/`TEAM2`) : pour lui, comme pour
+les équipes, la modale « Contacts » dit avant le départ « Ses contacts
+s'afficheront au départ du match » (`contacts.casterLater`) au lieu de deux « — ».
+Les deux modales rendent `CasterCard` sur la décision du serveur
+(`LaunchCaster.contactsShown`, issu d'`exposesCaster`), jamais recalculée côté
+client ; la note ne s'adresse jamais au caster lui-même (`viewerIsCaster`,
+`lib/shared/match-launch.ts`). Les fiches des engagées font de même
+(`LaunchSide.contactsShown`, issu d'`exposes`, faux pour une fantôme) ; tues, leur note renvoie à
+l'action « Contacts » quand elle ouvre déjà quelque chose au lecteur
+(`viewer.earlyContacts` : joueur du match, ou arbitre même inscrit comme
+caster) — sinon, au seul caster, la note courte (`contactsAtLaunchForCaster`). La modale de lancement d'un match programmé
+montre donc aux équipes la note du caster sous celles des engagées, dans leurs
+mots (`casterContactsAtLaunch`, « au lancement ») ; la modale « Contacts », ouverte à
+tout tournoi, lancement ou non, garde « au départ du match » (`contacts.casterLater`).
+
+Quand la relecture de l'heure de départ remplace la note par les contacts, la
+modale « Contacts » (seule, `announceArrival`) l'annonce par une phrase courte
+dans une région polie hors flux (`contacts.casterShown`, `<output>` `sr-only`) —
+pas les boutons « Copier ». L'annonce ne vient qu'au passage « en attente →
+montrés » d'un même caster (`useCasterArrival`, dans `CasterArrivalStatus`, monté
+seulement avec `announceArrival` et un caster inscrit) — sans contact, elle le dit
+(`contacts.casterShownEmpty` ; à l'écran, `noContact` plutôt que deux « — »,
+sauf au caster lui-même) —,
+jamais à l'ouverture, et se vide après dix secondes. La modale de lancement
+s'en passe : ce passage y coïncide avec son propre statut, déjà annoncé.
+Déclaré : `PRIVACY_CHANGES` `2026-10-contacts-du-caster-aux-arbitres`, `/rgpd`,
+le registre (T04) et les conditions (v6 retouchée, sans nouvelle version).
 
 Elle ouvre `MatchContactsDialog` (portail `document.body`,
 `useDialogBehavior`, `useBackdropDismiss`, `ScrollArea`, focus sur « Fermer »),
@@ -123,11 +150,13 @@ fenêtre d'une heure ni le filtre de l'option. Une différence, voulue : pour un
 match sont connus** — à planifier (décision de l'utilisateur, 2026-10-19),
 programmé, en lancement ou lancé —, et plus seulement au lancement : les parties
 s'organisent avant l'heure, surtout sans phase de lancement. Le **caster**, lui,
-garde la borne de la modale — en lancement ou lancé (`exposesContacts`, lu avec
+garde la borne de la modale — en lancement ou lancé (`exposesMatchContacts`, lu avec
 `viewerPlaysMatch`) — : avant, la route le traite comme un tiers. Symétrie :
 les équipes ne reçoivent les contacts **du caster** que le temps du match
-(`exposesCaster`) ; avant, la carte montre leurs contacts sans les siens. Qui
-n'est pas partie du match, le caster d'un match pas encore parti, ou
+(`exposesCaster`) ; avant, la carte montre leurs contacts sans les siens (un
+arbitre, lui, les reçoit dès que les adversaires sont connus). Qui
+n'est pas partie du match, le caster d'un match pas encore parti (sauf s'il
+est aussi arbitre : il lit alors en arbitre, dès que les adversaires sont connus), ou
 un match sans contacts (adversaire inconnu, terminé), reçoit `MATCH_CONTACTS_UNAVAILABLE` (404), un seul code :
 la réponse ne dit pas qui joue quoi. La carte décide du bouton à l'horloge du
 navigateur, le serveur à la sienne : un caster dont l'horloge avance verrait
@@ -137,7 +166,7 @@ sinon un refus à l'heure du départ. Ce refus est donc relu **une fois**
 (`contactsRetryDelay`, `CONTACTS_RETRY_MAX_WAIT_MS`), à l'heure du départ plus
 une seconde ; tout autre refus (match terminé, sans heure, tiers) part aussitôt.
 Fermer la modale coupe l'attente et la lecture (`AbortSignal`). Ouverte avant
-le départ sur un match qui a un caster (`casterContactsPending`), la modale
+le départ sur un match qui a un caster (`casterContactsPending`, `lib/shared/match-launch.ts`, la règle de la note de `CasterCard`), la modale
 relit à l'heure de départ **du serveur** (en-tête `Date` de sa réponse, plus une
 seconde ; une réponse « programmé » dont l'en-tête est déjà à l'heure est
 relue une seconde plus tard — `casterRereadDelay`), et quand la carte reçoit
@@ -335,9 +364,10 @@ les abonnés du flux : l'instantané ne porte que les « Prêt », l'hôte et le
 Le caster compte parmi les parties : il reçoit le BattleTag **masqué** des
 contacts, et les équipes le sien — dans les deux sens **le temps du match
 seulement** (`exposesCaster`, lancement ouvert ou lancé) ; avant, la carte
-montre aux équipes leurs contacts sans ceux du caster. Hors de cette fenêtre, un
-BattleTag masqué n'est lisible de personne, arbitres et administrateurs compris
-(`battletag-visibility.ts`). `docs/AUTHORIZATION_RULES.md` §2.3 l'écrit
+montre aux équipes leurs contacts sans ceux du caster. Les arbitres lisent ceux
+du caster, comme ceux des équipes, dès que les deux adversaires sont connus
+(2026-10-21). Hors de la fenêtre « Contacts », un BattleTag masqué n'est lisible
+de personne, arbitres et administrateurs compris (`battletag-visibility.ts`). `docs/AUTHORIZATION_RULES.md` §2.3 l'écrit
 comme une ligne à part, distincte de la permission `casting`, qui n'ouvre
 rien sur la fiche d'un joueur.
 

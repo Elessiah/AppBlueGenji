@@ -69,6 +69,8 @@
   "host": "Héberge la partie — crée le salon",
   "ghost": "Équipe invitée : pas de contact.",
   "contactsAtLaunch": "Les contacts s'affichent au lancement — ou dès maintenant par l'action « Contacts » du match, sur la page du tournoi (menu « Plus d'actions » au besoin).",
+  "contactsAtLaunchForCaster": "Les contacts s'affichent au lancement.",
+  "casterContactsAtLaunch": "Ses contacts s'affichent au lancement.",
   "noContact": "Aucun contact disponible.",
   "caster": "Caster",
   "noCaster": "Aucun caster inscrit : le match part dès que les deux équipes sont prêtes.",
@@ -77,13 +79,15 @@
   "pushLead": "Sois prévenu du départ de tes prochains matchs, même le site fermé.",
   "contacts": {
     "title": "Contacts — {match}",
-    "lead": "Fiches montrées aux membres des deux équipes et aux arbitres de ce match — et, le temps du match, à son caster —, pour s'ajouter en jeu et s'organiser.",
+    "lead": "Fiches montrées aux membres des deux équipes et aux arbitres de ce match — et, le temps du match, à son caster —, pour s'ajouter en jeu et s'organiser. Celle du caster : aux deux équipes le temps du match, aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin.",
     "scrollAria": "Contacts du match",
     "loading": "Chargement des contacts…",
     "notShown": "Contacts non affichés.",
     "noCaster": "Aucun caster inscrit sur ce match.",
     "casterLater": "Ses contacts s'afficheront au départ du match.",
-    "unavailable": "Les contacts ne sont visibles que des membres des deux équipes et des arbitres d'un match dont les deux adversaires sont connus, jusqu'à sa fin ; ceux du caster, et ceux des équipes pour le caster, le temps du match seulement.",
+    "casterShown": "Les contacts du caster sont maintenant affichés.",
+    "casterShownEmpty": "Aucun contact du caster disponible.",
+    "unavailable": "Les contacts de ce match ne te sont pas accessibles en ce moment (au caster : dès le départ du match).",
     "failed": "Les contacts n'ont pas pu être chargés. Réessaie dans un instant."
   }
 }

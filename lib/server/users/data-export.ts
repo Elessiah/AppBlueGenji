@@ -49,15 +49,17 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
     match_dm_enabled: number | null;
     /** Absente si son `ALTER` de `RECENT_SCHEMA_CHANGES` a échoué. */
     recruitment_modal_off?: number | null;
+    /** Absente de même (changement récent). */
+    discord_certify_prompt_dismissed_at?: Date | null;
     created_at: Date;
   };
-  const selectAccount = (withModalOff: boolean) =>
+  const selectAccount = (withModalOff: boolean, withCertifyPromptOff: boolean) =>
     db.execute<AccountRow[]>(
       `SELECT id, pseudo, avatar_url, overwatch_battletag, marvel_rivals_tag,
               discord_pseudo, discord_verified_at, discord_id, discord_link_method,
               google_sub, blizzard_sub, is_adult, is_admin,
               visible_avatar, visible_overwatch, visible_marvel, visible_major, visible_discord,
-              open_to_recruitment, locale, match_dm_enabled${withModalOff ? ", recruitment_modal_off" : ""}, created_at
+              open_to_recruitment, locale, match_dm_enabled${withModalOff ? ", recruitment_modal_off" : ""}${withCertifyPromptOff ? ", discord_certify_prompt_dismissed_at" : ""}, created_at
        FROM bg_users
        WHERE id = ? AND is_deleted = 0
        LIMIT 1`,
@@ -66,12 +68,24 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
   // Colonne d'un changement récent : son `ALTER` échoué au démarrage ne doit
   // pas priver le titulaire de son export (droit d'accès) — relu sans elle,
   // drapeau au défaut, comme la lecture de session (`selectUserRows`).
-  let rows: AccountRow[];
-  try {
-    [rows] = await selectAccount(true);
-  } catch (error) {
-    if (!isUnknownColumnError(error)) throw error;
-    [rows] = await selectAccount(false);
+  // Un repli par colonne : la plus récente tombe seule d'abord, sans emporter
+  // `recruitment_modal_off` (l'export doit dire le choix réellement gardé).
+  // Chaque combinaison est tentée : l'absence de l'une ne fait jamais taire
+  // l'autre, présente.
+  const attempts: readonly (readonly [boolean, boolean])[] = [
+    [true, true],
+    [true, false],
+    [false, true],
+    [false, false],
+  ];
+  let rows: AccountRow[] = [];
+  for (const [index, [modalOff, certifyOff]] of attempts.entries()) {
+    try {
+      [rows] = await selectAccount(modalOff, certifyOff);
+      break;
+    } catch (error) {
+      if (!isUnknownColumnError(error) || index === attempts.length - 1) throw error;
+    }
   }
 
   if (rows.length === 0) throw new Error("PROFILE_NOT_FOUND");
@@ -109,6 +123,8 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
       // « Ne plus afficher » la modale d'arrivée du recrutement : donnée détenue, rendue.
       recruitmentModalOff: recruitmentModalOff(row.recruitment_modal_off),
       recruitmentModalBackOn: recruitmentModalBackOn(row.recruitment_modal_off),
+      // « Ne plus voir » la fenêtre de certification du tag Discord : donnée détenue, rendue.
+      discordCertifyPromptDismissedAt: toIso(row.discord_certify_prompt_dismissed_at ?? null),
       createdAt: toIso(row.created_at) ?? new Date().toISOString(),
     },
     profile: {

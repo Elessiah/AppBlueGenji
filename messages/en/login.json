@@ -15,7 +15,7 @@
     "requestCode": "Get a code →",
     "codeSent": "Code sent by Discord direct message (expires at {time}).",
     "accountLabel": "Discord account",
-    "tagNotice": "Logging in with this code <strong>saves this tag</strong> without certifying it: it stays hidden from everyone, admins included. If you certify it later in “My profile”, {audience}",
+    "tagNotice": "Logging in with this code <strong>saves this tag</strong> without certifying it: it stays hidden from everyone, admins included. If you certify it later, in “My profile” or in the window offered after logging in through Discord or Blizzard, {audience}",
     "codeLabel": "Code received by DM (6 digits)",
     "pseudoLabel": "Site username",
     "pseudoOptional": "(optional, first login)",
@@ -27,9 +27,9 @@
   },
   "oauth": {
     "continueWith": "Continue with {provider}",
-    "discordNote": "Saves your Discord username without certifying it: it stays hidden from everyone, admins included. If you certify it later with one click in “My profile”, {audience}",
-    "blizzardNote": "Fills in your BattleTag automatically. You can hide your BattleTag: it stays visible to your opponents, admins and referees during a tournament match, and to its caster, in the match's “Contacts” window and its launch window, if you're among the contacts shown. If you don't want them to see it, remove it from your profile (if it comes from Battle.net, unlink your Battle.net account first — after adding another way to log in if it is your only one).",
-    "tagAudience": "admins can see it at any time, referees while you are registered for a tournament that is not finished (from the moment registration opens), the members of both teams of your match from the moment both its opponents are known until its end, and its caster only while the match is being played (and, if you cast a match, both its teams and the referees, only while the match is being played); other players only if you make it visible in your privacy settings. Never anyone else."
+    "discordNote": "Saves your Discord username without certifying it: it stays hidden from everyone, admins included. If you certify it later, in “My profile” or in the window offered after logging in through Discord or Blizzard, {audience}",
+    "blizzardNote": "Fills in your BattleTag automatically. You can hide your BattleTag: it stays visible to the members of both teams, admins and referees in a tournament match from the moment both its opponents are known until its end, and to its caster only while the match is being played, in the match's “Contacts” window (and, for the teams and the caster, its launch window), if you're among the contacts shown. If you cast a match, both its teams also see it while the match is being played, and referees and admins from the moment both its opponents are known until its end. If you don't want them to see it, remove it from your profile (if it comes from Battle.net, unlink your Battle.net account first — after adding another way to log in if it is your only one).",
+    "tagAudience": "admins can see it at any time, referees while you are registered for a tournament that is not finished (from the moment registration opens), the members of both teams of your match from the moment both its opponents are known until its end, and its caster only while the match is being played (and, if you cast a match, both its teams only while the match is being played, and the referees from the moment both its opponents are known until its end); other players only if you make it visible in your privacy settings. Never anyone else."
   },
   "environment": {
     "notice": {

@@ -12,6 +12,7 @@ import { PRIVACY_CHANGES_ANSWERED_EVENT } from "@/lib/shared/privacy-changes";
 import type { TermsTranslationNote } from "@/lib/shared/french-version-prevails";
 import {
   TERMS_PATH,
+  TERMS_ACCEPTED_EVENT,
   TERMS_REQUIRED_EVENT,
   TERMS_VERSION,
   formatTermsDateIn,
@@ -202,6 +203,7 @@ export function TermsAcceptanceModal({
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       setRequested(false);
+      window.dispatchEvent(new Event(TERMS_ACCEPTED_EVENT));
       showSuccess(t("termsModal.accepted"));
     } catch {
       showError(t("termsModal.failed"));

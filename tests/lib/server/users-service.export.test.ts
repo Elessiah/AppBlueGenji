@@ -224,10 +224,28 @@ describe("exportOwnData", () => {
     expect(await run(2)).toEqual([false, true]);
   });
 
+  it("rend la date du « Ne plus voir » de la fenêtre de certification Discord, null par défaut", async () => {
+    const run = async (value: Date | null | undefined) => {
+      const execute = jest
+        .fn<SqlQuery>()
+        .mockResolvedValueOnce([[exportRow({ discord_certify_prompt_dismissed_at: value })]])
+        .mockResolvedValueOnce([[fullProfileRow({})]])
+        .mockResolvedValue([[]]);
+      await mockDb(execute);
+      const data = await exportOwnData(42);
+      expect(execute.mock.calls[0][0]).toMatch(/\bdiscord_certify_prompt_dismissed_at\b/);
+      return data.account.discordCertifyPromptDismissedAt;
+    };
+    expect(await run(new Date("2026-10-21T08:00:00.000Z"))).toBe("2026-10-21T08:00:00.000Z");
+    expect(await run(null)).toBeNull();
+    expect(await run(undefined)).toBeNull();
+  });
+
   it("colonne recruitment_modal_off absente (ALTER échoué) : l'export est rendu quand même, drapeau au défaut", async () => {
     const unknownColumn = Object.assign(new Error("Unknown column 'recruitment_modal_off'"), { code: "ER_BAD_FIELD_ERROR" });
     const execute = jest
       .fn<SqlQuery>()
+      .mockRejectedValueOnce(unknownColumn)
       .mockRejectedValueOnce(unknownColumn)
       .mockResolvedValueOnce([[exportRow({ recruitment_modal_off: undefined })]])
       .mockResolvedValueOnce([[fullProfileRow({})]])
@@ -236,7 +254,26 @@ describe("exportOwnData", () => {
     const data = await exportOwnData(42);
     expect(data.account.recruitmentModalOff).toBe(false);
     expect(execute.mock.calls[0][0]).toMatch(/recruitment_modal_off/);
-    expect(execute.mock.calls[1][0]).not.toMatch(/recruitment_modal_off/);
+    // Repli par colonne : sans la plus récente d'abord, puis sans le recrutement.
+    expect(execute.mock.calls[1][0]).toMatch(/recruitment_modal_off/);
+    expect(execute.mock.calls[1][0]).not.toMatch(/discord_certify_prompt_dismissed_at/);
+    expect(execute.mock.calls[2][0]).not.toMatch(/recruitment_modal_off/);
+    // …sans emporter « Ne plus voir » de la certification, présente.
+    expect(execute.mock.calls[2][0]).toMatch(/discord_certify_prompt_dismissed_at/);
+  });
+
+  it("seule discord_certify_prompt_dismissed_at absente : l'export garde le vrai « Ne plus afficher » du recrutement", async () => {
+    const unknownColumn = Object.assign(new Error("Unknown column 'discord_certify_prompt_dismissed_at'"), { code: "ER_BAD_FIELD_ERROR" });
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockRejectedValueOnce(unknownColumn)
+      .mockResolvedValueOnce([[exportRow({ recruitment_modal_off: 1 })]])
+      .mockResolvedValueOnce([[fullProfileRow({})]])
+      .mockResolvedValue([[]]);
+    await mockDb(execute);
+    const data = await exportOwnData(42);
+    expect(data.account.recruitmentModalOff).toBe(true);
+    expect(execute.mock.calls[1][0]).toMatch(/recruitment_modal_off/);
   });
 
   it("une autre panne de la lecture du compte n'est pas masquée par le repli", async () => {

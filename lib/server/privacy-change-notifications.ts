@@ -6,7 +6,7 @@ import { privacyChangePush } from "@/lib/shared/push-messages";
 import { localizedPrivacyChanges } from "@/lib/shared/privacy-changes-en";
 import { siteBaseUrl } from "@/lib/server/site-url";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
-import { privacyAudienceSql } from "@/lib/server/privacy-consent";
+import { LIVE_STAFF_SQL, privacyAudienceSql } from "@/lib/server/privacy-consent";
 import { webPushConfig } from "@/lib/server/web-push";
 import {
   PRIVACY_DM_MIN_INTERVAL_DAYS,
@@ -74,6 +74,7 @@ type CandidateRow = RowDataPacket & {
   discord_verified_at: string | null;
   created_at: string | null;
   google_linked: 0 | 1 | null;
+  live_staff: 0 | 1 | null;
 };
 
 type DoneRow = RowDataPacket & { user_id: number; change_id: string };
@@ -91,22 +92,31 @@ type DoneRow = RowDataPacket & { user_id: number; change_id: string };
  * d'annonce borne le nombre de conditions, et les `NOT EXISTS` passent par les
  * clés primaires.
  */
-async function loadCandidates(settled: readonly PrivacyChange[]): Promise<CandidateRow[]> {
+async function loadCandidates(settled: readonly PrivacyChange[], liveStaff: boolean): Promise<CandidateRow[]> {
   // Un compte sans Discord n'est candidat que si le push est **allumé** : sans
   // clés, rien ne peut lui parvenir, et le réserver consommerait l'annonce pour
   // de bon. Et si la table des abonnements manque (table tolérée), la lecture
   // retombe sur Discord seul plutôt que d'éteindre toute l'annonce.
   if (webPushConfig()) {
     try {
-      return await queryCandidates(settled, true);
+      return await queryCandidates(settled, true, liveStaff);
     } catch (error) {
       if (!isMissingTableError(error)) throw error;
     }
   }
-  return queryCandidates(settled, false);
+  return queryCandidates(settled, false, liveStaff);
 }
 
-async function queryCandidates(settled: readonly PrivacyChange[], withPush: boolean): Promise<CandidateRow[]> {
+/**
+ * `liveStaff` : une entrée `LIVE_STAFF` est-elle encore annonçable ? Sinon le
+ * fait n'est pas calculé — aucune entrée ne le lit, inutile d'évaluer
+ * `LIVE_STAFF_SQL` sur chaque compte à chaque balayage.
+ */
+async function queryCandidates(
+  settled: readonly PrivacyChange[],
+  withPush: boolean,
+  liveStaff: boolean,
+): Promise<CandidateRow[]> {
   const db = await getDatabase();
   const clause = settled
     .map(
@@ -117,7 +127,7 @@ async function queryCandidates(settled: readonly PrivacyChange[], withPush: bool
     .join(" OR ");
   const [rows] = await db.query<CandidateRow[]>(
     `SELECT u.id, u.pseudo, u.discord_id, u.discord_pseudo, u.discord_verified_at, u.created_at,
-            u.google_sub IS NOT NULL AS google_linked
+            u.google_sub IS NOT NULL AS google_linked, ${liveStaff ? LIVE_STAFF_SQL : "0"} AS live_staff
        FROM bg_users u
       WHERE u.is_deleted = 0
         AND (u.discord_id IS NOT NULL OR (u.discord_verified_at IS NOT NULL AND u.discord_pseudo IS NOT NULL)
@@ -183,7 +193,10 @@ async function runSweep(now: Date): Promise<number> {
   // d'`INSERT`/`DELETE` pendant toute la panne.
   if (isBotCircuitOpen()) return 0;
 
-  const candidates = await loadCandidates(settled);
+  const candidates = await loadCandidates(
+    settled,
+    changes.some((change) => change.audience === "LIVE_STAFF"),
+  );
   if (candidates.length === 0) return 0;
   const done = await loadDone(candidates.map((row) => Number(row.id)));
 
@@ -203,7 +216,7 @@ async function runSweep(now: Date): Promise<number> {
         done.get(userId) ?? [],
         privacyChangeDay(now),
         changes,
-        { googleLinked: Number(row.google_linked) === 1 },
+        { googleLinked: Number(row.google_linked) === 1, liveStaff: Number(row.live_staff) === 1 },
       ),
       now,
     );

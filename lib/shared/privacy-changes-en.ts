@@ -501,6 +501,28 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "The certified Discord tag badge follows the same rule: it can be read on your player page by any logged-in player, even if your tag is not visible to other players. It rests on the same legitimate interest, you can object to it the same way, and it disappears if you remove your tag.",
     ],
   },
+  "2026-10-proposition-certification-discord": {
+    title: "Discord tag verification suggested at login",
+    linkLabels: ["Read the “Data collected” section"],
+    summary:
+      "After logging in with Discord or with Blizzard (Battle.net), a window suggests, once, that you verify your Discord tag if it isn't verified yet (or add one, if you have none), with a table of what verification changes. Logging in still verifies nothing: only your explicit confirmation does.",
+    details: [
+      "“Later” (or closing the window) keeps nothing on your account: your login session only records that the window no longer needs to be suggested, and this mark goes with the session. The window comes back at your next login with Discord or Blizzard.",
+      "“Don't show again” is kept on your account, with its date: the window no longer opens, on any device. This choice lasts as long as the account, is included in the export of your data and is erased if the account is anonymized. Verification remains possible at any time in “My profile”.",
+      "Logging in with Google doesn't open this window.",
+    ],
+  },
+  "2026-10-contacts-du-caster-aux-arbitres": {
+    linkLabels: ["Read the “Match contacts” section", "Read the “Data collected” section"],
+    title: "Caster contacts: visible to referees and administrators before the match",
+    summary:
+      "If you cast a match, referees and administrators see your contacts as soon as both its opponents are known, no longer only while the match is being played (for administrators, only your BattleTag is affected: they could already see your certified Discord tag); both its teams still only see them while the match is being played.",
+    details: [
+      "It's the same information as before (your certified Discord tag and your BattleTag, even when hidden), in the same “Contacts” window of the match, until its end. Only the timing changes for referees: they can reach you to organise the stream ahead of time. Administrators could already see your certified Discord tag at any time: for them, only your BattleTag is affected.",
+      "Nothing changes for players: their contacts stay visible to referees as soon as both opponents are known, and to the caster only while the match is being played.",
+      "As before, this reading is based on the performance of the service — running the tournament. The terms of use (“Match contacts” section) say so, with no new version to accept.",
+    ],
+  },
 };
 
 /**

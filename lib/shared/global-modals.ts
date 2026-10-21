@@ -28,6 +28,19 @@ export const LOGIN_PATH = "/connexion";
 export const TERMS_POSTPONED_COOKIE = "bg_terms_later";
 
 /**
+ * Pages légales (et leurs sous-pages) : aucune fenêtre d'arrivée ne s'y pose
+ * sur le texte qu'on lit. Une page légale nouvelle s'ajoute **ici**, et
+ * conditions comme certification s'y taisent d'un coup.
+ */
+export const LEGAL_PAGE_PATHS: readonly string[] = [
+  "/rgpd",
+  "/mentions-legales",
+  "/accessibilite",
+  "/privacy-policy-bot",
+  "/terms-of-service-bot",
+];
+
+/**
  * Pages où la fenêtre bloquante des conditions laisse passer, depuis la
  * version 6 (2026-10-19) : qui refuse les conditions doit encore pouvoir lire
  * la politique de confidentialité et les pages légales (celles du bot
@@ -35,16 +48,14 @@ export const TERMS_POSTPONED_COOKIE = "bg_terms_later";
  * ou contester un signalement (recours interne), exporter ses
  * données ou supprimer son compte (« Mon profil »), sans accepter d'abord.
  */
-export const TERMS_FREE_PATHS: readonly string[] = [
-  "/rgpd",
-  "/mentions-legales",
-  "/accessibilite",
-  "/privacy-policy-bot",
-  "/terms-of-service-bot",
-  "/regles",
-  "/signalements",
-  "/profil",
-];
+export const TERMS_FREE_PATHS: readonly string[] = [...LEGAL_PAGE_PATHS, "/regles", "/signalements", "/profil"];
+
+/** La connexion, la page des conditions, et `paths` avec leurs sous-pages. */
+function silencedOn(paths: readonly string[], pathname: string | null | undefined): boolean {
+  if (pathname === TERMS_PATH || pathname === LOGIN_PATH) return true;
+  if (!pathname) return false;
+  return paths.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+}
 
 /**
  * Pages où la modale des conditions se tait : celle des conditions elle-même
@@ -53,9 +64,7 @@ export const TERMS_FREE_PATHS: readonly string[] = [
  * sous-pages, `/rgpd/registre` compris).
  */
 export function termsModalSilencedOn(pathname: string | null | undefined): boolean {
-  if (pathname === TERMS_PATH || pathname === LOGIN_PATH) return true;
-  if (!pathname) return false;
-  return TERMS_FREE_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+  return silencedOn(TERMS_FREE_PATHS, pathname);
 }
 
 /**
@@ -72,7 +81,9 @@ export function termsModalDueOnLoad(input: {
 /**
  * La modale d'arrivée du recrutement doit-elle se taire ? Elle passe après
  * toute modale qui attend une réponse, et se tait sur la connexion (la modale
- * de consentement y est la seule à avoir sa place).
+ * de consentement y est la seule à avoir sa place). La certification du tag
+ * Discord la tient, elle, par `modalHeld` (`RecruitmentHighlight`), verrouillé
+ * pour la page.
  */
 export function recruitmentModalSilenced(input: {
   privacyPending: boolean;
@@ -80,4 +91,31 @@ export function recruitmentModalSilenced(input: {
   pathname: string | null | undefined;
 }): boolean {
   return input.privacyPending || input.termsModalDue || input.pathname === LOGIN_PATH;
+}
+
+/**
+ * Pages où la fenêtre « Certifier ton tag Discord » se tait
+ * (`docs/features/DISCORD_CERTIFY_PROMPT.md`) : la connexion, la page des
+ * conditions et les pages légales ({@link LEGAL_PAGE_PATHS}) — qui y lit la
+ * politique de confidentialité n'a pas à recevoir une proposition par-dessus.
+ * `/regles`, `/signalements` et `/profil` ne se taisent pas : la proposition y
+ * a sa place.
+ */
+export function certifyPromptSilencedOn(pathname: string | null | undefined): boolean {
+  return silencedOn(LEGAL_PAGE_PATHS, pathname);
+}
+
+/**
+ * La fenêtre de certification s'ouvre-t-elle ? Après **toute** modale qui
+ * attend une réponse : confidentialité, puis conditions (même quand celles-ci
+ * se taisent sur la page courante — on ne propose rien à qui n'a pas encore
+ * accepté), et jamais sur une page de {@link certifyPromptSilencedOn}.
+ */
+export function certifyPromptOpen(input: {
+  due: boolean;
+  privacyPending: boolean;
+  termsPending: boolean;
+  pathname: string | null | undefined;
+}): boolean {
+  return input.due && !input.privacyPending && !input.termsPending && !certifyPromptSilencedOn(input.pathname);
 }

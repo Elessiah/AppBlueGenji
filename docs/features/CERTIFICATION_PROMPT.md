@@ -83,6 +83,13 @@ contacts présentés aux équipes, au caster et aux arbitres (T04), portées OAu
 
 ## « Ne plus voir »
 
+Le « Ne plus voir » donné à la **proposition de certification de la
+connexion** (`DISCORD_CERTIFY_PROMPT.md`, `bg_users.discord_certify_prompt_dismissed_at`,
+gardé sur le compte) vaut aussi ici, sur tous les appareils : lu seulement
+quand une invitation serait due (`loadCertificationPrompt`), colonne absente =
+sans choix. L'inverse n'est pas vrai : la case de cette modale reste une
+préférence d'affichage du navigateur.
+
 - **« Plus tard »** ou fermeture (Échap, voile) : `bg_cert_prompt_closed` = « 1 »
   en **stockage de session** — la modale ne se rouvre pas dans cet onglet.
   La case « Ne plus voir », visible, vaut pour **toute** fermeture, Échap et

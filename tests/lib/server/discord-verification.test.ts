@@ -233,6 +233,18 @@ describe("certifyLinkedDiscordTag", () => {
 });
 
 describe("startDiscordVerification — le compte Google", () => {
+  it("avec linkedOnly (fenêtre de connexion) : refuse sans résoudre ni envoyer de code", async () => {
+    const db = fakeDb({ ...GOOGLE_ACCOUNT });
+
+    await expect(startDiscordVerification(7, "keryan", undefined, { linkedOnly: true })).rejects.toThrow(
+      "DISCORD_NOT_LINKED",
+    );
+    expect(resolveMock).not.toHaveBeenCalled();
+    expect(createChallengeMock).not.toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
+    expect(db.writes).toHaveLength(0);
+  });
+
   it("envoie un code, et transmet le tag au défi", async () => {
     // Le tag part **avec le défi** : c'est cette ligne qui portera la preuve, et
     // c'est de là que la confirmation relira le tag à écrire.

@@ -88,11 +88,12 @@ export function CertificationPromptDialog({
       zIndex={90}
       busy={false}
       yields
+      // Focus d'ouverture sur le cadre : la modale se lit avant d'agir, et ses
+      // contrôles, tout en bas, l'ouvriraient défilée sur un petit écran.
+      initialFocus="container"
       onClose={onClose}
     >
-      {/* Focus d'ouverture sur le titre : la modale se lit avant d'agir, et ses
-          contrôles, tout en bas, l'ouvriraient défilée sur un petit écran. */}
-      <h3 id="certification-prompt-title" className={s.title} tabIndex={-1} data-autofocus>
+<h3 id="certification-prompt-title" className={s.title}>
         {t(withBattletag ? "certification.title" : "certification.titleDiscordOnly")}
       </h3>
       <p id="certification-prompt-lead" className={s.lead}>

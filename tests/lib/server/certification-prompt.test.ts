@@ -28,9 +28,14 @@ const BARE: Omit<Member, "user_id"> = {
 const DISCORD = { discord_verified_at: "2026-10-01 10:00:00", discord_pseudo: "pseudo" };
 const BATTLETAG = { blizzard_sub: "sub", overwatch_battletag: "Joueur#1234" };
 
-function rosterOf(members: Member[]) {
+/** Roster simulé ; `declined` : réponse à la lecture du « Ne plus voir » du compte (ou son échec). */
+function rosterOf(members: Member[], declined: number | Error = 0) {
   const rows = members.map((member) => ({ team_id: 42, pseudo: `J${member.user_id}`, roles_json: "[]", ...member }));
-  const execute = jest.fn<SqlQuery>().mockResolvedValue([rows, []]);
+  const execute = jest.fn<SqlQuery>().mockImplementation(async (sql) => {
+    if (!String(sql).includes("discord_certify_prompt_dismissed_at")) return [rows, []];
+    if (declined instanceof Error) throw declined;
+    return [[{ declined }], []];
+  });
   return { execute, executor: fakeConnection({ execute }) };
 }
 
@@ -94,6 +99,25 @@ describe("loadCertificationPrompt", () => {
   it("en Marvel Rivals, invite le joueur dont l'équipe n'a qu'un BattleTag vérifié", async () => {
     const { executor } = rosterOf([{ user_id: 7, ...BARE }, { user_id: 8, ...BARE, ...BATTLETAG }]);
     expect((await loadCertificationPrompt(executor, 7, 42, false, false))?.reason).toBe("TEAM_WITHOUT_CONTACT");
+  });
+
+  it("respecte le « Ne plus voir » donné à la proposition de la connexion (compte)", async () => {
+    const { executor } = rosterOf([{ user_id: 7, ...BARE }], 1);
+    expect(await loadCertificationPrompt(executor, 7, 42, true, true)).toBeNull();
+  });
+
+  it("colonne du « Ne plus voir » absente : comme sans choix ; toute autre panne remonte", async () => {
+    const missing = Object.assign(new Error("Unknown column"), { code: "ER_BAD_FIELD_ERROR" });
+    const { executor } = rosterOf([{ user_id: 7, ...BARE }], missing);
+    expect((await loadCertificationPrompt(executor, 7, 42, true, true))?.reason).toBe("MANAGER");
+    const { executor: failing } = rosterOf([{ user_id: 7, ...BARE }], new Error("pool"));
+    await expect(loadCertificationPrompt(failing, 7, 42, true, true)).rejects.toThrow("pool");
+  });
+
+  it("ne lit pas le choix du compte quand aucune invitation n'est due", async () => {
+    const { execute, executor } = rosterOf([{ user_id: 7, ...BARE, ...DISCORD, ...BATTLETAG }]);
+    expect(await loadCertificationPrompt(executor, 7, 42, true, true)).toBeNull();
+    expect(execute).toHaveBeenCalledTimes(1);
   });
 
   it("rien pour un lecteur qui n'est plus dans le roster", async () => {

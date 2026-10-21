@@ -40,6 +40,7 @@ Le public se lit dans `canViewDiscordTag`, et l'ordre des cas *est* la règle :
 | ------------------------------------ | -------------------------------------------- |
 | Le propriétaire du compte            | Toujours, certifié ou non                    |
 | N'importe qui, tag **non certifié**  | **Jamais**                                   |
+| Partie du même match (`sharesMatchLobby`) | Équipes : dès que les deux adversaires sont connus, jusqu'à la fin ; caster, et équipes pour le caster : le temps du match ; arbitres (`tournaments`), par la carte, contacts des équipes comme du caster : dès que les deux adversaires sont connus, jusqu'à la fin |
 | Administrateur                       | Toujours (tag certifié)                       |
 | Permission `tournaments` (arbitre)   | Si le joueur est engagé dans un tournoi vivant |
 | Joueur connecté quelconque           | Si le propriétaire a coché « Tag Discord »    |
@@ -51,7 +52,9 @@ d'écriture : placée après, elle serait oubliée le jour où un rôle s'ajoute
 ### Visible des autres joueurs : un choix, pas un effet de la certification
 
 La certification ouvre le tag à l'**organisation** — administrateurs, arbitres
-pendant un tournoi, parties d'un match lancé. Elle ne l'ouvre pas aux autres
+pendant un tournoi, parties d'un match (équipes dès que les deux adversaires
+sont connus, caster le temps du match ; celui du caster, aux arbitres dès que
+les adversaires sont connus — tableau ci-dessus). Elle ne l'ouvre pas aux autres
 joueurs, et `/profil` le disait mal : sous les réglages « Visible par les autres
 joueurs », une phrase renvoyait le tag à « ses propres réglages, ci-dessus »,
 comme si la certification décidait aussi pour eux. Un joueur qui voulait être
@@ -128,6 +131,12 @@ origine (`bg_users.discord_pseudo_from_discord = 1`, par
 `linkOAuthIdentity`). Une certification déjà donnée **survit** si le pseudo ne
 change pas, et **tombe** s'il change : le joueur a consenti à exposer ce
 pseudo-là.
+
+**Proposée à la connexion.** Après une connexion par Discord ou Blizzard, un
+compte non certifié reçoit une fois la fenêtre « Certifier ton tag Discord ? »
+(tableau sans / avec, « Plus tard », « Ne plus voir ») : elle certifie d'un clic
+le premier cas ci-dessous et mène au dialogue de `/profil` pour les autres —
+`DISCORD_CERTIFY_PROMPT.md`. Elle ne certifie jamais d'elle-même.
 
 Trois cas pour certifier, tous depuis `/profil` :
 

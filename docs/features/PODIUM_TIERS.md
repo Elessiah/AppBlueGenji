@@ -80,6 +80,14 @@ Exceptions :
   Endurance, et dans l'historique manche par manche de l'Endurance) : la marche garde son repère (couronne, losange) mais quitte
   dégradé, lueur, mouvement et graisse — sinon le nom distancé brillerait plus
   fort que les autres.
+- **Lien en pastille** (l'équipe active de la fiche joueur) : sous la lueur,
+  le fond teinté de la pastille ferait tomber les marches sous 4,5:1. `.badge`,
+  `.pill` et `.cy-tag` l'éteignent d'office, sur le lien ou autour de lui
+  (`:is(.badge, .pill, .cy-tag) .podium-tier`), comme une ligne en retrait (repère conservé), le nom prenant
+  au repos la couleur de la pastille (survol et focus : couleur pleine, comme
+  tout lien d'entité). Une nouvelle surface teintée s'ajoute à cette liste,
+  reprise à l'identique par la règle de graisse. Compte supprimé : `podiumTier` à `null` sur la fiche, comme son
+  historique d'équipes.
 - **Vainqueur d'un match** : sans lueur — le fond teinté turquoise de la ligne
   ferait tomber violets et rose sous 4,5:1 sous la lueur.
 - **Graisse en ligne** des classements Suisse et Survie : `standingNameWeight`
@@ -106,6 +114,25 @@ seulement devenir **nettement visible** et suivre l'équipe partout.
 - Texte **réel** peint par `background-clip: text` (`-webkit-text-fill-color:
   transparent`, robuste dans un titre `.ds-title` déjà en dégradé) ; repères en
   `::before` sans texte : **nom accessible inchangé**.
+- **Peinte dans le lien, jamais sur le lien** : `TeamLink`, `PlayerLink` et
+  `EntrantLink` posent la marche sur un `<span>` intérieur ; la classe de
+  l'appelant reste sur le lien. Une classe qui pose un `background` (`.badge`,
+  `.pill`, une classe de module…) sur l'élément peint effacerait le dégradé —
+  le nom, transparent, n'apparaissait plus qu'au survol (fiche joueur,
+  v1.41.0). Aucune règle d'appel à tenir : toute classe est sûre sur le lien.
+  Le `<span>` enveloppe tous les enfants du lien : un lien qui dispose les
+  siens (avatar et nom en flex) passe `podiumTier={null}`.
+  Graisse : `EntityLink` pose sur le lien (ou le nom de spectateur) le repère
+  `data-podium` (famille de la marche) ; la feuille y met les 700
+  (`:where(.entity-link, .entity-name):where(:not([data-podium-muted],
+  [data-podium-muted] *, :is(.badge, .pill, .cy-tag), :is(.badge, .pill,
+  .cy-tag) *))[data-podium="podium-tier"]`, spécificité d'une classe) et le
+  nom peint en hérite — la graisse de l'appelant (classe, style en ligne)
+  l'emporte comme avant ; éteinte (ligne en retrait, pastille), la marche n'en
+  impose aucune.
+  Aucun `:has()`. Balisage du nom peint : `PodiumPaint`
+  (`components/podium-tiers.tsx`), partagé avec `TeamPodiumName` et
+  `PlayerPodiumName`.
 - Lueur par `drop-shadow`, jamais `text-shadow` (sous un texte peint par son
   fond, l'ombre recouvrirait le dégradé).
 - **Contraste** : chaque arrêt est un jeton de texte qui tient **4,5:1** sur le
@@ -118,8 +145,17 @@ seulement devenir **nettement visible** et suivre l'équipe partout.
   périodique (pas de saut), en pause par `var(--deco-anim-state)` (régime de
   charge `useClientPower`, mouvement réduit, menu d'accessibilité). À l'arrêt,
   la moitié la plus colorée du dégradé reste peinte.
-- Survol / focus d'un lien : couleur pleine `--blue-100`, soulignement lisible ;
-  « Liens soulignés » : trait `--blue-300` malgré le texte transparent.
+- Survol / focus d'un lien (`.entity-link:hover > .podium-tier`) : couleur
+  pleine `--blue-100`, soulignement lisible ; « Liens soulignés » : le trait,
+  tracé par le lien, garde la couleur du lien (le texte transparent est celui
+  du `<span>` intérieur).
+- Nom tronqué : `truncate` sur le lien d'entité (`.entity-truncate` ;
+  `EntrantName` `truncate`, pseudo des membres d'une fiche d'équipe). Peint
+  d'une marche, c'est le `<span>` peint qui rogne et pose l'ellipse, le lien le
+  laisse déborder — sa lueur n'est pas coupée et l'ellipse garde le dégradé.
+  Deux lignes : `truncate={2}` (`.entity-clamp-2`, même partage ; classement
+  de l'accueil). Un lien d'entité ne se tronque jamais par une classe de
+  l'appelant.
 - Contraste renforcé : lueur effacée. Couleurs forcées : fond retiré, couleur
   du système. Impression : couleur pleine `--blue-500`, repère masqué.
 
@@ -130,7 +166,9 @@ seulement devenir **nettement visible** et suivre l'équipe partout.
 - `tests/lib/server/podium-tiers.test.ts` — classement « Général », une requête,
   cache et invalidation, panne.
 - `tests/components/podium-tier-links.test.tsx` — `TeamLink`, `PlayerLink`,
-  `EntrantLink` (solo compris), noms non cliquables, marche imposée,
+  `EntrantLink` (solo compris), marche sur le `<span>` intérieur et classe de
+  l'appelant sur le lien, noms non cliquables, marche imposée,
   `PodiumTiersOff` sur les écrans d'administration.
 - `tests/app/podium-tiers-style.test.ts` — contraste sous la lueur, teintes
-  froides, hiérarchie, mouvement en pause, accessibilité, impression.
+  froides, hiérarchie, mouvement en pause, accessibilité, impression, pastille
+  de l'équipe active de la fiche joueur.

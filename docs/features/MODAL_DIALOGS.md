@@ -36,14 +36,13 @@ main est levé sous la modale par la fermeture d'une autre.
 Le focus initial va au premier élément focalisable, **sauf** s'il existe un
 élément marqué `data-autofocus` : le champ à remplir d'abord n'est pas toujours
 le premier (le bureau place un bouton « Couleur aléatoire » avant le champ
-Nom).
-
-Une modale longue, qui se lit avant d'agir et dont les contrôles sont tout en
-bas, marque son **titre** `tabIndex={-1}` + `data-autofocus` : le focus
-d'ouverture s'y pose et la modale s'ouvre par le haut, au lieu de défiler
-jusqu'au premier contrôle sur un petit écran (`CertificationPromptDialog`).
-Hors des focalisables, ce titre est tenu par le piège : `Maj+Tab` depuis lui
-reboucle sur le dernier contrôle (`beforeStart` de `focusTrapTarget`).
+Nom). `initialFocus: "container"` le pose sur le conteneur lui-même
+(`tabIndex={-1}`, sans défilement) : une proposition dont aucun bouton ne doit
+partir sur Entrée, et dont le titre doit rester en vue à fort zoom
+(`DiscordCertifyPrompt`, `CertificationPromptDialog` — prop `initialFocus` de
+`TournamentDialogFrame`). Le conteneur focalisé — focus d'ouverture ou clic
+sur son texte — est un **bord** du piège : `Maj+Tab` y reboucle sur le dernier
+contrôle au lieu de partir derrière le voile.
 
 Une modale **ouverte d'office** (sans geste du lecteur) attend qu'aucune autre
 ne soit ouverte (`anotherModalOpen`, `lib/shared/dialog-focus.ts`) : centre de

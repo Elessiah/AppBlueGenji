@@ -44,7 +44,7 @@ describe("contacts du lancement d'un match — base légale", () => {
       expect(entry?.finalite).not.toMatch(/non sur ce consentement/);
     }
     expect(MATCH_CONTACTS_SCOPE).toBe(
-      "présentation, dans la fenêtre « Contacts » du match et dans sa fenêtre de lancement, aux membres de ses deux équipes et aux arbitres dès que ses deux adversaires sont connus, et à son caster le temps du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes et au caster) ; les contacts du caster aux deux équipes et aux arbitres le temps du match (conditions d'utilisation, « Contacts de match »)",
+      "présentation, dans la fenêtre « Contacts » du match et dans sa fenêtre de lancement, aux membres de ses deux équipes et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, et à son caster le temps du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes et au caster) ; les contacts du caster aux deux équipes le temps du match, et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin (conditions d'utilisation, « Contacts de match »)",
     );
   });
 
@@ -74,8 +74,8 @@ describe("DONNEES_PROFIL", () => {
     expect(names).toContain("Identifiant Blizzard");
   });
 
-  it("has exactly 13 entries", () => {
-    expect(DONNEES_PROFIL).toHaveLength(13);
+  it("has exactly 14 entries", () => {
+    expect(DONNEES_PROFIL).toHaveLength(14);
   });
 
   it("déclare la langue du compte (lot 9-3) : exécution du contrat, durée du compte, remise au français", () => {

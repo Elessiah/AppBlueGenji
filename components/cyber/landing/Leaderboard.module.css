@@ -87,15 +87,10 @@
    sélecteur `span:last-child` ne l'atteignait pas. Deux lignes au plus, puis
    points de suspension (le `title` le donne entier) : sur une seule ligne, un
    nom s'abrégeait à ~13 caractères en mobile, et trois « Test - Bracket … »
-   devenaient indiscernables. */
+   devenaient indiscernables. La coupe elle-même est `truncate={2}` du lien
+   (`.entity-clamp-2`, qui la reporte sur le nom peint d'une marche du podium). */
 .team > :last-child {
   min-width: 0;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  overflow-wrap: anywhere;
   line-height: 1.25;
 }
 
