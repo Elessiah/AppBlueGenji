@@ -432,19 +432,34 @@ a {
 }
 
 .badge {
-  /* Rembourrage relayé : un lien posé dans la pastille le reprend pour couvrir
-     toute sa surface (équipe active de la fiche joueur, `PODIUM_TIERS.md`). */
   --badge-padding: 4px 12px;
+  --badge-border: 1px solid rgba(89, 212, 255, 0.35);
   display: inline-block;
   padding: var(--badge-padding);
   border-radius: 999px;
-  border: 1px solid rgba(89, 212, 255, 0.35);
+  border: var(--badge-border);
   background: rgba(89, 212, 255, 0.1);
   color: var(--accent-blue);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+/* Pastille autour d'un lien d'entité (équipe active de la fiche joueur) : le
+   lien reprend rembourrage et bord, toute la pastille est cliquable. La
+   pastille habille le conteneur et non le lien — son `background` effacerait le
+   nom d'une marche du podium, peint dans un texte transparent (`PODIUM_TIERS.md`). */
+.badge.badge-link {
+  padding: 0;
+  border: 0;
+}
+
+.badge-link > * {
+  display: inline-block;
+  padding: var(--badge-padding);
+  border: var(--badge-border);
+  border-radius: inherit;
 }
 
 .grid-2 {
