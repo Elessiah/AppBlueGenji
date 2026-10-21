@@ -133,22 +133,35 @@ describe("marches du podium — accessibilité et impression", () => {
     expect(rule(".podium-tier,\n.podium-member")).not.toMatch(/text-decoration/);
   });
 
-  it("rogne un nom tronqué sur le nom peint, pas sur le lien (lueur entière, ellipse en dégradé)", () => {
-    const truncate = /\n\.entity-truncate \{([^}]*)\}/.exec(block)![1];
-    for (const declaration of ["display: inline-block", "max-width: 100%", "min-width: 0", "vertical-align: text-bottom", "overflow: hidden", "text-overflow: ellipsis", "white-space: nowrap"]) {
-      expect(truncate).toContain(declaration);
+  /** Déclarations de la règle dont la liste de sélecteurs est exactement `selectors` (ordre libre). */
+  function declarations(...selectors: string[]): string[] {
+    const wanted = [...selectors].sort((a, b) => a.localeCompare(b)).join("|");
+    const rules = block.replaceAll(/\/\*[\s\S]*?\*\//g, "");
+    for (const [, list, body] of rules.matchAll(/\n([^{}\s][^{}]*?) \{([^}]*)\}/g)) {
+      const found = list.split(",").map((selector) => selector.trim()).sort((a, b) => a.localeCompare(b)).join("|");
+      if (found === wanted) return body.split(";").map((declaration) => declaration.trim()).filter(Boolean);
     }
-    expect(block).toMatch(/\n\.entity-truncate\[data-podium\] \{\s*overflow: visible;\s*\}/);
-    expect(block).toMatch(
-      /\n\.entity-truncate\[data-podium\] > \.podium-tier,\s*\.entity-truncate\[data-podium\] > \.podium-member \{\s*display: block;\s*overflow: hidden;\s*text-overflow: ellipsis;\s*\}/,
+    throw new Error(`Règle introuvable : ${selectors.join(", ")}`);
+  }
+  const painted = (base: string) => [`${base}[data-podium] > .podium-tier`, `${base}[data-podium] > .podium-member`];
+
+  it("rogne un nom tronqué sur le nom peint, pas sur le lien (lueur entière, ellipse en dégradé)", () => {
+    expect(declarations(".entity-truncate")).toEqual(
+      expect.arrayContaining(["display: inline-block", "max-width: 100%", "min-width: 0", "vertical-align: text-bottom", "white-space: nowrap"]),
     );
+    expect(declarations(".entity-truncate:not([data-podium])", ...painted(".entity-truncate"))).toEqual(
+      expect.arrayContaining(["overflow: hidden", "text-overflow: ellipsis"]),
+    );
+    expect(declarations(...painted(".entity-truncate"))).toContain("display: block");
+    expect(declarations(".entity-truncate")).not.toContain("overflow: hidden");
   });
 
   it("coupe à deux lignes le nom peint, pas le lien (`truncate={2}`, classement de l'accueil)", () => {
-    expect(block).toMatch(
-      /\n\.entity-clamp-2,\s*\.entity-clamp-2\[data-podium\] > \.podium-tier,\s*\.entity-clamp-2\[data-podium\] > \.podium-member \{[^}]*-webkit-line-clamp: 2;[^}]*overflow: hidden;/,
+    expect(declarations(".entity-clamp-2:not([data-podium])", ...painted(".entity-clamp-2"))).toEqual(
+      expect.arrayContaining(["display: -webkit-box", "-webkit-line-clamp: 2", "line-clamp: 2", "overflow: hidden"]),
     );
-    expect(block).toMatch(/\n\.entity-clamp-2\[data-podium\] \{\s*display: inline-block;\s*max-width: 100%;\s*vertical-align: top;\s*overflow: visible;\s*-webkit-line-clamp: none;\s*line-clamp: none;\s*\}/);
+    expect(declarations(".entity-clamp-2[data-podium]")).toEqual(expect.arrayContaining(["display: inline-block", "max-width: 100%"]));
+    expect(declarations(".entity-clamp-2")).toEqual(expect.arrayContaining(["min-width: 0", "overflow-wrap: anywhere"]));
     expect(readSource("components/cyber/landing/Leaderboard.tsx")).toMatch(/<TeamLink teamId=\{row\.teamId\} truncate=\{2\}/);
     expect(readSource("components/cyber/landing/Leaderboard.module.css")).not.toMatch(/line-clamp|data-podium/);
   });

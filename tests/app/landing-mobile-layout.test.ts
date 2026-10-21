@@ -122,7 +122,7 @@ describe("classement", () => {
     const name = blockFor(/\.team > :last-child\s*\{/, leaderboard);
     expect(name).toMatch(/min-width:\s*0\s*;/);
     expect(readSource("components/cyber/landing/Leaderboard.tsx")).toMatch(/<TeamLink teamId=\{row\.teamId\} truncate=\{2\}/);
-    const clamp = blockFor(/\.entity-clamp-2,[^{]*\{/, readSource("app/globals.css"));
+    const clamp = blockFor(/\.entity-clamp-2:not\(\[data-podium\]\),[^{]*\{/, readSource("app/globals.css"));
     expect(clamp).toMatch(/-webkit-line-clamp:\s*2\s*;/);
     expect(clamp).toMatch(/overflow:\s*hidden\s*;/);
     expect(clamp).not.toMatch(/white-space:\s*nowrap/);
