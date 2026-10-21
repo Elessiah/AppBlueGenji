@@ -279,9 +279,10 @@ describe("auth", () => {
         const inserts = sessionInserts(execute);
         expect(inserts).toHaveLength(1);
         expect(String(inserts[0][0]).replace(/\s+/g, " ")).toContain(
-          "(token_hash, user_id, expires_at, certify_prompt_due) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL ? DAY), 1)",
+          "(token_hash, user_id, expires_at, certify_prompt_due) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL ? DAY), COALESCE(( SELECT u.discord_verified_at IS NULL AND u.discord_certify_prompt_dismissed_at IS NULL FROM bg_users u WHERE u.id = ? ), 0))",
         );
-        expect(inserts[0][1]).toEqual([expect.stringMatching(/^[0-9a-f]{64}$/), 4, 30]);
+        // Marque posée seulement pour un compte non certifié, sans « Ne plus voir ».
+        expect(inserts[0][1]).toEqual([expect.stringMatching(/^[0-9a-f]{64}$/), 4, 30, 4]);
       });
     }
 

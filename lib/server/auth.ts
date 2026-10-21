@@ -159,10 +159,16 @@ async function insertSession(tokenHash: string, userId: number, certifyPromptDue
     return;
   }
   try {
+    // Marque posée seulement s'il y a quelque chose à proposer : un compte déjà
+    // certifié ou qui a choisi « Ne plus voir » ne paie, à sa première page,
+    // ni la lecture de `loadDiscordCertifyPrompt` ni l'écriture qui la lève.
     await db.execute(
       `INSERT INTO bg_user_sessions (token_hash, user_id, expires_at, certify_prompt_due)
-       VALUES (?, ?, DATE_ADD(NOW(), INTERVAL ? DAY), 1)`,
-      [tokenHash, userId, SESSION_TTL_DAYS],
+       VALUES (?, ?, DATE_ADD(NOW(), INTERVAL ? DAY), COALESCE((
+         SELECT u.discord_verified_at IS NULL AND u.discord_certify_prompt_dismissed_at IS NULL
+         FROM bg_users u WHERE u.id = ?
+       ), 0))`,
+      [tokenHash, userId, SESSION_TTL_DAYS, userId],
     );
   } catch (error) {
     if (!isUnknownColumnError(error)) throw error;

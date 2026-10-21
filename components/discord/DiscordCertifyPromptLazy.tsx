@@ -113,10 +113,9 @@ export function DiscordCertifyPromptLazy({ prompt, privacyPending, termsPending 
       termsPending: termsAccepted === null ? termsPending : !termsAccepted,
       pathname,
     });
-  // Le morceau ne part qu'au moment où la fenêtre peut s'ouvrir, puis reste.
-  useEffect(() => {
-    if (canOpen) setArmed(true);
-  }, [canOpen]);
+  // Le morceau ne part qu'au moment où la fenêtre peut s'ouvrir, puis reste
+  // (verrou posé au rendu : aucun second passage après l'ouverture).
+  if (canOpen && !armed) setArmed(true);
 
   if (certified || followedLink || !(armed || canOpen)) return null;
   const View = locale === "en" ? DiscordCertifyPromptEn : DiscordCertifyPromptFr;

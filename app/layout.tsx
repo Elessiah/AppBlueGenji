@@ -153,8 +153,7 @@ async function termsRequestFor(userId: number | undefined): Promise<TermsRequest
  * seulement ; une panne ne fait pas tomber la page, la question sera reposée
  * au chargement suivant.
  */
-async function loadCertifyPromptSafely(userId: number | undefined): Promise<CertifyPrompt | null> {
-  if (userId === undefined) return null;
+async function loadCertifyPromptSafely(userId: number): Promise<CertifyPrompt | null> {
   try {
     return await loadDiscordCertifyPrompt(userId, await currentTokenHash());
   } catch (error) {

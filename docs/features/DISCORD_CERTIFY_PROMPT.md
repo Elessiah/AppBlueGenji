@@ -19,7 +19,7 @@ sur « Certifier mon tag » certifie, par la route existante.
 
 | Condition | Où elle est tenue |
 | --- | --- |
-| Session ouverte par **Discord** (bouton OAuth, code en message privé) ou **Blizzard** — pas Google ni One Tap | `CERTIFY_PROMPT_DOORS` ; `createSession` pose `bg_user_sessions.certify_prompt_due = 1` |
+| Session ouverte par **Discord** (bouton OAuth, code en message privé) ou **Blizzard** — pas Google ni One Tap | `CERTIFY_PROMPT_DOORS` ; `createSession` pose `bg_user_sessions.certify_prompt_due = 1` — seulement pour un compte non certifié et sans « Ne plus voir » (sous-requête dans l'`INSERT`) : les autres n'en paient aucune lecture |
 | Une fois par connexion | la première réponse lève la marque (`markDiscordCertifyPromptSeen`) ; rien à proposer (déjà certifié, « Ne plus voir ») la lève aussi, à la première lecture — plus aucune requête ensuite |
 | Compte vivant, tag **non certifié**, pas de « Ne plus voir » | `loadDiscordCertifyPrompt`, une requête, toutes conditions dans le `WHERE` |
 | Après la confidentialité et les conditions, jamais par-dessus | `certifyPromptOpen` (`lib/shared/global-modals.ts`) ; la fenêtre suit `PRIVACY_CHANGES_ANSWERED_EVENT` et `TERMS_ACCEPTED_EVENT` (émis par `TermsAcceptanceModal`) et s'ouvre sans rechargement — sauf si la confidentialité s'est fermée sur un **lien d'action** (`privacyFollowedLink`) : l'écran visé n'est pas couvert, la proposition revient au chargement suivant |

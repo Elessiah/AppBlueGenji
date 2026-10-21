@@ -181,7 +181,7 @@ describe("mise en page racine", () => {
   it("chargée à la demande, seulement quand elle est due, chaque langue dans son morceau", () => {
     // …et seulement quand elle peut s'ouvrir (confidentialité, conditions, page), puis reste montée.
     expect(LAZY).toMatch(/const canOpen =\s*!followedLink &&\s*!certified &&\s*certifyPromptOpen\(/);
-    expect(LAZY).toMatch(/useEffect\(\(\) => \{\s*if \(canOpen\) setArmed\(true\);\s*\}, \[canOpen\]\);/);
+    expect(LAZY).toContain("if (canOpen && !armed) setArmed(true);");
     expect(LAZY.match(/\{ ssr: false \}/g)).toHaveLength(2);
     expect(LAZY.match(/orReload\(/g)).toHaveLength(2);
     // Une page française ne télécharge jamais l'anglais, ni l'inverse.
