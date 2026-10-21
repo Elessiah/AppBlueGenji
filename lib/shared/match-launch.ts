@@ -470,14 +470,15 @@ export type MatchLaunchInfo = {
 
 /**
  * Les contacts **du caster** sont-ils rendus à ce lecteur ? Le temps du match
- * (lancement ouvert, ou lancé), et à toute heure à un arbitre — rôle `REFEREE` :
- * un arbitre qui joue le match lit en joueur (décision de l'utilisateur,
- * 2026-10-21). Une seule règle, lue par le serveur (`exposesCaster`) et par la
+ * (lancement ouvert, ou lancé), et à un arbitre dès que les deux adversaires
+ * sont connus — rôle `REFEREE` : un arbitre qui joue le match lit en joueur
+ * (décision de l'utilisateur, 2026-10-21). Jamais hors phase (`NONE` : match
+ * terminé ou adversaire manquant), même si un appelant l'oubliait. Une seule règle, lue par le serveur (`exposesCaster`) et par la
  * modale « Contacts » (`casterContactsOpen`) : deux copies dériveraient, et la
  * fiche montrerait deux « — » ou une note à tort.
  */
 export function exposesCasterContacts(phase: MatchLaunchPhase, role: MatchLaunchViewerRole): boolean {
-  return phase === "LOBBY" || phase === "LAUNCHED" || role === "REFEREE";
+  return phase === "LOBBY" || phase === "LAUNCHED" || (phase !== "NONE" && role === "REFEREE");
 }
 
 /**

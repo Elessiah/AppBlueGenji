@@ -31,9 +31,11 @@ export const AUTOMOD_ALERT_SCOPE = "alerte AutoMod d'une telle annonce bloquée 
 
 /**
  * Contacts d'un match (registre T04) : exécution du service, que les
- * conditions d'utilisation prévoient (section « Contacts de match », version 5).
- * Les équipes les ont dès que les deux adversaires sont connus, le caster le
- * temps du match seulement (`match-launch-info.ts`).
+ * conditions d'utilisation prévoient (section « Contacts de match », version 6).
+ * Les équipes et les arbitres les ont dès que les deux adversaires sont connus,
+ * le caster le temps du match seulement ; ceux du caster, les équipes le temps
+ * du match et les arbitres dès que les adversaires sont connus
+ * (`match-launch-info.ts`, `exposesCasterContacts`).
  */
 export const MATCH_CONTACTS_SCOPE =
   "présentation, dans la fenêtre « Contacts » du match et dans sa fenêtre de lancement, aux membres de ses deux équipes et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, et à son caster le temps du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes et au caster) ; les contacts du caster aux deux équipes le temps du match, et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin (conditions d'utilisation, « Contacts de match »)";
