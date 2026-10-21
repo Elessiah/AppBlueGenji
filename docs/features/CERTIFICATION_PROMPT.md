@@ -28,13 +28,17 @@ prend ses variantes « Discord seul » (titre, motif d'équipe, ligne
 La modale ne s'ouvre **jamais par-dessus une autre** (`aria-modal` présent :
 lancement de match, changements de confidentialité…) — deux pièges à focus se
 disputeraient Tab et Échap. Elle attend sa fermeture, guettée par un
-observateur du DOM (`watchModalsClosed`, sans minuterie : l'économie d'énergie
-ne la bloque pas) ; la décision pure est `certificationPromptStep`. Décidée,
+observateur du DOM (`watchModalsClosed`, relectures espacées de 250 ms, sans
+minuterie de fond : l'économie d'énergie ne la bloque pas) ; la décision pure est `certificationPromptStep`. Décidée,
 sa **place est tenue dans le DOM** pendant le chargement de son morceau (le
 `loading` de son `dynamic()` rend un `data-modal-pending`) : le centre de
-lancement, qui attend toute modale ouverte (`anotherModalOpen`,
-`lib/shared/dialog-focus.ts`), ne s'ouvre pas en même temps. Une invitation
-retirée par le serveur (certification faite entre-temps) ferme la modale.
+lancement ne s'ouvre pas en même temps qu'elle par accident. Mais elle **cède
+sa place** (`data-modal-yields`, `anotherModalOpen(…, { overYielding: true })`,
+`lib/shared/dialog-focus.ts`) : l'annonce d'un match qui se lance, urgente,
+passe par-dessus, et l'invitation se ferme alors comme sur « Plus tard » (la
+modale recouverte ne reprend pas le focus à celle du dessus,
+`useDialogBehavior`). Une invitation retirée par le serveur (certification
+faite entre-temps) ferme la modale, une fiche figée aussi.
 
 En **Marvel Rivals**, les lignes qui parlent de Blizzard ou de Battle.net
 (identité, « ensuite ») prennent leur variante `…DiscordOnly`. Le tableau est

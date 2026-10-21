@@ -7,7 +7,7 @@ import {
   shouldOpenCertificationPrompt,
   type CertificationPrompt,
 } from "@/lib/shared/certification-prompt";
-import { anotherModalOpen, watchModalsClosed } from "@/lib/shared/dialog-focus";
+import { anotherModalOpen, watchModals, watchModalsClosed } from "@/lib/shared/dialog-focus";
 
 /** Un stockage du navigateur, `null` s'il est inaccessible (accès refusé, rendu serveur). */
 function browserStorage(kind: "localStorage" | "sessionStorage"): Storage | null {
@@ -28,7 +28,9 @@ function browserStorage(kind: "localStorage" | "sessionStorage"): Storage | null
  * confidentialité…) : elle attend sa fermeture, guettée par un observateur du
  * DOM (sans minuterie, économie d'énergie comprise). Décidée, sa place est
  * tenue dans le DOM pendant le chargement de son morceau (`data-modal-pending`,
- * `TournamentSheet`) : le centre de lancement ne s'ouvre pas en même temps.
+ * `TournamentSheet`). Elle **cède sa place** (`data-modal-yields`) : une
+ * modale urgente — le lancement d'un match — passe par-dessus, et
+ * l'invitation se ferme alors comme sur « Plus tard ».
  *
  * Renvoie l'invitation à afficher (`null` : rien) et la fermeture. Une
  * invitation retirée par le serveur (certifiée entre-temps) ferme la modale ;
@@ -65,5 +67,12 @@ export function useCertificationPrompt(prompt: CertificationPrompt | null | unde
     setOpen(false);
   }, []);
 
-  return { prompt: open ? (prompt ?? null) : null, close };
+  // Une modale urgente s'ouvre par-dessus (lancement d'un match) : place nette.
+  useEffect(() => {
+    if (!open) return;
+    return watchModals(() => anotherModalOpen(document, { overYielding: true }), () => close(false));
+  }, [open, close]);
+
+  // Fiche figée (erreur fatale, tournoi supprimé) : plus rien ne s'affiche.
+  return { prompt: open && !frozen ? (prompt ?? null) : null, close };
 }

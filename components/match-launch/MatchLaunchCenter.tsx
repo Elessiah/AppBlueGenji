@@ -194,11 +194,15 @@ export function MatchLaunchCenter({
       (info) => wantsAutoOpen(info, now) && !dismissedRef.current?.has(launchModalKey(info)),
     );
     if (!next) return;
-    // Jamais par-dessus une autre modale (« Contacts », score, invitation à
-    // certifier…) : deux pièges de focus se disputeraient Tab et Échap.
-    // L'annonce attend sa fermeture, guettée par un observateur du DOM — sans
-    // minuterie, donc aussi en économie d'énergie.
-    if (anotherModalOpen()) return watchModalsClosed(() => setModalRecheck((n) => n + 1));
+    // Jamais par-dessus une autre modale (« Contacts », score…) : deux pièges
+    // de focus se disputeraient Tab et Échap. L'annonce attend sa fermeture,
+    // guettée par un observateur du DOM — sans minuterie de fond, donc aussi
+    // en économie d'énergie. Une modale qui cède sa place (invitation à
+    // certifier, `data-modal-yields`) ne la retient pas : elle se ferme.
+    const urgent = { overYielding: true };
+    if (anotherModalOpen(document, urgent)) {
+      return watchModalsClosed(() => setModalRecheck((n) => n + 1), undefined, urgent);
+    }
     setConfirming(false);
     setOpenMatchId(next.matchId);
   }, [launches, current, waiting, modalRecheck]);

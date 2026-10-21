@@ -179,8 +179,8 @@ describe("modale « Contacts »", () => {
   });
 
   it("la modale de lancement ne s'ouvre pas d'office par-dessus une autre modale", () => {
-    const withModal = { querySelector: () => ({}) } as unknown as ParentNode;
-    const withoutModal = { querySelector: () => null } as unknown as ParentNode;
+    const withModal = { querySelectorAll: () => [{}] } as unknown as ParentNode;
+    const withoutModal = { querySelectorAll: () => [] } as unknown as ParentNode;
     expect(anotherModalOpen(withModal)).toBe(true);
     expect(anotherModalOpen(withoutModal)).toBe(false);
     // …et « Contacts » relance la lecture à sa fermeture.

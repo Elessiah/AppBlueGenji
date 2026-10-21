@@ -50,7 +50,11 @@ ne soit ouverte (`anotherModalOpen`, `lib/shared/dialog-focus.ts`) : centre de
 lancement, invitation à certifier. Chargée à la demande, sa place est tenue
 dès sa décision par le `loading` de son `dynamic()` (`<span data-modal-pending
 hidden />`, compté par `anotherModalOpen`) ; pour attendre sans minuterie,
-`watchModalsClosed`.
+`watchModalsClosed` (observateur du DOM, relectures espacées de 250 ms). Une
+modale sans urgence porte `data-modal-yields` : une ouverture urgente
+(`overYielding`) passe par-dessus et elle se ferme. Une modale **recouverte**
+qui se ferme ne rend pas le focus à son déclencheur (seule celle du dessus le
+fait).
 
 Jamais l'attribut `autoFocus` (Sonar S9379). Un champ qui n'apparaît qu'après
 un geste — éditeur en ligne ouvert par « Modifier », onglet d'une modale déjà

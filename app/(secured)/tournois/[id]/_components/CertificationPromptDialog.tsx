@@ -63,7 +63,9 @@ export function CertificationPromptDialog({ prompt, onClose }: Readonly<Certific
     >
       {/* Focus d'ouverture sur le titre : la modale se lit avant d'agir, et ses
           contrôles, tout en bas, l'ouvriraient défilée sur un petit écran. */}
-      <h3 id="certification-prompt-title" className={s.title} tabIndex={-1} data-autofocus>
+      {/* `data-modal-yields` : une modale urgente (lancement d'un match) passe
+          par-dessus, et celle-ci se ferme (`useCertificationPrompt`). */}
+      <h3 id="certification-prompt-title" className={s.title} tabIndex={-1} data-autofocus data-modal-yields>
         {t(withBattletag ? "certification.title" : "certification.titleDiscordOnly")}
       </h3>
       <p id="certification-prompt-lead" className={s.lead}>

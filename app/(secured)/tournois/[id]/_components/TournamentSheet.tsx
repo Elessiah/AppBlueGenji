@@ -86,8 +86,9 @@ const IssueReportDialog = dynamic(() => orReload(import("./IssueReportDialog").t
 const DeleteTournamentDialog = dynamic(() => orReload(import("./DeleteTournamentDialog").then((m) => m.DeleteTournamentDialog)), { ssr: false });
 const RollbackRoundDialog = dynamic(() => orReload(import("./RollbackRoundDialog").then((m) => m.RollbackRoundDialog)), { ssr: false });
 const EndurancePenaltyDialog = dynamic(() => orReload(import("./EndurancePenaltyDialog").then((m) => m.EndurancePenaltyDialog)), { ssr: false });
-// Ouverte d'office : sa place est tenue pendant le chargement (`anotherModalOpen`).
-const CertificationPromptDialog = dynamic(() => orReload(import("./CertificationPromptDialog").then((m) => m.CertificationPromptDialog)), { ssr: false, loading: () => <span data-modal-pending hidden /> });
+// Ouverte d'office : sa place est tenue pendant le chargement (`anotherModalOpen`),
+// et cédée à une modale urgente (`data-modal-yields`).
+const CertificationPromptDialog = dynamic(() => orReload(import("./CertificationPromptDialog").then((m) => m.CertificationPromptDialog)), { ssr: false, loading: () => <span data-modal-pending data-modal-yields hidden /> });
 const AdvanceTournamentDialog = dynamic(() => orReload(import("./AdvanceTournamentDialog").then((m) => m.AdvanceTournamentDialog)), { ssr: false });
 const TournamentImageDialog = dynamic(() => orReload(import("./TournamentImageDialog").then((m) => m.TournamentImageDialog)), { ssr: false });
 const ConfirmActionDialog = dynamic(() => orReload(import("@/components/ui/confirm-action-dialog").then((m) => m.ConfirmActionDialog)), { ssr: false });

@@ -89,23 +89,68 @@ function layerEdgeTarget<T>(extra: readonly T[], active: unknown, shiftKey: bool
  */
 export const OPEN_MODAL_SELECTOR = '[aria-modal="true"], [data-modal-pending]';
 
-/** Une modale est déjà ouverte (ou en chargement) : une ouverture d'office attend. */
-export function anotherModalOpen(root: ParentNode = document): boolean {
-  return root.querySelector(OPEN_MODAL_SELECTOR) !== null;
-}
+/**
+ * Marque d'une modale **qui cède sa place** : une invitation sans urgence
+ * (`CertificationPromptDialog`). Posée sur la modale ou l'un de ses
+ * descendants ; une ouverture urgente (lancement de match) passe par-dessus,
+ * et l'invitation se ferme d'elle-même.
+ */
+export const YIELDING_MODAL_ATTR = "data-modal-yields";
+
+/** Ce que la recherche d'une modale lit du DOM. */
+type ModalRoot = Pick<ParentNode, "querySelectorAll">;
 
 /**
- * Prévient (une fois) quand plus aucune modale n'est ouverte, sans minuterie :
- * un observateur du DOM, actif le temps de l'attente seulement. Ses rappels
- * sont groupés par le navigateur (un par rendu, pas un par nœud) et ne font
- * qu'une recherche par attribut. Renvoie l'arrêt.
+ * Une modale est déjà ouverte (ou en chargement) : une ouverture d'office
+ * attend. `overYielding` : ne compter que les modales qui ne cèdent pas leur
+ * place — la question d'une ouverture urgente.
  */
-export function watchModalsClosed(onClosed: () => void, root: Node = document.body): () => void {
-  const observer = new MutationObserver(() => {
-    if (anotherModalOpen()) return;
+export function anotherModalOpen(root: ModalRoot = document, { overYielding = false } = {}): boolean {
+  const open = Array.from(root.querySelectorAll(OPEN_MODAL_SELECTOR));
+  if (!overYielding) return open.length > 0;
+  return open.some((el) => !el.hasAttribute(YIELDING_MODAL_ATTR) && el.querySelector(`[${YIELDING_MODAL_ATTR}]`) === null);
+}
+
+/** Délai minimal entre deux relectures d'un guet : un plateau en direct mute sans cesse. */
+const WATCH_THROTTLE_MS = 250;
+
+/**
+ * Prévient (une fois) dès que `condition` est vraie — tout de suite si elle
+ * l'est déjà —, sans minuterie de fond : un observateur du DOM, actif le temps
+ * du guet seulement, ses relectures espacées d'au moins `WATCH_THROTTLE_MS`.
+ * Renvoie l'arrêt.
+ */
+export function watchModals(condition: () => boolean, onMet: () => void, root: Node = document.body): () => void {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let stopped = false;
+  const stop = () => {
+    stopped = true;
     observer.disconnect();
-    onClosed();
+    if (timer !== null) clearTimeout(timer);
+  };
+  const check = () => {
+    timer = null;
+    if (stopped || !condition()) return;
+    stop();
+    onMet();
+  };
+  const observer = new MutationObserver(() => {
+    timer ??= setTimeout(check, WATCH_THROTTLE_MS);
   });
-  observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-modal", "data-modal-pending"] });
-  return () => observer.disconnect();
+  if (condition()) {
+    onMet();
+    return () => undefined;
+  }
+  observer.observe(root, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["aria-modal", "data-modal-pending"],
+  });
+  return stop;
+}
+
+/** Prévient (une fois) quand plus aucune modale n'est ouverte (`watchModals`). */
+export function watchModalsClosed(onClosed: () => void, root?: Node, options: { overYielding?: boolean } = {}): () => void {
+  return watchModals(() => !anotherModalOpen(document, options), onClosed, root);
 }

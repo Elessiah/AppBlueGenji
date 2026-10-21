@@ -156,9 +156,13 @@ export function useDialogBehavior({ open, onClose, locked = false }: DialogBehav
     window.addEventListener("keydown", onKeyDown, true);
     return () => {
       window.removeEventListener("keydown", onKeyDown, true);
-      dialogStack.pop(token);
       // Retour au déclencheur : sans ça, le focus repart en tête de document.
-      previouslyFocused?.focus?.();
+      // Seulement pour la modale du dessus : une modale recouverte qui se ferme
+      // (invitation qui cède sa place au lancement d'un match) ne doit pas
+      // arracher le focus à celle qui la couvre.
+      const wasTop = dialogStack.isTop(token);
+      dialogStack.pop(token);
+      if (wasTop) previouslyFocused?.focus?.();
     };
   }, [open]);
 

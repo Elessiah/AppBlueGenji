@@ -1,9 +1,10 @@
-import { afterEach, describe, expect, it } from "@jest/globals";
+import { afterEach, describe, expect, it, jest } from "@jest/globals";
 
 import {
   anotherModalOpen,
   escapeBelongsElsewhere,
   focusTrapTarget,
+  watchModals,
   watchModalsClosed,
   type FocusTrapState,
 } from "@/lib/shared/dialog-focus";
@@ -79,42 +80,58 @@ describe("focusTrapTarget", () => {
   });
 });
 
-const withModal = { querySelector: () => ({}) } as unknown as ParentNode;
-const withoutModal = { querySelector: () => null } as unknown as ParentNode;
+/** Élément de modale simulé : `yields` = elle cède sa place (`data-modal-yields`). */
+function modal(yields: "self" | "child" | false = false) {
+  return {
+    hasAttribute: (name: string) => yields === "self" && name === "data-modal-yields",
+    querySelector: () => (yields === "child" ? {} : null),
+  };
+}
+const rootWith = (...modals: unknown[]) =>
+  ({ querySelectorAll: () => modals }) as unknown as Pick<ParentNode, "querySelectorAll">;
 
-describe("anotherModalOpen et réservation d'une ouverture d'office", () => {
-  it("lit une modale `aria-modal` du DOM", () => {
-    expect(anotherModalOpen(withModal)).toBe(true);
-    expect(anotherModalOpen(withoutModal)).toBe(false);
+describe("anotherModalOpen", () => {
+  it("lit une modale `aria-modal` ou en chargement", () => {
+    expect(anotherModalOpen(rootWith(modal()))).toBe(true);
+    expect(anotherModalOpen(rootWith())).toBe(false);
   });
 
   it("cherche aussi la place d'une modale en chargement", () => {
     const seen: string[] = [];
     const root = {
-      querySelector: (selector: string) => {
+      querySelectorAll: (selector: string) => {
         seen.push(selector);
-        return null;
+        return [];
       },
     } as unknown as ParentNode;
     anotherModalOpen(root);
     expect(seen[0]).toContain("[data-modal-pending]");
   });
+
+  it("une ouverture urgente passe une modale qui cède sa place, pas les autres", () => {
+    expect(anotherModalOpen(rootWith(modal("child")), { overYielding: true })).toBe(false);
+    expect(anotherModalOpen(rootWith(modal("self")), { overYielding: true })).toBe(false);
+    expect(anotherModalOpen(rootWith(modal("child"), modal()), { overYielding: true })).toBe(true);
+    // Sans l'option, toute modale retient.
+    expect(anotherModalOpen(rootWith(modal("child")))).toBe(true);
+  });
 });
 
-describe("watchModalsClosed", () => {
+describe("watchModals / watchModalsClosed", () => {
   const globals = globalThis as unknown as { document?: unknown; MutationObserver?: unknown };
   const saved = { document: globals.document, MutationObserver: globals.MutationObserver };
 
   afterEach(() => {
     globals.document = saved.document;
     globals.MutationObserver = saved.MutationObserver;
+    jest.useRealTimers();
   });
 
   /** DOM et observateur simulés : `mutate()` joue une mutation. */
-  function fakeDom() {
-    const state = { modal: true, disconnected: 0, observed: null as unknown };
+  function fakeDom(initiallyOpen = true) {
+    const state = { modal: initiallyOpen, disconnected: 0, observed: null as unknown };
     let callback: (() => void) | null = null;
-    globals.document = { querySelector: () => (state.modal ? {} : null) };
+    globals.document = { querySelectorAll: () => (state.modal ? [modal()] : []) };
     globals.MutationObserver = class {
       constructor(cb: () => void) {
         callback = cb;
@@ -129,23 +146,42 @@ describe("watchModalsClosed", () => {
     return { state, mutate: () => callback?.() };
   }
 
-  it("prévient une fois la dernière modale fermée, puis se débranche", () => {
+  it("prévient une fois la dernière modale fermée, relectures espacées, puis se débranche", () => {
+    jest.useFakeTimers();
     const { state, mutate } = fakeDom();
     const calls: number[] = [];
     watchModalsClosed(() => calls.push(1), {} as Node);
     expect(state.observed).toEqual(expect.objectContaining({ childList: true, subtree: true }));
     mutate();
+    jest.advanceTimersByTime(300);
     expect(calls).toHaveLength(0);
     state.modal = false;
     mutate();
+    mutate();
+    expect(calls).toHaveLength(0);
+    jest.advanceTimersByTime(300);
     expect(calls).toHaveLength(1);
     expect(state.disconnected).toBe(1);
   });
 
-  it("l'arrêt débranche l'observateur", () => {
-    const { state } = fakeDom();
-    const stop = watchModalsClosed(() => undefined, {} as Node);
+  it("prévient aussitôt si la condition tient déjà, sans observer", () => {
+    const { state } = fakeDom(false);
+    const calls: number[] = [];
+    watchModalsClosed(() => calls.push(1), {} as Node);
+    expect(calls).toHaveLength(1);
+    expect(state.observed).toBeNull();
+  });
+
+  it("l'arrêt débranche l'observateur et annule la relecture prévue", () => {
+    jest.useFakeTimers();
+    const { state, mutate } = fakeDom();
+    const calls: number[] = [];
+    const stop = watchModals(() => !state.modal, () => calls.push(1), {} as Node);
+    state.modal = false;
+    mutate();
     stop();
+    jest.advanceTimersByTime(300);
+    expect(calls).toHaveLength(0);
     expect(state.disconnected).toBe(1);
   });
 });

@@ -51,8 +51,8 @@ describe("CertificationPromptDialog", () => {
     expect(html).toContain("Ne plus voir");
   });
 
-  it("le titre prend le focus d'ouverture", () => {
-    expect(render(OW_MANAGER)).toMatch(/<h3[^>]*tabindex="-1"[^>]*data-autofocus/);
+  it("le titre prend le focus d'ouverture, et la modale cède sa place à une urgente", () => {
+    expect(render(OW_MANAGER)).toMatch(/<h3[^>]*tabindex="-1"[^>]*data-autofocus[^>]*data-modal-yields/);
   });
 
   it("Marvel Rivals : Discord seul, sans BattleTag ni Blizzard", () => {

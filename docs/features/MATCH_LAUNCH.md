@@ -168,8 +168,8 @@ gestes d'arbitrage (`PRIMARY_ORDER`). Noms cliquables **dans cette modale
 seulement** (`linkNames`) : équipe par `TeamLink`, entrée solo par `PlayerLink`
 (son unique contact), contacts et caster par `PlayerLink` ; la modale de
 lancement, qui survit à la navigation, garde des noms simples. Elle **ne s'ouvre
-pas d'office par-dessus** une autre modale (`anotherModalOpen`, invitation à
-certifier en chargement comprise) : elle guette sa fermeture par un observateur
+pas d'office par-dessus** une autre modale (`anotherModalOpen`), sauf une qui
+cède sa place (l'invitation à certifier, qui se ferme) : elle guette sa fermeture par un observateur
 du DOM (`watchModalsClosed`, sans minuterie — économie d'énergie comprise), et
 « Contacts » demande en plus une relève à sa fermeture. Option éteinte, les
 avertissements de la planification par l'arbitrage ont leur variante sans
