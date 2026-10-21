@@ -285,8 +285,8 @@ describe("textes (certifyPrompt) — FR et EN", () => {
   });
 
   it("arbitres : engagé dans un tournoi, ou caster d'un match dès que ses adversaires sont connus (CASTER-CONTACTS-REFEREES)", () => {
-    expect(fr.rows.referees.with).toMatch(/pour un match que tu castes, dès que ses adversaires sont connus/);
-    expect(en.rows.referees.with).toMatch(/for a match you cast, from when its opponents are known/);
+    expect(fr.rows.referees.with).toMatch(/pour un match que tu castes, dès que ses adversaires sont connus et jusqu'à sa fin/);
+    expect(en.rows.referees.with).toMatch(/for a match you cast, from when its opponents are known until it ends/);
   });
 
   it("compte sans tag : propose de l'ajouter, sans parler d'un tag existant", () => {

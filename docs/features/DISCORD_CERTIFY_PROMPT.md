@@ -136,7 +136,7 @@ certification reste offerte dans « Mon profil », que la fenêtre nomme.
 « Ce que change la certification », sans / avec, tiré de `canViewDiscordTag`,
 `canSeeDiscordVerification` et de la portée `certified` des messages de match
 (`lib/server/notify.ts`), en deux groupes (`CERTIFY_PROMPT_GROUPS`). « Qui voit
-ton tag » : administrateurs (toujours), arbitres (tournoi en cours ou à venir ; pour un match que l'on caste, dès que ses adversaires sont connus),
+ton tag » : administrateurs (toujours), arbitres (tournoi en cours ou à venir ; pour un match que l'on caste, dès que ses adversaires sont connus et jusqu'à sa fin),
 ton match (dès que les adversaires sont connus, caster le temps du match),
 autres joueurs (case « Tag Discord »), visiteurs (jamais). « Autres effets » :
 pastille sur la fiche (joueurs connectés), messages privés de match (sauf
