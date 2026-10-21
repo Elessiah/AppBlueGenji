@@ -213,12 +213,15 @@ describe("mise en page racine", () => {
     expect(GATE).toContain("export const RECHECK_AFTER_MS = 30_000;");
     expect(GATE).toContain("if (!canOpen && confirmed) setConfirmed(false);");
     expect(GATE).toMatch(/if \(!canOpen \|\| confirmed \|\| revoked \|\| answered\.current\) return;\s*if \(Date\.now\(\) - readAt\.current < RECHECK_AFTER_MS\) \{\s*setConfirmed\(true\);\s*return;\s*\}\s*const abort = new AbortController\(\);/);
-    expect(GATE).toMatch(/if \(result !== "UNKNOWN" && result\.prompt\) \{\s*readAt\.current = Date\.now\(\);\s*setCurrent\(result\.prompt\);\s*setConfirmed\(true\);\s*\} else \{\s*setRevoked\(true\);/);
+    expect(GATE).toMatch(/if \(result === "UNKNOWN"\) \{\s*setRevoked\("doubt"\);\s*\} else if \(result\.prompt\) \{\s*readAt\.current = Date\.now\(\);\s*setCurrent\(result\.prompt\);\s*setConfirmed\(true\);\s*\} else \{\s*setRevoked\("decided"\);/);
+    // Seule une lecture faite quand la fenêtre pouvait s'ouvrir dès le chargement vaut sans relecture.
+    expect(LAZY).toContain("const [openAtLoad] = useState(canOpen);");
+    expect(LAZY).toContain("loadedAt={openAtLoad ? loadedAt : 0}");
     expect(GATE).toContain("return () => abort.abort();");
     // Une proposition fraîche de la mise en page (router.refresh) annule la relecture en cours et la rouvre.
     expect(GATE).toContain("}, [canOpen, confirmed, revoked, layoutPrompt, answered]);");
-    expect(GATE).toMatch(/if \(prompt !== layoutPrompt\) \{\s*\/\/[^\n]*\n\s*setLayoutPrompt\(prompt\);\s*setCurrent\(prompt\);\s*setRevoked\(false\);\s*setConfirmed\(canOpen\);/);
-    expect(GATE).toContain("const shown = canOpen && confirmed && !revoked;");
+    expect(GATE).toMatch(/if \(prompt !== layoutPrompt\) \{\s*\/\/[^\n]*\n\s*setLayoutPrompt\(prompt\);\s*setCurrent\(prompt\);\s*if \(revoked !== "decided"\) \{\s*setRevoked\(null\);\s*setConfirmed\(canOpen\);/);
+    expect(GATE).toContain("const shown = canOpen && confirmed && revoked === null;");
     expect(GATE).toContain("<DiscordCertifyPrompt prompt={current} canOpen={shown}");
   });
 
@@ -229,13 +232,13 @@ describe("mise en page racine", () => {
     // Un doute (réseau pas revenu) est retenté une fois, au retour du réseau ou du focus.
     expect(GATE).toContain('window.addEventListener("online", onRetry);');
     expect(GATE).toContain('window.addEventListener("focus", onRetry);');
-    expect(GATE).toMatch(/if \(result === "UNKNOWN"\) \{\s*retry = !retrying;\s*return;\s*\}\s*readAt\.current = Date\.now\(\);\s*if \(result\.prompt\) setCurrent\(result\.prompt\);\s*else setRevoked\(true\);/);
+    expect(GATE).toMatch(/if \(result === "UNKNOWN"\) \{\s*retry = !retrying;\s*return;\s*\}\s*readAt\.current = Date\.now\(\);\s*if \(result\.prompt\) setCurrent\(result\.prompt\);\s*else setRevoked\("decided"\);/);
     expect(GATE).toContain("abort?.abort();");
     expect(GATE).not.toMatch(/setInterval|setTimeout/);
   });
 
   it("une réponse d'un autre onglet la ferme ; répondue ici, le morceau se démonte (écoutes fermées)", () => {
-    expect(GATE).toMatch(/if \(revoked\) return;\s*return onCertifyPromptAnsweredElsewhere\(onAnswered\);/);
+    expect(GATE).toMatch(/if \(revoked === "decided"\) return;\s*return onCertifyPromptAnsweredElsewhere\(onAnswered\);/);
     expect(LAZY).toMatch(/const markAnswered = useCallback\(\(\) => \{\s*answered\.current = true;\s*setDone\(true\);/);
     expect(ANSWER).toContain("channel.close();");
   });

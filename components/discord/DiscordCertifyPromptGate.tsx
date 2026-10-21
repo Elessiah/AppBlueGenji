@@ -25,7 +25,11 @@ export type DiscordCertifyPromptGateProps = {
   answered: { readonly current: boolean };
   /** Répondue ici ou dans un autre onglet : le relais démonte le morceau. */
   onAnswered: () => void;
-  /** Instant de la lecture de la mise en page au chargement (`Date.now()`). */
+  /**
+   * Instant de la lecture de la mise en page **si** la fenêtre a pu s'ouvrir
+   * dès le chargement, `0` sinon : avant le morceau, aucun canal n'écoute les
+   * autres onglets, une lecture d'avant ne vaut donc rien.
+   */
   loadedAt: number;
   text: CertifyPromptText;
 };
@@ -54,8 +58,12 @@ export function DiscordCertifyPromptGate({
   text,
 }: Readonly<DiscordCertifyPromptGateProps>) {
   const [current, setCurrent] = useState(prompt);
-  /** Plus due (relecture tranchée, ou doute avant l'ouverture). */
-  const [revoked, setRevoked] = useState(false);
+  /**
+   * Plus due : `"decided"` (relecture tranchée — jamais rouverte sur ce
+   * chargement) ou `"doubt"` (panne avant l'ouverture — une proposition
+   * fraîche de la mise en page la rouvre).
+   */
+  const [revoked, setRevoked] = useState<"decided" | "doubt" | null>(null);
   /** Proposition confirmée pour l'ouverture en cours ; perdue dès qu'elle ne peut plus s'ouvrir. */
   const [confirmed, setConfirmed] = useState(false);
   const [layoutPrompt, setLayoutPrompt] = useState(prompt);
@@ -63,8 +71,10 @@ export function DiscordCertifyPromptGate({
     // Relue par la mise en page (`router.refresh()`) : encore due, fraîchement.
     setLayoutPrompt(prompt);
     setCurrent(prompt);
-    setRevoked(false);
-    setConfirmed(canOpen);
+    if (revoked !== "decided") {
+      setRevoked(null);
+      setConfirmed(canOpen);
+    }
   }
   if (!canOpen && confirmed) setConfirmed(false);
 
@@ -82,7 +92,7 @@ export function DiscordCertifyPromptGate({
   }, [layoutPrompt]);
 
   useEffect(() => {
-    if (revoked) return;
+    if (revoked === "decided") return;
     return onCertifyPromptAnsweredElsewhere(onAnswered);
   }, [revoked, onAnswered]);
 
@@ -97,18 +107,20 @@ export function DiscordCertifyPromptGate({
     triedAt.current = Date.now();
     recheckCertifyPrompt(abort.signal).then((result) => {
       if (abort.signal.aborted) return;
-      if (result !== "UNKNOWN" && result.prompt) {
+      if (result === "UNKNOWN") {
+        setRevoked("doubt");
+      } else if (result.prompt) {
         readAt.current = Date.now();
         setCurrent(result.prompt);
         setConfirmed(true);
       } else {
-        setRevoked(true);
+        setRevoked("decided");
       }
     });
     return () => abort.abort();
   }, [canOpen, confirmed, revoked, layoutPrompt, answered]);
 
-  const shown = canOpen && confirmed && !revoked;
+  const shown = canOpen && confirmed && revoked === null;
   // Affichée : relue au retour de l'onglet (cache avant/arrière compris), que
   // le choix fait ailleurs entre-temps la ferme. Seule une réponse tranchée la
   // ferme : un réseau pas encore revenu (téléphone déverrouillé) ne l'escamote
@@ -132,7 +144,7 @@ export function DiscordCertifyPromptGate({
           }
           readAt.current = Date.now();
           if (result.prompt) setCurrent(result.prompt);
-          else setRevoked(true);
+          else setRevoked("decided");
         })
         .finally(() => {
           if (abort === request) abort = null;
@@ -159,6 +171,6 @@ export function DiscordCertifyPromptGate({
     };
   }, [shown, answered]);
 
-  if (revoked) return null;
+  if (revoked !== null) return null;
   return <DiscordCertifyPrompt prompt={current} canOpen={shown} onProfile={onProfile} onAnswered={onAnswered} text={text} />;
 }

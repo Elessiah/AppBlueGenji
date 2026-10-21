@@ -127,6 +127,11 @@ export function DiscordCertifyPromptLazy({ prompt, privacyPending, termsPending 
       termsPending: termsAccepted === null ? termsPending : !termsAccepted,
       pathname,
     });
+  /**
+   * Ouvrable dès le chargement ? Seule cette lecture-là vaut sans relecture :
+   * une fenêtre armée plus tard n'a écouté aucun autre onglet entre-temps.
+   */
+  const [openAtLoad] = useState(canOpen);
   // Le morceau part dès que la fenêtre peut s'ouvrir, puis reste (verrou posé au rendu).
   if (canOpen && !armed) setArmed(true);
 
@@ -139,7 +144,7 @@ export function DiscordCertifyPromptLazy({ prompt, privacyPending, termsPending 
       onProfile={pathname === "/profil"}
       answered={answered}
       onAnswered={markAnswered}
-      loadedAt={loadedAt}
+      loadedAt={openAtLoad ? loadedAt : 0}
     />
   );
 }
