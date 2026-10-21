@@ -432,8 +432,11 @@ a {
 }
 
 .badge {
+  /* Rembourrage relayé : un lien posé dans la pastille le reprend pour couvrir
+     toute sa surface (équipe active de la fiche joueur, `PODIUM_TIERS.md`). */
+  --badge-padding: 4px 12px;
   display: inline-block;
-  padding: 4px 12px;
+  padding: var(--badge-padding);
   border-radius: 999px;
   border: 1px solid rgba(89, 212, 255, 0.35);
   background: rgba(89, 212, 255, 0.1);
