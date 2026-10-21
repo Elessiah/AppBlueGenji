@@ -3,7 +3,7 @@
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { PodiumPaint, useMemberPodiumTier, useTeamPodiumTier } from "@/components/podium-tiers";
 import { useSpectatorView } from "@/components/spectator-view";
-import { joinClasses } from "@/lib/shared/class-names";
+import { entityTruncateClass, joinClasses } from "@/lib/shared/class-names";
 import { podiumTierClass, podiumTierFamily, type PodiumTier, type PodiumTierKind } from "@/lib/shared/podium-tiers";
 import type { CSSProperties, ReactNode } from "react";
 
@@ -75,12 +75,6 @@ function linkPodium(override: PodiumTier | null | undefined, fromContext: Podium
   return toPodium(override === undefined ? fromContext : override, kind);
 }
 
-/** Classe de troncature d'un nom (`truncate`) : partagée avec les noms non cliquables (`EntrantName`). */
-export function truncateClass(truncate: boolean | 2): string | false {
-  if (truncate === 2) return "entity-clamp-2";
-  return truncate && "entity-truncate";
-}
-
 export function EntityLink({
   href,
   children,
@@ -94,7 +88,7 @@ export function EntityLink({
   // Repère posé sur le lien, lu par la feuille sans `:has()` : la famille de la
   // marche peinte dedans (`podium-tier` / `podium-member`).
   const marks = { "data-podium": podium && podiumTierFamily(podium.kind) };
-  const extra = joinClasses(truncateClass(truncate), className);
+  const extra = joinClasses(entityTruncateClass(truncate), className);
   if (spectator) {
     // Pas d'`aria-label` sur un `<span>` sans rôle (`aria-prohibited-attr`) :
     // le nom affiché suffit, il n'annonce plus de destination.

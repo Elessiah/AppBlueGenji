@@ -277,7 +277,9 @@ a {
 }
 
 .entity-clamp-2[data-podium] {
-  display: block;
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: top;
   overflow: visible;
   -webkit-line-clamp: none;
   line-clamp: none;

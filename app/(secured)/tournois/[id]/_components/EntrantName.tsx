@@ -3,8 +3,7 @@
 import Image from "next/image";
 import type { CSSProperties, ReactNode } from "react";
 import { avatarInitial } from "@/lib/shared/avatar";
-import { joinClasses } from "@/lib/shared/class-names";
-import { truncateClass } from "@/components/entity-link";
+import { entityTruncateClass, joinClasses } from "@/lib/shared/class-names";
 import { EntrantLink, useEntrantLogo } from "../_lib/entrant-link";
 import styles from "./EntrantName.module.css";
 
@@ -111,7 +110,7 @@ export function EntrantName({
           {content}
         </EntrantLink>
       ) : (
-        <span className={joinClasses(textClass, truncateClass(truncate))} style={textStyle} title={title}>
+        <span className={joinClasses(textClass, entityTruncateClass(truncate))} style={textStyle} title={title}>
           {content}
         </span>
       )}
