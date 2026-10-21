@@ -87,28 +87,11 @@
    sélecteur `span:last-child` ne l'atteignait pas. Deux lignes au plus, puis
    points de suspension (le `title` le donne entier) : sur une seule ligne, un
    nom s'abrégeait à ~13 caractères en mobile, et trois « Test - Bracket … »
-   devenaient indiscernables. */
-.team > :last-child,
-.team > [data-podium="podium-tier"]:last-child > :global(.podium-tier) {
+   devenaient indiscernables. La coupe elle-même est `truncate={2}` du lien
+   (`.entity-clamp-2`, qui la reporte sur le nom peint d'une marche du podium). */
+.team > :last-child {
   min-width: 0;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  overflow-wrap: anywhere;
   line-height: 1.25;
-}
-
-/* Nom d'une marche du podium (`PODIUM_TIERS.md`) : peint sur un `<span>` dans
-   le lien. C'est lui qui se coupe à deux lignes (règle ci-dessus) ; le lien le
-   laisse déborder, sa lueur (`drop-shadow`) n'est pas rognée et l'ellipse
-   garde le dégradé. */
-.team > [data-podium="podium-tier"]:last-child {
-  display: block;
-  overflow: visible;
-  -webkit-line-clamp: none;
-  line-clamp: none;
 }
 
 .wl {

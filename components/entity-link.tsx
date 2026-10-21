@@ -47,11 +47,12 @@ export interface EntityLinkProps {
   title?: string;
   "aria-label"?: string;
   /**
-   * Tronque le nom d'une ellipse sur une ligne (`.entity-truncate`). Un nom
-   * peint d'une marche rogne alors sur lui-même et non sur le lien : sa lueur
-   * n'est pas coupée et l'ellipse garde le dégradé (`PODIUM_TIERS.md`).
+   * Tronque le nom d'une ellipse : `true` sur une ligne (`.entity-truncate`),
+   * `2` à deux lignes (`.entity-clamp-2`). Un nom peint d'une marche se coupe
+   * alors lui-même, pas le lien : sa lueur n'est pas rognée et l'ellipse garde
+   * le dégradé (`PODIUM_TIERS.md`).
    */
-  truncate?: boolean;
+  truncate?: boolean | 2;
 }
 
 /**
@@ -74,6 +75,11 @@ function linkPodium(override: PodiumTier | null | undefined, fromContext: Podium
   return toPodium(override === undefined ? fromContext : override, kind);
 }
 
+/** Classe de troncature d'un nom (`truncate`). */
+function truncateClass(truncate: boolean | 2): string | false {
+  if (truncate === 2) return "entity-clamp-2";
+  return truncate && "entity-truncate";
+}
 
 export function EntityLink({
   href,
@@ -88,7 +94,7 @@ export function EntityLink({
   // Repère posé sur le lien, lu par la feuille sans `:has()` : la famille de la
   // marche peinte dedans (`podium-tier` / `podium-member`).
   const marks = { "data-podium": podium && podiumTierFamily(podium.kind) };
-  const extra = joinClasses(truncate && "entity-truncate", className);
+  const extra = joinClasses(truncateClass(truncate), className);
   if (spectator) {
     // Pas d'`aria-label` sur un `<span>` sans rôle (`aria-prohibited-attr`) :
     // le nom affiché suffit, il n'annonce plus de destination.

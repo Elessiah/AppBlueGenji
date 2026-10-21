@@ -103,7 +103,7 @@ export function EntrantName({
   const content = children ?? name;
 
   return (
-    <span className={className ? `${styles.label} ${className}` : styles.label} style={style}>
+    <span className={joinClasses(styles.label, className)} style={style}>
       <EntrantLogo teamId={teamId} name={name} size={logoSize} />
       {teamId !== null ? (
         <EntrantLink teamId={teamId} className={textClass} style={textStyle} title={title} truncate={truncate}>
