@@ -118,7 +118,7 @@ export function cachedCertificationPrompt(
   const entry = recentPrompts.get(key);
   if (entry && entry.expiresAt > now()) return entry.value;
   recentPrompts.delete(key);
-  makeRoom(now());
+  const room = makeRoom(now());
 
   const slot = { value: Promise.resolve<CertificationPrompt | null>(null), expiresAt: Number.POSITIVE_INFINITY };
   const reading = load();
@@ -137,8 +137,15 @@ export function cachedCertificationPrompt(
     clearTimeout(timer);
     if (outcome === "TIMEOUT") {
       logCertificationPromptFailure(now(), "lecture abandonnée après 3 s");
-      void settled.then(() => {
-        slot.expiresAt = now() + CERTIFICATION_PROMPT_FAILURE_TTL_MS;
+      // Une lecture tardive mais réussie sert quand même, pour la minute
+      // ordinaire : sans quoi un pool saturé ferait relire en boucle.
+      void settled.then((late) => {
+        if (late.ok) {
+          slot.value = Promise.resolve(late.prompt);
+          slot.expiresAt = now() + CERTIFICATION_PROMPT_TTL_MS;
+        } else {
+          slot.expiresAt = now() + CERTIFICATION_PROMPT_FAILURE_TTL_MS;
+        }
       });
       return null;
     }
@@ -150,27 +157,29 @@ export function cachedCertificationPrompt(
     slot.expiresAt = now() + CERTIFICATION_PROMPT_FAILURE_TTL_MS;
     return null;
   });
-  recentPrompts.set(key, slot);
+  // Mémoire pleine de lectures en cours : celle-ci se fait sans être retenue.
+  if (room) recentPrompts.set(key, slot);
   return slot.value;
 }
 
 /**
  * Place pour une entrée de plus : les entrées expirées partent d'abord, puis
  * la plus ancienne **terminée** — jamais une lecture en cours, qui ne serait
- * plus partagée.
+ * plus partagée. `false` : rien à chasser, la mémoire ne grandit pas.
  */
-function makeRoom(at: number): void {
-  if (recentPrompts.size < CERTIFICATION_PROMPT_CACHE_MAX) return;
+function makeRoom(at: number): boolean {
+  if (recentPrompts.size < CERTIFICATION_PROMPT_CACHE_MAX) return true;
   for (const [key, entry] of recentPrompts) {
     if (entry.expiresAt <= at) recentPrompts.delete(key);
   }
-  if (recentPrompts.size < CERTIFICATION_PROMPT_CACHE_MAX) return;
+  if (recentPrompts.size < CERTIFICATION_PROMPT_CACHE_MAX) return true;
   for (const [key, entry] of recentPrompts) {
     if (entry.expiresAt !== Number.POSITIVE_INFINITY) {
       recentPrompts.delete(key);
-      return;
+      return true;
     }
   }
+  return false;
 }
 
 /**

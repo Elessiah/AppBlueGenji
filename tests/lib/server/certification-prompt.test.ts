@@ -223,13 +223,16 @@ describe("mémoire courte des invitations", () => {
       clock += 60_000;
       expect(await cachedCertificationPrompt("10:42:0:1", load, now)).toBeNull();
       expect(load).toHaveBeenCalledTimes(1);
-      // Finie, la clé n'est libre qu'au bout de la fenêtre d'échec.
+      // Finie (tard), son résultat sert la minute ordinaire.
       control.finish?.(null);
       await Promise.resolve();
       await Promise.resolve();
       await cachedCertificationPrompt("10:42:0:1", load, now);
       expect(load).toHaveBeenCalledTimes(1);
       clock += CERTIFICATION_PROMPT_FAILURE_TTL_MS;
+      void cachedCertificationPrompt("10:42:0:1", load, now);
+      expect(load).toHaveBeenCalledTimes(1);
+      clock += CERTIFICATION_PROMPT_TTL_MS;
       void cachedCertificationPrompt("10:42:0:1", load, now);
       expect(load).toHaveBeenCalledTimes(2);
       jest.clearAllTimers();
@@ -267,6 +270,22 @@ describe("mémoire courte des invitations", () => {
     await cachedCertificationPrompt("neuve", async () => null, now);
     void cachedCertificationPrompt("en-cours", pending, now);
     expect(pending).toHaveBeenCalledTimes(1);
+    jest.clearAllTimers();
+    jest.useRealTimers();
+    forgetCertificationPrompts();
+  });
+
+  it("pleine de lectures en cours, elle ne grandit pas", async () => {
+    forgetCertificationPrompts();
+    jest.useFakeTimers();
+    clock = 0;
+    const pending = () => new Promise<null>(() => undefined);
+    for (let i = 0; i < 2_000; i += 1) void cachedCertificationPrompt(`p${i}`, pending, now);
+    const extra = jest.fn(async () => null);
+    await cachedCertificationPrompt("en-trop", extra, now);
+    await cachedCertificationPrompt("en-trop", extra, now);
+    // Non retenue : relue à chaque fois.
+    expect(extra).toHaveBeenCalledTimes(2);
     jest.clearAllTimers();
     jest.useRealTimers();
     forgetCertificationPrompts();
