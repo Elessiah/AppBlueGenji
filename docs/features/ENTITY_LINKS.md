@@ -156,6 +156,8 @@ plus effacer le nom.
 
 - `podiumTier` impose une marche (`/classement`, onglet affiché) ; `null`
   n'en pose aucune (lien-avatar sans texte).
+- `podiumMuted` éteint la marche d'un lien habillé d'une surface teintée
+  (pastille `.badge`), repère conservé.
 - Un engagé **solo** porte la marche adoucie de son joueur, jamais celle
   d'une équipe (une entrée solo n'est jamais classée).
 - `PodiumTiersOff` : écrans d'administration sobres.
