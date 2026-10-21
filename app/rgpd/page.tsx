@@ -644,7 +644,8 @@ function RgpdFr({
               et votre BattleTag</strong> (fiche d&apos;un tournoi) : le premier, une valeur du stockage
               de session effacée à la fermeture de l&apos;onglet, pour ne pas vous la rouvrir dans cet
               onglet ; le second, une valeur du stockage local, seulement si vous cochez « Ne plus
-              voir ». Ils ne contiennent que la valeur « 1 », jamais d&apos;identifiant de personne, et
+              voir » — retenue aussi si la fenêtre s&apos;efface devant une autre (lancement d&apos;un
+              match). Ils ne contiennent que la valeur « 1 », jamais d&apos;identifiant de personne, et
               ne sont jamais transmis au serveur.
             </li>
             <li>
