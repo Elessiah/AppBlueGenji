@@ -14,7 +14,7 @@ import {
   type ContactsCard,
   shouldRetryReread,
 } from "@/components/match-launch/MatchContactsDialog";
-import { casterContactsPending, exposesCasterContacts, type MatchLaunchInfo } from "@/lib/shared/match-launch";
+import { casterContactsPending, exposesCasterContacts, matchUnderway, type MatchLaunchInfo } from "@/lib/shared/match-launch";
 import { readSource } from "../../helpers/read-source";
 
 /**
@@ -205,6 +205,13 @@ describe("contacts du caster en attente, modale ouverte", () => {
     expect(readSource("lib/server/tournaments/match-launch-info.ts")).toContain(
       "exposesCaster: exposes && exposesCasterContacts(phase, party.role)",
     );
+  });
+
+  it("le temps du match, une seule définition : matchUnderway", () => {
+    expect((["NONE", "TO_PLAN", "SCHEDULED", "LOBBY", "LAUNCHED"] as const).filter(matchUnderway)).toEqual(["LOBBY", "LAUNCHED"]);
+    // Le serveur et la carte du match lisent la même borne, sans copie.
+    expect(readSource("lib/server/tournaments/match-launch-info.ts")).toContain("matchUnderway(phase) ||");
+    expect(readSource("app/(secured)/tournois/[id]/_lib/launch-strip.ts")).toContain("isCaster && matchUnderway(phase)");
   });
 
   it("échecs passagers en rafale sans rien de lu : une seule notification", () => {

@@ -30,6 +30,7 @@ import {
   exposesCasterContacts,
   isAutoLaunchDue,
   matchLaunchPhase,
+  matchUnderway,
   pickLaunchContacts,
   resolveHostTeamId,
   type ContactCandidate,
@@ -340,7 +341,7 @@ type LaunchContext = {
  */
 function exposesContacts(phase: LaunchPhase, cardForPlayer: boolean): boolean {
   return (
-    phase === "LOBBY" || phase === "LAUNCHED" || (cardForPlayer && (phase === "SCHEDULED" || phase === "TO_PLAN"))
+    matchUnderway(phase) || (cardForPlayer && (phase === "SCHEDULED" || phase === "TO_PLAN"))
   );
 }
 

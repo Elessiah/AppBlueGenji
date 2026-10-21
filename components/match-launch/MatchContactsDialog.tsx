@@ -401,7 +401,6 @@ export function MatchContactsDialog({
                     isHost={launch.hostTeamId === launch.team1.teamId}
                     phase={launch.phase}
                     onCopy={copy}
-                    viewer={launch.viewer}
                     laterText={sidesLaterText}
                     linkNames
                   />
@@ -413,7 +412,6 @@ export function MatchContactsDialog({
                     isHost={launch.hostTeamId === launch.team2.teamId}
                     phase={launch.phase}
                     onCopy={copy}
-                    viewer={launch.viewer}
                     laterText={sidesLaterText}
                     linkNames
                   />

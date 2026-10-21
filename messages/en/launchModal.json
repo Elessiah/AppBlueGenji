@@ -87,7 +87,7 @@
     "casterLater": "Their contacts will show once the match starts.",
     "casterShown": "The caster's contacts are now shown.",
     "casterShownEmpty": "No caster contact available.",
-    "unavailable": "This match's contacts aren't available to you right now.",
+    "unavailable": "This match's contacts aren't available to you right now (for the caster: once the match starts).",
     "failed": "Contacts could not be loaded. Try again in a moment."
   }
 }

@@ -3,7 +3,7 @@
  * montre et offre, décidé hors du composant : une règle pure se teste sans
  * rendu, et le composant ne garde que la mise en page.
  */
-import type { MatchLaunchPhase } from "@/lib/shared/match-launch";
+import { matchUnderway, type MatchLaunchPhase } from "@/lib/shared/match-launch";
 import type { BracketMatch } from "@/lib/shared/types";
 
 type StripMatch = Pick<
@@ -60,11 +60,6 @@ const FORCEABLE_PHASES: ReadonlySet<MatchLaunchPhase> = new Set(["TO_PLAN", "SCH
  */
 const CONTACT_PHASES: ReadonlySet<MatchLaunchPhase> = new Set(["TO_PLAN", "SCHEDULED", "LOBBY", "LAUNCHED"]);
 
-/**
- * Phases où il l'est au caster inscrit : le temps du match seulement, du
- * départ (lancement ouvert, ou lancé) à la fin — la même borne qu'au serveur.
- */
-const CASTER_CONTACT_PHASES: ReadonlySet<MatchLaunchPhase> = new Set(["LOBBY", "LAUNCHED"]);
 
 export function launchStripControls(
   match: StripMatch,
@@ -82,10 +77,11 @@ export function launchStripControls(
   const showHost = phase !== "NONE";
   return {
     isCaster,
-    showOpen: (isCaster || isPlayer) && viewer.launchPhase !== false && (phase === "LOBBY" || phase === "LAUNCHED"),
+    showOpen: (isCaster || isPlayer) && viewer.launchPhase !== false && matchUnderway(phase),
     // Un arbitre (permission `tournaments`) les lit comme un joueur du match.
     showContacts:
-      (isPlayer || viewer.canSchedule) ? CONTACT_PHASES.has(phase) : isCaster && CASTER_CONTACT_PHASES.has(phase),
+      (isPlayer || viewer.canSchedule) ? CONTACT_PHASES.has(phase) : // Au caster inscrit, le temps du match seulement — la borne du serveur.
+        isCaster && matchUnderway(phase),
     showClaim: viewer.canManage && castable && match.casterUserId === null,
     showRelease: open && match.casterUserId !== null && (isCaster || viewer.canSchedule),
     showPlan: viewer.canSchedule && phase === "TO_PLAN",

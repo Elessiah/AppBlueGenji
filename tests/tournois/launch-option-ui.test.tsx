@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { closedNoticeText } from "@/app/(secured)/tournois/[id]/_components/PlayerScoreDialog";
 import { startAtHint } from "@/app/(secured)/tournois/[id]/_components/MatchScheduleDialog";
-import { anotherModalOpen } from "@/components/match-launch/MatchLaunchCenter";
+import { anotherModalOpen, launchSidesLaterText } from "@/components/match-launch/MatchLaunchCenter";
 import { CasterCard, SideCard } from "@/components/match-launch/LaunchContactCards";
 import { contactsErrorText } from "@/components/match-launch/MatchContactsDialog";
 import { FR_LAUNCH_TEXT } from "@/components/match-launch/launch-text";
@@ -224,49 +224,46 @@ describe("fiches de contact — noms cliquables", () => {
   });
   const noop = async () => {};
   const TEAM_VIEWER = { role: "TEAM1", isCaster: false, earlyContacts: true } as const;
+  const LATER = "Contacts non affichés.";
 
   it("modale de lancement (par défaut) : aucun lien — elle survit à la navigation", () => {
-    const html = renderToStaticMarkup(<SideCard side={side()} isHost={false} phase="LAUNCHED" onCopy={noop} viewer={TEAM_VIEWER} />);
+    const html = renderToStaticMarkup(<SideCard side={side()} isHost={false} phase="LAUNCHED" onCopy={noop} laterText={LATER} />);
     expect(html).not.toContain("href=");
   });
 
   it("équipe → sa fiche, contact → son profil", () => {
     const html = renderToStaticMarkup(
-      <SideCard side={side()} isHost={false} phase="LAUNCHED" onCopy={noop} viewer={TEAM_VIEWER} linkNames />,
+      <SideCard side={side()} isHost={false} phase="LAUNCHED" onCopy={noop} laterText={LATER} linkNames />,
     );
     expect(html).toContain('href="/equipes/42"');
     expect(html).toContain('href="/joueurs/7"');
   });
 
-  // Contacts tus par le serveur : la note ne renvoie à l'action « Contacts » que
-  // pour qui elle ouvre quelque chose — pas pour le caster avant le départ.
+  // Contacts tus par le serveur : la note de la modale de lancement ne renvoie
+  // à l'action « Contacts » que pour qui elle ouvre quelque chose — pas pour le
+  // seul caster avant le départ (un arbitre qui caste, si : `earlyContacts`).
   it("contacts tus → note au lancement, sans renvoi à « Contacts » pour le caster", () => {
+    expect(launchSidesLaterText(FR_LAUNCH_TEXT, { earlyContacts: true })).toContain("ou dès maintenant par l'action « Contacts »");
+    const forCaster = launchSidesLaterText(FR_LAUNCH_TEXT, { earlyContacts: false });
+    expect(forCaster).toBe("Les contacts s'affichent au lancement.");
     const closed = side({ contacts: [], contactsShown: false });
-    const forTeam = renderToStaticMarkup(
-      <SideCard side={closed} isHost={false} phase="SCHEDULED" onCopy={noop} viewer={{ earlyContacts: true }} />,
-    );
-    expect(forTeam).toContain("ou dès maintenant par l&#x27;action « Contacts »");
-    const forCaster = renderToStaticMarkup(
-      <SideCard side={closed} isHost={false} phase="SCHEDULED" onCopy={noop} viewer={{ earlyContacts: false }} />,
-    );
-    expect(forCaster).toContain("Les contacts s&#x27;affichent au lancement.</p>");
-    expect(forCaster).not.toContain("« Contacts »");
+    const html = renderToStaticMarkup(<SideCard side={closed} isHost={false} phase="SCHEDULED" onCopy={noop} laterText={forCaster} />);
+    expect(html).toContain("Les contacts s&#x27;affichent au lancement.</p>");
+    expect(html).not.toContain("« Contacts »");
     // La modale « Contacts » passe sa note : jamais un renvoi à elle-même.
-    const inDialog = renderToStaticMarkup(
-      <SideCard side={closed} isHost={false} phase="SCHEDULED" onCopy={noop} viewer={{ earlyContacts: true }} laterText="Contacts non affichés." />,
-    );
+    const inDialog = renderToStaticMarkup(<SideCard side={closed} isHost={false} phase="SCHEDULED" onCopy={noop} laterText={LATER} />);
     expect(inDialog).toContain("Contacts non affichés.");
     expect(inDialog).not.toContain("« Contacts »");
   });
 
   it("entrée solo → le profil du joueur, jamais une fiche d'équipe", () => {
     const html = renderToStaticMarkup(
-      <SideCard side={side({ isSolo: true })} isHost={false} phase="LAUNCHED" onCopy={noop} viewer={TEAM_VIEWER} linkNames />,
+      <SideCard side={side({ isSolo: true })} isHost={false} phase="LAUNCHED" onCopy={noop} laterText={LATER} linkNames />,
     );
     expect(html).not.toContain("/equipes/");
     expect(html).toContain('href="/joueurs/7"');
     const hidden = renderToStaticMarkup(
-      <SideCard side={side({ isSolo: true, contacts: [], contactsShown: false })} isHost={false} phase="SCHEDULED" onCopy={noop} viewer={TEAM_VIEWER} linkNames />,
+      <SideCard side={side({ isSolo: true, contacts: [], contactsShown: false })} isHost={false} phase="SCHEDULED" onCopy={noop} laterText={LATER} linkNames />,
     );
     expect(hidden).not.toContain("href=");
   });

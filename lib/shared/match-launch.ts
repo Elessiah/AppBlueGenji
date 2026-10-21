@@ -487,6 +487,16 @@ export type MatchLaunchInfo = {
 };
 
 /**
+ * Le match se joue-t-il (lancement ouvert, ou lancé) ? Le temps où ses contacts
+ * s'ouvrent à toutes ses parties, caster compris — une seule définition pour le
+ * serveur (`exposesContacts`, `exposesCasterContacts`) et la carte du match
+ * (`launch-strip.ts`), qui offre « Contacts » quand le serveur les rend.
+ */
+export function matchUnderway(phase: MatchLaunchPhase): boolean {
+  return phase === "LOBBY" || phase === "LAUNCHED";
+}
+
+/**
  * Les contacts **du caster** sont-ils rendus à ce lecteur ? Le temps du match
  * (lancement ouvert, ou lancé), et à un arbitre dès que les deux adversaires
  * sont connus — rôle `REFEREE` : un arbitre qui joue le match lit en joueur
@@ -498,7 +508,7 @@ export type MatchLaunchInfo = {
  * copies dériveraient, et la fiche montrerait deux « — » ou une note à tort.
  */
 export function exposesCasterContacts(phase: MatchLaunchPhase, role: MatchLaunchViewerRole): boolean {
-  return phase === "LOBBY" || phase === "LAUNCHED" || (phase !== "NONE" && role === "REFEREE");
+  return matchUnderway(phase) || (phase !== "NONE" && role === "REFEREE");
 }
 
 /**

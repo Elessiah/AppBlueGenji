@@ -116,7 +116,6 @@ export function SideCard({
   phase,
   onCopy,
   linkNames = false,
-  viewer,
   laterText,
 }: Readonly<{
   side: LaunchSide;
@@ -124,16 +123,11 @@ export function SideCard({
   phase: MatchLaunchInfo["phase"];
   onCopy: CopyFn;
   /**
-   * Le lecteur : la note des contacts tus ne renvoie à l'action « Contacts »
-   * que si elle lui ouvre déjà quelque chose (`earlyContacts` : joueur du match
-   * ou arbitre, même inscrit comme caster) — jamais au seul caster avant le départ.
+   * Note des contacts tus, choisie par la modale qui rend la fiche : celle de
+   * lancement ne renvoie à l'action « Contacts » qu'à qui elle ouvre déjà
+   * quelque chose (`launchSidesLaterText`) ; la modale « Contacts » passe la sienne.
    */
-  viewer: Pick<MatchLaunchInfo["viewer"], "earlyContacts">;
-  /**
-   * Note des contacts tus ; par défaut, celle de la modale de lancement, qui
-   * renvoie à l'action « Contacts » — la modale « Contacts » passe la sienne.
-   */
-  laterText?: string;
+  laterText: string;
   /**
    * Noms cliquables vers leurs fiches — modale « Contacts » seulement : la
    * modale de lancement survit à la navigation et recouvrirait la fiche ouverte.
@@ -166,7 +160,6 @@ export function SideCard({
         side={side}
         onCopy={onCopy}
         linkNames={linkNames}
-        earlyContacts={viewer.earlyContacts}
         laterText={laterText}
       />
     </section>
@@ -188,19 +181,17 @@ function SideContacts({
   side,
   onCopy,
   linkNames,
-  earlyContacts,
   laterText,
 }: Readonly<{
   side: LaunchSide;
   onCopy: CopyFn;
   linkNames: boolean;
-  earlyContacts: boolean;
-  laterText: string | undefined;
+  laterText: string;
 }>) {
   const { t } = useLaunchText();
   if (side.isGhost) return <p className={styles.note}>{t("ghost")}</p>;
   if (!side.contactsShown) {
-    return <p className={styles.note}>{laterText ?? t(earlyContacts ? "contactsAtLaunch" : "contactsAtLaunchForCaster")}</p>;
+    return <p className={styles.note}>{laterText}</p>;
   }
   if (side.contacts.length === 0) return <p className={styles.note}>{t("noContact")}</p>;
   return (

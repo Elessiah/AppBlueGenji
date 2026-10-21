@@ -87,7 +87,7 @@
     "casterLater": "Ses contacts s'afficheront au départ du match.",
     "casterShown": "Les contacts du caster sont maintenant affichés.",
     "casterShownEmpty": "Aucun contact du caster disponible.",
-    "unavailable": "Les contacts de ce match ne te sont pas accessibles en ce moment.",
+    "unavailable": "Les contacts de ce match ne te sont pas accessibles en ce moment (au caster : dès le départ du match).",
     "failed": "Les contacts n'ont pas pu être chargés. Réessaie dans un instant."
   }
 }
