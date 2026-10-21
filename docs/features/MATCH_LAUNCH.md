@@ -147,7 +147,7 @@ sinon un refus à l'heure du départ. Ce refus est donc relu **une fois**
 (`contactsRetryDelay`, `CONTACTS_RETRY_MAX_WAIT_MS`), à l'heure du départ plus
 une seconde ; tout autre refus (match terminé, sans heure, tiers) part aussitôt.
 Fermer la modale coupe l'attente et la lecture (`AbortSignal`). Ouverte avant
-le départ sur un match qui a un caster (`casterContactsPending`), la modale
+le départ sur un match qui a un caster (`casterContactsPending`, `lib/shared/match-launch.ts`, la règle de la note de `CasterCard`), la modale
 relit à l'heure de départ **du serveur** (en-tête `Date` de sa réponse, plus une
 seconde ; une réponse « programmé » dont l'en-tête est déjà à l'heure est
 relue une seconde plus tard — `casterRereadDelay`), et quand la carte reçoit

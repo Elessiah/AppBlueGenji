@@ -11,7 +11,7 @@
 import { PlayerLink, TeamLink } from "@/components/entity-link";
 import { useLaunchText } from "./launch-text";
 import {
-  viewerIsCaster,
+  casterContactsPending,
   type LaunchCaster,
   type LaunchContact,
   type LaunchSide,
@@ -210,9 +210,6 @@ export function CasterCard({
   linkNames?: boolean;
 }>) {
   const { t } = useLaunchText();
-  // Contacts tus : une note plutôt que deux « — » qui laisseraient croire qu'il
-  // n'en a pas — jamais au caster lui-même, dont elle parle.
-  const contactsLaterText = viewerIsCaster({ viewer }) ? null : t("contacts.casterLater");
   if (!caster) {
     return (
       <section className={styles.caster} aria-label={t("caster")}>
@@ -240,7 +237,9 @@ export function CasterCard({
           <IdentityLine kind="BattleTag" value={caster.battletag} verified={caster.battletagVerified} onCopy={onCopy} />
         </div>
       )}
-      {!caster.contactsShown && contactsLaterText && <p className={styles.note}>{contactsLaterText}</p>}
+      {/* Contacts tus : une note plutôt que deux « — » qui laisseraient croire
+          qu'il n'en a pas — jamais au caster lui-même, dont elle parle. */}
+      {casterContactsPending({ caster, viewer }) && <p className={styles.note}>{t("contacts.casterLater")}</p>}
     </section>
   );
 }

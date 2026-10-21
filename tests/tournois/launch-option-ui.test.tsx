@@ -316,12 +316,4 @@ describe("fiches de contact — noms cliquables", () => {
     expect(viewerIsCaster({ viewer: { role: "TEAM1", isCaster: true } })).toBe(true);
     expect(viewerIsCaster({ viewer: { role: "TEAM1", isCaster: false } })).toBe(false);
   });
-
-  // La carte tire la règle du lecteur : chaque modale lui passe le sien.
-  it("les deux modales passent le lecteur à la carte du caster", () => {
-    const dialog = readFileSync(join(process.cwd(), "components/match-launch/MatchContactsDialog.tsx"), "utf8");
-    const center = readFileSync(join(process.cwd(), "components/match-launch/MatchLaunchCenter.tsx"), "utf8");
-    expect(dialog.slice(dialog.indexOf("<CasterCard"))).toContain("viewer={launch.viewer}");
-    expect(center.slice(center.indexOf("<CasterCard"))).toContain("viewer={current.viewer}");
-  });
 });

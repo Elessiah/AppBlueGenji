@@ -8,7 +8,7 @@ import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
   MATCH_LAUNCH_REFRESH_EVENT,
-  viewerIsCaster,
+  casterContactsPending,
   type MatchLaunchInfo,
 } from "@/lib/shared/match-launch";
 import type { BracketMatch } from "@/lib/shared/types";
@@ -63,15 +63,8 @@ export function contactsRetryDelay(startAt: string | null, serverDate: string | 
   return delay <= CONTACTS_RETRY_MAX_WAIT_MS ? delay : null;
 }
 
-/**
- * Les contacts du caster attendent-ils le départ ? Un caster inscrit, sur un
- * match pas encore parti à l'heure du serveur (`launch.phase`), pour un lecteur
- * qui n'est pas arbitre : sa fiche porte alors une note plutôt que ses
- * contacts. Pas pour le caster lui-même : rien à attendre sur sa propre fiche.
- */
-export function casterContactsPending(launch: MatchLaunchInfo): boolean {
-  return launch.caster !== null && !viewerIsCaster(launch) && !launch.caster.contactsShown;
-}
+/** Réexportée : la règle vit dans `lib/shared/match-launch`, lue aussi par `CasterCard`. */
+export { casterContactsPending };
 
 /** Relectures supplémentaires d'une relecture qui échoue (réseau, 5xx, 429). */
 export const REREAD_RETRIES = 3;

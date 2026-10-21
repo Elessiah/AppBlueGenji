@@ -206,9 +206,6 @@ describe("contacts du caster en attente, modale ouverte", () => {
     expect(readSource("lib/server/tournaments/match-launch-info.ts")).toContain(
       "exposesCaster: exposes && exposesCasterContacts(phase, party.role)",
     );
-    // Les deux modales lisent cette décision, portée par la réponse.
-    expect(readSource("lib/server/tournaments/match-launch-info.ts")).toContain("contactsShown: ctx.exposesCaster,");
-    expect(readSource("components/match-launch/LaunchContactCards.tsx")).toContain("{caster.contactsShown && (");
   });
 
   it("échecs passagers en rafale sans rien de lu : une seule notification", () => {

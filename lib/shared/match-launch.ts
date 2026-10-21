@@ -500,6 +500,19 @@ export function viewerIsCaster(launch: { viewer: Pick<MatchLaunchInfo["viewer"],
 }
 
 /**
+ * Les contacts du caster attendent-ils le départ ? Un caster inscrit dont le
+ * serveur tait les contacts à ce lecteur (`LaunchCaster.contactsShown`), pour un
+ * lecteur qui n'est pas ce caster. Une seule règle pour la note « au départ »
+ * de `CasterCard` et la relecture de la modale « Contacts » à l'heure de départ.
+ */
+export function casterContactsPending(launch: {
+  caster: Pick<LaunchCaster, "contactsShown"> | null;
+  viewer: Pick<MatchLaunchInfo["viewer"], "role" | "isCaster">;
+}): boolean {
+  return launch.caster !== null && !viewerIsCaster(launch) && !launch.caster.contactsShown;
+}
+
+/**
  * Doit-on ouvrir la modale d'office pour ce match ? Au lancement, pour appeler
  * les « Prêt » ; puis une fois lancé, pour l'annoncer. Clé par phase : fermer la
  * modale du lancement ne fait pas taire l'annonce du départ.
