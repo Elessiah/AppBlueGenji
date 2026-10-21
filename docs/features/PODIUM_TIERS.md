@@ -84,8 +84,9 @@ Exceptions :
   le fond teinté de la pastille ferait tomber les marches sous 4,5:1. `.badge`,
   `.pill` et `.cy-tag` l'éteignent d'office (`:is(.badge, .pill, .cy-tag) >
   .podium-tier`), comme une ligne en retrait (repère conservé), le nom prenant
-  la couleur de la pastille ; toute autre surface teintée passe `podiumMuted`
-  au lien (`data-podium-muted`). Compte supprimé : `podiumTier` à `null` sur la fiche, comme son
+  au repos la couleur de la pastille (survol et focus : couleur pleine, comme
+  tout lien d'entité). Une nouvelle surface teintée s'ajoute à cette liste,
+  reprise à l'identique par la règle de graisse. Compte supprimé : `podiumTier` à `null` sur la fiche, comme son
   historique d'équipes.
 - **Vainqueur d'un match** : sans lueur — le fond teinté turquoise de la ligne
   ferait tomber violets et rose sous 4,5:1 sous la lueur.
@@ -151,7 +152,7 @@ seulement devenir **nettement visible** et suivre l'équipe partout.
   Un lien d'entité ne se tronque jamais par une classe de l'appelant — seule
   exception, le classement de l'accueil (deux lignes, `line-clamp`) : sa règle
   (`Leaderboard.module.css`) passe de même au nom peint quand le lien porte
-  `data-podium`.
+  `data-podium="podium-tier"`.
 - Contraste renforcé : lueur effacée. Couleurs forcées : fond retiré, couleur
   du système. Impression : couleur pleine `--blue-500`, repère masqué.
 
