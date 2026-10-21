@@ -280,8 +280,6 @@ export function CasterCard({
   announceArrival?: boolean;
 }>) {
   const { t } = useLaunchText();
-  const pending = casterContactsPending({ caster, viewer });
-  const self = viewerIsCaster({ viewer });
   if (!caster) {
     return (
       <section className={styles.caster} aria-label={t("caster")}>
@@ -291,6 +289,8 @@ export function CasterCard({
       </section>
     );
   }
+  const pending = casterContactsPending({ caster, viewer });
+  const self = viewerIsCaster({ viewer });
   const hasContacts = casterHasContacts(caster);
   return (
     <section className={styles.caster} aria-label={t("caster")}>
