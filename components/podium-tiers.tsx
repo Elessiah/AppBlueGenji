@@ -51,13 +51,23 @@ export function useMemberPodiumTier(userId: number | null | undefined): PodiumTi
 }
 
 /**
+ * Nom peint d'une marche (`podiumTierClass`) : un `<span>` qui porte la classe,
+ * ou le nom tel quel sans marche. Seul point où ce balisage s'écrit — les liens
+ * d'entité (`components/entity-link.tsx`) et les noms non cliquables ci-dessous
+ * le partagent, et la feuille (`.entity-link:hover > .podium-tier`, `.truncate >
+ * .podium-tier`) en dépend.
+ */
+export function PodiumPaint({ className, children }: Readonly<{ className: string | undefined; children: ReactNode }>) {
+  if (className === undefined) return <>{children}</>;
+  return <span className={className}>{children}</span>;
+}
+
+/**
  * Nom d'équipe **non cliquable** (titre d'une fiche d'équipe) habillé de sa
  * marche. Le texte reste tel quel : l'effet n'est que de la peinture.
  */
 export function TeamPodiumName({ teamId, children }: Readonly<{ teamId: number; children: ReactNode }>) {
-  const className = podiumTierClass(useTeamPodiumTier(teamId));
-  if (className === undefined) return <>{children}</>;
-  return <span className={className}>{children}</span>;
+  return <PodiumPaint className={podiumTierClass(useTeamPodiumTier(teamId))}>{children}</PodiumPaint>;
 }
 
 /**
@@ -65,7 +75,5 @@ export function TeamPodiumName({ teamId, children }: Readonly<{ teamId: number; 
  * habillé de la marche adoucie de son équipe du podium.
  */
 export function PlayerPodiumName({ userId, children }: Readonly<{ userId: number; children: ReactNode }>) {
-  const className = podiumTierClass(useMemberPodiumTier(userId), "member");
-  if (className === undefined) return <>{children}</>;
-  return <span className={className}>{children}</span>;
+  return <PodiumPaint className={podiumTierClass(useMemberPodiumTier(userId), "member")}>{children}</PodiumPaint>;
 }

@@ -190,6 +190,8 @@ export default function PlayerDetailPage() {
                     <TeamLink
                       teamId={activeTeam.teamId}
                       podiumTier={deleted ? null : undefined}
+                      // Sur le fond teinté de la pastille, la marche s'éteint (`PODIUM_TIERS.md`).
+                      podiumMuted
                       className="badge"
                       style={{ fontSize: 11 }}
                       title={t("page.viewTeam", { name: activeTeam.teamName })}

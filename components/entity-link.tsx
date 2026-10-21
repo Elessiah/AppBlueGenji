@@ -1,7 +1,7 @@
 "use client";
 
 import { LocaleLink } from "@/components/i18n/locale-navigation";
-import { useMemberPodiumTier, useTeamPodiumTier } from "@/components/podium-tiers";
+import { PodiumPaint, useMemberPodiumTier, useTeamPodiumTier } from "@/components/podium-tiers";
 import { useSpectatorView } from "@/components/spectator-view";
 import { podiumTierClass, type PodiumTier } from "@/lib/shared/podium-tiers";
 import type { CSSProperties, ReactNode } from "react";
@@ -45,6 +45,12 @@ export interface EntityLinkProps {
   style?: CSSProperties;
   title?: string;
   "aria-label"?: string;
+  /**
+   * Éteint la marche du podium (`data-podium-muted`, repère conservé) : un lien
+   * habillé d'une surface teintée (pastille `.badge`…) sur laquelle la marche,
+   * sous sa lueur, tomberait sous 4,5:1 (`PODIUM_TIERS.md`).
+   */
+  podiumMuted?: boolean;
 }
 
 /**
@@ -60,28 +66,40 @@ function tierClassName(override: PodiumTier | null | undefined, fromContext: Pod
 }
 
 /** Classe de la marche du podium à peindre sur le nom (`podiumTierClass`). */
-type PodiumPaint = { podiumClass?: string };
+type PodiumClass = { podiumClass?: string };
 
 export function EntityLink({
   href,
   children,
   className,
   podiumClass,
+  podiumMuted = false,
   ...rest
-}: Readonly<EntityLinkProps & PodiumPaint & { href: string }>) {
+}: Readonly<EntityLinkProps & PodiumClass & { href: string }>) {
   const spectator = useSpectatorView();
-  const name = podiumClass ? <span className={podiumClass}>{children}</span> : children;
+  const name = <PodiumPaint className={podiumClass}>{children}</PodiumPaint>;
+  const muted = podiumMuted ? "" : undefined;
   if (spectator) {
     // Pas d'`aria-label` sur un `<span>` sans rôle (`aria-prohibited-attr`) :
     // le nom affiché suffit, il n'annonce plus de destination.
     return (
-      <span className={className ? `entity-name ${className}` : "entity-name"} style={rest.style} title={rest.title}>
+      <span
+        className={className ? `entity-name ${className}` : "entity-name"}
+        style={rest.style}
+        title={rest.title}
+        data-podium-muted={muted}
+      >
         {name}
       </span>
     );
   }
   return (
-    <LocaleLink href={href} className={className ? `entity-link ${className}` : "entity-link"} {...rest}>
+    <LocaleLink
+      href={href}
+      className={className ? `entity-link ${className}` : "entity-link"}
+      data-podium-muted={muted}
+      {...rest}
+    >
       {name}
     </LocaleLink>
   );
