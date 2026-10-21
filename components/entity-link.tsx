@@ -75,8 +75,8 @@ function linkPodium(override: PodiumTier | null | undefined, fromContext: Podium
   return toPodium(override === undefined ? fromContext : override, kind);
 }
 
-/** Classe de troncature d'un nom (`truncate`). */
-function truncateClass(truncate: boolean | 2): string | false {
+/** Classe de troncature d'un nom (`truncate`) : partagée avec les noms non cliquables (`EntrantName`). */
+export function truncateClass(truncate: boolean | 2): string | false {
   if (truncate === 2) return "entity-clamp-2";
   return truncate && "entity-truncate";
 }

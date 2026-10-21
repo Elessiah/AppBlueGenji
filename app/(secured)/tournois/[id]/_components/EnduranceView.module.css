@@ -117,15 +117,14 @@
  * Le nom reste visible quand le tableau défile : sur une dizaine de manches, une
  * ligne de nombres sans son équipe ne se lit plus. Le fond de la colonne suit
  * celui de la ligne (`--history-row-bg`, redéfini pour la ligne du lecteur),
- * sinon le contenu défilé apparaîtrait au travers. La colonne s'élargit au nom
- * entier (piste `minmax(140px, 1fr)`, ligne en `max-content`) : rien à rogner
- * ici — rognée, la lueur d'une marche du podium serait coupée au bord de la
- * cellule (`PODIUM_TIERS.md`).
+ * sinon le contenu défilé apparaîtrait au travers.
  */
 .historyTeam {
   position: sticky;
   left: 0;
   z-index: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 12px;
   padding-right: 8px;
