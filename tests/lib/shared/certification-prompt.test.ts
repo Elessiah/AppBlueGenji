@@ -101,7 +101,7 @@ describe("Marvel Rivals : Discord seul", () => {
 });
 
 describe("certificationPromptStep", () => {
-  const ready = { decided: false, hasPrompt: true, frozen: false, allowed: true, otherModalOpen: false };
+  const ready = { allowed: true, otherModalOpen: false };
 
   it("ouvre une invitation due, sans autre modale", () => {
     expect(certificationPromptStep(ready)).toBe("OPEN");
@@ -113,13 +113,7 @@ describe("certificationPromptStep", () => {
 
   it("se décide sans ouvrir après « Ne plus voir » ou une fermeture dans l'onglet", () => {
     expect(certificationPromptStep({ ...ready, allowed: false })).toBe("SKIP");
-    expect(certificationPromptStep({ ...ready, allowed: false, otherModalOpen: true })).toBe("SKIP");
-  });
-
-  it("ne fait rien une fois décidé, sans invitation ou fiche figée", () => {
-    expect(certificationPromptStep({ ...ready, decided: true })).toBe("IDLE");
-    expect(certificationPromptStep({ ...ready, hasPrompt: false })).toBe("IDLE");
-    expect(certificationPromptStep({ ...ready, frozen: true })).toBe("IDLE");
+    expect(certificationPromptStep({ allowed: false, otherModalOpen: true })).toBe("SKIP");
   });
 });
 

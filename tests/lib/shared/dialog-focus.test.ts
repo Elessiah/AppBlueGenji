@@ -81,12 +81,9 @@ describe("focusTrapTarget", () => {
   });
 });
 
-/** Élément de modale simulé : `yields` = elle cède sa place (`data-modal-yields`). */
-function modal(yields: "self" | "child" | false = false) {
-  return {
-    hasAttribute: (name: string) => yields === "self" && name === "data-modal-yields",
-    querySelector: () => (yields === "child" ? {} : null),
-  };
+/** Élément de modale simulé : `yields` = elle cède sa place (`data-modal-yields` sur sa racine). */
+function modal(yields = false) {
+  return { hasAttribute: (name: string) => yields && name === "data-modal-yields" };
 }
 const rootWith = (...modals: unknown[]) =>
   ({ querySelectorAll: () => modals }) as unknown as Pick<ParentNode, "querySelectorAll">;
@@ -110,11 +107,10 @@ describe("anotherModalOpen", () => {
   });
 
   it("une ouverture urgente passe une modale qui cède sa place, pas les autres", () => {
-    expect(anotherModalOpen(rootWith(modal("child")), { overYielding: true })).toBe(false);
-    expect(anotherModalOpen(rootWith(modal("self")), { overYielding: true })).toBe(false);
-    expect(anotherModalOpen(rootWith(modal("child"), modal()), { overYielding: true })).toBe(true);
+    expect(anotherModalOpen(rootWith(modal(true)), { overYielding: true })).toBe(false);
+    expect(anotherModalOpen(rootWith(modal(true), modal()), { overYielding: true })).toBe(true);
     // Sans l'option, toute modale retient.
-    expect(anotherModalOpen(rootWith(modal("child")))).toBe(true);
+    expect(anotherModalOpen(rootWith(modal(true)))).toBe(true);
   });
 });
 
@@ -165,6 +161,16 @@ describe("watchModals / watchModalsClosed", () => {
     expect(state.disconnected).toBe(1);
   });
 
+  it("sans délai (`throttleMs: 0`), prévient dès le lot de mutations", () => {
+    const { state, mutate } = fakeDom();
+    const calls: number[] = [];
+    watchModals(() => !state.modal, () => calls.push(1), { root: {} as Node, throttleMs: 0 });
+    state.modal = false;
+    mutate();
+    expect(calls).toHaveLength(1);
+    expect(state.disconnected).toBe(1);
+  });
+
   it("prévient aussitôt si la condition tient déjà, sans observer", () => {
     const { state } = fakeDom(false);
     const calls: number[] = [];
@@ -177,7 +183,7 @@ describe("watchModals / watchModalsClosed", () => {
     jest.useFakeTimers();
     const { state, mutate } = fakeDom();
     const calls: number[] = [];
-    const stop = watchModals(() => !state.modal, () => calls.push(1), {} as Node);
+    const stop = watchModals(() => !state.modal, () => calls.push(1), { root: {} as Node });
     state.modal = false;
     mutate();
     stop();

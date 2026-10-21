@@ -91,9 +91,10 @@ const MODAL_OR_PENDING_SELECTOR = '[aria-modal="true"], [data-modal-pending]';
 
 /**
  * Marque d'une modale **qui cède sa place** : une invitation sans urgence
- * (`CertificationPromptDialog`). Posée sur la modale ou l'un de ses
- * descendants ; une ouverture urgente (lancement de match) passe par-dessus,
- * et l'invitation se ferme d'elle-même.
+ * (`CertificationPromptDialog`). Posée sur la racine de la modale (prop
+ * `yields` de `TournamentDialogFrame`) ou sur la place tenue pendant son
+ * chargement ; une ouverture urgente (lancement de match) passe par-dessus, et
+ * l'invitation s'efface.
  */
 export const YIELDING_MODAL_ATTR = "data-modal-yields";
 
@@ -108,7 +109,7 @@ type ModalRoot = Pick<ParentNode, "querySelectorAll">;
 export function anotherModalOpen(root: ModalRoot = document, { overYielding = false } = {}): boolean {
   const open = Array.from(root.querySelectorAll(MODAL_OR_PENDING_SELECTOR));
   if (!overYielding) return open.length > 0;
-  return open.some((el) => !el.hasAttribute(YIELDING_MODAL_ATTR) && el.querySelector(`[${YIELDING_MODAL_ATTR}]`) === null);
+  return open.some((el) => !el.hasAttribute(YIELDING_MODAL_ATTR));
 }
 
 /** Délai minimal entre deux relectures d'un guet : un plateau en direct mute sans cesse. */
@@ -117,10 +118,15 @@ const WATCH_THROTTLE_MS = 250;
 /**
  * Prévient (une fois) dès que `condition` est vraie — tout de suite si elle
  * l'est déjà —, sans minuterie de fond : un observateur du DOM, actif le temps
- * du guet seulement, ses relectures espacées d'au moins `WATCH_THROTTLE_MS`.
- * Renvoie l'arrêt.
+ * du guet seulement, ses relectures espacées d'au moins `throttleMs`
+ * (`WATCH_THROTTLE_MS` par défaut ; `0` : à chaque lot de mutations, pour
+ * céder sa place sans délai). Renvoie l'arrêt.
  */
-export function watchModals(condition: () => boolean, onMet: () => void, root: Node = document.body): () => void {
+export function watchModals(
+  condition: () => boolean,
+  onMet: () => void,
+  { root = document.body, throttleMs = WATCH_THROTTLE_MS }: { root?: Node; throttleMs?: number } = {},
+): () => void {
   let timer: ReturnType<typeof setTimeout> | null = null;
   let stopped = false;
   const stop = () => {
@@ -135,7 +141,8 @@ export function watchModals(condition: () => boolean, onMet: () => void, root: N
     onMet();
   };
   const observer = new MutationObserver(() => {
-    timer ??= setTimeout(check, WATCH_THROTTLE_MS);
+    if (throttleMs === 0) check();
+    else timer ??= setTimeout(check, throttleMs);
   });
   if (condition()) {
     onMet();

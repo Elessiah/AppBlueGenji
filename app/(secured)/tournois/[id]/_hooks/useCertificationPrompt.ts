@@ -46,12 +46,8 @@ export function useCertificationPrompt(prompt: CertificationPrompt | null | unde
   const decided = useRef(false);
 
   useEffect(() => {
-    // Les cas sans rien à décider passent avant toute lecture du stockage ou du DOM.
     if (decided.current || prompt == null || frozen) return;
     const step = certificationPromptStep({
-      decided: false,
-      hasPrompt: true,
-      frozen: false,
       allowed: shouldOpenCertificationPrompt(browserStorage("localStorage"), browserStorage("sessionStorage")),
       otherModalOpen: anotherModalOpen(),
     });
@@ -65,24 +61,30 @@ export function useCertificationPrompt(prompt: CertificationPrompt | null | unde
     setOpen(false);
   }, [neverAgain]);
 
-  // Une modale urgente s'ouvre par-dessus (lancement d'un match) : place
-  // nette, sans rien retenir — l'invitation n'a peut-être pas été lue.
+  // S'effacer devant une modale urgente, sans rien retenir — l'invitation n'a
+  // peut-être pas été lue : elle attend sa fermeture, puis revient.
+  const yieldPlace = useCallback(() => {
+    decided.current = false;
+    setOpen(false);
+    setRecheck((n) => n + 1);
+  }, []);
+
+  // Affichée seulement : invitation présente et fiche vivante.
+  const shown = open && prompt != null && !frozen;
+
+  // Une modale urgente s'ouvre par-dessus (lancement d'un match) : place nette
+  // sans délai (`throttleMs: 0`), avant que le morceau ne se monte au-dessus
+  // d'elle dans la pile.
   useEffect(() => {
-    if (!open || !clocks) return;
-    return watchModals(
-      () => anotherModalOpen(document, { overYielding: true }),
-      () => {
-        decided.current = false;
-        setOpen(false);
-        setRecheck((n) => n + 1);
-      },
-    );
-  }, [open, clocks]);
+    if (!shown || !clocks) return;
+    return watchModals(() => anotherModalOpen(document, { overYielding: true }), yieldPlace, { throttleMs: 0 });
+  }, [shown, clocks, yieldPlace]);
 
   return {
-    prompt: open && !frozen ? (prompt ?? null) : null,
+    prompt: shown ? prompt : null,
     neverAgain,
     setNeverAgain,
     close,
+    yieldPlace,
   };
 }

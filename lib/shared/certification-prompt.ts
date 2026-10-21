@@ -136,23 +136,15 @@ export function rememberCertificationPromptClosed(
 }
 
 /**
- * Où en est l'ouverture d'office, à chaque relecture :
- * - `IDLE` : rien à faire (déjà décidé, pas d'invitation, fiche figée) ;
+ * Où en est l'ouverture d'office d'une invitation due, pas encore décidée :
  * - `SKIP` : « Ne plus voir » ou déjà fermée dans l'onglet — décidé, sans ouvrir ;
  * - `WAIT` : une autre modale est ouverte — deux pièges à focus se
  *   disputeraient Tab et Échap, l'invitation attend sa fermeture ;
  * - `OPEN` : ouvrir.
  */
-export type CertificationPromptStep = "IDLE" | "SKIP" | "WAIT" | "OPEN";
+export type CertificationPromptStep = "SKIP" | "WAIT" | "OPEN";
 
-export function certificationPromptStep(input: {
-  decided: boolean;
-  hasPrompt: boolean;
-  frozen: boolean;
-  allowed: boolean;
-  otherModalOpen: boolean;
-}): CertificationPromptStep {
-  if (input.decided || !input.hasPrompt || input.frozen) return "IDLE";
+export function certificationPromptStep(input: { allowed: boolean; otherModalOpen: boolean }): CertificationPromptStep {
   if (!input.allowed) return "SKIP";
   return input.otherModalOpen ? "WAIT" : "OPEN";
 }

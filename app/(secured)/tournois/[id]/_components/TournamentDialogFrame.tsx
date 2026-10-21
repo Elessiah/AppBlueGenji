@@ -27,6 +27,11 @@ interface TournamentDialogFrameProps {
   deferMount?: boolean;
   /** Geste en vol : Échap et voile sans effet. */
   busy: boolean;
+  /**
+   * Modale sans urgence qui **cède sa place** à une ouverture urgente
+   * (`data-modal-yields`, `anotherModalOpen` de `lib/shared/dialog-focus.ts`).
+   */
+  yields?: boolean;
   onClose: () => void;
   children: ReactNode;
 }
@@ -51,6 +56,7 @@ export function TournamentDialogFrame({
   zIndex,
   deferMount = false,
   busy,
+  yields = false,
   onClose,
   children,
 }: Readonly<TournamentDialogFrameProps>) {
@@ -83,6 +89,7 @@ export function TournamentDialogFrame({
         className="dialog-bounded"
         aria-labelledby={titleId}
         aria-describedby={describedBy}
+        data-modal-yields={yields ? "" : undefined}
         tabIndex={-1}
         style={{
           width: "100%",

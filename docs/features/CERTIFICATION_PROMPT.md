@@ -33,10 +33,12 @@ tant que l'onglet est visible (`useClientPower().clocks`, réarmé au retour) ; 
 sa **place est tenue dans le DOM** pendant le chargement de son morceau (le
 `loading` de son `dynamic()` rend un `data-modal-pending`) : le centre de
 lancement ne s'ouvre pas en même temps qu'elle par accident. Mais elle **cède
-sa place** (`data-modal-yields`, `anotherModalOpen(…, { overYielding: true })`,
+sa place** (prop `yields` de `TournamentDialogFrame` → `data-modal-yields` sur
+sa racine, `anotherModalOpen(…, { overYielding: true })`,
 `lib/shared/dialog-focus.ts`) : l'annonce d'un match qui se lance, urgente,
-passe par-dessus — comme toute autre modale qui s'ouvrirait sur elle ;
-l'invitation s'efface **sans rien retenir** (elle n'a
+passe par-dessus — comme toute autre modale qui s'ouvrirait sur elle ; le guet
+réagit sans délai (`throttleMs: 0`), et un morceau arrivé après l'urgente ne se
+monte pas (lecture au montage, `onYield`). L'invitation s'efface **sans rien retenir** (elle n'a
 peut-être pas été lue ; la case « Ne plus voir », tenue par le crochet, garde
 son état) et revient à la fermeture de l'urgente. La modale
 recouverte ne reprend pas le focus à celle du dessus, et lui passe sa propre

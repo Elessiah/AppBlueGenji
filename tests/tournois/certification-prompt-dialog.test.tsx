@@ -1,9 +1,13 @@
-import { describe, expect, it, jest } from "@jest/globals";
+import { afterAll, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 // Le cadre (portail, piège à focus) est neutralisé : seul le contenu se lit.
-jest.mock("@/app/(secured)/tournois/[id]/_components/TournamentDialogFrame", () => ({
-  TournamentDialogFrame: ({ children }: { children: unknown }) => children,
-}));
+jest.mock("@/app/(secured)/tournois/[id]/_components/TournamentDialogFrame", () => {
+  const { createElement } = jest.requireActual<typeof import("react")>("react");
+  return {
+    TournamentDialogFrame: ({ children, yields }: { children: unknown; yields?: boolean }) =>
+      createElement("div", { "data-frame-yields": String(Boolean(yields)) }, children as never),
+  };
+});
 
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -37,6 +41,7 @@ function render(prompt: CertificationPrompt, locale: "fr" | "en" = "fr"): string
       neverAgain={false}
       onNeverAgainChange={() => undefined}
       onClose={() => undefined}
+      onYield={() => undefined}
     />
   );
   if (locale === "fr") return renderToStaticMarkup(ui);
@@ -46,6 +51,17 @@ function render(prompt: CertificationPrompt, locale: "fr" | "en" = "fr"): string
     </AppLocaleProvider>,
   );
 }
+
+const globals = globalThis as unknown as { document?: unknown };
+const noModal = { querySelectorAll: () => [] };
+
+beforeEach(() => {
+  globals.document = noModal;
+});
+
+afterAll(() => {
+  delete globals.document;
+});
 
 describe("CertificationPromptDialog", () => {
   it("Overwatch, Discord certifié : titre, deux pastilles, lien vers « Applications connectées »", () => {
@@ -58,8 +74,17 @@ describe("CertificationPromptDialog", () => {
     expect(html).toContain("Ne plus voir");
   });
 
-  it("le titre prend le focus d'ouverture, et la modale cède sa place à une urgente", () => {
-    expect(render(OW_MANAGER)).toMatch(/<h3[^>]*tabindex="-1"[^>]*data-autofocus[^>]*data-modal-yields/);
+  it("cède sa place à une modale urgente (`yields` sur le cadre)", () => {
+    expect(render(OW_MANAGER)).toContain('data-frame-yields="true"');
+  });
+
+  it("le titre prend le focus d'ouverture", () => {
+    expect(render(OW_MANAGER)).toMatch(/<h3[^>]*tabindex="-1"[^>]*data-autofocus/);
+  });
+
+  it("ne se monte pas si une modale urgente l'a devancée pendant son chargement", () => {
+    globals.document = { querySelectorAll: () => [{ hasAttribute: () => false }] };
+    expect(render(OW_MANAGER)).toBe("");
   });
 
   it("Marvel Rivals : Discord seul, sans BattleTag ni Blizzard", () => {
@@ -88,7 +113,13 @@ describe("CertificationPromptDialog", () => {
 
   it("la case « Ne plus voir » reflète l'état tenu par le crochet", () => {
     const html = renderToStaticMarkup(
-      <CertificationPromptDialog prompt={OW_MANAGER} neverAgain onNeverAgainChange={() => undefined} onClose={() => undefined} />,
+      <CertificationPromptDialog
+        prompt={OW_MANAGER}
+        neverAgain
+        onNeverAgainChange={() => undefined}
+        onClose={() => undefined}
+        onYield={() => undefined}
+      />,
     );
     expect(html).toMatch(/<input type="checkbox" checked=""/);
   });

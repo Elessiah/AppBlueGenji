@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { anotherModalOpen } from "@/lib/shared/dialog-focus";
 import { certificationProfileHref, type CertificationPrompt } from "@/lib/shared/certification-prompt";
 import { useDialogsText } from "../_lib/dialogs-text";
 import { TournamentDialogFrame } from "./TournamentDialogFrame";
@@ -19,6 +21,11 @@ interface CertificationPromptDialogProps {
   onNeverAgainChange: (value: boolean) => void;
   /** Fermeture ; la case cochée vaut pour toute fermeture. */
   onClose: () => void;
+  /**
+   * Une modale urgente s'est ouverte pendant le chargement de ce morceau :
+   * celle-ci ne se monte pas et s'efface sans rien retenir.
+   */
+  onYield: () => void;
 }
 
 /**
@@ -34,8 +41,16 @@ export function CertificationPromptDialog({
   neverAgain,
   onNeverAgainChange,
   onClose,
+  onYield,
 }: Readonly<CertificationPromptDialogProps>) {
   const { t } = useDialogsText();
+  // Lu une fois, au montage (morceau chargé côté client seulement) : une
+  // modale urgente ouverte entre la décision et l'arrivée du morceau garde la
+  // main — celle-ci, montée après, prendrait sinon le dessus de la pile.
+  const [preempted] = useState(() => anotherModalOpen(document, { overYielding: true }));
+  useEffect(() => {
+    if (preempted) onYield();
+  }, [preempted, onYield]);
 
   // Marvel Rivals : le BattleTag ne sert à rien, la modale ne parle que de Discord.
   const withBattletag = prompt.battletagRelevant;
@@ -60,6 +75,8 @@ export function CertificationPromptDialog({
     lead = t(withBattletag ? "certification.leadTeam" : "certification.leadTeamDiscordOnly");
   }
 
+  if (preempted) return null;
+
   return (
     <TournamentDialogFrame
       titleId="certification-prompt-title"
@@ -67,13 +84,12 @@ export function CertificationPromptDialog({
       maxWidth={640}
       zIndex={90}
       busy={false}
+      yields
       onClose={onClose}
     >
       {/* Focus d'ouverture sur le titre : la modale se lit avant d'agir, et ses
           contrôles, tout en bas, l'ouvriraient défilée sur un petit écran. */}
-      {/* `data-modal-yields` : une modale urgente (lancement d'un match) passe
-          par-dessus, et celle-ci se ferme (`useCertificationPrompt`). */}
-      <h3 id="certification-prompt-title" className={s.title} tabIndex={-1} data-autofocus data-modal-yields>
+      <h3 id="certification-prompt-title" className={s.title} tabIndex={-1} data-autofocus>
         {t(withBattletag ? "certification.title" : "certification.titleDiscordOnly")}
       </h3>
       <p id="certification-prompt-lead" className={s.lead}>
