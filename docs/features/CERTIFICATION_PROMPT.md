@@ -40,8 +40,11 @@ l'invitation s'efface **sans rien retenir** (elle n'a
 peut-être pas été lue ; la case « Ne plus voir », tenue par le crochet, garde
 son état) et revient à la fermeture de l'urgente. La modale
 recouverte ne reprend pas le focus à celle du dessus, et lui passe sa propre
-cible de retour (`useDialogBehavior`). Une invitation retirée par le serveur (certification
-faite entre-temps) ferme la modale, une fiche figée aussi.
+cible de retour (`useDialogBehavior`). Une invitation retirée (certification
+faite entre-temps, lecture en échec) **masque** la modale sans la fermer :
+revenue à la lecture suivante, elle réapparaît. Le client la recoupe avec
+l'instantané (`liveCertificationPrompt`) : tournoi clos depuis ou équipe
+retirée, plus rien. Une fiche figée la masque aussi.
 
 En **Marvel Rivals**, les lignes qui parlent de Blizzard ou de Battle.net
 (identité, « ensuite ») prennent leur variante `…DiscordOnly`. Le tableau est

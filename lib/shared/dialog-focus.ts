@@ -87,7 +87,7 @@ function layerEdgeTarget<T>(extra: readonly T[], active: unknown, shiftKey: bool
  * s'y glisserait pendant le chargement. Tenue par le DOM, la place se libère
  * d'elle-même au démontage.
  */
-export const OPEN_MODAL_SELECTOR = '[aria-modal="true"], [data-modal-pending]';
+const MODAL_OR_PENDING_SELECTOR = '[aria-modal="true"], [data-modal-pending]';
 
 /**
  * Marque d'une modale **qui cède sa place** : une invitation sans urgence
@@ -106,7 +106,7 @@ type ModalRoot = Pick<ParentNode, "querySelectorAll">;
  * place — la question d'une ouverture urgente.
  */
 export function anotherModalOpen(root: ModalRoot = document, { overYielding = false } = {}): boolean {
-  const open = Array.from(root.querySelectorAll(OPEN_MODAL_SELECTOR));
+  const open = Array.from(root.querySelectorAll(MODAL_OR_PENDING_SELECTOR));
   if (!overYielding) return open.length > 0;
   return open.some((el) => !el.hasAttribute(YIELDING_MODAL_ATTR) && el.querySelector(`[${YIELDING_MODAL_ATTR}]`) === null);
 }
@@ -151,8 +151,8 @@ export function watchModals(condition: () => boolean, onMet: () => void, root: N
 }
 
 /** Prévient (une fois) quand plus aucune modale n'est ouverte (`watchModals`). */
-export function watchModalsClosed(onClosed: () => void, root?: Node, options: { overYielding?: boolean } = {}): () => void {
-  return watchModals(() => !anotherModalOpen(document, options), onClosed, root);
+export function watchModalsClosed(onClosed: () => void, options: { overYielding?: boolean } = {}): () => void {
+  return watchModals(() => !anotherModalOpen(document, options), onClosed);
 }
 
 /**

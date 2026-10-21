@@ -202,7 +202,7 @@ export function MatchLaunchCenter({
     // s'efface.
     const urgent = { overYielding: true };
     if (anotherModalOpen(document, urgent)) {
-      return clocks ? watchModalsClosed(() => setModalRecheck((n) => n + 1), undefined, urgent) : undefined;
+      return clocks ? watchModalsClosed(() => setModalRecheck((n) => n + 1), urgent) : undefined;
     }
     setConfirming(false);
     setOpenMatchId(next.matchId);

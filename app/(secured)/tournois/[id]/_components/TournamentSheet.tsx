@@ -53,6 +53,7 @@ import { buildEntrantLogoMap } from "@/lib/shared/entrant-logos";
 import { MatchAnchorProvider } from "../_lib/match-anchor-context";
 import { useMatchAnchor } from "../_hooks/useMatchAnchor";
 import { useCertificationPrompt } from "../_hooks/useCertificationPrompt";
+import { liveCertificationPrompt } from "@/lib/shared/certification-prompt";
 import { TournamentProgress } from "./TournamentProgress";
 import { TournamentLoading } from "./TournamentLoading";
 import { TournamentHeader } from "./TournamentHeader";
@@ -586,7 +587,7 @@ export function TournamentSheet({ tournamentId, source }: Readonly<{ tournamentI
    */
   const frozen = fatal !== null;
   // Invitation à certifier Discord et BattleTag (`CERTIFICATION_PROMPT.md`).
-  const certificationPrompt = useCertificationPrompt(detail?.certificationPrompt, frozen);
+  const certificationPrompt = useCertificationPrompt(liveCertificationPrompt(detail), frozen);
   const canReportScore = useCallback(
     (match: BracketMatch): boolean =>
       !frozen &&

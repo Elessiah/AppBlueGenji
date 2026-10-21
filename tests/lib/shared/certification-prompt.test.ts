@@ -6,10 +6,14 @@ import {
   certificationPromptFor,
   certificationProfileHref,
   certificationPromptStep,
+  liveCertificationPrompt,
   rememberCertificationPromptClosed,
   shouldOpenCertificationPrompt,
   teamHasContact,
 } from "@/lib/shared/certification-prompt";
+import type { TournamentState } from "@/lib/shared/types";
+import { tournamentDetail } from "../../helpers/tournament-detail";
+import { tournamentCard } from "../../helpers/tournament-card";
 
 /**
  * Invitation à certifier Discord et BattleTag sur la fiche d'un tournoi
@@ -182,4 +186,32 @@ describe("« Ne plus voir » et fermeture", () => {
 it("mène à la section « Discord » si le tag manque, sinon à « Applications connectées »", () => {
   expect(certificationProfileHref({ discordVerified: false })).toBe("/profil#discord");
   expect(certificationProfileHref({ discordVerified: true })).toBe("/profil#connexions");
+});
+
+describe("liveCertificationPrompt", () => {
+  const prompt = { reason: "MANAGER", discordVerified: false, battletagVerified: true, battletagRelevant: true } as const;
+  const detail = (state: TournamentState, registered: boolean, certificationPrompt: typeof prompt | null = prompt) =>
+    tournamentDetail({
+      card: tournamentCard({ state }),
+      myTeamId: 42,
+      certificationPrompt,
+      registrations: registered
+        ? [{ teamId: 42, teamName: "Équipe", logoUrl: null, seed: null, registeredAt: "2026-10-01T10:00:00.000Z", finalRank: null }]
+        : [],
+    });
+
+  it("rejoue l'invitation tant que l'équipe est engagée dans un tournoi non clos", () => {
+    expect(liveCertificationPrompt(detail("RUNNING", true))).toEqual(prompt);
+  });
+
+  it("la tait pour un tournoi clos depuis, ou une équipe retirée", () => {
+    expect(liveCertificationPrompt(detail("FINISHED", true))).toBeNull();
+    expect(liveCertificationPrompt(detail("RUNNING", false))).toBeNull();
+    expect(liveCertificationPrompt(detail("RUNNING", true, null))).toBeNull();
+  });
+
+  it("fiche pas encore lue : rien de décidé", () => {
+    expect(liveCertificationPrompt(undefined)).toBeUndefined();
+    expect(liveCertificationPrompt(null)).toBeUndefined();
+  });
 });

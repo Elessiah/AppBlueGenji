@@ -151,7 +151,7 @@ describe("watchModals / watchModalsClosed", () => {
     jest.useFakeTimers();
     const { state, mutate } = fakeDom();
     const calls: number[] = [];
-    watchModalsClosed(() => calls.push(1), {} as Node);
+    watchModalsClosed(() => calls.push(1));
     expect(state.observed).toEqual(expect.objectContaining({ childList: true, subtree: true }));
     mutate();
     jest.advanceTimersByTime(300);
@@ -168,7 +168,7 @@ describe("watchModals / watchModalsClosed", () => {
   it("prévient aussitôt si la condition tient déjà, sans observer", () => {
     const { state } = fakeDom(false);
     const calls: number[] = [];
-    watchModalsClosed(() => calls.push(1), {} as Node);
+    watchModalsClosed(() => calls.push(1));
     expect(calls).toHaveLength(1);
     expect(state.observed).toBeNull();
   });

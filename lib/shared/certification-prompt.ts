@@ -20,7 +20,7 @@
  * clés de son « Ne plus voir ».
  */
 
-import type { TournamentGame } from "./types";
+import type { TournamentDetail, TournamentGame } from "./types";
 
 /** Pourquoi la fiche invite ce lecteur à certifier. */
 export type CertificationPromptReason = "MANAGER" | "TEAM_WITHOUT_CONTACT";
@@ -155,4 +155,19 @@ export function certificationPromptStep(input: {
   if (input.decided || !input.hasPrompt || input.frozen) return "IDLE";
   if (!input.allowed) return "SKIP";
   return input.otherModalOpen ? "WAIT" : "OPEN";
+}
+
+/**
+ * L'invitation telle que la fiche peut encore l'afficher. Le serveur la calcule
+ * une fois par connexion du flux, et le client la rejoue d'un instantané à
+ * l'autre : un tournoi clos depuis, ou une équipe qui s'est retirée, la
+ * rendraient périmée — l'instantané, lui, est à jour.
+ */
+export function liveCertificationPrompt(
+  detail: Pick<TournamentDetail, "certificationPrompt" | "card" | "registrations" | "myTeamId"> | null | undefined,
+): CertificationPrompt | null | undefined {
+  if (!detail) return undefined;
+  const { certificationPrompt, card, registrations, myTeamId } = detail;
+  if (certificationPrompt === null || card.state === "FINISHED") return null;
+  return registrations.some((row) => row.teamId === myTeamId) ? certificationPrompt : null;
 }

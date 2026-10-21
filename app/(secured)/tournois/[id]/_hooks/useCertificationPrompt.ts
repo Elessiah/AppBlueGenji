@@ -34,8 +34,9 @@ function browserStorage(kind: "localStorage" | "sessionStorage"): Storage | null
  * par-dessus ; l'invitation s'efface sans rien retenir, case « Ne plus voir »
  * comprise (tenue ici, pas dans la modale), et revient à sa fermeture.
  *
- * Une invitation retirée par le serveur (certifiée entre-temps) ferme la
- * modale, une fiche figée la masque.
+ * Une invitation retirée (certifiée entre-temps, tournoi clos, lecture en
+ * échec côté serveur) masque la modale sans la fermer : revenue à la lecture
+ * suivante, elle réapparaît. Une fiche figée la masque aussi.
  */
 export function useCertificationPrompt(prompt: CertificationPrompt | null | undefined, frozen: boolean) {
   const { clocks } = useClientPower();
@@ -58,12 +59,6 @@ export function useCertificationPrompt(prompt: CertificationPrompt | null | unde
     decided.current = true;
     if (step === "OPEN") setOpen(true);
   }, [prompt, frozen, clocks, recheck]);
-
-  // `null` seulement — c'est la réponse du serveur ; `undefined` veut dire que
-  // la fiche n'est pas (encore) lue, et ne ferme rien.
-  useEffect(() => {
-    if (prompt === null) setOpen(false);
-  }, [prompt]);
 
   const close = useCallback(() => {
     rememberCertificationPromptClosed(browserStorage("localStorage"), browserStorage("sessionStorage"), neverAgain);
