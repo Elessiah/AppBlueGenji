@@ -518,16 +518,16 @@ export function casterContactsPending(launch: {
 }
 
 /**
- * Annoncer l'arrivée des contacts du caster ? Seulement au passage « en
- * attente → montrés » (relecture à l'heure de départ), jamais à l'ouverture, et
- * pas s'il n'a aucun contact à montrer (deux « — » ne sont pas une arrivée).
+ * Annoncer l'arrivée des contacts du caster ? Seulement quand ils attendaient
+ * (`wasPending`, `casterContactsPending`) et que le serveur les montre désormais
+ * — la relecture à l'heure de départ —, jamais à l'ouverture, et pas s'il n'a
+ * aucun contact à montrer (deux « — » ne sont pas une arrivée).
  */
 export function casterContactsArrived(
   wasPending: boolean,
-  pending: boolean,
   caster: Pick<LaunchCaster, "contactsShown" | "discordTag" | "battletag">,
 ): boolean {
-  return wasPending && !pending && caster.contactsShown && (caster.discordTag !== null || caster.battletag !== null);
+  return wasPending && caster.contactsShown && (caster.discordTag !== null || caster.battletag !== null);
 }
 
 /**

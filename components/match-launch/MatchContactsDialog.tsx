@@ -420,6 +420,7 @@ export function MatchContactsDialog({
                   viewer={launch.viewer}
                   noCasterText={t("contacts.noCaster")}
                   linkNames
+                  announceArrival
                 />
               </>
             )}

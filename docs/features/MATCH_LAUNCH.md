@@ -115,7 +115,19 @@ s'afficheront au lancement » (`contacts.casterLater`) au lieu de deux « — »
 Les deux modales rendent `CasterCard` sur la décision du serveur
 (`LaunchCaster.contactsShown`, issu d'`exposesCaster`), jamais recalculée côté
 client ; la note ne s'adresse jamais au caster lui-même (`viewerIsCaster`,
-`lib/shared/match-launch.ts`).
+`lib/shared/match-launch.ts`). Les fiches des engagées font de même
+(`LaunchSide.contactsShown`, issu d'`exposes`) ; tues, leur note renvoie à
+l'action « Contacts » — sauf pour le caster, qu'elle ne servirait pas avant le
+départ (`contactsAtLaunchCaster`). La modale de lancement d'un match programmé
+montre donc aux équipes la note du caster sous celles des engagées.
+
+Quand la relecture de l'heure de départ remplace la note par les contacts, la
+modale « Contacts » (seule, `announceArrival`) l'annonce par une phrase courte
+dans une région polie hors flux (`contacts.casterShown`, `<output>` `sr-only`) —
+pas les boutons « Copier ». L'annonce ne vient qu'au passage « en attente →
+montrés » d'un même caster, avec au moins un contact (`casterContactsArrived`),
+jamais à l'ouverture, et se vide après dix secondes. La modale de lancement
+s'en passe : ce passage y coïncide avec son propre statut, déjà annoncé.
 Déclaré : `PRIVACY_CHANGES` `2026-10-contacts-du-caster-aux-arbitres`, `/rgpd`,
 le registre (T04) et les conditions (v6 retouchée, sans nouvelle version).
 

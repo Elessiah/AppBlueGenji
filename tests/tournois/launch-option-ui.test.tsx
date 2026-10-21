@@ -237,6 +237,21 @@ describe("fiches de contact — noms cliquables", () => {
     expect(html).toContain('href="/joueurs/7"');
   });
 
+  // Contacts tus par le serveur : la note ne renvoie à l'action « Contacts » que
+  // pour qui elle ouvre quelque chose — pas pour le caster avant le départ.
+  it("contacts tus → note au lancement, sans renvoi à « Contacts » pour le caster", () => {
+    const closed = side({ contacts: [], contactsShown: false });
+    const forTeam = renderToStaticMarkup(
+      <SideCard side={closed} isHost={false} phase="SCHEDULED" onCopy={noop} viewer={{ role: "TEAM1", isCaster: false }} />,
+    );
+    expect(forTeam).toContain("ou dès maintenant par l&#x27;action « Contacts »");
+    const forCaster = renderToStaticMarkup(
+      <SideCard side={closed} isHost={false} phase="SCHEDULED" onCopy={noop} viewer={{ role: "CASTER", isCaster: true }} />,
+    );
+    expect(forCaster).toContain("Les contacts s&#x27;affichent au lancement.</p>");
+    expect(forCaster).not.toContain("« Contacts »");
+  });
+
   it("entrée solo → le profil du joueur, jamais une fiche d'équipe", () => {
     const html = renderToStaticMarkup(
       <SideCard side={side({ isSolo: true })} isHost={false} phase="LAUNCHED" onCopy={noop} linkNames />,
@@ -308,11 +323,11 @@ describe("fiches de contact — noms cliquables", () => {
 
     it("annonce l'arrivée des contacts au seul passage « en attente → montrés »", () => {
       const shown = { ...caster, contactsShown: true };
-      expect(casterContactsArrived(true, false, shown)).toBe(true);
-      expect(casterContactsArrived(false, false, shown)).toBe(false);
-      expect(casterContactsArrived(true, true, { ...caster, contactsShown: false })).toBe(false);
+      expect(casterContactsArrived(true, shown)).toBe(true);
+      expect(casterContactsArrived(false, shown)).toBe(false);
+      expect(casterContactsArrived(true, { ...caster, contactsShown: false })).toBe(false);
       // Deux « — » ne sont pas une arrivée.
-      expect(casterContactsArrived(true, false, { ...shown, discordTag: null, battletag: null })).toBe(false);
+      expect(casterContactsArrived(true, { ...shown, discordTag: null, battletag: null })).toBe(false);
     });
 
     it("le caster lui-même avant le départ → ni contacts ni note sur sa propre fiche", () => {

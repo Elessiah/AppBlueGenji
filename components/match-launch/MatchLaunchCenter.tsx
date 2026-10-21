@@ -359,17 +359,14 @@ export function MatchLaunchCenter({
 
           <div className={styles.body}>
             <div className={styles.sides}>
-              <SideCard side={current.team1} isHost={current.hostTeamId === current.team1.teamId} phase={current.phase} onCopy={copy} />
+              <SideCard side={current.team1} isHost={current.hostTeamId === current.team1.teamId} phase={current.phase} onCopy={copy} viewer={current.viewer} />
               <div className={styles.divider} aria-hidden="true">
                 {t("vs")}
               </div>
-              <SideCard side={current.team2} isHost={current.hostTeamId === current.team2.teamId} phase={current.phase} onCopy={copy} />
+              <SideCard side={current.team2} isHost={current.hostTeamId === current.team2.teamId} phase={current.phase} onCopy={copy} viewer={current.viewer} />
             </div>
 
-            {/* Une carte par match : l'annonce d'arrivée ne survit pas au passage
-                à un autre match (« Autre match »). */}
             <CasterCard
-              key={current.matchId}
               caster={current.caster}
               phase={current.phase}
               onCopy={copy}
