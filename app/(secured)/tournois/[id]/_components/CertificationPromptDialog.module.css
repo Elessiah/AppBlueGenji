@@ -1,0 +1,143 @@
+/* Invitation à certifier (docs/features/CERTIFICATION_PROMPT.md). */
+
+.title {
+  margin: 0;
+  outline: none;
+  font-size: 18px;
+  color: var(--ink);
+}
+
+.lead {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-quiet);
+}
+
+.status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.statusItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.table {
+  width: 100%;
+  margin-top: 16px;
+  border-collapse: collapse;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.caption {
+  margin-bottom: 8px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--blue-300);
+}
+
+.table th,
+.table td {
+  padding: 8px 10px;
+  border-top: 1px solid var(--line-soft);
+  text-align: left;
+  vertical-align: top;
+}
+
+.table thead th {
+  border-top: none;
+  font-size: 12px;
+  color: var(--ink-mute);
+}
+
+.table tbody th {
+  width: 22%;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.does {
+  color: var(--ink-soft);
+}
+
+.doesNot {
+  color: var(--ink-quiet);
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.neverAgain {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-left: auto;
+}
+
+/* Écran étroit : chaque ligne devient une carte, chaque cellule nommée par
+   son intitulé de colonne (RESPONSIVE_TABLES.md). */
+@media (max-width: 560px) {
+  .table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .table tr,
+  .table th,
+  .table td {
+    display: block;
+    width: auto;
+  }
+
+  .table tbody tr {
+    padding: 6px 0;
+    border-top: 1px solid var(--line-soft);
+  }
+
+  .table tbody th,
+  .table tbody td {
+    width: auto;
+    border-top: none;
+    padding: 4px 0;
+  }
+
+  .table td::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--blue-300);
+  }
+}

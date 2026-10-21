@@ -52,6 +52,7 @@ import { EntrantProvider } from "../_lib/entrant-link";
 import { buildEntrantLogoMap } from "@/lib/shared/entrant-logos";
 import { MatchAnchorProvider } from "../_lib/match-anchor-context";
 import { useMatchAnchor } from "../_hooks/useMatchAnchor";
+import { useCertificationPrompt } from "../_hooks/useCertificationPrompt";
 import { TournamentProgress } from "./TournamentProgress";
 import { TournamentLoading } from "./TournamentLoading";
 import { TournamentHeader } from "./TournamentHeader";
@@ -85,6 +86,7 @@ const IssueReportDialog = dynamic(() => orReload(import("./IssueReportDialog").t
 const DeleteTournamentDialog = dynamic(() => orReload(import("./DeleteTournamentDialog").then((m) => m.DeleteTournamentDialog)), { ssr: false });
 const RollbackRoundDialog = dynamic(() => orReload(import("./RollbackRoundDialog").then((m) => m.RollbackRoundDialog)), { ssr: false });
 const EndurancePenaltyDialog = dynamic(() => orReload(import("./EndurancePenaltyDialog").then((m) => m.EndurancePenaltyDialog)), { ssr: false });
+const CertificationPromptDialog = dynamic(() => orReload(import("./CertificationPromptDialog").then((m) => m.CertificationPromptDialog)), { ssr: false });
 const AdvanceTournamentDialog = dynamic(() => orReload(import("./AdvanceTournamentDialog").then((m) => m.AdvanceTournamentDialog)), { ssr: false });
 const TournamentImageDialog = dynamic(() => orReload(import("./TournamentImageDialog").then((m) => m.TournamentImageDialog)), { ssr: false });
 const ConfirmActionDialog = dynamic(() => orReload(import("@/components/ui/confirm-action-dialog").then((m) => m.ConfirmActionDialog)), { ssr: false });
@@ -581,6 +583,8 @@ export function TournamentSheet({ tournamentId, source }: Readonly<{ tournamentI
    * plateau date de plusieurs minutes.
    */
   const frozen = fatal !== null;
+  // Invitation à certifier Discord et BattleTag (`CERTIFICATION_PROMPT.md`).
+  const certificationPrompt = useCertificationPrompt(detail?.certificationPrompt, frozen);
   const canReportScore = useCallback(
     (match: BracketMatch): boolean =>
       !frozen &&
@@ -1319,6 +1323,10 @@ export function TournamentSheet({ tournamentId, source }: Readonly<{ tournamentI
             router.replace("/tournois");
           }}
         />
+      )}
+
+      {certificationPrompt.open && detail.certificationPrompt && (
+        <CertificationPromptDialog prompt={detail.certificationPrompt} onClose={certificationPrompt.close} />
       )}
 
       {/*

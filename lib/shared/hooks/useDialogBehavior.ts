@@ -81,7 +81,13 @@ export function useDialogBehavior({ open, onClose, locked = false }: DialogBehav
       );
     const focusables = () => focusablesIn(containerRef.current);
     const candidates = focusables();
-    const preferred = candidates.find((el) => el.dataset.autofocus !== undefined);
+    // Un titre `tabIndex={-1}` marqué `data-autofocus` compte aussi : une modale
+    // longue qui se lit avant d'agir ouvre ainsi par le haut — le premier
+    // contrôle, tout en bas, la ferait s'ouvrir défilée sur un petit écran.
+    const preferred =
+      candidates.find((el) => el.dataset.autofocus !== undefined) ??
+      containerRef.current?.querySelector<HTMLElement>('[data-autofocus][tabindex="-1"]') ??
+      undefined;
     // Un bouton « × » d'en-tête (`data-dialog-close`) vient en tête du DOM pour
     // rester collé en haut du panneau : il n'est pas ce qu'on vient faire dans
     // la modale, le focus d'ouverture va au premier contrôle qui suit.

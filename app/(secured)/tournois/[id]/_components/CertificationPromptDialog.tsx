@@ -1,0 +1,110 @@
+"use client";
+
+import { useState } from "react";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { CERTIFICATION_PROFILE_HREF, type CertificationPrompt } from "@/lib/shared/certification-prompt";
+import { useDialogsText } from "../_lib/dialogs-text";
+import { TournamentDialogFrame } from "./TournamentDialogFrame";
+import s from "./CertificationPromptDialog.module.css";
+
+/** Lignes du tableau, dans l'ordre de lecture. */
+const ROWS = ["identity", "matches", "staff", "later"] as const;
+
+interface CertificationPromptDialogProps {
+  prompt: CertificationPrompt;
+  /** Fermeture, avec le choix « Ne plus voir ». */
+  onClose: (neverAgain: boolean) => void;
+}
+
+/**
+ * Invitation à certifier son tag Discord et son BattleTag
+ * (`docs/features/CERTIFICATION_PROMPT.md`), ouverte d'office sur la fiche
+ * d'un tournoi. Elle dit pourquoi elle s'ouvre, ce qui manque encore, puis ce
+ * que la certification fait et ne fait pas — un tableau, pour qu'aucune
+ * promesse ne se lise sans sa limite en face. Le bouton mène à « Applications
+ * connectées » du profil, où les deux se rattachent.
+ */
+export function CertificationPromptDialog({ prompt, onClose }: Readonly<CertificationPromptDialogProps>) {
+  const { t } = useDialogsText();
+  const [neverAgain, setNeverAgain] = useState(false);
+  const close = () => onClose(neverAgain);
+
+  const status = [
+    { key: "discord", label: t("certification.discord"), ok: prompt.discordVerified },
+    { key: "battletag", label: t("certification.battletag"), ok: prompt.battletagVerified },
+  ];
+
+  return (
+    <TournamentDialogFrame
+      titleId="certification-prompt-title"
+      describedBy="certification-prompt-lead"
+      maxWidth={640}
+      zIndex={90}
+      deferMount
+      busy={false}
+      onClose={close}
+    >
+      {/* Focus d'ouverture sur le titre : la modale se lit avant d'agir, et ses
+          contrôles, tout en bas, l'ouvriraient défilée sur un petit écran. */}
+      <h3 id="certification-prompt-title" className={s.title} tabIndex={-1} data-autofocus>
+        {t("certification.title")}
+      </h3>
+      <p id="certification-prompt-lead" className={s.lead}>
+        {t(prompt.reason === "MANAGER" ? "certification.leadManager" : "certification.leadTeam")}
+      </p>
+
+      <ul className={s.status} aria-label={t("certification.statusLabel")}>
+        {status.map((item) => (
+          <li key={item.key} className={s.statusItem}>
+            <span>{item.label}</span>
+            <span className={`pill ${item.ok ? "pill-success" : "pill-warning"}`}>
+              {t(item.ok ? "certification.done" : "certification.missing")}
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      <table className={s.table}>
+        <caption className={s.caption}>{t("certification.tableCaption")}</caption>
+        <thead>
+          <tr>
+            <th scope="col">
+              <span className="sr-only">{t("certification.colTopic")}</span>
+            </th>
+            <th scope="col">{t("certification.colDoes")}</th>
+            <th scope="col">{t("certification.colDoesNot")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {ROWS.map((row) => (
+            <tr key={row}>
+              <th scope="row">{t(`certification.rows.${row}.topic`)}</th>
+              <td className={s.does} data-label={t("certification.colDoes")}>
+                {t(`certification.rows.${row}.does`)}
+              </td>
+              <td className={s.doesNot} data-label={t("certification.colDoesNot")}>
+                {t(`certification.rows.${row}.doesNot`)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <div className={s.footer}>
+        <label className={s.neverAgain}>
+          <input type="checkbox" checked={neverAgain} onChange={(e) => setNeverAgain(e.target.checked)} />
+          {/* NOSONAR S6772 — label en flex avec `gap` */}
+          {t("certification.neverAgain")}
+        </label>
+        <div className={s.actions}>
+          <button type="button" className="btn ghost" onClick={close}>
+            {t("certification.later")}
+          </button>
+          <LocaleLink href={CERTIFICATION_PROFILE_HREF} className="btn" onClick={close}>
+            {t("certification.go")}
+          </LocaleLink>
+        </div>
+      </div>
+    </TournamentDialogFrame>
+  );
+}

@@ -54,7 +54,7 @@
       "savedForfeit": "Forfeit saved: the match is not settled yet.",
       "savedForfeitPaused": "Forfeit saved: the match is still in progress, and the proposal's automatic confirmation is paused.",
       "autoValidationPaused": "Automatic confirmation paused by a referee: without an answer from the opponent, only “Confirm the result” settles the match.",
-        "disputeNotice": "Dispute: score entry stays locked for both opponents until you use “Confirm the result” (score or forfeit). “Save” records progress without settling the match.",
+      "disputeNotice": "Dispute: score entry stays locked for both opponents until you use “Confirm the result” (score or forfeit). “Save” records progress without settling the match.",
       "resolved": "Result confirmed: the board is up to date.",
       "awaitingDetail": "Loading the proposed map details… Refresh the page if they don't arrive.",
       "proposal": "Score proposed by {author} ({score1} – {score2}), awaiting confirmation from {other}. Check it, then confirm the result to approve it.",
@@ -355,5 +355,44 @@
     "intro": "Referees only. Only <strong>verified</strong> tags appear: a player who hasn't proven theirs can't be reached through the site.",
     "hide": "Hide the contacts",
     "show": "Show the contacts"
+  },
+  "certification": {
+    "title": "Verify your Discord and your BattleTag",
+    "leadManager": "You manage a team entered in this tournament. When a match launches, the opponent, the caster and the referees must be able to reach you: you are still missing a verification.",
+    "leadTeam": "Your team has no contact to show when its matches launch: nobody on it has verified their Discord tag or their BattleTag. The opponent and the referees have no way to reach you.",
+    "statusLabel": "Where you stand",
+    "discord": "Discord tag",
+    "battletag": "BattleTag",
+    "done": "Verified",
+    "missing": "To verify",
+    "tableCaption": "What verification does, and what it does not",
+    "colTopic": "Topic",
+    "colDoes": "What it does",
+    "colDoesNot": "What it does not do",
+    "rows": {
+      "identity": {
+        "topic": "Your identity",
+        "does": "Proves your Discord tag and your BattleTag really are yours: Discord and Blizzard confirm it.",
+        "doesNot": "Gives the site no access to your password, your messages or your friends."
+      },
+      "matches": {
+        "topic": "Your matches",
+        "does": "You can be shown as your team's contact to the opponent and the caster of your matches.",
+        "doesNot": "Does not change your visibility settings: what other players see on your profile stays what you chose."
+      },
+      "staff": {
+        "topic": "The organisers",
+        "does": "Admins, and referees while you play an ongoing tournament, can reach you if something goes wrong.",
+        "doesNot": "Posts nothing on your behalf and does not change your username on the site."
+      },
+      "later": {
+        "topic": "Later on",
+        "does": "Opens tournaments that require a verified Discord or a Battle.net account.",
+        "doesNot": "Commits you to nothing: you can unlink Discord or Battle.net from your profile."
+      }
+    },
+    "neverAgain": "Don't show again",
+    "later": "Later",
+    "go": "Verify from my profile"
   }
 }
