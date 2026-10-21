@@ -38,11 +38,12 @@ export const DISCORD_TAG_AUDIENCE =
  *
  * Se connecter **n'est pas** certifier : la connexion enregistre le pseudo que
  * Discord donne, invisible de tous, et la certification — qui ouvre le tag à
- * l'organisation — reste un geste distinct, sur `/profil`. La phrase dit les
+ * l'organisation — reste un geste distinct, sur `/profil` ou dans la fenêtre
+ * proposée après une connexion par Discord ou Blizzard. La phrase dit les
  * deux, et qui lirait le tag une fois certifié, pour que le joueur sache ce que
  * ce geste-là ouvrirait avant d'avoir à le faire.
  */
-export const DISCORD_LOGIN_TAG_NOTICE = `Enregistre ton pseudo Discord sans le certifier : il reste invisible de tous, administrateurs compris. Si tu le certifies ensuite d'un clic dans « Mon profil », ${DISCORD_TAG_AUDIENCE}`;
+export const DISCORD_LOGIN_TAG_NOTICE = `Enregistre ton pseudo Discord sans le certifier : il reste invisible de tous, administrateurs compris. Si tu le certifies ensuite, dans « Mon profil » ou dans la fenêtre proposée après une connexion par Discord ou Blizzard, ${DISCORD_TAG_AUDIENCE}`;
 
 /**
  * Ce que la case « Tag Discord » des réglages de visibilité ouvre, et ce

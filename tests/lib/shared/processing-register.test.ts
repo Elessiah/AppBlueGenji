@@ -459,7 +459,7 @@ describe("bases légales : le registre et la politique disent la même chose", (
 
   it("fonde les contacts du lancement d'un match sur l'exécution des conditions d'utilisation", () => {
     expect(byRef("T04").legalBasis).toMatch(
-      /exécution du service demandé par le joueur \(contrat — conditions d'utilisation, section « Contacts de match »\) pour la présentation des contacts aux parties d'un match dans sa fenêtre « Contacts » et dans sa fenêtre de lancement \(à ses deux équipes et aux arbitres dès que ses deux adversaires sont connus, à son caster le temps du match, et ceux du caster à ses deux équipes le temps du match et aux arbitres dès que ses deux adversaires sont connus ; la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes et au caster\), BattleTag masqué compris — arbitres et administrateurs n'y ont pas d'autre accès, sur la même base —,/,
+      /exécution du service demandé par le joueur \(contrat — conditions d'utilisation, section « Contacts de match »\) pour la présentation des contacts aux parties d'un match dans sa fenêtre « Contacts » et dans sa fenêtre de lancement \(à ses deux équipes et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, à son caster le temps du match, et ceux du caster à ses deux équipes le temps du match et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin ; la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes et au caster\), BattleTag masqué compris — arbitres et administrateurs n'y ont pas d'autre accès, sur la même base —,/,
     );
   });
 
