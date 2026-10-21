@@ -1125,7 +1125,9 @@ export async function getTournamentViewerContext(
   // Invitation à certifier (`CERTIFICATION_PROMPT.md`) : au joueur d'une
   // équipe engagée dans un tournoi qui n'est pas clos. Une requête indexée sur
   // le roster, par connexion du flux (pas par instantané) et pour les seuls
-  // engagés ; « Ne plus voir » vit dans le navigateur, le serveur l'ignore.
+  // engagés. La case « Ne plus voir » de la modale vit dans le navigateur ;
+  // celui de la proposition de la connexion, gardé sur le compte, est lu ici
+  // (`loadCertificationPrompt`).
   const certificationPrompt =
     !isSolo && activeTeam && alreadyRegistered && snapshot.card.state !== "FINISHED"
       ? await readCertificationPrompt(

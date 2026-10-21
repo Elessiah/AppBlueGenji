@@ -47,9 +47,12 @@ export function useCertificationPrompt(prompt: CertificationPrompt | null | unde
   const [open, setOpen] = useState(false);
   const [neverAgain, setNeverAgain] = useState(false);
   const decided = useRef(false);
+  // Effacée devant une modale urgente : plus rien sur cette page, même si
+  // l'invitation est retirée puis revient.
+  const yielded = useRef(false);
 
   useEffect(() => {
-    if (decided.current || prompt == null || frozen) return;
+    if (decided.current || yielded.current || prompt == null || frozen) return;
     decided.current = true;
     const step = certificationPromptStep({
       allowed: shouldOpenCertificationPrompt(browserStorage("localStorage"), browserStorage("sessionStorage")),
@@ -71,6 +74,7 @@ export function useCertificationPrompt(prompt: CertificationPrompt | null | unde
   // drapeau d'onglet d'une fermeture.
   const yieldPlace = useCallback(() => {
     if (neverAgain) rememberCertificationPromptClosed(browserStorage("localStorage"), null, true);
+    yielded.current = true;
     setOpen(false);
   }, [neverAgain]);
 

@@ -101,9 +101,15 @@ describe("loadCertificationPrompt", () => {
     expect((await loadCertificationPrompt(executor, 7, 42, false, false))?.reason).toBe("TEAM_WITHOUT_CONTACT");
   });
 
-  it("respecte le « Ne plus voir » donné à la proposition de la connexion (compte)", async () => {
+  it("respecte le « Ne plus voir » donné à la proposition de la connexion (compte), Discord manquant", async () => {
     const { executor } = rosterOf([{ user_id: 7, ...BARE }], 1);
     expect(await loadCertificationPrompt(executor, 7, 42, true, true)).toBeNull();
+  });
+
+  it("ce refus ne tait pas une invitation qui ne porte que sur le BattleTag", async () => {
+    const { execute, executor } = rosterOf([{ user_id: 7, ...BARE, ...DISCORD }], 1);
+    expect((await loadCertificationPrompt(executor, 7, 42, true, true))?.reason).toBe("MANAGER");
+    expect(execute).toHaveBeenCalledTimes(1);
   });
 
   it("colonne du « Ne plus voir » absente : comme sans choix ; toute autre panne remonte", async () => {

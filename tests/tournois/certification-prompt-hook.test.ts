@@ -201,7 +201,10 @@ describe("useCertificationPrompt", () => {
     const yielded = act(() => modals.yieldWatchers[0](), PROMPT);
     expect(yielded.prompt).toBeNull();
     expect(session.values.size + local.values.size).toBe(0);
-    // L'annonce de lancement se ferme : l'invitation ne revient pas sur cette page.
+    // L'annonce de lancement se ferme : l'invitation ne revient pas sur cette page…
+    expect(render({ ...PROMPT }).prompt).toBeNull();
+    // …même retirée puis revenue (lecture en échec à une reconnexion).
+    render(null);
     expect(render({ ...PROMPT }).prompt).toBeNull();
   });
 

@@ -22,18 +22,11 @@ function identityOf(member: ContactCandidate): CertificationIdentity {
 }
 
 /**
- * Invitation due au lecteur, membre de l'équipe `teamId` ; `null` s'il n'en a
- * pas besoin, ou s'il n'est plus dans le roster (départ entre deux lectures).
- * Le roster et ses certifications se lisent comme le lancement les lit
- * (`loadRosters`, `toCandidate`, `hasVerifiedDiscord` / `hasVerifiedBattletag`).
- * Seule différence voulue : en Marvel Rivals, un BattleTag vérifié ne compte
- * pas comme contact (`teamHasContact`), même si le lancement le présente.
- */
-/**
  * « Ne plus voir » donné à la proposition de certification de la connexion
  * (`DISCORD_CERTIFY_PROMPT.md`, gardé sur le compte) : l'invitation de la fiche
- * le respecte aussi, sur tous les appareils. Colonne absente (`ALTER` échoué) :
- * comme sans choix.
+ * le respecte aussi, sur tous les appareils — tant que c'est Discord qui manque
+ * (un BattleTag seul à vérifier n'était pas l'objet de ce refus). Colonne
+ * absente (`ALTER` échoué) : comme sans choix.
  */
 async function certificationNudgesDeclined(executor: Pick<PoolConnection, "execute">, userId: number): Promise<boolean> {
   try {
@@ -48,6 +41,14 @@ async function certificationNudgesDeclined(executor: Pick<PoolConnection, "execu
   }
 }
 
+/**
+ * Invitation due au lecteur, membre de l'équipe `teamId` ; `null` s'il n'en a
+ * pas besoin, ou s'il n'est plus dans le roster (départ entre deux lectures).
+ * Le roster et ses certifications se lisent comme le lancement les lit
+ * (`loadRosters`, `toCandidate`, `hasVerifiedDiscord` / `hasVerifiedBattletag`).
+ * Seule différence voulue : en Marvel Rivals, un BattleTag vérifié ne compte
+ * pas comme contact (`teamHasContact`), même si le lancement le présente.
+ */
 export async function loadCertificationPrompt(
   executor: Pick<PoolConnection, "execute">,
   userId: number,
@@ -65,7 +66,9 @@ export async function loadCertificationPrompt(
     teamHasContact: teamHasContact(members.map(identityOf), battletagRelevant),
     battletagRelevant,
   });
-  // Lu seulement quand une invitation serait due : la plupart des lecteurs n'en ont pas.
-  if (prompt === null || (await certificationNudgesDeclined(executor, userId))) return null;
+  // Lu seulement quand une invitation serait due pour Discord : la plupart des
+  // lecteurs n'en ont pas.
+  if (prompt === null) return null;
+  if (!prompt.discordVerified && (await certificationNudgesDeclined(executor, userId))) return null;
   return prompt;
 }
