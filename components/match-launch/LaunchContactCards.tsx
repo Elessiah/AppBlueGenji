@@ -288,7 +288,6 @@ export function CasterCard({
   const { t } = useLaunchText();
   const pending = casterContactsPending({ caster, viewer });
   const arrival = useCasterArrival(caster, pending, announceArrival);
-  const hasContacts = caster !== null && casterHasContacts(caster);
   const self = viewerIsCaster({ viewer });
   if (!caster) {
     return (
@@ -299,6 +298,7 @@ export function CasterCard({
       </section>
     );
   }
+  const hasContacts = casterHasContacts(caster);
   return (
     <section className={styles.caster} aria-label={t("caster")}>
       <div className={styles.sideHead}>
