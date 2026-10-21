@@ -126,7 +126,9 @@ export function SideCard({
   /**
    * Le lecteur : au caster (rôle `CASTER` ; un joueur qui caste lit en joueur),
    * la note des contacts tus ne renvoie pas à l'action « Contacts », qui ne lui
-   * ouvre rien avant le départ.
+   * ouvre rien avant le départ. Un arbitre qui caste (rôle `CASTER` aussi) l'a
+   * pourtant : le lecteur ne dit pas l'arbitrage, la note tait alors un
+   * raccourci sans rien dire de faux — un renvoi à tort serait pire.
    */
   viewer: Pick<MatchLaunchInfo["viewer"], "role">;
   /**
