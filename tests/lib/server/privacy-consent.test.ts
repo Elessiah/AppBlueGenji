@@ -134,6 +134,12 @@ describe("privacyAudienceSql", () => {
     expect(privacyAudienceSql({ ...base, audience: undefined })).toBe("1 = 1");
     expect(privacyAudienceSql({ ...base, audience: "GOOGLE_LINKED" })).toBe("u.google_sub IS NOT NULL");
     expect(privacyAudienceSql({ ...base, audience: "LIVE_STAFF" })).toBe(LIVE_STAFF_SQL);
+  });
+
+  it("LIVE_STAFF : la règle de can(user, \"live\"), rôles tirés de ROLE_PERMISSIONS", () => {
+    expect(LIVE_STAFF_SQL).toBe(
+      `(u.is_admin = 1 OR JSON_CONTAINS(u.platform_roles_json, '"ADMIN"') OR JSON_CONTAINS(u.platform_roles_json, '"ARBITRE"') OR JSON_CONTAINS(u.platform_roles_json, '"CASTER"'))`,
+    );
     expect(privacyAudienceSql({ ...base, audience: "AUTRE" as never })).toBe("1 = 0");
   });
 });

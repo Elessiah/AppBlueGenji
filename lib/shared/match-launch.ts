@@ -469,6 +469,18 @@ export type MatchLaunchInfo = {
 };
 
 /**
+ * Les contacts **du caster** sont-ils rendus à ce lecteur ? Le temps du match
+ * (lancement ouvert, ou lancé), et à toute heure à un arbitre — rôle `REFEREE` :
+ * un arbitre qui joue le match lit en joueur (décision de l'utilisateur,
+ * 2026-10-21). Une seule règle, lue par le serveur (`exposesCaster`) et par la
+ * modale « Contacts » (`casterContactsOpen`) : deux copies dériveraient, et la
+ * fiche montrerait deux « — » ou une note à tort.
+ */
+export function exposesCasterContacts(phase: MatchLaunchPhase, role: MatchLaunchViewerRole): boolean {
+  return phase === "LOBBY" || phase === "LAUNCHED" || role === "REFEREE";
+}
+
+/**
  * Doit-on ouvrir la modale d'office pour ce match ? Au lancement, pour appeler
  * les « Prêt » ; puis une fois lancé, pour l'annoncer. Clé par phase : fermer la
  * modale du lancement ne fait pas taire l'annonce du départ.

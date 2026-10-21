@@ -6,7 +6,11 @@ import { ScrollArea } from "@/components/cyber/ScrollArea";
 import { useToast } from "@/components/ui/toast";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
-import { MATCH_LAUNCH_REFRESH_EVENT, type MatchLaunchInfo, type MatchLaunchPhase } from "@/lib/shared/match-launch";
+import {
+  MATCH_LAUNCH_REFRESH_EVENT,
+  exposesCasterContacts,
+  type MatchLaunchInfo,
+} from "@/lib/shared/match-launch";
 import type { BracketMatch } from "@/lib/shared/types";
 import { CasterCard, SideCard } from "./LaunchContactCards";
 import { useLaunchText, type LaunchText } from "./launch-text";
@@ -60,14 +64,6 @@ export function contactsRetryDelay(startAt: string | null, serverDate: string | 
 }
 
 /**
- * Le match est-il parti (lancement ouvert, ou lancé) ? C'est alors seulement
- * que les contacts du caster sortent (`exposesCaster`, serveur).
- */
-export function matchUnderway(phase: MatchLaunchPhase | null): boolean {
-  return phase === "LOBBY" || phase === "LAUNCHED";
-}
-
-/**
  * Le lecteur est-il le caster inscrit ? Son rôle le dit, sauf pour un joueur
  * du match qui caste aussi (`viewer.isCaster`, le rôle de joueur primant).
  */
@@ -76,12 +72,11 @@ export function viewerIsCaster(launch: MatchLaunchInfo): boolean {
 }
 
 /**
- * Les contacts du caster sont-ils rendus à ce lecteur ? Le temps du match
- * (`exposesCaster`), et à toute heure pour un arbitre (rôle `REFEREE` : un
- * arbitre qui joue le match lit en joueur) — décision de l'utilisateur, 2026-10-21.
+ * Les contacts du caster sont-ils rendus à ce lecteur ? La règle même du
+ * serveur (`exposesCasterContacts`), sur la phase qu'il a lue.
  */
 export function casterContactsOpen(launch: MatchLaunchInfo): boolean {
-  return matchUnderway(launch.phase) || launch.viewer.role === "REFEREE";
+  return exposesCasterContacts(launch.phase, launch.viewer.role);
 }
 
 /**

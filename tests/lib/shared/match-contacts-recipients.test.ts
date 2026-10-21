@@ -47,10 +47,10 @@ describe("contacts d'un match — destinataires et personnes présentées", () =
 describe("BattleTag masqué d'un caster", () => {
   it("la notice du profil dit que les deux équipes d'un match casté le voient (FR et EN)", () => {
     expect(frProfile.battletagNotice.asCaster).toContain(
-      "Les deux équipes d'un match que tu castes</strong>, le temps du match seulement (de son départ à sa fin), et <strong>ses arbitres</strong> dès que ses deux adversaires sont connus",
+      "Les deux équipes d'un match que tu castes</strong>, le temps du match seulement (de son départ à sa fin), et <strong>ses arbitres et les administrateurs</strong> dès que ses deux adversaires sont connus",
     );
     expect(enProfile.battletagNotice.asCaster).toContain(
-      "Both teams of a match you cast</strong>, only while the match is being played (from its start to its end), and <strong>its referees</strong> from the moment both its opponents are known",
+      "Both teams of a match you cast</strong>, only while the match is being played (from its start to its end), and <strong>its referees and administrators</strong> from the moment both its opponents are known",
     );
     expect(readSource("app/(secured)/profil/BattletagVisibilityNotice.tsx")).toContain('"battletagNotice.asCaster"');
   });
@@ -176,8 +176,10 @@ describe("tag Discord d'un caster — arbitres", () => {
     );
   });
 
-  it("le BattleTag masqué d'un caster : le staff le lit plus tôt que les équipes (FR et EN)", () => {
-    expect(frProfile.battletagNotice.staff).toContain("plus tôt pour un match que tu castes, dès que ses deux adversaires sont connus");
-    expect(enProfile.battletagNotice.staff).toContain("earlier for a match you cast, from the moment both its opponents are known");
+  it("le BattleTag masqué d'un caster : la ligne du caster nomme arbitres et administrateurs, celle du staff reste celle d'un joueur (FR et EN)", () => {
+    expect(frProfile.battletagNotice.asCaster).toContain("<strong>ses arbitres et les administrateurs</strong> dès que ses deux adversaires sont connus");
+    expect(enProfile.battletagNotice.asCaster).toContain("<strong>its referees and administrators</strong> from the moment both its opponents are known");
+    expect(frProfile.battletagNotice.staff).toContain("aux mêmes moments que les deux équipes (la fenêtre");
+    expect(enProfile.battletagNotice.staff).toContain("at the same times as both teams (the launch window");
   });
 });

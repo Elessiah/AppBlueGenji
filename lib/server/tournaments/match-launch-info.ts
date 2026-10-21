@@ -24,6 +24,7 @@ import { visibleDiscordTag } from "@/lib/shared/discord-identity";
 import {
   autoLaunchAt,
   canDeclareTeamReady,
+  exposesCasterContacts,
   isAutoLaunchDue,
   matchLaunchPhase,
   pickLaunchContacts,
@@ -651,7 +652,7 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
           castRevoked,
           readiness: rowReadiness(row),
           exposes,
-          exposesCaster: phase === "LOBBY" || phase === "LAUNCHED" || party.role === "REFEREE",
+          exposesCaster: exposesCasterContacts(phase, party.role),
         }),
       );
     }

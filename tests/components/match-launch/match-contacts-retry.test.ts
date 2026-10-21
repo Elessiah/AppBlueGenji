@@ -16,7 +16,7 @@ import {
   type ContactsCard,
   shouldRetryReread,
 } from "@/components/match-launch/MatchContactsDialog";
-import type { MatchLaunchInfo } from "@/lib/shared/match-launch";
+import { exposesCasterContacts, type MatchLaunchInfo } from "@/lib/shared/match-launch";
 import { readSource } from "../../helpers/read-source";
 
 /**
@@ -185,6 +185,20 @@ describe("contacts du caster en attente, modale ouverte", () => {
     }
     expect(casterContactsOpen(info("SCHEDULED"))).toBe(false);
     expect(casterContactsOpen(info("LOBBY"))).toBe(true);
+  });
+
+  it("une seule règle, serveur et modale : exposesCasterContacts", () => {
+    for (const phase of ["NONE", "TO_PLAN", "SCHEDULED", "LOBBY", "LAUNCHED"] as const) {
+      for (const role of ["TEAM1", "TEAM2", "CASTER", "REFEREE"] as const) {
+        expect(casterContactsOpen(info(phase, CASTER, START, role))).toBe(exposesCasterContacts(phase, role));
+      }
+    }
+    expect(exposesCasterContacts("SCHEDULED", "TEAM1")).toBe(false);
+    expect(exposesCasterContacts("SCHEDULED", "REFEREE")).toBe(true);
+    expect(exposesCasterContacts("LAUNCHED", "TEAM2")).toBe(true);
+    expect(readSource("lib/server/tournaments/match-launch-info.ts")).toContain(
+      "exposesCaster: exposesCasterContacts(phase, party.role)",
+    );
   });
 
   it("échecs passagers en rafale sans rien de lu : une seule notification", () => {

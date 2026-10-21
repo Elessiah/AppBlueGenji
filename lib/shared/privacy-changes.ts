@@ -114,9 +114,10 @@ export type PrivacyChangeLink = { href: string; label: string };
  * faute d'un fait qui la lèverait sans nouvelle collecte.
  *
  * `LIVE_STAFF` : un compte qui peut s'inscrire comme caster — permission `live`
- * (administrateur, arbitre, caster), relue en base. Un compte qui la reçoit après
- * la publication n'est pas informé : la règle est déjà en vigueur quand il
- * devient caster, et les conditions d'utilisation la disent.
+ * (administrateur, arbitre, caster), relue en base à chaque lecture : un compte
+ * créé avant la publication qui la reçoit plus tard est alors informé ; un
+ * compte qui la perd avant d'avoir lu ne l'est plus — il ne peut plus caster.
+ * Un compte créé après la publication ne l'est jamais, comme pour toute entrée.
  */
 export type PrivacyAudience = "GOOGLE_LINKED" | "LIVE_STAFF";
 

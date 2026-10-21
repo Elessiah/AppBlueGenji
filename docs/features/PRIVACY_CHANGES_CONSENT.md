@@ -128,9 +128,10 @@ partie des comptes :
   qui le coiffe ; une entrée `LIVE_STAFF` y paraît — la politique change pour
   tous, seuls ceux qu'elle concerne sont avertis. Première entrée `LIVE_STAFF` :
   `2026-10-contacts-du-caster-aux-arbitres` (contacts du caster lus par les
-  arbitres dès que les adversaires sont connus). Un compte qui reçoit `live`
-  après la publication n'est pas averti : la règle est déjà en vigueur, et les
-  conditions d'utilisation la disent.
+  arbitres dès que les adversaires sont connus). Le fait est relu à chaque
+  lecture : un compte antérieur à la publication qui reçoit `live` plus tard
+  est alors averti ; celui qui le perd avant d'avoir lu ne l'est plus (il ne
+  peut plus caster).
 - `links` : liens vers les écrans où agir, rendus par la modale sous le détail.
   Suivre l'un d'eux vaut prise de connaissance **de cette entrée seule** (ses
   voisines reviennent au chargement suivant) et ferme la modale sans attendre
