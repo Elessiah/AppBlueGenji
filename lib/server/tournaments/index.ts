@@ -202,7 +202,7 @@ import {
 } from "./dispute-self-resolution";
 import { loadViewerCastBlock } from "./match-launch";
 import { loadCertificationPrompt } from "./certification-prompt";
-import { battletagRelevantFor } from "@/lib/shared/certification-prompt";
+import { battletagRelevantFor, type CertificationPrompt } from "@/lib/shared/certification-prompt";
 
 let pendingSync: Promise<void> | null = null;
 let lastSyncAt = 0;
@@ -1003,6 +1003,27 @@ export type TournamentViewerRights = {
 };
 
 /**
+ * Invitation à certifier du lecteur (`CERTIFICATION_PROMPT.md`). Simple
+ * invitation : une lecture en échec la tait (`null`, journal pm2), elle ne
+ * fait pas tomber le contexte — et avec lui le flux — du joueur.
+ */
+async function readCertificationPrompt(
+  userId: number,
+  teamId: number,
+  isManager: boolean,
+  battletagRelevant: boolean,
+): Promise<CertificationPrompt | null> {
+  try {
+    return await withConnection((connection) =>
+      loadCertificationPrompt(connection, userId, teamId, isManager, battletagRelevant),
+    );
+  } catch (error) {
+    console.error("[tournaments] invitation à certifier indisponible :", error);
+    return null;
+  }
+}
+
+/**
  * Contexte propre au lecteur : ce qu'il a le droit de faire ici.
  *
  * Séparé de l'instantané partagé parce qu'il ne bouge presque jamais (il change
@@ -1105,22 +1126,14 @@ export async function getTournamentViewerContext(
   // équipe engagée dans un tournoi qui n'est pas clos. Une requête indexée sur
   // le roster, par connexion du flux (pas par instantané) et pour les seuls
   // engagés ; « Ne plus voir » vit dans le navigateur, le serveur l'ignore.
-  // Simple invitation : une lecture en échec la tait, elle ne fait pas tomber
-  // le contexte (et avec lui le flux) du joueur.
   const certificationPrompt =
     !isSolo && activeTeam && alreadyRegistered && snapshot.card.state !== "FINISHED"
-      ? await withConnection((connection) =>
-          loadCertificationPrompt(
-            connection,
-            userId,
-            activeTeam.teamId,
-            canRegisterEntrant,
-            battletagRelevantFor(snapshot.card.game),
-          ),
-        ).catch((error: unknown) => {
-          console.error("[tournaments] invitation à certifier indisponible :", error);
-          return null;
-        })
+      ? await readCertificationPrompt(
+          userId,
+          activeTeam.teamId,
+          canRegisterEntrant,
+          battletagRelevantFor(snapshot.card.game),
+        )
       : null;
 
   return {
