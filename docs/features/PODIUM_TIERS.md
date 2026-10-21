@@ -80,11 +80,12 @@ Exceptions :
   Endurance, et dans l'historique manche par manche de l'Endurance) : la marche garde son repère (couronne, losange) mais quitte
   dégradé, lueur, mouvement et graisse — sinon le nom distancé brillerait plus
   fort que les autres.
-- **Lien en pastille** (`.badge`… — l'équipe active de la fiche joueur) :
-  sous la lueur, le fond teinté de la pastille ferait tomber les marches sous
-  4,5:1 ; `podiumMuted` sur le lien pose `data-podium-muted` et l'éteint comme
-  une ligne en retrait (repère conservé), le nom prend la couleur de la
-  pastille. Compte supprimé : `podiumTier` à `null` sur la fiche, comme son
+- **Lien en pastille** (l'équipe active de la fiche joueur) : sous la lueur,
+  le fond teinté de la pastille ferait tomber les marches sous 4,5:1. `.badge`,
+  `.pill` et `.cy-tag` l'éteignent d'office (`:is(.badge, .pill, .cy-tag) >
+  .podium-tier`), comme une ligne en retrait (repère conservé), le nom prenant
+  la couleur de la pastille ; toute autre surface teintée passe `podiumMuted`
+  au lien (`data-podium-muted`). Compte supprimé : `podiumTier` à `null` sur la fiche, comme son
   historique d'équipes.
 - **Vainqueur d'un match** : sans lueur — le fond teinté turquoise de la ligne
   ferait tomber violets et rose sous 4,5:1 sous la lueur.

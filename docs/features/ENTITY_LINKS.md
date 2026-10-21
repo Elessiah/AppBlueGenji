@@ -156,8 +156,8 @@ plus effacer le nom.
 
 - `podiumTier` impose une marche (`/classement`, onglet affiché) ; `null`
   n'en pose aucune (lien-avatar sans texte).
-- `podiumMuted` éteint la marche d'un lien habillé d'une surface teintée
-  (pastille `.badge`), repère conservé.
+- `podiumMuted` éteint la marche d'un lien habillé d'une surface teintée,
+  repère conservé (`.badge`, `.pill`, `.cy-tag` l'éteignent d'office).
 - `truncate` tronque le nom d'une ellipse (`.entity-truncate`) — jamais une
   classe de l'appelant : peint d'une marche, le nom rogne sur lui-même.
 - Un engagé **solo** porte la marche adoucie de son joueur, jamais celle
