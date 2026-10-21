@@ -127,12 +127,15 @@ donnée sur une personne, déposées à la demande du lecteur.
   BattleTag vérifié ne compte pas comme contact), appelée par
   `getTournamentViewerContext` — **porte commune** du flux SSE et de la lecture
   REST de secours — seulement pour une équipe engagée dans un tournoi non clos :
-  une requête indexée par connexion du flux (pas par instantané). « Ne plus
-  voir » vit dans le navigateur, le serveur l'ignore. Une lecture en échec
+  une requête indexée par connexion du flux (pas par instantané). La case
+  « Ne plus voir » de la modale vit dans le navigateur ; le serveur ne lit que
+  celui de la proposition de la connexion (compte, § « Ne plus voir »). Une
+  lecture en échec
   tait l'invitation (`null`, journal pm2) sans faire tomber le contexte.
 - Champ `TournamentViewerContext.certificationPrompt`, rejoué tel quel d'un
   instantané à l'autre (`live-state.ts`), `null` pour le spectateur sans compte.
-- Ouverture une fois par page : `_hooks/useCertificationPrompt.ts` ; modale
+- Ouverture une fois par page — par tournoi, la fiche étant réutilisée d'un
+  tournoi à l'autre : `_hooks/useCertificationPrompt.ts` ; modale
   `_components/CertificationPromptDialog.tsx` (chargée à la demande,
   `TournamentDialogFrame`), textes FR/EN `tournamentDialogs.json`.
 

@@ -43,7 +43,11 @@ function browserStorage(kind: "localStorage" | "sessionStorage"): Storage | null
  * depuis : masquée sur-le-champ (`liveCertificationPrompt`, instantané à
  * jour). Une fiche figée la masque aussi.
  */
-export function useCertificationPrompt(prompt: CertificationPrompt | null | undefined, frozen: boolean) {
+export function useCertificationPrompt(
+  tournamentId: number,
+  prompt: CertificationPrompt | null | undefined,
+  frozen: boolean,
+) {
   const [open, setOpen] = useState(false);
   const [neverAgain, setNeverAgain] = useState(false);
   const decided = useRef(false);
@@ -54,6 +58,17 @@ export function useCertificationPrompt(prompt: CertificationPrompt | null | unde
   // (le drapeau d'onglet peut ne pas s'écrire).
   const closed = useRef(false);
 
+  // La fiche est réutilisée d'un tournoi à l'autre (lien, Précédent) : « cette
+  // page » change avec le tournoi, et la mémoire de la page repart de zéro —
+  // avant la décision, déclarée après.
+  useEffect(() => {
+    decided.current = false;
+    yielded.current = false;
+    closed.current = false;
+    setOpen(false);
+    setNeverAgain(false);
+  }, [tournamentId]);
+
   useEffect(() => {
     if (decided.current || yielded.current || closed.current || prompt == null || frozen) return;
     decided.current = true;
@@ -62,7 +77,7 @@ export function useCertificationPrompt(prompt: CertificationPrompt | null | unde
       otherModalOpen: anotherModalOpen(),
     });
     if (step === "OPEN") setOpen(true);
-  }, [prompt, frozen]);
+  }, [tournamentId, prompt, frozen]);
 
   const close = useCallback(() => {
     rememberCertificationPromptClosed(browserStorage("localStorage"), browserStorage("sessionStorage"), neverAgain);

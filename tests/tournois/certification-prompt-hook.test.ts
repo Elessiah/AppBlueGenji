@@ -86,13 +86,13 @@ import {
 type HookResult = ReturnType<typeof useCertificationPrompt>;
 
 /** Un rendu, puis ses effets, jusqu'à ce que plus aucun état ne change. */
-function render(prompt: CertificationPrompt | null | undefined, frozen = false): HookResult {
+function render(prompt: CertificationPrompt | null | undefined, frozen = false, tournamentId = 5): HookResult {
   let result: HookResult;
   let rounds = 0;
   do {
     bench.dirty = false;
     bench.index = { state: 0, ref: 0, callback: 0, effect: 0 };
-    result = runHook(prompt, frozen);
+    result = runHook(tournamentId, prompt, frozen);
     for (const slot of bench.effects) {
       if (!slot.pending) continue;
       if (typeof slot.cleanup === "function") slot.cleanup();
@@ -229,6 +229,14 @@ describe("useCertificationPrompt", () => {
     modals.open = false;
     render(null);
     expect(render({ ...PROMPT }).prompt).toEqual(PROMPT);
+  });
+
+  it("un autre tournoi dans la même fiche : la mémoire de la page repart de zéro", () => {
+    const first = render(PROMPT);
+    act(() => modals.yieldWatchers.at(-1)?.(), PROMPT);
+    expect(render({ ...PROMPT }).prompt).toBeNull();
+    expect(render({ ...PROMPT }, false, 6).prompt).toEqual(PROMPT);
+    expect(first.prompt).toBe(PROMPT);
   });
 
   it("une fiche figée masque la modale et n'ouvre rien", () => {
