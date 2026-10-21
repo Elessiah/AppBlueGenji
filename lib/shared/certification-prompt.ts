@@ -67,9 +67,13 @@ export function certificationPromptFor(input: {
   return reason ? { reason, discordVerified, battletagVerified, battletagRelevant } : null;
 }
 
-/** Une équipe a-t-elle un contact à présenter ? Au moins un membre certifié d'un côté. */
-export function teamHasContact(members: readonly CertificationIdentity[]): boolean {
-  return members.some((member) => member.discordVerified || member.battletagVerified);
+/**
+ * Une équipe a-t-elle un contact à présenter ? Au moins un membre certifié
+ * d'un côté — Discord seul en Marvel Rivals, où un BattleTag ne sert pas à
+ * joindre l'équipe.
+ */
+export function teamHasContact(members: readonly CertificationIdentity[], battletagRelevant: boolean): boolean {
+  return members.some((member) => member.discordVerified || (battletagRelevant && member.battletagVerified));
 }
 
 /** Où certifier : la section « Applications connectées » de `/profil`. */

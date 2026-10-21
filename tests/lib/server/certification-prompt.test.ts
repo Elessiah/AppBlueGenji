@@ -87,6 +87,11 @@ describe("loadCertificationPrompt", () => {
     expect(await loadCertificationPrompt(executor, 7, 42, true, false)).toBeNull();
   });
 
+  it("en Marvel Rivals, invite le joueur dont l'équipe n'a qu'un BattleTag vérifié", async () => {
+    const { executor } = rosterOf([{ user_id: 7, ...BARE }, { user_id: 8, ...BARE, ...BATTLETAG }]);
+    expect((await loadCertificationPrompt(executor, 7, 42, false, false))?.reason).toBe("TEAM_WITHOUT_CONTACT");
+  });
+
   it("rien pour un lecteur qui n'est plus dans le roster", async () => {
     const { executor } = rosterOf([{ user_id: 8, ...BARE }]);
     expect(await loadCertificationPrompt(executor, 7, 42, true, true)).toBeNull();

@@ -58,7 +58,7 @@ export async function loadCertificationPrompt(
   return certificationPromptFor({
     isManager,
     viewer: identityOf(viewer),
-    teamHasContact: teamHasContact(rows.map(identityOf)),
+    teamHasContact: teamHasContact(rows.map(identityOf), battletagRelevant),
     battletagRelevant,
   });
 }

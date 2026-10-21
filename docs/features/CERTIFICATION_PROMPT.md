@@ -14,7 +14,7 @@ La fiche d'un tournoi ouvre donc d'office une modale qui invite à certifier :
 | Lecteur | Condition | Motif (`reason`) |
 | --- | --- | --- |
 | Manager (`OWNER` / `MANAGER`, `hasTeamManagementRole`) d'une équipe engagée | il lui manque l'une des deux certifications, **quel que soit le roster** | `MANAGER` |
-| Tout autre joueur d'une équipe engagée | l'équipe n'a **aucun** membre certifié (ni Discord ni BattleTag), et il lui en manque une | `TEAM_WITHOUT_CONTACT` |
+| Tout autre joueur d'une équipe engagée | l'équipe n'a **aucun** membre certifié (ni Discord ni BattleTag ; Discord seul compte en Marvel Rivals), et il lui en manque une | `TEAM_WITHOUT_CONTACT` |
 
 Rien pour qui a déjà les deux, pour un tournoi terminé (`FINISHED`), en tournoi
 individuel, ni pour une équipe non engagée. Le motif `MANAGER` passe devant.
@@ -44,9 +44,9 @@ par `data-label` (libellé visuel seulement, texte de remplacement vide).
 
 Un membre est certifié par les règles mêmes du lancement
 (`hasVerifiedDiscord` / `hasVerifiedBattletag`, `lib/shared/match-launch.ts`).
-Une équipe a un contact dès qu'un membre a l'un ou l'autre, **Marvel Rivals
-compris** : `pickLaunchContacts` présente alors ce BattleTag, l'équipe n'est
-pas injoignable.
+Une équipe a un contact dès qu'un membre a l'un ou l'autre ; en **Marvel
+Rivals**, un Discord certifié seulement (`teamHasContact(members,
+battletagRelevant)`) : un BattleTag n'y sert pas à joindre l'équipe.
 
 La modale dit pourquoi elle s'ouvre, où en est le lecteur (pastilles
 « Certifié » / « À certifier »), puis un **tableau « Ce que ça fait / Ce que ça

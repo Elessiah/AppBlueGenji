@@ -53,9 +53,11 @@ export function useCertificationPrompt(prompt: CertificationPrompt | null | unde
     if (step === "OPEN") setOpen(true);
   }, [prompt, frozen, recheck]);
 
-  // Invitation retirée par le serveur (certification faite entre-temps) : fermée.
+  // Invitation retirée par le serveur (certification faite entre-temps) :
+  // fermée. `null` seulement — c'est la réponse du serveur ; `undefined` veut
+  // dire que la fiche n'est pas (encore) lue, et ne ferme rien.
   useEffect(() => {
-    if (prompt == null) setOpen(false);
+    if (prompt === null) setOpen(false);
   }, [prompt]);
 
   const close = useCallback((neverAgain: boolean) => {

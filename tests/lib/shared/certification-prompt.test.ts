@@ -121,13 +121,18 @@ describe("certificationPromptStep", () => {
 
 describe("teamHasContact", () => {
   it("vaut vrai dès qu'un membre a l'une des deux certifications", () => {
-    expect(teamHasContact([NONE, DISCORD_ONLY])).toBe(true);
-    expect(teamHasContact([BATTLETAG_ONLY])).toBe(true);
+    expect(teamHasContact([NONE, DISCORD_ONLY], true)).toBe(true);
+    expect(teamHasContact([BATTLETAG_ONLY], true)).toBe(true);
   });
 
   it("vaut faux pour un roster sans rien de certifié, ou vide", () => {
-    expect(teamHasContact([NONE, NONE])).toBe(false);
-    expect(teamHasContact([])).toBe(false);
+    expect(teamHasContact([NONE, NONE], true)).toBe(false);
+    expect(teamHasContact([], true)).toBe(false);
+  });
+
+  it("en Marvel Rivals, un BattleTag vérifié ne fait pas un contact : Discord seul", () => {
+    expect(teamHasContact([BATTLETAG_ONLY], false)).toBe(false);
+    expect(teamHasContact([BATTLETAG_ONLY, DISCORD_ONLY], false)).toBe(true);
   });
 });
 
