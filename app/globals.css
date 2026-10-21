@@ -219,7 +219,8 @@ a {
    `data-podium`, posé par `EntityLink`) et le nom peint en hérite : à
    spécificité d'une classe (`:where`), la classe ou le style de l'appelant
    l'emportent, comme quand la marche habillait le lien lui-même. Éteinte
-   (`data-podium-muted`, pastille), la marche n'impose aucune graisse. */
+   (`data-podium-muted`, pastille — même liste que la règle d'extinction plus
+   bas), la marche n'impose aucune graisse. */
 :where(.entity-link, .entity-name):where(:not([data-podium-muted], [data-podium-muted] *, .badge, .pill, .cy-tag))[data-podium="podium-tier"] {
   font-weight: 700;
 }
@@ -368,9 +369,10 @@ a {
 
 /* Ligne en retrait (perdant d'un match, éliminée, forfait) : le repère reste,
    l'éclat s'éteint — sinon le nom distancé brillerait plus fort que les autres.
-   De même un lien en pastille teintée — `.badge`, `.pill`, `.cy-tag` d'office,
-   toute autre surface par `podiumMuted` sur le lien : la marche, sous sa lueur,
-   y tomberait sous 4,5:1 ; le nom prend la couleur de la pastille. */
+   De même un lien en pastille teintée (`.badge`, `.pill`, `.cy-tag` — liste
+   reprise, à l'identique, par la règle de graisse plus haut) : la marche, sous
+   sa lueur, y tomberait sous 4,5:1 ; au repos, le nom prend la couleur de la
+   pastille (survol et focus : couleur pleine, comme tout lien d'entité). */
 :is(.badge, .pill, .cy-tag) > .podium-tier,
 :is(.badge, .pill, .cy-tag) > .podium-member,
 [data-podium-muted] .podium-tier,

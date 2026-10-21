@@ -3,6 +3,7 @@
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { PodiumPaint, useMemberPodiumTier, useTeamPodiumTier } from "@/components/podium-tiers";
 import { useSpectatorView } from "@/components/spectator-view";
+import { joinClasses } from "@/lib/shared/class-names";
 import { podiumTierClass, podiumTierFamily, type PodiumTier, type PodiumTierKind } from "@/lib/shared/podium-tiers";
 import type { CSSProperties, ReactNode } from "react";
 
@@ -46,13 +47,6 @@ export interface EntityLinkProps {
   title?: string;
   "aria-label"?: string;
   /**
-   * Éteint la marche du podium (`data-podium-muted`, repère conservé) : un lien
-   * habillé d'une surface teintée sur laquelle la marche, sous sa lueur,
-   * tomberait sous 4,5:1 (`PODIUM_TIERS.md`). Inutile pour `.badge`, `.pill`,
-   * `.cy-tag`, éteintes d'office par la feuille.
-   */
-  podiumMuted?: boolean;
-  /**
    * Tronque le nom d'une ellipse sur une ligne (`.entity-truncate`). Un nom
    * peint d'une marche rogne alors sur lui-même et non sur le lien : sa lueur
    * n'est pas coupée et l'ellipse garde le dégradé (`PODIUM_TIERS.md`).
@@ -80,28 +74,20 @@ function linkPodium(override: PodiumTier | null | undefined, fromContext: Podium
   return toPodium(override === undefined ? fromContext : override, kind);
 }
 
-/** Concatène des classes optionnelles (les absentes, `false` ou vides, sont omises). */
-export function joinClasses(...names: (string | false | undefined)[]): string {
-  return names.filter(Boolean).join(" ");
-}
 
 export function EntityLink({
   href,
   children,
   className,
   podium,
-  podiumMuted = false,
   truncate = false,
   ...rest
 }: Readonly<EntityLinkProps & { href: string; /** Marche peinte sur le nom. */ podium?: EntityPodium }>) {
   const spectator = useSpectatorView();
   const name = <PodiumPaint className={podium && podiumTierClass(podium.tier, podium.kind)}>{children}</PodiumPaint>;
-  // Repères posés sur le lien, lus par la feuille sans `:has()` : la famille de
-  // la marche peinte dedans (`podium-tier` / `podium-member`), et son extinction.
-  const marks = {
-    "data-podium": podium && podiumTierFamily(podium.kind),
-    "data-podium-muted": podiumMuted ? "" : undefined,
-  };
+  // Repère posé sur le lien, lu par la feuille sans `:has()` : la famille de la
+  // marche peinte dedans (`podium-tier` / `podium-member`).
+  const marks = { "data-podium": podium && podiumTierFamily(podium.kind) };
   const extra = joinClasses(truncate && "entity-truncate", className);
   if (spectator) {
     // Pas d'`aria-label` sur un `<span>` sans rôle (`aria-prohibited-attr`) :
