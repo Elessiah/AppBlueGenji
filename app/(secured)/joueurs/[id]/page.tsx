@@ -47,6 +47,17 @@ function tournamentStateLabel(text: PlayersText, state: string): string {
   return isTournamentState(state) ? text.t(`page.state.${state}`) : state;
 }
 
+/**
+ * Indication sous un BattleTag masqué, pour son seul titulaire. La phrase sur
+ * la pastille ne vient que si la pastille est là : un BattleTag saisi à la main
+ * n'en a pas.
+ */
+function battletagHiddenHint(text: PlayersText, data: FullProfileResponse, verified: boolean): string | null {
+  if (!data.isSelf || !data.profile.overwatchBattletag || data.profile.visibility.overwatch) return null;
+  const hidden = text.t("page.battletagHiddenSelf");
+  return verified ? `${hidden} ${text.t("page.battletagHiddenSelfBadge")}` : hidden;
+}
+
 /** `aria-describedby` des seuls identifiants présents, ou rien. */
 function describedBy(ids: Record<string, boolean>): string | undefined {
   const present = Object.keys(ids).filter((id) => ids[id]);
@@ -108,12 +119,8 @@ export default function PlayerDetailPage() {
   // Un BattleTag masqué n'arrive jusqu'ici que pour son titulaire : pour tout
   // autre lecteur, il ne se lit que dans la fenêtre « Contacts » d'un match
   // (`lib/shared/battletag-visibility.ts`).
-  const battletagHint =
-    data.isSelf && data.profile.overwatchBattletag && !data.profile.visibility.overwatch
-      ? t("page.battletagHiddenSelf")
-      : null;
-
   const battletagVerified = Boolean(data.profile.battletagVerified);
+  const battletagHint = battletagHiddenHint(text, data, battletagVerified);
   const battletagDescribedBy = describedBy({
     "player-battletag-verified": battletagVerified,
     "player-battletag-hint": Boolean(battletagHint),

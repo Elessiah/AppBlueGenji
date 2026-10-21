@@ -13,13 +13,14 @@ const read = (path: string) => readFileSync(join(root, path), "utf8");
 describe("indication du BattleTag masqué sur la fiche", () => {
   it("n'est montrée qu'au titulaire", () => {
     const page = read("app/(secured)/joueurs/[id]/page.tsx");
-    expect(page).toContain('data.isSelf && data.profile.overwatchBattletag && !data.profile.visibility.overwatch');
+    expect(page).toContain('if (!data.isSelf || !data.profile.overwatchBattletag || data.profile.visibility.overwatch) return null;');
     expect(page).not.toContain("battletagHiddenOther");
   });
 
   it.each(["fr", "en"])("n'a plus de texte pour un lecteur tiers (%s)", (locale: string) => {
     const messages = JSON.parse(read(`messages/${locale}/players.json`)) as { page: Record<string, string> };
     expect(messages.page.battletagHiddenSelf).toEqual(expect.any(String));
+    expect(messages.page.battletagHiddenSelfBadge).toEqual(expect.any(String));
     expect(messages.page).not.toHaveProperty("battletagHiddenOther");
   });
 
@@ -42,6 +43,11 @@ describe("pastille BattleTag vérifié sur la fiche", () => {
     expect(page).toContain("aria-describedby={battletagDescribedBy}");
     expect(page).toMatch(/<span id="player-battletag-verified" className="sr-only">\s*\{t\("page\.battletagVerifiedAlt"\)\}/);
     expect(page).toContain('labels={{ alt: "", title: t("page.battletagVerifiedTitle") }}');
+  });
+
+  it("ne parle de la pastille au titulaire que si elle est affichée", () => {
+    const page = read("app/(secured)/joueurs/[id]/page.tsx");
+    expect(page).toContain('return verified ? `${hidden} ${text.t("page.battletagHiddenSelfBadge")}` : hidden;');
   });
 
   it("garde la largeur du champ : la pastille est posée dedans", () => {

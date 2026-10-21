@@ -169,7 +169,7 @@ export const DROITS_EN: DroitEntry[] = [
   },
   {
     title: "Right to object",
-    text: "You can object to the processing of your data based on legitimate interest (tournament history, match time notices, reminders and match removal notices by direct message — these messages are turned off directly with the “Discord direct messages about my matches” box in My profile). The username posted in the #live announcement of a solo tournament is not part of it: it falls under performance of the service you register for — not being named in it means not registering; a past announcement is deleted on request. The AutoMod alert for such an announcement when blocked or flagged, kept to moderate the Discord server (legitimate interest), is deleted on request: that is how you object to it.",
+    text: "You can object to the processing of your data based on legitimate interest (tournament history, match time notices, reminders and match removal notices by direct message — these messages are turned off directly with the “Discord direct messages about my matches” box in My profile — and the certification badges on your player page, certified Discord tag and “Verified BattleTag”, through the report form, GDPR category). The username posted in the #live announcement of a solo tournament is not part of it: it falls under performance of the service you register for — not being named in it means not registering; a past announcement is deleted on request. The AutoMod alert for such an announcement when blocked or flagged, kept to moderate the Discord server (legitimate interest), is deleted on request: that is how you object to it.",
   },
   {
     title: "Right to data portability",
