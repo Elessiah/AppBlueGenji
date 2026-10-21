@@ -124,9 +124,10 @@ export function SideCard({
   /**
    * Note des contacts tus : la modale de lancement passe la sienne
    * (`launchSidesLaterText`, qui ne renvoie à l'action « Contacts » qu'à qui
-   * elle ouvre déjà quelque chose) ; par défaut, « Contacts non affichés » —
-   * jamais vue dans la modale « Contacts », dont la route ne rend que des
-   * matchs aux contacts des engagées ouverts.
+   * elle ouvre déjà quelque chose) ; par défaut, la note neutre de la modale
+   * « Contacts » (`contacts.notShown`, sa note d'échec), filet gardé exprès :
+   * sa route ne rend aujourd'hui que des matchs aux contacts des engagées
+   * ouverts, mais un changement de route n'y ferait jamais renvoyer à elle-même.
    */
   laterText?: string;
   /**

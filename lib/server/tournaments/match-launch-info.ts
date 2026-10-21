@@ -607,7 +607,10 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
     const read = rows
       .map((row) => {
         const phase = matchLaunchPhase(toLaunchInput(row), now);
-        return { row, phase, exposes: exposesMatchContacts(phase, forCard && (referee || viewerPlaysMatch(row, teams))) };
+        // Ce que la carte ouvrirait au lecteur avant le départ : joueur du
+        // match ou arbitre (permission `tournaments`, même inscrit comme caster).
+        const early = staff || viewerPlaysMatch(row, teams);
+        return { row, phase, early, exposes: exposesMatchContacts(phase, forCard && early) };
       })
       .filter(({ phase }) => phase !== "NONE");
     // Par la carte, un match sans contacts à montrer n'est pas rendu : le
@@ -635,15 +638,13 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
     const revoked = revokeIneligibleCasters(checked, users, revokedCasts, casterPlays);
 
     const result: MatchLaunchInfo[] = [];
-    for (const { row, phase, exposes } of visible) {
+    for (const { row, phase, early, exposes } of visible) {
       const castRevoked = revoked.has(Number(row.id));
       const party = viewerRole(row, viewer.id, teams, castRevoked, referee);
       if (!party) continue;
-      // Ce que lui ouvrirait la carte (`exposesMatchContacts` côté carte) : à un
-      // arbitre qui caste, la modale de lancement renvoie aussi à « Contacts ».
-      const earlyContacts = staff || viewerPlaysMatch(row, teams);
+      // À un arbitre qui caste, la modale de lancement renvoie aussi à « Contacts ».
       result.push(
-        buildLaunchInfo(row, phase, { ...party, earlyContacts }, {
+        buildLaunchInfo(row, phase, { ...party, earlyContacts: early }, {
           viewer,
           users,
           rosters,

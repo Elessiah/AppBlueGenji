@@ -215,7 +215,7 @@ describe("contacts du caster en attente, modale ouverte", () => {
     expect(phases.filter((phase) => exposesMatchContacts(phase, false))).toEqual(["LOBBY", "LAUNCHED"]);
     // Le serveur et la carte du match lisent la même règle, sans copie.
     expect(readSource("lib/server/tournaments/match-launch-info.ts")).toContain("exposes: exposesMatchContacts(phase,");
-    expect(readSource("app/(secured)/tournois/[id]/_lib/launch-strip.ts")).toContain("&& exposesMatchContacts(phase, isPlayer || viewer.canSchedule)");
+    expect(readSource("app/(secured)/tournois/[id]/_lib/launch-strip.ts")).toContain("(early || isCaster) && exposesMatchContacts(phase, early)");
   });
 
   it("échecs passagers en rafale sans rien de lu : une seule notification", () => {

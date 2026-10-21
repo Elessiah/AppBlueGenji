@@ -66,13 +66,15 @@ export function launchStripControls(
   const isByeLike = (match.team1Id === null) !== (match.team2Id === null) && match.status !== "PENDING";
   const castable = open && !isByeLike && !isPlayer;
   const showHost = phase !== "NONE";
+  // Contacts ouverts avant le départ : joueur du match ou arbitre.
+  const early = isPlayer || viewer.canSchedule;
   return {
     isCaster,
     showOpen: (isCaster || isPlayer) && viewer.launchPhase !== false && matchUnderway(phase),
     // La règle du serveur (`exposesMatchContacts`) : un arbitre (permission
     // `tournaments`) les lit comme un joueur du match, dès que les deux
     // adversaires sont connus ; le caster inscrit, le temps du match seulement.
-    showContacts: (isPlayer || viewer.canSchedule || isCaster) && exposesMatchContacts(phase, isPlayer || viewer.canSchedule),
+    showContacts: (early || isCaster) && exposesMatchContacts(phase, early),
     showClaim: viewer.canManage && castable && match.casterUserId === null,
     showRelease: open && match.casterUserId !== null && (isCaster || viewer.canSchedule),
     showPlan: viewer.canSchedule && phase === "TO_PLAN",
