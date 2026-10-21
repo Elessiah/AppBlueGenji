@@ -114,22 +114,38 @@ describe("CertificationPromptDialog", () => {
     expect(html).not.toContain("Battle.net");
     expect(html).not.toContain("BattleTag y est montré");
     expect(html).not.toContain(">BattleTag<");
+    // Un contact de match montre son BattleTag même masqué, quel que soit le jeu.
+    expect(html).toContain("Si ta fiche porte un BattleTag, présenté comme contact, il est montré même masqué");
+  });
+
+  it("dit tout ce que la certification ouvre : messages privés du bot, arbitres du site, BattleTag dès les adversaires connus", () => {
+    for (const html of [render(OW_MANAGER), render(MR_TEAM)]) {
+      expect(html).toContain("le bot t&#x27;envoie en message privé l&#x27;horaire de tes matchs");
+      expect(html).toContain("aux arbitres et aux administrateurs du site");
+      expect(html).toContain("dès que les deux adversaires du match sont connus et jusqu&#x27;à sa fin");
+      expect(html).toContain("retirer ton tag Discord de ton profil retire sa certification");
+      expect(html).not.toContain("tant qu&#x27;il te reste une autre façon de te connecter");
+    }
+    expect(render(OW_MANAGER)).toContain("Certifié ou non, présenté comme contact, ton BattleTag est montré même masqué");
+    const en = render(MR_TEAM, "en");
+    expect(en).toContain("the bot sends you your match times");
+    expect(en).toContain("If your profile holds a BattleTag");
   });
 
   it("chaque cellule du tableau porte son libellé de colonne (rendu mobile)", () => {
     const html = render(OW_MANAGER);
-    expect(html.match(/data-label="Ce que ça fait"/g)).toHaveLength(4);
-    expect(html.match(/data-label="Ce que ça ne fait pas"/g)).toHaveLength(4);
+    expect(html.match(/data-label="Ce que ça fait"/g)).toHaveLength(5);
+    expect(html.match(/data-label="Ce que ça ne fait pas"/g)).toHaveLength(5);
   });
 
   it("garde ses rôles de tableau (lignes, en-têtes, cellules)", () => {
     const html = render(OW_MANAGER);
     expect(html).toContain('role="table" aria-labelledby="certification-prompt-caption"');
-    expect(html.match(/role="rowheader"/g)).toHaveLength(4);
+    expect(html.match(/role="rowheader"/g)).toHaveLength(5);
     expect(html.match(/role="columnheader"/g)).toHaveLength(3);
     // L'en-tête masqué garde sa case de grille : seul son texte est `sr-only`.
     expect(html).toContain('<span role="columnheader"><span class="sr-only">');
-    expect(html.match(/role="cell"/g)).toHaveLength(8);
+    expect(html.match(/role="cell"/g)).toHaveLength(10);
   });
 
   it("la case « Ne plus voir » part décochée", () => {

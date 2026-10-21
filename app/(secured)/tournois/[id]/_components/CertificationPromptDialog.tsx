@@ -10,7 +10,7 @@ import { TournamentDialogFrame } from "./TournamentDialogFrame";
 import s from "./CertificationPromptDialog.module.css";
 
 /** Lignes du tableau, dans l'ordre de lecture. */
-const ROWS = ["identity", "matches", "staff", "later"] as const;
+const ROWS = ["identity", "matches", "messages", "staff", "later"] as const;
 
 /**
  * Variante « Discord seul » (Marvel Rivals) des cellules qui parlent de

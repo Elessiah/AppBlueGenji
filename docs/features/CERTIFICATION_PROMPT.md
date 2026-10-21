@@ -5,9 +5,12 @@
 Au lancement d'un match, chaque équipe présente un ou deux contacts
 (`pickLaunchContacts`, `MATCH_LAUNCH.md` § Les contacts présentés) : un joueur
 au tag Discord **certifié** ou au BattleTag **vérifié** (compte Battle.net
-rattaché). Une équipe où personne n'a rien certifié n'a **aucun contact à
-présenter** — un tag Discord non certifié ne sort jamais — et l'adversaire, le
-caster comme l'arbitrage restent sans moyen de la joindre.
+rattaché). Une équipe où personne n'a rien certifié n'a **aucun contact
+vérifié** : le premier par rôle est présenté avec son seul BattleTag, non
+vérifié (même masqué) — un tag Discord non certifié ne sort jamais — et
+l'adversaire, le caster comme l'arbitrage restent sans moyen sûr de la joindre.
+La modale le dit ainsi (« aucun contact vérifié », en Marvel Rivals « personne à
+présenter sur Discord »), jamais « aucun contact ».
 
 La fiche d'un tournoi ouvre donc d'office une modale qui invite à certifier :
 
@@ -73,7 +76,7 @@ Son titre ne nomme que ce qui manque (Discord, BattleTag, ou les deux).
 La modale dit pourquoi elle s'ouvre, où en est le lecteur (pastilles
 « Certifié » / « À certifier »), puis un **tableau « Ce que ça fait / Ce que ça
 ne fait pas »** — chaque promesse a sa limite en face, sur la même ligne
-(identité, matchs, organisation, ensuite). Le bouton principal
+(identité, matchs, messages du bot, organisation, ensuite). Le bouton principal
 (`certificationProfileHref`) ouvre d'emblée le **dialogue de certification**
 Discord du profil (`CERTIFY_PROFILE_HREF`, `/profil?certifier=discord`, le lien
 de la proposition de la connexion — `DISCORD_CERTIFY_PROMPT.md`) tant que le
@@ -81,10 +84,17 @@ tag Discord manque, sinon mène à **« Applications connectées »**
 (`/profil#connexions`), où Battle.net se rattache.
 
 Le tableau ne promet que ce que les règles tiennent : visibilité du tag
-(`canViewDiscordTag`), du BattleTag (`canViewBattletag`), pastilles de
+(`canViewDiscordTag` — case « Tag Discord » cochée avant la certification
+comprise), du BattleTag (`canViewBattletag`), pastilles de
 certification lues par tout joueur connecté même tag masqué (registre),
-contacts présentés aux équipes, au caster et aux arbitres (T04), portées OAuth
-(`OAUTH_PROVIDERS.md` : `identify`, `openid`), conditions d'inscription
+contacts présentés aux deux équipes, au caster, aux arbitres et administrateurs
+du site dès que les deux adversaires sont connus (T04, bouton « Contacts ») —
+le BattleTag d'un contact, vérifié ou non, sort même masqué, **quel que soit le
+jeu** (Marvel Rivals compris), la certification ne faisant que passer devant —,
+messages privés de match du bot (tag certifié seulement, coupables), portées OAuth
+(`OAUTH_PROVIDERS.md` : `identify`, `openid`), retrait (retirer son tag
+Discord retire sa certification ; détacher Battle.net retire la vérification,
+le BattleTag reste), conditions d'inscription
 (`REGISTRATION_FILTERS.md`). Une règle qui change ces faits relit le tableau
 (`messages/*/tournamentDialogs.json`, clé `certification`).
 
