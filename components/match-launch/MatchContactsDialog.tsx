@@ -65,21 +65,13 @@ export function contactsRetryDelay(startAt: string | null, serverDate: string | 
 }
 
 /**
- * Les contacts du caster sont-ils rendus à ce lecteur ? La règle même du
- * serveur (`exposesCasterContacts`), sur la phase qu'il a lue.
- */
-export function casterContactsOpen(launch: MatchLaunchInfo): boolean {
-  return exposesCasterContacts(launch.phase, launch.viewer.role);
-}
-
-/**
  * Les contacts du caster attendent-ils le départ ? Un caster inscrit, sur un
  * match pas encore parti à l'heure du serveur (`launch.phase`), pour un lecteur
  * qui n'est pas arbitre : sa fiche porte alors une note plutôt que ses
  * contacts. Pas pour le caster lui-même : rien à attendre sur sa propre fiche.
  */
 export function casterContactsPending(launch: MatchLaunchInfo): boolean {
-  return launch.caster !== null && !viewerIsCaster(launch) && !casterContactsOpen(launch);
+  return launch.caster !== null && !viewerIsCaster(launch) && !exposesCasterContacts(launch.phase, launch.viewer.role);
 }
 
 /** Relectures supplémentaires d'une relecture qui échoue (réseau, 5xx, 429). */
@@ -436,15 +428,8 @@ export function MatchContactsDialog({
                   caster={launch.caster}
                   phase={launch.phase}
                   onCopy={copy}
-                  // Les contacts du caster ne sortent que le temps du match
-                  // (`exposesCaster`), sauf à un arbitre, qui les lit dès que les
-                  // adversaires sont connus : avant, une note plutôt
-                  // que deux « — » qui laisseraient croire qu'il n'en a pas.
-                  contactsShown={casterContactsOpen(launch)}
-                  // Pas au caster lui-même : la note parle de lui.
-                  // Hors de là, toujours, même quand la phase de la carte et celle
-                  // du serveur divergent : jamais une fiche vide.
-                  contactsLaterText={viewerIsCaster(launch) ? undefined : t("contacts.casterLater")}
+                  // Phase du serveur à la lecture : la carte en tire la règle.
+                  viewer={launch.viewer}
                   noCasterText={t("contacts.noCaster")}
                   linkNames
                 />

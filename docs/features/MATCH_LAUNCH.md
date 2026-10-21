@@ -108,7 +108,7 @@ et `viewerRole` lui rend le rôle `REFEREE` (`MatchLaunchViewerRole`), sans
 « Prêt ». La modale de lancement ne lui présente rien. Les contacts du caster
 lui sont rendus dès que les deux adversaires sont connus (décision de
 l'utilisateur, 2026-10-21 : `exposesCaster` ouvert au rôle `REFEREE`,
-`casterContactsOpen` côté modale, sans relecture à l'heure de départ). Un arbitre
+`CasterCard` côté modales, sans relecture à l'heure de départ). Un arbitre
 qui **joue** le match lit en joueur (rôle `TEAM1`/`TEAM2`) : pour lui, comme pour
 les équipes, la modale « Contacts » dit avant le départ « Ses contacts
 s'afficheront au départ du match » (`contacts.casterLater`) au lieu de deux « — ».

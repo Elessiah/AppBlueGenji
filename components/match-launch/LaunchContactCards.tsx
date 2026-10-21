@@ -10,7 +10,14 @@
 
 import { PlayerLink, TeamLink } from "@/components/entity-link";
 import { useLaunchText } from "./launch-text";
-import type { LaunchCaster, LaunchContact, LaunchSide, MatchLaunchInfo } from "@/lib/shared/match-launch";
+import {
+  exposesCasterContacts,
+  viewerIsCaster,
+  type LaunchCaster,
+  type LaunchContact,
+  type LaunchSide,
+  type MatchLaunchInfo,
+} from "@/lib/shared/match-launch";
 import type { TeamRole } from "@/lib/shared/types";
 import styles from "./MatchLaunchCenter.module.css";
 
@@ -186,30 +193,30 @@ export function CasterCard({
   caster,
   phase,
   onCopy,
-  contactsShown,
+  viewer,
   noCasterText,
-  contactsLaterText,
   linkNames = false,
 }: Readonly<{
   caster: LaunchCaster | null;
+  /** Phase lue par le serveur : avec `viewer`, elle dit si les contacts sortent. */
   phase: MatchLaunchInfo["phase"];
   onCopy: CopyFn;
   /**
-   * Règle `exposesCasterContacts` pour ce lecteur. Sans défaut : une phase
-   * seule ne dit pas qui lit, chaque appelant passe la règle.
+   * Le lecteur : la carte applique elle-même la règle du serveur
+   * (`exposesCasterContacts`) et tait la note « au départ » au caster, de
+   * sorte que les deux modales ne puissent pas diverger.
    */
-  contactsShown: boolean;
+  viewer: Pick<MatchLaunchInfo["viewer"], "role" | "isCaster">;
   /** Texte sans caster ; par défaut, celui de la modale de lancement. */
   noCasterText?: string;
-  /**
-   * Texte à la place des contacts tus (`contactsShown` faux) : sans lui, la
-   * fiche ne montre que le pseudo.
-   */
-  contactsLaterText?: string;
   /** Pseudo cliquable (modale « Contacts » seulement, voir `SideCard`). */
   linkNames?: boolean;
 }>) {
   const { t } = useLaunchText();
+  const contactsShown = exposesCasterContacts(phase, viewer.role);
+  // Contacts tus : une note plutôt que deux « — » qui laisseraient croire qu'il
+  // n'en a pas — jamais au caster lui-même, dont elle parle.
+  const contactsLaterText = viewerIsCaster({ viewer }) ? null : t("contacts.casterLater");
   if (!caster) {
     return (
       <section className={styles.caster} aria-label={t("caster")}>

@@ -476,8 +476,9 @@ export type MatchLaunchInfo = {
  * terminé ou adversaire manquant), même si un appelant l'oubliait.
  *
  * Une seule règle, lue par le serveur (`exposesCaster`), par la modale
- * « Contacts » (`casterContactsOpen`) et par la modale de lancement : deux
- * copies dériveraient, et la fiche montrerait deux « — » ou une note à tort.
+ * « Contacts » et par la modale de lancement (`CasterCard`, qui l'applique
+ * elle-même) : deux copies dériveraient, et la fiche montrerait deux « — » ou
+ * une note à tort.
  */
 export function exposesCasterContacts(phase: MatchLaunchPhase, role: MatchLaunchViewerRole): boolean {
   return phase === "LOBBY" || phase === "LAUNCHED" || (phase !== "NONE" && role === "REFEREE");
@@ -488,7 +489,7 @@ export function exposesCasterContacts(phase: MatchLaunchPhase, role: MatchLaunch
  * du match qui caste aussi (`viewer.isCaster`, le rôle de joueur primant). Lu
  * par les deux modales : la note « contacts au départ » ne s'adresse pas à lui.
  */
-export function viewerIsCaster(launch: Pick<MatchLaunchInfo, "viewer">): boolean {
+export function viewerIsCaster(launch: { viewer: Pick<MatchLaunchInfo["viewer"], "role" | "isCaster"> }): boolean {
   return launch.viewer.role === "CASTER" || launch.viewer.isCaster === true;
 }
 

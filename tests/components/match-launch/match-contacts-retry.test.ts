@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import {
   CONTACTS_RETRY_MAX_WAIT_MS,
   contactsRetryDelay,
-  casterContactsOpen,
   casterContactsPending,
   casterRereadDelay,
   readMatchContacts,
@@ -179,18 +178,16 @@ describe("contacts du caster en attente, modale ouverte", () => {
   it("pas pour un arbitre : contacts du caster ouverts avant le départ, sans relecture", () => {
     for (const phase of ["TO_PLAN", "SCHEDULED", "LOBBY", "LAUNCHED"] as const) {
       const referee = info(phase, CASTER, START, "REFEREE");
-      expect(casterContactsOpen(referee)).toBe(true);
       expect(casterContactsPending(referee)).toBe(false);
       expect(casterRereadDelay(referee, SERVER_BEFORE)).toBeNull();
     }
-    expect(casterContactsOpen(info("SCHEDULED"))).toBe(false);
-    expect(casterContactsOpen(info("LOBBY"))).toBe(true);
   });
 
   it("une seule règle, serveur et modale : exposesCasterContacts", () => {
+    // En attente = caster tu à un lecteur qui n'est pas ce caster : la même règle.
     for (const phase of ["NONE", "TO_PLAN", "SCHEDULED", "LOBBY", "LAUNCHED"] as const) {
-      for (const role of ["TEAM1", "TEAM2", "CASTER", "REFEREE"] as const) {
-        expect(casterContactsOpen(info(phase, CASTER, START, role))).toBe(exposesCasterContacts(phase, role));
+      for (const role of ["TEAM1", "TEAM2", "REFEREE"] as const) {
+        expect(casterContactsPending(info(phase, CASTER, START, role))).toBe(!exposesCasterContacts(phase, role));
       }
     }
     expect(exposesCasterContacts("SCHEDULED", "TEAM1")).toBe(false);
@@ -201,9 +198,9 @@ describe("contacts du caster en attente, modale ouverte", () => {
     expect(readSource("lib/server/tournaments/match-launch-info.ts")).toContain(
       "exposesCaster: exposes && exposesCasterContacts(phase, party.role)",
     );
-    // La modale de lancement aussi, plutôt que le défaut de la carte.
-    expect(readSource("components/match-launch/MatchLaunchCenter.tsx")).toContain(
-      "contactsShown={exposesCasterContacts(current.phase, current.viewer.role)}",
+    // Les deux modales : la carte du caster applique elle-même la règle.
+    expect(readSource("components/match-launch/LaunchContactCards.tsx")).toContain(
+      "const contactsShown = exposesCasterContacts(phase, viewer.role);",
     );
   });
 
@@ -344,7 +341,7 @@ describe("contacts du caster en attente, modale ouverte", () => {
     expect(dialog).toMatch(/if \(transient\) \{\n\s*setRereadWait\(read\.retryAfterMs \?\? 0\);\n\s*setRereadFailures\(\(count\) => count \+ 1\);\n\s*\}\n\s*if \(keepWaiting\(transient\)\) return;/);
     expect(dialog).toMatch(/setRereadWait\(0\);\n\s*setRereadFailures\(\(count\) => count \+ 1\);\n\s*if \(keepWaiting\(true\)\) return;/);
     expect(dialog).toContain("failureIsSilent(transient, shown, rereadFailures)");
-    expect(dialog).toContain("contactsShown={casterContactsOpen(launch)}");
+    expect(dialog).toContain("viewer={launch.viewer}");
     const card = readSource("app/(secured)/tournois/[id]/_components/MatchCardActions.tsx");
     expect(card).toMatch(/<MatchContactsDialog[\s\S]*?card=\{match\}[\s\S]*?\/>/);
   });

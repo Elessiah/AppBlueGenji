@@ -16,14 +16,12 @@ import { useClientPower } from "@/lib/shared/hooks/useClientPower";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { tournamentMatchHref } from "@/lib/shared/match-anchor";
 import {
-  exposesCasterContacts,
   launchModalKey,
   launchModalWaits,
   MATCH_LAUNCH_OPEN_EVENT,
   nextLaunchMatchId,
   MATCH_LAUNCH_REFRESH_EVENT,
   readyCount,
-  viewerIsCaster,
   type MatchLaunchInfo,
 } from "@/lib/shared/match-launch";
 import { PRIVACY_CHANGES_ANSWERED_EVENT } from "@/lib/shared/privacy-changes";
@@ -372,11 +370,7 @@ export function MatchLaunchCenter({
               caster={current.caster}
               phase={current.phase}
               onCopy={copy}
-              // La règle du serveur, pas le défaut de la carte (qui tient
-              // `TO_PLAN` pour ouvert) : une seule règle des contacts du caster.
-              contactsShown={exposesCasterContacts(current.phase, current.viewer.role)}
-              // Comme la modale « Contacts » : une note plutôt qu'un pseudo seul.
-              contactsLaterText={viewerIsCaster(current) ? undefined : t("contacts.casterLater")}
+              viewer={current.viewer}
             />
           </div>
 

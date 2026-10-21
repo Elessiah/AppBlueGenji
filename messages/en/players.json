@@ -101,7 +101,7 @@
     "hidden": "Hidden",
     "adultYes": "Yes (18+)",
     "adultNo": "No (minor)",
-    "battletagHiddenSelf": "Hidden from everyone: it can only be read in the “Contacts” window of your matches and in their launch window. If you are shown there as a contact, by both teams and the referees, from the moment both opponents are known to the end of the match, and by the caster while the match is being played. If you cast a match, by both its teams while the match is being played, and by the referees from the moment both its opponents are known to the end of the match. The launch window, at the start of the match, only opens for both teams and the caster.",
+    "battletagHiddenSelf": "Hidden from everyone: it can only be read in the “Contacts” window of your matches and in their launch window. If you are shown there as a contact, both teams and the referees see it from the moment both opponents are known until the end of the match, and the caster while the match is being played. If you cast a match, both its teams see it while the match is being played, and the referees from the moment both its opponents are known until its end. The launch window, at the start of the match, only opens for both teams and the caster.",
     "verifiedAlt": "Verified Discord tag",
     "verifiedTitle": "Verified Discord tag: this player proved they own this Discord account.",
     "battletagHiddenSelfBadge": "The “Verified BattleTag” badge, however, stays visible to any logged-in player, without the BattleTag.",
