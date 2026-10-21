@@ -12,9 +12,13 @@ import { useEffect, useState } from "react";
 import { PlayerLink, TeamLink } from "@/components/entity-link";
 import { useLaunchText } from "./launch-text";
 import {
+  CASTER_ARRIVAL_ANNOUNCE_MS,
   casterContactsPending,
   casterHasContacts,
+  nextCasterArrival,
   viewerIsCaster,
+  type CasterArrival,
+  type CasterArrivalSeen,
   type LaunchCaster,
   type LaunchContact,
   type LaunchSide,
@@ -203,34 +207,6 @@ function SideContacts({
       ))}
     </ul>
   );
-}
-
-/** Arrivée des contacts du caster : avec au moins un contact, sans, ou aucune. */
-export type CasterArrival = "SHOWN" | "EMPTY" | null;
-
-/** Ce que l'annonce garde d'un rendu à l'autre. */
-export type CasterArrivalSeen = { pending: boolean; casterId: number | null; arrival: CasterArrival };
-
-/** Durée de l'annonce d'arrivée : lue, elle ne reste pas en statut périmé. */
-export const CASTER_ARRIVAL_ANNOUNCE_MS = 10_000;
-
-/**
- * Étape pure de l'annonce : le nouvel état, ou `null` s'il ne change pas (une
- * relecture identique ne réécrit rien — l'annonce reste figée à l'arrivée).
- * Annonce au seul passage « en attente → montrés » d'un même caster, jamais à
- * l'ouverture ; un autre caster, ou plus de caster, l'efface.
- */
-export function nextCasterArrival(
-  seen: CasterArrivalSeen,
-  caster: LaunchCaster | null,
-  pending: boolean,
-): CasterArrivalSeen | null {
-  const casterId = caster?.userId ?? null;
-  if (seen.pending === pending && seen.casterId === casterId) return null;
-  const arrived = caster !== null && seen.casterId === casterId && seen.pending && caster.contactsShown;
-  let arrival: CasterArrival = null;
-  if (arrived) arrival = casterHasContacts(caster) ? "SHOWN" : "EMPTY";
-  return { pending, casterId, arrival };
 }
 
 /**
