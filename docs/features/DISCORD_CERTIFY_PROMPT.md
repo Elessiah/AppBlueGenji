@@ -54,17 +54,21 @@ conditions acceptées ou de nouveau exigées). Le toast « déjà certifié » d
 
 **Jamais sur un état périmé** (« sur aucun appareil », `/rgpd`) : la lecture
 de la mise en page ne vaut que pour une fenêtre qui s'ouvre **dès le
-chargement**. Toute ouverture plus tardive — après la confidentialité ou les
-conditions, au retour d'une page qui la tait — relit d'abord la proposition
-(`GET /api/profile/discord/certify-prompt` → `{ prompt }`, `recheckCertifyPrompt`),
-**fermée en cas de doute** (panne, refus : la marque reste, elle revient au
-chargement suivant) ; la relecture peut changer le parcours. Ouverte, elle se
-relit quand l'onglet redevient visible (`visibilitychange`, `pageshow` du cache
-avant/arrière) ; une réponse écrite dans un autre onglet du navigateur (même
-session) la ferme sans requête (`BroadcastChannel` `bg:certify-prompt`, posté
-par `answerCertifyPrompt` après succès). Aucun sondage : rien ne part tant
-qu'aucune fenêtre n'est due ni affichée, et une session sans marque répond au
-`GET` sans requête SQL.
+chargement** (ou après un `router.refresh()`, qui la relit). Toute ouverture
+plus tardive — après la confidentialité ou les conditions, au retour d'une page
+qui la tait — relit d'abord la proposition (`GET
+/api/profile/discord/certify-prompt` → `{ prompt }`, `recheckCertifyPrompt`),
+**fermée en cas de doute** (panne : la marque reste, elle revient au chargement
+suivant) ; le morceau se charge pendant la relecture, qui peut changer le
+parcours. Affichée, elle se relit au retour d'un onglet resté caché au moins
+`RECHECK_AFTER_HIDDEN_MS` (30 s) ou rendu par le cache avant/arrière, et ne se
+ferme alors que sur une réponse **tranchée** (`{ prompt: null }`, 401) — un
+réseau pas encore revenu ne l'escamote pas. Une réponse écrite dans un autre
+onglet du navigateur (même session) la ferme sans requête (`BroadcastChannel`
+`bg:certify-prompt`, posté par `answerCertifyPrompt` sur un canal aussitôt
+refermé ; le canal d'écoute se ferme quand plus aucune proposition n'attend).
+Aucun sondage, aucune requête abandonnée qui continue (`AbortController`) ;
+une session sans marque répond au `GET` sans requête SQL.
 
 Le contournement de développement (`DEV_AUTH_USER_ID`) n'a pas de session : la
 fenêtre ne s'y montre pas. Pour la voir en local, se connecter vraiment par

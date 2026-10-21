@@ -147,7 +147,8 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
 
   it("ne couvre pas l'écran où un lien de la modale de confidentialité envoie agir", () => {
     expect(LAZY).toContain("if (privacyFollowedLink(event)) setFollowedLink(true);");
-    expect(LAZY).toContain("if (certified || followedLink || revoked || !armed) return null;");
+    expect(LAZY).toContain("const over = certified || followedLink || revoked;");
+    expect(LAZY).toContain("if (over || !armed) return null;");
     const privacy = readSource("components/privacy/PrivacyChangesModal.tsx");
     expect(privacy).toContain("window.dispatchEvent(privacyAnsweredEvent(followedLink));");
     expect(privacy).toMatch(/const followLink = \(changeId: string\) => \{\s*close\(true\);/);
@@ -181,7 +182,7 @@ describe("mise en page racine", () => {
   it("chargée à la demande, seulement quand elle est due, chaque langue dans son morceau", () => {
     // …et seulement quand elle peut s'ouvrir (confidentialité, conditions, page), puis reste montée.
     expect(LAZY).toMatch(/const canOpen =\s*!followedLink &&\s*!certified &&\s*certifyPromptOpen\(/);
-    expect(LAZY).toContain("if (shown && !armed) setArmed(true);");
+    expect(LAZY).toContain("if (canOpen && !over && !armed) setArmed(true);");
     expect(LAZY.match(/\{ ssr: false \}/g)).toHaveLength(2);
     expect(LAZY.match(/orReload\(/g)).toHaveLength(2);
     // Une page française ne télécharge jamais l'anglais, ni l'inverse.
@@ -207,20 +208,27 @@ describe("mise en page racine", () => {
     // Seule une ouverture dès le chargement se fie à la lecture de la mise en page.
     expect(LAZY).toContain("const [confirmed, setConfirmed] = useState(canOpen);");
     expect(LAZY).toContain("if (!canOpen && confirmed) setConfirmed(false);");
-    expect(LAZY).toMatch(/if \(!canOpen \|\| confirmed \|\| revoked \|\| answered\.current\) return;\s*let live = true;\s*recheckCertifyPrompt\(\)/);
-    expect(LAZY).toMatch(/if \(next\) \{\s*setCurrent\(next\);\s*setConfirmed\(true\);\s*\} else \{\s*setRevoked\(true\);/);
+    expect(LAZY).toMatch(/if \(!canOpen \|\| confirmed \|\| revoked \|\| answered\.current\) return;\s*const abort = new AbortController\(\);\s*recheckCertifyPrompt\(abort\.signal\)/);
+    expect(LAZY).toMatch(/if \(result !== "UNKNOWN" && result\.prompt\) \{\s*setCurrent\(result\.prompt\);\s*setConfirmed\(true\);\s*\} else \{\s*setRevoked\(true\);/);
+    expect(LAZY).toContain("return () => abort.abort();");
     expect(LAZY).toContain("const shown = canOpen && confirmed && !revoked;");
     expect(LAZY).toContain("<View prompt={current} canOpen={shown}");
-    expect(LAZY).toContain("if (certified || followedLink || revoked || !armed) return null;");
+    // Un nouveau parcours venu de la mise en page (router.refresh) remplace l'ancien.
+    expect(LAZY).toMatch(/if \(prompt !== layoutPrompt\) \{\s*setLayoutPrompt\(prompt\);\s*setCurrent\(prompt\);/);
   });
 
-  it("ouverte : relue au retour de l'onglet, fermée par une réponse d'un autre onglet — sans sondage", () => {
-    expect(LAZY).toContain('document.addEventListener("visibilitychange", check);');
+  it("ouverte : relue au retour d'une absence, fermée seulement sur réponse tranchée — sans sondage", () => {
+    expect(LAZY).toContain('document.addEventListener("visibilitychange", onVisibility);');
+    expect(LAZY).toContain("if (away >= RECHECK_AFTER_HIDDEN_MS) check();");
     expect(LAZY).toContain("if (event.persisted) check();");
-    expect(LAZY).toMatch(/if \(!shown\) return;\s*let inFlight = false;/);
-    expect(LAZY).toContain("const stopElsewhere = onCertifyPromptAnsweredElsewhere(onElsewhere);");
+    expect(LAZY).toMatch(/if \(request\.signal\.aborted \|\| result === "UNKNOWN" \|\| answered\.current\) return;\s*if \(result\.prompt\) setCurrent\(result\.prompt\);\s*else setRevoked\(true\);/);
+    expect(LAZY).toContain("abort?.abort();");
     expect(LAZY).not.toMatch(/setInterval|setTimeout/);
-    expect(ANSWER).toContain("certifyChannel()?.postMessage(action);");
+  });
+
+  it("une réponse d'un autre onglet la ferme ; canal fermé une fois la proposition finie", () => {
+    expect(LAZY).toMatch(/if \(over\) return;\s*return onCertifyPromptAnsweredElsewhere\(\(\) => \{\s*answered\.current = true;\s*setRevoked\(true\);/);
+    expect(ANSWER).toContain("channel.close();");
   });
 
   it("fait taire le recrutement tant qu'elle est due, quelle que soit la page", () => {

@@ -5,17 +5,19 @@ const PATH = "/api/profile/discord/certify-prompt";
 /** Canal des onglets du même navigateur (même session) : une réponse ici ferme la fenêtre ailleurs. */
 const CHANNEL_NAME = "bg:certify-prompt";
 
-let channel: BroadcastChannel | null | undefined;
+/** Cet onglet : il n'agit pas sur sa propre annonce. */
+const TAB_ID = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+
+type CertifyPromptMessage = { from: string };
 
 /**
- * Un seul canal par document : un message posté ne revient pas à l'objet qui
- * le poste, l'onglet qui répond ne s'entend donc pas lui-même. `null` sans
- * `BroadcastChannel` (navigateur ancien) : seule la relecture avant ouverture
- * tient alors.
+ * Canal d'écoute, ouvert tant qu'un relais l'écoute et **fermé** au dernier
+ * départ (un canal ouvert peut priver la page du cache avant/arrière).
  */
-function certifyChannel(): BroadcastChannel | null {
-  if (channel === undefined) channel = typeof BroadcastChannel === "function" ? new BroadcastChannel(CHANNEL_NAME) : null;
-  return channel;
+let listening: { channel: BroadcastChannel; listeners: Set<() => void> } | null = null;
+
+function hasBroadcastChannel(): boolean {
+  return typeof BroadcastChannel === "function";
 }
 
 /**
@@ -37,35 +39,66 @@ export async function answerCertifyPrompt(action: CertifyPromptAction): Promise<
     const payload = (await response.json().catch(() => ({}))) as { error?: string };
     throw new Error(payload.error ?? `HTTP ${response.status}`);
   }
+  if (!hasBroadcastChannel()) return;
   try {
-    certifyChannel()?.postMessage(action);
+    // Canal le temps d'un message : rien ne reste ouvert pour l'onglet qui répond.
+    const channel = new BroadcastChannel(CHANNEL_NAME);
+    channel.postMessage({ from: TAB_ID } satisfies CertifyPromptMessage);
+    channel.close();
   } catch {
-    // Canal fermé (document qui part) : la relecture avant ouverture suffit.
+    // Document qui part : la relecture avant ouverture suffit.
   }
 }
 
-/** Une réponse donnée dans un autre onglet de ce navigateur. Rend le désabonnement. */
+/**
+ * Une réponse donnée dans un autre onglet de ce navigateur. Rend le
+ * désabonnement, qui ferme le canal au dernier départ. Sans
+ * `BroadcastChannel` (navigateur ancien) : rien, seule la relecture tient.
+ */
 export function onCertifyPromptAnsweredElsewhere(listener: () => void): () => void {
-  const current = certifyChannel();
-  if (!current) return () => undefined;
-  current.addEventListener("message", listener);
-  return () => current.removeEventListener("message", listener);
+  if (!hasBroadcastChannel()) return () => undefined;
+  if (!listening) {
+    const channel = new BroadcastChannel(CHANNEL_NAME);
+    const listeners = new Set<() => void>();
+    channel.addEventListener("message", (event: MessageEvent<CertifyPromptMessage | null>) => {
+      if (event.data?.from === TAB_ID) return;
+      for (const notify of listeners) notify();
+    });
+    listening = { channel, listeners };
+  }
+  const current = listening;
+  current.listeners.add(listener);
+  return () => {
+    current.listeners.delete(listener);
+    if (current.listeners.size > 0 || listening !== current) return;
+    current.channel.close();
+    listening = null;
+  };
 }
+
+/**
+ * Relecture : `{ prompt }` quand le serveur a tranché (`null` : plus due, ou
+ * session close — 401), `"UNKNOWN"` sinon (réseau coupé, panne, réponse
+ * illisible, requête abandonnée).
+ */
+export type CertifyPromptRecheck = { prompt: CertifyPrompt | null } | "UNKNOWN";
 
 /**
  * La proposition est-elle **encore** due (`GET`) ? Relue avant d'ouvrir une
  * fenêtre sur une page chargée plus tôt — « Ne plus voir » ou certification
- * choisis entre-temps sur un autre appareil. Fermée en cas de doute : toute
- * panne rend `null` (la marque de session reste, la proposition revient au
- * chargement suivant).
+ * choisis entre-temps sur un autre appareil. Avant une ouverture, le relais
+ * traite `"UNKNOWN"` comme « plus due » (fermée en cas de doute ; la marque de
+ * session reste, la proposition revient au chargement suivant) ; une fenêtre
+ * déjà affichée, elle, ne se ferme que sur une réponse tranchée.
  */
-export async function recheckCertifyPrompt(): Promise<CertifyPrompt | null> {
+export async function recheckCertifyPrompt(signal?: AbortSignal): Promise<CertifyPromptRecheck> {
   try {
-    const response = await fetch(PATH, { cache: "no-store" });
-    if (!response.ok) return null;
+    const response = await fetch(PATH, { cache: "no-store", signal });
+    if (response.status === 401) return { prompt: null };
+    if (!response.ok) return "UNKNOWN";
     const payload = (await response.json()) as { prompt?: CertifyPrompt | null };
-    return payload.prompt ?? null;
+    return { prompt: payload.prompt ?? null };
   } catch {
-    return null;
+    return "UNKNOWN";
   }
 }
