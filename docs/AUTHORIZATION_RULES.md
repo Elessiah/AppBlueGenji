@@ -369,7 +369,7 @@ dit là où le BattleTag se renseigne et se masque (`games.hiddenWarning`,
 | Le propriétaire du compte                                                   | ✅                        |
 | Membre d'une des deux équipes, fenêtre « Contacts » (deux adversaires connus → fin du match), contact présenté | ✅ |
 | **Caster inscrit**, fenêtre « Contacts », en lancement ou lancé              | ✅ (le temps du match seulement) |
-| **Arbitre / administrateur** (permission `tournaments`), fenêtre « Contacts » de la carte, aux mêmes moments que les équipes — caster compris | ✅ |
+| **Arbitre / administrateur** (permission `tournaments`), fenêtre « Contacts » de la carte, dès que les deux adversaires sont connus et jusqu'à la fin du match — ceux des équipes comme celui du caster (un arbitre qui joue le match lit en joueur) | ✅ |
 | Arbitre, administrateur, `casting`, joueur, visiteur — partout ailleurs     | ❌                        |
 
 **L'arbitre lit les contacts comme un joueur du match** (décision de
