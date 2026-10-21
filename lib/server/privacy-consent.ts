@@ -31,12 +31,25 @@ type PendingRow = RowDataPacket & {
  * la verrait pas sur le site, ni l'inverse (un seul scalaire par ligne, pas la
  * colonne JSON). Un test confronte la liste des rôles à `can` rôle par rôle.
  * Les rôles sont des constantes du code,
- * jamais une saisie : les écrire dans la requête est sûr ; l'écran des rôles
- * (`lib/server/users/roles.ts`) est seul à écrire la colonne, en tableau JSON.
+ * jamais une saisie : les écrire dans la requête est sûr — et
+ * `jsonRoleLiteral` le vérifie au chargement, pour qu'un rôle venu un jour
+ * d'ailleurs casse le démarrage plutôt que d'ouvrir une injection ; l'écran des
+ * rôles (`lib/server/users/roles.ts`) est seul à écrire la colonne, en tableau
+ * JSON.
  */
 export const LIVE_STAFF_SQL = `(u.is_admin = 1${rolesGranting("live")
-  .map((role) => ` OR JSON_CONTAINS(u.platform_roles_json, '"${role}"')`)
+  .map((role) => ` OR JSON_CONTAINS(u.platform_roles_json, ${jsonRoleLiteral(role)})`)
   .join("")})`;
+
+/**
+ * Littéral SQL du document JSON d'un rôle (`'"CASTER"'`), refusé — par une
+ * exception — pour tout nom qui ne serait pas fait de majuscules et de `_` :
+ * aucun guillemet ni antislash ne peut alors entrer dans la requête.
+ */
+export function jsonRoleLiteral(role: string): string {
+  if (!/^[A-Z_]+$/.test(role)) throw new Error(`privacy-consent: rôle impropre à une requête SQL (${JSON.stringify(role)})`);
+  return `'"${role}"'`;
+}
 
 /**
  * Condition SQL d'une entrée ciblée (`PrivacyChange.audience`) sur la ligne

@@ -6,6 +6,7 @@ import { getDatabase } from "@/lib/server/database";
 import {
   LIVE_STAFF_SQL,
   acknowledgePrivacyChanges,
+  jsonRoleLiteral,
   listPrivacyAcknowledgments,
   loadPendingPrivacyChanges,
   privacyAudienceSql,
@@ -150,6 +151,13 @@ describe("privacyAudienceSql", () => {
       expect(LIVE_STAFF_SQL.includes(`'"${role}"'`)).toBe(can({ roles: [role] }, "live"));
     }
     expect(LIVE_STAFF_SQL.startsWith("(u.is_admin = 1")).toBe(can({ isAdmin: true, roles: [] }, "live"));
+  });
+
+  it("LIVE_STAFF : un rôle n'entre dans la requête que fait de majuscules et de _", () => {
+    for (const role of PLATFORM_ROLES) expect(jsonRoleLiteral(role)).toBe(`'"${role}"'`);
+    for (const role of ["CAST'ER", 'CAST"ER', String.raw`CAST\ER`, "caster", "", "CASTER ) OR 1=1 -- "]) {
+      expect(() => jsonRoleLiteral(role)).toThrow(/rôle impropre/);
+    }
   });
 
   it("LIVE_STAFF : la règle de can(user, \"live\"), rôles tirés de ROLE_PERMISSIONS", () => {

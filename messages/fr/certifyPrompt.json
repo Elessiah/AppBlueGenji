@@ -19,7 +19,7 @@
     "referees": {
       "label": "Arbitres",
       "without": "Jamais",
-      "with": "Si tu es engagé dans un tournoi en cours ou à venir"
+      "with": "Si tu es engagé dans un tournoi en cours ou à venir ; pour un match que tu castes, dès que ses adversaires sont connus"
     },
     "match": {
       "label": "Ton match (équipes, caster)",
