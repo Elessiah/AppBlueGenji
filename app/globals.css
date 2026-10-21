@@ -209,8 +209,6 @@ a {
   background-clip: text;
   color: transparent;
   -webkit-text-fill-color: transparent;
-  /* Soulignement visible malgré le texte transparent (« Liens soulignés »). */
-  text-decoration-color: var(--blue-300);
 }
 
 .podium-tier {
@@ -328,7 +326,16 @@ a {
 }
 
 /* Ligne en retrait (perdant d'un match, éliminée, forfait) : le repère reste,
-   l'éclat s'éteint — sinon le nom distancé brillerait plus fort que les autres. */
+   l'éclat s'éteint — sinon le nom distancé brillerait plus fort que les autres.
+   Lien en pastille (`.badge`, `.pill`, `.cy-tag`) : sur son fond teinté, la
+   marche sous sa lueur tomberait sous 4,5:1 — éteinte de même, le nom prend la
+   couleur de la pastille. */
+.badge > .podium-tier,
+.badge > .podium-member,
+.pill > .podium-tier,
+.pill > .podium-member,
+.cy-tag > .podium-tier,
+.cy-tag > .podium-member,
 [data-podium-muted] .podium-tier,
 [data-podium-muted] .podium-member {
   background-image: none;

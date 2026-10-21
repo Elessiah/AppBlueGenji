@@ -70,6 +70,21 @@
   white-space: nowrap;
 }
 
+/* Nom peint d'une marche du podium (`PODIUM_TIERS.md`) : la marche vit sur un
+   `<span>` dans le lien. Rognée par le lien, sa lueur (`drop-shadow`) serait
+   coupée net et l'ellipse tracée hors dégradé : c'est le nom peint qui rogne
+   et pose l'ellipse, le lien le laisse déborder. */
+.truncate:has(> :global(.podium-tier), > :global(.podium-member)) {
+  overflow: visible;
+}
+
+.truncate > :global(.podium-tier),
+.truncate > :global(.podium-member) {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Contrastes forcés : le fond teinté disparaît, et avec lui le seul contour
    d'une case à initiale. Une bordure système la redessine ; la case vide reste
    invisible, elle ne fait que réserver la place. */

@@ -168,20 +168,15 @@ export default function PlayerDetailPage() {
                   style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 2 }}
                 >
                   {activeTeam ? (
-                    // Sur le fond teinté de la pastille, la marche du podium
-                    // tomberait sous 4,5:1 : elle s'y éteint (`data-podium-muted`,
-                    // repère conservé, `PODIUM_TIERS.md`).
-                    <span data-podium-muted="">
-                      <TeamLink
-                        teamId={activeTeam.teamId}
-                        podiumTier={deleted ? null : undefined}
-                        className="badge"
-                        style={{ fontSize: 11 }}
-                        title={t("page.viewTeam", { name: activeTeam.teamName })}
-                      >
-                        {activeTeam.teamName}
-                      </TeamLink>
-                    </span>
+                    <TeamLink
+                      teamId={activeTeam.teamId}
+                      podiumTier={deleted ? null : undefined}
+                      className="badge"
+                      style={{ fontSize: 11 }}
+                      title={t("page.viewTeam", { name: activeTeam.teamName })}
+                    >
+                      {activeTeam.teamName}
+                    </TeamLink>
                   ) : (
                     <span className="badge" style={{ fontSize: 11, opacity: 0.7 }} title={t("page.noTeamTitle")}>
                       {t("page.noTeam")}
