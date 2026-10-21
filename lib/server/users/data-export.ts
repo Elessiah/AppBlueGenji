@@ -49,6 +49,8 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
     match_dm_enabled: number | null;
     /** Absente si son `ALTER` de `RECENT_SCHEMA_CHANGES` a échoué. */
     recruitment_modal_off?: number | null;
+    /** Absente de même (changement récent). */
+    discord_certify_prompt_dismissed_at?: Date | null;
     created_at: Date;
   };
   const selectAccount = (withModalOff: boolean) =>
@@ -57,7 +59,7 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
               discord_pseudo, discord_verified_at, discord_id, discord_link_method,
               google_sub, blizzard_sub, is_adult, is_admin,
               visible_avatar, visible_overwatch, visible_marvel, visible_major, visible_discord,
-              open_to_recruitment, locale, match_dm_enabled${withModalOff ? ", recruitment_modal_off" : ""}, created_at
+              open_to_recruitment, locale, match_dm_enabled${withModalOff ? ", recruitment_modal_off, discord_certify_prompt_dismissed_at" : ""}, created_at
        FROM bg_users
        WHERE id = ? AND is_deleted = 0
        LIMIT 1`,
@@ -109,6 +111,8 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
       // « Ne plus afficher » la modale d'arrivée du recrutement : donnée détenue, rendue.
       recruitmentModalOff: recruitmentModalOff(row.recruitment_modal_off),
       recruitmentModalBackOn: recruitmentModalBackOn(row.recruitment_modal_off),
+      // « Ne plus voir » la fenêtre de certification du tag Discord : donnée détenue, rendue.
+      discordCertifyPromptDismissedAt: toIso(row.discord_certify_prompt_dismissed_at ?? null),
       createdAt: toIso(row.created_at) ?? new Date().toISOString(),
     },
     profile: {

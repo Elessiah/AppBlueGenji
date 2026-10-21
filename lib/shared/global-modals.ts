@@ -77,7 +77,45 @@ export function termsModalDueOnLoad(input: {
 export function recruitmentModalSilenced(input: {
   privacyPending: boolean;
   termsModalDue: boolean;
+  /** La fenêtre de certification du tag Discord est due à ce chargement. */
+  certifyPromptDue?: boolean;
   pathname: string | null | undefined;
 }): boolean {
-  return input.privacyPending || input.termsModalDue || input.pathname === LOGIN_PATH;
+  return input.privacyPending || input.termsModalDue || input.certifyPromptDue === true || input.pathname === LOGIN_PATH;
+}
+
+/**
+ * Pages où la fenêtre « Certifier ton tag Discord » se tait
+ * (`docs/features/DISCORD_CERTIFY_PROMPT.md`) : la connexion, la page des
+ * conditions et les pages légales — qui y lit la politique de confidentialité
+ * n'a pas à recevoir une proposition par-dessus. `/regles`, `/signalements`
+ * et `/profil` ne se taisent pas : la proposition y a sa place.
+ */
+const CERTIFY_PROMPT_SILENT_PATHS: readonly string[] = [
+  "/rgpd",
+  "/mentions-legales",
+  "/accessibilite",
+  "/privacy-policy-bot",
+  "/terms-of-service-bot",
+];
+
+export function certifyPromptSilencedOn(pathname: string | null | undefined): boolean {
+  if (pathname === TERMS_PATH || pathname === LOGIN_PATH) return true;
+  if (!pathname) return false;
+  return CERTIFY_PROMPT_SILENT_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+}
+
+/**
+ * La fenêtre de certification s'ouvre-t-elle ? Après **toute** modale qui
+ * attend une réponse : confidentialité, puis conditions (même quand celles-ci
+ * se taisent sur la page courante — on ne propose rien à qui n'a pas encore
+ * accepté), et jamais sur une page de {@link certifyPromptSilencedOn}.
+ */
+export function certifyPromptOpen(input: {
+  due: boolean;
+  privacyPending: boolean;
+  termsPending: boolean;
+  pathname: string | null | undefined;
+}): boolean {
+  return input.due && !input.privacyPending && !input.termsPending && !certifyPromptSilencedOn(input.pathname);
 }

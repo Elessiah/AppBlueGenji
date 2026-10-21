@@ -249,6 +249,15 @@ export const DONNEES_PROFIL: DonneEntry[] = [
       "Non par défaut : la fenêtre des annonces de recrutement urgentes s'ouvre d'elle-même. « Ne plus afficher » dans cette fenêtre : elle ne s'ouvre plus d'elle-même sur tes autres appareils (un choix fait sur ce navigateur avant la connexion, ou pas enregistré sur-le-champ, y est reporté à la connexion ou à ta prochaine visite connectée). Réversible dans Mon profil : le compte note alors que la fenêtre a été réaffichée et le cookie bg_recr_off de ce navigateur est effacé ; dès lors, plus aucun cookie n'est reporté sur le compte (un nouveau « Ne plus afficher » fait connecté, ou la case de Mon profil, l'y remet). Figure dans l'export de tes données, remis au défaut si le compte est anonymisé",
     base: "Exécution du contrat",
     duree: "Durée du compte",
+  },  {
+    donnee: "Choix « Ne plus voir » de la certification Discord",
+    // `bg_users.discord_certify_prompt_dismissed_at` (registre T01) :
+    // préférence d'affichage, exportée et effacée à l'anonymisation. La marque
+    // de session (`bg_user_sessions.certify_prompt_due`) part avec la session.
+    finalite:
+      "Non par défaut : après une connexion par Discord ou Blizzard, une fenêtre te propose une fois de certifier ton tag Discord s'il ne l'est pas (la session de connexion note seulement qu'elle reste à proposer, marque effacée avec la session). « Ne plus voir » : elle ne s'ouvre plus, sur aucun appareil (date du choix gardée) ; la certification reste possible dans Mon profil. Figure dans l'export de tes données, effacé si le compte est anonymisé",
+    base: "Exécution du contrat",
+    duree: "Durée du compte",
   },
 ];
 

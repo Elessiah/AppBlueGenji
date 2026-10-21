@@ -134,6 +134,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Exporting one's data and deleting one's account from “My profile” (deletion also from the terms of use acceptance window, without accepting them)",
       "Writing push notifications in the account's language: the language of the site page the last login started from (a login started elsewhere, or a login through the Google, Discord or Blizzard button from a browser that does not tell (too old, or one that strips this information), does not change it; French by default), or the one chosen in “My profile”",
       "Keeping on the account the “Don't show again” choice of the window of urgent recruitment announcements, so that it no longer opens on its own on the player's other devices — a choice that can be undone in “My profile”",
+      "Suggesting once, after a login with Discord or Blizzard, the verification of the Discord tag to an account that does not have it (a window that verifies nothing on its own), and keeping on the account the “Don't show again” choice of that window",
     ],
     legalBasis:
       "Performance of the service requested by the player (contract) for the account; consent for the optional data the player fills in and chooses to make visible; performance of the service (contract — terms of use, “Match contacts”) for the BattleTag being read, even when hidden, only in a match's “Contacts” window and its launch window (record T04) — when hidden, it is readable nowhere else, referees and administrators included; legitimate interest (knowing who has proven their game identity) for the certification badges on the player page (certified Discord tag, BattleTag taken from a linked Battle.net account), read by any logged-in player even when the tag is hidden, without the tag — right to object through the report form (GDPR category)",
@@ -145,6 +146,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Visibility settings, availability for recruitment, roles on the platform",
       "Account language (French or English), reset to French on anonymization",
       "“Don't show again” choice on the window of urgent recruitment announcements, made in that window or by unticking the “My profile” box (never chosen / yes / turned back on from “My profile”; a choice made on the browser before logging in, or not saved right away, is carried over to an account that has never chosen, at login or on the next logged-in visit; turning it back on from “My profile” also deletes the bg_recr_off cookie of that browser), reset to “never chosen” on anonymization",
+      "“Don't show again” choice on the window suggesting the verification of the Discord tag (date of the choice), erased on anonymization; on the login session, a “window still to be suggested” mark (set at a login with Discord or Blizzard, cleared at the first answer), erased with the session",
       "No real name, no email address, no phone number, no postal address",
     ],
     sensitiveData: "None",

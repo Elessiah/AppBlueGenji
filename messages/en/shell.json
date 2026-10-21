@@ -205,5 +205,70 @@
   "imageCropLoad": {
     "failed": "The crop window couldn't open. Try again in a moment.",
     "reloading": "The site has just been updated: reload the page to crop your image."
+  },
+  "certifyPrompt": {
+    "eyebrow": "VERIFICATION · DISCORD",
+    "title": "Verify your Discord tag?",
+    "intro": "Logging in didn't verify your Discord tag. Verifying it lets the organizers reach you during a tournament. It's optional: saying no changes nothing else.",
+    "tag": "Saved tag: <strong>{tag}</strong>",
+    "tableCaption": "What verification changes",
+    "colWithout": "Without verification",
+    "colWith": "With verification",
+    "rows": {
+      "you": {
+        "label": "You",
+        "without": "Your tag",
+        "with": "Your tag"
+      },
+      "admins": {
+        "label": "Administrators",
+        "without": "Never",
+        "with": "Always"
+      },
+      "referees": {
+        "label": "Referees",
+        "without": "Never",
+        "with": "While you're entered in an ongoing or upcoming tournament"
+      },
+      "match": {
+        "label": "Your match (both teams, caster)",
+        "without": "Never",
+        "with": "From the moment your opponents are known until the match ends (caster: while it's played)"
+      },
+      "players": {
+        "label": "Other players",
+        "without": "Never",
+        "with": "Only if you tick “Discord tag” in your settings"
+      },
+      "visitors": {
+        "label": "Visitors without an account",
+        "without": "Never",
+        "with": "Never"
+      },
+      "badge": {
+        "label": "“Verified” badge on your player page",
+        "without": "No",
+        "with": "Yes, seen by logged-in players"
+      },
+      "dms": {
+        "label": "Match direct messages from the bot (times, reminders)",
+        "without": "None",
+        "with": "Yes, unless you turn them off"
+      }
+    },
+    "undo": "Removing your tag or changing your Discord username removes the verification.",
+    "later": "You can always verify from “My profile”.",
+    "certify": "Verify my tag",
+    "certifyElsewhere": "Verify my tag →",
+    "certifying": "Verifying…",
+    "postpone": "Later",
+    "never": "Don't show again",
+    "neverSaving": "Saving…",
+    "certified": "Discord tag verified.",
+    "neverSaved": "You won't see this suggestion again. You can always verify from “My profile”.",
+    "certifyChanged": "Your tag changed since you logged in: verify it from “My profile”.",
+    "certifyFailed": "Verification failed. Try again, or go through “My profile”.",
+    "neverFailed": "Your choice couldn't be saved. Try again.",
+    "bodyLabel": "Discord tag verification suggestion"
   }
 }

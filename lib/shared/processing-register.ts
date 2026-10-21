@@ -311,6 +311,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Exporter ses données et supprimer son compte depuis « Mon profil » (la suppression aussi depuis la fenêtre d'acceptation des conditions d'utilisation, sans les accepter)",
       "Rédiger les notifications push dans la langue du compte : celle de la page du site d'où part la dernière connexion (une connexion lancée d'ailleurs, ou par le bouton Google, Discord ou Blizzard depuis un navigateur qui ne l'indique pas (trop ancien, ou qui retire cette indication), ne la change pas ; français par défaut), ou celle choisie dans « Mon profil »",
       "Garder sur le compte le choix « Ne plus afficher » de la fenêtre des annonces de recrutement urgentes, pour qu'elle ne s'ouvre plus d'elle-même sur les autres appareils du joueur — choix réversible dans « Mon profil »",
+      "Proposer une fois, après une connexion par Discord ou Blizzard, la certification du tag Discord à un compte qui ne l'a pas (fenêtre qui ne certifie rien d'elle-même), et garder sur le compte le choix « Ne plus voir » de cette fenêtre",
     ],
     legalBasis:
       "Exécution du service demandé par le joueur (contrat) pour le compte ; consentement pour les données facultatives que le joueur renseigne et choisit de rendre visibles ; exécution du service (contrat — conditions d'utilisation, « Contacts de match ») pour la lecture du BattleTag, même masqué, dans la seule fenêtre « Contacts » d'un match et dans sa fenêtre de lancement (registre T04) — masqué, il n'est lisible nulle part ailleurs, arbitres et administrateurs compris ; intérêt légitime (savoir qui a prouvé son identité de jeu) pour les pastilles de certification de la fiche (tag Discord certifié, BattleTag tiré d'un compte Battle.net rattaché), lues par tout joueur connecté même tag masqué, sans le tag — droit d'opposition par le formulaire de signalement (catégorie RGPD)",
@@ -322,6 +323,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Réglages de visibilité, disponibilité pour le recrutement, rôles sur la plateforme",
       "Langue du compte (français ou anglais), remise au français à l'anonymisation",
       "Choix « Ne plus afficher » de la fenêtre des annonces de recrutement urgentes, fait dans cette fenêtre ou en décochant la case de « Mon profil » (jamais choisi / oui / réaffichée depuis « Mon profil » ; un choix fait sur le navigateur avant la connexion, ou pas enregistré sur-le-champ, est reporté sur un compte qui n'a jamais choisi, à la connexion ou à la visite connectée suivante ; réafficher depuis « Mon profil » efface aussi le cookie bg_recr_off de ce navigateur), remis à « jamais choisi » à l'anonymisation",
+      "Choix « Ne plus voir » de la fenêtre qui propose la certification du tag Discord (date du choix), effacé à l'anonymisation ; sur la session de connexion, marque « fenêtre encore à proposer » (posée à une connexion par Discord ou Blizzard, levée à la première réponse), effacée avec la session",
       "Aucun nom réel, aucune adresse e-mail, aucun numéro de téléphone, aucune adresse postale",
     ],
     sensitiveData: "Aucune",

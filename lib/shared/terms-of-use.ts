@@ -129,6 +129,13 @@ export function termsRequestFor(acceptedVersion: number | null | undefined): Ter
  */
 export const TERMS_REQUIRED_EVENT = "bg:terms-required";
 
+/**
+ * Événement de fenêtre émis quand la modale d'acceptation vient d'être
+ * acceptée : la fenêtre de certification du tag Discord, qui l'attendait, peut
+ * s'ouvrir sans rechargement.
+ */
+export const TERMS_ACCEPTED_EVENT = "bg:terms-accepted";
+
 /** Jeton de refus d'un geste de gestion sans acceptation. */
 export const TERMS_ACCEPTANCE_REQUIRED = "TERMS_ACCEPTANCE_REQUIRED";
 

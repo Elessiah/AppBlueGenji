@@ -18,13 +18,16 @@ import { SkipLink } from "@/components/accessibility/SkipLink";
 import { MatchLaunchCenterLazy } from "@/components/match-launch/MatchLaunchCenterLazy";
 import { EnglishLinkPreload } from "@/components/i18n/english-link-preload";
 import { TermsAcceptanceModal } from "@/components/legal/TermsAcceptanceModal";
+import { DiscordCertifyPrompt } from "@/components/discord/DiscordCertifyPrompt";
 import { TERMS_TRANSLATION_NOTE } from "@/lib/shared/french-version-prevails";
 import { needsTermsAcceptance } from "@/lib/server/terms-acceptance";
 import type { TermsRequest } from "@/lib/shared/terms-of-use";
 import { scheduleAccountDeletionJournalPrune } from "@/lib/server/account-deletion-journal";
 import { schedulePurgeExpiredReports } from "@/lib/server/content-reports";
 import { getRecruitmentSpotlight } from "@/lib/server/recruitment-service";
-import { getCurrentUser } from "@/lib/server/auth";
+import { currentTokenHash, getCurrentUser } from "@/lib/server/auth";
+import { loadDiscordCertifyPrompt } from "@/lib/server/users/discord-certify-prompt";
+import type { CertifyPrompt } from "@/lib/shared/discord-certify-prompt";
 import { healRecruitmentModalOff } from "@/lib/server/users/recruitment-modal-preference";
 import { loadPendingPrivacyChanges } from "@/lib/server/privacy-consent";
 import { dispatchPrivacyChangeNotifications } from "@/lib/server/privacy-change-notifications";
@@ -33,6 +36,7 @@ import { localizedPrivacyChanges } from "@/lib/shared/privacy-changes-en";
 import { siteMetadataBase } from "@/lib/server/site-url";
 import { PATHNAME_HEADER } from "@/lib/shared/csp";
 import {
+  certifyPromptOpen,
   recruitmentModalSilenced,
   termsModalDueOnLoad,
 } from "@/lib/shared/global-modals";
@@ -140,6 +144,22 @@ async function termsRequestFor(userId: number | undefined): Promise<TermsRequest
     return await needsTermsAcceptance(userId);
   } catch (error) {
     console.error("[terms] lecture impossible", error);
+    return null;
+  }
+}
+
+/**
+ * La fenêtre « Certifier ton tag Discord » est-elle due pour cette session
+ * (`docs/features/DISCORD_CERTIFY_PROMPT.md`) ? Une requête, compte connecté
+ * seulement ; une panne ne fait pas tomber la page, la question sera reposée
+ * au chargement suivant.
+ */
+async function certifyPromptFor(userId: number | undefined): Promise<CertifyPrompt | null> {
+  if (userId === undefined) return null;
+  try {
+    return await loadDiscordCertifyPrompt(userId, await currentTokenHash());
+  } catch (error) {
+    console.error("[discord-certify-prompt] lecture impossible", error);
     return null;
   }
 }
@@ -254,6 +274,16 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     termsRequired,
     pathname: requestedPath,
   });
+  // Proposée après la confidentialité et les conditions, jamais par-dessus :
+  // lue quand même, la fenêtre s'ouvre dès leur réponse, sans rechargement.
+  // Aucune requête de plus quand la session n'a rien à proposer (lu avec elle).
+  const certifyPrompt = user?.certifyPromptDue ? await certifyPromptFor(user.id) : null;
+  const certifyPromptDue = certifyPromptOpen({
+    due: certifyPrompt !== null,
+    privacyPending: privacyChanges.length > 0,
+    termsPending: termsRequired,
+    pathname: requestedPath,
+  });
   // Réglages d'accessibilité du lecteur : posés **dans le HTML initial**, sans
   // quoi un contraste renforcé ferait d'abord clignoter la page dans ses
   // couleurs d'origine. Voir `lib/shared/accessibility-settings.ts`.
@@ -305,6 +335,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             modalSilenced={recruitmentModalSilenced({
               privacyPending: privacyChanges.length > 0,
               termsModalDue: termsDueOnLoad,
+              certifyPromptDue,
               pathname: requestedPath,
             })}
             modalOptedOut={modalOptedOut}
@@ -326,6 +357,15 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
               request={termsRequest}
               privacyPending={privacyChanges.length > 0}
               translationNote={locale === DEFAULT_LOCALE ? null : TERMS_TRANSLATION_NOTE}
+            />
+          )}
+          {/* Certification du tag Discord proposée une fois par connexion
+              Discord ou Blizzard, après la confidentialité et les conditions. */}
+          {user && (
+            <DiscordCertifyPrompt
+              prompt={certifyPrompt}
+              privacyPending={privacyChanges.length > 0}
+              termsPending={termsRequired}
             />
           )}
           {/* Lancement des matchs du joueur, sur toutes les pages : la modale

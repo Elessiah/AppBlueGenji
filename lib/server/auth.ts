@@ -12,6 +12,7 @@ import { recordConnection } from "@/lib/server/connection-logs";
 import { closeSessionStreams, closeUserStreams } from "@/lib/server/session-streams";
 import { activeSuspensionSql, assertNotSuspended, purgeEndedSuspensions } from "@/lib/server/account-suspensions";
 import type { ConnectionLogEvent } from "@/lib/shared/connection-logs";
+import { certifyPromptDoor } from "@/lib/shared/discord-certify-prompt";
 import { isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { RECRUITMENT_MODAL_OFF_COOKIE, recruitmentModalOffInBrowser } from "@/lib/shared/recruitment";
 import {
@@ -34,6 +35,12 @@ export type AuthUser = {
   recruitmentModalOff: boolean;
   /** Modale réaffichée depuis « Mon profil » : aucun cookie n'est plus reporté sur le compte. */
   recruitmentModalBackOn: boolean;
+  /**
+   * La session (ouverte par Discord ou Blizzard) doit encore proposer la
+   * certification du tag Discord (`bg_user_sessions.certify_prompt_due`) —
+   * sans rien dire du compte : `loadDiscordCertifyPrompt` tranche le reste.
+   */
+  certifyPromptDue: boolean;
 };
 
 type UserRow = RowDataPacket & {
@@ -46,6 +53,7 @@ type UserRow = RowDataPacket & {
   is_admin: 0 | 1;
   platform_roles_json: string | null;
   recruitment_modal_off?: number | null;
+  certify_prompt_due?: number | null;
 };
 
 /**
@@ -96,6 +104,7 @@ function fromRow(row: UserRow): AuthUser {
     roles: resolveRoles(Boolean(row.is_admin), row.platform_roles_json),
     recruitmentModalOff: recruitmentModalOff(row.recruitment_modal_off),
     recruitmentModalBackOn: recruitmentModalBackOn(row.recruitment_modal_off),
+    certifyPromptDue: Number(row.certify_prompt_due ?? 0) === 1,
   };
 }
 
@@ -118,11 +127,7 @@ export async function createSession(userId: number, event: ConnectionLogEvent): 
 
   await db.execute(`DELETE FROM bg_user_sessions WHERE expires_at < NOW()`);
   await purgeEndedSuspensions();
-  await db.execute(
-    `INSERT INTO bg_user_sessions (token_hash, user_id, expires_at)
-     VALUES (?, ?, DATE_ADD(NOW(), INTERVAL ? DAY))`,
-    [tokenHash, userId, SESSION_TTL_DAYS],
-  );
+  await insertSession(tokenHash, userId, certifyPromptDoor(event));
 
   const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE, token, {
@@ -132,6 +137,37 @@ export async function createSession(userId: number, event: ConnectionLogEvent): 
   forgetTermsPostponement(cookieStore);
   // En parallèle : le report ne rallonge pas la connexion d'un aller-retour.
   await Promise.all([carryRecruitmentModalOff(userId, cookieStore), recordConnection(userId, event)]);
+}
+
+/**
+ * Écrit la session. `certifyPromptDue` : ouverte par Discord ou Blizzard, elle
+ * proposera la certification du tag Discord une fois
+ * (`docs/features/DISCORD_CERTIFY_PROMPT.md`). Colonne d'un changement récent :
+ * son `ALTER` échoué au démarrage ne doit pas fermer la connexion — la session
+ * est alors écrite sans elle, et la fenêtre se tait.
+ */
+async function insertSession(tokenHash: string, userId: number, certifyPromptDue: boolean): Promise<void> {
+  const db = await getDatabase();
+  const plain = () =>
+    db.execute(
+      `INSERT INTO bg_user_sessions (token_hash, user_id, expires_at)
+       VALUES (?, ?, DATE_ADD(NOW(), INTERVAL ? DAY))`,
+      [tokenHash, userId, SESSION_TTL_DAYS],
+    );
+  if (!certifyPromptDue) {
+    await plain();
+    return;
+  }
+  try {
+    await db.execute(
+      `INSERT INTO bg_user_sessions (token_hash, user_id, expires_at, certify_prompt_due)
+       VALUES (?, ?, DATE_ADD(NOW(), INTERVAL ? DAY), 1)`,
+      [tokenHash, userId, SESSION_TTL_DAYS],
+    );
+  } catch (error) {
+    if (!isUnknownColumnError(error)) throw error;
+    await plain();
+  }
 }
 
 /**
@@ -300,7 +336,8 @@ async function ensureFreshTestUser(): Promise<number> {
 
 /**
  * Lecture de l'utilisateur de la session, `bg_users.recruitment_modal_off`
- * compris. Colonne d'un changement récent (`RECENT_SCHEMA_CHANGES`) : si son
+ * (et, pour la session, `bg_user_sessions.certify_prompt_due`) compris.
+ * Colonnes d'un changement récent (`RECENT_SCHEMA_CHANGES`) : si son
  * `ALTER` a échoué au démarrage (`reportSchemaFailure` ne fait que
  * journaliser), la lecture est rejouée sans elle — la modale reste ouverte
  * par défaut — plutôt que de faire tomber chaque page connectée.
@@ -372,7 +409,7 @@ export const getCurrentUser = requestCache(async (): Promise<AuthUser | null> =>
   if (!token) return null;
 
   const rows = await selectUserRows(
-    (modalOff) => `SELECT u.id, u.pseudo, u.avatar_url, u.discord_id, u.google_sub, u.is_adult, u.is_admin, u.platform_roles_json${modalOff ? ", u.recruitment_modal_off" : ""}
+    (modalOff) => `SELECT u.id, u.pseudo, u.avatar_url, u.discord_id, u.google_sub, u.is_adult, u.is_admin, u.platform_roles_json${modalOff ? ", u.recruitment_modal_off, s.certify_prompt_due" : ""}
      FROM bg_user_sessions s
      JOIN bg_users u ON u.id = s.user_id
      WHERE s.token_hash = ?
