@@ -28,3 +28,18 @@ describe("indication du BattleTag masqué sur la fiche", () => {
     expect(source).not.toContain("targetInActiveTournament");
   });
 });
+
+describe("pastille BattleTag vérifié sur la fiche", () => {
+  it("suit `battletagVerified`, jamais le tag affiché", () => {
+    const page = read("app/(secured)/joueurs/[id]/page.tsx");
+    expect(page).toContain("data.profile.battletagVerified ? (");
+    expect(page).toContain('t("page.battletagVerifiedAlt")');
+    expect(page).not.toMatch(/overwatchBattletag\s*&&\s*data\.profile\.battletagVerified/);
+  });
+
+  it.each(["fr", "en"])("a ses textes (%s)", (locale: string) => {
+    const messages = JSON.parse(read(`messages/${locale}/players.json`)) as { page: Record<string, string> };
+    expect(messages.page.battletagVerifiedAlt).toEqual(expect.any(String));
+    expect(messages.page.battletagVerifiedTitle).toEqual(expect.any(String));
+  });
+});

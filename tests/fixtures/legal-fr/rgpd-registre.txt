@@ -5,7 +5,7 @@ Le registre décrit les traitements de données personnelles du site et du bot D
 Il décrit aussi le portail de support (Spiceworks), la retransmission des matchs et les journaux techniques du serveur web. La gestion des adhésions à l'association ne relève pas du site : l'association la tient hors du site, et ce registre ne la décrit pas — pour toute question à son sujet, utilisez les moyens de contact de la politique de confidentialité.
 Télécharger le registre (tableur CSV)← Politique de confidentialité
 RESPONSABLE
-ActeursMIS À JOUR LE 20/10/2026
+ActeursMIS À JOUR LE 21/10/2026
 Responsable du traitement
 Bluegenji Esport — Association loi 1901, 4 impasse des Cyprès, 51210 Janvilliers, France
 Contact
@@ -32,7 +32,7 @@ Personnes concernées
 Joueurs inscrits sur le site
 Données
 Pseudo du site (depuis le 30 septembre 2026, jamais tiré du nom du compte Google : pseudo neutre à la création ; un compte Google antérieur a pu recevoir ce nom), avatar (copié sur nos serveurs ; depuis la même date, masqué par défaut quand il vient du fournisseur de connexion)
-Pseudos Overwatch (BattleTag), Marvel Rivals et Discord ; certification du pseudo Discord
+Pseudos Overwatch (BattleTag), Marvel Rivals et Discord ; certification du pseudo Discord ; indication d'un BattleTag tiré d'un compte Battle.net rattaché (pastille de la fiche, montrée même BattleTag masqué)
 Majorité déclarée (oui / non / non renseignée)
 Réglages de visibilité, disponibilité pour le recrutement, rôles sur la plateforme
 Langue du compte (français ou anglais), remise au français à l'anonymisation
