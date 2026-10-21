@@ -1,0 +1,68 @@
+{
+  "eyebrow": "CERTIFICATION · DISCORD",
+  "title": "Certifier ton tag Discord ?",
+  "intro": "Ta connexion ne l'a pas certifié. Le certifier permet à l'organisation de te joindre pendant un tournoi. C'est facultatif, mais certains tournois l'exigent pour s'inscrire, et caster un match aussi.",
+  "tag": "Tag enregistré : <strong>{tag}</strong>",
+  "tableCaption": "Ce que change la certification",
+  "colWithout": "Sans",
+  "colWith": "Avec",
+  "groups": {
+    "seen": "Qui voit ton tag",
+    "effects": "Autres effets"
+  },
+  "rows": {
+    "admins": {
+      "label": "Administrateurs",
+      "without": "Jamais",
+      "with": "Toujours"
+    },
+    "referees": {
+      "label": "Arbitres",
+      "without": "Jamais",
+      "with": "Si tu es engagé dans un tournoi en cours ou à venir"
+    },
+    "match": {
+      "label": "Ton match (équipes, caster)",
+      "without": "Jamais",
+      "with": "Dès que tes adversaires sont connus, jusqu'à la fin (caster : pendant le match)"
+    },
+    "players": {
+      "label": "Autres joueurs",
+      "without": "Jamais",
+      "with": "Si tu coches « Tag Discord » dans tes réglages"
+    },
+    "visitors": {
+      "label": "Visiteurs sans compte",
+      "without": "Jamais",
+      "with": "Jamais"
+    },
+    "badge": {
+      "label": "Pastille « certifié » sur ta fiche",
+      "without": "Non",
+      "with": "Oui, visible des joueurs connectés"
+    },
+    "dms": {
+      "label": "Messages privés de match (bot)",
+      "without": "Aucun",
+      "with": "Oui, sauf si tu les coupes"
+    }
+  },
+  "undo": "Retirer ton tag ou changer de pseudo Discord retire la certification.",
+  "later": "Tu pourras toujours certifier depuis « Mon profil ».",
+  "certify": "Certifier mon tag",
+  "certifying": "Certification…",
+  "postpone": "Plus tard",
+  "never": "Ne plus voir",
+  "neverSaving": "Enregistrement…",
+  "certified": "Tag Discord certifié.",
+  "neverSaved": "Cette proposition ne s'affichera plus. Tu peux toujours certifier depuis « Mon profil ».",
+  "certifyChanged": "Ton compte Discord a changé depuis ta connexion : certifie ton tag depuis « Mon profil ».",
+  "certifyFailed": "La certification a échoué. Réessaie, ou passe par « Mon profil ».",
+  "neverFailed": "Ton choix n'a pas pu être enregistré. Réessaie.",
+  "bodyLabel": "Proposition de certification du tag Discord",
+  "accountDeleted": "Ce compte a été supprimé.",
+  "sessionEnded": "Ta session a pris fin : reconnecte-toi.",
+  "titleNoTag": "Ajouter et certifier ton tag Discord ?",
+  "introNoTag": "Ton compte n'a pas encore de tag Discord. L'ajouter et le certifier permet à l'organisation de te joindre pendant un tournoi. C'est facultatif, mais certains tournois l'exigent pour s'inscrire, et caster un match aussi.",
+  "addTag": "Ajouter mon tag"
+}

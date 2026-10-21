@@ -9,10 +9,12 @@ import {
   countOtherSessions,
   ensureUniquePseudo,
   revokeOtherSessions,
+  resetUnknownColumnMemoForTests,
 } from "@/lib/server/auth";
 import { type SqlQuery, fakePool } from "../../helpers/sql-double";
 import { fakeCookieStore } from "../../helpers/cookie-store";
 import { registerSessionStream, registeredStreamCount } from "@/lib/server/session-streams";
+import type { ConnectionLogEvent } from "@/lib/shared/connection-logs";
 
 const originalEnv = { ...process.env };
 
@@ -42,6 +44,7 @@ describe("auth", () => {
   beforeEach(() => {
     process.env = { ...originalEnv };
     jest.clearAllMocks();
+    resetUnknownColumnMemoForTests();
   });
 
   afterEach(() => {
@@ -257,6 +260,98 @@ describe("auth", () => {
     });
   });
 
+  describe("createSession — certification Discord proposée (CERTIFY-PROMPT)", () => {
+    const sessionInserts = (execute: ReturnType<typeof jest.fn<SqlQuery>>) =>
+      execute.mock.calls.filter(([sql]) => String(sql).includes("INSERT INTO bg_user_sessions"));
+    const setUp = async (execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []])) => {
+      const { getDatabase } = await import("@/lib/server/database");
+      const { cookies } = await import("next/headers");
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+      jest.mocked(cookies).mockResolvedValue(fakeCookieStore({ set: jest.fn(), get: jest.fn() }));
+      return execute;
+    };
+
+    const doors: ConnectionLogEvent[] = ["LOGIN_DISCORD", "LOGIN_DISCORD_CODE", "LOGIN_BLIZZARD"];
+    for (const event of doors) {
+      it(`${event} : la session porte la proposition`, async () => {
+        const execute = await setUp();
+        await createSession(4, event);
+        const inserts = sessionInserts(execute);
+        expect(inserts).toHaveLength(1);
+        expect(String(inserts[0][0]).replace(/\s+/g, " ")).toContain(
+          "(token_hash, user_id, expires_at, certify_prompt_due) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL ? DAY), COALESCE(( SELECT u.discord_verified_at IS NULL AND u.discord_certify_prompt_dismissed_at IS NULL FROM bg_users u WHERE u.id = ? ), 0))",
+        );
+        // Marque posée seulement pour un compte non certifié, sans « Ne plus voir ».
+        expect(inserts[0][1]).toEqual([expect.stringMatching(/^[0-9a-f]{64}$/), 4, 30, 4]);
+      });
+    }
+
+    it("LOGIN_GOOGLE (One Tap compris) : session sans proposition", async () => {
+      const execute = await setUp();
+      await createSession(4, "LOGIN_GOOGLE");
+      const inserts = sessionInserts(execute);
+      expect(inserts).toHaveLength(1);
+      expect(String(inserts[0][0])).not.toContain("certify_prompt_due");
+    });
+
+    it("colonne absente (migration en échec) : la session s'ouvre quand même, sans la marque", async () => {
+      const unknownColumn = Object.assign(new Error("Unknown column"), { code: "ER_BAD_FIELD_ERROR" });
+      const execute = await setUp(
+        jest.fn<SqlQuery>(async (sql) => {
+          if (sql.includes("certify_prompt_due")) throw unknownColumn;
+          return [{ affectedRows: 1 }, []];
+        }),
+      );
+      await expect(createSession(4, "LOGIN_DISCORD")).resolves.toBeUndefined();
+      const inserts = sessionInserts(execute);
+      expect(inserts).toHaveLength(2);
+      expect(String(inserts[1][0])).not.toContain("certify_prompt_due");
+      // Non retenu : la connexion suivante retente (colonne peut-être ajoutée entre-temps).
+      await expect(createSession(4, "LOGIN_DISCORD")).resolves.toBeUndefined();
+      const after = sessionInserts(execute);
+      expect(after).toHaveLength(4);
+      expect(String(after[2][0])).toContain("certify_prompt_due");
+    });
+
+    it("toute autre erreur d'écriture remonte (pas de session ouverte en silence)", async () => {
+      await setUp(
+        jest.fn<SqlQuery>(async (sql) => {
+          if (sql.includes("INSERT INTO bg_user_sessions")) throw Object.assign(new Error("lock"), { code: "ER_LOCK_WAIT_TIMEOUT" });
+          return [{ affectedRows: 1 }, []];
+        }),
+      );
+      await expect(createSession(4, "LOGIN_BLIZZARD")).rejects.toThrow("lock");
+    });
+  });
+
+  describe("getCurrentUser — proposition de certification lue avec la session", () => {
+    it("lit la marque de la session dans la même requête", async () => {
+      const { getDatabase } = await import("@/lib/server/database");
+      const { cookies } = await import("next/headers");
+      jest.mocked(cookies).mockResolvedValue(fakeCookieStore({ get: jest.fn().mockReturnValue({ value: "tok" }) }));
+      const row = {
+        id: 3, pseudo: "P", avatar_url: null, discord_id: null, google_sub: null,
+        is_adult: 1, is_admin: 0, platform_roles_json: null, recruitment_modal_off: 0, certify_prompt_due: 1,
+      };
+      const execute = jest.fn<SqlQuery>().mockResolvedValue([[row], []]);
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+      expect((await getCurrentUser())?.certifyPromptDue).toBe(true);
+      expect(execute).toHaveBeenCalledTimes(1);
+      expect(String(execute.mock.calls[0][0])).toMatch(/s\.certify_prompt_due/);
+    });
+
+    it("absente ou à 0 : rien à proposer", async () => {
+      const { getDatabase } = await import("@/lib/server/database");
+      const { cookies } = await import("next/headers");
+      jest.mocked(cookies).mockResolvedValue(fakeCookieStore({ get: jest.fn().mockReturnValue({ value: "tok" }) }));
+      for (const due of [0, null, undefined]) {
+        const row = { id: 3, pseudo: "P", avatar_url: null, discord_id: null, google_sub: null, is_adult: 1, is_admin: 0, platform_roles_json: null, certify_prompt_due: due };
+        jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: jest.fn<SqlQuery>().mockResolvedValue([[row], []]) }));
+        expect((await getCurrentUser())?.certifyPromptDue).toBe(false);
+      }
+    });
+  });
+
   describe("getCurrentUser — « Ne plus afficher » du recrutement", () => {
     it("lit le choix avec la session, dans la même requête", async () => {
       const { getDatabase } = await import("@/lib/server/database");
@@ -308,9 +403,37 @@ describe("auth", () => {
 
       expect(user?.id).toBe(3);
       expect(user?.recruitmentModalOff).toBe(false);
+      // Repli par colonne : sans la certification d'abord, puis sans le
+      // recrutement — la marque de certification, présente, reste lue.
+      expect(execute).toHaveBeenCalledTimes(3);
+      expect(String(execute.mock.calls[2][0])).toContain("FROM bg_user_sessions s");
+      expect(String(execute.mock.calls[2][0])).not.toContain("recruitment_modal_off");
+      expect(String(execute.mock.calls[2][0])).toContain("s.certify_prompt_due");
+    });
+
+    it("seule la marque de certification absente : « Ne plus afficher » du recrutement reste lu", async () => {
+      const { getDatabase } = await import("@/lib/server/database");
+      const { cookies } = await import("next/headers");
+      jest.mocked(cookies).mockResolvedValue(fakeCookieStore({ get: jest.fn().mockReturnValue({ value: "tok" }) }));
+      const execute = jest.fn<SqlQuery>(async (sql) => {
+        if (sql.includes("certify_prompt_due")) throw unknownColumn();
+        return [[{ ...plainRow, recruitment_modal_off: 1 }], []];
+      });
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+      const user = await getCurrentUser();
+
+      expect(user?.recruitmentModalOff).toBe(true);
+      expect(user?.certifyPromptDue).toBe(false);
       expect(execute).toHaveBeenCalledTimes(2);
-      expect(String(execute.mock.calls[1][0])).toContain("FROM bg_user_sessions s");
-      expect(String(execute.mock.calls[1][0])).not.toContain("recruitment_modal_off");
+      expect(String(execute.mock.calls[1][0])).toContain("u.recruitment_modal_off");
+      expect(String(execute.mock.calls[1][0])).not.toContain("certify_prompt_due");
+
+      // La lecture en échec est retenue : la requête suivante ne la retente pas.
+      execute.mockClear();
+      await getCurrentUser();
+      expect(execute).toHaveBeenCalledTimes(1);
+      expect(String(execute.mock.calls[0][0])).not.toContain("certify_prompt_due");
     });
 
     it("toute autre erreur de base remonte, sans seconde lecture", async () => {

@@ -58,6 +58,15 @@ describe("focusTrapTarget", () => {
     expect(focusTrapTarget({ ...inLayer, active: "x" })).toBeNull();
   });
 
+  it("focus sur le conteneur (ouverture, clic sur le texte) : un bord, Maj+Tab ne sort pas de la modale", () => {
+    const container = { ...base, active: "modal", onContainer: true };
+    expect(focusTrapTarget(container)).toBe("a");
+    expect(focusTrapTarget({ ...container, shiftKey: true })).toBe("c");
+    expect(focusTrapTarget({ ...container, extra: ["x", "y"], shiftKey: true })).toBe("y");
+    // Sans le drapeau, un élément du milieu garde l'ordre natif.
+    expect(focusTrapTarget({ ...base, active: "b", onContainer: false, shiftKey: true })).toBeNull();
+  });
+
   it("ramène dans la modale un focus parti ailleurs", () => {
     const outside = { ...base, active: "z", inModal: false };
     expect(focusTrapTarget(outside)).toBe("a");

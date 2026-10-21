@@ -97,7 +97,7 @@ export async function POST(req: Request) {
   if (throttled) return throttled;
 
   try {
-    const body = (await readJsonBody(req)) as { handle?: string };
+    const body = (await readJsonBody(req)) as { handle?: string; linkedOnly?: unknown };
 
     // Le plafond par **compte Discord visé** — celui qui protège le téléphone de
     // quelqu'un — ne peut être posé qu'une fois le tag résolu, et il doit
@@ -108,11 +108,18 @@ export async function POST(req: Request) {
     //
     // Il n'est pas consulté sur le chemin sans code : une certification
     // immédiate ne fait sonner personne.
-    const result = await startDiscordVerification(user.id, body.handle ?? "", (discordId) => {
-      if (enforceRateLimit(DISCORD_CODE_REQUEST_RULE, discordId)) {
-        throw new Error("TOO_MANY_CODE_REQUESTS");
-      }
-    });
+    // `linkedOnly` : la fenêtre de connexion ne certifie que d'un clic, jamais
+    // par un code qu'elle ne saurait faire saisir.
+    const result = await startDiscordVerification(
+      user.id,
+      body.handle ?? "",
+      (discordId) => {
+        if (enforceRateLimit(DISCORD_CODE_REQUEST_RULE, discordId)) {
+          throw new Error("TOO_MANY_CODE_REQUESTS");
+        }
+      },
+      { linkedOnly: body.linkedOnly === true },
+    );
 
     return ok(result);
   } catch (error) {

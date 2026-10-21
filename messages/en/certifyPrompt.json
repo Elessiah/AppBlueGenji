@@ -1,0 +1,68 @@
+{
+  "eyebrow": "VERIFICATION · DISCORD",
+  "title": "Verify your Discord tag?",
+  "intro": "Logging in didn't verify it. Verifying lets the organizers reach you during a tournament. It's optional, but some tournaments require it to register, and so does casting a match.",
+  "tag": "Saved tag: <strong>{tag}</strong>",
+  "tableCaption": "What verification changes",
+  "colWithout": "Without",
+  "colWith": "With",
+  "groups": {
+    "seen": "Who sees your tag",
+    "effects": "Other effects"
+  },
+  "rows": {
+    "admins": {
+      "label": "Administrators",
+      "without": "Never",
+      "with": "Always"
+    },
+    "referees": {
+      "label": "Referees",
+      "without": "Never",
+      "with": "If you're entered in an ongoing or upcoming tournament"
+    },
+    "match": {
+      "label": "Your match (teams, caster)",
+      "without": "Never",
+      "with": "From when your opponents are known until it ends (caster: during the match)"
+    },
+    "players": {
+      "label": "Other players",
+      "without": "Never",
+      "with": "If you tick “Discord tag” in your settings"
+    },
+    "visitors": {
+      "label": "Visitors without an account",
+      "without": "Never",
+      "with": "Never"
+    },
+    "badge": {
+      "label": "“Verified” badge on your player page",
+      "without": "No",
+      "with": "Yes, seen by logged-in players"
+    },
+    "dms": {
+      "label": "Match DMs from the bot",
+      "without": "None",
+      "with": "Yes, unless you turn them off"
+    }
+  },
+  "undo": "Removing your tag or changing your Discord username removes the verification.",
+  "later": "You can always verify from “My profile”.",
+  "certify": "Verify my tag",
+  "certifying": "Verifying…",
+  "postpone": "Later",
+  "never": "Don't show again",
+  "neverSaving": "Saving…",
+  "certified": "Discord tag verified.",
+  "neverSaved": "You won't see this suggestion again. You can always verify from “My profile”.",
+  "certifyChanged": "Your Discord account changed since you logged in: verify your tag from “My profile”.",
+  "certifyFailed": "Verification failed. Try again, or go through “My profile”.",
+  "neverFailed": "Your choice couldn't be saved. Try again.",
+  "bodyLabel": "Discord tag verification suggestion",
+  "accountDeleted": "This account has been deleted.",
+  "sessionEnded": "Your session has ended: log in again.",
+  "titleNoTag": "Add and verify your Discord tag?",
+  "introNoTag": "Your account has no Discord tag yet. Adding and verifying it lets the organizers reach you during a tournament. It's optional, but some tournaments require it to register, and so does casting a match.",
+  "addTag": "Add my tag"
+}

@@ -41,6 +41,12 @@ export interface FocusTrapState<T> {
   /** Élément qui a le focus. */
   active: unknown;
   inModal: boolean;
+  /**
+   * Le focus est sur le **conteneur** de la modale (`tabIndex={-1}` : focus
+   * d'ouverture, ou clic sur son texte) — hors des focalisables, c'est un bord :
+   * sans quoi `Maj+Tab` partirait dans la page derrière le voile.
+   */
+  onContainer?: boolean;
   inLayer: boolean;
   shiftKey: boolean;
 }
@@ -49,16 +55,28 @@ export interface FocusTrapState<T> {
  * Élément où envoyer le focus pour boucler sur la modale puis ses couches
  * exemptées, ou `null` quand l'ordre natif suffit (on n'est pas sur un bord).
  */
-export function focusTrapTarget<T>({ items, extra, active, inModal, inLayer, shiftKey }: FocusTrapState<T>): T | null {
+export function focusTrapTarget<T>({
+  items,
+  extra,
+  active,
+  inModal,
+  onContainer = false,
+  inLayer,
+  shiftKey,
+}: FocusTrapState<T>): T | null {
   const start = items[0];
   const end = items.at(-1)!;
-  if (inLayer) {
-    if (!shiftKey && active === extra.at(-1)) return start;
-    if (shiftKey && active === extra[0]) return end;
-    return null;
-  }
+  if (inLayer) return layerEdgeTarget(extra, active, shiftKey, start, end);
   if (!inModal) return shiftKey ? end : start;
+  if (onContainer) return shiftKey ? (extra.at(-1) ?? end) : start;
   if (shiftKey && active === start) return extra.at(-1) ?? end;
   if (!shiftKey && active === end) return extra[0] ?? start;
+  return null;
+}
+
+/** Bords d'une couche exemptée : on revient à la modale, sinon ordre natif. */
+function layerEdgeTarget<T>(extra: readonly T[], active: unknown, shiftKey: boolean, start: T, end: T): T | null {
+  if (!shiftKey && active === extra.at(-1)) return start;
+  if (shiftKey && active === extra[0]) return end;
   return null;
 }

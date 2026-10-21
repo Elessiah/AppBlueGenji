@@ -154,7 +154,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // ne doit pas coûter la porte Discord. D'où une base « Consentement » qui
     // tient — le geste est libre, spécifique, et se retire.
     finalite:
-      "Ouvre ton tag Discord à l'organisation pour te joindre : administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), membres des deux équipes de ton match dès que ses deux adversaires sont connus et jusqu'à sa fin, son caster le temps du match seulement (et, si tu castes un match, ses deux équipes et les arbitres le temps du match) ; les autres joueurs connectés seulement si tu coches « Tag Discord ». Que ton tag soit certifié (pastille ✅, sans le tag) se lit sur ta fiche par tout joueur connecté. Sans la certification, le bot ne t'envoie aucun message privé de match. Donnée seulement par toi, depuis Mon profil (un clic si ton Discord est rattaché, un code en message privé sinon) — se connecter par Discord ne la donne pas. Retirée en retirant ton tag ; perdue si ton pseudo change",
+      "Ouvre ton tag Discord à l'organisation pour te joindre : administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), membres des deux équipes de ton match dès que ses deux adversaires sont connus et jusqu'à sa fin, son caster le temps du match seulement (et, si tu castes un match, ses deux équipes et les arbitres le temps du match) ; les autres joueurs connectés seulement si tu coches « Tag Discord ». Que ton tag soit certifié (pastille ✅, sans le tag) se lit sur ta fiche par tout joueur connecté. Sans la certification, le bot ne t'envoie aucun message privé de match. Donnée seulement par toi, depuis Mon profil ou la fenêtre qui te la propose après une connexion par Discord ou Blizzard (un clic si ton Discord est rattaché, un code en message privé sinon) — se connecter par Discord ne la donne pas. Retirée en retirant ton tag ; perdue si ton pseudo change",
     base: "Consentement",
     // La certification décide aussi qui reçoit les messages privés de match,
     // qui reposent sur l'intérêt légitime (opposition par la case du profil).
@@ -247,6 +247,15 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // (`bg_recr_off`) est décrit à la section des cookies.
     finalite:
       "Non par défaut : la fenêtre des annonces de recrutement urgentes s'ouvre d'elle-même. « Ne plus afficher » dans cette fenêtre : elle ne s'ouvre plus d'elle-même sur tes autres appareils (un choix fait sur ce navigateur avant la connexion, ou pas enregistré sur-le-champ, y est reporté à la connexion ou à ta prochaine visite connectée). Réversible dans Mon profil : le compte note alors que la fenêtre a été réaffichée et le cookie bg_recr_off de ce navigateur est effacé ; dès lors, plus aucun cookie n'est reporté sur le compte (un nouveau « Ne plus afficher » fait connecté, ou la case de Mon profil, l'y remet). Figure dans l'export de tes données, remis au défaut si le compte est anonymisé",
+    base: "Exécution du contrat",
+    duree: "Durée du compte",
+  },  {
+    donnee: "Choix « Ne plus voir » de la certification Discord",
+    // `bg_users.discord_certify_prompt_dismissed_at` (registre T01) :
+    // préférence d'affichage, exportée et effacée à l'anonymisation. La marque
+    // de session (`bg_user_sessions.certify_prompt_due`) part avec la session.
+    finalite:
+      "Non par défaut : après une connexion par Discord ou Blizzard, une fenêtre te propose une fois de certifier ton tag Discord s'il ne l'est pas (la session de connexion note seulement qu'elle reste à proposer, marque effacée avec la session). « Ne plus voir » : elle ne s'ouvre plus, sur aucun appareil (date du choix gardée) ; la certification reste possible dans Mon profil. Figure dans l'export de tes données, effacé si le compte est anonymisé",
     base: "Exécution du contrat",
     duree: "Durée du compte",
   },

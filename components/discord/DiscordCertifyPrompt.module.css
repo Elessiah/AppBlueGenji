@@ -1,0 +1,172 @@
+/* Sous la fenêtre des conditions (1260) et celle des changements de
+   confidentialité (1300), au-dessus de la mise en avant du recrutement (1200) —
+   aucune ne s'affiche en même temps qu'elle (`lib/shared/global-modals.ts`). */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1250;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(4px);
+}
+
+/* Hauteur bornée et repli de défilement : `.dialog-bounded` (globals.css),
+   posée sur l'élément — à fort zoom, le plancher du corps l'emporte et la
+   fenêtre entière défile, boutons compris. */
+.modal {
+  width: min(560px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px;
+  background: var(--cyber-bg-1);
+  border: 1px solid var(--line-strong-cy);
+  border-radius: var(--r-cy-lg);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.75),
+    0 0 40px rgba(90, 200, 255, calc(0.12 * var(--glow, 1)));
+}
+
+/* Le focus d'ouverture est sur la fenêtre : un anneau discret le montre au
+   clavier (`:focus-visible`), jamais au clic — un clic sur le texte, ou sur un
+   bouton sous Safari, focalise aussi le conteneur. */
+.modal:focus {
+  outline: none;
+}
+
+.modal:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: -2px;
+}
+
+/* Seul le corps défile : les trois boutons restent en vue sur un petit écran. */
+/* Plancher : à fort zoom ou sur un écran court, le tableau garde une hauteur
+   lisible (il défile) au lieu de s'écraser à 0 px sous les boutons — on ne
+   certifie pas sans pouvoir lire ce que ça change (WCAG 1.4.10). */
+.body {
+  flex: 1 1 auto;
+  min-height: min(120px, 22vh);
+  min-height: min(120px, 22dvh);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: clamp(20px, 3vw, 24px);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+.text {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ink-mute);
+}
+
+.text strong {
+  color: var(--ink);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-mute);
+}
+
+.caption {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--ink-mute);
+  padding-bottom: 6px;
+}
+
+.table th,
+.table td {
+  padding: 7px 8px;
+  border-top: 1px solid var(--line-strong-cy);
+  text-align: left;
+  vertical-align: top;
+}
+
+.table thead th,
+.table thead td {
+  border-top: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.table tbody th {
+  font-weight: 500;
+  color: var(--ink-soft);
+  width: 34%;
+}
+
+/* Titre de groupe (« Qui voit ton tag », « Autres effets »). */
+.table tbody th.group {
+  width: auto;
+  padding-top: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-quiet);
+}
+
+.with {
+  color: var(--blue-300);
+}
+
+.note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--ink-quiet);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* À la largeur d'un téléphone : le tableau garde ses trois colonnes, serrées,
+   et les boutons s'empilent, le principal en dessous. */
+@media (max-width: 480px) {
+  .modal {
+    padding: 18px 16px;
+  }
+
+  .table th,
+  .table td {
+    padding: 6px 4px;
+  }
+
+  /* Les deux refus côte à côte, le principal pleine largeur dessous : une
+     rangée de boutons de moins, et l'ordre visuel reste celui de la
+     tabulation (jamais de `grid-row` qui le déplacerait — WCAG 2.4.3). */
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* Étirés à leur case : le libellé reste centré. */
+  .actions > * {
+    justify-content: center;
+  }
+
+  .actions > :last-child {
+    grid-column: 1 / -1;
+  }
+}

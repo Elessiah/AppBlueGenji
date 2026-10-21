@@ -1,7 +1,7 @@
 "use client";
 
 import { UserAvatar } from "@/components/user-avatar";
-import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { LogoutButton } from "@/components/logout-button";
 import { appendCroppedImage, useImageCropper, preloadImageCropDialog } from "@/components/ui/image-crop-dialog";
 import { Coche } from "@/components/Coche";
@@ -42,6 +42,8 @@ import { AccountLocaleField } from "./_components/AccountLocaleField";
 import { MatchDmField } from "./_components/MatchDmField";
 import { RecruitmentModalField } from "./_components/RecruitmentModalField";
 import { DiscordVerificationDialog } from "./DiscordVerificationDialog";
+import { useCertifyRequest } from "./useCertifyRequest";
+import { certifiedFromProfileEvent } from "@/lib/shared/discord-certify-prompt";
 import { ConnectedAppsSection } from "./ConnectedAppsSection";
 import { PushNotificationsPanel } from "@/components/notifications/PushNotificationsPanel";
 import { BattletagVisibilityNotice } from "./BattletagVisibilityNotice";
@@ -193,6 +195,7 @@ export default function ProfilePage() {
   // l'écran peut avoir périmé (voir `onSubmit`).
   const [savedDiscordPseudo, setSavedDiscordPseudo] = useState("");
   const [verifyOpen, setVerifyOpen] = useState(false);
+  const openVerifyDialog = useCallback(() => setVerifyOpen(true), []);
   const [isAdult, setIsAdult] = useState<string>("unknown");
   /**
    * Le bouton se désarme avant l'aperçu, focus encore dessus : le navigateur le
@@ -280,6 +283,15 @@ export default function ProfilePage() {
     void loadInvitations();
     void loadDiscordState();
   }, []);
+
+  // « Certifier mon tag » de la fenêtre proposée à la connexion, pour un tag
+  // que Discord n'a pas nommé : ce dialogue-ci fait la suite.
+  useCertifyRequest({
+    ready: !discordStateBusy && discordState.linked !== null,
+    verified: discordState.verified,
+    open: openVerifyDialog,
+    refresh: () => void loadDiscordState(),
+  });
 
   const [respondingInvitation, setRespondingInvitation] = useState<number | null>(null);
   // Garde synchrone : deux clics dans le même rendu voient encore l'état d'avant.
@@ -699,6 +711,9 @@ export default function ProfilePage() {
             // empêcher.
             setSavedDiscordPseudo(tag);
             setDiscordState((prev) => ({ ...prev, tag, verified: true, linked: true, attested: true }));
+            // Une fenêtre de proposition encore en attente (conditions à
+            // accepter) ne doit plus s'ouvrir pour un tag désormais certifié.
+            window.dispatchEvent(certifiedFromProfileEvent());
           }}
         />
       )}

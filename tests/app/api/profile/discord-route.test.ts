@@ -94,7 +94,17 @@ describe("POST — ouvrir la certification", () => {
     expect(await response.json()).toEqual({ status: "VERIFIED", tag: "keryan" });
     // Le troisième argument est le garde posé sur l'identifiant résolu : la
     // route y met son plafond par compte Discord visé, appelé avant l'envoi.
-    expect(startMock).toHaveBeenCalledWith(7, "keryan", expect.any(Function));
+    expect(startMock).toHaveBeenCalledWith(7, "keryan", expect.any(Function), { linkedOnly: false });
+  });
+
+  it("transmet `linkedOnly` (fenêtre de connexion), et seulement à la valeur true", async () => {
+    startMock.mockResolvedValue({ status: "VERIFIED", tag: "keryan" });
+
+    await post({ handle: "keryan", linkedOnly: true });
+    expect(startMock).toHaveBeenLastCalledWith(7, "keryan", expect.any(Function), { linkedOnly: true });
+
+    await post({ handle: "keryan", linkedOnly: "true" });
+    expect(startMock).toHaveBeenLastCalledWith(7, "keryan", expect.any(Function), { linkedOnly: false });
   });
 
   it("rend le jeton du défi et l'échéance quand un code part — jamais l'identifiant Discord", async () => {
@@ -116,7 +126,7 @@ describe("POST — ouvrir la certification", () => {
     startMock.mockRejectedValue(new Error("INVALID_DISCORD_HANDLE"));
 
     expect((await post({})).status).toBe(400);
-    expect(startMock).toHaveBeenCalledWith(7, "", expect.any(Function));
+    expect(startMock).toHaveBeenCalledWith(7, "", expect.any(Function), { linkedOnly: false });
   });
 
   it("refuse **avant** l'envoi quand le compte Discord visé a reçu trop de codes", async () => {

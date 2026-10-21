@@ -36,7 +36,12 @@ main est levé sous la modale par la fermeture d'une autre.
 Le focus initial va au premier élément focalisable, **sauf** s'il existe un
 élément marqué `data-autofocus` : le champ à remplir d'abord n'est pas toujours
 le premier (le bureau place un bouton « Couleur aléatoire » avant le champ
-Nom).
+Nom). `initialFocus: "container"` le pose sur le conteneur lui-même
+(`tabIndex={-1}`, sans défilement) : une proposition dont aucun bouton ne doit
+partir sur Entrée, et dont le titre doit rester en vue à fort zoom
+(`DiscordCertifyPrompt`). Le conteneur focalisé — focus d'ouverture ou clic
+sur son texte — est un **bord** du piège : `Maj+Tab` y reboucle sur le dernier
+contrôle au lieu de partir derrière le voile.
 
 Jamais l'attribut `autoFocus` (Sonar S9379). Un champ qui n'apparaît qu'après
 un geste — éditeur en ligne ouvert par « Modifier », onglet d'une modale déjà
