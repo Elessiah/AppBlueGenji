@@ -284,6 +284,11 @@ describe("textes (certifyPrompt) — FR et EN", () => {
     expect([fr.rows.visitors.with, en.rows.visitors.with]).toEqual(["Jamais", "Never"]);
   });
 
+  it("arbitres : engagé dans un tournoi, ou caster d'un match dès que ses adversaires sont connus (CASTER-CONTACTS-REFEREES)", () => {
+    expect(fr.rows.referees.with).toMatch(/pour un match que tu castes, dès que ses adversaires sont connus et jusqu'à sa fin/);
+    expect(en.rows.referees.with).toMatch(/for a match you cast, from when its opponents are known until it ends/);
+  });
+
   it("compte sans tag : propose de l'ajouter, sans parler d'un tag existant", () => {
     expect(SOURCE).toContain('const noTag = prompt.mode === "DIALOG" && !prompt.hasTag;');
     expect([fr.titleNoTag, fr.addTag]).toEqual(["Ajouter et certifier ton tag Discord ?", "Ajouter mon tag"]);

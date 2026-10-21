@@ -19,12 +19,12 @@
     "referees": {
       "label": "Arbitres",
       "without": "Jamais",
-      "with": "Si tu es engagé dans un tournoi en cours ou à venir"
+      "with": "Si tu es engagé dans un tournoi en cours ou à venir ; pour un match que tu castes, dès que ses adversaires sont connus et jusqu'à sa fin"
     },
     "match": {
       "label": "Ton match (équipes, caster)",
       "without": "Jamais",
-      "with": "Dès que tes adversaires sont connus, jusqu'à la fin (caster : pendant le match)"
+      "with": "Dès que tes adversaires sont connus, jusqu'à la fin (caster, et équipes d'un match que tu castes : pendant le match)"
     },
     "players": {
       "label": "Autres joueurs",

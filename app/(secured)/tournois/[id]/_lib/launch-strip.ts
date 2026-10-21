@@ -3,7 +3,7 @@
  * montre et offre, décidé hors du composant : une règle pure se teste sans
  * rendu, et le composant ne garde que la mise en page.
  */
-import type { MatchLaunchPhase } from "@/lib/shared/match-launch";
+import { exposesMatchContacts, matchUnderway, readsContactsEarly, type MatchLaunchPhase } from "@/lib/shared/match-launch";
 import type { BracketMatch } from "@/lib/shared/types";
 
 type StripMatch = Pick<
@@ -52,20 +52,6 @@ export type LaunchStripControls = {
 /** Phases où l'arbitrage peut forcer le départ : tout ce qui précède le lancement effectif. */
 const FORCEABLE_PHASES: ReadonlySet<MatchLaunchPhase> = new Set(["TO_PLAN", "SCHEDULED", "LOBBY"]);
 
-/**
- * Phases où le bouton « Contacts » est offert à un joueur du match (et à un
- * arbitre) : dès que
- * les deux adversaires sont connus — à planifier, programmé, en lancement ou
- * lancé —, celles où la lecture serveur les expose (`match-launch-info.ts`).
- */
-const CONTACT_PHASES: ReadonlySet<MatchLaunchPhase> = new Set(["TO_PLAN", "SCHEDULED", "LOBBY", "LAUNCHED"]);
-
-/**
- * Phases où il l'est au caster inscrit : le temps du match seulement, du
- * départ (lancement ouvert, ou lancé) à la fin — la même borne qu'au serveur.
- */
-const CASTER_CONTACT_PHASES: ReadonlySet<MatchLaunchPhase> = new Set(["LOBBY", "LAUNCHED"]);
-
 export function launchStripControls(
   match: StripMatch,
   phase: MatchLaunchPhase,
@@ -80,12 +66,15 @@ export function launchStripControls(
   const isByeLike = (match.team1Id === null) !== (match.team2Id === null) && match.status !== "PENDING";
   const castable = open && !isByeLike && !isPlayer;
   const showHost = phase !== "NONE";
+  // `canSchedule` : la permission `tournaments`, celle de l'arbitre au serveur.
+  const early = readsContactsEarly({ playsMatch: isPlayer, referee: viewer.canSchedule });
   return {
     isCaster,
-    showOpen: (isCaster || isPlayer) && viewer.launchPhase !== false && (phase === "LOBBY" || phase === "LAUNCHED"),
-    // Un arbitre (permission `tournaments`) les lit comme un joueur du match.
-    showContacts:
-      (isPlayer || viewer.canSchedule) ? CONTACT_PHASES.has(phase) : isCaster && CASTER_CONTACT_PHASES.has(phase),
+    showOpen: (isCaster || isPlayer) && viewer.launchPhase !== false && matchUnderway(phase),
+    // La règle du serveur (`exposesMatchContacts`) : un arbitre (permission
+    // `tournaments`) les lit comme un joueur du match, dès que les deux
+    // adversaires sont connus ; le caster inscrit, le temps du match seulement.
+    showContacts: (early || isCaster) && exposesMatchContacts(phase, early),
     showClaim: viewer.canManage && castable && match.casterUserId === null,
     showRelease: open && match.casterUserId !== null && (isCaster || viewer.canSchedule),
     showPlan: viewer.canSchedule && phase === "TO_PLAN",

@@ -359,7 +359,7 @@ et les rosters **pour tous**, arbitres et administrateurs compris : la fiche
 seul `lib/server/tournaments/match-launch-info.ts` pose en présentant les
 contacts d'un match — aux mêmes durées que la fenêtre elle-même. Cette lecture
 repose sur l'exécution du service — section « Contacts de match » des
-conditions d'utilisation (v5) —, pas sur le consentement ; l'avertissement est
+conditions d'utilisation (v6) —, pas sur le consentement ; l'avertissement est
 dit là où le BattleTag se renseigne et se masque (`games.hiddenWarning`,
 `battletagNotice.warning`, notes Blizzard de `/connexion` et du profil).
 
@@ -369,7 +369,7 @@ dit là où le BattleTag se renseigne et se masque (`games.hiddenWarning`,
 | Le propriétaire du compte                                                   | ✅                        |
 | Membre d'une des deux équipes, fenêtre « Contacts » (deux adversaires connus → fin du match), contact présenté | ✅ |
 | **Caster inscrit**, fenêtre « Contacts », en lancement ou lancé              | ✅ (le temps du match seulement) |
-| **Arbitre / administrateur** (permission `tournaments`), fenêtre « Contacts » de la carte, aux mêmes moments que les équipes | ✅ |
+| **Arbitre / administrateur** (permission `tournaments`), fenêtre « Contacts » de la carte, dès que les deux adversaires sont connus et jusqu'à la fin du match — ceux des équipes comme celui du caster (un arbitre qui joue le match lit en joueur) | ✅ |
 | Arbitre, administrateur, `casting`, joueur, visiteur — partout ailleurs     | ❌                        |
 
 **L'arbitre lit les contacts comme un joueur du match** (décision de
@@ -377,7 +377,9 @@ l'utilisateur, 2026-10-19) : la carte lui offre le bouton « Contacts » aux mê
 phases (dès « À planifier », les deux adversaires connus — `launchStripControls`,
 `canSchedule`), et `loadViewerMatchContacts` lui rend la même présentation, rôle
 `REFEREE`, sans « Prêt » ; la modale de lancement ne lui présente rien. Les
-contacts du caster lui sont tus avant le départ, comme aux équipes.
+contacts du caster lui sont rendus dès que les deux adversaires sont connus
+(décision de l'utilisateur, 2026-10-21), quand les équipes ne les lisent que le
+temps du match. Un arbitre qui joue le match lit en joueur (rôle `TEAM1`/`TEAM2`).
 
 Les contacts **du caster** (tag Discord certifié, BattleTag) ne sont présentés
 aux équipes que le temps du match, symétriquement ; avant, la carte montre les
@@ -391,7 +393,9 @@ masqué compris, et le BattleTag du caster aux deux équipes : c'est par lui
 qu'on s'ajoute en jeu. L'exposition est voulue et déclarée
 (`PRIVACY_CHANGES`, `2026-09-lancement-des-matchs` : « un nouveau public (le
 caster) pour le BattleTag » ; registre T04) ; elle se limite à un ou deux
-contacts par équipe, du lancement à la fin du match. Le ❌ de `casting`
+contacts par équipe, à chaque partie le temps du match (la modale ne s'ouvre
+qu'au départ du match) ; la fenêtre « Contacts » de la carte les ouvre plus tôt
+aux équipes et aux arbitres (tableau ci-dessus). Le ❌ de `casting`
 ci-dessus vaut pour la fiche d'un joueur, pas pour cette modale. Voir
 `docs/features/MATCH_LAUNCH.md`.
 
@@ -477,7 +481,7 @@ que pour un tag **certifié** — publier un tag que personne n'a prouvé ferait
 | ------------------------------------ | ---------------------------------------------- |
 | Le propriétaire du compte            | Toujours, certifié ou non                      |
 | N'importe qui, tag **non certifié**  | **Jamais**, administrateur compris              |
-| Partie d'un même match lancé         | Du lancement à la fin du match (joueurs des deux engagées, caster inscrit) |
+| Partie d'un même match (`sharesMatchLobby`) | Joueurs des deux engagées : dès que les deux adversaires sont connus, jusqu'à la fin ; caster inscrit, et équipes pour le caster : le temps du match ; arbitres (`tournaments`), par la carte, contacts des équipes comme du caster : dès que les deux adversaires sont connus, jusqu'à la fin |
 | Administrateur                       | Toujours (tag certifié)                         |
 | Permission `tournaments`             | Si le joueur est engagé dans un tournoi vivant  |
 | Joueur connecté quelconque           | Si le propriétaire a coché « Tag Discord » (`visible_discord`) |
@@ -513,8 +517,10 @@ profil du titulaire lu par `GET /api/profile`), le panneau de contacts
 d'un tournoi (`GET /api/admin/tournaments/[id]/contacts`, qui n'a plus que la
 certification à appliquer, en SQL, puisque tout joueur listé est engagé dans *ce*
 tournoi) et la modale de lancement d'un match (`GET /api/me/match-launches`, qui
-seule établit `sharesMatchLobby` — lecteur partie du match, match en lancement ou
-lancé). Rien de tout cela n'entre dans
+seule établit `sharesMatchLobby` — lecteur partie du match aux durées du tableau
+ci-dessus : équipes et arbitres dès que les deux adversaires sont connus, caster le
+temps du match, contacts du caster aux équipes le temps du match et aux arbitres dès
+que les adversaires sont connus). Rien de tout cela n'entre dans
 `TournamentSnapshot`, qui est diffusé tel quel à tous les abonnés du flux.
 
 ---

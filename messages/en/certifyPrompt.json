@@ -19,12 +19,12 @@
     "referees": {
       "label": "Referees",
       "without": "Never",
-      "with": "If you're entered in an ongoing or upcoming tournament"
+      "with": "If you're entered in an ongoing or upcoming tournament; for a match you cast, from when its opponents are known until it ends"
     },
     "match": {
       "label": "Your match (teams, caster)",
       "without": "Never",
-      "with": "From when your opponents are known until it ends (caster: during the match)"
+      "with": "From when your opponents are known until it ends (caster, and the teams of a match you cast: during the match)"
     },
     "players": {
       "label": "Other players",

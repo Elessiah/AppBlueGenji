@@ -417,8 +417,17 @@ export type LaunchSide = {
   /** Entrée solo : l'engagé est un joueur, pas une équipe. */
   isSolo: boolean;
   ready: boolean;
-  /** Vide pour une fantôme, et tant que le match n'est pas en lancement. */
+  /**
+   * Vide pour une fantôme, et tant que le serveur ne les ouvre pas à ce
+   * lecteur — `contactsShown` le dit, jamais la longueur de cette liste.
+   */
   contacts: LaunchContact[];
+  /**
+   * Le serveur ouvre-t-il les contacts de cette engagée à ce lecteur
+   * (`exposes`) ? Toujours faux pour une fantôme, qui n'en a jamais. La fiche
+   * lit cette décision : faux, une note dit quand ils viendront.
+   */
+  contactsShown: boolean;
 };
 
 export type LaunchCaster = {
@@ -429,6 +438,12 @@ export type LaunchCaster = {
   /** `true` si le BattleTag vient d'un compte Battle.net rattaché. */
   battletagVerified: boolean;
   ready: boolean;
+  /**
+   * Le serveur rend-il ses contacts à ce lecteur (`exposesCaster`) ? La carte
+   * lit cette décision plutôt que de la recalculer : faux, une note remplace
+   * les deux « — » qui laisseraient croire qu'il n'en a pas.
+   */
+  contactsShown: boolean;
 };
 
 export type LaunchViewerRole = "TEAM1" | "TEAM2" | "CASTER";
@@ -463,10 +478,122 @@ export type MatchLaunchInfo = {
      * parle pas de ses propres contacts.
      */
     isCaster: boolean;
+    /**
+     * L'action « Contacts » de la carte lui ouvre-t-elle les contacts des
+     * engagées avant le départ (joueur du match, ou arbitre — permission
+     * `tournaments` —, même inscrit comme caster) ? La modale de lancement ne
+     * renvoie à cette action que dans ce cas.
+     */
+    earlyContacts: boolean;
     /** Sa partie est-elle déjà déclarée prête ? */
     ready: boolean;
   };
 };
+
+/**
+ * Le match se joue-t-il (lancement ouvert, ou lancé) ? Le temps où ses contacts
+ * s'ouvrent à toutes ses parties, caster compris — une seule définition pour le
+ * serveur et la carte du match (`exposesMatchContacts`, `exposesCasterContacts`).
+ */
+export function matchUnderway(phase: MatchLaunchPhase): boolean {
+  return phase === "LOBBY" || phase === "LAUNCHED";
+}
+
+/**
+ * Les contacts des engagées sortent-ils pour ce match ? Dans la modale de
+ * lancement, en lancement ou lancé ; par le bouton « Contacts » d'une carte,
+ * pour un lecteur « précoce » (`earlyReader`, `readsContactsEarly` : joueur
+ * du match ou arbitre), dès que les deux adversaires sont connus — à planifier
+ * (décision de l'utilisateur, 2026-10-19) ou programmé — : les parties
+ * s'organisent avant l'heure, surtout sans phase de lancement. Le **caster**
+ * inscrit, lui, ne les reçoit que **le temps du match** (`matchUnderway`), par
+ * la modale comme par la carte : il n'a rien à organiser avec les équipes
+ * avant l'heure. Lue par le serveur (`match-launch-info.ts`) et par la carte du
+ * match (`launch-strip.ts`), qui n'offre « Contacts » que là où il les rend.
+ */
+export function exposesMatchContacts(phase: MatchLaunchPhase, earlyReader: boolean): boolean {
+  return matchUnderway(phase) || (earlyReader && (phase === "SCHEDULED" || phase === "TO_PLAN"));
+}
+
+/**
+ * Le lecteur lit-il les contacts des engagées avant le départ ? Joueur du match,
+ * ou arbitre (permission `tournaments`), même inscrit comme caster. Une seule
+ * définition pour le serveur et la carte du match.
+ */
+export function readsContactsEarly(reader: { playsMatch: boolean; referee: boolean }): boolean {
+  return reader.playsMatch || reader.referee;
+}
+
+/**
+ * Les contacts **du caster** sont-ils rendus à ce lecteur ? Le temps du match
+ * (lancement ouvert, ou lancé), et à un arbitre dès que les deux adversaires
+ * sont connus — rôle `REFEREE` : un arbitre qui joue le match lit en joueur
+ * (décision de l'utilisateur, 2026-10-21). Jamais hors phase (`NONE` : match
+ * terminé ou adversaire manquant), même si un appelant l'oubliait.
+ *
+ * Lue par le serveur seul (`exposesCaster`) : les deux modales n'en lisent que
+ * la décision (`LaunchCaster.contactsShown`) et ne la rejouent jamais — deux
+ * copies dériveraient, et la fiche montrerait deux « — » ou une note à tort.
+ */
+export function exposesCasterContacts(phase: MatchLaunchPhase, role: MatchLaunchViewerRole): boolean {
+  return matchUnderway(phase) || (phase !== "NONE" && role === "REFEREE");
+}
+
+/**
+ * Le lecteur est-il le caster inscrit ? Son rôle le dit, sauf pour un joueur
+ * du match qui caste aussi (`viewer.isCaster`, le rôle de joueur primant). Lu
+ * par les deux modales : la note « contacts au départ » ne s'adresse pas à lui.
+ */
+export function viewerIsCaster(launch: { viewer: Pick<MatchLaunchInfo["viewer"], "role" | "isCaster"> }): boolean {
+  return launch.viewer.role === "CASTER" || launch.viewer.isCaster === true;
+}
+
+/**
+ * Les contacts du caster attendent-ils le départ ? Un caster inscrit dont le
+ * serveur tait les contacts à ce lecteur (`LaunchCaster.contactsShown`), pour un
+ * lecteur qui n'est pas ce caster. Une seule règle pour la note « au départ »
+ * de `CasterCard` et la relecture de la modale « Contacts » à l'heure de départ.
+ */
+export function casterContactsPending(launch: {
+  caster: Pick<LaunchCaster, "contactsShown"> | null;
+  viewer: Pick<MatchLaunchInfo["viewer"], "role" | "isCaster">;
+}): boolean {
+  return launch.caster !== null && !viewerIsCaster(launch) && !launch.caster.contactsShown;
+}
+
+/** Le caster a-t-il au moins un contact à montrer (tag Discord ou BattleTag) ? */
+export function casterHasContacts(caster: Pick<LaunchCaster, "discordTag" | "battletag">): boolean {
+  return caster.discordTag !== null || caster.battletag !== null;
+}
+
+/** Arrivée des contacts du caster : avec au moins un contact, sans, ou aucune. */
+export type CasterArrival = "SHOWN" | "EMPTY" | null;
+
+/** Ce que l'annonce garde d'un rendu à l'autre. */
+export type CasterArrivalSeen = { pending: boolean; casterId: number; arrival: CasterArrival };
+
+/** Durée de l'annonce d'arrivée : lue, elle ne reste pas en statut périmé. */
+export const CASTER_ARRIVAL_ANNOUNCE_MS = 10_000;
+
+/**
+ * Étape pure de l'annonce : le nouvel état, ou `null` s'il ne change pas (une
+ * relecture identique ne réécrit rien — l'annonce reste figée à l'arrivée).
+ * Annonce au seul passage « en attente → montrés » d'un même caster, jamais à
+ * l'ouverture ; un autre caster l'efface. Sans caster, l'annonce n'est pas
+ * montée du tout (`CasterArrivalStatus`) : son état repart de zéro au retour.
+ */
+export function nextCasterArrival(
+  seen: CasterArrivalSeen,
+  caster: LaunchCaster,
+  pending: boolean,
+): CasterArrivalSeen | null {
+  const casterId = caster.userId;
+  if (seen.pending === pending && seen.casterId === casterId) return null;
+  const arrived = seen.casterId === casterId && seen.pending && caster.contactsShown;
+  let arrival: CasterArrival = null;
+  if (arrived) arrival = casterHasContacts(caster) ? "SHOWN" : "EMPTY";
+  return { pending, casterId, arrival };
+}
 
 /**
  * Doit-on ouvrir la modale d'office pour ce match ? Au lancement, pour appeler

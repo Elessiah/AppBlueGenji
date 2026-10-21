@@ -50,6 +50,7 @@ import {
   privacyChangeDay,
   privacyPolicyUpdatedLabel,
   privacyPolicyUpdatedLabelIn,
+  isPrivacyPolicyVersion,
   publishedPrivacyChanges,
   type PrivacyChange,
 } from "@/lib/shared/privacy-changes";
@@ -136,10 +137,11 @@ export default async function RgpdPage() {
   // L'historique des versions : chaque changement publié, présenté aux joueurs
   // à sa date. « Applicable depuis la création de la plateforme » disait le
   // contraire d'une politique qui a changé plusieurs fois.
-  // Une entrée à public restreint (`audience`) est un avis personnel, pas une
-  // version de la politique : elle ne paraît pas dans l'historique public, ni
-  // dans la date qui le coiffe — les deux lisent la même liste.
-  const history = publishedPrivacyChanges(today).filter((change) => !change.audience);
+  // Un avis personnel (`GOOGLE_LINKED`) n'est pas une version de la politique :
+  // il ne paraît pas dans l'historique public, ni dans la date qui le coiffe —
+  // les deux lisent la même liste. Une entrée seulement *annoncée* à une partie
+  // des comptes (`LIVE_STAFF`) y paraît (`isPrivacyPolicyVersion`).
+  const history = publishedPrivacyChanges(today).filter(isPrivacyPolicyVersion);
   if (locale === "en") {
     return (
       <PublicPageShell>

@@ -4,12 +4,12 @@ import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { closedNoticeText } from "@/app/(secured)/tournois/[id]/_components/PlayerScoreDialog";
 import { startAtHint } from "@/app/(secured)/tournois/[id]/_components/MatchScheduleDialog";
-import { anotherModalOpen } from "@/components/match-launch/MatchLaunchCenter";
+import { anotherModalOpen, launchSidesLaterText } from "@/components/match-launch/MatchLaunchCenter";
 import { CasterCard, SideCard } from "@/components/match-launch/LaunchContactCards";
-import { contactsErrorText, viewerIsCaster } from "@/components/match-launch/MatchContactsDialog";
+import { contactsErrorText } from "@/components/match-launch/MatchContactsDialog";
 import { FR_LAUNCH_TEXT } from "@/components/match-launch/launch-text";
 import { tournamentDialogsText } from "@/lib/shared/tournament-actions-text";
-import type { LaunchSide, MatchLaunchInfo } from "@/lib/shared/match-launch";
+import { CASTER_ARRIVAL_ANNOUNCE_MS, exposesCasterContacts, nextCasterArrival, viewerIsCaster, type LaunchSide, type MatchLaunchInfo } from "@/lib/shared/match-launch";
 import frDialogs from "@/messages/fr/tournamentDialogs.json";
 import enDialogs from "@/messages/en/tournamentDialogs.json";
 import frActions from "@/messages/fr/tournamentActions.json";
@@ -219,31 +219,51 @@ describe("fiches de contact — noms cliquables", () => {
     isSolo: false,
     ready: false,
     contacts: [contact],
+    contactsShown: true,
     ...overrides,
   });
   const noop = async () => {};
+  const TEAM_VIEWER = { role: "TEAM1", isCaster: false, earlyContacts: true } as const;
+  const LATER = "Contacts non affichés.";
 
   it("modale de lancement (par défaut) : aucun lien — elle survit à la navigation", () => {
-    const html = renderToStaticMarkup(<SideCard side={side()} isHost={false} phase="LAUNCHED" onCopy={noop} />);
+    const html = renderToStaticMarkup(<SideCard side={side()} isHost={false} phase="LAUNCHED" onCopy={noop} laterText={LATER} />);
     expect(html).not.toContain("href=");
   });
 
   it("équipe → sa fiche, contact → son profil", () => {
     const html = renderToStaticMarkup(
-      <SideCard side={side()} isHost={false} phase="LAUNCHED" onCopy={noop} linkNames />,
+      <SideCard side={side()} isHost={false} phase="LAUNCHED" onCopy={noop} laterText={LATER} linkNames />,
     );
     expect(html).toContain('href="/equipes/42"');
     expect(html).toContain('href="/joueurs/7"');
   });
 
+  // Contacts tus par le serveur : la note de la modale de lancement ne renvoie
+  // à l'action « Contacts » que pour qui elle ouvre quelque chose — pas pour le
+  // seul caster avant le départ (un arbitre qui caste, si : `earlyContacts`).
+  it("contacts tus → note au lancement, sans renvoi à « Contacts » pour le caster", () => {
+    expect(launchSidesLaterText(FR_LAUNCH_TEXT, { earlyContacts: true })).toContain("ou dès maintenant par l'action « Contacts »");
+    const forCaster = launchSidesLaterText(FR_LAUNCH_TEXT, { earlyContacts: false });
+    expect(forCaster).toBe("Les contacts s'affichent au lancement.");
+    const closed = side({ contacts: [], contactsShown: false });
+    const html = renderToStaticMarkup(<SideCard side={closed} isHost={false} phase="SCHEDULED" onCopy={noop} laterText={forCaster} />);
+    expect(html).toContain("Les contacts s&#x27;affichent au lancement.</p>");
+    expect(html).not.toContain("« Contacts »");
+    // La modale « Contacts » passe sa note : jamais un renvoi à elle-même.
+    const inDialog = renderToStaticMarkup(<SideCard side={closed} isHost={false} phase="SCHEDULED" onCopy={noop} laterText={LATER} />);
+    expect(inDialog).toContain("Contacts non affichés.");
+    expect(inDialog).not.toContain("« Contacts »");
+  });
+
   it("entrée solo → le profil du joueur, jamais une fiche d'équipe", () => {
     const html = renderToStaticMarkup(
-      <SideCard side={side({ isSolo: true })} isHost={false} phase="LAUNCHED" onCopy={noop} linkNames />,
+      <SideCard side={side({ isSolo: true })} isHost={false} phase="LAUNCHED" onCopy={noop} laterText={LATER} linkNames />,
     );
     expect(html).not.toContain("/equipes/");
     expect(html).toContain('href="/joueurs/7"');
     const hidden = renderToStaticMarkup(
-      <SideCard side={side({ isSolo: true, contacts: [] })} isHost={false} phase="SCHEDULED" onCopy={noop} linkNames />,
+      <SideCard side={side({ isSolo: true, contacts: [], contactsShown: false })} isHost={false} phase="SCHEDULED" onCopy={noop} laterText={LATER} linkNames />,
     );
     expect(hidden).not.toContain("href=");
   });
@@ -251,45 +271,128 @@ describe("fiches de contact — noms cliquables", () => {
   it("caster → son profil", () => {
     const html = renderToStaticMarkup(
       <CasterCard
-        caster={{ userId: 9, pseudo: "Voix", discordTag: null, battletag: null, battletagVerified: false, ready: false }}
+        caster={{ userId: 9, pseudo: "Voix", discordTag: null, battletag: null, battletagVerified: false, ready: false, contactsShown: true }}
         phase="LAUNCHED"
         onCopy={noop}
+        viewer={TEAM_VIEWER}
         linkNames
       />,
     );
     expect(html).toContain('href="/joueurs/9"');
   });
 
-  // Avant le départ, le serveur tait les contacts du caster : une note, pas deux « — ».
-  it("caster avant le départ → une note au lieu de contacts vides", () => {
-    const caster = { userId: 9, pseudo: "Voix", discordTag: null, battletag: null, battletagVerified: false, ready: false };
-    const later = FR_LAUNCH_TEXT.t("contacts.casterLater");
-    const before = renderToStaticMarkup(
-      <CasterCard caster={caster} phase="TO_PLAN" onCopy={noop} contactsShown={false} contactsLaterText={later} />,
+  // La carte rend la décision du serveur (`exposesCasterContacts`, portée par la réponse).
+  describe("caster : contacts ou note, selon la phase et le lecteur", () => {
+    const caster = { userId: 9, pseudo: "Voix", discordTag: "voix", battletag: null, battletagVerified: false, ready: false };
+    const NOTE = "Ses contacts s&#x27;afficheront au départ du match.";
+    const render = (phase: MatchLaunchInfo["phase"], viewer: { role: MatchLaunchInfo["viewer"]["role"]; isCaster: boolean }) =>
+      renderToStaticMarkup(
+        <CasterCard
+          caster={{ ...caster, contactsShown: exposesCasterContacts(phase, viewer.role) }}
+          phase={phase}
+          onCopy={noop}
+          viewer={viewer}
+          laterText={FR_LAUNCH_TEXT.t("contacts.casterLater")}
+          announceArrival
+        />,
+      );
+
+    it("équipe avant le départ → une note, pas deux « — »", () => {
+      for (const phase of ["TO_PLAN", "SCHEDULED"] as const) {
+        const html = render(phase, TEAM_VIEWER);
+        expect(html).toContain(NOTE);
+        // Statut présent mais vide : rien à annoncer tant que la note est là.
+        expect(html).toContain('<output class="sr-only" aria-live="polite"></output>');
+        expect(html).not.toContain("BattleTag");
+      }
+    });
+
+    it("équipe pendant le match → les contacts, sans note", () => {
+      for (const phase of ["LOBBY", "LAUNCHED"] as const) {
+        const html = render(phase, { role: "TEAM2", isCaster: false });
+        expect(html).toContain("BattleTag");
+        // Ouverte sur des contacts déjà là : rien d'« arrivé » à annoncer.
+        expect(html).toContain('<output class="sr-only" aria-live="polite"></output>');
+        expect(html).not.toContain("afficheront");
+      }
+    });
+
+    it("arbitre dès que les adversaires sont connus → les contacts", () => {
+      for (const phase of ["TO_PLAN", "SCHEDULED", "LOBBY", "LAUNCHED"] as const) {
+        const html = render(phase, { role: "REFEREE", isCaster: false });
+        expect(html).toContain("BattleTag");
+        expect(html).not.toContain("afficheront");
+      }
+    });
+
+    it("annonce l'arrivée des contacts au seul passage « en attente → montrés »", () => {
+      const shown = { ...caster, contactsShown: true };
+      const waiting = { pending: true, casterId: caster.userId, arrival: null };
+      // Nominal : en attente → montrés, avec ou sans contact à dire.
+      expect(nextCasterArrival(waiting, shown, false)).toEqual({ pending: false, casterId: caster.userId, arrival: "SHOWN" });
+      expect(nextCasterArrival(waiting, { ...shown, discordTag: null, battletag: null }, false)?.arrival).toBe("EMPTY");
+      // Rien de neuf : aucune réécriture, l'annonce reste figée.
+      expect(nextCasterArrival({ ...waiting, pending: false, arrival: "SHOWN" }, shown, false)).toBeNull();
+      // Pas d'attente avant (ouverture) : rien n'est annoncé.
+      expect(nextCasterArrival({ pending: false, casterId: caster.userId, arrival: null }, shown, false)).toBeNull();
+      // Un autre caster : l'annonce s'efface.
+      expect(nextCasterArrival(waiting, { ...shown, userId: caster.userId + 1 }, false)?.arrival).toBeNull();
+      expect(nextCasterArrival({ ...waiting, pending: false, arrival: "SHOWN" }, { ...shown, userId: caster.userId + 1 }, false)).toEqual({ pending: false, casterId: caster.userId + 1, arrival: null });
+      // Retour en attente : l'annonce s'efface, une nouvelle arrivée se rejouera.
+      expect(nextCasterArrival({ ...waiting, pending: false, arrival: "SHOWN" }, { ...caster, contactsShown: false }, true)?.arrival).toBeNull();
+      expect(CASTER_ARRIVAL_ANNOUNCE_MS).toBe(10_000);
+    });
+
+    // Ouverts mais vides : la phrase des engagées sans contact, jamais deux « — ».
+    it("contacts ouverts mais vides → « Aucun contact disponible. »", () => {
+      const html = renderToStaticMarkup(
+        <CasterCard
+          caster={{ ...caster, discordTag: null, battletag: null, contactsShown: true }}
+          phase="LOBBY"
+          onCopy={noop}
+          viewer={TEAM_VIEWER}
+        />,
+      );
+      expect(html).toContain("Aucun contact disponible.");
+      expect(html).not.toContain("BattleTag");
+      // Pas au caster lui-même, sous son propre nom.
+      const own = renderToStaticMarkup(
+        <CasterCard
+          caster={{ ...caster, discordTag: null, battletag: null, contactsShown: true }}
+          phase="LOBBY"
+          onCopy={noop}
+          viewer={{ role: "CASTER", isCaster: true }}
+        />,
+      );
+      expect(own).not.toContain("Aucun contact disponible.");
+    });
+
+    it("le caster lui-même avant le départ → ni contacts ni note sur sa propre fiche", () => {
+      for (const viewer of [{ role: "CASTER", isCaster: true }, { role: "TEAM1", isCaster: true }] as const) {
+        const html = render("SCHEDULED", viewer);
+        expect(html).not.toContain("afficheront");
+        expect(html).not.toContain("BattleTag");
+      }
+    });
+  });
+
+  // Modale de lancement : la note du caster reprend les mots de celle des engagées.
+  it("modale de lancement → note du caster « au lancement », comme celle des engagées", () => {
+    const html = renderToStaticMarkup(
+      <CasterCard
+        caster={{ userId: 9, pseudo: "Voix", discordTag: null, battletag: null, battletagVerified: false, ready: false, contactsShown: false }}
+        phase="SCHEDULED"
+        onCopy={noop}
+        viewer={TEAM_VIEWER}
+      />,
     );
-    expect(before).toContain("Ses contacts s&#x27;afficheront au départ du match.");
-    expect(before).not.toContain("BattleTag");
-    const during = renderToStaticMarkup(
-      <CasterCard caster={caster} phase="LOBBY" onCopy={noop} contactsShown contactsLaterText={later} />,
-    );
-    expect(during).not.toContain("afficheront");
+    expect(html).toContain("Ses contacts s&#x27;affichent au lancement.");
   });
 
   // Un joueur du match qui caste aussi garde son rôle de joueur : le drapeau le dit caster.
   it("reconnaît le caster par son rôle ou par le drapeau isCaster", () => {
-    const base = { caster: null, phase: "TO_PLAN" } as const;
-    const info = (viewer: { role: "TEAM1" | "CASTER"; isCaster: boolean }) =>
-      ({ ...base, viewer: { ...viewer, canDeclareReady: false, ready: false } }) as unknown as MatchLaunchInfo;
-    expect(viewerIsCaster(info({ role: "CASTER", isCaster: true }))).toBe(true);
-    expect(viewerIsCaster(info({ role: "TEAM1", isCaster: true }))).toBe(true);
-    expect(viewerIsCaster(info({ role: "TEAM1", isCaster: false }))).toBe(false);
-  });
-
-  it("la modale « Contacts » ne montre les contacts du caster que le temps du match", () => {
-    const source = readFileSync(join(process.cwd(), "components/match-launch/MatchContactsDialog.tsx"), "utf8");
-    // Phase du serveur à la lecture ; un horaire changé fait relire la modale.
-    expect(source).toContain("contactsShown={matchUnderway(launch.phase)}");
-    // La note parle du caster : jamais montrée au caster lui-même (arbitre qui caste compris).
-    expect(source).toContain('contactsLaterText={viewerIsCaster(launch) ? undefined : t("contacts.casterLater")}');
+    expect(viewerIsCaster({ viewer: { role: "CASTER", isCaster: true } })).toBe(true);
+    expect(viewerIsCaster({ viewer: { role: "TEAM1", isCaster: true } })).toBe(true);
+    expect(viewerIsCaster({ viewer: { role: "TEAM1", isCaster: false } })).toBe(false);
   });
 });

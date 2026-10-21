@@ -11,10 +11,12 @@ import {
   dispatchPrivacyChangeNotifications,
   resetPrivacyNotificationThrottle,
 } from "@/lib/server/privacy-change-notifications";
+import { LIVE_STAFF_SQL } from "@/lib/server/privacy-consent";
 import {
   PRIVACY_CHANGES,
   PRIVACY_DM_MIN_INTERVAL_DAYS,
   PRIVACY_DM_SETTLE_DAYS,
+  PRIVACY_DM_WINDOW_DAYS,
   privacyChangesForOneMessage,
 } from "@/lib/shared/privacy-changes";
 import { siteBaseUrl } from "@/lib/server/site-url";
@@ -36,6 +38,7 @@ type Candidate = {
   discord_verified_at: string | null;
   created_at: string;
   google_linked: 0 | 1;
+  live_staff: 0 | 1;
 };
 
 function candidate(overrides: Partial<Candidate> = {}): Candidate {
@@ -46,8 +49,10 @@ function candidate(overrides: Partial<Candidate> = {}): Candidate {
     discord_pseudo: null,
     discord_verified_at: null,
     created_at: "2025-01-01 00:00:00",
-    // Relié à Google : toutes les entrées, ciblées comprises, le concernent.
+    // Relié à Google et caster possible : toutes les entrées, ciblées
+    // comprises, le concernent.
     google_linked: 1,
+    live_staff: 1,
     ...overrides,
   };
 }
@@ -148,6 +153,16 @@ describe("dispatchPrivacyChangeNotifications", () => {
     const select = calls.find((c) => c.sql.startsWith("SELECT u.id, u.pseudo"))!;
     expect(select.sql).toContain("u.google_sub IS NOT NULL AS google_linked");
     expect(select.sql).toContain("u.created_at < ? AND u.google_sub IS NOT NULL AND NOT EXISTS");
+    expect(select.sql).toContain(`${LIVE_STAFF_SQL} AS live_staff`);
+    expect(select.sql).toContain(`u.created_at < ? AND ${LIVE_STAFF_SQL} AND NOT EXISTS`);
+  });
+
+  it("ne calcule pas le fait LIVE_STAFF quand aucune entrée annonçable ne le lit", async () => {
+    const last = PRIVACY_CHANGES.filter((c) => c.audience === "LIVE_STAFF").at(-1)!;
+    // Fenêtre d'annonce de l'entrée passée : plus rien ne lit le fait.
+    const calls = fakeDb();
+    await dispatchPrivacyChangeNotifications(at(last.publishedAt, PRIVACY_DM_WINDOW_DAYS + 1));
+    for (const call of calls) expect(call.sql).not.toContain("JSON_CONTAINS");
   });
 
   it("n'annonce pas une entrée ciblée Google à un compte qui n'y est pas relié", async () => {
@@ -156,7 +171,18 @@ describe("dispatchPrivacyChangeNotifications", () => {
     // Tout le reste est déjà lu : seule l'entrée ciblée resterait due.
     fakeDb({
       candidates: [candidate({ google_linked: 0 })],
-      done: PRIVACY_CHANGES.filter((c) => !c.audience).map((c) => ({ user_id: 1, change_id: c.id })),
+      done: PRIVACY_CHANGES.filter((c) => c.audience !== "GOOGLE_LINKED").map((c) => ({ user_id: 1, change_id: c.id })),
+    });
+    expect(await dispatchPrivacyChangeNotifications(NOW)).toBe(0);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("n'annonce pas une entrée réservée aux casters à un compte qui ne peut pas caster", async () => {
+    const targeted = PRIVACY_CHANGES.filter((c) => c.audience === "LIVE_STAFF");
+    expect(targeted.length).toBeGreaterThan(0);
+    fakeDb({
+      candidates: [candidate({ live_staff: 0 })],
+      done: PRIVACY_CHANGES.filter((c) => c.audience !== "LIVE_STAFF").map((c) => ({ user_id: 1, change_id: c.id })),
     });
     expect(await dispatchPrivacyChangeNotifications(NOW)).toBe(0);
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();

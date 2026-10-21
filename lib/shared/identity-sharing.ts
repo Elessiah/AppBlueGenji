@@ -30,7 +30,7 @@
  * un visiteur sans compte, et c'est la seule phrase qui le dise au joueur.
  */
 export const DISCORD_TAG_AUDIENCE =
-  "les administrateurs le voient à tout moment, les arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), les membres des deux équipes de ton match dès que ses deux adversaires sont connus et jusqu'à sa fin, et son caster le temps du match seulement (et, si tu castes un match, ses deux équipes et les arbitres, le temps du match seulement) ; les autres joueurs, seulement si tu le rends visible dans tes réglages de confidentialité. Jamais personne d'autre.";
+  "les administrateurs le voient à tout moment, les arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), les membres des deux équipes de ton match dès que ses deux adversaires sont connus et jusqu'à sa fin, et son caster le temps du match seulement (et, si tu castes un match, ses deux équipes le temps du match seulement, et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin) ; les autres joueurs, seulement si tu le rends visible dans tes réglages de confidentialité. Jamais personne d'autre.";
 
 /**
  * Ce que la connexion par Discord fait du pseudo — dit **sous le bouton**, avant
@@ -38,11 +38,12 @@ export const DISCORD_TAG_AUDIENCE =
  *
  * Se connecter **n'est pas** certifier : la connexion enregistre le pseudo que
  * Discord donne, invisible de tous, et la certification — qui ouvre le tag à
- * l'organisation — reste un geste distinct, sur `/profil`. La phrase dit les
+ * l'organisation — reste un geste distinct, sur `/profil` ou dans la fenêtre
+ * proposée après une connexion par Discord ou Blizzard. La phrase dit les
  * deux, et qui lirait le tag une fois certifié, pour que le joueur sache ce que
  * ce geste-là ouvrirait avant d'avoir à le faire.
  */
-export const DISCORD_LOGIN_TAG_NOTICE = `Enregistre ton pseudo Discord sans le certifier : il reste invisible de tous, administrateurs compris. Si tu le certifies ensuite d'un clic dans « Mon profil », ${DISCORD_TAG_AUDIENCE}`;
+export const DISCORD_LOGIN_TAG_NOTICE = `Enregistre ton pseudo Discord sans le certifier : il reste invisible de tous, administrateurs compris. Si tu le certifies ensuite, dans « Mon profil » ou dans la fenêtre proposée après une connexion par Discord ou Blizzard, ${DISCORD_TAG_AUDIENCE}`;
 
 /**
  * Ce que la case « Tag Discord » des réglages de visibilité ouvre, et ce
@@ -56,7 +57,7 @@ export const DISCORD_LOGIN_TAG_NOTICE = `Enregistre ton pseudo Discord sans le c
  * (`canViewDiscordTag`), ce que le joueur doit lire avant de la cocher.
  */
 export const DISCORD_PLAYER_VISIBILITY_NOTICE =
-  "La certification ouvre ton tag Discord à l'organisation (administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé) et, comme contact, aux membres des deux équipes de ton match dès que ses deux adversaires sont connus, et à son caster le temps du match seulement (et, si tu castes un match, à ses deux équipes et aux arbitres le temps du match) ; pas aux autres joueurs : coche « Tag Discord » pour qu'ils le voient sur ta fiche. Un tag non certifié reste masqué, case cochée ou non.";
+  "La certification ouvre ton tag Discord à l'organisation (administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé) et, comme contact, aux membres des deux équipes de ton match dès que ses deux adversaires sont connus, et à son caster le temps du match seulement (et, si tu castes un match, à ses deux équipes le temps du match, et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin) ; pas aux autres joueurs : coche « Tag Discord » pour qu'ils le voient sur ta fiche. Un tag non certifié reste masqué, case cochée ou non.";
 
 /**
  * Ajout à la phrase précédente quand la case est cochée sur un tag **non**

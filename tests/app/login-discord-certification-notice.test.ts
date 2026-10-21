@@ -41,8 +41,8 @@ describe("connexion Discord — annonce de l'enregistrement du tag", () => {
     expect(SOURCE).toContain('text.rich("page.tagNotice"');
   });
 
-  it("dit que la certification se fait ensuite, dans le profil", () => {
-    expect(FR.page.tagNotice).toMatch(/Si tu le certifies ensuite\s+dans « Mon profil »/);
+  it("dit que la certification se fait ensuite, dans le profil ou la fenêtre après connexion", () => {
+    expect(FR.page.tagNotice).toMatch(/Si tu le certifies ensuite, dans « Mon profil » ou dans la fenêtre proposée après une connexion par Discord ou Blizzard/);
   });
 
   it("la note sous le bouton Discord dit la même chose, et qui lirait le tag", () => {

@@ -112,15 +112,21 @@ export type PrivacyChangeLink = { href: string; label: string };
  * un compte né par Google puis détaché de Google (`google_sub` remis à `NULL`)
  * n'en garde aucune trace en base, et n'est donc pas compté — limite assumée,
  * faute d'un fait qui la lèverait sans nouvelle collecte.
+ *
+ * `LIVE_STAFF` : un compte qui peut s'inscrire comme caster — permission `live`
+ * (administrateur, arbitre, caster), relue en base à chaque lecture : un compte
+ * créé avant la publication qui la reçoit plus tard est alors informé ; un
+ * compte qui la perd avant d'avoir lu ne l'est plus — il ne peut plus caster.
+ * Un compte créé après la publication ne l'est jamais, comme pour toute entrée.
  */
-export type PrivacyAudience = "GOOGLE_LINKED";
+export type PrivacyAudience = "GOOGLE_LINKED" | "LIVE_STAFF";
 
 /**
  * Ce qu'on sait d'un compte pour décider des entrées ciblées. Un fait absent
  * vaut **faux** : dans le doute, une entrée ciblée se tait plutôt que d'être
  * montrée à qui elle ne parle pas.
  */
-export type PrivacyAccountFacts = { googleLinked?: boolean };
+export type PrivacyAccountFacts = { googleLinked?: boolean; liveStaff?: boolean };
 
 /** Une entrée s'adresse-t-elle à ce compte (date de création mise à part) ? */
 export function privacyChangeReachesAccount(change: PrivacyChange, facts: PrivacyAccountFacts): boolean {
@@ -129,9 +135,32 @@ export function privacyChangeReachesAccount(change: PrivacyChange, facts: Privac
       return true;
     case "GOOGLE_LINKED":
       return facts.googleLinked === true;
+    case "LIVE_STAFF":
+      return facts.liveStaff === true;
     default:
       return false;
   }
+}
+
+/**
+ * Pour chaque public, l'entrée est-elle une version de la politique ? Une table
+ * complète : un public ajouté demain ne compile pas sans que la question soit
+ * tranchée.
+ */
+const AUDIENCE_IS_POLICY_VERSION: Record<PrivacyAudience, boolean> = {
+  GOOGLE_LINKED: false,
+  LIVE_STAFF: true,
+};
+
+/**
+ * L'entrée est-elle une **version de la politique** — publiée dans l'historique
+ * de `/rgpd` et dans la date qui le coiffe ? Oui, sauf l'avis personnel
+ * `GOOGLE_LINKED` : le reliquat d'une règle passée, qui ne change pas la
+ * politique. Une entrée `LIVE_STAFF` en est une : la politique change pour
+ * tous, seuls ceux qu'elle concerne sont avertis.
+ */
+export function isPrivacyPolicyVersion(change: PrivacyChange): boolean {
+  return change.audience === undefined || AUDIENCE_IS_POLICY_VERSION[change.audience];
 }
 
 /**
@@ -968,6 +997,29 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "« Plus tard » (ou fermer la fenêtre) ne garde rien sur ton compte : ta session de connexion note seulement que la fenêtre n'est plus à proposer, et cette marque part avec la session. La fenêtre revient à ta prochaine connexion par Discord ou Blizzard.",
       "« Ne plus voir » est gardé sur ton compte, avec sa date : la fenêtre ne s'ouvre plus, sur aucun appareil. Ce choix dure le temps du compte, figure dans l'export de tes données et est effacé si le compte est anonymisé. La certification reste possible à tout moment dans « Mon profil ».",
       "Une connexion par Google n'ouvre pas cette fenêtre.",
+    ],
+  },
+  {
+    // CASTER-CONTACTS-REFEREES (décision de l'utilisateur du 2026-10-21) : les
+    // arbitres (administrateurs compris) lisent les contacts du caster dès que
+    // les deux adversaires sont connus, et plus seulement le temps du match — un
+    // changement de « quand », à annoncer. Conditions d'utilisation retouchées
+    // sans nouvelle version (seuls les casters, membres du staff, sont
+    // concernés) — et l'entrée ne s'adresse qu'à eux, d'où le public en tête.
+    audience: "LIVE_STAFF",
+    id: "2026-10-contacts-du-caster-aux-arbitres",
+    title: "Contacts du caster : visibles des arbitres et des administrateurs avant le match",
+    publishedAt: "2026-10-21",
+    summary:
+      "Si tu castes un match, les arbitres et les administrateurs voient tes contacts dès que ses deux adversaires sont connus, et plus seulement le temps du match (pour les administrateurs, seul ton BattleTag est concerné : ils voyaient déjà ton tag Discord certifié) ; ses deux équipes ne les voient toujours que le temps du match.",
+    details: [
+      "Ce sont les mêmes informations qu'avant — ton tag Discord certifié et ton BattleTag, même masqué —, dans la même fenêtre « Contacts » du match, jusqu'à sa fin. Seul le moment change pour les arbitres : ils peuvent te joindre pour organiser la diffusion avant l'heure. Les administrateurs voyaient déjà ton tag Discord certifié à tout moment : pour eux, seul ton BattleTag est concerné.",
+      "Rien ne change pour les joueurs : leurs contacts restent visibles des arbitres dès que les deux adversaires sont connus, et du caster le temps du match seulement.",
+      "Cette lecture repose, comme avant, sur l'exécution du service — l'organisation du tournoi. Les conditions d'utilisation (section « Contacts de match ») le disent, sans nouvelle version à accepter.",
+    ],
+    links: [
+      { href: "/conditions-utilisation#contacts-de-match", label: "Lire la section « Contacts de match »" },
+      { href: "/rgpd#donnees-collectees", label: "Lire la section « Données collectées »" },
     ],
   },
 ];

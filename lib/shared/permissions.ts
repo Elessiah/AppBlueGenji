@@ -117,6 +117,11 @@ export function permissionsForRoles(roles: readonly PlatformRole[]): Set<Permiss
   return permissions;
 }
 
+/** Les rôles qui accordent `permission`, dans l'ordre de `PLATFORM_ROLES`. */
+export function rolesGranting(permission: Permission): PlatformRole[] {
+  return PLATFORM_ROLES.filter((role) => ROLE_PERMISSIONS[role].includes(permission));
+}
+
 /** Vrai si l'un des rôles fournis accorde `permission`. */
 export function hasPermission(
   roles: readonly PlatformRole[] | null | undefined,
