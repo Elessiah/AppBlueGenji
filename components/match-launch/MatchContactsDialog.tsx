@@ -76,13 +76,22 @@ export function viewerIsCaster(launch: MatchLaunchInfo): boolean {
 }
 
 /**
+ * Les contacts du caster sont-ils rendus à ce lecteur ? Le temps du match
+ * (`exposesCaster`), et à toute heure pour un arbitre (rôle `REFEREE` : un
+ * arbitre qui joue le match lit en joueur) — décision de l'utilisateur, 2026-10-21.
+ */
+export function casterContactsOpen(launch: MatchLaunchInfo): boolean {
+  return matchUnderway(launch.phase) || launch.viewer.role === "REFEREE";
+}
+
+/**
  * Les contacts du caster attendent-ils le départ ? Un caster inscrit, sur un
- * match pas encore parti à l'heure du serveur (`launch.phase`) : sa fiche porte
- * alors une note plutôt que ses contacts. Pas pour le caster lui-même (arbitre
- * qui caste) : rien à attendre sur sa propre fiche.
+ * match pas encore parti à l'heure du serveur (`launch.phase`), pour un lecteur
+ * qui n'est pas arbitre : sa fiche porte alors une note plutôt que ses
+ * contacts. Pas pour le caster lui-même : rien à attendre sur sa propre fiche.
  */
 export function casterContactsPending(launch: MatchLaunchInfo): boolean {
-  return launch.caster !== null && !viewerIsCaster(launch) && !matchUnderway(launch.phase);
+  return launch.caster !== null && !viewerIsCaster(launch) && !casterContactsOpen(launch);
 }
 
 /** Relectures supplémentaires d'une relecture qui échoue (réseau, 5xx, 429). */
@@ -440,10 +449,10 @@ export function MatchContactsDialog({
                   phase={launch.phase}
                   onCopy={copy}
                   // Les contacts du caster ne sortent que le temps du match
-                  // (`exposesCaster`) : avant, une note plutôt que deux « — »
-                  // qui laisseraient croire qu'il n'en a pas.
-                  contactsShown={matchUnderway(launch.phase)}
-                  // Pas au caster lui-même (arbitre compris) : la note parle de lui.
+                  // (`exposesCaster`), sauf à un arbitre : avant, une note plutôt
+                  // que deux « — » qui laisseraient croire qu'il n'en a pas.
+                  contactsShown={casterContactsOpen(launch)}
+                  // Pas au caster lui-même : la note parle de lui.
                   // Hors de là, toujours, même quand la phase de la carte et celle
                   // du serveur divergent : jamais une fiche vide.
                   contactsLaterText={viewerIsCaster(launch) ? undefined : t("contacts.casterLater")}

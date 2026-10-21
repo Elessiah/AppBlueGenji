@@ -919,6 +919,24 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       { href: "/rgpd#exercer-vos-droits", label: "Lire la section « Exercer vos droits »" },
     ],
   },
+  // CASTER-CONTACTS-REFEREES (décision de l'utilisateur du 2026-10-21) : les
+  // arbitres (administrateurs compris) lisent les contacts du caster dès que
+  // les deux adversaires sont connus, et plus seulement le temps du match — un
+  // changement de « quand », à annoncer. Conditions d'utilisation retouchées
+  // sans nouvelle version (seuls les casters, membres du staff, sont concernés).
+  {
+    id: "2026-10-contacts-du-caster-aux-arbitres",
+    title: "Contacts du caster : visibles des arbitres avant le match",
+    publishedAt: "2026-10-21",
+    summary:
+      "Si tu castes un match, les arbitres et les administrateurs voient tes contacts dès que ses deux adversaires sont connus, et plus seulement le temps du match ; ses deux équipes ne les voient toujours que le temps du match.",
+    details: [
+      "Ce sont les mêmes informations qu'avant — ton tag Discord certifié et ton BattleTag, même masqué —, dans la même fenêtre « Contacts » du match, jusqu'à sa fin. Seul le moment change pour les arbitres : ils peuvent te joindre pour organiser la diffusion avant l'heure.",
+      "Rien ne change pour les joueurs : leurs contacts restent visibles des arbitres dès que les deux adversaires sont connus, et du caster le temps du match seulement.",
+      "Cette lecture repose, comme avant, sur l'exécution du service — l'organisation du tournoi. Les conditions d'utilisation (section « Contacts de match ») le disent, sans nouvelle version à accepter.",
+    ],
+    links: [{ href: "/conditions-utilisation#contacts-de-match", label: "Lire la section « Contacts de match »" }],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

@@ -6,8 +6,9 @@
  * **sauf** dans la fenêtre « Contacts » d'un match, quand elle est ouverte au
  * lecteur (décision de l'utilisateur, 2026-10-19) : membres des deux équipes et
  * arbitres (permission `tournaments`) dès que les deux adversaires sont connus,
- * caster inscrit le temps du match seulement ; ceux du caster, aux équipes et
- * aux arbitres le temps du match. C'est la clause `sharesLiveMatch`, que seul
+ * caster inscrit le temps du match seulement ; ceux du caster, aux équipes le
+ * temps du match, aux arbitres dès que les adversaires sont connus (décision
+ * du 2026-10-21). C'est la clause `sharesLiveMatch`, que seul
  * `lib/server/tournaments/match-launch-info.ts` pose, au moment de présenter ces
  * contacts. La modale ouverte à la bascule (`BattletagVisibilityNotice.tsx`) le
  * dit au joueur. Base : l'exécution du service (registre T04, conditions

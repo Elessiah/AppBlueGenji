@@ -9,7 +9,8 @@
  * par le bouton « Contacts » d'une carte, dès que ses deux adversaires sont
  * connus pour ses joueurs et pour les arbitres (permission `tournaments`), le
  * temps du match seulement pour son caster
- * (`exposesContacts`). C'est la clause `sharesMatchLobby` de `canViewDiscordTag` et
+ * (`exposesContacts`). Ceux **du caster** sortent le temps du match, et dès
+ * que les adversaires sont connus pour un arbitre (`exposesCaster`). C'est la clause `sharesMatchLobby` de `canViewDiscordTag` et
  * `sharesLiveMatch` de `canViewBattletag`, que ce module est seul à établir.
  * Un match terminé sort de la liste, et ses contacts avec lui.
  *
@@ -311,9 +312,10 @@ type LaunchContext = {
   exposes: boolean;
   /**
    * Contacts **du caster** : le temps du match seulement (lancement ouvert, ou
-   * lancé), pour tout lecteur — symétrique de ce que le caster reçoit des
-   * équipes (décision de l'utilisateur, 2026-10-19). Avant, la carte présente
-   * les contacts des équipes sans les siens.
+   * lancé) — symétrique de ce que le caster reçoit des équipes (décision de
+   * l'utilisateur, 2026-10-19). Avant, la carte présente les contacts des
+   * équipes sans les siens. Un arbitre (rôle `REFEREE`) les lit à toute heure,
+   * comme ceux des équipes (décision de l'utilisateur, 2026-10-21).
    */
   exposesCaster: boolean;
 };
@@ -649,7 +651,7 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
           castRevoked,
           readiness: rowReadiness(row),
           exposes,
-          exposesCaster: phase === "LOBBY" || phase === "LAUNCHED",
+          exposesCaster: phase === "LOBBY" || phase === "LAUNCHED" || party.role === "REFEREE",
         }),
       );
     }

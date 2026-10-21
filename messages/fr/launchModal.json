@@ -83,7 +83,7 @@
     "notShown": "Contacts non affichés.",
     "noCaster": "Aucun caster inscrit sur ce match.",
     "casterLater": "Ses contacts s'afficheront au départ du match.",
-    "unavailable": "Les contacts ne sont visibles que des membres des deux équipes et des arbitres d'un match dont les deux adversaires sont connus, jusqu'à sa fin ; ceux du caster, et ceux des équipes pour le caster, le temps du match seulement.",
+    "unavailable": "Les contacts ne sont visibles que des membres des deux équipes et des arbitres d'un match dont les deux adversaires sont connus, jusqu'à sa fin ; ceux des équipes pour le caster, et ceux du caster pour les équipes, le temps du match seulement.",
     "failed": "Les contacts n'ont pas pu être chargés. Réessaie dans un instant."
   }
 }
