@@ -5,6 +5,7 @@ import {
   PRIVACY_CHANGES,
   pendingPrivacyChanges,
   privacyChangeDay,
+  publishedPrivacyChanges,
   type PrivacyChange,
 } from "@/lib/shared/privacy-changes";
 import { rolesGranting } from "@/lib/shared/permissions";
@@ -70,9 +71,13 @@ export function privacyAudienceSql(change: PrivacyChange): string {
 export async function loadPendingPrivacyChanges(userId: number): Promise<PrivacyChange[]> {
   if (PRIVACY_CHANGES.length === 0) return [];
 
+  const today = privacyChangeDay(new Date());
+  // Comme le balayage Discord : sans entrée `LIVE_STAFF` publiée, le fait
+  // n'est pas calculé — la requête la plus fréquente n'en paie pas le coût.
+  const liveStaff = publishedPrivacyChanges(today, PRIVACY_CHANGES).some((change) => change.audience === "LIVE_STAFF");
   const db = await getDatabase();
   const [rows] = await db.execute<PendingRow[]>(
-    `SELECT u.created_at, u.google_sub IS NOT NULL AS google_linked, ${LIVE_STAFF_SQL} AS live_staff, a.change_id
+    `SELECT u.created_at, u.google_sub IS NOT NULL AS google_linked, ${liveStaff ? LIVE_STAFF_SQL : "0"} AS live_staff, a.change_id
        FROM bg_users u
        LEFT JOIN bg_privacy_acknowledgments a ON a.user_id = u.id
       WHERE u.id = ? AND u.is_deleted = 0`,
@@ -84,7 +89,7 @@ export async function loadPendingPrivacyChanges(userId: number): Promise<Privacy
   return pendingPrivacyChanges(
     rows[0].created_at ? String(rows[0].created_at) : null,
     acknowledged,
-    privacyChangeDay(new Date()),
+    today,
     PRIVACY_CHANGES,
     { googleLinked: Number(rows[0].google_linked) === 1, liveStaff: Number(rows[0].live_staff) === 1 },
   );
