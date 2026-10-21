@@ -147,7 +147,10 @@ seulement devenir **nettement visible** et suivre l'équipe partout.
   `EntrantName` `truncate`, pseudo des membres d'une fiche d'équipe). Peint
   d'une marche, c'est le `<span>` peint qui rogne et pose l'ellipse, le lien le
   laisse déborder — sa lueur n'est pas coupée et l'ellipse garde le dégradé.
-  Un lien d'entité ne se tronque jamais par une classe de l'appelant.
+  Un lien d'entité ne se tronque jamais par une classe de l'appelant — seule
+  exception, le classement de l'accueil (deux lignes, `line-clamp`) : sa règle
+  (`Leaderboard.module.css`) passe de même au nom peint quand le lien porte
+  `data-podium`.
 - Contraste renforcé : lueur effacée. Couleurs forcées : fond retiré, couleur
   du système. Impression : couleur pleine `--blue-500`, repère masqué.
 
