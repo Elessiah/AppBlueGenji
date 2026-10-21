@@ -8,11 +8,11 @@
  * seule de ce qui est exposé : ces fiches ne font que le montrer.
  */
 
+import { useState } from "react";
 import { PlayerLink, TeamLink } from "@/components/entity-link";
 import { useLaunchText } from "./launch-text";
 import {
   casterContactsPending,
-  viewerIsCaster,
   type LaunchCaster,
   type LaunchContact,
   type LaunchSide,
@@ -189,6 +189,19 @@ function SideContacts({
   );
 }
 
+/**
+ * Annoncer l'arrivée des contacts du caster ? Seulement au passage « en
+ * attente → montrés » (relecture à l'heure de départ), jamais à l'ouverture, et
+ * pas s'il n'a aucun contact à montrer (deux « — » ne sont pas une arrivée).
+ */
+export function casterContactsArrived(
+  wasPending: boolean,
+  pending: boolean,
+  caster: Pick<LaunchCaster, "contactsShown" | "discordTag" | "battletag">,
+): boolean {
+  return wasPending && !pending && caster.contactsShown && (caster.discordTag !== null || caster.battletag !== null);
+}
+
 export function CasterCard({
   caster,
   phase,
@@ -211,6 +224,16 @@ export function CasterCard({
   linkNames?: boolean;
 }>) {
   const { t } = useLaunchText();
+  const pending = caster !== null && casterContactsPending({ caster, viewer });
+  // La note cède la place aux contacts (relecture à l'heure de départ) : une
+  // phrase courte l'annonce. Retenu au passage « en attente → montrés »
+  // seulement (état précédent gardé au rendu), jamais à l'ouverture.
+  const [wasPending, setWasPending] = useState(pending);
+  const [arrived, setArrived] = useState(false);
+  if (wasPending !== pending) {
+    setWasPending(pending);
+    setArrived(caster !== null && casterContactsArrived(wasPending, pending, caster));
+  }
   if (!caster) {
     return (
       <section className={styles.caster} aria-label={t("caster")}>
@@ -240,12 +263,11 @@ export function CasterCard({
       )}
       {/* Contacts tus : une note plutôt que deux « — » qui laisseraient croire
           qu'il n'en a pas — jamais au caster lui-même, dont elle parle. */}
-      {casterContactsPending({ caster, viewer }) && <p className={styles.note}>{t("contacts.casterLater")}</p>}
-      {/* Statut toujours présent, hors flux : quand la relecture de l'heure de
-          départ remplace la note par les contacts, une phrase courte l'annonce
-          (pas les boutons « Copier »). Vide tant que la note est là. */}
+      {pending && <p className={styles.note}>{t("contacts.casterLater")}</p>}
+      {/* Statut toujours présent, hors flux : la phrase plutôt que les boutons
+          « Copier » ; muet si le caster n'a aucun contact à montrer. */}
       <output className="sr-only" aria-live="polite">
-        {caster.contactsShown && !viewerIsCaster({ viewer }) ? t("contacts.casterShown") : ""}
+        {arrived ? t("contacts.casterShown") : ""}
       </output>
     </section>
   );

@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { closedNoticeText } from "@/app/(secured)/tournois/[id]/_components/PlayerScoreDialog";
 import { startAtHint } from "@/app/(secured)/tournois/[id]/_components/MatchScheduleDialog";
 import { anotherModalOpen } from "@/components/match-launch/MatchLaunchCenter";
-import { CasterCard, SideCard } from "@/components/match-launch/LaunchContactCards";
+import { CasterCard, SideCard, casterContactsArrived } from "@/components/match-launch/LaunchContactCards";
 import { contactsErrorText } from "@/components/match-launch/MatchContactsDialog";
 import { FR_LAUNCH_TEXT } from "@/components/match-launch/launch-text";
 import { tournamentDialogsText } from "@/lib/shared/tournament-actions-text";
@@ -291,8 +291,8 @@ describe("fiches de contact — noms cliquables", () => {
       for (const phase of ["LOBBY", "LAUNCHED"] as const) {
         const html = render(phase, { role: "TEAM2", isCaster: false });
         expect(html).toContain("BattleTag");
-        // La relecture au départ remplace la note : une phrase courte l'annonce.
-        expect(html).toContain('aria-live="polite">Les contacts du caster sont maintenant affichés.</output>');
+        // Ouverte sur des contacts déjà là : rien d'« arrivé » à annoncer.
+        expect(html).toContain('<output class="sr-only" aria-live="polite"></output>');
         expect(html).not.toContain("afficheront");
       }
     });
@@ -303,6 +303,15 @@ describe("fiches de contact — noms cliquables", () => {
         expect(html).toContain("BattleTag");
         expect(html).not.toContain("afficheront");
       }
+    });
+
+    it("annonce l'arrivée des contacts au seul passage « en attente → montrés »", () => {
+      const shown = { ...caster, contactsShown: true };
+      expect(casterContactsArrived(true, false, shown)).toBe(true);
+      expect(casterContactsArrived(false, false, shown)).toBe(false);
+      expect(casterContactsArrived(true, true, { ...caster, contactsShown: false })).toBe(false);
+      // Deux « — » ne sont pas une arrivée.
+      expect(casterContactsArrived(true, false, { ...shown, discordTag: null, battletag: null })).toBe(false);
     });
 
     it("le caster lui-même avant le départ → ni contacts ni note sur sa propre fiche", () => {
