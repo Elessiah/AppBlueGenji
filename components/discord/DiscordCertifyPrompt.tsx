@@ -126,6 +126,7 @@ export function DiscordCertifyPrompt({ prompt, canOpen, onProfile, onAnswered, t
     if (!deadEnd) return false;
     setClosed(true);
     showError(t(deadEnd));
+    onAnswered();
     router.refresh();
     return true;
   };

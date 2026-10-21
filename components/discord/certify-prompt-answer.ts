@@ -22,8 +22,9 @@ function hasBroadcastChannel(): boolean {
 
 /**
  * Réponse à la proposition de certification (`POST /api/profile/discord/certify-prompt`).
- * Hors du morceau de la fenêtre : son relais (`DiscordCertifyPromptLazy`) clôt
- * aussi la proposition quand le tag est certifié avant qu'elle ne se charge.
+ * Module à part, chargé avec la fenêtre — ou à la demande par son relais
+ * (`DiscordCertifyPromptLazy`), qui clôt la proposition quand le tag est
+ * certifié avant qu'elle ne se charge.
  * Écrite, elle est annoncée aux autres onglets (`onCertifyPromptAnsweredElsewhere`).
  */
 export async function answerCertifyPrompt(action: CertifyPromptAction): Promise<void> {
