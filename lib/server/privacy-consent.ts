@@ -7,6 +7,7 @@ import {
   privacyChangeDay,
   type PrivacyChange,
 } from "@/lib/shared/privacy-changes";
+import { rolesGranting } from "@/lib/shared/permissions";
 
 /**
  * Lecture et écriture de la prise de connaissance des changements du traitement des
@@ -16,8 +17,18 @@ import {
 type PendingRow = RowDataPacket & {
   created_at: string | null;
   google_linked: 0 | 1 | null;
+  live_staff: 0 | 1 | null;
   change_id: string | null;
 };
+
+/**
+ * Le compte `u` peut-il caster (permission `live`) ? Même règle que `can` :
+ * administrateur, ou l'un des rôles qui l'accordent. Les rôles sont des
+ * constantes du code, jamais une saisie : les écrire dans la requête est sûr.
+ */
+export const LIVE_STAFF_SQL = `(u.is_admin = 1${rolesGranting("live")
+  .map((role) => ` OR JSON_CONTAINS(u.platform_roles_json, '"${role}"')`)
+  .join("")})`;
 
 /**
  * Condition SQL d'une entrée ciblée (`PrivacyChange.audience`) sur la ligne
@@ -31,6 +42,8 @@ export function privacyAudienceSql(change: PrivacyChange): string {
       return "1 = 1";
     case "GOOGLE_LINKED":
       return "u.google_sub IS NOT NULL";
+    case "LIVE_STAFF":
+      return LIVE_STAFF_SQL;
     default:
       return "1 = 0";
   }
@@ -51,7 +64,7 @@ export async function loadPendingPrivacyChanges(userId: number): Promise<Privacy
 
   const db = await getDatabase();
   const [rows] = await db.execute<PendingRow[]>(
-    `SELECT u.created_at, u.google_sub IS NOT NULL AS google_linked, a.change_id
+    `SELECT u.created_at, u.google_sub IS NOT NULL AS google_linked, ${LIVE_STAFF_SQL} AS live_staff, a.change_id
        FROM bg_users u
        LEFT JOIN bg_privacy_acknowledgments a ON a.user_id = u.id
       WHERE u.id = ? AND u.is_deleted = 0`,
@@ -65,7 +78,7 @@ export async function loadPendingPrivacyChanges(userId: number): Promise<Privacy
     acknowledged,
     privacyChangeDay(new Date()),
     PRIVACY_CHANGES,
-    { googleLinked: Number(rows[0].google_linked) === 1 },
+    { googleLinked: Number(rows[0].google_linked) === 1, liveStaff: Number(rows[0].live_staff) === 1 },
   );
 }
 

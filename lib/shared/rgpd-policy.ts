@@ -36,7 +36,7 @@ export const AUTOMOD_ALERT_SCOPE = "alerte AutoMod d'une telle annonce bloquée 
  * temps du match seulement (`match-launch-info.ts`).
  */
 export const MATCH_CONTACTS_SCOPE =
-  "présentation, dans la fenêtre « Contacts » du match et dans sa fenêtre de lancement, aux membres de ses deux équipes et aux arbitres dès que ses deux adversaires sont connus, et à son caster le temps du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes et au caster) ; les contacts du caster aux deux équipes le temps du match, et aux arbitres dès que ses deux adversaires sont connus (conditions d'utilisation, « Contacts de match »)";
+  "présentation, dans la fenêtre « Contacts » du match et dans sa fenêtre de lancement, aux membres de ses deux équipes et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, et à son caster le temps du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes et au caster) ; les contacts du caster aux deux équipes le temps du match, et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin (conditions d'utilisation, « Contacts de match »)";
 
 /**
  * BattleTag masqué : le masquer ne le retire pas des parties de tes matchs
@@ -45,7 +45,7 @@ export const MATCH_CONTACTS_SCOPE =
  * 2026-10-19), prévue par les conditions d'utilisation.
  */
 export const BATTLETAG_MATCH_SCOPE =
-  "lecture, même masqué, dans la seule fenêtre « Contacts » d'un match où tu es présenté comme contact et dans sa fenêtre de lancement : par ses deux équipes et les arbitres dès que ses deux adversaires sont connus, par son caster le temps du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes et au caster) — arbitres et administrateurs n'y ont pas d'autre accès (conditions d'utilisation, « Contacts de match »)";
+  "lecture, même masqué, dans la seule fenêtre « Contacts » d'un match où tu es présenté comme contact et dans sa fenêtre de lancement : par ses deux équipes et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, par son caster le temps du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes et au caster) — arbitres et administrateurs n'y ont pas d'autre accès (conditions d'utilisation, « Contacts de match »)";
 
 /**
  * Bases légales citées par la politique — les mêmes que le registre
@@ -103,7 +103,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // seconde écrase la première à chaque connexion : le dire est la condition
     // pour que le joueur comprenne pourquoi sa saisie a changé.
     finalite:
-      "Mise en relation entre joueurs (s'ajouter en jeu) — aucune statistique. Saisi par toi, ou renseigné par Blizzard à chaque connexion si tu as rattaché ton compte Battle.net. Masqué, il n'est lisible de personne — arbitres et administrateurs compris — sauf dans la fenêtre « Contacts » d'un match où tu fais partie des contacts présentés et dans sa fenêtre de lancement : des membres de ses deux équipes et des arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, de son caster le temps du match seulement (de son départ à sa fin) (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes et au caster) ; si tu castes un match, de ses deux équipes le temps du match et des arbitres dès que ses deux adversaires sont connus ; présenté comme contact d'un match, il est montré avec ton rôle d'équipe et l'indication qu'il vient ou non d'un compte Battle.net rattaché",
+      "Mise en relation entre joueurs (s'ajouter en jeu) — aucune statistique. Saisi par toi, ou renseigné par Blizzard à chaque connexion si tu as rattaché ton compte Battle.net. Masqué, il n'est lisible de personne — arbitres et administrateurs compris — sauf dans la fenêtre « Contacts » d'un match où tu fais partie des contacts présentés et dans sa fenêtre de lancement : des membres de ses deux équipes et des arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, de son caster le temps du match seulement (de son départ à sa fin) (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes et au caster) ; si tu castes un match, de ses deux équipes le temps du match et des arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin ; présenté comme contact d'un match, il est montré avec ton rôle d'équipe et l'indication qu'il vient ou non d'un compte Battle.net rattaché",
     // Masqué, le BattleTag reste lu par les parties de tes matchs : ce n'est
     // pas un consentement (le masquer n'y change rien), mais l'exécution du
     // service — les conditions d'utilisation le prévoient (« Contacts de

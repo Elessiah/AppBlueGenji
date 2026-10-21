@@ -35,6 +35,7 @@ import {
   formatPrivacyChangeDate,
   pendingPrivacyChanges,
   privacyChangeDay,
+  isPrivacyPolicyVersion,
   privacyChangeReachesAccount,
   publishedPrivacyChanges,
   privacyChangesForOneMessage,
@@ -418,6 +419,19 @@ describe("entrées ciblées (audience)", () => {
   it("GOOGLE_LINKED ne vise qu'un compte relié à Google", () => {
     expect(privacyChangeReachesAccount(G, { googleLinked: true })).toBe(true);
     expect(privacyChangeReachesAccount(G, { googleLinked: false })).toBe(false);
+  });
+
+  it("LIVE_STAFF ne vise qu'un compte qui peut caster (permission live)", () => {
+    const L = change("l", "2026-04-01", { audience: "LIVE_STAFF" });
+    expect(privacyChangeReachesAccount(L, { liveStaff: true })).toBe(true);
+    expect(privacyChangeReachesAccount(L, { liveStaff: false, googleLinked: true })).toBe(false);
+    expect(privacyChangeReachesAccount(L, {})).toBe(false);
+  });
+
+  it("seul l'avis personnel GOOGLE_LINKED sort de l'historique de la politique", () => {
+    expect(isPrivacyPolicyVersion(A)).toBe(true);
+    expect(isPrivacyPolicyVersion(G)).toBe(false);
+    expect(isPrivacyPolicyVersion(change("l", "2026-04-01", { audience: "LIVE_STAFF" }))).toBe(true);
   });
 
   it("un fait inconnu vaut faux : l'entrée ciblée se tait", () => {
@@ -1305,10 +1319,10 @@ describe("PRIVACY_CHANGES — contacts du caster aux arbitres (CASTER-CONTACTS-R
   const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-contacts-du-caster-aux-arbitres")!;
   const english = PRIVACY_CHANGES_EN["2026-10-contacts-du-caster-aux-arbitres"];
 
-  it("ferme la liste : datée du 21 octobre 2026, pour tous les comptes, et tient seule dans un message privé", () => {
+  it("ferme la liste : datée du 21 octobre 2026, pour les seuls comptes qui peuvent caster, et tient seule dans un message privé", () => {
     expect(entry).toBeDefined();
     expect(PRIVACY_CHANGES.indexOf(entry)).toBe(PRIVACY_CHANGES.length - 1);
-    expect([entry.publishedAt, entry.audience]).toEqual(["2026-10-21", undefined]);
+    expect([entry.publishedAt, entry.audience]).toEqual(["2026-10-21", "LIVE_STAFF"]);
     expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
   });
 

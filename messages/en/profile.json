@@ -355,7 +355,7 @@
     "players": "<strong>The members of both teams of your match</strong>, from the moment both its opponents are known to its end, if you're among the contacts shown — it's how you add each other in game to start the match.",
     "caster": "<strong>The caster of your match</strong>, only while the match is being played (from its start to its end), if you're among the contacts shown.",
     "asCaster": "<strong>Both teams of a match you cast</strong>, only while the match is being played (from its start to its end), and <strong>its referees</strong> from the moment both its opponents are known until its end.",
-    "staff": "<strong>Referees and administrators</strong>, in the same “Contacts” window of the tournament's matches, at the same times as both teams (the launch window only opens for the teams and the caster) — never anywhere else.",
+    "staff": "<strong>Referees and administrators</strong>, in the same “Contacts” window of the tournament's matches, at the same times as both teams — earlier for a match you cast, from the moment both its opponents are known — (the launch window only opens for the teams and the caster) — never anywhere else.",
     "outro": "To stop sharing it entirely, you have to clear the field — but your opponents will then no longer be able to add you in game. And if a Blizzard account is linked, it controls this field: you have to remove it first (after adding another way to log in if it is your only one).",
     "ok": "Got it"
   },
@@ -368,7 +368,7 @@
     "exposureTitle": "What verification exposes",
     "exposure": {
       "admins": "The site's administrators can see your Discord tag at all times.",
-      "referees": "Referees can see it only while you're entered in an ongoing or upcoming tournament — not after —, or while a match you cast is being played.",
+      "referees": "Referees can see it only while you're entered in an ongoing or upcoming tournament — not after —, or, for a match you cast, from the moment both its opponents are known until its end.",
       "match": "The members of both teams of your match can see it from the moment both its opponents are known until its end, and its caster only while the match is being played (from its start to its end) — to add each other and create the channel. If you cast a match, both its teams see yours only while the match is being played, and the referees from the moment both its opponents are known until its end.",
       "players": "Other players on the site only see it if you make it visible in your privacy settings. It doesn't appear on any public page.",
       "undo": "You can cancel at any time by removing your tag from “My profile”: the verification is lost, and the exposure with it. Logging in with Discord then saves your username again, but without verifying it: only this step verifies it."

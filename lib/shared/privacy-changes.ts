@@ -112,15 +112,20 @@ export type PrivacyChangeLink = { href: string; label: string };
  * un compte né par Google puis détaché de Google (`google_sub` remis à `NULL`)
  * n'en garde aucune trace en base, et n'est donc pas compté — limite assumée,
  * faute d'un fait qui la lèverait sans nouvelle collecte.
+ *
+ * `LIVE_STAFF` : un compte qui peut s'inscrire comme caster — permission `live`
+ * (administrateur, arbitre, caster), relue en base. Un compte qui la reçoit après
+ * la publication n'est pas informé : la règle est déjà en vigueur quand il
+ * devient caster, et les conditions d'utilisation la disent.
  */
-export type PrivacyAudience = "GOOGLE_LINKED";
+export type PrivacyAudience = "GOOGLE_LINKED" | "LIVE_STAFF";
 
 /**
  * Ce qu'on sait d'un compte pour décider des entrées ciblées. Un fait absent
  * vaut **faux** : dans le doute, une entrée ciblée se tait plutôt que d'être
  * montrée à qui elle ne parle pas.
  */
-export type PrivacyAccountFacts = { googleLinked?: boolean };
+export type PrivacyAccountFacts = { googleLinked?: boolean; liveStaff?: boolean };
 
 /** Une entrée s'adresse-t-elle à ce compte (date de création mise à part) ? */
 export function privacyChangeReachesAccount(change: PrivacyChange, facts: PrivacyAccountFacts): boolean {
@@ -129,9 +134,22 @@ export function privacyChangeReachesAccount(change: PrivacyChange, facts: Privac
       return true;
     case "GOOGLE_LINKED":
       return facts.googleLinked === true;
+    case "LIVE_STAFF":
+      return facts.liveStaff === true;
     default:
       return false;
   }
+}
+
+/**
+ * L'entrée est-elle une **version de la politique** — publiée dans l'historique
+ * de `/rgpd` et dans la date qui le coiffe ? Oui, sauf l'avis personnel
+ * `GOOGLE_LINKED` : le reliquat d'une règle passée, qui ne change pas la
+ * politique. Une entrée `LIVE_STAFF` en est une : la politique change pour
+ * tous, seuls ceux qu'elle concerne sont avertis.
+ */
+export function isPrivacyPolicyVersion(change: PrivacyChange): boolean {
+  return change.audience !== "GOOGLE_LINKED";
 }
 
 /**
@@ -923,11 +941,13 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
   // arbitres (administrateurs compris) lisent les contacts du caster dès que
   // les deux adversaires sont connus, et plus seulement le temps du match — un
   // changement de « quand », à annoncer. Conditions d'utilisation retouchées
-  // sans nouvelle version (seuls les casters, membres du staff, sont concernés).
+  // sans nouvelle version (seuls les casters, membres du staff, sont concernés)
+  // — et l'entrée ne s'adresse qu'à eux (`LIVE_STAFF`).
   {
     id: "2026-10-contacts-du-caster-aux-arbitres",
     title: "Contacts du caster : visibles des arbitres avant le match",
     publishedAt: "2026-10-21",
+    audience: "LIVE_STAFF",
     summary:
       "Si tu castes un match, les arbitres et les administrateurs voient tes contacts dès que ses deux adversaires sont connus, et plus seulement le temps du match ; ses deux équipes ne les voient toujours que le temps du match.",
     details: [

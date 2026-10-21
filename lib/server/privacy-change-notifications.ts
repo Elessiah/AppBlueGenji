@@ -6,7 +6,7 @@ import { privacyChangePush } from "@/lib/shared/push-messages";
 import { localizedPrivacyChanges } from "@/lib/shared/privacy-changes-en";
 import { siteBaseUrl } from "@/lib/server/site-url";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
-import { privacyAudienceSql } from "@/lib/server/privacy-consent";
+import { LIVE_STAFF_SQL, privacyAudienceSql } from "@/lib/server/privacy-consent";
 import { webPushConfig } from "@/lib/server/web-push";
 import {
   PRIVACY_DM_MIN_INTERVAL_DAYS,
@@ -74,6 +74,7 @@ type CandidateRow = RowDataPacket & {
   discord_verified_at: string | null;
   created_at: string | null;
   google_linked: 0 | 1 | null;
+  live_staff: 0 | 1 | null;
 };
 
 type DoneRow = RowDataPacket & { user_id: number; change_id: string };
@@ -117,7 +118,7 @@ async function queryCandidates(settled: readonly PrivacyChange[], withPush: bool
     .join(" OR ");
   const [rows] = await db.query<CandidateRow[]>(
     `SELECT u.id, u.pseudo, u.discord_id, u.discord_pseudo, u.discord_verified_at, u.created_at,
-            u.google_sub IS NOT NULL AS google_linked
+            u.google_sub IS NOT NULL AS google_linked, ${LIVE_STAFF_SQL} AS live_staff
        FROM bg_users u
       WHERE u.is_deleted = 0
         AND (u.discord_id IS NOT NULL OR (u.discord_verified_at IS NOT NULL AND u.discord_pseudo IS NOT NULL)
@@ -203,7 +204,7 @@ async function runSweep(now: Date): Promise<number> {
         done.get(userId) ?? [],
         privacyChangeDay(now),
         changes,
-        { googleLinked: Number(row.google_linked) === 1 },
+        { googleLinked: Number(row.google_linked) === 1, liveStaff: Number(row.live_staff) === 1 },
       ),
       now,
     );
