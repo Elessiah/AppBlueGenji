@@ -148,7 +148,7 @@ describe("marches du podium — accessibilité et impression", () => {
     expect(block).toMatch(
       /\n\.entity-clamp-2,\s*\.entity-clamp-2\[data-podium\] > \.podium-tier,\s*\.entity-clamp-2\[data-podium\] > \.podium-member \{[^}]*-webkit-line-clamp: 2;[^}]*overflow: hidden;/,
     );
-    expect(block).toMatch(/\n\.entity-clamp-2\[data-podium\] \{\s*display: block;\s*overflow: visible;\s*-webkit-line-clamp: none;\s*line-clamp: none;\s*\}/);
+    expect(block).toMatch(/\n\.entity-clamp-2\[data-podium\] \{\s*display: inline-block;\s*max-width: 100%;\s*vertical-align: top;\s*overflow: visible;\s*-webkit-line-clamp: none;\s*line-clamp: none;\s*\}/);
     expect(readSource("components/cyber/landing/Leaderboard.tsx")).toMatch(/<TeamLink teamId=\{row\.teamId\} truncate=\{2\}/);
     expect(readSource("components/cyber/landing/Leaderboard.module.css")).not.toMatch(/line-clamp|data-podium/);
   });
