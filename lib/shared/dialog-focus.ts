@@ -41,6 +41,12 @@ export interface FocusTrapState<T> {
   /** Élément qui a le focus. */
   active: unknown;
   inModal: boolean;
+  /**
+   * Le focus est sur le **conteneur** de la modale (`tabIndex={-1}` : focus
+   * d'ouverture, ou clic sur son texte) — hors des focalisables, c'est un bord :
+   * sans quoi `Maj+Tab` partirait dans la page derrière le voile.
+   */
+  onContainer?: boolean;
   inLayer: boolean;
   shiftKey: boolean;
 }
@@ -49,9 +55,18 @@ export interface FocusTrapState<T> {
  * Élément où envoyer le focus pour boucler sur la modale puis ses couches
  * exemptées, ou `null` quand l'ordre natif suffit (on n'est pas sur un bord).
  */
-export function focusTrapTarget<T>({ items, extra, active, inModal, inLayer, shiftKey }: FocusTrapState<T>): T | null {
+export function focusTrapTarget<T>({
+  items,
+  extra,
+  active,
+  inModal,
+  onContainer = false,
+  inLayer,
+  shiftKey,
+}: FocusTrapState<T>): T | null {
   const start = items[0];
   const end = items.at(-1)!;
+  if (inModal && onContainer) return shiftKey ? (extra.at(-1) ?? end) : start;
   if (inLayer) {
     if (!shiftKey && active === extra.at(-1)) return start;
     if (shiftKey && active === extra[0]) return end;

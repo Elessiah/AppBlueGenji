@@ -162,17 +162,10 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
     closeForSession();
   };
 
-  const dialogRef = useDialogBehavior({ open, onClose: postpone, locked: busy !== null });
-  // Focus d'ouverture sur la fenêtre elle-même (déclaré après le hook, donc
-  // joué après lui) : son nom (le titre) est annoncé, Entrée n'y certifie ni
-  // ne ferme rien, et à fort zoom, quand la fenêtre défile en entier, elle
-  // s'ouvre en haut — titre en vue — au lieu de défiler jusqu'aux boutons.
-  useEffect(() => {
-    if (!open) return;
-    const dialog = dialogRef.current;
-    dialog?.focus({ preventScroll: true });
-    if (dialog) dialog.scrollTop = 0;
-  }, [open, dialogRef]);
+  // Focus d'ouverture sur la fenêtre elle-même : son nom (le titre) est
+  // annoncé, Entrée n'y certifie ni ne ferme rien, et à fort zoom, quand la
+  // fenêtre défile en entier, elle s'ouvre en haut — titre en vue.
+  const dialogRef = useDialogBehavior({ open, onClose: postpone, locked: busy !== null, initialFocus: "container" });
   const backdrop = useBackdropDismiss(postpone, busy !== null);
 
   if (!open || !prompt) return null;

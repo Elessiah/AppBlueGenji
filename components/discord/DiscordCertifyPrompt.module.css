@@ -28,8 +28,11 @@
     0 0 40px rgba(90, 200, 255, calc(0.12 * var(--glow, 1)));
 }
 
+/* Le focus d'ouverture est sur la fenêtre : un anneau discret le montre
+   (jamais `outline: none` seul — l'utilisateur au clavier ne saurait pas où il est). */
 .modal:focus {
-  outline: none;
+  outline: 2px solid var(--blue-500);
+  outline-offset: -2px;
 }
 
 /* Seul le corps défile : les trois boutons restent en vue sur un petit écran. */

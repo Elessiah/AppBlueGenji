@@ -107,9 +107,11 @@ que le joueur caste). Tableau natif (`th` `scope`, titres de groupe en `rowgroup
 dessous, dans l'ordre de tabulation). Le corps défilant garde un plancher (`min(120px, 22dvh)`, repli `vh`) : à fort
 zoom, le tableau reste lisible au lieu de s'écraser sous les boutons, et la
 fenêtre (`.dialog-bounded`) défile alors en entier, boutons compris. Focus
-d'ouverture sur la fenêtre elle-même (`tabIndex={-1}`, après celui de
-`useDialogBehavior`), ouverte en haut : son titre est annoncé et en vue, et
-Entrée n'y certifie ni ne ferme pour de bon. Un `DISCORD_CERTIFIED_EVENT` après
+d'ouverture sur la fenêtre elle-même (`useDialogBehavior({ initialFocus:
+"container" })`, sans défilement, anneau discret visible), ouverte en haut :
+son titre est annoncé et en vue, et Entrée n'y certifie ni ne ferme pour de
+bon ; `Maj+Tab` depuis la fenêtre reboucle sur son dernier bouton
+(`focusTrapTarget`, `onContainer`). Un `DISCORD_CERTIFIED_EVENT` après
 une réponse déjà donnée sur ce chargement n'écrit pas un second `LATER`. La flèche
 du parcours `DIALOG` est décorative (`aria-hidden`).
 

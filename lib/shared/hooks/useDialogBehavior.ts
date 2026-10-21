@@ -14,6 +14,12 @@ interface DialogBehaviorOptions {
    * formulaire) : on ne veut pas qu'Échap referme une modale en train d'écrire.
    */
   locked?: boolean;
+  /**
+   * `"container"` : le focus d'ouverture va au conteneur lui-même (sans
+   * défilement), pas au premier contrôle — le titre est annoncé et reste en
+   * vue, Entrée n'y déclenche rien. Le conteneur porte `tabIndex={-1}`.
+   */
+  initialFocus?: "first" | "container";
 }
 
 /**
@@ -51,12 +57,14 @@ const FOCUSABLE_SELECTOR =
  * une annonce ouverte en lecture, par exemple) : seule celle du dessus répond au
  * clavier, et le défilement n'est rendu qu'à la fermeture de la dernière.
  */
-export function useDialogBehavior({ open, onClose, locked = false }: DialogBehaviorOptions) {
+export function useDialogBehavior({ open, onClose, locked = false, initialFocus = "first" }: DialogBehaviorOptions) {
   const containerRef = useRef<HTMLDivElement>(null);
   // `onClose` est relu à chaque événement : une fonction recréée à chaque rendu
   // ne doit pas réabonner l'écouteur (ni relancer le verrou de défilement).
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
+  const initialFocusRef = useRef(initialFocus);
+  initialFocusRef.current = initialFocus;
   const lockedRef = useRef(locked);
   lockedRef.current = locked;
 
@@ -87,7 +95,8 @@ export function useDialogBehavior({ open, onClose, locked = false }: DialogBehav
     // la modale, le focus d'ouverture va au premier contrôle qui suit.
     const firstContent = candidates.find((el) => el.dataset.dialogClose === undefined);
 
-    (preferred ?? firstContent ?? candidates[0] ?? containerRef.current)?.focus();
+    if (initialFocusRef.current === "container") containerRef.current?.focus({ preventScroll: true });
+    else (preferred ?? firstContent ?? candidates[0] ?? containerRef.current)?.focus();
 
     const onKeyDown = (event: KeyboardEvent) => {
       // Les écouteurs de toutes les couches vivent sur `window` : seule celle du
@@ -126,7 +135,8 @@ export function useDialogBehavior({ open, onClose, locked = false }: DialogBehav
       const inModal = containerRef.current?.contains(active as Node) ?? false;
       const inLayer = !inModal && extra.length > 0 && layers.some((layer) => layer.contains(active as Node));
 
-      const next = focusTrapTarget({ items, extra, active, inModal, inLayer, shiftKey: event.shiftKey });
+      const onContainer = active === containerRef.current;
+      const next = focusTrapTarget({ items, extra, active, inModal, onContainer, inLayer, shiftKey: event.shiftKey });
       if (next) {
         event.preventDefault();
         next.focus();

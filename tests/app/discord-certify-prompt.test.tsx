@@ -68,12 +68,14 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
 
   it("focus d'ouverture sur la fenêtre (titre en vue, Entrée inerte), flèche décorative hors du nom accessible", () => {
     expect(SOURCE).not.toContain("data-autofocus");
-    expect(SOURCE).toMatch(/dialog\?\.focus\(\{ preventScroll: true \}\);\s*if \(dialog\) dialog\.scrollTop = 0;/);
-    // Joué après celui du hook : déclaré après lui.
-    expect(SOURCE.indexOf("dialog?.focus({ preventScroll: true })")).toBeGreaterThan(SOURCE.indexOf("useDialogBehavior({ open"));
+    expect(SOURCE).toContain('useDialogBehavior({ open, onClose: postpone, locked: busy !== null, initialFocus: "container" })');
     expect(SOURCE).toContain("tabIndex={-1}");
-    expect(SOURCE).toContain('<span aria-hidden="true"> →</span>');
+    // Focus visible sur la fenêtre (pas d'`outline: none`).
     const css = readSource("components/discord/DiscordCertifyPrompt.module.css");
+    expect(css).toMatch(/\.modal:focus \{\s*outline: 2px solid var\(--blue-500\);/);
+    const hook = readSource("lib/shared/hooks/useDialogBehavior.ts");
+    expect(hook).toContain('if (initialFocusRef.current === "container") containerRef.current?.focus({ preventScroll: true });');
+    expect(SOURCE).toContain('<span aria-hidden="true"> →</span>');
     expect(css).not.toMatch(/grid-row:/);
   });
 
@@ -94,7 +96,7 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
   it("« Plus tard », Échap et le voile : LATER ; « Ne plus voir » : NEVER", () => {
     expect(SOURCE).toContain('answerPrompt("LATER")');
     expect(SOURCE).toContain('await answerPrompt("NEVER")');
-    expect(SOURCE).toContain("useDialogBehavior({ open, onClose: postpone, locked: busy !== null })");
+    expect(SOURCE).toContain("useDialogBehavior({ open, onClose: postpone, locked: busy !== null, initialFocus: \"container\" })");
     expect(SOURCE).toContain("useBackdropDismiss(postpone, busy !== null)");
   });
 
