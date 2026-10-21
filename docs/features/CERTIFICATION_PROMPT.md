@@ -22,8 +22,8 @@ individuel, ni pour une équipe non engagée. Le motif `MANAGER` passe devant.
 **Marvel Rivals** : le BattleTag (Battle.net) ne sert à rien à ce jeu
 (`battletagRelevantFor`, `battletagRelevant` du prompt). Seul le tag Discord est
 demandé : un Discord certifié suffit, la modale ne montre que sa pastille et
-prend ses variantes « Discord seul » (titre, motif d'équipe, ligne
-« identité »).
+prend ses variantes « Discord seul » (titre, motif d'équipe, cellules du
+tableau — `DISCORD_ONLY_CELLS` : identité, matchs, « ensuite »).
 
 La modale ne s'ouvre **jamais par-dessus une autre** (`aria-modal` présent :
 lancement de match, changements de confidentialité…) — deux pièges à focus se
@@ -143,4 +143,7 @@ donnée sur une personne, déposées à la demande du lecteur.
 Tests : `tests/lib/shared/certification-prompt.test.ts`,
 `tests/lib/server/certification-prompt.test.ts`,
 `tests/tournois/certification-prompt-context.test.ts`,
-`tests/tournois/certification-prompt-dialog.test.tsx`.
+`tests/tournois/certification-prompt-dialog.test.tsx`,
+`tests/tournois/certification-prompt-hook.test.ts` (décision, effacement,
+retrait, changement de tournoi), `tests/lib/shared/dialog-focus.test.ts`
+(`anotherModalOpen`, `watchUrgentModalOpened`, `handOffRestoreTargets`).
