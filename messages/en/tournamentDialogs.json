@@ -360,7 +360,7 @@
     "title": "Verify your Discord and your BattleTag",
     "titleDiscordOnly": "Verify your Discord",
     "titleBattletagOnly": "Verify your BattleTag",
-    "leadManager": "You lead a team entered in this tournament: you may be shown as its contact to the opponent, the caster and the referees, as soon as your opponents are known. Verify what is still missing.",
+    "leadManager": "You lead a team entered in this tournament: you may be shown as its contact to the opponent and the referees as soon as your opponents are known, and to the caster while the match is played. Verify what is still missing.",
     "leadTeam": "Your team has no verified contact to show for its matches: nobody on it has verified their Discord tag or their BattleTag. The opponent and the referees have no reliable way to reach you.",
     "leadTeamDiscordOnly": "Your team has nobody to show on Discord for its matches: nobody on it has verified their Discord tag. The opponent and the referees have no reliable way to reach you.",
     "statusLabel": "Where you stand",
@@ -375,8 +375,8 @@
     "rows": {
       "identity": {
         "topic": "Your identity",
-        "does": "Proves your Discord tag and your BattleTag really are yours: Discord and Blizzard confirm it.",
-        "doesDiscordOnly": "Proves your Discord tag really is yours: Discord confirms it.",
+        "does": "Proves your Discord tag and your BattleTag really are yours: Discord and Blizzard confirm it. The account linked for this becomes a way to sign in, and Battle.net replaces your BattleTag with its own, locked while it stays linked.",
+        "doesDiscordOnly": "Proves your Discord tag really is yours: Discord confirms it. The Discord account linked for this becomes a way to sign in.",
         "doesNot": "Gives the site no access to your password, your messages or your friends."
       },
       "matches": {
@@ -388,7 +388,7 @@
       },
       "messages": {
         "topic": "Bot messages",
-        "does": "Once your Discord tag is verified, the bot may write to you by direct message: your match times and reminders, requests to join a team you manage, moderation notices, information about your data.",
+        "does": "Once your Discord tag is verified, the bot sends you your match times and reminders by direct message. Discord linked to your account (verifying by code links it) also lets it write to you: requests to join a team you manage, moderation notices, information about your data.",
         "doesNot": "Does not force match messages on you: you can turn them off from your profile (Notifications section) and stay verified."
       },
       "staff": {
@@ -400,7 +400,7 @@
         "topic": "Later on",
         "does": "Opens tournaments that require a verified Discord or a Battle.net account.",
         "doesDiscordOnly": "Opens tournaments that require a verified Discord.",
-        "doesNot": "Commits you to nothing: removing your Discord tag from your profile removes its verification; Discord, if it was linked to your account to verify, is unlinked from “Connected apps” as long as you keep another way to sign in; unlinking Battle.net removes your BattleTag's verification, the BattleTag staying on your profile until you erase it.",
+        "doesNot": "Commits you to nothing: removing your Discord tag from your profile removes its verification; Discord or Battle.net is unlinked from “Connected apps” as long as you keep another way to sign in — once unlinked, Battle.net leaves your BattleTag on your profile, unverified, until you erase it.",
         "doesNotDiscordOnly": "Commits you to nothing: removing your Discord tag from your profile removes its verification; Discord, if it was linked to your account to verify, is unlinked from “Connected apps” as long as you keep another way to sign in."
       }
     },
