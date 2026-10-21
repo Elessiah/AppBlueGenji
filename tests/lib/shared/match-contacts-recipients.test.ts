@@ -82,8 +82,8 @@ describe("textes joueur et règles — mêmes lecteurs que le code", () => {
   });
 
   it("la règle « Lancement d'un match » renvoie au bouton « Contacts » ouvert dès que les adversaires sont connus", () => {
-    expect(readSource("messages/fr/rules.json")).toContain("le bouton « Contacts » de la carte du match montre déjà, aux membres des deux équipes et aux arbitres, dès que ses deux adversaires sont connus (au caster, au départ du match)");
-    expect(readSource("messages/en/rules.json")).toContain("the match card's “Contacts” button already shows to the members of both teams and to referees as soon as both its opponents are known (to the caster, once the match starts)");
+    expect(readSource("messages/fr/rules.json")).toContain("le bouton « Contacts » de la carte du match montre déjà aux membres des deux équipes et aux arbitres dès que ses deux adversaires sont connus (au caster, au départ du match) ; ceux du caster, les équipes ne les voient qu'au départ du match, les arbitres dès que les adversaires sont connus");
+    expect(readSource("messages/en/rules.json")).toContain("the match card's “Contacts” button already shows to the members of both teams and to referees as soon as both its opponents are known (to the caster, once the match starts); the caster's, the teams only see once the match starts, referees as soon as the opponents are known");
   });
 });
 

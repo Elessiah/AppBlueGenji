@@ -1011,7 +1011,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     title: "Contacts du caster : visibles des arbitres et des administrateurs avant le match",
     publishedAt: "2026-10-21",
     summary:
-      "Si tu castes un match, les arbitres et les administrateurs voient tes contacts dès que ses deux adversaires sont connus, et plus seulement le temps du match ; ses deux équipes ne les voient toujours que le temps du match.",
+      "Si tu castes un match, les arbitres et les administrateurs voient tes contacts dès que ses deux adversaires sont connus, et plus seulement le temps du match (pour les administrateurs, seul ton BattleTag est concerné : ils voyaient déjà ton tag Discord certifié) ; ses deux équipes ne les voient toujours que le temps du match.",
     details: [
       "Ce sont les mêmes informations qu'avant — ton tag Discord certifié et ton BattleTag, même masqué —, dans la même fenêtre « Contacts » du match, jusqu'à sa fin. Seul le moment change pour les arbitres : ils peuvent te joindre pour organiser la diffusion avant l'heure. Les administrateurs voyaient déjà ton tag Discord certifié à tout moment : pour eux, seul ton BattleTag est concerné.",
       "Rien ne change pour les joueurs : leurs contacts restent visibles des arbitres dès que les deux adversaires sont connus, et du caster le temps du match seulement.",
