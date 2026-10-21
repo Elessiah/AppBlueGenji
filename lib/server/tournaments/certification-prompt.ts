@@ -116,8 +116,12 @@ export function cachedCertificationPrompt(
   now: () => number = Date.now,
 ): Promise<CertificationPrompt | null> {
   const entry = recentPrompts.get(key);
-  if (entry && entry.expiresAt > now()) return entry.value;
   recentPrompts.delete(key);
+  if (entry && entry.expiresAt > now()) {
+    // Servie : remise en fin d'ordre — les plus anciennes restent en tête.
+    recentPrompts.set(key, entry);
+    return entry.value;
+  }
   const room = makeRoom(now());
 
   const slot = { value: Promise.resolve<CertificationPrompt | null>(null), expiresAt: Number.POSITIVE_INFINITY };
@@ -169,8 +173,11 @@ export function cachedCertificationPrompt(
  */
 function makeRoom(at: number): boolean {
   if (recentPrompts.size < CERTIFICATION_PROMPT_CACHE_MAX) return true;
+  // En tête, les moins récemment servies : on s'arrête à la première vivante
+  // terminée (les lectures en cours, sans échéance, sont passées).
   for (const [key, entry] of recentPrompts) {
     if (entry.expiresAt <= at) recentPrompts.delete(key);
+    else if (entry.expiresAt !== Number.POSITIVE_INFINITY) break;
   }
   if (recentPrompts.size < CERTIFICATION_PROMPT_CACHE_MAX) return true;
   for (const [key, entry] of recentPrompts) {

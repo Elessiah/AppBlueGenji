@@ -168,17 +168,17 @@ describe("watchModals / watchModalsClosed", () => {
     expect(state.disconnected).toBe(1);
   });
 
-  it("watchUrgentModalOpened : réagit sans délai à une modale ajoutée, ignore le reste du plateau", () => {
+  it("watchUrgentModalOpened : réagit sans délai à un élément ajouté, ignore les textes", () => {
     const { state, mutate } = fakeDom(false);
     const calls: number[] = [];
     watchUrgentModalOpened(() => calls.push(1), globals.document as Node & ParentNode);
-    const cell = { matches: () => false, querySelector: () => null };
-    const launch = { matches: () => true, querySelector: () => null };
-    // Une case du plateau re-rendue : la page n'est pas relue.
+    const text = { nodeType: 3 };
+    const element = { nodeType: 1 };
+    // Un texte du plateau mis à jour : la page n'est pas relue.
     state.modal = true;
-    mutate([{ type: "childList", addedNodes: [cell] }]);
+    mutate([{ type: "childList", addedNodes: [text] }]);
     expect(calls).toHaveLength(0);
-    mutate([{ type: "childList", addedNodes: [launch] }]);
+    mutate([{ type: "childList", addedNodes: [element] }]);
     expect(calls).toHaveLength(1);
     expect(state.disconnected).toBe(1);
   });

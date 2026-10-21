@@ -159,21 +159,21 @@ export function watchModals(condition: () => boolean, onMet: () => void, root: N
   return stop;
 }
 
-/** Une mutation peut-elle avoir ouvert une modale ? Nœud ajouté qui en est ou en contient une, ou marquage changé. */
+/**
+ * Une mutation peut-elle avoir ouvert une modale ? Un élément ajouté (la
+ * modale, ou un bloc qui la contient) ou un marquage changé ; le texte, non.
+ * La page n'est alors relue qu'une fois par lot.
+ */
 function mayOpenModal(record: Pick<MutationRecord, "type" | "addedNodes">): boolean {
   if (record.type === "attributes") return true;
-  return Array.from(record.addedNodes).some((node) => {
-    const element = node as Partial<Element>;
-    if (typeof element.matches !== "function" || typeof element.querySelector !== "function") return false;
-    return element.matches(MODAL_OR_PENDING_SELECTOR) || element.querySelector(MODAL_OR_PENDING_SELECTOR) !== null;
-  });
+  return Array.from(record.addedNodes).some((node) => node.nodeType === 1);
 }
 
 /**
  * Prévient (une fois), **sans délai**, quand une modale qui ne cède pas sa
  * place s'ouvre — tout de suite si c'est déjà le cas : pour qu'une modale qui
- * cède la sienne s'efface avant de se monter au-dessus d'elle. Seuls les nœuds
- * ajoutés sont examinés ; la page n'est relue que si l'un d'eux est une modale.
+ * cède la sienne s'efface avant de se monter au-dessus d'elle. Seuls les lots
+ * qui ajoutent un élément relisent la page, une fois par lot.
  * Renvoie l'arrêt.
  */
 export function watchUrgentModalOpened(onOpened: () => void, root: Node & ParentNode = document.body): () => void {

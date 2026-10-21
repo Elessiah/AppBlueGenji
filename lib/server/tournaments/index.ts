@@ -1074,6 +1074,26 @@ export async function getTournamentViewerContext(
   const alreadyRegistered =
     myTeamId !== null && snapshot.registrations.some((row) => row.teamId === myTeamId);
 
+  // Invitation à certifier (`CERTIFICATION_PROMPT.md`) : au joueur d'une
+  // équipe engagée dans un tournoi qui n'est pas clos. Une requête indexée sur
+  // le roster, pour les seuls engagés, gardée une minute par lecteur
+  // (`readCertificationPrompt`). La case « Ne plus voir » de la modale vit dans le navigateur ;
+  // celui de la proposition de la connexion, gardé sur le compte, est lu ici
+  // (`loadCertificationPrompt`).
+  // Lancée dès que l'engagement est connu, attendue en fin de contexte : elle
+  // ne dépend d'aucune des lectures suivantes (et ne rejette jamais).
+  const certificationPromptRead: Promise<CertificationPrompt | null> =
+    !isSolo && activeTeam && alreadyRegistered && snapshot.card.state !== "FINISHED"
+      ? readCertificationPrompt(
+          userId,
+          activeTeam.teamId,
+          // Ceux qui mènent l'équipe en match — capitaine compris, premier
+          // présenté par `pickLaunchContacts` à vérification égale.
+          canDeclareTeamReady(activeTeam.roles),
+          battletagRelevantFor(snapshot.card.game),
+        )
+      : Promise.resolve(null);
+
   // Conditions d'inscription du tournoi (`lib/shared/registration-filters.ts`).
   //
   // **Posées ici et pas seulement à l'écriture**, parce qu'un bouton qui mène à
@@ -1121,23 +1141,7 @@ export async function getTournamentViewerContext(
       ? []
       : await withConnection((connection) => loadViewerProposals(connection, snapshot.matches, proposalScope));
 
-  // Invitation à certifier (`CERTIFICATION_PROMPT.md`) : au joueur d'une
-  // équipe engagée dans un tournoi qui n'est pas clos. Une requête indexée sur
-  // le roster, par connexion du flux (pas par instantané) et pour les seuls
-  // engagés. La case « Ne plus voir » de la modale vit dans le navigateur ;
-  // celui de la proposition de la connexion, gardé sur le compte, est lu ici
-  // (`loadCertificationPrompt`).
-  const certificationPrompt =
-    !isSolo && activeTeam && alreadyRegistered && snapshot.card.state !== "FINISHED"
-      ? await readCertificationPrompt(
-          userId,
-          activeTeam.teamId,
-          // Ceux qui mènent l'équipe en match — capitaine compris, premier
-          // présenté par `pickLaunchContacts` à vérification égale.
-          canDeclareTeamReady(activeTeam.roles),
-          battletagRelevantFor(snapshot.card.game),
-        )
-      : null;
+  const certificationPrompt = await certificationPromptRead;
 
   return {
     preview,
