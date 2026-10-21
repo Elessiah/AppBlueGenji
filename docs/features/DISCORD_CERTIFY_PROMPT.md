@@ -52,23 +52,25 @@ arrive avant le morceau (réponse à la confidentialité, lien d'action compris 
 conditions acceptées ou de nouveau exigées). Le toast « déjà certifié » de
 `/profil` est dans l'espace `profile` (`discord.alreadyVerified`).
 
-**Jamais sur un état périmé** (« sur aucun appareil », `/rgpd`) : la lecture
-de la mise en page ne vaut que pour une fenêtre qui s'ouvre **dès le
-chargement** (ou après un `router.refresh()`, qui la relit). Toute ouverture
-plus tardive — après la confidentialité ou les conditions, au retour d'une page
-qui la tait — relit d'abord la proposition (`GET
-/api/profile/discord/certify-prompt` → `{ prompt }`, `recheckCertifyPrompt`),
-**fermée en cas de doute** (panne : la marque reste, elle revient au chargement
-suivant) ; le morceau se charge pendant la relecture, qui peut changer le
-parcours. Affichée, elle se relit au retour d'un onglet resté caché au moins
-`RECHECK_AFTER_HIDDEN_MS` (30 s) ou rendu par le cache avant/arrière, et ne se
-ferme alors que sur une réponse **tranchée** (`{ prompt: null }`, 401) — un
-réseau pas encore revenu ne l'escamote pas. Une réponse écrite dans un autre
-onglet du navigateur (même session) la ferme sans requête (`BroadcastChannel`
-`bg:certify-prompt`, posté par `answerCertifyPrompt` sur un canal aussitôt
-refermé ; le canal d'écoute se ferme quand plus aucune proposition n'attend).
-Aucun sondage, aucune requête abandonnée qui continue (`AbortController`) ;
-une session sans marque répond au `GET` sans requête SQL.
+**Jamais sur un état périmé** (« sur aucun appareil », `/rgpd`) : une lecture
+de la proposition (mise en page, `router.refresh()` compris, ou relecture) ne
+vaut que `RECHECK_AFTER_MS` (30 s). Une ouverture plus tardive — confidentialité
+ou conditions répondues après ce délai, retour d'une page qui la tait — relit
+d'abord la proposition (`GET /api/profile/discord/certify-prompt` →
+`{ prompt }`, `recheckCertifyPrompt`), **fermée en cas de doute** (panne : la
+marque reste, elle revient au chargement suivant ou au prochain
+`router.refresh()` qui la dit due) ; le morceau se charge pendant la
+relecture, qui peut changer le parcours. Affichée, elle se relit au retour d'un
+onglet resté caché au moins aussi longtemps ou rendu par le cache
+avant/arrière, et ne se ferme alors que sur une réponse **tranchée**
+(`{ prompt: null }`, 401) — un réseau pas encore revenu ne l'escamote pas, le
+doute est retenté une fois (`online`, `focus`). Une réponse écrite dans un
+autre onglet du navigateur (même session) la ferme sans requête
+(`BroadcastChannel` `bg:certify-prompt`, posté par `answerCertifyPrompt` sur
+un canal aussitôt refermé). Répondue (ici ou ailleurs), certifiée ou révoquée,
+le relais ferme son canal d'écoute et ses écoutes de retour d'onglet. Aucun
+sondage, aucune requête abandonnée qui continue (`AbortController`) ; une
+session sans marque répond au `GET` sans requête SQL.
 
 Le contournement de développement (`DEV_AUTH_USER_ID`) n'a pas de session : la
 fenêtre ne s'y montre pas. Pour la voir en local, se connecter vraiment par

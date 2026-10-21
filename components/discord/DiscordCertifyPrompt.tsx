@@ -60,10 +60,11 @@ export type DiscordCertifyPromptViewProps = {
   /** La page affichée est `/profil` (lue par le relais) : le dialogue y est déjà. */
   onProfile: boolean;
   /**
-   * Déjà répondue sur ce chargement (« Plus tard », dialogue, « Ne plus voir ») :
-   * tenu par le relais, seul à écouter `DISCORD_CERTIFIED_EVENT` — rien à réécrire.
+   * Répondue sur ce chargement (« Plus tard », dialogue, « Ne plus voir ») :
+   * dit au relais, seul à écouter `DISCORD_CERTIFIED_EVENT` (rien à réécrire),
+   * qui ferme alors ses écoutes (canal, retour d'onglet).
    */
-  answered: { current: boolean };
+  onAnswered: () => void;
   text: CertifyPromptText;
 };
 
@@ -79,7 +80,7 @@ export type DiscordCertifyPromptViewProps = {
  * par Discord. Elle attend la confidentialité et les conditions (attentes
  * suivies par `DiscordCertifyPromptLazy`).
  */
-export function DiscordCertifyPrompt({ prompt, canOpen, onProfile, answered, text }: Readonly<DiscordCertifyPromptViewProps>) {
+export function DiscordCertifyPrompt({ prompt, canOpen, onProfile, onAnswered, text }: Readonly<DiscordCertifyPromptViewProps>) {
   const { t, rich } = text;
   const { showError, showSuccess } = useToast();
   const router = useLocaleRouter();
@@ -99,9 +100,9 @@ export function DiscordCertifyPrompt({ prompt, canOpen, onProfile, answered, tex
    */
   const closeForSession = useCallback(() => {
     setClosed(true);
-    answered.current = true;
+    onAnswered();
     answerPrompt("LATER").catch(() => undefined);
-  }, [answered]);
+  }, [onAnswered]);
 
   const open = canOpen && !closed;
 
@@ -135,9 +136,9 @@ export function DiscordCertifyPrompt({ prompt, canOpen, onProfile, answered, tex
     setBusy("never");
     try {
       await answerPrompt("NEVER");
-      answered.current = true;
       setClosed(true);
       showSuccess(t("neverSaved"));
+      onAnswered();
     } catch (error) {
       if (!closeOnDeadEnd((error as Error).message)) showError(t("neverFailed"));
     } finally {

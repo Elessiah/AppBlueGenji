@@ -34,7 +34,7 @@ describe("DiscordCertifyPrompt — rendu", () => {
   it("rien au rendu serveur (portail monté après l'hydratation), même due", () => {
     const render = (node: React.JSX.Element) => renderToStaticMarkup(<ToastProvider>{node}</ToastProvider>);
     const empty = render(<span />).replace("<span></span>", "");
-    expect(render(<DiscordCertifyPrompt prompt={{ mode: "ONE_CLICK", tag: "keryan" }} canOpen={false} onProfile={false} answered={{ current: false }} text={FR_TEXT} />)).toBe(empty);
+    expect(render(<DiscordCertifyPrompt prompt={{ mode: "ONE_CLICK", tag: "keryan" }} canOpen={false} onProfile={false} onAnswered={() => undefined} text={FR_TEXT} />)).toBe(empty);
   });
 });
 
@@ -67,7 +67,7 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
     // Les deux boutons (« Ne plus voir », « Certifier ») passent par le même garde.
     expect(SOURCE.match(/closeOnDeadEnd\(/g)).toHaveLength(2);
     // « Close pour la session » écrit une seule fois : LATER, avec keepalive.
-    expect(SOURCE).toMatch(/const closeForSession = useCallback\(\(\) => \{\s*setClosed\(true\);\s*answered\.current = true;\s*answerPrompt\("LATER"\)\.catch\(\(\) => undefined\);/);
+    expect(SOURCE).toMatch(/const closeForSession = useCallback\(\(\) => \{\s*setClosed\(true\);\s*onAnswered\(\);\s*answerPrompt\("LATER"\)\.catch\(\(\) => undefined\);/);
     expect(SOURCE.match(/answerPrompt\("LATER"\)/g)).toHaveLength(1);
   });
 
@@ -128,8 +128,8 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
     expect(SOURCE).not.toContain("addEventListener(DISCORD_CERTIFIED_EVENT");
     // Close pour la session (LATER), et seulement quand une proposition est due.
     // …et pas une seconde fois après « Plus tard », le dialogue ou « Ne plus voir ».
-    expect(LAZY).toMatch(/const onCertified = \(\) => \{\s*setCertified\(true\);\s*if \(answered\.current\) return;\s*answered\.current = true;\s*answerCertifyPrompt\("LATER"\)\.catch\(\(\) => undefined\);/);
-    expect(SOURCE).toMatch(/await answerPrompt\("NEVER"\);\s*answered\.current = true;/);
+    expect(LAZY).toMatch(/const onCertified = \(\) => \{\s*setCertified\(true\);\s*if \(answered\.current\) return;\s*markAnswered\(\);\s*answerCertifyPrompt\("LATER"\)\.catch\(\(\) => undefined\);/);
+    expect(SOURCE).toMatch(/await answerPrompt\("NEVER"\);\s*setClosed\(true\);\s*showSuccess\(t\("neverSaved"\)\);\s*onAnswered\(\);/);
     const profile = readSource("app/(secured)/profil/page.tsx");
     expect(profile).toMatch(/setDiscordState\(\(prev\) => \(\{ \.\.\.prev, tag, verified: true[^\n]*\n(?:\s*\/\/[^\n]*\n)*\s*window\.dispatchEvent\(certifiedFromProfileEvent\(\)\);/);
     // /profil ne se relit pas pour son propre événement.
@@ -147,7 +147,7 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
 
   it("ne couvre pas l'écran où un lien de la modale de confidentialité envoie agir", () => {
     expect(LAZY).toContain("if (privacyFollowedLink(event)) setFollowedLink(true);");
-    expect(LAZY).toContain("const over = certified || followedLink || revoked;");
+    expect(LAZY).toContain("const over = certified || followedLink || revoked || done;");
     expect(LAZY).toContain("if (over || !armed) return null;");
     const privacy = readSource("components/privacy/PrivacyChangesModal.tsx");
     expect(privacy).toContain("window.dispatchEvent(privacyAnsweredEvent(followedLink));");
@@ -208,26 +208,31 @@ describe("mise en page racine", () => {
     // Seule une ouverture dès le chargement se fie à la lecture de la mise en page.
     expect(LAZY).toContain("const [confirmed, setConfirmed] = useState(canOpen);");
     expect(LAZY).toContain("if (!canOpen && confirmed) setConfirmed(false);");
-    expect(LAZY).toMatch(/if \(!canOpen \|\| confirmed \|\| revoked \|\| answered\.current\) return;\s*const abort = new AbortController\(\);\s*recheckCertifyPrompt\(abort\.signal\)/);
-    expect(LAZY).toMatch(/if \(result !== "UNKNOWN" && result\.prompt\) \{\s*setCurrent\(result\.prompt\);\s*setConfirmed\(true\);\s*\} else \{\s*setRevoked\(true\);/);
+    expect(LAZY).toMatch(/if \(!canOpen \|\| confirmed \|\| over\) return;\s*if \(Date\.now\(\) - readAt\.current < RECHECK_AFTER_MS\) \{\s*setConfirmed\(true\);\s*return;\s*\}\s*const abort = new AbortController\(\);\s*recheckCertifyPrompt\(abort\.signal\)/);
+    expect(LAZY).toMatch(/if \(result !== "UNKNOWN" && result\.prompt\) \{\s*readAt\.current = Date\.now\(\);\s*setCurrent\(result\.prompt\);\s*setConfirmed\(true\);\s*\} else \{\s*setRevoked\(true\);/);
     expect(LAZY).toContain("return () => abort.abort();");
-    expect(LAZY).toContain("const shown = canOpen && confirmed && !revoked;");
+    expect(LAZY).toContain("const shown = canOpen && confirmed && !over;");
     expect(LAZY).toContain("<View prompt={current} canOpen={shown}");
     // Un nouveau parcours venu de la mise en page (router.refresh) remplace l'ancien.
-    expect(LAZY).toMatch(/if \(prompt !== layoutPrompt\) \{\s*setLayoutPrompt\(prompt\);\s*setCurrent\(prompt\);/);
+    expect(LAZY).toMatch(/if \(prompt !== layoutPrompt\) \{\s*\/\/[^\n]*\n\s*setLayoutPrompt\(prompt\);\s*setCurrent\(prompt\);\s*if \(!done\) setRevoked\(false\);/);
   });
 
   it("ouverte : relue au retour d'une absence, fermée seulement sur réponse tranchée — sans sondage", () => {
     expect(LAZY).toContain('document.addEventListener("visibilitychange", onVisibility);');
-    expect(LAZY).toContain("if (away >= RECHECK_AFTER_HIDDEN_MS) check();");
+    expect(LAZY).toContain("if (away >= RECHECK_AFTER_MS) check();");
+    // Un doute (réseau pas revenu) est retenté au retour du réseau ou du focus.
+    expect(LAZY).toContain('window.addEventListener("online", onRetry);');
+    expect(LAZY).toContain('window.addEventListener("focus", onRetry);');
     expect(LAZY).toContain("if (event.persisted) check();");
-    expect(LAZY).toMatch(/if \(request\.signal\.aborted \|\| result === "UNKNOWN" \|\| answered\.current\) return;\s*if \(result\.prompt\) setCurrent\(result\.prompt\);\s*else setRevoked\(true\);/);
+    expect(LAZY).toMatch(/if \(result === "UNKNOWN"\) \{\s*retry = true;\s*return;\s*\}\s*readAt\.current = Date\.now\(\);\s*if \(result\.prompt\) setCurrent\(result\.prompt\);\s*else setRevoked\(true\);/);
     expect(LAZY).toContain("abort?.abort();");
     expect(LAZY).not.toMatch(/setInterval|setTimeout/);
   });
 
   it("une réponse d'un autre onglet la ferme ; canal fermé une fois la proposition finie", () => {
-    expect(LAZY).toMatch(/if \(over\) return;\s*return onCertifyPromptAnsweredElsewhere\(\(\) => \{\s*answered\.current = true;\s*setRevoked\(true\);/);
+    expect(LAZY).toMatch(/if \(over\) return;\s*return onCertifyPromptAnsweredElsewhere\(markAnswered\);/);
+    // Répondue ici : `done` (état) ferme le canal et les écoutes du retour d'onglet.
+    expect(LAZY).toContain("const over = certified || followedLink || revoked || done;");
     expect(ANSWER).toContain("channel.close();");
   });
 

@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useRef, useState, type ComponentType } from "react";
+import { useCallback, useEffect, useRef, useState, type ComponentType } from "react";
 import { useLocalePathname } from "@/components/i18n/locale-navigation";
 import { certifyPromptOpen } from "@/lib/shared/global-modals";
 import { DISCORD_CERTIFIED_EVENT } from "@/lib/shared/discord-certify-events";
@@ -51,11 +51,12 @@ const DiscordCertifyPromptEn = dynamic(
 );
 
 /**
- * Absence d'onglet en deçà de laquelle une fenêtre affichée n'est pas relue au
- * retour : un aller-retour bref (vers le jeu, une autre fenêtre) ne coûte
- * aucune requête, et un choix fait dans ce navigateur arrive déjà par le canal.
+ * Âge en deçà duquel une lecture de la proposition vaut encore : une
+ * ouverture qui suit de près le chargement (confidentialité acceptée dans la
+ * foulée) ou un aller-retour bref de l'onglet (vers le jeu) ne coûte aucune
+ * requête — un choix fait dans ce navigateur arrive déjà par le canal.
  */
-export const RECHECK_AFTER_HIDDEN_MS = 30_000;
+export const RECHECK_AFTER_MS = 30_000;
 
 /**
  * « Certifier ton tag Discord ? », montée par la mise en page racine pour tout
@@ -71,14 +72,14 @@ export const RECHECK_AFTER_HIDDEN_MS = 30_000;
  * elle peut s'ouvrir (`canOpen`). Montée par la mise en page seulement quand
  * une proposition est due : une proposition qui réapparaît la remonte, neuve.
  *
- * **Jamais sur un état périmé** : la lecture de la mise en page ne vaut que
- * pour une fenêtre qui s'ouvre dès le chargement. Toute autre ouverture
- * (après la confidentialité ou les conditions, au retour d'une page qui la
- * tait) relit d'abord la proposition (`recheckCertifyPrompt`, fermée en cas de
- * doute ; le morceau se charge pendant ce temps) ; ouverte, elle se relit
- * quand l'onglet redevient visible après une absence (`RECHECK_AFTER_HIDDEN_MS`)
- * et ne se ferme alors que sur une réponse tranchée ; une réponse donnée dans
- * un autre onglet la ferme (`BroadcastChannel`). Un « Ne
+ * **Jamais sur un état périmé** : une lecture (mise en page, relecture) ne
+ * vaut que `RECHECK_AFTER_MS`. Une ouverture plus tardive (après la
+ * confidentialité ou les conditions, au retour d'une page qui la tait) relit
+ * d'abord la proposition (`recheckCertifyPrompt`, fermée en cas de doute ; le
+ * morceau se charge pendant ce temps) ; ouverte, elle se relit quand l'onglet
+ * redevient visible après une absence aussi longue, et ne se ferme alors que
+ * sur une réponse tranchée (un doute est retenté au retour du réseau ou du
+ * focus) ; une réponse donnée dans un autre onglet la ferme (`BroadcastChannel`). Un « Ne
  * plus voir » ou une certification faits sur un autre appareil ne la rouvrent
  * donc nulle part. Aucune requête tant qu'elle n'a pas à s'ouvrir.
  */
@@ -90,15 +91,21 @@ export function DiscordCertifyPromptLazy({ prompt, privacyPending, termsPending 
   const [armed, setArmed] = useState(false);
   /** Parcours offert : celui de la mise en page (relu à chaque rendu serveur), puis celui de la dernière relecture. */
   const [current, setCurrent] = useState(prompt);
+  /** Plus due (relecture, ou réponse donnée dans un autre onglet) : rien ne s'ouvre plus. */
+  const [revoked, setRevoked] = useState(false);
+  /** Répondue sur ce chargement, ici ou dans un autre onglet : plus rien à suivre. */
+  const [done, setDone] = useState(false);
+  /** Même fait, lu sans attendre un rendu : un seul `LATER`. */
+  const answered = useRef(false);
+  /** Instant de la dernière lecture de la proposition (mise en page, relecture). */
+  const readAt = useRef(0);
   const [layoutPrompt, setLayoutPrompt] = useState(prompt);
   if (prompt !== layoutPrompt) {
+    // Relue par la mise en page (`router.refresh()`) : encore due, fraîchement.
     setLayoutPrompt(prompt);
     setCurrent(prompt);
+    if (!done) setRevoked(false);
   }
-  /** Plus due (relecture, ou réponse donnée dans un autre onglet) : rien ne s'ouvre plus sur ce chargement. */
-  const [revoked, setRevoked] = useState(false);
-  /** Déjà répondue sur ce chargement (fenêtre ou certification) : un seul `LATER`. */
-  const answered = useRef(false);
   const { locale, path: pathname } = useLocalePathname();
 
   const canOpen =
@@ -114,10 +121,20 @@ export function DiscordCertifyPromptLazy({ prompt, privacyPending, termsPending 
    * La proposition est-elle confirmée pour l'ouverture en cours ? D'emblée
    * pour une fenêtre qui s'ouvre au chargement (lecture de la mise en page,
    * fraîche) ; perdu dès qu'elle ne peut plus s'ouvrir, et regagné par une
-   * relecture.
+   * lecture de moins de `RECHECK_AFTER_MS`.
    */
   const [confirmed, setConfirmed] = useState(canOpen);
   if (!canOpen && confirmed) setConfirmed(false);
+
+  const markAnswered = useCallback(() => {
+    answered.current = true;
+    setDone(true);
+  }, []);
+
+  // Chaque proposition reçue de la mise en page est une lecture fraîche.
+  useEffect(() => {
+    readAt.current = Date.now();
+  }, [prompt]);
 
   useEffect(() => {
     const onPrivacy = (event: Event) => {
@@ -132,7 +149,7 @@ export function DiscordCertifyPromptLazy({ prompt, privacyPending, termsPending 
     const onCertified = () => {
       setCertified(true);
       if (answered.current) return;
-      answered.current = true;
+      markAnswered();
       answerCertifyPrompt("LATER").catch(() => undefined);
     };
     window.addEventListener(PRIVACY_CHANGES_ANSWERED_EVENT, onPrivacy);
@@ -145,25 +162,28 @@ export function DiscordCertifyPromptLazy({ prompt, privacyPending, termsPending 
       window.removeEventListener(TERMS_REQUIRED_EVENT, onTermsRequired);
       window.removeEventListener(DISCORD_CERTIFIED_EVENT, onCertified);
     };
-  }, []);
+  }, [markAnswered]);
 
-  const over = certified || followedLink || revoked;
+  const over = certified || followedLink || revoked || done;
   // Canal ouvert tant que la proposition peut encore s'afficher ici, fermé ensuite.
   useEffect(() => {
     if (over) return;
-    return onCertifyPromptAnsweredElsewhere(() => {
-      answered.current = true;
-      setRevoked(true);
-    });
-  }, [over]);
+    return onCertifyPromptAnsweredElsewhere(markAnswered);
+  }, [over, markAnswered]);
 
-  // Ouverture plus tard que le chargement : relire avant, fermée en cas de doute.
+  // Ouverture plus tardive : une lecture fraîche suffit, sinon relire avant,
+  // fermée en cas de doute.
   useEffect(() => {
-    if (!canOpen || confirmed || revoked || answered.current) return;
+    if (!canOpen || confirmed || over) return;
+    if (Date.now() - readAt.current < RECHECK_AFTER_MS) {
+      setConfirmed(true);
+      return;
+    }
     const abort = new AbortController();
     recheckCertifyPrompt(abort.signal).then((result) => {
       if (abort.signal.aborted) return;
       if (result !== "UNKNOWN" && result.prompt) {
+        readAt.current = Date.now();
         setCurrent(result.prompt);
         setConfirmed(true);
       } else {
@@ -171,30 +191,41 @@ export function DiscordCertifyPromptLazy({ prompt, privacyPending, termsPending 
       }
     });
     return () => abort.abort();
-  }, [canOpen, confirmed, revoked]);
+  }, [canOpen, confirmed, over]);
 
-  const shown = canOpen && confirmed && !revoked;
+  const shown = canOpen && confirmed && !over;
   // Affichée dans un onglet laissé un moment en arrière-plan (ou rendue par le
   // cache avant/arrière) : relue au retour, que le choix fait ailleurs
   // entre-temps la ferme. Seule une réponse tranchée la ferme : un réseau pas
-  // encore revenu (téléphone déverrouillé) ne l'escamote pas sous les yeux.
+  // encore revenu (téléphone déverrouillé) ne l'escamote pas sous les yeux, et
+  // ce doute est retenté une fois, au retour du réseau ou du focus.
   useEffect(() => {
     if (!shown) return;
     let abort: AbortController | null = null;
+    let retry = false;
     let hiddenAt = document.visibilityState === "hidden" ? Date.now() : null;
     const check = () => {
       if (abort || answered.current) return;
+      retry = false;
       const request = new AbortController();
       abort = request;
       recheckCertifyPrompt(request.signal)
         .then((result) => {
-          if (request.signal.aborted || result === "UNKNOWN" || answered.current) return;
+          if (request.signal.aborted || answered.current) return;
+          if (result === "UNKNOWN") {
+            retry = true;
+            return;
+          }
+          readAt.current = Date.now();
           if (result.prompt) setCurrent(result.prompt);
           else setRevoked(true);
         })
         .finally(() => {
           if (abort === request) abort = null;
         });
+    };
+    const onRetry = () => {
+      if (retry) check();
     };
     const onVisibility = () => {
       if (document.visibilityState === "hidden") {
@@ -203,16 +234,21 @@ export function DiscordCertifyPromptLazy({ prompt, privacyPending, termsPending 
       }
       const away = hiddenAt === null ? 0 : Date.now() - hiddenAt;
       hiddenAt = null;
-      if (away >= RECHECK_AFTER_HIDDEN_MS) check();
+      if (away >= RECHECK_AFTER_MS) check();
+      else onRetry();
     };
     const onPageShow = (event: PageTransitionEvent) => {
       if (event.persisted) check();
     };
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pageshow", onPageShow);
+    window.addEventListener("online", onRetry);
+    window.addEventListener("focus", onRetry);
     return () => {
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pageshow", onPageShow);
+      window.removeEventListener("online", onRetry);
+      window.removeEventListener("focus", onRetry);
       abort?.abort();
     };
   }, [shown]);
@@ -223,5 +259,5 @@ export function DiscordCertifyPromptLazy({ prompt, privacyPending, termsPending 
 
   if (over || !armed) return null;
   const View = locale === "en" ? DiscordCertifyPromptEn : DiscordCertifyPromptFr;
-  return <View prompt={current} canOpen={shown} onProfile={pathname === "/profil"} answered={answered} />;
+  return <View prompt={current} canOpen={shown} onProfile={pathname === "/profil"} onAnswered={markAnswered} />;
 }
