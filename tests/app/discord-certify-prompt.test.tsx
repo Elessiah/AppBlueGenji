@@ -62,12 +62,16 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
     // Les deux boutons (« Ne plus voir », « Certifier ») passent par le même garde.
     expect(SOURCE.match(/closeOnDeadEnd\(/g)).toHaveLength(2);
     // « Close pour la session » écrit une seule fois : LATER, avec keepalive.
-    expect(SOURCE).toMatch(/const closeForSession = useCallback\(\(\) => \{\s*setClosed\(true\);\s*answerPrompt\("LATER"\)\.catch\(\(\) => undefined\);/);
+    expect(SOURCE).toMatch(/const closeForSession = useCallback\(\(\) => \{\s*setClosed\(true\);\s*answered\.current = true;\s*answerPrompt\("LATER"\)\.catch\(\(\) => undefined\);/);
     expect(SOURCE.match(/answerPrompt\("LATER"\)/g)).toHaveLength(1);
   });
 
-  it("focus d'ouverture sur « Plus tard », flèche décorative hors du nom accessible", () => {
-    expect(SOURCE).toMatch(/onClick=\{postpone\} data-autofocus>/);
+  it("focus d'ouverture sur la fenêtre (titre en vue, Entrée inerte), flèche décorative hors du nom accessible", () => {
+    expect(SOURCE).not.toContain("data-autofocus");
+    expect(SOURCE).toMatch(/dialog\?\.focus\(\{ preventScroll: true \}\);\s*if \(dialog\) dialog\.scrollTop = 0;/);
+    // Joué après celui du hook : déclaré après lui.
+    expect(SOURCE.indexOf("dialog?.focus({ preventScroll: true })")).toBeGreaterThan(SOURCE.indexOf("useDialogBehavior({ open"));
+    expect(SOURCE).toContain("tabIndex={-1}");
     expect(SOURCE).toContain('<span aria-hidden="true"> →</span>');
     const css = readSource("components/discord/DiscordCertifyPrompt.module.css");
     expect(css).not.toMatch(/grid-row:/);
@@ -105,14 +109,16 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
 
   it("« Plus tard » survit à un départ de page (keepalive) ; un changement de parcours ne rouvre rien", () => {
     expect(SOURCE).toMatch(/body: JSON\.stringify\(\{ action \}\),[\s\S]*?keepalive: true,/);
-    expect(SOURCE).toMatch(/const due = prompt !== null;\s*useEffect\(\(\) => \{\s*if \(due\) setClosed\(false\);\s*\}, \[due\]\);/);
+    expect(SOURCE).toMatch(/useEffect\(\(\) => \{\s*if \(!due\) return;\s*setClosed\(false\);\s*answered\.current = false;\s*\}, \[due\]\);/);
     expect(SOURCE).not.toContain("[prompt?.mode]");
   });
 
   it("certifié depuis le dialogue de /profil : la fenêtre encore en attente se ferme", () => {
     expect(SOURCE).toContain("window.addEventListener(DISCORD_CERTIFIED_EVENT, onCertified)");
     // Close pour la session (LATER), et seulement quand une proposition est due.
-    expect(SOURCE).toMatch(/const onCertified = \(\) => \{\s*if \(dueRef\.current\) closeForSession\(\);\s*\};/);
+    // …et pas une seconde fois après « Plus tard », le dialogue ou « Ne plus voir ».
+    expect(SOURCE).toMatch(/const onCertified = \(\) => \{\s*if \(dueRef\.current && !answered\.current\) closeForSession\(\);\s*\};/);
+    expect(SOURCE).toMatch(/await answerPrompt\("NEVER"\);\s*answered\.current = true;/);
     const profile = readSource("app/(secured)/profil/page.tsx");
     expect(profile).toMatch(/setDiscordState\(\(prev\) => \(\{ \.\.\.prev, tag, verified: true[^\n]*\n(?:\s*\/\/[^\n]*\n)*\s*window\.dispatchEvent\(certifiedFromProfileEvent\(\)\);/);
     // /profil ne se relit pas pour son propre événement.

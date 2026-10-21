@@ -98,8 +98,12 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
   // code) rouvre la fenêtre ; un simple changement de parcours (tag modifié sur
   // `/profil`) ne rouvre pas une fenêtre déjà écartée.
   const due = prompt !== null;
+  /** Déjà répondue sur ce chargement (« Plus tard », dialogue, « Ne plus voir ») : rien à réécrire. */
+  const answered = useRef(false);
   useEffect(() => {
-    if (due) setClosed(false);
+    if (!due) return;
+    setClosed(false);
+    answered.current = false;
   }, [due]);
   const dueRef = useRef(due);
   dueRef.current = due;
@@ -110,6 +114,7 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
    */
   const closeForSession = useCallback(() => {
     setClosed(true);
+    answered.current = true;
     answerPrompt("LATER").catch(() => undefined);
   }, []);
   useEffect(() => setPrivacyAnswered(!privacyPending), [privacyPending]);
@@ -127,7 +132,7 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
     // Certifié — ici d'un clic, ou par le dialogue de `/profil` : close pour
     // la session, qu'un tag changé ensuite ne la fasse pas revenir.
     const onCertified = () => {
-      if (dueRef.current) closeForSession();
+      if (dueRef.current && !answered.current) closeForSession();
     };
     window.addEventListener(DISCORD_CERTIFIED_EVENT, onCertified);
     window.addEventListener(PRIVACY_CHANGES_ANSWERED_EVENT, onPrivacy);
@@ -158,6 +163,16 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
   };
 
   const dialogRef = useDialogBehavior({ open, onClose: postpone, locked: busy !== null });
+  // Focus d'ouverture sur la fenêtre elle-même (déclaré après le hook, donc
+  // joué après lui) : son nom (le titre) est annoncé, Entrée n'y certifie ni
+  // ne ferme rien, et à fort zoom, quand la fenêtre défile en entier, elle
+  // s'ouvre en haut — titre en vue — au lieu de défiler jusqu'aux boutons.
+  useEffect(() => {
+    if (!open) return;
+    const dialog = dialogRef.current;
+    dialog?.focus({ preventScroll: true });
+    if (dialog) dialog.scrollTop = 0;
+  }, [open, dialogRef]);
   const backdrop = useBackdropDismiss(postpone, busy !== null);
 
   if (!open || !prompt) return null;
@@ -178,6 +193,7 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
     setBusy("never");
     try {
       await answerPrompt("NEVER");
+      answered.current = true;
       setClosed(true);
       showSuccess(t("certifyPrompt.neverSaved"));
     } catch (error) {
@@ -297,8 +313,7 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
           >
             {busy === "never" ? t("certifyPrompt.neverSaving") : t("certifyPrompt.never")}
           </CyberButton>
-          {/* Focus d'ouverture sur le geste sans effet : Entrée ne certifie ni ne ferme pour de bon. */}
-          <CyberButton variant="ghost" type="button" aria-disabled={busy !== null || undefined} onClick={postpone} data-autofocus>
+          <CyberButton variant="ghost" type="button" aria-disabled={busy !== null || undefined} onClick={postpone}>
             {t("certifyPrompt.postpone")}
           </CyberButton>
           <CyberButton
