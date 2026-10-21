@@ -209,7 +209,6 @@ function EnduranceHistory({
                 teamId={standing.teamId}
                 name={standing.teamName}
                 title={standing.teamName}
-                truncate
                 className={styles.historyTeam}
               />
               {standing.rounds.map((cell) => (
