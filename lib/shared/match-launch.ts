@@ -520,14 +520,16 @@ export function casterContactsPending(launch: {
 /**
  * Annoncer l'arrivée des contacts du caster ? Seulement quand ils attendaient
  * (`wasPending`, `casterContactsPending`) et que le serveur les montre désormais
- * — la relecture à l'heure de départ —, jamais à l'ouverture, et pas s'il n'a
- * aucun contact à montrer (deux « — » ne sont pas une arrivée).
+ * — la relecture à l'heure de départ —, jamais à l'ouverture. Sans contact à
+ * montrer, l'annonce le dit (`casterHasContacts`) plutôt que de se taire.
  */
-export function casterContactsArrived(
-  wasPending: boolean,
-  caster: Pick<LaunchCaster, "contactsShown" | "discordTag" | "battletag">,
-): boolean {
-  return wasPending && caster.contactsShown && (caster.discordTag !== null || caster.battletag !== null);
+export function casterContactsArrived(wasPending: boolean, caster: Pick<LaunchCaster, "contactsShown">): boolean {
+  return wasPending && caster.contactsShown;
+}
+
+/** Le caster a-t-il au moins un contact à montrer (tag Discord ou BattleTag) ? */
+export function casterHasContacts(caster: Pick<LaunchCaster, "discordTag" | "battletag">): boolean {
+  return caster.discordTag !== null || caster.battletag !== null;
 }
 
 /**

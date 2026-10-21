@@ -14,6 +14,7 @@ import { useLaunchText } from "./launch-text";
 import {
   casterContactsArrived,
   casterContactsPending,
+  casterHasContacts,
   type LaunchCaster,
   type LaunchContact,
   type LaunchSide,
@@ -115,6 +116,7 @@ export function SideCard({
   onCopy,
   linkNames = false,
   viewer,
+  laterText,
 }: Readonly<{
   side: LaunchSide;
   isHost: boolean;
@@ -126,6 +128,11 @@ export function SideCard({
    * ouvre rien avant le départ.
    */
   viewer: Pick<MatchLaunchInfo["viewer"], "role">;
+  /**
+   * Note des contacts tus ; par défaut, celle de la modale de lancement, qui
+   * renvoie à l'action « Contacts » — la modale « Contacts » passe la sienne.
+   */
+  laterText?: string;
   /**
    * Noms cliquables vers leurs fiches — modale « Contacts » seulement : la
    * modale de lancement survit à la navigation et recouvrirait la fiche ouverte.
@@ -154,7 +161,15 @@ export function SideCard({
           <span aria-hidden="true">🏠</span> {t("host")}
         </p>
       )}
-      <SideContacts side={side} onCopy={onCopy} linkNames={linkNames} forCaster={viewer.role === "CASTER"} />
+      <SideContacts
+        side={side}
+        onCopy={onCopy}
+        linkNames={linkNames}
+        // Le rôle, pas `viewerIsCaster` : un joueur qui caste lit en joueur, et
+        // l'action « Contacts » lui ouvre bien les contacts avant le départ.
+        forCaster={viewer.role === "CASTER"}
+        laterText={laterText}
+      />
     </section>
   );
 }
@@ -175,16 +190,18 @@ function SideContacts({
   onCopy,
   linkNames,
   forCaster,
+  laterText,
 }: Readonly<{
   side: LaunchSide;
   onCopy: CopyFn;
   linkNames: boolean;
   forCaster: boolean;
+  laterText: string | undefined;
 }>) {
   const { t } = useLaunchText();
   if (side.isGhost) return <p className={styles.note}>{t("ghost")}</p>;
   if (!side.contactsShown) {
-    return <p className={styles.note}>{t(forCaster ? "contactsAtLaunchCaster" : "contactsAtLaunch")}</p>;
+    return <p className={styles.note}>{laterText ?? t(forCaster ? "contactsAtLaunchCaster" : "contactsAtLaunch")}</p>;
   }
   if (side.contacts.length === 0) return <p className={styles.note}>{t("noContact")}</p>;
   return (
@@ -258,6 +275,8 @@ export function CasterCard({
   const { t } = useLaunchText();
   const pending = casterContactsPending({ caster, viewer });
   const arrived = useCasterArrival(caster, pending, announceArrival);
+  const hasContacts = caster !== null && casterHasContacts(caster);
+  const arrivalText = hasContacts ? t("contacts.casterShown") : t("noContact");
   if (!caster) {
     return (
       <section className={styles.caster} aria-label={t("caster")}>
@@ -279,7 +298,9 @@ export function CasterCard({
         </span>
         <ReadyChip ready={caster.ready} phase={phase} />
       </div>
-      {caster.contactsShown && (
+      {/* Ouverts mais vides : la phrase des engagées sans contact, pas deux « — ». */}
+      {caster.contactsShown && !hasContacts && <p className={styles.note}>{t("noContact")}</p>}
+      {caster.contactsShown && hasContacts && (
         <div className={styles.casterIds}>
           <IdentityLine kind="Discord" value={caster.discordTag} verified={caster.discordTag !== null} onCopy={onCopy} />
           <IdentityLine kind="BattleTag" value={caster.battletag} verified={caster.battletagVerified} onCopy={onCopy} />
@@ -288,12 +309,12 @@ export function CasterCard({
       {/* Contacts tus : une note plutôt que deux « — » qui laisseraient croire
           qu'il n'en a pas — jamais au caster lui-même, dont elle parle. */}
       {pending && <p className={styles.note}>{laterText ?? t("casterAtLaunch")}</p>}
-      {/* Statut hors flux, présent dès l'ouverture là où il peut parler : la
-          phrase plutôt que les boutons « Copier » ; muet si le caster n'a aucun
-          contact à montrer. */}
+      {/* Statut hors flux, présent dès l'ouverture là où il peut parler : une
+          phrase plutôt que les boutons « Copier » — ou, sans contact, celle qui
+          le dit. */}
       {announceArrival && (
         <output className="sr-only" aria-live="polite">
-          {arrived ? t("contacts.casterShown") : ""}
+          {arrived ? arrivalText : ""}
         </output>
       )}
     </section>

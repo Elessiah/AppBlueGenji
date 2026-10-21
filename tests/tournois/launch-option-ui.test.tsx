@@ -251,6 +251,12 @@ describe("fiches de contact — noms cliquables", () => {
     );
     expect(forCaster).toContain("Les contacts s&#x27;affichent au lancement.</p>");
     expect(forCaster).not.toContain("« Contacts »");
+    // La modale « Contacts » passe sa note : jamais un renvoi à elle-même.
+    const inDialog = renderToStaticMarkup(
+      <SideCard side={closed} isHost={false} phase="SCHEDULED" onCopy={noop} viewer={{ role: "TEAM1" }} laterText="Contacts non affichés." />,
+    );
+    expect(inDialog).toContain("Contacts non affichés.");
+    expect(inDialog).not.toContain("« Contacts »");
   });
 
   it("entrée solo → le profil du joueur, jamais une fiche d'équipe", () => {
@@ -264,7 +270,6 @@ describe("fiches de contact — noms cliquables", () => {
     );
     expect(hidden).not.toContain("href=");
   });
-
 
   it("caster → son profil", () => {
     const html = renderToStaticMarkup(
@@ -328,8 +333,20 @@ describe("fiches de contact — noms cliquables", () => {
       expect(casterContactsArrived(true, shown)).toBe(true);
       expect(casterContactsArrived(false, shown)).toBe(false);
       expect(casterContactsArrived(true, { ...caster, contactsShown: false })).toBe(false);
-      // Deux « — » ne sont pas une arrivée.
-      expect(casterContactsArrived(true, { ...shown, discordTag: null, battletag: null })).toBe(false);
+    });
+
+    // Ouverts mais vides : la phrase des engagées sans contact, jamais deux « — ».
+    it("contacts ouverts mais vides → « Aucun contact disponible. »", () => {
+      const html = renderToStaticMarkup(
+        <CasterCard
+          caster={{ ...caster, discordTag: null, battletag: null, contactsShown: true }}
+          phase="LOBBY"
+          onCopy={noop}
+          viewer={TEAM_VIEWER}
+        />,
+      );
+      expect(html).toContain("Aucun contact disponible.");
+      expect(html).not.toContain("BattleTag");
     });
 
     it("le caster lui-même avant le départ → ni contacts ni note sur sa propre fiche", () => {

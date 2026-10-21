@@ -63,7 +63,6 @@ export function contactsRetryDelay(startAt: string | null, serverDate: string | 
   return delay <= CONTACTS_RETRY_MAX_WAIT_MS ? delay : null;
 }
 
-
 /** Relectures supplémentaires d'une relecture qui échoue (réseau, 5xx, 429). */
 export const REREAD_RETRIES = 3;
 
@@ -400,6 +399,8 @@ export function MatchContactsDialog({
                     phase={launch.phase}
                     onCopy={copy}
                     viewer={launch.viewer}
+                    // Jamais un renvoi à cette modale-ci.
+                    laterText={t("contacts.notShown")}
                     linkNames
                   />
                   <div className={launchStyles.divider} aria-hidden="true">
@@ -411,6 +412,8 @@ export function MatchContactsDialog({
                     phase={launch.phase}
                     onCopy={copy}
                     viewer={launch.viewer}
+                    // Jamais un renvoi à cette modale-ci.
+                    laterText={t("contacts.notShown")}
                     linkNames
                   />
                 </div>
