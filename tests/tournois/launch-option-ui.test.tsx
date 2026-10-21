@@ -347,6 +347,16 @@ describe("fiches de contact — noms cliquables", () => {
       );
       expect(html).toContain("Aucun contact disponible.");
       expect(html).not.toContain("BattleTag");
+      // Pas au caster lui-même, sous son propre nom.
+      const own = renderToStaticMarkup(
+        <CasterCard
+          caster={{ ...caster, discordTag: null, battletag: null, contactsShown: true }}
+          phase="LOBBY"
+          onCopy={noop}
+          viewer={{ role: "CASTER", isCaster: true }}
+        />,
+      );
+      expect(own).not.toContain("Aucun contact disponible.");
     });
 
     it("le caster lui-même avant le départ → ni contacts ni note sur sa propre fiche", () => {

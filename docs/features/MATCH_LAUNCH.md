@@ -128,7 +128,8 @@ modale « Contacts » (seule, `announceArrival`) l'annonce par une phrase courte
 dans une région polie hors flux (`contacts.casterShown`, `<output>` `sr-only`) —
 pas les boutons « Copier ». L'annonce ne vient qu'au passage « en attente →
 montrés » d'un même caster (`casterContactsArrived`) — sans contact, elle le dit
-(`noContact`, plutôt que deux « — » à l'écran aussi) —,
+(`contacts.casterShownEmpty` ; à l'écran, `noContact` plutôt que deux « — »,
+sauf au caster lui-même) —,
 jamais à l'ouverture, et se vide après dix secondes. La modale de lancement
 s'en passe : ce passage y coïncide avec son propre statut, déjà annoncé.
 Déclaré : `PRIVACY_CHANGES` `2026-10-contacts-du-caster-aux-arbitres`, `/rgpd`,

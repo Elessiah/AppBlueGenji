@@ -399,7 +399,8 @@ export function MatchContactsDialog({
                     phase={launch.phase}
                     onCopy={copy}
                     viewer={launch.viewer}
-                    // Jamais un renvoi à cette modale-ci.
+                    // Défensif : la route ne rend que des matchs aux contacts
+                    // ouverts ; si cela changeait, jamais un renvoi à cette modale-ci.
                     laterText={t("contacts.notShown")}
                     linkNames
                   />
@@ -412,7 +413,8 @@ export function MatchContactsDialog({
                     phase={launch.phase}
                     onCopy={copy}
                     viewer={launch.viewer}
-                    // Jamais un renvoi à cette modale-ci.
+                    // Défensif : la route ne rend que des matchs aux contacts
+                    // ouverts ; si cela changeait, jamais un renvoi à cette modale-ci.
                     laterText={t("contacts.notShown")}
                     linkNames
                   />

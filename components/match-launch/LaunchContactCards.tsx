@@ -15,6 +15,7 @@ import {
   casterContactsArrived,
   casterContactsPending,
   casterHasContacts,
+  viewerIsCaster,
   type LaunchCaster,
   type LaunchContact,
   type LaunchSide,
@@ -276,7 +277,8 @@ export function CasterCard({
   const pending = casterContactsPending({ caster, viewer });
   const arrived = useCasterArrival(caster, pending, announceArrival);
   const hasContacts = caster !== null && casterHasContacts(caster);
-  const arrivalText = hasContacts ? t("contacts.casterShown") : t("noContact");
+  const arrivalText = hasContacts ? t("contacts.casterShown") : t("contacts.casterShownEmpty");
+  const self = viewerIsCaster({ viewer });
   if (!caster) {
     return (
       <section className={styles.caster} aria-label={t("caster")}>
@@ -298,8 +300,9 @@ export function CasterCard({
         </span>
         <ReadyChip ready={caster.ready} phase={phase} />
       </div>
-      {/* Ouverts mais vides : la phrase des engagées sans contact, pas deux « — ». */}
-      {caster.contactsShown && !hasContacts && <p className={styles.note}>{t("noContact")}</p>}
+      {/* Ouverts mais vides : la phrase des engagées sans contact, pas deux
+          « — » — sauf au caster lui-même, sa propre fiche n'a rien à lui dire. */}
+      {caster.contactsShown && !hasContacts && !self && <p className={styles.note}>{t("noContact")}</p>}
       {caster.contactsShown && hasContacts && (
         <div className={styles.casterIds}>
           <IdentityLine kind="Discord" value={caster.discordTag} verified={caster.discordTag !== null} onCopy={onCopy} />
