@@ -406,7 +406,9 @@ describe("listViewerMatchLaunches — exposition des contacts", () => {
     state.candidates = [candidate({ team2_is_ghost: 1 })];
     state.members = [member(TEAM2, 5, { discord_pseudo: "own", discord_verified_at: OPENED })];
     const [info] = await listViewerMatchLaunches(viewer);
-    expect(info.team2).toMatchObject({ isGhost: true, ready: true, contacts: [] });
+    expect(info.team2).toMatchObject({ isGhost: true, ready: true, contacts: [], contactsShown: false });
+    // L'autre engagée, elle, a ses contacts ouverts : le drapeau est par fiche.
+    expect(info.team1.contactsShown).toBe(true);
   });
 
   // AUTHORIZATION_RULES §2.3 : le caster inscrit est une partie du match —

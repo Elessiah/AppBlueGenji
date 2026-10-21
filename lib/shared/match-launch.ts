@@ -423,8 +423,9 @@ export type LaunchSide = {
    */
   contacts: LaunchContact[];
   /**
-   * Le serveur ouvre-t-il les contacts des engagées à ce lecteur (`exposes`) ?
-   * La fiche lit cette décision : faux, une note dit quand ils viendront.
+   * Le serveur ouvre-t-il les contacts de cette engagée à ce lecteur
+   * (`exposes`) ? Toujours faux pour une fantôme, qui n'en a jamais. La fiche
+   * lit cette décision : faux, une note dit quand ils viendront.
    */
   contactsShown: boolean;
 };

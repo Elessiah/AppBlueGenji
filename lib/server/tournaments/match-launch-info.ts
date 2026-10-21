@@ -484,7 +484,7 @@ function buildLaunchSide(row: CandidateRow, index: 1 | 2, ctx: LaunchContext): L
     isSolo: side.soloUserId !== null,
     ready: index === 1 ? ctx.readiness.team1Ready : ctx.readiness.team2Ready,
     contacts,
-    contactsShown: ctx.exposes,
+    contactsShown: ctx.exposes && !side.isGhost,
   };
 }
 
@@ -650,9 +650,11 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
           castRevoked,
           readiness: rowReadiness(row),
           exposes,
-          // Une seule décision pour les contacts du caster : sa règle, sous
-          // celle du match (`exposes`) — aujourd'hui toujours vraie quand la
-          // première l'est, gardée en filet : jamais le caster sans le match.
+          // Une seule décision pour les contacts du caster : sa règle, plus
+          // stricte que celle du match — c'est elle, et elle seule, qui les
+          // tait aux équipes avant le match (`exposes` y est déjà vrai). Quand
+          // elle est vraie, `exposes` l'est aussi ; le `exposes &&` n'est
+          // qu'un filet : jamais le caster sans le match.
           exposesCaster: exposes && exposesCasterContacts(phase, party.role),
         }),
       );
