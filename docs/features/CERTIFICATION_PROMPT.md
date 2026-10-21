@@ -91,10 +91,13 @@ contacts présentés aux deux équipes, au caster, aux arbitres et administrateu
 du site dès que les deux adversaires sont connus (T04, bouton « Contacts ») —
 le BattleTag d'un contact, vérifié ou non, sort même masqué, **quel que soit le
 jeu** (Marvel Rivals compris), la certification ne faisant que passer devant —,
-messages privés de match du bot (tag certifié seulement, coupables), portées OAuth
+messages privés du bot (match — coupables —, adhésion, modération, données ;
+tag certifié), portées OAuth
 (`OAUTH_PROVIDERS.md` : `identify`, `openid`), retrait (retirer son tag
-Discord retire sa certification ; détacher Battle.net retire la vérification,
-le BattleTag reste), conditions d'inscription
+Discord retire sa certification ; le code en message privé rattache Discord, qui
+se détache à part ; détacher Battle.net retire la vérification, le BattleTag
+reste), chapeau sans promesse d'être contact (« tu peux être présenté », dès que
+les adversaires sont connus), conditions d'inscription
 (`REGISTRATION_FILTERS.md`). Une règle qui change ces faits relit le tableau
 (`messages/*/tournamentDialogs.json`, clé `certification`).
 

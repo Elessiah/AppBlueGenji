@@ -120,15 +120,17 @@ describe("CertificationPromptDialog", () => {
 
   it("dit tout ce que la certification ouvre : messages privés du bot, arbitres du site, BattleTag dès les adversaires connus", () => {
     for (const html of [render(OW_MANAGER), render(MR_TEAM)]) {
-      expect(html).toContain("le bot t&#x27;envoie en message privé l&#x27;horaire de tes matchs");
+      expect(html).toContain("le bot peut t&#x27;écrire en message privé : horaire et rappels de tes matchs, demandes d&#x27;adhésion");
       expect(html).toContain("aux arbitres et aux administrateurs du site");
       expect(html).toContain("dès que les deux adversaires du match sont connus et jusqu&#x27;à sa fin");
       expect(html).toContain("retirer ton tag Discord de ton profil retire sa certification");
-      expect(html).not.toContain("tant qu&#x27;il te reste une autre façon de te connecter");
+      // Certifier par code rattache Discord : la modale dit comment le détacher.
+      expect(html).toContain("se détache depuis « Applications connectées »");
     }
+    expect(render(OW_MANAGER)).toContain("tu peux être présenté comme son contact à l&#x27;adversaire, au caster et à l&#x27;arbitrage, dès que vos adversaires sont connus");
     expect(render(OW_MANAGER)).toContain("Certifié ou non, présenté comme contact, ton BattleTag est montré même masqué");
     const en = render(MR_TEAM, "en");
-    expect(en).toContain("the bot sends you your match times");
+    expect(en).toContain("the bot may write to you by direct message: your match times");
     expect(en).toContain("If your profile holds a BattleTag");
   });
 

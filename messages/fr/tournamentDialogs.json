@@ -360,9 +360,9 @@
     "title": "Certifie ton Discord et ton BattleTag",
     "titleDiscordOnly": "Certifie ton Discord",
     "titleBattletagOnly": "Certifie ton BattleTag",
-    "leadManager": "Tu mènes une équipe engagée dans ce tournoi : au lancement d'un match, tu fais partie de ceux que l'adversaire, le caster et l'arbitrage chercheront à joindre. Certifie ce qui te manque encore.",
-    "leadTeam": "Ton équipe n'a aucun contact vérifié à présenter au lancement de ses matchs : personne n'y a certifié son tag Discord ni son BattleTag. L'adversaire et l'arbitrage n'ont aucun moyen sûr de vous joindre.",
-    "leadTeamDiscordOnly": "Ton équipe n'a personne à présenter sur Discord au lancement de ses matchs : personne n'y a certifié son tag Discord. L'adversaire et l'arbitrage n'ont aucun moyen sûr de vous joindre.",
+    "leadManager": "Tu mènes une équipe engagée dans ce tournoi : tu peux être présenté comme son contact à l'adversaire, au caster et à l'arbitrage, dès que vos adversaires sont connus. Certifie ce qui te manque encore.",
+    "leadTeam": "Ton équipe n'a aucun contact vérifié à présenter pour ses matchs : personne n'y a certifié son tag Discord ni son BattleTag. L'adversaire et l'arbitrage n'ont aucun moyen sûr de vous joindre.",
+    "leadTeamDiscordOnly": "Ton équipe n'a personne à présenter sur Discord pour ses matchs : personne n'y a certifié son tag Discord. L'adversaire et l'arbitrage n'ont aucun moyen sûr de vous joindre.",
     "statusLabel": "Où tu en es",
     "discord": "Tag Discord",
     "battletag": "BattleTag",
@@ -381,15 +381,15 @@
       },
       "matches": {
         "topic": "Tes matchs",
-        "does": "Tu passes devant les membres non certifiés pour être présenté comme contact de ton équipe — aux deux équipes du match, à son caster, aux arbitres et aux administrateurs du site —, avec ton tag Discord certifié et ton BattleTag marqué « vérifié ».",
-        "doesDiscordOnly": "Tu passes devant les membres non certifiés pour être présenté comme contact de ton équipe — aux deux équipes du match, à son caster, aux arbitres et aux administrateurs du site —, avec ton tag Discord certifié.",
+        "does": "Tu passes devant les membres qui n'ont rien certifié pour être présenté comme contact de ton équipe — aux deux équipes du match, à son caster, aux arbitres et aux administrateurs du site —, avec ton tag Discord certifié et ton BattleTag marqué « vérifié ».",
+        "doesDiscordOnly": "Tu passes devant les membres qui n'ont rien certifié pour être présenté comme contact de ton équipe — aux deux équipes du match, à son caster, aux arbitres et aux administrateurs du site —, avec ton tag Discord certifié.",
         "doesNot": "Ne publie pas ton tag sur ta fiche : les autres joueurs y voient une pastille, et ton tag seulement si tes réglages de visibilité l'ouvrent (case « Tag Discord » pour le tag Discord, même cochée avant). Certifié ou non, présenté comme contact, ton BattleTag est montré même masqué, dès que les deux adversaires du match sont connus et jusqu'à sa fin.",
         "doesNotDiscordOnly": "Ne publie pas ton tag sur ta fiche : les autres joueurs y voient une pastille, et ton tag seulement si tu as coché « Tag Discord » dans tes réglages (même avant). Si ta fiche porte un BattleTag, présenté comme contact, il est montré même masqué, dès que les deux adversaires du match sont connus et jusqu'à sa fin."
       },
       "messages": {
         "topic": "Les messages du bot",
-        "does": "Une fois ton tag Discord certifié, le bot t'envoie en message privé l'horaire de tes matchs et leurs rappels.",
-        "doesNot": "Ne t'impose pas ces messages : tu peux les couper depuis ton profil (section Notifications) sans perdre la certification."
+        "does": "Une fois ton tag Discord certifié, le bot peut t'écrire en message privé : horaire et rappels de tes matchs, demandes d'adhésion à une équipe que tu gères, avis de modération, information sur tes données.",
+        "doesNot": "Ne t'impose pas les messages de match : tu peux les couper depuis ton profil (section Notifications) sans perdre la certification."
       },
       "staff": {
         "topic": "L'organisation",
@@ -400,8 +400,8 @@
         "topic": "Et ensuite",
         "does": "Ouvre les tournois qui exigent un Discord certifié ou un compte Battle.net.",
         "doesDiscordOnly": "Ouvre les tournois qui exigent un Discord certifié.",
-        "doesNot": "Ne t'engage à rien : retirer ton tag Discord de ton profil retire sa certification ; détacher Battle.net retire la vérification de ton BattleTag, qui reste sur ta fiche jusqu'à ce que tu l'effaces.",
-        "doesNotDiscordOnly": "Ne t'engage à rien : retirer ton tag Discord de ton profil retire sa certification."
+        "doesNot": "Ne t'engage à rien : retirer ton tag Discord de ton profil retire sa certification ; Discord, s'il a été rattaché à ton compte pour certifier, se détache depuis « Applications connectées » tant qu'il te reste une autre façon de te connecter ; détacher Battle.net retire la vérification de ton BattleTag, qui reste sur ta fiche jusqu'à ce que tu l'effaces.",
+        "doesNotDiscordOnly": "Ne t'engage à rien : retirer ton tag Discord de ton profil retire sa certification ; Discord, s'il a été rattaché à ton compte pour certifier, se détache depuis « Applications connectées » tant qu'il te reste une autre façon de te connecter."
       }
     },
     "neverAgain": "Ne plus voir",

@@ -360,9 +360,9 @@
     "title": "Verify your Discord and your BattleTag",
     "titleDiscordOnly": "Verify your Discord",
     "titleBattletagOnly": "Verify your BattleTag",
-    "leadManager": "You lead a team entered in this tournament: when a match launches, you are among those the opponent, the caster and the referees will try to reach. Verify what you are still missing.",
-    "leadTeam": "Your team has no verified contact to show when its matches launch: nobody on it has verified their Discord tag or their BattleTag. The opponent and the referees have no reliable way to reach you.",
-    "leadTeamDiscordOnly": "Your team has nobody to show on Discord when its matches launch: nobody on it has verified their Discord tag. The opponent and the referees have no reliable way to reach you.",
+    "leadManager": "You lead a team entered in this tournament: you may be shown as its contact to the opponent, the caster and the referees, as soon as your opponents are known. Verify what is still missing.",
+    "leadTeam": "Your team has no verified contact to show for its matches: nobody on it has verified their Discord tag or their BattleTag. The opponent and the referees have no reliable way to reach you.",
+    "leadTeamDiscordOnly": "Your team has nobody to show on Discord for its matches: nobody on it has verified their Discord tag. The opponent and the referees have no reliable way to reach you.",
     "statusLabel": "Where you stand",
     "discord": "Discord tag",
     "battletag": "BattleTag",
@@ -381,15 +381,15 @@
       },
       "matches": {
         "topic": "Your matches",
-        "does": "You go ahead of unverified members to be shown as your team's contact — to both teams of the match, its caster, and the site's referees and admins —, with your verified Discord tag and your BattleTag marked “verified”.",
-        "doesDiscordOnly": "You go ahead of unverified members to be shown as your team's contact — to both teams of the match, its caster, and the site's referees and admins —, with your verified Discord tag.",
+        "does": "You go ahead of members who have verified nothing to be shown as your team's contact — to both teams of the match, its caster, and the site's referees and admins —, with your verified Discord tag and your BattleTag marked “verified”.",
+        "doesDiscordOnly": "You go ahead of members who have verified nothing to be shown as your team's contact — to both teams of the match, its caster, and the site's referees and admins —, with your verified Discord tag.",
         "doesNot": "Does not publish your tag on your profile: other players see a badge there, and your tag only if your visibility settings open it (the “Discord tag” box for the Discord tag, even if ticked before). Verified or not, when you are shown as a contact your BattleTag appears even if hidden, from the moment both opponents of the match are known until its end.",
         "doesNotDiscordOnly": "Does not publish your tag on your profile: other players see a badge there, and your tag only if you ticked “Discord tag” in your settings (even before). If your profile holds a BattleTag, when you are shown as a contact it appears even if hidden, from the moment both opponents of the match are known until its end."
       },
       "messages": {
         "topic": "Bot messages",
-        "does": "Once your Discord tag is verified, the bot sends you your match times and their reminders by direct message.",
-        "doesNot": "Does not force these messages on you: you can turn them off from your profile (Notifications section) and stay verified."
+        "does": "Once your Discord tag is verified, the bot may write to you by direct message: your match times and reminders, requests to join a team you manage, moderation notices, information about your data.",
+        "doesNot": "Does not force match messages on you: you can turn them off from your profile (Notifications section) and stay verified."
       },
       "staff": {
         "topic": "The organisers",
@@ -400,8 +400,8 @@
         "topic": "Later on",
         "does": "Opens tournaments that require a verified Discord or a Battle.net account.",
         "doesDiscordOnly": "Opens tournaments that require a verified Discord.",
-        "doesNot": "Commits you to nothing: removing your Discord tag from your profile removes its verification; unlinking Battle.net removes your BattleTag's verification, the BattleTag staying on your profile until you erase it.",
-        "doesNotDiscordOnly": "Commits you to nothing: removing your Discord tag from your profile removes its verification."
+        "doesNot": "Commits you to nothing: removing your Discord tag from your profile removes its verification; Discord, if it was linked to your account to verify, is unlinked from “Connected apps” as long as you keep another way to sign in; unlinking Battle.net removes your BattleTag's verification, the BattleTag staying on your profile until you erase it.",
+        "doesNotDiscordOnly": "Commits you to nothing: removing your Discord tag from your profile removes its verification; Discord, if it was linked to your account to verify, is unlinked from “Connected apps” as long as you keep another way to sign in."
       }
     },
     "neverAgain": "Don't show again",
