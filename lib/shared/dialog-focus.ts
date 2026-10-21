@@ -154,3 +154,18 @@ export function watchModals(condition: () => boolean, onMet: () => void, root: N
 export function watchModalsClosed(onClosed: () => void, root?: Node, options: { overYielding?: boolean } = {}): () => void {
   return watchModals(() => !anotherModalOpen(document, options), onClosed, root);
 }
+
+/**
+ * Une modale **recouverte** se ferme : les modales qui comptaient rendre le
+ * focus à un élément en son sein (bientôt retiré du DOM) le rendront à sa
+ * propre cible. `inside` dit si un élément appartient à la modale fermée.
+ */
+export function handOffRestoreTargets<T>(
+  targets: Map<symbol, T | null>,
+  inside: (element: T) => boolean,
+  target: T | null,
+): void {
+  for (const [token, element] of targets) {
+    if (element !== null && inside(element)) targets.set(token, target);
+  }
+}

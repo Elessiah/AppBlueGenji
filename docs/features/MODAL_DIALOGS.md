@@ -52,9 +52,10 @@ dès sa décision par le `loading` de son `dynamic()` (`<span data-modal-pending
 hidden />`, compté par `anotherModalOpen`) ; pour attendre sans minuterie,
 `watchModalsClosed` (observateur du DOM, relectures espacées de 250 ms). Une
 modale sans urgence porte `data-modal-yields` : une ouverture urgente
-(`overYielding`) passe par-dessus et elle se ferme. Une modale **recouverte**
+(`overYielding`) passe par-dessus et elle s'efface. Une modale **recouverte**
 qui se ferme ne rend pas le focus à son déclencheur (seule celle du dessus le
-fait).
+fait) ; elle passe cette cible aux modales du dessus qui comptaient rendre le
+focus en son sein (`restoreTargets`).
 
 Jamais l'attribut `autoFocus` (Sonar S9379). Un champ qui n'apparaît qu'après
 un geste — éditeur en ligne ouvert par « Modifier », onglet d'une modale déjà

@@ -29,8 +29,8 @@ function browserStorage(kind: "localStorage" | "sessionStorage"): Storage | null
  * DOM (sans minuterie, économie d'énergie comprise). Décidée, sa place est
  * tenue dans le DOM pendant le chargement de son morceau (`data-modal-pending`,
  * `TournamentSheet`). Elle **cède sa place** (`data-modal-yields`) : une
- * modale urgente — le lancement d'un match — passe par-dessus, et
- * l'invitation se ferme alors comme sur « Plus tard ».
+ * modale urgente — le lancement d'un match — passe par-dessus ; l'invitation
+ * s'efface sans rien retenir et revient à sa fermeture.
  *
  * Renvoie l'invitation à afficher (`null` : rien) et la fermeture. Une
  * invitation retirée par le serveur (certifiée entre-temps) ferme la modale ;
@@ -67,11 +67,20 @@ export function useCertificationPrompt(prompt: CertificationPrompt | null | unde
     setOpen(false);
   }, []);
 
-  // Une modale urgente s'ouvre par-dessus (lancement d'un match) : place nette.
+  // Une modale urgente s'ouvre par-dessus (lancement d'un match) : place
+  // nette, **sans** rien retenir — l'invitation n'a peut-être pas été lue.
+  // Elle attend la fermeture de l'urgente, puis se rouvre.
   useEffect(() => {
     if (!open) return;
-    return watchModals(() => anotherModalOpen(document, { overYielding: true }), () => close(false));
-  }, [open, close]);
+    return watchModals(
+      () => anotherModalOpen(document, { overYielding: true }),
+      () => {
+        decided.current = false;
+        setOpen(false);
+        setRecheck((n) => n + 1);
+      },
+    );
+  }, [open]);
 
   // Fiche figée (erreur fatale, tournoi supprimé) : plus rien ne s'affiche.
   return { prompt: open && !frozen ? (prompt ?? null) : null, close };

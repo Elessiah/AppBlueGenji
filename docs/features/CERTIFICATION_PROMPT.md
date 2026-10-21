@@ -35,9 +35,10 @@ sa **place est tenue dans le DOM** pendant le chargement de son morceau (le
 lancement ne s'ouvre pas en même temps qu'elle par accident. Mais elle **cède
 sa place** (`data-modal-yields`, `anotherModalOpen(…, { overYielding: true })`,
 `lib/shared/dialog-focus.ts`) : l'annonce d'un match qui se lance, urgente,
-passe par-dessus, et l'invitation se ferme alors comme sur « Plus tard » (la
-modale recouverte ne reprend pas le focus à celle du dessus,
-`useDialogBehavior`). Une invitation retirée par le serveur (certification
+passe par-dessus ; l'invitation s'efface **sans rien retenir** (elle n'a
+peut-être pas été lue) et revient à la fermeture de l'urgente. La modale
+recouverte ne reprend pas le focus à celle du dessus, et lui passe sa propre
+cible de retour (`useDialogBehavior`). Une invitation retirée par le serveur (certification
 faite entre-temps) ferme la modale, une fiche figée aussi.
 
 En **Marvel Rivals**, les lignes qui parlent de Blizzard ou de Battle.net
@@ -69,7 +70,9 @@ Le tableau ne promet que ce que les règles tiennent : visibilité du tag
 ## « Ne plus voir »
 
 - **« Plus tard »** ou fermeture (Échap, voile) : `bg_cert_prompt_closed` = « 1 »
-  en **stockage de session** — la modale ne se rouvre pas dans cet onglet ;
+  en **stockage de session** — la modale ne se rouvre pas dans cet onglet.
+  La case « Ne plus voir », visible, vaut pour **toute** fermeture, Échap et
+  voile compris ;
 - case **« Ne plus voir »** cochée puis fermeture (ou clic sur le bouton du
   profil) : `bg_cert_prompt_off` = « 1 » en **stockage local**, en plus.
 

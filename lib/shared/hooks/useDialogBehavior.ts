@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { createDialogStack, type ScrollLockTarget } from "@/lib/shared/dialog-stack";
-import { escapeBelongsElsewhere, focusTrapTarget } from "@/lib/shared/dialog-focus";
+import { escapeBelongsElsewhere, focusTrapTarget, handOffRestoreTargets } from "@/lib/shared/dialog-focus";
 
 interface DialogBehaviorOptions {
   /** La boîte de dialogue est-elle montée / visible ? */
@@ -34,6 +34,14 @@ const bodyScrollLock: ScrollLockTarget = {
  */
 const dialogStack = createDialogStack(bodyScrollLock);
 
+/**
+ * Où rendre le focus à la fermeture de chaque modale ouverte. Tenu à part
+ * parce qu'une modale **recouverte** qui se ferme (invitation qui cède sa
+ * place au lancement d'un match) passe sa cible à celles du dessus qui
+ * comptaient rendre le focus en son sein — un élément bientôt retiré.
+ */
+const restoreTargets = new Map<symbol, HTMLElement | null>();
+
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -64,7 +72,8 @@ export function useDialogBehavior({ open, onClose, locked = false }: DialogBehav
     if (!open) return;
 
     const token = Symbol("dialog");
-    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const container = containerRef.current;
+    restoreTargets.set(token, document.activeElement as HTMLElement | null);
     dialogStack.push(token);
 
     // Focus initial : l'élément marqué `data-autofocus` s'il y en a un (le champ
@@ -162,7 +171,13 @@ export function useDialogBehavior({ open, onClose, locked = false }: DialogBehav
       // arracher le focus à celle qui la couvre.
       const wasTop = dialogStack.isTop(token);
       dialogStack.pop(token);
-      if (wasTop) previouslyFocused?.focus?.();
+      const target = restoreTargets.get(token) ?? null;
+      restoreTargets.delete(token);
+      if (wasTop) {
+        target?.focus?.();
+        return;
+      }
+      handOffRestoreTargets(restoreTargets, (element) => container?.contains(element) ?? false, target);
     };
   }, [open]);
 

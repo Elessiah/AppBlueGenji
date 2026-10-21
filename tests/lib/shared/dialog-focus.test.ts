@@ -4,6 +4,7 @@ import {
   anotherModalOpen,
   escapeBelongsElsewhere,
   focusTrapTarget,
+  handOffRestoreTargets,
   watchModals,
   watchModalsClosed,
   type FocusTrapState,
@@ -183,5 +184,26 @@ describe("watchModals / watchModalsClosed", () => {
     jest.advanceTimersByTime(300);
     expect(calls).toHaveLength(0);
     expect(state.disconnected).toBe(1);
+  });
+});
+
+describe("handOffRestoreTargets", () => {
+  it("les modales du dessus qui visaient la modale fermée héritent de sa cible", () => {
+    const launch = Symbol("launch");
+    const other = Symbol("other");
+    const targets = new Map<symbol, string | null>([
+      [launch, "titre-invitation"],
+      [other, "bouton-page"],
+    ]);
+    handOffRestoreTargets(targets, (element) => element === "titre-invitation", "body");
+    expect(targets.get(launch)).toBe("body");
+    expect(targets.get(other)).toBe("bouton-page");
+  });
+
+  it("laisse une cible absente telle quelle", () => {
+    const token = Symbol("t");
+    const targets = new Map<symbol, string | null>([[token, null]]);
+    handOffRestoreTargets(targets, () => true, "x");
+    expect(targets.get(token)).toBeNull();
   });
 });
