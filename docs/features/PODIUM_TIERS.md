@@ -118,12 +118,13 @@ seulement devenir **nettement visible** et suivre l'équipe partout.
   `.pill`, une classe de module…) sur l'élément peint effacerait le dégradé —
   le nom, transparent, n'apparaissait plus qu'au survol (fiche joueur,
   v1.41.0). Aucune règle d'appel à tenir : toute classe est sûre sur le lien.
-  Graisse : posée sur le lien ou le nom de spectateur (`:where(.entity-link,
-  .entity-name):where(:not([data-podium-muted], [data-podium-muted] *))
-  :has(> .podium-tier)`, spécificité d'une classe), le nom peint en hérite —
-  la graisse de l'appelant (classe, style en ligne) l'emporte comme avant ;
-  éteinte, la marche n'en impose aucune. Sans `:has()` (`@supports`), le nom
-  peint garde ses 700. Balisage du nom peint : `PodiumPaint`
+  Graisse : `EntityLink` pose sur le lien (ou le nom de spectateur) le repère
+  `data-podium` (famille de la marche) ; la feuille y met les 700
+  (`:where(.entity-link, .entity-name):where(:not([data-podium-muted],
+  [data-podium-muted] *))[data-podium="podium-tier"]`, spécificité d'une
+  classe) et le nom peint en hérite — la graisse de l'appelant (classe, style
+  en ligne) l'emporte comme avant ; éteinte, la marche n'en impose aucune.
+  Aucun `:has()`. Balisage du nom peint : `PodiumPaint`
   (`components/podium-tiers.tsx`), partagé avec `TeamPodiumName` et
   `PlayerPodiumName`.
 - Lueur par `drop-shadow`, jamais `text-shadow` (sous un texte peint par son
@@ -142,11 +143,11 @@ seulement devenir **nettement visible** et suivre l'équipe partout.
   pleine `--blue-100`, soulignement lisible ; « Liens soulignés » : le trait,
   tracé par le lien, garde la couleur du lien (le texte transparent est celui
   du `<span>` intérieur).
-- Nom tronqué par le lien lui-même (`EntrantName` `truncate`, pseudo des
-  membres d'une fiche d'équipe `.playerName`) : c'est le `<span>` peint qui
-  rogne et pose l'ellipse, le lien le laisse déborder — sa lueur n'est pas
-  coupée et l'ellipse garde le dégradé. Tout lien d'entité qui tronque son nom
-  reprend ces deux règles.
+- Nom tronqué : `truncate` sur le lien d'entité (`.entity-truncate` ;
+  `EntrantName` `truncate`, pseudo des membres d'une fiche d'équipe). Peint
+  d'une marche, c'est le `<span>` peint qui rogne et pose l'ellipse, le lien le
+  laisse déborder — sa lueur n'est pas coupée et l'ellipse garde le dégradé.
+  Un lien d'entité ne se tronque jamais par une classe de l'appelant.
 - Contraste renforcé : lueur effacée. Couleurs forcées : fond retiré, couleur
   du système. Impression : couleur pleine `--blue-500`, repère masqué.
 

@@ -158,6 +158,8 @@ plus effacer le nom.
   n'en pose aucune (lien-avatar sans texte).
 - `podiumMuted` éteint la marche d'un lien habillé d'une surface teintée
   (pastille `.badge`), repère conservé.
+- `truncate` tronque le nom d'une ellipse (`.entity-truncate`) — jamais une
+  classe de l'appelant : peint d'une marche, le nom rogne sur lui-même.
 - Un engagé **solo** porte la marche adoucie de son joueur, jamais celle
   d'une équipe (une entrée solo n'est jamais classée).
 - `PodiumTiersOff` : écrans d'administration sobres.
