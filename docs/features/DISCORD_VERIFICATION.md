@@ -40,7 +40,7 @@ Le public se lit dans `canViewDiscordTag`, et l'ordre des cas *est* la règle :
 | ------------------------------------ | -------------------------------------------- |
 | Le propriétaire du compte            | Toujours, certifié ou non                    |
 | N'importe qui, tag **non certifié**  | **Jamais**                                   |
-| Partie du même match (`sharesMatchLobby`) | Équipes : dès que les deux adversaires sont connus, jusqu'à la fin ; caster, et équipes pour le caster : le temps du match ; arbitres (`tournaments`) pour le caster : dès que les deux adversaires sont connus, jusqu'à la fin |
+| Partie du même match (`sharesMatchLobby`) | Équipes : dès que les deux adversaires sont connus, jusqu'à la fin ; caster, et équipes pour le caster : le temps du match ; arbitres (`tournaments`), par la carte, contacts des équipes comme du caster : dès que les deux adversaires sont connus, jusqu'à la fin |
 | Administrateur                       | Toujours (tag certifié)                       |
 | Permission `tournaments` (arbitre)   | Si le joueur est engagé dans un tournoi vivant |
 | Joueur connecté quelconque           | Si le propriétaire a coché « Tag Discord »    |

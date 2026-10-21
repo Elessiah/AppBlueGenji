@@ -187,11 +187,11 @@ masquage, fiche joueur, conditions v6, `/rgpd`, registre, `PRIVACY_CHANGES`)
 nomme **les deux** fenêtres : « Contacts » de la carte du match et fenêtre de
 lancement (équipes et caster ; les arbitres n'ont que la première). La phrase
 d'avertissement (profil, rattachement et connexion Battle.net, modale de
-masquage) dit la fenêtre exacte : « il reste visible pour tes adversaires, les
-admins et les arbitres d'un match de tournoi dès que ses deux adversaires sont
+masquage) dit la fenêtre exacte : « il reste visible pour les membres des deux
+équipes, les admins et les arbitres d'un match de tournoi dès que ses deux adversaires sont
 connus et jusqu'à sa fin, ainsi que pour son caster le temps du match
 seulement, dans la fenêtre « Contacts » du match (et, pour les équipes et le
-caster, dans sa fenêtre de lancement) » / “it stays visible to your opponents, admins and referees in a
+caster, dans sa fenêtre de lancement) » / “it stays visible to the members of both teams, admins and referees in a
 tournament match from the moment both its opponents are known until its end,
 and to its caster only while the match is being played, in the match's
 “Contacts” window (and, for the teams and the caster, its launch window)”, puis le cas du caster
