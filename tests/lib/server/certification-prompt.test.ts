@@ -204,19 +204,72 @@ describe("mémoire courte des invitations", () => {
     errors.mockRestore();
   });
 
-  it("une lecture qui pend est abandonnée : « rien », et les suivantes ne l'attendent pas", async () => {
+  it("une lecture qui pend est abandonnée : « rien », et sa clé reste occupée jusqu'à sa fin", async () => {
     forgetCertificationPrompts();
     jest.useFakeTimers();
     const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
     try {
-      const hung = cachedCertificationPrompt("10:42:0:1", () => new Promise<null>(() => undefined), now);
+      const control: { finish?: (value: null) => void } = {};
+      const load = jest.fn(
+        () =>
+          new Promise<null>((resolve) => {
+            control.finish = resolve;
+          }),
+      );
+      const hung = cachedCertificationPrompt("10:42:0:1", load, now);
       jest.advanceTimersByTime(CERTIFICATION_PROMPT_READ_TIMEOUT_MS);
       expect(await hung).toBeNull();
-      expect(errors).toHaveBeenCalled();
+      // Longtemps après : la lecture pend toujours, aucune autre ne part.
+      clock += 60_000;
+      expect(await cachedCertificationPrompt("10:42:0:1", load, now)).toBeNull();
+      expect(load).toHaveBeenCalledTimes(1);
+      // Finie, la clé n'est libre qu'au bout de la fenêtre d'échec.
+      control.finish?.(null);
+      await Promise.resolve();
+      await Promise.resolve();
+      await cachedCertificationPrompt("10:42:0:1", load, now);
+      expect(load).toHaveBeenCalledTimes(1);
+      clock += CERTIFICATION_PROMPT_FAILURE_TTL_MS;
+      void cachedCertificationPrompt("10:42:0:1", load, now);
+      expect(load).toHaveBeenCalledTimes(2);
+      jest.clearAllTimers();
+      forgetCertificationPrompts();
     } finally {
       errors.mockRestore();
       jest.useRealTimers();
     }
+  });
+
+  it("une panne ne journalise qu'un message par fenêtre", async () => {
+    forgetCertificationPrompts();
+    clock = 0;
+    const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const failing = async (): Promise<null> => {
+      throw new Error("pool");
+    };
+    await Promise.all(["a", "b", "c"].map((key) => cachedCertificationPrompt(key, failing, now)));
+    expect(errors).toHaveBeenCalledTimes(1);
+    clock = CERTIFICATION_PROMPT_FAILURE_TTL_MS;
+    await cachedCertificationPrompt("d", failing, now);
+    expect(errors).toHaveBeenCalledTimes(2);
+    expect(String(errors.mock.calls[1][0])).toContain("2 autres tus");
+    errors.mockRestore();
+  });
+
+  it("pleine, la mémoire chasse d'abord l'expiré, jamais une lecture en cours", async () => {
+    forgetCertificationPrompts();
+    jest.useFakeTimers();
+    clock = 0;
+    const pending = jest.fn(() => new Promise<null>(() => undefined));
+    void cachedCertificationPrompt("en-cours", pending, now);
+    for (let i = 0; i < 1_999; i += 1) await cachedCertificationPrompt(`k${i}`, async () => null, now);
+    clock = CERTIFICATION_PROMPT_TTL_MS;
+    await cachedCertificationPrompt("neuve", async () => null, now);
+    void cachedCertificationPrompt("en-cours", pending, now);
+    expect(pending).toHaveBeenCalledTimes(1);
+    jest.clearAllTimers();
+    jest.useRealTimers();
+    forgetCertificationPrompts();
   });
 
   it("reste bornée : la plus ancienne part", async () => {

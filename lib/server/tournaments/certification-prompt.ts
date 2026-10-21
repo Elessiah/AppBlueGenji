@@ -118,36 +118,81 @@ export function cachedCertificationPrompt(
   const entry = recentPrompts.get(key);
   if (entry && entry.expiresAt > now()) return entry.value;
   recentPrompts.delete(key);
-  if (recentPrompts.size >= CERTIFICATION_PROMPT_CACHE_MAX) {
-    const oldest = recentPrompts.keys().next().value;
-    if (oldest !== undefined) recentPrompts.delete(oldest);
-  }
+  makeRoom(now());
+
   const slot = { value: Promise.resolve<CertificationPrompt | null>(null), expiresAt: Number.POSITIVE_INFINITY };
-  slot.value = withTimeout(load(), CERTIFICATION_PROMPT_READ_TIMEOUT_MS).then(
-    (prompt) => {
-      slot.expiresAt = now() + CERTIFICATION_PROMPT_TTL_MS;
-      return prompt;
-    },
-    (error: unknown) => {
-      console.error("[tournaments] invitation à certifier indisponible :", error);
-      slot.expiresAt = now() + CERTIFICATION_PROMPT_FAILURE_TTL_MS;
-      return null;
-    },
+  const reading = load();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<"TIMEOUT">((resolve) => {
+    timer = setTimeout(() => resolve("TIMEOUT"), CERTIFICATION_PROMPT_READ_TIMEOUT_MS);
+  });
+  // La lecture n'est pas annulable : abandonnée, elle garde sa clé occupée
+  // (« rien » servi tout de suite) jusqu'à ce qu'elle finisse, pour qu'une
+  // seule lecture réelle par lecteur soit en attente du pool.
+  const settled = reading.then(
+    (prompt) => ({ ok: true as const, prompt }),
+    (error: unknown) => ({ ok: false as const, error }),
   );
+  slot.value = Promise.race([settled, expired]).then((outcome) => {
+    clearTimeout(timer);
+    if (outcome === "TIMEOUT") {
+      logCertificationPromptFailure(now(), "lecture abandonnée après 3 s");
+      void settled.then(() => {
+        slot.expiresAt = now() + CERTIFICATION_PROMPT_FAILURE_TTL_MS;
+      });
+      return null;
+    }
+    if (outcome.ok) {
+      slot.expiresAt = now() + CERTIFICATION_PROMPT_TTL_MS;
+      return outcome.prompt;
+    }
+    logCertificationPromptFailure(now(), outcome.error);
+    slot.expiresAt = now() + CERTIFICATION_PROMPT_FAILURE_TTL_MS;
+    return null;
+  });
   recentPrompts.set(key, slot);
   return slot.value;
 }
 
-/** `promise`, ou un échec passé `ms` (la lecture abandonnée finit seule). */
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const expired = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error("CERTIFICATION_PROMPT_TIMEOUT")), ms);
-  });
-  return Promise.race([promise, expired]).finally(() => clearTimeout(timer));
+/**
+ * Place pour une entrée de plus : les entrées expirées partent d'abord, puis
+ * la plus ancienne **terminée** — jamais une lecture en cours, qui ne serait
+ * plus partagée.
+ */
+function makeRoom(at: number): void {
+  if (recentPrompts.size < CERTIFICATION_PROMPT_CACHE_MAX) return;
+  for (const [key, entry] of recentPrompts) {
+    if (entry.expiresAt <= at) recentPrompts.delete(key);
+  }
+  if (recentPrompts.size < CERTIFICATION_PROMPT_CACHE_MAX) return;
+  for (const [key, entry] of recentPrompts) {
+    if (entry.expiresAt !== Number.POSITIVE_INFINITY) {
+      recentPrompts.delete(key);
+      return;
+    }
+  }
+}
+
+/**
+ * Une panne de base touche tous les lecteurs à la fois : un seul message par
+ * fenêtre d'échec dans pm2, avec le nombre d'échecs tus depuis le précédent.
+ */
+let lastFailureLogAt = Number.NEGATIVE_INFINITY;
+let silencedFailures = 0;
+function logCertificationPromptFailure(at: number, error: unknown): void {
+  if (at - lastFailureLogAt < CERTIFICATION_PROMPT_FAILURE_TTL_MS) {
+    silencedFailures += 1;
+    return;
+  }
+  const silenced = silencedFailures > 0 ? ` (${silencedFailures} autres tus)` : "";
+  console.error(`[tournaments] invitation à certifier indisponible${silenced} :`, error);
+  lastFailureLogAt = at;
+  silencedFailures = 0;
 }
 
 /** Vide la mémoire (tests). */
 export function forgetCertificationPrompts(): void {
   recentPrompts.clear();
+  lastFailureLogAt = Number.NEGATIVE_INFINITY;
+  silencedFailures = 0;
 }
