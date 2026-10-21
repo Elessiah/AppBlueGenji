@@ -106,6 +106,11 @@ seulement devenir **nettement visible** et suivre l'équipe partout.
 - Texte **réel** peint par `background-clip: text` (`-webkit-text-fill-color:
   transparent`, robuste dans un titre `.ds-title` déjà en dégradé) ; repères en
   `::before` sans texte : **nom accessible inchangé**.
+- **Aucune surface peinte sur le lien lui-même** : une classe qui pose un
+  `background` (`.badge`, `.pill`) sur le même élément efface le dégradé — le
+  nom, transparent, n'apparaît plus qu'au survol (fiche joueur, v1.41.0). La
+  pastille habille un conteneur autour du lien —
+  `tests/app/podium-link-surfaces.test.ts` balaie `app/` et `components/`.
 - Lueur par `drop-shadow`, jamais `text-shadow` (sous un texte peint par son
   fond, l'ombre recouvrirait le dégradé).
 - **Contraste** : chaque arrêt est un jeton de texte qui tient **4,5:1** sur le
