@@ -268,11 +268,14 @@ export async function certifyLinkedDiscordTag(
  *
  * @throws DISCORD_USER_NOT_FOUND / BOT_INTERNAL_UNREACHABLE / DISCORD_DM_FAILED
  *   Remontées telles quelles de la résolution et de l'envoi.
+ * @throws DISCORD_NOT_LINKED Avec `linkedOnly`, sur un compte sans Discord
+ *   rattaché : rien n'est résolu ni envoyé.
  */
 export async function startDiscordVerification(
   userId: number,
   handle: string,
   guardBeforeSend?: ResolvedDiscordIdGuard,
+  options: Readonly<{ linkedOnly?: boolean }> = {},
 ): Promise<VerificationStart> {
   const row = await loadDiscordRow(userId);
   if (!row) throw new Error("PROFILE_NOT_FOUND");
@@ -280,6 +283,10 @@ export async function startDiscordVerification(
   // **La preuve existe déjà** : ce compte s'est connecté par son Discord. Il ne
   // manque que le consentement, que ce clic donne.
   if (row.discord_id) return certifyLinkedDiscordTag(userId, handle);
+  // Certification d'un clic seulement (fenêtre de connexion,
+  // `DISCORD_CERTIFY_PROMPT.md`) : Discord a été détaché entre-temps, aucun
+  // code ne part — la fenêtre ne saurait pas le faire saisir.
+  if (options.linkedOnly) throw new Error("DISCORD_NOT_LINKED");
 
   const tag = normalizeDiscordHandle(handle);
   if (!tag) throw new Error("INVALID_DISCORD_HANDLE");

@@ -74,8 +74,8 @@ describe("DONNEES_PROFIL", () => {
     expect(names).toContain("Identifiant Blizzard");
   });
 
-  it("has exactly 13 entries", () => {
-    expect(DONNEES_PROFIL).toHaveLength(13);
+  it("has exactly 14 entries", () => {
+    expect(DONNEES_PROFIL).toHaveLength(14);
   });
 
   it("déclare la langue du compte (lot 9-3) : exécution du contrat, durée du compte, remise au français", () => {

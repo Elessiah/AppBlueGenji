@@ -318,7 +318,7 @@ describe("rattrapage du compte depuis le cookie, à chaque page connectée", () 
 
   it("n'envoie pas les annonces de la modale à qui l'a refusée, et lit le cookie une fois", () => {
     const layout = readSource("app/layout.tsx");
-    expect(layout).toContain("const modalAds = modalOptedOut ? [] : spotlight.modal;");
+    expect(layout).toContain("const modalAds = modalOptedOut || certifyPrompt !== null ? [] : spotlight.modal;");
     expect(layout).toContain("modalAds={modalAds}");
     expect(layout).not.toContain("modalAds={spotlight.modal}");
     // Sous `/en`, les textes ne partent que s'il reste une annonce à montrer :

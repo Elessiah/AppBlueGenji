@@ -149,10 +149,18 @@ qu'avec un lien mort.
 premières équipes du classement « Général » (`.podium-tier-N`), `PlayerLink`
 la version adoucie de l'équipe du joueur (`.podium-member-N`, la plus haute
 s'il en a plusieurs). La marche est lue dans un contexte posé par la mise en
-page racine (`components/podium-tiers.tsx`) — aucune requête par lien.
+page racine (`components/podium-tiers.tsx`) — aucune requête par lien. La marche se
+peint sur un `<span>` **dans** le lien, la classe de l'appelant restant sur
+le lien : une pastille (`.badge`) ou tout fond posé par l'appelant ne peut
+plus effacer le nom.
 
 - `podiumTier` impose une marche (`/classement`, onglet affiché) ; `null`
   n'en pose aucune (lien-avatar sans texte).
+- Un lien habillé en pastille (`.badge`, `.pill`, `.cy-tag`) éteint sa
+  marche, repère conservé (`PODIUM_TIERS.md`).
+- `truncate` tronque le nom d'une ellipse — `true` sur une ligne
+  (`.entity-truncate`), `2` à deux lignes (`.entity-clamp-2`) —, jamais une
+  classe de l'appelant : peint d'une marche, le nom se coupe lui-même.
 - Un engagé **solo** porte la marche adoucie de son joueur, jamais celle
   d'une équipe (une entrée solo n'est jamais classée).
 - `PodiumTiersOff` : écrans d'administration sobres.

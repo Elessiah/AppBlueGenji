@@ -85,11 +85,9 @@ describe("Composants de lien d'entité", () => {
     expect(source).toContain("`/joueurs/${userId}`");
   });
 
-  it("concatènent la classe reçue plutôt que de l'écraser", () => {
-    // Les appelants passent des classes de mise en page (ellipse, grille) : les
-    // perdre casserait le gabarit qui les entoure.
-    expect(source).toContain('className ? `entity-link ${className}` : "entity-link"');
-  });
+  // La classe reçue est concaténée, jamais écrasée (les appelants passent des
+  // classes de mise en page) : vérifié au rendu dans
+  // tests/components/podium-tier-links.test.tsx (« … les classes de l'appelant »).
 });
 
 describe("Page de tournoi — engagés cliquables", () => {

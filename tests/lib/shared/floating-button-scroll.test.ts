@@ -156,7 +156,7 @@ describe("le menu d'accessibilité garde son clavier au-dessus d'une modale", ()
   it("le bouton entre dans le cycle de tabulation, après la modale", () => {
     expect(hook).toContain('document.querySelectorAll("[data-dialog-exempt]")');
     expect(tab).toContain("const extra = layers.flatMap((layer) => focusablesIn(layer));");
-    expect(tab).toContain("focusTrapTarget({ items, extra, active, inModal, inLayer, shiftKey: event.shiftKey })");
+    expect(tab).toContain("focusTrapTarget({ items, extra, active, inModal, onContainer, inLayer, shiftKey: event.shiftKey })");
     // Bords de la modale → la couche ; bords de la couche → la modale.
     expect(focusRules).toMatch(/if \(shiftKey && active === start\) return extra\.at\(-1\) \?\? end;/);
     expect(focusRules).toMatch(/if \(!shiftKey && active === end\) return extra\[0\] \?\? start;/);

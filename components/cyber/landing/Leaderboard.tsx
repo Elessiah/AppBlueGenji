@@ -127,7 +127,7 @@ export function Leaderboard({ initialRows }: Readonly<LeaderboardProps>) {
                 <span className={styles.rank} role="cell">{String(row.rank).padStart(2, "0")}</span>
                 <span className={styles.team} role="cell">
                   <TeamSigil label={row.teamName.charAt(0)} size={24} logoUrl={row.logoUrl} />
-                  <TeamLink teamId={row.teamId} title={t("common.teamPageTitle", { name: row.teamName })}>
+                  <TeamLink teamId={row.teamId} truncate={2} title={t("common.teamPageTitle", { name: row.teamName })}>
                     {row.teamName}
                   </TeamLink>
                 </span>

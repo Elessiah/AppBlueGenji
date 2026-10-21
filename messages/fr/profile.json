@@ -114,7 +114,8 @@
     "removalBodyDms": "Le bot ne t'enverra plus non plus les messages privés de tes matchs.",
     "removalBody2": "Ta prochaine connexion par Discord réenregistrera ton pseudo, mais sans le certifier : il restera invisible de tous tant que tu ne le certifieras pas de nouveau.",
     "verifiedAlt": "Tag Discord vérifié",
-    "verifiedTitle": "Tag Discord vérifié : ce joueur a prouvé qu'il possède ce compte Discord."
+    "verifiedTitle": "Tag Discord vérifié : ce joueur a prouvé qu'il possède ce compte Discord.",
+    "alreadyVerified": "Ton tag Discord est déjà certifié."
   },
   "privacy": {
     "visibleTitle": "Visible par les autres joueurs",

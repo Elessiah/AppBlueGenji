@@ -129,6 +129,12 @@ origine (`bg_users.discord_pseudo_from_discord = 1`, par
 change pas, et **tombe** s'il change : le joueur a consenti à exposer ce
 pseudo-là.
 
+**Proposée à la connexion.** Après une connexion par Discord ou Blizzard, un
+compte non certifié reçoit une fois la fenêtre « Certifier ton tag Discord ? »
+(tableau sans / avec, « Plus tard », « Ne plus voir ») : elle certifie d'un clic
+le premier cas ci-dessous et mène au dialogue de `/profil` pour les autres —
+`DISCORD_CERTIFY_PROMPT.md`. Elle ne certifie jamais d'elle-même.
+
 Trois cas pour certifier, tous depuis `/profil` :
 
 - **Compte relié à Discord, pseudo nommé par Discord** (né par l'OAuth, par le

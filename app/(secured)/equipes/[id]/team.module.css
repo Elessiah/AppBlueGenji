@@ -232,11 +232,9 @@
   min-width: 0;
 }
 
+/* Tronqué par `truncate` (`.entity-truncate`, `PODIUM_TIERS.md`). */
 .playerName {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .youTag {

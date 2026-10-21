@@ -124,6 +124,15 @@ export async function anonymizeAccount(connection: PoolConnection, userId: numbe
   } catch (error) {
     if (!isUnknownColumnError(error)) throw error;
   }
+  // Et pour le « Ne plus voir » de la fenêtre de certification du tag Discord.
+  try {
+    await connection.execute(
+      `UPDATE bg_users SET discord_certify_prompt_dismissed_at = NULL WHERE id = ? AND is_deleted = 1`,
+      [userId],
+    );
+  } catch (error) {
+    if (!isUnknownColumnError(error)) throw error;
+  }
   // Les consentements aux changements de traitement et la trace des messages
   // privés envoyés : ils ne concernent plus personne, et le compte ne sera plus
   // jamais sollicité (`is_deleted = 0` borne les deux lectures).

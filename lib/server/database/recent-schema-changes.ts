@@ -268,6 +268,11 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // Validation d'office suspendue par un « Enregistrer » de l'arbitrage sur
     // un report seul (`docs/features/SCORE_DISPUTE_LOCK.md` § Arbitre et report seul).
     `ALTER TABLE bg_matches ADD COLUMN score_validation_paused_at DATETIME NULL`,
+    // Fenêtre « Certifier ton tag Discord » proposée à la connexion
+    // (`docs/features/DISCORD_CERTIFY_PROMPT.md`) : « Ne plus voir » sur le
+    // compte, et la proposition due sur la session ouverte par Discord ou Blizzard.
+    `ALTER TABLE bg_users ADD COLUMN discord_certify_prompt_dismissed_at DATETIME NULL`,
+    `ALTER TABLE bg_user_sessions ADD COLUMN certify_prompt_due TINYINT(1) NOT NULL DEFAULT 0`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

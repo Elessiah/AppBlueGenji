@@ -107,8 +107,8 @@ describe("PrivacyChangesModal — contrats du geste", () => {
     expect(source).toContain("onClick={() => followLink(change.id)}");
     const body = source.slice(source.indexOf("const followLink = (changeId: string) => {"));
     // Fermée avant l'envoi : elle ne doit pas rester sur l'écran où elle envoie.
-    expect(body.indexOf("close();")).toBeGreaterThan(-1);
-    expect(body.indexOf("close();")).toBeLessThan(body.indexOf("record("));
+    expect(body.indexOf("close(true);")).toBeGreaterThan(-1);
+    expect(body.indexOf("close(true);")).toBeLessThan(body.indexOf("record("));
     // Seul le changement du lien est acquitté, pas ses voisins.
     expect(body).toContain("record([changeId])");
     // Pas de second enregistrement si le bouton en a déjà lancé un, et sa
