@@ -103,16 +103,18 @@ describe("loadCertificationPrompt", () => {
     expect((await loadCertificationPrompt(executor, 7, 42, false, false))?.reason).toBe("TEAM_WITHOUT_CONTACT");
   });
 
-  it("ce refus ne tait jamais l'alerte d'une équipe sans contact", async () => {
+  it("ce refus ne tait jamais l'invitation d'une équipe sans contact, meneur compris", async () => {
     const { executor } = rosterOf([{ user_id: 7, ...BARE }], 1);
     expect((await loadCertificationPrompt(executor, 7, 42, false, false))?.reason).toBe("TEAM_WITHOUT_CONTACT");
+    const { executor: leader } = rosterOf([{ user_id: 7, ...BARE }], 1);
+    expect((await loadCertificationPrompt(leader, 7, 42, true, false))?.reason).toBe("MANAGER");
   });
 
   it("respecte le « Ne plus voir » donné à la proposition de la connexion (compte), Discord seul manquant", async () => {
     const { executor } = rosterOf([{ user_id: 7, ...BARE, ...BATTLETAG }], 1);
     expect(await loadCertificationPrompt(executor, 7, 42, true, true)).toBeNull();
     // Marvel Rivals : Discord est seul à compter.
-    const { executor: mr } = rosterOf([{ user_id: 7, ...BARE }], 1);
+    const { executor: mr } = rosterOf([{ user_id: 7, ...BARE }, { user_id: 8, ...BARE, ...DISCORD }], 1);
     expect(await loadCertificationPrompt(mr, 7, 42, true, false)).toBeNull();
   });
 

@@ -99,18 +99,19 @@ const MODAL_OR_PENDING_SELECTOR = '[aria-modal="true"], [data-modal-pending]';
  */
 export const YIELDING_MODAL_ATTR = "data-modal-yields";
 
+/** Même recherche, sans les modales qui cèdent leur place : la question d'une ouverture urgente. */
+const NON_YIELDING_MODAL_SELECTOR = `[aria-modal="true"]:not([${YIELDING_MODAL_ATTR}]), [data-modal-pending]:not([${YIELDING_MODAL_ATTR}])`;
+
 /** Ce que la recherche d'une modale lit du DOM. */
-type ModalRoot = Pick<ParentNode, "querySelectorAll">;
+type ModalRoot = Pick<ParentNode, "querySelector">;
 
 /**
  * Une modale est déjà ouverte (ou en chargement) : une ouverture d'office
- * attend. `overYielding` : ne compter que les modales qui ne cèdent pas leur
- * place — la question d'une ouverture urgente.
+ * n'a pas lieu. `overYielding` : ne compter que les modales qui ne cèdent pas
+ * leur place — la question d'une ouverture urgente. Une seule recherche.
  */
 export function anotherModalOpen(root: ModalRoot = document, { overYielding = false } = {}): boolean {
-  const open = Array.from(root.querySelectorAll(MODAL_OR_PENDING_SELECTOR));
-  if (!overYielding) return open.length > 0;
-  return open.some((el) => !el.hasAttribute(YIELDING_MODAL_ATTR));
+  return root.querySelector(overYielding ? NON_YIELDING_MODAL_SELECTOR : MODAL_OR_PENDING_SELECTOR) !== null;
 }
 
 /**

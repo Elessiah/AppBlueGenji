@@ -64,7 +64,7 @@ function render(prompt: CertificationPrompt, locale: "fr" | "en" = "fr"): string
 }
 
 const globals = globalThis as unknown as { document?: unknown };
-const noModal = { querySelectorAll: () => [] };
+const noModal = { querySelector: () => null };
 
 beforeEach(() => {
   globals.document = noModal;
@@ -94,7 +94,7 @@ describe("CertificationPromptDialog", () => {
   });
 
   it("ne se monte pas si une modale urgente l'a devancée pendant son chargement", () => {
-    globals.document = { querySelectorAll: () => [{ hasAttribute: () => false }] };
+    globals.document = { querySelector: () => ({}) };
     expect(render(OW_MANAGER)).toBe("");
   });
 

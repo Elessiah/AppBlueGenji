@@ -137,20 +137,6 @@ export function rememberCertificationPromptClosed(
 }
 
 /**
- * Ouverture d'office d'une invitation due, pas encore décidée :
- * - `OPEN` : ouvrir ;
- * - `SKIP` : « Ne plus voir », déjà fermée dans l'onglet, ou **une autre modale
- *   déjà ouverte** (lancement de match, changements de confidentialité…) —
- *   pas sur cette page, sans rien retenir. Attendre sa fermeture la ferait
- *   surgir au départ du match, sur le plateau.
- */
-export type CertificationPromptStep = "SKIP" | "OPEN";
-
-export function certificationPromptStep(input: { allowed: boolean; otherModalOpen: boolean }): CertificationPromptStep {
-  return input.allowed && !input.otherModalOpen ? "OPEN" : "SKIP";
-}
-
-/**
  * L'invitation telle que la fiche peut encore l'afficher. Le serveur la calcule
  * une fois par connexion du flux, et le client la rejoue d'un instantané à
  * l'autre : un tournoi clos depuis, ou une équipe qui s'est retirée, la
@@ -158,8 +144,11 @@ export function certificationPromptStep(input: { allowed: boolean; otherModalOpe
  */
 export function liveCertificationPrompt(
   detail: Pick<TournamentDetail, "certificationPrompt" | "card" | "registrations" | "myTeamId"> | null | undefined,
+  tournamentId: number,
 ): CertificationPrompt | null | undefined {
-  if (!detail) return undefined;
+  // Fiche réutilisée d'un tournoi à l'autre : rien de décidé tant que le
+  // détail lu est celui du tournoi précédent.
+  if (detail?.card.id !== tournamentId) return undefined;
   const { certificationPrompt, card, registrations, myTeamId } = detail;
   if (certificationPrompt === null || card.state === "FINISHED") return null;
   return registrations.some((row) => row.teamId === myTeamId) ? certificationPrompt : null;

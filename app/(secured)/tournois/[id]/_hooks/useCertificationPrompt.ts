@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  certificationPromptStep,
   rememberCertificationPromptClosed,
   shouldOpenCertificationPrompt,
   type CertificationPrompt,
@@ -72,11 +71,11 @@ export function useCertificationPrompt(
   useEffect(() => {
     if (decided.current || yielded.current || closed.current || prompt == null || frozen) return;
     decided.current = true;
-    const step = certificationPromptStep({
-      allowed: shouldOpenCertificationPrompt(browserStorage("localStorage"), browserStorage("sessionStorage")),
-      otherModalOpen: anotherModalOpen(),
-    });
-    if (step === "OPEN") setOpen(true);
+    // Ni « Ne plus voir », ni déjà fermée dans l'onglet, ni une autre modale
+    // déjà ouverte — l'attendre la ferait surgir au départ d'un match, sur le
+    // plateau : sinon, pas sur cette page, sans rien retenir.
+    const allowed = shouldOpenCertificationPrompt(browserStorage("localStorage"), browserStorage("sessionStorage"));
+    if (allowed && !anotherModalOpen()) setOpen(true);
   }, [tournamentId, prompt, frozen]);
 
   const close = useCallback(() => {

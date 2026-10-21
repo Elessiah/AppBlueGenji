@@ -66,10 +66,11 @@ export async function loadCertificationPrompt(
   // ne fait toujours pas un contact.
   const own = identityOf(viewer);
   const battletagUnfixable = viewer.blizzardLinked && !own.battletagVerified;
+  const teamReachable = teamHasContact(members.map(identityOf), battletagRelevant);
   const prompt = certificationPromptFor({
     isManager,
     viewer: own,
-    teamHasContact: teamHasContact(members.map(identityOf), battletagRelevant),
+    teamHasContact: teamReachable,
     battletagRelevant: battletagRelevant && !battletagUnfixable,
   });
   // Refus de la proposition de la connexion : un choix personnel, qui ne tait
@@ -78,7 +79,7 @@ export async function loadCertificationPrompt(
   // dans ce seul cas : la plupart des lecteurs n'en ont pas.
   if (prompt === null) return null;
   const onlyDiscordMissing = !prompt.discordVerified && (prompt.battletagVerified || !prompt.battletagRelevant);
-  if (prompt.reason === "MANAGER" && onlyDiscordMissing && (await certificationNudgesDeclined(executor, userId))) {
+  if (teamReachable && onlyDiscordMissing && (await certificationNudgesDeclined(executor, userId))) {
     return null;
   }
   return prompt;

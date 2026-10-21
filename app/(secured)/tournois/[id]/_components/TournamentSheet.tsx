@@ -587,7 +587,7 @@ export function TournamentSheet({ tournamentId, source }: Readonly<{ tournamentI
    */
   const frozen = fatal !== null;
   // Invitation à certifier Discord et BattleTag (`CERTIFICATION_PROMPT.md`).
-  const certificationPrompt = useCertificationPrompt(tournamentId, liveCertificationPrompt(detail), frozen);
+  const certificationPrompt = useCertificationPrompt(tournamentId, liveCertificationPrompt(detail, tournamentId), frozen);
   const canReportScore = useCallback(
     (match: BracketMatch): boolean =>
       !frozen &&

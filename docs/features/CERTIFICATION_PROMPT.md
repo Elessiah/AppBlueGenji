@@ -28,7 +28,7 @@ prend ses variantes « Discord seul » (titre, motif d'équipe, ligne
 La modale ne s'ouvre **jamais par-dessus une autre** (`aria-modal` présent :
 lancement de match, changements de confidentialité…) — deux pièges à focus se
 disputeraient Tab et Échap. Une modale déjà ouverte à la décision l'**écarte
-pour cette page**, sans rien retenir (`certificationPromptStep` → `SKIP`) :
+pour cette page**, sans rien retenir (`useCertificationPrompt`) :
 l'attendre la ferait surgir à la fermeture d'une annonce de lancement, au
 départ du match, sur le plateau. Elle revient à la prochaine fiche ouverte. Décidée,
 sa **place est tenue dans le DOM** pendant le chargement de son morceau (le
@@ -92,8 +92,8 @@ Le « Ne plus voir » donné à la **proposition de certification de la
 connexion** (`DISCORD_CERTIFY_PROMPT.md`, `bg_users.discord_certify_prompt_dismissed_at`,
 gardé sur le compte) vaut aussi ici, sur tous les appareils, pour l'invitation
 faite au **meneur** et **quand Discord est seul à manquer** (un BattleTag à
-vérifier n'était pas l'objet de ce refus) — jamais pour l'alerte d'une équipe
-sans aucun contact : lu seulement dans ce cas (`loadCertificationPrompt`), colonne absente
+vérifier n'était pas l'objet de ce refus) — jamais quand l'équipe n'a aucun
+contact, meneur compris : lu seulement dans ce cas (`loadCertificationPrompt`), colonne absente
 = sans choix. L'inverse n'est pas vrai : la case de cette modale reste une
 préférence d'affichage du navigateur.
 
@@ -118,7 +118,7 @@ donnée sur une personne, déposées à la demande du lecteur.
 
 - Règle pure, clés et lecture du stockage : `lib/shared/certification-prompt.ts`
   (`certificationPromptFor`, `teamHasContact`, `battletagRelevantFor`,
-  `certificationPromptStep`, `shouldOpenCertificationPrompt`,
+  `shouldOpenCertificationPrompt`,
   `rememberCertificationPromptClosed`).
 - Lecture : `lib/server/tournaments/certification-prompt.ts`
   (`loadCertificationPrompt`, une requête sur le roster en cours — `loadRosters`

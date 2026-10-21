@@ -5,7 +5,6 @@ import {
   battletagRelevantFor,
   certificationPromptFor,
   certificationProfileHref,
-  certificationPromptStep,
   liveCertificationPrompt,
   rememberCertificationPromptClosed,
   shouldOpenCertificationPrompt,
@@ -100,23 +99,6 @@ describe("Marvel Rivals : Discord seul", () => {
   });
 });
 
-describe("certificationPromptStep", () => {
-  const ready = { allowed: true, otherModalOpen: false };
-
-  it("ouvre une invitation due, sans autre modale", () => {
-    expect(certificationPromptStep(ready)).toBe("OPEN");
-  });
-
-  it("une autre modale déjà ouverte l'écarte (pas d'attente qui la ferait surgir au départ d'un match)", () => {
-    expect(certificationPromptStep({ ...ready, otherModalOpen: true })).toBe("SKIP");
-  });
-
-  it("se décide sans ouvrir après « Ne plus voir » ou une fermeture dans l'onglet", () => {
-    expect(certificationPromptStep({ ...ready, allowed: false })).toBe("SKIP");
-    expect(certificationPromptStep({ allowed: false, otherModalOpen: true })).toBe("SKIP");
-  });
-});
-
 describe("teamHasContact", () => {
   it("vaut vrai dès qu'un membre a l'une des deux certifications", () => {
     expect(teamHasContact([NONE, DISCORD_ONLY], true)).toBe(true);
@@ -186,7 +168,7 @@ describe("liveCertificationPrompt", () => {
   const prompt = { reason: "MANAGER", discordVerified: false, battletagVerified: true, battletagRelevant: true } as const;
   const detail = (state: TournamentState, registered: boolean, certificationPrompt: typeof prompt | null = prompt) =>
     tournamentDetail({
-      card: tournamentCard({ state }),
+      card: tournamentCard({ id: 5, state }),
       myTeamId: 42,
       certificationPrompt,
       registrations: registered
@@ -195,17 +177,21 @@ describe("liveCertificationPrompt", () => {
     });
 
   it("rejoue l'invitation tant que l'équipe est engagée dans un tournoi non clos", () => {
-    expect(liveCertificationPrompt(detail("RUNNING", true))).toEqual(prompt);
+    expect(liveCertificationPrompt(detail("RUNNING", true), 5)).toEqual(prompt);
   });
 
   it("la tait pour un tournoi clos depuis, ou une équipe retirée", () => {
-    expect(liveCertificationPrompt(detail("FINISHED", true))).toBeNull();
-    expect(liveCertificationPrompt(detail("RUNNING", false))).toBeNull();
-    expect(liveCertificationPrompt(detail("RUNNING", true, null))).toBeNull();
+    expect(liveCertificationPrompt(detail("FINISHED", true), 5)).toBeNull();
+    expect(liveCertificationPrompt(detail("RUNNING", false), 5)).toBeNull();
+    expect(liveCertificationPrompt(detail("RUNNING", true, null), 5)).toBeNull();
   });
 
   it("fiche pas encore lue : rien de décidé", () => {
-    expect(liveCertificationPrompt(undefined)).toBeUndefined();
-    expect(liveCertificationPrompt(null)).toBeUndefined();
+    expect(liveCertificationPrompt(undefined, 5)).toBeUndefined();
+    expect(liveCertificationPrompt(null, 5)).toBeUndefined();
+  });
+
+  it("détail encore celui du tournoi précédent : rien de décidé", () => {
+    expect(liveCertificationPrompt(detail("RUNNING", true), 6)).toBeUndefined();
   });
 });

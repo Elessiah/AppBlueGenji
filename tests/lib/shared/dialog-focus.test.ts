@@ -83,36 +83,41 @@ describe("focusTrapTarget", () => {
   });
 });
 
-/** Élément de modale simulé : `yields` = elle cède sa place (`data-modal-yields` sur sa racine). */
-function modal(yields = false) {
-  return { hasAttribute: (name: string) => yields && name === "data-modal-yields" };
+/**
+ * Racine simulée : des modales ouvertes, chacune cédant ou non sa place
+ * (`data-modal-yields`) ; la recherche « sans celles qui cèdent » se lit au
+ * `:not(...)` du sélecteur.
+ */
+function rootWith(...yields: boolean[]) {
+  const seen: string[] = [];
+  const root = {
+    seen,
+    querySelector: (selector: string) => {
+      seen.push(selector);
+      const candidates = selector.includes(":not([data-modal-yields])") ? yields.filter((y) => !y) : yields;
+      return candidates.length > 0 ? {} : null;
+    },
+  };
+  return root as typeof root & Pick<ParentNode, "querySelector">;
 }
-const rootWith = (...modals: unknown[]) =>
-  ({ querySelectorAll: () => modals }) as unknown as Pick<ParentNode, "querySelectorAll">;
 
 describe("anotherModalOpen", () => {
   it("lit une modale `aria-modal` ou en chargement", () => {
-    expect(anotherModalOpen(rootWith(modal()))).toBe(true);
+    expect(anotherModalOpen(rootWith(false))).toBe(true);
     expect(anotherModalOpen(rootWith())).toBe(false);
   });
 
   it("cherche aussi la place d'une modale en chargement", () => {
-    const seen: string[] = [];
-    const root = {
-      querySelectorAll: (selector: string) => {
-        seen.push(selector);
-        return [];
-      },
-    } as unknown as ParentNode;
+    const root = rootWith();
     anotherModalOpen(root);
-    expect(seen[0]).toContain("[data-modal-pending]");
+    expect(root.seen[0]).toContain("[data-modal-pending]");
   });
 
   it("une ouverture urgente passe une modale qui cède sa place, pas les autres", () => {
-    expect(anotherModalOpen(rootWith(modal(true)), { overYielding: true })).toBe(false);
-    expect(anotherModalOpen(rootWith(modal(true), modal()), { overYielding: true })).toBe(true);
+    expect(anotherModalOpen(rootWith(true), { overYielding: true })).toBe(false);
+    expect(anotherModalOpen(rootWith(true, false), { overYielding: true })).toBe(true);
     // Sans l'option, toute modale retient.
-    expect(anotherModalOpen(rootWith(modal(true)))).toBe(true);
+    expect(anotherModalOpen(rootWith(true))).toBe(true);
   });
 });
 
@@ -130,7 +135,7 @@ describe("watchModals / watchModalsClosed", () => {
   function fakeDom(initiallyOpen = true) {
     const state = { modal: initiallyOpen, disconnected: 0, observed: null as unknown };
     let callback: ((records: unknown[]) => void) | null = null;
-    globals.document = { querySelectorAll: () => (state.modal ? [modal()] : []) };
+    globals.document = { querySelector: () => (state.modal ? {} : null) };
     globals.MutationObserver = class {
       constructor(cb: (records: unknown[]) => void) {
         callback = cb;
