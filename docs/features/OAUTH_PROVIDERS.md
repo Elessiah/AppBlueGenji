@@ -159,6 +159,12 @@ l'identifiant Blizzard ne quitte jamais la base. Détacher Battle.net retire la
 pastille. Déclaré dans `PRIVACY_CHANGES` (`2026-10-pastille-battletag-fiche`),
 `/rgpd` (BattleTag) et le registre (T01).
 
+**Base légale : intérêt légitime** (`VERIFIED_BADGE_SCOPE`, `lib/shared/rgpd-policy.ts`),
+et non le consentement du BattleTag : masquer le tag retire ce consentement, la
+pastille n'en dépend donc pas. Opposition (art. 21) par le formulaire de
+signalement, catégorie RGPD — choix de l'utilisateur du 2026-10-21, sans
+réglage dédié. La pastille Discord est déclarée de même.
+
 ### « Applications connectées » (`/profil`)
 
 La section liste les trois portes, rattachées ou non, et porte les deux règles de
