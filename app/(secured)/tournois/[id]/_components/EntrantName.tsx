@@ -95,8 +95,9 @@ export function EntrantName({
   textStyle,
   title,
 }: Readonly<EntrantNameProps>) {
-  // Lien : la troncature passe par `EntityLink` (`.entity-truncate`), qui
-  // rogne sur le nom peint d'une marche du podium plutôt que sur le lien.
+  // Troncature : `.entity-truncate` (globale), par `EntityLink` pour le lien —
+  // qui rogne sur le nom peint d'une marche plutôt que sur le lien —, posée à
+  // la main sur le nom non cliquable.
   const textClass = [styles.text, textClassName ?? ""].filter(Boolean).join(" ");
   const content = children ?? name;
 
@@ -108,7 +109,7 @@ export function EntrantName({
           {content}
         </EntrantLink>
       ) : (
-        <span className={truncate ? `${textClass} ${styles.truncate}` : textClass} style={textStyle} title={title}>
+        <span className={truncate ? `${textClass} entity-truncate` : textClass} style={textStyle} title={title}>
           {content}
         </span>
       )}

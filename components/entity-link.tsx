@@ -86,7 +86,7 @@ export function EntityLink({
   // Repères posés sur le lien, lus par la feuille sans `:has()` : la famille de
   // la marche peinte dedans (`podium-tier` / `podium-member`), et son extinction.
   const marks = {
-    "data-podium": podiumClass?.split(" ")[0],
+    "data-podium": podiumClass?.split(" ").find((name) => name === "podium-tier" || name === "podium-member"),
     "data-podium-muted": podiumMuted ? "" : undefined,
   };
   if (spectator) {

@@ -54,8 +54,9 @@ export function useMemberPodiumTier(userId: number | null | undefined): PodiumTi
  * Nom peint d'une marche (`podiumTierClass`) : un `<span>` qui porte la classe,
  * ou le nom tel quel sans marche. Seul point où ce balisage s'écrit — les liens
  * d'entité (`components/entity-link.tsx`) et les noms non cliquables ci-dessous
- * le partagent, et la feuille (`.entity-link:hover > .podium-tier`, `.truncate >
- * .podium-tier`) en dépend.
+ * le partagent, et la feuille (`.entity-link:hover > .podium-tier`,
+ * `.entity-truncate[data-podium] > .podium-tier`) en dépend : le `<span>` est
+ * l'enfant direct du lien.
  */
 export function PodiumPaint({ className, children }: Readonly<{ className: string | undefined; children: ReactNode }>) {
   if (className === undefined) return <>{children}</>;
