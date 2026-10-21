@@ -3,13 +3,14 @@ import { NextRequest } from "next/server";
 
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/users/discord-certify-prompt", () => ({
+  loadDiscordCertifyPrompt: jest.fn(),
   markDiscordCertifyPromptSeen: jest.fn(),
   recordDiscordCertifyPromptOff: jest.fn(),
 }));
 
-import { POST } from "@/app/api/profile/discord/certify-prompt/route";
+import { GET, POST } from "@/app/api/profile/discord/certify-prompt/route";
 import { currentTokenHash, getCurrentUser } from "@/lib/server/auth";
-import { markDiscordCertifyPromptSeen, recordDiscordCertifyPromptOff } from "@/lib/server/users/discord-certify-prompt";
+import { loadDiscordCertifyPrompt, markDiscordCertifyPromptSeen, recordDiscordCertifyPromptOff } from "@/lib/server/users/discord-certify-prompt";
 import { middleware } from "@/middleware";
 import { authUser } from "../../../helpers/auth-user";
 
@@ -28,10 +29,47 @@ function post(body: unknown): Request {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7 }));
+  jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7, certifyPromptDue: true }));
   jest.mocked(currentTokenHash).mockResolvedValue(HASH);
   jest.mocked(markDiscordCertifyPromptSeen).mockResolvedValue(undefined);
   jest.mocked(recordDiscordCertifyPromptOff).mockResolvedValue(true);
+});
+
+describe("GET /api/profile/discord/certify-prompt (relecture avant ouverture)", () => {
+  it("due : le parcours encore offert, relu pour cette session", async () => {
+    jest.mocked(loadDiscordCertifyPrompt).mockResolvedValue({ mode: "ONE_CLICK", tag: "keryan" });
+    const response = await GET();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ prompt: { mode: "ONE_CLICK", tag: "keryan" } });
+    expect(loadDiscordCertifyPrompt).toHaveBeenCalledWith(7, HASH);
+  });
+
+  it("« Ne plus voir » ou certification faits ailleurs : null (le chargeur filtre)", async () => {
+    jest.mocked(loadDiscordCertifyPrompt).mockResolvedValue(null);
+    const response = await GET();
+    expect(await response.json()).toEqual({ prompt: null });
+  });
+
+  it("session sans marque : null sans aucune requête", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7, certifyPromptDue: false }));
+    const response = await GET();
+    expect(await response.json()).toEqual({ prompt: null });
+    expect(loadDiscordCertifyPrompt).not.toHaveBeenCalled();
+  });
+
+  it("sans session : 401 ; panne : 500, un code seulement", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValueOnce(null);
+    const anonymous = await GET();
+    expect(anonymous.status).toBe(401);
+    expect(await anonymous.json()).toEqual({ error: "UNAUTHORIZED" });
+
+    const spy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(loadDiscordCertifyPrompt).mockRejectedValueOnce(new Error("gone"));
+    const failed = await GET();
+    expect(failed.status).toBe(500);
+    expect(await failed.json()).toEqual({ error: "CERTIFY_PROMPT_FAILED" });
+    spy.mockRestore();
+  });
 });
 
 describe("POST /api/profile/discord/certify-prompt", () => {

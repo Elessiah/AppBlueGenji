@@ -147,7 +147,7 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
 
   it("ne couvre pas l'écran où un lien de la modale de confidentialité envoie agir", () => {
     expect(LAZY).toContain("if (privacyFollowedLink(event)) setFollowedLink(true);");
-    expect(LAZY).toContain("if (certified || followedLink || !armed) return null;");
+    expect(LAZY).toContain("if (certified || followedLink || revoked || !armed) return null;");
     const privacy = readSource("components/privacy/PrivacyChangesModal.tsx");
     expect(privacy).toContain("window.dispatchEvent(privacyAnsweredEvent(followedLink));");
     expect(privacy).toMatch(/const followLink = \(changeId: string\) => \{\s*close\(true\);/);
@@ -181,7 +181,7 @@ describe("mise en page racine", () => {
   it("chargée à la demande, seulement quand elle est due, chaque langue dans son morceau", () => {
     // …et seulement quand elle peut s'ouvrir (confidentialité, conditions, page), puis reste montée.
     expect(LAZY).toMatch(/const canOpen =\s*!followedLink &&\s*!certified &&\s*certifyPromptOpen\(/);
-    expect(LAZY).toContain("if (canOpen && !armed) setArmed(true);");
+    expect(LAZY).toContain("if (shown && !armed) setArmed(true);");
     expect(LAZY.match(/\{ ssr: false \}/g)).toHaveLength(2);
     expect(LAZY.match(/orReload\(/g)).toHaveLength(2);
     // Une page française ne télécharge jamais l'anglais, ni l'inverse.
@@ -201,6 +201,26 @@ describe("mise en page racine", () => {
     expect(LAZY).toContain("termsPending: termsAccepted === null ? termsPending : !termsAccepted,");
     // Certifié avant le chargement (conditions en attente) : close pour la session, une fois, sans charger la fenêtre.
     expect(LAZY).toContain("window.addEventListener(DISCORD_CERTIFIED_EVENT, onCertified)");
+  });
+
+  it("jamais sur un état périmé : relue avant une ouverture tardive, fermée en cas de doute", () => {
+    // Seule une ouverture dès le chargement se fie à la lecture de la mise en page.
+    expect(LAZY).toContain("const [confirmed, setConfirmed] = useState(canOpen);");
+    expect(LAZY).toContain("if (!canOpen && confirmed) setConfirmed(false);");
+    expect(LAZY).toMatch(/if \(!canOpen \|\| confirmed \|\| revoked \|\| answered\.current\) return;\s*let live = true;\s*recheckCertifyPrompt\(\)/);
+    expect(LAZY).toMatch(/if \(next\) \{\s*setCurrent\(next\);\s*setConfirmed\(true\);\s*\} else \{\s*setRevoked\(true\);/);
+    expect(LAZY).toContain("const shown = canOpen && confirmed && !revoked;");
+    expect(LAZY).toContain("<View prompt={current} canOpen={shown}");
+    expect(LAZY).toContain("if (certified || followedLink || revoked || !armed) return null;");
+  });
+
+  it("ouverte : relue au retour de l'onglet, fermée par une réponse d'un autre onglet — sans sondage", () => {
+    expect(LAZY).toContain('document.addEventListener("visibilitychange", check);');
+    expect(LAZY).toContain("if (event.persisted) check();");
+    expect(LAZY).toMatch(/if \(!shown\) return;\s*let inFlight = false;/);
+    expect(LAZY).toContain("const stopElsewhere = onCertifyPromptAnsweredElsewhere(onElsewhere);");
+    expect(LAZY).not.toMatch(/setInterval|setTimeout/);
+    expect(ANSWER).toContain("certifyChannel()?.postMessage(action);");
   });
 
   it("fait taire le recrutement tant qu'elle est due, quelle que soit la page", () => {

@@ -52,6 +52,20 @@ arrive avant le morceau (réponse à la confidentialité, lien d'action compris 
 conditions acceptées ou de nouveau exigées). Le toast « déjà certifié » de
 `/profil` est dans l'espace `profile` (`discord.alreadyVerified`).
 
+**Jamais sur un état périmé** (« sur aucun appareil », `/rgpd`) : la lecture
+de la mise en page ne vaut que pour une fenêtre qui s'ouvre **dès le
+chargement**. Toute ouverture plus tardive — après la confidentialité ou les
+conditions, au retour d'une page qui la tait — relit d'abord la proposition
+(`GET /api/profile/discord/certify-prompt` → `{ prompt }`, `recheckCertifyPrompt`),
+**fermée en cas de doute** (panne, refus : la marque reste, elle revient au
+chargement suivant) ; la relecture peut changer le parcours. Ouverte, elle se
+relit quand l'onglet redevient visible (`visibilitychange`, `pageshow` du cache
+avant/arrière) ; une réponse écrite dans un autre onglet du navigateur (même
+session) la ferme sans requête (`BroadcastChannel` `bg:certify-prompt`, posté
+par `answerCertifyPrompt` après succès). Aucun sondage : rien ne part tant
+qu'aucune fenêtre n'est due ni affichée, et une session sans marque répond au
+`GET` sans requête SQL.
+
 Le contournement de développement (`DEV_AUTH_USER_ID`) n'a pas de session : la
 fenêtre ne s'y montre pas. Pour la voir en local, se connecter vraiment par
 Discord ou Blizzard (ou poser la marque à la main sur sa ligne de session).
@@ -99,7 +113,8 @@ Le BattleTag n'y figure pas : il est vérifié par Battle.net au rattachement
 | « Plus tard », Échap, clic sur le voile | `POST … { action: "LATER" }` (`keepalive` : un lien qui change de document ne l'annule pas) — fermée tout de suite ; un échec d'écriture la fait seulement revenir au prochain chargement (un changement de parcours `ONE_CLICK` → `DIALOG` ne la rouvre pas) |
 | « Ne plus voir » | `POST … { action: "NEVER" }` — `bg_users.discord_certify_prompt_dismissed_at` (date du premier choix, `COALESCE`) puis **toutes** les sessions du compte (au mieux : un échec de cette seconde écriture est journalisé, le choix reste gardé et le chargeur, qui filtre sur la date, lève la marque restée) ; succès en toast, échec en toast et fenêtre gardée (compte supprimé entre-temps : fenêtre fermée, toast dédié) |
 
-Route : 401 sans session, 400 `INVALID_ACTION`, 409 `ACCOUNT_DELETED` (compte
+Route : `GET` (relecture, ci-dessus : 401 sans session, 500
+`CERTIFY_PROMPT_FAILED`) ; `POST` : 401 sans session, 400 `INVALID_ACTION`, 409 `ACCOUNT_DELETED` (compte
 supprimé entre-temps), 503 `CERTIFY_PROMPT_UNAVAILABLE` (colonne absente), 500
 `CERTIFY_PROMPT_FAILED`. Provenance vérifiée par le middleware. Aucune réponse
 ne certifie. Il n'existe pas de geste pour réafficher la fenêtre : la
