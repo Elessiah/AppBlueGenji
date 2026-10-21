@@ -498,6 +498,7 @@ function buildLaunchSide(row: CandidateRow, index: 1 | 2, ctx: LaunchContext): L
     isSolo: side.soloUserId !== null,
     ready: index === 1 ? ctx.readiness.team1Ready : ctx.readiness.team2Ready,
     contacts,
+    contactsShown: ctx.exposes,
   };
 }
 

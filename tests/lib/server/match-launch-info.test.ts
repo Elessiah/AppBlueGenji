@@ -396,6 +396,8 @@ describe("listViewerMatchLaunches — exposition des contacts", () => {
     expect(info.phase).toBe("SCHEDULED");
     expect(info.team1.contacts).toEqual([]);
     expect(info.team2.contacts).toEqual([]);
+    // La fiche lit la décision du serveur : une note, pas « Aucun contact ».
+    expect([info.team1.contactsShown, info.team2.contactsShown]).toEqual([false, false]);
     expect(info.caster).toMatchObject({ pseudo: "Caster", discordTag: null, battletag: null, contactsShown: false });
     expect(info.autoLaunchAt).toBeNull();
   });
@@ -759,6 +761,7 @@ describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => 
       expect(info?.phase).toBe("TO_PLAN");
       expect(info?.viewer).toEqual({ role: "REFEREE", canDeclareReady: false, ready: false, isCaster: false });
       expect(info?.team2.contacts).toEqual([expect.objectContaining({ userId: 5, discordTag: "cap2", battletag: "Cap#2" })]);
+      expect(info?.team2.contactsShown).toBe(true);
       // Décision du 2026-10-21 : ceux du caster aussi, dès « À planifier ».
       expect(info?.caster).toMatchObject({ discordTag: "caster", battletag: "Caster#1" });
     });

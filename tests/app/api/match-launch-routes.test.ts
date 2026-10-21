@@ -217,6 +217,7 @@ describe("GET /api/matches/[matchId]/contacts", () => {
     isSolo: false,
     ready: false,
     contacts: [],
+    contactsShown: true,
   });
   const info: MatchLaunchInfo = {
     matchId: 42,

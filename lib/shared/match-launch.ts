@@ -419,6 +419,11 @@ export type LaunchSide = {
   ready: boolean;
   /** Vide pour une fantôme, et tant que le match n'est pas en lancement. */
   contacts: LaunchContact[];
+  /**
+   * Le serveur ouvre-t-il les contacts des engagées à ce lecteur (`exposes`) ?
+   * La fiche lit cette décision : faux, une note dit quand ils viendront.
+   */
+  contactsShown: boolean;
 };
 
 export type LaunchCaster = {
@@ -510,6 +515,19 @@ export function casterContactsPending(launch: {
   viewer: Pick<MatchLaunchInfo["viewer"], "role" | "isCaster">;
 }): boolean {
   return launch.caster !== null && !viewerIsCaster(launch) && !launch.caster.contactsShown;
+}
+
+/**
+ * Annoncer l'arrivée des contacts du caster ? Seulement au passage « en
+ * attente → montrés » (relecture à l'heure de départ), jamais à l'ouverture, et
+ * pas s'il n'a aucun contact à montrer (deux « — » ne sont pas une arrivée).
+ */
+export function casterContactsArrived(
+  wasPending: boolean,
+  pending: boolean,
+  caster: Pick<LaunchCaster, "contactsShown" | "discordTag" | "battletag">,
+): boolean {
+  return wasPending && !pending && caster.contactsShown && (caster.discordTag !== null || caster.battletag !== null);
 }
 
 /**

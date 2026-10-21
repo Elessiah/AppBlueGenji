@@ -12,6 +12,7 @@ import { useState } from "react";
 import { PlayerLink, TeamLink } from "@/components/entity-link";
 import { useLaunchText } from "./launch-text";
 import {
+  casterContactsArrived,
   casterContactsPending,
   type LaunchCaster,
   type LaunchContact,
@@ -112,15 +113,12 @@ export function SideCard({
   isHost,
   phase,
   onCopy,
-  contactsShown = phase !== "SCHEDULED",
   linkNames = false,
 }: Readonly<{
   side: LaunchSide;
   isHost: boolean;
   phase: MatchLaunchInfo["phase"];
   onCopy: CopyFn;
-  /** Contacts montrés ; par défaut, pas avant le lancement (modale de lancement). */
-  contactsShown?: boolean;
   /**
    * Noms cliquables vers leurs fiches — modale « Contacts » seulement : la
    * modale de lancement survit à la navigation et recouvrirait la fiche ouverte.
@@ -149,7 +147,7 @@ export function SideCard({
           <span aria-hidden="true">🏠</span> {t("host")}
         </p>
       )}
-      <SideContacts side={side} onCopy={onCopy} shown={contactsShown} linkNames={linkNames} />
+      <SideContacts side={side} onCopy={onCopy} shown={side.contactsShown} linkNames={linkNames} />
     </section>
   );
 }
@@ -189,19 +187,6 @@ function SideContacts({
   );
 }
 
-/**
- * Annoncer l'arrivée des contacts du caster ? Seulement au passage « en
- * attente → montrés » (relecture à l'heure de départ), jamais à l'ouverture, et
- * pas s'il n'a aucun contact à montrer (deux « — » ne sont pas une arrivée).
- */
-export function casterContactsArrived(
-  wasPending: boolean,
-  pending: boolean,
-  caster: Pick<LaunchCaster, "contactsShown" | "discordTag" | "battletag">,
-): boolean {
-  return wasPending && !pending && caster.contactsShown && (caster.discordTag !== null || caster.battletag !== null);
-}
-
 export function CasterCard({
   caster,
   phase,
@@ -224,15 +209,17 @@ export function CasterCard({
   linkNames?: boolean;
 }>) {
   const { t } = useLaunchText();
-  const pending = caster !== null && casterContactsPending({ caster, viewer });
+  const pending = casterContactsPending({ caster, viewer });
   // La note cède la place aux contacts (relecture à l'heure de départ) : une
-  // phrase courte l'annonce. Retenu au passage « en attente → montrés »
-  // seulement (état précédent gardé au rendu), jamais à l'ouverture.
-  const [wasPending, setWasPending] = useState(pending);
+  // phrase courte l'annonce. Retenu au seul passage « en attente → montrés »
+  // d'un même caster (état précédent gardé au rendu), jamais à l'ouverture ;
+  // un autre caster, ou plus de caster, efface l'annonce.
+  const casterId = caster?.userId ?? null;
+  const [previous, setPrevious] = useState({ pending, casterId });
   const [arrived, setArrived] = useState(false);
-  if (wasPending !== pending) {
-    setWasPending(pending);
-    setArrived(caster !== null && casterContactsArrived(wasPending, pending, caster));
+  if (previous.pending !== pending || previous.casterId !== casterId) {
+    setPrevious({ pending, casterId });
+    setArrived(caster !== null && previous.casterId === casterId && casterContactsArrived(previous.pending, pending, caster));
   }
   if (!caster) {
     return (

@@ -5,11 +5,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { closedNoticeText } from "@/app/(secured)/tournois/[id]/_components/PlayerScoreDialog";
 import { startAtHint } from "@/app/(secured)/tournois/[id]/_components/MatchScheduleDialog";
 import { anotherModalOpen } from "@/components/match-launch/MatchLaunchCenter";
-import { CasterCard, SideCard, casterContactsArrived } from "@/components/match-launch/LaunchContactCards";
+import { CasterCard, SideCard } from "@/components/match-launch/LaunchContactCards";
 import { contactsErrorText } from "@/components/match-launch/MatchContactsDialog";
 import { FR_LAUNCH_TEXT } from "@/components/match-launch/launch-text";
 import { tournamentDialogsText } from "@/lib/shared/tournament-actions-text";
-import { exposesCasterContacts, viewerIsCaster, type LaunchSide, type MatchLaunchInfo } from "@/lib/shared/match-launch";
+import { casterContactsArrived, exposesCasterContacts, viewerIsCaster, type LaunchSide, type MatchLaunchInfo } from "@/lib/shared/match-launch";
 import frDialogs from "@/messages/fr/tournamentDialogs.json";
 import enDialogs from "@/messages/en/tournamentDialogs.json";
 import frActions from "@/messages/fr/tournamentActions.json";
@@ -219,6 +219,7 @@ describe("fiches de contact — noms cliquables", () => {
     isSolo: false,
     ready: false,
     contacts: [contact],
+    contactsShown: true,
     ...overrides,
   });
   const noop = async () => {};
@@ -243,7 +244,7 @@ describe("fiches de contact — noms cliquables", () => {
     expect(html).not.toContain("/equipes/");
     expect(html).toContain('href="/joueurs/7"');
     const hidden = renderToStaticMarkup(
-      <SideCard side={side({ isSolo: true, contacts: [] })} isHost={false} phase="SCHEDULED" onCopy={noop} linkNames />,
+      <SideCard side={side({ isSolo: true, contacts: [], contactsShown: false })} isHost={false} phase="SCHEDULED" onCopy={noop} linkNames />,
     );
     expect(hidden).not.toContain("href=");
   });
@@ -266,7 +267,7 @@ describe("fiches de contact — noms cliquables", () => {
   // La carte rend la décision du serveur (`exposesCasterContacts`, portée par la réponse).
   describe("caster : contacts ou note, selon la phase et le lecteur", () => {
     const caster = { userId: 9, pseudo: "Voix", discordTag: "voix", battletag: null, battletagVerified: false, ready: false };
-    const NOTE = "Ses contacts s&#x27;afficheront au départ du match.";
+    const NOTE = "Ses contacts s&#x27;afficheront au lancement.";
     const render = (phase: MatchLaunchInfo["phase"], viewer: { role: MatchLaunchInfo["viewer"]["role"]; isCaster: boolean }) =>
       renderToStaticMarkup(
         <CasterCard

@@ -366,7 +366,10 @@ export function MatchLaunchCenter({
               <SideCard side={current.team2} isHost={current.hostTeamId === current.team2.teamId} phase={current.phase} onCopy={copy} />
             </div>
 
+            {/* Une carte par match : l'annonce d'arrivée ne survit pas au passage
+                à un autre match (« Autre match »). */}
             <CasterCard
+              key={current.matchId}
               caster={current.caster}
               phase={current.phase}
               onCopy={copy}

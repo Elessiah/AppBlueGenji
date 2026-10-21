@@ -82,7 +82,7 @@
     "loading": "Loading contacts…",
     "notShown": "Contacts not shown.",
     "noCaster": "No caster signed up for this match.",
-    "casterLater": "Their contacts will show once the match starts.",
+    "casterLater": "Their contacts will show up at launch.",
     "casterShown": "The caster's contacts are now shown.",
     "unavailable": "This match's contacts aren't available to you right now.",
     "failed": "Contacts could not be loaded. Try again in a moment."
