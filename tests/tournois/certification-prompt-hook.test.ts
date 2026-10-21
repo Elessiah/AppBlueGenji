@@ -219,11 +219,13 @@ describe("useCertificationPrompt", () => {
     expect(session.values.size + local.values.size).toBe(0);
     expect(render(PROMPT).prompt).toBe(PROMPT);
     render(null);
-    // Une autre modale s'est ouverte entre-temps : écartée pour la page.
+    // Une autre modale s'est ouverte entre-temps : écartée…
     modals.open = true;
     expect(render(PROMPT).prompt).toBeNull();
+    // …mais une invitation retirée puis revenue repasse par la décision.
     modals.open = false;
-    expect(render({ ...PROMPT }).prompt).toBeNull();
+    render(null);
+    expect(render({ ...PROMPT }).prompt).toEqual(PROMPT);
   });
 
   it("une fiche figée masque la modale et n'ouvre rien", () => {

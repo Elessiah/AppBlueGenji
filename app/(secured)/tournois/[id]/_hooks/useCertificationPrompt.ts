@@ -78,10 +78,10 @@ export function useCertificationPrompt(prompt: CertificationPrompt | null | unde
   // ferme sans rien retenir, et la décision reprend à son retour — autre
   // modale ouverte entre-temps comprise.
   useEffect(() => {
-    if (prompt !== null || !open) return;
+    if (prompt !== null) return;
     decided.current = false;
     setOpen(false);
-  }, [prompt, open]);
+  }, [prompt]);
 
   // Affichée seulement : invitation présente et fiche vivante.
   const shown = open && prompt != null && !frozen;

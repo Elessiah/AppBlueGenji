@@ -119,8 +119,9 @@ export function CertificationPromptDialog({
       <div className={s.table} role="table" aria-labelledby="certification-prompt-caption">
         <div role="rowgroup" className={s.head}>
           <div role="row" className={s.row}>
-            <span role="columnheader" className="sr-only">
-              {t("certification.colTopic")}
+            {/* L'en-tête garde sa case de grille ; seul son texte est masqué. */}
+            <span role="columnheader">
+              <span className="sr-only">{t("certification.colTopic")}</span>
             </span>
             <span role="columnheader">{t("certification.colDoes")}</span>
             <span role="columnheader">{t("certification.colDoesNot")}</span>

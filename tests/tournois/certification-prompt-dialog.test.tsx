@@ -108,6 +108,8 @@ describe("CertificationPromptDialog", () => {
     expect(html).toContain('role="table" aria-labelledby="certification-prompt-caption"');
     expect(html.match(/role="rowheader"/g)).toHaveLength(4);
     expect(html.match(/role="columnheader"/g)).toHaveLength(3);
+    // L'en-tête masqué garde sa case de grille : seul son texte est `sr-only`.
+    expect(html).toContain('<span role="columnheader"><span class="sr-only">');
     expect(html.match(/role="cell"/g)).toHaveLength(8);
   });
 
