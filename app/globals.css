@@ -218,13 +218,16 @@ a {
 /* Dans un lien d'entité, la graisse de la marche se pose sur le lien et le nom
    peint en hérite : à spécificité d'une classe (`:where`), la classe ou le
    style de l'appelant l'emportent, comme quand la marche habillait le lien
-   lui-même. Éteinte (`data-podium-muted`), la marche n'impose aucune graisse. */
-:where(.entity-link, .entity-name):where(:not([data-podium-muted], [data-podium-muted] *)):has(> .podium-tier) {
-  font-weight: 700;
-}
+   lui-même. Éteinte (`data-podium-muted`), la marche n'impose aucune graisse.
+   Sans `:has()`, le nom peint garde ses 700. */
+@supports selector(:has(*)) {
+  :where(.entity-link, .entity-name):where(:not([data-podium-muted], [data-podium-muted] *)):has(> .podium-tier) {
+    font-weight: 700;
+  }
 
-:where(.entity-link, .entity-name) > .podium-tier {
-  font-weight: inherit;
+  :where(.entity-link, .entity-name) > .podium-tier {
+    font-weight: inherit;
+  }
 }
 
 .podium-tier-1 {

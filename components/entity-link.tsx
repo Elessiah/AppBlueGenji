@@ -65,9 +65,6 @@ function tierClassName(override: PodiumTier | null | undefined, fromContext: Pod
   return podiumTierClass(override === undefined ? fromContext : override, kind);
 }
 
-/** Classe de la marche du podium à peindre sur le nom (`podiumTierClass`). */
-type PodiumClass = { podiumClass?: string };
-
 export function EntityLink({
   href,
   children,
@@ -75,7 +72,7 @@ export function EntityLink({
   podiumClass,
   podiumMuted = false,
   ...rest
-}: Readonly<EntityLinkProps & PodiumClass & { href: string }>) {
+}: Readonly<EntityLinkProps & { href: string; /** Classe de la marche à peindre sur le nom (`podiumTierClass`). */ podiumClass?: string }>) {
   const spectator = useSpectatorView();
   const name = <PodiumPaint className={podiumClass}>{children}</PodiumPaint>;
   const muted = podiumMuted ? "" : undefined;
