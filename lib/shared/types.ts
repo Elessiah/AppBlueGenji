@@ -292,6 +292,14 @@ export type PublicUserProfile = {
    * d'inscription. Voir `canSeeDiscordVerification`.
    */
   discordVerified?: boolean;
+  /**
+   * Le BattleTag a-t-il été prouvé par un compte Battle.net rattaché ?
+   *
+   * Comme `discordVerified`, **ne suit pas `overwatchBattletag`** : masqué, le
+   * tag est effacé de la fiche mais la pastille reste (« Masqué ✅ »). Voir
+   * `canSeeBattletagVerification`.
+   */
+  battletagVerified?: boolean;
   // Enriched fields for /joueurs listing
   /**
    * Compte anonymisé (`bg_users.is_deleted`).

@@ -2,7 +2,7 @@
 
 import { TeamLink } from "@/components/entity-link";
 import { PlayerPodiumName } from "@/components/podium-tiers";
-import { DiscordTag } from "@/components/discord-tag";
+import { DiscordTag, VerifiedBadge } from "@/components/discord-tag";
 import { useParams } from "next/navigation";
 import { useEffect } from "react";
 import { UserX } from "lucide-react";
@@ -45,6 +45,23 @@ function isTournamentState(state: string): state is TournamentState {
 /** État d'un tournoi de l'historique : il s'affichait en code brut (`FINISHED`). */
 function tournamentStateLabel(text: PlayersText, state: string): string {
   return isTournamentState(state) ? text.t(`page.state.${state}`) : state;
+}
+
+/**
+ * Indication sous un BattleTag masqué, pour son seul titulaire. La phrase sur
+ * la pastille ne vient que si la pastille est là : un BattleTag saisi à la main
+ * n'en a pas.
+ */
+function battletagHiddenHint(text: PlayersText, data: FullProfileResponse, verified: boolean): string | null {
+  if (!data.isSelf || !data.profile.overwatchBattletag || data.profile.visibility.overwatch) return null;
+  const hidden = text.t("page.battletagHiddenSelf");
+  return verified ? `${hidden} ${text.t("page.battletagHiddenSelfBadge")}` : hidden;
+}
+
+/** `aria-describedby` des seuls identifiants présents, ou rien. */
+function describedBy(ids: Record<string, boolean>): string | undefined {
+  const present = Object.keys(ids).filter((id) => ids[id]);
+  return present.length > 0 ? present.join(" ") : undefined;
 }
 
 function HistoryEmpty({ empty, message }: { empty: boolean; message: string }) {
@@ -102,10 +119,12 @@ export default function PlayerDetailPage() {
   // Un BattleTag masqué n'arrive jusqu'ici que pour son titulaire : pour tout
   // autre lecteur, il ne se lit que dans la fenêtre « Contacts » d'un match
   // (`lib/shared/battletag-visibility.ts`).
-  const battletagHint =
-    data.isSelf && data.profile.overwatchBattletag && !data.profile.visibility.overwatch
-      ? t("page.battletagHiddenSelf")
-      : null;
+  const battletagVerified = Boolean(data.profile.battletagVerified);
+  const battletagHint = battletagHiddenHint(text, data, battletagVerified);
+  const battletagDescribedBy = describedBy({
+    "player-battletag-verified": battletagVerified,
+    "player-battletag-hint": Boolean(battletagHint),
+  });
 
   // Un compte supprimé garde sa fiche — ses résultats appartiennent aussi à
   // ceux qu'il a affrontés —, mais sous un pseudo d'emprunt qui se lit comme
@@ -229,12 +248,27 @@ export default function PlayerDetailPage() {
           <div className="form-grid">
             <div className="field">
               <label htmlFor="player-battletag">{t("page.battletag")}</label>
-              <input
-                id="player-battletag"
-                value={data.profile.overwatchBattletag || t("page.hidden")}
-                readOnly
-                aria-describedby={battletagHint ? "player-battletag-hint" : undefined}
-              />
+              {/* La pastille ne suit pas le tag : « Masqué ✅ » dit qu'un
+                  BattleTag est prouvé par Battle.net sans dire lequel. Le
+                  lecteur d'écran l'entend avec le champ (`aria-describedby`) :
+                  l'image, elle, devient décorative pour ne pas la dire deux fois. */}
+              <div className={styles.taggedInput}>
+                <input
+                  id="player-battletag"
+                  value={data.profile.overwatchBattletag || t("page.hidden")}
+                  readOnly
+                  style={battletagVerified ? { paddingRight: 34 } : undefined}
+                  aria-describedby={battletagDescribedBy}
+                />
+                {battletagVerified ? (
+                  <span className={styles.taggedBadge}>
+                    <VerifiedBadge labels={{ alt: "", title: t("page.battletagVerifiedTitle") }} />
+                    <span id="player-battletag-verified" className="sr-only">
+                      {t("page.battletagVerifiedAlt")}
+                    </span>
+                  </span>
+                ) : null}
+              </div>
               {/*
                 Un BattleTag masqué qui s'affiche quand même doit le dire : sans
                 cette phrase, le lecteur à qui un match l'ouvre le croirait public,

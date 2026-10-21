@@ -145,6 +145,26 @@ la liste par un appel à part, donc il ne la connaît pas au premier rendu. Ouvr
 **toute** la sauvegarde, le `PATCH` étant indivisible ; verrouiller à tort ne coûte
 qu'un rechargement.
 
+### Pastille « BattleTag vérifié » sur la fiche
+
+Un BattleTag tiré d'un compte Battle.net rattaché (`blizzard_sub` posé et
+`overwatch_battletag` rempli — la même règle que `battletagVerified` des
+contacts de match) porte sur la fiche `/joueurs/[id]` la pastille de
+certification, posée dans le champ (sa largeur ne change pas). Comme celle du tag Discord, **elle ne suit pas
+le tag** (`canSeeBattletagVerification`, `lib/shared/battletag-visibility.ts`) :
+masqué, le BattleTag est effacé par `applyVisibility` et la fiche lit
+« Masqué ✅ ». Le fait est calculé dans `getFullProfile` **avant** l'effacement,
+et sort en booléen seul (`PublicUserProfile.battletagVerified`) :
+l'identifiant Blizzard ne quitte jamais la base. Détacher Battle.net retire la
+pastille. Déclaré dans `PRIVACY_CHANGES` (`2026-10-pastille-battletag-fiche`),
+`/rgpd` (BattleTag) et le registre (T01).
+
+**Base légale : intérêt légitime** (`VERIFIED_BADGE_SCOPE`, `lib/shared/rgpd-policy.ts`),
+et non le consentement du BattleTag : masquer le tag retire ce consentement, la
+pastille n'en dépend donc pas. Opposition (art. 21) par le formulaire de
+signalement, catégorie RGPD — choix de l'utilisateur du 2026-10-21, sans
+réglage dédié. La pastille Discord est déclarée de même.
+
 ### « Applications connectées » (`/profil`)
 
 La section liste les trois portes, rattachées ou non, et porte les deux règles de
