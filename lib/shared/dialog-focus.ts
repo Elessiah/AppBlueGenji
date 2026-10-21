@@ -112,8 +112,11 @@ export function anotherModalOpen(root: ModalRoot = document, { overYielding = fa
   return open.some((el) => !el.hasAttribute(YIELDING_MODAL_ATTR));
 }
 
-/** Délai minimal entre deux relectures d'un guet : un plateau en direct mute sans cesse. */
-const WATCH_THROTTLE_MS = 250;
+/**
+ * Délai minimal entre deux relectures d'un guet : un plateau en direct mute
+ * sans cesse. Une seconde, la cadence de l'ancien guet du centre de lancement.
+ */
+const WATCH_THROTTLE_MS = 1_000;
 
 /** Ce que les guets observent : arrivée, départ ou marquage d'une modale. */
 const MODAL_OBSERVATION: MutationObserverInit = {

@@ -7,8 +7,7 @@ import {
   shouldOpenCertificationPrompt,
   type CertificationPrompt,
 } from "@/lib/shared/certification-prompt";
-import { anotherModalOpen, watchModalsClosed, watchUrgentModalOpened } from "@/lib/shared/dialog-focus";
-import { useClientPower } from "@/lib/shared/hooks/useClientPower";
+import { anotherModalOpen, watchUrgentModalOpened } from "@/lib/shared/dialog-focus";
 
 /** Un stockage du navigateur, `null` s'il est inaccessible (accès refusé, rendu serveur). */
 function browserStorage(kind: "localStorage" | "sessionStorage"): Storage | null {
@@ -26,8 +25,9 @@ function browserStorage(kind: "localStorage" | "sessionStorage"): Storage | null
  * rouvrent pas.
  *
  * Jamais par-dessus une autre modale (lancement de match, changements de
- * confidentialité…) : elle attend sa fermeture, guettée par un observateur du
- * DOM tant que l'onglet est visible (`useClientPower().clocks`). Décidée, sa
+ * confidentialité…) : une modale déjà ouverte à la décision l'écarte pour
+ * cette page, sans rien retenir — l'attendre la ferait surgir au départ du
+ * match, sur le plateau. Décidée, sa
  * place est tenue dans le DOM pendant le chargement de son morceau
  * (`data-modal-pending`, `TournamentSheet`). Elle **cède sa place**
  * (`data-modal-yields`) : une modale urgente — le lancement d'un match — passe
@@ -44,22 +44,19 @@ function browserStorage(kind: "localStorage" | "sessionStorage"): Storage | null
  * jour). Une fiche figée la masque aussi.
  */
 export function useCertificationPrompt(prompt: CertificationPrompt | null | undefined, frozen: boolean) {
-  const { clocks } = useClientPower();
   const [open, setOpen] = useState(false);
   const [neverAgain, setNeverAgain] = useState(false);
-  const [recheck, setRecheck] = useState(0);
   const decided = useRef(false);
 
   useEffect(() => {
     if (decided.current || prompt == null || frozen) return;
+    decided.current = true;
     const step = certificationPromptStep({
       allowed: shouldOpenCertificationPrompt(browserStorage("localStorage"), browserStorage("sessionStorage")),
       otherModalOpen: anotherModalOpen(),
     });
-    if (step === "WAIT") return clocks ? watchModalsClosed(() => setRecheck((n) => n + 1)) : undefined;
-    decided.current = true;
     if (step === "OPEN") setOpen(true);
-  }, [prompt, frozen, clocks, recheck]);
+  }, [prompt, frozen]);
 
   const close = useCallback(() => {
     rememberCertificationPromptClosed(browserStorage("localStorage"), browserStorage("sessionStorage"), neverAgain);

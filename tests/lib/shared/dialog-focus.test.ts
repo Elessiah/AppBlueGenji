@@ -151,13 +151,13 @@ describe("watchModals / watchModalsClosed", () => {
     watchModalsClosed(() => calls.push(1));
     expect(state.observed).toEqual(expect.objectContaining({ childList: true, subtree: true }));
     mutate();
-    jest.advanceTimersByTime(300);
+    jest.advanceTimersByTime(1_100);
     expect(calls).toHaveLength(0);
     state.modal = false;
     mutate();
     mutate();
     expect(calls).toHaveLength(0);
-    jest.advanceTimersByTime(300);
+    jest.advanceTimersByTime(1_100);
     expect(calls).toHaveLength(1);
     expect(state.disconnected).toBe(1);
   });
@@ -201,7 +201,7 @@ describe("watchModals / watchModalsClosed", () => {
     state.modal = false;
     mutate();
     stop();
-    jest.advanceTimersByTime(300);
+    jest.advanceTimersByTime(1_100);
     expect(calls).toHaveLength(0);
     expect(state.disconnected).toBe(1);
   });

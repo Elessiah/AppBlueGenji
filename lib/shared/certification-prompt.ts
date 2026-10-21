@@ -137,17 +137,17 @@ export function rememberCertificationPromptClosed(
 }
 
 /**
- * Où en est l'ouverture d'office d'une invitation due, pas encore décidée :
- * - `SKIP` : « Ne plus voir » ou déjà fermée dans l'onglet — décidé, sans ouvrir ;
- * - `WAIT` : une autre modale est ouverte — deux pièges à focus se
- *   disputeraient Tab et Échap, l'invitation attend sa fermeture ;
- * - `OPEN` : ouvrir.
+ * Ouverture d'office d'une invitation due, pas encore décidée :
+ * - `OPEN` : ouvrir ;
+ * - `SKIP` : « Ne plus voir », déjà fermée dans l'onglet, ou **une autre modale
+ *   déjà ouverte** (lancement de match, changements de confidentialité…) —
+ *   pas sur cette page, sans rien retenir. Attendre sa fermeture la ferait
+ *   surgir au départ du match, sur le plateau.
  */
-export type CertificationPromptStep = "SKIP" | "WAIT" | "OPEN";
+export type CertificationPromptStep = "SKIP" | "OPEN";
 
 export function certificationPromptStep(input: { allowed: boolean; otherModalOpen: boolean }): CertificationPromptStep {
-  if (!input.allowed) return "SKIP";
-  return input.otherModalOpen ? "WAIT" : "OPEN";
+  return input.allowed && !input.otherModalOpen ? "OPEN" : "SKIP";
 }
 
 /**

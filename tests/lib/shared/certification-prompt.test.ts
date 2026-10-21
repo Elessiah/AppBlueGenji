@@ -107,8 +107,8 @@ describe("certificationPromptStep", () => {
     expect(certificationPromptStep(ready)).toBe("OPEN");
   });
 
-  it("attend la fermeture d'une autre modale", () => {
-    expect(certificationPromptStep({ ...ready, otherModalOpen: true })).toBe("WAIT");
+  it("une autre modale déjà ouverte l'écarte (pas d'attente qui la ferait surgir au départ d'un match)", () => {
+    expect(certificationPromptStep({ ...ready, otherModalOpen: true })).toBe("SKIP");
   });
 
   it("se décide sans ouvrir après « Ne plus voir » ou une fermeture dans l'onglet", () => {

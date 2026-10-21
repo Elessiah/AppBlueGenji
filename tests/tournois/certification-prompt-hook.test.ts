@@ -57,23 +57,14 @@ jest.mock("react", () => ({
   },
 }));
 
-const power = { clocks: true };
-jest.mock("@/lib/shared/hooks/useClientPower", () => ({ useClientPower: () => power }));
 
 const modals = {
   open: false,
-  closedWatchers: [] as (() => void)[],
   yieldWatchers: [] as (() => void)[],
   stopped: 0,
 };
 jest.mock("@/lib/shared/dialog-focus", () => ({
   anotherModalOpen: () => modals.open,
-  watchModalsClosed: (onClosed: () => void) => {
-    modals.closedWatchers.push(onClosed);
-    return () => {
-      modals.stopped += 1;
-    };
-  },
   watchUrgentModalOpened: (onMet: () => void) => {
     modals.yieldWatchers.push(onMet);
     return () => {
@@ -146,9 +137,7 @@ beforeEach(() => {
   bench.refs = [];
   bench.callbacks = [];
   bench.effects = [];
-  power.clocks = true;
   modals.open = false;
-  modals.closedWatchers = [];
   modals.yieldWatchers = [];
   modals.stopped = 0;
   local = memoryStorage();
@@ -197,22 +186,13 @@ describe("useCertificationPrompt", () => {
     expect(render(PROMPT).prompt).toBeNull();
   });
 
-  it("attend la fermeture d'une autre modale, puis s'ouvre", () => {
+  it("une autre modale déjà ouverte l'écarte pour la page, sans rien retenir", () => {
     modals.open = true;
     expect(render(PROMPT).prompt).toBeNull();
-    expect(modals.closedWatchers).toHaveLength(1);
+    // L'annonce de lancement se ferme au départ du match : rien ne surgit.
     modals.open = false;
-    expect(act(() => modals.closedWatchers[0](), PROMPT).prompt).toBe(PROMPT);
-  });
-
-  it("onglet caché : n'arme aucun guet, et s'ouvre au retour", () => {
-    modals.open = true;
-    power.clocks = false;
-    expect(render(PROMPT).prompt).toBeNull();
-    expect(modals.closedWatchers).toHaveLength(0);
-    modals.open = false;
-    power.clocks = true;
-    expect(render(PROMPT).prompt).toBe(PROMPT);
+    expect(render({ ...PROMPT }).prompt).toBeNull();
+    expect(session.values.size + local.values.size).toBe(0);
   });
 
   it("cède sa place à une modale urgente pour le reste de la page, sans rien retenir", () => {
@@ -223,7 +203,6 @@ describe("useCertificationPrompt", () => {
     expect(session.values.size + local.values.size).toBe(0);
     // L'annonce de lancement se ferme : l'invitation ne revient pas sur cette page.
     expect(render({ ...PROMPT }).prompt).toBeNull();
-    expect(modals.closedWatchers).toHaveLength(0);
   });
 
   it("cédant sa place, une case « Ne plus voir » cochée est retenue pour de bon", () => {
@@ -240,18 +219,11 @@ describe("useCertificationPrompt", () => {
     expect(session.values.size + local.values.size).toBe(0);
     expect(render(PROMPT).prompt).toBe(PROMPT);
     render(null);
-    // Une autre modale s'est ouverte entre-temps : l'invitation attend.
+    // Une autre modale s'est ouverte entre-temps : écartée pour la page.
     modals.open = true;
     expect(render(PROMPT).prompt).toBeNull();
-    expect(modals.closedWatchers.length).toBeGreaterThan(0);
-  });
-
-  it("onglet caché : le guet de l'urgente reste armé (sans minuterie)", () => {
-    render(PROMPT);
-    power.clocks = false;
-    render(PROMPT);
-    expect(modals.yieldWatchers.length).toBeGreaterThan(0);
-    expect(act(() => modals.yieldWatchers.at(-1)?.(), PROMPT).prompt).toBeNull();
+    modals.open = false;
+    expect(render({ ...PROMPT }).prompt).toBeNull();
   });
 
   it("une fiche figée masque la modale et n'ouvre rien", () => {

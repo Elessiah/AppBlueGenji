@@ -27,9 +27,10 @@ prend ses variantes « Discord seul » (titre, motif d'équipe, ligne
 
 La modale ne s'ouvre **jamais par-dessus une autre** (`aria-modal` présent :
 lancement de match, changements de confidentialité…) — deux pièges à focus se
-disputeraient Tab et Échap. Elle attend sa fermeture, guettée par un
-observateur du DOM (`watchModalsClosed`, relectures espacées de 250 ms), armé
-tant que l'onglet est visible (`useClientPower().clocks`, réarmé au retour) ; la décision pure est `certificationPromptStep`. Décidée,
+disputeraient Tab et Échap. Une modale déjà ouverte à la décision l'**écarte
+pour cette page**, sans rien retenir (`certificationPromptStep` → `SKIP`) :
+l'attendre la ferait surgir à la fermeture d'une annonce de lancement, au
+départ du match, sur le plateau. Elle revient à la prochaine fiche ouverte. Décidée,
 sa **place est tenue dans le DOM** pendant le chargement de son morceau (le
 `loading` de son `dynamic()` rend un `data-modal-pending`) : le centre de
 lancement ne s'ouvre pas en même temps qu'elle par accident. Mais elle **cède
