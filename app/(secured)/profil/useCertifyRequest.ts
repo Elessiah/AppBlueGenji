@@ -3,13 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useProfileText } from "@/components/i18n/profile-text";
 import { useToast } from "@/components/ui/toast";
-import {
-  CERTIFY_DIALOG_EVENT,
-  CERTIFY_QUERY_PARAM,
-  DISCORD_CERTIFIED_EVENT,
-  certifiedFromProfile,
-  wantsCertifyDialog,
-} from "@/lib/shared/discord-certify-prompt";
+import { CERTIFY_QUERY_PARAM, certifiedFromProfile, wantsCertifyDialog } from "@/lib/shared/discord-certify-prompt";
+import { CERTIFY_DIALOG_EVENT, DISCORD_CERTIFIED_EVENT } from "@/lib/shared/discord-certify-events";
 
 /**
  * Ouvre le dialogue de certification quand la fenêtre de connexion

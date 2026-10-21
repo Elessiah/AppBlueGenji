@@ -39,7 +39,8 @@ export type AuthUser = {
    * La session (ouverte par Discord ou Blizzard) doit encore proposer la
    * certification du tag Discord (`bg_user_sessions.certify_prompt_due`) —
    * posée d'après l'état du compte **à la connexion** (non certifié, sans « Ne
-   * plus voir ») ; `loadDiscordCertifyPrompt` ne revérifie que ce qui a changé depuis.
+   * plus voir ») ; `loadDiscordCertifyPrompt` revérifie toutes les conditions
+   * (un compte certifié ou « Ne plus voir » depuis, ailleurs, s'y arrête).
    */
   certifyPromptDue: boolean;
 };
@@ -155,7 +156,9 @@ async function insertSession(tokenHash: string, userId: number, certifyPromptDue
        VALUES (?, ?, DATE_ADD(NOW(), INTERVAL ? DAY))`,
       [tokenHash, userId, SESSION_TTL_DAYS],
     );
-  if (!certifyPromptDue) {
+  // Colonnes absentes (`ALTER` échoué) : retenu pour le processus, aucune
+  // connexion ne repaie l'essai voué à l'échec.
+  if (!certifyPromptDue || CERTIFY_INSERT_UNAVAILABLE.value) {
     await plain();
     return;
   }
@@ -173,9 +176,13 @@ async function insertSession(tokenHash: string, userId: number, certifyPromptDue
     );
   } catch (error) {
     if (!isUnknownColumnError(error)) throw error;
+    CERTIFY_INSERT_UNAVAILABLE.value = true;
     await plain();
   }
 }
+
+/** L'écriture de session avec la marque est tombée sur une colonne absente, pour ce processus. */
+const CERTIFY_INSERT_UNAVAILABLE = { value: false };
 
 /**
  * « Ne plus afficher » choisi sur ce navigateur avant la connexion : reporté
@@ -381,6 +388,7 @@ const UNKNOWN_COLUMN_SQL = new Set<string>();
 /** Tests : oublie les lectures mémorisées comme en échec. */
 export function resetUnknownColumnMemoForTests(): void {
   UNKNOWN_COLUMN_SQL.clear();
+  CERTIFY_INSERT_UNAVAILABLE.value = false;
 }
 
 async function getDevBypassUser(): Promise<AuthUser | null> {

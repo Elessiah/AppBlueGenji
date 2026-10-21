@@ -8,12 +8,8 @@ import { richNodes } from "@/components/i18n/shell-text";
 import { useToast } from "@/components/ui/toast";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
-import {
-  CERTIFY_DIALOG_EVENT,
-  CERTIFY_PROFILE_HREF,
-  DISCORD_CERTIFIED_EVENT,
-  type CertifyPrompt,
-} from "@/lib/shared/discord-certify-prompt";
+import { CERTIFY_PROFILE_HREF, type CertifyPrompt } from "@/lib/shared/discord-certify-prompt";
+import { CERTIFY_DIALOG_EVENT, DISCORD_CERTIFIED_EVENT } from "@/lib/shared/discord-certify-events";
 import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
 import { visibleText } from "@/lib/shared/visible-text";
 import { answerCertifyPrompt as answerPrompt } from "./certify-prompt-answer";

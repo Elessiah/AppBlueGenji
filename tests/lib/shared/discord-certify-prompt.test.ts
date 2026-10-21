@@ -7,10 +7,10 @@ import {
   certifyPromptFor,
   parseCertifyPromptAction,
   wantsCertifyDialog,
-  DISCORD_CERTIFIED_EVENT,
   certifiedFromProfile,
   certifiedFromProfileEvent,
 } from "@/lib/shared/discord-certify-prompt";
+import { DISCORD_CERTIFIED_EVENT } from "@/lib/shared/discord-certify-events";
 import { CONNECTION_LOG_EVENTS } from "@/lib/shared/connection-logs";
 import {
   certifyPromptOpen,

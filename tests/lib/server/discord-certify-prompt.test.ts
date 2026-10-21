@@ -127,6 +127,19 @@ describe("recordDiscordCertifyPromptOff — « Ne plus voir »", () => {
     ]);
   });
 
+  it("sessions non levées (panne) : le choix est gardé, true, erreur journalisée", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([{ affectedRows: 1 }, []])
+      .mockRejectedValueOnce(new Error("lock wait timeout"));
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    expect(await recordDiscordCertifyPromptOff(7)).toBe(true);
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(log).toHaveBeenCalledWith("[discord-certify-prompt] sessions non levées", expect.any(Error));
+    log.mockRestore();
+  });
+
   it("compte supprimé : false, aucune session touchée", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 0 }, []]);
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));

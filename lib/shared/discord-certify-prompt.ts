@@ -78,8 +78,6 @@ export const CERTIFY_QUERY_PARAM = "certifier";
 export const CERTIFY_QUERY_VALUE = "discord";
 export const CERTIFY_PROFILE_HREF = `/profil?${CERTIFY_QUERY_PARAM}=${CERTIFY_QUERY_VALUE}`;
 
-export { CERTIFY_DIALOG_EVENT, DISCORD_CERTIFIED_EVENT } from "./discord-certify-events";
-
 /** L'événement émis par le dialogue de `/profil`. */
 export function certifiedFromProfileEvent(): CustomEvent<{ fromProfile: true }> {
   return new CustomEvent(DISCORD_CERTIFIED_EVENT, { detail: { fromProfile: true } });
