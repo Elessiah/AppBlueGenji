@@ -381,7 +381,8 @@
       "matches": {
         "topic": "Your matches",
         "does": "You can be shown as your team's contact to the opponent, the caster and the referees of your matches, with your verified Discord tag.",
-        "doesNot": "Does not publish your tag on your profile: other players only see a verification badge there, and your tag there still follows your visibility settings. Shown as a match contact, your BattleTag appears there even if hidden, as for any contact."
+        "doesNot": "Does not publish your tag on your profile: other players only see a verification badge there, and your tag there still follows your visibility settings. Shown as a match contact, your BattleTag appears there even if hidden, as for any contact.",
+        "doesNotDiscordOnly": "Does not publish your tag on your profile: other players only see a verification badge there, and your tag there still follows your visibility settings."
       },
       "staff": {
         "topic": "The organisers",

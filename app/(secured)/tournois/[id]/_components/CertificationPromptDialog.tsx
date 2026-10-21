@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { anotherModalOpen } from "@/lib/shared/dialog-focus";
+import { isPlainLeftClick } from "@/lib/shared/site-back";
 import { certificationProfileHref, type CertificationPrompt } from "@/lib/shared/certification-prompt";
 import { useDialogsText } from "../_lib/dialogs-text";
 import { TournamentDialogFrame } from "./TournamentDialogFrame";
@@ -10,6 +11,18 @@ import s from "./CertificationPromptDialog.module.css";
 
 /** Lignes du tableau, dans l'ordre de lecture. */
 const ROWS = ["identity", "matches", "staff", "later"] as const;
+
+/**
+ * Variante « Discord seul » (Marvel Rivals) des cellules qui parlent de
+ * BattleTag, de Blizzard ou de Battle.net.
+ */
+const DISCORD_ONLY_CELLS = {
+  "identity.does": "certification.rows.identity.doesDiscordOnly",
+  "matches.doesNot": "certification.rows.matches.doesNotDiscordOnly",
+  "later.does": "certification.rows.later.doesDiscordOnly",
+  "later.doesNot": "certification.rows.later.doesNotDiscordOnly",
+} as const satisfies Partial<Record<`${(typeof ROWS)[number]}.${"does" | "doesNot"}`, string>>;
+type DiscordOnlyCell = keyof typeof DISCORD_ONLY_CELLS;
 
 interface CertificationPromptDialogProps {
   prompt: CertificationPrompt;
@@ -55,12 +68,8 @@ export function CertificationPromptDialog({
   ];
   // Variante « Discord seul » d'une cellule, là où la ligne parle de Battle.net.
   const rowText = (row: (typeof ROWS)[number], column: "does" | "doesNot") => {
-    if (!withBattletag && row === "identity" && column === "does") {
-      return t("certification.rows.identity.doesDiscordOnly");
-    }
-    if (!withBattletag && row === "later") {
-      return t(column === "does" ? "certification.rows.later.doesDiscordOnly" : "certification.rows.later.doesNotDiscordOnly");
-    }
+    const cell = `${row}.${column}` as const;
+    if (!withBattletag && cell in DISCORD_ONLY_CELLS) return t(DISCORD_ONLY_CELLS[cell as DiscordOnlyCell]);
     return t(`certification.rows.${row}.${column}`);
   };
   let lead = t("certification.leadManager");
@@ -143,7 +152,15 @@ export function CertificationPromptDialog({
           <button type="button" className="btn ghost" onClick={onClose}>
             {t("certification.later")}
           </button>
-          <LocaleLink href={certificationProfileHref(prompt)} className="btn" onClick={onClose}>
+          <LocaleLink
+            href={certificationProfileHref(prompt)}
+            className="btn"
+            onClick={(event) => {
+              // Ouvert dans un nouvel onglet (Ctrl, Cmd, Maj, clic du milieu) :
+              // la modale reste là, rien n'est retenu.
+              if (isPlainLeftClick(event)) onClose();
+            }}
+          >
             {t("certification.go")}
           </LocaleLink>
         </div>

@@ -38,9 +38,10 @@ sa racine, `anotherModalOpen(…, { overYielding: true })`,
 `lib/shared/dialog-focus.ts`) : l'annonce d'un match qui se lance, urgente,
 passe par-dessus — comme toute autre modale qui s'ouvrirait sur elle ; le guet
 réagit sans délai (`throttleMs: 0`), et un morceau arrivé après l'urgente ne se
-monte pas (lecture au montage ; le guet l'efface ensuite). L'invitation s'efface **sans rien retenir** (elle n'a
-peut-être pas été lue ; la case « Ne plus voir », tenue par le crochet, garde
-son état) et revient à la fermeture de l'urgente. La modale
+monte pas (lecture au montage ; le guet l'efface ensuite). L'invitation s'efface **pour le reste de la page**, sans rien retenir dans le
+navigateur (elle n'a peut-être pas été lue) : revenue à chaque fermeture d'une
+annonce de lancement, elle couvrirait le plateau en plein match. Elle revient
+à la prochaine fiche ouverte. La modale
 recouverte ne reprend pas le focus à celle du dessus, et lui passe sa propre
 cible de retour (`useDialogBehavior`). Une invitation retirée (certification
 faite entre-temps, lecture en échec) **masque** la modale sans la fermer :
@@ -49,7 +50,8 @@ l'instantané (`liveCertificationPrompt`) : tournoi clos depuis ou équipe
 retirée, plus rien. Une fiche figée la masque aussi.
 
 En **Marvel Rivals**, les lignes qui parlent de Blizzard ou de Battle.net
-(identité, « ensuite ») prennent leur variante `…DiscordOnly`. Le tableau est
+(identité, « ne fait pas » des matchs, « ensuite ») prennent leur variante
+`…DiscordOnly`. Le tableau est
 en rôles ARIA (`role="table"`, comme le roster d'équipe) : sous 560 px ses
 lignes passent en cartes sans perdre leur sémantique, chaque cellule libellée
 par `data-label` (libellé visuel seulement, texte de remplacement vide).
@@ -84,7 +86,9 @@ contacts présentés aux équipes, au caster et aux arbitres (T04), portées OAu
   La case « Ne plus voir », visible, vaut pour **toute** fermeture, Échap et
   voile compris ;
 - case **« Ne plus voir »** cochée puis fermeture (ou clic sur le bouton du
-  profil) : `bg_cert_prompt_off` = « 1 » en **stockage local**, en plus.
+  profil) : `bg_cert_prompt_off` = « 1 » en **stockage local**, en plus. Un
+  clic qui ouvre le profil dans un nouvel onglet (Ctrl, Cmd, Maj, bouton du
+  milieu) ne ferme rien et ne retient rien.
 
 Traitement inscrit au registre (T04, sous-finalité « Inviter … à certifier »).
 Valeurs sans identifiant de personne, jamais transmises au serveur : un
