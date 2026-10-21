@@ -47,9 +47,12 @@
 
 .row {
   display: grid;
-  /* Le sujet ne descend jamais sous son plus long mot (« L’organisation ») :
-     une piste fixe le laisserait déborder sur la colonne voisine. */
-  grid-template-columns: minmax(min-content, 22%) 1fr 1fr;
+  /* Chaque ligne est sa propre grille : la piste du sujet ne dépend donc
+     jamais du contenu (sinon les colonnes se décaleraient d'une ligne à
+     l'autre), mais ne descend pas sous 8rem, la place de son plus long mot
+     (« L’organisation ») ; au-delà (espacement du texte élargi), il se coupe
+     plutôt que de déborder sur la colonne voisine. */
+  grid-template-columns: max(22%, 8rem) 1fr 1fr;
 }
 
 .row > * {
@@ -66,6 +69,7 @@
 
 .topic {
   font-weight: 600;
+  overflow-wrap: anywhere;
   color: var(--ink);
 }
 
