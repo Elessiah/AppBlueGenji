@@ -52,20 +52,24 @@
   }
 }
 
+/* Champ en lecture seule portant sa pastille de certification **dans** le
+   champ : vérifié ou non, il garde la largeur de sa colonne. La réserve à
+   droite (`padding-right`) est posée en ligne sur le champ, la règle de
+   `.field input` de `globals.css` étant plus spécifique qu'une classe. */
+.taggedInput {
+  position: relative;
+}
+
+.taggedBadge {
+  position: absolute;
+  top: 50%;
+  right: 11px;
+  transform: translateY(-50%);
+  display: flex;
+}
+
 /* Aide sous un champ de la fiche : même gabarit que `.hint` de `/profil`
    (12 px, `--ink-soft`), pour que les deux écrans parlent du même ton. */
-/* Champ en lecture seule suivi de sa pastille de certification. */
-.taggedInput {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.taggedInputField {
-  flex: 1;
-  min-width: 0;
-}
-
 .hint {
   font-size: 12px;
   line-height: 1.65;

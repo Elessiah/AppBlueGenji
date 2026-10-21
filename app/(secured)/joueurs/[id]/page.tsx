@@ -47,6 +47,12 @@ function tournamentStateLabel(text: PlayersText, state: string): string {
   return isTournamentState(state) ? text.t(`page.state.${state}`) : state;
 }
 
+/** `aria-describedby` des seuls identifiants présents, ou rien. */
+function describedBy(ids: Record<string, boolean>): string | undefined {
+  const present = Object.keys(ids).filter((id) => ids[id]);
+  return present.length > 0 ? present.join(" ") : undefined;
+}
+
 function HistoryEmpty({ empty, message }: { empty: boolean; message: string }) {
   return empty ? <p className={styles.historyEmpty}>{message}</p> : null;
 }
@@ -106,6 +112,12 @@ export default function PlayerDetailPage() {
     data.isSelf && data.profile.overwatchBattletag && !data.profile.visibility.overwatch
       ? t("page.battletagHiddenSelf")
       : null;
+
+  const battletagVerified = Boolean(data.profile.battletagVerified);
+  const battletagDescribedBy = describedBy({
+    "player-battletag-verified": battletagVerified,
+    "player-battletag-hint": Boolean(battletagHint),
+  });
 
   // Un compte supprimé garde sa fiche — ses résultats appartiennent aussi à
   // ceux qu'il a affrontés —, mais sous un pseudo d'emprunt qui se lit comme
@@ -229,19 +241,24 @@ export default function PlayerDetailPage() {
             <div className="field">
               <label htmlFor="player-battletag">{t("page.battletag")}</label>
               {/* La pastille ne suit pas le tag : « Masqué ✅ » dit qu'un
-                  BattleTag est prouvé par Battle.net sans dire lequel. */}
+                  BattleTag est prouvé par Battle.net sans dire lequel. Le
+                  lecteur d'écran l'entend avec le champ (`aria-describedby`) :
+                  l'image, elle, devient décorative pour ne pas la dire deux fois. */}
               <div className={styles.taggedInput}>
                 <input
                   id="player-battletag"
-                  className={styles.taggedInputField}
                   value={data.profile.overwatchBattletag || t("page.hidden")}
                   readOnly
-                  aria-describedby={battletagHint ? "player-battletag-hint" : undefined}
+                  style={battletagVerified ? { paddingRight: 34 } : undefined}
+                  aria-describedby={battletagDescribedBy}
                 />
-                {data.profile.battletagVerified ? (
-                  <VerifiedBadge
-                    labels={{ alt: t("page.battletagVerifiedAlt"), title: t("page.battletagVerifiedTitle") }}
-                  />
+                {battletagVerified ? (
+                  <span className={styles.taggedBadge}>
+                    <VerifiedBadge labels={{ alt: "", title: t("page.battletagVerifiedTitle") }} />
+                    <span id="player-battletag-verified" className="sr-only">
+                      {t("page.battletagVerifiedAlt")}
+                    </span>
+                  </span>
                 ) : null}
               </div>
               {/*

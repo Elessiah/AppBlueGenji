@@ -32,9 +32,22 @@ describe("indication du BattleTag masqué sur la fiche", () => {
 describe("pastille BattleTag vérifié sur la fiche", () => {
   it("suit `battletagVerified`, jamais le tag affiché", () => {
     const page = read("app/(secured)/joueurs/[id]/page.tsx");
-    expect(page).toContain("data.profile.battletagVerified ? (");
-    expect(page).toContain('t("page.battletagVerifiedAlt")');
-    expect(page).not.toMatch(/overwatchBattletag\s*&&\s*data\.profile\.battletagVerified/);
+    expect(page).toContain("const battletagVerified = Boolean(data.profile.battletagVerified);");
+    expect(page).not.toMatch(/overwatchBattletag\s*&&\s*(data\.profile\.)?battletagVerified/);
+  });
+
+  it("se dit au lecteur d'écran avec le champ, une seule fois", () => {
+    const page = read("app/(secured)/joueurs/[id]/page.tsx");
+    expect(page).toContain('"player-battletag-verified": battletagVerified,');
+    expect(page).toContain("aria-describedby={battletagDescribedBy}");
+    expect(page).toMatch(/<span id="player-battletag-verified" className="sr-only">\s*\{t\("page\.battletagVerifiedAlt"\)\}/);
+    expect(page).toContain('labels={{ alt: "", title: t("page.battletagVerifiedTitle") }}');
+  });
+
+  it("garde la largeur du champ : la pastille est posée dedans", () => {
+    const css = read("app/(secured)/joueurs/[id]/player.module.css");
+    expect(css).toMatch(/\.taggedBadge \{[^}]*position: absolute;/);
+    expect(css).not.toContain(".taggedInputField");
   });
 
   it.each(["fr", "en"])("a ses textes (%s)", (locale: string) => {
