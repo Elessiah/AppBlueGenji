@@ -38,6 +38,11 @@ Le focus initial va au premier élément focalisable, **sauf** s'il existe un
 le premier (le bureau place un bouton « Couleur aléatoire » avant le champ
 Nom).
 
+Une modale longue, qui se lit avant d'agir et dont les contrôles sont tout en
+bas, marque son **titre** `tabIndex={-1}` + `data-autofocus` : le focus
+d'ouverture s'y pose et la modale s'ouvre par le haut, au lieu de défiler
+jusqu'au premier contrôle sur un petit écran (`CertificationPromptDialog`).
+
 Jamais l'attribut `autoFocus` (Sonar S9379). Un champ qui n'apparaît qu'après
 un geste — éditeur en ligne ouvert par « Modifier », onglet d'une modale déjà
 ouverte — prend le focus par `ref={focusOnMount}` (`lib/shared/focus-on-mount.ts`) :

@@ -18,6 +18,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `REGISTRATION_FILTERS.md` — Conditions d'inscription : effectif minimal, Discord certifié, compte Blizzard.
 - `UNDERFILLED_TOURNAMENTS.md` — Tournoi sans adversaires : 0 ou 1 engagée au coup d'envoi → clos.
 - `MATCH_LAUNCH.md` — Lancement d'un match : lobby, trois « Prêt », contacts, inscription du caster ; option du tournoi (éteinte par défaut) et bouton « Contacts » de la carte.
+- `CERTIFICATION_PROMPT.md` — Fiche tournoi : modale d'office invitant à certifier Discord et BattleTag (manager à qui il en manque un, joueur d'une équipe sans contact), tableau fait / ne fait pas, « Ne plus voir ».
 - `MATCH_PLANNING.md` — Planification des matchs par l'arbitrage (`TO_PLAN`).
 - `SCORE_EDIT_LOCK.md` — Verrouillage d'un score dès que la manche suivante porte une saisie, **y compris pour un admin**.
 - `DOUBLE_FORFEIT.md` — Double forfait et ses cascades dans un arbre.
