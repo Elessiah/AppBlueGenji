@@ -380,7 +380,8 @@
       },
       "matches": {
         "topic": "Your matches",
-        "does": "You can be shown as your team's contact to the opponent, the caster and the referees of your matches, with your verified Discord tag.",
+        "does": "You can be shown as your team's contact to the opponent, the caster and the referees of your matches, with your verified Discord tag or your verified BattleTag.",
+        "doesDiscordOnly": "You can be shown as your team's contact to the opponent, the caster and the referees of your matches, with your verified Discord tag.",
         "doesNot": "Does not publish your tag on your profile: other players only see a verification badge there, and your tag there still follows your visibility settings. Shown as a match contact, your BattleTag appears there even if hidden, as for any contact.",
         "doesNotDiscordOnly": "Does not publish your tag on your profile: other players only see a verification badge there, and your tag there still follows your visibility settings."
       },
@@ -393,8 +394,8 @@
         "topic": "Later on",
         "does": "Opens tournaments that require a verified Discord or a Battle.net account.",
         "doesDiscordOnly": "Opens tournaments that require a verified Discord.",
-        "doesNot": "Commits you to nothing: you can unlink Discord or Battle.net from your profile.",
-        "doesNotDiscordOnly": "Commits you to nothing: you can unlink Discord from your profile."
+        "doesNot": "Commits you to nothing: you can unlink Discord or Battle.net from your profile, as long as you keep another way to sign in.",
+        "doesNotDiscordOnly": "Commits you to nothing: you can unlink Discord from your profile, as long as you keep another way to sign in."
       }
     },
     "neverAgain": "Don't show again",

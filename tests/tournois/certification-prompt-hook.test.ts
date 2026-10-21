@@ -234,10 +234,16 @@ describe("useCertificationPrompt", () => {
     expect(session.values.has(CERTIFICATION_PROMPT_CLOSED_KEY)).toBe(false);
   });
 
-  it("une invitation retirée masque la modale sans la fermer ; revenue, elle réapparaît", () => {
+  it("une invitation retirée ferme la modale sans rien retenir ; revenue, elle repasse par la décision", () => {
     render(PROMPT);
     expect(render(null).prompt).toBeNull();
+    expect(session.values.size + local.values.size).toBe(0);
     expect(render(PROMPT).prompt).toBe(PROMPT);
+    render(null);
+    // Une autre modale s'est ouverte entre-temps : l'invitation attend.
+    modals.open = true;
+    expect(render(PROMPT).prompt).toBeNull();
+    expect(modals.closedWatchers.length).toBeGreaterThan(0);
   });
 
   it("onglet caché : le guet de l'urgente reste armé (sans minuterie)", () => {

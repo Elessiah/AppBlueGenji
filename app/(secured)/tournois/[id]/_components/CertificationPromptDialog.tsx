@@ -18,6 +18,7 @@ const ROWS = ["identity", "matches", "staff", "later"] as const;
  */
 const DISCORD_ONLY_CELLS = {
   "identity.does": "certification.rows.identity.doesDiscordOnly",
+  "matches.does": "certification.rows.matches.doesDiscordOnly",
   "matches.doesNot": "certification.rows.matches.doesNotDiscordOnly",
   "later.does": "certification.rows.later.doesDiscordOnly",
   "later.doesNot": "certification.rows.later.doesNotDiscordOnly",

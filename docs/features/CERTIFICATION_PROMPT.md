@@ -45,14 +45,14 @@ annonce de lancement, elle couvrirait le plateau en plein match. Elle revient
 à la prochaine fiche ouverte. La modale
 recouverte ne reprend pas le focus à celle du dessus, et lui passe sa propre
 cible de retour (`useDialogBehavior`). Une invitation retirée (certification
-faite entre-temps, lecture en échec) **masque** la modale sans la fermer :
-revenue à la lecture suivante, elle réapparaît. Le client la recoupe avec
+faite entre-temps, lecture en échec) **ferme** la modale sans rien retenir :
+revenue à la lecture suivante, elle repasse par la décision (autre modale
+ouverte, « Ne plus voir »). Le client la recoupe avec
 l'instantané (`liveCertificationPrompt`) : tournoi clos depuis ou équipe
 retirée, plus rien. Une fiche figée la masque aussi.
 
 En **Marvel Rivals**, les lignes qui parlent de Blizzard ou de Battle.net
-(identité, « ne fait pas » des matchs, « ensuite ») prennent leur variante
-`…DiscordOnly`. Le tableau est
+(identité, matchs, « ensuite ») prennent leur variante `…DiscordOnly`. Le tableau est
 en rôles ARIA (`role="table"`, comme le roster d'équipe) : sous 560 px ses
 lignes passent en cartes sans perdre leur sémantique, chaque cellule libellée
 par `data-label` (libellé visuel seulement, texte de remplacement vide).

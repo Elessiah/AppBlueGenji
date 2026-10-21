@@ -37,8 +37,9 @@ function browserStorage(kind: "localStorage" | "sessionStorage"): Storage | null
  *
  * Le serveur la calcule une fois par connexion du flux (ou lecture REST de
  * secours) : une certification faite entre-temps ne la retire qu'à la lecture
- * suivante. Retirée (ou lecture en échec côté serveur), elle masque la modale
- * sans la fermer : revenue, elle réapparaît. Tournoi clos ou équipe retirée
+ * suivante. Retirée (ou lecture en échec côté serveur), elle ferme la modale
+ * sans rien retenir : revenue, elle repasse par la décision (autre modale
+ * ouverte, « Ne plus voir »). Tournoi clos ou équipe retirée
  * depuis : masquée sur-le-champ (`liveCertificationPrompt`, instantané à
  * jour). Une fiche figée la masque aussi.
  */
@@ -75,6 +76,15 @@ export function useCertificationPrompt(prompt: CertificationPrompt | null | unde
     if (neverAgain) rememberCertificationPromptClosed(browserStorage("localStorage"), null, true);
     setOpen(false);
   }, [neverAgain]);
+
+  // Invitation retirée (certifiée entre-temps, lecture en échec) : la modale se
+  // ferme sans rien retenir, et la décision reprend à son retour — autre
+  // modale ouverte entre-temps comprise.
+  useEffect(() => {
+    if (prompt !== null || !open) return;
+    decided.current = false;
+    setOpen(false);
+  }, [prompt, open]);
 
   // Affichée seulement : invitation présente et fiche vivante.
   const shown = open && prompt != null && !frozen;

@@ -380,7 +380,8 @@
       },
       "matches": {
         "topic": "Tes matchs",
-        "does": "Tu peux être présenté comme contact de ton équipe à l'adversaire, au caster et aux arbitres de vos matchs, avec ton tag Discord certifié.",
+        "does": "Tu peux être présenté comme contact de ton équipe à l'adversaire, au caster et aux arbitres de vos matchs, avec ton tag Discord certifié ou ton BattleTag vérifié.",
+        "doesDiscordOnly": "Tu peux être présenté comme contact de ton équipe à l'adversaire, au caster et aux arbitres de vos matchs, avec ton tag Discord certifié.",
         "doesNot": "Ne publie pas ton tag sur ta fiche : les autres joueurs n'y voient qu'une pastille de certification, et ton tag y reste soumis à tes réglages de visibilité. Présenté comme contact d'un match, ton BattleTag y est montré même masqué, comme pour tout contact.",
         "doesNotDiscordOnly": "Ne publie pas ton tag sur ta fiche : les autres joueurs n'y voient qu'une pastille de certification, et ton tag y reste soumis à tes réglages de visibilité."
       },
@@ -393,8 +394,8 @@
         "topic": "Et ensuite",
         "does": "Ouvre les tournois qui exigent un Discord certifié ou un compte Battle.net.",
         "doesDiscordOnly": "Ouvre les tournois qui exigent un Discord certifié.",
-        "doesNot": "Ne t'engage à rien : tu peux détacher Discord ou Battle.net depuis ton profil.",
-        "doesNotDiscordOnly": "Ne t'engage à rien : tu peux détacher Discord depuis ton profil."
+        "doesNot": "Ne t'engage à rien : tu peux détacher Discord ou Battle.net depuis ton profil, tant qu'il te reste une autre façon de te connecter.",
+        "doesNotDiscordOnly": "Ne t'engage à rien : tu peux détacher Discord depuis ton profil, tant qu'il te reste une autre façon de te connecter."
       }
     },
     "neverAgain": "Ne plus voir",
