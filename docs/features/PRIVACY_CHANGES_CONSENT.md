@@ -117,7 +117,8 @@ partie des comptes :
 - `audience` (`PrivacyAudience`) restreint les comptes concernés. Deux valeurs :
   `GOOGLE_LINKED`, un compte qui porte une identité Google (`google_sub`), et
   `LIVE_STAFF`, un compte qui peut s'inscrire comme caster (permission `live` :
-  administrateur, ou rôle qui l'accorde — `rolesGranting`, `LIVE_STAFF_SQL`). La
+  administrateur, ou rôle qui l'accorde — `rolesGranting`, `LIVE_STAFF_SQL`, une
+  seule expression lue par la modale et par l'annonce Discord). La
   règle est écrite deux fois, parce qu'elle est lue deux fois — en mémoire
   (`privacyChangeReachesAccount`, pour la modale et pour le message) et en base
   (`privacyAudienceSql`, pour la sélection des destinataires de l'annonce
