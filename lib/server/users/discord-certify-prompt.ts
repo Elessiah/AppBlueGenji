@@ -89,7 +89,9 @@ export async function markDiscordCertifyPromptSeen(userId: number, tokenHash: st
 /**
  * « Ne plus voir » : posé sur le compte, jamais sur un compte supprimé. La date
  * d'un premier choix est gardée (`COALESCE`). Rend `true` si une ligne vivante
- * le porte désormais (déjà posé compris).
+ * le porte désormais (déjà posé compris) — et lève alors la marque de
+ * **toutes** ses sessions (choix du compte : une autre session ouverte ne
+ * relira pas pour rien à sa page suivante).
  */
 export async function recordDiscordCertifyPromptOff(userId: number): Promise<boolean> {
   if (!Number.isInteger(userId) || userId <= 0) return false;
@@ -100,5 +102,7 @@ export async function recordDiscordCertifyPromptOff(userId: number): Promise<boo
      WHERE id = ? AND is_deleted = 0`,
     [userId],
   );
-  return Number((result as { affectedRows?: number }).affectedRows ?? 0) > 0;
+  if (Number((result as { affectedRows?: number }).affectedRows ?? 0) === 0) return false;
+  await db.execute(`UPDATE bg_user_sessions SET certify_prompt_due = 0 WHERE user_id = ? AND certify_prompt_due = 1`, [userId]);
+  return true;
 }

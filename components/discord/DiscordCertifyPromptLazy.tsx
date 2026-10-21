@@ -119,5 +119,5 @@ export function DiscordCertifyPromptLazy({ prompt, privacyPending, termsPending 
 
   if (certified || followedLink || !(armed || canOpen)) return null;
   const View = locale === "en" ? DiscordCertifyPromptEn : DiscordCertifyPromptFr;
-  return <View prompt={prompt} canOpen={canOpen} answered={answered} />;
+  return <View prompt={prompt} canOpen={canOpen} onProfile={pathname === "/profil"} answered={answered} />;
 }

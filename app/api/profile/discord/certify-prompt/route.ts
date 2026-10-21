@@ -4,8 +4,8 @@
  *
  * `POST { action: "LATER" }` — « Plus tard », fermeture, ou passage au
  * dialogue de `/profil` : la fenêtre ne revient pas sur **cette session**.
- * `POST { action: "NEVER" }` — « Ne plus voir » : posé sur le compte, et la
- * session aussi. Rien ici ne certifie : la certification reste
+ * `POST { action: "NEVER" }` — « Ne plus voir » : posé sur le compte, et ses
+ * sessions aussi. Rien ici ne certifie : la certification reste
  * `POST /api/profile/discord`. Provenance vérifiée par le middleware.
  */
 import { currentTokenHash, getCurrentUser } from "@/lib/server/auth";
@@ -33,10 +33,12 @@ export async function POST(req: Request) {
   if (!action) return fail("INVALID_ACTION", 400);
 
   try {
-    if (action === "NEVER" && !(await recordDiscordCertifyPromptOff(user.id))) {
-      return fail(ACCOUNT_DELETED_ERROR, 409);
+    if (action === "NEVER") {
+      // Le compte et toutes ses sessions, celle-ci comprise, en un appel.
+      if (!(await recordDiscordCertifyPromptOff(user.id))) return fail(ACCOUNT_DELETED_ERROR, 409);
+    } else {
+      await markDiscordCertifyPromptSeen(user.id, await currentTokenHash());
     }
-    await markDiscordCertifyPromptSeen(user.id, await currentTokenHash());
     return ok({ action });
   } catch (error) {
     // Colonne absente : la fenêtre ne s'ouvre pas non plus (`loadDiscordCertifyPrompt`).

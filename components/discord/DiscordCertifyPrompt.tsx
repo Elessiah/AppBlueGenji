@@ -3,7 +3,7 @@
 import { useCallback, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { CyberButton, ScrollArea } from "@/components/cyber";
-import { useLocalePathname, useLocaleRouter } from "@/components/i18n/locale-navigation";
+import { useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { richNodes } from "@/components/i18n/shell-text";
 import { useToast } from "@/components/ui/toast";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
@@ -61,6 +61,8 @@ export type DiscordCertifyPromptProps = {
 export type DiscordCertifyPromptViewProps = {
   prompt: CertifyPrompt;
   canOpen: boolean;
+  /** La page affichée est `/profil` (lue par le relais) : le dialogue y est déjà. */
+  onProfile: boolean;
   /**
    * Déjà répondue sur ce chargement (« Plus tard », dialogue, « Ne plus voir ») :
    * tenu par le relais, seul à écouter `DISCORD_CERTIFIED_EVENT` — rien à réécrire.
@@ -81,11 +83,10 @@ export type DiscordCertifyPromptViewProps = {
  * par Discord. Elle attend la confidentialité et les conditions (attentes
  * suivies par `DiscordCertifyPromptLazy`).
  */
-export function DiscordCertifyPrompt({ prompt, canOpen, answered, text }: Readonly<DiscordCertifyPromptViewProps>) {
+export function DiscordCertifyPrompt({ prompt, canOpen, onProfile, answered, text }: Readonly<DiscordCertifyPromptViewProps>) {
   const { t, rich } = text;
   const { showError, showSuccess } = useToast();
   const router = useLocaleRouter();
-  const { path: pathname } = useLocalePathname();
   const titleId = useId();
   const [closed, setClosed] = useState(false);
   const [busy, setBusy] = useState<"certify" | "never" | null>(null);
@@ -155,7 +156,7 @@ export function DiscordCertifyPrompt({ prompt, canOpen, answered, text }: Readon
       // Le dialogue de `/profil` fait la suite (code ou passage par Discord) :
       // la proposition est close pour la session, rien n'est certifié ici.
       closeForSession();
-      if (pathname === "/profil") window.dispatchEvent(new Event(CERTIFY_DIALOG_EVENT));
+      if (onProfile) window.dispatchEvent(new Event(CERTIFY_DIALOG_EVENT));
       else router.push(CERTIFY_PROFILE_HREF);
       return;
     }

@@ -114,7 +114,7 @@ describe("markDiscordCertifyPromptSeen — une fois par connexion", () => {
 });
 
 describe("recordDiscordCertifyPromptOff — « Ne plus voir »", () => {
-  it("posé sur le compte vivant, date du premier choix gardée, en une instruction", async () => {
+  it("posé sur le compte vivant, date du premier choix gardée, puis toutes ses sessions", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []]);
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
     expect(await recordDiscordCertifyPromptOff(7)).toBe(true);
@@ -123,12 +123,15 @@ describe("recordDiscordCertifyPromptOff — « Ne plus voir »", () => {
         "UPDATE bg_users SET discord_certify_prompt_dismissed_at = COALESCE(discord_certify_prompt_dismissed_at, NOW()) WHERE id = ? AND is_deleted = 0",
         [7],
       ],
+      ["UPDATE bg_user_sessions SET certify_prompt_due = 0 WHERE user_id = ? AND certify_prompt_due = 1", [7]],
     ]);
   });
 
-  it("compte supprimé : false", async () => {
-    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 0 }, []]) }));
+  it("compte supprimé : false, aucune session touchée", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 0 }, []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
     expect(await recordDiscordCertifyPromptOff(7)).toBe(false);
+    expect(execute).toHaveBeenCalledTimes(1);
   });
 
   it("identifiant invalide : rien n'est écrit", async () => {

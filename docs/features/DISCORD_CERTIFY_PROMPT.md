@@ -97,7 +97,7 @@ Le BattleTag n'y figure pas : il est vérifié par Battle.net au rattachement
 | --- | --- |
 | « Certifier mon tag » | certifie (`ONE_CLICK`) ou mène au dialogue (`DIALOG`, la proposition est close pour la session) |
 | « Plus tard », Échap, clic sur le voile | `POST … { action: "LATER" }` (`keepalive` : un lien qui change de document ne l'annule pas) — fermée tout de suite ; un échec d'écriture la fait seulement revenir au prochain chargement (un changement de parcours `ONE_CLICK` → `DIALOG` ne la rouvre pas) |
-| « Ne plus voir » | `POST … { action: "NEVER" }` — `bg_users.discord_certify_prompt_dismissed_at` (date du premier choix, `COALESCE`) puis la session ; succès en toast, échec en toast et fenêtre gardée (compte supprimé entre-temps : fenêtre fermée, toast dédié) |
+| « Ne plus voir » | `POST … { action: "NEVER" }` — `bg_users.discord_certify_prompt_dismissed_at` (date du premier choix, `COALESCE`) puis **toutes** les sessions du compte ; succès en toast, échec en toast et fenêtre gardée (compte supprimé entre-temps : fenêtre fermée, toast dédié) |
 
 Route : 401 sans session, 400 `INVALID_ACTION`, 409 `ACCOUNT_DELETED` (compte
 supprimé entre-temps), 503 `CERTIFY_PROMPT_UNAVAILABLE` (colonne absente), 500

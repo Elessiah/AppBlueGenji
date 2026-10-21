@@ -305,10 +305,9 @@ export function RecruitmentHighlight({
   // Verrou : une fois tenue par la certification, la modale ne s'ouvre plus
   // sur cette page (une réponse ou un succès relit la mise en page, où la
   // certification n'est plus due — la modale ne doit pas surgir après elle).
+  // Posé au rendu : aucun passage de plus quand un rafraîchissement l'apporte.
   const [held, setHeld] = useState(modalHeld);
-  useEffect(() => {
-    if (modalHeld) setHeld(true);
-  }, [modalHeld]);
+  if (modalHeld && !held) setHeld(true);
   const showModal = modalStart !== null && !modalSilenced && !modalHeld && !held && !modalOptedOut && !onAdPage;
   return (
     <>

@@ -43,12 +43,12 @@ describe("POST /api/profile/discord/certify-prompt", () => {
     expect(recordDiscordCertifyPromptOff).not.toHaveBeenCalled();
   });
 
-  it("NEVER : posé sur le compte, puis la session", async () => {
+  it("NEVER : posé sur le compte et toutes ses sessions, en un appel", async () => {
     const response = await POST(post({ action: "NEVER" }));
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ action: "NEVER" });
     expect(recordDiscordCertifyPromptOff).toHaveBeenCalledWith(7);
-    expect(markDiscordCertifyPromptSeen).toHaveBeenCalledWith(7, HASH);
+    expect(markDiscordCertifyPromptSeen).not.toHaveBeenCalled();
   });
 
   it("sans session : 401, rien n'est écrit", async () => {
