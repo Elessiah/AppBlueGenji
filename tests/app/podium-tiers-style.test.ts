@@ -146,8 +146,8 @@ describe("marches du podium — accessibilité et impression", () => {
 
   it("coupe à deux lignes le nom peint, pas le lien, au classement de l'accueil", () => {
     const leaderboard = readSource("components/cyber/landing/Leaderboard.module.css");
-    expect(leaderboard).toMatch(/\.team > \[data-podium\]:last-child \{\s*display: block;\s*overflow: visible;\s*\}/);
-    expect(leaderboard).toMatch(/\.team > \[data-podium\]:last-child > :global\(\.podium-tier\) \{[^}]*-webkit-line-clamp: 2;[^}]*overflow: hidden;/);
+    expect(leaderboard).toMatch(/\.team > :last-child,\s*\.team > \[data-podium\]:last-child > :global\(\.podium-tier\) \{[^}]*overflow: hidden;[^}]*-webkit-line-clamp: 2;/);
+    expect(leaderboard).toMatch(/\.team > \[data-podium\]:last-child \{\s*display: block;\s*overflow: visible;\s*-webkit-line-clamp: none;\s*line-clamp: none;\s*\}/);
   });
 
   it("ne tronque jamais un lien d'entité par une classe de l'appelant", () => {
@@ -155,7 +155,7 @@ describe("marches du podium — accessibilité et impression", () => {
     expect(readSource("app/(secured)/equipes/[id]/_components/MembersSection.tsx")).toMatch(/<PlayerLink [^>]*\btruncate>/);
     const entrant = readSource("app/(secured)/tournois/[id]/_components/EntrantName.tsx");
     expect(entrant).toContain("truncate={truncate}");
-    expect(entrant).toContain("`${textClass} entity-truncate`");
+    expect(entrant).toContain('joinClasses(textClass, truncate && "entity-truncate")');
     expect(readSource("app/(secured)/tournois/[id]/_components/EntrantName.module.css")).not.toMatch(/text-overflow/);
   });
 
@@ -318,10 +318,14 @@ describe("marches du podium — pastille de l'équipe active (fiche joueur)", ()
     expect(contrastRatio(hexOf(color)!, BADGE)).toBeGreaterThanOrEqual(4.5);
   });
 
-  it("éteint la marche du lien en pastille, la pastille restant le lien entier", () => {
-    const { attributes } = activeTeamLink();
-    expect(attributes.className).toBe('"badge"');
-    expect(attributes.podiumMuted).toBe("true");
+  it("éteint d'office la marche d'un lien en pastille, la pastille restant le lien entier", () => {
+    expect(activeTeamLink().attributes.className).toBe('"badge"');
+    const muted = /((?:[^{}]*,\s*)?)\[data-podium-muted\] \.podium-member \{([^}]*)\}/.exec(block)!;
+    expect(muted[1]).toContain(":is(.badge, .pill, .cy-tag) > .podium-tier,");
+    expect(muted[1]).toContain(":is(.badge, .pill, .cy-tag) > .podium-member,");
+    expect(muted[2]).toContain("color: inherit");
+    // Aucune graisse imposée à une pastille : elle garde la sienne.
+    expect(block).toContain(":where(:not([data-podium-muted], [data-podium-muted] *, .badge, .pill, .cy-tag))");
   });
 
   it("donne au nom éteint la couleur de la pastille, et non celle héritée par `.entity-link`", () => {
@@ -333,7 +337,7 @@ describe("marches du podium — pastille de l'équipe active (fiche joueur)", ()
 describe("marches du podium — graisse d'un lien d'entité", () => {
   it("pose la graisse sur le lien à spécificité d'une classe, le nom peint en hérite — sans `:has()`", () => {
     expect(block).toMatch(
-      /\n:where\(\.entity-link, \.entity-name\):where\(:not\(\[data-podium-muted\], \[data-podium-muted\] \*\)\)\[data-podium="podium-tier"\] \{\s*font-weight: 700;\s*\}/,
+      /\n:where\(\.entity-link, \.entity-name\):where\(:not\(\[data-podium-muted\], \[data-podium-muted\] \*, \.badge, \.pill, \.cy-tag\)\)\[data-podium="podium-tier"\] \{\s*font-weight: 700;\s*\}/,
     );
     expect(block).toMatch(/\n\[data-podium\] > \.podium-tier \{\s*font-weight: inherit;\s*\}/);
     expect(block).not.toContain(":has(");
