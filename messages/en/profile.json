@@ -275,7 +275,7 @@
     "notes": {
       "GOOGLE": "One-click login. No email address is saved.",
       "DISCORD": "Login, verification of your tag, and match time notices and reminders by direct message.",
-      "BLIZZARD": "Login, and your BattleTag kept up to date by Blizzard. You can hide your BattleTag: it stays visible to your opponents, admins and referees during a tournament match, and to its caster, in the match's “Contacts” window and its launch window, if you're among the contacts shown. If you cast a match, both its teams also see it while the match is being played, and its referees from the moment both its opponents are known. If you don't want them to see it, remove it from your profile (if it comes from Battle.net, unlink your Battle.net account first — after adding another way to log in if it is your only one)."
+      "BLIZZARD": "Login, and your BattleTag kept up to date by Blizzard, marked on your player page by a “Verified BattleTag” badge (even when hidden, without showing it). You can hide your BattleTag: it stays visible to your opponents, admins and referees during a tournament match, and to its caster, in the match's “Contacts” window and its launch window, if you're among the contacts shown. If you cast a match, both its teams also see it while the match is being played, and its referees from the moment both its opponents are known. If you don't want them to see it, remove it from your profile (if it comes from Battle.net, unlink your Battle.net account first — after adding another way to log in if it is your only one)."
     },
     "linked": "Linked",
     "handleLine": "{label}: {handle}",
@@ -351,7 +351,7 @@
     "eyebrow": "VISIBILITY · BATTLETAG",
     "warning": "You can hide your BattleTag: it stays visible to your opponents, admins and referees during a tournament match, and to its caster, in the match's “Contacts” window and its launch window, if you're among the contacts shown. If you cast a match, both its teams also see it while the match is being played, and its referees from the moment both its opponents are known. If you don't want them to see it, remove it from your profile (if it comes from Battle.net, unlink your Battle.net account first — after adding another way to log in if it is your only one).",
     "title": "Hidden, but not from everyone",
-    "intro": "Your BattleTag will no longer appear anywhere — profile, directory, rosters —, not even to referees and administrators. It stays readable only in a match's “Contacts” window and in its launch window, at the start of the match, where it's needed to add each other in game:",
+    "intro": "Your BattleTag will no longer appear anywhere — profile, directory, rosters —, not even to referees and administrators. If it comes from a linked Battle.net account, your player page still says so with a badge — without showing it. It stays readable only in a match's “Contacts” window and in its launch window, at the start of the match, where it's needed to add each other in game:",
     "players": "<strong>The members of both teams of your match</strong>, from the moment both its opponents are known to its end, if you're among the contacts shown — it's how you add each other in game to start the match.",
     "caster": "<strong>The caster of your match</strong>, only while the match is being played (from its start to its end), if you're among the contacts shown.",
     "asCaster": "<strong>Both teams of a match you cast</strong>, only while the match is being played (from its start to its end), and <strong>its referees and administrators</strong> from the moment both its opponents are known until its end.",
@@ -370,7 +370,7 @@
       "admins": "The site's administrators can see your Discord tag at all times.",
       "referees": "Referees can see it only while you're entered in an ongoing or upcoming tournament — not after —, or, for a match you cast, from the moment both its opponents are known until its end.",
       "match": "The members of both teams of your match can see it from the moment both its opponents are known until its end, and its caster only while the match is being played (from its start to its end) — to add each other and create the channel. If you cast a match, both its teams see yours only while the match is being played, and the referees from the moment both its opponents are known until its end.",
-      "players": "Other players on the site only see it if you make it visible in your privacy settings. It doesn't appear on any public page.",
+      "players": "Other players on the site only see it if you make it visible in your privacy settings. It doesn't appear on any public page. That your tag is verified (✅ badge, without the tag) can, however, be read on your player page by any logged-in player.",
       "undo": "You can cancel at any time by removing your tag from “My profile”: the verification is lost, and the exposure with it. Logging in with Discord then saves your username again, but without verifying it: only this step verifies it."
     },
     "attested": "Username provided by Discord at your last login: <strong>{tag}</strong>. You just need to confirm — no code, no new Discord authorization.",

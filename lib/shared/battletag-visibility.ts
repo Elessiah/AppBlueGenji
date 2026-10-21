@@ -70,3 +70,17 @@ export function visibleBattletag(
   if (!tag) return null;
   return canViewBattletag(viewer, subject) ? tag : null;
 }
+
+/**
+ * La **pastille** du BattleTag — prouvé par un compte Battle.net rattaché — se
+ * lit-elle sur la fiche ?
+ *
+ * Toujours, BattleTag masqué compris, comme la certification Discord
+ * (`canSeeDiscordVerification`) : le tag dit *comment* ajouter le joueur en jeu
+ * et se filtre ; la pastille dit seulement *que* son BattleTag a été prouvé, ne
+ * nomme personne et ne mène à personne. D'où « Masqué ✅ ». Une fonction plutôt
+ * qu'une constante : c'est le seul endroit où la restreindre un jour.
+ */
+export function canSeeBattletagVerification(): boolean {
+  return true;
+}

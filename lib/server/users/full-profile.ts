@@ -4,6 +4,7 @@ import type { PlayerPageIdentity } from "@/lib/shared/entity-page-titles";
 import { resolveRoles } from "@/lib/server/auth";
 import { parseRoles, toIso } from "@/lib/server/serialization";
 import { visibleDiscordTag } from "@/lib/shared/discord-identity";
+import { canSeeBattletagVerification } from "@/lib/shared/battletag-visibility";
 import { can, type PlatformRole } from "@/lib/shared/permissions";
 import { getPlayerEntityStats } from "@/lib/server/stats-service";
 import { getActiveSuspension } from "@/lib/server/account-suspensions";
@@ -99,7 +100,9 @@ export async function getFullProfile(
   const db = await getDatabase();
   const matchDmColumn = ownerOnlyColumns(viewerId === targetUserId);
 
-  const [userRows] = await db.execute<(UserRow & { locale: string; match_dm_enabled?: number | null })[]>(
+  const [userRows] = await db.execute<
+    (UserRow & { locale: string; match_dm_enabled?: number | null; blizzard_linked?: number | null })[]
+  >(
     `SELECT
       id,
       pseudo,
@@ -108,6 +111,7 @@ export async function getFullProfile(
       marvel_rivals_tag,
       discord_pseudo,
       discord_verified_at,
+      (blizzard_sub IS NOT NULL) AS blizzard_linked,
       is_adult,
       visible_avatar,
       visible_overwatch,
@@ -140,6 +144,10 @@ export async function getFullProfile(
   // supprimé : son pseudo d'emprunt se lit comme un pseudo ordinaire.
   const profile: PublicUserProfile = { ...mapPublicUser(userRows[0]), isDeleted };
   const discordVerified = userRows[0].discord_verified_at != null;
+  // Lu **avant** `applyVisibility`, qui efface le BattleTag masqué : la pastille
+  // dit qu'un BattleTag est prouvé par Battle.net, pas lequel. L'identifiant
+  // Blizzard lui-même ne quitte jamais la base (`blizzard_linked` n'est qu'un booléen).
+  const battletagVerified = Boolean(Number(userRows[0].blizzard_linked)) && Boolean(userRows[0].overwatch_battletag);
 
   if (!isSelf) applyVisibility(profile, false);
 
@@ -176,6 +184,9 @@ export async function getFullProfile(
   // précis, le capitaine dont le tournoi exige « tous les Discord vérifiés », qui
   // lisait jusqu'ici un refus sans savoir qui de son roster devait certifier.
   profile.discordVerified = discordVerified;
+  // Même règle pour le BattleTag : masqué, il s'affiche « Masqué ✅ » à tout
+  // lecteur de la fiche (`canSeeBattletagVerification`).
+  profile.battletagVerified = canSeeBattletagVerification() && battletagVerified;
 
   const [timelineRows] = await db.execute<TeamTimelineRow[]>(
     `SELECT

@@ -313,11 +313,11 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Garder sur le compte le choix « Ne plus afficher » de la fenêtre des annonces de recrutement urgentes, pour qu'elle ne s'ouvre plus d'elle-même sur les autres appareils du joueur — choix réversible dans « Mon profil »",
     ],
     legalBasis:
-      "Exécution du service demandé par le joueur (contrat) pour le compte ; consentement pour les données facultatives que le joueur renseigne et choisit de rendre visibles ; exécution du service (contrat — conditions d'utilisation, « Contacts de match ») pour la lecture du BattleTag, même masqué, dans la seule fenêtre « Contacts » d'un match et dans sa fenêtre de lancement (registre T04) — masqué, il n'est lisible nulle part ailleurs, arbitres et administrateurs compris",
+      "Exécution du service demandé par le joueur (contrat) pour le compte ; consentement pour les données facultatives que le joueur renseigne et choisit de rendre visibles ; exécution du service (contrat — conditions d'utilisation, « Contacts de match ») pour la lecture du BattleTag, même masqué, dans la seule fenêtre « Contacts » d'un match et dans sa fenêtre de lancement (registre T04) — masqué, il n'est lisible nulle part ailleurs, arbitres et administrateurs compris ; intérêt légitime (savoir qui a prouvé son identité de jeu) pour les pastilles de certification de la fiche (tag Discord certifié, BattleTag tiré d'un compte Battle.net rattaché), lues par tout joueur connecté même tag masqué, sans le tag — droit d'opposition par le formulaire de signalement (catégorie RGPD)",
     dataSubjects: ["Joueurs inscrits sur le site"],
     dataCategories: [
       "Pseudo du site (depuis le 30 septembre 2026, jamais tiré du nom du compte Google : pseudo neutre à la création ; un compte Google antérieur a pu recevoir ce nom), avatar (copié sur nos serveurs ; depuis la même date, masqué par défaut quand il vient du fournisseur de connexion)",
-      "Pseudos Overwatch (BattleTag), Marvel Rivals et Discord ; certification du pseudo Discord",
+      "Pseudos Overwatch (BattleTag), Marvel Rivals et Discord ; certification du pseudo Discord ; indication d'un BattleTag tiré d'un compte Battle.net rattaché (pastille de la fiche, montrée même BattleTag masqué)",
       "Majorité déclarée (oui / non / non renseignée)",
       "Réglages de visibilité, disponibilité pour le recrutement, rôles sur la plateforme",
       "Langue du compte (français ou anglais), remise au français à l'anonymisation",
@@ -333,7 +333,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     recipients: [
       "Public du site (seules les données que le joueur rend visibles)",
       "Parties d'un même match, dans sa seule fenêtre « Contacts » et dans sa fenêtre de lancement (BattleTag même masqué, pour s'ajouter en jeu ; durées du traitement T04)",
-      "Joueurs connectés du site : pseudo Discord certifié, si le joueur le rend visible",
+      "Joueurs connectés du site : pseudo Discord certifié, si le joueur le rend visible ; pastilles de certification de la fiche (tag Discord certifié, « BattleTag vérifié » — BattleTag tiré d'un compte Battle.net rattaché), même tag masqué, sans le tag",
       "Staff de l'association selon son rôle (administration, arbitrage)",
     ],
     transfers: ["Aucun"],

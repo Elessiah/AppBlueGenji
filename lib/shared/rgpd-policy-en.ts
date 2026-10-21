@@ -14,6 +14,7 @@ import {
   DATA_NOTICE_DM_SCOPE,
   DONNEES_PROFIL,
   BATTLETAG_MATCH_SCOPE,
+  VERIFIED_BADGE_SCOPE,
   LIVE_PSEUDO_SCOPE,
   MATCH_CONTACTS_SCOPE,
   MATCH_TIME_DM_SCOPE,
@@ -42,6 +43,8 @@ const SCOPE_EN: Record<string, string> = {
     "presentation, in the match's “Contacts” window and its launch window, to the members of both its teams and to the referees as soon as both its opponents are known until its end, and to its caster while the match is being played (the launch window, at the start of the match, only opens for both teams and the caster); the caster's contacts to both teams while the match is being played, and to the referees from the moment both its opponents are known until its end (terms of use, “Match contacts”)",
   [BATTLETAG_MATCH_SCOPE]:
     "reading, even when hidden, only in the “Contacts” window of a match where you are presented as a contact and in its launch window: by both its teams and the referees as soon as both its opponents are known until its end, by its caster while the match is being played; the caster's, by both teams while the match is being played and by the referees as soon as both its opponents are known until its end (the launch window, at the start of the match, only opens for both teams and the caster) — referees and administrators have no other access to it (terms of use, “Match contacts”)",
+  [VERIFIED_BADGE_SCOPE]:
+    "certification badge on your player page, read by any logged-in player even when the tag is hidden (without the tag) — objection through the report form, GDPR category",
   [MATCH_TIME_DM_SCOPE]: "match time notices, reminders and match removal notices by direct message",
   [MODERATION_DM_SCOPE]: "suspension or moderation notices by direct message",
   [DATA_NOTICE_DM_SCOPE]: "information about your data by direct message",
@@ -58,7 +61,7 @@ const PROFIL_TEXT_EN: readonly (readonly [donnee: string, finalite: string])[] =
   ],
   [
     "Overwatch username",
-    "Putting players in touch (adding each other in game) — no statistics. Entered by you, or filled in by Blizzard at each login if you have linked your Battle.net account. When hidden, it is readable by no one — referees and administrators included — except in the “Contacts” window of a match where you are one of the contacts presented and in its launch window: by the members of both its teams and the referees from the moment both its opponents are known to its end, by its caster only while the match is being played (from its start to its end) (the launch window, at the start of the match, only opens for both teams and the caster); if you cast a match, by both its teams while the match is being played and by the referees from the moment both its opponents are known until its end; when presented as a match contact, it is shown with your team role and whether it comes from a linked Battle.net account",
+    "Putting players in touch (adding each other in game) — no statistics. Entered by you, or filled in by Blizzard at each login if you have linked your Battle.net account. When hidden, it is readable by no one — referees and administrators included — except in the “Contacts” window of a match where you are one of the contacts presented and in its launch window: by the members of both its teams and the referees from the moment both its opponents are known to its end, by its caster only while the match is being played (from its start to its end) (the launch window, at the start of the match, only opens for both teams and the caster); if you cast a match, by both its teams while the match is being played and by the referees from the moment both its opponents are known until its end; when presented as a match contact, it is shown with your team role and whether it comes from a linked Battle.net account. Visible or hidden, your player page shows any logged-in player who opens it a “Verified BattleTag” badge if it comes from a linked Battle.net account — never revealing a hidden BattleTag; you can object to it through the report form (GDPR category)",
   ],
   [
     "Discord username",
@@ -66,7 +69,7 @@ const PROFIL_TEXT_EN: readonly (readonly [donnee: string, finalite: string])[] =
   ],
   [
     "Certification of the Discord username",
-    "Opens your Discord tag to the organizers so they can reach you: administrators at any time, referees while you are registered for a tournament that is not over (from the opening of registration), members of both teams of your match from the moment both its opponents are known to its end, its caster only while the match is being played (and, if you cast a match, both its teams while the match is being played, and the referees from the moment both its opponents are known until its end); other logged-in players only if you tick “Discord tag” (« Tag Discord »). Without it, the bot sends you no match direct message. Given only by you, from My profile (one click if your Discord is linked, a code by direct message otherwise) — logging in through Discord does not give it. Withdrawn by removing your tag; lost if your username changes",
+    "Opens your Discord tag to the organizers so they can reach you: administrators at any time, referees while you are registered for a tournament that is not over (from the opening of registration), members of both teams of your match from the moment both its opponents are known to its end, its caster only while the match is being played (and, if you cast a match, both its teams while the match is being played, and the referees from the moment both its opponents are known until its end); other logged-in players only if you tick “Discord tag” (« Tag Discord »). Whether your tag is certified (✅ badge, without the tag) can be read on your player page by any logged-in player. Without the certification, the bot sends you no match direct message. Given only by you, from My profile (one click if your Discord is linked, a code by direct message otherwise) — logging in through Discord does not give it. Withdrawn by removing your tag; lost if your username changes",
   ],
   [
     "Discord ID",
@@ -166,7 +169,7 @@ export const DROITS_EN: DroitEntry[] = [
   },
   {
     title: "Right to object",
-    text: "You can object to the processing of your data based on legitimate interest (tournament history, match time notices, reminders and match removal notices by direct message — these messages are turned off directly with the “Discord direct messages about my matches” box in My profile). The username posted in the #live announcement of a solo tournament is not part of it: it falls under performance of the service you register for — not being named in it means not registering; a past announcement is deleted on request. The AutoMod alert for such an announcement when blocked or flagged, kept to moderate the Discord server (legitimate interest), is deleted on request: that is how you object to it.",
+    text: "You can object to the processing of your data based on legitimate interest (tournament history, match time notices, reminders and match removal notices by direct message — these messages are turned off directly with the “Discord direct messages about my matches” box in My profile — and the certification badges on your player page, certified Discord tag and “Verified BattleTag”, through the report form, GDPR category). The username posted in the #live announcement of a solo tournament is not part of it: it falls under performance of the service you register for — not being named in it means not registering; a past announcement is deleted on request. The AutoMod alert for such an announcement when blocked or flagged, kept to moderate the Discord server (legitimate interest), is deleted on request: that is how you object to it.",
   },
   {
     title: "Right to data portability",

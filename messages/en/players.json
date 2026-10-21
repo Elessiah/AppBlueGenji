@@ -104,6 +104,9 @@
     "battletagHiddenSelf": "Hidden from everyone: it can only be read in the “Contacts” window of your matches and in their launch window — by both teams and the referees, from the moment both opponents are known to the end of the match, if you are shown as a contact, and by the caster while the match is being played; if you cast a match, by both its teams while the match is being played and by the referees from the moment both its opponents are known (the launch window, at the start of the match, only opens for both teams and the caster).",
     "verifiedAlt": "Verified Discord tag",
     "verifiedTitle": "Verified Discord tag: this player proved they own this Discord account.",
+    "battletagHiddenSelfBadge": "The “Verified BattleTag” badge, however, stays visible to any logged-in player, without the BattleTag.",
+    "battletagVerifiedAlt": "Verified BattleTag",
+    "battletagVerifiedTitle": "Verified BattleTag: this player proved through Battle.net that they own this BattleTag.",
     "teamsTitle": "Team history",
     "teamsEmpty": "No team memberships yet.",
     "teamsColumn": {
