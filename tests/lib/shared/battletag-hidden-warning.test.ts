@@ -141,6 +141,9 @@ describe("BattleTag masqué — les deux fenêtres nommées partout", () => {
     const en = TERMS_SECTIONS_EN.find((s) => s.id === "contacts-de-match")?.paragraphs.join(" ") ?? "";
     expectBoth(fr, FR_CONTACTS, FR_LAUNCH);
     expectBoth(en, EN_CONTACTS, EN_LAUNCH);
+    // Changé sans nouvelle version : la clause date elle-même ce qu'elle ouvre aux arbitres.
+    expect(fr).toContain("(en vigueur depuis le 21 octobre 2026 : auparavant, aux arbitres aussi le temps du match seulement)");
+    expect(en).toContain("(in force since 21 October 2026: before, to the referees too only while the match was being played)");
     const entryFr = JSON.stringify(PRIVACY_CHANGES.find((c) => c.id === V6_ENTRY_ID));
     const entryEn = JSON.stringify(PRIVACY_CHANGES_EN[V6_ENTRY_ID]);
     expectBoth(entryFr, FR_CONTACTS, FR_LAUNCH);
