@@ -150,7 +150,7 @@ qu'un rechargement.
 Un BattleTag tiré d'un compte Battle.net rattaché (`blizzard_sub` posé et
 `overwatch_battletag` rempli — la même règle que `battletagVerified` des
 contacts de match) porte sur la fiche `/joueurs/[id]` la pastille de
-certification, à côté du champ. Comme celle du tag Discord, **elle ne suit pas
+certification, posée dans le champ (sa largeur ne change pas). Comme celle du tag Discord, **elle ne suit pas
 le tag** (`canSeeBattletagVerification`, `lib/shared/battletag-visibility.ts`) :
 masqué, le BattleTag est effacé par `applyVisibility` et la fiche lit
 « Masqué ✅ ». Le fait est calculé dans `getFullProfile` **avant** l'effacement,
