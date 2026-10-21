@@ -51,6 +51,12 @@ export interface EntityLinkProps {
    * sous sa lueur, tomberait sous 4,5:1 (`PODIUM_TIERS.md`).
    */
   podiumMuted?: boolean;
+  /**
+   * Tronque le nom d'une ellipse sur une ligne (`.entity-truncate`). Un nom
+   * peint d'une marche rogne alors sur lui-même et non sur le lien : sa lueur
+   * n'est pas coupée et l'ellipse garde le dégradé (`PODIUM_TIERS.md`).
+   */
+  truncate?: boolean;
 }
 
 /**
@@ -71,32 +77,29 @@ export function EntityLink({
   className,
   podiumClass,
   podiumMuted = false,
+  truncate = false,
   ...rest
 }: Readonly<EntityLinkProps & { href: string; /** Classe de la marche à peindre sur le nom (`podiumTierClass`). */ podiumClass?: string }>) {
   const spectator = useSpectatorView();
   const name = <PodiumPaint className={podiumClass}>{children}</PodiumPaint>;
-  const muted = podiumMuted ? "" : undefined;
+  const classes = (base: string) => [base, truncate ? "entity-truncate" : "", className ?? ""].filter(Boolean).join(" ");
+  // Repères posés sur le lien, lus par la feuille sans `:has()` : la famille de
+  // la marche peinte dedans (`podium-tier` / `podium-member`), et son extinction.
+  const marks = {
+    "data-podium": podiumClass?.split(" ")[0],
+    "data-podium-muted": podiumMuted ? "" : undefined,
+  };
   if (spectator) {
     // Pas d'`aria-label` sur un `<span>` sans rôle (`aria-prohibited-attr`) :
     // le nom affiché suffit, il n'annonce plus de destination.
     return (
-      <span
-        className={className ? `entity-name ${className}` : "entity-name"}
-        style={rest.style}
-        title={rest.title}
-        data-podium-muted={muted}
-      >
+      <span className={classes("entity-name")} style={rest.style} title={rest.title} {...marks}>
         {name}
       </span>
     );
   }
   return (
-    <LocaleLink
-      href={href}
-      className={className ? `entity-link ${className}` : "entity-link"}
-      data-podium-muted={muted}
-      {...rest}
-    >
+    <LocaleLink href={href} className={classes("entity-link")} {...marks} {...rest}>
       {name}
     </LocaleLink>
   );

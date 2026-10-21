@@ -232,25 +232,9 @@
   min-width: 0;
 }
 
+/* Tronqué par `truncate` (`.entity-truncate`, `PODIUM_TIERS.md`). */
 .playerName {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Pseudo peint d'une marche du podium (`PODIUM_TIERS.md`) : c'est le nom peint
-   qui rogne et pose l'ellipse — tracée dans le dégradé —, le lien le laisse
-   déborder. */
-.playerName:has(> :global(.podium-tier), > :global(.podium-member)) {
-  overflow: visible;
-}
-
-.playerName > :global(.podium-tier),
-.playerName > :global(.podium-member) {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .youTag {

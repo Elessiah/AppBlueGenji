@@ -215,19 +215,37 @@ a {
   font-weight: 700;
 }
 
-/* Dans un lien d'entité, la graisse de la marche se pose sur le lien et le nom
-   peint en hérite : à spécificité d'une classe (`:where`), la classe ou le
-   style de l'appelant l'emportent, comme quand la marche habillait le lien
-   lui-même. Éteinte (`data-podium-muted`), la marche n'impose aucune graisse.
-   Sans `:has()`, le nom peint garde ses 700. */
-@supports selector(:has(*)) {
-  :where(.entity-link, .entity-name):where(:not([data-podium-muted], [data-podium-muted] *)):has(> .podium-tier) {
-    font-weight: 700;
-  }
+/* Dans un lien d'entité, la graisse de la marche se pose sur le lien (repère
+   `data-podium`, posé par `EntityLink`) et le nom peint en hérite : à
+   spécificité d'une classe (`:where`), la classe ou le style de l'appelant
+   l'emportent, comme quand la marche habillait le lien lui-même. Éteinte
+   (`data-podium-muted`), la marche n'impose aucune graisse. */
+:where(.entity-link, .entity-name):where(:not([data-podium-muted], [data-podium-muted] *))[data-podium="podium-tier"] {
+  font-weight: 700;
+}
 
-  :where(.entity-link, .entity-name) > .podium-tier {
-    font-weight: inherit;
-  }
+[data-podium] > .podium-tier {
+  font-weight: inherit;
+}
+
+/* Nom tronqué d'une ellipse (`truncate` d'`EntityLink`). Peint d'une marche,
+   c'est le nom qui rogne et pose l'ellipse — tracée dans le dégradé — et le
+   lien le laisse déborder : la lueur (`drop-shadow`) n'est pas coupée net. */
+.entity-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entity-truncate[data-podium] {
+  overflow: visible;
+}
+
+.entity-truncate[data-podium] > .podium-tier,
+.entity-truncate[data-podium] > .podium-member {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .podium-tier-1 {

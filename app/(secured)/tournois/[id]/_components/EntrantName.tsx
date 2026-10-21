@@ -95,20 +95,20 @@ export function EntrantName({
   textStyle,
   title,
 }: Readonly<EntrantNameProps>) {
-  const textClass = [styles.text, truncate ? styles.truncate : "", textClassName ?? ""]
-    .filter(Boolean)
-    .join(" ");
+  // Lien : la troncature passe par `EntityLink` (`.entity-truncate`), qui
+  // rogne sur le nom peint d'une marche du podium plutôt que sur le lien.
+  const textClass = [styles.text, textClassName ?? ""].filter(Boolean).join(" ");
   const content = children ?? name;
 
   return (
     <span className={className ? `${styles.label} ${className}` : styles.label} style={style}>
       <EntrantLogo teamId={teamId} name={name} size={logoSize} />
       {teamId !== null ? (
-        <EntrantLink teamId={teamId} className={textClass} style={textStyle} title={title}>
+        <EntrantLink teamId={teamId} className={textClass} style={textStyle} title={title} truncate={truncate}>
           {content}
         </EntrantLink>
       ) : (
-        <span className={textClass} style={textStyle} title={title}>
+        <span className={truncate ? `${textClass} ${styles.truncate}` : textClass} style={textStyle} title={title}>
           {content}
         </span>
       )}
