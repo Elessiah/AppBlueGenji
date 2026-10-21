@@ -1017,7 +1017,10 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Rien ne change pour les joueurs : leurs contacts restent visibles des arbitres dès que les deux adversaires sont connus, et du caster le temps du match seulement.",
       "Cette lecture repose, comme avant, sur l'exécution du service — l'organisation du tournoi. Les conditions d'utilisation (section « Contacts de match ») le disent, sans nouvelle version à accepter.",
     ],
-    links: [{ href: "/conditions-utilisation#contacts-de-match", label: "Lire la section « Contacts de match »" }],
+    links: [
+      { href: "/conditions-utilisation#contacts-de-match", label: "Lire la section « Contacts de match »" },
+      { href: "/rgpd#donnees-collectees", label: "Lire la section « Données collectées »" },
+    ],
   },
 ];
 

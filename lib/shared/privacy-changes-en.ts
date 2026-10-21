@@ -513,7 +513,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     ],
   },
   "2026-10-contacts-du-caster-aux-arbitres": {
-    linkLabels: ["Read the “Match contacts” section"],
+    linkLabels: ["Read the “Match contacts” section", "Read the “Data collected” section"],
     title: "Caster contacts: visible to referees and administrators before the match",
     summary:
       "If you cast a match, referees and administrators see your contacts as soon as both its opponents are known, no longer only while the match is being played; both its teams still only see them while the match is being played.",
