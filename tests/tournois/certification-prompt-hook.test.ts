@@ -241,5 +241,8 @@ describe("useCertificationPrompt", () => {
     const first = render(PROMPT);
     expect(first.prompt).toBe(PROMPT);
     expect(() => act(() => first.close(), PROMPT)).not.toThrow();
+    // Retirée puis revenue : fermée, elle ne se rouvre pas sur cette page.
+    render(null);
+    expect(render({ ...PROMPT }).prompt).toBeNull();
   });
 });

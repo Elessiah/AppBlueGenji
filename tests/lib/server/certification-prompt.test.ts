@@ -84,12 +84,12 @@ describe("loadCertificationPrompt", () => {
       { user_id: 7, ...BARE, discord_verified_at: "2026-10-01 10:00:00", discord_pseudo: null, blizzard_sub: "sub", overwatch_battletag: null },
     ]);
     // L'équipe reste sans contact ; le BattleTag, inactionnable (Battle.net déjà
-    // rattaché), n'est pas demandé au lecteur.
+    // rattaché), n'est pas demandé au lecteur : la modale ne parle que de Discord.
     expect(await loadCertificationPrompt(executor, 7, 42, false, true)).toEqual({
       reason: "TEAM_WITHOUT_CONTACT",
       discordVerified: false,
-      battletagVerified: true,
-      battletagRelevant: true,
+      battletagVerified: false,
+      battletagRelevant: false,
     });
   });
 
@@ -100,6 +100,11 @@ describe("loadCertificationPrompt", () => {
 
   it("en Marvel Rivals, invite le joueur dont l'équipe n'a qu'un BattleTag vérifié", async () => {
     const { executor } = rosterOf([{ user_id: 7, ...BARE }, { user_id: 8, ...BARE, ...BATTLETAG }]);
+    expect((await loadCertificationPrompt(executor, 7, 42, false, false))?.reason).toBe("TEAM_WITHOUT_CONTACT");
+  });
+
+  it("ce refus ne tait jamais l'alerte d'une équipe sans contact", async () => {
+    const { executor } = rosterOf([{ user_id: 7, ...BARE }], 1);
     expect((await loadCertificationPrompt(executor, 7, 42, false, false))?.reason).toBe("TEAM_WITHOUT_CONTACT");
   });
 

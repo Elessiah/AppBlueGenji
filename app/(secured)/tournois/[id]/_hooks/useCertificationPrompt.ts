@@ -50,9 +50,12 @@ export function useCertificationPrompt(prompt: CertificationPrompt | null | unde
   // Effacée devant une modale urgente : plus rien sur cette page, même si
   // l'invitation est retirée puis revient.
   const yielded = useRef(false);
+  // Fermée par le lecteur : plus rien sur cette page, stockage bloqué compris
+  // (le drapeau d'onglet peut ne pas s'écrire).
+  const closed = useRef(false);
 
   useEffect(() => {
-    if (decided.current || yielded.current || prompt == null || frozen) return;
+    if (decided.current || yielded.current || closed.current || prompt == null || frozen) return;
     decided.current = true;
     const step = certificationPromptStep({
       allowed: shouldOpenCertificationPrompt(browserStorage("localStorage"), browserStorage("sessionStorage")),
@@ -63,6 +66,7 @@ export function useCertificationPrompt(prompt: CertificationPrompt | null | unde
 
   const close = useCallback(() => {
     rememberCertificationPromptClosed(browserStorage("localStorage"), browserStorage("sessionStorage"), neverAgain);
+    closed.current = true;
     setOpen(false);
   }, [neverAgain]);
 

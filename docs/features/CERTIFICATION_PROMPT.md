@@ -59,9 +59,9 @@ lignes passent en cartes sans perdre leur sémantique, chaque cellule libellée
 par `data-label` (libellé visuel seulement, texte de remplacement vide).
 
 Battle.net rattaché **sans** BattleTag enregistré : rien à faire depuis le
-profil (rattachement déjà là, BattleTag tapé refusé) — le BattleTag n'est pas
-demandé au lecteur (pastille « Certifié »), mais il ne fait toujours pas un
-contact pour l'équipe.
+profil (rattachement déjà là, BattleTag tapé refusé) — la modale ne lui en
+parle pas (variante « Discord seul », `battletagRelevant: false`), mais il ne
+fait toujours pas un contact pour l'équipe.
 
 Un membre est certifié par les règles mêmes du lancement
 (`hasVerifiedDiscord` / `hasVerifiedBattletag`, `lib/shared/match-launch.ts`).
@@ -90,8 +90,10 @@ contacts présentés aux équipes, au caster et aux arbitres (T04), portées OAu
 
 Le « Ne plus voir » donné à la **proposition de certification de la
 connexion** (`DISCORD_CERTIFY_PROMPT.md`, `bg_users.discord_certify_prompt_dismissed_at`,
-gardé sur le compte) vaut aussi ici, sur tous les appareils, **quand Discord
-est seul à manquer** (un BattleTag à vérifier n'était pas l'objet de ce refus) : lu seulement dans ce cas (`loadCertificationPrompt`), colonne absente
+gardé sur le compte) vaut aussi ici, sur tous les appareils, pour l'invitation
+faite au **meneur** et **quand Discord est seul à manquer** (un BattleTag à
+vérifier n'était pas l'objet de ce refus) — jamais pour l'alerte d'une équipe
+sans aucun contact : lu seulement dans ce cas (`loadCertificationPrompt`), colonne absente
 = sans choix. L'inverse n'est pas vrai : la case de cette modale reste une
 préférence d'affichage du navigateur.
 

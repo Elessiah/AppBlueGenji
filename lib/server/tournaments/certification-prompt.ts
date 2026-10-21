@@ -61,19 +61,25 @@ export async function loadCertificationPrompt(
   const viewer = members.find((member) => member.userId === userId);
   if (!viewer) return null;
   // Battle.net rattaché sans BattleTag enregistré : rien à faire depuis le
-  // profil (le rattachement est déjà là, un BattleTag tapé y est refusé) — on
-  // ne le lui demande pas. Pour l'équipe, il ne fait toujours pas un contact.
+  // profil (le rattachement est déjà là, un BattleTag tapé y est refusé) — la
+  // modale ne lui en parle pas (variante « Discord seul »). Pour l'équipe, il
+  // ne fait toujours pas un contact.
   const own = identityOf(viewer);
+  const battletagUnfixable = viewer.blizzardLinked && !own.battletagVerified;
   const prompt = certificationPromptFor({
     isManager,
-    viewer: { ...own, battletagVerified: own.battletagVerified || viewer.blizzardLinked },
+    viewer: own,
     teamHasContact: teamHasContact(members.map(identityOf), battletagRelevant),
-    battletagRelevant,
+    battletagRelevant: battletagRelevant && !battletagUnfixable,
   });
-  // Lu seulement quand l'invitation ne porterait que sur Discord : la plupart
-  // des lecteurs n'en ont pas.
+  // Refus de la proposition de la connexion : un choix personnel, qui ne tait
+  // que l'invitation faite au meneur pour lui-même, et seulement quand Discord
+  // est seul en cause — jamais l'alerte d'une équipe sans aucun contact. Lu
+  // dans ce seul cas : la plupart des lecteurs n'en ont pas.
   if (prompt === null) return null;
   const onlyDiscordMissing = !prompt.discordVerified && (prompt.battletagVerified || !prompt.battletagRelevant);
-  if (onlyDiscordMissing && (await certificationNudgesDeclined(executor, userId))) return null;
+  if (prompt.reason === "MANAGER" && onlyDiscordMissing && (await certificationNudgesDeclined(executor, userId))) {
+    return null;
+  }
   return prompt;
 }
