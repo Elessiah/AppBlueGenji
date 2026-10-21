@@ -359,7 +359,7 @@
   "certification": {
     "title": "Verify your Discord and your BattleTag",
     "titleDiscordOnly": "Verify your Discord",
-    "leadManager": "You manage a team entered in this tournament: when a match launches, you are among those the opponent, the caster and the referees will try to reach. Verify what you are still missing.",
+    "leadManager": "You lead a team entered in this tournament: when a match launches, you are among those the opponent, the caster and the referees will try to reach. Verify what you are still missing.",
     "leadTeam": "Your team has no contact to show when its matches launch: nobody on it has verified their Discord tag or their BattleTag. The opponent and the referees have no way to reach you.",
     "leadTeamDiscordOnly": "Your team has no contact to show when its matches launch: nobody on it has verified their Discord tag. The opponent and the referees have no way to reach you.",
     "statusLabel": "Where you stand",
@@ -380,8 +380,8 @@
       },
       "matches": {
         "topic": "Your matches",
-        "does": "You can be shown as your team's contact to the opponent and the caster of your matches.",
-        "doesNot": "Does not change your visibility settings: what other players see on your profile stays what you chose."
+        "does": "You can be shown as your team's contact to the opponent, the caster and the referees of your matches, with your verified Discord tag.",
+        "doesNot": "Does not publish your tag on your profile: other players only see a verification badge there, and your tag still follows your visibility settings."
       },
       "staff": {
         "topic": "The organisers",

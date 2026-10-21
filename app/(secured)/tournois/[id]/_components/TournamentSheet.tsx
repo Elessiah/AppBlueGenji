@@ -1334,7 +1334,6 @@ export function TournamentSheet({ tournamentId, source }: Readonly<{ tournamentI
           neverAgain={certificationPrompt.neverAgain}
           onNeverAgainChange={certificationPrompt.setNeverAgain}
           onClose={certificationPrompt.close}
-          onYield={certificationPrompt.yieldPlace}
         />
       )}
 

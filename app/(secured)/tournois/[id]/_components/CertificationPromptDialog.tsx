@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { anotherModalOpen } from "@/lib/shared/dialog-focus";
 import { certificationProfileHref, type CertificationPrompt } from "@/lib/shared/certification-prompt";
@@ -21,11 +21,6 @@ interface CertificationPromptDialogProps {
   onNeverAgainChange: (value: boolean) => void;
   /** Fermeture ; la case cochée vaut pour toute fermeture. */
   onClose: () => void;
-  /**
-   * Une modale urgente s'est ouverte pendant le chargement de ce morceau :
-   * celle-ci ne se monte pas et s'efface sans rien retenir.
-   */
-  onYield: () => void;
 }
 
 /**
@@ -33,24 +28,22 @@ interface CertificationPromptDialogProps {
  * (`docs/features/CERTIFICATION_PROMPT.md`), ouverte d'office sur la fiche
  * d'un tournoi. Elle dit pourquoi elle s'ouvre, ce qui manque encore, puis ce
  * que la certification fait et ne fait pas — un tableau, pour qu'aucune
- * promesse ne se lise sans sa limite en face. Le bouton mène à « Applications
- * connectées » du profil, où les deux se rattachent.
+ * promesse ne se lise sans sa limite en face. Le bouton mène au profil, à la
+ * section « Discord » tant que le tag manque, sinon à « Applications
+ * connectées » où Battle.net se rattache (`certificationProfileHref`).
  */
 export function CertificationPromptDialog({
   prompt,
   neverAgain,
   onNeverAgainChange,
   onClose,
-  onYield,
 }: Readonly<CertificationPromptDialogProps>) {
   const { t } = useDialogsText();
   // Lu une fois, au montage (morceau chargé côté client seulement) : une
   // modale urgente ouverte entre la décision et l'arrivée du morceau garde la
-  // main — celle-ci, montée après, prendrait sinon le dessus de la pile.
+  // main — celle-ci, montée après, prendrait sinon le dessus de la pile. Le
+  // guet de `useCertificationPrompt` l'efface ensuite.
   const [preempted] = useState(() => anotherModalOpen(document, { overYielding: true }));
-  useEffect(() => {
-    if (preempted) onYield();
-  }, [preempted, onYield]);
 
   // Marvel Rivals : le BattleTag ne sert à rien, la modale ne parle que de Discord.
   const withBattletag = prompt.battletagRelevant;

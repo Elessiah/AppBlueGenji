@@ -62,10 +62,13 @@ describe("certificationPrompt du contexte du lecteur", () => {
     expect(loadCertificationPrompt).toHaveBeenCalledWith(expect.anything(), 7, 42, true, false);
   });
 
-  it("passe le rôle de gestion : un simple joueur n'est pas manager", async () => {
+  it("passe le rôle de meneur : capitaine compris, pas un simple joueur", async () => {
     jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 42, teamName: "Équipe", roles: ["DPS", "CAPITAINE"] });
     await getTournamentViewerContext(snapshot("RUNNING", true), 7);
-    expect(loadCertificationPrompt).toHaveBeenCalledWith(expect.anything(), 7, 42, false, true);
+    expect(loadCertificationPrompt).toHaveBeenLastCalledWith(expect.anything(), 7, 42, true, true);
+    jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 42, teamName: "Équipe", roles: ["DPS", "COACH"] });
+    await getTournamentViewerContext(snapshot("RUNNING", true), 7);
+    expect(loadCertificationPrompt).toHaveBeenLastCalledWith(expect.anything(), 7, 42, false, true);
   });
 
   it("rien sans lecture pour une équipe non engagée", async () => {

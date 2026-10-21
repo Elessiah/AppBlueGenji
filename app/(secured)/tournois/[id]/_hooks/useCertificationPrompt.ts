@@ -85,6 +85,5 @@ export function useCertificationPrompt(prompt: CertificationPrompt | null | unde
     neverAgain,
     setNeverAgain,
     close,
-    yieldPlace,
   };
 }

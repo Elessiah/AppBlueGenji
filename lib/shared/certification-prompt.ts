@@ -8,8 +8,9 @@
  * ne sort jamais — et l'adversaire comme l'arbitrage restent sans moyen de la
  * joindre. La fiche le dit donc à qui peut y remédier :
  *
- * - au **manager** (`OWNER` / `MANAGER`) d'une équipe engagée, dès qu'il lui
- *   manque l'une des deux certifications — c'est lui qu'on cherche à joindre ;
+ * - à celui qui **mène** une équipe engagée en match (`OWNER`, `MANAGER`,
+ *   `CAPITAINE`), dès qu'il lui manque l'une des deux certifications — c'est
+ *   lui qu'on cherche à joindre (motif `MANAGER`) ;
  * - à tout **joueur** d'une équipe engagée qui n'a aucun contact à présenter,
  *   s'il lui manque l'une des deux.
  *

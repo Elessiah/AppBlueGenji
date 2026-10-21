@@ -13,7 +13,7 @@ La fiche d'un tournoi ouvre donc d'office une modale qui invite à certifier :
 
 | Lecteur | Condition | Motif (`reason`) |
 | --- | --- | --- |
-| Manager (`OWNER` / `MANAGER`, `hasTeamManagementRole`) d'une équipe engagée | il lui manque l'une des deux certifications, **quel que soit le roster** | `MANAGER` |
+| Meneur (`OWNER` / `MANAGER` / `CAPITAINE`, `canDeclareTeamReady` — le capitaine est le premier présenté par `pickLaunchContacts` à vérification égale) d'une équipe engagée | il lui manque l'une des deux certifications, **quel que soit le roster** | `MANAGER` |
 | Tout autre joueur d'une équipe engagée | l'équipe n'a **aucun** membre certifié (ni Discord ni BattleTag ; Discord seul compte en Marvel Rivals), et il lui en manque une | `TEAM_WITHOUT_CONTACT` |
 
 Rien pour qui a déjà les deux, pour un tournoi terminé (`FINISHED`), en tournoi
@@ -38,7 +38,7 @@ sa racine, `anotherModalOpen(…, { overYielding: true })`,
 `lib/shared/dialog-focus.ts`) : l'annonce d'un match qui se lance, urgente,
 passe par-dessus — comme toute autre modale qui s'ouvrirait sur elle ; le guet
 réagit sans délai (`throttleMs: 0`), et un morceau arrivé après l'urgente ne se
-monte pas (lecture au montage, `onYield`). L'invitation s'efface **sans rien retenir** (elle n'a
+monte pas (lecture au montage ; le guet l'efface ensuite). L'invitation s'efface **sans rien retenir** (elle n'a
 peut-être pas été lue ; la case « Ne plus voir », tenue par le crochet, garde
 son état) et revient à la fermeture de l'urgente. La modale
 recouverte ne reprend pas le focus à celle du dessus, et lui passe sa propre
@@ -70,7 +70,9 @@ le tag Discord manque, sinon à **« Applications connectées »**
 (`/profil#connexions`), où Battle.net se rattache.
 
 Le tableau ne promet que ce que les règles tiennent : visibilité du tag
-(`canViewDiscordTag`), du BattleTag (`canViewBattletag`), portées OAuth
+(`canViewDiscordTag`), du BattleTag (`canViewBattletag`), pastilles de
+certification lues par tout joueur connecté même tag masqué (registre),
+contacts présentés aux équipes, au caster et aux arbitres (T04), portées OAuth
 (`OAUTH_PROVIDERS.md` : `identify`, `openid`), conditions d'inscription
 (`REGISTRATION_FILTERS.md`). Une règle qui change ces faits relit le tableau
 (`messages/*/tournamentDialogs.json`, clé `certification`).
@@ -84,6 +86,7 @@ Le tableau ne promet que ce que les règles tiennent : visibilité du tag
 - case **« Ne plus voir »** cochée puis fermeture (ou clic sur le bouton du
   profil) : `bg_cert_prompt_off` = « 1 » en **stockage local**, en plus.
 
+Traitement inscrit au registre (T04, sous-finalité « Inviter … à certifier »).
 Valeurs sans identifiant de personne, jamais transmises au serveur : un
 navigateur partagé tait la modale pour tous ses comptes, ce qu'une préférence
 d'affichage peut se permettre. Stockage bloqué (navigation privée) : la modale

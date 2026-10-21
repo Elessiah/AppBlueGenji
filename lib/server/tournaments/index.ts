@@ -1131,7 +1131,9 @@ export async function getTournamentViewerContext(
       ? await readCertificationPrompt(
           userId,
           activeTeam.teamId,
-          canRegisterEntrant,
+          // Ceux qui mènent l'équipe en match — capitaine compris, premier
+          // présenté par `pickLaunchContacts` à vérification égale.
+          canDeclareTeamReady(activeTeam.roles),
           battletagRelevantFor(snapshot.card.game),
         )
       : null;

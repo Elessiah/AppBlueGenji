@@ -41,7 +41,6 @@ function render(prompt: CertificationPrompt, locale: "fr" | "en" = "fr"): string
       neverAgain={false}
       onNeverAgainChange={() => undefined}
       onClose={() => undefined}
-      onYield={() => undefined}
     />
   );
   if (locale === "fr") return renderToStaticMarkup(ui);
@@ -118,8 +117,7 @@ describe("CertificationPromptDialog", () => {
         neverAgain
         onNeverAgainChange={() => undefined}
         onClose={() => undefined}
-        onYield={() => undefined}
-      />,
+        />,
     );
     expect(html).toMatch(/<input type="checkbox" checked=""/);
   });

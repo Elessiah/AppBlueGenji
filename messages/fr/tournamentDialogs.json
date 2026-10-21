@@ -359,7 +359,7 @@
   "certification": {
     "title": "Certifie ton Discord et ton BattleTag",
     "titleDiscordOnly": "Certifie ton Discord",
-    "leadManager": "Tu gères une équipe engagée dans ce tournoi : au lancement d'un match, tu fais partie de ceux que l'adversaire, le caster et l'arbitrage chercheront à joindre. Certifie ce qui te manque encore.",
+    "leadManager": "Tu mènes une équipe engagée dans ce tournoi : au lancement d'un match, tu fais partie de ceux que l'adversaire, le caster et l'arbitrage chercheront à joindre. Certifie ce qui te manque encore.",
     "leadTeam": "Ton équipe n'a aucun contact à présenter au lancement de ses matchs : personne n'y a certifié son tag Discord ni son BattleTag. L'adversaire et l'arbitrage n'ont aucun moyen de vous joindre.",
     "leadTeamDiscordOnly": "Ton équipe n'a aucun contact à présenter au lancement de ses matchs : personne n'y a certifié son tag Discord. L'adversaire et l'arbitrage n'ont aucun moyen de vous joindre.",
     "statusLabel": "Où tu en es",
@@ -380,8 +380,8 @@
       },
       "matches": {
         "topic": "Tes matchs",
-        "does": "Tu peux être présenté comme contact de ton équipe à l'adversaire et au caster de vos matchs.",
-        "doesNot": "Ne change pas tes réglages de visibilité : ce que les autres joueurs voient de ton profil reste ce que tu as choisi."
+        "does": "Tu peux être présenté comme contact de ton équipe à l'adversaire, au caster et aux arbitres de vos matchs, avec ton tag Discord certifié.",
+        "doesNot": "Ne publie pas ton tag sur ta fiche : les autres joueurs n'y voient qu'une pastille de certification, et ton tag reste soumis à tes réglages de visibilité."
       },
       "staff": {
         "topic": "L'organisation",
