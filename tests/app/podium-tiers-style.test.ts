@@ -129,8 +129,8 @@ describe("marches du podium — accessibilité et impression", () => {
   it("laisse le soulignement au lien, dont le texte reste coloré (« Liens soulignés »)", () => {
     // Le texte transparent est celui du `<span>` intérieur : le trait, tracé par
     // le lien, prend la couleur du lien — aucune couleur de trait à imposer.
+    // (Le `<span>` intérieur est vérifié au rendu : tests/components/podium-tier-links.test.tsx.)
     expect(rule(".podium-tier,\n.podium-member")).not.toMatch(/text-decoration/);
-    expect(readSource("components/entity-link.tsx")).toContain("<PodiumPaint className={podium && podiumTierClass(podium.tier, podium.kind)}>{children}</PodiumPaint>");
   });
 
   it("rogne un nom tronqué sur le nom peint, pas sur le lien (lueur entière, ellipse en dégradé)", () => {
@@ -156,9 +156,7 @@ describe("marches du podium — accessibilité et impression", () => {
   it("ne tronque jamais un lien d'entité par une classe de l'appelant", () => {
     expect(readSource("app/(secured)/equipes/[id]/team.module.css")).not.toMatch(/\.playerName \{[^}]*overflow/);
     expect(readSource("app/(secured)/equipes/[id]/_components/MembersSection.tsx")).toMatch(/<PlayerLink [^>]*\btruncate>/);
-    const entrant = readSource("app/(secured)/tournois/[id]/_components/EntrantName.tsx");
-    expect(entrant).toContain("truncate={truncate}");
-    expect(entrant).toContain('joinClasses(textClass, truncate && "entity-truncate")');
+    // `EntrantName` : vérifié au rendu (tests/tournois/entrant-logos-render.test.tsx).
     expect(readSource("app/(secured)/tournois/[id]/_components/EntrantName.module.css")).not.toMatch(/text-overflow/);
   });
 
