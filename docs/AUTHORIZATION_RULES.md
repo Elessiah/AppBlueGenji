@@ -359,7 +359,7 @@ et les rosters **pour tous**, arbitres et administrateurs compris : la fiche
 seul `lib/server/tournaments/match-launch-info.ts` pose en présentant les
 contacts d'un match — aux mêmes durées que la fenêtre elle-même. Cette lecture
 repose sur l'exécution du service — section « Contacts de match » des
-conditions d'utilisation (v5) —, pas sur le consentement ; l'avertissement est
+conditions d'utilisation (v6) —, pas sur le consentement ; l'avertissement est
 dit là où le BattleTag se renseigne et se masque (`games.hiddenWarning`,
 `battletagNotice.warning`, notes Blizzard de `/connexion` et du profil).
 
@@ -393,7 +393,9 @@ masqué compris, et le BattleTag du caster aux deux équipes : c'est par lui
 qu'on s'ajoute en jeu. L'exposition est voulue et déclarée
 (`PRIVACY_CHANGES`, `2026-09-lancement-des-matchs` : « un nouveau public (le
 caster) pour le BattleTag » ; registre T04) ; elle se limite à un ou deux
-contacts par équipe, du lancement à la fin du match. Le ❌ de `casting`
+contacts par équipe, à chaque partie le temps du match (la modale ne s'ouvre
+qu'au départ du match) ; la fenêtre « Contacts » de la carte les ouvre plus tôt
+aux équipes et aux arbitres (tableau ci-dessus). Le ❌ de `casting`
 ci-dessus vaut pour la fiche d'un joueur, pas pour cette modale. Voir
 `docs/features/MATCH_LAUNCH.md`.
 

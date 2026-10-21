@@ -35,7 +35,7 @@ export const AUTOMOD_ALERT_SCOPE = "alerte AutoMod d'une telle annonce bloquée 
  * Les équipes et les arbitres les ont dès que les deux adversaires sont connus,
  * le caster le temps du match seulement ; ceux du caster, les équipes le temps
  * du match et les arbitres dès que les adversaires sont connus
- * (`match-launch-info.ts`, `exposesCasterContacts`).
+ * (`lib/shared/match-launch.ts`, `exposesCasterContacts`).
  */
 export const MATCH_CONTACTS_SCOPE =
   "présentation, dans la fenêtre « Contacts » du match et dans sa fenêtre de lancement, aux membres de ses deux équipes et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, et à son caster le temps du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes et au caster) ; les contacts du caster aux deux équipes le temps du match, et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin (conditions d'utilisation, « Contacts de match »)";

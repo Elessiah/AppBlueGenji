@@ -15,7 +15,7 @@
     "requestCode": "Recevoir un code →",
     "codeSent": "Code envoyé en DM Discord (expiration : {time}).",
     "accountLabel": "Compte Discord",
-    "tagNotice": "Te connecter par ce code <strong>enregistre ce tag</strong>, sans le certifier : il reste invisible de tous, administrateurs compris. Si tu le certifies ensuite dans « Mon profil », {audience}",
+    "tagNotice": "Te connecter par ce code <strong>enregistre ce tag</strong>, sans le certifier : il reste invisible de tous, administrateurs compris. Si tu le certifies ensuite, dans « Mon profil » ou dans la fenêtre proposée après une connexion par Discord ou Blizzard, {audience}",
     "codeLabel": "Code reçu en DM (6 chiffres)",
     "pseudoLabel": "Pseudo site",
     "pseudoOptional": "(facultatif, première connexion)",

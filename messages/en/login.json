@@ -15,7 +15,7 @@
     "requestCode": "Get a code →",
     "codeSent": "Code sent by Discord direct message (expires at {time}).",
     "accountLabel": "Discord account",
-    "tagNotice": "Logging in with this code <strong>saves this tag</strong> without certifying it: it stays hidden from everyone, admins included. If you certify it later in “My profile”, {audience}",
+    "tagNotice": "Logging in with this code <strong>saves this tag</strong> without certifying it: it stays hidden from everyone, admins included. If you certify it later, in “My profile” or in the window offered after logging in through Discord or Blizzard, {audience}",
     "codeLabel": "Code received by DM (6 digits)",
     "pseudoLabel": "Site username",
     "pseudoOptional": "(optional, first login)",
