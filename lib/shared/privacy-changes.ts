@@ -143,6 +143,16 @@ export function privacyChangeReachesAccount(change: PrivacyChange, facts: Privac
 }
 
 /**
+ * Pour chaque public, l'entrée est-elle une version de la politique ? Une table
+ * complète : un public ajouté demain ne compile pas sans que la question soit
+ * tranchée.
+ */
+const AUDIENCE_IS_POLICY_VERSION: Record<PrivacyAudience, boolean> = {
+  GOOGLE_LINKED: false,
+  LIVE_STAFF: true,
+};
+
+/**
  * L'entrée est-elle une **version de la politique** — publiée dans l'historique
  * de `/rgpd` et dans la date qui le coiffe ? Oui, sauf l'avis personnel
  * `GOOGLE_LINKED` : le reliquat d'une règle passée, qui ne change pas la
@@ -152,16 +162,6 @@ export function privacyChangeReachesAccount(change: PrivacyChange, facts: Privac
 export function isPrivacyPolicyVersion(change: PrivacyChange): boolean {
   return change.audience === undefined || AUDIENCE_IS_POLICY_VERSION[change.audience];
 }
-
-/**
- * Pour chaque public, l'entrée est-elle une version de la politique ? Une table
- * complète : un public ajouté demain ne compile pas sans que la question soit
- * tranchée.
- */
-const AUDIENCE_IS_POLICY_VERSION: Record<PrivacyAudience, boolean> = {
-  GOOGLE_LINKED: false,
-  LIVE_STAFF: true,
-};
 
 /**
  * Événement de fenêtre émis quand le joueur a pris connaissance des

@@ -325,7 +325,10 @@ export function CasterCard({
       {pending && <p className={styles.note}>{laterText ?? t("casterContactsAtLaunch")}</p>}
       {/* Statut hors flux, présent dès l'ouverture là où il peut parler : une
           phrase plutôt que les boutons « Copier » — ou, sans contact, celle qui
-          le dit. */}
+          le dit. Pas un toast : rien n'a été demandé ni n'a réussi, le contenu
+          de la fiche change sous les yeux — une région polie pour lecteur
+          d'écran seulement, invisible à l'écran (la règle des toasts vise les
+          retours d'un geste). */}
       {announceArrival && (
         <output className="sr-only" aria-live="polite">
           {arrival && t(arrival === "SHOWN" ? "contacts.casterShown" : "contacts.casterShownEmpty")}
