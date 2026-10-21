@@ -135,7 +135,7 @@ describe("marches du podium — accessibilité et impression", () => {
 
   it("rogne un nom tronqué sur le nom peint, pas sur le lien (lueur entière, ellipse en dégradé)", () => {
     const truncate = /\n\.entity-truncate \{([^}]*)\}/.exec(block)![1];
-    for (const declaration of ["display: inline-block", "max-width: 100%", "min-width: 0", "overflow: hidden", "text-overflow: ellipsis", "white-space: nowrap"]) {
+    for (const declaration of ["display: inline-block", "max-width: 100%", "min-width: 0", "vertical-align: text-bottom", "overflow: hidden", "text-overflow: ellipsis", "white-space: nowrap"]) {
       expect(truncate).toContain(declaration);
     }
     expect(block).toMatch(/\n\.entity-truncate\[data-podium\] \{\s*overflow: visible;\s*\}/);
@@ -144,10 +144,13 @@ describe("marches du podium — accessibilité et impression", () => {
     );
   });
 
-  it("coupe à deux lignes le nom peint, pas le lien, au classement de l'accueil", () => {
-    const leaderboard = readSource("components/cyber/landing/Leaderboard.module.css");
-    expect(leaderboard).toMatch(/\.team > :last-child,\s*\.team > \[data-podium="podium-tier"\]:last-child > :global\(\.podium-tier\) \{[^}]*overflow: hidden;[^}]*-webkit-line-clamp: 2;/);
-    expect(leaderboard).toMatch(/\.team > \[data-podium="podium-tier"\]:last-child \{\s*display: block;\s*overflow: visible;\s*-webkit-line-clamp: none;\s*line-clamp: none;\s*\}/);
+  it("coupe à deux lignes le nom peint, pas le lien (`truncate={2}`, classement de l'accueil)", () => {
+    expect(block).toMatch(
+      /\n\.entity-clamp-2,\s*\.entity-clamp-2\[data-podium\] > \.podium-tier,\s*\.entity-clamp-2\[data-podium\] > \.podium-member \{[^}]*-webkit-line-clamp: 2;[^}]*overflow: hidden;/,
+    );
+    expect(block).toMatch(/\n\.entity-clamp-2\[data-podium\] \{\s*display: block;\s*overflow: visible;\s*-webkit-line-clamp: none;\s*line-clamp: none;\s*\}/);
+    expect(readSource("components/cyber/landing/Leaderboard.tsx")).toMatch(/<TeamLink teamId=\{row\.teamId\} truncate=\{2\}/);
+    expect(readSource("components/cyber/landing/Leaderboard.module.css")).not.toMatch(/line-clamp|data-podium/);
   });
 
   it("ne tronque jamais un lien d'entité par une classe de l'appelant", () => {
@@ -321,14 +324,16 @@ describe("marches du podium — pastille de l'équipe active (fiche joueur)", ()
   it("éteint d'office la marche d'un lien en pastille, la pastille restant le lien entier", () => {
     expect(activeTeamLink().attributes.className).toBe('"badge"');
     const muted = /((?:[^{}]*,\s*)?)\[data-podium-muted\] \.podium-member \{([^}]*)\}/.exec(block)!;
-    expect(muted[1]).toContain(":is(.badge, .pill, .cy-tag) > .podium-tier,");
-    expect(muted[1]).toContain(":is(.badge, .pill, .cy-tag) > .podium-member,");
+    // Lien habillé en pastille, ou posé dans une pastille.
+    expect(muted[1]).toContain(":is(.badge, .pill, .cy-tag) .podium-tier,");
+    expect(muted[1]).toContain(":is(.badge, .pill, .cy-tag) .podium-member,");
     expect(muted[2]).toContain("color: inherit");
     // Aucune graisse imposée à une pastille : elle garde la sienne. Les deux
     // listes de surfaces (extinction, graisse) restent identiques.
-    const mutedSurfaces = /:is\(([^)]*)\) > \.podium-tier,/.exec(muted[1])![1];
-    const weightSurfaces = /:where\(:not\(\[data-podium-muted\], \[data-podium-muted\] \*, ([^)]*)\)\)\[data-podium="podium-tier"\]/.exec(block)![1];
-    expect(weightSurfaces).toBe(mutedSurfaces);
+    const mutedSurfaces = /:is\(([^)]*)\) \.podium-tier,/.exec(muted[1])![1];
+    const weightRule = /\n:where\(\.entity-link, \.entity-name\):where\(:not\(([^{]*)\)\)\[data-podium="podium-tier"\] \{/.exec(block)![1];
+    const weightSurfaces = [...weightRule.matchAll(/:is\(([^)]*)\)/g)].map(([, list]) => list);
+    expect(weightSurfaces).toEqual([mutedSurfaces, mutedSurfaces]);
   });
 
   it("donne au nom éteint la couleur de la pastille, et non celle héritée par `.entity-link`", () => {
@@ -340,7 +345,7 @@ describe("marches du podium — pastille de l'équipe active (fiche joueur)", ()
 describe("marches du podium — graisse d'un lien d'entité", () => {
   it("pose la graisse sur le lien à spécificité d'une classe, le nom peint en hérite — sans `:has()`", () => {
     expect(block).toMatch(
-      /\n:where\(\.entity-link, \.entity-name\):where\(:not\(\[data-podium-muted\], \[data-podium-muted\] \*, \.badge, \.pill, \.cy-tag\)\)\[data-podium="podium-tier"\] \{\s*font-weight: 700;\s*\}/,
+      /\n:where\(\.entity-link, \.entity-name\):where\(:not\(\[data-podium-muted\], \[data-podium-muted\] \*, :is\(\.badge, \.pill, \.cy-tag\), :is\(\.badge, \.pill, \.cy-tag\) \*\)\)\[data-podium="podium-tier"\] \{\s*font-weight: 700;\s*\}/,
     );
     expect(block).toMatch(/\n\[data-podium\] > \.podium-tier \{\s*font-weight: inherit;\s*\}/);
     expect(block).not.toContain(":has(");

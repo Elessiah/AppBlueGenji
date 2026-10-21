@@ -85,6 +85,9 @@ describe("marche peinte dans le lien, jamais sur le lien", () => {
     expect(render(<TeamLink teamId={40} truncate className="x">Delta</TeamLink>)).toBe(
       '<a class="entity-link entity-truncate x" href="/equipes/40">Delta</a>',
     );
+    expect(render(<TeamLink teamId={10} truncate={2}>Alpha</TeamLink>)).toBe(
+      '<a class="entity-link entity-clamp-2" data-podium="podium-tier" href="/equipes/10"><span class="podium-tier podium-tier-1">Alpha</span></a>',
+    );
   });
 
   it("tire le repère `data-podium` de la famille de la marche (équipe, membre)", () => {
