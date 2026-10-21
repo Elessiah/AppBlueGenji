@@ -260,6 +260,7 @@ export function bannerLinkLabel(ad: Pick<RecruitmentAd, "title">, text: Recruitm
 export function RecruitmentHighlight({
   modalAds,
   modalSilenced,
+  modalHeld = false,
   modalSeen,
   modalSeenKept = [],
   bannerAds,
@@ -274,6 +275,12 @@ export function RecruitmentHighlight({
   modalAds: readonly RecruitmentAd[];
   /** La modale doit se taire quoi qu'il arrive (choix de confidentialité dû). */
   modalSilenced: boolean;
+  /**
+   * Une autre fenêtre d'arrivée (certification du tag Discord) a la main sur
+   * ce chargement : la modale se tait **jusqu'au prochain chargement complet**,
+   * même quand un `router.refresh()` lève ensuite le silence.
+   */
+  modalHeld?: boolean;
   /** Prioritaires que ce visiteur a déjà vues (cookie) : elles le restent. */
   modalSeen: readonly number[];
   /** Vues ailleurs mais masquées ici (sous `/en`, sans anglais) : gardées au cookie (`recruitmentSeenKept`). */
@@ -295,7 +302,14 @@ export function RecruitmentHighlight({
 }>) {
   // Ouverte sur la première prioritaire jamais vue ; toutes vues, elle se tait.
   const modalStart = recruitmentModalStart(modalAds.map((ad) => ad.id), modalSeen);
-  const showModal = modalStart !== null && !modalSilenced && !modalOptedOut && !onAdPage;
+  // Verrou : une fois tenue par la certification, la modale ne s'ouvre plus
+  // sur cette page (une réponse ou un succès relit la mise en page, où la
+  // certification n'est plus due — la modale ne doit pas surgir après elle).
+  const [held, setHeld] = useState(modalHeld);
+  useEffect(() => {
+    if (modalHeld) setHeld(true);
+  }, [modalHeld]);
+  const showModal = modalStart !== null && !modalSilenced && !modalHeld && !held && !modalOptedOut && !onAdPage;
   return (
     <>
       {!bannerDismissed && bannerAds.length > 0 && (

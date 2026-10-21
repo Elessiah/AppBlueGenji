@@ -97,6 +97,19 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
     expect(SOURCE).toContain("<ScrollArea");
   });
 
+  it("« Plus tard » survit à un départ de page (keepalive) ; un changement de parcours ne rouvre rien", () => {
+    expect(SOURCE).toMatch(/body: JSON\.stringify\(\{ action \}\),[\s\S]*?keepalive: true,/);
+    expect(SOURCE).toMatch(/const due = prompt !== null;\s*useEffect\(\(\) => \{\s*if \(due\) setClosed\(false\);\s*\}, \[due\]\);/);
+    expect(SOURCE).not.toContain("[prompt?.mode]");
+  });
+
+  it("ne couvre pas l'écran où un lien de la modale de confidentialité envoie agir", () => {
+    expect(SOURCE).toContain("if (privacyFollowedLink(event)) setClosed(true);");
+    const privacy = readSource("components/privacy/PrivacyChangesModal.tsx");
+    expect(privacy).toContain("window.dispatchEvent(privacyAnsweredEvent(followedLink));");
+    expect(privacy).toMatch(/const followLink = \(changeId: string\) => \{\s*close\(true\);/);
+  });
+
   it("attend la confidentialité et les conditions, par leurs événements", () => {
     expect(SOURCE).toContain("PRIVACY_CHANGES_ANSWERED_EVENT");
     expect(SOURCE).toContain("TERMS_ACCEPTED_EVENT");

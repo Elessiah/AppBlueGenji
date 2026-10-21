@@ -10,7 +10,7 @@ import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { crossesLocale } from "@/lib/shared/locales";
 import {
   formatPrivacyChangeDateIn,
-  PRIVACY_CHANGES_ANSWERED_EVENT,
+  privacyAnsweredEvent,
   type PrivacyChange,
 } from "@/lib/shared/privacy-changes";
 import styles from "./PrivacyChangesModal.module.css";
@@ -86,9 +86,9 @@ export function PrivacyChangesModal({ changes }: Readonly<{ changes: PrivacyChan
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
   };
 
-  const close = () => {
+  const close = (followedLink = false) => {
     setAnswered(true);
-    window.dispatchEvent(new Event(PRIVACY_CHANGES_ANSWERED_EVENT));
+    window.dispatchEvent(privacyAnsweredEvent(followedLink));
   };
 
   const acknowledge = async () => {
@@ -117,7 +117,7 @@ export function PrivacyChangesModal({ changes }: Readonly<{ changes: PrivacyChan
    * cours (clic sur le bouton juste avant) couvre tout et n'est pas doublé.
    */
   const followLink = (changeId: string) => {
-    close();
+    close(true);
     if (busy) {
       leftByLink.current = true;
       return;

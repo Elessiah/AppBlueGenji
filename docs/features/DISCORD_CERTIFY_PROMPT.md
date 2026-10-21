@@ -20,11 +20,11 @@ sur « Certifier mon tag » certifie, par la route existante.
 | Condition | Où elle est tenue |
 | --- | --- |
 | Session ouverte par **Discord** (bouton OAuth, code en message privé) ou **Blizzard** — pas Google ni One Tap | `CERTIFY_PROMPT_DOORS` ; `createSession` pose `bg_user_sessions.certify_prompt_due = 1` |
-| Une fois par connexion | la première réponse lève la marque (`markDiscordCertifyPromptSeen`) |
+| Une fois par connexion | la première réponse lève la marque (`markDiscordCertifyPromptSeen`) ; rien à proposer (déjà certifié, « Ne plus voir ») la lève aussi, à la première lecture — plus aucune requête ensuite |
 | Compte vivant, tag **non certifié**, pas de « Ne plus voir » | `loadDiscordCertifyPrompt`, une requête, toutes conditions dans le `WHERE` |
-| Après la confidentialité et les conditions, jamais par-dessus | `certifyPromptOpen` (`lib/shared/global-modals.ts`) ; la fenêtre suit `PRIVACY_CHANGES_ANSWERED_EVENT` et `TERMS_ACCEPTED_EVENT` (émis par `TermsAcceptanceModal`) et s'ouvre sans rechargement |
+| Après la confidentialité et les conditions, jamais par-dessus | `certifyPromptOpen` (`lib/shared/global-modals.ts`) ; la fenêtre suit `PRIVACY_CHANGES_ANSWERED_EVENT` et `TERMS_ACCEPTED_EVENT` (émis par `TermsAcceptanceModal`) et s'ouvre sans rechargement — sauf si la confidentialité s'est fermée sur un **lien d'action** (`privacyFollowedLink`) : l'écran visé n'est pas couvert, la proposition revient au chargement suivant |
 | Pas sur `/connexion`, `/conditions-utilisation`, `/rgpd`, `/mentions-legales`, `/accessibilite`, pages légales du bot | `certifyPromptSilencedOn` |
-| Fait taire la modale d'arrivée du recrutement | `recruitmentModalSilenced({ certifyPromptDue })`, dès qu'elle est due, **quelle que soit la page** (muette sur une page légale, elle s'ouvre à la navigation suivante) — ordre : confidentialité → conditions → certification → recrutement |
+| Fait taire la modale d'arrivée du recrutement | `recruitmentModalSilenced({ certifyPromptDue })`, dès qu'elle est due, **quelle que soit la page** (muette sur une page légale, elle s'ouvre à la navigation suivante), et `modalHeld` la **verrouille** jusqu'au prochain chargement complet : le `router.refresh()` d'une réponse ne la fait pas surgir derrière — ordre : confidentialité → conditions → certification → recrutement |
 
 **Montée par la mise en page racine**, comme `TermsAcceptanceModal`, et non par
 l'espace connecté : c'est la seule qui rend la **première page après la
@@ -71,7 +71,7 @@ Le BattleTag n'y figure pas : il est vérifié par Battle.net au rattachement
 | Geste | Effet |
 | --- | --- |
 | « Certifier mon tag » | certifie (`ONE_CLICK`) ou mène au dialogue (`DIALOG`, la proposition est close pour la session) |
-| « Plus tard », Échap, clic sur le voile | `POST … { action: "LATER" }` — fermée tout de suite ; un échec d'écriture la fait seulement revenir au prochain chargement |
+| « Plus tard », Échap, clic sur le voile | `POST … { action: "LATER" }` (`keepalive` : un lien qui change de document ne l'annule pas) — fermée tout de suite ; un échec d'écriture la fait seulement revenir au prochain chargement (un changement de parcours `ONE_CLICK` → `DIALOG` ne la rouvre pas) |
 | « Ne plus voir » | `POST … { action: "NEVER" }` — `bg_users.discord_certify_prompt_dismissed_at` (date du premier choix, `COALESCE`) puis la session ; succès en toast, échec en toast et fenêtre gardée (compte supprimé entre-temps : fenêtre fermée, toast dédié) |
 
 Route : 401 sans session, 400 `INVALID_ACTION`, 409 `ACCOUNT_DELETED` (compte

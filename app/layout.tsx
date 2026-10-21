@@ -335,6 +335,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
               certifyPromptDue,
               pathname: requestedPath,
             })}
+            modalHeld={certifyPromptDue}
             modalOptedOut={modalOptedOut}
             signedIn={user !== null}
             accountBackOn={user?.recruitmentModalBackOn === true}

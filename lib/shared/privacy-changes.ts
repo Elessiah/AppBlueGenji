@@ -142,6 +142,21 @@ export function privacyChangeReachesAccount(change: PrivacyChange, facts: Privac
  */
 export const PRIVACY_CHANGES_ANSWERED_EVENT = "bg:privacy-changes-answered";
 
+/**
+ * L'événement {@link PRIVACY_CHANGES_ANSWERED_EVENT}, dont `detail` dit si la
+ * modale s'est fermée sur un **lien d'action** (le lecteur part agir sur
+ * l'écran visé, qu'aucune autre fenêtre ne doit couvrir).
+ */
+export function privacyAnsweredEvent(followedLink: boolean): CustomEvent<{ followedLink: boolean }> {
+  return new CustomEvent(PRIVACY_CHANGES_ANSWERED_EVENT, { detail: { followedLink } });
+}
+
+/** La modale de confidentialité s'est-elle fermée sur un lien d'action ? */
+export function privacyFollowedLink(event: Event): boolean {
+  const detail = (event as CustomEvent<{ followedLink?: unknown } | null>).detail;
+  return detail?.followedLink === true;
+}
+
 /** Forme d'un identifiant de changement. */
 export const PRIVACY_CHANGE_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -938,7 +953,8 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Elle repose sur notre intérêt légitime (savoir qui a prouvé son identité de jeu). Tu peux t'y opposer par le formulaire de signalement (catégorie RGPD), ou la faire disparaître en détachant ton compte Battle.net dans « Mon profil » (Applications connectées) — après avoir ajouté un autre moyen de connexion si c'est le seul. Aucune donnée nouvelle n'est collectée.",
       "La pastille du tag Discord certifié suit la même règle : elle se lit sur ta fiche par tout joueur connecté, même si ton tag n'est pas visible des autres joueurs. Elle repose sur le même intérêt légitime, tu peux t'y opposer de la même façon, et elle disparaît si tu retires ton tag.",
     ],
-  },  // CERTIFY-PROMPT : choix nouveau gardé sur le compte (« Ne plus voir »,
+  },
+  // CERTIFY-PROMPT : choix nouveau gardé sur le compte (« Ne plus voir »,
   // registre T01) et marque nouvelle sur la session (fenêtre encore à
   // proposer). La certification elle-même ne change pas : toujours un geste.
   {

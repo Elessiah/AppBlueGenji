@@ -28,7 +28,7 @@ describe("loadDiscordCertifyPrompt — due, et pour qui", () => {
   };
 
   it("une seule requête, toutes conditions dans le WHERE (session marquée, compte vivant, non certifié, pas de « Ne plus voir »)", async () => {
-    const execute = setUp([]);
+    const execute = setUp([{ discord_id: null, discord_pseudo: null, discord_pseudo_from_discord: 0 }]);
     await loadDiscordCertifyPrompt(7, HASH);
     expect(execute).toHaveBeenCalledTimes(1);
     const [sql, params] = execute.mock.calls[0];
@@ -46,9 +46,13 @@ describe("loadDiscordCertifyPrompt — due, et pour qui", () => {
     expect(params).toEqual([HASH, 7]);
   });
 
-  it("rien de dû : null", async () => {
-    setUp([]);
+  it("rien de dû : null, et la marque de la session est levée (plus aucune lecture ensuite)", async () => {
+    const execute = setUp([]);
     expect(await loadDiscordCertifyPrompt(7, HASH)).toBeNull();
+    expect(execute).toHaveBeenCalledTimes(2);
+    const [sql, params] = execute.mock.calls[1];
+    expect(flat(sql)).toBe("UPDATE bg_user_sessions SET certify_prompt_due = 0 WHERE token_hash = ? AND user_id = ?");
+    expect(params).toEqual([HASH, 7]);
   });
 
   it("tag nommé par Discord sur un compte rattaché : un clic", async () => {

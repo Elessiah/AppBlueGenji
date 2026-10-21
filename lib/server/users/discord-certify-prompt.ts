@@ -31,6 +31,10 @@ type PromptRow = RowDataPacket & {
  * marquée, compte vivant, tag **non certifié**, pas de « Ne plus voir ». Une
  * colonne absente (son `ALTER` a échoué au démarrage) rend `null` : la
  * fenêtre se tait, la page ne tombe pas.
+ *
+ * Rien à proposer (tag déjà certifié, « Ne plus voir », compte supprimé) : la
+ * marque de la session est levée sur-le-champ, sans quoi chaque page de ses
+ * trente jours relancerait cette lecture pour rien.
  */
 export async function loadDiscordCertifyPrompt(userId: number, tokenHash: string): Promise<CertifyPrompt | null> {
   if (!Number.isInteger(userId) || userId <= 0 || !tokenHash) return null;
@@ -50,7 +54,10 @@ export async function loadDiscordCertifyPrompt(userId: number, tokenHash: string
       [tokenHash, userId],
     );
     const row = rows[0];
-    if (!row) return null;
+    if (!row) {
+      await markDiscordCertifyPromptSeen(userId, tokenHash);
+      return null;
+    }
     return certifyPromptFor({
       discordId: row.discord_id,
       discordPseudo: row.discord_pseudo,

@@ -17,7 +17,7 @@ import {
 } from "@/lib/shared/discord-certify-prompt";
 import { certifyPromptOpen } from "@/lib/shared/global-modals";
 import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
-import { PRIVACY_CHANGES_ANSWERED_EVENT } from "@/lib/shared/privacy-changes";
+import { PRIVACY_CHANGES_ANSWERED_EVENT, privacyFollowedLink } from "@/lib/shared/privacy-changes";
 import { TERMS_ACCEPTED_EVENT, TERMS_REQUIRED_EVENT } from "@/lib/shared/terms-of-use";
 import { visibleText } from "@/lib/shared/visible-text";
 import styles from "./DiscordCertifyPrompt.module.css";
@@ -62,6 +62,9 @@ async function answerPrompt(action: CertifyPromptAction): Promise<void> {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ action }),
+    // « Plus tard » puis un lien qui charge un nouveau document (changement de
+    // langue, passage par Discord) : sans `keepalive`, ce départ l'annulerait.
+    keepalive: true,
   });
   if (!response.ok) {
     const payload = (await response.json().catch(() => ({}))) as { error?: string };
@@ -94,12 +97,23 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
   const inFlight = useRef(false);
 
   useEffect(() => setMounted(true), []);
-  // Une nouvelle proposition (rafraîchissement après une connexion par code) rouvre la fenêtre.
-  useEffect(() => setClosed(false), [prompt?.mode]);
+  // Une proposition qui **apparaît** (rafraîchissement après une connexion par
+  // code) rouvre la fenêtre ; un simple changement de parcours (tag modifié sur
+  // `/profil`) ne rouvre pas une fenêtre déjà écartée.
+  const due = prompt !== null;
+  useEffect(() => {
+    if (due) setClosed(false);
+  }, [due]);
   useEffect(() => setPrivacyAnswered(!privacyPending), [privacyPending]);
   useEffect(() => setTermsAccepted(!termsPending), [termsPending]);
   useEffect(() => {
-    const onPrivacy = () => setPrivacyAnswered(true);
+    const onPrivacy = (event: Event) => {
+      setPrivacyAnswered(true);
+      // Un lien d'action de la modale de confidentialité envoie agir ailleurs
+      // (`/profil#confidentialite`…) : ne pas couvrir cet écran. Rien n'est
+      // écrit, la proposition revient au prochain chargement.
+      if (privacyFollowedLink(event)) setClosed(true);
+    };
     const onTermsAccepted = () => setTermsAccepted(true);
     const onTermsRequired = () => setTermsAccepted(false);
     window.addEventListener(PRIVACY_CHANGES_ANSWERED_EVENT, onPrivacy);

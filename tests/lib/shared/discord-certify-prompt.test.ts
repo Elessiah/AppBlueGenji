@@ -1,3 +1,4 @@
+import { PRIVACY_CHANGES_ANSWERED_EVENT, privacyAnsweredEvent, privacyFollowedLink } from "@/lib/shared/privacy-changes";
 import { describe, expect, it } from "@jest/globals";
 import {
   CERTIFY_PROFILE_HREF,
@@ -99,5 +100,15 @@ describe("certifyPromptOpen — jamais par-dessus une autre modale", () => {
     expect(recruitmentModalSilenced(quiet)).toBe(false);
     expect(recruitmentModalSilenced({ ...quiet, certifyPromptDue: false })).toBe(false);
     expect(recruitmentModalSilenced({ ...quiet, certifyPromptDue: true })).toBe(true);
+  });
+});
+
+describe("fermeture de la modale de confidentialité par un lien d'action", () => {
+  it("l'événement le dit dans `detail`, lu par privacyFollowedLink", () => {
+    expect(privacyAnsweredEvent(true).type).toBe(PRIVACY_CHANGES_ANSWERED_EVENT);
+    expect(privacyFollowedLink(privacyAnsweredEvent(true))).toBe(true);
+    expect(privacyFollowedLink(privacyAnsweredEvent(false))).toBe(false);
+    // Un émetteur plus ancien (événement nu) : pas un lien suivi.
+    expect(privacyFollowedLink(new Event(PRIVACY_CHANGES_ANSWERED_EVENT))).toBe(false);
   });
 });
