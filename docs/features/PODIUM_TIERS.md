@@ -120,6 +120,8 @@ seulement devenir **nettement visible** et suivre l'équipe partout.
   `.pill`, une classe de module…) sur l'élément peint effacerait le dégradé —
   le nom, transparent, n'apparaissait plus qu'au survol (fiche joueur,
   v1.41.0). Aucune règle d'appel à tenir : toute classe est sûre sur le lien.
+  Le `<span>` enveloppe tous les enfants du lien : un lien qui dispose les
+  siens (avatar et nom en flex) passe `podiumTier={null}`.
   Graisse : `EntityLink` pose sur le lien (ou le nom de spectateur) le repère
   `data-podium` (famille de la marche) ; la feuille y met les 700
   (`:where(.entity-link, .entity-name):where(:not([data-podium-muted],
