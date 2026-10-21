@@ -231,9 +231,11 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   // appel ne coûte rien de plus sur les pages où `PublicHeader`/`PublicFooter`
   // le lisent déjà.
   const user = await getCurrentUser();
-  // Certification du tag Discord : ne dépend que de la session, lancée tout de
-  // suite (attendue avec les conditions) ; aucune requête quand la session n'a
-  // rien à proposer (marque lue avec elle). Ne lève jamais.
+  // Conditions et certification du tag Discord : ne dépendent que de la
+  // session, lancées tout de suite (en parallèle des lectures qui suivent),
+  // attendues plus bas ; aucune requête de certification quand la session n'a
+  // rien à proposer (marque lue avec elle). Ne lèvent jamais.
+  const termsLoad = termsRequestFor(user?.id);
   const certifyPromptLoad = user?.certifyPromptDue ? loadCertifyPromptSafely(user.id) : Promise.resolve(null);
   // Lus sur **toutes** les pages, `/rgpd` comprise : la modale s'y tait côté
   // client. Décidé ici, le silence survivrait à la navigation — la mise en
@@ -269,7 +271,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   // navigateur. La modale ne s'ouvrant plus, ses annonces ne partent pas dans
   // la page (ni, sous `/en`, ses textes quand la banderole n'a rien non plus).
   const modalOptedOut = recruitmentModalOptedOut({ accountOff: user?.recruitmentModalOff, browserCookie: modalOffCookie });
-  const [termsRequest, certifyPrompt] = await Promise.all([termsRequestFor(user?.id), certifyPromptLoad]);
+  const [termsRequest, certifyPrompt] = await Promise.all([termsLoad, certifyPromptLoad]);
   // Tenue par la certification (`modalHeld`, verrouillé pour la page), la
   // modale ne s'ouvrira pas sur ce chargement : ses annonces n'y partent pas.
   const modalAds = modalOptedOut || certifyPrompt !== null ? [] : spotlight.modal;

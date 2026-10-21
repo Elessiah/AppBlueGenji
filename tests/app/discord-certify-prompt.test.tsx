@@ -34,7 +34,7 @@ describe("DiscordCertifyPrompt — rendu", () => {
   it("rien au rendu serveur (portail monté après l'hydratation), même due", () => {
     const render = (node: React.JSX.Element) => renderToStaticMarkup(<ToastProvider>{node}</ToastProvider>);
     const empty = render(<span />).replace("<span></span>", "");
-    expect(render(<DiscordCertifyPrompt prompt={{ mode: "ONE_CLICK", tag: "keryan" }} canOpen={false} text={FR_TEXT} />)).toBe(empty);
+    expect(render(<DiscordCertifyPrompt prompt={{ mode: "ONE_CLICK", tag: "keryan" }} canOpen={false} answered={{ current: false }} text={FR_TEXT} />)).toBe(empty);
   });
 });
 
@@ -123,10 +123,12 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
   });
 
   it("certifié depuis le dialogue de /profil : la fenêtre encore en attente se ferme", () => {
-    expect(SOURCE).toContain("window.addEventListener(DISCORD_CERTIFIED_EVENT, onCertified)");
+    expect(LAZY).toContain("window.addEventListener(DISCORD_CERTIFIED_EVENT, onCertified)");
+    // Un seul écouteur, chez le relais : aucun trou pendant le chargement du morceau.
+    expect(SOURCE).not.toContain("addEventListener(DISCORD_CERTIFIED_EVENT");
     // Close pour la session (LATER), et seulement quand une proposition est due.
     // …et pas une seconde fois après « Plus tard », le dialogue ou « Ne plus voir ».
-    expect(SOURCE).toMatch(/const onCertified = \(\) => \{\s*if \(!answered\.current\) closeForSession\(\);\s*\};/);
+    expect(LAZY).toMatch(/const onCertified = \(\) => \{\s*setCertified\(true\);\s*if \(answered\.current\) return;\s*answered\.current = true;\s*answerCertifyPrompt\("LATER"\)\.catch\(\(\) => undefined\);/);
     expect(SOURCE).toMatch(/await answerPrompt\("NEVER"\);\s*answered\.current = true;/);
     const profile = readSource("app/(secured)/profil/page.tsx");
     expect(profile).toMatch(/setDiscordState\(\(prev\) => \(\{ \.\.\.prev, tag, verified: true[^\n]*\n(?:\s*\/\/[^\n]*\n)*\s*window\.dispatchEvent\(certifiedFromProfileEvent\(\)\);/);
@@ -145,7 +147,7 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
 
   it("ne couvre pas l'écran où un lien de la modale de confidentialité envoie agir", () => {
     expect(LAZY).toContain("if (privacyFollowedLink(event)) setFollowedLink(true);");
-    expect(LAZY).toContain("if (certifiedEarly || followedLink || !(armed || canOpen)) return null;");
+    expect(LAZY).toContain("if (certified || followedLink || !(armed || canOpen)) return null;");
     const privacy = readSource("components/privacy/PrivacyChangesModal.tsx");
     expect(privacy).toContain("window.dispatchEvent(privacyAnsweredEvent(followedLink));");
     expect(privacy).toMatch(/const followLink = \(changeId: string\) => \{\s*close\(true\);/);
@@ -178,8 +180,8 @@ describe("mise en page racine", () => {
 
   it("chargée à la demande, seulement quand elle est due, chaque langue dans son morceau", () => {
     // …et seulement quand elle peut s'ouvrir (confidentialité, conditions, page), puis reste montée.
-    expect(LAZY).toMatch(/const canOpen =\s*!followedLink &&\s*!certifiedEarly &&\s*certifyPromptOpen\(/);
-    expect(LAZY).toMatch(/useEffect\(\(\) => \{\s*if \(!canOpen\) return;\s*armedRef\.current = true;\s*setArmed\(true\);\s*\}, \[canOpen\]\);/);
+    expect(LAZY).toMatch(/const canOpen =\s*!followedLink &&\s*!certified &&\s*certifyPromptOpen\(/);
+    expect(LAZY).toMatch(/useEffect\(\(\) => \{\s*if \(canOpen\) setArmed\(true\);\s*\}, \[canOpen\]\);/);
     expect(LAZY.match(/\{ ssr: false \}/g)).toHaveLength(2);
     expect(LAZY.match(/orReload\(/g)).toHaveLength(2);
     // Une page française ne télécharge jamais l'anglais, ni l'inverse.
@@ -198,7 +200,6 @@ describe("mise en page racine", () => {
     expect(LAZY).toContain("privacyPending: privacyPending && !privacyAnswered,");
     expect(LAZY).toContain("termsPending: termsAccepted === null ? termsPending : !termsAccepted,");
     // Certifié avant le chargement (conditions en attente) : close pour la session, une fois, sans charger la fenêtre.
-    expect(LAZY).toMatch(/const onCertified = \(\) => \{\s*if \(armedRef\.current\) return;\s*armedRef\.current = true;\s*setCertifiedEarly\(true\);\s*answerCertifyPrompt\("LATER"\)\.catch\(\(\) => undefined\);/);
     expect(LAZY).toContain("window.addEventListener(DISCORD_CERTIFIED_EVENT, onCertified)");
   });
 
@@ -208,7 +209,7 @@ describe("mise en page racine", () => {
     // Tenue, la modale ne s'ouvrira pas : ses annonces ne partent pas dans la page.
     expect(LAYOUT).toContain("const modalAds = modalOptedOut || certifyPrompt !== null ? [] : spotlight.modal;");
     // Lecture lancée dès la session, attendue avec les conditions.
-    expect(LAYOUT).toContain("await Promise.all([termsRequestFor(user?.id), certifyPromptLoad])");
+    expect(LAYOUT).toContain("await Promise.all([termsLoad, certifyPromptLoad])");
     expect(LAYOUT).not.toMatch(/termsModalDue: termsDueOnLoad,\s*certifyPromptDue,/);
   });
 });

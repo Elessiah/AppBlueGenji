@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useCallback, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { CyberButton, ScrollArea } from "@/components/cyber";
 import { useLocalePathname, useLocaleRouter } from "@/components/i18n/locale-navigation";
@@ -61,6 +61,11 @@ export type DiscordCertifyPromptProps = {
 export type DiscordCertifyPromptViewProps = {
   prompt: CertifyPrompt;
   canOpen: boolean;
+  /**
+   * Déjà répondue sur ce chargement (« Plus tard », dialogue, « Ne plus voir ») :
+   * tenu par le relais, seul à écouter `DISCORD_CERTIFIED_EVENT` — rien à réécrire.
+   */
+  answered: { current: boolean };
   text: CertifyPromptText;
 };
 
@@ -76,7 +81,7 @@ export type DiscordCertifyPromptViewProps = {
  * par Discord. Elle attend la confidentialité et les conditions (attentes
  * suivies par `DiscordCertifyPromptLazy`).
  */
-export function DiscordCertifyPrompt({ prompt, canOpen, text }: Readonly<DiscordCertifyPromptViewProps>) {
+export function DiscordCertifyPrompt({ prompt, canOpen, answered, text }: Readonly<DiscordCertifyPromptViewProps>) {
   const { t, rich } = text;
   const { showError, showSuccess } = useToast();
   const router = useLocaleRouter();
@@ -90,8 +95,6 @@ export function DiscordCertifyPrompt({ prompt, canOpen, text }: Readonly<Discord
   // sinon) : une proposition qui réapparaît la remonte, neuve ; un simple
   // changement de parcours (tag modifié sur `/profil`) ne rouvre pas une
   // fenêtre déjà écartée.
-  /** Déjà répondue sur ce chargement (« Plus tard », dialogue, « Ne plus voir ») : rien à réécrire. */
-  const answered = useRef(false);
 
   /**
    * Close pour la session (`LATER`, avec `keepalive`) : fermée tout de suite ;
@@ -101,16 +104,7 @@ export function DiscordCertifyPrompt({ prompt, canOpen, text }: Readonly<Discord
     setClosed(true);
     answered.current = true;
     answerPrompt("LATER").catch(() => undefined);
-  }, []);
-  useEffect(() => {
-    // Certifié — ici d'un clic, ou par le dialogue de `/profil` : close pour
-    // la session, qu'un tag changé ensuite ne la fasse pas revenir.
-    const onCertified = () => {
-      if (!answered.current) closeForSession();
-    };
-    window.addEventListener(DISCORD_CERTIFIED_EVENT, onCertified);
-    return () => window.removeEventListener(DISCORD_CERTIFIED_EVENT, onCertified);
-  }, [closeForSession]);
+  }, [answered]);
 
   const open = canOpen && !closed;
 
@@ -179,7 +173,7 @@ export function DiscordCertifyPrompt({ prompt, canOpen, text }: Readonly<Discord
       // plus celui que Discord a nommé, la suite se fait depuis « Mon profil ».
       if (payload.status !== "VERIFIED") throw new Error("DISCORD_TAG_CHANGED");
       showSuccess(t("certified"));
-      // L'événement close la proposition pour la session (`onCertified`) et
+      // L'événement close la proposition pour la session (relais, `onCertified`) et
       // fait relire son état Discord à un `/profil` ouvert.
       window.dispatchEvent(new Event(DISCORD_CERTIFIED_EVENT));
       router.refresh();

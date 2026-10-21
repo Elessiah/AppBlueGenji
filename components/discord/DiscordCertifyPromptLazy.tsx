@@ -61,7 +61,7 @@ const DiscordCertifyPromptEn = dynamic(
  * Seul à suivre ce que la fenêtre attend — une réponse à la confidentialité
  * (lien d'action compris : la page visée n'est pas couverte, rien n'est écrit,
  * la proposition revient au chargement suivant), des conditions acceptées ou
- * de nouveau exigées, un tag certifié avant son chargement — et à lui dire si
+ * de nouveau exigées, un tag certifié (avant son chargement comme après) — et à lui dire si
  * elle peut s'ouvrir (`canOpen`). Montée par la mise en page seulement quand
  * une proposition est due : une proposition qui réapparaît la remonte, neuve.
  */
@@ -70,9 +70,10 @@ export function DiscordCertifyPromptLazy({ prompt, privacyPending, termsPending 
   const [privacyAnswered, setPrivacyAnswered] = useState(false);
   const [followedLink, setFollowedLink] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState<boolean | null>(null);
-  const [certifiedEarly, setCertifiedEarly] = useState(false);
+  const [certified, setCertified] = useState(false);
   const [armed, setArmed] = useState(false);
-  const armedRef = useRef(false);
+  /** Déjà répondue sur ce chargement (fenêtre ou certification) : un seul `LATER`. */
+  const answered = useRef(false);
   const { path: pathname } = useLocalePathname();
 
   useEffect(() => {
@@ -82,14 +83,13 @@ export function DiscordCertifyPromptLazy({ prompt, privacyPending, termsPending 
     };
     const onTermsAccepted = () => setTermsAccepted(true);
     const onTermsRequired = () => setTermsAccepted(false);
-    // Certifié (dialogue de `/profil`) avant que la fenêtre ne soit chargée —
-    // conditions encore à accepter, par exemple : close pour la session ici,
-    // sans quoi elle s'ouvrirait plus tard pour un tag déjà certifié. Chargée,
-    // la fenêtre s'en charge elle-même.
+    // Certifié — d'un clic dans la fenêtre, ou par le dialogue de `/profil`,
+    // fenêtre chargée ou non (conditions encore à accepter, morceau en route) :
+    // close pour la session, qu'elle ne s'ouvre pas pour un tag déjà certifié.
     const onCertified = () => {
-      if (armedRef.current) return;
-      armedRef.current = true;
-      setCertifiedEarly(true);
+      setCertified(true);
+      if (answered.current) return;
+      answered.current = true;
       answerCertifyPrompt("LATER").catch(() => undefined);
     };
     window.addEventListener(PRIVACY_CHANGES_ANSWERED_EVENT, onPrivacy);
@@ -106,7 +106,7 @@ export function DiscordCertifyPromptLazy({ prompt, privacyPending, termsPending 
 
   const canOpen =
     !followedLink &&
-    !certifiedEarly &&
+    !certified &&
     certifyPromptOpen({
       due: true,
       privacyPending: privacyPending && !privacyAnswered,
@@ -115,12 +115,10 @@ export function DiscordCertifyPromptLazy({ prompt, privacyPending, termsPending 
     });
   // Le morceau ne part qu'au moment où la fenêtre peut s'ouvrir, puis reste.
   useEffect(() => {
-    if (!canOpen) return;
-    armedRef.current = true;
-    setArmed(true);
+    if (canOpen) setArmed(true);
   }, [canOpen]);
 
-  if (certifiedEarly || followedLink || !(armed || canOpen)) return null;
+  if (certified || followedLink || !(armed || canOpen)) return null;
   const View = locale === "en" ? DiscordCertifyPromptEn : DiscordCertifyPromptFr;
-  return <View prompt={prompt} canOpen={canOpen} />;
+  return <View prompt={prompt} canOpen={canOpen} answered={answered} />;
 }
