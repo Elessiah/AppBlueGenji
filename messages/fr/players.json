@@ -101,7 +101,7 @@
     "hidden": "Masqué",
     "adultYes": "Oui (18+)",
     "adultNo": "Non (mineur)",
-    "battletagHiddenSelf": "Masqué pour tous : il ne se lit que dans la fenêtre « Contacts » de tes matchs et dans leur fenêtre de lancement — par les deux équipes et les arbitres, de la connaissance des deux adversaires à la fin du match, si tu es présenté comme contact, et par le caster le temps du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes et au caster).",
+    "battletagHiddenSelf": "Masqué pour tous : il ne se lit que dans la fenêtre « Contacts » de tes matchs et dans leur fenêtre de lancement — par les deux équipes et les arbitres, de la connaissance des deux adversaires à la fin du match, si tu es présenté comme contact, et par le caster le temps du match ; si tu castes un match, par ses deux équipes le temps du match et par les arbitres dès que ses deux adversaires sont connus (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes et au caster).",
     "verifiedAlt": "Tag Discord vérifié",
     "verifiedTitle": "Tag Discord vérifié : ce joueur a prouvé qu'il possède ce compte Discord.",
     "teamsTitle": "Historique équipes",

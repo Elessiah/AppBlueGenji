@@ -150,8 +150,18 @@ export function privacyChangeReachesAccount(change: PrivacyChange, facts: Privac
  * tous, seuls ceux qu'elle concerne sont avertis.
  */
 export function isPrivacyPolicyVersion(change: PrivacyChange): boolean {
-  return change.audience !== "GOOGLE_LINKED";
+  return change.audience === undefined || AUDIENCE_IS_POLICY_VERSION[change.audience] === true;
 }
+
+/**
+ * Pour chaque public, l'entrée est-elle une version de la politique ? Une table
+ * complète : un public ajouté demain ne compile pas sans que la question soit
+ * tranchée.
+ */
+const AUDIENCE_IS_POLICY_VERSION: Record<PrivacyAudience, boolean> = {
+  GOOGLE_LINKED: false,
+  LIVE_STAFF: true,
+};
 
 /**
  * Événement de fenêtre émis quand le joueur a pris connaissance des

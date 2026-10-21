@@ -8,10 +8,13 @@
  * rendus qu'aux parties d'un match : dans la modale, **en lancement ou lancé** ;
  * par le bouton « Contacts » d'une carte, dès que ses deux adversaires sont
  * connus pour ses joueurs et pour les arbitres (permission `tournaments`), le
- * temps du match seulement pour son caster
- * (`exposesContacts`). Ceux **du caster** sortent le temps du match, et dès
- * que les adversaires sont connus pour un arbitre (`exposesCaster`). C'est la clause `sharesMatchLobby` de `canViewDiscordTag` et
- * `sharesLiveMatch` de `canViewBattletag`, que ce module est seul à établir.
+ * temps du match seulement pour son caster (`exposesContacts`). Ceux **du
+ * caster** sortent le temps du match, et dès que les adversaires sont connus
+ * pour un arbitre (`exposesCaster`, `exposesCasterContacts`).
+ *
+ * Ces présentations, toutes ensemble, sont la clause `sharesMatchLobby` de
+ * `canViewDiscordTag` et `sharesLiveMatch` de `canViewBattletag`, que ce
+ * module est seul à établir.
  * Un match terminé sort de la liste, et ses contacts avec lui.
  *
  * Voir `docs/features/MATCH_LAUNCH.md`.
