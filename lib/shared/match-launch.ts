@@ -489,11 +489,26 @@ export type MatchLaunchInfo = {
 /**
  * Le match se joue-t-il (lancement ouvert, ou lancé) ? Le temps où ses contacts
  * s'ouvrent à toutes ses parties, caster compris — une seule définition pour le
- * serveur (`exposesContacts`, `exposesCasterContacts`) et la carte du match
- * (`launch-strip.ts`), qui offre « Contacts » quand le serveur les rend.
+ * serveur et la carte du match (`exposesMatchContacts`, `exposesCasterContacts`).
  */
 export function matchUnderway(phase: MatchLaunchPhase): boolean {
   return phase === "LOBBY" || phase === "LAUNCHED";
+}
+
+/**
+ * Les contacts des engagées sortent-ils pour ce match ? Dans la modale de
+ * lancement, en lancement ou lancé ; par le bouton « Contacts » d'une carte,
+ * pour un **joueur** (membre d'une des deux engagées) ou un arbitre
+ * (`cardForPlayer`), dès que les deux adversaires sont connus — à planifier
+ * (décision de l'utilisateur, 2026-10-19) ou programmé — : les parties
+ * s'organisent avant l'heure, surtout sans phase de lancement. Le **caster**
+ * inscrit, lui, ne les reçoit que **le temps du match** (`matchUnderway`), par
+ * la modale comme par la carte : il n'a rien à organiser avec les équipes
+ * avant l'heure. Lue par le serveur (`match-launch-info.ts`) et par la carte du
+ * match (`launch-strip.ts`), qui n'offre « Contacts » que là où il les rend.
+ */
+export function exposesMatchContacts(phase: MatchLaunchPhase, cardForPlayer: boolean): boolean {
+  return matchUnderway(phase) || (cardForPlayer && (phase === "SCHEDULED" || phase === "TO_PLAN"));
 }
 
 /**
@@ -531,16 +546,6 @@ export function casterContactsPending(launch: {
   viewer: Pick<MatchLaunchInfo["viewer"], "role" | "isCaster">;
 }): boolean {
   return launch.caster !== null && !viewerIsCaster(launch) && !launch.caster.contactsShown;
-}
-
-/**
- * Annoncer l'arrivée des contacts du caster ? Seulement quand ils attendaient
- * (`wasPending`, `casterContactsPending`) et que le serveur les montre désormais
- * — la relecture à l'heure de départ —, jamais à l'ouverture. Sans contact à
- * montrer, l'annonce le dit (`casterHasContacts`) plutôt que de se taire.
- */
-export function casterContactsArrived(wasPending: boolean, caster: Pick<LaunchCaster, "contactsShown">): boolean {
-  return wasPending && caster.contactsShown;
 }
 
 /** Le caster a-t-il au moins un contact à montrer (tag Discord ou BattleTag) ? */

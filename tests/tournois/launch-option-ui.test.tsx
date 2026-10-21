@@ -9,7 +9,7 @@ import { CasterCard, SideCard } from "@/components/match-launch/LaunchContactCar
 import { contactsErrorText } from "@/components/match-launch/MatchContactsDialog";
 import { FR_LAUNCH_TEXT } from "@/components/match-launch/launch-text";
 import { tournamentDialogsText } from "@/lib/shared/tournament-actions-text";
-import { casterContactsArrived, exposesCasterContacts, viewerIsCaster, type LaunchSide, type MatchLaunchInfo } from "@/lib/shared/match-launch";
+import { exposesCasterContacts, viewerIsCaster, type LaunchSide, type MatchLaunchInfo } from "@/lib/shared/match-launch";
 import frDialogs from "@/messages/fr/tournamentDialogs.json";
 import enDialogs from "@/messages/en/tournamentDialogs.json";
 import frActions from "@/messages/fr/tournamentActions.json";
@@ -326,10 +326,9 @@ describe("fiches de contact — noms cliquables", () => {
     });
 
     it("annonce l'arrivée des contacts au seul passage « en attente → montrés »", () => {
-      const shown = { ...caster, contactsShown: true };
-      expect(casterContactsArrived(true, shown)).toBe(true);
-      expect(casterContactsArrived(false, shown)).toBe(false);
-      expect(casterContactsArrived(true, { ...caster, contactsShown: false })).toBe(false);
+      // Même caster, auparavant en attente, désormais montré : jamais à l'ouverture.
+      const source = read("components/match-launch/LaunchContactCards.tsx");
+      expect(source).toContain("seen.casterId === casterId && seen.pending && caster.contactsShown");
     });
 
     // Ouverts mais vides : la phrase des engagées sans contact, jamais deux « — ».

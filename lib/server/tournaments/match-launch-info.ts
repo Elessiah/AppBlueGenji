@@ -8,7 +8,7 @@
  * rendus qu'aux parties d'un match : dans la modale, **en lancement ou lancé** ;
  * par le bouton « Contacts » d'une carte, dès que ses deux adversaires sont
  * connus pour ses joueurs et pour les arbitres (permission `tournaments`), le
- * temps du match seulement pour son caster (`exposesContacts`). Ceux **du
+ * temps du match seulement pour son caster (`exposesMatchContacts`). Ceux **du
  * caster** sortent le temps du match, et dès que les adversaires sont connus
  * pour un arbitre (`exposesCaster`, `exposesCasterContacts`).
  *
@@ -29,8 +29,8 @@ import {
   canDeclareTeamReady,
   exposesCasterContacts,
   isAutoLaunchDue,
+  exposesMatchContacts,
   matchLaunchPhase,
-  matchUnderway,
   pickLaunchContacts,
   resolveHostTeamId,
   type ContactCandidate,
@@ -313,7 +313,7 @@ type LaunchContext = {
   rosters: Map<number, MemberRow[]>;
   castRevoked: boolean;
   readiness: ReturnType<typeof rowReadiness>;
-  /** Contacts : seulement pour les matchs où `exposesContacts` les ouvre. */
+  /** Contacts : seulement pour les matchs où `exposesMatchContacts` les ouvre. */
   exposes: boolean;
   /**
    * Contacts **du caster** : le temps du match seulement (lancement ouvert, ou
@@ -328,22 +328,6 @@ type LaunchContext = {
   exposesCaster: boolean;
 };
 
-/**
- * Les contacts sortent-ils pour ce match ? Dans la modale de lancement, en
- * lancement ou lancé ; par le bouton « Contacts » d'une carte, pour un
- * **joueur** (membre d'une des deux engagées), dès que les deux adversaires
- * sont connus — à planifier (décision de l'utilisateur, 2026-10-19) ou
- * programmé — : les parties s'organisent avant l'heure, surtout sans phase de
- * lancement. Le **caster** inscrit, lui, ne les reçoit que **le temps du
- * match** — du départ (lancement ouvert, ou lancé) à sa fin —, par la modale
- * comme par la carte (décision de l'utilisateur, 2026-10-19) : il n'a rien à
- * organiser avec les équipes avant l'heure.
- */
-function exposesContacts(phase: LaunchPhase, cardForPlayer: boolean): boolean {
-  return (
-    matchUnderway(phase) || (cardForPlayer && (phase === "SCHEDULED" || phase === "TO_PLAN"))
-  );
-}
 
 /** Le lecteur représente-t-il une des deux engagées du match ? */
 function viewerPlaysMatch(row: CandidateRow, teams: ViewerTeams): boolean {
@@ -623,7 +607,7 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
     const read = rows
       .map((row) => {
         const phase = matchLaunchPhase(toLaunchInput(row), now);
-        return { row, phase, exposes: exposesContacts(phase, forCard && (referee || viewerPlaysMatch(row, teams))) };
+        return { row, phase, exposes: exposesMatchContacts(phase, forCard && (referee || viewerPlaysMatch(row, teams))) };
       })
       .filter(({ phase }) => phase !== "NONE");
     // Par la carte, un match sans contacts à montrer n'est pas rendu : le
@@ -655,7 +639,7 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
       const castRevoked = revoked.has(Number(row.id));
       const party = viewerRole(row, viewer.id, teams, castRevoked, referee);
       if (!party) continue;
-      // Ce que lui ouvrirait la carte (`exposesContacts` côté carte) : à un
+      // Ce que lui ouvrirait la carte (`exposesMatchContacts` côté carte) : à un
       // arbitre qui caste, la modale de lancement renvoie aussi à « Contacts ».
       const earlyContacts = staff || viewerPlaysMatch(row, teams);
       result.push(
@@ -666,8 +650,9 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
           castRevoked,
           readiness: rowReadiness(row),
           exposes,
-          // Une seule décision pour les contacts du caster : ceux du match
-          // ouverts (`exposes`) et la règle du caster.
+          // Une seule décision pour les contacts du caster : sa règle, sous
+          // celle du match (`exposes`) — aujourd'hui toujours vraie quand la
+          // première l'est, gardée en filet : jamais le caster sans le match.
           exposesCaster: exposes && exposesCasterContacts(phase, party.role),
         }),
       );

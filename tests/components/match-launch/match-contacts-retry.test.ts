@@ -14,7 +14,7 @@ import {
   type ContactsCard,
   shouldRetryReread,
 } from "@/components/match-launch/MatchContactsDialog";
-import { casterContactsPending, exposesCasterContacts, matchUnderway, type MatchLaunchInfo } from "@/lib/shared/match-launch";
+import { casterContactsPending, exposesCasterContacts, exposesMatchContacts, matchUnderway, type MatchLaunchInfo } from "@/lib/shared/match-launch";
 import { readSource } from "../../helpers/read-source";
 
 /**
@@ -209,9 +209,13 @@ describe("contacts du caster en attente, modale ouverte", () => {
 
   it("le temps du match, une seule définition : matchUnderway", () => {
     expect((["NONE", "TO_PLAN", "SCHEDULED", "LOBBY", "LAUNCHED"] as const).filter(matchUnderway)).toEqual(["LOBBY", "LAUNCHED"]);
-    // Le serveur et la carte du match lisent la même borne, sans copie.
-    expect(readSource("lib/server/tournaments/match-launch-info.ts")).toContain("matchUnderway(phase) ||");
-    expect(readSource("app/(secured)/tournois/[id]/_lib/launch-strip.ts")).toContain("isCaster && matchUnderway(phase)");
+    const phases = ["NONE", "TO_PLAN", "SCHEDULED", "LOBBY", "LAUNCHED"] as const;
+    // Joueur ou arbitre par la carte : dès que les adversaires sont connus ; sinon le temps du match.
+    expect(phases.filter((phase) => exposesMatchContacts(phase, true))).toEqual(["TO_PLAN", "SCHEDULED", "LOBBY", "LAUNCHED"]);
+    expect(phases.filter((phase) => exposesMatchContacts(phase, false))).toEqual(["LOBBY", "LAUNCHED"]);
+    // Le serveur et la carte du match lisent la même règle, sans copie.
+    expect(readSource("lib/server/tournaments/match-launch-info.ts")).toContain("exposes: exposesMatchContacts(phase,");
+    expect(readSource("app/(secured)/tournois/[id]/_lib/launch-strip.ts")).toContain("&& exposesMatchContacts(phase, isPlayer || viewer.canSchedule)");
   });
 
   it("échecs passagers en rafale sans rien de lu : une seule notification", () => {

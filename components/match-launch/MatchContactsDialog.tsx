@@ -357,9 +357,6 @@ export function MatchContactsDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [matchId, readKey]);
 
-  // Défensif : la route ne rend que des matchs aux contacts des engagées
-  // ouverts ; si cela changeait, leur note ne renverrait jamais à cette modale-ci.
-  const sidesLaterText = t("contacts.notShown");
   const copy = async (value: string, label: string) => {
     try {
       await navigator.clipboard.writeText(value);
@@ -401,7 +398,6 @@ export function MatchContactsDialog({
                     isHost={launch.hostTeamId === launch.team1.teamId}
                     phase={launch.phase}
                     onCopy={copy}
-                    laterText={sidesLaterText}
                     linkNames
                   />
                   <div className={launchStyles.divider} aria-hidden="true">
@@ -412,7 +408,6 @@ export function MatchContactsDialog({
                     isHost={launch.hostTeamId === launch.team2.teamId}
                     phase={launch.phase}
                     onCopy={copy}
-                    laterText={sidesLaterText}
                     linkNames
                   />
                 </div>

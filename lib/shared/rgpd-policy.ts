@@ -121,7 +121,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // Masqué, le BattleTag reste lu par les parties de tes matchs : ce n'est
     // pas un consentement (le masquer n'y change rien), mais l'exécution du
     // service — les conditions d'utilisation le prévoient (« Contacts de
-    // match », version 5). Le consentement ne vaut que pour le renseigner et
+    // match », version 6). Le consentement ne vaut que pour le renseigner et
     // l'afficher au public.
     base: "Consentement",
     extraBases: [

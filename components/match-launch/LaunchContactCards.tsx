@@ -12,7 +12,6 @@ import { useEffect, useState } from "react";
 import { PlayerLink, TeamLink } from "@/components/entity-link";
 import { useLaunchText } from "./launch-text";
 import {
-  casterContactsArrived,
   casterContactsPending,
   casterHasContacts,
   viewerIsCaster,
@@ -123,11 +122,13 @@ export function SideCard({
   phase: MatchLaunchInfo["phase"];
   onCopy: CopyFn;
   /**
-   * Note des contacts tus, choisie par la modale qui rend la fiche : celle de
-   * lancement ne renvoie à l'action « Contacts » qu'à qui elle ouvre déjà
-   * quelque chose (`launchSidesLaterText`) ; la modale « Contacts » passe la sienne.
+   * Note des contacts tus : la modale de lancement passe la sienne
+   * (`launchSidesLaterText`, qui ne renvoie à l'action « Contacts » qu'à qui
+   * elle ouvre déjà quelque chose) ; par défaut, « Contacts non affichés » —
+   * jamais vue dans la modale « Contacts », dont la route ne rend que des
+   * matchs aux contacts des engagées ouverts.
    */
-  laterText: string;
+  laterText?: string;
   /**
    * Noms cliquables vers leurs fiches — modale « Contacts » seulement : la
    * modale de lancement survit à la navigation et recouvrirait la fiche ouverte.
@@ -186,12 +187,12 @@ function SideContacts({
   side: LaunchSide;
   onCopy: CopyFn;
   linkNames: boolean;
-  laterText: string;
+  laterText: string | undefined;
 }>) {
   const { t } = useLaunchText();
   if (side.isGhost) return <p className={styles.note}>{t("ghost")}</p>;
   if (!side.contactsShown) {
-    return <p className={styles.note}>{laterText}</p>;
+    return <p className={styles.note}>{laterText ?? t("contacts.notShown")}</p>;
   }
   if (side.contacts.length === 0) return <p className={styles.note}>{t("noContact")}</p>;
   return (
@@ -224,7 +225,7 @@ function useCasterArrival(caster: LaunchCaster | null, pending: boolean, enabled
   });
   // Sans annonce (modale de lancement), rien à suivre : aucun rendu de plus.
   if (enabled && (seen.pending !== pending || seen.casterId !== casterId)) {
-    const arrived = caster !== null && seen.casterId === casterId && casterContactsArrived(seen.pending, caster);
+    const arrived = caster !== null && seen.casterId === casterId && seen.pending && caster.contactsShown;
     // Figée à l'arrivée : une relecture dans les dix secondes ne la réécrit pas.
     let arrival: CasterArrival = null;
     if (arrived) arrival = casterHasContacts(caster) ? "SHOWN" : "EMPTY";

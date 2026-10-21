@@ -3,7 +3,7 @@
  * montre et offre, décidé hors du composant : une règle pure se teste sans
  * rendu, et le composant ne garde que la mise en page.
  */
-import { matchUnderway, type MatchLaunchPhase } from "@/lib/shared/match-launch";
+import { exposesMatchContacts, matchUnderway, type MatchLaunchPhase } from "@/lib/shared/match-launch";
 import type { BracketMatch } from "@/lib/shared/types";
 
 type StripMatch = Pick<
@@ -52,15 +52,6 @@ export type LaunchStripControls = {
 /** Phases où l'arbitrage peut forcer le départ : tout ce qui précède le lancement effectif. */
 const FORCEABLE_PHASES: ReadonlySet<MatchLaunchPhase> = new Set(["TO_PLAN", "SCHEDULED", "LOBBY"]);
 
-/**
- * Phases où le bouton « Contacts » est offert à un joueur du match (et à un
- * arbitre) : dès que
- * les deux adversaires sont connus — à planifier, programmé, en lancement ou
- * lancé —, celles où la lecture serveur les expose (`match-launch-info.ts`).
- */
-const CONTACT_PHASES: ReadonlySet<MatchLaunchPhase> = new Set(["TO_PLAN", "SCHEDULED", "LOBBY", "LAUNCHED"]);
-
-
 export function launchStripControls(
   match: StripMatch,
   phase: MatchLaunchPhase,
@@ -78,10 +69,10 @@ export function launchStripControls(
   return {
     isCaster,
     showOpen: (isCaster || isPlayer) && viewer.launchPhase !== false && matchUnderway(phase),
-    // Un arbitre (permission `tournaments`) les lit comme un joueur du match.
-    showContacts:
-      (isPlayer || viewer.canSchedule) ? CONTACT_PHASES.has(phase) : // Au caster inscrit, le temps du match seulement — la borne du serveur.
-        isCaster && matchUnderway(phase),
+    // La règle du serveur (`exposesMatchContacts`) : un arbitre (permission
+    // `tournaments`) les lit comme un joueur du match, dès que les deux
+    // adversaires sont connus ; le caster inscrit, le temps du match seulement.
+    showContacts: (isPlayer || viewer.canSchedule || isCaster) && exposesMatchContacts(phase, isPlayer || viewer.canSchedule),
     showClaim: viewer.canManage && castable && match.casterUserId === null,
     showRelease: open && match.casterUserId !== null && (isCaster || viewer.canSchedule),
     showPlan: viewer.canSchedule && phase === "TO_PLAN",

@@ -103,7 +103,7 @@ ni score à saisir ni lancement à suivre.
 
 **Arbitre** : `readViewerLaunches` pose `referee` (`can(viewer, "tournaments")`)
 pour la seule lecture d'une carte ; la requête du match lève alors la clause
-« partie du match » (`1 = 1 OR …`), `exposesContacts` le traite comme un joueur,
+« partie du match » (`1 = 1 OR …`), `exposesMatchContacts` le traite comme un joueur,
 et `viewerRole` lui rend le rôle `REFEREE` (`MatchLaunchViewerRole`), sans
 « Prêt ». La modale de lancement ne lui présente rien. Les contacts du caster
 lui sont rendus dès que les deux adversaires sont connus (décision de
@@ -128,7 +128,7 @@ Quand la relecture de l'heure de départ remplace la note par les contacts, la
 modale « Contacts » (seule, `announceArrival`) l'annonce par une phrase courte
 dans une région polie hors flux (`contacts.casterShown`, `<output>` `sr-only`) —
 pas les boutons « Copier ». L'annonce ne vient qu'au passage « en attente →
-montrés » d'un même caster (`casterContactsArrived`) — sans contact, elle le dit
+montrés » d'un même caster (`useCasterArrival`) — sans contact, elle le dit
 (`contacts.casterShownEmpty` ; à l'écran, `noContact` plutôt que deux « — »,
 sauf au caster lui-même) —,
 jamais à l'ouverture, et se vide après dix secondes. La modale de lancement
@@ -149,7 +149,7 @@ fenêtre d'une heure ni le filtre de l'option. Une différence, voulue : pour un
 match sont connus** — à planifier (décision de l'utilisateur, 2026-10-19),
 programmé, en lancement ou lancé —, et plus seulement au lancement : les parties
 s'organisent avant l'heure, surtout sans phase de lancement. Le **caster**, lui,
-garde la borne de la modale — en lancement ou lancé (`exposesContacts`, lu avec
+garde la borne de la modale — en lancement ou lancé (`exposesMatchContacts`, lu avec
 `viewerPlaysMatch`) — : avant, la route le traite comme un tiers. Symétrie :
 les équipes ne reçoivent les contacts **du caster** que le temps du match
 (`exposesCaster`) ; avant, la carte montre leurs contacts sans les siens (un
