@@ -81,31 +81,24 @@ function layerEdgeTarget<T>(extra: readonly T[], active: unknown, shiftKey: bool
 }
 
 /**
- * Modales ouvertes d'office et décidées, mais pas encore dans le DOM (morceau
- * chargé à la demande) : elles comptent déjà, sans quoi une autre ouverture
- * d'office s'y glisserait pendant le chargement.
+ * Sélecteur d'une modale ouverte : `aria-modal`, ou la place tenue par une
+ * modale décidée dont le morceau se charge encore (`data-modal-pending`, posé
+ * par le `loading` de son `dynamic()`) — sans quoi une autre ouverture d'office
+ * s'y glisserait pendant le chargement. Tenue par le DOM, la place se libère
+ * d'elle-même au démontage.
  */
-let pendingAutoOpenModals = 0;
+export const OPEN_MODAL_SELECTOR = '[aria-modal="true"], [data-modal-pending]';
 
-/** Réserve la place d'une modale ouverte d'office ; renvoie sa libération (idempotente). */
-export function claimAutoOpenModal(): () => void {
-  pendingAutoOpenModals += 1;
-  let released = false;
-  return () => {
-    if (released) return;
-    released = true;
-    pendingAutoOpenModals -= 1;
-  };
-}
-
-/** Une modale (`aria-modal`, ou réservée) est déjà ouverte : une ouverture d'office attend. */
+/** Une modale est déjà ouverte (ou en chargement) : une ouverture d'office attend. */
 export function anotherModalOpen(root: ParentNode = document): boolean {
-  return pendingAutoOpenModals > 0 || root.querySelector('[aria-modal="true"]') !== null;
+  return root.querySelector(OPEN_MODAL_SELECTOR) !== null;
 }
 
 /**
  * Prévient (une fois) quand plus aucune modale n'est ouverte, sans minuterie :
- * un observateur du DOM, actif le temps de l'attente. Renvoie l'arrêt.
+ * un observateur du DOM, actif le temps de l'attente seulement. Ses rappels
+ * sont groupés par le navigateur (un par rendu, pas un par nœud) et ne font
+ * qu'une recherche par attribut. Renvoie l'arrêt.
  */
 export function watchModalsClosed(onClosed: () => void, root: Node = document.body): () => void {
   const observer = new MutationObserver(() => {
@@ -113,6 +106,6 @@ export function watchModalsClosed(onClosed: () => void, root: Node = document.bo
     observer.disconnect();
     onClosed();
   });
-  observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-modal"] });
+  observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-modal", "data-modal-pending"] });
   return () => observer.disconnect();
 }

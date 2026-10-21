@@ -391,7 +391,9 @@
       "later": {
         "topic": "Et ensuite",
         "does": "Ouvre les tournois qui exigent un Discord certifié ou un compte Battle.net.",
-        "doesNot": "Ne t'engage à rien : tu peux détacher Discord ou Battle.net depuis ton profil."
+        "doesDiscordOnly": "Ouvre les tournois qui exigent un Discord certifié.",
+        "doesNot": "Ne t'engage à rien : tu peux détacher Discord ou Battle.net depuis ton profil.",
+        "doesNotDiscordOnly": "Ne t'engage à rien : tu peux détacher Discord depuis ton profil."
       }
     },
     "neverAgain": "Ne plus voir",

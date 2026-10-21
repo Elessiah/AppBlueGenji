@@ -391,7 +391,9 @@
       "later": {
         "topic": "Later on",
         "does": "Opens tournaments that require a verified Discord or a Battle.net account.",
-        "doesNot": "Commits you to nothing: you can unlink Discord or Battle.net from your profile."
+        "doesDiscordOnly": "Opens tournaments that require a verified Discord.",
+        "doesNot": "Commits you to nothing: you can unlink Discord or Battle.net from your profile.",
+        "doesNotDiscordOnly": "Commits you to nothing: you can unlink Discord from your profile."
       }
     },
     "neverAgain": "Don't show again",

@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it } from "@jest/globals";
 
 import {
   anotherModalOpen,
-  claimAutoOpenModal,
   escapeBelongsElsewhere,
   focusTrapTarget,
   watchModalsClosed,
@@ -89,15 +88,16 @@ describe("anotherModalOpen et réservation d'une ouverture d'office", () => {
     expect(anotherModalOpen(withoutModal)).toBe(false);
   });
 
-  it("compte une modale réservée, pas encore montée, jusqu'à sa libération (idempotente)", () => {
-    const release = claimAutoOpenModal();
-    expect(anotherModalOpen(withoutModal)).toBe(true);
-    const other = claimAutoOpenModal();
-    release();
-    release();
-    expect(anotherModalOpen(withoutModal)).toBe(true);
-    other();
-    expect(anotherModalOpen(withoutModal)).toBe(false);
+  it("cherche aussi la place d'une modale en chargement", () => {
+    const seen: string[] = [];
+    const root = {
+      querySelector: (selector: string) => {
+        seen.push(selector);
+        return null;
+      },
+    } as unknown as ParentNode;
+    anotherModalOpen(root);
+    expect(seen[0]).toContain("[data-modal-pending]");
   });
 });
 

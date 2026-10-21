@@ -37,6 +37,16 @@ export function CertificationPromptDialog({ prompt, onClose }: Readonly<Certific
       ? [{ key: "battletag", label: t("certification.battletag"), ok: prompt.battletagVerified }]
       : []),
   ];
+  // Variante « Discord seul » d'une cellule, là où la ligne parle de Battle.net.
+  const rowText = (row: (typeof ROWS)[number], column: "does" | "doesNot") => {
+    if (!withBattletag && row === "identity" && column === "does") {
+      return t("certification.rows.identity.doesDiscordOnly");
+    }
+    if (!withBattletag && row === "later") {
+      return t(column === "does" ? "certification.rows.later.doesDiscordOnly" : "certification.rows.later.doesNotDiscordOnly");
+    }
+    return t(`certification.rows.${row}.${column}`);
+  };
   let lead = t("certification.leadManager");
   if (prompt.reason === "TEAM_WITHOUT_CONTACT") {
     lead = t(withBattletag ? "certification.leadTeam" : "certification.leadTeamDiscordOnly");
@@ -48,7 +58,6 @@ export function CertificationPromptDialog({ prompt, onClose }: Readonly<Certific
       describedBy="certification-prompt-lead"
       maxWidth={640}
       zIndex={90}
-      deferMount
       busy={false}
       onClose={close}
     >
@@ -72,33 +81,38 @@ export function CertificationPromptDialog({ prompt, onClose }: Readonly<Certific
         ))}
       </ul>
 
-      <table className={s.table}>
-        <caption className={s.caption}>{t("certification.tableCaption")}</caption>
-        <thead>
-          <tr>
-            <th scope="col">
-              <span className="sr-only">{t("certification.colTopic")}</span>
-            </th>
-            <th scope="col">{t("certification.colDoes")}</th>
-            <th scope="col">{t("certification.colDoesNot")}</th>
-          </tr>
-        </thead>
-        <tbody>
+      {/* Tableau en rôles ARIA, comme le roster d'équipe : sous 560 px les
+          lignes passent en cartes, et un vrai <table> remis en bloc perd sa
+          sémantique dans Safari (RESPONSIVE_TABLES.md). */}
+      <p id="certification-prompt-caption" className={s.caption}>
+        {t("certification.tableCaption")}
+      </p>
+      <div className={s.table} role="table" aria-labelledby="certification-prompt-caption">
+        <div role="rowgroup" className={s.head}>
+          <div role="row" className={s.row}>
+            <span role="columnheader" className="sr-only">
+              {t("certification.colTopic")}
+            </span>
+            <span role="columnheader">{t("certification.colDoes")}</span>
+            <span role="columnheader">{t("certification.colDoesNot")}</span>
+          </div>
+        </div>
+        <div role="rowgroup">
           {ROWS.map((row) => (
-            <tr key={row}>
-              <th scope="row">{t(`certification.rows.${row}.topic`)}</th>
-              <td className={s.does} data-label={t("certification.colDoes")}>
-                {row === "identity" && !withBattletag
-                  ? t("certification.rows.identity.doesDiscordOnly")
-                  : t(`certification.rows.${row}.does`)}
-              </td>
-              <td className={s.doesNot} data-label={t("certification.colDoesNot")}>
-                {t(`certification.rows.${row}.doesNot`)}
-              </td>
-            </tr>
+            <div key={row} role="row" className={s.row}>
+              <span role="rowheader" className={s.topic}>
+                {t(`certification.rows.${row}.topic`)}
+              </span>
+              <span role="cell" className={s.does} data-label={t("certification.colDoes")}>
+                {rowText(row, "does")}
+              </span>
+              <span role="cell" className={s.doesNot} data-label={t("certification.colDoesNot")}>
+                {rowText(row, "doesNot")}
+              </span>
+            </div>
           ))}
-        </tbody>
-      </table>
+        </div>
+      </div>
 
       <div className={s.footer}>
         <label className={s.neverAgain}>

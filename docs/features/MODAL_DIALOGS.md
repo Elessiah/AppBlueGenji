@@ -47,8 +47,9 @@ reboucle sur le dernier contrôle (`beforeStart` de `focusTrapTarget`).
 
 Une modale **ouverte d'office** (sans geste du lecteur) attend qu'aucune autre
 ne soit ouverte (`anotherModalOpen`, `lib/shared/dialog-focus.ts`) : centre de
-lancement, invitation à certifier. Chargée à la demande, elle réserve sa place
-dès sa décision (`claimAutoOpenModal`) ; pour attendre sans minuterie,
+lancement, invitation à certifier. Chargée à la demande, sa place est tenue
+dès sa décision par le `loading` de son `dynamic()` (`<span data-modal-pending
+hidden />`, compté par `anotherModalOpen`) ; pour attendre sans minuterie,
 `watchModalsClosed`.
 
 Jamais l'attribut `autoFocus` (Sonar S9379). Un champ qui n'apparaît qu'après

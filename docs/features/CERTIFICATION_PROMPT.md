@@ -30,10 +30,17 @@ lancement de match, changements de confidentialité…) — deux pièges à focu
 disputeraient Tab et Échap. Elle attend sa fermeture, guettée par un
 observateur du DOM (`watchModalsClosed`, sans minuterie : l'économie d'énergie
 ne la bloque pas) ; la décision pure est `certificationPromptStep`. Décidée,
-elle **réserve sa place** (`claimAutoOpenModal`) pendant le chargement de son
-morceau : le centre de lancement, qui attend toute modale ouverte
-(`anotherModalOpen`, `lib/shared/dialog-focus.ts`), ne s'ouvre pas en même
-temps. La réservation se libère à la fermeture ou au démontage.
+sa **place est tenue dans le DOM** pendant le chargement de son morceau (le
+`loading` de son `dynamic()` rend un `data-modal-pending`) : le centre de
+lancement, qui attend toute modale ouverte (`anotherModalOpen`,
+`lib/shared/dialog-focus.ts`), ne s'ouvre pas en même temps. Une invitation
+retirée par le serveur (certification faite entre-temps) ferme la modale.
+
+En **Marvel Rivals**, les lignes qui parlent de Blizzard ou de Battle.net
+(identité, « ensuite ») prennent leur variante `…DiscordOnly`. Le tableau est
+en rôles ARIA (`role="table"`, comme le roster d'équipe) : sous 560 px ses
+lignes passent en cartes sans perdre leur sémantique, chaque cellule libellée
+par `data-label` (libellé visuel seulement, texte de remplacement vide).
 
 Un membre est certifié par les règles mêmes du lancement
 (`hasVerifiedDiscord` / `hasVerifiedBattletag`, `lib/shared/match-launch.ts`).

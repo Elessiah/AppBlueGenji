@@ -7,7 +7,7 @@ import {
   shouldOpenCertificationPrompt,
   type CertificationPrompt,
 } from "@/lib/shared/certification-prompt";
-import { anotherModalOpen, claimAutoOpenModal, watchModalsClosed } from "@/lib/shared/dialog-focus";
+import { anotherModalOpen, watchModalsClosed } from "@/lib/shared/dialog-focus";
 
 /** Un stockage du navigateur, `null` s'il est inaccessible (accès refusé, rendu serveur). */
 function browserStorage(kind: "localStorage" | "sessionStorage"): Storage | null {
@@ -26,17 +26,18 @@ function browserStorage(kind: "localStorage" | "sessionStorage"): Storage | null
  *
  * Jamais par-dessus une autre modale (lancement de match, changements de
  * confidentialité…) : elle attend sa fermeture, guettée par un observateur du
- * DOM (sans minuterie, économie d'énergie comprise). Décidée, elle réserve sa
- * place (`claimAutoOpenModal`) le temps que son morceau se charge : le centre
- * de lancement ne s'ouvre pas en même temps.
+ * DOM (sans minuterie, économie d'énergie comprise). Décidée, sa place est
+ * tenue dans le DOM pendant le chargement de son morceau (`data-modal-pending`,
+ * `TournamentSheet`) : le centre de lancement ne s'ouvre pas en même temps.
  *
- * Renvoie l'invitation à afficher (`null` : rien) et la fermeture.
+ * Renvoie l'invitation à afficher (`null` : rien) et la fermeture. Une
+ * invitation retirée par le serveur (certifiée entre-temps) ferme la modale ;
+ * elle ne se rouvre pas si une autre revient.
  */
 export function useCertificationPrompt(prompt: CertificationPrompt | null | undefined, frozen: boolean) {
   const [open, setOpen] = useState(false);
   const [recheck, setRecheck] = useState(0);
   const decided = useRef(false);
-  const releaseClaim = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     const step = certificationPromptStep({
@@ -49,19 +50,16 @@ export function useCertificationPrompt(prompt: CertificationPrompt | null | unde
     if (step === "IDLE") return;
     if (step === "WAIT") return watchModalsClosed(() => setRecheck((n) => n + 1));
     decided.current = true;
-    if (step === "OPEN") {
-      releaseClaim.current = claimAutoOpenModal();
-      setOpen(true);
-    }
+    if (step === "OPEN") setOpen(true);
   }, [prompt, frozen, recheck]);
 
-  // Démontage de la fiche, modale ouverte : la place réservée se libère.
-  useEffect(() => () => releaseClaim.current?.(), []);
+  // Invitation retirée par le serveur (certification faite entre-temps) : fermée.
+  useEffect(() => {
+    if (prompt == null) setOpen(false);
+  }, [prompt]);
 
   const close = useCallback((neverAgain: boolean) => {
     rememberCertificationPromptClosed(browserStorage("localStorage"), browserStorage("sessionStorage"), neverAgain);
-    releaseClaim.current?.();
-    releaseClaim.current = null;
     setOpen(false);
   }, []);
 

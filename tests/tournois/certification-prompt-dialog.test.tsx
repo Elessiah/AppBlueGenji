@@ -60,6 +60,7 @@ describe("CertificationPromptDialog", () => {
     expect(html).toContain("Certifie ton Discord<");
     expect(html).toContain("personne n&#x27;y a certifié son tag Discord.");
     expect(html).not.toContain("Blizzard le confirment");
+    expect(html).not.toContain("Battle.net");
     expect(html).not.toContain(">BattleTag<");
   });
 
@@ -69,12 +70,22 @@ describe("CertificationPromptDialog", () => {
     expect(html.match(/data-label="Ce que ça ne fait pas"/g)).toHaveLength(4);
   });
 
+  it("garde ses rôles de tableau (lignes, en-têtes, cellules)", () => {
+    const html = render(OW_MANAGER);
+    expect(html).toContain('role="table" aria-labelledby="certification-prompt-caption"');
+    expect(html.match(/role="rowheader"/g)).toHaveLength(4);
+    expect(html.match(/role="columnheader"/g)).toHaveLength(3);
+    expect(html.match(/role="cell"/g)).toHaveLength(8);
+  });
+
   it("en anglais, ni français ni lien sans préfixe de langue", () => {
     const html = render(OW_MANAGER, "en");
     expect(html).toContain("Verify your Discord and your BattleTag");
     expect(html).toContain("Don&#x27;t show again");
     expect(html).toContain('href="/en/profil#connexions"');
     expect(html).not.toContain("Certifie");
-    expect(render(MR_TEAM, "en")).toContain("Verify your Discord<");
+    const mr = render(MR_TEAM, "en");
+    expect(mr).toContain("Verify your Discord<");
+    expect(mr).not.toContain("Battle.net");
   });
 });

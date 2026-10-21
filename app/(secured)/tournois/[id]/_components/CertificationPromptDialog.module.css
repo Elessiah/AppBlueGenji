@@ -42,16 +42,13 @@
 }
 
 .table {
-  width: 100%;
-  margin-top: 16px;
-  border-collapse: collapse;
+  margin-top: 8px;
   font-size: 12px;
   line-height: 1.5;
 }
 
 .caption {
-  margin-bottom: 8px;
-  text-align: left;
+  margin: 16px 0 0;
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -59,22 +56,24 @@
   color: var(--blue-300);
 }
 
-.table th,
-.table td {
-  padding: 8px 10px;
-  border-top: 1px solid var(--line-soft);
-  text-align: left;
-  vertical-align: top;
+.row {
+  display: grid;
+  grid-template-columns: 22% 1fr 1fr;
 }
 
-.table thead th {
+.row > * {
+  padding: 8px 10px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.head .row > * {
   border-top: none;
   font-size: 12px;
+  font-weight: 600;
   color: var(--ink-mute);
 }
 
-.table tbody th {
-  width: 22%;
+.topic {
   font-weight: 600;
   color: var(--ink);
 }
@@ -115,7 +114,7 @@
 /* Écran étroit : chaque ligne devient une carte, chaque cellule nommée par
    son intitulé de colonne (RESPONSIVE_TABLES.md). */
 @media (max-width: 560px) {
-  .table thead {
+  .head {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -124,27 +123,23 @@
     white-space: nowrap;
   }
 
-  .table tr,
-  .table th,
-  .table td {
+  .row {
     display: block;
-    width: auto;
-  }
-
-  .table tbody tr {
     padding: 6px 0;
     border-top: 1px solid var(--line-soft);
   }
 
-  .table tbody th,
-  .table tbody td {
-    width: auto;
-    border-top: none;
+  .row > * {
+    display: block;
     padding: 4px 0;
+    border-top: none;
   }
 
-  .table td::before {
+  /* Libellé visuel seulement : le lecteur d'écran annonce déjà l'en-tête de
+     colonne (texte de remplacement vide, ignoré des navigateurs anciens). */
+  .row > [data-label]::before {
     content: attr(data-label);
+    content: attr(data-label) / "";
     display: block;
     font-size: 11px;
     font-weight: 600;
