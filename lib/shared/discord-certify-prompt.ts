@@ -10,6 +10,7 @@
  */
 import type { ConnectionLogEvent } from "./connection-logs";
 import { isCertifiableDiscordHandle } from "./discord-identity";
+import { DISCORD_CERTIFIED_EVENT } from "./discord-certify-events";
 
 /**
  * Portes d'entrée après lesquelles la fenêtre est proposée (décision du
@@ -77,19 +78,7 @@ export const CERTIFY_QUERY_PARAM = "certifier";
 export const CERTIFY_QUERY_VALUE = "discord";
 export const CERTIFY_PROFILE_HREF = `/profil?${CERTIFY_QUERY_PARAM}=${CERTIFY_QUERY_VALUE}`;
 
-/**
- * Événement de fenêtre qui ouvre le dialogue de certification quand la
- * proposition est acceptée **depuis** `/profil` (aucune navigation à faire).
- */
-export const CERTIFY_DIALOG_EVENT = "bg:certify-dialog";
-
-/**
- * Événement de fenêtre émis quand le tag vient d'être certifié — d'un clic par
- * la proposition, ou par le dialogue de `/profil` (`detail.fromProfile`). La
- * proposition se close pour la session ; `/profil`, s'il est ouvert, relit son
- * état Discord, sauf pour son propre événement (il le tient déjà à jour).
- */
-export const DISCORD_CERTIFIED_EVENT = "bg:discord-certified";
+export { CERTIFY_DIALOG_EVENT, DISCORD_CERTIFIED_EVENT } from "./discord-certify-events";
 
 /** L'événement émis par le dialogue de `/profil`. */
 export function certifiedFromProfileEvent(): CustomEvent<{ fromProfile: true }> {

@@ -103,6 +103,10 @@ export async function recordDiscordCertifyPromptOff(userId: number): Promise<boo
     [userId],
   );
   if (Number((result as { affectedRows?: number }).affectedRows ?? 0) === 0) return false;
-  await db.execute(`UPDATE bg_user_sessions SET certify_prompt_due = 0 WHERE user_id = ? AND certify_prompt_due = 1`, [userId]);
+  // Au mieux : le choix est déjà gardé, et le chargeur lève lui-même une
+  // marque restée (il filtre sur `discord_certify_prompt_dismissed_at`).
+  await db
+    .execute(`UPDATE bg_user_sessions SET certify_prompt_due = 0 WHERE user_id = ? AND certify_prompt_due = 1`, [userId])
+    .catch((error: unknown) => console.error("[discord-certify-prompt] sessions non levées", error));
   return true;
 }

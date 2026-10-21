@@ -308,7 +308,7 @@ export function RecruitmentHighlight({
   // Posé au rendu : aucun passage de plus quand un rafraîchissement l'apporte.
   const [held, setHeld] = useState(modalHeld);
   if (modalHeld && !held) setHeld(true);
-  const showModal = modalStart !== null && !modalSilenced && !modalHeld && !held && !modalOptedOut && !onAdPage;
+  const showModal = modalStart !== null && !modalSilenced && !held && !modalOptedOut && !onAdPage;
   return (
     <>
       {!bannerDismissed && bannerAds.length > 0 && (

@@ -147,7 +147,7 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
 
   it("ne couvre pas l'écran où un lien de la modale de confidentialité envoie agir", () => {
     expect(LAZY).toContain("if (privacyFollowedLink(event)) setFollowedLink(true);");
-    expect(LAZY).toContain("if (certified || followedLink || !(armed || canOpen)) return null;");
+    expect(LAZY).toContain("if (certified || followedLink || !armed) return null;");
     const privacy = readSource("components/privacy/PrivacyChangesModal.tsx");
     expect(privacy).toContain("window.dispatchEvent(privacyAnsweredEvent(followedLink));");
     expect(privacy).toMatch(/const followLink = \(changeId: string\) => \{\s*close\(true\);/);

@@ -38,7 +38,8 @@ export type AuthUser = {
   /**
    * La session (ouverte par Discord ou Blizzard) doit encore proposer la
    * certification du tag Discord (`bg_user_sessions.certify_prompt_due`) —
-   * sans rien dire du compte : `loadDiscordCertifyPrompt` tranche le reste.
+   * posée d'après l'état du compte **à la connexion** (non certifié, sans « Ne
+   * plus voir ») ; `loadDiscordCertifyPrompt` ne revérifie que ce qui a changé depuis.
    */
   certifyPromptDue: boolean;
 };

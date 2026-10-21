@@ -3,9 +3,8 @@
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import { useLocalePathname } from "@/components/i18n/locale-navigation";
-import { useShellText } from "@/components/i18n/shell-text";
 import { certifyPromptOpen } from "@/lib/shared/global-modals";
-import { DISCORD_CERTIFIED_EVENT } from "@/lib/shared/discord-certify-prompt";
+import { DISCORD_CERTIFIED_EVENT } from "@/lib/shared/discord-certify-events";
 import { orReload } from "@/lib/shared/lazy-component";
 import { PRIVACY_CHANGES_ANSWERED_EVENT, privacyFollowedLink } from "@/lib/shared/privacy-changes";
 import { TERMS_ACCEPTED_EVENT, TERMS_REQUIRED_EVENT } from "@/lib/shared/terms-of-use";
@@ -66,7 +65,6 @@ const DiscordCertifyPromptEn = dynamic(
  * une proposition est due : une proposition qui réapparaît la remonte, neuve.
  */
 export function DiscordCertifyPromptLazy({ prompt, privacyPending, termsPending }: Readonly<DiscordCertifyPromptProps>) {
-  const { locale } = useShellText();
   const [privacyAnswered, setPrivacyAnswered] = useState(false);
   const [followedLink, setFollowedLink] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState<boolean | null>(null);
@@ -74,7 +72,7 @@ export function DiscordCertifyPromptLazy({ prompt, privacyPending, termsPending 
   const [armed, setArmed] = useState(false);
   /** Déjà répondue sur ce chargement (fenêtre ou certification) : un seul `LATER`. */
   const answered = useRef(false);
-  const { path: pathname } = useLocalePathname();
+  const { locale, path: pathname } = useLocalePathname();
 
   useEffect(() => {
     const onPrivacy = (event: Event) => {
@@ -117,7 +115,7 @@ export function DiscordCertifyPromptLazy({ prompt, privacyPending, termsPending 
   // (verrou posé au rendu : aucun second passage après l'ouverture).
   if (canOpen && !armed) setArmed(true);
 
-  if (certified || followedLink || !(armed || canOpen)) return null;
+  if (certified || followedLink || !armed) return null;
   const View = locale === "en" ? DiscordCertifyPromptEn : DiscordCertifyPromptFr;
   return <View prompt={prompt} canOpen={canOpen} onProfile={pathname === "/profil"} answered={answered} />;
 }

@@ -115,7 +115,7 @@ describe("RecruitmentHighlight — modale d'arrivée", () => {
     const source = readSource("components/recruitment-highlight.tsx");
     expect(source).toContain("const [held, setHeld] = useState(modalHeld);");
     expect(source).toContain("if (modalHeld && !held) setHeld(true);");
-    expect(source).toContain("!modalSilenced && !modalHeld && !held");
+    expect(source).toContain("!modalSilenced && !held");
     expect(readSource("app/layout.tsx")).toContain("modalHeld={certifyPromptDue}");
   });
 
