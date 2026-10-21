@@ -42,6 +42,12 @@ Une modale longue, qui se lit avant d'agir et dont les contrôles sont tout en
 bas, marque son **titre** `tabIndex={-1}` + `data-autofocus` : le focus
 d'ouverture s'y pose et la modale s'ouvre par le haut, au lieu de défiler
 jusqu'au premier contrôle sur un petit écran (`CertificationPromptDialog`).
+Hors des focalisables, ce titre est tenu par le piège : `Maj+Tab` depuis lui
+reboucle sur le dernier contrôle (`beforeStart` de `focusTrapTarget`).
+
+Une modale **ouverte d'office** (sans geste du lecteur) attend qu'aucune autre
+ne soit ouverte (`anotherModalOpen`, `lib/shared/dialog-focus.ts`) : centre de
+lancement, invitation à certifier.
 
 Jamais l'attribut `autoFocus` (Sonar S9379). Un champ qui n'apparaît qu'après
 un geste — éditeur en ligne ouvert par « Modifier », onglet d'une modale déjà

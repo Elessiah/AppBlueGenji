@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { closedNoticeText } from "@/app/(secured)/tournois/[id]/_components/PlayerScoreDialog";
 import { startAtHint } from "@/app/(secured)/tournois/[id]/_components/MatchScheduleDialog";
-import { anotherModalOpen } from "@/components/match-launch/MatchLaunchCenter";
+import { anotherModalOpen } from "@/lib/shared/dialog-focus";
 import { CasterCard, SideCard } from "@/components/match-launch/LaunchContactCards";
 import { contactsErrorText, viewerIsCaster } from "@/components/match-launch/MatchContactsDialog";
 import { FR_LAUNCH_TEXT } from "@/components/match-launch/launch-text";

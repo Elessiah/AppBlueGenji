@@ -19,6 +19,19 @@ La fiche d'un tournoi ouvre donc d'office une modale qui invite à certifier :
 Rien pour qui a déjà les deux, pour un tournoi terminé (`FINISHED`), en tournoi
 individuel, ni pour une équipe non engagée. Le motif `MANAGER` passe devant.
 
+**Marvel Rivals** : le BattleTag (Battle.net) ne sert à rien à ce jeu
+(`battletagRelevantFor`, `battletagRelevant` du prompt). Seul le tag Discord est
+demandé : un Discord certifié suffit, la modale ne montre que sa pastille et
+prend ses variantes « Discord seul » (titre, motif d'équipe, ligne
+« identité »).
+
+La modale ne s'ouvre **jamais par-dessus une autre** (`aria-modal` présent :
+lancement de match, changements de confidentialité…) — deux pièges à focus se
+disputeraient Tab et Échap. Elle attend sa fermeture, guettée chaque seconde
+tant que les horloges tournent (`useClientPower().clocks`) ; la décision pure
+est `certificationPromptStep`. Réciproquement, le centre de lancement attend
+la sienne (`anotherModalOpen`, `lib/shared/dialog-focus.ts`).
+
 La modale dit pourquoi elle s'ouvre, où en est le lecteur (pastilles
 « Certifié » / « À certifier »), puis un **tableau « Ce que ça fait / Ce que ça
 ne fait pas »** — chaque promesse a sa limite en face, sur la même ligne
@@ -50,12 +63,15 @@ donnée sur une personne, déposées à la demande du lecteur.
 ## Câblage
 
 - Règle pure, clés et lecture du stockage : `lib/shared/certification-prompt.ts`
-  (`certificationPromptFor`, `teamHasContact`, `shouldOpenCertificationPrompt`,
+  (`certificationPromptFor`, `teamHasContact`, `battletagRelevantFor`,
+  `certificationPromptStep`, `shouldOpenCertificationPrompt`,
   `rememberCertificationPromptClosed`).
 - Lecture : `lib/server/tournaments/certification-prompt.ts`
   (`loadCertificationPrompt`, une requête sur le roster en cours), appelée par
   `getTournamentViewerContext` — **porte commune** du flux SSE et de la lecture
-  REST de secours — seulement pour une équipe engagée dans un tournoi non clos.
+  REST de secours — seulement pour une équipe engagée dans un tournoi non clos :
+  une requête indexée par connexion du flux (pas par instantané). « Ne plus
+  voir » vit dans le navigateur, le serveur l'ignore.
 - Champ `TournamentViewerContext.certificationPrompt`, rejoué tel quel d'un
   instantané à l'autre (`live-state.ts`), `null` pour le spectateur sans compte.
 - Ouverture une fois par page : `_hooks/useCertificationPrompt.ts` ; modale
@@ -64,4 +80,5 @@ donnée sur une personne, déposées à la demande du lecteur.
 
 Tests : `tests/lib/shared/certification-prompt.test.ts`,
 `tests/lib/server/certification-prompt.test.ts`,
-`tests/tournois/certification-prompt-context.test.ts`.
+`tests/tournois/certification-prompt-context.test.ts`,
+`tests/tournois/certification-prompt-dialog.test.tsx`.

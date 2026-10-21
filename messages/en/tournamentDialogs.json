@@ -358,8 +358,10 @@
   },
   "certification": {
     "title": "Verify your Discord and your BattleTag",
+    "titleDiscordOnly": "Verify your Discord",
     "leadManager": "You manage a team entered in this tournament. When a match launches, the opponent, the caster and the referees must be able to reach you: you are still missing a verification.",
     "leadTeam": "Your team has no contact to show when its matches launch: nobody on it has verified their Discord tag or their BattleTag. The opponent and the referees have no way to reach you.",
+    "leadTeamDiscordOnly": "Your team has no contact to show when its matches launch: nobody on it has verified their Discord tag. The opponent and the referees have no way to reach you.",
     "statusLabel": "Where you stand",
     "discord": "Discord tag",
     "battletag": "BattleTag",
@@ -373,6 +375,7 @@
       "identity": {
         "topic": "Your identity",
         "does": "Proves your Discord tag and your BattleTag really are yours: Discord and Blizzard confirm it.",
+        "doesDiscordOnly": "Proves your Discord tag really is yours: Discord confirms it.",
         "doesNot": "Gives the site no access to your password, your messages or your friends."
       },
       "matches": {

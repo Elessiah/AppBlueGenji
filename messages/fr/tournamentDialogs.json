@@ -358,8 +358,10 @@
   },
   "certification": {
     "title": "Certifie ton Discord et ton BattleTag",
+    "titleDiscordOnly": "Certifie ton Discord",
     "leadManager": "Tu gères une équipe engagée dans ce tournoi. Au lancement d'un match, l'adversaire, le caster et l'arbitrage doivent pouvoir te joindre : il te manque encore une certification.",
     "leadTeam": "Ton équipe n'a aucun contact à présenter au lancement de ses matchs : personne n'y a certifié son tag Discord ni son BattleTag. L'adversaire et l'arbitrage n'ont aucun moyen de vous joindre.",
+    "leadTeamDiscordOnly": "Ton équipe n'a aucun contact à présenter au lancement de ses matchs : personne n'y a certifié son tag Discord. L'adversaire et l'arbitrage n'ont aucun moyen de vous joindre.",
     "statusLabel": "Où tu en es",
     "discord": "Tag Discord",
     "battletag": "BattleTag",
@@ -373,6 +375,7 @@
       "identity": {
         "topic": "Ton identité",
         "does": "Prouve que ton tag Discord et ton BattleTag sont bien les tiens : Discord et Blizzard le confirment.",
+        "doesDiscordOnly": "Prouve que ton tag Discord est bien le tien : Discord le confirme.",
         "doesNot": "Ne donne au site accès ni à ton mot de passe, ni à tes messages, ni à tes amis."
       },
       "matches": {

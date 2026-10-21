@@ -202,6 +202,7 @@ import {
 } from "./dispute-self-resolution";
 import { loadViewerCastBlock } from "./match-launch";
 import { loadCertificationPrompt } from "./certification-prompt";
+import { battletagRelevantFor } from "@/lib/shared/certification-prompt";
 
 let pendingSync: Promise<void> | null = null;
 let lastSyncAt = 0;
@@ -1101,12 +1102,19 @@ export async function getTournamentViewerContext(
       : await withConnection((connection) => loadViewerProposals(connection, snapshot.matches, proposalScope));
 
   // Invitation à certifier (`CERTIFICATION_PROMPT.md`) : au joueur d'une
-  // équipe engagée dans un tournoi qui n'est pas clos. Une seule requête, et
-  // seulement dans ce cas — la plupart des lecteurs ne sont pas engagés.
+  // équipe engagée dans un tournoi qui n'est pas clos. Une requête indexée sur
+  // le roster, par connexion du flux (pas par instantané) et pour les seuls
+  // engagés ; « Ne plus voir » vit dans le navigateur, le serveur l'ignore.
   const certificationPrompt =
     !isSolo && activeTeam && alreadyRegistered && snapshot.card.state !== "FINISHED"
       ? await withConnection((connection) =>
-          loadCertificationPrompt(connection, userId, activeTeam.teamId, hasTeamManagementRole(activeTeam.roles)),
+          loadCertificationPrompt(
+            connection,
+            userId,
+            activeTeam.teamId,
+            hasTeamManagementRole(activeTeam.roles),
+            battletagRelevantFor(snapshot.card.game),
+          ),
         )
       : null;
 

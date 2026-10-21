@@ -13,9 +13,11 @@ import { getUserActiveTeam } from "@/lib/server/teams/roster";
 import { getTournamentPreview } from "@/lib/server/tournaments/preview-cache";
 import { loadCertificationPrompt } from "@/lib/server/tournaments/certification-prompt";
 import { findSoloEntry } from "@/lib/server/solo-entries-service";
-import { DEFAULT_REGISTRATION_FILTERS } from "@/lib/shared/registration-filters";
-import type { TournamentSnapshot } from "@/lib/shared/types";
+import type { TournamentGame, TournamentSnapshot, TournamentState } from "@/lib/shared/types";
+import type { ParticipantType } from "@/lib/shared/participants";
 import { fakeConnection } from "../helpers/sql-double";
+import { tournamentSnapshot } from "../helpers/tournament-detail";
+import { tournamentCard } from "../helpers/tournament-card";
 
 /**
  * L'invitation à certifier voyage dans le contexte du lecteur, porte commune
@@ -23,15 +25,21 @@ import { fakeConnection } from "../helpers/sql-double";
  * lue pour le seul joueur d'une équipe engagée dans un tournoi non clos.
  */
 
-function snapshot(state: string, registered: boolean, participantType = "TEAM"): TournamentSnapshot {
-  return {
-    card: { id: 5, state, participantType, registrationFilters: { ...DEFAULT_REGISTRATION_FILTERS } },
-    registrations: registered ? [{ teamId: 42 }] : [],
-    matches: [],
-  } as unknown as TournamentSnapshot;
+function snapshot(
+  state: TournamentState,
+  registered: boolean,
+  participantType: ParticipantType = "TEAM",
+  game: TournamentGame = "OW",
+): TournamentSnapshot {
+  return tournamentSnapshot({
+    card: tournamentCard({ id: 5, state, participantType, game }),
+    registrations: registered
+      ? [{ teamId: 42, teamName: "Équipe", logoUrl: null, seed: null, registeredAt: "2026-10-01T10:00:00.000Z", finalRank: null }]
+      : [],
+  });
 }
 
-const PROMPT = { reason: "MANAGER", discordVerified: false, battletagVerified: true } as const;
+const PROMPT = { reason: "MANAGER", discordVerified: false, battletagVerified: true, battletagRelevant: true } as const;
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -43,16 +51,21 @@ beforeEach(() => {
 });
 
 describe("certificationPrompt du contexte du lecteur", () => {
-  it.each(["REGISTRATION", "RUNNING", "UPCOMING"])("est lue pour une équipe engagée (%s)", async (state) => {
+  it.each<TournamentState>(["REGISTRATION", "RUNNING", "UPCOMING"])("est lue pour une équipe engagée (%s)", async (state) => {
     const context = await getTournamentViewerContext(snapshot(state, true), 7);
     expect(context.certificationPrompt).toEqual(PROMPT);
-    expect(loadCertificationPrompt).toHaveBeenCalledWith(expect.anything(), 7, 42, true);
+    expect(loadCertificationPrompt).toHaveBeenCalledWith(expect.anything(), 7, 42, true, true);
+  });
+
+  it("dit si le BattleTag compte : pas en Marvel Rivals", async () => {
+    await getTournamentViewerContext(snapshot("RUNNING", true, "TEAM", "MR"), 7);
+    expect(loadCertificationPrompt).toHaveBeenCalledWith(expect.anything(), 7, 42, true, false);
   });
 
   it("passe le rôle de gestion : un simple joueur n'est pas manager", async () => {
     jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 42, teamName: "Équipe", roles: ["DPS", "CAPITAINE"] });
     await getTournamentViewerContext(snapshot("RUNNING", true), 7);
-    expect(loadCertificationPrompt).toHaveBeenCalledWith(expect.anything(), 7, 42, false);
+    expect(loadCertificationPrompt).toHaveBeenCalledWith(expect.anything(), 7, 42, false, true);
   });
 
   it("rien sans lecture pour une équipe non engagée", async () => {

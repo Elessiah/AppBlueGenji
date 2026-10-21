@@ -3,7 +3,9 @@ import {
   CERTIFICATION_PROFILE_HREF,
   CERTIFICATION_PROMPT_CLOSED_KEY,
   CERTIFICATION_PROMPT_OFF_KEY,
+  battletagRelevantFor,
   certificationPromptFor,
+  certificationPromptStep,
   rememberCertificationPromptClosed,
   shouldOpenCertificationPrompt,
   teamHasContact,
@@ -39,31 +41,81 @@ function memoryStorage(initial: Record<string, string> = {}, failing = false) {
 describe("certificationPromptFor", () => {
   it("invite un manager à qui manque l'une des deux, même si l'équipe a un contact", () => {
     for (const viewer of [NONE, DISCORD_ONLY, BATTLETAG_ONLY]) {
-      expect(certificationPromptFor({ isManager: true, viewer, teamHasContact: true })).toEqual({
+      expect(certificationPromptFor({ isManager: true, viewer, teamHasContact: true, battletagRelevant: true })).toEqual({
         reason: "MANAGER",
         ...viewer,
+        battletagRelevant: true,
       });
     }
   });
 
   it("invite un joueur dont l'équipe n'a aucun contact", () => {
-    expect(certificationPromptFor({ isManager: false, viewer: NONE, teamHasContact: false })).toEqual({
+    expect(certificationPromptFor({ isManager: false, viewer: NONE, teamHasContact: false, battletagRelevant: true })).toEqual({
       reason: "TEAM_WITHOUT_CONTACT",
       ...NONE,
+      battletagRelevant: true,
     });
   });
 
   it("le motif manager passe devant l'équipe sans contact", () => {
-    expect(certificationPromptFor({ isManager: true, viewer: NONE, teamHasContact: false })?.reason).toBe("MANAGER");
+    expect(certificationPromptFor({ isManager: true, viewer: NONE, teamHasContact: false, battletagRelevant: true })?.reason).toBe("MANAGER");
   });
 
   it("n'invite pas un joueur dont l'équipe a déjà un contact", () => {
-    expect(certificationPromptFor({ isManager: false, viewer: NONE, teamHasContact: true })).toBeNull();
+    expect(certificationPromptFor({ isManager: false, viewer: NONE, teamHasContact: true, battletagRelevant: true })).toBeNull();
   });
 
   it("n'invite personne qui a déjà les deux certifications", () => {
-    expect(certificationPromptFor({ isManager: true, viewer: BOTH, teamHasContact: false })).toBeNull();
-    expect(certificationPromptFor({ isManager: false, viewer: BOTH, teamHasContact: false })).toBeNull();
+    expect(certificationPromptFor({ isManager: true, viewer: BOTH, teamHasContact: false, battletagRelevant: true })).toBeNull();
+    expect(certificationPromptFor({ isManager: false, viewer: BOTH, teamHasContact: false, battletagRelevant: true })).toBeNull();
+  });
+});
+
+describe("Marvel Rivals : Discord seul", () => {
+  it("le BattleTag ne compte qu'en Overwatch", () => {
+    expect(battletagRelevantFor("OW")).toBe(true);
+    expect(battletagRelevantFor("MR")).toBe(false);
+  });
+
+  it("n'invite pas un manager au Discord certifié, BattleTag absent", () => {
+    expect(
+      certificationPromptFor({ isManager: true, viewer: DISCORD_ONLY, teamHasContact: true, battletagRelevant: false }),
+    ).toBeNull();
+  });
+
+  it("invite un manager sans Discord certifié, et le dit à la modale", () => {
+    expect(
+      certificationPromptFor({ isManager: true, viewer: BATTLETAG_ONLY, teamHasContact: true, battletagRelevant: false }),
+    ).toEqual({ reason: "MANAGER", ...BATTLETAG_ONLY, battletagRelevant: false });
+  });
+
+  it("invite le joueur d'une équipe sans contact, sans Discord certifié", () => {
+    expect(
+      certificationPromptFor({ isManager: false, viewer: NONE, teamHasContact: false, battletagRelevant: false })?.reason,
+    ).toBe("TEAM_WITHOUT_CONTACT");
+  });
+});
+
+describe("certificationPromptStep", () => {
+  const ready = { decided: false, hasPrompt: true, frozen: false, allowed: true, otherModalOpen: false };
+
+  it("ouvre une invitation due, sans autre modale", () => {
+    expect(certificationPromptStep(ready)).toBe("OPEN");
+  });
+
+  it("attend la fermeture d'une autre modale", () => {
+    expect(certificationPromptStep({ ...ready, otherModalOpen: true })).toBe("WAIT");
+  });
+
+  it("se décide sans ouvrir après « Ne plus voir » ou une fermeture dans l'onglet", () => {
+    expect(certificationPromptStep({ ...ready, allowed: false })).toBe("SKIP");
+    expect(certificationPromptStep({ ...ready, allowed: false, otherModalOpen: true })).toBe("SKIP");
+  });
+
+  it("ne fait rien une fois décidé, sans invitation ou fiche figée", () => {
+    expect(certificationPromptStep({ ...ready, decided: true })).toBe("IDLE");
+    expect(certificationPromptStep({ ...ready, hasPrompt: false })).toBe("IDLE");
+    expect(certificationPromptStep({ ...ready, frozen: true })).toBe("IDLE");
   });
 });
 

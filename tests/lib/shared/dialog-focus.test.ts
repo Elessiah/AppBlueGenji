@@ -58,6 +58,14 @@ describe("focusTrapTarget", () => {
     expect(focusTrapTarget({ ...inLayer, active: "x" })).toBeNull();
   });
 
+  it("reboucle depuis un titre d'ouverture placé avant le premier focalisable", () => {
+    const onTitle = { ...base, active: "title", beforeStart: true };
+    expect(focusTrapTarget({ ...onTitle, shiftKey: true })).toBe("c");
+    expect(focusTrapTarget({ ...onTitle, shiftKey: true, extra: ["x", "y"] })).toBe("y");
+    // Tab avance dans l'ordre natif, vers le premier focalisable.
+    expect(focusTrapTarget(onTitle)).toBeNull();
+  });
+
   it("ramène dans la modale un focus parti ailleurs", () => {
     const outside = { ...base, active: "z", inModal: false };
     expect(focusTrapTarget(outside)).toBe("a");

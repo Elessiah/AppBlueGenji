@@ -220,7 +220,7 @@ describe("applyLiveMessage — instantané", () => {
   it("conserve l'invitation à certifier au fil des instantanés", () => {
     // Elle tient au roster, que l'instantané diffusé ne porte pas
     // (`CERTIFICATION_PROMPT.md`).
-    const prompt = { reason: "TEAM_WITHOUT_CONTACT", discordVerified: false, battletagVerified: false } as const;
+    const prompt = { reason: "TEAM_WITHOUT_CONTACT", discordVerified: false, battletagVerified: false, battletagRelevant: true } as const;
     const state = connected(INITIAL_LIVE_STATE);
     state.detail!.certificationPrompt = prompt;
 

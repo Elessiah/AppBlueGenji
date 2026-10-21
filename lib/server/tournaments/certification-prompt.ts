@@ -37,6 +37,7 @@ export async function loadCertificationPrompt(
   userId: number,
   teamId: number,
   isManager: boolean,
+  battletagRelevant: boolean,
 ): Promise<CertificationPrompt | null> {
   const [rows] = await executor.execute<RosterIdentityRow[]>(
     `SELECT u.id AS user_id, u.discord_verified_at, u.discord_pseudo, u.blizzard_sub, u.overwatch_battletag
@@ -51,5 +52,6 @@ export async function loadCertificationPrompt(
     isManager,
     viewer: identityOf(viewer),
     teamHasContact: teamHasContact(rows.map(identityOf)),
+    battletagRelevant,
   });
 }

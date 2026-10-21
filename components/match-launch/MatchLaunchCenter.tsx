@@ -14,6 +14,7 @@ import { PRIVACY_POLICY_PATH } from "@/components/privacy/PrivacyChangesModal";
 import { useToast } from "@/components/ui/toast";
 import { useClientPower } from "@/lib/shared/hooks/useClientPower";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
+import { anotherModalOpen } from "@/lib/shared/dialog-focus";
 import { tournamentMatchHref } from "@/lib/shared/match-anchor";
 import {
   launchModalKey,
@@ -26,11 +27,6 @@ import {
 } from "@/lib/shared/match-launch";
 import { PRIVACY_CHANGES_ANSWERED_EVENT } from "@/lib/shared/privacy-changes";
 import styles from "./MatchLaunchCenter.module.css";
-
-/** Une modale (`aria-modal`) est déjà ouverte : l'ouverture d'office attend. */
-export function anotherModalOpen(root: ParentNode = document): boolean {
-  return root.querySelector('[aria-modal="true"]') !== null;
-}
 import { CasterCard, SideCard } from "./LaunchContactCards";
 
 /** Cadences d'interrogation : serrée pendant un lancement, lâche sinon. */

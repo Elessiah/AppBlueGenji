@@ -13,9 +13,14 @@
  * - à tout **joueur** d'une équipe engagée qui n'a aucun contact à présenter,
  *   s'il lui manque l'une des deux.
  *
+ * En Marvel Rivals, le BattleTag (Battle.net, Overwatch) ne sert à rien : seul
+ * le tag Discord est demandé.
+ *
  * Module **pur** : la règle se rejoue sans base, et le client n'y lit que les
  * clés de son « Ne plus voir ».
  */
+
+import type { TournamentGame } from "./types";
 
 /** Pourquoi la fiche invite ce lecteur à certifier. */
 export type CertificationPromptReason = "MANAGER" | "TEAM_WITHOUT_CONTACT";
@@ -25,6 +30,8 @@ export type CertificationPrompt = {
   reason: CertificationPromptReason;
   discordVerified: boolean;
   battletagVerified: boolean;
+  /** `false` en Marvel Rivals : la modale ne parle alors que de Discord. */
+  battletagRelevant: boolean;
 };
 
 /** Ce que la règle lit d'un compte : ses deux certifications. */
@@ -33,23 +40,31 @@ export type CertificationIdentity = {
   battletagVerified: boolean;
 };
 
+/** Le BattleTag compte-t-il pour ce jeu ? Overwatch seulement. */
+export function battletagRelevantFor(game: TournamentGame): boolean {
+  return game === "OW";
+}
+
 /**
  * Invitation due au lecteur, `null` s'il n'y en a pas.
  *
- * Rien pour qui a déjà les deux certifications : il n'a plus de geste à faire.
- * Le motif « manager » passe devant : il vaut quel que soit l'état du roster.
+ * Rien pour qui a déjà ce que le jeu demande (les deux certifications en
+ * Overwatch, Discord en Marvel Rivals) : il n'a plus de geste à faire. Le
+ * motif « manager » passe devant : il vaut quel que soit l'état du roster.
  */
 export function certificationPromptFor(input: {
   isManager: boolean;
   viewer: CertificationIdentity;
   teamHasContact: boolean;
+  battletagRelevant: boolean;
 }): CertificationPrompt | null {
   const { discordVerified, battletagVerified } = input.viewer;
-  if (discordVerified && battletagVerified) return null;
+  const { battletagRelevant } = input;
+  if (discordVerified && (battletagVerified || !battletagRelevant)) return null;
   let reason: CertificationPromptReason | null = null;
   if (input.isManager) reason = "MANAGER";
   else if (!input.teamHasContact) reason = "TEAM_WITHOUT_CONTACT";
-  return reason ? { reason, discordVerified, battletagVerified } : null;
+  return reason ? { reason, discordVerified, battletagVerified, battletagRelevant } : null;
 }
 
 /** Une équipe a-t-elle un contact à présenter ? Au moins un membre certifié d'un côté. */
@@ -107,4 +122,26 @@ export function rememberCertificationPromptClosed(
 ): void {
   writeFlag(session, CERTIFICATION_PROMPT_CLOSED_KEY);
   if (neverAgain) writeFlag(local, CERTIFICATION_PROMPT_OFF_KEY);
+}
+
+/**
+ * Où en est l'ouverture d'office, à chaque relecture :
+ * - `IDLE` : rien à faire (déjà décidé, pas d'invitation, fiche figée) ;
+ * - `SKIP` : « Ne plus voir » ou déjà fermée dans l'onglet — décidé, sans ouvrir ;
+ * - `WAIT` : une autre modale est ouverte — deux pièges à focus se
+ *   disputeraient Tab et Échap, l'invitation attend sa fermeture ;
+ * - `OPEN` : ouvrir.
+ */
+export type CertificationPromptStep = "IDLE" | "SKIP" | "WAIT" | "OPEN";
+
+export function certificationPromptStep(input: {
+  decided: boolean;
+  hasPrompt: boolean;
+  frozen: boolean;
+  allowed: boolean;
+  otherModalOpen: boolean;
+}): CertificationPromptStep {
+  if (input.decided || !input.hasPrompt || input.frozen) return "IDLE";
+  if (!input.allowed) return "SKIP";
+  return input.otherModalOpen ? "WAIT" : "OPEN";
 }

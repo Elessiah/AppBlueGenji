@@ -29,10 +29,18 @@ export function CertificationPromptDialog({ prompt, onClose }: Readonly<Certific
   const [neverAgain, setNeverAgain] = useState(false);
   const close = () => onClose(neverAgain);
 
+  // Marvel Rivals : le BattleTag ne sert à rien, la modale ne parle que de Discord.
+  const withBattletag = prompt.battletagRelevant;
   const status = [
     { key: "discord", label: t("certification.discord"), ok: prompt.discordVerified },
-    { key: "battletag", label: t("certification.battletag"), ok: prompt.battletagVerified },
+    ...(withBattletag
+      ? [{ key: "battletag", label: t("certification.battletag"), ok: prompt.battletagVerified }]
+      : []),
   ];
+  let lead = t("certification.leadManager");
+  if (prompt.reason === "TEAM_WITHOUT_CONTACT") {
+    lead = t(withBattletag ? "certification.leadTeam" : "certification.leadTeamDiscordOnly");
+  }
 
   return (
     <TournamentDialogFrame
@@ -47,10 +55,10 @@ export function CertificationPromptDialog({ prompt, onClose }: Readonly<Certific
       {/* Focus d'ouverture sur le titre : la modale se lit avant d'agir, et ses
           contrôles, tout en bas, l'ouvriraient défilée sur un petit écran. */}
       <h3 id="certification-prompt-title" className={s.title} tabIndex={-1} data-autofocus>
-        {t("certification.title")}
+        {t(withBattletag ? "certification.title" : "certification.titleDiscordOnly")}
       </h3>
       <p id="certification-prompt-lead" className={s.lead}>
-        {t(prompt.reason === "MANAGER" ? "certification.leadManager" : "certification.leadTeam")}
+        {lead}
       </p>
 
       <ul className={s.status} aria-label={t("certification.statusLabel")}>
@@ -80,7 +88,9 @@ export function CertificationPromptDialog({ prompt, onClose }: Readonly<Certific
             <tr key={row}>
               <th scope="row">{t(`certification.rows.${row}.topic`)}</th>
               <td className={s.does} data-label={t("certification.colDoes")}>
-                {t(`certification.rows.${row}.does`)}
+                {row === "identity" && !withBattletag
+                  ? t("certification.rows.identity.doesDiscordOnly")
+                  : t(`certification.rows.${row}.does`)}
               </td>
               <td className={s.doesNot} data-label={t("certification.colDoesNot")}>
                 {t(`certification.rows.${row}.doesNot`)}

@@ -86,8 +86,7 @@ export function useDialogBehavior({ open, onClose, locked = false }: DialogBehav
     // contrôle, tout en bas, la ferait s'ouvrir défilée sur un petit écran.
     const preferred =
       candidates.find((el) => el.dataset.autofocus !== undefined) ??
-      containerRef.current?.querySelector<HTMLElement>('[data-autofocus][tabindex="-1"]') ??
-      undefined;
+      containerRef.current?.querySelector<HTMLElement>('[data-autofocus][tabindex="-1"]');
     // Un bouton « × » d'en-tête (`data-dialog-close`) vient en tête du DOM pour
     // rester collé en haut du panneau : il n'est pas ce qu'on vient faire dans
     // la modale, le focus d'ouverture va au premier contrôle qui suit.
@@ -132,7 +131,22 @@ export function useDialogBehavior({ open, onClose, locked = false }: DialogBehav
       const inModal = containerRef.current?.contains(active as Node) ?? false;
       const inLayer = !inModal && extra.length > 0 && layers.some((layer) => layer.contains(active as Node));
 
-      const next = focusTrapTarget({ items, extra, active, inModal, inLayer, shiftKey: event.shiftKey });
+      // Focus sur un titre d'ouverture (`tabIndex={-1}`), hors des focalisables
+      // mais avant le premier : `Maj+Tab` doit reboucler, pas sortir.
+      const beforeStart =
+        inModal &&
+        active instanceof Node &&
+        !items.includes(active as HTMLElement) &&
+        (active.compareDocumentPosition(items[0]) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+      const next = focusTrapTarget({
+        items,
+        extra,
+        active,
+        inModal,
+        inLayer,
+        beforeStart,
+        shiftKey: event.shiftKey,
+      });
       if (next) {
         event.preventDefault();
         next.focus();
