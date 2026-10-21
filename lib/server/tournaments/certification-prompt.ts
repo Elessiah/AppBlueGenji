@@ -78,9 +78,10 @@ export async function loadCertificationPrompt(
   // est seul en cause — jamais l'alerte d'une équipe sans aucun contact. Lu
   // dans ce seul cas : la plupart des lecteurs n'en ont pas.
   if (prompt === null) return null;
-  // Statut réel du BattleTag (pas la variante d'affichage d'un BattleTag
-  // inactionnable) : les déclarations promettent « seul Discord manque ».
-  const onlyDiscordMissing = !prompt.discordVerified && (own.battletagVerified || !battletagRelevant);
+  // Variante affichée : un BattleTag inactionnable (Battle.net rattaché sans
+  // BattleTag) n'y figure pas, la modale ne parle que de Discord — celle-là
+  // même que ce refus a écartée.
+  const onlyDiscordMissing = !prompt.discordVerified && (prompt.battletagVerified || !prompt.battletagRelevant);
   if (teamReachable && onlyDiscordMissing && (await certificationNudgesDeclined(executor, userId))) {
     return null;
   }

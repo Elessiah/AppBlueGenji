@@ -93,7 +93,8 @@ Le « Ne plus voir » donné à la **proposition de certification de la
 connexion** (`DISCORD_CERTIFY_PROMPT.md`, `bg_users.discord_certify_prompt_dismissed_at`,
 gardé sur le compte) vaut aussi ici, sur tous les appareils, pour l'invitation
 faite au **meneur** et **quand Discord est seul à manquer** (un BattleTag à
-vérifier n'était pas l'objet de ce refus) — jamais quand l'équipe n'a aucun
+vérifier n'était pas l'objet de ce refus ; un BattleTag inactionnable, absent de
+la variante « Discord seul », ne compte pas) — jamais quand l'équipe n'a aucun
 contact, meneur compris : lu seulement dans ce cas (`loadCertificationPrompt`), colonne absente
 = sans choix. L'inverse n'est pas vrai : la case de cette modale reste une
 préférence d'affichage du navigateur.

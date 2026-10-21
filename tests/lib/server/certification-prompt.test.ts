@@ -125,12 +125,12 @@ describe("loadCertificationPrompt", () => {
     expect(await loadCertificationPrompt(mr, 7, 42, true, false)).toBeNull();
   });
 
-  it("ce refus ne tait pas l'invitation d'un BattleTag inactionnable non plus (statut réel)", async () => {
+  it("ce refus tait aussi l'invitation « Discord seul » d'un BattleTag inactionnable", async () => {
     const { executor } = rosterOf(
       [{ user_id: 7, ...BARE, blizzard_sub: "sub", overwatch_battletag: null }, { user_id: 8, ...BARE, ...DISCORD }],
       1,
     );
-    expect((await loadCertificationPrompt(executor, 7, 42, true, true))?.reason).toBe("MANAGER");
+    expect(await loadCertificationPrompt(executor, 7, 42, true, true)).toBeNull();
   });
 
   it("ce refus ne tait pas une invitation qui porte aussi sur le BattleTag", async () => {
