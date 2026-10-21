@@ -265,7 +265,14 @@ describe("marches du podium — outils du staff et comptes supprimés", () => {
  * Lien de l'équipe active de la fiche joueur, lu par le compilateur TypeScript
  * (indépendant de l'ordre des props) : ses attributs.
  */
+let activeTeamLinkCache: { attributes: Record<string, string> } | undefined;
+
 function activeTeamLink(): { attributes: Record<string, string> } {
+  activeTeamLinkCache ??= parseActiveTeamLink();
+  return activeTeamLinkCache;
+}
+
+function parseActiveTeamLink(): { attributes: Record<string, string> } {
   const path = "app/(secured)/joueurs/[id]/page.tsx";
   const file = ts.createSourceFile(path, readSource(path), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const attributesOf = (opening: ts.JsxOpeningLikeElement) =>
