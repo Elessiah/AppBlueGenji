@@ -158,8 +158,9 @@ plus effacer le nom.
   n'en pose aucune (lien-avatar sans texte).
 - Un lien habillé en pastille (`.badge`, `.pill`, `.cy-tag`) éteint sa
   marche, repère conservé (`PODIUM_TIERS.md`).
-- `truncate` tronque le nom d'une ellipse (`.entity-truncate`) — jamais une
-  classe de l'appelant : peint d'une marche, le nom rogne sur lui-même.
+- `truncate` tronque le nom d'une ellipse — `true` sur une ligne
+  (`.entity-truncate`), `2` à deux lignes (`.entity-clamp-2`) —, jamais une
+  classe de l'appelant : peint d'une marche, le nom se coupe lui-même.
 - Un engagé **solo** porte la marche adoucie de son joueur, jamais celle
   d'une équipe (une entrée solo n'est jamais classée).
 - `PodiumTiersOff` : écrans d'administration sobres.

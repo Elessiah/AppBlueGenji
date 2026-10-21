@@ -82,8 +82,8 @@ Exceptions :
   fort que les autres.
 - **Lien en pastille** (l'équipe active de la fiche joueur) : sous la lueur,
   le fond teinté de la pastille ferait tomber les marches sous 4,5:1. `.badge`,
-  `.pill` et `.cy-tag` l'éteignent d'office (`:is(.badge, .pill, .cy-tag) >
-  .podium-tier`), comme une ligne en retrait (repère conservé), le nom prenant
+  `.pill` et `.cy-tag` l'éteignent d'office, sur le lien ou autour de lui
+  (`:is(.badge, .pill, .cy-tag) .podium-tier`), comme une ligne en retrait (repère conservé), le nom prenant
   au repos la couleur de la pastille (survol et focus : couleur pleine, comme
   tout lien d'entité). Une nouvelle surface teintée s'ajoute à cette liste,
   reprise à l'identique par la règle de graisse. Compte supprimé : `podiumTier` à `null` sur la fiche, comme son
@@ -123,9 +123,11 @@ seulement devenir **nettement visible** et suivre l'équipe partout.
   Graisse : `EntityLink` pose sur le lien (ou le nom de spectateur) le repère
   `data-podium` (famille de la marche) ; la feuille y met les 700
   (`:where(.entity-link, .entity-name):where(:not([data-podium-muted],
-  [data-podium-muted] *))[data-podium="podium-tier"]`, spécificité d'une
-  classe) et le nom peint en hérite — la graisse de l'appelant (classe, style
-  en ligne) l'emporte comme avant ; éteinte, la marche n'en impose aucune.
+  [data-podium-muted] *, :is(.badge, .pill, .cy-tag), :is(.badge, .pill,
+  .cy-tag) *))[data-podium="podium-tier"]`, spécificité d'une classe) et le
+  nom peint en hérite — la graisse de l'appelant (classe, style en ligne)
+  l'emporte comme avant ; éteinte (ligne en retrait, pastille), la marche n'en
+  impose aucune.
   Aucun `:has()`. Balisage du nom peint : `PodiumPaint`
   (`components/podium-tiers.tsx`), partagé avec `TeamPodiumName` et
   `PlayerPodiumName`.
@@ -149,10 +151,9 @@ seulement devenir **nettement visible** et suivre l'équipe partout.
   `EntrantName` `truncate`, pseudo des membres d'une fiche d'équipe). Peint
   d'une marche, c'est le `<span>` peint qui rogne et pose l'ellipse, le lien le
   laisse déborder — sa lueur n'est pas coupée et l'ellipse garde le dégradé.
-  Un lien d'entité ne se tronque jamais par une classe de l'appelant — seule
-  exception, le classement de l'accueil (deux lignes, `line-clamp`) : sa règle
-  (`Leaderboard.module.css`) passe de même au nom peint quand le lien porte
-  `data-podium="podium-tier"`.
+  Deux lignes : `truncate={2}` (`.entity-clamp-2`, même partage ; classement
+  de l'accueil). Un lien d'entité ne se tronque jamais par une classe de
+  l'appelant.
 - Contraste renforcé : lueur effacée. Couleurs forcées : fond retiré, couleur
   du système. Impression : couleur pleine `--blue-500`, repère masqué.
 
