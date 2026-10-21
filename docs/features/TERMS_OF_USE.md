@@ -125,7 +125,7 @@ la mise en page, elle garde le texte d'une première acceptation.
 | 3 | 1er octobre 2026 | Suspension d'un compte, voies de recours, base légale de la modération, absence de médiateur. |
 | 4 | 14 octobre 2026 | Annonce #live d'un tournoi individuel : le pseudo public du joueur y figure au titre de l'exécution du service (pas de nom neutre ; ne pas y être nommé = ne pas s'inscrire). Date d'entrée en vigueur fixée par l'association (décision du 2026-10-14), non le lendemain de la mise en ligne. |
 | 5 | 19 octobre 2026 | Section « Contacts de match » : contacts (BattleTag même masqué compris) communiqués aux deux équipes et aux arbitres d'un match, et à son caster le temps du match, par la fenêtre « Contacts » du match (détail ci-dessous). Redemandée comme la version 4 (connexion, gestion d'équipe). |
-| 6 | 19 octobre 2026 | « Acceptation » : **tout compte connecté** les accepte dans une fenêtre bloquante pour continuer à utiliser le site (plus de report « Plus tard ») ; « Contacts de match » : le BattleTag masqué se lit aussi dans la fenêtre de lancement. La version 5, déjà en ligne, n'est pas réécrite : nouvelle version et nouvelle entrée `PRIVACY_CHANGES` (`2026-10-conditions-v6-acceptation-pour-tous`). |
+| 6 | 19 octobre 2026 | « Acceptation » : **tout compte connecté** les accepte dans une fenêtre bloquante pour continuer à utiliser le site (plus de report « Plus tard ») ; « Contacts de match » : le BattleTag masqué se lit aussi dans la fenêtre de lancement. La version 5, déjà en ligne, n'est pas réécrite : nouvelle version et nouvelle entrée `PRIVACY_CHANGES` (`2026-10-conditions-v6-acceptation-pour-tous`). Retouchée le 21 octobre 2026 sans nouvelle version : contacts du caster aux arbitres dès que les deux adversaires sont connus (entrée `2026-10-contacts-du-caster-aux-arbitres`). |
 
 **Redemander, et le dire** : à la connexion, la modale d'entrée de `/connexion`
 revient dès que la version gardée par le navigateur (`bg_terms_consent`) n'est
@@ -154,8 +154,7 @@ refaire à chaque version qui change une règle de fond pour tous les comptes.
 et rôle d'équipe communiqués aux deux équipes d'un match et à ses arbitres
 (permission `tournaments`, administrateurs compris) dès que ses adversaires
 sont connus, et à son caster le temps du match seulement (ceux du caster aux
-équipes sur ce même temps ; aux arbitres, depuis le 2026-10-21, dès que les
-adversaires sont connus), par la fenêtre « Contacts » du match et par sa
+équipes sur ce même temps — voir la retouche du 2026-10-21 plus bas), par la fenêtre « Contacts » du match et par sa
 fenêtre de lancement, qui la reprend au départ du match (précision de la
 version 6) — un
 BattleTag masqué n'est lisible nulle part ailleurs, arbitres et administrateurs
