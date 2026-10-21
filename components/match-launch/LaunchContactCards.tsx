@@ -214,10 +214,9 @@ function SideContacts({
  * l'état précédent gardé au rendu ; l'annonce se vide d'elle-même après
  * `CASTER_ARRIVAL_ANNOUNCE_MS`.
  */
-function useCasterArrival(caster: LaunchCaster | null, pending: boolean, enabled: boolean): CasterArrival {
-  const [seen, setSeen] = useState<CasterArrivalSeen>({ pending, casterId: caster?.userId ?? null, arrival: null });
-  // Sans annonce (modale de lancement), rien à suivre : aucun rendu de plus.
-  const next = enabled ? nextCasterArrival(seen, caster, pending) : null;
+function useCasterArrival(caster: LaunchCaster, pending: boolean): CasterArrival {
+  const [seen, setSeen] = useState<CasterArrivalSeen>({ pending, casterId: caster.userId, arrival: null });
+  const next = nextCasterArrival(seen, caster, pending);
   if (next) setSeen(next);
   useEffect(() => {
     if (seen.arrival === null) return;
@@ -225,6 +224,25 @@ function useCasterArrival(caster: LaunchCaster | null, pending: boolean, enabled
     return () => clearTimeout(timer);
   }, [seen.arrival]);
   return seen.arrival;
+}
+
+/**
+ * Statut hors flux de l'arrivée des contacts du caster, présent dès
+ * l'ouverture là où il peut parler : une phrase plutôt que les boutons
+ * « Copier » — ou, sans contact, celle qui le dit. Pas un toast : rien n'a été
+ * demandé ni n'a réussi, le contenu de la fiche change sous les yeux — une
+ * région polie pour lecteur d'écran seulement, invisible à l'écran (la règle
+ * des toasts vise les retours d'un geste). Composant à part : la modale de
+ * lancement, relue à chaque interrogation, ne porte ni son état ni sa minuterie.
+ */
+function CasterArrivalStatus({ caster, pending }: Readonly<{ caster: LaunchCaster; pending: boolean }>) {
+  const { t } = useLaunchText();
+  const arrival = useCasterArrival(caster, pending);
+  return (
+    <output className="sr-only" aria-live="polite">
+      {arrival && t(arrival === "SHOWN" ? "contacts.casterShown" : "contacts.casterShownEmpty")}
+    </output>
+  );
 }
 
 export function CasterCard({
@@ -263,7 +281,6 @@ export function CasterCard({
 }>) {
   const { t } = useLaunchText();
   const pending = casterContactsPending({ caster, viewer });
-  const arrival = useCasterArrival(caster, pending, announceArrival);
   const self = viewerIsCaster({ viewer });
   if (!caster) {
     return (
@@ -299,17 +316,7 @@ export function CasterCard({
       {/* Contacts tus : une note plutôt que deux « — » qui laisseraient croire
           qu'il n'en a pas — jamais au caster lui-même, dont elle parle. */}
       {pending && <p className={styles.note}>{laterText ?? t("casterContactsAtLaunch")}</p>}
-      {/* Statut hors flux, présent dès l'ouverture là où il peut parler : une
-          phrase plutôt que les boutons « Copier » — ou, sans contact, celle qui
-          le dit. Pas un toast : rien n'a été demandé ni n'a réussi, le contenu
-          de la fiche change sous les yeux — une région polie pour lecteur
-          d'écran seulement, invisible à l'écran (la règle des toasts vise les
-          retours d'un geste). */}
-      {announceArrival && (
-        <output className="sr-only" aria-live="polite">
-          {arrival && t(arrival === "SHOWN" ? "contacts.casterShown" : "contacts.casterShownEmpty")}
-        </output>
-      )}
+      {announceArrival && <CasterArrivalStatus caster={caster} pending={pending} />}
     </section>
   );
 }
