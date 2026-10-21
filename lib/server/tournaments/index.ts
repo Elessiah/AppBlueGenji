@@ -1080,9 +1080,11 @@ export async function getTournamentViewerContext(
   // (`readCertificationPrompt`). La case « Ne plus voir » de la modale vit dans le navigateur ;
   // celui de la proposition de la connexion, gardé sur le compte, est lu ici
   // (`loadCertificationPrompt`).
-  // Lancée dès que l'engagement est connu, attendue en fin de contexte : elle
-  // ne dépend d'aucune des lectures suivantes (et ne rejette jamais).
-  const certificationPromptRead: Promise<CertificationPrompt | null> =
+  // Lancée en dernier, seule : le contexte ne tient jamais deux places du
+  // pool à la fois (une vague de reconnexions en demanderait le double). Une
+  // lecture gardée ne coûte rien ; manquée, une requête indexée par minute.
+  // Fonction, pour ne partir qu'au moment voulu ; elle ne rejette jamais.
+  const certificationPromptRead = (): Promise<CertificationPrompt | null> =>
     !isSolo && activeTeam && alreadyRegistered && snapshot.card.state !== "FINISHED"
       ? readCertificationPrompt(
           userId,
@@ -1141,7 +1143,7 @@ export async function getTournamentViewerContext(
       ? []
       : await withConnection((connection) => loadViewerProposals(connection, snapshot.matches, proposalScope));
 
-  const certificationPrompt = await certificationPromptRead;
+  const certificationPrompt = await certificationPromptRead();
 
   return {
     preview,
