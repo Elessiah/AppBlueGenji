@@ -73,9 +73,10 @@ La modale dit pourquoi elle s'ouvre, où en est le lecteur (pastilles
 « Certifié » / « À certifier »), puis un **tableau « Ce que ça fait / Ce que ça
 ne fait pas »** — chaque promesse a sa limite en face, sur la même ligne
 (identité, matchs, organisation, ensuite). Le bouton principal
-(`certificationProfileHref`) mène à la section **« Discord »** du profil
-(`/profil#discord`, « Certifier mon tag », `DISCORD_VERIFICATION.md`) tant que
-le tag Discord manque, sinon à **« Applications connectées »**
+(`certificationProfileHref`) ouvre d'emblée le **dialogue de certification**
+Discord du profil (`CERTIFY_PROFILE_HREF`, `/profil?certifier=discord`, le lien
+de la proposition de la connexion — `DISCORD_CERTIFY_PROMPT.md`) tant que le
+tag Discord manque, sinon mène à **« Applications connectées »**
 (`/profil#connexions`), où Battle.net se rattache.
 
 Le tableau ne promet que ce que les règles tiennent : visibilité du tag

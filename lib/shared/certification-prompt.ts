@@ -21,6 +21,7 @@
  * clés de son « Ne plus voir ».
  */
 
+import { CERTIFY_PROFILE_HREF } from "./discord-certify-prompt";
 import type { TournamentDetail, TournamentGame } from "./types";
 
 /** Pourquoi la fiche invite ce lecteur à certifier. */
@@ -78,13 +79,14 @@ export function teamHasContact(members: readonly CertificationIdentity[], battle
 }
 
 /**
- * Où certifier. Le tag Discord se certifie dans la section « Discord » de
- * `/profil` (« Certifier mon tag ») ; le BattleTag se vérifie en rattachant
- * Battle.net dans « Applications connectées ». Discord manquant passe devant :
- * c'est par lui que l'organisation joint un joueur.
+ * Où certifier. Le tag Discord : le lien de la proposition de la connexion
+ * (`CERTIFY_PROFILE_HREF`, `DISCORD_CERTIFY_PROMPT.md`), qui ouvre d'emblée le
+ * dialogue de certification de `/profil` ; le BattleTag se vérifie en
+ * rattachant Battle.net dans « Applications connectées ». Discord manquant
+ * passe devant : c'est par lui que l'organisation joint un joueur.
  */
 export function certificationProfileHref(prompt: Pick<CertificationPrompt, "discordVerified">): string {
-  return prompt.discordVerified ? "/profil#connexions" : "/profil#discord";
+  return prompt.discordVerified ? "/profil#connexions" : CERTIFY_PROFILE_HREF;
 }
 
 /**

@@ -159,8 +159,8 @@ describe("« Ne plus voir » et fermeture", () => {
   });
 });
 
-it("mène à la section « Discord » si le tag manque, sinon à « Applications connectées »", () => {
-  expect(certificationProfileHref({ discordVerified: false })).toBe("/profil#discord");
+it("mène au dialogue de certification Discord si le tag manque, sinon à « Applications connectées »", () => {
+  expect(certificationProfileHref({ discordVerified: false })).toBe("/profil?certifier=discord");
   expect(certificationProfileHref({ discordVerified: true })).toBe("/profil#connexions");
 });
 

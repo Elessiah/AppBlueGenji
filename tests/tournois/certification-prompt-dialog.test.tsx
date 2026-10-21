@@ -102,7 +102,7 @@ describe("CertificationPromptDialog", () => {
     const html = render(MR_TEAM);
     expect(html).toContain("Certifie ton Discord<");
     expect(html).toContain("personne n&#x27;y a certifié son tag Discord.");
-    expect(html).toContain('href="/profil#discord"');
+    expect(html).toContain('href="/profil?certifier=discord"');
     expect(html).not.toContain("Blizzard le confirment");
     expect(html).not.toContain("Battle.net");
     expect(html).not.toContain("BattleTag y est montré");

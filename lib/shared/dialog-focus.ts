@@ -135,6 +135,10 @@ const MODAL_OBSERVATION: MutationObserverInit = {
  * Renvoie l'arrêt.
  */
 export function watchModals(condition: () => boolean, onMet: () => void, root: Node = document.body): () => void {
+  if (condition()) {
+    onMet();
+    return () => undefined;
+  }
   let timer: ReturnType<typeof setTimeout> | null = null;
   let stopped = false;
   const stop = () => {
@@ -151,10 +155,6 @@ export function watchModals(condition: () => boolean, onMet: () => void, root: N
   const observer = new MutationObserver(() => {
     timer ??= setTimeout(check, WATCH_THROTTLE_MS);
   });
-  if (condition()) {
-    onMet();
-    return () => undefined;
-  }
   observer.observe(root, MODAL_OBSERVATION);
   return stop;
 }

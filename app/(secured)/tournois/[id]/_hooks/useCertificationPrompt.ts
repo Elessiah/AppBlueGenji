@@ -50,26 +50,23 @@ export function useCertificationPrompt(
   const [open, setOpen] = useState(false);
   const [neverAgain, setNeverAgain] = useState(false);
   const decided = useRef(false);
-  // Effacée devant une modale urgente : plus rien sur cette page, même si
-  // l'invitation est retirée puis revient.
-  const yielded = useRef(false);
-  // Fermée par le lecteur : plus rien sur cette page, stockage bloqué compris
-  // (le drapeau d'onglet peut ne pas s'écrire).
-  const closed = useRef(false);
+  // Fermée par le lecteur, ou effacée devant une modale urgente : plus rien
+  // sur cette page, même retirée puis revenue, stockage bloqué compris (le
+  // drapeau d'onglet peut ne pas s'écrire).
+  const doneForPage = useRef(false);
 
   // La fiche est réutilisée d'un tournoi à l'autre (lien, Précédent) : « cette
   // page » change avec le tournoi, et la mémoire de la page repart de zéro —
   // avant la décision, déclarée après.
   useEffect(() => {
     decided.current = false;
-    yielded.current = false;
-    closed.current = false;
+    doneForPage.current = false;
     setOpen(false);
     setNeverAgain(false);
   }, [tournamentId]);
 
   useEffect(() => {
-    if (decided.current || yielded.current || closed.current || prompt == null || frozen) return;
+    if (decided.current || doneForPage.current || prompt == null || frozen) return;
     decided.current = true;
     // Ni « Ne plus voir », ni déjà fermée dans l'onglet, ni une autre modale
     // déjà ouverte — l'attendre la ferait surgir au départ d'un match, sur le
@@ -80,7 +77,7 @@ export function useCertificationPrompt(
 
   const close = useCallback(() => {
     rememberCertificationPromptClosed(browserStorage("localStorage"), browserStorage("sessionStorage"), neverAgain);
-    closed.current = true;
+    doneForPage.current = true;
     setOpen(false);
   }, [neverAgain]);
 
@@ -92,7 +89,7 @@ export function useCertificationPrompt(
   // drapeau d'onglet d'une fermeture.
   const yieldPlace = useCallback(() => {
     if (neverAgain) rememberCertificationPromptClosed(browserStorage("localStorage"), null, true);
-    yielded.current = true;
+    doneForPage.current = true;
     setOpen(false);
   }, [neverAgain]);
 
