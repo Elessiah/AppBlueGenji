@@ -12,12 +12,12 @@ import {
 } from "@/lib/server/privacy-consent";
 import { PRIVACY_CHANGES, type PrivacyAudience } from "@/lib/shared/privacy-changes";
 import { PLATFORM_ROLES, can } from "@/lib/shared/permissions";
-import { fakePool } from "../../helpers/sql-double";
+import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 const flat = (sql: unknown) => String(sql).replace(/\s+/g, " ").trim();
 
 function mockExecute(result: unknown[]) {
-  const execute = jest.fn(async () => [result]);
+  const execute = jest.fn<SqlQuery>(async () => [result]);
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   return execute;
 }
@@ -48,7 +48,7 @@ describe("loadPendingPrivacyChanges", () => {
     const execute = mockExecute([{ created_at: "2025-01-01 10:00:00", google_linked: 1, live_staff: 1, change_id: null }]);
     const pending = await loadPendingPrivacyChanges(7);
     expect(execute).toHaveBeenCalledTimes(1);
-    const [sql, params] = execute.mock.calls[0] as unknown as [string, unknown[]];
+    const [sql, params] = execute.mock.calls[0];
     expect(flat(sql)).toContain("LEFT JOIN bg_privacy_acknowledgments");
     expect(flat(sql)).toContain("u.is_deleted = 0");
     expect(params).toEqual([7]);
@@ -67,7 +67,7 @@ describe("loadPendingPrivacyChanges", () => {
   it("tait une entrée ciblée Google à un compte qui n'est pas relié à Google", async () => {
     const execute = mockExecute([{ created_at: "2025-01-01 10:00:00", google_linked: 0, live_staff: 1, change_id: null }]);
     const pending = await loadPendingPrivacyChanges(7);
-    const [sql] = execute.mock.calls[0] as unknown as [string];
+    const [sql] = execute.mock.calls[0];
     expect(flat(sql)).toContain("u.google_sub IS NOT NULL AS google_linked");
     const targeted = PRIVACY_CHANGES.filter((c) => c.audience === "GOOGLE_LINKED").map((c) => c.id);
     expect(targeted.length).toBeGreaterThan(0);
@@ -80,7 +80,7 @@ describe("loadPendingPrivacyChanges", () => {
     expect(targeted).toContain("2026-10-contacts-du-caster-aux-arbitres");
     const execute = mockExecute([{ created_at: "2025-01-01 10:00:00", google_linked: 1, live_staff: 0, change_id: null }]);
     const pending = await loadPendingPrivacyChanges(7);
-    const [sql] = execute.mock.calls[0] as unknown as [string];
+    const [sql] = execute.mock.calls[0];
     // La même expression que l'annonce Discord : modale et message visent les mêmes comptes.
     expect(flat(sql)).toContain(`${LIVE_STAFF_SQL} AS live_staff`);
     for (const id of targeted) expect(pending.map((c) => c.id)).not.toContain(id);
@@ -112,7 +112,7 @@ describe("acknowledgePrivacyChanges", () => {
   it("insère une ligne par changement, sans doublon et sur un compte vivant", async () => {
     const execute = mockExecute([]);
     await acknowledgePrivacyChanges(7, ["a", "b"]);
-    const [sql, params] = execute.mock.calls[0] as unknown as [string, unknown[]];
+    const [sql, params] = execute.mock.calls[0];
     expect(flat(sql)).toMatch(/^INSERT IGNORE INTO bg_privacy_acknowledgments/);
     expect(flat(sql)).toContain("SELECT ? AS change_id UNION ALL SELECT ? AS change_id");
     expect(flat(sql)).toContain("u.is_deleted = 0");

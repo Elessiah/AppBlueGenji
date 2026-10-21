@@ -21,6 +21,7 @@ import {
   MATCH_LAUNCH_OPEN_EVENT,
   nextLaunchMatchId,
   MATCH_LAUNCH_REFRESH_EVENT,
+  matchUnderway,
   readyCount,
   type MatchLaunchInfo,
 } from "@/lib/shared/match-launch";
@@ -300,7 +301,7 @@ export function MatchLaunchCenter({
     (element ?? dialogRef.current)?.focus();
   });
 
-  const pending = launches.filter((info) => info.phase === "LOBBY" || info.phase === "LAUNCHED");
+  const pending = launches.filter((info) => matchUnderway(info.phase));
 
   if (!current) {
     if (waiting || pending.length === 0) return null;
