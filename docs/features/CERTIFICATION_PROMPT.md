@@ -129,8 +129,10 @@ donnée sur une personne, déposées à la demande du lecteur.
   `getTournamentViewerContext` — **porte commune** du flux SSE et de la lecture
   REST de secours — seulement pour une équipe engagée dans un tournoi non clos :
   une requête indexée, gardée une minute par lecteur
-  (`CERTIFICATION_PROMPT_TTL_MS`, mémoire bornée) : le contexte se relit à
-  chaque lecture REST (geste, proposition de score, repli du flux). La case
+  (`cachedCertificationPrompt`, `CERTIFICATION_PROMPT_TTL_MS`, mémoire bornée,
+  lecture en cours partagée, échec retenu dix secondes) : le contexte se relit
+  à chaque lecture REST (geste, proposition de score, repli du flux). Une
+  certification faite entre-temps se voit au plus une minute plus tard. La case
   « Ne plus voir » de la modale vit dans le navigateur ; le serveur ne lit que
   celui de la proposition de la connexion (compte, § « Ne plus voir »). Une
   lecture en échec

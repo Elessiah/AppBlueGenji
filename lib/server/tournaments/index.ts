@@ -201,11 +201,7 @@ import {
   type DisputeBeforeResolution,
 } from "./dispute-self-resolution";
 import { loadViewerCastBlock } from "./match-launch";
-import {
-  loadCertificationPrompt,
-  recentCertificationPrompt,
-  rememberCertificationPrompt,
-} from "./certification-prompt";
+import { cachedCertificationPrompt, loadCertificationPrompt } from "./certification-prompt";
 import { battletagRelevantFor, type CertificationPrompt } from "@/lib/shared/certification-prompt";
 
 let pendingSync: Promise<void> | null = null;
@@ -1021,18 +1017,9 @@ async function readCertificationPrompt(
   battletagRelevant: boolean,
 ): Promise<CertificationPrompt | null> {
   const key = `${userId}:${teamId}:${isManager ? 1 : 0}:${battletagRelevant ? 1 : 0}`;
-  const hit = recentCertificationPrompt(key, Date.now());
-  if (hit !== undefined) return hit;
-  try {
-    const prompt = await withConnection((connection) =>
-      loadCertificationPrompt(connection, userId, teamId, isManager, battletagRelevant),
-    );
-    rememberCertificationPrompt(key, prompt ?? null, Date.now());
-    return prompt;
-  } catch (error) {
-    console.error("[tournaments] invitation à certifier indisponible :", error);
-    return null;
-  }
+  return cachedCertificationPrompt(key, () =>
+    withConnection((connection) => loadCertificationPrompt(connection, userId, teamId, isManager, battletagRelevant)),
+  );
 }
 
 /**

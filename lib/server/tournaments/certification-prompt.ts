@@ -6,7 +6,6 @@
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { isUnknownColumnError } from "@/lib/server/mysql-errors";
-import { parseRoles } from "@/lib/server/serialization";
 import {
   certificationPromptFor,
   teamHasContact,
@@ -57,7 +56,8 @@ export async function loadCertificationPrompt(
   battletagRelevant: boolean,
 ): Promise<CertificationPrompt | null> {
   const rosters = await loadRosters(executor, new Set([teamId]));
-  const members = (rosters.get(teamId) ?? []).map((row) => toCandidate({ ...row, roles: parseRoles(row.roles_json) }));
+  // Les rôles ne comptent pas ici (seules les certifications) : pas de lecture du JSON.
+  const members = (rosters.get(teamId) ?? []).map((row) => toCandidate({ ...row, roles: [] }));
   const viewer = members.find((member) => member.userId === userId);
   if (!viewer) return null;
   // Battle.net rattaché sans BattleTag enregistré : rien à faire depuis le
@@ -90,29 +90,46 @@ export async function loadCertificationPrompt(
  * rôle, jeu). Le contexte du lecteur se relit à chaque lecture REST de la
  * fiche ; sans elle, chaque geste d'un meneur un soir de match coûterait une
  * place du pool et une ou deux requêtes. Une certification faite entre-temps
- * se voit au plus une minute plus tard. Bornée, échecs jamais retenus.
+ * se voit au plus une minute plus tard. Bornée ; la lecture **en cours** est
+ * partagée (une vague de reconnexions ne vaut qu'une requête par lecteur) ; un
+ * échec est retenu dix secondes, sans quoi chaque lecture le retenterait
+ * pendant la panne même.
  */
 export const CERTIFICATION_PROMPT_TTL_MS = 60_000;
+export const CERTIFICATION_PROMPT_FAILURE_TTL_MS = 10_000;
 const CERTIFICATION_PROMPT_CACHE_MAX = 2_000;
-const recentPrompts = new Map<string, { prompt: CertificationPrompt | null; expiresAt: number }>();
+const recentPrompts = new Map<string, { value: Promise<CertificationPrompt | null>; expiresAt: number }>();
 
-/** Invitation encore fraîche pour `key` ; `undefined` s'il faut la relire. */
-export function recentCertificationPrompt(key: string, now: number): CertificationPrompt | null | undefined {
+/**
+ * Invitation de `key`, lue par `load` au plus une fois par fenêtre (une minute,
+ * dix secondes après un échec, qui rend `null`), et au plus une fois à la fois.
+ */
+export function cachedCertificationPrompt(
+  key: string,
+  load: () => Promise<CertificationPrompt | null>,
+  now: () => number = Date.now,
+): Promise<CertificationPrompt | null> {
   const entry = recentPrompts.get(key);
-  if (!entry) return undefined;
-  if (entry.expiresAt > now) return entry.prompt;
-  recentPrompts.delete(key);
-  return undefined;
-}
-
-/** Retient une invitation lue ; la plus ancienne part si la mémoire est pleine. */
-export function rememberCertificationPrompt(key: string, prompt: CertificationPrompt | null, now: number): void {
+  if (entry && entry.expiresAt > now()) return entry.value;
   recentPrompts.delete(key);
   if (recentPrompts.size >= CERTIFICATION_PROMPT_CACHE_MAX) {
     const oldest = recentPrompts.keys().next().value;
     if (oldest !== undefined) recentPrompts.delete(oldest);
   }
-  recentPrompts.set(key, { prompt, expiresAt: now + CERTIFICATION_PROMPT_TTL_MS });
+  const slot = { value: Promise.resolve<CertificationPrompt | null>(null), expiresAt: Number.POSITIVE_INFINITY };
+  slot.value = load().then(
+    (prompt) => {
+      slot.expiresAt = now() + CERTIFICATION_PROMPT_TTL_MS;
+      return prompt;
+    },
+    (error: unknown) => {
+      console.error("[tournaments] invitation à certifier indisponible :", error);
+      slot.expiresAt = now() + CERTIFICATION_PROMPT_FAILURE_TTL_MS;
+      return null;
+    },
+  );
+  recentPrompts.set(key, slot);
+  return slot.value;
 }
 
 /** Vide la mémoire (tests). */

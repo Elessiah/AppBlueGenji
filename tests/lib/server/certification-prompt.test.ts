@@ -1,10 +1,10 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import {
+  CERTIFICATION_PROMPT_FAILURE_TTL_MS,
   CERTIFICATION_PROMPT_TTL_MS,
+  cachedCertificationPrompt,
   forgetCertificationPrompts,
   loadCertificationPrompt,
-  recentCertificationPrompt,
-  rememberCertificationPrompt,
 } from "@/lib/server/tournaments/certification-prompt";
 import { fakeConnection, type SqlQuery } from "../../helpers/sql-double";
 
@@ -162,26 +162,53 @@ describe("loadCertificationPrompt", () => {
 
 describe("mémoire courte des invitations", () => {
   const PROMPT = { reason: "MANAGER", discordVerified: false, battletagVerified: true, battletagRelevant: true } as const;
+  let clock = 0;
+  const now = () => clock;
 
-  it("sert une invitation retenue, « rien » compris, pendant une minute", () => {
+  it("sert l'invitation retenue pendant une minute, puis relit", async () => {
     forgetCertificationPrompts();
-    rememberCertificationPrompt("7:42:1:1", PROMPT, 1_000);
-    rememberCertificationPrompt("8:42:0:1", null, 1_000);
-    expect(recentCertificationPrompt("7:42:1:1", 1_000 + CERTIFICATION_PROMPT_TTL_MS - 1)).toEqual(PROMPT);
-    expect(recentCertificationPrompt("8:42:0:1", 2_000)).toBeNull();
-    expect(recentCertificationPrompt("9:42:0:1", 2_000)).toBeUndefined();
+    clock = 1_000;
+    const load = jest.fn(async () => PROMPT);
+    expect(await cachedCertificationPrompt("7:42:1:1", load, now)).toEqual(PROMPT);
+    clock += CERTIFICATION_PROMPT_TTL_MS - 1;
+    await cachedCertificationPrompt("7:42:1:1", load, now);
+    expect(load).toHaveBeenCalledTimes(1);
+    clock += 1;
+    await cachedCertificationPrompt("7:42:1:1", load, now);
+    expect(load).toHaveBeenCalledTimes(2);
   });
 
-  it("l'oublie passé le délai", () => {
+  it("partage la lecture en cours : une vague de lectures ne vaut qu'une requête", async () => {
     forgetCertificationPrompts();
-    rememberCertificationPrompt("7:42:1:1", PROMPT, 1_000);
-    expect(recentCertificationPrompt("7:42:1:1", 1_000 + CERTIFICATION_PROMPT_TTL_MS)).toBeUndefined();
+    const load = jest.fn(async () => null);
+    await Promise.all([1, 2, 3].map(() => cachedCertificationPrompt("8:42:0:1", load, now)));
+    expect(load).toHaveBeenCalledTimes(1);
   });
 
-  it("reste bornée : la plus ancienne part", () => {
+  it("un échec rend « rien », journalisé, et n'est retenté qu'après dix secondes", async () => {
     forgetCertificationPrompts();
-    for (let i = 0; i < 2_001; i += 1) rememberCertificationPrompt(`k${i}`, null, 0);
-    expect(recentCertificationPrompt("k0", 1)).toBeUndefined();
-    expect(recentCertificationPrompt("k2000", 1)).toBeNull();
+    clock = 0;
+    const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const load = jest.fn(async (): Promise<null> => {
+      throw new Error("pool");
+    });
+    expect(await cachedCertificationPrompt("9:42:0:1", load, now)).toBeNull();
+    clock = CERTIFICATION_PROMPT_FAILURE_TTL_MS - 1;
+    await cachedCertificationPrompt("9:42:0:1", load, now);
+    expect(load).toHaveBeenCalledTimes(1);
+    clock = CERTIFICATION_PROMPT_FAILURE_TTL_MS;
+    await cachedCertificationPrompt("9:42:0:1", load, now);
+    expect(load).toHaveBeenCalledTimes(2);
+    expect(errors).toHaveBeenCalled();
+    errors.mockRestore();
+  });
+
+  it("reste bornée : la plus ancienne part", async () => {
+    forgetCertificationPrompts();
+    clock = 0;
+    for (let i = 0; i < 2_001; i += 1) await cachedCertificationPrompt(`k${i}`, async () => null, now);
+    const load = jest.fn(async () => null);
+    await cachedCertificationPrompt("k0", load, now);
+    expect(load).toHaveBeenCalledTimes(1);
   });
 });

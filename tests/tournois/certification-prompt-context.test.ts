@@ -6,9 +6,12 @@ jest.mock("@/lib/server/tournaments/preview-cache");
 jest.mock("@/lib/server/tournaments/registration-eligibility");
 jest.mock("@/lib/server/tournaments/certification-prompt", () => ({
   loadCertificationPrompt: jest.fn(),
-  // Sans mémoire ici : chaque lecture du contexte relit.
-  recentCertificationPrompt: () => undefined,
-  rememberCertificationPrompt: () => undefined,
+  // Sans mémoire ici : chaque lecture du contexte relit ; un échec rend `null`, journalisé.
+  cachedCertificationPrompt: (_key: string, load: () => Promise<unknown>) =>
+    load().catch((error: unknown) => {
+      console.error(error);
+      return null;
+    }),
 }));
 jest.mock("@/lib/server/solo-entries-service");
 

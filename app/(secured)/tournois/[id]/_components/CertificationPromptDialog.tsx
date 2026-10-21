@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { anotherModalOpen } from "@/lib/shared/dialog-focus";
 import { isPlainLeftClick } from "@/lib/shared/site-back";
@@ -45,7 +45,7 @@ interface CertificationPromptDialogProps {
  * section « Discord » tant que le tag manque, sinon à « Applications
  * connectées » où Battle.net se rattache (`certificationProfileHref`).
  */
-export function CertificationPromptDialog({
+function CertificationPromptDialogView({
   prompt,
   onNeverAgainChange,
   onClose,
@@ -173,3 +173,9 @@ export function CertificationPromptDialog({
     </TournamentDialogFrame>
   );
 }
+
+/**
+ * Mémoïsée : la fiche se rend à chaque instantané du flux, et les props de la
+ * modale (invitation rejouée telle quelle, rappels stables) ne bougent pas.
+ */
+export const CertificationPromptDialog = memo(CertificationPromptDialogView);
