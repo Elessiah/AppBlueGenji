@@ -370,7 +370,7 @@
       "admins": "The site's administrators can see your Discord tag at all times.",
       "referees": "Referees can see it only while you're entered in an ongoing or upcoming tournament — not after —, or while a match you cast is being played.",
       "match": "The members of both teams of your match can see it from the moment both its opponents are known until its end, and its caster only while the match is being played (from its start to its end) — to add each other and create the channel. If you cast a match, both its teams and the referees see yours only while the match is being played.",
-      "players": "Other players on the site only see it if you make it visible in your privacy settings. It doesn't appear on any public page. That your tag is certified (✅ badge, without the tag) can however be read on your player page by any logged-in player.",
+      "players": "Other players on the site only see it if you make it visible in your privacy settings. It doesn't appear on any public page. That your tag is verified (✅ badge, without the tag) can, however, be read on your player page by any logged-in player.",
       "undo": "You can cancel at any time by removing your tag from “My profile”: the verification is lost, and the exposure with it. Logging in with Discord then saves your username again, but without verifying it: only this step verifies it."
     },
     "attested": "Username provided by Discord at your last login: <strong>{tag}</strong>. You just need to confirm — no code, no new Discord authorization.",
