@@ -66,14 +66,17 @@ export function focusTrapTarget<T>({
 }: FocusTrapState<T>): T | null {
   const start = items[0];
   const end = items.at(-1)!;
-  if (inModal && onContainer) return shiftKey ? (extra.at(-1) ?? end) : start;
-  if (inLayer) {
-    if (!shiftKey && active === extra.at(-1)) return start;
-    if (shiftKey && active === extra[0]) return end;
-    return null;
-  }
+  if (inLayer) return layerEdgeTarget(extra, active, shiftKey, start, end);
   if (!inModal) return shiftKey ? end : start;
+  if (onContainer) return shiftKey ? (extra.at(-1) ?? end) : start;
   if (shiftKey && active === start) return extra.at(-1) ?? end;
   if (!shiftKey && active === end) return extra[0] ?? start;
+  return null;
+}
+
+/** Bords d'une couche exemptée : on revient à la modale, sinon ordre natif. */
+function layerEdgeTarget<T>(extra: readonly T[], active: unknown, shiftKey: boolean, start: T, end: T): T | null {
+  if (!shiftKey && active === extra.at(-1)) return start;
+  if (shiftKey && active === extra[0]) return end;
   return null;
 }
