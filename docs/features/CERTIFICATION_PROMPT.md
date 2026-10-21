@@ -85,9 +85,8 @@ contacts présentés aux équipes, au caster et aux arbitres (T04), portées OAu
 
 Le « Ne plus voir » donné à la **proposition de certification de la
 connexion** (`DISCORD_CERTIFY_PROMPT.md`, `bg_users.discord_certify_prompt_dismissed_at`,
-gardé sur le compte) vaut aussi ici, sur tous les appareils, **tant que c'est
-Discord qui manque** (un BattleTag seul à vérifier n'était pas l'objet de ce
-refus) : lu seulement dans ce cas (`loadCertificationPrompt`), colonne absente
+gardé sur le compte) vaut aussi ici, sur tous les appareils, **quand Discord
+est seul à manquer** (un BattleTag à vérifier n'était pas l'objet de ce refus) : lu seulement dans ce cas (`loadCertificationPrompt`), colonne absente
 = sans choix. L'inverse n'est pas vrai : la case de cette modale reste une
 préférence d'affichage du navigateur.
 

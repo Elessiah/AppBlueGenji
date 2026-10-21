@@ -76,7 +76,7 @@ type CandidateRow = LaunchMatchRow & {
   team2_solo_user_id: number | null;
 };
 
-export type MemberRow = RowDataPacket & {
+type MemberRow = RowDataPacket & {
   team_id: number;
   user_id: number;
   pseudo: string;

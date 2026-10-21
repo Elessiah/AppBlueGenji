@@ -101,9 +101,17 @@ describe("loadCertificationPrompt", () => {
     expect((await loadCertificationPrompt(executor, 7, 42, false, false))?.reason).toBe("TEAM_WITHOUT_CONTACT");
   });
 
-  it("respecte le « Ne plus voir » donné à la proposition de la connexion (compte), Discord manquant", async () => {
-    const { executor } = rosterOf([{ user_id: 7, ...BARE }], 1);
+  it("respecte le « Ne plus voir » donné à la proposition de la connexion (compte), Discord seul manquant", async () => {
+    const { executor } = rosterOf([{ user_id: 7, ...BARE, ...BATTLETAG }], 1);
     expect(await loadCertificationPrompt(executor, 7, 42, true, true)).toBeNull();
+    // Marvel Rivals : Discord est seul à compter.
+    const { executor: mr } = rosterOf([{ user_id: 7, ...BARE }], 1);
+    expect(await loadCertificationPrompt(mr, 7, 42, true, false)).toBeNull();
+  });
+
+  it("ce refus ne tait pas une invitation qui porte aussi sur le BattleTag", async () => {
+    const { executor } = rosterOf([{ user_id: 7, ...BARE }], 1);
+    expect((await loadCertificationPrompt(executor, 7, 42, true, true))?.reason).toBe("MANAGER");
   });
 
   it("ce refus ne tait pas une invitation qui ne porte que sur le BattleTag", async () => {
@@ -114,9 +122,9 @@ describe("loadCertificationPrompt", () => {
 
   it("colonne du « Ne plus voir » absente : comme sans choix ; toute autre panne remonte", async () => {
     const missing = Object.assign(new Error("Unknown column"), { code: "ER_BAD_FIELD_ERROR" });
-    const { executor } = rosterOf([{ user_id: 7, ...BARE }], missing);
+    const { executor } = rosterOf([{ user_id: 7, ...BARE, ...BATTLETAG }], missing);
     expect((await loadCertificationPrompt(executor, 7, 42, true, true))?.reason).toBe("MANAGER");
-    const { executor: failing } = rosterOf([{ user_id: 7, ...BARE }], new Error("pool"));
+    const { executor: failing } = rosterOf([{ user_id: 7, ...BARE, ...BATTLETAG }], new Error("pool"));
     await expect(loadCertificationPrompt(failing, 7, 42, true, true)).rejects.toThrow("pool");
   });
 

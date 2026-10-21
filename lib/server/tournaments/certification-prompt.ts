@@ -24,8 +24,8 @@ function identityOf(member: ContactCandidate): CertificationIdentity {
 /**
  * « Ne plus voir » donné à la proposition de certification de la connexion
  * (`DISCORD_CERTIFY_PROMPT.md`, gardé sur le compte) : l'invitation de la fiche
- * le respecte aussi, sur tous les appareils — tant que c'est Discord qui manque
- * (un BattleTag seul à vérifier n'était pas l'objet de ce refus). Colonne
+ * le respecte aussi, sur tous les appareils — quand Discord est **seul** à
+ * manquer (un BattleTag à vérifier n'était pas l'objet de ce refus). Colonne
  * absente (`ALTER` échoué) : comme sans choix.
  */
 async function certificationNudgesDeclined(executor: Pick<PoolConnection, "execute">, userId: number): Promise<boolean> {
@@ -66,9 +66,10 @@ export async function loadCertificationPrompt(
     teamHasContact: teamHasContact(members.map(identityOf), battletagRelevant),
     battletagRelevant,
   });
-  // Lu seulement quand une invitation serait due pour Discord : la plupart des
-  // lecteurs n'en ont pas.
+  // Lu seulement quand l'invitation ne porterait que sur Discord : la plupart
+  // des lecteurs n'en ont pas.
   if (prompt === null) return null;
-  if (!prompt.discordVerified && (await certificationNudgesDeclined(executor, userId))) return null;
+  const onlyDiscordMissing = !prompt.discordVerified && (prompt.battletagVerified || !prompt.battletagRelevant);
+  if (onlyDiscordMissing && (await certificationNudgesDeclined(executor, userId))) return null;
   return prompt;
 }

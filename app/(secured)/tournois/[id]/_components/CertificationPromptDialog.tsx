@@ -93,7 +93,7 @@ export function CertificationPromptDialog({
       initialFocus="container"
       onClose={onClose}
     >
-<h3 id="certification-prompt-title" className={s.title}>
+      <h3 id="certification-prompt-title" className={s.title}>
         {t(withBattletag ? "certification.title" : "certification.titleDiscordOnly")}
       </h3>
       <p id="certification-prompt-lead" className={s.lead}>
