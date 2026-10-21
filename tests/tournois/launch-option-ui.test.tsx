@@ -334,10 +334,10 @@ describe("fiches de contact — noms cliquables", () => {
       // Rien de neuf : aucune réécriture, l'annonce reste figée.
       expect(nextCasterArrival({ ...waiting, pending: false, arrival: "SHOWN" }, shown, false)).toBeNull();
       // Pas d'attente avant (ouverture) : rien n'est annoncé.
-      expect(nextCasterArrival({ pending: false, casterId: null, arrival: null }, shown, false)?.arrival).toBeNull();
-      // Un autre caster, ou plus de caster : l'annonce s'efface.
+      expect(nextCasterArrival({ pending: false, casterId: caster.userId, arrival: null }, shown, false)).toBeNull();
+      // Un autre caster : l'annonce s'efface.
       expect(nextCasterArrival(waiting, { ...shown, userId: caster.userId + 1 }, false)?.arrival).toBeNull();
-      expect(nextCasterArrival({ ...waiting, pending: false, arrival: "SHOWN" }, null, false)).toEqual({ pending: false, casterId: null, arrival: null });
+      expect(nextCasterArrival({ ...waiting, pending: false, arrival: "SHOWN" }, { ...shown, userId: caster.userId + 1 }, false)).toEqual({ pending: false, casterId: caster.userId + 1, arrival: null });
       // Retour en attente : l'annonce s'efface, une nouvelle arrivée se rejouera.
       expect(nextCasterArrival({ ...waiting, pending: false, arrival: "SHOWN" }, { ...caster, contactsShown: false }, true)?.arrival).toBeNull();
       expect(CASTER_ARRIVAL_ANNOUNCE_MS).toBe(10_000);

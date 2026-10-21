@@ -128,7 +128,8 @@ Quand la relecture de l'heure de départ remplace la note par les contacts, la
 modale « Contacts » (seule, `announceArrival`) l'annonce par une phrase courte
 dans une région polie hors flux (`contacts.casterShown`, `<output>` `sr-only`) —
 pas les boutons « Copier ». L'annonce ne vient qu'au passage « en attente →
-montrés » d'un même caster (`useCasterArrival`) — sans contact, elle le dit
+montrés » d'un même caster (`useCasterArrival`, dans `CasterArrivalStatus`, monté
+seulement avec `announceArrival` et un caster inscrit) — sans contact, elle le dit
 (`contacts.casterShownEmpty` ; à l'écran, `noContact` plutôt que deux « — »,
 sauf au caster lui-même) —,
 jamais à l'ouverture, et se vide après dix secondes. La modale de lancement
