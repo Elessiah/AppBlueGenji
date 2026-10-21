@@ -166,7 +166,7 @@ describe("watchModals / watchModalsClosed", () => {
   it("watchUrgentModalOpened : réagit sans délai à une modale ajoutée, ignore le reste du plateau", () => {
     const { state, mutate } = fakeDom(false);
     const calls: number[] = [];
-    watchUrgentModalOpened(() => calls.push(1), {} as Node);
+    watchUrgentModalOpened(() => calls.push(1), globals.document as Node & ParentNode);
     const cell = { matches: () => false, querySelector: () => null };
     const launch = { matches: () => true, querySelector: () => null };
     // Une case du plateau re-rendue : la page n'est pas relue.
@@ -181,7 +181,7 @@ describe("watchModals / watchModalsClosed", () => {
   it("watchUrgentModalOpened : une urgente déjà ouverte prévient aussitôt", () => {
     const { state } = fakeDom(true);
     const calls: number[] = [];
-    watchUrgentModalOpened(() => calls.push(1), {} as Node);
+    watchUrgentModalOpened(() => calls.push(1), globals.document as Node & ParentNode);
     expect(calls).toHaveLength(1);
     expect(state.observed).toBeNull();
   });

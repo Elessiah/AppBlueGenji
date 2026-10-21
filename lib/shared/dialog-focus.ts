@@ -175,8 +175,8 @@ function mayOpenModal(record: Pick<MutationRecord, "type" | "addedNodes">): bool
  * ajoutés sont examinés ; la page n'est relue que si l'un d'eux est une modale.
  * Renvoie l'arrêt.
  */
-export function watchUrgentModalOpened(onOpened: () => void, root: Node = document.body): () => void {
-  const urgentOpen = () => anotherModalOpen(document, { overYielding: true });
+export function watchUrgentModalOpened(onOpened: () => void, root: Node & ParentNode = document.body): () => void {
+  const urgentOpen = () => anotherModalOpen(root, { overYielding: true });
   if (urgentOpen()) {
     onOpened();
     return () => undefined;
@@ -191,8 +191,12 @@ export function watchUrgentModalOpened(onOpened: () => void, root: Node = docume
 }
 
 /** Prévient (une fois) quand plus aucune modale n'est ouverte (`watchModals`). */
-export function watchModalsClosed(onClosed: () => void, options: { overYielding?: boolean } = {}): () => void {
-  return watchModals(() => !anotherModalOpen(document, options), onClosed);
+export function watchModalsClosed(
+  onClosed: () => void,
+  options: { overYielding?: boolean } = {},
+  root: Node & ParentNode = document.body,
+): () => void {
+  return watchModals(() => !anotherModalOpen(root, options), onClosed, root);
 }
 
 /**
