@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   rememberCertificationPromptClosed,
   shouldOpenCertificationPrompt,
@@ -131,8 +131,19 @@ export function useCertificationPrompt(
     neverAgain.current = value;
   }, []);
 
+  // Même contenu, même objet : une relecture REST en renvoie un neuf, et la
+  // modale mémoïsée ne doit pas se rendre pour rien.
+  const reason = prompt?.reason;
+  const discordVerified = prompt?.discordVerified === true;
+  const battletagVerified = prompt?.battletagVerified === true;
+  const battletagRelevant = prompt?.battletagRelevant === true;
+  const stablePrompt = useMemo<CertificationPrompt | null>(
+    () => (reason ? { reason, discordVerified, battletagVerified, battletagRelevant } : null),
+    [reason, discordVerified, battletagVerified, battletagRelevant],
+  );
+
   return {
-    prompt: shown ? prompt : null,
+    prompt: shown ? stablePrompt : null,
     setNeverAgain,
     close,
   };

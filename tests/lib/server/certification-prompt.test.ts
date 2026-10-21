@@ -1,6 +1,7 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import {
   CERTIFICATION_PROMPT_FAILURE_TTL_MS,
+  CERTIFICATION_PROMPT_READ_TIMEOUT_MS,
   CERTIFICATION_PROMPT_TTL_MS,
   cachedCertificationPrompt,
   forgetCertificationPrompts,
@@ -201,6 +202,21 @@ describe("mémoire courte des invitations", () => {
     expect(load).toHaveBeenCalledTimes(2);
     expect(errors).toHaveBeenCalled();
     errors.mockRestore();
+  });
+
+  it("une lecture qui pend est abandonnée : « rien », et les suivantes ne l'attendent pas", async () => {
+    forgetCertificationPrompts();
+    jest.useFakeTimers();
+    const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      const hung = cachedCertificationPrompt("10:42:0:1", () => new Promise<null>(() => undefined), now);
+      jest.advanceTimersByTime(CERTIFICATION_PROMPT_READ_TIMEOUT_MS);
+      expect(await hung).toBeNull();
+      expect(errors).toHaveBeenCalled();
+    } finally {
+      errors.mockRestore();
+      jest.useRealTimers();
+    }
   });
 
   it("reste bornée : la plus ancienne part", async () => {

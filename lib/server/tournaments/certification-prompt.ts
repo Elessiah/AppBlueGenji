@@ -92,11 +92,17 @@ export async function loadCertificationPrompt(
  * place du pool et une ou deux requêtes. Une certification faite entre-temps
  * se voit au plus une minute plus tard. Bornée ; la lecture **en cours** est
  * partagée (une vague de reconnexions ne vaut qu'une requête par lecteur) ; un
- * échec est retenu dix secondes, sans quoi chaque lecture le retenterait
- * pendant la panne même.
+ * échec — ou une lecture de plus de trois secondes — est retenu dix secondes,
+ * sans quoi chaque lecture le retenterait pendant la panne même.
  */
 export const CERTIFICATION_PROMPT_TTL_MS = 60_000;
 export const CERTIFICATION_PROMPT_FAILURE_TTL_MS = 10_000;
+/**
+ * Au-delà, une lecture est tenue pour échouée (pool saturé, lien à demi
+ * ouvert) : partagée, elle retiendrait sinon toutes les lectures du contexte
+ * de ce lecteur — flux compris — aussi longtemps qu'elle pend.
+ */
+export const CERTIFICATION_PROMPT_READ_TIMEOUT_MS = 3_000;
 const CERTIFICATION_PROMPT_CACHE_MAX = 2_000;
 const recentPrompts = new Map<string, { value: Promise<CertificationPrompt | null>; expiresAt: number }>();
 
@@ -117,7 +123,7 @@ export function cachedCertificationPrompt(
     if (oldest !== undefined) recentPrompts.delete(oldest);
   }
   const slot = { value: Promise.resolve<CertificationPrompt | null>(null), expiresAt: Number.POSITIVE_INFINITY };
-  slot.value = load().then(
+  slot.value = withTimeout(load(), CERTIFICATION_PROMPT_READ_TIMEOUT_MS).then(
     (prompt) => {
       slot.expiresAt = now() + CERTIFICATION_PROMPT_TTL_MS;
       return prompt;
@@ -130,6 +136,15 @@ export function cachedCertificationPrompt(
   );
   recentPrompts.set(key, slot);
   return slot.value;
+}
+
+/** `promise`, ou un échec passé `ms` (la lecture abandonnée finit seule). */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error("CERTIFICATION_PROMPT_TIMEOUT")), ms);
+  });
+  return Promise.race([promise, expired]).finally(() => clearTimeout(timer));
 }
 
 /** Vide la mémoire (tests). */

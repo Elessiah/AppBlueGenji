@@ -49,6 +49,14 @@ jest.mock("react", () => ({
     bench.callbacks[slot] = { deps, fn };
     return fn;
   },
+  useMemo: (factory: () => unknown, deps: Deps) => {
+    const slot = bench.index.callback++;
+    const previous = bench.callbacks[slot];
+    if (previous && sameDeps(previous.deps, deps)) return previous.fn;
+    const value = factory();
+    bench.callbacks[slot] = { deps, fn: value };
+    return value;
+  },
   useEffect: (effect: () => Cleanup, deps: Deps) => {
     const slot = bench.index.effect++;
     const previous = bench.effects[slot];
@@ -154,7 +162,7 @@ afterEach(() => {
 describe("useCertificationPrompt", () => {
   it("ouvre l'invitation dès que le contexte en porte une, et pas avant", () => {
     expect(render(undefined).prompt).toBeNull();
-    expect(render(PROMPT).prompt).toBe(PROMPT);
+    expect(render(PROMPT).prompt).toEqual(PROMPT);
   });
 
   it("« Plus tard » la ferme pour l'onglet ; une relecture du contexte ne la rouvre pas", () => {
@@ -219,7 +227,7 @@ describe("useCertificationPrompt", () => {
     render(PROMPT);
     expect(render(null).prompt).toBeNull();
     expect(session.values.size + local.values.size).toBe(0);
-    expect(render(PROMPT).prompt).toBe(PROMPT);
+    expect(render(PROMPT).prompt).toEqual(PROMPT);
     render(null);
     // Une autre modale s'est ouverte entre-temps : écartée…
     modals.open = true;
@@ -235,7 +243,13 @@ describe("useCertificationPrompt", () => {
     act(() => modals.yieldWatchers.at(-1)?.(), PROMPT);
     expect(render({ ...PROMPT }).prompt).toBeNull();
     expect(render({ ...PROMPT }, false, 6).prompt).toEqual(PROMPT);
-    expect(first.prompt).toBe(PROMPT);
+    expect(first.prompt).toEqual(PROMPT);
+  });
+
+  it("une relecture au contenu identique rend le même objet (modale mémoïsée)", () => {
+    const first = render(PROMPT);
+    const again = render({ ...PROMPT });
+    expect(again.prompt).toBe(first.prompt);
   });
 
   it("une fiche figée masque la modale et n'ouvre rien", () => {
@@ -246,7 +260,7 @@ describe("useCertificationPrompt", () => {
   it("stockage inaccessible : la modale s'ouvre et se ferme sans mémoire", () => {
     delete globals.window;
     const first = render(PROMPT);
-    expect(first.prompt).toBe(PROMPT);
+    expect(first.prompt).toEqual(PROMPT);
     expect(() => act(() => first.close(), PROMPT)).not.toThrow();
     // Retirée puis revenue : fermée, elle ne se rouvre pas sur cette page.
     render(null);
