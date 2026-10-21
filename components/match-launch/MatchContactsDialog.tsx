@@ -63,8 +63,6 @@ export function contactsRetryDelay(startAt: string | null, serverDate: string | 
   return delay <= CONTACTS_RETRY_MAX_WAIT_MS ? delay : null;
 }
 
-/** Réexportée : la règle vit dans `lib/shared/match-launch`, lue aussi par `CasterCard`. */
-export { casterContactsPending };
 
 /** Relectures supplémentaires d'une relecture qui échoue (réseau, 5xx, 429). */
 export const REREAD_RETRIES = 3;

@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import {
   CONTACTS_RETRY_MAX_WAIT_MS,
   contactsRetryDelay,
-  casterContactsPending,
   casterRereadDelay,
   readMatchContacts,
   REREAD_RETRIES,
@@ -15,7 +14,7 @@ import {
   type ContactsCard,
   shouldRetryReread,
 } from "@/components/match-launch/MatchContactsDialog";
-import { exposesCasterContacts, type MatchLaunchInfo } from "@/lib/shared/match-launch";
+import { casterContactsPending, exposesCasterContacts, type MatchLaunchInfo } from "@/lib/shared/match-launch";
 import { readSource } from "../../helpers/read-source";
 
 /**

@@ -977,7 +977,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // concernés) — et l'entrée ne s'adresse qu'à eux, d'où le public en tête.
     audience: "LIVE_STAFF",
     id: "2026-10-contacts-du-caster-aux-arbitres",
-    title: "Contacts du caster : visibles des arbitres avant le match",
+    title: "Contacts du caster : visibles des arbitres et des administrateurs avant le match",
     publishedAt: "2026-10-21",
     summary:
       "Si tu castes un match, les arbitres et les administrateurs voient tes contacts dès que ses deux adversaires sont connus, et plus seulement le temps du match ; ses deux équipes ne les voient toujours que le temps du match.",

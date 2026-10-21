@@ -281,6 +281,8 @@ describe("fiches de contact — noms cliquables", () => {
       for (const phase of ["TO_PLAN", "SCHEDULED"] as const) {
         const html = render(phase, TEAM_VIEWER);
         expect(html).toContain(NOTE);
+        // Région polie : la relecture au départ remplace la note, et le dit.
+        expect(html).toMatch(/aria-live="polite"[^>]*><p[^>]*>Ses contacts/);
         expect(html).not.toContain("BattleTag");
       }
     });
