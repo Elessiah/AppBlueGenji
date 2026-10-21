@@ -27,8 +27,8 @@ type DiscordOnlyCell = keyof typeof DISCORD_ONLY_CELLS;
 interface CertificationPromptDialogProps {
   prompt: CertificationPrompt;
   /**
-   * Case « Ne plus voir », tenue par `useCertificationPrompt` : elle survit à
-   * un effacement devant une modale urgente.
+   * Case « Ne plus voir », tenue par `useCertificationPrompt` : cochée, elle
+   * vaut aussi quand la modale s'efface devant une modale urgente.
    */
   neverAgain: boolean;
   onNeverAgainChange: (value: boolean) => void;

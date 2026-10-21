@@ -226,6 +226,14 @@ describe("useCertificationPrompt", () => {
     expect(modals.closedWatchers).toHaveLength(0);
   });
 
+  it("cédant sa place, une case « Ne plus voir » cochée est retenue pour de bon", () => {
+    const first = render(PROMPT);
+    act(() => first.setNeverAgain(true), PROMPT);
+    act(() => modals.yieldWatchers.at(-1)?.(), PROMPT);
+    expect(local.values.get(CERTIFICATION_PROMPT_OFF_KEY)).toBe("1");
+    expect(session.values.has(CERTIFICATION_PROMPT_CLOSED_KEY)).toBe(false);
+  });
+
   it("une invitation retirée masque la modale sans la fermer ; revenue, elle réapparaît", () => {
     render(PROMPT);
     expect(render(null).prompt).toBeNull();

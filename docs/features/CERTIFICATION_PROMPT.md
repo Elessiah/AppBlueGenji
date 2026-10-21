@@ -14,7 +14,7 @@ La fiche d'un tournoi ouvre donc d'office une modale qui invite à certifier :
 | Lecteur | Condition | Motif (`reason`) |
 | --- | --- | --- |
 | Meneur (`OWNER` / `MANAGER` / `CAPITAINE`, `canDeclareTeamReady` — le capitaine est le premier présenté par `pickLaunchContacts` à vérification égale) d'une équipe engagée | il lui manque l'une des deux certifications, **quel que soit le roster** | `MANAGER` |
-| Tout autre joueur d'une équipe engagée | l'équipe n'a **aucun** membre certifié (ni Discord ni BattleTag ; Discord seul compte en Marvel Rivals), et il lui en manque une | `TEAM_WITHOUT_CONTACT` |
+| Tout autre membre (joueur, coach) d'une équipe engagée | l'équipe n'a **aucun** membre certifié (ni Discord ni BattleTag ; Discord seul compte en Marvel Rivals), et il lui en manque une | `TEAM_WITHOUT_CONTACT` |
 
 Rien pour qui a déjà les deux, pour un tournoi terminé (`FINISHED`), en tournoi
 individuel, ni pour une équipe non engagée. Le motif `MANAGER` passe devant.
@@ -40,7 +40,7 @@ passe par-dessus — comme toute autre modale qui s'ouvrirait sur elle ; le guet
 (`watchUrgentModalOpened`) réagit sans délai, n'examine que les nœuds ajoutés et
 reste armé onglet caché (aucune minuterie) ; un morceau arrivé après l'urgente
 ne se monte pas (lecture au montage ; le guet l'efface ensuite). L'invitation s'efface **pour le reste de la page**, sans rien retenir dans le
-navigateur (elle n'a peut-être pas été lue) : revenue à chaque fermeture d'une
+navigateur (elle n'a peut-être pas été lue — sauf « Ne plus voir » déjà cochée, retenue) : revenue à chaque fermeture d'une
 annonce de lancement, elle couvrirait le plateau en plein match. Elle revient
 à la prochaine fiche ouverte. La modale
 recouverte ne reprend pas le focus à celle du dessus, et lui passe sa propre
@@ -107,8 +107,9 @@ donnée sur une personne, déposées à la demande du lecteur.
   `rememberCertificationPromptClosed`).
 - Lecture : `lib/server/tournaments/certification-prompt.ts`
   (`loadCertificationPrompt`, une requête sur le roster en cours — `loadRosters`
-  et `toCandidate` du lancement, `match-launch-info.ts` : l'invitation et les
-  contacts présentés ne peuvent pas diverger), appelée par
+  et `toCandidate` du lancement, `match-launch-info.ts` : les certifications se
+  lisent comme au lancement ; seule différence voulue, en Marvel Rivals un
+  BattleTag vérifié ne compte pas comme contact), appelée par
   `getTournamentViewerContext` — **porte commune** du flux SSE et de la lecture
   REST de secours — seulement pour une équipe engagée dans un tournoi non clos :
   une requête indexée par connexion du flux (pas par instantané). « Ne plus

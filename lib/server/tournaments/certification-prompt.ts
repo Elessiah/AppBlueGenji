@@ -23,8 +23,10 @@ function identityOf(member: ContactCandidate): CertificationIdentity {
 /**
  * Invitation due au lecteur, membre de l'équipe `teamId` ; `null` s'il n'en a
  * pas besoin, ou s'il n'est plus dans le roster (départ entre deux lectures).
- * Le roster est lu comme le lancement le lit (`loadRosters`, `toCandidate`) :
- * l'invitation et les contacts présentés ne peuvent pas diverger.
+ * Le roster et ses certifications se lisent comme le lancement les lit
+ * (`loadRosters`, `toCandidate`, `hasVerifiedDiscord` / `hasVerifiedBattletag`).
+ * Seule différence voulue : en Marvel Rivals, un BattleTag vérifié ne compte
+ * pas comme contact (`teamHasContact`), même si le lancement le présente.
  */
 export async function loadCertificationPrompt(
   executor: Pick<PoolConnection, "execute">,

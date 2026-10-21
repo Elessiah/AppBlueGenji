@@ -32,7 +32,8 @@ function browserStorage(kind: "localStorage" | "sessionStorage"): Storage | null
  * (`data-modal-pending`, `TournamentSheet`). Elle **cède sa place**
  * (`data-modal-yields`) : une modale urgente — le lancement d'un match — passe
  * par-dessus ; l'invitation s'efface pour le reste de la page, sans rien
- * retenir dans le navigateur : elle revient à la prochaine fiche ouverte.
+ * retenir dans le navigateur — sauf « Ne plus voir » déjà cochée : elle revient
+ * à la prochaine fiche ouverte.
  *
  * Le serveur la calcule une fois par connexion du flux (ou lecture REST de
  * secours) : une certification faite entre-temps ne la retire qu'à la lecture
@@ -68,7 +69,12 @@ export function useCertificationPrompt(prompt: CertificationPrompt | null | unde
   // l'invitation n'a peut-être pas été lue — mais pour le reste de la page :
   // revenue à chaque fermeture d'une annonce de lancement, elle couvrirait le
   // plateau en plein match. Elle revient à la prochaine fiche ouverte.
-  const yieldPlace = useCallback(() => setOpen(false), []);
+  // « Ne plus voir » déjà cochée vaut pourtant : retenue pour de bon, sans le
+  // drapeau d'onglet d'une fermeture.
+  const yieldPlace = useCallback(() => {
+    if (neverAgain) rememberCertificationPromptClosed(browserStorage("localStorage"), null, true);
+    setOpen(false);
+  }, [neverAgain]);
 
   // Affichée seulement : invitation présente et fiche vivante.
   const shown = open && prompt != null && !frozen;
