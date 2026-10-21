@@ -11,7 +11,6 @@
 import { PlayerLink, TeamLink } from "@/components/entity-link";
 import { useLaunchText } from "./launch-text";
 import {
-  exposesCasterContacts,
   viewerIsCaster,
   type LaunchCaster,
   type LaunchContact,
@@ -198,13 +197,11 @@ export function CasterCard({
   linkNames = false,
 }: Readonly<{
   caster: LaunchCaster | null;
-  /** Phase lue par le serveur : avec `viewer`, elle dit si les contacts sortent. */
   phase: MatchLaunchInfo["phase"];
   onCopy: CopyFn;
   /**
-   * Le lecteur : la carte applique elle-même la règle du serveur
-   * (`exposesCasterContacts`) et tait la note « au départ » au caster, de
-   * sorte que les deux modales ne puissent pas diverger.
+   * Le lecteur : la note « au départ » ne s'adresse jamais au caster lui-même.
+   * Que ses contacts sortent, c'est le serveur qui le dit (`caster.contactsShown`).
    */
   viewer: Pick<MatchLaunchInfo["viewer"], "role" | "isCaster">;
   /** Texte sans caster ; par défaut, celui de la modale de lancement. */
@@ -213,7 +210,6 @@ export function CasterCard({
   linkNames?: boolean;
 }>) {
   const { t } = useLaunchText();
-  const contactsShown = exposesCasterContacts(phase, viewer.role);
   // Contacts tus : une note plutôt que deux « — » qui laisseraient croire qu'il
   // n'en a pas — jamais au caster lui-même, dont elle parle.
   const contactsLaterText = viewerIsCaster({ viewer }) ? null : t("contacts.casterLater");
@@ -238,13 +234,13 @@ export function CasterCard({
         </span>
         <ReadyChip ready={caster.ready} phase={phase} />
       </div>
-      {contactsShown && (
+      {caster.contactsShown && (
         <div className={styles.casterIds}>
           <IdentityLine kind="Discord" value={caster.discordTag} verified={caster.discordTag !== null} onCopy={onCopy} />
           <IdentityLine kind="BattleTag" value={caster.battletag} verified={caster.battletagVerified} onCopy={onCopy} />
         </div>
       )}
-      {!contactsShown && contactsLaterText && <p className={styles.note}>{contactsLaterText}</p>}
+      {!caster.contactsShown && contactsLaterText && <p className={styles.note}>{contactsLaterText}</p>}
     </section>
   );
 }

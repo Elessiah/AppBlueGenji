@@ -9,7 +9,7 @@ import { CasterCard, SideCard } from "@/components/match-launch/LaunchContactCar
 import { contactsErrorText } from "@/components/match-launch/MatchContactsDialog";
 import { FR_LAUNCH_TEXT } from "@/components/match-launch/launch-text";
 import { tournamentDialogsText } from "@/lib/shared/tournament-actions-text";
-import { viewerIsCaster, type LaunchSide, type MatchLaunchInfo } from "@/lib/shared/match-launch";
+import { exposesCasterContacts, viewerIsCaster, type LaunchSide, type MatchLaunchInfo } from "@/lib/shared/match-launch";
 import frDialogs from "@/messages/fr/tournamentDialogs.json";
 import enDialogs from "@/messages/en/tournamentDialogs.json";
 import frActions from "@/messages/fr/tournamentActions.json";
@@ -253,7 +253,7 @@ describe("fiches de contact — noms cliquables", () => {
   it("caster → son profil", () => {
     const html = renderToStaticMarkup(
       <CasterCard
-        caster={{ userId: 9, pseudo: "Voix", discordTag: null, battletag: null, battletagVerified: false, ready: false }}
+        caster={{ userId: 9, pseudo: "Voix", discordTag: null, battletag: null, battletagVerified: false, ready: false, contactsShown: true }}
         phase="LAUNCHED"
         onCopy={noop}
         viewer={TEAM_VIEWER}
@@ -263,12 +263,19 @@ describe("fiches de contact — noms cliquables", () => {
     expect(html).toContain('href="/joueurs/9"');
   });
 
-  // La carte applique elle-même la règle du serveur : les deux modales la partagent.
+  // La carte rend la décision du serveur (`exposesCasterContacts`, portée par la réponse).
   describe("caster : contacts ou note, selon la phase et le lecteur", () => {
     const caster = { userId: 9, pseudo: "Voix", discordTag: "voix", battletag: null, battletagVerified: false, ready: false };
     const NOTE = "Ses contacts s&#x27;afficheront au départ du match.";
     const render = (phase: MatchLaunchInfo["phase"], viewer: { role: MatchLaunchInfo["viewer"]["role"]; isCaster: boolean }) =>
-      renderToStaticMarkup(<CasterCard caster={caster} phase={phase} onCopy={noop} viewer={viewer} />);
+      renderToStaticMarkup(
+        <CasterCard
+          caster={{ ...caster, contactsShown: exposesCasterContacts(phase, viewer.role) }}
+          phase={phase}
+          onCopy={noop}
+          viewer={viewer}
+        />,
+      );
 
     it("équipe avant le départ → une note, pas deux « — »", () => {
       for (const phase of ["TO_PLAN", "SCHEDULED"] as const) {

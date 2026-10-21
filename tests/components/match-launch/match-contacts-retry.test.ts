@@ -157,7 +157,15 @@ const info = (
   caster: MatchLaunchInfo["caster"] = CASTER,
   startAt: string | null = START,
   role: MatchLaunchInfo["viewer"]["role"] = "TEAM1",
-) => ({ matchId: 7, phase, startAt, caster, viewer: { role } }) as unknown as MatchLaunchInfo;
+) =>
+  ({
+    matchId: 7,
+    phase,
+    startAt,
+    // Décision du serveur (`exposesCaster`), telle que la réponse la porte.
+    caster: caster && { ...caster, contactsShown: exposesCasterContacts(phase, role) },
+    viewer: { role },
+  }) as unknown as MatchLaunchInfo;
 
 describe("contacts du caster en attente, modale ouverte", () => {
   it("en attente : caster inscrit sur un match pas encore parti au serveur", () => {
@@ -198,10 +206,9 @@ describe("contacts du caster en attente, modale ouverte", () => {
     expect(readSource("lib/server/tournaments/match-launch-info.ts")).toContain(
       "exposesCaster: exposes && exposesCasterContacts(phase, party.role)",
     );
-    // Les deux modales : la carte du caster applique elle-même la règle.
-    expect(readSource("components/match-launch/LaunchContactCards.tsx")).toContain(
-      "const contactsShown = exposesCasterContacts(phase, viewer.role);",
-    );
+    // Les deux modales lisent cette décision, portée par la réponse.
+    expect(readSource("lib/server/tournaments/match-launch-info.ts")).toContain("contactsShown: ctx.exposesCaster,");
+    expect(readSource("components/match-launch/LaunchContactCards.tsx")).toContain("{caster.contactsShown && (");
   });
 
   it("échecs passagers en rafale sans rien de lu : une seule notification", () => {

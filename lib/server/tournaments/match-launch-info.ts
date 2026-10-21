@@ -527,6 +527,7 @@ function buildLaunchCaster(row: CandidateRow, ctx: LaunchContext): LaunchCaster 
     battletag: contact?.battletag ?? null,
     battletagVerified: contact?.battletagVerified ?? false,
     ready: ctx.readiness.casterReady,
+    contactsShown: ctx.exposesCaster,
   };
 }
 

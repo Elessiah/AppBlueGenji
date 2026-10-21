@@ -8,7 +8,6 @@ import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
   MATCH_LAUNCH_REFRESH_EVENT,
-  exposesCasterContacts,
   viewerIsCaster,
   type MatchLaunchInfo,
 } from "@/lib/shared/match-launch";
@@ -71,7 +70,7 @@ export function contactsRetryDelay(startAt: string | null, serverDate: string | 
  * contacts. Pas pour le caster lui-même : rien à attendre sur sa propre fiche.
  */
 export function casterContactsPending(launch: MatchLaunchInfo): boolean {
-  return launch.caster !== null && !viewerIsCaster(launch) && !exposesCasterContacts(launch.phase, launch.viewer.role);
+  return launch.caster !== null && !viewerIsCaster(launch) && !launch.caster.contactsShown;
 }
 
 /** Relectures supplémentaires d'une relecture qui échoue (réseau, 5xx, 429). */
@@ -428,7 +427,6 @@ export function MatchContactsDialog({
                   caster={launch.caster}
                   phase={launch.phase}
                   onCopy={copy}
-                  // Phase du serveur à la lecture : la carte en tire la règle.
                   viewer={launch.viewer}
                   noCasterText={t("contacts.noCaster")}
                   linkNames

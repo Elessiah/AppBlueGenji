@@ -396,7 +396,7 @@ describe("listViewerMatchLaunches — exposition des contacts", () => {
     expect(info.phase).toBe("SCHEDULED");
     expect(info.team1.contacts).toEqual([]);
     expect(info.team2.contacts).toEqual([]);
-    expect(info.caster).toMatchObject({ pseudo: "Caster", discordTag: null, battletag: null });
+    expect(info.caster).toMatchObject({ pseudo: "Caster", discordTag: null, battletag: null, contactsShown: false });
     expect(info.autoLaunchAt).toBeNull();
   });
 
@@ -434,7 +434,7 @@ describe("listViewerMatchLaunches — exposition des contacts", () => {
     state.users = [casterUser(CASTER)];
     const [info] = await listViewerMatchLaunches(viewer);
     expect(info.viewer.role).toBe("TEAM1");
-    expect(info.caster).toMatchObject({ pseudo: "Caster", discordTag: "caster", battletag: "Caster#1" });
+    expect(info.caster).toMatchObject({ pseudo: "Caster", discordTag: "caster", battletag: "Caster#1", contactsShown: true });
   });
 
   it("tait le caster d'un compte supprimé", async () => {
@@ -769,7 +769,7 @@ describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => 
       state.users = [casterUser(CASTER)];
       const info = await loadViewerMatchContacts(referee, 42);
       expect(info?.phase).toBe("SCHEDULED");
-      expect(info?.caster).toMatchObject({ discordTag: "caster", battletag: "Caster#1" });
+      expect(info?.caster).toMatchObject({ discordTag: "caster", battletag: "Caster#1", contactsShown: true });
     });
 
     it("un arbitre qui joue le match lit en joueur : contacts du caster le temps du match seulement", async () => {
@@ -778,7 +778,7 @@ describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => 
       state.users = [casterUser(CASTER)];
       const info = await loadViewerMatchContacts(referee, 42);
       expect(info?.viewer).toMatchObject({ role: "TEAM1" });
-      expect(info?.caster).toMatchObject({ discordTag: null, battletag: null });
+      expect(info?.caster).toMatchObject({ discordTag: null, battletag: null, contactsShown: false });
     });
 
     it("rend aussi les contacts du caster une fois le match parti", async () => {

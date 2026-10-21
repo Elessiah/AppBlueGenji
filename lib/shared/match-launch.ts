@@ -429,6 +429,12 @@ export type LaunchCaster = {
   /** `true` si le BattleTag vient d'un compte Battle.net rattaché. */
   battletagVerified: boolean;
   ready: boolean;
+  /**
+   * Le serveur rend-il ses contacts à ce lecteur (`exposesCaster`) ? La carte
+   * lit cette décision plutôt que de la recalculer : faux, une note remplace
+   * les deux « — » qui laisseraient croire qu'il n'en a pas.
+   */
+  contactsShown: boolean;
 };
 
 export type LaunchViewerRole = "TEAM1" | "TEAM2" | "CASTER";
@@ -476,9 +482,9 @@ export type MatchLaunchInfo = {
  * terminé ou adversaire manquant), même si un appelant l'oubliait.
  *
  * Une seule règle, lue par le serveur (`exposesCaster`), par la modale
- * « Contacts » et par la modale de lancement (`CasterCard`, qui l'applique
- * elle-même) : deux copies dériveraient, et la fiche montrerait deux « — » ou
- * une note à tort.
+ * « Contacts » et par la modale de lancement, qui lisent sa décision
+ * (`LaunchCaster.contactsShown`) : deux copies dériveraient, et la fiche
+ * montrerait deux « — » ou une note à tort.
  */
 export function exposesCasterContacts(phase: MatchLaunchPhase, role: MatchLaunchViewerRole): boolean {
   return phase === "LOBBY" || phase === "LAUNCHED" || (phase !== "NONE" && role === "REFEREE");
