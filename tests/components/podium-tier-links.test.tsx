@@ -93,9 +93,11 @@ describe("marche peinte dans le lien, jamais sur le lien", () => {
     );
   });
 
-  it("tire le repère `data-podium` de la famille de la marche, quel que soit l'ordre des classes", () => {
-    expect(render(<EntityLink href="/x" podiumClass="podium-tier-2 podium-tier">N</EntityLink>)).toContain('data-podium="podium-tier"');
-    expect(render(<EntityLink href="/x" podiumClass="podium-member-1 podium-member">N</EntityLink>)).toContain('data-podium="podium-member"');
+  it("tire le repère `data-podium` de la famille de la marche (équipe, membre)", () => {
+    expect(render(<EntityLink href="/x" podium={{ tier: 2, kind: "team" }}>N</EntityLink>)).toBe(
+      '<a class="entity-link" data-podium="podium-tier" href="/x"><span class="podium-tier podium-tier-2">N</span></a>',
+    );
+    expect(render(<EntityLink href="/x" podium={{ tier: 1, kind: "member" }}>N</EntityLink>)).toContain('data-podium="podium-member"');
   });
 
   it("un compte supprimé (`podiumTier={null}`) ne peint rien, même éteint", () => {

@@ -130,15 +130,24 @@ describe("marches du podium — accessibilité et impression", () => {
     // Le texte transparent est celui du `<span>` intérieur : le trait, tracé par
     // le lien, prend la couleur du lien — aucune couleur de trait à imposer.
     expect(rule(".podium-tier,\n.podium-member")).not.toMatch(/text-decoration/);
-    expect(readSource("components/entity-link.tsx")).toContain("<PodiumPaint className={podiumClass}>{children}</PodiumPaint>");
+    expect(readSource("components/entity-link.tsx")).toContain("<PodiumPaint className={podium && podiumTierClass(podium.tier, podium.kind)}>{children}</PodiumPaint>");
   });
 
   it("rogne un nom tronqué sur le nom peint, pas sur le lien (lueur entière, ellipse en dégradé)", () => {
-    expect(block).toMatch(/\n\.entity-truncate \{\s*overflow: hidden;\s*text-overflow: ellipsis;\s*white-space: nowrap;\s*\}/);
+    const truncate = /\n\.entity-truncate \{([^}]*)\}/.exec(block)![1];
+    for (const declaration of ["display: inline-block", "max-width: 100%", "min-width: 0", "overflow: hidden", "text-overflow: ellipsis", "white-space: nowrap"]) {
+      expect(truncate).toContain(declaration);
+    }
     expect(block).toMatch(/\n\.entity-truncate\[data-podium\] \{\s*overflow: visible;\s*\}/);
     expect(block).toMatch(
       /\n\.entity-truncate\[data-podium\] > \.podium-tier,\s*\.entity-truncate\[data-podium\] > \.podium-member \{\s*display: block;\s*overflow: hidden;\s*text-overflow: ellipsis;\s*\}/,
     );
+  });
+
+  it("coupe à deux lignes le nom peint, pas le lien, au classement de l'accueil", () => {
+    const leaderboard = readSource("components/cyber/landing/Leaderboard.module.css");
+    expect(leaderboard).toMatch(/\.team > \[data-podium\]:last-child \{\s*display: block;\s*overflow: visible;\s*\}/);
+    expect(leaderboard).toMatch(/\.team > \[data-podium\]:last-child > :global\(\.podium-tier\) \{[^}]*-webkit-line-clamp: 2;[^}]*overflow: hidden;/);
   });
 
   it("ne tronque jamais un lien d'entité par une classe de l'appelant", () => {
