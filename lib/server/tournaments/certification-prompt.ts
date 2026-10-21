@@ -105,6 +105,8 @@ export const CERTIFICATION_PROMPT_FAILURE_TTL_MS = 10_000;
 export const CERTIFICATION_PROMPT_READ_TIMEOUT_MS = 3_000;
 const CERTIFICATION_PROMPT_CACHE_MAX = 2_000;
 const recentPrompts = new Map<string, { value: Promise<CertificationPrompt | null>; expiresAt: number }>();
+/** Lectures retenues encore en cours : la mémoire pleine d'elles se sait sans la parcourir. */
+let inFlightPrompts = 0;
 
 /**
  * Invitation de `key`, lue par `load` au plus une fois par fenêtre (une minute,
@@ -137,6 +139,12 @@ export function cachedCertificationPrompt(
     (prompt) => ({ ok: true as const, prompt }),
     (error: unknown) => ({ ok: false as const, error }),
   );
+  if (room) {
+    inFlightPrompts += 1;
+    void settled.then(() => {
+      inFlightPrompts = Math.max(0, inFlightPrompts - 1);
+    });
+  }
   slot.value = Promise.race([settled, expired]).then((outcome) => {
     clearTimeout(timer);
     if (outcome === "TIMEOUT") {
@@ -173,6 +181,7 @@ export function cachedCertificationPrompt(
  */
 function makeRoom(at: number): boolean {
   if (recentPrompts.size < CERTIFICATION_PROMPT_CACHE_MAX) return true;
+  if (inFlightPrompts >= CERTIFICATION_PROMPT_CACHE_MAX) return false;
   // En tête, les moins récemment servies : on s'arrête à la première vivante
   // terminée (les lectures en cours, sans échéance, sont passées).
   for (const [key, entry] of recentPrompts) {
@@ -209,6 +218,7 @@ function logCertificationPromptFailure(at: number, error: unknown): void {
 /** Vide la mémoire (tests). */
 export function forgetCertificationPrompts(): void {
   recentPrompts.clear();
+  inFlightPrompts = 0;
   lastFailureLogAt = Number.NEGATIVE_INFINITY;
   silencedFailures = 0;
 }

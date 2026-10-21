@@ -166,7 +166,10 @@ export function watchModals(condition: () => boolean, onMet: () => void, root: N
  */
 function mayOpenModal(record: Pick<MutationRecord, "type" | "addedNodes">): boolean {
   if (record.type === "attributes") return true;
-  return Array.from(record.addedNodes).some((node) => node.nodeType === 1);
+  for (const node of record.addedNodes) {
+    if (node.nodeType === 1) return true;
+  }
+  return false;
 }
 
 /**
