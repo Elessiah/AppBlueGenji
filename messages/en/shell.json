@@ -209,17 +209,16 @@
   "certifyPrompt": {
     "eyebrow": "VERIFICATION · DISCORD",
     "title": "Verify your Discord tag?",
-    "intro": "Logging in didn't verify your Discord tag. Verifying it lets the organizers reach you during a tournament. It's optional: saying no changes nothing else.",
+    "intro": "Logging in didn't verify it. Verifying lets the organizers reach you during a tournament. It's optional, and saying no costs nothing.",
     "tag": "Saved tag: <strong>{tag}</strong>",
     "tableCaption": "What verification changes",
-    "colWithout": "Without verification",
-    "colWith": "With verification",
+    "colWithout": "Without",
+    "colWith": "With",
+    "groups": {
+      "seen": "Who sees your tag",
+      "effects": "Other effects"
+    },
     "rows": {
-      "you": {
-        "label": "You",
-        "without": "Your tag",
-        "with": "Your tag"
-      },
       "admins": {
         "label": "Administrators",
         "without": "Never",
@@ -228,17 +227,17 @@
       "referees": {
         "label": "Referees",
         "without": "Never",
-        "with": "While you're entered in an ongoing or upcoming tournament"
+        "with": "If you're entered in an ongoing or upcoming tournament"
       },
       "match": {
-        "label": "Your match (both teams, caster)",
+        "label": "Your match (teams, caster)",
         "without": "Never",
-        "with": "From the moment your opponents are known until the match ends (caster: while it's played)"
+        "with": "From when your opponents are known until it ends (caster: during the match)"
       },
       "players": {
         "label": "Other players",
         "without": "Never",
-        "with": "Only if you tick “Discord tag” in your settings"
+        "with": "If you tick “Discord tag” in your settings"
       },
       "visitors": {
         "label": "Visitors without an account",
@@ -251,7 +250,7 @@
         "with": "Yes, seen by logged-in players"
       },
       "dms": {
-        "label": "Match direct messages from the bot (times, reminders)",
+        "label": "Match DMs from the bot",
         "without": "None",
         "with": "Yes, unless you turn them off"
       }

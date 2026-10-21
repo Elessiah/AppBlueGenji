@@ -20,8 +20,17 @@ import { TERMS_ACCEPTED_EVENT, TERMS_REQUIRED_EVENT } from "@/lib/shared/terms-o
 import { visibleText } from "@/lib/shared/visible-text";
 import styles from "./DiscordCertifyPrompt.module.css";
 
-/** Lignes du tableau, dans l'ordre affiché (`shell.certifyPrompt.rows.*`). */
-export const CERTIFY_PROMPT_ROWS = ["you", "admins", "referees", "match", "players", "visitors", "badge", "dms"] as const;
+/**
+ * Groupes du tableau, dans l'ordre affiché (`shell.certifyPrompt.groups.*`) :
+ * qui voit le tag, puis les autres effets (`shell.certifyPrompt.rows.*`).
+ */
+export const CERTIFY_PROMPT_GROUPS = [
+  { group: "seen", rows: ["admins", "referees", "match", "players", "visitors"] },
+  { group: "effects", rows: ["badge", "dms"] },
+] as const;
+
+/** Lignes du tableau, dans l'ordre affiché. */
+export const CERTIFY_PROMPT_ROWS = CERTIFY_PROMPT_GROUPS.flatMap(({ rows }) => rows);
 
 /** Refus de `POST /api/profile/discord` qui disent que l'état du tag a changé sous la fenêtre. */
 const STATE_CHANGED = new Set(["DISCORD_TAG_CHANGED", "DISCORD_NOT_LINKED", "DISCORD_TAG_MISSING", "DISCORD_TAG_NOT_ATTESTED"]);
@@ -192,17 +201,22 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
                 <th scope="col">{t("certifyPrompt.colWith")}</th>
               </tr>
             </thead>
-            <tbody>
-              {CERTIFY_PROMPT_ROWS.map((row) => (
-                <tr key={row}>
-                  <th scope="row">{t(`certifyPrompt.rows.${row}.label`)}</th>
-                  <td data-label={t("certifyPrompt.colWithout")}>{t(`certifyPrompt.rows.${row}.without`)}</td>
-                  <td data-label={t("certifyPrompt.colWith")} className={styles.with}>
-                    {t(`certifyPrompt.rows.${row}.with`)}
-                  </td>
+            {CERTIFY_PROMPT_GROUPS.map(({ group, rows }) => (
+              <tbody key={group}>
+                <tr>
+                  <th scope="rowgroup" colSpan={3} className={styles.group}>
+                    {t(`certifyPrompt.groups.${group}`)}
+                  </th>
                 </tr>
-              ))}
-            </tbody>
+                {rows.map((row) => (
+                  <tr key={row}>
+                    <th scope="row">{t(`certifyPrompt.rows.${row}.label`)}</th>
+                    <td>{t(`certifyPrompt.rows.${row}.without`)}</td>
+                    <td className={styles.with}>{t(`certifyPrompt.rows.${row}.with`)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            ))}
           </table>
           <p className={styles.note}>{t("certifyPrompt.undo")}</p>
           <p className={styles.note}>{t("certifyPrompt.later")}</p>

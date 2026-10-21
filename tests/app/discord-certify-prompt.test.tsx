@@ -7,7 +7,7 @@ jest.mock("next/navigation", () => ({
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { ToastProvider } from "@/components/ui/toast";
-import { CERTIFY_PROMPT_ROWS, DiscordCertifyPrompt } from "@/components/discord/DiscordCertifyPrompt";
+import { CERTIFY_PROMPT_GROUPS, CERTIFY_PROMPT_ROWS, DiscordCertifyPrompt } from "@/components/discord/DiscordCertifyPrompt";
 import frShell from "@/messages/fr/shell.json";
 import enShell from "@/messages/en/shell.json";
 import { readSource } from "../helpers/read-source";
@@ -103,13 +103,13 @@ describe("textes (shell.certifyPrompt) — FR et EN", () => {
       );
     expect(keys(en).sort()).toEqual(keys(fr).sort());
     expect(Object.keys(fr.rows)).toEqual([...CERTIFY_PROMPT_ROWS]);
+    expect(Object.keys(fr.groups)).toEqual(CERTIFY_PROMPT_GROUPS.map(({ group }) => group));
   });
 
   it("sans certification, personne d'autre que toi : ce que dit canViewDiscordTag", () => {
     const frNone: Record<string, string> = { badge: "Non", dms: "Aucun" };
     const enNone: Record<string, string> = { badge: "No", dms: "None" };
     for (const row of CERTIFY_PROMPT_ROWS) {
-      if (row === "you") continue;
       expect([row, fr.rows[row].without]).toEqual([row, frNone[row] ?? "Jamais"]);
       expect([row, en.rows[row].without]).toEqual([row, enNone[row] ?? "Never"]);
     }

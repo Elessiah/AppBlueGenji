@@ -98,6 +98,17 @@
   width: 34%;
 }
 
+/* Titre de groupe (« Qui voit ton tag », « Autres effets »). */
+.table tbody th.group {
+  width: auto;
+  padding-top: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-quiet);
+}
+
 .with {
   color: var(--blue-300);
 }
@@ -128,8 +139,15 @@
     padding: 6px 4px;
   }
 
+  /* Le principal pleine largeur en tête, les deux refus côte à côte dessous :
+     une rangée de boutons de moins, plus de tableau en vue. */
   .actions {
-    flex-direction: column-reverse;
-    align-items: stretch;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .actions > :last-child {
+    grid-column: 1 / -1;
+    grid-row: 1;
   }
 }

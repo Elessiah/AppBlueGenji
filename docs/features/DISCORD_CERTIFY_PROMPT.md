@@ -76,15 +76,18 @@ certification reste offerte dans « Mon profil », que la fenêtre nomme.
 
 « Ce que change la certification », sans / avec, tiré de `canViewDiscordTag`,
 `canSeeDiscordVerification` et de la portée `certified` des messages de match
-(`lib/server/notify.ts`) : toi (toujours), administrateurs (toujours), arbitres
-(tournoi en cours ou à venir), ton match (dès que les adversaires sont connus,
-caster le temps du match), autres joueurs (case « Tag Discord »), visiteurs
-(jamais), pastille sur la fiche (joueurs connectés), messages privés de match
-(sauf opposition). Sans certification : personne d'autre que toi. Puis une
+(`lib/server/notify.ts`), en deux groupes (`CERTIFY_PROMPT_GROUPS`). « Qui voit
+ton tag » : administrateurs (toujours), arbitres (tournoi en cours ou à venir),
+ton match (dès que les adversaires sont connus, caster le temps du match),
+autres joueurs (case « Tag Discord »), visiteurs (jamais). « Autres effets » :
+pastille sur la fiche (joueurs connectés), messages privés de match (sauf
+opposition). Soi-même n'a pas de ligne : on voit toujours son propre tag, rien
+n'y change. Sans certification : personne d'autre que toi. Puis une
 ligne : retirer son tag ou changer de pseudo Discord retire la certification.
 Textes `shell.certifyPrompt` (FR et EN) ; le détail complet reste dans le
 dialogue (`DISCORD_VERIFICATION_EXPOSURE`, qui nomme aussi l'arbitre d'un match
-que le joueur caste). Tableau natif (`th` `scope`), trois colonnes serrées sous
+que le joueur caste). Tableau natif (`th` `scope`, titres de groupe en `rowgroup`), colonnes
+« Sans » / « Avec », trois colonnes serrées sous
 480 px, boutons empilés.
 
 ## Données

@@ -209,17 +209,16 @@
   "certifyPrompt": {
     "eyebrow": "CERTIFICATION · DISCORD",
     "title": "Certifier ton tag Discord ?",
-    "intro": "Ta connexion n'a pas certifié ton tag Discord. Le certifier permet à l'organisation de te joindre pendant un tournoi. C'est facultatif : refuser ne change rien d'autre.",
+    "intro": "Ta connexion ne l'a pas certifié. Le certifier permet à l'organisation de te joindre pendant un tournoi. C'est facultatif, et refuser ne coûte rien.",
     "tag": "Tag enregistré : <strong>{tag}</strong>",
     "tableCaption": "Ce que change la certification",
-    "colWithout": "Sans certification",
-    "colWith": "Avec certification",
+    "colWithout": "Sans",
+    "colWith": "Avec",
+    "groups": {
+      "seen": "Qui voit ton tag",
+      "effects": "Autres effets"
+    },
     "rows": {
-      "you": {
-        "label": "Toi",
-        "without": "Ton tag",
-        "with": "Ton tag"
-      },
       "admins": {
         "label": "Administrateurs",
         "without": "Jamais",
@@ -228,17 +227,17 @@
       "referees": {
         "label": "Arbitres",
         "without": "Jamais",
-        "with": "Quand tu es engagé dans un tournoi en cours ou à venir"
+        "with": "Si tu es engagé dans un tournoi en cours ou à venir"
       },
       "match": {
-        "label": "Ton match (deux équipes, caster)",
+        "label": "Ton match (équipes, caster)",
         "without": "Jamais",
-        "with": "Dès que tes adversaires sont connus, jusqu'à la fin du match (caster : le temps du match)"
+        "with": "Dès que tes adversaires sont connus, jusqu'à la fin (caster : pendant le match)"
       },
       "players": {
         "label": "Autres joueurs",
         "without": "Jamais",
-        "with": "Seulement si tu coches « Tag Discord » dans tes réglages"
+        "with": "Si tu coches « Tag Discord » dans tes réglages"
       },
       "visitors": {
         "label": "Visiteurs sans compte",
@@ -251,7 +250,7 @@
         "with": "Oui, visible des joueurs connectés"
       },
       "dms": {
-        "label": "Messages privés de match du bot (horaires, rappels)",
+        "label": "Messages privés de match (bot)",
         "without": "Aucun",
         "with": "Oui, sauf si tu les coupes"
       }
