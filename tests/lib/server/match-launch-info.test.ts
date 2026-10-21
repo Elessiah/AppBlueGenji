@@ -759,7 +759,25 @@ describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => 
       expect(info?.phase).toBe("TO_PLAN");
       expect(info?.viewer).toEqual({ role: "REFEREE", canDeclareReady: false, ready: false, isCaster: false });
       expect(info?.team2.contacts).toEqual([expect.objectContaining({ userId: 5, discordTag: "cap2", battletag: "Cap#2" })]);
-      // Comme pour les équipes : les contacts du caster le temps du match seulement.
+      // Décision du 2026-10-21 : ceux du caster aussi, dès « À planifier ».
+      expect(info?.caster).toMatchObject({ discordTag: "caster", battletag: "Caster#1" });
+    });
+
+    it("rend les contacts du caster d'un match programmé", async () => {
+      const later = new Date(Date.now() + 3 * 3_600_000).toISOString();
+      state.candidates = [candidate({ match_launch_phase: 0, start_at: later, lobby_opened_at: null, caster_user_id: CASTER })];
+      state.users = [casterUser(CASTER)];
+      const info = await loadViewerMatchContacts(referee, 42);
+      expect(info?.phase).toBe("SCHEDULED");
+      expect(info?.caster).toMatchObject({ discordTag: "caster", battletag: "Caster#1" });
+    });
+
+    it("un arbitre qui joue le match lit en joueur : contacts du caster le temps du match seulement", async () => {
+      state.viewerMemberships = [{ team_id: TEAM1, roles_json: JSON.stringify(["DPS"]) }];
+      state.candidates = [candidate({ referee_scheduling: 1, start_at: null, caster_user_id: CASTER })];
+      state.users = [casterUser(CASTER)];
+      const info = await loadViewerMatchContacts(referee, 42);
+      expect(info?.viewer).toMatchObject({ role: "TEAM1" });
       expect(info?.caster).toMatchObject({ discordTag: null, battletag: null });
     });
 

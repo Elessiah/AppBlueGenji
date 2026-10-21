@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import {
   CONTACTS_RETRY_MAX_WAIT_MS,
   contactsRetryDelay,
+  casterContactsOpen,
   casterContactsPending,
   casterRereadDelay,
   readMatchContacts,
@@ -172,7 +173,18 @@ describe("contacts du caster en attente, modale ouverte", () => {
     const own = info("SCHEDULED", CASTER, START, "CASTER");
     expect(casterContactsPending(own)).toBe(false);
     expect(casterRereadDelay(own, SERVER_BEFORE)).toBeNull();
-    expect(casterContactsPending(info("SCHEDULED", CASTER, START, "REFEREE"))).toBe(true);
+  });
+
+  // Décision du 2026-10-21 : l'arbitre lit les contacts du caster à toute heure.
+  it("pas pour un arbitre : contacts du caster ouverts avant le départ, sans relecture", () => {
+    for (const phase of ["TO_PLAN", "SCHEDULED", "LOBBY", "LAUNCHED"] as const) {
+      const referee = info(phase, CASTER, START, "REFEREE");
+      expect(casterContactsOpen(referee)).toBe(true);
+      expect(casterContactsPending(referee)).toBe(false);
+      expect(casterRereadDelay(referee, SERVER_BEFORE)).toBeNull();
+    }
+    expect(casterContactsOpen(info("SCHEDULED"))).toBe(false);
+    expect(casterContactsOpen(info("LOBBY"))).toBe(true);
   });
 
   it("échecs passagers en rafale sans rien de lu : une seule notification", () => {
@@ -312,7 +324,7 @@ describe("contacts du caster en attente, modale ouverte", () => {
     expect(dialog).toMatch(/if \(transient\) \{\n\s*setRereadWait\(read\.retryAfterMs \?\? 0\);\n\s*setRereadFailures\(\(count\) => count \+ 1\);\n\s*\}\n\s*if \(keepWaiting\(transient\)\) return;/);
     expect(dialog).toMatch(/setRereadWait\(0\);\n\s*setRereadFailures\(\(count\) => count \+ 1\);\n\s*if \(keepWaiting\(true\)\) return;/);
     expect(dialog).toContain("failureIsSilent(transient, shown, rereadFailures)");
-    expect(dialog).toContain("contactsShown={matchUnderway(launch.phase)}");
+    expect(dialog).toContain("contactsShown={casterContactsOpen(launch)}");
     const card = readSource("app/(secured)/tournois/[id]/_components/MatchCardActions.tsx");
     expect(card).toMatch(/<MatchContactsDialog[\s\S]*?card=\{match\}[\s\S]*?\/>/);
   });

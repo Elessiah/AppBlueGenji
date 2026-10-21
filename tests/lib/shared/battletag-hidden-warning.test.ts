@@ -79,7 +79,7 @@ describe("conditions d'utilisation — contacts de match (version 5)", () => {
     expect(frProfile.battletagLock.change).toContain("après avoir ajouté un autre moyen de connexion si c'est le seul");
     expect(enProfile.battletagLock.change).toContain("after adding another way to log in if it is your only one");
     expect(text).toContain("Ce partage passe par la seule fenêtre « Contacts » du match et par sa fenêtre de lancement, qui la reprend au départ du match : un BattleTag masqué n'est lisible nulle part ailleurs sur le site, pour personne — arbitres et administrateurs compris.");
-    expect(text).toContain("celles du caster le sont aux deux équipes et aux arbitres sur ce même temps du match");
+    expect(text).toContain("celles du caster le sont aux deux équipes sur ce même temps du match, et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin");
     expect(text).toContain("le code de replay d'une map, visible de tout utilisateur connecté sur la fiche du tournoi");
   });
 
@@ -102,7 +102,7 @@ describe("conditions d'utilisation — contacts de match (version 5)", () => {
     expect(text).toContain("a hidden BattleTag is readable nowhere else on the site, by anyone — referees and administrators included");
     // Le jeu affiche les identifiants : le code de replay le dit (FR et EN), comme /rgpd.
     expect(text).toContain("a map's replay code, visible to any logged-in user on the tournament page");
-    expect(text).toContain("the caster's is shared with both teams and the referees over that same match time");
+    expect(text).toContain("the caster's is shared with both teams over that same match time, and with the referees from the moment both its opponents are known until its end");
     expect(en?.paragraphs).toHaveLength(fr?.paragraphs.length ?? -1);
   });
 });
