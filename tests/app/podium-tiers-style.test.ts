@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
+import * as ts from "typescript";
 import { contrastRatio } from "@/lib/shared/color-contrast";
 import { readSource } from "../helpers/read-source";
 
@@ -125,12 +126,55 @@ describe("marches du podium — mouvement", () => {
 });
 
 describe("marches du podium — accessibilité et impression", () => {
-  it("garde un soulignement visible malgré le texte transparent (« Liens soulignés »)", () => {
-    expect(rule(".podium-tier,\n.podium-member")).toMatch(/text-decoration-color: var\(--blue-300\)/);
+  it("laisse le soulignement au lien, dont le texte reste coloré (« Liens soulignés »)", () => {
+    // Le texte transparent est celui du `<span>` intérieur : le trait, tracé par
+    // le lien, prend la couleur du lien — aucune couleur de trait à imposer.
+    // (Le `<span>` intérieur est vérifié au rendu : tests/components/podium-tier-links.test.tsx.)
+    expect(rule(".podium-tier,\n.podium-member")).not.toMatch(/text-decoration/);
+  });
+
+  /** Déclarations de la règle dont la liste de sélecteurs est exactement `selectors` (ordre libre). */
+  function declarations(...selectors: string[]): string[] {
+    const wanted = [...selectors].sort((a, b) => a.localeCompare(b)).join("|");
+    const rules = block.replaceAll(/\/\*[\s\S]*?\*\//g, "");
+    for (const [, list, body] of rules.matchAll(/\n([^{}\s][^{}]*?) \{([^}]*)\}/g)) {
+      const found = list.split(",").map((selector) => selector.trim()).sort((a, b) => a.localeCompare(b)).join("|");
+      if (found === wanted) return body.split(";").map((declaration) => declaration.trim()).filter(Boolean);
+    }
+    throw new Error(`Règle introuvable : ${selectors.join(", ")}`);
+  }
+  const painted = (base: string) => [`${base}[data-podium] > .podium-tier`, `${base}[data-podium] > .podium-member`];
+
+  it("rogne un nom tronqué sur le nom peint, pas sur le lien (lueur entière, ellipse en dégradé)", () => {
+    expect(declarations(".entity-truncate")).toEqual(
+      expect.arrayContaining(["display: inline-block", "max-width: 100%", "min-width: 0", "vertical-align: text-bottom", "white-space: nowrap"]),
+    );
+    expect(declarations(".entity-truncate:not([data-podium])", ...painted(".entity-truncate"))).toEqual(
+      expect.arrayContaining(["overflow: hidden", "text-overflow: ellipsis"]),
+    );
+    expect(declarations(...painted(".entity-truncate"))).toContain("display: block");
+    expect(declarations(".entity-truncate")).not.toContain("overflow: hidden");
+  });
+
+  it("coupe à deux lignes le nom peint, pas le lien (`truncate={2}`, classement de l'accueil)", () => {
+    expect(declarations(".entity-clamp-2:not([data-podium])", ...painted(".entity-clamp-2"))).toEqual(
+      expect.arrayContaining(["display: -webkit-box", "-webkit-line-clamp: 2", "line-clamp: 2", "overflow: hidden"]),
+    );
+    expect(declarations(".entity-clamp-2[data-podium]")).toEqual(expect.arrayContaining(["display: inline-block", "max-width: 100%"]));
+    expect(declarations(".entity-clamp-2")).toEqual(expect.arrayContaining(["min-width: 0", "overflow-wrap: anywhere"]));
+    expect(readSource("components/cyber/landing/Leaderboard.tsx")).toMatch(/<TeamLink teamId=\{row\.teamId\} truncate=\{2\}/);
+    expect(readSource("components/cyber/landing/Leaderboard.module.css")).not.toMatch(/line-clamp|data-podium/);
+  });
+
+  it("ne tronque jamais un lien d'entité par une classe de l'appelant", () => {
+    expect(readSource("app/(secured)/equipes/[id]/team.module.css")).not.toMatch(/\.playerName \{[^}]*overflow/);
+    expect(readSource("app/(secured)/equipes/[id]/_components/MembersSection.tsx")).toMatch(/<PlayerLink [^>]*\btruncate>/);
+    // `EntrantName` : vérifié au rendu (tests/tournois/entrant-logos-render.test.tsx).
+    expect(readSource("app/(secured)/tournois/[id]/_components/EntrantName.module.css")).not.toMatch(/text-overflow/);
   });
 
   it("rend une couleur pleine au survol et au focus d'un lien", () => {
-    const hover = /\.entity-link\.podium-tier:hover,[\s\S]*?\{([^}]*)\}/.exec(block)![1];
+    const hover = /\.entity-link:hover > \.podium-tier,[\s\S]*?\{([^}]*)\}/.exec(block)![1];
     expect(hover).toMatch(/background-image: none/);
     expect(hover).toMatch(/-webkit-text-fill-color: var\(--blue-100\)/);
   });
@@ -221,5 +265,107 @@ describe("marches du podium — outils du staff et comptes supprimés", () => {
   it("garde sans marche l'historique d'équipes d'un compte supprimé", () => {
     const profile = readSource("app/(secured)/joueurs/[id]/page.tsx");
     expect(profile).toMatch(/<TeamLink teamId=\{entry\.teamId\} podiumTier=\{deleted \? null : undefined\}>/);
+  });
+
+  it("garde sans marche l'équipe active d'un compte supprimé", () => {
+    expect(activeTeamLink().attributes.podiumTier).toBe("{deleted ? null : undefined}");
+  });
+});
+
+/**
+ * Lien de l'équipe active de la fiche joueur, lu par le compilateur TypeScript
+ * (indépendant de l'ordre des props) : ses attributs.
+ */
+let activeTeamLinkCache: { attributes: Record<string, string> } | undefined;
+
+function activeTeamLink(): { attributes: Record<string, string> } {
+  activeTeamLinkCache ??= parseActiveTeamLink();
+  return activeTeamLinkCache;
+}
+
+function parseActiveTeamLink(): { attributes: Record<string, string> } {
+  const path = "app/(secured)/joueurs/[id]/page.tsx";
+  const file = ts.createSourceFile(path, readSource(path), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const attributesOf = (opening: ts.JsxOpeningLikeElement) =>
+    Object.fromEntries(
+      opening.attributes.properties
+        .filter(ts.isJsxAttribute)
+        .map((attribute) => [attribute.name.getText(file), attribute.initializer?.getText(file) ?? "true"]),
+    );
+  let found: { attributes: Record<string, string> } | undefined;
+  const visit = (node: ts.Node) => {
+    if (ts.isJsxElement(node) && node.openingElement.tagName.getText(file) === "TeamLink") {
+      const attributes = attributesOf(node.openingElement);
+      if (attributes.teamId === "{activeTeam.teamId}") found = { attributes };
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  expect(found).toBeDefined();
+  return found!;
+}
+
+describe("marches du podium — pastille de l'équipe active (fiche joueur)", () => {
+  // Fond de la pastille `.badge` sur le fond le plus clair, sous le halo de
+  // l'en-tête (`.ds-header::before`, côté du nom) — lus dans la feuille. Les
+  // marches, sous leur lueur, y tombent sous 4,5:1 : le lien les éteint.
+  const badge = /\n\.badge \{([^}]*)\}/.exec(css)![1];
+  const [, badgeRgb, badgeAlpha] = /background: rgba\((\d+, \d+, \d+), ([\d.]+)\);/.exec(badge)!;
+  const header = /\n\.ds-header \{\s*--header-rgb: var\((--[a-z0-9-]+)\);/.exec(css)![1];
+  const headerAlpha = /\n\.ds-header::before \{[^}]*rgba\(var\(--header-rgb\), ([\d.]+)\)/.exec(css)![1];
+  const BADGE = blend(
+    blend(SURFACE, rgbOf(header), Number(headerAlpha)),
+    badgeRgb.split(", ").map(Number) as [number, number, number],
+    Number(badgeAlpha),
+  );
+
+  it("le nom éteint, à la couleur de la pastille, tient 4,5:1 sur son fond", () => {
+    const color = /color: var\((--[a-z0-9-]+)\);/.exec(badge)![1];
+    expect(contrastRatio(hexOf(color)!, BADGE)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it.each([1, 2, 3])("le repère de la marche %i, conservé, tient 3:1 sur la pastille (contraste non textuel)", (tier) => {
+    // La règle propre au repère (la règle partagée des losanges n'en pose que la forme).
+    const bodies = [...block.matchAll(new RegExp(String.raw`\n\.podium-tier-${tier}::before \{([^}]*)\}`, "g"))].map(([, ruleBody]) => ruleBody);
+    const body = bodies.find((candidate) => candidate.includes("linear-gradient"))!;
+    const stops = [.../background: linear-gradient\(([^;]*)\);/.exec(body)![1].matchAll(/var\((--[a-z0-9-]+)\)/g)].map(([, name]) => name);
+    expect(stops.length).toBeGreaterThanOrEqual(2);
+    for (const name of stops) expect(contrastRatio(hexOf(name)!, BADGE)).toBeGreaterThanOrEqual(3);
+  });
+
+  it("au survol et au focus, la couleur pleine du lien tient aussi 4,5:1 sur la pastille", () => {
+    const hover = /\.entity-link:hover > \.podium-tier,[\s\S]*?\{([^}]*)\}/.exec(block)![1];
+    const color = /-webkit-text-fill-color: var\((--[a-z0-9-]+)\);/.exec(hover)![1];
+    expect(contrastRatio(hexOf(color)!, BADGE)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("éteint d'office la marche d'un lien en pastille, la pastille restant le lien entier", () => {
+    expect(activeTeamLink().attributes.className).toBe('"badge"');
+    const muted = /((?:[^{}]*,\s*)?)\[data-podium-muted\] \.podium-member \{([^}]*)\}/.exec(block)!;
+    // Lien habillé en pastille, ou posé dans une pastille.
+    expect(muted[1]).toContain(":is(.badge, .pill, .cy-tag) .podium-tier,");
+    expect(muted[1]).toContain(":is(.badge, .pill, .cy-tag) .podium-member,");
+    expect(muted[2]).toContain("color: inherit");
+    // Aucune graisse imposée à une pastille : elle garde la sienne. Les deux
+    // listes de surfaces (extinction, graisse) restent identiques.
+    const mutedSurfaces = /:is\(([^)]*)\) \.podium-tier,/.exec(muted[1])![1];
+    const weightRule = /\n:where\(\.entity-link, \.entity-name\):where\(:not\(([^{]*)\)\)\[data-podium="podium-tier"\] \{/.exec(block)![1];
+    const weightSurfaces = [...weightRule.matchAll(/:is\(([^)]*)\)/g)].map(([, list]) => list);
+    expect(weightSurfaces).toEqual([mutedSurfaces, mutedSurfaces]);
+  });
+
+  it("donne au nom éteint la couleur de la pastille, et non celle héritée par `.entity-link`", () => {
+    // Même spécificité : la pastille l'emporte parce qu'elle vient après.
+    expect(css.indexOf("\n.badge {")).toBeGreaterThan(css.indexOf("\n.entity-link {"));
+  });
+});
+
+describe("marches du podium — graisse d'un lien d'entité", () => {
+  it("pose la graisse sur le lien à spécificité d'une classe, le nom peint en hérite — sans `:has()`", () => {
+    expect(block).toMatch(
+      /\n:where\(\.entity-link, \.entity-name\):where\(:not\(\[data-podium-muted\], \[data-podium-muted\] \*, :is\(\.badge, \.pill, \.cy-tag\), :is\(\.badge, \.pill, \.cy-tag\) \*\)\)\[data-podium="podium-tier"\] \{\s*font-weight: 700;\s*\}/,
+    );
+    expect(block).toMatch(/\n\[data-podium\] > \.podium-tier \{\s*font-weight: inherit;\s*\}/);
+    expect(block).not.toContain(":has(");
   });
 });

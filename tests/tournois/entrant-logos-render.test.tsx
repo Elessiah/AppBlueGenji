@@ -130,6 +130,12 @@ describe("EntrantName", () => {
     expect(html).toContain("<strong>Dragon Squad</strong></a>");
   });
 
+  it("tronque le nom par `.entity-truncate`, lien ou case sans engagé", () => {
+    expect(withEntrants(<EntrantName teamId={1} name="Dragon" truncate />)).toMatch(/<a class="entity-link entity-truncate text"/);
+    expect(withEntrants(<EntrantName teamId={null} name="TBD" truncate />)).toMatch(/<span class="text entity-truncate"[^>]*>TBD<\/span>/);
+    expect(withEntrants(<EntrantName teamId={1} name="Dragon" />)).not.toContain("entity-truncate");
+  });
+
   it("porte la classe du nom sur le lien, et celle du conteneur sur le conteneur", () => {
     const html = withEntrants(
       <EntrantName teamId={1} name="Dragon" className="wrap" textClassName="txt" truncate />,

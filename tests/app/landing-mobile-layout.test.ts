@@ -117,11 +117,15 @@ describe("partenaires", () => {
 
 describe("classement", () => {
   it("borne le nom de l'équipe à deux lignes — le lien, dernier enfant de la cellule", () => {
+    // La coupe passe par `truncate={2}` du lien (`.entity-clamp-2`, globals.css),
+    // qui la reporte sur le nom peint d'une marche du podium (`PODIUM_TIERS.md`).
     const name = blockFor(/\.team > :last-child\s*\{/, leaderboard);
     expect(name).toMatch(/min-width:\s*0\s*;/);
-    expect(name).toMatch(/-webkit-line-clamp:\s*2\s*;/);
-    expect(name).toMatch(/overflow:\s*hidden\s*;/);
-    expect(name).not.toMatch(/white-space:\s*nowrap/);
+    expect(readSource("components/cyber/landing/Leaderboard.tsx")).toMatch(/<TeamLink teamId=\{row\.teamId\} truncate=\{2\}/);
+    const clamp = blockFor(/\.entity-clamp-2:not\(\[data-podium\]\),[^{]*\{/, readSource("app/globals.css"));
+    expect(clamp).toMatch(/-webkit-line-clamp:\s*2\s*;/);
+    expect(clamp).toMatch(/overflow:\s*hidden\s*;/);
+    expect(clamp).not.toMatch(/white-space:\s*nowrap/);
     expect(stripComments(leaderboard)).not.toContain("span:last-child");
   });
 

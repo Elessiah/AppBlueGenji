@@ -6,7 +6,7 @@ jest.mock("next/navigation", () => ({
 
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { PlayerLink, TeamLink } from "@/components/entity-link";
+import { EntityLink, PlayerLink, TeamLink } from "@/components/entity-link";
 import {
   PlayerPodiumName,
   PodiumTiersOff,
@@ -42,10 +42,10 @@ function render(node: ReactNode, tiers = TIERS): string {
 describe("TeamLink — marche de l'équipe", () => {
   it("pose la classe de chaque place, en gardant le texte, le lien et les classes de l'appelant", () => {
     expect(render(<TeamLink teamId={10}>Alpha</TeamLink>)).toBe(
-      '<a class="entity-link podium-tier podium-tier-1" href="/equipes/10">Alpha</a>',
+      '<a class="entity-link" data-podium="podium-tier" href="/equipes/10"><span class="podium-tier podium-tier-1">Alpha</span></a>',
     );
     expect(render(<TeamLink teamId={20} className="mine">Beta</TeamLink>)).toBe(
-      '<a class="entity-link podium-tier podium-tier-2 mine" href="/equipes/20">Beta</a>',
+      '<a class="entity-link mine" data-podium="podium-tier" href="/equipes/20"><span class="podium-tier podium-tier-2">Beta</span></a>',
     );
     expect(render(<TeamLink teamId={30}>Gamma</TeamLink>)).toContain("podium-tier podium-tier-3");
   });
@@ -65,10 +65,55 @@ describe("TeamLink — marche de l'équipe", () => {
   });
 });
 
+describe("marche peinte dans le lien, jamais sur le lien", () => {
+  // Une classe d'appelant qui pose un `background` (pastille `.badge`, `.pill`,
+  // classe de module) effacerait le dégradé peint dans le texte transparent :
+  // la marche vit sur un `<span>` intérieur, la classe de l'appelant sur le lien.
+  it("garde la pastille de l'appelant sur le lien et la marche sur le nom", () => {
+    expect(render(<TeamLink teamId={10} className="badge">Alpha</TeamLink>)).toBe(
+      '<a class="entity-link badge" data-podium="podium-tier" href="/equipes/10"><span class="podium-tier podium-tier-1">Alpha</span></a>',
+    );
+    expect(render(<PlayerLink userId={1} className="pill pill-accent">Joueur</PlayerLink>)).toBe(
+      '<a class="entity-link pill pill-accent" data-podium="podium-member" href="/joueurs/1"><span class="podium-member podium-member-1">Joueur</span></a>',
+    );
+  });
+
+  it("tronque par `truncate` (`.entity-truncate`), repère de la marche posé pour la feuille", () => {
+    expect(render(<TeamLink teamId={10} truncate>Alpha</TeamLink>)).toBe(
+      '<a class="entity-link entity-truncate" data-podium="podium-tier" href="/equipes/10"><span class="podium-tier podium-tier-1">Alpha</span></a>',
+    );
+    expect(render(<TeamLink teamId={40} truncate className="x">Delta</TeamLink>)).toBe(
+      '<a class="entity-link entity-truncate x" href="/equipes/40">Delta</a>',
+    );
+    expect(render(<TeamLink teamId={10} truncate={2}>Alpha</TeamLink>)).toBe(
+      '<a class="entity-link entity-clamp-2" data-podium="podium-tier" href="/equipes/10"><span class="podium-tier podium-tier-1">Alpha</span></a>',
+    );
+  });
+
+  it("tire le repère `data-podium` de la famille de la marche (équipe, membre)", () => {
+    expect(render(<EntityLink href="/x" podium={{ tier: 2, kind: "team" }}>N</EntityLink>)).toBe(
+      '<a class="entity-link" data-podium="podium-tier" href="/x"><span class="podium-tier podium-tier-2">N</span></a>',
+    );
+    expect(render(<EntityLink href="/x" podium={{ tier: 1, kind: "member" }}>N</EntityLink>)).toContain('data-podium="podium-member"');
+  });
+
+  it("un compte supprimé (`podiumTier={null}`) ne peint rien dans sa pastille", () => {
+    expect(render(<TeamLink teamId={10} className="badge" podiumTier={null}>Alpha</TeamLink>)).toBe(
+      '<a class="entity-link badge" href="/equipes/10">Alpha</a>',
+    );
+  });
+
+  it("n'ajoute aucun élément hors podium", () => {
+    expect(render(<TeamLink teamId={40} className="badge">Delta</TeamLink>)).toBe(
+      '<a class="entity-link badge" href="/equipes/40">Delta</a>',
+    );
+  });
+});
+
 describe("PlayerLink — marche adoucie du membre", () => {
   it("donne au membre la plus haute marche de ses équipes, en version adoucie", () => {
     expect(render(<PlayerLink userId={1}>Joueur</PlayerLink>)).toBe(
-      '<a class="entity-link podium-member podium-member-1" href="/joueurs/1">Joueur</a>',
+      '<a class="entity-link" data-podium="podium-member" href="/joueurs/1"><span class="podium-member podium-member-1">Joueur</span></a>',
     );
     expect(render(<PlayerLink userId={2}>Autre</PlayerLink>)).toContain("podium-member podium-member-3");
   });
@@ -90,14 +135,14 @@ describe("EntrantLink — engagé de tournoi", () => {
   }
 
   it("porte la marche de l'équipe engagée", () => {
-    expect(entrant(20)).toContain('class="entity-link podium-tier podium-tier-2"');
+    expect(entrant(20)).toBe('<a class="entity-link" data-podium="podium-tier" href="/equipes/20"><span class="podium-tier podium-tier-2">Nom</span></a>');
     expect(entrant(40)).toBe('<a class="entity-link" href="/equipes/40">Nom</a>');
   });
 
   it("entrée solo (jamais classée) : la marche adoucie de son joueur, jamais celle d'une équipe", () => {
     // L'entrée solo 10 porte le même identifiant qu'une équipe du podium : seule
     // compte la marche du joueur 2 (membre de la 3e).
-    expect(entrant(10, { 10: 2 })).toBe('<a class="entity-link podium-member podium-member-3" href="/joueurs/2">Nom</a>');
+    expect(entrant(10, { 10: 2 })).toBe('<a class="entity-link" data-podium="podium-member" href="/joueurs/2"><span class="podium-member podium-member-3">Nom</span></a>');
     expect(entrant(55, { 55: 3 })).toBe('<a class="entity-link" href="/joueurs/3">Nom</a>');
   });
 });

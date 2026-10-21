@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useMemo, type ReactNode } from "react";
-import { EntityLink, joinEntityClasses, useEntrantPodiumClass, type EntityLinkProps } from "@/components/entity-link";
+import { EntityLink, useEntrantPodium, type EntityLinkProps } from "@/components/entity-link";
 import { entrantHref, participantWording, type ParticipantType } from "@/lib/shared/participants";
 import { entrantLogoUrl, type EntrantLogoMap } from "@/lib/shared/entrant-logos";
 import type { SeedMap } from "@/lib/shared/match-sections";
@@ -90,11 +90,10 @@ export function useParticipantWording() {
  */
 export function EntrantLink({
   teamId,
-  className,
   ...rest
 }: Readonly<EntityLinkProps & { teamId: number }>) {
   const { soloUserIds } = useContext(EntrantContext);
   const entrantLink = useEntrantLink();
-  const tier = useEntrantPodiumClass(teamId, soloUserIds[teamId]);
-  return <EntityLink href={entrantLink(teamId)} className={joinEntityClasses(tier, className)} {...rest} />;
+  const podium = useEntrantPodium(teamId, soloUserIds[teamId]);
+  return <EntityLink href={entrantLink(teamId)} podium={podium} {...rest} />;
 }

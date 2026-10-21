@@ -1,9 +1,10 @@
 "use client";
 
 import { LocaleLink } from "@/components/i18n/locale-navigation";
-import { useMemberPodiumTier, useTeamPodiumTier } from "@/components/podium-tiers";
+import { PodiumPaint, useMemberPodiumTier, useTeamPodiumTier } from "@/components/podium-tiers";
 import { useSpectatorView } from "@/components/spectator-view";
-import { podiumTierClass, type PodiumTier } from "@/lib/shared/podium-tiers";
+import { entityTruncateClass, joinClasses } from "@/lib/shared/class-names";
+import { podiumTierClass, podiumTierFamily, type PodiumTier, type PodiumTierKind } from "@/lib/shared/podium-tiers";
 import type { CSSProperties, ReactNode } from "react";
 
 /**
@@ -29,6 +30,12 @@ import type { CSSProperties, ReactNode } from "react";
  * (`.podium-tier-N`) sur chaque `TeamLink`, ses membres une version adoucie
  * (`.podium-member-N`) sur chaque `PlayerLink` — lue dans le contexte posé par
  * la mise en page racine (`components/podium-tiers.tsx`, `PODIUM_TIERS.md`).
+ * Elle se peint sur un `<span>` **dans** le lien, jamais sur le lien : la classe
+ * de l'appelant (une pastille `.badge`, par exemple) pose souvent un
+ * `background`, qui effacerait le dégradé peint dans le texte transparent.
+ * Ce `<span>` enveloppe tous les enfants : un lien qui dispose les siens
+ * (avatar et nom en flex, par exemple) passe `podiumTier={null}`, comme le
+ * roster des cartes d'équipe.
  *
  * **Sans compte** (`useSpectatorView`, `/suivre/tournois/[id]`), le nom reste
  * un nom : les fiches d'équipe et de joueur sont dans l'espace connecté, un
@@ -42,6 +49,13 @@ export interface EntityLinkProps {
   style?: CSSProperties;
   title?: string;
   "aria-label"?: string;
+  /**
+   * Tronque le nom d'une ellipse : `true` sur une ligne (`.entity-truncate`),
+   * `2` à deux lignes (`.entity-clamp-2`). Un nom peint d'une marche se coupe
+   * alors lui-même, pas le lien : sa lueur n'est pas rognée et l'ellipse garde
+   * le dégradé (`PODIUM_TIERS.md`).
+   */
+  truncate?: boolean | 2;
 }
 
 /**
@@ -51,36 +65,45 @@ export interface EntityLinkProps {
  */
 export type PodiumTierOverride = { podiumTier?: PodiumTier | null };
 
-/** Classe de la marche à concaténer : l'imposée si elle est donnée, sinon celle du contexte. */
-function tierClassName(override: PodiumTier | null | undefined, fromContext: PodiumTier | null, kind: "team" | "member") {
-  return podiumTierClass(override === undefined ? fromContext : override, kind);
+/** Marche peinte sur le nom d'un lien d'entité : sa place, et la famille (équipe ou membre). */
+export type EntityPodium = { tier: PodiumTier; kind: PodiumTierKind };
+
+/** Marche d'une place et d'une famille ; `undefined` hors podium. */
+function toPodium(tier: PodiumTier | null, kind: PodiumTierKind): EntityPodium | undefined {
+  return tier === null ? undefined : { tier, kind };
 }
 
-/** Concatène des classes optionnelles (`undefined` si aucune). */
-export function joinEntityClasses(...names: (string | undefined)[]): string | undefined {
-  const joined = names.filter(Boolean).join(" ");
-  return joined === "" ? undefined : joined;
+/** Marche du lien : l'imposée si elle est donnée, sinon celle du contexte. */
+function linkPodium(override: PodiumTier | null | undefined, fromContext: PodiumTier | null, kind: PodiumTierKind) {
+  return toPodium(override === undefined ? fromContext : override, kind);
 }
 
 export function EntityLink({
   href,
   children,
   className,
+  podium,
+  truncate = false,
   ...rest
-}: Readonly<EntityLinkProps & { href: string }>) {
+}: Readonly<EntityLinkProps & { href: string; /** Marche peinte sur le nom. */ podium?: EntityPodium }>) {
   const spectator = useSpectatorView();
+  const name = <PodiumPaint className={podium && podiumTierClass(podium.tier, podium.kind)}>{children}</PodiumPaint>;
+  // Repère posé sur le lien, lu par la feuille sans `:has()` : la famille de la
+  // marche peinte dedans (`podium-tier` / `podium-member`).
+  const marks = { "data-podium": podium && podiumTierFamily(podium.kind) };
+  const extra = joinClasses(entityTruncateClass(truncate), className);
   if (spectator) {
     // Pas d'`aria-label` sur un `<span>` sans rôle (`aria-prohibited-attr`) :
     // le nom affiché suffit, il n'annonce plus de destination.
     return (
-      <span className={className ? `entity-name ${className}` : "entity-name"} style={rest.style} title={rest.title}>
-        {children}
+      <span className={joinClasses("entity-name", extra)} style={rest.style} title={rest.title} {...marks}>
+        {name}
       </span>
     );
   }
   return (
-    <LocaleLink href={href} className={className ? `entity-link ${className}` : "entity-link"} {...rest}>
-      {children}
+    <LocaleLink href={href} className={joinClasses("entity-link", extra)} {...marks} {...rest}>
+      {name}
     </LocaleLink>
   );
 }
@@ -89,22 +112,20 @@ export function EntityLink({
 export function TeamLink({
   teamId,
   podiumTier,
-  className,
   ...rest
 }: Readonly<EntityLinkProps & PodiumTierOverride & { teamId: number }>) {
-  const tier = tierClassName(podiumTier, useTeamPodiumTier(teamId), "team");
-  return <EntityLink href={`/equipes/${teamId}`} className={joinEntityClasses(tier, className)} {...rest} />;
+  const podium = linkPodium(podiumTier, useTeamPodiumTier(teamId), "team");
+  return <EntityLink href={`/equipes/${teamId}`} podium={podium} {...rest} />;
 }
 
 /** Pseudo cliquable → `/joueurs/[id]`, habillé de la marche (adoucie) de son équipe. */
 export function PlayerLink({
   userId,
   podiumTier,
-  className,
   ...rest
 }: Readonly<EntityLinkProps & PodiumTierOverride & { userId: number }>) {
-  const tier = tierClassName(podiumTier, useMemberPodiumTier(userId), "member");
-  return <EntityLink href={`/joueurs/${userId}`} className={joinEntityClasses(tier, className)} {...rest} />;
+  const podium = linkPodium(podiumTier, useMemberPodiumTier(userId), "member");
+  return <EntityLink href={`/joueurs/${userId}`} podium={podium} {...rest} />;
 }
 
 /**
@@ -112,9 +133,9 @@ export function PlayerLink({
  * entrée solo (`soloUserId`), jamais classée — celle du joueur, adoucie, comme
  * sur son `PlayerLink`.
  */
-export function useEntrantPodiumClass(teamId: number, soloUserId: number | undefined): string | undefined {
+export function useEntrantPodium(teamId: number, soloUserId: number | undefined): EntityPodium | undefined {
   const teamTier = useTeamPodiumTier(soloUserId === undefined ? teamId : null);
   const memberTier = useMemberPodiumTier(soloUserId);
-  return soloUserId === undefined ? podiumTierClass(teamTier, "team") : podiumTierClass(memberTier, "member");
+  return soloUserId === undefined ? toPodium(teamTier, "team") : toPodium(memberTier, "member");
 }
 

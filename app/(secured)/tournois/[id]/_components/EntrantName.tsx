@@ -3,6 +3,7 @@
 import Image from "next/image";
 import type { CSSProperties, ReactNode } from "react";
 import { avatarInitial } from "@/lib/shared/avatar";
+import { entityTruncateClass, joinClasses } from "@/lib/shared/class-names";
 import { EntrantLink, useEntrantLogo } from "../_lib/entrant-link";
 import styles from "./EntrantName.module.css";
 
@@ -95,20 +96,21 @@ export function EntrantName({
   textStyle,
   title,
 }: Readonly<EntrantNameProps>) {
-  const textClass = [styles.text, truncate ? styles.truncate : "", textClassName ?? ""]
-    .filter(Boolean)
-    .join(" ");
+  // Troncature : `.entity-truncate` (globale), par `EntityLink` pour le lien —
+  // qui rogne sur le nom peint d'une marche plutôt que sur le lien —, posée à
+  // la main sur le nom non cliquable.
+  const textClass = joinClasses(styles.text, textClassName);
   const content = children ?? name;
 
   return (
-    <span className={className ? `${styles.label} ${className}` : styles.label} style={style}>
+    <span className={joinClasses(styles.label, className)} style={style}>
       <EntrantLogo teamId={teamId} name={name} size={logoSize} />
       {teamId !== null ? (
-        <EntrantLink teamId={teamId} className={textClass} style={textStyle} title={title}>
+        <EntrantLink teamId={teamId} className={textClass} style={textStyle} title={title} truncate={truncate}>
           {content}
         </EntrantLink>
       ) : (
-        <span className={textClass} style={textStyle} title={title}>
+        <span className={joinClasses(textClass, entityTruncateClass(truncate))} style={textStyle} title={title}>
           {content}
         </span>
       )}
