@@ -144,7 +144,10 @@ describe("marches du podium — accessibilité et impression", () => {
   it("ne tronque jamais un lien d'entité par une classe de l'appelant", () => {
     expect(readSource("app/(secured)/equipes/[id]/team.module.css")).not.toMatch(/\.playerName \{[^}]*overflow/);
     expect(readSource("app/(secured)/equipes/[id]/_components/MembersSection.tsx")).toMatch(/<PlayerLink [^>]*\btruncate>/);
-    expect(readSource("app/(secured)/tournois/[id]/_components/EntrantName.tsx")).toContain("truncate={truncate}");
+    const entrant = readSource("app/(secured)/tournois/[id]/_components/EntrantName.tsx");
+    expect(entrant).toContain("truncate={truncate}");
+    expect(entrant).toContain("`${textClass} entity-truncate`");
+    expect(readSource("app/(secured)/tournois/[id]/_components/EntrantName.module.css")).not.toMatch(/text-overflow/);
   });
 
   it("rend une couleur pleine au survol et au focus d'un lien", () => {
@@ -289,6 +292,15 @@ describe("marches du podium — pastille de l'équipe active (fiche joueur)", ()
   it("le nom éteint, à la couleur de la pastille, tient 4,5:1 sur son fond", () => {
     const color = /color: var\((--[a-z0-9-]+)\);/.exec(badge)![1];
     expect(contrastRatio(hexOf(color)!, BADGE)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it.each([1, 2, 3])("le repère de la marche %i, conservé, tient 3:1 sur la pastille (contraste non textuel)", (tier) => {
+    // La règle propre au repère (la règle partagée des losanges n'en pose que la forme).
+    const bodies = [...block.matchAll(new RegExp(String.raw`\n\.podium-tier-${tier}::before \{([^}]*)\}`, "g"))].map(([, ruleBody]) => ruleBody);
+    const body = bodies.find((candidate) => candidate.includes("linear-gradient"))!;
+    const stops = [.../background: linear-gradient\(([^;]*)\);/.exec(body)![1].matchAll(/var\((--[a-z0-9-]+)\)/g)].map(([, name]) => name);
+    expect(stops.length).toBeGreaterThanOrEqual(2);
+    for (const name of stops) expect(contrastRatio(hexOf(name)!, BADGE)).toBeGreaterThanOrEqual(3);
   });
 
   it("au survol et au focus, la couleur pleine du lien tient aussi 4,5:1 sur la pastille", () => {

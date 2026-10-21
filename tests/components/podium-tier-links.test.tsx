@@ -6,7 +6,7 @@ jest.mock("next/navigation", () => ({
 
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { PlayerLink, TeamLink } from "@/components/entity-link";
+import { EntityLink, PlayerLink, TeamLink } from "@/components/entity-link";
 import {
   PlayerPodiumName,
   PodiumTiersOff,
@@ -91,6 +91,11 @@ describe("marche peinte dans le lien, jamais sur le lien", () => {
     expect(render(<TeamLink teamId={40} truncate className="x">Delta</TeamLink>)).toBe(
       '<a class="entity-link entity-truncate x" href="/equipes/40">Delta</a>',
     );
+  });
+
+  it("tire le repère `data-podium` de la famille de la marche, quel que soit l'ordre des classes", () => {
+    expect(render(<EntityLink href="/x" podiumClass="podium-tier-2 podium-tier">N</EntityLink>)).toContain('data-podium="podium-tier"');
+    expect(render(<EntityLink href="/x" podiumClass="podium-member-1 podium-member">N</EntityLink>)).toContain('data-podium="podium-member"');
   });
 
   it("un compte supprimé (`podiumTier={null}`) ne peint rien, même éteint", () => {
