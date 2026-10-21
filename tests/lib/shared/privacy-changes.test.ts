@@ -43,6 +43,7 @@ import {
   privacyDmBatch,
   privacyPolicyUpdatedLabel,
   settledPrivacyChanges,
+  type PrivacyAudience,
   type PrivacyChange,
 } from "@/lib/shared/privacy-changes";
 
@@ -440,7 +441,7 @@ describe("entrées ciblées (audience)", () => {
   });
 
   it("une cible inconnue (valeur inattendue) ne vise personne", () => {
-    const odd = change("x", "2026-04-01", { audience: "AUTRE" as never });
+    const odd = change("x", "2026-04-01", { audience: "AUTRE" as string as PrivacyAudience });
     expect(privacyChangeReachesAccount(odd, { googleLinked: true })).toBe(false);
   });
 

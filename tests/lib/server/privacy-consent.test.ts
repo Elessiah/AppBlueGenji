@@ -10,7 +10,7 @@ import {
   loadPendingPrivacyChanges,
   privacyAudienceSql,
 } from "@/lib/server/privacy-consent";
-import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
+import { PRIVACY_CHANGES, type PrivacyAudience } from "@/lib/shared/privacy-changes";
 import { fakePool } from "../../helpers/sql-double";
 
 const flat = (sql: unknown) => String(sql).replace(/\s+/g, " ").trim();
@@ -37,14 +37,14 @@ describe("loadPendingPrivacyChanges", () => {
     // Midi UTC la veille de sa publication.
     jest.setSystemTime(new Date(Date.parse(`${last.publishedAt}T12:00:00Z`) - 86_400_000));
     // Relié à Google : seule la date peut taire la dernière entrée, même ciblée.
-    mockExecute([{ created_at: "2025-01-01 10:00:00", google_linked: 1, live_staff: 1, change_id: null }]);
+    mockExecute([{ created_at: "2025-01-01 10:00:00", google_linked: 1, is_admin: 1, platform_roles_json: null, change_id: null }]);
     const pending = await loadPendingPrivacyChanges(7);
     expect(pending.map((c) => c.id)).not.toContain(last.id);
     expect(pending.every((c) => c.publishedAt < last.publishedAt)).toBe(true);
   });
 
   it("lit création et prises de connaissance en une seule requête, compte vivant seulement", async () => {
-    const execute = mockExecute([{ created_at: "2025-01-01 10:00:00", google_linked: 1, live_staff: 1, change_id: null }]);
+    const execute = mockExecute([{ created_at: "2025-01-01 10:00:00", google_linked: 1, is_admin: 1, platform_roles_json: null, change_id: null }]);
     const pending = await loadPendingPrivacyChanges(7);
     expect(execute).toHaveBeenCalledTimes(1);
     const [sql, params] = execute.mock.calls[0] as unknown as [string, unknown[]];
@@ -56,7 +56,7 @@ describe("loadPendingPrivacyChanges", () => {
 
   it("retire les changements déjà lus", async () => {
     mockExecute([
-      { created_at: "2025-01-01 10:00:00", google_linked: 1, live_staff: 1, change_id: PRIVACY_CHANGES[0].id },
+      { created_at: "2025-01-01 10:00:00", google_linked: 1, is_admin: 1, platform_roles_json: null, change_id: PRIVACY_CHANGES[0].id },
     ]);
     const pending = await loadPendingPrivacyChanges(7);
     expect(pending.map((c) => c.id)).not.toContain(PRIVACY_CHANGES[0].id);
@@ -64,7 +64,7 @@ describe("loadPendingPrivacyChanges", () => {
   });
 
   it("tait une entrée ciblée Google à un compte qui n'est pas relié à Google", async () => {
-    const execute = mockExecute([{ created_at: "2025-01-01 10:00:00", google_linked: 0, live_staff: 1, change_id: null }]);
+    const execute = mockExecute([{ created_at: "2025-01-01 10:00:00", google_linked: 0, is_admin: 1, platform_roles_json: null, change_id: null }]);
     const pending = await loadPendingPrivacyChanges(7);
     const [sql] = execute.mock.calls[0] as unknown as [string];
     expect(flat(sql)).toContain("u.google_sub IS NOT NULL AS google_linked");
@@ -75,14 +75,28 @@ describe("loadPendingPrivacyChanges", () => {
   });
 
   it("tait une entrée réservée aux casters (permission live) à un compte qui ne peut pas caster", async () => {
-    const execute = mockExecute([{ created_at: "2025-01-01 10:00:00", google_linked: 1, live_staff: 0, change_id: null }]);
-    const pending = await loadPendingPrivacyChanges(7);
-    const [sql] = execute.mock.calls[0] as unknown as [string];
-    expect(flat(sql)).toContain(`${LIVE_STAFF_SQL} AS live_staff`);
     const targeted = PRIVACY_CHANGES.filter((c) => c.audience === "LIVE_STAFF").map((c) => c.id);
     expect(targeted).toContain("2026-10-contacts-du-caster-aux-arbitres");
-    for (const id of targeted) expect(pending.map((c) => c.id)).not.toContain(id);
-    expect(pending).toHaveLength(PRIVACY_CHANGES.length - targeted.length);
+    for (const roles of [null, '["RECRUTEUR"]', '["COMMUNITY_MANAGER"]']) {
+      const execute = mockExecute([
+        { created_at: "2025-01-01 10:00:00", google_linked: 1, is_admin: 0, platform_roles_json: roles, change_id: null },
+      ]);
+      const pending = await loadPendingPrivacyChanges(7);
+      const [sql] = execute.mock.calls[0] as unknown as [string];
+      expect(flat(sql)).toContain("u.is_admin, u.platform_roles_json");
+      for (const id of targeted) expect(pending.map((c) => c.id)).not.toContain(id);
+      expect(pending).toHaveLength(PRIVACY_CHANGES.length - targeted.length);
+    }
+  });
+
+  it("la montre à un compte qui peut caster, décidé par can(user, \"live\")", async () => {
+    for (const [isAdmin, roles] of [[1, null], [0, '["CASTER"]'], [0, ["ARBITRE"]]] as const) {
+      mockExecute([
+        { created_at: "2025-01-01 10:00:00", google_linked: 1, is_admin: isAdmin, platform_roles_json: roles, change_id: null },
+      ]);
+      const pending = await loadPendingPrivacyChanges(7);
+      expect(pending.map((c) => c.id)).toContain("2026-10-contacts-du-caster-aux-arbitres");
+    }
   });
 
   it("n'impose rien à un compte créé après la dernière publication", async () => {
@@ -134,12 +148,12 @@ describe("privacyAudienceSql", () => {
     expect(privacyAudienceSql({ ...base, audience: undefined })).toBe("1 = 1");
     expect(privacyAudienceSql({ ...base, audience: "GOOGLE_LINKED" })).toBe("u.google_sub IS NOT NULL");
     expect(privacyAudienceSql({ ...base, audience: "LIVE_STAFF" })).toBe(LIVE_STAFF_SQL);
+    expect(privacyAudienceSql({ ...base, audience: "AUTRE" as string as PrivacyAudience })).toBe("1 = 0");
   });
 
   it("LIVE_STAFF : la règle de can(user, \"live\"), rôles tirés de ROLE_PERMISSIONS", () => {
     expect(LIVE_STAFF_SQL).toBe(
       `(u.is_admin = 1 OR JSON_CONTAINS(u.platform_roles_json, '"ADMIN"') OR JSON_CONTAINS(u.platform_roles_json, '"ARBITRE"') OR JSON_CONTAINS(u.platform_roles_json, '"CASTER"'))`,
     );
-    expect(privacyAudienceSql({ ...base, audience: "AUTRE" as never })).toBe("1 = 0");
   });
 });

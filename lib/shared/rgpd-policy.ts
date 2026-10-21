@@ -45,7 +45,7 @@ export const MATCH_CONTACTS_SCOPE =
  * 2026-10-19), prévue par les conditions d'utilisation.
  */
 export const BATTLETAG_MATCH_SCOPE =
-  "lecture, même masqué, dans la seule fenêtre « Contacts » d'un match où tu es présenté comme contact et dans sa fenêtre de lancement : par ses deux équipes et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, par son caster le temps du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes et au caster) — arbitres et administrateurs n'y ont pas d'autre accès (conditions d'utilisation, « Contacts de match »)";
+  "lecture, même masqué, dans la seule fenêtre « Contacts » d'un match où tu es présenté comme contact et dans sa fenêtre de lancement : par ses deux équipes et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, par son caster le temps du match ; celui du caster, par les deux équipes le temps du match et par les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes et au caster) — arbitres et administrateurs n'y ont pas d'autre accès (conditions d'utilisation, « Contacts de match »)";
 
 /**
  * Bases légales citées par la politique — les mêmes que le registre

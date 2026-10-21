@@ -7,7 +7,7 @@ import {
   privacyChangeDay,
   type PrivacyChange,
 } from "@/lib/shared/privacy-changes";
-import { rolesGranting } from "@/lib/shared/permissions";
+import { can, rolesGranting, sanitizePlatformRoles } from "@/lib/shared/permissions";
 
 /**
  * Lecture et écriture de la prise de connaissance des changements du traitement des
@@ -17,14 +17,20 @@ import { rolesGranting } from "@/lib/shared/permissions";
 type PendingRow = RowDataPacket & {
   created_at: string | null;
   google_linked: 0 | 1 | null;
-  live_staff: 0 | 1 | null;
+  is_admin: number | null;
+  platform_roles_json: unknown;
   change_id: string | null;
 };
 
 /**
  * Le compte `u` peut-il caster (permission `live`) ? Même règle que `can` :
- * administrateur, ou l'un des rôles qui l'accordent. Les rôles sont des
- * constantes du code, jamais une saisie : les écrire dans la requête est sûr.
+ * administrateur, ou l'un des rôles qui l'accordent (`rolesGranting`, tiré de
+ * la table des permissions). Seule l'annonce Discord la lit en base : elle doit
+ * filtrer **avant** sa limite de lot, sans quoi des comptes non concernés en
+ * occuperaient les places à chaque balayage. La modale, qui lit une seule
+ * ligne, décide par `can` lui-même. Les rôles sont des constantes du code,
+ * jamais une saisie : les écrire dans la requête est sûr ; l'écran des rôles
+ * (`lib/server/users/roles.ts`) est seul à écrire la colonne, en tableau JSON.
  */
 export const LIVE_STAFF_SQL = `(u.is_admin = 1${rolesGranting("live")
   .map((role) => ` OR JSON_CONTAINS(u.platform_roles_json, '"${role}"')`)
@@ -64,7 +70,7 @@ export async function loadPendingPrivacyChanges(userId: number): Promise<Privacy
 
   const db = await getDatabase();
   const [rows] = await db.execute<PendingRow[]>(
-    `SELECT u.created_at, u.google_sub IS NOT NULL AS google_linked, ${LIVE_STAFF_SQL} AS live_staff, a.change_id
+    `SELECT u.created_at, u.google_sub IS NOT NULL AS google_linked, u.is_admin, u.platform_roles_json, a.change_id
        FROM bg_users u
        LEFT JOIN bg_privacy_acknowledgments a ON a.user_id = u.id
       WHERE u.id = ? AND u.is_deleted = 0`,
@@ -78,7 +84,13 @@ export async function loadPendingPrivacyChanges(userId: number): Promise<Privacy
     acknowledged,
     privacyChangeDay(new Date()),
     PRIVACY_CHANGES,
-    { googleLinked: Number(rows[0].google_linked) === 1, liveStaff: Number(rows[0].live_staff) === 1 },
+    {
+      googleLinked: Number(rows[0].google_linked) === 1,
+      liveStaff: can(
+        { isAdmin: Number(rows[0].is_admin) === 1, roles: sanitizePlatformRoles(rows[0].platform_roles_json) },
+        "live",
+      ),
+    },
   );
 }
 

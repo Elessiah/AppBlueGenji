@@ -176,10 +176,14 @@ describe("tag Discord d'un caster — arbitres", () => {
     );
   });
 
-  it("le BattleTag masqué d'un caster : la ligne du caster nomme arbitres et administrateurs, celle du staff reste celle d'un joueur (FR et EN)", () => {
+  it("le BattleTag masqué d'un caster : la ligne du caster et celle du staff disent le même moment (FR et EN)", () => {
     expect(frProfile.battletagNotice.asCaster).toContain("<strong>ses arbitres et les administrateurs</strong> dès que ses deux adversaires sont connus");
     expect(enProfile.battletagNotice.asCaster).toContain("<strong>its referees and administrators</strong> from the moment both its opponents are known");
-    expect(frProfile.battletagNotice.staff).toContain("aux mêmes moments que les deux équipes (la fenêtre");
-    expect(enProfile.battletagNotice.staff).toContain("at the same times as both teams (the launch window");
+    expect(frProfile.battletagNotice.staff).toContain(
+      "aux mêmes moments que les deux équipes pour un match que tu joues, dès que ses deux adversaires sont connus pour un match que tu castes",
+    );
+    expect(enProfile.battletagNotice.staff).toContain(
+      "at the same times as both teams for a match you play, from the moment both its opponents are known for a match you cast",
+    );
   });
 });

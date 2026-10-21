@@ -355,7 +355,7 @@
     "players": "<strong>Les membres des deux équipes de ton match</strong>, dès que ses deux adversaires sont connus et jusqu'à sa fin, si tu fais partie des contacts présentés — c'est par lui qu'on s'ajoute en jeu pour lancer la partie.",
     "caster": "<strong>Le caster de ton match</strong>, le temps du match seulement (de son départ à sa fin), si tu fais partie des contacts présentés.",
     "asCaster": "<strong>Les deux équipes d'un match que tu castes</strong>, le temps du match seulement (de son départ à sa fin), et <strong>ses arbitres et les administrateurs</strong> dès que ses deux adversaires sont connus et jusqu'à sa fin.",
-    "staff": "<strong>Les arbitres et les administrateurs</strong>, dans la même fenêtre « Contacts » des matchs du tournoi, aux mêmes moments que les deux équipes (la fenêtre de lancement, elle, ne s'ouvre qu'aux équipes et au caster) — jamais ailleurs.",
+    "staff": "<strong>Les arbitres et les administrateurs</strong>, dans la même fenêtre « Contacts » des matchs du tournoi : aux mêmes moments que les deux équipes pour un match que tu joues, dès que ses deux adversaires sont connus pour un match que tu castes (la fenêtre de lancement, elle, ne s'ouvre qu'aux équipes et au caster) — jamais ailleurs.",
     "outro": "Pour ne plus le communiquer du tout, il faut effacer le champ — mais tes adversaires ne pourront alors plus t'ajouter en jeu. Et si un compte Blizzard est rattaché, c'est lui qui tient ce champ : il faut le retirer d'abord (après avoir ajouté un autre moyen de connexion si c'est le seul).",
     "ok": "J'ai compris"
   },
