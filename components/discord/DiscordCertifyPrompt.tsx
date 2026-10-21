@@ -17,8 +17,6 @@ import {
 } from "@/lib/shared/discord-certify-prompt";
 import { certifyPromptOpen } from "@/lib/shared/global-modals";
 import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
-import { PRIVACY_CHANGES_ANSWERED_EVENT, privacyFollowedLink } from "@/lib/shared/privacy-changes";
-import { TERMS_ACCEPTED_EVENT, TERMS_REQUIRED_EVENT } from "@/lib/shared/terms-of-use";
 import { visibleText } from "@/lib/shared/visible-text";
 import type { CertifyPromptText } from "./certify-prompt-text";
 import styles from "./DiscordCertifyPrompt.module.css";
@@ -56,10 +54,15 @@ export type DiscordCertifyPromptProps = {
 };
 
 /**
- * Props de la fenêtre elle-même : ses textes (espace `certifyPrompt`) lui sont
- * donnés par `DiscordCertifyPromptLazy`, dans la seule langue de la page.
+ * Props de la fenêtre elle-même, montée par `DiscordCertifyPromptLazy` seulement
+ * quand une proposition est due : attentes déjà mises à jour par ses
+ * événements (confidentialité, conditions), textes (espace `certifyPrompt`)
+ * dans la seule langue de la page.
  */
-export type DiscordCertifyPromptViewProps = DiscordCertifyPromptProps & { text: CertifyPromptText };
+export type DiscordCertifyPromptViewProps = Omit<DiscordCertifyPromptProps, "prompt"> & {
+  prompt: CertifyPrompt;
+  text: CertifyPromptText;
+};
 
 async function answerPrompt(action: CertifyPromptAction): Promise<void> {
   const response = await fetch("/api/profile/discord/certify-prompt", {
@@ -85,7 +88,8 @@ async function answerPrompt(action: CertifyPromptAction): Promise<void> {
  * voir » pour le compte. Le bouton principal certifie d'un clic quand Discord a
  * nommé le tag (`ONE_CLICK`, route existante), et mène sinon au dialogue de
  * certification de `/profil` (`DIALOG`), qui garde seul le code et le passage
- * par Discord. Elle attend la confidentialité et les conditions.
+ * par Discord. Elle attend la confidentialité et les conditions (attentes
+ * suivies par `DiscordCertifyPromptLazy`).
  */
 export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending, text }: Readonly<DiscordCertifyPromptViewProps>) {
   const { t, rich } = text;
@@ -95,25 +99,16 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending, tex
   const titleId = useId();
   const [mounted, setMounted] = useState(false);
   const [closed, setClosed] = useState(false);
-  const [privacyAnswered, setPrivacyAnswered] = useState(!privacyPending);
-  const [termsAccepted, setTermsAccepted] = useState(!termsPending);
   const [busy, setBusy] = useState<"certify" | "never" | null>(null);
   const inFlight = useRef(false);
 
   useEffect(() => setMounted(true), []);
-  // Une proposition qui **apparaît** (rafraîchissement après une connexion par
-  // code) rouvre la fenêtre ; un simple changement de parcours (tag modifié sur
-  // `/profil`) ne rouvre pas une fenêtre déjà écartée.
-  const due = prompt !== null;
+  // Montée seulement quand une proposition est due (le relais la démonte
+  // sinon) : une proposition qui réapparaît la remonte, neuve ; un simple
+  // changement de parcours (tag modifié sur `/profil`) ne rouvre pas une
+  // fenêtre déjà écartée.
   /** Déjà répondue sur ce chargement (« Plus tard », dialogue, « Ne plus voir ») : rien à réécrire. */
   const answered = useRef(false);
-  useEffect(() => {
-    if (!due) return;
-    setClosed(false);
-    answered.current = false;
-  }, [due]);
-  const dueRef = useRef(due);
-  dueRef.current = due;
 
   /**
    * Close pour la session (`LATER`, avec `keepalive`) : fermée tout de suite ;
@@ -124,42 +119,23 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending, tex
     answered.current = true;
     answerPrompt("LATER").catch(() => undefined);
   }, []);
-  useEffect(() => setPrivacyAnswered(!privacyPending), [privacyPending]);
-  useEffect(() => setTermsAccepted(!termsPending), [termsPending]);
   useEffect(() => {
-    const onPrivacy = (event: Event) => {
-      setPrivacyAnswered(true);
-      // Un lien d'action de la modale de confidentialité envoie agir ailleurs
-      // (`/profil#confidentialite`…) : ne pas couvrir cet écran. Rien n'est
-      // écrit, la proposition revient au prochain chargement.
-      if (privacyFollowedLink(event)) setClosed(true);
-    };
-    const onTermsAccepted = () => setTermsAccepted(true);
-    const onTermsRequired = () => setTermsAccepted(false);
     // Certifié — ici d'un clic, ou par le dialogue de `/profil` : close pour
     // la session, qu'un tag changé ensuite ne la fasse pas revenir.
     const onCertified = () => {
-      if (dueRef.current && !answered.current) closeForSession();
+      if (!answered.current) closeForSession();
     };
     window.addEventListener(DISCORD_CERTIFIED_EVENT, onCertified);
-    window.addEventListener(PRIVACY_CHANGES_ANSWERED_EVENT, onPrivacy);
-    window.addEventListener(TERMS_ACCEPTED_EVENT, onTermsAccepted);
-    window.addEventListener(TERMS_REQUIRED_EVENT, onTermsRequired);
-    return () => {
-      window.removeEventListener(DISCORD_CERTIFIED_EVENT, onCertified);
-      window.removeEventListener(PRIVACY_CHANGES_ANSWERED_EVENT, onPrivacy);
-      window.removeEventListener(TERMS_ACCEPTED_EVENT, onTermsAccepted);
-      window.removeEventListener(TERMS_REQUIRED_EVENT, onTermsRequired);
-    };
+    return () => window.removeEventListener(DISCORD_CERTIFIED_EVENT, onCertified);
   }, [closeForSession]);
 
   const open =
     mounted &&
     !closed &&
     certifyPromptOpen({
-      due: prompt !== null,
-      privacyPending: !privacyAnswered,
-      termsPending: !termsAccepted,
+      due: true,
+      privacyPending,
+      termsPending,
       pathname,
     });
 
@@ -175,7 +151,7 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending, tex
   const dialogRef = useDialogBehavior({ open, onClose: postpone, locked: busy !== null, initialFocus: "container" });
   const backdrop = useBackdropDismiss(postpone, busy !== null);
 
-  if (!open || !prompt) return null;
+  if (!open) return null;
 
   /** Refus sans issue (compte supprimé, session close) : fermée, toast, page relue. `false` sinon. */
   const closeOnDeadEnd = (code: string): boolean => {

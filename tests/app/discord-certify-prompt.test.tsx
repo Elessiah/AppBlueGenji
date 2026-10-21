@@ -34,7 +34,6 @@ describe("DiscordCertifyPrompt — rendu", () => {
     const render = (node: React.JSX.Element) => renderToStaticMarkup(<ToastProvider>{node}</ToastProvider>);
     const empty = render(<span />).replace("<span></span>", "");
     expect(render(<DiscordCertifyPrompt prompt={{ mode: "ONE_CLICK", tag: "keryan" }} privacyPending={false} termsPending={false} text={FR_TEXT} />)).toBe(empty);
-    expect(render(<DiscordCertifyPrompt prompt={null} privacyPending={false} termsPending={false} text={FR_TEXT} />)).toBe(empty);
   });
 });
 
@@ -116,7 +115,8 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
 
   it("« Plus tard » survit à un départ de page (keepalive) ; un changement de parcours ne rouvre rien", () => {
     expect(SOURCE).toMatch(/body: JSON\.stringify\(\{ action \}\),[\s\S]*?keepalive: true,/);
-    expect(SOURCE).toMatch(/useEffect\(\(\) => \{\s*if \(!due\) return;\s*setClosed\(false\);\s*answered\.current = false;\s*\}, \[due\]\);/);
+    // Montée seulement quand due : une proposition qui réapparaît la remonte neuve (relais).
+    expect(LAZY).toMatch(/useEffect\(\(\) => \{\s*if \(due\) setFollowedLink\(false\);\s*\}, \[due\]\);/);
     expect(SOURCE).not.toContain("[prompt?.mode]");
   });
 
@@ -124,7 +124,7 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
     expect(SOURCE).toContain("window.addEventListener(DISCORD_CERTIFIED_EVENT, onCertified)");
     // Close pour la session (LATER), et seulement quand une proposition est due.
     // …et pas une seconde fois après « Plus tard », le dialogue ou « Ne plus voir ».
-    expect(SOURCE).toMatch(/const onCertified = \(\) => \{\s*if \(dueRef\.current && !answered\.current\) closeForSession\(\);\s*\};/);
+    expect(SOURCE).toMatch(/const onCertified = \(\) => \{\s*if \(!answered\.current\) closeForSession\(\);\s*\};/);
     expect(SOURCE).toMatch(/await answerPrompt\("NEVER"\);\s*answered\.current = true;/);
     const profile = readSource("app/(secured)/profil/page.tsx");
     expect(profile).toMatch(/setDiscordState\(\(prev\) => \(\{ \.\.\.prev, tag, verified: true[^\n]*\n(?:\s*\/\/[^\n]*\n)*\s*window\.dispatchEvent\(certifiedFromProfileEvent\(\)\);/);
@@ -142,15 +142,20 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
   });
 
   it("ne couvre pas l'écran où un lien de la modale de confidentialité envoie agir", () => {
-    expect(SOURCE).toContain("if (privacyFollowedLink(event)) setClosed(true);");
+    expect(LAZY).toContain("if (privacyFollowedLink(event)) setFollowedLink(true);");
+    expect(LAZY).toContain("if (!due || followedLink || !(armed || canOpen)) return null;");
     const privacy = readSource("components/privacy/PrivacyChangesModal.tsx");
     expect(privacy).toContain("window.dispatchEvent(privacyAnsweredEvent(followedLink));");
     expect(privacy).toMatch(/const followLink = \(changeId: string\) => \{\s*close\(true\);/);
   });
 
   it("attend la confidentialité et les conditions, par leurs événements", () => {
-    expect(SOURCE).toContain("PRIVACY_CHANGES_ANSWERED_EVENT");
-    expect(SOURCE).toContain("TERMS_ACCEPTED_EVENT");
+    expect(LAZY).toContain("PRIVACY_CHANGES_ANSWERED_EVENT");
+    expect(LAZY).toContain("TERMS_ACCEPTED_EVENT");
+    // Un seul suivi : la fenêtre reçoit ses attentes du relais, sans écouteur en double.
+    expect(SOURCE).not.toContain("PRIVACY_CHANGES_ANSWERED_EVENT");
+    expect(SOURCE).not.toContain("TERMS_ACCEPTED_EVENT");
+    expect(SOURCE).toMatch(/certifyPromptOpen\(\{\s*due: true,\s*privacyPending,\s*termsPending,\s*pathname,/);
     expect(readSource("components/legal/TermsAcceptanceModal.tsx")).toMatch(
       /setRequested\(false\);\s*window\.dispatchEvent\(new Event\(TERMS_ACCEPTED_EVENT\)\);/,
     );
@@ -168,7 +173,9 @@ describe("mise en page racine", () => {
   });
 
   it("chargée à la demande, seulement quand elle est due, chaque langue dans son morceau", () => {
-    expect(LAZY).toContain("if (!due || followedLink) return null;");
+    // …et seulement quand elle peut s'ouvrir (confidentialité, conditions, page), puis reste montée.
+    expect(LAZY).toContain("const canOpen = due && !followedLink && certifyPromptOpen({ due, ...pending, pathname });");
+    expect(LAZY).toMatch(/useEffect\(\(\) => \{\s*if \(canOpen\) setArmed\(true\);\s*\}, \[canOpen\]\);/);
     expect(LAZY.match(/\{ ssr: false \}/g)).toHaveLength(2);
     expect(LAZY.match(/orReload\(/g)).toHaveLength(2);
     // Une page française ne télécharge jamais l'anglais, ni l'inverse.
@@ -184,13 +191,17 @@ describe("mise en page racine", () => {
     expect(LAZY).toContain("if (privacyFollowedLink(event)) setFollowedLink(true);");
     expect(LAZY).toContain("window.addEventListener(TERMS_ACCEPTED_EVENT, onTermsAccepted)");
     expect(LAZY).toContain("window.addEventListener(TERMS_REQUIRED_EVENT, onTermsRequired)");
-    expect(LAZY).toContain("privacyPending={privacyPending && !privacyAnswered}");
-    expect(LAZY).toContain("termsPending={termsAccepted === null ? termsPending : !termsAccepted}");
+    expect(LAZY).toContain("privacyPending: privacyPending && !privacyAnswered,");
+    expect(LAZY).toContain("termsPending: termsAccepted === null ? termsPending : !termsAccepted,");
   });
 
   it("fait taire le recrutement tant qu'elle est due, quelle que soit la page", () => {
     expect(LAYOUT).toContain("const certifyPromptDue = certifyPrompt !== null;");
     expect(LAYOUT).toContain("modalHeld={certifyPromptDue}");
+    // Tenue, la modale ne s'ouvrira pas : ses annonces ne partent pas dans la page.
+    expect(LAYOUT).toContain("const modalAds = modalOptedOut || certifyPrompt !== null ? [] : spotlight.modal;");
+    // Lecture lancée dès la session, attendue avec les conditions.
+    expect(LAYOUT).toContain("await Promise.all([termsRequestFor(user?.id), certifyPromptLoad])");
     expect(LAYOUT).not.toMatch(/termsModalDue: termsDueOnLoad,\s*certifyPromptDue,/);
   });
 });

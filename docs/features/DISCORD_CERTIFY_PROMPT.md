@@ -34,9 +34,15 @@ pages légales et la connexion la taisent. La marque se lit **avec la session**
 (`getCurrentUser`, colonne `s.certify_prompt_due`) : aucune requête de plus tant
 qu'elle est à `0`.
 
-**Chargée seulement quand elle est due** (`DiscordCertifyPromptLazy`, rendu par
-la mise en page sous `certifyPrompt &&`) : sans proposition, ni son code ni ses
-textes ne partent — aucun poids sur le premier chargement des pages. Ses textes
+**Chargée seulement quand elle peut s'ouvrir** (`DiscordCertifyPromptLazy`,
+rendu par la mise en page sous `certifyPrompt &&`) : sans proposition, ni son
+code ni ses textes ne partent — aucun poids sur le premier chargement des
+pages ; due mais en attente (confidentialité, conditions, page qui la tait), le
+morceau attend aussi, puis reste monté. Le relais est seul à suivre ces
+attentes et les passe à la fenêtre. Due, la lecture part dès la session lue
+(attendue avec les conditions) ; la marque levée faute de rien à proposer ne
+retarde pas la page (écriture non attendue). Tenue, la modale du recrutement
+ne reçoit pas ses annonces sur ce chargement (`modalAds` vide). Ses textes
 ont **leur** espace, `certifyPrompt` (hors de la coquille, qui voyage avec
 chaque page) ; un morceau par langue (`next/dynamic`, `ssr: false`, `orReload`),
 une page française ne télécharge jamais l'anglais. Le relais retient ce qui

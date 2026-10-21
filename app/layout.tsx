@@ -231,6 +231,10 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   // appel ne coûte rien de plus sur les pages où `PublicHeader`/`PublicFooter`
   // le lisent déjà.
   const user = await getCurrentUser();
+  // Certification du tag Discord : ne dépend que de la session, lancée tout de
+  // suite (attendue avec les conditions) ; aucune requête quand la session n'a
+  // rien à proposer (marque lue avec elle). Ne lève jamais.
+  const certifyPromptLoad = user?.certifyPromptDue ? loadCertifyPromptSafely(user.id) : Promise.resolve(null);
   // Lus sur **toutes** les pages, `/rgpd` comprise : la modale s'y tait côté
   // client. Décidé ici, le silence survivrait à la navigation — la mise en
   // page racine n'est pas re-rendue d'un lien à l'autre, et un joueur arrivé
@@ -265,13 +269,10 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   // navigateur. La modale ne s'ouvrant plus, ses annonces ne partent pas dans
   // la page (ni, sous `/en`, ses textes quand la banderole n'a rien non plus).
   const modalOptedOut = recruitmentModalOptedOut({ accountOff: user?.recruitmentModalOff, browserCookie: modalOffCookie });
-  const modalAds = modalOptedOut ? [] : spotlight.modal;
-  // Conditions et certification ne dépendent que de la session : lues de front.
-  // Aucune requête de certification quand la session n'a rien à proposer (lu avec elle).
-  const [termsRequest, certifyPrompt] = await Promise.all([
-    termsRequestFor(user?.id),
-    user?.certifyPromptDue ? loadCertifyPromptSafely(user.id) : Promise.resolve(null),
-  ]);
+  const [termsRequest, certifyPrompt] = await Promise.all([termsRequestFor(user?.id), certifyPromptLoad]);
+  // Tenue par la certification (`modalHeld`, verrouillé pour la page), la
+  // modale ne s'ouvrira pas sur ce chargement : ses annonces n'y partent pas.
+  const modalAds = modalOptedOut || certifyPrompt !== null ? [] : spotlight.modal;
   const termsRequired = termsRequest !== null;
   // Bloquante pour tout compte connecté en retard d'une version (pas de report).
   const termsDueOnLoad = termsModalDueOnLoad({

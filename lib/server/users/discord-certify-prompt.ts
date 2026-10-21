@@ -33,8 +33,8 @@ type PromptRow = RowDataPacket & {
  * fenêtre se tait, la page ne tombe pas.
  *
  * Rien à proposer (tag déjà certifié, « Ne plus voir », compte supprimé) : la
- * marque de la session est levée sur-le-champ, sans quoi chaque page de ses
- * trente jours relancerait cette lecture pour rien.
+ * marque de la session est levée sur-le-champ (sans l'attendre), sans quoi
+ * chaque page de ses trente jours relancerait cette lecture pour rien.
  */
 export async function loadDiscordCertifyPrompt(userId: number, tokenHash: string): Promise<CertifyPrompt | null> {
   if (!Number.isInteger(userId) || userId <= 0 || !tokenHash) return null;
@@ -55,7 +55,11 @@ export async function loadDiscordCertifyPrompt(userId: number, tokenHash: string
     );
     const row = rows[0];
     if (!row) {
-      await markDiscordCertifyPromptSeen(userId, tokenHash);
+      // Jamais attendue : la réponse (`null`) n'en dépend pas, et la page
+      // (mise en page racine) n'a pas à payer un aller-retour de plus.
+      void markDiscordCertifyPromptSeen(userId, tokenHash).catch((error: unknown) =>
+        console.error("[discord-certify-prompt] marque non levée", error),
+      );
       return null;
     }
     return certifyPromptFor({
@@ -67,7 +71,7 @@ export async function loadDiscordCertifyPrompt(userId: number, tokenHash: string
     if (!isUnknownColumnError(error)) throw error;
     // Colonne du compte absente : lever la marque (colonne de session, elle,
     // présente puisque lue) évite une lecture vouée à l'échec à chaque page.
-    await markDiscordCertifyPromptSeen(userId, tokenHash).catch(() => undefined);
+    void markDiscordCertifyPromptSeen(userId, tokenHash).catch(() => undefined);
     return null;
   }
 }
