@@ -190,9 +190,11 @@ d'avertissement (profil, rattachement et connexion Battle.net, modale de
 masquage) dit la fenêtre exacte : « il reste visible pour tes adversaires, les
 admins et les arbitres d'un match de tournoi dès que ses deux adversaires sont
 connus et jusqu'à sa fin, ainsi que pour son caster le temps du match
-seulement » / “it stays visible to your opponents, admins and referees in a
+seulement, dans la fenêtre « Contacts » du match (et, pour les équipes et le
+caster, dans sa fenêtre de lancement) » / “it stays visible to your opponents, admins and referees in a
 tournament match from the moment both its opponents are known until its end,
-and to its caster only while the match is being played”, puis le cas du caster
+and to its caster only while the match is being played, in the match's
+“Contacts” window (and, for the teams and the caster, its launch window)”, puis le cas du caster
 (`battletag-hidden-warning.test.ts`).
 
 `TERMS_UPDATED_AT` est daté du **lendemain** de la mise en ligne quand l'heure
