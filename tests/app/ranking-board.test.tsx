@@ -169,11 +169,11 @@ describe("styles de /classement", () => {
 describe("noms du podium — la marche de l'onglet affiché", () => {
   it("pose la marche de chaque place sur le lien du nom, nom accessible inchangé", () => {
     const markup = render();
-    const tiers = [...markup.matchAll(/<h3 class="podiumName"><a [^>]*class="entity-link (podium-tier podium-tier-\d)"/g)].map(
+    const tiers = [...markup.matchAll(/<h3 class="podiumName"><a [^>]*><span class="(podium-tier podium-tier-\d)">/g)].map(
       (match) => match[1],
     );
     expect(tiers).toEqual(["podium-tier podium-tier-1", "podium-tier podium-tier-2", "podium-tier podium-tier-3"]);
-    expect(markup).toMatch(/<h3 class="podiumName"><a [^>]*href="\/equipes\/10"[^>]*>Équipe 1<\/a><\/h3>/);
+    expect(markup).toMatch(/<h3 class="podiumName"><a [^>]*href="\/equipes\/10"[^>]*><span [^>]*>Équipe 1<\/span><\/a><\/h3>/);
   });
 
   it("ne pose aucune marche au tableau qui suit le podium", () => {

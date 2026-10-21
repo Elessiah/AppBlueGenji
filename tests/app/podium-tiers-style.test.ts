@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
+import * as ts from "typescript";
 import { contrastRatio } from "@/lib/shared/color-contrast";
 import { readSource } from "../helpers/read-source";
 
@@ -130,7 +131,7 @@ describe("marches du podium — accessibilité et impression", () => {
   });
 
   it("rend une couleur pleine au survol et au focus d'un lien", () => {
-    const hover = /\.entity-link\.podium-tier:hover,[\s\S]*?\{([^}]*)\}/.exec(block)![1];
+    const hover = /\.entity-link:hover > \.podium-tier,[\s\S]*?\{([^}]*)\}/.exec(block)![1];
     expect(hover).toMatch(/background-image: none/);
     expect(hover).toMatch(/-webkit-text-fill-color: var\(--blue-100\)/);
   });
@@ -224,17 +225,43 @@ describe("marches du podium — outils du staff et comptes supprimés", () => {
   });
 
   it("garde sans marche l'équipe active d'un compte supprimé", () => {
-    const profile = readSource("app/(secured)/joueurs/[id]/page.tsx");
-    expect(profile).toMatch(/<TeamLink\s+teamId=\{activeTeam\.teamId\}\s+podiumTier=\{deleted \? null : undefined\}/);
+    expect(activeTeamLink().attributes.podiumTier).toBe("{deleted ? null : undefined}");
   });
 });
+
+/**
+ * Lien de l'équipe active de la fiche joueur, lu par le compilateur TypeScript
+ * (indépendant de l'ordre des props) : ses attributs, et ceux de son parent.
+ */
+function activeTeamLink(): { attributes: Record<string, string>; parent: Record<string, string> } {
+  const path = "app/(secured)/joueurs/[id]/page.tsx";
+  const file = ts.createSourceFile(path, readSource(path), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const attributesOf = (opening: ts.JsxOpeningLikeElement) =>
+    Object.fromEntries(
+      opening.attributes.properties
+        .filter(ts.isJsxAttribute)
+        .map((attribute) => [attribute.name.getText(file), attribute.initializer?.getText(file) ?? "true"]),
+    );
+  let found: { attributes: Record<string, string>; parent: Record<string, string> } | undefined;
+  const visit = (node: ts.Node) => {
+    if (ts.isJsxElement(node) && node.openingElement.tagName.getText(file) === "TeamLink") {
+      const attributes = attributesOf(node.openingElement);
+      if (attributes.teamId === "{activeTeam.teamId}" && ts.isJsxElement(node.parent)) {
+        found = { attributes, parent: attributesOf(node.parent.openingElement) };
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  expect(found).toBeDefined();
+  return found!;
+}
 
 describe("marches du podium — pastille de l'équipe active (fiche joueur)", () => {
   // Fond de la pastille `.badge` (10 % de cyan) sur le fond le plus clair, sous
   // le halo de l'en-tête (`.ds-header::before`, 8 % de bleu, côté du nom). Les
   // marches, sous leur lueur, y tombent sous 4,5:1 : la pastille les éteint.
   const BADGE = blend(blend(SURFACE, [89, 212, 255], 0.08), [89, 212, 255], 0.1);
-  const profile = readSource("app/(secured)/joueurs/[id]/page.tsx");
 
   it("le nom éteint, à la couleur de la pastille, tient 4,5:1 sur son fond", () => {
     expect(css).toMatch(/\.badge \{[^}]*background: rgba\(89, 212, 255, 0\.1\);[^}]*color: var\(--accent-blue\);/);
@@ -242,12 +269,9 @@ describe("marches du podium — pastille de l'équipe active (fiche joueur)", ()
     expect(contrastRatio(hexOf("--accent-blue")!, BADGE)).toBeGreaterThanOrEqual(4.5);
   });
 
-  it("éteint la marche dans la pastille (repère conservé), le lien couvrant toute la pastille", () => {
-    expect(profile).toMatch(/<span className="badge badge-link" data-podium-muted=""[^>]*>\s*<TeamLink\s+teamId=\{activeTeam\.teamId\}/);
-    expect(css).toMatch(/\.badge\.badge-link \{\s*padding: 0;\s*border: 0;/);
-    const relay = /\.badge-link > \* \{([^}]*)\}/.exec(css)?.[1];
-    expect(relay).toMatch(/padding: var\(--badge-padding\);/);
-    expect(relay).toMatch(/border: var\(--badge-border\);/);
-    expect(css).toMatch(/\.badge \{[^}]*padding: var\(--badge-padding\);[^}]*border: var\(--badge-border\);/);
+  it("éteint la marche dans la pastille (repère conservé), la pastille restant le lien entier", () => {
+    const { attributes, parent } = activeTeamLink();
+    expect(attributes.className).toBe('"badge"');
+    expect(parent["data-podium-muted"]).toBe('""');
   });
 });
