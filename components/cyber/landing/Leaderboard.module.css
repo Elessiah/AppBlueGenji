@@ -88,7 +88,8 @@
    points de suspension (le `title` le donne entier) : sur une seule ligne, un
    nom s'abrégeait à ~13 caractères en mobile, et trois « Test - Bracket … »
    devenaient indiscernables. */
-.team > :last-child {
+.team > :last-child,
+.team > [data-podium]:last-child > :global(.podium-tier) {
   min-width: 0;
   overflow: hidden;
   display: -webkit-box;
@@ -100,19 +101,14 @@
 }
 
 /* Nom d'une marche du podium (`PODIUM_TIERS.md`) : peint sur un `<span>` dans
-   le lien. C'est lui qui se coupe à deux lignes ; le lien le laisse déborder,
-   sa lueur (`drop-shadow`) n'est pas rognée et l'ellipse garde le dégradé. */
+   le lien. C'est lui qui se coupe à deux lignes (règle ci-dessus) ; le lien le
+   laisse déborder, sa lueur (`drop-shadow`) n'est pas rognée et l'ellipse
+   garde le dégradé. */
 .team > [data-podium]:last-child {
   display: block;
   overflow: visible;
-}
-
-.team > [data-podium]:last-child > :global(.podium-tier) {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  overflow: hidden;
+  -webkit-line-clamp: none;
+  line-clamp: none;
 }
 
 .wl {

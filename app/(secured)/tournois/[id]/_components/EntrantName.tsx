@@ -3,6 +3,7 @@
 import Image from "next/image";
 import type { CSSProperties, ReactNode } from "react";
 import { avatarInitial } from "@/lib/shared/avatar";
+import { joinClasses } from "@/components/entity-link";
 import { EntrantLink, useEntrantLogo } from "../_lib/entrant-link";
 import styles from "./EntrantName.module.css";
 
@@ -98,7 +99,7 @@ export function EntrantName({
   // Troncature : `.entity-truncate` (globale), par `EntityLink` pour le lien —
   // qui rogne sur le nom peint d'une marche plutôt que sur le lien —, posée à
   // la main sur le nom non cliquable.
-  const textClass = [styles.text, textClassName ?? ""].filter(Boolean).join(" ");
+  const textClass = joinClasses(styles.text, textClassName);
   const content = children ?? name;
 
   return (
@@ -109,7 +110,7 @@ export function EntrantName({
           {content}
         </EntrantLink>
       ) : (
-        <span className={truncate ? `${textClass} entity-truncate` : textClass} style={textStyle} title={title}>
+        <span className={joinClasses(textClass, truncate && "entity-truncate")} style={textStyle} title={title}>
           {content}
         </span>
       )}

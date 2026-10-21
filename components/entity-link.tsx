@@ -47,8 +47,9 @@ export interface EntityLinkProps {
   "aria-label"?: string;
   /**
    * Éteint la marche du podium (`data-podium-muted`, repère conservé) : un lien
-   * habillé d'une surface teintée (pastille `.badge`…) sur laquelle la marche,
-   * sous sa lueur, tomberait sous 4,5:1 (`PODIUM_TIERS.md`).
+   * habillé d'une surface teintée sur laquelle la marche, sous sa lueur,
+   * tomberait sous 4,5:1 (`PODIUM_TIERS.md`). Inutile pour `.badge`, `.pill`,
+   * `.cy-tag`, éteintes d'office par la feuille.
    */
   podiumMuted?: boolean;
   /**
@@ -69,14 +70,18 @@ export type PodiumTierOverride = { podiumTier?: PodiumTier | null };
 /** Marche peinte sur le nom d'un lien d'entité : sa place, et la famille (équipe ou membre). */
 export type EntityPodium = { tier: PodiumTier; kind: PodiumTierKind };
 
-/** Marche du lien : l'imposée si elle est donnée, sinon celle du contexte ; `undefined` hors podium. */
-function linkPodium(override: PodiumTier | null | undefined, fromContext: PodiumTier | null, kind: PodiumTierKind) {
-  const tier = override === undefined ? fromContext : override;
+/** Marche d'une place et d'une famille ; `undefined` hors podium. */
+function toPodium(tier: PodiumTier | null, kind: PodiumTierKind): EntityPodium | undefined {
   return tier === null ? undefined : { tier, kind };
 }
 
-/** Concatène des classes optionnelles. */
-function joinClasses(...names: (string | false | undefined)[]): string {
+/** Marche du lien : l'imposée si elle est donnée, sinon celle du contexte. */
+function linkPodium(override: PodiumTier | null | undefined, fromContext: PodiumTier | null, kind: PodiumTierKind) {
+  return toPodium(override === undefined ? fromContext : override, kind);
+}
+
+/** Concatène des classes optionnelles (les absentes, `false` ou vides, sont omises). */
+export function joinClasses(...names: (string | false | undefined)[]): string {
   return names.filter(Boolean).join(" ");
 }
 
@@ -142,6 +147,6 @@ export function PlayerLink({
 export function useEntrantPodium(teamId: number, soloUserId: number | undefined): EntityPodium | undefined {
   const teamTier = useTeamPodiumTier(soloUserId === undefined ? teamId : null);
   const memberTier = useMemberPodiumTier(soloUserId);
-  return soloUserId === undefined ? linkPodium(undefined, teamTier, "team") : linkPodium(undefined, memberTier, "member");
+  return soloUserId === undefined ? toPodium(teamTier, "team") : toPodium(memberTier, "member");
 }
 
