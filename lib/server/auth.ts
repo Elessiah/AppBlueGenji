@@ -341,17 +341,27 @@ async function ensureFreshTestUser(): Promise<number> {
  * `ALTER` a échoué au démarrage (`reportSchemaFailure` ne fait que
  * journaliser), la lecture est rejouée sans elle — la modale reste ouverte
  * par défaut — plutôt que de faire tomber chaque page connectée.
+ *
+ * **Un repli par colonne** : la plus récente (`certify_prompt_due`, sur la
+ * table des sessions) tombe seule d'abord, sans emporter
+ * `recruitment_modal_off` — un « Ne plus afficher » posé ne doit pas se perdre
+ * parce qu'un autre `ALTER` a échoué.
  */
-async function selectUserRows(sql: (withModalOff: boolean) => string, params: (string | number)[]): Promise<UserRow[]> {
+async function selectUserRows(
+  sql: (withModalOff: boolean, withCertifyPrompt: boolean) => string,
+  params: (string | number)[],
+): Promise<UserRow[]> {
   const db = await getDatabase();
-  try {
-    const [rows] = await db.execute<UserRow[]>(sql(true), params);
-    return rows;
-  } catch (error) {
-    if (!isUnknownColumnError(error)) throw error;
-    const [rows] = await db.execute<UserRow[]>(sql(false), params);
-    return rows;
+  const attempts = [...new Set([sql(true, true), sql(true, false), sql(false, false)])];
+  for (const [index, text] of attempts.entries()) {
+    try {
+      const [rows] = await db.execute<UserRow[]>(text, params);
+      return rows;
+    } catch (error) {
+      if (!isUnknownColumnError(error) || index === attempts.length - 1) throw error;
+    }
   }
+  return [];
 }
 
 async function getDevBypassUser(): Promise<AuthUser | null> {
@@ -409,7 +419,7 @@ export const getCurrentUser = requestCache(async (): Promise<AuthUser | null> =>
   if (!token) return null;
 
   const rows = await selectUserRows(
-    (modalOff) => `SELECT u.id, u.pseudo, u.avatar_url, u.discord_id, u.google_sub, u.is_adult, u.is_admin, u.platform_roles_json${modalOff ? ", u.recruitment_modal_off, s.certify_prompt_due" : ""}
+    (modalOff, certifyPrompt) => `SELECT u.id, u.pseudo, u.avatar_url, u.discord_id, u.google_sub, u.is_adult, u.is_admin, u.platform_roles_json${modalOff ? ", u.recruitment_modal_off" : ""}${certifyPrompt ? ", s.certify_prompt_due" : ""}
      FROM bg_user_sessions s
      JOIN bg_users u ON u.id = s.user_id
      WHERE s.token_hash = ?

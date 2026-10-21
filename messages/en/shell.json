@@ -270,6 +270,9 @@
     "bodyLabel": "Discord tag verification suggestion",
     "accountDeleted": "This account has been deleted.",
     "alreadyVerified": "Your Discord tag is already verified.",
-    "sessionEnded": "Your session has ended: log in again."
+    "sessionEnded": "Your session has ended: log in again.",
+    "titleNoTag": "Add and verify your Discord tag?",
+    "introNoTag": "Your account has no Discord tag yet. Adding and verifying it lets the organizers reach you during a tournament. It's optional, and saying no costs nothing.",
+    "addTag": "Add my tag"
   }
 }

@@ -62,7 +62,7 @@ describe("loadDiscordCertifyPrompt — due, et pour qui", () => {
 
   it("connexion Blizzard sans Discord : le dialogue de /profil", async () => {
     setUp([{ discord_id: null, discord_pseudo: null, discord_pseudo_from_discord: 0 }]);
-    expect(await loadDiscordCertifyPrompt(7, HASH)).toEqual({ mode: "DIALOG" });
+    expect(await loadDiscordCertifyPrompt(7, HASH)).toEqual({ mode: "DIALOG", hasTag: false });
   });
 
   it("sans session (contournement de développement) ou identifiant invalide : aucune requête", async () => {

@@ -14,6 +14,8 @@ import {
   certifyPromptSilencedOn,
   LOGIN_PATH,
   recruitmentModalSilenced,
+  LEGAL_PAGE_PATHS,
+  termsModalSilencedOn,
 } from "@/lib/shared/global-modals";
 import { TERMS_PATH } from "@/lib/shared/terms-of-use";
 
@@ -35,15 +37,15 @@ describe("certifyPromptFor — parcours du bouton principal", () => {
   });
 
   it("mène au dialogue sans Discord rattaché (connexion Blizzard)", () => {
-    expect(certifyPromptFor({ ...base, discordId: null })).toEqual({ mode: "DIALOG" });
-    expect(certifyPromptFor({ discordId: null, discordPseudo: null, pseudoFromDiscord: false })).toEqual({ mode: "DIALOG" });
+    expect(certifyPromptFor({ ...base, discordId: null })).toEqual({ mode: "DIALOG", hasTag: true });
+    expect(certifyPromptFor({ discordId: null, discordPseudo: null, pseudoFromDiscord: false })).toEqual({ mode: "DIALOG", hasTag: false });
   });
 
   it("mène au dialogue pour un tag tapé à la main, absent ou numérique", () => {
-    expect(certifyPromptFor({ ...base, pseudoFromDiscord: false })).toEqual({ mode: "DIALOG" });
-    expect(certifyPromptFor({ ...base, discordPseudo: null })).toEqual({ mode: "DIALOG" });
-    expect(certifyPromptFor({ ...base, discordPseudo: "   " })).toEqual({ mode: "DIALOG" });
-    expect(certifyPromptFor({ ...base, discordPseudo: "123456789012345678" })).toEqual({ mode: "DIALOG" });
+    expect(certifyPromptFor({ ...base, pseudoFromDiscord: false })).toEqual({ mode: "DIALOG", hasTag: true });
+    expect(certifyPromptFor({ ...base, discordPseudo: null })).toEqual({ mode: "DIALOG", hasTag: false });
+    expect(certifyPromptFor({ ...base, discordPseudo: "   " })).toEqual({ mode: "DIALOG", hasTag: false });
+    expect(certifyPromptFor({ ...base, discordPseudo: "123456789012345678" })).toEqual({ mode: "DIALOG", hasTag: true });
   });
 });
 
@@ -95,11 +97,15 @@ describe("certifyPromptOpen — jamais par-dessus une autre modale", () => {
     expect(certifyPromptSilencedOn(null)).toBe(false);
   });
 
-  it("fait taire la modale d'arrivée du recrutement tant qu'elle est due", () => {
-    const quiet = { privacyPending: false, termsModalDue: false, pathname: "/" };
-    expect(recruitmentModalSilenced(quiet)).toBe(false);
-    expect(recruitmentModalSilenced({ ...quiet, certifyPromptDue: false })).toBe(false);
-    expect(recruitmentModalSilenced({ ...quiet, certifyPromptDue: true })).toBe(true);
+  it("se tait sur toute page légale, celles des conditions comprises (une seule liste)", () => {
+    for (const path of LEGAL_PAGE_PATHS) {
+      expect([path, certifyPromptSilencedOn(path), termsModalSilencedOn(path)]).toEqual([path, true, true]);
+    }
+    // Pages libres des conditions mais pas légales : la proposition y a sa place.
+    for (const path of ["/regles", "/signalements", "/profil"]) {
+      expect([path, certifyPromptSilencedOn(path)]).toEqual([path, false]);
+    }
+    expect(recruitmentModalSilenced({ privacyPending: false, termsModalDue: false, pathname: "/" })).toBe(false);
   });
 });
 

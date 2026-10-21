@@ -7,7 +7,7 @@ jest.mock("next/navigation", () => ({
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { ToastProvider } from "@/components/ui/toast";
-import { CERTIFY_PROMPT_GROUPS, CERTIFY_PROMPT_ROWS, DiscordCertifyPrompt } from "@/components/discord/DiscordCertifyPrompt";
+import { CERTIFY_PROMPT_GROUPS, DiscordCertifyPrompt } from "@/components/discord/DiscordCertifyPrompt";
 import frShell from "@/messages/fr/shell.json";
 import enShell from "@/messages/en/shell.json";
 import { readSource } from "../helpers/read-source";
@@ -22,6 +22,7 @@ import { readSource } from "../helpers/read-source";
 
 const SOURCE = readSource("components/discord/DiscordCertifyPrompt.tsx");
 const LAYOUT = readSource("app/layout.tsx");
+const CERTIFY_PROMPT_ROWS = CERTIFY_PROMPT_GROUPS.flatMap(({ rows }) => rows);
 
 describe("DiscordCertifyPrompt — rendu", () => {
   it("rien au rendu serveur (portail monté après l'hydratation), même due", () => {
@@ -124,12 +125,13 @@ describe("mise en page racine", () => {
     expect(LAYOUT).toMatch(
       /<DiscordCertifyPrompt\s+prompt=\{certifyPrompt\}\s+privacyPending=\{privacyChanges\.length > 0\}\s+termsPending=\{termsRequired\}/,
     );
-    expect(LAYOUT).toContain("user?.certifyPromptDue ? await certifyPromptFor(user.id) : null");
+    expect(LAYOUT).toContain("user?.certifyPromptDue ? loadCertifyPromptSafely(user.id) : Promise.resolve(null)");
   });
 
   it("fait taire le recrutement tant qu'elle est due, quelle que soit la page", () => {
     expect(LAYOUT).toContain("const certifyPromptDue = certifyPrompt !== null;");
-    expect(LAYOUT).toMatch(/termsModalDue: termsDueOnLoad,\s*certifyPromptDue,/);
+    expect(LAYOUT).toContain("modalHeld={certifyPromptDue}");
+    expect(LAYOUT).not.toMatch(/termsModalDue: termsDueOnLoad,\s*certifyPromptDue,/);
   });
 });
 
@@ -156,6 +158,13 @@ describe("textes (shell.certifyPrompt) — FR et EN", () => {
     }
     // Visiteurs sans compte : jamais, même certifié.
     expect([fr.rows.visitors.with, en.rows.visitors.with]).toEqual(["Jamais", "Never"]);
+  });
+
+  it("compte sans tag : propose de l'ajouter, sans parler d'un tag existant", () => {
+    expect(SOURCE).toContain('const noTag = prompt.mode === "DIALOG" && !prompt.hasTag;');
+    expect([fr.titleNoTag, fr.addTag]).toEqual(["Ajouter et certifier ton tag Discord ?", "Ajouter mon tag"]);
+    expect([en.titleNoTag, en.addTag]).toEqual(["Add and verify your Discord tag?", "Add my tag"]);
+    expect(fr.introNoTag).not.toContain("Ta connexion ne l'a pas certifié");
   });
 
   it("dit le retrait, le recours dans « Mon profil », et les trois boutons", () => {

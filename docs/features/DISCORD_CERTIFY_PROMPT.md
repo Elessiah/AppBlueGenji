@@ -23,8 +23,8 @@ sur « Certifier mon tag » certifie, par la route existante.
 | Une fois par connexion | la première réponse lève la marque (`markDiscordCertifyPromptSeen`) ; rien à proposer (déjà certifié, « Ne plus voir ») la lève aussi, à la première lecture — plus aucune requête ensuite |
 | Compte vivant, tag **non certifié**, pas de « Ne plus voir » | `loadDiscordCertifyPrompt`, une requête, toutes conditions dans le `WHERE` |
 | Après la confidentialité et les conditions, jamais par-dessus | `certifyPromptOpen` (`lib/shared/global-modals.ts`) ; la fenêtre suit `PRIVACY_CHANGES_ANSWERED_EVENT` et `TERMS_ACCEPTED_EVENT` (émis par `TermsAcceptanceModal`) et s'ouvre sans rechargement — sauf si la confidentialité s'est fermée sur un **lien d'action** (`privacyFollowedLink`) : l'écran visé n'est pas couvert, la proposition revient au chargement suivant |
-| Pas sur `/connexion`, `/conditions-utilisation`, `/rgpd`, `/mentions-legales`, `/accessibilite`, pages légales du bot | `certifyPromptSilencedOn` |
-| Fait taire la modale d'arrivée du recrutement | `recruitmentModalSilenced({ certifyPromptDue })`, dès qu'elle est due, **quelle que soit la page** (muette sur une page légale, elle s'ouvre à la navigation suivante), et `modalHeld` la **verrouille** jusqu'au prochain chargement complet : le `router.refresh()` d'une réponse ne la fait pas surgir derrière — ordre : confidentialité → conditions → certification → recrutement |
+| Pas sur `/connexion`, `/conditions-utilisation`, `/rgpd`, `/mentions-legales`, `/accessibilite`, pages légales du bot | `certifyPromptSilencedOn`, sur `LEGAL_PAGE_PATHS` — la même liste que les conditions (`TERMS_FREE_PATHS` l'étend) : une page légale nouvelle s'ajoute là, une fois |
+| Fait taire la modale d'arrivée du recrutement | `RecruitmentHighlight modalHeld`, dès qu'elle est due, **quelle que soit la page** (muette sur une page légale, elle s'ouvre à la navigation suivante), **verrouillé** jusqu'au prochain chargement complet : le `router.refresh()` d'une réponse ne la fait pas surgir derrière — ordre : confidentialité → conditions → certification → recrutement |
 
 **Montée par la mise en page racine**, comme `TermsAcceptanceModal`, et non par
 l'espace connecté : c'est la seule qui rend la **première page après la
@@ -55,7 +55,10 @@ Discord ou Blizzard (ou poser la marque à la main sur sa ligne de session).
   la ferment avec un toast dédié et relisent la page, sur les deux boutons ;
   tout autre refus la garde ouverte, en toast.
 - **`DIALOG`** — tout autre compte non certifié, le plus souvent une connexion
-  Blizzard sans Discord. Le bouton (« Certifier mon tag → ») clôt la
+  Blizzard sans Discord. Sans aucun tag enregistré (`hasTag: false`), la
+  fenêtre propose de l'**ajouter** (« Ajouter et certifier ton tag Discord ? »,
+  bouton « Ajouter mon tag → ») au lieu de parler d'un tag absent. Le bouton
+  (« Certifier mon tag → ») clôt la
   proposition pour la session et mène à `/profil?certifier=discord` (ou, déjà
   sur `/profil`, émet `CERTIFY_DIALOG_EVENT`) : `useCertifyRequest` ouvre
   **le** `DiscordVerificationDialog` une fois l'état Discord lu — code en
@@ -109,4 +112,6 @@ du parcours `DIALOG` est décorative (`aria-hidden`).
 `PRIVACY_CHANGES` `2026-10-proposition-certification-discord` (FR et EN),
 registre T01, ligne du tableau des données de `/rgpd` (`rgpd-policy.ts`, FR et EN).
 Les deux colonnes sont tolérées absentes (`ALTER` échoué) : session écrite sans
-la marque, fenêtre muette, export et anonymisation intacts.
+la marque, fenêtre muette, export et anonymisation intacts. Le repli se fait
+**colonne par colonne** (`selectUserRows`, `exportOwnData`) : l'absence de
+l'une n'efface jamais la lecture de `recruitment_modal_off`.

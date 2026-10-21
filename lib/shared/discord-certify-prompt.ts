@@ -46,14 +46,17 @@ export type CertifyPromptAccount = {
  *   `/profil` (code en message privé, ou passage par Discord), sans rien en
  *   recopier.
  */
-export type CertifyPrompt = { mode: "ONE_CLICK"; tag: string } | { mode: "DIALOG" };
+export type CertifyPrompt =
+  | { mode: "ONE_CLICK"; tag: string }
+  /** `hasTag: false` : aucun tag enregistré (souvent Blizzard seul) — la fenêtre propose de l'**ajouter**. */
+  | { mode: "DIALOG"; hasTag: boolean };
 
 export function certifyPromptFor(account: CertifyPromptAccount): CertifyPrompt {
   const tag = account.discordPseudo?.trim() ?? "";
   if (account.discordId && account.pseudoFromDiscord && isCertifiableDiscordHandle(tag)) {
     return { mode: "ONE_CLICK", tag };
   }
-  return { mode: "DIALOG" };
+  return { mode: "DIALOG", hasTag: tag !== "" };
 }
 
 /** Réponses du lecteur : la fenêtre se ferme pour la session, ou pour le compte. */

@@ -35,16 +35,27 @@ export const TERMS_POSTPONED_COOKIE = "bg_terms_later";
  * ou contester un signalement (recours interne), exporter ses
  * données ou supprimer son compte (« Mon profil »), sans accepter d'abord.
  */
-export const TERMS_FREE_PATHS: readonly string[] = [
+/**
+ * Pages légales (et leurs sous-pages) : aucune fenêtre d'arrivée ne s'y pose
+ * sur le texte qu'on lit. Une page légale nouvelle s'ajoute **ici**, et
+ * conditions comme certification s'y taisent d'un coup.
+ */
+export const LEGAL_PAGE_PATHS: readonly string[] = [
   "/rgpd",
   "/mentions-legales",
   "/accessibilite",
   "/privacy-policy-bot",
   "/terms-of-service-bot",
-  "/regles",
-  "/signalements",
-  "/profil",
 ];
+
+export const TERMS_FREE_PATHS: readonly string[] = [...LEGAL_PAGE_PATHS, "/regles", "/signalements", "/profil"];
+
+/** La connexion, la page des conditions, et `paths` avec leurs sous-pages. */
+function silencedOn(paths: readonly string[], pathname: string | null | undefined): boolean {
+  if (pathname === TERMS_PATH || pathname === LOGIN_PATH) return true;
+  if (!pathname) return false;
+  return paths.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+}
 
 /**
  * Pages où la modale des conditions se tait : celle des conditions elle-même
@@ -53,9 +64,7 @@ export const TERMS_FREE_PATHS: readonly string[] = [
  * sous-pages, `/rgpd/registre` compris).
  */
 export function termsModalSilencedOn(pathname: string | null | undefined): boolean {
-  if (pathname === TERMS_PATH || pathname === LOGIN_PATH) return true;
-  if (!pathname) return false;
-  return TERMS_FREE_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+  return silencedOn(TERMS_FREE_PATHS, pathname);
 }
 
 /**
@@ -72,37 +81,28 @@ export function termsModalDueOnLoad(input: {
 /**
  * La modale d'arrivée du recrutement doit-elle se taire ? Elle passe après
  * toute modale qui attend une réponse, et se tait sur la connexion (la modale
- * de consentement y est la seule à avoir sa place).
+ * de consentement y est la seule à avoir sa place). La certification du tag
+ * Discord la tient, elle, par `modalHeld` (`RecruitmentHighlight`), verrouillé
+ * pour la page.
  */
 export function recruitmentModalSilenced(input: {
   privacyPending: boolean;
   termsModalDue: boolean;
-  /** La fenêtre de certification du tag Discord est due à ce chargement. */
-  certifyPromptDue?: boolean;
   pathname: string | null | undefined;
 }): boolean {
-  return input.privacyPending || input.termsModalDue || input.certifyPromptDue === true || input.pathname === LOGIN_PATH;
+  return input.privacyPending || input.termsModalDue || input.pathname === LOGIN_PATH;
 }
 
 /**
  * Pages où la fenêtre « Certifier ton tag Discord » se tait
  * (`docs/features/DISCORD_CERTIFY_PROMPT.md`) : la connexion, la page des
- * conditions et les pages légales — qui y lit la politique de confidentialité
- * n'a pas à recevoir une proposition par-dessus. `/regles`, `/signalements`
- * et `/profil` ne se taisent pas : la proposition y a sa place.
+ * conditions et les pages légales ({@link LEGAL_PAGE_PATHS}) — qui y lit la
+ * politique de confidentialité n'a pas à recevoir une proposition par-dessus.
+ * `/regles`, `/signalements` et `/profil` ne se taisent pas : la proposition y
+ * a sa place.
  */
-const CERTIFY_PROMPT_SILENT_PATHS: readonly string[] = [
-  "/rgpd",
-  "/mentions-legales",
-  "/accessibilite",
-  "/privacy-policy-bot",
-  "/terms-of-service-bot",
-];
-
 export function certifyPromptSilencedOn(pathname: string | null | undefined): boolean {
-  if (pathname === TERMS_PATH || pathname === LOGIN_PATH) return true;
-  if (!pathname) return false;
-  return CERTIFY_PROMPT_SILENT_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+  return silencedOn(LEGAL_PAGE_PATHS, pathname);
 }
 
 /**

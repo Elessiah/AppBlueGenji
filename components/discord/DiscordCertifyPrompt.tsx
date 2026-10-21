@@ -31,9 +31,6 @@ export const CERTIFY_PROMPT_GROUPS = [
   { group: "effects", rows: ["badge", "dms"] },
 ] as const;
 
-/** Lignes du tableau, dans l'ordre affiché. */
-export const CERTIFY_PROMPT_ROWS = CERTIFY_PROMPT_GROUPS.flatMap(({ rows }) => rows);
-
 /** Refus de `POST /api/profile/discord` qui disent que l'état du tag a changé sous la fenêtre. */
 const STATE_CHANGED = new Set(["DISCORD_TAG_CHANGED", "DISCORD_NOT_LINKED", "DISCORD_TAG_MISSING", "DISCORD_TAG_NOT_ATTESTED"]);
 
@@ -223,6 +220,8 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
     }
   };
 
+  // Aucun tag enregistré : la fenêtre propose de l'ajouter, pas de « certifier » un tag absent.
+  const noTag = prompt.mode === "DIALOG" && !prompt.hasTag;
   const strong = { strong: (chunks: readonly ReactNode[]) => <strong>{richNodes(chunks)}</strong> };
 
   return createPortal(
@@ -238,11 +237,11 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
       >
         <span className="eyebrow">{t("certifyPrompt.eyebrow")}</span>
         <h2 id={titleId} className={styles.title}>
-          {t("certifyPrompt.title")}
+          {t(noTag ? "certifyPrompt.titleNoTag" : "certifyPrompt.title")}
         </h2>
         <ScrollArea orientation="y" className={styles.body} ariaLabel={t("certifyPrompt.bodyLabel")}>
           <p id={`${titleId}-intro`} className={styles.text}>
-            {t("certifyPrompt.intro")}
+            {t(noTag ? "certifyPrompt.introNoTag" : "certifyPrompt.intro")}
           </p>
           {prompt.mode === "ONE_CLICK" && (
             <p className={styles.text}>{richNodes(rich("certifyPrompt.tag", { tag: visibleText(prompt.tag) }, strong))}</p>
@@ -301,7 +300,7 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
               t("certifyPrompt.certifying")
             ) : (
               <>
-                {t("certifyPrompt.certify")}
+                {t(noTag ? "certifyPrompt.addTag" : "certifyPrompt.certify")}
                 {prompt.mode === "DIALOG" && <span aria-hidden="true"> →</span>}
               </>
             )}

@@ -270,6 +270,9 @@
     "bodyLabel": "Proposition de certification du tag Discord",
     "accountDeleted": "Ce compte a été supprimé.",
     "alreadyVerified": "Ton tag Discord est déjà certifié.",
-    "sessionEnded": "Ta session a pris fin : reconnecte-toi."
+    "sessionEnded": "Ta session a pris fin : reconnecte-toi.",
+    "titleNoTag": "Ajouter et certifier ton tag Discord ?",
+    "introNoTag": "Ton compte n'a pas encore de tag Discord. L'ajouter et le certifier permet à l'organisation de te joindre pendant un tournoi. C'est facultatif, et refuser ne coûte rien.",
+    "addTag": "Ajouter mon tag"
   }
 }

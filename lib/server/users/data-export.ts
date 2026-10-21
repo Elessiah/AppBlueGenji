@@ -53,13 +53,13 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
     discord_certify_prompt_dismissed_at?: Date | null;
     created_at: Date;
   };
-  const selectAccount = (withModalOff: boolean) =>
+  const selectAccount = (withModalOff: boolean, withCertifyPromptOff: boolean) =>
     db.execute<AccountRow[]>(
       `SELECT id, pseudo, avatar_url, overwatch_battletag, marvel_rivals_tag,
               discord_pseudo, discord_verified_at, discord_id, discord_link_method,
               google_sub, blizzard_sub, is_adult, is_admin,
               visible_avatar, visible_overwatch, visible_marvel, visible_major, visible_discord,
-              open_to_recruitment, locale, match_dm_enabled${withModalOff ? ", recruitment_modal_off, discord_certify_prompt_dismissed_at" : ""}, created_at
+              open_to_recruitment, locale, match_dm_enabled${withModalOff ? ", recruitment_modal_off" : ""}${withCertifyPromptOff ? ", discord_certify_prompt_dismissed_at" : ""}, created_at
        FROM bg_users
        WHERE id = ? AND is_deleted = 0
        LIMIT 1`,
@@ -68,12 +68,19 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
   // Colonne d'un changement récent : son `ALTER` échoué au démarrage ne doit
   // pas priver le titulaire de son export (droit d'accès) — relu sans elle,
   // drapeau au défaut, comme la lecture de session (`selectUserRows`).
+  // Un repli par colonne : la plus récente tombe seule d'abord, sans emporter
+  // `recruitment_modal_off` (l'export doit dire le choix réellement gardé).
   let rows: AccountRow[];
   try {
-    [rows] = await selectAccount(true);
+    [rows] = await selectAccount(true, true);
   } catch (error) {
     if (!isUnknownColumnError(error)) throw error;
-    [rows] = await selectAccount(false);
+    try {
+      [rows] = await selectAccount(true, false);
+    } catch (retryError) {
+      if (!isUnknownColumnError(retryError)) throw retryError;
+      [rows] = await selectAccount(false, false);
+    }
   }
 
   if (rows.length === 0) throw new Error("PROFILE_NOT_FOUND");

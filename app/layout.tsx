@@ -153,7 +153,7 @@ async function termsRequestFor(userId: number | undefined): Promise<TermsRequest
  * seulement ; une panne ne fait pas tomber la page, la question sera reposée
  * au chargement suivant.
  */
-async function certifyPromptFor(userId: number | undefined): Promise<CertifyPrompt | null> {
+async function loadCertifyPromptSafely(userId: number | undefined): Promise<CertifyPrompt | null> {
   if (userId === undefined) return null;
   try {
     return await loadDiscordCertifyPrompt(userId, await currentTokenHash());
@@ -266,17 +266,20 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   // la page (ni, sous `/en`, ses textes quand la banderole n'a rien non plus).
   const modalOptedOut = recruitmentModalOptedOut({ accountOff: user?.recruitmentModalOff, browserCookie: modalOffCookie });
   const modalAds = modalOptedOut ? [] : spotlight.modal;
-  const termsRequest = await termsRequestFor(user?.id);
+  // Conditions et certification ne dépendent que de la session : lues de front.
+  // Aucune requête de certification quand la session n'a rien à proposer (lu avec elle).
+  const [termsRequest, certifyPrompt] = await Promise.all([
+    termsRequestFor(user?.id),
+    user?.certifyPromptDue ? loadCertifyPromptSafely(user.id) : Promise.resolve(null),
+  ]);
   const termsRequired = termsRequest !== null;
   // Bloquante pour tout compte connecté en retard d'une version (pas de report).
   const termsDueOnLoad = termsModalDueOnLoad({
     termsRequired,
     pathname: requestedPath,
   });
-  // Proposée après la confidentialité et les conditions, jamais par-dessus :
-  // lue quand même, la fenêtre s'ouvre dès leur réponse, sans rechargement.
-  // Aucune requête de plus quand la session n'a rien à proposer (lu avec elle).
-  const certifyPrompt = user?.certifyPromptDue ? await certifyPromptFor(user.id) : null;
+  // Certification : proposée après la confidentialité et les conditions, jamais
+  // par-dessus ; lue quand même, la fenêtre s'ouvre dès leur réponse.
   // Le recrutement se tait tant qu'elle est due, **quelle que soit la page** :
   // muette sur une page légale, elle s'ouvrira à la navigation suivante, côté
   // client, sans que la mise en avant du recrutement ne soit rejugée.
@@ -332,7 +335,6 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             modalSilenced={recruitmentModalSilenced({
               privacyPending: privacyChanges.length > 0,
               termsModalDue: termsDueOnLoad,
-              certifyPromptDue,
               pathname: requestedPath,
             })}
             modalHeld={certifyPromptDue}

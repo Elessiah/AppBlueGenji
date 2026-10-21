@@ -395,9 +395,30 @@ describe("auth", () => {
 
       expect(user?.id).toBe(3);
       expect(user?.recruitmentModalOff).toBe(false);
+      // Repli par colonne : sans la certification d'abord, puis sans le recrutement.
+      expect(execute).toHaveBeenCalledTimes(3);
+      expect(String(execute.mock.calls[2][0])).toContain("FROM bg_user_sessions s");
+      expect(String(execute.mock.calls[2][0])).not.toContain("recruitment_modal_off");
+      expect(String(execute.mock.calls[2][0])).not.toContain("certify_prompt_due");
+    });
+
+    it("seule la marque de certification absente : « Ne plus afficher » du recrutement reste lu", async () => {
+      const { getDatabase } = await import("@/lib/server/database");
+      const { cookies } = await import("next/headers");
+      jest.mocked(cookies).mockResolvedValue(fakeCookieStore({ get: jest.fn().mockReturnValue({ value: "tok" }) }));
+      const execute = jest.fn<SqlQuery>(async (sql) => {
+        if (sql.includes("certify_prompt_due")) throw unknownColumn();
+        return [[{ ...plainRow, recruitment_modal_off: 1 }], []];
+      });
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+      const user = await getCurrentUser();
+
+      expect(user?.recruitmentModalOff).toBe(true);
+      expect(user?.certifyPromptDue).toBe(false);
       expect(execute).toHaveBeenCalledTimes(2);
-      expect(String(execute.mock.calls[1][0])).toContain("FROM bg_user_sessions s");
-      expect(String(execute.mock.calls[1][0])).not.toContain("recruitment_modal_off");
+      expect(String(execute.mock.calls[1][0])).toContain("u.recruitment_modal_off");
+      expect(String(execute.mock.calls[1][0])).not.toContain("certify_prompt_due");
     });
 
     it("toute autre erreur de base remonte, sans seconde lecture", async () => {
