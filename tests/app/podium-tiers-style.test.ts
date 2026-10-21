@@ -230,14 +230,16 @@ describe("marches du podium — outils du staff et comptes supprimés", () => {
 });
 
 describe("marches du podium — pastille de l'équipe active (fiche joueur)", () => {
-  // Fond de la pastille `.badge` (10 % de cyan) sur le fond le plus clair : plus
-  // teinté que la ligne de référence, il ferait tomber la 3e sous 4,5:1.
-  const BADGE = blend(SURFACE, [89, 212, 255], 0.1);
+  // Fond de la pastille `.badge` (10 % de cyan) sur le fond le plus clair, sous
+  // le halo de l'en-tête (`.ds-header::before`, 8 % de bleu, côté du nom).
+  const BADGE = blend(blend(SURFACE, [89, 212, 255], 0.08), [89, 212, 255], 0.1);
   const profile = readSource("app/(secured)/joueurs/[id]/page.tsx");
 
-  it("le fond de la pastille est plus clair que la référence : la marche y passerait sous 4,5:1", () => {
+  it.each([1, 2, 3])("la marche %i passerait sous 4,5:1 sur le fond de la pastille, sous sa lueur", (tier) => {
     expect(css).toMatch(/\.badge \{[^}]*background: rgba\(89, 212, 255, 0\.1\);/);
-    const body = rule(".podium-tier-3");
+    expect(css).toMatch(/\.ds-header \{\s*--header-rgb: var\(--blue-rgb\);/);
+    expect(css).toMatch(/\.ds-header::before \{[^}]*rgba\(var\(--header-rgb\), 0\.08\)/);
+    const body = rule(`.podium-tier-${tier}`);
     const lowest = Math.min(
       ...[.../background-image:([^;]*);/.exec(body)![1].matchAll(/var\((--[a-z0-9-]+)\)/g)].map(([, name]) =>
         contrastRatio(hexOf(name)!, litSurface(body, BADGE)),
@@ -247,8 +249,10 @@ describe("marches du podium — pastille de l'équipe active (fiche joueur)", ()
   });
 
   it("éteint donc la marche dans la pastille (repère conservé), le lien couvrant toute la pastille", () => {
-    expect(profile).toMatch(
-      /<span className="badge" data-podium-muted="" style=\{\{ fontSize: 11, padding: 0 \}\}>\s*<TeamLink\s+teamId=\{activeTeam\.teamId\}[^>]*style=\{\{ display: "inline-block", padding: "4px 12px", borderRadius: "inherit" \}\}/,
-    );
+    const badge = /<span className="badge" data-podium-muted=""[^>]*>\s*<TeamLink\s+teamId=\{activeTeam\.teamId\}([^>]*)>/.exec(profile);
+    expect(badge).not.toBeNull();
+    expect(badge![0]).toMatch(/padding: 0/);
+    expect(badge![1]).toMatch(/padding: "var\(--badge-padding\)"/);
+    expect(css).toMatch(/\.badge \{[^}]*--badge-padding: [^;]+;[^}]*padding: var\(--badge-padding\);/);
   });
 });

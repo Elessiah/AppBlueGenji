@@ -31,15 +31,23 @@ const TIER_LINKS = new Map([
 ]);
 const PAINT = /(?:^|;)\s*background(?:-image|-clip)?\s*:/;
 
-/** Classes dont une règle propre (sélecteur = `.classe`) pose un fond. */
+/**
+ * Classes d'une règle qui pose un fond sur l'élément qu'elle vise : toute
+ * classe du dernier sélecteur composé (`.badge`, `.badge:hover`,
+ * `.pill.pill-blue`, `.row .chip`). Commentaires et at-rules sans bloc
+ * (`@import …;`) sont retirés avant la lecture ; les règles propres à la
+ * marche (`.entity-link.podium-tier:hover`…) sont écartées.
+ */
 function surfaceClasses(css: string): Set<string> {
   const surfaces = new Set<string>();
-  const withoutComments = css.replaceAll(/\/\*[\s\S]*?\*\//g, "");
-  for (const [, selectors, body] of withoutComments.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+  const cleaned = css.replaceAll(/\/\*[\s\S]*?\*\//g, "").replaceAll(/@[^;{}]*;/g, "");
+  for (const [, selectors, body] of cleaned.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
     if (!PAINT.test(body)) continue;
     for (const selector of selectors.split(",")) {
-      const single = /^\.([\w-]+)$/.exec(selector.trim());
-      if (single && !single[1].startsWith("podium-")) surfaces.add(single[1]);
+      const target = selector.trim().split(/\s*[\s>+~]\s*/).at(-1) ?? "";
+      // Les règles de la marche elle-même (survol, ligne en retrait) ne sont pas des surfaces.
+      if (target.includes(".podium-")) continue;
+      for (const [, name] of target.matchAll(/\.([\w-]+)/g)) surfaces.add(name);
     }
   }
   return surfaces;
@@ -58,7 +66,9 @@ function moduleSurfaces(file: ts.SourceFile, path: string | undefined): Map<stri
   const modules = new Map<string, Set<string>>();
   for (const statement of file.statements) {
     if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
-    const name = statement.importClause?.name?.text;
+    const bindings = statement.importClause?.namedBindings;
+    const name =
+      statement.importClause?.name?.text ?? (bindings && ts.isNamespaceImport(bindings) ? bindings.name.text : undefined);
     const specifier = statement.moduleSpecifier.text;
     if (!name || !specifier.endsWith(".module.css")) continue;
     const cssPath = specifier.startsWith("@/") ? join(ROOT, specifier.slice(2)) : path && join(dirname(path), specifier);
@@ -98,7 +108,16 @@ function paintedLinks(code: string, path?: string): string[] {
   const visit = (node: ts.Node) => {
     const opening = ts.isJsxElement(node) ? node.openingElement : ts.isJsxSelfClosingElement(node) ? node : null;
     const paintedAttribute = opening && TIER_LINKS.get(opening.tagName.getText(file));
-    if (opening && paintedAttribute) {
+    // `podiumTier={null}` : lien sans marche (lien-avatar du roster, par exemple).
+    const tierless = opening?.attributes.properties.some(
+      (attribute) =>
+        ts.isJsxAttribute(attribute) &&
+        attribute.name.getText(file) === "podiumTier" &&
+        attribute.initializer !== undefined &&
+        ts.isJsxExpression(attribute.initializer) &&
+        attribute.initializer.expression?.kind === ts.SyntaxKind.NullKeyword,
+    );
+    if (opening && paintedAttribute && !tierless) {
       for (const attribute of opening.attributes.properties) {
         if (!ts.isJsxAttribute(attribute) || attribute.name.getText(file) !== paintedAttribute || !attribute.initializer) continue;
         const painted = classesOf(attribute.initializer, modules).filter(
@@ -134,15 +153,26 @@ describe("lien d'entité et marche du podium", () => {
     expect(paintedLinks(`<TeamLink teamId={1} onClick={() => track(a > b)} className="badge">X</TeamLink>`)).toHaveLength(1);
   });
 
+  it("compte les surfaces des sélecteurs composés, survol compris, et passe les at-rules", () => {
+    const surfaces = surfaceClasses(
+      `@import url("x.css");\n.chip { background: red; }\n.tag:hover { background-image: none; }\n.row .cell.on { background: red; }\n.chip-text { color: red; }`,
+    );
+    expect([...surfaces].sort((a, b) => a.localeCompare(b))).toEqual(["cell", "chip", "on", "tag"]);
+  });
+
   it("résout les classes d'un module CSS importé", () => {
     const path = join(ROOT, "app", "(secured)", "tournois", "[id]", "_components", "EntrantName.tsx");
     const code = (className: string) => `import styles from "./EntrantName.module.css";\n<TeamLink teamId={1} className={${className}} />`;
     expect(paintedLinks(code("styles.logo"), path)).toEqual(["<TeamLink> styles.logo"]);
     expect(paintedLinks(code(`styles["logo"]`), path)).toHaveLength(1);
     expect(paintedLinks(code("styles.logoImage"), path)).toEqual([]);
+    const namespaced = `import * as styles from "./EntrantName.module.css";\n<TeamLink teamId={1} className={styles.logo} />`;
+    expect(paintedLinks(namespaced, path)).toHaveLength(1);
   });
 
-  it("laisse passer une pastille posée sur un conteneur", () => {
+  it("laisse passer une pastille posée sur un conteneur, ou un lien sans marche", () => {
+    expect(paintedLinks(`<PlayerLink userId={1} className="badge" podiumTier={null} />`)).toEqual([]);
+    expect(paintedLinks(`<PlayerLink userId={1} className="badge" podiumTier={deleted ? null : undefined} />`)).toHaveLength(1);
     expect(paintedLinks(`<span className="badge"><TeamLink teamId={1}>X</TeamLink></span>`)).toEqual([]);
     expect(paintedLinks(`<TeamLink teamId={1} className="badge-like">X</TeamLink>`)).toEqual([]);
   });
