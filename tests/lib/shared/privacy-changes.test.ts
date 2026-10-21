@@ -1316,11 +1316,13 @@ describe("PRIVACY_CHANGES — pastille « BattleTag vérifié » sur la fiche (P
     const fr = [entry.title, entry.summary, ...entry.details].join(" ");
     expect(fr).toMatch(/à tout joueur connecté qui la consulte — y compris quand ton BattleTag est masqué/);
     expect(fr).toMatch(/sans jamais montrer le BattleTag/);
-    expect(fr).toMatch(/Elle disparaît si tu détaches ton compte Battle\.net/);
+    expect(fr).toMatch(/Tu peux t'y opposer par le formulaire de signalement \(catégorie RGPD\)/);
+    expect(fr).toMatch(/après avoir ajouté un autre moyen de connexion si c'est le seul/);
     const en = [english.title, english.summary, ...english.details].join(" ");
     expect(en).toMatch(/to any logged-in player who opens it — including when your BattleTag is hidden/);
     expect(en).toMatch(/never showing the BattleTag/);
-    expect(en).toMatch(/It disappears if you unlink your Battle\.net account/);
+    expect(en).toMatch(/You can object to it through the report form \(GDPR category\)/);
+    expect(en).toMatch(/after adding another login method if it is your only one/);
     expect(english.details).toHaveLength(entry.details.length);
     expect(english.linkLabels).toHaveLength(entry.links?.length ?? 0);
   });

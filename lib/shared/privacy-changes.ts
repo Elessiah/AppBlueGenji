@@ -931,9 +931,13 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Si ton BattleTag vient d'un compte Battle.net rattaché, ta fiche joueur affiche une pastille « BattleTag vérifié » à tout joueur connecté qui la consulte — y compris quand ton BattleTag est masqué : la fiche dit alors « Masqué » avec la pastille, sans jamais montrer le BattleTag.",
     details: [
       "La pastille dit seulement que ton BattleTag a été prouvé par Battle.net, comme celle du tag Discord certifié dit que ton tag a été prouvé : elle ne nomme ni ton BattleTag ni ton compte Battle.net, dont l'identifiant ne quitte jamais nos serveurs.",
-      "Elle disparaît si tu détaches ton compte Battle.net dans « Mon profil » (Applications connectées). Aucune donnée nouvelle n'est collectée.",
+      "Elle repose sur notre intérêt légitime (savoir qui a prouvé son identité de jeu). Tu peux t'y opposer par le formulaire de signalement (catégorie RGPD), ou la faire disparaître en détachant ton compte Battle.net dans « Mon profil » (Applications connectées) — après avoir ajouté un autre moyen de connexion si c'est le seul. Aucune donnée nouvelle n'est collectée.",
+      "La pastille du tag Discord certifié suit la même règle : elle se lit sur ta fiche par tout joueur connecté, même si ton tag n'est pas visible des autres joueurs.",
     ],
-    links: [{ href: "/rgpd#donnees-collectees", label: "Lire la section « Données collectées »" }],
+    links: [
+      { href: "/rgpd#donnees-collectees", label: "Lire la section « Données collectées »" },
+      { href: "/rgpd#exercer-vos-droits", label: "Lire la section « Exercer vos droits »" },
+    ],
   },
 ];
 

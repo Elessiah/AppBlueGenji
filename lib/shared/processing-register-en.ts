@@ -136,7 +136,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Keeping on the account the “Don't show again” choice of the window of urgent recruitment announcements, so that it no longer opens on its own on the player's other devices — a choice that can be undone in “My profile”",
     ],
     legalBasis:
-      "Performance of the service requested by the player (contract) for the account; consent for the optional data the player fills in and chooses to make visible; performance of the service (contract — terms of use, “Match contacts”) for the BattleTag being read, even when hidden, only in a match's “Contacts” window and its launch window (record T04) — when hidden, it is readable nowhere else, referees and administrators included",
+      "Performance of the service requested by the player (contract) for the account; consent for the optional data the player fills in and chooses to make visible; performance of the service (contract — terms of use, “Match contacts”) for the BattleTag being read, even when hidden, only in a match's “Contacts” window and its launch window (record T04) — when hidden, it is readable nowhere else, referees and administrators included; legitimate interest (knowing who has proven their game identity) for the certification badges on the player page (certified Discord tag, BattleTag taken from a linked Battle.net account), read by any logged-in player even when the tag is hidden, without the tag — right to object through the report form (GDPR category)",
     dataSubjects: ["Players registered on the site"],
     dataCategories: [
       "Site username (since September 30, 2026, never taken from the name of the Google account: neutral username at creation; an earlier Google account may have received that name), avatar (copied to our servers; since the same date, hidden by default when it comes from the login provider)",
@@ -156,7 +156,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     recipients: [
       "The site's public (only the data the player makes visible)",
       "Parties to the same match, only in its “Contacts” window and its launch window (BattleTag even when hidden, to add each other in game; durations of record T04)",
-      "Logged-in players of the site: certified Discord username, if the player makes it visible",
+      "Logged-in players of the site: certified Discord username, if the player makes it visible; certification badges on the player page (certified Discord tag, “Verified BattleTag” — BattleTag taken from a linked Battle.net account), even when the tag is hidden, without the tag",
       "The association's staff according to their role (administration, refereeing)",
     ],
     transfers: ["None"],
