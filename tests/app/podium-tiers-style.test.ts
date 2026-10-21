@@ -222,4 +222,33 @@ describe("marches du podium — outils du staff et comptes supprimés", () => {
     const profile = readSource("app/(secured)/joueurs/[id]/page.tsx");
     expect(profile).toMatch(/<TeamLink teamId=\{entry\.teamId\} podiumTier=\{deleted \? null : undefined\}>/);
   });
+
+  it("garde sans marche l'équipe active d'un compte supprimé", () => {
+    const profile = readSource("app/(secured)/joueurs/[id]/page.tsx");
+    expect(profile).toMatch(/<TeamLink\s+teamId=\{activeTeam\.teamId\}\s+podiumTier=\{deleted \? null : undefined\}/);
+  });
+});
+
+describe("marches du podium — pastille de l'équipe active (fiche joueur)", () => {
+  // Fond de la pastille `.badge` (10 % de cyan) sur le fond le plus clair : plus
+  // teinté que la ligne de référence, il ferait tomber la 3e sous 4,5:1.
+  const BADGE = blend(SURFACE, [89, 212, 255], 0.1);
+  const profile = readSource("app/(secured)/joueurs/[id]/page.tsx");
+
+  it("le fond de la pastille est plus clair que la référence : la marche y passerait sous 4,5:1", () => {
+    expect(css).toMatch(/\.badge \{[^}]*background: rgba\(89, 212, 255, 0\.1\);/);
+    const body = rule(".podium-tier-3");
+    const lowest = Math.min(
+      ...[.../background-image:([^;]*);/.exec(body)![1].matchAll(/var\((--[a-z0-9-]+)\)/g)].map(([, name]) =>
+        contrastRatio(hexOf(name)!, litSurface(body, BADGE)),
+      ),
+    );
+    expect(lowest).toBeLessThan(4.5);
+  });
+
+  it("éteint donc la marche dans la pastille (repère conservé), le lien couvrant toute la pastille", () => {
+    expect(profile).toMatch(
+      /<span className="badge" data-podium-muted="" style=\{\{ fontSize: 11, padding: 0 \}\}>\s*<TeamLink\s+teamId=\{activeTeam\.teamId\}[^>]*style=\{\{ display: "inline-block", padding: "4px 12px", borderRadius: "inherit" \}\}/,
+    );
+  });
 });
