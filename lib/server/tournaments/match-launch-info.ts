@@ -318,8 +318,10 @@ type LaunchContext = {
    * Contacts **du caster** : le temps du match seulement (lancement ouvert, ou
    * lancé) — symétrique de ce que le caster reçoit des équipes (décision de
    * l'utilisateur, 2026-10-19). Avant, la carte présente les contacts des
-   * équipes sans les siens. Un arbitre (rôle `REFEREE`) les lit à toute heure,
-   * comme ceux des équipes (décision de l'utilisateur, 2026-10-21).
+   * équipes sans les siens. Un arbitre (rôle `REFEREE`, par la carte seulement,
+   * tournoi en cours) les lit dès que les deux adversaires sont connus et
+   * jusqu'à la fin du match, comme ceux des équipes (décision de l'utilisateur,
+   * 2026-10-21) — `exposesCasterContacts`.
    */
   exposesCaster: boolean;
 };

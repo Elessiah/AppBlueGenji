@@ -444,7 +444,8 @@ export function MatchContactsDialog({
                   phase={launch.phase}
                   onCopy={copy}
                   // Les contacts du caster ne sortent que le temps du match
-                  // (`exposesCaster`), sauf à un arbitre : avant, une note plutôt
+                  // (`exposesCaster`), sauf à un arbitre, qui les lit dès que les
+                  // adversaires sont connus : avant, une note plutôt
                   // que deux « — » qui laisseraient croire qu'il n'en a pas.
                   contactsShown={casterContactsOpen(launch)}
                   // Pas au caster lui-même : la note parle de lui.

@@ -175,7 +175,7 @@ describe("contacts du caster en attente, modale ouverte", () => {
     expect(casterRereadDelay(own, SERVER_BEFORE)).toBeNull();
   });
 
-  // Décision du 2026-10-21 : l'arbitre lit les contacts du caster à toute heure.
+  // Décision du 2026-10-21 : l'arbitre lit les contacts du caster dès que les adversaires sont connus.
   it("pas pour un arbitre : contacts du caster ouverts avant le départ, sans relecture", () => {
     for (const phase of ["TO_PLAN", "SCHEDULED", "LOBBY", "LAUNCHED"] as const) {
       const referee = info(phase, CASTER, START, "REFEREE");
