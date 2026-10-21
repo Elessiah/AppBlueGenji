@@ -39,7 +39,9 @@ rendu par la mise en page sous `certifyPrompt &&`) : sans proposition, ni son
 code ni ses textes ne partent — aucun poids sur le premier chargement des
 pages ; due mais en attente (confidentialité, conditions, page qui la tait), le
 morceau attend aussi, puis reste monté. Le relais est seul à suivre ces
-attentes et les passe à la fenêtre. Due, la lecture part dès la session lue
+attentes et dit à la fenêtre si elle peut s'ouvrir (`canOpen`) ; un tag
+certifié depuis `/profil` avant son chargement (conditions encore à accepter)
+clôt la proposition pour la session (`LATER`) sans la charger. Due, la lecture part dès la session lue
 (attendue avec les conditions) ; la marque levée faute de rien à proposer ne
 retarde pas la page (écriture non attendue). Tenue, la modale du recrutement
 ne reçoit pas ses annonces sur ce chargement (`modalAds` vide). Ses textes

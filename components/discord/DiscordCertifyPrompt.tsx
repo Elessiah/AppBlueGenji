@@ -13,11 +13,10 @@ import {
   CERTIFY_PROFILE_HREF,
   DISCORD_CERTIFIED_EVENT,
   type CertifyPrompt,
-  type CertifyPromptAction,
 } from "@/lib/shared/discord-certify-prompt";
-import { certifyPromptOpen } from "@/lib/shared/global-modals";
 import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
 import { visibleText } from "@/lib/shared/visible-text";
+import { answerCertifyPrompt as answerPrompt } from "./certify-prompt-answer";
 import type { CertifyPromptText } from "./certify-prompt-text";
 import styles from "./DiscordCertifyPrompt.module.css";
 
@@ -45,8 +44,8 @@ function deadEndText(code: string): "accountDeleted" | "sessionEnded" | null {
 }
 
 export type DiscordCertifyPromptProps = {
-  /** Parcours offert, décidé par la mise en page racine ; `null` : rien à proposer. */
-  prompt: CertifyPrompt | null;
+  /** Parcours offert, décidé par la mise en page racine (montée seulement quand il y en a un). */
+  prompt: CertifyPrompt;
   /** Une modale de confidentialité attend une réponse : celle-ci passe après. */
   privacyPending: boolean;
   /** Les conditions d'utilisation attendent une acceptation : celle-ci passe après. */
@@ -54,30 +53,16 @@ export type DiscordCertifyPromptProps = {
 };
 
 /**
- * Props de la fenêtre elle-même, montée par `DiscordCertifyPromptLazy` seulement
- * quand une proposition est due : attentes déjà mises à jour par ses
- * événements (confidentialité, conditions), textes (espace `certifyPrompt`)
- * dans la seule langue de la page.
+ * Props de la fenêtre elle-même, montée par `DiscordCertifyPromptLazy` (jamais
+ * au rendu serveur) : `canOpen` dit si rien ne passe avant elle
+ * (confidentialité, conditions, page qui la tait — `certifyPromptOpen`, jugé
+ * par le relais), textes (espace `certifyPrompt`) dans la seule langue de la page.
  */
-export type DiscordCertifyPromptViewProps = Omit<DiscordCertifyPromptProps, "prompt"> & {
+export type DiscordCertifyPromptViewProps = {
   prompt: CertifyPrompt;
+  canOpen: boolean;
   text: CertifyPromptText;
 };
-
-async function answerPrompt(action: CertifyPromptAction): Promise<void> {
-  const response = await fetch("/api/profile/discord/certify-prompt", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ action }),
-    // « Plus tard » puis un lien qui charge un nouveau document (changement de
-    // langue, passage par Discord) : sans `keepalive`, ce départ l'annulerait.
-    keepalive: true,
-  });
-  if (!response.ok) {
-    const payload = (await response.json().catch(() => ({}))) as { error?: string };
-    throw new Error(payload.error ?? `HTTP ${response.status}`);
-  }
-}
 
 /**
  * « Certifier ton tag Discord ? », proposé une fois par connexion Discord ou
@@ -91,18 +76,16 @@ async function answerPrompt(action: CertifyPromptAction): Promise<void> {
  * par Discord. Elle attend la confidentialité et les conditions (attentes
  * suivies par `DiscordCertifyPromptLazy`).
  */
-export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending, text }: Readonly<DiscordCertifyPromptViewProps>) {
+export function DiscordCertifyPrompt({ prompt, canOpen, text }: Readonly<DiscordCertifyPromptViewProps>) {
   const { t, rich } = text;
   const { showError, showSuccess } = useToast();
   const router = useLocaleRouter();
   const { path: pathname } = useLocalePathname();
   const titleId = useId();
-  const [mounted, setMounted] = useState(false);
   const [closed, setClosed] = useState(false);
   const [busy, setBusy] = useState<"certify" | "never" | null>(null);
   const inFlight = useRef(false);
 
-  useEffect(() => setMounted(true), []);
   // Montée seulement quand une proposition est due (le relais la démonte
   // sinon) : une proposition qui réapparaît la remonte, neuve ; un simple
   // changement de parcours (tag modifié sur `/profil`) ne rouvre pas une
@@ -129,15 +112,7 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending, tex
     return () => window.removeEventListener(DISCORD_CERTIFIED_EVENT, onCertified);
   }, [closeForSession]);
 
-  const open =
-    mounted &&
-    !closed &&
-    certifyPromptOpen({
-      due: true,
-      privacyPending,
-      termsPending,
-      pathname,
-    });
+  const open = canOpen && !closed;
 
   /** « Plus tard », Échap, voile. */
   const postpone = () => {

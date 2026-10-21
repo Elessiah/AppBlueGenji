@@ -1,16 +1,18 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState, type ComponentType } from "react";
+import { useEffect, useRef, useState, type ComponentType } from "react";
 import { useLocalePathname } from "@/components/i18n/locale-navigation";
 import { useShellText } from "@/components/i18n/shell-text";
 import { certifyPromptOpen } from "@/lib/shared/global-modals";
+import { DISCORD_CERTIFIED_EVENT } from "@/lib/shared/discord-certify-prompt";
 import { orReload } from "@/lib/shared/lazy-component";
 import { PRIVACY_CHANGES_ANSWERED_EVENT, privacyFollowedLink } from "@/lib/shared/privacy-changes";
 import { TERMS_ACCEPTED_EVENT, TERMS_REQUIRED_EVENT } from "@/lib/shared/terms-of-use";
 import { scopedText } from "@/lib/shared/scoped-text";
 import type { Locale } from "@/lib/shared/locales";
 import type { DiscordCertifyPromptProps, DiscordCertifyPromptViewProps } from "./DiscordCertifyPrompt";
+import { answerCertifyPrompt } from "./certify-prompt-answer";
 import type { CertifyPromptMessages } from "./certify-prompt-text";
 
 /** La fenêtre, liée aux textes d'une langue. */
@@ -59,21 +61,19 @@ const DiscordCertifyPromptEn = dynamic(
  * Seul à suivre ce que la fenêtre attend — une réponse à la confidentialité
  * (lien d'action compris : la page visée n'est pas couverte, rien n'est écrit,
  * la proposition revient au chargement suivant), des conditions acceptées ou
- * de nouveau exigées — et à le lui passer.
+ * de nouveau exigées, un tag certifié avant son chargement — et à lui dire si
+ * elle peut s'ouvrir (`canOpen`). Montée par la mise en page seulement quand
+ * une proposition est due : une proposition qui réapparaît la remonte, neuve.
  */
 export function DiscordCertifyPromptLazy({ prompt, privacyPending, termsPending }: Readonly<DiscordCertifyPromptProps>) {
   const { locale } = useShellText();
   const [privacyAnswered, setPrivacyAnswered] = useState(false);
   const [followedLink, setFollowedLink] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState<boolean | null>(null);
+  const [certifiedEarly, setCertifiedEarly] = useState(false);
   const [armed, setArmed] = useState(false);
+  const armedRef = useRef(false);
   const { path: pathname } = useLocalePathname();
-  const due = prompt !== null;
-
-  // Une proposition qui apparaît (connexion par code, `router.refresh()`) repart de zéro.
-  useEffect(() => {
-    if (due) setFollowedLink(false);
-  }, [due]);
 
   useEffect(() => {
     const onPrivacy = (event: Event) => {
@@ -82,27 +82,45 @@ export function DiscordCertifyPromptLazy({ prompt, privacyPending, termsPending 
     };
     const onTermsAccepted = () => setTermsAccepted(true);
     const onTermsRequired = () => setTermsAccepted(false);
+    // Certifié (dialogue de `/profil`) avant que la fenêtre ne soit chargée —
+    // conditions encore à accepter, par exemple : close pour la session ici,
+    // sans quoi elle s'ouvrirait plus tard pour un tag déjà certifié. Chargée,
+    // la fenêtre s'en charge elle-même.
+    const onCertified = () => {
+      if (armedRef.current) return;
+      armedRef.current = true;
+      setCertifiedEarly(true);
+      answerCertifyPrompt("LATER").catch(() => undefined);
+    };
     window.addEventListener(PRIVACY_CHANGES_ANSWERED_EVENT, onPrivacy);
     window.addEventListener(TERMS_ACCEPTED_EVENT, onTermsAccepted);
     window.addEventListener(TERMS_REQUIRED_EVENT, onTermsRequired);
+    window.addEventListener(DISCORD_CERTIFIED_EVENT, onCertified);
     return () => {
       window.removeEventListener(PRIVACY_CHANGES_ANSWERED_EVENT, onPrivacy);
       window.removeEventListener(TERMS_ACCEPTED_EVENT, onTermsAccepted);
       window.removeEventListener(TERMS_REQUIRED_EVENT, onTermsRequired);
+      window.removeEventListener(DISCORD_CERTIFIED_EVENT, onCertified);
     };
   }, []);
 
-  const pending = {
-    privacyPending: privacyPending && !privacyAnswered,
-    termsPending: termsAccepted === null ? termsPending : !termsAccepted,
-  };
+  const canOpen =
+    !followedLink &&
+    !certifiedEarly &&
+    certifyPromptOpen({
+      due: true,
+      privacyPending: privacyPending && !privacyAnswered,
+      termsPending: termsAccepted === null ? termsPending : !termsAccepted,
+      pathname,
+    });
   // Le morceau ne part qu'au moment où la fenêtre peut s'ouvrir, puis reste.
-  const canOpen = due && !followedLink && certifyPromptOpen({ due, ...pending, pathname });
   useEffect(() => {
-    if (canOpen) setArmed(true);
+    if (!canOpen) return;
+    armedRef.current = true;
+    setArmed(true);
   }, [canOpen]);
 
-  if (!due || followedLink || !(armed || canOpen)) return null;
+  if (certifiedEarly || followedLink || !(armed || canOpen)) return null;
   const View = locale === "en" ? DiscordCertifyPromptEn : DiscordCertifyPromptFr;
-  return <View prompt={prompt} {...pending} />;
+  return <View prompt={prompt} canOpen={canOpen} />;
 }
