@@ -87,6 +87,16 @@ describe("certificationPrompt du contexte du lecteur", () => {
     expect(loadCertificationPrompt).not.toHaveBeenCalled();
   });
 
+  it("une lecture en échec tait l'invitation sans faire tomber le contexte", async () => {
+    jest.mocked(loadCertificationPrompt).mockRejectedValue(new Error("pool épuisé"));
+    const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const context = await getTournamentViewerContext(snapshot("RUNNING", true), 7);
+    expect(context.certificationPrompt).toBeNull();
+    expect(context.myTeamId).toBe(42);
+    expect(errors).toHaveBeenCalled();
+    errors.mockRestore();
+  });
+
   it("rien en tournoi individuel", async () => {
     const context = await getTournamentViewerContext(snapshot("RUNNING", true, "SOLO"), 7);
     expect(context.certificationPrompt).toBeNull();

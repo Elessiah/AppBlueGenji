@@ -1105,6 +1105,8 @@ export async function getTournamentViewerContext(
   // équipe engagée dans un tournoi qui n'est pas clos. Une requête indexée sur
   // le roster, par connexion du flux (pas par instantané) et pour les seuls
   // engagés ; « Ne plus voir » vit dans le navigateur, le serveur l'ignore.
+  // Simple invitation : une lecture en échec la tait, elle ne fait pas tomber
+  // le contexte (et avec lui le flux) du joueur.
   const certificationPrompt =
     !isSolo && activeTeam && alreadyRegistered && snapshot.card.state !== "FINISHED"
       ? await withConnection((connection) =>
@@ -1112,10 +1114,13 @@ export async function getTournamentViewerContext(
             connection,
             userId,
             activeTeam.teamId,
-            hasTeamManagementRole(activeTeam.roles),
+            canRegisterEntrant,
             battletagRelevantFor(snapshot.card.game),
           ),
-        )
+        ).catch((error: unknown) => {
+          console.error("[tournaments] invitation à certifier indisponible :", error);
+          return null;
+        })
       : null;
 
   return {

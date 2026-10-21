@@ -35,7 +35,8 @@ sa **place est tenue dans le DOM** pendant le chargement de son morceau (le
 lancement ne s'ouvre pas en même temps qu'elle par accident. Mais elle **cède
 sa place** (`data-modal-yields`, `anotherModalOpen(…, { overYielding: true })`,
 `lib/shared/dialog-focus.ts`) : l'annonce d'un match qui se lance, urgente,
-passe par-dessus ; l'invitation s'efface **sans rien retenir** (elle n'a
+passe par-dessus — comme toute autre modale qui s'ouvrirait sur elle ;
+l'invitation s'efface **sans rien retenir** (elle n'a
 peut-être pas été lue ; la case « Ne plus voir », tenue par le crochet, garde
 son état) et revient à la fermeture de l'urgente. La modale
 recouverte ne reprend pas le focus à celle du dessus, et lui passe sa propre
@@ -96,7 +97,8 @@ donnée sur une personne, déposées à la demande du lecteur.
   `getTournamentViewerContext` — **porte commune** du flux SSE et de la lecture
   REST de secours — seulement pour une équipe engagée dans un tournoi non clos :
   une requête indexée par connexion du flux (pas par instantané). « Ne plus
-  voir » vit dans le navigateur, le serveur l'ignore.
+  voir » vit dans le navigateur, le serveur l'ignore. Une lecture en échec
+  tait l'invitation (`null`, journal pm2) sans faire tomber le contexte.
 - Champ `TournamentViewerContext.certificationPrompt`, rejoué tel quel d'un
   instantané à l'autre (`live-state.ts`), `null` pour le spectateur sans compte.
 - Ouverture une fois par page : `_hooks/useCertificationPrompt.ts` ; modale
