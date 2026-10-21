@@ -6,10 +6,10 @@ import { closedNoticeText } from "@/app/(secured)/tournois/[id]/_components/Play
 import { startAtHint } from "@/app/(secured)/tournois/[id]/_components/MatchScheduleDialog";
 import { anotherModalOpen } from "@/components/match-launch/MatchLaunchCenter";
 import { CasterCard, SideCard } from "@/components/match-launch/LaunchContactCards";
-import { contactsErrorText, viewerIsCaster } from "@/components/match-launch/MatchContactsDialog";
+import { contactsErrorText } from "@/components/match-launch/MatchContactsDialog";
 import { FR_LAUNCH_TEXT } from "@/components/match-launch/launch-text";
 import { tournamentDialogsText } from "@/lib/shared/tournament-actions-text";
-import type { LaunchSide, MatchLaunchInfo } from "@/lib/shared/match-launch";
+import { viewerIsCaster, type LaunchSide, type MatchLaunchInfo } from "@/lib/shared/match-launch";
 import frDialogs from "@/messages/fr/tournamentDialogs.json";
 import enDialogs from "@/messages/en/tournamentDialogs.json";
 import frActions from "@/messages/fr/tournamentActions.json";
@@ -254,6 +254,7 @@ describe("fiches de contact — noms cliquables", () => {
         caster={{ userId: 9, pseudo: "Voix", discordTag: null, battletag: null, battletagVerified: false, ready: false }}
         phase="LAUNCHED"
         onCopy={noop}
+        contactsShown
         linkNames
       />,
     );
@@ -291,5 +292,12 @@ describe("fiches de contact — noms cliquables", () => {
     expect(source).toContain("contactsShown={casterContactsOpen(launch)}");
     // La note parle du caster : jamais montrée au caster lui-même (arbitre qui caste compris).
     expect(source).toContain('contactsLaterText={viewerIsCaster(launch) ? undefined : t("contacts.casterLater")}');
+  });
+
+  // Même règle et même note dans la modale de lancement : jamais un pseudo seul.
+  it("la modale de lancement passe la règle et la note du caster", () => {
+    const source = readFileSync(join(process.cwd(), "components/match-launch/MatchLaunchCenter.tsx"), "utf8");
+    expect(source).toContain("contactsShown={exposesCasterContacts(current.phase, current.viewer.role)}");
+    expect(source).toContain('contactsLaterText={viewerIsCaster(current) ? undefined : t("contacts.casterLater")}');
   });
 });

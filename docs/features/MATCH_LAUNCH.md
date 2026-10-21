@@ -112,6 +112,9 @@ l'utilisateur, 2026-10-21 : `exposesCaster` ouvert au rôle `REFEREE`,
 qui **joue** le match lit en joueur (rôle `TEAM1`/`TEAM2`) : pour lui, comme pour
 les équipes, la modale « Contacts » dit avant le départ « Ses contacts
 s'afficheront au départ du match » (`contacts.casterLater`) au lieu de deux « — ».
+La modale de lancement passe la même règle et la même note à `CasterCard`, dont
+`contactsShown` n'a plus de défaut (une phase seule ne dit pas qui lit) ; la note
+ne s'adresse jamais au caster lui-même (`viewerIsCaster`, `lib/shared/match-launch.ts`).
 Déclaré : `PRIVACY_CHANGES` `2026-10-contacts-du-caster-aux-arbitres`, `/rgpd`,
 le registre (T04) et les conditions (v6 retouchée, sans nouvelle version).
 

@@ -9,6 +9,7 @@ import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
   MATCH_LAUNCH_REFRESH_EVENT,
   exposesCasterContacts,
+  viewerIsCaster,
   type MatchLaunchInfo,
 } from "@/lib/shared/match-launch";
 import type { BracketMatch } from "@/lib/shared/types";
@@ -61,14 +62,6 @@ export function contactsRetryDelay(startAt: string | null, serverDate: string | 
   if (!Number.isFinite(start) || !Number.isFinite(server) || start <= server - HEADER_SLACK_MS) return null;
   const delay = untilServerStart(start, server);
   return delay <= CONTACTS_RETRY_MAX_WAIT_MS ? delay : null;
-}
-
-/**
- * Le lecteur est-il le caster inscrit ? Son rôle le dit, sauf pour un joueur
- * du match qui caste aussi (`viewer.isCaster`, le rôle de joueur primant).
- */
-export function viewerIsCaster(launch: MatchLaunchInfo): boolean {
-  return launch.viewer.role === "CASTER" || launch.viewer.isCaster === true;
 }
 
 /**

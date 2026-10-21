@@ -186,7 +186,7 @@ export function CasterCard({
   caster,
   phase,
   onCopy,
-  contactsShown = phase !== "SCHEDULED",
+  contactsShown,
   noCasterText,
   contactsLaterText,
   linkNames = false,
@@ -194,7 +194,11 @@ export function CasterCard({
   caster: LaunchCaster | null;
   phase: MatchLaunchInfo["phase"];
   onCopy: CopyFn;
-  contactsShown?: boolean;
+  /**
+   * Règle `exposesCasterContacts` pour ce lecteur. Sans défaut : une phase
+   * seule ne dit pas qui lit, chaque appelant passe la règle.
+   */
+  contactsShown: boolean;
   /** Texte sans caster ; par défaut, celui de la modale de lancement. */
   noCasterText?: string;
   /**

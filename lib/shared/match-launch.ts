@@ -484,6 +484,15 @@ export function exposesCasterContacts(phase: MatchLaunchPhase, role: MatchLaunch
 }
 
 /**
+ * Le lecteur est-il le caster inscrit ? Son rôle le dit, sauf pour un joueur
+ * du match qui caste aussi (`viewer.isCaster`, le rôle de joueur primant). Lu
+ * par les deux modales : la note « contacts au départ » ne s'adresse pas à lui.
+ */
+export function viewerIsCaster(launch: Pick<MatchLaunchInfo, "viewer">): boolean {
+  return launch.viewer.role === "CASTER" || launch.viewer.isCaster === true;
+}
+
+/**
  * Doit-on ouvrir la modale d'office pour ce match ? Au lancement, pour appeler
  * les « Prêt » ; puis une fois lancé, pour l'annoncer. Clé par phase : fermer la
  * modale du lancement ne fait pas taire l'annonce du départ.

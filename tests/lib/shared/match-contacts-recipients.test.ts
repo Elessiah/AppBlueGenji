@@ -47,10 +47,10 @@ describe("contacts d'un match — destinataires et personnes présentées", () =
 describe("BattleTag masqué d'un caster", () => {
   it("la notice du profil dit que les deux équipes d'un match casté le voient (FR et EN)", () => {
     expect(frProfile.battletagNotice.asCaster).toContain(
-      "Les deux équipes d'un match que tu castes</strong>, le temps du match seulement (de son départ à sa fin), et <strong>ses arbitres et les administrateurs</strong> dès que ses deux adversaires sont connus",
+      "Les deux équipes d'un match que tu castes</strong>, le temps du match seulement (de son départ à sa fin).",
     );
     expect(enProfile.battletagNotice.asCaster).toContain(
-      "Both teams of a match you cast</strong>, only while the match is being played (from its start to its end), and <strong>its referees and administrators</strong> from the moment both its opponents are known",
+      "Both teams of a match you cast</strong>, only while the match is being played (from its start to its end).",
     );
     expect(readSource("app/(secured)/profil/BattletagVisibilityNotice.tsx")).toContain('"battletagNotice.asCaster"');
   });
@@ -77,8 +77,8 @@ describe("modale « Contacts » — fermée quand l'action disparaît", () => {
 
 describe("textes joueur et règles — mêmes lecteurs que le code", () => {
   it("l'indication du BattleTag masqué compte le caster, en français et en anglais", () => {
-    expect(readSource("messages/fr/players.json")).toContain("il ne se lit que dans la fenêtre « Contacts » de tes matchs et dans leur fenêtre de lancement — par les deux équipes et les arbitres, de la connaissance des deux adversaires à la fin du match, si tu es présenté comme contact, et par le caster le temps du match ; si tu castes un match, par ses deux équipes le temps du match et par les arbitres dès que ses deux adversaires sont connus (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes et au caster).");
-    expect(readSource("messages/en/players.json")).toContain("it can only be read in the “Contacts” window of your matches and in their launch window — by both teams and the referees, from the moment both opponents are known to the end of the match, if you are shown as a contact, and by the caster while the match is being played; if you cast a match, by both its teams while the match is being played and by the referees from the moment both its opponents are known (the launch window, at the start of the match, only opens for both teams and the caster).");
+    expect(readSource("messages/fr/players.json")).toContain("il ne se lit que dans la fenêtre « Contacts » de tes matchs et dans leur fenêtre de lancement. Si tu y es présenté comme contact, par les deux équipes et les arbitres, de la connaissance des deux adversaires à la fin du match, et par le caster le temps du match. Si tu castes un match, par ses deux équipes le temps du match, et par les arbitres de la connaissance des deux adversaires à la fin du match. La fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes et au caster.");
+    expect(readSource("messages/en/players.json")).toContain("it can only be read in the “Contacts” window of your matches and in their launch window. If you are shown there as a contact, by both teams and the referees, from the moment both opponents are known to the end of the match, and by the caster while the match is being played. If you cast a match, by both its teams while the match is being played, and by the referees from the moment both its opponents are known to the end of the match. The launch window, at the start of the match, only opens for both teams and the caster.");
   });
 
   it("la règle « Lancement d'un match » renvoie au bouton « Contacts » ouvert dès que les adversaires sont connus", () => {
@@ -176,14 +176,15 @@ describe("tag Discord d'un caster — arbitres", () => {
     );
   });
 
-  it("le BattleTag masqué d'un caster : la ligne du caster et celle du staff disent le même moment (FR et EN)", () => {
-    expect(frProfile.battletagNotice.asCaster).toContain("<strong>ses arbitres et les administrateurs</strong> dès que ses deux adversaires sont connus");
-    expect(enProfile.battletagNotice.asCaster).toContain("<strong>its referees and administrators</strong> from the moment both its opponents are known");
+  // Le staff n'est dit qu'une fois, sur sa propre ligne : la ligne du caster ne parle que des équipes.
+  it("le BattleTag masqué d'un caster : la ligne du staff dit quand les arbitres le lisent (FR et EN)", () => {
+    expect(frProfile.battletagNotice.asCaster).not.toContain("arbitres");
+    expect(enProfile.battletagNotice.asCaster).not.toContain("referees");
     expect(frProfile.battletagNotice.staff).toContain(
-      "aux mêmes moments que les deux équipes pour un match que tu joues, dès que ses deux adversaires sont connus pour un match que tu castes",
+      "aux mêmes moments que les deux équipes pour un match que tu joues, dès que ses deux adversaires sont connus et jusqu'à sa fin pour un match que tu castes",
     );
     expect(enProfile.battletagNotice.staff).toContain(
-      "at the same times as both teams for a match you play, from the moment both its opponents are known for a match you cast",
+      "at the same times as both teams for a match you play, from the moment both its opponents are known until its end for a match you cast",
     );
   });
 });
