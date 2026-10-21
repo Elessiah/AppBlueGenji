@@ -93,13 +93,18 @@ export function memberPodiumTier(tiers: PodiumTiers, userId: number | null | und
 /** Version pleine (équipe) ou adoucie (membre) de la marche. */
 export type PodiumTierKind = "team" | "member";
 
+/** Famille de classes d'une marche : `.podium-tier` (équipe), `.podium-member` (membre). */
+export function podiumTierFamily(kind: PodiumTierKind): "podium-tier" | "podium-member" {
+  return kind === "team" ? "podium-tier" : "podium-member";
+}
+
 /**
  * Classes globales de la marche (`app/globals.css`, famille `.podium-tier` /
  * `.podium-member`, `DESIGN_SYSTEM.md`) ; `undefined` hors podium.
  */
 export function podiumTierClass(tier: PodiumTier | null, kind: PodiumTierKind = "team"): string | undefined {
   if (tier === null) return undefined;
-  const base = kind === "team" ? "podium-tier" : "podium-member";
+  const base = podiumTierFamily(kind);
   return `${base} ${base}-${tier}`;
 }
 

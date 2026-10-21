@@ -242,7 +242,7 @@ export function spectatorFreshnessMs(pollMs: number, cacheTtlMs: number): number
  * la fiche sait qu'un caster est inscrit (son pseudo, à l'antenne, s'affiche et
  * il compte dans les « prêts » du lancement) sans savoir qui. `soloUserIds`
  * reste en revanche : il porte la marche du podium d'un joueur engagé en
- * individuel (`useEntrantPodiumClass`), et le podium est public.
+ * individuel (`useEntrantPodium`), et le podium est public.
  *
  * Les **sanctions** (BlueGenji Survie) gardent l'équipe, la manche et les
  * points, mais ni l'arbitre qui les a prononcées (le staff reste anonyme hors de

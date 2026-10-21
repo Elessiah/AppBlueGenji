@@ -231,7 +231,15 @@ a {
 /* Nom tronqué d'une ellipse (`truncate` d'`EntityLink`). Peint d'une marche,
    c'est le nom qui rogne et pose l'ellipse — tracée dans le dégradé — et le
    lien le laisse déborder : la lueur (`drop-shadow`) n'est pas coupée net. */
+/* Bloc en ligne borné à son conteneur : l'ellipse vaut aussi dans le flux en
+   ligne, et le nom peint (`display: block`) n'y crée pas de bloc dans une
+   ligne. `min-width: 0` : en élément flexible, le lien d'une marche (qui laisse
+   déborder) rétrécit quand même. */
 .entity-truncate {
+  display: inline-block;
+  max-width: 100%;
+  min-width: 0;
+  vertical-align: bottom;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
