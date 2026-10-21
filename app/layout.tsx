@@ -18,7 +18,7 @@ import { SkipLink } from "@/components/accessibility/SkipLink";
 import { MatchLaunchCenterLazy } from "@/components/match-launch/MatchLaunchCenterLazy";
 import { EnglishLinkPreload } from "@/components/i18n/english-link-preload";
 import { TermsAcceptanceModal } from "@/components/legal/TermsAcceptanceModal";
-import { DiscordCertifyPrompt } from "@/components/discord/DiscordCertifyPrompt";
+import { DiscordCertifyPromptLazy } from "@/components/discord/DiscordCertifyPromptLazy";
 import { TERMS_TRANSLATION_NOTE } from "@/lib/shared/french-version-prevails";
 import { needsTermsAcceptance } from "@/lib/server/terms-acceptance";
 import type { TermsRequest } from "@/lib/shared/terms-of-use";
@@ -360,9 +360,11 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             />
           )}
           {/* Certification du tag Discord proposée une fois par connexion
-              Discord ou Blizzard, après la confidentialité et les conditions. */}
-          {user && (
-            <DiscordCertifyPrompt
+              Discord ou Blizzard, après la confidentialité et les conditions.
+              Chargée seulement quand elle est due : hors du premier
+              chargement de chaque page. */}
+          {certifyPrompt && (
+            <DiscordCertifyPromptLazy
               prompt={certifyPrompt}
               privacyPending={privacyChanges.length > 0}
               termsPending={termsRequired}

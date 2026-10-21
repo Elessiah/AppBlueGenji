@@ -114,7 +114,8 @@
     "removalBodyDms": "The bot will no longer send you direct messages about your matches either.",
     "removalBody2": "Your next login with Discord will save your username again, but without verifying it: it will stay invisible to everyone until you verify it again.",
     "verifiedAlt": "Verified Discord tag",
-    "verifiedTitle": "Verified Discord tag: this player proved they own this Discord account."
+    "verifiedTitle": "Verified Discord tag: this player proved they own this Discord account.",
+    "alreadyVerified": "Your Discord tag is already verified."
   },
   "privacy": {
     "visibleTitle": "Visible to other players",

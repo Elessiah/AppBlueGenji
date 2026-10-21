@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useShellText } from "@/components/i18n/shell-text";
+import { useProfileText } from "@/components/i18n/profile-text";
 import { useToast } from "@/components/ui/toast";
 import {
   CERTIFY_DIALOG_EVENT,
@@ -27,7 +27,7 @@ export function useCertifyRequest({
   refresh,
 }: Readonly<{ ready: boolean; verified: boolean; open: () => void; refresh: () => void }>): void {
   const [requested, setRequested] = useState(false);
-  const { t } = useShellText();
+  const { t } = useProfileText();
   const { showSuccess } = useToast();
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
@@ -56,7 +56,7 @@ export function useCertifyRequest({
   useEffect(() => {
     if (!requested || !ready) return;
     setRequested(false);
-    if (verified) showSuccess(t("certifyPrompt.alreadyVerified"));
+    if (verified) showSuccess(t("discord.alreadyVerified"));
     else open();
   }, [requested, ready, verified, open, showSuccess, t]);
 }

@@ -34,6 +34,16 @@ pages légales et la connexion la taisent. La marque se lit **avec la session**
 (`getCurrentUser`, colonne `s.certify_prompt_due`) : aucune requête de plus tant
 qu'elle est à `0`.
 
+**Chargée seulement quand elle est due** (`DiscordCertifyPromptLazy`, rendu par
+la mise en page sous `certifyPrompt &&`) : sans proposition, ni son code ni ses
+textes ne partent — aucun poids sur le premier chargement des pages. Ses textes
+ont **leur** espace, `certifyPrompt` (hors de la coquille, qui voyage avec
+chaque page) ; un morceau par langue (`next/dynamic`, `ssr: false`, `orReload`),
+une page française ne télécharge jamais l'anglais. Le relais retient ce qui
+arrive avant le morceau (réponse à la confidentialité, lien d'action compris ;
+conditions acceptées ou de nouveau exigées). Le toast « déjà certifié » de
+`/profil` est dans l'espace `profile` (`discord.alreadyVerified`).
+
 Le contournement de développement (`DEV_AUTH_USER_ID`) n'a pas de session : la
 fenêtre ne s'y montre pas. Pour la voir en local, se connecter vraiment par
 Discord ou Blizzard (ou poser la marque à la main sur sa ligne de session).
@@ -99,7 +109,7 @@ pastille sur la fiche (joueurs connectés), messages privés de match (sauf
 opposition). Soi-même n'a pas de ligne : on voit toujours son propre tag, rien
 n'y change. Sans certification : personne d'autre que toi. Puis une
 ligne : retirer son tag ou changer de pseudo Discord retire la certification.
-Textes `shell.certifyPrompt` (FR et EN) ; le détail complet reste dans le
+Textes de l'espace `certifyPrompt` (FR et EN) ; le détail complet reste dans le
 dialogue (`DISCORD_VERIFICATION_EXPOSURE`, qui nomme aussi l'arbitre d'un match
 que le joueur caste). Tableau natif (`th` `scope`, titres de groupe en `rowgroup`), colonnes
 « Sans » / « Avec », trois colonnes serrées sous

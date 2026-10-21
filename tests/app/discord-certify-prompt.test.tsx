@@ -8,6 +8,9 @@ jest.mock("next/navigation", () => ({
 import { renderToStaticMarkup } from "react-dom/server";
 import { ToastProvider } from "@/components/ui/toast";
 import { CERTIFY_PROMPT_GROUPS, DiscordCertifyPrompt } from "@/components/discord/DiscordCertifyPrompt";
+import { scopedText } from "@/lib/shared/scoped-text";
+import frCertify from "@/messages/fr/certifyPrompt.json";
+import enCertify from "@/messages/en/certifyPrompt.json";
 import frShell from "@/messages/fr/shell.json";
 import enShell from "@/messages/en/shell.json";
 import { readSource } from "../helpers/read-source";
@@ -22,14 +25,16 @@ import { readSource } from "../helpers/read-source";
 
 const SOURCE = readSource("components/discord/DiscordCertifyPrompt.tsx");
 const LAYOUT = readSource("app/layout.tsx");
+const LAZY = readSource("components/discord/DiscordCertifyPromptLazy.tsx");
+const FR_TEXT = scopedText("fr", frCertify);
 const CERTIFY_PROMPT_ROWS = CERTIFY_PROMPT_GROUPS.flatMap(({ rows }) => rows);
 
 describe("DiscordCertifyPrompt — rendu", () => {
   it("rien au rendu serveur (portail monté après l'hydratation), même due", () => {
     const render = (node: React.JSX.Element) => renderToStaticMarkup(<ToastProvider>{node}</ToastProvider>);
     const empty = render(<span />).replace("<span></span>", "");
-    expect(render(<DiscordCertifyPrompt prompt={{ mode: "ONE_CLICK", tag: "keryan" }} privacyPending={false} termsPending={false} />)).toBe(empty);
-    expect(render(<DiscordCertifyPrompt prompt={null} privacyPending={false} termsPending={false} />)).toBe(empty);
+    expect(render(<DiscordCertifyPrompt prompt={{ mode: "ONE_CLICK", tag: "keryan" }} privacyPending={false} termsPending={false} text={FR_TEXT} />)).toBe(empty);
+    expect(render(<DiscordCertifyPrompt prompt={null} privacyPending={false} termsPending={false} text={FR_TEXT} />)).toBe(empty);
   });
 });
 
@@ -47,17 +52,17 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
     expect(SOURCE).toContain('if (payload.status !== "VERIFIED") throw new Error("DISCORD_TAG_CHANGED");');
     // Succès : close pour la session (LATER), toast, /profil relit son état, rafraîchissement.
     expect(SOURCE).toMatch(
-      /showSuccess\(t\("certifyPrompt\.certified"\)\);\s*(?:\/\/[^\n]*\n\s*)*window\.dispatchEvent\(new Event\(DISCORD_CERTIFIED_EVENT\)\);\s*router\.refresh\(\);/,
+      /showSuccess\(t\("certified"\)\);\s*(?:\/\/[^\n]*\n\s*)*window\.dispatchEvent\(new Event\(DISCORD_CERTIFIED_EVENT\)\);\s*router\.refresh\(\);/,
     );
     // État changé : la fenêtre se ferme (plus rien à offrir) ; autre refus : elle reste.
     expect(SOURCE).toMatch(
-      /if \(closeOnDeadEnd\(code\)\) return;\s*if \(STATE_CHANGED\.has\(code\)\) \{\s*\/\/[^\n]*\n\s*closeForSession\(\);\s*showError\(t\("certifyPrompt\.certifyChanged"\)\);\s*\} else \{\s*showError\(t\("certifyPrompt\.certifyFailed"\)\);/,
+      /if \(closeOnDeadEnd\(code\)\) return;\s*if \(STATE_CHANGED\.has\(code\)\) \{\s*\/\/[^\n]*\n\s*closeForSession\(\);\s*showError\(t\("certifyChanged"\)\);\s*\} else \{\s*showError\(t\("certifyFailed"\)\);/,
     );
   });
 
   it("compte supprimé ou session close : fermée, toast dédié, pas de « Réessaie » sans fin (deux boutons)", () => {
-    expect(SOURCE).toContain('if (code === ACCOUNT_DELETED_ERROR || code === "PROFILE_NOT_FOUND") return "certifyPrompt.accountDeleted";');
-    expect(SOURCE).toContain('if (code === "UNAUTHORIZED") return "certifyPrompt.sessionEnded";');
+    expect(SOURCE).toContain('if (code === ACCOUNT_DELETED_ERROR || code === "PROFILE_NOT_FOUND") return "accountDeleted";');
+    expect(SOURCE).toContain('if (code === "UNAUTHORIZED") return "sessionEnded";');
     expect(SOURCE).toMatch(/if \(!deadEnd\) return false;\s*setClosed\(true\);\s*showError\(t\(deadEnd\)\);\s*router\.refresh\(\);/);
     // Les deux boutons (« Ne plus voir », « Certifier ») passent par le même garde.
     expect(SOURCE.match(/closeOnDeadEnd\(/g)).toHaveLength(2);
@@ -89,7 +94,7 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
     );
     const hook = readSource("app/(secured)/profil/useCertifyRequest.ts");
     // Tag déjà certifié : un toast le dit, au lieu d'un clic resté sans suite.
-    expect(hook).toContain('if (verified) showSuccess(t("certifyPrompt.alreadyVerified"));');
+    expect(hook).toContain('if (verified) showSuccess(t("discord.alreadyVerified"));');
     expect(hook).toContain("window.addEventListener(DISCORD_CERTIFIED_EVENT, onCertified)");
   });
 
@@ -155,9 +160,32 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
 describe("mise en page racine", () => {
   it("monte la fenêtre pour un compte connecté, avec ce qu'elle doit attendre", () => {
     expect(LAYOUT).toMatch(
-      /<DiscordCertifyPrompt\s+prompt=\{certifyPrompt\}\s+privacyPending=\{privacyChanges\.length > 0\}\s+termsPending=\{termsRequired\}/,
+      /\{certifyPrompt && \(\s*<DiscordCertifyPromptLazy\s+prompt=\{certifyPrompt\}\s+privacyPending=\{privacyChanges\.length > 0\}\s+termsPending=\{termsRequired\}/,
     );
+    // Rien de la fenêtre dans le premier chargement : ni import statique, ni textes de la coquille.
+    expect(LAYOUT).not.toMatch(/from "@\/components\/discord\/DiscordCertifyPrompt"/);
     expect(LAYOUT).toContain("user?.certifyPromptDue ? loadCertifyPromptSafely(user.id) : Promise.resolve(null)");
+  });
+
+  it("chargée à la demande, seulement quand elle est due, chaque langue dans son morceau", () => {
+    expect(LAZY).toContain("if (!due || followedLink) return null;");
+    expect(LAZY.match(/\{ ssr: false \}/g)).toHaveLength(2);
+    expect(LAZY.match(/orReload\(/g)).toHaveLength(2);
+    // Une page française ne télécharge jamais l'anglais, ni l'inverse.
+    expect(LAZY).toMatch(/Promise\.all\(\[import\("\.\/DiscordCertifyPrompt"\), import\("@\/messages\/fr\/certifyPrompt\.json"\)\]\)[^\n]*\n\s*withText\(module\.DiscordCertifyPrompt, "fr"/);
+    expect(LAZY).toMatch(/Promise\.all\(\[import\("\.\/DiscordCertifyPrompt"\), import\("@\/messages\/en\/certifyPrompt\.json"\)\]\)[^\n]*\n\s*withText\(module\.DiscordCertifyPrompt, "en"/);
+    expect(LAZY).not.toMatch(/^import [^\n]*messages\/(fr|en)\/certifyPrompt\.json/m);
+    expect(LAZY).not.toMatch(/^import \{[^}]*\} from "\.\/DiscordCertifyPrompt"/m);
+    expect(SOURCE).not.toContain("useShellText");
+  });
+
+  it("retient ce qui arrive avant le morceau (confidentialité, conditions)", () => {
+    expect(LAZY).toContain("window.addEventListener(PRIVACY_CHANGES_ANSWERED_EVENT, onPrivacy)");
+    expect(LAZY).toContain("if (privacyFollowedLink(event)) setFollowedLink(true);");
+    expect(LAZY).toContain("window.addEventListener(TERMS_ACCEPTED_EVENT, onTermsAccepted)");
+    expect(LAZY).toContain("window.addEventListener(TERMS_REQUIRED_EVENT, onTermsRequired)");
+    expect(LAZY).toContain("privacyPending={privacyPending && !privacyAnswered}");
+    expect(LAZY).toContain("termsPending={termsAccepted === null ? termsPending : !termsAccepted}");
   });
 
   it("fait taire le recrutement tant qu'elle est due, quelle que soit la page", () => {
@@ -167,9 +195,14 @@ describe("mise en page racine", () => {
   });
 });
 
-describe("textes (shell.certifyPrompt) — FR et EN", () => {
-  const fr = frShell.certifyPrompt;
-  const en = enShell.certifyPrompt;
+describe("textes (certifyPrompt) — FR et EN", () => {
+  const fr = frCertify;
+  const en = enCertify;
+
+  it("hors de la coquille : ni le paquet de chaque page ni l'anglais sérialisé sous /en ne les portent", () => {
+    expect(frShell).not.toHaveProperty("certifyPrompt");
+    expect(enShell).not.toHaveProperty("certifyPrompt");
+  });
 
   it("mêmes clés dans les deux langues, une ligne par public ou effet", () => {
     const keys = (value: object): string[] =>

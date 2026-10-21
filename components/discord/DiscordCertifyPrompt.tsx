@@ -4,7 +4,7 @@ import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 
 import { createPortal } from "react-dom";
 import { CyberButton, ScrollArea } from "@/components/cyber";
 import { useLocalePathname, useLocaleRouter } from "@/components/i18n/locale-navigation";
-import { richNodes, useShellText } from "@/components/i18n/shell-text";
+import { richNodes } from "@/components/i18n/shell-text";
 import { useToast } from "@/components/ui/toast";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
@@ -20,11 +20,12 @@ import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
 import { PRIVACY_CHANGES_ANSWERED_EVENT, privacyFollowedLink } from "@/lib/shared/privacy-changes";
 import { TERMS_ACCEPTED_EVENT, TERMS_REQUIRED_EVENT } from "@/lib/shared/terms-of-use";
 import { visibleText } from "@/lib/shared/visible-text";
+import type { CertifyPromptText } from "./certify-prompt-text";
 import styles from "./DiscordCertifyPrompt.module.css";
 
 /**
- * Groupes du tableau, dans l'ordre affiché (`shell.certifyPrompt.groups.*`) :
- * qui voit le tag, puis les autres effets (`shell.certifyPrompt.rows.*`).
+ * Groupes du tableau, dans l'ordre affiché (`certifyPrompt.groups.*`) :
+ * qui voit le tag, puis les autres effets (`certifyPrompt.rows.*`).
  */
 export const CERTIFY_PROMPT_GROUPS = [
   { group: "seen", rows: ["admins", "referees", "match", "players", "visitors"] },
@@ -39,9 +40,9 @@ const STATE_CHANGED = new Set(["DISCORD_TAG_CHANGED", "DISCORD_NOT_LINKED", "DIS
  * réessayer n'y changerait rien. La fenêtre se ferme, un toast dit pourquoi et
  * la page se relit. `null` : refus ordinaire, la fenêtre reste.
  */
-function deadEndText(code: string): "certifyPrompt.accountDeleted" | "certifyPrompt.sessionEnded" | null {
-  if (code === ACCOUNT_DELETED_ERROR || code === "PROFILE_NOT_FOUND") return "certifyPrompt.accountDeleted";
-  if (code === "UNAUTHORIZED") return "certifyPrompt.sessionEnded";
+function deadEndText(code: string): "accountDeleted" | "sessionEnded" | null {
+  if (code === ACCOUNT_DELETED_ERROR || code === "PROFILE_NOT_FOUND") return "accountDeleted";
+  if (code === "UNAUTHORIZED") return "sessionEnded";
   return null;
 }
 
@@ -53,6 +54,12 @@ export type DiscordCertifyPromptProps = {
   /** Les conditions d'utilisation attendent une acceptation : celle-ci passe après. */
   termsPending: boolean;
 };
+
+/**
+ * Props de la fenêtre elle-même : ses textes (espace `certifyPrompt`) lui sont
+ * donnés par `DiscordCertifyPromptLazy`, dans la seule langue de la page.
+ */
+export type DiscordCertifyPromptViewProps = DiscordCertifyPromptProps & { text: CertifyPromptText };
 
 async function answerPrompt(action: CertifyPromptAction): Promise<void> {
   const response = await fetch("/api/profile/discord/certify-prompt", {
@@ -80,8 +87,8 @@ async function answerPrompt(action: CertifyPromptAction): Promise<void> {
  * certification de `/profil` (`DIALOG`), qui garde seul le code et le passage
  * par Discord. Elle attend la confidentialité et les conditions.
  */
-export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: Readonly<DiscordCertifyPromptProps>) {
-  const { t, rich } = useShellText();
+export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending, text }: Readonly<DiscordCertifyPromptViewProps>) {
+  const { t, rich } = text;
   const { showError, showSuccess } = useToast();
   const router = useLocaleRouter();
   const { path: pathname } = useLocalePathname();
@@ -188,9 +195,9 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
       await answerPrompt("NEVER");
       answered.current = true;
       setClosed(true);
-      showSuccess(t("certifyPrompt.neverSaved"));
+      showSuccess(t("neverSaved"));
     } catch (error) {
-      if (!closeOnDeadEnd((error as Error).message)) showError(t("certifyPrompt.neverFailed"));
+      if (!closeOnDeadEnd((error as Error).message)) showError(t("neverFailed"));
     } finally {
       inFlight.current = false;
       setBusy(null);
@@ -220,7 +227,7 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
       // Un 2xx sans `VERIFIED` (code envoyé en message privé) : le tag n'est
       // plus celui que Discord a nommé, la suite se fait depuis « Mon profil ».
       if (payload.status !== "VERIFIED") throw new Error("DISCORD_TAG_CHANGED");
-      showSuccess(t("certifyPrompt.certified"));
+      showSuccess(t("certified"));
       // L'événement close la proposition pour la session (`onCertified`) et
       // fait relire son état Discord à un `/profil` ouvert.
       window.dispatchEvent(new Event(DISCORD_CERTIFIED_EVENT));
@@ -231,9 +238,9 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
       if (STATE_CHANGED.has(code)) {
         // Le tag montré n'est plus le bon : la fenêtre n'a plus rien à offrir.
         closeForSession();
-        showError(t("certifyPrompt.certifyChanged"));
+        showError(t("certifyChanged"));
       } else {
-        showError(t("certifyPrompt.certifyFailed"));
+        showError(t("certifyFailed"));
       }
     } finally {
       inFlight.current = false;
@@ -256,45 +263,45 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
         tabIndex={-1}
         className={`${styles.modal} dialog-bounded`}
       >
-        <span className="eyebrow">{t("certifyPrompt.eyebrow")}</span>
+        <span className="eyebrow">{t("eyebrow")}</span>
         <h2 id={titleId} className={styles.title}>
-          {t(noTag ? "certifyPrompt.titleNoTag" : "certifyPrompt.title")}
+          {t(noTag ? "titleNoTag" : "title")}
         </h2>
-        <ScrollArea orientation="y" className={styles.body} ariaLabel={t("certifyPrompt.bodyLabel")}>
+        <ScrollArea orientation="y" className={styles.body} ariaLabel={t("bodyLabel")}>
           <p id={`${titleId}-intro`} className={styles.text}>
-            {t(noTag ? "certifyPrompt.introNoTag" : "certifyPrompt.intro")}
+            {t(noTag ? "introNoTag" : "intro")}
           </p>
           {prompt.mode === "ONE_CLICK" && (
-            <p className={styles.text}>{richNodes(rich("certifyPrompt.tag", { tag: visibleText(prompt.tag) }, strong))}</p>
+            <p className={styles.text}>{richNodes(rich("tag", { tag: visibleText(prompt.tag) }, strong))}</p>
           )}
           <table className={styles.table}>
-            <caption className={styles.caption}>{t("certifyPrompt.tableCaption")}</caption>
+            <caption className={styles.caption}>{t("tableCaption")}</caption>
             <thead>
               <tr>
                 <td />
-                <th scope="col">{t("certifyPrompt.colWithout")}</th>
-                <th scope="col">{t("certifyPrompt.colWith")}</th>
+                <th scope="col">{t("colWithout")}</th>
+                <th scope="col">{t("colWith")}</th>
               </tr>
             </thead>
             {CERTIFY_PROMPT_GROUPS.map(({ group, rows }) => (
               <tbody key={group}>
                 <tr>
                   <th scope="rowgroup" colSpan={3} className={styles.group}>
-                    {t(`certifyPrompt.groups.${group}`)}
+                    {t(`groups.${group}`)}
                   </th>
                 </tr>
                 {rows.map((row) => (
                   <tr key={row}>
-                    <th scope="row">{t(`certifyPrompt.rows.${row}.label`)}</th>
-                    <td>{t(`certifyPrompt.rows.${row}.without`)}</td>
-                    <td className={styles.with}>{t(`certifyPrompt.rows.${row}.with`)}</td>
+                    <th scope="row">{t(`rows.${row}.label`)}</th>
+                    <td>{t(`rows.${row}.without`)}</td>
+                    <td className={styles.with}>{t(`rows.${row}.with`)}</td>
                   </tr>
                 ))}
               </tbody>
             ))}
           </table>
-          <p className={styles.note}>{t("certifyPrompt.undo")}</p>
-          <p className={styles.note}>{t("certifyPrompt.later")}</p>
+          <p className={styles.note}>{t("undo")}</p>
+          <p className={styles.note}>{t("later")}</p>
         </ScrollArea>
         <div className={styles.actions}>
           <CyberButton
@@ -304,10 +311,10 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
             aria-busy={busy === "never" || undefined}
             onClick={() => void neverShow()}
           >
-            {busy === "never" ? t("certifyPrompt.neverSaving") : t("certifyPrompt.never")}
+            {busy === "never" ? t("neverSaving") : t("never")}
           </CyberButton>
           <CyberButton variant="ghost" type="button" aria-disabled={busy !== null || undefined} onClick={postpone}>
-            {t("certifyPrompt.postpone")}
+            {t("postpone")}
           </CyberButton>
           <CyberButton
             variant="primary"
@@ -317,10 +324,10 @@ export function DiscordCertifyPrompt({ prompt, privacyPending, termsPending }: R
             onClick={() => void certify()}
           >
             {busy === "certify" ? (
-              t("certifyPrompt.certifying")
+              t("certifying")
             ) : (
               <>
-                {t(noTag ? "certifyPrompt.addTag" : "certifyPrompt.certify")}
+                {t(noTag ? "addTag" : "certify")}
                 {prompt.mode === "DIALOG" && <span aria-hidden="true"> →</span>}
               </>
             )}
