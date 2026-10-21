@@ -199,7 +199,7 @@ describe("contacts du caster en attente, modale ouverte", () => {
     // Hors phase (match terminé, adversaire manquant) : rien, arbitre compris.
     expect(exposesCasterContacts("NONE", "REFEREE")).toBe(false);
     expect(readSource("lib/server/tournaments/match-launch-info.ts")).toContain(
-      "exposesCaster: exposesCasterContacts(phase, party.role)",
+      "exposesCaster: exposes && exposesCasterContacts(phase, party.role)",
     );
   });
 

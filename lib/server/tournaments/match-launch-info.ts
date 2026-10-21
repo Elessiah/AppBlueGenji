@@ -321,7 +321,8 @@ type LaunchContext = {
    * équipes sans les siens. Un arbitre (rôle `REFEREE`, par la carte seulement,
    * tournoi en cours) les lit dès que les deux adversaires sont connus et
    * jusqu'à la fin du match, comme ceux des équipes (décision de l'utilisateur,
-   * 2026-10-21) — `exposesCasterContacts`.
+   * 2026-10-21) — `exposesCasterContacts`, et seulement si `exposes` les ouvre :
+   * ce drapeau porte seul la décision pour le caster.
    */
   exposesCaster: boolean;
 };
@@ -505,7 +506,7 @@ function buildLaunchCaster(row: CandidateRow, ctx: LaunchContext): LaunchCaster 
   const user = ctx.users.get(Number(row.caster_user_id));
   if (!user || Number(user.is_deleted) !== 0) return null;
   const discordTag = user.discord_verified_at !== null ? user.discord_pseudo : null;
-  const contact = ctx.exposes && ctx.exposesCaster
+  const contact = ctx.exposesCaster
     ? filterContact(
         {
           userId: Number(user.id),
@@ -657,7 +658,9 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
           castRevoked,
           readiness: rowReadiness(row),
           exposes,
-          exposesCaster: exposesCasterContacts(phase, party.role),
+          // Une seule décision pour les contacts du caster : ceux du match
+          // ouverts (`exposes`) et la règle du caster.
+          exposesCaster: exposes && exposesCasterContacts(phase, party.role),
         }),
       );
     }
