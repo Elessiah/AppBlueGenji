@@ -24,7 +24,7 @@
     "match": {
       "label": "Your match (teams, caster)",
       "without": "Never",
-      "with": "From when your opponents are known until it ends (caster: during the match)"
+      "with": "From when your opponents are known until it ends (caster, and the teams of a match you cast: during the match)"
     },
     "players": {
       "label": "Other players",

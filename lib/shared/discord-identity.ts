@@ -92,7 +92,8 @@ export type DiscordTagSubject = {
    * Lecteur et cible sont-ils **parties d'un même match** — membres des deux
    * engagées dès que ses deux adversaires sont connus (bouton « Contacts » ; la
    * modale, elle, attend le lancement), caster inscrit le temps du match seulement et tant qu'il
-   * n'est pas terminé ? Relatif au lecteur, établi par l'appelant
+   * n'est pas terminé, ou arbitre (`tournaments`) lisant le caster dès que les
+   * deux adversaires sont connus et jusqu'à la fin du match ? Relatif au lecteur, établi par l'appelant
    * (`lib/server/tournaments/match-launch-info.ts`). C'est ce qui permet aux
    * équipes de s'ajouter et d'inviter leur caster (`lib/shared/match-launch.ts`).
    */
@@ -115,7 +116,8 @@ export type DiscordTagSubject = {
  *    ne puisse pas l'oublier en ajoutant un rôle demain ;
  * 3. **même match** — les parties d'un match (membres des deux engagées,
  *    caster) se voient jusqu'à sa fin — les équipes dès que ses deux
- *    adversaires sont connus, le caster le temps du match seulement ;
+ *    adversaires sont connus, le caster le temps du match seulement ; les
+ *    arbitres lisent le caster dès que les deux adversaires sont connus ;
  * 4. **visible des autres joueurs** — tout lecteur connecté, si le titulaire l'a
  *    choisi. La clause vient **après** « non vérifié » : le réglage n'ouvre
  *    jamais un tag que personne n'a prouvé ;

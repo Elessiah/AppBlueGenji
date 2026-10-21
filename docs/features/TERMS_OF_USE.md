@@ -188,9 +188,12 @@ masquage, fiche joueur, conditions v6, `/rgpd`, registre, `PRIVACY_CHANGES`)
 nomme **les deux** fenêtres : « Contacts » de la carte du match et fenêtre de
 lancement (équipes et caster ; les arbitres n'ont que la première). La phrase
 d'avertissement (profil, rattachement et connexion Battle.net, modale de
-masquage) suit la formulation de l'utilisateur : « il reste visible pour tes
-adversaires, les admins et les arbitres pendant un match de tournoi » / “it
-stays visible to your opponents, admins and referees during a tournament match”
+masquage) dit la fenêtre exacte : « il reste visible pour tes adversaires, les
+admins et les arbitres d'un match de tournoi dès que ses deux adversaires sont
+connus et jusqu'à sa fin, ainsi que pour son caster le temps du match
+seulement » / “it stays visible to your opponents, admins and referees in a
+tournament match from the moment both its opponents are known until its end,
+and to its caster only while the match is being played”, puis le cas du caster
 (`battletag-hidden-warning.test.ts`).
 
 `TERMS_UPDATED_AT` est daté du **lendemain** de la mise en ligne quand l'heure
