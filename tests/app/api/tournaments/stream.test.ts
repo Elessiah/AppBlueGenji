@@ -90,6 +90,7 @@ function viewerWith(overrides: Partial<TournamentViewerContext> = {}): Tournamen
     canManageLive: false,
     viewerUserId: 1,
     castBlock: "NOT_CASTER",
+    certificationPrompt: null,
     preview: null,
     ...overrides,
   };
