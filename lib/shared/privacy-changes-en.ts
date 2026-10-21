@@ -492,6 +492,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
   },
   "2026-10-pastille-battletag-fiche": {
     title: "Player page: “Verified BattleTag” badge",
+    linkLabels: ["Read the “Data collected” section", "Read the “Exercising your rights” section"],
     summary:
       "If your BattleTag comes from a linked Battle.net account, your player page shows a “Verified BattleTag” badge to any logged-in player who opens it — including when your BattleTag is hidden: the page then says “Hidden” with the badge, never showing the BattleTag.",
     details: [
@@ -499,7 +500,6 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "It rests on our legitimate interest (knowing who has proven their game identity). You can object to it through the report form (GDPR category), or make it disappear by unlinking your Battle.net account in “My profile” (Connected apps) — after adding another login method if it is your only one. No new data is collected.",
       "The certified Discord tag badge follows the same rule: it can be read on your player page by any logged-in player, even if your tag is not visible to other players. It rests on the same legitimate interest, you can object to it the same way, and it disappears if you remove your tag.",
     ],
-    linkLabels: ["Read the “Data collected” section", "Read the “Exercising your rights” section"],
   },
 };
 
