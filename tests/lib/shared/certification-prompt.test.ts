@@ -1,10 +1,10 @@
 import { describe, expect, it } from "@jest/globals";
 import {
-  CERTIFICATION_PROFILE_HREF,
   CERTIFICATION_PROMPT_CLOSED_KEY,
   CERTIFICATION_PROMPT_OFF_KEY,
   battletagRelevantFor,
   certificationPromptFor,
+  certificationProfileHref,
   certificationPromptStep,
   rememberCertificationPromptClosed,
   shouldOpenCertificationPrompt,
@@ -179,6 +179,7 @@ describe("« Ne plus voir » et fermeture", () => {
   });
 });
 
-it("mène à « Applications connectées » du profil", () => {
-  expect(CERTIFICATION_PROFILE_HREF).toBe("/profil#connexions");
+it("mène à la section « Discord » si le tag manque, sinon à « Applications connectées »", () => {
+  expect(certificationProfileHref({ discordVerified: false })).toBe("/profil#discord");
+  expect(certificationProfileHref({ discordVerified: true })).toBe("/profil#connexions");
 });

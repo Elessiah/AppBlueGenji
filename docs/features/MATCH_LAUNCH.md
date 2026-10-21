@@ -170,7 +170,7 @@ seulement** (`linkNames`) : équipe par `TeamLink`, entrée solo par `PlayerLink
 lancement, qui survit à la navigation, garde des noms simples. Elle **ne s'ouvre
 pas d'office par-dessus** une autre modale (`anotherModalOpen`), sauf une qui
 cède sa place (l'invitation à certifier, qui se ferme) : elle guette sa fermeture par un observateur
-du DOM (`watchModalsClosed`, sans minuterie — économie d'énergie comprise), et
+du DOM (`watchModalsClosed`) tant que l'onglet est visible (`useClientPower`), et
 « Contacts » demande en plus une relève à sa fermeture. Option éteinte, les
 avertissements de la planification par l'arbitrage ont leur variante sans
 « Prêt » (`form.referee.warningDirect`, `planning.confirm.consequenceDirect`). Dans la modale de

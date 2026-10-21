@@ -76,8 +76,15 @@ export function teamHasContact(members: readonly CertificationIdentity[], battle
   return members.some((member) => member.discordVerified || (battletagRelevant && member.battletagVerified));
 }
 
-/** Où certifier : la section « Applications connectées » de `/profil`. */
-export const CERTIFICATION_PROFILE_HREF = "/profil#connexions";
+/**
+ * Où certifier. Le tag Discord se certifie dans la section « Discord » de
+ * `/profil` (« Certifier mon tag ») ; le BattleTag se vérifie en rattachant
+ * Battle.net dans « Applications connectées ». Discord manquant passe devant :
+ * c'est par lui que l'organisation joint un joueur.
+ */
+export function certificationProfileHref(prompt: Pick<CertificationPrompt, "discordVerified">): string {
+  return prompt.discordVerified ? "/profil#connexions" : "/profil#discord";
+}
 
 /**
  * « Ne plus voir » : valeur « 1 » du stockage local, jamais transmise au

@@ -31,7 +31,14 @@ const MR_TEAM: CertificationPrompt = {
 };
 
 function render(prompt: CertificationPrompt, locale: "fr" | "en" = "fr"): string {
-  const ui: ReactElement = <CertificationPromptDialog prompt={prompt} onClose={() => undefined} />;
+  const ui: ReactElement = (
+    <CertificationPromptDialog
+      prompt={prompt}
+      neverAgain={false}
+      onNeverAgainChange={() => undefined}
+      onClose={() => undefined}
+    />
+  );
   if (locale === "fr") return renderToStaticMarkup(ui);
   return renderToStaticMarkup(
     <AppLocaleProvider locale="en">
@@ -41,10 +48,10 @@ function render(prompt: CertificationPrompt, locale: "fr" | "en" = "fr"): string
 }
 
 describe("CertificationPromptDialog", () => {
-  it("Overwatch : titre, deux pastilles, lien vers « Applications connectées »", () => {
+  it("Overwatch, Discord certifié : titre, deux pastilles, lien vers « Applications connectées »", () => {
     const html = render(OW_MANAGER);
     expect(html).toContain("Certifie ton Discord et ton BattleTag");
-    expect(html).toContain("Tu gères une équipe engagée");
+    expect(html).toContain("Certifie ce qui te manque encore.");
     expect(html).toContain("pill-success");
     expect(html).toContain("pill-warning");
     expect(html).toContain('href="/profil#connexions"');
@@ -59,6 +66,7 @@ describe("CertificationPromptDialog", () => {
     const html = render(MR_TEAM);
     expect(html).toContain("Certifie ton Discord<");
     expect(html).toContain("personne n&#x27;y a certifié son tag Discord.");
+    expect(html).toContain('href="/profil#discord"');
     expect(html).not.toContain("Blizzard le confirment");
     expect(html).not.toContain("Battle.net");
     expect(html).not.toContain(">BattleTag<");
@@ -76,6 +84,13 @@ describe("CertificationPromptDialog", () => {
     expect(html.match(/role="rowheader"/g)).toHaveLength(4);
     expect(html.match(/role="columnheader"/g)).toHaveLength(3);
     expect(html.match(/role="cell"/g)).toHaveLength(8);
+  });
+
+  it("la case « Ne plus voir » reflète l'état tenu par le crochet", () => {
+    const html = renderToStaticMarkup(
+      <CertificationPromptDialog prompt={OW_MANAGER} neverAgain onNeverAgainChange={() => undefined} onClose={() => undefined} />,
+    );
+    expect(html).toMatch(/<input type="checkbox" checked=""/);
   });
 
   it("en anglais, ni français ni lien sans préfixe de langue", () => {

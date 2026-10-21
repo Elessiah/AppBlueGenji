@@ -28,15 +28,16 @@ prend ses variantes « Discord seul » (titre, motif d'équipe, ligne
 La modale ne s'ouvre **jamais par-dessus une autre** (`aria-modal` présent :
 lancement de match, changements de confidentialité…) — deux pièges à focus se
 disputeraient Tab et Échap. Elle attend sa fermeture, guettée par un
-observateur du DOM (`watchModalsClosed`, relectures espacées de 250 ms, sans
-minuterie de fond : l'économie d'énergie ne la bloque pas) ; la décision pure est `certificationPromptStep`. Décidée,
+observateur du DOM (`watchModalsClosed`, relectures espacées de 250 ms), armé
+tant que l'onglet est visible (`useClientPower().clocks`, réarmé au retour) ; la décision pure est `certificationPromptStep`. Décidée,
 sa **place est tenue dans le DOM** pendant le chargement de son morceau (le
 `loading` de son `dynamic()` rend un `data-modal-pending`) : le centre de
 lancement ne s'ouvre pas en même temps qu'elle par accident. Mais elle **cède
 sa place** (`data-modal-yields`, `anotherModalOpen(…, { overYielding: true })`,
 `lib/shared/dialog-focus.ts`) : l'annonce d'un match qui se lance, urgente,
 passe par-dessus ; l'invitation s'efface **sans rien retenir** (elle n'a
-peut-être pas été lue) et revient à la fermeture de l'urgente. La modale
+peut-être pas été lue ; la case « Ne plus voir », tenue par le crochet, garde
+son état) et revient à la fermeture de l'urgente. La modale
 recouverte ne reprend pas le focus à celle du dessus, et lui passe sa propre
 cible de retour (`useDialogBehavior`). Une invitation retirée par le serveur (certification
 faite entre-temps) ferme la modale, une fiche figée aussi.
@@ -56,10 +57,11 @@ battletagRelevant)`) : un BattleTag n'y sert pas à joindre l'équipe.
 La modale dit pourquoi elle s'ouvre, où en est le lecteur (pastilles
 « Certifié » / « À certifier »), puis un **tableau « Ce que ça fait / Ce que ça
 ne fait pas »** — chaque promesse a sa limite en face, sur la même ligne
-(identité, matchs, organisation, ensuite). Le bouton principal mène à
-**« Applications connectées »** du profil (`/profil#connexions`,
-`CERTIFICATION_PROFILE_HREF`), où Discord et Battle.net se rattachent ; le
-tag Discord rattaché s'y certifie ensuite d'un clic (`DISCORD_VERIFICATION.md`).
+(identité, matchs, organisation, ensuite). Le bouton principal
+(`certificationProfileHref`) mène à la section **« Discord »** du profil
+(`/profil#discord`, « Certifier mon tag », `DISCORD_VERIFICATION.md`) tant que
+le tag Discord manque, sinon à **« Applications connectées »**
+(`/profil#connexions`), où Battle.net se rattache.
 
 Le tableau ne promet que ce que les règles tiennent : visibilité du tag
 (`canViewDiscordTag`), du BattleTag (`canViewBattletag`), portées OAuth

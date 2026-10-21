@@ -196,16 +196,17 @@ export function MatchLaunchCenter({
     if (!next) return;
     // Jamais par-dessus une autre modale (« Contacts », score…) : deux pièges
     // de focus se disputeraient Tab et Échap. L'annonce attend sa fermeture,
-    // guettée par un observateur du DOM — sans minuterie de fond, donc aussi
-    // en économie d'énergie. Une modale qui cède sa place (invitation à
-    // certifier, `data-modal-yields`) ne la retient pas : elle se ferme.
+    // guettée par un observateur du DOM tant que l'onglet est visible
+    // (horloges actives), réarmé à son retour. Une modale qui cède sa place
+    // (invitation à certifier, `data-modal-yields`) ne la retient pas : elle
+    // s'efface.
     const urgent = { overYielding: true };
     if (anotherModalOpen(document, urgent)) {
-      return watchModalsClosed(() => setModalRecheck((n) => n + 1), undefined, urgent);
+      return clocks ? watchModalsClosed(() => setModalRecheck((n) => n + 1), undefined, urgent) : undefined;
     }
     setConfirming(false);
     setOpenMatchId(next.matchId);
-  }, [launches, current, waiting, modalRecheck]);
+  }, [launches, current, waiting, clocks, modalRecheck]);
 
   useEffect(() => {
     if (!privacyPending) return;

@@ -359,7 +359,7 @@
   "certification": {
     "title": "Certifie ton Discord et ton BattleTag",
     "titleDiscordOnly": "Certifie ton Discord",
-    "leadManager": "Tu gères une équipe engagée dans ce tournoi. Au lancement d'un match, l'adversaire, le caster et l'arbitrage doivent pouvoir te joindre : il te manque encore une certification.",
+    "leadManager": "Tu gères une équipe engagée dans ce tournoi : au lancement d'un match, tu fais partie de ceux que l'adversaire, le caster et l'arbitrage chercheront à joindre. Certifie ce qui te manque encore.",
     "leadTeam": "Ton équipe n'a aucun contact à présenter au lancement de ses matchs : personne n'y a certifié son tag Discord ni son BattleTag. L'adversaire et l'arbitrage n'ont aucun moyen de vous joindre.",
     "leadTeamDiscordOnly": "Ton équipe n'a aucun contact à présenter au lancement de ses matchs : personne n'y a certifié son tag Discord. L'adversaire et l'arbitrage n'ont aucun moyen de vous joindre.",
     "statusLabel": "Où tu en es",

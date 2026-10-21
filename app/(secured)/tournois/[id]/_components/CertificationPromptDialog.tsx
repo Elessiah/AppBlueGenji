@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
-import { CERTIFICATION_PROFILE_HREF, type CertificationPrompt } from "@/lib/shared/certification-prompt";
+import { certificationProfileHref, type CertificationPrompt } from "@/lib/shared/certification-prompt";
 import { useDialogsText } from "../_lib/dialogs-text";
 import { TournamentDialogFrame } from "./TournamentDialogFrame";
 import s from "./CertificationPromptDialog.module.css";
@@ -12,8 +11,14 @@ const ROWS = ["identity", "matches", "staff", "later"] as const;
 
 interface CertificationPromptDialogProps {
   prompt: CertificationPrompt;
-  /** Fermeture, avec le choix « Ne plus voir ». */
-  onClose: (neverAgain: boolean) => void;
+  /**
+   * Case « Ne plus voir », tenue par `useCertificationPrompt` : elle survit à
+   * un effacement devant une modale urgente.
+   */
+  neverAgain: boolean;
+  onNeverAgainChange: (value: boolean) => void;
+  /** Fermeture ; la case cochée vaut pour toute fermeture. */
+  onClose: () => void;
 }
 
 /**
@@ -24,10 +29,13 @@ interface CertificationPromptDialogProps {
  * promesse ne se lise sans sa limite en face. Le bouton mène à « Applications
  * connectées » du profil, où les deux se rattachent.
  */
-export function CertificationPromptDialog({ prompt, onClose }: Readonly<CertificationPromptDialogProps>) {
+export function CertificationPromptDialog({
+  prompt,
+  neverAgain,
+  onNeverAgainChange,
+  onClose,
+}: Readonly<CertificationPromptDialogProps>) {
   const { t } = useDialogsText();
-  const [neverAgain, setNeverAgain] = useState(false);
-  const close = () => onClose(neverAgain);
 
   // Marvel Rivals : le BattleTag ne sert à rien, la modale ne parle que de Discord.
   const withBattletag = prompt.battletagRelevant;
@@ -59,7 +67,7 @@ export function CertificationPromptDialog({ prompt, onClose }: Readonly<Certific
       maxWidth={640}
       zIndex={90}
       busy={false}
-      onClose={close}
+      onClose={onClose}
     >
       {/* Focus d'ouverture sur le titre : la modale se lit avant d'agir, et ses
           contrôles, tout en bas, l'ouvriraient défilée sur un petit écran. */}
@@ -118,15 +126,15 @@ export function CertificationPromptDialog({ prompt, onClose }: Readonly<Certific
 
       <div className={s.footer}>
         <label className={s.neverAgain}>
-          <input type="checkbox" checked={neverAgain} onChange={(e) => setNeverAgain(e.target.checked)} />
+          <input type="checkbox" checked={neverAgain} onChange={(e) => onNeverAgainChange(e.target.checked)} />
           {/* NOSONAR S6772 — label en flex avec `gap` */}
           {t("certification.neverAgain")}
         </label>
         <div className={s.actions}>
-          <button type="button" className="btn ghost" onClick={close}>
+          <button type="button" className="btn ghost" onClick={onClose}>
             {t("certification.later")}
           </button>
-          <LocaleLink href={CERTIFICATION_PROFILE_HREF} className="btn" onClick={close}>
+          <LocaleLink href={certificationProfileHref(prompt)} className="btn" onClick={onClose}>
             {t("certification.go")}
           </LocaleLink>
         </div>

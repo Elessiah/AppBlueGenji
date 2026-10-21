@@ -8,6 +8,7 @@ import {
   type CertificationPrompt,
 } from "@/lib/shared/certification-prompt";
 import { anotherModalOpen, watchModals, watchModalsClosed } from "@/lib/shared/dialog-focus";
+import { useClientPower } from "@/lib/shared/hooks/useClientPower";
 
 /** Un stockage du navigateur, `null` s'il est inaccessible (accès refusé, rendu serveur). */
 function browserStorage(kind: "localStorage" | "sessionStorage"): Storage | null {
@@ -26,52 +27,53 @@ function browserStorage(kind: "localStorage" | "sessionStorage"): Storage | null
  *
  * Jamais par-dessus une autre modale (lancement de match, changements de
  * confidentialité…) : elle attend sa fermeture, guettée par un observateur du
- * DOM (sans minuterie, économie d'énergie comprise). Décidée, sa place est
- * tenue dans le DOM pendant le chargement de son morceau (`data-modal-pending`,
- * `TournamentSheet`). Elle **cède sa place** (`data-modal-yields`) : une
- * modale urgente — le lancement d'un match — passe par-dessus ; l'invitation
- * s'efface sans rien retenir et revient à sa fermeture.
+ * DOM tant que l'onglet est visible (`useClientPower().clocks`). Décidée, sa
+ * place est tenue dans le DOM pendant le chargement de son morceau
+ * (`data-modal-pending`, `TournamentSheet`). Elle **cède sa place**
+ * (`data-modal-yields`) : une modale urgente — le lancement d'un match — passe
+ * par-dessus ; l'invitation s'efface sans rien retenir, case « Ne plus voir »
+ * comprise (tenue ici, pas dans la modale), et revient à sa fermeture.
  *
- * Renvoie l'invitation à afficher (`null` : rien) et la fermeture. Une
- * invitation retirée par le serveur (certifiée entre-temps) ferme la modale ;
- * elle ne se rouvre pas si une autre revient.
+ * Une invitation retirée par le serveur (certifiée entre-temps) ferme la
+ * modale, une fiche figée la masque.
  */
 export function useCertificationPrompt(prompt: CertificationPrompt | null | undefined, frozen: boolean) {
+  const { clocks } = useClientPower();
   const [open, setOpen] = useState(false);
+  const [neverAgain, setNeverAgain] = useState(false);
   const [recheck, setRecheck] = useState(0);
   const decided = useRef(false);
 
   useEffect(() => {
+    // Les cas sans rien à décider passent avant toute lecture du stockage ou du DOM.
+    if (decided.current || prompt == null || frozen) return;
     const step = certificationPromptStep({
-      decided: decided.current,
-      hasPrompt: prompt != null,
-      frozen,
+      decided: false,
+      hasPrompt: true,
+      frozen: false,
       allowed: shouldOpenCertificationPrompt(browserStorage("localStorage"), browserStorage("sessionStorage")),
       otherModalOpen: anotherModalOpen(),
     });
-    if (step === "IDLE") return;
-    if (step === "WAIT") return watchModalsClosed(() => setRecheck((n) => n + 1));
+    if (step === "WAIT") return clocks ? watchModalsClosed(() => setRecheck((n) => n + 1)) : undefined;
     decided.current = true;
     if (step === "OPEN") setOpen(true);
-  }, [prompt, frozen, recheck]);
+  }, [prompt, frozen, clocks, recheck]);
 
-  // Invitation retirée par le serveur (certification faite entre-temps) :
-  // fermée. `null` seulement — c'est la réponse du serveur ; `undefined` veut
-  // dire que la fiche n'est pas (encore) lue, et ne ferme rien.
+  // `null` seulement — c'est la réponse du serveur ; `undefined` veut dire que
+  // la fiche n'est pas (encore) lue, et ne ferme rien.
   useEffect(() => {
     if (prompt === null) setOpen(false);
   }, [prompt]);
 
-  const close = useCallback((neverAgain: boolean) => {
+  const close = useCallback(() => {
     rememberCertificationPromptClosed(browserStorage("localStorage"), browserStorage("sessionStorage"), neverAgain);
     setOpen(false);
-  }, []);
+  }, [neverAgain]);
 
   // Une modale urgente s'ouvre par-dessus (lancement d'un match) : place
-  // nette, **sans** rien retenir — l'invitation n'a peut-être pas été lue.
-  // Elle attend la fermeture de l'urgente, puis se rouvre.
+  // nette, sans rien retenir — l'invitation n'a peut-être pas été lue.
   useEffect(() => {
-    if (!open) return;
+    if (!open || !clocks) return;
     return watchModals(
       () => anotherModalOpen(document, { overYielding: true }),
       () => {
@@ -80,8 +82,12 @@ export function useCertificationPrompt(prompt: CertificationPrompt | null | unde
         setRecheck((n) => n + 1);
       },
     );
-  }, [open]);
+  }, [open, clocks]);
 
-  // Fiche figée (erreur fatale, tournoi supprimé) : plus rien ne s'affiche.
-  return { prompt: open && !frozen ? (prompt ?? null) : null, close };
+  return {
+    prompt: open && !frozen ? (prompt ?? null) : null,
+    neverAgain,
+    setNeverAgain,
+    close,
+  };
 }
