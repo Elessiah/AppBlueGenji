@@ -206,32 +206,43 @@ function SideContacts({
 }
 
 /** Arrivée des contacts du caster : avec au moins un contact, sans, ou aucune. */
-type CasterArrival = "SHOWN" | "EMPTY" | null;
+export type CasterArrival = "SHOWN" | "EMPTY" | null;
+
+/** Ce que l'annonce garde d'un rendu à l'autre. */
+export type CasterArrivalSeen = { pending: boolean; casterId: number | null; arrival: CasterArrival };
 
 /** Durée de l'annonce d'arrivée : lue, elle ne reste pas en statut périmé. */
 export const CASTER_ARRIVAL_ANNOUNCE_MS = 10_000;
 
 /**
- * Les contacts du caster viennent-ils d'arriver ? Vrai au seul passage « en
- * attente → montrés » d'un même caster (état précédent gardé au rendu), jamais
- * à l'ouverture ; un autre caster, ou plus de caster, l'efface, et l'annonce
- * se vide d'elle-même après `CASTER_ARRIVAL_ANNOUNCE_MS`.
+ * Étape pure de l'annonce : le nouvel état, ou `null` s'il ne change pas (une
+ * relecture identique ne réécrit rien — l'annonce reste figée à l'arrivée).
+ * Annonce au seul passage « en attente → montrés » d'un même caster, jamais à
+ * l'ouverture ; un autre caster, ou plus de caster, l'efface.
+ */
+export function nextCasterArrival(
+  seen: CasterArrivalSeen,
+  caster: LaunchCaster | null,
+  pending: boolean,
+): CasterArrivalSeen | null {
+  const casterId = caster?.userId ?? null;
+  if (seen.pending === pending && seen.casterId === casterId) return null;
+  const arrived = caster !== null && seen.casterId === casterId && seen.pending && caster.contactsShown;
+  let arrival: CasterArrival = null;
+  if (arrived) arrival = casterHasContacts(caster) ? "SHOWN" : "EMPTY";
+  return { pending, casterId, arrival };
+}
+
+/**
+ * Les contacts du caster viennent-ils d'arriver ? `nextCasterArrival` sur
+ * l'état précédent gardé au rendu ; l'annonce se vide d'elle-même après
+ * `CASTER_ARRIVAL_ANNOUNCE_MS`.
  */
 function useCasterArrival(caster: LaunchCaster | null, pending: boolean, enabled: boolean): CasterArrival {
-  const casterId = caster?.userId ?? null;
-  const [seen, setSeen] = useState<{ pending: boolean; casterId: number | null; arrival: CasterArrival }>({
-    pending,
-    casterId,
-    arrival: null,
-  });
+  const [seen, setSeen] = useState<CasterArrivalSeen>({ pending, casterId: caster?.userId ?? null, arrival: null });
   // Sans annonce (modale de lancement), rien à suivre : aucun rendu de plus.
-  if (enabled && (seen.pending !== pending || seen.casterId !== casterId)) {
-    const arrived = caster !== null && seen.casterId === casterId && seen.pending && caster.contactsShown;
-    // Figée à l'arrivée : une relecture dans les dix secondes ne la réécrit pas.
-    let arrival: CasterArrival = null;
-    if (arrived) arrival = casterHasContacts(caster) ? "SHOWN" : "EMPTY";
-    setSeen({ pending, casterId, arrival });
-  }
+  const next = enabled ? nextCasterArrival(seen, caster, pending) : null;
+  if (next) setSeen(next);
   useEffect(() => {
     if (seen.arrival === null) return;
     const timer = setTimeout(() => setSeen((current) => ({ ...current, arrival: null })), CASTER_ARRIVAL_ANNOUNCE_MS);

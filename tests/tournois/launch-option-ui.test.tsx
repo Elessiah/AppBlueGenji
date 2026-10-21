@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { closedNoticeText } from "@/app/(secured)/tournois/[id]/_components/PlayerScoreDialog";
 import { startAtHint } from "@/app/(secured)/tournois/[id]/_components/MatchScheduleDialog";
 import { anotherModalOpen, launchSidesLaterText } from "@/components/match-launch/MatchLaunchCenter";
-import { CasterCard, SideCard } from "@/components/match-launch/LaunchContactCards";
+import { CASTER_ARRIVAL_ANNOUNCE_MS, CasterCard, nextCasterArrival, SideCard } from "@/components/match-launch/LaunchContactCards";
 import { contactsErrorText } from "@/components/match-launch/MatchContactsDialog";
 import { FR_LAUNCH_TEXT } from "@/components/match-launch/launch-text";
 import { tournamentDialogsText } from "@/lib/shared/tournament-actions-text";
@@ -326,9 +326,21 @@ describe("fiches de contact — noms cliquables", () => {
     });
 
     it("annonce l'arrivée des contacts au seul passage « en attente → montrés »", () => {
-      // Même caster, auparavant en attente, désormais montré : jamais à l'ouverture.
-      const source = read("components/match-launch/LaunchContactCards.tsx");
-      expect(source).toContain("seen.casterId === casterId && seen.pending && caster.contactsShown");
+      const shown = { ...caster, contactsShown: true };
+      const waiting = { pending: true, casterId: caster.userId, arrival: null };
+      // Nominal : en attente → montrés, avec ou sans contact à dire.
+      expect(nextCasterArrival(waiting, shown, false)).toEqual({ pending: false, casterId: caster.userId, arrival: "SHOWN" });
+      expect(nextCasterArrival(waiting, { ...shown, discordTag: null, battletag: null }, false)?.arrival).toBe("EMPTY");
+      // Rien de neuf : aucune réécriture, l'annonce reste figée.
+      expect(nextCasterArrival({ ...waiting, pending: false, arrival: "SHOWN" }, shown, false)).toBeNull();
+      // Pas d'attente avant (ouverture) : rien n'est annoncé.
+      expect(nextCasterArrival({ pending: false, casterId: null, arrival: null }, shown, false)?.arrival).toBeNull();
+      // Un autre caster, ou plus de caster : l'annonce s'efface.
+      expect(nextCasterArrival(waiting, { ...shown, userId: caster.userId + 1 }, false)?.arrival).toBeNull();
+      expect(nextCasterArrival({ ...waiting, pending: false, arrival: "SHOWN" }, null, false)).toEqual({ pending: false, casterId: null, arrival: null });
+      // Retour en attente : l'annonce s'efface, une nouvelle arrivée se rejouera.
+      expect(nextCasterArrival({ ...waiting, pending: false, arrival: "SHOWN" }, { ...caster, contactsShown: false }, true)?.arrival).toBeNull();
+      expect(CASTER_ARRIVAL_ANNOUNCE_MS).toBe(10_000);
     });
 
     // Ouverts mais vides : la phrase des engagées sans contact, jamais deux « — ».
