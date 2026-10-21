@@ -81,10 +81,11 @@ Exceptions :
   dégradé, lueur, mouvement et graisse — sinon le nom distancé brillerait plus
   fort que les autres.
 - **Équipe active de la fiche joueur** (pastille `.badge`) : la pastille
-  habille un `<span data-podium-muted>` autour du lien — son fond à 10 % de
-  cyan ferait tomber la 3e marche sous 4,5:1, la marche s'y éteint donc
-  (repère conservé) ; le lien reprend le rembourrage de la pastille pour que
-  toute la pastille reste cliquable. Compte supprimé : `podiumTier` à `null`,
+  habille un `<span data-podium-muted>` autour du lien — sous la lueur, son
+  fond à 10 % de cyan ferait tomber chacune des trois marches sous 4,5:1, la
+  marche s'y éteint donc (repère conservé) ; le lien reprend le rembourrage
+  de la pastille (`--badge-padding`) pour que toute la pastille reste
+  cliquable. Compte supprimé : `podiumTier` à `null`,
   comme son historique d'équipes.
 - **Vainqueur d'un match** : sans lueur — le fond teinté turquoise de la ligne
   ferait tomber violets et rose sous 4,5:1 sous la lueur.
@@ -119,8 +120,14 @@ seulement devenir **nettement visible** et suivre l'équipe partout.
   lien — `tests/app/podium-link-surfaces.test.ts` lit `app/` et `components/`
   par le compilateur TypeScript (`className` de `TeamLink`, `PlayerLink`,
   `EntrantLink`, `textClassName` d'`EntrantName`) et tire les surfaces des
-  règles de `globals.css` et des modules CSS importés. Une classe passée par
-  une variable n'y est pas résolue.
+  règles de `globals.css` et des modules CSS importés (toute classe du dernier
+  sélecteur composé d'une règle qui pose un fond, `:hover` et classes jointes
+  compris). Une classe passée par une variable n'y est pas résolue.
+- **Pourquoi pas une spécificité plus forte** sur la peinture de la marche :
+  `background-clip: text` découperait aussi le fond de la pastille dans les
+  lettres (pastille vidée), et les surcharges de module à spécificité égale
+  (`.winner :global(.podium-tier)`, `MatchRow`) ne gagneraient plus que par
+  l'ordre de chargement des feuilles.
 - Lueur par `drop-shadow`, jamais `text-shadow` (sous un texte peint par son
   fond, l'ombre recouvrirait le dégradé).
 - **Contraste** : chaque arrêt est un jeton de texte qui tient **4,5:1** sur le
