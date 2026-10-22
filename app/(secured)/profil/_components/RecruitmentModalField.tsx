@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Coche } from "@/components/Coche";
 import { useProfileText } from "@/components/i18n/profile-text";
 import { useToast } from "@/components/ui/toast";
+import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import {
   RECRUITMENT_MODAL_OFF_COOKIE,
   RECRUITMENT_MODAL_OFF_EVENT,
@@ -175,7 +176,7 @@ export function RecruitmentModalField({
 
   return (
     <div className={`field ${s.matchDms}`}>
-      <div className={s.toggleRow}>
+      <InfoHintRow>
         <Coche
           id={FIELD_ID}
           label={t("recruitmentModal.label")}
@@ -185,10 +186,11 @@ export function RecruitmentModalField({
           aria-describedby={HINT_ID}
           onChange={() => void toggle()}
         />
-      </div>
-      <p id={HINT_ID} className={s.hint}>
-        {t("recruitmentModal.hint")}
-      </p>
+        <InfoHint id={HINT_ID} subject={t("recruitmentModal.label")}>
+          <p>{t("recruitmentModal.hint")}</p>
+          <p>{t("recruitmentModal.hintBrowser")}</p>
+        </InfoHint>
+      </InfoHintRow>
     </div>
   );
 }

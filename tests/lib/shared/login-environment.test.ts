@@ -98,7 +98,7 @@ describe("loginEnvironmentNotice", () => {
     "prévient avant le clic pour %s, et nomme le code Discord comme repli",
     (environment) => {
       const notice = loginEnvironmentNotice(environment) ?? "";
-      expect(notice).toContain("Si elle échoue");
+      expect(notice).toContain("En cas d'échec");
       expect(notice).toContain("code Discord");
     },
   );

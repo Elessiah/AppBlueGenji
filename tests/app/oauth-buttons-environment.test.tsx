@@ -40,15 +40,15 @@ describe("OAuthButtons — avertissement de contexte", () => {
     const html = render(NOTICE);
     const describedBy = [...html.matchAll(/aria-describedby="([^"]+)"/g)].map((match) => match[1]);
     expect(describedBy).toEqual([
-      "oauth-environment-notice oauth-note-discord",
+      "oauth-environment-notice oauth-note-discord oauth-note-discord-more",
       "oauth-environment-notice",
-      "oauth-environment-notice oauth-note-blizzard",
+      "oauth-environment-notice oauth-note-blizzard oauth-note-blizzard-more",
     ]);
   });
 
   it("garde les notes des fournisseurs seules sans avertissement", () => {
     const html = render(null);
     const describedBy = [...html.matchAll(/aria-describedby="([^"]+)"/g)].map((match) => match[1]);
-    expect(describedBy).toEqual(["oauth-note-discord", "oauth-note-blizzard"]);
+    expect(describedBy).toEqual(["oauth-note-discord oauth-note-discord-more", "oauth-note-blizzard oauth-note-blizzard-more"]);
   });
 });

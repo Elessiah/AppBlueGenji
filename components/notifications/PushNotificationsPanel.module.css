@@ -96,14 +96,15 @@
   }
 }
 
+/* Case, libellé et bouton « i » sur une ligne ; l'explication passe dessous. */
 .topic {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 10px;
 }
 
 .topic input[type="checkbox"] {
-  margin-top: 2px;
   flex-shrink: 0;
 }
 
@@ -120,8 +121,3 @@
   color: var(--ink);
 }
 
-.topicDesc {
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--ink-soft);
-}

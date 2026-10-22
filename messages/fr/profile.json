@@ -32,7 +32,7 @@
     },
     "notifications": {
       "title": "Notifications",
-      "lead": "Être prévenu sur ton téléphone ou ton ordinateur, même le site fermé, et choisir si le bot t'écrit en privé pour tes matchs."
+      "lead": "Notifications sur ton téléphone ou ton ordinateur, même site fermé, et messages privés du bot pour tes matchs."
     },
     "invitations": {
       "title": "Invitations d'équipe",
@@ -49,7 +49,7 @@
   },
   "identity": {
     "pseudo": "Pseudo site",
-    "pseudoHint": "C'est lui qui t'identifie dans les brackets, les rosters et les feuilles de match. Il n'est pas masquable ({max} caractères au plus).",
+    "pseudoHint": "{max} caractères au plus. Toujours visible : il t'identifie dans les brackets, les rosters et les feuilles de match.",
     "avatar": "Avatar",
     "changeAvatar": "Changer l'avatar",
     "sending": "Envoi…",
@@ -66,17 +66,17 @@
   "games": {
     "battletag": "BattleTag Overwatch",
     "battletagPlaceholder": "Pseudo#1234",
-    "hiddenWarning": "Tu peux masquer ton BattleTag : il reste visible pour les membres des deux équipes, les admins et les arbitres d'un match de tournoi dès que ses deux adversaires sont connus et jusqu'à sa fin, ainsi que pour son caster le temps du match seulement, dans la fenêtre « Contacts » du match (et, pour les équipes et le caster, dans sa fenêtre de lancement), si tu fais partie des contacts présentés. Si tu castes un match, ses deux équipes le voient aussi le temps du match, et les arbitres et les admins dès que ses deux adversaires sont connus et jusqu'à sa fin. Si tu ne veux pas qu'ils le voient, retire-le de ton profil (s'il vient de Battle.net, détache d'abord ton compte Battle.net — après avoir ajouté un autre moyen de connexion si c'est le seul).",
     "marvel": "Tag Marvel Rivals",
-    "gameTagNotice": "Sert uniquement à ce que les autres joueurs puissent t'ajouter en jeu — jamais pour des statistiques.",
-    "blizzardNotice": "Si tu rattaches Battle.net, Blizzard renseigne ce BattleTag et le remet à jour à chaque connexion — ta saisie est alors remplacée par celle de la source."
+    "gameTagNotice": "Sert seulement à t'ajouter en jeu, jamais pour des statistiques.",
+    "blizzardNotice": "Si tu rattaches Battle.net, Blizzard remplit ce champ et le met à jour à chaque connexion, à la place de ta saisie."
   },
   "battletagLock": {
-    "pending": "Lecture de tes applications connectées… Le champ reste en lecture seule le temps de savoir si Blizzard renseigne ce BattleTag.",
-    "unknown": "Impossible de lire tes applications connectées pour l'instant : le champ reste en lecture seule, pour ne pas écraser un BattleTag que Blizzard aurait renseigné. Recharge la page pour réessayer.",
-    "change": "Pour en changer, retire Blizzard depuis « Applications connectées » (après avoir ajouté un autre moyen de connexion si c'est le seul), puis rattache le bon compte.",
-    "noTag": "Ton compte Blizzard est rattaché, mais il n'a donné aucun BattleTag. Le champ reste en lecture seule : Blizzard le renseignera à ta prochaine connexion, et écraserait une saisie faite ici. {change}",
-    "tagged": "Ton compte Blizzard est rattaché : c'est lui qui donne ce BattleTag, et Blizzard le remet à jour à chaque connexion — une correction saisie ici serait effacée au passage suivant. {change} Pour cesser de le publier, décoche « BattleTag OW » plus bas."
+    "pending": "Lecture de tes applications connectées… Champ en lecture seule en attendant.",
+    "unknown": "Applications connectées illisibles pour l'instant : champ en lecture seule. Recharge la page pour réessayer.",
+    "tagged": "Fourni par ton compte Blizzard, et mis à jour à chaque connexion.",
+    "noTag": "Compte Blizzard rattaché, sans BattleTag : Blizzard le remplira à ta prochaine connexion.",
+    "change": "Pour en changer, retire Blizzard des « Applications connectées » (après avoir ajouté un autre moyen de connexion si c'est le seul), puis rattache le bon compte.",
+    "hide": "Pour le retirer de ta fiche, de l'annuaire et des rosters, décoche « BattleTag OW » plus bas."
   },
   "discord": {
     "label": "Pseudo Discord",
@@ -93,17 +93,18 @@
     "retry": "Réessayer",
     "retryLabel": "Réessayer la lecture de l'état Discord",
     "reading": "Lecture…",
-    "unverifiedHint": "Tag non certifié : {audience} Certifie-le pour qu'elle puisse le faire.",
-    "unverifiedAudience": "personne ne le voit, pas même les administrateurs. L'organisation ne peut donc pas te joindre pendant un tournoi.",
-    "audience": "les administrateurs le voient à tout moment, les arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), les membres des deux équipes de ton match dès que ses deux adversaires sont connus et jusqu'à sa fin, et son caster le temps du match seulement (et, si tu castes un match, ses deux équipes le temps du match seulement, et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin) ; les autres joueurs, seulement si tu le rends visible dans tes réglages de confidentialité. Jamais personne d'autre.",
+    "unverifiedHint": "Tag non certifié : personne ne le voit, pas même les administrateurs.",
     "removed": "Tag Discord retiré.",
     "lock": {
-      "pending": "Lecture de l'état de ton compte Discord… Le champ reste en lecture seule le temps de savoir si Discord a nommé ce pseudo.",
-      "unknown": "Impossible de lire l'état de ton compte Discord pour l'instant : le champ reste en lecture seule, pour ne pas écraser un pseudo que Discord aurait nommé. Réessaie, ou recharge la page.",
+      "pending": "Lecture de ton compte Discord… Champ en lecture seule en attendant.",
+      "unknown": "État de ton compte Discord illisible pour l'instant : champ en lecture seule. Réessaie, ou recharge la page.",
       "rename": "Pour en changer, renomme-toi sur Discord puis utilise « Mettre à jour mon pseudo » (ligne « Bot Discord » des applications connectées).",
-      "noTag": "Ton compte Discord est rattaché, mais aucun pseudo n'est enregistré : l'organisation ne peut pas te joindre pendant un tournoi. Utilise « Enregistrer mon tag » ou « Mettre à jour mon pseudo », ou reconnecte-toi par Discord.",
-      "unverified": "Ton compte Discord est rattaché, mais ce pseudo n'est pas certifié : {audience} Te connecter par Discord ne le certifie pas : c'est « Certifier mon tag » qui le fait. {rename} Tu peux aussi le retirer.",
-      "verified": "Ton compte Discord est rattaché et ce pseudo est certifié : {audience} {rename} Un nouveau pseudo arrive non certifié, à certifier de nouveau. Pour cesser d'être joignable, retire-le."
+      "noTag": "Compte Discord rattaché, sans pseudo enregistré : l'organisation ne peut pas te joindre.",
+      "noTagDetails": "Utilise « Enregistrer mon tag » ou « Mettre à jour mon pseudo », ou reconnecte-toi par Discord.",
+      "unverified": "Compte Discord rattaché, pseudo non certifié : personne ne le voit.",
+      "unverifiedDetails": "Te connecter par Discord ne le certifie pas : c'est « Certifier mon tag » qui le fait. Tu peux aussi le retirer.",
+      "verified": "Compte Discord rattaché, pseudo certifié.",
+      "verifiedDetails": "Un nouveau pseudo arrive non certifié, à certifier de nouveau. Pour ne plus être joignable, retire-le."
     },
     "removalTitle": "Retirer ton tag Discord ?",
     "removalConfirm": "Retirer mon tag",
@@ -115,7 +116,8 @@
     "removalBody2": "Ta prochaine connexion par Discord réenregistrera ton pseudo, mais sans le certifier : il restera invisible de tous tant que tu ne le certifieras pas de nouveau.",
     "verifiedAlt": "Tag Discord vérifié",
     "verifiedTitle": "Tag Discord vérifié : ce joueur a prouvé qu'il possède ce compte Discord.",
-    "alreadyVerified": "Ton tag Discord est déjà certifié."
+    "alreadyVerified": "Ton tag Discord est déjà certifié.",
+    "unverifiedDetails": "Sans certification, l'organisation ne peut pas te joindre pendant un tournoi : certifie-le pour qu'elle le puisse."
   },
   "privacy": {
     "visibleTitle": "Visible par les autres joueurs",
@@ -126,36 +128,38 @@
       "discord": "Tag Discord",
       "major": "Majorité"
     },
-    "pseudoAlwaysVisible": "Ton pseudo reste toujours visible : c'est lui qui t'identifie dans les brackets, les rosters et les feuilles de match.",
-    "discordNotice": "La certification ouvre ton tag Discord à l'organisation (administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé) et, comme contact, aux membres des deux équipes de ton match dès que ses deux adversaires sont connus, et à son caster le temps du match seulement (et, si tu castes un match, à ses deux équipes le temps du match, et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin) ; pas aux autres joueurs : coche « Tag Discord » pour qu'ils le voient sur ta fiche. Un tag non certifié reste masqué, case cochée ou non.",
+    "pseudoAlwaysVisible": "Ton pseudo reste toujours visible : il t'identifie dans les brackets, les rosters et les feuilles de match.",
+    "discordNotice": "« Tag Discord » ne vaut que pour un tag certifié : un tag non certifié reste masqué, case cochée ou non. Certifié, il est déjà visible de l'organisation et des contacts de tes matchs.",
     "discordPending": "Ton tag n'est pas certifié : il restera masqué aux autres joueurs tant que tu ne l'auras pas certifié.",
     "discordNoTag": "Tu n'as pas encore de tag Discord : enregistre-le puis certifie-le pour que les autres joueurs le voient.",
     "recruitmentTitle": "Recrutement",
     "openToOffers": "Ouvert aux propositions d'équipe",
-    "recruitmentHint": "Décochée par défaut. Cochée, tu apparais dans le filtre « Free agents » de l'annuaire et ta carte annonce « FREE AGENT » tant que tu es sans équipe."
+    "recruitmentHint": "Cochée, tu apparais dans le filtre « Free agents » de l'annuaire, avec la mention « FREE AGENT », tant que tu es sans équipe. Décochée par défaut.",
+    "battletagNotice": "Décoché, ton BattleTag reste lisible dans la fenêtre « Contacts » de tes matchs et dans leur fenêtre de lancement."
   },
   "save": "Sauvegarder",
   "saved": "Profil mis à jour.",
   "accountLocale": {
     "label": "Langue des notifications",
-    "hint": "Les notifications push t'arrivent dans cette langue. Elle suit la langue de la page à chaque connexion : ton choix ici vaut jusqu'à ta prochaine connexion faite dans l'autre langue.",
+    "hint": "Tes notifications push arrivent dans cette langue. Elle reprend celle de la page à chaque connexion.",
     "saved": "Langue des notifications enregistrée."
   },
   "matchDms": {
     "label": "Messages privés Discord de mes matchs",
-    "notCertified": "Ces messages ne partent qu'aux comptes dont le tag Discord est certifié, pour éviter le spam : sans tag certifié, ils ne peuvent pas te parvenir.",
+    "notCertified": "Sans tag Discord certifié, ces messages ne peuvent pas te parvenir (contre le spam).",
     "certifyLink": "Certifier mon tag Discord",
-    "hint": "Activés par défaut : le bot t'écrit en privé quand l'horaire d'un de tes matchs est posé, changé ou retiré, quand un match quitte ton programme, et pour ses rappels (veille, check-in). Décoche pour ne plus les recevoir : tes notifications push gardent leurs propres réglages, et les arbitres reçoivent toujours les leurs.",
+    "hint": "Activés par défaut : le bot t'écrit en privé quand l'horaire d'un de tes matchs est posé, changé ou retiré, quand un match quitte ton programme, et pour ses rappels (veille, check-in). Les notifications push et les messages reçus comme arbitre n'en dépendent pas.",
     "enabled": "Messages privés de match activés.",
     "enabledNotCertified": "Messages privés de match activés : ils partiront une fois ton tag Discord certifié.",
     "disabled": "Messages privés de match coupés."
   },
   "recruitmentModal": {
     "label": "Fenêtre des annonces de recrutement urgentes",
-    "hint": "Cochée par défaut : à ton arrivée, une fenêtre présente les annonces de recrutement urgentes que tu n'as pas encore vues. Décoche pour qu'elle ne s'ouvre plus d'elle-même, comme « Ne plus afficher ». Recochée, elle revient sur ton compte et sur ce navigateur ; un autre navigateur où tu l'avais refusée la garde fermée jusqu'à ce que tu la recoches depuis lui. Les annonces restent sur la page Recrutement.",
+    "hint": "Cochée (par défaut), une fenêtre te présente à ton arrivée les annonces de recrutement urgentes pas encore vues. Décochée, elle ne s'ouvre plus d'elle-même ; les annonces restent sur la page Recrutement.",
     "shown": "Fenêtre de recrutement réactivée : elle s'ouvrira de nouveau pour une annonce urgente.",
     "hidden": "Fenêtre de recrutement coupée : elle ne s'ouvrira plus d'elle-même.",
-    "hiddenBrowser": "Fenêtre de recrutement coupée sur ce navigateur : elle ne s'y ouvrira plus d'elle-même."
+    "hiddenBrowser": "Fenêtre de recrutement coupée sur ce navigateur : elle ne s'y ouvrira plus d'elle-même.",
+    "hintBrowser": "Un autre navigateur où tu l'avais refusée la garde fermée jusqu'à ce que tu la recoches depuis lui."
   },
   "avatarUpdated": "Avatar mis à jour.",
   "avatarDeleted": "Avatar supprimé.",
@@ -271,12 +275,12 @@
     "fallback": "La mise à jour de ton pseudo a échoué. Réessaie dans un instant."
   },
   "connections": {
-    "intro": "Ton compte n'a pas de mot de passe : il s'ouvre par les applications rattachées ci-dessous. Tu peux en ajouter plusieurs pour ne jamais rester à la porte — la dernière ne peut pas être retirée.",
+    "intro": "Pas de mot de passe : ton compte s'ouvre par ces applications. Rattaches-en plusieurs ; la dernière ne peut pas être retirée.",
     "loading": "Chargement…",
     "notes": {
       "GOOGLE": "Connexion en un clic. Aucune adresse n'est enregistrée.",
       "DISCORD": "Connexion, certification de ton tag, et annonce des horaires et rappels de match en message privé.",
-      "BLIZZARD": "Connexion, et ton BattleTag tenu à jour par Blizzard, signalé sur ta fiche par une pastille « BattleTag vérifié » (même masqué, sans le montrer). Tu peux masquer ton BattleTag : il reste visible pour les membres des deux équipes, les admins et les arbitres d'un match de tournoi dès que ses deux adversaires sont connus et jusqu'à sa fin, ainsi que pour son caster le temps du match seulement, dans la fenêtre « Contacts » du match (et, pour les équipes et le caster, dans sa fenêtre de lancement), si tu fais partie des contacts présentés. Si tu castes un match, ses deux équipes le voient aussi le temps du match, et les arbitres et les admins dès que ses deux adversaires sont connus et jusqu'à sa fin. Si tu ne veux pas qu'ils le voient, retire-le de ton profil (s'il vient de Battle.net, détache d'abord ton compte Battle.net — après avoir ajouté un autre moyen de connexion si c'est le seul)."
+      "BLIZZARD": "Connexion, et ton BattleTag tenu à jour par Blizzard."
     },
     "linked": "Rattaché",
     "handleLine": "{label} : {handle}",
@@ -302,9 +306,9 @@
       "label": "Bot Discord (code par message privé)",
       "handleNote": "Pseudo Discord : {handle}",
       "linkedByCode": "Rattaché par code en message privé",
-      "linkedByButton": "Ton Discord est rattaché par le bouton Discord : il se retire sur cette ligne-là. Le code en message privé met ici ton pseudo à jour.",
-      "linkedElsewhere": "Ton Discord est rattaché : il se retire sur la ligne Discord. Le code en message privé met ici ton pseudo à jour.",
-      "notLinked": "Rattache ton Discord sans écran d'autorisation : le bot BlueGenji t'envoie un code en message privé.",
+      "linkedByButton": "Rattaché par le bouton Discord, à retirer sur sa ligne. Le code en message privé met ici ton pseudo à jour.",
+      "linkedElsewhere": "Discord rattaché, à retirer sur sa ligne. Le code en message privé met ici ton pseudo à jour.",
+      "notLinked": "Rattache Discord sans écran d'autorisation : le bot BlueGenji t'envoie un code en message privé.",
       "linkByCode": "Rattacher par code",
       "updateHandle": "Mettre à jour mon pseudo",
       "disconnect": "Se déconnecter",
@@ -346,7 +350,8 @@
       "revoked": "{count, plural, one {1 autre session a été fermée} other {{count} autres sessions ont été fermées}}.",
       "revoke": "Déconnecter mes autres sessions",
       "revoking": "Fermeture…"
-    }
+    },
+    "blizzardBadge": "Ta fiche le signale par une pastille « BattleTag vérifié », même masqué (sans le montrer)."
   },
   "battletagNotice": {
     "eyebrow": "VISIBILITÉ · BATTLETAG",
@@ -420,5 +425,23 @@
     "updated": "Pseudo Discord mis à jour.",
     "codeSent": "Code envoyé en message privé Discord (expiration : {time}).",
     "bodyLabel": "Pseudo Discord du bot"
+  },
+  "audience": {
+    "discord": {
+      "title": "Un tag certifié est visible par :",
+      "admins": "les administrateurs, à tout moment ;",
+      "referees": "les arbitres, tant que tu es inscrit à un tournoi non terminé ;",
+      "match": "les membres des deux équipes de ton match, dès que ses adversaires sont connus et jusqu'à sa fin, et son caster le temps du match ;",
+      "asCaster": "si tu castes un match : ses deux équipes le temps du match, et les arbitres dès que ses adversaires sont connus et jusqu'à sa fin ;",
+      "players": "les autres joueurs, seulement si tu coches « Tag Discord » dans tes réglages de confidentialité.",
+      "footer": "Personne d'autre."
+    },
+    "battletag": {
+      "title": "Masqué, ton BattleTag ne se lit plus que dans la fenêtre « Contacts » de tes matchs et dans leur fenêtre de lancement :",
+      "match": "si tu y es présenté comme contact : les membres des deux équipes, les arbitres et les administrateurs, dès que les adversaires sont connus et jusqu'à la fin du match, et le caster le temps du match ;",
+      "asCaster": "si tu castes un match : ses deux équipes le temps du match, et les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin ;",
+      "launch": "la fenêtre de lancement, elle, ne s'ouvre qu'aux deux équipes et au caster.",
+      "footer": "Pour ne plus le partager du tout, efface-le de ton profil (s'il vient de Battle.net, détache d'abord Battle.net, après avoir ajouté un autre moyen de connexion si c'est le seul)."
+    }
   }
 }

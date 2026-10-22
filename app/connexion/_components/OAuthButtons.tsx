@@ -14,7 +14,8 @@
  * **Discord en tête** : c'est la porte qui enregistre le tag Discord au
  * passage, que le joueur n'a plus qu'à certifier d'un clic sur `/profil` s'il
  * veut être joignable. La phrase sous le bouton le dit avant le clic — qu'elle
- * **ne certifie pas**, et qui lirait le tag une fois certifié.
+ * **ne certifie pas** ; le bouton « i » à côté dit qui lirait le tag une fois
+ * certifié (`docs/features/INFO_HINTS.md`).
  *
  * **Langue** : textes du message `login.oauth` ; la langue de la page voyage
  * jusqu'à la route de départ (`oauthStartPath(…, { locale })`), qui la scelle
@@ -26,6 +27,8 @@ import { CyberButton } from "@/components/cyber/CyberButton";
 import { useLoginText } from "@/components/i18n/login-text";
 import type { LoginKey } from "@/lib/shared/login-text";
 import { LOGIN_HELP_TEXT_STYLE } from "../_lib/login-styles";
+import { AudienceList, InfoHint, InfoHintRow } from "@/components/ui/info-hint";
+import { discordAudienceLines, hiddenBattletagAudienceLines } from "@/lib/shared/identity-audience";
 import {
   OAUTH_PROVIDER_LABELS,
   OAUTH_PROVIDER_SLUGS,
@@ -38,8 +41,9 @@ import {
 const LOGIN_ORDER: readonly OAuthProvider[] = ["DISCORD", "GOOGLE", "BLIZZARD"];
 
 /**
- * Ce que chaque porte apporte en plus d'une session, dit en une ligne. La note
- * Discord reprend `DISCORD_LOGIN_TAG_NOTICE` (égalité du français testée).
+ * Ce que chaque porte apporte en plus d'une session, dit en une ligne ; le
+ * détail derrière le « i ». La note Discord reprend `DISCORD_LOGIN_TAG_NOTICE`
+ * (égalité du français testée).
  */
 const PROVIDER_NOTES: Partial<Record<OAuthProvider, LoginKey>> = {
   DISCORD: "oauth.discordNote",
@@ -93,9 +97,10 @@ export function OAuthButtons({
       ) : null}
       {LOGIN_ORDER.map((provider, index) => {
         const noteKey = PROVIDER_NOTES[provider];
-        const note = noteKey ? t(noteKey, { audience: t("oauth.tagAudience") }) : null;
+        const note = noteKey ? t(noteKey) : null;
         const noteId = `oauth-note-${OAUTH_PROVIDER_SLUGS[provider]}`;
-        const describedBy = [environmentNotice ? ENVIRONMENT_NOTICE_ID : null, note ? noteId : null]
+        const moreId = `${noteId}-more`;
+        const describedBy = [environmentNotice ? ENVIRONMENT_NOTICE_ID : null, note ? noteId : null, note ? moreId : null]
           .filter(Boolean)
           .join(" ");
         return (
@@ -142,9 +147,23 @@ export function OAuthButtons({
               </a>
             </CyberButton>
             {note ? (
-              <p id={noteId} style={{ ...LOGIN_HELP_TEXT_STYLE, margin: "6px 0 0" }}>
-                {note}
-              </p>
+              <div style={{ marginTop: 6 }}>
+                <InfoHintRow>
+                  <p id={noteId} style={{ ...LOGIN_HELP_TEXT_STYLE, margin: 0 }}>
+                    {note}
+                  </p>
+                  <InfoHint id={moreId} subject={OAUTH_PROVIDER_LABELS[provider]}>
+                    {provider === "DISCORD" ? (
+                      <>
+                        <p>{t("oauth.discordDetails")}</p>
+                        <AudienceList lines={discordAudienceLines(t)} />
+                      </>
+                    ) : (
+                      <AudienceList lines={hiddenBattletagAudienceLines(t)} />
+                    )}
+                  </InfoHint>
+                </InfoHintRow>
+              </div>
             ) : null}
           </div>
         );

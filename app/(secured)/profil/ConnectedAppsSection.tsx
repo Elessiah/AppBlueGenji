@@ -38,11 +38,13 @@ import {
   type OAuthProvider,
 } from "@/lib/shared/oauth-providers";
 import { useProfileText } from "@/components/i18n/profile-text";
+import { AudienceList, InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { useAppLocale } from "@/components/i18n/locale-context";
 import {
   connectionMethodText,
   connectionRefusalText,
   discordBotRowText,
+  hiddenBattletagAudienceText,
   type ProfileText,
 } from "./_lib/profile-text";
 import { DiscordBotHandleDialog } from "./DiscordBotHandleDialog";
@@ -266,17 +268,20 @@ function ConnectionRow({
         className="table-row"
         style={{ alignItems: "center", gap: 12, flexWrap: "wrap" }}
       >
-        <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-          <span className={s.connectionName}>
-            {/* Témoin décoratif : vert d'eau lumineux si rattaché. L'état se
-                lit déjà en toutes lettres dans la ligne de détail (« Rattaché »
-                ou le pseudo) — aucun texte en double. */}
-            <span
-              aria-hidden="true"
-              className={`${s.connectionDot} ${connection.linked ? s.connectionDotOn : ""}`}
-            />
-            <strong style={{ fontSize: 14 }}>{label}</strong>
-          </span>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+          <InfoHintRow>
+            <span className={s.connectionName}>
+              {/* Témoin décoratif : vert d'eau lumineux si rattaché. L'état se
+                  lit déjà en toutes lettres dans la ligne de détail (« Rattaché »
+                  ou le pseudo) — aucun texte en double. */}
+              <span
+                aria-hidden="true"
+                className={`${s.connectionDot} ${connection.linked ? s.connectionDotOn : ""}`}
+              />
+              <strong style={{ fontSize: 14 }}>{label}</strong>
+            </span>
+            <ProviderHint provider={connection.provider} />
+          </InfoHintRow>
           <span id={detailsId} style={{ fontSize: 11, color: "var(--ink-quiet)", lineHeight: 1.5 }}>
             {details}
           </span>
@@ -313,7 +318,7 @@ function ConnectionRow({
               {connectionRefusalText(text, refusal, connection.provider)}
             </span>
           ) : null}
-        </span>
+        </div>
 
         <span style={{ display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center" }}>
           {connection.linked && refusal !== "LAST_CONNECTION" ? (
@@ -361,6 +366,21 @@ function ConnectionRow({
         />
       ) : null}
     </>
+  );
+}
+
+/**
+ * Le « i » d'une ligne : pour Battle.net seulement, ce que la pastille dit et
+ * qui lit encore un BattleTag masqué — rattaché ou non.
+ */
+function ProviderHint({ provider }: Readonly<{ provider: OAuthProvider }>): React.ReactElement | null {
+  const text = useProfileText();
+  if (provider !== "BLIZZARD") return null;
+  return (
+    <InfoHint id={`connection-more-${OAUTH_PROVIDER_SLUGS[provider]}`} subject={OAUTH_PROVIDER_LABELS[provider]}>
+      <p>{text.t("connections.blizzardBadge")}</p>
+      <AudienceList lines={hiddenBattletagAudienceText(text)} />
+    </InfoHint>
   );
 }
 

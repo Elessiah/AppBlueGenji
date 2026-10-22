@@ -47,7 +47,10 @@ describe("ConnectedAppsSection — rendu des lignes", () => {
     const html = render([google(true), discord(false), blizzard(false)]);
     expect(html).toContain('aria-label="Rattacher Discord à mon compte"');
     expect(html).toContain('aria-label="Rattacher Blizzard à mon compte"');
-    expect(html).toContain("Connexion, et ton BattleTag tenu à jour par Blizzard, signalé sur ta fiche par une pastille « BattleTag vérifié » (même masqué, sans le montrer).");
+    expect(html).toContain("Connexion, et ton BattleTag tenu à jour par Blizzard.");
+    // La pastille et qui lit un BattleTag masqué : derrière le « i » de la ligne.
+    expect(html).toContain('aria-controls="connection-more-blizzard"');
+    expect(html).toContain("BattleTag vérifié");
     expect(html).toContain('aria-describedby="connection-details-blizzard"');
   });
 

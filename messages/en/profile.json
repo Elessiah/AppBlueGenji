@@ -32,7 +32,7 @@
     },
     "notifications": {
       "title": "Notifications",
-      "lead": "Get notified on your phone or computer, even with the site closed, and choose whether the bot messages you privately about your matches."
+      "lead": "Notifications on your phone or computer, even with the site closed, and bot direct messages about your matches."
     },
     "invitations": {
       "title": "Team invitations",
@@ -49,7 +49,7 @@
   },
   "identity": {
     "pseudo": "Site username",
-    "pseudoHint": "It's what identifies you in brackets, rosters and match sheets. It can't be hidden ({max} characters max).",
+    "pseudoHint": "{max} characters max. Always visible: it identifies you in brackets, rosters and match sheets.",
     "avatar": "Avatar",
     "changeAvatar": "Change avatar",
     "sending": "Uploading…",
@@ -66,17 +66,17 @@
   "games": {
     "battletag": "Overwatch BattleTag",
     "battletagPlaceholder": "Username#1234",
-    "hiddenWarning": "You can hide your BattleTag: it stays visible to the members of both teams, admins and referees in a tournament match from the moment both its opponents are known until its end, and to its caster only while the match is being played, in the match's “Contacts” window (and, for the teams and the caster, its launch window), if you're among the contacts shown. If you cast a match, both its teams also see it while the match is being played, and referees and admins from the moment both its opponents are known until its end. If you don't want them to see it, remove it from your profile (if it comes from Battle.net, unlink your Battle.net account first — after adding another way to log in if it is your only one).",
     "marvel": "Marvel Rivals tag",
-    "gameTagNotice": "Only used so other players can add you in game — never for statistics.",
-    "blizzardNotice": "If you link Battle.net, Blizzard fills in this BattleTag and updates it at every login — what you typed is then replaced by the source's value."
+    "gameTagNotice": "Only used to add you in game, never for statistics.",
+    "blizzardNotice": "If you link Battle.net, Blizzard fills in this field and updates it at every login, replacing what you typed."
   },
   "battletagLock": {
-    "pending": "Reading your connected apps… The field stays read-only until we know whether Blizzard fills in this BattleTag.",
-    "unknown": "Couldn't read your connected apps for now: the field stays read-only so as not to overwrite a BattleTag Blizzard may have filled in. Reload the page to try again.",
+    "pending": "Reading your connected apps… The field is read-only meanwhile.",
+    "unknown": "Couldn't read your connected apps for now: the field is read-only. Reload the page to try again.",
+    "tagged": "Provided by your Blizzard account, and updated at every login.",
+    "noTag": "Blizzard account linked, without a BattleTag: Blizzard will fill it in at your next login.",
     "change": "To change it, remove Blizzard from “Connected apps” (after adding another way to log in if it is your only one), then link the right account.",
-    "noTag": "Your Blizzard account is linked, but it gave no BattleTag. The field stays read-only: Blizzard will fill it in at your next login, and would overwrite anything typed here. {change}",
-    "tagged": "Your Blizzard account is linked: it provides this BattleTag, and Blizzard updates it at every login — a correction typed here would be erased next time. {change} To stop publishing it, untick “OW BattleTag” below."
+    "hide": "To remove it from your player page, the directory and rosters, untick “OW BattleTag” below."
   },
   "discord": {
     "label": "Discord username",
@@ -93,17 +93,18 @@
     "retry": "Try again",
     "retryLabel": "Try again (Discord status)",
     "reading": "Reading…",
-    "unverifiedHint": "Unverified tag: {audience} Verify it so they can.",
-    "unverifiedAudience": "nobody sees it, not even the administrators. So the organizers can't reach you during a tournament.",
-    "audience": "the administrators see it at any time, the referees as long as you're registered for a tournament that isn't over (from the moment registration opens), the members of both teams of your match from the moment both its opponents are known until its end, and its caster only while the match is being played (and, if you cast a match, both its teams only while the match is being played, and the referees from the moment both its opponents are known until its end); other players only if you make it visible in your privacy settings. Nobody else, ever.",
+    "unverifiedHint": "Unverified tag: nobody sees it, not even administrators.",
     "removed": "Discord tag removed.",
     "lock": {
-      "pending": "Reading your Discord account status… The field stays read-only until we know whether Discord provided this username.",
-      "unknown": "Couldn't read your Discord account status for now: the field stays read-only so as not to overwrite a username Discord may have provided. Try again, or reload the page.",
+      "pending": "Reading your Discord account… The field is read-only meanwhile.",
+      "unknown": "Couldn't read your Discord account status for now: the field is read-only. Try again, or reload the page.",
       "rename": "To change it, rename yourself on Discord, then use “Update my username” (“Discord bot” row of the connected apps).",
-      "noTag": "Your Discord account is linked, but no username is saved: the organizers can't reach you during a tournament. Use “Save my tag” or “Update my username”, or log in again with Discord.",
-      "unverified": "Your Discord account is linked, but this username isn't verified: {audience} Logging in with Discord doesn't verify it: “Verify my tag” does. {rename} You can also remove it.",
-      "verified": "Your Discord account is linked and this username is verified: {audience} {rename} A new username arrives unverified and must be verified again. To stop being reachable, remove it."
+      "noTag": "Discord account linked, no username saved: the organizers can't reach you.",
+      "noTagDetails": "Use “Save my tag” or “Update my username”, or log in again with Discord.",
+      "unverified": "Discord account linked, username unverified: nobody sees it.",
+      "unverifiedDetails": "Logging in with Discord doesn't verify it: “Verify my tag” does. You can also remove it.",
+      "verified": "Discord account linked, username verified.",
+      "verifiedDetails": "A new username arrives unverified and must be verified again. To stop being reachable, remove it."
     },
     "removalTitle": "Remove your Discord tag?",
     "removalConfirm": "Remove my tag",
@@ -115,7 +116,8 @@
     "removalBody2": "Your next login with Discord will save your username again, but without verifying it: it will stay invisible to everyone until you verify it again.",
     "verifiedAlt": "Verified Discord tag",
     "verifiedTitle": "Verified Discord tag: this player proved they own this Discord account.",
-    "alreadyVerified": "Your Discord tag is already verified."
+    "alreadyVerified": "Your Discord tag is already verified.",
+    "unverifiedDetails": "Without verification, the organizers can't reach you during a tournament: verify it so they can."
   },
   "privacy": {
     "visibleTitle": "Visible to other players",
@@ -126,36 +128,38 @@
       "discord": "Discord tag",
       "major": "Of legal age"
     },
-    "pseudoAlwaysVisible": "Your username is always visible: it's what identifies you in brackets, rosters and match sheets.",
-    "discordNotice": "Verification opens your Discord tag to the organizers (administrators at any time, referees as long as you're registered for a tournament that isn't over) and, as a contact, to the members of both teams of your match from the moment both its opponents are known, and to its caster only while the match is being played (and, if you cast a match, to both its teams while the match is being played, and to the referees from the moment both its opponents are known until its end); not to other players: tick “Discord tag” so they can see it on your profile. An unverified tag stays hidden, box ticked or not.",
+    "pseudoAlwaysVisible": "Your username is always visible: it identifies you in brackets, rosters and match sheets.",
+    "discordNotice": "“Discord tag” only applies to a verified tag: an unverified tag stays hidden, ticked or not. Once verified, the organizers and your match contacts already see it.",
     "discordPending": "Your tag isn't verified: it will stay hidden from other players until you verify it.",
     "discordNoTag": "You don't have a Discord tag yet: save it, then verify it so other players can see it.",
     "recruitmentTitle": "Recruitment",
     "openToOffers": "Open to team offers",
-    "recruitmentHint": "Unticked by default. Ticked, you show up in the directory's “Free agents” filter and your card says “FREE AGENT” as long as you have no team."
+    "recruitmentHint": "Ticked, you show up in the directory's “Free agents” filter, marked “FREE AGENT”, as long as you have no team. Unticked by default.",
+    "battletagNotice": "Unticked, your BattleTag stays readable in the “Contacts” window of your matches and in their launch window."
   },
   "save": "Save",
   "saved": "Profile updated.",
   "accountLocale": {
     "label": "Notification language",
-    "hint": "Push notifications reach you in this language. It follows the page's language each time you log in: your choice here holds until you next log in from a page in the other language.",
+    "hint": "Your push notifications arrive in this language. It takes the page's language again each time you log in.",
     "saved": "Notification language saved."
   },
   "matchDms": {
     "label": "Discord direct messages about my matches",
-    "notCertified": "These messages only go to accounts with a verified Discord tag, to avoid spam: without a verified tag, they can't reach you.",
+    "notCertified": "Without a verified Discord tag, these messages can't reach you (anti-spam).",
     "certifyLink": "Verify my Discord tag",
-    "hint": "On by default: the bot messages you privately when one of your matches is scheduled, rescheduled or unscheduled, when a match leaves your schedule, and for its reminders (day before, check-in). Untick to stop receiving them: your push notifications keep their own settings, and referees still get theirs.",
+    "hint": "On by default: the bot messages you privately when one of your matches is scheduled, rescheduled or unscheduled, when a match leaves your schedule, and for its reminders (day before, check-in). Push notifications and messages you get as a referee don't depend on it.",
     "enabled": "Match direct messages turned on.",
     "enabledNotCertified": "Match direct messages turned on: they'll be sent once your Discord tag is verified.",
     "disabled": "Match direct messages turned off."
   },
   "recruitmentModal": {
     "label": "Window of urgent recruitment announcements",
-    "hint": "Ticked by default: when you arrive, a window shows the urgent recruitment announcements you have not seen yet. Untick so that it no longer opens on its own, like “Don't show again”. Ticked again, it comes back on your account and on this browser; another browser where you had turned it down keeps it closed until you tick it again from that browser. The announcements stay on the Recruitment page.",
+    "hint": "Ticked (by default), a window shows you the urgent recruitment announcements you haven't seen yet when you arrive. Unticked, it no longer opens on its own; the announcements stay on the Recruitment page.",
     "shown": "Recruitment window turned back on: it will open again for an urgent announcement.",
     "hidden": "Recruitment window turned off: it will no longer open on its own.",
-    "hiddenBrowser": "Recruitment window turned off on this browser: it will no longer open on its own here."
+    "hiddenBrowser": "Recruitment window turned off on this browser: it will no longer open on its own here.",
+    "hintBrowser": "Another browser where you had turned it down keeps it closed until you tick it again from that browser."
   },
   "avatarUpdated": "Avatar updated.",
   "avatarDeleted": "Avatar deleted.",
@@ -271,12 +275,12 @@
     "fallback": "Updating your username failed. Try again in a moment."
   },
   "connections": {
-    "intro": "Your account has no password: it opens through the apps linked below. You can add several so you're never locked out — the last one can't be removed.",
+    "intro": "No password: your account opens through these apps. Link several; the last one can't be removed.",
     "loading": "Loading…",
     "notes": {
       "GOOGLE": "One-click login. No email address is saved.",
       "DISCORD": "Login, verification of your tag, and match time notices and reminders by direct message.",
-      "BLIZZARD": "Login, and your BattleTag kept up to date by Blizzard, marked on your player page by a “Verified BattleTag” badge (even when hidden, without showing it). You can hide your BattleTag: it stays visible to the members of both teams, admins and referees in a tournament match from the moment both its opponents are known until its end, and to its caster only while the match is being played, in the match's “Contacts” window (and, for the teams and the caster, its launch window), if you're among the contacts shown. If you cast a match, both its teams also see it while the match is being played, and referees and admins from the moment both its opponents are known until its end. If you don't want them to see it, remove it from your profile (if it comes from Battle.net, unlink your Battle.net account first — after adding another way to log in if it is your only one)."
+      "BLIZZARD": "Login, and your BattleTag kept up to date by Blizzard."
     },
     "linked": "Linked",
     "handleLine": "{label}: {handle}",
@@ -302,9 +306,9 @@
       "label": "Discord bot (direct-message code)",
       "handleNote": "Discord username: {handle}",
       "linkedByCode": "Linked by direct-message code",
-      "linkedByButton": "Your Discord is linked with the Discord button: it's removed on that row. The direct-message code updates your username here.",
-      "linkedElsewhere": "Your Discord is linked: it's removed on the Discord row. The direct-message code updates your username here.",
-      "notLinked": "Link your Discord without an authorization screen: the BlueGenji bot sends you a code by direct message.",
+      "linkedByButton": "Linked with the Discord button, removed on its row. The direct-message code updates your username here.",
+      "linkedElsewhere": "Discord linked, removed on its row. The direct-message code updates your username here.",
+      "notLinked": "Link Discord without an authorization screen: the BlueGenji bot sends you a code by direct message.",
       "linkByCode": "Link by code",
       "updateHandle": "Update my username",
       "disconnect": "Disconnect",
@@ -346,7 +350,8 @@
       "revoked": "{count, plural, one {1 other session was closed} other {{count} other sessions were closed}}.",
       "revoke": "Log out my other sessions",
       "revoking": "Closing…"
-    }
+    },
+    "blizzardBadge": "Your player page marks it with a “Verified BattleTag” badge, even when hidden (without showing it)."
   },
   "battletagNotice": {
     "eyebrow": "VISIBILITY · BATTLETAG",
@@ -420,5 +425,23 @@
     "updated": "Discord username updated.",
     "codeSent": "Code sent by Discord direct message (expires at {time}).",
     "bodyLabel": "Discord username for the bot"
+  },
+  "audience": {
+    "discord": {
+      "title": "A verified tag is visible to:",
+      "admins": "administrators, at any time;",
+      "referees": "referees, while you're registered for a tournament that isn't finished;",
+      "match": "the members of both teams of your match, from the moment its opponents are known until its end, and its caster while the match is being played;",
+      "asCaster": "if you cast a match: both its teams while the match is being played, and referees from the moment its opponents are known until its end;",
+      "players": "other players, only if you tick “Discord tag” in your privacy settings.",
+      "footer": "Nobody else."
+    },
+    "battletag": {
+      "title": "Hidden, your BattleTag can only be read in the “Contacts” window of your matches and in their launch window:",
+      "match": "if you're shown there as a contact: the members of both teams, referees and administrators, from the moment the opponents are known until the end of the match, and the caster while the match is being played;",
+      "asCaster": "if you cast a match: both its teams while the match is being played, and referees and administrators from the moment its opponents are known until its end;",
+      "launch": "the launch window only opens for both teams and the caster.",
+      "footer": "To stop sharing it entirely, clear it from your profile (if it comes from Battle.net, unlink Battle.net first, after adding another way to log in if it is your only one)."
+    }
   }
 }

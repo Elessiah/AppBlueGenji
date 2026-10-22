@@ -360,7 +360,7 @@ seul `lib/server/tournaments/match-launch-info.ts` pose en présentant les
 contacts d'un match — aux mêmes durées que la fenêtre elle-même. Cette lecture
 repose sur l'exécution du service — section « Contacts de match » des
 conditions d'utilisation (v6) —, pas sur le consentement ; l'avertissement est
-dit là où le BattleTag se renseigne et se masque (`games.hiddenWarning`,
+dit là où le BattleTag se renseigne et se masque (liste `HIDDEN_BATTLETAG_AUDIENCE` derrière le « i »,
 `battletagNotice.warning`, notes Blizzard de `/connexion` et du profil).
 
 

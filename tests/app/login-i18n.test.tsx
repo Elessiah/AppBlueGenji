@@ -67,11 +67,18 @@ import {
   type SuspensionNotice,
 } from "@/lib/shared/account-suspension";
 import { MIGRATED_ROUTES } from "@/lib/shared/i18n-routes";
-import { DISCORD_LOGIN_TAG_NOTICE, DISCORD_TAG_AUDIENCE } from "@/lib/shared/identity-sharing";
+import {
+  DISCORD_LOGIN_TAG_DETAILS,
+  DISCORD_LOGIN_TAG_NOTICE,
+  DISCORD_TAG_AUDIENCE,
+  HIDDEN_BATTLETAG_AUDIENCE,
+} from "@/lib/shared/identity-sharing";
+import { discordAudienceLines, hiddenBattletagAudienceLines } from "@/lib/shared/identity-audience";
 import { loginEnvironmentAdvice, loginEnvironmentNotice } from "@/lib/shared/login-environment";
 import { loginText, suspendedLoginText, suspensionEndText, suspensionSpanText } from "@/lib/shared/login-text";
 import { LOCALES, SITE_TIME_ZONE, isMigratedRoute, localeHref, type Locale } from "@/lib/shared/locales";
-import { formatMessage, formatMessageParts } from "@/lib/shared/message-format";
+import { formatMessageParts } from "@/lib/shared/message-format";
+import { scopedText } from "@/lib/shared/scoped-text";
 import { oauthStartPath } from "@/lib/shared/oauth-providers";
 import { localizedSitemapEntries, publicSitemapRoutes } from "@/lib/shared/sitemap";
 import {
@@ -269,7 +276,7 @@ describe("formulaire — /en/connexion sans un mot de français", () => {
   it("premier écran : boutons, séparateur, champ, aide, retour à l'accueil anglais", () => {
     const html = render(<LoginForm />, "en");
     const text = visibleText(html);
-    for (const phrase of ["← Back to home", "Log in", "Continue with Discord", "Get a code →", "Discord tag or ID", "Join us"]) {
+    for (const phrase of ["← Back to home", "Log in", "Continue with Discord", "Get a code →", "Discord tag or ID", "join ours"]) {
       expect(text).toContain(phrase);
     }
     // Retour à l'accueil anglais, départ OAuth qui emporte la langue.
@@ -437,8 +444,10 @@ describe("refus — codes traduits à l'affichage", () => {
 
 describe("messages `login`", () => {
   it("le français reprend les phrases partagées (tag Discord)", () => {
-    expect(FR.oauth.tagAudience).toBe(DISCORD_TAG_AUDIENCE);
-    expect(formatMessage("fr", FR.oauth.discordNote, { audience: FR.oauth.tagAudience })).toBe(DISCORD_LOGIN_TAG_NOTICE);
+    expect(discordAudienceLines(scopedText("fr", FR).t)).toEqual(DISCORD_TAG_AUDIENCE);
+    expect(hiddenBattletagAudienceLines(scopedText("fr", FR).t)).toEqual(HIDDEN_BATTLETAG_AUDIENCE);
+    expect(FR.oauth.discordNote).toBe(DISCORD_LOGIN_TAG_NOTICE);
+    expect(FR.oauth.discordDetails).toBe(DISCORD_LOGIN_TAG_DETAILS);
   });
 
   it("l'anglais suit le glossaire et la coquille", () => {

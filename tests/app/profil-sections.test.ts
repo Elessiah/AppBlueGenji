@@ -126,7 +126,7 @@ describe("La page dit ce qu'elle fait des identifiants", () => {
   });
 
   it("énonce l'exposition du tag Discord par la source partagée avec /connexion", () => {
-    expect(page).toContain('t("discord.unverifiedAudience")');
+    expect(page).toContain("<AudienceList lines={discordAudienceText(text)} />");
   });
 
   it("n'écrit pas de branche que l'état ne peut pas atteindre", () => {
@@ -138,9 +138,12 @@ describe("La page dit ce qu'elle fait des identifiants", () => {
     // et « lecture échouée » se confondaient en un seul `linked: null`, et le
     // verrou annonçait une panne pendant le temps normal d'un aller-retour.
     expect(page).toContain(
-      "discordTagLockText(text, { ...discordState, pending: discordStateBusy })",
+      "discordFieldNotice(text, discordLocked, { ...discordState, pending: discordStateBusy })",
     );
-    expect(page).toContain('t("discord.unverifiedAudience")');
+    expect(page).toContain(
+      "if (locked) return discordTagLockText(text, state);",
+    );
+    expect(page).toContain('{ status: text.t("discord.unverifiedHint"), details: [text.t("discord.unverifiedDetails")], audience: true }');
   });
 
   it("ne recopie pas à la main l'exposition d'un tag certifié", () => {

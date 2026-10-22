@@ -10,12 +10,12 @@
     "codeSeparator": "OU CODE PAR MESSAGE PRIVÉ",
     "handleLabel": "Tag Discord ou ID",
     "handlePlaceholder": "ton_pseudo ou 123456789012345678",
-    "handleHelp": "Le bot doit partager un serveur avec toi pour t'écrire en privé, que tu saisisses ton tag ou ton ID : l'ID évite seulement la recherche de ton tag. Pas encore sur un de ses serveurs ? <join>Rejoins-nous</join> — ou passe simplement par le bouton Discord ci-dessus, qui marche sans serveur commun.",
+    "handleHelp": "Le bot doit partager un serveur avec toi pour t'écrire : <join>rejoins le nôtre</join>, ou passe par le bouton Discord ci-dessus, qui s'en passe. Ton ID évite seulement la recherche de ton tag.",
     "sending": "Envoi...",
     "requestCode": "Recevoir un code →",
     "codeSent": "Code envoyé en DM Discord (expiration : {time}).",
     "accountLabel": "Compte Discord",
-    "tagNotice": "Te connecter par ce code <strong>enregistre ce tag</strong>, sans le certifier : il reste invisible de tous, administrateurs compris. Si tu le certifies ensuite, dans « Mon profil » ou dans la fenêtre proposée après une connexion par Discord ou Blizzard, {audience}",
+    "tagNotice": "Ce code <strong>enregistre ce tag</strong>, sans le certifier : personne ne le voit.",
     "codeLabel": "Code reçu en DM (6 chiffres)",
     "pseudoLabel": "Pseudo site",
     "pseudoOptional": "(facultatif, première connexion)",
@@ -27,14 +27,14 @@
   },
   "oauth": {
     "continueWith": "Continuer avec {provider}",
-    "discordNote": "Enregistre ton pseudo Discord sans le certifier : il reste invisible de tous, administrateurs compris. Si tu le certifies ensuite, dans « Mon profil » ou dans la fenêtre proposée après une connexion par Discord ou Blizzard, {audience}",
-    "blizzardNote": "Renseigne ton BattleTag automatiquement. Tu peux masquer ton BattleTag : il reste visible pour les membres des deux équipes, les admins et les arbitres d'un match de tournoi dès que ses deux adversaires sont connus et jusqu'à sa fin, ainsi que pour son caster le temps du match seulement, dans la fenêtre « Contacts » du match (et, pour les équipes et le caster, dans sa fenêtre de lancement), si tu fais partie des contacts présentés. Si tu castes un match, ses deux équipes le voient aussi le temps du match, et les arbitres et les admins dès que ses deux adversaires sont connus et jusqu'à sa fin. Si tu ne veux pas qu'ils le voient, retire-le de ton profil (s'il vient de Battle.net, détache d'abord ton compte Battle.net — après avoir ajouté un autre moyen de connexion si c'est le seul).",
-    "tagAudience": "les administrateurs le voient à tout moment, les arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), les membres des deux équipes de ton match dès que ses deux adversaires sont connus et jusqu'à sa fin, et son caster le temps du match seulement (et, si tu castes un match, ses deux équipes le temps du match seulement, et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin) ; les autres joueurs, seulement si tu le rends visible dans tes réglages de confidentialité. Jamais personne d'autre."
+    "discordNote": "Enregistre ton pseudo Discord, sans le certifier : personne ne le voit.",
+    "blizzardNote": "Renseigne ton BattleTag automatiquement.",
+    "discordDetails": "Tu pourras le certifier dans « Mon profil » ou dans la fenêtre proposée après une connexion par Discord ou Blizzard."
   },
   "environment": {
     "notice": {
-      "IOS_INSTALLED_APP": "Tu utilises le site depuis l'icône de l'écran d'accueil : iOS y bloque souvent la connexion par Google, Discord ou Blizzard. Si elle échoue, ouvre le site dans Safari, ou utilise le code Discord par message privé ci-dessous.",
-      "IN_APP_BROWSER": "Tu navigues dans le navigateur intégré d'une application, qui bloque souvent la connexion par Google, Discord ou Blizzard. Si elle échoue, ouvre le site dans ton navigateur habituel, ou utilise le code Discord par message privé ci-dessous."
+      "IOS_INSTALLED_APP": "Depuis l'icône de l'écran d'accueil, iOS bloque souvent ces connexions. En cas d'échec, ouvre le site dans Safari ou utilise le code Discord ci-dessous.",
+      "IN_APP_BROWSER": "Le navigateur intégré de cette application bloque souvent ces connexions. En cas d'échec, ouvre le site dans ton navigateur habituel ou utilise le code Discord ci-dessous."
     },
     "advice": {
       "IOS_INSTALLED_APP": "Depuis l'icône de l'écran d'accueil, iOS isole la connexion : ouvre le site dans Safari pour te connecter, ou utilise le code Discord par message privé.",
@@ -114,5 +114,23 @@
     "home": "Retour à l'accueil",
     "rules": "Découvrir les règles des tournois",
     "redirecting": "Ouverture du tournoi…"
+  },
+  "audience": {
+    "discord": {
+      "title": "Un tag certifié est visible par :",
+      "admins": "les administrateurs, à tout moment ;",
+      "referees": "les arbitres, tant que tu es inscrit à un tournoi non terminé ;",
+      "match": "les membres des deux équipes de ton match, dès que ses adversaires sont connus et jusqu'à sa fin, et son caster le temps du match ;",
+      "asCaster": "si tu castes un match : ses deux équipes le temps du match, et les arbitres dès que ses adversaires sont connus et jusqu'à sa fin ;",
+      "players": "les autres joueurs, seulement si tu coches « Tag Discord » dans tes réglages de confidentialité.",
+      "footer": "Personne d'autre."
+    },
+    "battletag": {
+      "title": "Masqué, ton BattleTag ne se lit plus que dans la fenêtre « Contacts » de tes matchs et dans leur fenêtre de lancement :",
+      "match": "si tu y es présenté comme contact : les membres des deux équipes, les arbitres et les administrateurs, dès que les adversaires sont connus et jusqu'à la fin du match, et le caster le temps du match ;",
+      "asCaster": "si tu castes un match : ses deux équipes le temps du match, et les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin ;",
+      "launch": "la fenêtre de lancement, elle, ne s'ouvre qu'aux deux équipes et au caster.",
+      "footer": "Pour ne plus le partager du tout, efface-le de ton profil (s'il vient de Battle.net, détache d'abord Battle.net, après avoir ajouté un autre moyen de connexion si c'est le seul)."
+    }
   }
 }

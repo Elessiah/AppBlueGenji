@@ -4,7 +4,11 @@ import {
   battletagLockNotice,
   checkBattletagEdit,
   isBattletagLocked,
+  type BattletagLockNotice,
 } from "@/lib/shared/battletag-lock";
+
+/** Tout ce que dit le champ : la ligne d'état, puis le détail derrière le « i ». */
+const all = (notice: BattletagLockNotice) => [notice.status, ...notice.details].join(" ");
 
 /**
  * **Un compte Blizzard rattaché possède son BattleTag.**
@@ -58,20 +62,22 @@ describe("battletagLockNotice", () => {
     // ferait chercher une cause qui n'existe pas.
     const notice = battletagLockNotice({ tag: null, linked: null, pending: true });
 
-    expect(notice).toContain("Lecture");
-    expect(notice).not.toContain("Impossible");
+    expect(notice.status).toContain("Lecture");
+    expect(all(notice)).not.toContain("illisible");
+    expect(notice.details).toEqual([]);
   });
 
   it("nomme le verrou et sa sortie quand la lecture a échoué", () => {
     const notice = battletagLockNotice({ tag: null, linked: null });
 
-    expect(notice).toContain("Impossible");
+    expect(notice.status).toContain("illisible");
+    expect(notice.status).toContain("Recharge la page");
     // On n'affirme **ni** un rattachement ni son absence : rien ne le soutient.
-    expect(notice).not.toContain("est rattaché");
+    expect(all(notice)).not.toContain("rattaché");
   });
 
   it("explique le verrou, et nomme les deux gestes qui restent", () => {
-    const notice = battletagLockNotice({ tag: "Nova#2143", linked: true });
+    const notice = all(battletagLockNotice({ tag: "Nova#2143", linked: true }));
 
     // Le geste qui **change** la valeur…
     expect(notice).toContain("Applications connectées");
@@ -79,13 +85,19 @@ describe("battletagLockNotice", () => {
     // qui n'en nommerait qu'un enverrait la moitié des joueurs au mauvais
     // endroit.
     expect(notice).toContain("BattleTag OW");
+    // Décocher ne le cache pas aux parties d'un match (fenêtre « Contacts ») :
+    // la phrase ne doit pas promettre de le cacher « aux autres joueurs ».
+    expect(notice).not.toContain("autres joueurs");
+    expect(notice).toContain("fiche");
   });
 
   it("couvre le compte rattaché **sans** BattleTag sans inventer de cause", () => {
     const notice = battletagLockNotice({ tag: null, linked: true });
 
-    expect(notice).toContain("aucun BattleTag");
-    expect(notice).toContain("Applications connectées");
+    expect(notice.status).toContain("sans BattleTag");
+    expect(all(notice)).toContain("Applications connectées");
+    // Rien à décocher : il n'y a aucun BattleTag à publier.
+    expect(all(notice)).not.toContain("BattleTag OW");
   });
 
   it("ne laisse jamais sortir un jeton en capitales", () => {
@@ -95,8 +107,19 @@ describe("battletagLockNotice", () => {
       { tag: null, linked: true },
       { tag: "Nova#2143", linked: true },
     ]) {
-      expect(battletagLockNotice(state)).not.toContain(BATTLETAG_LOCKED);
-      expect(battletagLockNotice(state)).not.toMatch(/[A-Z]{4,}_[A-Z]{4,}/);
+      expect(all(battletagLockNotice(state))).not.toContain(BATTLETAG_LOCKED);
+      expect(all(battletagLockNotice(state))).not.toMatch(/[A-Z]{4,}_[A-Z]{4,}/);
+    }
+  });
+
+  it("garde la ligne d'état courte : le détail passe derrière le « i »", () => {
+    for (const state of [
+      { tag: null, linked: null, pending: true },
+      { tag: null, linked: null },
+      { tag: null, linked: true },
+      { tag: "Nova#2143", linked: true },
+    ]) {
+      expect(battletagLockNotice(state).status.length).toBeLessThanOrEqual(120);
     }
   });
 });

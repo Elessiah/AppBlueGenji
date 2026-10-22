@@ -140,7 +140,7 @@ describe("champ Discord — l'attente ne se dit pas comme une panne", () => {
   });
 
   it("passe l'attente à la phrase, qui ne la devine pas", () => {
-    expect(page).toContain("discordTagLockText(text, { ...discordState, pending: discordStateBusy })");
+    expect(page).toContain("discordFieldNotice(text, discordLocked, { ...discordState, pending: discordStateBusy })");
   });
 });
 

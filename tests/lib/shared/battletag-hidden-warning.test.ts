@@ -13,42 +13,49 @@ import { PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
 import { PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register-en";
 import frPlayers from "@/messages/fr/players.json";
 import enPlayers from "@/messages/en/players.json";
+import { HIDDEN_BATTLETAG_AUDIENCE } from "@/lib/shared/identity-sharing";
+import { hiddenBattletagAudienceLines } from "@/lib/shared/identity-audience";
 
 /**
  * CONTACTS-FOLLOWUP (décisions du 2026-10-19) : masqué, le BattleTag ne se lit
- * plus que dans la fenêtre « Contacts » d'un match, ouverte aux deux équipes et
- * aux arbitres — dit là où on le renseigne (champ du
- * profil, connexion et rattachement Battle.net) et là où on le masque (modale
- * de la case « BattleTag OW »), avec la même phrase en français et en anglais.
+ * plus que dans la fenêtre « Contacts » d'un match et dans sa fenêtre de
+ * lancement — dit là où on le renseigne (champ du profil, connexion et
+ * rattachement Battle.net) et sur la fiche de son titulaire, par **une seule**
+ * liste (`HIDDEN_BATTLETAG_AUDIENCE`, derrière le bouton « i »), la même en
+ * français et en anglais dans chaque espace qui la montre.
  */
-const FR =
-  "Tu peux masquer ton BattleTag : il reste visible pour les membres des deux équipes, les admins et les arbitres d'un match de tournoi dès que ses deux adversaires sont connus et jusqu'à sa fin, ainsi que pour son caster le temps du match seulement, dans la fenêtre « Contacts » du match (et, pour les équipes et le caster, dans sa fenêtre de lancement), si tu fais partie des contacts présentés. Si tu castes un match, ses deux équipes le voient aussi le temps du match, et les arbitres et les admins dès que ses deux adversaires sont connus et jusqu'à sa fin. Si tu ne veux pas qu'ils le voient, retire-le de ton profil (s'il vient de Battle.net, détache d'abord ton compte Battle.net — après avoir ajouté un autre moyen de connexion si c'est le seul).";
-const EN =
-  "You can hide your BattleTag: it stays visible to the members of both teams, admins and referees in a tournament match from the moment both its opponents are known until its end, and to its caster only while the match is being played, in the match's “Contacts” window (and, for the teams and the caster, its launch window), if you're among the contacts shown. If you cast a match, both its teams also see it while the match is being played, and referees and admins from the moment both its opponents are known until its end. If you don't want them to see it, remove it from your profile (if it comes from Battle.net, unlink your Battle.net account first — after adding another way to log in if it is your only one).";
-
 const readSource = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
+const lines = (messages: { audience: { battletag: Record<string, string> } }) =>
+  hiddenBattletagAudienceLines((key) => messages.audience.battletag[key.slice("audience.battletag.".length)] ?? key);
 
 describe("avertissement du BattleTag masqué", () => {
-  it("se lit sous le champ BattleTag du profil, verrouillé ou non", () => {
-    expect(frProfile.games.hiddenWarning).toBe(FR);
-    expect(enProfile.games.hiddenWarning).toBe(EN);
+  it("est la liste partagée, mot pour mot, dans chaque espace (FR) et identique d'un espace à l'autre (EN)", () => {
+    expect(lines(frProfile)).toEqual(HIDDEN_BATTLETAG_AUDIENCE);
+    expect(lines(frLogin)).toEqual(HIDDEN_BATTLETAG_AUDIENCE);
+    expect(lines(frPlayers)).toEqual(HIDDEN_BATTLETAG_AUDIENCE);
+    expect(lines(enLogin)).toEqual(lines(enProfile));
+    expect(lines(enPlayers)).toEqual(lines(enProfile));
+  });
+
+  it("se lit derrière le « i » du champ BattleTag du profil, verrouillé ou non", () => {
     const page = readSource("app/(secured)/profil/page.tsx");
-    const hint = page.slice(page.indexOf('<p id="profile-battletag-hint"'), page.indexOf("</p>", page.indexOf('<p id="profile-battletag-hint"')));
-    expect(hint).toContain('{t("games.hiddenWarning")}');
-    // Hors du ternaire : les deux branches (verrouillé par Blizzard ou saisi) le portent.
-    expect(hint.lastIndexOf('t("games.hiddenWarning")')).toBeGreaterThan(hint.lastIndexOf('t("games.blizzardNotice")'));
+    const hint = page.slice(page.indexOf('<InfoHint id="profile-battletag-more"'), page.indexOf("</InfoHint>", page.indexOf('<InfoHint id="profile-battletag-more"')));
+    // Hors du ternaire : les deux branches (verrouillé par Blizzard ou saisi) la portent.
+    expect(hint).toContain("<AudienceList lines={hiddenBattletagAudienceText(text)} />");
+    expect(page).toContain('return { status: text.t("games.gameTagNotice"), details: [text.t("games.blizzardNotice")] };');
+    expect(hint.lastIndexOf("AudienceList")).toBeGreaterThan(hint.indexOf("<HintDetails lines={battletagNotice.details} />"));
+    // Le champ la garde pour description : le lecteur d'écran l'entend entière.
+    expect(page).toContain('fieldErrors.aria("battletag", "profile-battletag-hint", "profile-battletag-more")');
   });
 
   it("se lit au rattachement de Battle.net (profil) et à la connexion par Blizzard", () => {
-    expect(frProfile.connections.notes.BLIZZARD).toContain(FR);
-    expect(enProfile.connections.notes.BLIZZARD).toContain(EN);
-    expect(frLogin.oauth.blizzardNote).toContain(FR);
-    expect(enLogin.oauth.blizzardNote).toContain(EN);
+    expect(readSource("app/(secured)/profil/ConnectedAppsSection.tsx")).toContain("<AudienceList lines={hiddenBattletagAudienceText(text)} />");
+    expect(readSource("app/connexion/_components/OAuthButtons.tsx")).toContain("<AudienceList lines={hiddenBattletagAudienceLines(t)} />");
   });
 
-  it("ouvre la modale affichée quand on masque le BattleTag", () => {
-    expect(frProfile.battletagNotice.warning).toBe(FR);
-    expect(enProfile.battletagNotice.warning).toBe(EN);
+  it("garde dans la modale de masquage son propre avertissement, avant la liste", () => {
+    expect(frProfile.battletagNotice.warning).toMatch(/^Tu peux masquer ton BattleTag : il reste visible/);
+    expect(enProfile.battletagNotice.warning).toMatch(/^You can hide your BattleTag: it stays visible/);
     const notice = readSource("app/(secured)/profil/BattletagVisibilityNotice.tsx");
     expect(notice.indexOf('t("battletagNotice.warning")')).toBeGreaterThan(-1);
     expect(notice.indexOf('t("battletagNotice.warning")')).toBeLessThan(notice.indexOf('t("battletagNotice.intro")'));
@@ -57,6 +64,8 @@ describe("avertissement du BattleTag masqué", () => {
   it("dit au caster qu'il n'a les contacts que le temps du match (FR et EN)", () => {
     expect(frProfile.battletagNotice.caster).toContain("le temps du match seulement (de son départ à sa fin)");
     expect(enProfile.battletagNotice.caster).toContain("only while the match is being played (from its start to its end)");
+    expect(frProfile.audience.battletag.match).toContain("et le caster le temps du match");
+    expect(enProfile.audience.battletag.match).toContain("and the caster while the match is being played");
   });
 });
 
@@ -126,14 +135,14 @@ describe("BattleTag masqué — les deux fenêtres nommées partout", () => {
     expect(text).toMatch(launch);
   };
 
-  it("avertissement, modale de masquage et fiche joueur", () => {
+  it("liste partagée, modale de masquage et fiche joueur", () => {
     expect(frProfile.battletagNotice.intro).toMatch(FR_LAUNCH);
     expectBoth(frProfile.battletagNotice.intro, FR_CONTACTS, FR_LAUNCH);
     expectBoth(enProfile.battletagNotice.intro, EN_CONTACTS, EN_LAUNCH);
     expectBoth(frProfile.battletagNotice.staff, FR_CONTACTS, FR_LAUNCH);
     expectBoth(enProfile.battletagNotice.staff, EN_CONTACTS, EN_LAUNCH);
-    expectBoth(frPlayers.page.battletagHiddenSelf, FR_CONTACTS, FR_LAUNCH);
-    expectBoth(enPlayers.page.battletagHiddenSelf, EN_CONTACTS, EN_LAUNCH);
+    expectBoth(frPlayers.audience.battletag.title, FR_CONTACTS, FR_LAUNCH);
+    expectBoth(enPlayers.audience.battletag.title, EN_CONTACTS, EN_LAUNCH);
   });
 
   it("conditions v6, annonce PRIVACY_CHANGES et registre", () => {

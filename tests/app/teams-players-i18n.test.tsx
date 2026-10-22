@@ -470,7 +470,10 @@ describe("anglais", () => {
     expect(html).toContain("Referee");
     expect(html).toContain("Owner, Support");
     expect(html).toContain("In progress");
-    expect(html).toContain("Hidden from everyone: it can only be read");
+    expect(html).toContain("Hidden from everyone, except in your match contacts.");
+    // Qui le lit encore : la liste partagée, derrière le « i » du champ.
+    expect(html).toContain('aria-controls="player-battletag-more"');
+    expect(html).toContain("Hidden, your BattleTag can only be read in the “Contacts” window");
     expect(html).toContain("Verified Discord tag");
     expect(html).toContain("Statistics");
     expectEnglish(html);

@@ -73,6 +73,7 @@ Appels toujours app → bot, dégradation si injoignable.
 - **Entrées solo** (`bg_teams.solo_user_id`) : ne jamais compter `bg_teams` sans filtrer `solo_user_id IS NULL`. Équipes fantômes (`is_ghost`) → `GHOST_TEAMS.md`.
 - **Noms cliquables** : un nom d'équipe/joueur passe par `TeamLink` / `PlayerLink` / `EntrantLink` (jamais un chemin écrit à la main — une entrée solo n'a pas de fiche d'équipe) ; un écran de tournoi rend un engagé par `EntrantName` → `ENTITY_LINKS.md`, `TOURNAMENT_ENTRANT_LOGOS.md`.
 - **Modales** : portées dans `document.body`, `useDialogBehavior`, `useBackdropDismiss` → `MODAL_DIALOGS.md`. Gestes sans retour par `ConfirmActionDialog`, jamais `window.confirm`.
+- **Textes explicatifs** : derrière `<InfoHint>` (bouton « i »), 1–2 phrases, jamais en paragraphe permanent → `INFO_HINTS.md`.
 - **Champs numériques** : `<NumberInput>`, jamais `Number(e.target.value)` → `NUMBER_INPUT.md`.
 - **Zones défilantes** : toujours `<ScrollArea>` avec `ariaLabel`, jamais `overflow: auto` à la main → `ACCESSIBILITY_SCROLL_AREA_FOCUS.md`.
 - **Cases à cocher / radios** : style posé sur l'élément dans `globals.css` ; une règle sur un `input` nu exclut `[type="checkbox"]`/`[type="radio"]`, pas de style en ligne, état désactivé par couleurs (jamais `opacity`) → `CHECKBOX_STYLES.md`.

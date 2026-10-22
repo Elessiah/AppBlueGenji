@@ -3,34 +3,31 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   DISCORD_CERTIFICATION_UNDO,
+  DISCORD_LOGIN_TAG_DETAILS,
   DISCORD_LOGIN_TAG_NOTICE,
   DISCORD_TAG_AUDIENCE,
 } from "@/lib/shared/identity-sharing";
+import { discordAudienceLines } from "@/lib/shared/identity-audience";
 import { messagesFor } from "@/lib/server/i18n-messages";
-import { formatMessage } from "@/lib/shared/message-format";
+import { scopedText } from "@/lib/shared/scoped-text";
 
 /**
  * Ce que la connexion Discord fait du tag, dit avant le clic.
  *
- * La connexion certifiait le tag sans qu'on le demande : c'était le seul
- * endroit où un tag s'ouvrait à l'organisation sans geste de son titulaire, et
- * la base « Consentement » annoncée ne tenait pas. Elle l'**enregistre**
- * désormais, non certifié ; la certification est un clic distinct sur
- * `/profil`. La page de connexion doit donc le dire, et dire qui lirait le tag
- * une fois certifié.
+ * La connexion **enregistre** le tag, non certifié ; la certification est un
+ * clic distinct sur `/profil`. La page de connexion doit donc le dire — une
+ * ligne visible —, et dire qui lirait le tag une fois certifié, derrière le
+ * bouton « i » (`docs/features/INFO_HINTS.md`).
  *
  * Assertion sur la **source** faute de pouvoir monter la page : elle tient à ce
- * qu'aucun test ne peut deviner, la présence de la phrase.
- *
- * Depuis que `/profil` énonce la même promesse, la phrase elle-même vit dans
- * `lib/shared/identity-sharing.ts` : le contrôle porte donc sur son contenu
- * *et* sur le fait que la page de connexion l'emploie. C'est plus fort que
- * l'ancienne lecture littérale — deux écrans ne peuvent plus promettre deux
- * choses différentes.
+ * qu'aucun test ne peut deviner, la présence de la phrase. La promesse vit dans
+ * `lib/shared/identity-sharing.ts`, partagée avec `/profil`.
  */
 const SOURCE = readFileSync(join(process.cwd(), "app/connexion/_components/LoginForm.tsx"), "utf8");
+const OAUTH_SOURCE = readFileSync(join(process.cwd(), "app/connexion/_components/OAuthButtons.tsx"), "utf8");
 /** Textes de la page, dans les messages depuis le lot 6 (`messages/<langue>/login.json`). */
 const FR = messagesFor("fr").login;
+const FR_TEXT = scopedText("fr", FR);
 
 describe("connexion Discord — annonce de l'enregistrement du tag", () => {
   it("dit que se connecter enregistre le tag **sans le certifier**", () => {
@@ -41,31 +38,33 @@ describe("connexion Discord — annonce de l'enregistrement du tag", () => {
     expect(SOURCE).toContain('text.rich("page.tagNotice"');
   });
 
-  it("dit que la certification se fait ensuite, dans le profil ou la fenêtre après connexion", () => {
-    expect(FR.page.tagNotice).toMatch(/Si tu le certifies ensuite, dans « Mon profil » ou dans la fenêtre proposée après une connexion par Discord ou Blizzard/);
+  it("dit où certifier ensuite — profil ou fenêtre après connexion — derrière le « i »", () => {
+    expect(FR.oauth.discordDetails).toBe(DISCORD_LOGIN_TAG_DETAILS);
+    expect(DISCORD_LOGIN_TAG_DETAILS).toMatch(/dans « Mon profil » ou dans la fenêtre proposée après une connexion par Discord ou Blizzard/);
+    // Le code par message privé comme le bouton : même détail, même liste.
+    expect(SOURCE).toContain('<InfoHint id="login-discord-tag-more"');
+    expect(SOURCE).toContain('t("oauth.discordDetails")');
+    expect(OAUTH_SOURCE).toContain('t("oauth.discordDetails")');
   });
 
   it("la note sous le bouton Discord dit la même chose, et qui lirait le tag", () => {
     expect(DISCORD_LOGIN_TAG_NOTICE).toMatch(/sans le certifier/);
-    expect(DISCORD_LOGIN_TAG_NOTICE).toMatch(/invisible de tous, administrateurs compris/);
-    expect(DISCORD_LOGIN_TAG_NOTICE).toContain(DISCORD_TAG_AUDIENCE);
+    expect(DISCORD_LOGIN_TAG_NOTICE).toMatch(/personne ne le voit/);
     // La note du bouton vient des messages : son français est mot pour mot la phrase partagée.
-    expect(formatMessage("fr", FR.oauth.discordNote, { audience: FR.oauth.tagAudience })).toBe(DISCORD_LOGIN_TAG_NOTICE);
-    expect(
-      readFileSync(join(process.cwd(), "app/connexion/_components/OAuthButtons.tsx"), "utf8"),
-    ).toContain('DISCORD: "oauth.discordNote"');
+    expect(FR.oauth.discordNote).toBe(DISCORD_LOGIN_TAG_NOTICE);
+    expect(OAUTH_SOURCE).toContain('DISCORD: "oauth.discordNote"');
+    expect(OAUTH_SOURCE).toContain("<AudienceList lines={discordAudienceLines(t)} />");
   });
 
-  it("nomme les deux publics, et eux seuls", () => {
-    expect(DISCORD_TAG_AUDIENCE).toMatch(/administrateurs/i);
-    expect(DISCORD_TAG_AUDIENCE).toMatch(/arbitres/i);
-    // « Jamais personne d'autre » : la phrase borne l'exposition au lieu de la
-    // laisser deviner. Sans cela, « les administrateurs le voient » se lirait
-    // comme un début de liste.
-    expect(DISCORD_TAG_AUDIENCE).toMatch(/personne\s+d'autre/i);
-    // Le public est la phrase partagée, reprise telle quelle par les messages.
-    expect(FR.oauth.tagAudience).toBe(DISCORD_TAG_AUDIENCE);
-    expect(SOURCE).toContain('audience: t("oauth.tagAudience")');
+  it("nomme les publics, et eux seuls", () => {
+    const lines = discordAudienceLines(FR_TEXT.t);
+    // Le public est la liste partagée, reprise telle quelle par les messages.
+    expect(lines).toEqual(DISCORD_TAG_AUDIENCE);
+    expect(lines.items.join(" ")).toMatch(/administrateurs/);
+    expect(lines.items.join(" ")).toMatch(/arbitres/);
+    // « Personne d'autre » borne l'exposition au lieu de la laisser deviner.
+    expect(lines.footer).toMatch(/personne\s+d'autre/i);
+    expect(SOURCE).toContain("<AudienceList lines={discordAudienceLines(t)} />");
   });
 
   it("garde un geste d'annulation nommé, celui qui existe à l'écran", () => {
@@ -76,6 +75,7 @@ describe("connexion Discord — annonce de l'enregistrement du tag", () => {
   it("ne recopie plus la phrase dans la page", () => {
     // Une copie vaudrait promesse divergente au premier ajustement.
     expect(SOURCE).not.toMatch(/les administrateurs\s*\n?\s*le voient/i);
+    expect(SOURCE).not.toMatch(/administrateurs, à tout moment/);
   });
 });
 

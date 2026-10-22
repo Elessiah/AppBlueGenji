@@ -19,6 +19,10 @@ import type {
   DiscordBotRowState,
 } from "@/lib/shared/account-connections";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
+import type { DiscordTagLockNotice } from "@/lib/shared/discord-tag-lock";
+import type { BattletagLockNotice } from "@/lib/shared/battletag-lock";
+import type { IdentityAudience } from "@/lib/shared/identity-sharing";
+import { discordAudienceLines, hiddenBattletagAudienceLines } from "@/lib/shared/identity-audience";
 import { OAUTH_PROVIDER_LABELS, type OAuthProvider } from "@/lib/shared/oauth-providers";
 import { messageAt, type Leaves } from "@/lib/shared/scoped-text";
 import { visibleText } from "@/lib/shared/visible-text";
@@ -33,30 +37,43 @@ type Key = Leaves<typeof frProfile>;
 
 // ─── Verrous des champs (Discord, BattleTag) ────────────────────────────────
 
-/** `discordTagLockNotice` dans la langue du texte. */
+/** `discordTagLockNotice` dans la langue du texte (mêmes cas, même ordre). */
 export function discordTagLockText(
   text: ProfileText,
   state: { tag: string | null; verified: boolean; linked: boolean | null; pending?: boolean },
-): string {
+): DiscordTagLockNotice {
   const { t } = text;
-  if (state.pending && state.linked !== true) return t("discord.lock.pending");
-  if (state.linked !== true) return t("discord.lock.unknown");
-  if (!state.tag) return t("discord.lock.noTag");
+  if (state.pending && state.linked !== true) return { status: t("discord.lock.pending"), details: [], audience: false };
+  if (state.linked !== true) return { status: t("discord.lock.unknown"), details: [], audience: false };
+  if (!state.tag) return { status: t("discord.lock.noTag"), details: [t("discord.lock.noTagDetails")], audience: false };
   const rename = t("discord.lock.rename");
-  if (!state.verified) return t("discord.lock.unverified", { audience: t("discord.unverifiedAudience"), rename });
-  return t("discord.lock.verified", { audience: t("discord.audience"), rename });
+  if (!state.verified) {
+    return { status: t("discord.lock.unverified"), details: [t("discord.lock.unverifiedDetails"), rename], audience: true };
+  }
+  return { status: t("discord.lock.verified"), details: [rename, t("discord.lock.verifiedDetails")], audience: true };
 }
 
-/** `battletagLockNotice` dans la langue du texte. */
+/** `battletagLockNotice` dans la langue du texte (mêmes cas, même ordre). */
 export function battletagLockText(
   text: ProfileText,
   state: { tag: string | null; linked: boolean | null; pending?: boolean },
-): string {
+): BattletagLockNotice {
   const { t } = text;
-  if (state.pending && state.linked !== true) return t("battletagLock.pending");
-  if (state.linked !== true) return t("battletagLock.unknown");
+  if (state.pending && state.linked !== true) return { status: t("battletagLock.pending"), details: [] };
+  if (state.linked !== true) return { status: t("battletagLock.unknown"), details: [] };
   const change = t("battletagLock.change");
-  return state.tag ? t("battletagLock.tagged", { change }) : t("battletagLock.noTag", { change });
+  if (!state.tag) return { status: t("battletagLock.noTag"), details: [change] };
+  return { status: t("battletagLock.tagged"), details: [change, t("battletagLock.hide")] };
+}
+
+/** Qui voit un tag Discord certifié, dans la langue du texte. */
+export function discordAudienceText(text: ProfileText): IdentityAudience {
+  return discordAudienceLines(text.t);
+}
+
+/** Qui lit encore un BattleTag masqué, dans la langue du texte. */
+export function hiddenBattletagAudienceText(text: ProfileText): IdentityAudience {
+  return hiddenBattletagAudienceLines(text.t);
 }
 
 // ─── Suppression du compte ──────────────────────────────────────────────────
