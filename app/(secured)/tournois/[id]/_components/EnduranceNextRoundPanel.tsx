@@ -8,6 +8,7 @@ import {
   nextRoundSummary,
   nextRoundTitle,
 } from "../_lib/endurance-next-round";
+import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { BoardPanel, PanelPill } from "./BoardPanel";
 import { EntrantName } from "./EntrantName";
 import { useActionsText } from "../_lib/actions-text";
@@ -69,7 +70,7 @@ export function EnduranceNextRoundPanel({ preview, maxRounds, teamNames }: Reado
             <p className={styles.empty}>{nextRoundEmptyLabel(preview, text)}</p>
           ) : (
             <ul className={styles.list} aria-label={t("nextRound.listAria", { title })}>
-              {preview.matches.map((match) => (
+              {preview.matches.map((match, index) => (
                 <li
                   key={`${match.bracket}-${match.teamAId}-${match.teamBId ?? "bye"}`}
                   className={styles.item}
@@ -104,21 +105,28 @@ export function EnduranceNextRoundPanel({ preview, maxRounds, teamNames }: Reado
                       />
                     </>
                   )}
+                  {/* Pourquoi les côtés restent à confirmer : derrière le
+                      « i », un `title` échappant au toucher et au clavier. La
+                      rangée passe à la ligne : l'explication s'ouvre dessous. */}
                   {!match.sidesKnown && (
-                    <span className={styles.tag} title={sidesHint}>
-                      {t("nextRound.sidesUnknown")}
-                      {/* NOSONAR S6772 — texte réservé aux lecteurs d'écran, qui commence par « . » */}
-                      <span className="sr-only">{`. ${sidesHint}`}</span>
-                    </span>
+                    <>
+                      <span className={styles.tag}>{t("nextRound.sidesUnknown")}</span>
+                      <InfoHint id={`${panelId}-sides-${index}`} subject={t("nextRound.sidesUnknown")}>
+                        <p>{sidesHint}</p>
+                      </InfoHint>
+                    </>
                   )}
                 </li>
               ))}
             </ul>
           )}
 
-          <p className={styles.footnote}>
-            {preview.stage === "PLAYOFFS" ? t("nextRound.footnotePlayoffs") : t("nextRound.footnoteRound")}
-          </p>
+          <InfoHintRow>
+            <p className={styles.footnote}>{t("nextRound.footnoteShort")}</p>
+            <InfoHint id={`${panelId}-footnote`} subject={t("nextRound.footnoteSubject")}>
+              <p>{preview.stage === "PLAYOFFS" ? t("nextRound.footnotePlayoffs") : t("nextRound.footnoteRound")}</p>
+            </InfoHint>
+          </InfoHintRow>
         </div>
       </BoardPanel>
     </div>

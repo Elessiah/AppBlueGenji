@@ -45,6 +45,31 @@ export const HINT: CSSProperties = {
 };
 
 /**
+ * Gabarit de la carte « option » posée par le formulaire (phase de lancement,
+ * planification par l'arbitrage) : la case, puis une colonne — titre et bouton
+ * « i » sur une rangée, ligne d'état dessous. Le cadre vient de
+ * `checkboxCardChrome`.
+ */
+export const CHECKBOX_CARD_LAYOUT: CSSProperties = {
+  display: "flex",
+  alignItems: "flex-start",
+  gap: 12,
+  marginTop: 16,
+  padding: "14px 16px",
+  borderRadius: 10,
+  transition: "border-color 0.2s ease, background-color 0.2s ease",
+};
+
+/** Titre de la carte « option » : le libellé natif de sa case. */
+export const CHECKBOX_CARD_TITLE: CSSProperties = {
+  margin: 0,
+  fontSize: 14,
+  fontWeight: 500,
+  color: "var(--ink)",
+  userSelect: "none",
+};
+
+/**
  * Le chrome de la carte « option » (`.checkbox-card`), écrit **une fois**.
  *
  * Deux écrans posent cette carte pour le même réglage — le formulaire de

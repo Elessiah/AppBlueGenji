@@ -19,13 +19,13 @@
       "order": "Order",
       "removal": "Removal"
     },
-    "seedingHint": "This rank decides the first-round pairings. Use the arrows next to it to set it — until kickoff.",
+    "seedingHint": "This rank sets the first-round pairings; adjust it with the arrows, until kickoff.",
     "seedingHintWaiting": {
-      "TEAM": "This rank will decide the first-round pairings. You'll be able to set it here as soon as two teams are entered.",
-      "SOLO": "This rank will decide the first-round pairings. You'll be able to set it here as soon as two players are entered."
+      "TEAM": "This rank will set the first-round pairings; adjustable here once two teams are entered.",
+      "SOLO": "This rank will set the first-round pairings; adjustable here once two players are entered."
     },
-    "followsRanking": "Sorted by the site ranking: each new registration takes its place by rating. The order can still change before the launch if ratings change; reorder the list to lock it — your order will then take precedence.",
-    "followsFrozenDraw": "Ranks locked at kickoff from the site ranking: these are the draw's ranks, even if ratings have changed since.",
+    "followsRanking": "Sorted by the site ranking: each registration takes its place by rating, and the order follows ratings until the launch. Reorder the list to lock it: your order then takes precedence.",
+    "followsFrozenDraw": "Ranks locked at kickoff from the site ranking: the draw's ranks, even if ratings have changed since.",
     "reordered": "Order updated.",
     "newRank": "New rank for {name}: {rank} of {total}.",
     "moveUpAria": "Move {name} up one rank",
@@ -82,7 +82,9 @@
         "final": "You won't be able to cancel this registration yourself: only the tournament staff can remove an entrant."
       }
     },
-    "success": "Registration confirmed."
+    "success": "Registration confirmed.",
+    "streamNoticeShort": "Matches may be streamed live and recorded. You can object and appear under a neutral name.",
+    "streamNoticeSubject": "Match streaming"
   },
   "header": {
     "imageAria": "Tournament image",
@@ -95,10 +97,10 @@
   },
   "danger": {
     "title": "Destructive actions",
-    "rollbackHint": "Erasing {stage} reopens the previous round for correction. You can repeat it: round by round, you can go back to the start of the tournament. Note the scores first: nothing is archived.",
-    "rollbackHintFinished": "Erasing {stage} reopens the previous round for correction. You can repeat it: round by round, you can go back to the start of the tournament. Since the tournament is finished, it will be reopened and its final standings erased. Note the scores first: nothing is archived.",
+    "rollbackHint": "Erases {stage} and reopens the previous round; repeatable back to the start of the tournament. Note the scores first: nothing is archived.",
+    "rollbackHintFinished": "Erases {stage}, reopens the previous round and the finished tournament, whose final standings are erased. Note the scores first: nothing is archived.",
     "rollback": "Go back one round",
-    "deleteHint": "Deleting this tournament removes it from the site for good, with its matches, registrations and standings. Teams and players are kept.",
+    "deleteHint": "Removes the tournament from the site for good, with its matches, registrations and standings. Teams and players are kept.",
     "delete": "Delete the tournament"
   },
   "rollback": {
@@ -302,14 +304,16 @@
       "underfilled": "Fewer than two qualified entrants: the tournament will close without a final bracket.",
       "none": "No matchup is settled yet: they all depend on the remaining matches."
     },
-    "stageUncertain": "The qualifying stage may still end with the current round: these matchups will only be played if it continues.",
+    "stageUncertain": "The qualifying stage may end with this round: these matchups will only be played if it continues.",
     "thirdPlace": "Third-place match",
     "byePlayoffs": "advances (bye)",
     "byeRound": "sits out this round (odd number of entrants)",
     "versus": "vs",
     "sidesUnknown": "Sides to be confirmed",
-    "sidesHint": "The matchup is certain, but the remaining matches will decide who, ranked higher, takes the left side and hosts the game.",
-    "footnoteRound": "Matchups that are certain whatever the score of the remaining matches — barring a referee decision (withdrawal, penalty, double forfeit). The engine only sets up the round once the previous one is over.",
-    "footnotePlayoffs": "Matchups that are certain whatever the score of the remaining matches — barring a referee decision (withdrawal, penalty, double forfeit). The engine only sets up the next stage once the previous one is over."
+    "sidesHint": "The matchup is certain; the remaining matches will decide who, ranked higher, takes the left side and hosts the game.",
+    "footnoteRound": "Certain whatever the score of the remaining matches, barring a referee decision (withdrawal, penalty, double forfeit). The round is only set up once the previous one is over.",
+    "footnotePlayoffs": "Certain whatever the score of the remaining matches, barring a referee decision (withdrawal, penalty, double forfeit). The next stage is only set up once the previous one is over.",
+    "footnoteShort": "Certain matchups, barring a referee decision.",
+    "footnoteSubject": "Certain matchups"
   }
 }

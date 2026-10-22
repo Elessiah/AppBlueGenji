@@ -352,7 +352,7 @@
     "badgeAlt": "Tag Discord vérifié",
     "badgeTitle": "Tag Discord vérifié : ce joueur a prouvé qu'il possède ce compte Discord.",
     "title": "Contacts Discord",
-    "intro": "Réservé à l'arbitrage. Seuls apparaissent les tags <strong>certifiés</strong> : un joueur qui n'a pas prouvé le sien n'est pas joignable par le site.",
+    "intro": "Réservé à l'arbitrage. Seuls les tags <strong>certifiés</strong> apparaissent : un joueur sans tag certifié n'est pas joignable par le site.",
     "hide": "Masquer les contacts",
     "show": "Afficher les contacts"
   },

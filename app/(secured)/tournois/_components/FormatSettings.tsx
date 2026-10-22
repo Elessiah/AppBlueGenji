@@ -10,6 +10,8 @@ import { checkboxCardChrome, FULL_WIDTH, HINT } from "../_lib/form-styles";
 import type { TournamentFormValues } from "../_lib/tournament-form-values";
 import { NumberInput } from "@/components/ui/number-input";
 import { FieldErrorText } from "@/components/ui/field-error-text";
+import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
+import { describedBy } from "@/lib/shared/field-errors";
 import type { FieldAria } from "@/lib/shared/field-errors";
 import { earlyExitBlocker, type EarlyExitBlocker } from "@/lib/shared/bg-survie/config";
 
@@ -97,6 +99,9 @@ export function FormatSettings({
   // la case est grisée, comme « Égalités », et l'aide dit pourquoi.
   const earlyExitBlocked = earlyExitBlocker(values.enduranceMaxRounds, values.matchFormat);
   const reasonKey = earlyExitReasonKey(earlyExitBlocked, locked);
+  // L'aide derrière le « i », plus l'explication du verrou quand le champ est figé.
+  const hintAndLock = (hintId: string, field: TournamentField) =>
+    describedBy(hintId, lockedAttr(field)["aria-describedby"]);
 
   return (
     <>
@@ -157,7 +162,12 @@ export function FormatSettings({
           </div>
 
           <div className="field">
-            <label htmlFor="endurance-playoff">{t("settings.endurancePlayoff")}</label>
+            <InfoHintRow>
+              <label htmlFor="endurance-playoff">{t("settings.endurancePlayoff")}</label>
+              <InfoHint id="endurance-playoff-hint" subject={t("settings.endurancePlayoff")}>
+                <p>{t("settings.endurancePlayoffHint")}</p>
+              </InfoHint>
+            </InfoHintRow>
             <NumberInput
               id="endurance-playoff"
               min={2}
@@ -165,15 +175,17 @@ export function FormatSettings({
               disabled={locked("endurancePlayoffSize")}
               value={values.endurancePlayoffSize}
               onValueChange={(next) => set("endurancePlayoffSize", next)}
-              {...lockedAttr("endurancePlayoffSize")}
+              aria-describedby={hintAndLock("endurance-playoff-hint", "endurancePlayoffSize")}
             />
-            <p style={HINT}>
-              {t("settings.endurancePlayoffHint")}
-            </p>
           </div>
 
           <div className="field">
-            <label htmlFor="endurance-max-rounds">{t("settings.enduranceMaxRounds")}</label>
+            <InfoHintRow>
+              <label htmlFor="endurance-max-rounds">{t("settings.enduranceMaxRounds")}</label>
+              <InfoHint id="endurance-max-rounds-hint" subject={t("settings.enduranceMaxRounds")}>
+                <p>{t("settings.enduranceMaxRoundsHint")}</p>
+              </InfoHint>
+            </InfoHintRow>
             <NumberInput
               id="endurance-max-rounds"
               min={0}
@@ -181,14 +193,12 @@ export function FormatSettings({
               disabled={locked("enduranceMaxRounds")}
               value={values.enduranceMaxRounds}
               onValueChange={(next) => set("enduranceMaxRounds", next)}
-              {...lockedAttr("enduranceMaxRounds")}
+              aria-describedby={hintAndLock("endurance-max-rounds-hint", "enduranceMaxRounds")}
             />
-            <p style={HINT}>
-              {t("settings.enduranceMaxRoundsHint")}
-            </p>
           </div>
 
           <div className="field" style={FULL_WIDTH}>
+            <InfoHintRow>
             <label htmlFor={EARLY_EXIT_FIELD_ID} style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <input
                 id={EARLY_EXIT_FIELD_ID}
@@ -202,15 +212,25 @@ export function FormatSettings({
               />{/* NOSONAR S6772 — label en flex avec `gap` : l'espace est posé par la mise en page */}
               {t("settings.enduranceEarlyExit")}
             </label>
+            {/* Comme « Égalités » : grisée, l'aide ne dit que la raison, visible —
+                le fonctionnement (« dernière manche », « trait ») ne vaut pas
+                sans elle ; sinon il passe derrière le « i », même identifiant. */}
+            {reasonKey ? null : (
+              <InfoHint id={EARLY_EXIT_HINT_ID} subject={t("settings.enduranceEarlyExit")}>
+                <p>{t("settings.enduranceEarlyExitHint")}</p>
+              </InfoHint>
+            )}
+            </InfoHintRow>
             <FieldErrorText fieldId={EARLY_EXIT_FIELD_ID} message={earlyExitError} />
-            <p id={EARLY_EXIT_HINT_ID} style={HINT}>
-              {/* Comme « Égalités » : grisée, l'aide ne dit que la raison — le
-                  fonctionnement (« dernière manche », « trait ») ne vaut pas sans elle. */}
-              {reasonKey ? t(reasonKey) : t("settings.enduranceEarlyExitHint")}
-            </p>
+            {reasonKey ? (
+              <p id={EARLY_EXIT_HINT_ID} style={HINT}>
+                {t(reasonKey)}
+              </p>
+            ) : null}
           </div>
 
           <div className="field" style={FULL_WIDTH}>
+            <InfoHintRow>
             <label htmlFor="endurance-draws" style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <input
                 id="endurance-draws"
@@ -230,17 +250,32 @@ export function FormatSettings({
                     ...(e.target.checked ? {} : { maxMaps: null }),
                   });
                 }}
-                {...lockedAttr("matchFormat")}
+                aria-describedby={hintAndLock("endurance-draws-hint", "matchFormat")}
               />{/* NOSONAR S6772 — label en flex avec `gap` : l'espace est posé par la mise en page */}
               {t("settings.draws")}
             </label>
-            <p style={HINT}>
-              {values.matchFormat === null ? t("settings.drawsUnavailable") : t("settings.drawsHint")}
-            </p>
+            {/* Indisponible, la raison reste visible ; sinon le fonctionnement
+                passe derrière le « i », même identifiant. */}
+            {values.matchFormat === null ? null : (
+              <InfoHint id="endurance-draws-hint" subject={t("settings.draws")}>
+                <p>{t("settings.drawsHint")}</p>
+              </InfoHint>
+            )}
+            </InfoHintRow>
+            {values.matchFormat === null ? (
+              <p id="endurance-draws-hint" style={HINT}>
+                {t("settings.drawsUnavailable")}
+              </p>
+            ) : null}
           </div>
 
           <div className="field">
-            <label htmlFor="endurance-playoff-format-type">{t("settings.playoffFormat")}</label>
+            <InfoHintRow>
+              <label htmlFor="endurance-playoff-format-type">{t("settings.playoffFormat")}</label>
+              <InfoHint id="endurance-playoff-format-hint" subject={t("settings.playoffFormat")}>
+                <p>{t("settings.playoffFormatHint")}</p>
+              </InfoHint>
+            </InfoHintRow>
             <select
               id="endurance-playoff-format-type"
               disabled={locked("endurancePlayoffFormat")}
@@ -258,15 +293,12 @@ export function FormatSettings({
                 if (type === "BO" && value % 2 === 0) value -= 1;
                 set("endurancePlayoffFormat", { type, value });
               }}
-              {...lockedAttr("endurancePlayoffFormat")}
+              aria-describedby={hintAndLock("endurance-playoff-format-hint", "endurancePlayoffFormat")}
             >
               <option value="MEME">{t("settings.playoffFormats.MEME")}</option>
               <option value="BO">{t("settings.playoffFormats.BO")}</option>
               <option value="FT">{t("settings.playoffFormats.FT")}</option>
             </select>
-            <p style={HINT}>
-              {t("settings.playoffFormatHint")}
-            </p>
           </div>
 
           {values.endurancePlayoffFormat && (
@@ -337,10 +369,6 @@ export function FormatSettings({
               {t("settings.survivalRoundsHint")}
             </p>
           </div>
-
-          <p style={{ ...HINT, ...FULL_WIDTH }}>
-            {t("settings.survivalExplain")}
-          </p>
         </>
       )}
 
@@ -398,10 +426,6 @@ export function FormatSettings({
               {t("settings.swissByeHint")}
             </p>
           </div>
-
-          <p style={{ ...HINT, ...FULL_WIDTH }}>
-            {t("settings.swissExplain", { rounds: values.swissTotalRounds })}
-          </p>
         </>
       )}
 

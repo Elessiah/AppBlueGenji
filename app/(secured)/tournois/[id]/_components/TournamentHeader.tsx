@@ -8,6 +8,7 @@ import { tournamentLabel } from "@/lib/shared/tournaments-text";
 import type { Locale } from "@/lib/shared/locales";
 import { INTL_LOCALE } from "@/lib/shared/locales";
 import { CyberButton, Pill } from "@/components/cyber";
+import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { TournamentImageBanner, TournamentImageEmblem } from "@/components/tournament-image";
 import { useSpectatorView } from "@/components/spectator-view";
 import type { RefreshTier } from "@/lib/shared/refresh-tiers";
@@ -163,12 +164,14 @@ export function TournamentHeader({
             {/* Dit pourquoi aucun bouton n'apparaît, sans en ajouter un vers la
                 connexion : la page sans compte est faite pour regarder. */}
             {spectator && (
-              // L'explication aussi hors écran : `title` seul échappe au toucher,
-              // au clavier et aux lecteurs d'écran (comme `MetaCell`).
-              <Pill variant="neutral" title={t("header.spectatorTitle")}>
-                {t("header.spectator")}
-                <span className="sr-only"> — {t("header.spectatorTitle")}</span>
-              </Pill>
+              // L'explication derrière le « i » : un `title` échappe au toucher
+              // et au clavier (`docs/features/INFO_HINTS.md`).
+              <InfoHintRow>
+                <Pill variant="neutral">{t("header.spectator")}</Pill>
+                <InfoHint id="tournament-spectator-hint" subject={t("header.spectator")}>
+                  <p>{t("header.spectatorTitle")}</p>
+                </InfoHint>
+              </InfoHintRow>
             )}
           </div>
         </div>
@@ -247,11 +250,21 @@ export function TournamentHeader({
           {/* Information sur la retransmission, à l'endroit où l'on s'engage —
               sans case à cocher : la base est l'intérêt légitime, le joueur
               garde son droit d'opposition (`lib/shared/stream-notice.ts`). */}
+          {/* Information en couches : une ligne visible dit l'essentiel et le
+              droit d'opposition, le « i » porte la mention entière — que la
+              confirmation de l'inscription relit de toute façon. */}
           {detail.canRegister && !frozen && (
-            <p className={s.registerNotice}>
-              {a(`register.streamNotice.${entrantType}`)}{" "}
-              <LocaleLink href={STREAM_NOTICE_PRIVACY_PATH}>{a("register.streamNoticeLink")}</LocaleLink>
-            </p>
+            <div className={s.registerNotice}>
+              <InfoHintRow>
+                <p>{a("register.streamNoticeShort")}</p>
+                <InfoHint id="register-stream-notice" subject={a("register.streamNoticeSubject")}>
+                  <p>
+                    {a(`register.streamNotice.${entrantType}`)}{" "}
+                    <LocaleLink href={STREAM_NOTICE_PRIVACY_PATH}>{a("register.streamNoticeLink")}</LocaleLink>
+                  </p>
+                </InfoHint>
+              </InfoHintRow>
+            </div>
           )}
           {/* À la place du bouton, et non à côté : le lecteur cherche là où
               l'action devrait être. */}
@@ -315,16 +328,14 @@ function MetaCell({ item, locale }: Readonly<{ item: HeaderMetaItem; locale: Loc
       <dt className={s.metaLabel}>{item.label}</dt>
       <dd className={`${s.metaValue} ${isNumeric ? s.metaValueNum : ""}`} style={{ margin: 0 }}>
         {item.hint ? (
-          // `title` seul se perd pour les lecteurs d'écran : l'explication est
-          // donc aussi écrite dans le texte, hors écran. Pas d'`aria-label` —
-          // interdit sur un `<span>` sans rôle (`aria-prohibited-attr`), et
-          // ignoré de certains lecteurs —, ni de `tabIndex` : un repère
-          // focusable qui ne fait rien est un arrêt de tabulation pour rien, et
-          // l'infobulle n'apparaît de toute façon pas au focus clavier.
-          <span className={s.metaHint} title={item.hint}>
-            {text}
-            <span className="sr-only"> — {item.hint}</span>
-          </span>
+          // L'explication derrière le « i » : un `title` échappait au toucher
+          // et au clavier (`docs/features/INFO_HINTS.md`).
+          <InfoHintRow>
+            <span>{text}</span>
+            <InfoHint id={`tournament-meta-${item.key}-hint`} subject={item.label}>
+              <p>{item.hint}</p>
+            </InfoHint>
+          </InfoHintRow>
         ) : (
           text
         )}

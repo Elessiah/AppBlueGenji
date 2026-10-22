@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useToast } from "@/components/ui/toast";
+import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { canToggleRefereeScheduling, matchesToPlan } from "@/lib/shared/match-planning";
 import type { BracketMatch, TournamentDetail } from "@/lib/shared/types";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
@@ -111,13 +112,20 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: Readonly<MatchPla
       aria-labelledby="match-planning-title"
     >
       <div className={styles.text}>
-        <h2 id="match-planning-title" className={styles.title}>
-          <span aria-hidden="true">🗓 </span>
-          {enabled ? text.t("planning.titleOn") : text.t("planning.titleOff")}
-        </h2>
-        <p className={styles.description}>
-          {enabled ? text.t("planning.descriptionOn") : text.t("planning.descriptionOff")}
-        </p>
+        {/* Allumée, le parcours d'un match passe derrière le « i » ; éteinte,
+            la phrase courte reste visible (INFO_HINTS.md). */}
+        <InfoHintRow>
+          <h2 id="match-planning-title" className={styles.title}>
+            <span aria-hidden="true">🗓 </span>
+            {enabled ? text.t("planning.titleOn") : text.t("planning.titleOff")}
+          </h2>
+          {enabled && (
+            <InfoHint id="match-planning-more" subject={text.t("planning.titleOn")}>
+              <p>{text.t("planning.descriptionOn")}</p>
+            </InfoHint>
+          )}
+        </InfoHintRow>
+        {!enabled && <p className={styles.description}>{text.t("planning.descriptionOff")}</p>}
         {/* Le décompte n'intéresse que ceux qui peuvent le résorber. Pas de
             région live : il change à chaque instantané du flux. */}
         {showCount && pending.length > 0 && (

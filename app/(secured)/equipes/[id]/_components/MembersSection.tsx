@@ -8,6 +8,7 @@ import type { TeamMember, TeamRole, TeamSentInvitation } from "@/lib/shared/type
 import { DEFAULT_INVITE_ROLES, sortTeamMembers } from "@/lib/shared/team-role-display";
 import { useToast } from "@/components/ui/toast";
 import { FieldErrorText } from "@/components/ui/field-error-text";
+import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { PLAYER_PSEUDO_FIELD_ERRORS } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { useTeamErrorMessage } from "@/components/i18n/team-errors-text";
@@ -205,7 +206,14 @@ export function MembersSection({
             </h3>
             <div className={styles.inviteGrid}>
               <div className="field">
-                <label htmlFor="team-invite-pseudo">{t("members.pseudo")}</label>
+                {/* Qui est proposé et quand le joueur rejoint : derrière le « i »,
+                    toujours cité par le champ (INFO_HINTS.md). */}
+                <InfoHintRow>
+                  <label htmlFor="team-invite-pseudo">{t("members.pseudo")}</label>
+                  <InfoHint id="team-invite-help" subject={t("members.pseudo")}>
+                    <p>{t("members.inviteHelp")}</p>
+                  </InfoHint>
+                </InfoHintRow>
                 <PlayerPseudoCombobox
                   id={INVITE_FIELD_IDS.pseudo}
                   value={memberPseudo}
@@ -218,9 +226,6 @@ export function MembersSection({
                   excludeUserIds={invitations.map((inv) => inv.userId)}
                 />
                 <FieldErrorText fieldId={INVITE_FIELD_IDS.pseudo} message={fieldErrors.message("pseudo")} />
-                <p id="team-invite-help" className={styles.help}>
-                  {t("members.inviteHelp")}
-                </p>
               </div>
               <RolePicker selected={memberRoles} onChange={setMemberRoles} />
             </div>

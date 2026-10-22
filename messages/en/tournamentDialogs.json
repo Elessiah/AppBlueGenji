@@ -352,7 +352,7 @@
     "badgeAlt": "Verified Discord tag",
     "badgeTitle": "Verified Discord tag: this player has proven they own this Discord account.",
     "title": "Discord contacts",
-    "intro": "Referees only. Only <strong>verified</strong> tags appear: a player who hasn't proven theirs can't be reached through the site.",
+    "intro": "Referees only. Only <strong>verified</strong> tags appear: a player without a verified tag can't be reached through the site.",
     "hide": "Hide the contacts",
     "show": "Show the contacts"
   },

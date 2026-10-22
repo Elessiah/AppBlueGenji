@@ -140,9 +140,8 @@ export function ReportDetail({
               </button>
             </div>
             <p className={styles.muted}>
-              Archivé, le signalement est effacé {REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours plus tard — ou plus tard,
-              s&apos;il tient une image (logo ou avatar) masquée ou supprimée dont la personne concernée peut encore
-              contester la décision.
+              Archivé, le signalement est effacé {REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours plus tard — davantage
+              s&apos;il tient une image (logo, avatar) masquée ou supprimée encore contestable.
             </p>
           </div>
         )}

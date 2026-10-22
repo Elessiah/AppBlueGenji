@@ -1,7 +1,8 @@
 "use client";
 
 import type { TournamentFormText } from "@/lib/shared/tournament-actions-text";
-import { checkboxCardChrome, HINT } from "../_lib/form-styles";
+import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
+import { CHECKBOX_CARD_LAYOUT, CHECKBOX_CARD_TITLE, checkboxCardChrome, HINT } from "../_lib/form-styles";
 import { useFormText } from "../_lib/form-text";
 
 /** Précision sous la description, selon l'écran. */
@@ -18,8 +19,10 @@ function scopeHint(text: TournamentFormText, mode: "create" | "edit", editable: 
  * l'enregistre par sa route dédiée, pas par `PATCH .../edit`). D'où un
  * `editable` propre plutôt que la liste des champs de la fenêtre.
  *
- * La carte entière est le libellé natif de la case : un clic n'importe où la
- * coche, au clavier comme à la souris, sans `<div>` cliquable.
+ * La carte porte la case, son titre (libellé natif) et le bouton « i » du
+ * parcours d'un match (`docs/features/INFO_HINTS.md`) — un bouton ne se pose
+ * pas dans un `<label>`. La ligne visible dit jusqu'à quand l'option se
+ * modifie ; l'avertissement d'un tournoi en cours reste visible.
  */
 export function RefereeSchedulingField({
   mode,
@@ -43,55 +46,39 @@ export function RefereeSchedulingField({
   const { t } = text;
   return (
     <>
-      <label
-        className="checkbox-card"
-        htmlFor="referee-scheduling"
-        style={{
-          display: "flex",
-          alignItems: "flex-start",
-          gap: 12,
-          marginTop: 16,
-          padding: "14px 16px",
-          ...checkboxCardChrome(checked, !editable),
-          borderRadius: 10,
-          cursor: editable ? "pointer" : "default",
-          transition: "border-color 0.2s ease, background-color 0.2s ease",
-        }}
-      >
+      <div className="checkbox-card" style={{ ...CHECKBOX_CARD_LAYOUT, ...checkboxCardChrome(checked, !editable) }}>
         <input
           id="referee-scheduling"
           type="checkbox"
           checked={checked}
           disabled={!editable}
           onChange={(e) => onChange(e.target.checked)}
-          // Nom court (le titre) et description à part : la carte-libellé
-          // porte les deux textes, qui formeraient sinon un seul nom.
           aria-labelledby="referee-scheduling-label"
           aria-describedby={
             warnUndoesLaunches
-              ? "referee-scheduling-hint referee-scheduling-warning"
-              : "referee-scheduling-hint"
+              ? "referee-scheduling-more referee-scheduling-hint referee-scheduling-warning"
+              : "referee-scheduling-more referee-scheduling-hint"
           }
           style={{ marginTop: 2 }}
         />
-        <span style={{ flex: 1 }}>
-          <span
-            id="referee-scheduling-label"
-            style={{
-              display: "block",
-              margin: "0 0 4px",
-              fontSize: 14,
-              fontWeight: 500,
-              color: "var(--ink)",
-            }}
-          >
-            {t("form.referee.label")}
-          </span>
-          <span id="referee-scheduling-hint" style={{ ...HINT, display: "block", margin: 0 }}>
-            {t("form.referee.description")} {scopeHint(text, mode, editable)}
-          </span>
-        </span>
-      </label>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <InfoHintRow>
+            <label
+              id="referee-scheduling-label"
+              htmlFor="referee-scheduling"
+              style={{ ...CHECKBOX_CARD_TITLE, cursor: editable ? "pointer" : "default" }}
+            >
+              {t("form.referee.label")}
+            </label>
+            <InfoHint id="referee-scheduling-more" subject={t("form.referee.label")}>
+              <p>{t("form.referee.description")}</p>
+            </InfoHint>
+          </InfoHintRow>
+          <p id="referee-scheduling-hint" style={{ ...HINT, margin: "4px 0 0" }}>
+            {scopeHint(text, mode, editable)}
+          </p>
+        </div>
+      </div>
       {warnUndoesLaunches && (
         // `<output>` : région d'état native, lue quand elle apparaît au clic.
         <output

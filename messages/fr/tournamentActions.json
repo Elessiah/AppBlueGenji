@@ -19,13 +19,13 @@
       "order": "Ordre",
       "removal": "Retrait"
     },
-    "seedingHint": "Ce rang décide des appariements de la première manche. Utilisez les flèches ci-contre pour le régler — jusqu'au coup d'envoi.",
+    "seedingHint": "Ce rang fait les appariements de la première manche ; règle-le par les flèches, jusqu'au coup d'envoi.",
     "seedingHintWaiting": {
-      "TEAM": "Ce rang décidera des appariements de la première manche. Il se règlera ici dès qu'il y aura deux équipes engagées.",
-      "SOLO": "Ce rang décidera des appariements de la première manche. Il se règlera ici dès qu'il y aura deux joueurs engagés."
+      "TEAM": "Ce rang fera les appariements de la première manche ; réglable ici dès deux équipes engagées.",
+      "SOLO": "Ce rang fera les appariements de la première manche ; réglable ici dès deux joueurs engagés."
     },
-    "followsRanking": "Rangées selon le classement du site : chaque nouvelle inscription prend sa place de cote. L'ordre peut encore bouger d'ici le lancement si des cotes changent ; réordonnez la liste pour le figer — votre ordre fera alors autorité.",
-    "followsFrozenDraw": "Rangs figés au coup d'envoi selon le classement du site : ce sont ceux du tirage, même si les cotes ont bougé depuis.",
+    "followsRanking": "Rangées selon le classement du site : chaque inscription prend sa place selon sa cote, et l'ordre suit les cotes jusqu'au lancement. Réordonne la liste pour le figer : ton ordre fera foi.",
+    "followsFrozenDraw": "Rangs figés au coup d'envoi selon le classement du site : ceux du tirage, même si les cotes ont bougé depuis.",
     "reordered": "Ordre mis à jour.",
     "newRank": "Nouveau rang de {name} : {rank} sur {total}.",
     "moveUpAria": "Monter {name} d'un rang",
@@ -82,7 +82,9 @@
         "final": "Tu ne pourras pas annuler toi-même cette inscription : seul le staff du tournoi peut retirer un engagé."
       }
     },
-    "success": "Inscription validée."
+    "success": "Inscription validée.",
+    "streamNoticeShort": "Les matchs peuvent être diffusés en direct et enregistrés. Tu peux t'y opposer et apparaître sous un nom neutre.",
+    "streamNoticeSubject": "Retransmission des matchs"
   },
   "header": {
     "imageAria": "Image du tournoi",
@@ -95,10 +97,10 @@
   },
   "danger": {
     "title": "Zone de danger",
-    "rollbackHint": "Effacer {stage} rouvre la manche précédente à la correction. Le geste se répète : de manche en manche, on remonte jusqu'au début du tournoi. Pense à noter les scores avant : rien n'est archivé.",
-    "rollbackHintFinished": "Effacer {stage} rouvre la manche précédente à la correction. Le geste se répète : de manche en manche, on remonte jusqu'au début du tournoi. Le tournoi étant terminé, il sera rouvert et son classement final effacé. Pense à noter les scores avant : rien n'est archivé.",
+    "rollbackHint": "Efface {stage} et rouvre la manche précédente ; le geste se répète jusqu'au début du tournoi. Note les scores avant : rien n'est archivé.",
+    "rollbackHintFinished": "Efface {stage}, rouvre la manche précédente et le tournoi terminé, dont le classement final est effacé. Note les scores avant : rien n'est archivé.",
     "rollback": "Revenir en arrière d'une manche",
-    "deleteHint": "Supprimer ce tournoi l'efface du site pour de bon, avec ses matchs, ses inscriptions et ses classements. Les équipes et les joueurs, eux, sont conservés.",
+    "deleteHint": "Efface le tournoi du site pour de bon, avec ses matchs, ses inscriptions et ses classements. Les équipes et les joueurs sont conservés.",
     "delete": "Supprimer le tournoi"
   },
   "rollback": {
@@ -302,14 +304,16 @@
       "underfilled": "Moins de deux qualifiées : le tournoi se clôturera sans arbre final.",
       "none": "Aucune rencontre n'est encore acquise : toutes dépendent des matchs restants."
     },
-    "stageUncertain": "La phase qualificative peut encore s'achever sur la manche en cours : ces rencontres ne se joueront que si elle continue.",
+    "stageUncertain": "La phase qualificative peut s'achever sur cette manche : ces rencontres ne se joueront que si elle continue.",
     "thirdPlace": "Petite finale",
     "byePlayoffs": "passe le tour (exemption)",
     "byeRound": "ne joue pas cette manche (effectif impair)",
     "versus": "contre",
     "sidesUnknown": "Côtés à confirmer",
-    "sidesHint": "L'affiche est sûre, mais les matchs restants décideront qui, mieux classé, part à gauche et accueille la partie.",
-    "footnoteRound": "Rencontres sûres quel que soit le score des matchs restants — hors décision d'arbitrage (abandon, pénalité, double forfait). Le moteur ne pose la manche qu'une fois la précédente terminée.",
-    "footnotePlayoffs": "Rencontres sûres quel que soit le score des matchs restants — hors décision d'arbitrage (abandon, pénalité, double forfait). Le moteur ne pose la suite qu'une fois la précédente terminée."
+    "sidesHint": "L'affiche est sûre ; les matchs restants décideront qui, mieux classé, part à gauche et accueille la partie.",
+    "footnoteRound": "Sûres quel que soit le score des matchs restants, hors décision d'arbitrage (abandon, pénalité, double forfait). La manche n'est posée qu'une fois la précédente terminée.",
+    "footnotePlayoffs": "Sûres quel que soit le score des matchs restants, hors décision d'arbitrage (abandon, pénalité, double forfait). La suite n'est posée qu'une fois la précédente terminée.",
+    "footnoteShort": "Rencontres sûres, hors décision d'arbitrage.",
+    "footnoteSubject": "Rencontres sûres"
   }
 }

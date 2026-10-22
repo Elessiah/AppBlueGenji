@@ -27,12 +27,12 @@ import {
 import type { TournamentField } from "@/lib/shared/tournament-edit";
 import { useToast } from "@/components/ui/toast";
 import { CyberCard, CyberButton } from "@/components/cyber";
-import { conditionsText, formatHintText, invalidFormatText, phaseIssueText, useFormText } from "../_lib/form-text";
+import { conditionsText, formatExplainText, formatHintText, invalidFormatText, phaseIssueText, useFormText } from "../_lib/form-text";
 import { useErrorsText } from "../[id]/_lib/error-map";
 import { EARLY_EXIT_FIELD_ID, EARLY_EXIT_HINT_ID, FormatSettings } from "./FormatSettings";
 import { TournamentImagePicker } from "./TournamentImagePicker";
 import { RefereeSchedulingField } from "./RefereeSchedulingField";
-import { LAUNCH_PHASE_FIELD_ID, LAUNCH_PHASE_HINT_ID, LaunchPhaseField } from "./LaunchPhaseField";
+import { LAUNCH_PHASE_FIELD_ID, LAUNCH_PHASE_HINT_ID, LAUNCH_PHASE_MORE_ID, LaunchPhaseField } from "./LaunchPhaseField";
 import { initialImagePickerValue, type ImagePickerValue } from "../_lib/image-picker";
 import {
   sectionEyebrow,
@@ -57,6 +57,10 @@ import {
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { NumberInput } from "@/components/ui/number-input";
+import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
+
+/** Fonctionnement du format choisi, derrière le « i » du libellé « Format ». */
+const FORMAT_EXPLAIN_ID = "tournament-format-explain";
 
 /** Contrôles que peut désigner un refus de l'envoi. */
 const FIELD_IDS: Readonly<Record<TournamentFormField, string>> = {
@@ -191,6 +195,7 @@ export function TournamentForm({
       });
   const matchFormatValid = isLibre || isValidMatchFormat(matchFormatType, matchFormatValue);
   const formatHint = formatHintText(text, matchFormatType, matchFormatValid, matchFormat);
+  const formatExplain = formatExplainText(text, format, values.swissTotalRounds);
 
   /**
    * Modifie le format de match **sans perdre ses réglages voisins**.
@@ -341,9 +346,22 @@ export function TournamentForm({
           </p>
           <div className="form-grid" style={GRID}>
             <div className="field">
-              <label htmlFor="tournament-format">{t("form.bracketFormat")}</label>
+              {/* Le fonctionnement des formats qui ne se devinent pas (Survie,
+                  ronde suisse), derrière le « i » du libellé (INFO_HINTS.md). */}
+              <InfoHintRow>
+                <label htmlFor="tournament-format">{t("form.bracketFormat")}</label>
+                {formatExplain !== null && (
+                  <InfoHint id={FORMAT_EXPLAIN_ID} subject={t("form.bracketFormat")}>
+                    <p>{formatExplain}</p>
+                  </InfoHint>
+                )}
+              </InfoHintRow>
               <select
                 id="tournament-format"
+                aria-describedby={describedBy(
+                  formatExplain !== null && FORMAT_EXPLAIN_ID,
+                  locked("format") && explanationId,
+                )}
                 disabled={locked("format")}
                 value={format}
                 onChange={(e) =>
@@ -353,7 +371,6 @@ export function TournamentForm({
                     hasThirdPlaceMatch: false,
                   }))
                 }
-                {...lockedAttr("format")}
               >
                 {(["SINGLE", "DOUBLE", "SWISS", "SURVIVAL", "BG_SURVIE", "MULTI"] as const).map((value) => (
                   <option key={value} value={value}>
@@ -511,12 +528,16 @@ export function TournamentForm({
         </section>
 
         <section style={SECTION_SEPARATOR}>
-          <p className="eyebrow" style={sectionEyebrow("registration")}>
-            {t("form.sections.registration")}
-          </p>
-          <p style={{ ...HINT, margin: "0 0 14px" }}>
-            {richNodes(text.rich("form.registrationIntro", {}, { strong }))}
-          </p>
+          <div style={{ marginBottom: 14 }}>
+            <InfoHintRow>
+              <p className="eyebrow" style={{ ...sectionEyebrow("registration"), margin: 0 }}>
+                {t("form.sections.registration")}
+              </p>
+              <InfoHint id="registration-intro" subject={t("form.sections.registration")}>
+                <p>{richNodes(text.rich("form.registrationIntro", {}, { strong }))}</p>
+              </InfoHint>
+            </InfoHintRow>
+          </div>
           {/*
             La phrase que liront les engagés, telle quelle : c'est la même
             fonction qui l'écrit sur la fiche du tournoi
@@ -533,7 +554,12 @@ export function TournamentForm({
           </p>
           <div className="form-grid" style={GRID}>
             <div className="field">
-              <label htmlFor="registration-discord">{t("form.discord")}</label>
+              <InfoHintRow>
+                <label htmlFor="registration-discord">{t("form.discord")}</label>
+                <InfoHint id="registration-discord-hint" subject={t("form.discord")}>
+                  <p>{richNodes(text.rich(`form.discordHint.${entrantType}`, {}, { em }))}</p>
+                </InfoHint>
+              </InfoHintRow>
               <select
                 id="registration-discord"
                 disabled={locked("registrationDiscordRequirement")}
@@ -541,8 +567,10 @@ export function TournamentForm({
                 onChange={(e) =>
                   set("registrationDiscordRequirement", e.target.value as PlayerRequirement)
                 }
-                aria-describedby="registration-discord-hint"
-                {...lockedAttr("registrationDiscordRequirement")}
+                aria-describedby={describedBy(
+                  "registration-discord-hint",
+                  locked("registrationDiscordRequirement") && explanationId,
+                )}
               >
                 {PLAYER_REQUIREMENTS.map((value) => (
                   <option key={value} value={value}>
@@ -550,13 +578,15 @@ export function TournamentForm({
                   </option>
                 ))}
               </select>
-              <p id="registration-discord-hint" style={HINT}>
-                {richNodes(text.rich(`form.discordHint.${entrantType}`, {}, { em }))}
-              </p>
             </div>
 
             <div className="field">
-              <label htmlFor="registration-blizzard">{t("form.blizzard")}</label>
+              <InfoHintRow>
+                <label htmlFor="registration-blizzard">{t("form.blizzard")}</label>
+                <InfoHint id="registration-blizzard-hint" subject={t("form.blizzard")}>
+                  <p>{richNodes(text.rich(`form.blizzardHint.${entrantType}`, {}, { em }))}</p>
+                </InfoHint>
+              </InfoHintRow>
               <select
                 id="registration-blizzard"
                 disabled={locked("registrationBlizzardRequirement")}
@@ -564,8 +594,11 @@ export function TournamentForm({
                 onChange={(e) =>
                   set("registrationBlizzardRequirement", e.target.value as PlayerRequirement)
                 }
-                aria-describedby="registration-blizzard-hint"
-                {...lockedAttr("registrationBlizzardRequirement")}
+                aria-describedby={describedBy(
+                  "registration-blizzard-hint",
+                  values.game === "MR" && "registration-blizzard-marvel",
+                  locked("registrationBlizzardRequirement") && explanationId,
+                )}
               >
                 {PLAYER_REQUIREMENTS.map((value) => (
                   <option key={value} value={value}>
@@ -573,10 +606,12 @@ export function TournamentForm({
                   </option>
                 ))}
               </select>
-              <p id="registration-blizzard-hint" style={HINT}>
-                {richNodes(text.rich(`form.blizzardHint.${entrantType}`, {}, { em }))}
-                {values.game === "MR" ? ` ${t("form.blizzardMarvel")}` : ""}
-              </p>
+              {/* Conseil propre à Marvel Rivals : visible, il dit quoi choisir. */}
+              {values.game === "MR" && (
+                <p id="registration-blizzard-marvel" style={HINT}>
+                  {t("form.blizzardMarvel")}
+                </p>
+              )}
             </div>
 
             {/*
@@ -676,7 +711,7 @@ export function TournamentForm({
           <LaunchPhaseField
             checked={values.launchPhase}
             locked={locked("launchPhase")}
-            aria={fieldAttrs("launchPhase", LAUNCH_PHASE_HINT_ID)}
+            aria={fieldAttrs("launchPhase", LAUNCH_PHASE_MORE_ID, LAUNCH_PHASE_HINT_ID)}
             error={fieldErrors.message("launchPhase")}
             onChange={(checked) => set("launchPhase", checked)}
           />

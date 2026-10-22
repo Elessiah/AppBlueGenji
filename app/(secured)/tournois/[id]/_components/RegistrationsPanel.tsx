@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatLocalDateTime } from "@/lib/shared/dates";
 import { Pill } from "@/components/cyber";
+import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import {
   moveInOrder,
   registrationsFollowFrozenDraw,
@@ -26,6 +27,7 @@ import {
   hiddenRegistrationCount,
   mustExpandToShow,
   registrationActionsColumn,
+  registrationsRankingHintKey,
   removalNotice,
   visibleRegistrationCount,
 } from "../_lib/registrations-list";
@@ -262,6 +264,9 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
     ? a("registrations.seedingHint")
     : a(`registrations.seedingHintWaiting.${toParticipantType(detail.card.participantType)}`);
 
+  // Pourquoi l'ordre est celui-là, quand il suit le classement du site.
+  const rankingHint = registrationsRankingHintKey(followsRanking, followsFrozenDraw, rows.length);
+
   const hiddenCount = hiddenRegistrationCount(rows.length);
   const visibleRows = rows.slice(0, visibleRegistrationCount(rows.length, expanded));
 
@@ -274,20 +279,25 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
 
       {staff && (
         <>
-          <p className={styles.hint}>
-            {lockReason !== null ? a(LOCK_KEYS[lockReason]) : seedingHint}
-          </p>
+          {/* La ligne d'état reste visible ; pourquoi la liste suit le
+              classement du site passe derrière le « i » (INFO_HINTS.md). */}
+          <div className={styles.hintRow}>
+            <InfoHintRow>
+              <p className={styles.hint}>
+                {lockReason !== null ? a(LOCK_KEYS[lockReason]) : seedingHint}
+              </p>
+              {rankingHint !== null && (
+                <InfoHint id="registrations-seeding-more" subject={a(`registrations.seedingSource.${source}`)}>
+                  <p>{a(rankingHint)}</p>
+                </InfoHint>
+              )}
+            </InfoHintRow>
+          </div>
           {removalNoticeReason !== null && rows.length > 0 && (
             /* Le bouton « Retirer » a disparu, et rien sur la ligne ne dit
                pourquoi : la phrase est celle-là même que le serveur renverrait
                sur une écriture tardive (code du module pur). */
             <p className={styles.hint}>{mapError(removalNoticeReason)}</p>
-          )}
-          {followsRanking && rows.length > 0 && (
-            <p className={styles.hint}>{a("registrations.followsRanking")}</p>
-          )}
-          {followsFrozenDraw && rows.length > 0 && (
-            <p className={styles.hint}>{a("registrations.followsFrozenDraw")}</p>
           )}
         </>
       )}

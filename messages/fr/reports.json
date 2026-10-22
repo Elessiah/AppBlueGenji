@@ -164,7 +164,7 @@
     "notFoundBody": "Ce signalement n'existe pas, a été effacé, ou ne te concerne pas : seuls les joueurs visés et les membres des équipes visées peuvent le consulter.",
     "eyebrow": "SIGNALEMENT N° {id}",
     "heading": "Un signalement te concerne",
-    "lead": "L'association Bluegenji Esport examine ce signalement. Si tu le crois infondé — tu détiens les droits sur le logo, le contenu est le tien, le contexte est différent —, conteste-le : ta réponse est lue par les administrateurs avant toute décision définitive.",
+    "lead": "L'association examine ce signalement. Infondé selon toi ? Conteste-le : les admins lisent ta réponse avant toute décision définitive.",
     "logoHidden": "<strong>Le logo de « <team>{name}</team> » est masqué</strong> depuis le {since}. Sans contestation de votre part, il sera <strong>supprimé définitivement le {purge}</strong>. Si la contestation aboutit, il est rétabli tel quel.",
     "avatarHidden": "<strong>Ton avatar est masqué</strong> depuis le {since}. Sans contestation de ta part, il sera <strong>supprimé définitivement le {purge}</strong>. Si la contestation aboutit, il est rétabli tel quel.",
     "logoRemoved": "<strong>Le logo de « <team>{name}</team> » a été supprimé</strong> le {date} à la suite de ce signalement. Si vous en détenez les droits, contestez-le : si la contestation aboutit, vous pourrez l'envoyer de nouveau.",
@@ -181,6 +181,7 @@
     "addContest": "Ajouter une contestation",
     "contest": "Contester ce signalement",
     "howItWorks": "Comment se passe un signalement ?",
-    "archived": "Ce signalement est archivé : le contester le rouvre, et l'association en est prévenue."
+    "archived": "Ce signalement est archivé : le contester le rouvre, et l'association en est prévenue.",
+    "leadMore": "Par exemple : tu détiens les droits sur le logo, le contenu est le tien, ou le contexte est différent."
   }
 }

@@ -3,12 +3,12 @@
     "cropTitle": "Crop the tournament image",
     "drop": "Drop the image here",
     "add": "Add an illustration or a logo",
-    "hint": "Optional · PNG, JPEG or WebP, 5 MB max · any size accepted, you choose the area to keep",
+    "hint": "Optional · PNG, JPEG or WebP, 5 MB max · you then choose the area to keep",
     "kind": "Image type",
     "fits": {
       "COVER": {
         "label": "Illustration",
-        "hint": "Fills the tournament banner. Click the preview to choose the point that must stay visible."
+        "hint": "Fills the tournament banner; click the preview to choose the point that stays visible."
       },
       "CONTAIN": {
         "label": "Logo",
@@ -22,7 +22,7 @@
     "preview": "Preview",
     "previewBanner": "Tournament page banner",
     "previewCard": "List card",
-    "logoHint": "The logo is shown in full next to the tournament name, on its page as on the cards. A transparent background works best.",
+    "logoHint": "This is how the logo appears, in full, on the tournament page and on the cards.",
     "replace": "Replace the image",
     "recrop": "Crop again",
     "remove": "Remove the image"

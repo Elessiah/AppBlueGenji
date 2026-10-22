@@ -63,7 +63,7 @@
     "admin": "⚙ Admin",
     "adminTitle": "You have organizer rights on this tournament.",
     "spectator": "Spectator",
-    "spectatorTitle": "You are following this tournament without an account: the page is read-only and updates itself, more or less often depending on traffic on the site.",
+    "spectatorTitle": "You're following this tournament without an account: the page is read-only and updates itself, more or less often depending on traffic.",
     "officialChannel": "Official channel",
     "officialChannelOn": "Official channel · {platform}",
     "meta": {
@@ -317,7 +317,7 @@
   "planning": {
     "titleOn": "Matches scheduled by the referees",
     "titleOff": "Match scheduling",
-    "descriptionOn": "Each match waits for a referee or an admin to set its date and time (“To schedule”), then shows “Waiting to start” until that time, when it moves to launch.",
+    "descriptionOn": "Each match waits for a referee or an admin to set its date (“To schedule”), then stays “Waiting to start” until that time, when it moves to launch.",
     "descriptionOff": "Off: a match without a date moves to launch as soon as both its entrants are known."
   },
   "settings": {
