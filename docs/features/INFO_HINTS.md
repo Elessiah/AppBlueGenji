@@ -92,7 +92,54 @@ le détail pour le « i ».
   Battle.net des applications connectées, sujets des notifications push, langue
   des notifications, messages privés de match, fenêtre de recrutement.
 - `/joueurs/[id]` : BattleTag masqué, pour son titulaire.
+- Formulaire de tournoi (`/tournois/creer`, `/tournois/[id]/modifier`) : intro
+  des conditions d'inscription (« i » du titre de section), exigences Discord et
+  Battle.net, fonctionnement de la Survie et de la ronde suisse (« i » du libellé
+  « Format », `formatExplainText`), réglages de BG Survie (effectif des play-offs,
+  manches maximum, sortie anticipée, égalités, format des play-offs), cartes
+  « Phase de lancement » et « Matchs planifiés par l'arbitrage ». La raison d'une
+  case grisée (sortie anticipée, égalités) reste visible **à la place** du « i »,
+  sous le même identifiant. Le conseil Marvel Rivals reste visible.
+- Fiche `/tournois/[id]` : mention de retransmission **en couches** (ligne
+  visible avec le droit d'opposition, mention entière au « i » —
+  `LIVE_STREAMS.md`), pastille « Spectateur », cases de l'en-tête qui portaient
+  une explication (format des matchs, conditions d'inscription), explication de
+  l'ordre des inscrites suivant le classement du site, planification par
+  l'arbitrage allumée, aperçu de la manche suivante (côtés à confirmer, note de
+  bas de panneau).
+- `/equipes/[id]` : aide de l'invitation (champ pseudo).
+- `/signalements/[id]` : le droit de contester reste visible, les exemples
+  passent au « i ».
+
+### Ce qui est resté visible (raccourci), et pourquoi
+
+- Zones de danger (retour en arrière, suppression du tournoi, équipe fantôme) :
+  des **avertissements** de gestes sans retour — raccourcis, jamais repliés.
+- Avertissements et états : planification qui défait des lancements, phase
+  qualificative incertaine, verrous de l'ordre, ligne « Modifiable jusqu'à… »
+  des cartes d'option.
+- Sélecteur d'image : les aides sont dans un `<button>` et dans des `<label>`
+  de radios, où un bouton ne se pose pas ; l'aide du point de cadrage est le
+  mode d'emploi au clavier d'un `role="application"`.
+- Contacts Discord du staff, aide des rôles de manager (une `<legend>` ne peut
+  pas porter le bouton), retour dû et conservation de `/admin/signalements`
+  (dossier non migré : français en dur, obligation légale du staff).
+- `title` gardés : cartes et bandeau de `/equipes` (la carte entière est un lien
+  — un bouton n'y entre pas ; les points restent lus par `sr-only`), liens et
+  pastilles de `/joueurs/[id]` (redondants avec leur texte), pastille « Admin ».
+
+### Cartes d'option du formulaire
+
+« Phase de lancement » et « Matchs planifiés par l'arbitrage » étaient un
+`<label>` englobant la carte. Un bouton ne se pose pas dans un `<label>` : la
+carte est désormais un `<div class="checkbox-card">` (`CHECKBOX_CARD_LAYOUT`,
+`_lib/form-styles.ts`), son titre le `<label>` de la case, suivi du « i ». Un
+clic sur le cadre hors case et titre ne coche plus ; la case cite le « i » puis
+la ligne d'état dans son `aria-describedby`.
 
 Tests : `tests/components/info-hint.test.tsx` (balisage, nom FR/EN, gestes,
-feuille de style), `tests/app/info-hints-account.test.ts` (lignes visibles
-≤ 140 caractères, câblage des `aria-describedby`).
+feuille de style), `tests/app/info-hints-account.test.ts` et
+`tests/app/info-hints-tournaments.test.tsx` (lignes visibles ≤ 140 caractères,
+câblage des `aria-describedby`). Un test qui vérifie qu'un écran n'offre
+« aucun geste » retire d'abord les boutons « i » du balisage
+(`tests/helpers/info-hint-markup.ts`).

@@ -518,7 +518,11 @@ salon #live passe par Discord (T16 : transfert vers les États-Unis, Discord,
 Le joueur en est informé là où il s'engage, sans case à cocher — ce n'est pas
 un consentement : sous le bouton d'inscription de la fiche du tournoi
 (`TournamentHeader`, en équipe comme en individuel) et dans la confirmation
-d'inscription (`registration-confirm.ts`). Les phrases viennent d'un module pur,
+d'inscription (`registration-confirm.ts`). Sur la fiche, l'information est **en
+couches** (`INFO_HINTS.md`) : une ligne visible dit l'essentiel et le droit
+d'opposition (`REGISTRATION_STREAM_NOTICE_SHORT`, `register.streamNoticeShort`),
+le bouton « i » porte la mention entière et le lien vers `/rgpd#retransmission` ;
+la confirmation, elle, relit la mention entière. Les phrases viennent d'un module pur,
 `lib/shared/stream-notice.ts`, partagé avec la section « Retransmission des
 matchs » des conditions d'utilisation (une précision : `TERMS_VERSION` ne bouge
 pas) ; le détail est sur `/rgpd#retransmission`. L'opposition se demande par
