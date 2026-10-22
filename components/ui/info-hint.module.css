@@ -49,11 +49,14 @@
 }
 
 /* Sous la rangée, sur toute sa largeur : jamais plus large que son conteneur,
-   donc aucun défilement horizontal, à 375 px comme ailleurs. */
+   donc aucun défilement horizontal, à 375 px comme ailleurs. Aucune largeur
+   maximale sur le panneau lui-même : une base de 100 % bornée par un
+   `max-inline-size` redevient assez étroite pour se loger à côté du libellé
+   (rangée large, libellé court) au lieu de passer dessous. La mesure de
+   lecture se borne sur son contenu. */
 .panel {
-  flex: 1 0 100%;
+  flex: 0 0 100%;
   box-sizing: border-box;
-  max-inline-size: 68ch;
   margin: 8px 0 4px;
   padding: 10px 12px;
   border-left: 2px solid var(--blue-500);
@@ -71,6 +74,10 @@
 
 .panel[hidden] {
   display: none;
+}
+
+.panel > * {
+  max-inline-size: 68ch;
 }
 
 .panel p {
