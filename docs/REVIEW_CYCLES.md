@@ -1,6 +1,6 @@
 # Cycles de revue d'une PR
 
-Règle posée le 2026-10-01, une fois les deux projets arrivés à une version stable (site v1.0.0, bot v3.0.x) : la revue généraliste ne suffit plus, chaque PR qui touche une fonctionnalité est aussi relue sous des angles nommés. Allégée le 2026-10-22 pour tenir le coût en jetons (boucles de dix passes et plus sur des détails) : un seul cycle propre suffit, les findings mineurs sont consignés sans être corrigés. Elle complète l'étape 7 de la « Pipeline Git » (`CLAUDE.md`, détail dans `docs/WORKFLOW.md`) : SonarCloud, `npm test`, `npm run lint`, `npm run typecheck` et `npm run seed` restent exigés.
+Règle posée le 2026-10-01, une fois les deux projets arrivés à une version stable (site v1.0.0, bot v3.0.x) : la revue généraliste ne suffit plus, chaque PR qui touche une fonctionnalité est aussi relue sous des angles nommés. Allégée le 2026-10-22 pour tenir le coût en jetons (boucles de dix passes et plus sur des détails) : un seul cycle propre suffit, les findings mineurs sont consignés sans être corrigés. Elle complète l'étape 4 de la « Pipeline Git » (`CLAUDE.md`, détail dans `docs/WORKFLOW.md`) : SonarCloud, `npm test`, `npm run lint`, `npm run typecheck` et `npm run seed` restent exigés.
 
 ## 1. Règles communes à tous les cycles
 

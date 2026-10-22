@@ -61,24 +61,21 @@ Ne pas confondre les deux dossiers : `doc/` est le Markdown servi par le site, `
 
 ## Pipeline Git (workflow de livraison)
 
-Chaque tâche : quatre commits sur une branche de feature, puis une revue de PR.
+Chaque tâche : une branche de feature, des commits libres, puis une revue de PR. Les PR sont fusionnées par *squash* : le découpage des commits n'atteint pas `main`, seul le contenu de la PR compte.
 
 **Règle Co-Authored-By :**
-- **Tous** les commits (fonctionnel, docs, tests, polish) portent un trailer `Co-authored-by: <modèle> <noreply@anthropic.com>`.
+- **Tous** les commits portent un trailer `Co-authored-by: <modèle> <noreply@anthropic.com>`.
 - **`<modèle>` est le modèle qui écrit réellement le commit**, jamais une valeur recopiée : `Claude Opus 5`, `Claude Sonnet 5`, `Claude Opus 4.8`, selon le cas. Cette ligne a longtemps nommé `Claude Opus 4.8` en dur, et elle a continué d'être suivie à la lettre bien après : des commits écrits par un autre modèle portent donc une attribution fausse. Un co-auteur inexact vaut moins qu'aucun — c'est précisément ce que le trailer sert à dire.
-- Se relire sur ce point **au premier commit d'une session**, pas au cinquième : quatre commits à réécrire, c'est un historique qu'on ne corrige plus.
+- Se relire sur ce point **au premier commit d'une session** : des commits déjà poussés ne se réécrivent plus.
 
-Enchaîner la pipeline **sans s'arrêter** : ne pas attendre de validation de l'utilisateur après le commit fonctionnel — dérouler les commits, le push et la PR d'affilée.
+Enchaîner la pipeline **sans s'arrêter** : ne pas attendre de validation de l'utilisateur après le premier commit — dérouler les commits, le push et la PR d'affilée.
 
 Ajouter le trailer avec `git commit --trailer 'Co-authored-by: <modèle> <noreply@anthropic.com>'` — par exemple `git commit --trailer 'Co-authored-by: Claude Opus 5 <noreply@anthropic.com>'`.
 
 1. **Branche de feature** : `git checkout -b feature/<short-name>`
-2. **Commit fonctionnel** : ≤ 5 mots, impératif minuscule — `add swiss pairing` — *avec Co-Authored-By*
-3. **Commit docs** : README / JSDoc limité à ce qui a été construit — *avec Co-Authored-By*
-4. **Commit tests** : `jest` — *avec Co-Authored-By*
-5. **Commit polish UI/UX** : espacements, états, accessibilité — aucun changement de logique — *avec Co-Authored-By*. Tout problème d'accessibilité repéré pendant la tâche et **non réglé** dans la PR s'ajoute à `ACCESSIBILITE.md` par un commit poussé directement sur `main`, pas dans ce commit (voir « Accessibilité » plus haut) ; les tâches que la PR règle en ont déjà été retirées sur `main` au moment de leur sélection.
-6. **Push** : `git push -u origin feature/<short-name>`
-7. **Revue de PR** : ouvrir la PR (`gh pr create`), puis lancer les revues avec `/code-review --comment` pour poster les retours en **commentaires inline** sur la PR. Règles complètes : `docs/REVIEW_CYCLES.md` — en bref :
+2. **Commits libres** : autant qu'utile, souvent un seul — message ≤ 5 mots, impératif minuscule (`add swiss pairing`), *avec Co-Authored-By*. Aucun ordre ni découpage imposé (code, docs, tests, finitions) : ne pas trier les changements par commit. La PR, elle, doit contenir le code, **ses tests** (voir « Tests ») et **sa doc** (`docs/features/`, README, JSDoc limitée à ce qui a été construit). Tout problème d'accessibilité repéré pendant la tâche et **non réglé** dans la PR s'ajoute à `ACCESSIBILITE.md` par un commit poussé directement sur `main` (voir « Accessibilité » plus haut).
+3. **Push** : `git push -u origin feature/<short-name>`
+4. **Revue de PR** : ouvrir la PR (`gh pr create`), puis lancer les revues avec `/code-review --comment` pour poster les retours en **commentaires inline** sur la PR. Règles complètes : `docs/REVIEW_CYCLES.md` — en bref :
    - boucle standard, puis cycles thématiques UI/UX (si la PR touche un écran), performance et sécurité ; texte légal seul → un cycle juridique à la place ; doc de processus ou renommage seul → boucle standard seule ;
    - un **agent neuf par type de revue** ; chaque boucle s'arrête au **premier cycle propre**, changements critiques compris ;
    - un finding **mineur** se consigne dans `ERREUR.txt` sans être corrigé ; un cycle qui n'en remonte que de mineurs compte pour propre.

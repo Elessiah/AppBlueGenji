@@ -109,9 +109,6 @@ Noir profond, bleu glacier `#5ac8ff`, jetons `--cyber-*` / `--ink*` / `--blue-*`
 
 Enchaîner sans s'arrêter :
 1. `git checkout -b feature/<short-name>`
-2. Commit fonctionnel (≤ 5 mots, impératif minuscule)
-3. Commit docs (README / JSDoc / `docs/features/`)
-4. Commit tests (`jest`)
-5. Commit polish UI/UX (aucune logique)
-6. `git push -u origin feature/<short-name>`
-7. `gh pr create`, revue `/code-review --comment` en boucle, puis cycles **thématiques** UI/UX (si un écran change), performance, sécurité (texte légal seul : un cycle juridique ; doc de processus ou renommage : boucle standard seule) — un agent neuf par type, chaque boucle s'arrête au **premier cycle propre** ; un finding **mineur** va dans `ERREUR.txt` sans correction, un cycle qui n'en a que de mineurs est propre → `docs/REVIEW_CYCLES.md`. **Qualité : SonarCloud** sur la PR (`gh pr checks`), une correction de pure forme ne relance pas de revue ; jamais `npm run sonar` dans la pipeline. Ne rendre la main qu'avec `npm test`, `npm run lint`, `npm run typecheck` verts **et** `npm run seed` exécuté (seul contrôle réel du SQL).
+2. Commits libres (message ≤ 5 mots, impératif minuscule) ; la PR contient le code, ses tests et sa doc (`docs/features/`, JSDoc)
+3. `git push -u origin feature/<short-name>`
+4. `gh pr create`, revue `/code-review --comment` en boucle, puis cycles **thématiques** UI/UX (si un écran change), performance, sécurité (texte légal seul : un cycle juridique ; doc de processus ou renommage : boucle standard seule) — un agent neuf par type, chaque boucle s'arrête au **premier cycle propre** ; un finding **mineur** va dans `ERREUR.txt` sans correction, un cycle qui n'en a que de mineurs est propre → `docs/REVIEW_CYCLES.md`. **Qualité : SonarCloud** sur la PR (`gh pr checks`), une correction de pure forme ne relance pas de revue ; jamais `npm run sonar` dans la pipeline. Ne rendre la main qu'avec `npm test`, `npm run lint`, `npm run typecheck` verts **et** `npm run seed` exécuté (seul contrôle réel du SQL).
