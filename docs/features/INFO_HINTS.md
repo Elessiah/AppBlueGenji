@@ -51,6 +51,12 @@ après le libellé qu'elles expliquent, et se réécrivent **court**.
   lui-même (`flex: 0 0 100%`) : bornée, sa base redevenait assez étroite pour
   se loger **à côté** d'un libellé court sur une rangée large ; la mesure de
   lecture (68ch) se pose sur son contenu (`.panel > *`).
+- **Jamais dans un groupe à la largeur de son contenu** (`inline-flex`, élément
+  d'une barre en `space-between`) : ouverte, l'explication élargit le groupe,
+  qui change de place — et le bouton qu'on vient de cliquer fuit le pointeur.
+  Poser alors le `InfoHint` dans la barre elle-même, après le groupe (pastille
+  « Spectateur » de l'en-tête : le groupe `.viewer` garde la pastille, le « i »
+  le suit, `margin-inline-start: auto` cale le groupe à droite).
 - **Fermée, elle reste dans le DOM** (`hidden`) avec son `id` : un champ qui la
   cite dans son `aria-describedby` garde sa description entière.
 - Se referme par **Échap** (focus rendu au bouton ; écouté sur le composant
