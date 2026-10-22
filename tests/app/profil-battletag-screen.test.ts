@@ -76,7 +76,8 @@ describe("champ BattleTag — le verrou à l'écran", () => {
     // L'annonce prévient de ce qui arrivera si un compte Blizzard est rattaché.
     // Il l'est : la garder à côté du verrou ferait lire un avertissement au
     // futur sur un fait déjà accompli.
-    expect(page).toContain("battletagLockText(text, {");
+    expect(page).toContain("if (locked) return battletagLockText(text, state);");
+    expect(page).toContain("const battletagNotice = battletagFieldNotice(text, battletagLocked, {");
     expect(page).toContain("pending: connectionsPending");
   });
 
