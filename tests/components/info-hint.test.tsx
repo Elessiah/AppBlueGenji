@@ -211,34 +211,58 @@ describe("InfoHint — gestes", () => {
     const NodeClass = globals.Node as new () => object;
     const otherButton = new NodeClass();
     const rootRef = (view.root as unknown as { ref: { current: unknown } }).ref;
-    rootRef.current = { contains: () => false };
+    rootRef.current = { contains: () => false, addEventListener: () => {}, removeEventListener: () => {} };
     documentListeners.click[0]({ target: otherButton });
     view = render();
     expect(view.button.props["aria-expanded"]).toBe(false);
   });
 
+  /** Un faux conteneur qui retient ses écouteurs `keydown`, posé dans la référence du composant. */
+  function fakeRoot(view: { root: ReactElement<Props> }): Array<(event: unknown) => void> {
+    const listeners: Array<(event: unknown) => void> = [];
+    const rootRef = (view.root as unknown as { ref: { current: unknown } }).ref;
+    rootRef.current = {
+      contains: () => false,
+      addEventListener: (type: string, listener: (event: unknown) => void) => {
+        if (type === "keydown") listeners.push(listener);
+      },
+      removeEventListener: (type: string, listener: (event: unknown) => void) => {
+        const index = listeners.indexOf(listener);
+        if (type === "keydown" && index >= 0) listeners.splice(index, 1);
+      },
+    };
+    return listeners;
+  }
+
   it("se referme à Échap et rend le focus au bouton", () => {
     let view = render();
+    const keydown = fakeRoot(view);
     click(view.button);
     view = render();
+    expect(keydown).toHaveLength(1);
     const focus = jest.fn();
     const buttonRef = (view.button as unknown as { ref?: { current: unknown } }).ref;
     // Le bouton porte une référence : on y place un faux élément focalisable.
     expect(buttonRef).toBeDefined();
     if (buttonRef) buttonRef.current = { focus };
     const stopPropagation = jest.fn();
-    (view.root.props.onKeyDown as (event: { key: string; stopPropagation: () => void }) => void)({ key: "Escape", stopPropagation });
+    keydown[0]({ key: "Tab", stopPropagation });
+    view = render();
+    expect(view.button.props["aria-expanded"]).toBe(true);
+    keydown[0]({ key: "Escape", stopPropagation });
     view = render();
     expect(view.button.props["aria-expanded"]).toBe(false);
     expect(focus).toHaveBeenCalledTimes(1);
     expect(stopPropagation).toHaveBeenCalledTimes(1);
+    expect(keydown).toHaveLength(0);
   });
 
-  it("ignore Échap quand il est fermé : une modale ouverte garde le sien", () => {
+  it("n'écoute pas Échap quand il est fermé : une modale ouverte garde le sien", () => {
     const view = render();
-    const stopPropagation = jest.fn();
-    (view.root.props.onKeyDown as (event: { key: string; stopPropagation: () => void }) => void)({ key: "Escape", stopPropagation });
-    expect(stopPropagation).not.toHaveBeenCalled();
+    const keydown = fakeRoot(view);
+    render();
+    expect(keydown).toHaveLength(0);
+    expect(view.root.props.onKeyDown).toBeUndefined();
   });
 
   it("se referme au clic ailleurs, pas au clic dedans, et n'écoute que pendant qu'il est ouvert", () => {
@@ -251,7 +275,7 @@ describe("InfoHint — gestes", () => {
     const inside = new NodeClass();
     const outside = new NodeClass();
     const rootRef = (view.root as unknown as { ref: { current: unknown } }).ref;
-    rootRef.current = { contains: (target: unknown) => target === inside };
+    rootRef.current = { contains: (target: unknown) => target === inside, addEventListener: () => {}, removeEventListener: () => {} };
     documentListeners.click[0]({ target: inside });
     view = render();
     expect(view.button.props["aria-expanded"]).toBe(true);
