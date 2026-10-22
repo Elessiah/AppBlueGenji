@@ -252,6 +252,14 @@ describe("InfoHint — feuille de style", () => {
 
   it("ouvre l'explication dans le flux, jamais plus large que son conteneur", () => {
     expect(css).not.toMatch(/position: (absolute|fixed)/);
-    expect(css).toMatch(/\.panel \{[^}]*flex: 1 0 100%;[^}]*box-sizing: border-box;/);
+    expect(css).toMatch(/\.panel \{[^}]*flex: 0 0 100%;[^}]*box-sizing: border-box;/);
+  });
+
+  it("passe toujours sous le libellé : aucune largeur maximale sur le panneau lui-même", () => {
+    // Une base de 100 % bornée par `max-inline-size` redevenait assez étroite
+    // pour se loger à côté d'un libellé court dans une rangée large (bureau).
+    const panelRule = /\n\.panel \{([^}]*)\}/.exec(css)?.[1] ?? "";
+    expect(panelRule).not.toMatch(/max-inline-size|max-width/);
+    expect(css).toMatch(/\.panel > \* \{[^}]*max-inline-size: 68ch;/);
   });
 });
