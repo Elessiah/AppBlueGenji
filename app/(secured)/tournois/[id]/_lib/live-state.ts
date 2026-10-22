@@ -131,6 +131,8 @@ export function applyLiveMessage(state: LiveState, message: LiveMessage): LiveSt
     // déposée depuis se détecte à son `reportedAt` et se relit par la lecture
     // REST (`proposalsNeedRefresh`, MAP_SCORES.md).
     matchProposals: state.detail.matchProposals,
+    // Invitation à certifier : tient au roster et aux comptes, pas au plateau.
+    certificationPrompt: state.detail.certificationPrompt,
     // L'aperçu du plateau n'arrive qu'à la connexion, comme le reste du contexte
     // du lecteur : le flux ne le transporte pas, il est réservé au staff et au
     // cast (`docs/features/TOURNAMENT_PREVIEW.md`).

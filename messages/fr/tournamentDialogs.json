@@ -54,7 +54,7 @@
       "savedForfeit": "Forfait enregistré : le match n'est pas encore tranché.",
       "savedForfeitPaused": "Forfait enregistré : le match reste en cours, et la validation automatique de la proposition est suspendue.",
       "autoValidationPaused": "Validation automatique suspendue par l'arbitrage : sans réponse de l'adversaire, seul « Valider le résultat » tranche.",
-        "disputeNotice": "Litige : la saisie des deux adversaires reste verrouillée jusqu'à « Valider le résultat » (score ou forfait). « Enregistrer » note l'avancement sans trancher.",
+      "disputeNotice": "Litige : la saisie des deux adversaires reste verrouillée jusqu'à « Valider le résultat » (score ou forfait). « Enregistrer » note l'avancement sans trancher.",
       "resolved": "Résultat validé : le plateau est à jour.",
       "awaitingDetail": "Lecture du détail des maps proposé… Actualise la page s'il n'arrive pas.",
       "proposal": "Score proposé par {author} ({score1} – {score2}), en attente de confirmation de {other}. Vérifie-le puis valide le résultat pour le confirmer.",
@@ -355,5 +355,57 @@
     "intro": "Réservé à l'arbitrage. Seuls apparaissent les tags <strong>certifiés</strong> : un joueur qui n'a pas prouvé le sien n'est pas joignable par le site.",
     "hide": "Masquer les contacts",
     "show": "Afficher les contacts"
+  },
+  "certification": {
+    "title": "Certifie ton Discord et ton BattleTag",
+    "titleDiscordOnly": "Certifie ton Discord",
+    "titleBattletagOnly": "Certifie ton BattleTag",
+    "leadManager": "Tu mènes une équipe engagée dans ce tournoi : tu peux être présenté comme son contact à l'adversaire et à l'arbitrage dès que vos adversaires sont connus, et au caster le temps du match. Certifie ce qui te manque encore.",
+    "leadTeam": "Ton équipe n'a aucun contact vérifié à présenter pour ses matchs : personne n'y a certifié son tag Discord ni son BattleTag. L'adversaire et l'arbitrage n'ont aucun moyen sûr de vous joindre.",
+    "leadTeamDiscordOnly": "Ton équipe n'a personne à présenter sur Discord pour ses matchs : personne n'y a certifié son tag Discord. L'adversaire et l'arbitrage n'ont aucun moyen sûr de vous joindre.",
+    "statusLabel": "Où tu en es",
+    "discord": "Tag Discord",
+    "battletag": "BattleTag",
+    "done": "Certifié",
+    "missing": "À certifier",
+    "tableCaption": "Ce que la certification fait, et ce qu'elle ne fait pas",
+    "colTopic": "Sujet",
+    "colDoes": "Ce que ça fait",
+    "colDoesNot": "Ce que ça ne fait pas",
+    "rows": {
+      "identity": {
+        "topic": "Ton identité",
+        "does": "Prouve que ton tag Discord et ton BattleTag sont bien les tiens : Discord et Blizzard le confirment. Le compte rattaché pour cela devient un moyen de connexion, et Battle.net remplace ton BattleTag par le sien, verrouillé tant qu'il reste rattaché.",
+        "doesDiscordOnly": "Prouve que ton tag Discord est bien le tien : Discord le confirme. Le compte Discord rattaché pour cela devient un moyen de connexion.",
+        "doesNot": "Ne donne au site accès ni à ton mot de passe, ni à tes messages, ni à tes amis."
+      },
+      "matches": {
+        "topic": "Tes matchs",
+        "does": "Tu passes devant les membres qui n'ont rien certifié pour être présenté comme contact de ton équipe — aux deux équipes du match, à son caster, aux arbitres et aux administrateurs du site —, avec ton tag Discord certifié et ton BattleTag marqué « vérifié ».",
+        "doesDiscordOnly": "Tu passes devant les membres qui n'ont rien certifié pour être présenté comme contact de ton équipe — aux deux équipes du match, à son caster, aux arbitres et aux administrateurs du site —, avec ton tag Discord certifié.",
+        "doesNot": "Ne publie pas ton tag sur ta fiche : les autres joueurs y voient une pastille, et ton tag seulement si tes réglages de visibilité l'ouvrent (case « Tag Discord » pour le tag Discord, même cochée avant). Certifié ou non, présenté comme contact, ton BattleTag est montré même masqué, dès que les deux adversaires du match sont connus et jusqu'à sa fin.",
+        "doesNotDiscordOnly": "Ne publie pas ton tag sur ta fiche : les autres joueurs y voient une pastille, et ton tag seulement si tu as coché « Tag Discord » dans tes réglages (même avant). Si ta fiche porte un BattleTag, présenté comme contact, il est montré même masqué, dès que les deux adversaires du match sont connus et jusqu'à sa fin."
+      },
+      "messages": {
+        "topic": "Les messages du bot",
+        "does": "Une fois ton tag Discord certifié, le bot t'envoie en message privé l'horaire et les rappels de tes matchs. Discord rattaché à ton compte (la certification par code le rattache) lui sert aussi à t'écrire : demandes d'adhésion à une équipe que tu gères, avis de modération, information sur tes données.",
+        "doesNot": "Ne t'impose pas les messages de match : tu peux les couper depuis ton profil (section Notifications) sans perdre la certification."
+      },
+      "staff": {
+        "topic": "L'organisation",
+        "does": "Les admins peuvent te joindre en cas de souci, et les arbitres aussi tant que tu es engagé dans un tournoi en cours ou à venir.",
+        "doesNot": "Ne publie rien en ton nom et ne change pas ton pseudo sur le site."
+      },
+      "later": {
+        "topic": "Et ensuite",
+        "does": "Ouvre les tournois qui exigent un Discord certifié ou un compte Battle.net.",
+        "doesDiscordOnly": "Ouvre les tournois qui exigent un Discord certifié.",
+        "doesNot": "Ne t'engage à rien : retirer ton tag Discord de ton profil retire sa certification ; Discord ou Battle.net se détache depuis « Applications connectées » tant qu'il te reste une autre façon de te connecter — détaché, Battle.net laisse ton BattleTag sur ta fiche, sans vérification, jusqu'à ce que tu l'effaces.",
+        "doesNotDiscordOnly": "Ne t'engage à rien : retirer ton tag Discord de ton profil retire sa certification ; Discord, s'il a été rattaché à ton compte pour certifier, se détache depuis « Applications connectées » tant qu'il te reste une autre façon de te connecter."
+      }
+    },
+    "neverAgain": "Ne plus voir",
+    "later": "Plus tard",
+    "go": "Certifier depuis mon profil"
   }
 }

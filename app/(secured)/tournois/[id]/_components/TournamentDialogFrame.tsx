@@ -27,6 +27,16 @@ interface TournamentDialogFrameProps {
   deferMount?: boolean;
   /** Geste en vol : Échap et voile sans effet. */
   busy: boolean;
+  /**
+   * Modale sans urgence qui **cède sa place** à une ouverture urgente
+   * (`data-modal-yields`, `anotherModalOpen` de `lib/shared/dialog-focus.ts`).
+   */
+  yields?: boolean;
+  /**
+   * Focus d'ouverture : premier contrôle (défaut) ou le cadre lui-même — une
+   * modale qui se lit avant d'agir, ouverte par le haut (`useDialogBehavior`).
+   */
+  initialFocus?: "first" | "container";
   onClose: () => void;
   children: ReactNode;
 }
@@ -51,12 +61,14 @@ export function TournamentDialogFrame({
   zIndex,
   deferMount = false,
   busy,
+  yields = false,
+  initialFocus = "first",
   onClose,
   children,
 }: Readonly<TournamentDialogFrameProps>) {
   const [mounted, setMounted] = useState(!deferMount);
   useEffect(() => setMounted(true), []);
-  const dialogRef = useDialogBehavior({ open: mounted, onClose, locked: busy });
+  const dialogRef = useDialogBehavior({ open: mounted, onClose, locked: busy, initialFocus });
   const backdrop = useBackdropDismiss(onClose, busy);
 
   if (!mounted) return null;
@@ -83,6 +95,7 @@ export function TournamentDialogFrame({
         className="dialog-bounded"
         aria-labelledby={titleId}
         aria-describedby={describedBy}
+        data-modal-yields={yields ? "" : undefined}
         tabIndex={-1}
         style={{
           width: "100%",

@@ -48,6 +48,7 @@ export function tournamentViewerContext(
     canManageLive: false,
     viewerUserId: 1,
     castBlock: "NOT_CASTER",
+    certificationPrompt: null,
     ...overrides,
   };
 }

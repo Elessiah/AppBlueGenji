@@ -52,6 +52,8 @@ import { EntrantProvider } from "../_lib/entrant-link";
 import { buildEntrantLogoMap } from "@/lib/shared/entrant-logos";
 import { MatchAnchorProvider } from "../_lib/match-anchor-context";
 import { useMatchAnchor } from "../_hooks/useMatchAnchor";
+import { useCertificationPrompt } from "../_hooks/useCertificationPrompt";
+import { liveCertificationPrompt } from "@/lib/shared/certification-prompt";
 import { TournamentProgress } from "./TournamentProgress";
 import { TournamentLoading } from "./TournamentLoading";
 import { TournamentHeader } from "./TournamentHeader";
@@ -85,6 +87,9 @@ const IssueReportDialog = dynamic(() => orReload(import("./IssueReportDialog").t
 const DeleteTournamentDialog = dynamic(() => orReload(import("./DeleteTournamentDialog").then((m) => m.DeleteTournamentDialog)), { ssr: false });
 const RollbackRoundDialog = dynamic(() => orReload(import("./RollbackRoundDialog").then((m) => m.RollbackRoundDialog)), { ssr: false });
 const EndurancePenaltyDialog = dynamic(() => orReload(import("./EndurancePenaltyDialog").then((m) => m.EndurancePenaltyDialog)), { ssr: false });
+// Ouverte d'office : sa place est tenue pendant le chargement (`anotherModalOpen`),
+// et cédée à une modale urgente (`data-modal-yields`).
+const CertificationPromptDialog = dynamic(() => orReload(import("./CertificationPromptDialog").then((m) => m.CertificationPromptDialog)), { ssr: false, loading: () => <span data-modal-pending data-modal-yields hidden /> });
 const AdvanceTournamentDialog = dynamic(() => orReload(import("./AdvanceTournamentDialog").then((m) => m.AdvanceTournamentDialog)), { ssr: false });
 const TournamentImageDialog = dynamic(() => orReload(import("./TournamentImageDialog").then((m) => m.TournamentImageDialog)), { ssr: false });
 const ConfirmActionDialog = dynamic(() => orReload(import("@/components/ui/confirm-action-dialog").then((m) => m.ConfirmActionDialog)), { ssr: false });
@@ -581,6 +586,8 @@ export function TournamentSheet({ tournamentId, source }: Readonly<{ tournamentI
    * plateau date de plusieurs minutes.
    */
   const frozen = fatal !== null;
+  // Invitation à certifier Discord et BattleTag (`CERTIFICATION_PROMPT.md`).
+  const certificationPrompt = useCertificationPrompt(tournamentId, liveCertificationPrompt(detail, tournamentId), frozen);
   const canReportScore = useCallback(
     (match: BracketMatch): boolean =>
       !frozen &&
@@ -1318,6 +1325,14 @@ export function TournamentSheet({ tournamentId, source }: Readonly<{ tournamentI
             showSuccess(a("deleteTournament.success", { name }));
             router.replace("/tournois");
           }}
+        />
+      )}
+
+      {certificationPrompt.prompt && (
+        <CertificationPromptDialog
+          prompt={certificationPrompt.prompt}
+          onNeverAgainChange={certificationPrompt.setNeverAgain}
+          onClose={certificationPrompt.close}
         />
       )}
 

@@ -197,9 +197,10 @@ gestes d'arbitrage (`PRIMARY_ORDER`). Noms cliquables **dans cette modale
 seulement** (`linkNames`) : équipe par `TeamLink`, entrée solo par `PlayerLink`
 (son unique contact), contacts et caster par `PlayerLink` ; la modale de
 lancement, qui survit à la navigation, garde des noms simples. Elle **ne s'ouvre
-pas d'office par-dessus** une autre modale (`anotherModalOpen`) : elle guette sa
-fermeture chaque seconde (horloges actives, `useClientPower`), sinon la relève
-suivante — que « Contacts » demande à sa fermeture. Option éteinte, les
+pas d'office par-dessus** une autre modale (`anotherModalOpen`), sauf une qui
+cède sa place (l'invitation à certifier, qui se ferme) : elle guette sa fermeture par un observateur
+du DOM (`watchModalsClosed`, relectures espacées d'une seconde) tant que l'onglet est visible (`useClientPower`), et
+« Contacts » demande en plus une relève à sa fermeture. Option éteinte, les
 avertissements de la planification par l'arbitrage ont leur variante sans
 « Prêt » (`form.referee.warningDirect`, `planning.confirm.consequenceDirect`). Dans la modale de
 lancement, un match programmé renvoie au bouton « Contacts » (`contactsAtLaunch`).

@@ -6,6 +6,7 @@ import type { ConnectionMethod } from "./account-connections";
 import type { MatchFormat } from "./match-format";
 import type { MatchLiveTrigger } from "./live-streams";
 import type { CastBlock } from "./match-launch";
+import type { CertificationPrompt } from "./certification-prompt";
 import type { ParticipantType } from "./participants";
 import type {
   RegistrationFilterError,
@@ -759,6 +760,14 @@ export type TournamentViewerContext = {
    * proposition ne regardent que les deux engagés et le staff.
    */
   matchProposals: MatchProposalMaps[];
+  /**
+   * Invitation à certifier son tag Discord et son BattleTag
+   * (`docs/features/CERTIFICATION_PROMPT.md`), `null` s'il n'y en a pas :
+   * manager d'une équipe engagée à qui il manque une certification, ou joueur
+   * d'une équipe engagée sans aucun contact à présenter. Tient au roster, pas
+   * au plateau.
+   */
+  certificationPrompt: CertificationPrompt | null;
 };
 
 /** Proposition map par map d'un engagé, datée de son dépôt. */

@@ -641,6 +641,17 @@ function RgpdFr({
               serveur.
             </li>
             <li>
+              <strong>bg_cert_prompt_closed</strong> et <strong>bg_cert_prompt_off</strong> — posés
+              seulement <strong>si vous fermez la fenêtre qui vous invite à certifier votre tag Discord
+              et votre BattleTag</strong> (fiche d&apos;un tournoi) : le premier, une valeur du stockage
+              de session effacée à la fermeture de l&apos;onglet, pour ne pas vous la rouvrir dans cet
+              onglet ; le second, une valeur du stockage local, seulement si vous cochez « Ne plus
+              voir » — retenue aussi si la fenêtre s&apos;efface devant une autre (lancement d&apos;un
+              match). Ils ne contiennent que la valeur « 1 », jamais d&apos;identifiant de personne — ils valent donc
+              pour tous les comptes utilisés dans ce navigateur — et
+              ne sont jamais transmis au serveur.
+            </li>
+            <li>
               <strong>bg_lazy_chunk_reload_at</strong> — une valeur du stockage de session,
               effacée à la fermeture de l&apos;onglet, posée seulement <strong>si une partie
               de la page d&apos;un tournoi n&apos;a pas pu se charger</strong> (après une mise à

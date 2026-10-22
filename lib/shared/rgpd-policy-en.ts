@@ -109,7 +109,7 @@ const PROFIL_TEXT_EN: readonly (readonly [donnee: string, finalite: string])[] =
   ],
   [
     "Discord verification “Don't show again” choice",
-    "No by default: after logging in with Discord or Blizzard, a window suggests once that you verify your Discord tag if it isn't verified (the login session only records that it still needs to be suggested, a mark erased with the session). “Don't show again”: it no longer opens, on any device (date of the choice kept); verification remains possible in My profile. Included in the export of your data, erased if the account is anonymized",
+    "No by default: after logging in with Discord or Blizzard, a window suggests once that you verify your Discord tag if it isn't verified (the login session only records that it still needs to be suggested, a mark erased with the session). “Don't show again”: it no longer opens, on any device (date of the choice kept) — and, on a tournament page, the invitation to verify made to whoever leads a team no longer opens when only their Discord tag is missing (never the alert of a team with no contact at all); verification remains possible in My profile. Included in the export of your data, erased if the account is anonymized",
   ],
 ];
 

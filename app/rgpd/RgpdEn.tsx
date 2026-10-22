@@ -499,6 +499,14 @@ export function RgpdEn({
               launch, so as not to reopen it in that tab. Never sent to the server.
             </li>
             <li>
+              <strong>bg_cert_prompt_closed</strong> and <strong>bg_cert_prompt_off</strong> — set only{" "}
+              <strong>if you close the window inviting you to verify your Discord tag and your BattleTag</strong>{" "}
+              (tournament page): the first, a session storage value erased when the tab is closed, so as not to
+              reopen it in that tab; the second, a local storage value, only if you tick “Don&apos;t show again”
+              — also kept if the window steps aside for another one (a match launch). They only contain the value “1”, never an identifier of a person — so they apply to every account used
+              in that browser — and are never sent to the server.
+            </li>
+            <li>
               <strong>bg_lazy_chunk_reload_at</strong> — a session storage value, erased when the tab is closed,
               set only <strong>if part of a tournament page could not load</strong> (after an update of the site):
               the time of the automatic reload that followed, so as not to reload more than once a minute. Never

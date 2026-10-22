@@ -201,6 +201,8 @@ import {
   type DisputeBeforeResolution,
 } from "./dispute-self-resolution";
 import { loadViewerCastBlock } from "./match-launch";
+import { cachedCertificationPrompt, loadCertificationPrompt } from "./certification-prompt";
+import { battletagRelevantFor, type CertificationPrompt } from "@/lib/shared/certification-prompt";
 
 let pendingSync: Promise<void> | null = null;
 let lastSyncAt = 0;
@@ -1001,6 +1003,26 @@ export type TournamentViewerRights = {
 };
 
 /**
+ * Invitation à certifier du lecteur (`CERTIFICATION_PROMPT.md`). Simple
+ * invitation : une lecture en échec la tait (`null`, journal pm2), elle ne
+ * fait pas tomber le contexte — et avec lui le flux — du joueur. Gardée une
+ * minute par lecteur (`CERTIFICATION_PROMPT_TTL_MS`) : le contexte se relit à
+ * chaque lecture REST (après chaque geste, proposition de score, repli du
+ * flux), et l'invitation ne change qu'avec une certification.
+ */
+async function readCertificationPrompt(
+  userId: number,
+  teamId: number,
+  isManager: boolean,
+  battletagRelevant: boolean,
+): Promise<CertificationPrompt | null> {
+  const key = `${userId}:${teamId}:${isManager ? 1 : 0}:${battletagRelevant ? 1 : 0}`;
+  return cachedCertificationPrompt(key, () =>
+    withConnection((connection) => loadCertificationPrompt(connection, userId, teamId, isManager, battletagRelevant)),
+  );
+}
+
+/**
  * Contexte propre au lecteur : ce qu'il a le droit de faire ici.
  *
  * Séparé de l'instantané partagé parce qu'il ne bouge presque jamais (il change
@@ -1052,6 +1074,28 @@ export async function getTournamentViewerContext(
   const alreadyRegistered =
     myTeamId !== null && snapshot.registrations.some((row) => row.teamId === myTeamId);
 
+  // Invitation à certifier (`CERTIFICATION_PROMPT.md`) : au joueur d'une
+  // équipe engagée dans un tournoi qui n'est pas clos. Une requête indexée sur
+  // le roster, pour les seuls engagés, gardée une minute par lecteur
+  // (`readCertificationPrompt`). La case « Ne plus voir » de la modale vit dans le navigateur ;
+  // celui de la proposition de la connexion, gardé sur le compte, est lu ici
+  // (`loadCertificationPrompt`).
+  // Lancée en dernier, seule : le contexte ne tient jamais deux places du
+  // pool à la fois (une vague de reconnexions en demanderait le double). Une
+  // lecture gardée ne coûte rien ; manquée, une requête indexée par minute.
+  // Fonction, pour ne partir qu'au moment voulu ; elle ne rejette jamais.
+  const certificationPromptRead = (): Promise<CertificationPrompt | null> =>
+    !isSolo && activeTeam && alreadyRegistered && snapshot.card.state !== "FINISHED"
+      ? readCertificationPrompt(
+          userId,
+          activeTeam.teamId,
+          // Ceux qui mènent l'équipe en match — capitaine compris, premier
+          // présenté par `pickLaunchContacts` à vérification égale.
+          canDeclareTeamReady(activeTeam.roles),
+          battletagRelevantFor(snapshot.card.game),
+        )
+      : Promise.resolve(null);
+
   // Conditions d'inscription du tournoi (`lib/shared/registration-filters.ts`).
   //
   // **Posées ici et pas seulement à l'écriture**, parce qu'un bouton qui mène à
@@ -1099,6 +1143,8 @@ export async function getTournamentViewerContext(
       ? []
       : await withConnection((connection) => loadViewerProposals(connection, snapshot.matches, proposalScope));
 
+  const certificationPrompt = await certificationPromptRead();
+
   return {
     preview,
     // En individuel, un joueur sans entrée solo peut s'inscrire : elle sera
@@ -1118,6 +1164,7 @@ export async function getTournamentViewerContext(
     viewerUserId: userId,
     castBlock,
     matchProposals,
+    certificationPrompt,
   };
 }
 

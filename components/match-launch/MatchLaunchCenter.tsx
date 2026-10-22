@@ -14,6 +14,7 @@ import { PRIVACY_POLICY_PATH } from "@/components/privacy/PrivacyChangesModal";
 import { useToast } from "@/components/ui/toast";
 import { useClientPower } from "@/lib/shared/hooks/useClientPower";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
+import { anotherModalOpen, watchModalsClosed } from "@/lib/shared/dialog-focus";
 import { tournamentMatchHref } from "@/lib/shared/match-anchor";
 import {
   launchModalKey,
@@ -27,11 +28,6 @@ import {
 } from "@/lib/shared/match-launch";
 import { PRIVACY_CHANGES_ANSWERED_EVENT } from "@/lib/shared/privacy-changes";
 import styles from "./MatchLaunchCenter.module.css";
-
-/** Une modale (`aria-modal`) est déjà ouverte : l'ouverture d'office attend. */
-export function anotherModalOpen(root: ParentNode = document): boolean {
-  return root.querySelector('[aria-modal="true"]') !== null;
-}
 import { CasterCard, SideCard } from "./LaunchContactCards";
 
 /** Cadences d'interrogation : serrée pendant un lancement, lâche sinon. */
@@ -44,8 +40,6 @@ const POLL_IDLE_MS = 60_000;
  * qu'une rafale d'instantanés ne vaille qu'une lecture.
  */
 const REFRESH_EVENT_COALESCE_MS = 300;
-/** Cadence du guet d'une autre modale qui retient l'ouverture d'office. */
-const MODAL_RECHECK_MS = 1_000;
 /** Un match lancé depuis moins longtemps que cela est annoncé d'office. */
 const LAUNCH_ANNOUNCE_WINDOW_MS = 10 * 60_000;
 const DISMISSED_STORAGE_KEY = "bg_match_launch_dismissed";
@@ -213,13 +207,13 @@ export function MatchLaunchCenter({
     if (!next) return;
     // Jamais par-dessus une autre modale (« Contacts », score…) : deux pièges
     // de focus se disputeraient Tab et Échap. L'annonce attend sa fermeture,
-    // guettée chaque seconde (horloges actives), sinon la relève suivante.
-    if (anotherModalOpen()) {
-      if (!clocks) return;
-      const timer = setInterval(() => {
-        if (!anotherModalOpen()) setModalRecheck((n) => n + 1);
-      }, MODAL_RECHECK_MS);
-      return () => clearInterval(timer);
+    // guettée par un observateur du DOM tant que l'onglet est visible
+    // (horloges actives), réarmé à son retour. Une modale qui cède sa place
+    // (invitation à certifier, `data-modal-yields`) ne la retient pas : elle
+    // s'efface.
+    const urgent = { overYielding: true };
+    if (anotherModalOpen(document, urgent)) {
+      return clocks ? watchModalsClosed(() => setModalRecheck((n) => n + 1), urgent) : undefined;
     }
     setConfirming(false);
     setOpenMatchId(next.matchId);

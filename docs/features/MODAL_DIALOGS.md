@@ -39,9 +39,26 @@ le premier (le bureau place un bouton « Couleur aléatoire » avant le champ
 Nom). `initialFocus: "container"` le pose sur le conteneur lui-même
 (`tabIndex={-1}`, sans défilement) : une proposition dont aucun bouton ne doit
 partir sur Entrée, et dont le titre doit rester en vue à fort zoom
-(`DiscordCertifyPrompt`). Le conteneur focalisé — focus d'ouverture ou clic
+(`DiscordCertifyPrompt`, `CertificationPromptDialog` — prop `initialFocus` de
+`TournamentDialogFrame`). Le conteneur focalisé — focus d'ouverture ou clic
 sur son texte — est un **bord** du piège : `Maj+Tab` y reboucle sur le dernier
 contrôle au lieu de partir derrière le voile.
+
+Une modale **ouverte d'office** (sans geste du lecteur) ne s'ouvre pas sur une
+autre (`anotherModalOpen`, `lib/shared/dialog-focus.ts`) : le centre de
+lancement attend sa fermeture ; l'invitation à certifier, elle, est écartée
+pour la page (l'attendre la ferait surgir au départ d'un match). Chargée à la demande, sa place est tenue
+dès sa décision par le `loading` de son `dynamic()` (`<span data-modal-pending
+hidden />`, compté par `anotherModalOpen`) ; pour attendre sans minuterie,
+`watchModalsClosed` (observateur du DOM, relectures espacées d'une seconde) ; pour
+s'effacer sans délai devant une urgente, `watchUrgentModalOpened` (nœuds
+ajoutés seulement). Une
+modale sans urgence porte `data-modal-yields` sur sa racine (prop `yields` de
+`TournamentDialogFrame`) : une ouverture urgente
+(`overYielding`) passe par-dessus et elle s'efface. Une modale **recouverte**
+qui se ferme ne rend pas le focus à son déclencheur (seule celle du dessus le
+fait) ; elle passe cette cible aux modales du dessus qui comptaient rendre le
+focus en son sein (`restoreTargets`).
 
 Jamais l'attribut `autoFocus` (Sonar S9379). Un champ qui n'apparaît qu'après
 un geste — éditeur en ligne ouvert par « Modifier », onglet d'une modale déjà

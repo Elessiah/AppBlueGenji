@@ -102,6 +102,7 @@ const snapshot = (overrides: Partial<TournamentSnapshot> = {}): TournamentSnapsh
 const viewer = (overrides: Partial<TournamentViewerContext> = {}): TournamentViewerContext => ({
   canRegister: false,
   matchProposals: [],
+  certificationPrompt: null,
   // Qualité pour engager son équipe : le cas ordinaire. Le refus a son propre
   // test — sans ce défaut, tous les autres testeraient le mauvais refus.
   canRegisterEntrant: true,
@@ -214,6 +215,23 @@ describe("applyLiveMessage — instantané", () => {
     });
 
     expect(next.detail?.canDelete).toBe(true);
+  });
+
+  it("conserve l'invitation à certifier au fil des instantanés", () => {
+    // Elle tient au roster, que l'instantané diffusé ne porte pas
+    // (`CERTIFICATION_PROMPT.md`).
+    const prompt = { reason: "TEAM_WITHOUT_CONTACT", discordVerified: false, battletagVerified: false, battletagRelevant: true } as const;
+    const state = connected(INITIAL_LIVE_STATE);
+    state.detail!.certificationPrompt = prompt;
+
+    const next = applyLiveMessage(state, {
+      type: "snapshot",
+      tournamentId: 7,
+      version: "v2",
+      snapshot: snapshot({ version: "v2" }),
+    });
+
+    expect(next.detail?.certificationPrompt).toEqual(prompt);
   });
 
   it("rend le même état quand la version n'a pas bougé", () => {

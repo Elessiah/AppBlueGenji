@@ -4,6 +4,8 @@ jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/teams/roster");
 jest.mock("@/lib/server/tournaments/preview-cache");
 jest.mock("@/lib/server/tournaments/registration-eligibility");
+// Invitation à certifier : hors sujet ici (`certification-prompt-context.test.ts`).
+jest.mock("@/lib/server/tournaments/certification-prompt");
 // L'entrée solo se lit en base ; ici seul son absence nous intéresse — c'est le
 // cas qui compte, le joueur qui n'a encore jamais joué en individuel.
 jest.mock("@/lib/server/solo-entries-service");

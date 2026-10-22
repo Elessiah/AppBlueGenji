@@ -298,6 +298,7 @@ export const SPECTATOR_VIEWER_CONTEXT: Readonly<TournamentViewerContext> = Objec
   viewerUserId: 0,
   castBlock: "NOT_CASTER",
   matchProposals: [],
+  certificationPrompt: null,
 });
 
 /**

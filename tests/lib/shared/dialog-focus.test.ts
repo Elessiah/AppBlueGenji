@@ -1,6 +1,15 @@
-import { describe, expect, it } from "@jest/globals";
+import { afterEach, describe, expect, it, jest } from "@jest/globals";
 
-import { escapeBelongsElsewhere, focusTrapTarget, type FocusTrapState } from "@/lib/shared/dialog-focus";
+import {
+  anotherModalOpen,
+  escapeBelongsElsewhere,
+  focusTrapTarget,
+  handOffRestoreTargets,
+  watchModals,
+  watchModalsClosed,
+  watchUrgentModalOpened,
+  type FocusTrapState,
+} from "@/lib/shared/dialog-focus";
 
 const layer = (expanded: boolean) => ({ querySelector: () => (expanded ? {} : null) });
 const target = (attrs: Record<string, string>) => ({ getAttribute: (name: string) => attrs[name] ?? null });
@@ -71,5 +80,156 @@ describe("focusTrapTarget", () => {
     const outside = { ...base, active: "z", inModal: false };
     expect(focusTrapTarget(outside)).toBe("a");
     expect(focusTrapTarget({ ...outside, shiftKey: true })).toBe("c");
+  });
+});
+
+/**
+ * Racine simulée : des modales ouvertes, chacune cédant ou non sa place
+ * (`data-modal-yields`) ; la recherche « sans celles qui cèdent » se lit au
+ * `:not(...)` du sélecteur.
+ */
+function rootWith(...yields: boolean[]) {
+  const seen: string[] = [];
+  const root = {
+    seen,
+    querySelector: (selector: string) => {
+      seen.push(selector);
+      const candidates = selector.includes(":not([data-modal-yields])") ? yields.filter((y) => !y) : yields;
+      return candidates.length > 0 ? {} : null;
+    },
+  };
+  return root as typeof root & Pick<ParentNode, "querySelector">;
+}
+
+describe("anotherModalOpen", () => {
+  it("lit une modale `aria-modal` ou en chargement", () => {
+    expect(anotherModalOpen(rootWith(false))).toBe(true);
+    expect(anotherModalOpen(rootWith())).toBe(false);
+  });
+
+  it("cherche aussi la place d'une modale en chargement", () => {
+    const root = rootWith();
+    anotherModalOpen(root);
+    expect(root.seen[0]).toContain("[data-modal-pending]");
+  });
+
+  it("une ouverture urgente passe une modale qui cède sa place, pas les autres", () => {
+    expect(anotherModalOpen(rootWith(true), { overYielding: true })).toBe(false);
+    expect(anotherModalOpen(rootWith(true, false), { overYielding: true })).toBe(true);
+    // Sans l'option, toute modale retient.
+    expect(anotherModalOpen(rootWith(true))).toBe(true);
+  });
+});
+
+describe("watchModals / watchModalsClosed", () => {
+  const globals = globalThis as unknown as { document?: unknown; MutationObserver?: unknown };
+  const saved = { document: globals.document, MutationObserver: globals.MutationObserver };
+
+  afterEach(() => {
+    globals.document = saved.document;
+    globals.MutationObserver = saved.MutationObserver;
+    jest.useRealTimers();
+  });
+
+  /** DOM et observateur simulés : `mutate()` joue une mutation. */
+  function fakeDom(initiallyOpen = true) {
+    const state = { modal: initiallyOpen, disconnected: 0, observed: null as unknown };
+    let callback: ((records: unknown[]) => void) | null = null;
+    globals.document = { querySelector: () => (state.modal ? {} : null) };
+    globals.MutationObserver = class {
+      constructor(cb: (records: unknown[]) => void) {
+        callback = cb;
+      }
+      observe(_root: unknown, options: unknown) {
+        state.observed = options;
+      }
+      disconnect() {
+        state.disconnected += 1;
+      }
+    };
+    return { state, mutate: (records: unknown[] = []) => callback?.(records) };
+  }
+
+  it("prévient une fois la dernière modale fermée, relectures espacées, puis se débranche", () => {
+    jest.useFakeTimers();
+    const { state, mutate } = fakeDom();
+    const calls: number[] = [];
+    watchModalsClosed(() => calls.push(1));
+    expect(state.observed).toEqual(expect.objectContaining({ childList: true, subtree: true }));
+    mutate();
+    jest.advanceTimersByTime(1_100);
+    expect(calls).toHaveLength(0);
+    state.modal = false;
+    mutate();
+    mutate();
+    expect(calls).toHaveLength(0);
+    jest.advanceTimersByTime(1_100);
+    expect(calls).toHaveLength(1);
+    expect(state.disconnected).toBe(1);
+  });
+
+  it("watchUrgentModalOpened : réagit sans délai à un élément ajouté, ignore les textes", () => {
+    const { state, mutate } = fakeDom(false);
+    const calls: number[] = [];
+    watchUrgentModalOpened(() => calls.push(1), globals.document as Node & ParentNode);
+    const text = { nodeType: 3 };
+    const element = { nodeType: 1 };
+    // Un texte du plateau mis à jour : la page n'est pas relue.
+    state.modal = true;
+    mutate([{ type: "childList", addedNodes: [text] }]);
+    expect(calls).toHaveLength(0);
+    mutate([{ type: "childList", addedNodes: [element] }]);
+    expect(calls).toHaveLength(1);
+    expect(state.disconnected).toBe(1);
+  });
+
+  it("watchUrgentModalOpened : une urgente déjà ouverte prévient aussitôt", () => {
+    const { state } = fakeDom(true);
+    const calls: number[] = [];
+    watchUrgentModalOpened(() => calls.push(1), globals.document as Node & ParentNode);
+    expect(calls).toHaveLength(1);
+    expect(state.observed).toBeNull();
+  });
+
+  it("prévient aussitôt si la condition tient déjà, sans observer", () => {
+    const { state } = fakeDom(false);
+    const calls: number[] = [];
+    watchModalsClosed(() => calls.push(1));
+    expect(calls).toHaveLength(1);
+    expect(state.observed).toBeNull();
+  });
+
+  it("l'arrêt débranche l'observateur et annule la relecture prévue", () => {
+    jest.useFakeTimers();
+    const { state, mutate } = fakeDom();
+    const calls: number[] = [];
+    const stop = watchModals(() => !state.modal, () => calls.push(1), {} as Node);
+    state.modal = false;
+    mutate();
+    stop();
+    jest.advanceTimersByTime(1_100);
+    expect(calls).toHaveLength(0);
+    expect(state.disconnected).toBe(1);
+  });
+});
+
+describe("handOffRestoreTargets", () => {
+  it("les modales du dessus qui visaient la modale fermée héritent de sa cible", () => {
+    const launch = Symbol("launch");
+    const other = Symbol("other");
+    const targets = new Map<symbol, string | null>([
+      [launch, "titre-invitation"],
+      [other, "bouton-page"],
+    ]);
+    handOffRestoreTargets(targets, (element) => element === "titre-invitation", "body");
+    expect(targets.get(launch)).toBe("body");
+    expect(targets.get(other)).toBe("bouton-page");
+  });
+
+  it("laisse une cible absente telle quelle", () => {
+    const token = Symbol("t");
+    const targets = new Map<symbol, string | null>([[token, null]]);
+    handOffRestoreTargets(targets, () => true, "x");
+    expect(targets.get(token)).toBeNull();
   });
 });

@@ -258,7 +258,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // préférence d'affichage, exportée et effacée à l'anonymisation. La marque
     // de session (`bg_user_sessions.certify_prompt_due`) part avec la session.
     finalite:
-      "Non par défaut : après une connexion par Discord ou Blizzard, une fenêtre te propose une fois de certifier ton tag Discord s'il ne l'est pas (la session de connexion note seulement qu'elle reste à proposer, marque effacée avec la session). « Ne plus voir » : elle ne s'ouvre plus, sur aucun appareil (date du choix gardée) ; la certification reste possible dans Mon profil. Figure dans l'export de tes données, effacé si le compte est anonymisé",
+      "Non par défaut : après une connexion par Discord ou Blizzard, une fenêtre te propose une fois de certifier ton tag Discord s'il ne l'est pas (la session de connexion note seulement qu'elle reste à proposer, marque effacée avec la session). « Ne plus voir » : elle ne s'ouvre plus, sur aucun appareil (date du choix gardée) — et, sur la fiche d'un tournoi, l'invitation à certifier faite à qui mène une équipe ne s'ouvre plus quand seul son tag Discord manque (jamais l'alerte d'une équipe sans aucun contact) ; la certification reste possible dans Mon profil. Figure dans l'export de tes données, effacé si le compte est anonymisé",
     base: "Exécution du contrat",
     duree: "Durée du compte",
   },
