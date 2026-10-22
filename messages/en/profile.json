@@ -76,7 +76,7 @@
     "tagged": "Provided by your Blizzard account, and updated at every login.",
     "noTag": "Blizzard account linked, without a BattleTag: Blizzard will fill it in at your next login.",
     "change": "To change it, remove Blizzard from “Connected apps” (after adding another way to log in if it is your only one), then link the right account.",
-    "hide": "To stop showing it to other players, untick “OW BattleTag” below."
+    "hide": "To remove it from your player page, the directory and rosters, untick “OW BattleTag” below."
   },
   "discord": {
     "label": "Discord username",

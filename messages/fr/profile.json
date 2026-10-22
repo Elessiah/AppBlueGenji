@@ -76,7 +76,7 @@
     "tagged": "Fourni par ton compte Blizzard, et mis à jour à chaque connexion.",
     "noTag": "Compte Blizzard rattaché, sans BattleTag : Blizzard le remplira à ta prochaine connexion.",
     "change": "Pour en changer, retire Blizzard des « Applications connectées » (après avoir ajouté un autre moyen de connexion si c'est le seul), puis rattache le bon compte.",
-    "hide": "Pour ne plus le montrer aux autres joueurs, décoche « BattleTag OW » plus bas."
+    "hide": "Pour le retirer de ta fiche, de l'annuaire et des rosters, décoche « BattleTag OW » plus bas."
   },
   "discord": {
     "label": "Pseudo Discord",

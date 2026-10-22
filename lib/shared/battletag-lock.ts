@@ -134,6 +134,6 @@ export function battletagLockNotice(state: {
   }
   return {
     status: "Fourni par ton compte Blizzard, et mis à jour à chaque connexion.",
-    details: [change, "Pour ne plus le montrer aux autres joueurs, décoche « BattleTag OW » plus bas."],
+    details: [change, "Pour le retirer de ta fiche, de l'annuaire et des rosters, décoche « BattleTag OW » plus bas."],
   };
 }

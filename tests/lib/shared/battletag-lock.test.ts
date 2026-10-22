@@ -85,6 +85,10 @@ describe("battletagLockNotice", () => {
     // qui n'en nommerait qu'un enverrait la moitié des joueurs au mauvais
     // endroit.
     expect(notice).toContain("BattleTag OW");
+    // Décocher ne le cache pas aux parties d'un match (fenêtre « Contacts ») :
+    // la phrase ne doit pas promettre de le cacher « aux autres joueurs ».
+    expect(notice).not.toContain("autres joueurs");
+    expect(notice).toContain("fiche");
   });
 
   it("couvre le compte rattaché **sans** BattleTag sans inventer de cause", () => {
