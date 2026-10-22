@@ -151,6 +151,16 @@
   cursor: not-allowed;
 }
 
+/* Ligne d'état du staff et son « i » : la marge passe sur la rangée, pour que
+   le bouton reste centré sur la phrase. */
+.hintRow {
+  margin: 0 0 14px;
+}
+
+.hintRow .hint {
+  margin: 0;
+}
+
 .hint {
   margin: 0 0 14px;
   font-size: 12.5px;

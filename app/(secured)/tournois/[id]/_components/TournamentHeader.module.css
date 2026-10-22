@@ -218,11 +218,6 @@
   font-size: 16px;
 }
 
-.metaHint {
-  border-bottom: 1px dotted var(--line-strong-cy, rgba(180, 210, 230, 0.28));
-  cursor: help;
-}
-
 /* Jauge d'effectif : la seule information de l'en-tête qui gagne à être vue
    plutôt que lue. */
 .gauge {
@@ -246,9 +241,11 @@
 
 /* ---------- Étage 4 : actions ---------- */
 
+/* Alignés en haut : la mention de retransmission, son « i » ouvert, grandit
+   vers le bas sans faire glisser les boutons voisins au milieu de la rangée. */
 .actions {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   flex-wrap: wrap;
 }
@@ -269,6 +266,11 @@
   line-height: 1.45;
   color: var(--ink-mute);
   max-width: 46ch;
+}
+
+/* La ligne visible de la mention de retransmission, à côté de son « i ». */
+.registerNotice p {
+  margin: 0;
 }
 
 /* `a` est sans soulignement ni couleur dans tout le site : le lien de la
