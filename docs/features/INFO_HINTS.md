@@ -47,7 +47,10 @@ après le libellé qu'elles expliquent, et se réécrivent **court**.
   `overflow: hidden` (une bulle y serait rognée) et les sections `.fade-in`
   gardent un `transform` (contextes d'empilement : la section suivante la
   recouvrirait). Dans le flux, elle ne dépasse jamais son conteneur — aucun
-  défilement horizontal à 375 px.
+  défilement horizontal à 375 px. Aucune largeur maximale sur le panneau
+  lui-même (`flex: 0 0 100%`) : bornée, sa base redevenait assez étroite pour
+  se loger **à côté** d'un libellé court sur une rangée large ; la mesure de
+  lecture (68ch) se pose sur son contenu (`.panel > *`).
 - **Fermée, elle reste dans le DOM** (`hidden`) avec son `id` : un champ qui la
   cite dans son `aria-describedby` garde sa description entière.
 - Se referme par **Échap** (focus rendu au bouton ; écouté sur le composant
