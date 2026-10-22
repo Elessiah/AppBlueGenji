@@ -163,17 +163,18 @@ export function TournamentHeader({
             )}
             {/* Dit pourquoi aucun bouton n'apparaît, sans en ajouter un vers la
                 connexion : la page sans compte est faite pour regarder. */}
-            {spectator && (
-              // L'explication derrière le « i » : un `title` échappe au toucher
-              // et au clavier (`docs/features/INFO_HINTS.md`).
-              <InfoHintRow>
-                <Pill variant="neutral">{t("header.spectator")}</Pill>
-                <InfoHint id="tournament-spectator-hint" subject={t("header.spectator")}>
-                  <p>{t("header.spectatorTitle")}</p>
-                </InfoHint>
-              </InfoHintRow>
-            )}
+            {spectator && <Pill variant="neutral">{t("header.spectator")}</Pill>}
           </div>
+          {/* L'explication derrière le « i » : un `title` échappe au toucher et
+              au clavier (`docs/features/INFO_HINTS.md`). Posé dans la barre
+              même, hors du groupe `.viewer` : ouverte, l'explication passe à la
+              ligne sur toute la barre, au lieu d'élargir le groupe — qui, en
+              s'élargissant, déplaçait le bouton qu'on vient de cliquer. */}
+          {spectator && (
+            <InfoHint id="tournament-spectator-hint" subject={t("header.spectator")}>
+              <p>{t("header.spectatorTitle")}</p>
+            </InfoHint>
+          )}
         </div>
 
         {/* Illustration : un bandeau entre les outils du lecteur et l'identité,

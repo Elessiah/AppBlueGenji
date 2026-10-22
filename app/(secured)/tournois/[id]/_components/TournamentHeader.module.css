@@ -27,11 +27,13 @@
 
 /* ---------- Étage 1 : outils du lecteur ---------- */
 
+/* Le « i » de la pastille Spectateur est un élément de la barre (après
+   `.viewer`), son explication ouverte y passe à la ligne sur toute la largeur. */
 .utility {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 12px 8px;
   flex-wrap: wrap;
 }
 
@@ -63,7 +65,10 @@
 /* Témoin de flux et rôle du lecteur : ce qui parle de *qui regarde*, tenu à
    l'écart des faits du tournoi — « À jour » au milieu des tags se lisait comme
    une propriété du tournoi. */
+/* Marge automatique : avec le « i » qui le suit, le groupe reste calé à droite
+   (sinon `space-between` le centrerait entre le retour et le bouton). */
 .viewer {
+  margin-inline-start: auto;
   display: inline-flex;
   align-items: center;
   gap: 8px;
