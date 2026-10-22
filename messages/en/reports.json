@@ -164,7 +164,7 @@
     "notFoundBody": "This report doesn't exist, has been erased, or doesn't concern you: only the targeted players and members of targeted teams can view it.",
     "eyebrow": "REPORT NO. {id}",
     "heading": "A report concerns you",
-    "lead": "The Bluegenji Esport association is reviewing this report. If you believe it's unfounded — you hold the rights to the logo, the content is yours, the context is different — appeal it: your response is read by the administrators before any final decision.",
+    "lead": "The association is reviewing this report. Think it's unfounded? Appeal it: the admins read your response before any final decision.",
     "logoHidden": "<strong>The logo of “<team>{name}</team>” has been hidden</strong> since {since}. Unless you appeal, it will be <strong>permanently deleted on {purge}</strong>. If the appeal succeeds, it's restored as it was.",
     "avatarHidden": "<strong>Your avatar has been hidden</strong> since {since}. Unless you appeal, it will be <strong>permanently deleted on {purge}</strong>. If the appeal succeeds, it's restored as it was.",
     "logoRemoved": "<strong>The logo of “<team>{name}</team>” was deleted</strong> on {date} following this report. If you hold the rights to it, appeal: if the appeal succeeds, you'll be able to upload it again.",
@@ -181,6 +181,7 @@
     "addContest": "Add an appeal",
     "contest": "Appeal this report",
     "howItWorks": "How does a report work?",
-    "archived": "This report is archived: appealing it reopens it, and the association is notified."
+    "archived": "This report is archived: appealing it reopens it, and the association is notified.",
+    "leadMore": "For example: you hold the rights to the logo, the content is yours, or the context is different."
   }
 }

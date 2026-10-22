@@ -48,5 +48,15 @@ export function registrationStreamNotice(solo: boolean): string {
   return `Les matchs de ce tournoi peuvent être diffusés en direct et enregistrés, avec ${shown} — jamais de webcam ni de chat vocal. Tu peux t'y opposer et apparaître sous un nom neutre.${discord}`;
 }
 
+/**
+ * La ligne **visible** près du bouton d'inscription (information en couches,
+ * `docs/features/INFO_HINTS.md`) : l'essentiel — diffusion, enregistrement — et
+ * le droit d'opposition. La mention entière (`registrationStreamNotice`) passe
+ * derrière le bouton « i » de la fiche, et reste lue en entier dans la
+ * confirmation de l'inscription.
+ */
+export const REGISTRATION_STREAM_NOTICE_SHORT =
+  "Les matchs peuvent être diffusés en direct et enregistrés. Tu peux t'y opposer et apparaître sous un nom neutre.";
+
 /** Libellé du lien qui suit la mention de `registrationStreamNotice`. */
 export const REGISTRATION_STREAM_NOTICE_LINK_LABEL = "En savoir plus";

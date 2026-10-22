@@ -148,4 +148,4 @@ export function refereeSchedulingErrorMessage(code: string | null | undefined): 
  * fiche : ce qu'elle promet aux engagés ne doit être rédigé qu'une fois.
  */
 export const REFEREE_SCHEDULING_DESCRIPTION =
-  "Chaque match attend qu'un arbitre ou un admin fixe sa date et son heure (« À planifier »), puis « En attente de départ » jusqu'à l'heure dite, où il entre en lancement.";
+  "Chaque match attend qu'un arbitre ou un admin fixe sa date (« À planifier »), puis reste « En attente de départ » jusqu'à l'heure dite, où il entre en lancement.";

@@ -63,7 +63,7 @@
     "admin": "⚙ Admin",
     "adminTitle": "Tu disposes des droits d'organisation sur ce tournoi.",
     "spectator": "Spectateur",
-    "spectatorTitle": "Tu suis ce tournoi sans compte : la page est en lecture seule et se met à jour d'elle-même, plus ou moins souvent selon l'affluence sur le site.",
+    "spectatorTitle": "Tu suis ce tournoi sans compte : la page est en lecture seule et se met à jour d'elle-même, plus ou moins souvent selon l'affluence.",
     "officialChannel": "Chaîne officielle",
     "officialChannelOn": "Chaîne officielle · {platform}",
     "meta": {
@@ -317,7 +317,7 @@
   "planning": {
     "titleOn": "Matchs planifiés par l'arbitrage",
     "titleOff": "Planification des matchs",
-    "descriptionOn": "Chaque match attend qu'un arbitre ou un admin fixe sa date et son heure (« À planifier »), puis « En attente de départ » jusqu'à l'heure dite, où il entre en lancement.",
+    "descriptionOn": "Chaque match attend qu'un arbitre ou un admin fixe sa date (« À planifier »), puis reste « En attente de départ » jusqu'à l'heure dite, où il entre en lancement.",
     "descriptionOff": "Désactivée : un match sans date entre en lancement dès que ses deux engagés sont connus."
   },
   "settings": {

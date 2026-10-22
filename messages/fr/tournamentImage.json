@@ -3,16 +3,16 @@
     "cropTitle": "Recadrer l'image du tournoi",
     "drop": "Dépose l'image ici",
     "add": "Ajouter une illustration ou un logo",
-    "hint": "Facultatif · PNG, JPEG ou WebP, 5 Mo max · toutes dimensions acceptées, tu choisis la zone gardée",
+    "hint": "Facultatif · PNG, JPEG ou WebP, 5 Mo max · tu choisis ensuite la zone gardée",
     "kind": "Type d'image",
     "fits": {
       "COVER": {
         "label": "Illustration",
-        "hint": "Remplit le bandeau du tournoi. Clique sur l'aperçu pour choisir le point qui doit rester visible."
+        "hint": "Remplit le bandeau du tournoi ; clique sur l'aperçu pour choisir le point qui reste visible."
       },
       "CONTAIN": {
         "label": "Logo",
-        "hint": "Toujours affiché en entier, dans une pastille à côté du nom — idéal pour un fond transparent."
+        "hint": "Toujours entier, dans une pastille près du nom — idéal sur fond transparent."
       }
     },
     "focus": "Point de cadrage",
@@ -22,7 +22,7 @@
     "preview": "Aperçu",
     "previewBanner": "Bandeau de la fiche",
     "previewCard": "Carte de la liste",
-    "logoHint": "Le logo s'affiche en entier à côté du nom du tournoi, sur la fiche comme sur les cartes. Un fond transparent y rend le mieux.",
+    "logoHint": "Le logo s'affiche ainsi, en entier, sur la fiche comme sur les cartes.",
     "replace": "Remplacer l'image",
     "recrop": "Recadrer",
     "remove": "Retirer l'image"

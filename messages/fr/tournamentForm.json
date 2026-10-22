@@ -135,8 +135,8 @@
       "raceWithDraw": "premier à {wins, plural, one {# manche gagnée} other {# manches gagnées}}, {maps} au maximum. Le match peut se clore sans vainqueur (map nulle)."
     },
     "maxMaps": "Maps décisives au maximum",
-    "maxMapsHint": "Somme des deux scores au maximum. Une map nulle ne compte dans aucun des deux et n'entame donc pas ce plafond. L'abaisser sous {max} rend l'égalité possible.",
-    "registrationIntro": "Contrôlées à chaque inscription d'un joueur. Les <strong>équipes fantômes</strong> inscrites par le staff n'y sont pas soumises, et les engagés déjà inscrits ne sont jamais relus.",
+    "maxMapsHint": "Somme des deux scores au maximum ; une map nulle n'y compte pas. Sous {max}, l'égalité devient possible.",
+    "registrationIntro": "Contrôlées à chaque inscription d'un joueur. Les <strong>équipes fantômes</strong> inscrites par le staff y échappent, et un engagé déjà inscrit n'est jamais relu.",
     "conditionsOpen": "En l'état, ce tournoi est ouvert à tous : aucune condition ne sera affichée.",
     "conditionsRead": "Les participants liront : « {summary} ».",
     "conditions": {
@@ -155,13 +155,13 @@
     },
     "discord": "Discord vérifié",
     "discordHint": {
-      "TEAM": "Un tag Discord <em>vérifié</em> est un tag dont le joueur a prouvé qu'il lui appartient : c'est la seule façon pour l'organisation de joindre l'équipe pendant le tournoi.",
-      "SOLO": "Un tag Discord <em>vérifié</em> est un tag dont le joueur a prouvé qu'il lui appartient : c'est la seule façon pour l'organisation de joindre le joueur pendant le tournoi."
+      "TEAM": "Un tag Discord <em>vérifié</em> est un tag que son joueur a prouvé être le sien : c'est le seul moyen pour l'organisation de joindre l'équipe pendant le tournoi.",
+      "SOLO": "Un tag Discord <em>vérifié</em> est un tag que son joueur a prouvé être le sien : c'est le seul moyen pour l'organisation de joindre le joueur pendant le tournoi."
     },
     "blizzard": "Compte Blizzard",
     "blizzardHint": {
-      "TEAM": "Un compte Battle.net <em>rattaché</em> depuis « Mon profil » atteste le BattleTag de chaque joueur : un tag simplement saisi ne prouve rien.",
-      "SOLO": "Un compte Battle.net <em>rattaché</em> depuis « Mon profil » atteste le BattleTag du joueur : un tag simplement saisi ne prouve rien."
+      "TEAM": "Un compte Battle.net <em>rattaché</em> depuis « Mon profil » atteste le BattleTag de chaque joueur ; un tag simplement saisi ne prouve rien.",
+      "SOLO": "Un compte Battle.net <em>rattaché</em> depuis « Mon profil » atteste le BattleTag du joueur ; un tag simplement saisi ne prouve rien."
     },
     "blizzardMarvel": "Sans objet sur un tournoi Marvel Rivals : mieux vaut laisser « Aucun joueur ».",
     "minPlayers": "Joueurs minimum dans l'équipe",
@@ -174,7 +174,7 @@
     },
     "referee": {
       "label": "Matchs planifiés par l'arbitrage",
-      "description": "Chaque match attend qu'un arbitre ou un admin fixe sa date et son heure (« À planifier »), puis « En attente de départ » jusqu'à l'heure dite, où il entre en lancement.",
+      "description": "Chaque match attend qu'un arbitre ou un admin fixe sa date (« À planifier »), puis reste « En attente de départ » jusqu'à l'heure dite, où il entre en lancement.",
       "finished": "Le tournoi est terminé : l'option n'est plus modifiable.",
       "create": "Modifiable ensuite, jusqu'à la clôture du tournoi — même en cours.",
       "edit": "Modifiable jusqu'à la clôture du tournoi — même en cours.",
@@ -183,7 +183,7 @@
     },
     "launchPhase": {
       "label": "Phase de lancement des matchs",
-      "description": "Option allumée, chaque match ouvre à son heure une fenêtre de lancement : les deux équipes (et le caster) cliquent « Prêt », et le match part quand tout le monde l'est, quand l'arbitrage le force, ou d'office après {launchDelay} minutes. Éteinte (par défaut), un match part dès son heure, sans « Prêt » ni fenêtre de lancement — et un match sans heure, dès que ses deux adversaires sont connus (sauf planification par l'arbitrage).",
+      "description": "Allumée : à son heure, chaque match attend que les deux équipes (et le caster) cliquent « Prêt » ; l'arbitrage peut le forcer, et il part d'office après {launchDelay} minutes. Éteinte (par défaut) : un match part dès son heure ou, sans heure, dès que ses deux adversaires sont connus (sauf planification par l'arbitrage).",
       "scope": "Modifiable jusqu'au début du tournoi, puis figée.",
       "locked": "Le tournoi a commencé : l'option n'est plus modifiable."
     },
@@ -198,23 +198,23 @@
     "enduranceWin": "Points par victoire de map",
     "enduranceLoss": "Points par défaite de map",
     "endurancePlayoff": "Équipes en play-offs",
-    "endurancePlayoffHint": "La phase d'endurance s'arrête à cet effectif. À 8, l'arbre suit le tableau du règlement (8v4, 6v2, 1v5, 3v7) avec petite finale.",
+    "endurancePlayoffHint": "La phase d'endurance s'arrête à cet effectif. À 8, l'arbre suit le tableau du règlement (8v4, 6v2, 1v5, 3v7), avec petite finale.",
     "enduranceMaxRounds": "Manches maximum",
-    "enduranceMaxRoundsHint": "0 = aucune limite : la phase court jusqu'à l'effectif ci-dessus. Sinon elle s'arrête à cette manche et les meilleures du classement sont qualifiées, les autres sortent.",
+    "enduranceMaxRoundsHint": "0 = sans limite : la phase court jusqu'à l'effectif des play-offs. Sinon, elle s'arrête à cette manche : les mieux classées sont qualifiées, les autres sortent.",
     "enduranceEarlyExit": "Sortie anticipée « hors course »",
-    "enduranceEarlyExitHint": "Cochée, une équipe qui ne peut plus mathématiquement rejoindre les play-offs sort avant la dernière manche, capital en poche (sortie reportée d'une manche si elle laissait un nombre impair d'équipes en lice). Décochée (par défaut), personne n'est écarté d'avance : seuls un capital à zéro et le trait de la dernière manche font sortir.",
+    "enduranceEarlyExitHint": "Cochée : une équipe qui ne peut plus atteindre les play-offs sort avant la dernière manche, capital en poche (une manche plus tard si elle laissait un nombre impair d'équipes). Décochée (par défaut) : seuls un capital à zéro et le trait de la dernière manche font sortir.",
     "enduranceEarlyExitNoCap": "Indisponible tant que « Manches maximum » vaut 0 : sans dernière manche fixée, il n'y a rien à devancer.",
     "enduranceEarlyExitFreeScore": "Indisponible avec le format de match « Libre » : il faut un BO ou un FT pour savoir ce qu'une équipe peut encore gagner.",
     "draws": "Égalités autorisées en qualification",
     "drawsUnavailable": "Indisponible en saisie de score libre : il faut un format de match pour borner la rencontre.",
-    "drawsHint": "Une map nulle peut arrêter la rencontre avant l’objectif : le match se clôt alors sur 2-2, ou sur 2-1 si une seule map a été partagée. Le capital d’endurance se comptant map par map, il l’encaisse sans règle supplémentaire. L’arbre final, lui, exige toujours un vainqueur. Cocher cette case ouvre aussi le réglage « Maps décisives au maximum », plus haut.",
+    "drawsHint": "Une map nulle peut clore la rencontre avant l'objectif : 2-2, ou 2-1 si une seule map est nulle. Le capital, compté map par map, l'encaisse ; l'arbre final exige toujours un vainqueur. Cocher ouvre aussi « Maps décisives au maximum », plus haut.",
     "playoffFormat": "Format des play-offs",
     "playoffFormats": {
       "MEME": "Le même qu’en qualification",
       "BO": "Best of (BO)",
       "FT": "First to (FT)"
     },
-    "playoffFormatHint": "L’arbre final n’accepte jamais d’égalité, quel que soit ce réglage : il lui faut savoir qui joue le tour suivant. Le poser ici sert à jouer un vrai FT3 en play-offs quand la qualification tolère le nul.",
+    "playoffFormatHint": "L'arbre final n'accepte jamais d'égalité, quel que soit ce réglage. Il sert à jouer un vrai FT3 en play-offs quand la qualification tolère le nul.",
     "playoffFormatValue": {
       "BO": "Play-offs : manches jouées (impair)",
       "FT": "Play-offs : manches à gagner"
@@ -223,7 +223,7 @@
     "survivalFirstCutHint": "Laisse le classement se former avant la première élimination.",
     "survivalRounds": "Manches entre les coupes suivantes",
     "survivalRoundsHint": "Cadence appliquée après la première coupe.",
-    "survivalExplain": "Toutes les équipes s'affrontent par paires selon leur classement. À chaque coupe, les deux dernières équipes sont éliminées, jusqu'à la championne. Si le nombre d'inscrites est impair, un barrage entre les deux dernières ouvre le tournoi — aucune victoire d'office n'est distribuée.",
+    "survivalExplain": "Toutes les équipes s'affrontent par paires selon leur classement ; à chaque coupe, les deux dernières sont éliminées, jusqu'à la championne. Nombre d'inscrites impair : un barrage entre les deux dernières ouvre le tournoi, sans victoire d'office.",
     "swissRounds": "Nombre de rondes",
     "swissRecommended": {
       "TEAM": "Recommandé pour {count} équipes : {rounds, plural, one {# ronde} other {# rondes}}.",
@@ -234,7 +234,7 @@
     "swissPointsDraw": "Points par match nul",
     "swissPointsLoss": "Points par défaite",
     "swissByeHint": "Une victoire d'office rapporte autant qu'une victoire.",
-    "swissExplain": "Aucune élimination : toutes les équipes jouent les {rounds} rondes. À chaque ronde, on affronte une équipe ayant un total de points proche du sien, sans jamais rejouer le même adversaire tant que c'est possible. À égalité de points, le départage se fait au Buchholz (somme des points des adversaires rencontrés).",
+    "swissExplain": "Aucune élimination : chacun joue les {rounds} rondes, contre un adversaire au total de points proche, sans revanche tant que c'est possible. À égalité de points, départage au Buchholz (somme des points des adversaires rencontrés).",
     "options": "Options supplémentaires",
     "thirdPlace": "Petite finale",
     "thirdPlaceHint": "Ajoute un match pour déterminer la 3ᵉ place entre les deux perdants des demi-finales."
@@ -255,7 +255,7 @@
     "add": "+ Ajouter une phase",
     "maxReachedHint": "Maximum de {max} phases atteint.",
     "previewTitle": "Aperçu du plan",
-    "modeHint": "Un nombre fixe fait sauter la phase si moins d'équipes se présentent ; un pourcentage s'adapte au nombre réel d'inscrites.",
+    "modeHint": "Un nombre fixe saute la phase s'il manque des équipes ; un pourcentage suit le nombre réel d'inscrites.",
     "plan": {
       "phase": "Phase {position}",
       "teams": "{count, plural, one {# équipe} other {# équipes}}",

@@ -27,11 +27,13 @@
 
 /* ---------- Étage 1 : outils du lecteur ---------- */
 
+/* Le « i » de la pastille Spectateur est un élément de la barre (après
+   `.viewer`), son explication ouverte y passe à la ligne sur toute la largeur. */
 .utility {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 12px 8px;
   flex-wrap: wrap;
 }
 
@@ -63,7 +65,10 @@
 /* Témoin de flux et rôle du lecteur : ce qui parle de *qui regarde*, tenu à
    l'écart des faits du tournoi — « À jour » au milieu des tags se lisait comme
    une propriété du tournoi. */
+/* Marge automatique : avec le « i » qui le suit, le groupe reste calé à droite
+   (sinon `space-between` le centrerait entre le retour et le bouton). */
 .viewer {
+  margin-inline-start: auto;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -218,11 +223,6 @@
   font-size: 16px;
 }
 
-.metaHint {
-  border-bottom: 1px dotted var(--line-strong-cy, rgba(180, 210, 230, 0.28));
-  cursor: help;
-}
-
 /* Jauge d'effectif : la seule information de l'en-tête qui gagne à être vue
    plutôt que lue. */
 .gauge {
@@ -246,9 +246,11 @@
 
 /* ---------- Étage 4 : actions ---------- */
 
+/* Alignés en haut : la mention de retransmission, son « i » ouvert, grandit
+   vers le bas sans faire glisser les boutons voisins au milieu de la rangée. */
 .actions {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   flex-wrap: wrap;
 }
@@ -269,6 +271,11 @@
   line-height: 1.45;
   color: var(--ink-mute);
   max-width: 46ch;
+}
+
+/* La ligne visible de la mention de retransmission, à côté de son « i ». */
+.registerNotice p {
+  margin: 0;
 }
 
 /* `a` est sans soulignement ni couleur dans tout le site : le lien de la

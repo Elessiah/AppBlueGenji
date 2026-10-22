@@ -16,7 +16,7 @@ import {
 } from "@/lib/shared/match-format";
 import { MIN_PLAYERS_BOUNDS, type RegistrationFilters } from "@/lib/shared/registration-filters";
 import type { PhaseConfig, PhaseIssue, ResolvedPhase } from "@/lib/shared/tournament-phases";
-import type { PhaseFormat } from "@/lib/shared/types";
+import type { PhaseFormat, TournamentFormat } from "@/lib/shared/types";
 import { mapError } from "../[id]/_lib/error-map";
 
 /**
@@ -46,6 +46,21 @@ export function formatDescriptionText(text: TournamentFormText, format: MatchFor
   if (!format) return text.t("form.notation.noLimit");
   const values = { wins: matchWinsRequired(format), maps: String(matchMaxMaps(format)) };
   return text.t(matchAllowsDraw(format) ? "form.notation.raceWithDraw" : "form.notation.race", values);
+}
+
+/**
+ * Fonctionnement d'un format qui ne se devine pas (Survie, ronde suisse), posé
+ * derrière le « i » du libellé « Format » — `null` pour les autres formats,
+ * dont le nom suffit.
+ */
+export function formatExplainText(
+  text: TournamentFormText,
+  format: TournamentFormat,
+  swissRounds: number,
+): string | null {
+  if (format === "SURVIVAL") return text.t("settings.survivalExplain");
+  if (format === "SWISS") return text.t("settings.swissExplain", { rounds: swissRounds });
+  return null;
 }
 
 /** Aide sous le type de format de match — `matchFormatHint`. */

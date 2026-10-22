@@ -18,6 +18,10 @@
   color: var(--ink-mute);
 }
 
+.lead p {
+  margin: 0;
+}
+
 .muted {
   margin: 0;
   font-size: 13px;

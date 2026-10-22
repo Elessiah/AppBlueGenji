@@ -151,8 +151,8 @@ describe("formulaire et règles", () => {
   it("le délai d'office vient de LAUNCH_AUTO_DELAY_MINUTES", () => {
     expect(frForm.form.launchPhase.description).toContain("{launchDelay} minutes");
     expect(enForm.form.launchPhase.description).toContain("{launchDelay} minutes");
-    expect(frForm.form.launchPhase.description).toMatch(/un match sans heure, dès que ses deux adversaires sont connus/);
-    expect(enForm.form.launchPhase.description).toMatch(/a match with no time, as soon as both its opponents are known/);
+    expect(frForm.form.launchPhase.description).toMatch(/sans heure, dès que ses deux adversaires sont connus/);
+    expect(enForm.form.launchPhase.description).toMatch(/with no time, as soon as both its opponents are known/);
     expect(read("app/(secured)/tournois/_components/LaunchPhaseField.tsx")).toContain(
       "launchDelay: LAUNCH_AUTO_DELAY_MINUTES",
     );

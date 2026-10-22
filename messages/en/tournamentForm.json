@@ -135,8 +135,8 @@
       "raceWithDraw": "first to {wins, plural, one {# map won} other {# maps won}}, {maps} at most. The match can end without a winner (drawn map)."
     },
     "maxMaps": "Maximum deciding maps",
-    "maxMapsHint": "Maximum sum of both scores. A drawn map counts for neither side and so doesn't eat into this cap. Lowering it below {max} makes a draw possible.",
-    "registrationIntro": "Checked each time a player registers. <strong>Ghost teams</strong> registered by the staff aren't subject to them, and entrants already registered are never rechecked.",
+    "maxMapsHint": "Maximum sum of both scores; a drawn map doesn't count. Below {max}, a draw becomes possible.",
+    "registrationIntro": "Checked each time a player registers. <strong>Ghost teams</strong> registered by the staff are exempt, and an entrant already registered is never rechecked.",
     "conditionsOpen": "As it stands, this tournament is open to everyone: no requirement will be shown.",
     "conditionsRead": "Participants will read: “{summary}”.",
     "conditions": {
@@ -155,13 +155,13 @@
     },
     "discord": "Verified Discord",
     "discordHint": {
-      "TEAM": "A <em>verified</em> Discord tag is one the player has proven is theirs: it's the only way for the organizers to reach the team during the tournament.",
-      "SOLO": "A <em>verified</em> Discord tag is one the player has proven is theirs: it's the only way for the organizers to reach the player during the tournament."
+      "TEAM": "A <em>verified</em> Discord tag is one its player has proven is theirs: it's the only way for the organizers to reach the team during the tournament.",
+      "SOLO": "A <em>verified</em> Discord tag is one its player has proven is theirs: it's the only way for the organizers to reach the player during the tournament."
     },
     "blizzard": "Blizzard account",
     "blizzardHint": {
-      "TEAM": "A Battle.net account <em>linked</em> from “My profile” vouches for each player's BattleTag: a tag that's simply typed in proves nothing.",
-      "SOLO": "A Battle.net account <em>linked</em> from “My profile” vouches for the player's BattleTag: a tag that's simply typed in proves nothing."
+      "TEAM": "A Battle.net account <em>linked</em> from “My profile” vouches for each player's BattleTag; a tag that's simply typed in proves nothing.",
+      "SOLO": "A Battle.net account <em>linked</em> from “My profile” vouches for the player's BattleTag; a tag that's simply typed in proves nothing."
     },
     "blizzardMarvel": "Not relevant for a Marvel Rivals tournament: better leave “No player”.",
     "minPlayers": "Minimum players on the team",
@@ -174,7 +174,7 @@
     },
     "referee": {
       "label": "Matches scheduled by the referees",
-      "description": "Each match waits for a referee or an admin to set its date and time (“To schedule”), then shows “Waiting to start” until that time, when it moves to launch.",
+      "description": "Each match waits for a referee or an admin to set its date (“To schedule”), then stays “Waiting to start” until that time, when it moves to launch.",
       "finished": "The tournament is finished: this option can no longer be changed.",
       "create": "Can be changed later, until the tournament closes — even while it's in progress.",
       "edit": "Can be changed until the tournament closes — even while it's in progress.",
@@ -183,7 +183,7 @@
     },
     "launchPhase": {
       "label": "Match launch phase",
-      "description": "With this option on, at its start time each match opens a launch window: both teams (and the caster) click “Ready”, and the match starts once everyone is ready, when a referee forces it, or automatically after {launchDelay} minutes. Off (default), a match starts as soon as its time comes, with no “Ready” or launch window — and a match with no time, as soon as both its opponents are known (unless referees schedule the matches).",
+      "description": "On: at its start time, each match waits for both teams (and the caster) to click “Ready”; a referee can force it, and it starts automatically after {launchDelay} minutes. Off (default): a match starts at its time or, with no time, as soon as both its opponents are known (unless referees schedule the matches).",
       "scope": "Can be changed until the tournament starts, then locked.",
       "locked": "The tournament has started: this option can no longer be changed."
     },
@@ -198,23 +198,23 @@
     "enduranceWin": "Points per map won",
     "enduranceLoss": "Points per map lost",
     "endurancePlayoff": "Teams in the playoffs",
-    "endurancePlayoffHint": "The endurance stage stops at this headcount. At 8, the bracket follows the rulebook table (8v4, 6v2, 1v5, 3v7) with a third-place match.",
+    "endurancePlayoffHint": "The endurance stage stops at this headcount. At 8, the bracket follows the rulebook table (8v4, 6v2, 1v5, 3v7), with a third-place match.",
     "enduranceMaxRounds": "Maximum rounds",
-    "enduranceMaxRoundsHint": "0 = no limit: the stage runs until the headcount above. Otherwise it stops at this round and the top of the standings qualify; the others go out.",
+    "enduranceMaxRoundsHint": "0 = no limit: the stage runs until the playoff headcount. Otherwise it stops at this round: the top of the standings qualify, the others go out.",
     "enduranceEarlyExit": "Early “out of contention” exit",
-    "enduranceEarlyExitHint": "When ticked, a team that can no longer mathematically reach the playoffs goes out before the last round, keeping its pool (the exit is postponed by one round if it would leave an odd number of teams in the running). Unticked (default), no team is dropped in advance: only a pool at zero or the last-round cut takes a team out.",
+    "enduranceEarlyExitHint": "Ticked: a team that can no longer reach the playoffs goes out before the last round, keeping its pool (one round later if it would leave an odd number of teams). Unticked (default): only a pool at zero or the last-round cut takes a team out.",
     "enduranceEarlyExitNoCap": "Unavailable while “Maximum rounds” is 0: with no last round set, there is nothing to get ahead of.",
     "enduranceEarlyExitFreeScore": "Unavailable with the “Free” match format: a BO or FT is needed to know what a team can still win.",
     "draws": "Draws allowed in qualifying",
     "drawsUnavailable": "Unavailable with free score entry: a match format is needed to bound the match.",
-    "drawsHint": "A drawn map can end the match before the target: the match then closes at 2-2, or at 2-1 if only one map was shared. Since the endurance pool counts map by map, it takes this in without any extra rule. The final bracket always requires a winner. Ticking this box also opens the “Maximum deciding maps” setting, above.",
+    "drawsHint": "A drawn map can end the match before the target: 2-2, or 2-1 if only one map is drawn. The pool, counted map by map, absorbs it; the final bracket always needs a winner. Ticking also opens “Maximum deciding maps”, above.",
     "playoffFormat": "Playoff format",
     "playoffFormats": {
       "MEME": "Same as in qualifying",
       "BO": "Best of (BO)",
       "FT": "First to (FT)"
     },
-    "playoffFormatHint": "The final bracket never accepts a draw, whatever this setting: it needs to know who plays the next round. Setting it here lets you play a real FT3 in the playoffs when qualifying allows draws.",
+    "playoffFormatHint": "The final bracket never accepts a draw, whatever this setting. Use it to play a real FT3 in the playoffs when qualifying allows draws.",
     "playoffFormatValue": {
       "BO": "Playoffs: maps played (odd)",
       "FT": "Playoffs: maps to win"
@@ -223,7 +223,7 @@
     "survivalFirstCutHint": "Lets the standings take shape before the first elimination.",
     "survivalRounds": "Rounds between the following cuts",
     "survivalRoundsHint": "Pace applied after the first cut.",
-    "survivalExplain": "All teams face each other in pairs according to their standing. At each cut, the bottom two teams are eliminated, until the champion. If the number of entrants is odd, a play-in between the bottom two opens the tournament — no walkover is handed out.",
+    "survivalExplain": "All teams face each other in pairs by standing; at each cut, the bottom two are eliminated, until the champion. With an odd number of entrants, a play-in between the bottom two opens the tournament, with no walkover.",
     "swissRounds": "Number of rounds",
     "swissRecommended": {
       "TEAM": "Recommended for {count} teams: {rounds, plural, one {# round} other {# rounds}}.",
@@ -234,7 +234,7 @@
     "swissPointsDraw": "Points per draw",
     "swissPointsLoss": "Points per loss",
     "swissByeHint": "A walkover is worth as much as a win.",
-    "swissExplain": "No elimination: every team plays all {rounds} rounds. Each round, you face a team with a points total close to yours, never replaying the same opponent while that's possible. On equal points, the tiebreak is Buchholz (the sum of the points of the opponents faced).",
+    "swissExplain": "No elimination: everyone plays all {rounds} rounds, against an opponent with a close points total, with no rematch while possible. On equal points, the tiebreak is Buchholz (the sum of the points of the opponents faced).",
     "options": "Extra options",
     "thirdPlace": "Third-place match",
     "thirdPlaceHint": "Adds a match to decide 3rd place between the two semifinal losers."
@@ -255,7 +255,7 @@
     "add": "+ Add a stage",
     "maxReachedHint": "Maximum of {max} stages reached.",
     "previewTitle": "Plan preview",
-    "modeHint": "A fixed number skips the stage if fewer teams show up; a percentage adapts to the actual number of entrants.",
+    "modeHint": "A fixed number skips the stage if too few teams show up; a percentage follows the actual number of entrants.",
     "plan": {
       "phase": "Stage {position}",
       "teams": "{count, plural, one {# team} other {# teams}}",

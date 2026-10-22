@@ -72,3 +72,18 @@ export function registrationActionsColumn(
   if (reorderable) return { grid: "withActions", label: removable ? "Actions" : "Ordre" };
   return { grid: removable ? "withActions" : null, label: "Retrait" };
 }
+
+/**
+ * Explication de l'ordre, derrière le « i » de la ligne d'état du staff
+ * (`docs/features/INFO_HINTS.md`) — `null` quand la liste ne suit pas le
+ * classement du site, ou qu'elle est vide (rien à expliquer).
+ */
+export function registrationsRankingHintKey(
+  followsRanking: boolean,
+  followsFrozenDraw: boolean,
+  rowCount: number,
+): "registrations.followsRanking" | "registrations.followsFrozenDraw" | null {
+  if (rowCount === 0) return null;
+  if (followsFrozenDraw) return "registrations.followsFrozenDraw";
+  return followsRanking ? "registrations.followsRanking" : null;
+}

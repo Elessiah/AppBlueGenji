@@ -1,6 +1,7 @@
 "use client";
 
 import { CyberButton, CyberCard } from "@/components/cyber";
+import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { TargetThumb } from "@/components/reports/TargetPicker";
 import { PlayerLink, TeamLink } from "@/components/entity-link";
 import {
@@ -82,7 +83,16 @@ export function ConcernedReport({
     <>
       <span className="eyebrow">{t("concerned.eyebrow", { id: String(report.id) })}</span>
       <h1 className={`display ${styles.title}`}>{t("concerned.heading")}</h1>
-      <p className={styles.lead}>{t("concerned.lead")}</p>
+      {/* Le droit de contester reste visible ; les exemples passent derrière
+          le « i » (INFO_HINTS.md). */}
+      <div className={styles.lead}>
+        <InfoHintRow>
+          <p>{t("concerned.lead")}</p>
+          <InfoHint id="concerned-lead-more" subject={t("concerned.contest")}>
+            <p>{t("concerned.leadMore")}</p>
+          </InfoHint>
+        </InfoHintRow>
+      </div>
 
       {/* Alertes rendues avec la page, jamais mises à jour : pas de région
           d'annonce (`role="status"`), qui relirait aussi le lien d'équipe. */}

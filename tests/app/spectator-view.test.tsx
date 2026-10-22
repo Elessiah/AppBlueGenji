@@ -60,6 +60,7 @@ import { authUser } from "../helpers/auth-user";
 import { tournamentCard } from "../helpers/tournament-card";
 import { tournamentSnapshot } from "../helpers/tournament-detail";
 import { readSource } from "../helpers/read-source";
+import { withoutInfoHintButtons } from "../helpers/info-hint-markup";
 
 /**
  * Page sans compte d'un tournoi (`docs/features/SPECTATOR_VIEW.md`) : les deux
@@ -340,9 +341,18 @@ describe("fiche commune sous SpectatorViewProvider", () => {
     expect(html).not.toContain('href="/tournois"');
     expect(html).toContain(frTournament.header.backHome);
     expect(html).toContain(frTournament.header.spectator);
-    // L'explication de la pastille est aussi lisible hors survol.
-    expect(html).toContain(`<span class="sr-only"> — ${frTournament.header.spectatorTitle.replaceAll("'", "&#x27;")}</span>`);
-    expect(html).not.toContain("<button");
+    // L'explication de la pastille, derrière le « i » : lisible au toucher et au clavier.
+    expect(html).toContain('aria-controls="tournament-spectator-hint"');
+    // Le « i » suit le groupe de la pastille sans en faire partie : ouverte,
+    // l'explication passe à la ligne sur toute la barre au lieu d'élargir le
+    // groupe — qui déplaçait le bouton sous le pointeur.
+    const pillAt = html.indexOf(frTournament.header.spectator);
+    const groupEnd = html.indexOf("</div>", pillAt);
+    expect(groupEnd).toBeGreaterThan(pillAt);
+    expect(html.indexOf('aria-controls="tournament-spectator-hint"')).toBeGreaterThan(groupEnd);
+    expect(html).toContain(`<p>${frTournament.header.spectatorTitle.replaceAll("'", "&#x27;")}</p>`);
+    expect(html).not.toContain(`title="${frTournament.header.spectatorTitle.replaceAll("'", "&#x27;")}"`);
+    expect(withoutInfoHintButtons(html)).not.toContain("<button");
     expect(html).not.toContain("/connexion");
     expect(html).toContain("toutes les 2 minutes au plus");
   });

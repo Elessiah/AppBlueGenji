@@ -28,11 +28,11 @@ export type TournamentImageFit = (typeof TOURNAMENT_IMAGE_FITS)[number];
 export const TOURNAMENT_IMAGE_FIT_LABELS: Record<TournamentImageFit, { label: string; hint: string }> = {
   COVER: {
     label: "Illustration",
-    hint: "Remplit le bandeau du tournoi. Clique sur l'aperçu pour choisir le point qui doit rester visible.",
+    hint: "Remplit le bandeau du tournoi ; clique sur l'aperçu pour choisir le point qui reste visible.",
   },
   CONTAIN: {
     label: "Logo",
-    hint: "Toujours affiché en entier, dans une pastille à côté du nom — idéal pour un fond transparent.",
+    hint: "Toujours entier, dans une pastille près du nom — idéal sur fond transparent.",
   },
 };
 
