@@ -381,6 +381,13 @@ Pour rapatrier les photos de profil restées chez leur hébergeur d'origine :
 NODE_ENV=production npm run backfill:avatars     # conçu pour tourner en production, idempotent
 ```
 
+Une fois après le déploiement qui l'introduit, renommer les avatars déjà masqués
+(détail : `docs/AUTHORIZATION_RULES.md`) :
+
+```bash
+NODE_ENV=production npm run rotate:hidden-avatars
+```
+
 `NODE_ENV=production` n'est pas décoratif : les scripts `tsx` choisissent leurs
 fichiers d'environnement d'après lui (`lib/server/script-env.ts`), et le shell du
 serveur ne l'exporte pas — seul pm2 le pose. Sans lui, `.env.production` n'est

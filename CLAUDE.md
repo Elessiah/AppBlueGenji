@@ -15,15 +15,8 @@ npm run lint  # ESLint
 npm run typecheck  # TypeScript 7 sur l'app et tests/ (tsconfig.typecheck.json) — CI
 npm run typecheck:ts5  # même contrôle avec TypeScript 5 (celui de Next, ts-jest, ESLint)
 npm test  # Jest
-npm run test:coverage
 npm run seed  # Matrice de données de test (docs/seed/SEED_RULES.md)
-npm run seed:view
-NODE_ENV=production npm run backfill:avatars  # rapatrie les photos restées chez leur hébergeur
-NODE_ENV=production npm run replay:deletions  # après restauration d'une sauvegarde (--dry-run d'abord)
-NODE_ENV=production npm run rotate:hidden-avatars  # une fois après déploiement : renomme les avatars déjà masqués
-npm run push:keys  # paire de clés VAPID, une fois pour toutes
-npm run sonar  # SonarQube local (Docker), ponctuel — hors pipeline : la PR lit SonarCloud
-~/apps/updateBlueGenji.sh [bot|site] [--force|--dry-run]  # Déploiement prod, sans sudo (docs/DEPLOYMENT.md — ne jamais effacer les journaux pm2)
+~/apps/updateBlueGenji.sh [bot|site] [--force|--dry-run]  # Déploiement prod, sans sudo ; scripts de production → docs/DEPLOYMENT.md (ne jamais effacer les journaux pm2)
 npx jest tests/path/to/file.test.ts  # un seul fichier
 ```
 
@@ -37,7 +30,7 @@ npx jest tests/path/to/file.test.ts  # un seul fichier
 - Types partagés : `lib/shared/types.ts` (à lire en premier). Alias `@/*` → racine.
 
 ### Routes
-- `/` vitrine · `/connexion` connexion sans mot de passe · `/regles` + `/regles/[slug]` règles par mode (registre `lib/shared/tournament-rules.ts` → `docs/features/RULES_PAGE_LAYOUT.md`).
+- `/` vitrine · `/connexion` connexion sans mot de passe · `/regles` + `/regles/[slug]` règles par mode.
 - `/(secured)/*` : `tournois`, `equipes`, `joueurs`, `profil`, `signalements` — sans session : carte « Connexion requise » en 200.
 - `/api/*` : REST uniquement (ni tRPC ni server actions).
 
@@ -99,26 +92,26 @@ Noir profond, bleu glacier `#5ac8ff`, jetons `--cyber-*` / `--ink*` / `--blue-*`
 
 ## Règles de travail → détail dans `docs/WORKFLOW.md`
 
-- **Documentation** : le détail d'une fonctionnalité va dans `docs/features/<NOM>.md` (créé ou complété dans la PR), avec **une ligne dans `docs/features/INDEX.md`** sous son domaine. `CLAUDE.md` ne reçoit **que** les règles transverses (à appliquer partout) — un lien vers une doc n'y accompagne qu'une telle règle, jamais une ligne qui ne serait qu'un pointeur — et reste **aussi léger que possible** (plafond dur : 20 480 octets, `wc -c CLAUDE.md`).
+- **Documentation** : le détail d'une fonctionnalité va dans `docs/features/<NOM>.md` (créé ou complété dans la PR), avec **une ligne dans `docs/features/INDEX.md`** sous son domaine. `CLAUDE.md` ne reçoit **que** des règles transverses, jamais un simple pointeur, et reste aussi léger que possible (plafond : 20 480 octets).
 - **Tests** : toute feature a ses tests (nominal, limites, erreurs), sinon elle n'est pas terminée.
 - **Deux TypeScript** : `typescript` 5.x (Next, ts-jest, ESLint) et `typescript-native` (7, pour `npm run typecheck`) — les scripts désignent leur `tsc` **par chemin**, jamais `npx tsc`.
 - **Les tests sont type-vérifiés** : fabriques complètes de `tests/helpers/`, `jest.mocked(fn)`, doubles SQL `jest.fn<SqlQuery>()` ; jamais `x as never` sur une valeur simulée ni `it.each([...] as const)`.
 - **Branches** : `feature/<nom-kebab>`. **PR** vers `main`, avec l'étiquette de version qui convient (`release:major` / `release:minor` / aucune = patch / `release:skip`) ; CI (lint + typecheck → build → tests) : corriger dans cet ordre, ne jamais merger rouge.
 - **Versionnage** — bump, tag et release automatiques à la fusion → `docs/features/VERSIONING.md`.
 - **`ERREUR.txt`** : toute erreur **préexistante** hors de la zone touchée (dans la zone, un finding majeur se corrige) s'y consigne, comme tout finding **mineur** de revue (une entrée, à la fin : `- [AAAA-MM-JJ] <zone> — <symptôme> — <piste> — (rencontré sur : <branche>)`), sans élargir la tâche ; vérifier les doublons ; retirer l'entrée dans le commit qui la règle.
-- **Accessibilité (`ACCESSIBILITE.md`)** : tout problème d'accessibilité non réglé s'y consigne (titre, Critère, Constat, À faire). **Choisir ou ajouter une tâche se pousse sur `main` sur-le-champ**, par un commit qui ne touche que ce fichier, **avant** tout code (sélection = retirer la section, recopiée dans la description de la PR ; tâche abandonnée = remise sous son numéro ; ajout = numéro suivant le « dernier numéro attribué », avancé dans le même commit).
+- **Accessibilité (`ACCESSIBILITE.md`)** : tout problème d'accessibilité non réglé s'y consigne (titre, Critère, Constat, À faire). **Choisir ou ajouter une tâche se pousse sur `main` sur-le-champ**, par un commit qui ne touche que ce fichier, **avant** tout code (procédure : `docs/WORKFLOW.md`).
 - **Complexité** : demande importante → plan écrit puis exécution dans la session, sans pipeline externe.
 - **Dépôt voisin `blueGenjiBot`** : sa doc Markdown (`doc/*.md`, `help.md`, `helpfr.md`) est servie à chaud sur `/bot/docs` — la corriger avec toute commande touchée ; la référence JSDoc (`docs/`) se régénère (vider puis `npm run docs`) dans la même PR que le code, commitée à part.
 
 ## Pipeline Git (workflow de livraison) → détail dans `docs/WORKFLOW.md`
 
-**Co-Authored-By** : **tous** les commits portent `Co-authored-by: <modèle> <noreply@anthropic.com>`, où `<modèle>` est **le modèle qui écrit réellement le commit** (jamais une valeur recopiée) — à vérifier dès le premier commit de la session. `git commit --trailer 'Co-authored-by: <modèle> <noreply@anthropic.com>'`.
+**Co-Authored-By** : **tous** les commits portent `--trailer 'Co-authored-by: <modèle> <noreply@anthropic.com>'`, `<modèle>` étant **celui qui écrit réellement le commit**, jamais une valeur recopiée.
 
 Enchaîner sans s'arrêter :
 1. `git checkout -b feature/<short-name>`
 2. Commit fonctionnel (≤ 5 mots, impératif minuscule)
 3. Commit docs (README / JSDoc / `docs/features/`)
 4. Commit tests (`jest`)
-5. Commit polish UI/UX (aucune logique) — les problèmes d'accessibilité non réglés vont dans `ACCESSIBILITE.md` par un commit direct sur `main`
+5. Commit polish UI/UX (aucune logique)
 6. `git push -u origin feature/<short-name>`
 7. `gh pr create`, revue `/code-review --comment` en boucle, puis cycles **thématiques** UI/UX (si un écran change), performance, sécurité (texte légal seul : un cycle juridique ; doc de processus ou renommage : boucle standard seule) — un agent neuf par type, chaque boucle s'arrête au **premier cycle propre** ; un finding **mineur** va dans `ERREUR.txt` sans correction, un cycle qui n'en a que de mineurs est propre → `docs/REVIEW_CYCLES.md`. **Qualité : SonarCloud** sur la PR (`gh pr checks`), une correction de pure forme ne relance pas de revue ; jamais `npm run sonar` dans la pipeline. Ne rendre la main qu'avec `npm test`, `npm run lint`, `npm run typecheck` verts **et** `npm run seed` exécuté (seul contrôle réel du SQL).
