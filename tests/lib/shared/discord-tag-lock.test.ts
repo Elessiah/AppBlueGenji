@@ -1,16 +1,19 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import {
-  DISCORD_TAG_AUDIENCE,
-  DISCORD_TAG_UNVERIFIED_AUDIENCE,
-} from "@/lib/shared/identity-sharing";
 import { describe, expect, it } from "@jest/globals";
 import {
   DISCORD_TAG_LOCKED,
   checkDiscordTagEdit,
   discordTagLockNotice,
   isDiscordTagLocked,
+  type DiscordTagLockNotice,
 } from "@/lib/shared/discord-tag-lock";
+
+type LockState = Parameters<typeof discordTagLockNotice>[0];
+
+/** Tout ce que dit le champ : la ligne d'état, puis le détail derrière le « i ». */
+const all = (notice: DiscordTagLockNotice) => [notice.status, ...notice.details].join(" ");
+const lock = (state: LockState) => all(discordTagLockNotice(state));
 
 describe("checkDiscordTagEdit", () => {
   it("laisse saisir tant qu'aucun compte Discord n'est rattaché", () => {
@@ -50,48 +53,43 @@ describe("checkDiscordTagEdit", () => {
 });
 
 describe("discordTagLockNotice", () => {
-  it("dit qui lit un tag certifié, plutôt que d'où il vient", () => {
+  it("dit qu'un tag certifié l'est, et joint la liste de ceux qui le lisent", () => {
     const notice = discordTagLockNotice({ tag: "keryan", verified: true, linked: true });
-    expect(notice).toContain("rattaché");
-    expect(notice).toContain("certifié");
-    expect(notice).toContain("administrateurs");
+    expect(notice.status).toContain("rattaché");
+    expect(notice.status).toContain("certifié");
+    expect(notice.audience).toBe(true);
   });
 
   it("n'annonce pas une certification que le compte n'a pas", () => {
-    // Le rattachement ne la garantit pas : `linkOAuthIdentity` n'écrit le
-    // pseudo que si Discord en donne un affichable, si bien qu'un compte lié
-    // peut porter un tag saisi à la main. L'annoncer certifié contredirait la
-    // pastille absente d'à côté.
+    // Rattaché, mais jamais certifié : la ligne d'état le dit, et dit que
+    // personne ne le voit ; la liste jointe dit ce que la certification ouvrirait.
     const notice = discordTagLockNotice({ tag: "keryan", verified: false, linked: true });
-    expect(notice).toContain("n'est pas certifié");
-    expect(notice).toContain("personne ne le voit");
+    expect(notice.status).toContain("non certifié");
+    expect(notice.status).toContain("personne ne le voit");
+    expect(notice.audience).toBe(true);
   });
 
   it("n'affirme jamais l'origine du tag — elle n'est pas garantie", () => {
     for (const verified of [true, false]) {
-      expect(discordTagLockNotice({ tag: "keryan", verified, linked: true })).not.toContain("vient de Discord");
+      expect(lock({ tag: "keryan", verified, linked: true })).not.toContain("vient de Discord");
     }
   });
 
   it("dit l'état et le geste sans inventer la cause d'un champ vide", () => {
-    // Deux causes y mènent — un tag retiré, ou un pseudo Discord numérique —
-    // et l'écran ne peut pas les distinguer : le joueur qui vient de retirer
-    // son tag n'a pas à lire une explication fausse.
+    // Deux causes mènent ici (tag retiré, pseudo numérique) : la phrase ne
+    // choisit pas.
     const notice = discordTagLockNotice({ tag: null, verified: false, linked: true });
-    expect(notice).toContain("aucun pseudo n'est enregistré");
-    expect(notice).not.toContain("numérique");
-    expect(notice).not.toContain("est certifié");
+    expect(notice.status).toContain("sans pseudo enregistré");
+    expect(all(notice)).not.toContain("numérique");
+    expect(all(notice)).not.toContain("pseudo certifié");
+    expect(notice.audience).toBe(false);
   });
 
   it("nomme le bouton de l'écran avant la reconnexion, sur un tag absent", () => {
     // L'écran rend « Enregistrer mon tag » dans cet état : renvoyer d'abord
-    // vers une reconnexion par Discord, c'est ignorer le geste d'à côté.
-    //
-    // Les deux repères sont **exigés présents** avant d'être comparés : cette
-    // assertion a longtemps cherché une chaîne que la phrase ne contenait pas,
-    // si bien qu'`indexOf` rendait -1 et que le test passait quoi qu'il
-    // arrive — intervertir les deux gestes ne l'aurait pas fait tomber.
-    const notice = discordTagLockNotice({ tag: null, verified: false, linked: true });
+    // vers une reconnexion par Discord, c'est ignorer le geste d'à côté. Les
+    // deux repères sont **exigés présents** avant d'être comparés.
+    const notice = lock({ tag: null, verified: false, linked: true });
     const button = notice.indexOf("Enregistrer mon tag");
     const reconnect = notice.indexOf("reconnecte-toi");
     expect(button).toBeGreaterThanOrEqual(0);
@@ -101,43 +99,48 @@ describe("discordTagLockNotice", () => {
 
   it("ne nomme que des gestes qui existent à l'écran", () => {
     // « Détache Discord » n'en est pas un pour un compte né par Discord : le
-    // bouton y est remplacé par le refus `LAST_CONNECTION`, faute d'une autre
-    // porte. Le nommer enverrait chercher un contrôle absent.
+    // bouton y est remplacé par le refus `LAST_CONNECTION`.
     const notices = [
-      discordTagLockNotice({ tag: "keryan", verified: true, linked: true }),
-      discordTagLockNotice({ tag: "keryan", verified: false, linked: true }),
-      discordTagLockNotice({ tag: null, verified: false, linked: true }),
+      lock({ tag: "keryan", verified: true, linked: true }),
+      lock({ tag: "keryan", verified: false, linked: true }),
+      lock({ tag: null, verified: false, linked: true }),
     ];
     for (const notice of notices) {
-      // « Mettre à jour mon pseudo » est offert à tout compte rattaché, quelle
-      // que soit la porte (ligne « Bot Discord »).
       expect(notice).toContain("« Mettre à jour mon pseudo »");
       expect(notice).not.toContain("Applications connectées");
+      expect(notice).not.toMatch(/détache/i);
     }
   });
 
   it("nomme le retrait dès qu'un tag est enregistré", () => {
     for (const verified of [true, false]) {
-      expect(discordTagLockNotice({ tag: "keryan", verified, linked: true })).toMatch(/retire/i);
+      expect(lock({ tag: "keryan", verified, linked: true })).toMatch(/retire/i);
     }
   });
 
-  it("ne promet de « cesser d'être joignable » que sur un tag réellement exposé", () => {
-    // Un tag non certifié n'est vu de personne : proposer d'arrêter une
-    // exposition qui n'existe pas pousse à effacer une donnée sans raison.
-    const uncertified = discordTagLockNotice({ tag: "keryan", verified: false, linked: true });
-    const certified = discordTagLockNotice({ tag: "keryan", verified: true, linked: true });
-    expect(uncertified).not.toContain("cesser d'être joignable");
-    expect(certified).toContain("cesser d'être joignable");
+  it("ne promet de « ne plus être joignable » que sur un tag réellement exposé", () => {
+    // Personne ne voit un tag non certifié : proposer d'arrêter une exposition
+    // qui n'existe pas pousserait à effacer une donnée sans raison.
+    expect(lock({ tag: "keryan", verified: false, linked: true })).not.toContain("ne plus être joignable");
+    expect(lock({ tag: "keryan", verified: true, linked: true })).toContain("ne plus être joignable");
   });
 
   it("nomme le bouton d'enregistrement sans le situer", () => {
-    // Le bouton est rendu **au-dessus** du paragraphe ; et un module pur n'a de
-    // toute façon pas à connaître la mise en page de ses lecteurs.
-    const notice = discordTagLockNotice({ tag: null, verified: false, linked: true });
+    const notice = lock({ tag: null, verified: false, linked: true });
     expect(notice).toContain("Enregistrer mon tag");
     expect(notice).not.toContain("ci-dessous");
     expect(notice).not.toContain("ci-dessus");
+  });
+
+  it("garde la ligne d'état courte : le détail passe derrière le « i »", () => {
+    const states: LockState[] = [
+      { tag: "keryan", verified: true, linked: true },
+      { tag: "keryan", verified: false, linked: true },
+      { tag: null, verified: false, linked: true },
+      { tag: null, verified: false, linked: null },
+      { tag: null, verified: false, linked: null, pending: true },
+    ];
+    for (const state of states) expect(discordTagLockNotice(state).status.length).toBeLessThanOrEqual(120);
   });
 });
 
@@ -145,20 +148,19 @@ describe("discordTagLockNotice — rattachement inconnu", () => {
   const notice = discordTagLockNotice({ tag: null, verified: false, linked: null });
 
   it("dit la même chose sur n'importe quelle valeur non booléenne", () => {
-    expect(
-      discordTagLockNotice({ tag: null, verified: false, linked: undefined } as never),
-    ).toBe(notice);
+    expect(discordTagLockNotice({ tag: null, verified: false, linked: undefined } as never)).toEqual(notice);
   });
 
   it("n'affirme ni le rattachement ni son absence", () => {
-    expect(notice).not.toContain("est rattaché");
-    expect(notice).not.toContain("certifié");
+    expect(all(notice)).not.toContain("rattaché");
+    expect(all(notice)).not.toContain("certifié");
+    expect(notice.audience).toBe(false);
   });
 
-  it("nomme le verrou, sa raison et sa sortie", () => {
-    expect(notice).toContain("lecture seule");
-    expect(notice.toLowerCase()).toContain("réessaie");
-    expect(notice.toLowerCase()).toContain("recharge la page");
+  it("nomme le verrou et sa sortie", () => {
+    expect(notice.status).toContain("lecture seule");
+    expect(notice.status.toLowerCase()).toContain("réessaie");
+    expect(notice.status.toLowerCase()).toContain("recharge la page");
   });
 });
 
@@ -166,43 +168,30 @@ describe("discordTagLockNotice — lecture en cours", () => {
   /**
    * « Pas encore lu » et « lecture échouée » se confondaient en un seul
    * `linked: null` : la phrase annonçait une panne pendant le temps normal d'un
-   * aller-retour, le profil se rendant dès que `GET /api/profile` répond — ce
-   * qui arrive régulièrement avant `GET /api/profile/discord`.
+   * aller-retour.
    */
-  const pending = discordTagLockNotice({
-    tag: null,
-    verified: false,
-    linked: null,
-    pending: true,
-  });
+  const pending = discordTagLockNotice({ tag: null, verified: false, linked: null, pending: true });
 
   it("n'annonce aucune panne et ne propose rien à réessayer", () => {
-    expect(pending).not.toContain("Impossible");
-    expect(pending.toLowerCase()).not.toContain("réessaie");
-    expect(pending.toLowerCase()).not.toContain("recharge");
+    expect(all(pending)).not.toContain("illisible");
+    expect(all(pending).toLowerCase()).not.toContain("réessaie");
+    expect(all(pending).toLowerCase()).not.toContain("recharge");
   });
 
   it("dit tout de même pourquoi le champ est fermé", () => {
-    expect(pending).toContain("lecture seule");
+    expect(pending.status).toContain("lecture seule");
   });
 
   it("se distingue de l'échec, qui garde sa sortie", () => {
     const failed = discordTagLockNotice({ tag: null, verified: false, linked: null });
-    expect(failed).not.toBe(pending);
-    expect(failed.toLowerCase()).toContain("réessaie");
+    expect(failed).not.toEqual(pending);
+    expect(failed.status.toLowerCase()).toContain("réessaie");
   });
 
   it("s'efface dès que l'état est connu — un rattachement lu n'attend plus rien", () => {
-    // Le drapeau ne doit pas masquer un état déjà établi : une seconde lecture
-    // lancée à la main ne doit pas faire régresser la phrase.
-    const linked = discordTagLockNotice({
-      tag: "keryan",
-      verified: true,
-      linked: true,
-      pending: true,
-    });
-    expect(linked).toContain("certifié");
-    expect(linked).not.toContain("Lecture de l'état");
+    const linked = discordTagLockNotice({ tag: "keryan", verified: true, linked: true, pending: true });
+    expect(linked.status).toContain("certifié");
+    expect(linked.status).not.toContain("Lecture");
   });
 });
 
@@ -213,21 +202,11 @@ describe("DISCORD_TAG_LOCKED", () => {
 });
 
 describe("discordTagLockNotice — la promesse d'exposition n'est rédigée qu'une fois", () => {
-  // `/connexion` et `/profil` annoncent le même public : la phrase du verrou
-  // compose les constantes d'`identity-sharing.ts` au lieu de les recopier, sans
-  // quoi un ajustement de l'une laisserait l'autre promettre autre chose.
-  it("compose le public d'un tag certifié", () => {
-    const notice = discordTagLockNotice({ tag: "keryan", verified: true, linked: true });
-    expect(notice).toContain(DISCORD_TAG_AUDIENCE);
-  });
-
-  it("compose l'absence de public d'un tag non certifié", () => {
-    const notice = discordTagLockNotice({ tag: "keryan", verified: false, linked: true });
-    expect(notice).toContain(DISCORD_TAG_UNVERIFIED_AUDIENCE);
-  });
-
-  it("n'écrit plus le public en dur", () => {
+  // `/connexion` et `/profil` annoncent le même public : le verrou dit
+  // seulement s'il faut joindre la liste partagée (`DISCORD_TAG_AUDIENCE`).
+  it("n'écrit pas le public en dur", () => {
     const source = readFileSync(join(__dirname, "..", "..", "..", "lib", "shared", "discord-tag-lock.ts"), "utf8");
+    expect(source).not.toMatch(/administrateurs, à tout moment/);
     expect(source).not.toMatch(/les administrateurs le voient/);
   });
 });

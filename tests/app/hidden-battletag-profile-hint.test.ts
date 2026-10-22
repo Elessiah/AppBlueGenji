@@ -47,7 +47,8 @@ describe("pastille BattleTag vérifié sur la fiche", () => {
 
   it("ne parle de la pastille au titulaire que si elle est affichée", () => {
     const page = read("app/(secured)/joueurs/[id]/page.tsx");
-    expect(page).toContain('return verified ? `${hidden} ${text.t("page.battletagHiddenSelfBadge")}` : hidden;');
+    expect(page).toContain('return { status: text.t("page.battletagHiddenSelf"), badge: verified };');
+    expect(page).toContain('{battletagHint.badge ? <p>{t("page.battletagHiddenSelfBadge")}</p> : null}');
   });
 
   it("garde la largeur du champ : la pastille est posée dedans", () => {

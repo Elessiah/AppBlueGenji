@@ -61,8 +61,9 @@ describe("lisibilité de la page de connexion", () => {
     expect(styles).toMatch(/fontFamily: "var\(--font-sans\)"/);
     expect(styles).toMatch(/fontSize: 13/);
     expect(styles).not.toMatch(/color: "var\(--ink-dim\)"/);
-    // L'import, puis les trois aides du formulaire par code.
-    expect(form.match(/LOGIN_HELP_TEXT_STYLE/g)).toHaveLength(4);
+    // L'import, puis les deux aides restées visibles du formulaire par code (la troisième,
+    // le prérequis du serveur commun, passe derrière le bouton « i »).
+    expect(form.match(/LOGIN_HELP_TEXT_STYLE/g)).toHaveLength(3);
     expect(buttons).toMatch(/style=\{\{ \.\.\.LOGIN_HELP_TEXT_STYLE/);
   });
 

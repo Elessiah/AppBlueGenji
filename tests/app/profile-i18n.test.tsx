@@ -75,7 +75,9 @@ import {
   deletionErrorText,
   deletionOutcomeText,
   discordBotRowText,
+  discordAudienceText,
   discordTagLockText,
+  hiddenBattletagAudienceText,
   FR_PROFILE,
 } from "@/app/(secured)/profil/_lib/profile-text";
 import { avatarUploadErrorMessage, profileErrorMessage } from "@/app/(secured)/profil/profile-errors";
@@ -140,11 +142,14 @@ import {
   DISCORD_PLAYER_VISIBILITY_NOTICE,
   DISCORD_PLAYER_VISIBILITY_PENDING,
   DISCORD_TAG_AUDIENCE,
-  DISCORD_TAG_UNVERIFIED_AUDIENCE,
+  DISCORD_TAG_UNVERIFIED_CONSEQUENCE,
+  DISCORD_TAG_UNVERIFIED_NOTICE,
+  HIDDEN_BATTLETAG_AUDIENCE,
   GAME_TAG_NOTICE,
 } from "@/lib/shared/identity-sharing";
 import { isMigratedRoute, LOCALES, SITE_TIME_ZONE } from "@/lib/shared/locales";
 import { formatMessage } from "@/lib/shared/message-format";
+import { discordAudienceLines, hiddenBattletagAudienceLines } from "@/lib/shared/identity-audience";
 import { OAUTH_PROVIDERS, type OAuthProvider } from "@/lib/shared/oauth-providers";
 import { PUSH_ERROR_MESSAGES, PUSH_SUPPORT_NOTICES, PUSH_TOPIC_KEYS, PUSH_TOPICS, pushErrorMessage } from "@/lib/shared/push-notifications";
 import { scopedText } from "@/lib/shared/scoped-text";
@@ -276,8 +281,14 @@ describe("français inchangé — profil", () => {
   it("annonces partagées avec /connexion", () => {
     expect(FR_PROFILE.t("games.gameTagNotice")).toBe(GAME_TAG_NOTICE);
     expect(FR_PROFILE.t("games.blizzardNotice")).toBe(BLIZZARD_BATTLETAG_NOTICE);
-    expect(FR_PROFILE.t("discord.audience")).toBe(DISCORD_TAG_AUDIENCE);
-    expect(FR_PROFILE.t("discord.unverifiedAudience")).toBe(DISCORD_TAG_UNVERIFIED_AUDIENCE);
+    expect(discordAudienceText(FR_PROFILE)).toEqual(DISCORD_TAG_AUDIENCE);
+    expect(hiddenBattletagAudienceText(FR_PROFILE)).toEqual(HIDDEN_BATTLETAG_AUDIENCE);
+    expect(FR_PROFILE.t("discord.unverifiedHint")).toBe(DISCORD_TAG_UNVERIFIED_NOTICE);
+    expect(FR_PROFILE.t("discord.unverifiedDetails")).toBe(DISCORD_TAG_UNVERIFIED_CONSEQUENCE);
+    // L'anglais des listes est le même dans chaque espace qui les montre.
+    expect(discordAudienceText(EN_PROFILE)).toEqual(discordAudienceLines(scopedText("en", EN.login).t));
+    expect(hiddenBattletagAudienceText(EN_PROFILE)).toEqual(hiddenBattletagAudienceLines(scopedText("en", EN.login).t));
+    expect(hiddenBattletagAudienceText(EN_PROFILE)).toEqual(hiddenBattletagAudienceLines(scopedText("en", EN.players).t));
     expect(FR_PROFILE.t("privacy.discordNotice")).toBe(DISCORD_PLAYER_VISIBILITY_NOTICE);
     expect(FR_PROFILE.t("privacy.discordPending")).toBe(DISCORD_PLAYER_VISIBILITY_PENDING);
     expect(FR_PROFILE.t("privacy.discordNoTag")).toBe(DISCORD_PLAYER_VISIBILITY_NO_TAG);
@@ -291,9 +302,9 @@ describe("français inchangé — profil", () => {
         for (const tag of ["nova", null]) {
           for (const verified of [true, false]) {
             const state = { tag, verified, linked, pending };
-            expect(discordTagLockText(FR_PROFILE, state)).toBe(discordTagLockNotice(state));
+            expect(discordTagLockText(FR_PROFILE, state)).toEqual(discordTagLockNotice(state));
           }
-          expect(battletagLockText(FR_PROFILE, { tag, linked, pending })).toBe(battletagLockNotice({ tag, linked, pending }));
+          expect(battletagLockText(FR_PROFILE, { tag, linked, pending })).toEqual(battletagLockNotice({ tag, linked, pending }));
         }
       }
     }
@@ -337,10 +348,10 @@ describe("français inchangé — profil", () => {
       HANDLE: "Pseudo Discord : keryan",
       LINKED_BY_CODE: "Rattaché par code en message privé",
       LINKED_BY_BUTTON:
-        "Ton Discord est rattaché par le bouton Discord : il se retire sur cette ligne-là. Le code en message privé met ici ton pseudo à jour.",
+        "Rattaché par le bouton Discord, à retirer sur sa ligne. Le code en message privé met ici ton pseudo à jour.",
       LINKED_ELSEWHERE:
-        "Ton Discord est rattaché : il se retire sur la ligne Discord. Le code en message privé met ici ton pseudo à jour.",
-      NOT_LINKED: "Rattache ton Discord sans écran d'autorisation : le bot BlueGenji t'envoie un code en message privé.",
+        "Discord rattaché, à retirer sur sa ligne. Le code en message privé met ici ton pseudo à jour.",
+      NOT_LINKED: "Rattache Discord sans écran d'autorisation : le bot BlueGenji t'envoie un code en message privé.",
     } as const;
     for (const [noteCode, note] of Object.entries(FR_BOT_NOTES) as Array<[keyof typeof FR_BOT_NOTES, string]>) {
       expect(discordBotRowText(FR_PROFILE, { noteCode, handle: "keryan", refusalCode: null })).toEqual({ note, refusal: null });
@@ -431,7 +442,8 @@ describe("anglais — phrases", () => {
       "Blizzard was removed from your account. Your other sessions couldn't be closed: use “Log out my other sessions”.",
     );
     expect(deletionConsequencesText(EN_PROFILE, null)).toMatch(/^You haven't played any match/);
-    expect(discordTagLockText(EN_PROFILE, { tag: "nova", verified: true, linked: true })).toContain("Nobody else, ever.");
+    expect(discordTagLockText(EN_PROFILE, { tag: "nova", verified: true, linked: true }).status).toBe("Discord account linked, username verified.");
+    expect(discordAudienceText(EN_PROFILE).footer).toBe("Nobody else.");
   });
 
   it("suppression depuis la fenêtre des conditions : le conseil « transfère ou dissous » dit qu'il demande d'accepter, et le recours qui reste", () => {
@@ -477,8 +489,9 @@ describe("langue du compte (lot 9-3)", () => {
   it("en anglais : libellé, règle dite, chaque langue nommée dans sa langue", () => {
     const html = inEnglish(<AccountLocaleField initial="en" />);
     expect(html).toContain(">Notification language</label>");
-    expect(html).toContain("It follows the page&#x27;s language each time you log in");
-    expect(html).toContain("until you next log in from a page in the other language");
+    expect(html).toContain("It takes the page&#x27;s language again each time you log in");
+    // Derrière le « i », que le champ garde pour description.
+    expect(html).toContain('aria-controls="profile-account-locale-hint"');
     expect(html).toContain('<option value="fr" lang="fr">Français</option>');
     expect(html).toContain('<option value="en" lang="en" selected="">English</option>');
     expect(html).toContain('aria-describedby="profile-account-locale-hint"');
@@ -489,8 +502,8 @@ describe("langue du compte (lot 9-3)", () => {
   it("interrupteur des messages privés de match : libellé et aide en anglais, case liée à son aide", () => {
     const on = inEnglish(<MatchDmField initial />);
     expect(on).toContain("Discord direct messages about my matches");
-    expect(on).toContain("Untick to stop receiving them");
-    expect(on).toContain("referees still get theirs");
+    expect(on).toContain("On by default");
+    expect(on).toContain("messages you get as a referee don&#x27;t depend on it");
     expect(on).toContain("when a match leaves your schedule");
     expect(on).toContain('id="profile-match-dms"');
     expect(on).toContain('aria-describedby="profile-match-dms-hint"');
@@ -503,8 +516,8 @@ describe("langue du compte (lot 9-3)", () => {
   it("fenêtre de recrutement : libellé et aide en anglais, case liée à son aide, cochée sauf refus du compte", () => {
     const on = inEnglish(<RecruitmentModalField initialOff={false} />);
     expect(on).toContain("Window of urgent recruitment announcements");
-    expect(on).toContain("Untick so that it no longer opens on its own");
-    expect(on).toContain("another browser where you had turned it down keeps it closed");
+    expect(on).toContain("Unticked, it no longer opens on its own");
+    expect(on).toContain("Another browser where you had turned it down keeps it closed");
     expect(on).toContain('id="profile-recruitment-modal"');
     expect(on).toContain('aria-describedby="profile-recruitment-modal-hint"');
     expect(on).toMatch(/type="checkbox"[^>]*checked=""|checked=""[^>]*type="checkbox"/);
@@ -517,8 +530,8 @@ describe("langue du compte (lot 9-3)", () => {
   it("fenêtre de recrutement : le français dit le défaut, le réaffichage et l'autre navigateur", async () => {
     const fr = (await import("@/messages/fr/profile.json")).default.recruitmentModal;
     expect(fr.label).toBe("Fenêtre des annonces de recrutement urgentes");
-    expect(fr.hint).toMatch(/^Cochée par défaut/);
-    expect(fr.hint).toMatch(/un autre navigateur où tu l'avais refusée la garde fermée/);
+    expect(fr.hint).toMatch(/^Cochée \(par défaut\)/);
+    expect(fr.hintBrowser).toMatch(/Un autre navigateur où tu l'avais refusée la garde fermée/);
     expect(fr.shown).toMatch(/réactivée/);
     expect(fr.hidden).toMatch(/ne s'ouvrira plus d'elle-même/);
     const en = (await import("@/messages/en/profile.json")).default.recruitmentModal;
@@ -534,7 +547,7 @@ describe("langue du compte (lot 9-3)", () => {
     const fr = (await import("@/messages/fr/profile.json")).default.matchDms;
     expect(fr.label).toBe("Messages privés Discord de mes matchs");
     expect(fr.hint).toMatch(/Activés par défaut/);
-    expect(fr.hint).toMatch(/tes notifications push gardent leurs propres réglages, et les arbitres reçoivent toujours les leurs/);
+    expect(fr.hint).toMatch(/Les notifications push et les messages reçus comme arbitre n'en dépendent pas/);
     const { readFileSync } = await import("node:fs");
     const { join } = await import("node:path");
     expect(fr.hint).toMatch(/quand un match quitte ton programme/);
@@ -545,7 +558,7 @@ describe("langue du compte (lot 9-3)", () => {
 
   it("interrupteur des messages privés de match : sans tag certifié, une ligne le dit (FR et EN), liée à la case et à la certification", async () => {
     const en = inEnglish(<MatchDmField initial discordReachable={false} />);
-    expect(en).toContain("These messages only go to accounts with a verified Discord tag, to avoid spam");
+    expect(en).toContain("Without a verified Discord tag, these messages can&#x27;t reach you (anti-spam).");
     expect(en).toMatch(/<a href="#discord" class="[^"]*hintLink[^"]*">Verify my Discord tag<\/a>/);
     expect(en).toContain('aria-describedby="profile-match-dms-hint profile-match-dms-unreachable"');
     expect(en).toContain('id="profile-match-dms-unreachable"');
@@ -556,7 +569,7 @@ describe("langue du compte (lot 9-3)", () => {
     }
     const fr = (await import("@/messages/fr/profile.json")).default.matchDms;
     expect(fr.notCertified).toBe(
-      "Ces messages ne partent qu'aux comptes dont le tag Discord est certifié, pour éviter le spam : sans tag certifié, ils ne peuvent pas te parvenir.",
+      "Sans tag Discord certifié, ces messages ne peuvent pas te parvenir (contre le spam).",
     );
     expect(fr.certifyLink).toBe("Certifier mon tag Discord");
     // Retirer le tag coupe aussi ces messages : la confirmation le dit (FR et EN).
@@ -660,8 +673,9 @@ describe("langue du compte (lot 9-3)", () => {
   it("aide Discord des push : renvoie au choix des messages privés de match (FR et EN)", async () => {
     const fr = (await import("@/messages/fr/push.json")).default.panel.discordHint;
     const en = (await import("@/messages/en/push.json")).default.panel.discordHint;
-    expect(fr).toContain("pour tes matchs, ne partent qu'à un tag certifié et suivent la case « Messages privés Discord de mes matchs » (Mon profil, section Notifications)");
-    expect(en).toContain("for your matches, only go to a verified tag and follow the “Discord direct messages about my matches” box (My profile, Notifications section)");
+    expect(fr).toBe("Les messages privés Discord ont leur propre case : « Messages privés Discord de mes matchs ».");
+    expect(en).toBe("Discord direct messages have their own box: “Discord direct messages about my matches”.");
+    expect(fr).toBe(`Les messages privés Discord ont leur propre case : « ${(await import("@/messages/fr/profile.json")).default.matchDms.label} ».`);
   });
 
   it("pendant l'envoi : focus gardé et champ utilisable (aria-busy seul, ni disabled ni aria-disabled), second choix envoyé à la suite", async () => {
@@ -718,7 +732,7 @@ describe("langue du compte (lot 9-3)", () => {
   it("en français : libellé et règle", () => {
     const html = renderToStaticMarkup(<AccountLocaleField initial="fr" />);
     expect(html).toContain(">Langue des notifications</label>");
-    expect(html).toContain("prochaine connexion faite dans l&#x27;autre langue");
+    expect(html).toContain("Elle reprend celle de la page à chaque connexion.");
     expect(html).toContain('<option value="fr" lang="fr" selected="">Français</option>');
   });
 });
