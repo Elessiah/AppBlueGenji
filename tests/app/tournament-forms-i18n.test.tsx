@@ -461,8 +461,10 @@ describe("BG Survie — case « sortie anticipée hors course »", () => {
     expect(en).toContain("Early “out of contention” exit");
     // Utilisable par défaut (plafond et format de match posés) : pas grisée.
     expect(fr).not.toMatch(/id="endurance-early-exit" type="checkbox" disabled/);
-    expect(en).toContain("Unticked (default), no team is dropped in advance: only a pool at zero or the last-round cut takes a team out.");
-    expect(fr).toContain("Décochée (par défaut), personne n&#x27;est écarté d&#x27;avance : seuls un capital à zéro et le trait de la dernière manche font sortir.");
+    // Le fonctionnement passe derrière le « i », que la case cite toujours.
+    expect(fr).toContain('aria-controls="endurance-early-exit-hint"');
+    expect(en).toContain("Unticked (default): only a pool at zero or the last-round cut takes a team out.");
+    expect(fr).toContain("Décochée (par défaut) : seuls un capital à zéro et le trait de la dernière manche font sortir.");
     expectNoFrench(en);
   });
 
@@ -532,7 +534,7 @@ describe("BG Survie — case « sortie anticipée hors course »", () => {
   });
 
   it("l'aide dit que la parité reporte la sortie, sans l'annuler (FR et EN)", () => {
-    expect(render("fr", ui())).toContain("sortie reportée d&#x27;une manche si elle laissait un nombre impair");
-    expect(render("en", ui())).toContain("the exit is postponed by one round if it would leave an odd number of teams");
+    expect(render("fr", ui())).toContain("une manche plus tard si elle laissait un nombre impair d&#x27;équipes");
+    expect(render("en", ui())).toContain("one round later if it would leave an odd number of teams");
   });
 });

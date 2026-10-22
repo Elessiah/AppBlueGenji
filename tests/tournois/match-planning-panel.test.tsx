@@ -4,6 +4,7 @@ import { MatchPlanningPanel } from "@/app/(secured)/tournois/[id]/_components/Ma
 import { ToastProvider } from "@/components/ui/toast";
 import type { TournamentDetail, TournamentState } from "@/lib/shared/types";
 import { bracketMatch } from "../helpers/bracket-match";
+import { withoutInfoHintButtons } from "../helpers/info-hint-markup";
 import { tournamentCard } from "../helpers/tournament-card";
 import { tournamentDetail } from "../helpers/tournament-detail";
 
@@ -35,7 +36,9 @@ describe("MatchPlanningPanel — ce que tout le monde lit", () => {
     const html = render(detailOf({ enabled: true, matches: [toPlan] }));
     expect(html).toContain("Matchs planifiés par l&#x27;arbitrage");
     expect(html).toContain("À planifier");
-    expect(html).not.toContain("<button");
+    // Le parcours d'un match derrière le « i » : une explication, pas un geste.
+    expect(html).toContain('aria-controls="match-planning-more"');
+    expect(withoutInfoHintButtons(html)).not.toContain("<button");
     // Le décompte ne sert qu'à ceux qui peuvent le résorber.
     expect(html).not.toContain("match à planifier");
   });
@@ -76,6 +79,6 @@ describe("MatchPlanningPanel — arbitrage", () => {
 
   it("retire toute action sur un plateau figé", () => {
     const html = render(detailOf({ enabled: true, isAdmin: true, matches: [toPlan] }), true);
-    expect(html).not.toContain("<button");
+    expect(withoutInfoHintButtons(html)).not.toContain("<button");
   });
 });

@@ -41,7 +41,7 @@ describe("RefereeSchedulingField", () => {
   it("prévient avant d'enregistrer un allumage qui défait des lancements", () => {
     const html = render({ checked: true, warnUndoesLaunches: true });
     expect(html).toContain("<output");
-    expect(html).toContain('aria-describedby="referee-scheduling-hint referee-scheduling-warning"');
+    expect(html).toContain('aria-describedby="referee-scheduling-more referee-scheduling-hint referee-scheduling-warning"');
     expect(html).toContain("leurs « Prêt » sont effacés");
     expect(ENABLE_PLANNING_WHILE_RUNNING_WARNING).toContain("Les matchs déjà lancés continuent.");
   });
@@ -49,6 +49,16 @@ describe("RefereeSchedulingField", () => {
   it("ne prévient de rien hors de ce cas", () => {
     const html = render({ checked: true });
     expect(html).not.toContain("<output");
-    expect(html).toContain('aria-describedby="referee-scheduling-hint"');
+    expect(html).toContain('aria-describedby="referee-scheduling-more referee-scheduling-hint"');
+  });
+
+  it("passe le parcours d'un match derrière le « i », hors du libellé de la case", () => {
+    const html = render({ checked: true });
+    expect(html).toContain('aria-controls="referee-scheduling-more"');
+    expect(html).toMatch(/<div id="referee-scheduling-more" class="panel" hidden="">/);
+    expect(html).toContain("aria-label=\"Plus d&#x27;infos : Matchs planifiés par l&#x27;arbitrage\"");
+    // Un bouton ne se pose pas dans un `<label>` : la carte n'en est plus un.
+    expect(html).not.toMatch(/<label[^>]*>(?:(?!<\/label>)[\s\S])*<button/);
+    expect(html).toMatch(/<label id="referee-scheduling-label" for="referee-scheduling"/);
   });
 });
