@@ -50,23 +50,27 @@ export function InfoHint({
       const inside = event.target instanceof Node && rootRef.current?.contains(event.target);
       if (infoHintReaction({ kind: inside ? "insideClick" : "outsideClick" }) === "close") setOpen(false);
     };
+    // Échap écouté sur le composant seul (bouton et explication) : une modale
+    // ouverte par-dessus garde le sien, sans que le focus reparte derrière son
+    // voile. Posé ici plutôt qu'en `onKeyDown` : le conteneur n'est pas un
+    // contrôle.
+    const root = rootRef.current;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (infoHintReaction({ kind: "key", key: event.key }) !== "closeAndFocus") return;
+      event.stopPropagation();
+      setOpen(false);
+      buttonRef.current?.focus();
+    };
     document.addEventListener("click", onClick);
-    return () => document.removeEventListener("click", onClick);
+    root?.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("click", onClick);
+      root?.removeEventListener("keydown", onKeyDown);
+    };
   }, [open]);
 
   return (
-    <div
-      ref={rootRef}
-      className={s.root}
-      // Échap écouté sur le composant seul : une modale ouverte par-dessus
-      // garde le sien, sans que le focus reparte derrière son voile.
-      onKeyDown={(event) => {
-        if (!open || infoHintReaction({ kind: "key", key: event.key }) !== "closeAndFocus") return;
-        event.stopPropagation();
-        setOpen(false);
-        buttonRef.current?.focus();
-      }}
-    >
+    <div ref={rootRef} className={s.root}>
       <button
         ref={buttonRef}
         type="button"
