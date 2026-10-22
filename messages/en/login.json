@@ -10,12 +10,12 @@
     "codeSeparator": "OR GET A CODE BY DM",
     "handleLabel": "Discord tag or ID",
     "handlePlaceholder": "your_username or 123456789012345678",
-    "handleHelp": "The bot has to share a server with you to message you privately, whether you enter your tag or your ID: the ID only saves the bot from looking up your tag. Not on one of its servers yet? <join>Join us</join> — or just use the Discord button above, which works without a shared server.",
+    "handleHelp": "The bot has to share a server with you to message you: <join>join ours</join>, or use the Discord button above, which doesn't need one. Your ID only saves looking up your tag.",
     "sending": "Sending...",
     "requestCode": "Get a code →",
     "codeSent": "Code sent by Discord direct message (expires at {time}).",
     "accountLabel": "Discord account",
-    "tagNotice": "Logging in with this code <strong>saves this tag</strong> without certifying it: it stays hidden from everyone, admins included. If you certify it later, in “My profile” or in the window offered after logging in through Discord or Blizzard, {audience}",
+    "tagNotice": "This code <strong>saves this tag</strong>, without verifying it: nobody sees it.",
     "codeLabel": "Code received by DM (6 digits)",
     "pseudoLabel": "Site username",
     "pseudoOptional": "(optional, first login)",
@@ -27,14 +27,14 @@
   },
   "oauth": {
     "continueWith": "Continue with {provider}",
-    "discordNote": "Saves your Discord username without certifying it: it stays hidden from everyone, admins included. If you certify it later, in “My profile” or in the window offered after logging in through Discord or Blizzard, {audience}",
-    "blizzardNote": "Fills in your BattleTag automatically. You can hide your BattleTag: it stays visible to the members of both teams, admins and referees in a tournament match from the moment both its opponents are known until its end, and to its caster only while the match is being played, in the match's “Contacts” window (and, for the teams and the caster, its launch window), if you're among the contacts shown. If you cast a match, both its teams also see it while the match is being played, and referees and admins from the moment both its opponents are known until its end. If you don't want them to see it, remove it from your profile (if it comes from Battle.net, unlink your Battle.net account first — after adding another way to log in if it is your only one).",
-    "tagAudience": "admins can see it at any time, referees while you are registered for a tournament that is not finished (from the moment registration opens), the members of both teams of your match from the moment both its opponents are known until its end, and its caster only while the match is being played (and, if you cast a match, both its teams only while the match is being played, and the referees from the moment both its opponents are known until its end); other players only if you make it visible in your privacy settings. Never anyone else."
+    "discordNote": "Saves your Discord username, without verifying it: nobody sees it.",
+    "blizzardNote": "Fills in your BattleTag automatically.",
+    "discordDetails": "You can verify it later in “My profile” or in the window offered after logging in through Discord or Blizzard."
   },
   "environment": {
     "notice": {
-      "IOS_INSTALLED_APP": "You are using the site from its home screen icon: iOS often blocks logging in with Google, Discord or Blizzard there. If it fails, open the site in Safari, or use the Discord code by direct message below.",
-      "IN_APP_BROWSER": "You are browsing inside an app's built-in browser, which often blocks logging in with Google, Discord or Blizzard. If it fails, open the site in your usual browser, or use the Discord code by direct message below."
+      "IOS_INSTALLED_APP": "From the home screen icon, iOS often blocks these logins. If it fails, open the site in Safari or use the Discord code below.",
+      "IN_APP_BROWSER": "This app's built-in browser often blocks these logins. If it fails, open the site in your usual browser or use the Discord code below."
     },
     "advice": {
       "IOS_INSTALLED_APP": "From the home screen icon, iOS isolates the login: open the site in Safari to log in, or use the Discord code by direct message.",
@@ -114,5 +114,23 @@
     "home": "Back to home",
     "rules": "Discover the tournament rules",
     "redirecting": "Opening the tournament…"
+  },
+  "audience": {
+    "discord": {
+      "title": "A verified tag is visible to:",
+      "admins": "administrators, at any time;",
+      "referees": "referees, while you're registered for a tournament that isn't finished;",
+      "match": "the members of both teams of your match, from the moment its opponents are known until its end, and its caster while the match is being played;",
+      "asCaster": "if you cast a match: both its teams while the match is being played, and referees from the moment its opponents are known until its end;",
+      "players": "other players, only if you tick “Discord tag” in your privacy settings.",
+      "footer": "Nobody else."
+    },
+    "battletag": {
+      "title": "Hidden, your BattleTag can only be read in the “Contacts” window of your matches and in their launch window:",
+      "match": "if you're shown there as a contact: the members of both teams, referees and administrators, from the moment the opponents are known until the end of the match, and the caster while the match is being played;",
+      "asCaster": "if you cast a match: both its teams while the match is being played, and referees and administrators from the moment its opponents are known until its end;",
+      "launch": "the launch window only opens for both teams and the caster.",
+      "footer": "To stop sharing it entirely, clear it from your profile (if it comes from Battle.net, unlink Battle.net first, after adding another way to log in if it is your only one)."
+    }
   }
 }

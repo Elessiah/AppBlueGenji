@@ -30,10 +30,15 @@ import {
 } from "./_lib/profile-sections";
 import {
   battletagLockText,
+  discordAudienceText,
   discordTagLockText,
+  hiddenBattletagAudienceText,
   verifiedBadgeLabels,
   type ProfileText,
 } from "./_lib/profile-text";
+import { AudienceList, InfoHint, InfoHintRow } from "@/components/ui/info-hint";
+import type { DiscordTagLockNotice } from "@/lib/shared/discord-tag-lock";
+import type { BattletagLockNotice } from "@/lib/shared/battletag-lock";
 import { useProfileText } from "@/components/i18n/profile-text";
 import { useTeamErrorsText } from "@/components/i18n/team-errors-text";
 import { useLocaleRouter } from "@/components/i18n/locale-navigation";
@@ -97,7 +102,7 @@ function matchDmReachable(discordState: DiscordState, profileVerified: boolean |
 }
 
 /**
- * Avertissement ajouté sous les réglages de visibilité quand « Tag Discord »
+ * Avertissement affiché sous les réglages de visibilité quand « Tag Discord »
  * est coché sur un tag non certifié.
  *
  * Seulement sur un état **lu** (`linked` n'est plus `null`) : avant la
@@ -106,8 +111,63 @@ function matchDmReachable(discordState: DiscordState, profileVerified: boolean |
  */
 function discordVisibilityWarning(text: ProfileText, visible: boolean, discordState: DiscordState): string | null {
   if (!visible || discordState.linked === null || discordState.verified) return null;
-  const warning = discordState.tag ? text.t("privacy.discordPending") : text.t("privacy.discordNoTag");
-  return ` ${warning}`;
+  return discordState.tag ? text.t("privacy.discordPending") : text.t("privacy.discordNoTag");
+}
+
+/**
+ * Ce que dit le champ Discord : verrouillé, l'état du module ; ouvert, un tag
+ * non certifié (un tag certifié est toujours verrouillé). La liste de ceux qui
+ * liraient un tag certifié vient de la source partagée avec `/connexion`.
+ */
+function discordFieldNotice(
+  text: ProfileText,
+  locked: boolean,
+  state: DiscordState & { pending: boolean },
+): DiscordTagLockNotice {
+  if (locked) return discordTagLockText(text, state);
+  return { status: text.t("discord.unverifiedHint"), details: [text.t("discord.unverifiedDetails")], audience: true };
+}
+
+/**
+ * Ce que dit le champ BattleTag : verrouillé, l'état du module **remplace** la
+ * finalité — l'annonce Blizzard prévient de ce qui arrivera si un compte est
+ * rattaché, et il l'est déjà. Ouvert, la finalité reste visible (elle se dit à
+ * la collecte) et l'annonce Blizzard passe derrière le « i ».
+ */
+function battletagFieldNotice(
+  text: ProfileText,
+  locked: boolean,
+  state: { tag: string | null; linked: boolean | null; pending: boolean },
+): BattletagLockNotice {
+  if (locked) return battletagLockText(text, state);
+  return { status: text.t("games.gameTagNotice"), details: [text.t("games.blizzardNotice")] };
+}
+
+/** Le « i » a-t-il quelque chose à dire ? */
+function hasHintDetails(notice: DiscordTagLockNotice): boolean {
+  return notice.details.length > 0 || notice.audience;
+}
+
+/** Les phrases d'un détail, une par paragraphe. */
+function HintDetails({ lines }: Readonly<{ lines: readonly string[] }>) {
+  return (
+    <>
+      {lines.map((line) => (
+        <p key={line}>{line}</p>
+      ))}
+    </>
+  );
+}
+
+/** Le « i » du tag Discord : le détail du verrou, et qui lirait un tag certifié. */
+function DiscordFieldHint({ notice, text }: Readonly<{ notice: DiscordTagLockNotice; text: ProfileText }>) {
+  if (!hasHintDetails(notice)) return null;
+  return (
+    <InfoHint id="profile-discord-more" subject={text.t("discord.label")}>
+      <HintDetails lines={notice.details} />
+      {notice.audience ? <AudienceList lines={discordAudienceText(text)} /> : null}
+    </InfoHint>
+  );
 }
 
 /** Rattachement Blizzard : `null` tant que la liste n'a pas été lue. */
@@ -631,6 +691,14 @@ export default function ProfilePage() {
   // Le verrou se lit sur le rattachement **enregistré**, jamais sur le champ en
   // cours de saisie : le formulaire ne doit ni ouvrir ni fermer ce qu'il montre.
   const discordLocked = isDiscordTagLocked(discordState);
+  /**
+   * Ce que dit le champ : verrouillé, l'état du module ; ouvert, un tag non
+   * certifié (un tag certifié est toujours verrouillé). La liste de ceux qui
+   * liraient un tag certifié vient de la source partagée avec `/connexion`.
+   */
+  const discordNotice = discordFieldNotice(text, discordLocked, { ...discordState, pending: discordStateBusy });
+  const discordHasMore = hasHintDetails(discordNotice);
+  const discordWarning = discordVisibilityWarning(text, visibility.discord, discordState);
 
   // La liste des rattachements est chargée **ici** et non dans la section d'en
   // bas, qui la recevait : elle a deux lecteurs, et deux `fetch` en feraient
@@ -644,6 +712,11 @@ export default function ProfilePage() {
   // porte donc, comme celui du tag Discord, sur un état à trois valeurs.
   const blizzardLinked = blizzardLinkState(connections);
   const battletagLocked = isBattletagLocked({ linked: blizzardLinked });
+  const battletagNotice = battletagFieldNotice(text, battletagLocked, {
+    tag: overwatchBattletag.trim() || null,
+    linked: blizzardLinked,
+    pending: connectionsPending,
+  });
 
   /**
    * La modale qui dit ce que « décoché » ne fait pas.
@@ -833,7 +906,15 @@ export default function ProfilePage() {
         <ProfileSection section={sectionById.jeux}>
           <div className="form-grid">
             <div className="field">
-              <label htmlFor="profile-battletag">{t("games.battletag")}</label>
+              <InfoHintRow>
+                <label htmlFor="profile-battletag">{t("games.battletag")}</label>
+                {/* Le détail (Blizzard, verrou, qui lit un BattleTag masqué) derrière le « i » :
+                    l'avertissement sur le masquage y reste dans les deux cas, verrouillé ou non. */}
+                <InfoHint id="profile-battletag-more" subject={t("games.battletag")}>
+                  <HintDetails lines={battletagNotice.details} />
+                  <AudienceList lines={hiddenBattletagAudienceText(text)} />
+                </InfoHint>
+              </InfoHintRow>
               <input
                 id="profile-battletag"
                 value={overwatchBattletag}
@@ -842,7 +923,7 @@ export default function ProfilePage() {
                   fieldErrors.clear("battletag");
                 }}
                 placeholder={t("games.battletagPlaceholder")}
-                {...fieldErrors.aria("battletag", "profile-battletag-hint")}
+                {...fieldErrors.aria("battletag", "profile-battletag-hint", "profile-battletag-more")}
                 /* Un compte Blizzard rattaché possède son BattleTag : le champ
                    le montre, il ne le prend plus. `readOnly` et non `disabled`
                    — la valeur reste lisible au lecteur d'écran et atteignable
@@ -851,20 +932,9 @@ export default function ProfilePage() {
                 aria-readonly={battletagLocked || undefined}
               />
               <FieldErrorText fieldId={PROFILE_FIELD_IDS.battletag} message={fieldErrors.message("battletag")} />
-              {/* Verrouillé, la phrase du module **remplace** l'annonce : celle-ci
-                  prévient de ce qui arrivera si un compte Blizzard est rattaché,
-                  et il l'est déjà. L'avertissement sur le masquage suit dans les
-                  deux cas : c'est en renseignant le BattleTag qu'il faut savoir
-                  que le masquer ne le cache pas aux adversaires d'un match. */}
+              {/* Verrouillé, l'état du module ; ouvert, la finalité (`battletagFieldNotice`). */}
               <p id="profile-battletag-hint" className={s.hint}>
-                {battletagLocked
-                  ? battletagLockText(text, {
-                      tag: overwatchBattletag.trim() || null,
-                      linked: blizzardLinked,
-                      pending: connectionsPending,
-                    })
-                  : `${t("games.gameTagNotice")} ${t("games.blizzardNotice")}`}{" "}
-                {t("games.hiddenWarning")}
+                {battletagNotice.status}
               </p>
             </div>
             <div className="field">
@@ -884,12 +954,15 @@ export default function ProfilePage() {
 
         <ProfileSection section={sectionById.discord}>
           <div className="field">
-            <label htmlFor="profile-discord">
-              <span className={s.fieldLabelRow}>
-                {t("discord.label")}
-                {discordState.verified ? <VerifiedBadge labels={verifiedBadgeLabels(text)} /> : null}
-              </span>
-            </label>
+            <InfoHintRow>
+              <label htmlFor="profile-discord">
+                <span className={s.fieldLabelRow}>
+                  {t("discord.label")}
+                  {discordState.verified ? <VerifiedBadge labels={verifiedBadgeLabels(text)} /> : null}
+                </span>
+              </label>
+              <DiscordFieldHint notice={discordNotice} text={text} />
+            </InfoHintRow>
             <input
               id="profile-discord"
               value={discordPseudo}
@@ -898,7 +971,7 @@ export default function ProfilePage() {
                 fieldErrors.clear("discord");
               }}
               placeholder={t("discord.placeholder")}
-              {...fieldErrors.aria("discord", "profile-discord-hint")}
+              {...fieldErrors.aria("discord", "profile-discord-hint", discordHasMore && "profile-discord-more")}
               /* Un compte Discord rattaché possède son tag : le champ le
                  montre, il ne le prend plus. `readOnly` et non `disabled` —
                  la valeur reste lisible au lecteur d'écran et atteignable au
@@ -933,21 +1006,24 @@ export default function ProfilePage() {
                 forcément à un compte rattaché — `writeVerifiedTag` écrit
                 `discord_id`, et détacher Discord décertifie —, donc `verified`
                 implique `discordLocked` : la branche « certifié, non verrouillé »
-                ne pouvait jamais être atteinte. C'est la phrase du verrou qui
-                énonce alors l'exposition. L'annonce du tag **non** certifié, elle,
-                vient de la source partagée avec `/connexion` : c'est une promesse,
-                elle ne doit pas différer d'un écran à l'autre. */}
+                ne pouvait jamais être atteinte. C'est l'état du verrou qui énonce
+                alors l'exposition (`discordNotice`). */}
             <p id="profile-discord-hint" className={s.hint}>
-              {discordLocked
-                ? discordTagLockText(text, { ...discordState, pending: discordStateBusy })
-                : t("discord.unverifiedHint", { audience: t("discord.unverifiedAudience") })}
+              {discordNotice.status}
             </p>
           </div>
         </ProfileSection>
 
         <ProfileSection section={sectionById.confidentialite}>
           <div className={s.toggleGroup}>
-            <p className={s.toggleGroupTitle}>{t("privacy.visibleTitle")}</p>
+            <InfoHintRow>
+              <p className={s.toggleGroupTitle}>{t("privacy.visibleTitle")}</p>
+              <InfoHint id="profile-visibility-more" subject={t("privacy.visibleTitle")}>
+                <p>{t("privacy.pseudoAlwaysVisible")}</p>
+                <p>{t("privacy.discordNotice")}</p>
+                <p>{t("privacy.battletagNotice")}</p>
+              </InfoHint>
+            </InfoHintRow>
             <div className={s.toggleRow}>
               {Object.entries(visibility).map(([key, value]) => (
                 <Coche
@@ -967,14 +1043,17 @@ export default function ProfilePage() {
                 />
               ))}
             </div>
-            <p className={s.hint}>
-              {t("privacy.pseudoAlwaysVisible")} {t("privacy.discordNotice")}
-              {discordVisibilityWarning(text, visibility.discord, discordState)}
-            </p>
+            {/* L'avertissement reste visible : il dit l'état du joueur, pas une règle. */}
+            {discordWarning ? <p className={s.hint}>{discordWarning}</p> : null}
           </div>
 
           <div className={s.toggleGroup}>
-            <p className={s.toggleGroupTitle}>{t("privacy.recruitmentTitle")}</p>
+            <InfoHintRow>
+              <p className={s.toggleGroupTitle}>{t("privacy.recruitmentTitle")}</p>
+              <InfoHint id="profile-recruitment-more" subject={t("privacy.recruitmentTitle")}>
+                <p>{t("privacy.recruitmentHint")}</p>
+              </InfoHint>
+            </InfoHintRow>
             <div className={s.toggleRow}>
               <Coche
                 label={t("privacy.openToOffers")}
@@ -983,7 +1062,6 @@ export default function ProfilePage() {
                 onChange={() => setOpenToRecruitment((v) => !v)}
               />
             </div>
-            <p className={s.hint}>{t("privacy.recruitmentHint")}</p>
           </div>
 
         </ProfileSection>

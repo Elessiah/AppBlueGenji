@@ -83,7 +83,13 @@ export function isBattletagLocked(state: { linked: boolean | null }): boolean {
 }
 
 /**
- * La phrase qui remplace l'aide du champ quand il est verrouillé.
+ * Ce que dit le champ verrouillé : une **ligne d'état** visible, et le détail
+ * derrière le bouton « i » (`docs/features/INFO_HINTS.md`).
+ */
+export type BattletagLockNotice = { status: string; details: readonly string[] };
+
+/**
+ * Ce qui remplace l'aide du champ quand il est verrouillé.
  *
  * Elle vit ici, avec la règle : une copie dans l'écran aurait cessé de la
  * décrire au premier ajustement.
@@ -91,8 +97,7 @@ export function isBattletagLocked(state: { linked: boolean | null }): boolean {
  * Elle **nomme les deux gestes** qui restent, et ils ne font pas la même chose
  * — en changer (retirer Blizzard, puis rattacher le bon compte) et cesser de le
  * publier (décocher sa visibilité). Un refus qui ne dit pas comment il se lève
- * se lit comme une panne, et celui-ci se lève par deux portes différentes selon
- * ce que le joueur cherchait vraiment.
+ * se lit comme une panne.
  */
 export function battletagLockNotice(state: {
   tag: string | null;
@@ -106,26 +111,29 @@ export function battletagLockNotice(state: {
    * répond, ce qui arrive régulièrement avant la liste des rattachements.
    */
   pending?: boolean;
-}): string {
-  // L'attente se dit comme une attente, sans cause ni geste : il n'y a rien à
-  // réessayer tant que le premier essai n'a pas répondu.
+}): BattletagLockNotice {
+  // L'attente se dit comme une attente, sans cause ni geste.
   if (state.pending && state.linked !== true) {
-    return "Lecture de tes applications connectées… Le champ reste en lecture seule le temps de savoir si Blizzard renseigne ce BattleTag.";
+    return { status: "Lecture de tes applications connectées… Champ en lecture seule en attendant.", details: [] };
   }
-  // L'état n'est pas connu — ou ne l'a jamais été, l'appel ayant échoué. On ne
-  // décrit alors **ni** un rattachement ni son absence : on nomme le verrou, sa
-  // raison et sa sortie.
+  // L'état n'est pas connu — ou ne l'a jamais été, l'appel ayant échoué : ni
+  // rattachement ni absence, seulement le verrou et sa sortie.
   if (state.linked !== true) {
-    return "Impossible de lire tes applications connectées pour l'instant : le champ reste en lecture seule, pour ne pas écraser un BattleTag que Blizzard aurait renseigné. Recharge la page pour réessayer.";
+    return {
+      status: "Applications connectées illisibles pour l'instant : champ en lecture seule. Recharge la page pour réessayer.",
+      details: [],
+    };
   }
   const change =
-    "Pour en changer, retire Blizzard depuis « Applications connectées » (après avoir ajouté un autre moyen de connexion si c'est le seul), puis rattache le bon compte.";
+    "Pour en changer, retire Blizzard des « Applications connectées » (après avoir ajouté un autre moyen de connexion si c'est le seul), puis rattache le bon compte.";
   if (!state.tag) {
     // Rattaché sans BattleTag : le cas existe (un compte Battle.net peut n'en
     // porter aucun), et le champ reste fermé parce que la prochaine connexion
-    // écrira celui de la source par-dessus. Le dire évite de faire chercher un
-    // chargement raté là où il n'y en a pas.
-    return `Ton compte Blizzard est rattaché, mais il n'a donné aucun BattleTag. Le champ reste en lecture seule : Blizzard le renseignera à ta prochaine connexion, et écraserait une saisie faite ici. ${change}`;
+    // écrira celui de la source par-dessus.
+    return { status: "Compte Blizzard rattaché, sans BattleTag : Blizzard le remplira à ta prochaine connexion.", details: [change] };
   }
-  return `Ton compte Blizzard est rattaché : c'est lui qui donne ce BattleTag, et Blizzard le remet à jour à chaque connexion — une correction saisie ici serait effacée au passage suivant. ${change} Pour cesser de le publier, décoche « BattleTag OW » plus bas.`;
+  return {
+    status: "Fourni par ton compte Blizzard, et mis à jour à chaque connexion.",
+    details: [change, "Pour ne plus le montrer aux autres joueurs, décoche « BattleTag OW » plus bas."],
+  };
 }

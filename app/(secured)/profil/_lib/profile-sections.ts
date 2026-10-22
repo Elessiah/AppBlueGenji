@@ -89,7 +89,7 @@ export const PROFILE_SECTIONS = [
   {
     id: "notifications",
     title: "Notifications",
-    lead: "Être prévenu sur ton téléphone ou ton ordinateur, même le site fermé, et choisir si le bot t'écrit en privé pour tes matchs.",
+    lead: "Notifications sur ton téléphone ou ton ordinateur, même site fermé, et messages privés du bot pour tes matchs.",
     tone: "pink",
   },
   {

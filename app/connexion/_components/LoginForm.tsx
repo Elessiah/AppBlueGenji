@@ -27,6 +27,8 @@ import { CodedError, LOGIN_FIELD_ERRORS, errorCode } from "@/lib/shared/field-er
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { LOGIN_HELP_TEXT_STYLE } from "../_lib/login-styles";
+import { AudienceList, InfoHint, InfoHintRow } from "@/components/ui/info-hint";
+import { discordAudienceLines } from "@/lib/shared/identity-audience";
 
 /**
  * Information d'entrée **lue** dans ce navigateur, à sa version. Ce n'est plus un
@@ -338,7 +340,24 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
 
             <form onSubmit={requestCode} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div className="field">
-                <label htmlFor={LOGIN_FIELD_IDS.handle}>{t("page.handleLabel")}</label>
+                <InfoHintRow>
+                  <label htmlFor={LOGIN_FIELD_IDS.handle}>{t("page.handleLabel")}</label>
+                  {/* Le prérequis du code (un serveur commun avec le bot) derrière le « i » ;
+                      le champ le garde pour description. */}
+                  <InfoHint id="login-discord-handle-help" subject={t("page.handleLabel")}>
+                    <p>
+                      {richNodes(
+                        text.rich("page.handleHelp", {}, {
+                          join: (children) => (
+                            <a href={DISCORD_INVITE_URL} target="_blank" rel="noopener noreferrer">
+                              {richNodes(children)}
+                            </a>
+                          ),
+                        }),
+                      )}
+                    </p>
+                  </InfoHint>
+                </InfoHintRow>
                 <input
                   id={LOGIN_FIELD_IDS.handle}
                   type="text"
@@ -353,22 +372,6 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
                   {...fieldErrors.aria("handle", "login-discord-handle-help")}
                 />
                 <FieldErrorText fieldId={LOGIN_FIELD_IDS.handle} message={fieldErrors.message("handle")} />
-                <span id="login-discord-handle-help" style={{ ...LOGIN_HELP_TEXT_STYLE, marginTop: 4 }}>
-                  {richNodes(
-                    text.rich("page.handleHelp", {}, {
-                      join: (children) => (
-                        <a
-                          href={DISCORD_INVITE_URL}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ color: "var(--blue-300)", textDecoration: "underline" }}
-                        >
-                          {richNodes(children)}
-                        </a>
-                      ),
-                    }),
-                  )}
-                </span>
               </div>
               <CyberButton
                 variant="ghost"
@@ -420,13 +423,21 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
                   serveur, pas une seconde lecture du même motif.
                 */}
                 {isCertifiableDiscordHandle(handle) && (
-                  <span style={{ ...LOGIN_HELP_TEXT_STYLE, marginTop: 4 }}>
-                    {richNodes(
-                      text.rich("page.tagNotice", { audience: t("oauth.tagAudience") }, {
-                        strong: (children) => <strong>{richNodes(children)}</strong>,
-                      }),
-                    )}
-                  </span>
+                  <div style={{ marginTop: 4 }}>
+                    <InfoHintRow>
+                      <span style={LOGIN_HELP_TEXT_STYLE}>
+                        {richNodes(
+                          text.rich("page.tagNotice", {}, {
+                            strong: (children) => <strong>{richNodes(children)}</strong>,
+                          }),
+                        )}
+                      </span>
+                      <InfoHint id="login-discord-tag-more" subject={t("page.accountLabel")}>
+                        <p>{t("oauth.discordDetails")}</p>
+                        <AudienceList lines={discordAudienceLines(t)} />
+                      </InfoHint>
+                    </InfoHintRow>
+                  </div>
                 )}
               </div>
               <div className="field">

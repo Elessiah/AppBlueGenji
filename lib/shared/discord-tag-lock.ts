@@ -29,11 +29,6 @@
  * établi (le serveur en base, le client depuis `GET /api/profile/discord`).
  */
 
-import {
-  DISCORD_TAG_AUDIENCE,
-  DISCORD_TAG_UNVERIFIED_AUDIENCE,
-} from "@/lib/shared/identity-sharing";
-
 /**
  * Refus de l'écriture manuelle du tag.
  *
@@ -86,15 +81,22 @@ export function isDiscordTagLocked(state: { linked: boolean | null }): boolean {
 }
 
 /**
- * La phrase qui remplace l'aide du champ quand il est verrouillé.
+ * Ce que dit le champ verrouillé : une **ligne d'état** visible, le détail
+ * derrière le bouton « i » (`docs/features/INFO_HINTS.md`), et s'il faut y
+ * joindre la liste de ceux qui lisent un tag certifié (`DISCORD_TAG_AUDIENCE`).
+ */
+export type DiscordTagLockNotice = { status: string; details: readonly string[]; audience: boolean };
+
+/**
+ * Ce qui remplace l'aide du champ quand il est verrouillé.
  *
  * Elle vit ici, avec la règle : une copie dans l'écran aurait cessé de la
- * décrire au premier ajustement. Deux cas, parce que le joueur qui ne voit
- * aucun tag doit comprendre que ce n'est pas un chargement raté.
+ * décrire au premier ajustement. Le joueur qui ne voit aucun tag doit
+ * comprendre que ce n'est pas un chargement raté.
  *
- * Elle **nomme les deux gestes** qui rouvrent la donnée — renommer sur Discord
- * puis se reconnecter, ou détacher Discord — parce qu'un refus qui ne dit pas
- * comment il se lève se lit comme une panne.
+ * Elle **nomme le geste** qui rouvre la donnée — renommer sur Discord puis
+ * mettre à jour le pseudo — parce qu'un refus qui ne dit pas comment il se
+ * lève se lit comme une panne.
  */
 export function discordTagLockNotice(state: {
   tag: string | null;
@@ -109,55 +111,57 @@ export function discordTagLockNotice(state: {
    * `GET /api/profile` répond, ce qui arrive régulièrement avant
    * `GET /api/profile/discord`. C'est exactement ce que `profile-errors.ts`
    * s'interdit : affirmer une cause qu'on ne connaît pas.
-   *
-   * L'appelant est le seul à savoir laquelle des deux : le module reste pur, il
-   * se contente de ne plus supposer.
    */
   pending?: boolean;
-}): string {
+}): DiscordTagLockNotice {
   // L'attente se dit comme une attente, sans cause ni geste : il n'y a rien à
   // réessayer tant que le premier essai n'a pas répondu.
   if (state.pending && state.linked !== true) {
-    return "Lecture de l'état de ton compte Discord… Le champ reste en lecture seule le temps de savoir si Discord a nommé ce pseudo.";
+    return { status: "Lecture de ton compte Discord… Champ en lecture seule en attendant.", details: [], audience: false };
   }
-  // L'état n'est pas encore connu — ou ne l'a jamais été, l'appel ayant échoué.
-  // On ne décrit alors **ni** un rattachement ni son absence : on nomme le
-  // verrou, sa raison et sa sortie. Prétendre ici que le compte est rattaché
-  // serait une affirmation que rien ne soutient.
+  // L'état n'est pas connu — ou ne l'a jamais été, l'appel ayant échoué. On ne
+  // décrit alors **ni** un rattachement ni son absence : on nomme le verrou et
+  // sa sortie.
   if (state.linked !== true) {
-    return "Impossible de lire l'état de ton compte Discord pour l'instant : le champ reste en lecture seule, pour ne pas écraser un pseudo que Discord aurait nommé. Réessaie, ou recharge la page.";
+    return {
+      status: "État de ton compte Discord illisible pour l'instant : champ en lecture seule. Réessaie, ou recharge la page.",
+      details: [],
+      audience: false,
+    };
   }
   // Le geste nommé doit **exister à l'écran**. « Détache Discord » n'en est pas
   // un pour un compte né par Discord : le bouton y est remplacé par le refus
-  // `LAST_CONNECTION`, faute d'une autre porte. Reste celui qui vaut toujours :
-  // se renommer chez Discord, puis se reconnecter.
+  // `LAST_CONNECTION`, faute d'une autre porte.
   const rename =
     "Pour en changer, renomme-toi sur Discord puis utilise « Mettre à jour mon pseudo » (ligne « Bot Discord » des applications connectées).";
   if (!state.tag) {
     // Deux causes mènent ici — un tag retiré, ou un pseudo Discord entièrement
     // numérique que `normalizeDiscordHandle` écarte — et l'écran ne peut pas les
-    // distinguer. Il dit donc l'état et le geste, sans inventer la cause : le
-    // joueur qui vient de retirer son tag n'a pas à lire une explication fausse.
-    //
-    // Le bouton est **nommé**, jamais situé : « ci-dessous » était faux (il est
-    // rendu au-dessus du paragraphe) et n'aurait de toute façon rien à faire
-    // dans un module pur, qui ne connaît pas la mise en page de ses lecteurs.
-    return `Ton compte Discord est rattaché, mais aucun pseudo n'est enregistré : l'organisation ne peut pas te joindre pendant un tournoi. Utilise « Enregistrer mon tag » ou « Mettre à jour mon pseudo », ou reconnecte-toi par Discord.`;
+    // distinguer : l'état et le geste, sans inventer la cause. Les boutons sont
+    // **nommés**, jamais situés : un module pur ne connaît pas la mise en page.
+    return {
+      status: "Compte Discord rattaché, sans pseudo enregistré : l'organisation ne peut pas te joindre.",
+      details: ["Utilise « Enregistrer mon tag » ou « Mettre à jour mon pseudo », ou reconnecte-toi par Discord."],
+      audience: false,
+    };
   }
-  // On n'affirme pas l'**origine** du tag : `linkOAuthIdentity` n'écrit
-  // `discord_pseudo` que si Discord a donné un pseudo affichable, si bien qu'un
-  // compte rattaché peut porter un tag saisi à la main. Ce qui est sûr, et seul
-  // utile au joueur, c'est qui le lit.
+  // On n'affirme pas l'**origine** du tag : un compte rattaché peut porter un
+  // tag saisi à la main. Ce qui est sûr, et seul utile au joueur, c'est qui le lit.
   if (!state.verified) {
-    // **Pas de « pour cesser d'être joignable »** ici : la phrase vient de dire
-    // que personne ne voit ce tag. Proposer d'arrêter une exposition qui
-    // n'existe pas pousserait à effacer une donnée sans raison. Le retrait reste
-    // offert par le bouton d'à côté, il n'a simplement rien à promettre.
-    return `Ton compte Discord est rattaché, mais ce pseudo n'est pas certifié : ${DISCORD_TAG_UNVERIFIED_AUDIENCE} Te connecter par Discord ne le certifie pas : c'est « Certifier mon tag » qui le fait. ${rename} Tu peux aussi le retirer.`;
+    // **Pas de « pour ne plus être joignable »** ici : personne ne voit ce tag.
+    // Le retrait reste offert par le bouton d'à côté, sans rien à promettre.
+    return {
+      status: "Compte Discord rattaché, pseudo non certifié : personne ne le voit.",
+      details: ["Te connecter par Discord ne le certifie pas : c'est « Certifier mon tag » qui le fait. Tu peux aussi le retirer.", rename],
+      audience: true,
+    };
   }
-  // Qui lit le tag est une **promesse** du site, rédigée une seule fois dans
-  // `identity-sharing.ts` et partagée avec `/connexion` : la recopier ici
-  // laisserait les deux écrans promettre deux publics différents au premier
-  // ajustement de l'un.
-  return `Ton compte Discord est rattaché et ce pseudo est certifié : ${DISCORD_TAG_AUDIENCE} ${rename} Un nouveau pseudo arrive non certifié, à certifier de nouveau. Pour cesser d'être joignable, retire-le.`;
+  // Qui lit le tag est une **promesse** du site, rédigée une seule fois
+  // (`DISCORD_TAG_AUDIENCE`, `identity-sharing.ts`) et partagée avec
+  // `/connexion` : l'écran la joint à la place de la recopier.
+  return {
+    status: "Compte Discord rattaché, pseudo certifié.",
+    details: [rename, "Un nouveau pseudo arrive non certifié, à certifier de nouveau. Pour ne plus être joignable, retire-le."],
+    audience: true,
+  };
 }

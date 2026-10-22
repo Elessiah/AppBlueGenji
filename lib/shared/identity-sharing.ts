@@ -2,65 +2,95 @@
  * Ce que le site fait des identifiants qu'un joueur lui confie — **dit au
  * joueur**, à l'endroit où il les saisit.
  *
- * Ces phrases existaient, mais **pas là où elles servent**. L'exposition d'un
- * tag Discord certifié est énoncée sur `/connexion`, juste avant la case où l'on
- * tape son pseudo ; le fait que Blizzard réécrive le BattleTag à chaque
- * connexion n'est écrit nulle part ailleurs que dans le `CLAUDE.md`. Or
- * `/profil` est précisément l'écran où l'on revient *après*, celui où l'on
- * modifie ces champs des mois plus tard, et il n'en disait rien : le joueur y
- * corrige un tag sans savoir qui le lit, et voit son BattleTag changer tout seul
- * sans savoir pourquoi.
+ * Ces phrases vivent ici, une fois, partagées par `/connexion`, `/profil` et la
+ * fiche joueur. Deux copies auraient divergé au premier ajustement, et la
+ * divergence porterait sur ce que le site **promet** — le genre d'écart
+ * qu'aucun test d'intégration ne rattrape et qu'un joueur découvre en
+ * constatant le contraire. Les écrans les lisent dans la langue de la page
+ * (`audience.*`, `discord.*`… des espaces de messages) ; le français de chaque
+ * copie égale celui d'ici (testé).
  *
- * Elles vivent donc ici, une fois, partagées par les deux écrans. Deux copies
- * auraient divergé au premier ajustement, et la divergence porterait sur ce que
- * le site **promet** — le genre d'écart qu'aucun test ne rattrape et qu'un
- * joueur découvre en constatant le contraire.
+ * Rédaction courte (`docs/features/INFO_HINTS.md`) : une ligne visible pour
+ * l'essentiel, le détail derrière le bouton « i ».
  *
- * Module **pur** : ce sont des chaînes, sans lecteur ni contexte.
+ * Module **pur** : des chaînes et des listes de lecteurs, sans contexte.
  */
+
+/**
+ * Une explication « qui le voit » : une phrase d'entrée, les lecteurs, une
+ * phrase de fin. Rendue en liste derrière le bouton « i » (`AudienceList`,
+ * `components/ui/info-hint.tsx`) ; même forme sous `audience.*` dans chaque
+ * espace de messages qui la montre (`profile`, `login`, `players`).
+ */
+export type IdentityAudience = { readonly title: string; readonly items: readonly string[]; readonly footer: string };
 
 /**
  * Qui voit un tag Discord **certifié**, et personne d'autre.
  *
- * L'ordre suit `canViewDiscordTag` : soi-même toujours, les administrateurs
- * toujours, l'arbitrage seulement tant que le titulaire est inscrit à un tournoi
- * vivant (tout état sauf `FINISHED`, inscriptions comprises), les autres joueurs
- * seulement si le titulaire a coché « Tag Discord ». « Jamais personne
- * d'autre » n'est pas une formule de style — le tag n'est **jamais** montré à
- * un visiteur sans compte, et c'est la seule phrase qui le dise au joueur.
+ * L'ordre suit `canViewDiscordTag` : les administrateurs toujours, l'arbitrage
+ * seulement tant que le titulaire est inscrit à un tournoi vivant (tout état
+ * sauf `FINISHED`, inscriptions comprises), les parties d'un match par sa
+ * fenêtre « Contacts », les autres joueurs seulement si le titulaire a coché
+ * « Tag Discord ». « Personne d'autre » n'est pas une formule de style — le
+ * tag n'est **jamais** montré à un visiteur sans compte.
  */
-export const DISCORD_TAG_AUDIENCE =
-  "les administrateurs le voient à tout moment, les arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), les membres des deux équipes de ton match dès que ses deux adversaires sont connus et jusqu'à sa fin, et son caster le temps du match seulement (et, si tu castes un match, ses deux équipes le temps du match seulement, et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin) ; les autres joueurs, seulement si tu le rends visible dans tes réglages de confidentialité. Jamais personne d'autre.";
+export const DISCORD_TAG_AUDIENCE: IdentityAudience = {
+  title: "Un tag certifié est visible par :",
+  items: [
+    "les administrateurs, à tout moment ;",
+    "les arbitres, tant que tu es inscrit à un tournoi non terminé ;",
+    "les membres des deux équipes de ton match, dès que ses adversaires sont connus et jusqu'à sa fin, et son caster le temps du match ;",
+    "si tu castes un match : ses deux équipes le temps du match, et les arbitres dès que ses adversaires sont connus et jusqu'à sa fin ;",
+    "les autres joueurs, seulement si tu coches « Tag Discord » dans tes réglages de confidentialité.",
+  ],
+  footer: "Personne d'autre.",
+};
+
+/**
+ * Qui lit encore un BattleTag **masqué** : les parties d'un match, dans sa
+ * seule fenêtre « Contacts » et sa fenêtre de lancement (décision du
+ * 2026-10-19 : les deux fenêtres sont nommées partout), et comment cesser de
+ * le partager. Dite là où on le renseigne (profil, rattachement Battle.net,
+ * connexion par Blizzard) et sur la fiche de son titulaire.
+ */
+export const HIDDEN_BATTLETAG_AUDIENCE: IdentityAudience = {
+  title: "Masqué, ton BattleTag ne se lit plus que dans la fenêtre « Contacts » de tes matchs et dans leur fenêtre de lancement :",
+  items: [
+    "si tu y es présenté comme contact : les membres des deux équipes, les arbitres et les administrateurs, dès que les adversaires sont connus et jusqu'à la fin du match, et le caster le temps du match ;",
+    "si tu castes un match : ses deux équipes le temps du match, et les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin ;",
+    "la fenêtre de lancement, elle, ne s'ouvre qu'aux deux équipes et au caster.",
+  ],
+  footer:
+    "Pour ne plus le partager du tout, efface-le de ton profil (s'il vient de Battle.net, détache d'abord Battle.net, après avoir ajouté un autre moyen de connexion si c'est le seul).",
+};
 
 /**
  * Ce que la connexion par Discord fait du pseudo — dit **sous le bouton**, avant
- * le clic, et au-dessus du code reçu en message privé.
+ * le clic.
  *
  * Se connecter **n'est pas** certifier : la connexion enregistre le pseudo que
  * Discord donne, invisible de tous, et la certification — qui ouvre le tag à
- * l'organisation — reste un geste distinct, sur `/profil` ou dans la fenêtre
- * proposée après une connexion par Discord ou Blizzard. La phrase dit les
- * deux, et qui lirait le tag une fois certifié, pour que le joueur sache ce que
- * ce geste-là ouvrirait avant d'avoir à le faire.
+ * l'organisation — reste un geste distinct. La ligne visible dit l'essentiel ;
+ * le bouton « i » dit où certifier ({@link DISCORD_LOGIN_TAG_DETAILS}) et qui
+ * lirait le tag une fois certifié ({@link DISCORD_TAG_AUDIENCE}).
  */
-export const DISCORD_LOGIN_TAG_NOTICE = `Enregistre ton pseudo Discord sans le certifier : il reste invisible de tous, administrateurs compris. Si tu le certifies ensuite, dans « Mon profil » ou dans la fenêtre proposée après une connexion par Discord ou Blizzard, ${DISCORD_TAG_AUDIENCE}`;
+export const DISCORD_LOGIN_TAG_NOTICE = "Enregistre ton pseudo Discord, sans le certifier : personne ne le voit.";
+
+/** Où se fait la certification, après une connexion par Discord (ou par le code du bot). */
+export const DISCORD_LOGIN_TAG_DETAILS =
+  "Tu pourras le certifier dans « Mon profil » ou dans la fenêtre proposée après une connexion par Discord ou Blizzard.";
 
 /**
  * Ce que la case « Tag Discord » des réglages de visibilité ouvre, et ce
- * qu'elle n'ouvre pas.
- *
- * La phrase qu'elle remplace renvoyait le tag à « ses propres réglages », la
- * certification — or la certification l'ouvre à l'**organisation**
- * (administrateurs, arbitres), jamais aux autres joueurs : un joueur qui
- * voulait être trouvé par ses coéquipiers n'avait aucun geste pour cela. La
- * case est ce geste, et elle ne vaut que pour un tag certifié
- * (`canViewDiscordTag`), ce que le joueur doit lire avant de la cocher.
+ * qu'elle n'ouvre pas : elle ne vaut que pour un tag certifié
+ * (`canViewDiscordTag`), et la certification l'ouvre déjà à l'organisation et
+ * aux parties de ses matchs — aux autres joueurs, seulement par cette case.
  */
 export const DISCORD_PLAYER_VISIBILITY_NOTICE =
-  "La certification ouvre ton tag Discord à l'organisation (administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé) et, comme contact, aux membres des deux équipes de ton match dès que ses deux adversaires sont connus, et à son caster le temps du match seulement (et, si tu castes un match, à ses deux équipes le temps du match, et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin) ; pas aux autres joueurs : coche « Tag Discord » pour qu'ils le voient sur ta fiche. Un tag non certifié reste masqué, case cochée ou non.";
+  "« Tag Discord » ne vaut que pour un tag certifié : un tag non certifié reste masqué, case cochée ou non. Certifié, il est déjà visible de l'organisation et des contacts de tes matchs.";
 
 /**
- * Ajout à la phrase précédente quand la case est cochée sur un tag **non**
+ * Ajout sous les cases quand « Tag Discord » est cochée sur un tag **non**
  * certifié : le joueur croit s'être rendu joignable, et il ne l'est pas.
  */
 export const DISCORD_PLAYER_VISIBILITY_PENDING =
@@ -73,15 +103,15 @@ export const DISCORD_PLAYER_VISIBILITY_PENDING =
 export const DISCORD_PLAYER_VISIBILITY_NO_TAG =
   "Tu n'as pas encore de tag Discord : enregistre-le puis certifie-le pour que les autres joueurs le voient.";
 
+/** Ce qu'un tag **non** certifié vaut : rien, pour personne — la ligne visible sous le champ. */
+export const DISCORD_TAG_UNVERIFIED_NOTICE = "Tag non certifié : personne ne le voit, pas même les administrateurs.";
+
 /**
- * Ce qu'un tag **non** certifié vaut : rien, pour personne.
- *
- * La nuance compte au moment de choisir : sans certification, le tag est une
- * note privée, et l'organisation ne peut pas joindre le joueur pendant son
- * tournoi.
+ * Ce qu'on y perd, derrière le « i » : sans certification, le tag est une note
+ * privée, et l'organisation ne peut pas joindre le joueur pendant son tournoi.
  */
-export const DISCORD_TAG_UNVERIFIED_AUDIENCE =
-  "personne ne le voit, pas même les administrateurs. L'organisation ne peut donc pas te joindre pendant un tournoi.";
+export const DISCORD_TAG_UNVERIFIED_CONSEQUENCE =
+  "L'organisation ne peut donc pas te joindre pendant un tournoi : certifie-le pour qu'elle le puisse.";
 
 /**
  * Le geste qui défait la certification — **celui qui existe à l'écran**.
@@ -108,13 +138,13 @@ export const DISCORD_CERTIFICATION_UNDO =
  * Le joueur doit savoir pourquoi son champ change sans qu'il y touche.
  */
 export const BLIZZARD_BATTLETAG_NOTICE =
-  "Si tu rattaches Battle.net, Blizzard renseigne ce BattleTag et le remet à jour à chaque connexion — ta saisie est alors remplacée par celle de la source.";
+  "Si tu rattaches Battle.net, Blizzard remplit ce champ et le met à jour à chaque connexion, à la place de ta saisie.";
 
 /**
- * À quoi servent les identifiants de jeu — et à quoi ils ne servent pas.
+ * À quoi servent les identifiants de jeu — et à quoi ils ne servent pas : la
+ * finalité, dite à la collecte, reste visible sous le champ.
  *
  * Le site ne lit aucune statistique de jeu : ces champs n'existent que pour
  * qu'un joueur puisse en ajouter un autre. Le dire évite la crainte inverse.
  */
-export const GAME_TAG_NOTICE =
-  "Sert uniquement à ce que les autres joueurs puissent t'ajouter en jeu — jamais pour des statistiques.";
+export const GAME_TAG_NOTICE = "Sert seulement à t'ajouter en jeu, jamais pour des statistiques.";

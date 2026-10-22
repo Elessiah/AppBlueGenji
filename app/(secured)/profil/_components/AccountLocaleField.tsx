@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useProfileText } from "@/components/i18n/profile-text";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { useToast } from "@/components/ui/toast";
+import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { isLocale, LOCALE_NATIVE_NAME, LOCALES, type Locale } from "@/lib/shared/locales";
 import { profileErrorMessage } from "../profile-errors";
@@ -107,7 +108,12 @@ export function AccountLocaleField({ initial }: Readonly<{ initial: Locale }>): 
 
   return (
     <div className={`field ${s.accountLocale}`}>
-      <label htmlFor={FIELD_ID}>{t("accountLocale.label")}</label>
+      <InfoHintRow>
+        <label htmlFor={FIELD_ID}>{t("accountLocale.label")}</label>
+        <InfoHint id={HINT_ID} subject={t("accountLocale.label")}>
+          <p>{t("accountLocale.hint")}</p>
+        </InfoHint>
+      </InfoHintRow>
       <select
         id={FIELD_ID}
         value={locale}
@@ -123,9 +129,6 @@ export function AccountLocaleField({ initial }: Readonly<{ initial: Locale }>): 
         ))}
       </select>
       <FieldErrorText fieldId={FIELD_ID} message={fieldErrors.message("locale")} />
-      <p id={HINT_ID} className={s.hint}>
-        {t("accountLocale.hint")}
-      </p>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Coche } from "@/components/Coche";
 import { useProfileText } from "@/components/i18n/profile-text";
 import { useToast } from "@/components/ui/toast";
+import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { profileErrorMessage } from "../profile-errors";
 import { runQueuedSaves } from "../_lib/queued-saves";
 import s from "../profil.module.css";
@@ -136,7 +137,7 @@ export function MatchDmField({
   const unreachable = discordReachable === false;
   return (
     <div className={`field ${s.matchDms}`}>
-      <div className={s.toggleRow}>
+      <InfoHintRow>
         <Coche
           id={FIELD_ID}
           label={t("matchDms.label")}
@@ -146,10 +147,10 @@ export function MatchDmField({
           aria-describedby={unreachable ? `${HINT_ID} ${UNREACHABLE_ID}` : HINT_ID}
           onChange={() => void toggle()}
         />
-      </div>
-      <p id={HINT_ID} className={s.hint}>
-        {t("matchDms.hint")}
-      </p>
+        <InfoHint id={HINT_ID} subject={t("matchDms.label")}>
+          <p>{t("matchDms.hint")}</p>
+        </InfoHint>
+      </InfoHintRow>
       {unreachable ? (
         <p id={UNREACHABLE_ID} className={s.hint}>
           {t("matchDms.notCertified")} <a href="#discord" className={s.hintLink}>{t("matchDms.certifyLink")}</a>

@@ -1,0 +1,99 @@
+/* Bouton « i » et son explication — docs/features/INFO_HINTS.md. */
+
+/* Le conteneur ne dessine rien : bouton et explication deviennent des éléments
+   de la rangée parente, l'explication y passe à la ligne sur toute la largeur. */
+.root {
+  display: contents;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 6px;
+  row-gap: 0;
+}
+
+/* Cible de 24 × 24 px au moins (WCAG 2.5.8), l'icône de 16 px centrée. */
+.trigger {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 24px;
+  block-size: 24px;
+  min-inline-size: 24px;
+  padding: 0;
+  margin: 0;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--blue-300);
+  cursor: pointer;
+}
+
+.trigger:hover {
+  background: var(--blue-glow);
+  color: var(--blue-100);
+}
+
+.trigger[aria-expanded="true"] {
+  background: rgba(var(--blue-500-rgb), 0.16);
+  border-color: rgba(var(--blue-500-rgb), 0.45);
+  color: var(--blue-100);
+}
+
+.trigger:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+
+/* Sous la rangée, sur toute sa largeur : jamais plus large que son conteneur,
+   donc aucun défilement horizontal, à 375 px comme ailleurs. */
+.panel {
+  flex: 1 0 100%;
+  box-sizing: border-box;
+  max-inline-size: 68ch;
+  margin: 8px 0 4px;
+  padding: 10px 12px;
+  border-left: 2px solid var(--blue-500);
+  border-radius: 0 8px 8px 0;
+  background: var(--cyber-bg-2);
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.6;
+  text-align: start;
+  text-transform: none;
+  letter-spacing: normal;
+  overflow-wrap: anywhere;
+}
+
+.panel[hidden] {
+  display: none;
+}
+
+.panel p {
+  margin: 0;
+}
+
+.panel p + p,
+.panel p + ul,
+.panel ul + p {
+  margin-top: 6px;
+}
+
+.panel ul {
+  margin: 4px 0 0;
+  padding-inline-start: 18px;
+}
+
+.panel li + li {
+  margin-top: 2px;
+}
+
+.panel a {
+  color: var(--blue-300);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

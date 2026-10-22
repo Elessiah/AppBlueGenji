@@ -1,5 +1,8 @@
 {
   "languageSwitcher": {
     "label": "read this page in French"
+  },
+  "infoHint": {
+    "label": "More info: {subject}"
   }
 }

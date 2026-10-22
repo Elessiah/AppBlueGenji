@@ -59,7 +59,7 @@
     "compactLead": "Get notified even when the site is closed.",
     "devices": "{count, plural, one {1 device subscribed} other {{count} devices subscribed}} to your account. The settings below apply to all of them.",
     "legend": "Notify me about",
-    "discordHint": "Discord direct messages don't depend on these settings: they follow your Discord tag and, for your matches, only go to a verified tag and follow the “Discord direct messages about my matches” box (My profile, Notifications section).",
+    "discordHint": "Discord direct messages have their own box: “Discord direct messages about my matches”.",
     "notConfigured": "Push notifications aren't enabled on the site yet.",
     "checking": "Checking this device…",
     "enabledHere": "Enabled on this device",

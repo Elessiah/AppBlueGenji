@@ -101,7 +101,7 @@
     "hidden": "Masqué",
     "adultYes": "Oui (18+)",
     "adultNo": "Non (mineur)",
-    "battletagHiddenSelf": "Masqué pour tous : il ne se lit que dans la fenêtre « Contacts » de tes matchs et dans leur fenêtre de lancement. Si tu y es présenté comme contact, les deux équipes, les arbitres et les administrateurs le voient dès que les deux adversaires sont connus et jusqu'à la fin du match, et le caster le temps du match. Si tu castes un match, ses deux équipes le voient le temps du match, et les arbitres et les administrateurs dès que ses deux adversaires sont connus et jusqu'à sa fin. La fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes et au caster.",
+    "battletagHiddenSelf": "Masqué pour tous, sauf dans les contacts de tes matchs.",
     "verifiedAlt": "Tag Discord vérifié",
     "verifiedTitle": "Tag Discord vérifié : ce joueur a prouvé qu'il possède ce compte Discord.",
     "battletagHiddenSelfBadge": "La pastille « BattleTag vérifié », elle, reste visible de tout joueur connecté, sans le BattleTag.",
@@ -158,6 +158,15 @@
     "RECRUTEUR": {
       "label": "Recruteur",
       "description": "Gérer la page recrutement."
+    }
+  },
+  "audience": {
+    "battletag": {
+      "title": "Masqué, ton BattleTag ne se lit plus que dans la fenêtre « Contacts » de tes matchs et dans leur fenêtre de lancement :",
+      "match": "si tu y es présenté comme contact : les membres des deux équipes, les arbitres et les administrateurs, dès que les adversaires sont connus et jusqu'à la fin du match, et le caster le temps du match ;",
+      "asCaster": "si tu castes un match : ses deux équipes le temps du match, et les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin ;",
+      "launch": "la fenêtre de lancement, elle, ne s'ouvre qu'aux deux équipes et au caster.",
+      "footer": "Pour ne plus le partager du tout, efface-le de ton profil (s'il vient de Battle.net, détache d'abord Battle.net, après avoir ajouté un autre moyen de connexion si c'est le seul)."
     }
   }
 }

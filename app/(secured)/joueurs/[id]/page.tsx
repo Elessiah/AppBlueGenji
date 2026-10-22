@@ -22,6 +22,8 @@ import { formatTeamRoles } from "@/lib/shared/team-role-display";
 import { finalRankLabel } from "@/lib/shared/ordinal";
 import type { TeamRole, TournamentState } from "@/lib/shared/types";
 import { playerErrorMessage } from "../_lib/player-errors";
+import { AudienceList, InfoHint, InfoHintRow } from "@/components/ui/info-hint";
+import { hiddenBattletagAudienceLines } from "@/lib/shared/identity-audience";
 import styles from "./player.module.css";
 
 /** Majorité telle que la fiche l'affiche : `null` est une donnée masquée (ou absente). */
@@ -48,14 +50,18 @@ function tournamentStateLabel(text: PlayersText, state: string): string {
 }
 
 /**
- * Indication sous un BattleTag masqué, pour son seul titulaire. La phrase sur
- * la pastille ne vient que si la pastille est là : un BattleTag saisi à la main
- * n'en a pas.
+ * Indication sous un BattleTag masqué, pour son seul titulaire : une ligne
+ * visible, le détail (qui le lit encore) derrière le « i ». La phrase sur la
+ * pastille ne vient que si la pastille est là (`badge`) : un BattleTag saisi à
+ * la main n'en a pas.
  */
-function battletagHiddenHint(text: PlayersText, data: FullProfileResponse, verified: boolean): string | null {
+function battletagHiddenHint(
+  text: PlayersText,
+  data: FullProfileResponse,
+  verified: boolean,
+): { status: string; badge: boolean } | null {
   if (!data.isSelf || !data.profile.overwatchBattletag || data.profile.visibility.overwatch) return null;
-  const hidden = text.t("page.battletagHiddenSelf");
-  return verified ? `${hidden} ${text.t("page.battletagHiddenSelfBadge")}` : hidden;
+  return { status: text.t("page.battletagHiddenSelf"), badge: verified };
 }
 
 /** `aria-describedby` des seuls identifiants présents, ou rien. */
@@ -124,6 +130,7 @@ export default function PlayerDetailPage() {
   const battletagDescribedBy = describedBy({
     "player-battletag-verified": battletagVerified,
     "player-battletag-hint": Boolean(battletagHint),
+    "player-battletag-more": Boolean(battletagHint),
   });
 
   // Un compte supprimé garde sa fiche — ses résultats appartiennent aussi à
@@ -275,9 +282,15 @@ export default function PlayerDetailPage() {
                 et le titulaire ne saurait pas qui le lit encore.
               */}
               {battletagHint && (
-                <p id="player-battletag-hint" className={styles.hint}>
-                  {battletagHint}
-                </p>
+                <InfoHintRow>
+                  <p id="player-battletag-hint" className={styles.hint}>
+                    {battletagHint.status}
+                  </p>
+                  <InfoHint id="player-battletag-more" subject={t("page.battletag")}>
+                    <AudienceList lines={hiddenBattletagAudienceLines(t)} />
+                    {battletagHint.badge ? <p>{t("page.battletagHiddenSelfBadge")}</p> : null}
+                  </InfoHint>
+                </InfoHintRow>
               )}
             </div>
             <div className="field">

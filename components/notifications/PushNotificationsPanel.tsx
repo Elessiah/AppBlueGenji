@@ -22,6 +22,7 @@
 import { useCallback, useId } from "react";
 import { CyberButton } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
+import { InfoHint } from "@/components/ui/info-hint";
 import type { PushTopic } from "@/lib/shared/push-notifications";
 import { usePushNotifications } from "./usePushNotifications";
 import {
@@ -127,10 +128,11 @@ export function PushNotificationsPanel({
                   />
                   <label htmlFor={id} className={s.topicText}>
                     <span className={s.topicLabel}>{pushTopicLabel(text, topic)}</span>
-                    <span id={`${id}-desc`} className={s.topicDesc}>
-                      {pushTopicDescription(text, topic)}
-                    </span>
                   </label>
+                  {/* Ce que le sujet couvre, derrière le « i » : la case le garde pour description. */}
+                  <InfoHint id={`${id}-desc`} subject={pushTopicLabel(text, topic)}>
+                    <p>{pushTopicDescription(text, topic)}</p>
+                  </InfoHint>
                 </li>
               );
             })}
