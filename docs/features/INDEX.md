@@ -125,6 +125,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `RESPONSIVE_TABLES.md` — Tableaux `.table-row` libellés par `data-label`.
 - `WIDE_SCREEN_LAYOUT.md` — Annuaires élargis sur grand écran (`.page-wide`, `.controls`), colonnes du tableau /rgpd.
 - `MODAL_DIALOGS.md` — Modales : portail, `useDialogBehavior`, `useBackdropDismiss`.
+- `INFO_HINTS.md` — Textes explicatifs derrière le bouton « i » (`<InfoHint>`) : 1–2 phrases, information en couches, listes « qui le voit » partagées.
 - `NUMBER_INPUT.md` — `<NumberInput>`.
 - `CHECKBOX_STYLES.md` — Cases à cocher et radios.
 - `TAP_SELECTION.md` — Sélection de texte au toucher, `data-tap-zone`.

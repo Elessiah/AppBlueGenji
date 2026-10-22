@@ -211,38 +211,35 @@ section.
 ## Ce que le site dit de vos identifiants
 
 `lib/shared/identity-sharing.ts` porte les phrases qui **engagent le site**, et
-les deux écrans qui les affichent y puisent :
+les écrans qui les affichent (`/connexion`, `/profil`, fiche joueur) y puisent —
+une ligne visible courte, le détail derrière le bouton « i » (`INFO_HINTS.md`) :
 
 | Constante | Ce qu'elle promet |
 | --- | --- |
-| `DISCORD_TAG_AUDIENCE` | Qui lit un tag certifié : les administrateurs toujours, l'arbitrage pendant un tournoi, **jamais personne d'autre**. |
-| `DISCORD_TAG_UNVERIFIED_AUDIENCE` | Ce qu'un tag non certifié vaut : rien, pour personne — et l'organisation ne peut pas joindre le joueur. |
+| `DISCORD_TAG_AUDIENCE` | Liste de ceux qui lisent un tag certifié : administrateurs à tout moment, arbitres tant que le titulaire est inscrit à un tournoi non terminé, parties de ses matchs (joués ou castés) aux moments de la fenêtre « Contacts », autres joueurs seulement par la case « Tag Discord » — **personne d'autre**. |
+| `HIDDEN_BATTLETAG_AUDIENCE` | Liste de ceux qui lisent encore un BattleTag masqué, dans la fenêtre « Contacts » et la fenêtre de lancement d'un match, et comment cesser de le partager. |
+| `DISCORD_TAG_UNVERIFIED_NOTICE` / `…_CONSEQUENCE` | Ce qu'un tag non certifié vaut : rien, pour personne — et l'organisation ne peut pas joindre le joueur. |
 | `DISCORD_CERTIFICATION_UNDO` | Le seul geste qui défait la certification (il n'existe aucune route de décertification) — **le retrait du tag**, et non sa modification : un tag certifié appartient à un compte rattaché, dont le champ est en lecture seule. |
 | `BLIZZARD_BATTLETAG_NOTICE` | Blizzard renseigne le BattleTag et **remplace** la saisie à chaque connexion. |
-| `GAME_TAG_NOTICE` | Les identifiants de jeu servent à s'ajouter entre joueurs, jamais à des statistiques. |
+| `GAME_TAG_NOTICE` | Les identifiants de jeu servent à s'ajouter entre joueurs, jamais à des statistiques (finalité dite à la collecte : reste visible). |
 
-Le module n'expose que des **chaînes**, jamais d'assembleur : l'**entrée en
-matière** diffère selon l'écran (à la connexion, `DISCORD_LOGIN_TAG_NOTICE`
-dit que se connecter par Discord enregistre le tag **sans le certifier** ; sur le
-profil, la phrase du verrou) et aucun des deux ne peut passer par une fonction
-commune. Chaque écran compose donc son entrée en
-matière puis **concatène les constantes**, qui restent la seule rédaction de la
-promesse.
+Le module n'expose que des chaînes et des listes de lecteurs, jamais
+d'assembleur ; les listes se lisent dans la langue de la page par
+`lib/shared/identity-audience.ts` (même forme `audience.*` dans les espaces
+`profile`, `login`, `players`) et se rendent par `<AudienceList>`.
 
-Sur `/profil`, le cas « certifié » est énoncé par la **phrase du verrou**
-(`discordTagLockNotice`, `lib/shared/discord-tag-lock.ts`), qui dit en plus le
-rattachement : un tag certifié appartient toujours à un compte rattaché
+Sur `/profil`, le cas « certifié » est énoncé par le **verrou**
+(`discordTagLockNotice`, `lib/shared/discord-tag-lock.ts`), qui rend une ligne
+d'état (`status`), le détail (`details`) et s'il faut joindre la liste
+(`audience`) : un tag certifié appartient toujours à un compte rattaché
 (`writeVerifiedTag` écrit `discord_id`, et détacher Discord décertifie), donc le
 champ est toujours verrouillé — une branche « certifié, non verrouillé »
-n'aurait jamais été rendue. Cette phrase **compose** `DISCORD_TAG_AUDIENCE` (et
-`DISCORD_TAG_UNVERIFIED_AUDIENCE` pour le cas non certifié) au lieu de recopier
-l'exposition : c'était la seule que `/profil` affichait au tag certifié, et un
-ajustement de la constante l'aurait laissée promettre un autre public.
+n'aurait jamais été rendue. Le verrou du BattleTag (`battletagLockNotice`) rend
+de même `{ status, details }`.
 
-Le test de `/connexion` porte désormais sur ces constantes **et** sur le fait que
-la page les emploie : c'est strictement plus fort que l'ancienne lecture
-littérale de la source, où deux écrans pouvaient promettre deux choses
-différentes sans que rien ne le signale.
+Les tests de `/connexion` et du profil portent sur ces constantes **et** sur le
+fait que les pages les emploient : deux écrans ne peuvent plus promettre deux
+choses différentes sans que rien ne le signale.
 
 ## Voir aussi
 
