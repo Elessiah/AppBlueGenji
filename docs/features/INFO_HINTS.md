@@ -57,8 +57,11 @@ après le libellé qu'elles expliquent, et se réécrivent **court**.
   seul, pour ne pas voler l'Échap d'une modale), par un **clic ailleurs**, par
   un **second clic**. Le clic ailleurs ferme au `click` et non au `pointerdown` :
   replier l'explication à l'appui ferait remonter le contrôle visé sous le
-  pointeur, et le relâchement tomberait à côté (clic perdu). Ouvrir un « i » ne
-  referme pas les autres.
+  pointeur, et le relâchement tomberait à côté (clic perdu). Cliquer un autre
+  « i » est un clic ailleurs : il referme celui qui était ouvert. Le clic donne
+  le focus au bouton (Safari, macOS et iOS, ne le fait pas de lui-même) : sans
+  lui, Échap, écouté sur le composant, ne porterait pas après une ouverture à la
+  souris.
 - Cible de 24 × 24 px (WCAG 2.5.8), anneau de focus `--blue-500`, texte 12 px
   `--ink-soft`, aucun ambre, aucune animation ni transition.
 - Un lien est permis dans l'explication (`/connexion` : « rejoins le nôtre ») ;

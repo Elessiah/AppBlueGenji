@@ -81,12 +81,19 @@ function render(): { root: ReactElement<Props>; button: ReactElement<Props>; pan
   return { root, button, panel };
 }
 
+/** Un clic sur le bouton : son gestionnaire reçoit l'événement et focalise le bouton. */
+const buttonFocus = jest.fn();
+function click(button: ReactElement<Props>): void {
+  (button.props.onClick as (event: { currentTarget: { focus: () => void } }) => void)({ currentTarget: { focus: buttonFocus } });
+}
+
 const documentListeners: Record<string, Array<(event: unknown) => void>> = {};
 const globals = globalThis as unknown as { document?: unknown; Node?: unknown };
 
 beforeEach(() => {
   hooks.live = true;
   cells.length = 0;
+  buttonFocus.mockClear();
   locale.current = "fr";
   for (const key of Object.keys(documentListeners)) delete documentListeners[key];
   globals.document = {
@@ -181,19 +188,38 @@ describe("InfoHint — gestes", () => {
     let view = render();
     expect(view.button.props["aria-expanded"]).toBe(false);
     expect(view.panel.props.hidden).toBe(true);
-    (view.button.props.onClick as () => void)();
+    click(view.button);
     view = render();
     expect(view.button.props["aria-expanded"]).toBe(true);
     expect(view.panel.props.hidden).toBe(false);
-    (view.button.props.onClick as () => void)();
+    click(view.button);
     view = render();
     expect(view.button.props["aria-expanded"]).toBe(false);
     expect(view.panel.props.hidden).toBe(true);
   });
 
+  it("focalise le bouton au clic : sous Safari, Échap l'atteint aussi après une ouverture à la souris", () => {
+    const view = render();
+    click(view.button);
+    expect(buttonFocus).toHaveBeenCalledTimes(1);
+  });
+
+  it("se referme quand on ouvre un autre « i » : ce clic vient d'ailleurs", () => {
+    let view = render();
+    click(view.button);
+    view = render();
+    const NodeClass = globals.Node as new () => object;
+    const otherButton = new NodeClass();
+    const rootRef = (view.root as unknown as { ref: { current: unknown } }).ref;
+    rootRef.current = { contains: () => false };
+    documentListeners.click[0]({ target: otherButton });
+    view = render();
+    expect(view.button.props["aria-expanded"]).toBe(false);
+  });
+
   it("se referme à Échap et rend le focus au bouton", () => {
     let view = render();
-    (view.button.props.onClick as () => void)();
+    click(view.button);
     view = render();
     const focus = jest.fn();
     const buttonRef = (view.button as unknown as { ref?: { current: unknown } }).ref;
@@ -218,7 +244,7 @@ describe("InfoHint — gestes", () => {
   it("se referme au clic ailleurs, pas au clic dedans, et n'écoute que pendant qu'il est ouvert", () => {
     let view = render();
     expect(documentListeners.click ?? []).toHaveLength(0);
-    (view.button.props.onClick as () => void)();
+    click(view.button);
     view = render();
     expect(documentListeners.click).toHaveLength(1);
     const NodeClass = globals.Node as new () => object;

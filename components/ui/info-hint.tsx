@@ -21,8 +21,9 @@ import s from "./info-hint.module.css";
  * lecteur d'écran l'entend, l'œil voit le « i ». Une erreur de champ ne s'y
  * met jamais (`FieldErrorText`).
  *
- * Se referme par Échap (focus rendu au bouton), par un clic ailleurs, par un
- * second clic sur le bouton.
+ * Se referme par Échap (focus rendu au bouton), par un clic ailleurs — un
+ * autre « i » compris —, par un second clic sur le bouton. Le clic donne le
+ * focus au bouton (Safari ne le fait pas de lui-même), pour qu'Échap porte.
  *
  * Le parent pose le libellé et ce composant dans une rangée qui passe à la
  * ligne (`InfoHintRow`) : l'explication y prend toute la largeur, sous eux.
@@ -73,7 +74,12 @@ export function InfoHint({
         aria-expanded={open}
         aria-controls={id}
         aria-label={infoHintLabel(locale, subject)}
-        onClick={() => setOpen((value) => !value)}
+        onClick={(event) => {
+          // Safari (macOS, iOS) ne donne pas le focus à un bouton cliqué : sans
+          // lui, Échap — écouté sur le composant — ne l'atteindrait jamais.
+          event.currentTarget.focus();
+          setOpen((value) => !value);
+        }}
       >
         <Info aria-hidden="true" size={16} strokeWidth={2} />
       </button>
