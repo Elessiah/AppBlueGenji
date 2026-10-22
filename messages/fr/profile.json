@@ -117,7 +117,7 @@
     "verifiedAlt": "Tag Discord vérifié",
     "verifiedTitle": "Tag Discord vérifié : ce joueur a prouvé qu'il possède ce compte Discord.",
     "alreadyVerified": "Ton tag Discord est déjà certifié.",
-    "unverifiedDetails": "L'organisation ne peut donc pas te joindre pendant un tournoi : certifie-le pour qu'elle le puisse."
+    "unverifiedDetails": "Sans certification, l'organisation ne peut pas te joindre pendant un tournoi : certifie-le pour qu'elle le puisse."
   },
   "privacy": {
     "visibleTitle": "Visible par les autres joueurs",

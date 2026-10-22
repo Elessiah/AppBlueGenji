@@ -93,7 +93,7 @@ describe("tag non certifié", () => {
   });
 
   it("dit ce qu'on y perd, pas seulement ce qu'on y gagne", () => {
-    expect(DISCORD_TAG_UNVERIFIED_CONSEQUENCE).toMatch(/ne peut donc pas te joindre/i);
+    expect(DISCORD_TAG_UNVERIFIED_CONSEQUENCE).toMatch(/Sans certification, l'organisation ne peut pas te joindre/);
   });
 });
 

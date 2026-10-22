@@ -117,7 +117,7 @@
     "verifiedAlt": "Verified Discord tag",
     "verifiedTitle": "Verified Discord tag: this player proved they own this Discord account.",
     "alreadyVerified": "Your Discord tag is already verified.",
-    "unverifiedDetails": "So the organizers can't reach you during a tournament: verify it so they can."
+    "unverifiedDetails": "Without verification, the organizers can't reach you during a tournament: verify it so they can."
   },
   "privacy": {
     "visibleTitle": "Visible to other players",

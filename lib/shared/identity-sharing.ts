@@ -111,7 +111,7 @@ export const DISCORD_TAG_UNVERIFIED_NOTICE = "Tag non certifié : personne ne le
  * privée, et l'organisation ne peut pas joindre le joueur pendant son tournoi.
  */
 export const DISCORD_TAG_UNVERIFIED_CONSEQUENCE =
-  "L'organisation ne peut donc pas te joindre pendant un tournoi : certifie-le pour qu'elle le puisse.";
+  "Sans certification, l'organisation ne peut pas te joindre pendant un tournoi : certifie-le pour qu'elle le puisse.";
 
 /**
  * Le geste qui défait la certification — **celui qui existe à l'écran**.
