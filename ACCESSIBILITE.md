@@ -38,7 +38,7 @@ pipeline de `CLAUDE.md`.
 2. **Ajouter une tâche** : même chemin, à la suite, même format (critère,
    constat, à faire), avec le numéro qui suit le dernier attribué — relu sur
    `main` au moment du push et avancé dans le même commit. Les numéros ne
-   sont **pas** réattribués : **dernier numéro attribué — 21**.
+   sont **pas** réattribués : **dernier numéro attribué — 23**.
 3. **Abandonner une tâche** (ou ne la régler qu'en partie) : la remettre ici
    par un commit direct sur `main`, sous son numéro d'origine. La PR qui règle
    une tâche n'a rien à retirer de ce fichier.
@@ -50,3 +50,15 @@ pipeline de `CLAUDE.md`.
 - **À faire** : parcours complet avec NVDA (Windows) et VoiceOver (macOS / iOS)
   — connexion, inscription d'une équipe, report de score, menu d'accessibilité.
   Aucun test automatique ne remplace celui-là.
+
+## 22. Groupes de filtres et de tris des annuaires sans nom
+
+- **Critère** : RGAA 11.6 / 11.7 (regroupement de champs), WCAG 1.3.1, 4.1.2.
+- **Constat** : `app/(secured)/joueurs/PlayersList.tsx` (et `equipes/TeamsList.tsx`) — les pastilles de statut et les boutons de tri sont des boutons `aria-pressed` sans conteneur nommé ; « Trier : » est un `span` non rattaché. Un lecteur d'écran annonce « Date de création, bouton bascule » sans dire qu'il s'agit d'un tri ni que les options s'excluent (relevé en revue de la PR #466).
+- **À faire** : envelopper chaque série dans `role="group"` avec `aria-labelledby` (« Trier : », « Statut »), ou passer en groupe de radios.
+
+## 23. Résultat des filtres d'annuaire non annoncé, pas d'état vide
+
+- **Critère** : RGAA 7.5 (messages de statut), WCAG 4.1.3.
+- **Constat** : `app/(secured)/joueurs/PlayersList.tsx` — après un clic sur une pastille ou un filtre de rôle, le nombre de résultats change sans être annoncé (pas d'`aria-live`), et une combinaison sans résultat (« Sans équipe » + un rôle) laisse une grille vide avec « 0 joueurs » seulement (relevé en revue de la PR #466).
+- **À faire** : compteur dans une région `aria-live="polite"` et message d'état vide traduit (FR et EN) ; même traitement sur `/equipes`.
