@@ -1,47 +1,78 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { compareNewestFirst, matchesPlayerStatusFilter } from "@/lib/shared/player-directory";
 
 const ROOT = join(__dirname, "..", "..");
 const read = (relative: string) => readFileSync(join(ROOT, relative), "utf8");
 
-// Tri par date de création et filtre « sans équipe » de `/joueurs` : la logique
-// vit dans le client component, on la lit au niveau source (comme annuaire-labels).
 const playersList = read("app/(secured)/joueurs/PlayersList.tsx");
 const frPlayers = JSON.parse(read("messages/fr/players.json")) as typeof import("@/messages/fr/players.json");
 const enPlayers = JSON.parse(read("messages/en/players.json")) as typeof import("@/messages/fr/players.json");
 
-describe("Annuaire joueurs — tri par date de création", () => {
-  it("expose l'option « created » et trie les plus récents d'abord", () => {
-    expect(playersList).toContain('type SortKey = "pseudo" | "tournaments" | "created";');
-    expect(playersList).toContain('(["pseudo", "tournaments", "created"] as const)');
-    expect(playersList).toContain('if (sort === "created") r.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));');
+const team = { id: 4 };
+const inRoster = { team, openToRecruitment: true };
+const freeAgent = { team: null, openToRecruitment: true };
+const closed = { team: null, openToRecruitment: false };
+const unknown = { team: null };
+
+describe("matchesPlayerStatusFilter", () => {
+  it("« all » garde tout le monde", () => {
+    for (const p of [inRoster, freeAgent, closed, unknown]) expect(matchesPlayerStatusFilter(p, "all")).toBe(true);
   });
 
-  it("le libellé existe en français et en anglais", () => {
-    expect(frPlayers.list.sort.created).toBe("Date de création");
-    expect(enPlayers.list.sort.created).toBe("Creation date");
+  it("« free » ne garde que les joueurs sans roster et ouverts", () => {
+    expect([inRoster, freeAgent, closed, unknown].filter((p) => matchesPlayerStatusFilter(p, "free"))).toEqual([freeAgent]);
   });
 
-  it("la réinitialisation de la liste suit le tri choisi", () => {
-    expect(playersList).toContain("statusFilter, sort, showDeleted]");
+  it("« unaffiliated » garde tout joueur sans roster, ouvert ou non", () => {
+    expect([inRoster, freeAgent, closed, unknown].filter((p) => matchesPlayerStatusFilter(p, "unaffiliated"))).toEqual([
+      freeAgent,
+      closed,
+      unknown,
+    ]);
+  });
+
+  it("un joueur en roster ouvert au recrutement n'est jamais « sans équipe »", () => {
+    expect(matchesPlayerStatusFilter(inRoster, "unaffiliated")).toBe(false);
+    expect(matchesPlayerStatusFilter({ team }, "unaffiliated")).toBe(false);
   });
 });
 
-describe("Annuaire joueurs — filtre « sans équipe uniquement »", () => {
-  it("ajoute le statut « unaffiliated » qui ne garde que les joueurs sans équipe", () => {
-    expect(playersList).toContain('type StatusFilter = "all" | "free" | "unaffiliated";');
+describe("compareNewestFirst", () => {
+  const at = (createdAt: string, id: number) => ({ createdAt, id });
+
+  it("range les comptes les plus récents d'abord", () => {
+    const players = [
+      at("2026-01-02T10:00:00.000Z", 1),
+      at("2026-10-20T08:00:00.000Z", 2),
+      at("2025-12-31T23:59:59.000Z", 3),
+    ];
+    expect([...players].sort(compareNewestFirst).map((p) => p.id)).toEqual([2, 1, 3]);
+  });
+
+  it("garde l'ordre d'arrivée à égalité (tri stable)", () => {
+    const players = [at("2026-05-05T05:05:05.000Z", 1), at("2026-05-05T05:05:05.000Z", 2)];
+    expect(compareNewestFirst(players[0], players[1])).toBe(0);
+    expect([...players].sort(compareNewestFirst).map((p) => p.id)).toEqual([1, 2]);
+  });
+
+  it("une liste vide reste vide", () => {
+    expect([].sort(compareNewestFirst)).toEqual([]);
+  });
+});
+
+describe("Annuaire joueurs — branchement et libellés", () => {
+  it("le composant passe par les fonctions partagées et propose les trois tris", () => {
+    expect(playersList).toContain("matchesPlayerStatusFilter(p, statusFilter)");
+    expect(playersList).toContain("r.sort(compareNewestFirst)");
+    expect(playersList).toContain('(["pseudo", "tournaments", "created"] as const)');
     expect(playersList).toContain('["all", "free", "unaffiliated"] as const');
-    expect(playersList).toContain('if (statusFilter === "unaffiliated" && p.team) return false;');
   });
 
-  it("ne dépend pas de l'ouverture au recrutement, contrairement à « free agents »", () => {
-    const unaffiliatedLine = playersList.split("\n").find((line) => line.includes('"unaffiliated" && p.team'));
-    expect(unaffiliatedLine).toBeDefined();
-    expect(unaffiliatedLine).not.toContain("isFreeAgent");
-  });
-
-  it("le libellé existe en français et en anglais", () => {
+  it("les libellés existent en français et en anglais", () => {
+    expect(frPlayers.list.sort.created).toBe("Date de création");
+    expect(enPlayers.list.sort.created).toBe("Creation date");
     expect(frPlayers.list.statusFilter.unaffiliated).toBe("SANS ÉQUIPE");
     expect(enPlayers.list.statusFilter.unaffiliated).toBe("NO TEAM");
   });

@@ -80,7 +80,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `ACCOUNT_SUSPENSION.md` — Suspension d'un compte.
 - `USER_AVATAR_IMPORT.md` — Photos OAuth copiées chez nous, jamais relayées.
 - `USER_AVATAR_DISPLAY.md` — `<UserAvatar>`, repli à initiale, `visibleAvatarUrl`.
-- `PLAYER_ROSTER_STATUS.md` — Statut d'appartenance d'un joueur (`ROSTER`, `FREE_AGENT`, `UNAFFILIATED`).
+- `PLAYER_ROSTER_STATUS.md` — Statut d'appartenance d'un joueur (`ROSTER`, `FREE_AGENT`, `UNAFFILIATED`) ; filtres « Free agents » / « Sans équipe » et tri « Date de création » de `/joueurs`.
 
 ## Équipes
 

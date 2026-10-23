@@ -3,6 +3,7 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { PublicUserProfile, PlayerRole } from "@/lib/shared/types";
 import { isFreeAgent } from "@/lib/shared/player-roster-status";
+import { compareNewestFirst, matchesPlayerStatusFilter, type PlayerStatusFilter } from "@/lib/shared/player-directory";
 import { useToast } from "@/components/ui/toast";
 import { Ticker } from "@/components/cyber/Ticker";
 import { BgCanvas } from "../_shared/BgCanvas";
@@ -21,7 +22,6 @@ import s from "../_shared/annuaire.module.css";
 const ACCENT_RGB = "90, 200, 255";
 
 type RoleFilter = "all" | "DPS" | "TANK" | "HEAL" | "COACH";
-type StatusFilter = "all" | "free" | "unaffiliated";
 type SortKey = "pseudo" | "tournaments" | "created";
 
 export default function PlayersList() {
@@ -44,7 +44,7 @@ export default function PlayersList() {
   const [players, setPlayers] = useState<PublicUserProfile[]>([]);
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<PlayerStatusFilter>("all");
   const [sort, setSort] = useState<SortKey>("pseudo");
   // Les comptes anonymisés sortent de l'annuaire **par défaut** : sous leur
   // pseudo d'emprunt, ils ne sont plus personne, et la ligne n'existe que pour
@@ -104,8 +104,7 @@ export default function PlayersList() {
       r.sort((a, b) => compare(a.pseudo, b.pseudo));
     }
     if (sort === "tournaments") r.sort((a, b) => (b.tournamentsCount || 0) - (a.tournamentsCount || 0));
-    // Les plus récents d'abord.
-    if (sort === "created") r.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+    if (sort === "created") r.sort(compareNewestFirst);
     return r;
   }, [listed, sort, text.locale]);
   const filtered = useMemo(() => {
@@ -113,12 +112,8 @@ export default function PlayersList() {
     return sorted.filter((p) => {
       if (q && !searchKeyOf(p).includes(q)) return false;
       if (roleFilter !== "all" && !(p.roles || []).includes(roleFilter as PlayerRole)) return false;
-      // Free agent = sans roster ET ouvert au recrutement : un joueur qui a
-      // décoché « ouvert aux propositions » ne veut pas être démarché.
-      if (statusFilter === "free" && !isFreeAgent(p)) return false;
-      // Sans équipe, qu'il soit ouvert aux propositions ou non.
-      if (statusFilter === "unaffiliated" && p.team) return false;
-      return true;
+      // Free agents (sans roster ET ouverts) ou tout joueur sans roster.
+      return matchesPlayerStatusFilter(p, statusFilter);
     });
   }, [searchKeyOf, sorted, deferredQuery, roleFilter, statusFilter]);
 
