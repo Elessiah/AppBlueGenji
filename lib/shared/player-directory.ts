@@ -9,14 +9,19 @@ export type PlayerStatusFilter = "all" | "free" | "unaffiliated";
 /**
  * - `free` : free agents (sans roster **et** ouverts au recrutement).
  * - `unaffiliated` : tout joueur sans roster, ouvert ou non — les cartes
- *   « FREE AGENT » et « SANS ÉQUIPE » réunies.
+ *   « FREE AGENT » et « SANS ÉQUIPE » réunies. Un compte supprimé n'en est
+ *   jamais : sans équipe par construction, il n'est plus personne à recruter,
+ *   et la case « comptes supprimés » en remplirait sinon le filtre.
  *
  * Le statut se lit sur `lib/shared/player-roster-status.ts`, seule définition
  * partagée avec la carte et le compteur.
  */
-export function matchesPlayerStatusFilter(player: PlayerRosterInput, filter: PlayerStatusFilter): boolean {
+export function matchesPlayerStatusFilter(
+  player: PlayerRosterInput & { isDeleted?: boolean },
+  filter: PlayerStatusFilter,
+): boolean {
   if (filter === "free") return isFreeAgent(player);
-  if (filter === "unaffiliated") return playerRosterStatus(player) !== "ROSTER";
+  if (filter === "unaffiliated") return !player.isDeleted && playerRosterStatus(player) !== "ROSTER";
   return true;
 }
 

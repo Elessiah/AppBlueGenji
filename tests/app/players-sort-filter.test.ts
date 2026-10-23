@@ -37,6 +37,12 @@ describe("matchesPlayerStatusFilter", () => {
     expect(matchesPlayerStatusFilter(inRoster, "unaffiliated")).toBe(false);
     expect(matchesPlayerStatusFilter({ team }, "unaffiliated")).toBe(false);
   });
+
+  it("un compte supprimé n'est jamais « sans équipe », même affiché", () => {
+    expect(matchesPlayerStatusFilter({ team: null, isDeleted: true }, "unaffiliated")).toBe(false);
+    expect(matchesPlayerStatusFilter({ team: null, isDeleted: false }, "unaffiliated")).toBe(true);
+    expect(matchesPlayerStatusFilter({ team: null, isDeleted: true }, "all")).toBe(true);
+  });
 });
 
 describe("compareNewestFirst", () => {
@@ -68,6 +74,10 @@ describe("Annuaire joueurs — branchement et libellés", () => {
     expect(playersList).toContain("r.sort(compareNewestFirst)");
     expect(playersList).toContain('(["pseudo", "tournaments", "created"] as const)');
     expect(playersList).toContain('["all", "free", "unaffiliated"] as const');
+  });
+
+  it("la rangée des pastilles de statut passe à la ligne sur mobile", () => {
+    expect(playersList).toContain('<div style={{ display: "flex", flexWrap: "wrap", gap: "10px 12px" }}>');
   });
 
   it("les libellés existent en français et en anglais", () => {

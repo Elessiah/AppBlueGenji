@@ -226,10 +226,11 @@ export default function PlayersList() {
           </div>
 
           <div className={s.sortRow}>
-            <div style={{ display: "flex", gap: 18, alignItems: "center" }}>
+            {/* Trois pastilles de statut : la rangée passe à la ligne sur mobile. */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "10px 18px", alignItems: "center" }}>
               <span>{t("list.count", { count: filtered.length })}</span>
               <span style={{ color: "var(--ink-faint)" }}>·</span>
-              <div style={{ display: "flex", gap: 12 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "10px 12px" }}>
                 {(
                   ["all", "free", "unaffiliated"] as const
                 ).map((k) => (
