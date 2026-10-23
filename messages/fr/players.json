@@ -28,12 +28,14 @@
     "count": "{count, plural, one {# joueur} other {# joueurs}}",
     "statusFilter": {
       "all": "TOUS",
-      "free": "FREE AGENTS"
+      "free": "FREE AGENTS",
+      "unaffiliated": "SANS ÉQUIPE"
     },
     "sortBy": "Trier :",
     "sort": {
       "pseudo": "Pseudo",
-      "tournaments": "Tournois"
+      "tournaments": "Tournois",
+      "created": "Date de création"
     },
     "showDeleted": "Afficher les comptes supprimés ({count})",
     "sectionTitle": "PROFILS",

@@ -21,8 +21,8 @@ import s from "../_shared/annuaire.module.css";
 const ACCENT_RGB = "90, 200, 255";
 
 type RoleFilter = "all" | "DPS" | "TANK" | "HEAL" | "COACH";
-type StatusFilter = "all" | "free";
-type SortKey = "pseudo" | "tournaments";
+type StatusFilter = "all" | "free" | "unaffiliated";
+type SortKey = "pseudo" | "tournaments" | "created";
 
 export default function PlayersList() {
   const { showError } = useToast();
@@ -104,6 +104,8 @@ export default function PlayersList() {
       r.sort((a, b) => compare(a.pseudo, b.pseudo));
     }
     if (sort === "tournaments") r.sort((a, b) => (b.tournamentsCount || 0) - (a.tournamentsCount || 0));
+    // Les plus récents d'abord.
+    if (sort === "created") r.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
     return r;
   }, [listed, sort, text.locale]);
   const filtered = useMemo(() => {
@@ -114,6 +116,8 @@ export default function PlayersList() {
       // Free agent = sans roster ET ouvert au recrutement : un joueur qui a
       // décoché « ouvert aux propositions » ne veut pas être démarché.
       if (statusFilter === "free" && !isFreeAgent(p)) return false;
+      // Sans équipe, qu'il soit ouvert aux propositions ou non.
+      if (statusFilter === "unaffiliated" && p.team) return false;
       return true;
     });
   }, [searchKeyOf, sorted, deferredQuery, roleFilter, statusFilter]);
@@ -232,7 +236,7 @@ export default function PlayersList() {
               <span style={{ color: "var(--ink-faint)" }}>·</span>
               <div style={{ display: "flex", gap: 12 }}>
                 {(
-                  ["all", "free"] as const
+                  ["all", "free", "unaffiliated"] as const
                 ).map((k) => (
                   <button
                     key={k}
@@ -248,7 +252,7 @@ export default function PlayersList() {
             </div>
             <div className={s.sortOpts}>
               <span style={{ color: "var(--ink-dim)" }}>{t("list.sortBy")}</span>
-              {(["pseudo", "tournaments"] as const).map((k) => (
+              {(["pseudo", "tournaments", "created"] as const).map((k) => (
                 <button
                   key={k}
                   type="button"
