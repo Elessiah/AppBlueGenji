@@ -3,6 +3,7 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { PublicUserProfile, PlayerRole } from "@/lib/shared/types";
 import { isFreeAgent } from "@/lib/shared/player-roster-status";
+import { compareNewestFirst, matchesPlayerStatusFilter, type PlayerStatusFilter } from "@/lib/shared/player-directory";
 import { useToast } from "@/components/ui/toast";
 import { Ticker } from "@/components/cyber/Ticker";
 import { BgCanvas } from "../_shared/BgCanvas";
@@ -21,8 +22,7 @@ import s from "../_shared/annuaire.module.css";
 const ACCENT_RGB = "90, 200, 255";
 
 type RoleFilter = "all" | "DPS" | "TANK" | "HEAL" | "COACH";
-type StatusFilter = "all" | "free";
-type SortKey = "pseudo" | "tournaments";
+type SortKey = "pseudo" | "tournaments" | "created";
 
 export default function PlayersList() {
   const { showError } = useToast();
@@ -44,7 +44,7 @@ export default function PlayersList() {
   const [players, setPlayers] = useState<PublicUserProfile[]>([]);
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<PlayerStatusFilter>("all");
   const [sort, setSort] = useState<SortKey>("pseudo");
   // Les comptes anonymisés sortent de l'annuaire **par défaut** : sous leur
   // pseudo d'emprunt, ils ne sont plus personne, et la ligne n'existe que pour
@@ -104,6 +104,7 @@ export default function PlayersList() {
       r.sort((a, b) => compare(a.pseudo, b.pseudo));
     }
     if (sort === "tournaments") r.sort((a, b) => (b.tournamentsCount || 0) - (a.tournamentsCount || 0));
+    if (sort === "created") r.sort(compareNewestFirst);
     return r;
   }, [listed, sort, text.locale]);
   const filtered = useMemo(() => {
@@ -111,10 +112,8 @@ export default function PlayersList() {
     return sorted.filter((p) => {
       if (q && !searchKeyOf(p).includes(q)) return false;
       if (roleFilter !== "all" && !(p.roles || []).includes(roleFilter as PlayerRole)) return false;
-      // Free agent = sans roster ET ouvert au recrutement : un joueur qui a
-      // décoché « ouvert aux propositions » ne veut pas être démarché.
-      if (statusFilter === "free" && !isFreeAgent(p)) return false;
-      return true;
+      // Free agents (sans roster ET ouverts) ou tout joueur sans roster.
+      return matchesPlayerStatusFilter(p, statusFilter);
     });
   }, [searchKeyOf, sorted, deferredQuery, roleFilter, statusFilter]);
 
@@ -227,12 +226,13 @@ export default function PlayersList() {
           </div>
 
           <div className={s.sortRow}>
-            <div style={{ display: "flex", gap: 18, alignItems: "center" }}>
+            {/* Trois pastilles de statut : la rangée passe à la ligne sur mobile. */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "10px 18px", alignItems: "center" }}>
               <span>{t("list.count", { count: filtered.length })}</span>
               <span style={{ color: "var(--ink-faint)" }}>·</span>
-              <div style={{ display: "flex", gap: 12 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "10px 12px" }}>
                 {(
-                  ["all", "free"] as const
+                  ["all", "free", "unaffiliated"] as const
                 ).map((k) => (
                   <button
                     key={k}
@@ -248,7 +248,7 @@ export default function PlayersList() {
             </div>
             <div className={s.sortOpts}>
               <span style={{ color: "var(--ink-dim)" }}>{t("list.sortBy")}</span>
-              {(["pseudo", "tournaments"] as const).map((k) => (
+              {(["pseudo", "tournaments", "created"] as const).map((k) => (
                 <button
                   key={k}
                   type="button"
