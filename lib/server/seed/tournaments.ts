@@ -156,7 +156,10 @@ async function simulateSeedTournament(
   if (format === "MULTI" && def.phases) {
     await generateMultiPhaseTournament(db, tournamentId, def.phases, finish, def.playWaves ?? 2, winsRequired);
   } else if (format === "BG_SURVIE") {
-    await generateEnduranceTournament(db, tournamentId, finish, def.playWaves ?? 3, def.forfeits ?? 0, winsRequired, matchFormatDraws);
+    await generateEnduranceTournament(db, tournamentId, finish, def.playWaves ?? 3, def.forfeits ?? 0, winsRequired, matchFormatDraws, {
+      partialMatches: def.endurancePartialMatches ?? 0,
+      penalties: def.endurancePenalties ?? 0,
+    });
   } else if (format === "SURVIVAL") {
     await generateSurvivalTournament(db, tournamentId, finish, def.playWaves ?? 3, def.forfeits ?? 0, winsRequired);
   } else if (format === "SWISS") {

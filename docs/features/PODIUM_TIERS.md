@@ -77,7 +77,7 @@ Exceptions :
   des outils, pas une vitrine.
 - **Ligne en retrait** (`data-podium-muted` : perdant d'un match dans
   `MatchRow`, équipe éliminée ou forfait dans les classements Survie, Suisse et
-  Endurance, et dans l'historique manche par manche de l'Endurance) : la marche garde son repère (couronne, losange) mais quitte
+  Endurance, et dans les vues du classement de l'Endurance) : la marche garde son repère (couronne, losange) mais quitte
   dégradé, lueur, mouvement et graisse — sinon le nom distancé brillerait plus
   fort que les autres.
 - **Lien en pastille** (l'équipe active de la fiche joueur) : sous la lueur,

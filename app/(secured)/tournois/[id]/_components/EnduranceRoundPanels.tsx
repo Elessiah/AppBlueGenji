@@ -14,6 +14,7 @@ import {
   enduranceRoundOfMatch,
   enduranceRoundRegionLabel,
   enduranceRoundTitle,
+  orderEnduranceRoundSections,
   type EnduranceRoundSection,
 } from "../_lib/endurance-sections";
 import { useTournamentViewText } from "@/components/i18n/tournament-page-text";
@@ -26,8 +27,6 @@ interface EnduranceRoundPanelsProps {
   /** Couleur d'accent du mode, commune aux volets et à l'arbre final. */
   accent: string;
   myTeamId: number | null;
-  /** L'arbre final est-il lancé ? Décide du volet ouvert par défaut. */
-  playoffsStarted: boolean;
   allTournamentMatches: BracketMatch[];
   adminResolvable: (match: BracketMatch) => boolean;
   onOpenAdminModal: (match: BracketMatch) => void;
@@ -51,19 +50,23 @@ function hasPendingMatchFor(section: EnduranceRoundSection, myTeamId: number | n
  * manche courante. Les volets sont ceux des tableaux à élimination
  * (`BoardPanel`), et les cartes d'une manche s'y rangent en grille — une manche
  * de huit rencontres tient alors sur deux ou trois lignes au lieu de huit.
+ *
+ * Ordre et ouverture : la manche en cours en tête et ouverte, les manches
+ * closes ensuite, repliées, de la plus récente à la plus ancienne
+ * (`orderEnduranceRoundSections`, `defaultOpenEnduranceRound`).
  */
 export function EnduranceRoundPanels({
   sections,
   accent,
   myTeamId,
-  playoffsStarted,
   allTournamentMatches,
   adminResolvable,
   onOpenAdminModal,
   format,
 }: Readonly<EnduranceRoundPanelsProps>) {
   const text = useTournamentViewText(FR_VIEWS_TEXT);
-  const autoOpen = defaultOpenEnduranceRound(sections, myTeamId, playoffsStarted);
+  const autoOpen = defaultOpenEnduranceRound(sections);
+  const ordered = orderEnduranceRoundSections(sections);
 
   const [openRounds, setOpenRounds] = useState<Set<number>>(
     () => new Set(autoOpen === null ? [] : [autoOpen]),
@@ -102,7 +105,7 @@ export function EnduranceRoundPanels({
 
   return (
     <div className={styles.stack}>
-      {sections.map((section) => {
+      {ordered.map((section) => {
         const mine = hasPendingMatchFor(section, myTeamId);
         return (
           <BoardPanel

@@ -9,6 +9,7 @@ import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 import { createDoubleEliminationBracket } from "../tournaments/bracket-double";
 import { createSingleEliminationBracket } from "../tournaments/bracket-single";
 import { forfeitEnduranceTeam } from "../tournaments/bg-survie/forfeit";
+import { applyEndurancePenalty } from "../tournaments/bg-survie/penalties";
 import {
   generateEnduranceRound,
   initializeEnduranceTournament,
@@ -157,6 +158,55 @@ async function forfeitLastEnduranceTeams(
 }
 
 /**
+ * Entame la manche en cours : joue `count` de ses rencontres prêtes, puis
+ * réconcilie. Rend le nombre de rencontres jouées.
+ */
+async function playPartialEnduranceRound(
+  connection: PoolConnection,
+  tournamentId: number,
+  count: number,
+  winsRequired: number
+): Promise<number> {
+  if (count <= 0) return 0;
+  const ready = readyMatches(await getMatchRows(connection, tournamentId)).slice(0, count);
+  for (const m of ready) {
+    await finalizeMatch(connection, tournamentId, m, playMatch(Number(m.team1_id), Number(m.team2_id), winsRequired));
+  }
+  await reconcileEndurance(tournamentId, connection);
+  return ready.length;
+}
+
+/**
+ * Pose `count` pénalités d'un point, par le service de production, sur les
+ * équipes en lice du haut du classement (une par équipe). Le rejeu les
+ * applique à la manche courante, comme une sanction prononcée à l'écran.
+ */
+async function penalizeEnduranceTeams(
+  connection: PoolConnection,
+  tournamentId: number,
+  count: number
+): Promise<number> {
+  if (count <= 0) return 0;
+  const [rows] = await connection.execute<(RowDataPacket & { team_id: number })[]>(
+    `SELECT team_id FROM bg_endurance_standings
+       WHERE tournament_id = ? AND status = 'ACTIVE'
+       ORDER BY \`rank\` ASC
+       LIMIT ${Math.floor(count)}`,
+    [tournamentId]
+  );
+  let penalized = 0;
+  for (const row of rows) {
+    try {
+      await applyEndurancePenalty(tournamentId, Number(row.team_id), 1, "Test_ retard au check-in", null, connection);
+      penalized++;
+    } catch {
+      break;
+    }
+  }
+  return penalized;
+}
+
+/**
  * Simule un tournoi « BlueGenji Survie » : manches d'endurance jusqu'à la
  * bascule en play-offs, puis l'arbre final. Même schéma que la Survie —
  * initialize → generate → reconcile, puis vagues de matchs joués.
@@ -169,7 +219,14 @@ export async function generateEnduranceTournament(
   forfeits: number,
   winsRequired: number,
   /** Le format du tournoi ouvre-t-il l'égalité en qualification ? */
-  drawsAllowed = false
+  drawsAllowed = false,
+  /**
+   * Manche entamée (`partialMatches` rencontres de la manche en cours jouées
+   * après les vagues) et pénalités d'arbitrage posées en fin de simulation —
+   * de quoi lire le bandeau, la vue « matchs déjà joués » et le badge de
+   * pénalité des vues du classement.
+   */
+  extras: { partialMatches: number; penalties: number } = { partialMatches: 0, penalties: 0 }
 ): Promise<void> {
   const connection = await db.getConnection();
   try {
@@ -205,11 +262,17 @@ export async function generateEnduranceTournament(
       waves++;
     }
 
+    // Un tournoi joué jusqu'au bout n'a ni manche entamée ni sanction à poser.
+    const tail = finish ? { partialMatches: 0, penalties: 0 } : extras;
+    played += await playPartialEnduranceRound(connection, tournamentId, tail.partialMatches, winsRequired);
+
     const forfeited = await forfeitLastEnduranceTeams(connection, tournamentId, forfeits);
+    const penalized = await penalizeEnduranceTeams(connection, tournamentId, tail.penalties);
 
     console.log(
       `    ↳ endurance : ${played} matchs simulés sur ${waves} manche(s)` +
-        (forfeited > 0 ? ` · ${forfeited} forfait(s)` : "")
+        (forfeited > 0 ? ` · ${forfeited} forfait(s)` : "") +
+        (penalized > 0 ? ` · ${penalized} pénalité(s)` : "")
     );
   } finally {
     connection.release();

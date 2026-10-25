@@ -46,6 +46,7 @@ const AMBER_WARNINGS: Record<string, string> = {
   "app/(secured)/tournois/[id]/_components/EnduranceNextRoundPanel.module.css": "avertissement de manche",
   "app/(secured)/tournois/[id]/_components/EnduranceView.module.css": "pénalité d'endurance",
   "app/(secured)/tournois/[id]/_components/EnduranceView.tsx": "pénalité, « Abandonner »",
+  "app/(secured)/tournois/[id]/_components/EnduranceRankingViews.module.css": "cumul des pénalités d'endurance",
   "app/(secured)/tournois/[id]/_components/EntrantContactsPanel.module.css": "engagé injoignable",
   "app/(secured)/tournois/[id]/_components/GhostRegistrationDialog.module.css": "dépassement de places",
   "app/(secured)/tournois/[id]/_components/MatchCardActions.module.css": "geste à risque",

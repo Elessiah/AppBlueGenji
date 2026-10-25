@@ -73,6 +73,10 @@ export interface TournamentDef extends ReportStateCounts {
   // l'arbre final. Exige un `matchFormat` : c'est lui qui borne la rencontre.
   matchFormatDraws?: boolean;
   endurancePlayoffFormat?: MatchFormat; // BG_SURVIE : format de l'arbre final (absent = celui du tournoi)
+  // BG_SURVIE (RUNNING) : rencontres jouées dans la manche en cours après les
+  // vagues — une manche entamée, pour la vue « matchs déjà joués » et le bandeau.
+  endurancePartialMatches?: number;
+  endurancePenalties?: number; // BG_SURVIE (RUNNING) : pénalités d'arbitrage posées en fin de simulation
   teamOffset?: number; // décale la tranche du pool (rosters variés d'un tournoi à l'autre)
   closesInHours?: number; // REGISTRATION : clôture imminente
   description?: string | null;
@@ -236,7 +240,7 @@ export const TOURNAMENTS: TournamentDef[] = [
   // indéfiniment sans jamais retomber à huit.
   // Le cas du règlement : BO5 sans tiebreaker en qualification (une map nulle
   // peut arrêter la rencontre sur 2-2), vrai FT3 en play-offs.
-  { name: "BG Survie Égalités", game: "OW", state: "RUNNING", format: "BG_SURVIE", teamCount: 12, maxTeams: 16, daysOffset: -3, endurancePoints: 9, endurancePlayoffSize: 8, playWaves: 3, matchFormat: { type: "FT", value: 3 }, matchFormatDraws: true, endurancePlayoffFormat: { type: "FT", value: 3 }, teamOffset: 66, mapDetails: true },
+  { name: "BG Survie Égalités", game: "OW", state: "RUNNING", format: "BG_SURVIE", teamCount: 12, maxTeams: 16, daysOffset: -3, endurancePoints: 9, endurancePlayoffSize: 8, playWaves: 3, matchFormat: { type: "FT", value: 3 }, matchFormatDraws: true, endurancePlayoffFormat: { type: "FT", value: 3 }, teamOffset: 66, mapDetails: true, endurancePartialMatches: 2, forfeits: 1, endurancePenalties: 1 },
   { name: "BG Survie Plafond Manches", game: "OW", state: "RUNNING", format: "BG_SURVIE", teamCount: 20, maxTeams: 32, daysOffset: -3, endurancePoints: 20, endurancePlayoffSize: 8, enduranceMaxRounds: 4, enduranceEarlyExit: true, playWaves: 2, matchFormat: { type: "FT", value: 3 }, teamOffset: 108 },
   { name: "BG Survie Plafond Atteint", game: "MR", state: "FINISHED", format: "BG_SURVIE", teamCount: 16, maxTeams: 32, daysOffset: -18, endurancePoints: 20, endurancePlayoffSize: 8, enduranceMaxRounds: 3, matchFormat: { type: "FT", value: 3 }, teamOffset: 128 },
   // Défaut d'un tournoi neuf : plafond, option décochée — personne n'est écarté avant la dernière manche.

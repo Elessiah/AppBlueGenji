@@ -431,47 +431,47 @@ tournoi entier.
 | Route | `POST /api/admin/matches/[matchId]/resolve` | `POST /api/tournaments/[id]/forfeit` |
 | Écrit | `forfeit_team_id` + score plein sur **ce** match | statut `FORFEIT`, capital à 0, match en cours clos |
 | Suite | l'équipe reste en lice et joue la manche suivante | l'équipe n'est plus appariée |
-| Au classement | capital amputé du score plein | « Forfait (Mn) », et « FF » rouge dans le tableau |
+| Au classement | capital amputé du score plein | « Forfait (Mn) », et « Forfait — retirée » dans la colonne « MANCHE n » |
 
 Le premier est ouvert à tous les formats de tournoi ; le second n'a de sens que
 là où l'on reste en lice sans être éliminé par une défaite (Survie, Ronde
 suisse, BlueGenji Survie — `FORMATS_WITH_FORFEIT`).
 
-## Le tableau manche par manche
+## Cases manche par manche — la source des vues du classement
 
-`EnduranceView` affiche, sous le classement, le capital de chaque équipe
-**manche par manche** — la lecture « feuille de calcul » qui sert de référence à
-l'arbitrage. Une ligne par équipe, une colonne par manche jouée.
-
-Trois natures de case, et non une seule valeur numérique tolérant les trous
-(`EnduranceRoundCell`) :
+`replayEnduranceDetailed` produit, dans le même parcours que le classement, une
+case par équipe et par manche (`EnduranceRoundCell`). Trois natures, et non une
+seule valeur numérique tolérant les trous :
 
 | Case | Sens |
 | --- | --- |
-| un nombre | capital à l'issue de la manche (0 compris : la manche qui vide le capital affiche ce zéro) |
-| **FF** en rouge | manche couverte par un forfait de tournoi — de la manche du retrait jusqu'à la fin |
-| — | l'équipe était déjà éliminée, elle n'a pas disputé cette manche |
+| `POINTS` | capital à l'issue de la manche (0 compris : la manche qui vide le capital affiche ce zéro) |
+| `FORFEIT` | manche couverte par un forfait de tournoi — de la manche du retrait jusqu'à la fin |
+| `OUT` | l'équipe était déjà éliminée, elle n'a pas disputé cette manche |
 
-Un capital de 0 ne dit pas si l'équipe a été vidée par ses résultats ou retirée
-du tournoi, et une case vide ne dit pas si la manche reste à jouer ou si l'équipe
-n'y était plus : c'est pourquoi la case porte sa nature, et pas seulement un
-nombre.
+Chaque case porte aussi, depuis la refonte du plateau, le **rang** de l'équipe
+à l'issue de la manche (ordre de `assignRanks` : actives par `compareEndurance`,
+puis sorties) et son **bilan cumulé** (`wins` / `losses` / `draws`). Ces champs
+sont facultatifs : un instantané antérieur n'en porte pas, et la vue retombe
+alors sur le capital. Ils alimentent les vues « Classement après la manche n »
+(`ENDURANCE_RANKING_VIEWS.md`) sans second départage côté client.
 
-L'historique n'est **pas stocké**. `replayEnduranceDetailed` le produit dans le
-même parcours que le classement — même boucle, mêmes entrées — si bien qu'une
-correction de score le refait comme elle refait tout le reste, sans colonne ni
-migration. Le statut de chaque case est lu **au moment où la manche se referme**,
-jamais à la fin du rejeu : une équipe éliminée à la manche 5 a bien un capital à
-montrer pour les manches 1 à 4.
+L'historique n'est **pas stocké** : une correction de score le refait comme elle
+refait tout le reste, sans colonne ni migration. Le statut de chaque case est lu
+**au moment où la manche se referme** : une équipe éliminée à la manche 5 a bien
+un capital à montrer pour les manches 1 à 4. La dernière case est celle de la
+manche **en cours** et bouge à mesure que les scores tombent.
 
-La dernière colonne est celle de la manche **en cours** : elle vaut le capital
-acquis jusque-là et bouge à mesure que les scores tombent. Elle porte donc la
-même valeur que la colonne « Endurance » du classement.
+### Affichage
 
-Le rouge est celui du danger (`--danger`), jamais `--red-live`, réservé à ce qui
-est réellement à l'antenne. La zone défile horizontalement (`ScrollArea`) plutôt
-que de se replier sur mobile : un tableau de capitaux empilé en colonne ne se
-compare plus.
+Le tableau « manche par manche » a été **retiré** : il doublait les vues du
+classement, qui disent la même chose manche par manche avec le rang, les ▲▼ et
+la rencontre de chaque équipe. Ses deux signaux y ont migré — le forfait se lit
+au statut (« Forfait (M3) ») et dans la colonne « MANCHE n » (« Forfait —
+retirée »), la pénalité au badge ambre à côté de l'endurance (cumul jusqu'à la
+manche de la vue). L'en-tête, le bandeau de la manche en cours et les vues sont
+décrits dans `ENDURANCE_RANKING_VIEWS.md` ; l'ordre et l'ouverture des volets de
+manche dans `ENDURANCE_ROUND_PANELS.md`.
 
 ## Retrait du tournoi (abandon / forfait général)
 
@@ -576,4 +576,4 @@ même état, la prennent aussi.
 
 Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
 
-- **Mode `BG_SURVIE` (« BlueGenji Survie »)** : capital d'**endurance** (9 par défaut, réglable) — +1 par map gagnée, −1 par map perdue (un 3-0 déplace donc trois points, un 3-2 un seul : le barème n'est **pas** par match), **élimination immédiate à 0**. Un **forfait** vaut le score plein du format du tournoi (FT3 → 3-0, `forfeitMapCount`), et non un match blanc : les colonnes de score étant `NULL` sur un forfait arbitré, le barème se dérive du format. L'abandon se déclare depuis le classement d'`EnduranceView`, par un représentant de l'engagé ou par `can(user, "tournaments")`. Classement relu avant chaque manche (endurance puis **ordre du classement précédent**, pas le seed), appariement par couples adjacents, la mieux classée à gauche ; effectif impair → la dernière ne joue pas (aucune victoire d'office). La phase qualificative s'arrête à 8 équipes — ou, si le tournoi fixe un **plafond de manches** (`endurance_max_rounds`, `NULL` = aucun, comportement d'origine), à la manche dite : les 8 premières du classement sont alors qualifiées, **toutes les autres sortent**, capital en poche. Sous plafond, et **si le tournoi coche l'option** `endurance_early_exit` (décochée par défaut, éteinte sur les tournois d'avant), une équipe qui ne peut plus **mathématiquement** rejoindre le plateau est écartée sans attendre — critère volontairement conservateur (le **plancher** de `playoffSize` adversaires doit dépasser strictement son **plafond**, plafond de maps tiré du format de match ; en **saisie libre**, rien n'est acquis et personne n'est jamais écarté d'avance), et **abandonné** s'il laisserait un effectif impair *à qui il reste des manches* — un effectif impair fait chômer une équipe, et on ne prive pas une équipe en course pour sortir des condamnées qui le resteront la manche suivante. D'où un statut à part, `OUT_OF_CONTENTION` (« Hors course ») : l'écartée **garde son capital**, et « Éliminée » à côté de neuf points serait un contresens. Tout cela vit dans `replayEndurance` (`enduranceEliminationCut`), donc se défait avec une correction de score ou le retrait du plafond ; `reconcileEndurance` n'a **aucune branche** pour le plafond (le rejeu ayant ramené l'effectif à la cible, la bascule habituelle suffit), seul `generateEnduranceRound` garde un `roundLimitReached` pour qu'aucun chemin ne pose une manche de trop. Puis arbre imposé **8v4 / 6v2 / 1v5 / 3v7** + petite finale (manches numérotées à partir de 1000). Classement de départ = **classement du site** (cote Elo, `loadEntrantsBySiteRanking`) comme la Survie et la Ronde suisse, sauf si le staff a réordonné les inscrites (`manual_seeding`). `reconcileEndurance` ne décide **rien au milieu d'une manche** : la fin de la manche courante (`roundIsComplete`) conditionne aussi bien l'appariement de la suivante que la bascule en play-offs — un seul score faisant tomber l'effectif actif sur la cible lançait sinon l'arbre en laissant les autres rencontres de la manche ouvertes à jamais. Une manche **périmée** (posée, jamais jouée, aux appariements réécrits par une correction en amont) est défaite puis *retombe sur cette même décision* : la défaire et sortir laissait le tournoi sans manche et sans arbre dès que la correction achevait la qualification. **L'arbre final se relit de la même façon** (`repairPlayoffBracket`) : `finalizePlayoffsIfDone` ne sait que *poser* le tour suivant, si bien qu'une fois les demies créées, corriger le vainqueur d'un quart n'en changeait plus les participantes — elles continuaient d'annoncer une équipe qui venait de perdre. Les tours de play-off sont donc parcourus du premier au dernier, chacun confronté à ce qui le décrit (le **classement** pour le premier via `planPlayoffFirstRound`, les **vainqueurs du tour amont** pour les suivants via `planNextPlayoffRound`) ; le premier tour périmé est réécrit — **sur place** quand le plan garde la même forme, un identifiant de match étant une adresse publique (lien profond, diffusion, horaire) — et tout ce qui en descendait est supprimé, faute de base. Un tour portant la moindre saisie n'est **jamais** réécrit. Poser l'arbre et le réparer passent par les mêmes fonctions pures et le même écrivain (`writePlayoffRound`) : une réparation ne peut pas produire un autre tableau qu'un lancement. Logique pure `lib/shared/bg-survie/`, orchestration `lib/server/tournaments/bg-survie/`, table `bg_endurance_standings`, rejeu complet comme la Survie. **Deux forfaits à ne pas confondre** : sur **une manche** (arbitrage, depuis le dialogue de score — l'équipe reste en lice, la manche est comptée au score plein du format par `forfeitMapCount`, désormais **écrit en base** par `adminResolveMatch` et non laissé à `NULL`) et sur **tout le reste du tournoi** (`POST /api/tournaments/[id]/forfeit` — capital à 0, plus jamais appariée ; refusé hors `RUNNING` comme en Survie et en Ronde suisse, et le contrôle d'état passe **avant** celui des play-offs — un tournoi clos faute de qualifiées garde `endurance_playoffs_started` à 0, si bien que l'abandon s'écrivait sur une archive). Le classement se lit aussi **manche par manche** (`replayEnduranceDetailed`, jamais stocké) : une équipe retirée y porte « FF » en rouge sur ses manches restantes, à la place d'un capital. Distinct de `SURVIVAL`, qui reste inchangé. Voir `docs/features/BG_SURVIE_MODE.md`.
+- **Mode `BG_SURVIE` (« BlueGenji Survie »)** : capital d'**endurance** (9 par défaut, réglable) — +1 par map gagnée, −1 par map perdue (un 3-0 déplace donc trois points, un 3-2 un seul : le barème n'est **pas** par match), **élimination immédiate à 0**. Un **forfait** vaut le score plein du format du tournoi (FT3 → 3-0, `forfeitMapCount`), et non un match blanc : les colonnes de score étant `NULL` sur un forfait arbitré, le barème se dérive du format. L'abandon se déclare depuis le classement d'`EnduranceView`, par un représentant de l'engagé ou par `can(user, "tournaments")`. Classement relu avant chaque manche (endurance puis **ordre du classement précédent**, pas le seed), appariement par couples adjacents, la mieux classée à gauche ; effectif impair → la dernière ne joue pas (aucune victoire d'office). La phase qualificative s'arrête à 8 équipes — ou, si le tournoi fixe un **plafond de manches** (`endurance_max_rounds`, `NULL` = aucun, comportement d'origine), à la manche dite : les 8 premières du classement sont alors qualifiées, **toutes les autres sortent**, capital en poche. Sous plafond, et **si le tournoi coche l'option** `endurance_early_exit` (décochée par défaut, éteinte sur les tournois d'avant), une équipe qui ne peut plus **mathématiquement** rejoindre le plateau est écartée sans attendre — critère volontairement conservateur (le **plancher** de `playoffSize` adversaires doit dépasser strictement son **plafond**, plafond de maps tiré du format de match ; en **saisie libre**, rien n'est acquis et personne n'est jamais écarté d'avance), et **abandonné** s'il laisserait un effectif impair *à qui il reste des manches* — un effectif impair fait chômer une équipe, et on ne prive pas une équipe en course pour sortir des condamnées qui le resteront la manche suivante. D'où un statut à part, `OUT_OF_CONTENTION` (« Hors course ») : l'écartée **garde son capital**, et « Éliminée » à côté de neuf points serait un contresens. Tout cela vit dans `replayEndurance` (`enduranceEliminationCut`), donc se défait avec une correction de score ou le retrait du plafond ; `reconcileEndurance` n'a **aucune branche** pour le plafond (le rejeu ayant ramené l'effectif à la cible, la bascule habituelle suffit), seul `generateEnduranceRound` garde un `roundLimitReached` pour qu'aucun chemin ne pose une manche de trop. Puis arbre imposé **8v4 / 6v2 / 1v5 / 3v7** + petite finale (manches numérotées à partir de 1000). Classement de départ = **classement du site** (cote Elo, `loadEntrantsBySiteRanking`) comme la Survie et la Ronde suisse, sauf si le staff a réordonné les inscrites (`manual_seeding`). `reconcileEndurance` ne décide **rien au milieu d'une manche** : la fin de la manche courante (`roundIsComplete`) conditionne aussi bien l'appariement de la suivante que la bascule en play-offs — un seul score faisant tomber l'effectif actif sur la cible lançait sinon l'arbre en laissant les autres rencontres de la manche ouvertes à jamais. Une manche **périmée** (posée, jamais jouée, aux appariements réécrits par une correction en amont) est défaite puis *retombe sur cette même décision* : la défaire et sortir laissait le tournoi sans manche et sans arbre dès que la correction achevait la qualification. **L'arbre final se relit de la même façon** (`repairPlayoffBracket`) : `finalizePlayoffsIfDone` ne sait que *poser* le tour suivant, si bien qu'une fois les demies créées, corriger le vainqueur d'un quart n'en changeait plus les participantes — elles continuaient d'annoncer une équipe qui venait de perdre. Les tours de play-off sont donc parcourus du premier au dernier, chacun confronté à ce qui le décrit (le **classement** pour le premier via `planPlayoffFirstRound`, les **vainqueurs du tour amont** pour les suivants via `planNextPlayoffRound`) ; le premier tour périmé est réécrit — **sur place** quand le plan garde la même forme, un identifiant de match étant une adresse publique (lien profond, diffusion, horaire) — et tout ce qui en descendait est supprimé, faute de base. Un tour portant la moindre saisie n'est **jamais** réécrit. Poser l'arbre et le réparer passent par les mêmes fonctions pures et le même écrivain (`writePlayoffRound`) : une réparation ne peut pas produire un autre tableau qu'un lancement. Logique pure `lib/shared/bg-survie/`, orchestration `lib/server/tournaments/bg-survie/`, table `bg_endurance_standings`, rejeu complet comme la Survie. **Deux forfaits à ne pas confondre** : sur **une manche** (arbitrage, depuis le dialogue de score — l'équipe reste en lice, la manche est comptée au score plein du format par `forfeitMapCount`, désormais **écrit en base** par `adminResolveMatch` et non laissé à `NULL`) et sur **tout le reste du tournoi** (`POST /api/tournaments/[id]/forfeit` — capital à 0, plus jamais appariée ; refusé hors `RUNNING` comme en Survie et en Ronde suisse, et le contrôle d'état passe **avant** celui des play-offs — un tournoi clos faute de qualifiées garde `endurance_playoffs_started` à 0, si bien que l'abandon s'écrivait sur une archive). Le classement se lit aussi **manche par manche** (`replayEnduranceDetailed`, jamais stocké, rang et bilan par manche compris) dans les vues du classement (`ENDURANCE_RANKING_VIEWS.md`) : une équipe retirée y porte « Forfait — retirée » à la place d'une rencontre. Distinct de `SURVIVAL`, qui reste inchangé. Voir `docs/features/BG_SURVIE_MODE.md`.
