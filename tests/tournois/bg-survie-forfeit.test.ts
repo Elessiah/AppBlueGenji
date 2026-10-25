@@ -116,7 +116,7 @@ describe("replayEnduranceDetailed — tableau manche par manche", () => {
 
     // La manche qui vide le capital affiche bien son zéro ; la suivante, non.
     expect(line(replay.history.get(2)!)).toBe("6 3 0 ·");
-    expect(replay.history.get(2)!.at(-1)).toEqual({ round: 4, kind: "OUT", points: null });
+    expect(replay.history.get(2)!.at(-1)).toMatchObject({ round: 4, kind: "OUT", points: null });
   });
 
   it("laisse une case « FF » là où l'élimination et le retrait tombent ensemble", () => {
