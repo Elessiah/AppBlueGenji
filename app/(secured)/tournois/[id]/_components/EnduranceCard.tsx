@@ -50,8 +50,9 @@ export function EnduranceCard({
   return (
     <>
       <div className={styles.head}>
+        {/* Le titre « Endurance et manches » est celui du bloc du plateau
+            (`TournamentSheet`) : l'en-tête n'en porte pas un second. */}
         <div>
-          <h3 className={styles.title}>{t("endurance.cardTitle")}</h3>
           {/*
             Le barème se compte map par map : « par victoire » laissait lire un
             point par match gagné, alors qu'un 3-0 en déplace trois — et c'est ce

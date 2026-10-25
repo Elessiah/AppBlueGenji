@@ -16,7 +16,8 @@ réservé dans `EnduranceView`, entre le journal des sanctions et les play-offs.
 
 Dans l'ordre (`EnduranceView`) :
 
-1. **En-tête** (`EnduranceCard`) — « Endurance et manches », le barème, et à
+1. **En-tête** (`EnduranceCard`), sous le titre « Endurance et manches » du bloc
+   du plateau (`TournamentSheet`, qui n'est pas dupliqué) — le barème, et à
    droite « N équipes en lice → 8 en play-offs » (« joueurs » en tournoi
    individuel).
 2. **Bandeau de la manche en cours** — « MANCHE EN COURS 3 / 5 » (le total

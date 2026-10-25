@@ -436,7 +436,7 @@ describe("rendu anglais — aucun français hors des blocs lang=\"fr\"", () => {
       <EnduranceView endurance={endurance} matches={[]} canPenalize={canPenalize} onPenalize={noop} onLiftPenalty={noop} canForfeit={() => true} onForfeit={noop} adminResolvable={() => false} onOpenAdminModal={noop} format="BG_SURVIE" />,
     );
     expectNoFrench(html);
-    expect(html).toContain("Endurance and rounds");
+    expect(html).toContain("ENDURANCE 9 PTS");
     expect(html).toContain("1 team in contention → 4 in the playoffs");
     expect(html).toContain("Overall ranking");
     expect(html).toContain("Out of contention");

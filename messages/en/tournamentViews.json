@@ -69,7 +69,6 @@
     "regionProgress": "{played} of {total} played",
     "regionDone": "finished",
     "region": "{title}, {count}, {progress}",
-    "cardTitle": "Endurance and rounds",
     "inContentionTeam": "{count, plural, one {# team in contention} other {# teams in contention}} → {size} in the playoffs",
     "inContentionSolo": "{count, plural, one {# player in contention} other {# players in contention}} → {size} in the playoffs",
     "stripCurrent": "CURRENT ROUND",

@@ -50,7 +50,8 @@
   gap: 8px;
   padding: 8px 0;
   margin-bottom: 8px;
-  background: var(--cyber-bg);
+  /* Opaque (la barre passe au-dessus des lignes), du ton du bloc du plateau. */
+  background: var(--cyber-bg-2);
   border-bottom: 1px solid var(--line);
 }
 

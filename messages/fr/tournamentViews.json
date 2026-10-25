@@ -69,7 +69,6 @@
     "regionProgress": "{played} sur {total, plural, one {# jouée} other {# jouées}}",
     "regionDone": "terminée",
     "region": "{title}, {count}, {progress}",
-    "cardTitle": "Endurance et manches",
     "inContentionTeam": "{count, plural, one {# équipe en lice} other {# équipes en lice}} → {size} en play-offs",
     "inContentionSolo": "{count, plural, one {# joueur en lice} other {# joueurs en lice}} → {size} en play-offs",
     "stripCurrent": "MANCHE EN COURS",
