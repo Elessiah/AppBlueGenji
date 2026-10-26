@@ -6,6 +6,7 @@ import {
   FALLBACK_ABOUT_STATS,
   aboutStatErrorMessage,
   aboutStatValue,
+  aboutStatValueIsFrench,
   localizedAboutStats,
   validateAboutStatInput,
   type AboutStat,
@@ -146,5 +147,13 @@ describe("localizedAboutStats", () => {
   it("phrase un refus d'anglais", () => {
     expect(aboutStatErrorMessage("LABEL_EN_REQUIRED", "x")).toBe("La traduction anglaise est requise.");
   });
-});
 
+  it("sous /en, seule une valeur sans anglais qui porte des lettres est marquée française", () => {
+    expect(aboutStatValueIsFrench({ value: "Gratuit", valueEn: null }, "en")).toBe(true);
+    expect(aboutStatValueIsFrench({ value: "4 200 €", valueEn: "" }, "en")).toBe(false);
+    expect(aboutStatValueIsFrench({ value: "12", valueEn: null }, "en")).toBe(false);
+    expect(aboutStatValueIsFrench({ value: "100%", valueEn: null }, "en")).toBe(false);
+    expect(aboutStatValueIsFrench({ value: "Gratuit", valueEn: "Free" }, "en")).toBe(false);
+    expect(aboutStatValueIsFrench({ value: "Gratuit", valueEn: null }, "fr")).toBe(false);
+  });
+});

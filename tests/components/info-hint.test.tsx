@@ -284,9 +284,13 @@ describe("InfoHint — gestes", () => {
     const outside = new NodeClass();
     const rootRef = (view.root as unknown as { ref: { current: unknown } }).ref;
     rootRef.current = { contains: (target: unknown) => target === inside, addEventListener: () => {}, removeEventListener: () => {} };
+    buttonFocus.mockClear();
+    (view.button as unknown as { ref: { current: unknown } }).ref.current = { focus: buttonFocus };
     documentListeners.click[0]({ target: inside });
     view = render();
     expect(view.button.props["aria-expanded"]).toBe(true);
+    // Le focus parti au conteneur de la modale revient au bouton : Échap replie encore le « i ».
+    expect(buttonFocus).toHaveBeenCalledTimes(1);
     documentListeners.click[0]({ target: outside });
     view = render();
     expect(view.button.props["aria-expanded"]).toBe(false);

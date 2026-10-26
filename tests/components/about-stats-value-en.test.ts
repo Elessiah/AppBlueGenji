@@ -36,7 +36,7 @@ describe("AboutStats — valeur anglaise", () => {
   it("la carte affiche la valeur dans la langue de la page", () => {
     expect(source).toContain("{shown.map(({ stat: s, value, label, index }) => (");
     expect(source).toMatch(
-      /<div className="num" style=\{\{ fontSize: 26 \}\} lang=\{staffLang && !hasEnglish\(s\.valueEn\) \? "fr" : undefined\}>\s*\{value\}\s*<\/div>/,
+      /<div className="num" style=\{\{ fontSize: 26 \}\} lang=\{aboutStatValueIsFrench\(s, locale\) \? "fr" : undefined\}>\s*\{value\}\s*<\/div>/,
     );
   });
 
