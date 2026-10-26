@@ -206,6 +206,10 @@ async function penalizeEnduranceTeams(
   return penalized;
 }
 
+/** Fin de simulation sans manche entamée ni pénalité. */
+type EnduranceSimulationExtras = { partialMatches: number; penalties: number };
+const NO_ENDURANCE_EXTRAS: Readonly<EnduranceSimulationExtras> = Object.freeze({ partialMatches: 0, penalties: 0 });
+
 /**
  * Simule un tournoi « BlueGenji Survie » : manches d'endurance jusqu'à la
  * bascule en play-offs, puis l'arbre final. Même schéma que la Survie —
@@ -226,7 +230,7 @@ export async function generateEnduranceTournament(
    * de quoi lire le bandeau, la vue « matchs déjà joués » et le badge de
    * pénalité des vues du classement.
    */
-  extras: { partialMatches: number; penalties: number } = { partialMatches: 0, penalties: 0 }
+  extras: Readonly<EnduranceSimulationExtras> = NO_ENDURANCE_EXTRAS
 ): Promise<void> {
   const connection = await db.getConnection();
   try {
@@ -263,7 +267,7 @@ export async function generateEnduranceTournament(
     }
 
     // Un tournoi joué jusqu'au bout n'a ni manche entamée ni sanction à poser.
-    const tail = finish ? { partialMatches: 0, penalties: 0 } : extras;
+    const tail = finish ? NO_ENDURANCE_EXTRAS : extras;
     played += await playPartialEnduranceRound(connection, tournamentId, tail.partialMatches, winsRequired);
 
     const forfeited = await forfeitLastEnduranceTeams(connection, tournamentId, forfeits);
