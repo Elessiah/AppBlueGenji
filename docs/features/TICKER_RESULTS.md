@@ -28,6 +28,9 @@ L'issue est lue **côté serveur** sur le résultat enregistré
 `bg_matches` — jamais devinée d'après les scores. Double forfait : deux
 `forfeit`. Sans vainqueur enregistré, ou vainqueur étranger au match : deux
 `none`. Une case vide (exemption, engagé retiré) est `none`, jamais un perdant.
+La requête ne retient que les matchs entre **deux engagés** (`is_bye = FALSE`,
+`team1_id` et `team2_id` non nuls) : une exemption terminée s'affichait
+« Équipe #null 0 — Équipe B 1 ».
 Aucune donnée nouvelle n'est collectée : trois colonnes déjà publiques (le
 vainqueur d'un match se voit sur la fiche du tournoi) rejoignent la requête.
 
