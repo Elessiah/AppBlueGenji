@@ -25,7 +25,10 @@ Dans l'ordre (`EnduranceView`) :
    (`<progress>` natif), « N équipes doivent encore jouer cette manche », et
    **« PROCHAIN MATCH »** : la date à venir la plus proche parmi les rencontres
    non jouées de la manche, avec les deux engagés. Masqué sans date à venir.
-   Play-offs lancés : le bandeau dit « PLAY-OFFS » et l'avancement de l'arbre.
+   Play-offs lancés : le bandeau dit « PLAY-OFFS » et l'avancement de l'arbre,
+   compté sur l'arbre **complet** (`endurancePlayoffMatchTotal` : les tours pas
+   encore posés sont projetés, petite finale comprise) — jamais « 0 sur 4 » aux
+   quarts puis « 4 sur 6 » aux demies, une barre qui reculerait.
    Tournoi fini : pas de bandeau.
 3. **Vues du classement** (`EnduranceRankingViews`), puis la légende « Hors
    course », puis le journal des sanctions.
