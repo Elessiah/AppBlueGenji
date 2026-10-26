@@ -58,7 +58,7 @@ FinalitéAffichage sur le profil et les brackets. Téléversé par toi, ou copi�
 Base légaleConsentement
 ConservationDurée du compte
 DonnéeLangue du compte
-FinalitéFrançais ou anglais : la langue des notifications push. Celle de la page du site d'où part ta dernière connexion (sauf les exceptions détaillées à la section Notifications push), ou celle que tu choisis dans Mon profil ; français par défaut, remis au français si le compte est anonymisé
+FinalitéFrançais ou anglais : la langue des notifications push et des messages privés Discord du site (transmise au bot avec le seul code envoyé en message privé). Celle de la page du site d'où part ta dernière connexion (sauf les exceptions détaillées à la section Notifications push), ou celle que tu choisis dans Mon profil ; français par défaut, remis au français si le compte est anonymisé
 Base légaleExécution du contrat
 ConservationDurée du compte
 DonnéeChoix des messages privés de match

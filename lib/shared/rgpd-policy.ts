@@ -229,7 +229,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // (2026-10-13) — sert à rédiger les notifications push, pas un choix
     // facultatif de visibilité.
     finalite:
-      "Français ou anglais : la langue des notifications push. Celle de la page du site d'où part ta dernière connexion (sauf les exceptions détaillées à la section Notifications push), ou celle que tu choisis dans Mon profil ; français par défaut, remis au français si le compte est anonymisé",
+      "Français ou anglais : la langue des notifications push et des messages privés Discord du site (transmise au bot avec le seul code envoyé en message privé). Celle de la page du site d'où part ta dernière connexion (sauf les exceptions détaillées à la section Notifications push), ou celle que tu choisis dans Mon profil ; français par défaut, remis au français si le compte est anonymisé",
     base: "Exécution du contrat",
     duree: "Durée du compte",
   },

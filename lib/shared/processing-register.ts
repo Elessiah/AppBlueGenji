@@ -337,6 +337,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Parties d'un même match, dans sa seule fenêtre « Contacts » et dans sa fenêtre de lancement (BattleTag même masqué, pour s'ajouter en jeu ; durées du traitement T04)",
       "Joueurs connectés du site : pseudo Discord certifié, si le joueur le rend visible ; pastilles de certification de la fiche (tag Discord certifié, « BattleTag vérifié » — BattleTag tiré d'un compte Battle.net rattaché), même tag masqué, sans le tag",
       "Staff de l'association selon son rôle (administration, arbitrage)",
+      "Bot Discord de l'association (T08) : la langue du compte, avec le seul code envoyé en message privé",
     ],
     transfers: ["Aucun"],
     security: [
@@ -361,6 +362,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Identifiant Discord et pseudo Discord (connexion par code ou par bouton), enregistré sans être certifié — la certification, qui l'expose, est un geste distinct (T04)",
       "Porte de rattachement du compte Discord (bouton OAuth ou code en message privé)",
       "Code de connexion (conservé uniquement sous forme d'empreinte), nombre d'essais",
+      "Langue du compte déjà rattaché à ce compte Discord (T01), lue pour que le bot rédige le code dans cette langue",
       "Adresse IP, en mémoire pour limiter les essais ; celle d'une connexion réussie est écrite au journal des données de connexion (T14), pour la seule obligation légale de l'hébergeur",
     ],
     sensitiveData: "Aucune",
@@ -567,7 +569,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Exclusion d'un utilisateur du relais par la modération — valable pour tout le réseau de serveurs partenaires (modération communautaire), d'où la liste des exclusions ouverte aux administrateurs de chaque serveur",
       "Statistiques d'activité (commande /stats, qui ne montre à chacun que sa propre activité ; tableau de bord du bot)",
       "Confirmation des adhésions à l'association et rappels programmés sur ses serveurs",
-      "Remise des messages rédigés par le site : codes, horaires et rappels de match et avis de retrait d'un match (« Match retiré » ; ces messages de match aux seuls tags Discord certifiés), avis de modération (signalement désignant la personne, logo masqué, retiré ou supprimé), demandes d'adhésion à une équipe et informations sur les données en message privé, sans conservation par le bot ; alertes d'arbitrage, signalements et journal d'activité du site (sans pseudo de joueur) publiés au salon de journal privé du staff, alertes d'arbitrage aussi envoyées aux membres du rôle d'arbitrage de chaque serveur qui en a défini un ; annonce des matchs diffusés publiée dans le salon #live du serveur de l'association, en un message par soirée modifié à chaque début et fin de match, avec une mention @everyone pour la chaîne officielle ou du seul rôle StreamViewer pour toute autre chaîne (noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs — traitement T16)",
+      "Remise des messages du site : codes (rédigés par le bot dans la langue du compte que le site lui transmet), horaires et rappels de match et avis de retrait d'un match (« Match retiré » ; ces messages de match aux seuls tags Discord certifiés), avis de modération (signalement désignant la personne, logo masqué, retiré ou supprimé, avatar masqué, retiré ou rétabli, suspension du compte et sa levée), demandes d'adhésion à une équipe et informations sur les données en message privé, sans conservation par le bot ; alertes d'arbitrage, signalements et journal d'activité du site (sans pseudo de joueur) publiés au salon de journal privé du staff, alertes d'arbitrage aussi envoyées aux membres du rôle d'arbitrage de chaque serveur qui en a défini un ; annonce des matchs diffusés publiée dans le salon #live du serveur de l'association, en un message par soirée modifié à chaque début et fin de match, avec une mention @everyone pour la chaîne officielle ou du seul rôle StreamViewer pour toute autre chaîne (noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs — traitement T16)",
     ],
     legalBasis: "Intérêt légitime (faire fonctionner, modérer et mesurer le relais entre serveurs partenaires) ; les messages du site relèvent de la base de leur traitement d'origine",
     dataSubjects: [

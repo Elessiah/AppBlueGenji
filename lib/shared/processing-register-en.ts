@@ -160,6 +160,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Parties to the same match, only in its “Contacts” window and its launch window (BattleTag even when hidden, to add each other in game; durations of record T04)",
       "Logged-in players of the site: certified Discord username, if the player makes it visible; certification badges on the player page (certified Discord tag, “Verified BattleTag” — BattleTag taken from a linked Battle.net account), even when the tag is hidden, without the tag",
       "The association's staff according to their role (administration, refereeing)",
+      "The association's Discord bot (T08): the account language, with the code sent by direct message only",
     ],
     transfers: ["None"],
     security: [
@@ -184,6 +185,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Discord identifier and Discord username (login by code or by button), recorded without being certified — certification, which exposes it, is a separate action (T04)",
       "Way the Discord account was linked (OAuth button or code by direct message)",
       "Login code (kept only as a hash), number of attempts",
+      "Language of the account already linked to that Discord account (T01), read so that the bot writes the code in that language",
       "IP address, in memory to limit attempts; that of a successful login is written to the connection data log (T14), for the host's legal obligation only",
     ],
     sensitiveData: "None",
@@ -390,7 +392,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Exclusion of a user from the relay by moderation — valid for the whole network of partner servers (community moderation), hence the list of exclusions open to the administrators of each server",
       "Activity statistics (/stats command, which shows each person only their own activity; the bot's dashboard)",
       "Confirming memberships of the association and scheduled reminders on its servers",
-      "Delivering messages written by the site: codes, match times and reminders and notices of removal from a match (“Match retiré”; these match messages to certified Discord tags only), moderation notices (report naming the person, logo hidden, removed or deleted), requests to join a team and information about data by direct message, without being kept by the bot; refereeing alerts, reports and the site's activity log (without player usernames) posted in the staff's private log channel, refereeing alerts also sent to the members of the refereeing role of each server that has set one; announcement of the streamed matches posted in the #live channel of the association's server, in one message per evening edited at each match start and end, with an @everyone mention for the official channel or a mention of the StreamViewer role only for any other channel (team names or, in a solo tournament, the players' public BlueGenji username — processing activity T16)",
+      "Delivering the site's messages: codes (written by the bot in the account language the site sends it), match times and reminders and notices of removal from a match (“Match retiré”; these match messages to certified Discord tags only), moderation notices (report naming the person, logo hidden, removed or deleted, avatar hidden, removed or restored, suspension of the account and its lifting), requests to join a team and information about data by direct message, without being kept by the bot; refereeing alerts, reports and the site's activity log (without player usernames) posted in the staff's private log channel, refereeing alerts also sent to the members of the refereeing role of each server that has set one; announcement of the streamed matches posted in the #live channel of the association's server, in one message per evening edited at each match start and end, with an @everyone mention for the official channel or a mention of the StreamViewer role only for any other channel (team names or, in a solo tournament, the players' public BlueGenji username — processing activity T16)",
     ],
     legalBasis: "Legitimate interest (operating, moderating and measuring the relay between partner servers); the site's messages fall under the basis of their original processing",
     dataSubjects: [
