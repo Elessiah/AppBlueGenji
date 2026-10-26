@@ -146,6 +146,7 @@
     "points": "PTS",
     "trend": "Trend",
     "trendShort": "±",
+    "trendNew": "Entered the ranking in the last 7 days",
     "empty": "No ranked teams yet.",
     "fullRanking": "VIEW FULL RANKING →"
   },

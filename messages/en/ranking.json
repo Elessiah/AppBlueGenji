@@ -39,7 +39,8 @@
     "trend": {
       "up": "Up {value} over 7 days",
       "down": "Down {value} over 7 days",
-      "flat": "Steady over 7 days"
+      "flat": "Steady over 7 days",
+      "new": "Entered the ranking in the last 7 days"
     },
     "formNone": "No recent results",
     "formSpoken": "Recent form, most recent first: {results}",

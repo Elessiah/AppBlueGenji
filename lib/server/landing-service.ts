@@ -438,7 +438,10 @@ export async function loadLeaderboardRows(
   return shown.map((row, index) => {
     const rank = index + 1;
     const previousRank = previousRanks.get(row.teamId);
-    let trend: "up" | "down" | "flat" = "flat";
+    // Absente de la photo d'il y a une semaine : elle est entrée au classement
+    // depuis (une équipe sans match compté n'y figure pas) — la dire « stable »
+    // serait faux.
+    let trend: LandingLeaderboardRow["trend"] = previousRank === undefined ? "new" : "flat";
     let trendValue = 0;
     if (previousRank !== undefined) {
       const delta = previousRank - rank;

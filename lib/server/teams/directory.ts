@@ -3,7 +3,7 @@ import { getDatabase } from "@/lib/server/database";
 import { toIso } from "@/lib/server/serialization";
 import type { TeamListItem } from "@/lib/shared/types";
 import { cachedStats } from "@/lib/server/stats-cache";
-import { loadTeamRanking } from "@/lib/server/ranking-service";
+import { loadRankingState, loadTeamRanking } from "@/lib/server/ranking-service";
 import {
   compareDirectoryRank,
   compareRankedTeams,
@@ -142,7 +142,10 @@ export async function listTeams(viewerId: number | null = null): Promise<TeamLis
   // leaderboard de la landing. La liste ne porte que les équipes classées
   // (`isRankedTeam`) : une équipe sans match compté reste à l'annuaire, à la
   // cote de départ, mais **sans rang** — le rang est sa place à `/classement`.
-  const ranking = await loadTeamRanking();
+  // Hors liste, la cote se lit sur l'état rejoué (même photo mutualisée que la
+  // liste, pas un second rejeu) : une équipe qui n'a que des points de
+  // placement n'est pas à 500, et la fiche affiche la même cote.
+  const [ranking, states] = await Promise.all([loadTeamRanking(), loadRankingState()]);
   const rankingByTeam = new Map(ranking.map((row, index) => [row.teamId, { row, rank: index + 1 }]));
 
   // Get roster preview
@@ -229,7 +232,7 @@ export async function listTeams(viewerId: number | null = null): Promise<TeamLis
       createdAt: toIso(row.created_at)!,
       wins: ranked?.wins ?? 0,
       losses: ranked?.losses ?? 0,
-      points: ranked?.points ?? RANKING_BASE_POINTS,
+      points: ranked?.points ?? states.get(id)?.points ?? RANKING_BASE_POINTS,
       // Copie : la table vient du cache, partagée entre tous les lecteurs.
       form: [...(formByTeam.get(id) ?? [])],
       games: gamesByTeam.get(id) || [],

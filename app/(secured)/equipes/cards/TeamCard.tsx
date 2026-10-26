@@ -7,7 +7,6 @@ import { getPaletteColor } from "@/lib/shared/palette";
 import { PlayerLink } from "@/components/entity-link";
 import { TeamPodiumName } from "@/components/podium-tiers";
 import { displayTeamTag } from "@/lib/shared/team-tag";
-import { isRankedTeam } from "@/lib/shared/ranking";
 import { formatMonthYear } from "@/lib/shared/dates";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { useTeamsText } from "@/components/i18n/teams-text";
@@ -36,7 +35,11 @@ function TeamCardView({ team }: Readonly<{ team: TeamListItem }>) {
   const { t } = text;
   const color = getPaletteColor(team.id);
   const isTop3 = team.rank !== null && team.rank <= 3;
-  const ranked = isRankedTeam(team);
+  // Classée = présente au classement, donc avec un rang. `isRankedTeam` ne
+  // suffit pas ici : `TeamListItem` ne porte pas les nuls, et une équipe dont
+  // l'unique match s'est clos sur un nul afficherait son rang à côté de
+  // « Aucun match ».
+  const ranked = team.rank !== null;
 
   return (
     <article className={s.card} style={{ "--c": color } as React.CSSProperties}>

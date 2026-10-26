@@ -78,6 +78,9 @@ function trendText(row: LandingLeaderboardRow, text: RankingText): { symbol: str
   if (row.trend === "down") {
     return { symbol: `▼ ${value}`, label: text.t("board.trend.down", { value }), className: styles.trendDown };
   }
+  if (row.trend === "new") {
+    return { symbol: "★", label: text.t("board.trend.new"), className: styles.trendUp };
+  }
   return { symbol: "—", label: text.t("board.trend.flat"), className: styles.trendFlat };
 }
 

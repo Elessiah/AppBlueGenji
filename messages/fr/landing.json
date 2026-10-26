@@ -146,6 +146,7 @@
     "points": "PTS",
     "trend": "Tendance",
     "trendShort": "TR",
+    "trendNew": "Entrée au classement ces 7 derniers jours",
     "empty": "Aucune équipe classée pour le moment.",
     "fullRanking": "VOIR LE CLASSEMENT COMPLET →"
   },
