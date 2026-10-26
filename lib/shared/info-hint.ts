@@ -44,3 +44,19 @@ export function infoHintReaction(gesture: InfoHintGesture): "closeAndFocus" | "c
   if (gesture.kind === "key") return gesture.key === "Escape" ? "closeAndFocus" : "keep";
   return gesture.kind === "outsideClick" ? "close" : "keep";
 }
+
+/**
+ * Après un clic dans l'explication ouverte, faut-il rendre le focus au « i » ?
+ * Seulement quand il est parti à un conteneur qui porte le composant (la
+ * modale, `tabIndex={-1}`) : Échap y fermerait la modale au lieu de replier le
+ * « i ». Sur une page ordinaire il va à `body` — rien à rendre, la lecture
+ * reste où elle est.
+ */
+export function infoHintFocusLeftToContainer(
+  root: Node | null,
+  active: Node | null,
+  body: Node | null,
+): boolean {
+  if (!root || !active || active === body) return false;
+  return !root.contains(active) && active.contains(root);
+}

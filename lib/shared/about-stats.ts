@@ -86,6 +86,15 @@ export function aboutStatValueIsFrench(stat: Pick<AboutStat, "value" | "valueEn"
 }
 
 /**
+ * La carte attend-elle encore de l'anglais ? Sans titre anglais, elle n'est pas
+ * rendue sous `/en` ; sans valeur anglaise, une valeur faite de mots s'y lit en
+ * français (`aboutStatValueIsFrench`). Les deux se signalent au staff.
+ */
+export function aboutStatNeedsEnglish(stat: Pick<AboutStat, "value" | "valueEn" | "labelEn">): boolean {
+  return !hasEnglish(stat.labelEn) || aboutStatValueIsFrench(stat, "en");
+}
+
+/**
  * Les chiffres dans la langue de la page, avec leur place dans la liste
  * complète (le réordonnancement porte sur elle). Sous `/en`, un chiffre sans
  * titre anglais n'est pas rendu (`staff-translation.ts`) ; sa valeur est

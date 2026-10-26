@@ -12,6 +12,7 @@ import {
   ABOUT_STAT_LABEL_MAX,
   ABOUT_STAT_VALUE_MAX,
   aboutStatErrorMessage,
+  aboutStatNeedsEnglish,
   aboutStatValueIsFrench,
   FALLBACK_ABOUT_STATS,
   localizedAboutStats,
@@ -250,10 +251,10 @@ export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: R
                   className={styles.action}
                   onClick={() => openEdit(s)}
                   disabled={busy}
-                  aria-label={withEnglishMissing(`Modifier la carte ${s.label}`, !hasEnglish(s.labelEn))}
+                  aria-label={withEnglishMissing(`Modifier la carte ${s.label}`, aboutStatNeedsEnglish(s))}
                 >
                   Modifier
-                  {!hasEnglish(s.labelEn) && <EnglishMissingMark />}
+                  {aboutStatNeedsEnglish(s) && <EnglishMissingMark />}
                 </button>
                 <button
                   type="button"
