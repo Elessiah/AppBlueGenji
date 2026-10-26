@@ -74,6 +74,10 @@ describe("mouvement", () => {
     expect(CHART).not.toContain("<p className={styles.hint}>{modeHint}</p>");
   });
 
+  it("« Ma sélection » vide : l'encart (état vide, visible) dit comment ajouter un engagé", () => {
+    expect(CHART).toMatch(/mode === "PICK" && picked\.length === 0\s*\? t\(`endurance\.chartHintPickEmpty\$\{kind\}`, \{ max: ENDURANCE_CHART_PICK_MAX \}\)\s*: t\(`endurance\.chartInfoEmpty\$\{kind\}`\)/);
+  });
+
   it("aucune animation CSS infinie", () => {
     expect(CSS).not.toMatch(/animation\s*:/);
     expect(CSS).not.toContain("infinite");
