@@ -28,7 +28,7 @@ function ResultSide({ side }: Readonly<{ side: TickerResultSide }>) {
           {mark}
         </i>
       ) : null}
-      <span className={styles.name}>{side.name}</span>
+      <span>{side.name}</span>
       {side.sr ? <span className="sr-only"> ({side.sr})</span> : null}{" "}
       <b className={styles.score}>{side.score}</b>
     </span>
@@ -47,7 +47,7 @@ function TickerEntry({ item }: Readonly<{ item: TickerItem }>) {
           <i className={styles.mark} aria-hidden="true">
             ▲
           </i>
-          <span className={styles.name}>{item.name}</span>
+          <span>{item.name}</span>
         </span>
       </>
     );

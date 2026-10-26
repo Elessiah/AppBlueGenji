@@ -670,6 +670,8 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
     const db = await getDatabase();
     const entries: TickerEntry[] = [];
 
+    // Un résultat oppose deux engagés : une exemption (`is_bye`) ou une case
+    // restée vide n'en est pas un — le bandeau affichait « Équipe #null 0 ».
     const [resultRows] = await db.execute<MatchResultRow[]>(
       `SELECT
         m.updated_at,
@@ -688,6 +690,9 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
        LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
        LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
        WHERE m.status = 'COMPLETED'
+         AND m.is_bye = FALSE
+         AND m.team1_id IS NOT NULL
+         AND m.team2_id IS NOT NULL
        ORDER BY m.updated_at DESC
        LIMIT 3`,
     );
