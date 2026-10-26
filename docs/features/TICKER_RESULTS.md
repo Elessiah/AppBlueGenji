@@ -26,14 +26,18 @@ composant n'en connaît aucun.
 L'issue est lue **côté serveur** sur le résultat enregistré
 (`tickerOutcomes`) : `winner_team_id`, `forfeit_team_id`, `double_forfeit` de
 `bg_matches` — jamais devinée d'après les scores. Double forfait : deux
-`forfeit`, et **aucun score** (`score: null`, la base n'en garde pas) : le
-bandeau n'affiche pas un « 0 — 0 » de match joué. Sans vainqueur enregistré, ou vainqueur étranger au match : deux
+`forfeit`, et **aucun score** (`score: null`, même si une ancienne ligne garde
+un 0-0) : le bandeau n'affiche pas un « 0 — 0 » de match joué. Un forfait
+nominatif se lit avant le vainqueur (son adversaire l'emporte) et se chiffre,
+comme sur les fiches (`forfeitAwareMapScore`), au score plein du format du
+tournoi (`tickerScores`, `forfeitMapCount` : FT3 → 3-0, saisie libre → 1-0) —
+les forfaits antérieurs à la règle n'ont rien en colonnes. Sans vainqueur enregistré, ou vainqueur étranger au match : deux
 `none`. Une case vide (exemption, engagé retiré) est `none`, jamais un perdant.
 La requête ne retient que les matchs entre **deux engagés** (`is_bye = FALSE`,
 `team1_id` et `team2_id` non nuls) : une exemption terminée s'affichait
 « Équipe #null 0 — Équipe B 1 ».
-Aucune donnée nouvelle n'est collectée : trois colonnes déjà publiques (le
-vainqueur d'un match se voit sur la fiche du tournoi) rejoignent la requête.
+Aucune donnée nouvelle n'est collectée : trois colonnes déjà publiques et le
+format de match du tournoi (le vainqueur d'un match se voit sur la fiche du tournoi) rejoignent la requête.
 
 Noms : forme affichable (`visibleText`, `UNTRUSTED_NAMES.md`), repli
 « Équipe #id » / « Team #id » quand la ligne a disparu ou que le nom ne garde
@@ -77,7 +81,8 @@ chaînes et objets. Aucun client du site ni du bot ne lit cette route.
 ## Tests
 
 - `tests/lib/shared/ticker-items.test.ts` — issue de chaque camp (tranché,
-  forfait, double forfait, nul, case vide), texte brut d'une entrée ;
+  forfait, double forfait, nul, case vide), scores affichés (forfait au score
+  plein, double forfait sans score), texte brut d'une entrée ;
 - `tests/lib/server/landing-ticker-results.test.ts` — requête, issue et mots
   masqués FR / EN, nom affichable et repli, champions ;
 - `tests/lib/server/landing-ticker-i18n.test.ts` — phrases visibles
