@@ -5,6 +5,7 @@ import {
   ABOUT_STAT_VALUE_MAX,
   FALLBACK_ABOUT_STATS,
   aboutStatErrorMessage,
+  aboutStatValue,
   localizedAboutStats,
   validateAboutStatInput,
   type AboutStat,
@@ -13,7 +14,7 @@ import {
 describe("validateAboutStatInput", () => {
   it("accepts a valid input", () => {
     const result = validateAboutStatInput({ labelEn: "Label", value: "100%", label: "Bénévole" });
-    expect(result).toEqual({ ok: true, value: { value: "100%", label: "Bénévole", labelEn: "Label" } });
+    expect(result).toEqual({ ok: true, value: { value: "100%", valueEn: null, label: "Bénévole", labelEn: "Label" } });
   });
 
   it("trims value and label", () => {
@@ -70,19 +71,76 @@ describe("validateAboutStatInput — anglais du titre (lot 5b, D9)", () => {
   });
 });
 
+describe("validateAboutStatInput — valeur anglaise (facultative)", () => {
+  const base = { value: "€4 200", label: "Prizepool", labelEn: "Prize pool" };
+
+  it("rogne la valeur anglaise", () => {
+    const result = validateAboutStatInput({ ...base, valueEn: "  €4,200  " });
+    expect(result).toEqual({
+      ok: true,
+      value: { value: "€4 200", valueEn: "€4,200", label: "Prizepool", labelEn: "Prize pool" },
+    });
+  });
+
+  it("vide, absente ou non textuelle → null", () => {
+    for (const valueEn of ["", "   ", null, undefined, 42 as unknown as string]) {
+      const result = validateAboutStatInput({ ...base, valueEn });
+      expect(result.ok && result.value.valueEn).toBeNull();
+    }
+  });
+
+  it("accepte la longueur maximale, refuse au-delà", () => {
+    const max = validateAboutStatInput({ ...base, valueEn: "v".repeat(ABOUT_STAT_VALUE_MAX) });
+    expect(max.ok && max.value.valueEn).toHaveLength(ABOUT_STAT_VALUE_MAX);
+    expect(validateAboutStatInput({ ...base, valueEn: "v".repeat(ABOUT_STAT_VALUE_MAX + 1) })).toEqual({
+      ok: false,
+      error: "VALUE_EN_TOO_LONG",
+    });
+  });
+
+  it("une valeur française absente prime sur l'anglaise", () => {
+    expect(validateAboutStatInput({ ...base, value: "", valueEn: "€0" })).toEqual({ ok: false, error: "VALUE_REQUIRED" });
+  });
+
+  it("désigne son champ et a sa phrase", () => {
+    expect(ABOUT_STAT_FIELD_ERRORS.VALUE_EN_TOO_LONG).toBe("valueEn");
+    expect(aboutStatErrorMessage("VALUE_EN_TOO_LONG", "x")).toBe(
+      `Valeur anglaise trop longue (${ABOUT_STAT_VALUE_MAX} caractères maximum).`,
+    );
+  });
+});
+
 describe("localizedAboutStats", () => {
   const stats: AboutStat[] = [
-    { id: 1, value: "12", label: "Arbitres", labelEn: "Referees" },
-    { id: 2, value: "0 €", label: "Frais", labelEn: null },
+    { id: 1, value: "12", valueEn: null, label: "Arbitres", labelEn: "Referees" },
+    { id: 2, value: "0 €", valueEn: "Free", label: "Frais", labelEn: null },
+    { id: 3, value: "€4 200", valueEn: "€4,200", label: "Prizepool", labelEn: "Prize pool" },
   ];
 
   it("sous /en, seuls les chiffres traduits, dans leur anglais", () => {
-    expect(localizedAboutStats(stats, "en")).toEqual([{ stat: stats[0], label: "Referees", index: 0 }]);
-    expect(localizedAboutStats(stats, "fr").map((s) => s.label)).toEqual(["Arbitres", "Frais"]);
+    expect(localizedAboutStats(stats, "en")).toEqual([
+      { stat: stats[0], value: "12", label: "Referees", index: 0 },
+      { stat: stats[2], value: "€4,200", label: "Prize pool", index: 2 },
+    ]);
+    expect(localizedAboutStats(stats, "fr").map((s) => s.label)).toEqual(["Arbitres", "Frais", "Prizepool"]);
   });
 
-  it("les chiffres de secours ont leur anglais", () => {
-    expect(localizedAboutStats(FALLBACK_ABOUT_STATS, "en")).toHaveLength(FALLBACK_ABOUT_STATS.length);
+  it("en français, toujours la valeur française", () => {
+    expect(localizedAboutStats(stats, "fr").map((s) => s.value)).toEqual(["12", "0 €", "€4 200"]);
+  });
+
+  it("sous /en, la valeur anglaise, ou la française à défaut", () => {
+    expect(aboutStatValue({ value: "12", valueEn: null }, "en")).toBe("12");
+    expect(aboutStatValue({ value: "12", valueEn: "   " }, "en")).toBe("12");
+    expect(aboutStatValue({ value: "0 €", valueEn: " €0 " }, "en")).toBe("€0");
+    expect(aboutStatValue({ value: "0 €", valueEn: "€0" }, "fr")).toBe("0 €");
+  });
+
+  it("les chiffres de secours ont leur anglais, valeurs à l'anglaise", () => {
+    const en = localizedAboutStats(FALLBACK_ABOUT_STATS, "en");
+    expect(en).toHaveLength(FALLBACK_ABOUT_STATS.length);
+    expect(en.map((s) => s.value)).toEqual(["100%", "€4,200", "12", "€0"]);
+    expect(localizedAboutStats(FALLBACK_ABOUT_STATS, "fr").map((s) => s.value)).toEqual(["100%", "€4 200", "12", "0 €"]);
   });
 
   it("phrase un refus d'anglais", () => {

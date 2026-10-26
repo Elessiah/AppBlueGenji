@@ -33,7 +33,7 @@ describe("GET /api/association/about-stats", () => {
   });
 
   it("returns the public list without auth", async () => {
-    const stats = [{ id: 1, value: "100%", label: "Bénévole", labelEn: null }];
+    const stats = [{ id: 1, value: "100%", valueEn: null, label: "Bénévole", labelEn: null }];
     jest.mocked(service.listAboutStats).mockResolvedValue(stats);
 
     const res = await GET();
@@ -64,12 +64,34 @@ describe("POST /api/association/about-stats", () => {
 
   it("creates a stat for admins", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
-    const stat = { id: 5, value: "X", label: "Y", labelEn: null };
+    const stat = { id: 5, value: "X", valueEn: null, label: "Y", labelEn: null };
     jest.mocked(service.createAboutStat).mockResolvedValue(stat);
 
     const res = await POST(jsonReq("POST", { value: "X", label: "Y" }));
     expect(res.status).toBe(201);
     expect(await res.json()).toEqual({ stat });
+    expect(service.createAboutStat).toHaveBeenCalledWith(expect.objectContaining({ valueEn: null }));
+  });
+
+  it("carries the English value to the service and back", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    const stat = { id: 6, value: "0 €", valueEn: "€0", label: "Frais", labelEn: "Fee" };
+    jest.mocked(service.createAboutStat).mockResolvedValue(stat);
+
+    const res = await POST(jsonReq("POST", { value: "0 €", valueEn: "€0", label: "Frais", labelEn: "Fee" }));
+    expect(res.status).toBe(201);
+    expect(service.createAboutStat).toHaveBeenCalledWith(expect.objectContaining({ valueEn: "€0" }));
+    expect(await res.json()).toEqual({ stat });
+  });
+
+  it("drops a non-text English value and returns the validation code", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createAboutStat).mockRejectedValue(new Error("VALUE_EN_TOO_LONG"));
+
+    const res = await POST(jsonReq("POST", { value: "X", valueEn: 42, label: "Y", labelEn: "Y" }));
+    expect(service.createAboutStat).toHaveBeenCalledWith(expect.objectContaining({ valueEn: null }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "VALUE_EN_TOO_LONG" });
   });
 
   it("returns 400 with the validation error message", async () => {
@@ -105,12 +127,13 @@ describe("PUT /api/association/about-stats/[id]", () => {
 
   it("updates a stat for admins", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
-    const stat = { id: 3, value: "X", label: "Y", labelEn: null };
+    const stat = { id: 3, value: "X", valueEn: "X en", label: "Y", labelEn: null };
     jest.mocked(service.updateAboutStat).mockResolvedValue(stat);
 
-    const res = await PUT(jsonReq("PUT", { value: "X", label: "Y" }), params("3"));
+    const res = await PUT(jsonReq("PUT", { value: "X", valueEn: "X en", label: "Y" }), params("3"));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ stat });
+    expect(service.updateAboutStat).toHaveBeenCalledWith(3, expect.objectContaining({ valueEn: "X en" }));
   });
 
   it("returns 404 when the stat does not exist", async () => {
