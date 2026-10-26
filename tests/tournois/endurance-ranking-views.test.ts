@@ -9,6 +9,7 @@ import {
   enduranceViewBaseRound,
   enduranceViewColumnRound,
   enduranceViewKey,
+  endurancePlayoffMatchTotal,
   nextScheduledMatch,
   pendingEntrantCount,
   playoffCutIndex,
@@ -224,6 +225,23 @@ describe("enduranceRankingViews — la liste des vues", () => {
     expect(pointsAfterRound(forfeit, 1, 9)).toBe(9);
     const rows = enduranceRankingRows({ kind: "ROUND", round: 5 }, meta([out], { rounds: [1, 2, 3, 4, 5] }), []);
     expect(rows[0].points).toBe(7);
+  });
+
+  it("play-offs : compte les rencontres de l'arbre complet, pas les seules posées", () => {
+    const off = PLAYOFF_ROUND_OFFSET;
+    const quarters = [1, 2, 3, 4].map((n) => pending(100 + n, off, n, 9 - n));
+    // Quarts seuls posés : 4 quarts + 2 demies + finale + petite finale.
+    expect(endurancePlayoffMatchTotal(quarters)).toBe(8);
+    const semis = [pending(201, off + 1, 1, 2), pending(202, off + 1, 3, 4)];
+    expect(endurancePlayoffMatchTotal([...quarters, ...semis])).toBe(8);
+    const final = pending(301, off + 2, 1, 3);
+    const third = bracketMatch({ ...pending(302, off + 2, 2, 4), bracket: "THIRD_PLACE" });
+    expect(endurancePlayoffMatchTotal([...quarters, ...semis, final, third])).toBe(8);
+    // Demi-finales d'entrée (plateau de 4) : 2 + finale + petite finale.
+    expect(endurancePlayoffMatchTotal(semis)).toBe(4);
+    // Une petite finale absente (double forfait) ne se rajoute pas une fois la finale posée.
+    expect(endurancePlayoffMatchTotal([...semis, final])).toBe(3);
+    expect(endurancePlayoffMatchTotal([])).toBe(0);
   });
 
   it("retombe sur le Général pour une clé disparue sans manche close", () => {

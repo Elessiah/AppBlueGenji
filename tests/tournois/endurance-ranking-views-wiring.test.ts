@@ -222,3 +222,10 @@ describe("EnduranceRoundPanels — ordre et ouverture", () => {
     expect(PANELS).toContain("openedByHand.current.delete(round);");
   });
 });
+
+describe("EnduranceCard — bandeau des play-offs", () => {
+  it("compte l'arbre complet, pas les seuls tours posés (la barre ne recule pas)", () => {
+    expect(CARD).toContain("total: endurancePlayoffMatchTotal(playoffs)");
+    expect(CARD).not.toContain("total: playoffs.length");
+  });
+});
