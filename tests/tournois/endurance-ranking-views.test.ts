@@ -389,6 +389,7 @@ describe("enduranceRoundColumnCell — la colonne « MANCHE n » (variante A)", 
     expect(enduranceRoundColumnCell(team1, 2, MATCHES, 9)).toEqual({
       kind: "PLAYED",
       delta: -3,
+      penalty: 0,
       ownScore: 0,
       opponentScore: 3,
       opponentId: 4,
@@ -401,6 +402,16 @@ describe("enduranceRoundColumnCell — la colonne « MANCHE n » (variante A)", 
   it("variation pénalité comprise", () => {
     const team4 = STANDINGS.find((s) => s.teamId === 4)!;
     expect(enduranceRoundColumnCell(team4, 2, MATCHES, 9)).toMatchObject({ delta: 2 });
+  });
+
+  it("dit la pénalité de la manche à côté de la variation qui la compte", () => {
+    const penalized = row(5, {
+      points: 7,
+      rounds: [{ round: 1, kind: "POINTS", points: 7, penalty: 5, rank: 1, wins: 1, losses: 0, draws: 0 }],
+    });
+    const win = played(900, 1, 5, 6, 3, 0);
+    // 9 + 3 (3-0) − 5 (pénalité) = 7 : « −2 », dont −5 de pénalité.
+    expect(enduranceRoundColumnCell(penalized, 1, [win], 9)).toMatchObject({ kind: "PLAYED", delta: -2, penalty: 5 });
   });
 
   it("rencontre à jouer : date et adversaire", () => {

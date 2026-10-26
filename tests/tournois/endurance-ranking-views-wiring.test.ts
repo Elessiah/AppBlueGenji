@@ -229,3 +229,10 @@ describe("EnduranceCard — bandeau des play-offs", () => {
     expect(CARD).not.toContain("total: playoffs.length");
   });
 });
+
+describe("EnduranceRankingViews — pénalité de la manche", () => {
+  it("la case « MANCHE n » dit la pénalité que sa variation compte", () => {
+    expect(RANKING).toContain("{cell.penalty > 0 && (");
+    expect(RANKING).toContain('t("endurance.cellPenalty", { points: String(cell.penalty) })');
+  });
+});
