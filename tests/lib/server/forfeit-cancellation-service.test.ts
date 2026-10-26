@@ -63,11 +63,11 @@ function setup(options: {
     if (/^SELECT id, .* AS has_input FROM bg_matches WHERE tournament_id/.test(flat)) {
       return [laterIds.map((id, index) => ({ id, has_input: index < (options.committedInputs ?? 0) ? 1 : 0 }))];
     }
-    if (/FOR UPDATE NOWAIT/.test(flat)) {
+    if (/^SELECT id FROM bg_matches WHERE id IN .* FOR UPDATE$/.test(flat)) {
       if (busy > 0) {
         busy -= 1;
-        throw Object.assign(new Error("Lock wait timeout exceeded; try restarting transaction"), {
-          code: "ER_LOCK_WAIT_TIMEOUT",
+        throw Object.assign(new Error("Deadlock found when trying to get lock; try restarting transaction"), {
+          code: "ER_LOCK_DEADLOCK",
         });
       }
       return [laterIds.slice(0, options.laterInputs ?? 0).map((id) => ({ id }))];
@@ -137,12 +137,12 @@ describe("cancelTournamentForfeit", () => {
     expect(publishUpdatedEvent).toHaveBeenCalledTimes(1);
   });
 
-  it("relit les manches postérieures verrouillées par clé primaire, sans attendre ni jointure", async () => {
+  it("relit les manches postérieures verrouillées par clé primaire, sans jointure", async () => {
     const { sqls, params } = setup();
 
     await cancelTournamentForfeit(7, 102);
 
-    const guard = sqls.findIndex((sql) => /FOR UPDATE NOWAIT$/.test(sql));
+    const guard = sqls.findIndex((sql) => /WHERE id IN .* FOR UPDATE$/.test(sql));
     expect(sqls[guard]).toMatch(/^SELECT id FROM bg_matches WHERE id IN \(\?, \?\) AND/);
     expect(sqls[guard]).not.toMatch(/JOIN|FOR SHARE|round_number/);
     expect(params[guard]).toEqual([301, 302]);
@@ -153,7 +153,7 @@ describe("cancelTournamentForfeit", () => {
 
     await expect(cancelTournamentForfeit(7, 102)).rejects.toThrow("FORFEIT_ROUND_PASSED");
 
-    expect(sqls.some((sql) => /NOWAIT/.test(sql))).toBe(false);
+    expect(sqls.some((sql) => /WHERE id IN .* FOR UPDATE$/.test(sql))).toBe(false);
   });
 
   it("sans manche postérieure, ne verrouille aucun match", async () => {
@@ -161,10 +161,10 @@ describe("cancelTournamentForfeit", () => {
 
     await cancelTournamentForfeit(7, 102);
 
-    expect(sqls.some((sql) => /NOWAIT/.test(sql))).toBe(false);
+    expect(sqls.some((sql) => /WHERE id IN .* FOR UPDATE$/.test(sql))).toBe(false);
   });
 
-  it("une manche postérieure occupée défait l'annulation et la rejoue, qui refuse alors", async () => {
+  it("un report en cours (interblocage) défait l'annulation et la rejoue, qui refuse alors", async () => {
     const { connection } = setup({ laterBusy: 1 });
     let attempt = 0;
     connection.beginTransaction.mockImplementation(async () => {
@@ -173,7 +173,7 @@ describe("cancelTournamentForfeit", () => {
     // Au rejeu, le report concurrent est commité : la manche porte sa saisie.
     const execute = connection.execute.getMockImplementation();
     connection.execute.mockImplementation(async (sql: string, values?: unknown) => {
-      if (attempt > 1 && /FOR UPDATE NOWAIT/.test(sql)) return [[{ id: 301 }]];
+      if (attempt > 1 && /WHERE id IN/.test(sql)) return [[{ id: 301 }]];
       return execute!(sql, values);
     });
 
@@ -189,7 +189,7 @@ describe("cancelTournamentForfeit", () => {
     const { connection } = setup();
     const execute = connection.execute.getMockImplementation();
     connection.execute.mockImplementation(async (sql: string, values?: unknown) => {
-      if (/FOR UPDATE NOWAIT/.test(sql)) throw Object.assign(new Error("boom"), { code: "ER_PARSE_ERROR" });
+      if (/WHERE id IN/.test(sql)) throw Object.assign(new Error("boom"), { code: "ER_PARSE_ERROR" });
       return execute!(sql, values);
     });
 

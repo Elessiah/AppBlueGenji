@@ -136,7 +136,7 @@ describe("DELETE /api/admin/tournaments/[id]/forfeits/[teamId]", () => {
   it("rend une contention persistante en refus « réessaie », sans trace d'erreur", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
     jest.mocked(cancelTournamentForfeit).mockRejectedValue(
-      new Error("Deadlock found when trying to get lock (later round busy)"),
+      new Error("Deadlock found when trying to get lock; try restarting transaction"),
     );
     const error = jest.spyOn(console, "error").mockImplementation(() => {});
     const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
@@ -148,5 +148,23 @@ describe("DELETE /api/admin/tournaments/[id]/forfeits/[teamId]", () => {
     expect(error).not.toHaveBeenCalled();
     expect(warn).toHaveBeenCalled();
     expect(sendBotLog).not.toHaveBeenCalled();
+  });
+
+  it("rend un instantané périmé de MariaDB (1020) en refus « réessaie »", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(cancelTournamentForfeit).mockRejectedValue(
+      Object.assign(new Error("Record has changed since last read in table 'bg_matches'"), {
+        code: "ER_CHECKREAD",
+        errno: 1020,
+      }),
+    );
+    const error = jest.spyOn(console, "error").mockImplementation(() => {});
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+
+    const res = await cancel("7", "102");
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: CONCURRENT_UPDATE_RETRY });
+    expect(error).not.toHaveBeenCalled();
   });
 });
