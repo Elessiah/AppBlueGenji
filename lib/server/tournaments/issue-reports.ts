@@ -28,6 +28,8 @@ import { toParticipantType, type ParticipantType } from "@/lib/shared/participan
 import { pushRefereeAlert } from "@/lib/server/bot-integration";
 import { notifyStaff } from "@/lib/server/notify";
 import { issueReportPush } from "@/lib/shared/push-messages";
+import { discordInline } from "@/lib/shared/discord-text";
+import { staffAlertDm } from "@/lib/server/staff-alert-dm";
 import {
   buildIssueReportMessage,
   matchRoundLabel,
@@ -186,7 +188,18 @@ export async function reportTournamentIssue(
   });
   const { discord: alert, pushed } = await notifyStaff({
     topic: "REFEREE_ALERT",
-    discord: () => pushRefereeAlert(alertMessage, "issue-report"),
+    discord: () =>
+      pushRefereeAlert(alertMessage, "issue-report", {
+        // Bilingue : le bot ne connaît pas le compte du site des arbitres. Le
+        // texte du joueur n'est que dans la partie française, telle qu'écrite.
+        dmMessage: staffAlertDm(
+          alertMessage,
+          issueReportPush(
+            { tournamentId, tournamentName: discordInline(String(context.tournament_name)), match },
+            "en",
+          ),
+        ),
+      }),
     // Le texte du joueur reste sur Discord : une notification s'affiche sur un
     // écran verrouillé, elle ne dit que ce qui attend un arbitre, et où.
     push: (locale) =>

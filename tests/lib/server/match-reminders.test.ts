@@ -18,6 +18,7 @@ import { pushDiscordDirectMessages } from "@/lib/server/bot-integration";
 import { pushToUsers, usersReachableByPush } from "@/lib/server/push-subscriptions";
 import { fakePool } from "../../helpers/sql-double";
 import { resolvePush } from "../../helpers/push";
+import { BILINGUAL_DM_SEPARATOR } from "@/lib/shared/dm-language";
 
 const START = new Date("2026-09-10T18:00:00Z");
 const TWELVE_HOURS_BEFORE = new Date("2026-09-10T06:00:00Z");
@@ -201,7 +202,11 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     const messages = sentMessages();
     expect(messages.length).toBeGreaterThan(0);
     for (const message of messages) {
-      expect(message.split("\n").at(-1)).toMatch(/^Tu peux couper ces messages privés dans /);
+      // Langue du compte inconnue du double SQL : message bilingue, chaque partie
+      // finit par la ligne de retrait.
+      const [fr, en] = message.split(BILINGUAL_DM_SEPARATOR);
+      expect(fr.split("\n").at(-1)).toMatch(/^Tu peux couper ces messages privés dans /);
+      expect(en.split("\n").at(-1)).toMatch(/^You can turn off these direct messages in /);
     }
   });
 
@@ -1138,9 +1143,12 @@ describe("announceEntrantsWithdrawn — engagées retirées de leur manche", () 
     try {
       await mockWithdrawnDb();
       await announceEntrantsWithdrawn([DEPARTED]);
-      const message = jest.mocked(pushDiscordDirectMessages).mock.calls[0][0];
-      expect(message.split("\n").at(-1)).toBe(
+      const [fr, en] = jest.mocked(pushDiscordDirectMessages).mock.calls[0][0].split(BILINGUAL_DM_SEPARATOR);
+      expect(fr.split("\n").at(-1)).toBe(
         "Tu peux couper ces messages privés dans ton profil, section Notifications : <https://bluegenji.test/profil#notifications>",
+      );
+      expect(en.split("\n").at(-1)).toBe(
+        "You can turn off these direct messages in your profile, Notifications section: <https://bluegenji.test/en/profil#notifications>",
       );
     } finally {
       if (previous === undefined) delete process.env.APP_URL;

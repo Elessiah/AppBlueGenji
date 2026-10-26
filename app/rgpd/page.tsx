@@ -264,7 +264,8 @@ function RgpdFr({
             ou Blizzard du fournisseur choisi — et d&apos;un pseudo site, attribué d&apos;office à
             la création. Il garde aussi une langue, français ou anglais (le français par défaut),
             posée à la connexion ou choisie dans Mon profil, qui sert à vous écrire vos
-            notifications push (les messages Discord restent en français) : elle n&apos;est pas
+            notifications push et les messages privés Discord du site (les messages des salons Discord
+            restent en français) : elle n&apos;est pas
             facultative, mais vous la changez dans Mon profil (jusqu&apos;à votre prochaine connexion
             faite dans l&apos;autre langue). Sans moyen de connexion, aucun compte ne peut être créé : les pages
             publiques restent lisibles, mais on ne peut ni rejoindre une équipe ni
@@ -996,12 +997,18 @@ function RgpdFr({
               faite dans l&apos;autre langue. Ce point ne dépend pas de votre accord : le site garde ce seul
               choix avec tout compte, abonné ou non, le temps du compte, pour vous écrire dans votre langue
               (exécution du service, <Link href="/rgpd/registre#t01">registre, T01</Link>) ; il figure dans l&apos;export de vos données et revient au français si le compte
-              est anonymisé. Les messages Discord, eux, restent en français.
+              est anonymisé. Les messages privés que le site vous envoie sur Discord suivent la même langue
+              (en français puis en anglais quand elle ne peut pas être lue, et pour les alertes adressées au staff — arbitres,
+              direction —, dont le site ne connaît pas les destinataires ; en français seul si les deux ne tiennent pas dans un message) ; le code
+              envoyé par message privé Discord (connexion, certification ou changement du tag) est rédigé par le
+              bot, à qui le site transmet pour cela la langue du compte déjà rattaché à ce compte Discord — en
+              français puis en anglais s&apos;il n&apos;y en a pas. Les messages publiés dans les salons Discord restent en
+              français.
             </li>
           </ul>
           <p id="messages-de-match">
-            <strong>Messages privés Discord de match.</strong> Le bot vous écrit aussi en privé, en
-            français, quand l&apos;horaire d&apos;un de vos matchs est posé, changé ou retiré, pour ses
+            <strong>Messages privés Discord de match.</strong> Le bot vous écrit aussi en privé, dans la
+            langue de votre compte, quand l&apos;horaire d&apos;un de vos matchs est posé, changé ou retiré, pour ses
             rappels (24 h et 10 h avant) et quand vous êtes retiré d&apos;un match — seulement si votre tag
             Discord est <strong>certifié</strong> : un tag non certifié, même rattaché par la connexion Discord,
             n&apos;en reçoit aucun, pour

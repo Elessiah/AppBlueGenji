@@ -523,6 +523,17 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "As before, this reading is based on the performance of the service — running the tournament. The terms of use (“Match contacts” section) say so, with no new version to accept.",
     ],
   },
+  "2026-10-messages-discord-dans-ta-langue": {
+    linkLabels: ["Read the “Push notifications” section"],
+    title: "Discord direct messages in your account's language",
+    summary:
+      "The direct messages the site sends you on Discord (match reminders and times, moderation notices, requests to join your team, data information, login code) are now written in your account's language, French or English — the same as your push notifications.",
+    details: [
+      "For the code sent by Discord direct message (login, certification or change of the tag), the site sends the association's bot the language of the account already linked to that Discord account, and the bot writes the code in that language without keeping it. The other messages are written by the site, as before.",
+      "When the language cannot be read (unknown account, outage), the message is sent once, in French then in English — in French alone when both do not fit in one message. Messages posted in Discord channels stay in French.",
+      "No new data is collected: it's the language already kept with your account, which you change in “My profile”.",
+    ],
+  },
 };
 
 /**

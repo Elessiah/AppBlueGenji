@@ -36,6 +36,7 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { resolveDiscordUser, sendDiscordLoginCode } from "@/lib/server/bot-integration";
+import { accountLocaleForDiscordId } from "@/lib/server/users/account-locale";
 import { isDuplicateEntryError } from "@/lib/server/mysql-errors";
 import type { ConnectionMethod } from "@/lib/shared/account-connections";
 import {
@@ -351,7 +352,11 @@ export async function confirmDiscordVerification(
 async function sendHandleChallenge(discordId: string, tag: string): Promise<CodeSent> {
   const challenge = await createDiscordLoginChallenge(discordId, tag);
   try {
-    await sendDiscordLoginCode(discordId, challenge.code);
+    // Dans la langue du compte **destinataire** — celui qui porte déjà ce
+    // Discord —, jamais dans celle du demandeur : le tag saisi n'est pas encore
+    // prouvé et peut désigner quelqu'un d'autre. Sans compte rattaché, message
+    // bilingue (`BOT_DM_LANGUAGE.md`).
+    await sendDiscordLoginCode(discordId, challenge.code, await accountLocaleForDiscordId(discordId));
   } catch (error) {
     await discardDiscordChallenge(challenge.challengeId).catch(() => {});
     throw error;

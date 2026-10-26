@@ -5,6 +5,7 @@ import {
   requestClientIp,
 } from "@/lib/server/api-guard";
 import { resolveDiscordUser, sendDiscordLoginCode } from "@/lib/server/bot-integration";
+import { accountLocaleForDiscordId } from "@/lib/server/users/account-locale";
 import { fail, ok } from "@/lib/server/http";
 import { rejectCrossSiteRequest } from "@/lib/server/request-origin";
 import { createDiscordLoginChallenge, discardDiscordChallenge } from "@/lib/server/users/discord-challenges";
@@ -79,7 +80,9 @@ export async function POST(req: Request) {
     const challenge = await createDiscordLoginChallenge(discordId, handle);
 
     try {
-      await sendDiscordLoginCode(discordId, challenge.code);
+      // Langue du compte déjà rattaché à ce Discord, sinon message bilingue
+      // (`BOT_DM_LANGUAGE.md`).
+      await sendDiscordLoginCode(discordId, challenge.code, await accountLocaleForDiscordId(discordId));
     } catch (error) {
       // **Un envoi raté n'a produit aucun code**, et la base doit le dire.
       //

@@ -2,9 +2,11 @@
  * Langue du compte (`bg_users.locale`, lot 9-3 de la traduction, décision D5).
  *
  * **Ce qu'elle choisit** : la langue des notifications push que le site envoie
- * au joueur (`lib/server/push-subscriptions.ts`). Les messages privés Discord
- * restent en français (D6) ; les pages, elles, suivent toujours leur adresse
- * (`/en/...`) — la langue du compte ne redirige personne.
+ * au joueur (`lib/server/push-subscriptions.ts`) et celle des messages privés
+ * Discord qui lui sont adressés (`notifyUsers`, code de connexion —
+ * `docs/features/BOT_DM_LANGUAGE.md`) ; les salons Discord restent en français
+ * (D6). Les pages, elles, suivent toujours leur adresse (`/en/...`) — la langue
+ * du compte ne redirige personne.
  *
  * **Comment elle est posée**, règle retenue pour surprendre le moins :
  *
@@ -55,4 +57,35 @@ export async function recordLoginLocale(userId: number, locale: Locale): Promise
 /** Une valeur lue en base (ou absente) ramenée à une langue connue. */
 export function accountLocaleFromRow(value: unknown): Locale {
   return isLocale(value) ? value : DEFAULT_LOCALE;
+}
+
+/**
+ * Langue du compte du site rattaché à ce compte Discord, pour le code de
+ * connexion : `null` sans compte rattaché (première connexion) — message
+ * bilingue. Seul le bot la reçoit, pour rédiger le message : la réponse de la
+ * route n'en dit rien.
+ */
+export async function accountLocaleForDiscordId(discordId: string): Promise<Locale | null> {
+  return readDmLocale(`SELECT locale FROM bg_users WHERE discord_id = ? AND is_deleted = 0 LIMIT 1`, discordId);
+}
+
+async function readDmLocale(sql: string, key: number | string): Promise<Locale | null> {
+  try {
+    const db = await getDatabase();
+    const [rows] = await db.query(sql, [key]);
+    const row = (rows as { locale?: unknown }[])[0];
+    return row ? accountLocaleFromRow(row.locale) : null;
+  } catch (error) {
+    // Le code seul, jamais l'erreur entière : celle de mysql2 porte la requête
+    // avec ses valeurs (`sql`), donc l'identifiant Discord de la personne visée.
+    console.error("[account-locale] langue du compte illisible, message privé bilingue", dbErrorCode(error));
+    return null;
+  }
+}
+
+/** Code d'une erreur de base (`ER_BAD_FIELD_ERROR`…), sans son texte ni sa requête. */
+function dbErrorCode(error: unknown): string {
+  const code = (error as { code?: unknown } | null)?.code;
+  if (typeof code === "string") return code;
+  return error instanceof Error ? error.name : "UNKNOWN";
 }

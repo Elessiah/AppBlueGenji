@@ -141,7 +141,7 @@
   "saved": "Profile updated.",
   "accountLocale": {
     "label": "Notification language",
-    "hint": "Your push notifications arrive in this language. It takes the page's language again each time you log in.",
+    "hint": "Your push notifications and the site's Discord direct messages arrive in this language. It takes the page's language again each time you log in.",
     "saved": "Notification language saved."
   },
   "matchDms": {

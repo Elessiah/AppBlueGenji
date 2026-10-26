@@ -15,6 +15,8 @@
 import { hasTeamManagementRole } from "./team-roles";
 import type { TeamRole } from "./types";
 import { discordInline } from "./discord-text";
+import { localizedSiteUrl } from "./dm-language";
+import type { Locale } from "./locales";
 
 /**
  * Une même personne ne fait écrire le bot à une même équipe qu'une fois par
@@ -99,7 +101,13 @@ export function shouldNotifyTeamJoinRequest(input: { toThisTeam: number; toAnyTe
  * Discord du site (`docs/features/RGPD_LOGS_AND_VISITS.md`) : le demandeur se
  * lit sur la fiche de l'équipe, où mène le lien, derrière une connexion.
  */
-export function formatTeamJoinRequestNotice(input: { teamName: string; url: string }): string {
+export function formatTeamJoinRequestNotice(input: { teamName: string; url: string }, locale: Locale = "fr"): string {
+  if (locale === "en") {
+    return (
+      `📨 BlueGenji — A player is asking to join your team “${discordInline(input.teamName)}”. ` +
+      `Accept or decline the request from the team's page: ${localizedSiteUrl(input.url, locale)}`
+    );
+  }
   return (
     `📨 BlueGenji — Un joueur demande à rejoindre ton équipe « ${discordInline(input.teamName)} ». ` +
     `Accepte ou refuse sa demande depuis la fiche de l'équipe : ${input.url}`

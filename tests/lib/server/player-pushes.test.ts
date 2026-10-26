@@ -77,6 +77,7 @@ beforeEach(() => {
   );
   jest.mocked(notifyUsers).mockImplementation(async (recipients) => ({
     discord: { sent: 0, unresolved: [], failed: [] },
+    discordUnreachedUserIds: [],
     pushed: recipients.length,
   }));
 });

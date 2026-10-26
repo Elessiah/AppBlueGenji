@@ -321,11 +321,27 @@ describe("bot legal content matches the bot's code and the association", () => {
 
   it("says the site sends the recipient's BlueGenji username with each direct message (legal review #441)", () => {
     expect(flatOf(PRIVACY_POLICY, "fr")).toContain(
-      "un identifiant ou un pseudo Discord, le pseudo BlueGenji du destinataire et le message à remettre",
+      "un identifiant ou un pseudo Discord, le pseudo BlueGenji du destinataire, pour le seul code (connexion, certification ou changement du tag Discord) la langue du compte BlueGenji déjà rattaché à ce compte Discord",
     );
     expect(flatOf(PRIVACY_POLICY, "en")).toContain(
-      "a Discord ID or username, the recipient's BlueGenji username and the message to deliver",
+      "a Discord ID or username, the recipient's BlueGenji username, for the code only (login, certification or change of the Discord tag) the language of the BlueGenji account already linked to that Discord account",
     );
+  });
+
+  it("lists the suspension and avatar notices among the site's direct messages (legal review BOT-NOTIF-LANG)", () => {
+    expect(flatOf(PRIVACY_POLICY, "fr")).toContain("avatar masqué, retiré ou rétabli, suspension de votre compte ou sa levée");
+    expect(flatOf(PRIVACY_POLICY, "en")).toContain("an avatar hidden, removed or restored, the suspension of your account or its lifting");
+  });
+
+  it("says direct messages follow the account language, bilingual when unknown, channels in French (BOT-NOTIF-LANG)", () => {
+    expect(flatOf(PRIVACY_POLICY, "fr")).toContain(
+      "Les messages privés du site partent dans la langue du compte BlueGenji du destinataire, ou en un seul message en français puis en anglais quand elle n'est pas connue",
+    );
+    expect(flatOf(PRIVACY_POLICY, "fr")).toContain("les messages publiés dans les salons restent en français");
+    expect(flatOf(PRIVACY_POLICY, "en")).toContain(
+      "The website's direct messages are written in the language of the recipient's BlueGenji account, or as a single message in French then in English when it is not known",
+    );
+    expect(flatOf(PRIVACY_POLICY, "en")).toContain("messages posted in channels stay in French");
   });
 
   it("informs rather than binds: the policy is never 'accepted' by use", () => {
@@ -489,7 +505,7 @@ describe("politique du bot — pseudo solo dans #live et messages de match (RGPD
     // Retention of the #live post, as on the site (T16).
     expect(fr).toContain("**Annonces #live** (message de la soirée des matchs diffusés : noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs) : gardées dans le salon tant qu'il existe, même après la suppression du compte du joueur");
     expect(en).toContain("**#live announcements** (evening message of the streamed matches: team names or, in a solo tournament, the players' public BlueGenji username): kept in the channel as long as it exists, even after the player's account is deleted");
-    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["20 octobre 2026", "20 October 2026"]);
+    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["27 octobre 2026", "27 October 2026"]);
   });
 });
 

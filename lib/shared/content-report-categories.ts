@@ -1,4 +1,6 @@
 import { discordInline } from "./discord-text";
+import { localizedSiteUrl } from "./dm-language";
+import type { Locale } from "./locales";
 import {
   OFF_SITE_CONDUCT_ICON,
   REPORT_CATEGORY_RULES,
@@ -124,7 +126,17 @@ export function formatReportAlert(input: {
  * qui est visé. Il dit ce qui est en cause (la catégorie), qu'aucune décision
  * n'est prise, et comment répondre.
  */
-export function formatTargetNotice(input: { category: ReportCategory; url: string }): string {
+export function formatTargetNotice(
+  input: { category: ReportCategory; url: string; /** Libellé anglais de la catégorie (`reports.json`). */ labelEn?: string },
+  locale: Locale = "fr",
+): string {
+  if (locale === "en") {
+    return (
+      `⚠️ BlueGenji — A report (${input.labelEn ?? REPORT_CATEGORY_DEFINITIONS[input.category].label}) concerns you or your team. ` +
+      `The association is reviewing it: no decision has been made at this stage. ` +
+      `Read it and, if it is unfounded, appeal it here: ${localizedSiteUrl(input.url, locale)}`
+    );
+  }
   const label = REPORT_CATEGORY_DEFINITIONS[input.category].label;
   return (
     `⚠️ BlueGenji — Un signalement (${label}) te concerne, toi ou ton équipe. ` +

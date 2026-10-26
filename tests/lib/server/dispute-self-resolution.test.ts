@@ -66,7 +66,7 @@ beforeEach(() => {
     return [row ? [row] : [], undefined];
   });
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
-  jest.mocked(notifyStaff).mockResolvedValue({ discord: null, pushed: 2 });
+  jest.mocked(notifyStaff).mockResolvedValue({ discord: null, pushed: 2, discordUnreachedUserIds: [] });
 });
 
 describe("l'arbitre joue-t-il la manche ?", () => {
@@ -221,7 +221,7 @@ describe("alertSelfResolvedDispute", () => {
   });
 
   it("seul membre du staff : personne à prévenir, le geste reste journalisé", async () => {
-    jest.mocked(notifyStaff).mockResolvedValue({ discord: null, pushed: 0 });
+    jest.mocked(notifyStaff).mockResolvedValue({ discord: null, pushed: 0, discordUnreachedUserIds: [] });
 
     await expect(alertSelfResolvedDispute(dispute, actor)).resolves.toBe(true);
     expect(publishStaffAction).toHaveBeenCalledTimes(1);

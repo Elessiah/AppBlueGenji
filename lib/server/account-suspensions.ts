@@ -232,13 +232,13 @@ export async function suspendAccount(
       notifyUsers(recipients, {
         topic: "MODERATION",
         discord: {
-          message: formatSuspensionNotice({
+          message: (locale) => formatSuspensionNotice({
             id: view.id,
             reason: view.reason,
             ground: view.ground,
             endsAt: view.endsAt,
             termsUrl: termsUrl(view.ground),
-          }),
+          }, locale),
           context: "account-suspended",
         },
         push: (locale) => suspensionPush("SUSPENDED", locale),
@@ -274,7 +274,7 @@ export async function liftSuspension(targetUserId: number, actor: StaffActor): P
     .then((recipients) =>
       notifyUsers(recipients, {
         topic: "MODERATION",
-        discord: { message: formatSuspensionLiftedNotice(active.id), context: "account-suspension-lifted" },
+        discord: { message: (locale) => formatSuspensionLiftedNotice(active.id, locale), context: "account-suspension-lifted" },
         push: (locale) => suspensionPush("LIFTED", locale),
       }),
     )

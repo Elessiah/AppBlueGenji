@@ -1022,6 +1022,22 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       { href: "/rgpd#donnees-collectees", label: "Lire la section « Données collectées »" },
     ],
   },
+  {
+    // BOT-NOTIF-LANG : la langue du compte sert aussi aux messages privés
+    // Discord, et part au bot avec le code de connexion — un nouvel usage et un
+    // nouveau destinataire de la donnée, à annoncer.
+    id: "2026-10-messages-discord-dans-ta-langue",
+    publishedAt: "2026-10-27",
+    title: "Messages privés Discord dans la langue de ton compte",
+    links: [{ href: "/rgpd#notifications", label: "Lire la section « Notifications push »" }],
+    summary:
+      "Les messages privés que le site t'envoie sur Discord (rappels et horaires de match, avis de modération, demandes d'adhésion à ton équipe, informations sur les données, code de connexion) sont désormais rédigés dans la langue de ton compte, français ou anglais — la même que celle de tes notifications push.",
+    details: [
+      "Pour le code envoyé par message privé Discord (connexion, certification ou changement du tag), le site transmet au bot de l'association la langue du compte déjà rattaché à ce compte Discord, et le bot rédige le code dans cette langue sans la garder. Les autres messages sont rédigés par le site, comme avant.",
+      "Quand la langue ne peut pas être lue (compte inconnu, panne), le message part une seule fois, en français puis en anglais — en français seul si les deux ne tiennent pas dans un message. Les messages publiés dans les salons Discord restent en français.",
+      "Aucune donnée nouvelle n'est collectée : c'est la langue déjà gardée avec ton compte, que tu changes dans « Mon profil ».",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */
@@ -1233,14 +1249,53 @@ export const PRIVACY_DM_MAX_LENGTH = 1800;
  * décider. Borné sous le plafond du bot : au-delà, les derniers changements
  * sont comptés plutôt que coupés au milieu d'une phrase.
  *
+ * @param changes Changements **déjà dans la langue du message**
+ *   (`localizedPrivacyChanges` pour l'anglais).
  * @param siteUrl Adresse absolue du site, `null` si elle n'est pas configurée.
+ * @param locale Langue du message (langue du compte destinataire).
  */
 export function buildPrivacyChangesMessage(
   changes: readonly PrivacyChange[],
   siteUrl: string | null,
+  locale: "fr" | "en" = "fr",
 ): string {
-  return layoutPrivacyChangesMessage(changes, siteUrl).text;
+  return layoutPrivacyChangesMessage(changes, siteUrl, locale).text;
 }
+
+/** En-tête, pied et ligne de reste d'un message privé, par langue. */
+const PRIVACY_DM_FRAME: Record<
+  "fr" | "en",
+  {
+    header: (count: number) => string;
+    footer: (siteUrl: string | null) => string;
+    omitted: (count: number) => string;
+  }
+> = {
+  fr: {
+    header: (count) =>
+      count > 1
+        ? `🔐 **BlueGenji — ${count} changements de nos règles de confidentialité**`
+        : "🔐 **BlueGenji — nos règles de confidentialité ont changé**",
+    footer: (siteUrl) =>
+      `Le détail t'attend à ta prochaine visite${siteUrl ? " sur " + siteUrl : " sur le site"}. Aucun accord ne t'est demandé : ` +
+      "la politique de confidentialité dit comment t'opposer à un traitement ou exercer tes autres droits. Politique complète : " +
+      (siteUrl ? `${siteUrl.replace(/\/$/, "")}/rgpd` : "page « RGPD » du site") +
+      ".",
+    omitted: (count) => `• … et ${count} autre(s) changement(s).`,
+  },
+  en: {
+    header: (count) =>
+      count > 1
+        ? `🔐 **BlueGenji — ${count} changes to our privacy rules**`
+        : "🔐 **BlueGenji — our privacy rules have changed**",
+    footer: (siteUrl) =>
+      `The details are waiting for you on your next visit${siteUrl ? " to " + siteUrl : " to the site"}. No consent is asked of you: ` +
+      "the privacy policy explains how to object to a processing or exercise your other rights. Full policy: " +
+      (siteUrl ? `${siteUrl.replace(/\/$/, "")}/en/rgpd` : "the site's “GDPR” page") +
+      ".",
+    omitted: (count) => `• … and ${count} other change(s).`,
+  },
+};
 
 /**
  * Le message **et** le nombre de changements qu'il nomme, sortis de la même
@@ -1250,19 +1305,12 @@ export function buildPrivacyChangesMessage(
 function layoutPrivacyChangesMessage(
   changes: readonly PrivacyChange[],
   siteUrl: string | null,
+  locale: "fr" | "en" = "fr",
 ): { text: string; named: number } {
-  const header =
-    changes.length > 1
-      ? `🔐 **BlueGenji — ${changes.length} changements de nos règles de confidentialité**`
-      : "🔐 **BlueGenji — nos règles de confidentialité ont changé**";
-  const where = siteUrl ? ` sur ${siteUrl}` : " sur le site";
-  const footer =
-    `Le détail t'attend à ta prochaine visite${where}. Aucun accord ne t'est demandé : ` +
-    "la politique de confidentialité dit comment t'opposer à un traitement ou exercer tes autres droits. Politique complète : " +
-    (siteUrl ? `${siteUrl.replace(/\/$/, "")}/rgpd` : "page « RGPD » du site") +
-    ".";
-
-  const omittedLine = (count: number) => `• … et ${count} autre(s) changement(s).`;
+  const frame = PRIVACY_DM_FRAME[locale];
+  const header = frame.header(changes.length);
+  const footer = frame.footer(siteUrl);
+  const omittedLine = frame.omitted;
   const assemble = (lines: string[], omitted: number) =>
     [header, ...lines, ...(omitted > 0 ? [omittedLine(omitted)] : []), footer].join("\n\n");
 
@@ -1270,7 +1318,7 @@ function layoutPrivacyChangesMessage(
   // mention de ceux qui ne tiendraient plus après lui — reste sous le plafond.
   const lines: string[] = [];
   for (const [index, change] of changes.entries()) {
-    const line = `• **${change.title}** (${formatPrivacyChangeDate(change.publishedAt)}) — ${change.summary}`;
+    const line = `• **${change.title}** (${formatPrivacyChangeDateIn(change.publishedAt, locale)}) — ${change.summary}`;
     if (assemble([...lines, line], changes.length - index - 1).length > PRIVACY_DM_MAX_LENGTH) {
       return { text: assemble(lines, changes.length - index), named: lines.length };
     }
@@ -1296,13 +1344,19 @@ function layoutPrivacyChangesMessage(
 export function privacyChangesForOneMessage(
   changes: readonly PrivacyChange[],
   siteUrl: string | null,
+  english?: readonly PrivacyChange[],
 ): PrivacyChange[] {
   // Le lot se cherche en retirant par la fin : l'en-tête et le pied dépendent
   // du nombre de changements, un lot plus court n'est pas seulement un préfixe
-  // du message plus long.
+  // du message plus long. Avec `english` (les mêmes changements, dans le même
+  // ordre, en anglais), le lot doit tenir **dans les deux langues** : chaque
+  // compte le reçoit dans la sienne (BOT-NOTIF-LANG).
   for (let count = changes.length; count > 1; count -= 1) {
     const batch = changes.slice(0, count);
-    if (layoutPrivacyChangesMessage(batch, siteUrl).named === count) return batch;
+    const fits = layoutPrivacyChangesMessage(batch, siteUrl).named === count;
+    if (fits && (!english || layoutPrivacyChangesMessage(english.slice(0, count), siteUrl, "en").named === count)) {
+      return batch;
+    }
   }
   return changes.slice(0, 1);
 }

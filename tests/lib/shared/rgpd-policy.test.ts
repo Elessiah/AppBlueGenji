@@ -327,11 +327,68 @@ describe("/rgpd — données obligatoires : la langue du compte (revue juridique
 
   it("dit en FR et en EN que tout compte garde une langue, non facultative et modifiable", () => {
     expect(read("app/rgpd/page.tsx")).toMatch(/Il garde aussi une langue, français ou anglais \(le français par défaut\)/);
-    expect(read("app/rgpd/page.tsx")).toMatch(/vos\s+notifications push \(les messages Discord restent en français\)/);
+    // BOT-NOTIF-LANG : la langue sert aussi aux messages privés Discord ; les salons restent en français.
+    expect(read("app/rgpd/page.tsx")).toMatch(
+      /vos\s+notifications push et les messages privés Discord du site \(les messages des salons Discord\s+restent en français\)/,
+    );
+    expect(read("app/rgpd/page.tsx")).toMatch(/Le bot vous écrit aussi en privé, dans la\s+langue de votre compte/);
     expect(read("app/rgpd/page.tsx")).toMatch(/vous la changez dans Mon profil \(jusqu&apos;à votre prochaine connexion\s+faite dans l&apos;autre langue\)/);
     expect(read("app/rgpd/RgpdEn.tsx")).toMatch(/It also keeps a language, French or English \(French by default\)/);
-    expect(read("app/rgpd/RgpdEn.tsx")).toMatch(/your push notifications to you \(Discord messages stay in\s+French\)/);
+    expect(read("app/rgpd/RgpdEn.tsx")).toMatch(
+      /your push notifications and the site&apos;s Discord direct\s+messages to you \(messages in Discord channels stay in French\)/,
+    );
+    expect(read("app/rgpd/RgpdEn.tsx")).toMatch(/The bot also writes to you privately, in your account&apos;s\s+language/);
     expect(read("app/rgpd/RgpdEn.tsx")).toMatch(/you can change it in My profile \(until you next log in from a page\s+in the other language\)/);
+  });
+
+  // Revue juridique BOT-NOTIF-LANG : le code de certification ou de changement
+  // du tag part aussi au bot avec une langue — celle du compte déjà rattaché à
+  // ce Discord, bilingue sans compte — et un bilingue trop long part en français seul.
+  it("dit quel compte donne la langue du code, que T08 la reçoit, et le repli en français seul (FR et EN)", () => {
+    const fr = read("app/rgpd/page.tsx").replace(/\s+/g, " ");
+    expect(fr).toMatch(/le code envoyé par message privé Discord \(connexion, certification ou changement du tag\) est rédigé par le bot/);
+    expect(fr).toMatch(/la langue du compte déjà rattaché à ce compte Discord — en français puis en anglais s&apos;il n&apos;y en a pas/);
+    expect(fr).toMatch(/en français seul si les deux ne tiennent pas dans un message/);
+    expect(fr).toMatch(/et pour les alertes adressées au staff — arbitres, direction —, dont le site ne connaît pas les destinataires/);
+    const en = read("app/rgpd/RgpdEn.tsx").replace(/\s+/g, " ");
+    expect(en).toMatch(/the code sent by Discord direct message \(login, certification or change of the tag\) is written by the bot/);
+    expect(en).toMatch(/account already linked to that Discord account — French then English when there is none/);
+    expect(en).toMatch(/French alone when both do not fit in one message/);
+    expect(en).toMatch(/and for alerts sent to staff — referees, leadership —, whose recipients the site does not know/);
+
+    const items = (list: readonly (typeof PROCESSING_ACTIVITIES)[number][], ref: string) =>
+      list.find((activity) => activity.ref === ref)!.dataCategories.join(" ");
+    expect(items(PROCESSING_ACTIVITIES, "T01")).toMatch(/celle du compte déjà rattaché à ce compte Discord, en français puis en anglais s'il n'y en a pas/);
+    expect(items(PROCESSING_ACTIVITIES_EN, "T01")).toMatch(/the language of the account already linked to that Discord account, French then English when there is none/);
+    expect(items(PROCESSING_ACTIVITIES, "T08")).toMatch(/pour le seul code envoyé en message privé \(connexion, certification ou changement du tag\), la langue du compte du site/);
+    expect(items(PROCESSING_ACTIVITIES_EN, "T08")).toMatch(/for the code sent by direct message only \(login, certification or change of the tag\), the language of the site account/);
+  });
+
+  // Deuxième passe : la langue sert aux messages privés Discord partout où elle est décrite.
+  it("décrit le même usage dans le tableau des données, à la collecte, dans Mon profil et dans T01, T02, T08 (FR et EN)", () => {
+    expect(read("lib/shared/rgpd-policy.ts")).toMatch(/la langue des notifications push et des messages privés Discord du site \(transmise au bot avec le seul code envoyé en message privé\)/);
+    expect(read("lib/shared/rgpd-policy-en.ts")).toMatch(/the language of push notifications and of the site's Discord direct messages \(sent to the bot with the code sent by direct message only\)/);
+    expect(read("messages/fr/login.json")).toMatch(/pour t'écrire dans cette langue tes notifications push et les messages privés Discord du site/);
+    expect(read("messages/en/login.json")).toMatch(/to write your push notifications and the site's Discord direct messages in that language/);
+    expect(read("messages/fr/profile.json")).toMatch(/Tes notifications push et les messages privés Discord du site arrivent dans cette langue/);
+    expect(read("messages/en/profile.json")).toMatch(/Your push notifications and the site's Discord direct messages arrive in this language/);
+
+    const find = (list: readonly (typeof PROCESSING_ACTIVITIES)[number][], ref: string) =>
+      list.find((activity) => activity.ref === ref)!;
+    expect(find(PROCESSING_ACTIVITIES, "T01").recipients).toContain("Bot Discord de l'association (T08) : la langue du compte, avec le seul code envoyé en message privé");
+    expect(find(PROCESSING_ACTIVITIES_EN, "T01").recipients).toContain("The association's Discord bot (T08): the account language, with the code sent by direct message only");
+    expect(find(PROCESSING_ACTIVITIES, "T02").dataCategories).toContain("Langue du compte déjà rattaché à ce compte Discord (T01), lue pour que le bot rédige le code dans cette langue");
+    expect(find(PROCESSING_ACTIVITIES_EN, "T02").dataCategories).toContain("Language of the account already linked to that Discord account (T01), read so that the bot writes the code in that language");
+    const t08 = find(PROCESSING_ACTIVITIES, "T08").subPurposes.join(" ");
+    expect(t08).toMatch(/codes \(rédigés par le bot dans la langue du compte que le site lui transmet\)/);
+    expect(t08).toMatch(/avatar masqué, retiré ou rétabli, suspension du compte et sa levée/);
+    const t08En = find(PROCESSING_ACTIVITIES_EN, "T08").subPurposes.join(" ");
+    expect(t08En).toMatch(/codes \(written by the bot in the account language the site sends it\)/);
+    expect(t08En).toMatch(/avatar hidden, removed or restored, suspension of the account and its lifting/);
+    for (const activities of [PROCESSING_ACTIVITIES, PROCESSING_ACTIVITIES_EN]) {
+      expect(find(activities, "T01").recipients).toHaveLength(find(PROCESSING_ACTIVITIES, "T01").recipients.length);
+      expect(find(activities, "T02").dataCategories).toHaveLength(find(PROCESSING_ACTIVITIES, "T02").dataCategories.length);
+    }
   });
 });
 
@@ -398,7 +455,7 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
   it("le registre du bot (T08) déclare ce que le site lui transmet, comme sa politique", () => {
     const t08 = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T08");
     expect(t08?.dataCategories.join(" ")).toMatch(
-      /Messages du site : identifiant ou pseudo Discord du destinataire, son pseudo BlueGenji[^,]*et le texte du message/,
+      /Messages du site : identifiant ou pseudo Discord du destinataire, son pseudo BlueGenji[^,]*, le texte du message/,
     );
     const t08En = PROCESSING_ACTIVITIES_EN.find((activity) => activity.ref === "T08");
     expect(t08En?.dataCategories.join(" ")).toMatch(/Site messages: the recipient's Discord ID or username, their BlueGenji username/);

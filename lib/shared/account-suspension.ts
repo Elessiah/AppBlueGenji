@@ -27,6 +27,8 @@
  * Module pur, importable partout.
  */
 import { discordInline } from "./discord-text";
+import { localizedSiteUrl } from "./dm-language";
+import type { Locale } from "./locales";
 import { ANONYMOUS_PLAYER_LABEL } from "./log-privacy";
 
 /**
@@ -39,21 +41,24 @@ export const SUSPENSION_GROUNDS: readonly SuspensionGround[] = ["BEHAVIOR", "CON
 
 export const SUSPENSION_GROUND_DEFINITIONS: Record<
   SuspensionGround,
-  { anchor: string; clause: string; label: string }
+  { anchor: string; clause: string; clauseEn: string; label: string }
 > = {
   BEHAVIOR: {
     anchor: "comportement",
     clause: "Comportement",
+    clauseEn: "Conduct",
     label: "Comportement — harcèlement, propos haineux, triche, contournement des protections",
   },
   CONTENT: {
     anchor: "contenus",
     clause: "Contenus publiés par les utilisateurs",
+    clauseEn: "Content published by users",
     label: "Contenus publiés — atteinte aux droits d'un tiers, contenu illicite",
   },
   ACCOUNT: {
     anchor: "compte",
     clause: "Compte",
+    clauseEn: "Account",
     label: "Compte — usurpation, compte prêté ou partagé, pseudo contraire aux règles",
   },
 };
@@ -185,6 +190,24 @@ export function formatSuspensionEnd(endsAt: Date | string): string {
   return `${day} à ${time} (heure de Paris)`;
 }
 
+/** {@link formatSuspensionEnd} en anglais : « October 26, 2026 at 14:00 (Paris time) ». */
+export function formatSuspensionEndEn(endsAt: Date | string): string {
+  const date = typeof endsAt === "string" ? new Date(endsAt) : endsAt;
+  const day = date.toLocaleDateString("en-US", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "Europe/Paris",
+  });
+  const time = date.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: "Europe/Paris",
+  });
+  return `${day} at ${time} (Paris time)`;
+}
+
 /** Échéance d'une suspension : `null` pour une durée indéterminée. */
 export type SuspensionEndsAt = Date | string | null;
 
@@ -210,14 +233,30 @@ export function suspensionContestText(reference: string | null): string {
  * motif est saisi par la modération, invitée par le formulaire à ne citer
  * aucun autre joueur.
  */
-export function formatSuspensionNotice(input: {
-  id: number;
-  reason: string;
-  ground: SuspensionGround;
-  endsAt: SuspensionEndsAt;
-  termsUrl: string;
-}): string {
+export function formatSuspensionNotice(
+  input: {
+    id: number;
+    reason: string;
+    ground: SuspensionGround;
+    endsAt: SuspensionEndsAt;
+    termsUrl: string;
+  },
+  locale: Locale = "fr",
+): string {
   const reference = suspensionReference(input.id);
+  if (locale === "en") {
+    const span = input.endsAt === null ? "indefinitely" : `until ${formatSuspensionEndEn(input.endsAt)}`;
+    return (
+      `⛔ BlueGenji — Your account on the site has been suspended ${span} (decision ${reference}). ` +
+      `Your sessions have been closed and you can no longer log in while the suspension lasts. ` +
+      `Facts found: ${discordInline(input.reason)}. ` +
+      `Decision made by a member of the moderation team, without automated processing. ` +
+      `Grounds: terms of use, “${SUSPENSION_GROUND_DEFINITIONS[input.ground].clauseEn}” — ${localizedSiteUrl(input.termsUrl, locale)}. ` +
+      `Appeal: use “Report a problem” at the bottom of any page of the site, category “Other” (no login needed), ` +
+      `quoting decision ${reference} and leaving a way to reply to you: the association will review its decision. ` +
+      `You can then take the decision to the competent court.`
+    );
+  }
   const clause = SUSPENSION_GROUND_DEFINITIONS[input.ground].clause;
   return (
     `⛔ BlueGenji — Ton compte sur le site a été suspendu ${suspensionSpan(input.endsAt)} (décision ${reference}). ` +
@@ -230,7 +269,10 @@ export function formatSuspensionNotice(input: {
 }
 
 /** Message privé au titulaire d'un compte dont la suspension est levée. */
-export function formatSuspensionLiftedNotice(id: number): string {
+export function formatSuspensionLiftedNotice(id: number, locale: Locale = "fr"): string {
+  if (locale === "en") {
+    return `✅ BlueGenji — The suspension of your account (decision ${suspensionReference(id)}) has been lifted: you can log in to the site again.`;
+  }
   return `✅ BlueGenji — La suspension de ton compte (décision ${suspensionReference(id)}) a été levée : tu peux de nouveau te connecter au site.`;
 }
 

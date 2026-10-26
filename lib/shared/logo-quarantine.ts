@@ -31,6 +31,8 @@
  */
 import { ANONYMOUS_PLAYER_LABEL } from "./log-privacy";
 import { discordInline } from "./discord-text";
+import { localizedSiteUrl } from "./dm-language";
+import type { Locale } from "./locales";
 import { SUSPENSION_REASON_MAX_LENGTH, SUSPENSION_REASON_MIN_LENGTH, cleanModerationReason } from "./account-suspension";
 // Type seul : `content-reports.ts` importe les valeurs de ce module.
 import type { ReportCategory } from "./content-reports";
@@ -186,6 +188,20 @@ export function moderationGroundsFor(category: ReportCategory | null): Moderatio
 /** Ancre des conditions d'utilisation où se lit la clause invoquée (`TERMS_SECTIONS`). */
 export const MODERATION_TERMS_ANCHOR = "contenus";
 
+/** {@link GROUNDS_TEXT} en anglais (« you » vaut pour un joueur comme pour une équipe). */
+const GROUNDS_TEXT_EN: Record<ModerationGrounds, { reason: string; clause: string; answer: string }> = {
+  THIRD_PARTY_RIGHTS: {
+    reason: "presumed infringement of copyright or of a third party's rights",
+    clause: "terms of use, “Content published by users” (whoever publishes an image guarantees they hold the rights to it)",
+    answer: "if you hold the rights to it (your own creation, a licence, the holder's permission), say so",
+  },
+  SITE_RULES: {
+    reason: "image found to breach the site's terms of use",
+    clause: "terms of use, “Content published by users” and “Conduct”",
+    answer: "if you believe the image follows the rules, explain why",
+  },
+};
+
 const GROUNDS_TEXT: Record<
   ModerationGrounds,
   { reason: string; clause: string; answer: { you: string; yall: string } }
@@ -274,6 +290,36 @@ function decisionFacts(input: { fromReport: boolean; staffReason?: string | null
   return "constat de la modération, sans signalement préalable";
 }
 
+/** {@link decisionGroundsText} en anglais. */
+function decisionGroundsTextEn(input: {
+  grounds: ModerationGrounds;
+  fromReport: boolean;
+  termsUrl: string;
+  staffReason?: string | null;
+}): string {
+  const text = GROUNDS_TEXT_EN[input.grounds];
+  let facts = "a moderation finding, without a prior report";
+  if (input.fromReport) {
+    facts = "a report about this image, which you can read with what it alleges on the page given below";
+  } else if (input.staffReason) {
+    facts = `${discordInline(input.staffReason)} (a moderation finding, without a prior report)`;
+  }
+  return (
+    `Grounds: ${text.reason}. Facts found: ${facts}. ` +
+    `Decision made by a member of the moderation team, without automated processing. ` +
+    `Basis: ${text.clause} — ${localizedSiteUrl(input.termsUrl, "en")}.`
+  );
+}
+
+/** {@link redressText} en anglais. */
+function redressTextEn(input: { grounds: ModerationGrounds; url: string | null }): string {
+  const answer = GROUNDS_TEXT_EN[input.grounds].answer;
+  const internal = input.url
+    ? `appeal the decision here: ${localizedSiteUrl(input.url, "en")} — ${answer}`
+    : `write to the association (“Report a problem”, at the bottom of every page) — ${answer}`;
+  return `Appeal: ${internal}. You can also take the decision to the competent court.`;
+}
+
 /**
  * Voies de recours : la contestation auprès de l'association (par la page du
  * signalement, ou par le formulaire hors signalement), puis le juge.
@@ -298,13 +344,25 @@ function redressText(input: { grounds: ModerationGrounds; url: string | null; pl
  * décision et ses motifs, l'échéance et le moyen de l'empêcher — et rien de
  * l'auteur du signalement.
  */
-export function formatLogoHiddenNotice(input: {
-  teamName: string;
-  purgeAfter: Date;
-  url: string;
-  grounds: ModerationGrounds;
-  termsUrl: string;
-}): string {
+export function formatLogoHiddenNotice(
+  input: {
+    teamName: string;
+    purgeAfter: Date;
+    url: string;
+    grounds: ModerationGrounds;
+    termsUrl: string;
+  },
+  locale: Locale = "fr",
+): string {
+  if (locale === "en") {
+    return (
+      `🙈 BlueGenji — The logo of your team “${discordInline(input.teamName)}” has been hidden following a report: ` +
+      `it is no longer online, but it is kept so that it can be restored. ` +
+      `${decisionGroundsTextEn({ grounds: input.grounds, fromReport: true, termsUrl: input.termsUrl })} ` +
+      `Unless you appeal, it will be permanently deleted on ${formatQuarantineDate(input.purgeAfter, "en-US")}. ` +
+      redressTextEn({ grounds: input.grounds, url: input.url })
+    );
+  }
   return (
     `🙈 BlueGenji — Le logo de ton équipe « ${discordInline(input.teamName)} » a été masqué à la suite d'un signalement : ` +
     `il n'est plus en ligne, mais il est conservé pour pouvoir être rétabli. ` +
@@ -335,14 +393,25 @@ export function isImmediateLogoRemoval(view: Pick<LogoQuarantineView, "status" |
  * signalement, le logo n'a pas de page à contester — le message renvoie alors
  * vers l'association.
  */
-export function formatLogoRemovedNotice(input: {
-  teamName: string;
-  url: string | null;
-  grounds: ModerationGrounds;
-  termsUrl: string;
-  /** Motif saisi par la modération, pour un retrait hors signalement. */
-  staffReason?: string | null;
-}): string {
+export function formatLogoRemovedNotice(
+  input: {
+    teamName: string;
+    url: string | null;
+    grounds: ModerationGrounds;
+    termsUrl: string;
+    /** Motif saisi par la modération, pour un retrait hors signalement. */
+    staffReason?: string | null;
+  },
+  locale: Locale = "fr",
+): string {
+  if (locale === "en") {
+    return (
+      `🗑️ BlueGenji — The logo of your team “${discordInline(input.teamName)}” has been deleted by the site's moderation` +
+      `${input.url ? " following a report" : ""}. ` +
+      `${decisionGroundsTextEn({ grounds: input.grounds, fromReport: input.url !== null, termsUrl: input.termsUrl, staffReason: input.staffReason })} ` +
+      redressTextEn({ grounds: input.grounds, url: input.url })
+    );
+  }
   return (
     `🗑️ BlueGenji — Le logo de ton équipe « ${discordInline(input.teamName)} » a été supprimé par la modération du site` +
     `${input.url ? " à la suite d'un signalement" : ""}. ` +
@@ -352,7 +421,10 @@ export function formatLogoRemovedNotice(input: {
 }
 
 /** Message privé aux membres d'une équipe dont le logo est rétabli. */
-export function formatLogoRestoredNotice(input: { teamName: string }): string {
+export function formatLogoRestoredNotice(input: { teamName: string }, locale: Locale = "fr"): string {
+  if (locale === "en") {
+    return `✅ BlueGenji — The logo of your team “${discordInline(input.teamName)}” has been restored: the appeal was accepted.`;
+  }
   return `✅ BlueGenji — Le logo de ton équipe « ${discordInline(input.teamName)} » a été rétabli : la contestation a été acceptée.`;
 }
 
@@ -375,12 +447,24 @@ export function formatLogoHiddenLog(input: { teamName: string; reportId: number;
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Message privé au joueur dont l'avatar vient d'être masqué. */
-export function formatAvatarHiddenNotice(input: {
-  purgeAfter: Date;
-  url: string;
-  grounds: ModerationGrounds;
-  termsUrl: string;
-}): string {
+export function formatAvatarHiddenNotice(
+  input: {
+    purgeAfter: Date;
+    url: string;
+    grounds: ModerationGrounds;
+    termsUrl: string;
+  },
+  locale: Locale = "fr",
+): string {
+  if (locale === "en") {
+    return (
+      `🙈 BlueGenji — Your avatar has been hidden following a report: ` +
+      `it is no longer online, but it is kept so that it can be restored. ` +
+      `${decisionGroundsTextEn({ grounds: input.grounds, fromReport: true, termsUrl: input.termsUrl })} ` +
+      `Unless you appeal, it will be permanently deleted on ${formatQuarantineDate(input.purgeAfter, "en-US")}. ` +
+      redressTextEn({ grounds: input.grounds, url: input.url })
+    );
+  }
   return (
     `🙈 BlueGenji — Ton avatar a été masqué à la suite d'un signalement : ` +
     `il n'est plus en ligne, mais il est conservé pour pouvoir être rétabli. ` +
@@ -395,13 +479,24 @@ export function formatAvatarHiddenNotice(input: {
  * (contenu manifestement illicite) — ou par la modération, hors de tout
  * signalement (`url` alors `null`, comme `formatLogoRemovedNotice`).
  */
-export function formatAvatarRemovedNotice(input: {
-  url: string | null;
-  grounds: ModerationGrounds;
-  termsUrl: string;
-  /** Motif saisi par la modération, pour un retrait hors signalement. */
-  staffReason?: string | null;
-}): string {
+export function formatAvatarRemovedNotice(
+  input: {
+    url: string | null;
+    grounds: ModerationGrounds;
+    termsUrl: string;
+    /** Motif saisi par la modération, pour un retrait hors signalement. */
+    staffReason?: string | null;
+  },
+  locale: Locale = "fr",
+): string {
+  if (locale === "en") {
+    return (
+      `🗑️ BlueGenji — Your avatar has been deleted by the site's moderation` +
+      `${input.url ? " following a report" : ""}. ` +
+      `${decisionGroundsTextEn({ grounds: input.grounds, fromReport: input.url !== null, termsUrl: input.termsUrl, staffReason: input.staffReason })} ` +
+      redressTextEn({ grounds: input.grounds, url: input.url })
+    );
+  }
   return (
     `🗑️ BlueGenji — Ton avatar a été supprimé par la modération du site` +
     `${input.url ? " à la suite d'un signalement" : ""}. ` +
@@ -411,7 +506,8 @@ export function formatAvatarRemovedNotice(input: {
 }
 
 /** Message privé au joueur dont l'avatar est rétabli. */
-export function formatAvatarRestoredNotice(): string {
+export function formatAvatarRestoredNotice(locale: Locale = "fr"): string {
+  if (locale === "en") return `✅ BlueGenji — Your avatar has been restored: the appeal was accepted.`;
   return `✅ BlueGenji — Ton avatar a été rétabli : la contestation a été acceptée.`;
 }
 

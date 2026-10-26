@@ -13,6 +13,7 @@ jest.mock("@/lib/server/named-lock", () => ({
 
 import { getDatabase } from "@/lib/server/database";
 import { pushDiscordDirectMessages, pushLeadershipAlert } from "@/lib/server/bot-integration";
+import { BILINGUAL_DM_SEPARATOR } from "@/lib/shared/dm-language";
 import { listQuarantinesForReports, purgeDueQuarantines } from "@/lib/server/logo-quarantine";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import {
@@ -174,13 +175,19 @@ describe("createReport", () => {
       ],
     );
     await createReport(submission(), { userId: 3, managesTournaments: false });
-    const [message, context] = jest.mocked(pushLeadershipAlert).mock.calls[0];
+    const [message, context, dmMessage] = jest.mocked(pushLeadershipAlert).mock.calls[0];
     expect(context).toBe("content-report");
     expect(message).toContain("Alpha");
     expect(message).toContain("1 joueur");
     expect(message).not.toContain("PseudoSecret");
     expect(message).toContain("https://site.test/admin/signalements?id=12");
     expect(message).toContain("un membre");
+    // Messages privés à la direction : la ligne française, puis l'anglais du push, sans pseudo.
+    expect(message).not.toContain(BILINGUAL_DM_SEPARATOR);
+    const [french, english] = String(dmMessage).split(BILINGUAL_DM_SEPARATOR);
+    expect(french).toBe(message);
+    expect(english).toMatch(/^\*\*.+\*\* — .+ https?:\/\/\S+$/);
+    expect(dmMessage).not.toContain("PseudoSecret");
   });
 
   it("prévient les personnes visées joignables par un moyen prouvé, jamais l'auteur", async () => {

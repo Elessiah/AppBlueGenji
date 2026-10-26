@@ -40,7 +40,8 @@ import {
   type NotificationRecipient,
 } from "@/lib/server/notify";
 import { usersReachableByPush } from "@/lib/server/push-subscriptions";
-import { matchReminderPush, matchScheduleClearedPush, matchWithdrawnPush } from "@/lib/shared/push-messages";
+import { matchReminderPush, matchScheduleClearedPush, matchWithdrawnPush, pushRoundLabel } from "@/lib/shared/push-messages";
+import type { LocalizedDm } from "@/lib/shared/dm-language";
 import {
   CHECK_IN_REMINDER_KEY,
   FIRST_SCHEDULE,
@@ -534,6 +535,7 @@ async function sendToSide(
     teamName: side.teamName,
     opponentName: side.opponentName,
     roundLabel: matchRoundLabel(String(match.bracket), Number(match.round_number), swiss),
+    roundLabelEn: pushRoundLabel(String(match.bracket), Number(match.round_number), "en", swiss),
     startAt,
     solo,
     checkIn,
@@ -555,16 +557,17 @@ async function sendToSide(
   };
 
   // Le contexte dit au bot (et à ses journaux) de quel message il s'agit.
-  let message: string;
+  // Rédigé dans la langue de chaque destinataire (`notifyUsers`).
+  let message: LocalizedDm;
   let discordContext: string;
   if (clearedStartAt) {
-    message = buildMatchScheduleClearedNotice(context);
+    message = (locale) => buildMatchScheduleClearedNotice(context, locale);
     discordContext = "match-schedule-cleared";
   } else if (offset) {
-    message = buildMatchReminderMessage(offset, context);
+    message = (locale) => buildMatchReminderMessage(offset, context, locale);
     discordContext = "match-reminder";
   } else {
-    message = buildMatchScheduleAnnouncement(context, remaining, announcement);
+    message = (locale) => buildMatchScheduleAnnouncement(context, remaining, announcement, locale);
     discordContext = "match-scheduled";
   }
 
@@ -934,6 +937,7 @@ async function sendWithdrawnNotice(
     teamName,
     opponentName,
     roundLabel: matchRoundLabel(match.bracket, match.roundNumber, match.swiss),
+    roundLabelEn: pushRoundLabel(match.bracket, match.roundNumber, "en", match.swiss),
     startAt: departure.heldStartAt,
     solo: match.solo,
   };
@@ -957,8 +961,8 @@ async function sendWithdrawnNotice(
   await notifyUsers(recipients, {
     topic: "MATCH_REMINDER",
     discord: cleared
-      ? { message: buildMatchScheduleClearedNotice(context), context: "match-schedule-cleared" }
-      : { message: buildMatchWithdrawnNotice(context), context: "match-withdrawn" },
+      ? { message: (locale) => buildMatchScheduleClearedNotice(context, locale), context: "match-schedule-cleared" }
+      : { message: (locale) => buildMatchWithdrawnNotice(context, locale), context: "match-withdrawn" },
     push: (locale) => (cleared ? matchScheduleClearedPush(pushSide, locale) : matchWithdrawnPush(pushSide, locale)),
   });
 }

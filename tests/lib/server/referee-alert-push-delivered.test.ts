@@ -64,14 +64,14 @@ beforeEach(() => {
 
 describe("escalade remise par le seul push", () => {
   it("garde la réservation quand Discord est injoignable mais qu'un arbitre a reçu le push", async () => {
-    jest.mocked(notifyStaff).mockResolvedValue({ discord: null, pushed: 2 });
+    jest.mocked(notifyStaff).mockResolvedValue({ discord: null, pushed: 2, discordUnreachedUserIds: [] });
     const execute = await flushEscalation();
     expect(notifyStaff).toHaveBeenCalledTimes(1);
     expect(deletes(execute)).toHaveLength(0);
   });
 
   it("rend la réservation quand personne n'a été joint (ni Discord, ni push)", async () => {
-    jest.mocked(notifyStaff).mockResolvedValue({ discord: null, pushed: 0 });
+    jest.mocked(notifyStaff).mockResolvedValue({ discord: null, pushed: 0, discordUnreachedUserIds: [] });
     const execute = await flushEscalation();
     const released = deletes(execute);
     expect(released).toHaveLength(1);

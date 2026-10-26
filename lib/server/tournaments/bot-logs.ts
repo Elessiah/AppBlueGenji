@@ -40,6 +40,8 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { isBotCircuitOpen, pushRefereeAlert, sendBotLog } from "@/lib/server/bot-integration";
 import { notifyStaff } from "@/lib/server/notify";
 import { refereeAlertPush, type RefereeAlertKind, type RefereeAlertMatch } from "@/lib/shared/push-messages";
+import { discordInline } from "@/lib/shared/discord-text";
+import { staffAlertDm } from "@/lib/server/staff-alert-dm";
 import { notifyTournamentStart } from "./player-pushes";
 import { discardDepartedNotices, flushDepartedNotices } from "./departed-notices";
 import { discardAutoValidatedNotices, flushAutoValidatedNotices } from "./auto-validated-notices";
@@ -364,7 +366,22 @@ export function flushBotLogs(connection: PoolConnection): void {
       try {
         const report = await notifyStaff({
           topic: "REFEREE_ALERT",
-          discord: () => pushRefereeAlert(message, "referee-alert", { honourCircuit: true }),
+          discord: () =>
+            pushRefereeAlert(message, "referee-alert", {
+              honourCircuit: true,
+              // Messages privés aux arbitres : bilingues, le bot ne connaît pas
+              // leur compte du site (`BOT_DM_LANGUAGE.md`).
+              dmMessage: staffAlertDm(
+                message,
+                refereeAlertPush(
+                  message,
+                  refereePushKey(entry),
+                  "en",
+                  refereeAlertKind(entry),
+                  refereeMatch ? { ...refereeMatch, tournamentName: discordInline(refereeMatch.tournamentName) } : null,
+                ),
+              ),
+            }),
           push: (locale) =>
             refereeAlertPush(message, refereePushKey(entry), locale, refereeAlertKind(entry), refereeMatch ?? null),
         });

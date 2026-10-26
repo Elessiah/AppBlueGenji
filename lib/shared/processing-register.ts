@@ -49,7 +49,7 @@ import {
 } from "@/lib/shared/legal-contact";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
-export const REGISTER_UPDATED_AT = "2026-10-22";
+export const REGISTER_UPDATED_AT = "2026-10-27";
 
 /**
  * Durées appliquées par le serveur, et déclarées ici : `lib/server/auth.ts` et
@@ -309,7 +309,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Afficher un profil public (pseudo, avatar, pseudos de jeu selon les réglages de visibilité)",
       "Mettre les joueurs en relation (s'ajouter en jeu, recrutement d'équipe)",
       "Exporter ses données et supprimer son compte depuis « Mon profil » (la suppression aussi depuis la fenêtre d'acceptation des conditions d'utilisation, sans les accepter)",
-      "Rédiger les notifications push dans la langue du compte : celle de la page du site d'où part la dernière connexion (une connexion lancée d'ailleurs, ou par le bouton Google, Discord ou Blizzard depuis un navigateur qui ne l'indique pas (trop ancien, ou qui retire cette indication), ne la change pas ; français par défaut), ou celle choisie dans « Mon profil »",
+      "Rédiger les notifications push et les messages privés Discord du site dans la langue du compte (en français puis en anglais quand elle ne peut pas être lue, en français seul si les deux ne tiennent pas dans un message) : celle de la page du site d'où part la dernière connexion (une connexion lancée d'ailleurs, ou par le bouton Google, Discord ou Blizzard depuis un navigateur qui ne l'indique pas (trop ancien, ou qui retire cette indication), ne la change pas ; français par défaut), ou celle choisie dans « Mon profil »",
       "Garder sur le compte le choix « Ne plus afficher » de la fenêtre des annonces de recrutement urgentes, pour qu'elle ne s'ouvre plus d'elle-même sur les autres appareils du joueur — choix réversible dans « Mon profil »",
       "Proposer une fois, après une connexion par Discord ou Blizzard, la certification du tag Discord à un compte qui ne l'a pas (fenêtre qui ne certifie rien d'elle-même), et garder sur le compte le choix « Ne plus voir » de cette fenêtre",
     ],
@@ -321,7 +321,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Pseudos Overwatch (BattleTag), Marvel Rivals et Discord ; certification du pseudo Discord ; indication d'un BattleTag tiré d'un compte Battle.net rattaché (pastille de la fiche, montrée même BattleTag masqué)",
       "Majorité déclarée (oui / non / non renseignée)",
       "Réglages de visibilité, disponibilité pour le recrutement, rôles sur la plateforme",
-      "Langue du compte (français ou anglais), remise au français à l'anonymisation",
+      "Langue du compte (français ou anglais), remise au français à l'anonymisation ; transmise au bot Discord de l'association (T08) avec le seul code envoyé par message privé Discord (connexion, certification ou changement du tag) — celle du compte déjà rattaché à ce compte Discord, en français puis en anglais s'il n'y en a pas —, que le bot rédige dans cette langue sans la garder",
       "Choix « Ne plus afficher » de la fenêtre des annonces de recrutement urgentes, fait dans cette fenêtre ou en décochant la case de « Mon profil » (jamais choisi / oui / réaffichée depuis « Mon profil » ; un choix fait sur le navigateur avant la connexion, ou pas enregistré sur-le-champ, est reporté sur un compte qui n'a jamais choisi, à la connexion ou à la visite connectée suivante ; réafficher depuis « Mon profil » efface aussi le cookie bg_recr_off de ce navigateur), remis à « jamais choisi » à l'anonymisation",
       "Choix « Ne plus voir » de la fenêtre qui propose la certification du tag Discord (date du choix), effacé à l'anonymisation ; sur la session de connexion, marque « fenêtre encore à proposer » (posée à une connexion par Discord ou Blizzard, levée à la première réponse), effacée avec la session",
       "Aucun nom réel, aucune adresse e-mail, aucun numéro de téléphone, aucune adresse postale",
@@ -337,6 +337,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Parties d'un même match, dans sa seule fenêtre « Contacts » et dans sa fenêtre de lancement (BattleTag même masqué, pour s'ajouter en jeu ; durées du traitement T04)",
       "Joueurs connectés du site : pseudo Discord certifié, si le joueur le rend visible ; pastilles de certification de la fiche (tag Discord certifié, « BattleTag vérifié » — BattleTag tiré d'un compte Battle.net rattaché), même tag masqué, sans le tag",
       "Staff de l'association selon son rôle (administration, arbitrage)",
+      "Bot Discord de l'association (T08) : la langue du compte, avec le seul code envoyé en message privé",
     ],
     transfers: ["Aucun"],
     security: [
@@ -361,6 +362,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Identifiant Discord et pseudo Discord (connexion par code ou par bouton), enregistré sans être certifié — la certification, qui l'expose, est un geste distinct (T04)",
       "Porte de rattachement du compte Discord (bouton OAuth ou code en message privé)",
       "Code de connexion (conservé uniquement sous forme d'empreinte), nombre d'essais",
+      "Langue du compte déjà rattaché à ce compte Discord (T01), lue pour que le bot rédige le code dans cette langue",
       "Adresse IP, en mémoire pour limiter les essais ; celle d'une connexion réussie est écrite au journal des données de connexion (T14), pour la seule obligation légale de l'hébergeur",
     ],
     sensitiveData: "Aucune",
@@ -567,7 +569,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Exclusion d'un utilisateur du relais par la modération — valable pour tout le réseau de serveurs partenaires (modération communautaire), d'où la liste des exclusions ouverte aux administrateurs de chaque serveur",
       "Statistiques d'activité (commande /stats, qui ne montre à chacun que sa propre activité ; tableau de bord du bot)",
       "Confirmation des adhésions à l'association et rappels programmés sur ses serveurs",
-      "Remise des messages rédigés par le site : codes, horaires et rappels de match et avis de retrait d'un match (« Match retiré » ; ces messages de match aux seuls tags Discord certifiés), avis de modération (signalement désignant la personne, logo masqué, retiré ou supprimé), demandes d'adhésion à une équipe et informations sur les données en message privé, sans conservation par le bot ; alertes d'arbitrage, signalements et journal d'activité du site (sans pseudo de joueur) publiés au salon de journal privé du staff, alertes d'arbitrage aussi envoyées aux membres du rôle d'arbitrage de chaque serveur qui en a défini un ; annonce des matchs diffusés publiée dans le salon #live du serveur de l'association, en un message par soirée modifié à chaque début et fin de match, avec une mention @everyone pour la chaîne officielle ou du seul rôle StreamViewer pour toute autre chaîne (noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs — traitement T16)",
+      "Remise des messages du site : codes (rédigés par le bot dans la langue du compte que le site lui transmet), horaires et rappels de match et avis de retrait d'un match (« Match retiré » ; ces messages de match aux seuls tags Discord certifiés), avis de modération (signalement désignant la personne, logo masqué, retiré ou supprimé, avatar masqué, retiré ou rétabli, suspension du compte et sa levée), demandes d'adhésion à une équipe et informations sur les données en message privé, sans conservation par le bot ; alertes d'arbitrage, signalements et journal d'activité du site (sans pseudo de joueur) publiés au salon de journal privé du staff, alertes d'arbitrage aussi envoyées aux membres du rôle d'arbitrage de chaque serveur qui en a défini un ; annonce des matchs diffusés publiée dans le salon #live du serveur de l'association, en un message par soirée modifié à chaque début et fin de match, avec une mention @everyone pour la chaîne officielle ou du seul rôle StreamViewer pour toute autre chaîne (noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs — traitement T16)",
     ],
     legalBasis: "Intérêt légitime (faire fonctionner, modérer et mesurer le relais entre serveurs partenaires) ; les messages du site relèvent de la base de leur traitement d'origine",
     dataSubjects: [
@@ -582,7 +584,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Exclusions : identifiants de l'exclu et du modérateur, date ; identifiants et motif publiés au salon de journal privé du staff, motif copié en message privé au titulaire du bot, pseudos et motif affichés par /ban-list",
       "Configuration : identifiants de serveurs, salons et rôles, invitation, identifiant de l'administrateur qui l'a posée",
       "Adhésions et rappels programmés : identifiant du membre ou du rôle visé et de l'auteur, message, date du prochain envoi (pour une adhésion : sa date de péremption, donc la qualité d'adhérent), fréquence ; attestation d'adhésion remise en message privé sans être conservée",
-      "Messages du site : identifiant ou pseudo Discord du destinataire, son pseudo BlueGenji (repris dans le bilan de remise rendu au site) et le texte du message, transmis par le site et remis sans être enregistrés par le bot ; l'annonce #live, elle, reste publiée dans le salon (traitement T16)",
+      "Messages du site : identifiant ou pseudo Discord du destinataire, son pseudo BlueGenji (repris dans le bilan de remise rendu au site), le texte du message et, pour le seul code envoyé en message privé (connexion, certification ou changement du tag), la langue du compte du site rattaché à ce compte Discord (dans laquelle le bot rédige le code), transmis par le site et remis sans être enregistrés par le bot ; l'annonce #live, elle, reste publiée dans le salon (traitement T16)",
       "Journal technique (salon privé du staff, journaux du serveur) : nom des serveurs qui ajoutent ou retirent le bot, erreurs pouvant citer un identifiant ; le bot n'y écrit plus de pseudo de lui-même, messages antérieurs à cette règle exceptés (le motif libre d'une exclusion ou une erreur de remise d'un message privé peuvent en citer un)",
     ],
     sensitiveData: "Aucune",

@@ -3,6 +3,7 @@ import {
   fetchBotServers,
   fetchBotStats,
   pushDiscordDirectMessages,
+  pushLeadershipAlert,
   pushRefereeAlert,
   pushSiteVisitStats,
   resolveDiscordUser,
@@ -29,7 +30,7 @@ describe("bot-integration", () => {
   it("uses localhost fallback URL when BOT_INTERNAL_URL is missing", async () => {
     const fetchMock = jest.spyOn(global, "fetch").mockResolvedValue(new Response(null, { status: 200 }));
 
-    await sendDiscordLoginCode("123456789", "123456");
+    await sendDiscordLoginCode("123456789", "123456", null);
 
     expect(fetchMock).toHaveBeenCalledWith(
       "http://127.0.0.1:4400/internal/auth/send-code",
@@ -37,12 +38,25 @@ describe("bot-integration", () => {
     );
   });
 
+  it("sends the account locale with the login code, null when unknown", async () => {
+    const fetchMock = jest.spyOn(global, "fetch").mockResolvedValue(new Response(null, { status: 200 }));
+
+    await sendDiscordLoginCode("123456789", "123456", "en");
+    await sendDiscordLoginCode("123456789", "654321", null);
+
+    const bodies = fetchMock.mock.calls.map(([, init]) => JSON.parse(String(init?.body)));
+    expect(bodies).toEqual([
+      { discordId: "123456789", code: "123456", locale: "en" },
+      { discordId: "123456789", code: "654321", locale: null },
+    ]);
+  });
+
   it("uses BOT_INTERNAL_HOST and BOT_INTERNAL_PORT fallback values", async () => {
     process.env.BOT_INTERNAL_HOST = "10.10.10.7";
     process.env.BOT_INTERNAL_PORT = "4510";
     const fetchMock = jest.spyOn(global, "fetch").mockResolvedValue(new Response(null, { status: 200 }));
 
-    await sendDiscordLoginCode("123456789", "123456");
+    await sendDiscordLoginCode("123456789", "123456", null);
 
     expect(fetchMock).toHaveBeenCalledWith(
       "http://10.10.10.7:4510/internal/auth/send-code",
@@ -53,7 +67,7 @@ describe("bot-integration", () => {
   it("throws BOT_INTERNAL_UNREACHABLE when bot API cannot be reached", async () => {
     jest.spyOn(global, "fetch").mockRejectedValue(new Error("ECONNREFUSED"));
 
-    await expect(sendDiscordLoginCode("123456789", "123456")).rejects.toThrow("BOT_INTERNAL_UNREACHABLE");
+    await expect(sendDiscordLoginCode("123456789", "123456", null)).rejects.toThrow("BOT_INTERNAL_UNREACHABLE");
   });
 
   it("throws BOT_INTERNAL_UNAUTHORIZED on 401", async () => {
@@ -64,7 +78,7 @@ describe("bot-integration", () => {
       }),
     );
 
-    await expect(sendDiscordLoginCode("123456789", "123456")).rejects.toThrow("BOT_INTERNAL_UNAUTHORIZED");
+    await expect(sendDiscordLoginCode("123456789", "123456", null)).rejects.toThrow("BOT_INTERNAL_UNAUTHORIZED");
   });
 
   it("throws DISCORD_DM_FAILED when bot reports DM failure", async () => {
@@ -75,7 +89,7 @@ describe("bot-integration", () => {
       }),
     );
 
-    await expect(sendDiscordLoginCode("123456789", "123456")).rejects.toThrow("DISCORD_DM_FAILED");
+    await expect(sendDiscordLoginCode("123456789", "123456", null)).rejects.toThrow("DISCORD_DM_FAILED");
   });
 
   it("resolveDiscordUser returns a numeric id without calling the bot", async () => {
@@ -179,7 +193,7 @@ describe("bot-integration", () => {
       .spyOn(global, "fetch")
       .mockRejectedValue(new DOMException("The operation timed out.", "TimeoutError"));
 
-    await expect(sendDiscordLoginCode("123456789", "123456")).rejects.toThrow(
+    await expect(sendDiscordLoginCode("123456789", "123456", null)).rejects.toThrow(
       "BOT_INTERNAL_UNREACHABLE",
     );
   });
@@ -313,6 +327,23 @@ describe("bot-integration", () => {
         "http://127.0.0.1:4400/internal/notify/dm",
         expect.objectContaining({ method: "POST" }),
       );
+    });
+
+    it("joint le texte bilingue des messages privés sans toucher la ligne du canal, et l'omet sans lui", async () => {
+      const fetchMock = jest.spyOn(global, "fetch").mockResolvedValue(Response.json({ sent: 1 }));
+
+      await pushRefereeAlert("Ligne FR", "issue-report", { dmMessage: "FR + EN" });
+      await pushRefereeAlert("Ligne FR", "issue-report");
+      await pushLeadershipAlert("Alerte FR", "content-report", "FR + EN");
+      await pushLeadershipAlert("Alerte FR", "content-report");
+
+      const bodies = fetchMock.mock.calls.map(([, init]) => JSON.parse(String(init?.body)));
+      expect(bodies).toEqual([
+        { message: "Ligne FR", context: "issue-report", dmMessage: "FR + EN" },
+        { message: "Ligne FR", context: "issue-report" },
+        { message: "Alerte FR", context: "content-report", dmMessage: "FR + EN" },
+        { message: "Alerte FR", context: "content-report" },
+      ]);
     });
 
     it("complète un bilan partiel du bot", async () => {
