@@ -103,9 +103,6 @@ async function replayStandings(
   }
 }
 
-/** Codes d'un verrou refusé sur-le-champ (`NOWAIT`) : MariaDB, puis MySQL 8. */
-const LOCK_BUSY_CODES = new Set(["ER_LOCK_WAIT_TIMEOUT", "ER_LOCK_NOWAIT"]);
-
 /**
  * Une manche postérieure à `round` porte-t-elle une saisie ?
  *
@@ -114,9 +111,10 @@ const LOCK_BUSY_CODES = new Set(["ER_LOCK_WAIT_TIMEOUT", "ER_LOCK_NOWAIT"]);
  * score en cours, l'équipe rentrait et le rejeu suisse réappariait une manche
  * saisie. Les lignes encore vierges sont donc relues **verrouillées**, par clé
  * primaire seulement (les manches postérieures, pas toute la phase ni ses
- * intervalles), et **sans attendre** (`NOWAIT`) : attendre ce report, c'était
- * s'interbloquer avec lui. Une ligne occupée défait l'annulation, qui rend le
- * tournoi au report puis se rejoue (`retryOnDeadlock`) et voit alors le score.
+ * intervalles). Un geste bref sur l'une d'elles (« Prêt », horaire) se laisse
+ * attendre ; un report en cours, qui attend le tournoi, forme un interblocage
+ * que le moteur rompt aussitôt — l'annulation, qui n'a rien écrit, en est la
+ * victime ordinaire et se rejoue (`retryOnDeadlock`) en voyant alors le score.
  * Ces lignes restent verrouillées jusqu'au commit : un « Prêt » de la manche
  * suivante attend la fin du rejeu (geste d'administration rare et court).
  */
@@ -128,8 +126,7 @@ async function laterRoundHasInput(
 ): Promise<boolean> {
   // Les matchs ne naissent que sous le verrou du tournoi, déjà pris : la
   // lecture d'instantané les voit tous. Une saisie déjà commitée y suffit à
-  // refuser, sans rien verrouiller — sinon un rejeu après une ligne occupée se
-  // heurtait au report suivant au lieu de lire celui qui venait d'aboutir.
+  // refuser, sans rien verrouiller.
   const [later] = await connection.execute<(RowDataPacket & { id: number; has_input: number })[]>(
     `SELECT id, ${HAS_SCORE_INPUT_SQL} AS has_input FROM bg_matches
      WHERE tournament_id = ? AND phase_id = ? AND round_number > ?`,
@@ -137,23 +134,13 @@ async function laterRoundHasInput(
   );
   if (later.length === 0) return false;
   if (later.some((row) => Number(row.has_input) === 1)) return true;
-  try {
-    const [rows] = await connection.execute<(RowDataPacket & { id: number })[]>(
-      `SELECT id FROM bg_matches
-       WHERE id IN (${sqlPlaceholders(later.length)}) AND ${HAS_SCORE_INPUT_SQL}
-       FOR UPDATE NOWAIT`,
-      later.map((row) => Number(row.id)),
-    );
-    return rows.length > 0;
-  } catch (error) {
-    const code = (error as { code?: unknown } | null)?.code;
-    if (typeof code !== "string" || !LOCK_BUSY_CODES.has(code)) throw error;
-    // Même remède qu'un interblocage : tout défaire et rejouer.
-    throw Object.assign(new Error("Deadlock found when trying to get lock (later round busy)"), {
-      code: "ER_LOCK_DEADLOCK",
-      cause: error,
-    });
-  }
+  const [rows] = await connection.execute<(RowDataPacket & { id: number })[]>(
+    `SELECT id FROM bg_matches
+     WHERE id IN (${sqlPlaceholders(later.length)}) AND ${HAS_SCORE_INPUT_SQL}
+     FOR UPDATE`,
+    later.map((row) => Number(row.id)),
+  );
+  return rows.length > 0;
 }
 
 /**
