@@ -185,7 +185,7 @@ describe("classement de la ronde suisse", () => {
     // La ligne ne porte plus l'opacité : un parent estompé estomperait le bouton.
     expect(html).not.toMatch(/role="row"[^>]*opacity/);
     // Les sept cellules de données s'estompent, la cellule d'action non.
-    expect(count(forfeitRow, "opacity:0.8")).toBe(7);
+    expect(count(forfeitRow, "opacity:0.9")).toBe(7);
     const actionCell = forfeitRow.slice(forfeitRow.lastIndexOf('role="cell"'));
     expect(actionCell).toContain("Annuler l&#x27;abandon");
     expect(actionCell).not.toContain("opacity");
