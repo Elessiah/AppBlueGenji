@@ -529,8 +529,8 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     summary:
       "The direct messages the site sends you on Discord (match reminders and times, moderation notices, requests to join your team, data information, login code) are now written in your account's language, French or English — the same as your push notifications.",
     details: [
-      "For the Discord login code, the site sends your account's language to the association's bot, which writes the code in that language without keeping it. The other messages are written by the site, as before.",
-      "When the language cannot be read (unknown account, outage), the message is sent once, in French then in English. Messages posted in Discord channels stay in French.",
+      "For the code sent by Discord direct message (login, certification or change of the tag), the site sends the association's bot the language of the account already linked to that Discord account, and the bot writes the code in that language without keeping it. The other messages are written by the site, as before.",
+      "When the language cannot be read (unknown account, outage), the message is sent once, in French then in English — in French alone when both do not fit in one message. Messages posted in Discord channels stay in French.",
       "No new data is collected: it's the language already kept with your account, which you change in “My profile”.",
     ],
   },

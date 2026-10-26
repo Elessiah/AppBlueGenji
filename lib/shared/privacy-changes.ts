@@ -1033,8 +1033,8 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     summary:
       "Les messages privés que le site t'envoie sur Discord (rappels et horaires de match, avis de modération, demandes d'adhésion à ton équipe, informations sur les données, code de connexion) sont désormais rédigés dans la langue de ton compte, français ou anglais — la même que celle de tes notifications push.",
     details: [
-      "Pour le code de connexion par Discord, le site transmet la langue de ton compte au bot de l'association, qui rédige le code dans cette langue sans la garder. Les autres messages sont rédigés par le site, comme avant.",
-      "Quand la langue ne peut pas être lue (compte inconnu, panne), le message part une seule fois, en français puis en anglais. Les messages publiés dans les salons Discord restent en français.",
+      "Pour le code envoyé par message privé Discord (connexion, certification ou changement du tag), le site transmet au bot de l'association la langue du compte déjà rattaché à ce compte Discord, et le bot rédige le code dans cette langue sans la garder. Les autres messages sont rédigés par le site, comme avant.",
+      "Quand la langue ne peut pas être lue (compte inconnu, panne), le message part une seule fois, en français puis en anglais — en français seul si les deux ne tiennent pas dans un message. Les messages publiés dans les salons Discord restent en français.",
       "Aucune donnée nouvelle n'est collectée : c'est la langue déjà gardée avec ton compte, que tu changes dans « Mon profil ».",
     ],
   },
