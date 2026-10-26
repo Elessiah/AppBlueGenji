@@ -113,10 +113,11 @@ pure dans `_lib/endurance-chart.ts`.
 - **Modes** : « Top N » (les N premiers de la manche affichée, les autres
   masqués), « Ma sélection » (8 au plus, état du composant seulement — ni
   stockage local, ni serveur), « Toutes » / « Tous » (palette en boucle).
-  « Effacer la sélection » et « Rejouer l'animation ».
+  « Effacer la sélection » (monté dès « Ma sélection », `aria-disabled` une fois
+  vide : le focus reste sur lui) et « Rejouer l'animation ».
 - **Survol, focus, clic** : un bouton de la légende (au focus comme au survol)
   ou la zone de survol d'une courbe met la courbe en avant et remplit l'encart
-  (nom, « #rang · S seed · bilan », capital manche par manche). Un clic ajoute
+  (nom, « #rang · S seed · bilan » **à l'issue de la manche affichée** — `chartRecordAt`, comme le rang —, capital manche par manche). Un clic ajoute
   ou retire l'engagé de « Ma sélection ». Le clavier passe par la légende.
 - **Palette** : huit jetons froids (`ENDURANCE_CHART_PALETTE` : `--blue-500`,
   `--violet-400`, `--accent-green`, `--pink-400`, `--blue-100`, `--blue-700`,
