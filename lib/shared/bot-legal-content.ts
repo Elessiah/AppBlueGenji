@@ -88,9 +88,11 @@ const LAST_UPDATED_EN = "19 October 2026";
 // l'interrupteur des messages de match (RGPD-DM-SWITCH), la politique seule ;
 // base du pseudo solo, AutoMod et avis « Match retiré » (LEGAL-FOLLOWUP-444),
 // les deux (l'avis « Match retiré » est aussi cité à l'article 01 des conditions) ;
-// messages de match aux seuls tags certifiés (DM-CERTIFIED-ONLY), les deux (article 01).
-const PRIVACY_LAST_UPDATED_FR = "20 octobre 2026";
-const PRIVACY_LAST_UPDATED_EN = "20 October 2026";
+// messages de match aux seuls tags certifiés (DM-CERTIFIED-ONLY), les deux (article 01) ;
+// langue du compte transmise avec le code et messages privés dans cette langue
+// (BOT-NOTIF-LANG), la politique seule.
+const PRIVACY_LAST_UPDATED_FR = "27 octobre 2026";
+const PRIVACY_LAST_UPDATED_EN = "27 October 2026";
 
 const CONTACT_ITEMS_FR = [
   `Formulaire **« ${REPORT_FORM_NAME} »** en bas de chaque page du site (catégorie « RGPD » pour vos données)`,
