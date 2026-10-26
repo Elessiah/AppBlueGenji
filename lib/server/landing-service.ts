@@ -52,6 +52,8 @@ import { toIso } from "@/lib/server/serialization";
 import { getDiscordCommunity } from "@/lib/server/discord-community";
 import { landingServerText } from "@/lib/server/i18n-landing";
 import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
+import { tickerOutcomes, type TickerItem, type TickerOutcome } from "@/lib/shared/ticker-items";
+import { visibleText } from "@/lib/shared/visible-text";
 
 const DEFAULT_SITE_COUNTS: SiteCounts = {
   players: 0,
@@ -529,38 +531,71 @@ type TickerEntry = { sortAt: number } & (
       team2: string | null;
       team2Id: number | null;
       score2: number;
+      winnerTeamId: number | null;
+      forfeitTeamId: number | null;
+      doubleForfeit: boolean;
     }
   | { kind: "registration"; name: string; registered: number; max: number }
   | { kind: "winner"; name: string; winner: string | null; winnerTeamId: number | null }
   | { kind: "news"; title: string }
 );
 
+/** Issue dite au lecteur d'écran, par camp (`docs/features/TICKER_RESULTS.md`). */
+const OUTCOME_SR_KEY = {
+  win: "ticker.srWin",
+  loss: "ticker.srLoss",
+  forfeit: "ticker.srForfeit",
+  none: null,
+} as const satisfies Record<TickerOutcome, string | null>;
+
 /**
- * La phrase d'une entrée, ou `null` quand elle n'a rien à dire dans cette
+ * L'entrée rédigée, ou `null` quand elle n'a rien à dire dans cette
  * langue : un titre d'actualité est saisi en français par le staff, et
  * l'accueil anglais n'en montre aucun (`docs/features/I18N.md` § Accueil).
+ * Un résultat et un champion partent **en données** (camps, issue) : le
+ * bandeau habille vainqueur et perdant (`TICKER_RESULTS.md`).
  */
-function formatTickerEntry(entry: TickerEntry, locale: Locale): string | null {
+function formatTickerEntry(entry: TickerEntry, locale: Locale): TickerItem | null {
   const { t } = landingServerText(locale);
-  const team = (name: string | null, id: number | null) => name ?? t("ticker.teamFallback", { id: String(id) });
+  // Nom saisi par un joueur : forme affichable (`UNTRUSTED_NAMES.md`), repli
+  // « Équipe #id » quand la ligne a disparu ou que le nom ne garde rien.
+  const team = (name: string | null, id: number | null) =>
+    (name === null ? "" : visibleText(name)) || t("ticker.teamFallback", { id: String(id) });
   switch (entry.kind) {
-    case "result":
-      return t("ticker.result", {
-        tournament: entry.tournament,
-        team1: team(entry.team1, entry.team1Id),
-        score1: String(entry.score1),
-        team2: team(entry.team2, entry.team2Id),
-        score2: String(entry.score2),
+    case "result": {
+      const outcomes = tickerOutcomes({
+        team1Id: entry.team1Id,
+        team2Id: entry.team2Id,
+        winnerTeamId: entry.winnerTeamId,
+        forfeitTeamId: entry.forfeitTeamId,
+        doubleForfeit: entry.doubleForfeit,
       });
+      const side = (name: string | null, id: number | null, score: number, outcome: TickerOutcome) => {
+        const key = OUTCOME_SR_KEY[outcome];
+        return { name: team(name, id), score: String(score), outcome, sr: key === null ? null : t(key) };
+      };
+      return {
+        kind: "result",
+        lead: t("ticker.resultLead", { tournament: entry.tournament }),
+        sides: [
+          side(entry.team1, entry.team1Id, entry.score1, outcomes[0]),
+          side(entry.team2, entry.team2Id, entry.score2, outcomes[1]),
+        ],
+        // Nul : aucun camp n'a d'issue propre, la note dit qu'il n'y a pas de vainqueur.
+        sr: outcomes.every((outcome) => outcome === "none") ? t("ticker.srNoWinner") : null,
+      };
+    }
     case "registration":
       return t("ticker.registration", { name: entry.name, registered: String(entry.registered), max: String(entry.max) });
-    case "winner":
-      return t("ticker.winner", {
-        name: entry.name,
-        winner:
-          entry.winner ??
-          (entry.winnerTeamId === null ? t("ticker.unknownChampion") : team(null, entry.winnerTeamId)),
-      });
+    case "winner": {
+      const known = entry.winner !== null || entry.winnerTeamId !== null;
+      return {
+        kind: "champion",
+        lead: t("ticker.winnerLead", { name: entry.name }),
+        name: known ? team(entry.winner, entry.winnerTeamId) : t("ticker.unknownChampion"),
+        known,
+      };
+    }
     default:
       return locale === DEFAULT_LOCALE ? t("ticker.news", { title: entry.title }) : null;
   }
@@ -575,6 +610,9 @@ type MatchResultRow = RowDataPacket & {
   team2_score: number | null;
   team1_id: number | null;
   team2_id: number | null;
+  winner_team_id: number | null;
+  forfeit_team_id: number | null;
+  double_forfeit: number | boolean | null;
 };
 
 type RegistrationRow = RowDataPacket & {
@@ -622,7 +660,7 @@ export async function getLandingTicker(locale: Locale = DEFAULT_LOCALE): Promise
   }
   const items = (entries ?? [])
     .map((entry) => formatTickerEntry(entry, locale))
-    .filter((item): item is string => item !== null)
+    .filter((item): item is TickerItem => item !== null)
     .slice(0, 10);
   return items.length === 0 ? defaultTicker(locale) : { items };
 }
@@ -641,7 +679,10 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
         m.team1_score,
         m.team2_score,
         m.team1_id,
-        m.team2_id
+        m.team2_id,
+        m.winner_team_id,
+        m.forfeit_team_id,
+        m.double_forfeit
        FROM bg_matches m
        JOIN bg_tournaments t ON t.id = m.tournament_id
        LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
@@ -661,6 +702,9 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
         team2: row.team2_name,
         team2Id: row.team2_id,
         score2: Number(row.team2_score ?? 0),
+        winnerTeamId: row.winner_team_id === null ? null : Number(row.winner_team_id),
+        forfeitTeamId: row.forfeit_team_id === null ? null : Number(row.forfeit_team_id),
+        doubleForfeit: Boolean(Number(row.double_forfeit ?? 0)),
         sortAt: new Date(row.updated_at).getTime(),
       })),
     );
