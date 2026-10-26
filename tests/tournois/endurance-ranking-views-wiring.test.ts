@@ -132,6 +132,14 @@ describe("règles transverses", () => {
     expect(RANKING).toContain('aria-label={t("endurance.viewNext")}');
   });
 
+  it("arrivées au bout, les flèches gardent le focus (aria-disabled, jamais disabled)", () => {
+    expect(RANKING).toContain("aria-disabled={prev === null}");
+    expect(RANKING).toContain("aria-disabled={next === null}");
+    expect(RANKING).not.toMatch(/\sdisabled=\{/);
+    expect(RANKING).toMatch(/if \(target < 0 \|\| target >= views\.length/);
+    expect(RANKING_CSS).toMatch(/\.arrow\[aria-disabled="true"\] \{[^}]*color: var\(--ink-quiet\)/);
+  });
+
   it("le glissement lit le régime de charge et la préférence de mouvement, sans boucle", () => {
     expect(RANKING).toContain("const { decorativeMotion } = useClientPower();");
     expect(RANKING_CSS).toContain("@media (prefers-reduced-motion: reduce)");
