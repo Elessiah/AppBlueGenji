@@ -45,8 +45,11 @@ Avant la première rencontre, seul « Général » existe et la barre des vues n
 pas affichée.
 
 La vue suivie se retient **par sa clé** (`general`, `round-2`, `current-3`) : une
-manche qui arrive par le flux décale les index, pas les clés. Une clé disparue
-(la manche en cours vient de se clore) retombe sur « Général ».
+manche qui arrive par le flux décale les index, pas les clés. Quand la manche
+en cours se clôt, « current-n » devient « round-n » et le lecteur **reste sur sa
+manche** (`resolveEnduranceViewIndex`) ; toute autre clé disparue retombe sur
+« Général ». L'onglet est clé par sa **manche** (`enduranceTabKey`) : « M3 en
+cours » devenu « M3 » est le même bouton, le focus clavier ne tombe pas.
 
 ### Colonnes
 
@@ -95,12 +98,24 @@ déjà public. Logique pure : `_lib/endurance-ranking-views.ts`.
   `aria-controls`, flèches gauche / droite, Début / Fin ; ils défilent dans un
   `<ScrollArea ariaLabel>`. Flèches ‹ › de 44 px nommées, navigation basse
   nommée (« ← Manche 2 »).
-- Barre des vues collante sous l'en-tête du site (`--sticky-header-h`).
+- Barre des vues collante sous l'en-tête du site (`--sticky-header-h`). Le
+  plateau (`.ds-block`, `overflow: hidden`) aurait annulé `position: sticky` :
+  `.board` le passe en `overflow: clip` (`page.module.css`).
+- Les flèches ‹ › et la navigation basse ne déplacent pas le focus : le titre de
+  la vue atteinte est annoncé par une région `aria-live="polite"` (un onglet
+  s'annonce de lui-même). La navigation basse ramène le haut du classement à
+  l'écran quand la vue atteinte est plus courte.
+- Lignes sorties estompées **cellule par cellule** (`--row-fade`, plancher 0,8
+  pour garder 4,5:1 au texte discret et au rouge) ; la cellule des gestes reste
+  à pleine opacité.
+- Capital d'une vue passée : une case « sortie » / « forfait » ne porte pas de
+  capital, la vue lit le dernier connu (`pointsAfterRound`) — jamais 0.
 - Mobile (< 920 px) : chaque ligne devient une carte, chaque case porte son
   `data-label` (colonne « MANCHE n » comprise).
 - Glissement d'une vue à l'autre : une passe CSS, jamais en boucle, posée
   seulement si `useClientPower().decorativeMotion` et annulée sous
-  `prefers-reduced-motion`.
+  `prefers-reduced-motion` ; seulement pour une vue **demandée** par le
+  lecteur, jamais quand le flux change la vue suivie.
 - « Prochain match » lit l'heure par `useClock` (rien avant le montage :
   l'heure du serveur n'est pas celle du lecteur).
 - Polices ≥ 11 px, couleurs par jeton, ambre réservé aux pénalités.

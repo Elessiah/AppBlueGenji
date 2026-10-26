@@ -65,7 +65,9 @@ Décidé par `defaultOpenEnduranceRound(sections)` (module pur) : la **manche
 en cours** — la première inachevée — et elle seule. Toutes les manches closes
 restent **repliées** : leur bilan se lit dans les vues du classement. Une fois
 tout joué (play-offs lancés, tournoi fini, manche suivante pas encore tirée),
-rien ne s'ouvre d'office.
+rien ne s'ouvre d'office. Quand la manche ouverte d'office se clôt et que la
+suivante arrive par le flux, la close **se replie** et la nouvelle s'ouvre —
+sauf si le lecteur avait rouvert la close à la main.
 
 L'ancienne priorité « la manche où le lecteur a une rencontre à jouer » se
 confond avec la manche en cours : le moteur ne pose la manche suivante qu'une
