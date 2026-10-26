@@ -69,12 +69,13 @@ export type NotificationReport = {
   /**
    * `null` : bot injoignable pour **tous** les envois. Bilan vide si personne
    * n'était joignable sur Discord. Les destinataires d'une langue partent en un
-   * appel au bot : si l'un de ces appels échoue et pas l'autre, le bilan est
-   * celui des appels aboutis, et {@link discordUnreachedUserIds} nomme les
-   * comptes de l'appel perdu.
+   * appel au bot, les langues l'une après l'autre : un appel perdu arrête les
+   * suivants. Si un appel a abouti, le bilan est celui des appels aboutis, et
+   * {@link discordUnreachedUserIds} nomme les comptes de l'appel perdu et des
+   * langues non tentées.
    */
   discord: DiscordDeliveryReport | null;
-  /** Comptes dont l'appel au bot a échoué (tous ceux joignables sur Discord si `discord` est `null`). */
+  /** Comptes dont l'appel au bot a échoué ou n'a pas été tenté (tous ceux joignables sur Discord si `discord` est `null`). */
   discordUnreachedUserIds: number[];
   /** Appareils atteints. */
   pushed: number;
@@ -143,18 +144,29 @@ async function sendLocalizedDirectMessages(
   const groups = new Map<Locale | null, (NotificationRecipient & { discord: DiscordRecipient })[]>();
   for (const recipient of recipients) {
     const locale = locales.get(recipient.userId) ?? null;
-    groups.set(locale, [...(groups.get(locale) ?? []), recipient]);
+    const group = groups.get(locale);
+    if (group) group.push(recipient);
+    else groups.set(locale, [recipient]);
   }
-  const sends = await Promise.all(
-    [...groups].map(async ([locale, group]) => ({
-      group,
-      report: await pushDiscordDirectMessages(
-        renderDm(message.message, locale),
-        group.map((recipient) => recipient.discord),
-        message.context,
-      ),
-    })),
-  );
+  // Les langues partent **l'une après l'autre**, et un appel perdu arrête les
+  // suivants : un bot lent ou tombé ne reçoit qu'un appel par notification,
+  // comme avant le découpage par langue. Lancés ensemble, les appels d'un seul
+  // match (deux camps, deux langues) atteindraient d'un coup le seuil du
+  // coupe-circuit et suspendraient tout le trafic de fond pour une seule
+  // notification ; les comptes non tentés sont rendus comme non joints.
+  const sends: { group: (NotificationRecipient & { discord: DiscordRecipient })[]; report: DiscordDeliveryReport | null }[] = [];
+  let botLost = false;
+  for (const [locale, group] of groups) {
+    const report = botLost
+      ? null
+      : await pushDiscordDirectMessages(
+          renderDm(message.message, locale),
+          group.map((recipient) => recipient.discord),
+          message.context,
+        );
+    if (report === null) botLost = true;
+    sends.push({ group, report });
+  }
   const unreached = sends.flatMap(({ group, report }) => (report === null ? group.map((r) => r.userId) : []));
   const reached = sends.flatMap(({ report }) => (report === null ? [] : [report]));
   if (reached.length === 0) return { report: null, unreached };
