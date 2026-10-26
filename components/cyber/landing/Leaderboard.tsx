@@ -25,11 +25,13 @@ const TREND_CLASSES: Record<LandingLeaderboardRow["trend"], string | undefined> 
   up: styles.trendUp,
   down: styles.trendDown,
   flat: styles.trendFlat,
+  new: styles.trendUp,
 };
 
-/** Évolution affichée : un tiret quand rien n'a bougé, sinon la variation signée. */
+/** Évolution affichée : un tiret quand rien n'a bougé, une étoile pour une entrée, sinon la variation signée. */
 function trendLabel(row: Pick<LandingLeaderboardRow, "trend" | "trendValue">): string {
   if (row.trend === "flat") return "—";
+  if (row.trend === "new") return "★";
   return row.trend === "up" ? `+${row.trendValue}` : `-${row.trendValue}`;
 }
 
@@ -138,7 +140,16 @@ export function Leaderboard({ initialRows }: Readonly<LeaderboardProps>) {
                   <span className={row.losses > 0 ? "result-loss" : styles.losses}>{row.losses}</span>
                 </span>
                 <span className="num" role="cell">{row.points}</span>
-                <span className={`${styles.trend} ${trendClass}`} role="cell">{trend}</span>
+                <span className={`${styles.trend} ${trendClass}`} role="cell">
+                  {row.trend === "new" ? (
+                    <>
+                      <span aria-hidden="true" title={t("leaderboard.trendNew")}>{trend}</span>
+                      <span className="sr-only">{t("leaderboard.trendNew")}</span>
+                    </>
+                  ) : (
+                    trend
+                  )}
+                </span>
               </div>
             );
           })

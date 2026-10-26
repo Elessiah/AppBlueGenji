@@ -131,3 +131,17 @@ describe("JoinCTA — accessibilité", () => {
     expect(markup).not.toMatch(/<h3[^>]*>.*Ton équipe/);
   });
 });
+
+// Revue UI/UX : une entrée au classement de la semaine n'est pas un « — »
+// (stable) ; elle s'annonce à l'oral.
+describe("Leaderboard — tendance d'une équipe entrée au classement", () => {
+  it("affiche une étoile et la dit à l'oral", () => {
+    const markup = renderToStaticMarkup(
+      <ToastProvider>
+        <Leaderboard initialRows={[leaderboardRow({ trend: "new" })]} />
+      </ToastProvider>,
+    );
+    expect(markup).toContain('title="Entrée au classement ces 7 derniers jours">★');
+    expect(markup).toContain("Entrée au classement ces 7 derniers jours");
+  });
+});

@@ -50,7 +50,7 @@ afterEach(() => {
 describe("loadShareTeam", () => {
   it("rend la ligne du classement général : nom, cote, bilan, logo du site", async () => {
     const team = await loadShareTeam(1);
-    expect(loadTeamRanking).toHaveBeenCalledWith({ includeUnplayed: true });
+    expect(loadTeamRanking).toHaveBeenCalledWith();
     expect(team).toEqual({
       teamName: "Test - 1",
       wins: 3,

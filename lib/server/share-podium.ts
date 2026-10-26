@@ -2,8 +2,8 @@
  * Les données du podium de la carte d'aperçu de `/classement`
  * (`docs/features/SHARE_METADATA.md` § « Le podium »).
  *
- * **Le même podium que la page** : classement général, équipes non jouées
- * comprises (`loadTeamRanking({ includeUnplayed: true })`, l'onglet
+ * **Le même podium que la page** : classement général, équipes classées
+ * seulement (`loadTeamRanking()`, l'onglet
  * « Général » de `/classement`), les trois premières lignes. Rien de plus que
  * ce qu'un visiteur anonyme lit déjà sur la page publique : nom, logo, cote.
  *
@@ -20,7 +20,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
-import { cachedRanking } from "./ranking-cache";
+import { cachedRanking, RANKING_LIST_KEY_PREFIX } from "./ranking-cache";
 import { loadTeamRanking } from "./ranking-service";
 import { PODIUM_TIER_COUNT } from "@/lib/shared/podium-tiers";
 import type { PodiumShareInput } from "@/lib/shared/page-share-cards";
@@ -49,7 +49,7 @@ export async function teamLogoDataUrl(logoUrl: string | null, size = LOGO_SIZE):
 }
 
 async function computeSharePodium(): Promise<PodiumShareInput[]> {
-  const ranking = await loadTeamRanking({ includeUnplayed: true });
+  const ranking = await loadTeamRanking();
   if (ranking.length < PODIUM_TIER_COUNT) return [];
   const top = ranking.slice(0, PODIUM_TIER_COUNT);
   return Promise.all(
@@ -68,7 +68,7 @@ async function computeSharePodium(): Promise<PodiumShareInput[]> {
  */
 export async function loadSharePodium(): Promise<PodiumShareInput[]> {
   try {
-    return await cachedRanking("share-podium", computeSharePodium);
+    return await cachedRanking(`${RANKING_LIST_KEY_PREFIX}share-podium`, computeSharePodium);
   } catch (error) {
     console.error("[share-podium] lecture impossible", error);
     return [];

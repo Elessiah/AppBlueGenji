@@ -341,7 +341,7 @@ carte ne change pas quand son contenu change).
 ### Le podium (`/classement`)
 
 La carte du classement dessine le **vrai podium** : les trois premières du
-classement général (`loadTeamRanking({ includeUnplayed: true })`, l'onglet
+classement général (`loadTeamRanking()`, équipes classées seulement, l'onglet
 « Général », le même que la page et que `PODIUM_TIERS.md`), ordre 2-1-3 avec la
 1re au centre et plus haute, logo, nom, cote (« 1240 pts », sans séparateur comme
 la page) et marche dans la langue (« 1re / 2e / 3e », « 1st / 2nd / 3rd »).
@@ -350,7 +350,7 @@ Couleurs des marches reprises de la page : glacier (`--blue-500`), cyan, violet
 contraste du nom et du rang (4,5:1) sur le voile de chaque marche.
 
 - **Données** (`lib/server/share-podium.ts`) : mutualisées dans le cache du
-  classement (`cachedRanking("share-podium")`, 60 s, vidé à chaque score) — un
+  classement (`cachedRanking("list:share-podium")`, 60 s, vidé à chaque score et à chaque dissolution) — un
   lien collé dans un gros salon fait venir plusieurs robots, aucun ne rejoue le
   classement pour lui seul.
 - **Logos** : lus **sur le disque**, jamais par HTTP, et seulement un fichier
@@ -375,12 +375,13 @@ montre le nom, le logo, la cote et le bilan de l'équipe. Le texte de l'encart
 - **Aucune requête au rendu de la fiche** : la mise en page ne fait que
   désigner l'image (`memberAreaShareMetadata("team", teamShareCardKey(id))`).
   Seule la route d'image lit les données (`lib/server/share-team.ts`), une
-  **seule entrée** de cache pour toutes les équipes (`cachedRanking("share-teams")`,
-  60 s, vidée à chaque score) : un robot qui énumère des identifiants ne
+  **seule entrée** de cache pour toutes les équipes (`cachedRanking("list:share-teams")`,
+  60 s, vidée à chaque score et à chaque dissolution) : un robot qui énumère des identifiants ne
   remplit pas le cache, et le rejeu du classement est celui de la page.
   Réponse en `max-age=300`, comme le podium.
 - **Le sous-ensemble du classement public**, rien d'autre : la ligne de l'équipe
-  dans `loadTeamRanking({ includeUnplayed: true })` (onglet « Général »), bornée
+  dans `loadTeamRanking()` (onglet « Général », équipes classées seulement : une
+  équipe sans match n'a pas de carte nominative), bornée
   aux `RANKING_MAX_SHOWN` lignes que `/classement` peut afficher. Cote arrondie
   et bilan écrits comme la page (« 12 V · 3 D », nuls seulement s'il y en a ;
   « 12 W · 3 L » en anglais).

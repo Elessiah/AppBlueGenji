@@ -44,3 +44,20 @@ export function cachedRanking<T>(key: string, loader: () => Promise<T>): Promise
 export function invalidateTeamRanking(): void {
   invalidateCachedPrefix(PREFIX);
 }
+
+/**
+ * Sous-préfixe des entrées **tirées de la liste** du classement (marches du
+ * podium, podium et fiches de la carte d'aperçu) : elles dépendent de qui figure
+ * à la liste (`deleted_at`, `solo_user_id`), pas seulement du rejeu.
+ */
+export const RANKING_LIST_KEY_PREFIX = "list:";
+
+/**
+ * Oublie les seules entrées tirées de la liste, et garde le rejeu
+ * (`state:<fenêtre>:<jeu>`). Pour une écriture qui change la liste sans toucher
+ * aux matchs — une dissolution : vider tout le préfixe relancerait jusqu'à six
+ * rejeux complets à la lecture suivante, pour un état qui n'a pas bougé.
+ */
+export function invalidateRankingLists(): void {
+  invalidateCachedPrefix(`${PREFIX}${RANKING_LIST_KEY_PREFIX}`);
+}

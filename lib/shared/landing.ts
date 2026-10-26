@@ -283,7 +283,11 @@ export type LandingLeaderboardRow = {
   /** Matchs clos sans vainqueur — affichés seulement s'il y en a. */
   draws: number;
   points: number;
-  trend: "up" | "down" | "flat";
+  /**
+   * Évolution sur 7 jours. `new` : l'équipe n'était pas au classement il y a
+   * une semaine (premier match compté depuis) — ni montée ni stable.
+   */
+  trend: "up" | "down" | "flat" | "new";
   trendValue: number;
 };
 

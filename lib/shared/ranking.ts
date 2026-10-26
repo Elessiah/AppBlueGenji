@@ -510,15 +510,41 @@ export function rankingMatchJoinSql(teamExpr: string, match = "m"): string {
 /**
  * Une équipe est **classée** dès qu'elle a disputé un match compté.
  *
+ * C'est **le filtre unique** de la liste publique du classement (depuis le
+ * 2026-10-26) : `loadTeamRanking` ne rend que les équipes classées, et
+ * `/classement`, le leaderboard de l'accueil, le podium, les marches du podium,
+ * la carte d'aperçu, les rangs de l'annuaire `/equipes`, la place de la fiche et
+ * l'API du leaderboard en descendent tous — rangs, marches et écarts se
+ * comptent donc sur le même ensemble, sans trou.
+ *
+ * « Match compté » = une ligne de l'assiette du rejeu ({@link playedMatchSql}) :
+ * terminée, non-bye, entre deux équipes réelles, avec un vainqueur (forfait
+ * compris) ou nulle. Un bye, un match contre soi-même ou un classement final
+ * sans rencontre ne classent pas. Une équipe masquée garde ses données et sa
+ * cote ; elle réapparaît à son premier match compté.
+ *
  * Ce drapeau ne décide **pas** de l'ordre ({@link compareRankedTeams} ne lit
- * que la cote et le bilan) : il choisit la légende de la cote (« Aucun match
- * joué ») et si la fiche affiche une place (`getTeamRankingPosition`).
+ * que la cote et le bilan) : il décide qui figure à la liste, la légende de la
+ * cote (« Aucun match joué ») et si la fiche affiche une place.
  */
 export function isRankedTeam(team: { wins: number; losses: number; draws?: number }): boolean {
   // Le nul compte : une équipe dont l'unique rencontre s'est close sur 2-2 a
   // bien joué, et sa cote a bougé. `draws` est facultatif — les vues qui n'en
   // portent pas (une ligne SQL antérieure) se lisent exactement comme avant.
   return team.wins + team.losses + (team.draws ?? 0) > 0;
+}
+
+/**
+ * Ordre par rang de l'annuaire `/equipes` : rang croissant, les équipes **sans
+ * rang** (aucun match compté, {@link isRankedTeam}) à la fin. Zéro entre deux
+ * équipes sans rang : à l'appelant de les départager (le serveur par
+ * {@link compareRankedTeams}, qui les range par nom à cote de départ égale).
+ */
+export function compareDirectoryRank(a: { rank: number | null }, b: { rank: number | null }): number {
+  if (a.rank === b.rank) return 0;
+  if (a.rank === null) return 1;
+  if (b.rank === null) return -1;
+  return a.rank - b.rank;
 }
 
 /**

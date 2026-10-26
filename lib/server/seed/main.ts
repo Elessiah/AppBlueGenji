@@ -20,7 +20,7 @@ import {
   createRecruitmentAds,
   createSponsors,
 } from "./showcase";
-import { createBulkTeams, createGhostTeams, createSoloEntries, createTeams } from "./teams";
+import { createBulkTeams, createGhostTeams, createSoloEntries, createTeams, createUnplayedTeam } from "./teams";
 import { createTournament } from "./tournaments";
 import {
   acceptTermsForSeededAccounts,
@@ -85,6 +85,8 @@ async function seed(db: Pool): Promise<void> {
   // Hors du pool de tournois : elles servent à exercer l'administration des
   // équipes fantômes (badge, attribution, inscription manuelle par le staff).
   await createGhostTeams(db);
+  // Hors du pool aussi : l'équipe sans match, masquée du classement.
+  await createUnplayedTeam(db, userIds);
   console.log();
 
   // Pool d'équipes étendu pour alimenter les gros brackets (jusqu'à 128) avec

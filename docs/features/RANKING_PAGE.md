@@ -35,24 +35,72 @@ seeding des tournois à classement :
 4. puis **nuls** décroissants (plus de matchs joués d'abord) ;
 5. enfin le **nom** (`localeCompare("fr")`).
 
-Une équipe sans match vaut la cote de départ (500) et se range **à cette
-cote** : derrière toute équipe qui a gagné des points, devant toute équipe qui
-en a perdu.
+**Pourquoi la cote stricte.** La règle précédente rangeait les équipes
+« classées » (au moins un match) devant toutes les autres, quelle que soit leur
+cote. Avec un seul match joué sur le site, la perdante (483) passait
+**deuxième**, devant toutes les équipes restées à 500. L'ordre a d'abord été
+corrigé (2026-10-05) ; depuis le 2026-10-26, les équipes sans match sont en
+outre **masquées** (ci-dessous), ce qui règle le cas à la racine.
 
-**Pourquoi.** La règle précédente rangeait les équipes « classées » (au moins
-un match) devant toutes les autres, quelle que soit leur cote. Avec un seul
-match joué sur le site, la perdante (483) passait **deuxième**, devant toutes
-les équipes restées à 500. L'utilisatrice a choisi de corriger l'ordre plutôt
-que de masquer les équipes sans match.
+### Équipes sans match (masquées depuis le 2026-10-26)
 
-`isRankedTeam` reste, mais ne décide plus de l'ordre : il choisit la légende
-de la cote (« Aucun match joué ») et si la fiche d'équipe affiche une place.
+Demande du 2026-10-13 : une équipe qui n'a disputé **aucun match compté** ne
+figure ni à `/classement` ni dans rien de ce qui en dérive.
+
+**La règle.** « Avoir joué » = au moins une rencontre de l'assiette du rejeu
+(`playedMatchSql`) : terminée, non-bye, entre deux équipes réelles, avec un
+vainqueur — **forfait compris**, le rejeu le compte — ou nulle. Un bye, un
+match contre soi-même ou un classement final sans rencontre (points de
+parcours seuls) ne classent pas. C'est `isRankedTeam` (`lib/shared/ranking.ts`),
+**filtre unique**, posé une fois dans `loadTeamRanking` : l'option
+`includeUnplayed` qui permettait de réintroduire ces équipes a disparu.
+
+**Ce qui en descend**, tous sur le même ensemble, rangs recomptés sans trou :
+
+| Vue | Effet |
+|---|---|
+| `/classement` (tous onglets) et `GET /api/landing/leaderboard` (`loadLeaderboardRows`) | lignes, rangs, podium, écarts et tendance sans elles |
+| Marches du podium (`loadPodiumTiers`, `PODIUM_TIERS.md`) | une équipe sans match ne monte jamais |
+| Carte d'aperçu du podium (`loadSharePodium`) et carte nominative (`findShareTeam`) | absentes ; une équipe sans match a la carte de la page |
+| Tendance sur 7 jours (`loadLeaderboardRows`) | une équipe absente de la photo d'il y a une semaine (entrée depuis) a la tendance `new` : « ★ », « Entrée au classement ces 7 derniers jours » / « Entered the ranking in the last 7 days » — jamais « stable » |
+| Annuaire `/equipes` (`listTeams`) | l'équipe **reste** à l'annuaire, à sa cote rejouée (500, ou sa cote de placement), mais **sans badge de rang** (`rank: null`), rangée après les classées par nom (`compareDirectoryRank`) ; le podium de l'annuaire (`HighlightStrip`) ne prend que des classées |
+| Fiche d'équipe (`getTeamRankingPosition`) | « Aucun match joué », hors du total « #n sur N » |
+
+Le **seeding** des tournois n'est pas concerné : il range des inscrites, qu'elles
+aient joué ou non, sur l'état rejoué (`rankEntrantsBySiteRanking`).
+
+**Rien n'est supprimé.** L'équipe garde ses données et son historique ; le
+rejeu la compte toujours (adversaire des autres). Elle réapparaît dès son premier
+match compté — le cache du classement est vidé à chaque score.
+
+**Équipes dissoutes.** Toutes l'étaient déjà de la liste, qu'elles aient joué
+ou non (`deleted_at IS NULL`) : comportement inchangé. La dissolution vide
+désormais les entrées tirées de la liste — marches, podium et fiches de la
+carte d'aperçu (`invalidateRankingLists`, sous-préfixe `ranking:list:`) — et
+les leaderboards et le bandeau de l'accueil (`invalidateLandingTeamViews`,
+qui nomment des équipes), pour que la dissoute quitte podium et rangs, et son
+ancien nom le bandeau, sans attendre l'échéance de 60 s. Le rejeu
+(`ranking:state:*`), les compteurs et le direct (5 s) restent en cache : une
+dissolution ne change aucun match (revue de performance du lot). **Entrées solo** : toujours hors liste. **Équipes
+fantômes** : listées si elles ont joué, masquées sinon, comme les autres.
+
+**États vides.** Si le filtre ne laisse rien, la page lit « Aucune équipe
+classée pour le moment : le premier match ouvrira le bal. » / « No ranked
+teams yet: the first match will kick things off. » ; sous trois équipes, pas
+de podium (tout au tableau). La carte « cote de départ » de « Comment marche la
+cote » dit qu'une équipe entre au classement à son premier match joué (FR/EN).
+
+**Jeu de test.** `npm run seed` crée « Test - Sans Match » (`NOMT`), équipe
+ordinaire gardée hors du pool des tournois : présente à `/equipes` sans rang,
+absente de `/classement`.
+
+`isRankedTeam` ne décide pas de l'ordre : il décide qui figure à la liste, la
+légende de la cote (« Aucun match joué ») et si la fiche affiche une place.
 
 **Place sur la fiche** (`getTeamRankingPosition`) : comptée sur la même liste
-que `/classement` (toutes les équipes, celles sans match à 500), « #n sur N
-équipes » — sinon la perdante à 483 lirait « 2ᵉ sur 2 » sur sa fiche et 40ᵉ
-sur la page. La place est l'index dans cette liste triée : à cote égale, les
-départages ci-dessus tranchent, comme sur la page.
+que `/classement` (les équipes classées), « #n sur N équipes ». La place est
+l'index dans cette liste triée : à cote égale, les départages ci-dessus
+tranchent, comme sur la page.
 
 ### Effet sur le seeding
 
@@ -61,9 +109,10 @@ départages ci-dessus tranchent, comme sur la page.
   quels (`SEEDING_ORDER.md`).
 - **Ordre réordonné à la main par le staff** : aucun, il est figé.
 - **Tournois à venir** (ordre encore lu sur le classement) : une inscrite sans
-  match est désormais seedée à 500, donc **devant** une inscrite descendue sous
+  match est seedée à 500, donc **devant** une inscrite descendue sous
   500, et derrière une inscrite au-dessus. L'aperçu du plateau et la liste des
-  inscrites suivent, par le même comparateur.
+  inscrites suivent, par le même comparateur. (Le masquage des équipes sans
+  match ne touche que la liste publique, pas le seeding.)
 
 ## Contenu
 
@@ -224,8 +273,16 @@ les deux langues.
 
 - `tests/lib/shared/ranking.test.ts` — ordre : cote stricte, sans match à sa
   cote, départages.
-- `tests/lib/server/landing-leaderboard.test.ts` — scénario exact du retour
-  (un match, perdante derrière toutes les équipes à 500).
+- `tests/lib/server/landing-leaderboard.test.ts` — équipes sans match masquées,
+  rangs sans trou, dans chaque onglet.
+- `tests/lib/server/ranking-hide-unplayed.test.ts` — filtre unique
+  (`isRankedTeam`), ordre de l'annuaire (`compareDirectoryRank`), chaque
+  consommateur câblé sur `loadTeamRanking`, cache vidé à la dissolution.
+- `tests/lib/server/ranking-service.test.ts` — forfait, nul, bye, classement
+  final seul, fantôme, réapparition, place de la fiche ;
+  `tests/lib/server/teams-service.list.test.ts` — annuaire sans rang ;
+  `tests/app/team-card-logo.test.tsx`, `tests/app/team-ranking-podium-links.test.tsx`
+  — badge absent, podium de l'annuaire.
 - `tests/lib/server/ranking-service.test.ts` — liste et seeding avec le même
   ordre.
 - `tests/lib/shared/ranking-page.test.ts` — filtre, adresses, écarts,

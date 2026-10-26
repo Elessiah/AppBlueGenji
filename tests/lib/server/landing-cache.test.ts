@@ -4,7 +4,9 @@ import {
   LANDING_TTL_MS,
   cachedLanding,
   LANDING_LIVE_KEY,
+  LANDING_TICKER_KEY,
   invalidateLandingAggregates,
+  invalidateLandingTeamViews,
   invalidateLandingLive,
 } from "@/lib/server/landing-cache";
 
@@ -67,6 +69,41 @@ describe("cache de la vitrine", () => {
 
     expect(loader).toHaveBeenCalledTimes(1);
   });
+
+  it("oublie chaque leaderboard, par jeu compris, à l'invalidation des vues d'équipes", async () => {
+    const loader = jest.fn(async () => "valeur");
+    const keys = ["leaderboard:8:all", "leaderboard:50:MARVEL_RIVALS"];
+    for (const key of keys) await cachedLanding(key, LANDING_TTL_MS, loader as () => Promise<string>);
+
+    invalidateLandingTeamViews();
+    for (const key of keys) await cachedLanding(key, LANDING_TTL_MS, loader as () => Promise<string>);
+
+    expect(loader).toHaveBeenCalledTimes(4);
+  });
+
+  it("oublie le bandeau, qui nomme des équipes, à l'invalidation des vues d'équipes", async () => {
+    const loader = jest.fn(async () => "valeur");
+    await cachedLanding(LANDING_TICKER_KEY, LANDING_TTL_MS, loader as () => Promise<string>);
+
+    invalidateLandingTeamViews();
+    await cachedLanding(LANDING_TICKER_KEY, LANDING_TTL_MS, loader as () => Promise<string>);
+
+    expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["stats", "live"])(
+    "garde l'entrée « %s » à l'invalidation des vues d'équipes",
+    async (key) => {
+      // Une dissolution ne change pas les compteurs ; le direct vit 5 s.
+      const loader = jest.fn(async () => "valeur");
+      await cachedLanding(key, LANDING_TTL_MS, loader as () => Promise<string>);
+
+      invalidateLandingTeamViews();
+      await cachedLanding(key, LANDING_TTL_MS, loader as () => Promise<string>);
+
+      expect(loader).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it("range ses entrées sous un préfixe qui lui est propre", async () => {
     // Sans préfixe distinct, invalider la vitrine emporterait les instantanés

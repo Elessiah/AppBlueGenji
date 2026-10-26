@@ -3,8 +3,10 @@ import { getDatabase } from "@/lib/server/database";
 import { tournamentAudience } from "@/lib/server/tournament-broadcast";
 import {
   cachedLanding,
+  LANDING_LEADERBOARD_KEY_PREFIX,
   LANDING_LIVE_KEY,
   LANDING_LIVE_TTL_MS,
+  LANDING_TICKER_KEY,
   LANDING_TTL_MS,
 } from "@/lib/server/landing-cache";
 import { listTournamentBuckets } from "@/lib/server/tournaments-service";
@@ -396,7 +398,7 @@ export async function getLandingLeaderboard(
   game?: TournamentGame,
 ): Promise<LandingLeaderboardRow[]> {
   const safeLimit = Math.min(50, Math.max(1, Math.trunc(limit)));
-  return cachedLanding(`leaderboard:${safeLimit}:${game ?? "all"}`, LANDING_TTL_MS, () =>
+  return cachedLanding(`${LANDING_LEADERBOARD_KEY_PREFIX}${safeLimit}:${game ?? "all"}`, LANDING_TTL_MS, () =>
     loadLandingLeaderboard(safeLimit, game),
   );
 }
@@ -422,20 +424,15 @@ export async function loadLeaderboardRows(
   game: TournamentGame | undefined,
   limit?: number,
 ): Promise<LandingLeaderboardRow[]> {
-  // « Général » (pas de jeu demandé) garde toutes les équipes du site, jouées
-  // ou non — c'est le classement général, il les concerne toutes. Un onglet
-  // par jeu, lui, ne doit garder que les équipes qui ont **joué ce jeu** :
-  // sans ce garde-fou, l'onglet « Marvel Rivals » aurait affiché les équipes
-  // qui ne jouent qu'à Overwatch, à la cote de départ, comme si elles étaient
-  // simplement en attente de leur premier match — alors qu'elles n'en auront
-  // jamais dans ce jeu.
-  const includeUnplayed = game === undefined;
-
+  // Seules les équipes classées figurent (`isRankedTeam`, filtre unique de
+  // `loadTeamRanking`) : « Général » garde celles qui ont disputé au moins un
+  // match compté, un onglet par jeu celles qui en ont disputé un **dans ce
+  // jeu**. Les rangs se comptent donc sur cet ensemble, sans trou.
   const [currentRows, previousRows] = await Promise.all([
-    loadTeamRanking({ includeUnplayed, game }),
+    loadTeamRanking({ game }),
     // Le classement d'il y a une semaine : **même chargeur**, donc la flèche
     // compare deux photos du même calcul plutôt que deux barèmes.
-    loadTeamRanking({ includeUnplayed, completedMoreThanDaysAgo: TREND_WINDOW_DAYS, game }),
+    loadTeamRanking({ completedMoreThanDaysAgo: TREND_WINDOW_DAYS, game }),
   ]);
   const previousRanks = new Map(previousRows.map((row, index) => [row.teamId, index + 1]));
   const shown = limit === undefined ? currentRows : currentRows.slice(0, limit);
@@ -443,7 +440,10 @@ export async function loadLeaderboardRows(
   return shown.map((row, index) => {
     const rank = index + 1;
     const previousRank = previousRanks.get(row.teamId);
-    let trend: "up" | "down" | "flat" = "flat";
+    // Absente de la photo d'il y a une semaine : elle est entrée au classement
+    // depuis (une équipe sans match compté n'y figure pas) — la dire « stable »
+    // serait faux.
+    let trend: LandingLeaderboardRow["trend"] = previousRank === undefined ? "new" : "flat";
     let trendValue = 0;
     if (previousRank !== undefined) {
       const delta = previousRank - rank;
@@ -616,7 +616,7 @@ async function loadNewsEntries(db: Awaited<ReturnType<typeof getDatabase>>): Pro
 export async function getLandingTicker(locale: Locale = DEFAULT_LOCALE): Promise<LandingTickerPayload> {
   let entries: TickerEntry[] | null;
   try {
-    entries = await cachedLanding("ticker", LANDING_TTL_MS, loadLandingTicker);
+    entries = await cachedLanding(LANDING_TICKER_KEY, LANDING_TTL_MS, loadLandingTicker);
   } catch {
     entries = null;
   }

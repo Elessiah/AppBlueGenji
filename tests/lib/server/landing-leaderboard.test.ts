@@ -73,7 +73,7 @@ describe("leaderboard de la landing", () => {
 
     clearCache();
     await mockDb(teams, matches);
-    const ranking = await loadTeamRanking({ includeUnplayed: true });
+    const ranking = await loadTeamRanking();
 
     expect(rows.map((row) => [row.teamName, row.points, row.wins, row.losses])).toEqual(
       ranking.map((row) => [row.teamName, row.points, row.wins, row.losses]),
@@ -94,7 +94,9 @@ describe("leaderboard de la landing", () => {
 
   // Retour du 2026-10-05, scénario exact : un seul match sur le site, la
   // perdante passait deuxième devant toutes les équipes restées à 500.
-  it("range la seule équipe battue derrière toutes les équipes à la cote de départ", async () => {
+  // Demande du 2026-10-13 : les équipes sans match sont masquées, et la
+  // perdante prend la place suivante — rangs sans trou.
+  it("masque les équipes sans match et numérote les autres sans trou", async () => {
     await mockDb(
       [
         teamRow(1, "Alpha"),
@@ -108,10 +110,10 @@ describe("leaderboard de la landing", () => {
 
     const rows = await getLandingLeaderboard(8);
 
-    expect(rows.map((row) => row.teamName)).toEqual(["Alpha", "Charlie", "Delta", "Echo", "Bravo"]);
-    expect(rows[4].points).toBeLessThan(RANKING_BASE_POINTS);
-    expect(rows[4]).toMatchObject({ rank: 5, wins: 0, losses: 1 });
-    expect(rows.slice(1, 4).every((row) => row.points === RANKING_BASE_POINTS)).toBe(true);
+    expect(rows.map((row) => row.teamName)).toEqual(["Alpha", "Bravo"]);
+    expect(rows.map((row) => row.rank)).toEqual([1, 2]);
+    expect(rows[1].points).toBeLessThan(RANKING_BASE_POINTS);
+    expect(rows[1]).toMatchObject({ rank: 2, wins: 0, losses: 1 });
   });
 
   it("porte les nuls de chaque ligne", async () => {
@@ -202,7 +204,7 @@ describe("leaderboard de la landing", () => {
   // simplement son premier match — alors qu'elle n'en jouera jamais un dans
   // ce jeu-là. L'onglet « Général », lui, doit continuer à la montrer : c'est
   // sa raison d'être.
-  it("exclut d'un onglet par jeu les équipes qui n'ont joué aucun match de ce jeu", async () => {
+  it("exclut de chaque onglet les équipes qui n'ont joué aucun match compté", async () => {
     const teams = [teamRow(1, "Alpha"), teamRow(2, "Jamais engagée dans ce jeu")];
     // Représente ce que la base renvoie déjà filtrée par `t.game = ?` : seule
     // Alpha a un match dans le jeu demandé.
@@ -215,7 +217,8 @@ describe("leaderboard de la landing", () => {
     clearCache();
     await mockDb(teams, matches);
     const general = await getLandingLeaderboard(8);
-    expect(general.map((row) => row.teamName)).toEqual(["Alpha", "Jamais engagée dans ce jeu"]);
+    // « Général » applique le même filtre : sans match compté, pas de ligne.
+    expect(general.map((row) => row.teamName)).toEqual(["Alpha"]);
   });
 
   it("garde deux classements distincts en cache selon le jeu demandé", async () => {
@@ -229,5 +232,19 @@ describe("leaderboard de la landing", () => {
     // Un rejeu par jeu distinct, pas un par appel : la mutualisation tient
     // toujours, seulement sur des clés séparées.
     expect(execute.mock.calls.filter((call) => String(call[0]).includes("AS played_at"))).toHaveLength(4);
+  });
+
+  // Revue UI/UX : la photo d'il y a une semaine ne porte pas une équipe qui
+  // n'avait encore rien joué. Entrée depuis, elle n'est pas « stable ».
+  it("marque « new » une équipe absente du classement d'il y a une semaine", async () => {
+    const teams = [teamRow(1, "Alpha"), teamRow(2, "Bravo"), teamRow(3, "Nouvelle")];
+    const previous = [matchRow(1, 1, 2, 1)];
+    const current = [...previous, matchRow(2, 3, 2, 3)];
+    await mockDb(teams, current, previous);
+
+    const rows = await getLandingLeaderboard(8);
+
+    expect(rows.find((row) => row.teamName === "Nouvelle")).toMatchObject({ trend: "new", trendValue: 0 });
+    expect(rows.find((row) => row.teamName === "Alpha")?.trend).not.toBe("new");
   });
 });

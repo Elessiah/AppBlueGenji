@@ -336,15 +336,13 @@ et celle du cache de la landing (`leaderboard:${limite}:${jeu}`) portent donc le
 jeu : un classement filtré et le classement général vivent côte à côte sans se
 percuter, chacun invalidé par le même préfixe que l'autre.
 
-**Un onglet par jeu n'inclut pas les équipes qui n'ont pas joué ce jeu.**
-`loadLandingLeaderboard` pose `includeUnplayed: game === undefined` : l'onglet
-« Général » garde toute équipe du site (jouée ou non, cote de départ pour
-qui n'a rien joué — la garantie tenue par `compareRankedTeams`, voir plus
-haut), mais un onglet par jeu **exclut** toute équipe sans match dans ce
-jeu-là. Sans ce garde-fou, l'onglet « Marvel Rivals » aurait affiché une
-équipe qui ne joue qu'à Overwatch, à la cote de départ, comme si elle
-attendait simplement son premier match — alors qu'elle n'en jouera jamais un
-dans ce jeu.
+**Aucun onglet n'inclut une équipe sans match compté** (depuis le
+2026-10-26, `RANKING_PAGE.md` § « Équipes sans match ») : `loadTeamRanking`
+ne rend que les équipes classées (`isRankedTeam`). « Général » garde les
+équipes qui ont joué au moins un match compté, un onglet par jeu celles qui en
+ont joué un **dans ce jeu** — l'onglet « Marvel Rivals » n'affiche donc jamais
+une équipe qui ne joue qu'à Overwatch. Avant, « Général » gardait aussi les
+équipes jamais jouées, à la cote de départ (`includeUnplayed`, retiré).
 
 Le paramètre `?game=` de `GET /api/landing/leaderboard` arrivait jusqu'à la
 route et s'y arrêtait (`console.warn`, classement général renvoyé quoi qu'il

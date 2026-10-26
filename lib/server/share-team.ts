@@ -4,7 +4,7 @@
  *
  * **Le sous-ensemble du classement public**, rien d'autre : nom, logo, cote et
  * bilan de la ligne que `/classement` montre déjà à un visiteur anonyme (onglet
- * « Général », équipes non jouées comprises, dans la limite des lignes que la
+ * « Général », équipes classées seulement, dans la limite des lignes que la
  * page peut afficher — `RANKING_MAX_SHOWN`). Le classement écarte déjà les
  * entrées solo (dont le « nom » est un pseudo) et les équipes dissoutes ; les
  * équipes fantômes sont retirées ici. Aucun joueur : ni pseudo ni avatar.
@@ -17,7 +17,7 @@
  */
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "./database";
-import { cachedRanking } from "./ranking-cache";
+import { cachedRanking, RANKING_LIST_KEY_PREFIX } from "./ranking-cache";
 import { loadTeamRanking } from "./ranking-service";
 import { teamLogoDataUrl } from "./share-podium";
 import type { TeamShareInput } from "@/lib/shared/page-share-cards";
@@ -32,7 +32,7 @@ type GhostRow = RowDataPacket & { id: number };
 
 async function computeShareTeams(): Promise<ReadonlyMap<number, ShareTeamRow>> {
   const [ranking, [ghosts]] = await Promise.all([
-    loadTeamRanking({ includeUnplayed: true }),
+    loadTeamRanking(),
     (await getDatabase()).execute<GhostRow[]>("SELECT id FROM bg_teams WHERE is_ghost = 1"),
   ]);
   const ghostIds = new Set(ghosts.map((row) => Number(row.id)));
@@ -59,7 +59,7 @@ async function computeShareTeams(): Promise<ReadonlyMap<number, ShareTeamRow>> {
  */
 export async function findShareTeam(teamId: number): Promise<ShareTeamRow | null> {
   try {
-    return (await cachedRanking("share-teams", computeShareTeams)).get(teamId) ?? null;
+    return (await cachedRanking(`${RANKING_LIST_KEY_PREFIX}share-teams`, computeShareTeams)).get(teamId) ?? null;
   } catch (error) {
     console.error("[share-team] lecture impossible", error);
     return null;

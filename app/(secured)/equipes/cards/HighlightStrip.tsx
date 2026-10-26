@@ -2,7 +2,6 @@
 
 import { memo } from "react";
 import type { TeamListItem } from "@/lib/shared/types";
-import { isRankedTeam } from "@/lib/shared/ranking";
 import { TeamPodiumName } from "@/components/podium-tiers";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { richNodes } from "@/components/i18n/shell-text";
@@ -23,7 +22,9 @@ import s from "./HighlightStrip.module.css";
 function HighlightStripView({ teams }: Readonly<{ teams: TeamListItem[] }>) {
   const text = useTeamsText();
   const { t } = text;
-  const top = teams.slice(0, 3);
+  // Seules les équipes classées montent : une équipe sans rang (aucun match
+  // compté) ne figure pas au classement, donc pas à son podium.
+  const top = teams.filter((team) => team.rank !== null).slice(0, 3);
   if (top.length < 3) return null;
 
   return (
@@ -49,14 +50,12 @@ function HighlightStripView({ teams }: Readonly<{ teams: TeamListItem[] }>) {
               {team.region ? ` · ${team.region}` : ""}
             </div>
           </div>
-          {/* Même nuance que sur la carte : un filtre par jeu peut laisser
-              moins de trois équipes classées, et une équipe à 0V–0D monterait
-              alors sur le podium avec la cote de départ. Annoncer une cote
-              gagnée sur ce nombre-là, c'est expliquer deux fois le même chiffre
-              de deux façons contradictoires sur la même page. */}
+          {/* Même règle que la carte : classée = avec un rang. `isRankedTeam`
+              lirait 0V–0D comme « aucun match » pour une équipe classée sur
+              un seul nul (`TeamListItem` ne porte pas les nuls). */}
           <div
             className={s.ptsBlock}
-            title={`${t("points.label")} · ${teamPointsHint(text, isRankedTeam(team), team.points)}`}
+            title={`${t("points.label")} · ${teamPointsHint(text, team.rank !== null, team.points)}`}
           >
             <div className={s.pts}>{team.points}</div>
             {/* Même règle que sur la carte : le mot complet est lu, l'abréviation

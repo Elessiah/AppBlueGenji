@@ -91,7 +91,7 @@ describe("TeamCard — légende du total de points", () => {
 
   it("affiche « Aucun match » sous le total d'une équipe non classée", () => {
     const markup = renderToStaticMarkup(
-      <TeamCard team={team({ wins: 0, losses: 0, points: 500, form: [] })} />,
+      <TeamCard team={team({ rank: null, wins: 0, losses: 0, points: 500, form: [] })} />,
     );
     expect(markup).toContain(RANKING_UNRANKED_SHORT);
     expect(markup).toContain(escapeHtml(RANKING_UNRANKED_HINT));
@@ -99,7 +99,7 @@ describe("TeamCard — légende du total de points", () => {
 
   it("garde la nuance « classements de tournoi » d'une équipe sans match à cote bougée", () => {
     const markup = renderToStaticMarkup(
-      <TeamCard team={team({ wins: 0, losses: 0, points: 486, form: [] })} />,
+      <TeamCard team={team({ rank: null, wins: 0, losses: 0, points: 486, form: [] })} />,
     );
     expect(markup).toContain(RANKING_UNRANKED_SHORT);
     expect(markup).toContain(escapeHtml(RANKING_PLACEMENT_ONLY_HINT));

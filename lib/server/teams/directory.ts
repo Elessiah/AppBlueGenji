@@ -3,8 +3,13 @@ import { getDatabase } from "@/lib/server/database";
 import { toIso } from "@/lib/server/serialization";
 import type { TeamListItem } from "@/lib/shared/types";
 import { cachedStats } from "@/lib/server/stats-cache";
-import { loadTeamRanking } from "@/lib/server/ranking-service";
-import { compareRankedTeams, rankingMatchJoinSql } from "@/lib/shared/ranking";
+import { loadRankingState, loadTeamRanking } from "@/lib/server/ranking-service";
+import {
+  compareDirectoryRank,
+  compareRankedTeams,
+  RANKING_BASE_POINTS,
+  rankingMatchJoinSql,
+} from "@/lib/shared/ranking";
 import { visibleAvatarUrl } from "@/lib/shared/avatar";
 import { localUploadUrl } from "@/lib/shared/uploads";
 
@@ -133,11 +138,15 @@ export async function listTeams(viewerId: number | null = null): Promise<TeamLis
   // Forme : mutualisée (voir `loadTeamListForms`), elle ne dépend pas du lecteur.
   const formByTeam = await loadCachedTeamForms();
 
-  // Bilan et points : une seule source pour l'annuaire, la fiche et le
-  // leaderboard de la landing.
-  const rankingByTeam = new Map(
-    (await loadTeamRanking({ includeUnplayed: true })).map((row) => [row.teamId, row]),
-  );
+  // Bilan, points et rang : une seule source pour l'annuaire, la fiche et le
+  // leaderboard de la landing. La liste ne porte que les équipes classées
+  // (`isRankedTeam`) : une équipe sans match compté reste à l'annuaire, à la
+  // cote de départ, mais **sans rang** — le rang est sa place à `/classement`.
+  // Hors liste, la cote se lit sur l'état rejoué (même photo mutualisée que la
+  // liste, pas un second rejeu) : une équipe qui n'a que des points de
+  // placement n'est pas à 500, et la fiche affiche la même cote.
+  const [ranking, states] = await Promise.all([loadTeamRanking(), loadRankingState()]);
+  const rankingByTeam = new Map(ranking.map((row, index) => [row.teamId, { row, rank: index + 1 }]));
 
   // Get roster preview
   const [rosterRows] = await db.execute<
@@ -211,9 +220,9 @@ export async function listTeams(viewerId: number | null = null): Promise<TeamLis
   }
 
   // Transform rows and calculate rank
-  const unsorted: Omit<TeamListItem, "rank">[] = teamRows.map((row) => {
+  const unsorted: TeamListItem[] = teamRows.map((row) => {
     const id = Number(row.id);
-    const ranked = rankingByTeam.get(id);
+    const ranked = rankingByTeam.get(id)?.row;
     return {
       id,
       name: row.name,
@@ -223,29 +232,20 @@ export async function listTeams(viewerId: number | null = null): Promise<TeamLis
       createdAt: toIso(row.created_at)!,
       wins: ranked?.wins ?? 0,
       losses: ranked?.losses ?? 0,
-      points: ranked?.points ?? 0,
+      points: ranked?.points ?? states.get(id)?.points ?? RANKING_BASE_POINTS,
       // Copie : la table vient du cache, partagée entre tous les lecteurs.
       form: [...(formByTeam.get(id) ?? [])],
       games: gamesByTeam.get(id) || [],
       rosterPreview: rosterByTeam.get(id) || [],
       region: null,
       isGhost: row.is_ghost === 1,
+      rank: rankingByTeam.get(id)?.rank ?? null,
     };
   });
 
-  // Même ordre que le leaderboard de la landing et `/classement` : la cote, puis
-  // les victoires, les défaites, les nuls et le nom. `TeamListItem` ne porte
-  // pas les nuls : ils sont relus sur la ligne du classement, sans quoi deux
-  // équipes à égalité se départageraient autrement qu'à `/classement`.
-  const drawsOf = (id: number) => rankingByTeam.get(id)?.draws ?? 0;
-  unsorted.sort((a, b) =>
-    compareRankedTeams({ ...a, draws: drawsOf(a.id) }, { ...b, draws: drawsOf(b.id) }),
-  );
-
-  const teams: TeamListItem[] = unsorted.map((team, index) => ({
-    ...team,
-    rank: index + 1,
-  }));
-
-  return teams;
+  // Les équipes classées dans l'ordre de `/classement` (leur rang), puis les
+  // autres, sans rang, par le même comparateur — à cote de départ égale, c'est
+  // le nom qui les range.
+  unsorted.sort((a, b) => compareDirectoryRank(a, b) || compareRankedTeams(a, b));
+  return unsorted;
 }

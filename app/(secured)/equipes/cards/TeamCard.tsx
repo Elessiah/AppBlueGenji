@@ -7,7 +7,6 @@ import { getPaletteColor } from "@/lib/shared/palette";
 import { PlayerLink } from "@/components/entity-link";
 import { TeamPodiumName } from "@/components/podium-tiers";
 import { displayTeamTag } from "@/lib/shared/team-tag";
-import { isRankedTeam } from "@/lib/shared/ranking";
 import { formatMonthYear } from "@/lib/shared/dates";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { useTeamsText } from "@/components/i18n/teams-text";
@@ -35,8 +34,12 @@ function TeamCardView({ team }: Readonly<{ team: TeamListItem }>) {
   const text = useTeamsText();
   const { t } = text;
   const color = getPaletteColor(team.id);
-  const isTop3 = team.rank <= 3;
-  const ranked = isRankedTeam(team);
+  const isTop3 = team.rank !== null && team.rank <= 3;
+  // Classée = présente au classement, donc avec un rang. `isRankedTeam` ne
+  // suffit pas ici : `TeamListItem` ne porte pas les nuls, et une équipe dont
+  // l'unique match s'est clos sur un nul afficherait son rang à côté de
+  // « Aucun match ».
+  const ranked = team.rank !== null;
 
   return (
     <article className={s.card} style={{ "--c": color } as React.CSSProperties}>
@@ -46,9 +49,12 @@ function TeamCardView({ team }: Readonly<{ team: TeamListItem }>) {
         aria-label={t("card.viewTeam", { name: team.name })}
       />
 
-      <div className={`${s.rank} ${isTop3 ? s.rankTop : ""}`}>
-        #{String(team.rank).padStart(2, "0")}
-      </div>
+      {/* Sans match compté, l'équipe n'est pas au classement : pas de rang. */}
+      {team.rank !== null && (
+        <div className={`${s.rank} ${isTop3 ? s.rankTop : ""}`}>
+          #{String(team.rank).padStart(2, "0")}
+        </div>
+      )}
 
       <div className={s.head}>
         {/* Décoratif de bout en bout : logo comme initiale ne font que redire le

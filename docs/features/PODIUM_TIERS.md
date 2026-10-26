@@ -9,7 +9,9 @@ lisait blanche en production).
 ## Quel podium
 
 **Celui de l'onglet « Général » de `/classement`** (tous jeux) : même chargeur
-(`loadTeamRanking({ includeUnplayed: true })`), même tri (`compareRankedTeams`).
+(`loadTeamRanking()`, équipes classées seulement — une équipe sans match compté
+ne monte jamais, `RANKING_PAGE.md` § « Équipes sans match »), même tri
+(`compareRankedTeams`).
 Jamais deux podiums qui se contredisent.
 
 - Sous **trois** équipes classées, aucune marche (pas de podium sur
@@ -29,7 +31,7 @@ Jamais deux podiums qui se contredisent.
 |---|---|
 | Règles pures (marches, membres, plus haute marche, classes) | `lib/shared/podium-tiers.ts` |
 | Chargement : classement « Général » + **une** requête (`bg_team_members` actifs des trois équipes, `left_at IS NULL`, comptes supprimés exclus — une carte anonymisée de `/joueurs` et l'historique d'équipes de sa fiche restent sans marche) | `lib/server/podium-tiers.ts` (`loadPodiumTiers`) |
-| Cache | `cachedRanking("podium-tiers")` : même durée (60 s) et **même invalidation** que le classement — tout score qui tombe l'oublie (`invalidateTeamRanking`) |
+| Cache | `cachedRanking("list:podium-tiers")` : même durée (60 s) et **même invalidation** que le classement — tout score qui tombe l'oublie (`invalidateTeamRanking`), une dissolution aussi (`invalidateRankingLists`, qui garde le rejeu) |
 | Remise au client | `app/layout.tsx` → `<PodiumTiersProvider>` (`components/podium-tiers.tsx`) : aucune requête par lien |
 
 - **Plus haute marche** : un joueur membre de plusieurs équipes du podium prend
