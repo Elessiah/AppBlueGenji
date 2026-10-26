@@ -85,6 +85,24 @@ describe("getLandingTicker — résultats", () => {
     expect(sql).toMatch(/m\.team1_id IS NOT NULL\s+AND m\.team2_id IS NOT NULL/);
   });
 
+  it("ne prend que les matchs à l'issue enregistrée : vainqueur, forfait, double forfait ou nul à scores égaux", async () => {
+    const execute = await mockTicker([resultRow({}, 1)]);
+    await getLandingTicker();
+    const sql = String(execute.mock.calls[0][0]).replace(/\s+/g, " ");
+    expect(sql).toContain(
+      "AND ( m.winner_team_id IS NOT NULL OR m.forfeit_team_id IS NOT NULL OR m.double_forfeit = TRUE OR ( m.team1_score IS NOT NULL AND m.team2_score IS NOT NULL AND m.team1_score = m.team2_score ) )",
+    );
+  });
+
+  it("aucune requête du bandeau ne lit un tournoi pas encore publié (start_visibility_at)", async () => {
+    const execute = await mockTicker([resultRow({}, 1)]);
+    await getLandingTicker();
+    // Résultats, inscriptions, champions : chacune filtre la publication.
+    for (const index of [0, 1, 2]) {
+      expect(String(execute.mock.calls[index][0])).toMatch(/AND t\.start_visibility_at <= NOW\(\)/);
+    }
+  });
+
   it("match tranché : vainqueur et perdant nommés pour le lecteur d'écran, dans l'ordre du match", async () => {
     await mockTicker([resultRow({ winner_team_id: 2, team1_score: 0, team2_score: 3 }, 1)]);
     const [item] = results((await getLandingTicker()).items);
