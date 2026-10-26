@@ -99,6 +99,7 @@ export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: R
   }
 
   async function submit() {
+    if (busy) return;
     const payload = {
       value: form.value.trim(),
       valueEn: form.valueEn.trim(),
@@ -353,14 +354,16 @@ export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: R
           </div>
 
           <div className={styles.modalActions}>
-            <button type="button" className={styles.action} onClick={close} disabled={busy}>
+            {/* `aria-disabled` + garde (`close`, `submit`) plutôt que `disabled` :
+                le bouton cliqué garde le focus pendant l'envoi. */}
+            <button type="button" className={styles.action} onClick={close} aria-disabled={busy}>
               Annuler
             </button>
             <button
               type="button"
               className={styles.actionPrimary}
               onClick={submit}
-              disabled={busy}
+              aria-disabled={busy}
               aria-busy={busy}
             >
               {busy ? "…" : submitLabel}
