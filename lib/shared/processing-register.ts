@@ -621,7 +621,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     name: "Sauvegardes",
     purpose: "Reprendre l'activité après une panne, une corruption ou une erreur de manipulation",
     subPurposes: [
-      "Archive hebdomadaire des bases de données du site et du bot",
+      "Archive deux fois par semaine (dimanche et mardi soir) des bases de données du site et du bot",
       "Copie horaire des images téléversées (avatars, logos, photos)",
       "Journal des suppressions de compte, rejoué après toute restauration",
     ],

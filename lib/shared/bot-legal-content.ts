@@ -91,7 +91,8 @@ const LAST_UPDATED_EN = "19 October 2026";
 // messages de match aux seuls tags certifiés (DM-CERTIFIED-ONLY), les deux (article 01) ;
 // langue du compte transmise avec le code et messages privés dans cette langue
 // (BOT-NOTIF-LANG), la politique seule ; base de la conservation du choix des
-// messages de match, obligation légale (LEGAL-OPTOUT-BASIS), la politique seule.
+// messages de match, obligation légale (LEGAL-OPTOUT-BASIS), la politique seule ;
+// sauvegarde deux fois par semaine au lieu d'une (BACKUP-SCHEDULE), la politique seule.
 const PRIVACY_LAST_UPDATED_FR = "27 octobre 2026";
 const PRIVACY_LAST_UPDATED_EN = "27 October 2026";
 
@@ -514,11 +515,12 @@ export const PRIVACY_POLICY: BilingualDoc = {
               `**Salon de journal privé du staff** (et messages privés du Bot à son titulaire) : un an (${BOT_STAFF_LOG_RETENTION_DAYS} jours) ; les messages du Bot plus anciens sont supprimés par le ménage de nuit, par lots (plusieurs nuits pour un arriéré important), sauf le motif publié au salon d'une exclusion en cours — et, pour une exclusion prononcée à partir de cette règle, son avis et la copie de son motif en message privé —, supprimés à sa levée.`,
               "**Journaux du serveur** : selon leur rotation automatique.",
               "**Annonces #live** (message de la soirée des matchs diffusés : noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs) : gardées dans le salon tant qu'il existe, même après la suppression du compte du joueur ; supprimées sur demande de l'équipe ou du joueur concerné (formulaire « Signaler un problème » du site, catégorie RGPD). Une annonce bloquée ou signalée par une règle AutoMod : son alerte reste dans le salon d'alertes de modération jusqu'à sa suppression par les modérateurs, et est supprimée sur demande de la même façon.",
-              // « Au plus » tient bien que l'archive soit hebdomadaire : la purge
+              // « Au plus » tient bien que l'archive ne soit faite que deux fois par
+              // semaine (dimanche et mardi soir) : la purge
               // (`rclone delete --min-age`) est refaite **chaque heure** par
               // `blueGenjiBot/scripts/sync-uploads-onedrive.sh` (nom historique), et pas seulement
-              // par la sauvegarde du lundi — même promesse que T09 et `/rgpd`.
-              `**Sauvegardes** : la base du Bot est sauvegardée chaque semaine, chiffrée, et chaque copie est supprimée définitivement au bout de ${BACKUP_RETENTION_DAYS} jours au plus. Une restauration se fait depuis ces archives, déchiffrées sur la machine du Bot : la base ne transite plus par Discord ; la copie de la base précédente qu'elle laisse à côté est supprimée à la restauration réussie suivante, au plus tard dans la nuit qui suit ses ${BACKUP_RETENTION_DAYS} jours.`,
+              // par la sauvegarde — même promesse que T09 et `/rgpd`.
+              `**Sauvegardes** : la base du Bot est sauvegardée deux fois par semaine (dimanche et mardi soir), chiffrée, et chaque copie est supprimée définitivement au bout de ${BACKUP_RETENTION_DAYS} jours au plus. Une restauration se fait depuis ces archives, déchiffrées sur la machine du Bot : la base ne transite plus par Discord ; la copie de la base précédente qu'elle laisse à côté est supprimée à la restauration réussie suivante, au plus tard dans la nuit qui suit ses ${BACKUP_RETENTION_DAYS} jours.`,
             ],
           },
         ],
@@ -726,7 +728,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
               `**Staff private log channel** (and the Bot's direct messages to its owner): one year (${BOT_STAFF_LOG_RETENTION_DAYS} days); older messages from the Bot are deleted by the nightly clean-up, in batches (several nights for a large backlog), except the reason posted in the channel for an exclusion still in force — and, for an exclusion issued from this rule on, its notice and the copy of its reason by direct message —, deleted when it is lifted.`,
               "**Server logs**: according to their automatic rotation.",
               "**#live announcements** (evening message of the streamed matches: team names or, in a solo tournament, the players' public BlueGenji username): kept in the channel as long as it exists, even after the player's account is deleted; deleted at the request of the team or player concerned (the website's “Report a problem” form, GDPR category). An announcement blocked or flagged by an AutoMod rule: its alert stays in the moderation alert channel until the moderators delete it, and is deleted on request in the same way.",
-              `**Backups**: the Bot's database is backed up weekly, encrypted, and each copy is permanently deleted after ${BACKUP_RETENTION_DAYS} days at most. A restore is made from these archives, decrypted on the Bot's machine: the database no longer travels through Discord; the copy of the previous database it leaves alongside is deleted at the next successful restore, and at the latest during the night after it turns ${BACKUP_RETENTION_DAYS} days old.`,
+              `**Backups**: the Bot's database is backed up twice a week (Sunday and Tuesday evenings), encrypted, and each copy is permanently deleted after ${BACKUP_RETENTION_DAYS} days at most. A restore is made from these archives, decrypted on the Bot's machine: the database no longer travels through Discord; the copy of the previous database it leaves alongside is deleted at the next successful restore, and at the latest during the night after it turns ${BACKUP_RETENTION_DAYS} days old.`,
             ],
           },
         ],
