@@ -281,6 +281,29 @@ export function playoffCutIndex(rows: EnduranceRankingRow[], playoffSize: number
 }
 
 /**
+ * Nombre de rencontres que l'arbre final comptera **une fois complet**. Le
+ * moteur ne pose qu'un tour à la fois : compter les seuls matchs posés disait
+ * « 0 sur 4 » aux quarts puis « 4 sur 6 » aux demies — un arbre plus court qu'il
+ * n'est, et une barre qui recule. Le reste se projette depuis le dernier tour
+ * posé : chaque tour divise les rencontres décisives par deux (arrondi vers le
+ * haut), et la petite finale se joue avec la finale, au sortir des demies.
+ */
+export function endurancePlayoffMatchTotal(playoffs: BracketMatch[]): number {
+  const decisive = playoffs.filter((match) => match.bracket !== "THIRD_PLACE");
+  if (decisive.length === 0) return playoffs.length;
+  const lastRound = Math.max(...decisive.map((match) => match.roundNumber));
+  let remaining = decisive.filter((match) => match.roundNumber === lastRound).length;
+  let total = playoffs.length;
+  const thirdPlaced = playoffs.some((match) => match.bracket === "THIRD_PLACE");
+  while (remaining > 1) {
+    if (remaining === 2 && !thirdPlaced) total += 1;
+    remaining = Math.ceil(remaining / 2);
+    total += remaining;
+  }
+  return total;
+}
+
+/**
  * Prochaine rencontre programmée de la manche : la plus proche date **à venir**
  * parmi ses matchs non joués. `null` sans date à venir.
  */

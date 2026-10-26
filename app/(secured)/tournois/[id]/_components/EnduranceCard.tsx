@@ -8,6 +8,7 @@ import { FR_VIEWS_TEXT } from "../_lib/views-text";
 import { useEntrantParticipantType } from "../_lib/entrant-link";
 import {
   enduranceCurrentRound,
+  endurancePlayoffMatchTotal,
   nextScheduledMatch,
   pendingEntrantCount,
 } from "../_lib/endurance-ranking-views";
@@ -45,7 +46,8 @@ export function EnduranceCard({
   const playoffsPlayed = playoffs.filter(isMatchPlayed).length;
   const showPlayoffs = current === null && endurance.playoffsStarted && playoffs.length > 0 && !isFinished;
 
-  const progress = current ?? (showPlayoffs ? { total: playoffs.length, played: playoffsPlayed } : null);
+  const progress =
+    current ?? (showPlayoffs ? { total: endurancePlayoffMatchTotal(playoffs), played: playoffsPlayed } : null);
 
   return (
     <>
