@@ -677,6 +677,10 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
 
     // Un résultat oppose deux engagés : une exemption (`is_bye`) ou une case
     // restée vide n'en est pas un — le bandeau affichait « Équipe #null 0 ».
+    // Il porte une issue enregistrée (vainqueur, forfait, double forfait, ou
+    // nul à scores égaux, comme `playedMatchSql`) : une ligne close sans rien
+    // de tout cela se lirait « A 0 — B 0 (sans vainqueur) ». Un tournoi pas
+    // encore publié (`start_visibility_at`) ne montre rien, ici comme ailleurs.
     const [resultRows] = await db.execute<MatchResultRow[]>(
       `SELECT
         m.updated_at,
@@ -702,6 +706,17 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
          AND m.is_bye = FALSE
          AND m.team1_id IS NOT NULL
          AND m.team2_id IS NOT NULL
+         AND (
+           m.winner_team_id IS NOT NULL
+           OR m.forfeit_team_id IS NOT NULL
+           OR m.double_forfeit = TRUE
+           OR (
+             m.team1_score IS NOT NULL
+             AND m.team2_score IS NOT NULL
+             AND m.team1_score = m.team2_score
+           )
+         )
+         AND t.start_visibility_at <= NOW()
        ORDER BY m.updated_at DESC
        LIMIT 3`,
     );
@@ -750,6 +765,7 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
        FROM bg_tournaments t
        LEFT JOIN bg_tournament_registrations r ON r.tournament_id = t.id
        WHERE t.state = 'REGISTRATION'
+         AND t.start_visibility_at <= NOW()
        GROUP BY t.id, t.start_at, t.registration_open_at, t.name, t.max_teams
        ORDER BY t.registration_open_at DESC`,
     );
@@ -776,6 +792,7 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
         AND r.final_rank = 1
        LEFT JOIN bg_teams w ON w.id = r.team_id
        WHERE t.state = 'FINISHED'
+         AND t.start_visibility_at <= NOW()
        ORDER BY t.finished_at DESC
        LIMIT 2`,
     );
