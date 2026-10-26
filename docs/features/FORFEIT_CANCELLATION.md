@@ -53,7 +53,11 @@ La transaction prend `lockTournamentRow` en toute première instruction. Elle
 verrouille donc le tournoi avant les manches que le rejeu peut poser, quand un
 report ou « Enregistrer » prend la manche avant le tournoi : comme l'abandon,
 elle passe par `retryOnDeadlock`, qui rejoue la transaction entière après un
-interblocage (publication une seule fois, après le commit réussi).
+interblocage (publication une seule fois, après le commit réussi). Le contrôle
+des manches postérieures est une lecture verrouillante (`LOCK IN SHARE MODE`,
+table seule) : un report en cours écrit son score sous le verrou du match avant
+d'attendre le tournoi, et une lecture d'instantané l'aurait manqué — l'équipe
+rentrait et le rejeu suisse réappariait une manche déjà saisie.
 
 ## Permission : administrateur strict
 
@@ -101,7 +105,8 @@ tournoi individuel), auteur nommé dans pm2 seulement.
 
 - `tests/lib/server/forfeit-cancellation-service.test.ts` — verrou en premier,
   fenêtre, statut remis à `ACTIVE`, rejeu du bon moteur, multi-phases,
-  rejeu après interblocage (un refus métier ne se rejoue pas).
+  rejeu après interblocage (un refus métier ne se rejoue pas), contrôle des
+  manches postérieures sous verrou partagé.
 - `tests/app/api/admin/forfeit-cancellation.test.ts` — administrateur seul,
   codes d'erreur, journal anonyme.
 - `tests/tournois/forfeit-eligibility.test.ts` — `canCancelForfeits`.
