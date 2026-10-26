@@ -19,6 +19,7 @@ import { getDatabase } from "@/lib/server/database";
 import { toParticipantType, type ParticipantType } from "@/lib/shared/participants";
 import { HAS_SCORE_INPUT_SQL } from "./bg-survie/round-progress";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
+import { retryOnDeadlock } from "./deadlock-retry";
 import { publishUpdatedEvent } from "./notifications";
 import { lockTournamentRow } from "./registration";
 
@@ -118,6 +119,18 @@ async function replayStandings(
  *         comptent contre elle.
  */
 export async function cancelTournamentForfeit(
+  tournamentId: number,
+  teamId: number,
+): Promise<CancelledForfeit> {
+  // Verrous tournoi puis manches (le rejeu peut poser la manche suivante),
+  // quand un report ou « Enregistrer » prend la manche puis le tournoi : même
+  // inversion que l'abandon (`forfeitTournamentTeamPublic`), qu'un interblocage
+  // rejoue au lieu de renvoyer une erreur à l'administrateur.
+  return retryOnDeadlock(() => cancelTournamentForfeitOnce(tournamentId, teamId));
+}
+
+/** Une tentative d'annulation, dans sa propre transaction. */
+async function cancelTournamentForfeitOnce(
   tournamentId: number,
   teamId: number,
 ): Promise<CancelledForfeit> {
