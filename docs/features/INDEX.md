@@ -10,7 +10,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `BG_SURVIE_MODE.md` — BlueGenji Survie (`BG_SURVIE`) : capital d'endurance, plafond de manches, sortie « hors course » anticipée en option (décochée par défaut), arbre final imposé.
 - `ENDURANCE_NEXT_ROUND_PREVIEW.md` — BG Survie : aperçu, pour l'arbitrage, des rencontres de la manche suivante acquises quel que soit le score.
 - `ENDURANCE_PENALTIES.md` — BG Survie : pénalités, entrées du rejeu, qui se **retirent** (jamais une pénalité inverse).
-- `ENDURANCE_RANKING_VIEWS.md` — BG Survie : en-tête, bandeau de la manche en cours, vues du classement manche par manche (▲▼, colonne « MANCHE n », zone play-offs), gestes dans « Général » seulement.
+- `ENDURANCE_RANKING_VIEWS.md` — BG Survie : en-tête, bandeau de la manche en cours, vues du classement manche par manche (▲▼, colonne « MANCHE n », zone play-offs), gestes dans « Général » seulement, graphique « Évolution de l'endurance » (replié, chargé au dépliage).
 - `ENDURANCE_ROUND_PANELS.md` — BG Survie : un volet par manche (en cours d'abord, closes repliées), vrai arbre des play-offs.
 - `ROUND_MATCH_SECTIONS.md` — Matchs d'une manche (BG Survie, Survie, suisse) rangés en cinq sections d'état séparées par un filet, triés par date puis tête de série.
 - `SOLO_TOURNAMENTS.md` — Tournoi individuel (`SOLO`) : entrée solo par joueur, `resolveUserEntrantTeamId`.

@@ -1,0 +1,399 @@
+/*
+ * Graphique « Évolution de l'endurance » (docs/features/ENDURANCE_RANKING_VIEWS.md).
+ * Aucune animation infinie : seule la courbe s'anime, par requestAnimationFrame,
+ * et le reste n'a que des transitions de survol. Texte HTML ≥ 11 px ; le texte
+ * du SVG est en unités utilisateur, mises à l'échelle avec le schéma.
+ */
+.chart {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  background: var(--cyber-bg-1);
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.segment {
+  display: inline-flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid rgba(180, 210, 230, 0.14);
+  border-radius: 8px;
+}
+
+.segmentButton,
+.ghostButton,
+.replayButton,
+.roundButton,
+.legendItem {
+  font: inherit;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.segmentButton {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink-mute);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.selected {
+  background: rgba(var(--blue-500-rgb), 0.16);
+  border-color: rgba(var(--blue-500-rgb), 0.45);
+  color: var(--ink);
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.ghostButton,
+.replayButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.ghostButton {
+  border: 1px solid rgba(180, 210, 230, 0.14);
+  background: transparent;
+  color: var(--ink-soft);
+}
+
+/* Sélection vide : le bouton reste là (focus gardé), état par couleurs seules. */
+.ghostButton[aria-disabled="true"] {
+  cursor: default;
+  color: var(--ink-dim);
+  border-color: rgba(180, 210, 230, 0.08);
+}
+
+.replayButton {
+  border: 1px solid rgba(var(--blue-500-rgb), 0.35);
+  background: rgba(var(--blue-500-rgb), 0.06);
+  color: var(--blue-300);
+}
+
+.segmentButton:focus-visible,
+.ghostButton:focus-visible,
+.replayButton:focus-visible,
+.roundButton:focus-visible,
+.legendItem:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+
+.hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.body {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.plot {
+  flex: 999 1 520px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rounds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.roundButton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--blue-300);
+  white-space: nowrap;
+}
+
+/* Manche à venir : couleurs seules, jamais d'opacité (texte ≥ 4,5:1). */
+.roundButton:disabled {
+  cursor: default;
+  color: var(--ink-dim);
+}
+
+.roundLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.roundSub {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  font-family: var(--font-mono);
+}
+
+.future {
+  fill: rgba(255, 255, 255, 0.025);
+}
+
+.band {
+  fill: rgba(var(--blue-500-rgb), 0.07);
+}
+
+.grid {
+  stroke: rgba(180, 210, 230, 0.07);
+  stroke-width: 1;
+}
+
+.gridStart {
+  stroke: rgba(180, 210, 230, 0.22);
+  stroke-width: 1;
+}
+
+.axisY {
+  fill: var(--ink-dim);
+  font-size: 11px;
+  text-anchor: end;
+}
+
+.axisX {
+  fill: var(--ink-mute);
+  font-size: 11px;
+  font-weight: 600;
+  text-anchor: middle;
+}
+
+.axisXShown {
+  fill: var(--ink);
+}
+
+.axisXFuture {
+  fill: var(--ink-dim);
+}
+
+.cut {
+  stroke: var(--accent-green);
+  stroke-width: 1;
+  stroke-dasharray: 5 5;
+}
+
+.cutLabel {
+  fill: var(--accent-green);
+  font-size: 11px;
+  text-anchor: end;
+}
+
+.line {
+  fill: none;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.head {
+  stroke-width: 2;
+}
+
+.forfeit {
+  fill: var(--danger);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.dimmed {
+  opacity: 0.3;
+}
+
+.hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 12;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.info {
+  min-height: 64px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border: 1px solid rgba(180, 210, 230, 0.08);
+  border-radius: 8px;
+  background: var(--cyber-bg-2);
+}
+
+.infoHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.infoName {
+  font-size: 14px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.infoMeta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+
+.steps {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.step {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ink-soft);
+}
+
+.stepPending {
+  color: var(--blue-300);
+  border: 1px dashed rgba(143, 213, 255, 0.4);
+}
+
+.swatch,
+.swatchEmpty {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.swatchEmpty {
+  border: 1.5px solid var(--ink-dim);
+}
+
+.legend {
+  flex: 1 1 260px;
+  min-width: 0;
+  max-height: 470px;
+}
+
+.legendList {
+  list-style: none;
+  margin: 0;
+  padding: 0 4px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.legendItem {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 12px 22px minmax(0, 1fr) 26px 54px;
+  gap: 8px;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+}
+
+.legendItem[aria-pressed="true"] {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.legendHover,
+.legendItem:hover {
+  background: rgba(var(--blue-500-rgb), 0.1);
+  border-color: rgba(var(--blue-500-rgb), 0.35);
+}
+
+.legendRank {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+
+.legendName {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.legendValue {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: right;
+}
+
+.legendState {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-align: right;
+}
+
+.toneUp {
+  color: var(--accent-green);
+}
+
+.toneDown {
+  color: var(--danger);
+}
+
+.tonePending {
+  color: var(--blue-300);
+}
+
+.toneMute {
+  color: var(--ink-dim);
+}
