@@ -125,6 +125,58 @@ describe("notifyUsers", () => {
     expect(report.discordUnreachedUserIds).toEqual([2]);
   });
 
+  it("bot perdu au premier appel : les autres langues ne sont pas tentées, leurs comptes rendus non joints", async () => {
+    accountLocales([
+      { id: 1, locale: "fr" },
+      { id: 2, locale: "en" },
+      { id: 3, locale: "fr" },
+    ]);
+    jest.mocked(pushDiscordDirectMessages).mockResolvedValueOnce(null);
+
+    const report = await notifyUsers(
+      [
+        { userId: 1, discord: { discordId: "1", handle: null, label: "A" } },
+        { userId: 2, discord: { discordId: "2", handle: null, label: "B" } },
+        { userId: 3, discord: { discordId: "3", handle: null, label: "C" } },
+      ],
+      { topic: "MATCH_REMINDER", push: PUSH, discord: { message: DM, context: "ctx" } },
+    );
+
+    // Un seul appel vers un bot tombé, comme avant le découpage par langue :
+    // le coupe-circuit ne s'ouvre pas sur une seule notification.
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
+    expect(report.discord).toBeNull();
+    expect(report.discordUnreachedUserIds).toEqual([1, 3, 2]);
+  });
+
+  it("les langues partent l'une après l'autre, jamais deux appels au bot en même temps", async () => {
+    accountLocales([
+      { id: 1, locale: "fr" },
+      { id: 2, locale: "en" },
+    ]);
+    let inFlight = 0;
+    let maxInFlight = 0;
+    jest.mocked(pushDiscordDirectMessages).mockImplementation(async () => {
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await Promise.resolve();
+      inFlight -= 1;
+      return { sent: 1, unresolved: [], failed: [] };
+    });
+
+    const report = await notifyUsers(
+      [
+        { userId: 1, discord: { discordId: "1", handle: null, label: "A" } },
+        { userId: 2, discord: { discordId: "2", handle: null, label: "B" } },
+      ],
+      { topic: "MATCH_REMINDER", push: PUSH, discord: { message: DM, context: "ctx" } },
+    );
+
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(2);
+    expect(maxInFlight).toBe(1);
+    expect(report.discord).toEqual({ sent: 2, unresolved: [], failed: [] });
+  });
+
   it("n'appelle pas le bot quand personne n'est joignable sur Discord, ou sans message", async () => {
     await notifyUsers([{ userId: 2, discord: null }], {
       topic: "MODERATION",
