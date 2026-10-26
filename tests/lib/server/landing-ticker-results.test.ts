@@ -22,6 +22,8 @@ type ResultRow = {
   winner_team_id: number | null;
   forfeit_team_id: number | null;
   double_forfeit: number;
+  match_format_type: "BO" | "FT" | null;
+  match_format_value: number | null;
 };
 
 function resultRow(overrides: Partial<ResultRow>, minute: number) {
@@ -37,6 +39,8 @@ function resultRow(overrides: Partial<ResultRow>, minute: number) {
     winner_team_id: 1,
     forfeit_team_id: null,
     double_forfeit: 0,
+    match_format_type: null,
+    match_format_value: null,
     ...overrides,
   };
 }
@@ -70,6 +74,7 @@ describe("getLandingTicker — résultats", () => {
     expect(sql).toMatch(/m\.winner_team_id/);
     expect(sql).toMatch(/m\.forfeit_team_id/);
     expect(sql).toMatch(/m\.double_forfeit/);
+    expect(sql).toMatch(/t\.match_format_type/);
   });
 
   it("ne prend que les matchs entre deux engagés : ni exemption, ni case vide", async () => {
@@ -114,6 +119,20 @@ describe("getLandingTicker — résultats", () => {
     const [item] = results((await getLandingTicker()).items);
     expect(item.sides.map((side) => side.outcome)).toEqual(["forfeit", "forfeit"]);
     expect(item.sr).toBeNull();
+  });
+
+  it("forfait antérieur à la règle, sans score en colonnes : score plein du format, comme les fiches", async () => {
+    await mockTicker([
+      resultRow({ winner_team_id: 2, forfeit_team_id: 1, team1_score: null, team2_score: null, match_format_type: "FT", match_format_value: 3 }, 1),
+    ]);
+    const [item] = results((await getLandingTicker()).items);
+    expect(item.sides.map((side) => [side.score, side.outcome])).toEqual([["0", "forfeit"], ["3", "win"]]);
+  });
+
+  it("double forfait gardant un 0-0 en colonnes : aucun score affiché", async () => {
+    await mockTicker([resultRow({ winner_team_id: null, double_forfeit: 1, team1_score: 0, team2_score: 0 }, 1)]);
+    const [item] = results((await getLandingTicker()).items);
+    expect(item.sides.map((side) => side.score)).toEqual([null, null]);
   });
 
   it("double forfait sans score enregistré (DOUBLE_FORFEIT.md) : pas de score, jamais un 0 inventé", async () => {

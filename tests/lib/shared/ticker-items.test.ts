@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { tickerItemText, tickerOutcomes, type TickerMatchOutcomeInput } from "@/lib/shared/ticker-items";
+import { tickerItemText, tickerOutcomes, tickerScores, type TickerMatchOutcomeInput } from "@/lib/shared/ticker-items";
 
 /** Issue des camps d'un résultat du bandeau, lue sur le résultat enregistré (TICKER_RESULTS.md). */
 function match(overrides: Partial<TickerMatchOutcomeInput> = {}): TickerMatchOutcomeInput {
@@ -16,6 +16,11 @@ describe("tickerOutcomes", () => {
     expect(tickerOutcomes(match({ winnerTeamId: 2, forfeitTeamId: 1 }))).toEqual(["forfeit", "win"]);
   });
 
+  it("forfait sans vainqueur enregistré, ou avec un vainqueur étranger : l'adversaire du forfait l'emporte", () => {
+    expect(tickerOutcomes(match({ winnerTeamId: null, forfeitTeamId: 1 }))).toEqual(["forfeit", "win"]);
+    expect(tickerOutcomes(match({ winnerTeamId: 9, forfeitTeamId: 2 }))).toEqual(["win", "forfeit"]);
+  });
+
   it("double forfait : deux camps forfaits, même avec un vainqueur résiduel", () => {
     expect(tickerOutcomes(match({ doubleForfeit: true, winnerTeamId: null }))).toEqual(["forfeit", "forfeit"]);
     expect(tickerOutcomes(match({ doubleForfeit: true }))).toEqual(["forfeit", "forfeit"]);
@@ -29,6 +34,27 @@ describe("tickerOutcomes", () => {
     expect(tickerOutcomes(match({ winnerTeamId: 9 }))).toEqual(["none", "none"]);
     expect(tickerOutcomes(match({ team2Id: null }))).toEqual(["win", "none"]);
     expect(tickerOutcomes(match({ team1Id: null, team2Id: null, winnerTeamId: null }))).toEqual(["none", "none"]);
+  });
+});
+
+describe("tickerScores", () => {
+  const scored = (overrides: Partial<Parameters<typeof tickerScores>[0]> = {}) =>
+    tickerScores({ ...match(), score1: 2, score2: 1, format: { type: "FT", value: 3 }, ...overrides });
+
+  it("match tranché ou nul : les colonnes", () => {
+    expect(scored()).toEqual([2, 1]);
+    expect(scored({ winnerTeamId: null, score1: 1, score2: 1 })).toEqual([1, 1]);
+  });
+
+  it("double forfait : aucun score, même si la ligne garde un 0-0", () => {
+    expect(scored({ doubleForfeit: true, winnerTeamId: null, score1: 0, score2: 0 })).toEqual([null, null]);
+    expect(scored({ doubleForfeit: true, winnerTeamId: null, score1: null, score2: null })).toEqual([null, null]);
+  });
+
+  it("forfait : score plein du format, même sans score en colonnes (forfaits antérieurs à la règle)", () => {
+    expect(scored({ winnerTeamId: 2, forfeitTeamId: 1, score1: null, score2: null })).toEqual([0, 3]);
+    expect(scored({ winnerTeamId: 1, forfeitTeamId: 2, score1: 0, score2: 0 })).toEqual([3, 0]);
+    expect(scored({ winnerTeamId: 1, forfeitTeamId: 2, score1: null, score2: null, format: null })).toEqual([1, 0]);
   });
 });
 
