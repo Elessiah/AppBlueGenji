@@ -34,6 +34,8 @@ function setup(options: {
   phase?: { id: number; format: string } | null;
   standing?: { status: string; forfeit_round?: number } | null;
   laterInputs?: number;
+  laterMatchIds?: number[];
+  laterBusy?: number;
 } = {}) {
   const head =
     options.head === null
@@ -51,17 +53,28 @@ function setup(options: {
   const sqls: string[] = [];
   const params: unknown[] = [];
   const connection = connectionMock();
+  let busy = options.laterBusy ?? 0;
+  const laterIds = options.laterMatchIds ?? [301, 302];
   connection.execute.mockImplementation(async (sql: string, values?: unknown) => {
     const flat = sql.replace(/\s+/g, " ").trim();
     sqls.push(flat);
     params.push(values);
+    if (/^SELECT id FROM bg_matches WHERE tournament_id/.test(flat)) return [laterIds.map((id) => ({ id }))];
+    if (/FOR UPDATE NOWAIT/.test(flat)) {
+      if (busy > 0) {
+        busy -= 1;
+        throw Object.assign(new Error("Lock wait timeout exceeded; try restarting transaction"), {
+          code: "ER_LOCK_WAIT_TIMEOUT",
+        });
+      }
+      return [laterIds.slice(0, options.laterInputs ?? 0).map((id) => ({ id }))];
+    }
     if (/FOR UPDATE/.test(flat)) return [[{ id: 7 }]];
     if (/FROM bg_tournaments WHERE id/.test(flat)) return [head ? [head] : []];
     if (/bg_tournament_phases/.test(flat)) return [options.phase ? [options.phase] : []];
     if (/^SELECT s.status/.test(flat)) {
       return [standing ? [{ ...standing, team_name: "Team Nova" }] : []];
     }
-    if (/COUNT\(\*\) AS c FROM bg_matches/.test(flat)) return [[{ c: options.laterInputs ?? 0 }]];
     return [{ affectedRows: 1 }];
   });
   jest.mocked(getDatabase).mockResolvedValue(
@@ -121,14 +134,57 @@ describe("cancelTournamentForfeit", () => {
     expect(publishUpdatedEvent).toHaveBeenCalledTimes(1);
   });
 
-  it("lit les manches postérieures sous verrou partagé, sans jointure (MariaDB)", async () => {
-    const { sqls } = setup();
+  it("relit les manches postérieures verrouillées par clé primaire, sans attendre ni jointure", async () => {
+    const { sqls, params } = setup();
 
     await cancelTournamentForfeit(7, 102);
 
-    const guard = sqls.find((sql) => /COUNT\(\*\) AS c FROM bg_matches/.test(sql)) ?? "";
-    expect(guard).toMatch(/LOCK IN SHARE MODE$/);
-    expect(guard).not.toMatch(/JOIN|FOR SHARE/);
+    const guard = sqls.findIndex((sql) => /FOR UPDATE NOWAIT$/.test(sql));
+    expect(sqls[guard]).toMatch(/^SELECT id FROM bg_matches WHERE id IN \(\?, \?\) AND/);
+    expect(sqls[guard]).not.toMatch(/JOIN|FOR SHARE|round_number/);
+    expect(params[guard]).toEqual([301, 302]);
+  });
+
+  it("sans manche postérieure, ne verrouille aucun match", async () => {
+    const { sqls } = setup({ laterMatchIds: [] });
+
+    await cancelTournamentForfeit(7, 102);
+
+    expect(sqls.some((sql) => /NOWAIT/.test(sql))).toBe(false);
+  });
+
+  it("une manche postérieure occupée défait l'annulation et la rejoue, qui refuse alors", async () => {
+    const { connection } = setup({ laterBusy: 1 });
+    let attempt = 0;
+    connection.beginTransaction.mockImplementation(async () => {
+      attempt += 1;
+    });
+    // Au rejeu, le report concurrent est commité : la manche porte sa saisie.
+    const execute = connection.execute.getMockImplementation();
+    connection.execute.mockImplementation(async (sql: string, values?: unknown) => {
+      if (attempt > 1 && /FOR UPDATE NOWAIT/.test(sql)) return [[{ id: 301 }]];
+      return execute!(sql, values);
+    });
+
+    await expect(cancelTournamentForfeit(7, 102)).rejects.toThrow("FORFEIT_ROUND_PASSED");
+
+    expect(attempt).toBe(2);
+    expect(connection.rollback).toHaveBeenCalledTimes(2);
+    expect(connection.commit).not.toHaveBeenCalled();
+    expect(reconcileSurvival).not.toHaveBeenCalled();
+  });
+
+  it("laisse remonter une autre erreur du verrou sans la rejouer", async () => {
+    const { connection } = setup();
+    const execute = connection.execute.getMockImplementation();
+    connection.execute.mockImplementation(async (sql: string, values?: unknown) => {
+      if (/FOR UPDATE NOWAIT/.test(sql)) throw Object.assign(new Error("boom"), { code: "ER_PARSE_ERROR" });
+      return execute!(sql, values);
+    });
+
+    await expect(cancelTournamentForfeit(7, 102)).rejects.toThrow("boom");
+
+    expect(connection.beginTransaction).toHaveBeenCalledTimes(1);
   });
 
   it("ne rejoue pas un refus métier", async () => {
@@ -173,7 +229,7 @@ describe("cancelTournamentForfeit", () => {
 
     await cancelTournamentForfeit(7, 102);
 
-    const later = sqls.findIndex((sql) => /COUNT\(\*\) AS c FROM bg_matches/.test(sql));
+    const later = sqls.findIndex((sql) => /^SELECT id FROM bg_matches WHERE tournament_id/.test(sql));
     expect(sqls[later]).toContain("round_number > ?");
     expect(params[later]).toEqual([7, 0, 2]);
   });
