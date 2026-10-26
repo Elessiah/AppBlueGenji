@@ -12,13 +12,13 @@ jest.mock("@/lib/server/ranking-cache", () => ({
 }));
 jest.mock("@/lib/server/landing-cache", () => ({
   invalidateLandingAggregates: jest.fn(),
-  invalidateLandingLeaderboard: jest.fn(),
+  invalidateLandingTeamViews: jest.fn(),
 }));
 
 import { getDatabase } from "@/lib/server/database";
 import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
 import { invalidateRankingLists, invalidateTeamRanking } from "@/lib/server/ranking-cache";
-import { invalidateLandingAggregates, invalidateLandingLeaderboard } from "@/lib/server/landing-cache";
+import { invalidateLandingAggregates, invalidateLandingTeamViews } from "@/lib/server/landing-cache";
 import { softDeleteTeam } from "@/lib/server/teams/dissolution";
 import { compareDirectoryRank, isRankedTeam } from "@/lib/shared/ranking";
 
@@ -140,7 +140,7 @@ describe("softDeleteTeam — cache du classement et des marches", () => {
     await softDeleteTeam(1, 12);
 
     expect(invalidateRankingLists).toHaveBeenCalledTimes(1);
-    expect(invalidateLandingLeaderboard).toHaveBeenCalledTimes(1);
+    expect(invalidateLandingTeamViews).toHaveBeenCalledTimes(1);
     expect(jest.mocked(invalidateRankingLists).mock.invocationCallOrder[0])
       .toBeGreaterThan(connection.commit.mock.invocationCallOrder[0]);
     // La dissolution ne change aucun match : le rejeu et le reste de l'accueil
@@ -155,6 +155,6 @@ describe("softDeleteTeam — cache du classement et des marches", () => {
 
     await expect(softDeleteTeam(1, 12)).rejects.toThrow("ER_LOCK_DEADLOCK");
     expect(invalidateRankingLists).not.toHaveBeenCalled();
-    expect(invalidateLandingLeaderboard).not.toHaveBeenCalled();
+    expect(invalidateLandingTeamViews).not.toHaveBeenCalled();
   });
 });
