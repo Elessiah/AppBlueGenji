@@ -90,7 +90,8 @@ const LAST_UPDATED_EN = "19 October 2026";
 // les deux (l'avis « Match retiré » est aussi cité à l'article 01 des conditions) ;
 // messages de match aux seuls tags certifiés (DM-CERTIFIED-ONLY), les deux (article 01) ;
 // langue du compte transmise avec le code et messages privés dans cette langue
-// (BOT-NOTIF-LANG), la politique seule.
+// (BOT-NOTIF-LANG), la politique seule ; base de la conservation du choix des
+// messages de match, obligation légale (LEGAL-OPTOUT-BASIS), la politique seule.
 const PRIVACY_LAST_UPDATED_FR = "27 octobre 2026";
 const PRIVACY_LAST_UPDATED_EN = "27 October 2026";
 
@@ -492,7 +493,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Base légale" },
           {
             kind: "p",
-            text: "Ces traitements reposent sur l'**intérêt légitime** de l'association (article 6.1.f du RGPD) : faire fonctionner le relais entre serveurs partenaires, le modérer et en mesurer l'activité. Les messages du site reposent sur la base légale de leur traitement d'origine, indiquée dans le registre du site : intérêt légitime pour les messages privés de match d'un joueur (horaire, rappels, « Match retiré »), auxquels il s'oppose par l'interrupteur de « Mon profil » — le site garde ce choix dans l'intérêt légitime du joueur, pour l'honorer ; exécution du service auquel le joueur s'inscrit pour son pseudo public dans l'annonce #live d'un tournoi individuel ; intérêt légitime de l'association à modérer son serveur pour l'alerte AutoMod d'une telle annonce bloquée ou signalée, supprimée sur demande.",
+            text: "Ces traitements reposent sur l'**intérêt légitime** de l'association (article 6.1.f du RGPD) : faire fonctionner le relais entre serveurs partenaires, le modérer et en mesurer l'activité. Les messages du site reposent sur la base légale de leur traitement d'origine, indiquée dans le registre du site : intérêt légitime pour les messages privés de match d'un joueur (horaire, rappels, « Match retiré »), auxquels il s'oppose par l'interrupteur de « Mon profil » — le site garde ce choix au titre d'une obligation légale (article 6.1.c du RGPD), pour continuer d'honorer cette opposition ; exécution du service auquel le joueur s'inscrit pour son pseudo public dans l'annonce #live d'un tournoi individuel ; intérêt légitime de l'association à modérer son serveur pour l'alerte AutoMod d'une telle annonce bloquée ou signalée, supprimée sur demande.",
           },
         ],
       },
@@ -704,7 +705,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Legal basis" },
           {
             kind: "p",
-            text: "This processing is based on the association's **legitimate interest** (Article 6(1)(f) GDPR): running the relay between partner servers, moderating it and measuring its activity. Messages from the website rely on the legal basis of their original processing, set out in the website's register: legitimate interest for a player's match direct messages (time, reminders, “Match retiré”), which they object to with the switch in “My profile” — the website keeps that choice in their legitimate interest, to honour it; performance of the service the player registers for, for their public username in the #live announcement of a solo tournament; the association's legitimate interest in moderating its server for the AutoMod alert of such an announcement when blocked or flagged, deleted on request.",
+            text: "This processing is based on the association's **legitimate interest** (Article 6(1)(f) GDPR): running the relay between partner servers, moderating it and measuring its activity. Messages from the website rely on the legal basis of their original processing, set out in the website's register: legitimate interest for a player's match direct messages (time, reminders, “Match retiré”), which they object to with the switch in “My profile” — the website keeps that choice under a legal obligation (Article 6(1)(c) GDPR), to keep honouring that objection; performance of the service the player registers for, for their public username in the #live announcement of a solo tournament; the association's legitimate interest in moderating its server for the AutoMod alert of such an announcement when blocked or flagged, deleted on request.",
           },
         ],
       },

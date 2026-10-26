@@ -1016,8 +1016,8 @@ function RgpdFr({
             sur l&apos;<strong>intérêt légitime</strong> de l&apos;association au bon déroulement des
             tournois ; vous pouvez vous y opposer à tout moment en décochant « Messages privés Discord de
             mes matchs » dans <Link href="/profil#notifications">Mon profil</Link> — vos notifications push
-            gardent leurs propres réglages. Le site garde ce choix le temps du compte, dans votre intérêt
-            légitime (c&apos;est ce qui lui permet de l&apos;honorer) ; il figure dans
+            gardent leurs propres réglages. Le site garde ce choix le temps du compte, au titre d&apos;une{" "}
+            <strong>obligation légale</strong> (c&apos;est ce qui lui permet de continuer d&apos;honorer votre opposition) ; il figure dans
             l&apos;export de vos données. Les alertes et le programme d&apos;arbitrage adressés aux
             arbitres et administrateurs relèvent de l&apos;<strong>exécution du service</strong> et ne
             se coupent pas ainsi (<Link href="/rgpd/registre#t04">registre, T04</Link>). Quand un membre du

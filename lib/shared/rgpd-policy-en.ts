@@ -101,7 +101,7 @@ const PROFIL_TEXT_EN: readonly (readonly [donnee: string, finalite: string])[] =
   ],
   [
     "Match direct messages choice",
-    "Ticked by default: the bot writes to you privately about the time, reminders and removal of your matches, if your Discord tag is certified; unticked in My profile (your objection), it no longer does. Kept in your legitimate interest: that is what allows your objection to be honoured. Included in the export of your data, reset to the default if the account is anonymized",
+    "Ticked by default: the bot writes to you privately about the time, reminders and removal of your matches, if your Discord tag is certified; unticked in My profile (your objection), it no longer does. Kept under a legal obligation: that is what allows your objection to keep being honoured. Included in the export of your data, reset to the default if the account is anonymized",
   ],
   [
     "Recruitment “Don't show again” choice",
