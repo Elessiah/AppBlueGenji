@@ -121,3 +121,14 @@ describe("HighlightStrip — équipes sans match", () => {
     ).toBe("");
   });
 });
+
+// Revue UI/UX : classée = avec un rang. Une équipe classée sur un seul nul
+// (0V–0D, `TeamListItem` ne porte pas les nuls) n'est pas « sans match ».
+describe("HighlightStrip — légende de la cote d'une équipe classée sur un nul", () => {
+  it("ne dit pas « Aucun match joué » d'une équipe qui a un rang", () => {
+    const markup = renderToStaticMarkup(
+      <HighlightStrip teams={[team(7, 1, { wins: 0, losses: 0, points: 500 }), team(3, 2), team(11, 3)]} />,
+    );
+    expect(markup).not.toContain("Aucun match joué");
+  });
+});

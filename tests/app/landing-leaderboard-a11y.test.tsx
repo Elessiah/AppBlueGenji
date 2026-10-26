@@ -141,7 +141,7 @@ describe("Leaderboard — tendance d'une équipe entrée au classement", () => {
         <Leaderboard initialRows={[leaderboardRow({ trend: "new" })]} />
       </ToastProvider>,
     );
-    expect(markup).toContain("★");
+    expect(markup).toContain('title="Entrée au classement ces 7 derniers jours">★');
     expect(markup).toContain("Entrée au classement ces 7 derniers jours");
   });
 });

@@ -269,7 +269,8 @@ describe("tendance d'une équipe entrée au classement", () => {
   it("français", () => {
     const markup = renderBoard("fr", { rows });
     expect(markup).toContain("Entrée au classement ces 7 derniers jours");
-    expect(markup).toContain("★");
+    // Visible aussi au survol : l'étoile n'est pas un chiffre.
+    expect(markup).toContain('title="Entrée au classement ces 7 derniers jours">★');
   });
 
   it("anglais", () => {
