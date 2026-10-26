@@ -81,6 +81,13 @@
   color: var(--ink-soft);
 }
 
+/* Sélection vide : le bouton reste là (focus gardé), état par couleurs seules. */
+.ghostButton[aria-disabled="true"] {
+  cursor: default;
+  color: var(--ink-dim);
+  border-color: rgba(180, 210, 230, 0.08);
+}
+
 .replayButton {
   border: 1px solid rgba(var(--blue-500-rgb), 0.35);
   background: rgba(var(--blue-500-rgb), 0.06);

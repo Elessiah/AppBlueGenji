@@ -104,6 +104,22 @@ export function chartRankAt(series: EnduranceChartSeries, round: number, lastRou
   return rankAfterRound(series.standing, round) ?? series.standing.rank;
 }
 
+/**
+ * Bilan (V / N / D) cumulé **à l'issue** de la manche affichée, comme le rang
+ * de l'encart — la dernière lit le général. Même lecture que la vue « après la
+ * manche n » (`pastRow`) : 0 si l'instantané ne porte pas le bilan.
+ */
+export function chartRecordAt(
+  series: EnduranceChartSeries,
+  round: number,
+  lastRound: number,
+): { wins: number; draws: number; losses: number } {
+  const { standing } = series;
+  if (round >= lastRound) return { wins: standing.wins, draws: standing.draws, losses: standing.losses };
+  const cell = standing.rounds.find((entry) => entry.round === round);
+  return { wins: cell?.wins ?? 0, draws: cell?.draws ?? 0, losses: cell?.losses ?? 0 };
+}
+
 /** Capital d'un engagé à la manche affichée (dernier capital connu au-delà). */
 export function chartValueAt(series: EnduranceChartSeries, round: number, lastRound: number): number {
   if (round >= lastRound) return series.standing.points;

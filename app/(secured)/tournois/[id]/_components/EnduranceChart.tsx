@@ -21,6 +21,7 @@ import {
   chartLine,
   chartOrderAt,
   chartRankAt,
+  chartRecordAt,
   chartShownRound,
   chartTargetFor,
   chartThresholdAt,
@@ -278,8 +279,17 @@ export function EnduranceChart({ endurance, matches }: Readonly<{ endurance: End
           ))}
         </fieldset>
         <div className={styles.actions}>
-          {mode === "PICK" && picked.length > 0 && (
-            <button type="button" onClick={() => setPicked([])} className={styles.ghostButton}>
+          {/* Reste monté en « Ma sélection » : vider la liste ne retire pas le
+              bouton qui a le focus (aria-disabled, jamais disabled natif). */}
+          {mode === "PICK" && (
+            <button
+              type="button"
+              aria-disabled={picked.length === 0}
+              onClick={() => {
+                if (picked.length > 0) setPicked([]);
+              }}
+              className={styles.ghostButton}
+            >
               {t("endurance.chartClear")}
             </button>
           )}
@@ -413,9 +423,7 @@ export function EnduranceChart({ endurance, matches }: Readonly<{ endurance: End
                     {t(hasDraws ? "endurance.chartInfoMetaDraws" : "endurance.chartInfoMeta", {
                       rank: chartRankAt(hovered, shown, lastRound),
                       seed: hovered.seed,
-                      wins: hovered.standing.wins,
-                      draws: hovered.standing.draws,
-                      losses: hovered.standing.losses,
+                      ...chartRecordAt(hovered, shown, lastRound),
                     })}
                   </span>
                 </div>
