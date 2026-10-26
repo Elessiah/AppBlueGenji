@@ -653,3 +653,18 @@ describe("T01 : « Ne plus afficher » de la fenêtre du recrutement (MODAL-DISM
     expect(enT01().dataCategories.join(" ")).toMatch(/announcements, made in that window or by unticking the “My profile” box/);
   });
 });
+
+describe("sauvegardes (T09) : deux fois par semaine, dimanche et mardi (BACKUP-SCHEDULE)", () => {
+  const enT09 = () => PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T09")!;
+
+  it("annonce l'archive des bases le dimanche et le mardi soir (FR et EN)", () => {
+    expect(byRef("T09").subPurposes[0]).toBe("Archive deux fois par semaine (dimanche et mardi soir) des bases de données du site et du bot");
+    expect(enT09().subPurposes[0]).toBe("Twice-weekly archive (Sunday and Tuesday evenings) of the site's and the bot's databases");
+  });
+
+  it("ne dit plus « hebdomadaire » ni « weekly » pour les sauvegardes, durée inchangée", () => {
+    expect(JSON.stringify(byRef("T09"))).not.toMatch(/hebdomadaire|lundi/i);
+    expect(JSON.stringify(enT09())).not.toMatch(/(?<!Twice-)\bweekly\b|monday/i);
+    expect(enT09().retention[0]).toContain(`${BACKUP_RETENTION_DAYS} days at most`);
+  });
+});
