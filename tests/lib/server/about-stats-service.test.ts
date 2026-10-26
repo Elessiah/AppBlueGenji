@@ -29,11 +29,19 @@ describe("about-stats-service", () => {
 
   describe("listAboutStats", () => {
     it("returns rows from the database", async () => {
-      const rows = [{ id: 1, value: "100%", label: "Bénévole" }];
-      await mockDb(jest.fn<SqlQuery>().mockResolvedValue([rows]));
+      const rows = [
+        { id: 1, value: "100%", value_en: null, label: "Bénévole", label_en: "Volunteer-run" },
+        { id: 2, value: "0 €", value_en: "€0", label: "Frais", label_en: "Fee" },
+      ];
+      const execute = jest.fn<SqlQuery>().mockResolvedValue([rows]);
+      await mockDb(execute);
 
       const result = await listAboutStats();
-      expect(result).toEqual([{ id: 1, value: "100%", label: "Bénévole" }]);
+      expect(result).toEqual([
+        { id: 1, value: "100%", valueEn: null, label: "Bénévole", labelEn: "Volunteer-run" },
+        { id: 2, value: "0 €", valueEn: "€0", label: "Frais", labelEn: "Fee" },
+      ]);
+      expect(String(execute.mock.calls[0][0])).toContain("value_en");
     });
 
     it("returns the fallback when the table is empty", async () => {
@@ -54,8 +62,28 @@ describe("about-stats-service", () => {
       await mockDb(execute);
 
       const stat = await createAboutStat({ labelEn: "EN", value: "12", label: "Arbitres" });
-      expect(stat).toEqual({ id: 42, value: "12", label: "Arbitres", labelEn: "EN" });
+      expect(stat).toEqual({ id: 42, value: "12", valueEn: null, label: "Arbitres", labelEn: "EN" });
       expect(execute).toHaveBeenCalledTimes(1);
+      expect(String(execute.mock.calls[0][0])).toContain("value_en");
+      expect(execute.mock.calls[0][1]).toEqual(["12", null, "Arbitres", "EN"]);
+    });
+
+    it("stores the trimmed English value", async () => {
+      const execute = jest.fn<SqlQuery>().mockResolvedValue([{ insertId: 43 }]);
+      await mockDb(execute);
+
+      const stat = await createAboutStat({ labelEn: "Fee", value: "0 €", valueEn: "  Free ", label: "Frais" });
+      expect(stat.valueEn).toBe("Free");
+      expect(execute.mock.calls[0][1]).toEqual(["0 €", "Free", "Frais", "Fee"]);
+    });
+
+    it("rejects an over-long English value before touching the database", async () => {
+      const execute = jest.fn<SqlQuery>();
+      await mockDb(execute);
+      await expect(
+        createAboutStat({ labelEn: "EN", value: "12", valueEn: "x".repeat(41), label: "Arbitres" }),
+      ).rejects.toThrow("VALUE_EN_TOO_LONG");
+      expect(execute).not.toHaveBeenCalled();
     });
 
     it("rejects invalid input before touching the database", async () => {
@@ -71,8 +99,19 @@ describe("about-stats-service", () => {
       const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
       await mockDb(execute);
 
-      const stat = await updateAboutStat(7, { labelEn: "EN", value: "0 €", label: "Frais d'inscription" });
-      expect(stat).toEqual({ id: 7, value: "0 €", label: "Frais d'inscription", labelEn: "EN" });
+      const stat = await updateAboutStat(7, { labelEn: "EN", value: "0 €", valueEn: "€0", label: "Frais d'inscription" });
+      expect(stat).toEqual({ id: 7, value: "0 €", valueEn: "€0", label: "Frais d'inscription", labelEn: "EN" });
+      expect(String(execute.mock.calls[0][0])).toContain("value_en = ?");
+      expect(execute.mock.calls[0][1]).toEqual(["0 €", "€0", "Frais d'inscription", "EN", 7]);
+    });
+
+    it("clears the English value when it is emptied", async () => {
+      const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
+      await mockDb(execute);
+
+      const stat = await updateAboutStat(7, { labelEn: "EN", value: "12", valueEn: "  ", label: "Arbitres" });
+      expect(stat.valueEn).toBeNull();
+      expect(execute.mock.calls[0][1]).toEqual(["12", null, "Arbitres", "EN", 7]);
     });
 
     it("throws NOT_FOUND when no row matches", async () => {

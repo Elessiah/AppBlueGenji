@@ -41,8 +41,9 @@ jest.mock("@/lib/server/bureau-service", () => ({
 }));
 jest.mock("@/lib/server/about-stats-service", () => ({
   listAboutStats: jest.fn(async () => [
-    { id: 1, value: "12", label: "Arbitres", labelEn: "Referees" },
-    { id: 2, value: "0 €", label: "Frais d'inscription", labelEn: null },
+    { id: 1, value: "12", valueEn: null, label: "Arbitres", labelEn: "Referees" },
+    { id: 2, value: "0 €", valueEn: "€0", label: "Frais d'inscription", labelEn: null },
+    { id: 3, value: "€4 200", valueEn: "€4,200", label: "Prizepool 2025", labelEn: "2025 prize pool" },
   ]),
 }));
 jest.mock("@/lib/server/about-pillars-service", () => ({
@@ -231,6 +232,10 @@ describe("rendu anglais — aucune phrase française, contenu du staff sans angl
     expect(text).toContain("Léo Perreaut");
     expect(text).not.toContain("Bryan Boulleaux");
     expect(text).toContain("Referees");
+    // Valeur anglaise saisie, sinon la française reprise (« 12 »).
+    expect(text).toContain("€4,200");
+    expect(text).not.toContain("€4 200");
+    expect(html).toContain(">12</div>");
     expect(text).toContain("Free registration.");
     expect(text).toContain("1 MEMBER · VOLUNTEERS");
     expect(text).toContain("French nonprofit (law of 1901)");
@@ -359,6 +364,13 @@ describe("rendu anglais — rien encore traduit : le dire, sans « 0 » ni « au
 });
 
 describe("rendu français — inchangé, tout le contenu du staff", () => {
+  it("/association garde les valeurs françaises des chiffres", async () => {
+    const text = readable(await render(AssociationPage, "fr"));
+    expect(text).toContain("€4 200");
+    expect(text).toContain("0 €");
+    expect(text).not.toContain("€4,200");
+  });
+
   it("/association", async () => {
     const text = readable(await render(AssociationPage, "fr"));
     for (const french of [

@@ -25,6 +25,7 @@ Table `bg_about_stats` (migration auto dans `lib/server/database/schema/showcase
 | --------------- | ------------- | --------------------------------------- |
 | `id`            | BIGINT PK     | Auto-increment                          |
 | `value`         | VARCHAR(40)   | Valeur affichée (ex. « €4 200 », « 12 »)|
+| `value_en`      | VARCHAR(40) NULL | Valeur sous `/en` (« €4,200 ») ; `NULL` = la française |
 | `label`         | VARCHAR(60)   | Titre sous la valeur (ex. « Arbitres ») |
 | `display_order` | INT           | Ordre d'affichage (tri croissant)       |
 | `created_at`    | DATETIME      | Auto                                    |
@@ -40,7 +41,9 @@ pas modifiables** dans l'interface.
 Logique dans `lib/shared/about-stats.ts` (importable côté client et serveur) :
 
 - `validateAboutStatInput(input)` — normalise (trim) et valide `value` + `label` :
-  les deux sont **requis** ; `value` ≤ 40 car., `label` ≤ 60 car.
+  les deux sont **requis** ; `value` ≤ 40 car., `label` ≤ 60 car. ; `valueEn`
+  facultative, rognée, vide → `null`, ≤ 40 car. (`VALUE_EN_TOO_LONG`).
+- `aboutStatValue(stat, locale)` — la valeur dans la langue de la page.
 - `FALLBACK_ABOUT_STATS` — les 4 cartes historiques, servies quand la table est
   vide ou injoignable.
 
@@ -55,7 +58,9 @@ Logique dans `lib/shared/about-stats.ts` (importable côté client et serveur) :
 
 Codes d'erreur : `UNAUTHORIZED` (401), `FORBIDDEN` (403), `INVALID_ID` /
 `INVALID_BODY` / `VALUE_REQUIRED` / `LABEL_REQUIRED` / `VALUE_TOO_LONG` /
-`LABEL_TOO_LONG` (400), `ABOUT_STAT_NOT_FOUND` (404).
+`LABEL_TOO_LONG` / `VALUE_EN_TOO_LONG` (400), `ABOUT_STAT_NOT_FOUND` (404).
+`POST` et `PUT` portent `valueEn` (un non-texte devient `null`) ; chaque
+réponse renvoie la carte avec `valueEn`.
 
 ## Interface
 
@@ -87,11 +92,17 @@ trois règles communes à toutes les modales : `docs/features/MODAL_DIALOGS.md`.
   `LandingDialog` ; portail, pile commune et voile sur toutes les modales du
   site (balayage de source).
 - `tests/lib/shared/backdrop-dismiss.test.ts` — fermeture par le voile.
-- `tests/lib/shared/about-stats.test.ts` — validation (requis, trim, longueurs).
+- `tests/lib/shared/about-stats.test.ts` — validation (requis, trim, longueurs,
+  valeur anglaise), valeur par langue, cartes de secours en anglais.
+- `tests/components/about-stats-value-en.test.ts` — câblage du champ « Valeur en
+  anglais » (identifiant, « i », refus rattaché, envoi).
+- `tests/lib/server/database-schema.test.ts` — `value_en` aux deux endroits.
 - `tests/lib/server/about-stats-service.test.ts` — CRUD + fallback (DB mockée).
 - `tests/app/api/association/about-stats.test.ts` — gardes d'auth, validation,
   codes HTTP des routes.
 
 ## Langues (lot 5b de l'i18n)
 
-Le titre a son anglais (`label_en`, `labelEn`), obligatoire à la saisie (`LABEL_EN_REQUIRED` / `LABEL_EN_TOO_LONG`). La valeur (« 100% », « 12 ») ne se traduit pas. Sous `/en`, un chiffre sans titre anglais n'est pas rendu ; les chiffres de secours ont leur anglais. Détail : `I18N.md` § Association, bénévoles, recrutement ; rattrapage : `EDITABLE_SITE_COPY.md` § Rattrapage.
+Le titre a son anglais (`label_en`, `labelEn`), obligatoire à la saisie (`LABEL_EN_REQUIRED` / `LABEL_EN_TOO_LONG`). Sous `/en`, un chiffre sans titre anglais n'est pas rendu ; les chiffres de secours ont leur anglais.
+
+La valeur a une **anglaise facultative** (`value_en`, `valueEn`) : un montant s'y écrit à l'anglaise (« €4,200 » et non « 4 200 € », « Free » ou « €0 » et non « 0 € »). Laissée vide (`NULL`), la valeur française est reprise sous `/en` — un « 12 » ou un « 100% » n'a rien à traduire, d'où l'absence de marque **EN** et de rattrapage ; seule une valeur reprise qui porte des lettres (« Gratuit ») est annoncée `lang="fr"` (`aboutStatValueIsFrench`). Celle-ci, comme une valeur écrite à la française (groupe de milliers espacé « 4 200 », virgule décimale « 1,5 », euro en suffixe « 0 € » — `aboutStatValueNeedsEnglish`), met la marque **EN** sur le bouton « Modifier » de sa carte (`aboutStatNeedsEnglish`, comme un titre anglais absent) et un avertissement sous le champ anglais de la modale, tant qu'il est vide (`EnglishMissingHint`, cité par le champ) : une valeur identique dans les deux langues (« Top 8 ») s'y recopie. La page française ne lit jamais `valueEn`. Champ « Valeur en anglais (facultatif) » de la modale, juste sous « Valeur » (avant le titre bilingue, dont l'Entrée enregistre), avec son « i » (`InfoHint`, cité par le champ) ; la modale reste française (D4). Seed : `FICTIONAL_ABOUT_STATS` (`docs/seed/SEED_RULES.md`). Détail : `I18N.md` § Association, bénévoles, recrutement ; rattrapage : `EDITABLE_SITE_COPY.md` § Rattrapage.

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Info } from "lucide-react";
 import { useAppLocale } from "@/components/i18n/locale-context";
-import { infoHintLabel, infoHintReaction } from "@/lib/shared/info-hint";
+import { infoHintFocusLeftToContainer, infoHintLabel, infoHintReaction } from "@/lib/shared/info-hint";
 import s from "./info-hint.module.css";
 
 /**
@@ -49,6 +49,12 @@ export function InfoHint({
     const onClick = (event: MouseEvent) => {
       const inside = event.target instanceof Node && rootRef.current?.contains(event.target);
       if (infoHintReaction({ kind: inside ? "insideClick" : "outsideClick" }) === "close") setOpen(false);
+      // Un clic sur le texte de l'explication donne le focus au conteneur de la
+      // modale (`tabIndex={-1}`) : rendu au bouton, Échap replie encore le « i »
+      // au lieu de fermer la modale (`data-escape-owner` suit la cible). Sans
+      // défilement : le bouton a pu sortir de la vue pendant la lecture.
+      else if (inside && infoHintFocusLeftToContainer(rootRef.current, document.activeElement, document.body))
+        buttonRef.current?.focus({ preventScroll: true });
     };
     // Échap écouté sur le composant seul (bouton et explication) : une modale
     // ouverte par-dessus garde le sien, sans que le focus reparte derrière son
@@ -70,7 +76,8 @@ export function InfoHint({
   }, [open]);
 
   return (
-    <div ref={rootRef} className={s.root}>
+    // `data-escape-owner` : déplié, Échap le replie sans fermer la modale qui le porte (`escapeBelongsElsewhere`).
+    <div ref={rootRef} className={s.root} data-escape-owner={open ? "" : undefined}>
       <button
         ref={buttonRef}
         type="button"

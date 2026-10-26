@@ -15,12 +15,19 @@ export { FALLBACK_ABOUT_STATS } from "@/lib/shared/about-stats";
 interface AboutStatRow extends RowDataPacket {
   id: number;
   value: string;
+  value_en: string | null;
   label: string;
   label_en: string | null;
 }
 
 function fromRow(row: AboutStatRow): AboutStat {
-  return { id: Number(row.id), value: row.value, label: row.label, labelEn: row.label_en };
+  return {
+    id: Number(row.id),
+    value: row.value,
+    valueEn: row.value_en ?? null,
+    label: row.label,
+    labelEn: row.label_en,
+  };
 }
 
 /**
@@ -49,7 +56,7 @@ export async function listAboutStats(): Promise<AboutStat[]> {
 async function loadListAboutStats(): Promise<AboutStat[]> {
   const db = await getDatabase();
   const [rows] = await db.execute<AboutStatRow[]>(
-    `SELECT id, value, label, label_en
+    `SELECT id, value, value_en, label, label_en
      FROM bg_about_stats
      ORDER BY display_order ASC, id ASC`,
   );
@@ -61,36 +68,36 @@ async function loadListAboutStats(): Promise<AboutStat[]> {
 export async function createAboutStat(input: AboutStatInput): Promise<AboutStat> {
   const validation = validateAboutStatInput(input);
   if (!validation.ok) throw new Error(validation.error);
-  const { value, label, labelEn } = validation.value;
+  const { value, valueEn, label, labelEn } = validation.value;
 
   const db = await getDatabase();
   const [res] = await db.execute<ResultSetHeader>(
-    `INSERT INTO bg_about_stats (value, label, label_en, display_order)
-     VALUES (?, ?, ?, (SELECT COALESCE(MAX(display_order), 0) + 10 FROM bg_about_stats AS s))`,
-    [value, label, labelEn],
+    `INSERT INTO bg_about_stats (value, value_en, label, label_en, display_order)
+     VALUES (?, ?, ?, ?, (SELECT COALESCE(MAX(display_order), 0) + 10 FROM bg_about_stats AS s))`,
+    [value, valueEn, label, labelEn],
   );
 
   // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
   invalidateShowcase();
-  return { id: Number(res.insertId), value, label, labelEn };
+  return { id: Number(res.insertId), value, valueEn, label, labelEn };
 }
 
 /** Met à jour une carte existante et renvoie sa version mise à jour. */
 export async function updateAboutStat(id: number, input: AboutStatInput): Promise<AboutStat> {
   const validation = validateAboutStatInput(input);
   if (!validation.ok) throw new Error(validation.error);
-  const { value, label, labelEn } = validation.value;
+  const { value, valueEn, label, labelEn } = validation.value;
 
   const db = await getDatabase();
   const [res] = await db.execute<ResultSetHeader>(
-    `UPDATE bg_about_stats SET value = ?, label = ?, label_en = ? WHERE id = ?`,
-    [value, label, labelEn, id],
+    `UPDATE bg_about_stats SET value = ?, value_en = ?, label = ?, label_en = ? WHERE id = ?`,
+    [value, valueEn, label, labelEn, id],
   );
   if (res.affectedRows === 0) throw new Error("ABOUT_STAT_NOT_FOUND");
 
   // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
   invalidateShowcase();
-  return { id, value, label, labelEn };
+  return { id, value, valueEn, label, labelEn };
 }
 
 /**

@@ -28,6 +28,12 @@ describe("escapeBelongsElsewhere", () => {
     expect(escapeBelongsElsewhere([], target({ "aria-expanded": "true" }))).toBe(false);
   });
 
+  it("laisse Échap à un « i » déplié qui contient la cible, pas à un « i » replié", () => {
+    const inside = (owner: boolean) => ({ closest: (selector: string) => (owner && selector === "[data-escape-owner]" ? {} : null) });
+    expect(escapeBelongsElsewhere([], inside(true))).toBe(true);
+    expect(escapeBelongsElsewhere([], inside(false))).toBe(false);
+  });
+
   it("tolère une cible sans getAttribute (window, document)", () => {
     expect(escapeBelongsElsewhere([layer(false)], {})).toBe(false);
     expect(escapeBelongsElsewhere([], undefined)).toBe(false);

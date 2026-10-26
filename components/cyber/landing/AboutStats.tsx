@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { BilingualField, EnglishMissingMark, withEnglishMissing } from "@/components/ui/bilingual-field";
+import { BilingualField, EnglishMissingHint, EnglishMissingMark, withEnglishMissing } from "@/components/ui/bilingual-field";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { FieldErrorText } from "@/components/ui/field-error-text";
+import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { useToast } from "@/components/ui/toast";
 import {
   type AboutStat,
@@ -11,6 +12,9 @@ import {
   ABOUT_STAT_LABEL_MAX,
   ABOUT_STAT_VALUE_MAX,
   aboutStatErrorMessage,
+  aboutStatNeedsEnglish,
+  aboutStatValueIsFrench,
+  aboutStatValueNeedsEnglish,
   FALLBACK_ABOUT_STATS,
   localizedAboutStats,
   validateAboutStatInput,
@@ -30,14 +34,24 @@ interface AboutStatsProps {
 
 interface FormState {
   value: string;
+  valueEn: string;
   label: string;
   labelEn: string;
 }
 
-const EMPTY_FORM: FormState = { value: "", label: "", labelEn: "" };
+const EMPTY_FORM: FormState = { value: "", valueEn: "", label: "", labelEn: "" };
 
 /** `id` des champs du formulaire, cibles de `useFieldErrors`. */
-const STAT_FIELD_IDS = { value: "about-stat-value", label: "about-stat-label", labelEn: "about-stat-label-en" } as const;
+const STAT_FIELD_IDS = {
+  value: "about-stat-value",
+  valueEn: "about-stat-value-en",
+  label: "about-stat-label",
+  labelEn: "about-stat-label-en",
+} as const;
+
+/** Explication du champ « Valeur en anglais », citée par son `aria-describedby`. */
+const VALUE_EN_HINT_ID = "about-stat-value-en-help";
+const VALUE_EN_MISSING_ID = "about-stat-value-en-missing";
 
 export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: Readonly<AboutStatsProps>) {
   // La gestion reste en français (D4) : sous `/en`, ses contrôles, sa fenêtre
@@ -69,7 +83,7 @@ export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: R
   function openEdit(stat: AboutStat) {
     fieldErrors.clear();
     setEditing(stat);
-    setForm({ value: stat.value, label: stat.label, labelEn: stat.labelEn ?? "" });
+    setForm({ value: stat.value, valueEn: stat.valueEn ?? "", label: stat.label, labelEn: stat.labelEn ?? "" });
     setOpen(true);
   }
 
@@ -89,7 +103,13 @@ export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: R
   }
 
   async function submit() {
-    const payload = { value: form.value.trim(), label: form.label.trim(), labelEn: form.labelEn.trim() };
+    if (busy) return;
+    const payload = {
+      value: form.value.trim(),
+      valueEn: form.valueEn.trim(),
+      label: form.label.trim(),
+      labelEn: form.labelEn.trim(),
+    };
     // Même validation que le serveur, avant l'envoi : l'anglais (obligatoire,
     // D9) est désigné sans aller-retour.
     const check = validateAboutStatInput(payload);
@@ -190,13 +210,18 @@ export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: R
   }
 
   const submitLabel = editing ? "Enregistrer" : "Ajouter";
+  // La valeur saisie se lirait telle quelle sur la page anglaise : le champ anglais le dit.
+  const valueEnMissing = aboutStatValueNeedsEnglish(form);
 
   return (
     <>
       <div className={styles.stats}>
-        {shown.map(({ stat: s, label, index }) => (
+        {shown.map(({ stat: s, value, label, index }) => (
           <div key={s.id} className={styles.stat}>
-            <div className="num" style={{ fontSize: 26 }}>{s.value}</div>
+            {/* Sous /en, une valeur sans anglais qui porte des mots reste française : le lecteur d'écran la prononce en français. */}
+            <div className="num" style={{ fontSize: 26 }} lang={aboutStatValueIsFrench(s, locale) ? "fr" : undefined}>
+              {value}
+            </div>
             <div className="mono">{label}</div>
             {canManage(s) && (
               <div className={styles.statActions} lang={staffLang}>
@@ -230,10 +255,10 @@ export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: R
                   className={styles.action}
                   onClick={() => openEdit(s)}
                   disabled={busy}
-                  aria-label={withEnglishMissing(`Modifier la carte ${s.label}`, !hasEnglish(s.labelEn))}
+                  aria-label={withEnglishMissing(`Modifier la carte ${s.label}`, aboutStatNeedsEnglish(s))}
                 >
                   Modifier
-                  {!hasEnglish(s.labelEn) && <EnglishMissingMark />}
+                  {aboutStatNeedsEnglish(s) && <EnglishMissingMark />}
                 </button>
                 <button
                   type="button"
@@ -290,6 +315,41 @@ export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: R
           </div>
 
           <div className={styles.modalField}>
+            <InfoHintRow>
+              <label className={styles.modalLabel} htmlFor={STAT_FIELD_IDS.valueEn}>
+                Valeur en anglais (facultatif)
+              </label>
+              <InfoHint id={VALUE_EN_HINT_ID} subject="Valeur en anglais">
+                <p>
+                  La valeur affichée sur la page anglaise, écrite à l'anglaise (« €4,200 », « Free »). Laissée
+                  vide, la valeur française y est reprise : faite de mots ou écrite à la française, la carte reste
+                  alors marquée « EN ».
+                </p>
+              </InfoHint>
+            </InfoHintRow>
+            <input
+              id={STAT_FIELD_IDS.valueEn}
+              className={styles.modalInput}
+              value={form.valueEn}
+              maxLength={ABOUT_STAT_VALUE_MAX}
+              placeholder="€4,200"
+              lang="en"
+              enterKeyHint="next"
+              {...fieldErrors.aria("valueEn", VALUE_EN_HINT_ID, valueEnMissing && VALUE_EN_MISSING_ID)}
+              onChange={(e) => {
+                fieldErrors.clear("valueEn");
+                setForm((f) => ({ ...f, valueEn: e.target.value }));
+              }}
+            />
+            {valueEnMissing && (
+              <EnglishMissingHint id={VALUE_EN_MISSING_ID}>
+                {"Pas encore de valeur anglaise : la page anglaise affiche la valeur française telle quelle. Écris-la à l'anglaise, même identique."}
+              </EnglishMissingHint>
+            )}
+            <FieldErrorText fieldId={STAT_FIELD_IDS.valueEn} message={fieldErrors.message("valueEn")} />
+          </div>
+
+          <div className={styles.modalField}>
             <BilingualField
               label="Titre"
               ids={{ fr: STAT_FIELD_IDS.label, en: STAT_FIELD_IDS.labelEn }}
@@ -309,14 +369,16 @@ export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: R
           </div>
 
           <div className={styles.modalActions}>
-            <button type="button" className={styles.action} onClick={close} disabled={busy}>
+            {/* `aria-disabled` + garde (`close`, `submit`) plutôt que `disabled` :
+                le bouton cliqué garde le focus pendant l'envoi. */}
+            <button type="button" className={styles.action} onClick={close} aria-disabled={busy}>
               Annuler
             </button>
             <button
               type="button"
               className={styles.actionPrimary}
               onClick={submit}
-              disabled={busy}
+              aria-disabled={busy}
               aria-busy={busy}
             >
               {busy ? "…" : submitLabel}

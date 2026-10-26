@@ -49,7 +49,7 @@ jest.mock("@/components/i18n/locale-context", () => {
 
 import { AudienceList, InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { AppLocaleProvider } from "@/components/i18n/locale-context";
-import { infoHintLabel, infoHintReaction } from "@/lib/shared/info-hint";
+import { infoHintFocusLeftToContainer, infoHintLabel, infoHintReaction } from "@/lib/shared/info-hint";
 import frCommon from "@/messages/fr/common.json";
 import enCommon from "@/messages/en/common.json";
 import { readSource } from "../helpers/read-source";
@@ -126,6 +126,22 @@ describe("infoHintLabel", () => {
   });
 });
 
+describe("infoHintFocusLeftToContainer", () => {
+  const node = (contains: (other: unknown) => boolean) => ({ contains }) as unknown as Node;
+
+  it("ne rend le focus que s'il est parti à un conteneur qui porte le composant", () => {
+    const root = node(() => false);
+    const container = node((other) => other === root);
+    const body = node(() => true);
+    expect(infoHintFocusLeftToContainer(root, container, body)).toBe(true);
+    expect(infoHintFocusLeftToContainer(root, body, body)).toBe(false);
+    expect(infoHintFocusLeftToContainer(root, node(() => false), body)).toBe(false);
+    expect(infoHintFocusLeftToContainer(node(() => true), container, body)).toBe(false);
+    expect(infoHintFocusLeftToContainer(null, container, body)).toBe(false);
+    expect(infoHintFocusLeftToContainer(root, null, body)).toBe(false);
+  });
+});
+
 describe("infoHintReaction", () => {
   it("Échap referme et rend le focus ; les autres touches ne font rien", () => {
     expect(infoHintReaction({ kind: "key", key: "Escape" })).toBe("closeAndFocus");
@@ -184,6 +200,14 @@ describe("InfoHint — balisage", () => {
 });
 
 describe("InfoHint — gestes", () => {
+  it("déplié, se marque `data-escape-owner` : la modale qui le porte lui laisse Échap", () => {
+    let view = render();
+    expect(view.root.props["data-escape-owner"]).toBeUndefined();
+    click(view.button);
+    view = render();
+    expect(view.root.props["data-escape-owner"]).toBe("");
+  });
+
   it("s'ouvre au clic et se referme au second clic", () => {
     let view = render();
     expect(view.button.props["aria-expanded"]).toBe(false);
@@ -276,9 +300,22 @@ describe("InfoHint — gestes", () => {
     const outside = new NodeClass();
     const rootRef = (view.root as unknown as { ref: { current: unknown } }).ref;
     rootRef.current = { contains: (target: unknown) => target === inside, addEventListener: () => {}, removeEventListener: () => {} };
+    buttonFocus.mockClear();
+    (view.button as unknown as { ref: { current: unknown } }).ref.current = { focus: buttonFocus };
+    const doc = globals.document as { activeElement?: unknown; body?: unknown };
+    doc.body = { contains: () => true };
+    doc.activeElement = doc.body;
     documentListeners.click[0]({ target: inside });
     view = render();
     expect(view.button.props["aria-expanded"]).toBe(true);
+    // Sur une page ordinaire le focus va à `body` : rien à rendre, la lecture reste en place.
+    expect(buttonFocus).not.toHaveBeenCalled();
+    doc.activeElement = { contains: (node: unknown) => node === rootRef.current };
+    documentListeners.click[0]({ target: inside });
+    render();
+    // Le focus parti au conteneur de la modale revient au bouton, sans défiler : Échap replie encore le « i ».
+    expect(buttonFocus).toHaveBeenCalledTimes(1);
+    expect(buttonFocus).toHaveBeenCalledWith({ preventScroll: true });
     documentListeners.click[0]({ target: outside });
     view = render();
     expect(view.button.props["aria-expanded"]).toBe(false);

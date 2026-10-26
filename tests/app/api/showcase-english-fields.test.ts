@@ -52,7 +52,7 @@ describe("l'anglais saisi arrive au service", () => {
   });
 
   it("chiffres, cartes, bénévoles, partenaires", async () => {
-    jest.mocked(aboutStats.createAboutStat).mockResolvedValue({ id: 1, value: "1", label: "L", labelEn: "L" });
+    jest.mocked(aboutStats.createAboutStat).mockResolvedValue({ id: 1, value: "1", valueEn: null, label: "L", labelEn: "L" });
     jest.mocked(aboutPillars.createAboutPillar).mockResolvedValue({ id: 1, title: "T", text: "X", titleEn: "T", textEn: "X" });
     await postStat(jsonReq({ value: "1", label: "L", labelEn: "Label" }));
     expect(aboutStats.createAboutStat).toHaveBeenCalledWith(expect.objectContaining({ labelEn: "Label" }));

@@ -71,7 +71,7 @@ describe("écriture — l'anglais va dans sa colonne", () => {
     await createAboutStat({ value: "12", label: "Arbitres", labelEn: "Referees" });
     expect(String(execute.mock.calls[0][0])).toContain("label_en");
     await updateAboutStat(4, { value: "12", label: "Arbitres", labelEn: "Refs" });
-    expect(execute.mock.calls[1][1]).toEqual(["12", "Arbitres", "Refs", 4]);
+    expect(execute.mock.calls[1][1]).toEqual(["12", null, "Arbitres", "Refs", 4]);
   });
 
   it("partenaire : description_en (rien sans description)", async () => {

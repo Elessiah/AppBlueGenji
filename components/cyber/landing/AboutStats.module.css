@@ -51,12 +51,14 @@
   background: rgba(90, 200, 255, 0.05);
 }
 
-.action:disabled {
+.action:disabled,
+.action[aria-disabled="true"] {
   opacity: 0.45;
   cursor: not-allowed;
 }
 
-.action:disabled:hover {
+.action:disabled:hover,
+.action[aria-disabled="true"]:hover {
   color: var(--ink-mute);
   border-color: var(--line-soft);
   background: transparent;
@@ -98,7 +100,8 @@
   border-color: var(--blue-300, #84d6ff);
 }
 
-.actionPrimary:disabled {
+.actionPrimary:disabled,
+.actionPrimary[aria-disabled="true"] {
   opacity: 0.45;
   cursor: not-allowed;
 }
