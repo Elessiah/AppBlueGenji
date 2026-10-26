@@ -1037,7 +1037,8 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Quand la langue ne peut pas être lue (compte inconnu, panne), le message part une seule fois, en français puis en anglais — en français seul si les deux ne tiennent pas dans un message. Les messages publiés dans les salons Discord restent en français.",
       "Aucune donnée nouvelle n'est collectée : c'est la langue déjà gardée avec ton compte, que tu changes dans « Mon profil ».",
     ],
-  },  {
+  },
+  {
     // LEGAL-OPTOUT-BASIS : la conservation du choix des messages privés de match
     // passe de « l'intérêt légitime du joueur » (qui n'est pas celui du
     // responsable ni d'un tiers, art. 6.1.f et 4.10) à l'obligation légale

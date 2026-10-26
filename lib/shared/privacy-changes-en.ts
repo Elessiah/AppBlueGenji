@@ -533,7 +533,8 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "When the language cannot be read (unknown account, outage), the message is sent once, in French then in English — in French alone when both do not fit in one message. Messages posted in Discord channels stay in French.",
       "No new data is collected: it's the language already kept with your account, which you change in “My profile”.",
     ],
-  },  "2026-10-base-du-choix-des-messages-de-match": {
+  },
+  "2026-10-base-du-choix-des-messages-de-match": {
     linkLabels: ["Read the “Match Discord direct messages” paragraph"],
     title: "Your match direct messages choice: legal basis clarified",
     summary:
