@@ -3,6 +3,7 @@ import { getDatabase } from "@/lib/server/database";
 import { tournamentAudience } from "@/lib/server/tournament-broadcast";
 import {
   cachedLanding,
+  LANDING_LEADERBOARD_KEY_PREFIX,
   LANDING_LIVE_KEY,
   LANDING_LIVE_TTL_MS,
   LANDING_TTL_MS,
@@ -396,7 +397,7 @@ export async function getLandingLeaderboard(
   game?: TournamentGame,
 ): Promise<LandingLeaderboardRow[]> {
   const safeLimit = Math.min(50, Math.max(1, Math.trunc(limit)));
-  return cachedLanding(`leaderboard:${safeLimit}:${game ?? "all"}`, LANDING_TTL_MS, () =>
+  return cachedLanding(`${LANDING_LEADERBOARD_KEY_PREFIX}${safeLimit}:${game ?? "all"}`, LANDING_TTL_MS, () =>
     loadLandingLeaderboard(safeLimit, game),
   );
 }

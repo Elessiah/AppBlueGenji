@@ -32,6 +32,13 @@ export const LANDING_LIVE_KEY = "live";
 /** Le direct fait exception : il porte le score en cours, on le garde court. */
 export const LANDING_LIVE_TTL_MS = 5_000;
 
+/**
+ * Préfixe des leaderboards de la vitrine (`leaderboard:<limite>:<jeu>`),
+ * partagé par leur lecteur (`getLandingLeaderboard`) et leur invalidateur
+ * ({@link invalidateLandingLeaderboard}).
+ */
+export const LANDING_LEADERBOARD_KEY_PREFIX = "leaderboard:";
+
 /** Sert un agrégat de la vitrine, mutualisé entre tous les appels concurrents. */
 export function cachedLanding<T>(key: string, ttlMs: number, loader: () => Promise<T>): Promise<T> {
   return cached(`${PREFIX}${key}`, ttlMs, loader);
@@ -59,4 +66,13 @@ export function invalidateLandingAggregates(): void {
  */
 export function invalidateLandingLive(): void {
   invalidateCached(`${PREFIX}${LANDING_LIVE_KEY}`);
+}
+
+/**
+ * Oublie les seuls leaderboards de la vitrine. Pour une écriture qui change la
+ * liste du classement sans toucher aux tournois — une dissolution : le direct,
+ * le ticker et les compteurs n'en dépendent pas, les relancer serait perdu.
+ */
+export function invalidateLandingLeaderboard(): void {
+  invalidateCachedPrefix(`${PREFIX}${LANDING_LEADERBOARD_KEY_PREFIX}`);
 }

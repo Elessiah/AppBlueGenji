@@ -15,7 +15,7 @@
  */
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "./database";
-import { cachedRanking } from "./ranking-cache";
+import { cachedRanking, RANKING_LIST_KEY_PREFIX } from "./ranking-cache";
 import { loadTeamRanking } from "./ranking-service";
 import { buildPodiumTiers, EMPTY_PODIUM_TIERS, podiumTeamIds, type PodiumTiers } from "@/lib/shared/podium-tiers";
 
@@ -49,7 +49,7 @@ async function computePodiumTiers(): Promise<PodiumTiers> {
  */
 export async function loadPodiumTiers(): Promise<PodiumTiers> {
   try {
-    return await cachedRanking("podium-tiers", computePodiumTiers);
+    return await cachedRanking(`${RANKING_LIST_KEY_PREFIX}podium-tiers`, computePodiumTiers);
   } catch (error) {
     console.error("[podium-tiers] lecture impossible", error);
     return EMPTY_PODIUM_TIERS;

@@ -17,7 +17,7 @@
  */
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "./database";
-import { cachedRanking } from "./ranking-cache";
+import { cachedRanking, RANKING_LIST_KEY_PREFIX } from "./ranking-cache";
 import { loadTeamRanking } from "./ranking-service";
 import { teamLogoDataUrl } from "./share-podium";
 import type { TeamShareInput } from "@/lib/shared/page-share-cards";
@@ -59,7 +59,7 @@ async function computeShareTeams(): Promise<ReadonlyMap<number, ShareTeamRow>> {
  */
 export async function findShareTeam(teamId: number): Promise<ShareTeamRow | null> {
   try {
-    return (await cachedRanking("share-teams", computeShareTeams)).get(teamId) ?? null;
+    return (await cachedRanking(`${RANKING_LIST_KEY_PREFIX}share-teams`, computeShareTeams)).get(teamId) ?? null;
   } catch (error) {
     console.error("[share-team] lecture impossible", error);
     return null;

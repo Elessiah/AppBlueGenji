@@ -20,7 +20,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
-import { cachedRanking } from "./ranking-cache";
+import { cachedRanking, RANKING_LIST_KEY_PREFIX } from "./ranking-cache";
 import { loadTeamRanking } from "./ranking-service";
 import { PODIUM_TIER_COUNT } from "@/lib/shared/podium-tiers";
 import type { PodiumShareInput } from "@/lib/shared/page-share-cards";
@@ -68,7 +68,7 @@ async function computeSharePodium(): Promise<PodiumShareInput[]> {
  */
 export async function loadSharePodium(): Promise<PodiumShareInput[]> {
   try {
-    return await cachedRanking("share-podium", computeSharePodium);
+    return await cachedRanking(`${RANKING_LIST_KEY_PREFIX}share-podium`, computeSharePodium);
   } catch (error) {
     console.error("[share-podium] lecture impossible", error);
     return [];
