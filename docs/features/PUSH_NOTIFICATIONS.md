@@ -191,6 +191,8 @@ destinataire (`bg_users.locale`, `fr` ou `en`). Le contenu passé à
 (`LocalizedPushContent`) ; `pushToUsers` en tire une charge par langue. Tout
 rédacteur nouveau prend la langue en dernier argument, ses textes dans
 `messages/{fr,en}/pushMessages.json`. Règle de pose : `I18N.md` § Langue du compte.
+Le message privé Discord d'une notification suit la même langue : `discord.message`
+est un `LocalizedDm`, un appel au bot par langue (`BOT_DM_LANGUAGE.md`).
 
 ## Notes reprises de CLAUDE.md
 

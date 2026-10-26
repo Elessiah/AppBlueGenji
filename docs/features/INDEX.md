@@ -168,6 +168,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 ## Bot, Discord et diffusion
 
 - `BOT_INTEGRATION.md` — Appels app → bot, flux d'activité anonymisé.
+- `BOT_DM_LANGUAGE.md` — Langue des messages privés Discord : celle du compte, sinon un message bilingue (FR puis EN) ; salons en français.
 - `BOT_PAGE.md` — Pages `/bot` et `/bot/docs`.
 - `BOT_FEATURES_NEEDED.md` — Fonctionnalités à développer côté bot.
 - `DISCORD_NOTIFICATIONS.md` — Rappels de match (H-24, H-10 avec le check-in), programme d'arbitrage, annonce d'un horaire posé, changé ou retiré (joueurs, arbitres, journal), interrupteur des messages privés de match (`/profil`) et signalement d'un problème.

@@ -125,7 +125,7 @@ utilisateur, 2026-10-13, étendue par la revue de sécurité). Quand une engagé
 quitte une manche dont ses joueurs tenaient l'horaire, ils apprennent qu'il ne
 les concerne plus : « **Match retiré de ton programme** » / "Match removed from
 your schedule" (« Le tournoi a été mis à jour et tu ne joues plus ce match… » /
-"The tournament has been updated and you no longer play this match…") — message privé Discord (français, « Ton match » en tournoi
+"The tournament has been updated and you no longer play this match…") — message privé Discord (dans la langue du compte, `BOT_DM_LANGUAGE.md` ; « Ton match » en tournoi
 individuel, aucun pseudo) et push `MATCH_REMINDER` dans la langue de chacun,
 même étiquette que l'annonce qu'il remplace. Chemins couverts :
 
@@ -314,7 +314,7 @@ tenu : la lecture de `TOLD` est la première lecture ordinaire, et voit l'état
 le plus récent :
 
 - **Joueurs** des deux engagées (équipes ou entrées solo, push dans la langue de
-  chacun, message privé Discord en français) : `announceMatchSchedule` consomme
+  chacun, message privé Discord dans la langue du compte) : `announceMatchSchedule` consomme
   le palier déjà ouvert et envoie « Match programmé » ou « Match reprogrammé »
   — reprogrammé seulement si les joueurs avaient reçu un horaire (`TOLD`), avec
   « , au lieu du … » quand l'ancienne date est connue (pas après un
@@ -506,7 +506,7 @@ avant le coup d'envoi ; et, en même temps, rappeler aux arbitres les matchs,
 les heures et les équipes.
 
 **Joueurs — palier `PT10H`.** Mêmes destinataires et canaux que le rappel 24 h
-(message privé Discord en français, push `MATCH_REMINDER` dans la langue de
+(message privé Discord et push `MATCH_REMINDER` dans la langue de
 chacun, engagées solo comprises — « Ton match »). Le message ajoute
 `checkInLine()` : « Check-in : le salon de check-in ouvre 15 minutes avant le
 coup d'envoi sur Discord — <invitation> ». L'invitation est **une** constante,
