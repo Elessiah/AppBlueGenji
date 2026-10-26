@@ -6,6 +6,7 @@ import {
   LANDING_LEADERBOARD_KEY_PREFIX,
   LANDING_LIVE_KEY,
   LANDING_LIVE_TTL_MS,
+  LANDING_TICKER_KEY,
   LANDING_TTL_MS,
 } from "@/lib/server/landing-cache";
 import { listTournamentBuckets } from "@/lib/server/tournaments-service";
@@ -615,7 +616,7 @@ async function loadNewsEntries(db: Awaited<ReturnType<typeof getDatabase>>): Pro
 export async function getLandingTicker(locale: Locale = DEFAULT_LOCALE): Promise<LandingTickerPayload> {
   let entries: TickerEntry[] | null;
   try {
-    entries = await cachedLanding("ticker", LANDING_TTL_MS, loadLandingTicker);
+    entries = await cachedLanding(LANDING_TICKER_KEY, LANDING_TTL_MS, loadLandingTicker);
   } catch {
     entries = null;
   }

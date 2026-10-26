@@ -35,7 +35,7 @@ export const LANDING_LIVE_TTL_MS = 5_000;
 /**
  * Préfixe des leaderboards de la vitrine (`leaderboard:<limite>:<jeu>`),
  * partagé par leur lecteur (`getLandingLeaderboard`) et leur invalidateur
- * ({@link invalidateLandingLeaderboard}).
+ * ({@link invalidateLandingTeamViews}).
  */
 export const LANDING_LEADERBOARD_KEY_PREFIX = "leaderboard:";
 
@@ -68,11 +68,18 @@ export function invalidateLandingLive(): void {
   invalidateCached(`${PREFIX}${LANDING_LIVE_KEY}`);
 }
 
+/** Clé du bandeau de la vitrine (`getLandingTicker`), partagée avec {@link invalidateLandingTeamViews}. */
+export const LANDING_TICKER_KEY = "ticker";
+
 /**
- * Oublie les seuls leaderboards de la vitrine. Pour une écriture qui change la
- * liste du classement sans toucher aux tournois — une dissolution : le direct,
- * le ticker et les compteurs n'en dépendent pas, les relancer serait perdu.
+ * Oublie les vues de la vitrine qui **nomment des équipes** : les leaderboards
+ * et le bandeau (noms des derniers résultats). Pour une écriture qui change la
+ * liste du classement ou le nom d'une équipe sans toucher aux tournois — une
+ * dissolution, qui renomme l'équipe « Équipe dissoute #id ». Les compteurs n'en
+ * dépendent pas ; le direct non plus, ou pour 5 s au plus (sa durée de vie) :
+ * les relancer serait perdu.
  */
-export function invalidateLandingLeaderboard(): void {
+export function invalidateLandingTeamViews(): void {
   invalidateCachedPrefix(`${PREFIX}${LANDING_LEADERBOARD_KEY_PREFIX}`);
+  invalidateCached(`${PREFIX}${LANDING_TICKER_KEY}`);
 }

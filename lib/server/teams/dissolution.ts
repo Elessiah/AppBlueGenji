@@ -1,7 +1,7 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
-import { invalidateLandingLeaderboard } from "@/lib/server/landing-cache";
+import { invalidateLandingTeamViews } from "@/lib/server/landing-cache";
 import { invalidateRankingLists } from "@/lib/server/ranking-cache";
 import { ghostAdminOverride, lockMemberRoles, userOwnsTeam } from "./access";
 
@@ -99,10 +99,10 @@ export async function softDeleteTeam(
 
   // Une dissoute quitte la liste du classement (`loadTeamRanking`) : rangs,
   // podium, marches et carte d'aperçu mis en cache la montreraient encore
-  // jusqu'à leur échéance. Le rejeu, lui, ne change pas : il reste en cache,
-  // comme le direct, le ticker et les compteurs de l'accueil.
+  // jusqu'à leur échéance, comme le bandeau de l'accueil son ancien nom. Le
+  // rejeu, lui, ne change pas : il reste en cache, comme les compteurs.
   invalidateRankingLists();
-  invalidateLandingLeaderboard();
+  invalidateLandingTeamViews();
 
   // Vider la colonne ne retirait pas l'image : le fichier restait servi par
   // `/api/uploads/teams/…`, en cache public d'un an. Après le commit (un
