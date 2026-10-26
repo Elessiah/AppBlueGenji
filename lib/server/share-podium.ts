@@ -2,8 +2,8 @@
  * Les données du podium de la carte d'aperçu de `/classement`
  * (`docs/features/SHARE_METADATA.md` § « Le podium »).
  *
- * **Le même podium que la page** : classement général, équipes non jouées
- * comprises (`loadTeamRanking({ includeUnplayed: true })`, l'onglet
+ * **Le même podium que la page** : classement général, équipes classées
+ * seulement (`loadTeamRanking()`, l'onglet
  * « Général » de `/classement`), les trois premières lignes. Rien de plus que
  * ce qu'un visiteur anonyme lit déjà sur la page publique : nom, logo, cote.
  *
@@ -49,7 +49,7 @@ export async function teamLogoDataUrl(logoUrl: string | null, size = LOGO_SIZE):
 }
 
 async function computeSharePodium(): Promise<PodiumShareInput[]> {
-  const ranking = await loadTeamRanking({ includeUnplayed: true });
+  const ranking = await loadTeamRanking();
   if (ranking.length < PODIUM_TIER_COUNT) return [];
   const top = ranking.slice(0, PODIUM_TIER_COUNT);
   return Promise.all(

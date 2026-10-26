@@ -32,7 +32,7 @@ type GhostRow = RowDataPacket & { id: number };
 
 async function computeShareTeams(): Promise<ReadonlyMap<number, ShareTeamRow>> {
   const [ranking, [ghosts]] = await Promise.all([
-    loadTeamRanking({ includeUnplayed: true }),
+    loadTeamRanking(),
     (await getDatabase()).execute<GhostRow[]>("SELECT id FROM bg_teams WHERE is_ghost = 1"),
   ]);
   const ghostIds = new Set(ghosts.map((row) => Number(row.id)));

@@ -2,7 +2,7 @@
  * Marches du podium du site, suivies partout où un nom s'affiche.
  *
  * Les trois premières équipes de l'onglet « Général » de `/classement` (tous
- * jeux, `loadTeamRanking({ includeUnplayed: true })`, ordre de
+ * jeux, équipes classées seulement — `loadTeamRanking()` —, ordre de
  * `compareRankedTeams`) portent leur marche sur chaque nom d'équipe rendu par
  * les liens d'entité (`TeamLink`, `EntrantLink`, `EntrantName`), et leurs
  * membres en portent une version adoucie sur `PlayerLink`. Voir

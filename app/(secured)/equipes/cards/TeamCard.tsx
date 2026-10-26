@@ -35,7 +35,7 @@ function TeamCardView({ team }: Readonly<{ team: TeamListItem }>) {
   const text = useTeamsText();
   const { t } = text;
   const color = getPaletteColor(team.id);
-  const isTop3 = team.rank <= 3;
+  const isTop3 = team.rank !== null && team.rank <= 3;
   const ranked = isRankedTeam(team);
 
   return (
@@ -46,9 +46,12 @@ function TeamCardView({ team }: Readonly<{ team: TeamListItem }>) {
         aria-label={t("card.viewTeam", { name: team.name })}
       />
 
-      <div className={`${s.rank} ${isTop3 ? s.rankTop : ""}`}>
-        #{String(team.rank).padStart(2, "0")}
-      </div>
+      {/* Sans match compté, l'équipe n'est pas au classement : pas de rang. */}
+      {team.rank !== null && (
+        <div className={`${s.rank} ${isTop3 ? s.rankTop : ""}`}>
+          #{String(team.rank).padStart(2, "0")}
+        </div>
+      )}
 
       <div className={s.head}>
         {/* Décoratif de bout en bout : logo comme initiale ne font que redire le

@@ -3,9 +3,9 @@
  * pour toutes les pages.
  *
  * Le podium est **celui de l'onglet « Général » de `/classement`** : même
- * chargeur (`loadTeamRanking({ includeUnplayed: true })`), même tri
+ * chargeur (`loadTeamRanking()`, équipes classées seulement), même tri
  * (`compareRankedTeams`), donc jamais deux podiums qui se contredisent. Les
- * entrées solo en sont écartées par ce chargeur : elles ne montent jamais sur
+ * équipes sans match compté et les entrées solo en sont écartées par ce chargeur : elles ne montent jamais sur
  * le podium (voir `docs/features/PODIUM_TIERS.md`).
  *
  * Mutualisé dans le cache du classement (`ranking-cache`) : même durée de vie,
@@ -22,7 +22,7 @@ import { buildPodiumTiers, EMPTY_PODIUM_TIERS, podiumTeamIds, type PodiumTiers }
 type MembershipRow = RowDataPacket & { user_id: number; team_id: number };
 
 async function computePodiumTiers(): Promise<PodiumTiers> {
-  const ranking = await loadTeamRanking({ includeUnplayed: true });
+  const ranking = await loadTeamRanking();
   const rankedIds = ranking.map((row) => row.teamId);
   const top = podiumTeamIds(rankedIds);
   if (top.length === 0) return EMPTY_PODIUM_TIERS;

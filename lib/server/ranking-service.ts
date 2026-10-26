@@ -72,15 +72,6 @@ export type TeamRankingRow = {
 
 export type TeamRankingOptions = {
   /**
-   * Inclure les équipes n'ayant encore joué aucun match, à la cote de départ
-   * (annuaire, leaderboard). Par défaut, seules les équipes classées sont
-   * retournées.
-   *
-   * Elles se rangent à leur cote de départ (`compareRankedTeams`) : derrière
-   * toute équipe qui a gagné des points, devant toute équipe qui en a perdu.
-   */
-  includeUnplayed?: boolean;
-  /**
    * Ne rejouer que les matchs terminés il y a **plus de N jours** — sert à
    * reconstituer le classement d'il y a une semaine pour la tendance du
    * leaderboard. Le rejeu s'arrête simplement plus tôt.
@@ -360,6 +351,11 @@ export async function loadRankingState(
  * ce sont des équipes du site, administrées par le staff, et elles jouent
  * contre les autres.
  *
+ * Les équipes **sans match compté** sont écartées aussi (`isRankedTeam`, depuis
+ * le 2026-10-26) : la liste ne garde que les équipes classées, si bien que
+ * chaque vue qui en descend numérote le même ensemble, sans trou. Une équipe
+ * dissoute qui a joué reste dehors, comme avant.
+ *
  * L'exclusion porte sur la **liste**, jamais sur le rejeu : les rencontres
  * d'une dissoute restent comptées, sans quoi la cote de toutes celles qui l'ont
  * affrontée serait réécrite le jour où elle se dissout. C'est la même règle que
@@ -379,7 +375,9 @@ export async function loadTeamRanking(options: TeamRankingOptions = {}): Promise
   for (const team of teams) {
     const teamId = Number(team.id);
     const state = states.get(teamId) ?? baseRankedTeamState();
-    if (!options.includeUnplayed && state.matchesPlayed === 0) continue;
+    // Le filtre unique de la liste : une équipe sans match compté n'y figure
+    // pas (`isRankedTeam`), mais elle reste rejouée — sa cote est intacte.
+    if (!isRankedTeam(state)) continue;
     rows.push({
       teamId,
       teamName: team.name,
@@ -497,20 +495,17 @@ function rankingKey(state: RankedTeamState) {
  * affichée sur la fiche et la place posée juste à côté sortent donc du même
  * calcul, sur la même assiette que le bilan des matchs.
  *
- * La place se compte sur **la même liste** que `/classement` et le leaderboard
- * (`includeUnplayed`) : toutes les équipes, celles sans match rangées à leur
- * cote de départ. Compter seulement les équipes ayant joué ferait dire
- * « 2ᵉ sur 2 » à une équipe à 483 que `/classement` place derrière toutes les
- * équipes à 500. La place est l'index dans cette liste : à cote égale, les
+ * La place se compte sur **la même liste** que `/classement` et le leaderboard :
+ * les équipes classées seulement (`isRankedTeam`), celles sans match étant
+ * masquées partout. La place est l'index dans cette liste : à cote égale, les
  * départages de `compareRankedTeams` tranchent, comme sur la page.
  *
  * Une équipe sans match n'a pas de place (`position: null`, « Aucun match
- * joué ») ; elle compte pourtant dans `total`, comme elle figure à la page.
+ * joué ») et ne compte pas dans `total`, puisqu'elle ne figure pas à la page.
  */
 export async function getTeamRankingPosition(teamId: number): Promise<TeamRankingPosition> {
-  const listed = await loadTeamRanking({ includeUnplayed: true });
-  const found = listed.find((row) => row.teamId === teamId);
-  const self = found && isRankedTeam(found) ? found : undefined;
+  const listed = await loadTeamRanking();
+  const self = listed.find((row) => row.teamId === teamId);
 
   const states = await loadRankingState();
 

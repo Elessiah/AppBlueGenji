@@ -338,7 +338,12 @@ export type TeamListItem = {
   logoUrl: string | null;
   membersCount: number;
   createdAt: string;
-  rank: number;
+  /**
+   * Place au classement du site (`/classement`) ; `null` pour une équipe sans
+   * match compté, masquée du classement (`isRankedTeam`) — elle reste à
+   * l'annuaire, sans rang.
+   */
+  rank: number | null;
   points: number;
   wins: number;
   losses: number;

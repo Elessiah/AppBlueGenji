@@ -23,7 +23,9 @@ import s from "./HighlightStrip.module.css";
 function HighlightStripView({ teams }: Readonly<{ teams: TeamListItem[] }>) {
   const text = useTeamsText();
   const { t } = text;
-  const top = teams.slice(0, 3);
+  // Seules les équipes classées montent : une équipe sans rang (aucun match
+  // compté) ne figure pas au classement, donc pas à son podium.
+  const top = teams.filter((team) => team.rank !== null).slice(0, 3);
   if (top.length < 3) return null;
 
   return (

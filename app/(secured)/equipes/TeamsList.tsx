@@ -16,6 +16,7 @@ import { useTeamsText } from "@/components/i18n/teams-text";
 import { richNodes } from "@/components/i18n/shell-text";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { compareLocalText } from "@/lib/shared/dates";
+import { compareDirectoryRank } from "@/lib/shared/ranking";
 import s from "../_shared/annuaire.module.css";
 
 // Violet néon (`--violet-400-rgb`, littéral : le canevas de fond ne lit pas les variables CSS).
@@ -102,7 +103,7 @@ export default function TeamsList() {
   // qu'un filtre, qui garde l'ordre (revue de performance du lot 9-2).
   const sorted = useMemo(() => {
     const r = [...teams];
-    if (sort === "rank") r.sort((a, b) => a.rank - b.rank);
+    if (sort === "rank") r.sort(compareDirectoryRank);
     if (sort === "name") {
       const compare = compareLocalText(text.locale);
       r.sort((a, b) => compare(a.name, b.name));
@@ -265,7 +266,7 @@ export default function TeamsList() {
       <Ticker items={tickerItems} labels={tickerLabels} />
 
       <section className={`container ${s.sections}`}>
-        {sort === "rank" && filtered.length >= 3 && <HighlightStrip teams={filtered} />}
+        {sort === "rank" && <HighlightStrip teams={filtered} />}
 
         <div className={s.section}>
           <div className={s.sectionHead}>

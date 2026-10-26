@@ -149,6 +149,39 @@ export async function createTeams(db: Pool, userIds: number[]): Promise<number[]
   return teamIds;
 }
 
+/**
+ * Équipe réelle **qui n'a jamais joué** : gardée hors du pool des tournois, elle
+ * ne dispute aucun match. Elle prouve à l'écran que `/classement`, le podium et
+ * les rangs de `/equipes` masquent une équipe sans match compté
+ * (`docs/features/RANKING_PAGE.md` § « Équipes sans match ») : présente à
+ * l'annuaire, sans rang ; absente du classement.
+ */
+export const UNPLAYED_SEED_TEAM = { name: "Test - Sans Match", tag: "NOMT" } as const;
+
+export async function createUnplayedTeam(db: Pool, userIds: number[]): Promise<number | null> {
+  try {
+    const [result] = await db.execute<ResultSetHeader>(
+      `INSERT INTO bg_teams (name, tag) VALUES (?, ?)`,
+      [UNPLAYED_SEED_TEAM.name, UNPLAYED_SEED_TEAM.tag],
+    );
+    const teamId = result.insertId as number;
+    // Un propriétaire, pour qu'elle soit une équipe ordinaire et non une
+    // fantôme (un joueur peut appartenir à plusieurs équipes du jeu de test).
+    const ownerId = userIds.at(-1);
+    if (ownerId !== undefined) {
+      await db.execute(
+        `INSERT INTO bg_team_members (team_id, user_id, roles_json, joined_at) VALUES (?, ?, ?, NOW())`,
+        [teamId, ownerId, JSON.stringify(ROSTER_ROLES[0])],
+      );
+    }
+    console.log(`  ✓ équipe sans match créée (${UNPLAYED_SEED_TEAM.name})`);
+    return teamId;
+  } catch (error) {
+    console.error(`  ✗ ${UNPLAYED_SEED_TEAM.name}:`, (error as Error).message);
+    return null;
+  }
+}
+
 // Équipes fantômes : créées par le staff, sans aucun membre (voir
 // `docs/features/GHOST_TEAMS.md`). Présentes dans le jeu de test pour couvrir
 // l'affichage du badge, l'attribution à un joueur et l'inscription en tournoi.
