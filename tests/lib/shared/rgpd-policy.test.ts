@@ -361,6 +361,33 @@ describe("/rgpd — données obligatoires : la langue du compte (revue juridique
     expect(items(PROCESSING_ACTIVITIES, "T08")).toMatch(/pour le seul code envoyé en message privé \(connexion, certification ou changement du tag\), la langue du compte du site/);
     expect(items(PROCESSING_ACTIVITIES_EN, "T08")).toMatch(/for the code sent by direct message only \(login, certification or change of the tag\), the language of the site account/);
   });
+
+  // Deuxième passe : la langue sert aux messages privés Discord partout où elle est décrite.
+  it("décrit le même usage dans le tableau des données, à la collecte, dans Mon profil et dans T01, T02, T08 (FR et EN)", () => {
+    expect(read("lib/shared/rgpd-policy.ts")).toMatch(/la langue des notifications push et des messages privés Discord du site \(transmise au bot avec le seul code envoyé en message privé\)/);
+    expect(read("lib/shared/rgpd-policy-en.ts")).toMatch(/the language of push notifications and of the site's Discord direct messages \(sent to the bot with the code sent by direct message only\)/);
+    expect(read("messages/fr/login.json")).toMatch(/pour t'écrire dans cette langue tes notifications push et les messages privés Discord du site/);
+    expect(read("messages/en/login.json")).toMatch(/to write your push notifications and the site's Discord direct messages in that language/);
+    expect(read("messages/fr/profile.json")).toMatch(/Tes notifications push et les messages privés Discord du site arrivent dans cette langue/);
+    expect(read("messages/en/profile.json")).toMatch(/Your push notifications and the site's Discord direct messages arrive in this language/);
+
+    const find = (list: readonly (typeof PROCESSING_ACTIVITIES)[number][], ref: string) =>
+      list.find((activity) => activity.ref === ref)!;
+    expect(find(PROCESSING_ACTIVITIES, "T01").recipients).toContain("Bot Discord de l'association (T08) : la langue du compte, avec le seul code envoyé en message privé");
+    expect(find(PROCESSING_ACTIVITIES_EN, "T01").recipients).toContain("The association's Discord bot (T08): the account language, with the code sent by direct message only");
+    expect(find(PROCESSING_ACTIVITIES, "T02").dataCategories).toContain("Langue du compte déjà rattaché à ce compte Discord (T01), lue pour que le bot rédige le code dans cette langue");
+    expect(find(PROCESSING_ACTIVITIES_EN, "T02").dataCategories).toContain("Language of the account already linked to that Discord account (T01), read so that the bot writes the code in that language");
+    const t08 = find(PROCESSING_ACTIVITIES, "T08").subPurposes.join(" ");
+    expect(t08).toMatch(/codes \(rédigés par le bot dans la langue du compte que le site lui transmet\)/);
+    expect(t08).toMatch(/avatar masqué, retiré ou rétabli, suspension du compte et sa levée/);
+    const t08En = find(PROCESSING_ACTIVITIES_EN, "T08").subPurposes.join(" ");
+    expect(t08En).toMatch(/codes \(written by the bot in the account language the site sends it\)/);
+    expect(t08En).toMatch(/avatar hidden, removed or restored, suspension of the account and its lifting/);
+    for (const activities of [PROCESSING_ACTIVITIES, PROCESSING_ACTIVITIES_EN]) {
+      expect(find(activities, "T01").recipients).toHaveLength(find(PROCESSING_ACTIVITIES, "T01").recipients.length);
+      expect(find(activities, "T02").dataCategories).toHaveLength(find(PROCESSING_ACTIVITIES, "T02").dataCategories.length);
+    }
+  });
 });
 
 describe("messages privés d'horaire et de rappel de match — base légale (revue juridique #441)", () => {

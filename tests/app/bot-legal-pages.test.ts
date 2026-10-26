@@ -328,6 +328,11 @@ describe("bot legal content matches the bot's code and the association", () => {
     );
   });
 
+  it("lists the suspension and avatar notices among the site's direct messages (legal review BOT-NOTIF-LANG)", () => {
+    expect(flatOf(PRIVACY_POLICY, "fr")).toContain("avatar masqué, retiré ou rétabli, suspension de votre compte ou sa levée");
+    expect(flatOf(PRIVACY_POLICY, "en")).toContain("an avatar hidden, removed or restored, the suspension of your account or its lifting");
+  });
+
   it("says direct messages follow the account language, bilingual when unknown, channels in French (BOT-NOTIF-LANG)", () => {
     expect(flatOf(PRIVACY_POLICY, "fr")).toContain(
       "Les messages privés du site partent dans la langue du compte BlueGenji du destinataire, ou en un seul message en français puis en anglais quand elle n'est pas connue",
