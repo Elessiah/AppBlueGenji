@@ -86,12 +86,29 @@ export function aboutStatValueIsFrench(stat: Pick<AboutStat, "value" | "valueEn"
 }
 
 /**
+ * Écriture propre au français dans une valeur : groupe de milliers espacé
+ * (« 4 200 »), virgule décimale (« 1,5 », pas « 1,000 ») ou euro en suffixe (« 0 € »).
+ */
+const FRENCH_NUMBER_FORMAT = /\d[ \u00a0\u202f]\d{3}(?!\d)|\d,(?!\d{3}(?!\d))\d|\d\s*€/u;
+
+/**
+ * La valeur attend-elle une valeur anglaise ? Sans anglais saisi, quand elle
+ * porte des mots (`aboutStatValueIsFrench`) ou s'écrit à la française
+ * (« 4 200 € », que la page anglaise lirait tel quel) ; « 12 », « 100% » ou
+ * « €4200 » se lisent aussi bien en anglais.
+ */
+export function aboutStatValueNeedsEnglish(stat: Pick<AboutStat, "value" | "valueEn">): boolean {
+  return aboutStatValueIsFrench(stat, "en") || (!hasEnglish(stat.valueEn) && FRENCH_NUMBER_FORMAT.test(stat.value));
+}
+
+/**
  * La carte attend-elle encore de l'anglais ? Sans titre anglais, elle n'est pas
- * rendue sous `/en` ; sans valeur anglaise, une valeur faite de mots s'y lit en
- * français (`aboutStatValueIsFrench`). Les deux se signalent au staff.
+ * rendue sous `/en` ; sans valeur anglaise, une valeur faite de mots ou écrite
+ * à la française s'y lit telle quelle (`aboutStatValueNeedsEnglish`). Les deux
+ * se signalent au staff.
  */
 export function aboutStatNeedsEnglish(stat: Pick<AboutStat, "value" | "valueEn" | "labelEn">): boolean {
-  return !hasEnglish(stat.labelEn) || aboutStatValueIsFrench(stat, "en");
+  return !hasEnglish(stat.labelEn) || aboutStatValueNeedsEnglish(stat);
 }
 
 /**

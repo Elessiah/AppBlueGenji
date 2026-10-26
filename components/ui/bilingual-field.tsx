@@ -167,6 +167,19 @@ export function BilingualField<F extends string>({
 }
 
 /**
+ * Avertissement sous un champ anglais facultatif dont l'absence se voit sur la
+ * page anglaise (même ambre que {@link BilingualField}) ; le champ le cite par
+ * `aria-describedby` (`id`).
+ */
+export function EnglishMissingHint({ id, children }: Readonly<{ id: string; children: string }>) {
+  return (
+    <span id={id} className={styles.hint}>
+      {children}
+    </span>
+  );
+}
+
+/**
  * Marque **EN** d'un contenu déjà en ligne sans anglais, sur son bouton
  * d'édition (staff) : il manque à la page anglaise jusqu'à ce qu'on le traduise.
  * Le bouton qui la porte ajoute « (EN à rédiger) » à son nom accessible

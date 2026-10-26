@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { BilingualField, EnglishMissingMark, withEnglishMissing } from "@/components/ui/bilingual-field";
+import { BilingualField, EnglishMissingHint, EnglishMissingMark, withEnglishMissing } from "@/components/ui/bilingual-field";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
@@ -14,6 +14,7 @@ import {
   aboutStatErrorMessage,
   aboutStatNeedsEnglish,
   aboutStatValueIsFrench,
+  aboutStatValueNeedsEnglish,
   FALLBACK_ABOUT_STATS,
   localizedAboutStats,
   validateAboutStatInput,
@@ -50,6 +51,7 @@ const STAT_FIELD_IDS = {
 
 /** Explication du champ « Valeur en anglais », citée par son `aria-describedby`. */
 const VALUE_EN_HINT_ID = "about-stat-value-en-help";
+const VALUE_EN_MISSING_ID = "about-stat-value-en-missing";
 
 export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: Readonly<AboutStatsProps>) {
   // La gestion reste en français (D4) : sous `/en`, ses contrôles, sa fenêtre
@@ -208,6 +210,8 @@ export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: R
   }
 
   const submitLabel = editing ? "Enregistrer" : "Ajouter";
+  // La valeur saisie se lirait telle quelle sur la page anglaise : le champ anglais le dit.
+  const valueEnMissing = aboutStatValueNeedsEnglish(form);
 
   return (
     <>
@@ -318,7 +322,8 @@ export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: R
               <InfoHint id={VALUE_EN_HINT_ID} subject="Valeur en anglais">
                 <p>
                   La valeur affichée sur la page anglaise, écrite à l'anglaise (« €4,200 », « Free »). Laissée
-                  vide, la valeur française y est reprise.
+                  vide, la valeur française y est reprise : faite de mots ou écrite à la française, la carte reste
+                  alors marquée « EN ».
                 </p>
               </InfoHint>
             </InfoHintRow>
@@ -330,12 +335,17 @@ export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: R
               placeholder="€4,200"
               lang="en"
               enterKeyHint="next"
-              {...fieldErrors.aria("valueEn", VALUE_EN_HINT_ID)}
+              {...fieldErrors.aria("valueEn", VALUE_EN_HINT_ID, valueEnMissing && VALUE_EN_MISSING_ID)}
               onChange={(e) => {
                 fieldErrors.clear("valueEn");
                 setForm((f) => ({ ...f, valueEn: e.target.value }));
               }}
             />
+            {valueEnMissing && (
+              <EnglishMissingHint id={VALUE_EN_MISSING_ID}>
+                {"Pas encore de valeur anglaise : la page anglaise affiche la valeur française telle quelle. Écris-la à l'anglaise, même identique."}
+              </EnglishMissingHint>
+            )}
             <FieldErrorText fieldId={STAT_FIELD_IDS.valueEn} message={fieldErrors.message("valueEn")} />
           </div>
 
