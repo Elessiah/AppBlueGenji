@@ -60,7 +60,9 @@ après le libellé qu'elles expliquent, et se réécrivent **court**.
 - **Fermée, elle reste dans le DOM** (`hidden`) avec son `id` : un champ qui la
   cite dans son `aria-describedby` garde sa description entière.
 - Se referme par **Échap** (focus rendu au bouton ; écouté sur le composant
-  seul, pour ne pas voler l'Échap d'une modale), par un **clic ailleurs**, par
+  seul, pour ne pas voler l'Échap d'une modale ; déplié dans une modale, il
+  porte `data-escape-owner` et `escapeBelongsElsewhere` lui laisse la touche —
+  sans quoi l'écouteur de la modale, en capture, la fermait saisie comprise), par un **clic ailleurs**, par
   un **second clic**. Le clic ailleurs ferme au `click` et non au `pointerdown` :
   replier l'explication à l'appui ferait remonter le contrôle visé sous le
   pointeur, et le relâchement tomberait à côté (clic perdu). Cliquer un autre
