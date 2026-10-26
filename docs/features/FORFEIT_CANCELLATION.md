@@ -56,14 +56,16 @@ elle passe par `retryOnDeadlock`, qui rejoue la transaction entière après un
 interblocage (publication une seule fois, après le commit réussi). Le contrôle
 des manches postérieures lit d'abord leurs matchs sans verrou (une saisie déjà
 commitée suffit à refuser), puis relit les autres **verrouillés, par clé
-primaire et sans attendre** (`FOR UPDATE NOWAIT`, table seule) : un report en cours écrit
-son score sous le verrou du match avant d'attendre le tournoi, et une lecture
-d'instantané l'aurait manqué — l'équipe rentrait et le rejeu suisse réappariait
-une manche déjà saisie. Attendre ce report, c'était s'interbloquer avec lui :
-une ligne occupée défait donc l'annulation, qui rend la main au report et se
-rejoue (`retryOnDeadlock`), puis refuse en `FORFEIT_ROUND_PASSED` ; trois
-tentatives occupées rendent le refus « réessaie » (`409`) des interblocages. Le
-verrou ne couvre que les manches postérieures, pas toute la phase ni ses
+primaire** (`FOR UPDATE`, table seule) : un report en cours écrit son score
+sous le verrou du match avant d'attendre le tournoi, et une lecture
+d'instantané l'aurait manqué — l'équipe rentrait et le rejeu suisse
+réappariait une manche déjà saisie. Ce report et l'annulation s'interbloquent :
+le moteur rompt le cycle, l'annulation (qui n'a encore rien écrit) se rejoue
+(`retryOnDeadlock`) et refuse en `FORFEIT_ROUND_PASSED`. Un geste bref sur ces
+matchs (« Prêt », horaire) est simplement attendu. Une contention qui dure sur
+les trois tentatives — interblocage, ou ligne changée depuis l'instantané sous
+MariaDB (`ER_CHECKREAD`) — rend `409 CONCURRENT_UPDATE_RETRY`, pas une panne.
+Le verrou ne couvre que les manches postérieures, pas toute la phase ni ses
 intervalles ; il dure jusqu'au commit, si bien qu'un « Prêt » de la manche
 suivante attend la fin du rejeu.
 
@@ -114,8 +116,8 @@ tournoi individuel), auteur nommé dans pm2 seulement.
 - `tests/lib/server/forfeit-cancellation-service.test.ts` — verrou en premier,
   fenêtre, statut remis à `ACTIVE`, rejeu du bon moteur, multi-phases,
   rejeu après interblocage (un refus métier ne se rejoue pas), contrôle des
-  manches postérieures verrouillées par clé primaire sans attendre (ligne
-  occupée → rejeu puis refus).
+  manches postérieures verrouillées par clé primaire (interblocage → rejeu
+  puis refus), contention persistante rendue en `409`.
 - `tests/app/api/admin/forfeit-cancellation.test.ts` — administrateur seul,
   codes d'erreur, journal anonyme.
 - `tests/tournois/forfeit-eligibility.test.ts` — `canCancelForfeits`.
