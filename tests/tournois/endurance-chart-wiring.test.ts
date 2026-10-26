@@ -50,6 +50,13 @@ describe("mouvement", () => {
     expect(CHART).toMatch(/runTo\(lastRound, 0\);\s*return stop;/);
   });
 
+  it("une manche poussée par le flux volet ouvert est suivie si le lecteur suit la dernière", () => {
+    expect(CHART).toContain("useState<number | null>(null)");
+    expect(CHART).toContain("const shown = chartShownRound(target, lastRound);");
+    expect(CHART).toContain("setTarget(chartTargetFor(round, lastRound));");
+    expect(CHART).toMatch(/if \(previous === lastRound \|\| target !== null\) return;\s*runTo\(lastRound, Math\.min\(progressRef\.current, previous\)\);/);
+  });
+
   it("aucune animation CSS infinie", () => {
     expect(CSS).not.toMatch(/animation\s*:/);
     expect(CSS).not.toContain("infinite");

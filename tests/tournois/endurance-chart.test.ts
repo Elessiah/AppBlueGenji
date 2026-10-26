@@ -15,6 +15,8 @@ import {
   chartLine,
   chartOrderAt,
   chartRankAt,
+  chartShownRound,
+  chartTargetFor,
   chartThresholdAt,
   chartTickStep,
   chartTopAt,
@@ -355,5 +357,28 @@ describe("animation", () => {
 
   it("cible déjà atteinte : une seule image", () => {
     expect(chartAnimationFrame(2, 2, 0)).toEqual({ progress: 2, done: true });
+  });
+});
+
+describe("manche affichée et flux", () => {
+  it("sans choix, suit la dernière manche tirée, y compris une manche poussée ensuite", () => {
+    expect(chartShownRound(null, 3)).toBe(3);
+    expect(chartShownRound(null, 4)).toBe(4);
+  });
+
+  it("une manche passée choisie reste affichée quand une nouvelle arrive", () => {
+    expect(chartShownRound(2, 3)).toBe(2);
+    expect(chartShownRound(2, 4)).toBe(2);
+  });
+
+  it("bornée à [1, dernière manche]", () => {
+    expect(chartShownRound(0, 3)).toBe(1);
+    expect(chartShownRound(7, 3)).toBe(3);
+  });
+
+  it("choisir la dernière manche revient à la suivre ; une manche passée est retenue", () => {
+    expect(chartTargetFor(3, 3)).toBeNull();
+    expect(chartTargetFor(1, 3)).toBe(1);
+    expect(chartShownRound(chartTargetFor(3, 3), 4)).toBe(4);
   });
 });
