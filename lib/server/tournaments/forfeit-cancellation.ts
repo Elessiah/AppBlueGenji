@@ -111,10 +111,12 @@ async function replayStandings(
  * score en cours, l'équipe rentrait et le rejeu suisse réappariait une manche
  * saisie. Les lignes encore vierges sont donc relues **verrouillées**, par clé
  * primaire seulement (les manches postérieures, pas toute la phase ni ses
- * intervalles). Un geste bref sur l'une d'elles (« Prêt », horaire) se laisse
- * attendre ; un report en cours, qui attend le tournoi, forme un interblocage
- * que le moteur rompt aussitôt — l'annulation, qui n'a rien écrit, en est la
- * victime ordinaire et se rejoue (`retryOnDeadlock`) en voyant alors le score.
+ * intervalles). Un report en cours, qui attend le tournoi, forme un
+ * interblocage que le moteur rompt aussitôt — l'annulation, qui n'a rien écrit,
+ * en est la victime ordinaire et se rejoue (`retryOnDeadlock`) en voyant alors
+ * le score. Un « Prêt » commité pendant l'attente fait refuser la relecture
+ * sous MariaDB (`ER_CHECKREAD`, ligne plus récente que l'instantané) : même
+ * rejeu.
  * Ces lignes restent verrouillées jusqu'au commit : un « Prêt » de la manche
  * suivante attend la fin du rejeu (geste d'administration rare et court).
  */

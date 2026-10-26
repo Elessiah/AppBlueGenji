@@ -61,8 +61,9 @@ sous le verrou du match avant d'attendre le tournoi, et une lecture
 d'instantané l'aurait manqué — l'équipe rentrait et le rejeu suisse
 réappariait une manche déjà saisie. Ce report et l'annulation s'interbloquent :
 le moteur rompt le cycle, l'annulation (qui n'a encore rien écrit) se rejoue
-(`retryOnDeadlock`) et refuse en `FORFEIT_ROUND_PASSED`. Un geste bref sur ces
-matchs (« Prêt », horaire) est simplement attendu. Une contention qui dure sur
+(`retryOnDeadlock`) et refuse en `FORFEIT_ROUND_PASSED`. Un « Prêt » commité
+sur ces matchs pendant l'attente fait refuser la relecture sous MariaDB
+(`ER_CHECKREAD`) : même rejeu. Une contention qui dure sur
 les trois tentatives — interblocage, ou ligne changée depuis l'instantané sous
 MariaDB (`ER_CHECKREAD`) — rend `409 CONCURRENT_UPDATE_RETRY`, pas une panne.
 Le verrou ne couvre que les manches postérieures, pas toute la phase ni ses
