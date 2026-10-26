@@ -473,6 +473,12 @@ manche de la vue). L'en-tête, le bandeau de la manche en cours et les vues sont
 décrits dans `ENDURANCE_RANKING_VIEWS.md` ; l'ordre et l'ouverture des volets de
 manche dans `ENDURANCE_ROUND_PANELS.md`.
 
+Le volet « Évolution de l'endurance » (replié, chargé au dépliage) trace ces
+mêmes cases en courbes, du départ à la manche choisie : une case `FORFEIT` y
+devient « FF » à côté d'une tête creuse, une case `OUT` ou un match à jouer une
+tête creuse. Pour les lecteurs d'écran, il porte un tableau `sr-only` engagé ×
+manche (`ENDURANCE_RANKING_VIEWS.md`, § Graphique).
+
 ## Retrait du tournoi (abandon / forfait général)
 
 Pris en charge comme en Survie et en Ronde suisse : le capital tombe à 0,

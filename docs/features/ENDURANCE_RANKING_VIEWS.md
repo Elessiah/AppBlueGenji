@@ -9,8 +9,8 @@ vues. Même rendu sur la page connectée (`/tournois/[id]`) et sur la page sans
 compte (`/suivre/tournois/[id]`) : les deux passent par `TournamentSheet` →
 `EnduranceView` ; la page sans compte ne reçoit simplement aucun geste.
 
-Le graphique « Évolution de l'endurance » est le **lot 2** : son emplacement est
-réservé dans `EnduranceView`, entre le journal des sanctions et les play-offs.
+Le graphique « Évolution de l'endurance » suit le journal des sanctions, replié
+à chaque chargement (§ Graphique).
 
 ## Ce que voit le lecteur
 
@@ -32,7 +32,8 @@ Dans l'ordre (`EnduranceView`) :
    Tournoi fini : pas de bandeau.
 3. **Vues du classement** (`EnduranceRankingViews`), puis la légende « Hors
    course », puis le journal des sanctions.
-4. Aperçu de la manche suivante (arbitrage), play-offs (s'ils sont lancés),
+4. **Volet « Évolution de l'endurance »** (`EnduranceChartPanel`), replié.
+5. Aperçu de la manche suivante (arbitrage), play-offs (s'ils sont lancés),
    volets de manche (`ENDURANCE_ROUND_PANELS.md`).
 
 ## Les vues
@@ -85,6 +86,50 @@ les rend que dans la vue « Général » : une vue passée est de l'histoire, au
 geste ne s'y applique. Les gestes de match (score, programmation, live,
 arbitrage, contestation, « ★ Votre match ») restent sur les cartes des volets.
 
+## Graphique — « Évolution de l'endurance »
+
+`EnduranceChartPanel` (volet `BoardPanel`, **replié à chaque chargement**) →
+`EnduranceChart`, chargé par `dynamic()` au premier dépliage : replié, le volet ne
+coûte que son en-tête. `BoardPanel` ne rend ses enfants qu'ouvert, donc replier
+**démonte** le graphique. Même rendu, en lecture seule, connecté ou non. Logique
+pure dans `_lib/endurance-chart.ts`.
+
+- **Courbes** (SVG en ligne, `viewBox` 760 × 400) : du départ (capital initial)
+  aux manches 1 … dernière tirée, une courbe par engagé, lue dans
+  `standings[].rounds` (`pointsAfterRound`) ; l'état « pas encore joué » vient du
+  match de la manche (`enduranceRoundColumnCell`). Une courbe s'arrête à la
+  première manche non jouée : **tête creuse** quand l'engagé n'a pas joué la
+  manche affichée (match à jouer, forfait, déjà sorti), **« FF »** en rouge
+  quand il en est sorti par forfait. L'axe va jusqu'au plafond de manches
+  (manches à venir grisées), sinon jusqu'à la dernière tirée.
+- **Manche affichée** : boutons « Manche n » (terminée / en cours · 7/11 / à
+  venir) ; une manche à venir est désactivée. Le rang, le Top N, la légende et
+  le **seuil** (pointillé vert « SEUIL TOP N » = capital du N-ième, N =
+  `playoffSize`) suivent la manche affichée ; la dernière lit le général.
+- **Modes** : « Top N » (les N premiers de la manche affichée, les autres
+  masqués), « Ma sélection » (8 au plus, état du composant seulement — ni
+  stockage local, ni serveur), « Toutes » / « Tous » (palette en boucle).
+  « Effacer la sélection » et « Rejouer l'animation ».
+- **Survol, focus, clic** : un bouton de la légende (au focus comme au survol)
+  ou la zone de survol d'une courbe met la courbe en avant et remplit l'encart
+  (nom, « #rang · S seed · bilan », capital manche par manche). Un clic ajoute
+  ou retire l'engagé de « Ma sélection ». Le clavier passe par la légende.
+- **Palette** : huit jetons froids (`ENDURANCE_CHART_PALETTE` : `--blue-500`,
+  `--violet-400`, `--accent-green`, `--pink-400`, `--blue-100`, `--blue-700`,
+  `--violet-300`, `--cyan-400`), chacun ≥ 3:1 sur le fond, deux voisins écartés
+  aussi par la clarté. **Pas d'ambre** (avertissements seulement) : l'ambre de la
+  maquette a été remplacé.
+- **Animation** : `requestAnimationFrame` seulement volet ouvert, 650 ms par
+  manche, annulée au repli (démontage) ; **une seule image** sous
+  `prefers-reduced-motion` ou en régime économe (`useClientPower()`,
+  `CLIENT_POWER_MODES.md`). Aucune animation CSS infinie.
+- **Accessibilité** : SVG `role="img"` avec un `aria-label` réel (nombre
+  d'engagés, manche affichée, seuil) ; légende dans une `<ScrollArea ariaLabel>` ;
+  un **tableau `sr-only`** engagé × manche (capital, « à jouer », « Forfait »,
+  « sortie ») remplace pour les lecteurs d'écran le tableau « manche par
+  manche » retiré. Texte HTML ≥ 11 px ; le texte du SVG est en unités
+  utilisateur. Noms rendus en texte par `visibleText`, jamais en HTML.
+
 ## Données
 
 Le rang et le bilan de chaque manche viennent du **rejeu**
@@ -128,7 +173,8 @@ déjà public. Logique pure : `_lib/endurance-ranking-views.ts`.
 ## Vie privée
 
 Aucune donnée nouvelle : rang, bilan et rencontres sont des résultats déjà
-publics sur les deux pages. Pas d'entrée `PRIVACY_CHANGES`, pas de changement
+publics sur les deux pages. Le graphique n'en lit pas d'autres, et la sélection
+« Ma sélection » n'est conservée nulle part (état du composant). Pas d'entrée `PRIVACY_CHANGES`, pas de changement
 du registre.
 
 ## Tests
@@ -140,5 +186,11 @@ du registre.
   rejeu (égalités, nul, forfait, pénalité, élimination, sortie anticipée).
 - `tests/tournois/endurance-ranking-views-wiring.test.ts` — ordre des blocs,
   gestes de chaque rôle, gestes réservés au « Général », règles transverses.
+- `tests/tournois/endurance-chart.test.ts` — séries, tracés et têtes (creuse,
+  « FF »), Top N et seuil par manche, plafond de la sélection, palette (jetons,
+  contraste, clarté, pas d'ambre), pas de l'animation.
+- `tests/tournois/endurance-chart-wiring.test.ts` — volet replié, chargement à
+  la demande, mouvement réduit et régime client, `ScrollArea`, pas d'ambre,
+  tableau `sr-only`, lecture seule, textes FR + EN.
 - `tests/app/tournament-page-i18n.test.tsx` — rendu anglais sans français,
   accord « joueurs » en français.

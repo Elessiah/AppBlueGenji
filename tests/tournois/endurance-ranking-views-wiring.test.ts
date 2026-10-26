@@ -30,13 +30,13 @@ function renderIndex(pattern: string): number {
 }
 
 describe("EnduranceView — ordre des blocs", () => {
-  it("en-tête, classement, légende, sanctions, emplacement du graphique, aperçu, play-offs, manches", () => {
+  it("en-tête, classement, légende, sanctions, graphique, aperçu, play-offs, manches", () => {
     const order = [
       "<EnduranceCard",
       "<EnduranceRankingViews",
       "showOutLegend && (",
       "<PenaltyLog",
-      "Évolution de l'endurance",
+      "<EnduranceChartPanel",
       "<EnduranceNextRoundPanel",
       "<BracketSections",
       "<EnduranceRoundPanels",

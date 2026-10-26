@@ -30,6 +30,7 @@ import { EntrantName } from "./EntrantName";
 import { FORFEIT_CANCEL_BUTTON_STYLE } from "./RoundColumns";
 import { EnduranceCard } from "./EnduranceCard";
 import { EnduranceRankingViews } from "./EnduranceRankingViews";
+import { EnduranceChartPanel } from "./EnduranceChartPanel";
 import { PodiumTiersOff } from "@/components/podium-tiers";
 import { BracketSections } from "./BracketSections";
 import { EnduranceRoundPanels } from "./EnduranceRoundPanels";
@@ -407,8 +408,11 @@ export function EnduranceView({
         }
       />
 
-      {/* Emplacement réservé : l'accordéon « Évolution de l'endurance »
-          (lot 2) viendra ici, entre le journal des sanctions et l'aperçu. */}
+      {/*
+        Accordéon « Évolution de l'endurance », replié à chaque chargement : le
+        graphique n'est chargé qu'au premier dépliage.
+      */}
+      <EnduranceChartPanel endurance={endurance} matches={matches} />
 
       {/*
         L'aperçu ouvre la suite des volets (aperçu → manche en cours → manches
