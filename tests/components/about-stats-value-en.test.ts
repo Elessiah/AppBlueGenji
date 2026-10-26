@@ -22,10 +22,20 @@ describe("AboutStats — valeur anglaise", () => {
     expect(source).toContain("htmlFor={STAT_FIELD_IDS.valueEn}");
     expect(source).toContain("Valeur en anglais (facultatif)");
     expect(source).toMatch(/<InfoHint id=\{VALUE_EN_HINT_ID\} subject="Valeur en anglais">/);
-    expect(source).toContain("Laissée\n                  vide, la valeur française y est reprise.");
-    expect(source).toContain('{...fieldErrors.aria("valueEn", VALUE_EN_HINT_ID)}');
+    expect(source).toContain(
+      "Laissée\n                  vide, la valeur française y est reprise : faite de mots ou écrite à la française, la carte reste\n                  alors marquée « EN ».",
+    );
+    expect(source).toContain('{...fieldErrors.aria("valueEn", VALUE_EN_HINT_ID, valueEnMissing && VALUE_EN_MISSING_ID)}');
     expect(source).toContain('<FieldErrorText fieldId={STAT_FIELD_IDS.valueEn} message={fieldErrors.message("valueEn")} />');
     expect(source).toContain("maxLength={ABOUT_STAT_VALUE_MAX}");
+  });
+
+  it("signale sous le champ anglais une valeur saisie qui se lirait telle quelle sur /en", () => {
+    expect(source).toContain('const VALUE_EN_MISSING_ID = "about-stat-value-en-missing";');
+    expect(source).toContain("const valueEnMissing = aboutStatValueNeedsEnglish(form);");
+    expect(source).toMatch(
+      /\{valueEnMissing && \(\s*<EnglishMissingHint id=\{VALUE_EN_MISSING_ID\}>\s*\{"Pas encore de valeur anglaise : la page anglaise affiche la valeur française telle quelle\. Écris-la à l'anglaise, même identique\."\}\s*<\/EnglishMissingHint>/,
+    );
   });
 
   it("la valeur anglaise part avec le formulaire et revient à l'édition", () => {

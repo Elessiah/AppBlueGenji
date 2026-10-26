@@ -8,6 +8,7 @@ import {
   aboutStatValue,
   aboutStatNeedsEnglish,
   aboutStatValueIsFrench,
+  aboutStatValueNeedsEnglish,
   localizedAboutStats,
   validateAboutStatInput,
   type AboutStat,
@@ -164,6 +165,20 @@ describe("localizedAboutStats", () => {
     expect(aboutStatNeedsEnglish({ value: "Gratuit", valueEn: "  ", labelEn: "Entry fee" })).toBe(true);
     expect(aboutStatNeedsEnglish({ value: "Gratuit", valueEn: "Free", labelEn: "Entry fee" })).toBe(false);
     expect(aboutStatNeedsEnglish({ value: "100%", valueEn: null, labelEn: "Volunteer-run" })).toBe(false);
-    expect(aboutStatNeedsEnglish({ value: "4 200 €", valueEn: null, labelEn: "Prize pool" })).toBe(false);
+    expect(aboutStatNeedsEnglish({ value: "4 200 €", valueEn: null, labelEn: "Prize pool" })).toBe(true);
+    expect(aboutStatNeedsEnglish({ value: "4 200 €", valueEn: "€4,200", labelEn: "Prize pool" })).toBe(false);
+  });
+
+  it("une valeur écrite à la française attend son anglais, même sans lettre", () => {
+    for (const value of ["4 200 €", "€4 200", "4 200", "4 200", "0 €", "1,5", "1,50", "10 000 000"]) {
+      expect(aboutStatValueNeedsEnglish({ value, valueEn: null })).toBe(true);
+    }
+    for (const value of ["12", "100%", "€4200", "€4,200", "€1,000", "2026"]) {
+      expect(aboutStatValueNeedsEnglish({ value, valueEn: null })).toBe(false);
+    }
+    expect(aboutStatValueNeedsEnglish({ value: "Gratuit", valueEn: "" })).toBe(true);
+    expect(aboutStatValueNeedsEnglish({ value: "0 €", valueEn: "Free" })).toBe(false);
+    // Le lang="fr" reste réservé aux mots : « 4 200 € » se lit sans voix française.
+    expect(aboutStatValueIsFrench({ value: "4 200 €", valueEn: null }, "en")).toBe(false);
   });
 });
