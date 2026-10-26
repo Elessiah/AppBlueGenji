@@ -148,7 +148,7 @@
       "otherTitle": "Déclarer l'abandon de {name}",
       "selfAria": "Abandonner avec mon équipe",
       "otherAriaSwiss": "Abandonner : déclarer l'abandon de {name}",
-      "otherAriaSurvival": "Déclarer l'abandon de {name}"
+      "otherAriaSurvival": "Abandonner : déclarer l'abandon de {name}"
     },
     "endurance": {
       "selfTitle": {
@@ -164,8 +164,8 @@
     "success": "Abandon de {name} annulé : son classement est recalculé.",
     "title": "Annuler l'abandon de {name} ?",
     "body": {
-      "TEAM": "L'équipe revient en lice et sera appariée dès la prochaine manche. Le match perdu par forfait reste perdu : corrigez son score si besoin.",
-      "SOLO": "Le joueur revient en lice et sera apparié dès la prochaine manche. Le match perdu par forfait reste perdu : corrigez son score si besoin."
+      "TEAM": "L'abandon est effacé et le classement de l'équipe recalculé : elle sera appariée dès la prochaine manche, sauf si les matchs qu'elle a joués l'éliminent. Le match perdu par forfait reste perdu : corrigez son score si besoin.",
+      "SOLO": "L'abandon est effacé et le classement du joueur recalculé : il sera apparié dès la prochaine manche, sauf si les matchs qu'il a joués l'éliminent. Le match perdu par forfait reste perdu : corrigez son score si besoin."
     },
     "confirm": "Annuler l'abandon",
     "pending": "Annulation…",

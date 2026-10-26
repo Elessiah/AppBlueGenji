@@ -669,19 +669,28 @@ export function AdminScoreDialog({
           <div className={styles.actions}>
             {/* Trois poids, trois rôles : quitter est un lien, l'enregistrement
                 intermédiaire est secondaire, valider est l'action attendue. */}
+            {/* Pendant l'envoi, `aria-disabled` et non `disabled` : le bouton
+                pressé garde le focus, qui tomberait sinon sur <body>, derrière
+                la modale, le temps d'un refus. */}
             <button
               type="button"
               className={`${styles.link} ${styles.close}`}
-              onClick={onClose}
-              disabled={form.submitting}
+              onClick={() => {
+                if (!form.submitting) onClose();
+              }}
+              aria-disabled={form.submitting || undefined}
             >
               {t("score.close")}
             </button>
             <button
               type="button"
               className="btn ghost"
-              onClick={() => void run("save")}
-              disabled={(!form.decision.canSave && !form.mapsRefused.save) || form.submitting || awaitingDetail}
+              onClick={() => {
+                if (!form.submitting) void run("save");
+              }}
+              disabled={(!form.decision.canSave && !form.mapsRefused.save) || awaitingDetail}
+              aria-disabled={form.submitting || undefined}
+              aria-busy={form.submitting || undefined}
               title={buttonTitle(form.mapsRefused.save, form.decision.saveBlocker, t("score.admin.saveTitle"))}
             >
               {form.submitting ? "…" : t("score.admin.save")}
@@ -689,7 +698,9 @@ export function AdminScoreDialog({
             <button
               type="submit"
               className="btn"
-              disabled={(!form.decision.canResolve && !form.mapsRefused.resolve) || form.submitting || awaitingDetail}
+              disabled={(!form.decision.canResolve && !form.mapsRefused.resolve) || awaitingDetail}
+              aria-disabled={form.submitting || undefined}
+              aria-busy={form.submitting || undefined}
               title={buttonTitle(form.mapsRefused.resolve, form.decision.resolveBlocker, t("score.admin.resolveTitle"))}
             >
               {form.submitting ? "…" : t("score.admin.resolve")}

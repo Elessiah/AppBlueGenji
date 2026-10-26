@@ -57,6 +57,8 @@ const SUBGRID: CSSProperties = {
 
 const RIGHT: CSSProperties = { textAlign: "right" };
 const SECONDARY: CSSProperties = { fontSize: 12, color: "var(--ink-quiet)" };
+/** Estompe une cellule de ligne forfait (jamais la colonne d'action). */
+const FORFEIT_FADE: CSSProperties = { opacity: 0.55 };
 
 const STATUS_META: Record<SwissStandingRow["status"], { key: "ranking.active" | "ranking.forfeit"; color: string }> = {
   ACTIVE: { key: "ranking.active", color: ACCENT },
@@ -241,6 +243,10 @@ export function SwissView({
                     const isMine = team.teamId === myTeamId;
                     const forfeitable = isForfeitable(team);
                     const cancellable = isCancellable(team);
+                    // Une ligne forfait s'estompe cellule par cellule, hors
+                    // colonne d'action : « Annuler l'abandon » garderait sinon
+                    // l'air d'un bouton désactivé, sous le contraste requis.
+                    const fade = team.status === "FORFEIT" ? FORFEIT_FADE : undefined;
                     return (
                       <div
                         key={team.teamId}
@@ -252,20 +258,19 @@ export function SwissView({
                           padding: "7px 10px",
                           borderTop: idx === 0 ? "none" : `1px solid ${BORDER}`,
                           background: isMine ? "rgba(89,212,255,0.06)" : undefined,
-                          opacity: team.status === "FORFEIT" ? 0.55 : 1,
                           fontSize: 13,
                         }}
                       >
                         <span
                           role="cell"
                           className="num"
-                          style={{ color: "var(--ink-quiet)", fontWeight: 600 }}
+                          style={{ color: "var(--ink-quiet)", fontWeight: 600, ...fade }}
                         >
                           {team.rank}
                         </span>
                         {/* La cellule porte la place (piste élastique à
                             plancher), le nom s'y tronque d'une ellipse. */}
-                        <span role="cell" style={{ display: "flex", minWidth: 0 }}>
+                        <span role="cell" style={{ display: "flex", minWidth: 0, ...fade }}>
                           <EntrantName
                             teamId={team.teamId}
                             name={team.teamName}
@@ -274,13 +279,13 @@ export function SwissView({
                             textStyle={{ fontWeight: standingNameWeight(isMine, teamPodiumTier(podiumTiers, team.teamId) !== null, team.status === "FORFEIT") }}
                           />
                         </span>
-                        <span role="cell" className="num" style={{ ...RIGHT, fontWeight: 700 }}>
+                        <span role="cell" className="num" style={{ ...RIGHT, fontWeight: 700, ...fade }}>
                           {formatPoints(team.points)}
                         </span>
-                        <span role="cell" className="mono" style={{ ...RIGHT, ...SECONDARY }}>
+                        <span role="cell" className="mono" style={{ ...RIGHT, ...SECONDARY, ...fade }}>
                           {team.wins}-{team.draws}-<span className="result-loss">{team.losses}</span>
                         </span>
-                        <span role="cell" className="mono" style={{ ...RIGHT, ...SECONDARY }}>
+                        <span role="cell" className="mono" style={{ ...RIGHT, ...SECONDARY, ...fade }}>
                           {formatPoints(team.buchholz)}
                         </span>
                         {/* La coche est décorative, la cellule dit le fait en
@@ -288,7 +293,7 @@ export function SwissView({
                         <span
                           role="cell"
                           title={team.byes > 0 ? t("swiss.byeTitle") : undefined}
-                          style={{ fontSize: 11, color: "var(--violet-300)" }}
+                          style={{ fontSize: 11, color: "var(--violet-300)", ...fade }}
                         >
                           {team.byes > 0 && (
                             <>
@@ -305,6 +310,7 @@ export function SwissView({
                             textTransform: "uppercase",
                             letterSpacing: "0.04em",
                             color: meta.color,
+                            ...fade,
                           }}
                         >
                           {meta.label}

@@ -164,14 +164,14 @@
     "success": "{name}'s withdrawal cancelled: its standing is recalculated.",
     "title": "Cancel {name}'s withdrawal?",
     "body": {
-      "TEAM": "The team is back in contention and will be paired from the next round. The match lost by forfeit stays lost: correct its score if needed.",
-      "SOLO": "The player is back in contention and will be paired from the next round. The match lost by forfeit stays lost: correct its score if needed."
+      "TEAM": "The withdrawal is erased and the team's standing recalculated: it will be paired from the next round, unless the matches it has played eliminate it. The match lost by forfeit stays lost: correct its score if needed.",
+      "SOLO": "The withdrawal is erased and the player's standing recalculated: they will be paired from the next round, unless the matches they have played eliminate them. The match lost by forfeit stays lost: correct its score if needed."
     },
     "confirm": "Cancel the withdrawal",
     "pending": "Cancelling…",
     "button": "Cancel withdrawal",
     "buttonTitle": "Cancel the withdrawal: {name} is back in contention",
-    "buttonAria": "Cancel {name}'s withdrawal"
+    "buttonAria": "Cancel withdrawal of {name}"
   },
   "penaltyLift": {
     "success": "Penalty lifted: {name} gets back {points, plural, one {# point} other {# points}}.",
