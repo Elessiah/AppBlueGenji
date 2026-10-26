@@ -29,8 +29,15 @@ function ResultSide({ side }: Readonly<{ side: TickerResultSide }>) {
         </i>
       ) : null}
       <span>{side.name}</span>
-      {side.sr ? <span className="sr-only"> ({side.sr})</span> : null}{" "}
-      <b className={styles.score}>{side.score}</b>
+      {/* Un forfait se lit aussi à l'écran : sans teinte ni repère, le mot seul le dit. */}
+      {side.sr ? <span className={side.outcome === "forfeit" ? undefined : "sr-only"}> ({side.sr})</span> : null}
+      {/* Double forfait : aucun score enregistré, pas de « 0 » qui ferait croire à un 0-0. */}
+      {side.score === null ? null : (
+        <>
+          {" "}
+          <b className={styles.score}>{side.score}</b>
+        </>
+      )}
     </span>
   );
 }
@@ -88,7 +95,7 @@ interface TickerProps {
  *
  * Un **résultat** habille ses camps (`docs/features/TICKER_RESULTS.md`) :
  * vainqueur en `--teal-400`, gras, « ▲ » ; perdant dans l'encre de la
- * défaite (`--result-loss-ink`), « ▼ » ; forfait et nul neutres ; score en gras et plus grand ; l'issue dite
+ * défaite (`--result-loss-ink`), « ▼ » ; forfait et nul neutres, le forfait dit en clair ; score en gras et plus grand ; l'issue dite
  * en texte masqué aux lecteurs d'écran.
  */
 function TickerView({ items, labels }: Readonly<TickerProps>) {

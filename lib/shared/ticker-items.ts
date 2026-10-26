@@ -19,9 +19,10 @@ export type TickerOutcome = "win" | "loss" | "forfeit" | "none";
 /** Un camp d'un résultat : son nom affiché, son score, son issue. */
 export type TickerResultSide = {
   readonly name: string;
-  readonly score: string;
+  /** Score enregistré ; `null` pour un double forfait, qui n'en a pas (`DOUBLE_FORFEIT.md`). */
+  readonly score: string | null;
   readonly outcome: TickerOutcome;
-  /** Issue dite au lecteur d'écran (« vainqueur », « forfait »…), `null` sans issue propre. */
+  /** Issue dite au lecteur d'écran (« vainqueur », « forfait »…), `null` sans issue propre ; « forfait » se lit aussi à l'écran. */
   readonly sr: string | null;
 };
 
@@ -72,10 +73,11 @@ export function tickerOutcomes(match: TickerMatchOutcomeInput): readonly [Ticker
   return [side(match.team1Id), side(match.team2Id)];
 }
 
-/** Texte brut d'une entrée (titre, recherche, tests) : la phrase telle qu'elle se lit à l'écran. */
+/** Texte brut d'une entrée (tests) : amorce, noms et scores, sans les repères « ▲ » / « ▼ » ni les mots d'issue. */
 export function tickerItemText(item: TickerItem): string {
   if (typeof item === "string") return item;
   if (item.kind === "champion") return `${item.lead} ${item.name}`;
   const [left, right] = item.sides;
-  return `${item.lead} ${left.name} ${left.score} — ${right.name} ${right.score}`;
+  const side = (s: TickerResultSide) => (s.score === null ? s.name : `${s.name} ${s.score}`);
+  return `${item.lead} ${side(left)} — ${side(right)}`;
 }

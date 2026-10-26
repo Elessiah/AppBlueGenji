@@ -527,10 +527,10 @@ type TickerEntry = { sortAt: number } & (
       tournament: string;
       team1: string | null;
       team1Id: number | null;
-      score1: number;
+      score1: number | null;
       team2: string | null;
       team2Id: number | null;
-      score2: number;
+      score2: number | null;
       winnerTeamId: number | null;
       forfeitTeamId: number | null;
       doubleForfeit: boolean;
@@ -570,9 +570,9 @@ function formatTickerEntry(entry: TickerEntry, locale: Locale): TickerItem | nul
         forfeitTeamId: entry.forfeitTeamId,
         doubleForfeit: entry.doubleForfeit,
       });
-      const side = (name: string | null, id: number | null, score: number, outcome: TickerOutcome) => {
+      const side = (name: string | null, id: number | null, score: number | null, outcome: TickerOutcome) => {
         const key = OUTCOME_SR_KEY[outcome];
-        return { name: team(name, id), score: String(score), outcome, sr: key === null ? null : t(key) };
+        return { name: team(name, id), score: score === null ? null : String(score), outcome, sr: key === null ? null : t(key) };
       };
       return {
         kind: "result",
@@ -703,10 +703,10 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
         tournament: row.tournament_name,
         team1: row.team1_name,
         team1Id: row.team1_id,
-        score1: Number(row.team1_score ?? 0),
+        score1: row.team1_score === null ? null : Number(row.team1_score),
         team2: row.team2_name,
         team2Id: row.team2_id,
-        score2: Number(row.team2_score ?? 0),
+        score2: row.team2_score === null ? null : Number(row.team2_score),
         winnerTeamId: row.winner_team_id === null ? null : Number(row.winner_team_id),
         forfeitTeamId: row.forfeit_team_id === null ? null : Number(row.forfeit_team_id),
         doubleForfeit: Boolean(Number(row.double_forfeit ?? 0)),
