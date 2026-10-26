@@ -336,7 +336,13 @@ describe("anglais", () => {
   });
 
   it("cartes et podium", () => {
-    const teams = [listTeam(), listTeam({ id: 5, rank: 2, isGhost: false }), listTeam({ id: 6, rank: 3, wins: 0, losses: 0, form: [] })];
+    const teams = [
+      listTeam(),
+      listTeam({ id: 5, rank: 2, isGhost: false }),
+      listTeam({ id: 6, rank: 3 }),
+      // Sans match compté : pas de rang (`rank: null`), « No matches » sur la carte.
+      listTeam({ id: 7, rank: null, wins: 0, losses: 0, points: 500, form: [] }),
+    ];
     const html = inEnglish(
       <>
         <HighlightStrip teams={teams} />
