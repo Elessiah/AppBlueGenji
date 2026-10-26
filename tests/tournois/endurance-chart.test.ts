@@ -19,8 +19,10 @@ import {
   chartShownRound,
   chartTargetFor,
   chartThresholdAt,
+  chartThresholdOf,
   chartTickStep,
   chartTopAt,
+  chartTopOf,
   chartValueAt,
   chartX,
   chartY,
@@ -29,6 +31,7 @@ import {
   enduranceChartSeries,
   togglePick,
 } from "@/app/(secured)/tournois/[id]/_lib/endurance-chart";
+import { enduranceRoundColumnCell } from "@/app/(secured)/tournois/[id]/_lib/endurance-ranking-views";
 import { bracketMatch } from "../helpers/bracket-match";
 
 /**
@@ -406,5 +409,61 @@ describe("bilan de l'encart", () => {
 
   it("instantané sans bilan par manche : 0, comme la vue « après la manche n »", () => {
     expect(chartRecordAt(series[0], 1, 2)).toEqual({ wins: 0, draws: 0, losses: 0 });
+  });
+});
+
+describe("performance : grand plateau (64 engagés × 12 manches)", () => {
+  const TEAMS = 64;
+  const ROUNDS = 12;
+  // Manches 1 à 11 jouées, 12 à moitié : chaque équipe affronte sa voisine.
+  const matches: BracketMatch[] = [];
+  let id = 1;
+  for (let round = 1; round <= ROUNDS; round += 1) {
+    for (let t = 1; t <= TEAMS; t += 2) {
+      const played = round < ROUNDS || t <= TEAMS / 2;
+      matches.push(match(id, round, t, t + 1, played ? [2, (round + t) % 2] : null));
+      id += 1;
+    }
+  }
+  const standings = Array.from({ length: TEAMS }, (_, i) =>
+    row(i + 1, {
+      points: 9 + ((i * 7) % 13),
+      rounds: Array.from({ length: ROUNDS - 1 }, (_, r) => pts(r + 1, 9 + ((i + r) % 11), ((i + r * 5) % TEAMS) + 1)),
+    }),
+  );
+  const big: EnduranceMeta = {
+    ...fixture().endurance,
+    playoffSize: 8,
+    maxRounds: ROUNDS,
+    currentRound: ROUNDS,
+    rounds: Array.from({ length: ROUNDS }, (_, r) => r + 1),
+    standings,
+  };
+
+  it("les séries ne lisent que les matchs de chaque manche — même résultat que tous les matchs", () => {
+    const series = enduranceChartSeries(big, matches);
+    expect(series).toHaveLength(TEAMS);
+    for (const item of series) {
+      for (let round = 1; round <= ROUNDS; round += 1) {
+        const cell = enduranceRoundColumnCell(item.standing, round, matches, big.startPoints);
+        const kind = cell.kind === "BYE" ? "PLAYED" : cell.kind;
+        expect(item.states[round - 1].kind).toBe(kind);
+      }
+    }
+    // Moitié de la manche 12 encore à jouer.
+    expect(series.filter((item) => item.states[ROUNDS - 1].kind === "PENDING")).toHaveLength(TEAMS / 2);
+  });
+
+  it("Top N et seuil tirés d'un ordre déjà calculé = mêmes valeurs qu'en retriant", () => {
+    const series = enduranceChartSeries(big, matches);
+    for (const round of [1, 6, ROUNDS]) {
+      const order = chartOrderAt(series, round, ROUNDS);
+      expect(chartTopOf(order, 8)).toEqual(chartTopAt(series, round, ROUNDS, 8));
+      expect(chartThresholdOf(order, round, ROUNDS, 8)).toBe(chartThresholdAt(series, round, ROUNDS, 8));
+    }
+    const order = chartOrderAt(series, ROUNDS, ROUNDS);
+    expect(chartTopOf(order, 0)).toEqual([]);
+    expect(chartThresholdOf(order, ROUNDS, ROUNDS, 0)).toBeNull();
+    expect(chartThresholdOf(order.slice(0, 4), ROUNDS, ROUNDS, 8)).toBeNull();
   });
 });

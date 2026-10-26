@@ -37,6 +37,39 @@ describe("volet et chargement", () => {
   });
 });
 
+describe("performance (64 engagés × 12 manches)", () => {
+  it("un retour vers une manche antérieure saute sans animation invisible", () => {
+    // `drawn = min(progress, shown)` coupe déjà la courbe : une descente
+    // 4 → 2 tournerait ~1,3 s de requestAnimationFrame sans rien changer.
+    expect(CHART).toMatch(/if \(!animate \|\| to <= from\)/);
+  });
+
+  it("tris, couleurs, fond, légende et tableau sr-only ne se refont pas à chaque image", () => {
+    expect(CHART).toContain("const order = useMemo(() => chartOrderAt(series, shown, lastRound), [series, shown, lastRound]);");
+    expect(CHART).toContain("chartTopOf(order, endurance.playoffSize)");
+    expect(CHART).toContain("chartThresholdOf(order, shown, lastRound, endurance.playoffSize)");
+    expect(CHART).not.toContain("series.indexOf(");
+    for (const name of ["colors", "visible", "backdrop", "legend", "srTable"]) {
+      expect(CHART).toContain(`const ${name} = useMemo(`);
+    }
+    // Aucun mémo ne lit l'avancement de l'animation (`progress`, `drawn`).
+    const between = (from: string, to: string) => CHART.slice(CHART.indexOf(from), CHART.indexOf(to));
+    const derived = between("const order = useMemo(", "const drawn = ");
+    const views = between("const backdrop = useMemo(", "<div className={styles.chart}>");
+    for (const block of [derived, views]) {
+      expect(block.length).toBeGreaterThan(200);
+      expect(block).not.toMatch(/\bprogress\b|\bdrawn\b/);
+    }
+  });
+
+  it("seules les courbes tracées sont calculées à chaque image", () => {
+    expect(CHART).toContain("const lines = visible.map((entry) => ({ ...entry, line: chartLine(entry.item, shown, drawn, geometry) }));");
+    expect(CHART).toContain("{backdrop}");
+    expect(CHART).toContain("{legend}");
+    expect(CHART).toContain("{srTable}");
+  });
+});
+
 describe("mouvement", () => {
   it("lit le régime client et le mouvement réduit", () => {
     expect(CHART).toContain("useClientPower()");
@@ -45,7 +78,7 @@ describe("mouvement", () => {
   });
 
   it("une seule image sans animation, rAF annulé au démontage (repli)", () => {
-    expect(CHART).toMatch(/if \(!animate \|\| from === to\) \{\s*setProgress\(to\);\s*return;/);
+    expect(CHART).toMatch(/if \(!animate \|\| to <= from\) \{\s*setProgress\(to\);\s*return;/);
     expect(CHART).toContain("cancelAnimationFrame(frame.current)");
     expect(CHART).toMatch(/runTo\(lastRound, 0\);\s*return stop;/);
   });
