@@ -30,15 +30,15 @@ function renderIndex(pattern: string): number {
 }
 
 describe("EnduranceView — ordre des blocs", () => {
-  it("en-tête, classement, légende, sanctions, emplacement du graphique, play-offs, aperçu, manches", () => {
+  it("en-tête, classement, légende, sanctions, emplacement du graphique, aperçu, play-offs, manches", () => {
     const order = [
       "<EnduranceCard",
       "<EnduranceRankingViews",
       "showOutLegend && (",
       "<PenaltyLog",
       "Évolution de l'endurance",
-      "<BracketSections",
       "<EnduranceNextRoundPanel",
+      "<BracketSections",
       "<EnduranceRoundPanels",
     ].map(renderIndex);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
