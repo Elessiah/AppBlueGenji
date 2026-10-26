@@ -40,6 +40,7 @@ async function mockDb(
   teamRows: Record<string, unknown>[],
   rosterRows: Record<string, unknown>[] = [],
   formRows: Record<string, unknown>[] = [],
+  placementRows: Record<string, unknown>[] = [],
 ) {
   let matchId = 0;
   let sparringId = 10_000;
@@ -61,6 +62,7 @@ async function mockDb(
     const text = String(sql);
     if (TEAM_QUERY.test(text)) return [teamRows];
     if (REPLAY_QUERY.test(text)) return [matches];
+    if (text.includes("AS awarded_at")) return [placementRows];
     if (IDENTITY_QUERY.test(text)) {
       return [teamRows.map((row) => ({ id: row.id, name: row.name, logo_url: row.logo_url }))];
     }
@@ -338,5 +340,31 @@ describe("listTeams — rang des équipes sans match", () => {
     const teams = await listTeams();
 
     expect(teams.map((t) => t.name)).toEqual(["Classée", "Bravo", "Zulu"]);
+  });
+
+  // Revue UI/UX : hors liste, la cote vient du rejeu. Une équipe qui n'a que
+  // des points de placement affichait 500 à l'annuaire et sa vraie cote sur sa
+  // fiche.
+  it("garde la cote rejouée d'une équipe qui n'a que des points de placement", async () => {
+    const awarded = new Date("2026-06-20T20:00:00.000Z");
+    await mockDb(
+      [
+        teamRow({ id: 1, name: "Alpha", wins: 2 }),
+        teamRow({ id: 2, name: "Bravo", wins: 1 }),
+        teamRow({ id: 3, name: "Placement seul", wins: 0 }),
+      ],
+      [],
+      [],
+      [
+        { tournament_id: 9, team_id: 1, final_rank: 1, awarded_at: awarded },
+        { tournament_id: 9, team_id: 2, final_rank: 2, awarded_at: awarded },
+        { tournament_id: 9, team_id: 3, final_rank: 3, awarded_at: awarded },
+      ],
+    );
+
+    const placementOnly = (await listTeams()).find((t) => t.name === "Placement seul")!;
+
+    expect(placementOnly.rank).toBeNull();
+    expect(placementOnly.points).not.toBe(500);
   });
 });

@@ -233,4 +233,18 @@ describe("leaderboard de la landing", () => {
     // toujours, seulement sur des clés séparées.
     expect(execute.mock.calls.filter((call) => String(call[0]).includes("AS played_at"))).toHaveLength(4);
   });
+
+  // Revue UI/UX : la photo d'il y a une semaine ne porte pas une équipe qui
+  // n'avait encore rien joué. Entrée depuis, elle n'est pas « stable ».
+  it("marque « new » une équipe absente du classement d'il y a une semaine", async () => {
+    const teams = [teamRow(1, "Alpha"), teamRow(2, "Bravo"), teamRow(3, "Nouvelle")];
+    const previous = [matchRow(1, 1, 2, 1)];
+    const current = [...previous, matchRow(2, 3, 2, 3)];
+    await mockDb(teams, current, previous);
+
+    const rows = await getLandingLeaderboard(8);
+
+    expect(rows.find((row) => row.teamName === "Nouvelle")).toMatchObject({ trend: "new", trendValue: 0 });
+    expect(rows.find((row) => row.teamName === "Alpha")?.trend).not.toBe("new");
+  });
 });

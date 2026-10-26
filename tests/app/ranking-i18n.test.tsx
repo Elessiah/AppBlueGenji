@@ -260,3 +260,21 @@ describe("clé manquante", () => {
     expect(text.t("board.nope" as Parameters<typeof text.t>[0])).toBe("board.nope");
   });
 });
+
+// Revue UI/UX : une équipe entrée au classement dans la semaine n'était pas
+// au classement d'il y a sept jours — elle n'est ni montée ni « stable ».
+describe("tendance d'une équipe entrée au classement", () => {
+  const rows = [1, 2, 3, 4].map((rank) => row(rank, rank === 4 ? { trend: "new" } : {}));
+
+  it("français", () => {
+    const markup = renderBoard("fr", { rows });
+    expect(markup).toContain("Entrée au classement ces 7 derniers jours");
+    expect(markup).toContain("★");
+  });
+
+  it("anglais", () => {
+    const markup = renderBoard("en", { rows });
+    expect(markup).toContain("Entered the ranking in the last 7 days");
+    expect(markup).not.toContain("Entrée au classement");
+  });
+});

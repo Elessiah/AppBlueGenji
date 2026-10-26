@@ -202,4 +202,15 @@ describe("TeamCard — badge de rang", () => {
     expect(markup).not.toMatch(/#\d{2}/);
     expect(markup).toContain("Aucun match");
   });
+
+  // Revue UI/UX : `TeamListItem` ne porte pas les nuls. Une équipe dont
+  // l'unique match s'est clos sur un nul est classée : rang, et pas « Aucun
+  // match » à côté.
+  it("ne dit pas « Aucun match » d'une équipe classée sur un seul nul", () => {
+    const markup = renderToStaticMarkup(
+      <TeamCard team={team({ rank: 5, wins: 0, losses: 0, points: 500 })} />,
+    );
+    expect(markup).toContain("#05");
+    expect(markup).not.toContain("Aucun match");
+  });
 });
