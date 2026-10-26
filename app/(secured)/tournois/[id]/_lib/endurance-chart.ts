@@ -68,6 +68,15 @@ export type EnduranceChartSeries = {
 /** Séries de tous les engagés, dans l'ordre du classement général. */
 export function enduranceChartSeries(endurance: EnduranceMeta, matches: BracketMatch[]): EnduranceChartSeries[] {
   const lastRound = endurance.currentRound;
+  // Les matchs rangés par manche, une fois : `enduranceRoundColumnCell` ne lit
+  // que ceux de la manche demandée, et reparcourir tous les matchs pour chaque
+  // case (64 engagés × 12 manches) coûterait ~600 000 comparaisons par poussée.
+  const byRound = new Map<number, BracketMatch[]>();
+  for (const match of matches) {
+    const list = byRound.get(match.roundNumber);
+    if (list === undefined) byRound.set(match.roundNumber, [match]);
+    else list.push(match);
+  }
   return [...endurance.standings]
     .sort((a, b) => a.rank - b.rank)
     .map((standing) => {
@@ -76,7 +85,7 @@ export function enduranceChartSeries(endurance: EnduranceMeta, matches: BracketM
       let open = true;
       let previous = endurance.startPoints;
       for (let round = 1; round <= lastRound; round += 1) {
-        const cell = enduranceRoundColumnCell(standing, round, matches, endurance.startPoints);
+        const cell = enduranceRoundColumnCell(standing, round, byRound.get(round) ?? [], endurance.startPoints);
         let state: EnduranceChartRoundState;
         if (cell.kind === "PLAYED" || cell.kind === "BYE") {
           const points = pointsAfterRound(standing, round, endurance.startPoints);
@@ -135,9 +144,12 @@ export function chartOrderAt(all: EnduranceChartSeries[], round: number, lastRou
 
 /** Les `size` premiers à la manche affichée — le Top N des play-offs. */
 export function chartTopAt(all: EnduranceChartSeries[], round: number, lastRound: number, size: number): number[] {
-  return chartOrderAt(all, round, lastRound)
-    .slice(0, Math.max(0, size))
-    .map((series) => series.teamId);
+  return chartTopOf(chartOrderAt(all, round, lastRound), size);
+}
+
+/** Top N tiré d'un ordre déjà calculé (`chartOrderAt`), sans retrier. */
+export function chartTopOf(order: readonly EnduranceChartSeries[], size: number): number[] {
+  return order.slice(0, Math.max(0, size)).map((series) => series.teamId);
 }
 
 /**
@@ -150,9 +162,17 @@ export function chartThresholdAt(
   lastRound: number,
   size: number,
 ): number | null {
-  if (size <= 0) return null;
-  const order = chartOrderAt(all, round, lastRound);
-  if (order.length < size) return null;
+  return chartThresholdOf(chartOrderAt(all, round, lastRound), round, lastRound, size);
+}
+
+/** Seuil tiré d'un ordre déjà calculé (`chartOrderAt`), sans retrier. */
+export function chartThresholdOf(
+  order: readonly EnduranceChartSeries[],
+  round: number,
+  lastRound: number,
+  size: number,
+): number | null {
+  if (size <= 0 || order.length < size) return null;
   return chartValueAt(order[size - 1], round, lastRound);
 }
 

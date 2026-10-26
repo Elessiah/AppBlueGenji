@@ -25,8 +25,8 @@ import {
   chartRecordAt,
   chartShownRound,
   chartTargetFor,
-  chartThresholdAt,
-  chartTopAt,
+  chartThresholdOf,
+  chartTopOf,
   chartValueAt,
   chartX,
   chartY,
@@ -41,6 +41,8 @@ import { FR_VIEWS_TEXT } from "../_lib/views-text";
 import styles from "./EnduranceChart.module.css";
 
 const HOVER_STROKE = "var(--ink)";
+const PLOT_RIGHT = CHART_W - CHART_PAD.right;
+const PLOT_BOTTOM = CHART_H - CHART_PAD.bottom;
 const colorVar = (index: number | null) =>
   index === null ? null : `var(${ENDURANCE_CHART_PALETTE[index].token}, ${ENDURANCE_CHART_PALETTE[index].hex})`;
 
@@ -160,7 +162,9 @@ export function EnduranceChart({ endurance, matches }: Readonly<{ endurance: End
   const runTo = useCallback(
     (to: number, from: number) => {
       stop();
-      if (!animate || from === to) {
+      // Retour vers une manche antérieure : la courbe est déjà coupée à la
+      // manche affichée (`drawn`), une animation descendante ne se verrait pas.
+      if (!animate || to <= from) {
         setProgress(to);
         return;
       }
@@ -209,36 +213,50 @@ export function EnduranceChart({ endurance, matches }: Readonly<{ endurance: End
     runTo(round, Math.min(progressRef.current, shown));
   };
   const replay = () => runTo(shown, 0);
-  const toggle = (teamId: number) => {
-    const next = togglePick(mode, picked, teamId);
-    setMode(next.mode);
-    setPicked(next.picked);
-  };
+  const toggle = useCallback(
+    (teamId: number) => {
+      const next = togglePick(mode, picked, teamId);
+      setMode(next.mode);
+      setPicked(next.picked);
+    },
+    [mode, picked],
+  );
 
-  const order = chartOrderAt(series, shown, lastRound);
-  const top = chartTopAt(series, shown, lastRound, endurance.playoffSize);
-  const threshold = chartThresholdAt(series, shown, lastRound, endurance.playoffSize);
-  const colorOf = (item: EnduranceChartSeries) =>
-    chartColorIndex(mode, item.teamId, { top, picked, generalIndex: series.indexOf(item) });
+  // Tout ce qui ne dépend pas de l'avancement de l'animation est mémoïsé : une
+  // image d'animation (~470 pour 12 manches) ne refait que les courbes — ni les
+  // tris, ni les couleurs, ni le fond, ni la légende, ni le tableau sr-only.
+  const order = useMemo(() => chartOrderAt(series, shown, lastRound), [series, shown, lastRound]);
+  const top = useMemo(() => chartTopOf(order, endurance.playoffSize), [order, endurance.playoffSize]);
+  const threshold = useMemo(
+    () => chartThresholdOf(order, shown, lastRound, endurance.playoffSize),
+    [order, shown, lastRound, endurance.playoffSize],
+  );
+  const colors = useMemo(
+    () =>
+      new Map(
+        series.map((item, generalIndex) => [
+          item.teamId,
+          colorVar(chartColorIndex(mode, item.teamId, { top, picked, generalIndex })),
+        ]),
+      ),
+    [series, mode, top, picked],
+  );
+  const colorOf = (item: EnduranceChartSeries) => colors.get(item.teamId) ?? null;
+  // Courbes tracées : celles mises en couleur, plus la survolée — choisies et
+  // ordonnées une fois par changement, pas à chaque image.
+  const visible = useMemo(
+    () =>
+      series
+        .map((item) => ({ item, color: colors.get(item.teamId) ?? null, isHover: hover === item.teamId }))
+        .filter((entry) => entry.color !== null || entry.isHover)
+        // La courbe survolée se dessine en dernier, au-dessus des autres.
+        .sort((a, b) => Number(a.isHover) - Number(b.isHover) || Number(a.color !== null) - Number(b.color !== null)),
+    [series, colors, hover],
+  );
   // Progression jamais au-delà de la manche affichée (retour en arrière).
   const drawn = Math.min(progress, shown);
+  const lines = visible.map((entry) => ({ ...entry, line: chartLine(entry.item, shown, drawn, geometry) }));
 
-  const lines = series
-    .map((item) => {
-      const color = colorVar(colorOf(item));
-      const isHover = hover === item.teamId;
-      return { item, color, isHover, line: chartLine(item, shown, drawn, geometry) };
-    })
-    .filter((entry) => entry.color !== null || entry.isHover)
-    // La courbe survolée se dessine en dernier, au-dessus des autres.
-    .sort((a, b) => Number(a.isHover) - Number(b.isHover) || Number(a.color !== null) - Number(b.color !== null));
-
-  const yTicks: number[] = [];
-  for (let v = 0; v <= geometry.maxY; v += geometry.tick) yTicks.push(v);
-  const bandX = chartX(geometry, shown) - geometry.step / 2;
-  const futureX = chartX(geometry, lastRound) + geometry.step / 2;
-  const plotRight = CHART_W - CHART_PAD.right;
-  const plotBottom = CHART_H - CHART_PAD.bottom;
 
   const roundState = (round: number): RoundState => {
     if (round > lastRound) return "UPCOMING";
@@ -261,8 +279,139 @@ export function EnduranceChart({ endurance, matches }: Readonly<{ endurance: End
     { id: "ALL", label: t(`endurance.chartModeAll${kind}`) },
   ];
 
-  const rounds = Array.from({ length: roundCount }, (_, i) => i + 1);
-  const playedRounds = Array.from({ length: lastRound }, (_, i) => i + 1);
+  const rounds = useMemo(() => Array.from({ length: roundCount }, (_, i) => i + 1), [roundCount]);
+  const playedRounds = useMemo(() => Array.from({ length: lastRound }, (_, i) => i + 1), [lastRound]);
+
+  // Fond du tracé (zone future, bande, graduations, axes, seuil) : ne bouge
+  // qu'avec la manche affichée, jamais pendant l'animation.
+  const backdrop = useMemo(() => {
+    const yTicks: number[] = [];
+    for (let v = 0; v <= geometry.maxY; v += geometry.tick) yTicks.push(v);
+    const bandX = chartX(geometry, shown) - geometry.step / 2;
+    const futureX = chartX(geometry, lastRound) + geometry.step / 2;
+    return (
+      <>
+        {futureX < PLOT_RIGHT && (
+          <rect x={futureX} y={CHART_PAD.top} width={PLOT_RIGHT - futureX} height={PLOT_BOTTOM - CHART_PAD.top} className={styles.future} />
+        )}
+        <rect x={bandX} y={CHART_PAD.top} width={geometry.step} height={PLOT_BOTTOM - CHART_PAD.top} className={styles.band} />
+        {yTicks.map((value) => (
+          <g key={value}>
+            <line
+              x1={CHART_PAD.left}
+              x2={PLOT_RIGHT}
+              y1={chartY(geometry, value)}
+              y2={chartY(geometry, value)}
+              className={value === endurance.startPoints ? styles.gridStart : styles.grid}
+            />
+            <text x={CHART_PAD.left - 8} y={chartY(geometry, value) + 4} className={styles.axisY}>
+              {value}
+            </text>
+          </g>
+        ))}
+        <text x={chartX(geometry, 0)} y={CHART_H - 30} className={styles.axisX}>
+          {t("endurance.chartStart")}
+        </text>
+        {rounds.map((round) => (
+          <text
+            key={round}
+            x={chartX(geometry, round)}
+            y={CHART_H - 30}
+            className={axisClass(round, shown, lastRound)}
+          >
+            {t("endurance.chartAxisRound", { round })}
+          </text>
+        ))}
+        {threshold !== null && (
+          <>
+            <line
+              x1={CHART_PAD.left}
+              x2={PLOT_RIGHT}
+              y1={chartY(geometry, threshold)}
+              y2={chartY(geometry, threshold)}
+              className={styles.cut}
+            />
+            <text x={PLOT_RIGHT - 4} y={chartY(geometry, threshold) - 6} className={styles.cutLabel}>
+              {t("endurance.chartThreshold", { size: endurance.playoffSize, round: shown, value: threshold })}
+            </text>
+          </>
+        )}
+      </>
+    );
+  }, [geometry, shown, lastRound, threshold, rounds, endurance.startPoints, endurance.playoffSize, t]);
+
+  // Légende : suit la manche, le mode, la sélection et le survol — pas l'animation.
+  const legend = useMemo(
+    () => (
+      <ScrollArea orientation="y" ariaLabel={t(`endurance.chartLegend${kind}`)} className={styles.legend}>
+        <ul aria-label={t(`endurance.chartLegend${kind}`)} className={styles.legendList}>
+          {order.map((item) => {
+            const color = colors.get(item.teamId) ?? null;
+            const state = legendState(item.states[shown - 1], t, kind);
+            return (
+              <li key={item.teamId}>
+                <button
+                  type="button"
+                  aria-pressed={mode === "PICK" && picked.includes(item.teamId)}
+                  onClick={() => toggle(item.teamId)}
+                  onMouseEnter={() => setHover(item.teamId)}
+                  onMouseLeave={() => setHover(null)}
+                  onFocus={() => setHover(item.teamId)}
+                  onBlur={() => setHover(null)}
+                  className={`${styles.legendItem} ${hover === item.teamId ? styles.legendHover : ""}`}
+                >
+                  <span
+                    aria-hidden
+                    className={color === null ? styles.swatchEmpty : styles.swatch}
+                    style={color === null ? undefined : { background: color }}
+                  />
+                  <span className={styles.legendRank}>{chartRankAt(item, shown, lastRound)}</span>
+                  <span className={styles.legendName}>{visibleText(item.teamName)}</span>
+                  <span className={styles.legendValue}>{chartValueAt(item, shown, lastRound)}</span>
+                  <span className={`${styles.legendState} ${state.tone}`}>{state.text}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </ScrollArea>
+    ),
+    [order, colors, shown, lastRound, mode, picked, hover, toggle, t, kind],
+  );
+
+  // Le tableau « manche par manche » retiré de l'écran, pour les lecteurs
+  // d'écran : tous les engagés, toutes les manches tirées. Ne dépend que des
+  // résultats : ni l'animation ni le survol ne le refont.
+  const srTable = useMemo(
+    () => (
+      <table className="sr-only">
+        <caption>{t(`endurance.chartTableCaption${kind}`)}</caption>
+        <thead>
+          <tr>
+            <th scope="col">{t(`endurance.chartTableEntrant${kind}`)}</th>
+            <th scope="col">{t("endurance.chartStart")}</th>
+            {playedRounds.map((round) => (
+              <th key={round} scope="col">
+                {t("endurance.chartRoundButton", { round })}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {series.map((item) => (
+            <tr key={item.teamId}>
+              <th scope="row">{visibleText(item.teamName)}</th>
+              <td>{endurance.startPoints}</td>
+              {item.states.map((state, index) => (
+                <td key={index}>{cellText(state, t, kind, "endurance.chartTableForfeit")}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    ),
+    [series, playedRounds, endurance.startPoints, t, kind],
+  );
 
   return (
     <div className={styles.chart}>
@@ -340,51 +489,7 @@ export function EnduranceChart({ endurance, matches }: Readonly<{ endurance: End
             className={styles.svg}
             onMouseLeave={() => setHover(null)}
           >
-            {futureX < plotRight && (
-              <rect x={futureX} y={CHART_PAD.top} width={plotRight - futureX} height={plotBottom - CHART_PAD.top} className={styles.future} />
-            )}
-            <rect x={bandX} y={CHART_PAD.top} width={geometry.step} height={plotBottom - CHART_PAD.top} className={styles.band} />
-            {yTicks.map((value) => (
-              <g key={value}>
-                <line
-                  x1={CHART_PAD.left}
-                  x2={plotRight}
-                  y1={chartY(geometry, value)}
-                  y2={chartY(geometry, value)}
-                  className={value === endurance.startPoints ? styles.gridStart : styles.grid}
-                />
-                <text x={CHART_PAD.left - 8} y={chartY(geometry, value) + 4} className={styles.axisY}>
-                  {value}
-                </text>
-              </g>
-            ))}
-            <text x={chartX(geometry, 0)} y={CHART_H - 30} className={styles.axisX}>
-              {t("endurance.chartStart")}
-            </text>
-            {rounds.map((round) => (
-              <text
-                key={round}
-                x={chartX(geometry, round)}
-                y={CHART_H - 30}
-                className={axisClass(round, shown, lastRound)}
-              >
-                {t("endurance.chartAxisRound", { round })}
-              </text>
-            ))}
-            {threshold !== null && (
-              <>
-                <line
-                  x1={CHART_PAD.left}
-                  x2={plotRight}
-                  y1={chartY(geometry, threshold)}
-                  y2={chartY(geometry, threshold)}
-                  className={styles.cut}
-                />
-                <text x={plotRight - 4} y={chartY(geometry, threshold) - 6} className={styles.cutLabel}>
-                  {t("endurance.chartThreshold", { size: endurance.playoffSize, round: shown, value: threshold })}
-                </text>
-              </>
-            )}
+            {backdrop}
             {lines.map(({ item, color, isHover, line }) => {
               const stroke = color ?? HOVER_STROKE;
               const dimmed = hover !== null && !isHover;
@@ -429,7 +534,7 @@ export function EnduranceChart({ endurance, matches }: Readonly<{ endurance: End
                   <span
                     aria-hidden
                     className={styles.swatch}
-                    style={{ background: colorVar(colorOf(hovered)) ?? HOVER_STROKE }}
+                    style={{ background: colorOf(hovered) ?? HOVER_STROKE }}
                   />
                   <strong className={styles.infoName}>{visibleText(hovered.teamName)}</strong>
                   <span className={styles.infoMeta}>
@@ -456,69 +561,10 @@ export function EnduranceChart({ endurance, matches }: Readonly<{ endurance: End
           </div>
         </div>
 
-        <ScrollArea orientation="y" ariaLabel={t(`endurance.chartLegend${kind}`)} className={styles.legend}>
-          <ul aria-label={t(`endurance.chartLegend${kind}`)} className={styles.legendList}>
-            {order.map((item) => {
-              const color = colorVar(colorOf(item));
-              const state = legendState(item.states[shown - 1], t, kind);
-              return (
-                <li key={item.teamId}>
-                  <button
-                    type="button"
-                    aria-pressed={mode === "PICK" && picked.includes(item.teamId)}
-                    onClick={() => toggle(item.teamId)}
-                    onMouseEnter={() => setHover(item.teamId)}
-                    onMouseLeave={() => setHover(null)}
-                    onFocus={() => setHover(item.teamId)}
-                    onBlur={() => setHover(null)}
-                    className={`${styles.legendItem} ${hover === item.teamId ? styles.legendHover : ""}`}
-                  >
-                    <span
-                      aria-hidden
-                      className={color === null ? styles.swatchEmpty : styles.swatch}
-                      style={color === null ? undefined : { background: color }}
-                    />
-                    <span className={styles.legendRank}>{chartRankAt(item, shown, lastRound)}</span>
-                    <span className={styles.legendName}>{visibleText(item.teamName)}</span>
-                    <span className={styles.legendValue}>{chartValueAt(item, shown, lastRound)}</span>
-                    <span className={`${styles.legendState} ${state.tone}`}>{state.text}</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </ScrollArea>
+        {legend}
       </div>
 
-      {/*
-        Le tableau « manche par manche » retiré de l'écran, pour les lecteurs
-        d'écran : tous les engagés, toutes les manches tirées.
-      */}
-      <table className="sr-only">
-        <caption>{t(`endurance.chartTableCaption${kind}`)}</caption>
-        <thead>
-          <tr>
-            <th scope="col">{t(`endurance.chartTableEntrant${kind}`)}</th>
-            <th scope="col">{t("endurance.chartStart")}</th>
-            {playedRounds.map((round) => (
-              <th key={round} scope="col">
-                {t("endurance.chartRoundButton", { round })}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {series.map((item) => (
-            <tr key={item.teamId}>
-              <th scope="row">{visibleText(item.teamName)}</th>
-              <td>{endurance.startPoints}</td>
-              {item.states.map((state, index) => (
-                <td key={index}>{cellText(state, t, kind, "endurance.chartTableForfeit")}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {srTable}
     </div>
   );
 }
