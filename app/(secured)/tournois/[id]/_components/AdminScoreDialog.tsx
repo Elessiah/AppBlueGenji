@@ -671,7 +671,8 @@ export function AdminScoreDialog({
                 intermédiaire est secondaire, valider est l'action attendue. */}
             {/* Pendant l'envoi, `aria-disabled` et non `disabled` : le bouton
                 pressé garde le focus, qui tomberait sinon sur <body>, derrière
-                la modale, le temps d'un refus. */}
+                la modale, le temps d'un refus. Son libellé reste, suivi de
+                « … » : un nom réduit à « … » ne dirait plus rien. */}
             <button
               type="button"
               className={`${styles.link} ${styles.close}`}
@@ -693,7 +694,8 @@ export function AdminScoreDialog({
               aria-busy={form.submitting || undefined}
               title={buttonTitle(form.mapsRefused.save, form.decision.saveBlocker, t("score.admin.saveTitle"))}
             >
-              {form.submitting ? "…" : t("score.admin.save")}
+              {t("score.admin.save")}
+              {form.submitting && "…"}
             </button>
             <button
               type="submit"
@@ -703,7 +705,8 @@ export function AdminScoreDialog({
               aria-busy={form.submitting || undefined}
               title={buttonTitle(form.mapsRefused.resolve, form.decision.resolveBlocker, t("score.admin.resolveTitle"))}
             >
-              {form.submitting ? "…" : t("score.admin.resolve")}
+              {t("score.admin.resolve")}
+              {form.submitting && "…"}
             </button>
           </div>
         </form>

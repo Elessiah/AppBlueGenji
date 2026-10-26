@@ -615,7 +615,8 @@ export function PlayerScoreDialog({
                       aria-disabled={submitting || undefined}
                       aria-busy={submitting || undefined}
                     >
-                      {submitting ? "…" : t("score.player.forfeit.confirm", { name: myName })}
+                      {t("score.player.forfeit.confirm", { name: myName })}
+                      {submitting && "…"}
                     </button>
                   </div>
                 </div>
@@ -662,7 +663,8 @@ export function PlayerScoreDialog({
                 aria-describedby={opensDispute ? "player-score-counter-warning" : undefined}
                 aria-busy={submitting || undefined}
               >
-                {submitting ? "…" : submitLabel}
+                {submitLabel}
+                {submitting && "…"}
               </button>
             )}
           </div>

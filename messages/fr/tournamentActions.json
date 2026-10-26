@@ -170,7 +170,7 @@
     "confirm": "Annuler l'abandon",
     "pending": "Annulation…",
     "button": "Annuler l'abandon",
-    "buttonTitle": "Annuler l'abandon : {name} revient en lice",
+    "buttonTitle": "Annuler l'abandon : le classement de {name} est recalculé",
     "buttonAria": "Annuler l'abandon de {name}"
   },
   "penaltyLift": {

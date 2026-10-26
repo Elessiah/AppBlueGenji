@@ -170,7 +170,7 @@
     "confirm": "Cancel the withdrawal",
     "pending": "Cancelling…",
     "button": "Cancel withdrawal",
-    "buttonTitle": "Cancel the withdrawal: {name} is back in contention",
+    "buttonTitle": "Cancel withdrawal: {name}'s standing is recalculated",
     "buttonAria": "Cancel withdrawal of {name}"
   },
   "penaltyLift": {
