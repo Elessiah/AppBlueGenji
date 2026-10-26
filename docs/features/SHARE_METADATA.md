@@ -350,7 +350,7 @@ Couleurs des marches reprises de la page : glacier (`--blue-500`), cyan, violet
 contraste du nom et du rang (4,5:1) sur le voile de chaque marche.
 
 - **Données** (`lib/server/share-podium.ts`) : mutualisées dans le cache du
-  classement (`cachedRanking("share-podium")`, 60 s, vidé à chaque score) — un
+  classement (`cachedRanking("list:share-podium")`, 60 s, vidé à chaque score et à chaque dissolution) — un
   lien collé dans un gros salon fait venir plusieurs robots, aucun ne rejoue le
   classement pour lui seul.
 - **Logos** : lus **sur le disque**, jamais par HTTP, et seulement un fichier
@@ -375,8 +375,8 @@ montre le nom, le logo, la cote et le bilan de l'équipe. Le texte de l'encart
 - **Aucune requête au rendu de la fiche** : la mise en page ne fait que
   désigner l'image (`memberAreaShareMetadata("team", teamShareCardKey(id))`).
   Seule la route d'image lit les données (`lib/server/share-team.ts`), une
-  **seule entrée** de cache pour toutes les équipes (`cachedRanking("share-teams")`,
-  60 s, vidée à chaque score) : un robot qui énumère des identifiants ne
+  **seule entrée** de cache pour toutes les équipes (`cachedRanking("list:share-teams")`,
+  60 s, vidée à chaque score et à chaque dissolution) : un robot qui énumère des identifiants ne
   remplit pas le cache, et le rejeu du classement est celui de la page.
   Réponse en `max-age=300`, comme le podium.
 - **Le sous-ensemble du classement public**, rien d'autre : la ligne de l'équipe
