@@ -106,6 +106,10 @@ pure dans `_lib/endurance-chart.ts`.
   venir) ; une manche à venir est désactivée. Le rang, le Top N, la légende et
   le **seuil** (pointillé vert « SEUIL TOP N » = capital du N-ième, N =
   `playoffSize`) suivent la manche affichée ; la dernière lit le général.
+  Sans choix, le graphique **suit la dernière manche tirée** : une manche
+  poussée par le flux, volet ouvert, s'affiche d'elle-même (la courbe avance
+  sans rejouer depuis le départ) ; une manche passée choisie reste affichée
+  (`chartShownRound`, `chartTargetFor`).
 - **Modes** : « Top N » (les N premiers de la manche affichée, les autres
   masqués), « Ma sélection » (8 au plus, état du composant seulement — ni
   stockage local, ni serveur), « Toutes » / « Tous » (palette en boucle).
