@@ -416,7 +416,13 @@ export function EnduranceChart({ endurance, matches }: Readonly<{ endurance: End
 
           <div className={styles.info}>
             {hovered === null ? (
-              <span className={styles.hint}>{t(`endurance.chartInfoEmpty${kind}`)}</span>
+              // « Ma sélection » vide : rien n'est tracé, l'état vide dit comment
+              // ajouter un engagé (visible, pas seulement derrière le « i »).
+              <span className={styles.hint}>
+                {mode === "PICK" && picked.length === 0
+                  ? t(`endurance.chartHintPickEmpty${kind}`, { max: ENDURANCE_CHART_PICK_MAX })
+                  : t(`endurance.chartInfoEmpty${kind}`)}
+              </span>
             ) : (
               <>
                 <div className={styles.infoHead}>
