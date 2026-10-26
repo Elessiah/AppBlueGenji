@@ -114,7 +114,8 @@ pure dans `_lib/endurance-chart.ts`.
   masqués), « Ma sélection » (8 au plus, état du composant seulement — ni
   stockage local, ni serveur), « Toutes » / « Tous » (palette en boucle).
   L'aide de chaque mode (`chartHint*`) est derrière un `<InfoHint>` à côté des
-  modes (`INFO_HINTS.md`) ; seul l'état vide de l'encart reste visible.
+  modes (`INFO_HINTS.md`) ; seul l'état vide de l'encart reste visible — en
+  « Ma sélection » vide, il reprend l'aide d'ajout (`chartHintPickEmpty*`).
   « Effacer la sélection » (monté dès « Ma sélection », `aria-disabled` une fois
   vide : le focus reste sur lui) et « Rejouer l'animation ».
 - **Survol, focus, clic** : un bouton de la légende (au focus comme au survol)
