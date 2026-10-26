@@ -29,9 +29,12 @@ langues.
 **Site.** Chaque message privé est une fonction de la langue (`LocalizedDm`,
 `lib/shared/dm-language.ts`). `notifyUsers` lit `bg_users.locale` des
 destinataires en **une** requête, les groupe par langue et fait **un appel**
-`/internal/notify/dm` par groupe : le contrat du bot ne change pas. Lecture
+`/internal/notify/dm` par groupe : le contrat du bot ne change pas. Les groupes
+partent **l'un après l'autre** et un appel perdu arrête les suivants : un bot
+tombé ne reçoit qu'un appel par notification, et le coupe-circuit (3 échecs)
+ne s'ouvre pas sur un seul match. Lecture
 impossible ou compte absent → groupe `null`, message bilingue (`renderDm`). Un
-appel perdu pour une langue nomme ses comptes (`discordUnreachedUserIds`) :
+appel perdu nomme ses comptes et ceux des langues non tentées (`discordUnreachedUserIds`) :
 l'annonce des changements de politique ne marque « annoncé » que les comptes
 remis. Les liens du site passent par `localizedSiteUrl` (`/en/…` sur une page
 traduite). Dates : fuseau de Paris, `fr-FR` / `en-US` en 24 h.
