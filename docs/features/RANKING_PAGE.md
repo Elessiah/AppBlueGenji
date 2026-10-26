@@ -77,10 +77,11 @@ match compté — le cache du classement est vidé à chaque score.
 ou non (`deleted_at IS NULL`) : comportement inchangé. La dissolution vide
 désormais les entrées tirées de la liste — marches, podium et fiches de la
 carte d'aperçu (`invalidateRankingLists`, sous-préfixe `ranking:list:`) — et
-les leaderboards de l'accueil (`invalidateLandingLeaderboard`), pour que la
-dissoute quitte podium et rangs sans attendre l'échéance de 60 s. Le rejeu
-(`ranking:state:*`), le direct, le ticker et les compteurs restent en cache :
-une dissolution ne change aucun match (revue de performance du lot). **Entrées solo** : toujours hors liste. **Équipes
+les leaderboards et le bandeau de l'accueil (`invalidateLandingTeamViews`,
+qui nomment des équipes), pour que la dissoute quitte podium et rangs, et son
+ancien nom le bandeau, sans attendre l'échéance de 60 s. Le rejeu
+(`ranking:state:*`), les compteurs et le direct (5 s) restent en cache : une
+dissolution ne change aucun match (revue de performance du lot). **Entrées solo** : toujours hors liste. **Équipes
 fantômes** : listées si elles ont joué, masquées sinon, comme les autres.
 
 **États vides.** Si le filtre ne laisse rien, la page lit « Aucune équipe
