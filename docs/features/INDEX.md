@@ -97,7 +97,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `DEEP_STATS.md` — Statistiques approfondies des fiches équipe et joueur.
 - `TEAM_RANKING_POINTS.md` — Points d'équipe : une seule source, `loadTeamRanking`.
 - `ELO_RANKING.md` — Cote de type Elo, rejouée depuis les matchs.
-- `RANKING_PAGE.md` — Page `/classement` (titre éditable, podium et effets de nom par marche, tableau, filtres par jeu, en-tête selon la session) et règle d'ordre du classement.
+- `RANKING_PAGE.md` — Page `/classement` (titre éditable, podium et effets de nom par marche, tableau, filtres par jeu, en-tête selon la session), règle d'ordre du classement et masquage des équipes sans match (filtre unique `isRankedTeam`).
 - `PODIUM_TIERS.md` — Marches du podium (top 3 « Général ») sur chaque nom d'équipe et, adoucies, de ses membres, partout sur le site.
 - `TOURNAMENT_PLACEMENT_POINTS.md` — Points de parcours selon le rang final.
 

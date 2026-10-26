@@ -9,7 +9,9 @@ lisait blanche en production).
 ## Quel podium
 
 **Celui de l'onglet « Général » de `/classement`** (tous jeux) : même chargeur
-(`loadTeamRanking({ includeUnplayed: true })`), même tri (`compareRankedTeams`).
+(`loadTeamRanking()`, équipes classées seulement — une équipe sans match compté
+ne monte jamais, `RANKING_PAGE.md` § « Équipes sans match »), même tri
+(`compareRankedTeams`).
 Jamais deux podiums qui se contredisent.
 
 - Sous **trois** équipes classées, aucune marche (pas de podium sur

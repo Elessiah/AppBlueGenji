@@ -112,14 +112,12 @@ bilan des joueurs, si bien qu'il ne retarde jamais une forme.
 
 ## Ce qui reste volontairement différent
 
-Le **rang** n'est pas le même nombre selon la vue, et c'est assumé :
-
-- l'annuaire numérote **toutes** les équipes, y compris celles sans match ;
-- la fiche ne classe que les équipes ayant joué (`total` les compte) ;
-- le leaderboard ne montre que les premières.
-
-Ce sont trois dénominateurs pour trois questions différentes. Ce qui ne doit pas
-diverger, et ne le peut plus, c'est le **nombre de points d'une équipe**.
+Depuis le 2026-10-26, le **rang** est le même partout : l'annuaire, la fiche,
+`/classement` et le leaderboard numérotent les seules équipes classées (au
+moins un match compté, `isRankedTeam`) — une équipe sans match reste à
+l'annuaire, sans rang (`RANKING_PAGE.md` § « Équipes sans match »). Le
+leaderboard ne montre que les premières. Ce qui ne doit pas diverger, et ne le
+peut plus, c'est le **nombre de points d'une équipe** — ni sa place.
 
 ## Tests
 
