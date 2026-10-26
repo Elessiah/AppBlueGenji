@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { BracketMatch, EnduranceMeta } from "@/lib/shared/types";
 import { ScrollArea } from "@/components/cyber";
+import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { useTournamentViewText } from "@/components/i18n/tournament-page-text";
 import type { TournamentPageKey } from "@/lib/shared/tournament-page-text";
 import { useClientPower, useClientPowerInput } from "@/lib/shared/hooks/useClientPower";
@@ -120,6 +121,7 @@ function stepClass(state: EnduranceChartRoundState): string {
  */
 export function EnduranceChart({ endurance, matches }: Readonly<{ endurance: EnduranceMeta; matches: BracketMatch[] }>) {
   const { t } = useTournamentViewText(FR_VIEWS_TEXT);
+  const hintId = useId();
   const solo = useEntrantParticipantType() === "SOLO";
   const kind = solo ? "Solo" : "Team";
   // Mouvement réduit demandé, ou régime économe (machine à la peine, page en
@@ -265,19 +267,25 @@ export function EnduranceChart({ endurance, matches }: Readonly<{ endurance: End
   return (
     <div className={styles.chart}>
       <div className={styles.toolbar}>
-        <fieldset aria-label={t(`endurance.chartModes${kind}`)} className={`native-group ${styles.segment}`}>
-          {modes.map((entry) => (
-            <button
-              key={entry.id}
-              type="button"
-              aria-pressed={mode === entry.id}
-              onClick={() => setMode(entry.id)}
-              className={`${styles.segmentButton} ${mode === entry.id ? styles.selected : ""}`}
-            >
-              {entry.label}
-            </button>
-          ))}
-        </fieldset>
+        <InfoHintRow>
+          <fieldset aria-label={t(`endurance.chartModes${kind}`)} className={`native-group ${styles.segment}`}>
+            {modes.map((entry) => (
+              <button
+                key={entry.id}
+                type="button"
+                aria-pressed={mode === entry.id}
+                onClick={() => setMode(entry.id)}
+                className={`${styles.segmentButton} ${mode === entry.id ? styles.selected : ""}`}
+              >
+                {entry.label}
+              </button>
+            ))}
+          </fieldset>
+          {/* L'aide du mode, derrière le bouton « i » (INFO_HINTS.md). */}
+          <InfoHint id={`${hintId}-mode`} subject={t(`endurance.chartModes${kind}`)}>
+            {modeHint}
+          </InfoHint>
+        </InfoHintRow>
         <div className={styles.actions}>
           {/* Reste monté en « Ma sélection » : vider la liste ne retire pas le
               bouton qui a le focus (aria-disabled, jamais disabled natif). */}
@@ -302,7 +310,6 @@ export function EnduranceChart({ endurance, matches }: Readonly<{ endurance: End
           </button>
         </div>
       </div>
-      <p className={styles.hint}>{modeHint}</p>
 
       <div className={styles.body}>
         <div className={styles.plot}>
