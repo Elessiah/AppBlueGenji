@@ -110,14 +110,30 @@ describe("EnduranceRankingViews — gestes réservés au Général", () => {
     expect(RANKING).toContain("key={enduranceTabKey(candidate)}");
   });
 
-  it("annonce la vue atteinte par les flèches ou la navigation du bas", () => {
+  it("annonce la vue atteinte par les flèches ou la navigation du bas, jamais par un onglet", () => {
     expect(RANKING).toContain('<span className="sr-only" aria-live="polite">');
     expect(RANKING).toContain("else setAnnouncement(viewTitle(views[target], text))");
+    // Un onglet cliqué garde le focus et s'annonce de lui-même.
+    expect(RANKING).toContain("onClick={() => go(candidateIndex, true)}");
+  });
+
+  it("la navigation du bas ramène le haut du classement à l'écran", () => {
+    expect(RANKING).toContain("onClick={() => goFromBottom(index - 1)}");
+    expect(RANKING).toContain("onClick={() => goFromBottom(index + 1)}");
+    expect(RANKING).toContain("getComputedStyle(document.documentElement).scrollPaddingTop");
+    expect(RANKING).toContain("if (root.getBoundingClientRect().top < (Number.isFinite(arrival) ? arrival : 0)) {");
+    expect(RANKING).toContain('root.scrollIntoView({ block: "start" });');
+  });
+
+  it("ne glisse que vers une vue demandée, jamais sur un changement du flux", () => {
+    expect(RANKING).toContain("slide !== null && slide.key === enduranceViewKey(view) ? slide.direction : null");
   });
 
   it("une ligne sortie s'estompe sans éteindre ses gestes", () => {
     expect(RANKING).not.toContain("style={{ opacity: ROW_OPACITY");
     expect(RANKING).toContain('"--row-fade": ROW_OPACITY[row.status]');
+    // Plancher 0,8 : texte discret et rouge au-dessus de 4,5:1.
+    expect(RANKING).toMatch(/OUT_OF_CONTENTION: 0\.9,\s*ELIMINATED: 0\.8,\s*FORFEIT: 0\.8,/);
     expect(RANKING_CSS).toMatch(/\.fadable > :not\(\.rowActions\) \{\s*opacity: var\(--row-fade, 1\);/);
   });
 
@@ -198,5 +214,11 @@ describe("EnduranceRoundPanels — ordre et ouverture", () => {
   it("garde l'ancre et l'ouverture d'une nouvelle manche venue du flux", () => {
     expect(PANELS).toContain("useMatchAnchorTarget()");
     expect(PANELS).toContain("autoOpen === lastAutoOpen.current");
+  });
+
+  it("replie la manche ouverte d'office quand elle se clôt, sauf rouverte à la main", () => {
+    expect(PANELS).toContain("if (previous !== null && !openedByHand.current.has(previous)) next.delete(previous);");
+    expect(PANELS).toContain("openedByHand.current.add(round);");
+    expect(PANELS).toContain("openedByHand.current.delete(round);");
   });
 });

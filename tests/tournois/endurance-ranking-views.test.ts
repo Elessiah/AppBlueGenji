@@ -12,6 +12,7 @@ import {
   nextScheduledMatch,
   pendingEntrantCount,
   playoffCutIndex,
+  pointsAfterRound,
   rankMove,
   resolveEnduranceViewIndex,
   statusAfterRound,
@@ -197,6 +198,32 @@ describe("enduranceRankingViews — la liste des vues", () => {
     // L'onglet garde sa clé React : le bouton focalisé n'est pas démonté.
     expect(enduranceTabKey(before[1])).toBe(enduranceTabKey(after[1]));
     expect(enduranceTabKey({ kind: "GENERAL" })).toBe("general");
+  });
+
+  it("capital d'une vue passée : le dernier connu derrière une case sortie ou forfait, jamais 0", () => {
+    const out = row(7, {
+      status: "OUT_OF_CONTENTION",
+      eliminatedRound: 3,
+      points: 7,
+      rounds: [
+        { round: 1, kind: "POINTS", points: 8, rank: 4, wins: 0, losses: 1, draws: 0 },
+        { round: 3, kind: "POINTS", points: 7, rank: 6, wins: 1, losses: 2, draws: 0 },
+        { round: 4, kind: "OUT", points: null, rank: 6, wins: 1, losses: 2, draws: 0 },
+        { round: 5, kind: "OUT", points: null, rank: 6, wins: 1, losses: 2, draws: 0 },
+      ],
+    });
+    expect(pointsAfterRound(out, 5, 9)).toBe(7);
+    expect(pointsAfterRound(out, 3, 9)).toBe(7);
+    expect(pointsAfterRound(out, 1, 9)).toBe(8);
+    // Avant toute case : le capital de départ.
+    expect(pointsAfterRound(out, 0, 9)).toBe(9);
+    const forfeit = row(8, {
+      status: "FORFEIT",
+      rounds: [{ round: 1, kind: "FORFEIT", points: null, rank: 8, wins: 0, losses: 1, draws: 0 }],
+    });
+    expect(pointsAfterRound(forfeit, 1, 9)).toBe(9);
+    const rows = enduranceRankingRows({ kind: "ROUND", round: 5 }, meta([out], { rounds: [1, 2, 3, 4, 5] }), []);
+    expect(rows[0].points).toBe(7);
   });
 
   it("retombe sur le Général pour une clé disparue sans manche close", () => {
