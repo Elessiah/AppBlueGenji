@@ -15,8 +15,8 @@ que soit le score des matchs encore ouverts.
 
 - **Permission `tournaments`** — administrateurs et arbitres (`detail.isAdmin`).
   Le cast n'y a pas accès : c'est un outil d'organisation, pas de diffusion.
-- Sur `/tournois/[id]`, dans la vue BG Survie, sous le classement et les play-offs,
-  et au-dessus des volets de manche : un volet « Aperçu · Manche N » (ou « Aperçu ·
+- Sur `/tournois/[id]`, dans la vue BG Survie, sous le classement, au-dessus des
+  play-offs et des volets de manche : un volet « Aperçu · Manche N » (ou « Aperçu ·
   Quarts de finale »…), ouvert d'office et repliable.
 - Tournoi **en cours** seulement, et seulement quand une manche est ouverte : une
   manche close est aussitôt suivie de la suivante, rien n'est alors à prévoir.

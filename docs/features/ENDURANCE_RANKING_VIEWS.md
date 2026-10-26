@@ -29,7 +29,7 @@ Dans l'ordre (`EnduranceView`) :
    Tournoi fini : pas de bandeau.
 3. **Vues du classement** (`EnduranceRankingViews`), puis la légende « Hors
    course », puis le journal des sanctions.
-4. Play-offs (s'ils sont lancés), aperçu de la manche suivante (arbitrage),
+4. Aperçu de la manche suivante (arbitrage), play-offs (s'ils sont lancés),
    volets de manche (`ENDURANCE_ROUND_PANELS.md`).
 
 ## Les vues

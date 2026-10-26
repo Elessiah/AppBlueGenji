@@ -26,9 +26,11 @@ Dans l'ordre, du haut vers le bas :
    (`ENDURANCE_RANKING_VIEWS.md`), la légende « Hors course », le journal des
    sanctions — puis l'emplacement réservé au graphique « Évolution de
    l'endurance » (lot 2).
-2. **Les play-offs**, dès qu'ils sont lancés : l'arbre (`Phase finale`) puis la
+2. **L'aperçu de la manche suivante** (arbitrage, tournoi en cours) : il ouvre
+   la suite des volets — aperçu, manche en cours, manches closes. Play-offs
+   lancés, il annonce le tour suivant de l'arbre et le précède donc.
+3. **Les play-offs**, dès qu'ils sont lancés : l'arbre (`Phase finale`) puis la
    `Petite finale` dans son propre volet.
-3. **L'aperçu de la manche suivante** (arbitrage, tournoi en cours).
 4. **Les manches qualificatives**, un volet par manche : la **manche en cours
    d'abord**, puis les manches closes **de la plus récente à la plus
    ancienne** (`orderEnduranceRoundSections`, module pur).
