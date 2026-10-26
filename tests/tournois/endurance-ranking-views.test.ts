@@ -5,6 +5,7 @@ import {
   enduranceRankingRows,
   enduranceRankingViews,
   enduranceRoundColumnCell,
+  enduranceTabKey,
   enduranceViewBaseRound,
   enduranceViewColumnRound,
   enduranceViewKey,
@@ -12,7 +13,9 @@ import {
   pendingEntrantCount,
   playoffCutIndex,
   rankMove,
+  resolveEnduranceViewIndex,
   statusAfterRound,
+  type EnduranceRankingView,
 } from "@/app/(secured)/tournois/[id]/_lib/endurance-ranking-views";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 import { FR_VIEWS_TEXT } from "@/app/(secured)/tournois/[id]/_lib/views-text";
@@ -183,6 +186,25 @@ describe("enduranceRankingViews — la liste des vues", () => {
     expect(enduranceViewKey({ kind: "GENERAL" })).toBe("general");
     expect(enduranceViewKey({ kind: "ROUND", round: 3 })).toBe("round-3");
     expect(enduranceViewKey({ kind: "CURRENT", round: 4 })).toBe("current-4");
+  });
+
+  it("garde le lecteur sur sa manche quand la manche en cours se clôt", () => {
+    const before = [{ kind: "ROUND", round: 2 }, { kind: "CURRENT", round: 3 }, { kind: "GENERAL" }] satisfies EnduranceRankingView[];
+    const after = [{ kind: "ROUND", round: 2 }, { kind: "ROUND", round: 3 }, { kind: "GENERAL" }] satisfies EnduranceRankingView[];
+    expect(resolveEnduranceViewIndex(before, "current-3")).toBe(1);
+    // « M3 en cours » devient « Manche 3 » : même place, pas de retour au Général.
+    expect(resolveEnduranceViewIndex(after, "current-3")).toBe(1);
+    // L'onglet garde sa clé React : le bouton focalisé n'est pas démonté.
+    expect(enduranceTabKey(before[1])).toBe(enduranceTabKey(after[1]));
+    expect(enduranceTabKey({ kind: "GENERAL" })).toBe("general");
+  });
+
+  it("retombe sur le Général pour une clé disparue sans manche close", () => {
+    const views = [{ kind: "ROUND", round: 1 }, { kind: "GENERAL" }] satisfies EnduranceRankingView[];
+    expect(resolveEnduranceViewIndex(views, "general")).toBe(1);
+    expect(resolveEnduranceViewIndex(views, "round-1")).toBe(0);
+    expect(resolveEnduranceViewIndex(views, "current-5")).toBe(1);
+    expect(resolveEnduranceViewIndex(views, "round-9")).toBe(1);
   });
 });
 

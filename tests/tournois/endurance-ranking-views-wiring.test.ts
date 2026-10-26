@@ -105,7 +105,26 @@ describe("EnduranceRankingViews — gestes réservés au Général", () => {
 
   it("ouvre sur le Général, et le retrouve quand la vue suivie disparaît", () => {
     expect(RANKING).toContain('useState("general")');
-    expect(RANKING).toContain("foundIndex === -1 ? views.length - 1 : foundIndex");
+    expect(RANKING).toContain("const index = resolveEnduranceViewIndex(views, selectedKey)");
+    // Un onglet est clé par sa manche : « M3 en cours » → « Manche 3 » garde le focus.
+    expect(RANKING).toContain("key={enduranceTabKey(candidate)}");
+  });
+
+  it("annonce la vue atteinte par les flèches ou la navigation du bas", () => {
+    expect(RANKING).toContain('<span className="sr-only" aria-live="polite">');
+    expect(RANKING).toContain("else setAnnouncement(viewTitle(views[target], text))");
+  });
+
+  it("une ligne sortie s'estompe sans éteindre ses gestes", () => {
+    expect(RANKING).not.toContain("style={{ opacity: ROW_OPACITY");
+    expect(RANKING).toContain('"--row-fade": ROW_OPACITY[row.status]');
+    expect(RANKING_CSS).toMatch(/\.fadable > :not\(\.rowActions\) \{\s*opacity: var\(--row-fade, 1\);/);
+  });
+
+  it("le plateau coupe sans annuler la barre collante", () => {
+    const pageCss = readFileSync(join(ROOT, DIR, "page.module.css"), "utf8");
+    expect(pageCss).toMatch(/\.board:global\(\.ds-block\) \{\s*overflow: clip;/);
+    expect(RANKING_CSS).toMatch(/\.bar \{\s*position: sticky;/);
   });
 });
 
