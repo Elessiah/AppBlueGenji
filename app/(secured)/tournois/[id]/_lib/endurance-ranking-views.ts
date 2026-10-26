@@ -337,6 +337,12 @@ export type EnduranceRoundColumnCell =
       kind: "PLAYED";
       /** Variation du capital sur la manche (pénalité comprise). */
       delta: number;
+      /**
+       * Points retirés par pénalité **dans cette manche** (0 sans sanction) :
+       * sans lui, une victoire 3-0 sanctionnée de 5 se lisait « −2 », comme
+       * une défaite.
+       */
+      penalty: number;
       ownScore: number | null;
       opponentScore: number | null;
       opponentId: number | null;
@@ -382,6 +388,7 @@ export function enduranceRoundColumnCell(
   return {
     kind: "PLAYED",
     delta: after - capitalBefore(standing, round, startPoints),
+    penalty: cell?.penalty ?? 0,
     ownScore: isTeam1 ? match.team1Score : match.team2Score,
     opponentScore: isTeam1 ? match.team2Score : match.team1Score,
     opponentId,

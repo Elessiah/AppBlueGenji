@@ -56,6 +56,7 @@
     "eliminatedRound": " (R{round})",
     "penaltyBadgeTitle": "{points, plural, one {# point} other {# points}} deducted by referee penalty",
     "penaltyBadgeSr": " ({points, plural, one {# point} other {# points}} deducted by penalty)",
+    "cellPenalty": "incl. −{points} penalty",
     "outLegend": "OUT OF CONTENTION = POOL LEFT, BUT NO CHANCE OF REACHING THE PLAYOFFS ANYMORE",
     "outLegendRounds": " IN THE {count, plural, one {# PLANNED ROUND} other {# PLANNED ROUNDS}}",
     "penaltiesTitle": "REFEREE PENALTIES",

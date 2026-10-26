@@ -56,6 +56,7 @@
     "eliminatedRound": " (M{round})",
     "penaltyBadgeTitle": "{points} point(s) retiré(s) par pénalité d'arbitrage",
     "penaltyBadgeSr": " ({points} point(s) retiré(s) par pénalité)",
+    "cellPenalty": "dont −{points} de pénalité",
     "outLegend": "HORS COURSE = CAPITAL RESTANT, MAIS PLUS AUCUNE CHANCE D'ATTEINDRE LES PLAY-OFFS",
     "outLegendRounds": " DANS LES {count} MANCHES PRÉVUES",
     "penaltiesTitle": "PÉNALITÉS D'ARBITRAGE",

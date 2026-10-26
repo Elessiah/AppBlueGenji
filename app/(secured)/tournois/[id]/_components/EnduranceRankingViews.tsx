@@ -182,6 +182,12 @@ function RoundColumn({
         <span className={`mono ${deltaClass(cell.delta)}`}>
           {signed(cell.delta)}
         </span>
+        {/* La variation compte la pénalité de la manche : elle se dit à côté. */}
+        {cell.penalty > 0 && (
+          <span className={styles.penaltyBadge} title={t("endurance.penaltyBadgeTitle", { points: cell.penalty })}>
+            {t("endurance.cellPenalty", { points: String(cell.penalty) })}
+          </span>
+        )}
         {cell.ownScore !== null && cell.opponentScore !== null && (
           <span className="num">
             {cell.ownScore}–{cell.opponentScore}
