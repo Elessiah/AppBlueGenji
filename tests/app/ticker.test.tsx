@@ -61,10 +61,10 @@ describe("Ticker — résultats habillés par camp (TICKER_RESULTS.md)", () => {
   it("vainqueur et perdant : chacun sa classe, son repère de forme et son issue en texte masqué", () => {
     const html = firstCopy(renderToStaticMarkup(<Ticker items={[result("win", "loss")]} />));
     expect(html).toContain(
-      '<span class="side winner" data-outcome="win"><i class="mark" aria-hidden="true">▲</i><span class="name">Alpha</span><span class="sr-only"> (vainqueur)</span> <b class="score">2</b></span>',
+      '<span class="side winner" data-outcome="win"><i class="mark" aria-hidden="true">▲</i><span>Alpha</span><span class="sr-only"> (vainqueur)</span> <b class="score">2</b></span>',
     );
     expect(html).toContain(
-      '<span class="side loser" data-outcome="loss"><i class="mark" aria-hidden="true">▼</i><span class="name">Beta</span><span class="sr-only"> (perdant)</span> <b class="score">1</b></span>',
+      '<span class="side loser" data-outcome="loss"><i class="mark" aria-hidden="true">▼</i><span>Beta</span><span class="sr-only"> (perdant)</span> <b class="score">1</b></span>',
     );
   });
 
@@ -81,7 +81,7 @@ describe("Ticker — résultats habillés par camp (TICKER_RESULTS.md)", () => {
 
   it("forfait : camp neutre, sans repère de défaite, dit « forfait »", () => {
     const html = renderToStaticMarkup(<Ticker items={[result("forfeit", "win")]} />);
-    expect(html).toContain('<span class="side" data-outcome="forfeit"><span class="name">Alpha</span><span class="sr-only"> (forfait)</span>');
+    expect(html).toContain('<span class="side" data-outcome="forfeit"><span>Alpha</span><span class="sr-only"> (forfait)</span>');
     expect(html).not.toContain("loser");
     expect(html).not.toContain("▼");
   });
@@ -99,7 +99,7 @@ describe("Ticker — résultats habillés par camp (TICKER_RESULTS.md)", () => {
     const unknown: TickerChampionItem = { kind: "champion", lead: "VAINQUEUR · Cup ·", name: "Champion inconnu", known: false };
     const html = firstCopy(renderToStaticMarkup(<Ticker items={[known, unknown]} />));
     expect(html).toContain(
-      'VAINQUEUR · Cup · <span class="side winner" data-outcome="win"><i class="mark" aria-hidden="true">▲</i><span class="name">Alpha</span></span>',
+      'VAINQUEUR · Cup · <span class="side winner" data-outcome="win"><i class="mark" aria-hidden="true">▲</i><span>Alpha</span></span>',
     );
     expect(html).toContain('<span class="item">VAINQUEUR · Cup · Champion inconnu<i class="sep"');
   });

@@ -72,6 +72,14 @@ describe("getLandingTicker — résultats", () => {
     expect(sql).toMatch(/m\.double_forfeit/);
   });
 
+  it("ne prend que les matchs entre deux engagés : ni exemption, ni case vide", async () => {
+    const execute = await mockTicker([resultRow({}, 1)]);
+    await getLandingTicker();
+    const sql = String(execute.mock.calls[0][0]);
+    expect(sql).toMatch(/m\.is_bye = FALSE/);
+    expect(sql).toMatch(/m\.team1_id IS NOT NULL\s+AND m\.team2_id IS NOT NULL/);
+  });
+
   it("match tranché : vainqueur et perdant nommés pour le lecteur d'écran, dans l'ordre du match", async () => {
     await mockTicker([resultRow({ winner_team_id: 2, team1_score: 0, team2_score: 3 }, 1)]);
     const [item] = results((await getLandingTicker()).items);
