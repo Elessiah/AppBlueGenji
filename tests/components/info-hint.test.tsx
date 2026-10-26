@@ -184,6 +184,14 @@ describe("InfoHint — balisage", () => {
 });
 
 describe("InfoHint — gestes", () => {
+  it("déplié, se marque `data-escape-owner` : la modale qui le porte lui laisse Échap", () => {
+    let view = render();
+    expect(view.root.props["data-escape-owner"]).toBeUndefined();
+    click(view.button);
+    view = render();
+    expect(view.root.props["data-escape-owner"]).toBe("");
+  });
+
   it("s'ouvre au clic et se referme au second clic", () => {
     let view = render();
     expect(view.button.props["aria-expanded"]).toBe(false);
