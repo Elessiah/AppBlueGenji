@@ -7,16 +7,18 @@ jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/stored-upload-cleanup");
 jest.mock("@/lib/server/ranking-cache", () => ({
   cachedRanking: jest.fn(),
+  invalidateRankingLists: jest.fn(),
   invalidateTeamRanking: jest.fn(),
 }));
 jest.mock("@/lib/server/landing-cache", () => ({
   invalidateLandingAggregates: jest.fn(),
+  invalidateLandingLeaderboard: jest.fn(),
 }));
 
 import { getDatabase } from "@/lib/server/database";
 import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
-import { invalidateTeamRanking } from "@/lib/server/ranking-cache";
-import { invalidateLandingAggregates } from "@/lib/server/landing-cache";
+import { invalidateRankingLists, invalidateTeamRanking } from "@/lib/server/ranking-cache";
+import { invalidateLandingAggregates, invalidateLandingLeaderboard } from "@/lib/server/landing-cache";
 import { softDeleteTeam } from "@/lib/server/teams/dissolution";
 import { compareDirectoryRank, isRankedTeam } from "@/lib/shared/ranking";
 
@@ -131,16 +133,20 @@ describe("softDeleteTeam — cache du classement et des marches", () => {
     return connection;
   }
 
-  it("oublie le classement, les marches et le leaderboard après le commit", async () => {
+  it("oublie les marches, l'aperçu et le leaderboard après le commit, sans relancer le rejeu", async () => {
     failing = false;
     const connection = mockDb();
 
     await softDeleteTeam(1, 12);
 
-    expect(invalidateTeamRanking).toHaveBeenCalledTimes(1);
-    expect(invalidateLandingAggregates).toHaveBeenCalledTimes(1);
-    expect(jest.mocked(invalidateTeamRanking).mock.invocationCallOrder[0])
+    expect(invalidateRankingLists).toHaveBeenCalledTimes(1);
+    expect(invalidateLandingLeaderboard).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(invalidateRankingLists).mock.invocationCallOrder[0])
       .toBeGreaterThan(connection.commit.mock.invocationCallOrder[0]);
+    // La dissolution ne change aucun match : le rejeu et le reste de l'accueil
+    // (direct, ticker, compteurs) restent en cache.
+    expect(invalidateTeamRanking).not.toHaveBeenCalled();
+    expect(invalidateLandingAggregates).not.toHaveBeenCalled();
   });
 
   it("n'invalide rien quand la dissolution échoue", async () => {
@@ -148,7 +154,7 @@ describe("softDeleteTeam — cache du classement et des marches", () => {
     mockDb();
 
     await expect(softDeleteTeam(1, 12)).rejects.toThrow("ER_LOCK_DEADLOCK");
-    expect(invalidateTeamRanking).not.toHaveBeenCalled();
-    expect(invalidateLandingAggregates).not.toHaveBeenCalled();
+    expect(invalidateRankingLists).not.toHaveBeenCalled();
+    expect(invalidateLandingLeaderboard).not.toHaveBeenCalled();
   });
 });

@@ -5,6 +5,7 @@ import {
   cachedLanding,
   LANDING_LIVE_KEY,
   invalidateLandingAggregates,
+  invalidateLandingLeaderboard,
   invalidateLandingLive,
 } from "@/lib/server/landing-cache";
 
@@ -67,6 +68,31 @@ describe("cache de la vitrine", () => {
 
     expect(loader).toHaveBeenCalledTimes(1);
   });
+
+  it("oublie chaque leaderboard, par jeu compris, à l'invalidation du leaderboard", async () => {
+    const loader = jest.fn(async () => "valeur");
+    const keys = ["leaderboard:8:all", "leaderboard:50:MARVEL_RIVALS"];
+    for (const key of keys) await cachedLanding(key, LANDING_TTL_MS, loader as () => Promise<string>);
+
+    invalidateLandingLeaderboard();
+    for (const key of keys) await cachedLanding(key, LANDING_TTL_MS, loader as () => Promise<string>);
+
+    expect(loader).toHaveBeenCalledTimes(4);
+  });
+
+  it.each(["stats", "ticker", "live"])(
+    "garde l'entrée « %s » à l'invalidation du leaderboard",
+    async (key) => {
+      // Une dissolution ne change ni le direct, ni le ticker, ni les compteurs.
+      const loader = jest.fn(async () => "valeur");
+      await cachedLanding(key, LANDING_TTL_MS, loader as () => Promise<string>);
+
+      invalidateLandingLeaderboard();
+      await cachedLanding(key, LANDING_TTL_MS, loader as () => Promise<string>);
+
+      expect(loader).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it("range ses entrées sous un préfixe qui lui est propre", async () => {
     // Sans préfixe distinct, invalider la vitrine emporterait les instantanés
