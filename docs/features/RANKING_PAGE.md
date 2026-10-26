@@ -62,7 +62,8 @@ parcours seuls) ne classent pas. C'est `isRankedTeam` (`lib/shared/ranking.ts`),
 | `/classement` (tous onglets) et `GET /api/landing/leaderboard` (`loadLeaderboardRows`) | lignes, rangs, podium, écarts et tendance sans elles |
 | Marches du podium (`loadPodiumTiers`, `PODIUM_TIERS.md`) | une équipe sans match ne monte jamais |
 | Carte d'aperçu du podium (`loadSharePodium`) et carte nominative (`findShareTeam`) | absentes ; une équipe sans match a la carte de la page |
-| Annuaire `/equipes` (`listTeams`) | l'équipe **reste** à l'annuaire, à la cote de départ, mais **sans badge de rang** (`rank: null`), rangée après les classées par nom (`compareDirectoryRank`) ; le podium de l'annuaire (`HighlightStrip`) ne prend que des classées |
+| Tendance sur 7 jours (`loadLeaderboardRows`) | une équipe absente de la photo d'il y a une semaine (entrée depuis) a la tendance `new` : « ★ », « Entrée au classement ces 7 derniers jours » / « Entered the ranking in the last 7 days » — jamais « stable » |
+| Annuaire `/equipes` (`listTeams`) | l'équipe **reste** à l'annuaire, à sa cote rejouée (500, ou sa cote de placement), mais **sans badge de rang** (`rank: null`), rangée après les classées par nom (`compareDirectoryRank`) ; le podium de l'annuaire (`HighlightStrip`) ne prend que des classées |
 | Fiche d'équipe (`getTeamRankingPosition`) | « Aucun match joué », hors du total « #n sur N » |
 
 Le **seeding** des tournois n'est pas concerné : il range des inscrites, qu'elles
