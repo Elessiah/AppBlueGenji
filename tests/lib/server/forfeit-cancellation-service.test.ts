@@ -106,6 +106,29 @@ describe("cancelTournamentForfeit", () => {
     });
   });
 
+  it("rejoue la transaction entière après un interblocage, et ne publie qu'une fois", async () => {
+    const { connection } = setup();
+    const deadlock = Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK" });
+    jest.mocked(reconcileSurvival).mockRejectedValueOnce(deadlock);
+
+    const result = await cancelTournamentForfeit(7, 102);
+
+    expect(result.entrantName).toBe("Team Nova");
+    expect(reconcileSurvival).toHaveBeenCalledTimes(2);
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+    expect(connection.release).toHaveBeenCalledTimes(2);
+    expect(publishUpdatedEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it("ne rejoue pas un refus métier", async () => {
+    const { connection } = setup({ standing: { status: "ACTIVE" } });
+
+    await expect(cancelTournamentForfeit(7, 102)).rejects.toThrow("TEAM_NOT_FORFEITED");
+
+    expect(connection.beginTransaction).toHaveBeenCalledTimes(1);
+  });
+
   it("n'écrit que le statut : le match perdu par forfait reste perdu", async () => {
     const { sqls } = setup();
 
