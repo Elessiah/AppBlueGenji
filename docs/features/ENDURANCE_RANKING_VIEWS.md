@@ -130,7 +130,13 @@ pure dans `_lib/endurance-chart.ts`.
 - **Animation** : `requestAnimationFrame` seulement volet ouvert, 650 ms par
   manche, annulée au repli (démontage) ; **une seule image** sous
   `prefers-reduced-motion` ou en régime économe (`useClientPower()`,
-  `CLIENT_POWER_MODES.md`). Aucune animation CSS infinie.
+  `CLIENT_POWER_MODES.md`). Aucune animation CSS infinie. Revenir à une manche
+  antérieure saute sans animer (la courbe est déjà coupée à la manche affichée).
+- **Coût par image** (64 engagés × 12 manches ≈ 470 images à l'ouverture) :
+  seules les courbes tracées lisent l'avancement. Ordre, Top N, seuil, couleurs,
+  fond du tracé, légende et tableau `sr-only` sont mémoïsés sur la manche
+  affichée, le mode, la sélection et le survol ; les séries sont recalculées à
+  chaque instantané poussé, les matchs rangés par manche une fois.
 - **Accessibilité** : SVG `role="img"` avec un `aria-label` réel (nombre
   d'engagés, manche affichée, seuil) ; légende dans une `<ScrollArea ariaLabel>` ;
   un **tableau `sr-only`** engagé × manche (capital, « à jouer », « Forfait »,
@@ -196,9 +202,9 @@ du registre.
   gestes de chaque rôle, gestes réservés au « Général », règles transverses.
 - `tests/tournois/endurance-chart.test.ts` — séries, tracés et têtes (creuse,
   « FF »), Top N et seuil par manche, plafond de la sélection, palette (jetons,
-  contraste, clarté, pas d'ambre), pas de l'animation.
+  contraste, clarté, pas d'ambre), pas de l'animation, grand plateau (64 × 12).
 - `tests/tournois/endurance-chart-wiring.test.ts` — volet replié, chargement à
   la demande, mouvement réduit et régime client, `ScrollArea`, pas d'ambre,
-  tableau `sr-only`, lecture seule, textes FR + EN.
+  tableau `sr-only`, lecture seule, textes FR + EN, mémos hors de l'animation.
 - `tests/app/tournament-page-i18n.test.tsx` — rendu anglais sans français,
   accord « joueurs » en français.
