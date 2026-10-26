@@ -49,7 +49,11 @@ message de succès dit seulement que le classement est recalculé.
 | L'engagé est `FORFEIT` | `409 TEAM_NOT_FORFEITED` |
 | Aucune manche **postérieure** à celle de l'abandon ne porte de saisie (même borne que le retrait d'une pénalité) — sinon l'équipe rentrerait sans que les manches manquées comptent contre elle | `409 FORFEIT_ROUND_PASSED` |
 
-La transaction prend `lockTournamentRow` en toute première instruction.
+La transaction prend `lockTournamentRow` en toute première instruction. Elle
+verrouille donc le tournoi avant les manches que le rejeu peut poser, quand un
+report ou « Enregistrer » prend la manche avant le tournoi : comme l'abandon,
+elle passe par `retryOnDeadlock`, qui rejoue la transaction entière après un
+interblocage (publication une seule fois, après le commit réussi).
 
 ## Permission : administrateur strict
 
@@ -96,7 +100,8 @@ tournoi individuel), auteur nommé dans pm2 seulement.
 ## Tests
 
 - `tests/lib/server/forfeit-cancellation-service.test.ts` — verrou en premier,
-  fenêtre, statut remis à `ACTIVE`, rejeu du bon moteur, multi-phases.
+  fenêtre, statut remis à `ACTIVE`, rejeu du bon moteur, multi-phases,
+  rejeu après interblocage (un refus métier ne se rejoue pas).
 - `tests/app/api/admin/forfeit-cancellation.test.ts` — administrateur seul,
   codes d'erreur, journal anonyme.
 - `tests/tournois/forfeit-eligibility.test.ts` — `canCancelForfeits`.
