@@ -36,6 +36,7 @@ function setup(options: {
   laterInputs?: number;
   laterMatchIds?: number[];
   laterBusy?: number;
+  committedInputs?: number;
 } = {}) {
   const head =
     options.head === null
@@ -59,7 +60,9 @@ function setup(options: {
     const flat = sql.replace(/\s+/g, " ").trim();
     sqls.push(flat);
     params.push(values);
-    if (/^SELECT id FROM bg_matches WHERE tournament_id/.test(flat)) return [laterIds.map((id) => ({ id }))];
+    if (/^SELECT id, .* AS has_input FROM bg_matches WHERE tournament_id/.test(flat)) {
+      return [laterIds.map((id, index) => ({ id, has_input: index < (options.committedInputs ?? 0) ? 1 : 0 }))];
+    }
     if (/FOR UPDATE NOWAIT/.test(flat)) {
       if (busy > 0) {
         busy -= 1;
@@ -143,6 +146,14 @@ describe("cancelTournamentForfeit", () => {
     expect(sqls[guard]).toMatch(/^SELECT id FROM bg_matches WHERE id IN \(\?, \?\) AND/);
     expect(sqls[guard]).not.toMatch(/JOIN|FOR SHARE|round_number/);
     expect(params[guard]).toEqual([301, 302]);
+  });
+
+  it("une saisie déjà commitée refuse sans verrouiller aucun match", async () => {
+    const { sqls } = setup({ committedInputs: 1, laterBusy: 3 });
+
+    await expect(cancelTournamentForfeit(7, 102)).rejects.toThrow("FORFEIT_ROUND_PASSED");
+
+    expect(sqls.some((sql) => /NOWAIT/.test(sql))).toBe(false);
   });
 
   it("sans manche postérieure, ne verrouille aucun match", async () => {
@@ -229,7 +240,7 @@ describe("cancelTournamentForfeit", () => {
 
     await cancelTournamentForfeit(7, 102);
 
-    const later = sqls.findIndex((sql) => /^SELECT id FROM bg_matches WHERE tournament_id/.test(sql));
+    const later = sqls.findIndex((sql) => /AS has_input FROM bg_matches WHERE tournament_id/.test(sql));
     expect(sqls[later]).toContain("round_number > ?");
     expect(params[later]).toEqual([7, 0, 2]);
   });
