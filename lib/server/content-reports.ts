@@ -15,6 +15,8 @@
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { pushLeadershipAlert } from "@/lib/server/bot-integration";
+import { staffAlertDm } from "@/lib/server/staff-alert-dm";
+import enReports from "@/messages/en/reports.json";
 import { notifyStaff, notifyUsers, toNotificationRecipient, type NotificationRecipient } from "@/lib/server/notify";
 import { withNamedLock } from "@/lib/server/named-lock";
 import { contentReportPush, staffReportPush, staffReportSaturatedPush } from "@/lib/shared/push-messages";
@@ -432,7 +434,14 @@ function alertLeadership(receivedInLastHour: number, message: string, reportId: 
     : message;
   void notifyStaff({
     topic: "STAFF_REPORT",
-    discord: () => pushLeadershipAlert(text, contest ? "content-report-contest" : "content-report"),
+    // Messages privés bilingues : le bot écrit à `OWNER_ID` et `PRESIDENT`, dont
+    // le site ne connaît pas le compte (`BOT_DM_LANGUAGE.md`).
+    discord: () =>
+      pushLeadershipAlert(
+        text,
+        contest ? "content-report-contest" : "content-report",
+        staffAlertDm(text, saturated ? staffReportSaturatedPush("en") : staffReportPush({ reportId, contest }, "en")),
+      ),
     push: (locale) => (saturated ? staffReportSaturatedPush(locale) : staffReportPush({ reportId, contest }, locale)),
   }).catch(() => undefined);
 }
@@ -548,7 +557,7 @@ export async function notifyReportTargets(
     plan.map((group) =>
       notifyUsers(group.recipients, {
         topic: "CONTENT_REPORT",
-        discord: { message: formatTargetNotice({ category, url }), context: "content-report-target" },
+        discord: { message: (locale) => formatTargetNotice({ category, url, labelEn: enReports.categories[category].label }, locale), context: "content-report-target" },
         push: (locale) => contentReportPush({ reportId, category }, locale),
       }),
     ),

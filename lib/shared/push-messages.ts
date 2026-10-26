@@ -16,7 +16,8 @@
  * Chaque rédacteur prend la langue en dernier argument (français par défaut,
  * texte inchangé) ; `notifyUsers` / `notifyStaff` n'acceptent qu'une
  * notification à rédiger par langue (`LocalizedPushContent`). Les messages
- * privés Discord, eux, restent en français (D6).
+ * privés Discord suivent la même langue (`docs/features/BOT_DM_LANGUAGE.md`) ;
+ * les messages de salon restent en français (D6).
  *
  * Module pur : chaque rédacteur se teste sans réseau. **Serveur seulement**
  * malgré son dossier : il embarque les deux langues et les catégories des deux

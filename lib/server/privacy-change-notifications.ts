@@ -230,7 +230,7 @@ async function runSweep(now: Date): Promise<number> {
     const dueKey = due.map((change) => change.id).join("|");
     let batch = batchByDue.get(dueKey);
     if (!batch) {
-      batch = privacyChangesForOneMessage(due, siteUrl);
+      batch = privacyChangesForOneMessage(due, siteUrl, localizedPrivacyChanges(due, "en"));
       batchByDue.set(dueKey, batch);
     }
     const reserved = await reserve(userId, batch);
@@ -259,24 +259,26 @@ async function sendPrivacyGroup(
 ): Promise<number> {
   const report = await notifyUsers(group.recipients, {
     topic: "PRIVACY_CHANGE",
-    discord: { message: buildPrivacyChangesMessage(group.changes, siteUrl), context: "privacy-changes" },
-    // Les titres dans la langue de chaque destinataire (lot 9-3) ; le message
-    // Discord, lui, reste français (D6).
+    // Message privé et push dans la langue de chaque destinataire (lot 9-3,
+    // BOT-NOTIF-LANG) ; le lot tient sous le plafond dans les deux langues
+    // (`privacyChangesForOneMessage`).
+    discord: {
+      message: (locale) => buildPrivacyChangesMessage(localizedPrivacyChanges(group.changes, locale), siteUrl, locale),
+      context: "privacy-changes",
+    },
     push: (locale) => privacyChangePush(localizedPrivacyChanges(group.changes, locale).map((change) => change.title), locale),
   });
-  if (report.discord !== null) return report.pushed + report.discord.sent;
-  // Bot injoignable : seuls les comptes qu'il devait joindre sont rendus au
-  // balayage suivant — ceux qui n'avaient que le push l'ont reçu.
-  const viaDiscord = group.recipients
-    .filter((recipient) => recipient.discord !== null)
-    .map((recipient) => recipient.userId);
+  // Bot injoignable pour un appel (une langue) ou pour tous : seuls les comptes
+  // qu'il devait joindre par cet appel sont rendus au balayage suivant — ceux
+  // qui n'avaient que le push l'ont reçu, et l'autre langue est partie.
+  const viaDiscord = report.discordUnreachedUserIds;
   if (viaDiscord.length > 0) {
     await release(
       viaDiscord,
       group.changes.map((change) => change.id),
     );
   }
-  return report.pushed;
+  return report.pushed + (report.discord?.sent ?? 0);
 }
 
 /**

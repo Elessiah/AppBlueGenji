@@ -252,7 +252,7 @@ export function notifyTeamLogoRemoved(
       notifyUsers(recipients, {
         topic: "MODERATION",
         discord: {
-          message: formatLogoRemovedNotice({ teamName, url, grounds, termsUrl: moderationTermsUrl(), staffReason }),
+          message: (locale) => formatLogoRemovedNotice({ teamName, url, grounds, termsUrl: moderationTermsUrl(), staffReason }, locale),
           context: "logo-removed",
         },
         push: (locale) => moderationPush({ kind: "REMOVED", teamName, teamId, reportId }, locale),
@@ -273,7 +273,7 @@ export function notifyUserAvatarRemoved(userId: number, reportId: number | null,
       notifyUsers(recipients, {
         topic: "MODERATION",
         discord: {
-          message: formatAvatarRemovedNotice({ url, grounds, termsUrl: moderationTermsUrl(), staffReason }),
+          message: (locale) => formatAvatarRemovedNotice({ url, grounds, termsUrl: moderationTermsUrl(), staffReason }, locale),
           context: "avatar-removed",
         },
         push: (locale) => moderationPush({ kind: "REMOVED", reportId }, locale),
@@ -551,7 +551,7 @@ export async function hideTeamLogo(reportId: number, teamId: number, actor: Repo
       notifyUsers(recipients, {
         topic: "MODERATION",
         discord: {
-          message: formatLogoHiddenNotice({ teamName, purgeAfter, url, grounds, termsUrl: moderationTermsUrl() }),
+          message: (locale) => formatLogoHiddenNotice({ teamName, purgeAfter, url, grounds, termsUrl: moderationTermsUrl() }, locale),
           context: "logo-hidden",
         },
         push: (locale) => moderationPush({ kind: "HIDDEN", teamName, teamId, reportId }, locale),
@@ -648,7 +648,7 @@ export async function hideUserAvatarForReport(
       notifyUsers(recipients, {
         topic: "MODERATION",
         discord: {
-          message: formatAvatarHiddenNotice({ purgeAfter, url, grounds, termsUrl: moderationTermsUrl() }),
+          message: (locale) => formatAvatarHiddenNotice({ purgeAfter, url, grounds, termsUrl: moderationTermsUrl() }, locale),
           context: "avatar-hidden",
         },
         push: (locale) => moderationPush({ kind: "HIDDEN", reportId }, locale),
@@ -846,7 +846,7 @@ async function announceImageRestored(row: QuarantineRow, actor: ReportPerson): P
       .then((recipients) =>
         notifyUsers(recipients, {
           topic: "MODERATION",
-          discord: { message: formatLogoRestoredNotice({ teamName }), context: "logo-restored" },
+          discord: { message: (locale) => formatLogoRestoredNotice({ teamName }, locale), context: "logo-restored" },
           push: (locale) =>
             moderationPush({ kind: "RESTORED", teamName, teamId: Number(row.target_id), reportId: null }, locale),
         }),
@@ -870,7 +870,7 @@ async function announceImageRestored(row: QuarantineRow, actor: ReportPerson): P
       .then((recipients) =>
         notifyUsers(recipients, {
           topic: "MODERATION",
-          discord: { message: formatAvatarRestoredNotice(), context: "avatar-restored" },
+          discord: { message: (locale) => formatAvatarRestoredNotice(locale), context: "avatar-restored" },
           push: (locale) => moderationPush({ kind: "RESTORED", reportId: null }, locale),
         }),
       )

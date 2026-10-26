@@ -36,6 +36,7 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { resolveDiscordUser, sendDiscordLoginCode } from "@/lib/server/bot-integration";
+import { accountLocaleOf } from "@/lib/server/users/account-locale";
 import { isDuplicateEntryError } from "@/lib/server/mysql-errors";
 import type { ConnectionMethod } from "@/lib/shared/account-connections";
 import {
@@ -297,7 +298,7 @@ export async function startDiscordVerification(
   // quelqu'un, et un plafond posé après n'aurait plus rien à refuser.
   guardBeforeSend?.(discordId);
 
-  return sendHandleChallenge(discordId, tag);
+  return sendHandleChallenge(userId, discordId, tag);
 }
 
 /**
@@ -348,10 +349,11 @@ export async function confirmDiscordVerification(
  * à son échec, sinon il masque comme « dernier émis » celui que le joueur
  * détient vraiment.
  */
-async function sendHandleChallenge(discordId: string, tag: string): Promise<CodeSent> {
+async function sendHandleChallenge(userId: number, discordId: string, tag: string): Promise<CodeSent> {
   const challenge = await createDiscordLoginChallenge(discordId, tag);
   try {
-    await sendDiscordLoginCode(discordId, challenge.code);
+    // Dans la langue du compte qui demande le code (`BOT_DM_LANGUAGE.md`).
+    await sendDiscordLoginCode(discordId, challenge.code, await accountLocaleOf(userId));
   } catch (error) {
     await discardDiscordChallenge(challenge.challengeId).catch(() => {});
     throw error;
@@ -403,7 +405,7 @@ export async function startDiscordHandleUpdate(
 
   // Avant le défi et avant l'envoi, comme pour la certification.
   guardBeforeSend?.(discordId);
-  return sendHandleChallenge(discordId, tag);
+  return sendHandleChallenge(userId, discordId, tag);
 }
 
 /**

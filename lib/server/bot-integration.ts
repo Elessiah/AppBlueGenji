@@ -8,6 +8,7 @@ import type {
 } from "@/lib/shared/types";
 import { normalizeBotServersPayload, normalizeBotStats } from "@/lib/shared/bot-message-window";
 import type { LiveMentionTarget } from "@/lib/shared/live-announcements";
+import type { Locale } from "@/lib/shared/locales";
 
 const DEFAULT_BOT_INTERNAL_HOST = "127.0.0.1";
 const DEFAULT_BOT_INTERNAL_PORT = "4400";
@@ -215,7 +216,12 @@ export async function resolveDiscordUser(handle: string): Promise<string> {
   throw new Error(await safeReadError(response));
 }
 
-export async function sendDiscordLoginCode(discordId: string, code: string): Promise<void> {
+/**
+ * Envoie le code de connexion en message privé. Le bot le rédige lui-même :
+ * dans la langue du compte (`locale`) quand le compte existe, sinon (`null`)
+ * en un message bilingue, français puis anglais (`BOT_DM_LANGUAGE.md`).
+ */
+export async function sendDiscordLoginCode(discordId: string, code: string, locale: Locale | null): Promise<void> {
   const baseUrl = resolveBotInternalUrl();
 
   let response: Response;
@@ -226,7 +232,7 @@ export async function sendDiscordLoginCode(discordId: string, code: string): Pro
         "content-type": "application/json",
         ...getInternalHeaders(),
       },
-      body: JSON.stringify({ discordId, code }),
+      body: JSON.stringify({ discordId, code, locale }),
       cache: "no-store",
       signal: AbortSignal.timeout(BOT_LOGIN_FETCH_TIMEOUT_MS),
     });
@@ -412,19 +418,21 @@ export async function pushDiscordDirectMessages(
  * Sans cela, un bot éteint ferait patienter chaque flux d'arrière-plan sur la
  * fenêtre de 30 s que la recherche des membres du rôle impose.
  *
- * @param message Texte déjà rédigé, borné côté bot.
+ * @param message Texte déjà rédigé, borné côté bot : la ligne du canal de logs (français).
  * @param context Étiquette de journalisation côté bot (« issue-report », …).
- * @param options `honourCircuit` : respecter le coupe-circuit (défaut `false`).
+ * @param options `honourCircuit` : respecter le coupe-circuit (défaut `false`) ;
+ *   `dmMessage` : texte des messages privés aux arbitres (bilingue,
+ *   `staffAlertDm`) — un bot plus ancien l'ignore et écrit `message`.
  * @returns Le bilan du bot, ou `null` s'il est injoignable — jamais d'exception.
  */
 export async function pushRefereeAlert(
   message: string,
   context: string,
-  options: { honourCircuit?: boolean } = {},
+  options: { honourCircuit?: boolean; dmMessage?: string } = {},
 ): Promise<DiscordDeliveryReport | null> {
   return postDiscordNotification(
     "/internal/notify/referees",
-    { message, context },
+    { message, context, ...(options.dmMessage ? { dmMessage: options.dmMessage } : {}) },
     {
       timeoutMs: BOT_REFEREE_FETCH_TIMEOUT_MS,
       honourCircuit: options.honourCircuit ?? false,
@@ -569,17 +577,21 @@ export async function fetchBotActivity(): Promise<BotActivity | null> {
  * ignoré, comme pour l'alerte des arbitres : chaque appel suit l'action d'une
  * personne, qui mérite sa tentative.
  *
- * @param message Texte déjà rédigé, sans donnée nominative d'un joueur.
+ * @param message Texte déjà rédigé, sans donnée nominative d'un joueur : la ligne
+ *   du canal de logs (français).
  * @param context Étiquette de journalisation côté bot.
+ * @param dmMessage Texte des messages privés (bilingue, `staffAlertDm`) — un bot
+ *   plus ancien l'ignore et écrit `message`.
  * @returns Le bilan du bot, ou `null` s'il est injoignable — jamais d'exception.
  */
 export async function pushLeadershipAlert(
   message: string,
   context: string,
+  dmMessage?: string,
 ): Promise<DiscordDeliveryReport | null> {
   return postDiscordNotification(
     "/internal/notify/leadership",
-    { message, context },
+    { message, context, ...(dmMessage ? { dmMessage } : {}) },
     { timeoutMs: BOT_NOTIFY_FETCH_TIMEOUT_MS, honourCircuit: false },
   );
 }

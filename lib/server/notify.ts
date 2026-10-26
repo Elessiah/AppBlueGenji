@@ -35,6 +35,9 @@ import {
   type DiscordRecipient,
 } from "@/lib/server/bot-integration";
 import { can, sanitizePlatformRoles } from "@/lib/shared/permissions";
+import { renderDm, type LocalizedDm } from "@/lib/shared/dm-language";
+import type { Locale } from "@/lib/shared/locales";
+import { accountLocaleFromRow } from "./users/account-locale";
 import {
   PUSH_TOPICS,
   type LocalizedPushContent,
@@ -53,14 +56,26 @@ export type UserNotification = {
   topic: PushTopic;
   /** Rédigée dans la langue de chaque destinataire (lot 9-3, `bg_users.locale`). */
   push: LocalizedPushContent;
-  /** Le message privé Discord, quand la notification en a un. */
-  discord?: { message: string; context: string };
+  /**
+   * Le message privé Discord, quand la notification en a un : rédigé dans la
+   * langue du compte de chaque destinataire (`bg_users.locale`), bilingue si
+   * elle n'a pas pu être lue (`docs/features/BOT_DM_LANGUAGE.md`).
+   */
+  discord?: { message: LocalizedDm; context: string };
   pushOptions?: PushOptions;
 };
 
 export type NotificationReport = {
-  /** `null` : bot injoignable. Bilan vide si personne n'était joignable sur Discord. */
+  /**
+   * `null` : bot injoignable pour **tous** les envois. Bilan vide si personne
+   * n'était joignable sur Discord. Les destinataires d'une langue partent en un
+   * appel au bot : si l'un de ces appels échoue et pas l'autre, le bilan est
+   * celui des appels aboutis, et {@link discordUnreachedUserIds} nomme les
+   * comptes de l'appel perdu.
+   */
   discord: DiscordDeliveryReport | null;
+  /** Comptes dont l'appel au bot a échoué (tous ceux joignables sur Discord si `discord` est `null`). */
+  discordUnreachedUserIds: number[];
   /** Appareils atteints. */
   pushed: number;
 };
@@ -76,19 +91,81 @@ export async function notifyUsers(
   recipients: readonly NotificationRecipient[],
   notification: UserNotification,
 ): Promise<NotificationReport> {
-  const discordRecipients = recipients
-    .map((recipient) => recipient.discord)
-    .filter((recipient): recipient is DiscordRecipient => recipient !== null);
+  const reachable = recipients.filter(
+    (recipient): recipient is NotificationRecipient & { discord: DiscordRecipient } => recipient.discord !== null,
+  );
   const userIds = recipients.map((recipient) => recipient.userId);
+  const message = notification.discord;
 
   const [discord, pushed] = await Promise.all([
     // Personne à joindre sur Discord : aucun appel au bot, un bilan vide.
-    notification.discord && discordRecipients.length > 0
-      ? pushDiscordDirectMessages(notification.discord.message, discordRecipients, notification.discord.context)
-      : Promise.resolve({ sent: 0, unresolved: [], failed: [] }),
+    message && reachable.length > 0
+      ? sendLocalizedDirectMessages(reachable, message)
+      : Promise.resolve({ report: { sent: 0, unresolved: [], failed: [] }, unreached: [] }),
     pushToUsers(userIds, notification.topic, notification.push, notification.pushOptions),
   ]);
-  return { discord, pushed };
+  return { discord: discord.report, discordUnreachedUserIds: discord.unreached, pushed };
+}
+
+/**
+ * Langue de chaque compte, en une lecture. Une lecture qui échoue (base
+ * indisponible, colonne pas encore créée) ne coupe pas l'envoi : la langue
+ * reste inconnue, et le message part bilingue.
+ */
+async function loadAccountLocales(userIds: readonly number[]): Promise<Map<number, Locale>> {
+  const locales = new Map<number, Locale>();
+  const ids = [...new Set(userIds)];
+  if (ids.length === 0) return locales;
+  try {
+    const db = await getDatabase();
+    const [rows] = await db.query<(RowDataPacket & { id: number; locale: unknown })[]>(
+      `SELECT id, locale FROM bg_users WHERE id IN (${ids.map(() => "?").join(", ")})`,
+      ids,
+    );
+    for (const row of rows) locales.set(Number(row.id), accountLocaleFromRow(row.locale));
+  } catch (error) {
+    console.error("[notify] langue des comptes illisible, messages privés bilingues", error);
+  }
+  return locales;
+}
+
+/**
+ * Un appel au bot par langue : chaque destinataire reçoit le message dans la
+ * langue de son compte, bilingue s'il n'a pas pu être lue. Le bot distribue
+ * un texte unique par appel (`POST /internal/notify/dm`), ce qui le laisse
+ * ignorer tout de la langue — son contrat ne change pas.
+ */
+async function sendLocalizedDirectMessages(
+  recipients: readonly (NotificationRecipient & { discord: DiscordRecipient })[],
+  message: { message: LocalizedDm; context: string },
+): Promise<{ report: DiscordDeliveryReport | null; unreached: number[] }> {
+  const locales = await loadAccountLocales(recipients.map((recipient) => recipient.userId));
+  const groups = new Map<Locale | null, (NotificationRecipient & { discord: DiscordRecipient })[]>();
+  for (const recipient of recipients) {
+    const locale = locales.get(recipient.userId) ?? null;
+    groups.set(locale, [...(groups.get(locale) ?? []), recipient]);
+  }
+  const sends = await Promise.all(
+    [...groups].map(async ([locale, group]) => ({
+      group,
+      report: await pushDiscordDirectMessages(
+        renderDm(message.message, locale),
+        group.map((recipient) => recipient.discord),
+        message.context,
+      ),
+    })),
+  );
+  const unreached = sends.flatMap(({ group, report }) => (report === null ? group.map((r) => r.userId) : []));
+  const reached = sends.flatMap(({ report }) => (report === null ? [] : [report]));
+  if (reached.length === 0) return { report: null, unreached };
+  return {
+    report: {
+      sent: reached.reduce((total, report) => total + report.sent, 0),
+      unresolved: reached.flatMap((report) => report.unresolved),
+      failed: reached.flatMap((report) => report.failed),
+    },
+    unreached,
+  };
 }
 
 export type StaffNotification = {
@@ -130,7 +207,7 @@ export async function notifyStaff(notification: StaffNotification): Promise<Noti
     notification.discord ? notification.discord() : Promise.resolve(null),
     staffPush().catch(() => 0),
   ]);
-  return { discord, pushed };
+  return { discord, discordUnreachedUserIds: [], pushed };
 }
 
 type RecipientRow = RowDataPacket & {

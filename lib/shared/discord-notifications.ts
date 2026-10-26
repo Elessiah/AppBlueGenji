@@ -27,6 +27,8 @@ import { isEndurancePlayoffRound, PLAYOFF_ROUND_OFFSET } from "./bg-survie/round
 import { ANONYMOUS_PLAYER_LABEL, entrantLabel, type LogEntrant } from "./log-privacy";
 import { discordInline, discordQuote } from "./discord-text";
 import { CHECK_IN_INVITE_URL } from "./discord";
+import { localizedSiteUrl } from "./dm-language";
+import { INTL_LOCALE, type Locale } from "./locales";
 
 /**
  * Clé d'un palier de rappel. Persistée (`bg_match_reminders.offset_key`).
@@ -63,6 +65,16 @@ export const MATCH_REMINDER_OFFSETS: readonly MatchReminderOffset[] = [
   { key: "P1D", minutesBefore: 24 * 60, label: "24 heures", dueLabel: "moins de 24 heures" },
   { key: "PT10H", minutesBefore: 10 * 60, label: "10 heures", dueLabel: "moins de 10 heures" },
 ];
+
+/** `label` et `dueLabel` d'un palier, en anglais (messages privés des comptes anglophones). */
+const OFFSET_LABELS_EN: Readonly<Record<MatchReminderOffsetKey, { label: string; dueLabel: string }>> = {
+  P1D: { label: "24 hours", dueLabel: "less than 24 hours" },
+  PT10H: { label: "10 hours", dueLabel: "less than 10 hours" },
+};
+
+function offsetLabels(offset: MatchReminderOffset, locale: Locale): { label: string; dueLabel: string } {
+  return locale === "en" ? OFFSET_LABELS_EN[offset.key] : offset;
+}
 
 /**
  * Palier qui porte le **check-in** : son rappel donne le lien du serveur
@@ -245,6 +257,31 @@ export function openedMatchReminders(
  */
 let matchStartFormat: Intl.DateTimeFormat | null = null;
 
+const MATCH_START_FORMATS_EN = new Map<Locale, Intl.DateTimeFormat>();
+
+/**
+ * Date et heure d'un match dans une langue, fuseau de Paris (24 h dans les
+ * deux) : le français est {@link formatMatchStart}, inchangé.
+ */
+export function formatMatchStartIn(startAt: string | Date, locale: Locale): string {
+  if (locale === "fr") return formatMatchStart(startAt);
+  const date = startAt instanceof Date ? startAt : new Date(startAt);
+  let format = MATCH_START_FORMATS_EN.get(locale);
+  if (!format) {
+    format = new Intl.DateTimeFormat(INTL_LOCALE[locale], {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+      timeZone: "Europe/Paris",
+    });
+    MATCH_START_FORMATS_EN.set(locale, format);
+  }
+  return format.format(date);
+}
+
 /** Date et heure d'un match, en français, fuseau de Paris. */
 export function formatMatchStart(startAt: string | Date): string {
   const date = startAt instanceof Date ? startAt : new Date(startAt);
@@ -274,6 +311,11 @@ export interface MatchReminderContext {
   /** Adversaire. Toujours connue : un rappel sans adversaire n'a rien à dire. */
   opponentName: string;
   roundLabel: string;
+  /**
+   * La manche en anglais (`pushRoundLabel(…, "en")`), pour un compte
+   * anglophone ; à défaut, `roundLabel`.
+   */
+  roundLabelEn?: string;
   startAt: string | Date;
   /**
    * Tournoi individuel : les deux noms sont des pseudos, que le message
@@ -296,7 +338,12 @@ export interface MatchReminderContext {
 }
 
 /** Ligne du check-in : où et quand (texte fixe, aucun nom). */
-export function checkInLine(open = false): string {
+export function checkInLine(open = false, locale: Locale = "fr"): string {
+  if (locale === "en") {
+    return open
+      ? `Check-in: the check-in channel is already open on Discord — ${CHECK_IN_INVITE_URL}`
+      : `Check-in: the check-in channel opens ${CHECK_IN_OPENS_MINUTES_BEFORE} minutes before kickoff on Discord — ${CHECK_IN_INVITE_URL}`;
+  }
   if (open) return `Check-in : le salon de check-in est déjà ouvert sur Discord — ${CHECK_IN_INVITE_URL}`;
   return (
     `Check-in : le salon de check-in ouvre ${CHECK_IN_OPENS_MINUTES_BEFORE} minutes avant le coup d'envoi ` +
@@ -325,10 +372,15 @@ export const MATCH_DM_SETTINGS_PATH = "/profil#notifications";
 /**
  * Dernière ligne de **tout** message privé de match d'un joueur (annonce,
  * rappels, horaire retiré, « Match retiré ») : où couper ces messages — le
- * droit d'opposition rappelé là où il s'exerce (registre T04). En français,
- * comme tout message Discord ; jamais dans un message au staff.
+ * droit d'opposition rappelé là où il s'exerce (registre T04). Dans la langue
+ * du message ; jamais dans un message au staff.
  */
-export function matchDmOptOutLine(settingsUrl?: string | null): string {
+export function matchDmOptOutLine(settingsUrl?: string | null, locale: Locale = "fr"): string {
+  if (locale === "en") {
+    return settingsUrl
+      ? `You can turn off these direct messages in your profile, Notifications section: <${localizedSiteUrl(settingsUrl, locale)}>`
+      : "You can turn off these direct messages in “My profile”, Notifications section, on the site.";
+  }
   // `<…>` : Discord garde le lien cliquable sans en déplier l'aperçu — une
   // seconde carte (celle de « Mon profil ») sous celle du tournoi, à chaque
   // message, repousserait l'horaire hors de l'écran d'un téléphone.
@@ -341,9 +393,22 @@ export function matchDmOptOutLine(settingsUrl?: string | null): string {
 export const FIRST_SCHEDULE: ScheduleAnnouncement = { rescheduled: false };
 
 /** Ligne « qui contre qui » d'un message privé de match. */
-function pairingLine(context: MatchReminderContext): string {
-  if (context.solo) return "**Ton match**";
-  return `**${discordInline(context.teamName)}** contre **${discordInline(context.opponentName)}**`;
+function pairingLine(context: MatchReminderContext, locale: Locale): string {
+  if (context.solo) return locale === "en" ? "**Your match**" : "**Ton match**";
+  const versus = locale === "en" ? "vs" : "contre";
+  return `**${discordInline(context.teamName)}** ${versus} **${discordInline(context.opponentName)}**`;
+}
+
+/** Ligne « tournoi · manche » d'un message privé de match. */
+function tournamentLine(context: MatchReminderContext, locale: Locale): string {
+  const round = locale === "en" ? (context.roundLabelEn ?? context.roundLabel) : context.roundLabel;
+  return `${discordInline(context.tournamentName)} · ${round}`;
+}
+
+/** Dernières lignes communes : la page du tournoi, puis où couper ces messages. */
+function closingLines(context: MatchReminderContext, locale: Locale): string[] {
+  const link = localizedSiteUrl(context.tournamentUrl, locale);
+  return [...(link ? [link] : []), matchDmOptOutLine(context.matchDmSettingsUrl, locale)];
 }
 
 /**
@@ -354,21 +419,25 @@ function pairingLine(context: MatchReminderContext): string {
  *
  * @param offset Palier qui déclenche ce rappel.
  * @param context Ce qu'il y a à dire du match.
- * @returns Le message privé à envoyer, en français.
+ * @param locale Langue du compte destinataire (français par défaut, texte inchangé).
+ * @returns Le message privé à envoyer.
  */
 export function buildMatchReminderMessage(
   offset: MatchReminderOffset,
   context: MatchReminderContext,
+  locale: Locale = "fr",
 ): string {
+  const en = locale === "en";
+  const { dueLabel } = offsetLabels(offset, locale);
+  const start = formatMatchStartIn(context.startAt, locale);
   const lines = [
-    `**Rappel de match — dans ${offset.dueLabel}**`,
-    `${discordInline(context.tournamentName)} · ${context.roundLabel}`,
-    pairingLine(context),
-    `Coup d'envoi : ${formatMatchStart(context.startAt)} (heure de Paris)`,
+    en ? `**Match reminder — in ${dueLabel}**` : `**Rappel de match — dans ${dueLabel}**`,
+    tournamentLine(context, locale),
+    pairingLine(context, locale),
+    en ? `Kickoff: ${start} (Paris time)` : `Coup d'envoi : ${start} (heure de Paris)`,
   ];
-  if (context.checkIn ?? offset.key === CHECK_IN_REMINDER_KEY) lines.push(checkInLine(context.checkInOpen));
-  if (context.tournamentUrl) lines.push(context.tournamentUrl);
-  lines.push(matchDmOptOutLine(context.matchDmSettingsUrl));
+  if (context.checkIn ?? offset.key === CHECK_IN_REMINDER_KEY) lines.push(checkInLine(context.checkInOpen, locale));
+  lines.push(...closingLines(context, locale));
   return lines.join("\n");
 }
 
@@ -387,31 +456,47 @@ export function buildMatchReminderMessage(
  * @param remaining Paliers encore à venir, pour annoncer la suite.
  * @param announcement Date qui en remplace une autre (« Match reprogrammé »),
  *                     et l'ancienne quand elle est connue.
- * @returns Le message privé à envoyer, en français.
+ * @param locale Langue du compte destinataire (français par défaut, texte inchangé).
+ * @returns Le message privé à envoyer.
  */
 export function buildMatchScheduleAnnouncement(
   context: MatchReminderContext,
   remaining: readonly MatchReminderOffset[] = [],
   announcement: ScheduleAnnouncement = FIRST_SCHEDULE,
+  locale: Locale = "fr",
 ): string {
+  const en = locale === "en";
   const previous = announcement.rescheduled ? announcement.previousStartAt : null;
+  const start = formatMatchStartIn(context.startAt, locale);
   const lines = [
-    announcement.rescheduled ? "**Match reprogrammé**" : "**Match programmé**",
-    `${discordInline(context.tournamentName)} · ${context.roundLabel}`,
-    pairingLine(context),
-    previous
-      ? `Nouveau coup d'envoi : ${formatMatchStart(context.startAt)} (heure de Paris), au lieu du ${formatMatchStart(previous)}`
-      : `Coup d'envoi : ${formatMatchStart(context.startAt)} (heure de Paris)`,
+    scheduleTitle(announcement.rescheduled, en),
+    tournamentLine(context, locale),
+    pairingLine(context, locale),
+    scheduleKickoff(start, previous ? formatMatchStartIn(previous, locale) : null, en),
   ];
   if (remaining.length > 0) {
     // Le prochain rappel est le palier restant le plus **lointain** : la liste
     // est ordonnée du plus lointain au plus proche, c'est donc le premier.
-    lines.push(`Prochain rappel : ${remaining[0].label} avant le coup d'envoi.`);
+    const { label } = offsetLabels(remaining[0], locale);
+    lines.push(en ? `Next reminder: ${label} before kickoff.` : `Prochain rappel : ${label} avant le coup d'envoi.`);
   }
-  if (context.checkIn) lines.push(checkInLine(context.checkInOpen));
-  if (context.tournamentUrl) lines.push(context.tournamentUrl);
-  lines.push(matchDmOptOutLine(context.matchDmSettingsUrl));
+  if (context.checkIn) lines.push(checkInLine(context.checkInOpen, locale));
+  lines.push(...closingLines(context, locale));
   return lines.join("\n");
+}
+
+/** Titre d'une annonce d'horaire. */
+function scheduleTitle(rescheduled: boolean, en: boolean): string {
+  if (en) return rescheduled ? "**Match rescheduled**" : "**Match scheduled**";
+  return rescheduled ? "**Match reprogrammé**" : "**Match programmé**";
+}
+
+/** Ligne du coup d'envoi d'une annonce, avec l'ancien quand il est remplacé. */
+function scheduleKickoff(start: string, previous: string | null, en: boolean): string {
+  if (en) return previous ? `New kickoff: ${start} (Paris time), instead of ${previous}` : `Kickoff: ${start} (Paris time)`;
+  return previous
+    ? `Nouveau coup d'envoi : ${start} (heure de Paris), au lieu du ${previous}`
+    : `Coup d'envoi : ${start} (heure de Paris)`;
 }
 
 /**
@@ -419,18 +504,21 @@ export function buildMatchScheduleAnnouncement(
  * porte l'horaire qui ne vaut plus. Mêmes lignes que l'annonce, pour que le
  * joueur rapproche les deux messages.
  *
- * @returns Le message privé à envoyer, en français.
+ * @param locale Langue du compte destinataire (français par défaut, texte inchangé).
+ * @returns Le message privé à envoyer.
  */
-export function buildMatchScheduleClearedNotice(context: MatchReminderContext): string {
-  const lines = [
-    "**Horaire du match retiré**",
-    `${discordInline(context.tournamentName)} · ${context.roundLabel}`,
-    pairingLine(context),
-    `L'horaire du ${formatMatchStart(context.startAt)} (heure de Paris) est retiré : un nouvel horaire te sera annoncé.`,
-  ];
-  if (context.tournamentUrl) lines.push(context.tournamentUrl);
-  lines.push(matchDmOptOutLine(context.matchDmSettingsUrl));
-  return lines.join("\n");
+export function buildMatchScheduleClearedNotice(context: MatchReminderContext, locale: Locale = "fr"): string {
+  const en = locale === "en";
+  const start = formatMatchStartIn(context.startAt, locale);
+  return [
+    en ? "**Match time removed**" : "**Horaire du match retiré**",
+    tournamentLine(context, locale),
+    pairingLine(context, locale),
+    en
+      ? `The time set for ${start} (Paris time) has been removed: a new time will be announced.`
+      : `L'horaire du ${start} (heure de Paris) est retiré : un nouvel horaire te sera annoncé.`,
+    ...closingLines(context, locale),
+  ].join("\n");
 }
 
 /**
@@ -438,18 +526,21 @@ export function buildMatchScheduleClearedNotice(context: MatchReminderContext): 
  * tournoi (correction, retour en arrière, ronde réappariée) : l'horaire qu'elle avait reçu (`context.startAt`) ne la concerne plus.
  * Mêmes lignes que l'annonce, pour que le joueur rapproche les deux messages.
  *
- * @returns Le message privé à envoyer, en français.
+ * @param locale Langue du compte destinataire (français par défaut, texte inchangé).
+ * @returns Le message privé à envoyer.
  */
-export function buildMatchWithdrawnNotice(context: MatchReminderContext): string {
-  const lines = [
-    "**Match retiré de ton programme**",
-    `${discordInline(context.tournamentName)} · ${context.roundLabel}`,
-    pairingLine(context),
-    `Le tournoi a été mis à jour et tu ne joues plus ce match : l'horaire du ${formatMatchStart(context.startAt)} (heure de Paris) ne te concerne plus.`,
-  ];
-  if (context.tournamentUrl) lines.push(context.tournamentUrl);
-  lines.push(matchDmOptOutLine(context.matchDmSettingsUrl));
-  return lines.join("\n");
+export function buildMatchWithdrawnNotice(context: MatchReminderContext, locale: Locale = "fr"): string {
+  const en = locale === "en";
+  const start = formatMatchStartIn(context.startAt, locale);
+  return [
+    en ? "**Match removed from your schedule**" : "**Match retiré de ton programme**",
+    tournamentLine(context, locale),
+    pairingLine(context, locale),
+    en
+      ? `The tournament has been updated and you no longer play this match: the time set for ${start} (Paris time) no longer applies to you.`
+      : `Le tournoi a été mis à jour et tu ne joues plus ce match : l'horaire du ${start} (heure de Paris) ne te concerne plus.`,
+    ...closingLines(context, locale),
+  ].join("\n");
 }
 
 /**

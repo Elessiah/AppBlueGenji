@@ -80,7 +80,7 @@ export async function notifyTeamJoinRequest(teamId: number, requesterId: number)
   const url = `${siteCanonicalBase()}/equipes/${teamId}`;
   await notifyUsers(recipients, {
     topic: "TEAM_JOIN_REQUEST",
-    discord: { message: formatTeamJoinRequestNotice({ teamName: teams[0].name, url }), context: "team-join-request" },
+    discord: { message: (locale) => formatTeamJoinRequestNotice({ teamName: teams[0].name, url }, locale), context: "team-join-request" },
     push: (locale) => teamJoinRequestPush({ teamId, teamName: teams[0].name }, locale),
   });
 }
