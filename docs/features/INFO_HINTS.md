@@ -62,7 +62,7 @@ après le libellé qu'elles expliquent, et se réécrivent **court**.
 - Se referme par **Échap** (focus rendu au bouton ; écouté sur le composant
   seul, pour ne pas voler l'Échap d'une modale ; déplié dans une modale, il
   porte `data-escape-owner` et `escapeBelongsElsewhere` lui laisse la touche —
-  sans quoi l'écouteur de la modale, en capture, la fermait saisie comprise), par un **clic ailleurs**, par
+  sans quoi l'écouteur de la modale, en capture, la fermait saisie comprise ; un clic sur le texte de l'explication rend le focus au bouton, qui garde ainsi la touche), par un **clic ailleurs**, par
   un **second clic**. Le clic ailleurs ferme au `click` et non au `pointerdown` :
   replier l'explication à l'appui ferait remonter le contrôle visé sous le
   pointeur, et le relâchement tomberait à côté (clic perdu). Cliquer un autre
