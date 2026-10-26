@@ -44,13 +44,15 @@ const STATUS_KEYS = {
  * Une ligne sortie s'estompe, mais pas toutes au même degré : « Hors course »
  * porte encore un capital à lire.
  */
-// Plancher 0,8 : à 0,55 le texte discret (« S3 », dates, « Déjà sortie ») et le
-// rouge (« Forfait — retirée », ▼) tombaient sous 4,5:1 sur le fond du plateau.
+// Plancher 0,9 : à 0,55 le texte discret (« S3 », dates, « Déjà sortie ») et le
+// rouge (« Forfait — retirée », ▼) tombaient sous 4,5:1 sur le fond du plateau ;
+// à 0,8, le chiffre de défaite (`--result-loss-ink`) y restait encore, vers
+// 4,1:1 sur la ligne du lecteur (`.mine`).
 const ROW_OPACITY: Record<EnduranceStandingRow["status"], number> = {
   ACTIVE: 1,
-  OUT_OF_CONTENTION: 0.9,
-  ELIMINATED: 0.8,
-  FORFEIT: 0.8,
+  OUT_OF_CONTENTION: 0.95,
+  ELIMINATED: 0.9,
+  FORFEIT: 0.9,
 };
 
 interface EnduranceRankingViewsProps {

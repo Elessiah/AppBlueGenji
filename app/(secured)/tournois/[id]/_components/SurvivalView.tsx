@@ -182,8 +182,9 @@ export function SurvivalView({
                     borderTop: idx === 0 ? "none" : `1px solid ${BORDER}`,
                     borderLeft: inDanger ? `3px solid ${AMBER}` : "3px solid transparent",
                     background: isMine ? "rgba(89,212,255,0.06)" : undefined,
-                    // 0,8 et non 0,55 : le texte discret d'une ligne éliminée reste ≥ 4,5:1.
-                    opacity: team.status === "ELIMINATED" ? 0.8 : 1,
+                    // 0,9 et non 0,55 : le texte d'une ligne éliminée, chiffre de défaite
+                    // compris, reste ≥ 4,5:1, même sur la ligne du lecteur.
+                    opacity: team.status === "ELIMINATED" ? 0.9 : 1,
                     fontSize: 13,
                   }}
                 >

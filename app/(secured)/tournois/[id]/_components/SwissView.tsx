@@ -58,10 +58,11 @@ const SUBGRID: CSSProperties = {
 const RIGHT: CSSProperties = { textAlign: "right" };
 const SECONDARY: CSSProperties = { fontSize: 12, color: "var(--ink-quiet)" };
 /**
- * Estompe une cellule de ligne forfait (jamais la colonne d'action). 0,8 comme
- * la BG Survie (`ROW_OPACITY`) : à 0,55, le texte discret tombait vers 3:1.
+ * Estompe une cellule de ligne forfait (jamais la colonne d'action). 0,9 : le
+ * chiffre de défaite (`--result-loss-ink`) reste ≥ 4,5:1 même sur la ligne du
+ * lecteur ; à 0,55, le texte discret tombait vers 3:1.
  */
-const FORFEIT_FADE: CSSProperties = { opacity: 0.8 };
+const FORFEIT_FADE: CSSProperties = { opacity: 0.9 };
 
 const STATUS_META: Record<SwissStandingRow["status"], { key: "ranking.active" | "ranking.forfeit"; color: string }> = {
   ACTIVE: { key: "ranking.active", color: ACCENT },
