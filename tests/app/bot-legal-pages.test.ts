@@ -321,10 +321,10 @@ describe("bot legal content matches the bot's code and the association", () => {
 
   it("says the site sends the recipient's BlueGenji username with each direct message (legal review #441)", () => {
     expect(flatOf(PRIVACY_POLICY, "fr")).toContain(
-      "un identifiant ou un pseudo Discord, le pseudo BlueGenji du destinataire, pour le seul code de connexion la langue du compte BlueGenji",
+      "un identifiant ou un pseudo Discord, le pseudo BlueGenji du destinataire, pour le seul code (connexion, certification ou changement du tag Discord) la langue du compte BlueGenji déjà rattaché à ce compte Discord",
     );
     expect(flatOf(PRIVACY_POLICY, "en")).toContain(
-      "a Discord ID or username, the recipient's BlueGenji username, for the login code only the language of the BlueGenji account",
+      "a Discord ID or username, the recipient's BlueGenji username, for the code only (login, certification or change of the Discord tag) the language of the BlueGenji account already linked to that Discord account",
     );
   });
 

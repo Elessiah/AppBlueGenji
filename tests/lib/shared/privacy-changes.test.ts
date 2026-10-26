@@ -1451,13 +1451,15 @@ describe("PRIVACY_CHANGES — messages privés Discord dans la langue du compte 
   it("dit le nouvel usage de la langue, le bot qui la reçoit sans la garder, le repli bilingue et les salons en français (FR et EN)", () => {
     const fr = [entry.title, entry.summary, ...entry.details].join(" ");
     expect(fr).toMatch(/rédigés dans la langue de ton compte, français ou anglais/);
-    expect(fr).toMatch(/transmet la langue de ton compte au bot de l'association, qui rédige le code dans cette langue sans la garder/);
+    expect(fr).toMatch(/certification ou changement du tag\), le site transmet au bot de l'association la langue du compte déjà rattaché à ce compte Discord, et le bot rédige le code dans cette langue sans la garder/);
+    expect(fr).toMatch(/en français seul si les deux ne tiennent pas dans un message/);
     expect(fr).toMatch(/en français puis en anglais/);
     expect(fr).toMatch(/Les messages publiés dans les salons Discord restent en français/);
     expect(fr).toMatch(/Aucune donnée nouvelle n'est collectée/);
     const en = [english.title, english.summary, ...english.details].join(" ");
     expect(en).toMatch(/written in your account's language, French or English/);
-    expect(en).toMatch(/sends your account's language to the association's bot, which writes the code in that language without keeping it/);
+    expect(en).toMatch(/certification or change of the tag\), the site sends the association's bot the language of the account already linked to that Discord account, and the bot writes the code in that language without keeping it/);
+    expect(en).toMatch(/in French alone when both do not fit in one message/);
     expect(en).toMatch(/in French then in English/);
     expect(en).toMatch(/Messages posted in Discord channels stay in French/);
     expect(english.details).toHaveLength(entry.details.length);
