@@ -13,7 +13,7 @@ import type { TeamListItem } from "@/lib/shared/types";
  * inerte sur l'autre.
  */
 
-function team(id: number, rank: number, overrides: Partial<TeamListItem> = {}): TeamListItem {
+function team(id: number, rank: number | null, overrides: Partial<TeamListItem> = {}): TeamListItem {
   return {
     id,
     name: `Équipe ${id}`,
@@ -22,7 +22,7 @@ function team(id: number, rank: number, overrides: Partial<TeamListItem> = {}): 
     membersCount: 5,
     createdAt: "2026-01-15T10:00:00.000Z",
     rank,
-    points: 600 - rank,
+    points: 600 - (rank ?? 100),
     wins: 6,
     losses: 3,
     form: ["w", "l", "w"],
@@ -94,5 +94,30 @@ describe("HighlightStrip — liens vers les fiches d'équipe", () => {
     expect(zIndexOf(css, ".ptsBlock")).toBeGreaterThan(zIndexOf(css, ".cardOverlay"));
     const markup = renderToStaticMarkup(<HighlightStrip teams={PODIUM} />);
     expect(markup).toMatch(/class="[^"]*ptsBlock[^"]*" title="/);
+  });
+});
+
+/**
+ * Demande du 2026-10-13 : une équipe sans match compté n'a pas de rang
+ * (`rank: null`) et ne monte jamais sur le podium de l'annuaire.
+ */
+describe("HighlightStrip — équipes sans match", () => {
+  it("saute les équipes sans rang et garde les trois premières classées", () => {
+    const links = anchors(
+      renderToStaticMarkup(
+        <HighlightStrip teams={[team(7, 1), team(40, null), team(3, 2), team(11, 3)]} />,
+      ),
+    );
+    expect(links.map((link) => link.match(/href="([^"]+)"/)?.[1])).toEqual([
+      "/equipes/7",
+      "/equipes/3",
+      "/equipes/11",
+    ]);
+  });
+
+  it("ne rend rien s'il reste moins de trois équipes classées", () => {
+    expect(
+      renderToStaticMarkup(<HighlightStrip teams={[team(7, 1), team(3, 2), team(40, null), team(41, null)]} />),
+    ).toBe("");
   });
 });

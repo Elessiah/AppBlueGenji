@@ -36,7 +36,7 @@ afterEach(() => {
 });
 
 describe("loadPodiumTiers", () => {
-  it("lit le classement général (équipes non jouées comprises) et les membres actifs des trois premières en une requête", async () => {
+  it("lit le classement général (équipes classées seulement) et les membres actifs des trois premières en une requête", async () => {
     jest.mocked(loadTeamRanking).mockResolvedValue([rankingRow(7), rankingRow(8), rankingRow(9), rankingRow(10)]);
     const execute = await mockMembers([
       { user_id: 1, team_id: 7 },
@@ -46,7 +46,7 @@ describe("loadPodiumTiers", () => {
 
     const tiers = await loadPodiumTiers();
 
-    expect(loadTeamRanking).toHaveBeenCalledWith({ includeUnplayed: true });
+    expect(loadTeamRanking).toHaveBeenCalledWith();
     expect(execute).toHaveBeenCalledTimes(1);
     const [sql, params] = execute.mock.calls[0];
     expect(sql).toMatch(/FROM bg_team_members/);

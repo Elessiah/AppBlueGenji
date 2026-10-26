@@ -82,7 +82,7 @@ describe("loadSharePodium", () => {
       rankingRow(4),
     ]);
     const podium = await loadSharePodium();
-    expect(loadTeamRanking).toHaveBeenCalledWith({ includeUnplayed: true });
+    expect(loadTeamRanking).toHaveBeenCalledWith();
     expect(podium.map((row) => [row.teamName, row.points])).toEqual([
       ["Test - 1", 999],
       ["Test - 2", 998],

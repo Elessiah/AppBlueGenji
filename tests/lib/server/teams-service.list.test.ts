@@ -288,3 +288,55 @@ describe("listTeams — forme des équipes", () => {
     expect(second[0].form).toEqual(["w", "d", "l"]);
   });
 });
+
+/**
+ * Demande du 2026-10-13 : une équipe sans match compté n'a pas de rang. Elle
+ * reste à l'annuaire (c'est un annuaire), mais sans badge, et les rangs des
+ * autres se comptent sans elle — les mêmes que sur `/classement`.
+ */
+describe("listTeams — rang des équipes sans match", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    clearCache();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+    clearCache();
+  });
+
+  it("ne donne aucun rang à une équipe sans match et numérote les autres sans trou", async () => {
+    await mockDb([
+      teamRow({ id: 1, name: "Alpha", wins: 2 }),
+      teamRow({ id: 2, name: "Aucun match", wins: 0 }),
+      teamRow({ id: 3, name: "Charlie", wins: 1 }),
+    ]);
+
+    const teams = await listTeams();
+
+    expect(teams.map((t) => [t.name, t.rank])).toEqual([
+      ["Alpha", 1],
+      ["Charlie", 2],
+      ["Aucun match", null],
+    ]);
+  });
+
+  it("garde l'équipe sans match à l'annuaire, à la cote de départ", async () => {
+    await mockDb([teamRow({ id: 2, name: "Aucun match", wins: 0 })]);
+
+    const [team] = await listTeams();
+
+    expect(team).toMatchObject({ rank: null, points: 500, wins: 0, losses: 0 });
+  });
+
+  it("range les équipes sans rang après les classées, par nom", async () => {
+    await mockDb([
+      teamRow({ id: 1, name: "Zulu", wins: 0 }),
+      teamRow({ id: 2, name: "Bravo", wins: 0 }),
+      teamRow({ id: 3, name: "Classée", wins: 1 }),
+    ]);
+
+    const teams = await listTeams();
+
+    expect(teams.map((t) => t.name)).toEqual(["Classée", "Bravo", "Zulu"]);
+  });
+});

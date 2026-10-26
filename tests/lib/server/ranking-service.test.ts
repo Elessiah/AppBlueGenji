@@ -323,9 +323,10 @@ describe("loadTeamRanking", () => {
     expect((await loadTeamRanking()).map((row) => row.teamId)).toEqual([1, 2]);
   });
 
-  // Retour du 2026-10-05 : un seul match joué sur le site, et la perdante
-  // passait deuxième, devant toutes les équipes restées à 500.
-  it("les garde à la cote de départ quand on le demande, rangées à cette cote", async () => {
+  // Demande du 2026-10-13 : une équipe sans match ne figure plus au
+  // classement — ni ailleurs dans ce qui en descend. La liste n'a pas de trou :
+  // la perdante suit directement la gagnante.
+  it("masque les équipes sans match : la perdante suit la gagnante, sans trou", async () => {
     await mockDb(
       fakeDb(
         [matchRow(1, 1, 2, 1)],
@@ -333,13 +334,76 @@ describe("loadTeamRanking", () => {
       ),
     );
 
-    const rows = await loadTeamRanking({ includeUnplayed: true });
+    const rows = await loadTeamRanking();
 
-    // Alpha a gagné ; Yankee et Zulu, sans match, restent à 500 ; Bravo,
-    // battue, est passée sous la cote de départ : elle ferme la marche.
-    expect(rows.map((row) => row.teamName)).toEqual(["Alpha", "Yankee", "Zulu", "Bravo"]);
-    expect(rows[3].points).toBeLessThan(RANKING_BASE_POINTS);
-    expect(rows[1]).toMatchObject({ points: RANKING_BASE_POINTS, wins: 0, losses: 0 });
+    expect(rows.map((row) => row.teamName)).toEqual(["Alpha", "Bravo"]);
+    expect(rows[1].points).toBeLessThan(RANKING_BASE_POINTS);
+  });
+
+  // Un forfait est un match compté (un vainqueur, deux équipes réelles) : il
+  // classe les deux camps, comme le rejeu le compte.
+  it("garde les deux camps d'un forfait", async () => {
+    const forfeit = { ...matchRow(1, 1, 2, 1), forfeit_team_id: 2, team1_score: null, team2_score: null };
+    await mockDb(fakeDb([forfeit], [teamRow(1), teamRow(2), teamRow(3)]));
+
+    expect((await loadTeamRanking()).map((row) => row.teamId)).toEqual([1, 2]);
+  });
+
+  // Un nul compte comme un match joué : la cote a bougé.
+  it("garde une équipe dont le seul match est un nul", async () => {
+    const draw = { ...matchRow(1, 1, 2, 1), winner_team_id: null, team1_score: 2, team2_score: 2 };
+    await mockDb(fakeDb([draw], [teamRow(1), teamRow(2), teamRow(3)]));
+
+    const rows = await loadTeamRanking();
+
+    expect(rows.map((row) => row.teamId).sort((a, b) => a - b)).toEqual([1, 2]);
+    expect(rows.every((row) => row.draws === 1)).toBe(true);
+  });
+
+  // Un bye n'est pas joué : l'assiette du rejeu l'écarte en SQL, et une
+  // équipe qui n'a reçu que des byes n'a donc aucun match compté.
+  it("lit les matchs sur l'assiette qui écarte les byes", async () => {
+    const execute = await mockDb(fakeDb([], [teamRow(1)]));
+
+    expect(await loadTeamRanking()).toEqual([]);
+    const matchSql = execute.mock.calls
+      .map((call) => String(call[0]))
+      .find((sql) => sql.includes("AS played_at"))!;
+    expect(matchSql).toContain("m.is_bye = 0");
+    expect(matchSql).toContain("m.status = 'COMPLETED'");
+  });
+
+  // Un classement final sans rencontre ne classe pas : les points de parcours
+  // seuls ne font pas un match joué.
+  it("masque une équipe qui n'a qu'un classement final, sans match", async () => {
+    await mockDb(
+      fakeDb(
+        [matchRow(1, 1, 2, 1, 1)],
+        [teamRow(1), teamRow(2), teamRow(3)],
+        [],
+        [placementRow(9, 1, 1), placementRow(9, 2, 2), placementRow(9, 3, 3)],
+      ),
+    );
+
+    expect((await loadTeamRanking()).map((row) => row.teamId).sort((a, b) => a - b)).toEqual([1, 2]);
+  });
+
+  // Une équipe fantôme qui joue est une équipe du site : elle reste listée.
+  it("garde une équipe fantôme qui a joué", async () => {
+    await mockDb(fakeDb([matchRow(1, 1, 2, 1)], [teamRow(1, "Test - Fantôme"), teamRow(2)]));
+
+    expect((await loadTeamRanking()).map((row) => row.teamName)).toContain("Test - Fantôme");
+  });
+
+  // Masquée, pas effacée : la même équipe réapparaît à son premier match.
+  it("fait réapparaître une équipe masquée dès son premier match", async () => {
+    const teams = [teamRow(1), teamRow(2), teamRow(3)];
+    await mockDb(fakeDb([matchRow(1, 1, 2, 1)], teams));
+    expect((await loadTeamRanking()).map((row) => row.teamId)).not.toContain(3);
+
+    clearCache();
+    await mockDb(fakeDb([matchRow(1, 1, 2, 1), matchRow(2, 3, 1, 3)], teams));
+    expect((await loadTeamRanking()).map((row) => row.teamId)).toContain(3);
   });
 
   // Une entrée solo n'est pas une équipe : la laisser dans la liste décalerait
@@ -431,25 +495,25 @@ describe("getTeamRankingPosition", () => {
     expect((await getTeamRankingPosition(3)).position).toBe(2);
   });
 
-  // Retour du 2026-10-05 : la place de la fiche se compte sur la même liste
-  // que `/classement`, sinon la perdante lisait « 2ᵉ sur 2 » sur sa fiche.
-  it("place une équipe battue derrière les équipes restées à la cote de départ", async () => {
+  // La place de la fiche se compte sur la même liste que `/classement` : les
+  // équipes sans match y étant masquées, la perdante est 2ᵉ sur 2.
+  it("compte la place sur les seules équipes classées", async () => {
     await mockDb(
       fakeDb([matchRow(1, 1, 2, 1)], [teamRow(1), teamRow(2), teamRow(3), teamRow(4)]),
     );
 
     const ranking = await getTeamRankingPosition(2);
 
-    expect(ranking.position).toBe(4);
-    expect(ranking.total).toBe(4);
+    expect(ranking.position).toBe(2);
+    expect(ranking.total).toBe(2);
   });
 
-  it("ne donne pas de place à une équipe listée sans match, mais la compte", async () => {
+  it("ne donne pas de place à une équipe sans match, ni ne la compte", async () => {
     await mockDb(fakeDb([matchRow(1, 1, 2, 1)], [teamRow(1), teamRow(2), teamRow(3)]));
 
     const ranking = await getTeamRankingPosition(3);
 
-    expect(ranking).toMatchObject({ position: null, total: 3, points: RANKING_BASE_POINTS });
+    expect(ranking).toMatchObject({ position: null, total: 2, points: RANKING_BASE_POINTS });
   });
 
   it("laisse non classée une équipe sans match, à la cote de départ", async () => {
@@ -628,7 +692,7 @@ describe("rejeu — le classement est une fonction de ce que la base contient", 
   async function pointsAfter(matches: Row[]): Promise<Map<number, number>> {
     clearCache();
     await mockDb(fakeDb(matches, teams));
-    const rows = await loadTeamRanking({ includeUnplayed: true });
+    const rows = await loadTeamRanking();
     return new Map(rows.map((row) => [row.teamId, row.points]));
   }
 
@@ -684,7 +748,9 @@ describe("rejeu — le classement est une fonction de ce que la base contient", 
     const without = await pointsAfter([]);
 
     expect(withMatch.get(1)).toBe(RANKING_BASE_POINTS + ratingTransfer(500, 500));
-    expect(without.get(1)).toBe(RANKING_BASE_POINTS);
+    // Sans son seul match, l'équipe n'a plus de match compté : elle quitte la
+    // liste (masquée, pas supprimée).
+    expect(without.has(1)).toBe(false);
   });
 });
 

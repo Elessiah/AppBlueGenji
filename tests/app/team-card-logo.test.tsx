@@ -188,3 +188,18 @@ describe("TeamCard — le cadre de l'emblème ne se laisse pas étirer", () => {
     expect(rule).toMatch(/height:\s*56px/);
   });
 });
+
+/** Demande du 2026-10-13 : sans match compté, pas de badge de rang. */
+describe("TeamCard — badge de rang", () => {
+  it("affiche le rang d'une équipe classée", () => {
+    expect(renderToStaticMarkup(<TeamCard team={team({ rank: 4 })} />)).toContain("#04");
+  });
+
+  it("n'affiche aucun rang pour une équipe sans match", () => {
+    const markup = renderToStaticMarkup(
+      <TeamCard team={team({ rank: null, wins: 0, losses: 0, points: 500 })} />,
+    );
+    expect(markup).not.toMatch(/#\d{2}/);
+    expect(markup).toContain("Aucun match");
+  });
+});
