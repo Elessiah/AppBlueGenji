@@ -74,6 +74,14 @@ pas l'ambre, réservé aux avertissements) n'apparaît que :
 - en BG Survie, avant les play-offs.
 
 Il ouvre une `ConfirmActionDialog` ; le succès et l'échec passent par le toast.
+La confirmation ne promet l'appariement qu'avec sa réserve (« sauf si les
+matchs qu'elle a joués l'éliminent ») : le rejeu peut sortir l'engagé aussitôt.
+
+Son nom accessible commence par son texte visible, dans les deux langues
+(« Annuler l'abandon de X », « Cancel withdrawal of X » — WCAG 2.5.3). En ronde
+suisse, une ligne forfait s'estompe **cellule par cellule**, jamais la cellule
+d'action : une ligne entière à 55 % d'opacité ferait paraître le bouton
+désactivé et passer son texte sous le contraste requis.
 
 ## Journal
 
@@ -89,3 +97,7 @@ tournoi individuel), auteur nommé dans pm2 seulement.
   codes d'erreur, journal anonyme.
 - `tests/tournois/forfeit-eligibility.test.ts` — `canCancelForfeits`.
 - `tests/lib/shared/bot-logs.test.ts` — ligne Discord.
+- `tests/tournois/forfeit-buttons-label-in-name.test.ts` — nom accessible des
+  boutons d'abandon (FR, EN), réserve de la confirmation.
+- `tests/tournois/swiss-standings-table.test.tsx` — estompage hors cellule
+  d'action.
