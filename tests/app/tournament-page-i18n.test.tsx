@@ -443,6 +443,19 @@ describe("rendu anglais — aucun français hors des blocs lang=\"fr\"", () => {
     expect(html).toContain("REFEREE PENALTIES");
   });
 
+  it.each(["fr", "en"] as Array<"fr" | "en">)("BlueGenji Survie (%s) : la ligne du barème ne finit pas sur un « · » orphelin", (locale) => {
+    const render = (playoffsStarted: boolean) =>
+      inLocale(
+        locale,
+        <EnduranceView endurance={{ ...endurance, playoffsStarted }} matches={[]} canPenalize={false} onPenalize={noop} adminResolvable={() => false} onOpenAdminModal={noop} format="BG_SURVIE" />,
+      );
+    const qualifying = render(false);
+    expect(qualifying).toMatch(/3-0<\/p>/);
+    expect(qualifying).not.toMatch(/·\s*<\/p>/);
+    const playoffs = render(true);
+    expect(playoffs).toContain(locale === "fr" ? "3-0 · PLAY-OFFS À 4</p>" : "3-0 · PLAYOFFS AT 4</p>");
+  });
+
   describe("BlueGenji's Survival — bandeau et vues du classement", () => {
     const enduranceMatches: BracketMatch[] = [
       bracketMatch({ id: 1, roundNumber: 1, matchNumber: 1, team1Id: 1, team1Name: "Team 1", team2Id: 2, team2Name: "Team 2", team1Score: 3, team2Score: 1, winnerTeamId: 1, status: "COMPLETED" }),
