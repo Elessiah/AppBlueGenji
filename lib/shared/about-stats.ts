@@ -77,6 +77,15 @@ export function aboutStatValue(stat: Pick<AboutStat, "value" | "valueEn">, local
 }
 
 /**
+ * Sous `/en`, la valeur affichée est-elle du français ? Seulement sans anglais
+ * saisi **et** quand elle porte des lettres : « 12 » ou « 100% » se lisent
+ * aussi bien en anglais, un `lang="fr"` les ferait prononcer en français.
+ */
+export function aboutStatValueIsFrench(stat: Pick<AboutStat, "value" | "valueEn">, locale: Locale): boolean {
+  return locale !== DEFAULT_LOCALE && !hasEnglish(stat.valueEn) && /\p{L}/u.test(stat.value);
+}
+
+/**
  * Les chiffres dans la langue de la page, avec leur place dans la liste
  * complète (le réordonnancement porte sur elle). Sous `/en`, un chiffre sans
  * titre anglais n'est pas rendu (`staff-translation.ts`) ; sa valeur est

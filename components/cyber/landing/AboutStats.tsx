@@ -12,6 +12,7 @@ import {
   ABOUT_STAT_LABEL_MAX,
   ABOUT_STAT_VALUE_MAX,
   aboutStatErrorMessage,
+  aboutStatValueIsFrench,
   FALLBACK_ABOUT_STATS,
   localizedAboutStats,
   validateAboutStatInput,
@@ -212,8 +213,8 @@ export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: R
       <div className={styles.stats}>
         {shown.map(({ stat: s, value, label, index }) => (
           <div key={s.id} className={styles.stat}>
-            {/* Sous /en, une valeur sans anglais reste française : le lecteur d'écran la prononce en français. */}
-            <div className="num" style={{ fontSize: 26 }} lang={staffLang && !hasEnglish(s.valueEn) ? "fr" : undefined}>
+            {/* Sous /en, une valeur sans anglais qui porte des mots reste française : le lecteur d'écran la prononce en français. */}
+            <div className="num" style={{ fontSize: 26 }} lang={aboutStatValueIsFrench(s, locale) ? "fr" : undefined}>
               {value}
             </div>
             <div className="mono">{label}</div>

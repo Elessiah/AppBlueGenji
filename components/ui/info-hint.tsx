@@ -49,6 +49,10 @@ export function InfoHint({
     const onClick = (event: MouseEvent) => {
       const inside = event.target instanceof Node && rootRef.current?.contains(event.target);
       if (infoHintReaction({ kind: inside ? "insideClick" : "outsideClick" }) === "close") setOpen(false);
+      // Un clic sur le texte de l'explication donne le focus au conteneur de la
+      // modale (`tabIndex={-1}`) : rendu au bouton, Échap replie encore le « i »
+      // au lieu de fermer la modale (`data-escape-owner` suit la cible).
+      else if (inside && !rootRef.current?.contains(document.activeElement)) buttonRef.current?.focus();
     };
     // Échap écouté sur le composant seul (bouton et explication) : une modale
     // ouverte par-dessus garde le sien, sans que le focus reparte derrière son
