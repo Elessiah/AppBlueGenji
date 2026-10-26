@@ -47,7 +47,11 @@ function swiss(standings: SwissStandingRow[]): SwissMeta {
 
 function render(
   standings: SwissStandingRow[],
-  { canForfeit = () => false, isFinished = false }: { canForfeit?: (id: number) => boolean; isFinished?: boolean } = {},
+  {
+    canForfeit = () => false,
+    isFinished = false,
+    canCancelForfeit = false,
+  }: { canForfeit?: (id: number) => boolean; isFinished?: boolean; canCancelForfeit?: boolean } = {},
 ): string {
   return renderToStaticMarkup(
     <ToastProvider>
@@ -62,6 +66,8 @@ function render(
           onOpenAdminModal={() => {}}
           canForfeit={canForfeit}
           onForfeit={() => {}}
+          canCancelForfeit={canCancelForfeit}
+          onCancelForfeit={() => {}}
         />
       </EntrantProvider>
     </ToastProvider>,
@@ -164,6 +170,33 @@ describe("classement de la ronde suisse", () => {
     const html = render([], { isFinished: true });
     expect(html).toContain("Aucune équipe classée.</p>");
     expect(html).not.toContain("Aucune équipe classée pour");
+  });
+
+  it("estompe une ligne forfait cellule par cellule, sans estomper « Annuler l'abandon »", () => {
+    const html = render(
+      [standing(), standing({ teamId: 2, teamName: "Frost Alliance", rank: 2, status: "FORFEIT" })],
+      { canCancelForfeit: true },
+    );
+    expect(count(html, "<button")).toBe(1);
+    expect(html).toContain("Annuler l&#x27;abandon</button>");
+    // La ligne forfait est la dernière du tableau.
+    const forfeitRow = html.split('role="row"').at(-1) ?? "";
+    expect(forfeitRow).toContain("Frost Alliance");
+    // La ligne ne porte plus l'opacité : un parent estompé estomperait le bouton.
+    expect(html).not.toMatch(/role="row"[^>]*opacity/);
+    // Les sept cellules de données s'estompent, la cellule d'action non.
+    expect(count(forfeitRow, "opacity:0.55")).toBe(7);
+    const actionCell = forfeitRow.slice(forfeitRow.lastIndexOf('role="cell"'));
+    expect(actionCell).toContain("Annuler l&#x27;abandon");
+    expect(actionCell).not.toContain("opacity");
+  });
+
+  it("nomme « Annuler l'abandon » en commençant par son texte visible (WCAG 2.5.3)", () => {
+    const html = render(
+      [standing({ status: "FORFEIT" })],
+      { canCancelForfeit: true },
+    );
+    expect(html).toContain("aria-label=\"Annuler l&#x27;abandon de Dragon Squad\"");
   });
 
   it("ne propose aucun abandon sur un tournoi terminé", () => {
