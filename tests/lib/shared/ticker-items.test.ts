@@ -47,5 +47,16 @@ describe("tickerItemText", () => {
         sr: null,
       }),
     ).toBe("RÉSULTAT · Cup · Alpha 2 — Beta 1");
+    expect(
+      tickerItemText({
+        kind: "result",
+        lead: "RÉSULTAT · Cup ·",
+        sides: [
+          { name: "Alpha", score: null, outcome: "forfeit", sr: "forfait" },
+          { name: "Beta", score: null, outcome: "forfeit", sr: "forfait" },
+        ],
+        sr: null,
+      }),
+    ).toBe("RÉSULTAT · Cup · Alpha — Beta");
   });
 });

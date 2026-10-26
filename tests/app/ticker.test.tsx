@@ -81,9 +81,29 @@ describe("Ticker — résultats habillés par camp (TICKER_RESULTS.md)", () => {
 
   it("forfait : camp neutre, sans repère de défaite, dit « forfait »", () => {
     const html = renderToStaticMarkup(<Ticker items={[result("forfeit", "win")]} />);
-    expect(html).toContain('<span class="side" data-outcome="forfeit"><span>Alpha</span><span class="sr-only"> (forfait)</span>');
+    expect(html).toContain('<span class="side" data-outcome="forfeit"><span>Alpha</span><span> (forfait)</span>');
     expect(html).not.toContain("loser");
     expect(html).not.toContain("▼");
+  });
+
+  it("forfait : le mot se voit aussi, sans quoi un forfait se lirait comme une défaite ordinaire (FR et EN)", () => {
+    expect(visible(firstCopy(renderToStaticMarkup(<Ticker items={[result("forfeit", "win")]} />)))).toContain("Alpha (forfait) 2");
+    expect(visible(firstCopy(renderToStaticMarkup(<Ticker items={[result("forfeit", "win", EN)]} />)))).toContain("Alpha (forfeit) 2");
+  });
+
+  it("double forfait : aucun score affiché, jamais un « 0 — 0 » de match joué", () => {
+    const item: TickerResultItem = {
+      kind: "result",
+      lead: "RÉSULTAT · Alpha Cup ·",
+      sides: [
+        { name: "Alpha", score: null, outcome: "forfeit", sr: "forfait" },
+        { name: "Beta", score: null, outcome: "forfeit", sr: "forfait" },
+      ],
+      sr: null,
+    };
+    const html = firstCopy(renderToStaticMarkup(<Ticker items={[item]} />));
+    expect(html).not.toContain('class="score"');
+    expect(visible(html)).toContain("RÉSULTAT · Alpha Cup · Alpha (forfait) — Beta (forfait)");
   });
 
   it("nul : deux camps neutres, score en avant, note « sans vainqueur »", () => {

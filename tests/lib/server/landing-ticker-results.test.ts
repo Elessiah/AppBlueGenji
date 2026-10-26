@@ -15,8 +15,8 @@ import { type SqlQuery, fakePool } from "../../helpers/sql-double";
 type ResultRow = {
   team1_name: string | null;
   team2_name: string | null;
-  team1_score: number;
-  team2_score: number;
+  team1_score: number | null;
+  team2_score: number | null;
   team1_id: number | null;
   team2_id: number | null;
   winner_team_id: number | null;
@@ -114,6 +114,12 @@ describe("getLandingTicker — résultats", () => {
     const [item] = results((await getLandingTicker()).items);
     expect(item.sides.map((side) => side.outcome)).toEqual(["forfeit", "forfeit"]);
     expect(item.sr).toBeNull();
+  });
+
+  it("double forfait sans score enregistré (DOUBLE_FORFEIT.md) : pas de score, jamais un 0 inventé", async () => {
+    await mockTicker([resultRow({ winner_team_id: null, double_forfeit: 1, team1_score: null, team2_score: null }, 1)]);
+    const [item] = results((await getLandingTicker()).items);
+    expect(item.sides.map((side) => [side.score, side.sr])).toEqual([[null, "forfait"], [null, "forfait"]]);
   });
 
   it("nul : deux camps neutres et une note « sans vainqueur » (FR et EN)", async () => {
