@@ -21,6 +21,8 @@ import {
   chartLine,
   chartOrderAt,
   chartRankAt,
+  chartShownRound,
+  chartTargetFor,
   chartThresholdAt,
   chartTopAt,
   chartValueAt,
@@ -137,13 +139,15 @@ export function EnduranceChart({ endurance, matches }: Readonly<{ endurance: End
   const [mode, setMode] = useState<EnduranceChartMode>("TOP");
   const [picked, setPicked] = useState<number[]>([]);
   const [hover, setHover] = useState<number | null>(null);
-  const [target, setTarget] = useState(lastRound);
+  // `null` : suit la dernière manche tirée (y compris celles poussées ensuite).
+  const [target, setTarget] = useState<number | null>(null);
   const [progress, setProgress] = useState(animate ? 0 : lastRound);
   const progressRef = useRef(progress);
   progressRef.current = progress;
   const frame = useRef<number | null>(null);
 
-  const shown = Math.min(Math.max(1, target), lastRound);
+  const shown = chartShownRound(target, lastRound);
+  const lastSeen = useRef(lastRound);
 
   const stop = useCallback(() => {
     if (frame.current !== null) cancelAnimationFrame(frame.current);
@@ -187,9 +191,18 @@ export function EnduranceChart({ endurance, matches }: Readonly<{ endurance: End
     }
   }, [animate, shown, stop]);
 
+  // Le flux tire une nouvelle manche volet ouvert : si le lecteur suit la
+  // dernière, la courbe avance jusqu'à elle (sans rejouer depuis le départ).
+  useEffect(() => {
+    const previous = lastSeen.current;
+    lastSeen.current = lastRound;
+    if (previous === lastRound || target !== null) return;
+    runTo(lastRound, Math.min(progressRef.current, previous));
+  }, [lastRound, target, runTo]);
+
   const showRound = (round: number) => {
     if (round > lastRound || round === shown) return;
-    setTarget(round);
+    setTarget(chartTargetFor(round, lastRound));
     runTo(round, Math.min(progressRef.current, shown));
   };
   const replay = () => runTo(shown, 0);

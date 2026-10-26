@@ -172,6 +172,20 @@ export function chartColorIndex(
   return index === -1 ? null : index % size;
 }
 
+/**
+ * Manche affichée. `null` = suivre la dernière manche tirée : quand le flux en
+ * pousse une nouvelle, volet ouvert, le graphique s'y place de lui-même. Un
+ * choix explicite d'une manche passée reste, borné à [1, dernière manche].
+ */
+export function chartShownRound(target: number | null, lastRound: number): number {
+  return Math.min(Math.max(1, target ?? lastRound), lastRound);
+}
+
+/** Choix d'une manche : la dernière tirée redevient « suivre la dernière ». */
+export function chartTargetFor(round: number, lastRound: number): number | null {
+  return round >= lastRound ? null : round;
+}
+
 // ---------- Géométrie du SVG (unités utilisateur, mises à l'échelle) ----------
 
 export const CHART_W = 760;
