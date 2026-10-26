@@ -169,8 +169,9 @@ déjà public. Logique pure : `_lib/endurance-ranking-views.ts`.
   la vue atteinte est annoncé par une région `aria-live="polite"` (un onglet
   s'annonce de lui-même). La navigation basse ramène le haut du classement à
   l'écran quand la vue atteinte est plus courte.
-- Lignes sorties estompées **cellule par cellule** (`--row-fade`, plancher 0,8
-  pour garder 4,5:1 au texte discret et au rouge) ; la cellule des gestes reste
+- Lignes sorties estompées **cellule par cellule** (`--row-fade`, plancher 0,9
+  pour garder 4,5:1 au texte discret et au rouge, ligne du lecteur comprise —
+  à 0,8 le chiffre de défaite tombait vers 4,1:1 ; « Hors course » à 0,95) ; la cellule des gestes reste
   à pleine opacité.
 - Capital d'une vue passée : une case « sortie » / « forfait » ne porte pas de
   capital, la vue lit le dernier connu (`pointsAfterRound`) — jamais 0.
