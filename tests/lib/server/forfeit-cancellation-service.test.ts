@@ -121,6 +121,16 @@ describe("cancelTournamentForfeit", () => {
     expect(publishUpdatedEvent).toHaveBeenCalledTimes(1);
   });
 
+  it("lit les manches postérieures sous verrou partagé, sans jointure (MariaDB)", async () => {
+    const { sqls } = setup();
+
+    await cancelTournamentForfeit(7, 102);
+
+    const guard = sqls.find((sql) => /COUNT\(\*\) AS c FROM bg_matches/.test(sql)) ?? "";
+    expect(guard).toMatch(/LOCK IN SHARE MODE$/);
+    expect(guard).not.toMatch(/JOIN|FOR SHARE/);
+  });
+
   it("ne rejoue pas un refus métier", async () => {
     const { connection } = setup({ standing: { status: "ACTIVE" } });
 
