@@ -4,6 +4,7 @@ jest.mock("@/lib/server/database");
 
 import { getLandingTicker } from "@/lib/server/landing-service";
 import { clearCache } from "@/lib/server/cache";
+import { tickerItemText } from "@/lib/shared/ticker-items";
 import { type SqlQuery, fakePool } from "../../helpers/sql-double";
 
 /**
@@ -20,7 +21,7 @@ function rowsExecute() {
   return jest
     .fn<SqlQuery>()
     .mockResolvedValueOnce([[
-      { updated_at: new Date("2026-10-05T10:00:00Z"), tournament_name: "Alpha Cup", team1_name: "Alpha", team2_name: null, team1_score: 2, team2_score: 1, team1_id: 1, team2_id: 7 },
+      { updated_at: new Date("2026-10-05T10:00:00Z"), tournament_name: "Alpha Cup", team1_name: "Alpha", team2_name: null, team1_score: 2, team2_score: 1, team1_id: 1, team2_id: 7, winner_team_id: 1, forfeit_team_id: null, double_forfeit: 0 },
     ]])
     .mockResolvedValueOnce([[
       { start_at: new Date("2026-10-10T10:00:00Z"), registration_open_at: new Date("2026-10-04T10:00:00Z"), name: "Beta Open", registered_teams: 3, max_teams: 8 },
@@ -40,7 +41,7 @@ beforeEach(() => {
 describe("getLandingTicker", () => {
   it("français : les phrases de toujours, actualités comprises", async () => {
     await mockRows(rowsExecute());
-    expect((await getLandingTicker()).items).toEqual([
+    expect((await getLandingTicker()).items.map(tickerItemText)).toEqual([
       "NEWS · Nouvelle saison annoncée",
       "RÉSULTAT · Alpha Cup · Alpha 2 — Équipe #7 1",
       "INSCRIPTIONS · Beta Open · 3/8 équipes",
@@ -55,7 +56,7 @@ describe("getLandingTicker", () => {
     await getLandingTicker("fr");
     // Le cache sert les deux langues : aucune requête de plus.
     const calls = execute.mock.calls.length;
-    expect((await getLandingTicker("en")).items).toEqual([
+    expect((await getLandingTicker("en")).items.map(tickerItemText)).toEqual([
       "RESULT · Alpha Cup · Alpha 2 — Team #7 1",
       "REGISTRATION OPEN · Beta Open · 3/8 teams",
       "WINNER · Gamma League · Team #9",
@@ -66,7 +67,7 @@ describe("getLandingTicker", () => {
 
   it("sans actualité ni base : le bandeau d'attente, dans la langue de la page", async () => {
     await mockRows(jest.fn<SqlQuery>().mockRejectedValue(new Error("DB_DOWN")));
-    expect((await getLandingTicker("en")).items).toEqual([
+    expect((await getLandingTicker("en")).items.map(tickerItemText)).toEqual([
       "RESULT · Waiting for new matches",
       "REGISTRATION OPEN · More brackets coming soon",
       "COMMUNITY · Join the BlueGenji Discord",

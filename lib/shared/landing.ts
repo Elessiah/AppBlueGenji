@@ -5,6 +5,7 @@ import type { MatchLaunchPhase } from "@/lib/shared/match-launch";
 import { formatBoardStartAt } from "@/lib/shared/landing-board";
 import type { Locale } from "@/lib/shared/locales";
 import { MATCH_SECTION_LABELS } from "@/lib/shared/match-sections";
+import type { TickerItem } from "@/lib/shared/ticker-items";
 import type { TournamentBuckets, TournamentCard, TournamentGame } from "@/lib/shared/types";
 
 export type LandingStats = {
@@ -305,7 +306,8 @@ export type LandingCalendarEvent = {
 };
 
 export type LandingTickerPayload = {
-  items: string[];
+  /** Phrases, résultats et champions, rédigés dans la langue de la page (`TICKER_RESULTS.md`). */
+  items: TickerItem[];
 };
 
 /*

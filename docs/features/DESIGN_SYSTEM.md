@@ -104,7 +104,7 @@ Primitives dans `components/cyber/` :
 - **CyberButton** — `variant="primary"|"ghost"`, support `asChild` (Radix Slot)
 - **CyberCard** — `lift`, `ticks`, `as="div|section|article"`, style personnalisé, `tone` (posé en `data-tone`, lu par la feuille de la page)
 - **Pill** — badges inline, variantes sémantiques (§ Pastilles et étiquettes) ; tables de variante par sens : `REPORT_STATUS_PILL`, `RULE_STATUS_PILL`, `RECRUITMENT_DOMAIN_PILL`
-- **CyberButton, TeamSigil, CountdownStrip, Ticker, MiniBracket** — composants spécialisés
+- **CyberButton, TeamSigil, CountdownStrip, Ticker, MiniBracket** — composants spécialisés ; le Ticker habille un résultat par camp (vainqueur `--teal-400`, perdant `--result-loss-ink`, jamais d'ambre) → `TICKER_RESULTS.md`
 - **ScrollArea** — `orientation="x"|"y"|"both"`, `subtle`, `fade`, `ariaLabel`
 - **PublicHeader, PublicFooter** — layouts publics de landing
 

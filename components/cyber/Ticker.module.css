@@ -53,6 +53,35 @@
   color: var(--ink-mute);
 }
 
+/* Résultat (TICKER_RESULTS.md) : chaque camp a sa teinte, et un repère qui
+   ne tient pas à la couleur (« ▲ » / « ▼ », graisse) ; l'issue est dite en
+   texte masqué. Forfait et nul gardent l'encre du bandeau. Aucun ambre :
+   il ne dit qu'un avertissement. */
+.side {
+  color: var(--ink);
+}
+
+.winner {
+  color: var(--teal-400);
+  font-weight: 700;
+}
+
+.loser {
+  color: var(--result-loss-ink);
+}
+
+.mark {
+  margin-right: 4px;
+  font-style: normal;
+}
+
+/* Le score ressort : plus grand que le texte du bandeau (11 px), en gras. */
+.score {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
 .sep {
   margin-left: 48px;
   color: var(--blue-500);
