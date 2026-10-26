@@ -54,15 +54,18 @@ verrouille donc le tournoi avant les manches que le rejeu peut poser, quand un
 report ou « Enregistrer » prend la manche avant le tournoi : comme l'abandon,
 elle passe par `retryOnDeadlock`, qui rejoue la transaction entière après un
 interblocage (publication une seule fois, après le commit réussi). Le contrôle
-des manches postérieures relit leurs matchs **verrouillés, par clé primaire et
-sans attendre** (`FOR UPDATE NOWAIT`, table seule) : un report en cours écrit
+des manches postérieures lit d'abord leurs matchs sans verrou (une saisie déjà
+commitée suffit à refuser), puis relit les autres **verrouillés, par clé
+primaire et sans attendre** (`FOR UPDATE NOWAIT`, table seule) : un report en cours écrit
 son score sous le verrou du match avant d'attendre le tournoi, et une lecture
 d'instantané l'aurait manqué — l'équipe rentrait et le rejeu suisse réappariait
 une manche déjà saisie. Attendre ce report, c'était s'interbloquer avec lui :
 une ligne occupée défait donc l'annulation, qui rend la main au report et se
-rejoue (`retryOnDeadlock`), puis refuse en `FORFEIT_ROUND_PASSED`. Le verrou ne
-couvre que les manches postérieures — jamais toute la phase ni ses intervalles,
-qui bloqueraient les « Prêt » et reports de la manche en cours.
+rejoue (`retryOnDeadlock`), puis refuse en `FORFEIT_ROUND_PASSED` ; trois
+tentatives occupées rendent le refus « réessaie » (`409`) des interblocages. Le
+verrou ne couvre que les manches postérieures, pas toute la phase ni ses
+intervalles ; il dure jusqu'au commit, si bien qu'un « Prêt » de la manche
+suivante attend la fin du rejeu.
 
 ## Permission : administrateur strict
 
