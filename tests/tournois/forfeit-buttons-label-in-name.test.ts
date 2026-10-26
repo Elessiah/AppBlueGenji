@@ -1,4 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import frActions from "@/messages/fr/tournamentActions.json";
 import enActions from "@/messages/en/tournamentActions.json";
 
@@ -39,5 +41,25 @@ describe("confirmation de l'annulation d'un abandon", () => {
         expect(body).toMatch(locale === "fr" ? /sauf si/ : /unless/);
       }
     });
+
+    it(`${locale} : l'infobulle du bouton ne promet pas non plus le retour en lice`, () => {
+      expect(actions.forfeitCancel.buttonTitle).not.toMatch(/revient en lice|back in contention/);
+      expect(withName(actions.forfeitCancel.buttonTitle)).toContain(actions.forfeitCancel.button);
+    });
   }
+});
+
+describe("estompage des lignes sorties du classement", () => {
+  // À 0,55, le texte discret (`--ink-quiet`) d'une ligne sortie tombait vers
+  // 3:1 sur le fond du tableau ; 0,8 le garde au-dessus de 4,5:1, comme la BG
+  // Survie (`ROW_OPACITY`).
+  const survival = readFileSync(
+    join(__dirname, "..", "..", "app/(secured)/tournois/[id]/_components/SurvivalView.tsx"),
+    "utf8",
+  );
+
+  it("estompe une ligne éliminée de la Survie à 0,8, jamais à 0,55", () => {
+    expect(survival).toContain('opacity: team.status === "ELIMINATED" ? 0.8 : 1,');
+    expect(survival).not.toContain("0.55");
+  });
 });
