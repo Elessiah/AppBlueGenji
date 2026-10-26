@@ -13,9 +13,11 @@ import { clearDatabase } from "./cleanup";
 import { SEED_LOCK_TIMEOUT_SECONDS, withSeedLock } from "./lock";
 import { applyMatchLaunchCases } from "./match-states";
 import {
+  FICTIONAL_ABOUT_STATS,
   FICTIONAL_BUREAU,
   FICTIONAL_RECRUITMENT_ADS,
   FICTIONAL_SPONSORS,
+  createAboutStats,
   createBureau,
   createRecruitmentAds,
   createSponsors,
@@ -109,6 +111,9 @@ async function seed(db: Pool): Promise<void> {
   await createBureau(db);
   console.log();
 
+  await createAboutStats(db);
+  console.log();
+
   await createRecruitmentAds(db);
   console.log();
 
@@ -131,7 +136,7 @@ async function seed(db: Pool): Promise<void> {
   console.log(`\n  Récap :`);
   console.log(`  · ${userIds.length} joueurs + ${specialUserIds.size} comptes de test (Test_*)`);
   console.log(`  · ${teamIds.length} équipes (Test - *), dont solo / staff / roster complet`);
-  console.log(`  · ${FICTIONAL_SPONSORS.length} sponsors (dont 1 inactif) · ${FICTIONAL_BUREAU.length} membres du bureau`);
+  console.log(`  · ${FICTIONAL_SPONSORS.length} sponsors (dont 1 inactif) · ${FICTIONAL_BUREAU.length} membres du bureau · ${FICTIONAL_ABOUT_STATS.length} chiffres de l'association`);
   console.log(`  · ${FICTIONAL_RECRUITMENT_ADS.length} annonces de recrutement (longues descriptions, trois statuts, plusieurs prioritaires, brouillon, une sans anglais)`);
   console.log(`  · ${TOURNAMENTS.length} tournois :`);
   console.log(`    - états : ${byState("UPCOMING")} à venir · ${byState("REGISTRATION")} inscriptions · ${byState("RUNNING")} en cours · ${byState("FINISHED")} terminés`);

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { BilingualField, EnglishMissingMark, withEnglishMissing } from "@/components/ui/bilingual-field";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { FieldErrorText } from "@/components/ui/field-error-text";
+import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { useToast } from "@/components/ui/toast";
 import {
   type AboutStat,
@@ -30,14 +31,23 @@ interface AboutStatsProps {
 
 interface FormState {
   value: string;
+  valueEn: string;
   label: string;
   labelEn: string;
 }
 
-const EMPTY_FORM: FormState = { value: "", label: "", labelEn: "" };
+const EMPTY_FORM: FormState = { value: "", valueEn: "", label: "", labelEn: "" };
 
 /** `id` des champs du formulaire, cibles de `useFieldErrors`. */
-const STAT_FIELD_IDS = { value: "about-stat-value", label: "about-stat-label", labelEn: "about-stat-label-en" } as const;
+const STAT_FIELD_IDS = {
+  value: "about-stat-value",
+  valueEn: "about-stat-value-en",
+  label: "about-stat-label",
+  labelEn: "about-stat-label-en",
+} as const;
+
+/** Explication du champ « Valeur en anglais », citée par son `aria-describedby`. */
+const VALUE_EN_HINT_ID = "about-stat-value-en-help";
 
 export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: Readonly<AboutStatsProps>) {
   // La gestion reste en français (D4) : sous `/en`, ses contrôles, sa fenêtre
@@ -69,7 +79,7 @@ export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: R
   function openEdit(stat: AboutStat) {
     fieldErrors.clear();
     setEditing(stat);
-    setForm({ value: stat.value, label: stat.label, labelEn: stat.labelEn ?? "" });
+    setForm({ value: stat.value, valueEn: stat.valueEn ?? "", label: stat.label, labelEn: stat.labelEn ?? "" });
     setOpen(true);
   }
 
@@ -89,7 +99,12 @@ export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: R
   }
 
   async function submit() {
-    const payload = { value: form.value.trim(), label: form.label.trim(), labelEn: form.labelEn.trim() };
+    const payload = {
+      value: form.value.trim(),
+      valueEn: form.valueEn.trim(),
+      label: form.label.trim(),
+      labelEn: form.labelEn.trim(),
+    };
     // Même validation que le serveur, avant l'envoi : l'anglais (obligatoire,
     // D9) est désigné sans aller-retour.
     const check = validateAboutStatInput(payload);
@@ -194,9 +209,9 @@ export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: R
   return (
     <>
       <div className={styles.stats}>
-        {shown.map(({ stat: s, label, index }) => (
+        {shown.map(({ stat: s, value, label, index }) => (
           <div key={s.id} className={styles.stat}>
-            <div className="num" style={{ fontSize: 26 }}>{s.value}</div>
+            <div className="num" style={{ fontSize: 26 }}>{value}</div>
             <div className="mono">{label}</div>
             {canManage(s) && (
               <div className={styles.statActions} lang={staffLang}>
@@ -306,6 +321,35 @@ export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: R
               inputClassName={styles.modalInput}
               labelClassName={styles.modalLabel}
             />
+          </div>
+
+          <div className={styles.modalField}>
+            <InfoHintRow>
+              <label className={styles.modalLabel} htmlFor={STAT_FIELD_IDS.valueEn}>
+                Valeur en anglais (facultatif)
+              </label>
+              <InfoHint id={VALUE_EN_HINT_ID} subject="Valeur en anglais">
+                <p>
+                  La valeur affichée sur la page anglaise, écrite à l'anglaise (« €4,200 », « Free »). Laissée
+                  vide, la valeur française y est reprise.
+                </p>
+              </InfoHint>
+            </InfoHintRow>
+            <input
+              id={STAT_FIELD_IDS.valueEn}
+              className={styles.modalInput}
+              value={form.valueEn}
+              maxLength={ABOUT_STAT_VALUE_MAX}
+              placeholder="€4,200"
+              lang="en"
+              enterKeyHint="next"
+              {...fieldErrors.aria("valueEn", VALUE_EN_HINT_ID)}
+              onChange={(e) => {
+                fieldErrors.clear("valueEn");
+                setForm((f) => ({ ...f, valueEn: e.target.value }));
+              }}
+            />
+            <FieldErrorText fieldId={STAT_FIELD_IDS.valueEn} message={fieldErrors.message("valueEn")} />
           </div>
 
           <div className={styles.modalActions}>

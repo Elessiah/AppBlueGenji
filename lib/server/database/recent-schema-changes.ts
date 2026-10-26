@@ -273,6 +273,10 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // compte, et la proposition due sur la session ouverte par Discord ou Blizzard.
     `ALTER TABLE bg_users ADD COLUMN discord_certify_prompt_dismissed_at DATETIME NULL`,
     `ALTER TABLE bg_user_sessions ADD COLUMN certify_prompt_due TINYINT(1) NOT NULL DEFAULT 0`,
+    // Chiffres clés « L'association » — valeur anglaise facultative
+    // (`docs/features/ABOUT_STATS_MANAGEMENT.md`) : `NULL` = la valeur
+    // française est reprise sous `/en`, donc rien à rattraper.
+    `ALTER TABLE bg_about_stats ADD COLUMN value_en VARCHAR(40) NULL AFTER value`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

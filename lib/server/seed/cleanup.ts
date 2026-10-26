@@ -39,6 +39,7 @@ const STEPS: { label: string; sql: string }[] = [
   { label: "sponsors", sql: "DELETE FROM bg_sponsors WHERE name LIKE 'Test -%'" },
   { label: "annonces de recrutement", sql: "DELETE FROM bg_recruitment_ads WHERE title LIKE 'Test -%'" },
   { label: "membres du bureau", sql: "DELETE FROM bg_bureau_members" },
+  { label: "chiffres de l'association", sql: "DELETE FROM bg_about_stats WHERE label LIKE 'Test -%'" },
   // Équipes héritées préfixées « Team_ » (underscore échappé pour LIKE).
   { label: "matchs (équipes Team_)", sql: String.raw`DELETE FROM bg_matches WHERE team1_id IN (SELECT id FROM bg_teams WHERE name LIKE 'Team\_%') OR team2_id IN (SELECT id FROM bg_teams WHERE name LIKE 'Team\_%')` },
   { label: "inscriptions (équipes Team_)", sql: String.raw`DELETE FROM bg_tournament_registrations WHERE team_id IN (SELECT id FROM bg_teams WHERE name LIKE 'Team\_%')` },

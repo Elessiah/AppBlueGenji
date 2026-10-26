@@ -228,6 +228,36 @@ export async function createRecruitmentAds(db: Pool): Promise<void> {
   );
 }
 
+/**
+ * Chiffres « L'association » (`ABOUT_STATS_MANAGEMENT.md`) : chaque cas de la
+ * page anglaise — valeur anglaise saisie (« €4,200 », « Free »), valeur
+ * française reprise faute d'anglais (`value_en` NULL), carte masquée sous
+ * `/en` faute de titre anglais.
+ */
+export const FICTIONAL_ABOUT_STATS = [
+  { value: "100%", value_en: null, label: "Test - Bénévole", label_en: "Test - Volunteer-run" },
+  { value: "€4 200", value_en: "€4,200", label: "Test - Prizepool 2025", label_en: "Test - 2025 prize pool" },
+  { value: "0 €", value_en: "Free", label: "Test - Frais d'inscription", label_en: "Test - Entry fee" },
+  { value: "12", value_en: null, label: "Test - Arbitres", label_en: null },
+] as const;
+
+export async function createAboutStats(db: Pool): Promise<void> {
+  console.log("📊 Création des chiffres de l'association...");
+  for (let i = 0; i < FICTIONAL_ABOUT_STATS.length; i++) {
+    const s = FICTIONAL_ABOUT_STATS[i];
+    try {
+      await db.execute(
+        `INSERT INTO bg_about_stats (value, value_en, label, label_en, display_order)
+         VALUES (?, ?, ?, ?, ?)`,
+        [s.value, s.value_en, s.label, s.label_en, (i + 1) * 10]
+      );
+    } catch (error) {
+      console.error(`  ✗ ${s.label}:`, (error as Error).message);
+    }
+  }
+  console.log(`  ✓ ${FICTIONAL_ABOUT_STATS.length} chiffres créés (2 valeurs anglaises, 1 sans titre anglais)`);
+}
+
 export async function createBureau(db: Pool): Promise<void> {
   console.log("🏛️  Création des membres du bureau...");
   for (let i = 0; i < FICTIONAL_BUREAU.length; i++) {

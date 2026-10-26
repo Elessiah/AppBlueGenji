@@ -9,6 +9,7 @@ export const { PUT, DELETE } = itemRoutes({
   update: async (id, body) => ({
     stat: await updateAboutStat(id, {
       value: typeof body.value === "string" ? body.value : "",
+      valueEn: typeof body.valueEn === "string" ? body.valueEn : null,
       label: typeof body.label === "string" ? body.label : "",
       labelEn: typeof body.labelEn === "string" ? body.labelEn : null,
     }),

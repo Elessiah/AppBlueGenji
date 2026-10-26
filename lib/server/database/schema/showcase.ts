@@ -44,6 +44,7 @@ const SHOWCASE_TABLES: readonly string[] = [
       CREATE TABLE IF NOT EXISTS bg_about_stats (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       value VARCHAR(40) NOT NULL,
+      value_en VARCHAR(40) NULL,
       label VARCHAR(60) NOT NULL,
       label_en VARCHAR(60) NULL,
       display_order INT NOT NULL DEFAULT 100,
