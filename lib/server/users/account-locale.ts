@@ -60,15 +60,6 @@ export function accountLocaleFromRow(value: unknown): Locale {
 }
 
 /**
- * Langue d'un compte pour un message privé Discord (`BOT_DM_LANGUAGE.md`) :
- * `null` quand le compte n'existe pas (ou plus) ou que la lecture échoue — le
- * message part alors bilingue, jamais ne tombe.
- */
-export async function accountLocaleOf(userId: number): Promise<Locale | null> {
-  return readDmLocale(`SELECT locale FROM bg_users WHERE id = ? AND is_deleted = 0 LIMIT 1`, userId);
-}
-
-/**
  * Langue du compte du site rattaché à ce compte Discord, pour le code de
  * connexion : `null` sans compte rattaché (première connexion) — message
  * bilingue. Seul le bot la reçoit, pour rédiger le message : la réponse de la
@@ -85,7 +76,16 @@ async function readDmLocale(sql: string, key: number | string): Promise<Locale |
     const row = (rows as { locale?: unknown }[])[0];
     return row ? accountLocaleFromRow(row.locale) : null;
   } catch (error) {
-    console.error("[account-locale] langue du compte illisible, message privé bilingue", error);
+    // Le code seul, jamais l'erreur entière : celle de mysql2 porte la requête
+    // avec ses valeurs (`sql`), donc l'identifiant Discord de la personne visée.
+    console.error("[account-locale] langue du compte illisible, message privé bilingue", dbErrorCode(error));
     return null;
   }
+}
+
+/** Code d'une erreur de base (`ER_BAD_FIELD_ERROR`…), sans son texte ni sa requête. */
+function dbErrorCode(error: unknown): string {
+  const code = (error as { code?: unknown } | null)?.code;
+  if (typeof code === "string") return code;
+  return error instanceof Error ? error.name : "UNKNOWN";
 }
