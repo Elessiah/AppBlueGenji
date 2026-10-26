@@ -54,10 +54,15 @@ verrouille donc le tournoi avant les manches que le rejeu peut poser, quand un
 report ou « Enregistrer » prend la manche avant le tournoi : comme l'abandon,
 elle passe par `retryOnDeadlock`, qui rejoue la transaction entière après un
 interblocage (publication une seule fois, après le commit réussi). Le contrôle
-des manches postérieures est une lecture verrouillante (`LOCK IN SHARE MODE`,
-table seule) : un report en cours écrit son score sous le verrou du match avant
-d'attendre le tournoi, et une lecture d'instantané l'aurait manqué — l'équipe
-rentrait et le rejeu suisse réappariait une manche déjà saisie.
+des manches postérieures relit leurs matchs **verrouillés, par clé primaire et
+sans attendre** (`FOR UPDATE NOWAIT`, table seule) : un report en cours écrit
+son score sous le verrou du match avant d'attendre le tournoi, et une lecture
+d'instantané l'aurait manqué — l'équipe rentrait et le rejeu suisse réappariait
+une manche déjà saisie. Attendre ce report, c'était s'interbloquer avec lui :
+une ligne occupée défait donc l'annulation, qui rend la main au report et se
+rejoue (`retryOnDeadlock`), puis refuse en `FORFEIT_ROUND_PASSED`. Le verrou ne
+couvre que les manches postérieures — jamais toute la phase ni ses intervalles,
+qui bloqueraient les « Prêt » et reports de la manche en cours.
 
 ## Permission : administrateur strict
 
@@ -106,7 +111,8 @@ tournoi individuel), auteur nommé dans pm2 seulement.
 - `tests/lib/server/forfeit-cancellation-service.test.ts` — verrou en premier,
   fenêtre, statut remis à `ACTIVE`, rejeu du bon moteur, multi-phases,
   rejeu après interblocage (un refus métier ne se rejoue pas), contrôle des
-  manches postérieures sous verrou partagé.
+  manches postérieures verrouillées par clé primaire sans attendre (ligne
+  occupée → rejeu puis refus).
 - `tests/app/api/admin/forfeit-cancellation.test.ts` — administrateur seul,
   codes d'erreur, journal anonyme.
 - `tests/tournois/forfeit-eligibility.test.ts` — `canCancelForfeits`.
