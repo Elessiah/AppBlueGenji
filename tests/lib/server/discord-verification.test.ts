@@ -7,7 +7,6 @@ jest.mock("@/lib/server/bot-integration");
 // remplacer par un bouchon ferait passer ce test sans rien prouver de la règle.
 jest.mock("@/lib/server/users/account-locale", () => ({
   ...jest.requireActual<typeof import("@/lib/server/users/account-locale")>("@/lib/server/users/account-locale"),
-  accountLocaleOf: jest.fn(async () => "en"),
   accountLocaleForDiscordId: jest.fn(async () => null),
 }));
 jest.mock("@/lib/server/users/discord-challenges", () => ({
@@ -24,6 +23,7 @@ import {
 } from "@/lib/server/discord-verification";
 import { getDatabase } from "@/lib/server/database";
 import { resolveDiscordUser, sendDiscordLoginCode } from "@/lib/server/bot-integration";
+import { accountLocaleForDiscordId } from "@/lib/server/users/account-locale";
 import {
   consumeDiscordLoginChallenge,
   createDiscordLoginChallenge,
@@ -267,8 +267,10 @@ describe("startDiscordVerification — le compte Google", () => {
     });
     expect(result).not.toHaveProperty("discordId");
     expect(createChallengeMock).toHaveBeenCalledWith("900000000000000002", "keryan");
-    // Dans la langue du compte qui demande la certification.
-    expect(sendMock).toHaveBeenCalledWith("900000000000000002", "123456", "en");
+    // Tag pas encore prouvé : jamais la langue du demandeur (compte 7, "en"),
+    // celle du compte qui porte déjà ce Discord — ici aucun, donc bilingue.
+    expect(jest.mocked(accountLocaleForDiscordId)).toHaveBeenCalledWith("900000000000000002");
+    expect(sendMock).toHaveBeenCalledWith("900000000000000002", "123456", null);
     // Rien n'est certifié avant le code.
     expect(db.writes).toHaveLength(0);
   });

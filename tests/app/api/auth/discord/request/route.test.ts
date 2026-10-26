@@ -13,7 +13,6 @@ jest.mock("@/lib/server/bot-integration", () => ({
 
 jest.mock("@/lib/server/users/account-locale", () => ({
   ...jest.requireActual<typeof import("@/lib/server/users/account-locale")>("@/lib/server/users/account-locale"),
-  accountLocaleOf: jest.fn(async () => "en"),
   accountLocaleForDiscordId: jest.fn(async () => null),
 }));
 
