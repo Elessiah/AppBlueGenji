@@ -112,11 +112,13 @@ const LOCK_BUSY_CODES = new Set(["ER_LOCK_WAIT_TIMEOUT", "ER_LOCK_NOWAIT"]);
  * Un report écrit son score sous le verrou du match **avant** d'attendre celui
  * du tournoi, que l'annulation tient déjà : une lecture d'instantané manquait ce
  * score en cours, l'équipe rentrait et le rejeu suisse réappariait une manche
- * saisie. Les lignes sont donc relues **verrouillées**, par clé primaire
- * seulement (les manches postérieures, jamais toute la phase ni ses
+ * saisie. Les lignes encore vierges sont donc relues **verrouillées**, par clé
+ * primaire seulement (les manches postérieures, pas toute la phase ni ses
  * intervalles), et **sans attendre** (`NOWAIT`) : attendre ce report, c'était
  * s'interbloquer avec lui. Une ligne occupée défait l'annulation, qui rend le
  * tournoi au report puis se rejoue (`retryOnDeadlock`) et voit alors le score.
+ * Ces lignes restent verrouillées jusqu'au commit : un « Prêt » de la manche
+ * suivante attend la fin du rejeu (geste d'administration rare et court).
  */
 async function laterRoundHasInput(
   connection: PoolConnection,
@@ -125,12 +127,16 @@ async function laterRoundHasInput(
   round: number,
 ): Promise<boolean> {
   // Les matchs ne naissent que sous le verrou du tournoi, déjà pris : la
-  // lecture d'instantané les voit tous.
-  const [later] = await connection.execute<(RowDataPacket & { id: number })[]>(
-    `SELECT id FROM bg_matches WHERE tournament_id = ? AND phase_id = ? AND round_number > ?`,
+  // lecture d'instantané les voit tous. Une saisie déjà commitée y suffit à
+  // refuser, sans rien verrouiller — sinon un rejeu après une ligne occupée se
+  // heurtait au report suivant au lieu de lire celui qui venait d'aboutir.
+  const [later] = await connection.execute<(RowDataPacket & { id: number; has_input: number })[]>(
+    `SELECT id, ${HAS_SCORE_INPUT_SQL} AS has_input FROM bg_matches
+     WHERE tournament_id = ? AND phase_id = ? AND round_number > ?`,
     [tournamentId, phaseId, round],
   );
   if (later.length === 0) return false;
+  if (later.some((row) => Number(row.has_input) === 1)) return true;
   try {
     const [rows] = await connection.execute<(RowDataPacket & { id: number })[]>(
       `SELECT id FROM bg_matches

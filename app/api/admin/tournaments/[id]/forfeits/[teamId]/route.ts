@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
+import { isDeadlockMessage } from "@/lib/server/mysql-errors";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { cancelTournamentForfeit } from "@/lib/server/tournaments/forfeit-cancellation";
 import { formatForfeitCancelledLog } from "@/lib/shared/bot-logs";
@@ -51,6 +52,9 @@ export async function DELETE(
     const message = (error as Error).message;
     const status = CANCEL_ERROR_STATUS.get(message);
     if (status !== undefined) return fail(message, status);
+    // Manche postérieure occupée à chaque rejeu : `fail()` rend le refus
+    // « réessaie » (409) d'un interblocage, pas une panne.
+    if (isDeadlockMessage(message)) return fail(message, 409);
 
     // Le texte d'une erreur mysql2 est anglais et parle du moteur : il reste au
     // journal du serveur.
