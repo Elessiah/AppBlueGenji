@@ -65,7 +65,9 @@ export function EnduranceCard({
               loss: String(endurance.lossDelta),
               forfeit: String(endurance.forfeitMaps),
             })}
-            {endurance.playoffsStarted && t("endurance.playoffsAt", { size: String(endurance.playoffSize) })}
+            {/* Le séparateur ne suit le barème que s'il annonce quelque chose :
+                hors play-offs, la ligne finissait sur un « · » orphelin. */}
+            {endurance.playoffsStarted && ` · ${t("endurance.playoffsAt", { size: String(endurance.playoffSize) })}`}
           </p>
         </div>
         {!endurance.playoffsStarted && (

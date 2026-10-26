@@ -46,7 +46,7 @@
     "cutMark": "⚔ Coupe"
   },
   "endurance": {
-    "summary": "ENDURANCE {start} PTS · +{win} PAR MAP GAGNÉE · −{loss} PAR MAP PERDUE · FORFAIT COMPTÉ {forfeit}-0 · ",
+    "summary": "ENDURANCE {start} PTS · +{win} PAR MAP GAGNÉE · −{loss} PAR MAP PERDUE · FORFAIT COMPTÉ {forfeit}-0",
     "playoffsAt": "PLAY-OFFS À {size}",
     "endurance": "Endurance",
     "recordDraws": "V / N / D",
