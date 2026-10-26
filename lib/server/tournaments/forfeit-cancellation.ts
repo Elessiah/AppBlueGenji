@@ -22,6 +22,7 @@ import { discardBotLogs, flushBotLogs } from "./bot-logs";
 import { retryOnDeadlock } from "./deadlock-retry";
 import { publishUpdatedEvent } from "./notifications";
 import { lockTournamentRow } from "./registration";
+import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
 
 /** Ce que l'annulation a produit, pour la ligne de journal et le message rendu. */
 export type CancelledForfeit = {
@@ -99,6 +100,53 @@ async function replayStandings(
   } else {
     const { reconcileEndurance } = await import("./bg-survie/reconcile");
     await reconcileEndurance(tournamentId, connection);
+  }
+}
+
+/** Codes d'un verrou refusé sur-le-champ (`NOWAIT`) : MariaDB, puis MySQL 8. */
+const LOCK_BUSY_CODES = new Set(["ER_LOCK_WAIT_TIMEOUT", "ER_LOCK_NOWAIT"]);
+
+/**
+ * Une manche postérieure à `round` porte-t-elle une saisie ?
+ *
+ * Un report écrit son score sous le verrou du match **avant** d'attendre celui
+ * du tournoi, que l'annulation tient déjà : une lecture d'instantané manquait ce
+ * score en cours, l'équipe rentrait et le rejeu suisse réappariait une manche
+ * saisie. Les lignes sont donc relues **verrouillées**, par clé primaire
+ * seulement (les manches postérieures, jamais toute la phase ni ses
+ * intervalles), et **sans attendre** (`NOWAIT`) : attendre ce report, c'était
+ * s'interbloquer avec lui. Une ligne occupée défait l'annulation, qui rend le
+ * tournoi au report puis se rejoue (`retryOnDeadlock`) et voit alors le score.
+ */
+async function laterRoundHasInput(
+  connection: PoolConnection,
+  tournamentId: number,
+  phaseId: number,
+  round: number,
+): Promise<boolean> {
+  // Les matchs ne naissent que sous le verrou du tournoi, déjà pris : la
+  // lecture d'instantané les voit tous.
+  const [later] = await connection.execute<(RowDataPacket & { id: number })[]>(
+    `SELECT id FROM bg_matches WHERE tournament_id = ? AND phase_id = ? AND round_number > ?`,
+    [tournamentId, phaseId, round],
+  );
+  if (later.length === 0) return false;
+  try {
+    const [rows] = await connection.execute<(RowDataPacket & { id: number })[]>(
+      `SELECT id FROM bg_matches
+       WHERE id IN (${sqlPlaceholders(later.length)}) AND ${HAS_SCORE_INPUT_SQL}
+       FOR UPDATE NOWAIT`,
+      later.map((row) => Number(row.id)),
+    );
+    return rows.length > 0;
+  } catch (error) {
+    const code = (error as { code?: unknown } | null)?.code;
+    if (typeof code !== "string" || !LOCK_BUSY_CODES.has(code)) throw error;
+    // Même remède qu'un interblocage : tout défaire et rejouer.
+    throw Object.assign(new Error("Deadlock found when trying to get lock (later round busy)"), {
+      code: "ER_LOCK_DEADLOCK",
+      cause: error,
+    });
   }
 }
 
@@ -182,20 +230,9 @@ async function cancelTournamentForfeitOnce(
     // rentrerait sans que les manches manquées comptent contre elle — capital
     // intact en BG Survie, défaites en moins en Survie. Une manche posée mais
     // vierge ne bloque pas : l'équipe rejoint l'appariement suivant.
-    //
-    // Lecture **verrouillante** (table seule, MariaDB) : un report écrit son
-    // score sous le verrou du match **avant** d'attendre celui du tournoi.
-    // Une lecture d'instantané ne voyait pas ce score en cours ; l'annulation
-    // passait, puis le rejeu suisse réappariait la manche saisie. Verrouillée,
-    // elle attend le report (ou l'interblocage se rejoue) et refuse ensuite.
-    const [laterRows] = await connection.execute<(RowDataPacket & { c: number })[]>(
-      `SELECT COUNT(*) AS c FROM bg_matches
-       WHERE tournament_id = ? AND phase_id = ? AND round_number > ?
-         AND ${HAS_SCORE_INPUT_SQL}
-       LOCK IN SHARE MODE`,
-      [tournamentId, phaseId, Number(standing.forfeit_round ?? 1)],
-    );
-    if (Number(laterRows[0]?.c ?? 0) > 0) throw new Error("FORFEIT_ROUND_PASSED");
+    if (await laterRoundHasInput(connection, tournamentId, phaseId, Number(standing.forfeit_round ?? 1))) {
+      throw new Error("FORFEIT_ROUND_PASSED");
+    }
 
     await connection.execute(
       `UPDATE ${table} s SET s.status = 'ACTIVE', s.${roundColumn} = NULL WHERE ${scope}`,
