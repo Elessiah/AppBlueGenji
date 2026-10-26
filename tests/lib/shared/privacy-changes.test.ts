@@ -3,7 +3,6 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { DATA_CONTACT_NAME, DATA_CONTACT_ROLE } from "@/lib/shared/legal-contact";
 import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/account-suspension";
-import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
 import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-reports";
 import {
   BOT_FEED_EVENT_RETENTION_DAYS,
