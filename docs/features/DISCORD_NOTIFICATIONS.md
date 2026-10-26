@@ -802,9 +802,11 @@ programme d'arbitrage) relèvent de l'exécution du service, sans interrupteur.
   joueur connecté arrive sur l'interrupteur, pas en haut du profil. En français,
   comme tout message Discord ; jamais dans un message au staff. Un message au nom de tournoi et aux noms d'équipe les plus longs reste
   sous la limite de 2 000 caractères de Discord (testé).
-- **Conservation du choix** : intérêt légitime **du joueur lui-même** (le garder
-  est ce qui permet d'honorer son opposition), pas une obligation légale —
-  registre T04, `/rgpd#messages-de-match`, politique du bot.
+- **Conservation du choix** : **obligation légale** (art. 6.1.c RGPD — le garder
+  est ce qui permet de continuer d'honorer son opposition, art. 21 et 12), et non
+  l'intérêt légitime « du joueur », qui n'est pas celui du responsable ni d'un
+  tiers (art. 6.1.f, art. 4.10 ; LEGAL-OPTOUT-BASIS, 2026-10-27) — registre T04,
+  `/rgpd#messages-de-match`, tableau des données de `/rgpd`, politique du bot.
 - **Écran** : enregistré au clic, sans bouton. Pendant l'envoi la case reste
   focalisable et utilisable (`aria-busy`, ni `disabled` ni `aria-disabled`) ; un
   clic fait pendant l'envoi s'affiche et part à la suite (`runQueuedSaves`,

@@ -544,13 +544,16 @@ describe("politique du bot — avis « Match retiré », AutoMod et bases (LEGAL
     expect(en).toContain("An announcement blocked or flagged by an AutoMod rule: its alert stays in the moderation alert channel until the moderators delete it, and is deleted on request in the same way.");
   });
 
-  it("dit la base des messages de match et du pseudo solo, sans obligation légale (FR et EN)", () => {
-    expect(fr).toContain("le site garde ce choix dans l'intérêt légitime du joueur, pour l'honorer");
-    // Revue UI/UX #445 : « son » désignait le site ; l'intérêt est celui du joueur (registre T04, /rgpd).
+  it("dit la base des messages de match, de la conservation du choix et du pseudo solo (FR et EN)", () => {
+    // LEGAL-OPTOUT-BASIS : les messages restent d'intérêt légitime, garder le choix relève d'une obligation légale.
+    expect(fr).toContain("intérêt légitime pour les messages privés de match d'un joueur (horaire, rappels, « Match retiré »)");
+    expect(fr).toContain("le site garde ce choix au titre d'une obligation légale (article 6.1.c du RGPD), pour continuer d'honorer cette opposition");
+    expect(fr).not.toContain("intérêt légitime du joueur");
     expect(fr).not.toContain("dans son intérêt légitime");
     expect(fr).toContain("exécution du service auquel le joueur s'inscrit pour son pseudo public dans l'annonce #live d'un tournoi individuel");
-    expect(en).toContain("the website keeps that choice in their legitimate interest, to honour it");
+    expect(en).toContain("legitimate interest for a player's match direct messages (time, reminders, “Match retiré”)");
+    expect(en).toContain("the website keeps that choice under a legal obligation (Article 6(1)(c) GDPR), to keep honouring that objection");
+    expect(en).not.toContain("in their legitimate interest");
     expect(en).toContain("performance of the service the player registers for, for their public username in the #live announcement of a solo tournament");
-    expect(fr).not.toMatch(/obligation légale[^"]*messages privés de match/);
   });
 });

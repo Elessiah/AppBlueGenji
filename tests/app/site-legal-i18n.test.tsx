@@ -341,3 +341,14 @@ describe("routes, métadonnées, hreflang et sitemap", () => {
     }
   });
 });
+
+describe("/rgpd : base légale de la conservation du choix des messages de match (LEGAL-OPTOUT-BASIS)", () => {
+  it("dit l'obligation légale, et plus l'intérêt légitime du joueur, en français et en anglais", async () => {
+    const fr = legalPageText(await render(PrivacyPage, "fr"));
+    expect(fr).toContain("Le site garde ce choix le temps du compte, au titre d'une obligation légale (c'est ce qui lui permet de continuer d'honorer votre opposition)");
+    expect(fr).not.toContain("dans votre intérêt légitime (c'est ce qui lui permet de l'honorer)");
+    const en = legalPageText(await render(PrivacyPage, "en"));
+    expect(en).toContain("The site keeps this choice for the lifetime of the account, under a legal obligation (that is what lets it keep honouring your objection)");
+    expect(en).not.toContain("in your legitimate interest (that is what lets it honour the choice)");
+  });
+});

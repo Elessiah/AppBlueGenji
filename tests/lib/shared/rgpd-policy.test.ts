@@ -440,11 +440,15 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
       { base: "Intérêt légitime", scope: "AutoMod alert for such an announcement when blocked or flagged, kept in the moderators' alert channel until they delete it or on request" },
     ]);
     const choice = DONNEES_PROFIL.find((d) => d.donnee === "Choix des messages privés de match");
-    expect(choice?.base).toBe("Intérêt légitime");
+    // LEGAL-OPTOUT-BASIS : garder le choix relève d'une obligation légale (honorer l'opposition), comme T04.
+    expect(choice?.base).toBe("Obligation légale");
     expect(choice?.finalite).toMatch(/Figure dans l'export de tes données, remis au défaut si le compte est anonymisé/);
-    // Revue légale #445 : la ligne dit à qui profite l'intérêt légitime (le joueur), comme T04.
-    expect(choice?.finalite).toMatch(/Gardé dans ton intérêt légitime : c'est ce qui permet d'honorer ton opposition/);
-    expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Match direct messages choice")?.finalite).toMatch(/Kept in your legitimate interest: that is what allows your objection to be honoured/);
+    expect(choice?.finalite).toMatch(/Gardé au titre d'une obligation légale : c'est ce qui permet de continuer d'honorer ton opposition/);
+    expect(choice?.finalite).not.toMatch(/intérêt légitime/);
+    const choiceEn = DONNEES_PROFIL_EN.find((d) => d.donnee === "Match direct messages choice");
+    expect(choiceEn?.base).toBe("Obligation légale");
+    expect(choiceEn?.finalite).toMatch(/Kept under a legal obligation: that is what allows your objection to keep being honoured/);
+    expect(choiceEn?.finalite).not.toMatch(/legitimate interest/);
     expect(DROITS.find((d) => d.title === "Droit d'opposition")?.text).toMatch(/L'alerte AutoMod d'une telle annonce bloquée ou signalée, gardée pour la modération du serveur Discord \(intérêt légitime\), est supprimée sur demande/);
     expect(DROITS_EN.find((d) => d.title === "Right to object")?.text).toMatch(/The AutoMod alert for such an announcement when blocked or flagged, kept to moderate the Discord server \(legitimate interest\), is deleted on request/);
     expect(AUTOMOD_ALERT_SCOPE).toMatch(/alerte AutoMod d'une telle annonce bloquée ou signalée, gardée dans le salon d'alertes des modérateurs/);

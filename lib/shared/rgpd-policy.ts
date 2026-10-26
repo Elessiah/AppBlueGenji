@@ -236,10 +236,11 @@ export const DONNEES_PROFIL: DonneEntry[] = [
   {
     donnee: "Choix des messages privés de match",
     // `bg_users.match_dm_enabled` : l'opposition aux messages privés de match
-    // (registre T04), exportée et remise au défaut à l'anonymisation.
+    // (registre T04), exportée et remise au défaut à l'anonymisation. Le garder
+    // relève d'une obligation légale (art. 6.1.c : honorer l'opposition, art. 21).
     finalite:
-      "Coché par défaut : le bot t'écrit en privé pour l'horaire, les rappels et le retrait de tes matchs, si ton tag Discord est certifié ; décoché dans Mon profil (ton opposition), il ne le fait plus. Gardé dans ton intérêt légitime : c'est ce qui permet d'honorer ton opposition. Figure dans l'export de tes données, remis au défaut si le compte est anonymisé",
-    base: "Intérêt légitime",
+      "Coché par défaut : le bot t'écrit en privé pour l'horaire, les rappels et le retrait de tes matchs, si ton tag Discord est certifié ; décoché dans Mon profil (ton opposition), il ne le fait plus. Gardé au titre d'une obligation légale : c'est ce qui permet de continuer d'honorer ton opposition. Figure dans l'export de tes données, remis au défaut si le compte est anonymisé",
+    base: "Obligation légale",
     duree: "Durée du compte",
   },
   {

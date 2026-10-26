@@ -149,9 +149,12 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(byRef("T16").retention.join(" ")).toMatch(/relève de l'exécution du service et non de l'intérêt légitime/);
     // Un blocage AutoMod peut porter le texte de l'annonce au salon d'alertes des modérateurs.
     expect(byRef("T16").recipients.join(" ")).toMatch(/si une règle AutoMod de Discord bloque ou signale une annonce #live, son texte \(pseudo public compris en tournoi individuel\) peut parvenir au salon d'alertes de modération du serveur/);
-    // Garder le choix des messages de match : intérêt légitime du joueur, pas une obligation légale.
-    expect(t04.legalBasis).toMatch(/intérêt légitime, celui du joueur lui-même, pour la conservation de son choix des messages privés de match/);
-    expect(t04.legalBasis).not.toMatch(/obligation légale/i);
+    // LEGAL-OPTOUT-BASIS : garder le choix des messages de match relève d'une obligation légale
+    // (honorer l'opposition), plus de « l'intérêt légitime du joueur » (art. 6.1.f vise le responsable ou un tiers).
+    expect(t04.legalBasis).toMatch(/obligation légale \(RGPD, art\. 6\.1\.c\) pour la conservation de son choix des messages privés de match \(le garder est ce qui permet de continuer d'honorer son opposition, art\. 21 et 12\)/);
+    expect(t04.legalBasis).not.toMatch(/celui du joueur|intérêt légitime du joueur/);
+    // Les messages eux-mêmes restent d'intérêt légitime.
+    expect(t04.legalBasis).toMatch(/intérêt légitime \(bon déroulement des tournois\) pour l'annonce des horaires de match/);
     expect(t04.dataSubjects).toContain("Tout titulaire de compte, pour son choix des messages privés de match");
     expect(byRef("T08").recipients.join(" ")).toMatch(/Membres du serveur Discord de l'association, qui lisent l'annonce des matchs diffusés dans le salon #live/);
     expect(byRef("T05").legalBasis).toMatch(/programme d'arbitrage aux arbitres et administrateurs relève de l'exécution du service \(T04\)/);

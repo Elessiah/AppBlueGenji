@@ -191,7 +191,8 @@ describe("register (EN): #live username, match DMs, refereeing schedule basis", 
     expect(sheet("T16").legalBasis).toMatch(/performance of the service requested by the player \(GDPR, art\. 6\.1\.b — terms of use\) for their public username in the #live announcement of a solo tournament/);
     expect(sheet("T16").recipients.join(" ")).toMatch(/if a Discord AutoMod rule blocks or flags a #live announcement, its text \(including the public username in a solo tournament\) may reach the server's moderation alert channel/);
     expect(sheet("T16").recipients).toHaveLength(PROCESSING_ACTIVITIES.find((x) => x.ref === "T16")!.recipients.length);
-    expect(sheet("T04").legalBasis).toMatch(/legitimate interest, the player's own, for keeping their choice about match direct messages/);
+    expect(sheet("T04").legalBasis).toMatch(/legal obligation \(GDPR, art\. 6\.1\.c\) for keeping their choice about match direct messages \(keeping it is what allows their objection to keep being honoured, art\. 21 and 12\)/);
+    expect(sheet("T04").legalBasis).not.toMatch(/the player's own|player's legitimate interest/);
     expect(sheet("T04").legalBasis).toMatch(/for match time notices, the notice that a match leaves their schedule and match reminders sent to players/);
     expect(sheet("T04").dataSubjects).toContain("Any account holder, for their match direct messages choice");
     expect(sheet("T08").recipients).toHaveLength(PROCESSING_ACTIVITIES.find((x) => x.ref === "T08")!.recipients.length);

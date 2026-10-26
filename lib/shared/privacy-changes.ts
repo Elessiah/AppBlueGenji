@@ -1038,6 +1038,23 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Aucune donnée nouvelle n'est collectée : c'est la langue déjà gardée avec ton compte, que tu changes dans « Mon profil ».",
     ],
   },
+  {
+    // LEGAL-OPTOUT-BASIS : la conservation du choix des messages privés de match
+    // passe de « l'intérêt légitime du joueur » (qui n'est pas celui du
+    // responsable ni d'un tiers, art. 6.1.f et 4.10) à l'obligation légale
+    // (art. 6.1.c) d'honorer son opposition (art. 21). Changement de base
+    // légale, à déclarer ; l'entrée du 15 octobre, publiée, reste telle quelle.
+    id: "2026-10-base-du-choix-des-messages-de-match",
+    publishedAt: "2026-10-27",
+    title: "Ton choix des messages privés de match : base légale précisée",
+    links: [MATCH_DM_PARAGRAPH_LINK],
+    summary:
+      "Le site garde ton choix des messages privés Discord de tes matchs au titre d'une obligation légale — continuer d'honorer ton opposition —, et non plus dans ton intérêt légitime.",
+    details: [
+      "Rien ne change dans les faits : la case « Messages privés Discord de mes matchs » de « Mon profil » et ce qu'elle coupe (horaire, rappels, « Match retiré ») restent les mêmes, et le choix est gardé le temps du compte, seulement pour être respecté.",
+      "Les messages eux-mêmes reposent toujours sur l'intérêt légitime de l'association, avec ton droit d'opposition.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

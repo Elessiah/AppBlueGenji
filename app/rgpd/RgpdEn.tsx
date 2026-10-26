@@ -834,8 +834,8 @@ export function RgpdEn({
             <strong>legitimate interest</strong> in the smooth running of tournaments; you can object at any time by
             unticking “Discord direct messages about my matches” in{" "}
             <EnglishLegalLink href="/profil#notifications">My profile</EnglishLegalLink> — your push notifications
-            keep their own settings. The site keeps this choice for the lifetime of the account, in your legitimate
-            interest (that is what lets it honour the choice); it appears in the
+            keep their own settings. The site keeps this choice for the lifetime of the account, under a{" "}
+            <strong>legal obligation</strong> (that is what lets it keep honouring your objection); it appears in the
             export of your data. Referee alerts and the refereeing schedule sent to referees and administrators fall
             under <strong>performance of the service</strong> and are not turned off this way (
             <LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>). When a staff member settles a

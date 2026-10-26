@@ -534,6 +534,16 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "No new data is collected: it's the language already kept with your account, which you change in “My profile”.",
     ],
   },
+  "2026-10-base-du-choix-des-messages-de-match": {
+    linkLabels: ["Read the “Match Discord direct messages” paragraph"],
+    title: "Your match direct messages choice: legal basis clarified",
+    summary:
+      "The site keeps your choice about the Discord direct messages of your matches under a legal obligation — to keep honouring your objection — and no longer in your legitimate interest.",
+    details: [
+      "Nothing changes in practice: the “Discord direct messages about my matches” box in “My profile” and what it turns off (time, reminders, “Match retiré”) stay the same, and the choice is kept for the lifetime of the account, only so that it is respected.",
+      "The messages themselves are still based on the association's legitimate interest, with your right to object.",
+    ],
+  },
 };
 
 /**
