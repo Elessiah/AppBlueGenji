@@ -26,7 +26,8 @@ composant n'en connaît aucun.
 L'issue est lue **côté serveur** sur le résultat enregistré
 (`tickerOutcomes`) : `winner_team_id`, `forfeit_team_id`, `double_forfeit` de
 `bg_matches` — jamais devinée d'après les scores. Double forfait : deux
-`forfeit`. Sans vainqueur enregistré, ou vainqueur étranger au match : deux
+`forfeit`, et **aucun score** (`score: null`, la base n'en garde pas) : le
+bandeau n'affiche pas un « 0 — 0 » de match joué. Sans vainqueur enregistré, ou vainqueur étranger au match : deux
 `none`. Une case vide (exemption, engagé retiré) est `none`, jamais un perdant.
 La requête ne retient que les matchs entre **deux engagés** (`is_bye = FALSE`,
 `team1_id` et `team2_id` non nuls) : une exemption terminée s'affichait
@@ -45,9 +46,11 @@ bandeau ne porte aucun lien (inchangé).
 | --- | --- | --- | --- |
 | Vainqueur | `--teal-400` (néon de réussite) | gras 700, « ▲ » | « (vainqueur) » / « (winner) » |
 | Perdant | `--result-loss-ink` (encre réservée à la défaite, `DESIGN_SYSTEM.md` § Défaite) | « ▼ » | « (perdant) » / « (loser) » |
-| Forfait | encre du bandeau (`--ink`) — un forfait n'est pas une défaite | — | « (forfait) » / « (forfeit) » |
+| Forfait | encre du bandeau (`--ink`) — un forfait n'est pas une défaite | le mot « (forfait) » / « (forfeit) » **affiché** après le nom | — (le mot visible suffit) |
 | Nul | `--ink` pour les deux | — | « (sans vainqueur) » en fin d'entrée |
 
+- Le mot « forfait » se voit : sans teinte ni repère, un forfait se lirait
+  sinon comme une défaite ordinaire.
 - Score : `<b class="score">`, 13 px, graisse 800 (le texte du bandeau est à
   11 px, plancher typographique).
 - Champion connu : même habillage que le vainqueur ; « Champion inconnu »
