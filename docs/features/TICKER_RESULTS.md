@@ -31,7 +31,9 @@ un 0-0) : le bandeau n'affiche pas un « 0 — 0 » de match joué. Un forfait
 nominatif se lit avant le vainqueur (son adversaire l'emporte) et se chiffre,
 comme sur les fiches (`forfeitAwareMapScore`), au score plein du format du
 tournoi (`tickerScores`, `forfeitMapCount` : FT3 → 3-0, saisie libre → 1-0) —
-les forfaits antérieurs à la règle n'ont rien en colonnes. Sans vainqueur enregistré, ou vainqueur étranger au match : deux
+quand les colonnes sont vides ou à 0-0 (forfaits antérieurs à la règle) ; un
+score de forfait déjà écrit, qui suit le format de sa phase (play-offs d'une
+BG Survie), est gardé tel quel. Sans vainqueur enregistré, ou vainqueur étranger au match : deux
 `none`. Une case vide (exemption, engagé retiré) est `none`, jamais un perdant.
 La requête ne retient que les matchs entre **deux engagés** (`is_bye = FALSE`,
 `team1_id` et `team2_id` non nuls) : une exemption terminée s'affichait
