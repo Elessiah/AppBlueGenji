@@ -25,6 +25,31 @@ export function enduranceViewKey(view: EnduranceRankingView): string {
   return view.kind === "GENERAL" ? "general" : `${view.kind.toLowerCase()}-${view.round}`;
 }
 
+/**
+ * Index de la vue suivie. Quand la manche en cours se clôt, sa vue
+ * « current-n » devient « round-n » : le lecteur reste sur **sa** manche au
+ * lieu d'être renvoyé sans bruit au « Général ». Une autre clé disparue
+ * retombe sur la dernière vue (« Général »).
+ */
+export function resolveEnduranceViewIndex(views: EnduranceRankingView[], selectedKey: string): number {
+  const found = views.findIndex((view) => enduranceViewKey(view) === selectedKey);
+  if (found !== -1) return found;
+  if (selectedKey.startsWith("current-")) {
+    const closedKey = `round-${selectedKey.slice("current-".length)}`;
+    const closed = views.findIndex((view) => enduranceViewKey(view) === closedKey);
+    if (closed !== -1) return closed;
+  }
+  return views.length - 1;
+}
+
+/**
+ * Clé React d'un onglet : la **manche**, pas son état — l'onglet « M3 en
+ * cours » qui devient « Manche 3 » reste le même bouton et garde le focus.
+ */
+export function enduranceTabKey(view: EnduranceRankingView): string {
+  return view.kind === "GENERAL" ? "general" : `tab-${view.round}`;
+}
+
 type RoundProgress = { total: number; played: number };
 
 function qualificationMatches(matches: BracketMatch[]): BracketMatch[] {

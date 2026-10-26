@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Fragment, useId, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { ScrollArea } from "@/components/cyber";
 import type { BracketMatch, EnduranceMeta, EnduranceStandingRow } from "@/lib/shared/types";
@@ -15,10 +15,12 @@ import {
   enduranceRankingRows,
   enduranceRankingViews,
   enduranceRoundColumnCell,
+  enduranceTabKey,
   enduranceViewBaseRound,
   enduranceViewColumnRound,
   enduranceViewKey,
   playoffCutIndex,
+  resolveEnduranceViewIndex,
   type EnduranceRankingRow,
   type EnduranceRankingView,
   type EnduranceRoundColumnCell,
@@ -217,11 +219,14 @@ export function EnduranceRankingViews({
 
   const views = useMemo(() => enduranceRankingViews(endurance, matches), [endurance, matches]);
   // La vue suivie se retient par sa **clé** : une manche qui s'ajoute par le
-  // flux décale les index, pas les clés. Une clé disparue retombe sur « Général ».
+  // flux décale les index, pas les clés. La manche en cours qui se clôt garde
+  // le lecteur sur sa manche ; une autre clé disparue retombe sur « Général ».
   const [selectedKey, setSelectedKey] = useState("general");
   const [direction, setDirection] = useState<"left" | "right" | null>(null);
-  const foundIndex = views.findIndex((view) => enduranceViewKey(view) === selectedKey);
-  const index = foundIndex === -1 ? views.length - 1 : foundIndex;
+  // Les flèches et la navigation du bas ne déplacent pas le focus : le titre
+  // de la vue atteinte est annoncé ici (un onglet, lui, s'annonce de lui-même).
+  const [announcement, setAnnouncement] = useState("");
+  const index = resolveEnduranceViewIndex(views, selectedKey);
   const view = views[index];
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
@@ -241,6 +246,7 @@ export function EnduranceRankingViews({
     setDirection(target < index ? "left" : "right");
     setSelectedKey(enduranceViewKey(views[target]));
     if (focus) tabRefs.current[target]?.focus();
+    else setAnnouncement(viewTitle(views[target], text));
   };
 
   const onTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
@@ -308,7 +314,7 @@ export function EnduranceRankingViews({
                   const selected = candidateIndex === index;
                   return (
                     <button
-                      key={key}
+                      key={enduranceTabKey(candidate)}
                       ref={(node) => {
                         tabRefs.current[candidateIndex] = node;
                       }}
@@ -341,6 +347,9 @@ export function EnduranceRankingViews({
         </div>
       )}
       {views.length <= 1 && <div className={`${styles.viewTitle}`} style={{ marginBottom: 8 }}>{viewTitle(view, text)}</div>}
+      <span className="sr-only" aria-live="polite">
+        {announcement}
+      </span>
 
       <div
         id={panelId}
@@ -365,9 +374,9 @@ export function EnduranceRankingViews({
           return (
             <Fragment key={standing.teamId}>
               <div
-                className={`${rowClassName} ${isMine ? styles.mine : ""}`}
+                className={`${rowClassName} ${styles.fadable} ${isMine ? styles.mine : ""}`}
                 data-podium-muted={ROW_OPACITY[row.status] < 1 ? "" : undefined}
-                style={{ opacity: ROW_OPACITY[row.status] }}
+                style={{ "--row-fade": ROW_OPACITY[row.status] } as CSSProperties}
               >
                 <RankCell row={row} text={text} />
                 <span className={styles.teamCell}>

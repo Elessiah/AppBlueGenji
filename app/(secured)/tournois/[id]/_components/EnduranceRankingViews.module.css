@@ -246,3 +246,9 @@
     align-items: start;
   }
 }
+
+/* Une ligne sortie s'estompe, cellule par cellule : ses gestes (« Annuler
+   l'abandon ») restent à pleine opacité, lisibles et visiblement actifs. */
+.fadable > :not(.rowActions) {
+  opacity: var(--row-fade, 1);
+}
