@@ -66,7 +66,9 @@ La colonne « MANCHE n » montre la manche de la vue (la dernière manche au
 Général) :
 
 - rencontre jouée : variation du capital sur la manche (pénalité comprise),
-  score, adversaire, date ;
+  suivie de « dont −N de pénalité » / « incl. −N penalty » quand la manche en a
+  porté une (sans quoi un 3-0 sanctionné de 5 se lisait « −2 », comme une
+  défaite), score, adversaire, date ;
 - rencontre à jouer : date (ou « Date à fixer ») et adversaire ;
 - « Forfait — retirée » (« retiré » en individuel), « Déjà sortie », « Sans
   match cette manche » (effectif impair).
