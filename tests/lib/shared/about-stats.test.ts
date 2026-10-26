@@ -6,6 +6,7 @@ import {
   FALLBACK_ABOUT_STATS,
   aboutStatErrorMessage,
   aboutStatValue,
+  aboutStatNeedsEnglish,
   aboutStatValueIsFrench,
   localizedAboutStats,
   validateAboutStatInput,
@@ -155,5 +156,14 @@ describe("localizedAboutStats", () => {
     expect(aboutStatValueIsFrench({ value: "100%", valueEn: null }, "en")).toBe(false);
     expect(aboutStatValueIsFrench({ value: "Gratuit", valueEn: "Free" }, "en")).toBe(false);
     expect(aboutStatValueIsFrench({ value: "Gratuit", valueEn: null }, "fr")).toBe(false);
+  });
+
+  it("signale au staff une carte sans titre anglais, ou dont la valeur en mots n'a pas d'anglais", () => {
+    expect(aboutStatNeedsEnglish({ value: "12", valueEn: null, labelEn: null })).toBe(true);
+    expect(aboutStatNeedsEnglish({ value: "Gratuit", valueEn: null, labelEn: "Entry fee" })).toBe(true);
+    expect(aboutStatNeedsEnglish({ value: "Gratuit", valueEn: "  ", labelEn: "Entry fee" })).toBe(true);
+    expect(aboutStatNeedsEnglish({ value: "Gratuit", valueEn: "Free", labelEn: "Entry fee" })).toBe(false);
+    expect(aboutStatNeedsEnglish({ value: "100%", valueEn: null, labelEn: "Volunteer-run" })).toBe(false);
+    expect(aboutStatNeedsEnglish({ value: "4 200 €", valueEn: null, labelEn: "Prize pool" })).toBe(false);
   });
 });
