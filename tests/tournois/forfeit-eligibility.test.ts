@@ -132,8 +132,11 @@ describe("abandon — câblage des vues à classement", () => {
     // Un style en ligne l'emporte sur la media query qui replie `.table-row` en
     // une colonne sous 920 px : le gabarit doit rester une classe.
     expect(enduranceView).not.toContain("gridTemplateColumns");
+    expect(read("app/(secured)/tournois/[id]/_components/EnduranceRankingViews.tsx")).not.toContain(
+      "gridTemplateColumns",
+    );
 
-    const css = read("app/(secured)/tournois/[id]/_components/EnduranceView.module.css");
+    const css = read("app/(secured)/tournois/[id]/_components/EnduranceRankingViews.module.css");
     expect(css).toContain("@media (max-width: 920px)");
     expect(css).toContain("grid-template-columns: 1fr;");
   });

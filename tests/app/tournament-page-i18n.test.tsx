@@ -436,9 +436,61 @@ describe("rendu anglais — aucun français hors des blocs lang=\"fr\"", () => {
       <EnduranceView endurance={endurance} matches={[]} canPenalize={canPenalize} onPenalize={noop} onLiftPenalty={noop} canForfeit={() => true} onForfeit={noop} adminResolvable={() => false} onOpenAdminModal={noop} format="BG_SURVIE" />,
     );
     expectNoFrench(html);
-    expect(html).toContain("ROUND 2/6 · 1 TEAM IN CONTENTION → 4");
+    expect(html).toContain("ENDURANCE 9 PTS");
+    expect(html).toContain("1 team in contention → 4 in the playoffs");
+    expect(html).toContain("Overall ranking");
     expect(html).toContain("Out of contention");
     expect(html).toContain("REFEREE PENALTIES");
+  });
+
+  it.each(["fr", "en"] as Array<"fr" | "en">)("BlueGenji Survie (%s) : la ligne du barème ne finit pas sur un « · » orphelin", (locale) => {
+    const render = (playoffsStarted: boolean) =>
+      inLocale(
+        locale,
+        <EnduranceView endurance={{ ...endurance, playoffsStarted }} matches={[]} canPenalize={false} onPenalize={noop} adminResolvable={() => false} onOpenAdminModal={noop} format="BG_SURVIE" />,
+      );
+    const qualifying = render(false);
+    expect(qualifying).toMatch(/3-0<\/p>/);
+    expect(qualifying).not.toMatch(/·\s*<\/p>/);
+    const playoffs = render(true);
+    expect(playoffs).toContain(locale === "fr" ? "3-0 · PLAY-OFFS À 4</p>" : "3-0 · PLAYOFFS AT 4</p>");
+  });
+
+  describe("BlueGenji's Survival — bandeau et vues du classement", () => {
+    const enduranceMatches: BracketMatch[] = [
+      bracketMatch({ id: 1, roundNumber: 1, matchNumber: 1, team1Id: 1, team1Name: "Team 1", team2Id: 2, team2Name: "Team 2", team1Score: 3, team2Score: 1, winnerTeamId: 1, status: "COMPLETED" }),
+      bracketMatch({ id: 2, roundNumber: 2, matchNumber: 1, team1Id: 1, team1Name: "Team 1", team2Id: 2, team2Name: "Team 2", team1Score: 0, team2Score: 3, winnerTeamId: 2, status: "COMPLETED" }),
+      bracketMatch({ id: 3, roundNumber: 2, matchNumber: 2, team1Id: 3, team1Name: "Team 3", team2Id: 4, team2Name: "Team 4", status: "READY" }),
+    ];
+    const view = (locale: "fr" | "en", participantType: "TEAM" | "SOLO" = "TEAM") =>
+      inLocale(
+        locale,
+        <EnduranceView endurance={endurance} matches={enduranceMatches} canPenalize onPenalize={noop} canForfeit={() => true} onForfeit={noop} adminResolvable={() => false} onOpenAdminModal={noop} format="BG_SURVIE" />,
+        participantType,
+      );
+
+    it("en anglais, sans un mot de français", () => {
+      const html = view("en");
+      expectNoFrench(html);
+      expect(html).toContain("CURRENT ROUND");
+      expect(html).toContain("1 match played of 2");
+      expect(html).toContain("2 teams still have to play this round");
+      expect(html).toContain('role="tablist"');
+      expect(html).toContain("R1");
+      expect(html).toContain("R2 in progress");
+      expect(html).toContain("Overall");
+      // Trois engagés pour un plateau de quatre : aucune ligne de coupe.
+      expect(html).not.toContain("PLAYOFF ZONE");
+      expect(html).toContain("<span>Round 2</span>");
+    });
+
+    it("en français, accordé aux joueurs d'un tournoi individuel", () => {
+      const html = view("fr", "SOLO");
+      expect(html).toContain("MANCHE EN COURS");
+      expect(html).toContain("2 joueurs doivent encore jouer cette manche");
+      expect(html).toContain("Classement général");
+      expect(html).toContain("Forfait — retiré");
+    });
   });
 
   it("multi-phases : frise des phases et classement de phase", () => {
@@ -714,6 +766,7 @@ describe("tournament — équivalence avec next-intl, message par message", () =
       seconds: "5", minutes: "2", days: "1", hours: "3", base: "BO3", maps: "5", start: "9", loss: "1", forfeit: "3", size: "4",
       prefix: "Alpha · round 1", capital: "x", penalty: "1", every: "every round", list: "a, b", draw: "1", bye: "3", value: "50",
       title: "Round 1", progress: "done", registered: "3", max: "8", day: "May 12, 2026", hour: "20:00",
+      seed: "6",
     };
     for (const { key, source } of messages) {
       const reference = createTranslator({ locale, messages: { m: source }, timeZone: SITE_TIME_ZONE });
@@ -751,7 +804,8 @@ describe("performance — le français des vues voyage avec la vue", () => {
       "_components/SurvivalView.tsx",
       "_components/EnduranceView.tsx",
       "_components/EnduranceRoundPanels.tsx",
-      "_lib/endurance-history.ts",
+      "_components/EnduranceCard.tsx",
+      "_components/EnduranceRankingViews.tsx",
       "_lib/endurance-sections.ts",
     ];
     const keys = files.flatMap((file) => [...read(file).matchAll(/\bt\("([a-zA-Z.]+)"/g)].map((m) => m[1]));

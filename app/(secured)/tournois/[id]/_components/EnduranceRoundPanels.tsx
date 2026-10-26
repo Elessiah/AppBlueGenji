@@ -14,6 +14,7 @@ import {
   enduranceRoundOfMatch,
   enduranceRoundRegionLabel,
   enduranceRoundTitle,
+  orderEnduranceRoundSections,
   type EnduranceRoundSection,
 } from "../_lib/endurance-sections";
 import { useTournamentViewText } from "@/components/i18n/tournament-page-text";
@@ -26,8 +27,6 @@ interface EnduranceRoundPanelsProps {
   /** Couleur d'accent du mode, commune aux volets et à l'arbre final. */
   accent: string;
   myTeamId: number | null;
-  /** L'arbre final est-il lancé ? Décide du volet ouvert par défaut. */
-  playoffsStarted: boolean;
   allTournamentMatches: BracketMatch[];
   adminResolvable: (match: BracketMatch) => boolean;
   onOpenAdminModal: (match: BracketMatch) => void;
@@ -51,19 +50,23 @@ function hasPendingMatchFor(section: EnduranceRoundSection, myTeamId: number | n
  * manche courante. Les volets sont ceux des tableaux à élimination
  * (`BoardPanel`), et les cartes d'une manche s'y rangent en grille — une manche
  * de huit rencontres tient alors sur deux ou trois lignes au lieu de huit.
+ *
+ * Ordre et ouverture : la manche en cours en tête et ouverte, les manches
+ * closes ensuite, repliées, de la plus récente à la plus ancienne
+ * (`orderEnduranceRoundSections`, `defaultOpenEnduranceRound`).
  */
 export function EnduranceRoundPanels({
   sections,
   accent,
   myTeamId,
-  playoffsStarted,
   allTournamentMatches,
   adminResolvable,
   onOpenAdminModal,
   format,
 }: Readonly<EnduranceRoundPanelsProps>) {
   const text = useTournamentViewText(FR_VIEWS_TEXT);
-  const autoOpen = defaultOpenEnduranceRound(sections, myTeamId, playoffsStarted);
+  const autoOpen = defaultOpenEnduranceRound(sections);
+  const ordered = orderEnduranceRoundSections(sections);
 
   const [openRounds, setOpenRounds] = useState<Set<number>>(
     () => new Set(autoOpen === null ? [] : [autoOpen]),
@@ -73,12 +76,22 @@ export function EnduranceRoundPanels({
   // s'achève, la suivante arrive par le flux, et un état figé au montage
   // laisserait le lecteur sur une manche close. On ouvre donc la nouvelle
   // manche courante à chaque fois qu'elle change — et seulement alors, sinon
-  // un volet refermé à la main se rouvrirait au prochain instantané.
+  // un volet refermé à la main se rouvrirait au prochain instantané. La manche
+  // ouverte d'office qui se clôt se replie (une manche close est repliée), sauf
+  // si le lecteur l'a lui-même rouverte : un soir de tournoi suivi en direct ne
+  // finit pas avec toutes les manches dépliées.
   const lastAutoOpen = useRef(autoOpen);
+  const openedByHand = useRef(new Set<number>());
   useEffect(() => {
     if (autoOpen === null || autoOpen === lastAutoOpen.current) return;
+    const previous = lastAutoOpen.current;
     lastAutoOpen.current = autoOpen;
-    setOpenRounds((prev) => (prev.has(autoOpen) ? prev : new Set(prev).add(autoOpen)));
+    setOpenRounds((prev) => {
+      const next = new Set(prev);
+      if (previous !== null && !openedByHand.current.has(previous)) next.delete(previous);
+      next.add(autoOpen);
+      return next;
+    });
   }, [autoOpen]);
 
   // Ancre `#match-[id]` : la cible peut dormir dans un volet replié, que le hook
@@ -95,14 +108,19 @@ export function EnduranceRoundPanels({
   const toggle = (round: number) =>
     setOpenRounds((prev) => {
       const next = new Set(prev);
-      if (next.has(round)) next.delete(round);
-      else next.add(round);
+      if (next.has(round)) {
+        next.delete(round);
+        openedByHand.current.delete(round);
+      } else {
+        next.add(round);
+        openedByHand.current.add(round);
+      }
       return next;
     });
 
   return (
     <div className={styles.stack}>
-      {sections.map((section) => {
+      {ordered.map((section) => {
         const mine = hasPendingMatchFor(section, myTeamId);
         return (
           <BoardPanel

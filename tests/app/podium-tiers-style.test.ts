@@ -201,7 +201,7 @@ describe("marches du podium — écrans où elles s'effacent", () => {
 
   it.each([
     ["MatchRow.tsx", /data-podium-muted=\{podiumMuted\(team1Win\)\}/],
-    ["EnduranceView.tsx", /data-podium-muted=\{ROW_OPACITY\[standing\.status\] < 1/],
+    ["EnduranceRankingViews.tsx", /data-podium-muted=\{ROW_OPACITY\[row\.status\] < 1/],
     ["SurvivalView.tsx", /data-podium-muted=\{team\.status === "ACTIVE" \? undefined : ""\}/],
     ["SwissView.tsx", /data-podium-muted=\{team\.status === "FORFEIT"/],
   ])("marque les lignes en retrait de %s", (file, pattern) => {
@@ -229,9 +229,11 @@ describe("marches du podium — écrans où elles s'effacent", () => {
 });
 
 describe("marches du podium — historique et graisse des classements de phase", () => {
-  it("met en retrait la ligne d'historique d'une équipe éliminée ou forfait", () => {
-    const view = readSource("app/(secured)/tournois/[id]/_components/EnduranceView.tsx");
-    expect(view.match(/data-podium-muted=\{ROW_OPACITY\[standing\.status\] < 1/g)).toHaveLength(2);
+  it("met en retrait la ligne d'une équipe éliminée ou forfait, dans chaque vue du classement", () => {
+    // Le tableau « manche par manche » a cédé la place aux vues du classement :
+    // une seule ligne rendue, dont le statut est celui **de la vue** (`row`).
+    const view = readSource("app/(secured)/tournois/[id]/_components/EnduranceRankingViews.tsx");
+    expect(view.match(/data-podium-muted=\{ROW_OPACITY\[row\.status\] < 1/g)).toHaveLength(1);
   });
 
   it.each(["SwissView.tsx", "SurvivalView.tsx"])("%s n'écrase pas la graisse d'une marche en ligne", (file) => {

@@ -29,7 +29,7 @@ instantané du flux SSE. Aucun changement de l'instantané ni du serveur.
 | Vue | Taille |
 | --- | --- |
 | `MatchRow` (arbre, survie, suisse, BG Survie — donc tous les plateaux) | 16 px |
-| Classements Survie / Suisse / BG Survie / phases, tableau manche par manche | 16 px |
+| Classements Survie / Suisse / BG Survie (toutes ses vues, adversaire de la colonne « MANCHE n » et bandeau compris) / phases | 16 px |
 | Liste des inscrites, aperçu du plateau, journal des sanctions | 16 px |
 | Bandeau de la championne | 20 px |
 | Panneau des contacts, dialogue de score, dialogue des fantômes | 20 px |

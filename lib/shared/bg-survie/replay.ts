@@ -77,6 +77,20 @@ export type EnduranceRoundCell = {
    * en plus du chiffre.
    */
   penalty?: number;
+  /**
+   * Rang de l'équipe **à l'issue de cette manche**, parmi tout le plateau,
+   * selon l'ordre même du moteur (`assignRanks` : actives par
+   * `compareEndurance`, puis sorties). Facultatif : un instantané antérieur
+   * n'en porte pas. Les vues « Classement après la manche n » s'y lisent, sans
+   * second départage côté client.
+   */
+  rank?: number;
+  /** Victoires cumulées jusqu'à cette manche incluse. */
+  wins?: number;
+  /** Défaites cumulées jusqu'à cette manche incluse. */
+  losses?: number;
+  /** Nuls cumulés jusqu'à cette manche incluse. */
+  draws?: number;
 };
 
 /** Abandon déclaré : décision humaine, non déductible des matchs. */
@@ -121,6 +135,21 @@ export type ReplayEnduranceInput = {
  * les blanchirait toutes.
  */
 function enduranceRoundCell(
+  standing: EnduranceStanding,
+  round: number,
+  penalty: number,
+  rank: number,
+): EnduranceRoundCell {
+  return {
+    ...enduranceRoundCellBase(standing, round, penalty),
+    rank,
+    wins: standing.wins,
+    losses: standing.losses,
+    draws: standing.draws,
+  };
+}
+
+function enduranceRoundCellBase(
   standing: EnduranceStanding,
   round: number,
   penalty: number,
@@ -326,11 +355,14 @@ function recordRoundHistory(
   history: Map<number, EnduranceRoundCell[]>,
   penaltyTotals: Map<number, number>,
 ): void {
+  const ranks = new Map(
+    assignRanks([...standings.values()]).map((ranked) => [ranked.teamId, ranked.rank]),
+  );
   for (const standing of standings.values()) {
     const removed = applied.get(standing.teamId) ?? 0;
     if (removed > 0) {
       penaltyTotals.set(standing.teamId, (penaltyTotals.get(standing.teamId) ?? 0) + removed);
     }
-    history.get(standing.teamId)?.push(enduranceRoundCell(standing, round, removed));
+    history.get(standing.teamId)?.push(enduranceRoundCell(standing, round, removed, ranks.get(standing.teamId) ?? standing.rank));
   }
 }

@@ -477,13 +477,29 @@ function randomPhases(r: Rng, valid: boolean): PhaseConfig[] {
 
 const CASES = 160;
 
+/**
+ * Le rejeu sans les champs de lecture ajoutés aux cases (rang et bilan par
+ * manche) : l'empreinte reste celle d'avant, preuve que l'ajout n'a rien
+ * changé au moteur. Ces champs ont leurs propres tests (`bg-survie-round-rank`).
+ */
+function replayWithoutRoundRecord(input: Parameters<typeof replayEnduranceDetailed>[0]): unknown {
+  const replay = replayEnduranceDetailed(input);
+  const history = new Map(
+    [...replay.history].map(([teamId, cells]) => [
+      teamId,
+      cells.map(({ rank: _rank, wins: _wins, losses: _losses, draws: _draws, ...cell }) => cell),
+    ]),
+  );
+  return { ...replay, history };
+}
+
 describe("caractérisation du moteur pur", () => {
   it("replayEnduranceDetailed — historiques aléatoires", () => {
-    expect(runCases(CASES, randomEnduranceInput, replayEnduranceDetailed)).toMatchSnapshot();
+    expect(runCases(CASES, randomEnduranceInput, replayWithoutRoundRecord)).toMatchSnapshot();
   });
 
   it("replayEnduranceDetailed — tournois simulés manche par manche", () => {
-    expect(runCases(CASES, simulatedEnduranceInput, replayEnduranceDetailed)).toMatchSnapshot();
+    expect(runCases(CASES, simulatedEnduranceInput, replayWithoutRoundRecord)).toMatchSnapshot();
   });
 
   it("replaySurvival — historiques aléatoires", () => {

@@ -102,6 +102,13 @@
   margin-bottom: 20px;
 }
 
+/* `.ds-block` coupe en `overflow: hidden`, ce qui fait du plateau un conteneur
+   de défilement et annule tout `position: sticky` intérieur (barre des vues du
+   classement d'endurance). `clip` coupe pareil sans créer ce conteneur. */
+.board:global(.ds-block) {
+  overflow: clip;
+}
+
 /* Phrase à la place d'un plateau (avant-course, aucun match). */
 .empty {
   margin: 0;

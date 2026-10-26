@@ -65,10 +65,9 @@ export function splitEnduranceMatches(matches: BracketMatch[]): {
 }
 
 /**
- * Un volet par manche qualificative, dans l'ordre chronologique — celui du
- * tableau « manche par manche » juste au-dessus, et celui des arbres à
- * élimination. Lire une histoire à l'envers ne se justifierait que si la page ne
- * montrait qu'une manche à la fois ; ici le volet courant est ouvert d'office.
+ * Un volet par manche qualificative, dans l'ordre chronologique. L'ordre
+ * d'**affichage** (manche en cours d'abord, puis les closes de la plus récente à
+ * la plus ancienne) est décidé à part, par `orderEnduranceRoundSections`.
  */
 export function enduranceRoundSections(qualification: BracketMatch[]): EnduranceRoundSection[] {
   const rounds = [...new Set(qualification.map((match) => match.roundNumber))].sort((a, b) => a - b);
@@ -91,38 +90,34 @@ export function enduranceRoundSections(qualification: BracketMatch[]): Endurance
 }
 
 /**
- * Manche à ouvrir à l'arrivée sur la page.
+ * Manche à ouvrir à l'arrivée sur la page : la **manche en cours** (la première
+ * inachevée), et elle seule — `docs/features/ENDURANCE_ROUND_PANELS.md`.
  *
- * Par ordre de priorité : celle où le lecteur a une rencontre à jouer, puis la
- * première manche inachevée — la manche courante, celle qui bouge. Une fois tout
- * joué, on n'ouvre la dernière manche que si l'arbre final n'a pas commencé :
- * sinon c'est lui qui porte l'action, et déplier par-dessus une manche
- * qualificative close le repousserait sous la ligne de flottaison.
+ * Une rencontre du lecteur restant à jouer vit forcément dans cette manche-là
+ * (le moteur ne pose la suivante qu'une fois la courante close) : la chercher à
+ * part ne changerait rien. Les manches closes restent repliées, leur bilan se
+ * lit dans les vues du classement ; une fois tout joué (play-offs lancés ou
+ * tournoi fini), rien ne s'ouvre d'office.
  *
  * `null` = tout replié.
  */
-export function defaultOpenEnduranceRound(
-  sections: EnduranceRoundSection[],
-  myTeamId: number | null,
-  playoffsStarted: boolean,
-): number | null {
-  if (sections.length === 0) return null;
+export function defaultOpenEnduranceRound(sections: EnduranceRoundSection[]): number | null {
+  return sections.find((section) => !section.isComplete)?.round ?? null;
+}
 
-  if (myTeamId !== null) {
-    const mine = sections.find((section) =>
-      section.matches.some(
-        (match) =>
-          !isMatchPlayed(match) &&
-          (match.team1Id === myTeamId || match.team2Id === myTeamId),
-      ),
-    );
-    if (mine) return mine.round;
-  }
-
-  const pending = sections.find((section) => !section.isComplete);
-  if (pending) return pending.round;
-
-  return playoffsStarted ? null : sections.at(-1)!.round;
+/**
+ * Ordre d'affichage des volets : la manche en cours d'abord, puis les manches
+ * closes **de la plus récente à la plus ancienne** — on vient voir ce qui
+ * bouge, puis ce qui vient de se jouer. Les sections d'entrée ne sont pas
+ * modifiées.
+ */
+export function orderEnduranceRoundSections(sections: EnduranceRoundSection[]): EnduranceRoundSection[] {
+  const current = defaultOpenEnduranceRound(sections);
+  return [...sections].sort((a, b) => {
+    if (a.round === current) return -1;
+    if (b.round === current) return 1;
+    return b.round - a.round;
+  });
 }
 
 /**

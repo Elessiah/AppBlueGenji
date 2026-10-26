@@ -9,6 +9,7 @@ import {
   enduranceRoundOfMatch,
   enduranceRoundRegionLabel,
   enduranceRoundSections,
+  orderEnduranceRoundSections,
   PLAYOFF_ROUND_OFFSET,
   splitEnduranceMatches,
   splitPlayoffBrackets,
@@ -126,41 +127,42 @@ describe("defaultOpenEnduranceRound", () => {
     round(4, 2, 2),
   ]);
 
-  it("ouvre la manche où le lecteur a une rencontre à jouer", () => {
-    // L'équipe 40 joue le match 4, dans la manche 2 : c'est celle-là.
-    expect(defaultOpenEnduranceRound(sections, 40, false)).toBe(2);
+  it("ouvre la manche en cours — la première inachevée", () => {
+    expect(defaultOpenEnduranceRound(sections)).toBe(2);
   });
 
-  it("préfère une rencontre à jouer à une rencontre déjà tranchée", () => {
-    // L'équipe 10 a joué la manche 1 (tranchée) et rien d'autre : aucune
-    // rencontre en attente, on retombe donc sur la manche courante.
-    expect(defaultOpenEnduranceRound(sections, 10, false)).toBe(2);
-  });
-
-  it("ouvre sinon la première manche inachevée — celle qui bouge", () => {
-    expect(defaultOpenEnduranceRound(sections, null, false)).toBe(2);
-  });
-
-  it("ouvre la dernière manche quand tout est joué et que l'arbre n'a pas commencé", () => {
+  it("n'ouvre rien quand toutes les manches sont closes", () => {
+    // Play-offs lancés ou non : une manche close se lit dans les vues du
+    // classement, son volet reste replié.
     const played = enduranceRoundSections([round(1, 1, 1, 10), round(3, 2, 1, 30)]);
-    expect(defaultOpenEnduranceRound(played, null, false)).toBe(2);
-  });
-
-  it("ne déplie rien une fois les play-offs lancés", () => {
-    // C'est l'arbre qui porte l'action : déplier par-dessus une manche close le
-    // repousserait sous la ligne de flottaison.
-    const played = enduranceRoundSections([round(1, 1, 1, 10), round(3, 2, 1, 30)]);
-    expect(defaultOpenEnduranceRound(played, null, true)).toBeNull();
-  });
-
-  it("ouvre malgré tout la manche du lecteur si elle reste à jouer", () => {
-    // Cas limite : l'arbre est lancé mais une rencontre du lecteur traîne. Elle
-    // prime — c'est la seule chose qu'il ait à faire.
-    expect(defaultOpenEnduranceRound(sections, 40, true)).toBe(2);
+    expect(defaultOpenEnduranceRound(played)).toBeNull();
   });
 
   it("ne rend rien sur un plateau sans manche", () => {
-    expect(defaultOpenEnduranceRound([], 40, false)).toBeNull();
+    expect(defaultOpenEnduranceRound([])).toBeNull();
+  });
+});
+
+describe("orderEnduranceRoundSections", () => {
+  it("met la manche en cours en tête, puis les closes de la plus récente à la plus ancienne", () => {
+    const sections = enduranceRoundSections([
+      round(1, 1, 1, 10),
+      round(2, 2, 1, 20),
+      round(3, 3, 1, 30),
+      round(4, 4, 1),
+    ]);
+    expect(orderEnduranceRoundSections(sections).map((s) => s.round)).toEqual([4, 3, 2, 1]);
+    // L'entrée n'est pas réordonnée sur place.
+    expect(sections.map((s) => s.round)).toEqual([1, 2, 3, 4]);
+  });
+
+  it("range toutes les manches de la plus récente à la plus ancienne une fois tout joué", () => {
+    const played = enduranceRoundSections([round(1, 1, 1, 10), round(2, 2, 1, 20), round(3, 3, 1, 30)]);
+    expect(orderEnduranceRoundSections(played).map((s) => s.round)).toEqual([3, 2, 1]);
+  });
+
+  it("garde un plateau vide vide", () => {
+    expect(orderEnduranceRoundSections([])).toEqual([]);
   });
 });
 
@@ -370,7 +372,7 @@ describe("enduranceRoundSections — matchs nuls", () => {
     ]);
 
     // Sa manche 1 s'est close sur un nul : c'est la 2 qui l'attend.
-    expect(defaultOpenEnduranceRound(sections, 7, false)).toBe(2);
+    expect(defaultOpenEnduranceRound(sections)).toBe(2);
   });
 });
 

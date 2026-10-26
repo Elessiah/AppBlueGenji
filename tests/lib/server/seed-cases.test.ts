@@ -182,6 +182,26 @@ describe("seed — cohérence des définitions", () => {
     }
   });
 
+  it("porte une BG Survie en cours lisible par les vues du classement", () => {
+    // Au moins trois manches, une manche entamée, un forfait et une pénalité :
+    // de quoi relire chaque vue (`docs/features/ENDURANCE_RANKING_VIEWS.md`).
+    const rich = withState("RUNNING").filter(
+      (t) =>
+        formatOf(t) === "BG_SURVIE" &&
+        (t.playWaves ?? 0) >= 3 &&
+        (t.endurancePartialMatches ?? 0) > 0 &&
+        (t.forfeits ?? 0) > 0 &&
+        (t.endurancePenalties ?? 0) > 0,
+    );
+    expect(rich.length).toBeGreaterThan(0);
+    for (const t of TOURNAMENTS) {
+      if ((t.endurancePartialMatches ?? 0) > 0 || (t.endurancePenalties ?? 0) > 0) {
+        expect(formatOf(t)).toBe("BG_SURVIE");
+        expect(t.state).toBe("RUNNING");
+      }
+    }
+  });
+
   it("garde les tournois jouables jouables (≥ 2 équipes en cours / terminé)", () => {
     for (const t of TOURNAMENTS) {
       if (t.state === "FINISHED" || (t.state === "RUNNING" && !isUnderfilled(t))) {

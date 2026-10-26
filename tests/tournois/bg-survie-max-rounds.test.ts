@@ -318,7 +318,7 @@ describe("replayEndurance — plafond de manches", () => {
     expect(standings.find((s) => s.teamId === 3)?.eliminatedRound).toBe(2);
 
     // La manche de la sortie montre encore le capital : c'en est le résultat.
-    expect(history.get(3)).toEqual([
+    expect(history.get(3)).toMatchObject([
       { round: 1, kind: "POINTS", points: 7 },
       { round: 2, kind: "POINTS", points: 4 },
     ]);
@@ -334,7 +334,7 @@ describe("replayEndurance — plafond de manches", () => {
       matchFormat: FT3,
     });
 
-    expect(history.get(3)?.[2]).toEqual({ round: 3, kind: "OUT", points: null });
+    expect(history.get(3)?.[2]).toMatchObject({ round: 3, kind: "OUT", points: null });
   });
 
   // Le rejeu est la seule vérité : retirer le plafond défait la coupe, comme

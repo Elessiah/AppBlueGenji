@@ -1,0 +1,254 @@
+/*
+ * Vues du classement d'endurance (`docs/features/ENDURANCE_RANKING_VIEWS.md`).
+ *
+ * Le gabarit des lignes vit ici et **non dans un `style` en ligne** : un style
+ * en ligne l'emporterait sur le repli mobile de `.table-row`
+ * (`@media (max-width: 920px) { grid-template-columns: 1fr }`), et le tableau
+ * garderait ses colonnes sur un écran de 375 px. Les sélecteurs sont doublés de
+ * `:global(.table-row)` pour passer devant la règle globale quel que soit
+ * l'ordre d'injection des feuilles.
+ *
+ * Colonnes : # · engagé · endurance · « MANCHE n » · bilan · statut
+ * [· actions, vue « Général » seulement].
+ */
+:global(.table-row).row {
+  grid-template-columns: 56px minmax(0, 1.6fr) 0.8fr minmax(0, 1.4fr) 0.8fr 1fr;
+  align-items: center;
+}
+
+:global(.table-row).rowWithActions {
+  grid-template-columns: 56px minmax(0, 1.6fr) 0.8fr minmax(0, 1.4fr) 0.8fr 1fr 108px;
+  align-items: center;
+}
+
+/* Deux boutons pour l'arbitrage (« Pénalité » et « Forfait »). */
+:global(.table-row).rowWithWideActions {
+  grid-template-columns: 56px minmax(0, 1.6fr) 0.8fr minmax(0, 1.4fr) 0.8fr 1fr 190px;
+  align-items: center;
+}
+
+/* Les boutons se replient l'un sous l'autre plutôt que de déborder. */
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Ligne de l'engagé du lecteur. */
+.mine {
+  background: rgba(var(--blue-500-rgb), 0.06);
+}
+
+/* Barre des vues, collée sous l'en-tête du site pendant le parcours des lignes. */
+.bar {
+  position: sticky;
+  top: var(--sticky-header-h, 96px);
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  margin-bottom: 8px;
+  /* Opaque (la barre passe au-dessus des lignes), du ton du bloc du plateau. */
+  background: var(--cyber-bg-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.arrow {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.arrow[aria-disabled="true"] {
+  color: var(--ink-quiet);
+  cursor: default;
+}
+
+.barMiddle {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.viewTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.viewSub {
+  font-size: 11px;
+  color: var(--ink-quiet);
+}
+
+.tabs {
+  display: flex;
+  gap: 6px;
+  width: max-content;
+}
+
+.tab {
+  padding: 4px 10px;
+  font-size: 12px;
+  white-space: nowrap;
+  color: var(--ink-soft);
+  background: transparent;
+}
+
+.tab[aria-selected="true"] {
+  color: var(--ink);
+  background: rgba(var(--blue-500-rgb), 0.16);
+  border-color: rgba(var(--blue-500-rgb), 0.45);
+}
+
+.rank {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.moveUp {
+  font-size: 11px;
+  color: var(--blue-300);
+}
+
+.moveDown {
+  font-size: 11px;
+  color: var(--danger);
+}
+
+.teamCell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.seed {
+  font-size: 11px;
+  color: var(--ink-quiet);
+  white-space: nowrap;
+}
+
+.penaltyBadge {
+  margin-left: 6px;
+  font-size: 11px;
+  color: rgba(var(--amber-rgb), 0.9);
+}
+
+.roundCell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.roundLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+  min-width: 0;
+}
+
+.deltaUp {
+  color: var(--blue-300);
+}
+
+.deltaDown {
+  color: var(--danger);
+}
+
+.roundForfeit {
+  color: var(--danger);
+}
+
+.roundQuiet {
+  color: var(--ink-quiet);
+}
+
+/* Ligne « Zone play-offs » : un repère, pas une ligne de données. */
+.cut {
+  padding: 6px 12px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--blue-300);
+  border-top: 1px dashed rgba(var(--blue-500-rgb), 0.5);
+}
+
+.bottomNav {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.bottomNav > :only-child:last-child {
+  margin-left: auto;
+}
+
+/*
+ * Glissement à chaque changement de vue : une seule passe, jamais en boucle.
+ * La classe n'est posée que si le régime de charge permet le mouvement
+ * décoratif (`useClientPower`), et la préférence système l'annule ici aussi.
+ */
+.slideFromLeft {
+  animation: endurance-view-in-left 0.28s ease-out;
+}
+
+.slideFromRight {
+  animation: endurance-view-in-right 0.28s ease-out;
+}
+
+@keyframes endurance-view-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes endurance-view-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slideFromLeft,
+  .slideFromRight {
+    animation: none;
+  }
+}
+
+/* Repli mobile : une carte libellée par engagé, comme les autres tables. */
+@media (max-width: 920px) {
+  :global(.table-row).row,
+  :global(.table-row).rowWithActions,
+  :global(.table-row).rowWithWideActions {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+}
+
+/* Une ligne sortie s'estompe, cellule par cellule : ses gestes (« Annuler
+   l'abandon ») restent à pleine opacité, lisibles et visiblement actifs. */
+.fadable > :not(.rowActions) {
+  opacity: var(--row-fade, 1);
+}

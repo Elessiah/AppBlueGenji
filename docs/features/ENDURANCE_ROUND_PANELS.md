@@ -22,12 +22,18 @@ d'arbre du site**, celui de l'élimination simple.
 
 Dans l'ordre, du haut vers le bas :
 
-1. **Le barème et le classement d'endurance** — inchangés.
-2. **Le tableau manche par manche** — inchangé.
+1. **L'en-tête, le bandeau de la manche en cours et les vues du classement**
+   (`ENDURANCE_RANKING_VIEWS.md`), la légende « Hors course », le journal des
+   sanctions — puis l'emplacement réservé au graphique « Évolution de
+   l'endurance » (lot 2).
+2. **L'aperçu de la manche suivante** (arbitrage, tournoi en cours) : il ouvre
+   la suite des volets — aperçu, manche en cours, manches closes. Play-offs
+   lancés, il annonce le tour suivant de l'arbre et le précède donc.
 3. **Les play-offs**, dès qu'ils sont lancés : l'arbre (`Phase finale`) puis la
    `Petite finale` dans son propre volet.
-4. **Les manches qualificatives**, un volet par manche, dans l'ordre
-   chronologique.
+4. **Les manches qualificatives**, un volet par manche : la **manche en cours
+   d'abord**, puis les manches closes **de la plus récente à la plus
+   ancienne** (`orderEnduranceRoundSections`, module pur).
 
 Les manches restent affichées **sous** l'arbre une fois les play-offs lancés.
 L'ancienne vue les remplaçait purement (`playoffsStarted ? playoffs :
@@ -55,14 +61,22 @@ marque du lecteur : une pile de dix volets repliés doit se lire d'un coup d'œi
 
 ### Volet ouvert par défaut
 
-Décidé par `defaultOpenEnduranceRound` (module pur), par ordre de priorité :
+Décidé par `defaultOpenEnduranceRound(sections)` (module pur) : la **manche
+en cours** — la première inachevée — et elle seule. Toutes les manches closes
+restent **repliées** : leur bilan se lit dans les vues du classement. Une fois
+tout joué (play-offs lancés, tournoi fini, manche suivante pas encore tirée),
+rien ne s'ouvre d'office. Quand la manche ouverte d'office se clôt et que la
+suivante arrive par le flux, la close **se replie** et la nouvelle s'ouvre —
+sauf si le lecteur avait rouvert la close à la main.
 
-1. la manche où le lecteur a une rencontre à jouer ;
-2. la première manche inachevée — la manche courante, celle qui bouge ;
-3. sinon, la **dernière** manche… mais seulement si l'arbre final n'a pas
-   commencé. Sinon rien n'est ouvert : c'est l'arbre qui porte l'action, et
-   déplier par-dessus une manche close le repousserait sous la ligne de
-   flottaison.
+L'ancienne priorité « la manche où le lecteur a une rencontre à jouer » se
+confond avec la manche en cours : le moteur ne pose la manche suivante qu'une
+fois la courante close, une rencontre en attente vit donc forcément dans
+celle-ci. L'ancien repli « sinon la dernière manche » est retiré.
+
+L'ancre `#match-[id]` ouvre toujours le volet de sa manche, close ou non, et la
+marque « ★ Votre match » reste posée sur la manche où le lecteur a une
+rencontre à jouer.
 
 Le volet à ouvrir **change en cours de tournoi** : une manche s'achève, la
 suivante arrive par le flux SSE. Un état figé au montage laisserait le lecteur

@@ -1,21 +1,13 @@
 "use client";
 
 import { useMemo } from "react";
-import { ScrollArea } from "@/components/cyber";
 import type {
   BracketMatch,
   EnduranceMeta,
   EndurancePenaltyRow,
+  EnduranceStandingRow,
   TournamentFormat,
 } from "@/lib/shared/types";
-import {
-  enduranceCellLabel,
-  enduranceCellPenalty,
-  enduranceCellTitle,
-  enduranceCellTone,
-  enduranceHistoryColumns,
-  type EnduranceCellTone,
-} from "../_lib/endurance-history";
 import { ACCENT } from "../_lib/bracket-sections";
 import {
   endurancePlayoffLinks,
@@ -28,7 +20,6 @@ import { useEntrantParticipantType } from "../_lib/entrant-link";
 import { useTournamentViewText } from "@/components/i18n/tournament-page-text";
 import { FR_VIEWS_TEXT } from "../_lib/views-text";
 import { INTL_LOCALE } from "@/lib/shared/locales";
-import { participantText } from "@/lib/shared/tournament-page-text";
 import { toParticipantType } from "@/lib/shared/participants";
 import { useActionsText } from "../_lib/actions-text";
 import { enduranceNextRoundInput } from "../_lib/endurance-next-round";
@@ -37,6 +28,8 @@ import type { MatchFormat } from "@/lib/shared/match-format";
 import { EnduranceNextRoundPanel } from "./EnduranceNextRoundPanel";
 import { EntrantName } from "./EntrantName";
 import { FORFEIT_CANCEL_BUTTON_STYLE } from "./RoundColumns";
+import { EnduranceCard } from "./EnduranceCard";
+import { EnduranceRankingViews } from "./EnduranceRankingViews";
 import { PodiumTiersOff } from "@/components/podium-tiers";
 import { BracketSections } from "./BracketSections";
 import { EnduranceRoundPanels } from "./EnduranceRoundPanels";
@@ -101,162 +94,6 @@ function BoardHeading({ children }: Readonly<{ children: React.ReactNode }>) {
 }
 
 const AMBER = "var(--amber)";
-
-/**
- * Classe de gabarit du classement (cf. `EnduranceView.module.css`) : cinq
- * colonnes, six quand au moins une ligne porte un bouton d'abandon. Le gabarit
- * est une classe et non un style en ligne, sans quoi il l'emporterait sur le
- * repli mobile de `.table-row`.
- */
-function rowClass(withActions: boolean, wide: boolean): string {
-  if (!withActions) return `table-row ${styles.row}`;
-  return `table-row ${wide ? styles.rowWithWideActions : styles.rowWithActions}`;
-}
-
-/**
- * « Éliminée » et « Hors course » ne disent pas la même chose et ne peuvent pas
- * partager un libellé : la première a vidé son capital, la seconde en garde
- * mais ne peut plus rejoindre les play-offs dans les manches restantes — sa
- * ligne montre encore des points, et « Éliminée » à côté ne se lirait pas.
- */
-const STATUS_KEYS = {
-  ACTIVE: "ranking.active",
-  ELIMINATED: "ranking.eliminated",
-  OUT_OF_CONTENTION: "ranking.outOfContention",
-  FORFEIT: "ranking.forfeit",
-} as const satisfies Record<EnduranceMeta["standings"][number]["status"], string>;
-
-/**
- * Une ligne sortie s'estompe, mais pas toutes au même degré : « Hors course »
- * porte encore un capital à lire, là où une éliminée ou une partie n'affiche
- * qu'un zéro. Les effacer pareil rendrait la moins lisible des trois celle qui
- * a justement un chiffre à montrer.
- */
-const ROW_OPACITY: Record<EnduranceMeta["standings"][number]["status"], number> = {
-  ACTIVE: 1,
-  OUT_OF_CONTENTION: 0.8,
-  ELIMINATED: 0.55,
-  FORFEIT: 0.55,
-};
-
-/** Habillage d'une case, selon le poids décidé par `_lib/endurance-history`. */
-const CELL_CLASS: Record<EnduranceCellTone, string> = {
-  POINTS: "num",
-  ZERO: `num ${styles.historyZero}`,
-  FORFEIT: styles.historyForfeit,
-  OUT: styles.historyOut,
-};
-
-/**
- * Tableau du capital d'endurance **manche par manche**, comme la feuille de
- * calcul qui tient le règlement : une ligne par équipe, une colonne par manche.
- *
- * C'est le seul endroit où un forfait de tournoi se lit d'un coup d'œil : la
- * colonne « Statut » du classement dit qu'une équipe est partie, elle ne dit pas
- * **à partir de quand** — ici, ses manches restantes portent « FF » en rouge au
- * lieu d'un capital, et le tableau se lit comme le document d'arbitrage.
- *
- * Défilement horizontal plutôt que repli mobile : un tableau de capitaux empilé
- * en colonne ne se compare plus.
- */
-function EnduranceHistory({
-  endurance,
-  myTeamId,
-}: Readonly<{
-  endurance: EnduranceMeta;
-  myTeamId: number | null;
-}>) {
-  const text = useTournamentViewText(FR_VIEWS_TEXT);
-  const { t } = text;
-  if (endurance.rounds.length === 0) return null;
-
-  const columns = enduranceHistoryColumns(endurance.rounds.length);
-
-  return (
-    <div style={{ marginBottom: 24 }}>
-      <div className="mono" style={{ fontSize: 11, color: "var(--ink-quiet)", marginBottom: 8 }}>
-        {t("endurance.historyTitle")}
-      </div>
-      <ScrollArea fade ariaLabel={t("endurance.historyLabel")}>
-        <div className={styles.historyTable}>
-          <div
-            className={`${styles.historyRow} ${styles.historyHead}`}
-            style={{ "--history-cols": columns } as React.CSSProperties}
-          >
-            <span className={styles.historyTeam}>{t("swiss.team")}</span>
-            {endurance.rounds.map((round) => (
-              <span key={round} className={styles.historyCell} title={t("endurance.historyRound", { round: String(round) })}>
-                {t("endurance.historyRoundShort", { round: String(round) })}
-              </span>
-            ))}
-          </div>
-          {endurance.standings.map((standing) => (
-            <div
-              key={standing.teamId}
-              className={[
-                styles.historyRow,
-                standing.status === "FORFEIT" ? styles.historyRowForfeit : null,
-                myTeamId !== null && standing.teamId === myTeamId ? styles.historyRowMine : null,
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              data-podium-muted={ROW_OPACITY[standing.status] < 1 ? "" : undefined}
-              style={{ "--history-cols": columns } as React.CSSProperties}
-            >
-              {/* Même affordance que le classement au-dessus : un nom d'engagé
-                  mène toujours à sa fiche, d'une vue à l'autre. */}
-              <EntrantName
-                teamId={standing.teamId}
-                name={standing.teamName}
-                title={standing.teamName}
-                truncate
-                className={styles.historyTeam}
-              />
-              {standing.rounds.map((cell) => (
-                <span
-                  key={cell.round}
-                  className={[
-                    styles.historyCell,
-                    CELL_CLASS[enduranceCellTone(cell)],
-                    // La marque de pénalité s'**ajoute** au ton de la case : une
-                    // sanction qui vide le capital doit rester lisible comme un
-                    // zéro, tout en disant d'où vient ce zéro.
-                    enduranceCellPenalty(cell) > 0 ? styles.historyPenalty : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                  title={enduranceCellTitle(standing.teamName, cell, text)}
-                >
-                  {enduranceCellLabel(cell)}
-                </span>
-              ))}
-            </div>
-          ))}
-        </div>
-      </ScrollArea>
-      {/* Une case rouge n'est lisible qu'accompagnée de ce qu'elle veut dire :
-          la légende n'apparaît que s'il y a effectivement un forfait à lire. */}
-      {endurance.standings.some((standing) => standing.status === "FORFEIT") && (
-        <p className="mono" style={{ fontSize: 11, color: "var(--ink-quiet)", margin: "8px 0 0" }}>
-          {t("endurance.forfeitLegend")}
-        </p>
-      )}
-      {/* Un soulignement ambre ne se devine pas davantage qu'une case rouge :
-          la légende n'apparaît, elle aussi, que s'il y a quelque chose à lire.
-          Le test porte sur les **cases**, pas sur la liste des sanctions : une
-          pénalité qui n'a rien pu retirer (équipe déjà sortie) n'en marque
-          aucune, et la légende annoncerait alors un trait introuvable. */}
-      {endurance.standings.some((standing) =>
-        standing.rounds.some((cell) => enduranceCellPenalty(cell) > 0),
-      ) && (
-        <p className="mono" style={{ fontSize: 11, color: "var(--ink-quiet)", margin: "8px 0 0" }}>
-          {t("endurance.penaltyLegend")}
-        </p>
-      )}
-    </div>
-  );
-}
-
 
 /**
  * Journal des pénalités d'endurance (`docs/features/ENDURANCE_PENALTIES.md`).
@@ -414,16 +251,6 @@ export function EnduranceView({
   // s'appelleraient « Finale » tant qu'ils seraient le seul tour posé.
   const playoffRounds = endurancePlayoffRoundCount(decisive);
 
-  const activeCount = endurance.standings.filter((s) => s.status === "ACTIVE").length;
-
-  // Sous plafond, la manche courante ne se lit qu'accompagnée de son total :
-  // « manche 4 » ne dit pas s'il en reste six ou une seule, et c'est justement
-  // ce qui décide qui est encore en course.
-  const roundLabel =
-    endurance.maxRounds === null
-      ? String(endurance.currentRound)
-      : `${endurance.currentRound}/${endurance.maxRounds}`;
-
   // Abandon : proposé sur les équipes encore en lice, à leurs représentants
   // comme à l'arbitrage (cf. `canForfeit` côté page).
   //
@@ -466,180 +293,101 @@ export function EnduranceView({
     (s) => canForfeitRow(s.teamId, s.status) || canPenalizeRow(s.status) || canCancelRow(s.status),
   );
   const showPenaltyAction = endurance.standings.some((s) => canPenalizeRow(s.status));
-  const rowClassName = rowClass(showActions, showPenaltyAction);
-
   // « Hors course » ne se devine pas : la ligne affiche encore un capital, et
   // rien n'explique pourquoi elle n'est plus en lice. La légende n'apparaît
-  // qu'en présence d'une telle ligne, comme celle du forfait plus bas.
+  // qu'en présence d'une telle ligne.
   const showOutLegend = endurance.standings.some((s) => s.status === "OUT_OF_CONTENTION");
-  const hasDraws = endurance.standings.some((s) => s.draws > 0);
-  const recordLabel = hasDraws ? t("endurance.recordDraws") : t("endurance.record");
-  const roundStatusKey = participantType === "SOLO" ? "endurance.roundStatusSolo" : "endurance.roundStatusTeam";
+
+  // Gestes d'une ligne, avec leurs gardes : `EnduranceRankingViews` ne les
+  // montre que dans la vue « Général ».
+  const renderActions = (standing: EnduranceStandingRow) => {
+    const isMine = myTeamId !== null && standing.teamId === myTeamId;
+    const forfeitable = canForfeitRow(standing.teamId, standing.status);
+    return (
+      <>
+        {canPenalizeRow(standing.status) && onPenalize !== undefined && (
+          <button
+            type="button"
+            onClick={() => onPenalize(standing.teamId)}
+            className="btn tap-target"
+            title={a("penalty.buttonTitle", { name: standing.teamName })}
+            aria-label={a("penalty.buttonAria", { name: standing.teamName })}
+            style={{
+              padding: "3px 8px",
+              fontSize: 11,
+              textTransform: "uppercase",
+              letterSpacing: "0.04em",
+              background: "rgba(var(--amber-rgb), 0.12)",
+              borderColor: "rgba(var(--amber-rgb), 0.4)",
+              color: AMBER,
+            }}
+          >
+            {a("penalty.button")}
+          </button>
+        )}
+        {forfeitable && onForfeit !== undefined && (
+          <button
+            type="button"
+            onClick={() => onForfeit(standing.teamId, standing.teamName)}
+            className="btn tap-target"
+            title={
+              isMine
+                ? a(`forfeit.endurance.selfTitle.${toParticipantType(participantType)}`)
+                : a("forfeit.endurance.otherTitle", { name: standing.teamName })
+            }
+            aria-label={
+              isMine
+                ? a("forfeit.endurance.selfAria")
+                : a("forfeit.endurance.otherTitle", { name: standing.teamName })
+            }
+            style={{
+              padding: "3px 8px",
+              fontSize: 11,
+              textTransform: "uppercase",
+              letterSpacing: "0.04em",
+              background: "rgba(var(--amber-rgb), 0.12)",
+              borderColor: "rgba(var(--amber-rgb), 0.4)",
+              color: AMBER,
+            }}
+          >
+            {/*
+              Deux gestes différents sous un même bouton : le lecteur
+              qui quitte le tournoi « abandonne », l'arbitrage, lui,
+              « déclare forfait » une équipe — pour tout le reste du
+              tournoi, et non sur la seule manche en cours (ce
+              forfait-là se pose sur le match).
+            */}
+            {isMine ? a("forfeit.button.label") : a("forfeit.endurance.other")}
+          </button>
+        )}
+        {canCancelRow(standing.status) && onCancelForfeit !== undefined && (
+          <button
+            type="button"
+            onClick={() => onCancelForfeit(standing.teamId, standing.teamName)}
+            className="btn tap-target"
+            title={a("forfeitCancel.buttonTitle", { name: standing.teamName })}
+            aria-label={a("forfeitCancel.buttonAria", { name: standing.teamName })}
+            style={FORFEIT_CANCEL_BUTTON_STYLE}
+          >
+            {a("forfeitCancel.button")}
+          </button>
+        )}
+      </>
+    );
+  };
 
   return (
     <>
-      {/*
-        Le barème se compte map par map : « par victoire » laissait lire un
-        point par match gagné, alors qu'un 3-0 en déplace trois — et c'est ce
-        même compte qui chiffre un forfait.
-      */}
-      <p className="mono" style={{ fontSize: 11, color: "var(--ink-quiet)", margin: "0 0 16px" }}>
-        {t("endurance.summary", {
-          start: String(endurance.startPoints),
-          win: String(endurance.winDelta),
-          loss: String(endurance.lossDelta),
-          forfeit: String(endurance.forfeitMaps),
-        })}
-        {endurance.playoffsStarted
-          ? t("endurance.playoffsAt", { size: String(endurance.playoffSize) })
-          : t(roundStatusKey, {
-              round: roundLabel,
-              count: activeCount,
-              size: String(endurance.playoffSize),
-            })}
-      </p>
+      <EnduranceCard endurance={endurance} matches={matches} isFinished={isFinished} />
 
-      <div className="table-like" style={{ marginBottom: showOutLegend ? 8 : 24 }}>
-        {/* La colonne des nuls n'apparaît que si le tournoi en a produit un :
-            « V / N / D » sur un plateau qui n'en connaît aucun ferait porter au
-            classement une colonne de zéros, et la ligne est déjà dense. */}
-        <div className={`${rowClassName} table-header`}>
-          <span>#</span>
-          <span>{participantText(text, participantType, "oneCapitalized")}</span>
-          <span>{t("endurance.endurance")}</span>
-          <span>{recordLabel}</span>
-          <span>{t("endurance.status")}</span>
-          {showActions && <span className="sr-only">{t("endurance.actions")}</span>}
-        </div>
-        {endurance.standings.map((standing) => {
-          const isMine = myTeamId !== null && standing.teamId === myTeamId;
-          const forfeitable = canForfeitRow(standing.teamId, standing.status);
-
-          return (
-            <div
-              key={standing.teamId}
-              className={rowClassName}
-              data-podium-muted={ROW_OPACITY[standing.status] < 1 ? "" : undefined}
-              style={{
-                opacity: ROW_OPACITY[standing.status],
-                background: isMine ? "rgba(89,212,255,0.06)" : undefined,
-              }}
-            >
-              <span className="num" data-label="#">
-                {standing.rank}
-              </span>
-              <EntrantName
-                teamId={standing.teamId}
-                name={standing.teamName}
-                textStyle={{ fontWeight: isMine ? 700 : undefined, overflowWrap: "anywhere" }}
-              />
-              <span className="num" data-label={t("endurance.endurance")}>
-                {standing.points}
-                {/*
-                  Le cumul des pénalités se lit à côté du capital, pas à sa
-                  place : c'est le capital qui décide du classement, la sanction
-                  explique seulement pourquoi il n'est pas celui qu'on attendait.
-                */}
-                {standing.penaltyPoints > 0 && (
-                  <span
-                    className={styles.penaltyBadge}
-                    title={t("endurance.penaltyBadgeTitle", { points: standing.penaltyPoints })}
-                  >
-                    {/*
-                      « −3 » seul se lit « moins trois » sans dire de quoi : le
-                      `title` d'un `<span>` n'étant pas annoncé de façon fiable,
-                      la phrase est écrite pour de bon, et masquée à l'œil.
-                    */}
-                    <span aria-hidden="true">−{standing.penaltyPoints}</span>
-                    <span className="sr-only">
-                      {t("endurance.penaltyBadgeSr", { points: standing.penaltyPoints })}
-                    </span>
-                  </span>
-                )}
-              </span>
-              <span data-label={recordLabel}>
-                {hasDraws ? `${standing.wins} / ${standing.draws} / ` : `${standing.wins} / `}
-                <span className="result-loss">{standing.losses}</span>
-              </span>
-              <span data-label={t("endurance.status")}>
-                {t(STATUS_KEYS[standing.status])}
-                {standing.eliminatedRound ? t("endurance.eliminatedRound", { round: String(standing.eliminatedRound) }) : ""}
-              </span>
-              {showActions && (
-                <span className={styles.rowActions}>
-                  {canPenalizeRow(standing.status) && onPenalize !== undefined && (
-                    <button
-                      type="button"
-                      onClick={() => onPenalize(standing.teamId)}
-                      className="btn tap-target"
-                      title={a("penalty.buttonTitle", { name: standing.teamName })}
-                      aria-label={a("penalty.buttonAria", { name: standing.teamName })}
-                      style={{
-                        padding: "3px 8px",
-                        fontSize: 11,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.04em",
-                        background: "rgba(var(--amber-rgb), 0.12)",
-                        borderColor: "rgba(var(--amber-rgb), 0.4)",
-                        color: AMBER,
-                      }}
-                    >
-                      {a("penalty.button")}
-                    </button>
-                  )}
-                  {forfeitable && onForfeit !== undefined && (
-                    <button
-                      type="button"
-                      onClick={() => onForfeit(standing.teamId, standing.teamName)}
-                      className="btn tap-target"
-                      title={
-                        isMine
-                          ? a(`forfeit.endurance.selfTitle.${toParticipantType(participantType)}`)
-                          : a("forfeit.endurance.otherTitle", { name: standing.teamName })
-                      }
-                      aria-label={
-                        isMine
-                          ? a("forfeit.endurance.selfAria")
-                          : a("forfeit.endurance.otherTitle", { name: standing.teamName })
-                      }
-                      style={{
-                        padding: "3px 8px",
-                        fontSize: 11,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.04em",
-                        background: "rgba(var(--amber-rgb), 0.12)",
-                        borderColor: "rgba(var(--amber-rgb), 0.4)",
-                        color: AMBER,
-                      }}
-                    >
-                      {/*
-                        Deux gestes différents sous un même bouton : le lecteur
-                        qui quitte le tournoi « abandonne », l'arbitrage, lui,
-                        « déclare forfait » une équipe — pour tout le reste du
-                        tournoi, et non sur la seule manche en cours (ce
-                        forfait-là se pose sur le match).
-                      */}
-                      {isMine ? a("forfeit.button.label") : a("forfeit.endurance.other")}
-                    </button>
-                  )}
-                  {canCancelRow(standing.status) && onCancelForfeit !== undefined && (
-                    <button
-                      type="button"
-                      onClick={() => onCancelForfeit(standing.teamId, standing.teamName)}
-                      className="btn tap-target"
-                      title={a("forfeitCancel.buttonTitle", { name: standing.teamName })}
-                      aria-label={a("forfeitCancel.buttonAria", { name: standing.teamName })}
-                      style={FORFEIT_CANCEL_BUTTON_STYLE}
-                    >
-                      {a("forfeitCancel.button")}
-                    </button>
-                  )}
-                </span>
-              )}
-            </div>
-          );
-        })}
-      </div>
+      <EnduranceRankingViews
+        endurance={endurance}
+        matches={matches}
+        myTeamId={myTeamId}
+        renderActions={renderActions}
+        showActions={showActions}
+        wideActions={showPenaltyAction}
+      />
 
       {showOutLegend && (
         <p className="mono" style={{ fontSize: 11, color: "var(--ink-quiet)", margin: "0 0 24px" }}>
@@ -649,9 +397,8 @@ export function EnduranceView({
       )}
 
       {/*
-        Le journal des sanctions vient **avant** le tableau manche par manche :
-        c'est lui qui explique les soulignements ambre qu'on y trouvera, et une
-        légende qui suit ce qu'elle légende se lit deux fois.
+        Le journal des sanctions suit le classement : c'est lui qui explique les
+        badges ambre « −N » qu'on vient d'y lire.
       */}
       <PenaltyLog
         penalties={endurance.penalties}
@@ -660,12 +407,16 @@ export function EnduranceView({
         }
       />
 
-      <EnduranceHistory endurance={endurance} myTeamId={myTeamId} />
+      {/* Emplacement réservé : l'accordéon « Évolution de l'endurance »
+          (lot 2) viendra ici, entre le journal des sanctions et l'aperçu. */}
 
       {/*
-        L'aperçu précède le plateau : c'est en regardant la manche en cours que
-        l'arbitrage prépare la suivante, et le volet se replie pour qui n'en a
-        pas l'usage. Outil d'arbitrage : noms sobres, sans marche du podium.
+        L'aperçu ouvre la suite des volets (aperçu → manche en cours → manches
+        closes, de la plus récente à la plus ancienne) : c'est en regardant la
+        manche en cours que l'arbitrage prépare la suivante, et le volet se
+        replie pour qui n'en a pas l'usage. Play-offs lancés, il annonce le tour
+        suivant de l'arbre et précède donc l'arbre lui-même. Outil d'arbitrage :
+        noms sobres, sans marche du podium.
       */}
       {nextRound && (
         <PodiumTiersOff>
@@ -729,7 +480,6 @@ export function EnduranceView({
             sections={roundSections}
             accent={ACCENT.UPPER}
             myTeamId={myTeamId}
-            playoffsStarted={endurance.playoffsStarted}
             allTournamentMatches={matches}
             adminResolvable={adminResolvable}
             onOpenAdminModal={onOpenAdminModal}
