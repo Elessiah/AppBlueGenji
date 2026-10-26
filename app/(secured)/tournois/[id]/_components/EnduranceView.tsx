@@ -408,7 +408,25 @@ export function EnduranceView({
       />
 
       {/* Emplacement réservé : l'accordéon « Évolution de l'endurance »
-          (lot 2) viendra ici, entre le journal des sanctions et les play-offs. */}
+          (lot 2) viendra ici, entre le journal des sanctions et l'aperçu. */}
+
+      {/*
+        L'aperçu ouvre la suite des volets (aperçu → manche en cours → manches
+        closes, de la plus récente à la plus ancienne) : c'est en regardant la
+        manche en cours que l'arbitrage prépare la suivante, et le volet se
+        replie pour qui n'en a pas l'usage. Play-offs lancés, il annonce le tour
+        suivant de l'arbre et précède donc l'arbre lui-même. Outil d'arbitrage :
+        noms sobres, sans marche du podium.
+      */}
+      {nextRound && (
+        <PodiumTiersOff>
+          <EnduranceNextRoundPanel
+            preview={nextRound}
+            maxRounds={endurance.maxRounds}
+            teamNames={teamNames}
+          />
+        </PodiumTiersOff>
+      )}
 
       {/*
         Les play-offs passent devant les manches qualificatives dès qu'ils sont
@@ -453,21 +471,6 @@ export function EnduranceView({
             </div>
           )}
         </div>
-      )}
-
-      {/*
-        L'aperçu précède les manches : c'est en regardant la manche en cours que
-        l'arbitrage prépare la suivante, et le volet se replie pour qui n'en a
-        pas l'usage. Outil d'arbitrage : noms sobres, sans marche du podium.
-      */}
-      {nextRound && (
-        <PodiumTiersOff>
-          <EnduranceNextRoundPanel
-            preview={nextRound}
-            maxRounds={endurance.maxRounds}
-            teamNames={teamNames}
-          />
-        </PodiumTiersOff>
       )}
 
       {roundSections.length > 0 ? (
