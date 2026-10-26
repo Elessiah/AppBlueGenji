@@ -284,11 +284,14 @@ export function EnduranceRankingViews({
     <div style={{ marginBottom: 8 }}>
       {views.length > 1 && (
         <div className={styles.bar}>
+          {/* `aria-disabled` plutôt que `disabled` : arrivé au bout, le bouton
+              garde le focus au lieu de le rendre au document ; `go` ignore
+              déjà une cible hors des vues. */}
           <button
             type="button"
             className={`btn ghost ${styles.arrow}`}
             aria-label={t("endurance.viewPrev")}
-            disabled={prev === null}
+            aria-disabled={prev === null}
             onClick={() => go(index - 1)}
           >
             <ChevronLeft size={16} aria-hidden="true" />
@@ -330,7 +333,7 @@ export function EnduranceRankingViews({
             type="button"
             className={`btn ghost ${styles.arrow}`}
             aria-label={t("endurance.viewNext")}
-            disabled={next === null}
+            aria-disabled={next === null}
             onClick={() => go(index + 1)}
           >
             <ChevronRight size={16} aria-hidden="true" />

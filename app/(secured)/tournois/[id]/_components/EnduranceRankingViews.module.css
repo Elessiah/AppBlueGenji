@@ -64,6 +64,11 @@
   padding: 0;
 }
 
+.arrow[aria-disabled="true"] {
+  color: var(--ink-quiet);
+  cursor: default;
+}
+
 .barMiddle {
   display: flex;
   flex-direction: column;
