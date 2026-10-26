@@ -321,11 +321,22 @@ describe("bot legal content matches the bot's code and the association", () => {
 
   it("says the site sends the recipient's BlueGenji username with each direct message (legal review #441)", () => {
     expect(flatOf(PRIVACY_POLICY, "fr")).toContain(
-      "un identifiant ou un pseudo Discord, le pseudo BlueGenji du destinataire et le message à remettre",
+      "un identifiant ou un pseudo Discord, le pseudo BlueGenji du destinataire, pour le seul code de connexion la langue du compte BlueGenji",
     );
     expect(flatOf(PRIVACY_POLICY, "en")).toContain(
-      "a Discord ID or username, the recipient's BlueGenji username and the message to deliver",
+      "a Discord ID or username, the recipient's BlueGenji username, for the login code only the language of the BlueGenji account",
     );
+  });
+
+  it("says direct messages follow the account language, bilingual when unknown, channels in French (BOT-NOTIF-LANG)", () => {
+    expect(flatOf(PRIVACY_POLICY, "fr")).toContain(
+      "Les messages privés du site partent dans la langue du compte BlueGenji du destinataire, ou en un seul message en français puis en anglais quand elle n'est pas connue",
+    );
+    expect(flatOf(PRIVACY_POLICY, "fr")).toContain("les messages publiés dans les salons restent en français");
+    expect(flatOf(PRIVACY_POLICY, "en")).toContain(
+      "The website's direct messages are written in the language of the recipient's BlueGenji account, or as a single message in French then in English when it is not known",
+    );
+    expect(flatOf(PRIVACY_POLICY, "en")).toContain("messages posted in channels stay in French");
   });
 
   it("informs rather than binds: the policy is never 'accepted' by use", () => {

@@ -49,7 +49,7 @@ import {
 } from "@/lib/shared/legal-contact";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
-export const REGISTER_UPDATED_AT = "2026-10-22";
+export const REGISTER_UPDATED_AT = "2026-10-27";
 
 /**
  * Durées appliquées par le serveur, et déclarées ici : `lib/server/auth.ts` et
@@ -309,7 +309,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Afficher un profil public (pseudo, avatar, pseudos de jeu selon les réglages de visibilité)",
       "Mettre les joueurs en relation (s'ajouter en jeu, recrutement d'équipe)",
       "Exporter ses données et supprimer son compte depuis « Mon profil » (la suppression aussi depuis la fenêtre d'acceptation des conditions d'utilisation, sans les accepter)",
-      "Rédiger les notifications push dans la langue du compte : celle de la page du site d'où part la dernière connexion (une connexion lancée d'ailleurs, ou par le bouton Google, Discord ou Blizzard depuis un navigateur qui ne l'indique pas (trop ancien, ou qui retire cette indication), ne la change pas ; français par défaut), ou celle choisie dans « Mon profil »",
+      "Rédiger les notifications push et les messages privés Discord du site dans la langue du compte (en français puis en anglais quand elle ne peut pas être lue) : celle de la page du site d'où part la dernière connexion (une connexion lancée d'ailleurs, ou par le bouton Google, Discord ou Blizzard depuis un navigateur qui ne l'indique pas (trop ancien, ou qui retire cette indication), ne la change pas ; français par défaut), ou celle choisie dans « Mon profil »",
       "Garder sur le compte le choix « Ne plus afficher » de la fenêtre des annonces de recrutement urgentes, pour qu'elle ne s'ouvre plus d'elle-même sur les autres appareils du joueur — choix réversible dans « Mon profil »",
       "Proposer une fois, après une connexion par Discord ou Blizzard, la certification du tag Discord à un compte qui ne l'a pas (fenêtre qui ne certifie rien d'elle-même), et garder sur le compte le choix « Ne plus voir » de cette fenêtre",
     ],
@@ -321,7 +321,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Pseudos Overwatch (BattleTag), Marvel Rivals et Discord ; certification du pseudo Discord ; indication d'un BattleTag tiré d'un compte Battle.net rattaché (pastille de la fiche, montrée même BattleTag masqué)",
       "Majorité déclarée (oui / non / non renseignée)",
       "Réglages de visibilité, disponibilité pour le recrutement, rôles sur la plateforme",
-      "Langue du compte (français ou anglais), remise au français à l'anonymisation",
+      "Langue du compte (français ou anglais), remise au français à l'anonymisation ; transmise au bot Discord de l'association (T08) avec le seul code de connexion, que le bot rédige dans cette langue sans la garder",
       "Choix « Ne plus afficher » de la fenêtre des annonces de recrutement urgentes, fait dans cette fenêtre ou en décochant la case de « Mon profil » (jamais choisi / oui / réaffichée depuis « Mon profil » ; un choix fait sur le navigateur avant la connexion, ou pas enregistré sur-le-champ, est reporté sur un compte qui n'a jamais choisi, à la connexion ou à la visite connectée suivante ; réafficher depuis « Mon profil » efface aussi le cookie bg_recr_off de ce navigateur), remis à « jamais choisi » à l'anonymisation",
       "Choix « Ne plus voir » de la fenêtre qui propose la certification du tag Discord (date du choix), effacé à l'anonymisation ; sur la session de connexion, marque « fenêtre encore à proposer » (posée à une connexion par Discord ou Blizzard, levée à la première réponse), effacée avec la session",
       "Aucun nom réel, aucune adresse e-mail, aucun numéro de téléphone, aucune adresse postale",

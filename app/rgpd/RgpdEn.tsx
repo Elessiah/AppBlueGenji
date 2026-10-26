@@ -207,8 +207,8 @@ export function RgpdEn({
             <strong>Mandatory and optional data.</strong> To exist, an account only needs a means of logging in
             — the Google, Discord or Blizzard identifier of the chosen provider — and a site username, assigned
             automatically at creation. It also keeps a language, French or English (French by default), set at
-            login or chosen in My profile, used to write your push notifications to you (Discord messages stay in
-            French): it is not optional, but you can change it in My profile (until you next log in from a page
+            login or chosen in My profile, used to write your push notifications and the site&apos;s Discord direct
+            messages to you (messages in Discord channels stay in French): it is not optional, but you can change it in My profile (until you next log in from a page
             in the other language). Without a means of logging in, no account can be created: public pages
             remain readable, but you can neither join a team nor register for a tournament. The provider also
             sends what the table describes for it, which comes with the login: the Discord username from
@@ -816,11 +816,15 @@ export function RgpdEn({
               site keeps this single choice with every account, subscribed or not, for the lifetime of the account, to
               write to you in your language (performance of the service,{" "}
               <LocaleLink href="/rgpd/registre#t01">register, T01</LocaleLink>); it appears in the export of your data and goes back to French if the
-              account is anonymized. Discord messages, for their part, stay in French.
+              account is anonymized. The direct messages the site sends you on Discord follow the same language
+              (French then English when it cannot be read, and for staff whose account the site does not know); the
+              Discord login code is written by the bot, to which the site sends the account language for that purpose.
+              Messages posted in Discord channels stay in French.
             </li>
           </ul>
           <p id="messages-de-match">
-            <strong>Match Discord direct messages.</strong> The bot also writes to you privately, in French, when
+            <strong>Match Discord direct messages.</strong> The bot also writes to you privately, in your account&apos;s
+            language, when
             the time of one of your matches is set, changed or removed, for its reminders (24 h and 10 h before) and
             when you are removed from a match — only if your Discord tag is <strong>certified</strong>: an
             uncertified tag, even one linked by signing in with Discord, receives none, to avoid spam (your push notifications are still sent). These messages
