@@ -998,8 +998,8 @@ function RgpdFr({
               choix avec tout compte, abonné ou non, le temps du compte, pour vous écrire dans votre langue
               (exécution du service, <Link href="/rgpd/registre#t01">registre, T01</Link>) ; il figure dans l&apos;export de vos données et revient au français si le compte
               est anonymisé. Les messages privés que le site vous envoie sur Discord suivent la même langue
-              (en français puis en anglais quand elle ne peut pas être lue, et pour le staff dont le site ne
-              connaît pas le compte ; en français seul si les deux ne tiennent pas dans un message) ; le code
+              (en français puis en anglais quand elle ne peut pas être lue, et pour les alertes adressées au staff — arbitres,
+              direction —, dont le site ne connaît pas les destinataires ; en français seul si les deux ne tiennent pas dans un message) ; le code
               envoyé par message privé Discord (connexion, certification ou changement du tag) est rédigé par le
               bot, à qui le site transmet pour cela la langue du compte déjà rattaché à ce compte Discord — en
               français puis en anglais s&apos;il n&apos;y en a pas. Les messages publiés dans les salons Discord restent en

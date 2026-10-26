@@ -817,7 +817,7 @@ export function RgpdEn({
               write to you in your language (performance of the service,{" "}
               <LocaleLink href="/rgpd/registre#t01">register, T01</LocaleLink>); it appears in the export of your data and goes back to French if the
               account is anonymized. The direct messages the site sends you on Discord follow the same language
-              (French then English when it cannot be read, and for staff whose account the site does not know; French
+              (French then English when it cannot be read, and for alerts sent to staff — referees, leadership —, whose recipients the site does not know; French
               alone when both do not fit in one message); the code sent by Discord direct message (login, certification
               or change of the tag) is written by the bot, to which the site sends for that purpose the language of the
               account already linked to that Discord account — French then English when there is none.
