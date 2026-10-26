@@ -47,9 +47,10 @@ même évènement (`push-messages.ts`, une rédaction par langue) et son lien. L
 texte libre d'un joueur (signalement) n'est que dans la partie française.
 
 **Code de connexion.** `sendDiscordLoginCode(discordId, code, locale)` transmet
-la langue : celle du compte rattaché à ce Discord pour la connexion
-(`accountLocaleForDiscordId`), celle du compte qui demande pour la
-certification ou le changement de tag (`accountLocaleOf`).
+la langue du compte **destinataire**, celui qui porte déjà ce Discord
+(`accountLocaleForDiscordId`), pour la connexion comme pour la certification ou
+le changement de tag — jamais celle du demandeur : un tag saisi n'est pas encore
+prouvé et peut désigner quelqu'un d'autre. Sans compte rattaché, bilingue.
 
 ## Ce que vaut une `locale` absente
 
