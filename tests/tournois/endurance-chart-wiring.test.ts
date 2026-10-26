@@ -68,6 +68,12 @@ describe("mouvement", () => {
     expect(CSS).toMatch(/\.ghostButton\[aria-disabled="true"\] \{[^}]*color: var\(--ink-dim\);/);
   });
 
+  it("l'aide du mode est derrière un bouton « i », jamais en paragraphe permanent", () => {
+    expect(CHART).toContain('import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";');
+    expect(CHART).toMatch(/<InfoHint id=\{`\$\{hintId\}-mode`\} subject=\{t\(`endurance\.chartModes\$\{kind\}`\)\}>\s*\{modeHint\}\s*<\/InfoHint>/);
+    expect(CHART).not.toContain("<p className={styles.hint}>{modeHint}</p>");
+  });
+
   it("aucune animation CSS infinie", () => {
     expect(CSS).not.toMatch(/animation\s*:/);
     expect(CSS).not.toContain("infinite");
