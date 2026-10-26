@@ -92,13 +92,19 @@ export type TickerMatchScoreInput = TickerMatchOutcomeInput & {
  * Scores affichés, comme sur les fiches (`forfeitAwareMapScore`) : un double
  * forfait n'a **aucun** score (`DOUBLE_FORFEIT.md` — pas de « 0 — 0 », même si
  * une ancienne ligne en garde un) ; un forfait se chiffre au score plein du
- * format (FT3 → 3-0, `forfeitMapCount`), les forfaits antérieurs à la règle
- * n'ayant rien en colonnes. Sinon, les colonnes.
+ * format (FT3 → 3-0, `forfeitMapCount`) quand les colonnes sont vides ou à
+ * 0-0 (forfaits antérieurs à la règle) ; un score de forfait déjà écrit, qui
+ * suit le format de sa phase (play-offs d'une BG Survie), est gardé. Sinon,
+ * les colonnes.
  */
 export function tickerScores(match: TickerMatchScoreInput): readonly [number | null, number | null] {
   if (match.doubleForfeit) return [null, null];
   const [left, right] = tickerOutcomes(match);
   if (left === "forfeit" || right === "forfeit") {
+    // Score de forfait déjà écrit (`adminResolveMatch`, format de la phase) :
+    // on le garde. Le format du tournoi ne chiffre que les anciennes lignes vides.
+    const written = match.score1 !== null && match.score2 !== null && (match.score1 > 0 || match.score2 > 0);
+    if (written) return [Number(match.score1), Number(match.score2)];
     const maps = forfeitMapCount(match.format);
     return left === "forfeit" ? [0, maps] : [maps, 0];
   }
