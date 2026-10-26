@@ -12,6 +12,7 @@ export interface EscapeLayer {
 /** Ce que `Échap` consulte de l'élément qui a reçu la touche. */
 export interface EscapeTarget {
   getAttribute?(name: string): string | null;
+  closest?(selector: string): unknown;
 }
 
 /**
@@ -20,6 +21,8 @@ export interface EscapeTarget {
  * - un panneau d'une couche exemptée est ouvert (son propre écouteur le
  *   referme — la question porte sur le panneau, pas sur la cible : Safari ne
  *   focalise pas un bouton cliqué) ;
+ * - la cible est dans un élément ouvert qui referme lui-même sur Échap
+ *   (`data-escape-owner`, posé par `InfoHint` déplié) ;
  * - la cible est un `combobox` dont la liste est ouverte (il la referme).
  *   Le rôle est exigé, et pas seulement `aria-expanded` : un bouton de
  *   dépliage porte lui aussi `aria-expanded="true"` sans écouter Échap.
@@ -29,6 +32,7 @@ export function escapeBelongsElsewhere(
   target: EscapeTarget | null | undefined,
 ): boolean {
   if (layers.some((layer) => layer.querySelector('[aria-expanded="true"]'))) return true;
+  if (target?.closest?.("[data-escape-owner]")) return true;
   return target?.getAttribute?.("role") === "combobox" && target.getAttribute("aria-expanded") === "true";
 }
 

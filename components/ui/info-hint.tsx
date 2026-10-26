@@ -70,7 +70,8 @@ export function InfoHint({
   }, [open]);
 
   return (
-    <div ref={rootRef} className={s.root}>
+    // `data-escape-owner` : déplié, Échap le replie sans fermer la modale qui le porte (`escapeBelongsElsewhere`).
+    <div ref={rootRef} className={s.root} data-escape-owner={open ? "" : undefined}>
       <button
         ref={buttonRef}
         type="button"
