@@ -557,3 +557,17 @@ describe("politique du bot — avis « Match retiré », AutoMod et bases (LEGAL
     expect(en).toContain("performance of the service the player registers for, for their public username in the #live announcement of a solo tournament");
   });
 });
+
+describe("politique du bot — sauvegardes deux fois par semaine (BACKUP-SCHEDULE)", () => {
+  const flatOf = (doc: BilingualDoc, lang: "fr" | "en") => JSON.stringify(doc[lang]);
+
+  it("dit dimanche et mardi soir, en français comme en anglais", () => {
+    expect(flatOf(PRIVACY_POLICY, "fr")).toContain("la base du Bot est sauvegardée deux fois par semaine (dimanche et mardi soir), chiffrée,");
+    expect(flatOf(PRIVACY_POLICY, "en")).toContain("the Bot's database is backed up twice a week (Sunday and Tuesday evenings), encrypted,");
+  });
+
+  it("ne dit plus « chaque semaine » ni « weekly » pour les sauvegardes", () => {
+    expect(flatOf(PRIVACY_POLICY, "fr")).not.toContain("sauvegardée chaque semaine");
+    expect(flatOf(PRIVACY_POLICY, "en")).not.toContain("backed up weekly");
+  });
+});

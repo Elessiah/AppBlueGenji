@@ -544,6 +544,14 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "The messages themselves are still based on the association's legitimate interest, with your right to object.",
     ],
   },
+  "2026-10-sauvegardes-deux-fois-par-semaine": {
+    title: "Backups twice a week",
+    summary:
+      "The encrypted backups of the site's and the bot's databases are now made twice a week, on Sunday and Tuesday evenings, and no longer once a week as stated in the information of September 23, 2026.",
+    details: [
+      `What is backed up, the encryption and the retention period do not change: each archive is destroyed after ${BACKUP_RETENTION_DAYS} days at most.`,
+    ],
+  },
 };
 
 /**

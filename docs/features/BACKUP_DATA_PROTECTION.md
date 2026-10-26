@@ -10,13 +10,13 @@ garde une copie de données personnelles, donc chacune est un traitement.
 
 | Quoi | Comment | Durée |
 | --- | --- | --- |
-| Base MySQL du site (+ SQLite du bot) | Archive hebdomadaire chiffrée (`age`), déposée sur le stockage distant (Hetzner) | 30 jours (`BACKUP_RETENTION_DAYS`) |
+| Base MySQL du site (+ SQLite du bot) | Archive chiffrée (`age`) deux fois par semaine, dimanche et mardi à 23 h 49 (heure de Paris), déposée sur le stockage distant (Hetzner) | 30 jours (`BACKUP_RETENTION_DAYS`) |
 | Images téléversées (`public/uploads`) | Miroir horaire chiffré (`rclone crypt`) | Tant que l'image existe sur le site, **plus une heure au plus** |
 | Journal des suppressions (`data/account-deletions.jsonl`) | Copié chiffré avec les images, chaque heure | 60 jours par ligne (`ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS`) |
 
 La purge des archives est refaite **chaque heure** par le cron des images, et
-pas seulement par la sauvegarde du lundi : seule, cette dernière laissait une
-archive vivre jusqu'à 35 jours (28 jours au quatrième passage, donc gardée),
+pas seulement par les sauvegardes (dimanche et mardi) : seules, elles laisseraient une
+archive vivre jusqu'à 35 jours (30 jours au passage d'avant, donc gardée),
 davantage si une exécution échouait avant sa purge — et `/rgpd` annonce 30 jours
 au plus.
 

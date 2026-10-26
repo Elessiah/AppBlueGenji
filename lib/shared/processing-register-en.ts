@@ -444,7 +444,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     name: "Backups",
     purpose: "Resuming activity after an outage, corruption or a handling error",
     subPurposes: [
-      "Weekly archive of the site's and the bot's databases",
+      "Twice-weekly archive (Sunday and Tuesday evenings) of the site's and the bot's databases",
       "Hourly copy of uploaded images (avatars, logos, photos)",
       "Log of account deletions, replayed after any restoration",
     ],

@@ -1055,6 +1055,19 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Les messages eux-mêmes reposent toujours sur l'intérêt légitime de l'association, avec ton droit d'opposition.",
     ],
   },
+  {
+    // BACKUP-SCHEDULE : entrée rectificative. L'entrée du 23 septembre, publiée,
+    // dit « chaque semaine » ; le cron tourne désormais le dimanche et le mardi
+    // à 23 h 49. Contenu, chiffrement et durée inchangés.
+    id: "2026-10-sauvegardes-deux-fois-par-semaine",
+    publishedAt: "2026-10-27",
+    title: "Sauvegardes deux fois par semaine",
+    summary:
+      "Les sauvegardes chiffrées des bases du site et du bot sont désormais faites deux fois par semaine, le dimanche et le mardi soir, et non plus une fois par semaine comme l'annonçait l'information du 23 septembre 2026.",
+    details: [
+      `Ce qui est sauvegardé, le chiffrement et la durée de conservation ne changent pas : chaque archive est détruite au bout de ${BACKUP_RETENTION_DAYS} jours au plus.`,
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */
