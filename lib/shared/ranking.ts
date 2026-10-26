@@ -535,6 +535,19 @@ export function isRankedTeam(team: { wins: number; losses: number; draws?: numbe
 }
 
 /**
+ * Ordre par rang de l'annuaire `/equipes` : rang croissant, les équipes **sans
+ * rang** (aucun match compté, {@link isRankedTeam}) à la fin. Zéro entre deux
+ * équipes sans rang : à l'appelant de les départager (le serveur par
+ * {@link compareRankedTeams}, qui les range par nom à cote de départ égale).
+ */
+export function compareDirectoryRank(a: { rank: number | null }, b: { rank: number | null }): number {
+  if (a.rank === b.rank) return 0;
+  if (a.rank === null) return 1;
+  if (b.rank === null) return -1;
+  return a.rank - b.rank;
+}
+
+/**
  * Ordre du classement du site, appliqué **en mémoire** pour que toutes les vues
  * trient à l'identique — leaderboard, page `/classement`, annuaire **et**
  * seeding : la **cote** d'abord, strictement, puis, à cote égale, les victoires
@@ -553,19 +566,6 @@ export function isRankedTeam(team: { wins: number; losses: number; draws?: numbe
  * `localeCompare("fr")` ne départagent pas les noms de la même façon, et deux
  * vues triées chacune de son côté finiraient par afficher deux ordres.
  */
-/**
- * Ordre par rang de l'annuaire `/equipes` : rang croissant, les équipes **sans
- * rang** (aucun match compté, {@link isRankedTeam}) à la fin. Zéro entre deux
- * équipes sans rang : à l'appelant de les départager (le serveur par
- * {@link compareRankedTeams}, qui les range par nom à cote de départ égale).
- */
-export function compareDirectoryRank(a: { rank: number | null }, b: { rank: number | null }): number {
-  if (a.rank === b.rank) return 0;
-  if (a.rank === null) return 1;
-  if (b.rank === null) return -1;
-  return a.rank - b.rank;
-}
-
 export function compareRankedTeams(
   a: { points: number; wins: number; losses: number; draws?: number; name: string },
   b: { points: number; wins: number; losses: number; draws?: number; name: string },
