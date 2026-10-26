@@ -35,7 +35,18 @@ describe("AboutStats — valeur anglaise", () => {
 
   it("la carte affiche la valeur dans la langue de la page", () => {
     expect(source).toContain("{shown.map(({ stat: s, value, label, index }) => (");
-    expect(source).toMatch(/<div className="num" style=\{\{ fontSize: 26 \}\}>\{value\}<\/div>/);
+    expect(source).toMatch(
+      /<div className="num" style=\{\{ fontSize: 26 \}\} lang=\{staffLang && !hasEnglish\(s\.valueEn\) \? "fr" : undefined\}>\s*\{value\}\s*<\/div>/,
+    );
+  });
+
+  it("la valeur anglaise suit la valeur, avant le titre dont l'Entrée enregistre", () => {
+    const value = source.indexOf("htmlFor={STAT_FIELD_IDS.value}>");
+    const valueEn = source.indexOf("htmlFor={STAT_FIELD_IDS.valueEn}");
+    const title = source.indexOf("<BilingualField");
+    expect(value).toBeGreaterThan(-1);
+    expect(valueEn).toBeGreaterThan(value);
+    expect(title).toBeGreaterThan(valueEn);
   });
 
   it("pendant l'envoi, les boutons gardent le focus : aria-disabled + garde, jamais disabled", () => {
