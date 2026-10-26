@@ -52,7 +52,8 @@ import { toIso } from "@/lib/server/serialization";
 import { getDiscordCommunity } from "@/lib/server/discord-community";
 import { landingServerText } from "@/lib/server/i18n-landing";
 import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
-import { tickerOutcomes, type TickerItem, type TickerOutcome } from "@/lib/shared/ticker-items";
+import { parseMatchFormat } from "@/lib/shared/match-format";
+import { tickerOutcomes, tickerScores, type TickerItem, type TickerOutcome } from "@/lib/shared/ticker-items";
 import { visibleText } from "@/lib/shared/visible-text";
 
 const DEFAULT_SITE_COUNTS: SiteCounts = {
@@ -613,6 +614,10 @@ type MatchResultRow = RowDataPacket & {
   winner_team_id: number | null;
   forfeit_team_id: number | null;
   double_forfeit: number | boolean | null;
+  match_format_type: "BO" | "FT" | null;
+  match_format_value: number | null;
+  match_format_max_maps: number | null;
+  match_format_draws: number | null;
 };
 
 type RegistrationRow = RowDataPacket & {
@@ -684,7 +689,11 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
         m.team2_id,
         m.winner_team_id,
         m.forfeit_team_id,
-        m.double_forfeit
+        m.double_forfeit,
+        t.match_format_type,
+        t.match_format_value,
+        t.match_format_max_maps,
+        t.match_format_draws
        FROM bg_matches m
        JOIN bg_tournaments t ON t.id = m.tournament_id
        LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
@@ -698,20 +707,37 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
     );
 
     entries.push(
-      ...resultRows.map((row) => ({
-        kind: "result" as const,
-        tournament: row.tournament_name,
-        team1: row.team1_name,
-        team1Id: row.team1_id,
-        score1: row.team1_score === null ? null : Number(row.team1_score),
-        team2: row.team2_name,
-        team2Id: row.team2_id,
-        score2: row.team2_score === null ? null : Number(row.team2_score),
-        winnerTeamId: row.winner_team_id === null ? null : Number(row.winner_team_id),
-        forfeitTeamId: row.forfeit_team_id === null ? null : Number(row.forfeit_team_id),
-        doubleForfeit: Boolean(Number(row.double_forfeit ?? 0)),
-        sortAt: new Date(row.updated_at).getTime(),
-      })),
+      ...resultRows.map((row) => {
+        const outcome = {
+          team1Id: row.team1_id,
+          team2Id: row.team2_id,
+          winnerTeamId: row.winner_team_id === null ? null : Number(row.winner_team_id),
+          forfeitTeamId: row.forfeit_team_id === null ? null : Number(row.forfeit_team_id),
+          doubleForfeit: Boolean(Number(row.double_forfeit ?? 0)),
+        };
+        // Forfait au score plein du format, double forfait sans score (TICKER_RESULTS.md).
+        const [score1, score2] = tickerScores({
+          ...outcome,
+          score1: row.team1_score,
+          score2: row.team2_score,
+          format: parseMatchFormat(
+            row.match_format_type,
+            row.match_format_value,
+            row.match_format_max_maps,
+            row.match_format_draws,
+          ),
+        });
+        return {
+          kind: "result" as const,
+          tournament: row.tournament_name,
+          team1: row.team1_name,
+          team2: row.team2_name,
+          score1,
+          score2,
+          ...outcome,
+          sortAt: new Date(row.updated_at).getTime(),
+        };
+      }),
     );
 
     const [registrationRows] = await db.execute<RegistrationRow[]>(
