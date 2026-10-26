@@ -57,6 +57,17 @@ describe("mouvement", () => {
     expect(CHART).toMatch(/if \(previous === lastRound \|\| target !== null\) return;\s*runTo\(lastRound, Math\.min\(progressRef\.current, previous\)\);/);
   });
 
+  it("l'encart lit le bilan à la manche affichée, comme le rang", () => {
+    expect(CHART).toContain("...chartRecordAt(hovered, shown, lastRound),");
+    expect(CHART).not.toContain("wins: hovered.standing.wins");
+  });
+
+  it("« Effacer la sélection » reste monté (focus gardé), aria-disabled une fois vide", () => {
+    expect(CHART).toMatch(/\{mode === "PICK" && \(\s*<button[^>]*aria-disabled=\{picked\.length === 0\}/);
+    expect(CHART).not.toContain('mode === "PICK" && picked.length > 0 &&');
+    expect(CSS).toMatch(/\.ghostButton\[aria-disabled="true"\] \{[^}]*color: var\(--ink-dim\);/);
+  });
+
   it("aucune animation CSS infinie", () => {
     expect(CSS).not.toMatch(/animation\s*:/);
     expect(CSS).not.toContain("infinite");

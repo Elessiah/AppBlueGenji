@@ -15,6 +15,7 @@ import {
   chartLine,
   chartOrderAt,
   chartRankAt,
+  chartRecordAt,
   chartShownRound,
   chartTargetFor,
   chartThresholdAt,
@@ -380,5 +381,30 @@ describe("manche affichée et flux", () => {
     expect(chartTargetFor(3, 3)).toBeNull();
     expect(chartTargetFor(1, 3)).toBe(1);
     expect(chartShownRound(chartTargetFor(3, 3), 4)).toBe(4);
+  });
+});
+
+describe("bilan de l'encart", () => {
+  const { endurance, matches } = fixture();
+  const series = enduranceChartSeries(endurance, matches);
+  const withRecord = {
+    ...series[0],
+    standing: {
+      ...series[0].standing,
+      rounds: [{ ...pts(1, 12, 1), wins: 1, losses: 0, draws: 0 }, { ...pts(2, 14, 1), wins: 2, losses: 0, draws: 0 }],
+    },
+  };
+
+  it("une manche passée lit le bilan cumulé à son issue, pas le total du tournoi", () => {
+    expect(chartRecordAt(withRecord, 1, 2)).toEqual({ wins: 1, draws: 0, losses: 0 });
+  });
+
+  it("la dernière manche lit le bilan général", () => {
+    expect(chartRecordAt(withRecord, 2, 2)).toEqual({ wins: 2, draws: 0, losses: 0 });
+    expect(chartRecordAt(series[1], 2, 2)).toEqual({ wins: 1, draws: 0, losses: 1 });
+  });
+
+  it("instantané sans bilan par manche : 0, comme la vue « après la manche n »", () => {
+    expect(chartRecordAt(series[0], 1, 2)).toEqual({ wins: 0, draws: 0, losses: 0 });
   });
 });
