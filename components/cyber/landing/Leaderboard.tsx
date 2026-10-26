@@ -143,7 +143,7 @@ export function Leaderboard({ initialRows }: Readonly<LeaderboardProps>) {
                 <span className={`${styles.trend} ${trendClass}`} role="cell">
                   {row.trend === "new" ? (
                     <>
-                      <span aria-hidden="true">{trend}</span>
+                      <span aria-hidden="true" title={t("leaderboard.trendNew")}>{trend}</span>
                       <span className="sr-only">{t("leaderboard.trendNew")}</span>
                     </>
                   ) : (

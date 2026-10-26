@@ -4,7 +4,7 @@
  *
  * **Le sous-ensemble du classement public**, rien d'autre : nom, logo, cote et
  * bilan de la ligne que `/classement` montre déjà à un visiteur anonyme (onglet
- * « Général », équipes non jouées comprises, dans la limite des lignes que la
+ * « Général », équipes classées seulement, dans la limite des lignes que la
  * page peut afficher — `RANKING_MAX_SHOWN`). Le classement écarte déjà les
  * entrées solo (dont le « nom » est un pseudo) et les équipes dissoutes ; les
  * équipes fantômes sont retirées ici. Aucun joueur : ni pseudo ni avatar.

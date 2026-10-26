@@ -70,7 +70,10 @@ function lossClass(losses: number): string {
   return losses > 0 ? "result-loss" : styles.neutral;
 }
 
-function trendText(row: LandingLeaderboardRow, text: RankingText): { symbol: string; label: string; className: string } {
+function trendText(
+  row: LandingLeaderboardRow,
+  text: RankingText,
+): { symbol: string; label: string; className: string; title?: string } {
   const value = String(row.trendValue);
   if (row.trend === "up") {
     return { symbol: `▲ ${value}`, label: text.t("board.trend.up", { value }), className: styles.trendUp };
@@ -79,7 +82,9 @@ function trendText(row: LandingLeaderboardRow, text: RankingText): { symbol: str
     return { symbol: `▼ ${value}`, label: text.t("board.trend.down", { value }), className: styles.trendDown };
   }
   if (row.trend === "new") {
-    return { symbol: "★", label: text.t("board.trend.new"), className: styles.trendUp };
+    // L'étoile n'est pas un chiffre : son sens s'affiche aussi au survol.
+    const label = text.t("board.trend.new");
+    return { symbol: "★", label, className: styles.trendUp, title: label };
   }
   return { symbol: "—", label: text.t("board.trend.flat"), className: styles.trendFlat };
 }
@@ -179,7 +184,7 @@ function Podium({
               ) : null}
               <span className={`${styles.podiumMetaItem} ${styles.trend} ${trend.className}`}>
                 <span className={styles.podiumMetaLabel} aria-hidden="true">{text.t("board.trendLabel")}</span>
-                <span aria-hidden="true">{trend.symbol}</span>
+                <span aria-hidden="true" title={trend.title}>{trend.symbol}</span>
                 <span className="sr-only">{trend.label}</span>
               </span>
             </p>
@@ -263,7 +268,7 @@ function RankingTable({ rows, forms, showDraws, afterPodium, text }: Readonly<Ra
               </span>
             ) : null}
             <span className={`${styles.trend} ${trend.className}`} role="cell" data-label={column.trendShort}>
-              <span aria-hidden="true">{trend.symbol}</span>
+              <span aria-hidden="true" title={trend.title}>{trend.symbol}</span>
               <span className="sr-only">{trend.label}</span>
             </span>
           </div>
