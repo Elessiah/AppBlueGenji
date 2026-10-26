@@ -4,10 +4,17 @@ import { resolveDiscordUser, sendDiscordLoginCode } from "@/lib/server/bot-integ
 import { createDiscordLoginChallenge, discardDiscordChallenge } from "@/lib/server/users/discord-challenges";
 import { resetRateLimit } from "@/lib/server/rate-limit";
 import { DISCORD_CODE_REQUEST_IP_RULE, DISCORD_CODE_REQUEST_RULE } from "@/lib/server/api-guard";
+import { accountLocaleForDiscordId } from "@/lib/server/users/account-locale";
 
 jest.mock("@/lib/server/bot-integration", () => ({
   resolveDiscordUser: jest.fn(),
   sendDiscordLoginCode: jest.fn(),
+}));
+
+jest.mock("@/lib/server/users/account-locale", () => ({
+  ...jest.requireActual<typeof import("@/lib/server/users/account-locale")>("@/lib/server/users/account-locale"),
+  accountLocaleOf: jest.fn(async () => "en"),
+  accountLocaleForDiscordId: jest.fn(async () => null),
 }));
 
 jest.mock("@/lib/server/users/discord-challenges", () => ({
@@ -74,7 +81,28 @@ describe("POST /api/auth/discord/request", () => {
       challenge: "t1",
       expiresAt: "2030-01-01T10:00:00.000Z",
     });
-    expect(sendDiscordLoginCodeMock).toHaveBeenCalledWith("123456789012345678", "123456");
+    // Aucun compte rattaché à ce Discord : langue inconnue, message bilingue.
+    expect(sendDiscordLoginCodeMock).toHaveBeenCalledWith("123456789012345678", "123456", null);
+  });
+
+  it("écrit le code dans la langue du compte déjà rattaché à ce Discord", async () => {
+    jest.mocked(accountLocaleForDiscordId).mockResolvedValueOnce("en");
+    resolveDiscordUserMock.mockResolvedValue("123456789012345670");
+    createDiscordLoginChallengeMock.mockResolvedValue({
+      challengeId: 2,
+      challengeToken: "t-en",
+      code: "222333",
+      expiresAt: new Date("2030-01-01T10:00:00.000Z"),
+    });
+    sendDiscordLoginCodeMock.mockResolvedValue();
+
+    const response = await POST(buildRequest({ handle: "anglophone" }));
+
+    expect(response.status).toBe(200);
+    expect(accountLocaleForDiscordId).toHaveBeenCalledWith("123456789012345670");
+    expect(sendDiscordLoginCodeMock).toHaveBeenCalledWith("123456789012345670", "222333", "en");
+    // La réponse ne dit rien de la langue du compte visé.
+    expect(await response.json()).toEqual({ success: true, challenge: "t-en", expiresAt: "2030-01-01T10:00:00.000Z" });
   });
 
   it("plafonne les demandes par compte visé, message privé compris", async () => {
@@ -297,7 +325,7 @@ describe("POST /api/auth/discord/request", () => {
     // code revient juste (`consumeDiscordChallenge`), et il doit être celui qui a
     // servi à la résolution, pas celui qu'un second appel renverrait.
     expect(createDiscordLoginChallengeMock).toHaveBeenCalledWith("999888777666555444", "keryan");
-    expect(sendDiscordLoginCodeMock).toHaveBeenCalledWith("999888777666555444", "654321");
+    expect(sendDiscordLoginCodeMock).toHaveBeenCalledWith("999888777666555444", "654321", null);
   });
 
   it("maps DISCORD_USER_NOT_FOUND to 404 when the tag cannot be resolved", async () => {

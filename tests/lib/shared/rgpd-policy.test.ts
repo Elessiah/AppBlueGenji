@@ -327,10 +327,17 @@ describe("/rgpd — données obligatoires : la langue du compte (revue juridique
 
   it("dit en FR et en EN que tout compte garde une langue, non facultative et modifiable", () => {
     expect(read("app/rgpd/page.tsx")).toMatch(/Il garde aussi une langue, français ou anglais \(le français par défaut\)/);
-    expect(read("app/rgpd/page.tsx")).toMatch(/vos\s+notifications push \(les messages Discord restent en français\)/);
+    // BOT-NOTIF-LANG : la langue sert aussi aux messages privés Discord ; les salons restent en français.
+    expect(read("app/rgpd/page.tsx")).toMatch(
+      /vos\s+notifications push et les messages privés Discord du site \(les messages des salons Discord\s+restent en français\)/,
+    );
+    expect(read("app/rgpd/page.tsx")).toMatch(/Le bot vous écrit aussi en privé, dans la\s+langue de votre compte/);
     expect(read("app/rgpd/page.tsx")).toMatch(/vous la changez dans Mon profil \(jusqu&apos;à votre prochaine connexion\s+faite dans l&apos;autre langue\)/);
     expect(read("app/rgpd/RgpdEn.tsx")).toMatch(/It also keeps a language, French or English \(French by default\)/);
-    expect(read("app/rgpd/RgpdEn.tsx")).toMatch(/your push notifications to you \(Discord messages stay in\s+French\)/);
+    expect(read("app/rgpd/RgpdEn.tsx")).toMatch(
+      /your push notifications and the site&apos;s Discord direct\s+messages to you \(messages in Discord channels stay in French\)/,
+    );
+    expect(read("app/rgpd/RgpdEn.tsx")).toMatch(/The bot also writes to you privately, in your account&apos;s\s+language/);
     expect(read("app/rgpd/RgpdEn.tsx")).toMatch(/you can change it in My profile \(until you next log in from a page\s+in the other language\)/);
   });
 });

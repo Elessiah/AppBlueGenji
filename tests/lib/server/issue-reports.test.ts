@@ -14,6 +14,7 @@ import { loadTournamentRow } from "@/lib/server/tournaments/repository";
 import { fakePool, fakeConnection } from "../../helpers/sql-double";
 import { tournamentRow } from "../../helpers/tournament-rows";
 import { resolvePush } from "../../helpers/push";
+import { BILINGUAL_DM_SEPARATOR } from "@/lib/shared/dm-language";
 
 const ENTRANT = [
   {
@@ -71,6 +72,21 @@ describe("reportTournamentIssue", () => {
     expect(message).toContain(VALID_MESSAGE);
   });
 
+  it("écrit aux arbitres un message privé bilingue ; le canal garde la ligne française seule (BOT-NOTIF-LANG)", async () => {
+    await mockDb([ENTRANT]);
+
+    await reportTournamentIssue(7, 42, VALID_MESSAGE, null);
+
+    const [message, , options] = jest.mocked(pushRefereeAlert).mock.calls[0];
+    expect(message).not.toContain(BILINGUAL_DM_SEPARATOR);
+    const [french, english] = String(options?.dmMessage).split(BILINGUAL_DM_SEPARATOR);
+    expect(french).toBe(message);
+    expect(english).toContain("Coupe BlueGenji");
+    expect(english).toMatch(/^\*\*.+\*\* — .+ https?:\/\/\S+\/en\/tournois\/7$/);
+    // Le texte du joueur n'est que dans la partie française, telle qu'écrite.
+    expect(english).not.toContain(VALID_MESSAGE);
+  });
+
   it("ne lit ni n'envoie le pseudo de l'auteur", async () => {
     const execute = await mockDb([ENTRANT]);
 
@@ -97,9 +113,10 @@ describe("reportTournamentIssue", () => {
 
     await reportTournamentIssue(7, 42, VALID_MESSAGE, 31);
 
-    const [message] = jest.mocked(pushRefereeAlert).mock.calls[0];
+    const [message, , options] = jest.mocked(pushRefereeAlert).mock.calls[0];
     expect(message).not.toContain("Kiro");
     expect(message).not.toContain("Nova");
+    expect(options?.dmMessage).not.toMatch(/Kiro|Nova/);
     expect(message).toContain("Auteur : un joueur");
     expect(message).toContain("un joueur vs un joueur (#31)");
   });

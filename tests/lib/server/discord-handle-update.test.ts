@@ -4,6 +4,11 @@ jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
 // `normalizeDiscordHandle` (`users/tag-normalization`) reste la vraie : c'est
 // elle qui décide qu'un identifiant numérique n'est pas un pseudo.
+jest.mock("@/lib/server/users/account-locale", () => ({
+  ...jest.requireActual<typeof import("@/lib/server/users/account-locale")>("@/lib/server/users/account-locale"),
+  accountLocaleOf: jest.fn(async () => "en"),
+  accountLocaleForDiscordId: jest.fn(async () => null),
+}));
 jest.mock("@/lib/server/users/discord-challenges", () => ({
   createDiscordLoginChallenge: jest.fn(),
   consumeDiscordLoginChallenge: jest.fn(),
@@ -148,9 +153,11 @@ describe("startDiscordHandleUpdate", () => {
       "900000000000000001",
       "keryan_neuf",
     );
+    // Dans la langue du compte qui demande le code.
     expect(sendDiscordLoginCode).toHaveBeenCalledWith(
       "900000000000000001",
       "123456",
+      "en",
     );
   });
 

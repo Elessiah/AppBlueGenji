@@ -87,7 +87,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(announceMatchSchedule).mockResolvedValue(2);
   jest.mocked(announceMatchScheduleCleared).mockResolvedValue(2);
-  jest.mocked(notifyStaff).mockResolvedValue({ discord: null, pushed: 1 });
+  jest.mocked(notifyStaff).mockResolvedValue({ discord: null, pushed: 1, discordUnreachedUserIds: [] });
 });
 
 describe("isAnnounceableSchedule", () => {
@@ -461,7 +461,7 @@ describe("marque STAFF", () => {
     );
     expect(releaseStaffPush).not.toHaveBeenCalled();
 
-    jest.mocked(notifyStaff).mockResolvedValue({ discord: null, pushed: 0 });
+    jest.mocked(notifyStaff).mockResolvedValue({ discord: null, pushed: 0, discordUnreachedUserIds: [] });
     await notifyMatchScheduleChange(change());
     expect(releaseStaffPush).toHaveBeenCalledWith(expect.objectContaining({ kind: "reserved" }));
   });

@@ -44,7 +44,7 @@ const flush = () => new Promise((resolve) => setImmediate(resolve));
 beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(loadNotificationRecipients).mockResolvedValue([{ userId: 5, discord: null }]);
-  jest.mocked(notifyUsers).mockResolvedValue({ discord: { sent: 0, unresolved: [], failed: [] }, pushed: 0 });
+  jest.mocked(notifyUsers).mockResolvedValue({ discord: { sent: 0, unresolved: [], failed: [] }, discordUnreachedUserIds: [], pushed: 0 });
 });
 
 describe("activeSuspensionSql", () => {
@@ -206,8 +206,14 @@ describe("suspendAccount", () => {
     expect(loadNotificationRecipients).toHaveBeenCalledWith([5], "proven");
     const notification = jest.mocked(notifyUsers).mock.calls[0][1];
     expect(notification.topic).toBe("MODERATION");
-    expect(notification.discord?.message).toContain(`Faits retenus : ${input.reason}.`);
-    expect(notification.discord?.message).toContain("https://site.test/conditions-utilisation#comportement");
+    const fr = notification.discord?.message("fr");
+    expect(fr).toContain(`Faits retenus : ${input.reason}.`);
+    expect(fr).toContain("https://site.test/conditions-utilisation#comportement");
+    // En anglais : mêmes faits (texte du staff, tel quel) et lien vers la page anglaise.
+    const en = notification.discord?.message("en");
+    expect(en).toContain(input.reason);
+    expect(en).toContain("https://site.test/en/conditions-utilisation#comportement");
+    expect(en).not.toContain("Faits retenus");
     expect(resolvePush(notification.push).url).toBe("/connexion");
     expect(resolvePush(notification.push).body).not.toContain(input.reason);
   });
@@ -254,7 +260,10 @@ describe("liftSuspension", () => {
     expect(sql).toContain(activeSuspensionSql("s"));
     expect(params).toEqual([1, 11]);
     expect(publishStaffAction).toHaveBeenCalledWith("✅ Suspension S-11 levée par le staff.", actor);
-    expect(jest.mocked(notifyUsers).mock.calls[0][1].discord?.message).toContain("S-11");
+    const lifted = jest.mocked(notifyUsers).mock.calls[0][1].discord?.message;
+    expect(lifted?.("fr")).toContain("S-11");
+    expect(lifted?.("en")).toContain("S-11");
+    expect(lifted?.("en")).not.toEqual(lifted?.("fr"));
   });
 
   it("refuse sans suspension en cours", async () => {

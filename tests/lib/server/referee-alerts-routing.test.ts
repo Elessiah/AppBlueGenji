@@ -20,6 +20,7 @@ import {
 } from "@/lib/server/bot-integration";
 import { getDatabase } from "@/lib/server/database";
 import { type SqlMock, fakePool } from "../../helpers/sql-double";
+import { BILINGUAL_DM_SEPARATOR } from "@/lib/shared/dm-language";
 
 /**
  * Une connexion ne sert ici que de clé : la file est indexée par identité.
@@ -107,6 +108,15 @@ describe("routage vers deux transports", () => {
 
     expect(pushRefereeAlert).toHaveBeenCalledTimes(1);
     expect(sendBotLog).not.toHaveBeenCalled();
+    // BOT-NOTIF-LANG : la ligne du canal reste française, les messages privés
+    // aux arbitres la reprennent puis ajoutent l'anglais.
+    const [message, context, options] = jest.mocked(pushRefereeAlert).mock.calls[0];
+    expect(context).toBe("referee-alert");
+    expect(options?.honourCircuit).toBe(true);
+    expect(message).not.toContain(BILINGUAL_DM_SEPARATOR);
+    const [french, english] = String(options?.dmMessage).split(BILINGUAL_DM_SEPARATOR);
+    expect(french).toBe(message);
+    expect(english).toMatch(/^\*\*.+\*\* — .+ https?:\/\/\S+$/);
   });
 
   // Report expiré sans réponse → alerte arbitre seulement.
@@ -175,7 +185,7 @@ describe("routage vers deux transports", () => {
     expect(pushRefereeAlert).toHaveBeenCalledWith(
       expect.any(String),
       "referee-alert",
-      { honourCircuit: true },
+      { honourCircuit: true, dmMessage: expect.any(String) },
     );
   });
 

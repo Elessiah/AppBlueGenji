@@ -18,11 +18,21 @@ import {
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 const PUSH = () => ({ title: "t", body: "b", url: "/" });
+/** Message privé de test : sa langue se lit dans le texte. */
+const DM = (locale: string) => `m-${locale}`;
+
+/** Langue des comptes (`bg_users.locale`) telle que la base la rend. */
+function accountLocales(rows: { id: number; locale: string }[]) {
+  const query = jest.fn<SqlQuery>().mockResolvedValue([rows]);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
+  return query;
+}
 
 beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(pushToUsers).mockResolvedValue(2);
   jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 1, unresolved: [], failed: [] });
+  accountLocales([{ id: 1, locale: "fr" }]);
 });
 
 describe("notifyUsers", () => {
@@ -32,19 +42,94 @@ describe("notifyUsers", () => {
         { userId: 1, discord: { discordId: "1", handle: null, label: "A" } },
         { userId: 2, discord: null },
       ],
-      { topic: "TEAM_JOIN_REQUEST", push: PUSH, discord: { message: "m", context: "ctx" } },
+      { topic: "TEAM_JOIN_REQUEST", push: PUSH, discord: { message: DM, context: "ctx" } },
     );
 
-    expect(pushDiscordDirectMessages).toHaveBeenCalledWith("m", [{ discordId: "1", handle: null, label: "A" }], "ctx");
+    expect(pushDiscordDirectMessages).toHaveBeenCalledWith("m-fr", [{ discordId: "1", handle: null, label: "A" }], "ctx");
     expect(pushToUsers).toHaveBeenCalledWith([1, 2], "TEAM_JOIN_REQUEST", PUSH, undefined);
-    expect(report).toEqual({ discord: { sent: 1, unresolved: [], failed: [] }, pushed: 2 });
+    expect(report).toEqual({ discord: { sent: 1, unresolved: [], failed: [] }, discordUnreachedUserIds: [], pushed: 2 });
+  });
+
+  it("écrit à chacun dans la langue de son compte : un appel au bot par langue", async () => {
+    const query = accountLocales([
+      { id: 1, locale: "fr" },
+      { id: 2, locale: "en" },
+      { id: 3, locale: "en" },
+    ]);
+    jest
+      .mocked(pushDiscordDirectMessages)
+      .mockResolvedValueOnce({ sent: 1, unresolved: [], failed: [] })
+      .mockResolvedValueOnce({ sent: 1, unresolved: ["C"], failed: [] });
+    const a = { discordId: "1", handle: null, label: "A" };
+    const b = { discordId: "2", handle: null, label: "B" };
+    const c = { discordId: null, handle: "c", label: "C" };
+
+    const report = await notifyUsers(
+      [
+        { userId: 1, discord: a },
+        { userId: 2, discord: b },
+        { userId: 3, discord: c },
+      ],
+      { topic: "MATCH_REMINDER", push: PUSH, discord: { message: DM, context: "match-reminder" } },
+    );
+
+    // La langue est lue pour les destinataires de l'envoi, et pour eux seuls.
+    expect(query.mock.calls[0][0]).toMatch(/SELECT id, locale FROM bg_users/);
+    expect(query.mock.calls[0][1]).toEqual([1, 2, 3]);
+    expect(jest.mocked(pushDiscordDirectMessages).mock.calls).toEqual([
+      ["m-fr", [a], "match-reminder"],
+      ["m-en", [b, c], "match-reminder"],
+    ]);
+    expect(report.discord).toEqual({ sent: 2, unresolved: ["C"], failed: [] });
+    expect(report.discordUnreachedUserIds).toEqual([]);
+  });
+
+  it("langue illisible ou compte absent : un seul message bilingue, français d'abord", async () => {
+    jest.mocked(getDatabase).mockRejectedValue(new Error("ECONNREFUSED"));
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+    await notifyUsers([{ userId: 1, discord: { discordId: "1", handle: null, label: "A" } }], {
+      topic: "MODERATION",
+      push: PUSH,
+      discord: { message: DM, context: "ctx" },
+    });
+    accountLocales([]);
+    await notifyUsers([{ userId: 7, discord: { discordId: "7", handle: null, label: "G" } }], {
+      topic: "MODERATION",
+      push: PUSH,
+      discord: { message: DM, context: "ctx" },
+    });
+
+    const bilingual = "m-fr\n\n**— English —**\nm-en";
+    expect(jest.mocked(pushDiscordDirectMessages).mock.calls.map(([message]) => message)).toEqual([bilingual, bilingual]);
+  });
+
+  it("un appel perdu (une langue) nomme ses comptes, les autres restent remis", async () => {
+    accountLocales([
+      { id: 1, locale: "fr" },
+      { id: 2, locale: "en" },
+    ]);
+    jest
+      .mocked(pushDiscordDirectMessages)
+      .mockResolvedValueOnce({ sent: 1, unresolved: [], failed: [] })
+      .mockResolvedValueOnce(null);
+
+    const report = await notifyUsers(
+      [
+        { userId: 1, discord: { discordId: "1", handle: null, label: "A" } },
+        { userId: 2, discord: { discordId: "2", handle: null, label: "B" } },
+      ],
+      { topic: "PRIVACY_CHANGE", push: PUSH, discord: { message: DM, context: "ctx" } },
+    );
+
+    expect(report.discord).toEqual({ sent: 1, unresolved: [], failed: [] });
+    expect(report.discordUnreachedUserIds).toEqual([2]);
   });
 
   it("n'appelle pas le bot quand personne n'est joignable sur Discord, ou sans message", async () => {
     await notifyUsers([{ userId: 2, discord: null }], {
       topic: "MODERATION",
       push: PUSH,
-      discord: { message: "m", context: "ctx" },
+      discord: { message: DM, context: "ctx" },
     });
     await notifyUsers([{ userId: 2, discord: { discordId: "9", handle: null, label: "X" } }], {
       topic: "MATCH_START",
@@ -61,9 +146,10 @@ describe("notifyUsers", () => {
     const report = await notifyUsers([{ userId: 1, discord: { discordId: "1", handle: null, label: "A" } }], {
       topic: "PRIVACY_CHANGE",
       push: PUSH,
-      discord: { message: "m", context: "ctx" },
+      discord: { message: DM, context: "ctx" },
     });
     expect(report.discord).toBeNull();
+    expect(report.discordUnreachedUserIds).toEqual([1]);
     expect(report.pushed).toBe(2);
   });
 });
@@ -117,7 +203,7 @@ describe("notifyStaff", () => {
       push: PUSH,
       discord: async () => ({ sent: 1, unresolved: [], failed: [] }),
     });
-    expect(report).toEqual({ discord: { sent: 1, unresolved: [], failed: [] }, pushed: 0 });
+    expect(report).toEqual({ discord: { sent: 1, unresolved: [], failed: [] }, discordUnreachedUserIds: [], pushed: 0 });
   });
 });
 

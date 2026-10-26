@@ -5,6 +5,11 @@ jest.mock("@/lib/server/bot-integration");
 // `normalizeDiscordHandle` (`users/tag-normalization`) reste **la vraie** :
 // c'est elle qui décide qu'un identifiant numérique n'est pas un tag, et la
 // remplacer par un bouchon ferait passer ce test sans rien prouver de la règle.
+jest.mock("@/lib/server/users/account-locale", () => ({
+  ...jest.requireActual<typeof import("@/lib/server/users/account-locale")>("@/lib/server/users/account-locale"),
+  accountLocaleOf: jest.fn(async () => "en"),
+  accountLocaleForDiscordId: jest.fn(async () => null),
+}));
 jest.mock("@/lib/server/users/discord-challenges", () => ({
   createDiscordLoginChallenge: jest.fn(),
   consumeDiscordLoginChallenge: jest.fn(),
@@ -262,7 +267,8 @@ describe("startDiscordVerification — le compte Google", () => {
     });
     expect(result).not.toHaveProperty("discordId");
     expect(createChallengeMock).toHaveBeenCalledWith("900000000000000002", "keryan");
-    expect(sendMock).toHaveBeenCalledWith("900000000000000002", "123456");
+    // Dans la langue du compte qui demande la certification.
+    expect(sendMock).toHaveBeenCalledWith("900000000000000002", "123456", "en");
     // Rien n'est certifié avant le code.
     expect(db.writes).toHaveLength(0);
   });
