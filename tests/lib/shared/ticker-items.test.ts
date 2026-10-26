@@ -56,6 +56,10 @@ describe("tickerScores", () => {
     expect(scored({ winnerTeamId: 1, forfeitTeamId: 2, score1: 0, score2: 0 })).toEqual([3, 0]);
     expect(scored({ winnerTeamId: 1, forfeitTeamId: 2, score1: null, score2: null, format: null })).toEqual([1, 0]);
   });
+
+  it("forfait au score déjà écrit (format d'une phase, play-offs BG Survie) : les colonnes sont gardées", () => {
+    expect(scored({ winnerTeamId: 2, forfeitTeamId: 1, score1: 0, score2: 3, format: { type: "BO", value: 1 } })).toEqual([0, 3]);
+  });
 });
 
 describe("tickerItemText", () => {
