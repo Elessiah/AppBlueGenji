@@ -37,4 +37,16 @@ describe("AboutStats — valeur anglaise", () => {
     expect(source).toContain("{shown.map(({ stat: s, value, label, index }) => (");
     expect(source).toMatch(/<div className="num" style=\{\{ fontSize: 26 \}\}>\{value\}<\/div>/);
   });
+
+  it("pendant l'envoi, les boutons gardent le focus : aria-disabled + garde, jamais disabled", () => {
+    const actions = /<div className=\{styles\.modalActions\}>([\s\S]*?)<\/div>/.exec(source)?.[1] ?? "";
+    expect(actions).not.toMatch(/\sdisabled=\{busy\}/);
+    expect(actions.match(/aria-disabled=\{busy\}/g)).toHaveLength(2);
+    expect(actions).toContain("aria-busy={busy}");
+    expect(source).toMatch(/async function submit\(\) \{\r?\n\s+if \(busy\) return;/);
+    expect(source).toMatch(/function close\(\) \{\r?\n\s+if \(busy\) return;/);
+    const css = readSource("components/cyber/landing/AboutStats.module.css");
+    expect(css).toContain('.action[aria-disabled="true"]');
+    expect(css).toContain('.actionPrimary[aria-disabled="true"]');
+  });
 });
