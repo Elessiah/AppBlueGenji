@@ -349,10 +349,12 @@ describe("/rgpd — données obligatoires : la langue du compte (revue juridique
     expect(fr).toMatch(/le code envoyé par message privé Discord \(connexion, certification ou changement du tag\) est rédigé par le bot/);
     expect(fr).toMatch(/la langue du compte déjà rattaché à ce compte Discord — en français puis en anglais s&apos;il n&apos;y en a pas/);
     expect(fr).toMatch(/en français seul si les deux ne tiennent pas dans un message/);
+    expect(fr).toMatch(/et pour les alertes adressées au staff — arbitres, direction —, dont le site ne connaît pas les destinataires/);
     const en = read("app/rgpd/RgpdEn.tsx").replace(/\s+/g, " ");
     expect(en).toMatch(/the code sent by Discord direct message \(login, certification or change of the tag\) is written by the bot/);
     expect(en).toMatch(/account already linked to that Discord account — French then English when there is none/);
     expect(en).toMatch(/French alone when both do not fit in one message/);
+    expect(en).toMatch(/and for alerts sent to staff — referees, leadership —, whose recipients the site does not know/);
 
     const items = (list: readonly (typeof PROCESSING_ACTIVITIES)[number][], ref: string) =>
       list.find((activity) => activity.ref === ref)!.dataCategories.join(" ");
