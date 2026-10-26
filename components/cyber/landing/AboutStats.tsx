@@ -212,7 +212,10 @@ export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: R
       <div className={styles.stats}>
         {shown.map(({ stat: s, value, label, index }) => (
           <div key={s.id} className={styles.stat}>
-            <div className="num" style={{ fontSize: 26 }}>{value}</div>
+            {/* Sous /en, une valeur sans anglais reste française : le lecteur d'écran la prononce en français. */}
+            <div className="num" style={{ fontSize: 26 }} lang={staffLang && !hasEnglish(s.valueEn) ? "fr" : undefined}>
+              {value}
+            </div>
             <div className="mono">{label}</div>
             {canManage(s) && (
               <div className={styles.statActions} lang={staffLang}>
@@ -306,25 +309,6 @@ export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: R
           </div>
 
           <div className={styles.modalField}>
-            <BilingualField
-              label="Titre"
-              ids={{ fr: STAT_FIELD_IDS.label, en: STAT_FIELD_IDS.labelEn }}
-              fields={{ fr: "label", en: "labelEn" }}
-              errors={fieldErrors}
-              values={{ fr: form.label, en: form.labelEn }}
-              onChange={(lang, value) => setForm((f) => (lang === "fr" ? { ...f, label: value } : { ...f, labelEn: value }))}
-              maxLength={ABOUT_STAT_LABEL_MAX}
-              placeholders={{ fr: "Bénévole", en: "Volunteer-run" }}
-              onEnter={() => {
-                if (!busy) void submit();
-              }}
-              enMissing={editing !== null && !hasEnglish(editing.labelEn)}
-              inputClassName={styles.modalInput}
-              labelClassName={styles.modalLabel}
-            />
-          </div>
-
-          <div className={styles.modalField}>
             <InfoHintRow>
               <label className={styles.modalLabel} htmlFor={STAT_FIELD_IDS.valueEn}>
                 Valeur en anglais (facultatif)
@@ -351,6 +335,25 @@ export function AboutStats({ initialStats, isAdmin, locale = DEFAULT_LOCALE }: R
               }}
             />
             <FieldErrorText fieldId={STAT_FIELD_IDS.valueEn} message={fieldErrors.message("valueEn")} />
+          </div>
+
+          <div className={styles.modalField}>
+            <BilingualField
+              label="Titre"
+              ids={{ fr: STAT_FIELD_IDS.label, en: STAT_FIELD_IDS.labelEn }}
+              fields={{ fr: "label", en: "labelEn" }}
+              errors={fieldErrors}
+              values={{ fr: form.label, en: form.labelEn }}
+              onChange={(lang, value) => setForm((f) => (lang === "fr" ? { ...f, label: value } : { ...f, labelEn: value }))}
+              maxLength={ABOUT_STAT_LABEL_MAX}
+              placeholders={{ fr: "Bénévole", en: "Volunteer-run" }}
+              onEnter={() => {
+                if (!busy) void submit();
+              }}
+              enMissing={editing !== null && !hasEnglish(editing.labelEn)}
+              inputClassName={styles.modalInput}
+              labelClassName={styles.modalLabel}
+            />
           </div>
 
           <div className={styles.modalActions}>
