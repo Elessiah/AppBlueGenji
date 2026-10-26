@@ -113,6 +113,8 @@ pure dans `_lib/endurance-chart.ts`.
 - **Modes** : « Top N » (les N premiers de la manche affichée, les autres
   masqués), « Ma sélection » (8 au plus, état du composant seulement — ni
   stockage local, ni serveur), « Toutes » / « Tous » (palette en boucle).
+  L'aide de chaque mode (`chartHint*`) est derrière un `<InfoHint>` à côté des
+  modes (`INFO_HINTS.md`) ; seul l'état vide de l'encart reste visible.
   « Effacer la sélection » (monté dès « Ma sélection », `aria-disabled` une fois
   vide : le focus reste sur lui) et « Rejouer l'animation ».
 - **Survol, focus, clic** : un bouton de la légende (au focus comme au survol)
