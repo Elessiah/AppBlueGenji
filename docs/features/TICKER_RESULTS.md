@@ -37,8 +37,13 @@ BG Survie), est gardé tel quel. Sans vainqueur enregistré, ou vainqueur étran
 `none`. Une case vide (exemption, engagé retiré) est `none`, jamais un perdant.
 La requête ne retient que les matchs entre **deux engagés** (`is_bye = FALSE`,
 `team1_id` et `team2_id` non nuls) : une exemption terminée s'affichait
-« Équipe #null 0 — Équipe B 1 ».
-Aucune donnée nouvelle n'est collectée : trois colonnes déjà publiques et le
+« Équipe #null 0 — Équipe B 1 ». Elle exige aussi une **issue enregistrée** —
+vainqueur, forfait, double forfait, ou nul à scores égaux (comme
+`playedMatchSql`) : une ligne close sans rien de cela se serait lue « A 0 — B 0
+(sans vainqueur) ». Résultats, inscriptions et champions ne lisent que les
+tournois **publiés** (`start_visibility_at <= NOW()`, comme le compteur de
+l'accueil) : un tournoi encore masqué n'y montre ni nom, ni engagés, ni score.
+Aucune donnée nouvelle n'est collectée : trois colonnes déjà publiques (tournois publiés seulement) et le
 format de match du tournoi (le vainqueur d'un match se voit sur la fiche du tournoi) rejoignent la requête.
 
 Noms : forme affichable (`visibleText`, `UNTRUSTED_NAMES.md`), repli
