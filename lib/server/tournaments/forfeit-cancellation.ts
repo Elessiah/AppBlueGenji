@@ -182,10 +182,17 @@ async function cancelTournamentForfeitOnce(
     // rentrerait sans que les manches manquées comptent contre elle — capital
     // intact en BG Survie, défaites en moins en Survie. Une manche posée mais
     // vierge ne bloque pas : l'équipe rejoint l'appariement suivant.
+    //
+    // Lecture **verrouillante** (table seule, MariaDB) : un report écrit son
+    // score sous le verrou du match **avant** d'attendre celui du tournoi.
+    // Une lecture d'instantané ne voyait pas ce score en cours ; l'annulation
+    // passait, puis le rejeu suisse réappariait la manche saisie. Verrouillée,
+    // elle attend le report (ou l'interblocage se rejoue) et refuse ensuite.
     const [laterRows] = await connection.execute<(RowDataPacket & { c: number })[]>(
       `SELECT COUNT(*) AS c FROM bg_matches
        WHERE tournament_id = ? AND phase_id = ? AND round_number > ?
-         AND ${HAS_SCORE_INPUT_SQL}`,
+         AND ${HAS_SCORE_INPUT_SQL}
+       LOCK IN SHARE MODE`,
       [tournamentId, phaseId, Number(standing.forfeit_round ?? 1)],
     );
     if (Number(laterRows[0]?.c ?? 0) > 0) throw new Error("FORFEIT_ROUND_PASSED");
