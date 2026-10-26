@@ -192,7 +192,27 @@ function liveRow(standing: EnduranceStandingRow, baseRound: number): EnduranceRa
   };
 }
 
-function pastRow(standing: EnduranceStandingRow, round: number, fallbackRank: number): EnduranceRankingRow {
+/**
+ * Capital à l'issue d'une manche. Une case « sortie » ou « forfait » ne porte
+ * pas de capital (`points: null`, c'est la case grisée du rejeu) : on lit alors
+ * le dernier capital connu — une équipe « Hors course » garde le sien, elle ne
+ * retombe pas à 0 dans les vues des manches suivantes.
+ */
+export function pointsAfterRound(standing: EnduranceStandingRow, round: number, startPoints: number): number {
+  let best: { round: number; points: number } | null = null;
+  for (const cell of standing.rounds) {
+    if (cell.round > round || cell.points === null) continue;
+    if (best === null || cell.round > best.round) best = { round: cell.round, points: cell.points };
+  }
+  return best?.points ?? startPoints;
+}
+
+function pastRow(
+  standing: EnduranceStandingRow,
+  round: number,
+  fallbackRank: number,
+  startPoints: number,
+): EnduranceRankingRow {
   const cell = cellAt(standing, round);
   const rank = cell?.rank ?? fallbackRank;
   const status = statusAfterRound(standing, round);
@@ -203,7 +223,7 @@ function pastRow(standing: EnduranceStandingRow, round: number, fallbackRank: nu
     standing,
     rank,
     move: rankMove(rankAfterRound(standing, round - 1), rank),
-    points: cell?.points ?? 0,
+    points: pointsAfterRound(standing, round, startPoints),
     wins: cell?.wins ?? 0,
     losses: cell?.losses ?? 0,
     draws: cell?.draws ?? 0,
@@ -237,11 +257,15 @@ export function enduranceRankingRows(
   // Repli d'un instantané sans rang par manche : capital décroissant, puis
   // l'ordre du général — jamais une ligne sans rang.
   const fallback = [...endurance.standings].sort(
-    (a, b) => (cellAt(b, view.round)?.points ?? -1) - (cellAt(a, view.round)?.points ?? -1) || a.rank - b.rank,
+    (a, b) =>
+      pointsAfterRound(b, view.round, endurance.startPoints) - pointsAfterRound(a, view.round, endurance.startPoints) ||
+      a.rank - b.rank,
   );
   const fallbackRank = new Map(fallback.map((standing, index) => [standing.teamId, index + 1]));
   return endurance.standings
-    .map((standing) => pastRow(standing, view.round, fallbackRank.get(standing.teamId) ?? standing.rank))
+    .map((standing) =>
+      pastRow(standing, view.round, fallbackRank.get(standing.teamId) ?? standing.rank, endurance.startPoints),
+    )
     .sort((a, b) => a.rank - b.rank);
 }
 

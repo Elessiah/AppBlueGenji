@@ -76,12 +76,22 @@ export function EnduranceRoundPanels({
   // s'achève, la suivante arrive par le flux, et un état figé au montage
   // laisserait le lecteur sur une manche close. On ouvre donc la nouvelle
   // manche courante à chaque fois qu'elle change — et seulement alors, sinon
-  // un volet refermé à la main se rouvrirait au prochain instantané.
+  // un volet refermé à la main se rouvrirait au prochain instantané. La manche
+  // ouverte d'office qui se clôt se replie (une manche close est repliée), sauf
+  // si le lecteur l'a lui-même rouverte : un soir de tournoi suivi en direct ne
+  // finit pas avec toutes les manches dépliées.
   const lastAutoOpen = useRef(autoOpen);
+  const openedByHand = useRef(new Set<number>());
   useEffect(() => {
     if (autoOpen === null || autoOpen === lastAutoOpen.current) return;
+    const previous = lastAutoOpen.current;
     lastAutoOpen.current = autoOpen;
-    setOpenRounds((prev) => (prev.has(autoOpen) ? prev : new Set(prev).add(autoOpen)));
+    setOpenRounds((prev) => {
+      const next = new Set(prev);
+      if (previous !== null && !openedByHand.current.has(previous)) next.delete(previous);
+      next.add(autoOpen);
+      return next;
+    });
   }, [autoOpen]);
 
   // Ancre `#match-[id]` : la cible peut dormir dans un volet replié, que le hook
@@ -98,8 +108,13 @@ export function EnduranceRoundPanels({
   const toggle = (round: number) =>
     setOpenRounds((prev) => {
       const next = new Set(prev);
-      if (next.has(round)) next.delete(round);
-      else next.add(round);
+      if (next.has(round)) {
+        next.delete(round);
+        openedByHand.current.delete(round);
+      } else {
+        next.add(round);
+        openedByHand.current.add(round);
+      }
       return next;
     });
 

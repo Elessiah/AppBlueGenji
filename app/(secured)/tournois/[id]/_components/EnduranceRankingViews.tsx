@@ -44,11 +44,13 @@ const STATUS_KEYS = {
  * Une ligne sortie s'estompe, mais pas toutes au même degré : « Hors course »
  * porte encore un capital à lire.
  */
+// Plancher 0,8 : à 0,55 le texte discret (« S3 », dates, « Déjà sortie ») et le
+// rouge (« Forfait — retirée », ▼) tombaient sous 4,5:1 sur le fond du plateau.
 const ROW_OPACITY: Record<EnduranceStandingRow["status"], number> = {
   ACTIVE: 1,
-  OUT_OF_CONTENTION: 0.8,
-  ELIMINATED: 0.55,
-  FORFEIT: 0.55,
+  OUT_OF_CONTENTION: 0.9,
+  ELIMINATED: 0.8,
+  FORFEIT: 0.8,
 };
 
 interface EnduranceRankingViewsProps {
@@ -222,7 +224,10 @@ export function EnduranceRankingViews({
   // flux décale les index, pas les clés. La manche en cours qui se clôt garde
   // le lecteur sur sa manche ; une autre clé disparue retombe sur « Général ».
   const [selectedKey, setSelectedKey] = useState("general");
-  const [direction, setDirection] = useState<"left" | "right" | null>(null);
+  // Le glissement est lié à la vue que le lecteur a demandée : une clé changée
+  // par le flux (manche close, repli sur « Général ») s'affiche sans glisser.
+  const [slide, setSlide] = useState<{ key: string; direction: "left" | "right" } | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   // Les flèches et la navigation du bas ne déplacent pas le focus : le titre
   // de la vue atteinte est annoncé ici (un onglet, lui, s'annonce de lui-même).
   const [announcement, setAnnouncement] = useState("");
@@ -243,8 +248,9 @@ export function EnduranceRankingViews({
 
   const go = (target: number, focus = false) => {
     if (target < 0 || target >= views.length || target === index) return;
-    setDirection(target < index ? "left" : "right");
-    setSelectedKey(enduranceViewKey(views[target]));
+    const targetKey = enduranceViewKey(views[target]);
+    setSlide({ key: targetKey, direction: target < index ? "left" : "right" });
+    setSelectedKey(targetKey);
     if (focus) tabRefs.current[target]?.focus();
     else setAnnouncement(viewTitle(views[target], text));
   };
@@ -282,12 +288,33 @@ export function EnduranceRankingViews({
 
   const panelId = `${baseId}-panel`;
   const tabId = (key: string) => `${baseId}-tab-${key}`;
-  const animationClass = slideClass(decorativeMotion, direction);
+  const animationClass = slideClass(
+    decorativeMotion,
+    slide !== null && slide.key === enduranceViewKey(view) ? slide.direction : null,
+  );
+
+  /**
+   * Navigation du bas : la vue atteinte peut être bien plus courte (16 lignes →
+   * 4), le lecteur se retrouverait alors au-delà du tableau. On ramène le haut
+   * du classement à l'écran — seulement s'il est passé sous l'en-tête du site
+   * (la marge d'arrivée `scroll-padding-top`, qui le mesure).
+   */
+  const goFromBottom = (target: number) => {
+    go(target);
+    requestAnimationFrame(() => {
+      const root = rootRef.current;
+      if (root === null) return;
+      const arrival = Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop);
+      if (root.getBoundingClientRect().top < (Number.isFinite(arrival) ? arrival : 0)) {
+        root.scrollIntoView({ block: "start" });
+      }
+    });
+  };
   const prev = index > 0 ? views[index - 1] : null;
   const next = index < views.length - 1 ? views[index + 1] : null;
 
   return (
-    <div style={{ marginBottom: 8 }}>
+    <div ref={rootRef} style={{ marginBottom: 8 }}>
       {views.length > 1 && (
         <div className={styles.bar}>
           {/* `aria-disabled` plutôt que `disabled` : arrivé au bout, le bouton
@@ -325,7 +352,7 @@ export function EnduranceRankingViews({
                       aria-controls={panelId}
                       tabIndex={selected ? 0 : -1}
                       className={`btn ghost ${styles.tab}`}
-                      onClick={() => go(candidateIndex)}
+                      onClick={() => go(candidateIndex, true)}
                       onKeyDown={onTabKeyDown}
                     >
                       {tabLabel(candidate, text)}
@@ -436,12 +463,12 @@ export function EnduranceRankingViews({
       {views.length > 1 && (
         <nav className={styles.bottomNav} aria-label={t("endurance.viewsTabsLabel")}>
           {prev && (
-            <button type="button" className="btn ghost tap-target" onClick={() => go(index - 1)}>
+            <button type="button" className="btn ghost tap-target" onClick={() => goFromBottom(index - 1)}>
               <ChevronLeft size={14} aria-hidden="true" /> {navLabel(prev, text)}
             </button>
           )}
           {next && (
-            <button type="button" className="btn ghost tap-target" onClick={() => go(index + 1)}>
+            <button type="button" className="btn ghost tap-target" onClick={() => goFromBottom(index + 1)}>
               {navLabel(next, text)} <ChevronRight size={14} aria-hidden="true" />
             </button>
           )}
