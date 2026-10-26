@@ -80,7 +80,8 @@ matchs qu'elle a joués l'éliminent ») : le rejeu peut sortir l'engagé aussit
 Son nom accessible commence par son texte visible, dans les deux langues
 (« Annuler l'abandon de X », « Cancel withdrawal of X » — WCAG 2.5.3). En ronde
 suisse, une ligne forfait s'estompe **cellule par cellule**, jamais la cellule
-d'action, à 90 % d'opacité (de même une ligne éliminée de la Survie) : une
+d'action, à 90 % d'opacité (une ligne éliminée de la Survie, sans bouton,
+s'estompe en entier au même taux) : une
 ligne entière estompée ferait paraître le bouton désactivé, et à 55 % le texte
 discret tombait vers 3:1 ; à 90 %, le chiffre de défaite rouge reste ≥ 4,5:1
 même sur la ligne du lecteur (`forfeit-buttons-label-in-name.test.ts` le calcule). L'infobulle du bouton dit seulement que le

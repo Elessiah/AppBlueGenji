@@ -51,8 +51,9 @@ describe("confirmation de l'annulation d'un abandon", () => {
 
 describe("estompage des lignes sorties du classement", () => {
   // À 0,55, le texte discret (`--ink-quiet`) d'une ligne sortie tombait vers
-  // 3:1 sur le fond du tableau ; 0,8 le garde au-dessus de 4,5:1, comme la BG
-  // Survie (`ROW_OPACITY`).
+  // 3:1 sur le fond du tableau ; à 0,8, le chiffre de défaite
+  // (`--result-loss-ink`) restait vers 4,1:1 sur la ligne du lecteur. Le
+  // plancher est 0,9, partout (Survie, suisse, BG Survie `ROW_OPACITY`).
   const survival = readFileSync(
     join(__dirname, "..", "..", "app/(secured)/tournois/[id]/_components/SurvivalView.tsx"),
     "utf8",
