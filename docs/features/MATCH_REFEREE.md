@@ -127,9 +127,12 @@ avec la carte `SEED_FIRST_MAP`, autogestion, ou sans décision.
 
 ## RGPD
 
-Registre T04 (présentation de l'arbitre aux parties, « Prêt », avis push) et
-T05 (journal), `/rgpd#arbitre-designe`, entrée
+Registre T04 (présentation de l'arbitre aux parties, « Prêt », avis push),
+T12 (avis push « Arbitrage retiré ») et T05 (journal), `/rgpd#arbitre-designe`
+et la ligne BattleTag de `/rgpd`, les listes « BattleTag masqué » (profil,
+connexion, fiche joueur, clé `asReferee`) et la modale de masquage, entrée
 `2026-10-arbitre-designe-des-matchs`. Base : exécution du service, les
 arbitres agissant pour l'association. Les conditions d'utilisation ne changent
-pas (version 6) ; la clause « Contacts de match » reprendra l'arbitre désigné
-à la version 7.
+pas (version 6) : le registre ne rattache donc pas l'arbitre désigné à une
+clause des conditions ; la clause « Contacts de match » le reprendra à la
+version 7.
