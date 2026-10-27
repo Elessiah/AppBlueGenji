@@ -378,13 +378,11 @@
 
 /* Une diapositive cachée ne fait tourner, sans être vue, aucune animation
    infinie (lueur de « En attente de lancement », point de « En direct »…) :
-   elles sont figées, pas retirées — la diapositive sortante garde son image
-   pendant le fondu au lieu de s'éteindre d'un coup. `.slides >` passe devant
-   les règles globales des pastilles (`.pill-live .dot`, même poids sinon). */
-.slides > .slide:not(.slideActive) *,
-.slides > .slide:not(.slideActive) *::before,
-.slides > .slide:not(.slideActive) *::after {
-  animation-play-state: paused;
+   toutes lisent `--deco-anim-state`, qui s'hérite, pseudo-éléments compris.
+   Figées, pas retirées : la sortante garde son image pendant le fondu au lieu
+   de s'éteindre d'un coup. */
+.slide:not(.slideActive) {
+  --deco-anim-state: paused;
 }
 
 /* Pied à commandes : à 320 px, l'affordance et les commandes ne tiennent pas
