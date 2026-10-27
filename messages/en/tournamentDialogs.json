@@ -139,7 +139,8 @@
         "confirm": "Confirm {name}'s forfeit",
         "notAllowed": "A forfeit is declared by the team's owner or a manager."
       }
-    }
+    },
+    "sending": "Sending…"
   },
   "schedule": {
     "missing": {

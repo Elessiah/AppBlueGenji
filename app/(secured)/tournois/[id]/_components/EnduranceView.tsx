@@ -27,7 +27,8 @@ import { previewEnduranceNextRound } from "@/lib/shared/endurance-next-round/pre
 import type { MatchFormat } from "@/lib/shared/match-format";
 import { EnduranceNextRoundPanel } from "./EnduranceNextRoundPanel";
 import { EntrantName } from "./EntrantName";
-import { FORFEIT_CANCEL_BUTTON_STYLE } from "./RoundColumns";
+import { FORFEIT_BUTTON_STYLE, FORFEIT_CANCEL_BUTTON_STYLE } from "./RoundColumns";
+import { ForfeitRowAction, type ForfeitRowActionProps } from "./ForfeitRowAction";
 import { EnduranceCard } from "./EnduranceCard";
 import { EnduranceRankingViews } from "./EnduranceRankingViews";
 import { EnduranceChartPanel } from "./EnduranceChartPanel";
@@ -299,11 +300,47 @@ export function EnduranceView({
   // qu'en présence d'une telle ligne.
   const showOutLegend = endurance.standings.some((s) => s.status === "OUT_OF_CONTENTION");
 
+  const cancellableIds = new Set(endurance.cancellableForfeitTeamIds);
+  const forfeitAction = (
+    standing: EnduranceStandingRow,
+    isMine: boolean,
+    forfeitable: boolean,
+  ): ForfeitRowActionProps | null => {
+    if (forfeitable && onForfeit !== undefined) {
+      return {
+        kind: "button",
+        teamId: standing.teamId,
+        label: isMine ? a("forfeit.button.label") : a("forfeit.endurance.other"),
+        title: isMine
+          ? a(`forfeit.endurance.selfTitle.${toParticipantType(participantType)}`)
+          : a("forfeit.endurance.otherTitle", { name: standing.teamName }),
+        ariaLabel: isMine
+          ? a("forfeit.endurance.selfAria")
+          : a("forfeit.endurance.otherTitle", { name: standing.teamName }),
+        style: FORFEIT_BUTTON_STYLE,
+        onClick: () => onForfeit(standing.teamId, standing.teamName),
+      };
+    }
+    if (!canCancelRow(standing.status) || onCancelForfeit === undefined) return null;
+    if (!cancellableIds.has(standing.teamId)) {
+      return { kind: "locked", teamId: standing.teamId, label: a("forfeitCancel.frozen"), title: a("forfeitCancel.frozenTitle") };
+    }
+    return {
+      kind: "button",
+      teamId: standing.teamId,
+      label: a("forfeitCancel.button"),
+      title: a("forfeitCancel.buttonTitle", { name: standing.teamName }),
+      ariaLabel: a("forfeitCancel.buttonAria", { name: standing.teamName }),
+      style: FORFEIT_CANCEL_BUTTON_STYLE,
+      onClick: () => onCancelForfeit(standing.teamId, standing.teamName),
+    };
+  };
+
   // Gestes d'une ligne, avec leurs gardes : `EnduranceRankingViews` ne les
   // montre que dans la vue « Général ».
   const renderActions = (standing: EnduranceStandingRow) => {
     const isMine = myTeamId !== null && standing.teamId === myTeamId;
-    const forfeitable = canForfeitRow(standing.teamId, standing.status);
+    const forfeitRow = forfeitAction(standing, isMine, canForfeitRow(standing.teamId, standing.status));
     return (
       <>
         {canPenalizeRow(standing.status) && onPenalize !== undefined && (
@@ -326,53 +363,14 @@ export function EnduranceView({
             {a("penalty.button")}
           </button>
         )}
-        {forfeitable && onForfeit !== undefined && (
-          <button
-            type="button"
-            onClick={() => onForfeit(standing.teamId, standing.teamName)}
-            className="btn tap-target"
-            title={
-              isMine
-                ? a(`forfeit.endurance.selfTitle.${toParticipantType(participantType)}`)
-                : a("forfeit.endurance.otherTitle", { name: standing.teamName })
-            }
-            aria-label={
-              isMine
-                ? a("forfeit.endurance.selfAria")
-                : a("forfeit.endurance.otherTitle", { name: standing.teamName })
-            }
-            style={{
-              padding: "3px 8px",
-              fontSize: 11,
-              textTransform: "uppercase",
-              letterSpacing: "0.04em",
-              background: "rgba(var(--amber-rgb), 0.12)",
-              borderColor: "rgba(var(--amber-rgb), 0.4)",
-              color: AMBER,
-            }}
-          >
-            {/*
-              Deux gestes différents sous un même bouton : le lecteur
-              qui quitte le tournoi « abandonne », l'arbitrage, lui,
-              « déclare forfait » une équipe — pour tout le reste du
-              tournoi, et non sur la seule manche en cours (ce
-              forfait-là se pose sur le match).
-            */}
-            {isMine ? a("forfeit.button.label") : a("forfeit.endurance.other")}
-          </button>
-        )}
-        {canCancelRow(standing.status) && onCancelForfeit !== undefined && (
-          <button
-            type="button"
-            onClick={() => onCancelForfeit(standing.teamId, standing.teamName)}
-            className="btn tap-target"
-            title={a("forfeitCancel.buttonTitle", { name: standing.teamName })}
-            aria-label={a("forfeitCancel.buttonAria", { name: standing.teamName })}
-            style={FORFEIT_CANCEL_BUTTON_STYLE}
-          >
-            {a("forfeitCancel.button")}
-          </button>
-        )}
+        {/*
+          Un seul geste d'abandon par ligne, rendu par un même `<button>`
+          (`ForfeitRowAction`). Deux gestes différents sous ce bouton : le
+          lecteur qui quitte le tournoi « abandonne », l'arbitrage, lui,
+          « déclare forfait » une équipe — pour tout le reste du tournoi, et
+          non sur la seule manche en cours (ce forfait-là se pose sur le match).
+        */}
+        {forfeitRow && <ForfeitRowAction {...forfeitRow} />}
       </>
     );
   };

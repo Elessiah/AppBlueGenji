@@ -404,9 +404,10 @@ export function AdminScoreDialog({
     await perform(action);
   };
 
-  // `Entrée` dans un champ vaut « valider le résultat » : c'est l'issue
-  // attendue d'une saisie de score, l'enregistrement intermédiaire étant un
-  // geste délibéré.
+  // Soumission du formulaire (bouton « Valider le résultat ») : `Entrée` ne la
+  // déclenche **pas** depuis un champ de map, que `MapScoreList` retient —
+  // corriger un code puis valider d'un même geste trancherait le match sans
+  // relecture. Valider reste un clic (ou `Entrée` sur le bouton lui-même).
   const onSubmitForm = (event: FormEvent) => {
     event.preventDefault();
     if ((form.decision.canResolve || form.mapsRefused.resolve) && !form.submitting && !awaitingDetail) void run("resolve");
@@ -689,7 +690,9 @@ export function AdminScoreDialog({
               onClick={() => {
                 if (!form.submitting) void run("save");
               }}
-              disabled={(!form.decision.canSave && !form.mapsRefused.save) || awaitingDetail}
+              // Jamais `disabled` natif pendant l'envoi : un résultat reçu par le
+              // flux pourrait désactiver le bouton focalisé et faire tomber le focus.
+              disabled={!form.submitting && ((!form.decision.canSave && !form.mapsRefused.save) || awaitingDetail)}
               aria-disabled={form.submitting || undefined}
               aria-busy={form.submitting || undefined}
               title={buttonTitle(form.mapsRefused.save, form.decision.saveBlocker, t("score.admin.saveTitle"))}
@@ -700,7 +703,7 @@ export function AdminScoreDialog({
             <button
               type="submit"
               className="btn"
-              disabled={(!form.decision.canResolve && !form.mapsRefused.resolve) || awaitingDetail}
+              disabled={!form.submitting && ((!form.decision.canResolve && !form.mapsRefused.resolve) || awaitingDetail)}
               aria-disabled={form.submitting || undefined}
               aria-busy={form.submitting || undefined}
               title={buttonTitle(form.mapsRefused.resolve, form.decision.resolveBlocker, t("score.admin.resolveTitle"))}
@@ -708,6 +711,11 @@ export function AdminScoreDialog({
               {t("score.admin.resolve")}
               {form.submitting && "…"}
             </button>
+            {/* Le libellé d'un bouton focalisé qui change n'est pas annoncé :
+                l'envoi se dit ici, comme dans `ConfirmActionDialog`. */}
+            <output className="sr-only" aria-live="polite">
+              {form.submitting ? t("score.sending") : ""}
+            </output>
           </div>
         </form>
       </div>

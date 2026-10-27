@@ -3,6 +3,7 @@ import frTournamentErrors from "@/messages/fr/tournamentErrors.json";
 import { tournamentErrorsText, type TournamentErrorsText } from "@/lib/shared/tournament-actions-text";
 import { formatMessage } from "@/lib/shared/message-format";
 import { useTournamentErrorsText } from "@/components/i18n/tournament-actions-text";
+import type { ParticipantType } from "@/lib/shared/participants";
 
 /**
  * Refus des écrans de tournoi : un code d'API → une phrase, par langue
@@ -99,6 +100,21 @@ export function mapBatchError(
   return batchSize > 1 ? formatMessage(text.locale, text.messages.batch, { message }) : message;
 }
 
+/**
+ * Refus qui **nomme l'engagé** sans le désigner (« l'équipe » / « le joueur ») :
+ * en tournoi individuel, la variante `soloCodes` remplace la phrase d'équipe —
+ * le bouton et la confirmation parlaient déjà du joueur. Repli : `mapError`.
+ */
+export function mapParticipantError(
+  errorCode: string,
+  participantType: ParticipantType,
+  text: TournamentErrorsText = FR_ERRORS_TEXT,
+): string {
+  const solo: Readonly<Record<string, string>> = text.messages.soloCodes;
+  if (participantType === "SOLO" && Object.hasOwn(solo, errorCode)) return solo[errorCode];
+  return mapError(errorCode, text);
+}
+
 /** Table des refus dans la langue de la page (anglais sous `/en`). */
 export function useErrorsText(): TournamentErrorsText {
   return useTournamentErrorsText(FR_ERRORS_TEXT);
@@ -108,4 +124,13 @@ export function useErrorsText(): TournamentErrorsText {
 export function useMapError(): (errorCode: string) => string {
   const text = useErrorsText();
   return useCallback((errorCode: string) => mapError(errorCode, text), [text]);
+}
+
+/** `mapParticipantError` lié à la langue de la page. */
+export function useMapParticipantError(): (errorCode: string, participantType: ParticipantType) => string {
+  const text = useErrorsText();
+  return useCallback(
+    (errorCode: string, participantType: ParticipantType) => mapParticipantError(errorCode, participantType, text),
+    [text],
+  );
 }

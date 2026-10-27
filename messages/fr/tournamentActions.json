@@ -144,34 +144,45 @@
     },
     "button": {
       "label": "Abandonner",
-      "selfTitle": "Abandonner : votre équipe quitte définitivement le tournoi",
+      "selfTitle": {
+        "TEAM": "Abandonner : votre équipe quitte définitivement le tournoi",
+        "SOLO": "Abandonner : vous quittez définitivement le tournoi"
+      },
       "otherTitle": "Déclarer l'abandon de {name}",
-      "selfAria": "Abandonner avec mon équipe",
+      "selfAria": {
+        "TEAM": "Abandonner avec mon équipe",
+        "SOLO": "Abandonner le tournoi"
+      },
       "otherAriaSwiss": "Abandonner : déclarer l'abandon de {name}",
       "otherAriaSurvival": "Abandonner : déclarer l'abandon de {name}"
     },
     "endurance": {
       "selfTitle": {
-        "TEAM": "Abandonner : L'équipe quittera définitivement le tournoi",
-        "SOLO": "Abandonner : Le joueur quittera définitivement le tournoi"
+        "TEAM": "Abandonner : l'équipe quittera définitivement le tournoi",
+        "SOLO": "Abandonner : le joueur quittera définitivement le tournoi"
       },
       "selfAria": "Abandonner le tournoi",
-      "otherTitle": "Déclarer {name} forfait pour tout le reste du tournoi",
+      "otherTitle": "Forfait : déclarer {name} forfait pour tout le reste du tournoi",
       "other": "Forfait"
     }
   },
   "forfeitCancel": {
-    "success": "Abandon de {name} annulé : son classement est recalculé.",
+    "success": {
+      "TEAM": "Abandon de {name} annulé : son classement est recalculé.",
+      "SOLO": "Abandon de {name} annulé : son classement est recalculé."
+    },
     "title": "Annuler l'abandon de {name} ?",
     "body": {
-      "TEAM": "L'abandon est effacé et le classement de l'équipe recalculé : elle sera appariée dès la prochaine manche, sauf si les matchs qu'elle a joués l'éliminent. Le match perdu par forfait reste perdu : corrigez son score si besoin.",
-      "SOLO": "L'abandon est effacé et le classement du joueur recalculé : il sera apparié dès la prochaine manche, sauf si les matchs qu'il a joués l'éliminent. Le match perdu par forfait reste perdu : corrigez son score si besoin."
+      "TEAM": "L'abandon est effacé et le classement de l'équipe recalculé : elle sera appariée dès la prochaine manche, sauf si les matchs qu'elle a joués l'éliminent. Le match perdu par forfait reste perdu : corrige son score si besoin.",
+      "SOLO": "L'abandon est effacé et le classement du joueur recalculé : il sera apparié dès la prochaine manche, sauf si les matchs qu'il a joués l'éliminent. Le match perdu par forfait reste perdu : corrige son score si besoin."
     },
-    "confirm": "Annuler l'abandon",
-    "pending": "Annulation…",
+    "confirm": "Effacer l'abandon",
+    "pending": "Effacement…",
     "button": "Annuler l'abandon",
     "buttonTitle": "Annuler l'abandon : le classement de {name} est recalculé",
-    "buttonAria": "Annuler l'abandon de {name}"
+    "buttonAria": "Annuler l'abandon de {name}",
+    "frozen": "Figé",
+    "frozenTitle": "Une manche a été jouée depuis l'abandon : il ne s'annule plus."
   },
   "penaltyLift": {
     "success": "Pénalité retirée : {name} récupère {points} point(s).",

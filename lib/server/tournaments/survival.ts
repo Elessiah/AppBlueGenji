@@ -14,6 +14,7 @@ import {
 } from "@/lib/shared/survival";
 import { loadEntrantsBySiteRanking } from "@/lib/server/ranking-service";
 import { createMatch, finishTournament, forfeitMatchScores } from "./repository";
+import { loadCancellableForfeitIds } from "./forfeit-window";
 import { noteDeletedMatches } from "./departed-notices";
 import { localUploadUrl } from "@/lib/shared/uploads";
 
@@ -751,6 +752,16 @@ export async function loadSurvivalMeta(
   );
 
   const schedule = resolveCutSchedule(tournament);
+  const cancellableForfeitTeamIds = await loadCancellableForfeitIds(
+    conn,
+    tournamentId,
+    phaseId,
+    rows.map((row) => ({
+      teamId: Number(row.team_id),
+      status: row.status,
+      forfeitRound: row.eliminated_round === null ? null : Number(row.eliminated_round),
+    })),
+  );
 
   return {
     roundsBeforeFirstCut: schedule.roundsBeforeFirstCut,
@@ -768,6 +779,7 @@ export async function loadSurvivalMeta(
       eliminatedRound: row.eliminated_round === null ? null : Number(row.eliminated_round),
       rank: Number(row.rank),
     })),
+    cancellableForfeitTeamIds,
   };
 }
 

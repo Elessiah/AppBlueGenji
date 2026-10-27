@@ -410,6 +410,8 @@ export function EnduranceRankingViews({
             <Fragment key={standing.teamId}>
               <div
                 className={`${rowClassName} ${styles.fadable} ${isMine ? styles.mine : ""}`}
+                data-row-focus={standing.teamId}
+                tabIndex={-1}
                 data-podium-muted={ROW_OPACITY[row.status] < 1 ? "" : undefined}
                 style={{ "--row-fade": ROW_OPACITY[row.status] } as CSSProperties}
               >

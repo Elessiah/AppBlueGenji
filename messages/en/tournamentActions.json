@@ -144,9 +144,15 @@
     },
     "button": {
       "label": "Withdraw",
-      "selfTitle": "Withdraw: your team leaves the tournament for good",
+      "selfTitle": {
+        "TEAM": "Withdraw: your team leaves the tournament for good",
+        "SOLO": "Withdraw: you leave the tournament for good"
+      },
       "otherTitle": "Declare {name}'s withdrawal",
-      "selfAria": "Withdraw with my team",
+      "selfAria": {
+        "TEAM": "Withdraw with my team",
+        "SOLO": "Withdraw from the tournament"
+      },
       "otherAriaSwiss": "Withdraw: declare {name}'s withdrawal",
       "otherAriaSurvival": "Withdraw: declare {name}'s withdrawal"
     },
@@ -161,17 +167,22 @@
     }
   },
   "forfeitCancel": {
-    "success": "{name}'s withdrawal cancelled: its standing is recalculated.",
+    "success": {
+      "TEAM": "{name}'s withdrawal cancelled: its standing is recalculated.",
+      "SOLO": "{name}'s withdrawal cancelled: their standing is recalculated."
+    },
     "title": "Cancel {name}'s withdrawal?",
     "body": {
       "TEAM": "The withdrawal is erased and the team's standing recalculated: it will be paired from the next round, unless the matches it has played eliminate it. The match lost by forfeit stays lost: correct its score if needed.",
       "SOLO": "The withdrawal is erased and the player's standing recalculated: they will be paired from the next round, unless the matches they have played eliminate them. The match lost by forfeit stays lost: correct its score if needed."
     },
-    "confirm": "Cancel the withdrawal",
-    "pending": "Cancelling…",
+    "confirm": "Erase the withdrawal",
+    "pending": "Erasing…",
     "button": "Cancel withdrawal",
     "buttonTitle": "Cancel withdrawal: {name}'s standing is recalculated",
-    "buttonAria": "Cancel withdrawal of {name}"
+    "buttonAria": "Cancel withdrawal of {name}",
+    "frozen": "Locked",
+    "frozenTitle": "A round has been played since the withdrawal: it can no longer be cancelled."
   },
   "penaltyLift": {
     "success": "Penalty lifted: {name} gets back {points, plural, one {# point} other {# points}}.",

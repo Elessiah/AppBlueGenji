@@ -11,6 +11,7 @@ import { replayEnduranceDetailed } from "@/lib/shared/bg-survie/replay";
 import type { EnduranceStatus } from "@/lib/shared/bg-survie/standings";
 import { forfeitMapCount } from "@/lib/shared/match-format";
 import { localUploadUrl } from "@/lib/shared/uploads";
+import { loadCancellableForfeitIds } from "../forfeit-window";
 import { loadQualificationOutcomes } from "./replay-inputs";
 import { lastRoundWithScoreInput } from "./round-progress";
 import { configOf, loadTournament, matchFormatOf } from "./tournament-row";
@@ -160,6 +161,16 @@ export async function loadEnduranceMeta(conn: PoolConnection, tournamentId: numb
       penaltyPoints: detailed.penaltyTotals.get(Number(row.team_id)) ?? 0,
       rounds: detailed.history.get(Number(row.team_id)) ?? [],
     })),
+    cancellableForfeitTeamIds: await loadCancellableForfeitIds(
+      conn,
+      tournamentId,
+      0,
+      rows.map((row) => ({
+        teamId: Number(row.team_id),
+        status: row.status,
+        forfeitRound: row.eliminated_round === null ? null : Number(row.eliminated_round),
+      })),
+    ),
   };
 }
 

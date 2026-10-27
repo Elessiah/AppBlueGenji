@@ -31,7 +31,7 @@ export function useDialogsText(): TournamentDialogsText {
 }
 
 /**
- * Violation de format d'un score, chiffrée (`matchScoreViolationMessage`),
+ * Violation de format d'un score, chiffrée,
  * dans la langue du texte. La notation (« BO5 · 4 maps ») est celle de
  * `matchFormatLabel`, identique dans les deux langues hormis le score libre,
  * qui n'arrive jamais ici avec un format.
@@ -91,7 +91,7 @@ export function mapViolationText(
   }
 }
 
-/** Phrase sous un bouton de score refusé (`scoreBlockerMessage`), dans la langue du texte. */
+/** Phrase sous un bouton de score refusé, dans la langue du texte. */
 export function scoreBlockerText(
   text: TournamentDialogsText,
   blocker: ScoreFormBlocker,
@@ -116,7 +116,7 @@ export function scoreBlockerText(
   }
 }
 
-/** Score proposé et jamais confirmé, dans le dialogue d'arbitrage (`adminProposalNotice`). */
+/** Score proposé et jamais confirmé, dans le dialogue d'arbitrage. */
 export function adminProposalText(
   text: TournamentDialogsText,
   proposal: PendingScoreProposal | null,

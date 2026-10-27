@@ -30,9 +30,6 @@
 }
 
 .rows {
-  /* Le passage à deux lignes suit la largeur de la liste, pas celle de la
-     fenêtre : la modale (460 px) laisserait sinon le code à ~110 px. */
-  container-type: inline-size;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -43,7 +40,10 @@
 
 .row {
   display: grid;
-  grid-template-columns: 56px minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) 36px;
+  /* Deux lignes : libellé et code en pleine largeur, puis les deux scores et
+     le retrait. La liste ne vit que dans les dialogues de score (460 px) : une
+     disposition sur une ligne y laisserait le code à ~110 px. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 36px;
   gap: 8px;
   /* Alignés en haut : une erreur sous un champ allonge sa seule colonne, sans
      décaler les autres champs ni le bouton de retrait. */
@@ -55,9 +55,7 @@
 }
 
 .mapLabel {
-  /* Centrée sur les champs : libellé (16 px) + écart (4 px), puis 40 px. */
-  margin-top: 20px;
-  line-height: 40px;
+  grid-column: 1 / -1;
   font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 700;
@@ -194,18 +192,6 @@
   color: var(--ink-quiet, #9aa4b2);
 }
 
-@container (max-width: 560px) {
-  .row {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 36px;
-  }
-
-  .mapLabel {
-    grid-column: 1 / -1;
-    margin-top: 0;
-    line-height: normal;
-  }
-
-  .code {
-    grid-column: 1 / -1;
-  }
+.code {
+  grid-column: 1 / -1;
 }

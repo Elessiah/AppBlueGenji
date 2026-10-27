@@ -21,6 +21,8 @@ import { useTournamentViewText } from "@/components/i18n/tournament-page-text";
 import { FR_VIEWS_TEXT } from "../_lib/views-text";
 import type { TournamentPageText } from "@/lib/shared/tournament-page-text";
 import { useActionsText } from "../_lib/actions-text";
+import { useEntrantParticipantType } from "../_lib/entrant-link";
+import { ForfeitRowAction, type ForfeitRowActionProps } from "./ForfeitRowAction";
 
 interface SwissViewProps {
   swiss: SwissMeta;
@@ -87,6 +89,7 @@ export function SwissView({
   const { t } = text;
   // Textes de l'abandon (espace `tournamentActions`).
   const { t: a } = useActionsText();
+  const participantType = useEntrantParticipantType();
   const emptyText = emptyLabel ?? t("page.noMatchesShort");
   // Une marche du podium porte sa propre graisse : ne pas l'écraser en ligne.
   const podiumTiers = usePodiumTiers();
@@ -105,6 +108,39 @@ export function SwissView({
   const isCancellable = (team: SwissStandingRow) =>
     !isFinished && team.status === "FORFEIT" && canCancelForfeit && onCancelForfeit !== undefined;
   const anyRowAction = swiss.standings.some((team) => isForfeitable(team) || isCancellable(team));
+  const cancellableIds = new Set(swiss.cancellableForfeitTeamIds);
+
+  // Un seul geste par ligne, rendu par un même `<button>` (`ForfeitRowAction`).
+  const rowAction = (team: SwissStandingRow, isMine: boolean): ForfeitRowActionProps | null => {
+    if (isForfeitable(team)) {
+      return {
+        kind: "button",
+        teamId: team.teamId,
+        label: a("forfeit.button.label"),
+        title: isMine
+          ? a(`forfeit.button.selfTitle.${participantType}`)
+          : a("forfeit.button.otherTitle", { name: team.teamName }),
+        ariaLabel: isMine
+          ? a(`forfeit.button.selfAria.${participantType}`)
+          : a("forfeit.button.otherAriaSwiss", { name: team.teamName }),
+        style: FORFEIT_BUTTON_STYLE,
+        onClick: () => onForfeit(team.teamId, team.teamName),
+      };
+    }
+    if (!isCancellable(team)) return null;
+    if (!cancellableIds.has(team.teamId)) {
+      return { kind: "locked", teamId: team.teamId, label: a("forfeitCancel.frozen"), title: a("forfeitCancel.frozenTitle") };
+    }
+    return {
+      kind: "button",
+      teamId: team.teamId,
+      label: a("forfeitCancel.button"),
+      title: a("forfeitCancel.buttonTitle", { name: team.teamName }),
+      ariaLabel: a("forfeitCancel.buttonAria", { name: team.teamName }),
+      style: FORFEIT_CANCEL_BUTTON_STYLE,
+      onClick: () => onCancelForfeit?.(team.teamId, team.teamName),
+    };
+  };
 
   const scoreLabel = t("swiss.scoring", {
     win: swiss.pointsForWin,
@@ -245,8 +281,7 @@ export function SwissView({
                     // Tournoi clos : la tête du classement est championne, pas « en lice ».
                     const meta = standingMeta(team, isFinished, text);
                     const isMine = team.teamId === myTeamId;
-                    const forfeitable = isForfeitable(team);
-                    const cancellable = isCancellable(team);
+                    const action = rowAction(team, isMine);
                     // Une ligne forfait s'estompe cellule par cellule, hors
                     // colonne d'action : « Annuler l'abandon » garderait sinon
                     // l'air d'un bouton désactivé, sous le contraste requis.
@@ -255,6 +290,8 @@ export function SwissView({
                       <div
                         key={team.teamId}
                         role="row"
+                        data-row-focus={team.teamId}
+                        tabIndex={-1}
                         data-podium-muted={team.status === "FORFEIT" ? "" : undefined}
                         style={{
                           ...SUBGRID,
@@ -321,38 +358,7 @@ export function SwissView({
                         </span>
                         {anyRowAction && (
                           <span role="cell" className={styles.swissAction}>
-                            {forfeitable && (
-                              <button
-                                type="button"
-                                onClick={() => onForfeit(team.teamId, team.teamName)}
-                                className="btn tap-target"
-                                title={
-                                  isMine
-                                    ? a("forfeit.button.selfTitle")
-                                    : a("forfeit.button.otherTitle", { name: team.teamName })
-                                }
-                                aria-label={
-                                  isMine
-                                    ? a("forfeit.button.selfAria")
-                                    : a("forfeit.button.otherAriaSwiss", { name: team.teamName })
-                                }
-                                style={FORFEIT_BUTTON_STYLE}
-                              >
-                                {a("forfeit.button.label")}
-                              </button>
-                            )}
-                            {cancellable && (
-                              <button
-                                type="button"
-                                onClick={() => onCancelForfeit?.(team.teamId, team.teamName)}
-                                className="btn tap-target"
-                                title={a("forfeitCancel.buttonTitle", { name: team.teamName })}
-                                aria-label={a("forfeitCancel.buttonAria", { name: team.teamName })}
-                                style={FORFEIT_CANCEL_BUTTON_STYLE}
-                              >
-                                {a("forfeitCancel.button")}
-                              </button>
-                            )}
+                            {action && <ForfeitRowAction {...action} />}
                           </span>
                         )}
                       </div>
