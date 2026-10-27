@@ -95,7 +95,13 @@ modale) ; sinon l'équipe 1. L'hôte joue à **gauche** ; l'autre équipe
   (`LaunchContactCards.tsx`), dans la modale de lancement et la fenêtre
   « Contacts ».
 - **Staff** : la fenêtre « Arbitrage » (action « Arbitrage » de la carte,
-  `showReferee` = `canSchedule`, match à jouer, jamais un bye).
+  `showReferee` = `canSchedule`, match à jouer, jamais un bye). Ses comptes
+  désignables écartent les joueurs du match (membres en cours et entrée solo
+  des deux engagés) ; l'arbitre en place qui le joue désormais, avant le
+  départ, s'y lit « ne peut plus arbitrer » — la règle du bandeau
+  (`refereeKept`). Champs habillés par `.field` ; la carte saisie survit aux
+  autres gestes ; un geste qui retire son bouton rend le focus à la phrase
+  d'état.
 
 ## Annonces
 
