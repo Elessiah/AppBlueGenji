@@ -6,6 +6,9 @@ import {
   formatMatchStartEntryPreview,
   isMatchStartEntryInRange,
   isPastMatchStartChange,
+  pastStartWarning,
+  pastWarningKey,
+  type PastStartWarningMatch,
   localMatchTimeIfDifferent,
   matchEntryMonths,
   matchEntryReference,
@@ -466,5 +469,82 @@ describe("isPastMatchStartChange", () => {
 
   it("ignore un instant illisible", () => {
     expect(isPastMatchStartChange(Number.NaN, null, now)).toBe(false);
+  });
+
+  it("compare à la minute : une date posée avec des secondes, ressaisie telle quelle, ne change rien", () => {
+    const current = at("2026-10-20T19:00:42Z");
+    expect(isPastMatchStartChange(at("2026-10-20T19:00:00Z"), current, now)).toBe(false);
+    expect(isPastMatchStartChange(at("2026-10-20T19:01:00Z"), current, now)).toBe(true);
+    expect(isPastMatchStartChange(at("2026-10-20T18:59:00Z"), current, now)).toBe(true);
+  });
+});
+
+describe("pastWarningKey", () => {
+  it("dit ce que la date déclenche selon la phase de lancement et les engagés", () => {
+    expect(pastWarningKey(true, true)).toBe("schedule.warnPast");
+    expect(pastWarningKey(true, false)).toBe("schedule.warnPastDirect");
+    expect(pastWarningKey(false, true)).toBe("schedule.warnPastTbd");
+    expect(pastWarningKey(false, false)).toBe("schedule.warnPastTbd");
+  });
+});
+
+describe("pastStartWarning — n'avertir que d'un passage en lancement", () => {
+  const now = at("2026-10-31T10:00:00Z");
+  const past = at("2026-10-30T19:00:00Z");
+  const base: PastStartWarningMatch = {
+    status: "READY",
+    team1Id: 1,
+    team2Id: 2,
+    startAt: "2026-11-02T19:00:00.000Z",
+    launchedAt: null,
+    refereeScheduling: false,
+    team1Score: null,
+    team2Score: null,
+  };
+  const on = { launchPhase: true, tournamentFinished: false };
+  const off = { launchPhase: false, tournamentFinished: false };
+
+  it("match programmé (SCHEDULED) avancé à une date passée : il entre en lancement", () => {
+    expect(pastStartWarning(base, past, now, on)).toBe("schedule.warnPast");
+    expect(pastStartWarning(base, past, now, off)).toBe("schedule.warnPastDirect");
+  });
+
+  it("match à planifier (TO_PLAN) daté dans le passé : il part aussitôt", () => {
+    expect(pastStartWarning({ ...base, startAt: null, refereeScheduling: true }, past, now, on)).toBe("schedule.warnPast");
+  });
+
+  it("match déjà en lancement (LOBBY, sans date) : rien ne change, rien à dire", () => {
+    expect(pastStartWarning({ ...base, startAt: null }, past, now, on)).toBeNull();
+    expect(pastStartWarning({ ...base, startAt: "2026-10-31T09:00:00.000Z" }, past, now, on)).toBeNull();
+  });
+
+  it("match parti d'office sans date (option éteinte) : déjà lancé, rien à dire", () => {
+    expect(pastStartWarning({ ...base, startAt: null }, past, now, off)).toBeNull();
+  });
+
+  it("match lancé, au score noté, joué ou d'un tournoi clos : aucun avertissement", () => {
+    expect(pastStartWarning({ ...base, launchedAt: "2026-10-31T09:00:00.000Z" }, past, now, on)).toBeNull();
+    expect(pastStartWarning({ ...base, team1Score: 1 }, past, now, on)).toBeNull();
+    expect(pastStartWarning({ ...base, team2Score: 0 }, past, now, on)).toBeNull();
+    expect(pastStartWarning({ ...base, status: "COMPLETED" }, past, now, on)).toBeNull();
+    expect(pastStartWarning(base, past, now, { launchPhase: true, tournamentFinished: true })).toBeNull();
+  });
+
+  it("place encore vide : le match partira dès ses deux adversaires connus", () => {
+    const tbd = { ...base, status: "PENDING" as const, team2Id: null };
+    expect(pastStartWarning(tbd, past, now, on)).toBe("schedule.warnPastTbd");
+    expect(pastStartWarning(tbd, past, now, off)).toBe("schedule.warnPastTbd");
+  });
+
+  it("date à venir, ou la date déjà posée à la minute près : aucun avertissement", () => {
+    expect(pastStartWarning(base, at("2026-11-03T19:00:00Z"), now, on)).toBeNull();
+    const kept = { ...base, startAt: "2026-10-30T19:00:30.000Z", refereeScheduling: true };
+    expect(pastStartWarning(kept, past, now, on)).toBeNull();
+  });
+
+  it("juge sur l'horloge qu'on lui passe : une date devenue passée avertit à l'envoi", () => {
+    const soon = at("2026-10-31T10:05:00Z");
+    expect(pastStartWarning(base, soon, now, on)).toBeNull();
+    expect(pastStartWarning(base, soon, at("2026-10-31T10:06:00Z"), on)).toBe("schedule.warnPast");
   });
 });

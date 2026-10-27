@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
-import { pastWarningKey } from "@/app/(secured)/tournois/[id]/_components/MatchScheduleDialog";
 import { join } from "node:path";
+import { pastWarningKey } from "@/lib/shared/match-start-entry";
 import enDialogs from "@/messages/en/tournamentDialogs.json";
 import frDialogs from "@/messages/fr/tournamentDialogs.json";
 
@@ -43,8 +43,10 @@ describe("MatchScheduleDialog — heure", () => {
   });
 
   it("présélectionne le mois courant sans date posée, et le vide avec la date", () => {
-    expect(SOURCE).toContain("initial ? String(initial.month) : String(matchEntryDefaultMonth(Date.now()))");
+    expect(SOURCE).toContain("initial ? String(initial.month) : String(matchEntryDefaultMonth(clock))");
     expect(SOURCE).toContain('setMonth("")');
+    // Présélectionné, le mois ne compte qu'une fois un jour choisi (rendu : `match-schedule-dialog-render`).
+    expect(SOURCE).toContain('const enteredMonth = monthPreset && day === "" ? "" : month;');
   });
 
   it("n'explique plus la déduction de l'année, mais garde l'aperçu et sa correction", () => {
@@ -62,8 +64,8 @@ describe("MatchScheduleDialog — qui l'horaire prévient", () => {
     expect(SOURCE).toMatch(
       /startAtHint\(\s*text,\s*refereeScheduling,\s*match\.team1Id !== null && match\.team2Id !== null,\s*(\/\/[^\n]*\s*)?isMatchOver\(match\.status, tournamentFinished\),\s*launchPhase,\s*match\.launchedAt !== null,\s*\)/,
     );
-    // Un match joué n'annonce rien : l'aide s'en tient à la date.
-    expect(SOURCE).toContain("return played ? base : `${base} ${scheduleNotice(text, refereeScheduling, entrantsKnown)}`;");
+    // Un match joué n'annonce rien ; sinon l'avis vit derrière un « i », hors de l'aide.
+    expect(SOURCE).toContain("return played ? null : scheduleNotice(text, refereeScheduling, entrantsKnown);");
     expect(SOURCE).toMatch(/if \(!entrantsKnown\) return text\.t\("schedule\.noticeTbd"\);/);
     expect(SOURCE).toContain('text.t(refereeScheduling ? "schedule.noticePlanning" : "schedule.notice")');
   });
@@ -110,11 +112,9 @@ describe("MatchScheduleDialog — confirmation d'un retrait", () => {
 });
 
 describe("MatchScheduleDialog — date déjà passée", () => {
-  it("avertit d'une date passée sur un match ni lancé ni joué, sans la refuser", () => {
-    expect(SOURCE).toContain("isPastMatchStartChange(entry.instant, matchStartAtTime(match), openedAt)");
-    expect(SOURCE).toContain("match.launchedAt === null &&");
-    expect(SOURCE).toContain("!isMatchOver(match.status, tournamentFinished) &&");
-    expect(SOURCE).toMatch(/\{startsAtOnce && \(\s*<ScheduleWarning>/);
+  it("avertit d'une date passée par `pastStartWarning`, sans la refuser (logique : match-start-entry.test)", () => {
+    expect(SOURCE).toContain("pastStartWarning({ ...match, refereeScheduling }, entry.instant, now, { launchPhase, tournamentFinished })");
+    expect(SOURCE).toContain("<PastDateWarning message={pastWarning === null ? null : t(pastWarning)} />");
   });
 
   it("dit ce que la date déclenche selon la phase de lancement et les engagés", () => {
@@ -134,9 +134,10 @@ describe("MatchScheduleDialog — date déjà passée", () => {
 
 describe("MatchScheduleDialog — sous-titre", () => {
   it("rend les engagés par EntrantName (forme affichable, lien de fiche), jamais le nom brut", () => {
-    expect(SOURCE).toContain('<EntrantName teamId={match.team1Id} name={match.team1Name ?? "TBD"} />');
-    expect(SOURCE).toContain('<EntrantName teamId={match.team2Id} name={match.team2Name ?? "TBD"} />');
-    expect(SOURCE).not.toContain('{match.team1Name ?? "TBD"} vs');
+    expect(SOURCE).toContain('<EntrantName teamId={match.team1Id} name={match.team1Name ?? t("schedule.tbd")} />');
+    expect(SOURCE).toContain('<EntrantName teamId={match.team2Id} name={match.team2Name ?? t("schedule.tbd")} />');
+    expect(SOURCE).not.toContain('"TBD"');
+    expect(SOURCE).not.toMatch(/\/> vs\{" "\}/);
   });
 
   it("ouvre le focus sur le jour, pas sur le lien du premier engagé du sous-titre", () => {

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { closedNoticeText } from "@/app/(secured)/tournois/[id]/_components/PlayerScoreDialog";
-import { startAtHint } from "@/app/(secured)/tournois/[id]/_components/MatchScheduleDialog";
+import { startAtHint, startAtNotice } from "@/app/(secured)/tournois/[id]/_components/MatchScheduleDialog";
 import { anotherModalOpen } from "@/lib/shared/dialog-focus";
 import { launchSidesLaterText } from "@/components/match-launch/MatchLaunchCenter";
 import { CasterCard, SideCard } from "@/components/match-launch/LaunchContactCards";
@@ -84,22 +84,17 @@ describe("modale d'horaire — ce que la date produit", () => {
   });
 
   it("match déjà lancé, option allumée : la date ne le fait pas attendre (FR et EN)", () => {
-    expect(startAtHint(FR, false, true, false, true, true)).toBe(
-      `${frDialogs.schedule.hintLaunched} ${frDialogs.schedule.notice}`,
-    );
+    expect(startAtHint(FR, false, true, false, true, true)).toBe(frDialogs.schedule.hintLaunched);
+    expect(startAtNotice(FR, false, true, false)).toBe(frDialogs.schedule.notice);
     expect(startAtHint(EN, false, true, false, true, true)).toMatch(/^The match has already launched:/);
   });
 
   it("match lancé d'office, option éteinte : une heure à venir le remet en attente (FR et EN)", () => {
-    expect(startAtHint(FR, false, true, false, false, true)).toBe(
-      `${frDialogs.schedule.hintLaunchedDirect} ${frDialogs.schedule.notice}`,
-    );
-    expect(startAtHint(EN, false, true, false, false, true)).toBe(
-      `${enDialogs.schedule.hintLaunchedDirect} ${enDialogs.schedule.notice}`,
-    );
-    expect(startAtHint(FR, true, true, false, false, true)).toBe(
-      `${frDialogs.schedule.hintLaunchedPlanningDirect} ${frDialogs.schedule.noticePlanning}`,
-    );
+    expect(startAtHint(FR, false, true, false, false, true)).toBe(frDialogs.schedule.hintLaunchedDirect);
+    expect(startAtHint(EN, false, true, false, false, true)).toBe(enDialogs.schedule.hintLaunchedDirect);
+    expect(startAtHint(FR, true, true, false, false, true)).toBe(frDialogs.schedule.hintLaunchedPlanningDirect);
+    expect(startAtNotice(EN, false, true, false)).toBe(enDialogs.schedule.notice);
+    expect(startAtNotice(FR, true, true, false)).toBe(frDialogs.schedule.noticePlanning);
     for (const text of [frDialogs.schedule.hintLaunchedDirect, frDialogs.schedule.hintLaunchedPlanningDirect]) {
       expect(text).toMatch(/En attente de départ/);
       expect(text).not.toMatch(/prêt/i);
@@ -112,6 +107,16 @@ describe("modale d'horaire — ce que la date produit", () => {
     expect(enDialogs.schedule.hintLaunchedPlanningDirect).toMatch(/To schedule/);
     // Joué : l'archive seule.
     expect(startAtHint(FR, false, true, true, false, true)).toBe(frDialogs.schedule.hintDirect);
+  });
+
+  it("avis aux joueurs, à part de l'aide : aucun pour un match joué, l'attente d'une place vide", () => {
+    expect(startAtNotice(FR, false, true, true)).toBeNull();
+    expect(startAtNotice(FR, true, true, true)).toBeNull();
+    expect(startAtNotice(FR, false, false, false)).toBe(frDialogs.schedule.noticeTbd);
+    expect(startAtNotice(EN, true, false, false)).toBe(enDialogs.schedule.noticeTbd);
+    // L'aide ne reprend plus l'avis : une phrase, deux au plus.
+    expect(startAtHint(FR, false, true, false)).toBe(frDialogs.schedule.hint);
+    expect(startAtHint(EN, true, false, false)).toBe(enDialogs.schedule.hintPlanning);
   });
 
   it("option allumée ou absente : l'entrée en lancement", () => {

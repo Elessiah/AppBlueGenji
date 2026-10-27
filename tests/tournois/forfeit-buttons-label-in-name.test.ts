@@ -73,7 +73,7 @@ describe("confirmation de l'annulation d'un abandon", () => {
     it(`${locale} : le succès a ses variantes équipe / joueur`, () => {
       expect(actions.forfeitCancel.success.TEAM).toContain("{name}");
       expect(actions.forfeitCancel.success.SOLO).toContain("{name}");
-      if (locale === "en") expect(actions.forfeitCancel.success.SOLO).not.toMatch(/its/);
+      if (locale === "en") expect(actions.forfeitCancel.success.SOLO).not.toMatch(/\bits\b/);
     });
 
     it(`${locale} : l'infobulle du bouton ne promet pas non plus le retour en lice`, () => {

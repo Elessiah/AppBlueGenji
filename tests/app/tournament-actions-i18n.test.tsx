@@ -764,6 +764,20 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     expect(css).toContain(':hover:not(:disabled, [aria-disabled="true"])');
   });
 
+  it("score : l'envoi s'annonce dans une région d'état montée d'avance, vide au repos (FR et EN)", () => {
+    const player = <PlayerScoreDialog tournamentId={1} match={versus} myTeamId={10} canReportScore canForfeit proposals={[]} onClose={noop} onSubmitted={noop} onRefresh={noop} />;
+    const admin = <AdminScoreDialog match={versus} onClose={noop} onSubmitted={noop} />;
+    for (const locale of ["fr", "en"] as const) {
+      expect(render(locale, player)).toContain('<output class="sr-only" aria-live="polite"></output>');
+      expect(render(locale, admin)).toContain('<output class="sr-only" aria-live="polite"></output>');
+    }
+    expect(messagesFor("fr").tournamentDialogs.score.sending).toBe("Envoi…");
+    expect(EN.tournamentDialogs.score.sending).toBe("Sending…");
+    // En vol, le bouton de forfait dit l'envoi au lieu d'accoler « … » au nom.
+    const source = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx"), "utf8");
+    expect(source).toContain('{submitting ? t("score.sending") : t("score.player.forfeit.confirm", { name: myName })}');
+  });
+
   it("score (engagé) : une contre-proposition s'annonce comme un litige, le focus suit le verrou", () => {
     const source = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx"), "utf8");
     expect(source).toContain('if (!canEnterScore || view?.phase !== "THEIRS_PENDING" || !view.theirs) return false;');

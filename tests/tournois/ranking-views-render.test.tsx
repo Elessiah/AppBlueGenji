@@ -126,6 +126,35 @@ describe("vue survie — rendu inchangé", () => {
     ).toMatchSnapshot();
   });
 
+  it.each<[string, number[], boolean]>([
+    ["dans sa fenêtre : bouton d'annulation", [12], true],
+    ["manche passée : verrou, aucun bouton", [], false],
+  ])("ligne forfait %s", (_label, cancellable, offered) => {
+    const html = wrap(
+      <SurvivalView
+        survival={survival({
+          cancellableForfeitTeamIds: cancellable,
+          standings: [survivalRow({ teamId: 12, teamName: "Gamma", status: "FORFEIT" })],
+        })}
+        matches={[]}
+        allTournamentMatches={[]}
+        myTeamId={null}
+        isFinished={false}
+        adminResolvable={() => false}
+        onOpenAdminModal={noop}
+        canForfeit={() => false}
+        onForfeit={noop}
+        canCancelForfeit
+        onCancelForfeit={noop}
+      />,
+    );
+    expect(html.includes("Annuler l&#x27;abandon</button>")).toBe(offered);
+    expect(html.includes("Figé")).toBe(!offered);
+    expect(html).toContain('data-row-focus="12"');
+    // La ligne forfait s'estompe cellule par cellule, comme en suisse.
+    expect(html).toContain("opacity:0.9");
+  });
+
   it("sans barrage, cadence espacée", () => {
     expect(
       wrap(
