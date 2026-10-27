@@ -119,15 +119,17 @@ modale) ; sinon l'équipe 1. L'hôte joue à **gauche** ; l'autre équipe
   `match_no_referee` au canal des arbitres et en push `REFEREE_ALERT`
   (`queueNoRefereeAlerts`, regroupement pur `groupNoRefereeAlerts`) —
   décision du 2026-10-27, les matchs ne se jouant pas tous le même jour :
-  - match **planifié** (heure posée) : une alerte par match, réservée une fois
-    par appariement (`NO_REFEREE:<appariement>`, `bg_referee_alerts`) ;
+  - chaque match est réservé **une fois par appariement**, sur sa propre
+    ligne (`NO_REFEREE:<appariement>`, `bg_referee_alerts`), qu'il ait une
+    heure ou non : poser ou retirer l'heure ne le signale pas deux fois, un
+    réappariement le signale de nouveau ;
+  - match **planifié** (heure posée) : une alerte par match ;
   - matchs **sans horaire** : **une alerte par manche** (phase, tableau,
-    numéro) qui liste ses matchs (`formatRoundNoRefereeAlert`, douze nommés au
-    plus puis « et N autres »), une ligne de journal et un push, réservée une
-    seule fois pour la manche (`NO_REFEREE_ROUND`) sur son premier match
-    (`MIN(id)` de la manche) — un match de la manche entré en lancement plus
-    tard ne la réveille pas ; une manche régénérée (cascade) peut alerter de
-    nouveau ;
+    numéro) qui liste ceux qui entrent en lancement ensemble
+    (`queueRoundNoRefereeAlert`, `formatRoundNoRefereeAlert`, douze nommés au
+    plus puis « et N autres »), une ligne de journal et un push — un match de
+    la manche entré en lancement plus tard (tableau à élimination) part dans
+    une alerte de suite qui ne liste que lui, jamais ceux déjà signalés ;
   - manche mixte : chaque match planifié a la sienne, les autres sont groupés.
   Noms d'équipe sur Discord, « un joueur » pour une entrée solo.
 
