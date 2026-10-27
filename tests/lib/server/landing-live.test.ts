@@ -423,7 +423,7 @@ describe("getLandingLive — fiche des engagés du match", () => {
   it("rend un nom d'engagé sous sa forme affichable : la vitrine est lue sans compte", async () => {
     // Un nom ancien peut garder un renversement bidi ou n'être fait que de
     // caractères invisibles (`UNTRUSTED_NAMES.md`) : le bandeau le filtre déjà.
-    await mockDb([matchRow({ team1_name: "Al‮pha", team2_name: "​‍" })]);
+    await mockDb([matchRow({ team1_name: "Al\u202Epha", team2_name: "\u200B\u200D" })]);
 
     const live = await liveFrom(buckets([card(1, "Coupe A")]));
 

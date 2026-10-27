@@ -247,4 +247,14 @@ describe("leaderboard de la landing", () => {
     expect(rows.find((row) => row.teamName === "Nouvelle")).toMatchObject({ trend: "new", trendValue: 0 });
     expect(rows.find((row) => row.teamName === "Alpha")?.trend).not.toBe("new");
   });
+
+  it("rend chaque nom sous sa forme affichable : accueil et /classement sont lus sans compte", async () => {
+    // Un nom ancien peut garder un renversement bidi ou n'être fait que de
+    // caractères invisibles (`UNTRUSTED_NAMES.md`) ; repli « #id », commun aux deux langues.
+    await mockDb([teamRow(1, "Al\u202Epha"), teamRow(2, "\u200B\u200D")], [matchRow(1, 1, 2, 1)]);
+
+    const rows = await getLandingLeaderboard(8);
+
+    expect(rows.map((row) => row.teamName)).toEqual(["Alpha", "#2"]);
+  });
 });
