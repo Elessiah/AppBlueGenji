@@ -315,7 +315,7 @@ function RgpdFr({
                 <DataCell column={2}>
                   <span className={styles.badge}>{d.base}</span>
                   {d.extraBases?.map((extra) => (
-                    <span key={extra.base} className={styles.extraBase}>
+                    <span key={extra.scope} className={styles.extraBase}>
                       {/* Même base que la principale (pseudo dans #live) : pas de second badge identique, mais
                           « y compris » — seule sous le badge, la portée semblerait restreindre la base principale. */}
                       {extra.base === d.base ? "y compris : " : <><span className={styles.badge}>{extra.base}</span> </>}
@@ -1051,9 +1051,11 @@ function RgpdFr({
             un autre arbitre à qui le match est confié, l&apos;autogestion) ou qu&apos;il lui est retiré d&apos;office, il
             en est prévenu en notification push seulement, avec le motif. Ces gestes, l&apos;autogestion d&apos;un match
             et sa première carte sont notés au journal du staff sur Discord sans nommer personne, et un match qui
-            entre en lancement sans arbitre ni autogestion est signalé aux arbitres. Ce traitement relève de
-            l&apos;<strong>exécution du service</strong>, les arbitres agissant pour l&apos;association
-            (<Link href="/rgpd/registre#t04">registre, T04</Link>).
+            entre en lancement sans arbitre ni autogestion est signalé aux arbitres. Sa présentation aux parties
+            du match relève de l&apos;<strong>intérêt légitime</strong> (qu&apos;elles sachent qui arbitre et
+            puissent l&apos;ajouter en jeu) : il peut s&apos;y opposer en se retirant du match, à tout moment ; le
+            recueil de son « Prêt » et l&apos;avis du retrait, de l&apos;<strong>exécution du service</strong>, les
+            arbitres agissant pour l&apos;association (<Link href="/rgpd/registre#t04">registre, T04</Link>).
           </p>
         </div>
       </section>

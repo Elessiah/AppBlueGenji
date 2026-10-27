@@ -14,6 +14,7 @@ import {
   DATA_NOTICE_DM_SCOPE,
   DONNEES_PROFIL,
   BATTLETAG_MATCH_SCOPE,
+  REFEREE_BATTLETAG_SCOPE,
   VERIFIED_BADGE_SCOPE,
   LIVE_PSEUDO_SCOPE,
   MATCH_CONTACTS_SCOPE,
@@ -42,7 +43,9 @@ const SCOPE_EN: Record<string, string> = {
   [MATCH_CONTACTS_SCOPE]:
     "presentation, in the match's “Contacts” window and its launch window, to the members of both its teams and to the referees as soon as both its opponents are known until its end, and to its casters while the match is being played (the launch window, at the start of the match, only opens for both teams, the casters and the assigned referee); each caster's contacts to both teams and to the other casters of the match while the match is being played, and to the referees from the moment both its opponents are known until its end (terms of use, “Match contacts”)",
   [BATTLETAG_MATCH_SCOPE]:
-    "reading, even when hidden, only in the “Contacts” window of a match where you are presented as a contact and in its launch window: by both its teams and the referees as soon as both its opponents are known until its end, by its casters while the match is being played; a caster's, by both teams and the other casters of the match while the match is being played and by the referees as soon as both its opponents are known until its end (the launch window, at the start of the match, only opens for both teams, the casters and the assigned referee) — referees and administrators have no other access to it (terms of use, “Match contacts”); the assigned referee's of a match, in its “Contacts” and launch windows, by both its teams and the referees as soon as both its opponents are known until its end and by its casters while the match is being played (performance of the service, referees acting for the association)",
+    "reading, even when hidden, only in the “Contacts” window of a match where you are presented as a contact and in its launch window: by both its teams and the referees as soon as both its opponents are known until its end, by its casters while the match is being played; a caster's, by both teams and the other casters of the match while the match is being played and by the referees as soon as both its opponents are known until its end (the launch window, at the start of the match, only opens for both teams, the casters and the assigned referee) — referees and administrators have no other access to it (terms of use, “Match contacts”)",
+  [REFEREE_BATTLETAG_SCOPE]:
+    "the BattleTag of a match's assigned referee, even when hidden, in its “Contacts” and launch windows: read by both its teams and the referees as soon as both its opponents are known until its end, by its casters while the match is being played — objection by withdrawing from the match, at any time",
   [VERIFIED_BADGE_SCOPE]:
     "certification badge on your player page, read by any logged-in player even when the tag is hidden (without the tag) — objection through the report form, GDPR category",
   [MATCH_TIME_DM_SCOPE]: "match time notices, reminders and match removal notices by direct message",

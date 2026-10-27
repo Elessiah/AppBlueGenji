@@ -91,7 +91,7 @@ function DataRow({ entry, accent = false, mark = "" }: Readonly<{ entry: DonneEn
       <DataCell column={2}>
         <span className={accent ? `${styles.badge} ${styles.badgeAccent}` : styles.badge}>{LEGAL_BASE_EN[entry.base]}</span>
         {entry.extraBases?.map((extra) => (
-          <span key={extra.base} className={styles.extraBase}>
+          <span key={extra.scope} className={styles.extraBase}>
             {/* Même base que la principale : pas de second badge identique, mais « including » (cf. page FR). */}
             {extra.base === entry.base ? "including: " : <><span className={styles.badge}>{LEGAL_BASE_EN[extra.base]}</span> </>}
             {extra.scope}
@@ -868,9 +868,11 @@ export function RgpdEn({
             another referee the match is assigned to, self-management) or it is removed automatically, they are
             notified by push notification only, with the reason. These actions, a match&apos;s self-management and
             its first map are noted in the staff log on Discord without naming anyone, and a match that enters its
-            launch with neither a referee nor self-management is flagged to the referees. This processing falls
-            under <strong>performance of the service</strong>, the referees acting for the association
-            (<LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>).
+            launch with neither a referee nor self-management is flagged to the referees. Their presentation to
+            the parties to the match falls under <strong>legitimate interest</strong> (they know who referees and
+            can add them in game): they may object to it by withdrawing from the match, at any time; collecting
+            their “Ready” and the removal notice fall under <strong>performance of the service</strong>, the
+            referees acting for the association (<LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>).
           </p>
         </div>
       </section>
