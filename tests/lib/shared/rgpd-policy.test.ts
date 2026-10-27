@@ -52,7 +52,22 @@ describe("contacts du lancement d'un match — base légale", () => {
   // tes matchs au titre du service, pas du consentement (le réglage n'y peut rien).
   it("fonde la lecture du BattleTag masqué par les parties d'un match sur le contrat, pas le consentement", () => {
     expect(BATTLETAG_MATCH_SCOPE).toMatch(/^lecture, même masqué, dans la seule fenêtre « Contacts » d'un match où tu es présenté comme contact/);
-    expect(BATTLETAG_MATCH_SCOPE).toMatch(/arbitres et administrateurs n'y ont pas d'autre accès \(conditions d'utilisation, « Contacts de match »\)$/);
+    expect(BATTLETAG_MATCH_SCOPE).toMatch(/arbitres et administrateurs n'y ont pas d'autre accès \(conditions d'utilisation, « Contacts de match »\) ; /);
+  });
+
+  // Revue juridique de #487 : la ligne « Pseudo Overwatch » couvre aussi le
+  // BattleTag de l'arbitre désigné, sur sa propre base — sans clause des
+  // conditions, que le lot TERMS v7 ajoutera.
+  it("fonde la lecture du BattleTag de l'arbitre désigné sur le service, sans citer les conditions", () => {
+    const referee = BATTLETAG_MATCH_SCOPE.split(" ; celui de l'arbitre désigné d'un match")[1];
+    expect(referee).toBe(
+      ", dans ses fenêtres « Contacts » et de lancement, par ses deux équipes et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin et par ses casters le temps du match (exécution du service, les arbitres agissant pour l'association)",
+    );
+    expect(referee).not.toMatch(/conditions d'utilisation/);
+    const en = DONNEES_PROFIL_EN.find((d) => d.donnee === "Overwatch username");
+    expect(en?.extraBases?.[0]?.scope).toMatch(
+      /; the assigned referee's of a match, in its “Contacts” and launch windows, .* \(performance of the service, referees acting for the association\)$/,
+    );
   });
 });
 

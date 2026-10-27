@@ -340,4 +340,17 @@ describe("arbitre désigné — registre, /rgpd et annonce (revue juridique)", (
     expect(fr).toContain("La fenêtre de lancement s'ouvre aussi à lui");
     expect(en).toContain("The launch window also opens to them");
   });
+
+  it("le résumé de l'annonce dit les moments de chaque lecteur, sans « le staff » (FR et EN)", () => {
+    const fr = PRIVACY_CHANGES.find((c) => c.id === REFEREE_ENTRY)?.summary ?? "";
+    const en = PRIVACY_CHANGES_EN[REFEREE_ENTRY]?.summary ?? "";
+    expect(fr).toContain(
+      "Les deux équipes et les arbitres voient son pseudo et son BattleTag dès que les deux adversaires sont connus, les casters du match le temps du match",
+    );
+    expect(en).toContain(
+      "Both teams and the referees see their username and BattleTag as soon as both opponents are known, the match's casters while the match is being played",
+    );
+    expect(fr).not.toContain("le staff voient");
+    expect(en).not.toContain("the staff see");
+  });
 });
