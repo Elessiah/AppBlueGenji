@@ -165,13 +165,6 @@ function alertLine(emoji: string, reason: string, context: RefereeAlertContext):
 }
 
 /**
- * Alerte : les deux engagées annoncent des scores contradictoires.
- *
- * La rencontre est immobilisée dès cet instant — le moteur ne peut pas départager
- * deux reports qui se contredisent, et le délai de report ne la débloquera pas
- * non plus (il ne tranche que les matchs à un seul report).
- */
-/**
  * Alerte : le match entre en lancement sans arbitre désigné ni autogestion
  * (`docs/features/MATCH_REFEREE.md`). Rien ne bascule d'office : le match part
  * comme avant, le staff décide.
@@ -180,6 +173,13 @@ export function formatNoRefereeAlert(context: RefereeAlertContext): string {
   return alertLine("🧑‍⚖️", "match en lancement sans arbitre ni autogestion — une décision est attendue", context);
 }
 
+/**
+ * Alerte : les deux engagées annoncent des scores contradictoires.
+ *
+ * La rencontre est immobilisée dès cet instant — le moteur ne peut pas départager
+ * deux reports qui se contredisent, et le délai de report ne la débloquera pas
+ * non plus (il ne tranche que les matchs à un seul report).
+ */
 export function formatScoreConflictAlert(context: RefereeAlertContext): string {
   return alertLine("⚠️", "reports de score contradictoires", context);
 }

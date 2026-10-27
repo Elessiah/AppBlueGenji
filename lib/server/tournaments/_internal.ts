@@ -156,6 +156,8 @@ export type MatchRow = RowDataPacket & {
   referee_is_deleted?: number | null;
   referee_is_admin?: number | null;
   referee_platform_roles_json?: unknown;
+  /** `1` si l'arbitre désigné joue l'un des deux engagés (membre en cours ou entrée solo). */
+  referee_plays_match?: number | null;
   /** Rang d'endurance des engagées (BlueGenji Survie, phase finale ; `./match-host-seeds`). */
   team1_seed?: number | null;
   team2_seed?: number | null;
@@ -429,6 +431,10 @@ function casterWithdrawn(row: MatchRow, caster: MatchCasterRow): boolean {
  */
 function refereeKept(row: MatchRow): boolean {
   if (row.referee_user_id === null || row.referee_user_id === undefined) return false;
+  // Avant le départ, l'arbitre qui joue désormais le match ne compte plus — la
+  // même règle que le verrou du lancement (`lockLaunchMatch`).
+  const beforeStart = row.status !== "COMPLETED" && (row.launched_at ?? null) === null;
+  if (beforeStart && Number(row.referee_plays_match ?? 0) === 1) return false;
   return (
     refereeEligibilityBlock({
       discord_verified_at: row.referee_discord_verified_at ?? null,

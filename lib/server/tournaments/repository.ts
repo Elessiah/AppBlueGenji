@@ -347,6 +347,13 @@ export async function getMatchRows(
       ru.is_deleted AS referee_is_deleted,
       ru.is_admin AS referee_is_admin,
       ru.platform_roles_json AS referee_platform_roles_json,
+      (m.referee_user_id IS NOT NULL AND (
+        EXISTS (SELECT 1 FROM bg_team_members rtm
+                 WHERE rtm.user_id = m.referee_user_id AND rtm.left_at IS NULL
+                   AND rtm.team_id IN (m.team1_id, m.team2_id))
+        OR EXISTS (SELECT 1 FROM bg_teams rst
+                    WHERE rst.solo_user_id = m.referee_user_id AND rst.id IN (m.team1_id, m.team2_id))
+      )) AS referee_plays_match,
       es1.\`rank\` AS team1_seed,
       es2.\`rank\` AS team2_seed,
       m.replay_url,

@@ -296,8 +296,14 @@ async function lockLaunchMatch(
   // disparu n'est pas un match à lancer.
   const tournamentState = context[0]?.tournament_state ?? null;
   if (tournamentState === null) return null;
+  // Avant le départ, un arbitre qui joue désormais le match (roster rejoint
+  // sans changer d'appariement) ne compte plus : sinon le lancement attendrait
+  // un « Prêt » d'arbitre qu'il ne peut plus donner (il clique en joueur).
+  const refereeId = nullableId(base.referee_user_id);
   const refereeEligible =
-    base.referee_user_id !== null && (await loadRefereeEligibility(connection, Number(base.referee_user_id))) === null;
+    refereeId !== null &&
+    (await loadRefereeEligibility(connection, refereeId)) === null &&
+    (base.launched_at !== null || (await resolveTeamParty(connection, base, refereeId)) === null);
   const row: LaunchMatchRow = Object.assign(base, {
     casters: await lockMatchCasters(connection, matchId),
     refereeEligible,
@@ -413,13 +419,6 @@ async function launchIfAllReady(connection: PoolConnection, matchId: number): Pr
 }
 
 /**
- * Déclare (ou retire) le « Prêt » de la partie du lecteur. Le retrait n'est
- * possible que tant que le match n'est pas lancé : une fois parti, il l'est.
- *
- * @throws `MATCH_NOT_FOUND` | `TOURNAMENT_NOT_RUNNING` | `MATCH_ALREADY_LAUNCHED`
- *   | `MATCH_NOT_IN_LOBBY` | `NOT_MATCH_PARTY` | `NOT_TEAM_READY_ROLE`
- */
-/**
  * « Prêt » d'un caster : le sien seul change. L'arbitre désigné qui caste
  * aussi le match donne les deux d'un clic.
  */
@@ -442,6 +441,13 @@ async function writeCasterReady(
   );
 }
 
+/**
+ * Déclare (ou retire) le « Prêt » de la partie du lecteur. Le retrait n'est
+ * possible que tant que le match n'est pas lancé : une fois parti, il l'est.
+ *
+ * @throws `MATCH_NOT_FOUND` | `TOURNAMENT_NOT_RUNNING` | `MATCH_ALREADY_LAUNCHED`
+ *   | `MATCH_NOT_IN_LOBBY` | `NOT_MATCH_PARTY` | `NOT_TEAM_READY_ROLE`
+ */
 export async function setMatchReady(
   matchId: number,
   userId: number,
@@ -867,15 +873,18 @@ function assertRefereeable(row: LaunchMatchRow | null): asserts row is LaunchMat
 /**
  * Pose `refereeId` comme arbitre du match verrouillé : sa condition relue en
  * base (rôles compris, jamais ceux d'une session), le match qu'il joue refusé.
- * Éteint l'autogestion et remet son « Prêt » à zéro.
+ * Éteint l'autogestion et remet son « Prêt » à zéro — sauf pour un caster du
+ * match déjà prêt : un seul « Prêt » vaut pour les deux (`writeCasterReady`),
+ * sa modale le montre prêt, le lancement ne doit pas l'attendre une seconde fois.
  */
 async function writeReferee(connection: PoolConnection, row: LaunchMatchRow, refereeId: number): Promise<void> {
   const block = await loadRefereeEligibility(connection, refereeId);
   if (block) throw new Error(block);
   if (await resolveTeamParty(connection, row, refereeId)) throw new Error("REFEREE_IS_PLAYER");
+  const casterReadyAt = row.casters.find((caster) => caster.userId === refereeId)?.readyAt ?? null;
   await connection.execute(
-    `UPDATE bg_matches SET referee_user_id = ?, referee_ready_at = NULL, self_managed = 0 WHERE id = ?`,
-    [refereeId, row.id],
+    `UPDATE bg_matches SET referee_user_id = ?, referee_ready_at = ?, self_managed = 0 WHERE id = ?`,
+    [refereeId, casterReadyAt, row.id],
   );
 }
 
@@ -912,13 +921,16 @@ export async function takeMatchReferee(matchId: number, userId: number): Promise
  * pour le staff (`canManage`, permission `tournaments`). Sans arbitre, rien ne
  * change. Si toutes les autres parties étaient prêtes, le match part.
  *
- * @throws `MATCH_NOT_FOUND` | `NOT_MATCH_REFEREE`
+ * Un match joué ou exempt garde son arbitre : l'histoire ne se réécrit pas.
+ *
+ * @throws `MATCH_NOT_FOUND` | `MATCH_ALREADY_COMPLETED` | `MATCH_NOT_LAUNCHABLE`
+ *   | `NOT_MATCH_REFEREE`
  */
 export async function releaseMatchReferee(matchId: number, userId: number, canManage: boolean): Promise<void> {
   const tournamentId = await retryOnDeadlock(() =>
     inTransaction(async (connection) => {
       const row = await lockLaunchMatch(connection, matchId);
-      if (!row) throw new Error("MATCH_NOT_FOUND");
+      assertRefereeable(row);
       const current = nullableId(row.referee_user_id);
       if (current !== userId && !canManage) throw new Error("NOT_MATCH_REFEREE");
       if (current === null) return null;

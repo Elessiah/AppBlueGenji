@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { useToast } from "@/components/ui/toast";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { FieldErrorText } from "@/components/ui/field-error-text";
@@ -63,7 +63,15 @@ export function RefereeDialog({
   const pickId = useId();
   const mapId = useId();
   const [panel, setPanel] = useState<RefereePanelView | null>(null);
-  const [loadFailed, setLoadFailed] = useState(false);
+  // Échec de lecture : un toast, jamais un message en ligne ; à l'ouverture,
+  // la fenêtre se referme (rien à montrer). Ref : `load` reste stable.
+  const loadFailedRef = useRef<(initial: boolean) => void>(() => undefined);
+  useEffect(() => {
+    loadFailedRef.current = (initial) => {
+      showError(t("cardActions.refereeDialog.loadFailed"));
+      if (initial) onClose();
+    };
+  });
   const [busy, setBusy] = useState(false);
   const [pick, setPick] = useState("");
   const [map, setMap] = useState("");
@@ -71,19 +79,21 @@ export function RefereeDialog({
   const fieldErrors = useFieldErrors(FIRST_MAP_FIELD_ERRORS, { map: mapId });
   const errorText = (code: string) => launchErrorText(actionText, errorsText, code);
 
-  const load = useCallback(async () => {
-    try {
-      const payload = (await send(`/api/admin/matches/${match.id}/referee`, "GET")) as { panel: RefereePanelView };
-      setPanel(payload.panel);
-      setMap(payload.panel.firstMap ?? "");
-      setLoadFailed(false);
-    } catch {
-      setLoadFailed(true);
-    }
-  }, [match.id]);
+  const load = useCallback(
+    async (initial = false) => {
+      try {
+        const payload = (await send(`/api/admin/matches/${match.id}/referee`, "GET")) as { panel: RefereePanelView };
+        setPanel(payload.panel);
+        setMap(payload.panel.firstMap ?? "");
+      } catch {
+        loadFailedRef.current(initial);
+      }
+    },
+    [match.id],
+  );
 
   useEffect(() => {
-    void load();
+    void load(true);
   }, [load]);
 
   const run = async (request: () => Promise<unknown>, success: string): Promise<boolean> => {
@@ -163,8 +173,7 @@ export function RefereeDialog({
           {t("cardActions.refereeDialog.title", { match: matchLabel })}
         </h3>
 
-        {!panel && !loadFailed && <p className={styles.muted}>{t("cardActions.refereeDialog.loading")}</p>}
-        {loadFailed && <p className={styles.muted}>{t("cardActions.refereeDialog.loadFailed")}</p>}
+        {!panel && <p className={styles.muted}>{t("cardActions.refereeDialog.loading")}</p>}
 
         {panel && actions && (
           <div className={styles.body}>
