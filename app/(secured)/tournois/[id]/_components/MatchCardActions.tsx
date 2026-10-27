@@ -581,7 +581,6 @@ export function MatchCardActions({
           confirmLabel={t("cardActions.releaseConfirm.confirm")}
           pendingLabel={t("cardActions.releaseConfirm.pending")}
           onClose={() => setConfirmRelease(false)}
-          focusContent={match.casters.length > 1}
           onConfirm={() =>
             run(
               () =>
@@ -596,7 +595,9 @@ export function MatchCardActions({
           {match.casters.length > 1 && (
             <fieldset className={styles.releasePick}>
               <legend>{t("cardActions.releaseConfirm.pick")}</legend>
-              {match.casters.map((caster, index) => (
+              {/* Le focus reste sur « Annuler » : un Entrée réflexe sur un bouton
+                  radio enverrait le formulaire et retirerait un caster. */}
+              {match.casters.map((caster) => (
                 <label key={caster.userId}>
                   <input
                     type="radio"
@@ -604,7 +605,6 @@ export function MatchCardActions({
                     value={caster.userId}
                     checked={caster.userId === releasedCaster?.userId}
                     onChange={() => setReleaseTarget(caster.userId)}
-                    data-autofocus={index === 0 ? true : undefined}
                   />
                   <span>{caster.pseudo}</span>
                 </label>
