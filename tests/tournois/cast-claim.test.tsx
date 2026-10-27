@@ -48,8 +48,8 @@ afterAll(() => {
 
 const TWO_STREAMS = bracketMatch({
   streams: [
-    { id: 3, liveUrl: "https://twitch.tv/match" },
-    { id: 4, liveUrl: null },
+    { id: 3, liveUrl: "https://twitch.tv/match", staff: true },
+    { id: 4, liveUrl: null, staff: false },
   ],
   casters: [
     matchCaster({ userId: 9, pseudo: "Voix", streamId: 3 }),
@@ -68,7 +68,7 @@ describe("castClaimChoices — un choix par stream, puis « ouvrir le sien »", 
   });
 
   it("un stream que personne ne tient (lien du staff) se rejoint aussi", () => {
-    const match = bracketMatch({ streams: [{ id: 1, liveUrl: "https://kick.com/bg" }] });
+    const match = bracketMatch({ streams: [{ id: 1, liveUrl: "https://kick.com/bg", staff: true }] });
     expect(castClaimChoices(match)[0]).toEqual({
       kind: "JOIN",
       streamId: 1,
@@ -152,9 +152,9 @@ describe("matchStreamLinks — tous les liens du bandeau, le premier en tête", 
     const match = bracketMatch({
       liveUrl: "https://twitch.tv/match",
       streams: [
-        { id: 3, liveUrl: "https://twitch.tv/match" },
-        { id: 4, liveUrl: null },
-        { id: 5, liveUrl: "https://kick.com/voix" },
+        { id: 3, liveUrl: "https://twitch.tv/match", staff: true },
+        { id: 4, liveUrl: null, staff: false },
+        { id: 5, liveUrl: "https://kick.com/voix", staff: false },
       ],
     });
     expect(matchStreamLinks(match)).toEqual(["https://twitch.tv/match", "https://kick.com/voix"]);
@@ -179,5 +179,7 @@ describe("MatchCardActions — branchements du cast", () => {
     expect(card).toContain("/api/matches/${match.id}/caster?userId=${encodeURIComponent(");
     expect(card).toContain('send(`/api/matches/${match.id}/caster`, "DELETE")');
     expect(card).toContain("{match.casters.length > 1 && (");
+    // Un arbitre qui caste aussi le match passe par ce choix, lui compris.
+    expect(card).toContain("if (!isCaster || releasesOthers) {");
   });
 });

@@ -721,8 +721,8 @@ describe("getTournamentSnapshot — casters et streams (porte commune du flux et
     jest.mocked(loadMatchStreams).mockResolvedValue(
       new Map([
         [1, [
-          { id: 11, matchId: 1, liveUrl: "https://twitch.tv/match" },
-          { id: 12, matchId: 1, liveUrl: "https://kick.com/echo" },
+          { id: 11, matchId: 1, liveUrl: "https://twitch.tv/match", staff: true },
+          { id: 12, matchId: 1, liveUrl: "https://kick.com/echo", staff: false },
         ]],
       ]),
     );
@@ -734,8 +734,8 @@ describe("getTournamentSnapshot — casters et streams (porte commune du flux et
     const [casted, bare] = snapshot?.matches ?? [];
     expect(casted.liveUrl).toBe("https://twitch.tv/match");
     expect(casted.streams).toEqual([
-      { id: 11, liveUrl: "https://twitch.tv/match" },
-      { id: 12, liveUrl: "https://kick.com/echo" },
+      { id: 11, liveUrl: "https://twitch.tv/match", staff: true },
+      { id: 12, liveUrl: "https://kick.com/echo", staff: false },
     ]);
     expect(casted.casters.map((caster) => [caster.userId, caster.pseudo, caster.streamId])).toEqual([
       [9, "Voix", 11],

@@ -76,6 +76,18 @@ describe("launchStripControls", () => {
     expect(launchStripControls(bracketMatch({ ...casted, status: "COMPLETED" }), "NONE", referee).showRelease).toBe(false);
   });
 
+  it("un arbitre qui caste aussi le match peut retirer un autre caster, jamais seul face à lui-même", () => {
+    const coCast = bracketMatch({ ...match, casters: [matchCaster({ userId: 1 }), matchCaster({ userId: 5 })] });
+    const refereeCaster = launchStripControls(coCast, "LOBBY", referee);
+    expect(refereeCaster.isCaster).toBe(true);
+    expect(refereeCaster.releasesOthers).toBe(true);
+    // Seul caster du match : il ne retire que lui-même.
+    const alone = bracketMatch({ ...match, casters: [matchCaster({ userId: 1 })] });
+    expect(launchStripControls(alone, "LOBBY", referee).releasesOthers).toBe(false);
+    // Sans la permission d'arbitrage, jamais.
+    expect(launchStripControls(coCast, "LOBBY", nobody).releasesOthers).toBe(false);
+  });
+
   it("n'offre pas de caster un bye ni son propre match", () => {
     const caster = { ...nobody, canManage: true };
     const bye = bracketMatch({ ...match, team2Id: null });

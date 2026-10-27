@@ -27,6 +27,7 @@ const NO_LAUNCH: LaunchStripControls = {
   showContacts: false,
   showClaim: false,
   showRelease: false,
+  releasesOthers: false,
   showPlan: false,
   showForce: false,
   showHost: false,
@@ -61,6 +62,7 @@ describe("matchCardActionList — chaque drapeau donne son action, rien de plus"
       playerScoreLabel: "Saisir le score",
       launch: {
         isCaster: true,
+        releasesOthers: false,
         showOpen: true,
         showContacts: true,
         showClaim: true,
@@ -108,6 +110,10 @@ describe("matchCardActionList — chaque drapeau donne son action, rien de plus"
     expect(labels({ showReplay: true, hasReplay: true })).toEqual(["Modifier la rediff"]);
     expect(labels({ launch: { ...NO_LAUNCH, showRelease: true } })).toEqual(["Retirer le caster"]);
     expect(labels({ launch: { ...NO_LAUNCH, showRelease: true, isCaster: true } })).toEqual(["Ne plus caster"]);
+    // Arbitre qui caste aussi : il choisit le caster retiré, lui compris.
+    expect(labels({ launch: { ...NO_LAUNCH, showRelease: true, isCaster: true, releasesOthers: true } })).toEqual([
+      "Retirer le caster",
+    ]);
     expect(labels({ launch: { ...NO_LAUNCH, showOpen: true }, inLobby: true })).toEqual(["Ouvrir le lancement"]);
     expect(labels({ launch: { ...NO_LAUNCH, showOpen: true } })).toEqual(["Infos du match"]);
   });
@@ -419,8 +425,9 @@ describe("MatchCardActions — clavier et focus (branchements)", () => {
     expect(source).toContain("<ConfirmActionDialog");
   });
 
-  it("le staff qui retire un caster confirme d'abord (le caster est prévenu) ; le caster qui se retire, non", () => {
-    expect(source).toMatch(/releaseCast: \(\) => \{[\s\S]*?if \(!isCaster\) \{\s*setConfirmRelease\(true\);\s*return;/);
+  it("le staff qui retire un caster confirme d'abord (le caster est prévenu) ; le caster qui se retire seul, non", () => {
+    // Un caster du staff qui peut aussi retirer les autres choisit d'abord qui.
+    expect(source).toMatch(/releaseCast: \(\) => \{[\s\S]*?if \(!isCaster \|\| releasesOthers\) \{\s*setConfirmRelease\(true\);\s*return;/);
     expect(source).toContain('t("cardActions.releaseConfirm.title", { match: matchLabel })');
     expect(source).toContain('<p>{t("cardActions.releaseConfirm.body")}</p>');
     // Refermée si l'action disparaît (instantané du flux), comme « Forcer ».

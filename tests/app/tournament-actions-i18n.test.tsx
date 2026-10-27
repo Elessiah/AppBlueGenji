@@ -323,7 +323,7 @@ describe("français inchangé — les messages égalent les textes d'origine", (
     const pending = bracketMatch({ team1Name: "Alpha", team2Name: null, team2Report: report, status: "READY" });
     expect(fr(frActions.cardActions.reportPending, { score1: 2, score2: 1, reporter: fr(frActions.cardActions.reportSide, { side: 2 }) })).toBe(pendingReportNotice(pending));
     expect(frActions.cardActions.reportConflict).toBe(pendingReportNotice({ ...pending, team1Report: report }));
-    const launch: Parameters<typeof matchCardActionList>[0]["launch"] = { ...LAUNCH_ALL, isCaster: false };
+    const launch: Parameters<typeof matchCardActionList>[0]["launch"] = { ...LAUNCH_ALL, isCaster: false, releasesOthers: false };
     const input: Parameters<typeof matchCardActionList>[0] = { playerScoreLabel: null, launch, inLobby: true, adminScoreLabel: null, showSchedule: true, hasStartAt: true, showOnAir: true, onAir: false, showLiveConfig: true, liveConfigured: false, showReplay: true, hasReplay: false, canReport: true };
     expect(matchCardActionList(input).map((a) => a.label)).toEqual([
       "Ouvrir le lancement", "Contacts", "Planifier", "Modifier la date", "Forcer le lancement", "Changer l'équipe hôte", "Caster ce match", "Retirer le caster", "Lancer le direct", "Diffuser ce match", "Ajouter la rediff", "Signaler un problème",

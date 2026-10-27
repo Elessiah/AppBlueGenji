@@ -105,15 +105,15 @@ describe("mapMatch — casters inscrits et condition du cast", () => {
   it("revalide les liens des streams à la lecture", () => {
     const match = mapMatch(row(), {
       streams: [
-        { id: 10, matchId: 1, liveUrl: "twitch.tv/BlueGenji" },
-        { id: 11, matchId: 1, liveUrl: "https://evil.example/stream" },
-        { id: 12, matchId: 1, liveUrl: null },
+        { id: 10, matchId: 1, liveUrl: "twitch.tv/BlueGenji", staff: true },
+        { id: 11, matchId: 1, liveUrl: "https://evil.example/stream", staff: false },
+        { id: 12, matchId: 1, liveUrl: null, staff: false },
       ],
     });
     expect(match.streams).toEqual([
-      { id: 10, liveUrl: "https://twitch.tv/BlueGenji" },
-      { id: 11, liveUrl: null },
-      { id: 12, liveUrl: null },
+      { id: 10, liveUrl: "https://twitch.tv/BlueGenji", staff: true },
+      { id: 11, liveUrl: null, staff: false },
+      { id: 12, liveUrl: null, staff: false },
     ]);
   });
 });

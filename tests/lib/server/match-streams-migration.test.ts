@@ -53,6 +53,20 @@ describe("bg_match_streams / bg_match_casters — migration du caster unique", (
     expect(statements[2]).toMatch(/^UPDATE bg_matches m SET m\.live_url = NULL, m\.caster_user_id = NULL, m\.caster_ready_at = NULL/);
   });
 
+  it("marque le stream du staff : la colonne existe avant la copie, et un lien d'avant les co-casters est celui du staff", () => {
+    expect(SQL).toMatch(/live_url VARCHAR\(255\) NULL,\s*staff_owned TINYINT\(1\) NOT NULL DEFAULT 0,/);
+    const all = [...RECENT.matchAll(/`([^`]*)`/g)].map((match) => flat(match[1]));
+    const alter = all.indexOf(
+      "ALTER TABLE bg_match_streams ADD COLUMN staff_owned TINYINT(1) NOT NULL DEFAULT 0 AFTER live_url",
+    );
+    const copy = all.findIndex((statement) => statement.startsWith("INSERT INTO bg_match_streams"));
+    expect(alter).toBeGreaterThanOrEqual(0);
+    expect(alter).toBeLessThan(copy);
+    expect(all[copy]).toContain(
+      "INSERT INTO bg_match_streams (match_id, live_url, staff_owned) SELECT m.id, m.live_url, m.live_url IS NOT NULL FROM bg_matches m",
+    );
+  });
+
   it("n'ouvre jamais un second stream à un match qui en a déjà un", () => {
     const [streams] = migrationStatements();
     expect(streams).toContain("WHERE (m.live_url IS NOT NULL OR m.caster_user_id IS NOT NULL)");

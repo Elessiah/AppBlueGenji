@@ -56,8 +56,8 @@ type MatchState = {
   host_team_id: number | null;
   /** `bg_match_casters` du match, dans l'ordre d'inscription. */
   casters: CasterState[];
-  /** `bg_match_streams` du match. */
-  streams: { id: number; live_url: string | null }[];
+  /** `bg_match_streams` du match (`staff_owned` : 1 = stream du staff). */
+  streams: { id: number; live_url: string | null; staff_owned?: number }[];
 };
 
 type CasterState = { user_id: number; stream_id: number; ready_at: string | null };
@@ -714,16 +714,24 @@ describe("releaseMatchCast", () => {
     expect(state.match?.streams).toEqual([{ id: 1, live_url: null }]);
   });
 
-  it("le stream à part d'un caster qui part disparaît ; celui qui porte le lien du match reste", async () => {
+  it("le stream à part d'un caster qui part disparaît ; celui du staff reste avec son lien", async () => {
     state.match = matchState({ caster_user_id: 901 });
-    state.match.streams = [{ id: 1, live_url: "https://twitch.tv/match" }, { id: 2, live_url: "https://twitch.tv/voix" }];
+    const staffStream = { id: 1, live_url: "https://twitch.tv/match", staff_owned: 1 };
+    state.match.streams = [{ ...staffStream }, { id: 2, live_url: "https://twitch.tv/voix" }];
     state.match.casters.push({ user_id: CASTER, stream_id: 2, ready_at: null });
     await releaseMatchCast(42, CASTER, false);
-    expect(state.match?.streams).toEqual([{ id: 1, live_url: "https://twitch.tv/match" }]);
-    // Le dernier caster parti, le lien du match (stream principal) demeure.
+    expect(state.match?.streams).toEqual([staffStream]);
+    // Le dernier caster parti, le lien du staff demeure.
     await releaseMatchCast(42, 901, false);
     expect(state.match?.casters).toEqual([]);
-    expect(state.match?.streams).toEqual([{ id: 1, live_url: "https://twitch.tv/match" }]);
+    expect(state.match?.streams).toEqual([staffStream]);
+  });
+
+  it("le lien de la chaîne d'un caster part avec lui, même premier et seul lien du match", async () => {
+    state.match = matchState({ caster_user_id: CASTER });
+    state.match.streams = [{ id: 1, live_url: "https://twitch.tv/voix" }];
+    await releaseMatchCast(42, CASTER, false);
+    expect(state.match?.streams).toEqual([]);
   });
 
   it("lance le match quand toutes les parties n'attendaient plus que le caster qui part", async () => {
