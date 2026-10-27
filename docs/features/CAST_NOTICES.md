@@ -23,6 +23,12 @@ Lot LOGS-NOTIFS, PR ln-1 (décisions de l'utilisateur du 2026-10-27). Code :
 - Retrait d'office : si le caster est à la fois inéligible et devenu joueur du
   match, le motif dit les conditions du cast (`INELIGIBLE`).
 - Les **joueurs du match ne sont pas prévenus** (décision 3).
+- Sur la carte de match, « Retirer le caster » (staff) passe par une
+  `ConfirmActionDialog` qui dit que le caster sera prévenu, avec le motif
+  « décision du staff » : l'avis ne se reprend pas. « Ne plus caster » (le
+  caster lui-même, qui n'est prévenu de rien) part sans confirmation.
+- La case « Messages privés Discord de mes matchs » (`/profil`) coupe aussi ce
+  message privé : son aide (`matchDms.hint`, FR et EN) le dit.
 
 ## Confidentialité
 
