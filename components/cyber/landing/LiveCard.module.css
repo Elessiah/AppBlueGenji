@@ -376,6 +376,12 @@
     visibility 0s linear 0s;
 }
 
+/* Une diapositive cachée ne fait pas tourner, sans être vue, la lueur infinie
+   de la pastille « En attente de lancement ». */
+.slide:not(.slideActive) :global(.pill-waiting)::after {
+  animation: none;
+}
+
 /* Pied à commandes : à 320 px, l'affordance et les commandes ne tiennent pas
    sur une ligne — les commandes passent dessous, calées à droite. */
 .footerCarousel {
@@ -419,7 +425,15 @@
     background-color 0.18s ease;
 }
 
-.carouselButton:hover,
+/* Survol réservé à un vrai pointeur : au toucher, « Match suivant » gardait
+   son état allumé après le tapotement (le navigateur y laisse `:hover`). */
+@media (hover: hover) and (pointer: fine) {
+  .carouselButton:hover {
+    border-color: rgba(90, 200, 255, 0.5);
+    background: rgba(90, 200, 255, 0.12);
+  }
+}
+
 .carouselButton:focus-visible {
   border-color: rgba(90, 200, 255, 0.5);
   background: rgba(90, 200, 255, 0.12);

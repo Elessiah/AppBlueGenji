@@ -58,6 +58,7 @@
     "watchOn": "Watch on {platform}",
     "seed": "SEED {seed}",
     "emptyMatch": "The next match will show up here as soon as it starts.",
+    "viewers": "{count, plural, one {# person following the tournament} other {# people following the tournament}}",
     "footerMatch": "See the match in the tournament",
     "pill": {
       "live": "Live",
