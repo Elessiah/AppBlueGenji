@@ -219,4 +219,11 @@ describe("Co-casters — les textes qui disent qui lit les contacts", () => {
     for (const text of fr) expect(text).toContain("aux deux équipes du match, à ses casters, aux arbitres");
     for (const text of en) expect(text).toContain("to both teams of the match, its casters, and the site's");
   });
+
+  it("le contact d'une équipe engagée sait qu'il est montré à tous les casters du match (FR et EN)", () => {
+    expect(frDialogs.certification.leadManager).toContain("et aux casters le temps du match");
+    expect(enDialogs.certification.leadManager).toContain("and to the casters while the match is played");
+    expect(frDialogs.certification.leadManager).not.toContain("au caster ");
+    expect(enDialogs.certification.leadManager).not.toContain("the caster ");
+  });
 });

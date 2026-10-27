@@ -104,6 +104,7 @@ describe("mapMatch — casters inscrits et condition du cast", () => {
 
   it("revalide les liens des streams à la lecture", () => {
     const match = mapMatch(row(), {
+      casters: [caster(900, {}, { streamId: 11 }), caster(901, {}, { streamId: 12 })],
       streams: [
         { id: 10, matchId: 1, liveUrl: "twitch.tv/BlueGenji", staff: true },
         { id: 11, matchId: 1, liveUrl: "https://evil.example/stream", staff: false },
@@ -114,6 +115,19 @@ describe("mapMatch — casters inscrits et condition du cast", () => {
       { id: 10, liveUrl: "https://twitch.tv/BlueGenji", staff: true },
       { id: 11, liveUrl: null, staff: false },
       { id: 12, liveUrl: null, staff: false },
+    ]);
+  });
+
+  it("tait le stream que seul tient un caster tu (avant le lancement), garde celui du staff", () => {
+    const streams = [
+      { id: 10, matchId: 1, liveUrl: "https://twitch.tv/match", staff: true },
+      { id: 11, matchId: 1, liveUrl: "https://twitch.tv/perso", staff: false },
+    ];
+    const casters = [caster(900, { platform_roles_json: null }, { streamId: 11 })];
+    expect(mapMatch(row(), { casters, streams }).streams.map((stream) => stream.id)).toEqual([10]);
+    // Lancé : le caster et son stream restent (on ne réécrit pas une diffusion en cours).
+    expect(mapMatch(row({ launched_at: new Date() }), { casters, streams }).streams.map((stream) => stream.id)).toEqual([
+      10, 11,
     ]);
   });
 });

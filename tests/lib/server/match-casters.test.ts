@@ -8,6 +8,7 @@ import {
   type MatchStreamRow,
 } from "@/lib/server/tournaments/match-casters";
 import { parseCastTarget } from "@/lib/server/tournaments/match-launch-routes";
+import { LIVE_STAFF_SQL } from "@/lib/server/privacy-consent";
 import { fakeConnection, type SqlQuery } from "../../helpers/sql-double";
 
 /**
@@ -22,9 +23,19 @@ const stream = (id: number, liveUrl: string | null, staff = false): MatchStreamR
 describe("firstStreamUrlSql — le premier lien, seule définition", () => {
   it("prend le plus petit stream qui a un lien, sur l'alias donné", () => {
     const sql = firstStreamUrlSql("m").replace(/\s+/g, " ");
-    expect(sql).toBe(
-      "(SELECT fs.live_url FROM bg_match_streams fs WHERE fs.match_id = m.id AND fs.live_url IS NOT NULL ORDER BY fs.id LIMIT 1)",
-    );
+    expect(sql.startsWith("(SELECT fs.live_url FROM bg_match_streams fs WHERE fs.match_id = m.id AND fs.live_url IS NOT NULL")).toBe(true);
+    expect(sql.endsWith("ORDER BY fs.id LIMIT 1)")).toBe(true);
+  });
+
+  it("écarte le stream d'un caster qui ne remplit plus la condition, sauf stream du staff ou match lancé/joué", () => {
+    const sql = firstStreamUrlSql("m").replace(/\s+/g, " ");
+    expect(sql).toContain("fs.staff_owned = 1 OR m.status = 'COMPLETED' OR m.launched_at IS NOT NULL");
+    expect(sql).toContain("EXISTS (SELECT 1 FROM bg_match_casters fc JOIN bg_users u ON u.id = fc.user_id");
+    // La condition du cast, comme `castEligibilityBlock` : identité et permission `live`.
+    expect(sql).toContain("COALESCE(u.is_deleted, 0) = 0");
+    expect(sql).toContain("u.discord_verified_at IS NOT NULL AND COALESCE(u.discord_pseudo, '') <> ''");
+    expect(sql).toContain("u.blizzard_sub IS NOT NULL AND COALESCE(u.overwatch_battletag, '') <> ''");
+    expect(sql).toContain(`AND ${LIVE_STAFF_SQL})`);
   });
 });
 
