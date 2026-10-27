@@ -243,6 +243,7 @@
   },
   "match": {
     "tbd": "TBD",
+    "entrantFallback": "Engagé #{id}",
     "bye": "BYE",
     "team1": "Équipe 1",
     "team2": "Équipe 2",

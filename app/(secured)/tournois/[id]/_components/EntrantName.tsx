@@ -4,7 +4,8 @@ import Image from "next/image";
 import type { CSSProperties, ReactNode } from "react";
 import { avatarInitial } from "@/lib/shared/avatar";
 import { entityTruncateClass, joinClasses } from "@/lib/shared/class-names";
-import { visibleText } from "@/lib/shared/visible-text";
+import { withoutInvisibles } from "@/lib/shared/visible-text";
+import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { EntrantLink, useEntrantLogo } from "../_lib/entrant-link";
 import styles from "./EntrantName.module.css";
 
@@ -101,10 +102,15 @@ export function EntrantName({
   // qui rogne sur le nom peint d'une marche plutôt que sur le lien —, posée à
   // la main sur le nom non cliquable.
   const textClass = joinClasses(styles.text, textClassName);
-  // Forme affichable (`UNTRUSTED_NAMES.md`) : un nom resté en base avec une
+  const text = useTournamentPageText();
+  // Sans invisibles (`UNTRUSTED_NAMES.md`) : un nom resté en base avec une
   // commande de direction ou un invisible (sosie dont la forme propre est
-  // prise) ne brouille ni le nom ni son initiale de repli.
-  const shownName = name === null ? null : visibleText(name);
+  // prise) ne brouille ni le nom ni son initiale de repli — sans NFKC, il se
+  // lit comme sur sa fiche. Un nom qui ne garde rien retombe sur « Engagé
+  // #id » : jamais un lien vide, sans nom accessible.
+  const cleanName = name === null ? null : withoutInvisibles(name);
+  const shownName =
+    cleanName === "" && teamId !== null ? text.t("match.entrantFallback", { id: String(teamId) }) : cleanName;
   const content = children ?? shownName;
 
   return (

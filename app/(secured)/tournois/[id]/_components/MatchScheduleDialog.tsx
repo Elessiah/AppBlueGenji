@@ -395,7 +395,10 @@ export function MatchScheduleDialog({
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
               <div className="field" style={fieldStyle}>
                 <label htmlFor={FIELD_IDS.day}>{t("schedule.day")}</label>
+                {/* Focus d'ouverture sur la saisie, pas sur le lien du premier
+                    engagé du sous-titre (`useDialogBehavior`). */}
                 <select
+                  data-autofocus
                   id={FIELD_IDS.day}
                   value={day}
                   disabled={busy}

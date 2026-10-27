@@ -50,7 +50,7 @@ import {
 import { MIN_PLACEMENT_ENTRANTS } from "@/lib/shared/tournament-placement";
 import type { TeamRankingPosition } from "@/lib/shared/stats";
 import { localUploadUrl } from "@/lib/shared/uploads";
-import { visibleText } from "@/lib/shared/visible-text";
+import { withoutInvisibles } from "@/lib/shared/visible-text";
 import type { TournamentGame } from "@/lib/shared/types";
 
 export type { TeamRankingPosition };
@@ -62,7 +62,7 @@ type Queryable = Pick<Pool | PoolConnection, "execute">;
 export type TeamRankingRow = {
   teamId: number;
   /**
-   * Forme affichable du nom (`visibleText`, `UNTRUSTED_NAMES.md`), éventuellement
+   * Nom sans invisibles (`withoutInvisibles`, `UNTRUSTED_NAMES.md`), éventuellement
    * vide : c'est elle que départage `compareRankedTeams`, si bien que deux
    * équipes à égalité se rangent selon ce que le lecteur **voit**.
    */
@@ -386,7 +386,7 @@ export async function loadTeamRanking(options: TeamRankingOptions = {}): Promise
     if (!isRankedTeam(state)) continue;
     rows.push({
       teamId,
-      teamName: visibleText(String(team.name)),
+      teamName: withoutInvisibles(String(team.name)),
       logoUrl: localUploadUrl(team.logo_url),
       wins: state.wins,
       losses: state.losses,

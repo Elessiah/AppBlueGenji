@@ -54,7 +54,7 @@ import { landingServerText } from "@/lib/server/i18n-landing";
 import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
 import { parseMatchFormat } from "@/lib/shared/match-format";
 import { tickerOutcomes, tickerScores, type TickerItem, type TickerOutcome } from "@/lib/shared/ticker-items";
-import { visibleText } from "@/lib/shared/visible-text";
+import { withoutInvisibles } from "@/lib/shared/visible-text";
 
 const DEFAULT_SITE_COUNTS: SiteCounts = {
   players: 0,
@@ -163,13 +163,14 @@ function entrantHrefFor(teamId: number | null, soloUserId: number | null): strin
 }
 
 /**
- * Forme affichable d'un nom saisi par un joueur (`UNTRUSTED_NAMES.md`), `null`
- * quand il ne garde rien de visible : la vitrine est lue sans compte, et les
- * noms déjà en base ne sont pas réécrits. Chaque appelant choisit son repli.
+ * Nom saisi par un joueur, sans invisibles (`UNTRUSTED_NAMES.md`), `null`
+ * quand il ne garde rien de visible : la vitrine est lue sans compte, et un nom
+ * resté en base peut en porter encore (sosie refusé par `UNIQUE`). Sans NFKC :
+ * le nom se lit comme sur sa fiche. Chaque appelant choisit son repli.
  */
 function shownEntrantName(name: string | null): string | null {
   if (name === null) return null;
-  return visibleText(name) || null;
+  return withoutInvisibles(name) || null;
 }
 
 /** Seed exploitable (entier positif), ou `null` — la colonne est nullable. */
@@ -244,7 +245,7 @@ async function loadLandingLive(): Promise<LandingLive | null> {
     // Nom saisi par le staff, lu sans compte : forme affichable pour le titre
     // de la carte, le nom accessible de son lien et le bouton « Regarder le
     // live » (`UNTRUSTED_NAMES.md`).
-    const tournament = { ...picked, name: visibleText(picked.name) };
+    const tournament = { ...picked, name: withoutInvisibles(picked.name) };
 
     const db = await getDatabase();
     const [rows] = await db.execute<LiveMatchRow[]>(
@@ -606,7 +607,7 @@ function formatTickerEntry(entry: TickerEntry, locale: Locale): TickerItem | nul
       };
       return {
         kind: "result",
-        lead: t("ticker.resultLead", { tournament: visibleText(entry.tournament) }),
+        lead: t("ticker.resultLead", { tournament: withoutInvisibles(entry.tournament) }),
         sides: [
           side(entry.team1, entry.team1Id, entry.score1, outcomes[0]),
           side(entry.team2, entry.team2Id, entry.score2, outcomes[1]),
@@ -616,12 +617,12 @@ function formatTickerEntry(entry: TickerEntry, locale: Locale): TickerItem | nul
       };
     }
     case "registration":
-      return t("ticker.registration", { name: visibleText(entry.name), registered: String(entry.registered), max: String(entry.max) });
+      return t("ticker.registration", { name: withoutInvisibles(entry.name), registered: String(entry.registered), max: String(entry.max) });
     case "winner": {
       const known = entry.winner !== null || entry.winnerTeamId !== null;
       return {
         kind: "champion",
-        lead: t("ticker.winnerLead", { name: visibleText(entry.name) }),
+        lead: t("ticker.winnerLead", { name: withoutInvisibles(entry.name) }),
         name: known ? team(entry.winner, entry.winnerTeamId) : t("ticker.unknownChampion"),
         known,
       };

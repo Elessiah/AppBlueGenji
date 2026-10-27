@@ -25,7 +25,7 @@ import {
 import { DEFAULT_SWISS_POINTS } from "@/lib/shared/swiss";
 import type { PhaseConfig } from "@/lib/shared/tournament-phases";
 import type { TournamentFormat, TournamentGame } from "@/lib/shared/types";
-import { visibleText } from "@/lib/shared/visible-text";
+import { withoutInvisibles } from "@/lib/shared/visible-text";
 
 /** Phase telle qu'envoyée par le client, avant normalisation. */
 type RawPhase = {
@@ -263,10 +263,11 @@ function isTournamentFormat(format: TournamentFormat | undefined): format is Tou
 export function validateTournamentInput(
   body: TournamentInputBody,
 ): { error: string } | { value: ValidatedTournamentInput } {
-  // Forme affichable, comme un pseudo ou un nom d'équipe (`UNTRUSTED_NAMES.md`) :
-  // le nom s'affiche sur l'accueil sans compte et part vers Discord. Réduit à
-  // rien par le nettoyage, il est absent.
-  const name = typeof body.name === "string" ? visibleText(body.name) : "";
+  // Sans invisibles ni commandes de direction (`UNTRUSTED_NAMES.md`) : le nom
+  // s'affiche sur l'accueil sans compte et part vers Discord. Sans NFKC : la
+  // typographie d'un titre (« ™ », « ½ ») est voulue, et une modification de
+  // dates ne doit pas réécrire le nom. Réduit à rien, il est absent.
+  const name = typeof body.name === "string" ? withoutInvisibles(body.name) : "";
   if (!name) return { error: "MISSING_NAME" };
   if (!isTournamentFormat(body.format)) return { error: "INVALID_FORMAT" };
 
