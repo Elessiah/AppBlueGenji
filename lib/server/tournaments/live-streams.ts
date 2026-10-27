@@ -205,8 +205,9 @@ export async function setMatchLiveConfig(
  * lien ne prend jamais un stream de caster.
  *
  * Chaque lien posé est rattaché à qui le fournit (`providerId`, `NULL` pour
- * l'organisation) : un lien inchangé est réécrit pour suivre son dernier
- * auteur — le staff qui reprend le lien d'un caster en fait le sien.
+ * l'organisation). Un lien inchangé n'est pas réécrit : il reste à qui l'a
+ * fourni — un réglage réenregistré (mode changé, même lien) ne le prend ni à
+ * un caster, ni à l'organisation.
  */
 async function setStaffStreamUrl(
   connection: PoolConnection,
@@ -216,7 +217,7 @@ async function setStaffStreamUrl(
 ): Promise<void> {
   const target = staffStream(await lockMatchStreams(connection, matchId));
   if (target !== null && (target.staff || url !== null)) {
-    if (url !== null || target.liveUrl !== null || !target.staff) {
+    if (target.liveUrl !== url || !target.staff) {
       await connection.execute(
         `UPDATE bg_match_streams SET live_url = ?, staff_owned = 1, link_user_id = ? WHERE id = ?`,
         [url, url === null ? null : providerId, target.id],
