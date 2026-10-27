@@ -3,6 +3,7 @@ import { fail, ok } from "@/lib/server/http";
 import { setTournamentLiveUrl } from "@/lib/server/tournaments/live-streams";
 import { can } from "@/lib/shared/permissions";
 import { readJsonBody } from "@/lib/server/request-body";
+import { announceStaffTournamentAction } from "@/lib/server/tournaments/staff-action-logs";
 
 /**
  * Renseigne la chaîne officielle du tournoi. Corps : `{ liveUrl: string | null }`
@@ -29,6 +30,7 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
 
   try {
     const liveUrl = await setTournamentLiveUrl(tournamentId, body.liveUrl ?? null);
+    announceStaffTournamentAction(tournamentId, liveUrl === null ? "LIVE_URL_REMOVED" : "LIVE_URL_SET");
     return ok({ liveUrl });
   } catch (error) {
     const message = (error as Error).message;

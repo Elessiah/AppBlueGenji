@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/ghost-teams-service");
 jest.mock("@/lib/server/tournaments-service");
+jest.mock("@/lib/server/tournaments/staff-action-logs");
 
 import { GET, POST } from "@/app/api/admin/tournaments/[id]/ghost-registrations/route";
 import { getCurrentUser } from "@/lib/server/auth";

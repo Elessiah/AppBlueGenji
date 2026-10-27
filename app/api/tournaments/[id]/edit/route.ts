@@ -9,6 +9,7 @@ import { ALL_TOURNAMENT_FIELDS } from "@/lib/shared/tournament-edit";
 import { can } from "@/lib/shared/permissions";
 import { NextResponse } from "next/server";
 import { readJsonBody } from "@/lib/server/request-body";
+import { announceStaffTournamentAction } from "@/lib/server/tournaments/staff-action-logs";
 
 /**
  * Édition d'un tournoi. `GET` rend la fenêtre d'édition et les valeurs à
@@ -69,6 +70,7 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
 
   try {
     await updateTournament(checked.id, patch);
+    announceStaffTournamentAction(checked.id, "EDITED");
     return ok({ success: true });
   } catch (error) {
     const message = (error as Error).message;

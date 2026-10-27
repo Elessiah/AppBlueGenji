@@ -3,6 +3,7 @@ import { fail, ok } from "@/lib/server/http";
 import { loadSeedingBoard, reorderSeeding } from "@/lib/server/tournaments/seeding";
 import { can } from "@/lib/shared/permissions";
 import { readJsonBody } from "@/lib/server/request-body";
+import { announceStaffTournamentAction } from "@/lib/server/tournaments/staff-action-logs";
 
 /** Ordre de seeding courant + fenêtre d'édition. */
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
@@ -56,6 +57,7 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
 
   try {
     await reorderSeeding(tournamentId, teamIds);
+    announceStaffTournamentAction(tournamentId, "SEEDING_REORDERED");
     const board = await loadSeedingBoard(tournamentId);
     return ok(board);
   } catch (error) {

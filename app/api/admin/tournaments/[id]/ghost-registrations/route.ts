@@ -5,6 +5,7 @@ import { registerGhostTeams } from "@/lib/server/tournaments-service";
 import { parseGhostBatch, registrationErrorTeamId } from "@/lib/shared/ghost-registration";
 import { can } from "@/lib/shared/permissions";
 import { readJsonBody } from "@/lib/server/request-body";
+import { announceStaffTournamentAction } from "@/lib/server/tournaments/staff-action-logs";
 
 function readTournamentId(raw: string): number | null {
   const tournamentId = Number(raw);
@@ -57,6 +58,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
 
   try {
     await registerGhostTeams(tournamentId, selection.teamIds);
+    announceStaffTournamentAction(tournamentId, "GHOST_TEAMS_REGISTERED", selection.teamIds.length);
     return ok({ success: true, registered: selection.teamIds.length }, 201);
   } catch (error) {
     const message = (error as Error).message;

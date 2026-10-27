@@ -3,6 +3,7 @@ import { fail, ok } from "@/lib/server/http";
 import { setMatchReplayUrl } from "@/lib/server/tournaments/match-replay";
 import { can } from "@/lib/shared/permissions";
 import { readJsonBody } from "@/lib/server/request-body";
+import { announceStaffMatchAction, staffActionAuthor } from "@/lib/server/tournaments/staff-action-logs";
 
 function parseMatchId(raw: string): number | null {
   const matchId = Number(raw);
@@ -31,6 +32,7 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
 
   try {
     const replayUrl = await setMatchReplayUrl(matchId, raw);
+    announceStaffMatchAction(matchId, replayUrl === null ? "REPLAY_REMOVED" : "REPLAY_SET", staffActionAuthor(user));
     return ok({ replayUrl });
   } catch (error) {
     const message = (error as Error).message;

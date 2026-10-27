@@ -3,6 +3,7 @@ import { fail, ok } from "@/lib/server/http";
 import { forceLaunchMatch } from "@/lib/server/tournaments/match-launch";
 import { launchFailure, parseMatchIdParam } from "@/lib/server/tournaments/match-launch-routes";
 import { can } from "@/lib/shared/permissions";
+import { announceStaffMatchAction } from "@/lib/server/tournaments/staff-action-logs";
 
 const STATUSES: Readonly<Record<string, number>> = {
   MATCH_NOT_FOUND: 404,
@@ -25,6 +26,7 @@ export async function POST(_req: Request, context: { params: Promise<{ matchId: 
 
   try {
     await forceLaunchMatch(matchId);
+    announceStaffMatchAction(matchId, "FORCE_LAUNCHED");
     return ok({ launched: true });
   } catch (error) {
     return launchFailure(error, STATUSES, "MATCH_LAUNCH_FAILED");

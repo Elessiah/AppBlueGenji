@@ -20,6 +20,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `UNDERFILLED_TOURNAMENTS.md` — Tournoi sans adversaires : 0 ou 1 engagée au coup d'envoi → clos.
 - `MATCH_LAUNCH.md` — Lancement d'un match : lobby, trois « Prêt », contacts, inscription du caster ; option du tournoi (éteinte par défaut) et bouton « Contacts » de la carte.
 - `CAST_NOTICES.md` — Casts : journal anonyme du staff (inscription, reprise, retrait) et avis au caster retiré (DM + push `CAST_RELEASED`, avec le motif).
+- `STAFF_ACTION_LOGS.md` — Gestes du staff sans trace (résultat validé, lancement forcé, hôte, diffusion, rediffusion, édition, seeding, fantômes, image) : une ligne anonyme au journal Discord, rien dans pm2.
 - `CERTIFICATION_PROMPT.md` — Fiche tournoi : modale d'office invitant à certifier Discord et BattleTag (manager à qui il en manque un, joueur d'une équipe sans contact), tableau fait / ne fait pas, « Ne plus voir ».
 - `MATCH_PLANNING.md` — Planification des matchs par l'arbitrage (`TO_PLAN`).
 - `SCORE_EDIT_LOCK.md` — Verrouillage d'un score dès que la manche suivante porte une saisie, **y compris pour un admin**.

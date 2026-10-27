@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { advanceTournamentNow } from "@/lib/server/tournaments/advance";
 import { can } from "@/lib/shared/permissions";
+import { announceStaffTournamentAction } from "@/lib/server/tournaments/staff-action-logs";
 
 /**
  * « Avancer le tournoi » : fait franchir au tournoi l'étape suivante de son
@@ -31,6 +32,7 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
 
   try {
     const advanced = await advanceTournamentNow(tournamentId);
+    announceStaffTournamentAction(tournamentId, "ADVANCED");
     return ok({ advanced });
   } catch (error) {
     const message = (error as Error).message;

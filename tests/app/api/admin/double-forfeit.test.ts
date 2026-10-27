@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/tournaments-service");
+jest.mock("@/lib/server/tournaments/staff-action-logs");
 
 import { POST as resolveRoute } from "@/app/api/admin/matches/[matchId]/resolve/route";
 import { PATCH as scoresRoute } from "@/app/api/admin/matches/[matchId]/scores/route";

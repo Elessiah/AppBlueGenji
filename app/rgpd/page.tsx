@@ -1030,7 +1030,13 @@ function RgpdFr({
             l&apos;association à l&apos;impartialité de l&apos;arbitrage, et ce membre du staff peut s&apos;y opposer
             (section <a href="#exercer-vos-droits">« Exercer vos droits »</a>). L&apos;inscription d&apos;un caster
             sur un match, sa reprise par un autre caster et son retrait (avec le motif d&apos;une reprise ou d&apos;un retrait
-            d&apos;office) sont notés au journal du staff sur Discord sans nommer personne (« un caster », « le staff »).
+            d&apos;office) sont notés au journal du staff sur Discord sans nommer personne (« un caster », « le staff ») ;
+            les autres gestes du staff sur un match ou un tournoi (résultat validé, score enregistré, lancement forcé, hôte,
+            diffusion, rediffusion, modification du tournoi, têtes de série, étape avancée, équipes fantômes, image) aussi, avec les noms
+            d&apos;équipe du match (« un joueur » en tournoi individuel), sans nommer leur auteur (« le staff », ou
+            « un caster » pour la diffusion) ; cette ligne n&apos;ajoute rien aux journaux du serveur, où un litige tranché,
+            un résultat corrigé ou une validation suspendue garde sa trace nominative (<Link href="/rgpd/registre#t05">registre,
+            T05</Link>), sauf, quand elle n&apos;a pu être rédigée, le geste et le numéro du match ou du tournoi, sans auteur.
           </p>
         </div>
       </section>
