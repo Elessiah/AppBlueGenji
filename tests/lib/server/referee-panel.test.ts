@@ -31,15 +31,30 @@ function staffUser(id: number, pseudo: string, overrides: Record<string, unknown
 
 let match: Record<string, unknown> | null;
 let users: Record<string, unknown>[];
+let players: number[];
 let execute: jest.Mock<SqlQuery>;
 
 beforeEach(() => {
   jest.clearAllMocks();
-  match = { id: 42, phase_id: 0, round_number: 2, bracket: "UPPER", self_managed: 0, first_map: null, referee_user_id: null };
+  match = {
+    id: 42,
+    phase_id: 0,
+    round_number: 2,
+    bracket: "UPPER",
+    self_managed: 0,
+    first_map: null,
+    referee_user_id: null,
+    team1_id: 10,
+    team2_id: 11,
+    status: "READY",
+    launched_at: null,
+  };
   users = [];
+  players = [];
   execute = jest.fn<SqlQuery>(async (sql) => {
     if (sql.includes("FROM bg_matches")) return [match ? [match] : [], []];
     if (sql.includes("FROM bg_users")) return [users, []];
+    if (sql.includes("FROM bg_team_members")) return [players.map((user_id) => ({ user_id })), []];
     throw new Error(`requête inattendue : ${sql}`);
   });
   jest.mocked(withConnection).mockImplementation((run) => run(fakeConnection({ execute })));
@@ -82,5 +97,35 @@ describe("loadRefereePanel", () => {
     match = { ...match, referee_user_id: 9 };
     const panel = await loadRefereePanel(42);
     expect(panel?.referee).toEqual({ userId: 9, pseudo: "—", eligible: false });
+  });
+
+  it("ne propose pas un compte qui joue le match (membre d'une engagée ou engagé solo)", async () => {
+    users = [staffUser(3, "Joueur"), staffUser(4, "Libre")];
+    players = [3];
+    const panel = await loadRefereePanel(42);
+    expect(panel?.candidates).toEqual([{ userId: 4, pseudo: "Libre" }]);
+    const playersCall = execute.mock.calls.find(([sql]) => sql.includes("FROM bg_team_members"));
+    expect(playersCall?.[1]).toEqual([10, 11, 10, 11]);
+  });
+
+  it("l'arbitre qui joue désormais le match, avant le départ, ne peut plus arbitrer — comme dans l'instantané", async () => {
+    match = { ...match, referee_user_id: 3 };
+    users = [staffUser(3, "Joueur")];
+    players = [3];
+    await expect(loadRefereePanel(42)).resolves.toMatchObject({ referee: { userId: 3, eligible: false } });
+  });
+
+  it("une fois le match lancé, l'arbitre qui en est joueur reste désigné", async () => {
+    match = { ...match, referee_user_id: 3, launched_at: STAMP };
+    users = [staffUser(3, "Joueur")];
+    players = [3];
+    await expect(loadRefereePanel(42)).resolves.toMatchObject({ referee: { userId: 3, eligible: true } });
+  });
+
+  it("sans adversaire connu, aucun joueur à relire", async () => {
+    match = { ...match, team1_id: null, team2_id: null };
+    users = [staffUser(4, "Libre")];
+    await loadRefereePanel(42);
+    expect(execute.mock.calls.some(([sql]) => sql.includes("FROM bg_team_members"))).toBe(false);
   });
 });
