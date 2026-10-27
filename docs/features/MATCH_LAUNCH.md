@@ -356,10 +356,17 @@ qu'il tient, son « Prêt »). Code : `lib/server/tournaments/match-casters.ts`.
   `CastClaimDialog` fait choisir — un bouton radio par stream (ses casters, sa
   plateforme ou « sans lien »), puis « Ouvrir mon propre stream » avec son champ
   de lien. Un co-cast se fait aussi sur un match déjà lancé.
+  Un stream choisi qui disparaît pendant que la fenêtre est ouverte n'est pas
+  remplacé par un autre : plus rien n'est coché, l'envoi est désarmé.
 - **Se retirer** : `DELETE /api/matches/[id]/caster` retire le lecteur ;
   `?userId=` désigne un autre caster et demande la permission `tournaments` (le staff
   choisit sur la carte, quand le match a plusieurs casters). Refus :
   `INVALID_USER_ID` (400), `NOT_MATCH_CASTER` (403).
+  Le caster visé est fixé à l'ouverture de la confirmation (le premier, puis
+  le choix) ; s'il part entre-temps, la fenêtre se ferme plutôt que de viser
+  un autre caster, qui recevrait l'avis du staff (`useReleaseConfirm`).
+  Chaque fiche de caster des modales de lancement et « Contacts » est une
+  région nommée « Caster <pseudo> ».
 - **Premier lien** : `firstStreamUrlSql` — le plus petit stream qui a un lien.
   C'est lui que montrent les vues compactes (carte, ticker, annonce #live,
   détection « à l'antenne ») ; le bandeau de diffusion (`MatchLiveStrip`) montre
