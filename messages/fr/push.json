@@ -48,6 +48,10 @@
       "label": "Programme d'arbitrage",
       "description": "Environ 10 h à l'avance, la liste des matchs à venir : horaires, tournois et équipes."
     },
+    "CAST_RELEASED": {
+      "label": "Cast retiré",
+      "description": "Ton inscription comme caster d'un match est retirée par le staff ou d'office, ou un autre caster prend ta place : le motif est donné."
+    },
     "STAFF_REPORT": {
       "label": "Signalements reçus",
       "description": "Un nouveau signalement, ou une contestation, arrive à la modération."

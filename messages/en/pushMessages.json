@@ -135,5 +135,16 @@
     "more": "… and {count} more",
     "pairingSolo": "{count, plural, one {A match} other {# matches}}",
     "timeZone": "Paris time"
+  },
+  "castReleased": {
+    "title": "Cast removed",
+    "body": "Your caster registration has been removed: {reason}. {pairing} · {tournament}, {round}.",
+    "pairingSolo": "A match",
+    "reason": {
+      "STAFF": "staff decision",
+      "REPLACED": "you no longer met the casting requirements, another caster took your place",
+      "INELIGIBLE": "you no longer meet the casting requirements",
+      "JOINED_TEAM": "your team now plays this match"
+    }
   }
 }
