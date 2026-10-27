@@ -39,7 +39,7 @@ export const AUTOMOD_ALERT_SCOPE = "alerte AutoMod d'une telle annonce bloquée 
  * (`lib/shared/match-launch.ts`, `exposesCasterContacts`).
  */
 export const MATCH_CONTACTS_SCOPE =
-  "présentation, dans la fenêtre « Contacts » du match et dans sa fenêtre de lancement, aux membres de ses deux équipes et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, et à ses casters le temps du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné) ; les contacts de chaque caster aux deux équipes et aux autres casters du match le temps du match, et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, que la page du match reprend aussi, aux mêmes lecteurs et aux mêmes moments que la fenêtre « Contacts » (conditions d'utilisation, « Contacts de match »)";
+  "présentation, dans la fenêtre « Contacts » du match et dans sa fenêtre de lancement, aux membres de ses deux équipes et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, et à ses casters le temps du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné) ; les contacts de chaque caster aux deux équipes et aux autres casters du match le temps du match, et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin — contacts que la page du match reprend aussi, aux mêmes lecteurs et aux mêmes moments que la fenêtre « Contacts » — (conditions d'utilisation, « Contacts de match »)";
 
 /**
  * BattleTag masqué : le masquer ne le retire pas des parties de tes matchs
@@ -58,7 +58,7 @@ export const BATTLETAG_MATCH_SCOPE =
  * le staff peut le désigner sans qu'il l'ait demandé (revue juridique de #487).
  */
 export const REFEREE_BATTLETAG_SCOPE =
-  "BattleTag de l'arbitre désigné d'un match, même masqué, dans ses fenêtres « Contacts » et de lancement et sur sa page : lu par ses deux équipes et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, par ses casters le temps du match — opposition par le formulaire de signalement, catégorie RGPD (retenue, le staff ne lui confie plus de match) ; retrait d'un match à tout moment, le staff pouvant sinon lui confier de nouveau ce match, sans avis";
+  "BattleTag de l'arbitre désigné d'un match, même masqué, dans ses fenêtres « Contacts » et de lancement et sur la page du match : lu par ses deux équipes et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, par ses casters le temps du match — opposition par le formulaire de signalement, catégorie RGPD (retenue, le staff ne lui confie plus de match) ; retrait d'un match à tout moment, le staff pouvant sinon lui confier de nouveau ce match, sans avis";
 
 /**
  * Pastilles de certification de la fiche (tag Discord certifié, BattleTag tiré
