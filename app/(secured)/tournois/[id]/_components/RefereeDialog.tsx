@@ -76,15 +76,28 @@ export function RefereeDialog({
   const [pick, setPick] = useState("");
   const [map, setMap] = useState("");
   const [confirm, setConfirm] = useState<PendingConfirm | null>(null);
+  // Un geste retire souvent son propre bouton (« Arbitrer ce match » devient
+  // « Ne plus arbitrer », « Retirer l'arbitre » disparaît) : le focus tomberait
+  // sur la page, la fenêtre encore ouverte. Il revient sur la phrase d'état,
+  // qui dit le nouvel état — après la fermeture de la confirmation, dont le
+  // retour au déclencheur vise alors un bouton disparu.
+  const statusRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (busy || confirm !== null) return;
+    const active = document.activeElement;
+    if (active === null || active === document.body || !active.isConnected) statusRef.current?.focus();
+  }, [busy, confirm, panel]);
   const fieldErrors = useFieldErrors(FIRST_MAP_FIELD_ERRORS, { map: mapId });
   const errorText = (code: string) => launchErrorText(actionText, errorsText, code);
 
+  // `resetMap` : la carte saisie et pas encore enregistrée survit aux autres
+  // gestes ; seules l'ouverture et l'enregistrement de la carte la relisent.
   const load = useCallback(
-    async (initial = false) => {
+    async (initial = false, resetMap = initial) => {
       try {
         const payload = (await send(`/api/admin/matches/${match.id}/referee`, "GET")) as { panel: RefereePanelView };
         setPanel(payload.panel);
-        setMap(payload.panel.firstMap ?? "");
+        if (resetMap) setMap(payload.panel.firstMap ?? "");
       } catch {
         loadFailedRef.current(initial);
       }
@@ -96,13 +109,13 @@ export function RefereeDialog({
     void load(true);
   }, [load]);
 
-  const run = async (request: () => Promise<unknown>, success: string): Promise<boolean> => {
+  const run = async (request: () => Promise<unknown>, success: string, resetMap = false): Promise<boolean> => {
     setBusy(true);
     try {
       await request();
       showSuccess(success);
       window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
-      await load();
+      await load(false, resetMap);
       return true;
     } catch (error) {
       const code = (error as Error).message;
@@ -124,7 +137,7 @@ export function RefereeDialog({
   };
   const saveMap = (event: FormEvent) => {
     event.preventDefault();
-    void run(() => send(`${base}/first-map`, "PUT", { map: map.trim() === "" ? null : map }), t("cardActions.refereeDialog.mapSaved"));
+    void run(() => send(`${base}/first-map`, "PUT", { map: map.trim() === "" ? null : map }), t("cardActions.refereeDialog.mapSaved"), true);
   };
   const roundBody = (enabled: boolean) =>
     panel ? { phaseId: panel.round.phaseId, roundNumber: panel.round.roundNumber, bracket: panel.round.bracket, enabled } : {};
@@ -177,7 +190,7 @@ export function RefereeDialog({
 
         {panel && actions && (
           <div className={styles.body}>
-            <p className={styles.status}>
+            <p ref={statusRef} tabIndex={-1} className={styles.status}>
               {refereeStatusText(panel, t)}
               {panel.referee && !panel.referee.eligible && (
                 <span className={styles.warn}> {t("cardActions.refereeDialog.ineligible")}</span>
@@ -217,17 +230,17 @@ export function RefereeDialog({
             </div>
 
             <form className={styles.row} onSubmit={assign}>
-              <label htmlFor={pickId} className={styles.label}>
-                {t("cardActions.refereeDialog.assignLabel")}
-              </label>
-              <select id={pickId} value={pick} onChange={(event) => setPick(event.target.value)} disabled={busy}>
-                <option value="">{t("cardActions.refereeDialog.assignPlaceholder")}</option>
-                {actions.candidates.map((candidate) => (
-                  <option key={candidate.userId} value={candidate.userId}>
-                    {candidate.pseudo}
-                  </option>
-                ))}
-              </select>
+              <div className={`field ${styles.control}`}>
+                <label htmlFor={pickId}>{t("cardActions.refereeDialog.assignLabel")}</label>
+                <select id={pickId} value={pick} onChange={(event) => setPick(event.target.value)} disabled={busy}>
+                  <option value="">{t("cardActions.refereeDialog.assignPlaceholder")}</option>
+                  {actions.candidates.map((candidate) => (
+                    <option key={candidate.userId} value={candidate.userId}>
+                      {candidate.pseudo}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <button type="submit" className="btn ghost" disabled={busy || pick === ""}>
                 {t("cardActions.refereeDialog.assign")}
               </button>
@@ -262,25 +275,25 @@ export function RefereeDialog({
             </div>
 
             <form className={styles.row} onSubmit={saveMap}>
-              <label htmlFor={mapId} className={styles.label}>
-                {t("cardActions.refereeDialog.mapLabel")}
-              </label>
-              <input
-                id={mapId}
-                type="text"
-                value={map}
-                maxLength={FIRST_MAP_MAX_LENGTH}
-                onChange={(event) => {
-                  setMap(event.target.value);
-                  fieldErrors.clear("map");
-                }}
-                disabled={busy}
-                {...fieldErrors.aria("map")}
-              />
+              <div className={`field ${styles.control}`}>
+                <label htmlFor={mapId}>{t("cardActions.refereeDialog.mapLabel")}</label>
+                <input
+                  id={mapId}
+                  type="text"
+                  value={map}
+                  maxLength={FIRST_MAP_MAX_LENGTH}
+                  onChange={(event) => {
+                    setMap(event.target.value);
+                    fieldErrors.clear("map");
+                  }}
+                  disabled={busy}
+                  {...fieldErrors.aria("map")}
+                />
+                <FieldErrorText fieldId={mapId} message={fieldErrors.message("map")} />
+              </div>
               <button type="submit" className="btn ghost" disabled={busy}>
                 {t("cardActions.refereeDialog.mapSave")}
               </button>
-              <FieldErrorText fieldId={mapId} message={fieldErrors.message("map")} />
             </form>
           </div>
         )}

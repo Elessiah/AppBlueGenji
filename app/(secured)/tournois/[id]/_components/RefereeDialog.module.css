@@ -23,19 +23,13 @@
 .row {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-end;
   gap: 8px;
 }
 
-.label {
-  flex-basis: 100%;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--ink-soft);
-}
-
-.row select,
-.row input[type="text"] {
+/* Le champ (`.field` de globals.css : fond sombre, anneau au focus) prend la
+   place restante ; son bouton se range à côté, ou dessous sur un écran étroit. */
+.control {
   flex: 1 1 180px;
   min-width: 0;
 }
