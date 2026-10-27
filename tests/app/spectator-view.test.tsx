@@ -290,6 +290,12 @@ describe("fiche commune sous SpectatorViewProvider", () => {
     expect(member(<LiveIndicator isLive tier="STANDARD" cadenceMs={600_000} />)).toContain("toutes les 10 minutes au plus");
     // Une relecture ratée ne parle pas de flux à rouvrir.
     expect(spectator(<LiveIndicator isLive={false} tier="STANDARD" cadenceMs={30_000} />)).toContain("La dernière mise à jour");
+    // Après un échec, l'affichage peut être dépassé : il date de la dernière
+    // lecture réussie, il ne « reste » pas « valable » (recul jusqu'à 10 min).
+    expect(frTournament.live.retryTitle).toContain("dernière mise à jour réussie");
+    expect(enTournament.live.retryTitle).toContain("last successful update");
+    expect(frTournament.live.retryTitle).not.toContain("valable");
+    expect(enTournament.live.retryTitle).not.toContain("valid");
     // Pas de flux à rouvrir : « Hors ligne », jamais « Reconnexion… ».
     expect(spectator(<LiveIndicator isLive={false} tier="STANDARD" cadenceMs={30_000} />)).toContain("Hors ligne");
     expect(spectator(<LiveIndicator isLive={false} tier="STANDARD" cadenceMs={30_000} />)).not.toContain("Reconnexion");
