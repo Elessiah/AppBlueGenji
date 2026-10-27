@@ -8,11 +8,13 @@ import styles from "./RankingViews.module.css";
  * une ligne en lice, « Annuler l'abandon » sur une ligne forfait, ou « 🔒 »
  * quand l'annulation est fermée (une manche postérieure porte une saisie).
  *
- * **Un seul `<button>`, au même emplacement**, quel que soit le geste : après
- * confirmation, le rafraîchissement change le libellé et le geste du même nœud
- * DOM, si bien que le focus que la modale lui rend y reste — deux boutons
- * distincts faisaient tomber le focus sur `<body>`. Quand la ligne n'a plus de
- * geste, `focusRowAfterChange` le rend à la ligne (`data-row-focus`).
+ * **Un seul `<button>`, au même emplacement**, quel que soit le geste : tant
+ * que la ligne reste à sa place, le rafraîchissement change le libellé et le
+ * geste du même nœud DOM, et le focus que la modale lui rend y reste — deux
+ * boutons distincts faisaient tomber le focus sur `<body>`. Une ligne qui
+ * change de rang est déplacée (clé `teamId`), ce qui fait perdre le focus, et
+ * une ligne peut ne plus porter de geste : `focusRowAfterChange` rend alors le
+ * focus au geste de la ligne, ou à la ligne (`data-row-focus`).
  */
 export type ForfeitRowActionProps =
   | {
@@ -51,18 +53,32 @@ export function ForfeitRowAction(props: Readonly<ForfeitRowActionProps>) {
 }
 
 /**
- * Après un abandon ou son annulation : si le focus est tombé sur `<body>` (le
- * geste a disparu de la ligne, ou la ligne a changé de place), il revient au
- * geste de la ligne, sinon à la ligne elle-même.
+ * Durée de la veille du focus après le geste. Le nouvel état peut s'afficher
+ * après la fin de `refresh()` (rendu groupé du flux, `snapshotRenderDelayMs`) :
+ * une seule vérification à la trame suivante passait avant le déplacement de
+ * la ligne. Bornée : ce n'est pas une boucle de fond.
  */
-export function focusRowAfterChange(teamId: number): void {
+export const FOCUS_WATCH_MS = 3000;
+
+/**
+ * Après un abandon ou son annulation, pendant `FOCUS_WATCH_MS` : chaque fois
+ * que le focus tombe sur `<body>` (le geste a disparu de la ligne, ou la ligne
+ * a changé de place), il revient au geste de la ligne, sinon à la ligne
+ * elle-même. La veille s'arrête dès que le lecteur porte le focus ailleurs.
+ */
+export function focusRowAfterChange(teamId: number, now: () => number = () => performance.now()): void {
   if (typeof document === "undefined") return;
-  requestAnimationFrame(() => {
+  const deadline = now() + FOCUS_WATCH_MS;
+  const row = () => document.querySelector<HTMLElement>(`[data-row-focus="${teamId}"]`);
+  const tick = () => {
     const active = document.activeElement;
-    if (active !== null && active !== document.body && active.isConnected) return;
-    const target =
-      document.querySelector<HTMLElement>(`[data-row-action="${teamId}"]`) ??
-      document.querySelector<HTMLElement>(`[data-row-focus="${teamId}"]`);
-    target?.focus({ preventScroll: true });
-  });
+    if (active === null || active === document.body || !active.isConnected) {
+      const target = document.querySelector<HTMLElement>(`[data-row-action="${teamId}"]`) ?? row();
+      target?.focus({ preventScroll: true });
+    } else if (!row()?.contains(active)) {
+      return;
+    }
+    if (now() < deadline) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
 }
