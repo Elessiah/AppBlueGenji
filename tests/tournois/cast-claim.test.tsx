@@ -36,7 +36,9 @@ import { messagesFor } from "@/lib/server/i18n-messages";
 import { tournamentActionsMessages } from "@/lib/shared/tournament-actions-text";
 import { bracketMatch, matchCaster } from "../helpers/bracket-match";
 import { readSource } from "../helpers/read-source";
+import frActions from "@/messages/fr/tournamentActions.json";
 import frDialogs from "@/messages/fr/tournamentDialogs.json";
+import enActions from "@/messages/en/tournamentActions.json";
 import enDialogs from "@/messages/en/tournamentDialogs.json";
 
 const globalWithDocument = globalThis as { document?: unknown };
@@ -230,5 +232,16 @@ describe("Configuration du direct — l'aide du lien du staff", () => {
   it("dit qu'un champ vide laisse le premier lien d'un caster à l'annonce (FR et EN)", () => {
     expect(frDialogs.live.urlHint).toContain("sans lien du staff : son annonce sur Discord renverra alors au premier lien ouvert par un caster");
     expect(enDialogs.live.urlHint).toContain("without a staff link: its Discord announcement will then point to the first link opened by a caster");
+  });
+});
+
+describe("Fenêtre « Caster » — l'aide du lien du caster", () => {
+  it("prévient que le lien ne s'affiche qu'une fois le match marqué casté par le staff (FR et EN)", () => {
+    expect(frActions.cardActions.claimDialog.urlHint).toContain(
+      "Ton lien s'affiche sur le match une fois que le staff l'a marqué comme casté",
+    );
+    expect(enActions.cardActions.claimDialog.urlHint).toContain(
+      "Your link shows on the match once the staff has marked it as cast",
+    );
   });
 });
