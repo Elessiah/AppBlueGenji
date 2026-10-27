@@ -272,6 +272,12 @@ export type MatchCastExtras = {
 };
 
 export function mapMatch(row: MatchRow, extras: MatchCastExtras = {}): BracketMatch {
+  // Un stream que seul tient un caster que la lecture tait n'est pas montré
+  // (sa chaîne n'est plus celle d'un caster du match) — comme le premier lien
+  // (`firstStreamUrlSql`) ; le stream du staff reste.
+  const heldStreams = new Set(
+    (extras.casters ?? []).filter((caster) => !casterWithdrawn(row, caster)).map((caster) => caster.streamId),
+  );
   return {
     id: Number(row.id),
     tournamentId: Number(row.tournament_id),
@@ -318,11 +324,13 @@ export function mapMatch(row: MatchRow, extras: MatchCastExtras = {}): BracketMa
     liveTrigger: row.live_trigger ?? null,
     liveUrl: normalizeStreamUrl(row.live_url),
     // Revalidés à la lecture, comme le premier lien.
-    streams: (extras.streams ?? []).map((stream) => ({
-      id: stream.id,
-      liveUrl: normalizeStreamUrl(stream.liveUrl),
-      staff: stream.staff,
-    })),
+    streams: (extras.streams ?? [])
+      .filter((stream) => stream.staff || heldStreams.has(stream.id))
+      .map((stream) => ({
+        id: stream.id,
+        liveUrl: normalizeStreamUrl(stream.liveUrl),
+        staff: stream.staff,
+      })),
     liveStartedAt: toIso(row.live_started_at),
     ...mapMatchLaunch(row, extras.casters ?? []),
     replayUrl: normalizeReplayUrl(row.replay_url ?? null),

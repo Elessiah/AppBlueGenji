@@ -12,6 +12,7 @@
  * {@link firstStreamUrlSql}.
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import { LIVE_STAFF_SQL } from "@/lib/server/privacy-consent";
 import { staffStream } from "@/lib/shared/live-streams";
 import type { CastEligibilityFields } from "./cast-eligibility";
 
@@ -21,13 +22,33 @@ export { staffStream };
 type Executor = Pick<PoolConnection, "execute">;
 
 /**
+ * Le compte `u` remplit la condition du cast (`castEligibilityBlock`) :
+ * permission `live` (`LIVE_STAFF_SQL`), tag Discord certifié, Battle.net
+ * rattaché, compte non supprimé — la même règle, en base.
+ */
+const CAST_ELIGIBLE_SQL = `(COALESCE(u.is_deleted, 0) = 0
+             AND u.discord_verified_at IS NOT NULL AND COALESCE(u.discord_pseudo, '') <> ''
+             AND u.blizzard_sub IS NOT NULL AND COALESCE(u.overwatch_battletag, '') <> ''
+             AND ${LIVE_STAFF_SQL})`;
+
+/**
  * Sous-requête du premier lien d'un match, à poser dans une liste de colonnes
  * (`… AS live_url`). `alias` est l'alias SQL de `bg_matches` dans la requête —
  * une constante du code, jamais une entrée.
+ *
+ * Le stream d'un caster que la lecture tait (inscription d'un compte qui ne
+ * remplit plus la condition, avant le lancement : `casterWithdrawn`) ne donne
+ * pas le premier lien : l'accueil et l'annonce #live n'envoient jamais vers la
+ * chaîne d'un caster que le site ne montre plus. Le stream du staff, un match
+ * lancé ou joué gardent leurs liens.
  */
 export function firstStreamUrlSql(alias: string): string {
   return `(SELECT fs.live_url FROM bg_match_streams fs
            WHERE fs.match_id = ${alias}.id AND fs.live_url IS NOT NULL
+             AND (fs.staff_owned = 1 OR ${alias}.status = 'COMPLETED' OR ${alias}.launched_at IS NOT NULL
+                  OR EXISTS (SELECT 1 FROM bg_match_casters fc JOIN bg_users u ON u.id = fc.user_id
+                             WHERE fc.match_id = fs.match_id AND fc.stream_id = fs.id
+                               AND ${CAST_ELIGIBLE_SQL}))
            ORDER BY fs.id LIMIT 1)`;
 }
 
