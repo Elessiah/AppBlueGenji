@@ -54,10 +54,9 @@ describe("RefereeDialog — gestes qui ne perdent rien", () => {
     expect(source).toMatch(/refereeDialog\.mapSaved"\), true\)/);
   });
 
-  it("un geste qui retire son bouton rend le focus à la phrase d'état, pas à la page", () => {
+  it("le focus suit `refereeFocusTarget`, relevé avant l'envoi et rendu après la confirmation", () => {
     expect(source).toMatch(/<p ref=\{statusRef\} tabIndex=\{-1\}/);
-    expect(source).toMatch(/active === document\.body \|\| !active\.isConnected\) statusRef\.current\?\.focus\(\)/);
-    // Après la confirmation seulement : son retour au déclencheur passe d'abord.
+    expect(source).toMatch(/triggerRef\.current = document\.activeElement/);
     expect(source).toMatch(/if \(busy \|\| confirm !== null\) return;/);
   });
 });

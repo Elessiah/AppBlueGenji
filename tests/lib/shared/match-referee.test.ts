@@ -17,7 +17,11 @@ import {
   refereeStripState,
   type LaunchStripViewer,
 } from "@/app/(secured)/tournois/[id]/_lib/launch-strip";
-import { refereeDialogActions, type RefereePanelView } from "@/app/(secured)/tournois/[id]/_lib/referee-dialog";
+import {
+  refereeDialogActions,
+  refereeFocusTarget,
+  type RefereePanelView,
+} from "@/app/(secured)/tournois/[id]/_lib/referee-dialog";
 import { bracketMatch } from "../../helpers/bracket-match";
 
 /**
@@ -203,5 +207,34 @@ describe("fenêtre « Arbitrage » : gestes offerts", () => {
       removeOther: true,
     });
     expect(refereeDialogActions(panel({ userId: 2, pseudo: "Autre", eligible: false }), 1).take).toBe(true);
+  });
+});
+
+describe("refereeFocusTarget (fenêtre « Arbitrage »)", () => {
+  const node = (name: string, isConnected = true) => ({ name, isConnected });
+  const body = node("body");
+  const status = node("status");
+
+  it("ne touche à rien quand le focus est encore sur un élément vivant", () => {
+    expect(refereeFocusTarget({ active: node("champ"), body, trigger: node("bouton"), status })).toBeNull();
+  });
+
+  it("rend le focus au contrôle du geste, lâché pendant l'envoi, s'il existe encore", () => {
+    const trigger = node("Enregistrer la carte");
+    expect(refereeFocusTarget({ active: body, body, trigger, status })).toBe(trigger);
+    expect(refereeFocusTarget({ active: null, body, trigger, status })).toBe(trigger);
+  });
+
+  it("se rabat sur la phrase d'état quand le geste a retiré son bouton", () => {
+    expect(refereeFocusTarget({ active: body, body, trigger: node("Arbitrer ce match", false), status })).toBe(status);
+    expect(refereeFocusTarget({ active: node("retiré", false), body, trigger: null, status })).toBe(status);
+  });
+
+  it("n'adopte jamais la page comme déclencheur", () => {
+    expect(refereeFocusTarget({ active: body, body, trigger: body, status })).toBe(status);
+  });
+
+  it("sans phrase d'état montée, rien", () => {
+    expect(refereeFocusTarget({ active: body, body, trigger: null, status: null })).toBeNull();
   });
 });
