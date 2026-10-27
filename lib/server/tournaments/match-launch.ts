@@ -32,7 +32,13 @@ import { normalizeStreamUrl } from "@/lib/shared/live-streams";
 import type { MatchStatus, TeamRole } from "@/lib/shared/types";
 import { casterIdentityOf, loadCastEligibility, type CasterIdentityRow } from "./cast-eligibility";
 import { announceCastChange, discardCastChanges, flushCastChanges, queueCastChange } from "./cast-notices";
-import { lockMatchCasters, lockMatchStreams, pruneMatchStreams, type MatchCasterLink } from "./match-casters";
+import {
+  lockMatchCasters,
+  lockMatchStreams,
+  pruneMatchStreams,
+  type MatchCasterLink,
+  type MatchStreamRow,
+} from "./match-casters";
 import { retryOnDeadlock } from "./deadlock-retry";
 import { publishMatchUpdatedEvent } from "./notifications";
 
@@ -479,6 +485,21 @@ function castStreamUrl(rawUrl: string | null): string | null {
 }
 
 /**
+ * Le stream est-il montré (`mapMatch`, `firstStreamUrlSql`) ? Celui du staff,
+ * ou celui d'un match lancé, l'est toujours ; avant le lancement, celui qu'aucun
+ * caster éligible ne tient est tu — le rejoindre ferait réapparaître la chaîne
+ * d'un caster que le site ne montre plus. Les casters sont ceux relus sous
+ * verrou avec le match.
+ */
+async function streamShown(connection: PoolConnection, row: LaunchMatchRow, stream: MatchStreamRow): Promise<boolean> {
+  if (stream.staff || row.launched_at !== null) return true;
+  for (const caster of row.casters) {
+    if (caster.streamId === stream.id && (await loadCastEligibility(connection, caster.userId)) === null) return true;
+  }
+  return false;
+}
+
+/**
  * Inscrit le lecteur comme caster du match, sans plafond : sur un stream
  * existant (co-cast) ou sur un stream qu'il ouvre (`target`).
  * `hasLivePermission` est la permission `live`, établie par la route. Un
@@ -518,7 +539,8 @@ export async function claimMatchCast(
       let streamId: number;
       if ("streamId" in castTarget) {
         const streams = await lockMatchStreams(connection, matchId);
-        if (!streams.some((stream) => stream.id === castTarget.streamId)) throw new Error("STREAM_NOT_FOUND");
+        const stream = streams.find((candidate) => candidate.id === castTarget.streamId);
+        if (!stream || !(await streamShown(connection, row, stream))) throw new Error("STREAM_NOT_FOUND");
         streamId = castTarget.streamId;
       } else {
         const [created] = await connection.execute<ResultSetHeader>(

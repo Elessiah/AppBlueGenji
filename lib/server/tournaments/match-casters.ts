@@ -6,8 +6,8 @@
  *
  * Un match a zéro, un ou plusieurs streams (`bg_match_streams`), chacun avec
  * son lien facultatif ; chaque caster (`bg_match_casters`) est rattaché à un
- * stream de son match. Le **premier lien** — le stream au plus petit
- * identifiant qui en a un — est celui que montrent les vues compactes (carte,
+ * stream de son match. Le **premier lien** — celui du staff, à défaut le
+ * stream au plus petit identifiant qui en a un — est celui que montrent les vues compactes (carte,
  * bandeaux, accueil) et que lisent les annonces #live : une seule définition,
  * {@link firstStreamUrlSql}.
  */
@@ -36,6 +36,10 @@ const CAST_ELIGIBLE_SQL = `(COALESCE(u.is_deleted, 0) = 0
  * (`… AS live_url`). `alias` est l'alias SQL de `bg_matches` dans la requête —
  * une constante du code, jamais une entrée.
  *
+ * Le lien posé par le staff passe devant ceux des casters, même ouverts avant
+ * lui : l'annonce #live et l'accueil renvoient à la chaîne que le staff a
+ * choisie, comme avant les co-casters.
+ *
  * Le stream d'un caster que la lecture tait (inscription d'un compte qui ne
  * remplit plus la condition, avant le lancement : `casterWithdrawn`) ne donne
  * pas le premier lien : l'accueil et l'annonce #live n'envoient jamais vers la
@@ -49,7 +53,7 @@ export function firstStreamUrlSql(alias: string): string {
                   OR EXISTS (SELECT 1 FROM bg_match_casters fc JOIN bg_users u ON u.id = fc.user_id
                              WHERE fc.match_id = fs.match_id AND fc.stream_id = fs.id
                                AND ${CAST_ELIGIBLE_SQL}))
-           ORDER BY fs.id LIMIT 1)`;
+           ORDER BY fs.staff_owned DESC, fs.id LIMIT 1)`;
 }
 
 /** Un caster d'un match, tel que la base le décrit. */
