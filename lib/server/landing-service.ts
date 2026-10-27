@@ -158,6 +158,12 @@ function entrantHrefFor(teamId: number | null, soloUserId: number | null): strin
 }
 
 /** Seed exploitable (entier positif), ou `null` — la colonne est nullable. */
+/** Forme affichable d'un nom d'engagé, `null` quand il ne garde rien de visible. */
+function shownEntrantName(name: string | null): string | null {
+  if (name === null) return null;
+  return visibleText(name) || null;
+}
+
 function toSeed(value: number | null): number | null {
   if (value === null) return null;
   const seed = Number(value);
@@ -325,8 +331,11 @@ async function loadLandingLive(): Promise<LandingLive | null> {
       );
       return {
         id: Number(row.id),
-        team1Name: row.team1_name,
-        team2Name: row.team2_name,
+        // Nom saisi par un joueur, lu sans compte : forme affichable comme le
+        // bandeau (`UNTRUSTED_NAMES.md`) ; un nom qui ne garde rien retombe sur
+        // le libellé « Équipe 1 / 2 » de la carte.
+        team1Name: shownEntrantName(row.team1_name),
+        team2Name: shownEntrantName(row.team2_name),
         team1Href: entrantHrefFor(row.team1_id, row.team1_solo_user_id),
         team2Href: entrantHrefFor(row.team2_id, row.team2_solo_user_id),
         // Filtré à la sortie comme partout : la vitrine est lue sans compte,
