@@ -34,3 +34,24 @@ export function refereeDialogActions(panel: RefereePanelView, viewerUserId: numb
     candidates: panel.candidates.filter((candidate) => candidate.userId !== current?.userId),
   };
 }
+
+/** Ce que la fenêtre sait du focus au retour d'un geste. */
+type FocusCandidate = { isConnected: boolean };
+
+/**
+ * Où rendre le focus quand un geste de la fenêtre s'achève : rien si le focus
+ * est encore sur un élément vivant ; sinon le contrôle qui a lancé le geste
+ * s'il existe toujours (désactivé le temps de l'envoi, le navigateur l'a
+ * lâché), et la phrase d'état quand le geste a retiré son propre bouton.
+ */
+export function refereeFocusTarget<E extends FocusCandidate>(input: {
+  active: E | null;
+  body: E;
+  trigger: E | null;
+  status: E | null;
+}): E | null {
+  const { active, body, trigger, status } = input;
+  if (active !== null && active !== body && active.isConnected) return null;
+  if (trigger !== null && trigger !== body && trigger.isConnected) return trigger;
+  return status;
+}

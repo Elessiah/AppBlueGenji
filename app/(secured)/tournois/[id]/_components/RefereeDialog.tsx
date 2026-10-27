@@ -11,7 +11,7 @@ import type { BracketMatch } from "@/lib/shared/types";
 import { TournamentDialogFrame } from "./TournamentDialogFrame";
 import { launchErrorText, useActionsText } from "../_lib/actions-text";
 import { useErrorsText } from "../_lib/error-map";
-import { refereeDialogActions, type RefereePanelView } from "../_lib/referee-dialog";
+import { refereeDialogActions, refereeFocusTarget, type RefereePanelView } from "../_lib/referee-dialog";
 import styles from "./RefereeDialog.module.css";
 
 const FIRST_MAP_FIELD_ERRORS = { INVALID_FIRST_MAP: "map" } as const;
@@ -76,16 +76,25 @@ export function RefereeDialog({
   const [pick, setPick] = useState("");
   const [map, setMap] = useState("");
   const [confirm, setConfirm] = useState<PendingConfirm | null>(null);
-  // Un geste retire souvent son propre bouton (« Arbitrer ce match » devient
-  // « Ne plus arbitrer », « Retirer l'arbitre » disparaît) : le focus tomberait
-  // sur la page, la fenêtre encore ouverte. Il revient sur la phrase d'état,
-  // qui dit le nouvel état — après la fermeture de la confirmation, dont le
-  // retour au déclencheur vise alors un bouton disparu.
+  // Le contrôle d'un geste est désactivé le temps de l'envoi (le navigateur
+  // lâche alors le focus), et un geste retire souvent son propre bouton
+  // (« Arbitrer ce match » devient « Ne plus arbitrer ») : le focus tomberait
+  // sur la page, la fenêtre encore ouverte. Il revient au contrôle du geste
+  // s'il existe encore, sinon à la phrase d'état, qui dit le nouvel état —
+  // après la fermeture de la confirmation, dont le retour au déclencheur vise
+  // alors un bouton disparu (`refereeFocusTarget`).
   const statusRef = useRef<HTMLParagraphElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     if (busy || confirm !== null) return;
-    const active = document.activeElement;
-    if (active === null || active === document.body || !active.isConnected) statusRef.current?.focus();
+    const target = refereeFocusTarget<Element>({
+      active: document.activeElement,
+      body: document.body,
+      trigger: triggerRef.current,
+      status: statusRef.current,
+    });
+    triggerRef.current = null;
+    if (target instanceof HTMLElement) target.focus();
   }, [busy, confirm, panel]);
   const fieldErrors = useFieldErrors(FIRST_MAP_FIELD_ERRORS, { map: mapId });
   const errorText = (code: string) => launchErrorText(actionText, errorsText, code);
@@ -110,6 +119,7 @@ export function RefereeDialog({
   }, [load]);
 
   const run = async (request: () => Promise<unknown>, success: string, resetMap = false): Promise<boolean> => {
+    triggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setBusy(true);
     try {
       await request();
