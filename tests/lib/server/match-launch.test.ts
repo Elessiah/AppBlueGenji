@@ -7,7 +7,12 @@ jest.mock("@/lib/server/tournaments/cast-notices");
 import type { PoolConnection } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
-import { announceCastChange } from "@/lib/server/tournaments/cast-notices";
+import {
+  announceCastChange,
+  discardCastChanges,
+  flushCastChanges,
+  queueCastChange,
+} from "@/lib/server/tournaments/cast-notices";
 import {
   claimMatchCast,
   forceLaunchMatch,
@@ -355,14 +360,44 @@ describe("caster inscrit avant que son équipe n'atteigne le match", () => {
     // Inscrit sur un match aux créneaux vides, puis son équipe (TEAM1) l'atteint.
     state.memberships.push({ userId: CASTER, teamId: TEAM1, roles: ["DPS"] });
     state.match = matchState({ launch_pairing: null, caster_user_id: CASTER });
-    await maintainMatchLaunches(connectionFor(state), 7);
+    const connection = connectionFor(state);
+    await maintainMatchLaunches(connection, 7);
     expect(state.match?.caster_user_id).toBeNull();
+    // Annoncé comme tout retrait d'office, après le commit de l'appelant.
+    expect(queueCastChange).toHaveBeenCalledWith(connection, {
+      kind: "AUTO_RELEASED",
+      matchId: 42,
+      casterId: CASTER,
+      reason: "JOINED_TEAM",
+    });
+    expect(announceCastChange).not.toHaveBeenCalled();
   });
 
   it("garde un caster étranger aux deux équipes", async () => {
     state.match = matchState({ launch_pairing: null, caster_user_id: CASTER });
     await maintainMatchLaunches(connectionFor(state), 7);
     expect(state.match?.caster_user_id).toBe(CASTER);
+    expect(queueCastChange).not.toHaveBeenCalled();
+  });
+
+  it("annonce après le commit le caster désinscrit par un « Prêt »", async () => {
+    state.memberships.push({ userId: CASTER, teamId: TEAM1, roles: ["DPS"] });
+    state.match = matchState({ launch_pairing: null, caster_user_id: CASTER });
+    await setMatchReady(42, 1, true);
+    expect(state.match?.caster_user_id).toBeNull();
+    expect(queueCastChange).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ reason: "JOINED_TEAM" }));
+    expect(flushCastChanges).toHaveBeenCalledTimes(1);
+    expect(discardCastChanges).not.toHaveBeenCalled();
+  });
+
+  it("n'annonce rien quand la transaction échoue", async () => {
+    state.memberships.push({ userId: CASTER, teamId: TEAM1, roles: ["DPS"] });
+    state.match = matchState({ launch_pairing: null, caster_user_id: CASTER });
+    // Un lecteur étranger au match : refusé après la désinscription, tout est annulé.
+    await expect(setMatchReady(42, 999, true)).rejects.toThrow("NOT_MATCH_PARTY");
+    expect(queueCastChange).toHaveBeenCalledTimes(1);
+    expect(discardCastChanges).toHaveBeenCalledTimes(1);
+    expect(flushCastChanges).not.toHaveBeenCalled();
   });
 
   it("fait agir en joueur celui qui est à la fois inscrit comme caster et joueur", async () => {

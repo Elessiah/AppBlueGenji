@@ -13,11 +13,15 @@ import {
   castLogChange,
   castReleaseNotice,
   deliverCastChange,
+  discardCastChanges,
+  flushCastChanges,
+  queueCastChange,
   type CastChange,
 } from "@/lib/server/tournaments/cast-notices";
 import type { CastLogChange } from "@/lib/shared/bot-logs";
 import type { CastReleaseReason } from "@/lib/shared/cast-notices";
-import { fakePool, type SqlQuery } from "../../helpers/sql-double";
+import { flushBotLogs } from "@/lib/server/tournaments/bot-logs";
+import { fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 import { resolvePush } from "../../helpers/push";
 
 const CASTER = 900;
@@ -180,5 +184,45 @@ describe("announceCastChange", () => {
     await new Promise((resolve) => setImmediate(resolve));
     expect(error).toHaveBeenCalledWith("[cast] changement d'inscription non annoncé", expect.any(Error));
     error.mockRestore();
+  });
+});
+
+describe("queueCastChange — annonce après le commit", () => {
+  const RELEASE: CastChange = { kind: "AUTO_RELEASED", matchId: 42, casterId: CASTER, reason: "JOINED_TEAM" };
+  const settle = () => new Promise((resolve) => setImmediate(resolve));
+
+  it("annonce les changements notés une fois la transaction aboutie", async () => {
+    mockMatch(matchRow());
+    const connection = fakeConnection({});
+    queueCastChange(connection, RELEASE);
+    expect(sendBotLog).not.toHaveBeenCalled();
+    flushCastChanges(connection);
+    await settle();
+    expect(loggedLine()).toContain("le caster joue désormais ce match");
+    expect(notification().topic).toBe("CAST_RELEASED");
+    // La file est vidée : un second flush ne répète rien.
+    flushCastChanges(connection);
+    await settle();
+    expect(sendBotLog).toHaveBeenCalledTimes(1);
+  });
+
+  it("n'annonce rien d'une transaction annulée", async () => {
+    mockMatch(matchRow());
+    const connection = fakeConnection({});
+    queueCastChange(connection, RELEASE);
+    discardCastChanges(connection);
+    flushCastChanges(connection);
+    await settle();
+    expect(sendBotLog).not.toHaveBeenCalled();
+    expect(notifyUsers).not.toHaveBeenCalled();
+  });
+
+  it("part avec le journal du staff après l'entretien (flushBotLogs)", async () => {
+    mockMatch(matchRow());
+    const connection = fakeConnection({});
+    queueCastChange(connection, RELEASE);
+    flushBotLogs(connection);
+    await settle();
+    expect(notifyUsers).toHaveBeenCalledTimes(1);
   });
 });
