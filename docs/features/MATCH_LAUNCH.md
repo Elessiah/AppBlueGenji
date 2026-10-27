@@ -364,13 +364,19 @@ qu'il tient, son « Prêt »). Code : `lib/server/tournaments/match-casters.ts`.
   C'est lui que montrent les vues compactes (carte, ticker, annonce #live,
   détection « à l'antenne ») ; le bandeau de diffusion (`MatchLiveStrip`) montre
   tous les liens, le premier en tête (`matchStreamLinks`).
-- **Stream principal** (`primaryStream`) : le premier qui a un lien, sinon le
-  premier. La configuration du direct par le staff règle son lien ; « pas de
-  cast » efface tous les liens.
+- **Stream du staff** (`staff_owned = 1`, `staffStream`) : celui dont la
+  configuration du direct règle le lien — le stream marqué, sinon le premier
+  stream sans lien (un caster déjà inscrit sans chaîne), qui devient celui du
+  staff ; sinon un stream neuf. Le lien qu'un caster a ouvert n'est **jamais**
+  écrasé par le staff. « Pas de cast » efface le seul lien du staff, les
+  casters gardent le leur.
 - **Ménage** (`pruneMatchStreams`, sous verrou, chaque table seule) : un stream
-  que plus aucun caster ne tient part, sauf le principal tant qu'il porte un
-  lien (lien posé par le staff, gardé au match). À l'effacement d'un compte,
-  son stream part dans tous les cas (`alwaysDrop`).
+  que plus aucun caster ne tient part, avec son lien — qu'il se retire, soit
+  retiré ou que son compte soit effacé —, sauf le stream du staff tant qu'il
+  porte un lien (gardé au match).
+- **Interblocages** : inscription, retrait et retrait d'office se rejouent sur
+  un interblocage d'InnoDB (`retryOnDeadlock`) ; tout geste qui touche les
+  casters verrouille d'abord la ligne du match (`setRefereeScheduling` compris).
 - **Contacts** : chaque caster reçoit ceux des équipes, et ceux des autres
   casters du match, le temps du match (`PRIVACY_CHANGES`
   `2026-10-plusieurs-casters-par-match`, registre T04).

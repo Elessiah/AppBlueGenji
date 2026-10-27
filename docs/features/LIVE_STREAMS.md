@@ -17,8 +17,10 @@ chaque caster ouvre à part). Partout où un seul lien tient — carte, ticker d
 l'accueil, annonce #live, détection « à l'antenne » — c'est le **premier lien**
 (`firstStreamUrlSql`, plus petit stream qui a un lien) : le comportement d'avant,
 pour le premier stream. Le bandeau de diffusion du match montre tous les liens,
-le premier en tête. La configuration du direct par le staff règle le lien du
-stream principal ; « pas de cast » efface tous les liens. Voir
+le premier en tête. La configuration du direct par le staff règle le lien de
+son propre stream (`staff_owned`), jamais celui qu'un caster a ouvert ; « pas
+de cast » n'efface que ce lien du staff. Le stream d'un caster part, avec son
+lien, quand plus aucun caster ne le tient. Voir
 `docs/features/MATCH_LAUNCH.md` § Casters et streams.
 
 Un troisième mode d'antenne s'appuie sur le **calendrier** du match plutôt que
