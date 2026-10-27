@@ -59,6 +59,9 @@ const emptyBuckets: TournamentBuckets = {
  * pas cette limite : c'est un choix d'affichage, pas un fait sur les données). */
 type LimitedSectionKey = "mine" | "running" | "registration" | "upcoming" | "finished";
 const SECTION_DISPLAY_LIMIT = 12;
+/** Compte affiché tant que la première liste n'est pas arrivée. */
+const COUNT_PENDING = "–";
+const NO_TICKER_ITEMS: readonly string[] = [];
 
 const GAME_FILTERS: readonly GameFilter[] = ["all", "ow", "mr"];
 
@@ -493,11 +496,9 @@ export default function TournamentsList() {
                       onClick={() => setGameFilter(key)}
                     >
                       {label}
-                      {listLoaded && (
-                        <span className={s.num} aria-hidden="true">
-                          {count}
-                        </span>
-                      )}
+                      <span className={s.num} aria-hidden="true">
+                        {listLoaded ? count : COUNT_PENDING}
+                      </span>
                     </button>
                   );
                 })}
@@ -507,10 +508,23 @@ export default function TournamentsList() {
             {/* Sommaire : remplace le bandeau de chiffres, qui répétait les
                 comptes des sections sans mener nulle part. Une section vide y
                 reste, grisée, au lieu d'occuper un grand cadre « Vide » plus bas. */}
-            {listLoaded && (
-              <nav className={s.sectionNav} aria-label={t("list.sectionsNav")}>
-                {sections.map((entry) =>
-                  entry.count > 0 ? (
+            <nav className={s.sectionNav} aria-label={t("list.sectionsNav")}>
+              {sections.map((entry) => {
+                // Avant la première liste : les mêmes entrées, sans lien ni
+                // compte (« – »), pour garder la place du sommaire sans
+                // annoncer de zéros.
+                if (!listLoaded) {
+                  return (
+                    <span key={entry.key} className={s.sectionNavLink}>
+                      {entry.navLabel}
+                      <span className={s.num} aria-hidden="true">
+                        {COUNT_PENDING}
+                      </span>
+                    </span>
+                  );
+                }
+                if (entry.count > 0) {
+                  return (
                     <a
                       key={entry.key}
                       href={`#${pageSectionAnchor(entry.key)}`}
@@ -529,29 +543,30 @@ export default function TournamentsList() {
                         {entry.count}
                       </span>
                     </a>
-                  ) : (
-                    <span key={entry.key} className={`${s.sectionNavLink} ${s.sectionNavEmpty}`}>
-                      {entry.navLabel}
-                      <span className={s.num} aria-hidden="true">
-                        0
-                      </span>
-                      <span className="sr-only"> {t("list.navNone")}</span>
+                  );
+                }
+                return (
+                  <span key={entry.key} className={`${s.sectionNavLink} ${s.sectionNavEmpty}`}>
+                    {entry.navLabel}
+                    <span className={s.num} aria-hidden="true">
+                      0
                     </span>
-                  ),
-                )}
-              </nav>
-            )}
+                    <span className="sr-only"> {t("list.navNone")}</span>
+                  </span>
+                );
+              })}
+            </nav>
           </div>
 
           {/* Les paniers reclassés, comme les sections : sinon le bandeau
               annoncerait « À VENIR » un tournoi affiché juste dessous en
-              « INSCRIPTIONS » — le genre de doute qui fait recharger la page. */}
-          {listLoaded && (
-            <Ticker
-              items={buildTickerItems(scheduledBuckets, text)}
-              labels={text.tickerLabels}
-            />
-          )}
+              « INSCRIPTIONS » — le genre de doute qui fait recharger la page.
+              Avant la première liste, un bandeau vide (hauteur fixe) : il garde
+              sa place, sans annoncer « Aucune actualité ». */}
+          <Ticker
+            items={listLoaded ? buildTickerItems(scheduledBuckets, text) : NO_TICKER_ITEMS}
+            labels={text.tickerLabels}
+          />
 
           <div className={s.sections}>
             {!listLoaded && <SecuredLoadingView label={t("list.loading")} />}
