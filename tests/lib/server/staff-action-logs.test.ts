@@ -100,6 +100,21 @@ describe("deliverStaffTournamentAction", () => {
   });
 });
 
+describe("deliverStaffMatchAction — sans désigner le match", () => {
+  it("n'envoie que le tournoi avec withoutMatch", async () => {
+    mockRows(matchRow());
+    await deliverStaffMatchAction(42, "SCORES_SAVED", "STAFF", { withoutMatch: true });
+    expect(sendBotLog).toHaveBeenCalledWith("🛠️ Score enregistré — « Coupe d'hiver » (#7), par le staff.");
+  });
+
+  it("transmet l'option depuis announceStaffMatchAction", async () => {
+    mockRows(matchRow());
+    announceStaffMatchAction(42, "SCORES_SAVED", "STAFF", { withoutMatch: true });
+    await settle();
+    expect(sendBotLog).toHaveBeenCalledWith("🛠️ Score enregistré — « Coupe d'hiver » (#7), par le staff.");
+  });
+});
+
 describe("announceStaffMatchAction / announceStaffTournamentAction", () => {
   it("ne lèvent jamais quand la base est indisponible", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);

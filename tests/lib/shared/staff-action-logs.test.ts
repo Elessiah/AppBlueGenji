@@ -51,6 +51,13 @@ describe("formatStaffMatchActionLog", () => {
     );
   });
 
+  it("n'écrit que le tournoi quand le match ne doit pas être désigné", () => {
+    const line = formatStaffMatchActionLog({ ...base, action: "SCORES_SAVED", withoutMatch: true });
+    expect(line).toBe("🛠️ Score enregistré — « Coupe d'hiver » (#7), par le staff.");
+    expect(line).not.toMatch(/Renards|Nova|#42|Manche/);
+    expect(formatStaffMatchActionLog({ ...base, action: "SCORES_SAVED", withoutMatch: false })).toContain("(#42)");
+  });
+
   it("a un libellé distinct par geste, chacun sur une ligne", () => {
     const lines = MATCH_ACTIONS.map((action) => formatStaffMatchActionLog({ ...base, action }));
     expect(new Set(lines).size).toBe(MATCH_ACTIONS.length);

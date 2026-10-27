@@ -99,6 +99,16 @@ describe("gestes du staff sur un match", () => {
     expect(announceStaffTournamentAction).not.toHaveBeenCalled();
   });
 
+  it("un score qui suspend la validation ne désigne pas le match, sinon si", async () => {
+    jest.mocked(adminSaveMatchScores).mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    expect((await scoresRoute(jsonReq("PATCH", { forfeitTeamId: 7 }), match)).status).toBe(200);
+    expect((await scoresRoute(jsonReq("PATCH", { forfeitTeamId: 7 }), match)).status).toBe(200);
+    expect(jest.mocked(announceStaffMatchAction).mock.calls).toEqual([
+      [42, "SCORES_SAVED", "STAFF", { withoutMatch: true }],
+      [42, "SCORES_SAVED", "STAFF", { withoutMatch: false }],
+    ]);
+  });
+
   it("un caster sans permission tournois est écrit « un caster », jamais « le staff »", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
     jest.mocked(setMatchOnAir).mockResolvedValue();
