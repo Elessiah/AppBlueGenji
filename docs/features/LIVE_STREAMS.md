@@ -565,6 +565,13 @@ manquant est en revanche toléré (`twitch.tv/bluegenji` devient
 
 Ajouter une plateforme = ajouter une entrée à `LIVE_PLATFORMS`.
 
+## Arbitre qui caste
+
+L'arbitre désigné d'un match peut aussi le caster : les deux inscriptions
+sont indépendantes, chacune avec son « Prêt » (`MATCH_REFEREE.md`). Le public
+ne lit de l'arbitrage que « Arbitre désigné » ; le pseudo de l'arbitre ne
+va qu'aux deux équipes, aux casters du match et au staff.
+
 ## Permissions
 
 Une nouvelle permission **`live`**, portée par le rôle **`CASTER`**

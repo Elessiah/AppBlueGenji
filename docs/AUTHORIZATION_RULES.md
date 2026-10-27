@@ -376,10 +376,20 @@ dit là où le BattleTag se renseigne et se masque (liste `HIDDEN_BATTLETAG_AUDI
 l'utilisateur, 2026-10-19) : la carte lui offre le bouton « Contacts » aux mêmes
 phases (dès « À planifier », les deux adversaires connus — `launchStripControls`,
 `canSchedule`), et `loadViewerMatchContacts` lui rend la même présentation, rôle
-`REFEREE`, sans « Prêt » ; la modale de lancement ne lui présente rien. Les
+`REFEREE`, sans « Prêt » ; la modale de lancement ne lui présente rien — sauf
+à l'**arbitre désigné** du match, une partie à part entière (rôle
+`MATCH_REFEREE`, avec son « Prêt », `MATCH_REFEREE.md`). Les
 contacts du caster lui sont rendus dès que les deux adversaires sont connus
 (décision de l'utilisateur, 2026-10-21), quand les équipes ne les lisent que le
 temps du match. Un arbitre qui joue le match lit en joueur (rôle `TEAM1`/`TEAM2`).
+
+**Arbitre désigné** (`MATCH_REFEREE.md`) : le prendre exige la permission
+`tournaments`, un tag Discord certifié et un compte Battle.net rattaché, et ne
+pas jouer le match ; le confier, le retirer, l'autogestion (par match ou par
+manche) et la première carte passent par `can(user, "tournaments")`. Son
+pseudo et son BattleTag (même masqué, `sharesLiveMatch`, aux moments des
+contacts du match) ne vont qu'aux deux équipes, aux casters du match et au
+staff — jamais dans l'instantané.
 
 Les contacts **du caster** (tag Discord certifié, BattleTag) ne sont présentés
 aux équipes que le temps du match, symétriquement ; avant, la carte montre les
