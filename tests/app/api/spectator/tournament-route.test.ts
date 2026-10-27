@@ -259,10 +259,15 @@ describe("GET /api/spectator/tournaments/[id]", () => {
     }
     expect(mockedSnapshot).toHaveBeenCalledTimes(SPECTATOR_REBUILD_RULE.limit);
 
+    // Une reconstruction ne lit la carte qu'une fois.
+    expect(mockedCard).toHaveBeenCalledTimes(SPECTATOR_REBUILD_RULE.limit);
+
+    mockedCard.mockClear();
     const refused = await GET(req("1000"), params("1000"));
     expect(refused.status).toBe(429);
     expect(refused.headers.get("retry-after")).not.toBeNull();
-    // Refusée avant toute lecture en base.
+    // Refusée avant toute lecture en base, carte comprise.
+    expect(mockedCard).not.toHaveBeenCalled();
     expect(mockedSnapshot).toHaveBeenCalledTimes(SPECTATOR_REBUILD_RULE.limit);
 
     // Un tournoi déjà prêt reste servi à cette adresse : il ne coûte que le cache.
@@ -307,5 +312,20 @@ describe("GET /api/spectator/tournaments/[id]", () => {
     expect((await first).status).toBe(200);
     expect((await second).status).toBe(200);
     expect(mockedSnapshot).toHaveBeenCalledTimes(1);
+    // Une seule lecture de la carte pour les deux.
+    expect(mockedCard).toHaveBeenCalledTimes(1);
+  });
+
+  it("ne lit qu'une fois la carte d'un identifiant introuvable demandé par plusieurs lectures simultanées", async () => {
+    mockedCard.mockResolvedValue(null);
+
+    const responses = await Promise.all([1, 2, 3].map(() => GET(req("7"), params("7"))));
+
+    expect(responses.map((res) => res.status)).toEqual([404, 404, 404]);
+    expect(mockedCard).toHaveBeenCalledTimes(1);
+    // Rien n'est gardé : le tournoi publié ensuite s'ouvre à la lecture suivante.
+    mockedCard.mockResolvedValue(tournamentCard({ id: 7 }));
+    mockedSnapshot.mockResolvedValue(snapshot());
+    expect((await GET(req("7"), params("7"))).status).toBe(200);
   });
 });

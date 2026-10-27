@@ -5,6 +5,7 @@ import {
   TOURNAMENT_READ_RULE,
   VISIT_REQUEST_RULE,
   enforceRateLimit,
+  peekRateLimit,
   requestClientIp,
 } from "@/lib/server/api-guard";
 import { resetRateLimit, type RateLimitRule } from "@/lib/server/rate-limit";
@@ -125,6 +126,35 @@ describe("enforceRateLimit", () => {
     enforceRateLimit(RULE, "1.2.3.4");
     enforceRateLimit(RULE, "1.2.3.4");
     expect(enforceRateLimit(RULE, "1.2.3.4")).not.toBeNull();
+  });
+});
+
+describe("peekRateLimit", () => {
+  it("ne décompte rien sous le plafond", () => {
+    for (let i = 0; i < 5; i += 1) expect(peekRateLimit(RULE, "a")).toBeNull();
+    // Les deux actions du plafond restent entières.
+    expect(enforceRateLimit(RULE, "a")).toBeNull();
+    expect(enforceRateLimit(RULE, "a")).toBeNull();
+  });
+
+  it("refuse en 429, avec le même corps et les mêmes en-têtes, une fois le plafond atteint", async () => {
+    enforceRateLimit(RULE, "a");
+    enforceRateLimit(RULE, "a");
+
+    const response = peekRateLimit(RULE, "a")!;
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toEqual({ error: "TOO_MANY_REQUESTS" });
+    expect(Number(response.headers.get("Retry-After"))).toBeGreaterThan(0);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    // Une autre identité n'est pas touchée.
+    expect(peekRateLimit(RULE, "b")).toBeNull();
+  });
+
+  it("ne refuse pas ce qu'il ne sait pas distinguer", () => {
+    enforceRateLimit(RULE, null);
+    enforceRateLimit(RULE, null);
+    enforceRateLimit(RULE, null);
+    expect(peekRateLimit(RULE, null)).toBeNull();
   });
 });
 
