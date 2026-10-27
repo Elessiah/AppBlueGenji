@@ -93,8 +93,9 @@ pas l'ambre, réservé aux avertissements) n'apparaît que :
 - en BG Survie, avant les play-offs.
 
 **Hors fenêtre** (une manche postérieure à l'abandon porte une saisie), la
-ligne montre un verrou 🔒 « Figé » à la place du bouton, avec son motif en
-infobulle et en texte lu : la fenêtre est calculée au serveur par
+ligne montre un verrou 🔒 « Figé » à la place du bouton, avec son motif
+derrière un « i » (`InfoHint`, lisible au toucher et au clavier — un `title`
+ne l'était pas) : la fenêtre est calculée au serveur par
 `loadCancellableForfeitIds` (`lib/server/tournaments/forfeit-window.ts`, même
 borne que `FORFEIT_ROUND_PASSED`) et publiée dans
 `cancellableForfeitTeamIds` des métas suisse, survie et BG Survie.
