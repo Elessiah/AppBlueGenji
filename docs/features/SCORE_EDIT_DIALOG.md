@@ -155,9 +155,11 @@ borne la saisie.
 Le dialogue passe par `useDialogBehavior` comme les autres modales du site :
 `Échap` (bloqué pendant un envoi), piège à focus, défilement de l'arrière-plan
 verrouillé, focus rendu au bouton déclencheur à la fermeture. Il se déclare
-`role="dialog"` / `aria-modal` / `aria-labelledby`, et `Entrée` dans un champ
-vaut « Valider le résultat » — l'issue attendue d'une saisie de score,
-l'enregistrement intermédiaire restant un geste délibéré.
+`role="dialog"` / `aria-modal` / `aria-labelledby`. `Entrée` dans un champ de
+map **ne soumet pas** le formulaire (`MapScoreList` la retient) : corriger un
+code puis valider d'un même geste trancherait le match sans relecture.
+« Valider le résultat » reste un geste explicite (clic, ou `Entrée` sur le
+bouton).
 
 Pendant un envoi, « Fermer », « Enregistrer » et « Valider le résultat » sont
 `aria-disabled` (et `aria-busy` pour les deux derniers), **jamais** `disabled` :
