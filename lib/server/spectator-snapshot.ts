@@ -15,7 +15,7 @@
  * tournoi la retire (`invalidateSpectatorSnapshot`).
  */
 import { createHash } from "node:crypto";
-import { cached } from "@/lib/server/cache";
+import { cached, isCachedOrLoading } from "@/lib/server/cache";
 import { getVisibleTournamentCard, getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
 import { spectatorSnapshotCacheKey } from "@/lib/server/tournaments/snapshot";
 import { spectatorSnapshot } from "@/lib/shared/spectator-view";
@@ -35,6 +35,28 @@ export type SpectatorPayload = {
   ttlMs: number;
 };
 
+/**
+ * La réponse publique du tournoi est-elle déjà prête (ou en cours de calcul) ?
+ * Sinon, la prochaine lecture la **reconstruit** : c'est ce coût-là que
+ * `SPECTATOR_REBUILD_RULE` borne par adresse.
+ */
+export function isSpectatorPayloadWarm(tournamentId: number): boolean {
+  return isCachedOrLoading(spectatorSnapshotCacheKey(tournamentId));
+}
+
+/**
+ * Le tournoi est-il visible du public ? Une seule requête indexée (sa carte),
+ * sans écriture : c'est ce qu'une lecture d'un identifiant inconnu ou pas encore
+ * publié coûte, et elle ne puise pas dans `SPECTATOR_REBUILD_RULE`.
+ *
+ * Mutualisée **en vol** (rien n'est gardé : un tournoi publié une seconde plus
+ * tard s'ouvre aussitôt) : cent onglets qui arrivent ensemble sur une réponse
+ * froide ne font qu'une lecture de la carte, comme avant ce contrôle.
+ */
+export function isSpectatorTournamentPublic(tournamentId: number): Promise<boolean> {
+  return cached(`spectator-public:${tournamentId}`, 0, async () => (await getVisibleTournamentCard(tournamentId)) !== null);
+}
+
 /** Refus du chargeur : rien à servir, et rien à mettre en cache. */
 class SpectatorNotFound extends Error {}
 
@@ -45,8 +67,14 @@ class SpectatorNotFound extends Error {}
  * @param ttlMs Durée de vie d'une réponse **nouvellement** calculée
  *   (`spectatorCacheTtlMs`, selon la charge). Une réponse déjà en cache garde
  *   la sienne.
+ * @param options.visibilityChecked La carte vient d'être lue par
+ *   {@link isSpectatorTournamentPublic} : le chargeur ne la relit pas.
  */
-export async function getSpectatorPayload(tournamentId: number, ttlMs: number): Promise<SpectatorPayload | null> {
+export async function getSpectatorPayload(
+  tournamentId: number,
+  ttlMs: number,
+  options: { visibilityChecked?: boolean } = {},
+): Promise<SpectatorPayload | null> {
   // Choix assumé (décision de l'auteur, `SPECTATOR_VIEW.md`) : seule la
   // suppression du tournoi retire cette réponse. Un renommage, un avatar retiré
   // ou un compte supprimé attendent son expiration (15 s au calme, 150 s sous
@@ -60,7 +88,9 @@ export async function getSpectatorPayload(tournamentId: number, ttlMs: number): 
       // instantané entier (matchs, classements, entretien) par un visiteur
       // anonyme qui parcourt les identifiants. Pour un tournoi visible, c'est
       // une requête de plus par durée de vie (4 par minute au plus) : voulu.
-      const visible = await getVisibleTournamentCard(tournamentId);
+      // Déjà lue par l'appelant (`isSpectatorTournamentPublic`) : pas deux fois.
+      // L'instantané repasse de toute façon par la porte de visibilité.
+      const visible = options.visibilityChecked || (await getVisibleTournamentCard(tournamentId)) !== null;
       const snapshot = visible ? await getVisibleTournamentSnapshot(tournamentId) : null;
       // Un « introuvable » **n'entre pas** dans le cache : `cached` ne garde
       // jamais un échec. Des identifiants parcourus au hasard n'y chassent donc

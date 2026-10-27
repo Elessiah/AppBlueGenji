@@ -15,6 +15,7 @@
 import { NextResponse } from "next/server";
 import {
   ANONYMOUS_IDENTITY,
+  checkRateLimit,
   consumeRateLimit,
   rateLimitIdentity,
   type RateLimitRule,
@@ -137,11 +138,30 @@ export const LANDING_READ_RULE: RateLimitRule = {
  * les retours sur l'onglet. Le plafond laisse passer une salle de LAN entière
  * derrière une même adresse — une centaine d'écrans (≈ 222 lectures par
  * minute), avec la marge des ouvertures et des reprises — et ne borne que la
- * boucle d'un client déréglé. Une lecture de trop ne coûte qu'un cache.
+ * boucle d'un client déréglé. Une lecture servie par le cache ne coûte rien ;
+ * celles qui font **reconstruire** la réponse ont leur propre plafond
+ * (`SPECTATOR_REBUILD_RULE`).
  */
 export const SPECTATOR_READ_RULE: RateLimitRule = {
   name: "spectator-read",
   limit: 360,
+  windowMs: 60_000,
+};
+
+/**
+ * Lectures publiques d'un tournoi qui font **reconstruire** sa réponse (aucune
+ * réponse fraîche ni calcul en vol), par IP.
+ *
+ * Le plafond des lectures ne suffit pas : une seule adresse qui parcourt des
+ * dizaines de tournois publiés, chacun hors du cache, ferait reconstruire six
+ * instantanés entiers (matchs, rejeu des classements) par seconde. Une salle
+ * de LAN qui suit un tournoi n'en provoque qu'une par durée de vie (quatre par
+ * minute au calme) ; soixante laissent une marge large à qui en suit
+ * plusieurs, et ramènent une boucle hostile au rythme d'un compte connecté.
+ */
+export const SPECTATOR_REBUILD_RULE: RateLimitRule = {
+  name: "spectator-rebuild",
+  limit: 60,
   windowMs: 60_000,
 };
 
@@ -463,13 +483,32 @@ export function enforceRateLimit(
 
   const state = consumeRateLimit(rule, key);
   if (state.allowed) return null;
+  return tooManyRequests(state.retryAfterMs);
+}
 
+/**
+ * Le même refus que {@link enforceRateLimit}, **sans rien décompter** : pour
+ * refuser d'emblée un client déjà au plafond, avant un travail préalable
+ * (lecture en base) que le décompte, fait juste avant l'action, ne couvrirait
+ * pas.
+ */
+export function peekRateLimit(
+  rule: RateLimitRule,
+  identity: string | number | null | undefined,
+): NextResponse | null {
+  const key = rateLimitIdentity(identity);
+  if (key === ANONYMOUS_IDENTITY) return null;
+  const state = checkRateLimit(rule, key);
+  return state.allowed ? null : tooManyRequests(state.retryAfterMs);
+}
+
+function tooManyRequests(retryAfterMs: number): NextResponse {
   return NextResponse.json(
     { error: "TOO_MANY_REQUESTS" },
     {
       status: 429,
       headers: {
-        "Retry-After": String(Math.max(1, Math.ceil(state.retryAfterMs / 1000))),
+        "Retry-After": String(Math.max(1, Math.ceil(retryAfterMs / 1000))),
         "Cache-Control": "no-store",
       },
     },

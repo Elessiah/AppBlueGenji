@@ -170,6 +170,16 @@ export function invalidateCachedPrefix(prefix: string): void {
   }
 }
 
+/**
+ * `key` a-t-elle une valeur encore fraîche, ou un calcul en vol ? Si oui, un
+ * appel à `cached` sur cette clé ne lancerait pas son chargeur : c'est ce qui
+ * permet de ne faire payer à un appelant que les calculs qu'il provoque.
+ */
+export function isCachedOrLoading(key: string, now: number = Date.now()): boolean {
+  const entry = store.get(key);
+  return (entry !== undefined && entry.expiresAt > now) || inflight.has(key);
+}
+
 /** Vide le cache. Réservé aux tests. */
 export function clearCache(): void {
   store.clear();

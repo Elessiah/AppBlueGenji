@@ -5,7 +5,7 @@ jest.mock("@/lib/server/tournaments-service");
 import { getVisibleTournamentCard, getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
 import { tournamentCard } from "../../helpers/tournament-card";
 import { cached, clearCache } from "@/lib/server/cache";
-import { getSpectatorPayload } from "@/lib/server/spectator-snapshot";
+import { getSpectatorPayload, isSpectatorTournamentPublic } from "@/lib/server/spectator-snapshot";
 import { invalidateSpectatorSnapshot, invalidateTournamentSnapshot } from "@/lib/server/tournaments/snapshot";
 import { tournamentSnapshot } from "../../helpers/tournament-detail";
 
@@ -81,5 +81,48 @@ describe("getSpectatorPayload", () => {
     mockedSnapshot.mockRejectedValue(new Error("ECONNREFUSED"));
 
     await expect(getSpectatorPayload(5, 60_000)).rejects.toThrow("ECONNREFUSED");
+  });
+});
+
+describe("isSpectatorTournamentPublic", () => {
+  it("lit la seule carte, sans aucun droit, et ne construit pas l'instantané", async () => {
+    await expect(isSpectatorTournamentPublic(5)).resolves.toBe(true);
+    expect(getVisibleTournamentCard).toHaveBeenCalledWith(5);
+    expect(mockedSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("dit non pour un tournoi absent ou pas encore publié", async () => {
+    jest.mocked(getVisibleTournamentCard).mockResolvedValue(null);
+    await expect(isSpectatorTournamentPublic(5)).resolves.toBe(false);
+  });
+
+  it("mutualise les lectures simultanées sans rien garder", async () => {
+    await Promise.all([isSpectatorTournamentPublic(5), isSpectatorTournamentPublic(5)]);
+    expect(getVisibleTournamentCard).toHaveBeenCalledTimes(1);
+
+    await isSpectatorTournamentPublic(5);
+    expect(getVisibleTournamentCard).toHaveBeenCalledTimes(2);
+  });
+
+  it("laisse passer l'échec de la base (la route répond 503)", async () => {
+    jest.mocked(getVisibleTournamentCard).mockRejectedValue(new Error("ECONNREFUSED"));
+    await expect(isSpectatorTournamentPublic(5)).rejects.toThrow("ECONNREFUSED");
+  });
+});
+
+describe("getSpectatorPayload après le contrôle de visibilité", () => {
+  it("ne relit pas la carte que l'appelant vient de lire", async () => {
+    mockedSnapshot.mockResolvedValue(tournamentSnapshot({ version: "v1" }));
+
+    await expect(getSpectatorPayload(5, 60_000, { visibilityChecked: true })).resolves.not.toBeNull();
+
+    expect(getVisibleTournamentCard).not.toHaveBeenCalled();
+    expect(mockedSnapshot).toHaveBeenCalledWith(5);
+  });
+
+  it("garde la porte de l'instantané : un tournoi devenu invisible reste introuvable", async () => {
+    mockedSnapshot.mockResolvedValue(null);
+
+    await expect(getSpectatorPayload(5, 60_000, { visibilityChecked: true })).resolves.toBeNull();
   });
 });

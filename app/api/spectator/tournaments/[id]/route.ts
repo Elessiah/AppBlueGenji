@@ -1,7 +1,17 @@
-import { enforceRateLimit, requestClientIp, SPECTATOR_READ_RULE } from "@/lib/server/api-guard";
+import {
+  enforceRateLimit,
+  peekRateLimit,
+  requestClientIp,
+  SPECTATOR_READ_RULE,
+  SPECTATOR_REBUILD_RULE,
+} from "@/lib/server/api-guard";
 import { fail } from "@/lib/server/http";
 import { currentSpectatorLoadLevel, recordSpectatorRead } from "@/lib/server/spectator-load";
-import { getSpectatorPayload } from "@/lib/server/spectator-snapshot";
+import {
+  getSpectatorPayload,
+  isSpectatorPayloadWarm,
+  isSpectatorTournamentPublic,
+} from "@/lib/server/spectator-snapshot";
 import {
   parseTournamentId,
   SPECTATOR_FRESHNESS_HEADER,
@@ -37,6 +47,25 @@ function pollHeaders(pollAfterMs: number): Record<string, string> {
   return { "Cache-Control": "no-store", [SPECTATOR_POLL_HEADER]: String(pollAfterMs) };
 }
 
+/**
+ * Lecture **froide** (aucune réponse fraîche ni calcul en vol) : elle ferait
+ * reconstruire la réponse, ce qui se paie à part (`SPECTATOR_REBUILD_RULE`) —
+ * parcourir des tournois froids coûte un instantané entier chacun, pas un
+ * cache. Renvoie le refus à servir avant tout décompte, ou `null`.
+ */
+async function coldReadRefusal(tournamentId: number, clientIp: string | null): Promise<Response | null> {
+  // Une adresse déjà au plafond est refusée d'emblée, sans lecture en base.
+  const exhausted = peekRateLimit(SPECTATOR_REBUILD_RULE, clientIp);
+  if (exhausted) return exhausted;
+  // Un identifiant inconnu ou pas encore publié ne coûte que sa carte (lue une
+  // fois pour toutes les lectures simultanées) et n'entame pas ce plafond : des
+  // sondes au hasard ne privent pas une adresse partagée (salle de LAN) de ses
+  // relectures, et un lien ouvert avant la publication reçoit son
+  // « introuvable », pas un `429`.
+  const visible = await isSpectatorTournamentPublic(tournamentId);
+  return visible ? null : fail("TOURNAMENT_NOT_FOUND", 404);
+}
+
 export async function GET(req: Request, context: { params: Promise<{ id: string }> }) {
   const clientIp = requestClientIp(req);
   const throttled = enforceRateLimit(SPECTATOR_READ_RULE, clientIp);
@@ -45,12 +74,22 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   const { id } = await context.params;
   const tournamentId = parseTournamentId(id);
   if (tournamentId === null) return fail("INVALID_TOURNAMENT_ID", 400);
-
   const level = currentSpectatorLoadLevel();
 
   let payload;
   try {
-    payload = await getSpectatorPayload(tournamentId, spectatorCacheTtlMs(level));
+    const cold = !isSpectatorPayloadWarm(tournamentId);
+    if (cold) {
+      const refused = await coldReadRefusal(tournamentId, clientIp);
+      if (refused) return refused;
+      // Revérifié après l'attente (un autre visiteur a pu lancer le calcul), et
+      // décompté juste avant `getSpectatorPayload`, sans attente entre les deux.
+      const rebuildThrottled = isSpectatorPayloadWarm(tournamentId)
+        ? null
+        : enforceRateLimit(SPECTATOR_REBUILD_RULE, clientIp);
+      if (rebuildThrottled) return rebuildThrottled;
+    }
+    payload = await getSpectatorPayload(tournamentId, spectatorCacheTtlMs(level), { visibilityChecked: cold });
   } catch (error) {
     // Base injoignable ou saturée : le visiteur sans compte recule le premier —
     // il garde ce qu'il affiche et revient après une attente que la charge

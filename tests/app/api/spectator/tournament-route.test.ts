@@ -8,7 +8,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { getVisibleTournamentCard, getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
 import { clearCache } from "@/lib/server/cache";
 import { resetRateLimit } from "@/lib/server/rate-limit";
-import { SPECTATOR_READ_RULE } from "@/lib/server/api-guard";
+import { SPECTATOR_READ_RULE, SPECTATOR_REBUILD_RULE } from "@/lib/server/api-guard";
 import { resetSpectatorLoad, spectatorReadsPerMinute } from "@/lib/server/spectator-load";
 import {
   SPECTATOR_FRESHNESS_HEADER,
@@ -249,5 +249,83 @@ describe("GET /api/spectator/tournaments/[id]", () => {
     expect(refused.headers.get("retry-after")).not.toBeNull();
     // Une autre adresse passe toujours.
     expect((await GET(req("5", { "x-forwarded-for": "198.51.100.9" }), params("5"))).status).toBe(200);
+  });
+
+  it("plafonne à part les lectures qui font reconstruire la réponse, pas celles servies par le cache", async () => {
+    mockedSnapshot.mockResolvedValue(snapshot());
+    // Une adresse parcourt des tournois froids : chacun coûte un instantané entier.
+    for (let i = 1; i <= SPECTATOR_REBUILD_RULE.limit; i += 1) {
+      expect((await GET(req(String(i)), params(String(i)))).status).toBe(200);
+    }
+    expect(mockedSnapshot).toHaveBeenCalledTimes(SPECTATOR_REBUILD_RULE.limit);
+
+    // Une reconstruction ne lit la carte qu'une fois.
+    expect(mockedCard).toHaveBeenCalledTimes(SPECTATOR_REBUILD_RULE.limit);
+
+    mockedCard.mockClear();
+    const refused = await GET(req("1000"), params("1000"));
+    expect(refused.status).toBe(429);
+    expect(refused.headers.get("retry-after")).not.toBeNull();
+    // Refusée avant toute lecture en base, carte comprise.
+    expect(mockedCard).not.toHaveBeenCalled();
+    expect(mockedSnapshot).toHaveBeenCalledTimes(SPECTATOR_REBUILD_RULE.limit);
+
+    // Un tournoi déjà prêt reste servi à cette adresse : il ne coûte que le cache.
+    expect((await GET(req("1"), params("1"))).status).toBe(200);
+    // Et une autre adresse fait toujours reconstruire.
+    expect((await GET(req("1000", { "x-forwarded-for": "198.51.100.9" }), params("1000"))).status).toBe(200);
+    expect(mockedSnapshot).toHaveBeenCalledTimes(SPECTATOR_REBUILD_RULE.limit + 1);
+  });
+
+  it("ne fait pas payer au plafond des reconstructions un identifiant inconnu ou pas encore publié", async () => {
+    mockedSnapshot.mockResolvedValue(snapshot());
+    mockedCard.mockResolvedValue(null);
+    // Des sondes au hasard (ou une salle qui ouvre un lien avant la publication)
+    // reçoivent leur « introuvable », jamais un 429…
+    for (let i = 1; i <= SPECTATOR_REBUILD_RULE.limit + 5; i += 1) {
+      const res = await GET(req(String(i)), params(String(i)));
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: "TOURNAMENT_NOT_FOUND" });
+    }
+    expect(mockedSnapshot).not.toHaveBeenCalled();
+
+    // … et la même adresse fait toujours reconstruire le tournoi qu'elle suit.
+    mockedCard.mockResolvedValue(tournamentCard({ id: 5 }));
+    expect((await GET(req("5"), params("5"))).status).toBe(200);
+    expect(mockedSnapshot).toHaveBeenCalledTimes(1);
+  });
+
+  it("ne fait payer qu'une reconstruction quand deux lectures froides se croisent", async () => {
+    const pending: { release?: (value: TournamentSnapshot) => void } = {};
+    mockedSnapshot.mockReturnValue(
+      new Promise<TournamentSnapshot>((resolve) => {
+        pending.release = resolve;
+      }),
+    );
+    const first = GET(req("5"), params("5"));
+    const second = GET(req("5"), params("5"));
+    // Laisse les deux lectures passer la carte, puis termine le calcul.
+    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
+    pending.release?.(snapshot());
+
+    expect((await first).status).toBe(200);
+    expect((await second).status).toBe(200);
+    expect(mockedSnapshot).toHaveBeenCalledTimes(1);
+    // Une seule lecture de la carte pour les deux.
+    expect(mockedCard).toHaveBeenCalledTimes(1);
+  });
+
+  it("ne lit qu'une fois la carte d'un identifiant introuvable demandé par plusieurs lectures simultanées", async () => {
+    mockedCard.mockResolvedValue(null);
+
+    const responses = await Promise.all([1, 2, 3].map(() => GET(req("7"), params("7"))));
+
+    expect(responses.map((res) => res.status)).toEqual([404, 404, 404]);
+    expect(mockedCard).toHaveBeenCalledTimes(1);
+    // Rien n'est gardé : le tournoi publié ensuite s'ouvre à la lecture suivante.
+    mockedCard.mockResolvedValue(tournamentCard({ id: 7 }));
+    mockedSnapshot.mockResolvedValue(snapshot());
+    expect((await GET(req("7"), params("7"))).status).toBe(200);
   });
 });
