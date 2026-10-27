@@ -150,9 +150,11 @@ describe("vue survie — rendu inchangé", () => {
     );
     expect(html.includes("Annuler l&#x27;abandon</button>")).toBe(offered);
     expect(html.includes("Figé")).toBe(!offered);
-    // Figé : la raison derrière un « i » (lisible au toucher et au clavier),
-    // plus dans un `title` que seul un survol à la souris affichait.
-    expect(html.includes('aria-controls="forfeit-frozen-12"')).toBe(!offered);
+    // Figé : la raison derrière le « i » d'une légende sous le classement
+    // (lisible au toucher et au clavier), plus dans un `title` que seul un
+    // survol à la souris affichait ; lue aussi avec la ligne (texte masqué).
+    expect(html.includes('aria-controls="survival-forfeit-frozen"')).toBe(!offered);
+    expect(html.includes('<span class="sr-only"> Une manche a été jouée')).toBe(!offered);
     expect(html.includes("Une manche a été jouée depuis l&#x27;abandon : il ne s&#x27;annule plus.")).toBe(!offered);
     expect(html).not.toMatch(/class="forfeitLocked"[^>]*title=/);
     expect(html).toContain('data-row-focus="12"');

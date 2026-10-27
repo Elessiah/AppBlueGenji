@@ -204,11 +204,12 @@ describe("classement de la ronde suisse", () => {
     expect(html).toContain("aria-label=\"Annuler l&#x27;abandon de Dragon Squad\"");
   });
 
-  it("fige l'abandon d'une manche passée : verrou 🔒, aucun geste, motif derrière un « i »", () => {
+  it("fige l'abandon d'une manche passée : verrou 🔒, aucun geste, motif derrière le « i » de la légende", () => {
     const html = render([standing({ status: "FORFEIT" })], { canCancelForfeit: true, cancellable: [] });
-    // Seul bouton : le « i » qui porte le motif (aucun geste d'annulation).
+    // Seul bouton : le « i » de la légende, qui porte le motif (aucun geste
+    // d'annulation dans la ligne).
     expect(count(html, "<button")).toBe(1);
-    expect(html).toContain('aria-controls="forfeit-frozen-');
+    expect(html).toContain('aria-controls="swiss-forfeit-frozen"');
     expect(html).toContain("Figé");
     expect(html).toContain("Une manche a été jouée depuis l&#x27;abandon : il ne s&#x27;annule plus.");
     expect(html).not.toContain("Annuler l&#x27;abandon");

@@ -117,12 +117,23 @@ describe("MatchScheduleDialog — date déjà passée", () => {
     expect(SOURCE).toContain("<PastDateWarning message={pastWarning === null ? null : t(pastWarning)} />");
   });
 
-  it("une date devenue passée fenêtre ouverte : l'envoi retenu le dit aussi en notification", () => {
+  it("une date devenue passée fenêtre ouverte : l'envoi retenu le dit en notification, par un texte à elle", () => {
     // À 375 px, clavier ouvert, l'avertissement sous les champs peut être hors
     // de vue : sans notification, le premier clic semblait sans effet.
     expect(SOURCE).toMatch(
-      /const lateWarning = pastWarning === null \? pastWarningAt\(now\) : null;\s*if \(lateWarning !== null\) \{\s*setClock\(now\);\s*showError\(t\(lateWarning\)\);\s*return;/,
+      /if \(pastWarning === null && pastWarningAt\(now\) !== null\) \{\s*setClock\(now\);\s*showError\(t\("schedule\.warnPastLate"\)\);\s*return;/,
     );
+    // Dit que rien n'est enregistré et comment confirmer, sans répéter
+    // l'avertissement que la région d'état lit déjà.
+    expect(frDialogs.schedule.warnPastLate).toBe(
+      "Date passée entre-temps : rien n'est enregistré. Lisez l'avertissement, puis enregistrez à nouveau pour confirmer.",
+    );
+    expect(enDialogs.schedule.warnPastLate).toBe(
+      "The date passed in the meantime: nothing was saved. Read the warning, then save again to confirm.",
+    );
+    for (const key of ["warnPast", "warnPastDirect", "warnPastTbd"] as const) {
+      expect(frDialogs.schedule.warnPastLate).not.toBe(frDialogs.schedule[key]);
+    }
   });
 
   it("dit ce que la date déclenche selon la phase de lancement et les engagés", () => {

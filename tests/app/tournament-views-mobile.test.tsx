@@ -223,13 +223,21 @@ describe("Phase suisse d'un multi-phases", () => {
   });
 });
 
-describe("abandon figé — motif déplié", () => {
-  it("borne la cellule et, en survie, la fait passer sous le nom au lieu de l'écraser", () => {
-    expect(css).toMatch(/\.forfeitLocked \{[^}]*max-inline-size: 18rem;/);
-    expect(css).toMatch(/\.survivalRow:has\(\.forfeitLocked \[aria-expanded="true"\]\) \{[^}]*flex-wrap: wrap;/);
-    expect(css).toMatch(/\.survivalAction:has\(\.forfeitLocked \[aria-expanded="true"\]\) \{[^}]*flex-basis: 100%;/);
-    // Le verrou reste sur une ligne ; le motif, lui, passe à la ligne.
-    expect(css).toMatch(/\.forfeitLockedLabel \{\s*white-space: nowrap;\s*\}/);
-    expect(css).not.toMatch(/\.forfeitLocked \{[^}]*white-space: nowrap/);
+describe("abandon figé — légende", () => {
+  it("le motif vit derrière un « i » sous le classement, pas dans les cellules étroites", () => {
+    const rowAction = read("_components", "ForfeitRowAction.tsx");
+    expect(rowAction).toContain("export function FrozenForfeitLegend(");
+    expect(rowAction).not.toMatch(/forfeitLocked\} title=/);
+    for (const [view, id] of [
+      ["SurvivalView.tsx", "survival-forfeit-frozen"],
+      ["SwissView.tsx", "swiss-forfeit-frozen"],
+      ["EnduranceView.tsx", "endurance-forfeit-frozen"],
+    ]) {
+      const source = read("_components", view);
+      expect(source).toContain(`id="${id}"`);
+      expect(source).toMatch(/\?\.kind === "locked"/);
+    }
+    expect(css).toMatch(/\.frozenLegend \{[^}]*font-size: 11px;/);
+    expect(css).not.toContain(":has(.forfeitLocked");
   });
 });
