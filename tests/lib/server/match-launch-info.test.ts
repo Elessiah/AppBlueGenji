@@ -254,7 +254,7 @@ describe("listViewerMatchLaunches — le match et la place du lecteur", () => {
   it("refuse le bouton « Prêt » à un joueur sans rôle d'engagement", async () => {
     state.viewerMemberships = [{ team_id: TEAM1, roles_json: JSON.stringify(["DPS"]) }];
     const [info] = await listViewerMatchLaunches(viewer);
-    expect(info.viewer).toEqual({ role: "TEAM1", canDeclareReady: false, ready: false, isCaster: false, earlyContacts: true });
+    expect(info.viewer).toEqual({ role: "TEAM1", canDeclareReady: false, ready: false, isReferee: false, isCaster: false, earlyContacts: true });
   });
 
   it("reconnaît le caster et son « Prêt »", async () => {
@@ -262,7 +262,7 @@ describe("listViewerMatchLaunches — le match et la place du lecteur", () => {
     state.candidates = [candidate({ caster_user_id: VIEWER, caster_ready_at: OPENED })];
     state.users = [casterUser(VIEWER)];
     const [info] = await listViewerMatchLaunches(viewer);
-    expect(info.viewer).toEqual({ role: "CASTER", canDeclareReady: true, ready: true, isCaster: true, earlyContacts: false });
+    expect(info.viewer).toEqual({ role: "CASTER", canDeclareReady: true, ready: true, isReferee: false, isCaster: true, earlyContacts: false });
     expect(info.casters[0]).toMatchObject({
       userId: VIEWER,
       discordTag: "caster",
@@ -295,7 +295,7 @@ describe("listViewerMatchLaunches — le match et la place du lecteur", () => {
       },
     ];
     const [info] = await listViewerMatchLaunches(viewer);
-    expect(info.viewer).toEqual({ role: "TEAM2", canDeclareReady: true, ready: false, isCaster: false, earlyContacts: true });
+    expect(info.viewer).toEqual({ role: "TEAM2", canDeclareReady: true, ready: false, isReferee: false, isCaster: false, earlyContacts: true });
     expect(info.team2.isSolo).toBe(true);
     expect(info.team2.contacts).toEqual([
       expect.objectContaining({ userId: VIEWER, discordTag: "solo" }),
@@ -844,7 +844,7 @@ describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => 
       state.users = [casterUser(CASTER)];
       const info = await loadViewerMatchContacts(referee, 42);
       expect(info?.phase).toBe("TO_PLAN");
-      expect(info?.viewer).toEqual({ role: "REFEREE", canDeclareReady: false, ready: false, isCaster: false, earlyContacts: true });
+      expect(info?.viewer).toEqual({ role: "REFEREE", canDeclareReady: false, ready: false, isReferee: false, isCaster: false, earlyContacts: true });
       expect(info?.team2.contacts).toEqual([expect.objectContaining({ userId: 5, discordTag: "cap2", battletag: "Cap#2" })]);
       expect(info?.team2.contactsShown).toBe(true);
       // Décision du 2026-10-21 : ceux du caster aussi, dès « À planifier ».
@@ -950,14 +950,76 @@ describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => 
       state.candidates = [candidate({ caster_user_id: VIEWER })];
       state.users = [casterUser(VIEWER)];
       const [asReferee] = await listViewerMatchLaunches(referee);
-      expect(asReferee?.viewer).toMatchObject({ role: "CASTER", isCaster: true, earlyContacts: true });
+      expect(asReferee?.viewer).toMatchObject({ role: "CASTER", isReferee: false, isCaster: true, earlyContacts: true });
       const [asCaster] = await listViewerMatchLaunches({ id: VIEWER });
-      expect(asCaster?.viewer).toMatchObject({ role: "CASTER", isCaster: true, earlyContacts: false });
+      expect(asCaster?.viewer).toMatchObject({ role: "CASTER", isReferee: false, isCaster: true, earlyContacts: false });
     });
   });
 
   it("ne rend rien quand aucun tournoi n'est en cours", async () => {
     state.running = false;
     await expect(loadViewerMatchContacts(viewer, 42)).resolves.toBeNull();
+  });
+});
+
+describe("listViewerMatchLaunches — arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
+  const REFEREE = 950;
+  const refereeUser = (overrides: Record<string, unknown> = {}) =>
+    casterUser(REFEREE, {
+      pseudo: "Arbitre",
+      overwatch_battletag: "Arbitre#1",
+      platform_roles_json: JSON.stringify(["ARBITRE"]),
+      ...overrides,
+    });
+
+  it("les équipes lisent son pseudo et son BattleTag, masqué compris, et attendent son « Prêt »", async () => {
+    state.candidates = [candidate({ referee_user_id: REFEREE, referee_ready_at: null, self_managed: 0 })];
+    state.users = [refereeUser({ visible_overwatch: 0 })];
+    const [info] = await listViewerMatchLaunches(viewer);
+    expect(info.referee).toEqual({
+      userId: REFEREE,
+      pseudo: "Arbitre",
+      battletag: "Arbitre#1",
+      battletagVerified: true,
+      ready: false,
+      isViewer: false,
+    });
+    expect(info.selfManaged).toBe(false);
+    expect(info.viewer.isReferee).toBe(false);
+  });
+
+  it("son BattleTag attend la fenêtre des contacts : rien avant l'heure de début", async () => {
+    state.candidates = [
+      candidate({ referee_user_id: REFEREE, start_at: new Date(Date.now() + 30 * 60_000).toISOString() }),
+    ];
+    state.users = [refereeUser()];
+    const [info] = await listViewerMatchLaunches(viewer);
+    expect(info.referee).toMatchObject({ pseudo: "Arbitre", battletag: null });
+  });
+
+  it("l'arbitre lui-même lit le match en `MATCH_REFEREE`, avec son « Prêt » à donner", async () => {
+    state.viewerMemberships = [];
+    state.candidates = [candidate({ referee_user_id: VIEWER, referee_ready_at: OPENED })];
+    state.users = [casterUser(VIEWER, { pseudo: "Moi", platform_roles_json: JSON.stringify(["ARBITRE"]) })];
+    const [info] = await listViewerMatchLaunches({ id: VIEWER, roles: ["ARBITRE"] });
+    expect(info.viewer).toMatchObject({ role: "MATCH_REFEREE", canDeclareReady: true, isReferee: true, ready: true });
+    expect(info.referee).toMatchObject({ isViewer: true, ready: true });
+  });
+
+  it("un arbitre devenu inéligible n'est plus montré, et il est retiré avant le lancement", async () => {
+    state.candidates = [candidate({ referee_user_id: REFEREE })];
+    state.users = [refereeUser({ platform_roles_json: JSON.stringify(["CASTER"]) })];
+    const [info] = await listViewerMatchLaunches(viewer);
+    expect(info.referee).toBeNull();
+    expect(JSON.stringify(info)).not.toContain("Arbitre#1");
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(state.writes.some((sql) => sql.includes("referee_user_id = NULL"))).toBe(true);
+  });
+
+  it("autogestion : aucun arbitre, la note suit", async () => {
+    state.candidates = [candidate({ self_managed: 1 })];
+    const [info] = await listViewerMatchLaunches(viewer);
+    expect(info.referee).toBeNull();
+    expect(info.selfManaged).toBe(true);
   });
 });

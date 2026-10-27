@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/tournaments/notifications");
 jest.mock("@/lib/server/tournaments/cast-notices");
+jest.mock("@/lib/server/tournaments/referee-notices");
 
 import type { PoolConnection } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
@@ -13,15 +14,23 @@ import {
   flushCastChanges,
   queueCastChange,
 } from "@/lib/server/tournaments/cast-notices";
+import { announceRefereeChange, queueRefereeChange } from "@/lib/server/tournaments/referee-notices";
 import {
+  assignMatchReferee,
   claimMatchCast,
   forceLaunchMatch,
   loadViewerCastBlock,
   maintainMatchLaunches,
   releaseIneligibleCast,
+  releaseIneligibleReferee,
   releaseMatchCast,
+  releaseMatchReferee,
+  setMatchFirstMap,
   setMatchHost,
   setMatchReady,
+  setMatchSelfManaged,
+  setRoundSelfManaged,
+  takeMatchReferee,
 } from "@/lib/server/tournaments/match-launch";
 import { fakeConnection } from "../../helpers/sql-double";
 
@@ -54,6 +63,11 @@ type MatchState = {
   team1_ready_at: string | null;
   team2_ready_at: string | null;
   host_team_id: number | null;
+  /** Arbitre désigné (`docs/features/MATCH_REFEREE.md`), son « Prêt », l'autogestion, la première carte. */
+  referee_user_id: number | null;
+  referee_ready_at: string | null;
+  self_managed: number;
+  first_map: string | null;
   /** `bg_match_casters` du match, dans l'ordre d'inscription. */
   casters: CasterState[];
   /** `bg_match_streams` du match (`staff_owned` : 1 = stream du staff). */
@@ -76,6 +90,8 @@ type World = {
   soloEntries: { userId: number; teamId: number }[];
   users: Record<number, { discord_verified_at: string | null; discord_pseudo: string | null; blizzard_sub: string | null; overwatch_battletag: string | null; is_deleted: number; is_admin?: number; platform_roles_json?: string | null }>;
   writes: string[];
+  /** Réservations d'alerte d'arbitrage (`bg_referee_alerts`), `match:clé`. */
+  alerts?: string[];
 };
 
 const STAMP = "2026-09-24 20:00:00";
@@ -101,6 +117,10 @@ function matchState(overrides: MatchOverrides = {}): MatchState {
     team1_ready_at: null,
     team2_ready_at: null,
     host_team_id: null,
+    referee_user_id: null,
+    referee_ready_at: null,
+    self_managed: 0,
+    first_map: null,
     casters: firstCaster,
     streams: casterId === null ? [] : [{ id: 1, live_url: null }],
     ...rest,
@@ -134,7 +154,7 @@ function world(overrides: Partial<World> = {}): World {
 
 /** Les trois signaux « prêt » : posés à `NOW()`, levés à `NULL`. */
 function applyReadyStamps(sql: string, set: (column: keyof MatchState, value: unknown) => void) {
-  for (const column of ["team1_ready_at", "team2_ready_at"] as const) {
+  for (const column of ["team1_ready_at", "team2_ready_at", "referee_ready_at"] as const) {
     if (sql.includes(`${column} = NOW()`)) set(column, STAMP);
     if (sql.includes(`${column} = NULL`)) set(column, null);
   }
@@ -154,9 +174,14 @@ function applyUpdate(state: World, sql: string, params: unknown[]) {
   if (sql.includes("SET lobby_opened_at = NOW()")) set("lobby_opened_at", STAMP);
   if (sql.includes("launched_at = NOW()")) set("launched_at", STAMP);
   if (sql.includes("SET host_team_id = ?")) set("host_team_id", params[0]);
+  if (sql.includes("SET referee_user_id = ?")) set("referee_user_id", params[0]);
+  if (sql.includes("referee_user_id = NULL")) set("referee_user_id", null);
+  if (sql.includes("self_managed = 1")) set("self_managed", 1);
+  if (sql.includes("self_managed = 0")) set("self_managed", 0);
+  if (sql.includes("SET first_map = ?")) set("first_map", params[0]);
   if (sql.includes("SET launch_pairing = ?")) {
     set("launch_pairing", params[0]);
-    for (const column of ["lobby_opened_at", "launched_at", "team1_ready_at", "team2_ready_at"] as const) {
+    for (const column of ["lobby_opened_at", "launched_at", "team1_ready_at", "team2_ready_at", "referee_ready_at"] as const) {
       set(column, null);
     }
   }
@@ -241,6 +266,28 @@ function readCastRows(state: World, sql: string): unknown[] | null {
   return null;
 }
 
+/** Lectures et réservations du bloc « arbitre désigné », `null` pour les autres requêtes. */
+function readRefereeRows(state: World, sql: string, params: unknown[]): [unknown, unknown[]] | null {
+  if (sql.startsWith("SELECT 1 FROM bg_referee_alerts")) {
+    return [(state.alerts ?? []).includes(`${params[0]}:${params[1]}`) ? [{ 1: 1 }] : [], []];
+  }
+  if (sql.startsWith("INSERT IGNORE INTO bg_referee_alerts")) {
+    state.alerts = [...(state.alerts ?? []), `${params[0]}:${params[1]}`];
+    return [{ affectedRows: 1, insertId: state.alerts.length }, []];
+  }
+  if (sql.startsWith("SELECT tournament_id, status, first_map FROM bg_matches")) {
+    return [state.match ? [{ ...state.match }] : [], []];
+  }
+  if (sql.startsWith("SELECT id FROM bg_tournaments")) {
+    return [state.match ? [{ id: state.match.tournament_id }] : [], []];
+  }
+  if (sql.startsWith("SELECT id FROM bg_matches WHERE tournament_id = ?")) {
+    const match = state.match;
+    return [match && match.status !== "COMPLETED" && match.is_bye === 0 ? [{ id: match.id }] : [], []];
+  }
+  return null;
+}
+
 /** Le double de `execute`, non typé en `PoolConnection` : les tests le composent. */
 function executeFor(state: World) {
   return async (rawSql: string, params: unknown[] = []) => {
@@ -272,6 +319,8 @@ function executeFor(state: World) {
         .map((m) => ({ team_id: m.teamId, roles_json: JSON.stringify(m.roles) }));
       return [rows.slice(0, 1), []];
     }
+    const refereeResult = readRefereeRows(state, sql, params);
+    if (refereeResult) return refereeResult;
     if (sql.includes("AS tournament_state") && !sql.includes("FROM bg_matches")) {
       return [matchContextRows(state), []];
     }
@@ -1027,5 +1076,228 @@ describe("phase de lancement éteinte (`match_launch_phase = 0`)", () => {
     await expect(maintainMatchLaunches(connection(), 7)).resolves.toBe(1);
     expect(state.match?.launched_at).toBeNull();
     expect(state.match?.lobby_opened_at).toBe(STAMP);
+  });
+});
+
+describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
+  const REFEREE = 950;
+  const OTHER_REFEREE = 951;
+  const refereeUser = {
+    discord_verified_at: STAMP,
+    discord_pseudo: "arbitre",
+    blizzard_sub: "sub",
+    overwatch_battletag: "Arbitre#1",
+    is_deleted: 0,
+    is_admin: 0,
+    platform_roles_json: JSON.stringify(["ARBITRE"]),
+  };
+
+  beforeEach(() => {
+    state.users[REFEREE] = { ...refereeUser };
+    state.users[OTHER_REFEREE] = { ...refereeUser };
+  });
+
+  it("« Je prends ce match » : arbitre posé, autogestion éteinte, annonce après le commit", async () => {
+    state.match = matchState({ self_managed: 1 });
+    await takeMatchReferee(42, REFEREE);
+    expect(state.match?.referee_user_id).toBe(REFEREE);
+    expect(state.match?.self_managed).toBe(0);
+    expect(queueRefereeChange).toHaveBeenCalledWith(expect.anything(), { kind: "TAKEN", matchId: 42 });
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
+  });
+
+  it("reprendre son propre match ne change rien ; un autre arbitre éligible en place refuse", async () => {
+    state.match = matchState({ referee_user_id: REFEREE });
+    await takeMatchReferee(42, REFEREE);
+    expect(queueRefereeChange).not.toHaveBeenCalled();
+    await expect(takeMatchReferee(42, OTHER_REFEREE)).rejects.toThrow("MATCH_ALREADY_REFEREED");
+    expect(state.match?.referee_user_id).toBe(REFEREE);
+  });
+
+  it("reprend le match d'un arbitre devenu inéligible et le prévient", async () => {
+    state.users[REFEREE] = { ...refereeUser, platform_roles_json: null };
+    state.match = matchState({ referee_user_id: REFEREE });
+    await takeMatchReferee(42, OTHER_REFEREE);
+    expect(state.match?.referee_user_id).toBe(OTHER_REFEREE);
+    expect(queueRefereeChange).toHaveBeenCalledWith(expect.anything(), {
+      kind: "AUTO_RELEASED",
+      matchId: 42,
+      refereeId: REFEREE,
+      reason: "INELIGIBLE",
+    });
+  });
+
+  it("refuse sans la permission `tournaments`, sans identité certifiée, ou à un joueur du match", async () => {
+    state.users[REFEREE] = { ...refereeUser, platform_roles_json: JSON.stringify(["CASTER"]) };
+    await expect(takeMatchReferee(42, REFEREE)).rejects.toThrow("NOT_REFEREE");
+    state.users[REFEREE] = { ...refereeUser, blizzard_sub: null };
+    await expect(takeMatchReferee(42, REFEREE)).rejects.toThrow("REFEREE_IDENTITY_REQUIRED");
+    state.users[1] = { ...refereeUser };
+    await expect(takeMatchReferee(42, 1)).rejects.toThrow("REFEREE_IS_PLAYER");
+    expect(state.match?.referee_user_id).toBeNull();
+  });
+
+  it("refuse un match introuvable, joué, ou une exemption", async () => {
+    state.match = null;
+    await expect(takeMatchReferee(42, REFEREE)).rejects.toThrow("MATCH_NOT_FOUND");
+    state.match = matchState({ status: "COMPLETED" });
+    await expect(takeMatchReferee(42, REFEREE)).rejects.toThrow("MATCH_ALREADY_COMPLETED");
+    state.match = matchState({ is_bye: 1, team2_id: null });
+    await expect(assignMatchReferee(42, 1, REFEREE)).rejects.toThrow("MATCH_NOT_LAUNCHABLE");
+  });
+
+  it("l'arbitre est une 4e partie : le match attend son « Prêt », qui vaut aussi s'il caste", async () => {
+    state.match = matchState({ referee_user_id: REFEREE, team1_ready_at: STAMP, team2_ready_at: STAMP });
+    await setMatchReady(42, REFEREE, true);
+    expect(state.match?.referee_ready_at).toBe(STAMP);
+    expect(state.match?.launched_at).toBe(STAMP);
+  });
+
+  it("sans arbitre, les deux équipes suffisent", async () => {
+    state.match = matchState({ team1_ready_at: STAMP });
+    await setMatchReady(42, 3, true);
+    expect(state.match?.launched_at).toBe(STAMP);
+  });
+
+  it("l'arbitre qui se retire libère un match qui n'attendait plus que lui", async () => {
+    state.match = matchState({ referee_user_id: REFEREE, team1_ready_at: STAMP, team2_ready_at: STAMP });
+    await releaseMatchReferee(42, REFEREE, false);
+    expect(state.match?.referee_user_id).toBeNull();
+    expect(state.match?.launched_at).toBe(STAMP);
+    expect(queueRefereeChange).toHaveBeenCalledWith(expect.anything(), {
+      kind: "RELEASED",
+      matchId: 42,
+      refereeId: REFEREE,
+      byStaff: false,
+    });
+  });
+
+  it("seul le staff retire l'arbitre d'un autre ; il est alors prévenu", async () => {
+    state.match = matchState({ referee_user_id: REFEREE });
+    await expect(releaseMatchReferee(42, OTHER_REFEREE, false)).rejects.toThrow("NOT_MATCH_REFEREE");
+    await assignMatchReferee(42, OTHER_REFEREE, null);
+    expect(state.match?.referee_user_id).toBeNull();
+    expect(queueRefereeChange).toHaveBeenCalledWith(expect.anything(), {
+      kind: "RELEASED",
+      matchId: 42,
+      refereeId: REFEREE,
+      byStaff: true,
+    });
+  });
+
+  it("le staff désigne ou remplace l'arbitre ; l'arbitre remplacé est nommé pour l'avis", async () => {
+    state.match = matchState({ referee_user_id: REFEREE, referee_ready_at: STAMP });
+    await assignMatchReferee(42, 1, OTHER_REFEREE);
+    expect(state.match?.referee_user_id).toBe(OTHER_REFEREE);
+    expect(state.match?.referee_ready_at).toBeNull();
+    expect(queueRefereeChange).toHaveBeenCalledWith(expect.anything(), {
+      kind: "ASSIGNED",
+      matchId: 42,
+      replacedRefereeId: REFEREE,
+    });
+    jest.mocked(queueRefereeChange).mockClear();
+    await assignMatchReferee(42, 1, OTHER_REFEREE);
+    expect(queueRefereeChange).not.toHaveBeenCalled();
+  });
+
+  it("autogestion : l'allumer retire l'arbitre (prévenu), l'éteindre ne désigne personne ; rien d'office", async () => {
+    state.match = matchState({ referee_user_id: REFEREE });
+    await setMatchSelfManaged(42, true);
+    expect(state.match?.self_managed).toBe(1);
+    expect(state.match?.referee_user_id).toBeNull();
+    expect(queueRefereeChange).toHaveBeenCalledWith(expect.anything(), {
+      kind: "SELF_MANAGED",
+      matchId: 42,
+      enabled: true,
+      replacedRefereeId: REFEREE,
+    });
+    jest.mocked(queueRefereeChange).mockClear();
+    await setMatchSelfManaged(42, true);
+    expect(queueRefereeChange).not.toHaveBeenCalled();
+    await setMatchSelfManaged(42, false);
+    expect(state.match?.self_managed).toBe(0);
+    expect(state.match?.referee_user_id).toBeNull();
+  });
+
+  it("autogestion d'une manche : chaque match à jouer, une ligne au journal, un avis par arbitre retiré", async () => {
+    const quiet = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    state.match = matchState({ referee_user_id: REFEREE });
+    expect(await setRoundSelfManaged(7, { phaseId: 0, roundNumber: 1, bracket: null }, true)).toBe(1);
+    expect(state.match?.self_managed).toBe(1);
+    expect(announceRefereeChange).toHaveBeenCalledWith(
+      { kind: "SELF_MANAGED", matchId: 42, enabled: true, replacedRefereeId: REFEREE },
+      { log: false },
+    );
+    expect(await setRoundSelfManaged(7, { phaseId: 0, roundNumber: 1, bracket: "UPPER" }, true)).toBe(0);
+    state.match = null;
+    await expect(setRoundSelfManaged(7, { phaseId: 0, roundNumber: 1, bracket: null }, true)).rejects.toThrow(
+      "TOURNAMENT_NOT_FOUND",
+    );
+    quiet.mockRestore();
+  });
+
+  it("première carte : normalisée, retirée sur vide, refusée trop longue ou sur un match joué", async () => {
+    await setMatchFirstMap(42, "  Ilios  ");
+    expect(state.match?.first_map).toBe("Ilios");
+    expect(queueRefereeChange).toHaveBeenCalledWith(expect.anything(), { kind: "FIRST_MAP", matchId: 42, set: true });
+    await setMatchFirstMap(42, "");
+    expect(state.match?.first_map).toBeNull();
+    await expect(setMatchFirstMap(42, "x".repeat(65))).rejects.toThrow("INVALID_FIRST_MAP");
+    await expect(setMatchFirstMap(42, 12)).rejects.toThrow("INVALID_FIRST_MAP");
+    state.match = matchState({ status: "COMPLETED" });
+    await expect(setMatchFirstMap(42, "Ilios")).rejects.toThrow("MATCH_ALREADY_COMPLETED");
+  });
+
+  it("retire d'office un arbitre devenu inéligible avant le lancement, jamais après", async () => {
+    state.users[REFEREE] = { ...refereeUser, discord_verified_at: null };
+    state.match = matchState({ referee_user_id: REFEREE, launched_at: STAMP });
+    expect(await releaseIneligibleReferee(42, REFEREE)).toBe(false);
+    state.match = matchState({ referee_user_id: REFEREE });
+    expect(await releaseIneligibleReferee(42, REFEREE)).toBe(true);
+    expect(state.match?.referee_user_id).toBeNull();
+    expect(announceRefereeChange).toHaveBeenCalledWith({
+      kind: "AUTO_RELEASED",
+      matchId: 42,
+      refereeId: REFEREE,
+      reason: "INELIGIBLE",
+    });
+  });
+
+  it("garde un arbitre éligible qui ne joue pas le match", async () => {
+    state.match = matchState({ referee_user_id: REFEREE });
+    expect(await releaseIneligibleReferee(42, REFEREE)).toBe(false);
+    expect(state.match?.referee_user_id).toBe(REFEREE);
+  });
+});
+
+describe("maintainMatchLaunches — avertissement « sans arbitre »", () => {
+  const connection = () => connectionFor(state);
+
+  it("une alerte par appariement, jamais d'autogestion d'office", async () => {
+    await maintainMatchLaunches(connection(), 7);
+    await maintainMatchLaunches(connection(), 7);
+    expect(state.alerts).toEqual([`42:NO_REFEREE:${TEAM1}:${TEAM2}`]);
+    expect(state.match?.self_managed).toBe(0);
+    // Nouvel appariement : nouvelle alerte.
+    state.match = matchState({ ...state.match, team2_id: 30, launch_pairing: `${TEAM1}:${TEAM2}` });
+    await maintainMatchLaunches(connection(), 7);
+    expect(state.alerts).toEqual([`42:NO_REFEREE:${TEAM1}:${TEAM2}`, `42:NO_REFEREE:${TEAM1}:30`]);
+  });
+
+  it("se tait sur un match arbitré ou en autogestion", async () => {
+    state.users[950] = {
+      discord_verified_at: STAMP,
+      discord_pseudo: "arbitre",
+      blizzard_sub: "sub",
+      overwatch_battletag: "Arbitre#1",
+      is_deleted: 0,
+      is_admin: 0,
+      platform_roles_json: JSON.stringify(["ARBITRE"]),
+    };
+    state.match = matchState({ referee_user_id: 950 });
+    await maintainMatchLaunches(connection(), 7);
+    state.match = matchState({ self_managed: 1 });
+    await maintainMatchLaunches(connection(), 7);
+    expect(state.alerts ?? []).toEqual([]);
   });
 });
