@@ -848,11 +848,11 @@ export function RgpdEn({
             <a href="#exercer-vos-droits">“Exercising your rights”</a>). A caster&apos;s registration for a match,
             its takeover by another caster and its removal (with the reason for a takeover or an automatic removal)
             are noted in the staff log on Discord without naming anyone (“a caster”, “the staff”); so are the
-            staff&apos;s other actions on a match or a tournament (result confirmed, forced launch, host, broadcast,
-            replay, tournament edited, seeding, ghost teams, image), with the match&apos;s team names (“a player” in a
-            solo tournament), without naming their author (“the staff”, or “a caster” for broadcasting) or writing
-            anything to the server logs, except, when the log line could not be written, the action and the match or
-            tournament number, without its author.
+            staff&apos;s other actions on a match or a tournament (result confirmed, score saved, forced launch, host,
+            broadcast, replay, tournament edited, seeding, stage brought forward, ghost teams, image), with the match&apos;s team names (“a player” in a
+            solo tournament), without naming their author (“the staff”, or “a caster” for broadcasting); this line adds nothing to the server logs, where a dispute
+            settled, a result corrected or a confirmation paused keeps its named trace (<LocaleLink href="/rgpd/registre#t05">register,
+            T05</LocaleLink>), except, when it could not be composed, the action and the match or tournament number, without its author.
           </p>
         </div>
       </section>
