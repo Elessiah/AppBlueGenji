@@ -2,7 +2,7 @@
 
 import { useToast } from "@/components/ui/toast";
 import type { TournamentDialogsText } from "@/lib/shared/tournament-actions-text";
-import { FormEvent, ReactNode, useState } from "react";
+import { FormEvent, ReactNode, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { CodedError, MATCH_SCHEDULE_FIELD_ERRORS, errorCode } from "@/lib/shared/field-errors";
@@ -45,6 +45,12 @@ const NOTICE_ID = "match-start-at-notice";
 const PREVIEW_ID = "match-start-at-preview";
 const PAST_WARNING_ID = "match-start-past-warning";
 const YEAR_FIX_ID = "match-start-year-fix";
+const SUBMIT_ID = "match-start-submit";
+/**
+ * Après un envoi retenu (date devenue passée), un envoi plus proche que ce
+ * délai n'est pas une confirmation : c'est le second clic d'un double-clic.
+ */
+export const LATE_WARNING_CONFIRM_DELAY_MS = 600;
 
 /** Premier champ manquant, tel que l'aperçu le nomme (`schedule.missing.*`). */
 const MISSING_FIELD_KEYS = {
@@ -234,6 +240,8 @@ export function MatchScheduleDialog({
   // l'année, planification et date passée lisent le même instant (quatre
   // lectures pouvaient tomber de part et d'autre de minuit). Relue à l'envoi.
   const [clock, setClock] = useState(Date.now);
+  // Instant de l'envoi retenu par une date devenue passée (0 : aucun).
+  const heldBackAt = useRef(0);
   const [initial] = useState(() => matchStartEntryOf(match.startAt));
   const [day, setDay] = useState(initial ? String(initial.day) : "");
   // Sans date posée, le mois courant (Paris) est présélectionné : reste le jour.
@@ -345,12 +353,20 @@ export function MatchScheduleDialog({
     // et le clic semblait sans effet) ; sa région d'état le fait lire. Le focus
     // reste sur « Enregistrer » : un second envoi confirme, comme pour une date
     // passée dès la saisie — une notification `role="alert"` l'aurait coupé.
+    // Défilement vers l'avertissement puis vers « Enregistrer », juste dessous :
+    // l'avertissement qui grandit repousse le bouton, qui garde le focus.
     const now = Date.now();
     if (pastWarning === null && pastWarningAt(now) !== null) {
       setClock(now);
-      requestAnimationFrame(() => document.getElementById(PAST_WARNING_ID)?.scrollIntoView({ block: "nearest" }));
+      heldBackAt.current = now;
+      requestAnimationFrame(() => {
+        document.getElementById(PAST_WARNING_ID)?.scrollIntoView({ block: "nearest" });
+        document.getElementById(SUBMIT_ID)?.scrollIntoView({ block: "nearest" });
+      });
       return;
     }
+    // Le second clic d'un double-clic n'a pas laissé lire l'avertissement.
+    if (now - heldBackAt.current < LATE_WARNING_CONFIRM_DELAY_MS) return;
 
     setBusy(true);
     try {
@@ -621,6 +637,7 @@ export function MatchScheduleDialog({
               {t("score.cancel")}
             </button>
             <button
+              id={SUBMIT_ID}
               type="submit"
               className="btn"
               disabled={busy}
