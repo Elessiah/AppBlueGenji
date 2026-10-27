@@ -32,6 +32,7 @@ const NO_LAUNCH: LaunchStripControls = {
   showForce: false,
   showHost: false,
   showHostSwap: false,
+  showReferee: false,
 };
 
 const NOTHING: MatchCardActionInput = {
@@ -71,6 +72,7 @@ describe("matchCardActionList — chaque drapeau donne son action, rien de plus"
         showForce: true,
         showHost: true,
         showHostSwap: true,
+        showReferee: true,
       },
       adminScoreLabel: "Éditer le score",
       showSchedule: true,
@@ -88,6 +90,7 @@ describe("matchCardActionList — chaque drapeau donne son action, rien de plus"
       "schedule",
       "force",
       "hostSwap",
+      "referee",
       "claimCast",
       "releaseCast",
       "onAir",
@@ -116,6 +119,7 @@ describe("matchCardActionList — chaque drapeau donne son action, rien de plus"
     ]);
     expect(labels({ launch: { ...NO_LAUNCH, showOpen: true }, inLobby: true })).toEqual(["Ouvrir le lancement"]);
     expect(labels({ launch: { ...NO_LAUNCH, showOpen: true } })).toEqual(["Infos du match"]);
+    expect(labels({ launch: { ...NO_LAUNCH, showReferee: true } })).toEqual(["Arbitrage"]);
   });
 });
 

@@ -675,7 +675,12 @@ export function privacyChangePush(titles: readonly string[], locale: Locale = DE
 }
 
 /** Nature d'une alerte d'arbitrage, pour la rédiger sans le texte Discord (français, D6). */
-export type RefereeAlertKind = "score_conflict" | "score_report_stalled" | "other";
+export type RefereeAlertKind =
+  | "score_conflict"
+  | "score_report_stalled"
+  | "match_no_referee"
+  | "match_no_referee_round"
+  | "other";
 
 /** La manche en cause, quand l'alerte en a une : de quoi la nommer et y mener. */
 export type RefereeAlertMatch = {
@@ -686,6 +691,8 @@ export type RefereeAlertMatch = {
   roundNumber: number;
   /** Ronde suisse : « Ronde N » (`swissRoundSql`). */
   swiss?: boolean;
+  /** Alerte groupée d'une manche sans horaire : nombre de matchs listés. */
+  matchCount?: number;
 };
 
 /**
@@ -717,6 +724,7 @@ export function refereeAlertPush(
     body = text.t(`refereeAlert.${kind}Match`, {
       tournament: match.tournamentName,
       round: pushRoundLabel(match.bracket, match.roundNumber, locale, match.swiss),
+      count: match.matchCount ?? 1,
     });
   } else body = text.t(`refereeAlert.${kind}`);
   return {
@@ -882,6 +890,44 @@ export function castReleasedPush(input: CastReleasedMatch, locale: Locale = DEFA
     }),
     url: localeHref(tournamentMatchHref(input.tournamentId, input.matchId), locale),
     tag: `${matchTag(input.matchId)}-cast`,
+  };
+}
+
+/** Motif du retrait d'un arbitre désigné (`REFEREE_RELEASED`). */
+export type RefereeReleaseReason = "STAFF" | "REPLACED" | "SELF_MANAGED" | "INELIGIBLE" | "JOINED_TEAM";
+
+/** Le match dont l'arbitrage est retiré, et pourquoi. */
+export type RefereeReleasedMatch = {
+  tournamentId: number;
+  tournamentName: string;
+  matchId: number;
+  bracket: string;
+  roundNumber: number;
+  swiss?: boolean;
+  team1Name: string | null;
+  team2Name: string | null;
+  /** Tournoi individuel : aucun nom d'engagé (ce serait un pseudo). */
+  solo: boolean;
+  reason: RefereeReleaseReason;
+};
+
+/** L'arbitrage d'un match est retiré à son arbitre désigné par un autre que lui. */
+export function refereeReleasedPush(input: RefereeReleasedMatch, locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
+  const tbd = text.t("matchScheduled.tbd");
+  const pairingText = input.solo
+    ? text.t("castReleased.pairingSolo")
+    : text.t("pairing", { team: input.team1Name ?? tbd, opponent: input.team2Name ?? tbd });
+  return {
+    title: text.t("refereeReleased.title"),
+    body: text.t("refereeReleased.body", {
+      reason: text.t(`refereeReleased.reason.${input.reason}`),
+      pairing: pairingText,
+      tournament: input.tournamentName,
+      round: pushRoundLabel(input.bracket, input.roundNumber, locale, input.swiss),
+    }),
+    url: localeHref(tournamentMatchHref(input.tournamentId, input.matchId), locale),
+    tag: `${matchTag(input.matchId)}-referee`,
   };
 }
 

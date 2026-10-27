@@ -22,6 +22,7 @@ export type MatchCardActionId =
   | "schedule"
   | "force"
   | "hostSwap"
+  | "referee"
   | "claimCast"
   | "releaseCast"
   | "onAir"
@@ -91,6 +92,7 @@ export function matchCardActionList(
     [input.showSchedule, "schedule", either(input.hasStartAt, t("cardActions.editDate"), t("cardActions.setDate")), "staff"],
     [launch.showForce, "force", t("cardActions.force"), "warn"],
     [launch.showHostSwap, "hostSwap", t("cardActions.hostSwap"), "staff"],
+    [launch.showReferee, "referee", t("cardActions.referee"), "staff"],
     [launch.showClaim, "claimCast", t("cardActions.claimCast"), "neutral"],
     [
       launch.showRelease,

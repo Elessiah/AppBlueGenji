@@ -28,7 +28,7 @@ import {
 } from "@/lib/shared/match-launch";
 import { PRIVACY_CHANGES_ANSWERED_EVENT } from "@/lib/shared/privacy-changes";
 import styles from "./MatchLaunchCenter.module.css";
-import { CasterCards, SideCard } from "./LaunchContactCards";
+import { CasterCards, RefereeCard, SideCard } from "./LaunchContactCards";
 
 /** Cadences d'interrogation : serrée pendant un lancement, lâche sinon. */
 const POLL_LOBBY_MS = 8_000;
@@ -80,9 +80,15 @@ export function launchSidesLaterText(text: LaunchText, viewer: Pick<MatchLaunchI
   return text.t(viewer.earlyContacts ? "contactsAtLaunch" : "contactsAtLaunchForCaster");
 }
 
-/** Libellés qui dépendent de qui déclare « Prêt » : une équipe, ou le caster. */
+const LAUNCH_COPY_PARTY: Partial<Record<MatchLaunchInfo["viewer"]["role"], "caster" | "referee">> = {
+  CASTER: "caster",
+  MATCH_REFEREE: "referee",
+};
+
+/** Libellés qui dépendent de qui déclare « Prêt » : une équipe, le caster ou l'arbitre. */
 function viewerLaunchCopy(text: LaunchText, role: MatchLaunchInfo["viewer"]["role"]): { partyWord: string; confirmQuestion: string } {
-  const who = role === "CASTER" ? "caster" : "team";
+  // L'arbitre désigné qui caste aussi lit en `CASTER` : un seul « Prêt » vaut pour les deux.
+  const who = LAUNCH_COPY_PARTY[role] ?? "team";
   return { partyWord: text.t(`ready.${who}`), confirmQuestion: text.t(`confirmQuestion.${who}`) };
 }
 
@@ -314,6 +320,7 @@ export function MatchLaunchCenter({
     team1Ready: current.team1.ready,
     team2Ready: current.team2.ready,
     casters: current.casters,
+    referee: current.referee,
   });
   const autoAt = formatTime(current.autoLaunchAt, text.locale);
   const startAt = formatTime(current.startAt, text.locale);
@@ -372,6 +379,7 @@ export function MatchLaunchCenter({
             </div>
 
             <CasterCards casters={current.casters} phase={current.phase} onCopy={copy} />
+            <RefereeCard referee={current.referee} selfManaged={current.selfManaged} phase={current.phase} onCopy={copy} />
           </div>
 
           {/* Le même réglage que sur /profil, sous sa forme compacte : c'est ici

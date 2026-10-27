@@ -9,6 +9,8 @@ import {
   DROITS,
   AUTOMOD_ALERT_SCOPE,
   BATTLETAG_MATCH_SCOPE,
+  REFEREE_BATTLETAG_SCOPE,
+  VERIFIED_BADGE_SCOPE,
   MATCH_CONTACTS_SCOPE,
   LIVE_PSEUDO_SCOPE,
   MATCH_TIME_DM_SCOPE,
@@ -44,7 +46,7 @@ describe("contacts du lancement d'un match — base légale", () => {
       expect(entry?.finalite).not.toMatch(/non sur ce consentement/);
     }
     expect(MATCH_CONTACTS_SCOPE).toBe(
-      "présentation, dans la fenêtre « Contacts » du match et dans sa fenêtre de lancement, aux membres de ses deux équipes et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, et à ses casters le temps du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes et aux casters) ; les contacts de chaque caster aux deux équipes et aux autres casters du match le temps du match, et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin (conditions d'utilisation, « Contacts de match »)",
+      "présentation, dans la fenêtre « Contacts » du match et dans sa fenêtre de lancement, aux membres de ses deux équipes et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, et à ses casters le temps du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné) ; les contacts de chaque caster aux deux équipes et aux autres casters du match le temps du match, et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin (conditions d'utilisation, « Contacts de match »)",
     );
   });
 
@@ -53,6 +55,23 @@ describe("contacts du lancement d'un match — base légale", () => {
   it("fonde la lecture du BattleTag masqué par les parties d'un match sur le contrat, pas le consentement", () => {
     expect(BATTLETAG_MATCH_SCOPE).toMatch(/^lecture, même masqué, dans la seule fenêtre « Contacts » d'un match où tu es présenté comme contact/);
     expect(BATTLETAG_MATCH_SCOPE).toMatch(/arbitres et administrateurs n'y ont pas d'autre accès \(conditions d'utilisation, « Contacts de match »\)$/);
+  });
+
+  // Revue juridique de #487 : le BattleTag de l'arbitre désigné a sa propre
+  // portée, sur l'intérêt légitime — aucune clause des conditions ne le couvre
+  // avant leur version 7.
+  it("fonde la lecture du BattleTag de l'arbitre désigné sur l'intérêt légitime, sans citer les conditions", () => {
+    expect(
+      REFEREE_BATTLETAG_SCOPE.endsWith(
+        "— opposition par le formulaire de signalement, catégorie RGPD (retenue, le staff ne lui confie plus de match) ; retrait d'un match à tout moment, le staff pouvant sinon lui confier de nouveau ce match, sans avis",
+      ),
+    ).toBe(true);
+    expect(REFEREE_BATTLETAG_SCOPE).not.toMatch(/conditions d'utilisation/);
+    expect(DONNEES_PROFIL.find((d) => d.donnee === "Pseudo Overwatch")?.extraBases).toEqual([
+      { base: "Exécution du contrat", scope: BATTLETAG_MATCH_SCOPE },
+      { base: "Intérêt légitime", scope: REFEREE_BATTLETAG_SCOPE },
+      { base: "Intérêt légitime", scope: VERIFIED_BADGE_SCOPE },
+    ]);
   });
 });
 

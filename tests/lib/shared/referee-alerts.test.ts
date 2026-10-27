@@ -29,6 +29,7 @@ describe("BOT_EVENT_CHANNELS", () => {
       "tournament_underfilled",
       "endurance_penalty",
       "endurance_penalty_lifted",
+      "match_no_referee",
     ];
 
     expect(Object.keys(BOT_EVENT_CHANNELS).sort()).toEqual([...expected].sort());

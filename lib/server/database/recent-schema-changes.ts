@@ -321,6 +321,17 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
              OR EXISTS (SELECT 1 FROM bg_match_streams s WHERE s.match_id = m.id))
         AND (m.caster_user_id IS NULL
              OR EXISTS (SELECT 1 FROM bg_match_casters c WHERE c.match_id = m.id AND c.user_id = m.caster_user_id))`,
+    // Arbitre désigné, autogestion et première carte d'un match
+    // (`docs/features/MATCH_REFEREE.md`). Colonne, index et clé étrangère en
+    // une instruction : sur une base qui a déjà la colonne, tout retombe
+    // ensemble (`ER_DUP_FIELDNAME`), rien n'est posé à moitié.
+    `ALTER TABLE bg_matches ADD COLUMN referee_user_id BIGINT NULL AFTER host_team_id,
+       ADD INDEX idx_bg_matches_referee (referee_user_id),
+       ADD CONSTRAINT fk_bg_matches_referee FOREIGN KEY (referee_user_id)
+         REFERENCES bg_users(id) ON DELETE SET NULL`,
+    `ALTER TABLE bg_matches ADD COLUMN referee_ready_at DATETIME NULL AFTER referee_user_id`,
+    `ALTER TABLE bg_matches ADD COLUMN self_managed TINYINT(1) NOT NULL DEFAULT 0 AFTER referee_ready_at`,
+    `ALTER TABLE bg_matches ADD COLUMN first_map VARCHAR(64) NULL AFTER self_managed`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

@@ -131,3 +131,53 @@ describe("mapMatch — casters inscrits et condition du cast", () => {
     ]);
   });
 });
+
+describe("mapMatch — arbitre désigné dans l'instantané (`docs/features/MATCH_REFEREE.md`)", () => {
+  const pairing = "1:2";
+  const eligible = {
+    referee_user_id: 950,
+    referee_discord_verified_at: new Date(),
+    referee_discord_pseudo: "arbitre",
+    referee_blizzard_sub: "sub",
+    referee_overwatch_battletag: "Arbitre#1",
+    referee_is_deleted: 0,
+    referee_is_admin: 0,
+    referee_platform_roles_json: JSON.stringify(["ARBITRE"]),
+  };
+  const row = (overrides: Parameters<typeof matchRow>[0] = {}) =>
+    matchRow({ status: "READY", team1_id: 1, team2_id: 2, launch_pairing: pairing, ...overrides });
+
+  it("ne porte que des drapeaux : jamais l'identité de l'arbitre", () => {
+    const match = mapMatch(row({ ...eligible, referee_ready_at: new Date() }));
+    expect(match).toMatchObject({ refereeAssigned: true, refereeReady: true, selfManaged: false });
+    const text = JSON.stringify(match);
+    expect(text).not.toContain("950");
+    expect(text).not.toContain("arbitre");
+    expect(text).not.toContain("Arbitre#1");
+  });
+
+  it("tait un arbitre qui ne remplit plus la condition, et son « Prêt » d'un autre appariement", () => {
+    expect(mapMatch(row({ ...eligible, referee_platform_roles_json: JSON.stringify(["CASTER"]) })).refereeAssigned).toBe(false);
+    expect(mapMatch(row({ ...eligible, referee_ready_at: new Date(), launch_pairing: "1:3" })).refereeReady).toBe(false);
+  });
+
+  it("tait, avant le départ, un arbitre qui joue désormais le match ; le garde une fois le match lancé", () => {
+    expect(mapMatch(row({ ...eligible, referee_plays_match: 1 })).refereeAssigned).toBe(false);
+    expect(mapMatch(row({ ...eligible, referee_plays_match: 0 })).refereeAssigned).toBe(true);
+    expect(mapMatch(row({ ...eligible, referee_plays_match: 1, launched_at: new Date() })).refereeAssigned).toBe(true);
+  });
+
+  it("hôte à gauche, premier ban à l'autre ; en BlueGenji Survie la meilleure tête de série héberge", () => {
+    expect(mapMatch(row()).hostTeamId).toBe(1);
+    expect(mapMatch(row()).firstBanTeamId).toBe(2);
+    const seeded = mapMatch(row({ team1_seed: 5, team2_seed: 2 }));
+    expect(seeded.hostTeamId).toBe(2);
+    expect(seeded.firstBanTeamId).toBe(1);
+  });
+
+  it("autogestion et première carte passent telles quelles, la carte en texte visible", () => {
+    const match = mapMatch(row({ self_managed: 1, first_map: "  Ilios​ " }));
+    expect(match.selfManaged).toBe(true);
+    expect(match.firstMap).toBe("Ilios");
+  });
+});

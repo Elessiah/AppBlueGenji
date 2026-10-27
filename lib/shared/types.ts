@@ -640,10 +640,28 @@ export type BracketMatch = {
   /** Ouverture d'antenne (mode `MANUAL`) ; `null` = antenne fermée. */
   liveStartedAt: string | null;
   /**
-   * Équipe qui héberge la partie, **résolue** : celle que l'arbitrage a
-   * désignée, sinon l'équipe 1 (`resolveHostTeamId`, `lib/shared/match-launch.ts`).
+   * Équipe qui héberge la partie (côté gauche), **résolue** : celle que
+   * l'arbitrage a désignée, sinon — BlueGenji Survie, phase finale — la
+   * meilleure tête de série, sinon l'équipe 1 (`matchHostTeamId`,
+   * `lib/shared/match-referee.ts`).
    */
   hostTeamId: number | null;
+  /** L'équipe qui bannit la première : celle qui n'héberge pas (`firstBanTeamId`). */
+  firstBanTeamId: number | null;
+  /**
+   * Le match a-t-il un arbitre désigné (`docs/features/MATCH_REFEREE.md`) ?
+   * C'est **tout** ce que l'instantané en dit : diffusé à tous, il ne nomme
+   * personne — pseudo et BattleTag ne vont qu'aux parties du match et au
+   * staff (modale « Contacts », fenêtre « Arbitrage » du staff). Un arbitre devenu
+   * inéligible en est tu.
+   */
+  refereeAssigned: boolean;
+  /** « Prêt » de l'arbitre désigné (faux sans arbitre). */
+  refereeReady: boolean;
+  /** Match en autogestion : sans arbitre, les équipes créent et règlent la partie. */
+  selfManaged: boolean;
+  /** Première carte, saisie par le staff ; `null` = pas encore fixée. */
+  firstMap: string | null;
   /**
    * Casters inscrits sur ce match, dans l'ordre d'inscription (aucun plafond) ;
    * un caster devenu inéligible avant le lancement en est tu.

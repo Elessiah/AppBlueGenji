@@ -295,7 +295,18 @@
     "casterWaiting": "not ready",
     "missingDateTitle": "This match goes on air at its start time, but no date has been set.",
     "missingDateSr": "Warning: ",
-    "missingDate": " no date"
+    "missingDate": " no date",
+    "hostLeftSr": " (left side)",
+    "firstBanTitle": "Team that bans first: the one not hosting",
+    "firstBanSr": "First ban: ",
+    "firstMapTitle": "First map, set by the referees",
+    "firstMapSr": "First map: ",
+    "referee": "Referee assigned",
+    "refereeTitle": "A referee follows this match",
+    "selfManaged": "Self-managed",
+    "selfManagedTitle": "No referee: the teams create and run the game themselves",
+    "undecided": "No referee",
+    "undecidedTitle": "Neither a referee nor self-management: a decision is needed"
   },
   "ranking": {
     "title": "Standings",

@@ -175,7 +175,7 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(t04.dataCategories.join(" ")).toMatch(/recevoir ou non les messages privés Discord de ses matchs/);
     expect(t04.retention.join(" ")).toMatch(/Choix des messages privés de match : jusqu'à sa modification/);
     expect(t04.retention.join(" ")).toMatch(/Traces d'envoi des rappels, alertes et programmes d'arbitrage/);
-    expect(t04.recipients.join(" ")).toMatch(/Service de push du navigateur de chaque destinataire abonné \(joueur : [^;]*; caster : [^;]*; arbitre ou administrateur : programme d'arbitrage, litige tranché, résultat corrigé, abandon imposé à l'adversaire ou validation automatique suspendue par un membre du staff qui joue le match ; traitement T12\), qui/);
+    expect(t04.recipients.join(" ")).toMatch(/Service de push du navigateur de chaque destinataire abonné \(joueur : [^;]*; caster : [^;]*; arbitre désigné : [^;]*; arbitre ou administrateur : programme d'arbitrage, litige tranché, résultat corrigé, abandon imposé à l'adversaire ou validation automatique suspendue par un membre du staff qui joue le match ; traitement T12\), qui/);
     expect(t04.subPurposes.join(" ")).toMatch(/en message privé Discord et en push l'annonce/);
     expect(t04.recipients.join(" ")).toMatch(/Staff de l'association ayant accès au canal de logs Discord/);
     expect(byRef("T05").dataCategories.join(" ")).toMatch(/Sur Discord : [^—]*horaires et manches des matchs/);
@@ -219,8 +219,8 @@ describe("PROCESSING_ACTIVITIES", () => {
     const t05 = byRef("T05").dataCategories.join(" ");
     expect(t05).toMatch(/« un membre du staff qui joue ce match », avec le seul nom du tournoi/);
     expect(PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T05")!.dataCategories.join(" ")).toMatch(/“a staff member who plays in this match”, with the tournament name only/);
-    expect(t04.recipients.join(" ")).toMatch(/canal de logs Discord \(programme d'arbitrage, gestes d'un membre du staff qui joue le match, inscriptions et retraits des casters, sans les nommer, traitement T05\)/);
-    expect(t04En.recipients.join(" ")).toMatch(/Discord log channel \(refereeing schedule, actions of a staff member who plays in the match, casters' registrations and removals, without naming them, processing activity T05\)/);
+    expect(t04.recipients.join(" ")).toMatch(/canal de logs Discord \(programme d'arbitrage, gestes d'un membre du staff qui joue le match, inscriptions et retraits des casters, arbitrage des matchs, sans nommer ni casters ni arbitres, traitement T05\)/);
+    expect(t04En.recipients.join(" ")).toMatch(/Discord log channel \(refereeing schedule, actions of a staff member who plays in the match, casters' registrations and removals, match refereeing, without naming casters or referees, processing activity T05\)/);
     const t05En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T05")!.dataCategories.join(" ");
     expect(t05).toMatch(/pour un arbitre qui joue le match, en plus : tournoi, manche et, sauf pour une suspension, issue et noms d'équipe/);
     expect(byRef("T05").legalBasis).toMatch(/et du membre du staff auteur d'un geste, nommé dans les journaux du serveur/);
@@ -476,7 +476,7 @@ describe("bases légales : le registre et la politique disent la même chose", (
 
   it("fonde les contacts du lancement d'un match sur l'exécution des conditions d'utilisation", () => {
     expect(byRef("T04").legalBasis).toMatch(
-      /exécution du service demandé par le joueur \(contrat — conditions d'utilisation, section « Contacts de match »\) pour la présentation des contacts aux parties d'un match dans sa fenêtre « Contacts » et dans sa fenêtre de lancement \(à ses deux équipes et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, à ses casters le temps du match, et ceux de chaque caster — service qu'il demande en s'inscrivant sur le match — à ses deux équipes et aux autres casters du match le temps du match et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin ; la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes et aux casters\), BattleTag masqué compris — arbitres et administrateurs n'y ont pas d'autre accès, sur la même base —,/,
+      /exécution du service demandé par le joueur \(contrat — conditions d'utilisation, section « Contacts de match »\) pour la présentation des contacts aux parties d'un match dans sa fenêtre « Contacts » et dans sa fenêtre de lancement \(à ses deux équipes et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, à ses casters le temps du match, et ceux de chaque caster — service qu'il demande en s'inscrivant sur le match — à ses deux équipes et aux autres casters du match le temps du match et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin ; la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné\), BattleTag masqué compris — arbitres et administrateurs n'y ont pas d'autre accès, sur la même base —,/,
     );
   });
 
@@ -680,5 +680,36 @@ describe("sauvegardes (T09) : deux fois par semaine, dimanche et mardi (BACKUP-S
     expect(JSON.stringify(byRef("T09"))).not.toMatch(/hebdomadaire|lundi/i);
     expect(JSON.stringify(enT09())).not.toMatch(/(?<!Twice-)\bweekly\b|monday/i);
     expect(enT09().retention[0]).toContain(`${BACKUP_RETENTION_DAYS} days at most`);
+  });
+});
+
+describe("T04 / T05 — arbitre désigné d'un match (MATCH-REFEREE MR-2, FR et EN)", () => {
+  const t04 = byRef("T04");
+  const t04En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T04")!;
+  const t05 = byRef("T05");
+  const t05En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T05")!;
+
+  it("déclare qui lit l'arbitre, ce qui est montré, l'avis push et ce qui est gardé", () => {
+    expect(t04.subPurposes.join(" ")).toContain("jamais son tag Discord");
+    expect(t04.subPurposes.join(" ")).toContain("le public et les autres joueurs ne lisent que « Arbitre désigné »");
+    expect(t04.subPurposes.join(" ")).toContain("en push seulement (jamais en message privé)");
+    expect(t04.subPurposes.join(" ")).toContain("match entré en lancement sans arbitre désigné ni autogestion");
+    expect(t04.legalBasis).toContain("pour la présentation de l'arbitre désigné aux parties du match");
+    expect(t04.retention.join(" ")).toContain("l'arbitre d'un compte supprimé est retiré de tous ses matchs, joués compris");
+    expect(t04.recipients.join(" ")).toContain("arbitre désigné : retrait de son arbitrage");
+    expect(t05.subPurposes.join(" ")).toContain("sans nommer l'arbitre ni le staff");
+  });
+
+  it("l'anglais dit la même chose, item pour item", () => {
+    expect(t04En.subPurposes).toHaveLength(t04.subPurposes.length);
+    expect(t04En.dataCategories).toHaveLength(t04.dataCategories.length);
+    expect(t04En.retention).toHaveLength(t04.retention.length);
+    expect(t04En.recipients).toHaveLength(t04.recipients.length);
+    expect(t05En.subPurposes).toHaveLength(t05.subPurposes.length);
+    expect(t04En.subPurposes.join(" ")).toContain("never their Discord tag");
+    expect(t04En.subPurposes.join(" ")).toContain("by push only (never by direct message)");
+    expect(t04En.legalBasis).toContain("for presenting the assigned referee to the parties to the match");
+    expect(t04En.retention.join(" ")).toContain("the referee of a deleted account is removed from all their matches, played ones included");
+    expect(t05En.subPurposes.join(" ")).toContain("without naming the referee or the staff");
   });
 });

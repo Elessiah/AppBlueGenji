@@ -270,6 +270,8 @@ côté arbitrage) ; le forfait reste ouvert. Voir `MATCH_PLANNING.md`.
 - **Entrée solo** : le joueur lui-même.
 - **Caster** : chaque caster inscrit, pour lui-même (`bg_match_casters.ready_at`).
 - **Fantôme** : prête d'office — personne ne cliquerait pour elle.
+- **Arbitre désigné** : lui-même (`referee_ready_at`, rôle `MATCH_REFEREE`) —
+  sans arbitre, rien n'est attendu de plus (`MATCH_REFEREE.md`).
 
 Sans caster inscrit, les deux équipes suffisent ; avec plusieurs, le lancement
 attend chacun d'eux (ou le délai d'office). Le « Prêt » se retire tant que

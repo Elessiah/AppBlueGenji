@@ -9,6 +9,8 @@ import enLaunch from "@/messages/en/launchModal.json";
 import frLaunch from "@/messages/fr/launchModal.json";
 import enDialogs from "@/messages/en/tournamentDialogs.json";
 import frDialogs from "@/messages/fr/tournamentDialogs.json";
+import { DONNEES_PROFIL, DROITS, REFEREE_BATTLETAG_SCOPE } from "@/lib/shared/rgpd-policy";
+import { DONNEES_PROFIL_EN, DROITS_EN } from "@/lib/shared/rgpd-policy-en";
 import { readSource } from "../../helpers/read-source";
 
 /**
@@ -89,10 +91,10 @@ describe("textes joueur et règles — mêmes lecteurs que le code", () => {
     // Fiche du titulaire : la liste partagée, derrière le « i ».
     expect(readSource("messages/fr/players.json")).toContain("si tu y es présenté comme contact : les membres des deux équipes, les arbitres et les administrateurs, dès que les adversaires sont connus et jusqu'à la fin du match, et les casters le temps du match ;");
     expect(readSource("messages/fr/players.json")).toContain("si tu castes un match : ses deux équipes et ses autres casters le temps du match, et les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin ;");
-    expect(readSource("messages/fr/players.json")).toContain("la fenêtre de lancement, elle, ne s'ouvre qu'aux deux équipes et aux casters.");
+    expect(readSource("messages/fr/players.json")).toContain("la fenêtre de lancement, elle, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné.");
     expect(readSource("messages/en/players.json")).toContain("if you're shown there as a contact: the members of both teams, referees and administrators, from the moment the opponents are known until the end of the match, and the casters while the match is being played;");
     expect(readSource("messages/en/players.json")).toContain("if you cast a match: both its teams and its other casters while the match is being played, and referees and administrators from the moment its opponents are known until its end;");
-    expect(readSource("messages/en/players.json")).toContain("the launch window only opens for both teams and the casters.");
+    expect(readSource("messages/en/players.json")).toContain("the launch window only opens for both teams, the casters and the assigned referee.");
   });
 
   it("la règle « Lancement d'un match » renvoie au bouton « Contacts » ouvert dès que les adversaires sont connus", () => {
@@ -225,5 +227,162 @@ describe("Co-casters — les textes qui disent qui lit les contacts", () => {
     expect(enDialogs.certification.leadManager).toContain("and to the casters while the match is played");
     expect(frDialogs.certification.leadManager).not.toContain("au caster ");
     expect(enDialogs.certification.leadManager).not.toContain("the caster ");
+  });
+});
+
+/**
+ * MATCH-REFEREE MR-2 : le BattleTag (même masqué) de l'arbitre désigné est lu
+ * par les deux équipes et le staff dès que les adversaires sont connus, par
+ * les casters le temps du match (`buildLaunchReferee`, `ctx.exposes`) ; la
+ * fenêtre de lancement s'ouvre aussi à lui. Chaque notice « BattleTag masqué »
+ * le dit, en français et en anglais.
+ */
+describe("BattleTag masqué — arbitre désigné", () => {
+  const namespaces = ["profile", "login", "players"] as const;
+  const load = (lang: "fr" | "en", ns: (typeof namespaces)[number]) =>
+    JSON.parse(readSource(`messages/${lang}/${ns}.json`)) as { audience: { battletag: Record<string, string> } };
+
+  it("la liste « qui le lit » porte une ligne pour l'arbitre désigné, avant celle de la fenêtre de lancement (FR et EN)", () => {
+    for (const ns of namespaces) {
+      const fr = load("fr", ns).audience.battletag;
+      const en = load("en", ns).audience.battletag;
+      expect(fr.asReferee).toBe(
+        "si tu es l'arbitre désigné d'un match : ses deux équipes, les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin, et ses casters le temps du match ;",
+      );
+      expect(en.asReferee).toBe(
+        "if you are the assigned referee of a match: both its teams, referees and administrators from the moment its opponents are known until its end, and its casters while the match is being played;",
+      );
+      expect(Object.keys(fr)).toEqual(["title", "match", "asCaster", "asReferee", "launch", "footer"]);
+      expect(Object.keys(en)).toEqual(Object.keys(fr));
+    }
+    expect(readSource("lib/shared/identity-audience.ts")).toContain('["match", "asCaster", "asReferee", "launch"]');
+  });
+
+  it("la modale de masquage du profil nomme l'arbitre désigné, y compris dans la fenêtre de lancement (FR et EN)", () => {
+    expect(frProfile.battletagNotice.asReferee).toContain("d'un match dont tu es l'arbitre désigné</strong>");
+    expect(enProfile.battletagNotice.asReferee).toContain("of a match you are the assigned referee of</strong>");
+    expect(readSource("app/(secured)/profil/BattletagVisibilityNotice.tsx")).toContain('"battletagNotice.asReferee"');
+    expect(frProfile.battletagNotice.warning).toContain("Si tu es l'arbitre désigné d'un match");
+    expect(enProfile.battletagNotice.warning).toContain("If you are the assigned referee of a match");
+    expect(frProfile.battletagNotice.warning).toContain("pour les équipes, les casters et l'arbitre désigné, dans sa fenêtre de lancement");
+    expect(enProfile.battletagNotice.warning).toContain("for the teams, the casters and the assigned referee, its launch window");
+    expect(frProfile.battletagNotice.staff).toContain("ne s'ouvre qu'aux équipes, aux casters et à l'arbitre désigné");
+    expect(enProfile.battletagNotice.staff).toContain("only opens for the teams, the casters and the assigned referee");
+  });
+
+  it("aucun texte vivant ne borne plus la fenêtre de lancement aux équipes et aux casters (FR et EN)", () => {
+    const living = [
+      "lib/shared/processing-register.ts",
+      "lib/shared/processing-register-en.ts",
+      "lib/shared/rgpd-policy.ts",
+      "lib/shared/rgpd-policy-en.ts",
+      "lib/shared/identity-sharing.ts",
+      ...namespaces.flatMap((ns) => [`messages/fr/${ns}.json`, `messages/en/${ns}.json`]),
+    ];
+    for (const file of living) {
+      const text = readSource(file);
+      expect(text).not.toMatch(/ne s'ouvre qu'aux (deux )?équipes et aux casters/);
+      expect(text).not.toMatch(/only opens for (both|the) teams and the casters/);
+    }
+  });
+});
+
+/**
+ * Revue juridique MR-2 #487 : l'arbitre désigné repose sur l'exécution du
+ * service sans clause des conditions d'utilisation (v6 inchangée, clause
+ * reportée à la v7) ; son avis push figure au registre T12 ; la ligne
+ * BattleTag de /rgpd dit son cas ; l'annonce dit l'heure du pseudo seul et la
+ * condition de permission du push.
+ */
+describe("arbitre désigné — registre, /rgpd et annonce (revue juridique)", () => {
+  const T12 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T12");
+  const T12_EN = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T12");
+  const REFEREE_ENTRY = "2026-10-arbitre-designe-des-matchs";
+
+  it("T04 ne rattache pas la présentation de l'arbitre aux conditions d'utilisation (FR et EN)", () => {
+    expect(T04?.legalBasis).toContain(
+      "intérêt légitime (bon déroulement des matchs : que leurs parties sachent qui les arbitre et puissent l'ajouter en jeu) pour la présentation de l'arbitre désigné aux parties du match — il peut s'y opposer (art. 21) par le formulaire de signalement (catégorie RGPD) : retenue, son opposition fait que le staff ne lui confie plus de match ; il peut aussi se retirer d'un match à tout moment, le staff pouvant sinon lui confier de nouveau ce match, sans avis",
+    );
+    expect(T04_EN?.legalBasis).toContain(
+      "legitimate interest (smooth running of matches: their parties know who referees them and can add them in game) for presenting the assigned referee to the parties to the match — they may object to it (art. 21) through the report form (GDPR category): once upheld, their objection means the staff no longer assigns them matches; they can also withdraw from a match at any time, the staff otherwise being able to assign that match to them again, without notice",
+    );
+    expect(T04?.legalBasis).toContain("exécution du service (les arbitres agissant pour l'association) pour le recueil de son « Prêt »");
+    expect(T04_EN?.legalBasis).toContain("performance of the service (the referees acting for the association) for collecting their “Ready”");
+    expect(T04?.legalBasis).not.toContain("exécution du service (les arbitres agissant pour l'association) pour la présentation de l'arbitre");
+    expect(T04?.legalBasis).not.toContain("conditions d'utilisation, les arbitres agissant pour l'association) pour la présentation de l'arbitre");
+    expect(T04_EN?.legalBasis).not.toContain("terms of use, the referees acting for the association) for presenting the assigned referee");
+  });
+
+  it("T12 liste l'avis du retrait de l'arbitrage (FR et EN)", () => {
+    expect(T12?.subPurposes).toContain(
+      "Retrait de son arbitrage d'un match (par le staff, match confié à un autre arbitre ou passé en autogestion, ou d'office), avec le motif, pour l'arbitre désigné qui détient encore la permission d'arbitrage",
+    );
+    expect(T12_EN?.subPurposes).toContain(
+      "Removal of their refereeing of a match (by the staff, match assigned to another referee or switched to self-management, or automatically), with the reason, for the assigned referee who still holds the refereeing permission",
+    );
+    expect(T12_EN?.subPurposes).toHaveLength(T12?.subPurposes.length ?? -1);
+  });
+
+  it("la ligne BattleTag de /rgpd dit qui lit celui de l'arbitre désigné (FR et EN)", () => {
+    const fr = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo Overwatch")?.finalite ?? "";
+    const index = DONNEES_PROFIL.findIndex((d) => d.donnee === "Pseudo Overwatch");
+    const en = DONNEES_PROFIL_EN[index]?.finalite ?? "";
+    expect(fr).toContain(
+      "si tu es l'arbitre désigné d'un match, de ses deux équipes et des arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin et de ses casters le temps du match (voir « Arbitre désigné d'un match »)",
+    );
+    expect(en).toContain(
+      "if you are the assigned referee of a match, by both its teams and the referees from the moment both its opponents are known until its end and by its casters while the match is being played (see “Assigned referee of a match”)",
+    );
+  });
+
+  it("l'annonce dit le pseudo seul, le retrait par le staff seul et la condition de permission du push (FR et EN)", () => {
+    const fr = PRIVACY_CHANGES.find((c) => c.id === REFEREE_ENTRY)?.details.join(" ") ?? "";
+    const en = PRIVACY_CHANGES_EN[REFEREE_ENTRY]?.details.join(" ") ?? "";
+    expect(fr).toContain("son pseudo seul y paraît dès que la fenêtre de lancement montre le match");
+    expect(en).toContain("their username alone appears there as soon as the launch window shows the match");
+    expect(fr).toContain("retiré par le staff (retrait, match confié à un autre arbitre ou passé en autogestion)");
+    expect(en).toContain("removed from you by the staff (removal, match assigned to another referee or switched to self-management)");
+    expect(fr).toContain("tant que tu détiens la permission d'arbitrage");
+    expect(en).toContain("as long as you hold the refereeing permission");
+    expect(fr).toContain("La fenêtre de lancement s'ouvre aussi à lui");
+    expect(en).toContain("The launch window also opens to them");
+  });
+
+  it("le résumé de l'annonce dit les moments de chaque lecteur, sans « le staff » (FR et EN)", () => {
+    const fr = PRIVACY_CHANGES.find((c) => c.id === REFEREE_ENTRY)?.summary ?? "";
+    const en = PRIVACY_CHANGES_EN[REFEREE_ENTRY]?.summary ?? "";
+    expect(fr).toContain(
+      "Les deux équipes et les arbitres voient son pseudo et son BattleTag dès que les deux adversaires sont connus, les casters du match le temps du match",
+    );
+    expect(en).toContain(
+      "Both teams and the referees see their username and BattleTag as soon as both opponents are known, the match's casters while the match is being played",
+    );
+    expect(fr).not.toContain("le staff voient");
+    expect(en).not.toContain("the staff see");
+  });
+
+  // Revue juridique de #487, passe 3 : sans clause des conditions (version 6)
+  // et sans demande de l'arbitre que le staff désigne, la présentation de
+  // l'arbitre repose sur l'intérêt légitime, opposable par le formulaire de signalement.
+  it("fonde la présentation de l'arbitre sur l'intérêt légitime, avec son opposition (FR et EN)", () => {
+    const fr = PRIVACY_CHANGES.find((c) => c.id === REFEREE_ENTRY)?.details.join(" ") ?? "";
+    const en = PRIVACY_CHANGES_EN[REFEREE_ENTRY]?.details.join(" ") ?? "";
+    expect(fr).toContain("au titre de l'intérêt légitime (qu'elles sachent qui arbitre) : tu t'y opposes par le formulaire de signalement (catégorie RGPD) — retenue, ton opposition fait que le staff ne te confie plus de match — et tu peux te retirer d'un match à tout moment, le staff pouvant sinon te confier de nouveau ce match, sans avis");
+    expect(en).toContain("on the basis of legitimate interest (they know who referees): you object to it through the report form (GDPR category) — once upheld, your objection means the staff no longer assigns you matches — and you can withdraw from a match at any time, the staff otherwise being able to assign that match to you again, without notice");
+    expect(fr).not.toContain("présentés ainsi aux parties de tes matchs, au titre de l'exécution du service");
+    // Passe 5 : ce que fait une opposition retenue, et le droit d'opposition de /rgpd qui la cite.
+    expect(fr).toContain("retenue, ton opposition fait que le staff ne te confie plus de match");
+    expect(en).toContain("once upheld, your objection means the staff no longer assigns you matches");
+    const objectFr = DROITS.find((d) => d.title === "Droit d'opposition")?.text ?? "";
+    const objectEn = DROITS_EN.find((d) => d.title === "Right to object")?.text ?? "";
+    expect(objectFr).toContain("ainsi que la présentation de l'arbitre désigné aux parties de ses matchs, par le formulaire de signalement");
+    expect(objectEn).toContain("as well as the presentation of the assigned referee to the parties to their matches, through the report form");
+    const row = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo Overwatch");
+    expect(row?.extraBases).toContainEqual({ base: "Intérêt légitime", scope: REFEREE_BATTLETAG_SCOPE });
+    expect(row?.extraBases?.find((b) => b.base === "Exécution du contrat")?.scope).not.toMatch(/arbitre désigné d'un match,/);
+    const index = DONNEES_PROFIL.findIndex((d) => d.donnee === "Pseudo Overwatch");
+    expect(DONNEES_PROFIL_EN[index]?.extraBases?.map((b) => b.scope)).toContain(
+      "the BattleTag of a match's assigned referee, even when hidden, in its “Contacts” and launch windows: read by both its teams and the referees as soon as both its opponents are known until its end, by its casters while the match is being played — objection through the report form, GDPR category (once upheld, the staff no longer assigns them matches); withdrawal from a match at any time, the staff otherwise being able to assign that match to them again, without notice",
+    );
   });
 });

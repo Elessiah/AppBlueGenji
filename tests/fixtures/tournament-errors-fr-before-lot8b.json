@@ -1,5 +1,5 @@
 {
-  "count": 169,
+  "count": 175,
   "unknown": "L'action n'a pas abouti pour une raison inattendue. Si le problème persiste, préviens le staff.",
   "errors": {
     "MATCH_NOT_FOUND": "Match introuvable.",
@@ -170,6 +170,12 @@
     "FORMAT_WITHOUT_FORFEIT": "Ce format de tournoi ne connaît pas l'abandon.",
     "TEAM_NOT_FORFEITED": "Cette équipe n'a pas abandonné : il n'y a rien à annuler.",
     "FORFEIT_CANCEL_FAILED": "Erreur lors de l'annulation de l'abandon.",
-    "FORFEIT_ROUND_PASSED": "Une manche a été jouée depuis l'abandon : remettre l'équipe en lice lui épargnerait les manches qu'elle a manquées. Revenez d'abord en arrière."
+    "FORFEIT_ROUND_PASSED": "Une manche a été jouée depuis l'abandon : remettre l'équipe en lice lui épargnerait les manches qu'elle a manquées. Revenez d'abord en arrière.",
+    "NOT_REFEREE": "Arbitrer un match demande le rôle arbitre.",
+    "REFEREE_IDENTITY_REQUIRED": "Pour arbitrer un match, certifie ton tag Discord et rattache ton compte Battle.net depuis ton profil.",
+    "REFEREE_IS_PLAYER": "Ce compte joue ce match : il ne peut pas l'arbitrer.",
+    "MATCH_ALREADY_REFEREED": "Ce match a déjà un arbitre.",
+    "NOT_MATCH_REFEREE": "Tu n'arbitres pas ce match.",
+    "INVALID_FIRST_MAP": "Nom de carte invalide (64 caractères au plus)."
   }
 }

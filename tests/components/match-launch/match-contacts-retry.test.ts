@@ -194,9 +194,12 @@ const info = (
     isViewer: one.isViewer || (role === "CASTER" && one.userId === CASTER.userId),
     contactsShown: exposesCasterContacts(phase, role),
   })),
+  referee: null,
+  selfManaged: false,
   viewer: {
     role,
     canDeclareReady: false,
+    isReferee: false,
     isCaster: role === "CASTER",
     earlyContacts: role !== "CASTER",
     ready: false,
@@ -324,6 +327,9 @@ describe("contacts du caster en attente, modale ouverte", () => {
     hostTeamId: 1,
     team1Ready: false,
     team2Ready: false,
+    refereeAssigned: false,
+    refereeReady: false,
+    selfManaged: false,
   };
   const key = (patch: Partial<ContactsCard> = {}) => contactsCardKey({ ...CARD, ...patch });
   const card = (patch: Partial<ContactsCard> = {}): ContactsCard => ({ ...CARD, ...patch });
@@ -340,6 +346,9 @@ describe("contacts du caster en attente, modale ouverte", () => {
       { hostTeamId: 2 }, // hôte changé
       { team1Ready: true },
       { team2Ready: true },
+      { refereeAssigned: true }, // arbitre désigné
+      { refereeReady: true }, // « Prêt » de l'arbitre
+      { selfManaged: true }, // passé en autogestion
       { casters: [{ ...CARD.casters[0], ready: true }] }, // « Prêt » du caster
     ];
     for (const patch of writes) {

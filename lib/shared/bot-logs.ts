@@ -65,6 +65,7 @@ export type BotEventKind =
   | "match_finished"
   | "score_conflict"
   | "score_report_stalled"
+  | "match_no_referee"
   | "tournament_started"
   | "tournament_finished"
   | "tournament_underfilled"
@@ -606,6 +607,79 @@ const CAST_LOG_WORDING: Record<CastLogChange, { kind: string; detail: string }> 
   },
   JOINED_TEAM: { kind: "Cast retiré d'office", detail: "le caster joue désormais ce match" },
 };
+
+/**
+ * Ce qui vient d'arriver à l'arbitre désigné ou à l'organisation d'un match
+ * (`lib/server/tournaments/referee-notices.ts`, `docs/features/MATCH_REFEREE.md`).
+ * Personne n'est nommé : « un arbitre », « le staff ».
+ */
+export type RefereeLogChange =
+  | "TAKEN"
+  | "ASSIGNED"
+  | "SWAPPED"
+  | "RELEASED"
+  | "RELEASED_BY_STAFF"
+  | "INELIGIBLE"
+  | "JOINED_TEAM"
+  | "SELF_MANAGED_ON"
+  | "SELF_MANAGED_OFF"
+  | "FIRST_MAP_SET"
+  | "FIRST_MAP_CLEARED";
+
+const REFEREE_LOG_WORDING: Record<RefereeLogChange, { kind: string; detail: string }> = {
+  TAKEN: { kind: "Arbitre désigné", detail: "un arbitre prend le match" },
+  ASSIGNED: { kind: "Arbitre désigné", detail: `arbitre désigné par ${ANONYMOUS_STAFF_LABEL}` },
+  SWAPPED: { kind: "Arbitre changé", detail: `arbitre remplacé par ${ANONYMOUS_STAFF_LABEL}` },
+  RELEASED: { kind: "Arbitre retiré", detail: "l'arbitre se retire du match" },
+  RELEASED_BY_STAFF: { kind: "Arbitre retiré", detail: `arbitre retiré par ${ANONYMOUS_STAFF_LABEL}` },
+  INELIGIBLE: {
+    kind: "Arbitre retiré d'office",
+    detail: "l'arbitre ne remplit plus les conditions (rôle d'arbitre, tag Discord certifié, compte Battle.net)",
+  },
+  JOINED_TEAM: { kind: "Arbitre retiré d'office", detail: "l'arbitre joue désormais ce match" },
+  SELF_MANAGED_ON: { kind: "Autogestion activée", detail: `par ${ANONYMOUS_STAFF_LABEL}` },
+  SELF_MANAGED_OFF: { kind: "Autogestion désactivée", detail: `par ${ANONYMOUS_STAFF_LABEL}` },
+  FIRST_MAP_SET: { kind: "Première carte réglée", detail: `par ${ANONYMOUS_STAFF_LABEL}` },
+  FIRST_MAP_CLEARED: { kind: "Première carte retirée", detail: `par ${ANONYMOUS_STAFF_LABEL}` },
+};
+
+/**
+ * Arbitre désigné, autogestion ou première carte d'un match changés. Ni
+ * l'arbitre, ni le staff, ni, en tournoi individuel, les joueurs ne sont
+ * nommés ; rien ne part dans pm2 (gestes de staff anonymes partout,
+ * décision du 27 octobre 2026). Ni la carte : la page du match la dit.
+ */
+export function formatRefereeChangeLog(context: {
+  tournament: BotLogTournament;
+  matchId: number;
+  bracket: string;
+  roundNumber: number;
+  swiss?: boolean;
+  team1: LogEntrant | null;
+  team2: LogEntrant | null;
+  change: RefereeLogChange;
+}): string {
+  const wording = REFEREE_LOG_WORDING[context.change];
+  return (
+    `${lead("🧑‍⚖️", wording.kind, context.tournament)} : ${matchRoundLabel(context.bracket, context.roundNumber, context.swiss)} — ` +
+    `${scheduledPairLabel(context.team1, context.team2)} (#${context.matchId}), ${wording.detail}.`
+  );
+}
+
+/**
+ * Autogestion activée ou désactivée sur toute une manche, d'un geste
+ * (`count` : matchs changés). Le tournoi seul, sans équipe.
+ */
+export function formatRoundSelfManagementLog(context: {
+  tournament: BotLogTournament;
+  roundLabel: string;
+  enabled: boolean;
+  count: number;
+}): string {
+  const plural = context.count > 1 ? "s" : "";
+  const kind = context.enabled ? "Autogestion activée" : "Autogestion désactivée";
+  return `${lead("🧑‍⚖️", kind, context.tournament)} : ${context.roundLabel} — ${context.count} match${plural}, par ${ANONYMOUS_STAFF_LABEL}.`;
+}
 
 /**
  * Inscription d'un caster posée, reprise ou retirée. **Personne n'est nommé** :

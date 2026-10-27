@@ -1,7 +1,13 @@
 import { describe, expect, it } from "@jest/globals";
 import { TOURNAMENTS, type SeedFormat, type TournamentDef } from "@/lib/server/seed/cases";
 import { normalizeStreamUrl } from "@/lib/shared/live-streams";
-import { SEED_CAST_CASES, SEED_SEPARATE_STREAM_URL } from "@/lib/server/seed/match-states";
+import { normalizeFirstMap } from "@/lib/shared/match-referee";
+import {
+  SEED_CAST_CASES,
+  SEED_FIRST_MAP,
+  SEED_REFEREE_CASES,
+  SEED_SEPARATE_STREAM_URL,
+} from "@/lib/server/seed/match-states";
 
 const FORMATS: SeedFormat[] = ["SINGLE", "DOUBLE", "SWISS", "SURVIVAL"];
 const STATES: TournamentDef["state"][] = ["UPCOMING", "REGISTRATION", "RUNNING", "FINISHED"];
@@ -283,6 +289,12 @@ describe("seed — cohérence des définitions", () => {
       // sans caster (le cas « zéro caster »).
       const casted = TOURNAMENTS.filter((t) => t.live && t.launchPhase && t.state === "RUNNING");
       expect(casted.length).toBeGreaterThanOrEqual(SEED_CAST_CASES.length);
+    });
+
+    it("couvre chaque état d'arbitrage, autant de fois que les cas de cast", () => {
+      expect([...SEED_REFEREE_CASES]).toEqual(["REFEREE", "SELF_MANAGED", "UNDECIDED"]);
+      expect(SEED_REFEREE_CASES).toHaveLength(SEED_CAST_CASES.length);
+      expect(normalizeFirstMap(SEED_FIRST_MAP)).toBe(SEED_FIRST_MAP);
     });
 
     it("donne au stream à part un lien reconnu, distinct des chaînes seedées", () => {

@@ -4,11 +4,21 @@
  * rendu, et le composant ne garde que la mise en page.
  */
 import { exposesMatchContacts, matchUnderway, readsContactsEarly, type MatchLaunchPhase } from "@/lib/shared/match-launch";
+import { refereeDecision, type RefereeDecision } from "@/lib/shared/match-referee";
 import type { BracketMatch } from "@/lib/shared/types";
 
 type StripMatch = Pick<
   BracketMatch,
-  "status" | "team1Id" | "team2Id" | "team1Name" | "team2Name" | "hostTeamId" | "casters"
+  | "status"
+  | "team1Id"
+  | "team2Id"
+  | "team1Name"
+  | "team2Name"
+  | "hostTeamId"
+  | "casters"
+  | "firstBanTeamId"
+  | "refereeAssigned"
+  | "selfManaged"
 >;
 
 export type LaunchStripViewer = {
@@ -52,6 +62,11 @@ export type LaunchStripControls = {
   showHost: boolean;
   /** Changer d'équipe hôte. */
   showHostSwap: boolean;
+  /**
+   * Ouvrir la fenêtre « Arbitrage » (arbitre désigné, autogestion, première
+   * carte) : permission `tournaments`, match à jouer, jamais sur un bye.
+   */
+  showReferee: boolean;
 };
 
 /** Phases où l'arbitrage peut forcer le départ : tout ce qui précède le lancement effectif. */
@@ -89,6 +104,7 @@ export function launchStripControls(
     showForce: viewer.canSchedule && FORCEABLE_PHASES.has(phase),
     showHost,
     showHostSwap: viewer.canSchedule && showHost,
+    showReferee: viewer.canSchedule && open && !isByeLike,
   };
 }
 
@@ -96,4 +112,27 @@ export function launchStripControls(
 export function hostTeamName(match: StripMatch): string | null {
   if (match.hostTeamId === null) return null;
   return match.hostTeamId === match.team1Id ? match.team1Name : match.team2Name;
+}
+
+/** Nom de l'équipe qui bannit la première (celle qui n'héberge pas), `null` sans adversaires connus. */
+export function firstBanTeamName(match: StripMatch): string | null {
+  if (match.firstBanTeamId === null) return null;
+  return match.firstBanTeamId === match.team1Id ? match.team1Name : match.team2Name;
+}
+
+/**
+ * Ce que le bandeau dit de l'arbitrage (`docs/features/MATCH_REFEREE.md`) :
+ * « Arbitre désigné » ou « Autogestion » pour tous — jamais un nom —, et
+ * « Sans arbitre » pour le **staff** seul (`staff`, permission `tournaments`),
+ * là où une décision est attendue. Rien sur un match terminé ou sans phase.
+ */
+export function refereeStripState(
+  match: Pick<StripMatch, "status" | "refereeAssigned" | "selfManaged">,
+  phase: MatchLaunchPhase,
+  staff: boolean,
+): RefereeDecision | null {
+  if (phase === "NONE" || match.status === "COMPLETED") return null;
+  const decision = refereeDecision({ refereeAssigned: match.refereeAssigned, selfManaged: match.selfManaged });
+  if (decision === "UNDECIDED" && !staff) return null;
+  return decision;
 }

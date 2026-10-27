@@ -61,7 +61,7 @@ describe("HIDDEN_BATTLETAG_AUDIENCE", () => {
   });
 
   it("borne la fenêtre de lancement aux équipes et au caster", () => {
-    expect(battletag).toContain("ne s'ouvre qu'aux deux équipes et aux casters");
+    expect(battletag).toContain("ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné");
   });
 
   it("dit comment cesser de le partager, Battle.net compris", () => {

@@ -315,7 +315,7 @@ function RgpdFr({
                 <DataCell column={2}>
                   <span className={styles.badge}>{d.base}</span>
                   {d.extraBases?.map((extra) => (
-                    <span key={extra.base} className={styles.extraBase}>
+                    <span key={extra.scope} className={styles.extraBase}>
                       {/* Même base que la principale (pseudo dans #live) : pas de second badge identique, mais
                           « y compris » — seule sous le badge, la portée semblerait restreindre la base principale. */}
                       {extra.base === d.base ? "y compris : " : <><span className={styles.badge}>{extra.base}</span> </>}
@@ -966,7 +966,7 @@ function RgpdFr({
             Vous pouvez être prévenu sur votre téléphone ou votre ordinateur du départ de vos matchs, d&apos;un
             score à confirmer ou validé automatiquement faute de réponse, du coup d&apos;envoi d&apos;un tournoi, de l&apos;horaire de vos matchs (posé,
             changé ou retiré) et de ses rappels, et de ce qui concerne votre compte ou votre équipe ; un membre du staff, aussi des
-            alertes de son rôle (alertes d&apos;arbitrage, litiges tranchés, résultats corrigés, abandons imposés à l&apos;adversaire ou validations automatiques suspendues par un membre du staff qui joue le match, matchs planifiés, programme d&apos;arbitrage, signalements reçus) ; un caster, du retrait de son inscription sur un match par un autre que lui, avec le motif, tant qu&apos;il détient la permission de diffusion. <strong>Rien ne part sans votre geste</strong> :
+            alertes de son rôle (alertes d&apos;arbitrage, litiges tranchés, résultats corrigés, abandons imposés à l&apos;adversaire ou validations automatiques suspendues par un membre du staff qui joue le match, matchs planifiés, programme d&apos;arbitrage, signalements reçus) ; un caster, du retrait de son inscription sur un match par un autre que lui, avec le motif, tant qu&apos;il détient la permission de diffusion ; un arbitre désigné, du retrait de son arbitrage par un autre que lui ou d&apos;office, avec le motif, tant qu&apos;il détient la permission d&apos;arbitrage. <strong>Rien ne part sans votre geste</strong> :
             les notifications s&apos;activent appareil par appareil, depuis{" "}
             <Link href="/profil#notifications">Mon profil</Link>, où vous choisissez aussi les sujets.
           </p>
@@ -1036,6 +1036,26 @@ function RgpdFr({
             « un caster » pour la diffusion) ; cette ligne n&apos;ajoute rien aux journaux du serveur, où un litige tranché,
             un résultat corrigé ou une validation suspendue garde sa trace nominative (<Link href="/rgpd/registre#t05">registre,
             T05</Link>), sauf, quand elle n&apos;a pu être rédigée, le geste et le numéro du match ou du tournoi, sans auteur.
+          </p>
+          <p id="arbitre-designe">
+            <strong>Arbitre désigné d&apos;un match.</strong> Un membre du staff qui peut arbitrer (permission
+            d&apos;arbitrage, tag Discord certifié et compte Battle.net rattaché) prend un match, ou le staff le lui
+            confie. Son pseudo et son BattleTag (même masqué) — jamais son tag Discord — sont alors présentés dans
+            les fenêtres « Contacts » et de lancement du match, aux mêmes parties et aux mêmes moments que les
+            contacts du match : aux deux équipes et aux arbitres dès que ses deux adversaires sont connus et
+            jusqu&apos;à sa fin, à ses casters le temps du match ; le pseudo seul y paraît dès que la fenêtre de
+            lancement montre le match. Le public et les autres joueurs ne lisent que « Arbitre désigné ». Son
+            « Prêt » est attendu comme celui des équipes et des casters. S&apos;il ne remplit plus ces conditions ou
+            joue désormais le match, il n&apos;est plus montré (et en est retiré avant le lancement) ; l&apos;arbitrage
+            d&apos;un compte supprimé est retiré de tous ses matchs. Quand un autre que lui le lui retire (le staff,
+            un autre arbitre à qui le match est confié, l&apos;autogestion) ou qu&apos;il lui est retiré d&apos;office, il
+            en est prévenu en notification push seulement, avec le motif. Ces gestes, l&apos;autogestion d&apos;un match
+            et sa première carte sont notés au journal du staff sur Discord sans nommer personne, et un match qui
+            entre en lancement sans arbitre ni autogestion est signalé aux arbitres. Sa présentation aux parties
+            du match relève de l&apos;<strong>intérêt légitime</strong> (qu&apos;elles sachent qui arbitre et
+            puissent l&apos;ajouter en jeu) : il peut s&apos;y opposer par le formulaire de signalement (catégorie RGPD) — retenue, son opposition fait que le staff ne lui confie plus de match — et se retirer d&apos;un match à tout moment, le staff pouvant sinon lui confier de nouveau ce match, sans avis ; le
+            recueil de son « Prêt » et l&apos;avis du retrait, de l&apos;<strong>exécution du service</strong>, les
+            arbitres agissant pour l&apos;association (<Link href="/rgpd/registre#t04">registre, T04</Link>).
           </p>
         </div>
       </section>

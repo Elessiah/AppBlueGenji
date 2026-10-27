@@ -295,7 +295,18 @@
     "casterWaiting": "attendu",
     "missingDateTitle": "Ce match passe à l'antenne à sa date de début, mais aucune date n'est fixée.",
     "missingDateSr": "Attention : ",
-    "missingDate": " sans date"
+    "missingDate": " sans date",
+    "hostLeftSr": " (côté gauche)",
+    "firstBanTitle": "Équipe qui bannit la première : celle qui n'héberge pas",
+    "firstBanSr": "Premier ban : ",
+    "firstMapTitle": "Première carte, fixée par l'arbitrage",
+    "firstMapSr": "Première carte : ",
+    "referee": "Arbitre désigné",
+    "refereeTitle": "Un arbitre suit ce match",
+    "selfManaged": "Autogestion",
+    "selfManagedTitle": "Sans arbitre : les équipes créent et règlent la partie elles-mêmes",
+    "undecided": "Sans arbitre",
+    "undecidedTitle": "Ni arbitre ni autogestion : une décision est attendue"
   },
   "ranking": {
     "title": "Classement",

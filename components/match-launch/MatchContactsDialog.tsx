@@ -12,7 +12,7 @@ import {
   type MatchLaunchInfo,
 } from "@/lib/shared/match-launch";
 import type { BracketMatch } from "@/lib/shared/types";
-import { CasterCards, SideCard } from "./LaunchContactCards";
+import { CasterCards, RefereeCard, SideCard } from "./LaunchContactCards";
 import { useLaunchText, type LaunchText } from "./launch-text";
 import launchStyles from "./MatchLaunchCenter.module.css";
 import styles from "./MatchContactsDialog.module.css";
@@ -120,6 +120,9 @@ export type ContactsCard = Pick<
   | "hostTeamId"
   | "team1Ready"
   | "team2Ready"
+  | "refereeAssigned"
+  | "refereeReady"
+  | "selfManaged"
 >;
 
 const CARD_FIELDS = [
@@ -131,6 +134,9 @@ const CARD_FIELDS = [
   "hostTeamId",
   "team1Ready",
   "team2Ready",
+  "refereeAssigned",
+  "refereeReady",
+  "selfManaged",
 ] as const satisfies readonly (keyof ContactsCard)[];
 
 /** Empreinte de la carte : change à chaque écriture qui touche la modale. */
@@ -419,6 +425,13 @@ export function MatchContactsDialog({
                   laterText={t("contacts.casterLater")}
                   linkNames
                   announceArrival
+                />
+                <RefereeCard
+                  referee={launch.referee}
+                  selfManaged={launch.selfManaged}
+                  phase={launch.phase}
+                  onCopy={copy}
+                  linkNames
                 />
               </>
             )}

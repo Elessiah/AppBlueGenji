@@ -273,6 +273,59 @@
       "body": "The match starts without waiting for the missing “Ready” calls: the entrants can report their score right away.",
       "bodyDirect": "The match starts without waiting for its time: the entrants can report their score right away.",
       "unplanned": "This match isn't scheduled yet: it starts now, with no time announced to the entrants."
+    },
+    "referee": "Refereeing",
+    "refereeDialog": {
+      "title": "Refereeing: {match}",
+      "loading": "Loading…",
+      "loadFailed": "Couldn't read this match's refereeing. Try again in a moment.",
+      "current": "Assigned referee: {pseudo}",
+      "selfManagedNow": "Self-managed match: no referee.",
+      "none": "Neither a referee nor self-management: a decision is needed.",
+      "ineligible": "(can no longer referee: identity to certify or plays the match)",
+      "take": "Referee this match",
+      "taken": "You're refereeing this match.",
+      "releaseSelf": "Stop refereeing",
+      "released": "You no longer referee this match.",
+      "remove": "Remove the referee",
+      "removed": "Referee removed.",
+      "assignLabel": "Assign a referee",
+      "assignPlaceholder": "Pick an account…",
+      "assign": "Assign",
+      "assigned": "Referee assigned.",
+      "selfOnAction": "Switch to self-management",
+      "selfOffAction": "End self-management",
+      "selfOn": "Match switched to self-management.",
+      "selfOff": "Self-management ended.",
+      "roundOnAction": "Whole round self-managed",
+      "roundOffAction": "End the round's self-management",
+      "roundOn": "Round switched to self-management.",
+      "roundOff": "Round self-management ended.",
+      "mapLabel": "First map",
+      "mapSave": "Save the map",
+      "mapSaved": "First map saved.",
+      "pending": "Sending…",
+      "close": "Close",
+      "removeConfirm": {
+        "title": "Remove the referee of {match}?",
+        "body": "The referee is told they no longer follow this match.",
+        "confirm": "Remove"
+      },
+      "selfOnConfirm": {
+        "title": "Switch {match} to self-management?",
+        "body": "The teams create and run the game themselves; the current referee, if any, is removed and notified.",
+        "confirm": "Switch to self-management"
+      },
+      "roundOnConfirm": {
+        "title": "Self-manage the whole round?",
+        "body": "Every match still to play in this round switches to self-management; current referees are removed and notified.",
+        "confirm": "Self-manage everything"
+      },
+      "roundOffConfirm": {
+        "title": "End the round's self-management?",
+        "body": "The matches still to play in this round wait again for a referee or a decision.",
+        "confirm": "End self-management"
+      }
     }
   },
   "planning": {

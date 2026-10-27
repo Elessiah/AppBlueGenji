@@ -207,6 +207,17 @@ export const SEED_SEPARATE_STREAM_URL = "https://www.twitch.tv/bluegenji_cocast"
 export const SEED_CAST_CASES = ["ONE", "CO_CAST", "SEPARATE"] as const;
 
 /**
+ * Arbitrage de cette même manche (`docs/features/MATCH_REFEREE.md`), tour à
+ * tour : arbitre désigné (avec une première carte), autogestion, ou rien —
+ * le cas « sans arbitre » que le staff voit signalé. Les autres manches en
+ * lancement restent sans décision.
+ */
+export const SEED_REFEREE_CASES = ["REFEREE", "SELF_MANAGED", "UNDECIDED"] as const;
+
+/** Première carte posée sur le match arbitré seedé. */
+export const SEED_FIRST_MAP = "Ilios";
+
+/**
  * Lancement des matchs (`lib/shared/match-launch.ts`) : sur chaque tournoi
  * casté du jeu de test à phase de lancement (`match_launch_phase`), la première
  * manche jouable reçoit l'équipe 2 comme hôte (le cas où l'arbitrage a changé
@@ -216,11 +227,14 @@ export const SEED_CAST_CASES = ["ONE", "CO_CAST", "SEPARATE"] as const;
  * manches jouables restent en lancement, sans caster : le cas « deux équipes
  * seules ». L'empreinte de l'appariement est posée avec le « Prêt », sans quoi
  * il serait lu comme celui d'un autre appariement (`currentLaunchState`).
+ * Chaque manche reçoit aussi son arbitrage (`SEED_REFEREE_CASES`, arbitre
+ * `refereeId`).
  */
 export async function applyMatchLaunchCases(
   db: Pool,
   casterId: number | null,
   coCasterId: number | null,
+  refereeId: number | null = null,
 ): Promise<void> {
   if (casterId === null) return;
   const [firsts] = await db.query<(RowDataPacket & { id: number })[]>(
@@ -244,6 +258,7 @@ export async function applyMatchLaunchCases(
        WHERE id = ?`,
       [matchId]
     );
+    await applyRefereeCase(db, matchId, SEED_REFEREE_CASES[index % SEED_REFEREE_CASES.length], refereeId);
     const castCase = coCasterId === null ? "ONE" : SEED_CAST_CASES[index % SEED_CAST_CASES.length];
     const streamId = await seedStream(db, matchId);
     await seedCaster(db, matchId, casterId, streamId);
@@ -256,6 +271,24 @@ export async function applyMatchLaunchCases(
       );
       await seedCaster(db, matchId, coCasterId, Number(own.insertId));
     }
+  }
+}
+
+/** Arbitrage seedé d'un match : arbitre désigné et première carte, autogestion, ou rien. */
+async function applyRefereeCase(
+  db: Pool,
+  matchId: number,
+  refereeCase: (typeof SEED_REFEREE_CASES)[number],
+  refereeId: number | null,
+): Promise<void> {
+  if (refereeCase === "REFEREE" && refereeId !== null) {
+    await db.execute(`UPDATE bg_matches SET referee_user_id = ?, first_map = ? WHERE id = ?`, [
+      refereeId,
+      SEED_FIRST_MAP,
+      matchId,
+    ]);
+  } else if (refereeCase === "SELF_MANAGED") {
+    await db.execute(`UPDATE bg_matches SET self_managed = 1 WHERE id = ?`, [matchId]);
   }
 }
 

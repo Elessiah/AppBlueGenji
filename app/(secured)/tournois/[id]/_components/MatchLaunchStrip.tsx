@@ -3,7 +3,7 @@
 import { readyCount, type MatchLaunchPhase } from "@/lib/shared/match-launch";
 import { formatMatchStartAtFull } from "@/lib/shared/match-schedule";
 import type { BracketMatch } from "@/lib/shared/types";
-import { hostTeamName } from "../_lib/launch-strip";
+import { firstBanTeamName, hostTeamName, refereeStripState } from "../_lib/launch-strip";
 import styles from "./MatchLaunchStrip.module.css";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 
@@ -52,6 +52,7 @@ function LaunchPhaseBadge({ match, phase }: Readonly<{ match: BracketMatch; phas
       team1Ready: match.team1Ready,
       team2Ready: match.team2Ready,
       casters: match.casters,
+      referee: match.refereeAssigned ? { ready: match.refereeReady } : null,
     });
     return (
       <span className={styles.lobby}>
@@ -76,18 +77,23 @@ function LaunchPhaseBadge({ match, phase }: Readonly<{ match: BracketMatch; phas
 export function MatchLaunchStrip({
   match,
   phase,
+  staff = false,
 }: Readonly<{
   match: BracketMatch;
   /** Phase de lancement, calculée par la carte (`MatchRow`). */
   phase: MatchLaunchPhase;
+  /** Permission `tournaments` : le staff seul lit « Sans arbitre ». */
+  staff?: boolean;
 }>) {
   const { t } = useTournamentPageText();
   const showHost = phase !== "NONE";
   const hostName = hostTeamName(match);
+  const firstBanName = showHost ? firstBanTeamName(match) : null;
+  const referee = refereeStripState(match, phase, staff);
   const badge = <LaunchPhaseBadge match={match} phase={phase} />;
   const hasBadge = phase === "TO_PLAN" || phase === "SCHEDULED" || phase === "LOBBY" || (phase === "LAUNCHED" && match.status === "READY");
 
-  if (!hasBadge && !(showHost && hostName) && match.casters.length === 0) return null;
+  if (!hasBadge && !(showHost && hostName) && match.casters.length === 0 && referee === null) return null;
 
   return (
     <div className={styles.strip} data-phase={phase}>
@@ -98,6 +104,44 @@ export function MatchLaunchStrip({
           <span aria-hidden="true">🏠</span>
           <span className="sr-only">{t("launch.hostSr")}</span>
           <span className={styles.name}>{hostName}</span>
+          <span className="sr-only">{t("launch.hostLeftSr")}</span>
+        </span>
+      )}
+
+      {firstBanName && (
+        <span className={styles.fact} title={t("launch.firstBanTitle")}>
+          <span aria-hidden="true">🚫</span>
+          <span className="sr-only">{t("launch.firstBanSr")}</span>
+          <span className={styles.name}>{firstBanName}</span>
+        </span>
+      )}
+
+      {showHost && match.firstMap && (
+        <span className={styles.fact} title={t("launch.firstMapTitle")}>
+          <span aria-hidden="true">🗺</span>
+          <span className="sr-only">{t("launch.firstMapSr")}</span>
+          <span className={styles.name}>{match.firstMap}</span>
+        </span>
+      )}
+
+      {referee === "REFEREE" && (
+        <span className={styles.fact} title={t("launch.refereeTitle")}>
+          <span aria-hidden="true">🧑‍⚖️</span> {t("launch.referee")}
+          {phase === "LOBBY" && (
+            <span className={match.refereeReady ? styles.ok : styles.wait}>
+              {match.refereeReady ? t("launch.casterReady") : t("launch.casterWaiting")}
+            </span>
+          )}
+        </span>
+      )}
+      {referee === "SELF_MANAGED" && (
+        <span className={styles.fact} title={t("launch.selfManagedTitle")}>
+          <span aria-hidden="true">🤝</span> {t("launch.selfManaged")}
+        </span>
+      )}
+      {referee === "UNDECIDED" && (
+        <span className={styles.wait} title={t("launch.undecidedTitle")}>
+          <span aria-hidden="true">⚠</span> {t("launch.undecided")}
         </span>
       )}
 

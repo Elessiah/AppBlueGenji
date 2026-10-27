@@ -52,6 +52,17 @@ non leur gravité.
   en parler le lendemain.
 - **Suppression d'un tournoi.** Un geste d'administrateur, déjà accompli.
 
+## Match sans arbitre ni autogestion
+
+`match_no_referee` (`MATCH_REFEREE.md`) : un match qui entre en lancement
+sans arbitre désigné ni autogestion est signalé au canal des arbitres (et en
+push `REFEREE_ALERT`) — un **avertissement** : rien ne bascule d'office.
+Chaque match est réservé une fois par appariement (`NO_REFEREE:<appariement>`,
+sur sa ligne) ; un match planifié a son alerte, les matchs sans horaire d'une
+manche entrés ensemble en lancement partagent une alerte qui les liste
+(`queueRoundNoRefereeAlert`) — un retardataire part en alerte de suite. Relu
+sans verrou à chaque passe de l'entretien.
+
 ## Une règle unique et pure
 
 Le tri vit dans `lib/shared/referee-alerts.ts`, sous la forme d'un `Record`
@@ -64,6 +75,7 @@ export const BOT_EVENT_CHANNELS: Record<BotEventKind, BotEventChannel> = {
   …
   score_conflict: "REFEREE",
   score_report_stalled: "REFEREE",
+  match_no_referee: "REFEREE",
 };
 ```
 

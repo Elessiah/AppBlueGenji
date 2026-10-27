@@ -171,7 +171,13 @@
     "NOT_BG_SURVIE": "Les pénalités d'endurance n'existent qu'en mode BlueGenji Survie.",
     "PENALTY_FAILED": "Erreur lors de l'enregistrement de la pénalité.",
     "PENALTIES_UNAVAILABLE": "Les pénalités sont indisponibles sur ce serveur : leur table n'existe pas. Prévenez un administrateur.",
-    "PENALTY_LIFT_FAILED": "Erreur lors du retrait de la pénalité."
+    "PENALTY_LIFT_FAILED": "Erreur lors du retrait de la pénalité.",
+    "NOT_REFEREE": "Arbitrer un match demande le rôle arbitre.",
+    "REFEREE_IDENTITY_REQUIRED": "Pour arbitrer un match, certifie ton tag Discord et rattache ton compte Battle.net depuis ton profil.",
+    "REFEREE_IS_PLAYER": "Ce compte joue ce match : il ne peut pas l'arbitrer.",
+    "MATCH_ALREADY_REFEREED": "Ce match a déjà un arbitre.",
+    "NOT_MATCH_REFEREE": "Tu n'arbitres pas ce match.",
+    "INVALID_FIRST_MAP": "Nom de carte invalide (64 caractères au plus)."
   },
   "soloCodes": {
     "TEAM_NOT_FORFEITED": "Ce joueur n'a pas abandonné : il n'y a rien à annuler.",
