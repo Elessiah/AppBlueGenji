@@ -89,7 +89,19 @@ describe("formatCastReleasedNotice", () => {
     const texts = REASONS.map((reason) => formatCastReleasedNotice(match({ reason }), URL, "fr"));
     expect(new Set(texts).size).toBe(REASONS.length);
     expect(texts[0]).toContain("décision du staff");
-    expect(texts[3]).toContain("ton équipe joue désormais ce match");
+    expect(texts[3]).toContain("tu joues désormais ce match");
+  });
+
+  it("JOINED_TEAM ne parle jamais d'équipe : il vaut aussi pour une entrée solo (FR et EN)", () => {
+    const joined = match({ reason: "JOINED_TEAM", solo: true });
+    const texts = [
+      formatCastReleasedNotice(joined, URL, "fr"),
+      formatCastReleasedNotice(joined, URL, "en"),
+      castReleasedPush(joined, "fr").body,
+      castReleasedPush(joined, "en").body,
+    ];
+    for (const text of texts) expect(text).not.toMatch(/équipe|team/i);
+    expect(texts[1]).toContain("you now play in this match");
   });
 
   it("ne nomme aucun joueur en tournoi individuel", () => {
