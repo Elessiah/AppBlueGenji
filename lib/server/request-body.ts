@@ -124,6 +124,18 @@ export async function readFormDataBody(
   return new Response(bytes, { headers: { "content-type": contentType } }).formData();
 }
 
+/**
+ * Code d'un refus de lecture qui a **son propre statut** — `PAYLOAD_TOO_LARGE`
+ * (413), `UNSUPPORTED_CONTENT_TYPE` (415), posés par `fail()` —, ou `null` pour
+ * un corps simplement illisible (JSON invalide), que la route rend sous son
+ * propre code de refus. Une route qui avale toute erreur de lecture dans un
+ * seul 400 dirait sinon « date invalide » à un envoi trop lourd.
+ */
+export function bodyReadRefusal(error: unknown): string | null {
+  if (!(error instanceof Error)) return null;
+  return error.message === PAYLOAD_TOO_LARGE || error.message === UNSUPPORTED_CONTENT_TYPE ? error.message : null;
+}
+
 /** Vrai si l'erreur est le refus d'un corps trop lourd. */
 export function isPayloadTooLarge(error: unknown): boolean {
   return error instanceof Error && error.message === PAYLOAD_TOO_LARGE;

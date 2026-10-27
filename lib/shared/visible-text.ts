@@ -54,13 +54,27 @@ const ZERO_WIDTH_JOINER = "\u200D";
  * @returns Le nom nettoyé, éventuellement vide.
  */
 export function visibleText(raw: string): string {
+  return withoutInvisibles(raw.normalize("NFKC"))
+    .replace(/\s+/gu, " ")
+    .trim();
+}
+
+/**
+ * Texte d'une ligne débarrassé de ce qui ne se **voit** pas — contrôles
+ * (→ espace), invisibles, commandes de direction — mais pas normalisé : ni NFKC
+ * ni réduction des espaces. Pour une saisie du staff dont la typographie est le
+ * propos (« 4 200 € » à espace fine insécable, « 50 m² », « ½ ») : NFKC la
+ * réécrirait (« 4 200 € », « 50 m2 », « 1⁄2 »).
+ *
+ * @param raw Saisie brute.
+ * @returns Le texte nettoyé et rogné, éventuellement vide.
+ */
+export function withoutInvisibles(raw: string): string {
   return raw
-    .normalize("NFKC")
     .replace(CONTROL, " ")
     .replace(EMOJI_JOINER, JOINER_PLACEHOLDER)
     .replace(FORMAT, "")
     .replace(INVISIBLE_LETTERS, "")
     .replaceAll(JOINER_PLACEHOLDER, ZERO_WIDTH_JOINER)
-    .replace(/\s+/gu, " ")
     .trim();
 }

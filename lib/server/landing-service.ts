@@ -237,10 +237,14 @@ async function loadLandingLive(): Promise<LandingLive | null> {
       findBroadcastingTournament().catch(() => null),
     ]);
     if (tournamentBuckets.running.length === 0) return null;
-    const tournament =
+    const picked =
       (broadcasting
         ? tournamentBuckets.running.find((card) => card.id === broadcasting.tournamentId)
         : null) ?? tournamentBuckets.running[0];
+    // Nom saisi par le staff, lu sans compte : forme affichable pour le titre
+    // de la carte, le nom accessible de son lien et le bouton « Regarder le
+    // live » (`UNTRUSTED_NAMES.md`).
+    const tournament = { ...picked, name: visibleText(picked.name) };
 
     const db = await getDatabase();
     const [rows] = await db.execute<LiveMatchRow[]>(
@@ -483,9 +487,10 @@ export async function loadLeaderboardRows(
     return {
       rank,
       teamId: row.teamId,
-      // Lu sans compte (accueil, `/classement`) : forme affichable, repli
-      // neutre en langue « #id » — la ligne est commune aux deux langues.
-      teamName: shownEntrantName(row.teamName) ?? `#${row.teamId}`,
+      // Lu sans compte (accueil, `/classement`) : déjà la forme affichable
+      // (`loadTeamRanking`) ; vide, la vue pose son repli traduit — la ligne
+      // est commune aux deux langues.
+      teamName: row.teamName || null,
       logoUrl: localUploadUrl(row.logoUrl),
       wins: row.wins,
       losses: row.losses,
@@ -601,7 +606,7 @@ function formatTickerEntry(entry: TickerEntry, locale: Locale): TickerItem | nul
       };
       return {
         kind: "result",
-        lead: t("ticker.resultLead", { tournament: entry.tournament }),
+        lead: t("ticker.resultLead", { tournament: visibleText(entry.tournament) }),
         sides: [
           side(entry.team1, entry.team1Id, entry.score1, outcomes[0]),
           side(entry.team2, entry.team2Id, entry.score2, outcomes[1]),
@@ -611,12 +616,12 @@ function formatTickerEntry(entry: TickerEntry, locale: Locale): TickerItem | nul
       };
     }
     case "registration":
-      return t("ticker.registration", { name: entry.name, registered: String(entry.registered), max: String(entry.max) });
+      return t("ticker.registration", { name: visibleText(entry.name), registered: String(entry.registered), max: String(entry.max) });
     case "winner": {
       const known = entry.winner !== null || entry.winnerTeamId !== null;
       return {
         kind: "champion",
-        lead: t("ticker.winnerLead", { name: entry.name }),
+        lead: t("ticker.winnerLead", { name: visibleText(entry.name) }),
         name: known ? team(entry.winner, entry.winnerTeamId) : t("ticker.unknownChampion"),
         known,
       };

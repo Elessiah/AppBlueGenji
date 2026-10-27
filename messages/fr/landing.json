@@ -146,6 +146,7 @@
     "loadError": "Impossible de charger ce classement, réessaie plus tard.",
     "chipAll": "Général",
     "tableLabel": "Classement des équipes",
+    "teamFallback": "Équipe #{id}",
     "team": "ÉQUIPE",
     "winLoss": "V–D",
     "points": "PTS",

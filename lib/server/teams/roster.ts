@@ -2,6 +2,7 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { parseRoles } from "@/lib/server/serialization";
 import type { TeamRole } from "@/lib/shared/types";
+import { visibleText } from "@/lib/shared/visible-text";
 import { sanitizeRoles } from "@/lib/server/users/roles";
 import { assertTermsAccepted } from "@/lib/server/terms-acceptance";
 import { lockMemberRoles, withTeamRosterLock, writeActiveMembership } from "./access";
@@ -148,7 +149,9 @@ export async function getUserActiveTeam(
 
   return {
     teamId: Number(rows[0].team_id),
-    teamName: rows[0].team_name,
+    // Forme affichable (`UNTRUSTED_NAMES.md`), éventuellement vide : le menu du
+    // compte la montre et en fait son nom accessible.
+    teamName: visibleText(String(rows[0].team_name)),
     roles: parseRoles(rows[0].roles_json),
   };
 }

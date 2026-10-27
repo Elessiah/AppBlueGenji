@@ -277,7 +277,12 @@ export type LandingLive = {
 export type LandingLeaderboardRow = {
   rank: number;
   teamId: number;
-  teamName: string;
+  /**
+   * Forme affichable du nom, `null` quand il ne garde rien de visible : la
+   * ligne est commune aux deux langues, le repli traduit (« Équipe #id » /
+   * « Team #id ») est donc posé par la vue.
+   */
+  teamName: string | null;
   logoUrl: string | null;
   wins: number;
   losses: number;

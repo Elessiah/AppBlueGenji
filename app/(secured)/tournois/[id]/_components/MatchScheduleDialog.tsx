@@ -32,6 +32,7 @@ import { matchLaunchPhase } from "@/lib/shared/match-launch";
 import type { BracketMatch } from "@/lib/shared/types";
 import { useMapError } from "../_lib/error-map";
 import { useDialogsText } from "../_lib/dialogs-text";
+import { EntrantName } from "./EntrantName";
 
 const FIELD_IDS = {
   day: "match-start-day",
@@ -379,7 +380,8 @@ export function MatchScheduleDialog({
             {planning ? t("schedule.titlePlanning") : t("schedule.title")}
           </h3>
           <p style={{ marginTop: 6, fontSize: 13, color: "var(--ink-quiet, #9aa4b2)" }}>
-            {match.team1Name ?? "TBD"} vs {match.team2Name ?? "TBD"}
+            <EntrantName teamId={match.team1Id} name={match.team1Name ?? "TBD"} /> vs{" "}
+            <EntrantName teamId={match.team2Id} name={match.team2Name ?? "TBD"} />
           </p>
 
           {/* L'aide est rattachée au premier champ (lue une fois, et non à

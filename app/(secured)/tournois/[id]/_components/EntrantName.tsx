@@ -4,6 +4,7 @@ import Image from "next/image";
 import type { CSSProperties, ReactNode } from "react";
 import { avatarInitial } from "@/lib/shared/avatar";
 import { entityTruncateClass, joinClasses } from "@/lib/shared/class-names";
+import { visibleText } from "@/lib/shared/visible-text";
 import { EntrantLink, useEntrantLogo } from "../_lib/entrant-link";
 import styles from "./EntrantName.module.css";
 
@@ -100,11 +101,15 @@ export function EntrantName({
   // qui rogne sur le nom peint d'une marche plutôt que sur le lien —, posée à
   // la main sur le nom non cliquable.
   const textClass = joinClasses(styles.text, textClassName);
-  const content = children ?? name;
+  // Forme affichable (`UNTRUSTED_NAMES.md`) : un nom resté en base avec une
+  // commande de direction ou un invisible (sosie dont la forme propre est
+  // prise) ne brouille ni le nom ni son initiale de repli.
+  const shownName = name === null ? null : visibleText(name);
+  const content = children ?? shownName;
 
   return (
     <span className={joinClasses(styles.label, className)} style={style}>
-      <EntrantLogo teamId={teamId} name={name} size={logoSize} />
+      <EntrantLogo teamId={teamId} name={shownName} size={logoSize} />
       {teamId !== null ? (
         <EntrantLink teamId={teamId} className={textClass} style={textStyle} title={title} truncate={truncate}>
           {content}

@@ -25,6 +25,7 @@ import {
 import { DEFAULT_SWISS_POINTS } from "@/lib/shared/swiss";
 import type { PhaseConfig } from "@/lib/shared/tournament-phases";
 import type { TournamentFormat, TournamentGame } from "@/lib/shared/types";
+import { visibleText } from "@/lib/shared/visible-text";
 
 /** Phase telle qu'envoyée par le client, avant normalisation. */
 type RawPhase = {
@@ -262,7 +263,11 @@ function isTournamentFormat(format: TournamentFormat | undefined): format is Tou
 export function validateTournamentInput(
   body: TournamentInputBody,
 ): { error: string } | { value: ValidatedTournamentInput } {
-  if (!body.name?.trim()) return { error: "MISSING_NAME" };
+  // Forme affichable, comme un pseudo ou un nom d'équipe (`UNTRUSTED_NAMES.md`) :
+  // le nom s'affiche sur l'accueil sans compte et part vers Discord. Réduit à
+  // rien par le nettoyage, il est absent.
+  const name = typeof body.name === "string" ? visibleText(body.name) : "";
+  if (!name) return { error: "MISSING_NAME" };
   if (!isTournamentFormat(body.format)) return { error: "INVALID_FORMAT" };
 
   const shapeError = tournamentShapeError(body);
@@ -288,7 +293,7 @@ export function validateTournamentInput(
 
   return {
     value: {
-      name: body.name.trim(),
+      name,
       description: body.description ?? null,
       format: body.format,
       game: body.game ?? "OW",

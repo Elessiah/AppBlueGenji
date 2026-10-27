@@ -66,6 +66,11 @@ function boardText(locale: Locale): RankingText {
 }
 
 /** Une défaite se lit dans sa couleur ; zéro défaite reste neutre (`DESIGN_SYSTEM.md`). */
+/** Nom affiché : un nom qui ne garde rien de visible retombe sur « Équipe #id ». */
+function shownTeamName(row: Pick<LandingLeaderboardRow, "teamId" | "teamName">, text: RankingText): string {
+  return row.teamName ?? text.t("board.teamFallback", { id: String(row.teamId) });
+}
+
 function lossClass(losses: number): string {
   return losses > 0 ? "result-loss" : styles.neutral;
 }
@@ -144,6 +149,7 @@ function Podium({
     <ol className={styles.podium} aria-label={text.t("board.podiumLabel")}>
       {top.map((row, index) => {
         const trend = trendText(row, text);
+        const teamName = shownTeamName(row, text);
         return (
           <li key={row.teamId} className={styles.podiumCard} data-place={index + 1}>
             <div className={styles.podiumGlow} aria-hidden="true" />
@@ -153,11 +159,11 @@ function Podium({
                 <span className={styles.podiumNumber} aria-hidden="true">{index + 1}</span>
                 <span className="sr-only">{text.t(PLACE_KEYS[index])}</span>
               </span>
-              <TeamSigil label={row.teamName.charAt(0)} size={40} logoUrl={row.logoUrl} />
+              <TeamSigil label={teamName.charAt(0)} size={40} logoUrl={row.logoUrl} />
             </div>
             <h3 className={styles.podiumName}>
-              <TeamLink teamId={row.teamId} podiumTier={PODIUM_TIERS[index]} title={text.t("board.teamLinkTitle", { team: row.teamName })}>
-                {row.teamName}
+              <TeamLink teamId={row.teamId} podiumTier={PODIUM_TIERS[index]} title={text.t("board.teamLinkTitle", { team: teamName })}>
+                {teamName}
               </TeamLink>
             </h3>
             <p className={styles.podiumPoints}>
@@ -236,6 +242,7 @@ function RankingTable({ rows, forms, showDraws, afterPodium, text }: Readonly<Ra
       </div>
       {rows.map((row) => {
         const trend = trendText(row, text);
+        const teamName = shownTeamName(row, text);
         return (
           <div
             key={row.teamId}
@@ -246,14 +253,14 @@ function RankingTable({ rows, forms, showDraws, afterPodium, text }: Readonly<Ra
             data-place={row.rank <= 3 ? row.rank : undefined}>
             <span className={styles.rank} role="cell">{String(row.rank).padStart(2, "0")}</span>
             <span className={styles.team} role="cell">
-              <TeamSigil label={row.teamName.charAt(0)} size={32} logoUrl={row.logoUrl} />
+              <TeamSigil label={teamName.charAt(0)} size={32} logoUrl={row.logoUrl} />
               {/* Aucune marche au tableau : il suit le podium (rangs 4 et plus)
                   ou, sous trois équipes, il n'y a pas de podium du tout. */}
               <TeamLink
                 teamId={row.teamId}
                 podiumTier={null}
-                title={text.t("board.teamLinkTitle", { team: row.teamName })}>
-                {row.teamName}
+                title={text.t("board.teamLinkTitle", { team: teamName })}>
+                {teamName}
               </TeamLink>
             </span>
             <span className={styles.points} role="cell" data-label={column.points}>{row.points}</span>

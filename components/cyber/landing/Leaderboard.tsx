@@ -123,14 +123,16 @@ export function Leaderboard({ initialRows }: Readonly<LeaderboardProps>) {
           rows.map((row) => {
             const trend = trendLabel(row);
             const trendClass = TREND_CLASSES[row.trend];
+            // Un nom qui ne garde rien de visible : repli traduit, jamais « # ».
+            const teamName = row.teamName ?? t("leaderboard.teamFallback", { id: String(row.teamId) });
 
             return (
               <div key={row.teamId} className={`${styles.row} ${row.rank <= 3 ? styles.top : ""}`} role="row">
                 <span className={styles.rank} role="cell">{String(row.rank).padStart(2, "0")}</span>
                 <span className={styles.team} role="cell">
-                  <TeamSigil label={row.teamName.charAt(0)} size={24} logoUrl={row.logoUrl} />
-                  <TeamLink teamId={row.teamId} truncate={2} title={t("common.teamPageTitle", { name: row.teamName })}>
-                    {row.teamName}
+                  <TeamSigil label={teamName.charAt(0)} size={24} logoUrl={row.logoUrl} />
+                  <TeamLink teamId={row.teamId} truncate={2} title={t("common.teamPageTitle", { name: teamName })}>
+                    {teamName}
                   </TeamLink>
                 </span>
                 <span className={styles.wl} role="cell">

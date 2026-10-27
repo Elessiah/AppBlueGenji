@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { LogOut, Shield, UserRound } from "lucide-react";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { entrantHref } from "@/lib/shared/participants";
 import { UserAvatar } from "./user-avatar";
 import { focusLeftMenu, handleMenuEscape } from "./cyber/landing/PublicNavMenu";
 import { useShellText } from "./i18n/shell-text";
@@ -120,10 +121,10 @@ export function AccountMenuPanel({
       </LocaleLink>
       {activeTeam && (
         <LocaleLink
-          href={`/equipes/${activeTeam.teamId}`}
+          href={entrantHref(activeTeam.teamId, null)}
           className={s.item}
           onClick={onNavigate}
-          aria-label={t("nav.myTeamLabel", { team: activeTeam.teamName })}
+          aria-label={activeTeam.teamName ? t("nav.myTeamLabel", { team: activeTeam.teamName }) : t("nav.myTeam")}
         >
           <Shield className={s.itemIcon} size={16} aria-hidden="true" />
           <span className={s.itemText}>
@@ -131,9 +132,11 @@ export function AccountMenuPanel({
             {/* `title` : le nom complet au survol quand il est rogné ; muet, le
                 rappel étant masqué aux technologies d'assistance. */}
             {/* NOSONAR S6772 — entrée en flex colonne : l'indication passe à la ligne */}
-            <span className={s.itemHint} aria-hidden="true" title={activeTeam.teamName}>
-              {activeTeam.teamName}
-            </span>
+            {activeTeam.teamName ? (
+              <span className={s.itemHint} aria-hidden="true" title={activeTeam.teamName}>
+                {activeTeam.teamName}
+              </span>
+            ) : null}
           </span>
         </LocaleLink>
       )}

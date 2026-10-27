@@ -2,6 +2,7 @@ import type { Pool } from "mysql2/promise";
 import { applyPermanentCatchUps } from "./catch-ups";
 import {
   backfillLaunchedAt,
+  cleanStoredNames,
   dropRecruitmentContactEmail,
   dropSiteVisitUserId,
   dropUserEmail,
@@ -87,6 +88,7 @@ export async function runMigrations(db: Pool): Promise<void> {
   await dropSiteVisitUserId(db);
   await seedSiteVisitors(db);
   await migrateRecruitmentPriority(db);
+  await cleanStoredNames(db);
   await applyPermanentCatchUps(db);
   await warnIfSchemaIsBehind(db);
 }
