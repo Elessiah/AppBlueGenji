@@ -9,7 +9,17 @@ réellement en cours.
 | | Porté par | Rôle |
 |---|---|---|
 | **Chaîne officielle** | `bg_tournaments.live_url` | L'antenne permanente de l'organisation, affichée en tête de la page du tournoi. |
-| **Diffusion d'un match** | `bg_matches.live_trigger` / `live_url` / `live_started_at` | Ce match est-il casté, par quelle chaîne, et est-il à l'antenne ? |
+| **Diffusion d'un match** | `bg_matches.live_trigger` / `live_started_at` + `bg_match_streams.live_url` | Ce match est-il casté, par quelles chaînes, et est-il à l'antenne ? |
+
+**Plusieurs streams par match.** Les liens d'un match vivent dans
+`bg_match_streams` (un par stream : celui que règle le staff, et celui que
+chaque caster ouvre à part). Partout où un seul lien tient — carte, ticker de
+l'accueil, annonce #live, détection « à l'antenne » — c'est le **premier lien**
+(`firstStreamUrlSql`, plus petit stream qui a un lien) : le comportement d'avant,
+pour le premier stream. Le bandeau de diffusion du match montre tous les liens,
+le premier en tête. La configuration du direct par le staff règle le lien du
+stream principal ; « pas de cast » efface tous les liens. Voir
+`docs/features/MATCH_LAUNCH.md` § Casters et streams.
 
 Un troisième mode d'antenne s'appuie sur le **calendrier** du match plutôt que
 sur le tableau ou sur un clic : voir `docs/features/MATCH_START_DATES.md`.
@@ -606,11 +616,14 @@ match casté. `ADMIN` a tout.
 - **Live Horaire (heure à venir)** — même configuration, horaire futur : le match
   reste « programmé » et bascule tout seul à l'heure dite.
 
-Le compte `Test_Caster` porte la permission `live` seule.
+Les comptes `Test_Caster` et `Test_CoCaster` portent la permission `live` seule ;
+sur les tournois à phase de lancement, la première manche castée reçoit tour à
+tour un caster seul, deux co-casters sur un même stream, et deux casters sur
+deux streams, le second avec son propre lien (`SEED_CAST_CASES`).
 
 ## Notes reprises de CLAUDE.md
 
 Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
 
 - **« Live » / « Direct » — trois sens à ne jamais confondre dans les libellés** : le projet emploie le mot pour (1) l'**état d'un tournoi** `RUNNING`, (2) une **diffusion** (stream Twitch/YouTube/Kick d'un tournoi ou d'un match), (3) la **connexion au flux SSE** qui tient la page à jour. Les trois se côtoyaient sur la même ligne de pastilles de `/tournois/[id]`, où « ● DIRECT » (connexion) voisinait « ● EN COURS » (état) sur un tournoi sans la moindre chaîne — on y lisait un stream qui n'existait pas. Règle de vocabulaire, sans effet sur le code interne (les valeurs `MatchLiveState`, les noms de fichiers `*live*` et les classes `pill-live` restent) : **« En cours »** pour l'état d'un tournoi (jamais « Live » ni « En direct »), **« En direct » / « le live »** réservé à une vraie diffusion, **« À jour » / « Reconnexion… » / « Hors ligne »** pour le témoin de flux (`LiveIndicator`). Le **rouge** (`pill-live`, `--red-live`) n'habille que ce qui est réellement à l'antenne : un état de tournoi ou un témoin de connexion se met en bleu. Avant d'écrire « Live » ou « Direct » dans une interface, se demander lequel des trois on désigne.
-- **Diffusion en direct** (`lib/shared/live-streams.ts` pur + `lib/server/tournaments/live-streams.ts`) : le tournoi porte sa **chaîne officielle** (`bg_tournaments.live_url`), chaque match porte sa propre diffusion (`live_trigger` `AUTO`/`MANUAL`, `live_url`, `live_started_at`) — **un match n'hérite jamais** de la chaîne du tournoi, parce qu'un streamer indépendant peut le caster. L'état (`OFF`/`SCHEDULED`/`LIVE`) n'est **pas stocké** : `resolveMatchLiveState` le dérive, si bien que l'arrêt du direct à la saisie du score ne demande aucune écriture et qu'une correction de score le défait seule. Aucune requête ne réimplémente la règle en SQL — `findBroadcastingTournament` filtre en mémoire avec `isMatchLive`. Le bouton « Regarder le live » de l'accueil n'est rendu **que si** un tournoi `RUNNING` a une chaîne officielle et au moins un match `LIVE` ; sinon il disparaît. URLs bornées par une liste blanche (`twitch.tv`, `youtube.com`, `youtu.be`, `kick.com`). Voir `docs/features/LIVE_STREAMS.md`.
+- **Diffusion en direct** (`lib/shared/live-streams.ts` pur + `lib/server/tournaments/live-streams.ts`) : le tournoi porte sa **chaîne officielle** (`bg_tournaments.live_url`), chaque match porte sa propre diffusion (`live_trigger` `AUTO`/`MANUAL`, `live_started_at`, et ses liens dans `bg_match_streams` — le premier fait foi) — **un match n'hérite jamais** de la chaîne du tournoi, parce qu'un streamer indépendant peut le caster. L'état (`OFF`/`SCHEDULED`/`LIVE`) n'est **pas stocké** : `resolveMatchLiveState` le dérive, si bien que l'arrêt du direct à la saisie du score ne demande aucune écriture et qu'une correction de score le défait seule. Aucune requête ne réimplémente la règle en SQL — `findBroadcastingTournament` filtre en mémoire avec `isMatchLive`. Le bouton « Regarder le live » de l'accueil n'est rendu **que si** un tournoi `RUNNING` a une chaîne officielle et au moins un match `LIVE` ; sinon il disparaît. URLs bornées par une liste blanche (`twitch.tv`, `youtube.com`, `youtu.be`, `kick.com`). Voir `docs/features/LIVE_STREAMS.md`.

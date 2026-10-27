@@ -790,8 +790,13 @@ ouvre l'antenne d'un match, il ne décide pas de la chaîne du tournoi.
 (`POST /api/matches/[matchId]/caster`), à une condition de plus que la
 permission : un tag Discord **certifié** et un compte Battle.net **rattaché**
 (`castBlockReason`, refus `CASTER_IDENTITY_REQUIRED` → 409). Un joueur du match
-ne peut pas le caster (`CASTER_IS_PLAYER`), un match n'a qu'un caster
-(`MATCH_ALREADY_CASTED`), et l'on se retire soi-même (`DELETE`).
+ne peut pas le caster (`CASTER_IS_PLAYER`). Un match n'a **pas de nombre
+maximal** de casters : chacun rejoint un stream du match ou ouvre le sien, et
+les casters d'un même match reçoivent les contacts les uns des autres le temps
+du match. On se retire soi-même (`DELETE`) ; l'arbitrage (`tournaments`) retire
+n'importe quel caster en le désignant (`DELETE …?userId=`, sinon
+`NOT_MATCH_CASTER` → 403). Voir `docs/features/MATCH_LAUNCH.md` § Casters et
+streams.
 
 **Aucun lien avec le match n'est exigé, et c'est une décision.** Tout porteur
 de `live` peut s'inscrire sur n'importe quel match non terminé, et

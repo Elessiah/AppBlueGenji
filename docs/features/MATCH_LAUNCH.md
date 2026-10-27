@@ -235,9 +235,11 @@ côté arbitrage) ; le forfait reste ouvert. Voir `MATCH_PLANNING.md`.
 
 ## Colonnes
 
-`bg_matches` : `host_team_id`, `caster_user_id`, `lobby_opened_at`,
-`launch_pairing`, `launched_at`, `team1_ready_at`, `team2_ready_at`,
-`caster_ready_at`.
+`bg_matches` : `host_team_id`, `lobby_opened_at`, `launch_pairing`,
+`launched_at`, `team1_ready_at`, `team2_ready_at`. Les casters et leurs
+« Prêt » vivent dans `bg_match_casters`, les streams dans `bg_match_streams`
+(§ Casters et streams) ; les anciennes colonnes `caster_user_id`,
+`caster_ready_at` et `live_url` de `bg_matches` ne sont plus écrites.
 
 - **`launch_pairing` rattache l'état à un appariement** (`"team1:team2"`,
   `launchPairingKey`). Le moteur réécrit parfois les équipes d'un match **sur
@@ -266,10 +268,11 @@ côté arbitrage) ; le forfait reste ouvert. Voir `MATCH_PLANNING.md`.
 - **Équipe** : un membre en cours portant `CAPITAINE`, `MANAGER` ou `OWNER`
   (`canDeclareTeamReady`). Les autres joueurs voient la modale et l'attente.
 - **Entrée solo** : le joueur lui-même.
-- **Caster** : celui qui est inscrit sur le match.
+- **Caster** : chaque caster inscrit, pour lui-même (`bg_match_casters.ready_at`).
 - **Fantôme** : prête d'office — personne ne cliquerait pour elle.
 
-Sans caster inscrit, les deux équipes suffisent. Le « Prêt » se retire tant que
+Sans caster inscrit, les deux équipes suffisent ; avec plusieurs, le lancement
+attend chacun d'eux (ou le délai d'office). Le « Prêt » se retire tant que
 le match n'est pas lancé ; une fois parti, il l'est.
 
 ## Lancement d'office
@@ -299,12 +302,13 @@ Trois conditions de plus que la permission :
   vérifié : quand l'appariement arrive et compte l'équipe du caster, son
   inscription est retirée (`adoptCurrentPairing`), et d'ici là le rôle de joueur
   prime partout (`resolveMatchParty`) ;
-- un seul caster par match (`MATCH_ALREADY_CASTED`) — sauf si le titulaire ne
-  remplit plus la condition du cast et que le match n'est pas lancé : sa place
-  est alors reprise par le nouvel inscrit. L'instantané du plateau le tait
-  déjà (`casterWithdrawn`, sur la condition relue par la même jointure que son
-  pseudo), si bien que la carte rouvre « 🎙 Caster » — au prochain instantané :
-  retirer un rôle ne publie aucun évènement de tournoi.
+- **aucun nombre maximal** de casters : le premier ouvre un stream, les suivants
+  rejoignent un stream existant (co-cast) ou ouvrent le leur (§ Casters et
+  streams). Un caster qui ne remplit plus la condition du cast n'est plus
+  « repris » par un nouvel inscrit : le nouveau s'ajoute, et l'ancien est
+  retiré par `releaseIneligibleCast` à la prochaine lecture des contacts.
+  L'instantané du plateau le tait déjà (`casterWithdrawn`, sur la condition
+  relue par la même jointure que son pseudo).
 
 Rien d'autre n'est exigé : tout porteur de `live` peut caster n'importe quel
 match non terminé et en recevoir les contacts — droit de diffusion
@@ -331,7 +335,51 @@ qui ouvrait la configuration du stream, devient « ＋ Live » (aujourd'hui « D
 « Caster » sur la même carte auraient désigné deux gestes différents.
 
 Un compte supprimé (anonymisé) perd son inscription sur les matchs non terminés ;
-l'effacement complet la retire par la clé étrangère (`SET NULL`).
+l'effacement complet la retire de tous ses matchs (`withdrawUserCasts`, puis la
+clé étrangère `CASCADE`), avec le stream qu'il était seul à tenir — même celui
+qui porte le premier lien du match, puisque c'est le lien de sa chaîne.
+
+## Casters et streams
+
+Un match a **une liste de streams** (`bg_match_streams` : un lien facultatif
+chacun) et **une liste de casters** (`bg_match_casters` : un compte, le stream
+qu'il tient, son « Prêt »). Code : `lib/server/tournaments/match-casters.ts`.
+
+- **S'inscrire** : `POST /api/matches/[id]/caster`, corps `{ streamId }` pour
+  rejoindre un stream du match (co-cast), `{ liveUrl }` (texte ou `null`) pour
+  ouvrir le sien ; un corps vide ouvre un stream sans lien. Les deux à la fois,
+  un identifiant mal formé ou un lien qui n'est pas du texte :
+  `INVALID_CAST_TARGET` (400) ; un stream d'un autre match ou disparu :
+  `STREAM_NOT_FOUND` (409) ; un lien hors Twitch/YouTube/Kick :
+  `INVALID_STREAM_URL`. Déjà inscrit : rien ne change.
+- **Interface** : sans stream, « 🎙 Caster » inscrit d'un clic ; sinon
+  `CastClaimDialog` fait choisir — un bouton radio par stream (ses casters, sa
+  plateforme ou « sans lien »), puis « Ouvrir mon propre stream » avec son champ
+  de lien. Un co-cast se fait aussi sur un match déjà lancé.
+- **Se retirer** : `DELETE /api/matches/[id]/caster` retire le lecteur ;
+  `?userId=` désigne un autre caster et demande la permission `tournaments` (le staff
+  choisit sur la carte, quand le match a plusieurs casters). Refus :
+  `INVALID_USER_ID` (400), `NOT_MATCH_CASTER` (403).
+- **Premier lien** : `firstStreamUrlSql` — le plus petit stream qui a un lien.
+  C'est lui que montrent les vues compactes (carte, ticker, annonce #live,
+  détection « à l'antenne ») ; le bandeau de diffusion (`MatchLiveStrip`) montre
+  tous les liens, le premier en tête (`matchStreamLinks`).
+- **Stream principal** (`primaryStream`) : le premier qui a un lien, sinon le
+  premier. La configuration du direct par le staff règle son lien ; « pas de
+  cast » efface tous les liens.
+- **Ménage** (`pruneMatchStreams`, sous verrou, chaque table seule) : un stream
+  que plus aucun caster ne tient part, sauf le principal tant qu'il porte un
+  lien (lien posé par le staff, gardé au match). À l'effacement d'un compte,
+  son stream part dans tous les cas (`alwaysDrop`).
+- **Contacts** : chaque caster reçoit ceux des équipes, et ceux des autres
+  casters du match, le temps du match (`PRIVACY_CHANGES`
+  `2026-10-plusieurs-casters-par-match`, registre T04).
+- **Lecteur** : la liste voyage dans `TournamentSnapshot` (`match.streams`,
+  `match.casters`) par les deux portes ; la vue spectateur masque les comptes
+  des casters (identifiants négatifs) et garde les pseudos.
+- **Migration** (`RECENT_SCHEMA_CHANGES`, rejouable) : un stream par match qui
+  avait un lien ou un caster, le caster posé dessus avec son « Prêt », puis les
+  anciennes colonnes remises à `NULL` une fois les deux tables garnies.
 
 ## Les contacts présentés
 
