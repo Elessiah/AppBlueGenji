@@ -291,14 +291,18 @@ describe("GET /api/spectator/tournaments/[id]", () => {
   });
 
   it("ne fait payer qu'une reconstruction quand deux lectures froides se croisent", async () => {
-    let release: (value: TournamentSnapshot) => void = () => undefined;
-    mockedSnapshot.mockReturnValue(new Promise<TournamentSnapshot>((resolve) => (release = resolve)));
+    const pending: { release?: (value: TournamentSnapshot) => void } = {};
+    mockedSnapshot.mockReturnValue(
+      new Promise<TournamentSnapshot>((resolve) => {
+        pending.release = resolve;
+      }),
+    );
     const first = GET(req("5"), params("5"));
     const second = GET(req("5"), params("5"));
     // Laisse les deux lectures passer la carte, puis termine le calcul.
     await new Promise((resolve) => setImmediate(resolve));
     await new Promise((resolve) => setImmediate(resolve));
-    release(snapshot());
+    pending.release?.(snapshot());
 
     expect((await first).status).toBe(200);
     expect((await second).status).toBe(200);
