@@ -349,8 +349,9 @@ qu'il tient, son « Prêt »). Code : `lib/server/tournaments/match-casters.ts`.
   rejoindre un stream du match (co-cast), `{ liveUrl }` (texte ou `null`) pour
   ouvrir le sien ; un corps vide ouvre un stream sans lien. Les deux à la fois,
   un identifiant mal formé ou un lien qui n'est pas du texte :
-  `INVALID_CAST_TARGET` (400) ; un stream d'un autre match ou disparu :
-  `STREAM_NOT_FOUND` (409) ; un lien hors Twitch/YouTube/Kick :
+  `INVALID_CAST_TARGET` (400) ; un stream d'un autre match, disparu, ou tu
+  (avant le lancement, aucun de ses casters ne remplit plus la condition du
+  cast) : `STREAM_NOT_FOUND` (409) ; un lien hors Twitch/YouTube/Kick :
   `INVALID_STREAM_URL`. Déjà inscrit : rien ne change.
 - **Interface** : sans stream, « 🎙 Caster » inscrit d'un clic ; sinon
   `CastClaimDialog` fait choisir — un bouton radio par stream (ses casters, sa
@@ -374,7 +375,8 @@ qu'il tient, son « Prêt »). Code : `lib/server/tournaments/match-casters.ts`.
   enverrait le formulaire).
   Chaque fiche de caster des modales de lancement et « Contacts » est une
   région nommée « Caster <pseudo> ».
-- **Premier lien** : `firstStreamUrlSql` — le plus petit stream qui a un lien.
+- **Premier lien** : `firstStreamUrlSql` — le lien du staff s'il y en a un (même
+  posé après celui d'un caster), à défaut le plus petit stream qui a un lien.
   Avant le lancement, un stream de caster ne compte que si l'un de ses casters
   remplit encore la condition du cast (`castEligibilityBlock` : compte actif,
   tag Discord certifié, Battle.net lié, permission `live`) ; sinon son lien est

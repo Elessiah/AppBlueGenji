@@ -15,8 +15,8 @@ réellement en cours.
 `bg_match_streams` (un par stream : celui que règle le staff, et celui que
 chaque caster ouvre à part). Partout où un seul lien tient — carte, ticker de
 l'accueil, annonce #live, détection « à l'antenne » — c'est le **premier lien**
-(`firstStreamUrlSql`, plus petit stream qui a un lien) : le comportement d'avant,
-pour le premier stream. Avant le lancement, le stream d'un caster qui ne remplit
+(`firstStreamUrlSql` : le lien du staff, à défaut le plus petit stream qui a un
+lien) : le comportement d'avant, pour le premier stream. Avant le lancement, le stream d'un caster qui ne remplit
 plus la condition du cast est tu, lien compris. Le bandeau de diffusion du match montre tous les liens,
 le premier en tête. La configuration du direct par le staff règle le lien de
 son propre stream (`staff_owned`), jamais celui qu'un caster a ouvert ; « pas
