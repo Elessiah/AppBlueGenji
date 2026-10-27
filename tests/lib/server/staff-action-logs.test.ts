@@ -10,8 +10,10 @@ import {
   announceStaffTournamentAction,
   deliverStaffMatchAction,
   deliverStaffTournamentAction,
+  staffActionAuthor,
 } from "@/lib/server/tournaments/staff-action-logs";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
+import { authUser } from "../../helpers/auth-user";
 
 function matchRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -66,6 +68,20 @@ describe("deliverStaffMatchAction", () => {
     mockRows(null);
     await deliverStaffMatchAction(42, "ON_AIR");
     expect(sendBotLog).not.toHaveBeenCalled();
+  });
+});
+
+describe("staffActionAuthor", () => {
+  it("« le staff » avec la permission tournois, « un caster » avec la seule diffusion", () => {
+    expect(staffActionAuthor(authUser({ id: 1, isAdmin: true, roles: ["ADMIN"] }))).toBe("STAFF");
+    expect(staffActionAuthor(authUser({ id: 3, isAdmin: false, roles: ["ARBITRE"] }))).toBe("STAFF");
+    expect(staffActionAuthor(authUser({ id: 4, isAdmin: false, roles: ["CASTER"] }))).toBe("CASTER");
+  });
+
+  it("transmet l'auteur à la ligne", async () => {
+    mockRows(matchRow());
+    await deliverStaffMatchAction(42, "REPLAY_REMOVED", "CASTER");
+    expect(jest.mocked(sendBotLog).mock.calls[0][0]).toMatch(/Rediffusion retirée .*, par un caster\.$/);
   });
 });
 

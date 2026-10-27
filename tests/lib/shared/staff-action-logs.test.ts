@@ -13,6 +13,7 @@ const MATCH_ACTIONS: StaffMatchAction[] = [
   "HOST_SET",
   "HOST_CLEARED",
   "LIVE_CONFIGURED",
+  "LIVE_REMOVED",
   "ON_AIR",
   "OFF_AIR",
   "REPLAY_SET",
@@ -57,6 +58,15 @@ describe("formatStaffMatchActionLog", () => {
       expect(line).not.toContain("\n");
       expect(line.endsWith(", par le staff.")).toBe(true);
     }
+  });
+
+  it("écrit « un caster » pour un geste de diffusion d'un caster", () => {
+    expect(formatStaffMatchActionLog({ ...base, action: "ON_AIR", author: "CASTER" })).toBe(
+      "🛠️ Mis à l'antenne — « Coupe d'hiver » (#7) : Manche 2 — Renards vs Nova (#42), par un caster.",
+    );
+    expect(formatStaffMatchActionLog({ ...base, action: "ON_AIR", author: "STAFF" })).toBe(
+      formatStaffMatchActionLog({ ...base, action: "ON_AIR" }),
+    );
   });
 
   it("n'écrit jamais le pseudo d'un joueur en tournoi individuel", () => {

@@ -10,7 +10,16 @@ jest.mock("@/lib/server/tournaments/match-replay");
 jest.mock("@/lib/server/tournaments/advance");
 jest.mock("@/lib/server/tournaments/seeding");
 jest.mock("@/lib/server/tournaments/image");
-jest.mock("@/lib/server/tournaments/staff-action-logs");
+jest.mock("@/lib/server/tournaments/staff-action-logs", () => {
+  const actual = jest.requireActual<typeof import("@/lib/server/tournaments/staff-action-logs")>(
+    "@/lib/server/tournaments/staff-action-logs",
+  );
+  return {
+    announceStaffMatchAction: jest.fn(),
+    announceStaffTournamentAction: jest.fn(),
+    staffActionAuthor: actual.staffActionAuthor,
+  };
+});
 
 import { POST as resolveRoute } from "@/app/api/admin/matches/[matchId]/resolve/route";
 import { PATCH as scoresRoute } from "@/app/api/admin/matches/[matchId]/scores/route";
@@ -44,6 +53,7 @@ import { authUser } from "../../../helpers/auth-user";
 
 const admin = authUser({ id: 1, isAdmin: true, roles: ["ADMIN"] });
 const player = authUser({ id: 2, isAdmin: false, roles: [] });
+const caster = authUser({ id: 4, isAdmin: false, roles: ["CASTER"] });
 
 function jsonReq(method: string, body: unknown): Request {
   return new Request("http://localhost/api/x", {
@@ -63,6 +73,8 @@ beforeEach(() => {
 
 type MatchCase = [string, StaffMatchAction, () => Promise<Response>, () => void];
 
+const LIVE_ACTIONS = new Set<StaffMatchAction>(["LIVE_CONFIGURED", "LIVE_REMOVED", "ON_AIR", "OFF_AIR", "REPLAY_SET", "REPLAY_REMOVED"]);
+
 describe("gestes du staff sur un match", () => {
   it.each<MatchCase>([
     ["résultat validé", "RESULT_VALIDATED", () => resolveRoute(jsonReq("POST", { doubleForfeit: true }), match), () => jest.mocked(adminResolveMatch).mockResolvedValue()],
@@ -70,7 +82,8 @@ describe("gestes du staff sur un match", () => {
     ["lancement forcé", "FORCE_LAUNCHED", () => launchRoute(jsonReq("POST", {}), match), () => jest.mocked(forceLaunchMatch).mockResolvedValue()],
     ["hôte désigné", "HOST_SET", () => hostRoute(jsonReq("PUT", { teamId: 3 }), match), () => jest.mocked(setMatchHost).mockResolvedValue()],
     ["hôte retiré", "HOST_CLEARED", () => hostRoute(jsonReq("PUT", { teamId: null }), match), () => jest.mocked(setMatchHost).mockResolvedValue()],
-    ["diffusion réglée", "LIVE_CONFIGURED", () => matchLiveRoute(jsonReq("PUT", { trigger: null, liveUrl: null }), match), () => jest.mocked(setMatchLiveConfig).mockResolvedValue()],
+    ["diffusion réglée", "LIVE_CONFIGURED", () => matchLiveRoute(jsonReq("PUT", { trigger: "MANUAL", liveUrl: null }), match), () => jest.mocked(setMatchLiveConfig).mockResolvedValue()],
+    ["diffusion retirée", "LIVE_REMOVED", () => matchLiveRoute(jsonReq("PUT", { trigger: null, liveUrl: null }), match), () => jest.mocked(setMatchLiveConfig).mockResolvedValue()],
     ["mis à l'antenne", "ON_AIR", () => onAirRoute(jsonReq("POST", { onAir: true }), match), () => jest.mocked(setMatchOnAir).mockResolvedValue()],
     ["retiré de l'antenne", "OFF_AIR", () => onAirRoute(jsonReq("POST", { onAir: false }), match), () => jest.mocked(setMatchOnAir).mockResolvedValue()],
     ["rediffusion ajoutée", "REPLAY_SET", () => replayRoute(jsonReq("PUT", { replayUrl: "https://youtu.be/x" }), match), () => jest.mocked(setMatchReplayUrl).mockResolvedValue("https://youtu.be/x")],
@@ -80,8 +93,25 @@ describe("gestes du staff sur un match", () => {
     const res = await call();
     expect(res.status).toBe(200);
     expect(announceStaffMatchAction).toHaveBeenCalledTimes(1);
-    expect(announceStaffMatchAction).toHaveBeenCalledWith(42, action);
+    const args = jest.mocked(announceStaffMatchAction).mock.calls[0];
+    expect(args.slice(0, 2)).toEqual([42, action]);
+    if (LIVE_ACTIONS.has(action)) expect(args[2]).toBe("STAFF");
     expect(announceStaffTournamentAction).not.toHaveBeenCalled();
+  });
+
+  it("un caster sans permission tournois est écrit « un caster », jamais « le staff »", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    jest.mocked(setMatchOnAir).mockResolvedValue();
+    jest.mocked(setMatchLiveConfig).mockResolvedValue();
+    jest.mocked(setMatchReplayUrl).mockResolvedValue("https://youtu.be/x");
+    expect((await onAirRoute(jsonReq("POST", { onAir: true }), match)).status).toBe(200);
+    expect((await matchLiveRoute(jsonReq("PUT", { trigger: null }), match)).status).toBe(200);
+    expect((await replayRoute(jsonReq("PUT", { replayUrl: "https://youtu.be/x" }), match)).status).toBe(200);
+    expect(jest.mocked(announceStaffMatchAction).mock.calls).toEqual([
+      [42, "ON_AIR", "CASTER"],
+      [42, "LIVE_REMOVED", "CASTER"],
+      [42, "REPLAY_SET", "CASTER"],
+    ]);
   });
 
   it("n'écrit rien quand le geste échoue", async () => {
