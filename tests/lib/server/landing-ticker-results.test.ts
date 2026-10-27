@@ -192,3 +192,41 @@ describe("getLandingTicker — champions", () => {
     ]);
   });
 });
+
+// Revue de performance a posteriori #436 : les quatre lectures du bandeau
+// étaient attendues l'une après l'autre.
+describe("getLandingTicker — lectures côte à côte", () => {
+  it("lance les quatre lectures avant qu'aucune n'ait répondu", async () => {
+    const releases: Array<() => void> = [];
+    const execute = jest.fn<SqlQuery>(
+      () =>
+        new Promise((resolve) => {
+          releases.push(() => resolve([[]]));
+        }),
+    );
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    const pending = getLandingTicker();
+    for (let tick = 0; tick < 5; tick += 1) await Promise.resolve();
+    expect(execute).toHaveBeenCalledTimes(4);
+    for (const release of releases) release();
+    // Rien à montrer : les phrases d'attente.
+    expect((await pending).items).toHaveLength(3);
+  });
+
+  it("une lecture en échec rend les phrases d'attente, les actualités gardent leur repli", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[resultRow({}, 1)]])
+      .mockRejectedValueOnce(new Error("down"))
+      .mockResolvedValueOnce([[]])
+      .mockRejectedValueOnce(new Error("news down"));
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    const { items } = await getLandingTicker();
+    expect(results(items)).toEqual([]);
+    expect(items).toHaveLength(3);
+  });
+});

@@ -74,25 +74,29 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function HomePage() {
   const locale = await requestLocale();
   const description = landingServerText(locale).t("meta.description");
-  const buckets = await listTournamentBuckets(null).catch(() => ({
+  // Seuls le calendrier et le mini-tableau dépendent des tournois : les autres
+  // lectures partent **en même temps** qu'eux, sans quoi le premier rendu après
+  // une invalidation attendait les tournois, puis la plus lente des autres.
+  const bucketsLoad = listTournamentBuckets(null).catch(() => ({
     upcoming: [],
     registration: [],
     running: [],
     finished: [],
   }));
-
-  const featured = chooseFeaturedTournament(buckets);
-  const [stats, live, leaderboard, events, ticker, sponsors, aboutStats, aboutPillars, miniBracket, user, copyBundle] =
+  const featuredLoad = bucketsLoad.then(chooseFeaturedTournament);
+  const [buckets, featured, stats, live, leaderboard, events, ticker, sponsors, aboutStats, aboutPillars, miniBracket, user, copyBundle] =
     await Promise.all([
+      bucketsLoad,
+      featuredLoad,
       getLandingStats(),
       getLandingLive(),
       getLandingLeaderboard(),
-      getLandingCalendar(buckets, 5),
+      bucketsLoad.then((loaded) => getLandingCalendar(loaded, 5)),
       getLandingTicker(locale),
       listSponsors().catch(() => []),
       listAboutStats(),
       listAboutPillars(),
-      featured ? loadMiniBracket(featured.id, locale) : Promise.resolve([]),
+      featuredLoad.then((shown) => (shown ? loadMiniBracket(shown.id, locale) : [])),
       getCurrentUser().catch(() => null),
       getSiteCopyBundle(),
     ]);

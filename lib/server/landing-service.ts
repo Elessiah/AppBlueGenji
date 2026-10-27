@@ -96,13 +96,18 @@ async function loadLandingStats(): Promise<LandingStats> {
 
 type SiteCounts = Omit<LandingStats, "discord">;
 
+/**
+ * « Équipes actives » : les équipes que l'annuaire montre — ni entrée solo
+ * (`solo_user_id`), ni équipe dissoute (`deleted_at`) ; une équipe fantôme y
+ * figure, comme à l'annuaire (`GHOST_TEAMS.md`).
+ */
 async function loadSiteCounts(): Promise<SiteCounts> {
   try {
     const db = await getDatabase();
     const [rows] = await db.execute<StatsRow[]>(`
       SELECT
         (SELECT COUNT(*) FROM bg_users) AS players,
-        (SELECT COUNT(*) FROM bg_teams WHERE solo_user_id IS NULL) AS teams,
+        (SELECT COUNT(*) FROM bg_teams WHERE solo_user_id IS NULL AND deleted_at IS NULL) AS teams,
         (SELECT COUNT(*) FROM bg_tournaments WHERE start_visibility_at <= NOW()) AS tournaments
     `);
     const row = rows[0];
@@ -221,13 +226,17 @@ async function loadLandingLive(): Promise<LandingLive | null> {
     // résultat en dépendrait alors que la clé de cache ne peut pas les
     // représenter, et un appelant passant une liste filtrée recevrait
     // silencieusement le direct de quelqu'un d'autre.
-    const tournamentBuckets = await listTournamentBuckets(null);
-    if (tournamentBuckets.running.length === 0) return null;
-
+    //
     // Le tournoi réellement à l'antenne prime sur le plus récent : sans cela, la
     // carte live et le bouton « Regarder le live » pourraient désigner deux
-    // tournois différents quand plusieurs tournent en parallèle.
-    const broadcasting = await findBroadcastingTournament().catch(() => null);
+    // tournois différents quand plusieurs tournent en parallèle. Les deux
+    // lectures sont indépendantes : côte à côte, le premier rendu après une
+    // invalidation (et chaque visiteur qui l'attend) n'attend qu'un aller-retour.
+    const [tournamentBuckets, broadcasting] = await Promise.all([
+      listTournamentBuckets(null),
+      findBroadcastingTournament().catch(() => null),
+    ]);
+    if (tournamentBuckets.running.length === 0) return null;
     const tournament =
       (broadcasting
         ? tournamentBuckets.running.find((card) => card.id === broadcasting.tournamentId)
@@ -412,17 +421,19 @@ export async function getLandingLeaderboard(
   game?: TournamentGame,
 ): Promise<LandingLeaderboardRow[]> {
   const safeLimit = Math.min(50, Math.max(1, Math.trunc(limit)));
-  return cachedLanding(`${LANDING_LEADERBOARD_KEY_PREFIX}${safeLimit}:${game ?? "all"}`, LANDING_TTL_MS, () =>
-    loadLandingLeaderboard(safeLimit, game),
+  // Une entrée **par jeu**, la liste entière, découpée à la lecture : la
+  // longueur est choisie par le client (1–50), et une entrée par longueur
+  // refaisait tout le rejeu pour n'en garder qu'une tranche. Les rangs et les
+  // tendances ne dépendent pas de la longueur : la tranche est la même.
+  const rows = await cachedLanding(`${LANDING_LEADERBOARD_KEY_PREFIX}${game ?? "all"}`, LANDING_TTL_MS, () =>
+    loadLandingLeaderboard(game),
   );
+  return rows.slice(0, safeLimit);
 }
 
-async function loadLandingLeaderboard(
-  safeLimit: number,
-  game: TournamentGame | undefined,
-): Promise<LandingLeaderboardRow[]> {
+async function loadLandingLeaderboard(game: TournamentGame | undefined): Promise<LandingLeaderboardRow[]> {
   try {
-    return await loadLeaderboardRows(game, safeLimit);
+    return await loadLeaderboardRows(game);
   } catch {
     return [];
   }
@@ -688,51 +699,90 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
     const db = await getDatabase();
     const entries: TickerEntry[] = [];
 
+    // Quatre lectures indépendantes, lancées ensemble : attendues l'une après
+    // l'autre, le premier rendu après une invalidation — et, par le vol unique,
+    // chaque visiteur qui l'attend — payait quatre allers-retours. Une erreur
+    // de l'une emporte le bandeau comme avant (repli sur les phrases d'attente) ;
+    // les actualités gardent leur propre repli.
+    const [[resultRows], [registrationRows], [winnerRows], newsEntries] = await Promise.all([
+      db.execute<MatchResultRow[]>(
+        `SELECT
+          m.updated_at,
+          t.name AS tournament_name,
+          t1.name AS team1_name,
+          t2.name AS team2_name,
+          m.team1_score,
+          m.team2_score,
+          m.team1_id,
+          m.team2_id,
+          m.winner_team_id,
+          m.forfeit_team_id,
+          m.double_forfeit,
+          t.match_format_type,
+          t.match_format_value,
+          t.match_format_max_maps,
+          t.match_format_draws
+         FROM bg_matches m
+         JOIN bg_tournaments t ON t.id = m.tournament_id
+         LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
+         LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
+         WHERE m.status = 'COMPLETED'
+           AND m.is_bye = FALSE
+           AND m.team1_id IS NOT NULL
+           AND m.team2_id IS NOT NULL
+           AND (
+             m.winner_team_id IS NOT NULL
+             OR m.forfeit_team_id IS NOT NULL
+             OR m.double_forfeit = TRUE
+             OR (
+               m.team1_score IS NOT NULL
+               AND m.team2_score IS NOT NULL
+               AND m.team1_score = m.team2_score
+             )
+           )
+           AND t.start_visibility_at <= NOW()
+         ORDER BY m.updated_at DESC
+         LIMIT 3`,
+      ),
+      db.execute<RegistrationRow[]>(
+        `SELECT
+          t.start_at,
+          t.registration_open_at,
+          t.name,
+          COUNT(r.id) AS registered_teams,
+          t.max_teams
+         FROM bg_tournaments t
+         LEFT JOIN bg_tournament_registrations r ON r.tournament_id = t.id
+         WHERE t.state = 'REGISTRATION'
+           AND t.start_visibility_at <= NOW()
+         GROUP BY t.id, t.start_at, t.registration_open_at, t.name, t.max_teams
+         ORDER BY t.registration_open_at DESC`,
+      ),
+      db.execute<WinnerRow[]>(
+        `SELECT
+          t.finished_at,
+          t.name,
+          w.name AS winner_name,
+          r.team_id AS winner_team_id
+         FROM bg_tournaments t
+         LEFT JOIN bg_tournament_registrations r
+           ON r.tournament_id = t.id
+          AND r.final_rank = 1
+         LEFT JOIN bg_teams w ON w.id = r.team_id
+         WHERE t.state = 'FINISHED'
+           AND t.start_visibility_at <= NOW()
+         ORDER BY t.finished_at DESC
+         LIMIT 2`,
+      ),
+      loadNewsEntries(db),
+    ]);
+
     // Un résultat oppose deux engagés : une exemption (`is_bye`) ou une case
     // restée vide n'en est pas un — le bandeau affichait « Équipe #null 0 ».
     // Il porte une issue enregistrée (vainqueur, forfait, double forfait, ou
     // nul à scores égaux, comme `playedMatchSql`) : une ligne close sans rien
     // de tout cela se lirait « A 0 — B 0 (sans vainqueur) ». Un tournoi pas
     // encore publié (`start_visibility_at`) ne montre rien, ici comme ailleurs.
-    const [resultRows] = await db.execute<MatchResultRow[]>(
-      `SELECT
-        m.updated_at,
-        t.name AS tournament_name,
-        t1.name AS team1_name,
-        t2.name AS team2_name,
-        m.team1_score,
-        m.team2_score,
-        m.team1_id,
-        m.team2_id,
-        m.winner_team_id,
-        m.forfeit_team_id,
-        m.double_forfeit,
-        t.match_format_type,
-        t.match_format_value,
-        t.match_format_max_maps,
-        t.match_format_draws
-       FROM bg_matches m
-       JOIN bg_tournaments t ON t.id = m.tournament_id
-       LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
-       LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
-       WHERE m.status = 'COMPLETED'
-         AND m.is_bye = FALSE
-         AND m.team1_id IS NOT NULL
-         AND m.team2_id IS NOT NULL
-         AND (
-           m.winner_team_id IS NOT NULL
-           OR m.forfeit_team_id IS NOT NULL
-           OR m.double_forfeit = TRUE
-           OR (
-             m.team1_score IS NOT NULL
-             AND m.team2_score IS NOT NULL
-             AND m.team1_score = m.team2_score
-           )
-         )
-         AND t.start_visibility_at <= NOW()
-       ORDER BY m.updated_at DESC
-       LIMIT 3`,
-    );
 
     entries.push(
       ...resultRows.map((row) => {
@@ -768,21 +818,6 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
       }),
     );
 
-    const [registrationRows] = await db.execute<RegistrationRow[]>(
-      `SELECT
-        t.start_at,
-        t.registration_open_at,
-        t.name,
-        COUNT(r.id) AS registered_teams,
-        t.max_teams
-       FROM bg_tournaments t
-       LEFT JOIN bg_tournament_registrations r ON r.tournament_id = t.id
-       WHERE t.state = 'REGISTRATION'
-         AND t.start_visibility_at <= NOW()
-       GROUP BY t.id, t.start_at, t.registration_open_at, t.name, t.max_teams
-       ORDER BY t.registration_open_at DESC`,
-    );
-
     entries.push(
       ...registrationRows.map((row) => ({
         kind: "registration" as const,
@@ -793,23 +828,6 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
       })),
     );
 
-    const [winnerRows] = await db.execute<WinnerRow[]>(
-      `SELECT
-        t.finished_at,
-        t.name,
-        w.name AS winner_name,
-        r.team_id AS winner_team_id
-       FROM bg_tournaments t
-       LEFT JOIN bg_tournament_registrations r
-         ON r.tournament_id = t.id
-        AND r.final_rank = 1
-       LEFT JOIN bg_teams w ON w.id = r.team_id
-       WHERE t.state = 'FINISHED'
-         AND t.start_visibility_at <= NOW()
-       ORDER BY t.finished_at DESC
-       LIMIT 2`,
-    );
-
     entries.push(
       ...winnerRows.map((row) => ({
         kind: "winner" as const,
@@ -818,7 +836,7 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
         winnerTeamId: row.winner_team_id === null ? null : Number(row.winner_team_id),
         sortAt: new Date(row.finished_at ?? Date.now()).getTime(),
       })),
-      ...(await loadNewsEntries(db)),
+      ...newsEntries,
     );
 
     entries.sort((left, right) => right.sortAt - left.sortAt);

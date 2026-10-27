@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { ChevronLeft, ChevronRight, Eye, Pause, Play } from "lucide-react";
 import { CyberCard, Pill, TeamSigil } from "@/components/cyber";
@@ -59,11 +60,14 @@ type LiveCardProps = {
  *
  * Le chemin est résolu côté serveur (`LandingLiveMatch.team1Href`) : la carte
  * n'a pas à savoir si le tournoi oppose des équipes ou des joueurs. Une place
- * vide — bye, adversaire encore à désigner — ne mène nulle part.
+ * vide — bye, adversaire encore à désigner — ne mène nulle part. Sans compte
+ * (`spectator`), le nom reste un nom : les fiches d'équipe et de joueur sont
+ * dans l'espace connecté, un lien n'y mènerait qu'à « Connexion requise » —
+ * la plaque de la carte, elle, mène à la vue sans compte.
  */
-function EntrantName({ href, name }: Readonly<{ href: string | null; name: string }>) {
+function EntrantName({ href, name, spectator }: Readonly<{ href: string | null; name: string; spectator: boolean }>) {
   const { t } = useLandingText();
-  if (!href) return <>{name}</>;
+  if (!href || spectator) return <>{name}</>;
   return (
     <EntityLink href={href} className={`${styles.nested} ${styles.entrantLink}`} title={t("common.teamPageTitle", { name })}>
       {name}
@@ -136,11 +140,42 @@ function noLiveTournamentMessage({ t }: LandingText, iso: string | null | undefi
   return t("live.nextInDays", { days });
 }
 
+type MatchSlideProps = {
+  match: LandingLiveMatch;
+  /**
+   * Horloge de la carte, `null` pour un match qui n'en dépend pas : seul un
+   * match daté (`SCHEDULED`, hors antenne) lit l'heure. Les autres gardent des
+   * props identiques d'un tic à l'autre, et `memo` leur épargne le rendu.
+   */
+  clock: number | null;
+  /**
+   * Logos chargés : la diapositive affichée et ses deux voisines seulement.
+   * Les diapositives cachées sont empilées dans la case visible, si bien que
+   * `loading="lazy"` ne retenait rien : les logos de tous les matchs partaient
+   * dès l'arrivée sur l'accueil. Une voisine est prête avant d'être montrée.
+   */
+  showLogos: boolean;
+  spectator: boolean;
+};
+
+/** Horloge à transmettre à un match : seul un match daté hors antenne la lit (`featuredMatchPill`). */
+export function slideClock(match: Pick<LandingLiveMatch, "launchPhase" | "liveState">, clock: number | null): number | null {
+  return match.launchPhase === "SCHEDULED" && match.liveState !== "LIVE" ? clock : null;
+}
+
+/** La diapositive `index` est-elle l'affichée ou l'une de ses voisines (carrousel circulaire) ? */
+export function slideNearActive(index: number, active: number, count: number): boolean {
+  if (count <= 3) return true;
+  const distance = Math.abs(index - active);
+  return Math.min(distance, count - distance) <= 1;
+}
+
 /**
  * Un match de la carte : pastille d'état, bandeau de diffusion, les deux
- * engagés et la manche. Le carrousel en empile un par match.
+ * engagés et la manche. Le carrousel en empile un par match ; mémoïsé, un pas
+ * du carrousel ou un tic d'horloge ne refait que les diapositives concernées.
  */
-function MatchSlide({ match, clock }: Readonly<{ match: LandingLiveMatch; clock: number | null }>) {
+const MatchSlide = memo(function MatchSlide({ match, clock, showLogos, spectator }: Readonly<MatchSlideProps>) {
   const text = useLandingText();
   const { t } = text;
   // Le format est un réglage, jamais une déduction du nom de la manche : un FT3
@@ -181,10 +216,10 @@ function MatchSlide({ match, clock }: Readonly<{ match: LandingLiveMatch; clock:
       />
 
       <div className={styles.team}>
-        <TeamSigil label={sigilFor(match.team1Name)} size={40} logoUrl={match.team1LogoUrl} />
+        <TeamSigil label={sigilFor(match.team1Name)} size={40} logoUrl={showLogos ? match.team1LogoUrl : null} />
         <div className={styles.teamText}>
           <div className={styles.teamName}>
-            <EntrantName href={match.team1Href} name={team1Label} />
+            <EntrantName href={match.team1Href} name={team1Label} spectator={spectator} />
           </div>
           {/* Rien plutôt qu'un seed inventé : la ligne portait « FR · SEED 1 »
               en dur, identique sur tous les matchs de tous les tournois. */}
@@ -215,10 +250,15 @@ function MatchSlide({ match, clock }: Readonly<{ match: LandingLiveMatch; clock:
       </div>
 
       <div className={styles.team}>
-        <TeamSigil label={sigilFor(match.team2Name)} color="var(--violet-400)" size={40} logoUrl={match.team2LogoUrl} />
+        <TeamSigil
+          label={sigilFor(match.team2Name)}
+          color="var(--violet-400)"
+          size={40}
+          logoUrl={showLogos ? match.team2LogoUrl : null}
+        />
         <div className={styles.teamText}>
           <div className={styles.teamName}>
-            <EntrantName href={match.team2Href} name={team2Label} />
+            <EntrantName href={match.team2Href} name={team2Label} spectator={spectator} />
           </div>
           {match.team2Seed !== null && <div className="mono">{t("live.seed", { seed: String(match.team2Seed) })}</div>}
         </div>
@@ -226,7 +266,7 @@ function MatchSlide({ match, clock }: Readonly<{ match: LandingLiveMatch; clock:
       </div>
     </div>
   );
-}
+});
 
 /**
  * Commandes du carrousel : précédent, position, suivant, pause. Au-dessus de la
@@ -285,7 +325,14 @@ function MatchArea({
   carousel,
   clock,
   tournament,
-}: Readonly<{ matches: LandingLiveMatch[]; carousel: MatchCarousel; clock: number | null; tournament: string }>) {
+  spectator,
+}: Readonly<{
+  matches: LandingLiveMatch[];
+  carousel: MatchCarousel;
+  clock: number | null;
+  tournament: string;
+  spectator: boolean;
+}>) {
   const { t } = useLandingText();
   if (matches.length === 0) {
     return (
@@ -294,7 +341,9 @@ function MatchArea({
       </div>
     );
   }
-  if (matches.length === 1) return <MatchSlide match={matches[0]} clock={clock} />;
+  if (matches.length === 1) {
+    return <MatchSlide match={matches[0]} clock={slideClock(matches[0], clock)} showLogos spectator={spectator} />;
+  }
   return (
     <section className={styles.slides} aria-roledescription={t("live.carousel.role")} aria-label={t("live.carousel.label", { tournament })}>
       {matches.map((match, index) => (
@@ -303,7 +352,12 @@ function MatchArea({
           className={index === carousel.index ? `${styles.slide} ${styles.slideActive}` : styles.slide}
           aria-hidden={index === carousel.index ? undefined : true}
         >
-          <MatchSlide match={match} clock={clock} />
+          <MatchSlide
+            match={match}
+            clock={slideClock(match, clock)}
+            showLogos={slideNearActive(index, carousel.index, matches.length)}
+            spectator={spectator}
+          />
         </div>
       ))}
     </section>
@@ -399,15 +453,20 @@ export function LiveCard({ live, nextUpcomingISO, spectator = false }: Readonly<
           </span>
           {visibleViewers !== null && (
             <span className={styles.viewers}>
-              <Eye size={12} />
-              <span className="mono">{visibleViewers}</span>
+              {/* Un nombre nu ne dit rien à un lecteur d'écran : le libellé
+                  entier lui est lu, l'icône et le chiffre restent visuels. */}
+              <Eye size={12} aria-hidden="true" />
+              <span className="sr-only">{t("live.viewers", { count: visibleViewers })}</span>
+              <span className="mono" aria-hidden="true">
+                {visibleViewers}
+              </span>
             </span>
           )}
         </div>
 
         <div className={styles.title}>{title}</div>
 
-        <MatchArea matches={matches} carousel={carousel} clock={clock} tournament={tournament} />
+        <MatchArea matches={matches} carousel={carousel} clock={clock} tournament={tournament} spectator={spectator} />
 
         {/*
           Affordance de la plaque, et rien de plus : le seul lien est la plaque

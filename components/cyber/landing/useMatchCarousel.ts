@@ -8,6 +8,25 @@ import type { ClientPowerInput } from "@/lib/shared/client-power";
 export const LANDING_CAROUSEL_INTERVAL_MS = 7_000;
 
 /**
+ * Prise posée par un toucher : le match touché reste affiché tant que le doigt
+ * revient dans ce délai, puis le défilement reprend seul. Le doigt n'a pas de
+ * « sortie » qui relâcherait la prise comme la souris : sans échéance, le
+ * carrousel resterait figé pour toujours après un premier toucher.
+ */
+export const LANDING_CAROUSEL_TOUCH_HOLD_MS = 10_000;
+
+/**
+ * Un appui retient-il le carrousel ? Le toucher et le stylet, oui : sans cela,
+ * le match change toutes les sept secondes pendant la lecture, et un
+ * tapotement au moment du changement ouvre l'ancre du match suivant. La souris
+ * a déjà le survol ; un bouton de la carte (précédent, suivant, pause) règle
+ * lui-même le défilement — retenu, « Reprendre » paraîtrait sans effet.
+ */
+export function pointerDownHoldsCarousel(pointerType: string, onButton: boolean): boolean {
+  return pointerType !== "mouse" && !onButton;
+}
+
+/**
  * Index du match affiché : celui qu'on regardait s'il est encore dans la liste
  * (un sondage de `useLandingLive` la renouvelle), sinon le match mis en avant,
  * sinon le premier. Suivre un **identifiant** plutôt qu'un index évite qu'un
@@ -51,13 +70,15 @@ export type MatchCarousel = {
   /** Enveloppe de la carte, pour retrouver le focus qu'un retrait a perdu. */
   holdRef: RefObject<HTMLDivElement>;
   /**
-   * Survol à la souris ou focus clavier dans la carte : on ne fait pas défiler
-   * sous le lecteur. Ni le toucher ni le focus laissé par un clic ne retiennent
-   * le carrousel : rien ne viendrait le relâcher (pas de sortie du pointeur au
-   * doigt, focus gardé tant qu'on ne clique pas ailleurs), et le bouton
-   * « Reprendre » paraîtrait sans effet.
+   * Survol à la souris, focus clavier ou toucher dans la carte : on ne fait pas
+   * défiler sous le lecteur. Le toucher retient le carrousel pour
+   * `LANDING_CAROUSEL_TOUCH_HOLD_MS` seulement (pas de sortie du pointeur au
+   * doigt) ; le focus laissé par un clic ne le retient pas : il resterait
+   * posé tant qu'on ne clique pas ailleurs, et le bouton « Reprendre »
+   * paraîtrait sans effet.
    */
   holdHandlers: {
+    onPointerDown: (event: PointerEvent<HTMLElement>) => void;
     onPointerEnter: (event: PointerEvent<HTMLElement>) => void;
     onPointerLeave: (event: PointerEvent<HTMLElement>) => void;
     onFocus: (event: FocusEvent<HTMLElement>) => void;
@@ -71,7 +92,7 @@ export type MatchCarousel = {
  * Le défilement automatique est une animation au sens du régime de charge : il
  * ne tourne qu'avec `decorativeMotion` (figé onglet caché, page sans focus,
  * mouvement réduit, machine à la peine — `CLIENT_POWER_MODES.md`), et s'arrête
- * sous le pointeur ou le focus, pour qu'un lecteur ne voie pas le match qu'il
+ * sous le pointeur, le focus ou le doigt, pour qu'un lecteur ne voie pas le match qu'il
  * s'apprêtait à ouvrir lui être retiré. Un bouton le met en pause (WCAG 2.2.2).
  *
  * Un `setTimeout` par match affiché plutôt qu'un `setInterval` : un geste du
@@ -84,6 +105,8 @@ export function useMatchCarousel(ids: readonly number[], featuredId: number | nu
   const [paused, setPaused] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [touched, setTouched] = useState(false);
+  const touchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const count = ids.length;
   // Match figé par la prise (survol, focus clavier) : il ne vaut que le temps de
@@ -91,10 +114,10 @@ export function useMatchCarousel(ids: readonly number[], featuredId: number | nu
   // match mis en avant — chez qui rien ne défile (mouvement réduit), un match
   // entré à l'antenne ne serait jamais montré.
   const [heldId, setHeldId] = useState<number | null>(null);
-  const held = hovered || focused;
+  const held = hovered || focused || touched;
   const index = resolveCarouselIndex(ids, activeId ?? (held ? heldId : null), featuredId);
   const canRotate = count > 1 && decorativeMotion;
-  const rotating = canRotate && !paused && !hovered && !focused;
+  const rotating = canRotate && !paused && !held;
   const nextId = count > 1 ? ids[(index + 1) % count] : null;
 
   // Un retrait sous le focus clavier — match terminé entre deux sondages, bouton
@@ -131,6 +154,14 @@ export function useMatchCarousel(ids: readonly number[], featuredId: number | nu
     if (!held) setHeldId(ids[index] ?? null);
   };
 
+  // L'échéance du toucher ne survit pas à la carte.
+  useEffect(
+    () => () => {
+      if (touchTimer.current !== null) clearTimeout(touchTimer.current);
+    },
+    [],
+  );
+
   useEffect(() => {
     if (!rotating || nextId === null) return;
     const timer = setTimeout(() => setActiveId(nextId), LANDING_CAROUSEL_INTERVAL_MS);
@@ -150,6 +181,18 @@ export function useMatchCarousel(ids: readonly number[], featuredId: number | nu
     togglePaused: () => setPaused((value) => !value),
     holdRef,
     holdHandlers: {
+      onPointerDown: (event) => {
+        const onButton = event.target instanceof Element && event.target.closest("button") !== null;
+        if (!pointerDownHoldsCarousel(event.pointerType, onButton)) return;
+        pin();
+        setTouched(true);
+        // Chaque toucher repousse l'échéance : la prise dure tant qu'on lit.
+        if (touchTimer.current !== null) clearTimeout(touchTimer.current);
+        touchTimer.current = setTimeout(() => {
+          touchTimer.current = null;
+          setTouched(false);
+        }, LANDING_CAROUSEL_TOUCH_HOLD_MS);
+      },
       onPointerEnter: (event) => {
         if (event.pointerType !== "mouse") return;
         pin();

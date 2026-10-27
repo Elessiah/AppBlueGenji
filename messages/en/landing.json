@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Amateur Overwatch esports tournaments",
-    "description": "Amateur esports tournaments online and at LANs, mostly Overwatch: live brackets, team rankings, volunteer refereeing — by the BlueGenji association."
+    "description": "Amateur esports tournaments online and at LANs, mostly Overwatch: real-time brackets, team rankings, volunteer refereeing — by the BlueGenji association."
   },
   "common": {
     "newTab": "(new tab)",
@@ -57,7 +57,8 @@
     "watchMatchLabelOn": "Watch {match} live on {platform} (new tab)",
     "watchOn": "Watch on {platform}",
     "seed": "SEED {seed}",
-    "emptyMatch": "The next live match will show up here as soon as it starts.",
+    "emptyMatch": "The next match will show up here as soon as it starts.",
+    "viewers": "{count, plural, one {# person following the tournament} other {# people following the tournament}}",
     "footerMatch": "See the match in the tournament",
     "pill": {
       "live": "Live",

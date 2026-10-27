@@ -33,7 +33,8 @@ export const LANDING_LIVE_KEY = "live";
 export const LANDING_LIVE_TTL_MS = 5_000;
 
 /**
- * Préfixe des leaderboards de la vitrine (`leaderboard:<limite>:<jeu>`),
+ * Préfixe des leaderboards de la vitrine (`leaderboard:<jeu>`, `all` pour « Général » :
+ * la liste entière, découpée à la lecture),
  * partagé par leur lecteur (`getLandingLeaderboard`) et leur invalidateur
  * ({@link invalidateLandingTeamViews}).
  */

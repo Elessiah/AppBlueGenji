@@ -92,7 +92,7 @@ describe("chaque consommateur lit la liste filtrée", () => {
   it("la page /classement et l'API passent par loadLeaderboardRows", () => {
     expect(source("app/classement/page.tsx")).toContain("loadLeaderboardRows(game)");
     expect(source("app/api/landing/leaderboard/route.ts")).toContain("getLandingLeaderboard");
-    expect(source("lib/server/landing-service.ts")).toMatch(/return await loadLeaderboardRows\(game, safeLimit\)/);
+    expect(source("lib/server/landing-service.ts")).toMatch(/return await loadLeaderboardRows\(game\)/);
   });
 
   it("le filtre est posé une fois, dans loadTeamRanking", () => {
