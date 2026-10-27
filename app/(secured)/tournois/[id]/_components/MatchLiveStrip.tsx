@@ -111,7 +111,7 @@ function LiveStateFact({
       {links.length > 1 && !onPage && (
         <LocaleLink
           href={pageHref}
-          className={styles.more}
+          className={`${styles.more} tap-target`}
           aria-label={t("match.moreStreamsLabel", { count: links.length - 1, match: matchLabel })}
         >
           {t("match.moreStreams", { count: links.length - 1 })}

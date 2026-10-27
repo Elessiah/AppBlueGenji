@@ -410,7 +410,7 @@ export function MatchPage({
     <>
       <div className={styles.topbar}>
         <nav className={styles.crumbs} aria-label={t("matchPage.crumbsLabel")}>
-          <LocaleLink href={tournamentMatchHref(detail.card.id, match.id, spectator)} className={styles.back}>
+          <LocaleLink href={tournamentMatchHref(detail.card.id, match.id, spectator)} className={`${styles.back} tap-target`}>
             <span aria-hidden="true">←</span> {detail.card.name}
           </LocaleLink>
         </nav>

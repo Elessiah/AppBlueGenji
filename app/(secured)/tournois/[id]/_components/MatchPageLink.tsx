@@ -29,6 +29,7 @@ export function MatchPageLink({
     <p className={styles.pageLink}>
       <LocaleLink
         href={matchPagePath(match.tournamentId, match.id, spectator)}
+        className="tap-target"
         aria-label={t("match.viewMatchLabel", { match: matchLabel })}
       >
         {t("match.viewMatch")}
