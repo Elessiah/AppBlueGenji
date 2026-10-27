@@ -117,6 +117,13 @@ déjà posée pré-remplit les trois champs (`matchStartEntryOf`).
   Paris, figé à l'ouverture) pour un match sans date : reste à choisir le jour.
   Envoyer sans jour est refusé (« jour manquant ») ; « Vider la date » vide
   aussi le mois, pour effacer l'horaire.
+- **Date déjà passée : avertie** (`isPastMatchStartChange`, `pastWarningKey`) :
+  sur un match ni lancé ni joué d'un tournoi pas terminé, une date saisie
+  antérieure à l'ouverture du dialogue (et différente de celle déjà posée)
+  affiche un avertissement — le match partira dès l'enregistrement (lancement,
+  départ direct, ou dès ses deux adversaires connus). Le mois présélectionné
+  rend l'erreur facile en fin de mois : le 31, un « 2 » seul tombe au 2 du mois
+  en cours. Rien n'est refusé : rattraper un match en retard reste possible.
 - **Quarts d'heure seulement** (`MATCH_ENTRY_QUARTER_HOURS`) : une liste native se
   parcourt au clavier (flèches, première lettre) et ouvre le sélecteur du
   système sur mobile, sans saisie partielle à gérer.
