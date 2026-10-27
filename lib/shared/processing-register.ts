@@ -499,7 +499,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Casters inscrits sur un match (jamais nommés)",
     ],
     dataCategories: [
-      "Sur Discord : noms d'équipe, scores, noms des tournois, horaires et manches des matchs — aucun pseudo de joueur (« un joueur », y compris en tournoi individuel) et aucun membre du staff ni caster nommé (« le staff », « un caster » ; motif du retrait d'office d'un caster ou de sa reprise par un autre — il ne remplissait plus les conditions du cast ; « un membre du staff qui joue ce match », avec le seul nom du tournoi, pour un litige tranché, un résultat corrigé, un abandon imposé ou une validation automatique suspendue par lui)",
+      "Sur Discord : noms d'équipe, scores, noms des tournois, horaires et manches des matchs — aucun pseudo de joueur (« un joueur », y compris en tournoi individuel) et aucun membre du staff ni caster nommé (« le staff », « un caster » ; motif du retrait d'office d'un caster — il ne remplit plus les conditions du cast, ou il joue désormais le match — ou de sa reprise par un autre — il ne remplissait plus ces conditions ; « un membre du staff qui joue ce match », avec le seul nom du tournoi, pour un litige tranché, un résultat corrigé, un abandon imposé ou une validation automatique suspendue par lui)",
       "Dans les journaux du serveur : pseudo et identifiant du membre du staff auteur d'un geste d'arbitrage, avec le geste (numéro du match ; pour un arbitre qui joue le match, en plus : tournoi, manche et, sauf pour une suspension, issue et noms d'équipe, aucun en tournoi individuel)",
     ],
     sensitiveData: "Aucune",

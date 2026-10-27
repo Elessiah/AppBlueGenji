@@ -1073,9 +1073,11 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // casters dont l'inscription est retirée par un autre qu'eux, et une
     // nouvelle ligne, anonyme, au journal du staff sur Discord. Seuls les
     // casters sont concernés — d'où le public.
+    // Daté du lendemain de la mise en ligne prévue (nuit du 27 au 28 octobre),
+    // l'heure du déploiement n'étant pas connue (§ Dates corrigées).
     audience: "LIVE_STAFF",
     id: "2026-10-avis-de-retrait-du-cast",
-    publishedAt: "2026-10-27",
+    publishedAt: "2026-10-29",
     title: "Cast retiré : tu es prévenu, avec le motif",
     links: [MATCH_DM_PARAGRAPH_LINK],
     summary:
