@@ -143,11 +143,15 @@ avec la carte `SEED_FIRST_MAP`, autogestion, ou sans décision.
 
 Registre T04 (présentation de l'arbitre aux parties, « Prêt », avis push),
 T12 (avis push « Arbitrage retiré ») et T05 (journal), `/rgpd#arbitre-designe`
-et la ligne BattleTag de `/rgpd` (finalité et portée « Exécution du contrat »,
-`BATTLETAG_MATCH_SCOPE`, sans clause des conditions pour l'arbitre), les listes « BattleTag masqué » (profil,
+et la ligne BattleTag de `/rgpd` (finalité et portée « Intérêt légitime »
+de l'arbitre), les listes « BattleTag masqué » (profil,
 connexion, fiche joueur, clé `asReferee`) et la modale de masquage, entrée
-`2026-10-arbitre-designe-des-matchs`. Base : exécution du service, les
-arbitres agissant pour l'association. Les conditions d'utilisation ne changent
+`2026-10-arbitre-designe-des-matchs`. Base : intérêt légitime pour la
+présentation de l'arbitre aux parties (pseudo et BattleTag, portée
+`REFEREE_BATTLETAG_SCOPE` sur la ligne BattleTag de `/rgpd`), avec une
+opposition qu'il exerce en se retirant du match — le staff peut le désigner
+sans qu'il l'ait demandé ; exécution du service (les arbitres agissant pour
+l'association) pour son « Prêt » et l'avis du retrait. Les conditions d'utilisation ne changent
 pas (version 6) : le registre ne rattache donc pas l'arbitre désigné à une
 clause des conditions ; la clause « Contacts de match » le reprendra à la
 version 7.
