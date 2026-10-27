@@ -202,12 +202,16 @@ export async function createTournamentTables(db: Pool): Promise<void> {
   // retirera une fois jouée partout.
   //
   // La clé `(match_id, id)` porte la clé étrangère composée des casters : un
-  // caster ne peut rejoindre qu'un stream **de son match**.
+  // caster ne peut rejoindre qu'un stream **de son match**. `staff_owned` = 1 :
+  // le stream du match, dont la configuration du direct règle le lien et qui le
+  // garde quand ses casters s'en vont ; 0 : un stream qu'un caster a ouvert,
+  // effacé avec son dernier caster.
   await createTable(db, `
       CREATE TABLE IF NOT EXISTS bg_match_streams (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       match_id BIGINT NOT NULL,
       live_url VARCHAR(255) NULL,
+      staff_owned TINYINT(1) NOT NULL DEFAULT 0,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       UNIQUE KEY uq_bg_match_streams_match (match_id, id),
       CONSTRAINT fk_bg_match_streams_match FOREIGN KEY (match_id)

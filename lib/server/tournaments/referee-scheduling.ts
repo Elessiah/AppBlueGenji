@@ -122,12 +122,20 @@ export async function setRefereeScheduling(
           [tournamentId],
         );
         // Le « Prêt » des casters de ces matchs tombe avec ceux des équipes.
-        await connection.execute(
-          `UPDATE bg_match_casters SET ready_at = NULL
-           WHERE match_id IN (SELECT id FROM bg_matches
-                              WHERE ${resetCandidates} AND NOT ${SCORE_NOTED_SQL})`,
+        // Les matchs d'abord, verrouillés, puis leurs casters : l'ordre de
+        // l'inscription d'un caster (`claimMatchCast`), sans quoi les deux
+        // transactions s'attendraient l'une l'autre.
+        const [resetRows] = await connection.execute<RowDataPacket[]>(
+          `SELECT id FROM bg_matches WHERE ${resetCandidates} AND NOT ${SCORE_NOTED_SQL} FOR UPDATE`,
           [tournamentId],
         );
+        const resetIds = resetRows.map((match) => Number(match.id));
+        if (resetIds.length > 0) {
+          await connection.execute(
+            `UPDATE bg_match_casters SET ready_at = NULL WHERE match_id IN (${resetIds.map(() => "?").join(", ")})`,
+            resetIds,
+          );
+        }
         // Puis le reste — mêmes conditions que la phase `TO_PLAN` : jouable,
         // sans date, jamais lancé. Un lancement posé pour un autre appariement
         // ne lance pas celui-ci (`currentLaunchState`) : il est défait avec le

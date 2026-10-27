@@ -21,7 +21,8 @@ import {
 } from "@/lib/shared/live-streams";
 import { launchPairingKey } from "@/lib/shared/match-launch";
 import type { MatchStatus } from "@/lib/shared/types";
-import { lockMatchStreams, primaryStream, pruneMatchStreams } from "./match-casters";
+import { retryOnDeadlock } from "./deadlock-retry";
+import { lockMatchStreams, pruneMatchStreams, staffStream } from "./match-casters";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "./notifications";
 
 /** Cible du bouton d'accueil : un tournoi en cours réellement à l'antenne. */
@@ -119,10 +120,10 @@ async function loadMatchLiveRow(matchId: number): Promise<MatchLiveRow> {
  * - passer en `AUTO` ou `START_TIME` referme l'antenne, qui n'a plus de sens
  *   dans ces modes — leur frontière est le statut du match ou l'horloge.
  *
- * La chaîne réglée ici est celle du **stream principal** du match
- * (`primaryStream`, le premier lien des vues compactes) ; un stream séparé
- * qu'un caster a ouvert garde la sienne. Démarquer le match efface tous ses
- * liens, et les streams que plus personne ne tient disparaissent.
+ * La chaîne réglée ici est celle du **stream du staff** (`staffStream`) ; un
+ * stream qu'un caster a ouvert garde la sienne, que le staff n'écrase jamais.
+ * Démarquer le match efface le lien du staff, et les streams que plus personne
+ * ne tient disparaissent.
  *
  * Le mode `START_TIME` exige une date de début sur le match : l'accepter sans
  * date poserait une diffusion qui ne s'ouvrirait jamais, et l'échec ne se
@@ -153,7 +154,9 @@ export async function setMatchLiveConfig(
     throw new Error("INVALID_STREAM_URL");
   }
 
-  await withConnection(async (connection) => {
+  // Les verrous d'intervalle des streams et des casters peuvent opposer deux
+  // matchs voisins (inscription, ménage) : la transaction se rejoue.
+  await retryOnDeadlock(() => withConnection(async (connection) => {
     await connection.beginTransaction();
     try {
       // Verrou du match d'abord, puis ses streams et casters : le même ordre
@@ -164,7 +167,10 @@ export async function setMatchLiveConfig(
           `UPDATE bg_matches SET live_trigger = NULL, live_started_at = NULL WHERE id = ?`,
           [matchId],
         );
-        await connection.execute(`UPDATE bg_match_streams SET live_url = NULL WHERE match_id = ?`, [matchId]);
+        await connection.execute(
+          `UPDATE bg_match_streams SET live_url = NULL WHERE match_id = ? AND staff_owned = 1`,
+          [matchId],
+        );
       } else {
         await connection.execute(
           trigger === "MANUAL"
@@ -172,7 +178,7 @@ export async function setMatchLiveConfig(
             : `UPDATE bg_matches SET live_trigger = ?, live_started_at = NULL WHERE id = ?`,
           [trigger, matchId],
         );
-        await setPrimaryStreamUrl(connection, matchId, url);
+        await setStaffStreamUrl(connection, matchId, url);
       }
       await pruneMatchStreams(connection, matchId);
       await connection.commit();
@@ -180,25 +186,30 @@ export async function setMatchLiveConfig(
       await connection.rollback();
       throw error;
     }
-  });
+  }));
 
   publishMatchUpdatedEvent(Number(row.tournament_id), { landingLive: true });
 }
 
 /**
- * Pose (ou efface) le lien du stream principal ; sans stream, en ouvre un —
- * le lien du staff n'attend pas qu'un caster s'inscrive.
+ * Pose (ou efface) le lien du stream du staff (`staffStream`). Sans lui, un
+ * lien habille le premier stream sans lien, qui devient celui du staff — ou en
+ * ouvre un : le lien du staff n'attend pas qu'un caster s'inscrive. Effacer le
+ * lien ne prend jamais un stream de caster.
  */
-async function setPrimaryStreamUrl(connection: PoolConnection, matchId: number, url: string | null): Promise<void> {
-  const primary = primaryStream(await lockMatchStreams(connection, matchId));
-  if (primary !== null) {
-    if (primary.liveUrl !== url) {
-      await connection.execute(`UPDATE bg_match_streams SET live_url = ? WHERE id = ?`, [url, primary.id]);
+async function setStaffStreamUrl(connection: PoolConnection, matchId: number, url: string | null): Promise<void> {
+  const target = staffStream(await lockMatchStreams(connection, matchId));
+  if (target !== null && (target.staff || url !== null)) {
+    if (target.liveUrl !== url || !target.staff) {
+      await connection.execute(`UPDATE bg_match_streams SET live_url = ?, staff_owned = 1 WHERE id = ?`, [url, target.id]);
     }
     return;
   }
   if (url !== null) {
-    await connection.execute(`INSERT INTO bg_match_streams (match_id, live_url) VALUES (?, ?)`, [matchId, url]);
+    await connection.execute(
+      `INSERT INTO bg_match_streams (match_id, live_url, staff_owned) VALUES (?, ?, 1)`,
+      [matchId, url],
+    );
   }
 }
 

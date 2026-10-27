@@ -12,7 +12,10 @@
  * {@link firstStreamUrlSql}.
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import { staffStream } from "@/lib/shared/live-streams";
 import type { CastEligibilityFields } from "./cast-eligibility";
+
+export { staffStream };
 
 /** Ce qui s'exécute : une connexion ou le pool. */
 type Executor = Pick<PoolConnection, "execute">;
@@ -42,8 +45,12 @@ export type MatchCasterRow = MatchCasterLink & {
   eligibility: CastEligibilityFields;
 };
 
-/** Un stream d'un match. */
-export type MatchStreamRow = { id: number; matchId: number; liveUrl: string | null };
+/**
+ * Un stream d'un match. `staff` : le stream du match, dont le lien est réglé
+ * par la configuration du direct (`setMatchLiveConfig`) — sinon, le stream
+ * qu'un caster a ouvert, avec le lien de sa chaîne.
+ */
+export type MatchStreamRow = { id: number; matchId: number; liveUrl: string | null; staff: boolean };
 
 type CasterLinkRow = RowDataPacket & {
   match_id: number;
@@ -54,7 +61,7 @@ type CasterLinkRow = RowDataPacket & {
 
 type CasterUserRow = CasterLinkRow & CastEligibilityFields & { pseudo: string };
 
-type StreamRow = RowDataPacket & { id: number; match_id: number; live_url: string | null };
+type StreamRow = RowDataPacket & { id: number; match_id: number; live_url: string | null; staff_owned: number };
 
 function placeholders(ids: readonly number[]): string {
   return ids.map(() => "?").join(", ");
@@ -80,7 +87,12 @@ function toLink(row: CasterLinkRow): MatchCasterLink {
 }
 
 function toStream(row: StreamRow): MatchStreamRow {
-  return { id: Number(row.id), matchId: Number(row.match_id), liveUrl: row.live_url ?? null };
+  return {
+    id: Number(row.id),
+    matchId: Number(row.match_id),
+    liveUrl: row.live_url ?? null,
+    staff: Number(row.staff_owned) === 1,
+  };
 }
 
 /**
@@ -158,7 +170,7 @@ export async function loadMatchStreams(
   const ids = [...new Set(matchIds)];
   if (ids.length === 0) return new Map();
   const [rows] = await executor.execute<StreamRow[]>(
-    `SELECT id, match_id, live_url FROM bg_match_streams
+    `SELECT id, match_id, live_url, staff_owned FROM bg_match_streams
      WHERE match_id IN (${placeholders(ids)}) ORDER BY match_id, id`,
     ids,
   );
@@ -168,42 +180,26 @@ export async function loadMatchStreams(
 /** Streams d'**un** match, relus sous verrou (table seule), du plus ancien au plus récent. */
 export async function lockMatchStreams(connection: Executor, matchId: number): Promise<MatchStreamRow[]> {
   const [rows] = await connection.execute<StreamRow[]>(
-    `SELECT id, match_id, live_url FROM bg_match_streams WHERE match_id = ? ORDER BY id FOR UPDATE`,
+    `SELECT id, match_id, live_url, staff_owned FROM bg_match_streams WHERE match_id = ? ORDER BY id FOR UPDATE`,
     [matchId],
   );
   return rows.map(toStream);
 }
 
 /**
- * Le stream **principal** d'un match : le premier qui a un lien (celui des vues
- * compactes), sinon le premier tout court. C'est lui que règle le lien du staff
- * (`setMatchLiveConfig`), et lui qui survit au départ de ses casters tant qu'il
- * porte un lien.
- */
-export function primaryStream<T extends { id: number; liveUrl: string | null }>(streams: readonly T[]): T | null {
-  return streams.find((stream) => stream.liveUrl !== null) ?? streams[0] ?? null;
-}
-
-/**
- * Les streams à effacer : ceux qu'aucun caster ne tient plus, sauf le stream
- * principal tant qu'il a un lien — le lien que le staff a posé sur le match
- * reste quand le caster s'en va, comme avant les co-casters. `alwaysDrop` lève
- * cette exception pour les streams nommés : à la suppression d'un compte, le
- * stream qu'il était seul à tenir part avec son lien, même principal — ce lien
- * peut désigner sa chaîne. Pur, pour être testé sans base.
+ * Les streams à effacer : ceux qu'aucun caster ne tient plus, sauf le stream du
+ * staff tant qu'il a un lien — le lien que le staff a posé sur le match reste
+ * quand ses casters s'en vont, comme avant les co-casters. Le stream qu'un
+ * caster a ouvert part avec le dernier de ses casters, et le lien de sa chaîne
+ * avec lui. Pur, pour être testé sans base.
  */
 export function orphanStreamIds(
   streams: readonly MatchStreamRow[],
   casters: readonly Pick<MatchCasterLink, "streamId">[],
-  alwaysDrop: readonly number[] = [],
 ): number[] {
   const held = new Set(casters.map((caster) => caster.streamId));
-  const primary = primaryStream(streams);
   return streams
-    .filter((stream) => !held.has(stream.id))
-    .filter(
-      (stream) => alwaysDrop.includes(stream.id) || !(stream.id === primary?.id && stream.liveUrl !== null),
-    )
+    .filter((stream) => !held.has(stream.id) && !(stream.staff && stream.liveUrl !== null))
     .map((stream) => stream.id);
 }
 
@@ -213,15 +209,11 @@ export function orphanStreamIds(
  * match. Deux lectures et une écriture : un `DELETE` ne peut pas relire sa
  * propre table en sous-requête.
  */
-export async function pruneMatchStreams(
-  connection: Executor,
-  matchId: number,
-  alwaysDrop: readonly number[] = [],
-): Promise<void> {
+export async function pruneMatchStreams(connection: Executor, matchId: number): Promise<void> {
   const streams = await lockMatchStreams(connection, matchId);
   if (streams.length === 0) return;
   const casters = await lockMatchCasters(connection, matchId);
-  const orphans = orphanStreamIds(streams, casters, alwaysDrop);
+  const orphans = orphanStreamIds(streams, casters);
   if (orphans.length === 0) return;
   await connection.execute(
     `DELETE FROM bg_match_streams WHERE match_id = ? AND id IN (${placeholders(orphans)})`,
@@ -235,16 +227,16 @@ export async function pruneMatchStreams(
  * matchs joués (`includeCompleted: false`) : l'histoire ne se réécrit pas ;
  * l'effacement emporte tout. Chaque match est verrouillé avant ses casters et
  * ses streams, dans l'ordre de `claimMatchCast`, puis ses streams orphelins
- * sont effacés — le stream que le compte tenait seul avec son lien, même
- * principal (`orphanStreamIds`, `alwaysDrop`).
+ * sont effacés — le stream qu'il avait ouvert, avec le lien de sa chaîne
+ * (`orphanStreamIds`).
  */
 export async function withdrawUserCasts(
   connection: Executor,
   userId: number,
   includeCompleted: boolean,
 ): Promise<number[]> {
-  const [rows] = await connection.execute<(RowDataPacket & { match_id: number; stream_id: number })[]>(
-    `SELECT c.match_id, c.stream_id FROM bg_match_casters c
+  const [rows] = await connection.execute<(RowDataPacket & { match_id: number })[]>(
+    `SELECT c.match_id FROM bg_match_casters c
      JOIN bg_matches m ON m.id = c.match_id
      WHERE c.user_id = ?${includeCompleted ? "" : " AND m.status <> 'COMPLETED'"}
      ORDER BY c.match_id`,
@@ -255,7 +247,7 @@ export async function withdrawUserCasts(
     const matchId = Number(row.match_id);
     await connection.execute(`SELECT id FROM bg_matches WHERE id = ? FOR UPDATE`, [matchId]);
     await connection.execute(`DELETE FROM bg_match_casters WHERE match_id = ? AND user_id = ?`, [matchId, userId]);
-    await pruneMatchStreams(connection, matchId, [Number(row.stream_id)]);
+    await pruneMatchStreams(connection, matchId);
   }
   return matchIds;
 }

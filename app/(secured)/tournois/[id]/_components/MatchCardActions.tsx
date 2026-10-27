@@ -191,6 +191,7 @@ export function MatchCardActions({
   actions,
   matchLabel,
   isCaster,
+  releasesOthers = false,
   onAir,
   onPlayerScore,
   onAdminScore,
@@ -202,6 +203,11 @@ export function MatchCardActions({
   matchLabel: string;
   /** Le lecteur est un des casters inscrits (« Ne plus caster » plutôt que « Retirer le caster »). */
   isCaster: boolean;
+  /**
+   * L'arbitrage peut retirer un autre caster que le lecteur : « Retirer le
+   * caster » fait choisir, lecteur compris, même s'il caste aussi le match.
+   */
+  releasesOthers?: boolean;
   /** Le direct est ouvert : le bouton d'antenne le coupe. */
   onAir: boolean;
   onPlayerScore: () => void;
@@ -417,7 +423,7 @@ export function MatchCardActions({
     releaseCast: () => {
       // Le caster qui se retire lui-même n'est prévenu de rien : pas de
       // confirmation. Le staff qui retire un caster lui envoie un avis.
-      if (!isCaster) {
+      if (!isCaster || releasesOthers) {
         setConfirmRelease(true);
         return;
       }

@@ -8,6 +8,7 @@ import {
   MATCH_LIVE_TRIGGERS,
   MAX_STREAM_URL_LENGTH,
   requiresMatchStartAt,
+  staffStream,
   type MatchLiveTrigger,
 } from "@/lib/shared/live-streams";
 import { formatMatchStartAt } from "@/lib/shared/match-schedule";
@@ -40,7 +41,11 @@ export function MatchLiveDialog({ match, onClose, onSaved }: Readonly<MatchLiveD
   const { t } = text;
   const [streamed, setStreamed] = useState(match.liveTrigger !== null);
   const [trigger, setTrigger] = useState<MatchLiveTrigger>(match.liveTrigger ?? "MANUAL");
-  const [liveUrl, setLiveUrl] = useState(match.liveUrl ?? "");
+  // Le lien du stream du staff, que ce réglage écrit — jamais celui qu'un
+  // caster a ouvert (lecture partielle sans streams : le premier lien).
+  const [liveUrl, setLiveUrl] = useState(
+    (match.streams.length > 0 ? staffStream(match.streams)?.liveUrl : match.liveUrl) ?? "",
+  );
   const [busy, setBusy] = useState(false);
 
   const urlTouched = liveUrl.trim().length > 0;

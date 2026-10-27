@@ -280,10 +280,14 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // Co-casters et streams multiples (`docs/features/MATCH_LAUNCH.md`
     // § Casters et streams) : le lien et le caster unique de `bg_matches`
     // passent dans `bg_match_streams` / `bg_match_casters`, créées plus haut.
+    // 0. Le stream du staff (`staff_owned`), sur une table créée avant la
+    //    colonne ; là où la table naît avec, `ER_DUP_FIELDNAME` est toléré.
+    `ALTER TABLE bg_match_streams ADD COLUMN staff_owned TINYINT(1) NOT NULL DEFAULT 0 AFTER live_url`,
     // 1. Un stream par match qui avait un lien ou un caster — jamais deux : un
-    //    match qui a déjà le sien est sauté.
-    `INSERT INTO bg_match_streams (match_id, live_url)
-       SELECT m.id, m.live_url FROM bg_matches m
+    //    match qui a déjà le sien est sauté. Avant les co-casters, seul le staff
+    //    posait un lien : un stream qui en a un est celui du staff.
+    `INSERT INTO bg_match_streams (match_id, live_url, staff_owned)
+       SELECT m.id, m.live_url, m.live_url IS NOT NULL FROM bg_matches m
         WHERE (m.live_url IS NOT NULL OR m.caster_user_id IS NOT NULL)
           AND NOT EXISTS (SELECT 1 FROM bg_match_streams s WHERE s.match_id = m.id)`,
     // 2. Le caster rejoint ce stream, avec son « Prêt ».

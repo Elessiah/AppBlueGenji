@@ -167,13 +167,13 @@ export async function applyLiveStreams(
        AND team2_id IS NOT NULL`,
     [def.live.trigger, startedAt, tournamentId]
   );
-  // La chaîne d'un match casté est celle de son stream principal
-  // (`bg_match_streams`), comme la poserait le staff (`setMatchLiveConfig`).
+  // La chaîne d'un match casté est celle du stream du staff
+  // (`bg_match_streams.staff_owned`), comme la poserait `setMatchLiveConfig`.
   const matchUrl = normalizeStreamUrl(def.live.matchUrl);
   if (matchUrl !== null) {
     await db.execute(
-      `INSERT INTO bg_match_streams (match_id, live_url)
-       SELECT id, ? FROM bg_matches WHERE tournament_id = ? AND live_trigger IS NOT NULL`,
+      `INSERT INTO bg_match_streams (match_id, live_url, staff_owned)
+       SELECT id, ?, 1 FROM bg_matches WHERE tournament_id = ? AND live_trigger IS NOT NULL`,
       [matchUrl, tournamentId]
     );
   }

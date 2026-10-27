@@ -39,6 +39,11 @@ export type LaunchStripControls = {
   showClaim: boolean;
   /** Se retirer du cast, ou retirer un des casters (arbitrage). */
   showRelease: boolean;
+  /**
+   * L'arbitrage peut retirer un **autre** caster que le lecteur : le retrait
+   * passe par le choix du caster, même quand le lecteur caste aussi le match.
+   */
+  releasesOthers: boolean;
   /** Ouvrir la date d'un match à planifier. */
   showPlan: boolean;
   /** Lancer sans attendre les « Prêt » — et, à planifier, sans date. */
@@ -78,6 +83,8 @@ export function launchStripControls(
     showContacts: (early || isCaster) && exposesMatchContacts(phase, early),
     showClaim: viewer.canManage && castable && !isCaster,
     showRelease: open && match.casters.length > 0 && (isCaster || viewer.canSchedule),
+    releasesOthers:
+      open && viewer.canSchedule && match.casters.some((caster) => caster.userId !== viewer.viewerUserId),
     showPlan: viewer.canSchedule && phase === "TO_PLAN",
     showForce: viewer.canSchedule && FORCEABLE_PHASES.has(phase),
     showHost,

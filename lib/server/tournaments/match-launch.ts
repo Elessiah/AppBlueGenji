@@ -33,6 +33,7 @@ import type { MatchStatus, TeamRole } from "@/lib/shared/types";
 import { casterIdentityOf, loadCastEligibility, type CasterIdentityRow } from "./cast-eligibility";
 import { announceCastChange, discardCastChanges, flushCastChanges, queueCastChange } from "./cast-notices";
 import { lockMatchCasters, lockMatchStreams, pruneMatchStreams, type MatchCasterLink } from "./match-casters";
+import { retryOnDeadlock } from "./deadlock-retry";
 import { publishMatchUpdatedEvent } from "./notifications";
 
 /** La ligne d'un match telle que le lancement la lit, sans ses casters. */
@@ -492,42 +493,47 @@ export async function claimMatchCast(
   matchId: number,
   userId: number,
   hasLivePermission: boolean,
-  target: CastTarget = { liveUrl: null },
+  target?: CastTarget,
 ): Promise<void> {
+  const castTarget: CastTarget = target ?? { liveUrl: null };
   // Le lien est jugé avant toute lecture : un refus ne coûte rien.
-  const liveUrl = "liveUrl" in target ? castStreamUrl(target.liveUrl) : null;
-  const { tournamentId, claimed } = await inTransaction(async (connection) => {
-    const block = castBlockReason(hasLivePermission, await loadCasterIdentity(connection, userId));
-    if (block) throw new Error(block);
+  const liveUrl = "liveUrl" in castTarget ? castStreamUrl(castTarget.liveUrl) : null;
+  // Deux inscriptions simultanées se croisent sur les verrous d'intervalle
+  // d'InnoDB : l'interblocage se rejoue.
+  const { tournamentId, claimed } = await retryOnDeadlock(() =>
+    inTransaction(async (connection) => {
+      const block = castBlockReason(hasLivePermission, await loadCasterIdentity(connection, userId));
+      if (block) throw new Error(block);
 
-    const row = await lockLaunchMatch(connection, matchId);
-    if (!row) throw new Error("MATCH_NOT_FOUND");
-    if (row.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
-    if (Number(row.is_bye) === 1) throw new Error("MATCH_NOT_LAUNCHABLE");
-    if (row.casters.some((caster) => caster.userId === userId)) {
-      return { tournamentId: Number(row.tournament_id), claimed: false };
-    }
-    const party = await resolveMatchParty(connection, row, userId);
-    if (party) throw new Error("CASTER_IS_PLAYER");
+      const row = await lockLaunchMatch(connection, matchId);
+      if (!row) throw new Error("MATCH_NOT_FOUND");
+      if (row.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
+      if (Number(row.is_bye) === 1) throw new Error("MATCH_NOT_LAUNCHABLE");
+      if (row.casters.some((caster) => caster.userId === userId)) {
+        return { tournamentId: Number(row.tournament_id), claimed: false };
+      }
+      const party = await resolveMatchParty(connection, row, userId);
+      if (party) throw new Error("CASTER_IS_PLAYER");
 
-    let streamId: number;
-    if ("streamId" in target) {
-      const streams = await lockMatchStreams(connection, matchId);
-      if (!streams.some((stream) => stream.id === target.streamId)) throw new Error("STREAM_NOT_FOUND");
-      streamId = target.streamId;
-    } else {
-      const [created] = await connection.execute<ResultSetHeader>(
-        `INSERT INTO bg_match_streams (match_id, live_url) VALUES (?, ?)`,
-        [matchId, liveUrl],
+      let streamId: number;
+      if ("streamId" in castTarget) {
+        const streams = await lockMatchStreams(connection, matchId);
+        if (!streams.some((stream) => stream.id === castTarget.streamId)) throw new Error("STREAM_NOT_FOUND");
+        streamId = castTarget.streamId;
+      } else {
+        const [created] = await connection.execute<ResultSetHeader>(
+          `INSERT INTO bg_match_streams (match_id, live_url) VALUES (?, ?)`,
+          [matchId, liveUrl],
+        );
+        streamId = Number(created.insertId);
+      }
+      await connection.execute(
+        `INSERT INTO bg_match_casters (match_id, user_id, stream_id, ready_at) VALUES (?, ?, ?, NULL)`,
+        [matchId, userId, streamId],
       );
-      streamId = Number(created.insertId);
-    }
-    await connection.execute(
-      `INSERT INTO bg_match_casters (match_id, user_id, stream_id, ready_at) VALUES (?, ?, ?, NULL)`,
-      [matchId, userId, streamId],
-    );
-    return { tournamentId: Number(row.tournament_id), claimed: true };
-  });
+      return { tournamentId: Number(row.tournament_id), claimed: true };
+    }),
+  );
   // Un lien neuf peut changer ce que montrent l'accueil et ses bandeaux.
   publishMatchUpdatedEvent(tournamentId, { landingLive: liveUrl !== null });
   // Après le commit : journal du staff. Aucune place n'est reprise à personne.
@@ -549,19 +555,21 @@ export async function releaseMatchCast(
   canManage: boolean,
   casterId: number = userId,
 ): Promise<void> {
-  const { tournamentId, releasedCasterId } = await inTransaction(async (connection) => {
-    const row = await lockLaunchMatch(connection, matchId);
-    if (!row) throw new Error("MATCH_NOT_FOUND");
-    if (casterId !== userId && !canManage) throw new Error("NOT_MATCH_CASTER");
-    if (!row.casters.some((caster) => caster.userId === casterId)) {
-      return { tournamentId: Number(row.tournament_id), releasedCasterId: null };
-    }
+  const { tournamentId, releasedCasterId } = await retryOnDeadlock(() =>
+    inTransaction(async (connection) => {
+      const row = await lockLaunchMatch(connection, matchId);
+      if (!row) throw new Error("MATCH_NOT_FOUND");
+      if (casterId !== userId && !canManage) throw new Error("NOT_MATCH_CASTER");
+      if (!row.casters.some((caster) => caster.userId === casterId)) {
+        return { tournamentId: Number(row.tournament_id), releasedCasterId: null };
+      }
 
-    await connection.execute(`DELETE FROM bg_match_casters WHERE match_id = ? AND user_id = ?`, [matchId, casterId]);
-    await pruneMatchStreams(connection, matchId);
-    if (row.tournament_state === "RUNNING") await launchIfAllReady(connection, matchId);
-    return { tournamentId: Number(row.tournament_id), releasedCasterId: casterId };
-  });
+      await connection.execute(`DELETE FROM bg_match_casters WHERE match_id = ? AND user_id = ?`, [matchId, casterId]);
+      await pruneMatchStreams(connection, matchId);
+      if (row.tournament_state === "RUNNING") await launchIfAllReady(connection, matchId);
+      return { tournamentId: Number(row.tournament_id), releasedCasterId: casterId };
+    }),
+  );
   publishMatchUpdatedEvent(tournamentId, { landingLive: true });
   if (releasedCasterId !== null) {
     announceCastChange({ kind: "RELEASED", matchId, casterId: releasedCasterId, byStaff: releasedCasterId !== userId });
@@ -581,33 +589,35 @@ export async function releaseMatchCast(
 export async function releaseIneligibleCast(matchId: number, casterId: number): Promise<boolean> {
   let tournamentId: number | null = null;
   let reason: "INELIGIBLE" | "JOINED_TEAM" = "INELIGIBLE";
-  await inTransaction(async (connection) => {
-    const row = await lockLaunchMatch(connection, matchId);
-    if (!row?.casters.some((caster) => caster.userId === casterId)) return;
-    // Seul un match qui attend encore son lancement est concerné. Un match
-    // lancé n'attend plus aucun « Prêt » (l'inscription y reste, la lecture
-    // des contacts la tait) ; un match joué entre la lecture et ce verrou est
-    // de l'histoire, qu'on ne réécrit pas.
-    if (row.status === "COMPLETED") return;
-    // Phase allumée : lancé = `launched_at` posé, y compris sans phase de
-    // lancement (heure passée, entretien pas encore passé : pas encore lancé).
-    const phase = matchLaunchPhase({ ...toLaunchInput(row), launchPhase: true }, Date.now());
-    if (phase !== "TO_PLAN" && phase !== "SCHEDULED" && phase !== "LOBBY") return;
-    // Un caster devenu joueur du match (équipe rejointe après l'inscription,
-    // que `CASTER_IS_PLAYER` ne contrôle qu'à l'inscription) ne donnera jamais
-    // son « Prêt » de caster : son inscription bloquerait le départ jusqu'au
-    // lancement d'office.
-    // Le motif dit au caster : les conditions du cast d'abord, l'équipe ensuite.
-    if ((await loadCastEligibility(connection, casterId)) === null) {
-      if ((await resolveTeamParty(connection, row, casterId)) === null) return;
-      reason = "JOINED_TEAM";
-    }
+  await retryOnDeadlock(() =>
+    inTransaction(async (connection) => {
+      const row = await lockLaunchMatch(connection, matchId);
+      if (!row?.casters.some((caster) => caster.userId === casterId)) return;
+      // Seul un match qui attend encore son lancement est concerné. Un match
+      // lancé n'attend plus aucun « Prêt » (l'inscription y reste, la lecture
+      // des contacts la tait) ; un match joué entre la lecture et ce verrou est
+      // de l'histoire, qu'on ne réécrit pas.
+      if (row.status === "COMPLETED") return;
+      // Phase allumée : lancé = `launched_at` posé, y compris sans phase de
+      // lancement (heure passée, entretien pas encore passé : pas encore lancé).
+      const phase = matchLaunchPhase({ ...toLaunchInput(row), launchPhase: true }, Date.now());
+      if (phase !== "TO_PLAN" && phase !== "SCHEDULED" && phase !== "LOBBY") return;
+      // Un caster devenu joueur du match (équipe rejointe après l'inscription,
+      // que `CASTER_IS_PLAYER` ne contrôle qu'à l'inscription) ne donnera jamais
+      // son « Prêt » de caster : son inscription bloquerait le départ jusqu'au
+      // lancement d'office.
+      // Le motif dit au caster : les conditions du cast d'abord, l'équipe ensuite.
+      if ((await loadCastEligibility(connection, casterId)) === null) {
+        if ((await resolveTeamParty(connection, row, casterId)) === null) return;
+        reason = "JOINED_TEAM";
+      }
 
-    await connection.execute(`DELETE FROM bg_match_casters WHERE match_id = ? AND user_id = ?`, [matchId, casterId]);
-    await pruneMatchStreams(connection, matchId);
-    if (row.tournament_state === "RUNNING") await launchIfAllReady(connection, matchId);
-    tournamentId = Number(row.tournament_id);
-  });
+      await connection.execute(`DELETE FROM bg_match_casters WHERE match_id = ? AND user_id = ?`, [matchId, casterId]);
+      await pruneMatchStreams(connection, matchId);
+      if (row.tournament_state === "RUNNING") await launchIfAllReady(connection, matchId);
+      tournamentId = Number(row.tournament_id);
+    }),
+  );
   if (tournamentId === null) return false;
   publishMatchUpdatedEvent(tournamentId, { landingLive: true });
   announceCastChange({ kind: "AUTO_RELEASED", matchId, casterId, reason });

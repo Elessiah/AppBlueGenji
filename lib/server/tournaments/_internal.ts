@@ -318,7 +318,11 @@ export function mapMatch(row: MatchRow, extras: MatchCastExtras = {}): BracketMa
     liveTrigger: row.live_trigger ?? null,
     liveUrl: normalizeStreamUrl(row.live_url),
     // Revalidés à la lecture, comme le premier lien.
-    streams: (extras.streams ?? []).map((stream) => ({ id: stream.id, liveUrl: normalizeStreamUrl(stream.liveUrl) })),
+    streams: (extras.streams ?? []).map((stream) => ({
+      id: stream.id,
+      liveUrl: normalizeStreamUrl(stream.liveUrl),
+      staff: stream.staff,
+    })),
     liveStartedAt: toIso(row.live_started_at),
     ...mapMatchLaunch(row, extras.casters ?? []),
     replayUrl: normalizeReplayUrl(row.replay_url ?? null),

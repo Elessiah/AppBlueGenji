@@ -548,10 +548,15 @@ export type MatchScoreReport = {
   maps: MatchMapResult[];
 };
 
-/** Un stream d'un match : son lien (`null` = pas encore de lien public). */
+/**
+ * Un stream d'un match : son lien (`null` = pas encore de lien public).
+ * `staff` : le stream du match, dont la configuration du direct règle le lien ;
+ * sinon, un stream qu'un caster a ouvert.
+ */
 export type MatchStream = {
   id: number;
   liveUrl: string | null;
+  staff: boolean;
 };
 
 /** Un caster d'un match : pseudo public, stream rejoint, « Prêt » propre. */

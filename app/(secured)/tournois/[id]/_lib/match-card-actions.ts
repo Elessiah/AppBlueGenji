@@ -92,7 +92,12 @@ export function matchCardActionList(
     [launch.showForce, "force", t("cardActions.force"), "warn"],
     [launch.showHostSwap, "hostSwap", t("cardActions.hostSwap"), "staff"],
     [launch.showClaim, "claimCast", t("cardActions.claimCast"), "neutral"],
-    [launch.showRelease, "releaseCast", either(launch.isCaster, t("cardActions.stopCasting"), t("cardActions.removeCaster")), "neutral"],
+    [
+      launch.showRelease,
+      "releaseCast",
+      either(launch.isCaster && !launch.releasesOthers, t("cardActions.stopCasting"), t("cardActions.removeCaster")),
+      "neutral",
+    ],
     [input.showOnAir, "onAir", either(input.onAir, t("cardActions.stopLive"), t("cardActions.startLive")), "neutral"],
     [
       input.showLiveConfig,
