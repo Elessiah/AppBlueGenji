@@ -851,7 +851,8 @@ export function RgpdEn({
             staff&apos;s other actions on a match or a tournament (result confirmed, forced launch, host, broadcast,
             replay, tournament edited, seeding, ghost teams, image), with the match&apos;s team names (“a player” in a
             solo tournament), without naming their author (“the staff”, or “a caster” for broadcasting) or writing
-            anything to the server logs.
+            anything to the server logs, except, when the log line could not be written, the action and the match or
+            tournament number, without its author.
           </p>
         </div>
       </section>

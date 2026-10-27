@@ -1034,7 +1034,8 @@ function RgpdFr({
             les autres gestes du staff sur un match ou un tournoi (résultat validé, lancement forcé, hôte, diffusion,
             rediffusion, modification du tournoi, têtes de série, équipes fantômes, image) aussi, avec les noms
             d&apos;équipe du match (« un joueur » en tournoi individuel), sans nommer leur auteur (« le staff », ou
-            « un caster » pour la diffusion) ni rien noter dans les journaux du serveur.
+            « un caster » pour la diffusion) ni rien noter dans les journaux du serveur, sauf, quand la ligne n&apos;a pu
+            être rédigée, le geste et le numéro du match ou du tournoi, sans auteur.
           </p>
         </div>
       </section>
