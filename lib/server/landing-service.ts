@@ -417,17 +417,19 @@ export async function getLandingLeaderboard(
   game?: TournamentGame,
 ): Promise<LandingLeaderboardRow[]> {
   const safeLimit = Math.min(50, Math.max(1, Math.trunc(limit)));
-  return cachedLanding(`${LANDING_LEADERBOARD_KEY_PREFIX}${safeLimit}:${game ?? "all"}`, LANDING_TTL_MS, () =>
-    loadLandingLeaderboard(safeLimit, game),
+  // Une entrée **par jeu**, la liste entière, découpée à la lecture : la
+  // longueur est choisie par le client (1–50), et une entrée par longueur
+  // refaisait tout le rejeu pour n'en garder qu'une tranche. Les rangs et les
+  // tendances ne dépendent pas de la longueur : la tranche est la même.
+  const rows = await cachedLanding(`${LANDING_LEADERBOARD_KEY_PREFIX}${game ?? "all"}`, LANDING_TTL_MS, () =>
+    loadLandingLeaderboard(game),
   );
+  return rows.slice(0, safeLimit);
 }
 
-async function loadLandingLeaderboard(
-  safeLimit: number,
-  game: TournamentGame | undefined,
-): Promise<LandingLeaderboardRow[]> {
+async function loadLandingLeaderboard(game: TournamentGame | undefined): Promise<LandingLeaderboardRow[]> {
   try {
-    return await loadLeaderboardRows(game, safeLimit);
+    return await loadLeaderboardRows(game);
   } catch {
     return [];
   }
