@@ -11,6 +11,7 @@ import {
   markMatchResolved,
   queueBotLog,
   queueRefereeAlert,
+  queueRoundNoRefereeAlert,
   resolveBotLogs,
 } from "@/lib/server/tournaments/bot-logs";
 import {
@@ -702,7 +703,13 @@ describe("alerte « sans arbitre » d'une manche sans horaire", () => {
     const connection = fakeConnection();
     mockDb([[MATCH_ROW], [{ ...MATCH_ROW, id: 32, team1_name: "Alpha", team2_name: "Bravo" }]]);
 
-    queueBotLog(connection, { kind: "match_no_referee", matchId: 31, pairing: "ROUND", roundMatchIds: [31, 32], claimId: 9 });
+    queueBotLog(connection, {
+      kind: "match_no_referee",
+      matchId: 31,
+      pairing: "10:20",
+      roundMatchIds: [31, 32],
+      roundClaimIds: [8, 9],
+    });
     flushBotLogs(connection);
     await new Promise((resolve) => setImmediate(resolve));
     await new Promise((resolve) => setImmediate(resolve));
@@ -712,5 +719,119 @@ describe("alerte « sans arbitre » d'une manche sans horaire", () => {
     const [message] = jest.mocked(pushRefereeAlert).mock.calls[0];
     expect(message).toContain("Les Renards vs Team Nova (match #31) ; Alpha vs Bravo (match #32)");
     expect(message).toContain("2 matchs en lancement sans arbitre ni autogestion");
+  });
+
+  it("bot injoignable : rend la réservation de chaque match listé", async () => {
+    const connection = fakeConnection();
+    const execute = mockDb([[MATCH_ROW], [{ ...MATCH_ROW, id: 32 }]]);
+    jest.mocked(pushRefereeAlert).mockResolvedValue(null);
+
+    queueBotLog(connection, {
+      kind: "match_no_referee",
+      matchId: 31,
+      pairing: "10:20",
+      roundMatchIds: [31, 32],
+      roundClaimIds: [8, 9],
+    });
+    flushBotLogs(connection);
+    for (let tick = 0; tick < 5; tick += 1) await new Promise((resolve) => setImmediate(resolve));
+
+    const released = execute.mock.calls
+      .filter(([sql]) => String(sql).startsWith("DELETE FROM bg_referee_alerts WHERE id = ?"))
+      .map(([, params]) => params);
+    expect(released).toEqual([[8], [9]]);
+  });
+});
+
+/**
+ * `queueRoundNoRefereeAlert` (revue de #487) : chaque match d'une manche sans
+ * horaire garde sa réservation par appariement — sur sa propre ligne —, si
+ * bien que la clôture d'un match n'en réveille aucun autre, et qu'un match
+ * entré en lancement plus tard part dans une alerte de suite.
+ */
+describe("queueRoundNoRefereeAlert", () => {
+  type Reservations = { rows: string[]; failOn?: number; error?: Error };
+
+  function roundConnection(state: Reservations): PoolConnection {
+    return {
+      execute: async (sql: string, params: unknown[] = []) => {
+        const key = `${params[0]}:${params[1]}`;
+        if (state.failOn === Number(params[0])) throw state.error ?? new Error("ER_LOCK_WAIT_TIMEOUT");
+        if (sql.startsWith("SELECT 1 FROM bg_referee_alerts")) return [state.rows.includes(key) ? [{ 1: 1 }] : [], []];
+        if (sql.startsWith("INSERT IGNORE INTO bg_referee_alerts")) {
+          state.rows.push(key);
+          return [{ affectedRows: 1, insertId: 700 + state.rows.length }, []];
+        }
+        if (sql.startsWith("DELETE FROM bg_referee_alerts")) return [{ affectedRows: 1 }, []];
+        throw new Error(`requête inattendue : ${sql}`);
+      },
+    } as unknown as PoolConnection;
+  }
+
+  const roundOf = (...ids: number[]) => ids.map((matchId) => ({ matchId, pairing: `${matchId}0:${matchId}1` }));
+
+  async function flushedMessages(connection: PoolConnection): Promise<string[]> {
+    flushBotLogs(connection);
+    for (let tick = 0; tick < 5; tick += 1) await new Promise((resolve) => setImmediate(resolve));
+    return jest.mocked(pushRefereeAlert).mock.calls.map(([message]) => message);
+  }
+
+  it("réserve chaque match sous sa clé d'appariement et met une seule alerte en file", async () => {
+    const state: Reservations = { rows: [] };
+    const connection = roundConnection(state);
+    mockDb([[MATCH_ROW], [{ ...MATCH_ROW, id: 32, team1_name: "Alpha", team2_name: "Bravo" }]]);
+
+    expect(await queueRoundNoRefereeAlert(connection, roundOf(31, 32))).toBe(true);
+    expect(state.rows).toEqual(["31:NO_REFEREE:310:311", "32:NO_REFEREE:320:321"]);
+    const messages = await flushedMessages(connection);
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toContain("(match #31) ; Alpha vs Bravo (match #32)");
+  });
+
+  it("ne relist jamais un match signalé : un match entré plus tard part seul, en alerte de suite", async () => {
+    const state: Reservations = { rows: [] };
+    const connection = roundConnection(state);
+    expect(await queueRoundNoRefereeAlert(connection, roundOf(31, 32))).toBe(true);
+    discardBotLogs(connection);
+
+    const later = roundConnection(state);
+    mockDb([[{ ...MATCH_ROW, id: 33, team1_name: "Charlie", team2_name: "Delta" }]]);
+    expect(await queueRoundNoRefereeAlert(later, roundOf(31, 32, 33))).toBe(true);
+    expect(state.rows).toEqual(["31:NO_REFEREE:310:311", "32:NO_REFEREE:320:321", "33:NO_REFEREE:330:331"]);
+    const messages = await flushedMessages(later);
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toContain("Charlie vs Delta (match #33)");
+    expect(messages[0]).not.toContain("(match #31)");
+    expect(messages[0]).toContain("1 match en lancement");
+  });
+
+  it("se tait quand tous les matchs sont déjà signalés", async () => {
+    const state: Reservations = { rows: ["31:NO_REFEREE:310:311"] };
+    expect(await queueRoundNoRefereeAlert(roundConnection(state), roundOf(31))).toBe(false);
+    expect(state.rows).toHaveLength(1);
+  });
+
+  it("une réservation inaccessible arrête la liste à ce qui est réservé", async () => {
+    const state: Reservations = { rows: [], failOn: 32 };
+    const connection = roundConnection(state);
+    mockDb([[MATCH_ROW]]);
+    expect(await queueRoundNoRefereeAlert(connection, roundOf(31, 32, 33))).toBe(true);
+    expect(state.rows).toEqual(["31:NO_REFEREE:310:311"]);
+    const messages = await flushedMessages(connection);
+    expect(messages[0]).toContain("1 match en lancement");
+  });
+
+  it("un interblocage remonte : la transaction de l'entretien est défaite", async () => {
+    const deadlock = Object.assign(new Error("Deadlock found"), { code: "ER_LOCK_DEADLOCK" });
+    const state: Reservations = { rows: [], failOn: 31, error: deadlock };
+    await expect(queueRoundNoRefereeAlert(roundConnection(state), roundOf(31))).rejects.toBe(deadlock);
+  });
+
+  it("bot coupé ou liste vide : ni lecture ni réservation", async () => {
+    const state: Reservations = { rows: [] };
+    expect(await queueRoundNoRefereeAlert(roundConnection(state), [])).toBe(false);
+    jest.mocked(isBotCircuitOpen).mockReturnValue(true);
+    expect(await queueRoundNoRefereeAlert(roundConnection(state), roundOf(31))).toBe(false);
+    expect(state.rows).toEqual([]);
   });
 });

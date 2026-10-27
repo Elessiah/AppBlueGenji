@@ -6,35 +6,28 @@ jest.mock("@/lib/server/tournaments/cast-notices");
 jest.mock("@/lib/server/tournaments/referee-notices");
 jest.mock("@/lib/server/tournaments/bot-logs", () => ({
   queueRefereeAlert: jest.fn(async () => true),
+  queueRoundNoRefereeAlert: jest.fn(async () => true),
   flushBotLogs: jest.fn(),
   discardBotLogs: jest.fn(),
 }));
 
 import type { PoolConnection } from "mysql2/promise";
 import { queueNoRefereeAlerts } from "@/lib/server/tournaments/match-launch";
-import { queueRefereeAlert } from "@/lib/server/tournaments/bot-logs";
+import { queueRefereeAlert, queueRoundNoRefereeAlert } from "@/lib/server/tournaments/bot-logs";
 import type { NoRefereeCandidate } from "@/lib/shared/match-referee";
 
 /**
  * Décision de l'utilisateur du 2026-10-27 (`MATCH_REFEREE.md` § Avertissement) :
  * match planifié → une alerte par match (clé par appariement) ; matchs sans
- * horaire → une alerte par manche, qui les liste, réservée sur le premier
- * match de la manche.
+ * horaire → une alerte par manche, qui les liste — chacun y garde sa
+ * réservation par appariement (`queueRoundNoRefereeAlert`).
  */
-const ANCHOR = 100;
-
-function connection(): { conn: PoolConnection; anchorQueries: unknown[][] } {
-  const anchorQueries: unknown[][] = [];
-  const conn = {
-    execute: async (sql: string, params: unknown[] = []) => {
-      if (sql.includes("SELECT MIN(id) AS id FROM bg_matches")) {
-        anchorQueries.push(params);
-        return [[{ id: ANCHOR }], []];
-      }
+function connection(): PoolConnection {
+  return {
+    execute: async (sql: string) => {
       throw new Error(`requête inattendue : ${sql}`);
     },
   } as unknown as PoolConnection;
-  return { conn, anchorQueries };
 }
 
 const candidate = (overrides: Partial<NoRefereeCandidate>): NoRefereeCandidate => ({
@@ -49,12 +42,12 @@ const candidate = (overrides: Partial<NoRefereeCandidate>): NoRefereeCandidate =
 
 beforeEach(() => {
   jest.mocked(queueRefereeAlert).mockClear();
+  jest.mocked(queueRoundNoRefereeAlert).mockClear();
 });
 
 describe("queueNoRefereeAlerts", () => {
   it("match planifié : une alerte par match, par appariement", async () => {
-    const { conn, anchorQueries } = connection();
-    await queueNoRefereeAlerts(conn, 7, [
+    await queueNoRefereeAlerts(connection(), [
       candidate({ matchId: 101, pairing: "10:20", scheduled: true }),
       candidate({ matchId: 102, pairing: "30:40", scheduled: true }),
     ]);
@@ -62,63 +55,59 @@ describe("queueNoRefereeAlerts", () => {
       { kind: "match_no_referee", matchId: 101, pairing: "10:20" },
       { kind: "match_no_referee", matchId: 102, pairing: "30:40" },
     ]);
-    expect(anchorQueries).toEqual([]);
+    expect(queueRoundNoRefereeAlert).not.toHaveBeenCalled();
   });
 
-  it("manche sans horaire : une seule alerte qui liste ses N matchs, portée par le premier match de la manche", async () => {
-    const { conn, anchorQueries } = connection();
-    await queueNoRefereeAlerts(conn, 7, [
-      candidate({ matchId: 105 }),
-      candidate({ matchId: 103 }),
-      candidate({ matchId: 104 }),
+  it("manche sans horaire : une seule alerte qui liste ses N matchs, chacun avec son appariement", async () => {
+    await queueNoRefereeAlerts(connection(), [
+      candidate({ matchId: 105, pairing: "5:6" }),
+      candidate({ matchId: 103, pairing: "1:2" }),
+      candidate({ matchId: 104, pairing: "3:4" }),
     ]);
-    expect(jest.mocked(queueRefereeAlert)).toHaveBeenCalledTimes(1);
-    expect(jest.mocked(queueRefereeAlert).mock.calls[0][1]).toEqual({
-      kind: "match_no_referee",
-      matchId: ANCHOR,
-      pairing: "ROUND",
-      roundMatchIds: [103, 104, 105],
-    });
-    expect(anchorQueries).toEqual([[7, 3, "UPPER", 2]]);
+    expect(queueRefereeAlert).not.toHaveBeenCalled();
+    expect(jest.mocked(queueRoundNoRefereeAlert).mock.calls.map(([, matches]) => matches)).toEqual([
+      [
+        { matchId: 103, pairing: "1:2" },
+        { matchId: 104, pairing: "3:4" },
+        { matchId: 105, pairing: "5:6" },
+      ],
+    ]);
   });
 
   it("manche mixte : le match planifié à part, les sans horaire groupés", async () => {
-    const { conn } = connection();
-    await queueNoRefereeAlerts(conn, 7, [
+    await queueNoRefereeAlerts(connection(), [
       candidate({ matchId: 110, pairing: "1:2", scheduled: true }),
-      candidate({ matchId: 111 }),
-      candidate({ matchId: 112 }),
+      candidate({ matchId: 111, pairing: "3:4" }),
+      candidate({ matchId: 112, pairing: "5:6" }),
     ]);
     expect(jest.mocked(queueRefereeAlert).mock.calls.map(([, entry]) => entry)).toEqual([
       { kind: "match_no_referee", matchId: 110, pairing: "1:2" },
-      { kind: "match_no_referee", matchId: ANCHOR, pairing: "ROUND", roundMatchIds: [111, 112] },
+    ]);
+    expect(jest.mocked(queueRoundNoRefereeAlert).mock.calls.map(([, matches]) => matches)).toEqual([
+      [
+        { matchId: 111, pairing: "3:4" },
+        { matchId: 112, pairing: "5:6" },
+      ],
     ]);
   });
 
-  it("lecture du premier match en échec : l'alerte de la manche se tait, l'entretien continue", async () => {
-    const conn = {
-      execute: async () => {
-        throw new Error("ER_LOCK_WAIT_TIMEOUT");
-      },
-    } as unknown as PoolConnection;
-    await expect(queueNoRefereeAlerts(conn, 7, [candidate({ matchId: 120 })])).resolves.toBeUndefined();
-    expect(queueRefereeAlert).not.toHaveBeenCalled();
+  it("deux manches sans horaire : une alerte chacune", async () => {
+    await queueNoRefereeAlerts(connection(), [
+      candidate({ matchId: 120 }),
+      candidate({ matchId: 121, roundNumber: 3 }),
+    ]);
+    expect(queueRoundNoRefereeAlert).toHaveBeenCalledTimes(2);
   });
 
-  it("transaction défaite pendant la lecture : l'erreur remonte", async () => {
-    const aborted = Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK", errno: 1213 });
-    const conn = {
-      execute: async () => {
-        throw aborted;
-      },
-    } as unknown as PoolConnection;
-    await expect(queueNoRefereeAlerts(conn, 7, [candidate({ matchId: 121 })])).rejects.toBe(aborted);
+  it("une erreur de réservation remonte telle quelle (interblocage)", async () => {
+    const deadlock = Object.assign(new Error("Deadlock found"), { code: "ER_LOCK_DEADLOCK" });
+    jest.mocked(queueRoundNoRefereeAlert).mockRejectedValueOnce(deadlock);
+    await expect(queueNoRefereeAlerts(connection(), [candidate({ matchId: 130 })])).rejects.toBe(deadlock);
   });
 
-  it("rien à signaler : aucune alerte, aucune lecture", async () => {
-    const { conn, anchorQueries } = connection();
-    await queueNoRefereeAlerts(conn, 7, []);
+  it("rien à signaler : aucune alerte", async () => {
+    await queueNoRefereeAlerts(connection(), []);
     expect(queueRefereeAlert).not.toHaveBeenCalled();
-    expect(anchorQueries).toEqual([]);
+    expect(queueRoundNoRefereeAlert).not.toHaveBeenCalled();
   });
 });

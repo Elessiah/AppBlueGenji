@@ -276,9 +276,6 @@ function readRefereeRows(state: World, sql: string, params: unknown[]): [unknown
     state.alerts = [...(state.alerts ?? []), `${params[0]}:${params[1]}`];
     return [{ affectedRows: 1, insertId: state.alerts.length }, []];
   }
-  if (sql.startsWith("SELECT MIN(id) AS id FROM bg_matches")) {
-    return [[{ id: state.match?.id ?? null }], []];
-  }
   if (sql.startsWith("SELECT tournament_id, status, first_map FROM bg_matches")) {
     return [state.match ? [{ ...state.match }] : [], []];
   }
@@ -1326,14 +1323,22 @@ describe("maintainMatchLaunches — avertissement « sans arbitre »", () => {
     expect(state.alerts).toEqual([`42:NO_REFEREE:${TEAM1}:${TEAM2}`, `42:NO_REFEREE:${TEAM1}:30`]);
   });
 
-  it("match sans horaire : une alerte pour sa manche, réservée une seule fois (réappariement compris)", async () => {
+  it("match sans horaire : alerte de sa manche, réservée par appariement sur le match lui-même", async () => {
     await maintainMatchLaunches(connection(), 7);
     await maintainMatchLaunches(connection(), 7);
-    expect(state.alerts).toEqual(["42:NO_REFEREE_ROUND"]);
+    expect(state.alerts).toEqual([`42:NO_REFEREE:${TEAM1}:${TEAM2}`]);
+    // Réappariement : il repart sans décision, le staff est de nouveau averti.
     state.match = matchState({ ...state.match, team2_id: 30, launch_pairing: `${TEAM1}:${TEAM2}` });
     await maintainMatchLaunches(connection(), 7);
-    expect(state.alerts).toEqual(["42:NO_REFEREE_ROUND"]);
+    expect(state.alerts).toEqual([`42:NO_REFEREE:${TEAM1}:${TEAM2}`, `42:NO_REFEREE:${TEAM1}:30`]);
     expect(state.match?.self_managed).toBe(0);
+  });
+
+  it("une heure posée après coup ne signale pas le match une seconde fois", async () => {
+    await maintainMatchLaunches(connection(), 7);
+    state.match = matchState({ ...state.match, start_at: "2026-09-24 19:00:00" });
+    await maintainMatchLaunches(connection(), 7);
+    expect(state.alerts).toEqual([`42:NO_REFEREE:${TEAM1}:${TEAM2}`]);
   });
 
   it("se tait sur un match arbitré ou en autogestion", async () => {

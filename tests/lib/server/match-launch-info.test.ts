@@ -151,12 +151,8 @@ function castersOf(c: Candidate) {
   }));
 }
 
-/**
- * Lectures des streams (aucun ici) et des casters des candidats — et du premier
- * match de la manche, porteur de l'alerte « sans arbitre » groupée.
- */
+/** Lectures des streams (aucun ici) et des casters des candidats. */
 function readCastRows(world: World, sql: string, params: unknown[]): unknown[] | null {
-  if (sql.startsWith("SELECT MIN(id) AS id FROM bg_matches")) return [[{ id: world.candidates[0]?.id ?? null }], []];
   if (sql.includes("FROM bg_match_streams")) return [[], []];
   if (!sql.startsWith("SELECT match_id, user_id, stream_id, ready_at FROM bg_match_casters")) return null;
   const ids = new Set(params.map(Number));
