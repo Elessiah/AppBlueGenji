@@ -187,6 +187,9 @@
     "nextYear": "Next year",
     "warnLive": "This match goes on air at its start date: without a date, it will stay “scheduled” and never start.",
     "warnPlanning": "Without a date, this match goes back to “To schedule”: it won't launch until a new time is set.",
+    "warnPast": "This date has already passed: once saved, the match moves straight into launch. Check the day and month.",
+    "warnPastDirect": "This date has already passed: once saved, the match is launched right away. Check the day and month.",
+    "warnPastTbd": "This date has already passed: the match will start as soon as both its opponents are known. Check the day and month.",
     "clear": "Clear the date"
   },
   "ghost": {

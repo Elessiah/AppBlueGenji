@@ -309,6 +309,16 @@ export function matchEntryDefaultMonth(now: number): number {
 }
 
 /**
+ * Une date saisie **déjà passée** et différente de celle déjà posée : le
+ * dialogue avertit avant l'envoi, car un match non lancé part alors sans
+ * attendre. Le mois présélectionné (`matchEntryDefaultMonth`) rend le cas
+ * facile : le 31, un jour « 2 » choisi seul tombe au 2 du mois en cours.
+ */
+export function isPastMatchStartChange(instant: number, current: number | null, now: number): boolean {
+  return Number.isFinite(instant) && instant < now && instant !== current;
+}
+
+/**
  * Choix de la liste des heures : les quarts d'heure, plus l'heure déjà posée si
  * elle tombe entre deux (`20:50`, posée par un autre chemin) — insérée à sa
  * place, pour qu'elle s'affiche telle quelle et reste gardée tant qu'on n'y
