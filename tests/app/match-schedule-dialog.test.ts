@@ -117,18 +117,27 @@ describe("MatchScheduleDialog — date déjà passée", () => {
     expect(SOURCE).toContain("<PastDateWarning message={pastWarning === null ? null : t(pastWarning)} />");
   });
 
-  it("une date devenue passée fenêtre ouverte : l'envoi retenu fait défiler l'avertissement, le focus reste sur l'envoi", () => {
+  it("une date devenue passée fenêtre ouverte : l'envoi retenu fait défiler l'avertissement et l'envoi, le focus reste sur l'envoi", () => {
     // À 375 px l'avertissement pouvait être sous le pli, et le clic semblait
-    // sans effet. Focus inchangé : un second « Entrée » confirme (déplacé, la
-    // tabulation suivante tombait sur « Vider la date »). Pas de notification
+    // sans effet ; il repousse le bouton, qu'on ramène aussi dans la vue. Focus
+    // inchangé : un second « Entrée » confirme. Pas de notification
     // `role="alert"`, qui aurait coupé la région d'état au lecteur d'écran.
     expect(SOURCE).toMatch(
-      /if \(pastWarning === null && pastWarningAt\(now\) !== null\) \{\s*setClock\(now\);\s*requestAnimationFrame\(\(\) => document\.getElementById\(PAST_WARNING_ID\)\?\.scrollIntoView\(\{ block: "nearest" \}\)\);\s*return;/,
+      /if \(pastWarning === null && pastWarningAt\(now\) !== null\) \{\s*setClock\(now\);\s*heldBackAt\.current = now;\s*requestAnimationFrame\(\(\) => \{\s*document\.getElementById\(PAST_WARNING_ID\)\?\.scrollIntoView\(\{ block: "nearest" \}\);\s*document\.getElementById\(SUBMIT_ID\)\?\.scrollIntoView\(\{ block: "nearest" \}\);\s*\}\);\s*return;/,
     );
+    expect(SOURCE).toMatch(/<button\s+id=\{SUBMIT_ID\}\s+type="submit"/);
     expect(SOURCE).not.toMatch(/getElementById\(PAST_WARNING_ID\)\?\.focus/);
     expect(SOURCE).toContain("<output id={PAST_WARNING_ID} style=");
     expect(SOURCE).not.toContain("warnPastLate");
   });
+
+  it("le second clic d'un double-clic ne vaut pas confirmation", () => {
+    expect(SOURCE).toContain("export const LATE_WARNING_CONFIRM_DELAY_MS = 600;");
+    expect(SOURCE).toContain("if (now - heldBackAt.current < LATE_WARNING_CONFIRM_DELAY_MS) return;");
+    // Le garde suit le hold-back, avant tout envoi.
+    expect(SOURCE.indexOf("heldBackAt.current < LATE_WARNING_CONFIRM_DELAY_MS")).toBeLessThan(SOURCE.indexOf("setBusy(true);"));
+  });
+
 
 
 
