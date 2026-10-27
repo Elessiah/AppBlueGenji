@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/tournaments/live-streams");
+jest.mock("@/lib/server/tournaments/staff-action-logs");
 
 import { PUT as putTournamentLive } from "@/app/api/admin/tournaments/[id]/live/route";
 import {

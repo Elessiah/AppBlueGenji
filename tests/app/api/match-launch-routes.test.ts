@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/tournaments/match-launch");
 jest.mock("@/lib/server/tournaments/match-launch-info");
+jest.mock("@/lib/server/tournaments/staff-action-logs");
 
 import { POST as readyPost } from "@/app/api/matches/[matchId]/ready/route";
 import { DELETE as casterDelete, POST as casterPost } from "@/app/api/matches/[matchId]/caster/route";
