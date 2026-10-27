@@ -138,4 +138,8 @@ describe("MatchScheduleDialog — sous-titre", () => {
     expect(SOURCE).toContain('<EntrantName teamId={match.team2Id} name={match.team2Name ?? "TBD"} />');
     expect(SOURCE).not.toContain('{match.team1Name ?? "TBD"} vs');
   });
+
+  it("ouvre le focus sur le jour, pas sur le lien du premier engagé du sous-titre", () => {
+    expect(SOURCE).toMatch(/<select\s+data-autofocus\s+id=\{FIELD_IDS\.day\}/);
+  });
 });

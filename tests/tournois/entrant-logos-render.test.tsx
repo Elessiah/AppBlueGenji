@@ -300,6 +300,17 @@ describe("EntrantName — forme affichable d'un nom resté en base", () => {
     expect(html).toContain(">E</span>");
   });
 
+  it("garde octet pour octet un nom stylisé (sans NFKC : il se lit comme sur sa fiche)", () => {
+    const html = withEntrants(<EntrantName teamId={2} name="ＢＬＵＥ Team²" />);
+    expect(html).toContain(">ＢＬＵＥ Team²</a>");
+  });
+
+  it("nomme « Engagé #id » un engagé dont le nom ne garde rien — jamais un lien vide", () => {
+    const html = withEntrants(<EntrantName teamId={2} name={`${ZWSP}${RLO}`} />);
+    expect(html).toContain(">Engagé #2</a>");
+    expect(html).toContain(">E</span>");
+  });
+
   it("rend tel quel le libellé d'une case vide (TBD)", () => {
     const html = withEntrants(<EntrantName teamId={null} name="TBD" />);
     expect(html).toContain(">TBD</span>");

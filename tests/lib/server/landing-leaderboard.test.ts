@@ -290,6 +290,14 @@ describe("leaderboard de la landing", () => {
     expect(rows.map((row) => row.teamName)).toEqual(["Alpha", null]);
   });
 
+  it("garde un nom stylisé tel qu'il est sur la fiche (sans NFKC)", async () => {
+    await mockDb([teamRow(1, "ＢＬＵＥ Team²"), teamRow(2, "Yann")], [matchRow(1, 1, 2, 1)]);
+
+    const rows = await getLandingLeaderboard(8);
+
+    expect(rows.map((row) => row.teamName)).toContain("ＢＬＵＥ Team²");
+  });
+
   it("départage deux équipes à égalité sur le nom affiché, pas sur le nom brut", async () => {
     // Bilans identiques (1 et 2 gagnent chacune contre une équipe à la cote de
     // départ). Brut, « ␠␠Zed » passerait devant « Yann » par ses espaces de

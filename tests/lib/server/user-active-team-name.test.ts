@@ -21,6 +21,11 @@ describe("getUserActiveTeam — nom de l'équipe", () => {
     });
   });
 
+  it("garde un nom stylisé tel qu'il est sur la fiche (sans NFKC)", async () => {
+    const team = await getUserActiveTeam(1, connectionWith("ＢＬＵＥ  Team²"));
+    expect(team?.teamName).toBe("ＢＬＵＥ  Team²");
+  });
+
   it("rend un nom vide quand il ne garde rien de visible (le menu retombe sur « Mon équipe »)", async () => {
     const team = await getUserActiveTeam(1, connectionWith(String.fromCodePoint(0x200b, 0x2060)));
     expect(team?.teamName).toBe("");
