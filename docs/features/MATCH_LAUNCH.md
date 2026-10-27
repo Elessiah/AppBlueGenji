@@ -339,9 +339,11 @@ l'effacement complet la retire de tous ses matchs (`withdrawUserCasts`, puis la
 clé étrangère `CASCADE`), avec le stream qu'il était seul à tenir — même celui
 qui porte le premier lien du match, puisque c'est le lien de sa chaîne.
 Dans les deux cas, **chaque lien qu'il a fourni** (`bg_match_streams.link_user_id`,
-posé à l'ouverture de son stream) est retiré, matchs joués compris et même
-d'un stream qu'un co-caster tient encore : le stream reste à ce co-caster,
-sans lien. Le lien du staff (`staff_owned`) n'est jamais touché.
+posé à l'ouverture de son stream, ou dans la configuration du direct par un
+compte sans la permission `tournaments` — un caster à la seule permission
+`live`) est retiré, matchs joués compris et même d'un stream qu'un co-caster
+tient encore : le stream reste à ce co-caster, sans lien. Le lien de
+l'organisation (`link_user_id` nul) n'est jamais touché.
 
 ## Casters et streams
 

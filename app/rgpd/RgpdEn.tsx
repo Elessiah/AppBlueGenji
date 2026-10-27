@@ -934,9 +934,10 @@ export function RgpdEn({
             <strong>Match streaming.</strong> A tournament match may be streamed live and recorded on{" "}
             <strong>YouTube, Twitch or Kick</strong>, on the association&apos;s channel or that of one or more
             casters: each caster joins a stream of the match or opens their own, with its own link (optional),
-            published with the match. That stream goes, with its link, once no caster holds it any more; the link a
-            caster provided also goes when their account is deleted, played matches included, even if another caster
-            still holds that stream; only the link set by the organizers stays with the match.{" "}
+            published with the match. That stream goes, with its link, once no caster holds it any more; only the link
+            set in the match&apos;s live configuration (by the organizers or a caster) stays with the match. The link a
+            caster provided, there or when opening their stream, also goes when their account is deleted, played
+            matches included, even if another caster still holds that stream.{" "}
             {STREAM_NOTICE_SHOWN_EN} This processing is based on the association&apos;s legitimate interest in
             promoting its competitions. <EnglishLegalText text={STREAM_NOTICE_OBJECTION_EN} /> A replay link that shows the player is then
             removed from the site, and a video published by the association&apos;s channel is hidden or deleted.
