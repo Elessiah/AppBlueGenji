@@ -283,7 +283,7 @@ describe("leaderboard de la landing", () => {
     // Un nom ancien peut garder un renversement bidi ou n'être fait que de
     // caractères invisibles (`UNTRUSTED_NAMES.md`) ; vide, il part à `null` et
     // la vue pose son repli traduit — la ligne est commune aux deux langues.
-    await mockDb([teamRow(1, "Al‮pha"), teamRow(2, "​‍")], [matchRow(1, 1, 2, 1)]);
+    await mockDb([teamRow(1, "Al\u202Epha"), teamRow(2, "\u200B\u200D")], [matchRow(1, 1, 2, 1)]);
 
     const rows = await getLandingLeaderboard(8);
 
