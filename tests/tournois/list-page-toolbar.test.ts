@@ -32,7 +32,7 @@ describe("page tournois — barre de recherche et filtres", () => {
 
   it("les pastilles de jeu annoncent leur état et leur compte au lecteur d'écran", () => {
     expect(page).toContain("aria-pressed={gameFilter === key}");
-    expect(page).toContain('aria-label={t("list.countLabel", { label, count: String(count) })}');
+    expect(page).toContain('aria-label={listLoaded ? t("list.countLabel", { label, count: String(count) }) : undefined}');
     expect(frTournaments.list.countLabel).toBe("{label} ({count})");
     // Le nombre visible ne double pas ce que l'aria-label dit déjà.
     expect(page).toMatch(/<span className=\{s\.num\} aria-hidden="true">/);
@@ -46,6 +46,17 @@ describe("page tournois — barre de recherche et filtres", () => {
   it("une page vidée par un filtre le dit, distinctement d'une page réellement vide", () => {
     expect(page).toContain('sectionEmptyMessage(t("list.emptyUnfiltered"), query, gameFilter, t("list.emptyFiltered"))');
     expect(frTournaments.list.emptyUnfiltered).toBe("Aucun tournoi publié pour le moment.");
+  });
+
+  it("avant la première liste : un squelette, ni état vide, ni compteurs à zéro, ni bandeau « Aucune actualité »", () => {
+    expect(page).toMatch(/setBuckets\(\(previous\) => \(sameBuckets\(previous, all\) \? previous : all\)\);\s*setListLoaded\(true\);/);
+    expect(page).toContain('{!listLoaded && <SecuredLoadingView label={t("list.loading")} />}');
+    expect(page).toContain("{listLoaded && shownSections.length === 0 && (");
+    expect(page).toMatch(/\{listLoaded && \(\s*<nav className=\{s\.sectionNav\}/);
+    expect(page).toMatch(/\{listLoaded && \(\s*<Ticker/);
+    // Le drapeau ne repasse jamais à faux : un échec de relecture garde la liste.
+    expect(page.match(/setListLoaded\(/g)).toHaveLength(1);
+    expect(frTournaments.list.loading).toBe("Chargement des tournois…");
   });
 
   it("« Créer un tournoi » est un seul contrôle interactif, pas un bouton dans un lien", () => {
