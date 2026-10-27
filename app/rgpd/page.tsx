@@ -1030,7 +1030,11 @@ function RgpdFr({
             l&apos;association à l&apos;impartialité de l&apos;arbitrage, et ce membre du staff peut s&apos;y opposer
             (section <a href="#exercer-vos-droits">« Exercer vos droits »</a>). L&apos;inscription d&apos;un caster
             sur un match, sa reprise par un autre caster et son retrait (avec le motif d&apos;une reprise ou d&apos;un retrait
-            d&apos;office) sont notés au journal du staff sur Discord sans nommer personne (« un caster », « le staff »).
+            d&apos;office) sont notés au journal du staff sur Discord sans nommer personne (« un caster », « le staff ») ;
+            les autres gestes du staff sur un match ou un tournoi (résultat validé, lancement forcé, hôte, diffusion,
+            rediffusion, modification du tournoi, têtes de série, équipes fantômes, image) aussi, avec les noms
+            d&apos;équipe du match (« un joueur » en tournoi individuel), sans nommer le staff ni rien noter dans les
+            journaux du serveur.
           </p>
         </div>
       </section>
