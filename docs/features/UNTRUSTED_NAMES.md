@@ -37,15 +37,18 @@ français, absente en anglais.
 
 ### Noms déjà en base
 
-Les noms enregistrés avant le nettoyage à l'écriture sont **réécrits une fois**
-au démarrage (`cleanStoredNames`, `lib/server/database/data-migrations.ts`) :
-`bg_teams.name`, `bg_users.pseudo`, `bg_tournaments.name`. La passe lit les
-noms et compare en JavaScript (la syntaxe des classes Unicode diffère entre
-MySQL et MariaDB), et ne trouve plus rien à écrire une fois les noms propres.
-Elle laisse tel quel un nom qui ne garderait rien, ou que la base refuse : un
-sosie dont la forme propre est déjà prise (`UNIQUE`), une forme NFKC trop
-longue pour la colonne. Le journal (`pm2 logs`) ne compte que des lignes,
-jamais un nom.
+Les noms enregistrés avant le nettoyage à l'écriture sont **débarrassés une
+fois** de leurs invisibles et commandes de direction au démarrage
+(`cleanStoredNames`, `lib/server/database/data-migrations.ts`, par
+`withoutInvisibles`) : `bg_teams.name`, `bg_users.pseudo`,
+`bg_tournaments.name`. **Ni NFKC ni réduction des espaces** : un nom stylisé
+choisi par son auteur (« Team² », pleine chasse, espace fine) reste octet pour
+octet — le normaliser serait un renommage silencieux et sans retour. La passe
+lit les noms et compare en JavaScript (la syntaxe des classes Unicode diffère
+entre MySQL et MariaDB), et ne trouve plus rien à écrire une fois les noms
+propres. Elle laisse tel quel un nom qui ne garderait rien, ou que la base
+refuse : un sosie dont la forme propre est déjà prise (`UNIQUE`). Le journal
+(`pm2 logs`) ne compte que des lignes, jamais un nom.
 
 Ces restes expliquent que les filtres de sortie demeurent :
 
