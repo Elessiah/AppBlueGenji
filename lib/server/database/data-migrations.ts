@@ -343,7 +343,10 @@ type StoredNameRow = RowDataPacket & { id: number; name: string | null };
  * quand il est refusé par la base : un sosie (`Adm` + U+200B + `in`) dont la
  * forme propre est déjà prise par l'original (`UNIQUE`). La condition sur
  * l'ancien nom évite d'écraser un renommage fait entre la lecture et
- * l'écriture. Le journal ne compte que des lignes, jamais un nom
+ * l'écriture. `updated_at` est gardé : les trois tables le remettent à
+ * l'heure à chaque `UPDATE`, et le classement date un tournoi terminé sans
+ * `finished_at` par lui — un simple nettoyage ne doit pas en déplacer les
+ * tendances. Le journal ne compte que des lignes, jamais un nom
  * (`RGPD_LOGS_AND_VISITS.md`).
  */
 export async function cleanStoredNames(db: Pool): Promise<void> {
@@ -384,7 +387,7 @@ async function rewriteName(db: Pool, table: string, column: string, row: StoredN
   if (!clean) return "kept";
   try {
     const [result] = await db.execute<ResultSetHeader>(
-      `UPDATE ${table} SET ${column} = ? WHERE id = ? AND ${column} = ?`,
+      `UPDATE ${table} SET ${column} = ?, updated_at = updated_at WHERE id = ? AND ${column} = ?`,
       [clean, row.id, row.name],
     );
     return result.affectedRows;
