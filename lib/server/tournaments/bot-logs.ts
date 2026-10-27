@@ -93,9 +93,17 @@ export type PendingBotLog =
   | { kind: "score_conflict"; matchId: number; claimId?: number }
   | { kind: "score_report_stalled"; matchId: number; claimId?: number }
   // `pairing` : l'appariement lancé — une alerte par appariement, pas par match.
-  // `roundMatchIds` : alerte d'une manche sans horaire, qui liste ses matchs ;
-  // `matchId` est alors le premier match de la manche (porteur de la réservation).
-  | { kind: "match_no_referee"; matchId: number; pairing: string; roundMatchIds?: number[]; claimId?: number }
+  // `roundMatchIds` : alerte d'une manche sans horaire, qui liste les matchs
+  // réservés ensemble (`queueRoundNoRefereeAlert`), chacun sous sa propre clé —
+  // `roundClaimIds`, leurs réservations ; `matchId` est le premier listé.
+  | {
+      kind: "match_no_referee";
+      matchId: number;
+      pairing: string;
+      roundMatchIds?: number[];
+      roundClaimIds?: number[];
+      claimId?: number;
+    }
   | { kind: "tournament_started"; tournamentId: number }
   | { kind: "tournament_finished"; tournamentId: number }
   | { kind: "tournament_underfilled"; tournamentId: number }
@@ -173,12 +181,6 @@ export function noRefereeAlertKey(pairing: string): string {
   return `NO_REFEREE:${pairing}`.slice(0, 32);
 }
 
-/**
- * Clé de l'alerte groupée d'une manche **sans horaire** : réservée une seule
- * fois par manche, sur son premier match (`MATCH_REFEREE.md` § Avertissement).
- */
-export const NO_REFEREE_ROUND_ALERT_KEY = "NO_REFEREE_ROUND";
-
 /** Clé de réservation de l'escalade « délai dépassé, toujours pas tranché » (`./score-report-sql`). */
 export { STALLED_ALERT_KEY };
 
@@ -206,7 +208,7 @@ export function refereeAlertKey(entry: PendingBotLog): string | null {
     case "score_report_stalled":
       return STALLED_ALERT_KEY;
     case "match_no_referee":
-      return entry.roundMatchIds ? NO_REFEREE_ROUND_ALERT_KEY : noRefereeAlertKey(entry.pairing);
+      return noRefereeAlertKey(entry.pairing);
     default:
       return null;
   }
@@ -448,9 +450,7 @@ export function flushBotLogs(connection: PoolConnection): void {
     // pas d'elle-même : il n'y a pas de palier suivant pour la rattraper.
     for (const entry of queue) {
       if (delivered.has(entryKey(entry))) continue;
-      const claimId = refereeAlertClaimId(entry);
-      if (claimId === null) continue;
-      await releaseRefereeAlertOnPool(claimId);
+      for (const claimId of refereeAlertClaimIds(entry)) await releaseRefereeAlertOnPool(claimId);
     }
 
     // La manche est tranchée : ses réservations n'ont plus d'objet, et un
@@ -472,18 +472,20 @@ export function flushBotLogs(connection: PoolConnection): void {
 }
 
 /**
- * Identifiant de la réservation portée par une entrée, `null` si elle n'en a
- * pas — évènement de journal, ou alerte mise en file sans passer par
- * `queueRefereeAlert`.
+ * Réservations portées par une entrée, aucune si elle n'en a pas — évènement
+ * de journal, ou alerte mise en file sans passer par `queueRefereeAlert` ;
+ * plusieurs pour l'alerte d'une manche (une par match listé).
  */
-function refereeAlertClaimId(entry: PendingBotLog): number | null {
+function refereeAlertClaimIds(entry: PendingBotLog): number[] {
   switch (entry.kind) {
+    case "match_no_referee":
+      if (entry.roundClaimIds) return entry.roundClaimIds;
+      return entry.claimId === undefined ? [] : [entry.claimId];
     case "score_conflict":
     case "score_report_stalled":
-    case "match_no_referee":
-      return entry.claimId ?? null;
+      return entry.claimId === undefined ? [] : [entry.claimId];
     default:
-      return null;
+      return [];
   }
 }
 
@@ -720,6 +722,61 @@ export async function queueRefereeAlert(
     await releaseRefereeAlert(connection, claimId);
   } catch {
     // Meilleur effort : au pire, cette manche n'aura pas son alerte.
+  }
+  return false;
+}
+
+/**
+ * Réserve et met en file **une** alerte pour des matchs sans horaire d'une même
+ * manche, entrés en lancement sans arbitre ni autogestion (`MATCH_REFEREE.md`
+ * § Avertissement).
+ *
+ * Chaque match garde **sa** réservation, sous la même clé qu'un match planifié
+ * (`NO_REFEREE:<appariement>`, sur sa propre ligne, déjà verrouillée par
+ * l'entretien) : un match déjà signalé n'est jamais relisté, un match de la
+ * manche entré en lancement plus tard part dans une alerte de suite qui ne
+ * liste que lui, un réappariement alerte de nouveau, et la clôture d'un match
+ * (`clearRefereeAlertsOnPool`) n'efface que la sienne. Seuls les matchs
+ * réservés **ici** sont listés.
+ *
+ * Même contrat que `queueRefereeAlert` : un interblocage remonte, toute autre
+ * erreur de réservation arrête la liste à ce qui est déjà réservé (le reste
+ * est retenté au passage suivant), et une file pleine rend les réservations.
+ *
+ * @returns `true` si l'alerte est mise en file.
+ */
+export async function queueRoundNoRefereeAlert(
+  connection: PoolConnection,
+  matches: readonly { matchId: number; pairing: string }[],
+): Promise<boolean> {
+  if (matches.length === 0 || isBotCircuitOpen()) return false;
+  const claimed: { matchId: number; pairing: string; claimId: number }[] = [];
+  for (const match of matches) {
+    const alertKey = noRefereeAlertKey(match.pairing);
+    try {
+      if (await refereeAlertExists(connection, match.matchId, alertKey)) continue;
+      const claimId = await claimRefereeAlert(connection, match.matchId, alertKey);
+      if (claimId !== null) claimed.push({ ...match, claimId });
+    } catch (error) {
+      if (isTransactionAborted(error)) throw error;
+      break;
+    }
+  }
+  const first = claimed[0];
+  if (!first) return false;
+  const roundClaimIds = claimed.map((match) => match.claimId);
+  const entry: PendingBotLog = {
+    kind: "match_no_referee",
+    matchId: first.matchId,
+    pairing: first.pairing,
+    roundMatchIds: claimed.map((match) => match.matchId),
+    roundClaimIds,
+  };
+  if (queueBotLog(connection, entry)) return true;
+  try {
+    for (const claimId of roundClaimIds) await releaseRefereeAlert(connection, claimId);
+  } catch {
+    // Meilleur effort : au pire, ces matchs n'auront pas leur alerte.
   }
   return false;
 }

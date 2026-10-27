@@ -34,7 +34,6 @@ import {
   normalizeFirstMap,
   refereeDecision,
   type NoRefereeCandidate,
-  type NoRefereeRound,
 } from "@/lib/shared/match-referee";
 import { formatRoundSelfManagementLog } from "@/lib/shared/bot-logs";
 import { matchRoundLabel } from "@/lib/shared/discord-notifications";
@@ -55,10 +54,9 @@ import {
   type MatchStreamRow,
 } from "./match-casters";
 import { retryOnDeadlock } from "./deadlock-retry";
-import { isTransactionAborted } from "@/lib/server/mysql-errors";
 import { announceRefereeChange, queueRefereeChange } from "./referee-notices";
 import { loadMatchLogRow, matchLogSubject } from "./match-log-subject";
-import { discardBotLogs, flushBotLogs, queueRefereeAlert } from "./bot-logs";
+import { discardBotLogs, flushBotLogs, queueRefereeAlert, queueRoundNoRefereeAlert } from "./bot-logs";
 import { publishMatchUpdatedEvent } from "./notifications";
 
 /** La ligne d'un match telle que le lancement la lit, sans ses casters. */
@@ -786,21 +784,6 @@ function undecidedCandidate(row: LaunchMatchRow): NoRefereeCandidate | null {
   };
 }
 
-/** Premier match d'une manche : porteur stable de la réservation de son alerte groupée. */
-async function roundAnchorMatchId(
-  connection: PoolConnection,
-  tournamentId: number,
-  round: NoRefereeRound,
-): Promise<number | null> {
-  const [rows] = await connection.execute<RowDataPacket[]>(
-    `SELECT MIN(id) AS id FROM bg_matches
-     WHERE tournament_id = ? AND phase_id = ? AND bracket = ? AND round_number = ?`,
-    [tournamentId, round.phaseId, round.bracket, round.roundNumber],
-  );
-  const id = rows[0]?.id;
-  return id === null || id === undefined ? null : Number(id);
-}
-
 /**
  * Avertit le staff des matchs entrés en lancement sans décision, dans la
  * transaction de l'entretien (alerte d'arbitrage `match_no_referee`) —
@@ -808,37 +791,28 @@ async function roundAnchorMatchId(
  *
  * - un match **planifié** (heure posée) : une alerte par match, réservée par
  *   appariement (`NO_REFEREE:<appariement>`), comme avant ;
- * - des matchs **sans horaire** : une alerte par manche, qui les liste,
- *   réservée une seule fois pour la manche sur son premier match
- *   (`NO_REFEREE_ROUND`) — un match de la manche entré en lancement plus tard
- *   ne réveille pas l'alerte.
+ * - des matchs **sans horaire** : une alerte par manche, qui liste ceux qui
+ *   entrent en lancement ensemble ; chaque match y garde sa réservation par
+ *   appariement (`queueRoundNoRefereeAlert`) — un match de la manche entré plus
+ *   tard part dans une alerte de suite qui ne liste que lui.
+ *
+ * Une seule clé par appariement dans les deux cas : un match dont l'heure est
+ * posée ou retirée n'est pas signalé deux fois.
  */
 export async function queueNoRefereeAlerts(
   connection: PoolConnection,
-  tournamentId: number,
   candidates: readonly NoRefereeCandidate[],
 ): Promise<void> {
   const { perMatch, perRound } = groupNoRefereeAlerts(candidates);
   for (const match of perMatch) {
     await queueRefereeAlert(connection, { kind: "match_no_referee", matchId: match.matchId, pairing: match.pairing });
   }
+  const pairingOf = new Map(candidates.map((candidate) => [candidate.matchId, candidate.pairing]));
   for (const round of perRound) {
-    let anchor: number;
-    try {
-      anchor = (await roundAnchorMatchId(connection, tournamentId, round)) ?? round.matchIds[0];
-    } catch (error) {
-      // Une transaction défaite (interblocage) remonte ; toute autre erreur de
-      // lecture tait seulement l'alerte de la manche, comme une réservation
-      // inaccessible (`queueRefereeAlert`) — l'entretien, lui, continue.
-      if (isTransactionAborted(error)) throw error;
-      continue;
-    }
-    await queueRefereeAlert(connection, {
-      kind: "match_no_referee",
-      matchId: anchor,
-      pairing: "ROUND",
-      roundMatchIds: round.matchIds,
-    });
+    await queueRoundNoRefereeAlert(
+      connection,
+      round.matchIds.map((matchId) => ({ matchId, pairing: pairingOf.get(matchId) ?? "" })),
+    );
   }
 }
 
@@ -931,7 +905,7 @@ export async function maintainMatchLaunches(
       changed += 1;
     }
   }
-  await queueNoRefereeAlerts(connection, tournamentId, undecided);
+  await queueNoRefereeAlerts(connection, undecided);
   return changed;
 }
 
