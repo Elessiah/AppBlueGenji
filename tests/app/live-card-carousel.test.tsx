@@ -122,7 +122,7 @@ describe("LiveCard — carrousel des matchs", () => {
 
   it("garde l'état vide sans aucun match", () => {
     const html = render(live([], null));
-    expect(html).toContain("Le prochain match en direct sera affiché ici dès son lancement.");
+    expect(html).toContain("Le prochain match sera affiché ici dès son lancement.");
     expect(html).toContain('href="/tournois/7"');
   });
 });
