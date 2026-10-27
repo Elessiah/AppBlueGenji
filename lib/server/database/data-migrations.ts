@@ -1,6 +1,6 @@
 import type { Pool, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { isSchemaNoOpError, isUnknownColumnError } from "@/lib/server/mysql-errors";
-import { visibleText } from "@/lib/shared/visible-text";
+import { withoutInvisibles } from "@/lib/shared/visible-text";
 import { reportSchemaFailure } from "./report-schema-failure";
 
 /*
@@ -319,13 +319,19 @@ const STORED_NAME_COLUMNS = [
 type StoredNameRow = RowDataPacket & { id: number; name: string | null };
 
 /**
- * Réécrit une fois par `visibleText` les noms enregistrés **avant** que
- * l'écriture ne les nettoie (`UNTRUSTED_NAMES.md`).
+ * Retire une fois des noms enregistrés **avant** que l'écriture ne les
+ * nettoie ce qui ne se voit pas : caractères invisibles et commandes de
+ * direction (`withoutInvisibles`, `UNTRUSTED_NAMES.md`).
  *
  * Le nettoyage ne jouait qu'à l'écriture : un ancien nom à commande de
  * direction (U+202E) ou à caractère invisible brouillait donc chaque surface
  * qui l'oubliait à la lecture (menu du compte, dialogue de programmation,
  * pages de tournoi). Réécrit en base, il est propre partout à la fois.
+ *
+ * Ni NFKC ni réduction des espaces : ce serait renommer en silence, et sans
+ * retour, un nom stylisé que son auteur a choisi (« Team² » → « Team2 »,
+ * lettres pleine chasse, espace fine insécable). Seul ce qui ne s'affiche
+ * pas disparaît, si bien que le nom se lit à l'identique après la passe.
  *
  * La lecture filtre en JavaScript, pas en `REGEXP` : la syntaxe des classes
  * Unicode diffère entre MySQL (ICU) et MariaDB (PCRE), et trois tables de
@@ -335,10 +341,10 @@ type StoredNameRow = RowDataPacket & { id: number; name: string | null };
  * Une ligne est **laissée telle quelle** — les filtres de sortie restent donc
  * en place — quand son nom nettoyé serait vide (la saisie le refuserait), ou
  * quand il est refusé par la base : un sosie (`Adm` + U+200B + `in`) dont la
- * forme propre est déjà prise par l'original (`UNIQUE`), ou une forme NFKC
- * plus longue que la colonne. La condition sur l'ancien nom évite d'écraser
- * un renommage fait entre la lecture et l'écriture. Le journal ne compte que
- * des lignes, jamais un nom (`RGPD_LOGS_AND_VISITS.md`).
+ * forme propre est déjà prise par l'original (`UNIQUE`). La condition sur
+ * l'ancien nom évite d'écraser un renommage fait entre la lecture et
+ * l'écriture. Le journal ne compte que des lignes, jamais un nom
+ * (`RGPD_LOGS_AND_VISITS.md`).
  */
 export async function cleanStoredNames(db: Pool): Promise<void> {
   for (const { table, column } of STORED_NAME_COLUMNS) {
@@ -364,7 +370,7 @@ async function cleanNameColumn(db: Pool, table: string, column: string): Promise
   }
   if (cleaned > 0 || kept > 0) {
     console.log(
-      `[migrations] ${table}.${column} : ${cleaned} nom(s) réécrit(s) en forme affichable, ` +
+      `[migrations] ${table}.${column} : ${cleaned} nom(s) réécrit(s) sans caractère invisible, ` +
         `${kept} laissé(s) tel(s) quel(s) (vide une fois nettoyé, ou refusé par la base).`,
     );
   }
@@ -373,7 +379,7 @@ async function cleanNameColumn(db: Pool, table: string, column: string): Promise
 /** Lignes réécrites (0 si le nom est déjà propre ou a changé depuis), ou `"kept"`. */
 async function rewriteName(db: Pool, table: string, column: string, row: StoredNameRow): Promise<number | "kept"> {
   if (typeof row.name !== "string") return 0;
-  const clean = visibleText(row.name);
+  const clean = withoutInvisibles(row.name);
   if (clean === row.name) return 0;
   if (!clean) return "kept";
   try {
