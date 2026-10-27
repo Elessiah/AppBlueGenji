@@ -1133,8 +1133,9 @@ function RgpdFr({
             plus aucun caster ne le tient ; seul le lien posé dans la configuration du direct du match (par
             l&apos;organisation ou un caster) reste au match. Le lien qu&apos;un caster a fourni, là ou en ouvrant
             son stream, part aussi à la suppression de son compte, matchs joués compris, même si un autre caster
-            tient encore ce stream ; un membre de l&apos;organisation qui caste le match compte comme caster pour la
-            chaîne qu&apos;il y pose — seul le lien que l&apos;organisation pose sans caster ce match lui reste. Un lien
+            tient encore ce stream ; un membre de l&apos;organisation qui caste déjà le match quand il y pose sa chaîne
+            compte comme caster — le lien que l&apos;organisation pose sans caster ce match (même s&apos;il le caste
+            ensuite) lui reste. Un lien
             posé dans cette configuration avant que le site n&apos;enregistre qui le fournit n&apos;a pas d&apos;auteur
             connu et reste au match.{" "}
             {STREAM_NOTICE_SHOWN} Ce traitement repose sur l&apos;intérêt

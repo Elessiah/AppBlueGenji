@@ -783,7 +783,7 @@ Un `CASTER` n'a **aucun** de ces droits.
 déclencheur `AUTO` / `MANUAL` / `START_TIME`, ouverture de l'antenne). La
 chaîne qu'y pose un compte reste rattachée à lui (retirée à la suppression du
 compte), sauf celle d'un membre de l'organisation (`tournaments`) qui ne caste
-pas ce match : c'est le lien de l'organisation.
+pas déjà ce match quand il la pose : c'est le lien de l'organisation.
 
 La **chaîne officielle du tournoi** est un autre droit : elle passe par
 `PUT /api/admin/tournaments/[id]/live`, protégé par `tournaments`. Un `CASTER`
