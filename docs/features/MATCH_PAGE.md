@@ -21,14 +21,18 @@ d'équipe et du pool de maps : des sections, sans emplacement vide.
   Requête et langue suivent. Les chemins se lisent par
   `matchPageIdsFromMemberPath` / `matchPageIdsFromSpectatorPath`
   (`lib/shared/match-page.ts`, chiffres seuls).
-- **Encart d'un lien partagé** : celui du tournoi, titre précédé de « Manche R ·
-  Match N », adresse canonique sur la page du match ; la page sans compte reste
-  `noindex`.
+- **Encart d'un lien partagé** : celui du tournoi, titre précédé de la place du
+  match (`matchPositionText` : « Manche R · Match N », précédé du tableau hors
+  du tableau principal — « Tableau perdants · … »), adresse canonique sur la page
+  du match ; la page sans compte reste `noindex`. Même place sous le titre de la
+  page. Une session illisible (base injoignable) n'est pas un 404.
 
 La page est rendue **dans la fiche** (`TournamentSheet`, prop `matchId`) : même
 flux temps réel (`useTournamentLive`, ou la relecture publique sans compte),
 mêmes fenêtres (score, arbitrage, direct, signalement…), mêmes droits du
-lecteur. Son composant (`MatchPage.tsx`) est chargé à la demande. Un match
+lecteur, même témoin du flux (`LiveIndicator`, à côté du retour à la fiche).
+Le champ « Première map » garde la carte enregistrée jusqu'à ce que le plateau
+relu la porte (`firstMapFieldFollows`). Son composant (`MatchPage.tsx`) est chargé à la demande. Un match
 retiré depuis (retour en arrière) affiche « Match introuvable » et ramène à la
 fiche.
 
@@ -43,6 +47,7 @@ fiche.
    (`PUT /api/admin/matches/[id]/first-map`) — et le premier ban (l'équipe qui
    n'héberge pas). Match casté : le rappel « triez les joueurs par rôle ».
 3. **Arbitrage** (`matchPageDecision`) : « Arbitre désigné » pour tous — son
+   explication derrière le « i » —, son
    pseudo et son BattleTag (« À inviter dans la partie ») aux seuls lecteurs
    que sert la lecture des contacts ; ou l'aide-mémoire de l'**autogestion**
    (l'hôte crée la partie, les managers s'invitent, les paramètres, les casters
@@ -51,9 +56,11 @@ fiche.
    exemption. Prendre, rendre ou confier l'arbitrage reste le geste de la carte
    (`MATCH_REFEREE.md`).
 4. **Casts** (`matchPageStreams`) : **tous** les streams du match, chacun avec
-   son lien et ses casters (co-cast compris), le premier lien des vues
-   compactes en tête. Les liens suivent la règle de la carte : tus tant que le
-   match n'est pas annoncé casté. Puis les fiches des casters, BattleTag marqué
+   son lien et ses casters (co-cast compris, chacun par `PlayerLink`), le
+   premier lien des vues compactes en tête — gardé même quand aucun stream
+   visible ne le porte, comme sur la carte. Deux liens au même texte prennent
+   leur numéro (« YouTube 2 »). Les liens suivent la règle de la carte : tus
+   tant que le match n'est pas annoncé casté. Puis les fiches des casters, BattleTag marqué
    « À inviter — obligatoire » (pas sur sa propre fiche).
 
 ## Données : aucune nouvelle
