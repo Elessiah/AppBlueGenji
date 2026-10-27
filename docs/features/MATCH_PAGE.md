@@ -56,7 +56,7 @@ fiche.
    exemption. Prendre, rendre ou confier l'arbitrage reste le geste de la carte
    (`MATCH_REFEREE.md`).
 4. **Casts** (`matchPageStreams`) : **tous** les streams du match, chacun avec
-   son lien et ses casters (co-cast compris, chacun par `PlayerLink`), le
+   son lien et ses casters (co-cast compris, chacun par `PlayerLink` — sans compte, pseudo seul : l'identifiant y est masqué), le
    premier lien des vues compactes en tête — gardé même quand aucun stream
    visible ne le porte, comme sur la carte. Deux liens au même texte prennent
    leur numéro (« YouTube 2 »). Les liens suivent la règle de la carte : tus
