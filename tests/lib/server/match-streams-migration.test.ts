@@ -67,6 +67,30 @@ describe("bg_match_streams / bg_match_casters — migration du caster unique", (
     );
   });
 
+  it("rattache le lien d'un stream de caster à son fournisseur : colonne, index, rattrapage rejouable", () => {
+    expect(SQL).toMatch(/staff_owned TINYINT\(1\) NOT NULL DEFAULT 0,\s*link_user_id BIGINT NULL,/);
+    expect(SQL).toMatch(/INDEX idx_bg_match_streams_link_user \(link_user_id\)/);
+    const all = [...RECENT.matchAll(/`([^`]*)`/g)].map((match) => flat(match[1]));
+    const column = all.indexOf("ALTER TABLE bg_match_streams ADD COLUMN link_user_id BIGINT NULL AFTER staff_owned");
+    const index = all.indexOf("ALTER TABLE bg_match_streams ADD INDEX idx_bg_match_streams_link_user (link_user_id)");
+    const casters = all.findIndex((statement) => statement.startsWith("INSERT IGNORE INTO bg_match_casters"));
+    const backfill = all.findIndex((statement) => statement.startsWith("UPDATE bg_match_streams s SET s.link_user_id"));
+    expect(column).toBeGreaterThanOrEqual(0);
+    expect(index).toBeGreaterThan(column);
+    // Après la copie des casters : le rattrapage lit leurs lignes.
+    expect(backfill).toBeGreaterThan(casters);
+    const sql = all[backfill];
+    // Jamais le lien du staff ; seulement un stream qu'un seul caster tient ;
+    // jamais un lien déjà rattaché — un second passage ne change rien.
+    expect(sql).toContain("WHERE s.staff_owned = 0 AND s.live_url IS NOT NULL AND s.link_user_id IS NULL");
+    expect(sql).toContain("(SELECT COUNT(*) FROM bg_match_casters c WHERE c.match_id = s.match_id AND c.stream_id = s.id) = 1");
+    expect(sql).toContain(
+      "SET s.link_user_id = (SELECT MIN(c.user_id) FROM bg_match_casters c WHERE c.match_id = s.match_id AND c.stream_id = s.id)",
+    );
+    // MariaDB : la sous-requête lit une autre table que celle mise à jour.
+    expect(sql).not.toMatch(/\(SELECT[^)]*FROM bg_match_streams/);
+  });
+
   it("n'ouvre jamais un second stream à un match qui en a déjà un", () => {
     const [streams] = migrationStatements();
     expect(streams).toContain("WHERE (m.live_url IS NOT NULL OR m.caster_user_id IS NOT NULL)");

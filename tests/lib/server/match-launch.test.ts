@@ -57,7 +57,7 @@ type MatchState = {
   /** `bg_match_casters` du match, dans l'ordre d'inscription. */
   casters: CasterState[];
   /** `bg_match_streams` du match (`staff_owned` : 1 = stream du staff). */
-  streams: { id: number; live_url: string | null; staff_owned?: number }[];
+  streams: { id: number; live_url: string | null; staff_owned?: number; link_user_id?: number }[];
 };
 
 type CasterState = { user_id: number; stream_id: number; ready_at: string | null };
@@ -222,7 +222,8 @@ function applyStreamWrite(match: MatchState, sql: string, params: unknown[]): un
     match.streams = match.streams.filter((stream) => !ids.includes(stream.id));
   } else if (sql.startsWith("INSERT INTO bg_match_streams")) {
     const id = Math.max(0, ...match.streams.map((stream) => stream.id)) + 1;
-    match.streams.push({ id, live_url: (params[1] as string | null) ?? null });
+    const linkUserId = params[2] == null ? {} : { link_user_id: Number(params[2]) };
+    match.streams.push({ id, live_url: (params[1] as string | null) ?? null, ...linkUserId });
     return [{ affectedRows: 1, insertId: id }, []];
   }
   return [{ affectedRows: 1 }, []];
@@ -566,7 +567,8 @@ describe("claimMatchCast", () => {
     await claimMatchCast(42, CASTER, true, { liveUrl: "  https://www.twitch.tv/Voix  " });
     expect(state.match?.streams).toEqual([
       { id: 1, live_url: null },
-      { id: 2, live_url: "https://www.twitch.tv/Voix" },
+      // Le lien est rattaché à celui qui le fournit : son effacement le retire.
+      { id: 2, live_url: "https://www.twitch.tv/Voix", link_user_id: CASTER },
     ]);
     expect(state.match?.casters.map((caster) => [caster.user_id, caster.stream_id])).toEqual([[901, 1], [CASTER, 2]]);
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });

@@ -74,15 +74,37 @@ describe("orphanStreamIds — ce qui part quand un caster s'en va", () => {
   });
 });
 
-/** Base à état : streams et casters d'un match, rejoués par `pruneMatchStreams`. */
-function world(streams: { id: number; live_url: string | null; staff_owned?: number }[], casters: { user_id: number; stream_id: number }[]) {
+type WorldStream = { id: number; live_url: string | null; staff_owned?: number; link_user_id?: number | null };
+
+/** Le lien qu'un compte a fourni sur un stream de caster : lecture et retrait (`withdrawUserCasts`). */
+function applyLinkSql(streams: WorldStream[], sql: string, params: unknown[]): unknown[] | null {
+  const provided = (stream: WorldStream, userId: unknown) => stream.link_user_id === userId && (stream.staff_owned ?? 0) === 0;
+  if (sql.startsWith("SELECT DISTINCT match_id FROM bg_match_streams")) {
+    return [streams.some((stream) => provided(stream, params[0])) ? [{ match_id: 42 }] : []];
+  }
+  if (sql.startsWith("UPDATE bg_match_streams SET live_url = NULL, link_user_id = NULL")) {
+    for (const stream of streams) if (provided(stream, params[1])) Object.assign(stream, { live_url: null, link_user_id: null });
+    return [{ affectedRows: 1 }];
+  }
+  return null;
+}
+
+/**
+ * Base à état : streams et casters d'un match (42), rejoués par
+ * `pruneMatchStreams`. `completed` : le match est joué — la lecture des casts
+ * d'une anonymisation (`<> 'COMPLETED'`) ne le rend pas.
+ */
+function world(streams: WorldStream[], casters: { user_id: number; stream_id: number }[], completed = false) {
   const state = { streams: [...streams], casters: [...casters], locked: [] as number[] };
   const execute = jest.fn<SqlQuery>(async (rawSql, rawParams) => {
     const sql = rawSql.replace(/\s+/g, " ").trim();
     const params = (rawParams ?? []) as unknown[];
     if (sql.startsWith("SELECT c.match_id FROM bg_match_casters c")) {
+      if (completed && sql.includes("<> 'COMPLETED'")) return [[]];
       return [state.casters.filter((c) => c.user_id === params[0]).map(() => ({ match_id: 42 }))];
     }
+    const linkResult = applyLinkSql(state.streams, sql, params);
+    if (linkResult) return linkResult;
     if (sql === "SELECT id FROM bg_matches WHERE id = ? FOR UPDATE") {
       state.locked.push(params[0] as number);
       return [[{ id: params[0] }]];
@@ -172,10 +194,75 @@ describe("withdrawUserCasts — un compte qui part quitte ses casts", () => {
     expect(erase.execute.mock.calls[0][0]).not.toContain("COMPLETED");
   });
 
-  it("ne touche à rien pour un compte qui ne caste rien", async () => {
-    const w = world([{ id: 3, live_url: null }], [{ user_id: 9, stream_id: 3 }]);
+  it("ne touche à rien pour un compte qui ne caste rien et n'a fourni aucun lien", async () => {
+    const w = world([{ id: 3, live_url: "https://twitch.tv/autre", link_user_id: 9 }], [{ user_id: 9, stream_id: 3 }]);
     expect(await withdrawUserCasts(w.connection, 12, true)).toEqual([]);
-    expect(w.execute).toHaveBeenCalledTimes(1);
+    // Les deux lectures, rien d'autre.
+    expect(w.execute).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("withdrawUserCasts — le lien qu'un compte a fourni part avec lui", () => {
+  it("effacement : son stream à part, qu'il tenait seul, part avec son lien", async () => {
+    const w = world(
+      [{ id: 3, live_url: null }, { id: 4, live_url: "https://kick.com/sa-chaine", link_user_id: 12 }],
+      [{ user_id: 9, stream_id: 3 }, { user_id: 12, stream_id: 4 }],
+    );
+    expect(await withdrawUserCasts(w.connection, 12, true)).toEqual([42]);
+    expect(w.state.streams).toEqual([{ id: 3, live_url: null }]);
+  });
+
+  it("co-cast : le stream reste au co-caster, sans le lien de la chaîne du compte effacé", async () => {
+    const w = world(
+      [{ id: 4, live_url: "https://kick.com/sa-chaine", link_user_id: 12 }],
+      [{ user_id: 12, stream_id: 4 }, { user_id: 9, stream_id: 4 }],
+    );
+    await withdrawUserCasts(w.connection, 12, true);
+    expect(w.state.casters).toEqual([{ user_id: 9, stream_id: 4 }]);
+    expect(w.state.streams).toEqual([{ id: 4, live_url: null, link_user_id: null }]);
+  });
+
+  it("co-cast : retiré aussi quand il avait déjà quitté le stream qu'il avait ouvert", async () => {
+    const w = world([{ id: 4, live_url: "https://kick.com/sa-chaine", link_user_id: 12 }], [{ user_id: 9, stream_id: 4 }]);
+    expect(await withdrawUserCasts(w.connection, 12, true)).toEqual([42]);
+    expect(w.state.locked).toEqual([42]);
+    expect(w.state.streams).toEqual([{ id: 4, live_url: null, link_user_id: null }]);
+    // Aucune inscription à retirer : le co-caster garde la sienne.
+    expect(w.execute.mock.calls.some(([sql]) => sql.startsWith("DELETE FROM bg_match_casters"))).toBe(false);
+    expect(w.state.casters).toEqual([{ user_id: 9, stream_id: 4 }]);
+  });
+
+  it("anonymisation d'un match joué : il reste inscrit, son lien part quand même", async () => {
+    const w = world([{ id: 4, live_url: "https://kick.com/sa-chaine", link_user_id: 12 }], [{ user_id: 12, stream_id: 4 }], true);
+    expect(await withdrawUserCasts(w.connection, 12, false)).toEqual([42]);
+    expect(w.state.casters).toEqual([{ user_id: 12, stream_id: 4 }]);
+    expect(w.state.streams).toEqual([{ id: 4, live_url: null, link_user_id: null }]);
+  });
+
+  it("le lien du staff n'est jamais touché, même sur un stream qu'il tenait", async () => {
+    const staff = { id: 3, live_url: "https://twitch.tv/bluegenji", staff_owned: 1, link_user_id: 12 };
+    const w = world([staff], [{ user_id: 12, stream_id: 3 }]);
+    await withdrawUserCasts(w.connection, 12, true);
+    expect(w.state.streams).toEqual([staff]);
+    const sqls = w.execute.mock.calls.map(([sql]) => sql.replace(/\s+/g, " ").trim());
+    expect(sqls[1]).toBe(
+      "SELECT DISTINCT match_id FROM bg_match_streams WHERE link_user_id = ? AND staff_owned = 0 ORDER BY match_id",
+    );
+    expect(sqls.some((sql) => sql.startsWith("UPDATE bg_match_streams"))).toBe(false);
+  });
+
+  it("efface sous le verrou du match, sans lire sa table en sous-requête, le seul stream de caster du compte", async () => {
+    const w = world([{ id: 4, live_url: "https://kick.com/sa-chaine", link_user_id: 12 }], [{ user_id: 9, stream_id: 4 }]);
+    await withdrawUserCasts(w.connection, 12, true);
+    const sqls = w.execute.mock.calls.map(([sql]) => sql.replace(/\s+/g, " ").trim());
+    const lock = sqls.indexOf("SELECT id FROM bg_matches WHERE id = ? FOR UPDATE");
+    const update = sqls.findIndex((sql) => sql.startsWith("UPDATE bg_match_streams"));
+    expect(lock).toBeGreaterThanOrEqual(0);
+    expect(update).toBeGreaterThan(lock);
+    expect(sqls[update]).toBe(
+      "UPDATE bg_match_streams SET live_url = NULL, link_user_id = NULL WHERE match_id = ? AND link_user_id = ? AND staff_owned = 0",
+    );
+    expect(w.execute.mock.calls[update][1]).toEqual([42, 12]);
   });
 });
 
