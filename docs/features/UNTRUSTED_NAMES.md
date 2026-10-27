@@ -21,8 +21,7 @@ compose un emoji (famille, drapeau arc-en-ciel).
 Appelée par `normalizePseudo` (écriture du profil, création de compte OAuth,
 **et** recherche par pseudo — une saisie piégée désigne le compte qu'elle imite,
 jamais un sosie), par `checkTeamName` (création, renommage, équipes
-fantômes, formulaires) et par `validateTournamentInput` (nom d'un tournoi, à la
-création comme à l'édition — il s'affiche sur l'accueil sans compte). La saisie
+fantômes, formulaires). La saisie
 est **nettoyée, pas refusée** : un pseudo naît aussi d'une connexion OAuth, où
 un refus empêcherait de se connecter. Un nom réduit à rien par le nettoyage
 retombe sur les refus existants (`PSEUDO_EMPTY`, `INVALID_TEAM_NAME`,
@@ -32,8 +31,12 @@ retombe sur les refus existants (`PSEUDO_EMPTY`, `INVALID_TEAM_NAME`,
 réduction des espaces) : pour une saisie du staff dont la typographie est le
 propos — les chiffres de l'association (`validateAboutStatInput`, valeur et
 titre, français et anglais), où NFKC réécrirait « 4 200 € » à espace fine ou
-« m² ». Une valeur faite seulement d'invisibles y est vide : refusée en
-français, absente en anglais.
+« m² », et le nom d'un tournoi (`validateTournamentInput`, à la création comme
+à l'édition : il s'affiche sur l'accueil sans compte), où « Coupe™ » ou
+« Saison ½ » deviendraient « CoupeTM » et « Saison 1⁄2 », et où une simple
+modification de dates réécrirait le nom. Une valeur faite seulement
+d'invisibles y est vide : refusée en français (`MISSING_NAME` pour un tournoi),
+absente en anglais.
 
 ### Noms déjà en base
 
@@ -50,21 +53,24 @@ propres. Elle laisse tel quel un nom qui ne garderait rien, ou que la base
 refuse : un sosie dont la forme propre est déjà prise (`UNIQUE`). Le journal
 (`pm2 logs`) ne compte que des lignes, jamais un nom.
 
-Ces restes expliquent que les filtres de sortie demeurent :
+Ces restes expliquent que les filtres de sortie demeurent. Ils passent eux aussi
+par `withoutInvisibles`, **sans NFKC** : un nom ancien stylisé (« ＢＬＵＥ ») se
+lit à l'identique sur sa fiche, au classement et dans le menu du compte.
 
-- l'accueil (`lib/server/landing-service.ts`, `shownEntrantName`) passe par
-  `visibleText` les noms d'engagés du bandeau et de la carte « en cours »
+- l'accueil (`lib/server/landing-service.ts`, `shownEntrantName`) nettoie les noms d'engagés du bandeau et de la carte « en cours »
   (match mis en avant et carrousel), et le **nom du tournoi** du bandeau
   (résultat, inscriptions, vainqueur), de la carte et du bouton « Regarder le
   live » ;
-- le classement (`loadTeamRanking`) rend la forme affichable — c'est elle que
+- le classement (`loadTeamRanking`) rend le nom nettoyé — c'est lui que
   départage `compareRankedTeams` à égalité ; vide, le leaderboard et
   `/classement` reçoivent `null` et posent un repli **traduit** (« Équipe #id » /
   « Team #id », `leaderboard.teamFallback`, `board.teamFallback`) ;
 - `getUserActiveTeam` (menu du compte : indication et nom accessible ; vide,
   l'entrée se nomme « Mon équipe ») ;
 - `EntrantName` (tout écran de tournoi, spectateur compris, et le dialogue de
-  programmation d'un match), nom et initiale de repli.
+  programmation d'un match), nom et initiale de repli ; vide, l'engagé se nomme
+  « Engagé #id » / « Entrant #id » (`match.entrantFallback`) — jamais un lien
+  sans nom accessible.
 
 ## 2. Mentions et balisage Discord — `lib/shared/discord-text.ts`
 
