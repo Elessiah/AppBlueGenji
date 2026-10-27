@@ -115,8 +115,10 @@ texte, effacée un jour après la fin de la soirée).
   diffusion — une ligne « par le staff » au journal, sans ligne pm2
   nominative (si la ligne ne peut être rédigée, pm2 garde `[staff-log]`, le
   geste et le numéro du match ou du tournoi, sans auteur — `STAFF_ACTION_LOGS.md`).
-  Un résultat validé, ou un score qui suspend la validation automatique, garde
-  en plus la trace nominative courte de `dispute-self-resolution.ts`.
+  Un litige tranché, un résultat corrigé ou une validation automatique
+  suspendue garde en plus la trace nominative courte de
+  `dispute-self-resolution.ts` ; un score qui suspend la validation n'écrit
+  au journal que le tournoi (comme l'alerte ⚠️), pas le match.
 
 - Le **motif d'une pénalité** est saisi librement par l'arbitre et repris tel
   quel : il ne doit pas nommer de joueur.

@@ -41,7 +41,10 @@ n'appellent l'intervention de personne.
 | `PUT /api/admin/tournaments/[id]/live` | `LIVE_URL_SET` / `LIVE_URL_REMOVED` | Lien de diffusion du tournoi posé / retiré |
 
 Forme : `🛠️ <Geste> — « Tournoi » (#id) : <Manche> — A vs B (#match), par le staff.`
-pour un match, `🛠️ <Geste> — « Tournoi » (#id), par le staff.` pour un tournoi.
+pour un match, `🛠️ <Geste> — « Tournoi » (#id), par le staff.` pour un tournoi
+— et pour un score qui suspend la validation automatique (`withoutMatch`) :
+l'alerte ⚠️ d'un arbitre qui joue ce match ne nomme que le tournoi, la ligne
+🛠️ ne désigne donc pas le match à côté.
 L'auteur est « le staff », ou « un caster » pour un geste de diffusion
 (`live`, rediffusion) de qui détient `live` sans `tournaments`
 (`staffActionAuthor`) : la ligne ne prête pas aux arbitres le geste d'un caster.
@@ -59,8 +62,8 @@ match dit le détail.
   Les gestes lourds d'administration restent au seul journal (décision 5).
 - Un arbitre qui joue le match qu'il tranche reçoit **en plus** l'alerte de
   `dispute-self-resolution.ts` (ligne ⚠️ et push `REFEREE_SELF_RESOLUTION`).
-  Qu'il le joue ou non, « Valider le résultat » (litige clos ou résultat
-  corrigé) et un score qui suspend la validation automatique gardent leur
+  Qu'il le joue ou non, « Valider le résultat » quand il clôt un litige ou
+  corrige un résultat acquis, et un score qui suspend la validation automatique gardent leur
   trace courte **nominative** dans pm2 (`auditStaffAction`) : la ligne 🛠️
   n'ajoute rien à pm2, elle n'en retire rien non plus — `/rgpd` et le
   registre T05 le disent.
