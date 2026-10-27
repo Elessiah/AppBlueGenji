@@ -49,7 +49,11 @@ describe("page tournois — barre de recherche et filtres", () => {
   });
 
   it("avant la première liste : un squelette, ni état vide, ni compteurs à zéro, ni bandeau « Aucune actualité », sans saut de mise en page", () => {
-    expect(page).toMatch(/setBuckets\(\(previous\) => \(sameBuckets\(previous, all\) \? previous : all\)\);\s*setListLoaded\(true\);/);
+    expect(page).toMatch(/setBuckets\(\(previous\) => \(sameBuckets\(previous, all\) \? previous : all\)\);\s*setListFetched\(true\);/);
+    // « Mes tournois » attendu aussi (échec compris), sans quoi sa section
+    // naissait au sommet après coup et poussait la liste vers le bas.
+    expect(page).toContain("const listLoaded = listFetched && mineSettled;");
+    expect(page).toMatch(/fetchMyTournamentIds[\s\S]*?\} catch \{[\s\S]*?\}\s*if \(!signal\?\.aborted\) setMineSettled\(true\);/);
     expect(page).toContain('{!listLoaded && <SecuredLoadingView label={t("list.loading")} />}');
     expect(page).toContain("{listLoaded && shownSections.length === 0 && (");
     // Sommaire, pastilles et bandeau gardent leur place (pas de saut de mise
@@ -59,7 +63,8 @@ describe("page tournois — barre de recherche et filtres", () => {
     expect(page).toContain("items={listLoaded ? buildTickerItems(scheduledBuckets, text) : NO_TICKER_ITEMS}");
     expect(page).not.toMatch(/\{listLoaded && \(\s*<(nav|Ticker)/);
     // Le drapeau ne repasse jamais à faux : un échec de relecture garde la liste.
-    expect(page.match(/setListLoaded\(/g)).toHaveLength(1);
+    expect(page.match(/setListFetched\(/g)).toHaveLength(1);
+    expect(page.match(/setMineSettled\(/g)).toHaveLength(1);
     expect(frTournaments.list.loading).toBe("Chargement des tournois…");
   });
 
