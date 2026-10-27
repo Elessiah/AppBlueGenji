@@ -335,7 +335,7 @@ juste après l'écriture qui l'a rendue fausse.
 | --- | --- | --- |
 | `tournament-snapshot:<id>` | 3 s | toute publication d'événement du tournoi |
 | `tournaments-list:public` | 15 s | `updated` (plateau, inscrites, état), la création d'un tournoi, et une clôture détectée autour d'un score |
-| `landing:stats`, `landing:ticker`, `landing:leaderboard:<n>` | 60 s | — |
+| `landing:stats`, `landing:ticker`, `landing:leaderboard:<jeu>` (liste entière, tranchée à la lecture) | 60 s | — |
 | `landing:live` | 5 s | `updated`, et un changement de match qui déplace la carte du direct (antenne : chaîne, mode, ouverture ; horaire ; lancement : « Prêt », forçage, lancement d'office) |
 | `tournament-preview:<id>` | 3 s | `updated` (inscrites, seeding) |
 | `showcase:sponsors`, `:about-stats`, `:about-pillars`, `:site-copy` | 60 s | toute écriture du staff |

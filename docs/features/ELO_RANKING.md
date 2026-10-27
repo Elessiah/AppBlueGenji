@@ -332,7 +332,8 @@ ailleurs (annuaire, fiche, seeding) : **la** cote d'une équipe reste toujours
 ce calcul-là. Poser `game` lance un **second** rejeu, sur une assiette plus
 étroite — le nombre qu'il rend n'est vrai que pour l'onglet qui l'affiche,
 jamais la cote de l'équipe. La clé du cache mutualisé (`state:${jours}:${jeu}`)
-et celle du cache de la landing (`leaderboard:${limite}:${jeu}`) portent donc le
+et celle du cache de la landing (`leaderboard:${jeu}`, la liste entière, découpée à
+la longueur demandée à la lecture) portent donc le
 jeu : un classement filtré et le classement général vivent côte à côte sans se
 percuter, chacun invalidé par le même préfixe que l'autre.
 
