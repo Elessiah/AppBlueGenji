@@ -154,7 +154,12 @@ export default function TournamentsList() {
   // compteurs à zéro et un bandeau « Aucune actualité » jusqu'à la réponse.
   // Un échec le laisse faux : le squelette reste, la notification dit
   // l'incident, et la relecture de fond suivante remplit la page.
-  const [listLoaded, setListLoaded] = useState(false);
+  const [listFetched, setListFetched] = useState(false);
+  // « Mes tournois » arrive par sa propre lecture : sans l'attendre, la
+  // section naissait au sommet une fois la liste affichée et poussait tout le
+  // reste vers le bas. Réglé au premier résultat, échec compris (silencieux).
+  const [mineSettled, setMineSettled] = useState(false);
+  const listLoaded = listFetched && mineSettled;
   const [hiddenTournaments, setHiddenTournaments] = useState<TournamentCard[]>([]);
   const [myTournamentIds, setMyTournamentIds] = useState<ReadonlySet<number>>(new Set());
   const [expandedSections, setExpandedSections] = useState<ReadonlySet<LimitedSectionKey>>(new Set());
@@ -187,7 +192,7 @@ export default function TournamentsList() {
         // relecture de fond redessinerait toute la liste et réarmerait le
         // minuteur de bascule, pour un contenu identique.
         setBuckets((previous) => (sameBuckets(previous, all) ? previous : all));
-        setListLoaded(true);
+        setListFetched(true);
       } catch (e) {
         // Une requête abandonnée (démontage, rafraîchissement suivant) n'est pas
         // un incident : la page n'a plus rien à afficher de toute façon.
@@ -216,6 +221,7 @@ export default function TournamentsList() {
     } catch {
       // Silencieux, premier chargement compris : voir `fetchMyTournamentIds`.
     }
+    if (!signal?.aborted) setMineSettled(true);
   }, []);
 
   useEffect(() => {
