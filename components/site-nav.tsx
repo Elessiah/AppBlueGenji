@@ -9,9 +9,9 @@ import { isNavLinkActive } from "@/lib/shared/nav-active";
 import { REPORTS_ADMIN_PATH } from "@/lib/shared/content-reports";
 import type { ShellKey } from "@/lib/shared/shell-text";
 import { useShellText } from "./i18n/shell-text";
-import s from "./arena-nav.module.css";
+import s from "./site-nav.module.css";
 
-type ArenaNavProps = {
+type SiteNavProps = {
   pseudo: string;
   avatarUrl: string | null;
   activeTeam?: { teamId: number; teamName: string } | null;
@@ -33,21 +33,21 @@ type ArenaNavProps = {
  * tournois vert d'eau, classement rose. Aucune teinte chaude (ni rouge du direct,
  * ni ambre, ni couleur de défaite).
  */
-export const ARENA_NAV_LINKS = [
+export const SITE_NAV_LINKS = [
   { href: "/joueurs", labelKey: "nav.links.players", rgb: "var(--blue-500-rgb)" },
   { href: "/equipes", labelKey: "nav.links.teams", rgb: "var(--violet-400-rgb)" },
   { href: "/tournois", labelKey: "nav.links.tournaments", rgb: "var(--teal-400-rgb)" },
   { href: "/classement", labelKey: "nav.links.ranking", rgb: "var(--pink-400-rgb)" },
 ] as const satisfies ReadonlyArray<{ href: string; labelKey: ShellKey; rgb: string }>;
-const links = ARENA_NAV_LINKS;
+const links = SITE_NAV_LINKS;
 
-export function ArenaNav({
+export function SiteNav({
   pseudo,
   avatarUrl,
   activeTeam,
   openReports = null,
   languageSwitcherLabel,
-}: Readonly<ArenaNavProps>) {
+}: Readonly<SiteNavProps>) {
   // Chemin sans préfixe de langue : `/en/tournois` reste la section « Tournois ».
   const { path: pathname } = useLocalePathname();
   const { t } = useShellText();

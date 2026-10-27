@@ -110,7 +110,7 @@ describe("requestLogout", () => {
 });
 
 describe("mise en page de la navigation", () => {
-  const arenaCss = readSource("components/arena-nav.module.css");
+  const siteNavCss = readSource("components/site-nav.module.css");
   const headerCss = readSource("components/cyber/landing/PublicHeader.module.css");
 
   it("l'en-tête public ne passe plus sur deux lignes sous 1100 px", () => {
@@ -118,19 +118,19 @@ describe("mise en page de la navigation", () => {
   });
 
   it("aucune des deux barres ne reste collante en paysage bas", () => {
-    for (const css of [arenaCss, headerCss]) {
+    for (const css of [siteNavCss, headerCss]) {
       const block = css.slice(css.indexOf("@media (max-height: 500px)"));
       expect(block.slice(0, block.indexOf("}\n}"))).toContain("position: relative");
     }
   });
 
   it("tient les quatre liens sur une ligne sous 1000 px en retirant leur losange", () => {
-    const block = arenaCss.slice(arenaCss.indexOf("@media (max-width: 1000px)"));
+    const block = siteNavCss.slice(siteNavCss.indexOf("@media (max-width: 1000px)"));
     expect(block).toMatch(/^@media \(max-width: 1000px\) \{\s*\.navLink::before\s*\{\s*display: none;/);
   });
 
   it("garde aux outils une cible de 44 px, comme le sélecteur de langue", () => {
-    expect(arenaCss).toMatch(/\.navTools \.navTool\s*\{[^}]*min-width: 44px;[^}]*min-height: 44px;/);
+    expect(siteNavCss).toMatch(/\.navTools \.navTool\s*\{[^}]*min-width: 44px;[^}]*min-height: 44px;/);
   });
 
   it("n'éclaire pas la déconnexion désactivée au survol", () => {
@@ -146,11 +146,11 @@ describe("mise en page de la navigation", () => {
   });
 
   it("dessine la pastille des signalements en contraste forcé", () => {
-    const badge = arenaCss.slice(arenaCss.indexOf(".navBadge {")).split("}")[0];
+    const badge = siteNavCss.slice(siteNavCss.indexOf(".navBadge {")).split("}")[0];
     expect(badge).toContain("border: 1px solid transparent;");
   });
 
   it("sépare les outils du compte par un filet", () => {
-    expect(arenaCss).toMatch(/\.navTools\s*\{[^}]*border-right: 1px solid var\(--line-strong-cy\);/);
+    expect(siteNavCss).toMatch(/\.navTools\s*\{[^}]*border-right: 1px solid var\(--line-strong-cy\);/);
   });
 });

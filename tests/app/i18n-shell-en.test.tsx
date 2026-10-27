@@ -44,7 +44,7 @@ import NotFound, { generateMetadata } from "@/app/not-found";
 import { AccessibilityPanel, accessibilityButtonLabel } from "@/components/accessibility/AccessibilityMenu";
 import { SkipLink } from "@/components/accessibility/SkipLink";
 import { AccountMenuPanel } from "@/components/account-menu";
-import { ArenaNav } from "@/components/arena-nav";
+import { SiteNav } from "@/components/site-nav";
 import { FooterContact } from "@/components/cyber/landing/FooterContact";
 import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
 import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
@@ -108,7 +108,7 @@ describe("coquille en anglais — composants client", () => {
   it("barre des connectés : sections, signalements — liens sans préfixe vers des routes non traduites", () => {
     mockPathname = "/en/equipes/12";
     const html = english(
-      <ArenaNav pseudo="Nova" avatarUrl={null} activeTeam={{ teamId: 7, teamName: "Les Ours" }} openReports={2} />,
+      <SiteNav pseudo="Nova" avatarUrl={null} activeTeam={{ teamId: 7, teamName: "Les Ours" }} openReports={2} />,
     );
     expect(html).toContain('aria-label="Main navigation"');
     expect(html).toMatch(/aria-current="page"[^>]*>Teams<\/a>/);

@@ -7,12 +7,12 @@ du lien « Voir le classement complet » du leaderboard de l'accueil, qui menait
 
 ## En-tête selon la session
 
-`/classement` est aussi listé par la barre des connectés (`ARENA_NAV_LINKS`).
+`/classement` est aussi listé par la barre des connectés (`SITE_NAV_LINKS`).
 La page passe donc par **`SessionPageShell`**
 (`components/cyber/landing/SessionPageShell.tsx`) : déconnecté — robots
 d'indexation compris —, l'en-tête et le pied vitrine (`PublicPageShell`) ;
-connecté, le gabarit de l'espace `(secured)` (**`ArenaShell`**,
-`components/arena-shell.tsx` : `ArenaNav`, `<main>`, `SiteFooterBar`), lien
+connecté, le gabarit de l'espace `(secured)` (**`SiteShell`**,
+`components/site-shell.tsx` : `SiteNav`, `<main>`, `SiteFooterBar`), lien
 « Classement » en `aria-current="page"`. Le choix se fait au serveur
 (`getCurrentUser`, mémoïsé par requête et déjà lu par le layout racine) : ni
 flash, ni requête côté client ; un connecté coûte au serveur la lecture de son
@@ -239,8 +239,8 @@ complète sans JavaScript.
 - Leaderboard de l'accueil : « Voir le classement complet » → `/classement`.
 - Menu burger de la vitrine (`PUBLIC_NAV_LINKS`) : « Classement », après
   « Équipes ».
-- Barre de navigation des connectés (`ARENA_NAV_LINKS`,
-  `components/arena-nav.tsx`) : « Classement », après « Tournois », teinte
+- Barre de navigation des connectés (`SITE_NAV_LINKS`,
+  `components/site-nav.tsx`) : « Classement », après « Tournois », teinte
   rose (`--pink-400-rgb`) — voir `PUBLIC_NAVIGATION.md`.
 - Pied de page, COMPÉTITIONS : « Classement » → `/classement` (menait à
   `/joueurs`).

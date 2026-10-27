@@ -78,7 +78,7 @@ describe("état d'un signalement en pastille", () => {
 });
 
 describe("barre de navigation", () => {
-  const nav = readSource(join(ROOT, "components", "arena-nav.tsx"));
+  const nav = readSource(join(ROOT, "components", "site-nav.tsx"));
 
   it("passe « Équipes » au violet des pages d'équipe, sans aucune teinte chaude", () => {
     expect(nav).toMatch(/labelKey: "nav\.links\.teams", rgb: "var\(--violet-400-rgb\)"/);

@@ -203,7 +203,7 @@ describe("mise en page racine", () => {
       "components/ui/confirm-action-dialog.tsx",
       "components/accessibility/AccessibilityMenu.tsx",
       "components/accessibility/SkipLink.tsx",
-      "components/arena-nav.tsx",
+      "components/site-nav.tsx",
       "components/account-menu.tsx",
       "components/cyber/landing/PublicNavMenu.tsx",
       "components/legal/SiteFooterBar.tsx",

@@ -1,7 +1,7 @@
 /**
  * Hauteur de l'en-tête collant, source des marges d'ancre (WCAG 2.4.11).
  *
- * Les en-têtes du site (`PublicHeader` de la vitrine, `ArenaNav` de l'espace
+ * Les en-têtes du site (`PublicHeader` de la vitrine, `SiteNav` de l'espace
  * connecté) sont `position: sticky; top: 0`, et leur hauteur **varie** : selon
  * l'en-tête, la largeur d'écran et le retour à la ligne des actions, on a
  * mesuré 110, 124 et 134 px. Une marge écrite en dur (`scroll-margin-top:

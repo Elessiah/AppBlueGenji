@@ -1,7 +1,7 @@
 /**
  * Le lien de navigation qui désigne la page courante.
  *
- * Écrit une fois pour les deux navigations du site (`ArenaNav` de l'espace
+ * Écrit une fois pour les deux navigations du site (`SiteNav` de l'espace
  * connecté, `PublicNavMenu` de la vitrine), qui en tenaient chacune une copie.
  * La réponse sert **deux** lecteurs : le style du lien actif, et
  * `aria-current="page"` — sans lequel la page courante ne se signalait que par

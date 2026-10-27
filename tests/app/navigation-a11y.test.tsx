@@ -9,7 +9,7 @@ jest.mock("next/navigation", () => ({
 }));
 
 import { renderToStaticMarkup } from "react-dom/server";
-import { ARENA_NAV_LINKS, ArenaNav } from "@/components/arena-nav";
+import { SITE_NAV_LINKS, SiteNav } from "@/components/site-nav";
 import { ToastProvider } from "@/components/ui/toast";
 import {
   PUBLIC_NAV_LINKS,
@@ -19,10 +19,10 @@ import {
 } from "@/components/cyber/landing/PublicNavMenu";
 import { readSource } from "../helpers/read-source";
 
-const arenaNav = (activeTeam: { teamId: number; teamName: string } | null = null) =>
+const siteNav = (activeTeam: { teamId: number; teamName: string } | null = null) =>
   renderToStaticMarkup(
     <ToastProvider>
-      <ArenaNav pseudo="Nova" avatarUrl={null} activeTeam={activeTeam} />
+      <SiteNav pseudo="Nova" avatarUrl={null} activeTeam={activeTeam} />
     </ToastProvider>,
   );
 
@@ -30,34 +30,34 @@ const arenaNav = (activeTeam: { teamId: number; teamName: string } | null = null
 const currentLinks = (html: string) =>
   [...html.matchAll(/<a [^>]*aria-current="page"[^>]*>([^<]*)<\/a>/g)].map((m) => m[1]);
 
-describe("ArenaNav — page courante et pictogrammes", () => {
+describe("SiteNav — page courante et pictogrammes", () => {
   afterEach(() => {
     mockPathname = "/equipes/12/roster";
   });
 
   it("signale la section courante autrement que par le style", () => {
-    expect(currentLinks(arenaNav())).toEqual(["Équipes"]);
+    expect(currentLinks(siteNav())).toEqual(["Équipes"]);
   });
 
   it("n'annonce aucune page courante hors de ses sections", () => {
     mockPathname = "/profil";
-    expect(arenaNav()).not.toContain("aria-current");
+    expect(siteNav()).not.toContain("aria-current");
   });
 
   it("propose « Classement » aux connectés, page courante comprise", () => {
-    expect(arenaNav()).toMatch(/<a [^>]*href="\/classement"[^>]*>Classement<\/a>/);
+    expect(siteNav()).toMatch(/<a [^>]*href="\/classement"[^>]*>Classement<\/a>/);
     mockPathname = "/classement";
-    expect(currentLinks(arenaNav())).toEqual(["Classement"]);
+    expect(currentLinks(siteNav())).toEqual(["Classement"]);
   });
 
   it("donne à chaque section une teinte froide qui lui est propre", () => {
-    const tints = ARENA_NAV_LINKS.map((link) => link.rgb);
+    const tints = SITE_NAV_LINKS.map((link) => link.rgb);
     expect(new Set(tints).size).toBe(tints.length);
     for (const tint of tints) expect(tint).not.toMatch(/amber|orange|red|result-loss/);
   });
 
   it("ne déborde pas entre 721 et 1000 px : liens resserrés, repli plutôt que débordement", () => {
-    const css = readSource("components/arena-nav.module.css");
+    const css = readSource("components/site-nav.module.css");
     const block = css.slice(css.indexOf("@media (min-width: 721px) and (max-width: 1000px)"));
     expect(block).toMatch(/\.navLeft\s*\{[^}]*min-width:\s*0;[^}]*flex-wrap:\s*wrap;/);
     expect(block).toMatch(/\.navLink\s*\{[^}]*letter-spacing:\s*0\.08em;/);
@@ -66,11 +66,11 @@ describe("ArenaNav — page courante et pictogrammes", () => {
   });
 
   it("nomme sa navigation", () => {
-    expect(arenaNav()).toContain('<nav class="nav" aria-label="Navigation principale" data-sticky-header="true">');
+    expect(siteNav()).toContain('<nav class="nav" aria-label="Navigation principale" data-sticky-header="true">');
   });
 
   it("n'alourdit plus la barre de raccourcis « Accueil » / « Mon équipe »", () => {
-    const html = arenaNav({ teamId: 3, teamName: "Les Ours" });
+    const html = siteNav({ teamId: 3, teamName: "Les Ours" });
     // L'accueil passe par le logo, l'équipe par le menu du compte.
     expect(html).not.toContain("navHome");
     expect(html).not.toContain('href="/equipes/3"');
@@ -81,7 +81,7 @@ describe("ArenaNav — page courante et pictogrammes", () => {
   it("réduit les signalements à un drapeau nommé, compteur en pastille", () => {
     const html = renderToStaticMarkup(
       <ToastProvider>
-        <ArenaNav pseudo="Nova" avatarUrl={null} openReports={2} />
+        <SiteNav pseudo="Nova" avatarUrl={null} openReports={2} />
       </ToastProvider>,
     );
     expect(html).toContain('<a class="navTool navReports navReportsPending" href="/admin/signalements">');
@@ -90,7 +90,7 @@ describe("ArenaNav — page courante et pictogrammes", () => {
     expect(html).toMatch(/<svg[^>]*aria-hidden="true"[^>]*>.*?<\/svg><span class="navReportsLabel">Signalements<\/span>/);
     // Compte lu tel qu'affiché, séparé du libellé (« Signalements, 2 à traiter »).
     expect(html).toContain('<span class="sr-only">, </span><span class="navBadge">2</span><span class="sr-only"> à traiter</span>');
-    const css = readSource("components/arena-nav.module.css");
+    const css = readSource("components/site-nav.module.css");
     // Libellé visible dès 1150 px, comme l'était l'ancien bouton en toutes lettres.
     expect(css).toMatch(/@media \(max-width: 1149\.98px\) \{\s*\.navReportsLabel\s*\{[^}]*clip: rect\(0, 0, 0, 0\)/);
   });
@@ -98,7 +98,7 @@ describe("ArenaNav — page courante et pictogrammes", () => {
   it("plafonne la pastille à « 99+ », lue telle qu'affichée (WCAG 2.5.3)", () => {
     const html = renderToStaticMarkup(
       <ToastProvider>
-        <ArenaNav pseudo="Nova" avatarUrl={null} openReports={142} />
+        <SiteNav pseudo="Nova" avatarUrl={null} openReports={142} />
       </ToastProvider>,
     );
     expect(html).toContain('<span class="navBadge">99+</span><span class="sr-only"> à traiter</span>');
@@ -106,7 +106,7 @@ describe("ArenaNav — page courante et pictogrammes", () => {
   });
 
   it("réserve le survol des outils aux pointeurs qui survolent", () => {
-    const css = readSource("components/arena-nav.module.css");
+    const css = readSource("components/site-nav.module.css");
     expect(css).toMatch(/@media \(hover: hover\) and \(pointer: fine\) \{\s*\.navTools \.navTool:hover/);
     expect(css).toMatch(/@media \(hover: hover\) and \(pointer: fine\) \{\s*\.navTools \.navReportsPending:hover/);
     expect(readSource("components/i18n/LanguageSwitcher.module.css")).toMatch(/@media \(hover: hover\) and \(pointer: fine\) \{\s*\.link:hover/);
@@ -128,11 +128,11 @@ describe("ArenaNav — page courante et pictogrammes", () => {
     mockPathname = "/admin/signalements";
     const html = renderToStaticMarkup(
       <ToastProvider>
-        <ArenaNav pseudo="Nova" avatarUrl={null} openReports={0} />
+        <SiteNav pseudo="Nova" avatarUrl={null} openReports={0} />
       </ToastProvider>,
     );
     expect(html).toContain('<a class="navTool navReports" aria-current="page" href="/admin/signalements">');
-    const css = readSource("components/arena-nav.module.css");
+    const css = readSource("components/site-nav.module.css");
     expect(css).toMatch(/\.navReports\[aria-current="page"\]\s*\{[^}]*border-color: var\(--blue-500\);/);
     expect(css).toMatch(/\.navReportsPending\[aria-current="page"\]\s*\{[^}]*border-color: var\(--amber\);/);
     // Contraste forcé : un contour système remplace fond et halo.
@@ -148,7 +148,7 @@ describe("ArenaNav — page courante et pictogrammes", () => {
     // `/equipes/12/roster` n'est pas traduite : le sélecteur serait muet, le filet orphelin.
     const html = renderToStaticMarkup(
       <ToastProvider>
-        <ArenaNav pseudo="Nova" avatarUrl={null} languageSwitcherLabel="lire cette page en anglais" />
+        <SiteNav pseudo="Nova" avatarUrl={null} languageSwitcherLabel="lire cette page en anglais" />
       </ToastProvider>,
     );
     expect(html).not.toContain("navTools");
@@ -158,14 +158,14 @@ describe("ArenaNav — page courante et pictogrammes", () => {
     mockPathname = "/tournois";
     const html = renderToStaticMarkup(
       <ToastProvider>
-        <ArenaNav pseudo="Nova" avatarUrl={null} languageSwitcherLabel="lire cette page en anglais" />
+        <SiteNav pseudo="Nova" avatarUrl={null} languageSwitcherLabel="lire cette page en anglais" />
       </ToastProvider>,
     );
     expect(html).toMatch(/<div class="navTools"><a href="\/en\/tournois" hrefLang="en" class="link">/);
   });
 
   it("ne rend ni drapeau ni groupe d'outils sans permission de modération ni langue", () => {
-    const html = arenaNav();
+    const html = siteNav();
     expect(html).not.toContain("navReports");
     expect(html).not.toContain("navTools");
   });
@@ -173,7 +173,7 @@ describe("ArenaNav — page courante et pictogrammes", () => {
   it("n'affiche pas de pastille quand rien n'attend", () => {
     const html = renderToStaticMarkup(
       <ToastProvider>
-        <ArenaNav pseudo="Nova" avatarUrl={null} openReports={0} />
+        <SiteNav pseudo="Nova" avatarUrl={null} openReports={0} />
       </ToastProvider>,
     );
     expect(html).toContain("navReports");

@@ -31,8 +31,8 @@ const I18N_MIGRATED_FILES = [
   "app/regles/**",
   "components/accessibility/**",
   "components/account-menu.tsx",
-  "components/arena-nav.tsx",
-  "components/arena-shell.tsx",
+  "components/site-nav.tsx",
+  "components/site-shell.tsx",
   "components/cyber/landing/PublicFooter.tsx",
   "components/cyber/landing/PublicHeader.tsx",
   "components/cyber/landing/PublicNavMenu.tsx",
@@ -197,7 +197,7 @@ const I18N_MIGRATED_FILES = [
 
 /** Composants de toutes les pages dont les liens passent déjà par `LocaleLink`. */
 const I18N_LOCALE_LINK_FILES = [
-  "components/arena-nav.tsx",
+  "components/site-nav.tsx",
   "components/account-menu.tsx",
   "components/entity-link.tsx",
   "components/recruitment-highlight.tsx",

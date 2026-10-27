@@ -36,7 +36,7 @@ export function LanguageSwitcher({ label, className }: Readonly<{ label: string;
 /**
  * Le chemin courant (sans préfixe de langue) s'il a une autre langue, sinon
  * `null` : la seule décision « le sélecteur parle-t-il ? », partagée avec qui
- * doit savoir d'avance s'il sera rendu (groupe d'outils de `ArenaNav`).
+ * doit savoir d'avance s'il sera rendu (groupe d'outils de `SiteNav`).
  */
 export function useSwitchablePath(): string | null {
   const path = splitLocalePrefix(usePathname() ?? "/").path;

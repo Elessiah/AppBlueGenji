@@ -31,7 +31,7 @@ import ErrorBoundary from "@/app/error";
 import { AccessibilityPanel } from "@/components/accessibility/AccessibilityMenu";
 import { SkipLink } from "@/components/accessibility/SkipLink";
 import { AccountMenuPanel } from "@/components/account-menu";
-import { ArenaNav } from "@/components/arena-nav";
+import { SiteNav } from "@/components/site-nav";
 import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
 import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
 import { PublicNavPanel } from "@/components/cyber/landing/PublicNavMenu";
@@ -56,10 +56,10 @@ const CLIENT_FIXTURES: ReadonlyArray<[string, () => ReactElement]> = [
   ],
   ["PublicNavPanel", () => <PublicNavPanel id="n" pathname="/equipes" onNavigate={noop} />],
   [
-    "ArenaNav",
+    "SiteNav",
     () => (
       <ToastProvider>
-        <ArenaNav
+        <SiteNav
           pseudo="Nova"
           avatarUrl={null}
           activeTeam={{ teamId: 7, teamName: "Les Ours" }}

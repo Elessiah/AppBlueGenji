@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/server/auth";
-import { ArenaShell } from "@/components/arena-shell";
+import { SiteShell } from "@/components/site-shell";
 import { AuthGate } from "./_shared/AuthGate";
 import { SiteFooterBar } from "@/components/legal/SiteFooterBar";
 import { messagesFor } from "@/lib/server/i18n-messages";
@@ -68,8 +68,8 @@ export default async function SecuredLayout({ children }: Readonly<{ children: R
   }
 
   return (
-    <ArenaShell user={user} mainClassName="page-shell">
+    <SiteShell user={user} mainClassName="page-shell">
       {children}
-    </ArenaShell>
+    </SiteShell>
   );
 }

@@ -156,7 +156,7 @@
 
 /* ── Sections ─────────────────────────────────────────────────────────────── */
 
-/* Aucune marge d'ancre sur les sections : l'arrivée sous `ArenaNav` (collante)
+/* Aucune marge d'ancre sur les sections : l'arrivée sous `SiteNav` (collante)
    est tenue par `html { scroll-padding-top }`, calé sur la hauteur **mesurée**
    de la barre (`lib/shared/sticky-header.ts`) — aussi quand on arrive par une
    URL collée. Une marge en dur s'y ajouterait. */

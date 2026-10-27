@@ -1,11 +1,11 @@
 import type { ReactNode } from "react";
 import { getCurrentUser } from "@/lib/server/auth";
-import { ArenaShell } from "@/components/arena-shell";
+import { SiteShell } from "@/components/site-shell";
 import { PublicPageShell } from "./PublicPageShell";
 
 /**
  * Gabarit d'une page publique que la barre des connectés liste aussi
- * (`ARENA_NAV_LINKS`, ex. `/classement`) : un visiteur déconnecté — et donc
+ * (`SITE_NAV_LINKS`, ex. `/classement`) : un visiteur déconnecté — et donc
  * tout robot d'indexation — reçoit l'en-tête vitrine (`PublicPageShell`), un
  * connecté la même barre que sur `/tournois` ou `/equipes`, lien de la section
  * en `aria-current`.
@@ -20,8 +20,8 @@ export async function SessionPageShell({ children }: Readonly<{ children: ReactN
   const user = await getCurrentUser().catch(() => null);
   if (!user) return <PublicPageShell>{children}</PublicPageShell>;
   return (
-    <ArenaShell user={user} mainStyle={{ position: "relative", zIndex: 1 }}>
+    <SiteShell user={user} mainStyle={{ position: "relative", zIndex: 1 }}>
       {children}
-    </ArenaShell>
+    </SiteShell>
   );
 }

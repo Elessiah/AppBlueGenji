@@ -94,7 +94,7 @@ function fromRow(row: UserRow): AuthUser {
     id: Number(row.id),
     pseudo: row.pseudo,
     // Le compte voit **son** avatar, sans passer par la visibilité — mais la
-    // règle d'origine s'applique ici aussi : `ArenaNav` et `PublicHeader` le
+    // règle d'origine s'applique ici aussi : `SiteNav` et `PublicHeader` le
     // rendent par `next/image`, qui lève sur une origine absente de
     // `remotePatterns`. Une URL Google restée en base casserait donc toutes
     // les pages de ce compte, au lieu de simplement fuiter comme avant.

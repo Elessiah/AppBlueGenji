@@ -27,8 +27,8 @@ du pied de page (`components/cyber/landing/PublicFooter.tsx`).
 
 ## Barre des connectés
 
-`ArenaNav` (`components/arena-nav.tsx`, pages `/(secured)`) liste
-`ARENA_NAV_LINKS` : Joueurs (glacier `--blue-500-rgb`), Équipes (violet
+`SiteNav` (`components/site-nav.tsx`, pages `/(secured)`) liste
+`SITE_NAV_LINKS` : Joueurs (glacier `--blue-500-rgb`), Équipes (violet
 `--violet-400-rgb`), Tournois (vert d'eau `--teal-400-rgb`), **Classement**
 (`/classement`, rose `--pink-400-rgb`). Chaque lien a sa propre teinte, jamais
 chaude (ni rouge du direct, ni ambre, ni `--result-loss`), et porte
