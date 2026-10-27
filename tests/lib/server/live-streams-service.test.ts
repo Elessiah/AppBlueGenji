@@ -282,6 +282,18 @@ describe("setMatchLiveConfig", () => {
     expect(world.state.streams).toEqual([dbStream(3, "https://twitch.tv/bluegenji", true)]);
   });
 
+  it("ne rattache pas après coup : posé avant son inscription comme caster, le lien reste à l'organisation, même réenregistré", async () => {
+    const world = liveWorld(matchRow(), [], []);
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/arbitre", setter: ORGANISER_5 });
+    // L'arbitre 5 s'inscrit ensuite sur ce stream, puis réenregistre le même lien.
+    world.state.casters.push({ user_id: 5, stream_id: 1 });
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/arbitre", setter: ORGANISER_5 });
+
+    expect(world.state.streams).toEqual([dbStream(1, "https://twitch.tv/arbitre", true)]);
+  });
+
   it("garde comme lien de l'organisation celui qu'elle pose sans caster le match, même quand d'autres le castent", async () => {
     const world = liveWorld(matchRow(), [], [{ user_id: 12, stream_id: 4 }]);
     await mockLiveDb(world);
