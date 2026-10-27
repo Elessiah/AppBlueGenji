@@ -420,6 +420,18 @@ describe("getLandingLive — fiche des engagés du match", () => {
     expect(live?.currentMatch?.team2Href).toBeNull();
   });
 
+  it("rend un nom d'engagé sous sa forme affichable : la vitrine est lue sans compte", async () => {
+    // Un nom ancien peut garder un renversement bidi ou n'être fait que de
+    // caractères invisibles (`UNTRUSTED_NAMES.md`) : le bandeau le filtre déjà.
+    await mockDb([matchRow({ team1_name: "Al‮pha", team2_name: "​‍" })]);
+
+    const live = await liveFrom(buckets([card(1, "Coupe A")]));
+
+    expect(live?.currentMatch?.team1Name).toBe("Alpha");
+    expect(live?.currentMatch?.team2Name).toBeNull();
+    expect(live?.matches.map((match) => match.team1Name)).toEqual(["Alpha"]);
+  });
+
   it("expose le logo de chaque engagé, servi par le site", async () => {
     await mockDb([
       matchRow({ team1_logo_url: "/api/uploads/teams/a.webp", team2_logo_url: null }),
