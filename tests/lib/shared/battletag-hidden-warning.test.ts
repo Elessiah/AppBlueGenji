@@ -173,3 +173,17 @@ describe("BattleTag masqué — les deux fenêtres nommées partout", () => {
     );
   });
 });
+
+describe("page du match (#489) : chaque avertissement du BattleTag masqué la nomme", () => {
+  it("dans la liste partagée, la case du profil et l'encart de visibilité, en français et en anglais", () => {
+    const frNotice = frProfile.battletagNotice;
+    const enNotice = enProfile.battletagNotice;
+    const fr = [HIDDEN_BATTLETAG_AUDIENCE.title, frProfile.privacy.battletagNotice, frNotice.warning, frNotice.intro, frNotice.staff];
+    const en = [lines(enProfile).title, enProfile.privacy.battletagNotice, enNotice.warning, enNotice.intro, enNotice.staff];
+    for (const text of fr) expect(text).toMatch(/page du match|sur sa page|la page d'un match/);
+    for (const text of en) expect(text).toMatch(/match page|on its page|the page of a match/);
+    // Le public de la page est celui de la fenêtre « Contacts », arbitres et administrateurs compris.
+    expect(HIDDEN_BATTLETAG_AUDIENCE.items.at(-1)).toContain("aux mêmes personnes et aux mêmes moments que la fenêtre « Contacts »");
+    expect(lines(enProfile).items.at(-1)).toContain("to the same people at the same times as the “Contacts” window");
+  });
+});
