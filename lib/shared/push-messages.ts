@@ -675,7 +675,12 @@ export function privacyChangePush(titles: readonly string[], locale: Locale = DE
 }
 
 /** Nature d'une alerte d'arbitrage, pour la rédiger sans le texte Discord (français, D6). */
-export type RefereeAlertKind = "score_conflict" | "score_report_stalled" | "match_no_referee" | "other";
+export type RefereeAlertKind =
+  | "score_conflict"
+  | "score_report_stalled"
+  | "match_no_referee"
+  | "match_no_referee_round"
+  | "other";
 
 /** La manche en cause, quand l'alerte en a une : de quoi la nommer et y mener. */
 export type RefereeAlertMatch = {
@@ -686,6 +691,8 @@ export type RefereeAlertMatch = {
   roundNumber: number;
   /** Ronde suisse : « Ronde N » (`swissRoundSql`). */
   swiss?: boolean;
+  /** Alerte groupée d'une manche sans horaire : nombre de matchs listés. */
+  matchCount?: number;
 };
 
 /**
@@ -717,6 +724,7 @@ export function refereeAlertPush(
     body = text.t(`refereeAlert.${kind}Match`, {
       tournament: match.tournamentName,
       round: pushRoundLabel(match.bracket, match.roundNumber, locale, match.swiss),
+      count: match.matchCount ?? 1,
     });
   } else body = text.t(`refereeAlert.${kind}`);
   return {

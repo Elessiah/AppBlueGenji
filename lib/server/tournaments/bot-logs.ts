@@ -67,6 +67,8 @@ import { toParticipantType } from "@/lib/shared/participants";
 import {
   botEventChannel,
   formatNoRefereeAlert,
+  formatRoundNoRefereeAlert,
+  ROUND_ALERT_LISTED_MATCHES,
   formatScoreConflictAlert,
   formatStalledScoreReportAlert,
   type BotEventChannel,
@@ -91,7 +93,9 @@ export type PendingBotLog =
   | { kind: "score_conflict"; matchId: number; claimId?: number }
   | { kind: "score_report_stalled"; matchId: number; claimId?: number }
   // `pairing` : l'appariement lancé — une alerte par appariement, pas par match.
-  | { kind: "match_no_referee"; matchId: number; pairing: string; claimId?: number }
+  // `roundMatchIds` : alerte d'une manche sans horaire, qui liste ses matchs ;
+  // `matchId` est alors le premier match de la manche (porteur de la réservation).
+  | { kind: "match_no_referee"; matchId: number; pairing: string; roundMatchIds?: number[]; claimId?: number }
   | { kind: "tournament_started"; tournamentId: number }
   | { kind: "tournament_finished"; tournamentId: number }
   | { kind: "tournament_underfilled"; tournamentId: number }
@@ -169,6 +173,12 @@ export function noRefereeAlertKey(pairing: string): string {
   return `NO_REFEREE:${pairing}`.slice(0, 32);
 }
 
+/**
+ * Clé de l'alerte groupée d'une manche **sans horaire** : réservée une seule
+ * fois par manche, sur son premier match (`MATCH_REFEREE.md` § Avertissement).
+ */
+export const NO_REFEREE_ROUND_ALERT_KEY = "NO_REFEREE_ROUND";
+
 /** Clé de réservation de l'escalade « délai dépassé, toujours pas tranché » (`./score-report-sql`). */
 export { STALLED_ALERT_KEY };
 
@@ -196,7 +206,7 @@ export function refereeAlertKey(entry: PendingBotLog): string | null {
     case "score_report_stalled":
       return STALLED_ALERT_KEY;
     case "match_no_referee":
-      return noRefereeAlertKey(entry.pairing);
+      return entry.roundMatchIds ? NO_REFEREE_ROUND_ALERT_KEY : noRefereeAlertKey(entry.pairing);
     default:
       return null;
   }
@@ -491,11 +501,13 @@ function refereeAlertClaimId(entry: PendingBotLog): number | null {
  * doit pas faire échouer son propre envoi.
  */
 function refereePushKey(entry: PendingBotLog): string {
+  if (entry.kind === "match_no_referee" && entry.roundMatchIds) return `${entry.kind}-round-${entry.matchId}`;
   return "matchId" in entry ? `${entry.kind}-${entry.matchId}` : entry.kind;
 }
 
 /** Nature d'une alerte d'arbitrage, pour la rédiger hors du français du journal (lot 9-3). */
 function refereeAlertKind(entry: PendingBotLog): RefereeAlertKind {
+  if (entry.kind === "match_no_referee" && entry.roundMatchIds) return "match_no_referee_round";
   return entry.kind === "score_conflict" || entry.kind === "score_report_stalled" || entry.kind === "match_no_referee"
     ? entry.kind
     : "other";
@@ -1010,8 +1022,35 @@ async function resolveScoreReportStalledLog(
 async function resolveNoRefereeLog(
   entry: Extract<PendingBotLog, { kind: "match_no_referee" }>,
 ): Promise<ResolvedRefereeLine | null> {
+  if (entry.roundMatchIds) return resolveRoundNoRefereeLog(entry.roundMatchIds);
   const context = await loadRefereeAlertContext(entry.matchId);
   return context === null ? null : { message: formatNoRefereeAlert(context), refereeMatch: refereeMatchOf(context) };
+}
+
+/**
+ * L'alerte d'une manche sans horaire : une ligne qui liste ses matchs, le push
+ * mène au premier. Un match relu sans ses deux engagées sort de la liste (et
+ * du compte) ; sans aucun, rien ne part.
+ */
+async function resolveRoundNoRefereeLog(matchIds: readonly number[]): Promise<ResolvedRefereeLine | null> {
+  const listed = matchIds.slice(0, ROUND_ALERT_LISTED_MATCHES);
+  const contexts = await Promise.all(listed.map((matchId) => loadRefereeAlertContext(matchId)));
+  const found = contexts.filter((context): context is RefereeAlertContext => context !== null);
+  const first = found[0];
+  if (!first) return null;
+  const total = matchIds.length - (listed.length - found.length);
+  return {
+    message: formatRoundNoRefereeAlert({
+      tournament: first.tournament,
+      tournamentUrl: first.tournamentUrl,
+      bracket: first.bracket,
+      roundNumber: first.roundNumber,
+      swiss: first.swiss,
+      matches: found.map(({ matchId, team1, team2 }) => ({ matchId, team1, team2 })),
+      total,
+    }),
+    refereeMatch: { ...refereeMatchOf(first), matchCount: total },
+  };
 }
 
 async function resolveTournamentStartedLog(

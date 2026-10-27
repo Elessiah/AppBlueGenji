@@ -96,7 +96,9 @@
     "score_report_stalledMatch": "Dispute without a referee for too long · {tournament}, {round}: entry locked, a referee needs to decide.",
     "otherMatch": "Alert · {tournament}, {round}: a referee is needed.",
     "match_no_referee": "A match is starting with neither a referee nor self-management: a decision is needed.",
-    "match_no_refereeMatch": "Match without a referee · {tournament}, {round}: neither a referee nor self-management, a decision is needed."
+    "match_no_refereeMatch": "Match without a referee · {tournament}, {round}: neither a referee nor self-management, a decision is needed.",
+    "match_no_referee_round": "A round is starting with neither a referee nor self-management: a decision is needed.",
+    "match_no_referee_roundMatch": "Round without a referee · {tournament}, {round}: {count, plural, one {# match} other {# matches}} with neither a referee nor self-management, a decision is needed."
   },
   "selfResolved": {
     "title": "Dispute settled by a player of the match",

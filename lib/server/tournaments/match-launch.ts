@@ -29,7 +29,13 @@ import {
   type MatchLaunchInput,
 } from "@/lib/shared/match-launch";
 import { normalizeStreamUrl } from "@/lib/shared/live-streams";
-import { normalizeFirstMap, refereeDecision } from "@/lib/shared/match-referee";
+import {
+  groupNoRefereeAlerts,
+  normalizeFirstMap,
+  refereeDecision,
+  type NoRefereeCandidate,
+  type NoRefereeRound,
+} from "@/lib/shared/match-referee";
 import { formatRoundSelfManagementLog } from "@/lib/shared/bot-logs";
 import { matchRoundLabel } from "@/lib/shared/discord-notifications";
 import { sendBotLog } from "@/lib/server/bot-integration";
@@ -49,6 +55,7 @@ import {
   type MatchStreamRow,
 } from "./match-casters";
 import { retryOnDeadlock } from "./deadlock-retry";
+import { isTransactionAborted } from "@/lib/server/mysql-errors";
 import { announceRefereeChange, queueRefereeChange } from "./referee-notices";
 import { loadMatchLogRow, matchLogSubject } from "./match-log-subject";
 import { discardBotLogs, flushBotLogs, queueRefereeAlert } from "./bot-logs";
@@ -80,6 +87,10 @@ export type LaunchMatchBaseRow = RowDataPacket & {
   referee_user_id: number | null;
   referee_ready_at: Date | string | null;
   self_managed: number | null;
+  /** La manche du match : l'alerte « sans arbitre » d'un match sans horaire est groupée par manche. */
+  phase_id?: number | null;
+  bracket?: string | null;
+  round_number?: number | null;
 };
 
 /**
@@ -101,7 +112,8 @@ const LAUNCH_MATCH_COLUMNS = `
   m.status, m.is_bye,
   m.team1_id, m.team2_id, t1.is_ghost AS team1_is_ghost, t2.is_ghost AS team2_is_ghost,
   m.start_at, m.lobby_opened_at, m.launch_pairing, m.launched_at, m.team1_ready_at,
-  m.team2_ready_at, m.host_team_id, m.referee_user_id, m.referee_ready_at, m.self_managed`;
+  m.team2_ready_at, m.host_team_id, m.referee_user_id, m.referee_ready_at, m.self_managed,
+  m.phase_id, m.bracket, m.round_number`;
 
 const LAUNCH_MATCH_FROM = `
   FROM bg_matches m
@@ -237,7 +249,8 @@ async function adoptCurrentPairing(connection: PoolConnection, row: LaunchMatchR
 const LAUNCH_MATCH_OWN_COLUMNS = `
   m.id, m.tournament_id, m.status, m.is_bye, m.team1_id, m.team2_id,
   m.start_at, m.lobby_opened_at, m.launch_pairing, m.launched_at, m.team1_ready_at,
-  m.team2_ready_at, m.host_team_id, m.referee_user_id, m.referee_ready_at, m.self_managed`;
+  m.team2_ready_at, m.host_team_id, m.referee_user_id, m.referee_ready_at, m.self_managed,
+  m.phase_id, m.bracket, m.round_number`;
 
 /**
  * Relit le match **sous verrou** de sa seule ligne : les tables jointes ne sont
@@ -751,19 +764,82 @@ export async function setMatchHost(matchId: number, teamId: number | null): Prom
 }
 
 /**
- * Le match entre en lancement **sans arbitre ni autogestion** : le staff est
- * averti (alerte d'arbitrage `match_no_referee`, une par appariement, réservée
- * dans la transaction de l'entretien). Rien d'autre : le match part comme
- * avant, jamais d'autogestion d'office (décision de l'utilisateur, 2026-10-26).
+ * Le match entre-t-il en lancement **sans arbitre ni autogestion** ? Rend sa
+ * candidature à l'alerte du staff, `null` s'il a une décision (ou pas encore
+ * ses deux engagées). Rien d'autre : le match part comme avant, jamais
+ * d'autogestion d'office (décision de l'utilisateur, 2026-10-26).
  */
-async function warnIfUndecided(connection: PoolConnection, row: LaunchMatchRow): Promise<void> {
+function undecidedCandidate(row: LaunchMatchRow): NoRefereeCandidate | null {
   const decision = refereeDecision({
     refereeAssigned: row.referee_user_id !== null && row.refereeEligible,
     selfManaged: Number(row.self_managed ?? 0) === 1,
   });
   const pairing = launchPairingKey(nullableId(row.team1_id), nullableId(row.team2_id));
-  if (decision !== "UNDECIDED" || pairing === null) return;
-  await queueRefereeAlert(connection, { kind: "match_no_referee", matchId: Number(row.id), pairing });
+  if (decision !== "UNDECIDED" || pairing === null) return null;
+  return {
+    matchId: Number(row.id),
+    pairing,
+    scheduled: row.start_at !== null,
+    phaseId: Number(row.phase_id ?? 0),
+    bracket: String(row.bracket ?? ""),
+    roundNumber: Number(row.round_number ?? 0),
+  };
+}
+
+/** Premier match d'une manche : porteur stable de la réservation de son alerte groupée. */
+async function roundAnchorMatchId(
+  connection: PoolConnection,
+  tournamentId: number,
+  round: NoRefereeRound,
+): Promise<number | null> {
+  const [rows] = await connection.execute<RowDataPacket[]>(
+    `SELECT MIN(id) AS id FROM bg_matches
+     WHERE tournament_id = ? AND phase_id = ? AND bracket = ? AND round_number = ?`,
+    [tournamentId, round.phaseId, round.bracket, round.roundNumber],
+  );
+  const id = rows[0]?.id;
+  return id === null || id === undefined ? null : Number(id);
+}
+
+/**
+ * Avertit le staff des matchs entrés en lancement sans décision, dans la
+ * transaction de l'entretien (alerte d'arbitrage `match_no_referee`) —
+ * décision de l'utilisateur du 2026-10-27 :
+ *
+ * - un match **planifié** (heure posée) : une alerte par match, réservée par
+ *   appariement (`NO_REFEREE:<appariement>`), comme avant ;
+ * - des matchs **sans horaire** : une alerte par manche, qui les liste,
+ *   réservée une seule fois pour la manche sur son premier match
+ *   (`NO_REFEREE_ROUND`) — un match de la manche entré en lancement plus tard
+ *   ne réveille pas l'alerte.
+ */
+export async function queueNoRefereeAlerts(
+  connection: PoolConnection,
+  tournamentId: number,
+  candidates: readonly NoRefereeCandidate[],
+): Promise<void> {
+  const { perMatch, perRound } = groupNoRefereeAlerts(candidates);
+  for (const match of perMatch) {
+    await queueRefereeAlert(connection, { kind: "match_no_referee", matchId: match.matchId, pairing: match.pairing });
+  }
+  for (const round of perRound) {
+    let anchor: number;
+    try {
+      anchor = (await roundAnchorMatchId(connection, tournamentId, round)) ?? round.matchIds[0];
+    } catch (error) {
+      // Une transaction défaite (interblocage) remonte ; toute autre erreur de
+      // lecture tait seulement l'alerte de la manche, comme une réservation
+      // inaccessible (`queueRefereeAlert`) — l'entretien, lui, continue.
+      if (isTransactionAborted(error)) throw error;
+      continue;
+    }
+    await queueRefereeAlert(connection, {
+      kind: "match_no_referee",
+      matchId: anchor,
+      pairing: "ROUND",
+      roundMatchIds: round.matchIds,
+    });
+  }
 }
 
 /**
@@ -810,6 +886,7 @@ export async function maintainMatchLaunches(
   );
   const now = Date.now();
   let changed = 0;
+  const undecided: NoRefereeCandidate[] = [];
   for (const candidate of rows) {
     // Les candidats sont parcourus par identifiant croissant (`ORDER BY`) : deux
     // entretiens du même tournoi — balayage passif et relève de la modale —
@@ -830,7 +907,8 @@ export async function maintainMatchLaunches(
     if (row?.status !== "READY" || !enteredLaunch(row, now)) continue;
     const stale = row.launch_pairing !== launchPairingKey(nullableId(row.team1_id), nullableId(row.team2_id));
     await adoptCurrentPairing(connection, row);
-    await warnIfUndecided(connection, row);
+    const undecidedMatch = undecidedCandidate(row);
+    if (undecidedMatch) undecided.push(undecidedMatch);
     const launch =
       Number(row.match_launch_phase ?? 0) !== 1 ||
       allPartiesReady(rowReadiness(row)) ||
@@ -853,6 +931,7 @@ export async function maintainMatchLaunches(
       changed += 1;
     }
   }
+  await queueNoRefereeAlerts(connection, tournamentId, undecided);
   return changed;
 }
 

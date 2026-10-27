@@ -173,6 +173,38 @@ export function formatNoRefereeAlert(context: RefereeAlertContext): string {
   return alertLine("🧑‍⚖️", "match en lancement sans arbitre ni autogestion — une décision est attendue", context);
 }
 
+/** Au plus autant de matchs nommés dans l'alerte d'une manche : la ligne reste sous la limite d'un message Discord. */
+export const ROUND_ALERT_LISTED_MATCHES = 12;
+
+/** La manche sans horaire d'une alerte groupée et les matchs qu'elle liste. */
+export type RoundNoRefereeAlertContext = Omit<RefereeAlertContext, "matchId" | "team1" | "team2"> & {
+  matches: readonly { matchId: number; team1: LogEntrant; team2: LogEntrant }[];
+  /** Nombre de matchs de l'alerte, nommés ou non. */
+  total: number;
+};
+
+/**
+ * Alerte groupée : des matchs **sans horaire** d'une même manche entrent en
+ * lancement sans arbitre ni autogestion — une seule ligne pour la manche, qui
+ * les liste (au plus {@link ROUND_ALERT_LISTED_MATCHES}, puis « et N autres »).
+ * Noms d'équipe permis, « un joueur » pour une entrée solo (`entrantLabel`).
+ */
+export function formatRoundNoRefereeAlert(context: RoundNoRefereeAlertContext): string {
+  const round = matchRoundLabel(context.bracket, context.roundNumber, context.swiss);
+  const listed = context.matches.slice(0, ROUND_ALERT_LISTED_MATCHES);
+  const pairs = listed
+    .map((match) => `${entrantLabel(match.team1)} vs ${entrantLabel(match.team2)} (match #${match.matchId})`)
+    .join(" ; ");
+  const others = context.total - listed.length;
+  let more = "";
+  if (others > 0) more = ` ; et ${others} autre${others > 1 ? "s" : ""}`;
+  const count = `${context.total} match${context.total > 1 ? "s" : ""}`;
+  const line =
+    `🧑‍⚖️ Arbitrage requis — « ${discordInline(context.tournament.name)} » (#${context.tournament.id})` +
+    ` · ${round} : ${pairs}${more} — ${count} en lancement sans arbitre ni autogestion — une décision est attendue.`;
+  return context.tournamentUrl ? `${line} ${context.tournamentUrl}` : line;
+}
+
 /**
  * Alerte : les deux engagées annoncent des scores contradictoires.
  *

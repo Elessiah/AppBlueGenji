@@ -92,3 +92,50 @@ export function firstBanTeamId(
   if (hostTeamId === null || team1Id === null || team2Id === null) return null;
   return hostTeamId === team1Id ? team2Id : team1Id;
 }
+
+/** Un match entré en lancement sans arbitre ni autogestion, avant son alerte. */
+export type NoRefereeCandidate = {
+  matchId: number;
+  /** Appariement lancé (`launchPairingKey`). */
+  pairing: string;
+  /** Le match a une heure (`start_at`) : il se joue à son heure, pas avec sa manche. */
+  scheduled: boolean;
+  phaseId: number;
+  bracket: string;
+  roundNumber: number;
+};
+
+/** Une manche sans horaire dont des matchs entrent en lancement sans décision. */
+export type NoRefereeRound = { phaseId: number; bracket: string; roundNumber: number; matchIds: number[] };
+
+/**
+ * Regroupe les alertes « sans arbitre ni autogestion » (décision de
+ * l'utilisateur, 2026-10-27) : un match **planifié** garde son alerte à lui
+ * (les matchs ne se jouent pas tous le même jour) ; les matchs **sans
+ * horaire** d'une même manche (phase, tableau, numéro) partagent une seule
+ * alerte qui les liste. Matchs triés par identifiant, manches dans l'ordre de
+ * leur premier match.
+ */
+export function groupNoRefereeAlerts(candidates: readonly NoRefereeCandidate[]): {
+  perMatch: NoRefereeCandidate[];
+  perRound: NoRefereeRound[];
+} {
+  const sorted = [...candidates].sort((a, b) => a.matchId - b.matchId);
+  const perMatch = sorted.filter((candidate) => candidate.scheduled);
+  const rounds = new Map<string, NoRefereeRound>();
+  for (const candidate of sorted) {
+    if (candidate.scheduled) continue;
+    const key = `${candidate.phaseId}:${candidate.bracket}:${candidate.roundNumber}`;
+    const round = rounds.get(key);
+    if (round) round.matchIds.push(candidate.matchId);
+    else {
+      rounds.set(key, {
+        phaseId: candidate.phaseId,
+        bracket: candidate.bracket,
+        roundNumber: candidate.roundNumber,
+        matchIds: [candidate.matchId],
+      });
+    }
+  }
+  return { perMatch, perRound: [...rounds.values()] };
+}
