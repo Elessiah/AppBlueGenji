@@ -1,7 +1,7 @@
 # Gestes du staff au journal
 
 Les gestes du staff sur un match ou un tournoi qui ne laissaient aucune trace
-partent au journal du staff sur Discord (`/internal/log`, `sendBotLog`), **sans
+de leur auteur partent au journal du staff sur Discord (`/internal/log`, `sendBotLog`), **sans
 personne nommée** et **sans ligne dans pm2** (décision du 27 octobre 2026 :
 gestes de staff anonymes partout). Aucun push, aucun message privé : ces gestes
 n'appellent l'intervention de personne.
@@ -28,7 +28,7 @@ n'appellent l'intervention de personne.
 | `PATCH /api/admin/matches/[id]/scores` | `SCORES_SAVED` | Score enregistré |
 | `POST /api/admin/matches/[id]/launch` | `FORCE_LAUNCHED` | Lancement forcé |
 | `PUT /api/admin/matches/[id]/host` | `HOST_SET` / `HOST_CLEARED` | Hôte désigné / retiré |
-| `PUT /api/admin/matches/[id]/live` | `LIVE_CONFIGURED` | Diffusion réglée |
+| `PUT /api/admin/matches/[id]/live` | `LIVE_CONFIGURED` / `LIVE_REMOVED` (déclencheur `null`) | Diffusion réglée / retirée |
 | `POST /api/admin/matches/[id]/live` | `ON_AIR` / `OFF_AIR` | Mis à l'antenne / Retiré de l'antenne |
 | `PUT /api/admin/matches/[id]/replay` | `REPLAY_SET` / `REPLAY_REMOVED` | Rediffusion ajoutée / retirée |
 | `PATCH /api/tournaments/[id]/edit` | `EDITED` | Tournoi modifié |
@@ -40,12 +40,17 @@ n'appellent l'intervention de personne.
 
 Forme : `🛠️ <Geste> — « Tournoi » (#id) : <Manche> — A vs B (#match), par le staff.`
 pour un match, `🛠️ <Geste> — « Tournoi » (#id), par le staff.` pour un tournoi.
+L'auteur est « le staff », ou « un caster » pour un geste de diffusion
+(`live`, rediffusion) de qui détient `live` sans `tournaments`
+(`staffActionAuthor`) : la ligne ne prête pas aux arbitres le geste d'un caster.
 Les engagés passent par `entrantLabel` (« un joueur » en tournoi individuel,
 « TBD » pour une place vide) ; ni score, ni lien, ni équipe hôte : la page du
 match dit le détail.
 
 ## Ce qui ne change pas
 
+- Les équipes fantômes avaient déjà une ligne « inscription » par équipe
+  (`registration`, par le staff) : la ligne 🛠️ les regroupe en un geste.
 - Les gestes déjà tracés gardent leur ligne : horaires (`schedule-notices.ts`),
   pénalités, abandons, retrait d'un engagé, retour en arrière, suppression d'un
   tournoi, arbitrage des horaires (`publishStaffAction`, auteur nommé dans pm2).
