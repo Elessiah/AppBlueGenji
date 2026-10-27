@@ -9,6 +9,7 @@ import { can } from "@/lib/shared/permissions";
 import { checkTournamentImageSettings } from "@/lib/shared/tournament-image";
 import { IMAGE_CROP_FIELD, IMAGE_CROP_INVALID, parseImageCropField } from "@/lib/shared/image-crop";
 import { readImageUploadForm, readJsonBody } from "@/lib/server/request-body";
+import { announceStaffTournamentAction } from "@/lib/server/tournaments/staff-action-logs";
 
 /**
  * Illustration ou logo d'un tournoi (`lib/shared/tournament-image.ts`).
@@ -82,6 +83,7 @@ export async function POST(req: Request, context: RouteContext) {
 
   try {
     const image = await setTournamentImage(auth.tournamentId, file, settings.value, crop.crop);
+    announceStaffTournamentAction(auth.tournamentId, "IMAGE_SET");
     return ok({ image });
   } catch (error) {
     return mapFailure(error, "TOURNAMENT_IMAGE_UPLOAD_FAILED");
@@ -109,6 +111,7 @@ export async function PATCH(req: Request, context: RouteContext) {
 
   try {
     const image = await updateTournamentImageSettings(auth.tournamentId, settings.value);
+    announceStaffTournamentAction(auth.tournamentId, "IMAGE_UPDATED");
     return ok({ image });
   } catch (error) {
     return mapFailure(error, "TOURNAMENT_IMAGE_UPDATE_FAILED");
@@ -121,6 +124,7 @@ export async function DELETE(_req: Request, context: RouteContext) {
 
   try {
     await removeTournamentImage(auth.tournamentId);
+    announceStaffTournamentAction(auth.tournamentId, "IMAGE_REMOVED");
     return ok({ image: null });
   } catch (error) {
     return mapFailure(error, "TOURNAMENT_IMAGE_DELETE_FAILED");

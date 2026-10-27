@@ -6,6 +6,7 @@ import { readJsonBody } from "@/lib/server/request-body";
 import { parseAdminScoreBody } from "@/lib/shared/admin-score-body";
 import { MAP_LIST_ERROR_CODES } from "@/lib/shared/match-maps";
 import type { StaffActor } from "@/lib/shared/log-privacy";
+import { announceStaffMatchAction } from "@/lib/server/tournaments/staff-action-logs";
 
 export async function POST(req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();
@@ -52,6 +53,7 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
 async function resolve(matchId: number, entry: AdminResolveEntry, actor: StaffActor) {
   try {
     await adminResolveMatch(matchId, entry, { id: actor.id, pseudo: actor.pseudo });
+    announceStaffMatchAction(matchId, "RESULT_VALIDATED");
     return ok({});
   } catch (e) {
     const msg = (e as Error).message;

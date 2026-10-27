@@ -4,6 +4,7 @@ import { setMatchHost } from "@/lib/server/tournaments/match-launch";
 import { launchFailure, parseMatchIdParam } from "@/lib/server/tournaments/match-launch-routes";
 import { can } from "@/lib/shared/permissions";
 import { readJsonBody } from "@/lib/server/request-body";
+import { announceStaffMatchAction } from "@/lib/server/tournaments/staff-action-logs";
 
 const STATUSES: Readonly<Record<string, number>> = {
   MATCH_NOT_FOUND: 404,
@@ -30,6 +31,7 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
 
   try {
     await setMatchHost(matchId, raw);
+    announceStaffMatchAction(matchId, raw === null ? "HOST_CLEARED" : "HOST_SET");
     return ok({ hostTeamId: raw });
   } catch (error) {
     return launchFailure(error, STATUSES, "MATCH_HOST_UPDATE_FAILED");

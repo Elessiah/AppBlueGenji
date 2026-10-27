@@ -5,6 +5,7 @@ import { can } from "@/lib/shared/permissions";
 import { readJsonBody } from "@/lib/server/request-body";
 import { parseAdminScoreBody } from "@/lib/shared/admin-score-body";
 import { MAP_LIST_ERROR_CODES } from "@/lib/shared/match-maps";
+import { announceStaffMatchAction } from "@/lib/server/tournaments/staff-action-logs";
 
 export async function PATCH(req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();
@@ -38,6 +39,7 @@ export async function PATCH(req: Request, context: { params: Promise<{ matchId: 
     // report seul (`SCORE_DISPUTE_LOCK.md`) — la notification le dit. L'arbitre
     // passé : s'il joue ce match, les autres membres du staff sont avertis.
     const autoValidationPaused = await adminSaveMatchScores(matchId_, entry, { id: user.id, pseudo: user.pseudo });
+    announceStaffMatchAction(matchId_, "SCORES_SAVED");
     return ok({ autoValidationPaused });
   } catch (e) {
     const msg = (e as Error).message;

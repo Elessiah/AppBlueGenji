@@ -15,18 +15,15 @@
  * Appelé **après le commit**, sans attendre : le bot est optionnel, et un envoi
  * lent n'a pas à retarder le geste. Ne lève jamais.
  */
-import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import type { PoolConnection } from "mysql2/promise";
 import { sendBotLog } from "@/lib/server/bot-integration";
-import { getDatabase } from "@/lib/server/database";
 import { loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
 import { siteCanonicalBase } from "@/lib/server/site-url";
 import { formatCastChangeLog, type CastLogChange } from "@/lib/shared/bot-logs";
 import { formatCastReleasedNotice, type CastReleaseReason, type CastReleasedMatch } from "@/lib/shared/cast-notices";
-import type { LogEntrant } from "@/lib/shared/log-privacy";
 import { tournamentMatchHref } from "@/lib/shared/match-anchor";
-import { toParticipantType } from "@/lib/shared/participants";
 import { castReleasedPush } from "@/lib/shared/push-messages";
-import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
+import { loadMatchLogRow, matchLogSubject } from "./match-log-subject";
 
 /** Un changement d'inscription de caster, tel que `match-launch.ts` le constate sous verrou. */
 export type CastChange =
@@ -36,35 +33,6 @@ export type CastChange =
   | { kind: "RELEASED"; matchId: number; casterId: number; byStaff: boolean }
   /** Inscription retirée d'office (`releaseIneligibleCast`). */
   | { kind: "AUTO_RELEASED"; matchId: number; casterId: number; reason: "INELIGIBLE" | "JOINED_TEAM" };
-
-type CastMatchRow = RowDataPacket & {
-  id: number;
-  bracket: string;
-  round_number: number;
-  swiss_round: number | null;
-  team1_name: string | null;
-  team2_name: string | null;
-  tournament_id: number;
-  tournament_name: string;
-  participant_type: string | null;
-};
-
-async function loadCastMatch(matchId: number): Promise<CastMatchRow | null> {
-  const db = await getDatabase();
-  const [rows] = await db.execute<CastMatchRow[]>(
-    `SELECT m.id, m.bracket, m.round_number, ${swissRoundSql("m", "tr")},
-            t1.name AS team1_name, t2.name AS team2_name,
-            tr.id AS tournament_id, tr.name AS tournament_name, tr.participant_type
-       FROM bg_matches m
-       JOIN bg_tournaments tr ON tr.id = m.tournament_id
-       LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
-       LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
-      WHERE m.id = ?
-      LIMIT 1`,
-    [matchId],
-  );
-  return rows[0] ?? null;
-}
 
 /** Ligne du journal de ce changement. */
 export function castLogChange(change: CastChange): CastLogChange {
@@ -92,19 +60,18 @@ export function castReleaseNotice(change: CastChange): { casterId: number; reaso
 
 /** Le journal, puis l'avis au caster s'il en faut un. Peut lever (base indisponible) : {@link announceCastChange} l'enveloppe. */
 export async function deliverCastChange(change: CastChange): Promise<void> {
-  const match = await loadCastMatch(change.matchId);
-  if (!match) return;
-  const participantType = toParticipantType(match.participant_type);
-  const entrant = (name: string | null): LogEntrant | null => (name === null ? null : { name, participantType });
+  const row = await loadMatchLogRow(change.matchId);
+  if (!row) return;
+  const match = matchLogSubject(row);
   const log = sendBotLog(
     formatCastChangeLog({
-      tournament: { id: Number(match.tournament_id), name: match.tournament_name },
-      matchId: Number(match.id),
-      bracket: String(match.bracket),
-      roundNumber: Number(match.round_number),
-      swiss: isSwissRound(match),
-      team1: entrant(match.team1_name),
-      team2: entrant(match.team2_name),
+      tournament: match.tournament,
+      matchId: match.matchId,
+      bracket: match.bracket,
+      roundNumber: match.roundNumber,
+      swiss: match.swiss,
+      team1: match.team1,
+      team2: match.team2,
       change: castLogChange(change),
     }),
   );
@@ -115,15 +82,15 @@ export async function deliverCastChange(change: CastChange): Promise<void> {
     return;
   }
   const subject: CastReleasedMatch = {
-    tournamentId: Number(match.tournament_id),
-    tournamentName: match.tournament_name,
-    matchId: Number(match.id),
-    bracket: String(match.bracket),
-    roundNumber: Number(match.round_number),
-    swiss: isSwissRound(match),
-    team1Name: match.team1_name,
-    team2Name: match.team2_name,
-    solo: participantType === "SOLO",
+    tournamentId: match.tournament.id,
+    tournamentName: match.tournament.name,
+    matchId: match.matchId,
+    bracket: match.bracket,
+    roundNumber: match.roundNumber,
+    swiss: match.swiss,
+    team1Name: row.team1_name,
+    team2Name: row.team2_name,
+    solo: match.participantType === "SOLO",
     reason: notice.reason,
   };
   const url = `${siteCanonicalBase()}${tournamentMatchHref(subject.tournamentId, subject.matchId)}`;

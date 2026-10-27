@@ -630,3 +630,112 @@ export function formatCastChangeLog(context: {
     `${scheduledPairLabel(context.team1, context.team2)} (#${context.matchId}), ${wording.detail}.`
   );
 }
+
+/**
+ * Gestes du staff sur un match qui ne laissaient aucune trace
+ * (`docs/features/STAFF_ACTION_LOGS.md`) :
+ *
+ * - `RESULT_VALIDATED` — « Valider le résultat » (score, forfait ou double
+ *   forfait tranché par l'arbitrage) ;
+ * - `SCORES_SAVED` — « Enregistrer » : avancement noté sans trancher ;
+ * - `FORCE_LAUNCHED` — lancement forcé du match ;
+ * - `HOST_SET` / `HOST_CLEARED` — hôte du salon désigné ou retiré ;
+ * - `LIVE_CONFIGURED` — réglage de la diffusion du match (déclencheur, lien) ;
+ * - `ON_AIR` / `OFF_AIR` — match mis à l'antenne ou retiré de l'antenne ;
+ * - `REPLAY_SET` / `REPLAY_REMOVED` — lien de rediffusion posé ou retiré.
+ */
+export type StaffMatchAction =
+  | "RESULT_VALIDATED"
+  | "SCORES_SAVED"
+  | "FORCE_LAUNCHED"
+  | "HOST_SET"
+  | "HOST_CLEARED"
+  | "LIVE_CONFIGURED"
+  | "ON_AIR"
+  | "OFF_AIR"
+  | "REPLAY_SET"
+  | "REPLAY_REMOVED";
+
+const STAFF_MATCH_ACTION_WORDING: Record<StaffMatchAction, string> = {
+  RESULT_VALIDATED: "Résultat validé",
+  SCORES_SAVED: "Score enregistré",
+  FORCE_LAUNCHED: "Lancement forcé",
+  HOST_SET: "Hôte désigné",
+  HOST_CLEARED: "Hôte retiré",
+  LIVE_CONFIGURED: "Diffusion réglée",
+  ON_AIR: "Mis à l'antenne",
+  OFF_AIR: "Retiré de l'antenne",
+  REPLAY_SET: "Rediffusion ajoutée",
+  REPLAY_REMOVED: "Rediffusion retirée",
+};
+
+/**
+ * Geste du staff sur un match. **Personne n'est nommé** : l'auteur est « le
+ * staff », les joueurs d'un tournoi individuel « un joueur » (`entrantLabel`),
+ * et rien ne part dans pm2 (décision du 27 octobre 2026). Ni score, ni lien, ni
+ * équipe hôte : la ligne dit qu'un geste a eu lieu, la page du match dit lequel.
+ */
+export function formatStaffMatchActionLog(context: {
+  tournament: BotLogTournament;
+  matchId: number;
+  bracket: string;
+  roundNumber: number;
+  /** Ronde suisse : « Ronde N » (`matchRoundLabel`). */
+  swiss?: boolean;
+  team1: LogEntrant | null;
+  team2: LogEntrant | null;
+  action: StaffMatchAction;
+}): string {
+  return (
+    `${lead("🛠️", STAFF_MATCH_ACTION_WORDING[context.action], context.tournament)} : ` +
+    `${matchRoundLabel(context.bracket, context.roundNumber, context.swiss)} — ` +
+    `${scheduledPairLabel(context.team1, context.team2)} (#${context.matchId}), par ${ANONYMOUS_STAFF_LABEL}.`
+  );
+}
+
+/**
+ * Gestes du staff sur un tournoi qui ne laissaient aucune trace :
+ *
+ * - `EDITED` — paramètres du tournoi modifiés ;
+ * - `SEEDING_REORDERED` — ordre des têtes de série changé ;
+ * - `ADVANCED` — étape suivante avancée (ouverture des inscriptions, début) ;
+ * - `GHOST_TEAMS_REGISTERED` — équipes fantômes inscrites (`count`) ;
+ * - `IMAGE_SET` / `IMAGE_UPDATED` / `IMAGE_REMOVED` — image du tournoi ;
+ * - `LIVE_URL_SET` / `LIVE_URL_REMOVED` — lien de diffusion du tournoi.
+ */
+export type StaffTournamentAction =
+  | "EDITED"
+  | "SEEDING_REORDERED"
+  | "ADVANCED"
+  | "GHOST_TEAMS_REGISTERED"
+  | "IMAGE_SET"
+  | "IMAGE_UPDATED"
+  | "IMAGE_REMOVED"
+  | "LIVE_URL_SET"
+  | "LIVE_URL_REMOVED";
+
+const STAFF_TOURNAMENT_ACTION_WORDING: Record<StaffTournamentAction, string> = {
+  EDITED: "Tournoi modifié",
+  SEEDING_REORDERED: "Têtes de série réordonnées",
+  ADVANCED: "Étape suivante avancée",
+  GHOST_TEAMS_REGISTERED: "Équipes fantômes inscrites",
+  IMAGE_SET: "Image du tournoi ajoutée",
+  IMAGE_UPDATED: "Cadrage de l'image modifié",
+  IMAGE_REMOVED: "Image du tournoi retirée",
+  LIVE_URL_SET: "Lien de diffusion du tournoi posé",
+  LIVE_URL_REMOVED: "Lien de diffusion du tournoi retiré",
+};
+
+/**
+ * Geste du staff sur un tournoi, auteur anonyme (« le staff ») et rien dans
+ * pm2, comme {@link formatStaffMatchActionLog}. `count` (équipes fantômes) suit
+ * le geste : c'est ce que l'arbitre vérifie, et il ne nomme personne.
+ */
+export function formatStaffTournamentActionLog(context: {
+  tournament: BotLogTournament;
+  action: StaffTournamentAction;
+  count?: number;
+}): string {
+  const count = context.count === undefined ? "" : ` (${context.count})`;
+  return `${lead("🛠️", STAFF_TOURNAMENT_ACTION_WORDING[context.action], context.tournament)}${count}, par ${ANONYMOUS_STAFF_LABEL}.`;
+}
