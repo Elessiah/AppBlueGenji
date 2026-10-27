@@ -53,12 +53,12 @@ export const BATTLETAG_MATCH_SCOPE =
 /**
  * BattleTag de l'arbitre désigné d'un match, même masqué, présenté aux parties
  * du match : intérêt légitime (savoir qui arbitre, l'ajouter en jeu), avec un
- * droit d'opposition que l'arbitre exerce en se retirant du match — aucune
+ * droit d'opposition par le formulaire de signalement (se retirer d'un match l'en retire, sans empêcher le staff de le lui confier de nouveau) — aucune
  * clause des conditions d'utilisation ne le prévoit avant leur version 7, et
  * le staff peut le désigner sans qu'il l'ait demandé (revue juridique de #487).
  */
 export const REFEREE_BATTLETAG_SCOPE =
-  "BattleTag de l'arbitre désigné d'un match, même masqué, dans ses fenêtres « Contacts » et de lancement : lu par ses deux équipes et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, par ses casters le temps du match — opposition en se retirant du match, à tout moment";
+  "BattleTag de l'arbitre désigné d'un match, même masqué, dans ses fenêtres « Contacts » et de lancement : lu par ses deux équipes et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, par ses casters le temps du match — opposition par le formulaire de signalement, catégorie RGPD ; retrait d'un match à tout moment, que le staff peut lui confier de nouveau";
 
 /**
  * Pastilles de certification de la fiche (tag Discord certifié, BattleTag tiré

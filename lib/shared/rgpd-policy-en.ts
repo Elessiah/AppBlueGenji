@@ -45,7 +45,7 @@ const SCOPE_EN: Record<string, string> = {
   [BATTLETAG_MATCH_SCOPE]:
     "reading, even when hidden, only in the “Contacts” window of a match where you are presented as a contact and in its launch window: by both its teams and the referees as soon as both its opponents are known until its end, by its casters while the match is being played; a caster's, by both teams and the other casters of the match while the match is being played and by the referees as soon as both its opponents are known until its end (the launch window, at the start of the match, only opens for both teams, the casters and the assigned referee) — referees and administrators have no other access to it (terms of use, “Match contacts”)",
   [REFEREE_BATTLETAG_SCOPE]:
-    "the BattleTag of a match's assigned referee, even when hidden, in its “Contacts” and launch windows: read by both its teams and the referees as soon as both its opponents are known until its end, by its casters while the match is being played — objection by withdrawing from the match, at any time",
+    "the BattleTag of a match's assigned referee, even when hidden, in its “Contacts” and launch windows: read by both its teams and the referees as soon as both its opponents are known until its end, by its casters while the match is being played — objection through the report form, GDPR category; withdrawal from a match at any time, which the staff may assign to them again",
   [VERIFIED_BADGE_SCOPE]:
     "certification badge on your player page, read by any logged-in player even when the tag is hidden (without the tag) — objection through the report form, GDPR category",
   [MATCH_TIME_DM_SCOPE]: "match time notices, reminders and match removal notices by direct message",

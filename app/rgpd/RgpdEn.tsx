@@ -870,7 +870,7 @@ export function RgpdEn({
             its first map are noted in the staff log on Discord without naming anyone, and a match that enters its
             launch with neither a referee nor self-management is flagged to the referees. Their presentation to
             the parties to the match falls under <strong>legitimate interest</strong> (they know who referees and
-            can add them in game): they may object to it by withdrawing from the match, at any time; collecting
+            can add them in game): they may object to it through the report form (GDPR category), and withdraw from a match at any time — the staff may however assign it to them again, without notice; collecting
             their “Ready” and the removal notice fall under <strong>performance of the service</strong>, the
             referees acting for the association (<LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>).
           </p>

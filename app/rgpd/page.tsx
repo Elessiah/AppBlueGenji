@@ -1053,7 +1053,7 @@ function RgpdFr({
             et sa première carte sont notés au journal du staff sur Discord sans nommer personne, et un match qui
             entre en lancement sans arbitre ni autogestion est signalé aux arbitres. Sa présentation aux parties
             du match relève de l&apos;<strong>intérêt légitime</strong> (qu&apos;elles sachent qui arbitre et
-            puissent l&apos;ajouter en jeu) : il peut s&apos;y opposer en se retirant du match, à tout moment ; le
+            puissent l&apos;ajouter en jeu) : il peut s&apos;y opposer par le formulaire de signalement (catégorie RGPD), et se retirer d&apos;un match à tout moment — le staff peut toutefois le lui confier de nouveau, sans avis ; le
             recueil de son « Prêt » et l&apos;avis du retrait, de l&apos;<strong>exécution du service</strong>, les
             arbitres agissant pour l&apos;association (<Link href="/rgpd/registre#t04">registre, T04</Link>).
           </p>
