@@ -53,7 +53,10 @@ propres. Elle laisse tel quel un nom qui ne garderait rien, ou que la base
 refuse : un sosie dont la forme propre est déjà prise (`UNIQUE`). Elle garde
 `updated_at` (`SET … , updated_at = updated_at`) : le classement date un
 tournoi terminé sans `finished_at` par cette colonne, un nettoyage n'a pas à
-en déplacer les tendances. Le journal
+en déplacer les tendances. Elle n'écrit que si le nom n'a pas changé depuis sa
+lecture, comparé **octet à octet** (`… COLLATE utf8mb4_bin = ?`) : la collation
+des colonnes ignore casse, accents et invisibles, et « TEAM », renommé
+entre-temps, y égalerait l'ancien nom à invisible — il serait réécrit. Le journal
 (`pm2 logs`) ne compte que des lignes, jamais un nom.
 
 Ces restes expliquent que les filtres de sortie demeurent. Ils passent eux aussi
