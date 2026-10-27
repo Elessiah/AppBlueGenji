@@ -207,7 +207,7 @@ describe("LiveCard.module.css", () => {
   const css = readSource("components/cyber/landing/LiveCard.module.css");
 
   it("le survol des commandes est réservé à un vrai pointeur", () => {
-    expect(css).toMatch(/@media \(hover: hover\) and \(pointer: fine\) \{\n  \.carouselButton:hover \{/);
+    expect(css).toContain("@media (hover: hover) and (pointer: fine) {\n  .carouselButton:hover {");
     expect(css).not.toMatch(/\.carouselButton:hover,/);
   });
 
