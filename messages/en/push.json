@@ -50,7 +50,7 @@
     },
     "CAST_RELEASED": {
       "label": "Cast removed",
-      "description": "Your caster registration for a match is removed by the staff or automatically, or another caster takes your place: the reason is given."
+      "description": "Your caster registration for a match is removed by the staff or automatically: the reason is given."
     },
     "STAFF_REPORT": {
       "label": "Incoming reports",
