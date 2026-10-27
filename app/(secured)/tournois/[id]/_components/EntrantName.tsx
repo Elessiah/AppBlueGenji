@@ -58,12 +58,28 @@ export function EntrantLogo({ teamId, name, size = 16, logoUrl: knownLogoUrl }: 
   );
 }
 
+/**
+ * Nom d'engagé tel qu'il s'affiche : sans invisibles ni commandes de direction
+ * (`UNTRUSTED_NAMES.md`) — sans NFKC, il se lit comme sur sa fiche. Un nom
+ * resté en base peut en porter encore (sosie refusé par `UNIQUE`) ; s'il ne
+ * garde rien, il retombe sur « Engagé #id » : jamais un lien vide, sans nom
+ * accessible. Pour un appelant qui habille le nom (`children` d'`EntrantName`).
+ */
+export function useShownEntrantName(teamId: number | null, name: string | null): string | null {
+  const text = useTournamentPageText();
+  const cleanName = name === null ? null : withoutInvisibles(name);
+  return cleanName === "" && teamId !== null ? text.t("match.entrantFallback", { id: String(teamId) }) : cleanName;
+}
+
 type EntrantNameProps = {
   /** Engagé nommé ; `null` pour une case vide, rendue en texte simple. */
   teamId: number | null;
   /** Nom de l'engagé (ou libellé de la case vide : « TBD », « BYE »…). */
   name: string | null;
-  /** Contenu affiché à la place de `name` (mise en gras, par exemple). */
+  /**
+   * Contenu affiché à la place de `name` (mise en gras, par exemple) — le nom
+   * qu'il porte vient de `useShownEntrantName`, jamais du nom brut.
+   */
   children?: ReactNode;
   logoSize?: EntrantLogoSize;
   /** Tronquer le nom d'une ellipse plutôt que le laisser passer à la ligne. */
@@ -102,15 +118,9 @@ export function EntrantName({
   // qui rogne sur le nom peint d'une marche plutôt que sur le lien —, posée à
   // la main sur le nom non cliquable.
   const textClass = joinClasses(styles.text, textClassName);
-  const text = useTournamentPageText();
-  // Sans invisibles (`UNTRUSTED_NAMES.md`) : un nom resté en base avec une
-  // commande de direction ou un invisible (sosie dont la forme propre est
-  // prise) ne brouille ni le nom ni son initiale de repli — sans NFKC, il se
-  // lit comme sur sa fiche. Un nom qui ne garde rien retombe sur « Engagé
-  // #id » : jamais un lien vide, sans nom accessible.
-  const cleanName = name === null ? null : withoutInvisibles(name);
-  const shownName =
-    cleanName === "" && teamId !== null ? text.t("match.entrantFallback", { id: String(teamId) }) : cleanName;
+  // Nom et initiale de repli nettoyés (`useShownEntrantName`) ; des
+  // `children` passent par le même nettoyage chez leur appelant.
+  const shownName = useShownEntrantName(teamId, name);
   const content = children ?? shownName;
 
   return (
