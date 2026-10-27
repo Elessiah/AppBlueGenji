@@ -62,6 +62,7 @@ const SECTION_DISPLAY_LIMIT = 12;
 /** Compte affiché tant que la première liste n'est pas arrivée. */
 const COUNT_PENDING = "–";
 const NO_TICKER_ITEMS: readonly string[] = [];
+const NO_TOURNAMENTS: TournamentCard[] = [];
 
 const GAME_FILTERS: readonly GameFilter[] = ["all", "ow", "mr"];
 
@@ -318,7 +319,14 @@ export default function TournamentsList() {
   // Les cartes portent leur horaire : le client fait basculer « Prochainement »
   // → « Inscriptions » → « En cours » à la seconde dite, sans rien demander au
   // serveur (`lib/shared/tournament-schedule.ts`).
-  const scheduledBuckets = useScheduledBuckets(buckets);
+  //
+  // Une seule porte pour tout ce que la page montre : tant que `listLoaded`
+  // est faux, la page lit des paniers vides (et aucun invisible). Sans elle,
+  // une liste arrivée avant « Mes tournois » s'affichait sous le squelette,
+  // puis tout sautait deux fois à l'arrivée de la seconde lecture.
+  const viewBuckets = listLoaded ? buckets : emptyBuckets;
+  const viewHidden = listLoaded ? hiddenTournaments : NO_TOURNAMENTS;
+  const scheduledBuckets = useScheduledBuckets(viewBuckets);
 
   // La recherche (le passage coûteux : nom, description, format sur chaque
   // tournoi) n'est faite qu'une fois — le filtre de jeu, lui, ne fait que
@@ -328,7 +336,7 @@ export default function TournamentsList() {
   // Le format se cherche sous le nom que la carte affiche (« Swiss » sous `/en`).
   const formatName = (format: string) => tournamentLabel(text, "format", format);
   const queryFilteredBuckets = filterBuckets(scheduledBuckets, query, "all", formatName);
-  const queryFilteredHidden = filterTournamentsByQuery(hiddenTournaments, query, formatName);
+  const queryFilteredHidden = filterTournamentsByQuery(viewHidden, query, formatName);
 
   const gameFilteredBuckets: TournamentBuckets =
     gameFilter === "all"
@@ -359,14 +367,14 @@ export default function TournamentsList() {
   const totalUpcoming = filteredBuckets.upcoming.length;
   // Sans recherche, les terminés que la liste tronquée ne porte pas comptent
   // quand même : « Voir plus » et le sommaire annoncent l'archive entière.
-  const finishedBeyond = (key: GameFilter) => (query.trim() ? 0 : finishedBeyondList(buckets, key));
+  const finishedBeyond = (key: GameFilter) => (query.trim() ? 0 : finishedBeyondList(viewBuckets, key));
   const totalFinished = filteredBuckets.finished.length + finishedBeyond(gameFilter);
   // Section dépliée, archive demandée mais pas encore reçue : la liste en main
   // est encore la liste tronquée.
   const finishedArchiveLoading =
     finishedExpanded && wantFinishedArchive && buckets.finishedTotals !== undefined;
 
-  const showHidden = isAdmin && hiddenTournaments.length > 0;
+  const showHidden = isAdmin && viewHidden.length > 0;
 
   // Toutes les sections que ce lecteur peut avoir, zéros compris : le
   // sommaire les montre toutes (un zéro répond à « y a-t-il un tournoi en
