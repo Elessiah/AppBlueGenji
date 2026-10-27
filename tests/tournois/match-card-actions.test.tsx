@@ -418,4 +418,23 @@ describe("MatchCardActions — clavier et focus (branchements)", () => {
     expect(source).toContain("force: () => setConfirmForce(true),");
     expect(source).toContain("<ConfirmActionDialog");
   });
+
+  it("le staff qui retire un caster confirme d'abord (le caster est prévenu) ; le caster qui se retire, non", () => {
+    expect(source).toMatch(/releaseCast: \(\) => \{[\s\S]*?if \(!isCaster\) \{\s*setConfirmRelease\(true\);\s*return;/);
+    expect(source).toContain('t("cardActions.releaseConfirm.title", { match: matchLabel })');
+    expect(source).toContain('<p>{t("cardActions.releaseConfirm.body")}</p>');
+    // Refermée si l'action disparaît (instantané du flux), comme « Forcer ».
+    expect(source).toContain('useConfirmWhile(actions.some((a) => a.id === "releaseCast"))');
+    expect(source).toContain("if (open && !present) setOpen(false);");
+  });
+
+  it("la confirmation du retrait a ses textes en FR et en EN", () => {
+    const fr = (JSON.parse(readFileSync(join(__dirname, "..", "..", "messages", "fr", "tournamentActions.json"), "utf8")) as { cardActions: { releaseConfirm: Record<string, string> } }).cardActions.releaseConfirm;
+    const en = (JSON.parse(readFileSync(join(__dirname, "..", "..", "messages", "en", "tournamentActions.json"), "utf8")) as { cardActions: { releaseConfirm: Record<string, string> } }).cardActions.releaseConfirm;
+    expect(Object.keys(en).sort()).toEqual(Object.keys(fr).sort());
+    expect(fr.title).toBe("Retirer le caster de {match} ?");
+    expect(fr.body).toMatch(/« décision du staff »/);
+    expect(en.title).toBe("Remove the caster from {match}?");
+    expect(en.body).toMatch(/“staff decision”/);
+  });
 });

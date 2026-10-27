@@ -45,6 +45,7 @@ import { staffAlertDm } from "@/lib/server/staff-alert-dm";
 import { notifyTournamentStart } from "./player-pushes";
 import { discardDepartedNotices, flushDepartedNotices } from "./departed-notices";
 import { discardAutoValidatedNotices, flushAutoValidatedNotices } from "./auto-validated-notices";
+import { discardCastChanges, flushCastChanges } from "./cast-notices";
 import { getDatabase } from "@/lib/server/database";
 import { isTransactionAborted } from "@/lib/server/mysql-errors";
 import {
@@ -280,6 +281,8 @@ export function discardBotLogs(connection: PoolConnection): void {
   // Les avis aux engagées retirées suivent la même transaction.
   discardDepartedNotices(connection);
   discardAutoValidatedNotices(connection);
+  // Comme les casters désinscrits d'office par l'entretien des lancements.
+  discardCastChanges(connection);
   // Les manches notées tranchées ne l'ont pas été : leurs réservations gardent
   // tout leur objet, et le prochain entretien les retrouvera telles quelles.
   resolvedMatches.delete(connection);
@@ -299,6 +302,8 @@ export function flushBotLogs(connection: PoolConnection): void {
   flushDepartedNotices(connection);
   // Comme les avis de validation d'office d'un score (`./auto-validated-notices`).
   flushAutoValidatedNotices(connection);
+  // Et les casters désinscrits d'office par l'entretien (`./cast-notices`).
+  flushCastChanges(connection);
   const queue = pending.get(connection) ?? [];
   pending.delete(connection);
   const settled = resolvedMatches.get(connection) ?? new Set<number>();

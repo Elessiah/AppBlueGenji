@@ -28,6 +28,7 @@ import {
 } from "@/lib/shared/match-launch";
 import type { MatchStatus, TeamRole } from "@/lib/shared/types";
 import { casterIdentityOf, loadCastEligibility, type CasterIdentityRow } from "./cast-eligibility";
+import { announceCastChange, discardCastChanges, flushCastChanges, queueCastChange } from "./cast-notices";
 import { publishMatchUpdatedEvent } from "./notifications";
 
 export type LaunchMatchRow = RowDataPacket & {
@@ -160,6 +161,10 @@ async function adoptCurrentPairing(connection: PoolConnection, row: LaunchMatchR
         [row.id],
       );
       row.caster_user_id = null;
+      // Annoncé comme tout retrait d'office (journal du staff, avis au caster),
+      // après le commit de la transaction appelante : `inTransaction` ici,
+      // `flushBotLogs` pour l'entretien.
+      queueCastChange(connection, { kind: "AUTO_RELEASED", matchId: Number(row.id), casterId, reason: "JOINED_TEAM" });
     }
   }
 }
@@ -236,9 +241,11 @@ async function inTransaction<T>(run: (connection: PoolConnection) => Promise<T>)
     try {
       const result = await run(connection);
       await connection.commit();
+      flushCastChanges(connection);
       return result;
     } catch (error) {
       await connection.rollback().catch(() => undefined);
+      discardCastChanges(connection);
       throw error;
     }
   });
@@ -432,7 +439,7 @@ export async function claimMatchCast(
   userId: number,
   hasLivePermission: boolean,
 ): Promise<void> {
-  const tournamentId = await inTransaction(async (connection) => {
+  const { tournamentId, claimed, replacedCasterId } = await inTransaction(async (connection) => {
     const block = castBlockReason(hasLivePermission, await loadCasterIdentity(connection, userId));
     if (block) throw new Error(block);
 
@@ -440,9 +447,10 @@ export async function claimMatchCast(
     if (!row) throw new Error("MATCH_NOT_FOUND");
     if (row.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
     if (Number(row.is_bye) === 1) throw new Error("MATCH_NOT_LAUNCHABLE");
+    let replaced: number | null = null;
     if (row.caster_user_id !== null) {
       const holder = Number(row.caster_user_id);
-      if (holder === userId) return Number(row.tournament_id);
+      if (holder === userId) return { tournamentId: Number(row.tournament_id), claimed: false, replacedCasterId: null };
       // Une inscription dont le titulaire ne remplit plus la condition du cast
       // ne retient pas le match : sans quoi elle le bloquerait jusqu'à ce qu'un
       // joueur ouvre la modale de lancement. Jamais sur un match lancé, où l'on
@@ -454,6 +462,7 @@ export async function claimMatchCast(
         matchLaunchPhase({ ...toLaunchInput(row), launchPhase: true }, Date.now()) !== "LAUNCHED" &&
         (await loadCastEligibility(connection, holder)) !== null;
       if (!displaceable) throw new Error("MATCH_ALREADY_CASTED");
+      replaced = holder;
     }
     const party = await resolveMatchParty(connection, row, userId);
     if (party) throw new Error("CASTER_IS_PLAYER");
@@ -462,9 +471,11 @@ export async function claimMatchCast(
       `UPDATE bg_matches SET caster_user_id = ?, caster_ready_at = NULL WHERE id = ?`,
       [userId, matchId],
     );
-    return Number(row.tournament_id);
+    return { tournamentId: Number(row.tournament_id), claimed: true, replacedCasterId: replaced };
   });
   publishMatchUpdatedEvent(tournamentId);
+  // Après le commit : journal du staff, et l'avis au titulaire dont la place est reprise.
+  if (claimed) announceCastChange({ kind: "CLAIMED", matchId, replacedCasterId });
 }
 
 /**
@@ -478,20 +489,24 @@ export async function releaseMatchCast(
   userId: number,
   canManage: boolean,
 ): Promise<void> {
-  const tournamentId = await inTransaction(async (connection) => {
+  const { tournamentId, releasedCasterId } = await inTransaction(async (connection) => {
     const row = await lockLaunchMatch(connection, matchId);
     if (!row) throw new Error("MATCH_NOT_FOUND");
-    if (row.caster_user_id === null) return Number(row.tournament_id);
-    if (Number(row.caster_user_id) !== userId && !canManage) throw new Error("NOT_MATCH_CASTER");
+    if (row.caster_user_id === null) return { tournamentId: Number(row.tournament_id), releasedCasterId: null };
+    const casterId = Number(row.caster_user_id);
+    if (casterId !== userId && !canManage) throw new Error("NOT_MATCH_CASTER");
 
     await connection.execute(
       `UPDATE bg_matches SET caster_user_id = NULL, caster_ready_at = NULL WHERE id = ?`,
       [matchId],
     );
     if (row.tournament_state === "RUNNING") await launchIfAllReady(connection, matchId);
-    return Number(row.tournament_id);
+    return { tournamentId: Number(row.tournament_id), releasedCasterId: casterId };
   });
   publishMatchUpdatedEvent(tournamentId);
+  if (releasedCasterId !== null) {
+    announceCastChange({ kind: "RELEASED", matchId, casterId: releasedCasterId, byStaff: releasedCasterId !== userId });
+  }
 }
 
 /**
@@ -506,6 +521,7 @@ export async function releaseMatchCast(
  */
 export async function releaseIneligibleCast(matchId: number, casterId: number): Promise<boolean> {
   let tournamentId: number | null = null;
+  let reason: "INELIGIBLE" | "JOINED_TEAM" = "INELIGIBLE";
   await inTransaction(async (connection) => {
     const row = await lockLaunchMatch(connection, matchId);
     if (!row || row.caster_user_id === null || Number(row.caster_user_id) !== casterId) return; // NOSONAR typescript:S6582 — `row?.caster_user_id === null` serait faux sur `row` absent : le chaînage inverserait la garde
@@ -522,10 +538,11 @@ export async function releaseIneligibleCast(matchId: number, casterId: number): 
     // que `CASTER_IS_PLAYER` ne contrôle qu'à l'inscription) ne donnera jamais
     // son « Prêt » de caster : son inscription bloquerait le départ jusqu'au
     // lancement d'office.
-    const released =
-      (await loadCastEligibility(connection, casterId)) !== null ||
-      (await resolveTeamParty(connection, row, casterId)) !== null;
-    if (!released) return;
+    // Le motif dit au caster : les conditions du cast d'abord, l'équipe ensuite.
+    if ((await loadCastEligibility(connection, casterId)) === null) {
+      if ((await resolveTeamParty(connection, row, casterId)) === null) return;
+      reason = "JOINED_TEAM";
+    }
 
     await connection.execute(
       `UPDATE bg_matches SET caster_user_id = NULL, caster_ready_at = NULL WHERE id = ? AND caster_user_id = ?`,
@@ -536,6 +553,7 @@ export async function releaseIneligibleCast(matchId: number, casterId: number): 
   });
   if (tournamentId === null) return false;
   publishMatchUpdatedEvent(tournamentId);
+  announceCastChange({ kind: "AUTO_RELEASED", matchId, casterId, reason });
   return true;
 }
 

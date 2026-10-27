@@ -168,8 +168,21 @@ const TONE_CLASS = {
  * encore.
  *
  * Les gestes et leurs appels sont ceux des anciens bandeaux, à l'identique ;
- * le lancement forcé garde sa confirmation (`ConfirmActionDialog`).
+ * le lancement forcé garde sa confirmation (`ConfirmActionDialog`), comme le
+ * retrait d'un caster par le staff : le caster en est prévenu (message privé,
+ * push), un message qui ne se reprend pas (`docs/features/CAST_NOTICES.md`).
  */
+/**
+ * Une confirmation qui ne survit pas à la disparition de son action : remise à
+ * zéro dès que `present` tombe, sans quoi la modale se rouvrirait seule au
+ * retour de l'action (instantané du flux), sans clic.
+ */
+function useConfirmWhile(present: boolean) {
+  const [open, setOpen] = useState(false);
+  if (open && !present) setOpen(false);
+  return [open && present, setOpen] as const;
+}
+
 export function MatchCardActions({
   match,
   phase,
@@ -216,6 +229,8 @@ export function MatchCardActions({
   // sans cette remise à zéro, la modale se rouvrirait seule au retour de
   // « Forcer » (instantané du flux), sans clic.
   if (confirmForce && !hasForce) setConfirmForce(false);
+  // Même règle pour le retrait du caster (match terminé, caster parti…).
+  const [confirmRelease, setConfirmRelease] = useConfirmWhile(actions.some((a) => a.id === "releaseCast"));
   // Les contacts ne restent pas affichés quand le match ne les offre plus
   // (terminé, caster retiré, tournoi clos) : l'instantané du flux retire
   // l'action, et la modale se ferme avec elle.
@@ -371,10 +386,13 @@ export function MatchCardActions({
       void run(() => send(`/api/matches/${match.id}/caster`, "POST"), t("cardActions.casting"));
     },
     releaseCast: () => {
-      void run(
-        () => send(`/api/matches/${match.id}/caster`, "DELETE"),
-        isCaster ? t("cardActions.notCasting") : t("cardActions.casterRemoved"),
-      );
+      // Le caster qui se retire lui-même n'est prévenu de rien : pas de
+      // confirmation. Le staff qui retire un caster lui envoie un avis.
+      if (!isCaster) {
+        setConfirmRelease(true);
+        return;
+      }
+      void run(() => send(`/api/matches/${match.id}/caster`, "DELETE"), t("cardActions.notCasting"));
     },
     onAir: () => {
       void run(
@@ -504,6 +522,17 @@ export function MatchCardActions({
           {phase === "TO_PLAN" && (
             <p>{t("cardActions.forceConfirm.unplanned")}</p>
           )}
+        </ConfirmActionDialog>
+      )}
+      {confirmRelease && (
+        <ConfirmActionDialog
+          title={t("cardActions.releaseConfirm.title", { match: matchLabel })}
+          confirmLabel={t("cardActions.releaseConfirm.confirm")}
+          pendingLabel={t("cardActions.releaseConfirm.pending")}
+          onClose={() => setConfirmRelease(false)}
+          onConfirm={() => run(() => send(`/api/matches/${match.id}/caster`, "DELETE"), t("cardActions.casterRemoved"))}
+        >
+          <p>{t("cardActions.releaseConfirm.body")}</p>
         </ConfirmActionDialog>
       )}
       {contactsOpen && (

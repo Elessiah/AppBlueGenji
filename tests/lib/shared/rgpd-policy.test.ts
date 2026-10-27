@@ -408,7 +408,7 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
     const t04 = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T04");
     // Les messages vont à tous les membres actifs des équipes, pas aux seuls joueurs.
     expect(t04?.dataSubjects).toContain("Autres membres des équipes engagées (coachs, managers, propriétaires)");
-    expect(t04?.legalBasis).toMatch(/intérêt légitime \(bon déroulement des tournois\) pour l'annonce des horaires de match, l'avis qu'un match quitte son programme et les rappels de match envoyés aux joueurs, avec un droit d'opposition/);
+    expect(t04?.legalBasis).toMatch(/intérêt légitime \(bon déroulement des tournois\) pour l'annonce des horaires de match, l'avis qu'un match quitte son programme et les rappels de match envoyés aux joueurs, et l'avis du retrait de son inscription envoyé à un caster, avec un droit d'opposition/);
   });
 
   it("le droit d'opposition les nomme, en français et en anglais", () => {

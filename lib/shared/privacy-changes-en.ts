@@ -552,6 +552,16 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       `What is backed up, the encryption and the retention period do not change: each archive is destroyed after ${BACKUP_RETENTION_DAYS} days at most.`,
     ],
   },
+  "2026-10-avis-de-retrait-du-cast": {
+    linkLabels: ["Read the “Match Discord direct messages” paragraph"],
+    title: "Cast removed: you are notified, with the reason",
+    summary:
+      "If you cast a match and your registration is removed by the staff, automatically (casting requirements no longer met, or you now play in the match) or because another caster takes your place, the site notifies you by Discord direct message and push notification, with the reason.",
+    details: [
+      "The message names the match (team names, “a match” in a solo tournament), its tournament and its round, never who removed the registration. The direct message only goes to a certified Discord tag and is turned off, like the other match messages, with the “Discord direct messages about my matches” box in “My profile”; the push notification, only sent if you still hold the streaming permission, has its own setting, “Cast removed”.",
+      "A caster's registration for a match, its takeover by another caster and its removal (with the reason for a takeover or an automatic removal) are also noted in the staff log on Discord, without naming anyone (“a caster”, “the staff”).",
+    ],
+  },
 };
 
 /**

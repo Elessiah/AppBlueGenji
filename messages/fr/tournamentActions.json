@@ -245,6 +245,12 @@
     "casterRemoved": "Caster retiré.",
     "airClosed": "Antenne fermée.",
     "airOpened": "Antenne ouverte.",
+    "releaseConfirm": {
+      "title": "Retirer le caster de {match} ?",
+      "confirm": "Retirer le caster",
+      "pending": "Retrait…",
+      "body": "Le caster en est prévenu, avec le motif « décision du staff », par message privé Discord ou notification push selon ses réglages."
+    },
     "forceConfirm": {
       "title": "Forcer le lancement de {match} ?",
       "confirm": "Lancer le match",

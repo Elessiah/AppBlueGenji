@@ -206,6 +206,58 @@ describe("notifyUsers", () => {
   });
 });
 
+describe("notifyUsers — sujet réservé à une permission", () => {
+  /** Droits des comptes (`bg_users`) : la lecture de `pushAudience`, le reste rend des langues. */
+  function accountRights(rows: { id: number; is_admin: number; platform_roles_json: string | null }[]) {
+    const query = jest.fn<SqlQuery>().mockImplementation(async (sql) =>
+      String(sql).includes("platform_roles_json") ? [rows, []] : [[{ id: 5, locale: "fr" }], []],
+    );
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
+    return query;
+  }
+
+  it("ne pousse qu'aux destinataires qui détiennent encore la permission du sujet", async () => {
+    accountRights([
+      { id: 5, is_admin: 0, platform_roles_json: JSON.stringify(["CASTER"]) },
+      { id: 6, is_admin: 0, platform_roles_json: null },
+      { id: 7, is_admin: 1, platform_roles_json: null },
+    ]);
+    await notifyUsers(
+      [5, 6, 7].map((userId) => ({ userId, discord: null })),
+      { topic: "CAST_RELEASED", push: PUSH },
+    );
+    expect(pushToUsers).toHaveBeenCalledWith([5, 7], "CAST_RELEASED", PUSH, undefined);
+  });
+
+  it("le message privé part quand même à qui a perdu la permission", async () => {
+    accountRights([{ id: 5, is_admin: 0, platform_roles_json: null }]);
+    const report = await notifyUsers(
+      [{ userId: 5, discord: { discordId: "5", handle: null, label: "C" } }],
+      { topic: "CAST_RELEASED", push: PUSH, discord: { message: DM, context: "cast-released" } },
+    );
+    expect(pushDiscordDirectMessages).toHaveBeenCalledWith("m-fr", [{ discordId: "5", handle: null, label: "C" }], "cast-released");
+    expect(pushToUsers).toHaveBeenCalledWith([], "CAST_RELEASED", PUSH, undefined);
+    expect(report.discord).toEqual({ sent: 1, unresolved: [], failed: [] });
+  });
+
+  it("droits illisibles : aucun push, sans lever", async () => {
+    const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(getDatabase).mockRejectedValue(new Error("ECONNREFUSED"));
+    await expect(notifyUsers([{ userId: 5, discord: null }], { topic: "CAST_RELEASED", push: PUSH })).resolves.toEqual(
+      expect.objectContaining({ discord: { sent: 0, unresolved: [], failed: [] } }),
+    );
+    expect(pushToUsers).toHaveBeenCalledWith([], "CAST_RELEASED", PUSH, undefined);
+    errors.mockRestore();
+  });
+
+  it("sujet ouvert : aucune lecture des droits", async () => {
+    const query = accountLocales([{ id: 1, locale: "fr" }]);
+    await notifyUsers([{ userId: 1, discord: null }], { topic: "MATCH_REMINDER", push: PUSH });
+    expect(query).not.toHaveBeenCalled();
+    expect(pushToUsers).toHaveBeenCalledWith([1], "MATCH_REMINDER", PUSH, undefined);
+  });
+});
+
 describe("notifyStaff", () => {
   it("pousse aux seuls comptes qui détiennent la permission du sujet", async () => {
     jest.mocked(subscribedStaffCandidates).mockResolvedValue([

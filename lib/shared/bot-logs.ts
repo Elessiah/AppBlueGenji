@@ -577,3 +577,56 @@ export function formatRoundRolledBackLog(context: {
   const reopened = context.reopenedTournament ? ", tournoi rouvert" : "";
   return `${lead("⏪", "Retour en arrière", context.tournament)} : ${context.roundLabel} — ${matches}${reopened}, par ${ANONYMOUS_STAFF_LABEL}.`;
 }
+
+/**
+ * Ce qui vient d'arriver à l'inscription d'un caster sur un match
+ * (`lib/server/tournaments/cast-notices.ts`) :
+ *
+ * - `CLAIMED` — un caster s'inscrit sur un match libre ;
+ * - `REPLACED` — un caster prend la place d'un autre, qui ne remplissait plus
+ *   les conditions du cast ;
+ * - `RELEASED` — le caster retire lui-même son inscription ;
+ * - `RELEASED_BY_STAFF` — le staff la retire ;
+ * - `INELIGIBLE` / `JOINED_TEAM` — retirée d'office : le caster ne remplit plus
+ *   les conditions du cast, ou il joue désormais le match.
+ */
+export type CastLogChange = "CLAIMED" | "REPLACED" | "RELEASED" | "RELEASED_BY_STAFF" | "INELIGIBLE" | "JOINED_TEAM";
+
+const CAST_LOG_WORDING: Record<CastLogChange, { kind: string; detail: string }> = {
+  CLAIMED: { kind: "Cast réservé", detail: "un caster s'inscrit sur le match" },
+  REPLACED: {
+    kind: "Cast repris",
+    detail: "un caster prend la place du précédent, qui ne remplissait plus les conditions du cast",
+  },
+  RELEASED: { kind: "Cast libéré", detail: "le caster retire son inscription" },
+  RELEASED_BY_STAFF: { kind: "Cast retiré", detail: `inscription du caster retirée par ${ANONYMOUS_STAFF_LABEL}` },
+  INELIGIBLE: {
+    kind: "Cast retiré d'office",
+    detail: "le caster ne remplit plus les conditions du cast (permission de diffusion, tag Discord certifié, compte Battle.net)",
+  },
+  JOINED_TEAM: { kind: "Cast retiré d'office", detail: "le caster joue désormais ce match" },
+};
+
+/**
+ * Inscription d'un caster posée, reprise ou retirée. **Personne n'est nommé** :
+ * ni le caster (« un caster », « le caster »), ni le staff (« le staff »), ni,
+ * en tournoi individuel, les joueurs (`entrantLabel`) — et rien ne part dans
+ * pm2 non plus (décision du 27 octobre 2026 : gestes de staff anonymes partout).
+ */
+export function formatCastChangeLog(context: {
+  tournament: BotLogTournament;
+  matchId: number;
+  bracket: string;
+  roundNumber: number;
+  /** Ronde suisse : « Ronde N » (`matchRoundLabel`). */
+  swiss?: boolean;
+  team1: LogEntrant | null;
+  team2: LogEntrant | null;
+  change: CastLogChange;
+}): string {
+  const wording = CAST_LOG_WORDING[context.change];
+  return (
+    `${lead("🎙️", wording.kind, context.tournament)} : ${matchRoundLabel(context.bracket, context.roundNumber, context.swiss)} — ` +
+    `${scheduledPairLabel(context.team1, context.team2)} (#${context.matchId}), ${wording.detail}.`
+  );
+}

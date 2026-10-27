@@ -2,10 +2,17 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/tournaments/notifications");
+jest.mock("@/lib/server/tournaments/cast-notices");
 
 import type { PoolConnection } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
+import {
+  announceCastChange,
+  discardCastChanges,
+  flushCastChanges,
+  queueCastChange,
+} from "@/lib/server/tournaments/cast-notices";
 import {
   claimMatchCast,
   forceLaunchMatch,
@@ -353,14 +360,44 @@ describe("caster inscrit avant que son équipe n'atteigne le match", () => {
     // Inscrit sur un match aux créneaux vides, puis son équipe (TEAM1) l'atteint.
     state.memberships.push({ userId: CASTER, teamId: TEAM1, roles: ["DPS"] });
     state.match = matchState({ launch_pairing: null, caster_user_id: CASTER });
-    await maintainMatchLaunches(connectionFor(state), 7);
+    const connection = connectionFor(state);
+    await maintainMatchLaunches(connection, 7);
     expect(state.match?.caster_user_id).toBeNull();
+    // Annoncé comme tout retrait d'office, après le commit de l'appelant.
+    expect(queueCastChange).toHaveBeenCalledWith(connection, {
+      kind: "AUTO_RELEASED",
+      matchId: 42,
+      casterId: CASTER,
+      reason: "JOINED_TEAM",
+    });
+    expect(announceCastChange).not.toHaveBeenCalled();
   });
 
   it("garde un caster étranger aux deux équipes", async () => {
     state.match = matchState({ launch_pairing: null, caster_user_id: CASTER });
     await maintainMatchLaunches(connectionFor(state), 7);
     expect(state.match?.caster_user_id).toBe(CASTER);
+    expect(queueCastChange).not.toHaveBeenCalled();
+  });
+
+  it("annonce après le commit le caster désinscrit par un « Prêt »", async () => {
+    state.memberships.push({ userId: CASTER, teamId: TEAM1, roles: ["DPS"] });
+    state.match = matchState({ launch_pairing: null, caster_user_id: CASTER });
+    await setMatchReady(42, 1, true);
+    expect(state.match?.caster_user_id).toBeNull();
+    expect(queueCastChange).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ reason: "JOINED_TEAM" }));
+    expect(flushCastChanges).toHaveBeenCalledTimes(1);
+    expect(discardCastChanges).not.toHaveBeenCalled();
+  });
+
+  it("n'annonce rien quand la transaction échoue", async () => {
+    state.memberships.push({ userId: CASTER, teamId: TEAM1, roles: ["DPS"] });
+    state.match = matchState({ launch_pairing: null, caster_user_id: CASTER });
+    // Un lecteur étranger au match : refusé après la désinscription, tout est annulé.
+    await expect(setMatchReady(42, 999, true)).rejects.toThrow("NOT_MATCH_PARTY");
+    expect(queueCastChange).toHaveBeenCalledTimes(1);
+    expect(discardCastChanges).toHaveBeenCalledTimes(1);
+    expect(flushCastChanges).not.toHaveBeenCalled();
   });
 
   it("fait agir en joueur celui qui est à la fois inscrit comme caster et joueur", async () => {
@@ -421,12 +458,14 @@ describe("claimMatchCast", () => {
     await claimMatchCast(42, CASTER, true);
     expect(state.match?.caster_user_id).toBe(CASTER);
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
+    expect(announceCastChange).toHaveBeenCalledWith({ kind: "CLAIMED", matchId: 42, replacedCasterId: null });
   });
 
   it("refuse sans la permission `live`", async () => {
     state.users[CASTER] = verified;
     await expect(claimMatchCast(42, CASTER, false)).rejects.toThrow("NOT_CASTER");
     expect(state.match?.caster_user_id).toBeNull();
+    expect(announceCastChange).not.toHaveBeenCalled();
   });
 
   it("refuse sans tag Discord certifié, ou sans compte Battle.net rattaché", async () => {
@@ -458,6 +497,8 @@ describe("claimMatchCast", () => {
     await claimMatchCast(42, CASTER, true);
     // Rejouée, l'inscription ne défait pas un « Prêt » déjà donné.
     expect(state.match?.caster_ready_at).toBe(STAMP);
+    // Ni l'inscription refusée ni l'inscription rejouée ne s'annoncent.
+    expect(announceCastChange).not.toHaveBeenCalled();
   });
 
   it("reprend la place d'un titulaire qui ne remplit plus la condition", async () => {
@@ -467,6 +508,8 @@ describe("claimMatchCast", () => {
     await claimMatchCast(42, CASTER, true);
     expect(state.match?.caster_user_id).toBe(CASTER);
     expect(state.match?.caster_ready_at).toBeNull();
+    // Le titulaire évincé est nommé à l'annonce : c'est lui qui sera prévenu.
+    expect(announceCastChange).toHaveBeenCalledWith({ kind: "CLAIMED", matchId: 42, replacedCasterId: 901 });
   });
 
   it("sans phase de lancement, reprend la place à l'heure passée tant que le lancement n'est pas écrit", async () => {
@@ -487,6 +530,7 @@ describe("claimMatchCast", () => {
     state.match = matchState({ caster_user_id: 901, launched_at: STAMP });
     await expect(claimMatchCast(42, CASTER, true)).rejects.toThrow("MATCH_ALREADY_CASTED");
     expect(state.match?.caster_user_id).toBe(901);
+    expect(announceCastChange).not.toHaveBeenCalled();
   });
 
   it("refuse un match terminé ou une exemption", async () => {
@@ -504,6 +548,13 @@ describe("releaseMatchCast", () => {
     await releaseMatchCast(42, CASTER, false);
     expect(state.match?.caster_user_id).toBeNull();
     expect(state.match?.caster_ready_at).toBeNull();
+    expect(announceCastChange).toHaveBeenCalledWith({ kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: false });
+  });
+
+  it("un arbitre qui retire sa propre inscription n'est pas « le staff »", async () => {
+    state.match = matchState({ caster_user_id: CASTER });
+    await releaseMatchCast(42, CASTER, true);
+    expect(announceCastChange).toHaveBeenCalledWith({ kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: false });
   });
 
   it("lance le match quand les deux équipes n'attendaient plus que le caster", async () => {
@@ -515,13 +566,16 @@ describe("releaseMatchCast", () => {
   it("refuse de retirer le caster d'un autre sans être arbitre", async () => {
     state.match = matchState({ caster_user_id: CASTER });
     await expect(releaseMatchCast(42, 1, false)).rejects.toThrow("NOT_MATCH_CASTER");
+    expect(announceCastChange).not.toHaveBeenCalled();
     await releaseMatchCast(42, 1, true);
     expect(state.match?.caster_user_id).toBeNull();
+    expect(announceCastChange).toHaveBeenCalledWith({ kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: true });
   });
 
   it("ne fait rien sur un match sans caster", async () => {
     await releaseMatchCast(42, CASTER, false);
     expect(state.writes).toEqual([]);
+    expect(announceCastChange).not.toHaveBeenCalled();
   });
 });
 
@@ -682,6 +736,7 @@ describe("releaseIneligibleCast", () => {
     expect(state.match?.caster_user_id).toBeNull();
     expect(state.match?.launched_at).toBe(STAMP);
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
+    expect(announceCastChange).toHaveBeenCalledWith({ kind: "AUTO_RELEASED", matchId: 42, casterId: CASTER, reason: "INELIGIBLE" });
   });
 
   it.each<[string, Partial<MatchState>]>([
@@ -695,6 +750,7 @@ describe("releaseIneligibleCast", () => {
     await expect(releaseIneligibleCast(42, CASTER)).resolves.toBe(false);
     expect(state.match?.caster_user_id).toBe(before);
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+    expect(announceCastChange).not.toHaveBeenCalled();
   });
 
   it("garde un compte redevenu éligible", async () => {
@@ -702,6 +758,7 @@ describe("releaseIneligibleCast", () => {
     state.match = matchState({ caster_user_id: CASTER });
     await expect(releaseIneligibleCast(42, CASTER)).resolves.toBe(false);
     expect(state.match?.caster_user_id).toBe(CASTER);
+    expect(announceCastChange).not.toHaveBeenCalled();
   });
 
   // Inscrit puis entré dans un roster du match : son « Prêt » de caster ne viendrait jamais.
@@ -712,6 +769,15 @@ describe("releaseIneligibleCast", () => {
     await expect(releaseIneligibleCast(42, CASTER)).resolves.toBe(true);
     expect(state.match?.caster_user_id).toBeNull();
     expect(state.match?.launched_at).toBe(STAMP);
+    expect(announceCastChange).toHaveBeenCalledWith({ kind: "AUTO_RELEASED", matchId: 42, casterId: CASTER, reason: "JOINED_TEAM" });
+  });
+
+  it("dit d'abord les conditions du cast quand le caster, inéligible, a aussi rejoint une équipe du match", async () => {
+    state.users[CASTER] = ineligible;
+    state.memberships.push({ userId: CASTER, teamId: TEAM1, roles: ["DPS"] });
+    state.match = matchState({ caster_user_id: CASTER });
+    await expect(releaseIneligibleCast(42, CASTER)).resolves.toBe(true);
+    expect(announceCastChange).toHaveBeenCalledWith({ kind: "AUTO_RELEASED", matchId: 42, casterId: CASTER, reason: "INELIGIBLE" });
   });
 });
 

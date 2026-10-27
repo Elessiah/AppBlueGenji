@@ -245,6 +245,12 @@
     "casterRemoved": "Caster removed.",
     "airClosed": "Off air.",
     "airOpened": "On air.",
+    "releaseConfirm": {
+      "title": "Remove the caster from {match}?",
+      "confirm": "Remove the caster",
+      "pending": "Removing…",
+      "body": "The caster is notified, with the reason “staff decision”, by Discord direct message or push notification depending on their settings."
+    },
     "forceConfirm": {
       "title": "Force the launch of {match}?",
       "confirm": "Launch the match",

@@ -45,6 +45,7 @@ import { cached } from "./intl-cache";
 import { DEFAULT_LOCALE, INTL_LOCALE, localeHref, type Locale } from "./locales";
 import { scopedText, type Leaves, type ScopedText } from "./scoped-text";
 import { clipPushText, PUSH_BODY_MAX, type PushContent } from "./push-notifications";
+import type { CastReleasedMatch } from "./cast-notices";
 
 type PushText = ScopedText<Leaves<typeof frPush>>;
 
@@ -856,6 +857,31 @@ export function selfPausedValidationPush(input: RefereeAlertMatch, locale: Local
     }),
     url: localeHref(tournamentMatchHref(input.tournamentId, input.matchId), locale),
     tag: `self-paused-${input.matchId}`,
+  };
+}
+
+/**
+ * Au caster dont l'inscription sur un match vient d'être retirée par un autre
+ * que lui (`CAST_RELEASED`), avec le motif. Les deux engagées sont nommées
+ * quand ce sont des équipes ; en tournoi individuel, « Un match » (leurs noms
+ * sont des pseudos). Une place encore vide se lit « TBD ».
+ */
+export function castReleasedPush(input: CastReleasedMatch, locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
+  const tbd = text.t("matchScheduled.tbd");
+  const pairingText = input.solo
+    ? text.t("castReleased.pairingSolo")
+    : text.t("pairing", { team: input.team1Name ?? tbd, opponent: input.team2Name ?? tbd });
+  return {
+    title: text.t("castReleased.title"),
+    body: text.t("castReleased.body", {
+      reason: text.t(`castReleased.reason.${input.reason}`),
+      pairing: pairingText,
+      tournament: input.tournamentName,
+      round: pushRoundLabel(input.bracket, input.roundNumber, locale, input.swiss),
+    }),
+    url: localeHref(tournamentMatchHref(input.tournamentId, input.matchId), locale),
+    tag: `${matchTag(input.matchId)}-cast`,
   };
 }
 

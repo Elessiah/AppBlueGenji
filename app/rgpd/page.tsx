@@ -966,7 +966,7 @@ function RgpdFr({
             Vous pouvez être prévenu sur votre téléphone ou votre ordinateur du départ de vos matchs, d&apos;un
             score à confirmer ou validé automatiquement faute de réponse, du coup d&apos;envoi d&apos;un tournoi, de l&apos;horaire de vos matchs (posé,
             changé ou retiré) et de ses rappels, et de ce qui concerne votre compte ou votre équipe ; un membre du staff, aussi des
-            alertes de son rôle (alertes d&apos;arbitrage, litiges tranchés, résultats corrigés, abandons imposés à l&apos;adversaire ou validations automatiques suspendues par un membre du staff qui joue le match, matchs planifiés, programme d&apos;arbitrage, signalements reçus). <strong>Rien ne part sans votre geste</strong> :
+            alertes de son rôle (alertes d&apos;arbitrage, litiges tranchés, résultats corrigés, abandons imposés à l&apos;adversaire ou validations automatiques suspendues par un membre du staff qui joue le match, matchs planifiés, programme d&apos;arbitrage, signalements reçus) ; un caster, du retrait de son inscription sur un match par un autre que lui, avec le motif, tant qu&apos;il détient la permission de diffusion. <strong>Rien ne part sans votre geste</strong> :
             les notifications s&apos;activent appareil par appareil, depuis{" "}
             <Link href="/profil#notifications">Mon profil</Link>, où vous choisissez aussi les sujets.
           </p>
@@ -1009,7 +1009,9 @@ function RgpdFr({
           <p id="messages-de-match">
             <strong>Messages privés Discord de match.</strong> Le bot vous écrit aussi en privé, dans la
             langue de votre compte, quand l&apos;horaire d&apos;un de vos matchs est posé, changé ou retiré, pour ses
-            rappels (24 h et 10 h avant) et quand vous êtes retiré d&apos;un match — seulement si votre tag
+            rappels (24 h et 10 h avant), quand vous êtes retiré d&apos;un match et, si vous castez, quand votre
+            inscription de caster sur un match est retirée par le staff ou d&apos;office, ou reprise par un autre
+            caster (avec le motif) — seulement si votre tag
             Discord est <strong>certifié</strong> : un tag non certifié, même rattaché par la connexion Discord,
             n&apos;en reçoit aucun, pour
             éviter le spam (vos notifications push, elles, partent quand même). Ces messages reposent
@@ -1026,7 +1028,9 @@ function RgpdFr({
             l&apos;équipe adverse de celle qu&apos;il retire) et, s&apos;il le joue, en
             avertit ses collègues : ce contrôle repose sur l&apos;<strong>intérêt légitime</strong> de
             l&apos;association à l&apos;impartialité de l&apos;arbitrage, et ce membre du staff peut s&apos;y opposer
-            (section <a href="#exercer-vos-droits">« Exercer vos droits »</a>).
+            (section <a href="#exercer-vos-droits">« Exercer vos droits »</a>). L&apos;inscription d&apos;un caster
+            sur un match, sa reprise par un autre caster et son retrait (avec le motif d&apos;une reprise ou d&apos;un retrait
+            d&apos;office) sont notés au journal du staff sur Discord sans nommer personne (« un caster », « le staff »).
           </p>
         </div>
       </section>

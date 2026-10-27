@@ -100,6 +100,11 @@ export const PUSH_TOPICS = {
     description: "Environ 10 h à l'avance, la liste des matchs à venir : horaires, tournois et équipes.",
     audience: "tournaments",
   },
+  CAST_RELEASED: {
+    label: "Cast retiré",
+    description: "Ton inscription comme caster d'un match est retirée par le staff ou d'office, ou un autre caster prend ta place : le motif est donné.",
+    audience: "live",
+  },
   STAFF_REPORT: {
     label: "Signalements reçus",
     description: "Un nouveau signalement, ou une contestation, arrive à la modération.",
