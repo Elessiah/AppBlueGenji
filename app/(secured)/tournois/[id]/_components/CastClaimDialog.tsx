@@ -53,14 +53,18 @@ export function CastClaimDialog({
   const hintId = useId();
   const choices = castClaimChoices(match);
   const [choiceKey, setChoiceKey] = useState(castClaimChoiceKey(choices[0]));
-  const choice: CastClaimChoice = choices.find((option) => castClaimChoiceKey(option) === choiceKey) ?? choices[0];
+  // Un stream choisi qui disparaît (son dernier caster parti) ne se remplace
+  // pas en silence par un autre : plus rien n'est coché, il faut rechoisir.
+  const choice: CastClaimChoice | null =
+    choices.find((option) => castClaimChoiceKey(option) === choiceKey) ?? null;
   const [url, setUrl] = useState("");
   const fieldErrors = useFieldErrors(CAST_FIELD_ERRORS, { url: urlId });
-  const separate = choice.kind === "SEPARATE";
+  const separate = choice?.kind === "SEPARATE";
   const urlInvalid = separate && url.trim() !== "" && normalizeStreamUrl(url) === null;
   const platforms = LIVE_PLATFORMS.join(", ");
 
   const confirm = async (): Promise<boolean> => {
+    if (choice === null) return false;
     const outcome = await onClaim(castClaimBody(choice, url));
     if (!outcome.ok) fieldErrors.report(outcome.code, outcome.message);
     return outcome.ok;
@@ -73,7 +77,7 @@ export function CastClaimDialog({
       pendingLabel={t("cardActions.claimDialog.pending")}
       tone="primary"
       focusContent
-      disabled={urlInvalid}
+      disabled={choice === null || urlInvalid}
       onClose={onClose}
       onConfirm={confirm}
     >

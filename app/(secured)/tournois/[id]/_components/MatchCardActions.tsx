@@ -185,6 +185,24 @@ function useConfirmWhile(present: boolean) {
   return [open && present, setOpen] as const;
 }
 
+/**
+ * Retrait d'un caster par l'arbitrage : le caster visé est fixé à l'ouverture
+ * (le premier) puis par le choix. Parti entre-temps, la fenêtre se ferme : le
+ * retrait ne passe jamais en silence à un autre caster, qui recevrait l'avis
+ * du staff.
+ */
+function useReleaseConfirm(present: boolean, casters: BracketMatch["casters"]) {
+  const [open, setOpen] = useConfirmWhile(present);
+  const [releaseTarget, setReleaseTarget] = useState<number | null>(null);
+  const releasedCaster = casters.find((caster) => caster.userId === releaseTarget) ?? null;
+  if (open && releasedCaster === null) setOpen(false);
+  const openRelease = () => {
+    setReleaseTarget(casters[0]?.userId ?? null);
+    setOpen(true);
+  };
+  return { confirmRelease: open && releasedCaster !== null, openRelease, setConfirmRelease: setOpen, releasedCaster, setReleaseTarget };
+}
+
 export function MatchCardActions({
   match,
   phase,
@@ -238,12 +256,10 @@ export function MatchCardActions({
   // « Forcer » (instantané du flux), sans clic.
   if (confirmForce && !hasForce) setConfirmForce(false);
   // Même règle pour le retrait du caster (match terminé, caster parti…).
-  const [confirmRelease, setConfirmRelease] = useConfirmWhile(actions.some((a) => a.id === "releaseCast"));
-  // Caster que l'arbitrage retire, quand le match en compte plusieurs ; un
-  // caster parti entre-temps ramène le choix au premier qui reste.
-  const [releaseTarget, setReleaseTarget] = useState<number | null>(null);
-  const releasedCaster =
-    match.casters.find((caster) => caster.userId === releaseTarget) ?? match.casters[0] ?? null;
+  const { confirmRelease, openRelease, setConfirmRelease, releasedCaster, setReleaseTarget } = useReleaseConfirm(
+    actions.some((a) => a.id === "releaseCast"),
+    match.casters,
+  );
   // Le choix du stream ne survit pas non plus à l'action (match lancé, joué…).
   const [claimOpen, setClaimOpen] = useConfirmWhile(actions.some((a) => a.id === "claimCast"));
   // Les contacts ne restent pas affichés quand le match ne les offre plus
@@ -424,7 +440,7 @@ export function MatchCardActions({
       // Le caster qui se retire lui-même n'est prévenu de rien : pas de
       // confirmation. Le staff qui retire un caster lui envoie un avis.
       if (!isCaster || releasesOthers) {
-        setConfirmRelease(true);
+        openRelease();
         return;
       }
       void run(() => send(`/api/matches/${match.id}/caster`, "DELETE"), t("cardActions.notCasting"));
@@ -565,7 +581,6 @@ export function MatchCardActions({
           confirmLabel={t("cardActions.releaseConfirm.confirm")}
           pendingLabel={t("cardActions.releaseConfirm.pending")}
           onClose={() => setConfirmRelease(false)}
-          disabled={releasedCaster === null}
           focusContent={match.casters.length > 1}
           onConfirm={() =>
             run(

@@ -324,7 +324,8 @@ export function CasterCard({
   const self = caster.isViewer;
   const hasContacts = casterHasContacts(caster);
   return (
-    <section className={styles.caster} aria-label={t("caster")}>
+    // Nommée par son caster : à plusieurs, chaque région se distingue.
+    <section className={styles.caster} aria-label={`${t("caster")} ${caster.pseudo}`}>
       <div className={styles.sideHead}>
         <span className={styles.emblem} aria-hidden="true">
           🎙
