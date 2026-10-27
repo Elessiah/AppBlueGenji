@@ -96,13 +96,18 @@ async function loadLandingStats(): Promise<LandingStats> {
 
 type SiteCounts = Omit<LandingStats, "discord">;
 
+/**
+ * « Équipes actives » : les équipes que l'annuaire montre — ni entrée solo
+ * (`solo_user_id`), ni équipe dissoute (`deleted_at`) ; une équipe fantôme y
+ * figure, comme à l'annuaire (`GHOST_TEAMS.md`).
+ */
 async function loadSiteCounts(): Promise<SiteCounts> {
   try {
     const db = await getDatabase();
     const [rows] = await db.execute<StatsRow[]>(`
       SELECT
         (SELECT COUNT(*) FROM bg_users) AS players,
-        (SELECT COUNT(*) FROM bg_teams WHERE solo_user_id IS NULL) AS teams,
+        (SELECT COUNT(*) FROM bg_teams WHERE solo_user_id IS NULL AND deleted_at IS NULL) AS teams,
         (SELECT COUNT(*) FROM bg_tournaments WHERE start_visibility_at <= NOW()) AS tournaments
     `);
     const row = rows[0];
