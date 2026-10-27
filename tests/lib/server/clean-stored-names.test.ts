@@ -94,7 +94,7 @@ describe("cleanStoredNames", () => {
         { id: 2, name: "Ｄｒａｇｏｎ  Squad" },
       ],
       bg_users: [{ id: 3, name: "½ Lune" }],
-      bg_tournaments: [{ id: 4, name: "Coupe 2026 ™" }],
+      bg_tournaments: [{ id: 4, name: "Coupe\u202F2026 ™" }],
     });
 
     await cleanStoredNames(pool);
@@ -104,12 +104,12 @@ describe("cleanStoredNames", () => {
   });
 
   it("ne retire que les invisibles d'un nom stylisé, sans le normaliser", async () => {
-    const { execute, pool } = database({ bg_teams: [{ id: 1, name: "‮Team²​ Ｘ" }] });
+    const { execute, pool } = database({ bg_teams: [{ id: 1, name: "\u202ETeam²\u200B Ｘ" }] });
 
     await cleanStoredNames(pool);
 
     expect(updates(execute)).toEqual([
-      { sql: "UPDATE bg_teams SET name = ? WHERE id = ? AND name = ?", params: ["Team² Ｘ", 1, "‮Team²​ Ｘ"] },
+      { sql: "UPDATE bg_teams SET name = ? WHERE id = ? AND name = ?", params: ["Team² Ｘ", 1, "\u202ETeam²\u200B Ｘ"] },
     ]);
   });
 
