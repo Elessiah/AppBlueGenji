@@ -13,6 +13,7 @@ import { useAutoRefresh } from "@/lib/shared/hooks/useAutoRefresh";
 import { useScheduledBuckets } from "@/lib/shared/hooks/useScheduledBuckets";
 import { useToast } from "@/components/ui/toast";
 import { BgCanvas } from "../_shared/BgCanvas";
+import { SecuredLoadingView } from "../_shared/SecuredLoadingView";
 import { CyberButton } from "@/components/cyber/CyberButton";
 import { Ticker } from "@/components/cyber/Ticker";
 import { RunningCard } from "./cards/RunningCard";
@@ -58,6 +59,10 @@ const emptyBuckets: TournamentBuckets = {
  * pas cette limite : c'est un choix d'affichage, pas un fait sur les données). */
 type LimitedSectionKey = "mine" | "running" | "registration" | "upcoming" | "finished";
 const SECTION_DISPLAY_LIMIT = 12;
+/** Compte affiché tant que la première liste n'est pas arrivée. */
+const COUNT_PENDING = "–";
+const NO_TICKER_ITEMS: readonly string[] = [];
+const NO_TOURNAMENTS: TournamentCard[] = [];
 
 const GAME_FILTERS: readonly GameFilter[] = ["all", "ow", "mr"];
 
@@ -144,6 +149,18 @@ export default function TournamentsList() {
   const [query, setQuery] = useState("");
   const [gameFilter, setGameFilter] = useState<GameFilter>("all");
   const [buckets, setBuckets] = useState<TournamentBuckets>(emptyBuckets);
+  // Faux tant que la première liste n'est pas arrivée : les paniers vides du
+  // départ ne disent pas « aucun tournoi », ils disent « pas encore lu ». Sans
+  // ce drapeau, chaque visite affichait « Aucun tournoi publié », des
+  // compteurs à zéro et un bandeau « Aucune actualité » jusqu'à la réponse.
+  // Un échec le laisse faux : le squelette reste, la notification dit
+  // l'incident, et la relecture de fond suivante remplit la page.
+  const [listFetched, setListFetched] = useState(false);
+  // « Mes tournois » arrive par sa propre lecture : sans l'attendre, la
+  // section naissait au sommet une fois la liste affichée et poussait tout le
+  // reste vers le bas. Réglé au premier résultat, échec compris (silencieux).
+  const [mineSettled, setMineSettled] = useState(false);
+  const listLoaded = listFetched && mineSettled;
   const [hiddenTournaments, setHiddenTournaments] = useState<TournamentCard[]>([]);
   const [myTournamentIds, setMyTournamentIds] = useState<ReadonlySet<number>>(new Set());
   const [expandedSections, setExpandedSections] = useState<ReadonlySet<LimitedSectionKey>>(new Set());
@@ -176,6 +193,7 @@ export default function TournamentsList() {
         // relecture de fond redessinerait toute la liste et réarmerait le
         // minuteur de bascule, pour un contenu identique.
         setBuckets((previous) => (sameBuckets(previous, all) ? previous : all));
+        setListFetched(true);
       } catch (e) {
         // Une requête abandonnée (démontage, rafraîchissement suivant) n'est pas
         // un incident : la page n'a plus rien à afficher de toute façon.
@@ -204,6 +222,7 @@ export default function TournamentsList() {
     } catch {
       // Silencieux, premier chargement compris : voir `fetchMyTournamentIds`.
     }
+    if (!signal?.aborted) setMineSettled(true);
   }, []);
 
   useEffect(() => {
@@ -300,7 +319,14 @@ export default function TournamentsList() {
   // Les cartes portent leur horaire : le client fait basculer « Prochainement »
   // → « Inscriptions » → « En cours » à la seconde dite, sans rien demander au
   // serveur (`lib/shared/tournament-schedule.ts`).
-  const scheduledBuckets = useScheduledBuckets(buckets);
+  //
+  // Une seule porte pour tout ce que la page montre : tant que `listLoaded`
+  // est faux, la page lit des paniers vides (et aucun invisible). Sans elle,
+  // une liste arrivée avant « Mes tournois » s'affichait sous le squelette,
+  // puis tout sautait deux fois à l'arrivée de la seconde lecture.
+  const viewBuckets = listLoaded ? buckets : emptyBuckets;
+  const viewHidden = listLoaded ? hiddenTournaments : NO_TOURNAMENTS;
+  const scheduledBuckets = useScheduledBuckets(viewBuckets);
 
   // La recherche (le passage coûteux : nom, description, format sur chaque
   // tournoi) n'est faite qu'une fois — le filtre de jeu, lui, ne fait que
@@ -310,7 +336,7 @@ export default function TournamentsList() {
   // Le format se cherche sous le nom que la carte affiche (« Swiss » sous `/en`).
   const formatName = (format: string) => tournamentLabel(text, "format", format);
   const queryFilteredBuckets = filterBuckets(scheduledBuckets, query, "all", formatName);
-  const queryFilteredHidden = filterTournamentsByQuery(hiddenTournaments, query, formatName);
+  const queryFilteredHidden = filterTournamentsByQuery(viewHidden, query, formatName);
 
   const gameFilteredBuckets: TournamentBuckets =
     gameFilter === "all"
@@ -341,14 +367,14 @@ export default function TournamentsList() {
   const totalUpcoming = filteredBuckets.upcoming.length;
   // Sans recherche, les terminés que la liste tronquée ne porte pas comptent
   // quand même : « Voir plus » et le sommaire annoncent l'archive entière.
-  const finishedBeyond = (key: GameFilter) => (query.trim() ? 0 : finishedBeyondList(buckets, key));
+  const finishedBeyond = (key: GameFilter) => (query.trim() ? 0 : finishedBeyondList(viewBuckets, key));
   const totalFinished = filteredBuckets.finished.length + finishedBeyond(gameFilter);
   // Section dépliée, archive demandée mais pas encore reçue : la liste en main
   // est encore la liste tronquée.
   const finishedArchiveLoading =
     finishedExpanded && wantFinishedArchive && buckets.finishedTotals !== undefined;
 
-  const showHidden = isAdmin && hiddenTournaments.length > 0;
+  const showHidden = isAdmin && viewHidden.length > 0;
 
   // Toutes les sections que ce lecteur peut avoir, zéros compris : le
   // sommaire les montre toutes (un zéro répond à « y a-t-il un tournoi en
@@ -480,12 +506,12 @@ export default function TournamentsList() {
                       key={key}
                       className={`${s.chip} ${gameFilter === key ? s.chipOn : ""}`}
                       aria-pressed={gameFilter === key}
-                      aria-label={t("list.countLabel", { label, count: String(count) })}
+                      aria-label={listLoaded ? t("list.countLabel", { label, count: String(count) }) : undefined}
                       onClick={() => setGameFilter(key)}
                     >
                       {label}
                       <span className={s.num} aria-hidden="true">
-                        {count}
+                        {listLoaded ? count : COUNT_PENDING}
                       </span>
                     </button>
                   );
@@ -497,27 +523,43 @@ export default function TournamentsList() {
                 comptes des sections sans mener nulle part. Une section vide y
                 reste, grisée, au lieu d'occuper un grand cadre « Vide » plus bas. */}
             <nav className={s.sectionNav} aria-label={t("list.sectionsNav")}>
-              {sections.map((entry) =>
-                entry.count > 0 ? (
-                  <a
-                    key={entry.key}
-                    href={`#${pageSectionAnchor(entry.key)}`}
-                    className={s.sectionNavLink}
-                    data-tone={entry.key}
-                    // Mène parfois à une section repliée (« Terminés ») : on la
-                    // déplie, sans quoi le lien aboutirait sur un en-tête vide.
-                    onClick={() => setSectionOpen(entry.key, true)}
-                    // Libellé et compte sont deux éléments sans séparateur : le
-                    // nom accessible les collerait (« Mes tournois34 »). Il
-                    // commence par le texte visible (WCAG 2.5.3).
-                    aria-label={t("list.countLabel", { label: entry.navLabel, count: String(entry.count) })}
-                  >
-                    {entry.navLabel}
-                    <span className={s.num} aria-hidden="true">
-                      {entry.count}
+              {sections.map((entry) => {
+                // Avant la première liste : les mêmes entrées, sans lien ni
+                // compte (« – »), pour garder la place du sommaire sans
+                // annoncer de zéros.
+                if (!listLoaded) {
+                  return (
+                    <span key={entry.key} className={s.sectionNavLink}>
+                      {entry.navLabel}
+                      <span className={s.num} aria-hidden="true">
+                        {COUNT_PENDING}
+                      </span>
                     </span>
-                  </a>
-                ) : (
+                  );
+                }
+                if (entry.count > 0) {
+                  return (
+                    <a
+                      key={entry.key}
+                      href={`#${pageSectionAnchor(entry.key)}`}
+                      className={s.sectionNavLink}
+                      data-tone={entry.key}
+                      // Mène parfois à une section repliée (« Terminés ») : on la
+                      // déplie, sans quoi le lien aboutirait sur un en-tête vide.
+                      onClick={() => setSectionOpen(entry.key, true)}
+                      // Libellé et compte sont deux éléments sans séparateur : le
+                      // nom accessible les collerait (« Mes tournois34 »). Il
+                      // commence par le texte visible (WCAG 2.5.3).
+                      aria-label={t("list.countLabel", { label: entry.navLabel, count: String(entry.count) })}
+                    >
+                      {entry.navLabel}
+                      <span className={s.num} aria-hidden="true">
+                        {entry.count}
+                      </span>
+                    </a>
+                  );
+                }
+                return (
                   <span key={entry.key} className={`${s.sectionNavLink} ${s.sectionNavEmpty}`}>
                     {entry.navLabel}
                     <span className={s.num} aria-hidden="true">
@@ -525,21 +567,25 @@ export default function TournamentsList() {
                     </span>
                     <span className="sr-only"> {t("list.navNone")}</span>
                   </span>
-                ),
-              )}
+                );
+              })}
             </nav>
           </div>
 
           {/* Les paniers reclassés, comme les sections : sinon le bandeau
               annoncerait « À VENIR » un tournoi affiché juste dessous en
-              « INSCRIPTIONS » — le genre de doute qui fait recharger la page. */}
+              « INSCRIPTIONS » — le genre de doute qui fait recharger la page.
+              Avant la première liste, un bandeau vide (hauteur fixe) : il garde
+              sa place, sans annoncer « Aucune actualité ». */}
           <Ticker
-            items={buildTickerItems(scheduledBuckets, text)}
+            items={listLoaded ? buildTickerItems(scheduledBuckets, text) : NO_TICKER_ITEMS}
             labels={text.tickerLabels}
           />
 
           <div className={s.sections}>
-            {shownSections.length === 0 && (
+            {!listLoaded && <SecuredLoadingView label={t("list.loading")} />}
+
+            {listLoaded && shownSections.length === 0 && (
               <div className={s.emptyAll}>
                 <div className={s.emptyTitle}>{t("list.emptyTitle")}</div>
                 <div className={s.emptyMsg}>

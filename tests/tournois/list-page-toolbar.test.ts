@@ -32,7 +32,7 @@ describe("page tournois — barre de recherche et filtres", () => {
 
   it("les pastilles de jeu annoncent leur état et leur compte au lecteur d'écran", () => {
     expect(page).toContain("aria-pressed={gameFilter === key}");
-    expect(page).toContain('aria-label={t("list.countLabel", { label, count: String(count) })}');
+    expect(page).toContain('aria-label={listLoaded ? t("list.countLabel", { label, count: String(count) }) : undefined}');
     expect(frTournaments.list.countLabel).toBe("{label} ({count})");
     // Le nombre visible ne double pas ce que l'aria-label dit déjà.
     expect(page).toMatch(/<span className=\{s\.num\} aria-hidden="true">/);
@@ -46,6 +46,34 @@ describe("page tournois — barre de recherche et filtres", () => {
   it("une page vidée par un filtre le dit, distinctement d'une page réellement vide", () => {
     expect(page).toContain('sectionEmptyMessage(t("list.emptyUnfiltered"), query, gameFilter, t("list.emptyFiltered"))');
     expect(frTournaments.list.emptyUnfiltered).toBe("Aucun tournoi publié pour le moment.");
+  });
+
+  it("avant la première liste : un squelette, ni état vide, ni compteurs à zéro, ni bandeau « Aucune actualité », sans saut de mise en page", () => {
+    expect(page).toMatch(/setBuckets\(\(previous\) => \(sameBuckets\(previous, all\) \? previous : all\)\);\s*setListFetched\(true\);/);
+    // « Mes tournois » attendu aussi (échec compris), sans quoi sa section
+    // naissait au sommet après coup et poussait la liste vers le bas.
+    expect(page).toContain("const listLoaded = listFetched && mineSettled;");
+    // Une seule porte sur les données : ni section ni invisible sous le
+    // squelette, même quand la liste arrive avant « Mes tournois ».
+    expect(page).toContain("const viewBuckets = listLoaded ? buckets : emptyBuckets;");
+    expect(page).toContain("const viewHidden = listLoaded ? hiddenTournaments : NO_TOURNAMENTS;");
+    expect(page).toContain("useScheduledBuckets(viewBuckets)");
+    expect(page).toContain("finishedBeyondList(viewBuckets, key)");
+    expect(page).toContain("isAdmin && viewHidden.length > 0");
+    expect(page.match(/\bhiddenTournaments\b/g)).toHaveLength(2);
+    expect(page).toMatch(/fetchMyTournamentIds[\s\S]*?\} catch \{[\s\S]*?\}\s*if \(!signal\?\.aborted\) setMineSettled\(true\);/);
+    expect(page).toContain('{!listLoaded && <SecuredLoadingView label={t("list.loading")} />}');
+    expect(page).toContain("{listLoaded && shownSections.length === 0 && (");
+    // Sommaire, pastilles et bandeau gardent leur place (pas de saut de mise
+    // en page à l'arrivée de la liste) : entrées sans compte, bandeau vide.
+    expect(page).toMatch(/<nav className=\{s\.sectionNav\}[^>]*>\s*\{sections\.map\(\(entry\) => \{[\s\S]*?if \(!listLoaded\) \{[\s\S]*?\{COUNT_PENDING\}/);
+    expect(page).toContain("{listLoaded ? count : COUNT_PENDING}");
+    expect(page).toContain("items={listLoaded ? buildTickerItems(scheduledBuckets, text) : NO_TICKER_ITEMS}");
+    expect(page).not.toMatch(/\{listLoaded && \(\s*<(nav|Ticker)/);
+    // Le drapeau ne repasse jamais à faux : un échec de relecture garde la liste.
+    expect(page.match(/setListFetched\(/g)).toHaveLength(1);
+    expect(page.match(/setMineSettled\(/g)).toHaveLength(1);
+    expect(frTournaments.list.loading).toBe("Chargement des tournois…");
   });
 
   it("« Créer un tournoi » est un seul contrôle interactif, pas un bouton dans un lien", () => {

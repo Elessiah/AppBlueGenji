@@ -26,6 +26,7 @@
     "showLessLabel": "Voir moins · {section}",
     "showMore": "Voir plus ({count})",
     "showMoreLabel": "Voir plus ({count}) · {section}",
+    "loading": "Chargement des tournois…",
     "finishedLoading": "Chargement des tournois terminés…",
     "sections": {
       "hidden": "TOURNOIS INVISIBLES",

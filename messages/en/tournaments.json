@@ -26,6 +26,7 @@
     "showLessLabel": "Show less · {section}",
     "showMore": "Show more ({count})",
     "showMoreLabel": "Show more ({count}) · {section}",
+    "loading": "Loading tournaments…",
     "finishedLoading": "Loading finished tournaments…",
     "sections": {
       "hidden": "HIDDEN TOURNAMENTS",

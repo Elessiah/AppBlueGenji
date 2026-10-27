@@ -160,8 +160,8 @@ describe("liste des tournois — sans flux SSE", () => {
     // en « INSCRIPTIONS ».
     // Une seule horloge, un seul minuteur : les deux jeux se recouvrent presque
     // entièrement.
-    expect(listPage).toContain("useScheduledBuckets(buckets)");
-    expect(listPage).toContain("items={buildTickerItems(scheduledBuckets, text)}");
+    expect(listPage).toContain("useScheduledBuckets(viewBuckets)");
+    expect(listPage).toContain("items={listLoaded ? buildTickerItems(scheduledBuckets, text) : NO_TICKER_ITEMS}");
   });
 
   it("rafraîchit aussi la section des invisibles", () => {

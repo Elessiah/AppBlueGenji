@@ -46,7 +46,7 @@ describe("page tournois — section « Tournois invisibles »", () => {
 
   it("réserve la section au staff et la masque quand il n'y a rien", () => {
     expect(page).toMatch(
-      /const showHidden = isAdmin && hiddenTournaments\.length > 0/,
+      /const showHidden = isAdmin && viewHidden\.length > 0/,
     );
     expect(page).toMatch(/\{showHidden && totalHidden > 0 && \(\s*<Section[\s\S]*?sectionTitle\("hidden"\)/);
   });
@@ -61,7 +61,7 @@ describe("page tournois — section « Tournois invisibles »", () => {
   it("applique la recherche et le filtre de jeu aux invisibles", () => {
     // La recherche (coûteuse) n'est faite qu'une fois, dans `queryFilteredHidden` ;
     // le filtre de jeu (une comparaison de chaîne) s'applique ensuite par-dessus.
-    expect(page).toContain("filterTournamentsByQuery(hiddenTournaments, query, formatName)");
+    expect(page).toContain("filterTournamentsByQuery(viewHidden, query, formatName)");
     expect(page).toContain("filterTournamentsByGame(queryFilteredHidden, gameFilter)");
   });
 
