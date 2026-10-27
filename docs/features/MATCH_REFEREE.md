@@ -32,8 +32,10 @@ relues en base à chaque geste (`loadRefereeEligibility`, jamais les rôles d'un
 session). Il **peut caster** le match, il **ne peut pas le jouer**
 (`REFEREE_IS_PLAYER`).
 
-Un arbitre qui ne remplit plus ces conditions ou dont l'équipe entre dans le
-match n'est plus montré (`refereeEligible`, comme les casters —
+Un arbitre qui ne remplit plus ces conditions ou qui, avant le départ, joue
+désormais le match (roster rejoint, même sans changer d'appariement — le verrou
+`lockLaunchMatch` et l'instantané, `referee_plays_match`, appliquent la même
+règle) n'est plus montré ni attendu (`refereeEligible`, comme les casters —
 `cast-eligibility.ts`) ; s'il est constaté **avant le lancement**, il est
 retiré (`releaseIneligibleReferee`, motif `INELIGIBLE` / `JOINED_TEAM`). À
 l'anonymisation d'un compte, il est retiré de **tous** ses matchs, joués
@@ -65,7 +67,10 @@ L'arbitre désigné est une partie du lancement (`LaunchViewerRole`
 `MATCH_REFEREE`) : son « Prêt » est attendu avec ceux des deux équipes et de
 chaque caster (`readyCount` / `allPartiesReady`, `referee: { ready } | null`).
 Sans arbitre, rien n'est attendu de plus. L'auto-lancement à l'échéance du
-lobby reste inchangé.
+lobby reste inchangé. Un arbitre qui caste aussi le match donne les deux
+« Prêt » d'un clic ; un caster déjà prêt qui devient arbitre garde ce « Prêt »
+(`writeReferee`). Un match joué ou exempt garde son arbitre : ni retrait ni
+remplacement (`assertRefereeable`, retrait compris).
 
 ## Hôte et premier ban
 
