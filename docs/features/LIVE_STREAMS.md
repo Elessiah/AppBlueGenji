@@ -23,8 +23,12 @@ son propre stream (`staff_owned`), jamais celui qu'un caster a ouvert ; « pas
 de cast » n'efface que ce lien du staff. Le stream d'un caster part, avec son
 lien, quand plus aucun caster ne le tient ; le lien qu'un caster a fourni
 (`link_user_id` : en ouvrant son stream, ou dans la configuration du direct
-sans la permission `tournaments`) part aussi à la suppression de son compte,
-matchs joués compris, même d'un stream qu'un co-caster tient encore. Voir
+sans la permission `tournaments` — ou avec elle, en castant déjà ce match quand le lien est posé) part aussi à la suppression de son compte,
+matchs joués compris, même d'un stream qu'un co-caster tient encore. Seul le
+lien qu'y pose un membre de l'organisation qui ne caste pas ce match est celui
+de l'organisation (`link_user_id` nul), gardé ; un lien posé avant
+`link_user_id` (ancien `live_url`) n'a pas de fournisseur connu et compte comme
+tel. Voir
 `docs/features/MATCH_LAUNCH.md` § Casters et streams.
 
 Un troisième mode d'antenne s'appuie sur le **calendrier** du match plutôt que
