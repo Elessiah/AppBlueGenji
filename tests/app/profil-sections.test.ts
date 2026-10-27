@@ -24,7 +24,7 @@ const connectedApps = readFileSync(
   "utf8",
 );
 const css = readFileSync(join(ROOT, "app/(secured)/profil/profil.module.css"), "utf8");
-const arenaNav = readFileSync(join(ROOT, "components/arena-nav.module.css"), "utf8");
+const siteNav = readFileSync(join(ROOT, "components/site-nav.module.css"), "utf8");
 
 /**
  * `/profil` empilait onze blocs dans un seul formulaire, sans un titre pour dire
@@ -250,7 +250,7 @@ describe("Aucune section ne se dessine deux fois", () => {
 });
 
 /**
- * `/profil` vit sous `ArenaNav`, barre `position: sticky; top: 0`. Une ancre qui
+ * `/profil` vit sous `SiteNav`, barre `position: sticky; top: 0`. Une ancre qui
  * tombe à la hauteur exacte de la section la range **derrière** la barre : le
  * titre visé devient le seul élément qu'on ne voit pas.
  */
@@ -260,10 +260,10 @@ describe("L'ancre tombe sous la barre de navigation", () => {
   });
 
   it("confie l'arrivée à la hauteur mesurée de la barre", () => {
-    // `ArenaNav` est collante et se déclare comme l'en-tête à mesurer ; la
+    // `SiteNav` est collante et se déclare comme l'en-tête à mesurer ; la
     // marge globale lit cette mesure (`lib/shared/sticky-header.ts`).
-    expect(arenaNav).toContain("position: sticky");
-    expect(readFileSync(join(ROOT, "components/arena-nav.tsx"), "utf8")).toContain("data-sticky-header");
+    expect(siteNav).toContain("position: sticky");
+    expect(readFileSync(join(ROOT, "components/site-nav.tsx"), "utf8")).toContain("data-sticky-header");
     expect(readFileSync(join(ROOT, "app/globals.css"), "utf8")).toMatch(
       /scroll-padding-top:\s*calc\(var\(--sticky-header-h/,
     );

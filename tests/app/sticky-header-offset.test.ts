@@ -48,7 +48,7 @@ describe("stickyHeaderHeightValue", () => {
     // Le jour où ce repli disparaît, la règle `position` ci-dessus n'a plus d'objet.
     const shortScreen = /@media \(max-height: 500px\) \{[^}]*\{\s*position:\s*relative/;
     expect(readSource("components/cyber/landing/PublicHeader.module.css")).toMatch(shortScreen);
-    expect(readSource("components/arena-nav.module.css")).toMatch(shortScreen);
+    expect(readSource("components/site-nav.module.css")).toMatch(shortScreen);
   });
 });
 
@@ -88,7 +88,7 @@ describe("marge d'ancre sous l'en-tête collant", () => {
 
   it("les deux en-têtes collants se déclarent à la mesure", () => {
     expect(readSource("components/cyber/landing/PublicHeader.tsx")).toContain(STICKY_HEADER_ATTR);
-    expect(readSource("components/arena-nav.tsx")).toContain(STICKY_HEADER_ATTR);
+    expect(readSource("components/site-nav.tsx")).toContain(STICKY_HEADER_ATTR);
   });
 
   it("la mesure est montée par la mise en page racine", () => {

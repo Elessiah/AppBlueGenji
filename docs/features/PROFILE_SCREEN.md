@@ -80,7 +80,7 @@ se joue qu'une fois : `window.location.hash` garde le dernier lien cliqué et
 remonterait le lecteur à la section visitée dix minutes plus tôt au moment où il
 enregistre son profil depuis une autre.
 
-`html { scroll-padding-top }` vaut la hauteur **mesurée** d'`ArenaNav`
+`html { scroll-padding-top }` vaut la hauteur **mesurée** d'`SiteNav`
 (`docs/features/ERROR_PAGES_AND_ANCHORS.md`)
 **plus** 16 px de respiration : la barre est `position: sticky`, si
 bien qu'une marge plus courte rangeait le titre visé derrière elle — le seul

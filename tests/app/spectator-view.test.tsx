@@ -26,8 +26,8 @@ jest.mock("next/navigation", () => ({
   useParams: () => ({ id: "12" }),
   useRouter: () => ({ push: () => undefined, replace: () => undefined, refresh: () => undefined, prefetch: () => undefined, back: () => undefined, forward: () => undefined }),
 }));
-jest.mock("@/components/arena-shell", () => ({
-  ArenaShell: ({ children }: { children: React.ReactNode }) => <div data-shell="arena">{children}</div>,
+jest.mock("@/components/site-shell", () => ({
+  SiteShell: ({ children }: { children: React.ReactNode }) => <div data-shell="site">{children}</div>,
 }));
 jest.mock("@/components/legal/SiteFooterBar", () => ({ SiteFooterBar: () => null }));
 // En-tête et pied de la vitrine : composants serveur asynchrones, hors de ce test.

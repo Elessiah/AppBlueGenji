@@ -223,7 +223,7 @@ l'augmentation `AppConfig` et l'import JSON (`resolveJsonModule`).
   lot 7b), formulaire « Signaler un problème » (→ lot 9, seul le bouton est traduit), place du
   sélecteur de langue sur mobile (→ lot 2, avec une vraie page anglaise).
 - `SiteFooterBar` devient composant client (sans état) : un composant serveur asynchrone ne se rend
-  pas dans les tests de `ArenaShell`, et ses textes n'ont besoin d'aucune donnée serveur.
+  pas dans les tests de `SiteShell`, et ses textes n'ont besoin d'aucune donnée serveur.
 
 ### Ce que le lot 2 a établi (2026-10-06) — écarts au plan
 

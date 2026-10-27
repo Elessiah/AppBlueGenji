@@ -67,7 +67,7 @@ const AMBER_WARNINGS: Record<string, string> = {
   "app/(secured)/tournois/[id]/page.module.css": "retour en arrière",
   "app/(secured)/tournois/_components/RefereeSchedulingField.tsx": "planification arbitre",
   "app/(secured)/tournois/tournois.module.css": "« Complet », clôture proche",
-  "components/arena-nav.module.css": "lien de modération (décision attendue)",
+  "components/site-nav.module.css": "lien de modération (décision attendue)",
   // Pages publiques, triées au lot « Nettoyage ».
   "app/bot/bot.css": "relais en retard, latence élevée",
   "app/connexion/_components/OAuthButtons.tsx": "navigateur qui bloque la connexion",

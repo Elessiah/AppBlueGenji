@@ -24,18 +24,18 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { getUserActiveTeam } from "@/lib/server/teams/roster";
 import { countOpenReports } from "@/lib/server/content-reports";
 import { SessionPageShell } from "@/components/cyber/landing/SessionPageShell";
-import { ArenaShell } from "@/components/arena-shell";
+import { SiteShell } from "@/components/site-shell";
 import { ToastProvider } from "@/components/ui/toast";
 import { authUser } from "../helpers/auth-user";
 import { readSource } from "../helpers/read-source";
 
-/** Rend le gabarit, `ArenaShell` (asynchrone) résolu à la main. */
+/** Rend le gabarit, `SiteShell` (asynchrone) résolu à la main. */
 async function render(): Promise<string> {
   let tree = (await SessionPageShell({ children: <h1>Classement</h1> })) as ReactElement<{
     user: AuthUser;
     children: ReactNode;
   }>;
-  if (tree.type === ArenaShell) tree = (await ArenaShell(tree.props)) as typeof tree;
+  if (tree.type === SiteShell) tree = (await SiteShell(tree.props)) as typeof tree;
   return renderToStaticMarkup(<ToastProvider>{tree}</ToastProvider>);
 }
 
@@ -88,7 +88,7 @@ describe("SessionPageShell — en-tête selon la session", () => {
   });
 });
 
-describe("ArenaShell — lectures en échec", () => {
+describe("SiteShell — lectures en échec", () => {
   it("une équipe active illisible ne fait pas tomber la page", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(authUser());
     jest.mocked(getUserActiveTeam).mockRejectedValue(new Error("pool"));
@@ -105,6 +105,6 @@ describe("/classement — gabarit suivant la session", () => {
   });
 
   it("l'espace connecté partage la même barre", () => {
-    expect(readSource("app/(secured)/layout.tsx")).toContain('<ArenaShell user={user} mainClassName="page-shell">');
+    expect(readSource("app/(secured)/layout.tsx")).toContain('<SiteShell user={user} mainClassName="page-shell">');
   });
 });

@@ -30,7 +30,7 @@ Le `border-bottom` plein (trait « brut » au scroll) est remplacé par un **lis
 sur les deux barres :
 
 - `components/cyber/landing/PublicHeader.module.css` — header public (landing)
-- `components/arena-nav.module.css` — nav des pages sécurisées
+- `components/site-nav.module.css` — nav des pages sécurisées
 
 Implémenté via un pseudo-élément `::after` :
 

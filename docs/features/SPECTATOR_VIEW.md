@@ -11,7 +11,7 @@ de liste publique.
 | | Espace connecté | Page sans compte |
 | --- | --- | --- |
 | Adresse | `/tournois/[id]` | `/suivre/tournois/[id]` (`/en/…` traduite) |
-| Gabarit | `ArenaShell` | `PublicPageShell` (vitrine) |
+| Gabarit | `SiteShell` | `PublicPageShell` (vitrine) |
 | Donnée | flux SSE `/api/tournaments/[id]/stream` + REST de secours | lecture publique `/api/spectator/tournaments/[id]` |
 | Contexte du lecteur | calculé par le serveur | constant, sans aucun droit (`SPECTATOR_VIEWER_CONTEXT`) |
 | Session | lue partout | **jamais lue** par la route publique |

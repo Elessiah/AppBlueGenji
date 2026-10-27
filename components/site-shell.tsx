@@ -3,12 +3,12 @@ import type { AuthUser } from "@/lib/server/auth";
 import { getUserActiveTeam } from "@/lib/server/teams/roster";
 import { countOpenReports } from "@/lib/server/content-reports";
 import { can } from "@/lib/shared/permissions";
-import { ArenaNav } from "@/components/arena-nav";
+import { SiteNav } from "@/components/site-nav";
 import { languageSwitcherLabel } from "@/lib/server/i18n-labels";
 import { SiteFooterBar } from "@/components/legal/SiteFooterBar";
 
 /**
- * Gabarit des connectés : barre `ArenaNav`, contenu principal, pied de page —
+ * Gabarit des connectés : barre `SiteNav`, contenu principal, pied de page —
  * en frères, un seul repère de chaque (`banner`/`navigation`, `main`,
  * `contentinfo`). Rendu par l'espace `(secured)` et par les pages publiques
  * qui suivent la session (`SessionPageShell`), pour que la barre soit la même
@@ -17,7 +17,7 @@ import { SiteFooterBar } from "@/components/legal/SiteFooterBar";
  * Server component : l'équipe active et le compteur de signalements se lisent
  * ici, sans requête côté client ni flash d'en-tête.
  */
-export async function ArenaShell({
+export async function SiteShell({
   user,
   children,
   mainClassName,
@@ -30,7 +30,7 @@ export async function ArenaShell({
 
   return (
     <>
-      <ArenaNav
+      <SiteNav
         pseudo={user.pseudo}
         avatarUrl={user.avatarUrl}
         activeTeam={activeTeam}

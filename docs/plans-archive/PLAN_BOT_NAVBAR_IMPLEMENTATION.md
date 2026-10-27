@@ -4,7 +4,7 @@
 **Date** : 2026-05-12
 **Source design** : bundle Claude Design `O-oRl29qBWppuhpIKafZ-g`
 **Fichiers de référence (extraits localement)** :
-- `C:\Users\kerya\.claude\projects\C--work-BlueGenji-appbluegenji\858230cd-22ce-46ed-9635-b2b36b9a282c\tool-results\design-extract\bluegenji-arena\project\Bot.html`
+- `C:\Users\kerya\.claude\projects\C--work-BlueGenji-appbluegenji\858230cd-22ce-46ed-9635-b2b36b9a282c\tool-results\design-extract\bluegenji\project\Bot.html`
 - `…\project\bot.jsx` (676 LOC — la source de vérité du dashboard)
 - `…\project\bot.css` (677 LOC — styles dédiés bot)
 - `…\project\styles.css`, `…\project\page.css` (déjà reflétés dans `app/globals.css`)

@@ -34,7 +34,7 @@ le titre visé passait dessous (« Règles communes » du sommaire de
 
 La hauteur est désormais **mesurée** :
 
-- les deux en-têtes collants (`PublicHeader`, `ArenaNav`) portent
+- les deux en-têtes collants (`PublicHeader`, `SiteNav`) portent
   `data-sticky-header` ;
 - `components/sticky-header-offset.tsx`, monté dans la mise en page racine, le
   recherche dès qu'il a quitté le document (`MutationObserver` — l'en-tête

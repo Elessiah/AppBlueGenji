@@ -1,4 +1,4 @@
-# Plan de tests — BlueGenji Arena
+# Plan de tests — BlueGenji
 
 > Ce document décrit la stratégie de couverture de tests pour la plateforme, et fournit des **prompts prêts à l'emploi** pour Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) afin d'écrire chaque lot de tests de manière autonome.
 
@@ -135,7 +135,7 @@ Ou via le sous-agent `general-purpose` avec `model: "haiku"`.
 ### 📝 Prompt — Phase 1 : Helpers purs
 
 ```
-Tu travailles sur le projet Next.js 15 + TypeScript à C:\work\BlueGenji\appbluegenji (BlueGenji Arena, plateforme esports).
+Tu travailles sur le projet Next.js 15 + TypeScript à C:\work\BlueGenji\appbluegenji (BlueGenji, plateforme esports).
 
 OBJECTIF : écrire des tests unitaires exhaustifs pour les helpers purs du serveur. Aucune I/O.
 
@@ -172,7 +172,7 @@ RÈGLES :
 ### 📝 Prompt — Phase 2 : Auth service
 
 ```
-Projet : BlueGenji Arena — C:\work\BlueGenji\appbluegenji — Next.js 15 + MySQL2.
+Projet : BlueGenji — C:\work\BlueGenji\appbluegenji — Next.js 15 + MySQL2.
 
 OBJECTIF : tester lib/server/auth.ts (sessions, cookies, hash tokens, pseudo uniqueness).
 
@@ -203,7 +203,7 @@ FIN : `npm test tests/lib/server/auth.test.ts` — tous verts.
 ### 📝 Prompt — Phase 3 : Tournament engine (le plus critique)
 
 ```
-Projet : BlueGenji Arena — C:\work\BlueGenji\appbluegenji.
+Projet : BlueGenji — C:\work\BlueGenji\appbluegenji.
 
 OBJECTIF : tests exhaustifs du moteur de brackets (lib/server/tournaments-service.ts, ~1774 lignes). C'est le cœur métier — couverture >= 90%.
 
@@ -274,7 +274,7 @@ FIN :
 ### 📝 Prompt — Phase 4 : Teams & Users services
 
 ```
-Projet : BlueGenji Arena — C:\work\BlueGenji\appbluegenji.
+Projet : BlueGenji — C:\work\BlueGenji\appbluegenji.
 
 OBJECTIF : tester lib/server/teams-service.ts et lib/server/users-service.ts.
 
@@ -311,7 +311,7 @@ FIN : `npm test tests/lib/server/teams-service.test.ts tests/lib/server/users-se
 ### 📝 Prompt — Phase 5 : Routes API Auth
 
 ```
-Projet : BlueGenji Arena — C:\work\BlueGenji\appbluegenji — Next.js 15 App Router.
+Projet : BlueGenji — C:\work\BlueGenji\appbluegenji — Next.js 15 App Router.
 
 OBJECTIF : tester les routes API d'authentification.
 
@@ -348,7 +348,7 @@ FIN : `npm test tests/app/api/auth/`. Tous verts.
 ### 📝 Prompt — Phase 6 : Routes API Tournois
 
 ```
-Projet : BlueGenji Arena — C:\work\BlueGenji\appbluegenji.
+Projet : BlueGenji — C:\work\BlueGenji\appbluegenji.
 
 OBJECTIF : tester les routes API des tournois.
 
@@ -380,7 +380,7 @@ FIN : `npm test tests/app/api/tournaments/`.
 ### 📝 Prompt — Phase 7 : Routes API Teams, Players, Profile
 
 ```
-Projet : BlueGenji Arena — C:\work\BlueGenji\appbluegenji.
+Projet : BlueGenji — C:\work\BlueGenji\appbluegenji.
 
 OBJECTIF : tester routes équipes, joueurs publics, profil utilisateur.
 
@@ -406,7 +406,7 @@ FIN : `npm test tests/app/api/teams/ tests/app/api/players/ tests/app/api/profil
 ### 📝 Prompt — Phase 8 : Admin, Landing, Bot
 
 ```
-Projet : BlueGenji Arena — C:\work\BlueGenji\appbluegenji.
+Projet : BlueGenji — C:\work\BlueGenji\appbluegenji.
 
 OBJECTIF : tester routes admin, landing publiques, bot stats.
 
@@ -429,7 +429,7 @@ FIN : `npm test tests/app/api/admin/ tests/app/api/landing/ tests/app/api/bot/`.
 ### 📝 Prompt — Phase 9 : Intégration E2E
 
 ```
-Projet : BlueGenji Arena — C:\work\BlueGenji\appbluegenji.
+Projet : BlueGenji — C:\work\BlueGenji\appbluegenji.
 
 OBJECTIF : un test d'intégration couvrant un tournoi complet, de la création à la finalisation, avec DB réelle (ou fake-db en mémoire suffisamment fidèle).
 

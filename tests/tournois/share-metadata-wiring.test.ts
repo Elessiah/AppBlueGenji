@@ -99,7 +99,7 @@ describe("garde de l'espace sécurisé", () => {
   it("ne rend pas les enfants sans session : rien du contenu protégé ne fuit", () => {
     const guard = SECURED_LAYOUT.slice(
       SECURED_LAYOUT.indexOf("if (!user)"),
-      SECURED_LAYOUT.indexOf("<ArenaShell"),
+      SECURED_LAYOUT.indexOf("<SiteShell"),
     );
     expect(guard).not.toContain("{children}");
   });
