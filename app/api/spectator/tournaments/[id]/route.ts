@@ -1,7 +1,12 @@
-import { enforceRateLimit, requestClientIp, SPECTATOR_READ_RULE } from "@/lib/server/api-guard";
+import {
+  enforceRateLimit,
+  requestClientIp,
+  SPECTATOR_READ_RULE,
+  SPECTATOR_REBUILD_RULE,
+} from "@/lib/server/api-guard";
 import { fail } from "@/lib/server/http";
 import { currentSpectatorLoadLevel, recordSpectatorRead } from "@/lib/server/spectator-load";
-import { getSpectatorPayload } from "@/lib/server/spectator-snapshot";
+import { getSpectatorPayload, isSpectatorPayloadWarm } from "@/lib/server/spectator-snapshot";
 import {
   parseTournamentId,
   SPECTATOR_FRESHNESS_HEADER,
@@ -45,6 +50,13 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   const { id } = await context.params;
   const tournamentId = parseTournamentId(id);
   if (tournamentId === null) return fail("INVALID_TOURNAMENT_ID", 400);
+  // Une lecture qui ferait reconstruire la réponse se paie à part : parcourir
+  // des tournois froids coûte un instantané entier chacun, pas un cache.
+  // Vérifié juste avant `getSpectatorPayload`, sans attente entre les deux.
+  if (!isSpectatorPayloadWarm(tournamentId)) {
+    const rebuildThrottled = enforceRateLimit(SPECTATOR_REBUILD_RULE, clientIp);
+    if (rebuildThrottled) return rebuildThrottled;
+  }
 
   const level = currentSpectatorLoadLevel();
 

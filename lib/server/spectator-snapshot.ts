@@ -15,7 +15,7 @@
  * tournoi la retire (`invalidateSpectatorSnapshot`).
  */
 import { createHash } from "node:crypto";
-import { cached } from "@/lib/server/cache";
+import { cached, isCachedOrLoading } from "@/lib/server/cache";
 import { getVisibleTournamentCard, getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
 import { spectatorSnapshotCacheKey } from "@/lib/server/tournaments/snapshot";
 import { spectatorSnapshot } from "@/lib/shared/spectator-view";
@@ -34,6 +34,15 @@ export type SpectatorPayload = {
   /** Durée de vie reçue à la construction : l'âge maximal annoncé en dépend. */
   ttlMs: number;
 };
+
+/**
+ * La réponse publique du tournoi est-elle déjà prête (ou en cours de calcul) ?
+ * Sinon, la prochaine lecture la **reconstruit** : c'est ce coût-là que
+ * `SPECTATOR_REBUILD_RULE` borne par adresse.
+ */
+export function isSpectatorPayloadWarm(tournamentId: number): boolean {
+  return isCachedOrLoading(spectatorSnapshotCacheKey(tournamentId));
+}
 
 /** Refus du chargeur : rien à servir, et rien à mettre en cache. */
 class SpectatorNotFound extends Error {}
