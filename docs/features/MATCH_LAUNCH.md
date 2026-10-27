@@ -356,6 +356,9 @@ qu'il tient, son « Prêt »). Code : `lib/server/tournaments/match-casters.ts`.
   `CastClaimDialog` fait choisir — un bouton radio par stream (ses casters, sa
   plateforme ou « sans lien »), puis « Ouvrir mon propre stream » avec son champ
   de lien. Un co-cast se fait aussi sur un match déjà lancé.
+  Seul le stream du staff s'offre sans caster (« Rejoindre le stream du match ») ;
+  le stream d'un caster que la lecture tait (retiré d'office avant le lancement)
+  n'est pas proposé.
   Un stream choisi qui disparaît pendant que la fenêtre est ouverte n'est pas
   remplacé par un autre : plus rien n'est coché, l'envoi est désarmé.
 - **Se retirer** : `DELETE /api/matches/[id]/caster` retire le lecteur ;
