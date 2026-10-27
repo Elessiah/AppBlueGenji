@@ -262,9 +262,12 @@ function OfficiatingSection({
       )}
       {decision === "SELF_MANAGED" && (
         <>
-          <p className={styles.decision}>
-            <span className="pill pill-info">{t("launch.selfManaged")}</span> {t("launch.selfManagedTitle")}
-          </p>
+          <DecisionLine
+            pill={<span className="pill pill-info">{t("launch.selfManaged")}</span>}
+            subject={t("launch.selfManaged")}
+            hintId={`${titleId}-self`}
+            hint={t("launch.selfManagedTitle")}
+          />
           <ol className={styles.steps} aria-label={t("matchPage.stepsLabel")}>
             {selfManagementSteps(match.casters.length).map((step) => (
               <li key={step}>{t(`matchPage.steps.${step}`)}</li>
