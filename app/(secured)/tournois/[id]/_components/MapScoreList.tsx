@@ -20,6 +20,7 @@ import {
 import type { TournamentGame } from "@/lib/shared/types";
 import { EntrantLogo } from "./EntrantName";
 import styles from "./MapScoreList.module.css";
+import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { replayCodeHintText, useDialogsText } from "../_lib/dialogs-text";
 
 // `Entrée` dans un champ de map ne soumet pas le formulaire : corriger un code
@@ -177,11 +178,21 @@ export function MapScoreList({
           ({played}/{Math.max(shownLimit, played)})
         </span>
       </legend>
-      <p id={hintId} className={styles.hint}>
-        {replayCodeHintText(text, game)} {t("score.maps.drawHint")}
-        {replayHint ? ` ${replayHint}` : ""}
-        {replayCodeOptional ? ` ${t("score.maps.replayOptionalHint")}` : ""}
-      </p>
+      {/* En ligne, la seule consigne de format — celle que chaque champ de code
+          cite (`aria-describedby`) ; le reste derrière le « i » (INFO_HINTS.md) :
+          un paragraphe de quatre phrases repoussait maps et boutons à 375 px. */}
+      <InfoHintRow>
+        <p id={hintId} className={styles.hint}>
+          {replayCodeHintText(text, game)}
+        </p>
+        <InfoHint id={`${idPrefix}-map-rules`} subject={t("score.maps.legend")}>
+          <p>
+            {t("score.maps.drawHint")}
+            {replayHint ? ` ${replayHint}` : ""}
+            {replayCodeOptional ? ` ${t("score.maps.replayOptionalHint")}` : ""}
+          </p>
+        </InfoHint>
+      </InfoHintRow>
 
       {maps.length > 0 && (
         <ol className={styles.rows}>

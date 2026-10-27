@@ -23,6 +23,14 @@ import styles from "./RankingViews.module.css";
 import { useTournamentViewText } from "@/components/i18n/tournament-page-text";
 import { FR_VIEWS_TEXT } from "../_lib/views-text";
 import { useActionsText } from "../_lib/actions-text";
+import { useEntrantParticipantType } from "../_lib/entrant-link";
+import { ForfeitRowAction, FrozenForfeitLegend, type ForfeitRowActionProps } from "./ForfeitRowAction";
+
+/**
+ * Estompe une cellule de ligne forfait, jamais l'action (« Annuler l'abandon »
+ * aurait l'air désactivé) — même plancher que la suisse et la BG Survie.
+ */
+const FORFEIT_FADE = { opacity: 0.9 } as const;
 
 interface SurvivalViewProps {
   survival: SurvivalMeta;
@@ -77,6 +85,41 @@ export function SurvivalView({
   const { t } = text;
   // Textes de l'abandon (espace `tournamentActions`).
   const { t: a } = useActionsText();
+  const participantType = useEntrantParticipantType();
+  const cancellableIds = new Set(survival.cancellableForfeitTeamIds);
+  // Un seul geste par ligne, rendu par un même `<button>` (`ForfeitRowAction`).
+  const rowAction = (team: SurvivalStandingRow, isMine: boolean): ForfeitRowActionProps | null => {
+    // Abandon : proposé sur les équipes encore en lice, à leurs représentants
+    // comme à l'arbitrage (cf. `canForfeit` côté page).
+    if (!isFinished && team.status === "ACTIVE" && canForfeit(team.teamId)) {
+      return {
+        kind: "button",
+        teamId: team.teamId,
+        label: a("forfeit.button.label"),
+        title: isMine
+          ? a(`forfeit.button.selfTitle.${participantType}`)
+          : a("forfeit.button.otherTitle", { name: team.teamName }),
+        ariaLabel: isMine
+          ? a(`forfeit.button.selfAria.${participantType}`)
+          : a("forfeit.button.otherAriaSurvival", { name: team.teamName }),
+        style: FORFEIT_BUTTON_STYLE,
+        onClick: () => onForfeit(team.teamId, team.teamName),
+      };
+    }
+    if (isFinished || team.status !== "FORFEIT" || !canCancelForfeit || onCancelForfeit === undefined) return null;
+    if (!cancellableIds.has(team.teamId)) {
+      return { kind: "locked", teamId: team.teamId, label: a("forfeitCancel.frozen"), title: a("forfeitCancel.frozenTitle") };
+    }
+    return {
+      kind: "button",
+      teamId: team.teamId,
+      label: a("forfeitCancel.button"),
+      title: a("forfeitCancel.buttonTitle", { name: team.teamName }),
+      ariaLabel: a("forfeitCancel.buttonAria", { name: team.teamName }),
+      style: FORFEIT_CANCEL_BUTTON_STYLE,
+      onClick: () => onCancelForfeit(team.teamId, team.teamName),
+    };
+  };
   const emptyText = emptyLabel ?? t("page.noMatchesShort");
   // Une marche du podium porte sa propre graisse : ne pas l'écraser en ligne.
   const podiumTiers = usePodiumTiers();
@@ -166,16 +209,14 @@ export function SurvivalView({
                   : { label: t(status.key), color: status.color };
               const inDanger = dangerTeamIds.has(team.teamId);
               const isMine = team.teamId === myTeamId;
-              // Abandon : proposé sur les équipes encore en lice, à leurs
-              // représentants comme à l'arbitrage (cf. `canForfeit` côté page).
-              const forfeitable =
-                !isFinished && team.status === "ACTIVE" && canForfeit(team.teamId);
-              const cancellable =
-                !isFinished && team.status === "FORFEIT" && canCancelForfeit && onCancelForfeit !== undefined;
+              const action = rowAction(team, isMine);
+              const fade = team.status === "FORFEIT" ? FORFEIT_FADE : undefined;
               return (
                 <div
                   key={team.teamId}
                   className={styles.survivalRow}
+                  data-row-focus={team.teamId}
+                  tabIndex={-1}
                   data-podium-muted={team.status === "ACTIVE" ? undefined : ""}
                   style={{
                     padding: "7px 10px",
@@ -188,7 +229,7 @@ export function SurvivalView({
                     fontSize: 13,
                   }}
                 >
-                  <span className="num" style={{ width: 22, color: "var(--ink-quiet)", fontWeight: 600 }}>
+                  <span className="num" style={{ width: 22, color: "var(--ink-quiet)", fontWeight: 600, ...fade }}>
                     {team.rank}
                   </span>
                   <EntrantName
@@ -200,10 +241,10 @@ export function SurvivalView({
                     // rien dans la negociation d'espace et se faisait rogner a
                     // quelques pixels par les colonnes fixes et le bouton
                     // d'abandon. Il retrecit desormais comme les autres.
-                    style={{ flex: "1 1 72px" }}
+                    style={{ flex: "1 1 72px", ...fade }}
                     textStyle={{ fontWeight: standingNameWeight(isMine, teamPodiumTier(podiumTiers, team.teamId) !== null, team.status !== "ACTIVE") }}
                   />
-                  <span className="mono" style={{ fontSize: 12, color: "var(--ink-quiet)" }}>
+                  <span className="mono" style={{ fontSize: 12, color: "var(--ink-quiet)", ...fade }}>
                     {team.wins}-<span className="result-loss">{team.losses}</span>
                   </span>
                   <span
@@ -214,52 +255,29 @@ export function SurvivalView({
                       color: meta.color,
                       minWidth: 58,
                       textAlign: "right",
+                      ...fade,
                     }}
                   >
                     {meta.label}
                   </span>
-                  {forfeitable && (
+                  {action && (
                     // Sous 720 px, l'action passe sous le nom : à côté, elle
                     // l'écrasait à « Test - … ».
                     <span className={styles.survivalAction}>
-                    <button
-                      type="button"
-                      onClick={() => onForfeit(team.teamId, team.teamName)}
-                      className="btn tap-target"
-                      title={
-                        isMine
-                          ? a("forfeit.button.selfTitle")
-                          : a("forfeit.button.otherTitle", { name: team.teamName })
-                      }
-                      aria-label={
-                        isMine
-                          ? a("forfeit.button.selfAria")
-                          : a("forfeit.button.otherAriaSurvival", { name: team.teamName })
-                      }
-                      style={FORFEIT_BUTTON_STYLE}
-                    >
-                      {a("forfeit.button.label")}
-                    </button>
-                    </span>
-                  )}
-                  {cancellable && (
-                    <span className={styles.survivalAction}>
-                    <button
-                      type="button"
-                      onClick={() => onCancelForfeit?.(team.teamId, team.teamName)}
-                      className="btn tap-target"
-                      title={a("forfeitCancel.buttonTitle", { name: team.teamName })}
-                      aria-label={a("forfeitCancel.buttonAria", { name: team.teamName })}
-                      style={FORFEIT_CANCEL_BUTTON_STYLE}
-                    >
-                      {a("forfeitCancel.button")}
-                    </button>
+                      <ForfeitRowAction {...action} />
                     </span>
                   )}
                 </div>
               );
             })}
           </div>
+          {survival.standings.some((team) => rowAction(team, false)?.kind === "locked") && (
+            <FrozenForfeitLegend
+              id="survival-forfeit-frozen"
+              label={a("forfeitCancel.frozen")}
+              reason={a("forfeitCancel.frozenTitle")}
+            />
+          )}
           {atRisk > 0 && !isFinished && (
             <p style={{ margin: "8px 2px 0", fontSize: 12, color: AMBER }}>
               {inBarrage ? (

@@ -1,7 +1,6 @@
 import type { BracketMatch, MatchScoreReport } from "@/lib/shared/types";
 import {
   checkMatchScores,
-  matchScoreViolationMessage,
   type MatchFormat,
 } from "@/lib/shared/match-format";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
@@ -230,7 +229,7 @@ export function sameScoreFormState(a: ScoreFormState, b: ScoreFormState): boolea
 
 /**
  * Pourquoi une action est refusée. Un code plutôt qu'une phrase : le module
- * reste pur et testable, `scoreBlockerMessage` habille ensuite avec les
+ * reste pur et testable, `scoreBlockerText` habille ensuite avec les
  * chiffres du format du tournoi.
  */
 export type ScoreFormBlocker =
@@ -360,49 +359,6 @@ export function decideScoreForm(
     saveBlocker: decided ? "ALREADY_DECIDED" : null,
     resolveBlocker,
   };
-}
-
-/**
- * Phrase affichée sous le bouton refusé. Les deux violations de format
- * réutilisent le message chiffré partagé avec le report d'équipe, pour que
- * l'arbitrage et les engagés lisent exactement la même règle.
- */
-export function scoreBlockerMessage(
-  blocker: ScoreFormBlocker,
-  format: MatchFormat | null,
-): string {
-  switch (blocker) {
-    case "INCOMPLETE":
-      return "Saisis au moins une map jouée.";
-    case "EXCEEDS_FORMAT":
-      return matchScoreViolationMessage(format, "SCORE_EXCEEDS_MATCH_FORMAT");
-    case "BELOW_FORMAT":
-      return matchScoreViolationMessage(format, "SCORE_BELOW_MATCH_FORMAT");
-    case "DRAW":
-      return "Les scores ne peuvent pas être égaux : il faut un vainqueur.";
-    case "DOUBLE_FORFEIT":
-      return "Un double forfait tranche le match : il s'écrit avec « Valider le résultat ».";
-    case "NOT_IN_LAUNCH":
-      return "Le score se saisit à partir du lancement du match. Avant, seul un forfait peut être prononcé.";
-    case "ALREADY_DECIDED":
-      return "Ce match est déjà tranché. Corrige-le avec « Valider le résultat » pour que le vainqueur et la suite du plateau suivent.";
-  }
-}
-
-/**
- * Annonce, dans le dialogue d'arbitrage, d'un score proposé par une engagée
- * et jamais confirmé par l'autre ; `null` sans proposition.
- */
-export function adminProposalNotice(
-  proposal: PendingScoreProposal | null,
-  team1: string,
-  team2: string,
-  dirty: boolean,
-): string | null {
-  if (!proposal) return null;
-  const [author, other] = proposal.proposedBy === "team1" ? [team1, team2] : [team2, team1];
-  const next = dirty ? `« Enregistrer » note ta saisie et suspend la validation automatique de cette proposition ; seul « Valider le résultat » tranche, à moins que ${other} ne la confirme.` : "Vérifie-le puis valide le résultat pour le confirmer.";
-  return `Score proposé par ${author} (${proposal.team1Score} – ${proposal.team2Score}), en attente de confirmation de ${other}. ${next}`;
 }
 
 /** Engagée qui déclare forfait et celle qui passe, `null` sans forfait nominatif. */

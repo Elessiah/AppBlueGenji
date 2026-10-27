@@ -32,8 +32,12 @@ function standing(overrides: Partial<SwissStandingRow> = {}): SwissStandingRow {
   };
 }
 
-function swiss(standings: SwissStandingRow[]): SwissMeta {
+function swiss(
+  standings: SwissStandingRow[],
+  cancellable: number[] = standings.filter((row) => row.status === "FORFEIT").map((row) => row.teamId),
+): SwissMeta {
   return {
+    cancellableForfeitTeamIds: cancellable,
     totalRounds: 3,
     currentRound: 2,
     pointsForWin: 3,
@@ -51,13 +55,14 @@ function render(
     canForfeit = () => false,
     isFinished = false,
     canCancelForfeit = false,
-  }: { canForfeit?: (id: number) => boolean; isFinished?: boolean; canCancelForfeit?: boolean } = {},
+    cancellable,
+  }: { canForfeit?: (id: number) => boolean; isFinished?: boolean; canCancelForfeit?: boolean; cancellable?: number[] } = {},
 ): string {
   return renderToStaticMarkup(
     <ToastProvider>
       <EntrantProvider participantType="TEAM" soloUserIds={{}} logos={buildEntrantLogoMap([])}>
         <SwissView
-          swiss={swiss(standings)}
+          swiss={swiss(standings, cancellable)}
           matches={[]}
           allTournamentMatches={[]}
           myTeamId={null}
@@ -197,6 +202,23 @@ describe("classement de la ronde suisse", () => {
       { canCancelForfeit: true },
     );
     expect(html).toContain("aria-label=\"Annuler l&#x27;abandon de Dragon Squad\"");
+  });
+
+  it("fige l'abandon d'une manche passée : verrou 🔒, aucun geste, motif derrière le « i » de la légende", () => {
+    const html = render([standing({ status: "FORFEIT" })], { canCancelForfeit: true, cancellable: [] });
+    // Seul bouton : le « i » de la légende, qui porte le motif (aucun geste
+    // d'annulation dans la ligne).
+    expect(count(html, "<button")).toBe(1);
+    expect(html).toContain('aria-controls="swiss-forfeit-frozen"');
+    expect(html).toContain("Figé");
+    expect(html).toContain("Une manche a été jouée depuis l&#x27;abandon : il ne s&#x27;annule plus.");
+    expect(html).not.toContain("Annuler l&#x27;abandon");
+  });
+
+  it("n'affiche ni verrou ni bouton d'annulation sans le droit d'annuler", () => {
+    const html = render([standing({ status: "FORFEIT" })], { cancellable: [] });
+    expect(html).not.toContain("Figé");
+    expect(count(html, "<button")).toBe(0);
   });
 
   it("ne propose aucun abandon sur un tournoi terminé", () => {

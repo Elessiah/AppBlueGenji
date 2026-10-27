@@ -99,6 +99,7 @@ function fixture(): { endurance: EnduranceMeta; matches: BracketMatch[] } {
     }),
   ];
   const endurance: EnduranceMeta = {
+    cancellableForfeitTeamIds: [],
     startPoints: 9,
     winDelta: 1,
     lossDelta: 1,

@@ -67,8 +67,10 @@ describe("Classements — action sous le nom sous 720 px", () => {
     expect(narrow).toMatch(/\.swissAction\s*\{[^}]*grid-column:\s*2 \/ -1/);
     expect(narrow).toMatch(/\.swissTable\[data-with-action\]\s*\{[^}]*grid-template-columns:\s*auto minmax\(6em, 1fr\) auto auto auto auto auto;/);
     expect(narrow).toMatch(/\.survivalAction\s*\{[^}]*flex-basis:\s*100%/);
-    // Une cellule d'action sans bouton ne laisse pas de ligne vide.
-    expect(narrow).toMatch(/\.swissAction:not\(:has\(button\)\)\s*\{\s*display:\s*none;/);
+    // Une cellule d'action vide (et son en-tête) ne laisse pas de ligne vide,
+    // mais reste lue : chaque ligne garde autant de cellules que d'en-têtes.
+    expect(narrow).toMatch(/\.swissAction\[role="columnheader"\],\s*\.swissAction:empty\s*\{[^}]*position:\s*absolute;[^}]*clip-path:\s*inset\(50%\);/);
+    expect(narrow).not.toMatch(/\.swissAction[^{]*\{\s*display:\s*none;/);
   });
 
   it("les pistes de la ronde suisse ne sont plus posées en ligne, où elles battraient la requête média", () => {
@@ -81,7 +83,7 @@ describe("Classements — action sous le nom sous 720 px", () => {
 
   it("le bouton d'abandon de la survie vit dans sa cellule d'action", () => {
     expect(survival).toContain("className={styles.survivalRow}");
-    expect(survival).toMatch(/<span className=\{styles\.survivalAction\}>\s*<button/);
+    expect(survival).toMatch(/<span className=\{styles\.survivalAction\}>\s*<ForfeitRowAction \{\.\.\.action\} \/>/);
   });
 });
 
@@ -218,5 +220,34 @@ describe("Phase suisse d'un multi-phases", () => {
     expect(page).toContain(
       'const SwissRounds = dynamic(() => orReload(import("./SwissView").then((m) => m.SwissRounds)), { ssr: false });',
     );
+  });
+});
+
+describe("abandon figé — légende", () => {
+  it("le motif vit derrière un « i » sous le classement, pas dans les cellules étroites", () => {
+    const rowAction = read("_components", "ForfeitRowAction.tsx");
+    expect(rowAction).toContain("export function FrozenForfeitLegend(");
+    expect(rowAction).not.toMatch(/forfeitLocked\} title=/);
+    for (const [view, id] of [
+      ["SurvivalView.tsx", "survival-forfeit-frozen"],
+      ["SwissView.tsx", "swiss-forfeit-frozen"],
+      ["EnduranceView.tsx", "endurance-forfeit-frozen"],
+    ]) {
+      const source = read("_components", view);
+      expect(source).toContain(`id="${id}"`);
+      expect(source).toMatch(/\?\.kind === "locked"/);
+    }
+    expect(css).toMatch(/\.frozenLegend \{[^}]*font-size: 11px;/);
+    expect(css).not.toContain(":has(.forfeitLocked");
+  });
+
+  it("BG Survie : la légende vit dans le panneau « Général » seul, en pied du tableau, avant la navigation du bas", () => {
+    const views = read("_components", "EnduranceRankingViews.tsx");
+    const legend = views.indexOf("{withActions && actionsLegend && <div className={styles.legend}>{actionsLegend}</div>}");
+    expect(legend).toBeGreaterThan(views.indexOf('role={views.length > 1 ? "tabpanel" : undefined}'));
+    // Dernier enfant du panneau : sa balise fermante suit la légende.
+    expect(views.slice(legend).trimStart()).toMatch(/^\{withActions[^\n]*\r?\n\s*<\/div>/);
+    expect(legend).toBeLessThan(views.indexOf("className={styles.bottomNav}"));
+    expect(read("_components", "EnduranceView.tsx")).toContain("actionsLegend={");
   });
 });

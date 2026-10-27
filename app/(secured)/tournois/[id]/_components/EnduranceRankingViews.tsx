@@ -67,6 +67,11 @@ interface EnduranceRankingViewsProps {
   renderActions?: (standing: EnduranceStandingRow) => ReactNode;
   /** Au moins une ligne porte un geste. */
   showActions: boolean;
+  /**
+   * Légende des gestes (« 🔒 Figé » et son « i »), dernière ligne du panneau
+   * « Général » — seule vue qui porte les gestes —, au-dessus de la navigation.
+   */
+  actionsLegend?: ReactNode;
   /** Une ligne porte deux gestes (arbitrage) : colonne élargie. */
   wideActions: boolean;
 }
@@ -219,6 +224,7 @@ export function EnduranceRankingViews({
   renderActions,
   showActions,
   wideActions,
+  actionsLegend,
 }: Readonly<EnduranceRankingViewsProps>) {
   const text = useTournamentViewText(FR_VIEWS_TEXT);
   const { t } = text;
@@ -410,6 +416,8 @@ export function EnduranceRankingViews({
             <Fragment key={standing.teamId}>
               <div
                 className={`${rowClassName} ${styles.fadable} ${isMine ? styles.mine : ""}`}
+                data-row-focus={standing.teamId}
+                tabIndex={-1}
                 data-podium-muted={ROW_OPACITY[row.status] < 1 ? "" : undefined}
                 style={{ "--row-fade": ROW_OPACITY[row.status] } as CSSProperties}
               >
@@ -466,6 +474,8 @@ export function EnduranceRankingViews({
             </Fragment>
           );
         })}
+        {/* Dans le panneau « Général » qu'elle explique : lue avec lui. */}
+        {withActions && actionsLegend && <div className={styles.legend}>{actionsLegend}</div>}
       </div>
 
       {views.length > 1 && (

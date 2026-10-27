@@ -5,12 +5,12 @@ import {
   sameScoreFormState,
   scoresFromMaps,
   parseScoreInput,
-  scoreBlockerMessage,
   scoreFormStateFor,
   storedResultSignature,
   type ScoreFormState,
 } from "@/app/(secured)/tournois/[id]/_lib/score-form";
 import type { BracketMatch } from "@/lib/shared/types";
+import { FR_DIALOGS_TEXT, scoreBlockerText } from "@/app/(secured)/tournois/[id]/_lib/dialogs-text";
 import type { MatchFormat } from "@/lib/shared/match-format";
 import { emptyMap } from "@/lib/shared/match-maps";
 import { mapsFor } from "../helpers/match-maps";
@@ -240,16 +240,17 @@ describe("decideScoreForm — forfait", () => {
   });
 });
 
-describe("scoreBlockerMessage", () => {
-  it("chiffre les violations avec le format du tournoi", () => {
-    expect(scoreBlockerMessage("BELOW_FORMAT", BO5)).toContain("3 manches");
-    expect(scoreBlockerMessage("EXCEEDS_FORMAT", BO5)).toContain("BO5");
+describe("scoreBlockerText (français)", () => {
+  it("chiffre les violations avec le format du tournoi, en maps", () => {
+    expect(scoreBlockerText(FR_DIALOGS_TEXT, "BELOW_FORMAT", BO5)).toContain("3 maps");
+    expect(scoreBlockerText(FR_DIALOGS_TEXT, "EXCEEDS_FORMAT", BO5)).toContain("BO5");
+    expect(scoreBlockerText(FR_DIALOGS_TEXT, "EXCEEDS_FORMAT", BO5)).not.toContain("manche");
   });
 
   it("nomme les autres refus en clair", () => {
-    expect(scoreBlockerMessage("INCOMPLETE", null)).toBe("Saisis au moins une map jouée.");
-    expect(scoreBlockerMessage("DRAW", null)).toContain("vainqueur");
-    expect(scoreBlockerMessage("ALREADY_DECIDED", null)).toContain("Valider le résultat");
+    expect(scoreBlockerText(FR_DIALOGS_TEXT, "INCOMPLETE", null)).toBe("Saisis au moins une map jouée.");
+    expect(scoreBlockerText(FR_DIALOGS_TEXT, "DRAW", null)).toContain("vainqueur");
+    expect(scoreBlockerText(FR_DIALOGS_TEXT, "ALREADY_DECIDED", null)).toContain("Valider le résultat");
   });
 });
 
@@ -299,7 +300,7 @@ describe("decideScoreForm — égalités autorisées", () => {
 
     expect(decision.canResolve).toBe(false);
     expect(decision.resolveBlocker).toBe("DRAW");
-    expect(scoreBlockerMessage("DRAW", null)).toContain("vainqueur");
+    expect(scoreBlockerText(FR_DIALOGS_TEXT, "DRAW", null)).toContain("vainqueur");
   });
 
   it("n'ouvre pas l'enregistrement d'un match déjà tranché, égalités ou non", () => {
@@ -347,7 +348,7 @@ describe("decideScoreForm — aucun score avant le lancement", () => {
   });
 
   it("explique le refus et nomme le forfait comme seul geste", () => {
-    const message = scoreBlockerMessage("NOT_IN_LAUNCH", BO5);
+    const message = scoreBlockerText(FR_DIALOGS_TEXT, "NOT_IN_LAUNCH", BO5);
     expect(message).toMatch(/lancement/);
     expect(message).toMatch(/forfait/);
   });

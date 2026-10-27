@@ -172,5 +172,9 @@
     "PENALTY_FAILED": "Erreur lors de l'enregistrement de la pénalité.",
     "PENALTIES_UNAVAILABLE": "Les pénalités sont indisponibles sur ce serveur : leur table n'existe pas. Prévenez un administrateur.",
     "PENALTY_LIFT_FAILED": "Erreur lors du retrait de la pénalité."
+  },
+  "soloCodes": {
+    "TEAM_NOT_FORFEITED": "Ce joueur n'a pas abandonné : il n'y a rien à annuler.",
+    "FORFEIT_ROUND_PASSED": "Une manche a été jouée depuis l'abandon : remettre le joueur en lice lui épargnerait les manches qu'il a manquées. Revenez d'abord en arrière."
   }
 }

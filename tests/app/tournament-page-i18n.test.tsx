@@ -199,6 +199,7 @@ function phase(overrides: Partial<TournamentPhase>): TournamentPhase {
 }
 
 const swiss: SwissMeta = {
+  cancellableForfeitTeamIds: [],
   totalRounds: 3,
   currentRound: 2,
   pointsForWin: 3,
@@ -213,6 +214,7 @@ const swiss: SwissMeta = {
 };
 
 const survival: SurvivalMeta = {
+  cancellableForfeitTeamIds: [],
   roundsBeforeFirstCut: 2,
   roundsPerCut: 1,
   currentRound: 3,
@@ -247,6 +249,7 @@ function enduranceRow(teamId: number, overrides: Partial<EnduranceStandingRow> =
 }
 
 const endurance: EnduranceMeta = {
+  cancellableForfeitTeamIds: [],
   startPoints: 9,
   winDelta: 1,
   lossDelta: 1,

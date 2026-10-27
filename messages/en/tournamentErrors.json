@@ -172,5 +172,9 @@
     "PENALTY_FAILED": "Error while recording the penalty.",
     "PENALTIES_UNAVAILABLE": "Penalties are unavailable on this server: their table doesn't exist. Let an administrator know.",
     "PENALTY_LIFT_FAILED": "Error while lifting the penalty."
+  },
+  "soloCodes": {
+    "TEAM_NOT_FORFEITED": "This player hasn't withdrawn: there is nothing to cancel.",
+    "FORFEIT_ROUND_PASSED": "A round has been played since the withdrawal: putting the player back would spare them the rounds they missed. Roll back first."
   }
 }

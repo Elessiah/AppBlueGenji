@@ -7,8 +7,8 @@
     "violation": {
       "draw": "Match nul impossible : ce tournoi exige un vainqueur.",
       "invalid": "Score invalide.",
-      "exceeds": "Score impossible en {label} : {max} manches au maximum, et jamais plus de {wins} par équipe.",
-      "below": "Score incomplet en {label} : le vainqueur doit atteindre {wins, plural, one {# manche} other {# manches}}."
+      "exceeds": "Score impossible en {label} : {max} maps au maximum, et jamais plus de {wins} par équipe.",
+      "below": "Score incomplet en {label} : le vainqueur doit atteindre {wins, plural, one {# map} other {# maps}}."
     },
     "blocker": {
       "incomplete": "Saisis au moins une map jouée.",
@@ -81,7 +81,7 @@
         "open": "Déclarer un forfait sur cette manche",
         "cancel": "Annuler le forfait",
         "double": "{team1} et {team2} déclarent toutes les deux forfait : le match est perdu pour les deux, personne ne se qualifie, et dans un tableau leur prochain adversaire passe le tour par exemption.",
-        "single": "{out} déclare forfait sur cette manche : {through} l'emporte {maps}-0, sans manche jouée.",
+        "single": "{out} déclare forfait sur cette manche : {through} l'emporte {maps}-0, sans map jouée.",
         "question": "Qui déclare forfait sur cette manche ? Son adversaire l'emporte {maps}-0, et les scores saisis sont ignorés.",
         "questionClosed": "Qui déclare forfait sur cette manche ? Son adversaire l'emporte {maps}-0.",
         "both": "Les deux (double forfait)"
@@ -135,11 +135,12 @@
       "forfeit": {
         "open": "Déclarer forfait sur ce match",
         "close": "Ne pas déclarer forfait",
-        "hint": "{mine} déclare forfait sur ce match : {opponent} l'emporte {maps}-0, sans manche jouée. Le résultat est immédiat — seul l'arbitrage peut revenir dessus.",
+        "hint": "{mine} déclare forfait sur ce match : {opponent} l'emporte {maps}-0, sans map jouée. Le résultat est immédiat — seul l'arbitrage peut revenir dessus.",
         "confirm": "Confirmer le forfait de {name}",
         "notAllowed": "Un forfait se déclare par le propriétaire ou un manager de l'équipe."
       }
-    }
+    },
+    "sending": "Envoi…"
   },
   "schedule": {
     "missing": {
@@ -165,6 +166,7 @@
     "notice": "Pour un match à jouer, un horaire à venir posé ou changé est annoncé aux joueurs du match (notification push, et message privé Discord aux joueurs dont le tag Discord est certifié, sauf s'ils ont coupé ceux de leurs matchs).",
     "noticePlanning": "Pour un match à jouer, un horaire à venir posé ou changé, ou un horaire retiré, est annoncé aux joueurs du match (notification push, et message privé Discord aux joueurs dont le tag Discord est certifié, sauf s'ils ont coupé ceux de leurs matchs).",
     "noticeTbd": "Une place est encore vide : l'horaire sera annoncé aux joueurs quand les deux adversaires seront connus, dans les 48 h qui précèdent le coup d'envoi.",
+    "noticeSubject": "Avis aux joueurs",
     "cleared": "Date de début effacée.",
     "noTime": "Aucune date de début posée.",
     "planned": "Match planifié.",
@@ -174,6 +176,8 @@
     "save": "Enregistrer",
     "titlePlanning": "Planifier le match",
     "title": "Date de début du match",
+    "tbd": "TBD",
+    "versus": "contre",
     "legend": "Début programmé (heure de Paris)",
     "day": "Jour",
     "month": "Mois",

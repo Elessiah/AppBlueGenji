@@ -408,26 +408,3 @@ export function checkMatchScores(
   return null;
 }
 
-/**
- * Message d'erreur en clair pour une violation de format, avec les valeurs du
- * tournoi. Utilisé par l'interface avant l'envoi ; le serveur, lui, renvoie le
- * code brut (voir `_lib/error-map.ts` pour la formulation de repli).
- */
-export function matchScoreViolationMessage(
-  format: MatchFormat | null,
-  violation: MatchScoreViolation,
-): string {
-  if (violation === "DRAW_NOT_ALLOWED") {
-    return "Match nul impossible : ce tournoi exige un vainqueur.";
-  }
-
-  if (!format) return "Score invalide.";
-
-  const wins = matchWinsRequired(format);
-  const label = matchFormatLabel(format);
-
-  if (violation === "SCORE_EXCEEDS_MATCH_FORMAT") {
-    return `Score impossible en ${label} : ${matchMaxMaps(format)} manches au maximum, et jamais plus de ${wins} par équipe.`;
-  }
-  return `Score incomplet en ${label} : le vainqueur doit atteindre ${wins} manche${wins > 1 ? "s" : ""}.`;
-}

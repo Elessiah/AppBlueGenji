@@ -22,7 +22,8 @@ import { useSpectatorView } from "@/components/spectator-view";
 import { SPECTATOR_NOT_FOUND_RECHECK_MINUTES } from "@/lib/shared/spectator-view";
 import type { RefreshTier } from "@/lib/shared/refresh-tiers";
 import type { LiveFailure } from "../_lib/live-state";
-import { useMapError } from "../_lib/error-map";
+import { useMapError, useMapParticipantError } from "../_lib/error-map";
+import { focusRowAfterChange } from "./ForfeitRowAction";
 import { advanceSuccessText, rollbackStageText, useActionsText } from "../_lib/actions-text";
 import { registrationConfirmText } from "../_lib/registration-confirm";
 import { formatLocalDateTime } from "@/lib/shared/dates";
@@ -397,6 +398,7 @@ export function TournamentSheet({ tournamentId, source }: Readonly<{ tournamentI
   const actionText = useActionsText();
   const a = actionText.t;
   const mapError = useMapError();
+  const mapParticipantError = useMapParticipantError();
   const { showError, showSuccess } = useToast();
 
   const { tournament: detail, refresh, isLive, tier, fatal, cadenceMs, retrying } = source;
@@ -694,7 +696,7 @@ export function TournamentSheet({ tournamentId, source }: Readonly<{ tournamentI
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "FORFEIT_FAILED");
       showSuccess(isMine ? a("forfeit.recorded") : a("forfeit.recordedFor", { name: teamName }));
-      void refresh();
+      void refresh().then(() => focusRowAfterChange(teamId));
       return true;
     } catch (e) {
       showError(mapError((e as Error).message));
@@ -735,11 +737,11 @@ export function TournamentSheet({ tournamentId, source }: Readonly<{ tournamentI
   const performCancelForfeit = async (teamId: number, teamName: string) => {
     try {
       await requestForfeitCancellation(tournamentId, teamId);
-      showSuccess(a("forfeitCancel.success", { name: teamName }));
-      void refresh();
+      showSuccess(a(`forfeitCancel.success.${entrantType}`, { name: teamName }));
+      void refresh().then(() => focusRowAfterChange(teamId));
       return true;
     } catch (e) {
-      showError(mapError((e as Error).message));
+      showError(mapParticipantError((e as Error).message, entrantType));
       return false;
     }
   };
@@ -750,6 +752,8 @@ export function TournamentSheet({ tournamentId, source }: Readonly<{ tournamentI
       body: [a(`forfeitCancel.body.${entrantType}`)],
       confirmLabel: a("forfeitCancel.confirm"),
       pendingLabel: a("forfeitCancel.pending"),
+      // Le geste remet l'engagé en course : rien de destructeur à signaler en rouge.
+      tone: "primary",
       run: () => performCancelForfeit(teamId, teamName),
     });
   };

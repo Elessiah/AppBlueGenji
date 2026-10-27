@@ -51,6 +51,7 @@ function survivalRow(overrides: Partial<SurvivalStandingRow> = {}): SurvivalStan
 
 function survival(overrides: Partial<SurvivalMeta> = {}): SurvivalMeta {
   return {
+    cancellableForfeitTeamIds: [],
     roundsBeforeFirstCut: 2,
     roundsPerCut: 1,
     currentRound: 3,
@@ -86,6 +87,7 @@ function swissRow(overrides: Partial<SwissStandingRow> = {}): SwissStandingRow {
 
 function swiss(overrides: Partial<SwissMeta> = {}): SwissMeta {
   return {
+    cancellableForfeitTeamIds: [],
     totalRounds: 3,
     currentRound: 2,
     pointsForWin: 3,
@@ -122,6 +124,42 @@ describe("vue survie — rendu inchangé", () => {
         />,
       ),
     ).toMatchSnapshot();
+  });
+
+  it.each<[string, number[], boolean]>([
+    ["dans sa fenêtre : bouton d'annulation", [12], true],
+    ["manche passée : verrou, aucun bouton", [], false],
+  ])("ligne forfait %s", (_label, cancellable, offered) => {
+    const html = wrap(
+      <SurvivalView
+        survival={survival({
+          cancellableForfeitTeamIds: cancellable,
+          standings: [survivalRow({ teamId: 12, teamName: "Gamma", status: "FORFEIT" })],
+        })}
+        matches={[]}
+        allTournamentMatches={[]}
+        myTeamId={null}
+        isFinished={false}
+        adminResolvable={() => false}
+        onOpenAdminModal={noop}
+        canForfeit={() => false}
+        onForfeit={noop}
+        canCancelForfeit
+        onCancelForfeit={noop}
+      />,
+    );
+    expect(html.includes("Annuler l&#x27;abandon</button>")).toBe(offered);
+    expect(html.includes("Figé")).toBe(!offered);
+    // Figé : la raison derrière le « i » d'une légende sous le classement
+    // (lisible au toucher et au clavier), plus dans un `title` que seul un
+    // survol à la souris affichait ; lue aussi avec la ligne (texte masqué).
+    expect(html.includes('aria-controls="survival-forfeit-frozen"')).toBe(!offered);
+    expect(html.includes('<span class="sr-only"> Une manche a été jouée')).toBe(!offered);
+    expect(html.includes("Une manche a été jouée depuis l&#x27;abandon : il ne s&#x27;annule plus.")).toBe(!offered);
+    expect(html).not.toMatch(/class="forfeitLocked"[^>]*title=/);
+    expect(html).toContain('data-row-focus="12"');
+    // La ligne forfait s'estompe cellule par cellule, comme en suisse.
+    expect(html).toContain("opacity:0.9");
   });
 
   it("sans barrage, cadence espacée", () => {

@@ -84,6 +84,11 @@ export type SurvivalMeta = {
    */
   barrageRounds: number;
   standings: SurvivalStandingRow[];
+  /**
+   * Engagés `FORFEIT` dont l'abandon s'annule encore (aucune manche postérieure
+   * saisie) : sans eux, « Annuler l'abandon » laisse place à « 🔒 ».
+   */
+  cancellableForfeitTeamIds: number[];
 };
 
 /** Ligne du classement d'endurance (mode « BlueGenji Survie »). */
@@ -183,6 +188,11 @@ export type EnduranceMeta = {
    */
   penalties: EndurancePenaltyRow[];
   standings: EnduranceStandingRow[];
+  /**
+   * Engagés `FORFEIT` dont l'abandon s'annule encore (aucune manche postérieure
+   * saisie) : sans eux, « Annuler l'abandon » laisse place à « 🔒 ».
+   */
+  cancellableForfeitTeamIds: number[];
 };
 
 export type SwissTiebreaker = "buchholz" | "sonneborn-berger" | "opponent-mwp" | "head-to-head";
@@ -216,6 +226,11 @@ export type SwissMeta = {
   /** Ordre des départages appliqués à points égaux. */
   tiebreakers: SwissTiebreaker[];
   standings: SwissStandingRow[];
+  /**
+   * Engagés `FORFEIT` dont l'abandon s'annule encore (aucune manche postérieure
+   * saisie) : sans eux, « Annuler l'abandon » laisse place à « 🔒 ».
+   */
+  cancellableForfeitTeamIds: number[];
 };
 
 export type TournamentState = "UPCOMING" | "REGISTRATION" | "RUNNING" | "FINISHED";

@@ -15,7 +15,6 @@ import {
   matchEntryDefaultMonth,
   matchEntryMonths,
   formatMatchStartEntryPreview,
-  isPastMatchStartChange,
   localMatchTimeIfDifferent,
   matchEntryReference,
   matchEntryTimeOptions,
@@ -23,13 +22,15 @@ import {
   matchStartEntryOf,
   readMatchStartEntry,
   nextValidYearShift,
+  pastStartWarning,
   withYearShift,
   type MatchStartEntryField,
   type MatchStartEntryState,
 } from "@/lib/shared/match-start-entry";
-import { isMatchOver, matchStartAtTime } from "@/lib/shared/match-schedule";
+import { isMatchOver } from "@/lib/shared/match-schedule";
 import { matchLaunchPhase } from "@/lib/shared/match-launch";
 import type { BracketMatch } from "@/lib/shared/types";
+import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { useMapError } from "../_lib/error-map";
 import { useDialogsText } from "../_lib/dialogs-text";
 import { EntrantName } from "./EntrantName";
@@ -40,8 +41,11 @@ const FIELD_IDS = {
   time: "match-start-time",
 } as const;
 const HINT_ID = "match-start-at-hint";
+const NOTICE_ID = "match-start-at-notice";
 const PREVIEW_ID = "match-start-at-preview";
+const PAST_WARNING_ID = "match-start-past-warning";
 const YEAR_FIX_ID = "match-start-year-fix";
+const SUBMIT_ID = "match-start-submit";
 
 /** Premier champ manquant, tel que l'aperçu le nomme (`schedule.missing.*`). */
 const MISSING_FIELD_KEYS = {
@@ -69,7 +73,12 @@ function pendingPreview(text: TournamentDialogsText, state: MatchStartEntryState
   return null;
 }
 
-/** Aide sous les champs : ce que la date va produire. */
+/**
+ * Aide sous les champs : ce que la date va produire. L'avis aux joueurs
+ * (`startAtNotice`) vit derrière un « i » : les deux formaient un paragraphe
+ * permanent de trois phrases ou plus, qui repoussait boutons et avertissements
+ * sous le pli à 375 px.
+ */
 export function startAtHint(
   text: TournamentDialogsText,
   refereeScheduling: boolean,
@@ -86,30 +95,27 @@ export function startAtHint(
     const directLaunchedKey = refereeScheduling
       ? "schedule.hintLaunchedPlanningDirect"
       : "schedule.hintLaunchedDirect";
-    const launchedKey = launchPhase ? "schedule.hintLaunched" : directLaunchedKey;
-    return `${text.t(launchedKey)} ${scheduleNotice(text, refereeScheduling, entrantsKnown)}`;
+    return text.t(launchPhase ? "schedule.hintLaunched" : directLaunchedKey);
   }
   const planningKey = launchPhase ? "schedule.hintPlanning" : "schedule.hintPlanningDirect";
   // Option éteinte, un match sans date part d'emblée — mais seulement une fois
   // ses deux adversaires connus.
   const directKey = entrantsKnown ? "schedule.hintDirect" : "schedule.hintDirectTbd";
   const plainKey = launchPhase ? "schedule.hint" : directKey;
-  const base = text.t(refereeScheduling ? planningKey : plainKey);
-  // Un match joué (ou au score saisi) n'annonce rien : la date n'est qu'une
-  // correction d'archive.
-  return played ? base : `${base} ${scheduleNotice(text, refereeScheduling, entrantsKnown)}`;
+  return text.t(refereeScheduling ? planningKey : plainKey);
 }
 
 /**
- * Avertissement d'une date déjà passée : ce qu'elle déclenche dépend de la
- * phase de lancement et des engagés connus (une place vide fait attendre).
+ * Avis aux joueurs que l'horaire déclenche, ou `null` : un match joué (ou d'un
+ * tournoi clos) n'annonce rien, la date n'est qu'une correction d'archive.
  */
-export function pastWarningKey(
+export function startAtNotice(
+  text: TournamentDialogsText,
+  refereeScheduling: boolean,
   entrantsKnown: boolean,
-  launchPhase: boolean,
-): "schedule.warnPast" | "schedule.warnPastDirect" | "schedule.warnPastTbd" {
-  if (!entrantsKnown) return "schedule.warnPastTbd";
-  return launchPhase ? "schedule.warnPast" : "schedule.warnPastDirect";
+  played: boolean,
+): string | null {
+  return played ? null : scheduleNotice(text, refereeScheduling, entrantsKnown);
 }
 
 /**
@@ -139,25 +145,35 @@ function submitLabel(text: TournamentDialogsText, busy: boolean, planning: boole
   return text.t(planning ? "schedule.plan" : "schedule.save");
 }
 
+const WARNING_STYLE = {
+  display: "block",
+  margin: "12px 0 0",
+  padding: "8px 10px",
+  borderRadius: 8,
+  border: "1px solid rgba(var(--amber-rgb), 0.4)",
+  background: "rgba(var(--amber-rgb), 0.1)",
+  fontSize: 12,
+  color: "var(--ink-soft, #c3ccd8)",
+} as const;
+
 /**
  * Avertissement avant l'envoi. `<output>` : une région d'état native, qui se
  * lit quand elle apparaît au fil de la saisie.
  */
 function ScheduleWarning({ children }: Readonly<{ children: ReactNode }>) {
+  return <output style={WARNING_STYLE}>{children}</output>;
+}
+
+/**
+ * Avertissement de date passée : région **toujours montée** dont seul le texte
+ * change — une région insérée avec son texte déjà dedans n'est pas annoncée
+ * par tous les lecteurs d'écran (NVDA, JAWS, VoiceOver iOS) au choix du jour.
+ * Vide, elle n'occupe aucune place.
+ */
+function PastDateWarning({ message }: Readonly<{ message: string | null }>) {
   return (
-    <output
-      style={{
-        display: "block",
-        margin: "12px 0 0",
-        padding: "8px 10px",
-        borderRadius: 8,
-        border: "1px solid rgba(var(--amber-rgb), 0.4)",
-        background: "rgba(var(--amber-rgb), 0.1)",
-        fontSize: 12,
-        color: "var(--ink-soft, #c3ccd8)",
-      }}
-    >
-      {children}
+    <output id={PAST_WARNING_ID} style={message ? WARNING_STYLE : { display: "block" }}>
+      {message ?? ""}
     </output>
   );
 }
@@ -215,12 +231,21 @@ export function MatchScheduleDialog({
   const mapError = useMapError();
   const { showError, showSuccess } = useToast();
   const fieldErrors = useFieldErrors(MATCH_SCHEDULE_FIELD_ERRORS, FIELD_IDS);
+  // Une seule horloge pour le dialogue : mois présélectionné, référence de
+  // l'année, planification et date passée lisent le même instant (quatre
+  // lectures pouvaient tomber de part et d'autre de minuit). Relue à l'envoi.
+  const [clock, setClock] = useState(Date.now);
   const [initial] = useState(() => matchStartEntryOf(match.startAt));
   const [day, setDay] = useState(initial ? String(initial.day) : "");
   // Sans date posée, le mois courant (Paris) est présélectionné : reste le jour.
   const [month, setMonth] = useState(() =>
-    initial ? String(initial.month) : String(matchEntryDefaultMonth(Date.now())),
+    initial ? String(initial.month) : String(matchEntryDefaultMonth(clock)),
   );
+  // Le mois présélectionné ne compte pas tant qu'aucun jour n'est choisi : la
+  // saisie reste « aucun horaire » (pas de « Vider la date » sans date à vider,
+  // pas de refus « jour manquant » pour confirmer qu'il n'y a pas d'horaire).
+  const [monthPreset, setMonthPreset] = useState(initial === null);
+  const enteredMonth = monthPreset && day === "" ? "" : month;
   // Une liste de quarts d'heure, 21:00 par défaut ; une heure déjà posée entre
   // deux quarts d'heure (posée par un autre chemin) y reste proposée telle quelle.
   const [time, setTime] = useState(initial ? matchEntryTimeValue(initial) : MATCH_ENTRY_DEFAULT_TIME);
@@ -229,7 +254,7 @@ export function MatchScheduleDialog({
   const [reference] = useState(() =>
     matchEntryReference(
       { tournamentStartAt, tournamentFinished },
-      Date.now(),
+      clock,
     ),
   );
   // Décalage d'année choisi à la main quand la déduction tombe à côté
@@ -249,9 +274,9 @@ export function MatchScheduleDialog({
   // l'ouverture : sur un match terminé ou sans ses deux engagés, poser une date
   // n'en lance aucun.
   const [planning] = useState(
-    () => matchLaunchPhase({ ...match, refereeScheduling }, Date.now()) === "TO_PLAN",
+    () => matchLaunchPhase({ ...match, refereeScheduling }, clock) === "TO_PLAN",
   );
-  const deduced = readMatchStartEntry({ day, month, time }, reference, match.startAt);
+  const deduced = readMatchStartEntry({ day, month: enteredMonth, time }, reference, match.startAt);
   const entry = withYearShift(deduced, yearShift);
   // Décalage de chaque bouton : un cran, ou quatre pour un 29 février. Libellés
   // fixes (« Année précédente ») : un libellé qui changerait au clic, sous le
@@ -273,15 +298,15 @@ export function MatchScheduleDialog({
   // Une saisie seulement incomplète n'est pas un effacement : on n'avertit pas
   // encore, l'utilisateur est en train de taper.
   const clearsLiveTrigger = cleared && requiresMatchStartAt(match.liveTrigger);
-  // Une date déjà passée sur un match pas encore lancé le fait partir dès
-  // l'enregistrement : on le dit (le mois présélectionné rend l'erreur facile).
-  const [openedAt] = useState(() => Date.now());
+  // Une date déjà passée qui ferait partir un match en attente de son heure :
+  // on le dit avant l'envoi (le mois présélectionné rend l'erreur facile).
   const entrantsKnown = match.team1Id !== null && match.team2Id !== null;
-  const startsAtOnce =
-    entry.kind === "ready" &&
-    match.launchedAt === null &&
-    !isMatchOver(match.status, tournamentFinished) &&
-    isPastMatchStartChange(entry.instant, matchStartAtTime(match), openedAt);
+  const pastWarningAt = (now: number) =>
+    entry.kind === "ready"
+      ? pastStartWarning({ ...match, refereeScheduling }, entry.instant, now, { launchPhase, tournamentFinished })
+      : null;
+  const pastWarning = pastWarningAt(clock);
+  const notice = startAtNotice(text, refereeScheduling, entrantsKnown, isMatchOver(match.status, tournamentFinished));
   // Effacer la date d'un match non lancé d'un tournoi planifié le renvoie à
   // l'arbitrage : on le dit avant l'envoi. Un match lancé ou joué n'est pas
   // concerné (sa phase ne dépend plus de la date).
@@ -298,6 +323,7 @@ export function MatchScheduleDialog({
   const clearAll = () => {
     setDay("");
     setMonth("");
+    setMonthPreset(false);
     setTime(MATCH_ENTRY_DEFAULT_TIME);
     setYearShift(0);
     fieldErrors.clear();
@@ -312,6 +338,23 @@ export function MatchScheduleDialog({
       const message = entryRefusal(text, entry) ?? t("schedule.refusal.unknown");
       fieldErrors.flag(entry.field, message);
       showError(message);
+      return;
+    }
+    // L'horloge a pu avancer depuis l'ouverture (fenêtre laissée ouverte) : une
+    // date devenue passée entre-temps s'avertit d'abord, l'envoi suivant part.
+    // L'avertissement défile dans la vue (à 375 px il pouvait être sous le pli,
+    // et le clic semblait sans effet) ; sa région d'état le fait lire. Le focus
+    // reste sur « Enregistrer » : un second envoi confirme, comme pour une date
+    // passée dès la saisie — une notification `role="alert"` l'aurait coupé.
+    // Défilement vers l'avertissement puis vers « Enregistrer », juste dessous :
+    // l'avertissement qui grandit repousse le bouton, qui garde le focus.
+    const now = Date.now();
+    if (pastWarning === null && pastWarningAt(now) !== null) {
+      setClock(now);
+      requestAnimationFrame(() => {
+        document.getElementById(PAST_WARNING_ID)?.scrollIntoView({ block: "nearest" });
+        document.getElementById(SUBMIT_ID)?.scrollIntoView({ block: "nearest" });
+      });
       return;
     }
 
@@ -380,8 +423,9 @@ export function MatchScheduleDialog({
             {planning ? t("schedule.titlePlanning") : t("schedule.title")}
           </h3>
           <p style={{ marginTop: 6, fontSize: 13, color: "var(--ink-quiet, #9aa4b2)" }}>
-            <EntrantName teamId={match.team1Id} name={match.team1Name ?? "TBD"} /> vs{" "}
-            <EntrantName teamId={match.team2Id} name={match.team2Name ?? "TBD"} />
+            <EntrantName teamId={match.team1Id} name={match.team1Name ?? t("schedule.tbd")} />{" "}
+            {t("schedule.versus")}{" "}
+            <EntrantName teamId={match.team2Id} name={match.team2Name ?? t("schedule.tbd")} />
           </p>
 
           {/* L'aide est rattachée au premier champ (lue une fois, et non à
@@ -426,6 +470,7 @@ export function MatchScheduleDialog({
                   disabled={busy}
                   onChange={(e) => {
                     setMonth(e.target.value);
+                    setMonthPreset(false);
                     setYearShift(0);
                     fieldErrors.clear();
                   }}
@@ -524,20 +569,27 @@ export function MatchScheduleDialog({
               </div>
             </fieldset>
           )}
-          <p
-            id={HINT_ID}
-            style={{ margin: "6px 0 0", fontSize: 12, color: "var(--ink-quiet, #9aa4b2)" }}
-          >
-            {startAtHint(
-              text,
-              refereeScheduling,
-              match.team1Id !== null && match.team2Id !== null,
-              // Tournoi clos : ses manches comptent pour jouées, rien n'est annoncé.
-              isMatchOver(match.status, tournamentFinished),
-              launchPhase,
-              match.launchedAt !== null,
+          <InfoHintRow>
+            <p
+              id={HINT_ID}
+              style={{ margin: "6px 0 0", fontSize: 12, color: "var(--ink-quiet, #9aa4b2)" }}
+            >
+              {startAtHint(
+                text,
+                refereeScheduling,
+                match.team1Id !== null && match.team2Id !== null,
+                // Tournoi clos : ses manches comptent pour jouées, rien n'est annoncé.
+                isMatchOver(match.status, tournamentFinished),
+                launchPhase,
+                match.launchedAt !== null,
+              )}
+            </p>
+            {notice !== null && (
+              <InfoHint id={NOTICE_ID} subject={t("schedule.noticeSubject")}>
+                <p>{notice}</p>
+              </InfoHint>
             )}
-          </p>
+          </InfoHintRow>
 
           {clearsLiveTrigger && (
             <ScheduleWarning>
@@ -545,11 +597,7 @@ export function MatchScheduleDialog({
             </ScheduleWarning>
           )}
 
-          {startsAtOnce && (
-            <ScheduleWarning>
-              {t(pastWarningKey(entrantsKnown, launchPhase))}
-            </ScheduleWarning>
-          )}
+          <PastDateWarning message={pastWarning === null ? null : t(pastWarning)} />
 
           {returnsToPlanning && (
             <ScheduleWarning>
@@ -562,7 +610,9 @@ export function MatchScheduleDialog({
               <button
                 type="button"
                 className="btn ghost"
-                onClick={clearAll}
+                onClick={(event) => {
+                  if (event.detail <= 1) clearAll();
+                }}
                 disabled={busy}
                 style={{ padding: "8px 14px", fontSize: 13, marginRight: "auto" }}
               >
@@ -572,14 +622,29 @@ export function MatchScheduleDialog({
             <button
               type="button"
               className="btn ghost"
-              onClick={onClose}
+              onClick={(event) => {
+                if (event.detail <= 1) onClose();
+              }}
               disabled={busy}
               style={{ padding: "8px 18px", fontSize: 13 }}
             >
               {t("score.cancel")}
             </button>
+            {/* Le second clic d'un double-clic (`detail`, au réglage du système)
+                et la répétition d'« Entrée » tenue n'envoient pas : après un
+                envoi retenu (date devenue passée), ils confirmeraient sans
+                laisser lire l'avertissement. Même garde sur « Vider la date »
+                et « Annuler » : l'avertissement qui apparaît repousse la
+                rangée, et le second clic tombait sur eux (date perdue). */}
             <button
+              id={SUBMIT_ID}
               type="submit"
+              onClick={(event) => {
+                if (event.detail > 1) event.preventDefault();
+              }}
+              onKeyDown={(event) => {
+                if (event.repeat && event.key === "Enter") event.preventDefault();
+              }}
               className="btn"
               disabled={busy}
               style={{ padding: "8px 20px", fontSize: 13 }}

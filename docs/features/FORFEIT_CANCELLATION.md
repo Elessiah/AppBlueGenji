@@ -92,7 +92,25 @@ pas l'ambre, réservé aux avertissements) n'apparaît que :
 - sur un tournoi `RUNNING` dont le suivi n'est pas arrêté (`canCancelForfeits`) ;
 - en BG Survie, avant les play-offs.
 
-Il ouvre une `ConfirmActionDialog` ; le succès et l'échec passent par le toast.
+**Hors fenêtre** (une manche postérieure à l'abandon porte une saisie), la
+ligne montre un verrou 🔒 « Figé » à la place du bouton, son motif lu avec la
+ligne (texte masqué) ; à l'œil, il vit derrière le « i » d'une légende sous le
+classement (`FrozenForfeitLegend`, une fois pour toutes les lignes — un `title`
+ne s'affichait ni au toucher ni au clavier, un « i » par ligne déformait les
+cellules étroites) : la fenêtre est calculée au serveur par
+`loadCancellableForfeitIds` (`lib/server/tournaments/forfeit-window.ts`, même
+borne que `FORFEIT_ROUND_PASSED`) et publiée dans
+`cancellableForfeitTeamIds` des métas suisse, survie et BG Survie.
+
+Il ouvre une `ConfirmActionDialog` au ton primaire, dont la confirmation
+« Effacer l'abandon » se distingue du « Annuler » qui ferme ; le succès et
+l'échec passent par le toast, au singulier d'un joueur en tournoi individuel
+(`forfeitCancel.success.SOLO`, `tournamentErrors.soloCodes`). Abandon comme
+annulation sont rendus par un même `<button>` (`ForfeitRowAction`) : après le
+geste, le focus revient sur le nouveau bouton de la ligne, ou sur la ligne
+(`data-row-focus`) si elle n'en porte plus. `focusRowAfterChange` veille
+`FOCUS_WATCH_MS` (3 s) : le rendu groupé du flux peut déplacer la ligne après
+la fin de `refresh()`, et la veille s'arrête dès que le lecteur va ailleurs.
 La confirmation ne promet l'appariement qu'avec sa réserve (« sauf si les
 matchs qu'elle a joués l'éliminent ») : le rejeu peut sortir l'engagé aussitôt.
 
@@ -122,6 +140,8 @@ tournoi individuel), auteur nommé dans pm2 seulement.
 - `tests/app/api/admin/forfeit-cancellation.test.ts` — administrateur seul,
   codes d'erreur, journal anonyme.
 - `tests/tournois/forfeit-eligibility.test.ts` — `canCancelForfeits`.
+- `tests/tournois/forfeit-cancel-window.test.ts` — fenêtre affichée
+  (`loadCancellableForfeitIds`), refus au singulier d'un joueur (FR, EN).
 - `tests/lib/shared/bot-logs.test.ts` — ligne Discord.
 - `tests/tournois/forfeit-buttons-label-in-name.test.ts` — nom accessible des
   boutons d'abandon (FR, EN), réserve de la confirmation.

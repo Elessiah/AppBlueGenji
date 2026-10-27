@@ -230,6 +230,19 @@ function sendingOpensDispute(
   return form.entered.team1Score !== view.theirs.team1Score || form.entered.team2Score !== view.theirs.team2Score;
 }
 
+/**
+ * Le libellé d'un bouton focalisé qui change n'est pas annoncé : l'envoi se
+ * dit dans cette région, toujours montée, comme dans `ConfirmActionDialog`.
+ */
+function SendingStatus({ active }: Readonly<{ active: boolean }>) {
+  const { t } = useDialogsText();
+  return (
+    <output className="sr-only" aria-live="polite">
+      {active ? t("score.sending") : ""}
+    </output>
+  );
+}
+
 export function PlayerScoreDialog({
   tournamentId,
   match: liveMatch,
@@ -615,8 +628,9 @@ export function PlayerScoreDialog({
                       aria-disabled={submitting || undefined}
                       aria-busy={submitting || undefined}
                     >
-                      {t("score.player.forfeit.confirm", { name: myName })}
-                      {submitting && "…"}
+                      {/* En vol, un libellé d'attente plutôt qu'un « … » accolé au
+                          nom, qui se lisait comme un nom tronqué. */}
+                      {submitting ? t("score.sending") : t("score.player.forfeit.confirm", { name: myName })}
                     </button>
                   </div>
                 </div>
@@ -656,7 +670,9 @@ export function PlayerScoreDialog({
               <button
                 type="submit"
                 className="btn"
-                disabled={nothingEntered || unchangedMine}
+                // Jamais `disabled` natif pendant l'envoi : le report reçu par le
+                // flux pourrait désactiver le bouton focalisé et faire tomber le focus.
+                disabled={!submitting && (nothingEntered || unchangedMine)}
                 aria-disabled={submitting || undefined}
                 // Un avertissement monté déjà rempli n'est pas toujours annoncé :
                 // rattaché au bouton, il se lit au moment d'envoyer.
@@ -667,6 +683,7 @@ export function PlayerScoreDialog({
                 {submitting && "…"}
               </button>
             )}
+            <SendingStatus active={submitting} />
           </div>
         </form>
       </div>

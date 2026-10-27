@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
-import { pastWarningKey } from "@/app/(secured)/tournois/[id]/_components/MatchScheduleDialog";
 import { join } from "node:path";
+import { pastWarningKey } from "@/lib/shared/match-start-entry";
 import enDialogs from "@/messages/en/tournamentDialogs.json";
 import frDialogs from "@/messages/fr/tournamentDialogs.json";
 
@@ -43,8 +43,10 @@ describe("MatchScheduleDialog — heure", () => {
   });
 
   it("présélectionne le mois courant sans date posée, et le vide avec la date", () => {
-    expect(SOURCE).toContain("initial ? String(initial.month) : String(matchEntryDefaultMonth(Date.now()))");
+    expect(SOURCE).toContain("initial ? String(initial.month) : String(matchEntryDefaultMonth(clock))");
     expect(SOURCE).toContain('setMonth("")');
+    // Présélectionné, le mois ne compte qu'une fois un jour choisi (rendu : `match-schedule-dialog-render`).
+    expect(SOURCE).toContain('const enteredMonth = monthPreset && day === "" ? "" : month;');
   });
 
   it("n'explique plus la déduction de l'année, mais garde l'aperçu et sa correction", () => {
@@ -62,8 +64,8 @@ describe("MatchScheduleDialog — qui l'horaire prévient", () => {
     expect(SOURCE).toMatch(
       /startAtHint\(\s*text,\s*refereeScheduling,\s*match\.team1Id !== null && match\.team2Id !== null,\s*(\/\/[^\n]*\s*)?isMatchOver\(match\.status, tournamentFinished\),\s*launchPhase,\s*match\.launchedAt !== null,\s*\)/,
     );
-    // Un match joué n'annonce rien : l'aide s'en tient à la date.
-    expect(SOURCE).toContain("return played ? base : `${base} ${scheduleNotice(text, refereeScheduling, entrantsKnown)}`;");
+    // Un match joué n'annonce rien ; sinon l'avis vit derrière un « i », hors de l'aide.
+    expect(SOURCE).toContain("return played ? null : scheduleNotice(text, refereeScheduling, entrantsKnown);");
     expect(SOURCE).toMatch(/if \(!entrantsKnown\) return text\.t\("schedule\.noticeTbd"\);/);
     expect(SOURCE).toContain('text.t(refereeScheduling ? "schedule.noticePlanning" : "schedule.notice")');
   });
@@ -110,11 +112,37 @@ describe("MatchScheduleDialog — confirmation d'un retrait", () => {
 });
 
 describe("MatchScheduleDialog — date déjà passée", () => {
-  it("avertit d'une date passée sur un match ni lancé ni joué, sans la refuser", () => {
-    expect(SOURCE).toContain("isPastMatchStartChange(entry.instant, matchStartAtTime(match), openedAt)");
-    expect(SOURCE).toContain("match.launchedAt === null &&");
-    expect(SOURCE).toContain("!isMatchOver(match.status, tournamentFinished) &&");
-    expect(SOURCE).toMatch(/\{startsAtOnce && \(\s*<ScheduleWarning>/);
+  it("avertit d'une date passée par `pastStartWarning`, sans la refuser (logique : match-start-entry.test)", () => {
+    expect(SOURCE).toContain("pastStartWarning({ ...match, refereeScheduling }, entry.instant, now, { launchPhase, tournamentFinished })");
+    expect(SOURCE).toContain("<PastDateWarning message={pastWarning === null ? null : t(pastWarning)} />");
+  });
+
+  it("une date devenue passée fenêtre ouverte : l'envoi retenu fait défiler l'avertissement et l'envoi, le focus reste sur l'envoi", () => {
+    // À 375 px l'avertissement pouvait être sous le pli, et le clic semblait
+    // sans effet ; il repousse le bouton, qu'on ramène aussi dans la vue. Focus
+    // inchangé : un second « Entrée » confirme. Pas de notification
+    // `role="alert"`, qui aurait coupé la région d'état au lecteur d'écran.
+    expect(SOURCE).toMatch(
+      /if \(pastWarning === null && pastWarningAt\(now\) !== null\) \{\s*setClock\(now\);\s*requestAnimationFrame\(\(\) => \{\s*document\.getElementById\(PAST_WARNING_ID\)\?\.scrollIntoView\(\{ block: "nearest" \}\);\s*document\.getElementById\(SUBMIT_ID\)\?\.scrollIntoView\(\{ block: "nearest" \}\);\s*\}\);\s*return;/,
+    );
+    expect(SOURCE).toMatch(/<button\s+id=\{SUBMIT_ID\}\s+type="submit"/);
+    expect(SOURCE).not.toMatch(/getElementById\(PAST_WARNING_ID\)\?\.focus/);
+    expect(SOURCE).toContain("<output id={PAST_WARNING_ID} style=");
+    expect(SOURCE).not.toContain("warnPastLate");
+  });
+
+  it("le second clic d'un double-clic et la répétition d'« Entrée » ne valent pas confirmation", () => {
+    // `detail` suit le délai de double-clic du système (pas de seuil fixe), et
+    // aucun horodatage : rien ne dépend de l'horloge murale.
+    expect(SOURCE).toMatch(/onClick=\{\(event\) => \{\s*if \(event\.detail > 1\) event\.preventDefault\(\);\s*\}\}/);
+    expect(SOURCE).toMatch(/onKeyDown=\{\(event\) => \{\s*if \(event\.repeat && event\.key === "Enter"\) event\.preventDefault\(\);\s*\}\}/);
+    // « Vider la date » et « Annuler », repoussés sous le second clic par
+    // l'avertissement qui apparaît, ne le prennent pas non plus.
+    expect(SOURCE).toMatch(/onClick=\{\(event\) => \{\s*if \(event\.detail <= 1\) clearAll\(\);\s*\}\}/);
+    expect(SOURCE).toMatch(/onClick=\{\(event\) => \{\s*if \(event\.detail <= 1\) onClose\(\);\s*\}\}/);
+    expect(SOURCE).not.toContain("onClick={onClose}");
+    expect(SOURCE).not.toContain("heldBackAt");
+    expect(SOURCE).not.toContain("LATE_WARNING_CONFIRM_DELAY_MS");
   });
 
   it("dit ce que la date déclenche selon la phase de lancement et les engagés", () => {
@@ -134,9 +162,10 @@ describe("MatchScheduleDialog — date déjà passée", () => {
 
 describe("MatchScheduleDialog — sous-titre", () => {
   it("rend les engagés par EntrantName (forme affichable, lien de fiche), jamais le nom brut", () => {
-    expect(SOURCE).toContain('<EntrantName teamId={match.team1Id} name={match.team1Name ?? "TBD"} />');
-    expect(SOURCE).toContain('<EntrantName teamId={match.team2Id} name={match.team2Name ?? "TBD"} />');
-    expect(SOURCE).not.toContain('{match.team1Name ?? "TBD"} vs');
+    expect(SOURCE).toContain('<EntrantName teamId={match.team1Id} name={match.team1Name ?? t("schedule.tbd")} />');
+    expect(SOURCE).toContain('<EntrantName teamId={match.team2Id} name={match.team2Name ?? t("schedule.tbd")} />');
+    expect(SOURCE).not.toContain('"TBD"');
+    expect(SOURCE).not.toMatch(/\/> vs\{" "\}/);
   });
 
   it("ouvre le focus sur le jour, pas sur le lien du premier engagé du sous-titre", () => {

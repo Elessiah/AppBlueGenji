@@ -26,6 +26,7 @@ import { loadEntrantsBySiteRanking } from "@/lib/server/ranking-service";
 import type { SwissMeta, SwissTiebreaker } from "@/lib/shared/types";
 import { createMatch, finishTournament, forfeitMatchScores } from "./repository";
 import { noteDeletedMatches } from "./departed-notices";
+import { loadCancellableForfeitIds } from "./forfeit-window";
 import { localUploadUrl } from "@/lib/shared/uploads";
 
 interface TournamentSwissRow extends RowDataPacket {
@@ -780,11 +781,12 @@ export async function loadSwissMeta(
       buchholz: string | number;
       rank: number;
       status: "ACTIVE" | "FORFEIT";
+      forfeit_round: number | null;
     })[]
   >(
     `SELECT
       s.team_id, s.seed, s.points, s.wins, s.draws, s.losses, s.byes,
-      s.buchholz, s.\`rank\`, s.status,
+      s.buchholz, s.\`rank\`, s.status, s.forfeit_round,
       t.name AS team_name, t.logo_url
      FROM bg_swiss_standings s
      JOIN bg_teams t ON t.id = s.team_id
@@ -794,6 +796,16 @@ export async function loadSwissMeta(
   );
 
   const points = resolvePoints(tournament);
+  const cancellableForfeitTeamIds = await loadCancellableForfeitIds(
+    conn,
+    tournamentId,
+    phaseId,
+    rows.map((row) => ({
+      teamId: Number(row.team_id),
+      status: row.status,
+      forfeitRound: row.forfeit_round === null ? null : Number(row.forfeit_round),
+    })),
+  );
 
   return {
     totalRounds: Number(tournament.swiss_total_rounds ?? 0),
@@ -817,5 +829,6 @@ export async function loadSwissMeta(
       status: row.status,
       rank: Number(row.rank),
     })),
+    cancellableForfeitTeamIds,
   };
 }

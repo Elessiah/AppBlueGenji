@@ -3,10 +3,10 @@ import {
   adminFormStateFor,
   decideScoreForm,
   sameScoreFormState,
-  scoreBlockerMessage,
   scoreFormStateFor,
   storedResultSignature,
 } from "@/app/(secured)/tournois/[id]/_lib/score-form";
+import { FR_DIALOGS_TEXT, scoreBlockerText } from "@/app/(secured)/tournois/[id]/_lib/dialogs-text";
 import { mapError } from "@/app/(secured)/tournois/[id]/_lib/error-map";
 import { formatMatchResultLog } from "@/lib/shared/bot-logs";
 import type { BracketMatch } from "@/lib/shared/types";
@@ -41,7 +41,7 @@ describe("formulaire d'arbitrage — double forfait", () => {
       saveBlocker: "DOUBLE_FORFEIT",
       resolveBlocker: null,
     });
-    expect(scoreBlockerMessage("DOUBLE_FORFEIT", null)).toContain("Valider le résultat");
+    expect(scoreBlockerText(FR_DIALOGS_TEXT, "DOUBLE_FORFEIT", null)).toContain("Valider le résultat");
   });
 
   it("rouvre le dialogue sur le double forfait enregistré", () => {

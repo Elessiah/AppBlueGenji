@@ -14,6 +14,7 @@ import {
 } from "@/lib/shared/survival";
 import { loadEntrantsBySiteRanking } from "@/lib/server/ranking-service";
 import { createMatch, finishTournament, forfeitMatchScores } from "./repository";
+import { loadCancellableForfeitIds } from "./forfeit-window";
 import { noteDeletedMatches } from "./departed-notices";
 import { localUploadUrl } from "@/lib/shared/uploads";
 
@@ -639,7 +640,8 @@ export async function reconcileSurvival(
 /**
  * Déclare le forfait d'une équipe : elle quitte le tournoi. Son match en cours
  * (le cas échéant) est résolu en faveur de l'adversaire, puis l'état est
- * réconcilié (coupe/clôture/round suivant).
+ * réconcilié (coupe/clôture/round suivant) — dans un tournoi simple ; dans une
+ * phase (`phaseId` non nul), l'appelant réconcilie par `reconcilePhases`.
  */
 export async function forfeitSurvivalTeam(
   tournamentId: number,
@@ -715,7 +717,13 @@ export async function forfeitSurvivalTeam(
     [Math.max(currentRound, 1), tournamentId, phaseId, teamId],
   );
 
-  await reconcileSurvival(tournamentId, conn, { phaseId });
+  // Dans une phase, seul `reconcilePhases` (que l'appelant enchaîne) connaît la
+  // cible de qualifiées : réconcilier ici avec la cible par défaut (1) couperait
+  // ou clôturerait la phase sur une cible fausse avant que la bonne ne passe.
+  // Même règle que `replayStandings` dans forfeit-cancellation.ts.
+  if (phaseId === 0) {
+    await reconcileSurvival(tournamentId, conn, { phaseId });
+  }
 }
 
 /**
@@ -744,6 +752,16 @@ export async function loadSurvivalMeta(
   );
 
   const schedule = resolveCutSchedule(tournament);
+  const cancellableForfeitTeamIds = await loadCancellableForfeitIds(
+    conn,
+    tournamentId,
+    phaseId,
+    rows.map((row) => ({
+      teamId: Number(row.team_id),
+      status: row.status,
+      forfeitRound: row.eliminated_round === null ? null : Number(row.eliminated_round),
+    })),
+  );
 
   return {
     roundsBeforeFirstCut: schedule.roundsBeforeFirstCut,
@@ -761,6 +779,7 @@ export async function loadSurvivalMeta(
       eliminatedRound: row.eliminated_round === null ? null : Number(row.eliminated_round),
       rank: Number(row.rank),
     })),
+    cancellableForfeitTeamIds,
   };
 }
 
