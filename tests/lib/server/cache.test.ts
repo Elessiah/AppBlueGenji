@@ -4,6 +4,7 @@ import {
   clearCache,
   invalidateCached,
   invalidateCachedPrefix,
+  isCachedOrLoading,
 } from "@/lib/server/cache";
 
 afterEach(() => {
@@ -203,5 +204,37 @@ describe("cache — bornes mémoire", () => {
 
     expect(await cached("rechargee", 60_000, async () => "v3")).toBe("v2");
     expect(await cached("autre", 60_000, async () => "a2")).toBe("a2");
+  });
+});
+
+describe("cache — clé prête ou à calculer", () => {
+  it("dit froide une clé jamais lue, invalidée, ou dont le calcul a échoué", async () => {
+    expect(isCachedOrLoading("froide")).toBe(false);
+
+    await cached("froide", 60_000, async () => 1);
+    invalidateCached("froide");
+    expect(isCachedOrLoading("froide")).toBe(false);
+
+    await expect(cached("echec", 60_000, async () => Promise.reject(new Error("x")))).rejects.toThrow("x");
+    expect(isCachedOrLoading("echec")).toBe(false);
+  });
+
+  it("dit prête une clé fraîche ou en cours de calcul, froide une fois expirée", async () => {
+    jest.useFakeTimers();
+    const pending = deferred<number>();
+    const reading = cached("k", 1_000, () => pending.promise);
+    expect(isCachedOrLoading("k")).toBe(true);
+
+    pending.resolve(1);
+    await reading;
+    expect(isCachedOrLoading("k")).toBe(true);
+
+    jest.setSystemTime(Date.now() + 1_001);
+    expect(isCachedOrLoading("k")).toBe(false);
+  });
+
+  it("ne garde rien d'une durée de vie nulle : prête seulement pendant le calcul", async () => {
+    await cached("nulle", 0, async () => 1);
+    expect(isCachedOrLoading("nulle")).toBe(false);
   });
 });

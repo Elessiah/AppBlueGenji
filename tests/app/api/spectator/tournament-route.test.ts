@@ -8,7 +8,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { getVisibleTournamentCard, getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
 import { clearCache } from "@/lib/server/cache";
 import { resetRateLimit } from "@/lib/server/rate-limit";
-import { SPECTATOR_READ_RULE } from "@/lib/server/api-guard";
+import { SPECTATOR_READ_RULE, SPECTATOR_REBUILD_RULE } from "@/lib/server/api-guard";
 import { resetSpectatorLoad, spectatorReadsPerMinute } from "@/lib/server/spectator-load";
 import {
   SPECTATOR_FRESHNESS_HEADER,
@@ -249,5 +249,26 @@ describe("GET /api/spectator/tournaments/[id]", () => {
     expect(refused.headers.get("retry-after")).not.toBeNull();
     // Une autre adresse passe toujours.
     expect((await GET(req("5", { "x-forwarded-for": "198.51.100.9" }), params("5"))).status).toBe(200);
+  });
+
+  it("plafonne à part les lectures qui font reconstruire la réponse, pas celles servies par le cache", async () => {
+    mockedSnapshot.mockResolvedValue(snapshot());
+    // Une adresse parcourt des tournois froids : chacun coûte un instantané entier.
+    for (let i = 1; i <= SPECTATOR_REBUILD_RULE.limit; i += 1) {
+      expect((await GET(req(String(i)), params(String(i)))).status).toBe(200);
+    }
+    expect(mockedSnapshot).toHaveBeenCalledTimes(SPECTATOR_REBUILD_RULE.limit);
+
+    const refused = await GET(req("1000"), params("1000"));
+    expect(refused.status).toBe(429);
+    expect(refused.headers.get("retry-after")).not.toBeNull();
+    // Refusée avant toute lecture en base.
+    expect(mockedSnapshot).toHaveBeenCalledTimes(SPECTATOR_REBUILD_RULE.limit);
+
+    // Un tournoi déjà prêt reste servi à cette adresse : il ne coûte que le cache.
+    expect((await GET(req("1"), params("1"))).status).toBe(200);
+    // Et une autre adresse fait toujours reconstruire.
+    expect((await GET(req("1000", { "x-forwarded-for": "198.51.100.9" }), params("1000"))).status).toBe(200);
+    expect(mockedSnapshot).toHaveBeenCalledTimes(SPECTATOR_REBUILD_RULE.limit + 1);
   });
 });
