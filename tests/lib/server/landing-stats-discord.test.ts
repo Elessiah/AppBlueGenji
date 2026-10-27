@@ -113,3 +113,28 @@ describe("compteur de tournois de l'accueil", () => {
     expect(sql).toMatch(/COUNT\(\*\) FROM bg_tournaments WHERE start_visibility_at <= NOW\(\)/);
   });
 });
+
+describe("compteur « Équipes actives »", () => {
+  beforeEach(() => {
+    clearCache();
+    jest.clearAllMocks();
+    mockedDiscord.mockResolvedValue(null);
+  });
+
+  it("compte les équipes de l'annuaire : ni entrée solo ni équipe dissoute, fantômes compris", async () => {
+    const execute = jest.fn<SqlQuery>(async () => [[{ players: 3, teams: 2, tournaments: 1 }], []]);
+    mockedDb.mockResolvedValue(fakePool({ execute }));
+
+    await expect(getLandingStats()).resolves.toMatchObject({ teams: 2 });
+    const sql = String(execute.mock.calls[0][0]);
+    const teamCount = sql.slice(sql.indexOf("FROM bg_teams"), sql.indexOf("AS teams"));
+    expect(teamCount).toContain("solo_user_id IS NULL");
+    expect(teamCount).toContain("deleted_at IS NULL");
+    expect(teamCount).not.toContain("is_ghost");
+  });
+
+  it("une ligne absente ramène les compteurs à zéro plutôt qu'à NaN", async () => {
+    mockedDb.mockResolvedValue(fakePool({ execute: jest.fn<SqlQuery>(async () => [[], []]) }));
+    await expect(getLandingStats()).resolves.toMatchObject({ players: 0, teams: 0, tournaments: 0 });
+  });
+});
