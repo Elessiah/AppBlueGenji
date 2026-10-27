@@ -148,7 +148,11 @@ lui-même).
   identifiants au hasard ne ralentissent pas les vrais spectateurs ;
 - plafond par IP (`SPECTATOR_READ_RULE`, 360/min : une salle de LAN d'une
   centaine d'écrans derrière une même adresse passe, gigue, ouvertures et
-  reprises comprises) ; base injoignable → `503` +
+  reprises comprises) et, à part, plafond des lectures qui font
+  **reconstruire** la réponse (`SPECTATOR_REBUILD_RULE`, 60/min : aucune
+  réponse fraîche ni calcul en vol, `isSpectatorPayloadWarm`) — une adresse qui
+  parcourt des tournois froids ne fait plus bâtir six instantanés entiers par
+  seconde, une lecture servie par le cache n'y entre pas ; base injoignable → `503` +
   `Retry-After` du double de la cadence au niveau du moment
   (`spectatorUnavailableRetryMs` : 1 min au calme, 10 au pire), puis recul
   doublé par le relecteur — le `Retry-After` n'est qu'un plancher : des `503`
