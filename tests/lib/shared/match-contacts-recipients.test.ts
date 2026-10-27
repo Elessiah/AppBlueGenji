@@ -5,6 +5,10 @@ import { PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
 import { PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register-en";
 import enProfile from "@/messages/en/profile.json";
 import frProfile from "@/messages/fr/profile.json";
+import enLaunch from "@/messages/en/launchModal.json";
+import frLaunch from "@/messages/fr/launchModal.json";
+import enDialogs from "@/messages/en/tournamentDialogs.json";
+import frDialogs from "@/messages/fr/tournamentDialogs.json";
 import { readSource } from "../../helpers/read-source";
 
 /**
@@ -198,5 +202,21 @@ describe("tag Discord d'un caster — arbitres", () => {
     expect(enProfile.battletagNotice.staff).toContain(
       "at the same times as both teams for a match you play, from the moment both its opponents are known until its end for a match you cast",
     );
+  });
+});
+
+describe("Co-casters — les textes qui disent qui lit les contacts", () => {
+  it("la fenêtre « Contacts » nomme les casters et dit que les autres casters lisent la fiche d'un caster (FR et EN)", () => {
+    expect(frLaunch.contacts.lead).toContain("le temps du match, à ses casters");
+    expect(frLaunch.contacts.lead).toContain("Celle d'un caster : aux deux équipes et aux autres casters le temps du match");
+    expect(enLaunch.contacts.lead).toContain("while the match is being played, its casters");
+    expect(enLaunch.contacts.lead).toContain("A caster's: to both teams and the other casters while the match is being played");
+  });
+
+  it("la priorité du contact d'équipe nomme les casters du match (FR et EN)", () => {
+    const fr = [frDialogs.certification.rows.matches.does, frDialogs.certification.rows.matches.doesDiscordOnly];
+    const en = [enDialogs.certification.rows.matches.does, enDialogs.certification.rows.matches.doesDiscordOnly];
+    for (const text of fr) expect(text).toContain("aux deux équipes du match, à ses casters, aux arbitres");
+    for (const text of en) expect(text).toContain("to both teams of the match, its casters, and the site's");
   });
 });

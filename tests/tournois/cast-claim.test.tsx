@@ -79,6 +79,20 @@ describe("castClaimChoices — un choix par stream, puis « ouvrir le sien »", 
     });
   });
 
+  it("le stream d'un caster que la lecture tait n'est pas offert comme « stream du match »", () => {
+    // Caster retiré d'office avant le lancement : son stream reste, sans caster visible.
+    const match = bracketMatch({
+      streams: [
+        { id: 6, liveUrl: "https://twitch.tv/perso", staff: false },
+        { id: 7, liveUrl: "https://kick.com/bg", staff: true },
+      ],
+    });
+    expect(castClaimChoices(match)).toEqual([
+      { kind: "JOIN", streamId: 7, liveUrl: "https://kick.com/bg", casterPseudos: [] },
+      { kind: "SEPARATE" },
+    ]);
+  });
+
   it("sans stream : seul le stream à part reste", () => {
     expect(castClaimChoices(bracketMatch())).toEqual([{ kind: "SEPARATE" }]);
   });
