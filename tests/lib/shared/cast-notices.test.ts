@@ -5,6 +5,7 @@ import { castReleasedPush } from "@/lib/shared/push-messages";
 import { DM_MAX_LENGTH } from "@/lib/shared/dm-language";
 import { PUSH_BODY_MAX, PUSH_TOPICS } from "@/lib/shared/push-notifications";
 import enPush from "@/messages/en/push.json";
+import frPush from "@/messages/fr/push.json";
 
 const REASONS: CastReleaseReason[] = ["STAFF", "REPLACED", "INELIGIBLE", "JOINED_TEAM"];
 const CHANGES: CastLogChange[] = ["CLAIMED", "REPLACED", "RELEASED", "RELEASED_BY_STAFF", "INELIGIBLE", "JOINED_TEAM"];
@@ -145,5 +146,15 @@ describe("sujet CAST_RELEASED", () => {
   it("réservé à la permission de diffusion, libellé dans les deux langues", () => {
     expect(PUSH_TOPICS.CAST_RELEASED.audience).toBe("live");
     expect(enPush.topics.CAST_RELEASED.label).toBe("Cast removed");
+  });
+
+  // Co-casters : aucun caster n'en déloge un autre, la description ne promet plus d'avis pour ce cas.
+  it("ne décrit plus de caster qui prend la place d'un autre (FR et EN)", () => {
+    for (const description of [PUSH_TOPICS.CAST_RELEASED.description, frPush.topics.CAST_RELEASED.description]) {
+      expect(description).toBe("Ton inscription comme caster d'un match est retirée par le staff ou d'office : le motif est donné.");
+    }
+    expect(enPush.topics.CAST_RELEASED.description).toBe(
+      "Your caster registration for a match is removed by the staff or automatically: the reason is given.",
+    );
   });
 });
