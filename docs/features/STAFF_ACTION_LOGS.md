@@ -15,8 +15,10 @@ n'appellent l'intervention de personne.
   `announceStaffTournamentAction(tournamentId, action, count?)` dans
   `lib/server/tournaments/staff-action-logs.ts` — relit le match
   (`match-log-subject.ts`, partagé avec `CAST_NOTICES.md`) ou le nom du tournoi,
-  n'attend pas, ne lève jamais (base ou bot indisponible : une ligne
-  `[staff-log]` en erreur, la réponse de la route ne change pas).
+  n'attend pas, ne lève jamais (base indisponible : une ligne `[staff-log]`
+  en erreur dans pm2, avec le geste et le numéro du match ou du tournoi mais
+  jamais l'auteur — le registre et `/rgpd` le disent ; bot injoignable :
+  `sendBotLog` abandonne en silence ; la réponse de la route ne change pas).
 - Appel : dans chaque route, **après** le geste réussi ; un refus (401, 403,
   400) ou un échec du service n'écrit rien.
 

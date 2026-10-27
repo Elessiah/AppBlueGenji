@@ -113,7 +113,8 @@ texte, effacée un jour après la fin de la soirée).
   enregistré, lancement forcé, hôte, diffusion, rediffusion, édition d'un
   tournoi, têtes de série, étape avancée, équipes fantômes, image et lien de
   diffusion — une ligne « par le staff » au journal, sans ligne pm2
-  (`STAFF_ACTION_LOGS.md`).
+  nominative (si la ligne ne peut être rédigée, pm2 garde `[staff-log]`, le
+  geste et le numéro du match ou du tournoi, sans auteur — `STAFF_ACTION_LOGS.md`).
 
 - Le **motif d'une pénalité** est saisi librement par l'arbitre et repris tel
   quel : il ne doit pas nommer de joueur.
