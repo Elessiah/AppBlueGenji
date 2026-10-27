@@ -172,6 +172,17 @@ const TONE_CLASS = {
  * retrait d'un caster par le staff : le caster en est prévenu (message privé,
  * push), un message qui ne se reprend pas (`docs/features/CAST_NOTICES.md`).
  */
+/**
+ * Une confirmation qui ne survit pas à la disparition de son action : remise à
+ * zéro dès que `present` tombe, sans quoi la modale se rouvrirait seule au
+ * retour de l'action (instantané du flux), sans clic.
+ */
+function useConfirmWhile(present: boolean) {
+  const [open, setOpen] = useState(false);
+  if (open && !present) setOpen(false);
+  return [open && present, setOpen] as const;
+}
+
 export function MatchCardActions({
   match,
   phase,
@@ -207,7 +218,6 @@ export function MatchCardActions({
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
   const [confirmForce, setConfirmForce] = useState(false);
-  const [confirmRelease, setConfirmRelease] = useState(false);
   const [contactsOpen, setContactsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
@@ -220,8 +230,7 @@ export function MatchCardActions({
   // « Forcer » (instantané du flux), sans clic.
   if (confirmForce && !hasForce) setConfirmForce(false);
   // Même règle pour le retrait du caster (match terminé, caster parti…).
-  const hasRelease = actions.some((a) => a.id === "releaseCast");
-  if (confirmRelease && !hasRelease) setConfirmRelease(false);
+  const [confirmRelease, setConfirmRelease] = useConfirmWhile(actions.some((a) => a.id === "releaseCast"));
   // Les contacts ne restent pas affichés quand le match ne les offre plus
   // (terminé, caster retiré, tournoi clos) : l'instantané du flux retire
   // l'action, et la modale se ferme avec elle.
@@ -515,7 +524,7 @@ export function MatchCardActions({
           )}
         </ConfirmActionDialog>
       )}
-      {confirmRelease && hasRelease && (
+      {confirmRelease && (
         <ConfirmActionDialog
           title={t("cardActions.releaseConfirm.title", { match: matchLabel })}
           confirmLabel={t("cardActions.releaseConfirm.confirm")}
