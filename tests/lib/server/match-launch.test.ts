@@ -589,6 +589,33 @@ describe("claimMatchCast", () => {
     expect(announceCastChange).not.toHaveBeenCalled();
   });
 
+  it("refuse, avant le lancement, un stream que seul tient un caster tu : sa chaîne ne réapparaît pas", async () => {
+    state.users[CASTER] = verified;
+    // 901 a perdu la permission `live` : son stream (et son lien) est tu.
+    state.users[901] = { ...ELIGIBLE_CASTER, platform_roles_json: null };
+    state.match = matchState({ caster_user_id: 901, streams: [{ id: 1, live_url: "https://twitch.tv/a" }] });
+    await expect(claimMatchCast(42, CASTER, true, { streamId: 1 })).rejects.toThrow("STREAM_NOT_FOUND");
+    expect(state.writes).toEqual([]);
+    expect(announceCastChange).not.toHaveBeenCalled();
+    // Un caster encore éligible sur le même stream le rend montré, donc joignable.
+    state.users[902] = ELIGIBLE_CASTER;
+    state.match.casters.push({ user_id: 902, stream_id: 1, ready_at: null });
+    await claimMatchCast(42, CASTER, true, { streamId: 1 });
+    expect(state.match.casters.map((caster) => caster.user_id)).toEqual([901, 902, CASTER]);
+  });
+
+  it("rejoint le stream du staff sans caster, et tout stream d'un match lancé", async () => {
+    state.users[CASTER] = verified;
+    state.match = matchState({ streams: [{ id: 1, live_url: "https://twitch.tv/officiel", staff_owned: 1 }] });
+    await claimMatchCast(42, CASTER, true, { streamId: 1 });
+    expect(state.match.casters).toEqual([{ user_id: CASTER, stream_id: 1, ready_at: null }]);
+    // Lancé : la lecture ne tait plus aucun caster, son stream se rejoint.
+    state.users[901] = { ...ELIGIBLE_CASTER, platform_roles_json: null };
+    state.match = matchState({ caster_user_id: 901, launched_at: STAMP });
+    await claimMatchCast(42, CASTER, true, { streamId: 1 });
+    expect(state.match.casters.map((caster) => caster.user_id)).toEqual([901, CASTER]);
+  });
+
   it("refuse un lien non reconnu avant toute lecture", async () => {
     state.users[CASTER] = verified;
     await expect(claimMatchCast(42, CASTER, true, { liveUrl: "https://exemple.invalid/live" })).rejects.toThrow("INVALID_STREAM_URL");
@@ -627,6 +654,8 @@ describe("claimMatchCast", () => {
 
   it("sans plafond : un troisième caster s'ajoute ; rejouer sa propre inscription ne change rien", async () => {
     state.users[CASTER] = verified;
+    state.users[901] = ELIGIBLE_CASTER;
+    state.users[902] = ELIGIBLE_CASTER;
     state.match = matchState({ caster_user_id: 901 });
     state.match.casters.push({ user_id: 902, stream_id: 1, ready_at: null });
     await claimMatchCast(42, CASTER, true, { streamId: 1 });

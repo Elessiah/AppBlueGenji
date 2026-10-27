@@ -21,10 +21,12 @@ import { fakeConnection, type SqlQuery } from "../../helpers/sql-double";
 const stream = (id: number, liveUrl: string | null, staff = false): MatchStreamRow => ({ id, matchId: 42, liveUrl, staff });
 
 describe("firstStreamUrlSql — le premier lien, seule définition", () => {
-  it("prend le plus petit stream qui a un lien, sur l'alias donné", () => {
+  it("prend le lien du staff, à défaut le plus petit stream qui a un lien, sur l'alias donné", () => {
     const sql = firstStreamUrlSql("m").replace(/\s+/g, " ");
     expect(sql.startsWith("(SELECT fs.live_url FROM bg_match_streams fs WHERE fs.match_id = m.id AND fs.live_url IS NOT NULL")).toBe(true);
-    expect(sql.endsWith("ORDER BY fs.id LIMIT 1)")).toBe(true);
+    // Un lien de caster ouvert avant celui du staff ne passe pas devant lui :
+    // l'annonce #live et l'accueil gardent la chaîne choisie par le staff.
+    expect(sql.endsWith("ORDER BY fs.staff_owned DESC, fs.id LIMIT 1)")).toBe(true);
   });
 
   it("écarte le stream d'un caster qui ne remplit plus la condition, sauf stream du staff ou match lancé/joué", () => {
