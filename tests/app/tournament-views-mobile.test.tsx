@@ -241,10 +241,12 @@ describe("abandon figé — légende", () => {
     expect(css).not.toContain(":has(.forfeitLocked");
   });
 
-  it("BG Survie : la légende vit dans la vue « Général » seule, sous le tableau et avant la navigation du bas", () => {
+  it("BG Survie : la légende vit dans le panneau « Général » seul, en pied du tableau, avant la navigation du bas", () => {
     const views = read("_components", "EnduranceRankingViews.tsx");
-    const legend = views.indexOf("{withActions && actionsLegend}");
-    expect(legend).toBeGreaterThan(-1);
+    const legend = views.indexOf("{withActions && actionsLegend && <div className={styles.legend}>{actionsLegend}</div>}");
+    expect(legend).toBeGreaterThan(views.indexOf('role={views.length > 1 ? "tabpanel" : undefined}'));
+    // Dernier enfant du panneau : sa balise fermante suit la légende.
+    expect(views.slice(legend).trimStart()).toMatch(/^\{withActions[^\n]*\r?\n\s*<\/div>/);
     expect(legend).toBeLessThan(views.indexOf("className={styles.bottomNav}"));
     expect(read("_components", "EnduranceView.tsx")).toContain("actionsLegend={");
   });

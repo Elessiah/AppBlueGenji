@@ -117,17 +117,19 @@ describe("MatchScheduleDialog — date déjà passée", () => {
     expect(SOURCE).toContain("<PastDateWarning message={pastWarning === null ? null : t(pastWarning)} />");
   });
 
-  it("une date devenue passée fenêtre ouverte : l'envoi retenu porte le focus sur l'avertissement", () => {
+  it("une date devenue passée fenêtre ouverte : l'envoi retenu fait défiler l'avertissement, le focus reste sur l'envoi", () => {
     // À 375 px l'avertissement pouvait être sous le pli, et le clic semblait
-    // sans effet ; le focus le fait défiler et le fait lire. Pas de
-    // notification `role="alert"`, qui l'aurait coupé au lecteur d'écran.
+    // sans effet. Focus inchangé : un second « Entrée » confirme (déplacé, la
+    // tabulation suivante tombait sur « Vider la date »). Pas de notification
+    // `role="alert"`, qui aurait coupé la région d'état au lecteur d'écran.
     expect(SOURCE).toMatch(
-      /if \(pastWarning === null && pastWarningAt\(now\) !== null\) \{\s*setClock\(now\);\s*requestAnimationFrame\(\(\) => document\.getElementById\(PAST_WARNING_ID\)\?\.focus\(\)\);\s*return;/,
+      /if \(pastWarning === null && pastWarningAt\(now\) !== null\) \{\s*setClock\(now\);\s*requestAnimationFrame\(\(\) => document\.getElementById\(PAST_WARNING_ID\)\?\.scrollIntoView\(\{ block: "nearest" \}\)\);\s*return;/,
     );
-    expect(SOURCE).toContain("<output id={PAST_WARNING_ID} tabIndex={-1}");
+    expect(SOURCE).not.toMatch(/getElementById\(PAST_WARNING_ID\)\?\.focus/);
+    expect(SOURCE).toContain("<output id={PAST_WARNING_ID} style=");
     expect(SOURCE).not.toContain("warnPastLate");
-    expect("warnPastLate" in frDialogs.schedule).toBe(false);
   });
+
 
 
   it("dit ce que la date déclenche selon la phase de lancement et les engagés", () => {

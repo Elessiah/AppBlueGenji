@@ -137,7 +137,7 @@ describe("MatchScheduleDialog — date passée", () => {
   it("la région d'avertissement est montée dès l'ouverture, vide et sans cadre", () => {
     for (const locale of ["fr", "en"] as const) {
       const html = render(locale, versus);
-      expect(html).toContain('<output id="match-start-past-warning" tabindex="-1" style="display:block"></output>');
+      expect(html).toContain('<output id="match-start-past-warning" style="display:block"></output>');
     }
   });
 });
