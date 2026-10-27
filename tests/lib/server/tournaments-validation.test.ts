@@ -38,6 +38,22 @@ describe("validateTournamentInput", () => {
     expect(validateTournamentInput({ ...base, name: "   " })).toEqual({ error: "MISSING_NAME" });
   });
 
+  it("enregistre le nom sans invisibles, et refuse un nom fait seulement d'invisibles", () => {
+    const rlo = String.fromCodePoint(0x202e);
+    const zwsp = String.fromCodePoint(0x200b);
+    const result = validateTournamentInput({ ...base, name: `  Coupe${zwsp}  d'hiver${rlo} ` });
+    expect("value" in result && result.value.name).toBe("Coupe  d'hiver");
+    expect(validateTournamentInput({ ...base, name: `${zwsp}${rlo}` })).toEqual({ error: "MISSING_NAME" });
+    // Un nom qui n'est pas du texte (corps JSON forgé) est absent, sans lever.
+    expect(validateTournamentInput({ ...base, name: 42 as unknown as string })).toEqual({ error: "MISSING_NAME" });
+  });
+
+  it("garde la typographie d'un titre : ni NFKC ni réduction des espaces", () => {
+    const name = "Coupe Overwatch™ — Saison ½ ｘ 2026 €";
+    const result = validateTournamentInput({ ...base, name });
+    expect("value" in result && result.value.name).toBe(name);
+  });
+
   it("refuse un format inconnu", () => {
     expect(validateTournamentInput({ ...base, format: "TRIPLE" as never })).toEqual({
       error: "INVALID_FORMAT",

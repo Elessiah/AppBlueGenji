@@ -1,5 +1,6 @@
 import type { Pool, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { isSchemaNoOpError, isUnknownColumnError } from "@/lib/server/mysql-errors";
+import { withoutInvisibles } from "@/lib/shared/visible-text";
 import { reportSchemaFailure } from "./report-schema-failure";
 
 /*
@@ -305,5 +306,96 @@ export async function migrateRecruitmentPriority(db: Pool): Promise<void> {
     } catch (error) {
       reportSchemaFailure(error, DROP_RECRUITMENT_HIGHLIGHT);
     }
+  }
+}
+
+/** Colonnes de noms saisis, lus partout sur le site (`UNTRUSTED_NAMES.md`). */
+const STORED_NAME_COLUMNS = [
+  { table: "bg_teams", column: "name" },
+  { table: "bg_users", column: "pseudo" },
+  { table: "bg_tournaments", column: "name" },
+] as const;
+
+type StoredNameRow = RowDataPacket & { id: number; name: string | null };
+
+/**
+ * Retire une fois des noms enregistrés **avant** que l'écriture ne les
+ * nettoie ce qui ne se voit pas : caractères invisibles et commandes de
+ * direction (`withoutInvisibles`, `UNTRUSTED_NAMES.md`).
+ *
+ * Le nettoyage ne jouait qu'à l'écriture : un ancien nom à commande de
+ * direction (U+202E) ou à caractère invisible brouillait donc chaque surface
+ * qui l'oubliait à la lecture (menu du compte, dialogue de programmation,
+ * pages de tournoi). Réécrit en base, il est propre partout à la fois.
+ *
+ * Ni NFKC ni réduction des espaces : ce serait renommer en silence, et sans
+ * retour, un nom stylisé que son auteur a choisi (« Team² » → « Team2 »,
+ * lettres pleine chasse, espace fine insécable). Seul ce qui ne s'affiche
+ * pas disparaît, si bien que le nom se lit à l'identique après la passe.
+ *
+ * La lecture filtre en JavaScript, pas en `REGEXP` : la syntaxe des classes
+ * Unicode diffère entre MySQL (ICU) et MariaDB (PCRE), et trois tables de
+ * quelques milliers de lignes au plus se lisent d'un trait. Rejouée à chaque
+ * démarrage, la passe ne trouve plus rien à écrire une fois les noms propres.
+ *
+ * Une ligne est **laissée telle quelle** — les filtres de sortie restent donc
+ * en place — quand son nom nettoyé serait vide (la saisie le refuserait), ou
+ * quand il est refusé par la base : un sosie (`Adm` + U+200B + `in`) dont la
+ * forme propre est déjà prise par l'original (`UNIQUE`). La condition sur
+ * l'ancien nom évite d'écraser un renommage fait entre la lecture et
+ * l'écriture ; elle compare **octet à octet** (`utf8mb4_bin`) : la collation
+ * des colonnes (`utf8mb4_0900_ai_ci`, `utf8mb4_uca1400_ai_ci` sous MariaDB)
+ * ignore casse, accents et caractères invisibles, si bien que « TEAM »,
+ * renommé entre-temps, y égalerait l'ancien « Te » + U+200B + « am » et
+ * serait réécrit « Team ». `updated_at` est gardé : les trois tables le remettent à
+ * l'heure à chaque `UPDATE`, et le classement date un tournoi terminé sans
+ * `finished_at` par lui — un simple nettoyage ne doit pas en déplacer les
+ * tendances. Le journal ne compte que des lignes, jamais un nom
+ * (`RGPD_LOGS_AND_VISITS.md`).
+ */
+export async function cleanStoredNames(db: Pool): Promise<void> {
+  for (const { table, column } of STORED_NAME_COLUMNS) {
+    await cleanNameColumn(db, table, column);
+  }
+}
+
+/** Une colonne de `cleanStoredNames` : lue d'un trait, réécrite ligne à ligne. */
+async function cleanNameColumn(db: Pool, table: string, column: string): Promise<void> {
+  let rows: StoredNameRow[];
+  try {
+    [rows] = await db.execute<StoredNameRow[]>(`SELECT id, ${column} AS name FROM ${table}`);
+  } catch (error) {
+    reportSchemaFailure(error, `SELECT ${column} FROM ${table} (nettoyage des noms)`);
+    return;
+  }
+  let cleaned = 0;
+  let kept = 0;
+  for (const row of rows) {
+    const outcome = await rewriteName(db, table, column, row);
+    if (outcome === "kept") kept += 1;
+    else cleaned += outcome;
+  }
+  if (cleaned > 0 || kept > 0) {
+    console.log(
+      `[migrations] ${table}.${column} : ${cleaned} nom(s) réécrit(s) sans caractère invisible, ` +
+        `${kept} laissé(s) tel(s) quel(s) (vide une fois nettoyé, ou refusé par la base).`,
+    );
+  }
+}
+
+/** Lignes réécrites (0 si le nom est déjà propre ou a changé depuis), ou `"kept"`. */
+async function rewriteName(db: Pool, table: string, column: string, row: StoredNameRow): Promise<number | "kept"> {
+  if (typeof row.name !== "string") return 0;
+  const clean = withoutInvisibles(row.name);
+  if (clean === row.name) return 0;
+  if (!clean) return "kept";
+  try {
+    const [result] = await db.execute<ResultSetHeader>(
+      `UPDATE ${table} SET ${column} = ?, updated_at = updated_at WHERE id = ? AND ${column} COLLATE utf8mb4_bin = ?`,
+      [clean, row.id, row.name],
+    );
+    return result.affectedRows;
+  } catch {
+    return "kept";
   }
 }

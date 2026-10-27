@@ -6,7 +6,7 @@ import { MatchRow } from "./MatchRow";
 import { RoundMatchSections } from "./RoundMatchSections";
 import { isMatchScoreLocked } from "../_lib/score-lock";
 import { ScrollArea } from "@/components/cyber";
-import { EntrantName } from "./EntrantName";
+import { EntrantName, useShownEntrantName } from "./EntrantName";
 import { SCROLL_REVEAL_ATTRIBUTE } from "@/lib/shared/scroll-reveal";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 
@@ -71,6 +71,7 @@ function RoundBadge({ children }: Readonly<{ children: ReactNode }>) {
 /** Bandeau de la championne d'un tournoi clos, nommée par un lien. */
 export function ChampionBanner({ champion }: Readonly<{ champion: { teamId: number; teamName: string } }>) {
   const { t } = useTournamentPageText();
+  const championName = useShownEntrantName(champion.teamId, champion.teamName);
   return (
     <div
       style={{
@@ -83,7 +84,7 @@ export function ChampionBanner({ champion }: Readonly<{ champion: { teamId: numb
     >
       {t("match.champion")}{" "}
       <EntrantName teamId={champion.teamId} name={champion.teamName} logoSize={20}>
-        <strong>{champion.teamName}</strong>
+        <strong>{championName}</strong>
       </EntrantName>
     </div>
   );

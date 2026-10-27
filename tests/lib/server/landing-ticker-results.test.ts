@@ -167,10 +167,11 @@ describe("getLandingTicker — résultats", () => {
     expect(results((await getLandingTicker("en")).items)[0].sr).toBe("no winner");
   });
 
-  it("entrée solo, nom invisible ou ligne disparue : forme affichable du nom, sinon le repli « Équipe #id »", async () => {
+  it("entrée solo, nom invisible ou ligne disparue : nom sans invisibles, sinon le repli « Équipe #id »", async () => {
     await mockTicker([resultRow({ team1_name: "  Pseudo​  Solo ", team2_name: "​", team2_id: 7 }, 1)]);
     const [item] = results((await getLandingTicker()).items);
-    expect(item.sides.map((side) => side.name)).toEqual(["Pseudo Solo", "Équipe #7"]);
+    // Invisibles retirés, sans NFKC ni réduction des espaces (`UNTRUSTED_NAMES.md`).
+    expect(item.sides.map((side) => side.name)).toEqual(["Pseudo  Solo", "Équipe #7"]);
   });
 });
 

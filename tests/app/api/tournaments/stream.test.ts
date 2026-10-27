@@ -124,19 +124,27 @@ afterEach(() => {
 describe("GET /api/tournaments/[id]/stream — accès", () => {
   it("refuse un visiteur non connecté", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(null);
-    expect((await GET(new Request("http://t/"), params("5"))).status).toBe(401);
+    const response = await GET(new Request("http://t/"), params("5"));
+    expect(response.status).toBe(401);
+    // Un code (`fail`), jamais une phrase — comme la lecture REST de secours.
+    await expect(response.json()).resolves.toEqual({ error: "UNAUTHORIZED" });
   });
 
   it("refuse un identifiant invalide", async () => {
-    expect((await GET(new Request("http://t/"), params("abc"))).status).toBe(400);
-    expect((await GET(new Request("http://t/"), params("0"))).status).toBe(400);
+    for (const id of ["abc", "0"]) {
+      const response = await GET(new Request("http://t/"), params(id));
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({ error: "INVALID_TOURNAMENT_ID" });
+    }
   });
 
   it("répond 404 sur un tournoi inconnu plutôt que d'ouvrir un flux vide", async () => {
     // C'est ce 404 que la lecture de secours du client traduit en échec
     // définitif : sans lui, la page réessaierait pour l'éternité.
     jest.mocked(getVisibleTournamentSnapshot).mockResolvedValue(null);
-    expect((await GET(new Request("http://t/"), params("5"))).status).toBe(404);
+    const response = await GET(new Request("http://t/"), params("5"));
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: "TOURNAMENT_NOT_FOUND" });
   });
 });
 
@@ -419,6 +427,7 @@ describe("GET /api/tournaments/[id]/stream — plafonds", () => {
     const refused = await GET(new Request("http://t/"), params("5"));
     expect(refused.status).toBe(429);
     expect(refused.headers.get("Retry-After")).toBe("30");
+    await expect(refused.json()).resolves.toEqual({ error: "TOO_MANY_STREAMS" });
   });
 
   it("rend la place quand le client s'en va", async () => {

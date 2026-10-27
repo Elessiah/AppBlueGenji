@@ -3,7 +3,7 @@ import { enforceRateLimit, MATCH_SCHEDULE_WRITE_RULE } from "@/lib/server/api-gu
 import { fail, ok } from "@/lib/server/http";
 import { setMatchStartAt } from "@/lib/server/tournaments/match-schedule";
 import { can } from "@/lib/shared/permissions";
-import { readJsonBody } from "@/lib/server/request-body";
+import { bodyReadRefusal, readJsonBody } from "@/lib/server/request-body";
 
 function parseMatchId(raw: string): number | null {
   const matchId = Number(raw);
@@ -33,7 +33,14 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
   const throttled = enforceRateLimit(MATCH_SCHEDULE_WRITE_RULE, user.id);
   if (throttled) return throttled;
 
-  const body = (await readJsonBody(req).catch(() => null)) as { startAt?: unknown } | null;
+  let body: unknown;
+  try {
+    body = await readJsonBody(req);
+  } catch (error) {
+    // Trop lourd (413) ou non déclaré JSON (415) : le refus de la lecture, pas
+    // une date invalide.
+    return fail(bodyReadRefusal(error) ?? "INVALID_MATCH_START_AT", 400);
+  }
   if (body === null || typeof body !== "object" || !("startAt" in body)) return fail("INVALID_MATCH_START_AT", 400);
   const raw = body.startAt;
   if (raw !== null && typeof raw !== "string") return fail("INVALID_MATCH_START_AT", 400);

@@ -146,6 +146,7 @@
     "loadError": "Couldn't load this ranking, try again later.",
     "chipAll": "Overall",
     "tableLabel": "Team ranking",
+    "teamFallback": "Team #{id}",
     "team": "TEAM",
     "winLoss": "W–L",
     "points": "PTS",

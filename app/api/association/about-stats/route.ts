@@ -2,7 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { can } from "@/lib/shared/permissions";
 import { fail, ok } from "@/lib/server/http";
 import { createAboutStat, listAboutStats } from "@/lib/server/about-stats-service";
-import { readJsonBody } from "@/lib/server/request-body";
+import { bodyReadRefusal, readJsonBody } from "@/lib/server/request-body";
 
 export async function GET() {
   const stats = await listAboutStats();
@@ -14,12 +14,16 @@ export async function POST(req: Request) {
   if (!user) return fail("UNAUTHORIZED", 401);
   if (!can(user, "showcase")) return fail("FORBIDDEN", 403);
 
-  let body: { value?: unknown; valueEn?: unknown; label?: unknown; labelEn?: unknown };
+  let json: unknown;
   try {
-    body = (await readJsonBody(req)) as typeof body;
-  } catch {
-    return fail("INVALID_BODY", 400);
+    json = await readJsonBody(req);
+  } catch (error) {
+    return fail(bodyReadRefusal(error) ?? "INVALID_BODY", 400);
   }
+  // `null`, un tableau ou un nombre sont du JSON valide, mais pas une carte :
+  // refusés comme le PUT (`readBody`), sans quoi `body.value` lèverait.
+  if (typeof json !== "object" || json === null || Array.isArray(json)) return fail("INVALID_BODY", 400);
+  const body = json as { value?: unknown; valueEn?: unknown; label?: unknown; labelEn?: unknown };
 
   try {
     const stat = await createAboutStat({

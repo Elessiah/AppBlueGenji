@@ -7,6 +7,7 @@ import {
   hasEnglish,
   staffText,
 } from "@/lib/shared/staff-translation";
+import { withoutInvisibles } from "@/lib/shared/visible-text";
 
 export type AboutStat = {
   id: number;
@@ -51,17 +52,29 @@ export type AboutStatValidationResult =
  * Valide et normalise une carte (valeur + titre). Les deux champs sont requis ;
  * la valeur anglaise est facultative (rognée, vide → `null`).
  */
+/**
+ * Champ saisi sans ce qui ne se voit pas (`withoutInvisibles`) : une valeur
+ * faite seulement d'invisibles ou de commandes de direction (U+200B, U+202E)
+ * est donc **vide** — refusée en français, absente en anglais (la marque EN et
+ * l'avertissement restent justes). Sans NFKC : « 4 200 € » et « m² » gardent
+ * leur typographie. Tout ce qui n'est pas du texte reste tel quel, pour les
+ * refus existants.
+ */
+function cleanField(raw: unknown): unknown {
+  return typeof raw === "string" ? withoutInvisibles(raw) : raw;
+}
+
 export function validateAboutStatInput(input: AboutStatInput): AboutStatValidationResult {
-  const value = typeof input.value === "string" ? input.value.trim() : "";
-  const label = typeof input.label === "string" ? input.label.trim() : "";
+  const value = typeof input.value === "string" ? withoutInvisibles(input.value) : "";
+  const label = typeof input.label === "string" ? withoutInvisibles(input.label) : "";
 
   if (!value) return { ok: false, error: "VALUE_REQUIRED" };
   if (value.length > ABOUT_STAT_VALUE_MAX) return { ok: false, error: "VALUE_TOO_LONG" };
-  const valueEn = englishOrNull(input.valueEn);
+  const valueEn = englishOrNull(cleanField(input.valueEn));
   if (valueEn !== null && valueEn.length > ABOUT_STAT_VALUE_MAX) return { ok: false, error: "VALUE_EN_TOO_LONG" };
   if (!label) return { ok: false, error: "LABEL_REQUIRED" };
   if (label.length > ABOUT_STAT_LABEL_MAX) return { ok: false, error: "LABEL_TOO_LONG" };
-  const labelEn = checkEnglish(input.labelEn, true, ABOUT_STAT_LABEL_MAX, englishCodes("LABEL"));
+  const labelEn = checkEnglish(cleanField(input.labelEn), true, ABOUT_STAT_LABEL_MAX, englishCodes("LABEL"));
   if (!labelEn.ok) return labelEn;
 
   return { ok: true, value: { value, valueEn, label, labelEn: labelEn.value ?? "" } };

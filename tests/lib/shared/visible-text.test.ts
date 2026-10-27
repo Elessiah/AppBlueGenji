@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { visibleText } from "@/lib/shared/visible-text";
+import { visibleText, withoutInvisibles } from "@/lib/shared/visible-text";
 import { checkTeamName } from "@/lib/shared/team-name";
 import { normalizePseudo } from "@/lib/server/serialization";
 
@@ -96,5 +96,27 @@ describe("checkTeamName", () => {
 
   it("remplace un saut de ligne par une espace", () => {
     expect(checkTeamName("Les\nLoups")).toEqual({ ok: true, name: "Les Loups" });
+  });
+});
+
+describe("withoutInvisibles — saisie du staff à la typographie gardée", () => {
+  it("retire invisibles et commandes de direction, et rogne", () => {
+    expect(withoutInvisibles(` 4${cp(0x200b)}2${cp(0x202e)}00 `)).toBe("4200");
+  });
+
+  it("rend vide une saisie faite seulement d'invisibles", () => {
+    expect(withoutInvisibles(`${cp(0x200b)}${cp(0x2060)}${cp(0x202e)}${cp(0x3164)}`)).toBe("");
+  });
+
+  it("garde ce que NFKC réécrirait : espace fine insécable, exposant, fraction", () => {
+    const value = `4${cp(0x202f)}200 €, 50 m², ½`;
+    expect(withoutInvisibles(value)).toBe(value);
+    expect(visibleText(value)).not.toBe(value);
+  });
+
+  it("garde le liant d'un emoji composé, remplace un saut de ligne par une espace", () => {
+    const family = `👨${cp(0x200d)}👩${cp(0x200d)}👧`;
+    expect(withoutInvisibles(family)).toBe(family);
+    expect(withoutInvisibles("Prize" + String.fromCodePoint(10) + "pool")).toBe("Prize pool");
   });
 });

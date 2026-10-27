@@ -11,6 +11,7 @@
  * quel que soit le nombre de spectateurs.
  */
 import { currentTokenHash, getCurrentUser } from "@/lib/server/auth";
+import { fail } from "@/lib/server/http";
 import {
   registerSessionStream,
   revocationMark,
@@ -79,8 +80,10 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   // pendant celle-ci ne trouverait pas encore le flux à fermer.
   const mark = revocationMark();
   const user = await getCurrentUser();
+  // Les refus portent un code (`fail`), comme la lecture REST de secours :
+  // `EventSource` n'en lit rien, mais un client qui sonde la route, si.
   if (!user) {
-    return new Response("Unauthorized", { status: 401 });
+    return fail("UNAUTHORIZED", 401);
   }
 
   /**
@@ -112,7 +115,7 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
     return response;
   };
   if (revokedSince(user.id, tokenHash, mark)) {
-    return refuse(new Response("Unauthorized", { status: 401 }));
+    return refuse(fail("UNAUTHORIZED", 401));
   }
 
   // Toute sortie imprévue (base indisponible pendant les lectures) désinscrit
@@ -129,7 +132,7 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
     const { id } = await context.params;
     const tournamentId = Number(id);
     if (!Number.isInteger(tournamentId) || tournamentId <= 0) {
-      return refuse(new Response("Invalid tournament id", { status: 400 }));
+      return refuse(fail("INVALID_TOURNAMENT_ID", 400));
     }
 
     // Gestion résolue **avant** la lecture : elle décide aussi de l'accès. Un
@@ -143,7 +146,7 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
     // de refus. « N'existe pas » et « pas encore publié » se répondent pareil.
     const snapshot = await getVisibleTournamentSnapshot(tournamentId, { canManage });
     if (!snapshot) {
-      return refuse(new Response("Tournament not found", { status: 404 }));
+      return refuse(fail("TOURNAMENT_NOT_FOUND", 404));
     }
 
     // L'aperçu du plateau va plus loin que la gestion : le cast y a droit sans
@@ -191,17 +194,14 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
     // qu'un client en boucle de reconnexion accapare la machine.
     // Session révoquée pendant les lectures : la porte ordinaire répondrait 401.
     if (revoked) {
-      return refuse(new Response("Unauthorized", { status: 401 }));
+      return refuse(fail("UNAUTHORIZED", 401));
     }
 
     const releaseSlot = acquireStreamSlot(user.id);
     if (!releaseSlot) {
-      return refuse(
-        new Response("Too many streams", {
-          status: 429,
-          headers: { "Retry-After": "30" },
-        }),
-      );
+      const tooMany = fail("TOO_MANY_STREAMS", 429);
+      tooMany.headers.set("Retry-After", "30");
+      return refuse(tooMany);
     }
 
     // Rien à servir si le client est déjà parti : ni encoder l'instantané (jusqu'à
