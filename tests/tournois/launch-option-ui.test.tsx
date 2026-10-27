@@ -413,6 +413,9 @@ describe("fiches de contact — noms cliquables", () => {
       expect(html).toContain('href="/joueurs/9"');
       expect(html).toContain('href="/joueurs/12"');
       expect(html.match(/<section/g)).toHaveLength(2);
+      // Deux régions, deux noms : le lecteur d'écran les distingue par leur caster.
+      expect(html).toContain('aria-label="Caster Voix"');
+      expect(html).toContain('aria-label="Caster Écho"');
     });
 
     it("une seule annonce d'arrivée, sur la première fiche qui n'est pas celle du lecteur", () => {

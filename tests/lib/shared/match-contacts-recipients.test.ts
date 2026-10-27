@@ -45,14 +45,19 @@ describe("contacts d'un match — destinataires et personnes présentées", () =
 });
 
 describe("BattleTag masqué d'un caster", () => {
-  it("la notice du profil dit que les deux équipes d'un match casté le voient (FR et EN)", () => {
+  it("la notice du profil dit que les deux équipes et les autres casters d'un match casté le voient (FR et EN)", () => {
     expect(frProfile.battletagNotice.asCaster).toContain(
-      "Les deux équipes d'un match que tu castes</strong>, le temps du match seulement (de son départ à sa fin).",
+      "Les deux équipes et les autres casters d'un match que tu castes</strong>, le temps du match seulement (de son départ à sa fin).",
     );
     expect(enProfile.battletagNotice.asCaster).toContain(
-      "Both teams of a match you cast</strong>, only while the match is being played (from its start to its end).",
+      "Both teams and the other casters of a match you cast</strong>, only while the match is being played (from its start to its end).",
     );
     expect(readSource("app/(secured)/profil/BattletagVisibilityNotice.tsx")).toContain('"battletagNotice.asCaster"');
+  });
+
+  it("la notice du profil nomme les casters du match, au pluriel (FR et EN)", () => {
+    expect(frProfile.battletagNotice.caster).toMatch(/^<strong>Les casters de ton match<\/strong>/);
+    expect(enProfile.battletagNotice.caster).toMatch(/^<strong>The casters of your match<\/strong>/);
   });
 });
 

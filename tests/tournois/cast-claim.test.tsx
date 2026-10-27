@@ -166,6 +166,16 @@ describe("matchStreamLinks — tous les liens du bandeau, le premier en tête", 
   });
 });
 
+describe("CastClaimDialog — un stream choisi qui disparaît", () => {
+  const source = readSource("app/(secured)/tournois/[id]/_components/CastClaimDialog.tsx");
+
+  it("n'est pas remplacé en silence par le premier : plus rien n'est choisi, l'envoi est désarmé", () => {
+    expect(source).toContain("choices.find((option) => castClaimChoiceKey(option) === choiceKey) ?? null;");
+    expect(source).toContain("disabled={choice === null || urlInvalid}");
+    expect(source).toContain("if (choice === null) return false;");
+  });
+});
+
 describe("MatchCardActions — branchements du cast", () => {
   const card = readSource("app/(secured)/tournois/[id]/_components/MatchCardActions.tsx");
 
@@ -181,5 +191,13 @@ describe("MatchCardActions — branchements du cast", () => {
     expect(card).toContain("{match.casters.length > 1 && (");
     // Un arbitre qui caste aussi le match passe par ce choix, lui compris.
     expect(card).toContain("if (!isCaster || releasesOthers) {");
+  });
+
+  it("le caster à retirer est fixé à l'ouverture ; parti entre-temps, la fenêtre se ferme au lieu d'en viser un autre", () => {
+    expect(card).toContain("setReleaseTarget(casters[0]?.userId ?? null);");
+    expect(card).toContain("const releasedCaster = casters.find((caster) => caster.userId === releaseTarget) ?? null;");
+    expect(card).toContain("if (open && releasedCaster === null) setOpen(false);");
+    expect(card).toContain("confirmRelease: open && releasedCaster !== null");
+    expect(card).not.toContain("?? match.casters[0] ?? null");
   });
 });
