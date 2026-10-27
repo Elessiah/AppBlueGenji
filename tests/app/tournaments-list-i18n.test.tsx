@@ -158,6 +158,8 @@ describe("page — rendu anglais", () => {
     expect(text).toContain("Loading tournaments…");
     expect(text).not.toContain("No tournament published yet.");
     expect(text).not.toContain("No tournament news right now");
+    expect(html).toContain('role="marquee"');
+    expect(html).toContain('aria-label="Page sections"');
     expect(html).toContain('href="/en/regles"');
     expect(html).toContain('aria-label="Tournament rules"');
   });
