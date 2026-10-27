@@ -136,13 +136,14 @@ describe("MatchScheduleDialog — date déjà passée", () => {
     // aucun horodatage : rien ne dépend de l'horloge murale.
     expect(SOURCE).toMatch(/onClick=\{\(event\) => \{\s*if \(event\.detail > 1\) event\.preventDefault\(\);\s*\}\}/);
     expect(SOURCE).toMatch(/onKeyDown=\{\(event\) => \{\s*if \(event\.repeat && event\.key === "Enter"\) event\.preventDefault\(\);\s*\}\}/);
+    // « Vider la date » et « Annuler », repoussés sous le second clic par
+    // l'avertissement qui apparaît, ne le prennent pas non plus.
+    expect(SOURCE).toMatch(/onClick=\{\(event\) => \{\s*if \(event\.detail <= 1\) clearAll\(\);\s*\}\}/);
+    expect(SOURCE).toMatch(/onClick=\{\(event\) => \{\s*if \(event\.detail <= 1\) onClose\(\);\s*\}\}/);
+    expect(SOURCE).not.toContain("onClick={onClose}");
     expect(SOURCE).not.toContain("heldBackAt");
     expect(SOURCE).not.toContain("LATE_WARNING_CONFIRM_DELAY_MS");
   });
-
-
-
-
 
   it("dit ce que la date déclenche selon la phase de lancement et les engagés", () => {
     expect(pastWarningKey(true, true)).toBe("schedule.warnPast");
