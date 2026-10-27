@@ -124,10 +124,9 @@ déjà posée pré-remplit les trois champs (`matchStartEntryOf`).
   présélectionné, la référence de l'année, « Planifier » et la date passée —
   quatre lectures pouvaient tomber de part et d'autre de minuit. Elle est
   **relue à l'envoi** : une date devenue passée pendant que la fenêtre restait
-  ouverte fait d'abord paraître l'avertissement, qui reçoit le focus (il
-  défile dans la vue — à 375 px il pouvait être sous le pli et le clic sembler
-  sans effet — et le lecteur d'écran le lit ; une notification `role="alert"`
-  l'aurait coupé) ; l'envoi suivant part.
+  ouverte fait d'abord paraître l'avertissement, qui défile dans la vue (à
+  375 px il pouvait être sous le pli et le clic sembler sans effet) et que sa
+  région d'état fait lire ; le focus reste sur l'envoi, et l'envoi suivant part.
 - **Date déjà passée : avertie** (`pastStartWarning`, `pastWarningKey`,
   `lib/shared/match-start-entry.ts`) seulement quand elle fait **changer de
   phase** un match qui attendait son heure : `matchLaunchPhase` passe de
