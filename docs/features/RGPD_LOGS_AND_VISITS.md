@@ -103,6 +103,12 @@ texte, effacée un jour après la fin de la soirée).
   ou non** ; un échec ensuite s'y dit avec l'auteur par son seul identifiant
   (« auteur #id »). Registre T05, entrée `2026-10-arbitre-qui-joue-le-match`.
 
+- **Casts** (décision du 2026-10-27) : inscription, reprise et retrait d'un
+  caster partent au journal sans **aucun** nom — « un caster », « le staff » —
+  et sans ligne pm2 (`sendBotLog` seul, pas `publishStaffAction`) ; le caster
+  retiré par un autre que lui reçoit le motif en message privé et en push
+  (`CAST_NOTICES.md`).
+
 - Le **motif d'une pénalité** est saisi librement par l'arbitre et repris tel
   quel : il ne doit pas nommer de joueur.
 
