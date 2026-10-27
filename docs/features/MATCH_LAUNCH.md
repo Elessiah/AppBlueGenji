@@ -373,6 +373,11 @@ qu'il tient, son « Prêt »). Code : `lib/server/tournaments/match-casters.ts`.
   Chaque fiche de caster des modales de lancement et « Contacts » est une
   région nommée « Caster <pseudo> ».
 - **Premier lien** : `firstStreamUrlSql` — le plus petit stream qui a un lien.
+  Avant le lancement, un stream de caster ne compte que si l'un de ses casters
+  remplit encore la condition du cast (`castEligibilityBlock` : compte actif,
+  tag Discord certifié, Battle.net lié, permission `live`) ; sinon son lien est
+  tu partout (carte, bandeau, ticker, annonce #live), comme son caster
+  (`casterWithdrawn`). Le stream du staff compte toujours.
   C'est lui que montrent les vues compactes (carte, ticker, annonce #live,
   détection « à l'antenne ») ; le bandeau de diffusion (`MatchLiveStrip`) montre
   tous les liens, le premier en tête (`matchStreamLinks`).
