@@ -70,7 +70,8 @@ lit à l'identique sur sa fiche, au classement et dans le menu du compte.
 - `EntrantName` (tout écran de tournoi, spectateur compris, et le dialogue de
   programmation d'un match), nom et initiale de repli ; vide, l'engagé se nomme
   « Engagé #id » / « Entrant #id » (`match.entrantFallback`) — jamais un lien
-  sans nom accessible.
+  sans nom accessible. Un appelant qui habille le nom (`children`, comme le
+  bandeau de la championne) le prend de `useShownEntrantName`, jamais brut.
 
 ## 2. Mentions et balisage Discord — `lib/shared/discord-text.ts`
 
