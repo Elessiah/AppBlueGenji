@@ -343,7 +343,9 @@ posé à l'ouverture de son stream, ou dans la configuration du direct par un
 compte sans la permission `tournaments` — un caster à la seule permission
 `live`) est retiré, matchs joués compris et même d'un stream qu'un co-caster
 tient encore : le stream reste à ce co-caster, sans lien. Le lien de
-l'organisation (`link_user_id` nul) n'est jamais touché.
+l'organisation (`link_user_id` nul) n'est jamais touché. Un réglage du direct
+réenregistré avec le même lien ne change pas son fournisseur ; un lien neuf
+prend celui qui le pose.
 
 ## Casters et streams
 
