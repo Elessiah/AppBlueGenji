@@ -53,6 +53,14 @@ describe("page tournois — barre de recherche et filtres", () => {
     // « Mes tournois » attendu aussi (échec compris), sans quoi sa section
     // naissait au sommet après coup et poussait la liste vers le bas.
     expect(page).toContain("const listLoaded = listFetched && mineSettled;");
+    // Une seule porte sur les données : ni section ni invisible sous le
+    // squelette, même quand la liste arrive avant « Mes tournois ».
+    expect(page).toContain("const viewBuckets = listLoaded ? buckets : emptyBuckets;");
+    expect(page).toContain("const viewHidden = listLoaded ? hiddenTournaments : NO_TOURNAMENTS;");
+    expect(page).toContain("useScheduledBuckets(viewBuckets)");
+    expect(page).toContain("finishedBeyondList(viewBuckets, key)");
+    expect(page).toContain("isAdmin && viewHidden.length > 0");
+    expect(page.match(/\bhiddenTournaments\b/g)).toHaveLength(2);
     expect(page).toMatch(/fetchMyTournamentIds[\s\S]*?\} catch \{[\s\S]*?\}\s*if \(!signal\?\.aborted\) setMineSettled\(true\);/);
     expect(page).toContain('{!listLoaded && <SecuredLoadingView label={t("list.loading")} />}');
     expect(page).toContain("{listLoaded && shownSections.length === 0 && (");
