@@ -83,9 +83,11 @@ export default async function HomePage() {
     running: [],
     finished: [],
   }));
-  const [buckets, stats, live, leaderboard, events, ticker, sponsors, aboutStats, aboutPillars, miniBracket, user, copyBundle] =
+  const featuredLoad = bucketsLoad.then(chooseFeaturedTournament);
+  const [buckets, featured, stats, live, leaderboard, events, ticker, sponsors, aboutStats, aboutPillars, miniBracket, user, copyBundle] =
     await Promise.all([
       bucketsLoad,
+      featuredLoad,
       getLandingStats(),
       getLandingLive(),
       getLandingLeaderboard(),
@@ -94,14 +96,10 @@ export default async function HomePage() {
       listSponsors().catch(() => []),
       listAboutStats(),
       listAboutPillars(),
-      bucketsLoad.then((loaded) => {
-        const shown = chooseFeaturedTournament(loaded);
-        return shown ? loadMiniBracket(shown.id, locale) : [];
-      }),
+      featuredLoad.then((shown) => (shown ? loadMiniBracket(shown.id, locale) : [])),
       getCurrentUser().catch(() => null),
       getSiteCopyBundle(),
     ]);
-  const featured = chooseFeaturedTournament(buckets);
   // Gestion du site vitrine : administrateurs + Community Managers.
   const isAdmin = can(user, "showcase");
   // Jamais de repli français sous `/en` : `copyBundle.en` sert l'anglais
