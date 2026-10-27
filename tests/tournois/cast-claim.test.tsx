@@ -36,6 +36,8 @@ import { messagesFor } from "@/lib/server/i18n-messages";
 import { tournamentActionsMessages } from "@/lib/shared/tournament-actions-text";
 import { bracketMatch, matchCaster } from "../helpers/bracket-match";
 import { readSource } from "../helpers/read-source";
+import frDialogs from "@/messages/fr/tournamentDialogs.json";
+import enDialogs from "@/messages/en/tournamentDialogs.json";
 
 const globalWithDocument = globalThis as { document?: unknown };
 const hadDocument = "document" in globalWithDocument;
@@ -199,5 +201,20 @@ describe("MatchCardActions — branchements du cast", () => {
     expect(card).toContain("if (open && releasedCaster === null) setOpen(false);");
     expect(card).toContain("confirmRelease: open && releasedCaster !== null");
     expect(card).not.toContain("?? match.casters[0] ?? null");
+  });
+
+  it("le choix du caster à retirer garde le focus sur « Annuler » : un Entrée réflexe sur un bouton radio ne retire personne", () => {
+    const start = card.indexOf("{confirmRelease && (");
+    const dialog = card.slice(start, card.indexOf("</ConfirmActionDialog>", start));
+    expect(dialog).toContain('name={`release-caster-${match.id}`}');
+    expect(dialog).not.toContain("focusContent");
+    expect(dialog).not.toContain("data-autofocus");
+  });
+});
+
+describe("Configuration du direct — l'aide du lien du staff", () => {
+  it("dit qu'un champ vide laisse le premier lien d'un caster à l'annonce (FR et EN)", () => {
+    expect(frDialogs.live.urlHint).toContain("sans lien du staff : son annonce sur Discord renverra alors au premier lien ouvert par un caster");
+    expect(enDialogs.live.urlHint).toContain("without a staff link: its Discord announcement will then point to the first link opened by a caster");
   });
 });
