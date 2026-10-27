@@ -161,6 +161,37 @@ describe("leaderboard de la landing", () => {
     expect(await getLandingLeaderboard(2)).toHaveLength(2);
   });
 
+  // Revue de performance #471 : une entrée de cache par longueur refaisait
+  // tout le rejeu pour chaque `limit` demandé par le client.
+  it("un seul rejeu par jeu, quelle que soit la longueur demandée", async () => {
+    const execute = await mockDb(
+      [teamRow(1, "Alpha"), teamRow(2, "Bravo"), teamRow(3, "Charlie")],
+      [matchRow(1, 1, 2, 1), matchRow(2, 1, 3, 1)],
+    );
+
+    const two = await getLandingLeaderboard(2);
+    const eight = await getLandingLeaderboard(8);
+    const one = await getLandingLeaderboard(1);
+
+    expect(execute.mock.calls.filter((call) => String(call[0]).includes("AS played_at"))).toHaveLength(2);
+    expect(two).toEqual(eight.slice(0, 2));
+    expect(one).toEqual(eight.slice(0, 1));
+    expect(eight).toHaveLength(3);
+  });
+
+  it("borne la longueur entre 1 et 50, entier", async () => {
+    await mockDb(
+      Array.from({ length: 60 }, (_, index) => teamRow(index + 1, `Team ${index + 1}`)),
+      // 30 matchs entre paires distinctes : les 60 équipes ont joué, toutes classées.
+      Array.from({ length: 30 }, (_, index) => matchRow(index + 1, 2 * index + 1, 2 * index + 2, 2 * index + 1)),
+    );
+
+    expect(await getLandingLeaderboard(0)).toHaveLength(1);
+    expect(await getLandingLeaderboard(-5)).toHaveLength(1);
+    expect(await getLandingLeaderboard(2.9)).toHaveLength(2);
+    expect(await getLandingLeaderboard(500)).toHaveLength(50);
+  });
+
   it("rend une liste vide plutôt que de casser la page si la base tombe", async () => {
     const { getDatabase } = await import("@/lib/server/database");
     jest.mocked(getDatabase).mockRejectedValue(new Error("db down"));
