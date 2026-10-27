@@ -62,17 +62,22 @@ et sur le message d'origine sinon.
 **Avant la première liste** (revue performance a posteriori #425) : la page
 partait de paniers vides et affichait, à chaque visite et jusqu'à la réponse
 de `GET /api/tournaments`, « Aucun tournoi publié pour le moment. », des
-compteurs à zéro et un bandeau « Aucune actualité tournoi ». Le drapeau
-`listLoaded` (vrai une fois reçues la première liste **et** la première
-réponse de « Mes tournois » — échec compris, sans quoi cette section naissait
-au sommet après coup —, jamais remis à faux) rend à la
-place le squelette `SecuredLoadingView` (« Chargement des tournois… » /
-« Loading tournaments… », `list.loading`) à la place de l'état vide. Sommaire,
-pastilles et bandeau gardent leur place, sans quoi la liste sautait vers le
-bas à son arrivée : entrées du sommaire sans lien, comptes en « – »
-(`COUNT_PENDING`), bandeau rendu vide (hauteur fixe). Un échec du premier chargement laisse le
-squelette : la notification dit l'incident, la relecture de fond suivante
-remplit la page.
+compteurs à zéro et un bandeau « Aucune actualité tournoi ».
+
+- **Une seule porte sur les données** : `listLoaded` devient vrai une fois
+  reçues la première liste **et** la première réponse de « Mes tournois »
+  (échec compris, silencieux — sans quoi cette section naissait au sommet
+  après coup et poussait tout vers le bas), et ne repasse jamais à faux. Tant
+  qu'il est faux, la page lit des paniers vides et aucun invisible
+  (`viewBuckets`, `viewHidden`) : aucune section ne s'affiche sous le
+  squelette.
+- Le squelette `SecuredLoadingView` (« Chargement des tournois… » /
+  « Loading tournaments… », `list.loading`) remplace l'état vide.
+- Sommaire, pastilles et bandeau gardent leur place, sans quoi la liste
+  sautait vers le bas à son arrivée : entrées du sommaire sans lien, comptes
+  en « – » (`COUNT_PENDING`), bandeau rendu vide (hauteur fixe).
+- Un échec du premier chargement laisse le squelette : la notification dit
+  l'incident, la relecture de fond suivante remplit la page.
 
 ## En-tête de section (`Section.tsx`)
 
