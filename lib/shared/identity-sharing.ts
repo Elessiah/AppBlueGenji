@@ -30,7 +30,7 @@ export type IdentityAudience = { readonly title: string; readonly items: readonl
  * L'ordre suit `canViewDiscordTag` : les administrateurs toujours, l'arbitrage
  * seulement tant que le titulaire est inscrit à un tournoi vivant (tout état
  * sauf `FINISHED`, inscriptions comprises), les parties d'un match par sa
- * fenêtre « Contacts », les autres joueurs seulement si le titulaire a coché
+ * fenêtre « Contacts » (et, celui d'un caster, par la page du match), les autres joueurs seulement si le titulaire a coché
  * « Tag Discord ». « Personne d'autre » n'est pas une formule de style — le
  * tag n'est **jamais** montré à un visiteur sans compte.
  */
@@ -49,7 +49,8 @@ export const DISCORD_TAG_AUDIENCE: IdentityAudience = {
 /**
  * Qui lit encore un BattleTag **masqué** : les parties d'un match, dans sa
  * seule fenêtre « Contacts » et sa fenêtre de lancement (décision du
- * 2026-10-19 : les deux fenêtres sont nommées partout), et comment cesser de
+ * 2026-10-19 : les deux fenêtres sont nommées partout) — et, celui d'un caster
+ * ou de l'arbitre désigné, sur la page du match —, et comment cesser de
  * le partager. Dite là où on le renseigne (profil, rattachement Battle.net,
  * connexion par Blizzard) et sur la fiche de son titulaire.
  */
@@ -59,7 +60,7 @@ export const HIDDEN_BATTLETAG_AUDIENCE: IdentityAudience = {
     "si tu y es présenté comme contact : les membres des deux équipes, les arbitres et les administrateurs, dès que les adversaires sont connus et jusqu'à la fin du match, et les casters le temps du match ;",
     "si tu castes un match : ses deux équipes et ses autres casters le temps du match, et les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin ;",
     "si tu es l'arbitre désigné d'un match : ses deux équipes, les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin, et ses casters le temps du match ;",
-    "la fenêtre de lancement, elle, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné ; la page du match reprend le BattleTag de ses casters et de son arbitre désigné, aux mêmes personnes et aux mêmes moments.",
+    "la fenêtre de lancement, elle, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné ; la page du match reprend le BattleTag de ses casters et de son arbitre désigné, aux mêmes personnes et aux mêmes moments que la fenêtre « Contacts ».",
   ],
   footer:
     "Pour ne plus le partager du tout, efface-le de ton profil (s'il vient de Battle.net, détache d'abord Battle.net, après avoir ajouté un autre moyen de connexion si c'est le seul).",
