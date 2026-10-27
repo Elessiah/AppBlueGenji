@@ -787,7 +787,7 @@ export function RgpdEn({
             You can be notified on your phone or computer of the start of your matches, of a score to confirm or confirmed automatically without an answer, of a
             tournament&apos;s kickoff, of your match times (set, changed or removed) and their reminders, and of what
             concerns your account or your team; a staff member, also of the alerts of their role (referee alerts, disputes settled, results corrected,
-            opponents&apos; withdrawals imposed or automatic confirmations paused by a staff member who plays in the match, scheduled matches, refereeing schedule, incoming reports).{" "}
+            opponents&apos; withdrawals imposed or automatic confirmations paused by a staff member who plays in the match, scheduled matches, refereeing schedule, incoming reports); a caster, of the removal of their registration for a match by someone else, with the reason, as long as they hold the streaming permission.{" "}
             <strong>Nothing is sent without your action</strong>: notifications are turned on device by device,
             from <EnglishLegalLink href="/profil#notifications">My profile</EnglishLegalLink>, where you also choose the topics.
           </p>
