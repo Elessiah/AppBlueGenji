@@ -126,7 +126,10 @@ déjà posée pré-remplit les trois champs (`matchStartEntryOf`).
   **relue à l'envoi** : une date devenue passée pendant que la fenêtre restait
   ouverte fait d'abord paraître l'avertissement, qui défile dans la vue (à
   375 px il pouvait être sous le pli et le clic sembler sans effet) et que sa
-  région d'état fait lire ; le focus reste sur l'envoi, et l'envoi suivant part.
+  région d'état fait lire, puis « Enregistrer » qu'il repousse ; le focus reste
+  sur l'envoi, et l'envoi suivant part — sauf à moins de
+  `LATE_WARNING_CONFIRM_DELAY_MS` (600 ms) : c'est le second clic d'un
+  double-clic, l'avertissement n'a pas été lu.
 - **Date déjà passée : avertie** (`pastStartWarning`, `pastWarningKey`,
   `lib/shared/match-start-entry.ts`) seulement quand elle fait **changer de
   phase** un match qui attendait son heure : `matchLaunchPhase` passe de
