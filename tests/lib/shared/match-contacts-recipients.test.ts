@@ -9,7 +9,7 @@ import enLaunch from "@/messages/en/launchModal.json";
 import frLaunch from "@/messages/fr/launchModal.json";
 import enDialogs from "@/messages/en/tournamentDialogs.json";
 import frDialogs from "@/messages/fr/tournamentDialogs.json";
-import { DONNEES_PROFIL } from "@/lib/shared/rgpd-policy";
+import { DONNEES_PROFIL, REFEREE_BATTLETAG_SCOPE } from "@/lib/shared/rgpd-policy";
 import { DONNEES_PROFIL_EN } from "@/lib/shared/rgpd-policy-en";
 import { readSource } from "../../helpers/read-source";
 
@@ -300,8 +300,15 @@ describe("arbitre désigné — registre, /rgpd et annonce (revue juridique)", (
   const REFEREE_ENTRY = "2026-10-arbitre-designe-des-matchs";
 
   it("T04 ne rattache pas la présentation de l'arbitre aux conditions d'utilisation (FR et EN)", () => {
-    expect(T04?.legalBasis).toContain("exécution du service (les arbitres agissant pour l'association) pour la présentation de l'arbitre désigné");
-    expect(T04_EN?.legalBasis).toContain("performance of the service (the referees acting for the association) for presenting the assigned referee");
+    expect(T04?.legalBasis).toContain(
+      "intérêt légitime (bon déroulement des matchs : que leurs parties sachent qui les arbitre et puissent l'ajouter en jeu) pour la présentation de l'arbitre désigné aux parties du match — il peut s'y opposer (art. 21) en se retirant du match, à tout moment",
+    );
+    expect(T04_EN?.legalBasis).toContain(
+      "legitimate interest (smooth running of matches: their parties know who referees them and can add them in game) for presenting the assigned referee to the parties to the match — they may object to it (art. 21) by withdrawing from the match, at any time",
+    );
+    expect(T04?.legalBasis).toContain("exécution du service (les arbitres agissant pour l'association) pour le recueil de son « Prêt »");
+    expect(T04_EN?.legalBasis).toContain("performance of the service (the referees acting for the association) for collecting their “Ready”");
+    expect(T04?.legalBasis).not.toContain("exécution du service (les arbitres agissant pour l'association) pour la présentation de l'arbitre");
     expect(T04?.legalBasis).not.toContain("conditions d'utilisation, les arbitres agissant pour l'association) pour la présentation de l'arbitre");
     expect(T04_EN?.legalBasis).not.toContain("terms of use, the referees acting for the association) for presenting the assigned referee");
   });
@@ -352,5 +359,23 @@ describe("arbitre désigné — registre, /rgpd et annonce (revue juridique)", (
     );
     expect(fr).not.toContain("le staff voient");
     expect(en).not.toContain("the staff see");
+  });
+
+  // Revue juridique de #487, passe 3 : sans clause des conditions (version 6)
+  // et sans demande de l'arbitre que le staff désigne, la présentation de
+  // l'arbitre repose sur l'intérêt légitime, opposable en se retirant du match.
+  it("fonde la présentation de l'arbitre sur l'intérêt légitime, avec son opposition (FR et EN)", () => {
+    const fr = PRIVACY_CHANGES.find((c) => c.id === REFEREE_ENTRY)?.details.join(" ") ?? "";
+    const en = PRIVACY_CHANGES_EN[REFEREE_ENTRY]?.details.join(" ") ?? "";
+    expect(fr).toContain("au titre de l'intérêt légitime (qu'elles sachent qui arbitre) : tu t'y opposes en te retirant du match, à tout moment");
+    expect(en).toContain("on the basis of legitimate interest (they know who referees): you object to it by withdrawing from the match, at any time");
+    expect(fr).not.toContain("présentés ainsi aux parties de tes matchs, au titre de l'exécution du service");
+    const row = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo Overwatch");
+    expect(row?.extraBases).toContainEqual({ base: "Intérêt légitime", scope: REFEREE_BATTLETAG_SCOPE });
+    expect(row?.extraBases?.find((b) => b.base === "Exécution du contrat")?.scope).not.toMatch(/arbitre désigné d'un match,/);
+    const index = DONNEES_PROFIL.findIndex((d) => d.donnee === "Pseudo Overwatch");
+    expect(DONNEES_PROFIL_EN[index]?.extraBases?.map((b) => b.scope)).toContain(
+      "the BattleTag of a match's assigned referee, even when hidden, in its “Contacts” and launch windows: read by both its teams and the referees as soon as both its opponents are known until its end, by its casters while the match is being played — objection by withdrawing from the match, at any time",
+    );
   });
 });
