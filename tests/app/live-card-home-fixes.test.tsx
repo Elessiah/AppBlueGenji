@@ -211,7 +211,19 @@ describe("LiveCard.module.css", () => {
     expect(css).not.toMatch(/\.carouselButton:hover,/);
   });
 
-  it("les diapositives cachées n'animent pas la pastille d'attente", () => {
-    expect(css).toContain(".slide:not(.slideActive) :global(.pill-waiting)::after {\n  animation: none;\n}");
+  it("les diapositives cachées figent toutes leurs animations, pseudo-éléments compris", () => {
+    expect(css).toContain(
+      ".slides > .slide:not(.slideActive) *,\n.slides > .slide:not(.slideActive) *::before,\n.slides > .slide:not(.slideActive) *::after {\n  animation-play-state: paused;\n}",
+    );
+    // Figées, pas retirées : `animation: none` éteignait la lueur au milieu du fondu.
+    expect(css).not.toContain(".pill-waiting)::after {\n  animation: none;");
+  });
+
+  it("la règle de pause pèse plus que celle du point « En direct »", () => {
+    // `.pill-live .dot` pèse (0,2,0) et pose `animation-play-state` ; la règle
+    // des diapositives doit peser plus, quel que soit l'ordre des feuilles.
+    const globals = readSource("app/globals.css");
+    expect(globals).toMatch(/\.pill-live \.dot \{[^}]*animation-play-state: var\(--deco-anim-state\);/);
+    expect(css).toMatch(/^\.slides > \.slide:not\(\.slideActive\) \*,$/m);
   });
 });
