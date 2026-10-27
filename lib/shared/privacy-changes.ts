@@ -1068,6 +1068,23 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       `Ce qui est sauvegardé, le chiffrement et la durée de conservation ne changent pas : chaque archive est détruite au bout de ${BACKUP_RETENTION_DAYS} jours au plus.`,
     ],
   },
+  {
+    // LOGS-NOTIFS (PR ln-1) : un nouveau message (privé Discord et push) aux
+    // casters dont l'inscription est retirée par un autre qu'eux, et une
+    // nouvelle ligne, anonyme, au journal du staff sur Discord. Seuls les
+    // casters sont concernés — d'où le public.
+    audience: "LIVE_STAFF",
+    id: "2026-10-avis-de-retrait-du-cast",
+    publishedAt: "2026-10-27",
+    title: "Cast retiré : tu es prévenu, avec le motif",
+    links: [MATCH_DM_PARAGRAPH_LINK],
+    summary:
+      "Si tu castes un match et que ton inscription est retirée par le staff, d'office (conditions du cast plus remplies, ou ton équipe joue désormais le match) ou parce qu'un autre caster prend ta place, le site te prévient en message privé Discord et en notification push, avec le motif.",
+    details: [
+      "Le message nomme le match (noms d'équipe, « un match » en tournoi individuel), son tournoi et sa manche, jamais qui a retiré l'inscription. Le message privé ne part qu'à un tag Discord certifié et se coupe, comme les autres messages de match, par la case « Messages privés Discord de mes matchs » de « Mon profil » ; la notification push a son propre réglage, « Cast retiré ».",
+      "L'inscription d'un caster sur un match, sa reprise par un autre caster et son retrait sont aussi notés au journal du staff sur Discord, sans nommer personne (« un caster », « le staff »).",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

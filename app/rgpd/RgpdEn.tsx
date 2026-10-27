@@ -827,8 +827,9 @@ export function RgpdEn({
           <p id="messages-de-match">
             <strong>Match Discord direct messages.</strong> The bot also writes to you privately, in your account&apos;s
             language, when
-            the time of one of your matches is set, changed or removed, for its reminders (24 h and 10 h before) and
-            when you are removed from a match — only if your Discord tag is <strong>certified</strong>: an
+            the time of one of your matches is set, changed or removed, for its reminders (24 h and 10 h before),
+            when you are removed from a match and, if you cast, when your caster registration for a match is removed
+            by the staff or automatically, or taken over by another caster (with the reason) — only if your Discord tag is <strong>certified</strong>: an
             uncertified tag, even one linked by signing in with Discord, receives none, to avoid spam (your push notifications are still sent). These messages
             are based on the association&apos;s{" "}
             <strong>legitimate interest</strong> in the smooth running of tournaments; you can object at any time by
@@ -844,7 +845,9 @@ export function RgpdEn({
             team they withdraw) and, if they play in it, warns their
             colleagues: this check rests on the association&apos;s <strong>legitimate interest</strong> in impartial
             refereeing, and this staff member may object to it (section{" "}
-            <a href="#exercer-vos-droits">“Exercising your rights”</a>).
+            <a href="#exercer-vos-droits">“Exercising your rights”</a>). A caster&apos;s registration for a match,
+            its takeover by another caster and its removal are noted in the staff log on Discord without naming
+            anyone (“a caster”, “the staff”).
           </p>
         </div>
       </section>

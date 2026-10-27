@@ -127,12 +127,26 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(retention).toMatch(/sans limite/);
   });
 
+  it("déclare l'avis de retrait du cast et le journal anonyme des casts (FR + EN)", () => {
+    const t04 = byRef("T04");
+    const t04En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T04")!;
+    expect(t04.subPurposes.join(" ")).toMatch(/Prévenir un caster, en message privé Discord et en push, que son inscription sur un match a été retirée par un autre que lui[^"]*avec le motif[^"]*sans nommer qui l'a retirée ; le message privé ne part qu'à un tag Discord certifié/);
+    expect(t04En.subPurposes.join(" ")).toMatch(/Notifying a caster, by Discord direct message and by push, that their registration for a match was removed by someone other than themselves[^"]*with the reason[^"]*without naming who removed it; the direct message only goes to a certified Discord tag/);
+    expect(t04.recipients.join(" ")).toContain("caster : retrait de son inscription sur un match");
+    expect(t04En.recipients.join(" ")).toContain("caster: removal of their registration for a match");
+    expect(byRef("T05").subPurposes.join(" ")).toContain("sans nommer le caster ni le staff — et sans trace dans les journaux du serveur");
+    expect(PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T05")!.subPurposes.join(" ")).toContain("without naming the caster or the staff — and without any trace in the server logs");
+    expect(byRef("T05").dataCategories.join(" ")).toContain("aucun membre du staff ni caster nommé (« le staff », « un caster »");
+    expect(byRef("T12").subPurposes.join(" ")).toContain("Retrait de son inscription de caster sur un match");
+    expect(PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T12")!.subPurposes.join(" ")).toContain("Removal of their caster registration for a match");
+  });
+
   it("couvre le programme d'arbitrage : base légale, trace gardée, push et canal de logs, personnes citées", () => {
     const t04 = byRef("T04");
     // Décision du 2026-10-14 : le staff est prévenu en exécution du service ;
     // les messages de match des joueurs restent d'intérêt légitime, opposables.
     expect(t04.legalBasis).toMatch(/exécution du service[^;]*programme d'arbitrage adressés au staff/);
-    expect(t04.legalBasis).toMatch(/intérêt légitime[^;]*rappels de match envoyés aux joueurs, avec un droit d'opposition \(art\. 21\) honoré par un interrupteur de « Mon profil »/);
+    expect(t04.legalBasis).toMatch(/intérêt légitime[^;]*rappels de match envoyés aux joueurs, et l'avis du retrait de son inscription envoyé à un caster, avec un droit d'opposition \(art\. 21\) honoré par un interrupteur de « Mon profil »/);
     expect(t04.subPurposes.join(" ")).toMatch(/couper ces messages privés depuis « Mon profil »/);
     // L'avis « Match retiré de ton programme » est l'un des messages coupés par l'interrupteur.
     expect(t04.subPurposes.join(" ")).toMatch(/l'avis qu'un match quitte son programme/);
@@ -161,7 +175,7 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(t04.dataCategories.join(" ")).toMatch(/recevoir ou non les messages privés Discord de ses matchs/);
     expect(t04.retention.join(" ")).toMatch(/Choix des messages privés de match : jusqu'à sa modification/);
     expect(t04.retention.join(" ")).toMatch(/Traces d'envoi des rappels, alertes et programmes d'arbitrage/);
-    expect(t04.recipients.join(" ")).toMatch(/Service de push du navigateur de chaque destinataire abonné \(joueur : [^;]*; arbitre ou administrateur : programme d'arbitrage, litige tranché, résultat corrigé, abandon imposé à l'adversaire ou validation automatique suspendue par un membre du staff qui joue le match ; traitement T12\), qui/);
+    expect(t04.recipients.join(" ")).toMatch(/Service de push du navigateur de chaque destinataire abonné \(joueur : [^;]*; caster : [^;]*; arbitre ou administrateur : programme d'arbitrage, litige tranché, résultat corrigé, abandon imposé à l'adversaire ou validation automatique suspendue par un membre du staff qui joue le match ; traitement T12\), qui/);
     expect(t04.subPurposes.join(" ")).toMatch(/en message privé Discord et en push l'annonce/);
     expect(t04.recipients.join(" ")).toMatch(/Staff de l'association ayant accès au canal de logs Discord/);
     expect(byRef("T05").dataCategories.join(" ")).toMatch(/Sur Discord : [^—]*horaires et manches des matchs/);
@@ -205,8 +219,8 @@ describe("PROCESSING_ACTIVITIES", () => {
     const t05 = byRef("T05").dataCategories.join(" ");
     expect(t05).toMatch(/« un membre du staff qui joue ce match », avec le seul nom du tournoi/);
     expect(PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T05")!.dataCategories.join(" ")).toMatch(/“a staff member who plays in this match”, with the tournament name only/);
-    expect(t04.recipients.join(" ")).toMatch(/canal de logs Discord \(programme d'arbitrage, gestes d'un membre du staff qui joue le match, traitement T05\)/);
-    expect(t04En.recipients.join(" ")).toMatch(/Discord log channel \(refereeing schedule, actions of a staff member who plays in the match, processing activity T05\)/);
+    expect(t04.recipients.join(" ")).toMatch(/canal de logs Discord \(programme d'arbitrage, gestes d'un membre du staff qui joue le match, inscriptions et retraits des casters, sans les nommer, traitement T05\)/);
+    expect(t04En.recipients.join(" ")).toMatch(/Discord log channel \(refereeing schedule, actions of a staff member who plays in the match, casters' registrations and removals, without naming them, processing activity T05\)/);
     const t05En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T05")!.dataCategories.join(" ");
     expect(t05).toMatch(/pour un arbitre qui joue le match, en plus : tournoi, manche et, sauf pour une suspension, issue et noms d'équipe/);
     expect(byRef("T05").legalBasis).toMatch(/et du membre du staff auteur d'un geste, nommé dans les journaux du serveur/);
