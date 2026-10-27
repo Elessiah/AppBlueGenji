@@ -5,7 +5,7 @@ jest.mock("@/lib/server/tournaments-service");
 import { getVisibleTournamentCard, getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
 import { tournamentCard } from "../../helpers/tournament-card";
 import { cached, clearCache } from "@/lib/server/cache";
-import { getSpectatorPayload } from "@/lib/server/spectator-snapshot";
+import { getSpectatorPayload, isSpectatorTournamentPublic } from "@/lib/server/spectator-snapshot";
 import { invalidateSpectatorSnapshot, invalidateTournamentSnapshot } from "@/lib/server/tournaments/snapshot";
 import { tournamentSnapshot } from "../../helpers/tournament-detail";
 
@@ -81,5 +81,23 @@ describe("getSpectatorPayload", () => {
     mockedSnapshot.mockRejectedValue(new Error("ECONNREFUSED"));
 
     await expect(getSpectatorPayload(5, 60_000)).rejects.toThrow("ECONNREFUSED");
+  });
+});
+
+describe("isSpectatorTournamentPublic", () => {
+  it("lit la seule carte, sans aucun droit, et ne construit pas l'instantané", async () => {
+    await expect(isSpectatorTournamentPublic(5)).resolves.toBe(true);
+    expect(getVisibleTournamentCard).toHaveBeenCalledWith(5);
+    expect(mockedSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("dit non pour un tournoi absent ou pas encore publié", async () => {
+    jest.mocked(getVisibleTournamentCard).mockResolvedValue(null);
+    await expect(isSpectatorTournamentPublic(5)).resolves.toBe(false);
+  });
+
+  it("laisse passer l'échec de la base (la route répond 503)", async () => {
+    jest.mocked(getVisibleTournamentCard).mockRejectedValue(new Error("ECONNREFUSED"));
+    await expect(isSpectatorTournamentPublic(5)).rejects.toThrow("ECONNREFUSED");
   });
 });

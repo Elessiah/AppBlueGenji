@@ -271,4 +271,37 @@ describe("GET /api/spectator/tournaments/[id]", () => {
     expect((await GET(req("1000", { "x-forwarded-for": "198.51.100.9" }), params("1000"))).status).toBe(200);
     expect(mockedSnapshot).toHaveBeenCalledTimes(SPECTATOR_REBUILD_RULE.limit + 1);
   });
+
+  it("ne fait pas payer au plafond des reconstructions un identifiant inconnu ou pas encore publié", async () => {
+    mockedSnapshot.mockResolvedValue(snapshot());
+    mockedCard.mockResolvedValue(null);
+    // Des sondes au hasard (ou une salle qui ouvre un lien avant la publication)
+    // reçoivent leur « introuvable », jamais un 429…
+    for (let i = 1; i <= SPECTATOR_REBUILD_RULE.limit + 5; i += 1) {
+      const res = await GET(req(String(i)), params(String(i)));
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: "TOURNAMENT_NOT_FOUND" });
+    }
+    expect(mockedSnapshot).not.toHaveBeenCalled();
+
+    // … et la même adresse fait toujours reconstruire le tournoi qu'elle suit.
+    mockedCard.mockResolvedValue(tournamentCard({ id: 5 }));
+    expect((await GET(req("5"), params("5"))).status).toBe(200);
+    expect(mockedSnapshot).toHaveBeenCalledTimes(1);
+  });
+
+  it("ne fait payer qu'une reconstruction quand deux lectures froides se croisent", async () => {
+    let release: (value: TournamentSnapshot) => void = () => undefined;
+    mockedSnapshot.mockReturnValue(new Promise<TournamentSnapshot>((resolve) => (release = resolve)));
+    const first = GET(req("5"), params("5"));
+    const second = GET(req("5"), params("5"));
+    // Laisse les deux lectures passer la carte, puis termine le calcul.
+    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
+    release(snapshot());
+
+    expect((await first).status).toBe(200);
+    expect((await second).status).toBe(200);
+    expect(mockedSnapshot).toHaveBeenCalledTimes(1);
+  });
 });
