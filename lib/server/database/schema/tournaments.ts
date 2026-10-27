@@ -206,8 +206,9 @@ export async function createTournamentTables(db: Pool): Promise<void> {
   // le stream du match, dont la configuration du direct règle le lien et qui le
   // garde quand ses casters s'en vont ; 0 : un stream qu'un caster a ouvert,
   // effacé avec son dernier caster. `link_user_id` : le compte qui a fourni le
-  // lien d'un stream de caster (`NULL` pour le lien du staff) — l'effacement de
-  // ce compte retire le lien, même d'un stream qu'un co-caster tient encore.
+  // lien — en ouvrant son stream, ou dans la configuration du direct sans être
+  // de l'organisation (`NULL` pour le lien de l'organisation) ; la suppression
+  // de ce compte retire le lien, même d'un stream qu'un co-caster tient encore.
   await createTable(db, `
       CREATE TABLE IF NOT EXISTS bg_match_streams (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,

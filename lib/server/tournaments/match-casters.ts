@@ -252,10 +252,11 @@ export async function pruneMatchStreams(connection: Executor, matchId: number): 
  * inscription sur les matchs joués (`includeCompleted: false`) : l'histoire ne
  * se réécrit pas ; l'effacement emporte tout.
  *
- * Dans les deux cas, chaque lien de chaîne qu'il a fourni (`link_user_id`, sur
- * un stream de caster) est retiré, **matchs joués compris** et même d'un stream
+ * Dans les deux cas, chaque lien de chaîne qu'il a fourni (`link_user_id` : en
+ * ouvrant son stream, ou dans la configuration du direct sans être de
+ * l'organisation) est retiré, **matchs joués compris** et même d'un stream
  * qu'un co-caster tient encore : le stream reste à ce co-caster, sans lien. Le
- * lien du staff (`staff_owned`) n'est jamais touché.
+ * lien de l'organisation (`link_user_id` nul) n'est jamais touché.
  *
  * Chaque match est verrouillé avant ses casters et ses streams, dans l'ordre
  * de `claimMatchCast`, puis ses streams orphelins sont effacés
@@ -274,8 +275,7 @@ export async function withdrawUserCasts(
     [userId],
   );
   const [linkRows] = await connection.execute<(RowDataPacket & { match_id: number })[]>(
-    `SELECT DISTINCT match_id FROM bg_match_streams
-     WHERE link_user_id = ? AND staff_owned = 0 ORDER BY match_id`,
+    `SELECT DISTINCT match_id FROM bg_match_streams WHERE link_user_id = ? ORDER BY match_id`,
     [userId],
   );
   const casts = new Set(castRows.map((row) => Number(row.match_id)));
@@ -289,7 +289,7 @@ export async function withdrawUserCasts(
     if (links.has(matchId)) {
       await connection.execute(
         `UPDATE bg_match_streams SET live_url = NULL, link_user_id = NULL
-          WHERE match_id = ? AND link_user_id = ? AND staff_owned = 0`,
+          WHERE match_id = ? AND link_user_id = ?`,
         [matchId, userId],
       );
     }

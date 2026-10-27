@@ -37,6 +37,13 @@ export type MatchLiveConfig = {
   trigger: MatchLiveTrigger | null;
   /** `null` = casté sans lien public (badge seul). */
   liveUrl: string | null;
+  /**
+   * Le compte qui fournit le lien quand ce n'est pas l'organisation : un
+   * caster qui n'a que la permission `live` (pas `tournaments`). Son lien lui
+   * reste rattaché (`bg_match_streams.link_user_id`) et part à la suppression
+   * de son compte (`withdrawUserCasts`). Absent ou `null` : lien du staff.
+   */
+  linkProviderId?: number | null;
 };
 
 type TournamentStateRow = RowDataPacket & { id: number; state: string };
@@ -168,7 +175,7 @@ export async function setMatchLiveConfig(
           [matchId],
         );
         await connection.execute(
-          `UPDATE bg_match_streams SET live_url = NULL WHERE match_id = ? AND staff_owned = 1`,
+          `UPDATE bg_match_streams SET live_url = NULL, link_user_id = NULL WHERE match_id = ? AND staff_owned = 1`,
           [matchId],
         );
       } else {
@@ -178,7 +185,7 @@ export async function setMatchLiveConfig(
             : `UPDATE bg_matches SET live_trigger = ?, live_started_at = NULL WHERE id = ?`,
           [trigger, matchId],
         );
-        await setStaffStreamUrl(connection, matchId, url);
+        await setStaffStreamUrl(connection, matchId, url, config.linkProviderId ?? null);
       }
       await pruneMatchStreams(connection, matchId);
       await connection.commit();
@@ -196,19 +203,31 @@ export async function setMatchLiveConfig(
  * lien habille le premier stream sans lien, qui devient celui du staff — ou en
  * ouvre un : le lien du staff n'attend pas qu'un caster s'inscrive. Effacer le
  * lien ne prend jamais un stream de caster.
+ *
+ * Chaque lien posé est rattaché à qui le fournit (`providerId`, `NULL` pour
+ * l'organisation) : un lien inchangé est réécrit pour suivre son dernier
+ * auteur — le staff qui reprend le lien d'un caster en fait le sien.
  */
-async function setStaffStreamUrl(connection: PoolConnection, matchId: number, url: string | null): Promise<void> {
+async function setStaffStreamUrl(
+  connection: PoolConnection,
+  matchId: number,
+  url: string | null,
+  providerId: number | null,
+): Promise<void> {
   const target = staffStream(await lockMatchStreams(connection, matchId));
   if (target !== null && (target.staff || url !== null)) {
-    if (target.liveUrl !== url || !target.staff) {
-      await connection.execute(`UPDATE bg_match_streams SET live_url = ?, staff_owned = 1 WHERE id = ?`, [url, target.id]);
+    if (url !== null || target.liveUrl !== null || !target.staff) {
+      await connection.execute(
+        `UPDATE bg_match_streams SET live_url = ?, staff_owned = 1, link_user_id = ? WHERE id = ?`,
+        [url, url === null ? null : providerId, target.id],
+      );
     }
     return;
   }
   if (url !== null) {
     await connection.execute(
-      `INSERT INTO bg_match_streams (match_id, live_url, staff_owned) VALUES (?, ?, 1)`,
-      [matchId, url],
+      `INSERT INTO bg_match_streams (match_id, live_url, staff_owned, link_user_id) VALUES (?, ?, 1, ?)`,
+      [matchId, url, providerId],
     );
   }
 }
