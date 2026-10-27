@@ -562,6 +562,17 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "A caster's registration for a match, its takeover by another caster and its removal (with the reason for a takeover or an automatic removal) are also noted in the staff log on Discord, without naming anyone (“a caster”, “the staff”).",
     ],
   },
+  "2026-10-plusieurs-casters-par-match": {
+    linkLabels: ["Read the “Match streaming” paragraph"],
+    title: "Several casters per match",
+    summary:
+      "A match can now have several casters: each one joins a stream of the match (co-cast) or opens their own, with its own link. The match contacts presented to the caster while the match is being played are presented to each registered caster, and each caster's are also presented to the other casters of the match.",
+    details: [
+      "What is shown and when do not change: certified Discord tag and BattleTag (even hidden), in the match's “Contacts” and launch windows, only while the match is being played (to the referees, as soon as both its opponents are known), as part of the performance of the service.",
+      "If you cast: your username is shown with the stream you join. The link of the stream you open separately is published with the match; that stream goes once no caster holds it any more, unless it carries the match's first link, which stays with the match — and, when your account is deleted, in every case.",
+      "A caster no longer replaces another: a new registration is added without removing anyone. A registration is now only removed by the caster themselves, by the staff or automatically.",
+    ],
+  },
 };
 
 /**

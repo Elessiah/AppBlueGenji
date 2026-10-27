@@ -39,8 +39,8 @@ export const DISCORD_TAG_AUDIENCE: IdentityAudience = {
   items: [
     "les administrateurs, à tout moment ;",
     "les arbitres, tant que tu es inscrit à un tournoi non terminé ;",
-    "les membres des deux équipes de ton match, dès que ses adversaires sont connus et jusqu'à sa fin, et son caster le temps du match ;",
-    "si tu castes un match : ses deux équipes le temps du match, et les arbitres dès que ses adversaires sont connus et jusqu'à sa fin ;",
+    "les membres des deux équipes de ton match, dès que ses adversaires sont connus et jusqu'à sa fin, et ses casters le temps du match ;",
+    "si tu castes un match : ses deux équipes et ses autres casters le temps du match, et les arbitres dès que ses adversaires sont connus et jusqu'à sa fin ;",
     "les autres joueurs, seulement si tu coches « Tag Discord » dans tes réglages de confidentialité.",
   ],
   footer: "Personne d'autre.",
@@ -56,9 +56,9 @@ export const DISCORD_TAG_AUDIENCE: IdentityAudience = {
 export const HIDDEN_BATTLETAG_AUDIENCE: IdentityAudience = {
   title: "Masqué, ton BattleTag ne se lit plus que dans la fenêtre « Contacts » de tes matchs et dans leur fenêtre de lancement :",
   items: [
-    "si tu y es présenté comme contact : les membres des deux équipes, les arbitres et les administrateurs, dès que les adversaires sont connus et jusqu'à la fin du match, et le caster le temps du match ;",
-    "si tu castes un match : ses deux équipes le temps du match, et les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin ;",
-    "la fenêtre de lancement, elle, ne s'ouvre qu'aux deux équipes et au caster.",
+    "si tu y es présenté comme contact : les membres des deux équipes, les arbitres et les administrateurs, dès que les adversaires sont connus et jusqu'à la fin du match, et les casters le temps du match ;",
+    "si tu castes un match : ses deux équipes et ses autres casters le temps du match, et les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin ;",
+    "la fenêtre de lancement, elle, ne s'ouvre qu'aux deux équipes et aux casters.",
   ],
   footer:
     "Pour ne plus le partager du tout, efface-le de ton profil (s'il vient de Battle.net, détache d'abord Battle.net, après avoir ajouté un autre moyen de connexion si c'est le seul).",
