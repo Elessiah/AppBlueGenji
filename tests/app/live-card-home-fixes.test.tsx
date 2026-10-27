@@ -211,19 +211,17 @@ describe("LiveCard.module.css", () => {
     expect(css).not.toMatch(/\.carouselButton:hover,/);
   });
 
-  it("les diapositives cachées figent toutes leurs animations, pseudo-éléments compris", () => {
-    expect(css).toContain(
-      ".slides > .slide:not(.slideActive) *,\n.slides > .slide:not(.slideActive) *::before,\n.slides > .slide:not(.slideActive) *::after {\n  animation-play-state: paused;\n}",
-    );
+  it("les diapositives cachées figent leurs animations par le jeton hérité", () => {
+    expect(css).toContain(".slide:not(.slideActive) {\n  --deco-anim-state: paused;\n}");
     // Figées, pas retirées : `animation: none` éteignait la lueur au milieu du fondu.
     expect(css).not.toContain(".pill-waiting)::after {\n  animation: none;");
   });
 
-  it("la règle de pause pèse plus que celle du point « En direct »", () => {
-    // `.pill-live .dot` pèse (0,2,0) et pose `animation-play-state` ; la règle
-    // des diapositives doit peser plus, quel que soit l'ordre des feuilles.
+  it("les animations infinies des pastilles d'une diapositive lisent ce jeton", () => {
+    // Point de « En direct » et lueur de « En attente de lancement » : sans la
+    // lecture du jeton, la pause des diapositives cachées ne les atteindrait pas.
     const globals = readSource("app/globals.css");
     expect(globals).toMatch(/\.pill-live \.dot \{[^}]*animation-play-state: var\(--deco-anim-state\);/);
-    expect(css).toMatch(/^\.slides > \.slide:not\(\.slideActive\) \*,$/m);
+    expect(globals).toMatch(/\.pill-waiting::after \{[^}]*animation-play-state: var\(--deco-anim-state\);/);
   });
 });
