@@ -47,7 +47,7 @@ export const SITE_NAME = "BlueGenji Esport";
  * lui-même, et la coupe tombe au milieu de ce qu'on voulait dire.
  */
 export const SITE_DESCRIPTION =
-  "Tournois esport amateurs en ligne et en LAN, principalement Overwatch : brackets en direct, classement des équipes, arbitrage bénévole — association BlueGenji.";
+  "Tournois esport amateurs en ligne et en LAN, principalement Overwatch : brackets en temps réel, classement des équipes, arbitrage bénévole — association BlueGenji.";
 
 /**
  * Ce qu'affiche la carte d'aperçu du site — celle que reçoit toute page sans
@@ -61,7 +61,7 @@ export const SITE_SHARE_CARD = {
   eyebrow: "Overwatch · Marvel Rivals",
   title: SITE_NAME,
   subtitle:
-    "Tournois amateurs francophones, brackets en direct, classement des équipes et bot Discord.",
+    "Tournois amateurs francophones, brackets en temps réel, classement des équipes et bot Discord.",
 } as const;
 
 /** Fuseau de rédaction des dates partagées (voir l'en-tête du module). */

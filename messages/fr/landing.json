@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Tournois esport amateurs Overwatch",
-    "description": "Tournois esport amateurs en ligne et en LAN, principalement Overwatch : brackets en direct, classement des équipes, arbitrage bénévole — association BlueGenji."
+    "description": "Tournois esport amateurs en ligne et en LAN, principalement Overwatch : brackets en temps réel, classement des équipes, arbitrage bénévole — association BlueGenji."
   },
   "common": {
     "newTab": "(nouvel onglet)",
@@ -57,7 +57,7 @@
     "watchMatchLabelOn": "Regarder {match} en direct sur {platform} (nouvel onglet)",
     "watchOn": "Regarder sur {platform}",
     "seed": "SEED {seed}",
-    "emptyMatch": "Le prochain match en direct sera affiché ici dès son lancement.",
+    "emptyMatch": "Le prochain match sera affiché ici dès son lancement.",
     "footerMatch": "Voir le match dans le tournoi",
     "pill": {
       "live": "En direct",
