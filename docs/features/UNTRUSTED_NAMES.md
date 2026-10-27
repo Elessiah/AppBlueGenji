@@ -20,18 +20,48 @@ compose un emoji (famille, drapeau arc-en-ciel).
 
 Appelée par `normalizePseudo` (écriture du profil, création de compte OAuth,
 **et** recherche par pseudo — une saisie piégée désigne le compte qu'elle imite,
-jamais un sosie) et par `checkTeamName` (création, renommage, équipes
-fantômes, formulaires). La saisie est **nettoyée, pas refusée** : un pseudo naît
-aussi d'une connexion OAuth, où un refus empêcherait de se connecter. Un nom
-réduit à rien par le nettoyage retombe sur les refus existants (`PSEUDO_EMPTY`,
-`INVALID_TEAM_NAME`).
+jamais un sosie), par `checkTeamName` (création, renommage, équipes
+fantômes, formulaires) et par `validateTournamentInput` (nom d'un tournoi, à la
+création comme à l'édition — il s'affiche sur l'accueil sans compte). La saisie
+est **nettoyée, pas refusée** : un pseudo naît aussi d'une connexion OAuth, où
+un refus empêcherait de se connecter. Un nom réduit à rien par le nettoyage
+retombe sur les refus existants (`PSEUDO_EMPTY`, `INVALID_TEAM_NAME`,
+`MISSING_NAME`).
 
-Les noms déjà en base ne sont pas réécrits : ils se corrigent à la prochaine
-écriture. Les surfaces lues **sans compte** les filtrent donc aussi à la sortie :
-l'accueil (`lib/server/landing-service.ts`, `shownEntrantName`) passe par
-`visibleText` les noms du bandeau, de la carte « en cours » (match mis en avant et
-carrousel) **et** du leaderboard (repris par `/classement`), un nom qui ne garde
-rien retombant sur son libellé de repli (« Équipe #id », « Équipe 1 / 2 », « #id »).
+`withoutInvisibles(raw)` en est la moitié sans normalisation (ni NFKC ni
+réduction des espaces) : pour une saisie du staff dont la typographie est le
+propos — les chiffres de l'association (`validateAboutStatInput`, valeur et
+titre, français et anglais), où NFKC réécrirait « 4 200 € » à espace fine ou
+« m² ». Une valeur faite seulement d'invisibles y est vide : refusée en
+français, absente en anglais.
+
+### Noms déjà en base
+
+Les noms enregistrés avant le nettoyage à l'écriture sont **réécrits une fois**
+au démarrage (`cleanStoredNames`, `lib/server/database/data-migrations.ts`) :
+`bg_teams.name`, `bg_users.pseudo`, `bg_tournaments.name`. La passe lit les
+noms et compare en JavaScript (la syntaxe des classes Unicode diffère entre
+MySQL et MariaDB), et ne trouve plus rien à écrire une fois les noms propres.
+Elle laisse tel quel un nom qui ne garderait rien, ou que la base refuse : un
+sosie dont la forme propre est déjà prise (`UNIQUE`), une forme NFKC trop
+longue pour la colonne. Le journal (`pm2 logs`) ne compte que des lignes,
+jamais un nom.
+
+Ces restes expliquent que les filtres de sortie demeurent :
+
+- l'accueil (`lib/server/landing-service.ts`, `shownEntrantName`) passe par
+  `visibleText` les noms d'engagés du bandeau et de la carte « en cours »
+  (match mis en avant et carrousel), et le **nom du tournoi** du bandeau
+  (résultat, inscriptions, vainqueur), de la carte et du bouton « Regarder le
+  live » ;
+- le classement (`loadTeamRanking`) rend la forme affichable — c'est elle que
+  départage `compareRankedTeams` à égalité ; vide, le leaderboard et
+  `/classement` reçoivent `null` et posent un repli **traduit** (« Équipe #id » /
+  « Team #id », `leaderboard.teamFallback`, `board.teamFallback`) ;
+- `getUserActiveTeam` (menu du compte : indication et nom accessible ; vide,
+  l'entrée se nomme « Mon équipe ») ;
+- `EntrantName` (tout écran de tournoi, spectateur compris, et le dialogue de
+  programmation d'un match), nom et initiale de repli.
 
 ## 2. Mentions et balisage Discord — `lib/shared/discord-text.ts`
 
