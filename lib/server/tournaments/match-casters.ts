@@ -248,30 +248,51 @@ export async function pruneMatchStreams(connection: Executor, matchId: number): 
 
 /**
  * Retire un compte de tous les casts qui le nomment encore — suppression de
- * compte (`lib/server/users/account-erasure.ts`). L'anonymisation garde les
- * matchs joués (`includeCompleted: false`) : l'histoire ne se réécrit pas ;
- * l'effacement emporte tout. Chaque match est verrouillé avant ses casters et
- * ses streams, dans l'ordre de `claimMatchCast`, puis ses streams orphelins
- * sont effacés — le stream qu'il avait ouvert, avec le lien de sa chaîne
- * (`orphanStreamIds`).
+ * compte (`lib/server/users/account-erasure.ts`). L'anonymisation garde son
+ * inscription sur les matchs joués (`includeCompleted: false`) : l'histoire ne
+ * se réécrit pas ; l'effacement emporte tout.
+ *
+ * Dans les deux cas, chaque lien de chaîne qu'il a fourni (`link_user_id`, sur
+ * un stream de caster) est retiré, **matchs joués compris** et même d'un stream
+ * qu'un co-caster tient encore : le stream reste à ce co-caster, sans lien. Le
+ * lien du staff (`staff_owned`) n'est jamais touché.
+ *
+ * Chaque match est verrouillé avant ses casters et ses streams, dans l'ordre
+ * de `claimMatchCast`, puis ses streams orphelins sont effacés
+ * (`orphanStreamIds`). Rend les matchs touchés, dans l'ordre croissant.
  */
 export async function withdrawUserCasts(
   connection: Executor,
   userId: number,
   includeCompleted: boolean,
 ): Promise<number[]> {
-  const [rows] = await connection.execute<(RowDataPacket & { match_id: number })[]>(
+  const [castRows] = await connection.execute<(RowDataPacket & { match_id: number })[]>(
     `SELECT c.match_id FROM bg_match_casters c
      JOIN bg_matches m ON m.id = c.match_id
      WHERE c.user_id = ?${includeCompleted ? "" : " AND m.status <> 'COMPLETED'"}
      ORDER BY c.match_id`,
     [userId],
   );
-  const matchIds = rows.map((row) => Number(row.match_id));
-  for (const row of rows) {
-    const matchId = Number(row.match_id);
+  const [linkRows] = await connection.execute<(RowDataPacket & { match_id: number })[]>(
+    `SELECT DISTINCT match_id FROM bg_match_streams
+     WHERE link_user_id = ? AND staff_owned = 0 ORDER BY match_id`,
+    [userId],
+  );
+  const casts = new Set(castRows.map((row) => Number(row.match_id)));
+  const links = new Set(linkRows.map((row) => Number(row.match_id)));
+  const matchIds = [...new Set([...casts, ...links])].sort((a, b) => a - b);
+  for (const matchId of matchIds) {
     await connection.execute(`SELECT id FROM bg_matches WHERE id = ? FOR UPDATE`, [matchId]);
-    await connection.execute(`DELETE FROM bg_match_casters WHERE match_id = ? AND user_id = ?`, [matchId, userId]);
+    if (casts.has(matchId)) {
+      await connection.execute(`DELETE FROM bg_match_casters WHERE match_id = ? AND user_id = ?`, [matchId, userId]);
+    }
+    if (links.has(matchId)) {
+      await connection.execute(
+        `UPDATE bg_match_streams SET live_url = NULL, link_user_id = NULL
+          WHERE match_id = ? AND link_user_id = ? AND staff_owned = 0`,
+        [matchId, userId],
+      );
+    }
     await pruneMatchStreams(connection, matchId);
   }
   return matchIds;

@@ -251,8 +251,8 @@ export async function applyMatchLaunchCases(
     if (castCase === "CO_CAST") await seedCaster(db, matchId, coCasterId, streamId);
     if (castCase === "SEPARATE") {
       const [own] = await db.execute<ResultSetHeader>(
-        `INSERT INTO bg_match_streams (match_id, live_url) VALUES (?, ?)`,
-        [matchId, normalizeStreamUrl(SEED_SEPARATE_STREAM_URL)]
+        `INSERT INTO bg_match_streams (match_id, live_url, link_user_id) VALUES (?, ?, ?)`,
+        [matchId, normalizeStreamUrl(SEED_SEPARATE_STREAM_URL), coCasterId]
       );
       await seedCaster(db, matchId, coCasterId, Number(own.insertId));
     }

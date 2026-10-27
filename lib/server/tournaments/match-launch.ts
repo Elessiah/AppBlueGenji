@@ -543,9 +543,11 @@ export async function claimMatchCast(
         if (!stream || !(await streamShown(connection, row, stream))) throw new Error("STREAM_NOT_FOUND");
         streamId = castTarget.streamId;
       } else {
+        // Le lien est rattaché à celui qui le fournit : son effacement de
+        // compte le retire (`withdrawUserCasts`).
         const [created] = await connection.execute<ResultSetHeader>(
-          `INSERT INTO bg_match_streams (match_id, live_url) VALUES (?, ?)`,
-          [matchId, liveUrl],
+          `INSERT INTO bg_match_streams (match_id, live_url, link_user_id) VALUES (?, ?, ?)`,
+          [matchId, liveUrl, liveUrl === null ? null : userId],
         );
         streamId = Number(created.insertId);
       }

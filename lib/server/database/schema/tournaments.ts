@@ -205,15 +205,19 @@ export async function createTournamentTables(db: Pool): Promise<void> {
   // caster ne peut rejoindre qu'un stream **de son match**. `staff_owned` = 1 :
   // le stream du match, dont la configuration du direct règle le lien et qui le
   // garde quand ses casters s'en vont ; 0 : un stream qu'un caster a ouvert,
-  // effacé avec son dernier caster.
+  // effacé avec son dernier caster. `link_user_id` : le compte qui a fourni le
+  // lien d'un stream de caster (`NULL` pour le lien du staff) — l'effacement de
+  // ce compte retire le lien, même d'un stream qu'un co-caster tient encore.
   await createTable(db, `
       CREATE TABLE IF NOT EXISTS bg_match_streams (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       match_id BIGINT NOT NULL,
       live_url VARCHAR(255) NULL,
       staff_owned TINYINT(1) NOT NULL DEFAULT 0,
+      link_user_id BIGINT NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       UNIQUE KEY uq_bg_match_streams_match (match_id, id),
+      INDEX idx_bg_match_streams_link_user (link_user_id),
       CONSTRAINT fk_bg_match_streams_match FOREIGN KEY (match_id)
         REFERENCES bg_matches(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

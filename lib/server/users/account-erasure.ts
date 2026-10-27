@@ -29,7 +29,8 @@ export async function eraseAccount(connection: PoolConnection, userId: number): 
     [userId],
   );
   // La cascade emporterait ses inscriptions de caster, mais pas le stream
-  // séparé qu'il avait ouvert — ni son lien, qui désigne sa chaîne.
+  // séparé qu'il avait ouvert — ni son lien, qui désigne sa chaîne, retiré
+  // aussi d'un stream qu'un co-caster tient encore.
   await withdrawUserCasts(connection, userId, true);
   await connection.execute(`DELETE FROM bg_users WHERE id = ?`, [userId]);
 }
@@ -193,7 +194,9 @@ export async function anonymizeAccount(connection: PoolConnection, userId: numbe
   // est retirée, sans quoi le lancement attendrait un « Prêt » que plus
   // personne ne peut donner (`lib/shared/match-launch.ts`). Les matchs joués
   // gardent la leur — l'histoire ne se réécrit pas, et le pseudo est anonymisé.
-  // Un stream séparé qu'il était seul à tenir part avec lui.
+  // Un stream séparé qu'il était seul à tenir part avec lui, et chaque lien de
+  // chaîne qu'il a fourni est retiré — matchs joués compris, même d'un stream
+  // qu'un co-caster tient encore.
   await withdrawUserCasts(connection, userId, false);
   // Le pseudo anonymisé doit aussi remplacer le nom affiché en tournoi — sur la
   // connexion de la transaction, sans quoi le renommage survivrait à un

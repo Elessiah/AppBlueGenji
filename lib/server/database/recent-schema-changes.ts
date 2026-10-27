@@ -283,6 +283,10 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // 0. Le stream du staff (`staff_owned`), sur une table créée avant la
     //    colonne ; là où la table naît avec, `ER_DUP_FIELDNAME` est toléré.
     `ALTER TABLE bg_match_streams ADD COLUMN staff_owned TINYINT(1) NOT NULL DEFAULT 0 AFTER live_url`,
+    //    Le compte qui a fourni le lien d'un stream de caster (`link_user_id`),
+    //    que l'effacement de ce compte retire (`withdrawUserCasts`).
+    `ALTER TABLE bg_match_streams ADD COLUMN link_user_id BIGINT NULL AFTER staff_owned`,
+    `ALTER TABLE bg_match_streams ADD INDEX idx_bg_match_streams_link_user (link_user_id)`,
     // 1. Un stream par match qui avait un lien ou un caster — jamais deux : un
     //    match qui a déjà le sien est sauté. Avant les co-casters, seul le staff
     //    posait un lien : un stream qui en a un est celui du staff.
@@ -298,6 +302,15 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
          FROM bg_matches m
         WHERE m.caster_user_id IS NOT NULL
           AND EXISTS (SELECT 1 FROM bg_match_streams s WHERE s.match_id = m.id)`,
+    // 2 bis. Un stream de caster ouvert avant `link_user_id` : son lien est
+    //    rattaché à son caster quand il n'en a qu'un — sans ambiguïté. Le lien
+    //    déjà rattaché n'est jamais réécrit : un second passage ne change rien.
+    `UPDATE bg_match_streams s
+        SET s.link_user_id = (SELECT MIN(c.user_id) FROM bg_match_casters c
+                               WHERE c.match_id = s.match_id AND c.stream_id = s.id)
+      WHERE s.staff_owned = 0 AND s.live_url IS NOT NULL AND s.link_user_id IS NULL
+        AND (SELECT COUNT(*) FROM bg_match_casters c
+              WHERE c.match_id = s.match_id AND c.stream_id = s.id) = 1`,
     // 3. Les anciennes colonnes sont vidées — plus rien ne les écrit : un
     //    redémarrage ne recopie rien, et rien de périmé ne revient. Seulement
     //    ce qui est **arrivé** dans les nouvelles tables : si 1 ou 2 a échoué,
