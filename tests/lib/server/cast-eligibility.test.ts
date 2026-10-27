@@ -161,6 +161,12 @@ describe("mapMatch — arbitre désigné dans l'instantané (`docs/features/MATC
     expect(mapMatch(row({ ...eligible, referee_ready_at: new Date(), launch_pairing: "1:3" })).refereeReady).toBe(false);
   });
 
+  it("tait, avant le départ, un arbitre qui joue désormais le match ; le garde une fois le match lancé", () => {
+    expect(mapMatch(row({ ...eligible, referee_plays_match: 1 })).refereeAssigned).toBe(false);
+    expect(mapMatch(row({ ...eligible, referee_plays_match: 0 })).refereeAssigned).toBe(true);
+    expect(mapMatch(row({ ...eligible, referee_plays_match: 1, launched_at: new Date() })).refereeAssigned).toBe(true);
+  });
+
   it("hôte à gauche, premier ban à l'autre ; en BlueGenji Survie la meilleure tête de série héberge", () => {
     expect(mapMatch(row()).hostTeamId).toBe(1);
     expect(mapMatch(row()).firstBanTeamId).toBe(2);

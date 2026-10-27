@@ -175,6 +175,7 @@ function applyUpdate(state: World, sql: string, params: unknown[]) {
   if (sql.includes("launched_at = NOW()")) set("launched_at", STAMP);
   if (sql.includes("SET host_team_id = ?")) set("host_team_id", params[0]);
   if (sql.includes("SET referee_user_id = ?")) set("referee_user_id", params[0]);
+  if (sql.includes("referee_ready_at = ?, self_managed = 0")) set("referee_ready_at", params[1]);
   if (sql.includes("referee_user_id = NULL")) set("referee_user_id", null);
   if (sql.includes("self_managed = 1")) set("self_managed", 1);
   if (sql.includes("self_managed = 0")) set("self_managed", 0);
@@ -1151,6 +1152,30 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
     await setMatchReady(42, REFEREE, true);
     expect(state.match?.referee_ready_at).toBe(STAMP);
     expect(state.match?.launched_at).toBe(STAMP);
+  });
+
+  it("un caster déjà prêt qui devient arbitre n'a pas à se redéclarer : son « Prêt » vaut pour les deux", async () => {
+    state.match = matchState({ caster_user_id: REFEREE, caster_ready_at: STAMP, team1_ready_at: STAMP, team2_ready_at: STAMP });
+    await takeMatchReferee(42, REFEREE);
+    expect(state.match?.referee_ready_at).toBe(STAMP);
+    state.match = matchState({ caster_user_id: OTHER_REFEREE, caster_ready_at: null });
+    await assignMatchReferee(42, 1, OTHER_REFEREE);
+    expect(state.match?.referee_ready_at).toBeNull();
+  });
+
+  it("un arbitre qui rejoint une équipe du match sans changer l'appariement n'est plus attendu", async () => {
+    state.match = matchState({ referee_user_id: REFEREE, team1_ready_at: STAMP });
+    state.memberships.push({ userId: REFEREE, teamId: TEAM2, roles: ["DPS"] });
+    await setMatchReady(42, 3, true);
+    expect(state.match?.launched_at).toBe(STAMP);
+  });
+
+  it("un match joué garde son arbitre : ni retrait par lui-même ni par le staff", async () => {
+    state.match = matchState({ referee_user_id: REFEREE, status: "COMPLETED" });
+    await expect(releaseMatchReferee(42, REFEREE, false)).rejects.toThrow("MATCH_ALREADY_COMPLETED");
+    await expect(assignMatchReferee(42, 1, null)).rejects.toThrow("MATCH_ALREADY_COMPLETED");
+    expect(state.match?.referee_user_id).toBe(REFEREE);
+    expect(queueRefereeChange).not.toHaveBeenCalled();
   });
 
   it("sans arbitre, les deux équipes suffisent", async () => {
