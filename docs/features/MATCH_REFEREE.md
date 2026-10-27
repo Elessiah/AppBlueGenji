@@ -143,7 +143,8 @@ avec la carte `SEED_FIRST_MAP`, autogestion, ou sans décision.
 
 Registre T04 (présentation de l'arbitre aux parties, « Prêt », avis push),
 T12 (avis push « Arbitrage retiré ») et T05 (journal), `/rgpd#arbitre-designe`
-et la ligne BattleTag de `/rgpd`, les listes « BattleTag masqué » (profil,
+et la ligne BattleTag de `/rgpd` (finalité et portée « Exécution du contrat »,
+`BATTLETAG_MATCH_SCOPE`, sans clause des conditions pour l'arbitre), les listes « BattleTag masqué » (profil,
 connexion, fiche joueur, clé `asReferee`) et la modale de masquage, entrée
 `2026-10-arbitre-designe-des-matchs`. Base : exécution du service, les
 arbitres agissant pour l'association. Les conditions d'utilisation ne changent
