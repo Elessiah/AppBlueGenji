@@ -5,6 +5,7 @@ import {
   MATCH_ENTRY_MONTHS,
   formatMatchStartEntryPreview,
   isMatchStartEntryInRange,
+  isPastMatchStartChange,
   localMatchTimeIfDifferent,
   matchEntryMonths,
   matchEntryReference,
@@ -437,5 +438,33 @@ describe("formateurs anglais (lot 8b) — construits une fois", () => {
 
   it("fuseau inconnu : null, sans rien mettre en cache", () => {
     expect(localMatchTimeIfDifferent(instant, "Nowhere/Void", "en")).toBeNull();
+  });
+});
+
+describe("isPastMatchStartChange", () => {
+  const now = at("2026-10-31T10:00:00Z");
+
+  it("avertit d'une date saisie déjà passée — le 2 du mois présélectionné, choisi le 31", () => {
+    const entry = readMatchStartEntry({ day: "2", month: String(matchEntryDefaultMonth(now)), time: "21:00" }, now, null);
+    expect(entry.kind).toBe("ready");
+    if (entry.kind !== "ready") return;
+    expect(iso(entry.instant)).toBe("2026-10-02T19:00:00.000Z");
+    expect(isPastMatchStartChange(entry.instant, null, now)).toBe(true);
+  });
+
+  it("n'avertit pas d'une date à venir, ni de l'instant même de l'ouverture", () => {
+    expect(isPastMatchStartChange(at("2026-11-02T20:00:00Z"), null, now)).toBe(false);
+    expect(isPastMatchStartChange(now, null, now)).toBe(false);
+    expect(isPastMatchStartChange(now - 1, null, now)).toBe(true);
+  });
+
+  it("n'avertit pas d'une date passée déjà posée, gardée telle quelle", () => {
+    const current = at("2026-10-20T19:00:00Z");
+    expect(isPastMatchStartChange(current, current, now)).toBe(false);
+    expect(isPastMatchStartChange(current + 15 * 60_000, current, now)).toBe(true);
+  });
+
+  it("ignore un instant illisible", () => {
+    expect(isPastMatchStartChange(Number.NaN, null, now)).toBe(false);
   });
 });

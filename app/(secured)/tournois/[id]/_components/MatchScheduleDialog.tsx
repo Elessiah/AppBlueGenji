@@ -15,6 +15,7 @@ import {
   matchEntryDefaultMonth,
   matchEntryMonths,
   formatMatchStartEntryPreview,
+  isPastMatchStartChange,
   localMatchTimeIfDifferent,
   matchEntryReference,
   matchEntryTimeOptions,
@@ -26,7 +27,7 @@ import {
   type MatchStartEntryField,
   type MatchStartEntryState,
 } from "@/lib/shared/match-start-entry";
-import { isMatchOver } from "@/lib/shared/match-schedule";
+import { isMatchOver, matchStartAtTime } from "@/lib/shared/match-schedule";
 import { matchLaunchPhase } from "@/lib/shared/match-launch";
 import type { BracketMatch } from "@/lib/shared/types";
 import { useMapError } from "../_lib/error-map";
@@ -96,6 +97,18 @@ export function startAtHint(
   // Un match joué (ou au score saisi) n'annonce rien : la date n'est qu'une
   // correction d'archive.
   return played ? base : `${base} ${scheduleNotice(text, refereeScheduling, entrantsKnown)}`;
+}
+
+/**
+ * Avertissement d'une date déjà passée : ce qu'elle déclenche dépend de la
+ * phase de lancement et des engagés connus (une place vide fait attendre).
+ */
+export function pastWarningKey(
+  entrantsKnown: boolean,
+  launchPhase: boolean,
+): "schedule.warnPast" | "schedule.warnPastDirect" | "schedule.warnPastTbd" {
+  if (!entrantsKnown) return "schedule.warnPastTbd";
+  return launchPhase ? "schedule.warnPast" : "schedule.warnPastDirect";
 }
 
 /**
@@ -259,6 +272,15 @@ export function MatchScheduleDialog({
   // Une saisie seulement incomplète n'est pas un effacement : on n'avertit pas
   // encore, l'utilisateur est en train de taper.
   const clearsLiveTrigger = cleared && requiresMatchStartAt(match.liveTrigger);
+  // Une date déjà passée sur un match pas encore lancé le fait partir dès
+  // l'enregistrement : on le dit (le mois présélectionné rend l'erreur facile).
+  const [openedAt] = useState(() => Date.now());
+  const entrantsKnown = match.team1Id !== null && match.team2Id !== null;
+  const startsAtOnce =
+    entry.kind === "ready" &&
+    match.launchedAt === null &&
+    !isMatchOver(match.status, tournamentFinished) &&
+    isPastMatchStartChange(entry.instant, matchStartAtTime(match), openedAt);
   // Effacer la date d'un match non lancé d'un tournoi planifié le renvoie à
   // l'arbitrage : on le dit avant l'envoi. Un match lancé ou joué n'est pas
   // concerné (sa phase ne dépend plus de la date).
@@ -515,6 +537,12 @@ export function MatchScheduleDialog({
           {clearsLiveTrigger && (
             <ScheduleWarning>
               {t("schedule.warnLive")}
+            </ScheduleWarning>
+          )}
+
+          {startsAtOnce && (
+            <ScheduleWarning>
+              {t(pastWarningKey(entrantsKnown, launchPhase))}
             </ScheduleWarning>
           )}
 
