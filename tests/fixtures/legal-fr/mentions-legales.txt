@@ -2,7 +2,7 @@ LÉGAL · LOI 1901
 Mentions légales
 ÉDITEURBluegenji Esport
 STATUTAssociation loi 1901
-MISE À JOURSeptembre 2026
+MISE À JOUROctobre 2026
 SECTION 01
 Éditeur du siteRESPONSABLE DE LA PUBLICATION
 La plateforme est éditée par l'association Bluegenji Esport, association à but non lucratif régie par la loi du 1er juillet 1901 et le décret du 16 août 1901.
@@ -48,6 +48,10 @@ CookiesCOOKIES TECHNIQUES
 Le site n'utilise que des cookies techniques : la session d'un utilisateur connecté, l'état d'une connexion en cours, vos réglages d'accessibilité et le souvenir des annonces de recrutement déjà vues. Aucun ne permet de suivi publicitaire. Leur liste complète, avec celle des autres données que le site garde dans votre navigateur (stockage local, stockage de session, cache de la page hors ligne) et leur durée, figure dans la politique de confidentialité.
 Aucun traceur publicitaire, outil de mesure d'audience externe ni cookie tiers n'est utilisé. La fréquentation du site est mesurée par le site lui-même, sans cookie : voir la mesure d'audience. La communication entre votre navigateur et le serveur est chiffrée (HTTPS).
 SECTION 09
+Intelligence artificielleRÈGLEMENT UE 2024/1689
+Par transparence, et en lien avec le règlement européen sur l'intelligence artificielle (règlement UE 2024/1689), l'association indique que ce site a été généré par Claude Code, l'assistant de programmation fondé sur l'intelligence artificielle d'Anthropic : son code et ses textes ont été écrits avec cet outil, sous la direction de Keryan Houssin, qui en reste l'auteur et en répond.
+Aucun système d'intelligence artificielle n'échange avec les visiteurs ni ne produit de contenu à leur intention pendant leur visite : le site n'en utilise pas en fonctionnement, et aucune décision à votre égard n'est prise de façon automatisée par un tel système. Les contenus publiés par les utilisateurs ne sont pas générés par l'association.
+SECTION 10
 Documents officielsSTATUTS · ADHÉSION
 Statuts de l'associationPDF →
 Règlement intérieurDOC →

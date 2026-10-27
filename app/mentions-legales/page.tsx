@@ -92,7 +92,7 @@ function MentionsLegalesFr() {
             </div>
             <div className={styles.heroFact}>
               <span className={styles.heroFactLabel}>MISE À JOUR</span>
-              <span style={{ fontSize: 17 }}>Septembre 2026</span>
+              <span style={{ fontSize: 17 }}>Octobre 2026</span>
             </div>
           </div>
         </div>
@@ -427,6 +427,30 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
           n&apos;est utilisé. La fréquentation du site est mesurée par le site lui-même, sans
           cookie : voir la <Link href="/rgpd#audience">mesure d&apos;audience</Link>. La
           communication entre votre navigateur et le serveur est chiffrée (HTTPS).
+        </p>
+      </>
+    ),
+  },
+  {
+    id: "intelligence-artificielle",
+    title: "Intelligence artificielle",
+    meta: "RÈGLEMENT UE 2024/1689",
+    body: (
+      <>
+        <p>
+          Par transparence, et en lien avec le règlement européen sur l&apos;intelligence
+          artificielle (règlement UE 2024/1689), l&apos;association indique que ce site a été{" "}
+          <strong>généré par Claude Code</strong>, l&apos;assistant de programmation fondé sur
+          l&apos;intelligence artificielle d&apos;Anthropic : son code et ses textes ont été écrits
+          avec cet outil, sous la direction de {CODE_COPYRIGHT_HOLDER}, qui en reste l&apos;auteur et
+          en répond.
+        </p>
+        <p>
+          Aucun système d&apos;intelligence artificielle n&apos;échange avec les visiteurs ni ne
+          produit de contenu à leur intention pendant leur visite : le site n&apos;en utilise pas en
+          fonctionnement, et aucune décision à votre égard n&apos;est prise de façon automatisée
+          par un tel système. Les contenus publiés par les utilisateurs ne sont pas générés par
+          l&apos;association.
         </p>
       </>
     ),

@@ -178,8 +178,16 @@ describe("anglais : une traduction, qui le dit", () => {
 
   it("les mentions anglaises gardent leurs ancres (conditions, documents du bot)", async () => {
     const html = await render(LegalNoticePage, "en");
-    for (const id of ["editeur", "hebergement", "propriete-intellectuelle", "contenus-membres", "autorites", "donnees-personnelles", "cookies"]) {
+    for (const id of ["editeur", "hebergement", "propriete-intellectuelle", "contenus-membres", "autorites", "donnees-personnelles", "cookies", "intelligence-artificielle"]) {
       expect(html).toContain(`id="${id}"`);
+    }
+  });
+
+  it("les mentions anglaises et françaises déclarent le site généré par Claude Code (règlement UE 2024/1689)", async () => {
+    for (const locale of ["fr", "en"] as const) {
+      const text = legalPageText(await render(LegalNoticePage, locale));
+      expect(text).toContain("Claude Code");
+      expect(text).toContain("2024/1689");
     }
   });
 });
