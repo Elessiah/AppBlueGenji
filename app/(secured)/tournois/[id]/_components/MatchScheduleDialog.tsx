@@ -336,9 +336,13 @@ export function MatchScheduleDialog({
     }
     // L'horloge a pu avancer depuis l'ouverture (fenêtre laissée ouverte) : une
     // date devenue passée entre-temps s'avertit d'abord, l'envoi suivant part.
+    // Aussi en notification : à 375 px, clavier ouvert, l'avertissement sous
+    // les champs peut être hors de vue, et le clic semblait sans effet.
     const now = Date.now();
-    if (pastWarning === null && pastWarningAt(now) !== null) {
+    const lateWarning = pastWarning === null ? pastWarningAt(now) : null;
+    if (lateWarning !== null) {
       setClock(now);
+      showError(t(lateWarning));
       return;
     }
 

@@ -40,6 +40,9 @@
 .forfeitLocked {
   font-size: 11px;
   color: var(--ink-quiet);
+}
+
+.forfeitLockedLabel {
   white-space: nowrap;
 }
 

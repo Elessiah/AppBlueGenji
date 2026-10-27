@@ -1,6 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import styles from "./RankingViews.module.css";
 
 /**
@@ -31,10 +32,18 @@ export type ForfeitRowActionProps =
 export function ForfeitRowAction(props: Readonly<ForfeitRowActionProps>) {
   if (props.kind === "locked") {
     return (
-      <span className={styles.forfeitLocked} title={props.title} data-row-action={props.teamId} tabIndex={-1}>
-        <span aria-hidden="true">🔒</span> {props.label}
-        <span className="sr-only"> {props.title}</span>
-      </span>
+      // La raison derrière un « i » (INFO_HINTS.md) : un `title` ne s'affiche ni
+      // au toucher ni au clavier, « Figé » restait inexpliqué à 375 px.
+      <div className={styles.forfeitLocked} data-row-action={props.teamId} tabIndex={-1}>
+        <InfoHintRow>
+          <span className={styles.forfeitLockedLabel}>
+            <span aria-hidden="true">🔒</span> {props.label}
+          </span>
+          <InfoHint id={`forfeit-frozen-${props.teamId}`} subject={props.label}>
+            <p>{props.title}</p>
+          </InfoHint>
+        </InfoHintRow>
+      </div>
     );
   }
   return (
