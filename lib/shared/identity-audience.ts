@@ -9,7 +9,7 @@
 import type { IdentityAudience } from "@/lib/shared/identity-sharing";
 
 const DISCORD_ITEMS = ["admins", "referees", "match", "asCaster", "players"] as const;
-const BATTLETAG_ITEMS = ["match", "asCaster", "launch"] as const;
+const BATTLETAG_ITEMS = ["match", "asCaster", "asReferee", "launch"] as const;
 
 export type DiscordAudienceKey = `audience.discord.${"title" | "footer" | (typeof DISCORD_ITEMS)[number]}`;
 export type BattletagAudienceKey = `audience.battletag.${"title" | "footer" | (typeof BATTLETAG_ITEMS)[number]}`;

@@ -101,6 +101,7 @@ export function BattletagVisibilityNotice({ onClose }: Readonly<{ onClose: () =>
             <li>{richNodes(text.rich("battletagNotice.players", {}, strong))}</li>
             <li>{richNodes(text.rich("battletagNotice.caster", {}, strong))}</li>
             <li>{richNodes(text.rich("battletagNotice.asCaster", {}, strong))}</li>
+            <li>{richNodes(text.rich("battletagNotice.asReferee", {}, strong))}</li>
             <li>{richNodes(text.rich("battletagNotice.staff", {}, strong))}</li>
           </ul>
 

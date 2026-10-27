@@ -58,6 +58,7 @@ export const HIDDEN_BATTLETAG_AUDIENCE: IdentityAudience = {
   items: [
     "si tu y es présenté comme contact : les membres des deux équipes, les arbitres et les administrateurs, dès que les adversaires sont connus et jusqu'à la fin du match, et les casters le temps du match ;",
     "si tu castes un match : ses deux équipes et ses autres casters le temps du match, et les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin ;",
+    "si tu es l'arbitre désigné d'un match : ses deux équipes, les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin, et ses casters le temps du match ;",
     "la fenêtre de lancement, elle, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné.",
   ],
   footer:
