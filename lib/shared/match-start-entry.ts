@@ -16,7 +16,8 @@
  * validé comme avant par `normalizeMatchStartAt`.
  */
 
-import { matchStartAtTime, normalizeMatchStartAt, type MatchScheduleInput } from "@/lib/shared/match-schedule";
+import { matchLaunchPhase, type MatchLaunchInput } from "@/lib/shared/match-launch";
+import { isMatchOver, matchStartAtTime, normalizeMatchStartAt, type MatchScheduleInput } from "@/lib/shared/match-schedule";
 import { DEFAULT_LOCALE, INTL_LOCALE, type Locale } from "@/lib/shared/locales";
 
 /** Fuseau de la saisie et de l'aperçu : celui de l'organisation. */
@@ -308,14 +309,62 @@ export function matchEntryDefaultMonth(now: number): number {
   return parisParts(now).month;
 }
 
+const MINUTE_MS = 60_000;
+
 /**
- * Une date saisie **déjà passée** et différente de celle déjà posée : le
+ * Une date saisie **déjà passée** et différente (à la minute) de celle déjà posée : le
  * dialogue avertit avant l'envoi, car un match non lancé part alors sans
  * attendre. Le mois présélectionné (`matchEntryDefaultMonth`) rend le cas
  * facile : le 31, un jour « 2 » choisi seul tombe au 2 du mois en cours.
  */
 export function isPastMatchStartChange(instant: number, current: number | null, now: number): boolean {
-  return Number.isFinite(instant) && instant < now && instant !== current;
+  if (!Number.isFinite(instant) || instant >= now) return false;
+  // À la minute : le dialogue ne saisit pas les secondes, qu'une date posée
+  // par un autre chemin peut porter — la même minute n'est pas un changement.
+  return current === null || Math.floor(instant / MINUTE_MS) !== Math.floor(current / MINUTE_MS);
+}
+
+/** Clé de l'avertissement de date passée affiché par le dialogue d'horaire. */
+export type PastStartWarningKey = "schedule.warnPast" | "schedule.warnPastDirect" | "schedule.warnPastTbd";
+
+/**
+ * Avertissement d'une date déjà passée : ce qu'elle déclenche dépend de la
+ * phase de lancement et des engagés connus (une place vide fait attendre).
+ */
+export function pastWarningKey(entrantsKnown: boolean, launchPhase: boolean): PastStartWarningKey {
+  if (!entrantsKnown) return "schedule.warnPastTbd";
+  return launchPhase ? "schedule.warnPast" : "schedule.warnPastDirect";
+}
+
+/** Le match vu par l'avertissement : sa phase, son score et l'état du tournoi. */
+export type PastStartWarningMatch = Omit<MatchLaunchInput, "launchPhase"> & {
+  team1Score: number | null;
+  team2Score: number | null;
+};
+
+/**
+ * L'avertissement à montrer pour une date saisie, ou `null`. Il ne prévient que
+ * d'un **passage** : un match qui attendait son heure (`TO_PLAN`, `SCHEDULED`)
+ * et que la date saisie, déjà passée, ferait partir (`LOBBY`, `LAUNCHED`). Un
+ * match déjà en lancement, déjà parti, joué, au score noté (tenu pour lancé par
+ * le serveur) ou d'un tournoi clos ne change pas de phase : rien à dire. Une
+ * place encore vide : le match partira dès ses deux adversaires connus.
+ */
+export function pastStartWarning(
+  match: PastStartWarningMatch,
+  instant: number,
+  now: number,
+  options: Readonly<{ launchPhase: boolean; tournamentFinished: boolean }>,
+): PastStartWarningKey | null {
+  if (!isPastMatchStartChange(instant, matchStartAtTime(match), now)) return null;
+  if (isMatchOver(match.status, options.tournamentFinished)) return null;
+  if (match.launchedAt !== null || match.team1Score !== null || match.team2Score !== null) return null;
+  if (match.team1Id === null || match.team2Id === null) return pastWarningKey(false, options.launchPhase);
+  const input = { ...match, launchPhase: options.launchPhase };
+  const before = matchLaunchPhase(input, now);
+  const after = matchLaunchPhase({ ...input, startAt: new Date(instant).toISOString() }, now);
+  const waiting = (phase: string) => phase === "TO_PLAN" || phase === "SCHEDULED";
+  return waiting(before) && !waiting(after) ? pastWarningKey(true, options.launchPhase) : null;
 }
 
 /**

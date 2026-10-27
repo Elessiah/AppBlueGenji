@@ -87,6 +87,39 @@ export function SurvivalView({
   const { t: a } = useActionsText();
   const participantType = useEntrantParticipantType();
   const cancellableIds = new Set(survival.cancellableForfeitTeamIds);
+  // Un seul geste par ligne, rendu par un même `<button>` (`ForfeitRowAction`).
+  const rowAction = (team: SurvivalStandingRow, isMine: boolean): ForfeitRowActionProps | null => {
+    // Abandon : proposé sur les équipes encore en lice, à leurs représentants
+    // comme à l'arbitrage (cf. `canForfeit` côté page).
+    if (!isFinished && team.status === "ACTIVE" && canForfeit(team.teamId)) {
+      return {
+        kind: "button",
+        teamId: team.teamId,
+        label: a("forfeit.button.label"),
+        title: isMine
+          ? a(`forfeit.button.selfTitle.${participantType}`)
+          : a("forfeit.button.otherTitle", { name: team.teamName }),
+        ariaLabel: isMine
+          ? a(`forfeit.button.selfAria.${participantType}`)
+          : a("forfeit.button.otherAriaSurvival", { name: team.teamName }),
+        style: FORFEIT_BUTTON_STYLE,
+        onClick: () => onForfeit(team.teamId, team.teamName),
+      };
+    }
+    if (isFinished || team.status !== "FORFEIT" || !canCancelForfeit || onCancelForfeit === undefined) return null;
+    if (!cancellableIds.has(team.teamId)) {
+      return { kind: "locked", teamId: team.teamId, label: a("forfeitCancel.frozen"), title: a("forfeitCancel.frozenTitle") };
+    }
+    return {
+      kind: "button",
+      teamId: team.teamId,
+      label: a("forfeitCancel.button"),
+      title: a("forfeitCancel.buttonTitle", { name: team.teamName }),
+      ariaLabel: a("forfeitCancel.buttonAria", { name: team.teamName }),
+      style: FORFEIT_CANCEL_BUTTON_STYLE,
+      onClick: () => onCancelForfeit(team.teamId, team.teamName),
+    };
+  };
   const emptyText = emptyLabel ?? t("page.noMatchesShort");
   // Une marche du podium porte sa propre graisse : ne pas l'écraser en ligne.
   const podiumTiers = usePodiumTiers();
@@ -176,46 +209,7 @@ export function SurvivalView({
                   : { label: t(status.key), color: status.color };
               const inDanger = dangerTeamIds.has(team.teamId);
               const isMine = team.teamId === myTeamId;
-              // Abandon : proposé sur les équipes encore en lice, à leurs
-              // représentants comme à l'arbitrage (cf. `canForfeit` côté page).
-              const forfeitable =
-                !isFinished && team.status === "ACTIVE" && canForfeit(team.teamId);
-              const cancellable =
-                !isFinished && team.status === "FORFEIT" && canCancelForfeit && onCancelForfeit !== undefined;
-              // Un seul geste par ligne, rendu par un même `<button>` (`ForfeitRowAction`).
-              let action: ForfeitRowActionProps | null = null;
-              if (forfeitable) {
-                action = {
-                  kind: "button",
-                  teamId: team.teamId,
-                  label: a("forfeit.button.label"),
-                  title: isMine
-                    ? a(`forfeit.button.selfTitle.${participantType}`)
-                    : a("forfeit.button.otherTitle", { name: team.teamName }),
-                  ariaLabel: isMine
-                    ? a(`forfeit.button.selfAria.${participantType}`)
-                    : a("forfeit.button.otherAriaSurvival", { name: team.teamName }),
-                  style: FORFEIT_BUTTON_STYLE,
-                  onClick: () => onForfeit(team.teamId, team.teamName),
-                };
-              } else if (cancellable && !cancellableIds.has(team.teamId)) {
-                action = {
-                  kind: "locked",
-                  teamId: team.teamId,
-                  label: a("forfeitCancel.frozen"),
-                  title: a("forfeitCancel.frozenTitle"),
-                };
-              } else if (cancellable) {
-                action = {
-                  kind: "button",
-                  teamId: team.teamId,
-                  label: a("forfeitCancel.button"),
-                  title: a("forfeitCancel.buttonTitle", { name: team.teamName }),
-                  ariaLabel: a("forfeitCancel.buttonAria", { name: team.teamName }),
-                  style: FORFEIT_CANCEL_BUTTON_STYLE,
-                  onClick: () => onCancelForfeit?.(team.teamId, team.teamName),
-                };
-              }
+              const action = rowAction(team, isMine);
               const fade = team.status === "FORFEIT" ? FORFEIT_FADE : undefined;
               return (
                 <div

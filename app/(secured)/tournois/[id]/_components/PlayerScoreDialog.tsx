@@ -230,6 +230,19 @@ function sendingOpensDispute(
   return form.entered.team1Score !== view.theirs.team1Score || form.entered.team2Score !== view.theirs.team2Score;
 }
 
+/**
+ * Le libellé d'un bouton focalisé qui change n'est pas annoncé : l'envoi se
+ * dit dans cette région, toujours montée, comme dans `ConfirmActionDialog`.
+ */
+function SendingStatus({ active }: Readonly<{ active: boolean }>) {
+  const { t } = useDialogsText();
+  return (
+    <output className="sr-only" aria-live="polite">
+      {active ? t("score.sending") : ""}
+    </output>
+  );
+}
+
 export function PlayerScoreDialog({
   tournamentId,
   match: liveMatch,
@@ -670,11 +683,7 @@ export function PlayerScoreDialog({
                 {submitting && "…"}
               </button>
             )}
-            {/* Le libellé d'un bouton focalisé qui change n'est pas annoncé :
-                l'envoi se dit ici, comme dans `ConfirmActionDialog`. */}
-            <output className="sr-only" aria-live="polite">
-              {submitting ? t("score.sending") : ""}
-            </output>
+            <SendingStatus active={submitting} />
           </div>
         </form>
       </div>
