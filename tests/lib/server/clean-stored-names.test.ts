@@ -3,9 +3,10 @@ import { cleanStoredNames } from "@/lib/server/database/data-migrations";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 /**
- * `cleanStoredNames` réécrit une fois par `visibleText` les noms enregistrés
- * avant le nettoyage à l'écriture (`UNTRUSTED_NAMES.md`) : équipes, pseudos,
- * tournois.
+ * `cleanStoredNames` retire une fois, par `withoutInvisibles`, les invisibles et
+ * commandes de direction des noms enregistrés avant le nettoyage à l'écriture
+ * (`UNTRUSTED_NAMES.md`) : équipes, pseudos, tournois. Sans NFKC : un nom
+ * stylisé n'est jamais renommé.
  */
 
 /** Erreur mysql2 minimale. */
@@ -61,7 +62,7 @@ describe("cleanStoredNames", () => {
       { sql: "UPDATE bg_users SET pseudo = ? WHERE id = ? AND pseudo = ?", params: ["Admin", 2, "Adm\u200Bin"] },
       {
         sql: "UPDATE bg_tournaments SET name = ? WHERE id = ? AND name = ?",
-        params: ["Coupe d'hiver", 3, "  Coupe\u2060   d'hiver "],
+        params: ["Coupe   d'hiver", 3, "  Coupe\u2060   d'hiver "],
       },
     ]);
     // Le journal compte, il ne nomme personne (`RGPD_LOGS_AND_VISITS.md`).
@@ -86,13 +87,39 @@ describe("cleanStoredNames", () => {
     expect(logSpy).not.toHaveBeenCalled();
   });
 
+  it("laisse octet pour octet un nom stylisé (exposant, fraction, pleine chasse, espace fine)", async () => {
+    const { execute, pool } = database({
+      bg_teams: [
+        { id: 1, name: "Team²" },
+        { id: 2, name: "Ｄｒａｇｏｎ  Squad" },
+      ],
+      bg_users: [{ id: 3, name: "½ Lune" }],
+      bg_tournaments: [{ id: 4, name: "Coupe 2026 ™" }],
+    });
+
+    await cleanStoredNames(pool);
+
+    expect(updates(execute)).toEqual([]);
+    expect(logSpy).not.toHaveBeenCalled();
+  });
+
+  it("ne retire que les invisibles d'un nom stylisé, sans le normaliser", async () => {
+    const { execute, pool } = database({ bg_teams: [{ id: 1, name: "‮Team²​ Ｘ" }] });
+
+    await cleanStoredNames(pool);
+
+    expect(updates(execute)).toEqual([
+      { sql: "UPDATE bg_teams SET name = ? WHERE id = ? AND name = ?", params: ["Team² Ｘ", 1, "‮Team²​ Ｘ"] },
+    ]);
+  });
+
   it("laisse un nom qui ne garderait rien de visible", async () => {
     const { execute, pool } = database({ bg_teams: [{ id: 1, name: "\u200B\u2060" }] });
 
     await cleanStoredNames(pool);
 
     expect(updates(execute)).toEqual([]);
-    expect(logged()).toContain("bg_teams.name : 0 nom(s) réécrit(s) en forme affichable, 1 laissé(s)");
+    expect(logged()).toContain("bg_teams.name : 0 nom(s) réécrit(s) sans caractère invisible, 1 laissé(s)");
   });
 
   it("laisse un sosie dont la forme propre est prise (UNIQUE), et poursuit", async () => {
@@ -112,7 +139,7 @@ describe("cleanStoredNames", () => {
     await cleanStoredNames(pool);
 
     expect(updates(execute)).toHaveLength(2);
-    expect(logged()).toContain("bg_users.pseudo : 1 nom(s) réécrit(s) en forme affichable, 1 laissé(s)");
+    expect(logged()).toContain("bg_users.pseudo : 1 nom(s) réécrit(s) sans caractère invisible, 1 laissé(s)");
     expect(errorSpy).not.toHaveBeenCalled();
   });
 
