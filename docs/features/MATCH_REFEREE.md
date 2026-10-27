@@ -100,8 +100,8 @@ modale) ; sinon l'équipe 1. L'hôte joue à **gauche** ; l'autre équipe
   des deux engagés) ; l'arbitre en place qui le joue désormais, avant le
   départ, s'y lit « ne peut plus arbitrer » — la règle du bandeau
   (`refereeKept`). Champs habillés par `.field` ; la carte saisie survit aux
-  autres gestes ; un geste qui retire son bouton rend le focus à la phrase
-  d'état.
+  autres gestes ; au retour d'un geste, le focus revient à son contrôle, ou à
+  la phrase d'état quand le geste a retiré son bouton (`refereeFocusTarget`).
 
 ## Annonces
 
