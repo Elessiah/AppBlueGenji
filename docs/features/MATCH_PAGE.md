@@ -72,7 +72,11 @@ la fenêtre « Contacts » (`GET /api/matches/[id]/contacts`, hook partagé
 sur une fiche figée. Le serveur décide seul de ce qu'il rend
 (`AUTHORIZATION_RULES.md`). Les contacts des deux équipes ne sont pas repris :
 ils restent dans la fenêtre « Contacts ». Le registre et `/rgpd` nomment la page
-parmi les lieux où ces contacts paraissent.
+parmi les lieux où ces contacts paraissent, avec leur base
+(registre T01, T04 ; tableau de `/rgpd` par `rgpd-policy.ts`) : contrat pour les
+contacts des casters, intérêt légitime pour le BattleTag de l'arbitre, comme dans
+les fenêtres. La section « Contacts de match » des conditions (version 6) ne
+nomme que les deux fenêtres : la page ne se déploie qu'avec la version 7.
 
 ## Liens vers la page
 
