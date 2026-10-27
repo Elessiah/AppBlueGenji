@@ -300,9 +300,15 @@ les 7 s (`LANDING_CAROUSEL_INTERVAL_MS`), par un `setTimeout` relancé à chaque
 changement — un geste du lecteur redonne le délai entier. Il ne tourne qu'avec
 `decorativeMotion` (régime de charge : figé onglet caché, page sans focus,
 mouvement réduit, machine à la peine — `CLIENT_POWER_MODES.md`) et s'arrête sous
-la souris ou le focus **clavier** (`:focus-visible`) **de toute la carte** — ni
-le toucher ni le focus laissé par un clic, que rien ne viendrait relâcher : le
-carrousel resterait figé, bouton « Pause » affiché. L'enveloppe `.hold`
+la souris, le focus **clavier** (`:focus-visible`) ou le **doigt** **de toute la
+carte**. Le doigt n'a pas de sortie qui relâcherait la prise : un toucher (ou un
+stylet) la pose pour `LANDING_CAROUSEL_TOUCH_HOLD_MS` (10 s), échéance repoussée
+à chaque nouveau toucher — sans elle, le match changeait toutes les 7 s pendant
+la lecture et un tapotement au moment du changement ouvrait l'ancre du match
+suivant. Un toucher sur un bouton de la carte (précédent, suivant, pause) ne
+retient rien : il règle lui-même le défilement, et « Reprendre » paraîtrait
+sans effet (`pointerDownHoldsCarousel`). Le focus laissé par un clic ne retient
+pas non plus : rien ne viendrait le relâcher. L'enveloppe `.hold`
 (`display: contents`) porte les écouteurs, la plaque de lien couvrant les
 matchs. Le match affiché est suivi **par identifiant** (`resolveCarouselIndex`) :
 un sondage de `useLandingLive` qui retire un match terminé ne décale pas la
@@ -334,6 +340,25 @@ dans celui du retrait : le focus revient au bouton « suivant »
 parti ailleurs, ou carte démontée, il relâche la prise. La position n'est annoncée (`aria-live="polite"`) que
 défilement arrêté. La plaque de lien et son intitulé suivent le match affiché.
 
+**Coût des diapositives cachées.** Les diapositives empilées dans la case
+visible ne retiennent pas `loading="lazy"` : seules l'affichée et ses deux
+voisines (circulaires, `slideNearActive`) chargent leurs logos, les autres
+gardent l'initiale. `MatchSlide` est mémoïsée, et l'horloge de la carte
+(30 s) n'est transmise qu'aux matchs datés hors antenne (`slideClock`) : un pas
+du carrousel ou un tic ne refait que les diapositives concernées. Une
+diapositive cachée n'anime pas la lueur de la pastille « En attente de
+lancement » (`.slide:not(.slideActive) .pill-waiting::after`). Le survol des
+commandes est gardé par `@media (hover: hover) and (pointer: fine)` : au
+toucher, « Match suivant » restait allumé après le tapotement.
+
+**Noms et audience.** Sans compte (`spectator`), les noms des engagés restent du
+texte : les fiches d'équipe et de joueur sont derrière la connexion, la plaque
+mène à la vue sans compte. Connecté, leur titre au survol est neutre
+(« Voir la fiche de … » / « View …'s page »), juste pour une équipe comme pour un
+joueur. Le nombre de personnes qui suivent le tournoi porte un libellé lu par
+le lecteur d'écran (`live.viewers`, FR + EN), l'icône et le chiffre restant
+visuels.
+
 ## Fichiers
 
 | Fichier | Rôle |
@@ -358,6 +383,7 @@ défilement arrêté. La plaque de lien et son intitulé suivent le match affich
 | `tests/lib/shared/landing.test.ts` | `featuredMatchPill` : libellé par section, cas « En direct », bascule par l'horloge ; `carouselMatchOrder` : ordre, exclusions, plafond. |
 | `tests/lib/server/landing-live.test.ts` | Seeds exposés format par format, seed aberrant écarté ; liste chronologique du carrousel. |
 | `tests/app/live-card-carousel.test.tsx` | Pile des matchs, ouverture sur le match mis en avant, commandes, repli à un seul match. |
+| `tests/app/live-card-home-fixes.test.tsx` | Audience lisible (FR + EN), noms sans lien sans compte, titre neutre, logos des seules voisines, horloge des matchs datés, prise au toucher, survol gardé, pastille cachée figée. |
 | `tests/tournois/match-anchor-wiring.test.ts` | Points de passage (l'ancre est dans `MatchRow`, le hook est branché) et unicité du préfixe. |
 
 ## Notes reprises de CLAUDE.md
