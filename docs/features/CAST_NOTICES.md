@@ -20,6 +20,12 @@ Lot LOGS-NOTIFS, PR ln-1 (décisions de l'utilisateur du 2026-10-27). Code :
 
 - Une inscription rejouée (déjà titulaire) ou refusée ne s'annonce pas ; un
   retrait sur un match sans caster non plus.
+- Le retrait `JOINED_TEAM` naît aussi au fond d'une transaction, quand
+  l'appariement qui arrive compte l'équipe du caster (`adoptCurrentPairing` :
+  « Prêt », lancement forcé, entretien des lancements). Il y est **noté**
+  (`queueCastChange`) et n'est annoncé qu'après le commit (`flushCastChanges`,
+  appelé par `inTransaction`, `flushBotLogs` et l'entretien de la modale) ;
+  une transaction annulée le jette (`discardCastChanges`).
 - Retrait d'office : si le caster est à la fois inéligible et devenu joueur du
   match, le motif dit les conditions du cast (`INELIGIBLE`).
 - Les **joueurs du match ne sont pas prévenus** (décision 3).
