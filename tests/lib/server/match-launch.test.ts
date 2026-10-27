@@ -276,6 +276,9 @@ function readRefereeRows(state: World, sql: string, params: unknown[]): [unknown
     state.alerts = [...(state.alerts ?? []), `${params[0]}:${params[1]}`];
     return [{ affectedRows: 1, insertId: state.alerts.length }, []];
   }
+  if (sql.startsWith("SELECT MIN(id) AS id FROM bg_matches")) {
+    return [[{ id: state.match?.id ?? null }], []];
+  }
   if (sql.startsWith("SELECT tournament_id, status, first_map FROM bg_matches")) {
     return [state.match ? [{ ...state.match }] : [], []];
   }
@@ -1311,7 +1314,8 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
 describe("maintainMatchLaunches — avertissement « sans arbitre »", () => {
   const connection = () => connectionFor(state);
 
-  it("une alerte par appariement, jamais d'autogestion d'office", async () => {
+  it("match planifié : une alerte par appariement, jamais d'autogestion d'office", async () => {
+    state.match = matchState({ start_at: "2026-09-24 19:00:00" });
     await maintainMatchLaunches(connection(), 7);
     await maintainMatchLaunches(connection(), 7);
     expect(state.alerts).toEqual([`42:NO_REFEREE:${TEAM1}:${TEAM2}`]);
@@ -1320,6 +1324,16 @@ describe("maintainMatchLaunches — avertissement « sans arbitre »", () => {
     state.match = matchState({ ...state.match, team2_id: 30, launch_pairing: `${TEAM1}:${TEAM2}` });
     await maintainMatchLaunches(connection(), 7);
     expect(state.alerts).toEqual([`42:NO_REFEREE:${TEAM1}:${TEAM2}`, `42:NO_REFEREE:${TEAM1}:30`]);
+  });
+
+  it("match sans horaire : une alerte pour sa manche, réservée une seule fois (réappariement compris)", async () => {
+    await maintainMatchLaunches(connection(), 7);
+    await maintainMatchLaunches(connection(), 7);
+    expect(state.alerts).toEqual(["42:NO_REFEREE_ROUND"]);
+    state.match = matchState({ ...state.match, team2_id: 30, launch_pairing: `${TEAM1}:${TEAM2}` });
+    await maintainMatchLaunches(connection(), 7);
+    expect(state.alerts).toEqual(["42:NO_REFEREE_ROUND"]);
+    expect(state.match?.self_managed).toBe(0);
   });
 
   it("se tait sur un match arbitré ou en autogestion", async () => {

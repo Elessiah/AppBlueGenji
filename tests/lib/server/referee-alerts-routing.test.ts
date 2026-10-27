@@ -696,3 +696,21 @@ describe("resolveBotLogs pour le routage", () => {
     expect(logs[0].channel).toBe("JOURNAL");
   });
 });
+
+describe("alerte « sans arbitre » d'une manche sans horaire", () => {
+  it("une seule alerte arbitre, qui liste les matchs de la manche", async () => {
+    const connection = fakeConnection();
+    mockDb([[MATCH_ROW], [{ ...MATCH_ROW, id: 32, team1_name: "Alpha", team2_name: "Bravo" }]]);
+
+    queueBotLog(connection, { kind: "match_no_referee", matchId: 31, pairing: "ROUND", roundMatchIds: [31, 32], claimId: 9 });
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(pushRefereeAlert).toHaveBeenCalledTimes(1);
+    expect(sendBotLog).not.toHaveBeenCalled();
+    const [message] = jest.mocked(pushRefereeAlert).mock.calls[0];
+    expect(message).toContain("Les Renards vs Team Nova (match #31) ; Alpha vs Bravo (match #32)");
+    expect(message).toContain("2 matchs en lancement sans arbitre ni autogestion");
+  });
+});

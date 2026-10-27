@@ -8,7 +8,7 @@ import {
   refereeDecision,
 } from "@/lib/shared/match-referee";
 import { allPartiesReady, readyCount } from "@/lib/shared/match-launch";
-import { noRefereeAlertKey, refereeAlertKey } from "@/lib/server/tournaments/bot-logs";
+import { NO_REFEREE_ROUND_ALERT_KEY, noRefereeAlertKey, refereeAlertKey } from "@/lib/server/tournaments/bot-logs";
 import { botEventChannel, formatNoRefereeAlert } from "@/lib/shared/referee-alerts";
 import { formatRefereeChangeLog, formatRoundSelfManagementLog } from "@/lib/shared/bot-logs";
 import {
@@ -102,6 +102,10 @@ describe("alerte « sans arbitre »", () => {
     expect(noRefereeAlertKey("1".repeat(60))).toHaveLength(32);
     expect(refereeAlertKey({ kind: "match_no_referee", matchId: 42, pairing: "10:20" })).toBe("NO_REFEREE:10:20");
     expect(refereeAlertKey({ kind: "match_no_referee", matchId: 42, pairing: "10:30" })).not.toBe("NO_REFEREE:10:20");
+    // Manche sans horaire : une seule clé pour la manche, quel que soit l'appariement.
+    expect(refereeAlertKey({ kind: "match_no_referee", matchId: 42, pairing: "ROUND", roundMatchIds: [42, 43] })).toBe(
+      NO_REFEREE_ROUND_ALERT_KEY,
+    );
     expect(botEventChannel("match_no_referee")).toBe(botEventChannel("score_conflict"));
   });
 
