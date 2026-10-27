@@ -356,6 +356,6 @@ describe("Autres écrans — noms cliquables", () => {
     expect(code).toContain("href={match.team2Href}");
     expect(code).not.toContain("/equipes/");
     // Une place vide (bye, adversaire à désigner) ne mène nulle part.
-    expect(code).toContain("if (!href) return <>{name}</>;");
+    expect(code).toContain("if (!href || spectator) return <>{name}</>;");
   });
 });

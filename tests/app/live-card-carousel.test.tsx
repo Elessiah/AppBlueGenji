@@ -149,11 +149,13 @@ describe("useMatchCarousel — régime de charge", () => {
 
   it("ne fait défiler qu'avec les animations permises, et jamais sous le lecteur", () => {
     expect(source).toContain("const { decorativeMotion } = useClientPower();");
-    expect(source).toContain("const rotating = canRotate && !paused && !hovered && !focused;");
+    expect(source).toContain("const rotating = canRotate && !paused && !held;");
+    expect(source).toContain("const held = hovered || focused || touched;");
   });
 
-  it("ne se laisse retenir ni par le toucher ni par le focus d'un clic", () => {
+  it("ne se laisse retenir ni par le survol d'un doigt ni par le focus d'un clic", () => {
     // Rien ne relâcherait la prise : le carrousel resterait figé sous « Pause ».
+    // Le toucher, lui, retient avec une échéance (`LANDING_CAROUSEL_TOUCH_HOLD_MS`).
     expect(source).toContain('if (event.pointerType !== "mouse") return;');
     expect(source).toContain('const keyboard = event.target.matches(":focus-visible");');
     expect(source).not.toContain("onMouseEnter");
@@ -187,9 +189,9 @@ describe("carouselCanAutoRotate", () => {
 describe("useMatchCarousel — match figé sous le lecteur", () => {
   const source = readFileSync(join(process.cwd(), "components/cyber/landing/useMatchCarousel.ts"), "utf8");
 
-  it("fige le match affiché dès le survol ou le focus clavier", () => {
+  it("fige le match affiché dès le survol, le focus clavier ou le toucher", () => {
     expect(source).toContain("if (!held) setHeldId(ids[index] ?? null);");
-    expect(source.match(/pin\(\);/g)).toHaveLength(2);
+    expect(source.match(/pin\(\);/g)).toHaveLength(3);
   });
 
   it("ne le fige que le temps de la prise : la carte suit ensuite le match mis en avant", () => {
