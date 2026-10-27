@@ -105,7 +105,9 @@ l'échec passent par le toast, au singulier d'un joueur en tournoi individuel
 (`forfeitCancel.success.SOLO`, `tournamentErrors.soloCodes`). Abandon comme
 annulation sont rendus par un même `<button>` (`ForfeitRowAction`) : après le
 geste, le focus revient sur le nouveau bouton de la ligne, ou sur la ligne
-(`data-row-focus`) si elle n'en porte plus.
+(`data-row-focus`) si elle n'en porte plus. `focusRowAfterChange` veille
+`FOCUS_WATCH_MS` (3 s) : le rendu groupé du flux peut déplacer la ligne après
+la fin de `refresh()`, et la veille s'arrête dès que le lecteur va ailleurs.
 La confirmation ne promet l'appariement qu'avec sa réserve (« sauf si les
 matchs qu'elle a joués l'éliminent ») : le rejeu peut sortir l'engagé aussitôt.
 
