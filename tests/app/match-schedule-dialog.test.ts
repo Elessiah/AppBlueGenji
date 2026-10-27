@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
+import { pastWarningKey } from "@/app/(secured)/tournois/[id]/_components/MatchScheduleDialog";
 import { join } from "node:path";
 import enDialogs from "@/messages/en/tournamentDialogs.json";
 import frDialogs from "@/messages/fr/tournamentDialogs.json";
@@ -105,5 +106,28 @@ describe("MatchScheduleDialog — confirmation d'un retrait", () => {
     expect(SOURCE).toContain("savedMessage(text, entry.kind === \"ready\", planning, match.startAt !== null)");
     expect(frDialogs.schedule.noTime).toBe("Aucune date de début posée.");
     expect(enDialogs.schedule.noTime).toBe("No start date set.");
+  });
+});
+
+describe("MatchScheduleDialog — date déjà passée", () => {
+  it("avertit d'une date passée sur un match ni lancé ni joué, sans la refuser", () => {
+    expect(SOURCE).toContain("isPastMatchStartChange(entry.instant, matchStartAtTime(match), openedAt)");
+    expect(SOURCE).toContain("match.launchedAt === null &&");
+    expect(SOURCE).toContain("!isMatchOver(match.status, tournamentFinished) &&");
+    expect(SOURCE).toMatch(/\{startsAtOnce && \(\s*<ScheduleWarning>/);
+  });
+
+  it("dit ce que la date déclenche selon la phase de lancement et les engagés", () => {
+    expect(pastWarningKey(true, true)).toBe("schedule.warnPast");
+    expect(pastWarningKey(true, false)).toBe("schedule.warnPastDirect");
+    expect(pastWarningKey(false, true)).toBe("schedule.warnPastTbd");
+    expect(pastWarningKey(false, false)).toBe("schedule.warnPastTbd");
+  });
+
+  it("porte ses trois avertissements en français et en anglais", () => {
+    for (const key of ["warnPast", "warnPastDirect", "warnPastTbd"] as const) {
+      expect(frDialogs.schedule[key]).toMatch(/^Cette date est déjà passée : .+ Vérifiez le jour et le mois\.$/);
+      expect(enDialogs.schedule[key]).toMatch(/^This date has already passed: .+ Check the day and month\.$/);
+    }
   });
 });
