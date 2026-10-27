@@ -234,6 +234,10 @@ describe("page d'un match — arbitrage × lecteur", () => {
     const staff = render(match(), "staff");
     expect(staff).toContain(`aria-label="${infoHintLabel("fr", "Aucune décision").replaceAll("'", "&#x27;")}"`);
     expect(staff).not.toContain('<p class="decision">');
+    // L'autogestion suit la même règle : sa phrase est derrière le « i ».
+    const self = render(match({ selfManaged: true }), "public");
+    expect(self).toContain(`aria-label="${infoHintLabel("fr", "Autogestion").replaceAll("'", "&#x27;")}"`);
+    expect(self).not.toContain('<p class="decision">');
   });
 
   it("sans décision : avertissement au staff seul, rien aux autres", () => {
@@ -417,6 +421,8 @@ describe("« Voir le match » sur la carte du plateau", () => {
     expect(html).not.toContain('href="https://twitch.tv/autre"');
     expect(html).toContain(">+2<");
     expect(html).toContain('aria-label="+2 : les autres streams de Alpha contre Bravo"');
+    // Le « +2 » nu dit sa portée aussi à qui voit l'écran : infobulle.
+    expect(html).toContain('title="+2 : les autres streams de Alpha contre Bravo"');
   });
 });
 
