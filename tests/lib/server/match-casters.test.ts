@@ -78,7 +78,7 @@ type WorldStream = { id: number; live_url: string | null; staff_owned?: number; 
 
 /** Le lien qu'un compte a fourni sur un stream de caster : lecture et retrait (`withdrawUserCasts`). */
 function applyLinkSql(streams: WorldStream[], sql: string, params: unknown[]): unknown[] | null {
-  const provided = (stream: WorldStream, userId: unknown) => stream.link_user_id === userId && (stream.staff_owned ?? 0) === 0;
+  const provided = (stream: WorldStream, userId: unknown) => stream.link_user_id === userId;
   if (sql.startsWith("SELECT DISTINCT match_id FROM bg_match_streams")) {
     return [streams.some((stream) => provided(stream, params[0])) ? [{ match_id: 42 }] : []];
   }
@@ -239,16 +239,25 @@ describe("withdrawUserCasts — le lien qu'un compte a fourni part avec lui", ()
     expect(w.state.streams).toEqual([{ id: 4, live_url: null, link_user_id: null }]);
   });
 
-  it("le lien du staff n'est jamais touché, même sur un stream qu'il tenait", async () => {
-    const staff = { id: 3, live_url: "https://twitch.tv/bluegenji", staff_owned: 1, link_user_id: 12 };
+  it("le lien de l'organisation n'est jamais touché, même sur un stream qu'il tenait", async () => {
+    const staff = { id: 3, live_url: "https://twitch.tv/bluegenji", staff_owned: 1, link_user_id: null };
     const w = world([staff], [{ user_id: 12, stream_id: 3 }]);
     await withdrawUserCasts(w.connection, 12, true);
     expect(w.state.streams).toEqual([staff]);
     const sqls = w.execute.mock.calls.map(([sql]) => sql.replace(/\s+/g, " ").trim());
-    expect(sqls[1]).toBe(
-      "SELECT DISTINCT match_id FROM bg_match_streams WHERE link_user_id = ? AND staff_owned = 0 ORDER BY match_id",
-    );
+    expect(sqls[1]).toBe("SELECT DISTINCT match_id FROM bg_match_streams WHERE link_user_id = ? ORDER BY match_id");
     expect(sqls.some((sql) => sql.startsWith("UPDATE bg_match_streams"))).toBe(false);
+  });
+
+  it("le lien qu'un caster (permission `live` seule) a posé dans la configuration du direct part aussi", async () => {
+    // Stream du match, lien rattaché au caster : retiré ; sans caster, le stream part.
+    const w = world([{ id: 3, live_url: "https://twitch.tv/sa-chaine", staff_owned: 1, link_user_id: 12 }], []);
+    expect(await withdrawUserCasts(w.connection, 12, true)).toEqual([42]);
+    expect(w.state.streams).toEqual([]);
+    // Tenu par un autre caster : le stream reste, sans lien.
+    const held = world([{ id: 3, live_url: "https://twitch.tv/sa-chaine", staff_owned: 1, link_user_id: 12 }], [{ user_id: 9, stream_id: 3 }]);
+    await withdrawUserCasts(held.connection, 12, true);
+    expect(held.state.streams).toEqual([{ id: 3, live_url: null, staff_owned: 1, link_user_id: null }]);
   });
 
   it("efface sous le verrou du match, sans lire sa table en sous-requête, le seul stream de caster du compte", async () => {
@@ -260,7 +269,7 @@ describe("withdrawUserCasts — le lien qu'un compte a fourni part avec lui", ()
     expect(lock).toBeGreaterThanOrEqual(0);
     expect(update).toBeGreaterThan(lock);
     expect(sqls[update]).toBe(
-      "UPDATE bg_match_streams SET live_url = NULL, link_user_id = NULL WHERE match_id = ? AND link_user_id = ? AND staff_owned = 0",
+      "UPDATE bg_match_streams SET live_url = NULL, link_user_id = NULL WHERE match_id = ? AND link_user_id = ?",
     );
     expect(w.execute.mock.calls[update][1]).toEqual([42, 12]);
   });

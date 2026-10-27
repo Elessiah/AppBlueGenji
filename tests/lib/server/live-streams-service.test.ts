@@ -102,7 +102,7 @@ describe("setMatchLiveConfig", () => {
    * casters (`bg_match_streams`, `bg_match_casters`), rejoués écriture après
    * écriture dans la transaction de `setMatchLiveConfig`.
    */
-  type StreamState = { id: number; live_url: string | null; staff_owned: number };
+  type StreamState = { id: number; live_url: string | null; staff_owned: number; link_user_id?: number };
   /** Un stream de la base ; `staff` : celui du staff (`staff_owned`). */
   const dbStream = (id: number, liveUrl: string | null, staff = false): StreamState => ({
     id,
@@ -147,20 +147,28 @@ describe("setMatchLiveConfig", () => {
     return { state, execute, connection };
   }
 
+  /** Pose lien et fournisseur ; `link_user_id` n'apparaît que s'il désigne un compte. */
+  function setStream(stream: StreamState, liveUrl: string | null, providerId: number | null): StreamState {
+    stream.live_url = liveUrl;
+    if (providerId === null) delete stream.link_user_id;
+    else stream.link_user_id = providerId;
+    return stream;
+  }
+
   /** Écritures sur `bg_match_streams`, rejouées sur l'état. */
   function writeStreams(state: { streams: StreamState[] }, sql: string, params: unknown[]) {
-    if (sql === "UPDATE bg_match_streams SET live_url = NULL WHERE match_id = ? AND staff_owned = 1") {
-      for (const stream of state.streams) if (stream.staff_owned === 1) stream.live_url = null;
+    if (sql === "UPDATE bg_match_streams SET live_url = NULL, link_user_id = NULL WHERE match_id = ? AND staff_owned = 1") {
+      for (const stream of state.streams) if (stream.staff_owned === 1) setStream(stream, null, null);
       return [{ affectedRows: 1 }];
     }
-    if (sql === "UPDATE bg_match_streams SET live_url = ?, staff_owned = 1 WHERE id = ?") {
-      const stream = state.streams.find((candidate) => candidate.id === params[1]);
-      if (stream) Object.assign(stream, { live_url: params[0] as string | null, staff_owned: 1 });
+    if (sql === "UPDATE bg_match_streams SET live_url = ?, staff_owned = 1, link_user_id = ? WHERE id = ?") {
+      const stream = state.streams.find((candidate) => candidate.id === params[2]);
+      if (stream) setStream(Object.assign(stream, { staff_owned: 1 }), params[0] as string | null, params[1] as number | null);
       return [{ affectedRows: 1 }];
     }
-    if (sql === "INSERT INTO bg_match_streams (match_id, live_url, staff_owned) VALUES (?, ?, 1)") {
+    if (sql === "INSERT INTO bg_match_streams (match_id, live_url, staff_owned, link_user_id) VALUES (?, ?, 1, ?)") {
       const id = Math.max(0, ...state.streams.map((stream) => stream.id)) + 1;
-      state.streams.push(dbStream(id, params[1] as string | null, true));
+      state.streams.push(setStream(dbStream(id, null, true), params[1] as string | null, params[2] as number | null));
       return [{ affectedRows: 1, insertId: id }];
     }
     if (sql.startsWith("DELETE FROM bg_match_streams")) {
@@ -223,6 +231,23 @@ describe("setMatchLiveConfig", () => {
       dbStream(3, "https://kick.com/voix"),
       dbStream(4, "https://twitch.tv/bluegenji", true),
     ]);
+  });
+
+  it("rattache au caster le lien qu'il pose sans être de l'organisation ; le staff qui le reprend en fait le sien", async () => {
+    const world = liveWorld(matchRow());
+    await mockLiveDb(world);
+
+    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/voix", linkProviderId: 12 });
+    expect(world.state.streams).toEqual([{ ...dbStream(1, "https://twitch.tv/voix", true), link_user_id: 12 }]);
+
+    // Le même lien, réenregistré par l'organisation : il n'est plus celui du caster.
+    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/voix", linkProviderId: null });
+    expect(world.state.streams).toEqual([dbStream(1, "https://twitch.tv/voix", true)]);
+
+    // Démarquer efface lien et fournisseur.
+    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/voix", linkProviderId: 12 });
+    await setMatchLiveConfig(42, { trigger: null, liveUrl: null });
+    expect(world.state.streams).toEqual([]);
   });
 
   it("pose le lien sur le stream sans lien d'un caster déjà inscrit, qui devient celui du staff", async () => {

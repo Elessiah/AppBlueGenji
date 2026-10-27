@@ -1598,13 +1598,16 @@ describe("PRIVACY_CHANGES — plusieurs casters par match (MATCH-REFEREE MR-1)",
     expect(fr).toContain("le sont à chaque caster inscrit, et ceux de chaque caster aussi aux autres casters du match");
     expect(fr).toContain("le temps du match seulement");
     expect(fr).toContain("ce stream part, avec son lien, quand plus aucun caster ne le tient");
-    expect(fr).toContain("seul le lien posé par l'organisation reste au match");
+    expect(fr).toContain("seul le lien posé dans la configuration du direct du match reste au match");
+    // Le lien fourni part à la suppression du compte (décision 27).
+    expect(fr).toContain("À la suppression de ton compte, le lien que tu as fourni — en ouvrant ton stream ou dans cette configuration — part aussi, matchs joués compris, même si un autre caster tient encore ce stream");
     expect(fr).toContain("Un caster n'en remplace plus un autre");
     const en = [english.title, english.summary, ...english.details].join(" ");
     expect(en).toContain("each one joins a stream of the match (co-cast) or opens their own, with its own link");
     expect(en).toContain("are presented to each registered caster, and each caster's are also presented to the other casters of the match");
     expect(en).toContain("that stream goes, with its link, once no caster holds it any more");
-    expect(en).toContain("only the link set by the organizers stays with the match");
+    expect(en).toContain("only the link set in the match's live configuration stays with the match");
+    expect(en).toContain("When your account is deleted, the link you provided — when opening your stream or in that configuration — also goes, played matches included, even if another caster still holds that stream");
     expect(en).toContain("A caster no longer replaces another");
     expect(english.details).toHaveLength(entry.details.length);
     expect(english.linkLabels).toHaveLength(1);
