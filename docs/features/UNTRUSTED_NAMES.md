@@ -50,7 +50,10 @@ octet — le normaliser serait un renommage silencieux et sans retour. La passe
 lit les noms et compare en JavaScript (la syntaxe des classes Unicode diffère
 entre MySQL et MariaDB), et ne trouve plus rien à écrire une fois les noms
 propres. Elle laisse tel quel un nom qui ne garderait rien, ou que la base
-refuse : un sosie dont la forme propre est déjà prise (`UNIQUE`). Le journal
+refuse : un sosie dont la forme propre est déjà prise (`UNIQUE`). Elle garde
+`updated_at` (`SET … , updated_at = updated_at`) : le classement date un
+tournoi terminé sans `finished_at` par cette colonne, un nettoyage n'a pas à
+en déplacer les tendances. Le journal
 (`pm2 logs`) ne compte que des lignes, jamais un nom.
 
 Ces restes expliquent que les filtres de sortie demeurent. Ils passent eux aussi
