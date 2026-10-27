@@ -382,7 +382,7 @@ describe("arbitre désigné — registre, /rgpd et annonce (revue juridique)", (
     expect(row?.extraBases?.find((b) => b.base === "Exécution du contrat")?.scope).not.toMatch(/arbitre désigné d'un match,/);
     const index = DONNEES_PROFIL.findIndex((d) => d.donnee === "Pseudo Overwatch");
     expect(DONNEES_PROFIL_EN[index]?.extraBases?.map((b) => b.scope)).toContain(
-      "the BattleTag of a match's assigned referee, even when hidden, in its “Contacts” and launch windows and on its page: read by both its teams and the referees as soon as both its opponents are known until its end, by its casters while the match is being played — objection through the report form, GDPR category (once upheld, the staff no longer assigns them matches); withdrawal from a match at any time, the staff otherwise being able to assign that match to them again, without notice",
+      "the BattleTag of a match's assigned referee, even when hidden, in its “Contacts” and launch windows and on the match page: read by both its teams and the referees as soon as both its opponents are known until its end, by its casters while the match is being played — objection through the report form, GDPR category (once upheld, the staff no longer assigns them matches); withdrawal from a match at any time, the staff otherwise being able to assign that match to them again, without notice",
     );
   });
 });
