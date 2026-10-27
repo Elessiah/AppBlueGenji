@@ -74,28 +74,34 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function HomePage() {
   const locale = await requestLocale();
   const description = landingServerText(locale).t("meta.description");
-  const buckets = await listTournamentBuckets(null).catch(() => ({
+  // Seuls le calendrier et le mini-tableau dépendent des tournois : les autres
+  // lectures partent **en même temps** qu'eux, sans quoi le premier rendu après
+  // une invalidation attendait les tournois, puis la plus lente des autres.
+  const bucketsLoad = listTournamentBuckets(null).catch(() => ({
     upcoming: [],
     registration: [],
     running: [],
     finished: [],
   }));
-
-  const featured = chooseFeaturedTournament(buckets);
-  const [stats, live, leaderboard, events, ticker, sponsors, aboutStats, aboutPillars, miniBracket, user, copyBundle] =
+  const [buckets, stats, live, leaderboard, events, ticker, sponsors, aboutStats, aboutPillars, miniBracket, user, copyBundle] =
     await Promise.all([
+      bucketsLoad,
       getLandingStats(),
       getLandingLive(),
       getLandingLeaderboard(),
-      getLandingCalendar(buckets, 5),
+      bucketsLoad.then((loaded) => getLandingCalendar(loaded, 5)),
       getLandingTicker(locale),
       listSponsors().catch(() => []),
       listAboutStats(),
       listAboutPillars(),
-      featured ? loadMiniBracket(featured.id, locale) : Promise.resolve([]),
+      bucketsLoad.then((loaded) => {
+        const shown = chooseFeaturedTournament(loaded);
+        return shown ? loadMiniBracket(shown.id, locale) : [];
+      }),
       getCurrentUser().catch(() => null),
       getSiteCopyBundle(),
     ]);
+  const featured = chooseFeaturedTournament(buckets);
   // Gestion du site vitrine : administrateurs + Community Managers.
   const isAdmin = can(user, "showcase");
   // Jamais de repli français sous `/en` : `copyBundle.en` sert l'anglais
