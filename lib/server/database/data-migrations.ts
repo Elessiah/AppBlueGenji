@@ -343,7 +343,11 @@ type StoredNameRow = RowDataPacket & { id: number; name: string | null };
  * quand il est refusé par la base : un sosie (`Adm` + U+200B + `in`) dont la
  * forme propre est déjà prise par l'original (`UNIQUE`). La condition sur
  * l'ancien nom évite d'écraser un renommage fait entre la lecture et
- * l'écriture. `updated_at` est gardé : les trois tables le remettent à
+ * l'écriture ; elle compare **octet à octet** (`utf8mb4_bin`) : la collation
+ * des colonnes (`utf8mb4_0900_ai_ci`, `utf8mb4_uca1400_ai_ci` sous MariaDB)
+ * ignore casse, accents et caractères invisibles, si bien que « TEAM »,
+ * renommé entre-temps, y égalerait l'ancien « Te » + U+200B + « am » et
+ * serait réécrit « Team ». `updated_at` est gardé : les trois tables le remettent à
  * l'heure à chaque `UPDATE`, et le classement date un tournoi terminé sans
  * `finished_at` par lui — un simple nettoyage ne doit pas en déplacer les
  * tendances. Le journal ne compte que des lignes, jamais un nom
@@ -387,7 +391,7 @@ async function rewriteName(db: Pool, table: string, column: string, row: StoredN
   if (!clean) return "kept";
   try {
     const [result] = await db.execute<ResultSetHeader>(
-      `UPDATE ${table} SET ${column} = ?, updated_at = updated_at WHERE id = ? AND ${column} = ?`,
+      `UPDATE ${table} SET ${column} = ?, updated_at = updated_at WHERE id = ? AND ${column} COLLATE utf8mb4_bin = ?`,
       [clean, row.id, row.name],
     );
     return result.affectedRows;
