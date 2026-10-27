@@ -111,7 +111,8 @@ export type MatchPageStream = {
  * d'ouverture. Un stream sans caster visible n'est montré que s'il porte un
  * lien affichable (celui de la configuration du direct). Les liens suivent la
  * règle de la carte : tus tant que le match n'est pas annoncé casté
- * (`liveState` `OFF`).
+ * (`liveState` `OFF`). Un premier lien qu'aucun stream ne porte vient en tête,
+ * sous l'identifiant `0`.
  */
 export function matchPageStreams(
   match: Pick<BracketMatch, "liveUrl" | "streams" | "casters">,
@@ -125,8 +126,13 @@ export function matchPageStreams(
       casters: match.casters.filter((caster) => caster.streamId === stream.id),
     }))
     .filter((row) => row.casters.length > 0 || row.url !== null);
-  const firstIndex = match.liveUrl === null || !linksShown ? -1 : rows.findIndex((row) => row.url === match.liveUrl);
-  if (firstIndex <= 0) return rows;
+  if (match.liveUrl === null || !linksShown) return rows;
+  const firstIndex = rows.findIndex((row) => row.url === match.liveUrl);
+  // Premier lien des vues compactes qu'aucun stream visible ne porte (stream
+  // d'un caster retiré, lecture partielle) : montré quand même, comme sur le
+  // bandeau de la carte (`matchStreamLinks`), sans caster.
+  if (firstIndex === -1) return [{ id: 0, url: match.liveUrl, casters: [] }, ...rows];
+  if (firstIndex === 0) return rows;
   return [rows[firstIndex], ...rows.slice(0, firstIndex), ...rows.slice(firstIndex + 1)];
 }
 
@@ -146,6 +152,17 @@ export function matchPageDecision(
   if (byeLike) return null;
   const decision = refereeDecision(match);
   return decision === "UNDECIDED" && !staff ? null : decision;
+}
+
+/**
+ * Le champ « Première map » de la page reprend-il la carte du plateau ? Oui
+ * tant qu'il n'a pas été modifié ; après un enregistrement (`saved`, la valeur
+ * envoyée), seulement quand le plateau relu la porte — sinon l'ancienne carte
+ * revenait dans le champ jusqu'au prochain instantané.
+ */
+export function firstMapFieldFollows(current: string | null, edited: boolean, saved: string | null): boolean {
+  if (saved !== null) return (current ?? "") === saved;
+  return !edited;
 }
 
 /** Étapes de l'autogestion, dans l'ordre (spécification de l'utilisateur, 2026-10-26). */

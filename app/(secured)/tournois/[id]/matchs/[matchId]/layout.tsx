@@ -21,14 +21,15 @@ export async function generateMetadata({ params }: LayoutProps): Promise<Metadat
  * Page d'un match (`docs/features/MATCH_PAGE.md`) : 404 quand le match n'est
  * pas de ce tournoi, ou que le tournoi n'est pas visible pour ce lecteur. Sans
  * session, l'espace sécurisé renvoie déjà vers la page sans compte : rien
- * n'est lu ici pour lui.
+ * n'est lu ici pour lui. Une session illisible (base injoignable) n'est pas un
+ * 404 : la page s'affiche et dit son erreur, comme la fiche.
  */
 export default async function MatchPageLayout({
   children,
   params,
 }: Readonly<LayoutProps & { children: React.ReactNode }>) {
   const { id, matchId } = await params;
-  const user = await getCurrentUser();
+  const user = await getCurrentUser().catch(() => null);
   if (user && (await matchPageExists(id, matchId, { canManage: can(user, "tournaments") })) === false) notFound();
   return children;
 }

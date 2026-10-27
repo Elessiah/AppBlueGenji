@@ -55,10 +55,18 @@ export function StreamLink({
   url,
   matchLabel,
   className,
-}: Readonly<{ url: string; matchLabel: string; className?: string }>) {
+  ordinal,
+}: Readonly<{
+  url: string;
+  matchLabel: string;
+  className?: string;
+  /** Numéro ajouté au texte quand deux liens du match en auraient le même. */
+  ordinal?: number;
+}>) {
   const { t } = useTournamentPageText();
   const platform = streamPlatform(url);
-  const linkText = streamLinkText(url, t("match.channel"));
+  const baseText = streamLinkText(url, t("match.channel"));
+  const linkText = ordinal === undefined ? baseText : `${baseText} ${ordinal}`;
   const watchLabel = platform
     ? t("match.watchOn", { link: linkText, match: matchLabel, platform: PLATFORM_LABELS[platform] })
     : t("match.watch", { link: linkText, match: matchLabel });

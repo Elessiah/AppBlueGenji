@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useId, useState, type FormEvent } from "react";
+import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
+import { PlayerLink } from "@/components/entity-link";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { useSpectatorView } from "@/components/spectator-view";
 import { useToast } from "@/components/ui/toast";
 import { FieldErrorText } from "@/components/ui/field-error-text";
+import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { CasterCards, RefereeCard } from "@/components/match-launch/LaunchContactCards";
 import { useMatchContacts } from "@/components/match-launch/MatchContactsDialog";
 import { useLaunchText } from "@/components/match-launch/launch-text";
@@ -15,14 +17,16 @@ import { useMatchLiveState } from "@/lib/shared/hooks/useMatchLiveState";
 import { MATCH_LAUNCH_REFRESH_EVENT, type MatchLaunchInfo } from "@/lib/shared/match-launch";
 import { tournamentMatchHref } from "@/lib/shared/match-anchor";
 import {
+  firstMapFieldFollows,
   matchPageDecision,
   matchPageSides,
   matchPageStreams,
   selfManagementSteps,
   type MatchPageSide,
 } from "@/lib/shared/match-page";
-import { FIRST_MAP_MAX_LENGTH } from "@/lib/shared/match-referee";
-import { localizedPlaceholder, versusText } from "@/lib/shared/tournament-page-text";
+import { FIRST_MAP_MAX_LENGTH, normalizeFirstMap } from "@/lib/shared/match-referee";
+import { streamLinkText } from "@/lib/shared/live-streams";
+import { localizedPlaceholder, matchPositionText, versusText } from "@/lib/shared/tournament-page-text";
 import type { BracketMatch, TournamentDetail } from "@/lib/shared/types";
 import { launchStripControls } from "../_lib/launch-strip";
 import { useLiveControls } from "../_lib/live-context";
@@ -73,11 +77,17 @@ function FirstMapForm({ match }: Readonly<{ match: Pick<BracketMatch, "id" | "fi
   const [busy, setBusy] = useState(false);
   const fieldErrors = useFieldErrors(FIRST_MAP_FIELD_ERRORS, { map: inputId });
   // Une carte posée ailleurs (autre membre du staff, fenêtre « Arbitrage »)
-  // remplace la saisie tant qu'elle n'a pas été modifiée ici.
+  // remplace la saisie tant qu'elle n'a pas été modifiée ici. Après un
+  // enregistrement, la saisie reste jusqu'à ce que le plateau relu la porte :
+  // sinon l'ancienne carte revenait dans le champ jusqu'au prochain instantané.
   const [edited, setEdited] = useState(false);
+  const [saved, setSaved] = useState<string | null>(null);
   useEffect(() => {
-    if (!edited) setValue(match.firstMap ?? "");
-  }, [match.firstMap, edited]);
+    if (!firstMapFieldFollows(match.firstMap, edited, saved)) return;
+    setSaved(null);
+    setEdited(false);
+    setValue(match.firstMap ?? "");
+  }, [match.firstMap, edited, saved]);
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
@@ -91,7 +101,8 @@ function FirstMapForm({ match }: Readonly<{ match: Pick<BracketMatch, "id" | "fi
       });
       const payload = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "UNKNOWN");
-      setEdited(false);
+      // Comparée à la carte relue telle que le serveur l'enregistre.
+      setSaved(normalizeFirstMap(value) ?? "");
       showSuccess(actionText.t("cardActions.refereeDialog.mapSaved"));
       window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
     } catch (error) {
@@ -117,6 +128,7 @@ function FirstMapForm({ match }: Readonly<{ match: Pick<BracketMatch, "id" | "fi
           onChange={(event) => {
             setValue(event.target.value);
             setEdited(true);
+            setSaved(null);
             fieldErrors.clear("map");
           }}
           {...fieldErrors.aria("map")}
@@ -188,6 +200,25 @@ function LobbySection({
   );
 }
 
+/** Décision d'arbitrage : sa pastille, son explication derrière le « i » (`INFO_HINTS.md`). */
+function DecisionLine({
+  pill,
+  subject,
+  hintId,
+  hint,
+}: Readonly<{ pill: ReactNode; subject: string; hintId: string; hint: string }>) {
+  return (
+    <div className={styles.decision}>
+      <InfoHintRow>
+        {pill}
+        <InfoHint id={hintId} subject={subject}>
+          <p>{hint}</p>
+        </InfoHint>
+      </InfoHintRow>
+    </div>
+  );
+}
+
 /** Arbitrage : l'arbitre (nommé aux seules parties du match), l'autogestion et ses étapes, ou l'absence de décision (staff). */
 function OfficiatingSection({
   match,
@@ -211,9 +242,12 @@ function OfficiatingSection({
       </div>
       {decision === "REFEREE" && (
         <>
-          <p className={styles.decision}>
-            <span className="pill pill-info">{t("launch.referee")}</span> {t("matchPage.refereeLead")}
-          </p>
+          <DecisionLine
+            pill={<span className="pill pill-info">{t("launch.referee")}</span>}
+            subject={t("launch.referee")}
+            hintId={`${titleId}-referee`}
+            hint={t("matchPage.refereeLead")}
+          />
           {launch?.referee && (
             <RefereeCard
               referee={launch.referee}
@@ -239,9 +273,12 @@ function OfficiatingSection({
         </>
       )}
       {decision === "UNDECIDED" && (
-        <p className={styles.decision}>
-          <span className="pill pill-warning">{t("matchPage.undecided")}</span> {t("matchPage.undecidedLead")}
-        </p>
+        <DecisionLine
+          pill={<span className="pill pill-warning">{t("matchPage.undecided")}</span>}
+          subject={t("matchPage.undecided")}
+          hintId={`${titleId}-undecided`}
+          hint={t("matchPage.undecidedLead")}
+        />
       )}
     </section>
   );
@@ -264,6 +301,11 @@ function CastSection({
   const titleId = useId();
   const liveState = useMatchLiveState(match);
   const streams = matchPageStreams(match, liveState);
+  // Deux liens au même texte (deux vidéos YouTube sans poignée) se distinguent
+  // par leur numéro, dans le texte comme dans le nom accessible (WCAG 2.4.4).
+  const linkTexts = streams.map((stream) => (stream.url ? streamLinkText(stream.url, t("match.channel")) : null));
+  const sharedText = (index: number) =>
+    linkTexts[index] !== null && linkTexts.filter((item) => item === linkTexts[index]).length > 1;
   return (
     <section className={`ds-block ${styles.block}`} aria-labelledby={titleId}>
       <div className="ds-section-title blue">
@@ -277,7 +319,12 @@ function CastSection({
             <li key={stream.id} className={styles.stream}>
               <span className={styles.streamLabel}>{t("matchPage.stream", { number: index + 1 })}</span>
               {stream.url ? (
-                <StreamLink url={stream.url} matchLabel={matchLabel} className={styles.streamLink} />
+                <StreamLink
+                  url={stream.url}
+                  matchLabel={matchLabel}
+                  className={styles.streamLink}
+                  ordinal={sharedText(index) ? index + 1 : undefined}
+                />
               ) : (
                 <span className={styles.muted}>{t("matchPage.noLink")}</span>
               )}
@@ -285,7 +332,12 @@ function CastSection({
                 <span className={styles.streamCasters}>
                   <span aria-hidden="true">🎙</span>
                   <span className="sr-only">{t("launch.casterSr")}</span>
-                  {stream.casters.map((caster) => caster.pseudo).join(", ")}
+                  {stream.casters.map((caster, casterIndex) => (
+                    <span key={caster.userId}>
+                      {casterIndex > 0 && ", "}
+                      <PlayerLink userId={caster.userId}>{caster.pseudo}</PlayerLink>
+                    </span>
+                  ))}
                 </span>
               )}
             </li>
@@ -325,6 +377,7 @@ export function MatchPage({
   scoreLocked,
   onOpenAdminModal,
   frozen,
+  status,
 }: Readonly<{
   detail: TournamentDetail;
   match: BracketMatch;
@@ -332,6 +385,8 @@ export function MatchPage({
   scoreLocked: boolean;
   onOpenAdminModal: (match: BracketMatch) => void;
   frozen: boolean;
+  /** Témoin du flux de la fiche (« À jour », « Reconnexion… », « Hors ligne »). */
+  status: ReactNode;
 }>) {
   const text = useTournamentPageText();
   const { t } = text;
@@ -353,17 +408,18 @@ export function MatchPage({
 
   return (
     <>
-      <nav className={styles.crumbs} aria-label={t("matchPage.crumbsLabel")}>
-        <LocaleLink href={tournamentMatchHref(detail.card.id, match.id, spectator)} className={styles.back}>
-          <span aria-hidden="true">←</span> {detail.card.name}
-        </LocaleLink>
-      </nav>
+      <div className={styles.topbar}>
+        <nav className={styles.crumbs} aria-label={t("matchPage.crumbsLabel")}>
+          <LocaleLink href={tournamentMatchHref(detail.card.id, match.id, spectator)} className={styles.back}>
+            <span aria-hidden="true">←</span> {detail.card.name}
+          </LocaleLink>
+        </nav>
+        {status}
+      </div>
       <header className={styles.header}>
         <h1 className={styles.title}>{matchLabel}</h1>
         <p className={styles.meta}>
-          {[phaseName, t("bracket.roundN", { number: match.roundNumber }), t("bracket.matchN", { number: match.matchNumber })]
-            .filter(Boolean)
-            .join(" · ")}
+          {[phaseName, matchPositionText(text, match)].filter(Boolean).join(" · ")}
         </p>
       </header>
 

@@ -60,6 +60,7 @@ import { liveCertificationPrompt } from "@/lib/shared/certification-prompt";
 import { TournamentProgress } from "./TournamentProgress";
 import { TournamentLoading } from "./TournamentLoading";
 import { TournamentHeader } from "./TournamentHeader";
+import { LiveIndicator } from "./LiveIndicator";
 import styles from "../page.module.css";
 import { orReload } from "@/lib/shared/lazy-component";
 import { buildSeedMap } from "@/lib/shared/match-sections";
@@ -129,11 +130,13 @@ function MatchPageSection({
   frozen,
   canAdminResolve,
   onOpenAdminModal,
+  status,
   children,
 }: Readonly<{
   detail: TournamentDetail;
   matchId: number | null;
   frozen: boolean;
+  status: ReactNode;
   canAdminResolve: (match: BracketMatch) => boolean;
   onOpenAdminModal: (match: BracketMatch) => void;
   children: ReactNode;
@@ -151,6 +154,7 @@ function MatchPageSection({
           scoreLocked={isMatchScoreLocked(match.id, detail.matches, format)}
           onOpenAdminModal={onOpenAdminModal}
           frozen={frozen}
+          status={status}
         />
       ) : (
         <MatchMissing tournamentId={detail.card.id} />
@@ -1190,6 +1194,7 @@ export function TournamentSheet({
         frozen={frozen}
         canAdminResolve={canAdminResolve}
         onOpenAdminModal={openAdminScore}
+        status={<LiveIndicator isLive={isLive} tier={tier} cadenceMs={cadenceMs} fatal={fatal} />}
       >
       <section className={`fade-in ${styles.sheet}`}>
         <TournamentHeader

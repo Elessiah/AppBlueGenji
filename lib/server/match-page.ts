@@ -7,7 +7,8 @@ import { tournamentPageMetadata, type TournamentMetadataRights } from "@/lib/ser
 import { getVisibleTournamentCard } from "@/lib/server/tournaments-service";
 import { parseEntityPageId } from "@/lib/shared/entity-page-titles";
 import { matchPagePath } from "@/lib/shared/match-page";
-import { scopedText } from "@/lib/shared/scoped-text";
+import type { BracketType } from "@/lib/shared/types";
+import { matchPositionText, tournamentPageMessages, tournamentPageText } from "@/lib/shared/tournament-page-text";
 
 /**
  * Lectures serveur de la page d'un match (`docs/features/MATCH_PAGE.md`) :
@@ -17,9 +18,9 @@ import { scopedText } from "@/lib/shared/scoped-text";
  */
 
 /** Place d'un match dans son tournoi : sa manche et son numéro. */
-export type MatchPagePosition = { roundNumber: number; matchNumber: number };
+export type MatchPagePosition = { bracket: BracketType; roundNumber: number; matchNumber: number };
 
-type PositionRow = RowDataPacket & { round_number: number; match_number: number };
+type PositionRow = RowDataPacket & { bracket: BracketType; round_number: number; match_number: number };
 
 /**
  * La manche et le numéro du match, `null` s'il n'appartient pas à ce tournoi :
@@ -28,12 +29,14 @@ type PositionRow = RowDataPacket & { round_number: number; match_number: number 
 export async function getMatchPagePosition(tournamentId: number, matchId: number): Promise<MatchPagePosition | null> {
   const [rows] = await withConnection((connection) =>
     connection.query<PositionRow[]>(
-      "SELECT round_number, match_number FROM bg_matches WHERE id = ? AND tournament_id = ? LIMIT 1",
+      "SELECT bracket, round_number, match_number FROM bg_matches WHERE id = ? AND tournament_id = ? LIMIT 1",
       [matchId, tournamentId],
     ),
   );
   const row = rows[0];
-  return row ? { roundNumber: Number(row.round_number), matchNumber: Number(row.match_number) } : null;
+  return row
+    ? { bracket: row.bracket, roundNumber: Number(row.round_number), matchNumber: Number(row.match_number) }
+    : null;
 }
 
 /**
@@ -89,8 +92,8 @@ export async function matchPageMetadata(
   const position = await getMatchPagePosition(tournamentId, matchId).catch(() => null);
   if (!position || metadata.alternates === undefined) return metadata;
   const locale = await requestLocale();
-  const { t } = scopedText(locale, messagesFor(locale).tournament);
-  const prefix = `${t("bracket.roundN", { number: position.roundNumber })} · ${t("bracket.matchN", { number: position.matchNumber })}`;
+  const text = tournamentPageText(locale, tournamentPageMessages(messagesFor(locale)));
+  const prefix = matchPositionText(text, position);
   const title = prefixedTitle(metadata.title, prefix);
   return {
     ...metadata,

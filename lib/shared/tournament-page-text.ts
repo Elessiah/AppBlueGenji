@@ -22,6 +22,7 @@ import { matchAllowsDraw, matchFormatNotation, matchMaxMaps, matchWinsRequired, 
 import { toParticipantType, type ParticipantType } from "@/lib/shared/participants";
 import type { Messages } from "@/lib/shared/i18n-messages";
 import { parseBracketPlaceholder } from "@/lib/shared/bracket-placeholders";
+import type { BracketType } from "@/lib/shared/types";
 
 type FrTournament = typeof frTournament;
 
@@ -138,6 +139,24 @@ export function participantText(
   key: ParticipantKey,
 ): string {
   return text.t(`participants.${toParticipantType(participantType)}.${key}`);
+}
+
+/**
+ * Place d'un match (« Tableau perdants · Manche 2 · Match 1 ») : le tableau
+ * n'est nommé que hors du tableau principal — sans lui, en double
+ * élimination, deux matchs de même manche et de même numéro se confondaient.
+ */
+export function matchPositionText(
+  text: TournamentPageText,
+  position: Readonly<{ bracket: BracketType; roundNumber: number; matchNumber: number }>,
+): string {
+  return [
+    position.bracket === "UPPER" ? null : text.t(`page.bracketLabels.${position.bracket}`),
+    text.t("bracket.roundN", { number: position.roundNumber }),
+    text.t("bracket.matchN", { number: position.matchNumber }),
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 /** Notation d'un format de match (« BO5 », « FT3 · 4 maps », « Score libre »). */

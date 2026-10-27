@@ -6,8 +6,17 @@
  * avertissements (`pill-warning`).
  */
 
-.crumbs {
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
   margin-bottom: 8px;
+}
+
+.crumbs {
+  min-width: 0;
   font-size: 13px;
 }
 
