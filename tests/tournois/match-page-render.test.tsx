@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { infoHintLabel } from "@/lib/shared/info-hint";
 
 // La carte entière est rendue avec une sonde à la place du pied d'action
 // (`tests/helpers/match-card-actions-probe.ts`).
@@ -129,6 +130,7 @@ function render(page: BracketMatch, viewer: Viewer, frozen = false, locale: "fr"
           scoreLocked={false}
           onOpenAdminModal={() => undefined}
           frozen={frozen}
+          status={<span data-probe="live-status">{frozen ? "Hors ligne" : "À jour"}</span>}
         />
       </LiveProvider>
     </ToastProvider>
@@ -177,6 +179,13 @@ describe("page d'un match — ce que tout le monde lit", () => {
     expect(html).not.toContain("Hôte : crée la partie");
   });
 
+  it("nomme le tableau hors du tableau principal, et porte le témoin du flux", () => {
+    expect(visible(render(match({ bracket: "LOWER" }), "public"))).toContain("Tableau perdants · Manche 2 · Match 3");
+    expect(visible(render(match(), "public"))).not.toContain("Tableau principal");
+    expect(render(match(), "public")).toContain('data-probe="live-status"');
+    expect(visible(render(match(), "public", true))).toContain("Hors ligne");
+  });
+
   it("la carte qu'elle reprend ne renvoie pas vers la page elle-même", () => {
     const html = render(match(), "public");
     expect(html).not.toContain("Voir le match");
@@ -215,6 +224,18 @@ describe("page d'un match — arbitrage × lecteur", () => {
     expect(cast).toContain("Invitez les casters du match.");
   });
 
+  it("l'explication d'une décision attend derrière le « i », jamais en paragraphe", () => {
+    const html = render(match({ refereeAssigned: true }), "public");
+    expect(html).toContain(`aria-label="${infoHintLabel("fr", "Arbitre désigné").replaceAll("'", "&#x27;")}"`);
+    // Le texte vit dans l'explication du « i », après son bouton — plus en paragraphe.
+    const hint = html.indexOf(infoHintLabel("fr", "Arbitre désigné").replaceAll("'", "&#x27;"));
+    expect(html.indexOf("Un arbitre suit ce match.")).toBeGreaterThan(hint);
+    expect(html).not.toContain('<p class="decision">');
+    const staff = render(match(), "staff");
+    expect(staff).toContain(`aria-label="${infoHintLabel("fr", "Aucune décision").replaceAll("'", "&#x27;")}"`);
+    expect(staff).not.toContain('<p class="decision">');
+  });
+
   it("sans décision : avertissement au staff seul, rien aux autres", () => {
     expect(visible(render(match(), "staff"))).toContain("Aucune décision");
     for (const viewer of ["public", "other", "player"] as const) {
@@ -250,8 +271,11 @@ describe("page d'un match — streams et casters", () => {
     expect(section).toContain('href="https://kick.com/autre_voix"');
     expect(visible(section)).toContain("bluegenji");
     expect(visible(section)).toContain("autre_voix");
-    expect(visible(section)).toContain("Voix, Echo");
+    expect(visible(section)).toMatch(/Voix\s*,\s*Echo/);
     expect(visible(section)).toContain("Solo");
+    // Chaque caster est un nom cliquable (`PlayerLink`) pour un membre, co-cast compris.
+    const member = render(cast(), "other");
+    for (const id of [900, 901, 902]) expect(member.slice(member.indexOf("Casts"))).toContain(`href="/joueurs/${id}"`);
     expect(visible(html)).toContain("triez les joueurs par rôle");
     // La carte reprise ne garde que le premier lien, sans « +N » vers la page elle-même.
     expect(html).not.toContain("les autres streams de");
@@ -260,7 +284,35 @@ describe("page d'un match — streams et casters", () => {
   it("sans annonce de cast, les liens sont tus mais les casters restent", () => {
     const html = visible(render(cast({ liveTrigger: null, liveStartedAt: null }), "public"));
     expect(html).toContain("Lien pas encore publié");
-    expect(html).toContain("Voix, Echo");
+    expect(html).toMatch(/Voix\s*,\s*Echo/);
+  });
+
+  it("deux liens au même texte se distinguent par leur numéro, texte et nom accessible", () => {
+    const html = render(
+      cast({
+        streams: [
+          { id: 1, liveUrl: "https://www.youtube.com/watch?v=aaa", staff: false },
+          { id: 2, liveUrl: "https://www.youtube.com/watch?v=bbb", staff: false },
+          { id: 3, liveUrl: "https://twitch.tv/bluegenji", staff: false },
+        ],
+        casters: [matchCaster({ userId: 900, streamId: 1 }), matchCaster({ userId: 901, streamId: 2 }), matchCaster({ userId: 902, streamId: 3 })],
+        liveUrl: "https://www.youtube.com/watch?v=aaa",
+      }),
+      "public",
+    );
+    const section = html.slice(html.indexOf("Casts"));
+    expect(section).toContain(">YouTube 1<");
+    expect(section).toContain(">YouTube 2<");
+    expect(section).toMatch(/aria-label="YouTube 2[^"]*"/);
+    // Un texte unique ne prend pas de numéro.
+    expect(section).toContain(">bluegenji<");
+  });
+
+  it("garde le premier lien qu'aucun stream visible ne porte, comme la carte", () => {
+    const html = render(cast({ streams: [], casters: [], liveUrl: "https://twitch.tv/bluegenji" }), "public");
+    const section = html.slice(html.indexOf("Casts"));
+    expect(section).toContain('href="https://twitch.tv/bluegenji"');
+    expect(visible(section)).not.toContain("Aucun caster inscrit");
   });
 
   it("sans caster ni lien : le dit, sans rappel du tri par rôle", () => {

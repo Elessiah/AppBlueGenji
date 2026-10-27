@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  firstMapFieldFollows,
   matchPageDecision,
   matchPageIdsFromMemberPath,
   matchPageIdsFromSpectatorPath,
@@ -120,9 +121,16 @@ describe("matchPageStreams", () => {
     expect(matchPageStreams(bracketMatch(), "LIVE")).toEqual([]);
   });
 
-  it("un premier lien qui ne correspond à aucun stream laisse l'ordre d'ouverture", () => {
+  it("un premier lien qu'aucun stream ne porte vient en tête, sans caster, comme sur la carte", () => {
     const rows = matchPageStreams(bracketMatch({ streams, casters, liveUrl: "https://twitch.tv/zz" }), "LIVE");
-    expect(rows.map((row) => row.id)).toEqual([1, 2, 3]);
+    expect(rows.map((row) => row.id)).toEqual([0, 1, 2, 3]);
+    expect(rows[0]).toEqual({ id: 0, url: "https://twitch.tv/zz", casters: [] });
+    // Lecture partielle : aucun stream, le premier lien reste.
+    expect(matchPageStreams(bracketMatch({ liveUrl: "https://twitch.tv/zz" }), "SCHEDULED")).toEqual([
+      { id: 0, url: "https://twitch.tv/zz", casters: [] },
+    ]);
+    // Match pas annoncé casté : rien.
+    expect(matchPageStreams(bracketMatch({ liveUrl: "https://twitch.tv/zz" }), "OFF")).toEqual([]);
   });
 });
 
@@ -145,6 +153,26 @@ describe("matchPageDecision", () => {
     expect(matchPageDecision(bracketMatch({ team1Id: 1, team2Id: null, status: "READY" }), true)).toBeNull();
     expect(matchPageDecision(bracketMatch({ team1Id: 1, team2Id: null, status: "PENDING" }), true)).toBe("UNDECIDED");
     expect(matchPageDecision(bracketMatch({ status: "PENDING", selfManaged: true }), false)).toBe("SELF_MANAGED");
+  });
+});
+
+describe("firstMapFieldFollows", () => {
+  it("reprend la carte du plateau tant que le champ n'est pas modifié", () => {
+    expect(firstMapFieldFollows("Ilios", false, null)).toBe(true);
+    expect(firstMapFieldFollows(null, false, null)).toBe(true);
+    expect(firstMapFieldFollows("Ilios", true, null)).toBe(false);
+  });
+
+  it("après un enregistrement, garde la saisie jusqu'à ce que le plateau porte la carte envoyée", () => {
+    // Instantané pas encore relu : l'ancienne carte ne revient pas.
+    expect(firstMapFieldFollows("Ilios", true, "Busan")).toBe(false);
+    expect(firstMapFieldFollows("Ilios", false, "Busan")).toBe(false);
+    expect(firstMapFieldFollows("Busan", true, "Busan")).toBe(true);
+  });
+
+  it("une carte effacée (envoi vide) se reconnaît au plateau sans carte", () => {
+    expect(firstMapFieldFollows(null, true, "")).toBe(true);
+    expect(firstMapFieldFollows("Ilios", true, "")).toBe(false);
   });
 });
 

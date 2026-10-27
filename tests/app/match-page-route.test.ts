@@ -32,11 +32,17 @@ const connection = connectionMock();
 const card = jest.mocked(getVisibleTournamentCard);
 const user = jest.mocked(getCurrentUser);
 
-/** Le match 34 est la manche 2, match 3 du tournoi 12 ; tout autre couple est absent. */
+/**
+ * Le match 34 est la manche 2, match 3 du tableau principal du tournoi 12, le
+ * match 36 la même place au tableau perdants ; tout autre couple est absent.
+ */
 function seedPosition() {
   connection.query.mockImplementation(async (_sql, params) => {
     const [matchId, tournamentId] = params as number[];
-    return [matchId === 34 && tournamentId === 12 ? [{ round_number: 2, match_number: 3 }] : []];
+    if (tournamentId !== 12) return [[]];
+    if (matchId === 34) return [[{ bracket: "UPPER", round_number: 2, match_number: 3 }]];
+    if (matchId === 36) return [[{ bracket: "LOWER", round_number: 2, match_number: 3 }]];
+    return [[]];
   });
 }
 
@@ -53,9 +59,9 @@ beforeEach(() => {
 
 describe("getMatchPagePosition", () => {
   it("lit la manche et le numéro par clé primaire, dans ce tournoi seulement", async () => {
-    await expect(getMatchPagePosition(12, 34)).resolves.toEqual({ roundNumber: 2, matchNumber: 3 });
+    await expect(getMatchPagePosition(12, 34)).resolves.toEqual({ bracket: "UPPER", roundNumber: 2, matchNumber: 3 });
     expect(connection.query).toHaveBeenCalledWith(
-      "SELECT round_number, match_number FROM bg_matches WHERE id = ? AND tournament_id = ? LIMIT 1",
+      "SELECT bracket, round_number, match_number FROM bg_matches WHERE id = ? AND tournament_id = ? LIMIT 1",
       [34, 12],
     );
     await expect(getMatchPagePosition(13, 34)).resolves.toBeNull();
@@ -109,6 +115,12 @@ describe("mise en page connectée", () => {
     await expect(MemberLayout({ children: "page", ...params("12", "35") })).resolves.toBe("page");
     expect(card).not.toHaveBeenCalled();
   });
+
+  it("session illisible (base injoignable) : ni 404 ni erreur, la page dira son erreur", async () => {
+    user.mockRejectedValueOnce(new Error("ECONNREFUSED"));
+    await expect(MemberLayout({ children: "page", ...params("12", "35") })).resolves.toBe("page");
+    expect(notFound).not.toHaveBeenCalled();
+  });
 });
 
 describe("mise en page sans compte", () => {
@@ -136,6 +148,17 @@ describe("encart du lien partagé", () => {
     expect(metadata.title).toEqual({ absolute: expect.stringMatching(/^Manche 2 · Match 3 — .*Coupe d'hiver/) });
     expect(metadata.alternates?.canonical).toBe("/tournois/12/matchs/34");
     expect((metadata.openGraph as { title?: string }).title).toMatch(/^Manche 2 · Match 3 — /);
+  });
+
+  it("nomme le tableau hors du tableau principal (double élimination), en français et en anglais", async () => {
+    user.mockResolvedValue(authUser({ id: 7 }));
+    expect((await memberMetadata(params("12", "36"))).title).toEqual({
+      absolute: expect.stringMatching(/^Tableau perdants · Manche 2 · Match 3 — /),
+    });
+    mockLocale = "en";
+    expect((await memberMetadata(params("12", "36"))).title).toEqual({
+      absolute: expect.stringMatching(/^Lower bracket · Round 2 · Match 3 — /),
+    });
   });
 
   it("sous /en, en anglais ; sans compte, page sans compte et noindex", async () => {
