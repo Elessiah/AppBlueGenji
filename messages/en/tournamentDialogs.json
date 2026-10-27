@@ -262,7 +262,7 @@
     "autoStop": "The live stops on its own as soon as a score is entered.",
     "url": "Match channel (optional)",
     "urlInvalid": "Link not recognized. Accepted platforms: {platforms}.",
-    "urlHint": "Leave empty to flag the match without a link: its Discord announcement will then point to the tournament's official channel, or will not be posted if it has none. Accepted platforms: {platforms}."
+    "urlHint": "Leave empty to flag the match without a staff link: its Discord announcement will then point to the first link opened by a caster, otherwise to the tournament's official channel, or will not be posted if it has none. Accepted platforms: {platforms}."
   },
   "replay": {
     "removed": "Replay removed.",
