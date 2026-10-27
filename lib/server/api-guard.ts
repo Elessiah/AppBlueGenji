@@ -15,6 +15,7 @@
 import { NextResponse } from "next/server";
 import {
   ANONYMOUS_IDENTITY,
+  checkRateLimit,
   consumeRateLimit,
   rateLimitIdentity,
   type RateLimitRule,
@@ -482,13 +483,32 @@ export function enforceRateLimit(
 
   const state = consumeRateLimit(rule, key);
   if (state.allowed) return null;
+  return tooManyRequests(state.retryAfterMs);
+}
 
+/**
+ * Le même refus que {@link enforceRateLimit}, **sans rien décompter** : pour
+ * refuser d'emblée un client déjà au plafond, avant un travail préalable
+ * (lecture en base) que le décompte, fait juste avant l'action, ne couvrirait
+ * pas.
+ */
+export function peekRateLimit(
+  rule: RateLimitRule,
+  identity: string | number | null | undefined,
+): NextResponse | null {
+  const key = rateLimitIdentity(identity);
+  if (key === ANONYMOUS_IDENTITY) return null;
+  const state = checkRateLimit(rule, key);
+  return state.allowed ? null : tooManyRequests(state.retryAfterMs);
+}
+
+function tooManyRequests(retryAfterMs: number): NextResponse {
   return NextResponse.json(
     { error: "TOO_MANY_REQUESTS" },
     {
       status: 429,
       headers: {
-        "Retry-After": String(Math.max(1, Math.ceil(state.retryAfterMs / 1000))),
+        "Retry-After": String(Math.max(1, Math.ceil(retryAfterMs / 1000))),
         "Cache-Control": "no-store",
       },
     },

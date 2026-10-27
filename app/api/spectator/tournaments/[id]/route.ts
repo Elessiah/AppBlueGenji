@@ -1,5 +1,6 @@
 import {
   enforceRateLimit,
+  peekRateLimit,
   requestClientIp,
   SPECTATOR_READ_RULE,
   SPECTATOR_REBUILD_RULE,
@@ -60,11 +61,16 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   try {
     // Une lecture qui ferait reconstruire la réponse se paie à part : parcourir
     // des tournois froids coûte un instantané entier chacun, pas un cache.
-    if (!isSpectatorPayloadWarm(tournamentId)) {
-      // Un identifiant inconnu ou pas encore publié ne coûte que sa carte et
-      // n'entame pas ce plafond : des sondes au hasard ne privent pas une
-      // adresse partagée (salle de LAN) de ses relectures, et un lien ouvert
-      // avant la publication reçoit son « introuvable », pas un `429`.
+    const cold = !isSpectatorPayloadWarm(tournamentId);
+    if (cold) {
+      // Une adresse déjà au plafond est refusée d'emblée, sans lecture en base.
+      const exhausted = peekRateLimit(SPECTATOR_REBUILD_RULE, clientIp);
+      if (exhausted) return exhausted;
+      // Un identifiant inconnu ou pas encore publié ne coûte que sa carte (lue
+      // une fois pour toutes les lectures simultanées) et n'entame pas ce
+      // plafond : des sondes au hasard ne privent pas une adresse partagée
+      // (salle de LAN) de ses relectures, et un lien ouvert avant la
+      // publication reçoit son « introuvable », pas un `429`.
       if (!(await isSpectatorTournamentPublic(tournamentId))) return fail("TOURNAMENT_NOT_FOUND", 404);
       // Revérifié après l'attente (un autre visiteur a pu lancer le calcul), et
       // juste avant `getSpectatorPayload`, sans attente entre les deux.
@@ -73,7 +79,7 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
         if (rebuildThrottled) return rebuildThrottled;
       }
     }
-    payload = await getSpectatorPayload(tournamentId, spectatorCacheTtlMs(level));
+    payload = await getSpectatorPayload(tournamentId, spectatorCacheTtlMs(level), { visibilityChecked: cold });
   } catch (error) {
     // Base injoignable ou saturée : le visiteur sans compte recule le premier —
     // il garde ce qu'il affiche et revient après une attente que la charge
