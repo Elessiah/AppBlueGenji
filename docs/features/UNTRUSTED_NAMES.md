@@ -28,9 +28,10 @@ réduit à rien par le nettoyage retombe sur les refus existants (`PSEUDO_EMPTY`
 
 Les noms déjà en base ne sont pas réécrits : ils se corrigent à la prochaine
 écriture. Les surfaces lues **sans compte** les filtrent donc aussi à la sortie :
-l'accueil (`lib/server/landing-service.ts`) passe les noms du bandeau **et** de la
-carte « en cours » (match mis en avant et carrousel) par `visibleText`, un nom qui
-ne garde rien retombant sur son libellé de repli.
+l'accueil (`lib/server/landing-service.ts`, `shownEntrantName`) passe par
+`visibleText` les noms du bandeau, de la carte « en cours » (match mis en avant et
+carrousel) **et** du leaderboard (repris par `/classement`), un nom qui ne garde
+rien retombant sur son libellé de repli (« Équipe #id », « Équipe 1 / 2 », « #id »).
 
 ## 2. Mentions et balisage Discord — `lib/shared/discord-text.ts`
 
