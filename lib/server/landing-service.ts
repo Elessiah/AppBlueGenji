@@ -157,13 +157,17 @@ function entrantHrefFor(teamId: number | null, soloUserId: number | null): strin
   return entrantHref(Number(teamId), soloUserId === null ? null : { [Number(teamId)]: Number(soloUserId) });
 }
 
-/** Seed exploitable (entier positif), ou `null` — la colonne est nullable. */
-/** Forme affichable d'un nom d'engagé, `null` quand il ne garde rien de visible. */
+/**
+ * Forme affichable d'un nom saisi par un joueur (`UNTRUSTED_NAMES.md`), `null`
+ * quand il ne garde rien de visible : la vitrine est lue sans compte, et les
+ * noms déjà en base ne sont pas réécrits. Chaque appelant choisit son repli.
+ */
 function shownEntrantName(name: string | null): string | null {
   if (name === null) return null;
   return visibleText(name) || null;
 }
 
+/** Seed exploitable (entier positif), ou `null` — la colonne est nullable. */
 function toSeed(value: number | null): number | null {
   if (value === null) return null;
   const seed = Number(value);
@@ -331,9 +335,7 @@ async function loadLandingLive(): Promise<LandingLive | null> {
       );
       return {
         id: Number(row.id),
-        // Nom saisi par un joueur, lu sans compte : forme affichable comme le
-        // bandeau (`UNTRUSTED_NAMES.md`) ; un nom qui ne garde rien retombe sur
-        // le libellé « Équipe 1 / 2 » de la carte.
+        // Un nom qui ne garde rien retombe sur le libellé « Équipe 1 / 2 » de la carte.
         team1Name: shownEntrantName(row.team1_name),
         team2Name: shownEntrantName(row.team2_name),
         team1Href: entrantHrefFor(row.team1_id, row.team1_solo_user_id),
@@ -470,7 +472,9 @@ export async function loadLeaderboardRows(
     return {
       rank,
       teamId: row.teamId,
-      teamName: row.teamName,
+      // Lu sans compte (accueil, `/classement`) : forme affichable, repli
+      // neutre en langue « #id » — la ligne est commune aux deux langues.
+      teamName: shownEntrantName(row.teamName) ?? `#${row.teamId}`,
       logoUrl: localUploadUrl(row.logoUrl),
       wins: row.wins,
       losses: row.losses,
@@ -570,7 +574,7 @@ function formatTickerEntry(entry: TickerEntry, locale: Locale): TickerItem | nul
   // Nom saisi par un joueur : forme affichable (`UNTRUSTED_NAMES.md`), repli
   // « Équipe #id » quand la ligne a disparu ou que le nom ne garde rien.
   const team = (name: string | null, id: number | null) =>
-    (name === null ? "" : visibleText(name)) || t("ticker.teamFallback", { id: String(id) });
+    shownEntrantName(name) ?? t("ticker.teamFallback", { id: String(id) });
   switch (entry.kind) {
     case "result": {
       const outcomes = tickerOutcomes({
