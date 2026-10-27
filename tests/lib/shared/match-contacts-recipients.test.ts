@@ -227,3 +227,60 @@ describe("Co-casters — les textes qui disent qui lit les contacts", () => {
     expect(enDialogs.certification.leadManager).not.toContain("the caster ");
   });
 });
+
+/**
+ * MATCH-REFEREE MR-2 : le BattleTag (même masqué) de l'arbitre désigné est lu
+ * par les deux équipes et le staff dès que les adversaires sont connus, par
+ * les casters le temps du match (`buildLaunchReferee`, `ctx.exposes`) ; la
+ * fenêtre de lancement s'ouvre aussi à lui. Chaque notice « BattleTag masqué »
+ * le dit, en français et en anglais.
+ */
+describe("BattleTag masqué — arbitre désigné", () => {
+  const namespaces = ["profile", "login", "players"] as const;
+  const load = (lang: "fr" | "en", ns: (typeof namespaces)[number]) =>
+    JSON.parse(readSource(`messages/${lang}/${ns}.json`)) as { audience: { battletag: Record<string, string> } };
+
+  it("la liste « qui le lit » porte une ligne pour l'arbitre désigné, avant celle de la fenêtre de lancement (FR et EN)", () => {
+    for (const ns of namespaces) {
+      const fr = load("fr", ns).audience.battletag;
+      const en = load("en", ns).audience.battletag;
+      expect(fr.asReferee).toBe(
+        "si tu es l'arbitre désigné d'un match : ses deux équipes, les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin, et ses casters le temps du match ;",
+      );
+      expect(en.asReferee).toBe(
+        "if you are the assigned referee of a match: both its teams, referees and administrators from the moment its opponents are known until its end, and its casters while the match is being played;",
+      );
+      expect(Object.keys(fr)).toEqual(["title", "match", "asCaster", "asReferee", "launch", "footer"]);
+      expect(Object.keys(en)).toEqual(Object.keys(fr));
+    }
+    expect(readSource("lib/shared/identity-audience.ts")).toContain('["match", "asCaster", "asReferee", "launch"]');
+  });
+
+  it("la modale de masquage du profil nomme l'arbitre désigné, y compris dans la fenêtre de lancement (FR et EN)", () => {
+    expect(frProfile.battletagNotice.asReferee).toContain("d'un match dont tu es l'arbitre désigné</strong>");
+    expect(enProfile.battletagNotice.asReferee).toContain("of a match you are the assigned referee of</strong>");
+    expect(readSource("app/(secured)/profil/BattletagVisibilityNotice.tsx")).toContain('"battletagNotice.asReferee"');
+    expect(frProfile.battletagNotice.warning).toContain("Si tu es l'arbitre désigné d'un match");
+    expect(enProfile.battletagNotice.warning).toContain("If you are the assigned referee of a match");
+    expect(frProfile.battletagNotice.warning).toContain("pour les équipes, les casters et l'arbitre désigné, dans sa fenêtre de lancement");
+    expect(enProfile.battletagNotice.warning).toContain("for the teams, the casters and the assigned referee, its launch window");
+    expect(frProfile.battletagNotice.staff).toContain("ne s'ouvre qu'aux équipes, aux casters et à l'arbitre désigné");
+    expect(enProfile.battletagNotice.staff).toContain("only opens for the teams, the casters and the assigned referee");
+  });
+
+  it("aucun texte vivant ne borne plus la fenêtre de lancement aux équipes et aux casters (FR et EN)", () => {
+    const living = [
+      "lib/shared/processing-register.ts",
+      "lib/shared/processing-register-en.ts",
+      "lib/shared/rgpd-policy.ts",
+      "lib/shared/rgpd-policy-en.ts",
+      "lib/shared/identity-sharing.ts",
+      ...namespaces.flatMap((ns) => [`messages/fr/${ns}.json`, `messages/en/${ns}.json`]),
+    ];
+    for (const file of living) {
+      const text = readSource(file);
+      expect(text).not.toMatch(/ne s'ouvre qu'aux (deux )?équipes et aux casters/);
+      expect(text).not.toMatch(/only opens for (both|the) teams and the casters/);
+    }
+  });
+});
