@@ -424,7 +424,8 @@ describe("MatchCardActions — clavier et focus (branchements)", () => {
     expect(source).toContain('t("cardActions.releaseConfirm.title", { match: matchLabel })');
     expect(source).toContain('<p>{t("cardActions.releaseConfirm.body")}</p>');
     // Refermée si l'action disparaît (instantané du flux), comme « Forcer ».
-    expect(source).toContain("if (confirmRelease && !hasRelease) setConfirmRelease(false);");
+    expect(source).toContain('useConfirmWhile(actions.some((a) => a.id === "releaseCast"))');
+    expect(source).toContain("if (open && !present) setOpen(false);");
   });
 
   it("la confirmation du retrait a ses textes en FR et en EN", () => {
