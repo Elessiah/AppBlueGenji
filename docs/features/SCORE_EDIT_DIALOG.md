@@ -159,6 +159,13 @@ verrouillé, focus rendu au bouton déclencheur à la fermeture. Il se déclare
 vaut « Valider le résultat » — l'issue attendue d'une saisie de score,
 l'enregistrement intermédiaire restant un geste délibéré.
 
+Pendant un envoi, « Fermer », « Enregistrer » et « Valider le résultat » sont
+`aria-disabled` (et `aria-busy` pour les deux derniers), **jamais** `disabled` :
+un bouton natif désactivé perd le focus, qui tomberait sur `<body>`, derrière
+la modale, le temps d'un refus. Le geste pressé pendant l'envoi est ignoré.
+`disabled` reste réservé aux blocages de la saisie (`decision.canSave`,
+`canResolve`, détail en chargement). Test : `tests/tournois/admin-confirmations.test.ts`.
+
 Les champs de score sont ceux de la liste de maps (`MapScoreList`,
 `<NumberInput>`), un refus rattaché à son champ (`useFieldErrors`) — jamais sur
 une ligne vierge, qui n'est pas une erreur.

@@ -19,8 +19,10 @@ import { getDatabase } from "@/lib/server/database";
 import { toParticipantType, type ParticipantType } from "@/lib/shared/participants";
 import { HAS_SCORE_INPUT_SQL } from "./bg-survie/round-progress";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
+import { retryOnDeadlock } from "./deadlock-retry";
 import { publishUpdatedEvent } from "./notifications";
 import { lockTournamentRow } from "./registration";
+import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
 
 /** Ce que l'annulation a produit, pour la ligne de journal et le message rendu. */
 export type CancelledForfeit = {
@@ -102,6 +104,48 @@ async function replayStandings(
 }
 
 /**
+ * Une manche postérieure à `round` porte-t-elle une saisie ?
+ *
+ * Un report écrit son score sous le verrou du match **avant** d'attendre celui
+ * du tournoi, que l'annulation tient déjà : une lecture d'instantané manquait ce
+ * score en cours, l'équipe rentrait et le rejeu suisse réappariait une manche
+ * saisie. Les lignes encore vierges sont donc relues **verrouillées**, par clé
+ * primaire seulement (les manches postérieures, pas toute la phase ni ses
+ * intervalles). Un report en cours, qui attend le tournoi, forme un
+ * interblocage que le moteur rompt aussitôt — l'annulation, qui n'a rien écrit,
+ * en est la victime ordinaire et se rejoue (`retryOnDeadlock`) en voyant alors
+ * le score. Un « Prêt » commité pendant l'attente fait refuser la relecture
+ * sous MariaDB (`ER_CHECKREAD`, ligne plus récente que l'instantané) : même
+ * rejeu.
+ * Ces lignes restent verrouillées jusqu'au commit : un « Prêt » de la manche
+ * suivante attend la fin du rejeu (geste d'administration rare et court).
+ */
+async function laterRoundHasInput(
+  connection: PoolConnection,
+  tournamentId: number,
+  phaseId: number,
+  round: number,
+): Promise<boolean> {
+  // Les matchs ne naissent que sous le verrou du tournoi, déjà pris : la
+  // lecture d'instantané les voit tous. Une saisie déjà commitée y suffit à
+  // refuser, sans rien verrouiller.
+  const [later] = await connection.execute<(RowDataPacket & { id: number; has_input: number })[]>(
+    `SELECT id, ${HAS_SCORE_INPUT_SQL} AS has_input FROM bg_matches
+     WHERE tournament_id = ? AND phase_id = ? AND round_number > ?`,
+    [tournamentId, phaseId, round],
+  );
+  if (later.length === 0) return false;
+  if (later.some((row) => Number(row.has_input) === 1)) return true;
+  const [rows] = await connection.execute<(RowDataPacket & { id: number })[]>(
+    `SELECT id FROM bg_matches
+     WHERE id IN (${sqlPlaceholders(later.length)}) AND ${HAS_SCORE_INPUT_SQL}
+     FOR UPDATE`,
+    later.map((row) => Number(row.id)),
+  );
+  return rows.length > 0;
+}
+
+/**
  * Remet en lice un engagé qui avait abandonné.
  *
  * Le contrôle de permission appartient à la route (administrateur strict).
@@ -118,6 +162,18 @@ async function replayStandings(
  *         comptent contre elle.
  */
 export async function cancelTournamentForfeit(
+  tournamentId: number,
+  teamId: number,
+): Promise<CancelledForfeit> {
+  // Verrous tournoi puis manches (le rejeu peut poser la manche suivante),
+  // quand un report ou « Enregistrer » prend la manche puis le tournoi : même
+  // inversion que l'abandon (`forfeitTournamentTeamPublic`), qu'un interblocage
+  // rejoue au lieu de renvoyer une erreur à l'administrateur.
+  return retryOnDeadlock(() => cancelTournamentForfeitOnce(tournamentId, teamId));
+}
+
+/** Une tentative d'annulation, dans sa propre transaction. */
+async function cancelTournamentForfeitOnce(
   tournamentId: number,
   teamId: number,
 ): Promise<CancelledForfeit> {
@@ -169,13 +225,9 @@ export async function cancelTournamentForfeit(
     // rentrerait sans que les manches manquées comptent contre elle — capital
     // intact en BG Survie, défaites en moins en Survie. Une manche posée mais
     // vierge ne bloque pas : l'équipe rejoint l'appariement suivant.
-    const [laterRows] = await connection.execute<(RowDataPacket & { c: number })[]>(
-      `SELECT COUNT(*) AS c FROM bg_matches
-       WHERE tournament_id = ? AND phase_id = ? AND round_number > ?
-         AND ${HAS_SCORE_INPUT_SQL}`,
-      [tournamentId, phaseId, Number(standing.forfeit_round ?? 1)],
-    );
-    if (Number(laterRows[0]?.c ?? 0) > 0) throw new Error("FORFEIT_ROUND_PASSED");
+    if (await laterRoundHasInput(connection, tournamentId, phaseId, Number(standing.forfeit_round ?? 1))) {
+      throw new Error("FORFEIT_ROUND_PASSED");
+    }
 
     await connection.execute(
       `UPDATE ${table} s SET s.status = 'ACTIVE', s.${roundColumn} = NULL WHERE ${scope}`,

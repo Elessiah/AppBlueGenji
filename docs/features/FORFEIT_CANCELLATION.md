@@ -49,7 +49,26 @@ message de succès dit seulement que le classement est recalculé.
 | L'engagé est `FORFEIT` | `409 TEAM_NOT_FORFEITED` |
 | Aucune manche **postérieure** à celle de l'abandon ne porte de saisie (même borne que le retrait d'une pénalité) — sinon l'équipe rentrerait sans que les manches manquées comptent contre elle | `409 FORFEIT_ROUND_PASSED` |
 
-La transaction prend `lockTournamentRow` en toute première instruction.
+La transaction prend `lockTournamentRow` en toute première instruction. Elle
+verrouille donc le tournoi avant les manches que le rejeu peut poser, quand un
+report ou « Enregistrer » prend la manche avant le tournoi : comme l'abandon,
+elle passe par `retryOnDeadlock`, qui rejoue la transaction entière après un
+interblocage (publication une seule fois, après le commit réussi). Le contrôle
+des manches postérieures lit d'abord leurs matchs sans verrou (une saisie déjà
+commitée suffit à refuser), puis relit les autres **verrouillés, par clé
+primaire** (`FOR UPDATE`, table seule) : un report en cours écrit son score
+sous le verrou du match avant d'attendre le tournoi, et une lecture
+d'instantané l'aurait manqué — l'équipe rentrait et le rejeu suisse
+réappariait une manche déjà saisie. Ce report et l'annulation s'interbloquent :
+le moteur rompt le cycle, l'annulation (qui n'a encore rien écrit) se rejoue
+(`retryOnDeadlock`) et refuse en `FORFEIT_ROUND_PASSED`. Un « Prêt » commité
+sur ces matchs pendant l'attente fait refuser la relecture sous MariaDB
+(`ER_CHECKREAD`) : même rejeu. Une contention qui dure sur
+les trois tentatives — interblocage, ou ligne changée depuis l'instantané sous
+MariaDB (`ER_CHECKREAD`) — rend `409 CONCURRENT_UPDATE_RETRY`, pas une panne.
+Le verrou ne couvre que les manches postérieures, pas toute la phase ni ses
+intervalles ; il dure jusqu'au commit, si bien qu'un « Prêt » de la manche
+suivante attend la fin du rejeu.
 
 ## Permission : administrateur strict
 
@@ -74,6 +93,18 @@ pas l'ambre, réservé aux avertissements) n'apparaît que :
 - en BG Survie, avant les play-offs.
 
 Il ouvre une `ConfirmActionDialog` ; le succès et l'échec passent par le toast.
+La confirmation ne promet l'appariement qu'avec sa réserve (« sauf si les
+matchs qu'elle a joués l'éliminent ») : le rejeu peut sortir l'engagé aussitôt.
+
+Son nom accessible commence par son texte visible, dans les deux langues
+(« Annuler l'abandon de X », « Cancel withdrawal of X » — WCAG 2.5.3). En ronde
+suisse, une ligne forfait s'estompe **cellule par cellule**, jamais la cellule
+d'action, à 90 % d'opacité (une ligne éliminée de la Survie, sans bouton,
+s'estompe en entier au même taux) : une
+ligne entière estompée ferait paraître le bouton désactivé, et à 55 % le texte
+discret tombait vers 3:1 ; à 90 %, le chiffre de défaite rouge reste ≥ 4,5:1
+même sur la ligne du lecteur (`forfeit-buttons-label-in-name.test.ts` le calcule). L'infobulle du bouton dit seulement que le
+classement est recalculé, sans promettre le retour en lice.
 
 ## Journal
 
@@ -84,8 +115,15 @@ tournoi individuel), auteur nommé dans pm2 seulement.
 ## Tests
 
 - `tests/lib/server/forfeit-cancellation-service.test.ts` — verrou en premier,
-  fenêtre, statut remis à `ACTIVE`, rejeu du bon moteur, multi-phases.
+  fenêtre, statut remis à `ACTIVE`, rejeu du bon moteur, multi-phases,
+  rejeu après interblocage (un refus métier ne se rejoue pas), contrôle des
+  manches postérieures verrouillées par clé primaire (interblocage → rejeu
+  puis refus), contention persistante rendue en `409`.
 - `tests/app/api/admin/forfeit-cancellation.test.ts` — administrateur seul,
   codes d'erreur, journal anonyme.
 - `tests/tournois/forfeit-eligibility.test.ts` — `canCancelForfeits`.
 - `tests/lib/shared/bot-logs.test.ts` — ligne Discord.
+- `tests/tournois/forfeit-buttons-label-in-name.test.ts` — nom accessible des
+  boutons d'abandon (FR, EN), réserve de la confirmation.
+- `tests/tournois/swiss-standings-table.test.tsx` — estompage hors cellule
+  d'action.

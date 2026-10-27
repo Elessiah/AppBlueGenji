@@ -81,7 +81,7 @@ describe("scoreCorrectionNeedsConfirmation", () => {
 
 describe("Correction d'un résultat — câblage", () => {
   it("aucune écriture n'échappe à la règle : toute saisie passe par run (Enregistrer, désactivé sur un match tranché, compris)", () => {
-    expect(SCORE).toMatch(/onClick=\{\(\) => void run\("save"\)\}/);
+    expect(SCORE).toMatch(/onClick=\{\(\) => \{\s*if \(!form\.submitting\) void run\("save"\);\s*\}\}/);
     expect(SCORE).toMatch(/void run\("resolve"\)/);
     expect(SCORE.match(/form\.submit\(/g)).toHaveLength(1);
     const run = /const run = async[\s\S]*?\n {2}\};/.exec(SCORE)?.[0] ?? "";
@@ -107,5 +107,33 @@ describe("Correction d'un résultat — câblage", () => {
 
   it("seeding : lâche le geste en attente si la liste change pendant la lecture", () => {
     expect(PANEL).toMatch(/useEffect\(\(\) => \{\s*setConfirmingMove\(null\);\s*\}, \[serverKey\]\);/);
+  });
+});
+
+describe("AdminScoreDialog — focus gardé pendant l'envoi", () => {
+  // Un bouton natif `disabled` perd le focus, qui tombe sur <body> derrière la
+  // modale le temps d'un refus : pendant l'envoi, les trois boutons d'action
+  // restent focalisables (`aria-disabled`), le geste étant ignoré.
+  const actions = SCORE.slice(SCORE.indexOf("className={styles.actions}"), SCORE.indexOf("</form>"));
+
+  it("ne désactive jamais nativement un bouton d'action sur `form.submitting`", () => {
+    expect(actions).not.toMatch(/(?<!aria-)disabled=\{[^}]*form\.submitting/);
+    expect(actions.match(/aria-disabled=\{form\.submitting \|\| undefined\}/g)).toHaveLength(3);
+    expect(actions.match(/aria-busy=\{form\.submitting \|\| undefined\}/g)).toHaveLength(2);
+  });
+
+  it("ignore Fermer et Enregistrer pressés pendant l'envoi", () => {
+    expect(actions).toContain("if (!form.submitting) onClose();");
+    expect(actions).toContain('if (!form.submitting) void run("save");');
+    // « Valider le résultat » passe par le formulaire, qui garde déjà l'envoi.
+    expect(SCORE).toMatch(/!form\.submitting && !awaitingDetail\) void run\("resolve"\)/);
+  });
+
+  it("garde le libellé des boutons pendant l'envoi : un nom réduit à « … » ne dit rien", () => {
+    expect(actions).not.toMatch(/submitting \? "…"/);
+    expect(actions).toMatch(/\{t\("score\.admin\.save"\)\}\s*\{form\.submitting && "…"\}/);
+    expect(actions).toMatch(/\{t\("score\.admin\.resolve"\)\}\s*\{form\.submitting && "…"\}/);
+    const player = read("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
+    expect(player).not.toMatch(/submitting \? "…"/);
   });
 });

@@ -132,8 +132,9 @@ describe("EnduranceRankingViews — gestes réservés au Général", () => {
   it("une ligne sortie s'estompe sans éteindre ses gestes", () => {
     expect(RANKING).not.toContain("style={{ opacity: ROW_OPACITY");
     expect(RANKING).toContain('"--row-fade": ROW_OPACITY[row.status]');
-    // Plancher 0,8 : texte discret et rouge au-dessus de 4,5:1.
-    expect(RANKING).toMatch(/OUT_OF_CONTENTION: 0\.9,\s*ELIMINATED: 0\.8,\s*FORFEIT: 0\.8,/);
+    // Plancher 0,9 : texte discret et rouge au-dessus de 4,5:1, même sur la
+    // ligne du lecteur (calcul dans forfeit-buttons-label-in-name.test.ts).
+    expect(RANKING).toMatch(/OUT_OF_CONTENTION: 0\.95,\s*ELIMINATED: 0\.9,\s*FORFEIT: 0\.9,/);
     expect(RANKING_CSS).toMatch(/\.fadable > :not\(\.rowActions\) \{\s*opacity: var\(--row-fade, 1\);/);
   });
 

@@ -7,7 +7,7 @@ import { isTransactionAborted } from "@/lib/server/mysql-errors";
  * Rejouer la transaction entière relit l'état récent — même remède qu'un
  * interblocage.
  */
-function isSnapshotConflict(error: unknown): boolean {
+export function isSnapshotConflict(error: unknown): boolean {
   const code = (error as { code?: unknown; errno?: unknown } | null) ?? null;
   return code?.code === "ER_CHECKREAD" || code?.errno === 1020;
 }

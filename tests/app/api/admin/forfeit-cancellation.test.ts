@@ -9,6 +9,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { cancelTournamentForfeit } from "@/lib/server/tournaments/forfeit-cancellation";
 import { authUser } from "../../../helpers/auth-user";
+import { CONCURRENT_UPDATE_RETRY } from "@/lib/shared/api-error-code";
 
 const admin = authUser({ id: 1, pseudo: "Root", isAdmin: true, roles: ["ADMIN"] });
 const arbitre = authUser({ id: 2, pseudo: "Sifflet", isAdmin: false, roles: ["ARBITRE"] });
@@ -130,5 +131,40 @@ describe("DELETE /api/admin/tournaments/[id]/forfeits/[teamId]", () => {
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ error: "FORFEIT_CANCEL_FAILED" });
     expect(error).toHaveBeenCalled();
+  });
+
+  it("rend une contention persistante en refus « réessaie », sans trace d'erreur", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(cancelTournamentForfeit).mockRejectedValue(
+      new Error("Deadlock found when trying to get lock; try restarting transaction"),
+    );
+    const error = jest.spyOn(console, "error").mockImplementation(() => {});
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+
+    const res = await cancel("7", "102");
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: CONCURRENT_UPDATE_RETRY });
+    expect(error).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalled();
+    expect(sendBotLog).not.toHaveBeenCalled();
+  });
+
+  it("rend un instantané périmé de MariaDB (1020) en refus « réessaie »", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(cancelTournamentForfeit).mockRejectedValue(
+      Object.assign(new Error("Record has changed since last read in table 'bg_matches'"), {
+        code: "ER_CHECKREAD",
+        errno: 1020,
+      }),
+    );
+    const error = jest.spyOn(console, "error").mockImplementation(() => {});
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+
+    const res = await cancel("7", "102");
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: CONCURRENT_UPDATE_RETRY });
+    expect(error).not.toHaveBeenCalled();
   });
 });

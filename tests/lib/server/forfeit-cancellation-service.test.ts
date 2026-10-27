@@ -34,6 +34,9 @@ function setup(options: {
   phase?: { id: number; format: string } | null;
   standing?: { status: string; forfeit_round?: number } | null;
   laterInputs?: number;
+  laterMatchIds?: number[];
+  laterBusy?: number;
+  committedInputs?: number;
 } = {}) {
   const head =
     options.head === null
@@ -51,17 +54,30 @@ function setup(options: {
   const sqls: string[] = [];
   const params: unknown[] = [];
   const connection = connectionMock();
+  let busy = options.laterBusy ?? 0;
+  const laterIds = options.laterMatchIds ?? [301, 302];
   connection.execute.mockImplementation(async (sql: string, values?: unknown) => {
     const flat = sql.replace(/\s+/g, " ").trim();
     sqls.push(flat);
     params.push(values);
+    if (/^SELECT id, .* AS has_input FROM bg_matches WHERE tournament_id/.test(flat)) {
+      return [laterIds.map((id, index) => ({ id, has_input: index < (options.committedInputs ?? 0) ? 1 : 0 }))];
+    }
+    if (/^SELECT id FROM bg_matches WHERE id IN .* FOR UPDATE$/.test(flat)) {
+      if (busy > 0) {
+        busy -= 1;
+        throw Object.assign(new Error("Deadlock found when trying to get lock; try restarting transaction"), {
+          code: "ER_LOCK_DEADLOCK",
+        });
+      }
+      return [laterIds.slice(0, options.laterInputs ?? 0).map((id) => ({ id }))];
+    }
     if (/FOR UPDATE/.test(flat)) return [[{ id: 7 }]];
     if (/FROM bg_tournaments WHERE id/.test(flat)) return [head ? [head] : []];
     if (/bg_tournament_phases/.test(flat)) return [options.phase ? [options.phase] : []];
     if (/^SELECT s.status/.test(flat)) {
       return [standing ? [{ ...standing, team_name: "Team Nova" }] : []];
     }
-    if (/COUNT\(\*\) AS c FROM bg_matches/.test(flat)) return [[{ c: options.laterInputs ?? 0 }]];
     return [{ affectedRows: 1 }];
   });
   jest.mocked(getDatabase).mockResolvedValue(
@@ -106,6 +122,90 @@ describe("cancelTournamentForfeit", () => {
     });
   });
 
+  it("rejoue la transaction entière après un interblocage, et ne publie qu'une fois", async () => {
+    const { connection } = setup();
+    const deadlock = Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK" });
+    jest.mocked(reconcileSurvival).mockRejectedValueOnce(deadlock);
+
+    const result = await cancelTournamentForfeit(7, 102);
+
+    expect(result.entrantName).toBe("Team Nova");
+    expect(reconcileSurvival).toHaveBeenCalledTimes(2);
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+    expect(connection.release).toHaveBeenCalledTimes(2);
+    expect(publishUpdatedEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it("relit les manches postérieures verrouillées par clé primaire, sans jointure", async () => {
+    const { sqls, params } = setup();
+
+    await cancelTournamentForfeit(7, 102);
+
+    const guard = sqls.findIndex((sql) => /WHERE id IN .* FOR UPDATE$/.test(sql));
+    expect(sqls[guard]).toMatch(/^SELECT id FROM bg_matches WHERE id IN \(\?, \?\) AND/);
+    expect(sqls[guard]).not.toMatch(/JOIN|FOR SHARE|round_number/);
+    expect(params[guard]).toEqual([301, 302]);
+  });
+
+  it("une saisie déjà commitée refuse sans verrouiller aucun match", async () => {
+    const { sqls } = setup({ committedInputs: 1, laterBusy: 3 });
+
+    await expect(cancelTournamentForfeit(7, 102)).rejects.toThrow("FORFEIT_ROUND_PASSED");
+
+    expect(sqls.some((sql) => /WHERE id IN .* FOR UPDATE$/.test(sql))).toBe(false);
+  });
+
+  it("sans manche postérieure, ne verrouille aucun match", async () => {
+    const { sqls } = setup({ laterMatchIds: [] });
+
+    await cancelTournamentForfeit(7, 102);
+
+    expect(sqls.some((sql) => /WHERE id IN .* FOR UPDATE$/.test(sql))).toBe(false);
+  });
+
+  it("un report en cours (interblocage) défait l'annulation et la rejoue, qui refuse alors", async () => {
+    const { connection } = setup({ laterBusy: 1 });
+    let attempt = 0;
+    connection.beginTransaction.mockImplementation(async () => {
+      attempt += 1;
+    });
+    // Au rejeu, le report concurrent est commité : la manche porte sa saisie.
+    const execute = connection.execute.getMockImplementation();
+    connection.execute.mockImplementation(async (sql: string, values?: unknown) => {
+      if (attempt > 1 && /WHERE id IN/.test(sql)) return [[{ id: 301 }]];
+      return execute!(sql, values);
+    });
+
+    await expect(cancelTournamentForfeit(7, 102)).rejects.toThrow("FORFEIT_ROUND_PASSED");
+
+    expect(attempt).toBe(2);
+    expect(connection.rollback).toHaveBeenCalledTimes(2);
+    expect(connection.commit).not.toHaveBeenCalled();
+    expect(reconcileSurvival).not.toHaveBeenCalled();
+  });
+
+  it("laisse remonter une autre erreur du verrou sans la rejouer", async () => {
+    const { connection } = setup();
+    const execute = connection.execute.getMockImplementation();
+    connection.execute.mockImplementation(async (sql: string, values?: unknown) => {
+      if (/WHERE id IN/.test(sql)) throw Object.assign(new Error("boom"), { code: "ER_PARSE_ERROR" });
+      return execute!(sql, values);
+    });
+
+    await expect(cancelTournamentForfeit(7, 102)).rejects.toThrow("boom");
+
+    expect(connection.beginTransaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("ne rejoue pas un refus métier", async () => {
+    const { connection } = setup({ standing: { status: "ACTIVE" } });
+
+    await expect(cancelTournamentForfeit(7, 102)).rejects.toThrow("TEAM_NOT_FORFEITED");
+
+    expect(connection.beginTransaction).toHaveBeenCalledTimes(1);
+  });
+
   it("n'écrit que le statut : le match perdu par forfait reste perdu", async () => {
     const { sqls } = setup();
 
@@ -140,7 +240,7 @@ describe("cancelTournamentForfeit", () => {
 
     await cancelTournamentForfeit(7, 102);
 
-    const later = sqls.findIndex((sql) => /COUNT\(\*\) AS c FROM bg_matches/.test(sql));
+    const later = sqls.findIndex((sql) => /AS has_input FROM bg_matches WHERE tournament_id/.test(sql));
     expect(sqls[later]).toContain("round_number > ?");
     expect(params[later]).toEqual([7, 0, 2]);
   });
