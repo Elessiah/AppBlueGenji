@@ -115,8 +115,19 @@ describe("espace sécurisé — visiteur sans session", () => {
     await expect(SecuredLayout({ children: <p>protégé</p> })).rejects.toThrow(/NEXT_REDIRECT \/suivre\/tournois\/12$/);
   });
 
+  it("renvoie la page d'un match vers sa page sans compte, requête comprise", async () => {
+    mockPathname = "/tournois/12/matchs/34";
+    mockSearch = "?utm_source=discord";
+    await expect(SecuredLayout({ children: <p>protégé</p> })).rejects.toThrow(
+      "NEXT_REDIRECT /suivre/tournois/12/matchs/34?utm_source=discord",
+    );
+    mockLocale = "en";
+    mockSearch = null;
+    await expect(SecuredLayout({ children: <p>protégé</p> })).rejects.toThrow("NEXT_REDIRECT /en/suivre/tournois/12/matchs/34");
+  });
+
   it("laisse la carte « Connexion requise » partout ailleurs", async () => {
-    for (const path of ["/tournois", "/tournois/creer", "/tournois/12/modifier", "/equipes/12", null]) {
+    for (const path of ["/tournois", "/tournois/creer", "/tournois/12/modifier", "/tournois/12/matchs/abc", "/equipes/12", null]) {
       mockPathname = path;
       const html = renderToStaticMarkup(await SecuredLayout({ children: <p>protégé</p> }));
       expect(html).not.toContain("protégé");
@@ -133,10 +144,14 @@ describe("espace sécurisé — visiteur sans session", () => {
 
   it("relaie côté client la carte servie par un préchargement, ancre comprise", () => {
     const gate = readSource("app/(secured)/_shared/AuthGate.tsx");
-    expect(gate).toContain("tournamentIdFromMemberPath(splitLocalePrefix(pathname).path)");
-    expect(gate).toContain("router.replace(`${spectatorTournamentPath(spectatorId)}${search}${anchor}`);");
+    expect(gate).toContain("const memberPath = splitLocalePrefix(pathname).path;");
+    expect(gate).toContain("tournamentIdFromMemberPath(memberPath)");
+    // La page d'un match, de même, vers sa page sans compte.
+    expect(gate).toContain("matchPageIdsFromMemberPath(memberPath)");
+    expect(gate).toContain("matchPagePath(matchPage.tournamentId, matchPage.matchId, true)");
+    expect(gate).toContain("router.replace(`${spectatorPath}${search}${anchor}`);");
     // Pas de carte « Connexion requise » le temps du relais, mais un état annoncé.
-    expect(gate).toMatch(/if \(spectatorId !== null\) \{\s*return \(\s*<output className=\{styles.shell\}>/);
+    expect(gate).toMatch(/if \(spectatorPath !== null\) \{\s*return \(\s*<output className=\{styles.shell\}>/);
     expect(gate).toContain("{text.redirecting}");
   });
 });
@@ -149,6 +164,18 @@ describe("page sans compte — mise en page", () => {
     await expect(SpectatorLayout({ children: null, ...params("12") })).rejects.toThrow("NEXT_REDIRECT /tournois/12");
     mockLocale = "en";
     await expect(SpectatorLayout({ children: null, ...params("12") })).rejects.toThrow("NEXT_REDIRECT /en/tournois/12");
+  });
+
+  it("renvoie un membre connecté de la page sans compte d'un match vers celle de son espace", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7 }));
+    mockPathname = "/suivre/tournois/12/matchs/34";
+    await expect(SpectatorLayout({ children: null, ...params("12") })).rejects.toThrow("NEXT_REDIRECT /tournois/12/matchs/34");
+    mockLocale = "en";
+    await expect(SpectatorLayout({ children: null, ...params("12") })).rejects.toThrow("NEXT_REDIRECT /en/tournois/12/matchs/34");
+    // Un chemin d'un autre tournoi (en-tête incohérent) ramène à la fiche demandée.
+    mockPathname = "/suivre/tournois/99/matchs/34";
+    mockLocale = "fr";
+    await expect(SpectatorLayout({ children: null, ...params("12") })).rejects.toThrow(/NEXT_REDIRECT \/tournois\/12$/);
   });
 
   it("fait suivre la requête au membre renvoyé vers sa fiche, et elle seule", async () => {

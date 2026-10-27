@@ -91,10 +91,10 @@ describe("textes joueur et règles — mêmes lecteurs que le code", () => {
     // Fiche du titulaire : la liste partagée, derrière le « i ».
     expect(readSource("messages/fr/players.json")).toContain("si tu y es présenté comme contact : les membres des deux équipes, les arbitres et les administrateurs, dès que les adversaires sont connus et jusqu'à la fin du match, et les casters le temps du match ;");
     expect(readSource("messages/fr/players.json")).toContain("si tu castes un match : ses deux équipes et ses autres casters le temps du match, et les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin ;");
-    expect(readSource("messages/fr/players.json")).toContain("la fenêtre de lancement, elle, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné.");
+    expect(readSource("messages/fr/players.json")).toContain("la fenêtre de lancement, elle, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné ; la page du match reprend le BattleTag de ses casters et de son arbitre désigné, aux mêmes personnes et aux mêmes moments.");
     expect(readSource("messages/en/players.json")).toContain("if you're shown there as a contact: the members of both teams, referees and administrators, from the moment the opponents are known until the end of the match, and the casters while the match is being played;");
     expect(readSource("messages/en/players.json")).toContain("if you cast a match: both its teams and its other casters while the match is being played, and referees and administrators from the moment its opponents are known until its end;");
-    expect(readSource("messages/en/players.json")).toContain("the launch window only opens for both teams, the casters and the assigned referee.");
+    expect(readSource("messages/en/players.json")).toContain("the launch window only opens for both teams, the casters and the assigned referee; the match page repeats the BattleTag of its casters and its assigned referee, to the same people at the same times.");
   });
 
   it("la règle « Lancement d'un match » renvoie au bouton « Contacts » ouvert dès que les adversaires sont connus", () => {

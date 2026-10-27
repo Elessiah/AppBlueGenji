@@ -142,7 +142,16 @@ describe("LiveCard — accès au direct", () => {
   it("propose le direct d'un match à l'antenne", () => {
     const html = withStream("LIVE", "https://twitch.tv/bluegenji");
     expect(hrefs(html)).toContain("https://twitch.tv/bluegenji");
-    expect(text(html)).toContain("Regarder sur Twitch");
+    // Le lien nomme la chaîne (`streamChannelName`) ; son nom accessible
+    // commence par ce texte et garde la plateforme.
+    expect(text(html)).toContain("Regarder bluegenji");
+    expect(html).toContain('aria-label="Regarder bluegenji : ');
+    expect(html).toContain("en direct sur Twitch (nouvel onglet)");
+  });
+
+  it("garde le nom de la plateforme quand le lien ne nomme pas de chaîne", () => {
+    expect(text(withStream("LIVE", "https://www.twitch.tv/videos/123"))).toContain("Regarder sur Twitch");
+    expect(text(withStream("LIVE", "https://youtu.be/abc"))).toContain("Regarder sur YouTube");
   });
 
   it("ouvre le direct dans un nouvel onglet, sans laisser la page en otage", () => {
@@ -155,7 +164,8 @@ describe("LiveCard — accès au direct", () => {
     expect(text(withStream("LIVE", "https://www.youtube.com/@bg"))).toContain(
       "Regarder sur YouTube",
     );
-    expect(text(withStream("LIVE", "https://kick.com/bg"))).toContain("Regarder sur Kick");
+    expect(text(withStream("LIVE", "https://kick.com/bg"))).toContain("Regarder bg");
+    expect(withStream("LIVE", "https://kick.com/bg")).toContain("en direct sur Kick (nouvel onglet)");
   });
 
   it("retombe sur un libellé neutre si la plateforme est inconnue", () => {
