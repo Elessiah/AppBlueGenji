@@ -2,7 +2,7 @@
 
 import { useToast } from "@/components/ui/toast";
 import type { TournamentDialogsText } from "@/lib/shared/tournament-actions-text";
-import { FormEvent, ReactNode, useRef, useState } from "react";
+import { FormEvent, ReactNode, useState } from "react";
 import { createPortal } from "react-dom";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { CodedError, MATCH_SCHEDULE_FIELD_ERRORS, errorCode } from "@/lib/shared/field-errors";
@@ -46,11 +46,6 @@ const PREVIEW_ID = "match-start-at-preview";
 const PAST_WARNING_ID = "match-start-past-warning";
 const YEAR_FIX_ID = "match-start-year-fix";
 const SUBMIT_ID = "match-start-submit";
-/**
- * Après un envoi retenu (date devenue passée), un envoi plus proche que ce
- * délai n'est pas une confirmation : c'est le second clic d'un double-clic.
- */
-export const LATE_WARNING_CONFIRM_DELAY_MS = 600;
 
 /** Premier champ manquant, tel que l'aperçu le nomme (`schedule.missing.*`). */
 const MISSING_FIELD_KEYS = {
@@ -240,8 +235,6 @@ export function MatchScheduleDialog({
   // l'année, planification et date passée lisent le même instant (quatre
   // lectures pouvaient tomber de part et d'autre de minuit). Relue à l'envoi.
   const [clock, setClock] = useState(Date.now);
-  // Instant de l'envoi retenu par une date devenue passée (0 : aucun).
-  const heldBackAt = useRef(0);
   const [initial] = useState(() => matchStartEntryOf(match.startAt));
   const [day, setDay] = useState(initial ? String(initial.day) : "");
   // Sans date posée, le mois courant (Paris) est présélectionné : reste le jour.
@@ -358,15 +351,12 @@ export function MatchScheduleDialog({
     const now = Date.now();
     if (pastWarning === null && pastWarningAt(now) !== null) {
       setClock(now);
-      heldBackAt.current = now;
       requestAnimationFrame(() => {
         document.getElementById(PAST_WARNING_ID)?.scrollIntoView({ block: "nearest" });
         document.getElementById(SUBMIT_ID)?.scrollIntoView({ block: "nearest" });
       });
       return;
     }
-    // Le second clic d'un double-clic n'a pas laissé lire l'avertissement.
-    if (now - heldBackAt.current < LATE_WARNING_CONFIRM_DELAY_MS) return;
 
     setBusy(true);
     try {
@@ -636,9 +626,19 @@ export function MatchScheduleDialog({
             >
               {t("score.cancel")}
             </button>
+            {/* Le second clic d'un double-clic (`detail`, au réglage du système)
+                et la répétition d'« Entrée » tenue n'envoient pas : après un
+                envoi retenu (date devenue passée), ils confirmeraient sans
+                laisser lire l'avertissement. */}
             <button
               id={SUBMIT_ID}
               type="submit"
+              onClick={(event) => {
+                if (event.detail > 1) event.preventDefault();
+              }}
+              onKeyDown={(event) => {
+                if (event.repeat && event.key === "Enter") event.preventDefault();
+              }}
               className="btn"
               disabled={busy}
               style={{ padding: "8px 20px", fontSize: 13 }}
