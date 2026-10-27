@@ -59,6 +59,11 @@ match dit le détail.
   Les gestes lourds d'administration restent au seul journal (décision 5).
 - Un arbitre qui joue le match qu'il tranche reçoit **en plus** l'alerte de
   `dispute-self-resolution.ts` (ligne ⚠️ et push `REFEREE_SELF_RESOLUTION`).
+  Qu'il le joue ou non, « Valider le résultat » (litige clos ou résultat
+  corrigé) et un score qui suspend la validation automatique gardent leur
+  trace courte **nominative** dans pm2 (`auditStaffAction`) : la ligne 🛠️
+  n'ajoute rien à pm2, elle n'en retire rien non plus — `/rgpd` et le
+  registre T05 le disent.
 - « Valider le résultat » écrit aussi « Match terminé » (`match_finished`) : la
   ligne 🛠️ dit que c'est l'arbitrage qui a tranché.
 
