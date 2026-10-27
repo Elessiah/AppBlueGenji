@@ -1547,11 +1547,11 @@ describe("PRIVACY_CHANGES — avis de retrait du cast (LOGS-NOTIFS ln-1)", () =>
   const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-avis-de-retrait-du-cast")!;
   const english = PRIVACY_CHANGES_EN["2026-10-avis-de-retrait-du-cast"];
 
-  it("ferme la liste : datée du 27 octobre, pour les seuls casters, et tient seule dans un message privé (FR et EN)", () => {
+  it("ferme la liste : datée du 29 octobre (lendemain de la mise en ligne prévue), pour les seuls casters, et tient seule dans un message privé (FR et EN)", () => {
     expect(entry).toBeDefined();
     expect(english).toBeDefined();
     expect(PRIVACY_CHANGES.indexOf(entry)).toBe(PRIVACY_CHANGES.length - 1);
-    expect([entry.publishedAt, entry.audience]).toEqual(["2026-10-27", "LIVE_STAFF"]);
+    expect([entry.publishedAt, entry.audience]).toEqual(["2026-10-29", "LIVE_STAFF"]);
     expect(PRIVACY_CHANGES.at(-2)!.publishedAt <= entry.publishedAt).toBe(true);
     expect(entry.links).toEqual([{ href: "/rgpd#messages-de-match", label: "Lire le paragraphe « Messages privés Discord de match »" }]);
     expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
