@@ -152,7 +152,11 @@ lui-même).
   **reconstruire** la réponse (`SPECTATOR_REBUILD_RULE`, 60/min : aucune
   réponse fraîche ni calcul en vol, `isSpectatorPayloadWarm`) — une adresse qui
   parcourt des tournois froids ne fait plus bâtir six instantanés entiers par
-  seconde, une lecture servie par le cache n'y entre pas ; base injoignable → `503` +
+  seconde, une lecture servie par le cache n'y entre pas, ni celle d'un
+  identifiant inconnu ou pas encore publié (`isSpectatorTournamentPublic`, sa
+  seule carte, lue avant le plafond : des sondes au hasard ne privent pas une
+  adresse partagée de ses relectures, un lien ouvert avant la publication
+  reçoit son `404`, pas un `429`) ; base injoignable → `503` +
   `Retry-After` du double de la cadence au niveau du moment
   (`spectatorUnavailableRetryMs` : 1 min au calme, 10 au pire), puis recul
   doublé par le relecteur — le `Retry-After` n'est qu'un plancher : des `503`
