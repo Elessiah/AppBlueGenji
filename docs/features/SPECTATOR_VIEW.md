@@ -132,9 +132,12 @@ lui-même).
   charge, est ce qui protège la machine d'un tournoi animé (choix de l'auteur ;
   ce délai, 150 s au pire, est déclaré dans `/rgpd`). Seule la
   **suppression** du tournoi la retire (`invalidateSpectatorSnapshot`,
-  `deletion.ts`). La reconstruction lit d'abord la **carte** du tournoi (une
-  requête indexée) : un identifiant inconnu ou pas encore publié s'arrête là,
-  sans faire construire d'instantané. Un « introuvable » n'entre **pas** dans le
+  `deletion.ts`). Une lecture froide lit d'abord la **carte** du tournoi (une
+  requête indexée, `isSpectatorTournamentPublic`, mutualisée en vol entre les
+  lectures simultanées et jamais gardée) : un identifiant inconnu ou pas encore
+  publié s'arrête là, sans faire construire d'instantané ; le chargeur ne la
+  relit pas (`visibilityChecked`), l'instantané repassant par sa propre porte de
+  visibilité. Un « introuvable » n'entre **pas** dans le
   cache (le chargeur lève une sentinelle, `cached` ne garde jamais un échec). Le
   corps est sérialisé **une fois** (version vide) ;
 - en-tête `x-bg-fresh-within-ms` : l'âge maximal de l'affichage (attente entre
@@ -153,10 +156,12 @@ lui-même).
   réponse fraîche ni calcul en vol, `isSpectatorPayloadWarm`) — une adresse qui
   parcourt des tournois froids ne fait plus bâtir six instantanés entiers par
   seconde, une lecture servie par le cache n'y entre pas, ni celle d'un
-  identifiant inconnu ou pas encore publié (`isSpectatorTournamentPublic`, sa
-  seule carte, lue avant le plafond : des sondes au hasard ne privent pas une
-  adresse partagée de ses relectures, un lien ouvert avant la publication
-  reçoit son `404`, pas un `429`) ; base injoignable → `503` +
+  identifiant inconnu ou pas encore publié (sa seule carte, lue avant le
+  décompte : des sondes au hasard ne privent pas une adresse partagée de ses
+  relectures, un lien ouvert avant la publication reçoit son `404`, pas un
+  `429`) ; une adresse déjà au plafond est refusée avant toute lecture en base
+  (`peekRateLimit`, qui ne décompte rien), le jeton n'est pris qu'après la
+  carte, juste avant le calcul ; base injoignable → `503` +
   `Retry-After` du double de la cadence au niveau du moment
   (`spectatorUnavailableRetryMs` : 1 min au calme, 10 au pire), puis recul
   doublé par le relecteur — le `Retry-After` n'est qu'un plancher : des `503`
