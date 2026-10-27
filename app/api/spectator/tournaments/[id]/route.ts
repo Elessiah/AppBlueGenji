@@ -47,6 +47,25 @@ function pollHeaders(pollAfterMs: number): Record<string, string> {
   return { "Cache-Control": "no-store", [SPECTATOR_POLL_HEADER]: String(pollAfterMs) };
 }
 
+/**
+ * Lecture **froide** (aucune réponse fraîche ni calcul en vol) : elle ferait
+ * reconstruire la réponse, ce qui se paie à part (`SPECTATOR_REBUILD_RULE`) —
+ * parcourir des tournois froids coûte un instantané entier chacun, pas un
+ * cache. Renvoie le refus à servir avant tout décompte, ou `null`.
+ */
+async function coldReadRefusal(tournamentId: number, clientIp: string | null): Promise<Response | null> {
+  // Une adresse déjà au plafond est refusée d'emblée, sans lecture en base.
+  const exhausted = peekRateLimit(SPECTATOR_REBUILD_RULE, clientIp);
+  if (exhausted) return exhausted;
+  // Un identifiant inconnu ou pas encore publié ne coûte que sa carte (lue une
+  // fois pour toutes les lectures simultanées) et n'entame pas ce plafond : des
+  // sondes au hasard ne privent pas une adresse partagée (salle de LAN) de ses
+  // relectures, et un lien ouvert avant la publication reçoit son
+  // « introuvable », pas un `429`.
+  const visible = await isSpectatorTournamentPublic(tournamentId);
+  return visible ? null : fail("TOURNAMENT_NOT_FOUND", 404);
+}
+
 export async function GET(req: Request, context: { params: Promise<{ id: string }> }) {
   const clientIp = requestClientIp(req);
   const throttled = enforceRateLimit(SPECTATOR_READ_RULE, clientIp);
@@ -59,25 +78,16 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
 
   let payload;
   try {
-    // Une lecture qui ferait reconstruire la réponse se paie à part : parcourir
-    // des tournois froids coûte un instantané entier chacun, pas un cache.
     const cold = !isSpectatorPayloadWarm(tournamentId);
     if (cold) {
-      // Une adresse déjà au plafond est refusée d'emblée, sans lecture en base.
-      const exhausted = peekRateLimit(SPECTATOR_REBUILD_RULE, clientIp);
-      if (exhausted) return exhausted;
-      // Un identifiant inconnu ou pas encore publié ne coûte que sa carte (lue
-      // une fois pour toutes les lectures simultanées) et n'entame pas ce
-      // plafond : des sondes au hasard ne privent pas une adresse partagée
-      // (salle de LAN) de ses relectures, et un lien ouvert avant la
-      // publication reçoit son « introuvable », pas un `429`.
-      if (!(await isSpectatorTournamentPublic(tournamentId))) return fail("TOURNAMENT_NOT_FOUND", 404);
+      const refused = await coldReadRefusal(tournamentId, clientIp);
+      if (refused) return refused;
       // Revérifié après l'attente (un autre visiteur a pu lancer le calcul), et
-      // juste avant `getSpectatorPayload`, sans attente entre les deux.
-      if (!isSpectatorPayloadWarm(tournamentId)) {
-        const rebuildThrottled = enforceRateLimit(SPECTATOR_REBUILD_RULE, clientIp);
-        if (rebuildThrottled) return rebuildThrottled;
-      }
+      // décompté juste avant `getSpectatorPayload`, sans attente entre les deux.
+      const rebuildThrottled = isSpectatorPayloadWarm(tournamentId)
+        ? null
+        : enforceRateLimit(SPECTATOR_REBUILD_RULE, clientIp);
+      if (rebuildThrottled) return rebuildThrottled;
     }
     payload = await getSpectatorPayload(tournamentId, spectatorCacheTtlMs(level), { visibilityChecked: cold });
   } catch (error) {
