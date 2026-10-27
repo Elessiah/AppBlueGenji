@@ -240,4 +240,12 @@ describe("abandon figé — légende", () => {
     expect(css).toMatch(/\.frozenLegend \{[^}]*font-size: 11px;/);
     expect(css).not.toContain(":has(.forfeitLocked");
   });
+
+  it("BG Survie : la légende vit dans la vue « Général » seule, sous le tableau et avant la navigation du bas", () => {
+    const views = read("_components", "EnduranceRankingViews.tsx");
+    const legend = views.indexOf("{withActions && actionsLegend}");
+    expect(legend).toBeGreaterThan(-1);
+    expect(legend).toBeLessThan(views.indexOf("className={styles.bottomNav}"));
+    expect(read("_components", "EnduranceView.tsx")).toContain("actionsLegend={");
+  });
 });
