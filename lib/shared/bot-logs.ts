@@ -703,8 +703,17 @@ export function formatStaffMatchActionLog(context: {
   action: StaffMatchAction;
   /** Par défaut `STAFF`. */
   author?: StaffActionAuthor;
+  /**
+   * Le tournoi seul, sans manche ni équipes ni numéro de match : un score qui
+   * suspend la validation automatique, dont l'alerte ⚠️ « arbitre qui joue »
+   * ne nomme que le tournoi — la ligne 🛠️ ne doit pas désigner le match à côté.
+   */
+  withoutMatch?: boolean;
 }): string {
   const author = STAFF_ACTION_AUTHOR_LABEL[context.author ?? "STAFF"];
+  if (context.withoutMatch) {
+    return `${lead("🛠️", STAFF_MATCH_ACTION_WORDING[context.action], context.tournament)}, par ${author}.`;
+  }
   return (
     `${lead("🛠️", STAFF_MATCH_ACTION_WORDING[context.action], context.tournament)} : ` +
     `${matchRoundLabel(context.bracket, context.roundNumber, context.swiss)} — ` +

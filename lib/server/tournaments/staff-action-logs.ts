@@ -30,11 +30,15 @@ export function staffActionAuthor(user: Parameters<typeof can>[0]): StaffActionA
   return can(user, "tournaments") ? "STAFF" : "CASTER";
 }
 
+/** Options d'une ligne de match : `withoutMatch`, le tournoi seul (`formatStaffMatchActionLog`). */
+export type StaffMatchActionOptions = { withoutMatch?: boolean };
+
 /** La ligne d'un geste sur un match ; rien si le match n'existe plus. Peut lever. */
 export async function deliverStaffMatchAction(
   matchId: number,
   action: StaffMatchAction,
   author: StaffActionAuthor = "STAFF",
+  options: StaffMatchActionOptions = {},
 ): Promise<void> {
   const row = await loadMatchLogRow(matchId);
   if (!row) return;
@@ -50,6 +54,7 @@ export async function deliverStaffMatchAction(
       team2: match.team2,
       action,
       author,
+      withoutMatch: options.withoutMatch,
     }),
   );
 }
@@ -78,8 +83,9 @@ export function announceStaffMatchAction(
   matchId: number,
   action: StaffMatchAction,
   author: StaffActionAuthor = "STAFF",
+  options: StaffMatchActionOptions = {},
 ): void {
-  void deliverStaffMatchAction(matchId, action, author).catch((error) =>
+  void deliverStaffMatchAction(matchId, action, author, options).catch((error) =>
     console.error(`[staff-log] geste ${action} sur le match #${matchId} non journalisé`, error),
   );
 }

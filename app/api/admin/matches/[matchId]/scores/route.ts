@@ -39,7 +39,9 @@ export async function PATCH(req: Request, context: { params: Promise<{ matchId: 
     // report seul (`SCORE_DISPUTE_LOCK.md`) — la notification le dit. L'arbitre
     // passé : s'il joue ce match, les autres membres du staff sont avertis.
     const autoValidationPaused = await adminSaveMatchScores(matchId_, entry, { id: user.id, pseudo: user.pseudo });
-    announceStaffMatchAction(matchId_, "SCORES_SAVED");
+    // Validation suspendue : le tournoi seul, comme l'alerte ⚠️ d'un arbitre qui
+    // joue ce match — la ligne ne doit pas désigner le match qu'il a suspendu.
+    announceStaffMatchAction(matchId_, "SCORES_SAVED", "STAFF", { withoutMatch: autoValidationPaused });
     return ok({ autoValidationPaused });
   } catch (e) {
     const msg = (e as Error).message;
