@@ -262,7 +262,7 @@
       "noLink": "no link",
       "separate": "Open my own stream",
       "url": "My stream link (optional)",
-      "urlHint": "Accepted platforms: {platforms}. Without a link, your stream has no “Watch” button.",
+      "urlHint": "Accepted platforms: {platforms}. Your link shows on the match once the staff has marked it as cast; without a link, your stream has no “Watch” button.",
       "urlInvalid": "Link not recognized. Accepted platforms: {platforms}."
     },
     "forceConfirm": {

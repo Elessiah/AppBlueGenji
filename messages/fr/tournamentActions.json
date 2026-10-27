@@ -262,7 +262,7 @@
       "noLink": "sans lien",
       "separate": "Ouvrir mon propre stream",
       "url": "Lien de mon stream (facultatif)",
-      "urlHint": "Plateformes acceptées : {platforms}. Sans lien, ton stream n'a pas de bouton « Regarder ».",
+      "urlHint": "Plateformes acceptées : {platforms}. Ton lien s'affiche sur le match une fois que le staff l'a marqué comme casté ; sans lien, ton stream n'a pas de bouton « Regarder ».",
       "urlInvalid": "Lien non reconnu. Plateformes acceptées : {platforms}."
     },
     "forceConfirm": {
