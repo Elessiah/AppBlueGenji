@@ -13,6 +13,7 @@ import { useAutoRefresh } from "@/lib/shared/hooks/useAutoRefresh";
 import { useScheduledBuckets } from "@/lib/shared/hooks/useScheduledBuckets";
 import { useToast } from "@/components/ui/toast";
 import { BgCanvas } from "../_shared/BgCanvas";
+import { SecuredLoadingView } from "../_shared/SecuredLoadingView";
 import { CyberButton } from "@/components/cyber/CyberButton";
 import { Ticker } from "@/components/cyber/Ticker";
 import { RunningCard } from "./cards/RunningCard";
@@ -144,6 +145,13 @@ export default function TournamentsList() {
   const [query, setQuery] = useState("");
   const [gameFilter, setGameFilter] = useState<GameFilter>("all");
   const [buckets, setBuckets] = useState<TournamentBuckets>(emptyBuckets);
+  // Faux tant que la première liste n'est pas arrivée : les paniers vides du
+  // départ ne disent pas « aucun tournoi », ils disent « pas encore lu ». Sans
+  // ce drapeau, chaque visite affichait « Aucun tournoi publié », des
+  // compteurs à zéro et un bandeau « Aucune actualité » jusqu'à la réponse.
+  // Un échec le laisse faux : le squelette reste, la notification dit
+  // l'incident, et la relecture de fond suivante remplit la page.
+  const [listLoaded, setListLoaded] = useState(false);
   const [hiddenTournaments, setHiddenTournaments] = useState<TournamentCard[]>([]);
   const [myTournamentIds, setMyTournamentIds] = useState<ReadonlySet<number>>(new Set());
   const [expandedSections, setExpandedSections] = useState<ReadonlySet<LimitedSectionKey>>(new Set());
@@ -176,6 +184,7 @@ export default function TournamentsList() {
         // relecture de fond redessinerait toute la liste et réarmerait le
         // minuteur de bascule, pour un contenu identique.
         setBuckets((previous) => (sameBuckets(previous, all) ? previous : all));
+        setListLoaded(true);
       } catch (e) {
         // Une requête abandonnée (démontage, rafraîchissement suivant) n'est pas
         // un incident : la page n'a plus rien à afficher de toute façon.
@@ -480,13 +489,15 @@ export default function TournamentsList() {
                       key={key}
                       className={`${s.chip} ${gameFilter === key ? s.chipOn : ""}`}
                       aria-pressed={gameFilter === key}
-                      aria-label={t("list.countLabel", { label, count: String(count) })}
+                      aria-label={listLoaded ? t("list.countLabel", { label, count: String(count) }) : undefined}
                       onClick={() => setGameFilter(key)}
                     >
                       {label}
-                      <span className={s.num} aria-hidden="true">
-                        {count}
-                      </span>
+                      {listLoaded && (
+                        <span className={s.num} aria-hidden="true">
+                          {count}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -496,50 +507,56 @@ export default function TournamentsList() {
             {/* Sommaire : remplace le bandeau de chiffres, qui répétait les
                 comptes des sections sans mener nulle part. Une section vide y
                 reste, grisée, au lieu d'occuper un grand cadre « Vide » plus bas. */}
-            <nav className={s.sectionNav} aria-label={t("list.sectionsNav")}>
-              {sections.map((entry) =>
-                entry.count > 0 ? (
-                  <a
-                    key={entry.key}
-                    href={`#${pageSectionAnchor(entry.key)}`}
-                    className={s.sectionNavLink}
-                    data-tone={entry.key}
-                    // Mène parfois à une section repliée (« Terminés ») : on la
-                    // déplie, sans quoi le lien aboutirait sur un en-tête vide.
-                    onClick={() => setSectionOpen(entry.key, true)}
-                    // Libellé et compte sont deux éléments sans séparateur : le
-                    // nom accessible les collerait (« Mes tournois34 »). Il
-                    // commence par le texte visible (WCAG 2.5.3).
-                    aria-label={t("list.countLabel", { label: entry.navLabel, count: String(entry.count) })}
-                  >
-                    {entry.navLabel}
-                    <span className={s.num} aria-hidden="true">
-                      {entry.count}
+            {listLoaded && (
+              <nav className={s.sectionNav} aria-label={t("list.sectionsNav")}>
+                {sections.map((entry) =>
+                  entry.count > 0 ? (
+                    <a
+                      key={entry.key}
+                      href={`#${pageSectionAnchor(entry.key)}`}
+                      className={s.sectionNavLink}
+                      data-tone={entry.key}
+                      // Mène parfois à une section repliée (« Terminés ») : on la
+                      // déplie, sans quoi le lien aboutirait sur un en-tête vide.
+                      onClick={() => setSectionOpen(entry.key, true)}
+                      // Libellé et compte sont deux éléments sans séparateur : le
+                      // nom accessible les collerait (« Mes tournois34 »). Il
+                      // commence par le texte visible (WCAG 2.5.3).
+                      aria-label={t("list.countLabel", { label: entry.navLabel, count: String(entry.count) })}
+                    >
+                      {entry.navLabel}
+                      <span className={s.num} aria-hidden="true">
+                        {entry.count}
+                      </span>
+                    </a>
+                  ) : (
+                    <span key={entry.key} className={`${s.sectionNavLink} ${s.sectionNavEmpty}`}>
+                      {entry.navLabel}
+                      <span className={s.num} aria-hidden="true">
+                        0
+                      </span>
+                      <span className="sr-only"> {t("list.navNone")}</span>
                     </span>
-                  </a>
-                ) : (
-                  <span key={entry.key} className={`${s.sectionNavLink} ${s.sectionNavEmpty}`}>
-                    {entry.navLabel}
-                    <span className={s.num} aria-hidden="true">
-                      0
-                    </span>
-                    <span className="sr-only"> {t("list.navNone")}</span>
-                  </span>
-                ),
-              )}
-            </nav>
+                  ),
+                )}
+              </nav>
+            )}
           </div>
 
           {/* Les paniers reclassés, comme les sections : sinon le bandeau
               annoncerait « À VENIR » un tournoi affiché juste dessous en
               « INSCRIPTIONS » — le genre de doute qui fait recharger la page. */}
-          <Ticker
-            items={buildTickerItems(scheduledBuckets, text)}
-            labels={text.tickerLabels}
-          />
+          {listLoaded && (
+            <Ticker
+              items={buildTickerItems(scheduledBuckets, text)}
+              labels={text.tickerLabels}
+            />
+          )}
 
           <div className={s.sections}>
-            {shownSections.length === 0 && (
+            {!listLoaded && <SecuredLoadingView label={t("list.loading")} />}
+
+            {listLoaded && shownSections.length === 0 && (
               <div className={s.emptyAll}>
                 <div className={s.emptyTitle}>{t("list.emptyTitle")}</div>
                 <div className={s.emptyMsg}>
