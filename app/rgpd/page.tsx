@@ -1029,8 +1029,8 @@ function RgpdFr({
             avertit ses collègues : ce contrôle repose sur l&apos;<strong>intérêt légitime</strong> de
             l&apos;association à l&apos;impartialité de l&apos;arbitrage, et ce membre du staff peut s&apos;y opposer
             (section <a href="#exercer-vos-droits">« Exercer vos droits »</a>). L&apos;inscription d&apos;un caster
-            sur un match, sa reprise par un autre caster et son retrait sont notés au journal du staff sur
-            Discord sans nommer personne (« un caster », « le staff »).
+            sur un match, sa reprise par un autre caster et son retrait (avec le motif d&apos;une reprise ou d&apos;un retrait
+            d&apos;office) sont notés au journal du staff sur Discord sans nommer personne (« un caster », « le staff »).
           </p>
         </div>
       </section>

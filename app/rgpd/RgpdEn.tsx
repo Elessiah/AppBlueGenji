@@ -846,8 +846,8 @@ export function RgpdEn({
             colleagues: this check rests on the association&apos;s <strong>legitimate interest</strong> in impartial
             refereeing, and this staff member may object to it (section{" "}
             <a href="#exercer-vos-droits">“Exercising your rights”</a>). A caster&apos;s registration for a match,
-            its takeover by another caster and its removal are noted in the staff log on Discord without naming
-            anyone (“a caster”, “the staff”).
+            its takeover by another caster and its removal (with the reason for a takeover or an automatic removal)
+            are noted in the staff log on Discord without naming anyone (“a caster”, “the staff”).
           </p>
         </div>
       </section>

@@ -322,7 +322,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Casters registered for a match (never named)",
     ],
     dataCategories: [
-      "On Discord: team names, scores, tournament names, match times and rounds — no player username (“a player”, including in solo tournaments) and no staff member or caster named (“the staff”, “a caster”; reason for a caster's automatic removal; “a staff member who plays in this match”, with the tournament name only, for a dispute settled, a result corrected, a withdrawal imposed or an automatic confirmation paused by them)",
+      "On Discord: team names, scores, tournament names, match times and rounds — no player username (“a player”, including in solo tournaments) and no staff member or caster named (“the staff”, “a caster”; reason for a caster's automatic removal or for their takeover by another caster — they no longer met the casting requirements; “a staff member who plays in this match”, with the tournament name only, for a dispute settled, a result corrected, a withdrawal imposed or an automatic confirmation paused by them)",
       "In the server logs: username and identifier of the staff member who carried out a refereeing action, with the action (match number; for a referee who plays in the match, also: tournament, round and, except for a pause, outcome and team names, none in a solo tournament)",
     ],
     sensitiveData: "None",

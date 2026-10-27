@@ -1082,7 +1082,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Si tu castes un match et que ton inscription est retirée par le staff, d'office (conditions du cast plus remplies, ou tu joues désormais le match) ou parce qu'un autre caster prend ta place, le site te prévient en message privé Discord et en notification push, avec le motif.",
     details: [
       "Le message nomme le match (noms d'équipe, « un match » en tournoi individuel), son tournoi et sa manche, jamais qui a retiré l'inscription. Le message privé ne part qu'à un tag Discord certifié et se coupe, comme les autres messages de match, par la case « Messages privés Discord de mes matchs » de « Mon profil » ; la notification push, qui ne part que si tu détiens encore la permission de diffusion, a son propre réglage, « Cast retiré ».",
-      "L'inscription d'un caster sur un match, sa reprise par un autre caster et son retrait sont aussi notés au journal du staff sur Discord, sans nommer personne (« un caster », « le staff »).",
+      "L'inscription d'un caster sur un match, sa reprise par un autre caster et son retrait (avec le motif d'une reprise ou d'un retrait d'office) sont aussi notés au journal du staff sur Discord, sans nommer personne (« un caster », « le staff »).",
     ],
   },
 ];
