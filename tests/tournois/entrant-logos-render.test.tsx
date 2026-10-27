@@ -6,6 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { EntrantProvider } from "@/app/(secured)/tournois/[id]/_lib/entrant-link";
 import { EntrantLogo, EntrantName } from "@/app/(secured)/tournois/[id]/_components/EntrantName";
 import { MatchRow } from "@/app/(secured)/tournois/[id]/_components/MatchRow";
+import { ChampionBanner } from "@/app/(secured)/tournois/[id]/_components/RoundColumns";
 import { ToastProvider } from "@/components/ui/toast";
 import { buildEntrantLogoMap } from "@/lib/shared/entrant-logos";
 import type { BracketMatch } from "@/lib/shared/types";
@@ -309,6 +310,15 @@ describe("EntrantName — forme affichable d'un nom resté en base", () => {
     const html = withEntrants(<EntrantName teamId={2} name={`${ZWSP}${RLO}`} />);
     expect(html).toContain(">Engagé #2</a>");
     expect(html).toContain(">E</span>");
+  });
+
+  it("bandeau de la championne : nom mis en gras nettoyé, repli « Engagé #id » s'il ne garde rien", () => {
+    const reversed = withEntrants(<ChampionBanner champion={{ teamId: 2, teamName: `${RLO}ember core` }} />);
+    expect(reversed).not.toContain(RLO);
+    expect(reversed).toContain("<strong>ember core</strong>");
+
+    const empty = withEntrants(<ChampionBanner champion={{ teamId: 2, teamName: ZWSP }} />);
+    expect(empty).toContain("<strong>Engagé #2</strong>");
   });
 
   it("rend tel quel le libellé d'une case vide (TBD)", () => {
