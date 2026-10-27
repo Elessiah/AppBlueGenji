@@ -149,7 +149,7 @@ connexion, fiche joueur, clé `asReferee`) et la modale de masquage, entrée
 `2026-10-arbitre-designe-des-matchs`. Base : intérêt légitime pour la
 présentation de l'arbitre aux parties (pseudo et BattleTag, portée
 `REFEREE_BATTLETAG_SCOPE` sur la ligne BattleTag de `/rgpd`), avec une
-opposition qu'il exerce en se retirant du match — le staff peut le désigner
+opposition par le formulaire de signalement (se retirer d'un match l'en retire, le staff pouvant le lui confier de nouveau, sans avis) — le staff peut le désigner
 sans qu'il l'ait demandé ; exécution du service (les arbitres agissant pour
 l'association) pour son « Prêt » et l'avis du retrait. Les conditions d'utilisation ne changent
 pas (version 6) : le registre ne rattache donc pas l'arbitre désigné à une
