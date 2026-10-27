@@ -61,7 +61,7 @@ describe("contacts du lancement d'un match — base légale", () => {
   // portée, sur l'intérêt légitime — aucune clause des conditions ne le couvre
   // avant leur version 7.
   it("fonde la lecture du BattleTag de l'arbitre désigné sur l'intérêt légitime, sans citer les conditions", () => {
-    expect(REFEREE_BATTLETAG_SCOPE).toMatch(/— opposition en se retirant du match, à tout moment$/);
+    expect(REFEREE_BATTLETAG_SCOPE).toMatch(/— opposition par le formulaire de signalement, catégorie RGPD ; retrait d'un match à tout moment, que le staff peut lui confier de nouveau$/);
     expect(REFEREE_BATTLETAG_SCOPE).not.toMatch(/conditions d'utilisation/);
     expect(DONNEES_PROFIL.find((d) => d.donnee === "Pseudo Overwatch")?.extraBases).toEqual([
       { base: "Exécution du contrat", scope: BATTLETAG_MATCH_SCOPE },
