@@ -67,6 +67,11 @@ interface EnduranceRankingViewsProps {
   renderActions?: (standing: EnduranceStandingRow) => ReactNode;
   /** Au moins une ligne porte un geste. */
   showActions: boolean;
+  /**
+   * Légende des gestes (« 🔒 Figé » et son « i »), sous le tableau et au-dessus
+   * de la navigation du bas — dans la vue « Général » seule, comme les gestes.
+   */
+  actionsLegend?: ReactNode;
   /** Une ligne porte deux gestes (arbitrage) : colonne élargie. */
   wideActions: boolean;
 }
@@ -219,6 +224,7 @@ export function EnduranceRankingViews({
   renderActions,
   showActions,
   wideActions,
+  actionsLegend,
 }: Readonly<EnduranceRankingViewsProps>) {
   const text = useTournamentViewText(FR_VIEWS_TEXT);
   const { t } = text;
@@ -469,6 +475,8 @@ export function EnduranceRankingViews({
           );
         })}
       </div>
+
+      {withActions && actionsLegend}
 
       {views.length > 1 && (
         <nav className={styles.bottomNav} aria-label={t("endurance.viewsTabsLabel")}>

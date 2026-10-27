@@ -43,6 +43,7 @@ const FIELD_IDS = {
 const HINT_ID = "match-start-at-hint";
 const NOTICE_ID = "match-start-at-notice";
 const PREVIEW_ID = "match-start-at-preview";
+const PAST_WARNING_ID = "match-start-past-warning";
 const YEAR_FIX_ID = "match-start-year-fix";
 
 /** Premier champ manquant, tel que l'aperçu le nomme (`schedule.missing.*`). */
@@ -169,7 +170,12 @@ function ScheduleWarning({ children }: Readonly<{ children: ReactNode }>) {
  * Vide, elle n'occupe aucune place.
  */
 function PastDateWarning({ message }: Readonly<{ message: string | null }>) {
-  return <output style={message ? WARNING_STYLE : { display: "block" }}>{message ?? ""}</output>;
+  // `tabIndex={-1}` : l'envoi retenu (date devenue passée) y porte le focus.
+  return (
+    <output id={PAST_WARNING_ID} tabIndex={-1} style={message ? WARNING_STYLE : { display: "block" }}>
+      {message ?? ""}
+    </output>
+  );
 }
 
 interface MatchScheduleDialogProps {
@@ -336,14 +342,13 @@ export function MatchScheduleDialog({
     }
     // L'horloge a pu avancer depuis l'ouverture (fenêtre laissée ouverte) : une
     // date devenue passée entre-temps s'avertit d'abord, l'envoi suivant part.
-    // Une notification dit que rien n'est parti et quoi faire — à 375 px,
-    // clavier ouvert, l'avertissement sous les champs peut être hors de vue et
-    // le clic semblait sans effet ; un texte à elle, pour que le lecteur d'écran
-    // n'entende pas deux fois l'avertissement.
+    // Le focus va sur l'avertissement : il défile dans la vue (à 375 px il
+    // pouvait être sous le pli, et le clic semblait sans effet) et le lecteur
+    // d'écran le lit — une notification en `role="alert"` l'aurait coupé.
     const now = Date.now();
     if (pastWarning === null && pastWarningAt(now) !== null) {
       setClock(now);
-      showError(t("schedule.warnPastLate"));
+      requestAnimationFrame(() => document.getElementById(PAST_WARNING_ID)?.focus());
       return;
     }
 

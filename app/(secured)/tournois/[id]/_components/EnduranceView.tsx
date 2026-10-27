@@ -386,18 +386,18 @@ export function EnduranceView({
         renderActions={renderActions}
         showActions={showActions}
         wideActions={showPenaltyAction}
+        actionsLegend={
+          endurance.standings.some(
+            (standing) => forfeitAction(standing, false, canForfeitRow(standing.teamId, standing.status))?.kind === "locked",
+          ) ? (
+            <FrozenForfeitLegend
+              id="endurance-forfeit-frozen"
+              label={a("forfeitCancel.frozen")}
+              reason={a("forfeitCancel.frozenTitle")}
+            />
+          ) : null
+        }
       />
-
-      {showActions &&
-        endurance.standings.some(
-          (standing) => forfeitAction(standing, false, canForfeitRow(standing.teamId, standing.status))?.kind === "locked",
-        ) && (
-          <FrozenForfeitLegend
-            id="endurance-forfeit-frozen"
-            label={a("forfeitCancel.frozen")}
-            reason={a("forfeitCancel.frozenTitle")}
-          />
-        )}
 
       {showOutLegend && (
         <p className="mono" style={{ fontSize: 11, color: "var(--ink-quiet)", margin: "0 0 24px" }}>
