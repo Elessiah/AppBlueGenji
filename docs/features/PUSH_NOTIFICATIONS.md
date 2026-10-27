@@ -16,7 +16,7 @@ aujourd'hui et demain. D'où trois pièces, et une seule règle pour la suite.
 | Pièce | Fichier | Rôle |
 |---|---|---|
 | Registre des sujets | `lib/shared/push-notifications.ts` (`PUSH_TOPICS`) | Chaque notification est un **sujet** : libellé, description, public (`null` = tout joueur, sinon une permission). L'ordre des clés est l'ordre de l'écran. |
-| Point d'entrée serveur | `lib/server/notify.ts` | `notifyUsers` (des personnes nommées : message privé Discord à qui Discord joint, push à tous) et `notifyStaff` (un métier : l'envoi Discord de l'appelant, push aux comptes qui détiennent la permission du sujet). |
+| Point d'entrée serveur | `lib/server/notify.ts` | `notifyUsers` (des personnes nommées : message privé Discord à qui Discord joint, push à tous — pour un sujet réservé à une permission, aux seuls destinataires qui la détiennent encore, puisque les autres n'en voient pas le réglage) et `notifyStaff` (un métier : l'envoi Discord de l'appelant, push aux comptes qui détiennent la permission du sujet). |
 | Composant | `components/notifications/PushNotificationsPanel.tsx` (+ `usePushNotifications.ts`) | Construit **depuis le registre**. Forme `full` sur `/profil#notifications`, forme `compact` dans la modale de lancement d'un match. |
 
 **La règle pour demain** : une notification nouvelle est une entrée de
