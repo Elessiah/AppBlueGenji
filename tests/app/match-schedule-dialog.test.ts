@@ -123,7 +123,7 @@ describe("MatchScheduleDialog — date déjà passée", () => {
     // inchangé : un second « Entrée » confirme. Pas de notification
     // `role="alert"`, qui aurait coupé la région d'état au lecteur d'écran.
     expect(SOURCE).toMatch(
-      /if \(pastWarning === null && pastWarningAt\(now\) !== null\) \{\s*setClock\(now\);\s*heldBackAt\.current = now;\s*requestAnimationFrame\(\(\) => \{\s*document\.getElementById\(PAST_WARNING_ID\)\?\.scrollIntoView\(\{ block: "nearest" \}\);\s*document\.getElementById\(SUBMIT_ID\)\?\.scrollIntoView\(\{ block: "nearest" \}\);\s*\}\);\s*return;/,
+      /if \(pastWarning === null && pastWarningAt\(now\) !== null\) \{\s*setClock\(now\);\s*requestAnimationFrame\(\(\) => \{\s*document\.getElementById\(PAST_WARNING_ID\)\?\.scrollIntoView\(\{ block: "nearest" \}\);\s*document\.getElementById\(SUBMIT_ID\)\?\.scrollIntoView\(\{ block: "nearest" \}\);\s*\}\);\s*return;/,
     );
     expect(SOURCE).toMatch(/<button\s+id=\{SUBMIT_ID\}\s+type="submit"/);
     expect(SOURCE).not.toMatch(/getElementById\(PAST_WARNING_ID\)\?\.focus/);
@@ -131,12 +131,15 @@ describe("MatchScheduleDialog — date déjà passée", () => {
     expect(SOURCE).not.toContain("warnPastLate");
   });
 
-  it("le second clic d'un double-clic ne vaut pas confirmation", () => {
-    expect(SOURCE).toContain("export const LATE_WARNING_CONFIRM_DELAY_MS = 600;");
-    expect(SOURCE).toContain("if (now - heldBackAt.current < LATE_WARNING_CONFIRM_DELAY_MS) return;");
-    // Le garde suit le hold-back, avant tout envoi.
-    expect(SOURCE.indexOf("heldBackAt.current < LATE_WARNING_CONFIRM_DELAY_MS")).toBeLessThan(SOURCE.indexOf("setBusy(true);"));
+  it("le second clic d'un double-clic et la répétition d'« Entrée » ne valent pas confirmation", () => {
+    // `detail` suit le délai de double-clic du système (pas de seuil fixe), et
+    // aucun horodatage : rien ne dépend de l'horloge murale.
+    expect(SOURCE).toMatch(/onClick=\{\(event\) => \{\s*if \(event\.detail > 1\) event\.preventDefault\(\);\s*\}\}/);
+    expect(SOURCE).toMatch(/onKeyDown=\{\(event\) => \{\s*if \(event\.repeat && event\.key === "Enter"\) event\.preventDefault\(\);\s*\}\}/);
+    expect(SOURCE).not.toContain("heldBackAt");
+    expect(SOURCE).not.toContain("LATE_WARNING_CONFIRM_DELAY_MS");
   });
+
 
 
 
