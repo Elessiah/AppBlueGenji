@@ -73,7 +73,7 @@ import {
 import { matchCardActionList, matchCardActionName } from "@/app/(secured)/tournois/[id]/_lib/match-card-actions";
 import { registerBlockedNotice } from "@/app/(secured)/tournois/[id]/_lib/register-entry";
 import { registrationConfirmText } from "@/app/(secured)/tournois/[id]/_lib/registration-confirm";
-import { adminProposalNotice, scoreBlockerMessage, type ScoreFormBlocker } from "@/app/(secured)/tournois/[id]/_lib/score-form";
+import type { ScoreFormBlocker } from "@/app/(secured)/tournois/[id]/_lib/score-form";
 import { EntrantProvider } from "@/app/(secured)/tournois/[id]/_lib/entrant-link";
 import { AdvanceTournamentDialog } from "@/app/(secured)/tournois/[id]/_components/AdvanceTournamentDialog";
 import { AdminScoreDialog } from "@/app/(secured)/tournois/[id]/_components/AdminScoreDialog";
@@ -109,7 +109,7 @@ import { batchCounterLabel, guestBatchSuccessMessage } from "@/lib/shared/ghost-
 import { MATCH_LIVE_TRIGGER_LABELS, MATCH_LIVE_TRIGGERS } from "@/lib/shared/live-streams";
 import { LOCALES, SITE_TIME_ZONE } from "@/lib/shared/locales";
 import { scoreSubmittedMessage } from "@/lib/shared/match-card-viewer";
-import { matchScoreViolationMessage, type MatchFormat, type MatchScoreViolation } from "@/lib/shared/match-format";
+import type { MatchFormat, MatchScoreViolation } from "@/lib/shared/match-format";
 import { LAUNCH_ERROR_MESSAGES, launchErrorMessage } from "@/lib/shared/match-launch";
 import { mapListViolationMessage, type MapListViolation } from "@/lib/shared/match-maps";
 import {
@@ -358,18 +358,23 @@ describe("français inchangé — les messages égalent les textes d'origine", (
   it("score : violations de format, refus de maps, blocages, proposition, envoi", () => {
     const violations: MatchScoreViolation[] = ["SCORE_EXCEEDS_MATCH_FORMAT", "SCORE_BELOW_MATCH_FORMAT", "DRAW_NOT_ALLOWED"];
     for (const format of [BO3, FT3, { type: "FT", value: 1 } as MatchFormat, null]) {
-      for (const violation of violations) expect(scoreViolationText(FR_DIALOGS_TEXT, format, violation)).toBe(matchScoreViolationMessage(format, violation));
       const mapErrors: MapListViolation[] = ["MAP_LIST_EMPTY", "MAP_COUNT_EXCEEDED", "MAP_REPLAY_CODE_REQUIRED", "MAP_REPLAY_CODE_INVALID", "MAP_REPLAY_CODE_DUPLICATE", "MAP_SCORE_INVALID", "MAP_AFTER_DECISION", "MAP_LIST_INCOMPLETE", ...violations];
       for (const error of mapErrors) {
         for (const game of ["OW", "MR", null] as const) expect(mapViolationText(FR_DIALOGS_TEXT, error, format, game)).toBe(mapListViolationMessage(error, format, game));
       }
-      const blockers: ScoreFormBlocker[] = ["INCOMPLETE", "EXCEEDS_FORMAT", "BELOW_FORMAT", "DRAW", "ALREADY_DECIDED", "DOUBLE_FORFEIT", "NOT_IN_LAUNCH"];
-      for (const blocker of blockers) expect(scoreBlockerText(FR_DIALOGS_TEXT, blocker, format)).toBe(scoreBlockerMessage(blocker, format));
     }
-    for (const dirty of [false, true]) {
-      const proposal = { team1Score: 2, team2Score: 0, proposedBy: "team2" as const };
-      expect(adminProposalText(FR_DIALOGS_TEXT, proposal, "Alpha", "Bravo", dirty)).toBe(adminProposalNotice(proposal, "Alpha", "Bravo", dirty));
-    }
+    // Les copies françaises en dur (`matchScoreViolationMessage`,
+    // `scoreBlockerMessage`, `adminProposalNotice`) n'existent plus : les
+    // textes traduits sont vérifiés directement.
+    expect(scoreViolationText(FR_DIALOGS_TEXT, BO3, "SCORE_EXCEEDS_MATCH_FORMAT")).toBe("Score impossible en BO3 : 3 maps au maximum, et jamais plus de 2 par équipe.");
+    expect(scoreViolationText(FR_DIALOGS_TEXT, BO3, "SCORE_BELOW_MATCH_FORMAT")).toBe("Score incomplet en BO3 : le vainqueur doit atteindre 2 maps.");
+    expect(scoreViolationText(FR_DIALOGS_TEXT, { type: "FT", value: 1 } as MatchFormat, "SCORE_BELOW_MATCH_FORMAT")).toBe("Score incomplet en FT1 : le vainqueur doit atteindre 1 map.");
+    expect(scoreViolationText(FR_DIALOGS_TEXT, null, "SCORE_EXCEEDS_MATCH_FORMAT")).toBe("Score invalide.");
+    expect(scoreViolationText(FR_DIALOGS_TEXT, BO3, "DRAW_NOT_ALLOWED")).toBe("Match nul impossible : ce tournoi exige un vainqueur.");
+    const blockers: ScoreFormBlocker[] = ["INCOMPLETE", "EXCEEDS_FORMAT", "BELOW_FORMAT", "DRAW", "ALREADY_DECIDED", "DOUBLE_FORFEIT", "NOT_IN_LAUNCH"];
+    for (const blocker of blockers) expect(scoreBlockerText(FR_DIALOGS_TEXT, blocker, BO3).length).toBeGreaterThan(0);
+    const proposal = { team1Score: 2, team2Score: 0, proposedBy: "team2" as const };
+    expect(adminProposalText(FR_DIALOGS_TEXT, proposal, "Alpha", "Bravo", false)).toBe("Score proposé par Bravo (2 – 0), en attente de confirmation de Alpha. Vérifie-le puis valide le résultat pour le confirmer.");
     expect(fr(frDialogs.score.player.submitted, { team1: "A", team2: "B", score1: 2, score2: 1 })).toBe(scoreSubmittedMessage(true, 2, 1, "A", "B"));
     expect(frDialogs.score.player.closed.toPlan).toBe(playerScoreClosedNotice("TO_PLAN", null));
     expect(fr(frDialogs.score.player.closed.scheduledAt, { date: "mardi 12 mai" })).toBe(playerScoreClosedNotice("SCHEDULED", "mardi 12 mai"));
@@ -747,7 +752,9 @@ describe("rendu anglais — aucun français dans les gestes", () => {
   it("score (engagé) pendant l'envoi : boutons aria-disabled, jamais disabled natif (le focus reste)", () => {
     const source = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx"), "utf8");
     // Seuls les champs de maps (`MapScoreList`) se figent pendant l'envoi ; les boutons gardent le focus.
-    expect(source.match(/(?<![-\w])disabled=\{[^}]*submitting/g)).toEqual(["disabled={submitting"]);
+    // Le bouton d'envoi n'est désactivé nativement que hors envoi.
+    expect(source.match(/(?<![-\w])disabled=\{[^}]*submitting/g)).toEqual(["disabled={submitting", "disabled={!submitting"]);
+    expect(source).toContain("disabled={!submitting && (nothingEntered || unchangedMine)}");
     expect(source.match(/aria-busy=\{submitting \|\| undefined\}/g)).toHaveLength(2);
     // Un bouton aria-disabled doit aussi s'en voir : la feuille le grise comme `:disabled`.
     const css = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/ScoreDialog.module.css"), "utf8");

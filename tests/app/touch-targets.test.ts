@@ -32,8 +32,8 @@ describe("zones de tap étendues", () => {
     ["components/cyber/landing/PublicFooter.tsx", /<LocaleLink className="tap-target" href="\/rgpd">/],
     ["components/legal/SiteFooterBar.tsx", /<LocaleLink className="tap-target" href="\/rgpd">/],
     ["app/(secured)/tournois/[id]/_components/TournamentHeader.tsx", /\$\{s\.back\} tap-target/],
-    ["app/(secured)/tournois/[id]/_components/SurvivalView.tsx", /btn tap-target"/],
-    ["app/(secured)/tournois/[id]/_components/SwissView.tsx", /btn tap-target"/],
+    // Abandon et annulation des classements survie, suisse et endurance.
+    ["app/(secured)/tournois/[id]/_components/ForfeitRowAction.tsx", /btn tap-target"/],
     ["app/(secured)/tournois/[id]/_components/EnduranceView.tsx", /btn tap-target"/],
     // Pied d'action de la carte de match : action principale, éléments du
     // panneau et bouton « Plus d'actions ».

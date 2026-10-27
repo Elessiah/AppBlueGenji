@@ -72,9 +72,11 @@ describe("gestes de chaque rôle — toujours atteignables", () => {
   it("pénalité, forfait et annulation gardent leurs gardes, dans `renderActions`", () => {
     const actions = VIEW.slice(VIEW.indexOf("const renderActions"), VIEW.indexOf("<EnduranceCard"));
     expect(actions).toContain("canPenalizeRow(standing.status) && onPenalize !== undefined");
-    expect(actions).toContain("forfeitable && onForfeit !== undefined");
-    expect(actions).toContain("canCancelRow(standing.status) && onCancelForfeit !== undefined");
-    expect(actions).toContain("const forfeitable = canForfeitRow(standing.teamId, standing.status)");
+    expect(actions).toContain("forfeitAction(standing, isMine, canForfeitRow(standing.teamId, standing.status))");
+    const forfeit = VIEW.slice(VIEW.indexOf("const forfeitAction"), VIEW.indexOf("const renderActions"));
+    expect(forfeit).toContain("forfeitable && onForfeit !== undefined");
+    expect(forfeit).toContain("!canCancelRow(standing.status) || onCancelForfeit === undefined");
+    expect(forfeit).toContain("!cancellableIds.has(standing.teamId)");
     expect(VIEW).toMatch(/renderActions=\{renderActions\}/);
   });
 

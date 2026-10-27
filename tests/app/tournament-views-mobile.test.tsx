@@ -67,8 +67,10 @@ describe("Classements — action sous le nom sous 720 px", () => {
     expect(narrow).toMatch(/\.swissAction\s*\{[^}]*grid-column:\s*2 \/ -1/);
     expect(narrow).toMatch(/\.swissTable\[data-with-action\]\s*\{[^}]*grid-template-columns:\s*auto minmax\(6em, 1fr\) auto auto auto auto auto;/);
     expect(narrow).toMatch(/\.survivalAction\s*\{[^}]*flex-basis:\s*100%/);
-    // Une cellule d'action sans bouton ne laisse pas de ligne vide.
-    expect(narrow).toMatch(/\.swissAction:not\(:has\(button\)\)\s*\{\s*display:\s*none;/);
+    // Une cellule d'action vide (et son en-tête) ne laisse pas de ligne vide,
+    // mais reste lue : chaque ligne garde autant de cellules que d'en-têtes.
+    expect(narrow).toMatch(/\.swissAction\[role="columnheader"\],\s*\.swissAction:empty\s*\{[^}]*position:\s*absolute;[^}]*clip-path:\s*inset\(50%\);/);
+    expect(narrow).not.toMatch(/\.swissAction[^{]*\{\s*display:\s*none;/);
   });
 
   it("les pistes de la ronde suisse ne sont plus posées en ligne, où elles battraient la requête média", () => {
@@ -81,7 +83,7 @@ describe("Classements — action sous le nom sous 720 px", () => {
 
   it("le bouton d'abandon de la survie vit dans sa cellule d'action", () => {
     expect(survival).toContain("className={styles.survivalRow}");
-    expect(survival).toMatch(/<span className=\{styles\.survivalAction\}>\s*<button/);
+    expect(survival).toMatch(/<span className=\{styles\.survivalAction\}>\s*<ForfeitRowAction \{\.\.\.action\} \/>/);
   });
 });
 

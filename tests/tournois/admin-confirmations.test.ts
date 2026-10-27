@@ -117,7 +117,9 @@ describe("AdminScoreDialog — focus gardé pendant l'envoi", () => {
   const actions = SCORE.slice(SCORE.indexOf("className={styles.actions}"), SCORE.indexOf("</form>"));
 
   it("ne désactive jamais nativement un bouton d'action sur `form.submitting`", () => {
-    expect(actions).not.toMatch(/(?<!aria-)disabled=\{[^}]*form\.submitting/);
+    // Un `disabled` natif ne joue que hors envoi (`!form.submitting && …`).
+    expect(actions).not.toMatch(/(?<!aria-)disabled=\{(?!!form\.submitting && )[^}]*form\.submitting/);
+    expect(actions.match(/(?<!aria-)disabled=\{!form\.submitting && /g)).toHaveLength(2);
     expect(actions.match(/aria-disabled=\{form\.submitting \|\| undefined\}/g)).toHaveLength(3);
     expect(actions.match(/aria-busy=\{form\.submitting \|\| undefined\}/g)).toHaveLength(2);
   });

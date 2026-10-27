@@ -36,6 +36,7 @@ function standingRow(teamId: number, overrides: Partial<EnduranceStandingRow> = 
 
 function meta(overrides: Partial<EnduranceMeta> = {}): EnduranceMeta {
   return {
+    cancellableForfeitTeamIds: [],
     startPoints: 9,
     winDelta: 1,
     lossDelta: 1,

@@ -10,7 +10,6 @@ import {
   matchFormatLabel,
   MATCH_FORMAT_BOUNDS,
   matchMaxMaps,
-  matchScoreViolationMessage,
   matchWinsRequired,
   parseMatchFormat,
   type MatchFormat,
@@ -149,18 +148,6 @@ describe("match-format — contrôle des scores", () => {
     expect(checkMatchScores(bo1, 1, 0, { decisive: true })).toBeNull();
     expect(checkMatchScores(bo1, 1, 1, { decisive: true })).toBe("SCORE_EXCEEDS_MATCH_FORMAT");
     expect(checkMatchScores(bo1, 0, 0, { decisive: true })).toBe("SCORE_BELOW_MATCH_FORMAT");
-  });
-});
-
-describe("match-format — message d'erreur", () => {
-  it("chiffre le plafond et l'objectif du tournoi", () => {
-    expect(matchScoreViolationMessage(BO5, "SCORE_EXCEEDS_MATCH_FORMAT")).toContain("BO5");
-    expect(matchScoreViolationMessage(BO5, "SCORE_BELOW_MATCH_FORMAT")).toContain("3 manches");
-    expect(matchScoreViolationMessage(FT3, "SCORE_BELOW_MATCH_FORMAT")).toContain("FT3");
-  });
-
-  it("reste générique en saisie libre", () => {
-    expect(matchScoreViolationMessage(null, "SCORE_EXCEEDS_MATCH_FORMAT")).toBe("Score invalide.");
   });
 });
 

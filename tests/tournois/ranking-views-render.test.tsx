@@ -51,6 +51,7 @@ function survivalRow(overrides: Partial<SurvivalStandingRow> = {}): SurvivalStan
 
 function survival(overrides: Partial<SurvivalMeta> = {}): SurvivalMeta {
   return {
+    cancellableForfeitTeamIds: [],
     roundsBeforeFirstCut: 2,
     roundsPerCut: 1,
     currentRound: 3,
@@ -86,6 +87,7 @@ function swissRow(overrides: Partial<SwissStandingRow> = {}): SwissStandingRow {
 
 function swiss(overrides: Partial<SwissMeta> = {}): SwissMeta {
   return {
+    cancellableForfeitTeamIds: [],
     totalRounds: 3,
     currentRound: 2,
     pointsForWin: 3,

@@ -97,10 +97,11 @@ describe("champs de score sur un petit écran", () => {
     }
   });
 
-  it("sur un conteneur étroit, le code prend toute la ligne et les deux scores se partagent la suivante", () => {
-    const narrow = mapCss.match(/@container \(max-width: 560px\) \{[\s\S]*?\n\}/)?.[0] ?? "";
-    expect(narrow).toMatch(/\.row \{[^}]*grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1fr\) 36px;/);
-    expect(narrow).toMatch(/\.code \{[^}]*grid-column: 1 \/ -1;/);
+  it("à toute largeur, le code prend toute la ligne et les deux scores se partagent la suivante", () => {
+    expect(rule(mapCss, ".row")).toMatch(/grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1fr\) 36px;/);
+    expect(rule(mapCss, ".code")).toMatch(/grid-column: 1 \/ -1;/);
+    expect(rule(mapCss, ".mapLabel")).toMatch(/grid-column: 1 \/ -1;/);
+    expect(mapCss).not.toContain("@container");
   });
 });
 

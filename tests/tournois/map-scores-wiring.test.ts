@@ -117,7 +117,7 @@ describe("détail map par map — arbitrage et relecture", () => {
       hook.indexOf("const blocker = action === \"save\" ? decision.saveBlocker : decision.resolveBlocker;"),
     );
     const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");
-    expect(dialog).toContain("disabled={(!form.decision.canResolve && !form.mapsRefused.resolve) || awaitingDetail}");
+    expect(dialog).toContain("disabled={!form.submitting && ((!form.decision.canResolve && !form.mapsRefused.resolve) || awaitingDetail)}");
   });
 
   it("la relecture du détail adverse se retente tant qu'il manque, au plus trois fois", () => {
@@ -165,10 +165,11 @@ describe("détail map par map — retours de la revue UI/UX", () => {
     expect(FR_SCORE.maps.replayAllowance).toBe("Une map nulle peut être rejouée ({count} au plus).");
   });
 
-  it("la liste passe sur deux lignes selon sa propre largeur (modale de 460 px)", () => {
+  it("la liste tient toujours sur deux lignes : elle ne vit que dans des modales de 460 px", () => {
     const css = readSource("app/(secured)/tournois/[id]/_components/MapScoreList.module.css");
-    expect(css).toContain("container-type: inline-size;");
-    expect(css).toContain("@container (max-width: 560px)");
+    expect(css).not.toContain("container-type: inline-size;");
+    expect(css).not.toContain("@container");
+    expect(css).toContain("grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 36px;");
     expect(css).not.toContain("@media (max-width: 560px)");
   });
 
@@ -210,7 +211,7 @@ describe("détail map par map — arbitrage pendant la lecture du détail propos
   it("les boutons de score attendent le détail de la proposition, pour ne pas en effacer les codes", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");
     expect(dialog).toMatch(/const awaitingDetail =\s*proposalsNeedRefresh\(liveMatch, proposals\) &&\s*!form\.maps\.some\(isMapTouched\)/);
-    expect(dialog).toContain("disabled={(!form.decision.canSave && !form.mapsRefused.save) || awaitingDetail}");
+    expect(dialog).toContain("disabled={!form.submitting && ((!form.decision.canSave && !form.mapsRefused.save) || awaitingDetail)}");
     expect(dialog).toContain("!form.submitting && !awaitingDetail) void run(\"resolve\");");
     expect(dialog).toContain('if (input.awaitingDetail) return text.t("score.admin.awaitingDetail");');
   });
@@ -446,7 +447,7 @@ describe("détail map par map — formulaire vierge", () => {
   it("la ligne vierge d'ouverture n'est pas une proposition : bouton fermé, rien d'« envoyé »", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
     expect(dialog).toContain("const nothingEntered = !maps.some(isMapTouched);");
-    expect(dialog).toContain("disabled={nothingEntered || unchangedMine}");
+    expect(dialog).toContain("disabled={!submitting && (nothingEntered || unchangedMine)}");
     // Pendant l'envoi : `aria-disabled` + `aria-busy`, le focus reste sur le bouton.
     expect(dialog).toContain("aria-busy={submitting || undefined}");
     expect(dialog).not.toContain("disabled={maps.length === 0 ||");

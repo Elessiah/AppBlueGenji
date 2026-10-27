@@ -305,6 +305,7 @@ describe("ce que lit le visiteur sans compte", () => {
       removable: false,
     };
     const endurance: EnduranceMeta = {
+      cancellableForfeitTeamIds: [],
       startPoints: 9,
       winDelta: 1,
       lossDelta: 1,
@@ -484,6 +485,7 @@ describe("inventaire des champs publics", () => {
       removable: false,
     };
     const endurance: EnduranceMeta = {
+      cancellableForfeitTeamIds: [],
       startPoints: 9,
       winDelta: 1,
       lossDelta: 1,

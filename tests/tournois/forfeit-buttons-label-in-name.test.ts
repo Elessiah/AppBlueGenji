@@ -29,7 +29,31 @@ describe("nom accessible des boutons d'abandon", () => {
     it(`${locale} : le nom d'« Abandonner » contient son texte visible, en Survie comme en suisse`, () => {
       expect(withName(actions.forfeit.button.otherAriaSurvival)).toContain(visibleForfeit);
       expect(withName(actions.forfeit.button.otherAriaSwiss)).toContain(visibleForfeit);
-      expect(withName(actions.forfeit.button.selfAria)).toContain(visibleForfeit);
+      expect(actions.forfeit.button.selfAria.TEAM).toContain(visibleForfeit);
+      expect(actions.forfeit.button.selfAria.SOLO).toContain(visibleForfeit);
+    });
+
+    it(`${locale} : en BG Survie, le nom de « Forfait » commence par son libellé, celui d'« Abandonner » le contient`, () => {
+      expect(withName(actions.forfeit.endurance.otherTitle).startsWith(actions.forfeit.endurance.other)).toBe(true);
+      expect(actions.forfeit.endurance.selfAria).toContain(visibleForfeit);
+    });
+
+    it(`${locale} : le nom de « Pénalité » contient son libellé (casse ignorée)`, () => {
+      expect(withName(actions.penalty.buttonAria).toLowerCase()).toContain(actions.penalty.button.toLowerCase());
+      expect(withName(actions.penaltyLift.buttonAria).toLowerCase()).toContain(actions.penaltyLift.button.toLowerCase());
+    });
+
+    it(`${locale} : en tournoi individuel, l'abandon du lecteur ne parle pas d'équipe`, () => {
+      const team = locale === "fr" ? /équipe/ : /team/;
+      expect(actions.forfeit.button.selfTitle.SOLO).not.toMatch(team);
+      expect(actions.forfeit.button.selfAria.SOLO).not.toMatch(team);
+      expect(actions.forfeit.button.selfTitle.TEAM).toMatch(team);
+    });
+
+    it(`${locale} : pas de majuscule après les deux-points de l'infobulle BG Survie`, () => {
+      for (const title of [actions.forfeit.endurance.selfTitle.TEAM, actions.forfeit.endurance.selfTitle.SOLO]) {
+        expect(title).toMatch(/: [a-zà-ÿ]/);
+      }
     });
   }
 });
@@ -40,6 +64,16 @@ describe("confirmation de l'annulation d'un abandon", () => {
       for (const body of [actions.forfeitCancel.body.TEAM, actions.forfeitCancel.body.SOLO]) {
         expect(body).toMatch(locale === "fr" ? /sauf si/ : /unless/);
       }
+    });
+
+    it(`${locale} : la confirmation ne commence pas par « Annuler », comme le bouton qui ferme la modale`, () => {
+      expect(actions.forfeitCancel.confirm).not.toMatch(/^(Annuler|Cancel)/);
+    });
+
+    it(`${locale} : le succès a ses variantes équipe / joueur`, () => {
+      expect(actions.forfeitCancel.success.TEAM).toContain("{name}");
+      expect(actions.forfeitCancel.success.SOLO).toContain("{name}");
+      if (locale === "en") expect(actions.forfeitCancel.success.SOLO).not.toMatch(/its/);
     });
 
     it(`${locale} : l'infobulle du bouton ne promet pas non plus le retour en lice`, () => {

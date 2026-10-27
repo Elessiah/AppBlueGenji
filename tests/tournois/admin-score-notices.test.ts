@@ -1,8 +1,12 @@
 import { describe, expect, it } from "@jest/globals";
 
-import { adminProposalNotice, forfeitParties } from "@/app/(secured)/tournois/[id]/_lib/score-form";
+import { forfeitParties } from "@/app/(secured)/tournois/[id]/_lib/score-form";
+import { FR_DIALOGS_TEXT, adminProposalText } from "@/app/(secured)/tournois/[id]/_lib/dialogs-text";
 
-describe("adminProposalNotice", () => {
+const adminProposalNotice = (...args: Parameters<typeof adminProposalText> extends [unknown, ...infer Rest] ? Rest : never) =>
+  adminProposalText(FR_DIALOGS_TEXT, ...args);
+
+describe("adminProposalText (français)", () => {
   const proposal = { team1Score: 3, team2Score: 1, proposedBy: "team1" as const };
 
   it("rien sans proposition", () => {

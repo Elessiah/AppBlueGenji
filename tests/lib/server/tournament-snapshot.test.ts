@@ -506,6 +506,7 @@ describe("getTournamentSnapshot — inscrites rangées par le classement du site
   /** Classement de survie chargé par l'instantané : il porte les rangs figés au lancement. */
   function frozenSurvival(seeds: Array<[number, number]>) {
     jest.mocked(loadSurvivalMeta).mockResolvedValue({
+      cancellableForfeitTeamIds: [],
       roundsBeforeFirstCut: 2,
       roundsPerCut: 1,
       currentRound: 1,
