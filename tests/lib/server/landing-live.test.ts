@@ -660,3 +660,40 @@ describe("getLandingLive — carrousel des matchs", () => {
     expect(live?.currentMatch).toBeNull();
   });
 });
+
+// Revue de performance a posteriori #436 : la liste publique et le tournoi à
+// l'antenne étaient attendus l'un après l'autre.
+describe("getLandingLive — lectures côte à côte", () => {
+  it("lance la liste publique et la recherche du direct ensemble", async () => {
+    let releaseBuckets: (value: TournamentBuckets) => void = () => {};
+    jest.mocked(listTournamentBuckets).mockReturnValue(
+      new Promise<TournamentBuckets>((resolve) => {
+        releaseBuckets = resolve;
+      }),
+    );
+    jest.mocked(findBroadcastingTournament).mockResolvedValue(null);
+    await mockDb([matchRow({ ...ON_AIR })]);
+
+    const pending = getLandingLive();
+    await Promise.resolve();
+    await Promise.resolve();
+    // La liste n'a pas encore répondu : la recherche du direct est déjà partie.
+    expect(findBroadcastingTournament).toHaveBeenCalledTimes(1);
+    releaseBuckets(buckets([card(1, "Cup")]));
+    expect((await pending)?.tournament.id).toBe(1);
+  });
+
+  it("une recherche du direct en échec ne retire pas la carte", async () => {
+    jest.mocked(findBroadcastingTournament).mockRejectedValue(new Error("down"));
+    await mockDb([matchRow({ ...ON_AIR })]);
+    const live = await liveFrom(buckets([card(1, "Cup")]));
+    expect(live?.tournament.id).toBe(1);
+    expect(live?.stream).toBeNull();
+  });
+
+  it("une liste publique en échec rend null", async () => {
+    jest.mocked(listTournamentBuckets).mockRejectedValue(new Error("down"));
+    jest.mocked(findBroadcastingTournament).mockResolvedValue(null);
+    expect(await getLandingLive()).toBeNull();
+  });
+});
