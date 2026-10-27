@@ -1108,6 +1108,25 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Un caster n'en remplace plus un autre : une nouvelle inscription s'ajoute sans retirer personne. Une inscription n'est plus retirée que par le caster lui-même, par le staff ou d'office.",
     ],
   },
+  {
+    // MATCH-REFEREE MR-2 : arbitre désigné d'un match, nommé aux parties du
+    // match (pseudo et BattleTag, même masqué), « Prêt » attendu, avis push du
+    // retrait de son arbitrage, journal anonyme. Joueurs (qui le lisent) comme
+    // arbitres (dont les données sont présentées) concernés : pas de public.
+    // Daté comme les entrées MR-1 (mise en ligne groupée, heure inconnue —
+    // § Dates corrigées).
+    id: "2026-10-arbitre-designe-des-matchs",
+    publishedAt: "2026-10-29",
+    title: "Arbitre désigné des matchs",
+    links: [{ href: "/rgpd#arbitre-designe", label: "Lire le paragraphe « Arbitre désigné d'un match »" }],
+    summary:
+      "Un membre du staff peut désormais arbitrer un match : il le prend, ou le staff le lui confie. Les deux équipes, les casters du match et le staff voient son pseudo et son BattleTag ; le public ne lit que « Arbitre désigné ».",
+    details: [
+      "Si tu joues ou castes un match : son arbitre désigné t'est présenté dans les fenêtres « Contacts » et de lancement du match, aux mêmes moments que les contacts du match (dès que tes deux adversaires sont connus si tu joues, le temps du match si tu castes) — son pseudo et son BattleTag, même masqué, jamais son tag Discord. Rien de tes propres données ne change.",
+      "Si tu arbitres : ton pseudo et ton BattleTag (même masqué) sont présentés ainsi aux parties de tes matchs, au titre de l'exécution du service ; ton « Prêt » est attendu avant le lancement. Si l'arbitrage t'est retiré par un autre que toi (le staff, un autre arbitre, l'autogestion) ou d'office (conditions plus remplies, ou tu joues désormais le match), tu es prévenu en notification push seulement, avec le motif — réglage « Arbitrage retiré ». À la suppression de ton compte, tu es retiré de tous tes matchs.",
+      "La prise d'un match, son retrait, l'autogestion et la première carte sont notés au journal du staff sur Discord sans nommer personne ; un match qui entre en lancement sans arbitre ni autogestion est signalé aux arbitres, sans rien basculer d'office.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

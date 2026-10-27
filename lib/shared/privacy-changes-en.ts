@@ -573,6 +573,17 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "A caster no longer replaces another: a new registration is added without removing anyone. A registration is now only removed by the caster themselves, by the staff or automatically.",
     ],
   },
+  "2026-10-arbitre-designe-des-matchs": {
+    linkLabels: ["Read the “Assigned referee of a match” paragraph"],
+    title: "Assigned match referees",
+    summary:
+      "A staff member can now referee a match: they take it, or the staff assigns it to them. Both teams, the match's casters and the staff see their username and BattleTag; the public only reads “Referee assigned”.",
+    details: [
+      "If you play or cast a match: its assigned referee is presented to you in the match's “Contacts” and launch windows, at the same times as the match contacts (as soon as both your opponents are known if you play, while the match is being played if you cast) — their username and BattleTag, even when hidden, never their Discord tag. Nothing about your own data changes.",
+      "If you referee: your username and BattleTag (even when hidden) are presented in this way to the parties to your matches, as part of the performance of the service; your “Ready” is expected before the launch. If the refereeing is removed from you by someone else (the staff, another referee, self-management) or automatically (requirements no longer met, or you now play the match), you are notified by push notification only, with the reason — “Refereeing removed” setting. When your account is deleted, you are removed from all your matches.",
+      "Taking a match, its removal, self-management and the first map are noted in the staff log on Discord without naming anyone; a match that enters its launch with neither a referee nor self-management is flagged to the referees, without switching anything automatically.",
+    ],
+  },
 };
 
 /**
