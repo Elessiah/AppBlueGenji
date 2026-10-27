@@ -57,8 +57,10 @@ non leur gravité.
 `match_no_referee` (`MATCH_REFEREE.md`) : un match qui entre en lancement
 sans arbitre désigné ni autogestion est signalé au canal des arbitres (et en
 push `REFEREE_ALERT`) — un **avertissement** : rien ne bascule d'office.
-Réservé une fois par appariement (`NO_REFEREE:<appariement>`), relu sans
-verrou à chaque passe de l'entretien.
+Match planifié : réservé une fois par appariement (`NO_REFEREE:<appariement>`) ;
+matchs sans horaire : une alerte par manche qui les liste, réservée une fois
+(`NO_REFEREE_ROUND`, sur le premier match de la manche). Relu sans verrou à
+chaque passe de l'entretien.
 
 ## Une règle unique et pure
 
