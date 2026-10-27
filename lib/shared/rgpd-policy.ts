@@ -45,10 +45,12 @@ export const MATCH_CONTACTS_SCOPE =
  * BattleTag masqué : le masquer ne le retire pas des parties de tes matchs
  * (`battletag-visibility.ts`). Cette lecture-là n'est pas un consentement —
  * le réglage n'y peut rien — mais l'exécution du service (décision du
- * 2026-10-19), prévue par les conditions d'utilisation.
+ * 2026-10-19), prévue par les conditions d'utilisation ; celui de l'arbitre
+ * désigné, au titre du service seulement (les arbitres agissant pour
+ * l'association), sans clause des conditions jusqu'au lot TERMS v7.
  */
 export const BATTLETAG_MATCH_SCOPE =
-  "lecture, même masqué, dans la seule fenêtre « Contacts » d'un match où tu es présenté comme contact et dans sa fenêtre de lancement : par ses deux équipes et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, par ses casters le temps du match ; celui d'un caster, par les deux équipes et les autres casters du match le temps du match et par les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné) — arbitres et administrateurs n'y ont pas d'autre accès (conditions d'utilisation, « Contacts de match »)";
+  "lecture, même masqué, dans la seule fenêtre « Contacts » d'un match où tu es présenté comme contact et dans sa fenêtre de lancement : par ses deux équipes et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, par ses casters le temps du match ; celui d'un caster, par les deux équipes et les autres casters du match le temps du match et par les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné) — arbitres et administrateurs n'y ont pas d'autre accès (conditions d'utilisation, « Contacts de match ») ; celui de l'arbitre désigné d'un match, dans ses fenêtres « Contacts » et de lancement, par ses deux équipes et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin et par ses casters le temps du match (exécution du service, les arbitres agissant pour l'association)";
 
 /**
  * Pastilles de certification de la fiche (tag Discord certifié, BattleTag tiré
