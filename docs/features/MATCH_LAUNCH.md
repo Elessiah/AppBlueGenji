@@ -341,11 +341,18 @@ qui porte le premier lien du match, puisque c'est le lien de sa chaîne.
 Dans les deux cas, **chaque lien qu'il a fourni** (`bg_match_streams.link_user_id`,
 posé à l'ouverture de son stream, ou dans la configuration du direct par un
 compte sans la permission `tournaments` — un caster à la seule permission
-`live`) est retiré, matchs joués compris et même d'un stream qu'un co-caster
+`live` —, ou par un membre de l'organisation qui caste ce match : sa propre
+chaîne) est retiré, matchs joués compris et même d'un stream qu'un co-caster
 tient encore : le stream reste à ce co-caster, sans lien. Le lien de
-l'organisation (`link_user_id` nul) n'est jamais touché. Un réglage du direct
-réenregistré avec le même lien ne change pas son fournisseur ; un lien neuf
-prend celui qui le pose.
+l'organisation (`link_user_id` nul : posé par un membre de l'organisation qui
+ne caste pas ce match) n'est jamais touché. Qu'il caste se lit sous le verrou
+du match, au moment où il pose le lien (`linkProvider`, `live-streams.ts`) :
+qui s'inscrit après ne reprend pas un lien déjà posé, qui quitte le match garde
+le sien. Un réglage du direct réenregistré avec le même lien ne change pas son
+fournisseur ; un lien neuf prend celui qui le pose. Limite : un lien posé avant
+`link_user_id` (ancien `live_url`, migré en stream du staff) n'a pas de
+fournisseur connu — impossible à retrouver — et reste comme lien de
+l'organisation.
 
 ## Casters et streams
 
