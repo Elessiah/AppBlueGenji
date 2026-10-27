@@ -4,7 +4,7 @@ import { setMatchLiveConfig, setMatchOnAir } from "@/lib/server/tournaments/live
 import { isMatchLiveTrigger } from "@/lib/shared/live-streams";
 import { can } from "@/lib/shared/permissions";
 import { readJsonBody } from "@/lib/server/request-body";
-import { announceStaffMatchAction } from "@/lib/server/tournaments/staff-action-logs";
+import { announceStaffMatchAction, staffActionAuthor } from "@/lib/server/tournaments/staff-action-logs";
 
 function parseMatchId(raw: string): number | null {
   const matchId = Number(raw);
@@ -52,7 +52,7 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
 
   try {
     await setMatchLiveConfig(matchId, { trigger, liveUrl: (body.liveUrl as string) ?? null });
-    announceStaffMatchAction(matchId, "LIVE_CONFIGURED");
+    announceStaffMatchAction(matchId, trigger === null ? "LIVE_REMOVED" : "LIVE_CONFIGURED", staffActionAuthor(user));
     return ok({ trigger });
   } catch (error) {
     return mapLiveError(error);
@@ -77,7 +77,7 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
 
   try {
     await setMatchOnAir(matchId, body.onAir);
-    announceStaffMatchAction(matchId, body.onAir ? "ON_AIR" : "OFF_AIR");
+    announceStaffMatchAction(matchId, body.onAir ? "ON_AIR" : "OFF_AIR", staffActionAuthor(user));
     return ok({ onAir: body.onAir });
   } catch (error) {
     return mapLiveError(error);

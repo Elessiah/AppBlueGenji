@@ -15,13 +15,27 @@ import { getDatabase } from "@/lib/server/database";
 import {
   formatStaffMatchActionLog,
   formatStaffTournamentActionLog,
+  type StaffActionAuthor,
   type StaffMatchAction,
   type StaffTournamentAction,
 } from "@/lib/shared/bot-logs";
+import { can } from "@/lib/shared/permissions";
 import { loadMatchLogRow, matchLogSubject } from "./match-log-subject";
 
+/**
+ * Auteur anonyme d'un geste : « le staff » pour qui détient la permission
+ * `tournaments`, « un caster » pour qui n'a que la diffusion (`live`).
+ */
+export function staffActionAuthor(user: Parameters<typeof can>[0]): StaffActionAuthor {
+  return can(user, "tournaments") ? "STAFF" : "CASTER";
+}
+
 /** La ligne d'un geste sur un match ; rien si le match n'existe plus. Peut lever. */
-export async function deliverStaffMatchAction(matchId: number, action: StaffMatchAction): Promise<void> {
+export async function deliverStaffMatchAction(
+  matchId: number,
+  action: StaffMatchAction,
+  author: StaffActionAuthor = "STAFF",
+): Promise<void> {
   const row = await loadMatchLogRow(matchId);
   if (!row) return;
   const match = matchLogSubject(row);
@@ -35,6 +49,7 @@ export async function deliverStaffMatchAction(matchId: number, action: StaffMatc
       team1: match.team1,
       team2: match.team2,
       action,
+      author,
     }),
   );
 }
@@ -59,8 +74,12 @@ export async function deliverStaffTournamentAction(
 }
 
 /** Journalise un geste du staff sur un match, sans attendre ; ne lève jamais. */
-export function announceStaffMatchAction(matchId: number, action: StaffMatchAction): void {
-  void deliverStaffMatchAction(matchId, action).catch((error) =>
+export function announceStaffMatchAction(
+  matchId: number,
+  action: StaffMatchAction,
+  author: StaffActionAuthor = "STAFF",
+): void {
+  void deliverStaffMatchAction(matchId, action, author).catch((error) =>
     console.error(`[staff-log] geste ${action} sur le match #${matchId} non journalisé`, error),
   );
 }

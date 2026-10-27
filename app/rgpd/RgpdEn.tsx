@@ -850,7 +850,8 @@ export function RgpdEn({
             are noted in the staff log on Discord without naming anyone (“a caster”, “the staff”); so are the
             staff&apos;s other actions on a match or a tournament (result confirmed, forced launch, host, broadcast,
             replay, tournament edited, seeding, ghost teams, image), with the match&apos;s team names (“a player” in a
-            solo tournament), without naming the staff or writing anything to the server logs.
+            solo tournament), without naming their author (“the staff”, or “a caster” for broadcasting) or writing
+            anything to the server logs.
           </p>
         </div>
       </section>

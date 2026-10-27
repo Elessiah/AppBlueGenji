@@ -640,7 +640,8 @@ export function formatCastChangeLog(context: {
  * - `SCORES_SAVED` — « Enregistrer » : avancement noté sans trancher ;
  * - `FORCE_LAUNCHED` — lancement forcé du match ;
  * - `HOST_SET` / `HOST_CLEARED` — hôte du salon désigné ou retiré ;
- * - `LIVE_CONFIGURED` — réglage de la diffusion du match (déclencheur, lien) ;
+ * - `LIVE_CONFIGURED` / `LIVE_REMOVED` — diffusion du match réglée
+ *   (déclencheur, lien) ou retirée (le match n'est plus casté) ;
  * - `ON_AIR` / `OFF_AIR` — match mis à l'antenne ou retiré de l'antenne ;
  * - `REPLAY_SET` / `REPLAY_REMOVED` — lien de rediffusion posé ou retiré.
  */
@@ -651,6 +652,7 @@ export type StaffMatchAction =
   | "HOST_SET"
   | "HOST_CLEARED"
   | "LIVE_CONFIGURED"
+  | "LIVE_REMOVED"
   | "ON_AIR"
   | "OFF_AIR"
   | "REPLAY_SET"
@@ -663,6 +665,7 @@ const STAFF_MATCH_ACTION_WORDING: Record<StaffMatchAction, string> = {
   HOST_SET: "Hôte désigné",
   HOST_CLEARED: "Hôte retiré",
   LIVE_CONFIGURED: "Diffusion réglée",
+  LIVE_REMOVED: "Diffusion retirée",
   ON_AIR: "Mis à l'antenne",
   OFF_AIR: "Retiré de l'antenne",
   REPLAY_SET: "Rediffusion ajoutée",
@@ -670,8 +673,21 @@ const STAFF_MATCH_ACTION_WORDING: Record<StaffMatchAction, string> = {
 };
 
 /**
+ * Auteur d'un geste, jamais nommé : `STAFF` (« le staff ») ou `CASTER` (« un
+ * caster ») — la diffusion et la rediffusion d'un match s'ouvrent aussi à qui
+ * ne détient que la permission `live`, et la ligne ne doit pas prêter son geste
+ * aux arbitres.
+ */
+export type StaffActionAuthor = "STAFF" | "CASTER";
+
+const STAFF_ACTION_AUTHOR_LABEL: Record<StaffActionAuthor, string> = {
+  STAFF: ANONYMOUS_STAFF_LABEL,
+  CASTER: "un caster",
+};
+
+/**
  * Geste du staff sur un match. **Personne n'est nommé** : l'auteur est « le
- * staff », les joueurs d'un tournoi individuel « un joueur » (`entrantLabel`),
+ * staff » ou « un caster » (`author`), les joueurs d'un tournoi individuel « un joueur » (`entrantLabel`),
  * et rien ne part dans pm2 (décision du 27 octobre 2026). Ni score, ni lien, ni
  * équipe hôte : la ligne dit qu'un geste a eu lieu, la page du match dit lequel.
  */
@@ -685,11 +701,14 @@ export function formatStaffMatchActionLog(context: {
   team1: LogEntrant | null;
   team2: LogEntrant | null;
   action: StaffMatchAction;
+  /** Par défaut `STAFF`. */
+  author?: StaffActionAuthor;
 }): string {
+  const author = STAFF_ACTION_AUTHOR_LABEL[context.author ?? "STAFF"];
   return (
     `${lead("🛠️", STAFF_MATCH_ACTION_WORDING[context.action], context.tournament)} : ` +
     `${matchRoundLabel(context.bracket, context.roundNumber, context.swiss)} — ` +
-    `${scheduledPairLabel(context.team1, context.team2)} (#${context.matchId}), par ${ANONYMOUS_STAFF_LABEL}.`
+    `${scheduledPairLabel(context.team1, context.team2)} (#${context.matchId}), par ${author}.`
   );
 }
 

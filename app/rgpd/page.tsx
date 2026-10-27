@@ -1033,8 +1033,8 @@ function RgpdFr({
             d&apos;office) sont notés au journal du staff sur Discord sans nommer personne (« un caster », « le staff ») ;
             les autres gestes du staff sur un match ou un tournoi (résultat validé, lancement forcé, hôte, diffusion,
             rediffusion, modification du tournoi, têtes de série, équipes fantômes, image) aussi, avec les noms
-            d&apos;équipe du match (« un joueur » en tournoi individuel), sans nommer le staff ni rien noter dans les
-            journaux du serveur.
+            d&apos;équipe du match (« un joueur » en tournoi individuel), sans nommer leur auteur (« le staff », ou
+            « un caster » pour la diffusion) ni rien noter dans les journaux du serveur.
           </p>
         </div>
       </section>
