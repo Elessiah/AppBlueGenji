@@ -277,6 +277,33 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // (`docs/features/ABOUT_STATS_MANAGEMENT.md`) : `NULL` = la valeur
     // française est reprise sous `/en`, donc rien à rattraper.
     `ALTER TABLE bg_about_stats ADD COLUMN value_en VARCHAR(40) NULL AFTER value`,
+    // Co-casters et streams multiples (`docs/features/MATCH_LAUNCH.md`
+    // § Casters et streams) : le lien et le caster unique de `bg_matches`
+    // passent dans `bg_match_streams` / `bg_match_casters`, créées plus haut.
+    // 1. Un stream par match qui avait un lien ou un caster — jamais deux : un
+    //    match qui a déjà le sien est sauté.
+    `INSERT INTO bg_match_streams (match_id, live_url)
+       SELECT m.id, m.live_url FROM bg_matches m
+        WHERE (m.live_url IS NOT NULL OR m.caster_user_id IS NOT NULL)
+          AND NOT EXISTS (SELECT 1 FROM bg_match_streams s WHERE s.match_id = m.id)`,
+    // 2. Le caster rejoint ce stream, avec son « Prêt ».
+    `INSERT IGNORE INTO bg_match_casters (match_id, user_id, stream_id, ready_at)
+       SELECT m.id, m.caster_user_id,
+              (SELECT MIN(s.id) FROM bg_match_streams s WHERE s.match_id = m.id),
+              m.caster_ready_at
+         FROM bg_matches m
+        WHERE m.caster_user_id IS NOT NULL
+          AND EXISTS (SELECT 1 FROM bg_match_streams s WHERE s.match_id = m.id)`,
+    // 3. Les anciennes colonnes sont vidées — plus rien ne les écrit : un
+    //    redémarrage ne recopie rien, et rien de périmé ne revient. Seulement
+    //    ce qui est **arrivé** dans les nouvelles tables : si 1 ou 2 a échoué,
+    //    la donnée reste en place et la copie se retente au démarrage suivant.
+    `UPDATE bg_matches m SET m.live_url = NULL, m.caster_user_id = NULL, m.caster_ready_at = NULL
+      WHERE (m.live_url IS NOT NULL OR m.caster_user_id IS NOT NULL OR m.caster_ready_at IS NOT NULL)
+        AND (m.live_url IS NULL
+             OR EXISTS (SELECT 1 FROM bg_match_streams s WHERE s.match_id = m.id))
+        AND (m.caster_user_id IS NULL
+             OR EXISTS (SELECT 1 FROM bg_match_casters c WHERE c.match_id = m.id AND c.user_id = m.caster_user_id))`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

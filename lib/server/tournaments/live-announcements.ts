@@ -57,6 +57,7 @@ import { siteBaseUrl } from "@/lib/server/site-url";
 import { isBotCircuitOpen, pushLiveEvening, type LiveAnnouncementOutcome } from "@/lib/server/bot-integration";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { toIso } from "@/lib/server/serialization";
+import { firstStreamUrlSql } from "./match-casters";
 import {
   formatLiveEvening,
   LIVE_EVENING_WINDOW_HOURS,
@@ -273,7 +274,7 @@ async function selectMatches(
   const [rows] = await db.query<LiveCandidateRow[]>(
     `SELECT m.id, m.tournament_id, t.name AS tournament_name, t.participant_type,
             t.live_url AS tournament_live_url, m.status, m.start_at, m.live_trigger,
-            m.live_started_at, m.live_url, m.launched_at, m.launch_pairing,
+            m.live_started_at, ${firstStreamUrlSql("m")} AS live_url, m.launched_at, m.launch_pairing,
             CONCAT(m.team1_id, ':', m.team2_id) AS pairing,
             t1.name AS team1_name, t2.name AS team2_name,
             t1.solo_user_id AS team1_solo_user_id, t2.solo_user_id AS team2_solo_user_id,

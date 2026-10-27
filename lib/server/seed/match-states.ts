@@ -3,7 +3,7 @@
  * cours, horaires des manches, diffusion en direct, lancement et rediffusions.
  */
 
-import type { Pool, RowDataPacket } from "mysql2/promise";
+import type { Pool, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { SCORE_AUTO_VALIDATE_MINUTES, SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { normalizeStreamUrl } from "@/lib/shared/live-streams";
 import { normalizeReplayUrl } from "@/lib/shared/match-replay";
@@ -160,13 +160,23 @@ export async function applyLiveStreams(
   const startedAt = def.live.trigger === "MANUAL" && def.live.onAir ? new Date() : null;
   await db.execute(
     `UPDATE bg_matches
-     SET live_trigger = ?, live_url = ?, live_started_at = ?
+     SET live_trigger = ?, live_started_at = ?
      WHERE tournament_id = ?
        AND status = 'READY'
        AND team1_id IS NOT NULL
        AND team2_id IS NOT NULL`,
-    [def.live.trigger, normalizeStreamUrl(def.live.matchUrl), startedAt, tournamentId]
+    [def.live.trigger, startedAt, tournamentId]
   );
+  // La chaîne d'un match casté est celle de son stream principal
+  // (`bg_match_streams`), comme la poserait le staff (`setMatchLiveConfig`).
+  const matchUrl = normalizeStreamUrl(def.live.matchUrl);
+  if (matchUrl !== null) {
+    await db.execute(
+      `INSERT INTO bg_match_streams (match_id, live_url)
+       SELECT id, ? FROM bg_matches WHERE tournament_id = ? AND live_trigger IS NOT NULL`,
+      [matchUrl, tournamentId]
+    );
+  }
 
   // `AUTO` ne passe à l'antenne qu'au lancement du match : on lance toutes les
   // manches castées sauf la première, que `applyMatchLaunchCases` laisse en
@@ -190,35 +200,84 @@ export async function applyLiveStreams(
   }
 }
 
+/** Lien du stream séparé du co-caster de test — distinct de toute chaîne seedée. */
+export const SEED_SEPARATE_STREAM_URL = "https://www.twitch.tv/bluegenji_cocast";
+
+/** Casters de la première manche castée d'un tournoi, tournoi après tournoi. */
+export const SEED_CAST_CASES = ["ONE", "CO_CAST", "SEPARATE"] as const;
+
 /**
  * Lancement des matchs (`lib/shared/match-launch.ts`) : sur chaque tournoi
- * casté du jeu de test à phase de lancement (`match_launch_phase`), la première manche jouable reçoit le caster de test,
- * l'équipe 2 comme hôte (le cas où l'arbitrage a changé le défaut) et un
- * « Prêt » de l'équipe 1 — de quoi voir la modale avec ses trois parties, dont
- * une prête et deux attendues. Les autres manches jouables restent en
- * lancement, sans caster : le cas « deux équipes seules ». L'empreinte de
- * l'appariement est posée avec le « Prêt », sans quoi il serait lu comme celui
- * d'un autre appariement (`currentLaunchState`).
+ * casté du jeu de test à phase de lancement (`match_launch_phase`), la première
+ * manche jouable reçoit l'équipe 2 comme hôte (le cas où l'arbitrage a changé
+ * le défaut), un « Prêt » de l'équipe 1 et ses casters — tour à tour
+ * (`SEED_CAST_CASES`) un caster seul, deux co-casters sur un même stream, et
+ * deux casters sur deux streams (le second avec son propre lien). Les autres
+ * manches jouables restent en lancement, sans caster : le cas « deux équipes
+ * seules ». L'empreinte de l'appariement est posée avec le « Prêt », sans quoi
+ * il serait lu comme celui d'un autre appariement (`currentLaunchState`).
  */
-export async function applyMatchLaunchCases(db: Pool, casterId: number | null): Promise<void> {
+export async function applyMatchLaunchCases(
+  db: Pool,
+  casterId: number | null,
+  coCasterId: number | null,
+): Promise<void> {
   if (casterId === null) return;
+  const [firsts] = await db.query<(RowDataPacket & { id: number })[]>(
+    `SELECT MIN(m.id) AS id
+     FROM bg_matches m
+     JOIN bg_tournaments t ON t.id = m.tournament_id
+     WHERE t.name LIKE 'Test - %'
+       AND t.state = 'RUNNING'
+       AND t.match_launch_phase = 1
+       AND m.status = 'READY'
+       AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL
+       AND m.live_trigger IS NOT NULL
+     GROUP BY m.tournament_id
+     ORDER BY m.tournament_id`
+  );
+  for (const [index, { id }] of firsts.entries()) {
+    const matchId = Number(id);
+    await db.execute(
+      `UPDATE bg_matches
+       SET host_team_id = team2_id, team1_ready_at = NOW(), launch_pairing = CONCAT(team1_id, ':', team2_id)
+       WHERE id = ?`,
+      [matchId]
+    );
+    const castCase = coCasterId === null ? "ONE" : SEED_CAST_CASES[index % SEED_CAST_CASES.length];
+    const streamId = await seedStream(db, matchId);
+    await seedCaster(db, matchId, casterId, streamId);
+    if (coCasterId === null) continue;
+    if (castCase === "CO_CAST") await seedCaster(db, matchId, coCasterId, streamId);
+    if (castCase === "SEPARATE") {
+      const [own] = await db.execute<ResultSetHeader>(
+        `INSERT INTO bg_match_streams (match_id, live_url) VALUES (?, ?)`,
+        [matchId, normalizeStreamUrl(SEED_SEPARATE_STREAM_URL)]
+      );
+      await seedCaster(db, matchId, coCasterId, Number(own.insertId));
+    }
+  }
+}
+
+/** Le premier stream du match (posé par `applyLiveStreams`), sinon un stream sans lien. */
+async function seedStream(db: Pool, matchId: number): Promise<number> {
+  const [rows] = await db.query<(RowDataPacket & { id: number })[]>(
+    `SELECT id FROM bg_match_streams WHERE match_id = ? ORDER BY id LIMIT 1`,
+    [matchId]
+  );
+  if (rows[0]) return Number(rows[0].id);
+  const [created] = await db.execute<ResultSetHeader>(
+    `INSERT INTO bg_match_streams (match_id, live_url) VALUES (?, NULL)`,
+    [matchId]
+  );
+  return Number(created.insertId);
+}
+
+/** Inscrit un caster sur un stream, sans « Prêt » : il reste attendu. */
+async function seedCaster(db: Pool, matchId: number, userId: number, streamId: number): Promise<void> {
   await db.execute(
-    `UPDATE bg_matches m
-     JOIN (
-       SELECT MIN(m2.id) AS id
-       FROM bg_matches m2
-       JOIN bg_tournaments t ON t.id = m2.tournament_id
-       WHERE t.name LIKE 'Test - %'
-         AND t.state = 'RUNNING'
-         AND t.match_launch_phase = 1
-         AND m2.status = 'READY'
-         AND m2.team1_id IS NOT NULL AND m2.team2_id IS NOT NULL
-         AND m2.live_trigger IS NOT NULL
-       GROUP BY m2.tournament_id
-     ) first_casted ON first_casted.id = m.id
-     SET m.caster_user_id = ?, m.host_team_id = m.team2_id, m.team1_ready_at = NOW(),
-         m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id)`,
-    [casterId]
+    `INSERT INTO bg_match_casters (match_id, user_id, stream_id) VALUES (?, ?, ?)`,
+    [matchId, userId, streamId]
   );
 }
 

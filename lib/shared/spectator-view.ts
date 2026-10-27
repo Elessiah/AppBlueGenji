@@ -238,9 +238,11 @@ export function spectatorFreshnessMs(pollMs: number, cacheTtlMs: number): number
  * propositions en attente est déjà vide dans l'instantané diffusé ; il l'est
  * ici aussi, explicitement.
  *
- * L'identifiant du **caster** est remplacé par {@link SPECTATOR_HIDDEN_USER_ID} :
- * la fiche sait qu'un caster est inscrit (son pseudo, à l'antenne, s'affiche et
- * il compte dans les « prêts » du lancement) sans savoir qui. `soloUserIds`
+ * L'identifiant de chaque **caster** est remplacé par un identifiant négatif
+ * ({@link SPECTATOR_HIDDEN_USER_ID}, puis `-2`, `-3`… dans l'ordre d'inscription,
+ * pour que deux co-casters restent deux) : la fiche sait qui est inscrit (son
+ * pseudo, à l'antenne, s'affiche et il compte dans les « prêts » du lancement)
+ * sans savoir quel compte. `soloUserIds`
  * reste en revanche : il porte la marche du podium d'un joueur engagé en
  * individuel (`useEntrantPodium`), et le podium est public.
  *
@@ -260,7 +262,7 @@ export function spectatorSnapshot(snapshot: TournamentSnapshot): TournamentSnaps
       : null,
     matches: snapshot.matches.map((match) => ({
       ...match,
-      casterUserId: match.casterUserId === null ? null : SPECTATOR_HIDDEN_USER_ID,
+      casters: match.casters.map((caster, index) => ({ ...caster, userId: SPECTATOR_HIDDEN_USER_ID - index })),
       // Le lien de rediffusion que l'interface masque (match rouvert…) ne part
       // pas non plus dans la réponse publique.
       replayUrl: visibleReplayUrl(match),

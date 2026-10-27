@@ -249,7 +249,21 @@
       "title": "Remove the caster from {match}?",
       "confirm": "Remove the caster",
       "pending": "Removing…",
+      "pick": "Caster to remove",
       "body": "The caster is notified, with the reason “staff decision”, by Discord direct message or push notification depending on their settings."
+    },
+    "claimDialog": {
+      "title": "Cast {match}",
+      "confirm": "Cast this match",
+      "pending": "Signing up…",
+      "legend": "Your stream",
+      "join": "Co-cast with {casters}",
+      "joinMatchStream": "Join the match stream",
+      "noLink": "no link",
+      "separate": "Open my own stream",
+      "url": "My stream link (optional)",
+      "urlHint": "Accepted platforms: {platforms}. Without a link, your stream has no “Watch” button.",
+      "urlInvalid": "Link not recognized. Accepted platforms: {platforms}."
     },
     "forceConfirm": {
       "title": "Force the launch of {match}?",

@@ -121,6 +121,13 @@ export async function setRefereeScheduling(
                               WHERE ${resetCandidates} AND NOT ${SCORE_NOTED_SQL})`,
           [tournamentId],
         );
+        // Le « Prêt » des casters de ces matchs tombe avec ceux des équipes.
+        await connection.execute(
+          `UPDATE bg_match_casters SET ready_at = NULL
+           WHERE match_id IN (SELECT id FROM bg_matches
+                              WHERE ${resetCandidates} AND NOT ${SCORE_NOTED_SQL})`,
+          [tournamentId],
+        );
         // Puis le reste — mêmes conditions que la phase `TO_PLAN` : jouable,
         // sans date, jamais lancé. Un lancement posé pour un autre appariement
         // ne lance pas celui-ci (`currentLaunchState`) : il est défait avec le
@@ -128,7 +135,7 @@ export async function setRefereeScheduling(
         const [update] = await connection.execute<ResultSetHeader>(
           `UPDATE bg_matches
            SET lobby_opened_at = NULL, launched_at = NULL, team1_ready_at = NULL,
-               team2_ready_at = NULL, caster_ready_at = NULL
+               team2_ready_at = NULL
            WHERE ${resetCandidates} AND NOT ${SCORE_NOTED_SQL}`,
           [tournamentId],
         );

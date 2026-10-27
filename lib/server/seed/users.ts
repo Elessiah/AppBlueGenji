@@ -110,6 +110,17 @@ const SPECIAL_USERS: SpecialUserDef[] = [
     blizzardSub: "seed-blizzard-caster",
   },
   {
+    pseudo: "CoCaster",
+    purpose:
+      "second rôle CASTER, identité vérifiée : co-caste un stream ou ouvre le sien sur les matchs de lancement seedés",
+    platformRoles: ["CASTER"],
+    isAdult: 1,
+    discordId: "900000000000000019",
+    discordTag: "test_cocaster",
+    discordVerified: true,
+    blizzardSub: "seed-blizzard-cocaster",
+  },
+  {
     pseudo: "CommunityManager",
     purpose: "permission showcase seule",
     platformRoles: ["COMMUNITY_MANAGER"],

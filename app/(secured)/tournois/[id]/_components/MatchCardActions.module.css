@@ -170,3 +170,28 @@
     transition: none;
   }
 }
+
+/* Retrait d'un caster par l'arbitrage, match à plusieurs casters : lequel. */
+.releasePick {
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+}
+
+.releasePick legend {
+  margin-bottom: 8px;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.releasePick label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  cursor: pointer;
+}

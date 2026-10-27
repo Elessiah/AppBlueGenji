@@ -249,7 +249,21 @@
       "title": "Retirer le caster de {match} ?",
       "confirm": "Retirer le caster",
       "pending": "Retrait…",
+      "pick": "Caster à retirer",
       "body": "Le caster en est prévenu, avec le motif « décision du staff », par message privé Discord ou notification push selon ses réglages."
+    },
+    "claimDialog": {
+      "title": "Caster {match}",
+      "confirm": "Caster ce match",
+      "pending": "Inscription…",
+      "legend": "Ton stream",
+      "join": "Co-caster avec {casters}",
+      "joinMatchStream": "Rejoindre le stream du match",
+      "noLink": "sans lien",
+      "separate": "Ouvrir mon propre stream",
+      "url": "Lien de mon stream (facultatif)",
+      "urlHint": "Plateformes acceptées : {platforms}. Sans lien, ton stream n'a pas de bouton « Regarder ».",
+      "urlInvalid": "Lien non reconnu. Plateformes acceptées : {platforms}."
     },
     "forceConfirm": {
       "title": "Forcer le lancement de {match} ?",

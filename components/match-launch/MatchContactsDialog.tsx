@@ -12,7 +12,7 @@ import {
   type MatchLaunchInfo,
 } from "@/lib/shared/match-launch";
 import type { BracketMatch } from "@/lib/shared/types";
-import { CasterCard, SideCard } from "./LaunchContactCards";
+import { CasterCards, SideCard } from "./LaunchContactCards";
 import { useLaunchText, type LaunchText } from "./launch-text";
 import launchStyles from "./MatchLaunchCenter.module.css";
 import styles from "./MatchContactsDialog.module.css";
@@ -114,25 +114,23 @@ export type ContactsCard = Pick<
   BracketMatch,
   | "startAt"
   | "launchedAt"
-  | "casterUserId"
+  | "casters"
   | "team1Id"
   | "team2Id"
   | "hostTeamId"
   | "team1Ready"
   | "team2Ready"
-  | "casterReady"
 >;
 
 const CARD_FIELDS = [
   "startAt",
   "launchedAt",
-  "casterUserId",
+  "casters",
   "team1Id",
   "team2Id",
   "hostTeamId",
   "team1Ready",
   "team2Ready",
-  "casterReady",
 ] as const satisfies readonly (keyof ContactsCard)[];
 
 /** Empreinte de la carte : change à chaque écriture qui touche la modale. */
@@ -156,7 +154,8 @@ export function rereadOnCardChange(
 ): boolean {
   if (launch === null || previous === null || next === null) return false;
   return CARD_FIELDS.some((field) => {
-    if (previous[field] === next[field]) return false;
+    // Par valeur : la liste des casters est un nouveau tableau à chaque instantané.
+    if (JSON.stringify(previous[field]) === JSON.stringify(next[field])) return false;
     return field !== "launchedAt" || launch.phase !== "LAUNCHED";
   });
 }
@@ -411,11 +410,10 @@ export function MatchContactsDialog({
                     linkNames
                   />
                 </div>
-                <CasterCard
-                  caster={launch.caster}
+                <CasterCards
+                  casters={launch.casters}
                   phase={launch.phase}
                   onCopy={copy}
-                  viewer={launch.viewer}
                   noCasterText={t("contacts.noCaster")}
                   // Tout tournoi, lancement ou non : « au départ du match ».
                   laterText={t("contacts.casterLater")}

@@ -43,6 +43,7 @@ import {
 import { rankEntrantsBySiteRanking } from "@/lib/server/ranking-service";
 import { attachMatchMaps, mapCard, mapMatch, type TournamentRow } from "./_internal";
 import { loadMapsByMatch } from "./match-maps";
+import { loadMatchCasters, loadMatchStreams } from "./match-casters";
 import {
   getMatchRows,
   getRegistrationRows,
@@ -455,9 +456,19 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
     // Détail map par map, d'une requête pour tout le plateau — dans
     // l'instantané commun, donc servi à l'identique par le flux et par le REST
     // de secours (`docs/features/MAP_SCORES.md`).
+    // Casters et streams, une lecture chacun pour tout le plateau — dans
+    // l'instantané commun eux aussi (`docs/features/MATCH_LAUNCH.md`).
+    const matchIds = matches.map((row) => Number(row.id));
+    const castersByMatch = await loadMatchCasters(connection, matchIds);
+    const streamsByMatch = await loadMatchStreams(connection, matchIds);
     const mappedMatches = attachMatchMaps(
-      matches.map(mapMatch),
-      await loadMapsByMatch(connection, matches.map((row) => Number(row.id))),
+      matches.map((row) =>
+        mapMatch(row, {
+          casters: castersByMatch.get(Number(row.id)),
+          streams: streamsByMatch.get(Number(row.id)),
+        }),
+      ),
+      await loadMapsByMatch(connection, matchIds),
     );
     const phases = phasesDetail?.phases ?? null;
     const currentPhaseId = phasesDetail?.currentPhaseId ?? null;

@@ -10,8 +10,8 @@
  * avec la fonction partagée, pour qu'il n'existe qu'une définition de « ce match
  * est à l'antenne ».
  */
-import type { RowDataPacket } from "mysql2/promise";
-import { getDatabase } from "@/lib/server/database";
+import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import { getDatabase, withConnection } from "@/lib/server/database";
 import {
   isMatchLive,
   isMatchLiveTrigger,
@@ -21,6 +21,7 @@ import {
 } from "@/lib/shared/live-streams";
 import { launchPairingKey } from "@/lib/shared/match-launch";
 import type { MatchStatus } from "@/lib/shared/types";
+import { lockMatchStreams, primaryStream, pruneMatchStreams } from "./match-casters";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "./notifications";
 
 /** Cible du bouton d'accueil : un tournoi en cours réellement à l'antenne. */
@@ -118,6 +119,11 @@ async function loadMatchLiveRow(matchId: number): Promise<MatchLiveRow> {
  * - passer en `AUTO` ou `START_TIME` referme l'antenne, qui n'a plus de sens
  *   dans ces modes — leur frontière est le statut du match ou l'horloge.
  *
+ * La chaîne réglée ici est celle du **stream principal** du match
+ * (`primaryStream`, le premier lien des vues compactes) ; un stream séparé
+ * qu'un caster a ouvert garde la sienne. Démarquer le match efface tous ses
+ * liens, et les streams que plus personne ne tient disparaissent.
+ *
  * Le mode `START_TIME` exige une date de début sur le match : l'accepter sans
  * date poserait une diffusion qui ne s'ouvrirait jamais, et l'échec ne se
  * verrait qu'à l'heure du match. La date, elle, reste effaçable ensuite — le
@@ -135,46 +141,65 @@ export async function setMatchLiveConfig(
   }
 
   const row = await loadMatchLiveRow(matchId);
-  const db = await getDatabase();
 
   if (requiresMatchStartAt(config.trigger) && row.start_at === null) {
     throw new Error("MATCH_START_AT_REQUIRED");
   }
 
-  if (config.trigger === null) {
-    await db.execute(
-      `UPDATE bg_matches
-       SET live_trigger = NULL, live_url = NULL, live_started_at = NULL
-       WHERE id = ?`,
-      [matchId],
-    );
-    publishMatchUpdatedEvent(Number(row.tournament_id), { landingLive: true });
-    return;
-  }
-
-  const rawUrl = config.liveUrl;
+  const trigger = config.trigger;
+  const rawUrl = trigger === null ? null : config.liveUrl;
   const url = rawUrl === null || rawUrl.trim() === "" ? null : normalizeStreamUrl(rawUrl);
   if (rawUrl !== null && rawUrl.trim() !== "" && url === null) {
     throw new Error("INVALID_STREAM_URL");
   }
 
-  if (config.trigger === "MANUAL") {
-    await db.execute(
-      `UPDATE bg_matches
-       SET live_trigger = ?, live_url = ?
-       WHERE id = ?`,
-      ["MANUAL", url, matchId],
-    );
-  } else {
-    await db.execute(
-      `UPDATE bg_matches
-       SET live_trigger = ?, live_url = ?, live_started_at = NULL
-       WHERE id = ?`,
-      [config.trigger, url, matchId],
-    );
-  }
+  await withConnection(async (connection) => {
+    await connection.beginTransaction();
+    try {
+      // Verrou du match d'abord, puis ses streams et casters : le même ordre
+      // que l'inscription d'un caster (`claimMatchCast`).
+      await connection.execute(`SELECT id FROM bg_matches WHERE id = ? FOR UPDATE`, [matchId]);
+      if (trigger === null) {
+        await connection.execute(
+          `UPDATE bg_matches SET live_trigger = NULL, live_started_at = NULL WHERE id = ?`,
+          [matchId],
+        );
+        await connection.execute(`UPDATE bg_match_streams SET live_url = NULL WHERE match_id = ?`, [matchId]);
+      } else {
+        await connection.execute(
+          trigger === "MANUAL"
+            ? `UPDATE bg_matches SET live_trigger = ? WHERE id = ?`
+            : `UPDATE bg_matches SET live_trigger = ?, live_started_at = NULL WHERE id = ?`,
+          [trigger, matchId],
+        );
+        await setPrimaryStreamUrl(connection, matchId, url);
+      }
+      await pruneMatchStreams(connection, matchId);
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    }
+  });
 
   publishMatchUpdatedEvent(Number(row.tournament_id), { landingLive: true });
+}
+
+/**
+ * Pose (ou efface) le lien du stream principal ; sans stream, en ouvre un —
+ * le lien du staff n'attend pas qu'un caster s'inscrive.
+ */
+async function setPrimaryStreamUrl(connection: PoolConnection, matchId: number, url: string | null): Promise<void> {
+  const primary = primaryStream(await lockMatchStreams(connection, matchId));
+  if (primary !== null) {
+    if (primary.liveUrl !== url) {
+      await connection.execute(`UPDATE bg_match_streams SET live_url = ? WHERE id = ?`, [url, primary.id]);
+    }
+    return;
+  }
+  if (url !== null) {
+    await connection.execute(`INSERT INTO bg_match_streams (match_id, live_url) VALUES (?, ?)`, [matchId, url]);
+  }
 }
 
 /**

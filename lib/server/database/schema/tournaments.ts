@@ -192,6 +192,48 @@ export async function createTournamentTables(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
+  // Streams d'un match et leurs casters (`docs/features/MATCH_LAUNCH.md`
+  // § Casters et streams). Un match peut avoir plusieurs streams, chacun avec
+  // son lien (`NULL` = pas encore de lien public) ; un caster rejoint un stream
+  // existant (co-cast) ou en ouvre un à part. Le moment de l'antenne reste au
+  // match (`bg_matches.live_trigger` / `live_started_at`), commun à ses streams.
+  // `bg_matches.live_url`, `caster_user_id` et `caster_ready_at` ne sont plus
+  // écrits : la migration les recopie ici puis les vide, et une PR de ménage les
+  // retirera une fois jouée partout.
+  //
+  // La clé `(match_id, id)` porte la clé étrangère composée des casters : un
+  // caster ne peut rejoindre qu'un stream **de son match**.
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_match_streams (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      match_id BIGINT NOT NULL,
+      live_url VARCHAR(255) NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_bg_match_streams_match (match_id, id),
+      CONSTRAINT fk_bg_match_streams_match FOREIGN KEY (match_id)
+        REFERENCES bg_matches(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  // Un caster par ligne, au plus une fois par match (clé primaire) ; son
+  // « Prêt » (`ready_at`) lui est propre. Aucun plafond par match.
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_match_casters (
+      match_id BIGINT NOT NULL,
+      user_id BIGINT NOT NULL,
+      stream_id BIGINT NOT NULL,
+      ready_at DATETIME NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (match_id, user_id),
+      INDEX idx_bg_match_casters_user (user_id),
+      INDEX idx_bg_match_casters_stream (match_id, stream_id),
+      CONSTRAINT fk_bg_match_casters_stream FOREIGN KEY (match_id, stream_id)
+        REFERENCES bg_match_streams(match_id, id) ON DELETE CASCADE,
+      CONSTRAINT fk_bg_match_casters_user FOREIGN KEY (user_id)
+        REFERENCES bg_users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
   // Détail map par map d'un match (`docs/features/MAP_SCORES.md`). `source`
   // sépare la proposition de chaque engagée (`TEAM1`, `TEAM2`) du résultat
   // retenu (`FINAL`) ; les scores sont toujours dans l'orientation du plateau.
