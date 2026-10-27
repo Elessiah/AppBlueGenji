@@ -144,7 +144,7 @@
       "STAFF": "staff decision",
       "REPLACED": "you no longer met the casting requirements, another caster took your place",
       "INELIGIBLE": "you no longer meet the casting requirements",
-      "JOINED_TEAM": "your team now plays this match"
+      "JOINED_TEAM": "you now play in this match"
     }
   }
 }

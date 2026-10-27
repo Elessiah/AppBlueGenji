@@ -588,7 +588,7 @@ export function formatRoundRolledBackLog(context: {
  * - `RELEASED` — le caster retire lui-même son inscription ;
  * - `RELEASED_BY_STAFF` — le staff la retire ;
  * - `INELIGIBLE` / `JOINED_TEAM` — retirée d'office : le caster ne remplit plus
- *   les conditions du cast, ou son équipe joue désormais le match.
+ *   les conditions du cast, ou il joue désormais le match.
  */
 export type CastLogChange = "CLAIMED" | "REPLACED" | "RELEASED" | "RELEASED_BY_STAFF" | "INELIGIBLE" | "JOINED_TEAM";
 
@@ -604,7 +604,7 @@ const CAST_LOG_WORDING: Record<CastLogChange, { kind: string; detail: string }> 
     kind: "Cast retiré d'office",
     detail: "le caster ne remplit plus les conditions du cast (permission de diffusion, tag Discord certifié, compte Battle.net)",
   },
-  JOINED_TEAM: { kind: "Cast retiré d'office", detail: "le caster joue désormais ce match avec son équipe" },
+  JOINED_TEAM: { kind: "Cast retiré d'office", detail: "le caster joue désormais ce match" },
 };
 
 /**

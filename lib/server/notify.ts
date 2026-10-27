@@ -103,9 +103,40 @@ export async function notifyUsers(
     message && reachable.length > 0
       ? sendLocalizedDirectMessages(reachable, message)
       : Promise.resolve({ report: { sent: 0, unresolved: [], failed: [] }, unreached: [] }),
-    pushToUsers(userIds, notification.topic, notification.push, notification.pushOptions),
+    pushAudience(userIds, notification.topic).then((ids) =>
+      pushToUsers(ids, notification.topic, notification.push, notification.pushOptions),
+    ),
   ]);
   return { discord: discord.report, discordUnreachedUserIds: discord.unreached, pushed };
+}
+
+/**
+ * Destinataires du push d'un sujet : tous pour un sujet ouvert ; pour un sujet
+ * réservé à une permission (`PUSH_TOPICS[topic].audience`), ceux qui la
+ * détiennent **encore**. « Mon profil » ne montre le réglage d'un tel sujet qu'à
+ * eux : qui ne le voit pas ne pourrait pas le couper, il ne le reçoit donc pas
+ * (un caster dont la permission de diffusion est retirée, par exemple). Une
+ * lecture des droits qui échoue n'envoie à personne.
+ */
+async function pushAudience(userIds: readonly number[], topic: PushTopic): Promise<number[]> {
+  const audience = PUSH_TOPICS[topic].audience;
+  const ids = [...new Set(userIds)];
+  if (audience === null || ids.length === 0) return [...userIds];
+  try {
+    const db = await getDatabase();
+    const [rows] = await db.query<(RowDataPacket & { id: number; is_admin: number; platform_roles_json: unknown })[]>(
+      `SELECT id, is_admin, platform_roles_json FROM bg_users WHERE id IN (${ids.map(() => "?").join(", ")})`,
+      ids,
+    );
+    return rows
+      .filter((row) =>
+        can({ isAdmin: Number(row.is_admin) === 1, roles: sanitizePlatformRoles(row.platform_roles_json) }, audience),
+      )
+      .map((row) => Number(row.id));
+  } catch (error) {
+    console.error("[notify] droits des destinataires illisibles, push d'un sujet réservé non envoyé", error);
+    return [];
+  }
 }
 
 /**

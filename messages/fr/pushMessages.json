@@ -144,7 +144,7 @@
       "STAFF": "décision du staff",
       "REPLACED": "tu ne remplissais plus les conditions du cast, un autre caster a pris ta place",
       "INELIGIBLE": "tu ne remplis plus les conditions du cast",
-      "JOINED_TEAM": "ton équipe joue désormais ce match"
+      "JOINED_TEAM": "tu joues désormais ce match"
     }
   }
 }

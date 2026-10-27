@@ -12,7 +12,8 @@
  *   autre caster a pris le match ;
  * - `INELIGIBLE` — retirée d'office : les conditions du cast ne sont plus
  *   remplies (permission de diffusion, tag Discord certifié, compte Battle.net) ;
- * - `JOINED_TEAM` — retirée d'office : son équipe joue désormais le match.
+ * - `JOINED_TEAM` — retirée d'office : il joue désormais le match (avec son
+ *   équipe, ou seul en tournoi individuel).
  *
  * Aucun pseudo de joueur : en tournoi individuel, les engagés sont des
  * personnes, et le message dit « un match » (`RGPD_LOGS_AND_VISITS.md`).
@@ -50,7 +51,7 @@ const DM_REASONS: Readonly<Record<Locale, Readonly<Record<CastReleaseReason, str
       "tu ne remplissais plus les conditions du cast (permission de diffusion, tag Discord certifié, compte Battle.net rattaché), et un autre caster a pris le match",
     INELIGIBLE:
       "tu ne remplis plus les conditions du cast (permission de diffusion, tag Discord certifié, compte Battle.net rattaché)",
-    JOINED_TEAM: "ton équipe joue désormais ce match",
+    JOINED_TEAM: "tu joues désormais ce match",
   },
   en: {
     STAFF: "staff decision",
@@ -58,7 +59,7 @@ const DM_REASONS: Readonly<Record<Locale, Readonly<Record<CastReleaseReason, str
       "you no longer met the casting requirements (streaming permission, certified Discord tag, linked Battle.net account), and another caster took the match",
     INELIGIBLE:
       "you no longer meet the casting requirements (streaming permission, certified Discord tag, linked Battle.net account)",
-    JOINED_TEAM: "your team now plays this match",
+    JOINED_TEAM: "you now play in this match",
   },
 };
 
