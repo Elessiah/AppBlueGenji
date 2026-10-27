@@ -22,7 +22,7 @@ import { FR_VIEWS_TEXT } from "../_lib/views-text";
 import type { TournamentPageText } from "@/lib/shared/tournament-page-text";
 import { useActionsText } from "../_lib/actions-text";
 import { useEntrantParticipantType } from "../_lib/entrant-link";
-import { ForfeitRowAction, type ForfeitRowActionProps } from "./ForfeitRowAction";
+import { ForfeitRowAction, FrozenForfeitLegend, type ForfeitRowActionProps } from "./ForfeitRowAction";
 
 interface SwissViewProps {
   swiss: SwissMeta;
@@ -367,6 +367,13 @@ export function SwissView({
                 </div>
               </div>
             </ScrollArea>
+          )}
+          {swiss.standings.some((team) => rowAction(team, false)?.kind === "locked") && (
+            <FrozenForfeitLegend
+              id="swiss-forfeit-frozen"
+              label={a("forfeitCancel.frozen")}
+              reason={a("forfeitCancel.frozenTitle")}
+            />
           )}
 
           <p style={{ margin: "8px 2px 0", fontSize: 12, color: "var(--ink-quiet)" }}>

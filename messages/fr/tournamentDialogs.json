@@ -194,6 +194,7 @@
     "warnPast": "Cette date est déjà passée : à l'enregistrement, le match entrera tout de suite en lancement. Vérifiez le jour et le mois.",
     "warnPastDirect": "Cette date est déjà passée : à l'enregistrement, le match sera lancé tout de suite. Vérifiez le jour et le mois.",
     "warnPastTbd": "Cette date est déjà passée : le match partira dès que ses deux adversaires seront connus. Vérifiez le jour et le mois.",
+    "warnPastLate": "Date passée entre-temps : rien n'est enregistré. Lisez l'avertissement, puis enregistrez à nouveau pour confirmer.",
     "clear": "Vider la date"
   },
   "ghost": {

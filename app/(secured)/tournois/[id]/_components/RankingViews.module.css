@@ -40,26 +40,18 @@
 .forfeitLocked {
   font-size: 11px;
   color: var(--ink-quiet);
-  /* Déplié, le motif du « i » passe sous le verrou sur toute la largeur de la
-     rangée : sans borne, la largeur de sa phrase entière s'imposait à la
-     cellule (action en `flex-shrink: 0`) et écrasait le nom de l'engagé. */
-  max-inline-size: 18rem;
-}
-
-.forfeitLockedLabel {
   white-space: nowrap;
 }
 
-/* Survie, motif déplié : la cellule passe sous le nom, alignée sur lui, comme
-   sous 720 px — à côté, elle réduisait le nom à quelques lettres. */
-.survivalRow:has(.forfeitLocked [aria-expanded="true"]) {
-  flex-wrap: wrap;
-  row-gap: 4px;
+/* Légende sous le classement : « 🔒 Figé » et son « i ». */
+.frozenLegend {
+  margin: 8px 2px 0;
+  font-size: 11px;
+  color: var(--ink-quiet);
 }
 
-.survivalAction:has(.forfeitLocked [aria-expanded="true"]) {
-  flex-basis: 100%;
-  padding-left: 32px;
+.frozenLegendLabel {
+  white-space: nowrap;
 }
 
 /* Sous 720 px, la colonne « Abandonner » écrasait les noms (« Test - … ») ou

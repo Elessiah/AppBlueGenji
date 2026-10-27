@@ -194,6 +194,7 @@
     "warnPast": "This date has already passed: once saved, the match moves straight into launch. Check the day and month.",
     "warnPastDirect": "This date has already passed: once saved, the match is launched right away. Check the day and month.",
     "warnPastTbd": "This date has already passed: the match will start as soon as both its opponents are known. Check the day and month.",
+    "warnPastLate": "The date passed in the meantime: nothing was saved. Read the warning, then save again to confirm.",
     "clear": "Clear the date"
   },
   "ghost": {

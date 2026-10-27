@@ -32,18 +32,14 @@ export type ForfeitRowActionProps =
 export function ForfeitRowAction(props: Readonly<ForfeitRowActionProps>) {
   if (props.kind === "locked") {
     return (
-      // La raison derrière un « i » (INFO_HINTS.md) : un `title` ne s'affiche ni
-      // au toucher ni au clavier, « Figé » restait inexpliqué à 375 px.
-      <div className={styles.forfeitLocked} data-row-action={props.teamId} tabIndex={-1}>
-        <InfoHintRow>
-          <span className={styles.forfeitLockedLabel}>
-            <span aria-hidden="true">🔒</span> {props.label}
-          </span>
-          <InfoHint id={`forfeit-frozen-${props.teamId}`} subject={props.label}>
-            <p>{props.title}</p>
-          </InfoHint>
-        </InfoHintRow>
-      </div>
+      // Motif lu avec la ligne (texte masqué) ; à l'œil, il vit derrière le
+      // « i » de la légende sous le classement (`FrozenForfeitLegend`) — un
+      // `title` ne s'affichait ni au toucher ni au clavier, et un « i » par
+      // ligne déformait les cellules étroites.
+      <span className={styles.forfeitLocked} data-row-action={props.teamId} tabIndex={-1}>
+        <span aria-hidden="true">🔒</span> {props.label}
+        <span className="sr-only"> {props.title}</span>
+      </span>
     );
   }
   return (
@@ -58,6 +54,29 @@ export function ForfeitRowAction(props: Readonly<ForfeitRowActionProps>) {
     >
       {props.label}
     </button>
+  );
+}
+
+/**
+ * Légende « 🔒 Figé » sous un classement qui porte au moins une ligne figée :
+ * le motif derrière un « i » (INFO_HINTS.md), une fois pour toutes les lignes.
+ */
+export function FrozenForfeitLegend({
+  id,
+  label,
+  reason,
+}: Readonly<{ id: string; label: string; reason: string }>) {
+  return (
+    <div className={styles.frozenLegend}>
+      <InfoHintRow>
+        <span className={styles.frozenLegendLabel}>
+          <span aria-hidden="true">🔒</span> {label}
+        </span>
+        <InfoHint id={id} subject={label}>
+          <p>{reason}</p>
+        </InfoHint>
+      </InfoHintRow>
+    </div>
   );
 }
 

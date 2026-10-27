@@ -28,7 +28,7 @@ import type { MatchFormat } from "@/lib/shared/match-format";
 import { EnduranceNextRoundPanel } from "./EnduranceNextRoundPanel";
 import { EntrantName } from "./EntrantName";
 import { FORFEIT_BUTTON_STYLE, FORFEIT_CANCEL_BUTTON_STYLE } from "./RoundColumns";
-import { ForfeitRowAction, type ForfeitRowActionProps } from "./ForfeitRowAction";
+import { ForfeitRowAction, FrozenForfeitLegend, type ForfeitRowActionProps } from "./ForfeitRowAction";
 import { EnduranceCard } from "./EnduranceCard";
 import { EnduranceRankingViews } from "./EnduranceRankingViews";
 import { EnduranceChartPanel } from "./EnduranceChartPanel";
@@ -387,6 +387,17 @@ export function EnduranceView({
         showActions={showActions}
         wideActions={showPenaltyAction}
       />
+
+      {showActions &&
+        endurance.standings.some(
+          (standing) => forfeitAction(standing, false, canForfeitRow(standing.teamId, standing.status))?.kind === "locked",
+        ) && (
+          <FrozenForfeitLegend
+            id="endurance-forfeit-frozen"
+            label={a("forfeitCancel.frozen")}
+            reason={a("forfeitCancel.frozenTitle")}
+          />
+        )}
 
       {showOutLegend && (
         <p className="mono" style={{ fontSize: 11, color: "var(--ink-quiet)", margin: "0 0 24px" }}>

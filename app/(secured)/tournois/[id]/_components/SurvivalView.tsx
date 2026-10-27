@@ -24,7 +24,7 @@ import { useTournamentViewText } from "@/components/i18n/tournament-page-text";
 import { FR_VIEWS_TEXT } from "../_lib/views-text";
 import { useActionsText } from "../_lib/actions-text";
 import { useEntrantParticipantType } from "../_lib/entrant-link";
-import { ForfeitRowAction, type ForfeitRowActionProps } from "./ForfeitRowAction";
+import { ForfeitRowAction, FrozenForfeitLegend, type ForfeitRowActionProps } from "./ForfeitRowAction";
 
 /**
  * Estompe une cellule de ligne forfait, jamais l'action (« Annuler l'abandon »
@@ -271,6 +271,13 @@ export function SurvivalView({
               );
             })}
           </div>
+          {survival.standings.some((team) => rowAction(team, false)?.kind === "locked") && (
+            <FrozenForfeitLegend
+              id="survival-forfeit-frozen"
+              label={a("forfeitCancel.frozen")}
+              reason={a("forfeitCancel.frozenTitle")}
+            />
+          )}
           {atRisk > 0 && !isFinished && (
             <p style={{ margin: "8px 2px 0", fontSize: 12, color: AMBER }}>
               {inBarrage ? (

@@ -336,13 +336,14 @@ export function MatchScheduleDialog({
     }
     // L'horloge a pu avancer depuis l'ouverture (fenêtre laissée ouverte) : une
     // date devenue passée entre-temps s'avertit d'abord, l'envoi suivant part.
-    // Aussi en notification : à 375 px, clavier ouvert, l'avertissement sous
-    // les champs peut être hors de vue, et le clic semblait sans effet.
+    // Une notification dit que rien n'est parti et quoi faire — à 375 px,
+    // clavier ouvert, l'avertissement sous les champs peut être hors de vue et
+    // le clic semblait sans effet ; un texte à elle, pour que le lecteur d'écran
+    // n'entende pas deux fois l'avertissement.
     const now = Date.now();
-    const lateWarning = pastWarning === null ? pastWarningAt(now) : null;
-    if (lateWarning !== null) {
+    if (pastWarning === null && pastWarningAt(now) !== null) {
       setClock(now);
-      showError(t(lateWarning));
+      showError(t("schedule.warnPastLate"));
       return;
     }
 
