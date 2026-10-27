@@ -9,6 +9,8 @@ import enLaunch from "@/messages/en/launchModal.json";
 import frLaunch from "@/messages/fr/launchModal.json";
 import enDialogs from "@/messages/en/tournamentDialogs.json";
 import frDialogs from "@/messages/fr/tournamentDialogs.json";
+import { DONNEES_PROFIL } from "@/lib/shared/rgpd-policy";
+import { DONNEES_PROFIL_EN } from "@/lib/shared/rgpd-policy-en";
 import { readSource } from "../../helpers/read-source";
 
 /**
@@ -282,5 +284,60 @@ describe("BattleTag masqué — arbitre désigné", () => {
       expect(text).not.toMatch(/ne s'ouvre qu'aux (deux )?équipes et aux casters/);
       expect(text).not.toMatch(/only opens for (both|the) teams and the casters/);
     }
+  });
+});
+
+/**
+ * Revue juridique MR-2 #487 : l'arbitre désigné repose sur l'exécution du
+ * service sans clause des conditions d'utilisation (v6 inchangée, clause
+ * reportée à la v7) ; son avis push figure au registre T12 ; la ligne
+ * BattleTag de /rgpd dit son cas ; l'annonce dit l'heure du pseudo seul et la
+ * condition de permission du push.
+ */
+describe("arbitre désigné — registre, /rgpd et annonce (revue juridique)", () => {
+  const T12 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T12");
+  const T12_EN = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T12");
+  const REFEREE_ENTRY = "2026-10-arbitre-designe-des-matchs";
+
+  it("T04 ne rattache pas la présentation de l'arbitre aux conditions d'utilisation (FR et EN)", () => {
+    expect(T04?.legalBasis).toContain("exécution du service (les arbitres agissant pour l'association) pour la présentation de l'arbitre désigné");
+    expect(T04_EN?.legalBasis).toContain("performance of the service (the referees acting for the association) for presenting the assigned referee");
+    expect(T04?.legalBasis).not.toContain("conditions d'utilisation, les arbitres agissant pour l'association) pour la présentation de l'arbitre");
+    expect(T04_EN?.legalBasis).not.toContain("terms of use, the referees acting for the association) for presenting the assigned referee");
+  });
+
+  it("T12 liste l'avis du retrait de l'arbitrage (FR et EN)", () => {
+    expect(T12?.subPurposes).toContain(
+      "Retrait de son arbitrage d'un match (par le staff, match confié à un autre arbitre ou passé en autogestion, ou d'office), avec le motif, pour l'arbitre désigné qui détient encore la permission d'arbitrage",
+    );
+    expect(T12_EN?.subPurposes).toContain(
+      "Removal of their refereeing of a match (by the staff, match assigned to another referee or switched to self-management, or automatically), with the reason, for the assigned referee who still holds the refereeing permission",
+    );
+    expect(T12_EN?.subPurposes).toHaveLength(T12?.subPurposes.length ?? -1);
+  });
+
+  it("la ligne BattleTag de /rgpd dit qui lit celui de l'arbitre désigné (FR et EN)", () => {
+    const fr = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo Overwatch")?.finalite ?? "";
+    const index = DONNEES_PROFIL.findIndex((d) => d.donnee === "Pseudo Overwatch");
+    const en = DONNEES_PROFIL_EN[index]?.finalite ?? "";
+    expect(fr).toContain(
+      "si tu es l'arbitre désigné d'un match, de ses deux équipes et des arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin et de ses casters le temps du match (voir « Arbitre désigné d'un match »)",
+    );
+    expect(en).toContain(
+      "if you are the assigned referee of a match, by both its teams and the referees from the moment both its opponents are known until its end and by its casters while the match is being played (see “Assigned referee of a match”)",
+    );
+  });
+
+  it("l'annonce dit le pseudo seul, le retrait par le staff seul et la condition de permission du push (FR et EN)", () => {
+    const fr = PRIVACY_CHANGES.find((c) => c.id === REFEREE_ENTRY)?.details.join(" ") ?? "";
+    const en = PRIVACY_CHANGES_EN[REFEREE_ENTRY]?.details.join(" ") ?? "";
+    expect(fr).toContain("son pseudo seul y paraît dès que la fenêtre de lancement montre le match");
+    expect(en).toContain("their username alone appears there as soon as the launch window shows the match");
+    expect(fr).toContain("retiré par le staff (retrait, match confié à un autre arbitre ou passé en autogestion)");
+    expect(en).toContain("removed from you by the staff (removal, match assigned to another referee or switched to self-management)");
+    expect(fr).toContain("tant que tu détiens la permission d'arbitrage");
+    expect(en).toContain("as long as you hold the refereeing permission");
+    expect(fr).toContain("La fenêtre de lancement s'ouvre aussi à lui");
+    expect(en).toContain("The launch window also opens to them");
   });
 });
