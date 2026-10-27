@@ -48,6 +48,10 @@
       "label": "Refereeing schedule",
       "description": "About 10 hours ahead, the list of upcoming matches: times, tournaments and teams."
     },
+    "REFEREE_RELEASED": {
+      "label": "Refereeing removed",
+      "description": "The staff removes you as a match's referee, gives it to another referee or switches it to self-management, or it is removed automatically: the reason is given."
+    },
     "CAST_RELEASED": {
       "label": "Cast removed",
       "description": "Your caster registration for a match is removed by the staff or automatically: the reason is given."

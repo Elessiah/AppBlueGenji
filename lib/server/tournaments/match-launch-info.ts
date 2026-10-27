@@ -34,10 +34,10 @@ import {
   matchLaunchPhase,
   readsContactsEarly,
   pickLaunchContacts,
-  resolveHostTeamId,
   type ContactCandidate,
   type LaunchCaster,
   type LaunchContact,
+  type LaunchReferee,
   type LaunchSide,
   type MatchLaunchInfo,
   type MatchLaunchViewerRole,
@@ -50,13 +50,16 @@ import { localUploadUrl } from "@/lib/shared/uploads";
 import {
   maintainMatchLaunches,
   releaseIneligibleCast,
+  releaseIneligibleReferee,
   rowLaunchState,
   rowReadiness,
   toLaunchInput,
   type LaunchMatchBaseRow,
 } from "./match-launch";
-import { castEligibilityBlock } from "./cast-eligibility";
-import { discardCastChanges, flushCastChanges } from "./cast-notices";
+import { castEligibilityBlock, refereeEligibilityBlock } from "./cast-eligibility";
+import { matchHostTeamId } from "@/lib/shared/match-referee";
+import { seedJoins } from "./match-host-seeds";
+import { discardBotLogs, flushBotLogs } from "./bot-logs";
 import { cachedTournamentList } from "./list-cache";
 import { publishMatchUpdatedEvent } from "./notifications";
 
@@ -78,9 +81,16 @@ type CandidateBaseRow = LaunchMatchBaseRow & {
   team2_logo_url: string | null;
   team1_solo_user_id: number | null;
   team2_solo_user_id: number | null;
+  /** Rang de chaque engagée au classement d'endurance (BlueGenji Survie, phase finale) ; `null` ailleurs. */
+  team1_seed: number | null;
+  team2_seed: number | null;
 };
 
-type CandidateRow = CandidateBaseRow & { casters: MatchCasterLink[] };
+type CandidateRow = CandidateBaseRow & {
+  casters: MatchCasterLink[];
+  /** Arbitre désigné encore éligible (relu à chaque lecture, `keepEligibleReferees`). */
+  refereeEligible: boolean;
+};
 
 type MemberRow = RowDataPacket & {
   team_id: number;
@@ -188,7 +198,8 @@ async function loadCandidates(
        m.status, m.is_bye,
        m.team1_id, m.team2_id, t1.is_ghost AS team1_is_ghost, t2.is_ghost AS team2_is_ghost,
        m.start_at, m.lobby_opened_at, m.launch_pairing, m.launched_at, m.team1_ready_at, m.team2_ready_at,
-       m.host_team_id,
+       m.host_team_id, m.referee_user_id, m.referee_ready_at, m.self_managed,
+       es1.\`rank\` AS team1_seed, es2.\`rank\` AS team2_seed,
        t.name AS tournament_name,
        t1.name AS team1_name, t2.name AS team2_name,
        t1.logo_url AS team1_logo_url, t2.logo_url AS team2_logo_url,
@@ -197,24 +208,26 @@ async function loadCandidates(
      JOIN bg_tournaments t ON t.id = m.tournament_id
      LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
      LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
+     ${seedJoins("m")}
      WHERE t.state = 'RUNNING'
        AND m.status IN ('READY', 'AWAITING_CONFIRMATION')
        AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL
        ${scope}
        AND (${referee && matchId !== null ? "1 = 1 OR " : ""}EXISTS (
               SELECT 1 FROM bg_match_casters mc WHERE mc.match_id = m.id AND mc.user_id = ?)
+            OR m.referee_user_id = ?
             OR m.team1_id IN ${viewerTeams}
             OR m.team2_id IN ${viewerTeams})
      ORDER BY m.start_at IS NULL, m.start_at, m.id`,
     matchId === null
-      ? [userId, userId, userId, userId, userId]
-      : [matchId, userId, userId, userId, userId, userId],
+      ? [userId, userId, userId, userId, userId, userId]
+      : [matchId, userId, userId, userId, userId, userId, userId],
   );
   const casters = await loadCasterLinks(
     connection,
     rows.map((row) => Number(row.id)),
   );
-  return rows.map((row) => Object.assign(row, { casters: casters.get(Number(row.id)) ?? [] }));
+  return rows.map((row) => Object.assign(row, { casters: casters.get(Number(row.id)) ?? [], refereeEligible: false }));
 }
 
 /** Membre lu → candidat contact (aussi lu par l'invitation à certifier, `certification-prompt.ts`). */
@@ -270,6 +283,7 @@ function viewerRole(
   casters: readonly MatchCasterLink[],
   referee: boolean,
 ): { role: MatchLaunchViewerRole; canDeclareReady: boolean } | null {
+  // Ordre de `resolveMatchParty` : joueur, caster, arbitre désigné.
   // Le rôle de joueur prime, comme dans `resolveMatchParty`.
   for (const [role, teamId] of [
     ["TEAM1", row.team1_id],
@@ -283,6 +297,9 @@ function viewerRole(
   // `casters` : ceux que la lecture garde (un caster inéligible n'en est plus).
   if (casters.some((caster) => caster.userId === userId)) {
     return { role: "CASTER", canDeclareReady: true };
+  }
+  if (row.refereeEligible && Number(row.referee_user_id) === userId) {
+    return { role: "MATCH_REFEREE", canDeclareReady: true };
   }
   // Un arbitre n'a pas de « Prêt » à donner : il lit les contacts, rien de plus.
   if (referee) return { role: "REFEREE", canDeclareReady: false };
@@ -309,11 +326,11 @@ async function maintainIfDue(connection: PoolConnection, rows: CandidateRow[]): 
     try {
       const changed = await maintainMatchLaunches(connection, tournamentId);
       await connection.commit();
-      flushCastChanges(connection);
+      flushBotLogs(connection);
       if (changed > 0) publishMatchUpdatedEvent(tournamentId);
     } catch (error) {
       await connection.rollback().catch(() => undefined);
-      discardCastChanges(connection);
+      discardBotLogs(connection);
       console.error("[match-launch] entretien impossible", error);
     }
   }
@@ -377,6 +394,7 @@ function collectContactIds(visible: readonly VisibleLaunch[]): {
   const userIds = new Set<number>();
   for (const { row } of visible) {
     for (const caster of row.casters) userIds.add(caster.userId);
+    if (row.referee_user_id !== null) userIds.add(Number(row.referee_user_id));
   }
   for (const { row } of exposed) {
     for (const index of [1, 2] as const) {
@@ -472,6 +490,30 @@ function keepEligibleCasters(
   return kept;
 }
 
+/**
+ * L'arbitre désigné n'est une partie du match que tant qu'il remplit la
+ * condition d'arbitrage (`refereeEligibilityBlock`) et ne le joue pas : rejouée
+ * à chaque lecture, comme celle des casters. Avant le lancement, un arbitre
+ * qui ne la remplit plus est rangé dans `revokedReferees` (retrait d'office
+ * sous verrou, `releaseIneligibleReferee`) ; un match lancé le garde, tu.
+ */
+function keepEligibleReferees(
+  visible: readonly VisibleLaunch[],
+  users: Map<number, UserRow>,
+  revokedReferees: { matchId: number; refereeId: number }[],
+  plays: (row: CandidateRow, userId: number) => boolean,
+): void {
+  const now = Date.now();
+  for (const { row } of visible) {
+    if (row.referee_user_id === null) continue;
+    const refereeId = Number(row.referee_user_id);
+    const recorded = matchLaunchPhase({ ...toLaunchInput(row), launchPhase: true }, now);
+    const playsMatch = recorded !== "LAUNCHED" && plays(row, refereeId);
+    row.refereeEligible = refereeEligibilityBlock(users.get(refereeId)) === null && !playsMatch;
+    if (!row.refereeEligible && recorded !== "LAUNCHED") revokedReferees.push({ matchId: Number(row.id), refereeId });
+  }
+}
+
 /** Contacts d'une entrée solo : le joueur lui-même, s'il existe encore. */
 function soloContacts(soloUserId: number, ctx: LaunchContext): LaunchContact[] {
   const user = ctx.users.get(Number(soloUserId));
@@ -539,6 +581,33 @@ function buildLaunchCaster(caster: MatchCasterLink, ctx: LaunchContext): LaunchC
   };
 }
 
+/**
+ * L'arbitre désigné tel que les parties du match le lisent : pseudo et
+ * BattleTag (`visibleBattletag`, clause `sharesLiveMatch`), jamais son tag
+ * Discord. `null` sans arbitre ou arbitre inéligible.
+ */
+function buildLaunchReferee(row: CandidateRow, ctx: LaunchContext): LaunchReferee | null {
+  if (!row.refereeEligible || row.referee_user_id === null) return null;
+  const user = ctx.users.get(Number(row.referee_user_id));
+  if (!user || Number(user.is_deleted) !== 0) return null;
+  return {
+    userId: Number(user.id),
+    pseudo: user.pseudo,
+    // Le BattleTag suit la fenêtre des contacts du match (`ctx.exposes`) : les
+    // équipes l'ajoutent en jeu au départ, pas avant.
+    battletag: ctx.exposes
+      ? visibleBattletag(user.overwatch_battletag, ctx.viewer, {
+          userId: Number(user.id),
+          visible: Number(user.visible_overwatch) === 1,
+          sharesLiveMatch: true,
+        })
+      : null,
+    battletagVerified: user.blizzard_sub !== null,
+    ready: ctx.readiness.referee?.ready ?? false,
+    isViewer: Number(user.id) === ctx.viewer.id,
+  };
+}
+
 function buildLaunchInfo(
   row: CandidateRow,
   phase: LaunchPhase,
@@ -550,6 +619,7 @@ function buildLaunchInfo(
     .map((caster) => buildLaunchCaster(caster, ctx))
     .filter((caster): caster is LaunchCaster => caster !== null);
   const self = casters.find((caster) => caster.userId === ctx.viewer.id);
+  const referee = buildLaunchReferee(row, ctx);
   const launch = rowLaunchState(row);
   const lobbyOpenedAt = launch.lobbyOpenedAt;
   return {
@@ -561,23 +631,23 @@ function buildLaunchInfo(
     lobbyOpenedAt,
     autoLaunchAt: phase === "LOBBY" ? autoLaunchAt(lobbyOpenedAt) : null,
     launchedAt: launch.launchedAt,
-    hostTeamId: resolveHostTeamId(
-      row.host_team_id === null ? null : Number(row.host_team_id),
-      Number(row.team1_id),
-      Number(row.team2_id),
-    ),
+    hostTeamId: candidateHostTeamId(row),
     team1: buildLaunchSide(row, 1, ctx),
     team2: buildLaunchSide(row, 2, ctx),
     casters,
+    referee,
+    selfManaged: Number(row.self_managed ?? 0) === 1,
     viewer: {
       role: party.role,
       canDeclareReady: party.canDeclareReady,
+      isReferee: referee?.isViewer ?? false,
       isCaster: self !== undefined,
       earlyContacts: party.earlyContacts,
       ready: {
         CASTER: self?.ready ?? false,
         TEAM1: readiness.team1Ready,
         TEAM2: readiness.team2Ready,
+        MATCH_REFEREE: referee?.ready ?? false,
         REFEREE: false,
       }[party.role],
     },
@@ -619,6 +689,7 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
   const referee = forCard && staff;
 
   const revokedCasts: { matchId: number; casterId: number }[] = [];
+  const revokedReferees: { matchId: number; refereeId: number }[] = [];
   const launches = await withConnection(async (connection) => {
     let rows = await loadCandidates(connection, viewer.id, matchId, referee);
     if (rows.length === 0) return [];
@@ -644,7 +715,12 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
     // inscription à cette lecture-là, sans attendre celle d'un joueur. La
     // modale, qui interroge en boucle, n'en paie pas le coût.
     const checked = forCard ? read : visible;
-    if (visible.length === 0 && !checked.some(({ row }) => row.casters.length > 0)) return [];
+    if (
+      visible.length === 0 &&
+      !checked.some(({ row }) => row.casters.length > 0 || row.referee_user_id !== null)
+    ) {
+      return [];
+    }
 
     const { rosterTeamIds, userIds } = collectContactIds(checked);
     const rosters = await loadRosters(connection, rosterTeamIds);
@@ -659,6 +735,7 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
         return (rosters.get(Number(side.teamId)) ?? []).some((member) => Number(member.user_id) === casterId);
       });
     const kept = keepEligibleCasters(checked, users, revokedCasts, casterPlays);
+    keepEligibleReferees(checked, users, revokedReferees, casterPlays);
 
     const result: MatchLaunchInfo[] = [];
     for (const { row, phase, early, exposes } of visible) {
@@ -697,5 +774,25 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
       console.error("[match-launch] retrait d'un caster non éligible impossible", error);
     }
   }
+  for (const entry of revokedReferees) {
+    try {
+      await releaseIneligibleReferee(entry.matchId, entry.refereeId);
+    } catch (error) {
+      console.error("[match-launch] retrait d'un arbitre non éligible impossible", error);
+    }
+  }
   return launches;
+}
+
+/** Hôte du match lu par la modale : la règle même de l'instantané (`matchHostTeamId`). */
+function candidateHostTeamId(row: CandidateRow): number | null {
+  return matchHostTeamId(
+    row.host_team_id === null ? null : Number(row.host_team_id),
+    Number(row.team1_id),
+    Number(row.team2_id),
+    {
+      team1: row.team1_seed === null ? null : Number(row.team1_seed),
+      team2: row.team2_seed === null ? null : Number(row.team2_seed),
+    },
+  );
 }

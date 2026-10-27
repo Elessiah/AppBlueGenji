@@ -273,6 +273,59 @@
       "body": "Le match démarre sans attendre les « Prêt » manquants : les engagés peuvent reporter leur score dès maintenant.",
       "bodyDirect": "Le match démarre sans attendre son heure : les engagés peuvent reporter leur score dès maintenant.",
       "unplanned": "Ce match n'est pas encore planifié : il démarre maintenant, sans heure annoncée aux engagés."
+    },
+    "referee": "Arbitrage",
+    "refereeDialog": {
+      "title": "Arbitrage : {match}",
+      "loading": "Chargement…",
+      "loadFailed": "Impossible de lire l'arbitrage de ce match. Réessaie dans un instant.",
+      "current": "Arbitre désigné : {pseudo}",
+      "selfManagedNow": "Match en autogestion : sans arbitre.",
+      "none": "Ni arbitre ni autogestion : une décision est attendue.",
+      "ineligible": "(ne peut plus arbitrer : identité à certifier ou joueur du match)",
+      "take": "Arbitrer ce match",
+      "taken": "Tu arbitres ce match.",
+      "releaseSelf": "Ne plus arbitrer",
+      "released": "Tu n'arbitres plus ce match.",
+      "remove": "Retirer l'arbitre",
+      "removed": "Arbitre retiré.",
+      "assignLabel": "Désigner un arbitre",
+      "assignPlaceholder": "Choisir un compte…",
+      "assign": "Désigner",
+      "assigned": "Arbitre désigné.",
+      "selfOnAction": "Passer en autogestion",
+      "selfOffAction": "Quitter l'autogestion",
+      "selfOn": "Match passé en autogestion.",
+      "selfOff": "Autogestion levée.",
+      "roundOnAction": "Toute la manche en autogestion",
+      "roundOffAction": "Lever l'autogestion de la manche",
+      "roundOn": "Manche passée en autogestion.",
+      "roundOff": "Autogestion de la manche levée.",
+      "mapLabel": "Première carte",
+      "mapSave": "Enregistrer la carte",
+      "mapSaved": "Première carte enregistrée.",
+      "pending": "Envoi…",
+      "close": "Fermer",
+      "removeConfirm": {
+        "title": "Retirer l'arbitre de {match} ?",
+        "body": "L'arbitre est prévenu qu'il ne suit plus ce match.",
+        "confirm": "Retirer"
+      },
+      "selfOnConfirm": {
+        "title": "Passer {match} en autogestion ?",
+        "body": "Les équipes créent et règlent la partie elles-mêmes ; l'arbitre en place, s'il y en a un, est retiré et prévenu.",
+        "confirm": "Passer en autogestion"
+      },
+      "roundOnConfirm": {
+        "title": "Toute la manche en autogestion ?",
+        "body": "Chaque match encore à jouer de cette manche passe en autogestion ; les arbitres en place sont retirés et prévenus.",
+        "confirm": "Tout passer en autogestion"
+      },
+      "roundOffConfirm": {
+        "title": "Lever l'autogestion de la manche ?",
+        "body": "Les matchs encore à jouer de cette manche attendent de nouveau un arbitre ou une décision.",
+        "confirm": "Lever l'autogestion"
+      }
     }
   },
   "planning": {

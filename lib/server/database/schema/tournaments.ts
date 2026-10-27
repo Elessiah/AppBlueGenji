@@ -154,6 +154,12 @@ export async function createTournamentTables(db: Pool): Promise<void> {
       live_url VARCHAR(255) NULL,
       live_started_at DATETIME NULL,
       host_team_id BIGINT NULL,
+      -- Arbitre désigné du match (docs/features/MATCH_REFEREE.md), son
+      -- « Prêt », l'autogestion (exclusive de l'arbitre) et la première carte.
+      referee_user_id BIGINT NULL,
+      referee_ready_at DATETIME NULL,
+      self_managed TINYINT(1) NOT NULL DEFAULT 0,
+      first_map VARCHAR(64) NULL,
       caster_user_id BIGINT NULL,
       lobby_opened_at DATETIME NULL,
       launch_pairing VARCHAR(48) NULL,
@@ -170,6 +176,7 @@ export async function createTournamentTables(db: Pool): Promise<void> {
       INDEX idx_bg_matches_phase (tournament_id, phase_id),
       INDEX idx_bg_matches_live (live_trigger, status),
       INDEX idx_bg_matches_caster (caster_user_id),
+      INDEX idx_bg_matches_referee (referee_user_id),
       INDEX idx_bg_matches_start_at (start_at),
       CONSTRAINT fk_bg_matches_tournament FOREIGN KEY (tournament_id)
         REFERENCES bg_tournaments(id) ON DELETE CASCADE,
@@ -188,6 +195,8 @@ export async function createTournamentTables(db: Pool): Promise<void> {
       CONSTRAINT fk_bg_matches_host_team FOREIGN KEY (host_team_id)
         REFERENCES bg_teams(id) ON DELETE SET NULL,
       CONSTRAINT fk_bg_matches_caster FOREIGN KEY (caster_user_id)
+        REFERENCES bg_users(id) ON DELETE SET NULL,
+      CONSTRAINT fk_bg_matches_referee FOREIGN KEY (referee_user_id)
         REFERENCES bg_users(id) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);

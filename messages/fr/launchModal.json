@@ -6,11 +6,13 @@
   },
   "ready": {
     "caster": "Je suis prêt",
-    "team": "Mon équipe est prête"
+    "team": "Mon équipe est prête",
+    "referee": "Je suis prêt à arbitrer"
   },
   "confirmQuestion": {
     "caster": "Confirmes-tu être prêt à caster ce match ?",
-    "team": "Confirmes-tu que ton équipe est au complet et prête à jouer ?"
+    "team": "Confirmes-tu que ton équipe est au complet et prête à jouer ?",
+    "referee": "Confirmes-tu être prêt à arbitrer ce match ?"
   },
   "eyebrowLaunched": "MATCH LANCÉ",
   "eyebrowLobby": "LANCEMENT DU MATCH",
@@ -33,7 +35,13 @@
     "NOT_MATCH_CASTER": "Tu ne castes pas ce match.",
     "INVALID_HOST_TEAM": "L'équipe hôte doit être l'une des deux engagées du match.",
     "TOURNAMENT_NOT_RUNNING": "Le tournoi n'est pas en cours.",
-    "fallback": "L'action n'a pas pu aboutir. Réessaie dans un instant."
+    "fallback": "L'action n'a pas pu aboutir. Réessaie dans un instant.",
+    "NOT_REFEREE": "Arbitrer un match demande le rôle arbitre.",
+    "REFEREE_IDENTITY_REQUIRED": "Pour arbitrer un match, certifie ton tag Discord et rattache ton compte Battle.net depuis ton profil.",
+    "REFEREE_IS_PLAYER": "Ce compte joue ce match : il ne peut pas l'arbitrer.",
+    "MATCH_ALREADY_REFEREED": "Ce match a déjà un arbitre.",
+    "NOT_MATCH_REFEREE": "Tu n'arbitres pas ce match.",
+    "INVALID_FIRST_MAP": "Nom de carte invalide (64 caractères au plus)."
   },
   "readyNoted": "C'est noté, tu es prêt.",
   "readyCanceled": "« Prêt » annulé.",
@@ -90,5 +98,7 @@
     "casterShownEmpty": "Aucun contact du caster disponible.",
     "unavailable": "Les contacts de ce match ne te sont pas accessibles en ce moment (au caster : dès le départ du match).",
     "failed": "Les contacts n'ont pas pu être chargés. Réessaie dans un instant."
-  }
+  },
+  "referee": "Arbitre",
+  "selfManaged": "Match en autogestion : pas d'arbitre, les équipes créent et règlent la partie elles-mêmes."
 }

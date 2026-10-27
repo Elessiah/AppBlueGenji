@@ -46,6 +46,7 @@ import { notifyTournamentStart } from "./player-pushes";
 import { discardDepartedNotices, flushDepartedNotices } from "./departed-notices";
 import { discardAutoValidatedNotices, flushAutoValidatedNotices } from "./auto-validated-notices";
 import { discardCastChanges, flushCastChanges } from "./cast-notices";
+import { discardRefereeChanges, flushRefereeChanges } from "./referee-notices";
 import { getDatabase } from "@/lib/server/database";
 import { isTransactionAborted } from "@/lib/server/mysql-errors";
 import {
@@ -65,6 +66,7 @@ import { staffAuditLine, type LogEntrant } from "@/lib/shared/log-privacy";
 import { toParticipantType } from "@/lib/shared/participants";
 import {
   botEventChannel,
+  formatNoRefereeAlert,
   formatScoreConflictAlert,
   formatStalledScoreReportAlert,
   type BotEventChannel,
@@ -88,6 +90,8 @@ export type PendingBotLog =
   | { kind: "match_finished"; matchId: number }
   | { kind: "score_conflict"; matchId: number; claimId?: number }
   | { kind: "score_report_stalled"; matchId: number; claimId?: number }
+  // `pairing` : l'appariement lancé — une alerte par appariement, pas par match.
+  | { kind: "match_no_referee"; matchId: number; pairing: string; claimId?: number }
   | { kind: "tournament_started"; tournamentId: number }
   | { kind: "tournament_finished"; tournamentId: number }
   | { kind: "tournament_underfilled"; tournamentId: number }
@@ -154,6 +158,17 @@ type ResolvedRefereeLine = { message: string; refereeMatch: RefereeAlertMatch };
  */
 export const CONFLICT_ALERT_KEY = "SCORE_CONFLICT";
 
+/**
+ * Clé de l'avertissement « lancé sans arbitre ni autogestion » : une par
+ * **appariement** (`launchPairingKey`) — un match réapparié qui repart sans
+ * décision avertit de nouveau. `bg_referee_alerts.alert_key` tient 32
+ * caractères : l'appariement est coupé au-delà, sans autre effet qu'une clé
+ * moins fine sur des identifiants que la base n'atteindra pas.
+ */
+export function noRefereeAlertKey(pairing: string): string {
+  return `NO_REFEREE:${pairing}`.slice(0, 32);
+}
+
 /** Clé de réservation de l'escalade « délai dépassé, toujours pas tranché » (`./score-report-sql`). */
 export { STALLED_ALERT_KEY };
 
@@ -165,7 +180,7 @@ export { STALLED_ALERT_KEY };
  */
 export type RefereeAlertEntry = Extract<
   PendingBotLog,
-  { kind: "score_conflict" | "score_report_stalled" }
+  { kind: "score_conflict" | "score_report_stalled" | "match_no_referee" }
 >;
 
 /**
@@ -180,6 +195,8 @@ export function refereeAlertKey(entry: PendingBotLog): string | null {
       return CONFLICT_ALERT_KEY;
     case "score_report_stalled":
       return STALLED_ALERT_KEY;
+    case "match_no_referee":
+      return noRefereeAlertKey(entry.pairing);
     default:
       return null;
   }
@@ -283,6 +300,7 @@ export function discardBotLogs(connection: PoolConnection): void {
   discardAutoValidatedNotices(connection);
   // Comme les casters désinscrits d'office par l'entretien des lancements.
   discardCastChanges(connection);
+  discardRefereeChanges(connection);
   // Les manches notées tranchées ne l'ont pas été : leurs réservations gardent
   // tout leur objet, et le prochain entretien les retrouvera telles quelles.
   resolvedMatches.delete(connection);
@@ -304,6 +322,7 @@ export function flushBotLogs(connection: PoolConnection): void {
   flushAutoValidatedNotices(connection);
   // Et les casters désinscrits d'office par l'entretien (`./cast-notices`).
   flushCastChanges(connection);
+  flushRefereeChanges(connection);
   const queue = pending.get(connection) ?? [];
   pending.delete(connection);
   const settled = resolvedMatches.get(connection) ?? new Set<number>();
@@ -451,6 +470,7 @@ function refereeAlertClaimId(entry: PendingBotLog): number | null {
   switch (entry.kind) {
     case "score_conflict":
     case "score_report_stalled":
+    case "match_no_referee":
       return entry.claimId ?? null;
     default:
       return null;
@@ -476,13 +496,16 @@ function refereePushKey(entry: PendingBotLog): string {
 
 /** Nature d'une alerte d'arbitrage, pour la rédiger hors du français du journal (lot 9-3). */
 function refereeAlertKind(entry: PendingBotLog): RefereeAlertKind {
-  return entry.kind === "score_conflict" || entry.kind === "score_report_stalled" ? entry.kind : "other";
+  return entry.kind === "score_conflict" || entry.kind === "score_report_stalled" || entry.kind === "match_no_referee"
+    ? entry.kind
+    : "other";
 }
 
 function refereeAlertMatchId(entry: PendingBotLog): number {
   switch (entry.kind) {
     case "score_conflict":
     case "score_report_stalled":
+    case "match_no_referee":
       return entry.matchId;
     default:
       throw new Error("NO_MATCH_ID");
@@ -984,6 +1007,13 @@ async function resolveScoreReportStalledLog(
       };
 }
 
+async function resolveNoRefereeLog(
+  entry: Extract<PendingBotLog, { kind: "match_no_referee" }>,
+): Promise<ResolvedRefereeLine | null> {
+  const context = await loadRefereeAlertContext(entry.matchId);
+  return context === null ? null : { message: formatNoRefereeAlert(context), refereeMatch: refereeMatchOf(context) };
+}
+
 async function resolveTournamentStartedLog(
   entry: Extract<PendingBotLog, { kind: "tournament_started" }>,
 ): Promise<string | null> {
@@ -1066,6 +1096,8 @@ async function resolveOne(entry: PendingBotLog): Promise<string | ResolvedRefere
       return resolveScoreConflictLog(entry);
     case "score_report_stalled":
       return resolveScoreReportStalledLog(entry);
+    case "match_no_referee":
+      return resolveNoRefereeLog(entry);
     case "tournament_started":
       return resolveTournamentStartedLog(entry);
     case "tournament_finished":

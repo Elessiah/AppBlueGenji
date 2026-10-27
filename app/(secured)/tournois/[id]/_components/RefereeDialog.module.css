@@ -1,0 +1,47 @@
+/* Fenêtre « Arbitrage » d'un match (`RefereeDialog`). */
+.title {
+  margin: 0 0 12px;
+  font-size: 16px;
+}
+
+.body {
+  display: grid;
+  gap: 14px;
+}
+
+.status,
+.muted {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.warn {
+  color: var(--danger);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.label {
+  flex-basis: 100%;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.row select,
+.row input[type="text"] {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}

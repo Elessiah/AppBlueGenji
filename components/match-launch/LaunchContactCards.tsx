@@ -20,6 +20,7 @@ import {
   type CasterArrivalSeen,
   type LaunchCaster,
   type LaunchContact,
+  type LaunchReferee,
   type LaunchSide,
   type MatchLaunchInfo,
 } from "@/lib/shared/match-launch";
@@ -349,6 +350,56 @@ export function CasterCard({
           qu'il n'en a pas — jamais au caster lui-même, dont elle parle. */}
       {pending && <p className={styles.note}>{laterText ?? t("casterContactsAtLaunch")}</p>}
       {announceArrival && <CasterArrivalStatus caster={caster} pending={pending} />}
+    </section>
+  );
+}
+
+/**
+ * Fiche de l'arbitre désigné (`docs/features/MATCH_REFEREE.md`) : son pseudo et
+ * son BattleTag — exposés par le serveur aux deux engagées, aux casters du
+ * match et au staff seulement. Sans arbitre, la note d'autogestion, ou rien.
+ */
+export function RefereeCard({
+  referee,
+  selfManaged,
+  phase,
+  onCopy,
+  linkNames = false,
+}: Readonly<{
+  referee: LaunchReferee | null;
+  selfManaged: boolean;
+  phase: MatchLaunchInfo["phase"];
+  onCopy: CopyFn;
+  linkNames?: boolean;
+}>) {
+  const { t } = useLaunchText();
+  if (!referee) {
+    if (!selfManaged) return null;
+    return (
+      <section className={styles.caster} aria-label={t("referee")}>
+        <p className={styles.note}>
+          <span aria-hidden="true">🤝</span> {t("selfManaged")}
+        </p>
+      </section>
+    );
+  }
+  return (
+    <section className={styles.caster} aria-label={`${t("referee")} ${referee.pseudo}`}>
+      <div className={styles.sideHead}>
+        <span className={styles.emblem} aria-hidden="true">
+          🧑‍⚖️
+        </span>
+        <span className={styles.sideName}>
+          <span className={styles.casterLabel}>{t("referee")}</span>{" "}
+          {linkNames ? <PlayerLink userId={referee.userId}>{referee.pseudo}</PlayerLink> : referee.pseudo}
+        </span>
+        <ReadyChip ready={referee.ready} phase={phase} />
+      </div>
+      {!referee.isViewer && referee.battletag !== null && (
+        <div className={styles.casterIds}>
+          <IdentityLine kind="BattleTag" value={referee.battletag} verified={referee.battletagVerified} onCopy={onCopy} />
+        </div>
+      )}
     </section>
   );
 }

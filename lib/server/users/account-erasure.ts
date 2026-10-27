@@ -198,6 +198,13 @@ export async function anonymizeAccount(connection: PoolConnection, userId: numbe
   // chaîne qu'il a fourni est retiré — matchs joués compris, même d'un stream
   // qu'un co-caster tient encore.
   await withdrawUserCasts(connection, userId, false);
+  // Arbitre désigné (`docs/features/MATCH_REFEREE.md`) : retiré de tous ses
+  // matchs, joués compris — rien n'en a besoin après coup, et le lien entre
+  // le compte et l'arbitrage disparaît avec l'identité.
+  await connection.execute(
+    `UPDATE bg_matches SET referee_user_id = NULL, referee_ready_at = NULL WHERE referee_user_id = ?`,
+    [userId],
+  );
   // Le pseudo anonymisé doit aussi remplacer le nom affiché en tournoi — sur la
   // connexion de la transaction, sans quoi le renommage survivrait à un
   // rollback de l'anonymisation qui l'a motivé.

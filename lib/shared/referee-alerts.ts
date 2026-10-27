@@ -110,6 +110,7 @@ export const BOT_EVENT_CHANNELS: Record<BotEventKind, BotEventChannel> = {
   endurance_penalty_lifted: "JOURNAL",
   score_conflict: "REFEREE",
   score_report_stalled: "REFEREE",
+  match_no_referee: "REFEREE",
 };
 
 /**
@@ -170,6 +171,15 @@ function alertLine(emoji: string, reason: string, context: RefereeAlertContext):
  * deux reports qui se contredisent, et le délai de report ne la débloquera pas
  * non plus (il ne tranche que les matchs à un seul report).
  */
+/**
+ * Alerte : le match entre en lancement sans arbitre désigné ni autogestion
+ * (`docs/features/MATCH_REFEREE.md`). Rien ne bascule d'office : le match part
+ * comme avant, le staff décide.
+ */
+export function formatNoRefereeAlert(context: RefereeAlertContext): string {
+  return alertLine("🧑‍⚖️", "match en lancement sans arbitre ni autogestion — une décision est attendue", context);
+}
+
 export function formatScoreConflictAlert(context: RefereeAlertContext): string {
   return alertLine("⚠️", "reports de score contradictoires", context);
 }

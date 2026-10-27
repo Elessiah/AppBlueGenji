@@ -11,9 +11,11 @@ import {
 import { normalizeStreamUrl, type MatchLiveTrigger } from "@/lib/shared/live-streams";
 import { normalizeReplayUrl } from "@/lib/shared/match-replay";
 import { parseTournamentImage } from "@/lib/shared/tournament-image";
-import { currentLaunchState, launchReadiness, launchStateIsCurrent, resolveHostTeamId } from "@/lib/shared/match-launch";
+import { currentLaunchState, launchReadiness, launchStateIsCurrent } from "@/lib/shared/match-launch";
+import { firstBanTeamId, matchHostTeamId } from "@/lib/shared/match-referee";
+import { visibleText } from "@/lib/shared/visible-text";
 import { localizeBracketPlaceholder } from "@/lib/shared/bracket-placeholders";
-import { castEligibilityBlock } from "./cast-eligibility";
+import { castEligibilityBlock, refereeEligibilityBlock } from "./cast-eligibility";
 import type { MatchCasterRow, MatchStreamRow } from "./match-casters";
 
 export type TournamentRow = RowDataPacket & {
@@ -141,6 +143,22 @@ export type MatchRow = RowDataPacket & {
   team2_ready_at?: Date | null;
   team1_is_ghost?: number | null;
   team2_is_ghost?: number | null;
+  /** Arbitre désigné, autogestion, première carte (`docs/features/MATCH_REFEREE.md`). */
+  referee_user_id?: number | null;
+  referee_ready_at?: Date | null;
+  self_managed?: number | null;
+  first_map?: string | null;
+  /** Condition d'arbitrage de l'arbitre désigné (`refereeEligibilitySql`). */
+  referee_discord_verified_at?: Date | null;
+  referee_discord_pseudo?: string | null;
+  referee_blizzard_sub?: string | null;
+  referee_overwatch_battletag?: string | null;
+  referee_is_deleted?: number | null;
+  referee_is_admin?: number | null;
+  referee_platform_roles_json?: unknown;
+  /** Rang d'endurance des engagées (BlueGenji Survie, phase finale ; `./match-host-seeds`). */
+  team1_seed?: number | null;
+  team2_seed?: number | null;
   /** NULL = aucune rediff (cf. `lib/shared/match-replay.ts`). */
   replay_url?: string | null;
 };
@@ -404,11 +422,32 @@ function casterWithdrawn(row: MatchRow, caster: MatchCasterRow): boolean {
   return castEligibilityBlock(caster.eligibility) !== null;
 }
 
+/**
+ * L'arbitre désigné compte-t-il encore ? Il remplit la condition d'arbitrage
+ * (relue sur la jointure de l'instantané) ; sinon l'instantané le tait, comme
+ * un caster inéligible, et la lecture de la modale le retire avant le lancement.
+ */
+function refereeKept(row: MatchRow): boolean {
+  if (row.referee_user_id === null || row.referee_user_id === undefined) return false;
+  return (
+    refereeEligibilityBlock({
+      discord_verified_at: row.referee_discord_verified_at ?? null,
+      discord_pseudo: row.referee_discord_pseudo ?? null,
+      blizzard_sub: row.referee_blizzard_sub ?? null,
+      overwatch_battletag: row.referee_overwatch_battletag ?? null,
+      is_deleted: Number(row.referee_is_deleted ?? 1),
+      is_admin: Number(row.referee_is_admin ?? 0),
+      platform_roles_json: row.referee_platform_roles_json ?? null,
+    }) === null
+  );
+}
+
 /** Champs du lancement d'un match (`lib/shared/match-launch.ts`). */
 function mapMatchLaunch(row: MatchRow, allCasters: readonly MatchCasterRow[]) {
   const team1Id = nullableId(row.team1_id);
   const team2Id = nullableId(row.team2_id);
   const casters = allCasters.filter((caster) => !casterWithdrawn(row, caster));
+  const referee = refereeKept(row);
   // Un état posé pour un autre appariement ne vaut rien pour celui-ci.
   const launch = currentLaunchState(
     {
@@ -428,9 +467,20 @@ function mapMatchLaunch(row: MatchRow, allCasters: readonly MatchCasterRow[]) {
     team1IsGhost: Number(row.team1_is_ghost ?? 0) === 1,
     team2IsGhost: Number(row.team2_is_ghost ?? 0) === 1,
     casters: casters.map((caster) => ({ userId: caster.userId, readyAt: current ? toIso(caster.readyAt) : null })),
+    referee: referee ? { readyAt: current ? toIso(row.referee_ready_at ?? null) : null } : null,
   });
+  const hostTeamId = matchHostTeamId(nullableId(row.host_team_id), team1Id, team2Id, {
+    team1: nullableId(row.team1_seed),
+    team2: nullableId(row.team2_seed),
+  });
+  const firstMap = row.first_map ? visibleText(row.first_map) : "";
   return {
-    hostTeamId: resolveHostTeamId(nullableId(row.host_team_id), team1Id, team2Id),
+    hostTeamId,
+    firstBanTeamId: firstBanTeamId(hostTeamId, team1Id, team2Id),
+    refereeAssigned: referee,
+    refereeReady: readiness.referee?.ready ?? false,
+    selfManaged: Number(row.self_managed ?? 0) === 1,
+    firstMap: firstMap === "" ? null : firstMap,
     casters: casters.map((caster, index) => ({
       userId: caster.userId,
       pseudo: caster.pseudo,

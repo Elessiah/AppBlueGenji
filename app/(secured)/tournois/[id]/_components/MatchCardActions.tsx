@@ -16,6 +16,7 @@ import {
   Pencil,
   Play,
   Radio,
+  Scale,
   Settings,
   TriangleAlert,
   Users,
@@ -42,6 +43,7 @@ import {
 } from "../_lib/match-card-actions";
 import { orReload } from "@/lib/shared/lazy-component";
 import { CastClaimDialog, type CastClaimOutcome } from "./CastClaimDialog";
+import { RefereeDialog } from "./RefereeDialog";
 import type { CastClaimBody } from "../_lib/cast-claim";
 import styles from "./MatchCardActions.module.css";
 
@@ -73,6 +75,7 @@ const ICONS: Record<MatchCardActionId, LucideIcon> = {
   schedule: CalendarClock,
   force: Play,
   hostSwap: ArrowLeftRight,
+  referee: Scale,
   claimCast: Mic,
   releaseCast: MicOff,
   onAir: Radio,
@@ -232,7 +235,7 @@ export function MatchCardActions({
   onAdminScore: () => void;
   onReport: () => void;
 }>) {
-  const { openSchedule, openConfig, openReplay, castBlock, launchPhase: launchPhaseEnabled } = useLiveControls();
+  const { openSchedule, openConfig, openReplay, castBlock, launchPhase: launchPhaseEnabled, viewerUserId } = useLiveControls();
   const { showError, showSuccess } = useToast();
   const mapError = useMapError();
   const errorsText = useErrorsText();
@@ -266,6 +269,8 @@ export function MatchCardActions({
   // (terminé, caster retiré, tournoi clos) : l'instantané du flux retire
   // l'action, et la modale se ferme avec elle.
   if (contactsOpen && !actions.some((a) => a.id === "contacts")) setContactsOpen(false);
+  // La fenêtre « Arbitrage » se ferme avec son action (match joué, tournoi clos).
+  const [refereeOpen, setRefereeOpen] = useConfirmWhile(actions.some((a) => a.id === "referee"));
   // Ouvert **et** encore quelque chose à montrer : un instantané du flux qui
   // retire le panneau ne doit pas le laisser « ouvert » en mémoire, prêt à
   // reparaître déplié sans clic au retour d'une action.
@@ -423,6 +428,7 @@ export function MatchCardActions({
       const next = match.hostTeamId === match.team1Id ? match.team2Id : match.team1Id;
       void run(() => send(`/api/admin/matches/${match.id}/host`, "PUT", { teamId: next }), t("cardActions.hostChanged"));
     },
+    referee: () => setRefereeOpen(true),
     claimCast: () => {
       if (castBlock) {
         showError(launchError(castBlock));
@@ -616,6 +622,14 @@ export function MatchCardActions({
       )}
       {claimOpen && (
         <CastClaimDialog match={match} matchLabel={matchLabel} onClose={() => setClaimOpen(false)} onClaim={claim} />
+      )}
+      {refereeOpen && viewerUserId !== null && (
+        <RefereeDialog
+          match={match}
+          matchLabel={matchLabel}
+          viewerUserId={viewerUserId}
+          onClose={() => setRefereeOpen(false)}
+        />
       )}
       {contactsOpen && (
         <MatchContactsDialog

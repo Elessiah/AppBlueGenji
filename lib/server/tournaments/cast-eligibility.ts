@@ -14,6 +14,7 @@
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { castBlockReason, type CastBlock, type CasterIdentity } from "@/lib/shared/match-launch";
+import { refereeBlockReason, type RefereeBlock } from "@/lib/shared/match-referee";
 import { can, sanitizePlatformRoles } from "@/lib/shared/permissions";
 
 type CasterIdentityFields = {
@@ -78,4 +79,25 @@ export async function loadEligibleCasterIds(
     ids,
   );
   return new Set(rows.filter((row) => castEligibilityBlock(row) === null).map((row) => Number(row.id)));
+}
+
+/**
+ * `refereeBlockReason` sur la ligne d'un compte ; `null` s'il peut arbitrer
+ * (`docs/features/MATCH_REFEREE.md`) : permission `tournaments`, tag Discord
+ * certifié, compte Battle.net rattaché — l'identité même d'un caster.
+ */
+export function refereeEligibilityBlock(row: CastEligibilityFields | undefined): RefereeBlock | null {
+  const tournaments =
+    row !== undefined &&
+    can({ isAdmin: Boolean(Number(row.is_admin)), roles: sanitizePlatformRoles(row.platform_roles_json) }, "tournaments");
+  return refereeBlockReason(tournaments, casterIdentityOf(row));
+}
+
+/** La condition d'arbitrage d'un seul compte, relue sur l'exécuteur donné (verrou compris). */
+export async function loadRefereeEligibility(executor: Executor, userId: number): Promise<RefereeBlock | null> {
+  const [rows] = await executor.execute<CastEligibilityRow[]>(
+    `SELECT ${CAST_ELIGIBILITY_COLUMNS} FROM bg_users WHERE id = ? LIMIT 1`,
+    [userId],
+  );
+  return refereeEligibilityBlock(rows[0]);
 }

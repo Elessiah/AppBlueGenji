@@ -217,6 +217,11 @@ export type LaunchReadiness = {
   team2Ready: boolean;
   /** Chaque caster inscrit doit lui aussi se déclarer prêt — sans caster, rien à attendre. */
   casters: { userId: number; ready: boolean }[];
+  /**
+   * L'arbitre désigné, quatrième partie (`docs/features/MATCH_REFEREE.md`) ;
+   * absent ou `null` : le match n'a pas d'arbitre, rien à attendre de ce côté.
+   */
+  referee?: { ready: boolean } | null;
 };
 
 /** Ce qu'il faut savoir d'un match pour compter ses « Prêt ». */
@@ -228,6 +233,8 @@ export type LaunchReadinessInput = {
   team2IsGhost: boolean;
   /** Casters inscrits et leur « Prêt », déjà rapporté à l'appariement courant. */
   casters: readonly { userId: number; readyAt: string | null }[];
+  /** Arbitre désigné et son « Prêt » (rapporté à l'appariement courant) ; `null` sans arbitre. */
+  referee?: { readyAt: string | null } | null;
 };
 
 export function launchReadiness(input: LaunchReadinessInput): LaunchReadiness {
@@ -235,20 +242,28 @@ export function launchReadiness(input: LaunchReadinessInput): LaunchReadiness {
     team1Ready: input.team1IsGhost || input.team1ReadyAt !== null,
     team2Ready: input.team2IsGhost || input.team2ReadyAt !== null,
     casters: input.casters.map((caster) => ({ userId: caster.userId, ready: caster.readyAt !== null })),
+    referee: input.referee ? { ready: input.referee.readyAt !== null } : null,
   };
 }
 
 /**
  * Toutes les parties attendues sont-elles prêtes ? Chaque caster inscrit est
- * attendu : sans caster, les deux équipes suffisent.
+ * attendu, et l'arbitre désigné s'il y en a un : sans caster ni arbitre, les
+ * deux équipes suffisent.
  */
 export function allPartiesReady(readiness: LaunchReadiness): boolean {
-  return readiness.team1Ready && readiness.team2Ready && readiness.casters.every((caster) => caster.ready);
+  return (
+    readiness.team1Ready &&
+    readiness.team2Ready &&
+    readiness.casters.every((caster) => caster.ready) &&
+    (readiness.referee?.ready ?? true)
+  );
 }
 
-/** Nombre de parties prêtes sur le nombre attendu (« 3/4 prêts » : deux équipes, deux casters). */
+/** Nombre de parties prêtes sur le nombre attendu (« 3/4 prêts » : deux équipes, un caster, l'arbitre). */
 export function readyCount(readiness: LaunchReadiness): { ready: number; expected: number } {
   const parties = [readiness.team1Ready, readiness.team2Ready, ...readiness.casters.map((caster) => caster.ready)];
+  if (readiness.referee) parties.push(readiness.referee.ready);
   return { ready: parties.filter(Boolean).length, expected: parties.length };
 }
 
@@ -459,7 +474,28 @@ export type LaunchCaster = {
   isViewer: boolean;
 };
 
-export type LaunchViewerRole = "TEAM1" | "TEAM2" | "CASTER";
+/**
+ * L'arbitre désigné tel que la modale le présente : pseudo et BattleTag (à
+ * ajouter en jeu), jamais son tag Discord. Rendu aux seules parties du match
+ * (équipes, casters) et à l'arbitrage — le public ne lit que « Arbitre
+ * désigné » (`BracketMatch.refereeAssigned`).
+ */
+export type LaunchReferee = {
+  userId: number;
+  pseudo: string;
+  battletag: string | null;
+  battletagVerified: boolean;
+  ready: boolean;
+  /** Cette fiche est-elle celle du lecteur ? */
+  isViewer: boolean;
+};
+
+/**
+ * Partie qui donne un « Prêt » : une des deux engagées, un caster, ou
+ * l'arbitre désigné du match (`MATCH_REFEREE`, à ne pas confondre avec le rôle
+ * de lecture `REFEREE` d'un membre de l'arbitrage).
+ */
+export type LaunchViewerRole = "TEAM1" | "TEAM2" | "CASTER" | "MATCH_REFEREE";
 
 /**
  * Rôle du lecteur dans une présentation de match : une partie, ou un arbitre
@@ -482,10 +518,19 @@ export type MatchLaunchInfo = {
   team2: LaunchSide;
   /** Casters du match, dans l'ordre d'inscription ; vide sans caster. */
   casters: LaunchCaster[];
+  /** Arbitre désigné, `null` sans arbitre (ou arbitre devenu inéligible, tu). */
+  referee: LaunchReferee | null;
+  /** Match en autogestion (aucun arbitre : les équipes créent et règlent la partie). */
+  selfManaged: boolean;
   viewer: {
     role: MatchLaunchViewerRole;
     /** Le lecteur peut-il cliquer « Prêt » pour sa partie ? */
     canDeclareReady: boolean;
+    /**
+     * Le lecteur est-il l'arbitre désigné du match, quel que soit `role` (un
+     * arbitre qui caste aussi lit en `CASTER`) ? Son « Prêt » vaut pour les deux.
+     */
+    isReferee: boolean;
     /**
      * Le lecteur est-il un des casters inscrits, quel que soit `role` (un
      * joueur du match qui caste reste `TEAM1`/`TEAM2`) ? La modale « Contacts »
@@ -646,6 +691,12 @@ export const LAUNCH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   NOT_MATCH_CASTER: "Tu ne castes pas ce match.",
   INVALID_HOST_TEAM: "L'équipe hôte doit être l'une des deux engagées du match.",
   TOURNAMENT_NOT_RUNNING: "Le tournoi n'est pas en cours.",
+  NOT_REFEREE: "Arbitrer un match demande le rôle arbitre.",
+  REFEREE_IDENTITY_REQUIRED: "Pour arbitrer un match, certifie ton tag Discord et rattache ton compte Battle.net depuis ton profil.",
+  REFEREE_IS_PLAYER: "Ce compte joue ce match : il ne peut pas l'arbitrer.",
+  MATCH_ALREADY_REFEREED: "Ce match a déjà un arbitre.",
+  NOT_MATCH_REFEREE: "Tu n'arbitres pas ce match.",
+  INVALID_FIRST_MAP: "Nom de carte invalide (64 caractères au plus).",
 };
 
 /** Message français d'un refus du lancement. */

@@ -94,7 +94,9 @@
     "other": "Une alerte attend un arbitre.",
     "score_conflictMatch": "Conflit de score · {tournament}, {round} : un arbitre est attendu.",
     "score_report_stalledMatch": "Litige sans arbitrage depuis trop longtemps · {tournament}, {round} : saisie verrouillée, un arbitre doit trancher.",
-    "otherMatch": "Alerte · {tournament}, {round} : un arbitre est attendu."
+    "otherMatch": "Alerte · {tournament}, {round} : un arbitre est attendu.",
+    "match_no_referee": "Un match entre en lancement sans arbitre ni autogestion : une décision est attendue.",
+    "match_no_refereeMatch": "Match sans arbitre · {tournament}, {round} : ni arbitre ni autogestion, une décision est attendue."
   },
   "selfResolved": {
     "title": "Litige tranché par un joueur du match",
@@ -144,6 +146,17 @@
       "STAFF": "décision du staff",
       "REPLACED": "tu ne remplissais plus les conditions du cast, un autre caster a pris ta place",
       "INELIGIBLE": "tu ne remplis plus les conditions du cast",
+      "JOINED_TEAM": "tu joues désormais ce match"
+    }
+  },
+  "refereeReleased": {
+    "title": "Arbitrage retiré",
+    "body": "Tu n'arbitres plus ce match : {reason}. {pairing} · {tournament}, {round}.",
+    "reason": {
+      "STAFF": "décision du staff",
+      "REPLACED": "le staff l'a confié à un autre arbitre",
+      "SELF_MANAGED": "le staff l'a passé en autogestion",
+      "INELIGIBLE": "tu ne remplis plus les conditions de l'arbitrage",
       "JOINED_TEAM": "tu joues désormais ce match"
     }
   }

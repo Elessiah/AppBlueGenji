@@ -100,6 +100,11 @@ export const PUSH_TOPICS = {
     description: "Environ 10 h à l'avance, la liste des matchs à venir : horaires, tournois et équipes.",
     audience: "tournaments",
   },
+  REFEREE_RELEASED: {
+    label: "Arbitrage retiré",
+    description: "Le staff te retire l'arbitrage d'un match, le confie à un autre, passe le match en autogestion, ou il t'est retiré d'office : le motif est donné.",
+    audience: "tournaments",
+  },
   CAST_RELEASED: {
     label: "Cast retiré",
     description: "Ton inscription comme caster d'un match est retirée par le staff ou d'office : le motif est donné.",

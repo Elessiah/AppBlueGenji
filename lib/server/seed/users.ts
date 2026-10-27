@@ -91,12 +91,14 @@ const SPECIAL_USERS: SpecialUserDef[] = [
   },
   {
     pseudo: "Arbitre",
-    purpose: "permission tournaments seule",
+    purpose:
+      "permission tournaments seule ; identité vérifiée (Discord + Battle.net) : arbitre désigné des matchs de lancement seedés",
     platformRoles: ["ARBITRE"],
     isAdult: 1,
     discordId: "900000000000000002",
     discordTag: "test_arbitre",
     discordVerified: true,
+    blizzardSub: "seed-blizzard-arbitre",
   },
   {
     pseudo: "Caster",

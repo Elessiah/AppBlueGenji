@@ -262,7 +262,7 @@ export const MatchRow = memo(function MatchRow({
           Vide (`:empty`), elle disparaît avec son filet. */}
       <div className={styles.meta}>
         <MatchLiveStrip match={match} state={liveState} />
-        <MatchLaunchStrip match={match} phase={launchPhase} />
+        <MatchLaunchStrip match={match} phase={launchPhase} staff={canSchedule} />
       </div>
 
       <MatchReplayStrip match={match} />
