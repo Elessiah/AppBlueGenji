@@ -551,6 +551,10 @@ describe("langue du compte (lot 9-3)", () => {
     const { readFileSync } = await import("node:fs");
     const { join } = await import("node:path");
     expect(fr.hint).toMatch(/quand un match quitte ton programme/);
+    // La case coupe aussi l'avis de retrait du cast (CAST_NOTICES.md) : l'aide le dit.
+    const en = (await import("@/messages/en/profile.json")).default.matchDms;
+    expect(fr.hint).toMatch(/quand ton inscription de caster sur un match est retirée par un autre que toi/);
+    expect(en.hint).toMatch(/when someone else removes your caster registration for a match/);
     expect(readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/page.tsx"), "utf8")).toMatch(
       /<MatchDmField\s+initial=\{data\?\.matchDmEnabled\}\s+discordReachable=/,
     );
