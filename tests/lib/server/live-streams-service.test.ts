@@ -233,16 +233,24 @@ describe("setMatchLiveConfig", () => {
     ]);
   });
 
-  it("rattache au caster le lien qu'il pose sans être de l'organisation ; le staff qui le reprend en fait le sien", async () => {
+  it("rattache au caster le lien qu'il pose sans être de l'organisation ; un réglage réenregistré ne le lui prend pas", async () => {
     const world = liveWorld(matchRow());
     await mockLiveDb(world);
 
     await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/voix", linkProviderId: 12 });
     expect(world.state.streams).toEqual([{ ...dbStream(1, "https://twitch.tv/voix", true), link_user_id: 12 }]);
 
-    // Le même lien, réenregistré par l'organisation : il n'est plus celui du caster.
-    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/voix", linkProviderId: null });
-    expect(world.state.streams).toEqual([dbStream(1, "https://twitch.tv/voix", true)]);
+    // Le même lien, réenregistré par l'organisation (mode changé) : il reste au caster.
+    await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/voix", linkProviderId: null });
+    expect(world.state.streams).toEqual([{ ...dbStream(1, "https://twitch.tv/voix", true), link_user_id: 12 }]);
+
+    // Un autre lien, posé par l'organisation : c'est le sien.
+    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/bluegenji", linkProviderId: null });
+    expect(world.state.streams).toEqual([dbStream(1, "https://twitch.tv/bluegenji", true)]);
+
+    // Et un caster qui le réenregistre tel quel ne le prend pas.
+    await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/bluegenji", linkProviderId: 12 });
+    expect(world.state.streams).toEqual([dbStream(1, "https://twitch.tv/bluegenji", true)]);
 
     // Démarquer efface lien et fournisseur.
     await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/voix", linkProviderId: 12 });
