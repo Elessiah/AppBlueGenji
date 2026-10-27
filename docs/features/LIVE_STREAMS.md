@@ -17,8 +17,9 @@ chaque caster ouvre à part). Partout où un seul lien tient — carte, ticker d
 l'accueil, annonce #live, détection « à l'antenne » — c'est le **premier lien**
 (`firstStreamUrlSql` : le lien du staff, à défaut le plus petit stream qui a un
 lien) : le comportement d'avant, pour le premier stream. Avant le lancement, le stream d'un caster qui ne remplit
-plus la condition du cast est tu, lien compris. Le bandeau de diffusion du match montre tous les liens,
-le premier en tête. La configuration du direct par le staff règle le lien de
+plus la condition du cast est tu, lien compris. La carte d'un match ne garde que le premier lien, suivi de « +N » vers
+la page du match (`MATCH_PAGE.md`), qui montre tous les streams, chacun avec ses casters.
+Un lien de stream porte le nom de sa chaîne (`streamChannelName`). La configuration du direct par le staff règle le lien de
 son propre stream (`staff_owned`), jamais celui qu'un caster a ouvert ; « pas
 de cast » n'efface que ce lien du staff. Le stream d'un caster part, avec son
 lien, quand plus aucun caster ne le tient ; le lien qu'un caster a fourni

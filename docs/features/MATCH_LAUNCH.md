@@ -400,8 +400,9 @@ qu'il tient, son « Prêt »). Code : `lib/server/tournaments/match-casters.ts`.
   tu partout (carte, bandeau, ticker, annonce #live), comme son caster
   (`casterWithdrawn`). Le stream du staff compte toujours.
   C'est lui que montrent les vues compactes (carte, ticker, annonce #live,
-  détection « à l'antenne ») ; le bandeau de diffusion (`MatchLiveStrip`) montre
-  tous les liens, le premier en tête (`matchStreamLinks`).
+  détection « à l'antenne ») ; le bandeau de diffusion (`MatchLiveStrip`) de la
+  carte ne garde que ce premier lien, suivi de « +N » vers la page du match
+  (`MATCH_PAGE.md`), qui montre tous les streams avec leurs casters.
 - **Stream du staff** (`staff_owned = 1`, `staffStream`) : celui dont la
   configuration du direct règle le lien — le stream marqué, sinon le premier
   stream sans lien (un caster déjà inscrit sans chaîne), qui devient celui du
@@ -488,7 +489,8 @@ Changement déclaré dans `PRIVACY_CHANGES` (`2026-09-lancement-des-matchs`),
   confidentialité dû soit fait (`launchModalWaits`, signal
   `PRIVACY_CHANGES_ANSWERED_EVENT`) : ouvertes ensemble, la modale de lancement,
   empilée en dernier, prenait le piège de focus sous l'autre. Sur téléphone,
-  la barre d'actions (« Prêt », « Voir le match », « Fermer ») et la
+  la barre d'actions (« Prêt », « Voir le match » — la page du match,
+  `MATCH_PAGE.md` —, « Fermer ») et la
   confirmation restent **au bas** de la modale, hors de la zone qui défile (une
   `ScrollArea` porte en-tête, fiches et notifications) : les fiches contacts la
   poussaient sous la ligne de flottaison. Pas de `position: sticky` — collée,
