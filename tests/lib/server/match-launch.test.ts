@@ -1288,6 +1288,19 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
     });
   });
 
+  it("retire d'office, motif « équipe rejointe », un arbitre éligible qui joue désormais le match", async () => {
+    state.memberships.push({ userId: REFEREE, teamId: TEAM2, roles: ["DPS"] });
+    state.match = matchState({ referee_user_id: REFEREE });
+    expect(await releaseIneligibleReferee(42, REFEREE)).toBe(true);
+    expect(state.match?.referee_user_id).toBeNull();
+    expect(announceRefereeChange).toHaveBeenCalledWith({
+      kind: "AUTO_RELEASED",
+      matchId: 42,
+      refereeId: REFEREE,
+      reason: "JOINED_TEAM",
+    });
+  });
+
   it("garde un arbitre éligible qui ne joue pas le match", async () => {
     state.match = matchState({ referee_user_id: REFEREE });
     expect(await releaseIneligibleReferee(42, REFEREE)).toBe(false);
