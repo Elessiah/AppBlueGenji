@@ -6,7 +6,11 @@ import {
 } from "@/lib/server/api-guard";
 import { fail } from "@/lib/server/http";
 import { currentSpectatorLoadLevel, recordSpectatorRead } from "@/lib/server/spectator-load";
-import { getSpectatorPayload, isSpectatorPayloadWarm } from "@/lib/server/spectator-snapshot";
+import {
+  getSpectatorPayload,
+  isSpectatorPayloadWarm,
+  isSpectatorTournamentPublic,
+} from "@/lib/server/spectator-snapshot";
 import {
   parseTournamentId,
   SPECTATOR_FRESHNESS_HEADER,
@@ -50,18 +54,25 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   const { id } = await context.params;
   const tournamentId = parseTournamentId(id);
   if (tournamentId === null) return fail("INVALID_TOURNAMENT_ID", 400);
-  // Une lecture qui ferait reconstruire la réponse se paie à part : parcourir
-  // des tournois froids coûte un instantané entier chacun, pas un cache.
-  // Vérifié juste avant `getSpectatorPayload`, sans attente entre les deux.
-  if (!isSpectatorPayloadWarm(tournamentId)) {
-    const rebuildThrottled = enforceRateLimit(SPECTATOR_REBUILD_RULE, clientIp);
-    if (rebuildThrottled) return rebuildThrottled;
-  }
-
   const level = currentSpectatorLoadLevel();
 
   let payload;
   try {
+    // Une lecture qui ferait reconstruire la réponse se paie à part : parcourir
+    // des tournois froids coûte un instantané entier chacun, pas un cache.
+    if (!isSpectatorPayloadWarm(tournamentId)) {
+      // Un identifiant inconnu ou pas encore publié ne coûte que sa carte et
+      // n'entame pas ce plafond : des sondes au hasard ne privent pas une
+      // adresse partagée (salle de LAN) de ses relectures, et un lien ouvert
+      // avant la publication reçoit son « introuvable », pas un `429`.
+      if (!(await isSpectatorTournamentPublic(tournamentId))) return fail("TOURNAMENT_NOT_FOUND", 404);
+      // Revérifié après l'attente (un autre visiteur a pu lancer le calcul), et
+      // juste avant `getSpectatorPayload`, sans attente entre les deux.
+      if (!isSpectatorPayloadWarm(tournamentId)) {
+        const rebuildThrottled = enforceRateLimit(SPECTATOR_REBUILD_RULE, clientIp);
+        if (rebuildThrottled) return rebuildThrottled;
+      }
+    }
     payload = await getSpectatorPayload(tournamentId, spectatorCacheTtlMs(level));
   } catch (error) {
     // Base injoignable ou saturée : le visiteur sans compte recule le premier —

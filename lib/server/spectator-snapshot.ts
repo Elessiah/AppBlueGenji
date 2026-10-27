@@ -44,6 +44,15 @@ export function isSpectatorPayloadWarm(tournamentId: number): boolean {
   return isCachedOrLoading(spectatorSnapshotCacheKey(tournamentId));
 }
 
+/**
+ * Le tournoi est-il visible du public ? Une seule requête indexée (sa carte),
+ * sans écriture : c'est ce qu'une lecture d'un identifiant inconnu ou pas encore
+ * publié coûte, et elle ne puise pas dans `SPECTATOR_REBUILD_RULE`.
+ */
+export async function isSpectatorTournamentPublic(tournamentId: number): Promise<boolean> {
+  return (await getVisibleTournamentCard(tournamentId)) !== null;
+}
+
 /** Refus du chargeur : rien à servir, et rien à mettre en cache. */
 class SpectatorNotFound extends Error {}
 
