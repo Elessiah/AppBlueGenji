@@ -58,10 +58,10 @@ describe("cleanStoredNames", () => {
     await cleanStoredNames(pool);
 
     expect(updates(execute)).toEqual([
-      { sql: "UPDATE bg_teams SET name = ?, updated_at = updated_at WHERE id = ? AND name = ?", params: ["Dragon Squad", 1, "Dragon\u202E Squad"] },
-      { sql: "UPDATE bg_users SET pseudo = ?, updated_at = updated_at WHERE id = ? AND pseudo = ?", params: ["Admin", 2, "Adm\u200Bin"] },
+      { sql: "UPDATE bg_teams SET name = ?, updated_at = updated_at WHERE id = ? AND name COLLATE utf8mb4_bin = ?", params: ["Dragon Squad", 1, "Dragon\u202E Squad"] },
+      { sql: "UPDATE bg_users SET pseudo = ?, updated_at = updated_at WHERE id = ? AND pseudo COLLATE utf8mb4_bin = ?", params: ["Admin", 2, "Adm\u200Bin"] },
       {
-        sql: "UPDATE bg_tournaments SET name = ?, updated_at = updated_at WHERE id = ? AND name = ?",
+        sql: "UPDATE bg_tournaments SET name = ?, updated_at = updated_at WHERE id = ? AND name COLLATE utf8mb4_bin = ?",
         params: ["Coupe   d'hiver", 3, "  Coupe\u2060   d'hiver "],
       },
     ]);
@@ -123,7 +123,7 @@ describe("cleanStoredNames", () => {
     await cleanStoredNames(pool);
 
     expect(updates(execute)).toEqual([
-      { sql: "UPDATE bg_teams SET name = ?, updated_at = updated_at WHERE id = ? AND name = ?", params: ["Team² Ｘ", 1, "\u202ETeam²\u200B Ｘ"] },
+      { sql: "UPDATE bg_teams SET name = ?, updated_at = updated_at WHERE id = ? AND name COLLATE utf8mb4_bin = ?", params: ["Team² Ｘ", 1, "\u202ETeam²\u200B Ｘ"] },
     ]);
   });
 
@@ -163,6 +163,21 @@ describe("cleanStoredNames", () => {
     await cleanStoredNames(pool);
 
     expect(logSpy).not.toHaveBeenCalled();
+  });
+
+  it("compare l'ancien nom octet à octet : un renommage par la casse n'est pas écrasé", async () => {
+    // La collation des colonnes (`_ai_ci`) ignore casse, accents et invisibles :
+    // sans `utf8mb4_bin`, « TEAM » renommé entre-temps égalerait « Te​am ».
+    const { execute, pool } = database({
+      bg_teams: [{ id: 1, name: "Te​am" }],
+      bg_users: [{ id: 2, name: "Bo​b" }],
+      bg_tournaments: [{ id: 3, name: "Cu​p" }],
+    });
+
+    await cleanStoredNames(pool);
+
+    const guards = updates(execute).map(({ sql }) => /WHERE id = \? AND (\w+)( COLLATE \w+)? = \?$/.exec(sql));
+    expect(guards.map((match) => match?.[2])).toEqual([" COLLATE utf8mb4_bin", " COLLATE utf8mb4_bin", " COLLATE utf8mb4_bin"]);
   });
 
   it("dit une table illisible sans faire tomber le démarrage, et passe à la suivante", async () => {
