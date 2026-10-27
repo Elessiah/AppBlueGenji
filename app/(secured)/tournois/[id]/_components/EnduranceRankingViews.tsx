@@ -68,8 +68,8 @@ interface EnduranceRankingViewsProps {
   /** Au moins une ligne porte un geste. */
   showActions: boolean;
   /**
-   * Légende des gestes (« 🔒 Figé » et son « i »), sous le tableau et au-dessus
-   * de la navigation du bas — dans la vue « Général » seule, comme les gestes.
+   * Légende des gestes (« 🔒 Figé » et son « i »), dernière ligne du panneau
+   * « Général » — seule vue qui porte les gestes —, au-dessus de la navigation.
    */
   actionsLegend?: ReactNode;
   /** Une ligne porte deux gestes (arbitrage) : colonne élargie. */
@@ -474,9 +474,9 @@ export function EnduranceRankingViews({
             </Fragment>
           );
         })}
+        {/* Dans le panneau « Général » qu'elle explique : lue avec lui. */}
+        {withActions && actionsLegend && <div className={styles.legend}>{actionsLegend}</div>}
       </div>
-
-      {withActions && actionsLegend}
 
       {views.length > 1 && (
         <nav className={styles.bottomNav} aria-label={t("endurance.viewsTabsLabel")}>

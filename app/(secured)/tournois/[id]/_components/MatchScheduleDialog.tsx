@@ -170,9 +170,8 @@ function ScheduleWarning({ children }: Readonly<{ children: ReactNode }>) {
  * Vide, elle n'occupe aucune place.
  */
 function PastDateWarning({ message }: Readonly<{ message: string | null }>) {
-  // `tabIndex={-1}` : l'envoi retenu (date devenue passée) y porte le focus.
   return (
-    <output id={PAST_WARNING_ID} tabIndex={-1} style={message ? WARNING_STYLE : { display: "block" }}>
+    <output id={PAST_WARNING_ID} style={message ? WARNING_STYLE : { display: "block" }}>
       {message ?? ""}
     </output>
   );
@@ -342,13 +341,14 @@ export function MatchScheduleDialog({
     }
     // L'horloge a pu avancer depuis l'ouverture (fenêtre laissée ouverte) : une
     // date devenue passée entre-temps s'avertit d'abord, l'envoi suivant part.
-    // Le focus va sur l'avertissement : il défile dans la vue (à 375 px il
-    // pouvait être sous le pli, et le clic semblait sans effet) et le lecteur
-    // d'écran le lit — une notification en `role="alert"` l'aurait coupé.
+    // L'avertissement défile dans la vue (à 375 px il pouvait être sous le pli,
+    // et le clic semblait sans effet) ; sa région d'état le fait lire. Le focus
+    // reste sur « Enregistrer » : un second envoi confirme, comme pour une date
+    // passée dès la saisie — une notification `role="alert"` l'aurait coupé.
     const now = Date.now();
     if (pastWarning === null && pastWarningAt(now) !== null) {
       setClock(now);
-      requestAnimationFrame(() => document.getElementById(PAST_WARNING_ID)?.focus());
+      requestAnimationFrame(() => document.getElementById(PAST_WARNING_ID)?.scrollIntoView({ block: "nearest" }));
       return;
     }
 

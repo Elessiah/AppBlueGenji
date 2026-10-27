@@ -184,6 +184,12 @@
   border-top: 1px dashed rgba(var(--blue-500-rgb), 0.5);
 }
 
+/* Légende des gestes, en pied du panneau « Général ». */
+.legend {
+  padding: 0 12px 8px;
+  border-top: 1px solid var(--line);
+}
+
 .bottomNav {
   display: flex;
   justify-content: space-between;
