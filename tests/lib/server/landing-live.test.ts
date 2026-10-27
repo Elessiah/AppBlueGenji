@@ -429,7 +429,7 @@ describe("getLandingLive — fiche des engagés du match", () => {
 
     expect(live?.currentMatch?.team1Name).toBe("Alpha");
     expect(live?.currentMatch?.team2Name).toBeNull();
-    expect(live?.matches.map((match) => match.team1Name)).toEqual(["Alpha"]);
+    expect(live?.matches?.map((match) => match.team1Name)).toEqual(["Alpha"]);
   });
 
   it("expose le logo de chaque engagé, servi par le site", async () => {
