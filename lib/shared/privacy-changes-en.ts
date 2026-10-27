@@ -569,7 +569,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "A match can now have several casters: each one joins a stream of the match (co-cast) or opens their own, with its own link. The match contacts presented to the caster while the match is being played are presented to each registered caster, and each caster's are also presented to the other casters of the match.",
     details: [
       "What is shown and when do not change: certified Discord tag and BattleTag (even hidden), in the match's “Contacts” and launch windows, only while the match is being played (to the referees, as soon as both its opponents are known), as part of the performance of the service.",
-      "If you cast: your username is shown with the stream you join. The link of the stream you open separately is published with the match; that stream goes, with its link, once no caster holds it any more — whether you leave it or your account is deleted; only the link set by the organizers stays with the match.",
+      "If you cast: your username is shown with the stream you join. The link of the stream you open separately is published with the match; that stream goes, with its link, once no caster holds it any more — whether you leave it or your account is deleted; when your account is deleted, the link you provided also goes, played matches included, even if another caster still holds that stream; only the link set by the organizers stays with the match.",
       "A caster no longer replaces another: a new registration is added without removing anyone. A registration is now only removed by the caster themselves, by the staff or automatically.",
     ],
   },

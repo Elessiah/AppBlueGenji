@@ -1130,7 +1130,9 @@ function RgpdFr({
             direct et enregistré sur <strong>YouTube, Twitch ou Kick</strong>, par la chaîne de l&apos;association
             ou d&apos;un ou plusieurs casters : chaque caster rejoint un stream du match ou ouvre le sien,
             avec son propre lien (facultatif), publié avec le match. Ce stream part, avec son lien, quand
-            plus aucun caster ne le tient ; seul le lien posé par l&apos;organisation reste au match.{" "}
+            plus aucun caster ne le tient ; le lien qu&apos;un caster a fourni part aussi à la suppression de
+            son compte, matchs joués compris, même si un autre caster tient encore ce stream ; seul le lien
+            posé par l&apos;organisation reste au match.{" "}
             {STREAM_NOTICE_SHOWN} Ce traitement repose sur l&apos;intérêt
             légitime de l&apos;association à faire connaître ses compétitions.{" "}
             {STREAM_NOTICE_OBJECTION} Un lien de rediffusion qui montre le joueur est alors

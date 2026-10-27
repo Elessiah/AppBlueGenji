@@ -338,6 +338,10 @@ Un compte supprimé (anonymisé) perd son inscription sur les matchs non termin�
 l'effacement complet la retire de tous ses matchs (`withdrawUserCasts`, puis la
 clé étrangère `CASCADE`), avec le stream qu'il était seul à tenir — même celui
 qui porte le premier lien du match, puisque c'est le lien de sa chaîne.
+Dans les deux cas, **chaque lien qu'il a fourni** (`bg_match_streams.link_user_id`,
+posé à l'ouverture de son stream) est retiré, matchs joués compris et même
+d'un stream qu'un co-caster tient encore : le stream reste à ce co-caster,
+sans lien. Le lien du staff (`staff_owned`) n'est jamais touché.
 
 ## Casters et streams
 
@@ -394,7 +398,9 @@ qu'il tient, son « Prêt »). Code : `lib/server/tournaments/match-casters.ts`.
 - **Ménage** (`pruneMatchStreams`, sous verrou, chaque table seule) : un stream
   que plus aucun caster ne tient part, avec son lien — qu'il se retire, soit
   retiré ou que son compte soit effacé —, sauf le stream du staff tant qu'il
-  porte un lien (gardé au match).
+  porte un lien (gardé au match). Le lien d'un stream de caster est rattaché à
+  qui l'a fourni (`link_user_id`) : la suppression de son compte le retire
+  (`withdrawUserCasts`), même quand un co-caster garde le stream.
 - **Interblocages** : inscription, retrait et retrait d'office se rejouent sur
   un interblocage d'InnoDB (`retryOnDeadlock`) ; tout geste qui touche les
   casters verrouille d'abord la ligne du match (`setRefereeScheduling` compris).

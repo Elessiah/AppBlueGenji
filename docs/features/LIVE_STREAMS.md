@@ -21,7 +21,9 @@ plus la condition du cast est tu, lien compris. Le bandeau de diffusion du match
 le premier en tête. La configuration du direct par le staff règle le lien de
 son propre stream (`staff_owned`), jamais celui qu'un caster a ouvert ; « pas
 de cast » n'efface que ce lien du staff. Le stream d'un caster part, avec son
-lien, quand plus aucun caster ne le tient. Voir
+lien, quand plus aucun caster ne le tient ; le lien qu'un caster a fourni
+(`link_user_id`) part aussi à la suppression de son compte, matchs joués
+compris, même d'un stream qu'un co-caster tient encore. Voir
 `docs/features/MATCH_LAUNCH.md` § Casters et streams.
 
 Un troisième mode d'antenne s'appuie sur le **calendrier** du match plutôt que
