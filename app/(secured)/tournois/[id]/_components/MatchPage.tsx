@@ -338,7 +338,13 @@ function CastSection({
                   {stream.casters.map((caster, casterIndex) => (
                     <span key={caster.userId}>
                       {casterIndex > 0 && ", "}
-                      <PlayerLink userId={caster.userId}>{caster.pseudo}</PlayerLink>
+                      {/* Sans compte, l'identifiant du caster est masqué (négatif,
+                          `spectatorSnapshot`) : son pseudo seul, sans lien vers une fiche. */}
+                      {caster.userId > 0 ? (
+                        <PlayerLink userId={caster.userId}>{caster.pseudo}</PlayerLink>
+                      ) : (
+                        <span>{caster.pseudo}</span>
+                      )}
                     </span>
                   ))}
                 </span>
