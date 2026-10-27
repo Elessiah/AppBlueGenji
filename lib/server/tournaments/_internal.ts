@@ -11,9 +11,10 @@ import {
 import { normalizeStreamUrl, type MatchLiveTrigger } from "@/lib/shared/live-streams";
 import { normalizeReplayUrl } from "@/lib/shared/match-replay";
 import { parseTournamentImage } from "@/lib/shared/tournament-image";
-import { currentLaunchState, launchReadiness, resolveHostTeamId } from "@/lib/shared/match-launch";
+import { currentLaunchState, launchReadiness, launchStateIsCurrent, resolveHostTeamId } from "@/lib/shared/match-launch";
 import { localizeBracketPlaceholder } from "@/lib/shared/bracket-placeholders";
 import { castEligibilityBlock } from "./cast-eligibility";
+import type { MatchCasterRow, MatchStreamRow } from "./match-casters";
 
 export type TournamentRow = RowDataPacket & {
   id: number;
@@ -128,30 +129,16 @@ export type MatchRow = RowDataPacket & {
   start_at: Date | null;
   /** NULL = match non casté (cf. `lib/shared/live-streams.ts`). */
   live_trigger: MatchLiveTrigger | null;
+  /** Premier lien du match (`firstStreamUrlSql`, `./match-casters`). */
   live_url: string | null;
   live_started_at: Date | null;
   /** Lancement (`lib/shared/match-launch.ts`) — absents des lectures partielles. */
   host_team_id?: number | null;
-  caster_user_id?: number | null;
-  caster_pseudo?: string | null;
   lobby_opened_at?: Date | null;
   launch_pairing?: string | null;
   launched_at?: Date | null;
   team1_ready_at?: Date | null;
   team2_ready_at?: Date | null;
-  caster_ready_at?: Date | null;
-  /**
-   * Condition du cast du titulaire (`cast-eligibility.ts`), relue par la
-   * lecture du plateau — absente des lectures partielles, qui gardent alors
-   * l'inscription telle qu'elle est stockée.
-   */
-  caster_discord_verified_at?: Date | string | null;
-  caster_discord_pseudo?: string | null;
-  caster_blizzard_sub?: string | null;
-  caster_overwatch_battletag?: string | null;
-  caster_is_deleted?: number | null;
-  caster_is_admin?: number | null;
-  caster_platform_roles_json?: unknown;
   team1_is_ghost?: number | null;
   team2_is_ghost?: number | null;
   /** NULL = aucune rediff (cf. `lib/shared/match-replay.ts`). */
@@ -275,7 +262,22 @@ export function mapCard(row: TournamentListRow): TournamentCard {
   };
 }
 
-export function mapMatch(row: MatchRow): BracketMatch {
+/**
+ * Casters et streams d'un match, lus à part par lot (`./match-casters`) :
+ * l'instantané les passe, une lecture partielle s'en passe (listes vides).
+ */
+export type MatchCastExtras = {
+  casters?: readonly MatchCasterRow[];
+  streams?: readonly MatchStreamRow[];
+};
+
+export function mapMatch(row: MatchRow, extras: MatchCastExtras = {}): BracketMatch {
+  // Un stream que seul tient un caster que la lecture tait n'est pas montré
+  // (sa chaîne n'est plus celle d'un caster du match) — comme le premier lien
+  // (`firstStreamUrlSql`) ; le stream du staff reste.
+  const heldStreams = new Set(
+    (extras.casters ?? []).filter((caster) => !casterWithdrawn(row, caster)).map((caster) => caster.streamId),
+  );
   return {
     id: Number(row.id),
     tournamentId: Number(row.tournament_id),
@@ -321,8 +323,16 @@ export function mapMatch(row: MatchRow): BracketMatch {
     startAt: toIso(row.start_at ?? null),
     liveTrigger: row.live_trigger ?? null,
     liveUrl: normalizeStreamUrl(row.live_url),
+    // Revalidés à la lecture, comme le premier lien.
+    streams: (extras.streams ?? [])
+      .filter((stream) => stream.staff || heldStreams.has(stream.id))
+      .map((stream) => ({
+        id: stream.id,
+        liveUrl: normalizeStreamUrl(stream.liveUrl),
+        staff: stream.staff,
+      })),
     liveStartedAt: toIso(row.live_started_at),
-    ...mapMatchLaunch(row),
+    ...mapMatchLaunch(row, extras.casters ?? []),
     replayUrl: normalizeReplayUrl(row.replay_url ?? null),
   };
 }
@@ -382,35 +392,23 @@ function nullableId(value: number | null | undefined): number | null {
   return value === null || value === undefined ? null : Number(value);
 }
 
-/** Champs du lancement d'un match (`lib/shared/match-launch.ts`). */
 /**
- * Le titulaire du cast ne remplit plus la condition (`live` + identité) et le
- * match attend encore son lancement : l'instantané le tait, si bien que la
- * carte rouvre l'inscription — `claimMatchCast` accepte de le remplacer. Un
- * match lancé ou joué garde son caster : on ne réécrit ni une diffusion en
- * cours ni l'histoire.
+ * Un caster ne remplit plus la condition (`live` + identité) et le match
+ * attend encore son lancement : l'instantané le tait — il ne retient plus de
+ * « Prêt », et la lecture de la modale retire son inscription. Un match lancé
+ * ou joué garde ses casters : on ne réécrit ni une diffusion en cours ni
+ * l'histoire.
  */
-function casterWithdrawn(row: MatchRow): boolean {
-  if (row.caster_user_id === null || row.caster_user_id === undefined) return false;
-  if (row.caster_is_deleted === undefined) return false;
+function casterWithdrawn(row: MatchRow, caster: MatchCasterRow): boolean {
   if (row.status === "COMPLETED" || (row.launched_at ?? null) !== null) return false;
-  return (
-    castEligibilityBlock({
-      discord_verified_at: row.caster_discord_verified_at ?? null,
-      discord_pseudo: row.caster_discord_pseudo ?? null,
-      blizzard_sub: row.caster_blizzard_sub ?? null,
-      overwatch_battletag: row.caster_overwatch_battletag ?? null,
-      is_deleted: Number(row.caster_is_deleted ?? 1),
-      is_admin: Number(row.caster_is_admin ?? 0),
-      platform_roles_json: row.caster_platform_roles_json ?? null,
-    }) !== null
-  );
+  return castEligibilityBlock(caster.eligibility) !== null;
 }
 
-function mapMatchLaunch(row: MatchRow) {
+/** Champs du lancement d'un match (`lib/shared/match-launch.ts`). */
+function mapMatchLaunch(row: MatchRow, allCasters: readonly MatchCasterRow[]) {
   const team1Id = nullableId(row.team1_id);
   const team2Id = nullableId(row.team2_id);
-  const casterUserId = casterWithdrawn(row) ? null : nullableId(row.caster_user_id);
+  const casters = allCasters.filter((caster) => !casterWithdrawn(row, caster));
   // Un état posé pour un autre appariement ne vaut rien pour celui-ci.
   const launch = currentLaunchState(
     {
@@ -419,27 +417,29 @@ function mapMatchLaunch(row: MatchRow) {
       launchedAt: toIso(row.launched_at ?? null),
       team1ReadyAt: toIso(row.team1_ready_at ?? null),
       team2ReadyAt: toIso(row.team2_ready_at ?? null),
-      casterReadyAt: toIso(row.caster_ready_at ?? null),
     },
     team1Id,
     team2Id,
   );
+  const current = launchStateIsCurrent(row.launch_pairing ?? null, team1Id, team2Id);
   const readiness = launchReadiness({
     team1ReadyAt: launch.team1ReadyAt,
     team2ReadyAt: launch.team2ReadyAt,
     team1IsGhost: Number(row.team1_is_ghost ?? 0) === 1,
     team2IsGhost: Number(row.team2_is_ghost ?? 0) === 1,
-    casterUserId,
-    casterReadyAt: launch.casterReadyAt,
+    casters: casters.map((caster) => ({ userId: caster.userId, readyAt: current ? toIso(caster.readyAt) : null })),
   });
   return {
     hostTeamId: resolveHostTeamId(nullableId(row.host_team_id), team1Id, team2Id),
-    casterUserId,
-    casterPseudo: casterUserId === null ? null : (row.caster_pseudo ?? null),
+    casters: casters.map((caster, index) => ({
+      userId: caster.userId,
+      pseudo: caster.pseudo,
+      streamId: caster.streamId,
+      ready: readiness.casters[index].ready,
+    })),
     lobbyOpenedAt: launch.lobbyOpenedAt,
     launchedAt: launch.launchedAt,
     team1Ready: readiness.team1Ready,
     team2Ready: readiness.team2Ready,
-    casterReady: readiness.casterReady,
   };
 }

@@ -320,8 +320,8 @@ export function RgpdEn({
           <p id="suivi-sans-compte">
             <strong>Following a tournament without an account.</strong> Since October 2026, the page of a
             published tournament can also be viewed without logging in, at <code>/suivre/tournois/…</code>:
-            bracket, scores, rankings, names of the teams and usernames of the players taking part, username of a
-            match&apos;s caster — what streams and Discord already show —, as well as team logos and, for a solo
+            bracket, scores, rankings, names of the teams and usernames of the players taking part, usernames of a
+            match&apos;s casters — what streams and Discord already show —, as well as team logos and, for a solo
             tournament, the avatar of each player taking part (unless they hid it) and their internal account
             number, which carries their podium mark, and BlueGenji Survival penalties (entrant, round, points),
             without their reason or the referee who imposed them. Replay codes are not shown there: they
@@ -829,7 +829,7 @@ export function RgpdEn({
             language, when
             the time of one of your matches is set, changed or removed, for its reminders (24 h and 10 h before),
             when you are removed from a match and, if you cast, when your caster registration for a match is removed
-            by the staff or automatically, or taken over by another caster (with the reason) — only if your Discord tag is <strong>certified</strong>: an
+            by the staff or automatically (with the reason) — only if your Discord tag is <strong>certified</strong>: an
             uncertified tag, even one linked by signing in with Discord, receives none, to avoid spam (your push notifications are still sent). These messages
             are based on the association&apos;s{" "}
             <strong>legitimate interest</strong> in the smooth running of tournaments; you can object at any time by
@@ -845,8 +845,8 @@ export function RgpdEn({
             team they withdraw) and, if they play in it, warns their
             colleagues: this check rests on the association&apos;s <strong>legitimate interest</strong> in impartial
             refereeing, and this staff member may object to it (section{" "}
-            <a href="#exercer-vos-droits">“Exercising your rights”</a>). A caster&apos;s registration for a match,
-            its takeover by another caster and its removal (with the reason for a takeover or an automatic removal)
+            <a href="#exercer-vos-droits">“Exercising your rights”</a>). A caster&apos;s registration for a match
+            and its removal (with the reason for an automatic removal)
             are noted in the staff log on Discord without naming anyone (“a caster”, “the staff”); so are the
             staff&apos;s other actions on a match or a tournament (result confirmed, score saved, forced launch, host,
             broadcast, replay, tournament edited, seeding, stage brought forward, ghost teams, image), with the match&apos;s team names (“a player” in a
@@ -932,7 +932,12 @@ export function RgpdEn({
           </p>
           <p id="retransmission">
             <strong>Match streaming.</strong> A tournament match may be streamed live and recorded on{" "}
-            <strong>YouTube, Twitch or Kick</strong>, on the association&apos;s channel or a caster&apos;s.{" "}
+            <strong>YouTube, Twitch or Kick</strong>, on the association&apos;s channel or that of one or more
+            casters: each caster joins a stream of the match or opens their own, with its own link (optional),
+            published with the match. That stream goes, with its link, once no caster holds it any more; only the link
+            set in the match&apos;s live configuration (by the organizers or a caster) stays with the match. The link a
+            caster provided, there or when opening their stream, also goes when their account is deleted, played
+            matches included, even if another caster still holds that stream.{" "}
             {STREAM_NOTICE_SHOWN_EN} This processing is based on the association&apos;s legitimate interest in
             promoting its competitions. <EnglishLegalText text={STREAM_NOTICE_OBJECTION_EN} /> A replay link that shows the player is then
             removed from the site, and a video published by the association&apos;s channel is hidden or deleted.

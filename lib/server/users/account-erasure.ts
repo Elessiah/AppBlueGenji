@@ -1,6 +1,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { ignoreMissingTable, isDuplicateEntryError, isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
+import { withdrawUserCasts } from "@/lib/server/tournaments/match-casters";
 import { ANONYMOUS_PSEUDOS, pickAnonymousPseudo } from "@/lib/shared/anonymous-pseudos";
 import { DEFAULT_LOCALE } from "@/lib/shared/locales";
 
@@ -27,6 +28,10 @@ export async function eraseAccount(connection: PoolConnection, userId: number): 
         AND NOT EXISTS (SELECT 1 FROM bg_matches m WHERE m.team2_id = bg_teams.id)`,
     [userId],
   );
+  // La cascade emporterait ses inscriptions de caster, mais pas le stream
+  // séparé qu'il avait ouvert — ni son lien, qui désigne sa chaîne, retiré
+  // aussi d'un stream qu'un co-caster tient encore.
+  await withdrawUserCasts(connection, userId, true);
   await connection.execute(`DELETE FROM bg_users WHERE id = ?`, [userId]);
 }
 
@@ -189,13 +194,10 @@ export async function anonymizeAccount(connection: PoolConnection, userId: numbe
   // est retirée, sans quoi le lancement attendrait un « Prêt » que plus
   // personne ne peut donner (`lib/shared/match-launch.ts`). Les matchs joués
   // gardent la leur — l'histoire ne se réécrit pas, et le pseudo est anonymisé.
-  // L'effacement n'a rien à faire : la clé étrangère passe à `NULL`.
-  await connection.execute(
-    `UPDATE bg_matches
-        SET caster_user_id = NULL, caster_ready_at = NULL
-      WHERE caster_user_id = ? AND status <> 'COMPLETED'`,
-    [userId],
-  );
+  // Un stream séparé qu'il était seul à tenir part avec lui, et chaque lien de
+  // chaîne qu'il a fourni est retiré — matchs joués compris, même d'un stream
+  // qu'un co-caster tient encore.
+  await withdrawUserCasts(connection, userId, false);
   // Le pseudo anonymisé doit aussi remplacer le nom affiché en tournoi — sur la
   // connexion de la transaction, sans quoi le renommage survivrait à un
   // rollback de l'anonymisation qui l'a motivé.

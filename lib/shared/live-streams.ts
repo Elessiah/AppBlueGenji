@@ -294,3 +294,14 @@ export function isMatchCastable(match: MatchLiveInput): boolean {
 export function canConfigureLive(match: MatchLiveInput): boolean {
   return isMatchCastable(match) || match.liveTrigger !== null;
 }
+
+/**
+ * Le stream **du staff** d'un match : celui dont la configuration du direct
+ * règle le lien (`setMatchLiveConfig`). Sans lui, le premier stream sans lien —
+ * qu'un lien du staff vient habiller, comme `bg_matches.live_url` habillait le
+ * cast d'avant les co-casters ; jamais le stream qu'un caster a ouvert avec le
+ * lien de sa chaîne, que le staff écraserait.
+ */
+export function staffStream<T extends { liveUrl: string | null; staff: boolean }>(streams: readonly T[]): T | null {
+  return streams.find((stream) => stream.staff) ?? streams.find((stream) => stream.liveUrl === null) ?? null;
+}

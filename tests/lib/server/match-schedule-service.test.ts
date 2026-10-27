@@ -512,7 +512,10 @@ describe("setMatchStartAt", () => {
       await setMatchStartAt(42, FUTURE);
       const update = writes.find((w) => w.sql.startsWith("UPDATE bg_matches"));
       expect(update?.sql).toContain("team1_ready_at = NULL");
-      expect(update?.sql).toContain("caster_ready_at = NULL");
+      // Chaque caster perd son « Prêt » avec celui des équipes.
+      const casters = writes.find((w) => w.sql.startsWith("UPDATE bg_match_casters"));
+      expect(casters?.sql).toContain("SET ready_at = NULL WHERE match_id = ?");
+      expect(casters?.params).toEqual([42]);
       expect(resets(writes)).toBe(true);
       // La notification de départ de ce lancement est réarmée pour la nouvelle heure.
       const notices = writes.find((w) => w.sql.startsWith("DELETE FROM bg_match_start_notices"));

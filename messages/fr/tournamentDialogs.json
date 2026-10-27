@@ -262,7 +262,7 @@
     "autoStop": "Le direct s'arrête tout seul dès qu'un score est saisi.",
     "url": "Chaîne du match (facultatif)",
     "urlInvalid": "Lien non reconnu. Plateformes acceptées : {platforms}.",
-    "urlHint": "Laisser vide pour signaler le match sans lien : son annonce sur Discord renverra alors à la chaîne officielle du tournoi, ou ne partira pas s'il n'en a pas. Plateformes acceptées : {platforms}."
+    "urlHint": "Laisser vide pour signaler le match sans lien du staff : son annonce sur Discord renverra alors au premier lien ouvert par un caster, à défaut à la chaîne officielle du tournoi, ou ne partira pas s'il n'en a pas. Plateformes acceptées : {platforms}."
   },
   "replay": {
     "removed": "Rediff retirée.",
@@ -367,7 +367,7 @@
     "title": "Certifie ton Discord et ton BattleTag",
     "titleDiscordOnly": "Certifie ton Discord",
     "titleBattletagOnly": "Certifie ton BattleTag",
-    "leadManager": "Tu mènes une équipe engagée dans ce tournoi : tu peux être présenté comme son contact à l'adversaire et à l'arbitrage dès que vos adversaires sont connus, et au caster le temps du match. Certifie ce qui te manque encore.",
+    "leadManager": "Tu mènes une équipe engagée dans ce tournoi : tu peux être présenté comme son contact à l'adversaire et à l'arbitrage dès que vos adversaires sont connus, et aux casters le temps du match. Certifie ce qui te manque encore.",
     "leadTeam": "Ton équipe n'a aucun contact vérifié à présenter pour ses matchs : personne n'y a certifié son tag Discord ni son BattleTag. L'adversaire et l'arbitrage n'ont aucun moyen sûr de vous joindre.",
     "leadTeamDiscordOnly": "Ton équipe n'a personne à présenter sur Discord pour ses matchs : personne n'y a certifié son tag Discord. L'adversaire et l'arbitrage n'ont aucun moyen sûr de vous joindre.",
     "statusLabel": "Où tu en es",
@@ -388,8 +388,8 @@
       },
       "matches": {
         "topic": "Tes matchs",
-        "does": "Tu passes devant les membres qui n'ont rien certifié pour être présenté comme contact de ton équipe — aux deux équipes du match, à son caster, aux arbitres et aux administrateurs du site —, avec ton tag Discord certifié et ton BattleTag marqué « vérifié ».",
-        "doesDiscordOnly": "Tu passes devant les membres qui n'ont rien certifié pour être présenté comme contact de ton équipe — aux deux équipes du match, à son caster, aux arbitres et aux administrateurs du site —, avec ton tag Discord certifié.",
+        "does": "Tu passes devant les membres qui n'ont rien certifié pour être présenté comme contact de ton équipe — aux deux équipes du match, à ses casters, aux arbitres et aux administrateurs du site —, avec ton tag Discord certifié et ton BattleTag marqué « vérifié ».",
+        "doesDiscordOnly": "Tu passes devant les membres qui n'ont rien certifié pour être présenté comme contact de ton équipe — aux deux équipes du match, à ses casters, aux arbitres et aux administrateurs du site —, avec ton tag Discord certifié.",
         "doesNot": "Ne publie pas ton tag sur ta fiche : les autres joueurs y voient une pastille, et ton tag seulement si tes réglages de visibilité l'ouvrent (case « Tag Discord » pour le tag Discord, même cochée avant). Certifié ou non, présenté comme contact, ton BattleTag est montré même masqué, dès que les deux adversaires du match sont connus et jusqu'à sa fin.",
         "doesNotDiscordOnly": "Ne publie pas ton tag sur ta fiche : les autres joueurs y voient une pastille, et ton tag seulement si tu as coché « Tag Discord » dans tes réglages (même avant). Si ta fiche porte un BattleTag, présenté comme contact, il est montré même masqué, dès que les deux adversaires du match sont connus et jusqu'à sa fin."
       },

@@ -355,13 +355,13 @@
   },
   "battletagNotice": {
     "eyebrow": "VISIBILITÉ · BATTLETAG",
-    "warning": "Tu peux masquer ton BattleTag : il reste visible pour les membres des deux équipes, les admins et les arbitres d'un match de tournoi dès que ses deux adversaires sont connus et jusqu'à sa fin, ainsi que pour son caster le temps du match seulement, dans la fenêtre « Contacts » du match (et, pour les équipes et le caster, dans sa fenêtre de lancement), si tu fais partie des contacts présentés. Si tu castes un match, ses deux équipes le voient aussi le temps du match, et les arbitres et les admins dès que ses deux adversaires sont connus et jusqu'à sa fin. Si tu ne veux pas qu'ils le voient, retire-le de ton profil (s'il vient de Battle.net, détache d'abord ton compte Battle.net — après avoir ajouté un autre moyen de connexion si c'est le seul).",
+    "warning": "Tu peux masquer ton BattleTag : il reste visible pour les membres des deux équipes, les admins et les arbitres d'un match de tournoi dès que ses deux adversaires sont connus et jusqu'à sa fin, ainsi que pour ses casters le temps du match seulement, dans la fenêtre « Contacts » du match (et, pour les équipes et les casters, dans sa fenêtre de lancement), si tu fais partie des contacts présentés. Si tu castes un match, ses deux équipes et ses autres casters le voient aussi le temps du match, et les arbitres et les admins dès que ses deux adversaires sont connus et jusqu'à sa fin. Si tu ne veux pas qu'ils le voient, retire-le de ton profil (s'il vient de Battle.net, détache d'abord ton compte Battle.net — après avoir ajouté un autre moyen de connexion si c'est le seul).",
     "title": "Masqué, mais pas pour tout le monde",
     "intro": "Ton BattleTag n'apparaîtra plus nulle part — fiche, annuaire, rosters —, pas même pour les arbitres et les administrateurs. S'il vient d'un compte Battle.net rattaché, ta fiche continue de l'indiquer par une pastille — sans le montrer. Il reste lisible dans la seule fenêtre « Contacts » d'un match et dans sa fenêtre de lancement, au départ du match, là où il sert à s'ajouter en jeu :",
     "players": "<strong>Les membres des deux équipes de ton match</strong>, dès que ses deux adversaires sont connus et jusqu'à sa fin, si tu fais partie des contacts présentés — c'est par lui qu'on s'ajoute en jeu pour lancer la partie.",
-    "caster": "<strong>Le caster de ton match</strong>, le temps du match seulement (de son départ à sa fin), si tu fais partie des contacts présentés.",
-    "asCaster": "<strong>Les deux équipes d'un match que tu castes</strong>, le temps du match seulement (de son départ à sa fin).",
-    "staff": "<strong>Les arbitres et les administrateurs</strong>, dans la même fenêtre « Contacts » des matchs du tournoi : aux mêmes moments que les deux équipes pour un match que tu joues, dès que ses deux adversaires sont connus et jusqu'à sa fin pour un match que tu castes (la fenêtre de lancement, elle, ne s'ouvre qu'aux équipes et au caster) — jamais ailleurs.",
+    "caster": "<strong>Les casters de ton match</strong>, le temps du match seulement (de son départ à sa fin), si tu fais partie des contacts présentés.",
+    "asCaster": "<strong>Les deux équipes et les autres casters d'un match que tu castes</strong>, le temps du match seulement (de son départ à sa fin).",
+    "staff": "<strong>Les arbitres et les administrateurs</strong>, dans la même fenêtre « Contacts » des matchs du tournoi : aux mêmes moments que les deux équipes pour un match que tu joues, dès que ses deux adversaires sont connus et jusqu'à sa fin pour un match que tu castes (la fenêtre de lancement, elle, ne s'ouvre qu'aux équipes et aux casters) — jamais ailleurs.",
     "outro": "Pour ne plus le communiquer du tout, il faut effacer le champ — mais tes adversaires ne pourront alors plus t'ajouter en jeu. Et si un compte Blizzard est rattaché, c'est lui qui tient ce champ : il faut le retirer d'abord (après avoir ajouté un autre moyen de connexion si c'est le seul).",
     "ok": "J'ai compris"
   },
@@ -375,7 +375,7 @@
     "exposure": {
       "admins": "Les administrateurs du site voient ton tag Discord en permanence.",
       "referees": "Les arbitres le voient uniquement quand tu es engagé dans un tournoi en cours ou à venir — plus après —, ou, pour un match que tu castes, dès que ses deux adversaires sont connus et jusqu'à sa fin.",
-      "match": "Les membres des deux équipes de ton match le voient dès que ses deux adversaires sont connus et jusqu'à sa fin, son caster le temps du match seulement (de son départ à sa fin) — pour s'ajouter et créer le salon. Si tu castes un match, ses deux équipes voient le tien le temps du match seulement, et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin.",
+      "match": "Les membres des deux équipes de ton match le voient dès que ses deux adversaires sont connus et jusqu'à sa fin, ses casters le temps du match seulement (de son départ à sa fin) — pour s'ajouter et créer le salon. Si tu castes un match, ses deux équipes et ses autres casters voient le tien le temps du match seulement, et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin.",
       "players": "Les autres joueurs du site ne le voient que si tu le rends visible dans tes réglages de confidentialité. Il n'apparaît sur aucune page publique. Que ton tag soit certifié (pastille ✅, sans le tag) se lit en revanche sur ta fiche par tout joueur connecté.",
       "undo": "Tu peux annuler à tout moment en retirant ton tag depuis « Mon profil » : la certification est perdue, et l'exposition avec elle. Une connexion par Discord réenregistre ensuite ton pseudo, mais sans le certifier : seul ce geste-ci le certifie."
     },
@@ -431,16 +431,16 @@
       "title": "Un tag certifié est visible par :",
       "admins": "les administrateurs, à tout moment ;",
       "referees": "les arbitres, tant que tu es inscrit à un tournoi non terminé ;",
-      "match": "les membres des deux équipes de ton match, dès que ses adversaires sont connus et jusqu'à sa fin, et son caster le temps du match ;",
-      "asCaster": "si tu castes un match : ses deux équipes le temps du match, et les arbitres dès que ses adversaires sont connus et jusqu'à sa fin ;",
+      "match": "les membres des deux équipes de ton match, dès que ses adversaires sont connus et jusqu'à sa fin, et ses casters le temps du match ;",
+      "asCaster": "si tu castes un match : ses deux équipes et ses autres casters le temps du match, et les arbitres dès que ses adversaires sont connus et jusqu'à sa fin ;",
       "players": "les autres joueurs, seulement si tu coches « Tag Discord » dans tes réglages de confidentialité.",
       "footer": "Personne d'autre."
     },
     "battletag": {
       "title": "Masqué, ton BattleTag ne se lit plus que dans la fenêtre « Contacts » de tes matchs et dans leur fenêtre de lancement :",
-      "match": "si tu y es présenté comme contact : les membres des deux équipes, les arbitres et les administrateurs, dès que les adversaires sont connus et jusqu'à la fin du match, et le caster le temps du match ;",
-      "asCaster": "si tu castes un match : ses deux équipes le temps du match, et les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin ;",
-      "launch": "la fenêtre de lancement, elle, ne s'ouvre qu'aux deux équipes et au caster.",
+      "match": "si tu y es présenté comme contact : les membres des deux équipes, les arbitres et les administrateurs, dès que les adversaires sont connus et jusqu'à la fin du match, et les casters le temps du match ;",
+      "asCaster": "si tu castes un match : ses deux équipes et ses autres casters le temps du match, et les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin ;",
+      "launch": "la fenêtre de lancement, elle, ne s'ouvre qu'aux deux équipes et aux casters.",
       "footer": "Pour ne plus le partager du tout, efface-le de ton profil (s'il vient de Battle.net, détache d'abord Battle.net, après avoir ajouté un autre moyen de connexion si c'est le seul)."
     }
   }

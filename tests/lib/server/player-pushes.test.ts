@@ -30,20 +30,24 @@ const LOBBY_MATCH = {
   team2_id: 2,
   team1_name: "Renards",
   team2_name: "Nova",
-  caster_user_id: null,
   launch_pairing: "1:2",
   launched_at: null,
 };
 
 type Db = { query: jest.Mock<SqlQuery>; execute: jest.Mock<SqlQuery> };
 
-/** `query` rend les candidats ; `execute` rejoue les réservations (`claims`) et l'existence d'une annonce. */
+/**
+ * `query` rend les candidats ; `execute` rejoue les réservations (`claims`),
+ * l'existence d'une annonce, les inscriptions de casters (`bg_match_casters`,
+ * `castLinks` : `[matchId, userId]`) et leurs comptes (`casters`).
+ */
 function mockDb(
   candidates: unknown[],
   options: {
     claims?: boolean[];
     lobbyAnnounced?: boolean;
     casters?: Record<string, unknown>[];
+    castLinks?: [number, number][];
     castersFail?: boolean;
   } = {},
 ): Db {
@@ -54,6 +58,10 @@ function mockDb(
       return [{ affectedRows: (claims.length > 0 ? claims.shift() : true) ? 1 : 0 }];
     }
     if (sql.includes("SELECT 1 FROM bg_match_start_notices")) return [options.lobbyAnnounced ? [{}] : []];
+    if (sql.includes("FROM bg_match_casters")) {
+      const links = options.castLinks ?? [];
+      return [links.map(([matchId, userId]) => ({ match_id: matchId, user_id: userId, stream_id: 1, ready_at: null }))];
+    }
     if (sql.includes("FROM bg_users WHERE id IN")) {
       if (options.castersFail) throw new Error("DB_DOWN");
       return [options.casters ?? []];
@@ -139,7 +147,8 @@ describe("dispatchMatchStartNotices", () => {
   it("annonce un départ jamais appelé (lancement forcé)", async () => {
     const { execute } = mockDb([{ ...LOBBY_MATCH, launched_at: new Date() }]);
     await dispatchMatchStartNotices();
-    expect(execute.mock.calls.at(-1)?.[1]).toEqual([40, "1:2", "LAUNCHED"]);
+    const claimed = execute.mock.calls.filter(([sql]) => sql.startsWith("INSERT IGNORE INTO bg_match_start_notices"));
+    expect(claimed.map(([, params]) => params)).toEqual([[40, "1:2", "LAUNCHED"]]);
     expect(resolvePush(pushes()[0].notification.push).title).toBe("Ton match est lancé");
   });
 
@@ -162,21 +171,30 @@ describe("dispatchMatchStartNotices", () => {
   });
 
   it("prévient aussi le caster inscrit", async () => {
-    mockDb([{ ...LOBBY_MATCH, caster_user_id: 99 }], { casters: [caster()] });
+    mockDb([LOBBY_MATCH], { castLinks: [[40, 99]], casters: [caster()] });
     await dispatchMatchStartNotices();
     expect(pushes().map((p) => p.userIds)).toEqual([[10, 11], [20], [99]]);
   });
 
+  it("prévient chaque co-caster, sauf celui qui ne remplit plus la condition", async () => {
+    mockDb([LOBBY_MATCH], {
+      castLinks: [[40, 99], [40, 98], [40, 97]],
+      casters: [caster(), caster({ id: 98 }), caster({ id: 97, discord_verified_at: null })],
+    });
+    await dispatchMatchStartNotices();
+    expect(pushes().map((p) => p.userIds)).toEqual([[10, 11], [20], [99, 98]]);
+  });
+
   it("prévient les joueurs même si la lecture des casters échoue", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
-    mockDb([{ ...LOBBY_MATCH, caster_user_id: 99 }], { castersFail: true });
+    mockDb([LOBBY_MATCH], { castLinks: [[40, 99]], castersFail: true });
     await dispatchMatchStartNotices();
     expect(pushes().map((p) => p.userIds)).toEqual([[10, 11], [20]]);
     error.mockRestore();
   });
 
   it("ne prévient pas un caster inscrit qui ne remplit plus la condition", async () => {
-    mockDb([{ ...LOBBY_MATCH, caster_user_id: 99 }], { casters: [caster({ platform_roles_json: null })] });
+    mockDb([LOBBY_MATCH], { castLinks: [[40, 99]], casters: [caster({ platform_roles_json: null })] });
     await dispatchMatchStartNotices();
     expect(pushes().map((p) => p.userIds)).toEqual([[10, 11], [20]]);
   });

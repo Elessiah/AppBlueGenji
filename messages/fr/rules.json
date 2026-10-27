@@ -154,11 +154,11 @@
     {
       "title": "Lancement d'un match",
       "body": [
-        "Un match jouable ne commence pas d'emblée : à son heure de début (ou dès qu'il est jouable s'il n'a pas d'horaire), il entre en <b>lancement</b>. Une fenêtre s'ouvre alors pour les membres des deux équipes et le caster inscrit, avec l'équipe hôte et les contacts utiles — ceux des équipes, que le bouton « Contacts » de la carte du match montre déjà aux membres des deux équipes et aux arbitres dès que ses deux adversaires sont connus (au caster, au départ du match) ; ceux du caster, les équipes ne les voient qu'au départ du match, les arbitres dès que les adversaires sont connus.",
+        "Un match jouable ne commence pas d'emblée : à son heure de début (ou dès qu'il est jouable s'il n'a pas d'horaire), il entre en <b>lancement</b>. Une fenêtre s'ouvre alors pour les membres des deux équipes et les casters inscrits, avec l'équipe hôte et les contacts utiles — ceux des équipes, que le bouton « Contacts » de la carte du match montre déjà aux membres des deux équipes et aux arbitres dès que ses deux adversaires sont connus (aux casters, au départ du match) ; ceux d'un caster, les équipes et les autres casters ne les voient qu'au départ du match, les arbitres dès que les adversaires sont connus.",
         "Cette phase n'a lieu que si le tournoi l'active (voir ses réglages) : sinon, le match est lancé directement à son heure de début, sans « Prêt »."
       ],
       "bullets": [
-        "Chaque équipe confirme qu'elle est prête — capitaine, manager ou propriétaire ; en tournoi individuel, le joueur lui-même. Le caster inscrit confirme aussi.",
+        "Chaque équipe confirme qu'elle est prête — capitaine, manager ou propriétaire ; en tournoi individuel, le joueur lui-même. Chaque caster inscrit confirme aussi, pour lui-même.",
         "Le match est lancé quand toutes les parties sont prêtes, quand un arbitre le force, ou d'office au bout de {launchDelay} minutes.",
         "Aucun score ne peut être déclaré avant le lancement."
       ]

@@ -10,8 +10,8 @@ import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 /**
  * Bandeau de **lancement** d'un match (`lib/shared/match-launch.ts`) : ce
  * qu'il dit à tous — la phase (à planifier, en attente de départ, lancement
- * avec le décompte des « Prêt », lancé), l'équipe qui héberge la partie et le
- * caster inscrit.
+ * avec le décompte des « Prêt », lancé), l'équipe qui héberge la partie et
+ * chacun des casters inscrits.
  *
  * Ses boutons (ouvrir le lancement, planifier, caster, hôte, forcer) vivent
  * dans le pied d'action de la carte (`MatchCardActions`, voir
@@ -51,8 +51,7 @@ function LaunchPhaseBadge({ match, phase }: Readonly<{ match: BracketMatch; phas
     const count = readyCount({
       team1Ready: match.team1Ready,
       team2Ready: match.team2Ready,
-      casterRequired: match.casterUserId !== null,
-      casterReady: match.casterReady,
+      casters: match.casters,
     });
     return (
       <span className={styles.lobby}>
@@ -88,7 +87,7 @@ export function MatchLaunchStrip({
   const badge = <LaunchPhaseBadge match={match} phase={phase} />;
   const hasBadge = phase === "TO_PLAN" || phase === "SCHEDULED" || phase === "LOBBY" || (phase === "LAUNCHED" && match.status === "READY");
 
-  if (!hasBadge && !(showHost && hostName) && match.casterUserId === null) return null;
+  if (!hasBadge && !(showHost && hostName) && match.casters.length === 0) return null;
 
   return (
     <div className={styles.strip} data-phase={phase}>
@@ -102,18 +101,18 @@ export function MatchLaunchStrip({
         </span>
       )}
 
-      {match.casterUserId !== null && (
-        <span className={styles.fact} title={t("launch.casterTitle")}>
+      {match.casters.map((caster, index) => (
+        <span key={`${index}:${caster.userId}`} className={styles.fact} title={t("launch.casterTitle")}>
           <span aria-hidden="true">🎙</span>
           <span className="sr-only">{t("launch.casterSr")}</span>
-          <span className={styles.name}>{match.casterPseudo ?? t("launch.caster")}</span>
+          <span className={styles.name}>{caster.pseudo}</span>
           {phase === "LOBBY" && (
-            <span className={match.casterReady ? styles.ok : styles.wait}>
-              {match.casterReady ? t("launch.casterReady") : t("launch.casterWaiting")}
+            <span className={caster.ready ? styles.ok : styles.wait}>
+              {caster.ready ? t("launch.casterReady") : t("launch.casterWaiting")}
             </span>
           )}
         </span>
-      )}
+      ))}
     </div>
   );
 }

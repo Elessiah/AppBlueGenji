@@ -102,7 +102,7 @@ export const PUSH_TOPICS = {
   },
   CAST_RELEASED: {
     label: "Cast retiré",
-    description: "Ton inscription comme caster d'un match est retirée par le staff ou d'office, ou un autre caster prend ta place : le motif est donné.",
+    description: "Ton inscription comme caster d'un match est retirée par le staff ou d'office : le motif est donné.",
     audience: "live",
   },
   STAFF_REPORT: {

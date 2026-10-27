@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Fiches d'un match — les deux engagées, l'hôte, leurs contacts, le caster —
+ * Fiches d'un match — les deux engagées, l'hôte, leurs contacts, ses casters —
  * partagées par la modale de lancement (`MatchLaunchCenter`) et la modale
  * « Contacts » d'une carte de match (`MatchContactsDialog`). Les données
  * viennent de la même lecture serveur (`match-launch-info.ts`), qui décide
@@ -13,10 +13,9 @@ import { PlayerLink, TeamLink } from "@/components/entity-link";
 import { useLaunchText } from "./launch-text";
 import {
   CASTER_ARRIVAL_ANNOUNCE_MS,
-  casterContactsPending,
+  casterCardPending,
   casterHasContacts,
   nextCasterArrival,
-  viewerIsCaster,
   type CasterArrival,
   type CasterArrivalSeen,
   type LaunchCaster,
@@ -245,24 +244,9 @@ function CasterArrivalStatus({ caster, pending }: Readonly<{ caster: LaunchCaste
   );
 }
 
-export function CasterCard({
-  caster,
-  phase,
-  onCopy,
-  viewer,
-  noCasterText,
-  laterText,
-  linkNames = false,
-  announceArrival = false,
-}: Readonly<{
-  caster: LaunchCaster | null;
+type CasterCardOptions = {
   phase: MatchLaunchInfo["phase"];
   onCopy: CopyFn;
-  /**
-   * Le lecteur : la note « au départ » ne s'adresse jamais au caster lui-même.
-   * Que ses contacts sortent, c'est le serveur qui le dit (`caster.contactsShown`).
-   */
-  viewer: Pick<MatchLaunchInfo["viewer"], "role" | "isCaster">;
   /** Texte sans caster ; par défaut, celui de la modale de lancement. */
   noCasterText?: string;
   /**
@@ -278,7 +262,54 @@ export function CasterCard({
    * s'annonce déjà — deux annonces polies s'y empileraient).
    */
   announceArrival?: boolean;
-}>) {
+};
+
+/**
+ * Les fiches des casters d'un match, une par caster dans l'ordre
+ * d'inscription — ou la fiche « sans caster ». Les contacts de tous les casters
+ * arrivent ensemble (même phase, même lecteur) : seule la première fiche qui
+ * n'est pas celle du lecteur annonce leur arrivée, pour ne pas empiler les
+ * annonces polies.
+ */
+export function CasterCards({
+  casters,
+  announceArrival = false,
+  ...options
+}: Readonly<CasterCardOptions & { casters: readonly LaunchCaster[] }>) {
+  if (casters.length === 0) return <CasterCard caster={null} {...options} />;
+  const announcer = casters.findIndex((caster) => !caster.isViewer);
+  return (
+    <>
+      {casters.map((caster, index) => (
+        <CasterCard
+          key={caster.userId}
+          caster={caster}
+          announceArrival={announceArrival && index === announcer}
+          {...options}
+        />
+      ))}
+    </>
+  );
+}
+
+export function CasterCard({
+  caster,
+  phase,
+  onCopy,
+  noCasterText,
+  laterText,
+  linkNames = false,
+  announceArrival = false,
+}: Readonly<
+  CasterCardOptions & {
+    /**
+     * Le caster, `null` sans caster. Que ses contacts sortent, c'est le serveur
+     * qui le dit (`caster.contactsShown`) ; la note « au départ » ne s'adresse
+     * jamais au caster lui-même (`caster.isViewer`).
+     */
+    caster: LaunchCaster | null;
+  }
+>) {
   const { t } = useLaunchText();
   if (!caster) {
     return (
@@ -289,11 +320,12 @@ export function CasterCard({
       </section>
     );
   }
-  const pending = casterContactsPending({ caster, viewer });
-  const self = viewerIsCaster({ viewer });
+  const pending = casterCardPending(caster);
+  const self = caster.isViewer;
   const hasContacts = casterHasContacts(caster);
   return (
-    <section className={styles.caster} aria-label={t("caster")}>
+    // Nommée par son caster : à plusieurs, chaque région se distingue.
+    <section className={styles.caster} aria-label={`${t("caster")} ${caster.pseudo}`}>
       <div className={styles.sideHead}>
         <span className={styles.emblem} aria-hidden="true">
           🎙

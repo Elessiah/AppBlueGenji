@@ -104,7 +104,7 @@ function scheduleUpdateSql(leaving: boolean, scoreNoted: boolean): string {
   }
   return `UPDATE bg_matches
           SET start_at = ?, launched_at = NULL, lobby_opened_at = NULL, team1_ready_at = NULL,
-              team2_ready_at = NULL, caster_ready_at = NULL
+              team2_ready_at = NULL
           WHERE id = ?`;
 }
 
@@ -388,6 +388,8 @@ export async function setMatchStartAt(
       // (`./player-pushes`) part avec, pour que la nouvelle heure prévienne de
       // nouveau les joueurs.
       if (leaving && !scoreNoted) {
+        // Le « Prêt » de chaque caster tombe avec ceux des équipes.
+        await connection.execute(`UPDATE bg_match_casters SET ready_at = NULL WHERE match_id = ?`, [matchId]);
         await connection.execute(`DELETE FROM bg_match_start_notices WHERE match_id = ?`, [matchId]);
       }
       const previousStartAt = toIso(row.start_at);

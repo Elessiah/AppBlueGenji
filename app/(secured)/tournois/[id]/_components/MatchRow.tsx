@@ -280,6 +280,7 @@ export const MatchRow = memo(function MatchRow({
         actions={actions}
         matchLabel={actionMatchLabel}
         isCaster={launch.isCaster}
+        releasesOthers={launch.releasesOthers}
         onAir={liveState === "LIVE"}
         onPlayerScore={() => playerScore.open(match)}
         onAdminScore={() => onOpenAdminModal(match)}

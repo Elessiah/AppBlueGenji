@@ -42,14 +42,13 @@ type AlertMatch = {
   phaseId: number;
   /** Horodatage de la dernière écriture : change à chaque saisie sur la ligne. */
   updatedAt?: string;
-  /** Caster inscrit : ses rencontres sont aussi celles du lecteur. */
-  casterUserId?: number | null;
+  /** Casters inscrits et leur « Prêt » : leurs rencontres sont aussi celles du lecteur. */
+  casters?: readonly { userId: number; ready: boolean }[];
   /** État du lancement (`lib/shared/match-launch.ts`). */
   lobbyOpenedAt?: string | null;
   launchedAt?: string | null;
   team1Ready?: boolean;
   team2Ready?: boolean;
-  casterReady?: boolean;
 };
 
 /** Ce dont la comparaison a besoin — satisfait par `TournamentDetail`. */
@@ -215,7 +214,7 @@ export function viewerLaunchChanged(
 function isViewerMatch(match: AlertMatch, viewer: ViewerAlertDetail): boolean {
   if (involves(match, viewer.myTeamId)) return true;
   const me = viewer.viewerUserId ?? null;
-  return me !== null && match.casterUserId === me;
+  return me !== null && (match.casters ?? []).some((caster) => caster.userId === me);
 }
 
 /**
@@ -237,8 +236,7 @@ function viewerMatchesFingerprint(detail: ViewerAlertDetail, viewer: ViewerAlert
         match.launchedAt ?? "",
         match.team1Ready ? 1 : 0,
         match.team2Ready ? 1 : 0,
-        match.casterReady ? 1 : 0,
-        match.casterUserId ?? "",
+        (match.casters ?? []).map((caster) => `${caster.userId}${caster.ready ? "+" : "-"}`).join(","),
       ].join(":"),
     )
     .sort((x, y) => x.localeCompare(y))

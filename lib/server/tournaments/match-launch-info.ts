@@ -1,6 +1,6 @@
 /**
  * Lecture de la modale de lancement : les matchs du lecteur — joueur d'une des
- * deux engagées ou caster inscrit — qui approchent de leur heure, sont en
+ * deux engagées ou un de leurs casters — qui approchent de leur heure, sont en
  * lancement ou se jouent, avec les contacts que chaque partie doit avoir sous
  * la main.
  *
@@ -8,9 +8,10 @@
  * rendus qu'aux parties d'un match : dans la modale, **en lancement ou lancé** ;
  * par le bouton « Contacts » d'une carte, dès que ses deux adversaires sont
  * connus pour ses joueurs et pour les arbitres (permission `tournaments`), le
- * temps du match seulement pour son caster (`exposesMatchContacts`). Ceux **du
- * caster** sortent le temps du match, et dès que les adversaires sont connus
- * pour un arbitre (`exposesCaster`, `exposesCasterContacts`).
+ * temps du match seulement pour ses casters (`exposesMatchContacts`). Ceux **des
+ * casters** sortent le temps du match — vers les équipes **et vers chaque autre
+ * caster du match** —, et dès que les adversaires sont connus pour un arbitre
+ * (`exposesCaster`, `exposesCasterContacts`).
  *
  * Ces présentations, toutes ensemble, sont la clause `sharesMatchLobby` de
  * `canViewDiscordTag` et `sharesLiveMatch` de `canViewBattletag`, que ce
@@ -41,6 +42,8 @@ import {
   type MatchLaunchInfo,
   type MatchLaunchViewerRole,
 } from "@/lib/shared/match-launch";
+import type { MatchCasterLink } from "./match-casters";
+import { loadCasterLinks } from "./match-casters";
 import { can, type PlatformRole } from "@/lib/shared/permissions";
 import type { TeamRole } from "@/lib/shared/types";
 import { localUploadUrl } from "@/lib/shared/uploads";
@@ -50,7 +53,7 @@ import {
   rowLaunchState,
   rowReadiness,
   toLaunchInput,
-  type LaunchMatchRow,
+  type LaunchMatchBaseRow,
 } from "./match-launch";
 import { castEligibilityBlock } from "./cast-eligibility";
 import { discardCastChanges, flushCastChanges } from "./cast-notices";
@@ -67,7 +70,7 @@ export const LAUNCH_LOOKAHEAD_MINUTES = 60;
 /** Le lecteur tel que ce module le lit. */
 export type LaunchViewer = { id: number; isAdmin?: boolean; roles?: readonly PlatformRole[] };
 
-type CandidateRow = LaunchMatchRow & {
+type CandidateBaseRow = LaunchMatchBaseRow & {
   tournament_name: string;
   team1_name: string | null;
   team2_name: string | null;
@@ -76,6 +79,8 @@ type CandidateRow = LaunchMatchRow & {
   team1_solo_user_id: number | null;
   team2_solo_user_id: number | null;
 };
+
+type CandidateRow = CandidateBaseRow & { casters: MatchCasterLink[] };
 
 type MemberRow = RowDataPacket & {
   team_id: number;
@@ -152,7 +157,8 @@ function hasRunningTournament(withLaunchPhase: boolean): Promise<boolean> {
  * Matchs à présenter au lecteur : ceux d'une équipe qu'il représente (membre
  * en cours ou entrée solo) ou qu'il caste. Les équipes du lecteur sont lues
  * **dans** la requête : un lecteur qui n'a aucun match — le cas courant — ne
- * coûte qu'une lecture, et ses rôles ne sont relus que s'il en a un.
+ * coûte qu'une lecture, et ses rôles ne sont relus que s'il en a un. Les
+ * casters des matchs retenus suivent, en une lecture.
  */
 async function loadCandidates(
   connection: PoolConnection,
@@ -176,13 +182,13 @@ async function loadCandidates(
   const viewerTeams = `(SELECT tm.team_id FROM bg_team_members tm
                         WHERE tm.user_id = ? AND tm.left_at IS NULL
                         UNION SELECT st.id FROM bg_teams st WHERE st.solo_user_id = ?)`;
-  const [rows] = await connection.execute<CandidateRow[]>(
+  const [rows] = await connection.execute<(CandidateBaseRow & RowDataPacket)[]>(
     `SELECT
        m.id, m.tournament_id, t.state AS tournament_state, t.referee_scheduling, t.match_launch_phase,
        m.status, m.is_bye,
        m.team1_id, m.team2_id, t1.is_ghost AS team1_is_ghost, t2.is_ghost AS team2_is_ghost,
        m.start_at, m.lobby_opened_at, m.launch_pairing, m.launched_at, m.team1_ready_at, m.team2_ready_at,
-       m.caster_user_id, m.caster_ready_at, m.host_team_id,
+       m.host_team_id,
        t.name AS tournament_name,
        t1.name AS team1_name, t2.name AS team2_name,
        t1.logo_url AS team1_logo_url, t2.logo_url AS team2_logo_url,
@@ -195,7 +201,8 @@ async function loadCandidates(
        AND m.status IN ('READY', 'AWAITING_CONFIRMATION')
        AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL
        ${scope}
-       AND (${referee && matchId !== null ? "1 = 1 OR " : ""}m.caster_user_id = ?
+       AND (${referee && matchId !== null ? "1 = 1 OR " : ""}EXISTS (
+              SELECT 1 FROM bg_match_casters mc WHERE mc.match_id = m.id AND mc.user_id = ?)
             OR m.team1_id IN ${viewerTeams}
             OR m.team2_id IN ${viewerTeams})
      ORDER BY m.start_at IS NULL, m.start_at, m.id`,
@@ -203,7 +210,11 @@ async function loadCandidates(
       ? [userId, userId, userId, userId, userId]
       : [matchId, userId, userId, userId, userId, userId],
   );
-  return rows;
+  const casters = await loadCasterLinks(
+    connection,
+    rows.map((row) => Number(row.id)),
+  );
+  return rows.map((row) => Object.assign(row, { casters: casters.get(Number(row.id)) ?? [] }));
 }
 
 /** Membre lu → candidat contact (aussi lu par l'invitation à certifier, `certification-prompt.ts`). */
@@ -256,7 +267,7 @@ function viewerRole(
   row: CandidateRow,
   userId: number,
   teams: ViewerTeams,
-  castRevoked: boolean,
+  casters: readonly MatchCasterLink[],
   referee: boolean,
 ): { role: MatchLaunchViewerRole; canDeclareReady: boolean } | null {
   // Le rôle de joueur prime, comme dans `resolveMatchParty`.
@@ -269,7 +280,8 @@ function viewerRole(
       return { role, canDeclareReady: membership.solo || canDeclareTeamReady(membership.roles) };
     }
   }
-  if (!castRevoked && row.caster_user_id !== null && Number(row.caster_user_id) === userId) {
+  // `casters` : ceux que la lecture garde (un caster inéligible n'en est plus).
+  if (casters.some((caster) => caster.userId === userId)) {
     return { role: "CASTER", canDeclareReady: true };
   }
   // Un arbitre n'a pas de « Prêt » à donner : il lit les contacts, rien de plus.
@@ -316,7 +328,8 @@ type LaunchContext = {
   viewer: LaunchViewer;
   users: Map<number, UserRow>;
   rosters: Map<number, MemberRow[]>;
-  castRevoked: boolean;
+  /** Casters gardés par la lecture : un caster inéligible (ou devenu joueur) en est tu. */
+  casters: readonly MatchCasterLink[];
   readiness: ReturnType<typeof rowReadiness>;
   /** Contacts : seulement pour les matchs où `exposesMatchContacts` les ouvre. */
   exposes: boolean;
@@ -352,8 +365,8 @@ function rowSide(row: CandidateRow, index: 1 | 2) {
 }
 
 /**
- * Comptes et rosters à lire : le caster de tout match présenté, et les joueurs
- * des seuls matchs dont les contacts sont exposés.
+ * Comptes et rosters à lire : les casters de tout match présenté, et les
+ * joueurs des seuls matchs dont les contacts sont exposés.
  */
 function collectContactIds(visible: readonly VisibleLaunch[]): {
   rosterTeamIds: Set<number>;
@@ -363,7 +376,7 @@ function collectContactIds(visible: readonly VisibleLaunch[]): {
   const rosterTeamIds = new Set<number>();
   const userIds = new Set<number>();
   for (const { row } of visible) {
-    if (row.caster_user_id !== null) userIds.add(Number(row.caster_user_id));
+    for (const caster of row.casters) userIds.add(caster.userId);
   }
   for (const { row } of exposed) {
     for (const index of [1, 2] as const) {
@@ -417,43 +430,46 @@ async function loadUsers(connection: PoolConnection, userIds: Set<number>): Prom
 
 /**
  * Un caster n'est une partie du match que tant qu'il remplit la condition
- * de son inscription : elle est rejouée ici, à chaque lecture, sans quoi
- * un compte privé de `live` (ou d'identité) garderait les contacts.
- * L'inscription n'est retirée qu'avant le lancement, là où elle retient
- * un « Prêt » ; un match lancé garde son caster, seulement tu.
+ * de son inscription : elle est rejouée ici, à chaque lecture et pour chaque
+ * caster, sans quoi un compte privé de `live` (ou d'identité) garderait les
+ * contacts. L'inscription n'est retirée qu'avant le lancement, là où elle
+ * retient un « Prêt » ; un match lancé garde son caster, seulement tu.
  *
- * Rend les matchs dont le caster est tu, et range dans `revokedCasts` les
+ * Rend, par match, les casters gardés, et range dans `revokedCasts` les
  * inscriptions à retirer.
  */
-function revokeIneligibleCasters(
+function keepEligibleCasters(
   visible: readonly VisibleLaunch[],
   users: Map<number, UserRow>,
   revokedCasts: { matchId: number; casterId: number }[],
   casterPlays: (row: CandidateRow, casterId: number) => boolean = () => false,
-): Set<number> {
+): Map<number, MatchCasterLink[]> {
   const now = Date.now();
-  const revoked = new Set<number>();
+  const kept = new Map<number, MatchCasterLink[]>();
   for (const { row } of visible) {
-    if (row.caster_user_id === null) continue;
-    const casterId = Number(row.caster_user_id);
     // Phase jugée **allumée** — la règle même de `releaseIneligibleCast` : sur
     // un tournoi sans phase de lancement, un match à l'heure passée se lit
     // lancé avant que l'entretien ne l'écrive, et c'est la dernière occasion
     // de retirer l'inscription, qu'un match lancé garde ensuite. Un report en
     // attente vaut lancé, des deux côtés : rien n'est mis en file pour rien.
     const recorded = matchLaunchPhase({ ...toLaunchInput(row), launchPhase: true }, now);
-    // Un caster devenu joueur du match ne donnera jamais son « Prêt » de
-    // caster : avant le lancement, dès qu'une lecture le constate (le sien,
-    // ou les rosters lus pour les contacts), il est tu et son inscription
-    // retirée, comme un caster inéligible — sous verrou, `releaseIneligibleCast`
-    // rejoue la même règle. Lancé, il garde sa place.
-    const playsMatch = recorded !== "LAUNCHED" && casterPlays(row, casterId);
-    if (castEligibilityBlock(users.get(casterId)) !== null || playsMatch) {
-      revoked.add(Number(row.id));
-      if (recorded !== "LAUNCHED") revokedCasts.push({ matchId: Number(row.id), casterId });
+    const keptHere: MatchCasterLink[] = [];
+    for (const caster of row.casters) {
+      // Un caster devenu joueur du match ne donnera jamais son « Prêt » de
+      // caster : avant le lancement, dès qu'une lecture le constate (le sien,
+      // ou les rosters lus pour les contacts), il est tu et son inscription
+      // retirée, comme un caster inéligible — sous verrou, `releaseIneligibleCast`
+      // rejoue la même règle. Lancé, il garde sa place.
+      const playsMatch = recorded !== "LAUNCHED" && casterPlays(row, caster.userId);
+      if (castEligibilityBlock(users.get(caster.userId)) !== null || playsMatch) {
+        if (recorded !== "LAUNCHED") revokedCasts.push({ matchId: Number(row.id), casterId: caster.userId });
+      } else {
+        keptHere.push(caster);
+      }
     }
+    kept.set(Number(row.id), keptHere);
   }
-  return revoked;
+  return kept;
 }
 
 /** Contacts d'une entrée solo : le joueur lui-même, s'il existe encore. */
@@ -493,9 +509,8 @@ function buildLaunchSide(row: CandidateRow, index: 1 | 2, ctx: LaunchContext): L
   };
 }
 
-function buildLaunchCaster(row: CandidateRow, ctx: LaunchContext): LaunchCaster | null {
-  if (row.caster_user_id === null || ctx.castRevoked) return null;
-  const user = ctx.users.get(Number(row.caster_user_id));
+function buildLaunchCaster(caster: MatchCasterLink, ctx: LaunchContext): LaunchCaster | null {
+  const user = ctx.users.get(caster.userId);
   if (!user || Number(user.is_deleted) !== 0) return null;
   const discordTag = user.discord_verified_at !== null ? user.discord_pseudo : null;
   const contact = ctx.exposesCaster
@@ -518,8 +533,9 @@ function buildLaunchCaster(row: CandidateRow, ctx: LaunchContext): LaunchCaster 
     discordTag: contact?.discordTag ?? null,
     battletag: contact?.battletag ?? null,
     battletagVerified: contact?.battletagVerified ?? false,
-    ready: ctx.readiness.casterReady,
+    ready: ctx.readiness.casters.some((entry) => entry.userId === caster.userId && entry.ready),
     contactsShown: ctx.exposesCaster,
+    isViewer: Number(user.id) === ctx.viewer.id,
   };
 }
 
@@ -530,7 +546,10 @@ function buildLaunchInfo(
   ctx: LaunchContext,
 ): MatchLaunchInfo {
   const { readiness } = ctx;
-  const caster = buildLaunchCaster(row, ctx);
+  const casters = ctx.casters
+    .map((caster) => buildLaunchCaster(caster, ctx))
+    .filter((caster): caster is LaunchCaster => caster !== null);
+  const self = casters.find((caster) => caster.userId === ctx.viewer.id);
   const launch = rowLaunchState(row);
   const lobbyOpenedAt = launch.lobbyOpenedAt;
   return {
@@ -549,14 +568,14 @@ function buildLaunchInfo(
     ),
     team1: buildLaunchSide(row, 1, ctx),
     team2: buildLaunchSide(row, 2, ctx),
-    caster,
+    casters,
     viewer: {
       role: party.role,
       canDeclareReady: party.canDeclareReady,
-      isCaster: caster !== null && caster.userId === ctx.viewer.id,
+      isCaster: self !== undefined,
       earlyContacts: party.earlyContacts,
       ready: {
-        CASTER: readiness.casterReady,
+        CASTER: self?.ready ?? false,
         TEAM1: readiness.team1Ready,
         TEAM2: readiness.team2Ready,
         REFEREE: false,
@@ -625,7 +644,7 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
     // inscription à cette lecture-là, sans attendre celle d'un joueur. La
     // modale, qui interroge en boucle, n'en paie pas le coût.
     const checked = forCard ? read : visible;
-    if (visible.length === 0 && !checked.some(({ row }) => row.caster_user_id !== null)) return [];
+    if (visible.length === 0 && !checked.some(({ row }) => row.casters.length > 0)) return [];
 
     const { rosterTeamIds, userIds } = collectContactIds(checked);
     const rosters = await loadRosters(connection, rosterTeamIds);
@@ -639,12 +658,12 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
         if (side.soloUserId !== null) return Number(side.soloUserId) === casterId;
         return (rosters.get(Number(side.teamId)) ?? []).some((member) => Number(member.user_id) === casterId);
       });
-    const revoked = revokeIneligibleCasters(checked, users, revokedCasts, casterPlays);
+    const kept = keepEligibleCasters(checked, users, revokedCasts, casterPlays);
 
     const result: MatchLaunchInfo[] = [];
     for (const { row, phase, early, exposes } of visible) {
-      const castRevoked = revoked.has(Number(row.id));
-      const party = viewerRole(row, viewer.id, teams, castRevoked, referee);
+      const casters = kept.get(Number(row.id)) ?? [];
+      const party = viewerRole(row, viewer.id, teams, casters, referee);
       if (!party) continue;
       // À un arbitre qui caste, la modale de lancement renvoie aussi à « Contacts ».
       result.push(
@@ -652,8 +671,8 @@ async function readViewerLaunches(viewer: LaunchViewer, matchId: number | null):
           viewer,
           users,
           rosters,
-          castRevoked,
-          readiness: rowReadiness(row),
+          casters,
+          readiness: rowReadiness(row, casters),
           exposes,
           // Une seule décision pour les contacts du caster : sa règle, plus
           // stricte que celle du match — c'est elle, et elle seule, qui les

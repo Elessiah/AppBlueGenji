@@ -27,6 +27,7 @@ import { purgeStaleSubscriptions } from "@/lib/server/push-subscriptions";
 import { webPushConfig } from "@/lib/server/web-push";
 import { LAUNCH_AUTO_DELAY_MINUTES } from "@/lib/shared/match-launch";
 import { loadEligibleCasterIds } from "./cast-eligibility";
+import { loadCasterLinks } from "./match-casters";
 import {
   matchStartPush,
   scoreAutoValidatedPush,
@@ -68,7 +69,6 @@ type StartingMatchRow = RowDataPacket & {
   team2_id: number;
   team1_name: string;
   team2_name: string;
-  caster_user_id: number | null;
   launch_pairing: string;
   launched_at: Date | string | null;
 };
@@ -122,6 +122,33 @@ async function planStartNotice(row: StartingMatchRow): Promise<MatchStartPhase |
   return (await claimStartNotice(matchId, pairing, "LAUNCHED")) ? "LAUNCHED" : null;
 }
 
+/**
+ * Casters à appeler, par match : les inscrits qui remplissent encore la
+ * condition du cast. Une panne de lecture n'en appelle aucun — les joueurs
+ * gardent leur annonce.
+ */
+async function readMatchCasters(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  matchIds: readonly number[],
+): Promise<Map<number, number[]>> {
+  try {
+    const links = await loadCasterLinks(db, matchIds);
+    const eligible = await loadEligibleCasterIds(
+      db,
+      [...links.values()].flatMap((casters) => casters.map((caster) => caster.userId)),
+    );
+    return new Map(
+      [...links].map(([matchId, casters]) => [
+        matchId,
+        casters.map((caster) => caster.userId).filter((userId) => eligible.has(userId)),
+      ]),
+    );
+  } catch (error) {
+    console.error("[push] lecture des casters impossible, annonce faite aux seuls joueurs", error);
+    return new Map();
+  }
+}
+
 async function runMatchStartSweep(): Promise<number> {
   const db = await getDatabase();
   // L'appariement courant seulement : un état de lancement posé pour une paire
@@ -129,7 +156,7 @@ async function runMatchStartSweep(): Promise<number> {
   const [rows] = await db.query<StartingMatchRow[]>(
     `SELECT m.id, m.tournament_id, t.name AS tournament_name, t.participant_type,
             m.team1_id, m.team2_id, t1.name AS team1_name, t2.name AS team2_name,
-            m.caster_user_id, m.launch_pairing, m.launched_at
+            m.launch_pairing, m.launched_at
        FROM bg_matches m
        JOIN bg_tournaments t ON t.id = m.tournament_id AND t.state = 'RUNNING'
        JOIN bg_teams t1 ON t1.id = m.team1_id
@@ -158,17 +185,11 @@ async function runMatchStartSweep(): Promise<number> {
   const players = await loadEntrantPlayerIds(
     planned.flatMap(({ row }) => [Number(row.team1_id), Number(row.team2_id)]),
   );
-  // Un caster inscrit qui ne remplit plus la condition du cast n'est plus une
-  // partie du lancement : on ne l'appelle pas à un « Prêt » qu'il ne peut plus
+  // Chaque caster inscrit est une partie du lancement — sauf celui qui ne
+  // remplit plus la condition du cast : on ne l'appelle pas à un « Prêt » qu'il ne peut plus
   // déclarer. Les annonces sont déjà réservées : une panne de cette lecture ne
   // doit pas priver les joueurs de la leur, le caster seul s'en passe.
-  const eligibleCasters = await loadEligibleCasterIds(
-    db,
-    planned.flatMap(({ row }) => (row.caster_user_id === null ? [] : [Number(row.caster_user_id)])),
-  ).catch((error: unknown) => {
-    console.error("[push] lecture des casters impossible, annonce faite aux seuls joueurs", error);
-    return new Set<number>();
-  });
+  const castersByMatch = await readMatchCasters(db, planned.map(({ row }) => Number(row.id)));
 
   let pushed = 0;
   for (const { row, phase } of planned) {
@@ -191,10 +212,11 @@ async function runMatchStartSweep(): Promise<number> {
         true,
       );
     }
-    // Le caster est une partie du lancement : son « Prêt » est attendu aussi.
-    if (row.caster_user_id !== null && eligibleCasters.has(Number(row.caster_user_id))) {
+    // Les casters sont des parties du lancement : leur « Prêt » est attendu aussi.
+    const casterIds = castersByMatch.get(Number(row.id)) ?? [];
+    if (casterIds.length > 0) {
       pushed += await pushTo(
-        [Number(row.caster_user_id)],
+        casterIds,
         "MATCH_START",
         (locale) => matchStartPush({ ...base, teamName: sides[0].teamName, opponentName: sides[0].opponentName }, phase, locale),
         true,

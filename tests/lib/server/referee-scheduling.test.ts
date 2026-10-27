@@ -11,6 +11,7 @@ import { connectionMock, fakeConnection } from "../../helpers/sql-double";
 function world(
   tournament: { state: string; referee_scheduling?: number; match_launch_phase?: number } | null,
   moved = 2,
+  resetIds: number[] = [11, 12],
 ) {
   const connection = connectionMock();
   connection.rollback.mockResolvedValue(undefined);
@@ -22,6 +23,7 @@ function world(
       return [tournament ? [{ name: "Coupe", referee_scheduling: 0, match_launch_phase: 1, ...tournament }] : []];
     }
     if (sql.startsWith("UPDATE bg_matches")) return [{ affectedRows: moved }];
+    if (sql.startsWith("SELECT id FROM bg_matches")) return [resetIds.map((id) => ({ id }))];
     return [{ affectedRows: 1 }];
   });
   jest.mocked(withConnection).mockImplementation(async (run) => run(fakeConnection(connection)));
@@ -71,6 +73,27 @@ describe("setRefereeScheduling", () => {
     expect(reset?.sql).toContain("NOT (team1_score IS NOT NULL OR team2_score IS NOT NULL)");
     expect(connection.commit).toHaveBeenCalled();
     expect(publishUpdatedEvent).toHaveBeenCalledWith(7);
+  });
+
+  it("verrouille les matchs rendus à planifier avant d'effacer le « Prêt » de leurs casters", async () => {
+    const { statements } = world({ state: "RUNNING" });
+    await setRefereeScheduling(7, true);
+    const lock = statements.findIndex((s) => s.sql.startsWith("SELECT id FROM bg_matches"));
+    const casters = statements.findIndex((s) => s.sql.startsWith("UPDATE bg_match_casters"));
+    expect(statements[lock].sql).toMatch(/NOT \(team1_score IS NOT NULL OR team2_score IS NOT NULL\) FOR UPDATE$/);
+    expect(statements[lock].params).toEqual([7]);
+    expect(lock).toBeGreaterThan(0);
+    expect(casters).toBeGreaterThan(lock);
+    expect(statements[casters]).toEqual({
+      sql: "UPDATE bg_match_casters SET ready_at = NULL WHERE match_id IN (?, ?)",
+      params: [11, 12],
+    });
+  });
+
+  it("ne touche aucun caster quand aucun match n'est rendu à planifier", async () => {
+    const { statements } = world({ state: "RUNNING" }, 0, []);
+    await setRefereeScheduling(7, true);
+    expect(statements.some((s) => s.sql.startsWith("UPDATE bg_match_casters"))).toBe(false);
   });
 
   it("sans phase de lancement, rend aussi à planifier les matchs sans date lancés d'office, sans score", async () => {

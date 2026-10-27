@@ -28,7 +28,7 @@ import {
 } from "@/lib/shared/match-launch";
 import { PRIVACY_CHANGES_ANSWERED_EVENT } from "@/lib/shared/privacy-changes";
 import styles from "./MatchLaunchCenter.module.css";
-import { CasterCard, SideCard } from "./LaunchContactCards";
+import { CasterCards, SideCard } from "./LaunchContactCards";
 
 /** Cadences d'interrogation : serrée pendant un lancement, lâche sinon. */
 const POLL_LOBBY_MS = 8_000;
@@ -313,8 +313,7 @@ export function MatchLaunchCenter({
   const count = readyCount({
     team1Ready: current.team1.ready,
     team2Ready: current.team2.ready,
-    casterRequired: current.caster !== null,
-    casterReady: current.caster?.ready ?? false,
+    casters: current.casters,
   });
   const autoAt = formatTime(current.autoLaunchAt, text.locale);
   const startAt = formatTime(current.startAt, text.locale);
@@ -372,12 +371,7 @@ export function MatchLaunchCenter({
               <SideCard side={current.team2} isHost={current.hostTeamId === current.team2.teamId} phase={current.phase} onCopy={copy} laterText={sidesLaterText} />
             </div>
 
-            <CasterCard
-              caster={current.caster}
-              phase={current.phase}
-              onCopy={copy}
-              viewer={current.viewer}
-            />
+            <CasterCards casters={current.casters} phase={current.phase} onCopy={copy} />
           </div>
 
           {/* Le même réglage que sur /profil, sous sa forme compacte : c'est ici

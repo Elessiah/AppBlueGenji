@@ -1087,6 +1087,27 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "L'inscription d'un caster sur un match, sa reprise par un autre caster et son retrait (avec le motif d'une reprise ou d'un retrait d'office) sont aussi notés au journal du staff sur Discord, sans nommer personne (« un caster », « le staff »).",
     ],
   },
+  {
+    // MATCH-REFEREE MR-1 : plusieurs casters par match, chacun sur un stream
+    // existant (co-cast) ou sur le sien, avec son lien. Nouveaux destinataires
+    // — les contacts d'un caster vont aussi aux autres casters du match, ceux
+    // des équipes à chaque caster — et ce qu'emporte le départ d'un caster (son
+    // stream à part et son lien). Joueurs comme casters concernés : pas de
+    // public. Daté comme l'entrée précédente (mise en ligne groupée, heure
+    // inconnue — § Dates corrigées). Un caster n'en remplace plus un autre :
+    // l'entrée du cast retiré, datée avant, n'est pas réécrite.
+    id: "2026-10-plusieurs-casters-par-match",
+    publishedAt: "2026-10-29",
+    title: "Plusieurs casters par match",
+    links: [{ href: "/rgpd#retransmission", label: "Lire le paragraphe « Retransmission des matchs »" }],
+    summary:
+      "Un match peut désormais avoir plusieurs casters : chacun rejoint un stream du match (co-cast) ou ouvre le sien, avec son propre lien. Les contacts de match présentés au caster le temps du match le sont à chaque caster inscrit, et ceux de chaque caster aussi aux autres casters du match.",
+    details: [
+      "Ce qui est montré et le moment ne changent pas : tag Discord certifié et BattleTag (même masqué), dans les fenêtres « Contacts » et de lancement du match, le temps du match seulement (aux arbitres, dès que ses deux adversaires sont connus), au titre de l'exécution du service.",
+      "Si tu castes : ton pseudo est montré avec le stream que tu rejoins. Le lien du stream que tu ouvres à part est publié avec le match ; ce stream part, avec son lien, quand plus aucun caster ne le tient — que tu le quittes ou que ton compte soit supprimé ; seul le lien posé dans la configuration du direct du match reste au match. À la suppression de ton compte, le lien que tu as fourni — en ouvrant ton stream ou dans cette configuration — part aussi, matchs joués compris, même si un autre caster tient encore ce stream.",
+      "Un caster n'en remplace plus un autre : une nouvelle inscription s'ajoute sans retirer personne. Une inscription n'est plus retirée que par le caster lui-même, par le staff ou d'office.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

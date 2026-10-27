@@ -27,7 +27,8 @@
     "NOT_CASTER": "Caster un match demande le rôle caster.",
     "CASTER_IDENTITY_REQUIRED": "Pour caster un match, certifie ton tag Discord et rattache ton compte Battle.net depuis ton profil.",
     "CASTER_IS_PLAYER": "Tu joues ce match : tu ne peux pas le caster.",
-    "MATCH_ALREADY_CASTED": "Ce match a déjà un caster.",
+    "STREAM_NOT_FOUND": "Ce stream n'existe plus sur ce match : choisis-en un autre.",
+    "INVALID_STREAM_URL": "Lien de diffusion non reconnu (Twitch, YouTube ou Kick attendu).",
     "MATCH_ALREADY_COMPLETED": "Ce match est terminé.",
     "NOT_MATCH_CASTER": "Tu ne castes pas ce match.",
     "INVALID_HOST_TEAM": "L'équipe hôte doit être l'une des deux engagées du match.",
@@ -79,7 +80,7 @@
   "pushLead": "Sois prévenu du départ de tes prochains matchs, même le site fermé.",
   "contacts": {
     "title": "Contacts — {match}",
-    "lead": "Fiches montrées aux membres des deux équipes et aux arbitres de ce match — et, le temps du match, à son caster —, pour s'ajouter en jeu et s'organiser. Celle du caster : aux deux équipes le temps du match, aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin.",
+    "lead": "Fiches montrées aux membres des deux équipes et aux arbitres de ce match — et, le temps du match, à ses casters —, pour s'ajouter en jeu et s'organiser. Celle d'un caster : aux deux équipes et aux autres casters le temps du match, aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin.",
     "scrollAria": "Contacts du match",
     "loading": "Chargement des contacts…",
     "notShown": "Contacts non affichés.",

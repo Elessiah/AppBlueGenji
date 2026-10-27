@@ -2,7 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/tournaments-service");
-jest.mock("@/lib/shared/permissions");
+// Seul `can` est simulé : les tables de rôles restent réelles, car des modules
+// chargés par la route en tirent leur SQL au chargement (`LIVE_STAFF_SQL`).
+jest.mock("@/lib/shared/permissions", () => ({
+  ...jest.requireActual<typeof import("@/lib/shared/permissions")>("@/lib/shared/permissions"),
+  can: jest.fn(),
+}));
 
 import { POST } from "@/app/api/tournaments/route";
 import { getCurrentUser } from "@/lib/server/auth";

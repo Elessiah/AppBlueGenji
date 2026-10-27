@@ -35,8 +35,8 @@ describe("DISCORD_TAG_AUDIENCE", () => {
   });
 
   it("dit les parties d'un match, joué ou casté, et leurs moments", () => {
-    expect(discord).toContain("les membres des deux équipes de ton match, dès que ses adversaires sont connus et jusqu'à sa fin, et son caster le temps du match");
-    expect(discord).toContain("si tu castes un match : ses deux équipes le temps du match, et les arbitres dès que ses adversaires sont connus et jusqu'à sa fin");
+    expect(discord).toContain("les membres des deux équipes de ton match, dès que ses adversaires sont connus et jusqu'à sa fin, et ses casters le temps du match");
+    expect(discord).toContain("si tu castes un match : ses deux équipes et ses autres casters le temps du match, et les arbitres dès que ses adversaires sont connus et jusqu'à sa fin");
   });
 
   it("nomme les autres joueurs comme un public choisi, pas acquis", () => {
@@ -56,12 +56,12 @@ describe("HIDDEN_BATTLETAG_AUDIENCE", () => {
 
   it("dit qui le lit, et quand, comme contact et comme caster", () => {
     expect(battletag).toContain("si tu y es présenté comme contact");
-    expect(battletag).toContain("dès que les adversaires sont connus et jusqu'à la fin du match, et le caster le temps du match");
-    expect(battletag).toContain("si tu castes un match : ses deux équipes le temps du match");
+    expect(battletag).toContain("dès que les adversaires sont connus et jusqu'à la fin du match, et les casters le temps du match");
+    expect(battletag).toContain("si tu castes un match : ses deux équipes et ses autres casters le temps du match");
   });
 
   it("borne la fenêtre de lancement aux équipes et au caster", () => {
-    expect(battletag).toContain("ne s'ouvre qu'aux deux équipes et au caster");
+    expect(battletag).toContain("ne s'ouvre qu'aux deux équipes et aux casters");
   });
 
   it("dit comment cesser de le partager, Battle.net compris", () => {

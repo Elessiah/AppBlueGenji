@@ -51,7 +51,13 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
   }
 
   try {
-    await setMatchLiveConfig(matchId, { trigger, liveUrl: (body.liveUrl as string) ?? null });
+    // Le lien d'un caster qui n'est pas de l'organisation lui reste rattaché :
+    // la suppression de son compte le retire (`withdrawUserCasts`).
+    await setMatchLiveConfig(matchId, {
+      trigger,
+      liveUrl: (body.liveUrl as string) ?? null,
+      linkProviderId: can(user, "tournaments") ? null : user.id,
+    });
     announceStaffMatchAction(matchId, trigger === null ? "LIVE_REMOVED" : "LIVE_CONFIGURED", staffActionAuthor(user));
     return ok({ trigger });
   } catch (error) {

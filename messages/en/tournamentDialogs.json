@@ -262,7 +262,7 @@
     "autoStop": "The live stops on its own as soon as a score is entered.",
     "url": "Match channel (optional)",
     "urlInvalid": "Link not recognized. Accepted platforms: {platforms}.",
-    "urlHint": "Leave empty to flag the match without a link: its Discord announcement will then point to the tournament's official channel, or will not be posted if it has none. Accepted platforms: {platforms}."
+    "urlHint": "Leave empty to flag the match without a staff link: its Discord announcement will then point to the first link opened by a caster, otherwise to the tournament's official channel, or will not be posted if it has none. Accepted platforms: {platforms}."
   },
   "replay": {
     "removed": "Replay removed.",
@@ -367,7 +367,7 @@
     "title": "Verify your Discord and your BattleTag",
     "titleDiscordOnly": "Verify your Discord",
     "titleBattletagOnly": "Verify your BattleTag",
-    "leadManager": "You lead a team entered in this tournament: you may be shown as its contact to the opponent and the referees as soon as your opponents are known, and to the caster while the match is played. Verify what is still missing.",
+    "leadManager": "You lead a team entered in this tournament: you may be shown as its contact to the opponent and the referees as soon as your opponents are known, and to the casters while the match is played. Verify what is still missing.",
     "leadTeam": "Your team has no verified contact to show for its matches: nobody on it has verified their Discord tag or their BattleTag. The opponent and the referees have no reliable way to reach you.",
     "leadTeamDiscordOnly": "Your team has nobody to show on Discord for its matches: nobody on it has verified their Discord tag. The opponent and the referees have no reliable way to reach you.",
     "statusLabel": "Where you stand",
@@ -388,8 +388,8 @@
       },
       "matches": {
         "topic": "Your matches",
-        "does": "You go ahead of members who have verified nothing to be shown as your team's contact — to both teams of the match, its caster, and the site's referees and admins —, with your verified Discord tag and your BattleTag marked “verified”.",
-        "doesDiscordOnly": "You go ahead of members who have verified nothing to be shown as your team's contact — to both teams of the match, its caster, and the site's referees and admins —, with your verified Discord tag.",
+        "does": "You go ahead of members who have verified nothing to be shown as your team's contact — to both teams of the match, its casters, and the site's referees and admins —, with your verified Discord tag and your BattleTag marked “verified”.",
+        "doesDiscordOnly": "You go ahead of members who have verified nothing to be shown as your team's contact — to both teams of the match, its casters, and the site's referees and admins —, with your verified Discord tag.",
         "doesNot": "Does not publish your tag on your profile: other players see a badge there, and your tag only if your visibility settings open it (the “Discord tag” box for the Discord tag, even if ticked before). Verified or not, when you are shown as a contact your BattleTag appears even if hidden, from the moment both opponents of the match are known until its end.",
         "doesNotDiscordOnly": "Does not publish your tag on your profile: other players see a badge there, and your tag only if you ticked “Discord tag” in your settings (even before). If your profile holds a BattleTag, when you are shown as a contact it appears even if hidden, from the moment both opponents of the match are known until its end."
       },

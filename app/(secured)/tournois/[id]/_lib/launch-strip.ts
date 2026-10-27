@@ -8,7 +8,7 @@ import type { BracketMatch } from "@/lib/shared/types";
 
 type StripMatch = Pick<
   BracketMatch,
-  "status" | "team1Id" | "team2Id" | "team1Name" | "team2Name" | "hostTeamId" | "casterUserId"
+  "status" | "team1Id" | "team2Id" | "team1Name" | "team2Name" | "hostTeamId" | "casters"
 >;
 
 export type LaunchStripViewer = {
@@ -35,10 +35,15 @@ export type LaunchStripControls = {
    * les deux adversaires sont connus, caster le temps du match seulement.
    */
   showContacts: boolean;
-  /** S'inscrire comme caster. */
+  /** S'inscrire comme caster — sans plafond : co-caster ou ouvrir son stream. */
   showClaim: boolean;
-  /** Se retirer du cast, ou retirer le caster (arbitrage). */
+  /** Se retirer du cast, ou retirer un des casters (arbitrage). */
   showRelease: boolean;
+  /**
+   * L'arbitrage peut retirer un **autre** caster que le lecteur : le retrait
+   * passe par le choix du caster, même quand le lecteur caste aussi le match.
+   */
+  releasesOthers: boolean;
   /** Ouvrir la date d'un match à planifier. */
   showPlan: boolean;
   /** Lancer sans attendre les « Prêt » — et, à planifier, sans date. */
@@ -57,7 +62,8 @@ export function launchStripControls(
   phase: MatchLaunchPhase,
   viewer: LaunchStripViewer,
 ): LaunchStripControls {
-  const isCaster = viewer.viewerUserId !== null && match.casterUserId === viewer.viewerUserId;
+  const isCaster =
+    viewer.viewerUserId !== null && match.casters.some((caster) => caster.userId === viewer.viewerUserId);
   const isPlayer =
     viewer.myTeamId !== null && (match.team1Id === viewer.myTeamId || match.team2Id === viewer.myTeamId);
   const open = match.status !== "COMPLETED";
@@ -75,8 +81,10 @@ export function launchStripControls(
     // `tournaments`) les lit comme un joueur du match, dès que les deux
     // adversaires sont connus ; le caster inscrit, le temps du match seulement.
     showContacts: (early || isCaster) && exposesMatchContacts(phase, early),
-    showClaim: viewer.canManage && castable && match.casterUserId === null,
-    showRelease: open && match.casterUserId !== null && (isCaster || viewer.canSchedule),
+    showClaim: viewer.canManage && castable && !isCaster,
+    showRelease: open && match.casters.length > 0 && (isCaster || viewer.canSchedule),
+    releasesOthers:
+      open && viewer.canSchedule && match.casters.some((caster) => caster.userId !== viewer.viewerUserId),
     showPlan: viewer.canSchedule && phase === "TO_PLAN",
     showForce: viewer.canSchedule && FORCEABLE_PHASES.has(phase),
     showHost,

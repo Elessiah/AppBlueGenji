@@ -128,7 +128,7 @@ describe("CertificationPromptDialog", () => {
       // Certifier par code rattache Discord : la modale dit comment le détacher.
       expect(html).toContain("se détache depuis « Applications connectées » tant qu&#x27;il te reste une autre façon de te connecter");
     }
-    expect(render(OW_MANAGER)).toContain("tu peux être présenté comme son contact à l&#x27;adversaire et à l&#x27;arbitrage dès que vos adversaires sont connus, et au caster le temps du match");
+    expect(render(OW_MANAGER)).toContain("tu peux être présenté comme son contact à l&#x27;adversaire et à l&#x27;arbitrage dès que vos adversaires sont connus, et aux casters le temps du match");
     expect(render(OW_MANAGER)).toContain("Battle.net remplace ton BattleTag par le sien, verrouillé tant qu&#x27;il reste rattaché");
     expect(render(OW_MANAGER)).toContain("Certifié ou non, présenté comme contact, ton BattleTag est montré même masqué");
     const en = render(MR_TEAM, "en");

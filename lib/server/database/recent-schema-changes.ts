@@ -277,6 +277,50 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // (`docs/features/ABOUT_STATS_MANAGEMENT.md`) : `NULL` = la valeur
     // française est reprise sous `/en`, donc rien à rattraper.
     `ALTER TABLE bg_about_stats ADD COLUMN value_en VARCHAR(40) NULL AFTER value`,
+    // Co-casters et streams multiples (`docs/features/MATCH_LAUNCH.md`
+    // § Casters et streams) : le lien et le caster unique de `bg_matches`
+    // passent dans `bg_match_streams` / `bg_match_casters`, créées plus haut.
+    // 0. Le stream du staff (`staff_owned`), sur une table créée avant la
+    //    colonne ; là où la table naît avec, `ER_DUP_FIELDNAME` est toléré.
+    `ALTER TABLE bg_match_streams ADD COLUMN staff_owned TINYINT(1) NOT NULL DEFAULT 0 AFTER live_url`,
+    //    Le compte qui a fourni le lien d'un stream de caster (`link_user_id`),
+    //    que l'effacement de ce compte retire (`withdrawUserCasts`).
+    `ALTER TABLE bg_match_streams ADD COLUMN link_user_id BIGINT NULL AFTER staff_owned`,
+    `ALTER TABLE bg_match_streams ADD INDEX idx_bg_match_streams_link_user (link_user_id)`,
+    // 1. Un stream par match qui avait un lien ou un caster — jamais deux : un
+    //    match qui a déjà le sien est sauté. Avant les co-casters, seul le staff
+    //    posait un lien : un stream qui en a un est celui du staff.
+    `INSERT INTO bg_match_streams (match_id, live_url, staff_owned)
+       SELECT m.id, m.live_url, m.live_url IS NOT NULL FROM bg_matches m
+        WHERE (m.live_url IS NOT NULL OR m.caster_user_id IS NOT NULL)
+          AND NOT EXISTS (SELECT 1 FROM bg_match_streams s WHERE s.match_id = m.id)`,
+    // 2. Le caster rejoint ce stream, avec son « Prêt ».
+    `INSERT IGNORE INTO bg_match_casters (match_id, user_id, stream_id, ready_at)
+       SELECT m.id, m.caster_user_id,
+              (SELECT MIN(s.id) FROM bg_match_streams s WHERE s.match_id = m.id),
+              m.caster_ready_at
+         FROM bg_matches m
+        WHERE m.caster_user_id IS NOT NULL
+          AND EXISTS (SELECT 1 FROM bg_match_streams s WHERE s.match_id = m.id)`,
+    // 2 bis. Un stream de caster ouvert avant `link_user_id` : son lien est
+    //    rattaché à son caster quand il n'en a qu'un — sans ambiguïté. Le lien
+    //    déjà rattaché n'est jamais réécrit : un second passage ne change rien.
+    `UPDATE bg_match_streams s
+        SET s.link_user_id = (SELECT MIN(c.user_id) FROM bg_match_casters c
+                               WHERE c.match_id = s.match_id AND c.stream_id = s.id)
+      WHERE s.staff_owned = 0 AND s.live_url IS NOT NULL AND s.link_user_id IS NULL
+        AND (SELECT COUNT(*) FROM bg_match_casters c
+              WHERE c.match_id = s.match_id AND c.stream_id = s.id) = 1`,
+    // 3. Les anciennes colonnes sont vidées — plus rien ne les écrit : un
+    //    redémarrage ne recopie rien, et rien de périmé ne revient. Seulement
+    //    ce qui est **arrivé** dans les nouvelles tables : si 1 ou 2 a échoué,
+    //    la donnée reste en place et la copie se retente au démarrage suivant.
+    `UPDATE bg_matches m SET m.live_url = NULL, m.caster_user_id = NULL, m.caster_ready_at = NULL
+      WHERE (m.live_url IS NOT NULL OR m.caster_user_id IS NOT NULL OR m.caster_ready_at IS NOT NULL)
+        AND (m.live_url IS NULL
+             OR EXISTS (SELECT 1 FROM bg_match_streams s WHERE s.match_id = m.id))
+        AND (m.caster_user_id IS NULL
+             OR EXISTS (SELECT 1 FROM bg_match_casters c WHERE c.match_id = m.id AND c.user_id = m.caster_user_id))`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

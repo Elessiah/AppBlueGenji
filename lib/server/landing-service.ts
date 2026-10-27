@@ -35,6 +35,7 @@ import type {
 } from "@/lib/shared/types";
 import { gameLabel } from "@/lib/shared/tournament-labels";
 import { findBroadcastingTournament } from "@/lib/server/tournaments/live-streams";
+import { firstStreamUrlSql } from "@/lib/server/tournaments/match-casters";
 import {
   isMatchLive,
   normalizeStreamUrl,
@@ -270,7 +271,7 @@ async function loadLandingLive(): Promise<LandingLive | null> {
         t.manual_seeding,
         m.start_at,
         m.live_trigger,
-        m.live_url,
+        ${firstStreamUrlSql("m")} AS live_url,
         m.live_started_at,
         m.launched_at,
         m.launch_pairing,

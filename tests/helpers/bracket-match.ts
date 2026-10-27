@@ -1,4 +1,4 @@
-import type { BracketMatch } from "@/lib/shared/types";
+import type { BracketMatch, MatchCaster } from "@/lib/shared/types";
 
 /**
  * Un `BracketMatch` **complet** (match vierge d'un tournoi sans phases),
@@ -40,16 +40,20 @@ export function bracketMatch(overrides: Partial<BracketMatch> = {}): BracketMatc
     startAt: null,
     liveTrigger: null,
     liveUrl: null,
+    streams: [],
     liveStartedAt: null,
     hostTeamId: null,
-    casterUserId: null,
-    casterPseudo: null,
+    casters: [],
     lobbyOpenedAt: null,
     launchedAt: null,
     team1Ready: false,
     team2Ready: false,
-    casterReady: false,
     replayUrl: null,
     ...overrides,
   };
+}
+
+/** Un caster de match (`BracketMatch.casters`), sur le stream 1 par défaut. */
+export function matchCaster(overrides: Partial<MatchCaster> = {}): MatchCaster {
+  return { userId: 900, pseudo: "Caster", streamId: 1, ready: false, ...overrides };
 }

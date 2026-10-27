@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { mapMatch } from "@/lib/server/tournaments/_internal";
 import { castEligibilityBlock, type CastEligibilityFields } from "@/lib/server/tournaments/cast-eligibility";
+import type { MatchCasterRow } from "@/lib/server/tournaments/match-casters";
 import { matchRow } from "../../helpers/tournament-rows";
 
 /**
@@ -45,53 +46,88 @@ describe("castEligibilityBlock", () => {
   });
 });
 
-describe("mapMatch — caster inscrit qui ne remplit plus la condition", () => {
-  const caster = (overrides: Partial<CastEligibilityFields> = {}) => {
-    const fields = { ...ELIGIBLE, ...overrides };
-    return {
-      caster_user_id: 900,
-      caster_pseudo: "Caster",
-      caster_discord_verified_at: fields.discord_verified_at,
-      caster_discord_pseudo: fields.discord_pseudo,
-      caster_blizzard_sub: fields.blizzard_sub,
-      caster_overwatch_battletag: fields.overwatch_battletag,
-      caster_is_deleted: fields.is_deleted,
-      caster_is_admin: fields.is_admin,
-      caster_platform_roles_json: fields.platform_roles_json,
-    };
-  };
+describe("mapMatch — casters inscrits et condition du cast", () => {
+  const caster = (
+    userId: number,
+    overrides: Partial<CastEligibilityFields> = {},
+    extra: Partial<MatchCasterRow> = {},
+  ): MatchCasterRow => ({
+    matchId: 1,
+    userId,
+    streamId: 10,
+    readyAt: null,
+    pseudo: `Caster${userId}`,
+    eligibility: { ...ELIGIBLE, ...overrides },
+    ...extra,
+  });
+  const pairing = "1:2";
+  const row = (overrides: Parameters<typeof matchRow>[0] = {}) =>
+    matchRow({ status: "READY", team1_id: 1, team2_id: 2, launch_pairing: pairing, ...overrides });
 
-  it("garde un caster éligible", () => {
-    const match = mapMatch(matchRow({ status: "READY", ...caster() }));
-    expect(match.casterUserId).toBe(900);
-    expect(match.casterPseudo).toBe("Caster");
+  it("garde un caster éligible, avec son stream", () => {
+    const match = mapMatch(row(), { casters: [caster(900)] });
+    expect(match.casters).toEqual([{ userId: 900, pseudo: "Caster900", streamId: 10, ready: false }]);
   });
 
-  it("tait un caster devenu inéligible tant que le match n'est pas lancé", () => {
-    const match = mapMatch(matchRow({ status: "READY", caster_ready_at: new Date(), ...caster({ blizzard_sub: null }) }));
-    expect(match.casterUserId).toBeNull();
-    expect(match.casterPseudo).toBeNull();
-    expect(match.casterReady).toBe(false);
+  it("tait un caster devenu inéligible tant que le match n'est pas lancé, et garde les autres", () => {
+    const match = mapMatch(row(), {
+      casters: [caster(900, { blizzard_sub: null }, { readyAt: new Date() }), caster(901)],
+    });
+    expect(match.casters.map((entry) => entry.userId)).toEqual([901]);
   });
 
-  it("tait un caster dont le compte a disparu", () => {
-    const match = mapMatch(
-      matchRow({ status: "READY", ...caster(), caster_is_deleted: null, caster_platform_roles_json: null }),
-    );
-    expect(match.casterUserId).toBeNull();
+  it("tait un caster dont le compte est supprimé (anonymisé)", () => {
+    const match = mapMatch(row(), { casters: [caster(900, { is_deleted: 1 })] });
+    expect(match.casters).toEqual([]);
   });
 
-  it("garde le caster d'un match lancé ou joué", () => {
-    const launched = mapMatch(
-      matchRow({ status: "READY", launched_at: new Date(), ...caster({ platform_roles_json: null }) }),
-    );
-    expect(launched.casterUserId).toBe(900);
-    const played = mapMatch(matchRow({ status: "COMPLETED", ...caster({ platform_roles_json: null }) }));
-    expect(played.casterUserId).toBe(900);
+  it("garde les casters d'un match lancé ou joué", () => {
+    const ineligible = [caster(900, { platform_roles_json: null })];
+    expect(mapMatch(row({ launched_at: new Date() }), { casters: ineligible }).casters).toHaveLength(1);
+    expect(mapMatch(row({ status: "COMPLETED" }), { casters: ineligible }).casters).toHaveLength(1);
   });
 
-  it("garde l'inscription stockée d'une lecture partielle, sans la condition", () => {
-    const match = mapMatch(matchRow({ status: "READY", caster_user_id: 900, caster_pseudo: "Caster" }));
-    expect(match.casterUserId).toBe(900);
+  it("lit le « Prêt » de chaque caster, effacé pour un autre appariement", () => {
+    const casters = [caster(900, {}, { readyAt: new Date() }), caster(901)];
+    expect(mapMatch(row(), { casters }).casters.map((entry) => entry.ready)).toEqual([true, false]);
+    expect(mapMatch(row({ launch_pairing: "1:3" }), { casters }).casters.map((entry) => entry.ready)).toEqual([
+      false,
+      false,
+    ]);
+  });
+
+  it("sans liste (lecture partielle) : ni caster ni stream", () => {
+    const match = mapMatch(row());
+    expect(match.casters).toEqual([]);
+    expect(match.streams).toEqual([]);
+  });
+
+  it("revalide les liens des streams à la lecture", () => {
+    const match = mapMatch(row(), {
+      casters: [caster(900, {}, { streamId: 11 }), caster(901, {}, { streamId: 12 })],
+      streams: [
+        { id: 10, matchId: 1, liveUrl: "twitch.tv/BlueGenji", staff: true },
+        { id: 11, matchId: 1, liveUrl: "https://evil.example/stream", staff: false },
+        { id: 12, matchId: 1, liveUrl: null, staff: false },
+      ],
+    });
+    expect(match.streams).toEqual([
+      { id: 10, liveUrl: "https://twitch.tv/BlueGenji", staff: true },
+      { id: 11, liveUrl: null, staff: false },
+      { id: 12, liveUrl: null, staff: false },
+    ]);
+  });
+
+  it("tait le stream que seul tient un caster tu (avant le lancement), garde celui du staff", () => {
+    const streams = [
+      { id: 10, matchId: 1, liveUrl: "https://twitch.tv/match", staff: true },
+      { id: 11, matchId: 1, liveUrl: "https://twitch.tv/perso", staff: false },
+    ];
+    const casters = [caster(900, { platform_roles_json: null }, { streamId: 11 })];
+    expect(mapMatch(row(), { casters, streams }).streams.map((stream) => stream.id)).toEqual([10]);
+    // Lancé : le caster et son stream restent (on ne réécrit pas une diffusion en cours).
+    expect(mapMatch(row({ launched_at: new Date() }), { casters, streams }).streams.map((stream) => stream.id)).toEqual([
+      10, 11,
+    ]);
   });
 });

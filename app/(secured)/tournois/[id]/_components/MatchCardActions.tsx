@@ -41,6 +41,8 @@ import {
   type MatchCardActionId,
 } from "../_lib/match-card-actions";
 import { orReload } from "@/lib/shared/lazy-component";
+import { CastClaimDialog, type CastClaimOutcome } from "./CastClaimDialog";
+import type { CastClaimBody } from "../_lib/cast-claim";
 import styles from "./MatchCardActions.module.css";
 
 // Chargée au premier clic sur « Contacts » : seules les parties du match
@@ -183,12 +185,31 @@ function useConfirmWhile(present: boolean) {
   return [open && present, setOpen] as const;
 }
 
+/**
+ * Retrait d'un caster par l'arbitrage : le caster visé est fixé à l'ouverture
+ * (le premier) puis par le choix. Parti entre-temps, la fenêtre se ferme : le
+ * retrait ne passe jamais en silence à un autre caster, qui recevrait l'avis
+ * du staff.
+ */
+function useReleaseConfirm(present: boolean, casters: BracketMatch["casters"]) {
+  const [open, setOpen] = useConfirmWhile(present);
+  const [releaseTarget, setReleaseTarget] = useState<number | null>(null);
+  const releasedCaster = casters.find((caster) => caster.userId === releaseTarget) ?? null;
+  if (open && releasedCaster === null) setOpen(false);
+  const openRelease = () => {
+    setReleaseTarget(casters[0]?.userId ?? null);
+    setOpen(true);
+  };
+  return { confirmRelease: open && releasedCaster !== null, openRelease, setConfirmRelease: setOpen, releasedCaster, setReleaseTarget };
+}
+
 export function MatchCardActions({
   match,
   phase,
   actions,
   matchLabel,
   isCaster,
+  releasesOthers = false,
   onAir,
   onPlayerScore,
   onAdminScore,
@@ -198,8 +219,13 @@ export function MatchCardActions({
   phase: MatchLaunchPhase;
   actions: readonly MatchCardAction[];
   matchLabel: string;
-  /** Le lecteur est le caster inscrit (« Ne plus caster » plutôt que « Retirer le caster »). */
+  /** Le lecteur est un des casters inscrits (« Ne plus caster » plutôt que « Retirer le caster »). */
   isCaster: boolean;
+  /**
+   * L'arbitrage peut retirer un autre caster que le lecteur : « Retirer le
+   * caster » fait choisir, lecteur compris, même s'il caste aussi le match.
+   */
+  releasesOthers?: boolean;
   /** Le direct est ouvert : le bouton d'antenne le coupe. */
   onAir: boolean;
   onPlayerScore: () => void;
@@ -230,7 +256,12 @@ export function MatchCardActions({
   // « Forcer » (instantané du flux), sans clic.
   if (confirmForce && !hasForce) setConfirmForce(false);
   // Même règle pour le retrait du caster (match terminé, caster parti…).
-  const [confirmRelease, setConfirmRelease] = useConfirmWhile(actions.some((a) => a.id === "releaseCast"));
+  const { confirmRelease, openRelease, setConfirmRelease, releasedCaster, setReleaseTarget } = useReleaseConfirm(
+    actions.some((a) => a.id === "releaseCast"),
+    match.casters,
+  );
+  // Le choix du stream ne survit pas non plus à l'action (match lancé, joué…).
+  const [claimOpen, setClaimOpen] = useConfirmWhile(actions.some((a) => a.id === "claimCast"));
   // Les contacts ne restent pas affichés quand le match ne les offre plus
   // (terminé, caster retiré, tournoi clos) : l'instantané du flux retire
   // l'action, et la modale se ferme avec elle.
@@ -350,6 +381,20 @@ export function MatchCardActions({
 
   if (actions.length === 0) return null;
 
+  const claim = async (body: CastClaimBody): Promise<CastClaimOutcome> => {
+    try {
+      await send(`/api/matches/${match.id}/caster`, "POST", body);
+      showSuccess(t("cardActions.casting"));
+      window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
+      return { ok: true };
+    } catch (error) {
+      const code = (error as Error).message;
+      const message = launchError(code);
+      showError(message);
+      return { ok: false, code, message };
+    }
+  };
+
   const run = async (action: () => Promise<void>, success: string, refresh = true): Promise<boolean> => {
     setBusy(true);
     try {
@@ -383,13 +428,19 @@ export function MatchCardActions({
         showError(launchError(castBlock));
         return;
       }
-      void run(() => send(`/api/matches/${match.id}/caster`, "POST"), t("cardActions.casting"));
+      // Un match sans stream n'a rien à choisir : un clic ouvre un stream sans
+      // lien, comme avant les co-casters. Sinon, la fenêtre fait choisir.
+      if (match.streams.length === 0) {
+        void run(() => send(`/api/matches/${match.id}/caster`, "POST", {}), t("cardActions.casting"));
+        return;
+      }
+      setClaimOpen(true);
     },
     releaseCast: () => {
       // Le caster qui se retire lui-même n'est prévenu de rien : pas de
       // confirmation. Le staff qui retire un caster lui envoie un avis.
-      if (!isCaster) {
-        setConfirmRelease(true);
+      if (!isCaster || releasesOthers) {
+        openRelease();
         return;
       }
       void run(() => send(`/api/matches/${match.id}/caster`, "DELETE"), t("cardActions.notCasting"));
@@ -530,10 +581,41 @@ export function MatchCardActions({
           confirmLabel={t("cardActions.releaseConfirm.confirm")}
           pendingLabel={t("cardActions.releaseConfirm.pending")}
           onClose={() => setConfirmRelease(false)}
-          onConfirm={() => run(() => send(`/api/matches/${match.id}/caster`, "DELETE"), t("cardActions.casterRemoved"))}
+          onConfirm={() =>
+            run(
+              () =>
+                send(
+                  `/api/matches/${match.id}/caster?userId=${encodeURIComponent(String(releasedCaster?.userId ?? ""))}`,
+                  "DELETE",
+                ),
+              t("cardActions.casterRemoved"),
+            )
+          }
         >
+          {match.casters.length > 1 && (
+            <fieldset className={styles.releasePick}>
+              <legend>{t("cardActions.releaseConfirm.pick")}</legend>
+              {/* Le focus reste sur « Annuler » : un Entrée réflexe sur un bouton
+                  radio enverrait le formulaire et retirerait un caster. */}
+              {match.casters.map((caster) => (
+                <label key={caster.userId}>
+                  <input
+                    type="radio"
+                    name={`release-caster-${match.id}`}
+                    value={caster.userId}
+                    checked={caster.userId === releasedCaster?.userId}
+                    onChange={() => setReleaseTarget(caster.userId)}
+                  />
+                  <span>{caster.pseudo}</span>
+                </label>
+              ))}
+            </fieldset>
+          )}
           <p>{t("cardActions.releaseConfirm.body")}</p>
         </ConfirmActionDialog>
+      )}
+      {claimOpen && (
+        <CastClaimDialog match={match} matchLabel={matchLabel} onClose={() => setClaimOpen(false)} onClaim={claim} />
       )}
       {contactsOpen && (
         <MatchContactsDialog

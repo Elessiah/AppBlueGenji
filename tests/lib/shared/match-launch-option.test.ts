@@ -10,7 +10,7 @@ import { matchSectionOf, sectionRoundMatches } from "@/lib/shared/match-sections
 import { launchStripControls, type LaunchStripViewer } from "@/app/(secured)/tournois/[id]/_lib/launch-strip";
 import { groupMatchCardActions, matchCardActionList } from "@/app/(secured)/tournois/[id]/_lib/match-card-actions";
 import { editableFieldsForWindow, RESTRICTED_FIELDS } from "@/lib/shared/tournament-edit";
-import { bracketMatch } from "../../helpers/bracket-match";
+import { bracketMatch, matchCaster } from "../../helpers/bracket-match";
 import frActions from "@/messages/fr/tournamentActions.json";
 import enActions from "@/messages/en/tournamentActions.json";
 import frLaunch from "@/messages/fr/launchModal.json";
@@ -93,7 +93,7 @@ describe("sections de la ronde", () => {
 });
 
 describe("bouton « Contacts » de la carte", () => {
-  const match = bracketMatch({ status: "READY", team1Id: 10, team2Id: 20, casterUserId: 900 });
+  const match = bracketMatch({ status: "READY", team1Id: 10, team2Id: 20, casters: [matchCaster({ userId: 900 })] });
   const viewer = (overrides: Partial<LaunchStripViewer> = {}): LaunchStripViewer => ({
     canManage: false,
     canSchedule: false,

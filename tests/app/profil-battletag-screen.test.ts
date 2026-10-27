@@ -164,7 +164,7 @@ describe("modale de visibilité du BattleTag", () => {
   it("nomme les publics qui continuent de lire le tag, comme la politique", () => {
     const notice = Object.values(frProfile.battletagNotice).join(" ");
     expect(notice).toContain("Les membres des deux équipes de ton match");
-    expect(notice).toContain("Le caster de ton match");
+    expect(notice).toContain("Les casters de ton match");
     // Décision du 2026-10-19 : l'arbitrage n'a plus d'accès propre, seule la
     // fenêtre « Contacts » d'un match ouvre un BattleTag masqué.
     expect(notice).toContain("pas même pour les arbitres et les administrateurs");

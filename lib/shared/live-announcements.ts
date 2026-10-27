@@ -120,7 +120,7 @@ export function formatLiveAnnouncementGroup(group: LiveAnnouncementGroup): strin
  * par la liste blanche (`normalizeStreamUrl`) : une ligne posée avant elle, ou
  * éditée en base, ne part pas devant tout le serveur.
  *
- * @param matchUrl `bg_matches.live_url`.
+ * @param matchUrl Premier lien du match (`firstStreamUrlSql`, `bg_match_streams`).
  * @param tournamentUrl `bg_tournaments.live_url`.
  * @returns Le lien `https` à publier, ou `null` : pas de lien, pas d'annonce.
  */

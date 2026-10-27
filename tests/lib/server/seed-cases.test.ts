@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { TOURNAMENTS, type SeedFormat, type TournamentDef } from "@/lib/server/seed/cases";
 import { normalizeStreamUrl } from "@/lib/shared/live-streams";
+import { SEED_CAST_CASES, SEED_SEPARATE_STREAM_URL } from "@/lib/server/seed/match-states";
 
 const FORMATS: SeedFormat[] = ["SINGLE", "DOUBLE", "SWISS", "SURVIVAL"];
 const STATES: TournamentDef["state"][] = ["UPCOMING", "REGISTRATION", "RUNNING", "FINISHED"];
@@ -269,6 +270,27 @@ describe("seed — cohérence des définitions", () => {
     expect(running("DOUBLE").length).toBeGreaterThanOrEqual(3);
     expect(running("SWISS").length).toBeGreaterThanOrEqual(2);
     expect(running("SURVIVAL").length).toBeGreaterThanOrEqual(5);
+  });
+
+  describe("casters et streams (`applyMatchLaunchCases`)", () => {
+    it("couvre un caster seul, deux co-casters sur un stream et deux streams", () => {
+      expect([...SEED_CAST_CASES]).toEqual(["ONE", "CO_CAST", "SEPARATE"]);
+    });
+
+    it("a assez de tournois castés à lancement pour que chaque cas apparaisse", () => {
+      // Une manche par tournoi casté en cours à phase de lancement, les cas
+      // tour à tour : il en faut au moins trois. Les autres manches restent
+      // sans caster (le cas « zéro caster »).
+      const casted = TOURNAMENTS.filter((t) => t.live && t.launchPhase && t.state === "RUNNING");
+      expect(casted.length).toBeGreaterThanOrEqual(SEED_CAST_CASES.length);
+    });
+
+    it("donne au stream à part un lien reconnu, distinct des chaînes seedées", () => {
+      const own = normalizeStreamUrl(SEED_SEPARATE_STREAM_URL);
+      expect(own).not.toBeNull();
+      const seeded = TOURNAMENTS.flatMap((t) => (t.live ? [t.live.url, t.live.matchUrl ?? ""] : []));
+      expect(seeded.map((url) => normalizeStreamUrl(url))).not.toContain(own);
+    });
   });
 
   describe("diffusion en direct", () => {

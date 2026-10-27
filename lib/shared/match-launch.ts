@@ -1,11 +1,11 @@
 /**
- * Lancement d'un match : l'état « LANCEMENT », les trois « Prêt », l'équipe qui
+ * Lancement d'un match : l'état « LANCEMENT », les « Prêt » des parties, l'équipe qui
  * héberge la partie et les contacts que la modale de lancement présente.
  *
  * Un match jouable (`READY`, deux engagées connues) ne se joue plus d'emblée :
  * à son heure de début — ou dès qu'il devient jouable s'il n'a pas d'horaire —
- * il entre en **lancement**. Les deux équipes, et le caster s'il y en a un,
- * déclarent alors qu'elles sont prêtes ; le match est **lancé** quand toutes
+ * il entre en **lancement**. Les deux équipes, et chacun de ses casters s'il en
+ * a, déclarent alors qu'ils sont prêts ; le match est **lancé** quand toutes
  * les parties le sont, quand l'arbitrage le force, ou d'office passé
  * {@link LAUNCH_AUTO_DELAY_MINUTES} minutes. Tant qu'il ne l'est pas, les
  * engagés ne peuvent pas y reporter de score (l'arbitrage garde la main).
@@ -174,28 +174,40 @@ export type StoredLaunchState = {
   launchedAt: string | null;
   team1ReadyAt: string | null;
   team2ReadyAt: string | null;
-  casterReadyAt: string | null;
 };
 
 /**
+ * L'empreinte stockée décrit-elle encore les deux engagées du match ? Faux, tout
+ * l'état de lancement — « Prêt » des casters compris — appartient à l'appariement
+ * d'avant (`currentLaunchState`).
+ */
+export function launchStateIsCurrent(
+  launchPairing: string | null,
+  team1Id: number | null,
+  team2Id: number | null,
+): boolean {
+  const key = launchPairingKey(team1Id, team2Id);
+  return key !== null && launchPairing === key;
+}
+
+/**
  * L'état de lancement **valable pour l'appariement courant** : tout est effacé
- * quand l'empreinte stockée ne décrit plus les deux engagées du match. Seul le
- * caster reste — il s'est inscrit sur le match, pas sur un appariement.
+ * quand l'empreinte stockée ne décrit plus les deux engagées du match. Seuls
+ * les casters restent — ils se sont inscrits sur le match, pas sur un
+ * appariement —, mais leur « Prêt » tombe avec le reste (`launchStateIsCurrent`).
  */
 export function currentLaunchState(
   stored: StoredLaunchState,
   team1Id: number | null,
   team2Id: number | null,
 ): StoredLaunchState {
-  const key = launchPairingKey(team1Id, team2Id);
-  if (key !== null && stored.launchPairing === key) return stored;
+  if (launchStateIsCurrent(stored.launchPairing, team1Id, team2Id)) return stored;
   return {
     launchPairing: stored.launchPairing,
     lobbyOpenedAt: null,
     launchedAt: null,
     team1ReadyAt: null,
     team2ReadyAt: null,
-    casterReadyAt: null,
   };
 }
 
@@ -203,9 +215,8 @@ export function currentLaunchState(
 export type LaunchReadiness = {
   team1Ready: boolean;
   team2Ready: boolean;
-  /** Un caster est inscrit : il doit lui aussi se déclarer prêt. */
-  casterRequired: boolean;
-  casterReady: boolean;
+  /** Chaque caster inscrit doit lui aussi se déclarer prêt — sans caster, rien à attendre. */
+  casters: { userId: number; ready: boolean }[];
 };
 
 /** Ce qu'il faut savoir d'un match pour compter ses « Prêt ». */
@@ -215,35 +226,29 @@ export type LaunchReadinessInput = {
   /** Une fantôme n'a personne pour cliquer : elle est prête d'office. */
   team1IsGhost: boolean;
   team2IsGhost: boolean;
-  casterUserId: number | null;
-  casterReadyAt: string | null;
+  /** Casters inscrits et leur « Prêt », déjà rapporté à l'appariement courant. */
+  casters: readonly { userId: number; readyAt: string | null }[];
 };
 
 export function launchReadiness(input: LaunchReadinessInput): LaunchReadiness {
   return {
     team1Ready: input.team1IsGhost || input.team1ReadyAt !== null,
     team2Ready: input.team2IsGhost || input.team2ReadyAt !== null,
-    casterRequired: input.casterUserId !== null,
-    casterReady: input.casterUserId !== null && input.casterReadyAt !== null,
+    casters: input.casters.map((caster) => ({ userId: caster.userId, ready: caster.readyAt !== null })),
   };
 }
 
 /**
- * Toutes les parties attendues sont-elles prêtes ? Le caster n'est attendu que
- * s'il est inscrit : sans caster, les deux équipes suffisent.
+ * Toutes les parties attendues sont-elles prêtes ? Chaque caster inscrit est
+ * attendu : sans caster, les deux équipes suffisent.
  */
 export function allPartiesReady(readiness: LaunchReadiness): boolean {
-  return (
-    readiness.team1Ready &&
-    readiness.team2Ready &&
-    (!readiness.casterRequired || readiness.casterReady)
-  );
+  return readiness.team1Ready && readiness.team2Ready && readiness.casters.every((caster) => caster.ready);
 }
 
-/** Nombre de parties prêtes sur le nombre attendu (« 2/3 prêts »). */
+/** Nombre de parties prêtes sur le nombre attendu (« 3/4 prêts » : deux équipes, deux casters). */
 export function readyCount(readiness: LaunchReadiness): { ready: number; expected: number } {
-  const parties = [readiness.team1Ready, readiness.team2Ready];
-  if (readiness.casterRequired) parties.push(readiness.casterReady);
+  const parties = [readiness.team1Ready, readiness.team2Ready, ...readiness.casters.map((caster) => caster.ready)];
   return { ready: parties.filter(Boolean).length, expected: parties.length };
 }
 
@@ -446,6 +451,12 @@ export type LaunchCaster = {
    * les deux « — » qui laisseraient croire qu'il n'en a pas.
    */
   contactsShown: boolean;
+  /**
+   * Cette carte est-elle celle du lecteur ? Sa propre fiche n'a rien à lui
+   * dire (ni note « au départ », ni « aucun contact ») ; celle d'un co-caster,
+   * si.
+   */
+  isViewer: boolean;
 };
 
 export type LaunchViewerRole = "TEAM1" | "TEAM2" | "CASTER";
@@ -469,15 +480,16 @@ export type MatchLaunchInfo = {
   hostTeamId: number | null;
   team1: LaunchSide;
   team2: LaunchSide;
-  caster: LaunchCaster | null;
+  /** Casters du match, dans l'ordre d'inscription ; vide sans caster. */
+  casters: LaunchCaster[];
   viewer: {
     role: MatchLaunchViewerRole;
     /** Le lecteur peut-il cliquer « Prêt » pour sa partie ? */
     canDeclareReady: boolean;
     /**
-     * Le lecteur est-il le caster inscrit, quel que soit `role` (un joueur du
-     * match qui caste reste `TEAM1`/`TEAM2`) ? La modale « Contacts » ne lui
-     * parle pas de ses propres contacts.
+     * Le lecteur est-il un des casters inscrits, quel que soit `role` (un
+     * joueur du match qui caste reste `TEAM1`/`TEAM2`) ? La modale « Contacts »
+     * ne lui parle pas de ses propres contacts.
      */
     isCaster: boolean;
     /**
@@ -542,7 +554,7 @@ export function exposesCasterContacts(phase: MatchLaunchPhase, role: MatchLaunch
 }
 
 /**
- * Le lecteur est-il le caster inscrit ? Son rôle le dit, sauf pour un joueur
+ * Le lecteur est-il un caster inscrit ? Son rôle le dit, sauf pour un joueur
  * du match qui caste aussi (`viewer.isCaster`, le rôle de joueur primant). Lu
  * par les deux modales : la note « contacts au départ » ne s'adresse pas à lui.
  */
@@ -551,16 +563,24 @@ export function viewerIsCaster(launch: { viewer: Pick<MatchLaunchInfo["viewer"],
 }
 
 /**
- * Les contacts du caster attendent-ils le départ ? Un caster inscrit dont le
- * serveur tait les contacts à ce lecteur (`LaunchCaster.contactsShown`), pour un
- * lecteur qui n'est pas ce caster. Une seule règle pour la note « au départ »
- * de `CasterCard` et la relecture de la modale « Contacts » à l'heure de départ.
+ * Les contacts de ce caster attendent-ils le départ ? Le serveur les tait à ce
+ * lecteur (`LaunchCaster.contactsShown`), et la carte n'est pas celle du
+ * lecteur lui-même (`isViewer`) — un co-caster, lui, attend ceux des autres
+ * comme les équipes.
+ */
+export function casterCardPending(caster: Pick<LaunchCaster, "contactsShown" | "isViewer">): boolean {
+  return !caster.isViewer && !caster.contactsShown;
+}
+
+/**
+ * Des contacts de caster attendent-ils le départ (`casterCardPending`) ? Une
+ * seule règle pour la note « au départ » de `CasterCard` et la relecture de la
+ * modale « Contacts » à l'heure de départ.
  */
 export function casterContactsPending(launch: {
-  caster: Pick<LaunchCaster, "contactsShown"> | null;
-  viewer: Pick<MatchLaunchInfo["viewer"], "role" | "isCaster">;
+  casters: readonly Pick<LaunchCaster, "contactsShown" | "isViewer">[];
 }): boolean {
-  return launch.caster !== null && !viewerIsCaster(launch) && !launch.caster.contactsShown;
+  return launch.casters.some(casterCardPending);
 }
 
 /** Le caster a-t-il au moins un contact à montrer (tag Discord ou BattleTag) ? */
@@ -620,7 +640,8 @@ export const LAUNCH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   NOT_CASTER: "Caster un match demande le rôle caster.",
   CASTER_IDENTITY_REQUIRED: CAST_IDENTITY_NOTICE,
   CASTER_IS_PLAYER: "Tu joues ce match : tu ne peux pas le caster.",
-  MATCH_ALREADY_CASTED: "Ce match a déjà un caster.",
+  STREAM_NOT_FOUND: "Ce stream n'existe plus sur ce match : choisis-en un autre.",
+  INVALID_STREAM_URL: "Lien de diffusion non reconnu (Twitch, YouTube ou Kick attendu).",
   MATCH_ALREADY_COMPLETED: "Ce match est terminé.",
   NOT_MATCH_CASTER: "Tu ne castes pas ce match.",
   INVALID_HOST_TEAM: "L'équipe hôte doit être l'une des deux engagées du match.",

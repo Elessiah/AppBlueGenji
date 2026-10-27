@@ -21,7 +21,7 @@ import {
 import type { TournamentSnapshot } from "@/lib/shared/types";
 import { tournamentSnapshot } from "../../../helpers/tournament-detail";
 import { tournamentCard } from "../../../helpers/tournament-card";
-import { bracketMatch } from "../../../helpers/bracket-match";
+import { bracketMatch, matchCaster } from "../../../helpers/bracket-match";
 
 /**
  * Lecture publique d'un tournoi : la route est appelée pour de vrai, cache,
@@ -188,13 +188,13 @@ describe("GET /api/spectator/tournaments/[id]", () => {
 
   it("ne transmet pas l'identifiant du caster, mais garde les entrées solo (marche du podium)", async () => {
     mockedSnapshot.mockResolvedValue(
-      snapshot({ soloUserIds: { 3: 77 }, matches: [bracketMatch({ id: 1, tournamentId: 5, casterUserId: 88 })] }),
+      snapshot({ soloUserIds: { 3: 77 }, matches: [bracketMatch({ id: 1, tournamentId: 5, casters: [matchCaster({ userId: 88 })] })] }),
     );
 
     const body = (await (await GET(req(), params("5"))).json()) as TournamentSnapshot;
 
     expect(body.soloUserIds).toEqual({ 3: 77 });
-    expect(body.matches[0].casterUserId).toBe(SPECTATOR_HIDDEN_USER_ID);
+    expect(body.matches[0].casters.map((caster) => caster.userId)).toEqual([SPECTATOR_HIDDEN_USER_ID]);
   });
 
   it("arrête un tournoi non publié à sa carte, sans construire son instantané", async () => {

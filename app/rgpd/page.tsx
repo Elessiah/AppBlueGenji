@@ -435,7 +435,7 @@ function RgpdFr({
             <strong>Suivre un tournoi sans compte.</strong> Depuis octobre 2026, la fiche d&apos;un
             tournoi publié se consulte aussi sans se connecter, à l&apos;adresse{" "}
             <code>/suivre/tournois/…</code> : plateau, scores, classements, noms des équipes et
-            pseudos des joueurs engagés, pseudo du caster d&apos;un match — ce que les retransmissions
+            pseudos des joueurs engagés, pseudos des casters d&apos;un match — ce que les retransmissions
             et Discord montrent déjà —, ainsi que les logos des équipes et, pour un tournoi individuel,
             l&apos;avatar de chaque joueur engagé (sauf s&apos;il l&apos;a masqué) et son numéro de compte
             interne, qui porte sa marque du podium, et les pénalités d&apos;une BlueGenji Survie (engagé, manche,
@@ -1010,8 +1010,7 @@ function RgpdFr({
             <strong>Messages privés Discord de match.</strong> Le bot vous écrit aussi en privé, dans la
             langue de votre compte, quand l&apos;horaire d&apos;un de vos matchs est posé, changé ou retiré, pour ses
             rappels (24 h et 10 h avant), quand vous êtes retiré d&apos;un match et, si vous castez, quand votre
-            inscription de caster sur un match est retirée par le staff ou d&apos;office, ou reprise par un autre
-            caster (avec le motif) — seulement si votre tag
+            inscription de caster sur un match est retirée par le staff ou d&apos;office (avec le motif) — seulement si votre tag
             Discord est <strong>certifié</strong> : un tag non certifié, même rattaché par la connexion Discord,
             n&apos;en reçoit aucun, pour
             éviter le spam (vos notifications push, elles, partent quand même). Ces messages reposent
@@ -1029,7 +1028,7 @@ function RgpdFr({
             avertit ses collègues : ce contrôle repose sur l&apos;<strong>intérêt légitime</strong> de
             l&apos;association à l&apos;impartialité de l&apos;arbitrage, et ce membre du staff peut s&apos;y opposer
             (section <a href="#exercer-vos-droits">« Exercer vos droits »</a>). L&apos;inscription d&apos;un caster
-            sur un match, sa reprise par un autre caster et son retrait (avec le motif d&apos;une reprise ou d&apos;un retrait
+            sur un match et son retrait (avec le motif d&apos;un retrait
             d&apos;office) sont notés au journal du staff sur Discord sans nommer personne (« un caster », « le staff ») ;
             les autres gestes du staff sur un match ou un tournoi (résultat validé, score enregistré, lancement forcé, hôte,
             diffusion, rediffusion, modification du tournoi, têtes de série, étape avancée, équipes fantômes, image) aussi, avec les noms
@@ -1129,7 +1128,13 @@ function RgpdFr({
           <p id="retransmission">
             <strong>Retransmission des matchs.</strong> Un match de tournoi peut être diffusé en
             direct et enregistré sur <strong>YouTube, Twitch ou Kick</strong>, par la chaîne de l&apos;association
-            ou d&apos;un caster. {STREAM_NOTICE_SHOWN} Ce traitement repose sur l&apos;intérêt
+            ou d&apos;un ou plusieurs casters : chaque caster rejoint un stream du match ou ouvre le sien,
+            avec son propre lien (facultatif), publié avec le match. Ce stream part, avec son lien, quand
+            plus aucun caster ne le tient ; seul le lien posé dans la configuration du direct du match (par
+            l&apos;organisation ou un caster) reste au match. Le lien qu&apos;un caster a fourni, là ou en ouvrant
+            son stream, part aussi à la suppression de son compte, matchs joués compris, même si un autre caster
+            tient encore ce stream.{" "}
+            {STREAM_NOTICE_SHOWN} Ce traitement repose sur l&apos;intérêt
             légitime de l&apos;association à faire connaître ses compétitions.{" "}
             {STREAM_NOTICE_OBJECTION} Un lien de rediffusion qui montre le joueur est alors
             retiré du site, et une vidéo publiée par la chaîne de l&apos;association est masquée

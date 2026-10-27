@@ -10,8 +10,8 @@
  * avec la fonction partagée, pour qu'il n'existe qu'une définition de « ce match
  * est à l'antenne ».
  */
-import type { RowDataPacket } from "mysql2/promise";
-import { getDatabase } from "@/lib/server/database";
+import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import { getDatabase, withConnection } from "@/lib/server/database";
 import {
   isMatchLive,
   isMatchLiveTrigger,
@@ -21,6 +21,8 @@ import {
 } from "@/lib/shared/live-streams";
 import { launchPairingKey } from "@/lib/shared/match-launch";
 import type { MatchStatus } from "@/lib/shared/types";
+import { retryOnDeadlock } from "./deadlock-retry";
+import { lockMatchStreams, pruneMatchStreams, staffStream } from "./match-casters";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "./notifications";
 
 /** Cible du bouton d'accueil : un tournoi en cours réellement à l'antenne. */
@@ -35,6 +37,13 @@ export type MatchLiveConfig = {
   trigger: MatchLiveTrigger | null;
   /** `null` = casté sans lien public (badge seul). */
   liveUrl: string | null;
+  /**
+   * Le compte qui fournit le lien quand ce n'est pas l'organisation : un
+   * caster qui n'a que la permission `live` (pas `tournaments`). Son lien lui
+   * reste rattaché (`bg_match_streams.link_user_id`) et part à la suppression
+   * de son compte (`withdrawUserCasts`). Absent ou `null` : lien du staff.
+   */
+  linkProviderId?: number | null;
 };
 
 type TournamentStateRow = RowDataPacket & { id: number; state: string };
@@ -118,6 +127,11 @@ async function loadMatchLiveRow(matchId: number): Promise<MatchLiveRow> {
  * - passer en `AUTO` ou `START_TIME` referme l'antenne, qui n'a plus de sens
  *   dans ces modes — leur frontière est le statut du match ou l'horloge.
  *
+ * La chaîne réglée ici est celle du **stream du staff** (`staffStream`) ; un
+ * stream qu'un caster a ouvert garde la sienne, que le staff n'écrase jamais.
+ * Démarquer le match efface le lien du staff, et les streams que plus personne
+ * ne tient disparaissent.
+ *
  * Le mode `START_TIME` exige une date de début sur le match : l'accepter sans
  * date poserait une diffusion qui ne s'ouvrirait jamais, et l'échec ne se
  * verrait qu'à l'heure du match. La date, elle, reste effaçable ensuite — le
@@ -135,46 +149,88 @@ export async function setMatchLiveConfig(
   }
 
   const row = await loadMatchLiveRow(matchId);
-  const db = await getDatabase();
 
   if (requiresMatchStartAt(config.trigger) && row.start_at === null) {
     throw new Error("MATCH_START_AT_REQUIRED");
   }
 
-  if (config.trigger === null) {
-    await db.execute(
-      `UPDATE bg_matches
-       SET live_trigger = NULL, live_url = NULL, live_started_at = NULL
-       WHERE id = ?`,
-      [matchId],
-    );
-    publishMatchUpdatedEvent(Number(row.tournament_id), { landingLive: true });
-    return;
-  }
-
-  const rawUrl = config.liveUrl;
+  const trigger = config.trigger;
+  const rawUrl = trigger === null ? null : config.liveUrl;
   const url = rawUrl === null || rawUrl.trim() === "" ? null : normalizeStreamUrl(rawUrl);
   if (rawUrl !== null && rawUrl.trim() !== "" && url === null) {
     throw new Error("INVALID_STREAM_URL");
   }
 
-  if (config.trigger === "MANUAL") {
-    await db.execute(
-      `UPDATE bg_matches
-       SET live_trigger = ?, live_url = ?
-       WHERE id = ?`,
-      ["MANUAL", url, matchId],
-    );
-  } else {
-    await db.execute(
-      `UPDATE bg_matches
-       SET live_trigger = ?, live_url = ?, live_started_at = NULL
-       WHERE id = ?`,
-      [config.trigger, url, matchId],
-    );
-  }
+  // Les verrous d'intervalle des streams et des casters peuvent opposer deux
+  // matchs voisins (inscription, ménage) : la transaction se rejoue.
+  await retryOnDeadlock(() => withConnection(async (connection) => {
+    await connection.beginTransaction();
+    try {
+      // Verrou du match d'abord, puis ses streams et casters : le même ordre
+      // que l'inscription d'un caster (`claimMatchCast`).
+      await connection.execute(`SELECT id FROM bg_matches WHERE id = ? FOR UPDATE`, [matchId]);
+      if (trigger === null) {
+        await connection.execute(
+          `UPDATE bg_matches SET live_trigger = NULL, live_started_at = NULL WHERE id = ?`,
+          [matchId],
+        );
+        await connection.execute(
+          `UPDATE bg_match_streams SET live_url = NULL, link_user_id = NULL WHERE match_id = ? AND staff_owned = 1`,
+          [matchId],
+        );
+      } else {
+        await connection.execute(
+          trigger === "MANUAL"
+            ? `UPDATE bg_matches SET live_trigger = ? WHERE id = ?`
+            : `UPDATE bg_matches SET live_trigger = ?, live_started_at = NULL WHERE id = ?`,
+          [trigger, matchId],
+        );
+        await setStaffStreamUrl(connection, matchId, url, config.linkProviderId ?? null);
+      }
+      await pruneMatchStreams(connection, matchId);
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    }
+  }));
 
   publishMatchUpdatedEvent(Number(row.tournament_id), { landingLive: true });
+}
+
+/**
+ * Pose (ou efface) le lien du stream du staff (`staffStream`). Sans lui, un
+ * lien habille le premier stream sans lien, qui devient celui du staff — ou en
+ * ouvre un : le lien du staff n'attend pas qu'un caster s'inscrive. Effacer le
+ * lien ne prend jamais un stream de caster.
+ *
+ * Chaque lien posé est rattaché à qui le fournit (`providerId`, `NULL` pour
+ * l'organisation). Un lien inchangé n'est pas réécrit : il reste à qui l'a
+ * fourni — un réglage réenregistré (mode changé, même lien) ne le prend ni à
+ * un caster, ni à l'organisation.
+ */
+async function setStaffStreamUrl(
+  connection: PoolConnection,
+  matchId: number,
+  url: string | null,
+  providerId: number | null,
+): Promise<void> {
+  const target = staffStream(await lockMatchStreams(connection, matchId));
+  if (target !== null && (target.staff || url !== null)) {
+    if (target.liveUrl !== url || !target.staff) {
+      await connection.execute(
+        `UPDATE bg_match_streams SET live_url = ?, staff_owned = 1, link_user_id = ? WHERE id = ?`,
+        [url, url === null ? null : providerId, target.id],
+      );
+    }
+    return;
+  }
+  if (url !== null) {
+    await connection.execute(
+      `INSERT INTO bg_match_streams (match_id, live_url, staff_owned, link_user_id) VALUES (?, ?, 1, ?)`,
+      [matchId, url, providerId],
+    );
+  }
 }
 
 /**

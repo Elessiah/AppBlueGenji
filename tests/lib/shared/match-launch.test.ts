@@ -14,6 +14,7 @@ import {
   launchModalWaits,
   launchPairingKey,
   launchReadiness,
+  launchStateIsCurrent,
   matchLaunchPhase,
   nextLaunchMatchId,
   nextLaunchPhaseChangeAt,
@@ -209,7 +210,6 @@ describe("launchPairingKey / currentLaunchState", () => {
     launchedAt: "b",
     team1ReadyAt: "c",
     team2ReadyAt: "d",
-    casterReadyAt: "e",
   };
 
   it("forme l'empreinte comme le `CONCAT` du SQL, et n'en a pas sans les deux engagées", () => {
@@ -230,8 +230,8 @@ describe("launchPairingKey / currentLaunchState", () => {
       launchedAt: null,
       team1ReadyAt: null,
       team2ReadyAt: null,
-      casterReadyAt: null,
     });
+    expect(launchStateIsCurrent("10:20", 10, 30)).toBe(false);
     // Les équipes qui échangent leurs créneaux forment aussi un autre appariement.
     expect(currentLaunchState(stored, 20, 10).launchedAt).toBeNull();
   });
@@ -239,6 +239,9 @@ describe("launchPairingKey / currentLaunchState", () => {
   it("ne reconnaît aucun état sans empreinte, ni sans les deux engagées", () => {
     expect(currentLaunchState({ ...stored, launchPairing: null }, 10, 20).team1ReadyAt).toBeNull();
     expect(currentLaunchState(stored, 10, null).launchedAt).toBeNull();
+    expect(launchStateIsCurrent(null, 10, 20)).toBe(false);
+    expect(launchStateIsCurrent("10:", 10, null)).toBe(false);
+    expect(launchStateIsCurrent("10:20", 10, 20)).toBe(true);
   });
 });
 
@@ -248,13 +251,12 @@ describe("launchReadiness / allPartiesReady / readyCount", () => {
     team2ReadyAt: null,
     team1IsGhost: false,
     team2IsGhost: false,
-    casterUserId: null,
-    casterReadyAt: null,
+    casters: [],
   };
 
   it("sans caster, les deux équipes suffisent", () => {
     const readiness = launchReadiness({ ...base, team1ReadyAt: "t", team2ReadyAt: "t" });
-    expect(readiness.casterRequired).toBe(false);
+    expect(readiness.casters).toEqual([]);
     expect(allPartiesReady(readiness)).toBe(true);
     expect(readyCount(readiness)).toEqual({ ready: 2, expected: 2 });
   });
@@ -264,15 +266,33 @@ describe("launchReadiness / allPartiesReady / readyCount", () => {
       ...base,
       team1ReadyAt: "t",
       team2ReadyAt: "t",
-      casterUserId: 9,
+      casters: [{ userId: 9, readyAt: null }],
     });
     expect(allPartiesReady(readiness)).toBe(false);
     expect(readyCount(readiness)).toEqual({ ready: 2, expected: 3 });
     expect(
       allPartiesReady(
-        launchReadiness({ ...base, team1ReadyAt: "t", team2ReadyAt: "t", casterUserId: 9, casterReadyAt: "t" }),
+        launchReadiness({ ...base, team1ReadyAt: "t", team2ReadyAt: "t", casters: [{ userId: 9, readyAt: "t" }] }),
       ),
     ).toBe(true);
+  });
+
+  it("attend chaque co-caster, sans plafond", () => {
+    const casters = [
+      { userId: 9, readyAt: "t" },
+      { userId: 10, readyAt: null },
+      { userId: 11, readyAt: "t" },
+    ];
+    const readiness = launchReadiness({ ...base, team1ReadyAt: "t", team2ReadyAt: "t", casters });
+    expect(readiness.casters).toEqual([
+      { userId: 9, ready: true },
+      { userId: 10, ready: false },
+      { userId: 11, ready: true },
+    ]);
+    expect(allPartiesReady(readiness)).toBe(false);
+    expect(readyCount(readiness)).toEqual({ ready: 4, expected: 5 });
+    const all = casters.map((caster) => ({ ...caster, readyAt: "t" }));
+    expect(allPartiesReady(launchReadiness({ ...base, team1ReadyAt: "t", team2ReadyAt: "t", casters: all }))).toBe(true);
   });
 
   it("compte une fantôme prête d'office — personne ne cliquerait pour elle", () => {
@@ -281,9 +301,6 @@ describe("launchReadiness / allPartiesReady / readyCount", () => {
     expect(allPartiesReady(readiness)).toBe(true);
   });
 
-  it("ne compte pas un « Prêt » de caster sans caster", () => {
-    expect(launchReadiness({ ...base, casterReadyAt: "t" }).casterReady).toBe(false);
-  });
 
   it("attend l'équipe qui n'a pas cliqué", () => {
     expect(allPartiesReady(launchReadiness({ ...base, team1ReadyAt: "t" }))).toBe(false);

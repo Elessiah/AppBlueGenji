@@ -1,0 +1,42 @@
+/* Fenêtre « Caster ce match » (`CastClaimDialog`) : choix du stream, lien facultatif. */
+.choices {
+  margin: 0 0 14px;
+  padding: 0;
+  border: 0;
+}
+
+.legend {
+  margin-bottom: 8px;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.detail {
+  color: var(--ink-quiet);
+}
+
+.hint,
+.hintInvalid {
+  margin: 6px 0 0;
+  font-size: 12px;
+}
+
+.hint {
+  color: var(--ink-quiet);
+}
+
+.hintInvalid {
+  color: var(--danger);
+}

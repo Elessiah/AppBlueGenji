@@ -548,6 +548,26 @@ export type MatchScoreReport = {
   maps: MatchMapResult[];
 };
 
+/**
+ * Un stream d'un match : son lien (`null` = pas encore de lien public).
+ * `staff` : le stream du match, dont la configuration du direct règle le lien ;
+ * sinon, un stream qu'un caster a ouvert.
+ */
+export type MatchStream = {
+  id: number;
+  liveUrl: string | null;
+  staff: boolean;
+};
+
+/** Un caster d'un match : pseudo public, stream rejoint, « Prêt » propre. */
+export type MatchCaster = {
+  userId: number;
+  pseudo: string;
+  /** Stream que ce caster tient (`MatchStream.id`), seul ou avec d'autres. */
+  streamId: number;
+  ready: boolean;
+};
+
 export type BracketMatch = {
   id: number;
   tournamentId: number;
@@ -609,8 +629,14 @@ export type BracketMatch = {
   startAt: string | null;
   /** Mode de passage à l'antenne ; `null` = match non casté. */
   liveTrigger: MatchLiveTrigger | null;
-  /** Chaîne diffusant ce match ; `null` = casté sans lien public. */
+  /**
+   * **Premier** lien de diffusion du match (le stream le plus ancien qui en a
+   * un) — celui des vues compactes ; `null` = casté sans lien public. Tous les
+   * liens sont dans `streams`.
+   */
   liveUrl: string | null;
+  /** Streams du match, du plus ancien au plus récent (`MATCH_LAUNCH.md` § Casters et streams). */
+  streams: MatchStream[];
   /** Ouverture d'antenne (mode `MANUAL`) ; `null` = antenne fermée. */
   liveStartedAt: string | null;
   /**
@@ -618,10 +644,11 @@ export type BracketMatch = {
    * désignée, sinon l'équipe 1 (`resolveHostTeamId`, `lib/shared/match-launch.ts`).
    */
   hostTeamId: number | null;
-  /** Caster inscrit sur ce match ; `null` = aucun. */
-  casterUserId: number | null;
-  /** Pseudo du caster (public, comme tout pseudo du site). */
-  casterPseudo: string | null;
+  /**
+   * Casters inscrits sur ce match, dans l'ordre d'inscription (aucun plafond) ;
+   * un caster devenu inéligible avant le lancement en est tu.
+   */
+  casters: MatchCaster[];
   /** Ouverture du lancement (ISO), posée à la première observation. */
   lobbyOpenedAt: string | null;
   /** Lancement du match (ISO) ; `null` = pas encore lancé. */
@@ -629,7 +656,6 @@ export type BracketMatch = {
   /** « Prêt » de chaque partie ; une fantôme est prête d'office. */
   team1Ready: boolean;
   team2Ready: boolean;
-  casterReady: boolean;
   /**
    * Lien YouTube de la rediff, posé par la permission `live` une fois le match
    * joué ; `null` = aucune. Stocké tel quel : son **affichage** est décidé par

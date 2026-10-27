@@ -53,10 +53,20 @@ type MatchState = {
   launched_at: string | null;
   team1_ready_at: string | null;
   team2_ready_at: string | null;
-  caster_user_id: number | null;
-  caster_ready_at: string | null;
   host_team_id: number | null;
+  /** `bg_match_casters` du match, dans l'ordre d'inscription. */
+  casters: CasterState[];
+  /** `bg_match_streams` du match (`staff_owned` : 1 = stream du staff). */
+  streams: { id: number; live_url: string | null; staff_owned?: number; link_user_id?: number }[];
 };
+
+type CasterState = { user_id: number; stream_id: number; ready_at: string | null };
+
+/**
+ * Raccourci des fixtures : `caster_user_id` / `caster_ready_at` décrivent le
+ * premier caster (sur le stream 1), comme avant les co-casters.
+ */
+type MatchOverrides = Partial<MatchState> & { caster_user_id?: number | null; caster_ready_at?: string | null };
 
 type Membership = { userId: number; teamId: number; roles: string[] };
 
@@ -70,7 +80,9 @@ type World = {
 
 const STAMP = "2026-09-24 20:00:00";
 
-function matchState(overrides: Partial<MatchState> = {}): MatchState {
+function matchState(overrides: MatchOverrides = {}): MatchState {
+  const { caster_user_id: casterId = null, caster_ready_at: casterReadyAt = null, ...rest } = overrides;
+  const firstCaster: CasterState[] = casterId === null ? [] : [{ user_id: casterId, stream_id: 1, ready_at: casterReadyAt }];
   return {
     id: 42,
     tournament_id: 7,
@@ -88,11 +100,21 @@ function matchState(overrides: Partial<MatchState> = {}): MatchState {
     launched_at: null,
     team1_ready_at: null,
     team2_ready_at: null,
-    caster_user_id: null,
-    caster_ready_at: null,
     host_team_id: null,
-    ...overrides,
+    casters: firstCaster,
+    streams: casterId === null ? [] : [{ id: 1, live_url: null }],
+    ...rest,
   };
+}
+
+/** Premier caster du match, `null` sans. */
+function casterOf(state: World): number | null {
+  return state.match?.casters[0]?.user_id ?? null;
+}
+
+/** « Prêt » du premier caster, `null` sans. */
+function casterReadyOf(state: World): string | null {
+  return state.match?.casters[0]?.ready_at ?? null;
 }
 
 function world(overrides: Partial<World> = {}): World {
@@ -112,7 +134,7 @@ function world(overrides: Partial<World> = {}): World {
 
 /** Les trois signaux « prêt » : posés à `NOW()`, levés à `NULL`. */
 function applyReadyStamps(sql: string, set: (column: keyof MatchState, value: unknown) => void) {
-  for (const column of ["team1_ready_at", "team2_ready_at", "caster_ready_at"] as const) {
+  for (const column of ["team1_ready_at", "team2_ready_at"] as const) {
     if (sql.includes(`${column} = NOW()`)) set(column, STAMP);
     if (sql.includes(`${column} = NULL`)) set(column, null);
   }
@@ -131,12 +153,10 @@ function applyUpdate(state: World, sql: string, params: unknown[]) {
   }
   if (sql.includes("SET lobby_opened_at = NOW()")) set("lobby_opened_at", STAMP);
   if (sql.includes("launched_at = NOW()")) set("launched_at", STAMP);
-  if (sql.includes("SET caster_user_id = ?")) set("caster_user_id", params[0]);
-  if (sql.includes("SET caster_user_id = NULL")) set("caster_user_id", null);
   if (sql.includes("SET host_team_id = ?")) set("host_team_id", params[0]);
   if (sql.includes("SET launch_pairing = ?")) {
     set("launch_pairing", params[0]);
-    for (const column of ["lobby_opened_at", "launched_at", "team1_ready_at", "team2_ready_at", "caster_ready_at"] as const) {
+    for (const column of ["lobby_opened_at", "launched_at", "team1_ready_at", "team2_ready_at"] as const) {
       set(column, null);
     }
   }
@@ -167,10 +187,66 @@ function launchCandidateRows(state: World) {
   return candidate ? [{ ...match }] : [];
 }
 
+/**
+ * Écritures sur les casters et les streams du match (`bg_match_casters`,
+ * `bg_match_streams`), rejouées sur l'état ; `null` : pas l'une d'elles.
+ */
+function applyCastWrite(state: World, sql: string, params: unknown[]): unknown[] | null {
+  const match = state.match;
+  if (!/^(UPDATE|DELETE FROM|INSERT INTO) bg_match_(casters|streams)/.test(sql)) return null;
+  state.writes.push(sql);
+  if (!match) return [{ affectedRows: 0 }, []];
+  if (sql.includes("bg_match_streams")) return applyStreamWrite(match, sql, params);
+  applyCasterWrite(match, sql, params);
+  return [{ affectedRows: 1 }, []];
+}
+
+/** `bg_match_casters` : « Prêt », retrait, inscription. */
+function applyCasterWrite(match: MatchState, sql: string, params: unknown[]): void {
+  if (sql.startsWith("UPDATE bg_match_casters SET ready_at")) {
+    const value = sql.includes("ready_at = NOW()") ? STAMP : null;
+    const userId = sql.includes("AND user_id = ?") ? Number(params[1]) : null;
+    for (const caster of match.casters) if (userId === null || caster.user_id === userId) caster.ready_at = value;
+  } else if (sql.startsWith("DELETE FROM bg_match_casters")) {
+    const ids = params.slice(1).map(Number);
+    match.casters = match.casters.filter((caster) => !ids.includes(caster.user_id));
+  } else if (sql.startsWith("INSERT INTO bg_match_casters")) {
+    match.casters.push({ user_id: Number(params[1]), stream_id: Number(params[2]), ready_at: null });
+  }
+}
+
+/** `bg_match_streams` : ménage et stream neuf (qui rend son `insertId`). */
+function applyStreamWrite(match: MatchState, sql: string, params: unknown[]): unknown[] {
+  if (sql.startsWith("DELETE FROM bg_match_streams")) {
+    const ids = params.slice(1).map(Number);
+    match.streams = match.streams.filter((stream) => !ids.includes(stream.id));
+  } else if (sql.startsWith("INSERT INTO bg_match_streams")) {
+    const id = Math.max(0, ...match.streams.map((stream) => stream.id)) + 1;
+    const linkUserId = params[2] == null ? {} : { link_user_id: Number(params[2]) };
+    match.streams.push({ id, live_url: (params[1] as string | null) ?? null, ...linkUserId });
+    return [{ affectedRows: 1, insertId: id }, []];
+  }
+  return [{ affectedRows: 1 }, []];
+}
+
+/** Lectures des casters et des streams d'un match. */
+function readCastRows(state: World, sql: string): unknown[] | null {
+  const match = state.match;
+  if (sql.includes("FROM bg_match_casters WHERE match_id = ?")) {
+    return [(match?.casters ?? []).map((caster) => ({ match_id: match?.id, ...caster })), []];
+  }
+  if (sql.includes("FROM bg_match_streams WHERE match_id = ?")) {
+    return [(match?.streams ?? []).map((stream) => ({ match_id: match?.id, ...stream })), []];
+  }
+  return null;
+}
+
 /** Le double de `execute`, non typé en `PoolConnection` : les tests le composent. */
 function executeFor(state: World) {
   return async (rawSql: string, params: unknown[] = []) => {
     const sql = rawSql.replace(/\s+/g, " ").trim();
+    const castResult = applyCastWrite(state, sql, params) ?? readCastRows(state, sql);
+    if (castResult) return castResult;
     if (sql.startsWith("UPDATE")) {
       state.writes.push(sql);
       applyUpdate(state, sql, params);
@@ -248,7 +324,26 @@ describe("setMatchReady", () => {
     state.users[CASTER] = ELIGIBLE_CASTER;
     await expect(setMatchReady(42, 1, true)).resolves.toEqual({ launched: false });
     await expect(setMatchReady(42, CASTER, true)).resolves.toEqual({ launched: true });
-    expect(state.match?.caster_ready_at).toBe(STAMP);
+    expect(casterReadyOf(state)).toBe(STAMP);
+  });
+
+  it("co-casters : chacun son « Prêt », le match part au dernier attendu", async () => {
+    state.match = matchState({ team1_ready_at: STAMP, team2_ready_at: STAMP, caster_user_id: CASTER });
+    state.match.casters.push({ user_id: 901, stream_id: 1, ready_at: null });
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.users[901] = ELIGIBLE_CASTER;
+    await expect(setMatchReady(42, CASTER, true)).resolves.toEqual({ launched: false });
+    expect(state.match?.casters.map((caster) => caster.ready_at)).toEqual([STAMP, null]);
+    await expect(setMatchReady(42, 901, true)).resolves.toEqual({ launched: true });
+    expect(state.match?.casters.map((caster) => caster.ready_at)).toEqual([STAMP, STAMP]);
+  });
+
+  it("co-casters : retirer son « Prêt » ne touche pas celui de l'autre", async () => {
+    state.match = matchState({ caster_user_id: CASTER, caster_ready_at: STAMP });
+    state.match.casters.push({ user_id: 901, stream_id: 1, ready_at: STAMP });
+    state.users[901] = ELIGIBLE_CASTER;
+    await setMatchReady(42, 901, false);
+    expect(state.match?.casters.map((caster) => caster.ready_at)).toEqual([STAMP, null]);
   });
 
   it.each<[string, Partial<typeof ELIGIBLE_CASTER>]>([
@@ -259,7 +354,7 @@ describe("setMatchReady", () => {
     state.match = matchState({ team2_ready_at: STAMP, caster_user_id: CASTER });
     state.users[CASTER] = { ...ELIGIBLE_CASTER, ...overrides };
     await expect(setMatchReady(42, CASTER, true)).rejects.toThrow("NOT_MATCH_PARTY");
-    expect(state.match?.caster_ready_at).toBeNull();
+    expect(casterReadyOf(state)).toBeNull();
   });
 
   it("compte une fantôme prête d'office : l'équipe réelle suffit", async () => {
@@ -362,7 +457,7 @@ describe("caster inscrit avant que son équipe n'atteigne le match", () => {
     state.match = matchState({ launch_pairing: null, caster_user_id: CASTER });
     const connection = connectionFor(state);
     await maintainMatchLaunches(connection, 7);
-    expect(state.match?.caster_user_id).toBeNull();
+    expect(casterOf(state)).toBeNull();
     // Annoncé comme tout retrait d'office, après le commit de l'appelant.
     expect(queueCastChange).toHaveBeenCalledWith(connection, {
       kind: "AUTO_RELEASED",
@@ -376,7 +471,7 @@ describe("caster inscrit avant que son équipe n'atteigne le match", () => {
   it("garde un caster étranger aux deux équipes", async () => {
     state.match = matchState({ launch_pairing: null, caster_user_id: CASTER });
     await maintainMatchLaunches(connectionFor(state), 7);
-    expect(state.match?.caster_user_id).toBe(CASTER);
+    expect(casterOf(state)).toBe(CASTER);
     expect(queueCastChange).not.toHaveBeenCalled();
   });
 
@@ -384,7 +479,7 @@ describe("caster inscrit avant que son équipe n'atteigne le match", () => {
     state.memberships.push({ userId: CASTER, teamId: TEAM1, roles: ["DPS"] });
     state.match = matchState({ launch_pairing: null, caster_user_id: CASTER });
     await setMatchReady(42, 1, true);
-    expect(state.match?.caster_user_id).toBeNull();
+    expect(casterOf(state)).toBeNull();
     expect(queueCastChange).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ reason: "JOINED_TEAM" }));
     expect(flushCastChanges).toHaveBeenCalledTimes(1);
     expect(discardCastChanges).not.toHaveBeenCalled();
@@ -404,7 +499,7 @@ describe("caster inscrit avant que son équipe n'atteigne le match", () => {
     state.match = matchState({ caster_user_id: 1 });
     await setMatchReady(42, 1, true);
     expect(state.match?.team1_ready_at).toBe(STAMP);
-    expect(state.match?.caster_ready_at).toBeNull();
+    expect(casterReadyOf(state)).toBeNull();
   });
 });
 
@@ -456,15 +551,86 @@ describe("claimMatchCast", () => {
   it("inscrit un caster à l'identité vérifiée", async () => {
     state.users[CASTER] = verified;
     await claimMatchCast(42, CASTER, true);
-    expect(state.match?.caster_user_id).toBe(CASTER);
-    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
+    expect(casterOf(state)).toBe(CASTER);
+    // Sans stream sur le match : un stream sans lien est ouvert pour lui.
+    expect(state.match?.streams).toEqual([{ id: 1, live_url: null }]);
+    expect(state.match?.casters).toEqual([{ user_id: CASTER, stream_id: 1, ready_at: null }]);
+    // Aucun lien neuf : l'accueil n'a rien à relire.
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: false });
     expect(announceCastChange).toHaveBeenCalledWith({ kind: "CLAIMED", matchId: 42, replacedCasterId: null });
+  });
+
+  it("ouvre un stream à part avec son lien, normalisé : l'accueil relit", async () => {
+    state.users[CASTER] = verified;
+    state.users[901] = ELIGIBLE_CASTER;
+    state.match = matchState({ caster_user_id: 901 });
+    await claimMatchCast(42, CASTER, true, { liveUrl: "  https://www.twitch.tv/Voix  " });
+    expect(state.match?.streams).toEqual([
+      { id: 1, live_url: null },
+      // Le lien est rattaché à celui qui le fournit : son effacement le retire.
+      { id: 2, live_url: "https://www.twitch.tv/Voix", link_user_id: CASTER },
+    ]);
+    expect(state.match?.casters.map((caster) => [caster.user_id, caster.stream_id])).toEqual([[901, 1], [CASTER, 2]]);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
+  });
+
+  it("co-caste un stream du match : aucun stream de plus", async () => {
+    state.users[CASTER] = verified;
+    state.users[901] = ELIGIBLE_CASTER;
+    state.match = matchState({ caster_user_id: 901 });
+    await claimMatchCast(42, CASTER, true, { streamId: 1 });
+    expect(state.match?.streams).toHaveLength(1);
+    expect(state.match?.casters.map((caster) => [caster.user_id, caster.stream_id])).toEqual([[901, 1], [CASTER, 1]]);
+  });
+
+  it("refuse un stream qui n'est pas celui du match, sans rien écrire", async () => {
+    state.users[CASTER] = verified;
+    state.match = matchState({ caster_user_id: 901 });
+    await expect(claimMatchCast(42, CASTER, true, { streamId: 99 })).rejects.toThrow("STREAM_NOT_FOUND");
+    expect(state.writes).toEqual([]);
+    expect(announceCastChange).not.toHaveBeenCalled();
+  });
+
+  it("refuse, avant le lancement, un stream que seul tient un caster tu : sa chaîne ne réapparaît pas", async () => {
+    state.users[CASTER] = verified;
+    // 901 a perdu la permission `live` : son stream (et son lien) est tu.
+    state.users[901] = { ...ELIGIBLE_CASTER, platform_roles_json: null };
+    state.match = matchState({ caster_user_id: 901, streams: [{ id: 1, live_url: "https://twitch.tv/a" }] });
+    await expect(claimMatchCast(42, CASTER, true, { streamId: 1 })).rejects.toThrow("STREAM_NOT_FOUND");
+    expect(state.writes).toEqual([]);
+    expect(announceCastChange).not.toHaveBeenCalled();
+    // Un caster encore éligible sur le même stream le rend montré, donc joignable.
+    state.users[902] = ELIGIBLE_CASTER;
+    state.match.casters.push({ user_id: 902, stream_id: 1, ready_at: null });
+    await claimMatchCast(42, CASTER, true, { streamId: 1 });
+    expect(state.match.casters.map((caster) => caster.user_id)).toEqual([901, 902, CASTER]);
+  });
+
+  it("rejoint le stream du staff sans caster, et tout stream d'un match lancé", async () => {
+    state.users[CASTER] = verified;
+    state.match = matchState({ streams: [{ id: 1, live_url: "https://twitch.tv/officiel", staff_owned: 1 }] });
+    await claimMatchCast(42, CASTER, true, { streamId: 1 });
+    expect(state.match.casters).toEqual([{ user_id: CASTER, stream_id: 1, ready_at: null }]);
+    // Lancé : la lecture ne tait plus aucun caster, son stream se rejoint.
+    state.users[901] = { ...ELIGIBLE_CASTER, platform_roles_json: null };
+    state.match = matchState({ caster_user_id: 901, launched_at: STAMP });
+    await claimMatchCast(42, CASTER, true, { streamId: 1 });
+    expect(state.match.casters.map((caster) => caster.user_id)).toEqual([901, CASTER]);
+  });
+
+  it("refuse un lien non reconnu avant toute lecture", async () => {
+    state.users[CASTER] = verified;
+    await expect(claimMatchCast(42, CASTER, true, { liveUrl: "https://exemple.invalid/live" })).rejects.toThrow("INVALID_STREAM_URL");
+    expect(withConnection).not.toHaveBeenCalled();
+    // Un lien vide vaut « sans lien ».
+    await claimMatchCast(42, CASTER, true, { liveUrl: "   " });
+    expect(state.match?.streams).toEqual([{ id: 1, live_url: null }]);
   });
 
   it("refuse sans la permission `live`", async () => {
     state.users[CASTER] = verified;
     await expect(claimMatchCast(42, CASTER, false)).rejects.toThrow("NOT_CASTER");
-    expect(state.match?.caster_user_id).toBeNull();
+    expect(casterOf(state)).toBeNull();
     expect(announceCastChange).not.toHaveBeenCalled();
   });
 
@@ -488,49 +654,45 @@ describe("claimMatchCast", () => {
     await expect(claimMatchCast(42, 1, true)).rejects.toThrow("CASTER_IS_PLAYER");
   });
 
-  it("refuse un match déjà casté par un autre, accepte de rejouer sa propre inscription", async () => {
+  it("sans plafond : un troisième caster s'ajoute ; rejouer sa propre inscription ne change rien", async () => {
     state.users[CASTER] = verified;
     state.users[901] = ELIGIBLE_CASTER;
+    state.users[902] = ELIGIBLE_CASTER;
     state.match = matchState({ caster_user_id: 901 });
-    await expect(claimMatchCast(42, CASTER, true)).rejects.toThrow("MATCH_ALREADY_CASTED");
+    state.match.casters.push({ user_id: 902, stream_id: 1, ready_at: null });
+    await claimMatchCast(42, CASTER, true, { streamId: 1 });
+    expect(state.match?.casters.map((caster) => caster.user_id)).toEqual([901, 902, CASTER]);
+    jest.clearAllMocks();
     state.match = matchState({ caster_user_id: CASTER, caster_ready_at: STAMP });
-    await claimMatchCast(42, CASTER, true);
+    state.writes = [];
+    await claimMatchCast(42, CASTER, true, { liveUrl: "https://twitch.tv/autre" });
+    expect(state.writes).toEqual([]);
     // Rejouée, l'inscription ne défait pas un « Prêt » déjà donné.
-    expect(state.match?.caster_ready_at).toBe(STAMP);
+    expect(casterReadyOf(state)).toBe(STAMP);
     // Ni l'inscription refusée ni l'inscription rejouée ne s'annoncent.
     expect(announceCastChange).not.toHaveBeenCalled();
   });
 
-  it("reprend la place d'un titulaire qui ne remplit plus la condition", async () => {
+  it("ne déplace personne : un caster inéligible garde sa place (`releaseIneligibleCast` la reprend), le nouveau s'ajoute", async () => {
     state.users[CASTER] = verified;
     state.users[901] = { ...ELIGIBLE_CASTER, platform_roles_json: null };
     state.match = matchState({ caster_user_id: 901, caster_ready_at: STAMP });
     await claimMatchCast(42, CASTER, true);
-    expect(state.match?.caster_user_id).toBe(CASTER);
-    expect(state.match?.caster_ready_at).toBeNull();
-    // Le titulaire évincé est nommé à l'annonce : c'est lui qui sera prévenu.
-    expect(announceCastChange).toHaveBeenCalledWith({ kind: "CLAIMED", matchId: 42, replacedCasterId: 901 });
+    expect(state.match?.casters).toEqual([
+      { user_id: 901, stream_id: 1, ready_at: STAMP },
+      { user_id: CASTER, stream_id: 2, ready_at: null },
+    ]);
+    expect(announceCastChange).toHaveBeenCalledWith({ kind: "CLAIMED", matchId: 42, replacedCasterId: null });
   });
 
-  it("sans phase de lancement, reprend la place à l'heure passée tant que le lancement n'est pas écrit", async () => {
+  it("un match lancé accueille un co-caster sans toucher au caster en place", async () => {
     state.users[CASTER] = verified;
-    state.users[901] = { ...ELIGIBLE_CASTER, platform_roles_json: null };
-    state.match = matchState({
-      match_launch_phase: 0,
-      caster_user_id: 901,
-      start_at: new Date(Date.now() - 5_000).toISOString(),
-    });
-    await claimMatchCast(42, CASTER, true);
-    expect(state.match?.caster_user_id).toBe(CASTER);
-  });
-
-  it("ne remplace jamais le caster d'un match lancé", async () => {
-    state.users[CASTER] = verified;
-    state.users[901] = { ...ELIGIBLE_CASTER, discord_verified_at: null };
-    state.match = matchState({ caster_user_id: 901, launched_at: STAMP });
-    await expect(claimMatchCast(42, CASTER, true)).rejects.toThrow("MATCH_ALREADY_CASTED");
-    expect(state.match?.caster_user_id).toBe(901);
-    expect(announceCastChange).not.toHaveBeenCalled();
+    state.match = matchState({ caster_user_id: 901, caster_ready_at: STAMP, launched_at: STAMP });
+    await claimMatchCast(42, CASTER, true, { streamId: 1 });
+    expect(state.match?.casters).toEqual([
+      { user_id: 901, stream_id: 1, ready_at: STAMP },
+      { user_id: CASTER, stream_id: 1, ready_at: null },
+    ]);
   });
 
   it("refuse un match terminé ou une exemption", async () => {
@@ -546,8 +708,8 @@ describe("releaseMatchCast", () => {
   it("retire son inscription et le « Prêt » qui va avec", async () => {
     state.match = matchState({ caster_user_id: CASTER, caster_ready_at: STAMP });
     await releaseMatchCast(42, CASTER, false);
-    expect(state.match?.caster_user_id).toBeNull();
-    expect(state.match?.caster_ready_at).toBeNull();
+    expect(casterOf(state)).toBeNull();
+    expect(casterReadyOf(state)).toBeNull();
     expect(announceCastChange).toHaveBeenCalledWith({ kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: false });
   });
 
@@ -565,11 +727,49 @@ describe("releaseMatchCast", () => {
 
   it("refuse de retirer le caster d'un autre sans être arbitre", async () => {
     state.match = matchState({ caster_user_id: CASTER });
-    await expect(releaseMatchCast(42, 1, false)).rejects.toThrow("NOT_MATCH_CASTER");
+    await expect(releaseMatchCast(42, 1, false, CASTER)).rejects.toThrow("NOT_MATCH_CASTER");
     expect(announceCastChange).not.toHaveBeenCalled();
-    await releaseMatchCast(42, 1, true);
-    expect(state.match?.caster_user_id).toBeNull();
+    // Un co-caster non plus : chacun ne retire que lui-même.
+    state.match.casters.push({ user_id: 901, stream_id: 1, ready_at: null });
+    await expect(releaseMatchCast(42, 901, false, CASTER)).rejects.toThrow("NOT_MATCH_CASTER");
+    await releaseMatchCast(42, 1, true, CASTER);
+    expect(state.match?.casters.map((caster) => caster.user_id)).toEqual([901]);
     expect(announceCastChange).toHaveBeenCalledWith({ kind: "RELEASED", matchId: 42, casterId: CASTER, byStaff: true });
+  });
+
+  it("co-caster qui part : l'autre reste, avec son « Prêt », sur le stream qu'ils partageaient", async () => {
+    state.match = matchState({ caster_user_id: 901, caster_ready_at: STAMP });
+    state.match.casters.push({ user_id: CASTER, stream_id: 1, ready_at: null });
+    await releaseMatchCast(42, CASTER, false);
+    expect(state.match?.casters).toEqual([{ user_id: 901, stream_id: 1, ready_at: STAMP }]);
+    expect(state.match?.streams).toEqual([{ id: 1, live_url: null }]);
+  });
+
+  it("le stream à part d'un caster qui part disparaît ; celui du staff reste avec son lien", async () => {
+    state.match = matchState({ caster_user_id: 901 });
+    const staffStream = { id: 1, live_url: "https://twitch.tv/match", staff_owned: 1 };
+    state.match.streams = [{ ...staffStream }, { id: 2, live_url: "https://twitch.tv/voix" }];
+    state.match.casters.push({ user_id: CASTER, stream_id: 2, ready_at: null });
+    await releaseMatchCast(42, CASTER, false);
+    expect(state.match?.streams).toEqual([staffStream]);
+    // Le dernier caster parti, le lien du staff demeure.
+    await releaseMatchCast(42, 901, false);
+    expect(state.match?.casters).toEqual([]);
+    expect(state.match?.streams).toEqual([staffStream]);
+  });
+
+  it("le lien de la chaîne d'un caster part avec lui, même premier et seul lien du match", async () => {
+    state.match = matchState({ caster_user_id: CASTER });
+    state.match.streams = [{ id: 1, live_url: "https://twitch.tv/voix" }];
+    await releaseMatchCast(42, CASTER, false);
+    expect(state.match?.streams).toEqual([]);
+  });
+
+  it("lance le match quand toutes les parties n'attendaient plus que le caster qui part", async () => {
+    state.match = matchState({ caster_user_id: 901, caster_ready_at: STAMP, team1_ready_at: STAMP, team2_ready_at: STAMP });
+    state.match.casters.push({ user_id: CASTER, stream_id: 1, ready_at: null });
+    await releaseMatchCast(42, CASTER, false);
+    expect(state.match?.launched_at).toBe(STAMP);
   });
 
   it("ne fait rien sur un match sans caster", async () => {
@@ -677,7 +877,8 @@ describe("maintainMatchLaunches", () => {
       // le tournoi et les équipes.
       expect(lock).not.toMatch(/FOR UPDATE OF/);
       expect(lock).not.toMatch(/JOIN/);
-      expect(lock).toMatch(/FROM bg_matches m WHERE m\.id = \?/);
+      // La ligne du match, puis ses casters : chaque table verrouillée seule.
+      expect(lock).toMatch(/FROM bg_matches m WHERE m\.id = \?|FROM bg_match_casters WHERE match_id = \?/);
     }
     // Le contexte (état du tournoi, fantômes) est relu sans verrou.
     const context = queries.find((q) => q.includes("AS tournament_state") && !q.includes("FROM bg_matches"));
@@ -733,22 +934,22 @@ describe("releaseIneligibleCast", () => {
     state.users[CASTER] = ineligible;
     state.match = matchState({ caster_user_id: CASTER, team1_ready_at: STAMP, team2_ready_at: STAMP });
     await expect(releaseIneligibleCast(42, CASTER)).resolves.toBe(true);
-    expect(state.match?.caster_user_id).toBeNull();
+    expect(casterOf(state)).toBeNull();
     expect(state.match?.launched_at).toBe(STAMP);
-    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
     expect(announceCastChange).toHaveBeenCalledWith({ kind: "AUTO_RELEASED", matchId: 42, casterId: CASTER, reason: "INELIGIBLE" });
   });
 
-  it.each<[string, Partial<MatchState>]>([
+  it.each<[string, MatchOverrides]>([
     ["un match lancé", { launched_at: STAMP }],
     ["un match joué entre-temps", { status: "COMPLETED" }],
-    ["un match repris par un autre caster", { caster_user_id: 901 }],
+    ["un match qu'il ne caste plus", { caster_user_id: 901 }],
   ])("ne touche pas à %s", async (_label, overrides) => {
     state.users[CASTER] = ineligible;
     state.match = matchState({ caster_user_id: CASTER, ...overrides });
-    const before = state.match.caster_user_id;
+    const before = casterOf(state);
     await expect(releaseIneligibleCast(42, CASTER)).resolves.toBe(false);
-    expect(state.match?.caster_user_id).toBe(before);
+    expect(casterOf(state)).toBe(before);
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
     expect(announceCastChange).not.toHaveBeenCalled();
   });
@@ -757,7 +958,7 @@ describe("releaseIneligibleCast", () => {
     state.users[CASTER] = ELIGIBLE_CASTER;
     state.match = matchState({ caster_user_id: CASTER });
     await expect(releaseIneligibleCast(42, CASTER)).resolves.toBe(false);
-    expect(state.match?.caster_user_id).toBe(CASTER);
+    expect(casterOf(state)).toBe(CASTER);
     expect(announceCastChange).not.toHaveBeenCalled();
   });
 
@@ -767,7 +968,7 @@ describe("releaseIneligibleCast", () => {
     state.memberships.push({ userId: CASTER, teamId: TEAM1, roles: ["DPS"] });
     state.match = matchState({ caster_user_id: CASTER, team1_ready_at: STAMP, team2_ready_at: STAMP });
     await expect(releaseIneligibleCast(42, CASTER)).resolves.toBe(true);
-    expect(state.match?.caster_user_id).toBeNull();
+    expect(casterOf(state)).toBeNull();
     expect(state.match?.launched_at).toBe(STAMP);
     expect(announceCastChange).toHaveBeenCalledWith({ kind: "AUTO_RELEASED", matchId: 42, casterId: CASTER, reason: "JOINED_TEAM" });
   });

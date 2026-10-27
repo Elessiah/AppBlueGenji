@@ -123,7 +123,7 @@ async function seed(db: Pool): Promise<void> {
   for (let i = 0; i < TOURNAMENTS.length; i++) {
     await createTournament(db, organizerId, teamIds, soloEntryIds, TOURNAMENTS[i], i);
   }
-  await applyMatchLaunchCases(db, specialUserIds.get("Caster") ?? null);
+  await applyMatchLaunchCases(db, specialUserIds.get("Caster") ?? null, specialUserIds.get("CoCaster") ?? null);
   await attachDeletedAccountToPlayedTeam(db, specialUserIds.get("CompteSupprime") ?? null);
   await acceptTermsForSeededAccounts(db);
 

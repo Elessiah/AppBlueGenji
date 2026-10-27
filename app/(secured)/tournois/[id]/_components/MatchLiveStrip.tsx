@@ -30,38 +30,58 @@ function StartAtFact({ startAt }: Readonly<{ startAt: BracketMatch["startAt"] }>
   );
 }
 
-/** État de diffusion (programmé / en direct) et lien vers la chaîne. */
-function LiveStateFact({
-  state,
-  liveUrl,
-  matchLabel,
-}: Readonly<{ state: LiveState; liveUrl: string | null; matchLabel: string }>) {
+/**
+ * Liens des streams d'un match, sans doublon, le premier lien en tête — celui
+ * que montrent les vues compactes (accueil, bandeau). Sans liste de streams
+ * (lecture partielle), le premier lien seul.
+ */
+export function matchStreamLinks(match: Pick<BracketMatch, "liveUrl" | "streams">): string[] {
+  const links = match.streams.flatMap((stream) => (stream.liveUrl === null ? [] : [stream.liveUrl]));
+  const ordered = match.liveUrl === null ? links : [match.liveUrl, ...links];
+  return [...new Set(ordered)];
+}
+
+/** Lien vers une chaîne ; numéroté quand le match en a plusieurs (« Twitch 2 »). */
+function StreamLink({ url, rank, matchLabel }: Readonly<{ url: string; rank: number | null; matchLabel: string }>) {
   const { t } = useTournamentPageText();
-  if (state === "OFF") return null;
-  const platform = streamPlatform(liveUrl);
-  const live = state === "LIVE";
-  const linkText = platform ? PLATFORM_LABELS[platform] : t("match.channel");
+  const platform = streamPlatform(url);
+  const name = platform ? PLATFORM_LABELS[platform] : t("match.channel");
+  const linkText = rank === null ? name : `${name} ${rank}`;
   const watchLabel = platform
     ? t("match.watchOn", { link: linkText, match: matchLabel, platform: PLATFORM_LABELS[platform] })
     : t("match.watch", { link: linkText, match: matchLabel });
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      // Le texte visible ouvre le nom accessible (WCAG 2.5.3).
+      aria-label={watchLabel}
+      className={styles.link}
+    >
+      {linkText}
+    </a>
+  );
+}
+
+/** État de diffusion (programmé / en direct) et liens vers les chaînes du match. */
+function LiveStateFact({
+  state,
+  links,
+  matchLabel,
+}: Readonly<{ state: LiveState; links: readonly string[]; matchLabel: string }>) {
+  const { t } = useTournamentPageText();
+  if (state === "OFF") return null;
+  const live = state === "LIVE";
   return (
     <>
       <span className={live ? `${styles.state} ${styles.stateLive}` : styles.state}>
         <span aria-hidden="true">{live ? "●" : "○"}</span>
         {live ? t("match.live") : t("match.scheduled")}
       </span>
-      {liveUrl && (
-        <a
-          href={liveUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          // Le texte visible ouvre le nom accessible (WCAG 2.5.3).
-          aria-label={watchLabel}
-          className={styles.link}
-        >
-          {linkText}
-        </a>
-      )}
+      {links.map((url, index) => (
+        <StreamLink key={url} url={url} rank={links.length > 1 ? index + 1 : null} matchLabel={matchLabel} />
+      ))}
     </>
   );
 }
@@ -111,7 +131,7 @@ export function MatchLiveStrip({
         </span>
       )}
 
-      <LiveStateFact state={state} liveUrl={match.liveUrl} matchLabel={matchLabel} />
+      <LiveStateFact state={state} links={matchStreamLinks(match)} matchLabel={matchLabel} />
     </div>
   );
 }

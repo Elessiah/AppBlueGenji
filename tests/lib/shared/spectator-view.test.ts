@@ -38,7 +38,7 @@ import type {
   MatchScoreReport,
   TournamentSnapshot,
 } from "@/lib/shared/types";
-import { bracketMatch } from "../../helpers/bracket-match";
+import { bracketMatch, matchCaster } from "../../helpers/bracket-match";
 import { tournamentSnapshot } from "../../helpers/tournament-detail";
 
 const calm: SpectatorLoadSignals = { eventLoopDelayMs: 5, openStreams: 10, spectatorReadsPerMinute: 30 };
@@ -276,20 +276,31 @@ describe("ce que lit le visiteur sans compte", () => {
     expect(JSON.stringify(out)).not.toContain("ABC123");
   });
 
-  it("masque qui caste sans masquer qu'un caster est inscrit, garde les entrées solo", () => {
+  it("masque qui caste sans masquer qui est inscrit, garde les entrées solo", () => {
     const snapshot = tournamentSnapshot({
       soloUserIds: { 4: 9 },
-      matches: [bracketMatch({ id: 1, casterUserId: 33, casterPseudo: "Caster" })],
+      matches: [
+        bracketMatch({
+          id: 1,
+          casters: [
+            matchCaster({ userId: 33, pseudo: "Caster", ready: true }),
+            matchCaster({ userId: 34, pseudo: "CoCaster", streamId: 2 }),
+          ],
+        }),
+      ],
     });
     const out = spectatorSnapshot(snapshot);
     // Le podium est public : un joueur solo garde sa marche sur la page sans compte.
     expect(out.soloUserIds).toEqual({ 4: 9 });
-    // Un caster est inscrit (le lancement le compte dans les « prêts »), sans dire qui.
-    expect(out.matches[0].casterUserId).toBe(SPECTATOR_HIDDEN_USER_ID);
-    expect(SPECTATOR_HIDDEN_USER_ID).not.toBe(SPECTATOR_VIEWER_CONTEXT.viewerUserId);
-    expect(spectatorSnapshot(tournamentSnapshot({ matches: [bracketMatch({ casterUserId: null })] })).matches[0].casterUserId).toBeNull();
-    // Le pseudo du caster reste : il est à l'antenne.
-    expect(out.matches[0].casterPseudo).toBe("Caster");
+    // Les casters sont inscrits (le lancement les compte dans les « prêts »),
+    // sans dire quels comptes — deux co-casters restent deux.
+    expect(out.matches[0].casters).toEqual([
+      { userId: SPECTATOR_HIDDEN_USER_ID, pseudo: "Caster", streamId: 1, ready: true },
+      { userId: SPECTATOR_HIDDEN_USER_ID - 1, pseudo: "CoCaster", streamId: 2, ready: false },
+    ]);
+    expect(JSON.stringify(out)).not.toMatch(/"userId":3[34]\b/);
+    expect(out.matches[0].casters.map((caster) => caster.userId)).not.toContain(SPECTATOR_VIEWER_CONTEXT.viewerUserId);
+    expect(spectatorSnapshot(tournamentSnapshot({ matches: [bracketMatch()] })).matches[0].casters).toEqual([]);
   });
 
   it("garde les sanctions, sans leur arbitre ni leur motif", () => {
@@ -382,9 +393,8 @@ const SNAPSHOT_FIELDS = {
 
 const MATCH_FIELDS = {
   bracket: "public",
-  casterPseudo: "public",
-  casterReady: "public",
-  casterUserId: "retiré",
+  // `userId` remplacé, pseudo (à l'antenne), stream et « Prêt » publics.
+  casters: "parcouru",
   doubleForfeit: "public",
   forfeitTeamId: "public",
   hostTeamId: "public",
@@ -393,6 +403,7 @@ const MATCH_FIELDS = {
   liveStartedAt: "public",
   liveTrigger: "public",
   liveUrl: "public",
+  streams: "public",
   lobbyOpenedAt: "public",
   loserTeamId: "public",
   maps: "parcouru",
@@ -462,13 +473,14 @@ describe("inventaire des champs publics", () => {
     const maps: MatchMapResult[] = [{ mapNumber: 1, replayCode: "ABC123", team1Score: 2, team2Score: 1 }];
     const report: MatchScoreReport = { team1Score: 2, team2Score: 1, reportedAt: "2026-01-01T00:00:00.000Z", maps };
     const snapshot = tournamentSnapshot({
-      matches: [bracketMatch({ maps, casterUserId: 7, team1Report: report, team2Report: report })],
+      matches: [bracketMatch({ maps, casters: [matchCaster({ userId: 7 })], team1Report: report, team2Report: report })],
     });
     const out = spectatorSnapshot(snapshot);
     expect(Object.keys(out).sort()).toEqual(Object.keys(snapshot).sort());
     const match = out.matches[0];
     expect(Object.keys(match).sort()).toEqual(Object.keys(snapshot.matches[0]).sort());
     expect(Object.keys(match.maps[0]).sort()).toEqual(Object.keys(MAP_FIELDS).sort());
+    expect(Object.keys(match.casters[0]).sort()).toEqual(Object.keys(matchCaster()).sort());
     expect(Object.keys(match.team1Report!).sort()).toEqual(Object.keys(REPORT_FIELDS).sort());
   });
 

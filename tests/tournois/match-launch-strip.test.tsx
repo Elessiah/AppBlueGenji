@@ -17,7 +17,7 @@ import { LiveProvider } from "@/app/(secured)/tournois/[id]/_lib/live-context";
 import { ToastProvider } from "@/components/ui/toast";
 import { matchLaunchPhase, type CastBlock } from "@/lib/shared/match-launch";
 import type { BracketMatch } from "@/lib/shared/types";
-import { bracketMatch } from "../helpers/bracket-match";
+import { bracketMatch, matchCaster } from "../helpers/bracket-match";
 
 /**
  * Bandeau de lancement d'une carte de match : ce qu'il dit à tous, et quel
@@ -103,9 +103,26 @@ describe("MatchLaunchStrip — ce que tout le monde lit", () => {
   });
 
   it("compte le caster inscrit parmi les parties attendues", () => {
-    const html = render(lobby({ casterUserId: 9, casterPseudo: "Voix", casterReady: false }));
+    const html = render(lobby({ casters: [matchCaster({ userId: 9, pseudo: "Voix" })] }));
     expect(html).toContain(">0/3<");
     expect(html).toContain("Voix");
+    expect(html).toContain("attendu");
+  });
+
+  it("compte et nomme chaque co-caster, avec son « Prêt »", () => {
+    const html = render(
+      lobby({
+        team1Ready: true,
+        casters: [
+          matchCaster({ userId: 9, pseudo: "Voix", ready: true }),
+          matchCaster({ userId: 10, pseudo: "Echo", streamId: 2 }),
+        ],
+      }),
+    );
+    expect(html).toContain(">2/4<");
+    expect(html).toContain("Voix");
+    expect(html).toContain("Echo");
+    expect(html).toContain("prêt");
     expect(html).toContain("attendu");
   });
 
@@ -144,17 +161,23 @@ describe("pied d'action — boutons du lancement selon le lecteur", () => {
     expect(card(lobby(), { canManage: true, castBlock: null })).toContain('data-action="claimCast"');
   });
 
-  it("ne propose pas de caster son propre match ni un match déjà casté", () => {
+  it("ne propose pas de caster son propre match, ni un match qu'on caste déjà", () => {
     expect(card(lobby(), { canManage: true, castBlock: null, myTeamId: 10 })).not.toContain('data-action="claimCast"');
-    expect(card(lobby({ casterUserId: 5, casterPseudo: "Autre" }), { canManage: true, castBlock: null })).not.toContain(
-      'data-action="claimCast"',
-    );
+    expect(
+      card(lobby({ casters: [matchCaster({ userId: 1, pseudo: "Moi" })] }), { canManage: true, castBlock: null }),
+    ).not.toContain('data-action="claimCast"');
+  });
+
+  it("propose de co-caster un match déjà casté par un autre", () => {
+    expect(
+      card(lobby({ casters: [matchCaster({ userId: 5, pseudo: "Autre" })] }), { canManage: true, castBlock: null }),
+    ).toContain('data-action="claimCast"');
   });
 
   it("laisse le caster se retirer, et l'arbitrage retirer un caster", () => {
-    const mine = lobby({ casterUserId: 1, casterPseudo: "Moi" });
+    const mine = lobby({ casters: [matchCaster({ userId: 1, pseudo: "Moi" })] });
     expect(card(mine, { viewerUserId: 1 })).toContain("Ne plus caster");
-    expect(card(lobby({ casterUserId: 5, casterPseudo: "Autre" }), { canSchedule: true })).toContain(
+    expect(card(lobby({ casters: [matchCaster({ userId: 5, pseudo: "Autre" })] }), { canSchedule: true })).toContain(
       "Retirer le caster",
     );
   });

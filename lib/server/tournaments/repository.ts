@@ -4,6 +4,7 @@ import { forfeitMapCount, parseMatchFormat, type MatchFormat } from "@/lib/share
 import { tournamentMatchFormat } from "@/lib/shared/bg-survie/rounds";
 import { TournamentRow, RegistrationRow, MatchRow, TournamentListRow } from "./_internal";
 import { queueBotLog } from "./bot-logs";
+import { firstStreamUrlSql } from "./match-casters";
 import { AUTO_VALIDATION_PAUSED_SQL } from "./score-report-sql";
 
 /**
@@ -324,24 +325,14 @@ export async function getMatchRows(
       m.phase_id,
       m.start_at,
       m.live_trigger,
-      m.live_url,
+      ${firstStreamUrlSql("m")} AS live_url,
       m.live_started_at,
       m.host_team_id,
-      m.caster_user_id,
-      cu.pseudo AS caster_pseudo,
-      cu.discord_verified_at AS caster_discord_verified_at,
-      cu.discord_pseudo AS caster_discord_pseudo,
-      cu.blizzard_sub AS caster_blizzard_sub,
-      cu.overwatch_battletag AS caster_overwatch_battletag,
-      cu.is_deleted AS caster_is_deleted,
-      cu.is_admin AS caster_is_admin,
-      cu.platform_roles_json AS caster_platform_roles_json,
       m.lobby_opened_at,
       m.launch_pairing,
       m.launched_at,
       m.team1_ready_at,
       m.team2_ready_at,
-      m.caster_ready_at,
       t1.is_ghost AS team1_is_ghost,
       t2.is_ghost AS team2_is_ghost,
       m.replay_url,
@@ -349,7 +340,6 @@ export async function getMatchRows(
      FROM bg_matches m
      LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
      LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
-     LEFT JOIN bg_users cu ON cu.id = m.caster_user_id
      LEFT JOIN bg_tournament_phases p ON p.id = m.phase_id
      WHERE m.tournament_id = ?
      ORDER BY

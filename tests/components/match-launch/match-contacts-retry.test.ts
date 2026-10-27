@@ -158,6 +158,7 @@ const CASTER: LaunchCaster = {
   battletagVerified: false,
   ready: false,
   contactsShown: false,
+  isViewer: false,
 };
 const launchSide = (teamId: number, name: string): LaunchSide => ({
   teamId,
@@ -171,7 +172,7 @@ const launchSide = (teamId: number, name: string): LaunchSide => ({
 });
 const info = (
   phase: MatchLaunchInfo["phase"],
-  caster: LaunchCaster | null = CASTER,
+  caster: LaunchCaster | readonly LaunchCaster[] | null = CASTER,
   startAt: string | null = START,
   role: MatchLaunchInfo["viewer"]["role"] = "TEAM1",
 ): MatchLaunchInfo => ({
@@ -186,8 +187,13 @@ const info = (
   hostTeamId: 10,
   team1: launchSide(10, "Alpha"),
   team2: launchSide(20, "Bravo"),
-  // Décision du serveur (`exposesCaster`), telle que la réponse la porte.
-  caster: caster && { ...caster, contactsShown: exposesCasterContacts(phase, role) },
+  // Décision du serveur (`exposesCaster`), telle que la réponse la porte ;
+  // la fiche du lecteur lui-même porte `isViewer` (`buildLaunchCaster`).
+  casters: (caster === null ? [] : Array.isArray(caster) ? caster : [caster as LaunchCaster]).map((one) => ({
+    ...one,
+    isViewer: one.isViewer || (role === "CASTER" && one.userId === CASTER.userId),
+    contactsShown: exposesCasterContacts(phase, role),
+  })),
   viewer: {
     role,
     canDeclareReady: false,
@@ -210,6 +216,17 @@ describe("contacts du caster en attente, modale ouverte", () => {
     const own = info("SCHEDULED", CASTER, START, "CASTER");
     expect(casterContactsPending(own)).toBe(false);
     expect(casterRereadDelay(own, SERVER_BEFORE)).toBeNull();
+  });
+
+  it("co-casters : la fiche de l'autre caster attend le départ, la sienne non", () => {
+    const other: LaunchCaster = { ...CASTER, userId: 12, pseudo: "Écho" };
+    const cocast = info("SCHEDULED", [CASTER, other], START, "CASTER");
+    expect(cocast.casters.map((caster) => caster.isViewer)).toEqual([true, false]);
+    expect(casterContactsPending(cocast)).toBe(true);
+    expect(casterRereadDelay(cocast, SERVER_BEFORE)).toBe(11_000);
+    // Deux casters tus à un joueur : une seule relecture, à l'heure du serveur.
+    expect(casterRereadDelay(info("SCHEDULED", [CASTER, other]), SERVER_BEFORE)).toBe(11_000);
+    expect(casterContactsPending(info("LOBBY", [CASTER, other]))).toBe(false);
   });
 
   // Décision du 2026-10-21 : l'arbitre lit les contacts du caster dès que les adversaires sont connus.
@@ -301,13 +318,12 @@ describe("contacts du caster en attente, modale ouverte", () => {
   const CARD: ContactsCard = {
     startAt: START,
     launchedAt: null,
-    casterUserId: 9,
+    casters: [{ userId: 9, pseudo: "Voix", streamId: 1, ready: false }],
     team1Id: 1,
     team2Id: 2,
     hostTeamId: 1,
     team1Ready: false,
     team2Ready: false,
-    casterReady: false,
   };
   const key = (patch: Partial<ContactsCard> = {}) => contactsCardKey({ ...CARD, ...patch });
   const card = (patch: Partial<ContactsCard> = {}): ContactsCard => ({ ...CARD, ...patch });
@@ -317,13 +333,14 @@ describe("contacts du caster en attente, modale ouverte", () => {
       { launchedAt: "2026-10-19T17:50:00.000Z" }, // lancement forcé
       { startAt: "2026-10-19T18:30:00.000Z" }, // reprogrammé
       { startAt: null }, // remis à planifier
-      { casterUserId: null }, // caster retiré
-      { casterUserId: 12 }, // autre caster
+      { casters: [] }, // caster retiré
+      { casters: [{ userId: 12, pseudo: "Écho", streamId: 1, ready: false }] }, // autre caster
+      { casters: [...CARD.casters, { userId: 12, pseudo: "Écho", streamId: 2, ready: false }] }, // co-caster inscrit
       { team2Id: 3 }, // adversaire corrigé
       { hostTeamId: 2 }, // hôte changé
       { team1Ready: true },
       { team2Ready: true },
-      { casterReady: true },
+      { casters: [{ ...CARD.casters[0], ready: true }] }, // « Prêt » du caster
     ];
     for (const patch of writes) {
       expect(rereadOnCardChange(card(), card(patch), info("SCHEDULED"))).toBe(true);
@@ -333,6 +350,8 @@ describe("contacts du caster en attente, modale ouverte", () => {
 
   it("rien sans changement, ni avant la première lecture (l'horloge du navigateur ne relit rien)", () => {
     expect(rereadOnCardChange(card(), card(), info("SCHEDULED"))).toBe(false);
+    // Un instantané neuf porte un nouveau tableau de casters, mêmes valeurs : rien à relire.
+    expect(rereadOnCardChange(card(), card({ casters: CARD.casters.map((caster) => ({ ...caster })) }), info("SCHEDULED"))).toBe(false);
     expect(rereadOnCardChange(card(), card({ hostTeamId: 2 }), null)).toBe(false);
     expect(rereadOnCardChange(null, card(), info("SCHEDULED"))).toBe(false);
   });
@@ -383,7 +402,8 @@ describe("contacts du caster en attente, modale ouverte", () => {
     expect(dialog).toMatch(/if \(transient\) \{\n\s*setRereadWait\(read\.retryAfterMs \?\? 0\);\n\s*setRereadFailures\(\(count\) => count \+ 1\);\n\s*\}\n\s*if \(keepWaiting\(transient\)\) return;/);
     expect(dialog).toMatch(/setRereadWait\(0\);\n\s*setRereadFailures\(\(count\) => count \+ 1\);\n\s*if \(keepWaiting\(true\)\) return;/);
     expect(dialog).toContain("failureIsSilent(transient, shown, rereadFailures)");
-    expect(dialog).toContain("viewer={launch.viewer}");
+    expect(dialog).toContain("<CasterCards");
+    expect(dialog).toContain("casters={launch.casters}");
     const card = readSource("app/(secured)/tournois/[id]/_components/MatchCardActions.tsx");
     expect(card).toMatch(/<MatchContactsDialog[\s\S]*?card=\{match\}[\s\S]*?\/>/);
   });
