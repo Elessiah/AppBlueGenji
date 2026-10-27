@@ -46,16 +46,20 @@ function IdentityLine({
   value,
   verified,
   onCopy,
+  note,
 }: Readonly<{
   kind: "Discord" | "BattleTag";
   value: string | null;
   verified: boolean;
   onCopy: CopyFn;
+  /** Ce que le lecteur doit en faire (page du match : « À inviter — obligatoire »). */
+  note?: string;
 }>) {
   const { t } = useLaunchText();
   return (
     <div className={styles.identity}>
       <span className={styles.identityKind}>{kind}</span>
+      {note && value && <span className={styles.identityNote}>{note}</span>}
       {value ? (
         <>
           <span className={`mono ${styles.identityValue}`}>{value}</span>
@@ -250,6 +254,8 @@ type CasterCardOptions = {
   onCopy: CopyFn;
   /** Texte sans caster ; par défaut, celui de la modale de lancement. */
   noCasterText?: string;
+  /** Note posée sur le BattleTag (page du match : « À inviter — obligatoire »). */
+  battletagNote?: string;
   /**
    * Note des contacts tus ; par défaut, celle de la modale de lancement, dans
    * les mots de la note des engagées juste au-dessus (« au lancement »).
@@ -301,6 +307,7 @@ export function CasterCard({
   laterText,
   linkNames = false,
   announceArrival = false,
+  battletagNote,
 }: Readonly<
   CasterCardOptions & {
     /**
@@ -343,7 +350,13 @@ export function CasterCard({
       {caster.contactsShown && hasContacts && (
         <div className={styles.casterIds}>
           <IdentityLine kind="Discord" value={caster.discordTag} verified={caster.discordTag !== null} onCopy={onCopy} />
-          <IdentityLine kind="BattleTag" value={caster.battletag} verified={caster.battletagVerified} onCopy={onCopy} />
+          <IdentityLine
+            kind="BattleTag"
+            value={caster.battletag}
+            verified={caster.battletagVerified}
+            onCopy={onCopy}
+            note={self ? undefined : battletagNote}
+          />
         </div>
       )}
       {/* Contacts tus : une note plutôt que deux « — » qui laisseraient croire
@@ -365,12 +378,15 @@ export function RefereeCard({
   phase,
   onCopy,
   linkNames = false,
+  battletagNote,
 }: Readonly<{
   referee: LaunchReferee | null;
   selfManaged: boolean;
   phase: MatchLaunchInfo["phase"];
   onCopy: CopyFn;
   linkNames?: boolean;
+  /** Note posée sur le BattleTag (page du match : « À ajouter en jeu »). */
+  battletagNote?: string;
 }>) {
   const { t } = useLaunchText();
   if (!referee) {
@@ -397,7 +413,13 @@ export function RefereeCard({
       </div>
       {!referee.isViewer && referee.battletag !== null && (
         <div className={styles.casterIds}>
-          <IdentityLine kind="BattleTag" value={referee.battletag} verified={referee.battletagVerified} onCopy={onCopy} />
+          <IdentityLine
+            kind="BattleTag"
+            value={referee.battletag}
+            verified={referee.battletagVerified}
+            onCopy={onCopy}
+            note={battletagNote}
+          />
         </div>
       )}
     </section>

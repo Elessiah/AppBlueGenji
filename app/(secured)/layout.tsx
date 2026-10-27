@@ -11,6 +11,7 @@ import { requestLocale } from "@/lib/server/request-locale";
 import { PATHNAME_HEADER, SEARCH_HEADER } from "@/lib/shared/csp";
 import { localeHref } from "@/lib/shared/locales";
 import { forwardedSearch, spectatorTournamentPath, tournamentIdFromMemberPath } from "@/lib/shared/spectator-view";
+import { matchPageIdsFromMemberPath, matchPagePath } from "@/lib/shared/match-page";
 
 /**
  * L'espace sécurisé répond `200` aux visiteurs non connectés — une carte
@@ -47,9 +48,15 @@ export default async function SecuredLayout({ children }: Readonly<{ children: R
     // la vitrine mènent directement à `/suivre/…` (`tournamentHref`,
     // `tournamentMatchHref`).
     const requestHeaders = await headers();
-    const tournamentId = tournamentIdFromMemberPath(requestHeaders.get(PATHNAME_HEADER));
-    if (tournamentId !== null) {
-      redirect(localeHref(`${spectatorTournamentPath(tournamentId)}${forwardedSearch(requestHeaders.get(SEARCH_HEADER))}`, await requestLocale()));
+    const pathname = requestHeaders.get(PATHNAME_HEADER);
+    const tournamentId = tournamentIdFromMemberPath(pathname);
+    // Page d'un match : sa page sans compte, de même (`MATCH_PAGE.md`).
+    const matchPage = matchPageIdsFromMemberPath(pathname);
+    let spectatorPath: string | null = null;
+    if (tournamentId !== null) spectatorPath = spectatorTournamentPath(tournamentId);
+    else if (matchPage !== null) spectatorPath = matchPagePath(matchPage.tournamentId, matchPage.matchId, true);
+    if (spectatorPath !== null) {
+      redirect(localeHref(`${spectatorPath}${forwardedSearch(requestHeaders.get(SEARCH_HEADER))}`, await requestLocale()));
     }
     // Dans la langue de l'adresse : anglaise sous une route traduite
     // (`/en/tournois`), française partout ailleurs (le middleware renvoie les

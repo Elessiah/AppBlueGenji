@@ -275,7 +275,11 @@
       "copyFailed": "Couldn't copy: select the code by hand."
     },
     "byeWin": "✓ Walkover",
-    "champion": "🏆 Champion —"
+    "champion": "🏆 Champion —",
+    "moreStreams": "+{count}",
+    "moreStreamsLabel": "+{count}: the other streams of {match}",
+    "viewMatch": "View match",
+    "viewMatchLabel": "View match: {match}"
   },
   "launch": {
     "toPlan": "To schedule",
@@ -414,5 +418,42 @@
       "KICKOFF": "Kickoff on {date}"
     },
     "date": "{day} at {hour}"
+  },
+  "matchPage": {
+    "crumbsLabel": "Breadcrumb",
+    "left": "Left",
+    "right": "Right",
+    "host": "Host: creates the game",
+    "firstBan": "First ban",
+    "firstMap": "First map",
+    "firstMapUnset": "Not chosen yet",
+    "opponentsPending": "Opponents to come",
+    "vs": "vs",
+    "sortByRole": "Cast match: sort the players by role in the game lobby.",
+    "refereeLead": "A referee follows this match.",
+    "refereeBattletagNote": "To invite to the game",
+    "stepsLabel": "Self-management steps",
+    "steps": {
+      "hostCreates": "The host team creates the game.",
+      "managersInvite": "Both teams' managers add each other as friends and send invites.",
+      "settings": "Set the game settings.",
+      "inviteCasters": "Invite the match's casters."
+    },
+    "undecided": "No decision",
+    "undecidedLead": "Neither a referee nor self-management: to be decided.",
+    "noCaster": "No caster signed up for this match.",
+    "stream": "Stream {number}",
+    "noLink": "Link not published yet",
+    "castersToInvite": "Casters to invite",
+    "battletagRequired": "To invite — required",
+    "sections": {
+      "match": "The match",
+      "lobby": "The game",
+      "officiating": "Officiating",
+      "casts": "Casts"
+    },
+    "missingTitle": "Match not found",
+    "missingText": "This match doesn't exist in this tournament.",
+    "missingBack": "Back to the tournament"
   }
 }

@@ -5,7 +5,8 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
 import { tournamentPageMetadata } from "@/lib/server/tournament-metadata";
-import { SEARCH_HEADER } from "@/lib/shared/csp";
+import { PATHNAME_HEADER, SEARCH_HEADER } from "@/lib/shared/csp";
+import { matchPageIdsFromSpectatorPath, matchPagePath } from "@/lib/shared/match-page";
 import { localeHref } from "@/lib/shared/locales";
 import {
   forwardedSearch,
@@ -66,8 +67,15 @@ export default async function SpectatorTournamentLayout({
   // sert telle qu'au visiteur sans compte.
   const user = await getCurrentUser().catch(() => null);
   if (user) {
-    const search = forwardedSearch((await headers()).get(SEARCH_HEADER));
-    redirect(localeHref(`${memberTournamentPath(tournamentId)}${search}`, locale));
+    const requestHeaders = await headers();
+    const search = forwardedSearch(requestHeaders.get(SEARCH_HEADER));
+    // Page d'un match : la page du match de son espace (`MATCH_PAGE.md`).
+    const matchPage = matchPageIdsFromSpectatorPath(requestHeaders.get(PATHNAME_HEADER));
+    const memberPath =
+      matchPage?.tournamentId === tournamentId
+        ? matchPagePath(tournamentId, matchPage.matchId)
+        : memberTournamentPath(tournamentId);
+    redirect(localeHref(`${memberPath}${search}`, locale));
   }
 
   const catalog = locale === "en" ? messagesFor(locale) : null;

@@ -27,6 +27,7 @@ import { launchStripControls } from "../_lib/launch-strip";
 import { matchCardActionList } from "../_lib/match-card-actions";
 import { MatchLiveStrip } from "./MatchLiveStrip";
 import { MatchLaunchStrip } from "./MatchLaunchStrip";
+import { MatchPageLink } from "./MatchPageLink";
 import { MatchReplayStrip, canEditReplay } from "./MatchReplayStrip";
 import { MatchMapDetails } from "./MatchMapDetails";
 import { MatchCardActions } from "./MatchCardActions";
@@ -268,6 +269,8 @@ export const MatchRow = memo(function MatchRow({
       <MatchReplayStrip match={match} />
 
       <MatchMapDetails match={match} />
+
+      <MatchPageLink match={match} matchLabel={actionMatchLabel} />
 
       {/* Pas de région live : un plateau de cent vingt-sept cartes en
           annoncerait autant à chaque instantané du flux. L'annonce qui compte,

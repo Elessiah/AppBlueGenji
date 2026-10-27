@@ -4,8 +4,13 @@ import {
   isMatchCastable,
   PLATFORM_LABELS,
   requiresMatchStartAt,
+  streamLinkText,
   streamPlatform,
 } from "@/lib/shared/live-streams";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { useSpectatorView } from "@/components/spectator-view";
+import { matchPagePath } from "@/lib/shared/match-page";
+import { useOnMatchPage } from "../_lib/match-page-context";
 import type { MatchLiveState } from "@/lib/shared/live-streams";
 import { formatMatchStartAt, formatMatchStartAtFull } from "@/lib/shared/match-schedule";
 import type { BracketMatch } from "@/lib/shared/types";
@@ -41,12 +46,19 @@ export function matchStreamLinks(match: Pick<BracketMatch, "liveUrl" | "streams"
   return [...new Set(ordered)];
 }
 
-/** Lien vers une chaîne ; numéroté quand le match en a plusieurs (« Twitch 2 »). */
-function StreamLink({ url, rank, matchLabel }: Readonly<{ url: string; rank: number | null; matchLabel: string }>) {
+/**
+ * Lien vers une chaîne, au nom de la chaîne (`streamLinkText` : « bluegenji »,
+ * sinon « Twitch »). Abrégé d'une ellipse quand il est long ; le nom
+ * accessible le porte en entier (WCAG 2.5.3). Partagé avec la page du match.
+ */
+export function StreamLink({
+  url,
+  matchLabel,
+  className,
+}: Readonly<{ url: string; matchLabel: string; className?: string }>) {
   const { t } = useTournamentPageText();
   const platform = streamPlatform(url);
-  const name = platform ? PLATFORM_LABELS[platform] : t("match.channel");
-  const linkText = rank === null ? name : `${name} ${rank}`;
+  const linkText = streamLinkText(url, t("match.channel"));
   const watchLabel = platform
     ? t("match.watchOn", { link: linkText, match: matchLabel, platform: PLATFORM_LABELS[platform] })
     : t("match.watch", { link: linkText, match: matchLabel });
@@ -57,20 +69,28 @@ function StreamLink({ url, rank, matchLabel }: Readonly<{ url: string; rank: num
       rel="noopener noreferrer"
       // Le texte visible ouvre le nom accessible (WCAG 2.5.3).
       aria-label={watchLabel}
-      className={styles.link}
+      title={linkText}
+      className={className ?? styles.link}
     >
       {linkText}
     </a>
   );
 }
 
-/** État de diffusion (programmé / en direct) et liens vers les chaînes du match. */
+/**
+ * État de diffusion (programmé / en direct) et **premier** lien du match, celui
+ * des vues compactes ; les autres streams se lisent sur la page du match, à
+ * laquelle mène « +N ».
+ */
 function LiveStateFact({
   state,
   links,
   matchLabel,
-}: Readonly<{ state: LiveState; links: readonly string[]; matchLabel: string }>) {
+  pageHref,
+}: Readonly<{ state: LiveState; links: readonly string[]; matchLabel: string; pageHref: string }>) {
   const { t } = useTournamentPageText();
+  // Sur la page du match, ses streams sont tous listés juste en dessous.
+  const onPage = useOnMatchPage();
   if (state === "OFF") return null;
   const live = state === "LIVE";
   return (
@@ -79,9 +99,16 @@ function LiveStateFact({
         <span aria-hidden="true">{live ? "●" : "○"}</span>
         {live ? t("match.live") : t("match.scheduled")}
       </span>
-      {links.map((url, index) => (
-        <StreamLink key={url} url={url} rank={links.length > 1 ? index + 1 : null} matchLabel={matchLabel} />
-      ))}
+      {links.length > 0 && <StreamLink url={links[0]} matchLabel={matchLabel} />}
+      {links.length > 1 && !onPage && (
+        <LocaleLink
+          href={pageHref}
+          className={styles.more}
+          aria-label={t("match.moreStreamsLabel", { count: links.length - 1, match: matchLabel })}
+        >
+          {t("match.moreStreams", { count: links.length - 1 })}
+        </LocaleLink>
+      )}
     </>
   );
 }
@@ -105,6 +132,7 @@ export function MatchLiveStrip({
 }>) {
   const { canManage, canSchedule } = useLiveControls();
   const text = useTournamentPageText();
+  const spectator = useSpectatorView();
 
   const hasStartAt = formatMatchStartAt(match.startAt) !== null;
   const missingStartAt =
@@ -131,7 +159,12 @@ export function MatchLiveStrip({
         </span>
       )}
 
-      <LiveStateFact state={state} links={matchStreamLinks(match)} matchLabel={matchLabel} />
+      <LiveStateFact
+        state={state}
+        links={matchStreamLinks(match)}
+        matchLabel={matchLabel}
+        pageHref={matchPagePath(match.tournamentId, match.id, spectator)}
+      />
     </div>
   );
 }

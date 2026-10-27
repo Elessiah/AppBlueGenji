@@ -1041,7 +1041,7 @@ function RgpdFr({
             <strong>Arbitre désigné d&apos;un match.</strong> Un membre du staff qui peut arbitrer (permission
             d&apos;arbitrage, tag Discord certifié et compte Battle.net rattaché) prend un match, ou le staff le lui
             confie. Son pseudo et son BattleTag (même masqué) — jamais son tag Discord — sont alors présentés dans
-            les fenêtres « Contacts » et de lancement du match, aux mêmes parties et aux mêmes moments que les
+            les fenêtres « Contacts » et de lancement du match et sur la page du match, aux mêmes parties et aux mêmes moments que les
             contacts du match : aux deux équipes et aux arbitres dès que ses deux adversaires sont connus et
             jusqu&apos;à sa fin, à ses casters le temps du match ; le pseudo seul y paraît dès que la fenêtre de
             lancement montre le match. Le public et les autres joueurs ne lisent que « Arbitre désigné ». Son

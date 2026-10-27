@@ -86,7 +86,9 @@
       "next": "Next match",
       "pause": "Pause the match carousel",
       "play": "Resume the match carousel"
-    }
+    },
+    "watchChannel": "Watch {channel}",
+    "watchChannelLabel": "Watch {channel}: {match} live on {platform} (new tab)"
   },
   "ticker": {
     "label": "News feed",

@@ -23,7 +23,8 @@ export function contactsErrorText(text: LaunchText, code: string | null | undefi
   return text.t("contacts.failed");
 }
 
-type LoadState = { kind: "loading" } | { kind: "ready"; launch: MatchLaunchInfo } | { kind: "failed" };
+/** Lecture des contacts d'un match : en cours, lue, ou en échec (notifié). */
+export type MatchContactsState = { kind: "loading" } | { kind: "ready"; launch: MatchLaunchInfo } | { kind: "failed" };
 
 /**
  * Attente la plus longue avant l'unique relecture d'un refus
@@ -229,48 +230,22 @@ export async function readMatchContacts(matchId: number, options: ReadOptions): 
 }
 
 /**
- * Modale « Contacts » d'une carte de match (`docs/features/MATCH_LAUNCH.md`
- * § Contacts hors lancement) : les fiches de la modale de lancement — équipes,
- * hôte, contacts, caster —, lues pour **ce** match par
- * `GET /api/matches/[id]/contacts`. Le serveur seul décide qui les reçoit (les
- * parties du match, comme au lancement) ; la carte n'offre le bouton qu'à
- * elles, et un refus se dit par une notification.
- *
- * Portée dans `document.body`, `useDialogBehavior` (piège de focus, Échap),
- * voile fermé par `useBackdropDismiss` ; le focus d'ouverture va à « Fermer ».
+ * Lit les contacts d'un match (`GET /api/matches/[id]/contacts`) et les tient à
+ * jour : relus à chaque écriture qui touche ce qu'ils montrent (`card`), à
+ * l'heure de départ du serveur quand ceux du caster l'attendent, et retentés
+ * sans bruit après un échec passager ; un refus se dit par une notification.
+ * Partagée par la modale « Contacts » et la page du match (`enabled` : le
+ * lecteur est une partie du match ou un arbitre — rien n'est lu sinon).
  */
-export function MatchContactsDialog({
-  matchId,
-  matchLabel,
-  onClose,
-  card = null,
-}: Readonly<{
-  matchId: number;
-  matchLabel: string;
-  onClose: () => void;
-  /**
-   * Le match tel que la carte le reçoit : un match pas encore lancé est relu à
-   * la frontière du départ ; une écriture qui touche la modale la fait relire.
-   */
-  card?: ContactsCard | null;
-}>) {
+export function useMatchContacts(
+  matchId: number,
+  card: ContactsCard | null,
+  enabled = true,
+): { state: MatchContactsState; launch: MatchLaunchInfo | null } {
   const text = useLaunchText();
-  const { t } = text;
-  const { showError, showSuccess } = useToast();
-  const titleId = useId();
-  const [mounted, setMounted] = useState(false);
-  const [state, setState] = useState<LoadState>({ kind: "loading" });
+  const { showError } = useToast();
+  const [state, setState] = useState<MatchContactsState>({ kind: "loading" });
   const launch = state.kind === "ready" ? state.launch : null;
-  // À la fermeture, la modale de lancement relit ses matchs : une ouverture
-  // d'office retenue pendant que « Contacts » était ouverte part alors. Pas
-  // pour un arbitre : la modale de lancement ne lui présente rien.
-  const close = () => {
-    onClose();
-    if (launch?.viewer.role !== "REFEREE") window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
-  };
-  useEffect(() => setMounted(true), []);
-  const dialogRef = useDialogBehavior({ open: mounted, onClose: close });
-  const backdrop = useBackdropDismiss(close);
   const [readKey, setReadKey] = useState(0);
   const [serverDate, setServerDate] = useState<string | null>(null);
   const [rereadFailures, setRereadFailures] = useState(0);
@@ -314,6 +289,7 @@ export function MatchContactsDialog({
   }, [launch, serverDate]);
 
   useEffect(() => {
+    if (!enabled) return;
     let alive = true;
     const controller = new AbortController();
     // Un échec passager garde à l'écran ce qui est déjà lu (seuls les contacts
@@ -360,7 +336,52 @@ export function MatchContactsDialog({
     // Une lecture par ouverture, et une au départ du match : la langue ou la
     // notification ne relancent rien.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [matchId, readKey]);
+  }, [matchId, readKey, enabled]);
+  return { state, launch };
+}
+
+/**
+ * Modale « Contacts » d'une carte de match (`docs/features/MATCH_LAUNCH.md`
+ * § Contacts hors lancement) : les fiches de la modale de lancement — équipes,
+ * hôte, contacts, caster —, lues pour **ce** match par
+ * `GET /api/matches/[id]/contacts`. Le serveur seul décide qui les reçoit (les
+ * parties du match, comme au lancement) ; la carte n'offre le bouton qu'à
+ * elles, et un refus se dit par une notification.
+ *
+ * Portée dans `document.body`, `useDialogBehavior` (piège de focus, Échap),
+ * voile fermé par `useBackdropDismiss` ; le focus d'ouverture va à « Fermer ».
+ */
+export function MatchContactsDialog({
+  matchId,
+  matchLabel,
+  onClose,
+  card = null,
+}: Readonly<{
+  matchId: number;
+  matchLabel: string;
+  onClose: () => void;
+  /**
+   * Le match tel que la carte le reçoit : un match pas encore lancé est relu à
+   * la frontière du départ ; une écriture qui touche la modale la fait relire.
+   */
+  card?: ContactsCard | null;
+}>) {
+  const text = useLaunchText();
+  const { t } = text;
+  const { showError, showSuccess } = useToast();
+  const titleId = useId();
+  const [mounted, setMounted] = useState(false);
+  const { state, launch } = useMatchContacts(matchId, card);
+  // À la fermeture, la modale de lancement relit ses matchs : une ouverture
+  // d'office retenue pendant que « Contacts » était ouverte part alors. Pas
+  // pour un arbitre : la modale de lancement ne lui présente rien.
+  const close = () => {
+    onClose();
+    if (launch?.viewer.role !== "REFEREE") window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
+  };
+  useEffect(() => setMounted(true), []);
+  const dialogRef = useDialogBehavior({ open: mounted, onClose: close });
+  const backdrop = useBackdropDismiss(close);
 
   const copy = async (value: string, label: string) => {
     try {

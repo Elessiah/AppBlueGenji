@@ -275,7 +275,11 @@
       "copyFailed": "Copie impossible : sélectionne le code à la main."
     },
     "byeWin": "✓ Victoire d'office",
-    "champion": "🏆 Championne —"
+    "champion": "🏆 Championne —",
+    "moreStreams": "+{count}",
+    "moreStreamsLabel": "+{count} : les autres streams de {match}",
+    "viewMatch": "Voir le match",
+    "viewMatchLabel": "Voir le match : {match}"
   },
   "launch": {
     "toPlan": "À planifier",
@@ -414,5 +418,42 @@
       "KICKOFF": "Coup d'envoi le {date}"
     },
     "date": "{day} à {hour}"
+  },
+  "matchPage": {
+    "crumbsLabel": "Fil d'Ariane",
+    "left": "Gauche",
+    "right": "Droite",
+    "host": "Hôte : crée la partie",
+    "firstBan": "Premier ban",
+    "firstMap": "Première map",
+    "firstMapUnset": "Pas encore choisie",
+    "opponentsPending": "Adversaires à venir",
+    "vs": "contre",
+    "sortByRole": "Match casté : triez les joueurs par rôle dans le salon de la partie.",
+    "refereeLead": "Un arbitre suit ce match.",
+    "refereeBattletagNote": "À inviter dans la partie",
+    "stepsLabel": "Étapes de l'autogestion",
+    "steps": {
+      "hostCreates": "L'équipe hôte crée la partie.",
+      "managersInvite": "Les managers des deux équipes s'ajoutent en ami et s'invitent.",
+      "settings": "Réglez les paramètres de la partie.",
+      "inviteCasters": "Invitez les casters du match."
+    },
+    "undecided": "Aucune décision",
+    "undecidedLead": "Ni arbitre ni autogestion : à décider.",
+    "noCaster": "Aucun caster inscrit pour ce match.",
+    "stream": "Stream {number}",
+    "noLink": "Lien pas encore publié",
+    "castersToInvite": "Casters à inviter",
+    "battletagRequired": "À inviter — obligatoire",
+    "sections": {
+      "match": "Le match",
+      "lobby": "La partie",
+      "officiating": "Arbitrage",
+      "casts": "Casts"
+    },
+    "missingTitle": "Match introuvable",
+    "missingText": "Ce match n'existe pas dans ce tournoi.",
+    "missingBack": "Retour au tournoi"
   }
 }

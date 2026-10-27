@@ -60,6 +60,7 @@ function clientPart(messages: Messages["tournament"], views: Messages["tournamen
     endurance: views.endurance,
     registrations: messages.registrations,
     planning: messages.planning,
+    matchPage: messages.matchPage,
   };
 }
 
@@ -98,6 +99,7 @@ export const FR_TOURNAMENT_PAGE_MESSAGES: Omit<TournamentPageMessages, Tournamen
   ranking: frTournament.ranking,
   registrations: frTournament.registrations,
   planning: frTournament.planning,
+  matchPage: frTournament.matchPage,
 };
 
 /** Ce qui voyage vers le navigateur sous `/en`. */
