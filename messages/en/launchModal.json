@@ -80,7 +80,7 @@
   "pushLead": "Get notified when your next matches start, even with the site closed.",
   "contacts": {
     "title": "Contacts — {match}",
-    "lead": "Shown to the members of both teams and the referees of this match — and, while the match is being played, its caster — to add each other in game and get organised. The caster's: to both teams while the match is being played, to the referees from the moment both its opponents are known until its end.",
+    "lead": "Shown to the members of both teams and the referees of this match — and, while the match is being played, its casters — to add each other in game and get organised. A caster's: to both teams and the other casters while the match is being played, to the referees from the moment both its opponents are known until its end.",
     "scrollAria": "Match contacts",
     "loading": "Loading contacts…",
     "notShown": "Contacts not shown.",

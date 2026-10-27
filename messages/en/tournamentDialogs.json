@@ -388,8 +388,8 @@
       },
       "matches": {
         "topic": "Your matches",
-        "does": "You go ahead of members who have verified nothing to be shown as your team's contact — to both teams of the match, its caster, and the site's referees and admins —, with your verified Discord tag and your BattleTag marked “verified”.",
-        "doesDiscordOnly": "You go ahead of members who have verified nothing to be shown as your team's contact — to both teams of the match, its caster, and the site's referees and admins —, with your verified Discord tag.",
+        "does": "You go ahead of members who have verified nothing to be shown as your team's contact — to both teams of the match, its casters, and the site's referees and admins —, with your verified Discord tag and your BattleTag marked “verified”.",
+        "doesDiscordOnly": "You go ahead of members who have verified nothing to be shown as your team's contact — to both teams of the match, its casters, and the site's referees and admins —, with your verified Discord tag.",
         "doesNot": "Does not publish your tag on your profile: other players see a badge there, and your tag only if your visibility settings open it (the “Discord tag” box for the Discord tag, even if ticked before). Verified or not, when you are shown as a contact your BattleTag appears even if hidden, from the moment both opponents of the match are known until its end.",
         "doesNotDiscordOnly": "Does not publish your tag on your profile: other players see a badge there, and your tag only if you ticked “Discord tag” in your settings (even before). If your profile holds a BattleTag, when you are shown as a contact it appears even if hidden, from the moment both opponents of the match are known until its end."
       },

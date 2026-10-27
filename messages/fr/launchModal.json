@@ -80,7 +80,7 @@
   "pushLead": "Sois prévenu du départ de tes prochains matchs, même le site fermé.",
   "contacts": {
     "title": "Contacts — {match}",
-    "lead": "Fiches montrées aux membres des deux équipes et aux arbitres de ce match — et, le temps du match, à son caster —, pour s'ajouter en jeu et s'organiser. Celle du caster : aux deux équipes le temps du match, aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin.",
+    "lead": "Fiches montrées aux membres des deux équipes et aux arbitres de ce match — et, le temps du match, à ses casters —, pour s'ajouter en jeu et s'organiser. Celle d'un caster : aux deux équipes et aux autres casters le temps du match, aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin.",
     "scrollAria": "Contacts du match",
     "loading": "Chargement des contacts…",
     "notShown": "Contacts non affichés.",
