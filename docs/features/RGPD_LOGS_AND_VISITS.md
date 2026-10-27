@@ -109,6 +109,12 @@ texte, effacée un jour après la fin de la soirée).
   retiré par un autre que lui reçoit le motif en message privé et en push
   (`CAST_NOTICES.md`).
 
+- **Autres gestes du staff** (même décision) : résultat validé, score
+  enregistré, lancement forcé, hôte, diffusion, rediffusion, édition d'un
+  tournoi, têtes de série, étape avancée, équipes fantômes, image et lien de
+  diffusion — une ligne « par le staff » au journal, sans ligne pm2
+  (`STAFF_ACTION_LOGS.md`).
+
 - Le **motif d'une pénalité** est saisi librement par l'arbitre et repris tel
   quel : il ne doit pas nommer de joueur.
 
