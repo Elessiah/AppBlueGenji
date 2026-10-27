@@ -129,7 +129,9 @@ déjà posée pré-remplit les trois champs (`matchStartEntryOf`).
   région d'état fait lire, puis « Enregistrer » qu'il repousse ; le focus reste
   sur l'envoi, et l'envoi suivant part. Le second clic d'un double-clic
   (`event.detail > 1`, au délai du système) et la répétition d'« Entrée » tenue
-  n'envoient pas : ils confirmeraient sans laisser lire l'avertissement.
+  n'envoient pas : ils confirmeraient sans laisser lire l'avertissement. « Vider
+  la date » et « Annuler » ignorent aussi ce second clic : l'avertissement qui
+  apparaît repousse la rangée sous le pointeur (date vidée ou perdue).
 - **Date déjà passée : avertie** (`pastStartWarning`, `pastWarningKey`,
   `lib/shared/match-start-entry.ts`) seulement quand elle fait **changer de
   phase** un match qui attendait son heure : `matchLaunchPhase` passe de
