@@ -117,6 +117,14 @@ describe("MatchScheduleDialog — date déjà passée", () => {
     expect(SOURCE).toContain("<PastDateWarning message={pastWarning === null ? null : t(pastWarning)} />");
   });
 
+  it("une date devenue passée fenêtre ouverte : l'envoi retenu le dit aussi en notification", () => {
+    // À 375 px, clavier ouvert, l'avertissement sous les champs peut être hors
+    // de vue : sans notification, le premier clic semblait sans effet.
+    expect(SOURCE).toMatch(
+      /const lateWarning = pastWarning === null \? pastWarningAt\(now\) : null;\s*if \(lateWarning !== null\) \{\s*setClock\(now\);\s*showError\(t\(lateWarning\)\);\s*return;/,
+    );
+  });
+
   it("dit ce que la date déclenche selon la phase de lancement et les engagés", () => {
     expect(pastWarningKey(true, true)).toBe("schedule.warnPast");
     expect(pastWarningKey(true, false)).toBe("schedule.warnPastDirect");

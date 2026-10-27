@@ -150,6 +150,11 @@ describe("vue survie — rendu inchangé", () => {
     );
     expect(html.includes("Annuler l&#x27;abandon</button>")).toBe(offered);
     expect(html.includes("Figé")).toBe(!offered);
+    // Figé : la raison derrière un « i » (lisible au toucher et au clavier),
+    // plus dans un `title` que seul un survol à la souris affichait.
+    expect(html.includes('aria-controls="forfeit-frozen-12"')).toBe(!offered);
+    expect(html.includes("Une manche a été jouée depuis l&#x27;abandon : il ne s&#x27;annule plus.")).toBe(!offered);
+    expect(html).not.toMatch(/class="forfeitLocked"[^>]*title=/);
     expect(html).toContain('data-row-focus="12"');
     // La ligne forfait s'estompe cellule par cellule, comme en suisse.
     expect(html).toContain("opacity:0.9");
