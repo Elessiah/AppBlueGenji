@@ -127,9 +127,9 @@ déjà posée pré-remplit les trois champs (`matchStartEntryOf`).
   ouverte fait d'abord paraître l'avertissement, qui défile dans la vue (à
   375 px il pouvait être sous le pli et le clic sembler sans effet) et que sa
   région d'état fait lire, puis « Enregistrer » qu'il repousse ; le focus reste
-  sur l'envoi, et l'envoi suivant part — sauf à moins de
-  `LATE_WARNING_CONFIRM_DELAY_MS` (600 ms) : c'est le second clic d'un
-  double-clic, l'avertissement n'a pas été lu.
+  sur l'envoi, et l'envoi suivant part. Le second clic d'un double-clic
+  (`event.detail > 1`, au délai du système) et la répétition d'« Entrée » tenue
+  n'envoient pas : ils confirmeraient sans laisser lire l'avertissement.
 - **Date déjà passée : avertie** (`pastStartWarning`, `pastWarningKey`,
   `lib/shared/match-start-entry.ts`) seulement quand elle fait **changer de
   phase** un match qui attendait son heure : `matchLaunchPhase` passe de
