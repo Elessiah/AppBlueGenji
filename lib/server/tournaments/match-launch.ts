@@ -1136,14 +1136,18 @@ export async function releaseIneligibleReferee(matchId: number, refereeId: numbe
   let reason: "INELIGIBLE" | "JOINED_TEAM" = "INELIGIBLE";
   await retryOnDeadlock(() =>
     inTransaction(async (connection) => {
+      // Une tentative rejouée après un interblocage repart de zéro.
+      tournamentId = null;
+      reason = "INELIGIBLE";
       const row = await lockLaunchMatch(connection, matchId);
       if (!row || nullableId(row.referee_user_id) !== refereeId || row.status === "COMPLETED") return;
       const phase = matchLaunchPhase({ ...toLaunchInput(row), launchPhase: true }, Date.now());
       if (phase !== "TO_PLAN" && phase !== "SCHEDULED" && phase !== "LOBBY") return;
-      if (row.refereeEligible) {
-        if ((await resolveTeamParty(connection, row, refereeId)) === null) return;
-        reason = "JOINED_TEAM";
-      }
+      // `lockLaunchMatch` compte déjà inéligible un arbitre qui joue le match
+      // avant le départ : rien à faire tant qu'il compte. Le motif dit
+      // d'abord les conditions d'arbitrage, l'équipe ensuite.
+      if (row.refereeEligible) return;
+      if ((await loadRefereeEligibility(connection, refereeId)) === null) reason = "JOINED_TEAM";
       await connection.execute(`UPDATE bg_matches SET referee_user_id = NULL, referee_ready_at = NULL WHERE id = ?`, [
         matchId,
       ]);
