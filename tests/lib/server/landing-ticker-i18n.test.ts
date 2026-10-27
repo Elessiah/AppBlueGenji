@@ -50,6 +50,32 @@ describe("getLandingTicker", () => {
     ]);
   });
 
+  it("rend les noms de tournoi sous leur forme affichable (résultat, inscriptions, vainqueur)", async () => {
+    const rlo = String.fromCodePoint(0x202e);
+    const zwsp = String.fromCodePoint(0x200b);
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[
+        { updated_at: new Date("2026-10-05T10:00:00Z"), tournament_name: `Alpha${rlo} Cup`, team1_name: "Alpha", team2_name: "Bravo", team1_score: 2, team2_score: 1, team1_id: 1, team2_id: 7, winner_team_id: 1, forfeit_team_id: null, double_forfeit: 0 },
+      ]])
+      .mockResolvedValueOnce([[
+        { start_at: new Date("2026-10-10T10:00:00Z"), registration_open_at: new Date("2026-10-04T10:00:00Z"), name: `Beta${zwsp} Open`, registered_teams: 3, max_teams: 8 },
+      ]])
+      .mockResolvedValueOnce([[
+        { finished_at: new Date("2026-10-03T10:00:00Z"), name: `${rlo}Gamma League`, winner_name: "Alpha", winner_team_id: 1 },
+      ]])
+      .mockResolvedValueOnce([[]]);
+    await mockRows(execute);
+
+    const text = (await getLandingTicker()).items.map(tickerItemText).join(" | ");
+
+    expect(text).toContain("RÉSULTAT · Alpha Cup · Alpha 2 — Bravo 1");
+    expect(text).toContain("INSCRIPTIONS · Beta Open · 3/8 équipes");
+    expect(text).toContain("VAINQUEUR · Gamma League · Alpha");
+    expect(text).not.toContain(rlo);
+    expect(text).not.toContain(zwsp);
+  });
+
   it("anglais : mêmes entrées, rédigées en anglais, sans les titres d'actualité", async () => {
     const execute = rowsExecute();
     await mockRows(execute);

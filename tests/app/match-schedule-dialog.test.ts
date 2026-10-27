@@ -131,3 +131,11 @@ describe("MatchScheduleDialog — date déjà passée", () => {
     }
   });
 });
+
+describe("MatchScheduleDialog — sous-titre", () => {
+  it("rend les engagés par EntrantName (forme affichable, lien de fiche), jamais le nom brut", () => {
+    expect(SOURCE).toContain('<EntrantName teamId={match.team1Id} name={match.team1Name ?? "TBD"} />');
+    expect(SOURCE).toContain('<EntrantName teamId={match.team2Id} name={match.team2Name ?? "TBD"} />');
+    expect(SOURCE).not.toContain('{match.team1Name ?? "TBD"} vs');
+  });
+});

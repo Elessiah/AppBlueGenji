@@ -102,6 +102,34 @@ describe("POST /api/association/about-stats", () => {
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "VALUE_REQUIRED" });
   });
+
+  it("refuses a JSON body that is not an object (null, array, number, string) with INVALID_BODY", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    for (const body of [null, [], [{ value: "X", label: "Y" }], 42, "X"]) {
+      const res = await POST(jsonReq("POST", body));
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "INVALID_BODY" });
+    }
+    expect(service.createAboutStat).not.toHaveBeenCalled();
+  });
+
+  it("refuses unreadable JSON with INVALID_BODY, a non-JSON body with 415, an oversized one with 413", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    const url = "http://localhost/api/association/about-stats";
+
+    const broken = await POST(new Request(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{" }));
+    expect(broken.status).toBe(400);
+    expect(await broken.json()).toEqual({ error: "INVALID_BODY" });
+
+    const plain = await POST(new Request(url, { method: "POST", body: "{}" }));
+    expect(plain.status).toBe(415);
+    expect(await plain.json()).toEqual({ error: "UNSUPPORTED_CONTENT_TYPE" });
+
+    const heavy = await POST(jsonReq("POST", { value: "X", label: "x".repeat(300 * 1024) }));
+    expect(heavy.status).toBe(413);
+    expect(await heavy.json()).toEqual({ error: "PAYLOAD_TOO_LARGE" });
+    expect(service.createAboutStat).not.toHaveBeenCalled();
+  });
 });
 
 describe("PUT /api/association/about-stats/[id]", () => {

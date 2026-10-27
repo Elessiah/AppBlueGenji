@@ -164,6 +164,20 @@ describe("getLandingLive", () => {
     });
   });
 
+  it("rend le nom du tournoi sous sa forme affichable : titre de la carte et bouton du direct", async () => {
+    // Saisi par le staff, lu sans compte (`UNTRUSTED_NAMES.md`) : un ancien nom
+    // à renversement bidi ou invisible brouillait le titre et le nom accessible.
+    const rlo = String.fromCodePoint(0x202e);
+    const zwsp = String.fromCodePoint(0x200b);
+    jest.mocked(findBroadcastingTournament).mockResolvedValue({ tournamentId: 1, url: "https://twitch.tv/bg" });
+    await mockDb([matchRow({ live_trigger: "AUTO", live_url: "https://twitch.tv/bg" })]);
+
+    const live = await liveFrom(buckets([card(1, `Coupe${zwsp} A${rlo}`)]));
+
+    expect(live?.tournament.name).toBe("Coupe A");
+    expect(live?.stream?.tournamentName).toBe("Coupe A");
+  });
+
   it("retient le tournoi qui diffuse, pas le plus récent", async () => {
     // Sans cette préférence, la carte live et le bouton désigneraient deux
     // tournois différents quand plusieurs tournent en parallèle.

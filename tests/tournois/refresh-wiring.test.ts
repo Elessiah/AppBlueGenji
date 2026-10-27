@@ -60,7 +60,7 @@ describe("flux SSE — le contrat de la route", () => {
     // place, si bien qu'une boucle ouverture/fermeture échappe au premier.
     expect(stream).toContain("acquireStreamSlot(user.id)");
     expect(stream).toContain("enforceRateLimit(STREAM_OPEN_RULE, user.id)");
-    expect(stream).toMatch(/status: 429/);
+    expect(stream).toContain('fail("TOO_MANY_STREAMS", 429)');
   });
 
   it("journalise une ouverture de flux impossible", () => {

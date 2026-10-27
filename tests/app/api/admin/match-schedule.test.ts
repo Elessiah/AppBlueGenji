@@ -101,9 +101,11 @@ describe("PUT /api/admin/matches/[matchId]/schedule — corps et erreurs", () =>
   });
 
   it("refuse un corps vide, illisible ou sans startAt : effacer un horaire prévient les joueurs", async () => {
+    const json = { "content-type": "application/json" };
     const bodies = [
-      new Request("http://localhost/api/admin/matches/42/schedule", { method: "PUT" }),
-      new Request("http://localhost/api/admin/matches/42/schedule", { method: "PUT", body: "{\"startAt\": \"2026" }),
+      new Request("http://localhost/api/admin/matches/42/schedule", { method: "PUT", headers: json }),
+      new Request("http://localhost/api/admin/matches/42/schedule", { method: "PUT", headers: json, body: "{\"startAt\": \"2026" }),
+      req(null),
       req({}),
       req({ start: null }),
     ];
@@ -112,6 +114,20 @@ describe("PUT /api/admin/matches/[matchId]/schedule — corps et erreurs", () =>
       expect(res.status).toBe(400);
       expect(JSON.stringify(await res.json())).toContain("INVALID_MATCH_START_AT");
     }
+    expect(setMatchStartAt).not.toHaveBeenCalled();
+  });
+
+  it("rend le refus de la lecture : 415 hors JSON, 413 au-delà du plafond, jamais « date invalide »", async () => {
+    const plain = await PUT(
+      new Request("http://localhost/api/admin/matches/42/schedule", { method: "PUT", body: "{\"startAt\": null}" }),
+      params("42"),
+    );
+    expect(plain.status).toBe(415);
+    await expect(plain.json()).resolves.toEqual({ error: "UNSUPPORTED_CONTENT_TYPE" });
+
+    const heavy = await PUT(req({ startAt: null, pad: "x".repeat(300 * 1024) }), params("42"));
+    expect(heavy.status).toBe(413);
+    await expect(heavy.json()).resolves.toEqual({ error: "PAYLOAD_TOO_LARGE" });
     expect(setMatchStartAt).not.toHaveBeenCalled();
   });
 

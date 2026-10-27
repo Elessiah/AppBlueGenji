@@ -287,3 +287,21 @@ describe("emblème — alignement et cas limites", () => {
   });
 });
 
+describe("EntrantName — forme affichable d'un nom resté en base", () => {
+  const RLO = String.fromCodePoint(0x202e);
+  const ZWSP = String.fromCodePoint(0x200b);
+
+  it("retire commande de direction et invisible du nom et de son initiale (UNTRUSTED_NAMES.md)", () => {
+    const html = withEntrants(<EntrantName teamId={2} name={`${ZWSP}${RLO}ember core`} />);
+
+    expect(html).not.toContain(RLO);
+    expect(html).not.toContain(ZWSP);
+    expect(html).toContain(">ember core</a>");
+    expect(html).toContain(">E</span>");
+  });
+
+  it("rend tel quel le libellé d'une case vide (TBD)", () => {
+    const html = withEntrants(<EntrantName teamId={null} name="TBD" />);
+    expect(html).toContain(">TBD</span>");
+  });
+});

@@ -182,3 +182,46 @@ describe("localizedAboutStats", () => {
     expect(aboutStatValueIsFrench({ value: "4 200 €", valueEn: null }, "en")).toBe(false);
   });
 });
+
+describe("validateAboutStatInput — caractères invisibles", () => {
+  const ZWSP = String.fromCodePoint(0x200b);
+  const RLO = String.fromCodePoint(0x202e);
+  const WJ = String.fromCodePoint(0x2060);
+
+  it("lit une valeur anglaise faite seulement d'invisibles comme absente (la marque EN reste juste)", () => {
+    const result = validateAboutStatInput({ value: "Gratuit", valueEn: `${ZWSP}${WJ}${RLO}`, label: "Frais", labelEn: "Fee" });
+    expect(result).toEqual({ ok: true, value: { value: "Gratuit", valueEn: null, label: "Frais", labelEn: "Fee" } });
+  });
+
+  it("refuse une valeur ou un titre français faits seulement d'invisibles", () => {
+    expect(validateAboutStatInput({ value: `${ZWSP}${RLO}`, label: "Frais", labelEn: "Fee" })).toEqual({
+      ok: false,
+      error: "VALUE_REQUIRED",
+    });
+    expect(validateAboutStatInput({ value: "12", label: `${WJ} `, labelEn: "Fee" })).toEqual({
+      ok: false,
+      error: "LABEL_REQUIRED",
+    });
+  });
+
+  it("demande l'anglais d'un titre anglais fait seulement d'invisibles", () => {
+    expect(validateAboutStatInput({ value: "12", label: "Arbitres", labelEn: `${RLO}${ZWSP}` })).toEqual({
+      ok: false,
+      error: "LABEL_EN_REQUIRED",
+    });
+  });
+
+  it("retire les invisibles d'une valeur avant de la mesurer et de l'enregistrer, typographie gardée", () => {
+    const padded = `${"9".repeat(ABOUT_STAT_VALUE_MAX)}${ZWSP.repeat(5)}`;
+    const result = validateAboutStatInput({ value: padded, valueEn: `€4,200${RLO}`, label: "Prizepool", labelEn: "Prize pool" });
+    expect(result).toEqual({
+      ok: true,
+      value: { value: "9".repeat(ABOUT_STAT_VALUE_MAX), valueEn: "€4,200", label: "Prizepool", labelEn: "Prize pool" },
+    });
+    const french = `4${String.fromCodePoint(0x202f)}200 €`;
+    expect(validateAboutStatInput({ value: french, valueEn: "€4,200", label: "Prizepool", labelEn: "Prize pool" })).toMatchObject({
+      ok: true,
+      value: { value: french },
+    });
+  });
+});

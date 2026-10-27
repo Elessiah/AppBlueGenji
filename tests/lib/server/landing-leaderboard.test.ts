@@ -281,11 +281,25 @@ describe("leaderboard de la landing", () => {
 
   it("rend chaque nom sous sa forme affichable : accueil et /classement sont lus sans compte", async () => {
     // Un nom ancien peut garder un renversement bidi ou n'être fait que de
-    // caractères invisibles (`UNTRUSTED_NAMES.md`) ; repli « #id », commun aux deux langues.
-    await mockDb([teamRow(1, "Al\u202Epha"), teamRow(2, "\u200B\u200D")], [matchRow(1, 1, 2, 1)]);
+    // caractères invisibles (`UNTRUSTED_NAMES.md`) ; vide, il part à `null` et
+    // la vue pose son repli traduit — la ligne est commune aux deux langues.
+    await mockDb([teamRow(1, "Al‮pha"), teamRow(2, "​‍")], [matchRow(1, 1, 2, 1)]);
 
     const rows = await getLandingLeaderboard(8);
 
-    expect(rows.map((row) => row.teamName)).toEqual(["Alpha", "#2"]);
+    expect(rows.map((row) => row.teamName)).toEqual(["Alpha", null]);
+  });
+
+  it("départage deux équipes à égalité sur le nom affiché, pas sur le nom brut", async () => {
+    // Bilans identiques (1 et 2 gagnent chacune contre une équipe à la cote de
+    // départ). Brut, « ␠␠Zed » passerait devant « Yann » par ses espaces de
+    // tête ; affiché « Zed », il se range derrière.
+    const teams = [teamRow(1, "  Zed"), teamRow(2, "Yann"), teamRow(3, "Charlie"), teamRow(4, "Delta")];
+    await mockDb(teams, [matchRow(1, 1, 3, 1), matchRow(2, 2, 4, 2)]);
+
+    const rows = await getLandingLeaderboard(8);
+
+    expect(rows.slice(0, 2).map((row) => row.teamName)).toEqual(["Yann", "Zed"]);
+    expect(rows[0].points).toBe(rows[1].points);
   });
 });

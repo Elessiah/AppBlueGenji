@@ -67,3 +67,18 @@ describe("Leaderboard", () => {
     expect(markup).not.toContain("Aucune équipe classée");
   });
 });
+
+describe("Leaderboard — nom qui ne garde rien de visible", () => {
+  it("pose le repli traduit « Équipe #id » (pastille, lien, titre), jamais « # »", () => {
+    const markup = renderToStaticMarkup(
+      <ToastProvider>
+        <Leaderboard initialRows={[leaderboardRow({ teamId: 12, teamName: null })]} />
+      </ToastProvider>,
+    );
+    expect(markup).toContain(">Équipe #12<");
+    expect(markup).toContain('title="Voir la fiche de Équipe #12"');
+    // La pastille prend l'initiale du repli, plus « # ».
+    expect(markup).toMatch(/--size:24px[^"]*">É<\/div>/);
+    expect(markup).not.toContain(">#12<");
+  });
+});

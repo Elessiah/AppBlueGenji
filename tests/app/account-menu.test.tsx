@@ -63,6 +63,21 @@ describe("AccountMenuPanel", () => {
     expect(html.match(/<svg[^>]*aria-hidden="true"/g)).toHaveLength(3);
   });
 
+  it("nomme l'entrée « Mon équipe » seule quand le nom ne garde rien de visible", () => {
+    // `getUserActiveTeam` rend la forme affichable, vide pour un nom fait
+    // d'invisibles : ni indication vide, ni nom accessible « Mon équipe :  ».
+    const html = panel({ teamId: 7, teamName: "" });
+    expect(html).toContain('href="/equipes/7"');
+    expect(html).toContain('aria-label="Mon équipe"');
+    expect(html).not.toContain("itemHint");
+  });
+
+  it("construit le lien d'équipe par la règle de chemin partagée, jamais à la main", () => {
+    const source = readSource("components/account-menu.tsx");
+    expect(source).toContain("entrantHref(activeTeam.teamId, null)");
+    expect(source).not.toMatch(/`\/equipes\/\$\{/);
+  });
+
   it("n'affiche pas d'entrée d'équipe à qui n'en a pas", () => {
     const html = panel(null);
     expect(html).not.toContain("/equipes/");
