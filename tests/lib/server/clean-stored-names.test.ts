@@ -58,10 +58,10 @@ describe("cleanStoredNames", () => {
     await cleanStoredNames(pool);
 
     expect(updates(execute)).toEqual([
-      { sql: "UPDATE bg_teams SET name = ? WHERE id = ? AND name = ?", params: ["Dragon Squad", 1, "Dragon\u202E Squad"] },
-      { sql: "UPDATE bg_users SET pseudo = ? WHERE id = ? AND pseudo = ?", params: ["Admin", 2, "Adm\u200Bin"] },
+      { sql: "UPDATE bg_teams SET name = ?, updated_at = updated_at WHERE id = ? AND name = ?", params: ["Dragon Squad", 1, "Dragon\u202E Squad"] },
+      { sql: "UPDATE bg_users SET pseudo = ?, updated_at = updated_at WHERE id = ? AND pseudo = ?", params: ["Admin", 2, "Adm\u200Bin"] },
       {
-        sql: "UPDATE bg_tournaments SET name = ? WHERE id = ? AND name = ?",
+        sql: "UPDATE bg_tournaments SET name = ?, updated_at = updated_at WHERE id = ? AND name = ?",
         params: ["Coupe   d'hiver", 3, "  Coupe\u2060   d'hiver "],
       },
     ]);
@@ -69,6 +69,20 @@ describe("cleanStoredNames", () => {
     expect(logged()).toContain("bg_users.pseudo : 1 nom(s) réécrit(s)");
     expect(logged()).not.toContain("Admin");
     expect(logged()).not.toContain("Dragon");
+  });
+
+  it("garde updated_at : un nettoyage ne redate ni tournoi ni équipe (tendances du classement)", async () => {
+    const { execute, pool } = database({
+      bg_teams: [{ id: 1, name: "A​b" }],
+      bg_users: [{ id: 2, name: "C​d" }],
+      bg_tournaments: [{ id: 3, name: "E​f" }],
+    });
+
+    await cleanStoredNames(pool);
+
+    const sent = updates(execute);
+    expect(sent).toHaveLength(3);
+    for (const { sql } of sent) expect(sql).toContain(", updated_at = updated_at WHERE");
   });
 
   it("ne touche ni n'annonce rien quand les noms sont déjà propres (accents et emoji compris)", async () => {
@@ -109,7 +123,7 @@ describe("cleanStoredNames", () => {
     await cleanStoredNames(pool);
 
     expect(updates(execute)).toEqual([
-      { sql: "UPDATE bg_teams SET name = ? WHERE id = ? AND name = ?", params: ["Team² Ｘ", 1, "\u202ETeam²\u200B Ｘ"] },
+      { sql: "UPDATE bg_teams SET name = ?, updated_at = updated_at WHERE id = ? AND name = ?", params: ["Team² Ｘ", 1, "\u202ETeam²\u200B Ｘ"] },
     ]);
   });
 
