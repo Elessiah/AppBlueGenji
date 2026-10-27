@@ -51,12 +51,13 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
   }
 
   try {
-    // Le lien d'un caster qui n'est pas de l'organisation lui reste rattaché :
-    // la suppression de son compte le retire (`withdrawUserCasts`).
+    // Le lien posé reste rattaché à qui le pose — sauf l'organisation quand
+    // elle ne caste pas ce match : la suppression de son compte le retire
+    // (`withdrawUserCasts`).
     await setMatchLiveConfig(matchId, {
       trigger,
       liveUrl: (body.liveUrl as string) ?? null,
-      linkProviderId: can(user, "tournaments") ? null : user.id,
+      setter: { userId: user.id, organisation: can(user, "tournaments") },
     });
     announceStaffMatchAction(matchId, trigger === null ? "LIVE_REMOVED" : "LIVE_CONFIGURED", staffActionAuthor(user));
     return ok({ trigger });
