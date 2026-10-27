@@ -610,7 +610,9 @@ export function MatchScheduleDialog({
               <button
                 type="button"
                 className="btn ghost"
-                onClick={clearAll}
+                onClick={(event) => {
+                  if (event.detail <= 1) clearAll();
+                }}
                 disabled={busy}
                 style={{ padding: "8px 14px", fontSize: 13, marginRight: "auto" }}
               >
@@ -620,7 +622,9 @@ export function MatchScheduleDialog({
             <button
               type="button"
               className="btn ghost"
-              onClick={onClose}
+              onClick={(event) => {
+                if (event.detail <= 1) onClose();
+              }}
               disabled={busy}
               style={{ padding: "8px 18px", fontSize: 13 }}
             >
@@ -629,7 +633,9 @@ export function MatchScheduleDialog({
             {/* Le second clic d'un double-clic (`detail`, au réglage du système)
                 et la répétition d'« Entrée » tenue n'envoient pas : après un
                 envoi retenu (date devenue passée), ils confirmeraient sans
-                laisser lire l'avertissement. */}
+                laisser lire l'avertissement. Même garde sur « Vider la date »
+                et « Annuler » : l'avertissement qui apparaît repousse la
+                rangée, et le second clic tombait sur eux (date perdue). */}
             <button
               id={SUBMIT_ID}
               type="submit"
