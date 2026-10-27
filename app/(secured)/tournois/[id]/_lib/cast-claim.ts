@@ -15,14 +15,20 @@ export type CastClaimBody = { streamId: number } | { liveUrl: string | null };
 /**
  * Les streams du match, dans leur ordre (le premier lien en tête des vues
  * compactes), chacun avec ses casters, puis « ouvrir mon propre stream ».
+ *
+ * Seul le stream du staff se rejoint sans caster (« le stream du match ») : le
+ * stream d'un caster que la lecture tait (inscription retirée d'office au
+ * lancement, `casterWithdrawn`) n'est pas offert — ce serait rejoindre sa
+ * chaîne personnelle en la croyant celle du match.
  */
 export function castClaimChoices(match: Pick<BracketMatch, "streams" | "casters">): CastClaimChoice[] {
-  const joins: CastClaimChoice[] = match.streams.map((stream) => ({
-    kind: "JOIN",
-    streamId: stream.id,
-    liveUrl: stream.liveUrl,
-    casterPseudos: match.casters.filter((caster) => caster.streamId === stream.id).map((caster) => caster.pseudo),
-  }));
+  const joins: CastClaimChoice[] = match.streams.flatMap((stream): CastClaimChoice[] => {
+    const casterPseudos = match.casters
+      .filter((caster) => caster.streamId === stream.id)
+      .map((caster) => caster.pseudo);
+    if (casterPseudos.length === 0 && !stream.staff) return [];
+    return [{ kind: "JOIN", streamId: stream.id, liveUrl: stream.liveUrl, casterPseudos }];
+  });
   return [...joins, { kind: "SEPARATE" }];
 }
 
