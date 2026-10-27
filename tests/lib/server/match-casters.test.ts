@@ -260,6 +260,22 @@ describe("withdrawUserCasts — le lien qu'un compte a fourni part avec lui", ()
     expect(held.state.streams).toEqual([{ id: 3, live_url: null, staff_owned: 1, link_user_id: null }]);
   });
 
+  it("la chaîne qu'un membre de l'organisation a posée en castant le match part avec son compte, effacé ou anonymisé", async () => {
+    // L'arbitre 5 caste le match et y a posé sa chaîne par la configuration du
+    // direct (`setMatchLiveConfig` l'a rattachée à lui) ; le caster 9 le tient aussi.
+    const adminLink = () => ({ id: 3, live_url: "https://twitch.tv/arbitre", staff_owned: 1, link_user_id: 5 });
+    for (const includeCompleted of [true, false]) {
+      const w = world([adminLink()], [{ user_id: 5, stream_id: 3 }, { user_id: 9, stream_id: 3 }]);
+      expect(await withdrawUserCasts(w.connection, 5, includeCompleted)).toEqual([42]);
+      expect(w.state.streams).toEqual([{ id: 3, live_url: null, staff_owned: 1, link_user_id: null }]);
+      expect(w.state.casters).toEqual([{ user_id: 9, stream_id: 3 }]);
+    }
+    // Seul à le tenir : le stream part avec son lien.
+    const alone = world([adminLink()], [{ user_id: 5, stream_id: 3 }]);
+    await withdrawUserCasts(alone.connection, 5, true);
+    expect(alone.state.streams).toEqual([]);
+  });
+
   it("efface sous le verrou du match, sans lire sa table en sous-requête, le seul stream de caster du compte", async () => {
     const w = world([{ id: 4, live_url: "https://kick.com/sa-chaine", link_user_id: 12 }], [{ user_id: 9, stream_id: 4 }]);
     await withdrawUserCasts(w.connection, 12, true);

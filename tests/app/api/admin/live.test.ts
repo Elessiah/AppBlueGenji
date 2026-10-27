@@ -164,7 +164,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
     expect(setMatchLiveConfig).toHaveBeenCalledWith(42, {
       trigger: "MANUAL",
       liveUrl: "kick.com/bg",
-      linkProviderId: caster.id,
+      setter: { userId: caster.id, organisation: false },
     });
   });
 
@@ -174,8 +174,13 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
     expect((await putMatchLive(matchReq("PUT", { trigger: "AUTO" }), matchParams("42"))).status).toBe(
       200,
     );
-    // L'organisation (permission tournaments) : le lien est celui du staff.
-    expect(setMatchLiveConfig).toHaveBeenCalledWith(42, { trigger: "AUTO", liveUrl: null, linkProviderId: null });
+    // L'organisation (permission tournaments) : le service rattache le lien à
+    // l'arbitre s'il caste ce match, sinon à l'organisation.
+    expect(setMatchLiveConfig).toHaveBeenCalledWith(42, {
+      trigger: "AUTO",
+      liveUrl: null,
+      setter: { userId: arbitre.id, organisation: true },
+    });
   });
 
   it("rejette un community manager avec 403", async () => {
@@ -190,7 +195,11 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
     jest.mocked(setMatchLiveConfig).mockResolvedValue(undefined);
 
     await putMatchLive(matchReq("PUT", {}), matchParams("42"));
-    expect(setMatchLiveConfig).toHaveBeenCalledWith(42, { trigger: null, liveUrl: null, linkProviderId: caster.id });
+    expect(setMatchLiveConfig).toHaveBeenCalledWith(42, {
+      trigger: null,
+      liveUrl: null,
+      setter: { userId: caster.id, organisation: false },
+    });
   });
 
   it("accepte le mode START_TIME", async () => {
@@ -203,7 +212,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
     expect(setMatchLiveConfig).toHaveBeenCalledWith(42, {
       trigger: "START_TIME",
       liveUrl: null,
-      linkProviderId: caster.id,
+      setter: { userId: caster.id, organisation: false },
     });
   });
 
