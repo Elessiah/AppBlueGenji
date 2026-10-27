@@ -44,7 +44,7 @@ describe("contacts du lancement d'un match — base légale", () => {
       expect(entry?.finalite).not.toMatch(/non sur ce consentement/);
     }
     expect(MATCH_CONTACTS_SCOPE).toBe(
-      "présentation, dans la fenêtre « Contacts » du match et dans sa fenêtre de lancement, aux membres de ses deux équipes et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, et à son caster le temps du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes et au caster) ; les contacts du caster aux deux équipes le temps du match, et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin (conditions d'utilisation, « Contacts de match »)",
+      "présentation, dans la fenêtre « Contacts » du match et dans sa fenêtre de lancement, aux membres de ses deux équipes et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, et à ses casters le temps du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes et aux casters) ; les contacts de chaque caster aux deux équipes et aux autres casters du match le temps du match, et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin (conditions d'utilisation, « Contacts de match »)",
     );
   });
 
@@ -143,7 +143,7 @@ describe("DONNEES_PROFIL", () => {
     const overwatch = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo Overwatch");
     // Décision du 2026-10-19 : la seule fenêtre « Contacts » d'un match, staff compris.
     expect(overwatch?.finalite).toMatch(/Masqué, il n'est lisible de personne — arbitres et administrateurs compris — sauf dans la fenêtre « Contacts » d'un match où tu fais partie des contacts présentés/);
-    expect(overwatch?.finalite).toMatch(/de son caster le temps du match seulement \(de son départ à sa fin\)/);
+    expect(overwatch?.finalite).toMatch(/de ses casters le temps du match seulement \(de son départ à sa fin\)/);
     expect(overwatch?.finalite).not.toMatch(/de l'arbitrage tant que tu es inscrit/);
   });
 
@@ -170,7 +170,7 @@ describe("DONNEES_PROFIL", () => {
     expect(certification?.finalite).toMatch(/administrateurs à tout moment/i);
     expect(certification?.finalite).toMatch(/arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé/i);
     expect(certification?.finalite).not.toMatch(/tournoi en cours/i);
-    expect(certification?.finalite).toMatch(/son caster le temps du match seulement/i);
+    expect(certification?.finalite).toMatch(/ses casters le temps du match seulement/i);
     expect(certification?.finalite).toMatch(/autres joueurs connectés/i);
     expect(certification?.finalite).toContain("« Tag Discord »");
   });

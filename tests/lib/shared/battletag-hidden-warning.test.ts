@@ -64,8 +64,8 @@ describe("avertissement du BattleTag masqué", () => {
   it("dit au caster qu'il n'a les contacts que le temps du match (FR et EN)", () => {
     expect(frProfile.battletagNotice.caster).toContain("le temps du match seulement (de son départ à sa fin)");
     expect(enProfile.battletagNotice.caster).toContain("only while the match is being played (from its start to its end)");
-    expect(frProfile.audience.battletag.match).toContain("et le caster le temps du match");
-    expect(enProfile.audience.battletag.match).toContain("and the caster while the match is being played");
+    expect(frProfile.audience.battletag.match).toContain("et les casters le temps du match");
+    expect(enProfile.audience.battletag.match).toContain("and the casters while the match is being played");
   });
 });
 

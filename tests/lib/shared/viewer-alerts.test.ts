@@ -186,11 +186,18 @@ describe("touchesViewerMatches — ce qui ne se regroupe pas", () => {
     // Le caster n'a pas d'engagée : son match lui échappait, et se redessinait
     // au rythme regroupé du reste du plateau.
     const caster = { myTeamId: null, viewerUserId: 42 };
-    const casted = { ...other, casterUserId: 42 };
+    const casted = { ...other, casters: [{ userId: 7, ready: false }, { userId: 42, ready: false }] };
     expect(
       touchesViewerMatches(
         detail([casted], caster),
-        detail([{ ...casted, casterReady: true }], caster),
+        detail([{ ...casted, casters: [{ userId: 7, ready: false }, { userId: 42, ready: true }] }], caster),
+      ),
+    ).toBe(true);
+    // Le « Prêt » d'un co-caster se voit aussi.
+    expect(
+      touchesViewerMatches(
+        detail([casted], caster),
+        detail([{ ...casted, casters: [{ userId: 7, ready: true }, { userId: 42, ready: false }] }], caster),
       ),
     ).toBe(true);
   });
@@ -215,10 +222,10 @@ describe("viewerLaunchChanged — relecture de la modale de lancement", () => {
 
   it.each<[string, Partial<M>]>([
     ["le « Prêt » de l'adversaire", { team2Ready: true }],
-    ["le « Prêt » du caster", { casterReady: true }],
+    ["le « Prêt » du caster", { casters: [{ userId: 9, ready: true }] }],
     ["l'ouverture du lancement", { lobbyOpenedAt: "2026-09-23T20:01:00Z" }],
     ["le lancement", { launchedAt: "2026-09-23T20:02:00Z" }],
-    ["un caster qui s'inscrit", { casterUserId: 9 }],
+    ["un caster qui s'inscrit", { casters: [{ userId: 9, ready: false }] }],
     ["un changement de statut", { status: "AWAITING_CONFIRMATION" }],
   ])("demande une relecture sur %s, même sans écriture datée", (_label, change) => {
     // `updatedAt` inchangé : ce qui compte est le contenu, pas l'horodatage.
@@ -233,7 +240,7 @@ describe("viewerLaunchChanged — relecture de la modale de lancement", () => {
 
   it("couvre les matchs que le lecteur caste", () => {
     const caster = { myTeamId: null, viewerUserId: 42 };
-    const casted = { ...other, casterUserId: 42 };
+    const casted = { ...other, casters: [{ userId: 42, ready: false }] };
     expect(
       viewerLaunchChanged(detail([casted], caster), detail([{ ...casted, team1Ready: true }], caster)),
     ).toBe(true);

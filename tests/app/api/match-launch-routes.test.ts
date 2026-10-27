@@ -101,17 +101,46 @@ describe("POST / DELETE /api/matches/[matchId]/caster", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
     jest.mocked(claimMatchCast).mockResolvedValue();
     expect((await casterPost(jsonRequest("POST"), params("42"))).status).toBe(200);
-    expect(claimMatchCast).toHaveBeenCalledWith(42, 4, true);
+    expect(claimMatchCast).toHaveBeenCalledWith(42, 4, true, { liveUrl: null });
 
     jest.mocked(getCurrentUser).mockResolvedValue(player);
     jest.mocked(claimMatchCast).mockRejectedValue(new Error("NOT_CASTER"));
     expect((await casterPost(jsonRequest("POST"), params("42"))).status).toBe(403);
-    expect(claimMatchCast).toHaveBeenLastCalledWith(42, 2, false);
+    expect(claimMatchCast).toHaveBeenLastCalledWith(42, 2, false, { liveUrl: null });
+  });
+
+  it("transmet le stream choisi : co-cast d'un stream, ou stream séparé avec ou sans lien", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    jest.mocked(claimMatchCast).mockResolvedValue();
+    expect((await casterPost(jsonRequest("POST", { streamId: 7 }), params("42"))).status).toBe(200);
+    expect(claimMatchCast).toHaveBeenLastCalledWith(42, 4, true, { streamId: 7 });
+    expect((await casterPost(jsonRequest("POST", { liveUrl: "https://twitch.tv/voix" }), params("42"))).status).toBe(200);
+    expect(claimMatchCast).toHaveBeenLastCalledWith(42, 4, true, { liveUrl: "https://twitch.tv/voix" });
+    expect((await casterPost(jsonRequest("POST", { liveUrl: null }), params("42"))).status).toBe(200);
+    expect(claimMatchCast).toHaveBeenLastCalledWith(42, 4, true, { liveUrl: null });
+  });
+
+  it("refuse un choix de stream mal formé, sans appeler le service", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    const bodies: unknown[] = [
+      { streamId: 7, liveUrl: "https://twitch.tv/voix" },
+      { streamId: "7" },
+      { streamId: 0 },
+      { streamId: 1.5 },
+      { liveUrl: 12 },
+    ];
+    for (const body of bodies) {
+      const res = await casterPost(jsonRequest("POST", body), params("42"));
+      expect(res.status).toBe(400);
+      await expect(res.json()).resolves.toMatchObject({ error: "INVALID_CAST_TARGET" });
+    }
+    expect(claimMatchCast).not.toHaveBeenCalled();
   });
 
   it.each<[string, number]>([
     ["CASTER_IDENTITY_REQUIRED", 409],
-    ["MATCH_ALREADY_CASTED", 409],
+    ["STREAM_NOT_FOUND", 409],
+    ["INVALID_STREAM_URL", 400],
     ["CASTER_IS_PLAYER", 409],
     ["MATCH_ALREADY_COMPLETED", 409],
     ["MATCH_NOT_FOUND", 404],
@@ -125,12 +154,35 @@ describe("POST / DELETE /api/matches/[matchId]/caster", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
     jest.mocked(releaseMatchCast).mockResolvedValue();
     expect((await casterDelete(jsonRequest("DELETE"), params("42"))).status).toBe(200);
-    expect(releaseMatchCast).toHaveBeenCalledWith(42, 3, true);
+    expect(releaseMatchCast).toHaveBeenCalledWith(42, 3, true, 3);
 
     jest.mocked(getCurrentUser).mockResolvedValue(player);
     jest.mocked(releaseMatchCast).mockRejectedValue(new Error("NOT_MATCH_CASTER"));
     expect((await casterDelete(jsonRequest("DELETE"), params("42"))).status).toBe(403);
-    expect(releaseMatchCast).toHaveBeenLastCalledWith(42, 2, false);
+    expect(releaseMatchCast).toHaveBeenLastCalledWith(42, 2, false, 2);
+  });
+
+  it("désigne le caster retiré par `?userId=` (co-casters), le lecteur sinon", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(releaseMatchCast).mockResolvedValue();
+    const res = await casterDelete(new Request("http://localhost/api/matches/42/caster?userId=9", { method: "DELETE" }), params("42"));
+    expect(res.status).toBe(200);
+    expect(releaseMatchCast).toHaveBeenCalledWith(42, 3, true, 9);
+    // Un caster qui retire un autre caster sans l'arbitrage : refus du service.
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    jest.mocked(releaseMatchCast).mockRejectedValue(new Error("NOT_MATCH_CASTER"));
+    expect((await casterDelete(new Request("http://localhost/api/matches/42/caster?userId=9", { method: "DELETE" }), params("42"))).status).toBe(403);
+    expect(releaseMatchCast).toHaveBeenLastCalledWith(42, 4, false, 9);
+  });
+
+  it("refuse un `?userId=` qui n'est pas un identifiant", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    for (const raw of ["abc", "0", "-3", "1.5", ""]) {
+      const res = await casterDelete(new Request(`http://localhost/api/matches/42/caster?userId=${raw}`, { method: "DELETE" }), params("42"));
+      expect(res.status).toBe(400);
+      await expect(res.json()).resolves.toMatchObject({ error: "INVALID_USER_ID" });
+    }
+    expect(releaseMatchCast).not.toHaveBeenCalled();
   });
 });
 
@@ -232,7 +284,7 @@ describe("GET /api/matches/[matchId]/contacts", () => {
     hostTeamId: 10,
     team1: side(10, "Alpha"),
     team2: side(20, "Bravo"),
-    caster: null,
+    casters: [],
     viewer: { role: "TEAM1", canDeclareReady: true, ready: false, isCaster: false, earlyContacts: true },
   };
   const request = () => new Request("http://localhost/api/matches/42/contacts");

@@ -28,6 +28,7 @@ jest.mock("@/lib/server/tournaments/bg-survie/meta");
 jest.mock("@/lib/server/ranking-service");
 jest.mock("@/lib/server/tournaments/player-pushes");
 jest.mock("@/lib/server/tournaments/match-maps");
+jest.mock("@/lib/server/tournaments/match-casters");
 
 import {
   getTournamentSnapshot,
@@ -50,6 +51,7 @@ import { invalidateTeamRanking } from "@/lib/server/ranking-cache";
 import { invalidateStats } from "@/lib/server/stats-cache";
 import { getDatabase } from "@/lib/server/database";
 import { loadMapsByMatch } from "@/lib/server/tournaments/match-maps";
+import { loadMatchCasters, loadMatchStreams } from "@/lib/server/tournaments/match-casters";
 import { loadSwissMeta } from "@/lib/server/tournaments/swiss";
 import { loadSurvivalMeta } from "@/lib/server/tournaments/survival";
 import { loadEnduranceMeta } from "@/lib/server/tournaments/bg-survie/meta";
@@ -122,6 +124,8 @@ beforeEach(() => {
   expiredRows = [];
 
   jest.mocked(loadMapsByMatch).mockResolvedValue(new Map());
+  jest.mocked(loadMatchCasters).mockResolvedValue(new Map());
+  jest.mocked(loadMatchStreams).mockResolvedValue(new Map());
   jest.mocked(getDatabase).mockResolvedValue(fakePool({
     getConnection: jest.fn(async () => connection),
     execute: jest.fn(async () => [expiredRows]),
@@ -687,5 +691,73 @@ describe("getTournamentSnapshot — résumé de la carte", () => {
     expect(snapshot?.card.champion).toBeNull();
     expect(snapshot?.card.runningProgress).toBeNull();
     expect(snapshot?.card.finishedAt).toBeNull();
+  });
+});
+
+describe("getTournamentSnapshot — casters et streams (porte commune du flux et du REST)", () => {
+  const eligibility = {
+    discord_verified_at: "2026-10-01 10:00:00",
+    discord_pseudo: "voix",
+    blizzard_sub: "sub",
+    overwatch_battletag: "Voix#1",
+    is_deleted: 0,
+    is_admin: 0,
+    platform_roles_json: JSON.stringify(["CASTER"]),
+  };
+
+  it("porte chaque caster et chaque stream du match, lus en une passe pour tout le plateau", async () => {
+    jest.mocked(getMatchRows).mockResolvedValue([
+      matchRow({ id: 1, status: "READY", live_url: "https://twitch.tv/match" }),
+      matchRow({ id: 2, status: "READY" }),
+    ]);
+    jest.mocked(loadMatchCasters).mockResolvedValue(
+      new Map([
+        [1, [
+          { matchId: 1, userId: 9, streamId: 11, readyAt: null, pseudo: "Voix", eligibility },
+          { matchId: 1, userId: 12, streamId: 12, readyAt: null, pseudo: "Écho", eligibility },
+        ]],
+      ]),
+    );
+    jest.mocked(loadMatchStreams).mockResolvedValue(
+      new Map([
+        [1, [
+          { id: 11, matchId: 1, liveUrl: "https://twitch.tv/match" },
+          { id: 12, matchId: 1, liveUrl: "https://kick.com/echo" },
+        ]],
+      ]),
+    );
+
+    const snapshot = await getTournamentSnapshot(TOURNAMENT_ID);
+
+    expect(loadMatchCasters).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(loadMatchCasters).mock.calls[0][1]).toEqual([1, 2]);
+    const [casted, bare] = snapshot?.matches ?? [];
+    expect(casted.liveUrl).toBe("https://twitch.tv/match");
+    expect(casted.streams).toEqual([
+      { id: 11, liveUrl: "https://twitch.tv/match" },
+      { id: 12, liveUrl: "https://kick.com/echo" },
+    ]);
+    expect(casted.casters.map((caster) => [caster.userId, caster.pseudo, caster.streamId])).toEqual([
+      [9, "Voix", 11],
+      [12, "Écho", 12],
+    ]);
+    expect(bare.casters).toEqual([]);
+    expect(bare.streams).toEqual([]);
+  });
+
+  it("tait un caster devenu inéligible d'un match pas encore lancé", async () => {
+    jest.mocked(getMatchRows).mockResolvedValue([matchRow({ id: 1, status: "READY" })]);
+    jest.mocked(loadMatchCasters).mockResolvedValue(
+      new Map([
+        [1, [
+          { matchId: 1, userId: 9, streamId: 11, readyAt: null, pseudo: "Voix", eligibility },
+          { matchId: 1, userId: 12, streamId: 11, readyAt: null, pseudo: "Écho", eligibility: { ...eligibility, platform_roles_json: null } },
+        ]],
+      ]),
+    );
+
+    const snapshot = await getTournamentSnapshot(TOURNAMENT_ID);
+
+    expect(snapshot?.matches[0].casters.map((caster) => caster.userId)).toEqual([9]);
   });
 });

@@ -5,7 +5,7 @@ import {
   type LaunchStripViewer,
 } from "@/app/(secured)/tournois/[id]/_lib/launch-strip";
 import type { MatchLaunchPhase } from "@/lib/shared/match-launch";
-import { bracketMatch } from "../helpers/bracket-match";
+import { bracketMatch, matchCaster } from "../helpers/bracket-match";
 
 const match = bracketMatch({
   status: "READY",
@@ -14,7 +14,7 @@ const match = bracketMatch({
   team1Name: "Alpha",
   team2Name: "Bravo",
   hostTeamId: 20,
-  casterUserId: null,
+  casters: [],
 });
 const nobody: LaunchStripViewer = { canManage: false, canSchedule: false, viewerUserId: 1, myTeamId: null };
 const referee: LaunchStripViewer = { ...nobody, canSchedule: true };
@@ -50,11 +50,30 @@ describe("launchStripControls", () => {
     expect(launchStripControls(match, "SCHEDULED", player).showOpen).toBe(false);
   });
 
-  it("reconnaît le caster, qui peut se retirer", () => {
-    const casted = bracketMatch({ ...match, casterUserId: 1 });
+  it("reconnaît le caster, qui peut se retirer — co-caster compris", () => {
+    const casted = bracketMatch({ ...match, casters: [matchCaster({ userId: 5 }), matchCaster({ userId: 1 })] });
     const controls = launchStripControls(casted, "LOBBY", nobody);
     expect(controls.isCaster).toBe(true);
     expect(controls.showRelease).toBe(true);
+    // Déjà caster : rien de plus à rejoindre.
+    expect(launchStripControls(casted, "LOBBY", { ...nobody, canManage: true }).showClaim).toBe(false);
+  });
+
+  it("laisse caster un match déjà casté, sans plafond", () => {
+    const caster = { ...nobody, canManage: true };
+    const casted = bracketMatch({
+      ...match,
+      casters: [matchCaster({ userId: 5 }), matchCaster({ userId: 6 }), matchCaster({ userId: 7, streamId: 2 })],
+    });
+    expect(launchStripControls(casted, "LOBBY", caster).showClaim).toBe(true);
+  });
+
+  it("offre le retrait d'un caster à l'arbitrage seulement, et jamais sans caster", () => {
+    const casted = bracketMatch({ ...match, casters: [matchCaster({ userId: 5 })] });
+    expect(launchStripControls(casted, "LOBBY", referee).showRelease).toBe(true);
+    expect(launchStripControls(casted, "LOBBY", nobody).showRelease).toBe(false);
+    expect(launchStripControls(match, "LOBBY", referee).showRelease).toBe(false);
+    expect(launchStripControls(bracketMatch({ ...casted, status: "COMPLETED" }), "NONE", referee).showRelease).toBe(false);
   });
 
   it("n'offre pas de caster un bye ni son propre match", () => {

@@ -14,7 +14,7 @@
     "NOT_CASTER": "Caster un match demande le rôle caster.",
     "CASTER_IDENTITY_REQUIRED": "Pour caster un match, certifie ton tag Discord et rattache ton compte Battle.net depuis ton profil.",
     "CASTER_IS_PLAYER": "Tu joues ce match : tu ne peux pas le caster.",
-    "MATCH_ALREADY_CASTED": "Ce match a déjà un caster.",
+    "STREAM_NOT_FOUND": "Ce stream n'existe plus sur ce match : choisis-en un autre.",
     "MATCH_ALREADY_COMPLETED": "Ce match est déjà tranché : son résultat ne peut plus être saisi.",
     "NOT_MATCH_CASTER": "Tu ne castes pas ce match.",
     "INVALID_HOST_TEAM": "L'équipe hôte doit être l'une des deux engagées du match.",
