@@ -63,7 +63,9 @@ et sur le message d'origine sinon.
 partait de paniers vides et affichait, à chaque visite et jusqu'à la réponse
 de `GET /api/tournaments`, « Aucun tournoi publié pour le moment. », des
 compteurs à zéro et un bandeau « Aucune actualité tournoi ». Le drapeau
-`listLoaded` (vrai à la première liste reçue, jamais remis à faux) rend à la
+`listLoaded` (vrai une fois reçues la première liste **et** la première
+réponse de « Mes tournois » — échec compris, sans quoi cette section naissait
+au sommet après coup —, jamais remis à faux) rend à la
 place le squelette `SecuredLoadingView` (« Chargement des tournois… » /
 « Loading tournaments… », `list.loading`) à la place de l'état vide. Sommaire,
 pastilles et bandeau gardent leur place, sans quoi la liste sautait vers le
