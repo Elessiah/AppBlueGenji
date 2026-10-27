@@ -285,6 +285,18 @@ describe("page d'un match — streams et casters", () => {
     expect(html).not.toContain("les autres streams de");
   });
 
+  it("sans compte, un caster masqué (identifiant négatif) est nommé sans lien vers /joueurs", () => {
+    const hidden = [
+      matchCaster({ userId: -1, pseudo: "Voix", streamId: 1 }),
+      matchCaster({ userId: -2, pseudo: "Solo", streamId: 2 }),
+    ];
+    const html = render(cast({ casters: hidden }), "public");
+    const section = html.slice(html.indexOf("Casts"));
+    expect(section).not.toContain("/joueurs/");
+    expect(visible(section)).toContain("Voix");
+    expect(visible(section)).toContain("Solo");
+  });
+
   it("sans annonce de cast, les liens sont tus mais les casters restent", () => {
     const html = visible(render(cast({ liveTrigger: null, liveStartedAt: null }), "public"));
     expect(html).toContain("Lien pas encore publié");
