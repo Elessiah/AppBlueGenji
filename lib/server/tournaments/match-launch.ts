@@ -28,7 +28,7 @@ import {
 } from "@/lib/shared/match-launch";
 import type { MatchStatus, TeamRole } from "@/lib/shared/types";
 import { casterIdentityOf, loadCastEligibility, type CasterIdentityRow } from "./cast-eligibility";
-import { announceCastChange } from "./cast-notices";
+import { announceCastChange, discardCastChanges, flushCastChanges, queueCastChange } from "./cast-notices";
 import { publishMatchUpdatedEvent } from "./notifications";
 
 export type LaunchMatchRow = RowDataPacket & {
@@ -161,6 +161,10 @@ async function adoptCurrentPairing(connection: PoolConnection, row: LaunchMatchR
         [row.id],
       );
       row.caster_user_id = null;
+      // Annoncé comme tout retrait d'office (journal du staff, avis au caster),
+      // après le commit de la transaction appelante : `inTransaction` ici,
+      // `flushBotLogs` pour l'entretien.
+      queueCastChange(connection, { kind: "AUTO_RELEASED", matchId: Number(row.id), casterId, reason: "JOINED_TEAM" });
     }
   }
 }
@@ -237,9 +241,11 @@ async function inTransaction<T>(run: (connection: PoolConnection) => Promise<T>)
     try {
       const result = await run(connection);
       await connection.commit();
+      flushCastChanges(connection);
       return result;
     } catch (error) {
       await connection.rollback().catch(() => undefined);
+      discardCastChanges(connection);
       throw error;
     }
   });

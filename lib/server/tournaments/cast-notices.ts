@@ -15,7 +15,7 @@
  * Appelé **après le commit**, sans attendre : le bot est optionnel, et un envoi
  * lent n'a pas à retarder le geste. Ne lève jamais.
  */
-import type { RowDataPacket } from "mysql2/promise";
+import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { getDatabase } from "@/lib/server/database";
 import { loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
@@ -144,4 +144,33 @@ export async function deliverCastChange(change: CastChange): Promise<void> {
 /** Annonce un changement d'inscription de caster, sans attendre ; ne lève jamais. */
 export function announceCastChange(change: CastChange): void {
   void deliverCastChange(change).catch((error) => console.error("[cast] changement d'inscription non annoncé", error));
+}
+
+/**
+ * Changements constatés **au fond d'une transaction** qui ne les annonce pas
+ * elle-même — le caster désinscrit d'office quand l'appariement qui arrive
+ * compte son équipe (`adoptCurrentPairing`, appelé par l'entretien comme par
+ * les gestes de lancement). Même cycle de vie que la file du journal
+ * (`./bot-logs`) : partis après le commit (`flushCastChanges`), jetés si la
+ * transaction échoue (`discardCastChanges`). Rien n'est annoncé qui ne soit écrit.
+ */
+const pendingChanges = new WeakMap<PoolConnection, CastChange[]>();
+
+/** Note un changement à annoncer si — et seulement si — la transaction en cours aboutit. */
+export function queueCastChange(connection: PoolConnection, change: CastChange): void {
+  const queued = pendingChanges.get(connection);
+  if (queued) queued.push(change);
+  else pendingChanges.set(connection, [change]);
+}
+
+/** La transaction n'a pas abouti : rien ne part. */
+export function discardCastChanges(connection: PoolConnection): void {
+  pendingChanges.delete(connection);
+}
+
+/** Annonce, sans attendre, les changements de la transaction qui vient d'aboutir. Ne lève jamais. */
+export function flushCastChanges(connection: PoolConnection): void {
+  const queued = pendingChanges.get(connection);
+  pendingChanges.delete(connection);
+  for (const change of queued ?? []) announceCastChange(change);
 }

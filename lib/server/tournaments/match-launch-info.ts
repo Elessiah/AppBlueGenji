@@ -53,6 +53,7 @@ import {
   type LaunchMatchRow,
 } from "./match-launch";
 import { castEligibilityBlock } from "./cast-eligibility";
+import { discardCastChanges, flushCastChanges } from "./cast-notices";
 import { cachedTournamentList } from "./list-cache";
 import { publishMatchUpdatedEvent } from "./notifications";
 
@@ -296,9 +297,11 @@ async function maintainIfDue(connection: PoolConnection, rows: CandidateRow[]): 
     try {
       const changed = await maintainMatchLaunches(connection, tournamentId);
       await connection.commit();
+      flushCastChanges(connection);
       if (changed > 0) publishMatchUpdatedEvent(tournamentId);
     } catch (error) {
       await connection.rollback().catch(() => undefined);
+      discardCastChanges(connection);
       console.error("[match-launch] entretien impossible", error);
     }
   }
