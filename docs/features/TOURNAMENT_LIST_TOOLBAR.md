@@ -65,8 +65,10 @@ de `GET /api/tournaments`, « Aucun tournoi publié pour le moment. », des
 compteurs à zéro et un bandeau « Aucune actualité tournoi ». Le drapeau
 `listLoaded` (vrai à la première liste reçue, jamais remis à faux) rend à la
 place le squelette `SecuredLoadingView` (« Chargement des tournois… » /
-« Loading tournaments… », `list.loading`) et retient sommaire, comptes des
-pastilles, bandeau et état vide. Un échec du premier chargement laisse le
+« Loading tournaments… », `list.loading`) à la place de l'état vide. Sommaire,
+pastilles et bandeau gardent leur place, sans quoi la liste sautait vers le
+bas à son arrivée : entrées du sommaire sans lien, comptes en « – »
+(`COUNT_PENDING`), bandeau rendu vide (hauteur fixe). Un échec du premier chargement laisse le
 squelette : la notification dit l'incident, la relecture de fond suivante
 remplit la page.
 
