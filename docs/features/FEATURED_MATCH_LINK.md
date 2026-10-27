@@ -347,8 +347,8 @@ gardent l'initiale. `MatchSlide` est mémoïsée, et l'horloge de la carte
 (30 s) n'est transmise qu'aux matchs datés hors antenne (`slideClock`) : un pas
 du carrousel ou un tic ne refait que les diapositives concernées. Une
 diapositive cachée fige toutes ses animations infinies (lueur de « En attente
-de lancement », point de « En direct ») par `animation-play-state: paused`
-(`.slides > .slide:not(.slideActive) *`, pseudo-éléments compris) : figées
+de lancement », point de « En direct ») : `.slide:not(.slideActive)` pose
+`--deco-anim-state: paused`, jeton hérité que lisent toutes ces animations ; figées
 plutôt que retirées, la sortante ne s'éteint pas au milieu du fondu. Le survol des
 commandes est gardé par `@media (hover: hover) and (pointer: fine)` : au
 toucher, « Match suivant » restait allumé après le tapotement.
