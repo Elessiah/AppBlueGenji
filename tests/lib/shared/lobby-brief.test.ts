@@ -156,10 +156,10 @@ describe("brief du salon — registre des traitements (T04, T12)", () => {
     const enBrief = en.subPurposes.find((line) => line.includes("lobby of a match opens"))!;
     expect(frBrief).toContain("propriétaires et managers d'une équipe, joueur d'une entrée solo");
     expect(frBrief).toContain("sans BattleTag, tag Discord ni pseudo de joueur");
-    expect(frBrief).toContain("une fois par appariement");
+    expect(frBrief).toContain("(de nouveau s'il rouvre, par exemple après un changement d'horaire)");
     expect(enBrief).toContain("owners and managers of a team, the player of a solo entry");
     expect(enBrief).toContain("without any BattleTag, Discord tag or player username");
-    expect(enBrief).toContain("once per pairing");
+    expect(enBrief).toContain("(again if it reopens, for instance after a change of time)");
     expect(fr.legalBasis).toContain("les réglages du salon envoyés à ceux qui gèrent les engagées d'un match");
     expect(en.legalBasis).toContain("the lobby settings sent to those who manage the entrants of a match");
     const frPushActivity = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T12")!;
