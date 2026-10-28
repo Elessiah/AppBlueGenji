@@ -21,13 +21,21 @@ function browserStorage(kind: "localStorage" | "sessionStorage"): Storage | null
 
 /**
  * « Ne plus voir » coché : gardé sur le compte (`POST`, `keepalive` — la
- * fermeture peut être un départ vers le profil). Un échec n'a pas de suite
- * visible : la modale reviendra simplement à une prochaine fiche, comme avant
- * le choix.
+ * fermeture peut être un départ vers le profil). Le corps porte le compte à
+ * qui la modale a été montrée : une session changée depuis (autre compte
+ * connecté dans un autre onglet) est refusée sans rien écrire. Un échec n'a
+ * pas de suite visible : la modale reviendra simplement à une prochaine fiche,
+ * comme avant le choix.
  */
-async function saveNeverAgain(): Promise<void> {
+async function saveNeverAgain(shownTo: number | null): Promise<void> {
+  if (shownTo == null) return;
   try {
-    await fetch(CERTIFICATION_PROMPT_OFF_PATH, { method: "POST", keepalive: true });
+    await fetch(CERTIFICATION_PROMPT_OFF_PATH, {
+      method: "POST",
+      keepalive: true,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: shownTo }),
+    });
   } catch {
     // Réseau, ou `fetch` indisponible (document qui part) : rien de gardé.
   }
@@ -62,6 +70,7 @@ export function useCertificationPrompt(
   tournamentId: number,
   prompt: CertificationPrompt | null | undefined,
   frozen: boolean,
+  viewerUserId: number | null,
 ) {
   const [open, setOpen] = useState(false);
   // Case « Ne plus voir » : tenue ici pour valoir aussi quand la modale
@@ -70,6 +79,9 @@ export function useCertificationPrompt(
   // l'état local de la modale).
   const neverAgain = useRef(false);
   const decided = useRef(false);
+  // Le compte à qui la modale a été montrée, retenu à l'ouverture : c'est lui,
+  // pas la session du moment, que « Ne plus voir » désigne.
+  const shownTo = useRef<number | null>(null);
   // Les effets lisent l'invitation par sa présence, pas par son identité : une
   // relecture REST en renvoie une neuve au contenu identique.
   const present = prompt != null;
@@ -102,12 +114,15 @@ export function useCertificationPrompt(
     // déjà ouverte — l'attendre la ferait surgir au départ d'un match, sur le
     // plateau : sinon, pas sur cette page, sans rien retenir.
     const allowed = shouldOpenCertificationPrompt(browserStorage("sessionStorage"));
-    if (allowed && !anotherModalOpen()) setOpen(true);
-  }, [tournamentId, present, frozen]);
+    if (allowed && !anotherModalOpen()) {
+      shownTo.current = viewerUserId;
+      setOpen(true);
+    }
+  }, [tournamentId, present, frozen, viewerUserId]);
 
   const close = useCallback(() => {
     rememberCertificationPromptClosed(browserStorage("sessionStorage"));
-    if (neverAgain.current) void saveNeverAgain();
+    if (neverAgain.current) void saveNeverAgain(shownTo.current);
     doneForPage.current = true;
     setOpen(false);
   }, []);
@@ -119,7 +134,7 @@ export function useCertificationPrompt(
   // « Ne plus voir » déjà cochée vaut pourtant : gardée sur le compte, sans le
   // drapeau d'onglet d'une fermeture.
   const yieldPlace = useCallback(() => {
-    if (neverAgain.current) void saveNeverAgain();
+    if (neverAgain.current) void saveNeverAgain(shownTo.current);
     doneForPage.current = true;
     setOpen(false);
   }, []);
