@@ -14,9 +14,12 @@ import { resolveMatchParty } from "@/lib/server/tournaments/match-launch";
 import {
   loadMapRules,
   parseMapRulesInput,
+  ROUND_MAPS_BULK_MAX,
   parseRoundKey,
+  parseRoundKeys,
   pickMatchMap,
   setRoundMaps,
+  setRoundsMaps,
   setTournamentMapRules,
 } from "@/lib/server/tournaments/round-maps";
 import { connectionMock, fakeConnection, type SqlMock } from "../../helpers/sql-double";
@@ -177,6 +180,74 @@ describe("setRoundMaps", () => {
 
   it("cartes invalides : refusées avant toute requête", async () => {
     await expect(setRoundMaps(7, ROUND, "Ilios")).rejects.toThrow("INVALID_ROUND_MAPS");
+    expect(withConnection).not.toHaveBeenCalled();
+  });
+});
+
+describe("parseRoundKeys", () => {
+  it("parseRoundKeys_validList_returnsDedupedKeys", () => {
+    expect(parseRoundKeys([ROUND, { ...ROUND }, { phaseId: 0, bracket: "LOWER", roundNumber: 1 }])).toEqual([
+      ROUND,
+      { phaseId: 0, bracket: "LOWER", roundNumber: 1 },
+    ]);
+  });
+
+  it("parseRoundKeys_emptyList_throwsInvalidRound", () => {
+    expect(() => parseRoundKeys([])).toThrow("INVALID_ROUND");
+  });
+
+  it("parseRoundKeys_notAList_throwsInvalidRound", () => {
+    expect(() => parseRoundKeys(ROUND)).toThrow("INVALID_ROUND");
+  });
+
+  it("parseRoundKeys_bulkMax_accepted", () => {
+    const rounds = Array.from({ length: ROUND_MAPS_BULK_MAX }, (_, index) => ({ ...ROUND, roundNumber: index + 1 }));
+    expect(parseRoundKeys(rounds)).toHaveLength(ROUND_MAPS_BULK_MAX);
+  });
+
+  it("parseRoundKeys_overBulkMax_throwsInvalidRound", () => {
+    const rounds = Array.from({ length: ROUND_MAPS_BULK_MAX + 1 }, (_, index) => ({ ...ROUND, roundNumber: index + 1 }));
+    expect(() => parseRoundKeys(rounds)).toThrow("INVALID_ROUND");
+  });
+
+  it("parseRoundKeys_invalidEntry_throwsInvalidRound", () => {
+    expect(() => parseRoundKeys([ROUND, null])).toThrow("INVALID_ROUND");
+    expect(() => parseRoundKeys([{ ...ROUND, bracket: "NOPE" }])).toThrow("INVALID_ROUND");
+  });
+});
+
+describe("setRoundsMaps", () => {
+  const ROUND_3 = { ...ROUND, roundNumber: 3 };
+
+  it("setRoundsMaps_severalRounds_locksOnceWritesEachPublishesOnce", async () => {
+    route(connection.execute, [
+      { pattern: /FROM bg_tournaments/, rows: [TOURNAMENT] },
+      { pattern: /SELECT[\s\S]*FROM bg_tournament_round_maps/, rows: [] },
+    ]);
+    await expect(setRoundsMaps(7, [ROUND, ROUND_3], [["Ilios"]])).resolves.toEqual([["Ilios"]]);
+    expect(connection.execute.mock.calls[0][0]).toMatch(/FROM bg_tournaments[\s\S]*FOR UPDATE/);
+    expect(writes(/FROM bg_tournaments/)).toHaveLength(1);
+    expect(writes(/INSERT INTO bg_tournament_round_maps/).map(([, params]) => params)).toEqual([
+      [7, 0, "UPPER", 2, '[["Ilios"]]'],
+      [7, 0, "UPPER", 3, '[["Ilios"]]'],
+    ]);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(sendBotLog).mock.calls[0][0]).toContain("2 tours");
+  });
+
+  it("setRoundsMaps_everyRoundUnchanged_publishesNothing", async () => {
+    route(connection.execute, [
+      { pattern: /FROM bg_tournaments/, rows: [TOURNAMENT] },
+      { pattern: /SELECT[\s\S]*FROM bg_tournament_round_maps/, rows: [{ ...ROUND, slots_json: '[["Ilios"]]' }] },
+    ]);
+    await setRoundsMaps(7, [ROUND, ROUND_3], [["Ilios"]]);
+    expect(writes(/^\s*(INSERT|DELETE)/)).toHaveLength(0);
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+    expect(sendBotLog).not.toHaveBeenCalled();
+  });
+
+  it("setRoundsMaps_noRound_throwsInvalidRoundBeforeQuery", async () => {
+    await expect(setRoundsMaps(7, [], [["Ilios"]])).rejects.toThrow("INVALID_ROUND");
     expect(withConnection).not.toHaveBeenCalled();
   });
 });

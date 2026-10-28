@@ -7,8 +7,9 @@ jest.mock("@/lib/server/tournaments/round-maps", () => {
   );
   return {
     parseRoundKey: actual.parseRoundKey,
+    parseRoundKeys: actual.parseRoundKeys,
     parseMapRulesInput: actual.parseMapRulesInput,
-    setRoundMaps: jest.fn(),
+    setRoundsMaps: jest.fn(),
     setTournamentMapRules: jest.fn(),
     pickMatchMap: jest.fn(),
   };
@@ -18,7 +19,7 @@ import { PUT as roundMapsPut } from "@/app/api/admin/tournaments/[id]/round-maps
 import { PUT as mapRulesPut } from "@/app/api/admin/tournaments/[id]/map-rules/route";
 import { PUT as mapPickPut } from "@/app/api/matches/[matchId]/map-pick/route";
 import { getCurrentUser } from "@/lib/server/auth";
-import { pickMatchMap, setRoundMaps, setTournamentMapRules, type MapRulesInput } from "@/lib/server/tournaments/round-maps";
+import { pickMatchMap, setRoundsMaps, setTournamentMapRules, type MapRulesInput } from "@/lib/server/tournaments/round-maps";
 import { authUser } from "../../helpers/auth-user";
 
 /**
@@ -59,7 +60,7 @@ describe("PUT /api/admin/tournaments/[id]/round-maps", () => {
       jest.mocked(getCurrentUser).mockResolvedValue(user);
       expect((await roundMapsPut(put({ ...ROUND, slots: [] }), tournament("7"))).status).toBe(403);
     }
-    expect(setRoundMaps).not.toHaveBeenCalled();
+    expect(setRoundsMaps).not.toHaveBeenCalled();
   });
 
   it("refuse une manche invalide (400 INVALID_ROUND)", async () => {
@@ -69,24 +70,42 @@ describe("PUT /api/admin/tournaments/[id]/round-maps", () => {
       expect(res.status).toBe(400);
       await expect(res.json()).resolves.toEqual({ error: "INVALID_ROUND" });
     }
-    expect(setRoundMaps).not.toHaveBeenCalled();
+    expect(setRoundsMaps).not.toHaveBeenCalled();
   });
 
   it("refuse des cartes invalides (400) et un tournoi absent (404)", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
-    jest.mocked(setRoundMaps).mockRejectedValueOnce(new Error("INVALID_ROUND_MAPS"));
+    jest.mocked(setRoundsMaps).mockRejectedValueOnce(new Error("INVALID_ROUND_MAPS"));
     expect((await roundMapsPut(put({ ...ROUND, slots: "x" }), tournament("7"))).status).toBe(400);
-    jest.mocked(setRoundMaps).mockRejectedValueOnce(new Error("TOURNAMENT_NOT_FOUND"));
+    jest.mocked(setRoundsMaps).mockRejectedValueOnce(new Error("TOURNAMENT_NOT_FOUND"));
     expect((await roundMapsPut(put({ ...ROUND, slots: [] }), tournament("7"))).status).toBe(404);
   });
 
   it("pose les cartes de la manche et rend les créneaux retenus", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
-    jest.mocked(setRoundMaps).mockResolvedValue([["Ilios"]]);
+    jest.mocked(setRoundsMaps).mockResolvedValue([["Ilios"]]);
     const res = await roundMapsPut(put({ ...ROUND, slots: [[" Ilios "]] }), tournament("7"));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ slots: [["Ilios"]] });
-    expect(setRoundMaps).toHaveBeenCalledWith(7, ROUND, [[" Ilios "]]);
+    expect(setRoundsMaps).toHaveBeenCalledWith(7, [ROUND], [[" Ilios "]]);
+  });
+  it("PUT_roundsList_appliesSlotsToEveryRound", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(setRoundsMaps).mockResolvedValue([["Ilios"]]);
+    const rounds = [ROUND, { ...ROUND, roundNumber: 3 }];
+    const res = await roundMapsPut(put({ rounds, slots: [["Ilios"]] }), tournament("7"));
+    expect(res.status).toBe(200);
+    expect(setRoundsMaps).toHaveBeenCalledWith(7, rounds, [["Ilios"]]);
+  });
+
+  it("PUT_invalidRoundsList_returns400InvalidRound", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    for (const rounds of [[], [{ ...ROUND, bracket: "SIDE" }], "x"]) {
+      const res = await roundMapsPut(put({ rounds, slots: [] }), tournament("7"));
+      expect(res.status).toBe(400);
+      await expect(res.json()).resolves.toEqual({ error: "INVALID_ROUND" });
+    }
+    expect(setRoundsMaps).not.toHaveBeenCalled();
   });
 });
 

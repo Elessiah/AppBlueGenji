@@ -10,6 +10,9 @@
  *   par le staff (`bg_matches.first_map`).
  * - Le choix de la carte 1 est `first_map` lui-même ; les suivants vivent dans
  *   `bg_matches.map_picks` (`{"2":"Ilios"}`).
+ * - **Échelle** : dès qu'une manche porte un réglage, la carte ne se saisit plus
+ *   match par match (`ROUND_MAPS_SET`) ; seul le choix dans un pool reste
+ *   ouvert. Réinitialiser la manche (liste vide) rend la saisie par match.
  * - **Préséance** : une carte imposée l'emporte toujours à l'affichage ; un
  *   pool montre le choix explicite du match s'il existe (même sorti du pool
  *   depuis : un choix n'est jamais perdu en silence), sinon « à choisir ».
@@ -267,6 +270,12 @@ export function applyMapRules<
     if (firstMap === match.firstMap && firstBanTeamId === match.firstBanTeamId) return match;
     return { ...match, firstMap, firstBanTeamId };
   });
+}
+
+/** Décompte d'un réglage, pour le résumé d'un tour (« 5 cartes · 2 pools »). */
+export function roundMapsSummary(slots: readonly string[][]): { maps: number; imposed: number; pools: number } {
+  const imposed = slots.filter((slot) => slot.length === 1).length;
+  return { maps: slots.length, imposed, pools: slots.length - imposed };
 }
 
 /** Une manche du plateau, telle que l'écran de réglage la propose. */

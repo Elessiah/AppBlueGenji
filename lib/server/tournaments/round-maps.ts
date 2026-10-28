@@ -133,48 +133,97 @@ async function lockTournament(connection: PoolConnection, tournamentId: number):
   return rows[0];
 }
 
+/** Tours au plus d'une copie « à tous les tours » : borne une requête aberrante. */
+export const ROUND_MAPS_BULK_MAX = 128;
+
 /**
- * Pose (ou retire, liste vide) les cartes d'une manche — à tout moment, avant,
- * pendant ou après la manche. Réservé à l'arbitrage (permission `tournaments`,
- * vérifiée par la route). Les choix déjà faits sur les matchs restent.
+ * Tours lus d'un corps de requête : une liste (copie vers plusieurs tours),
+ * dédoublonnée, de 1 à {@link ROUND_MAPS_BULK_MAX} tours. @throws `INVALID_ROUND`
+ */
+export function parseRoundKeys(raw: unknown): RoundKey[] {
+  if (!Array.isArray(raw) || raw.length === 0 || raw.length > ROUND_MAPS_BULK_MAX) throw new Error("INVALID_ROUND");
+  const seen = new Map<string, RoundKey>();
+  for (const entry of raw) {
+    if (entry === null || typeof entry !== "object") throw new Error("INVALID_ROUND");
+    const round = parseRoundKey(entry as Record<string, unknown>);
+    seen.set(`${round.phaseId}:${round.bracket}:${round.roundNumber}`, round);
+  }
+  return [...seen.values()];
+}
+
+/** Écrit (ou retire) le réglage d'une manche ; `false` s'il ne change rien. */
+async function writeRoundSlots(
+  connection: PoolConnection,
+  tournamentId: number,
+  round: RoundKey,
+  slots: string[][],
+): Promise<boolean> {
+  const before = await loadRoundSlots(connection, tournamentId, round);
+  if (JSON.stringify(before) === JSON.stringify(slots)) return false;
+  if (slots.length === 0) {
+    await connection.execute(
+      `DELETE FROM bg_tournament_round_maps
+        WHERE tournament_id = ? AND phase_id = ? AND bracket = ? AND round_number = ?`,
+      [tournamentId, round.phaseId, round.bracket, round.roundNumber],
+    );
+  } else {
+    await connection.execute(
+      `INSERT INTO bg_tournament_round_maps (tournament_id, phase_id, bracket, round_number, slots_json)
+       VALUES (?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE slots_json = VALUES(slots_json)`,
+      [tournamentId, round.phaseId, round.bracket, round.roundNumber, JSON.stringify(slots)],
+    );
+  }
+  return true;
+}
+
+/**
+ * Pose (ou retire, liste vide) les mêmes cartes sur une ou plusieurs manches —
+ * à tout moment, avant, pendant ou après la manche, y compris sur un tour pas
+ * encore généré (le réglage s'applique à ses matchs dès leur création).
+ * Réservé à l'arbitrage (permission `tournaments`, vérifiée par la route). Les
+ * choix déjà faits sur les matchs restent. Une seule transaction, un seul
+ * événement, une seule ligne au journal, quel que soit le nombre de tours.
  *
  * @returns les créneaux retenus.
- * @throws `INVALID_ROUND_MAPS` | `TOURNAMENT_NOT_FOUND`
+ * @throws `INVALID_ROUND_MAPS` | `INVALID_ROUND` | `TOURNAMENT_NOT_FOUND`
  */
-export async function setRoundMaps(tournamentId: number, round: RoundKey, rawSlots: unknown): Promise<string[][]> {
+export async function setRoundsMaps(
+  tournamentId: number,
+  rounds: readonly RoundKey[],
+  rawSlots: unknown,
+): Promise<string[][]> {
   const slots = normalizeRoundMapSlots(rawSlots);
+  if (rounds.length === 0 || rounds.length > ROUND_MAPS_BULK_MAX) throw new Error("INVALID_ROUND");
   const result = await inTransaction(async (connection) => {
     const tournament = await lockTournament(connection, tournamentId);
-    const before = await loadRoundSlots(connection, tournamentId, round);
-    if (JSON.stringify(before) === JSON.stringify(slots)) return null;
-    if (slots.length === 0) {
-      await connection.execute(
-        `DELETE FROM bg_tournament_round_maps
-          WHERE tournament_id = ? AND phase_id = ? AND bracket = ? AND round_number = ?`,
-        [tournamentId, round.phaseId, round.bracket, round.roundNumber],
-      );
-    } else {
-      await connection.execute(
-        `INSERT INTO bg_tournament_round_maps (tournament_id, phase_id, bracket, round_number, slots_json)
-         VALUES (?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE slots_json = VALUES(slots_json)`,
-        [tournamentId, round.phaseId, round.bracket, round.roundNumber, JSON.stringify(slots)],
-      );
+    let changed = false;
+    for (const round of rounds) {
+      if (await writeRoundSlots(connection, tournamentId, round, slots)) changed = true;
     }
-    return tournament;
+    return changed ? tournament : null;
   });
   if (result !== null) {
     publishMatchUpdatedEvent(tournamentId);
+    const roundLabel =
+      rounds.length === 1
+        ? matchRoundLabel(rounds[0].bracket, rounds[0].roundNumber, result.format === "SWISS")
+        : `${rounds.length} tours`;
     void sendBotLog(
       formatRoundMapsLog({
         tournament: { id: Number(result.id), name: result.name },
-        roundLabel: matchRoundLabel(round.bracket, round.roundNumber, result.format === "SWISS"),
+        roundLabel,
         slots: slots.length,
         imposed: slots.filter((slot) => slot.length === 1).length,
       }),
     ).catch((error: unknown) => console.error("[round-maps] journal non envoyé", error));
   }
   return slots;
+}
+
+/** Les cartes d'une seule manche (`setRoundsMaps`). */
+export async function setRoundMaps(tournamentId: number, round: RoundKey, rawSlots: unknown): Promise<string[][]> {
+  return setRoundsMaps(tournamentId, [round], rawSlots);
 }
 
 export type MapRulesInput = { firstBan: FirstBanRule; nextBan: NextBanRule; nextPick: NextPickRule };

@@ -1316,8 +1316,8 @@ function TournamentSheetView({
             (`tournamentGrantsContactAccess`) : le besoin de joindre un engagé
             naît du tournoi et s'éteint avec lui, et la route refuse de toute
             façon — un panneau qui ne rendrait qu'un toast n'a rien à faire là. */}
-        {/* Cartes et bans (`ROUND_MAPS.md`) : réglables à tout moment par le staff. */}
-        {detail.isAdmin && !frozen && detail.matches.length > 0 && <RoundMapsPanel detail={detail} />}
+        {/* Cartes et bans (`ROUND_MAPS.md`) : réglables à tout moment par le staff, tours à venir compris. */}
+        {detail.isAdmin && !frozen && <RoundMapsPanel detail={detail} />}
 
         {detail.isAdmin && tournamentGrantsContactAccess(detail.card.state) && (
           <EntrantContactsPanel tournamentId={detail.card.id} />

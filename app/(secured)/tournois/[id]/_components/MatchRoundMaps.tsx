@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useId, useState } from "react";
 import { useToast } from "@/components/ui/toast";
 import { InfoHint } from "@/components/ui/info-hint";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { MATCH_LAUNCH_REFRESH_EVENT } from "@/lib/shared/match-launch";
 import { resolveMatchMaps, roundMapsOf, type ResolvedMapSlot, type TournamentMapRules } from "@/lib/shared/round-maps";
 import type { BracketMatch, TournamentDetail } from "@/lib/shared/types";
@@ -68,7 +69,7 @@ function MapPickSelect({ match, slot }: Readonly<{ match: Pick<BracketMatch, "id
   );
 }
 
-/** Une carte du round : imposée, choisie, ou « à choisir parmi … ». */
+/** Une carte du tour : imposée, choisie, ou « à choisir parmi … ». */
 function MapSlotLine({
   match,
   slot,
@@ -98,9 +99,10 @@ function MapSlotLine({
 }
 
 /**
- * Cartes du round d'un match (`docs/features/ROUND_MAPS.md`) : la liste
- * ordonnée des créneaux réglés pour sa manche, le choix dans un pool pour qui
- * le peut, et l'entrée « Paramétrer les cartes du round » du staff. Sans
+ * Cartes du tour d'un match (`docs/features/ROUND_MAPS.md`) : la liste
+ * ordonnée des créneaux réglés pour son tour du tournoi, le choix dans un pool
+ * pour qui le peut, et pour le staff « Paramétrer les cartes du tour » et
+ * « Réinitialiser le tour » (rend la saisie de la carte match par match). Sans
  * réglage, seule l'entrée du staff paraît.
  */
 export function MatchRoundMaps({
@@ -110,12 +112,33 @@ export function MatchRoundMaps({
   staff,
 }: Readonly<{ detail: TournamentDetail; match: BracketMatch; canPick: boolean; staff: boolean }>) {
   const { t } = useRoundMapsText();
+  const actionText = useActionsText();
+  const errorsText = useErrorsText();
+  const { showError, showSuccess } = useToast();
   const [open, setOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const rules = detail.mapRules;
   const round = roundMapsOf(rules.rounds, match);
   const slots = round ? resolveMatchMaps(round.slots, match.firstMap, match.mapPicks) : [];
   const titleId = useId();
   if (slots.length === 0 && !staff) return null;
+  const reset = async (): Promise<boolean> => {
+    try {
+      const response = await fetch(`/api/admin/tournaments/${detail.card.id}/round-maps`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ phaseId: match.phaseId, bracket: match.bracket, roundNumber: match.roundNumber, slots: [] }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) throw new Error(payload.error || "UNKNOWN");
+      showSuccess(t("dialog.roundCleared"));
+      window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
+      return true;
+    } catch (error) {
+      showError(launchErrorText(actionText, errorsText, (error as Error).message));
+      return false;
+    }
+  };
   return (
     <div className={styles.roundMaps}>
       {slots.length > 0 && (
@@ -131,11 +154,33 @@ export function MatchRoundMaps({
         </>
       )}
       {staff && (
-        <div>
+        <div className={styles.roundMapsActions}>
           <button type="button" className="btn ghost" onClick={() => setOpen(true)}>
             {t("page.configureMaps")}
           </button>
+          {slots.length > 0 && (
+            <>
+              <button type="button" className="btn ghost" onClick={() => setResetting(true)}>
+                {t("page.resetRound")}
+              </button>
+              <InfoHint id={`${titleId}-scale`} subject={t("page.resetRound")}>
+                {t("page.scaleHint")}
+              </InfoHint>
+            </>
+          )}
         </div>
+      )}
+      {resetting && (
+        <ConfirmActionDialog
+          title={t("dialog.resetConfirm.title")}
+          confirmLabel={t("dialog.resetConfirm.confirm")}
+          pendingLabel={t("dialog.pending")}
+          tone="danger"
+          onClose={() => setResetting(false)}
+          onConfirm={reset}
+        >
+          <p>{t("page.resetConfirmBody")}</p>
+        </ConfirmActionDialog>
       )}
       {open && (
         <RoundMapsDialog
@@ -150,7 +195,7 @@ export function MatchRoundMaps({
 
 /**
  * Bloc « Cartes et bans » de la fiche, pour le staff (permission
- * `tournaments`) : ouvre la fenêtre de réglage sur la première manche.
+ * `tournaments`) : ouvre la fenêtre de réglage sur le premier tour du tournoi.
  */
 export function RoundMapsPanel({ detail }: Readonly<{ detail: TournamentDetail }>) {
   const { t } = useRoundMapsText();

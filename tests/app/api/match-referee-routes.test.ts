@@ -48,6 +48,7 @@ const PANEL: RefereePanel = {
   selfManaged: false,
   firstMap: null,
   round: { phaseId: 0, roundNumber: 1, bracket: "UPPER" },
+  roundSlots: [],
   candidates: [{ userId: 3, pseudo: "Arbitre" }],
 };
 
@@ -212,9 +213,13 @@ describe("PUT autogestion et première carte", () => {
     const res = await firstMapPut(jsonRequest("PUT", { map: "x".repeat(80) }), params("42"));
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: "INVALID_FIRST_MAP" });
-    jest.mocked(setMatchFirstMap).mockRejectedValue(new Error("INVALID_MAP_PICK"));
-    const outOfPool = await firstMapPut(jsonRequest("PUT", { map: "Busan" }), params("42"));
-    expect(outOfPool.status).toBe(400);
-    await expect(outOfPool.json()).resolves.toEqual({ error: "INVALID_MAP_PICK" });
+  });
+
+  it("PUT first-map_roundMapsSet_returns409", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(setMatchFirstMap).mockRejectedValue(new Error("ROUND_MAPS_SET"));
+    const res = await firstMapPut(jsonRequest("PUT", { map: "Busan" }), params("42"));
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toEqual({ error: "ROUND_MAPS_SET" });
   });
 });

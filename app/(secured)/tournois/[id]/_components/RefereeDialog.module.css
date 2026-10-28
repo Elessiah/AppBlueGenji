@@ -39,3 +39,13 @@
   justify-content: flex-end;
   margin-top: 16px;
 }
+
+/* Cartes réglées pour le tour, en lecture seule (`ROUND_MAPS.md`). */
+.roundMaps {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--ink);
+}
