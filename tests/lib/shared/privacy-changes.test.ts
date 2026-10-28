@@ -1758,6 +1758,13 @@ describe("PRIVACY_CHANGES — conditions v7 : casters, arbitre désigné et page
     expect(en).toContain("now rests on the performance of the service, no longer on legitimate interest, once that referee has accepted this version");
     expect(en).toContain("objecting through the report form no longer applies to it");
     expect(en).toContain("Until you accept it, it still rests on legitimate interest, and you can object to it through the report form (GDPR category)");
+    // Revue juridique de #491 : opposition déjà retenue, arbitre devenu joueur, arbitre qui caste aussi.
+    expect(fr).toContain("une opposition déjà retenue continue de valoir (le staff ne te confie plus de match)");
+    expect(en).toContain("an objection already upheld still stands (the staff no longer assigns you matches)");
+    expect(fr).toContain("ou si tu deviens joueur du match avant son lancement, tu n'es plus présenté");
+    expect(en).toContain("or become a player of the match before its launch, you are no longer presented");
+    expect(fr).toContain("jamais son tag Discord à ce titre (s'il caste aussi le match, ses contacts de caster suivent la règle des casters)");
+    expect(en).toContain("never their Discord tag in that capacity (if they also cast the match, their caster contacts follow the casters' rule)");
     expect(en).toContain("the teams' contacts stay in the “Contacts” and launch windows");
   });
 

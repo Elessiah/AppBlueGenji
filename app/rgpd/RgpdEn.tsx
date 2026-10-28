@@ -861,7 +861,8 @@ export function RgpdEn({
           <p id="arbitre-designe">
             <strong>Assigned referee of a match.</strong> A staff member who can referee (refereeing permission,
             certified Discord tag and linked Battle.net account) takes a match, or the staff assigns it to them.
-            Their username and BattleTag (even when hidden) — never their Discord tag — are then presented in the
+            Their username and BattleTag (even when hidden) — never their Discord tag in that capacity (if they also
+            cast the match, their caster contacts follow the casters&apos; rule) — are then presented in the
             match&apos;s “Contacts” and launch windows and on the match page, to the same parties and at the same times as the match
             contacts: to both teams and to the referees as soon as both its opponents are known until its end, to
             its casters while the match is being played; the username alone appears there as soon as the launch
