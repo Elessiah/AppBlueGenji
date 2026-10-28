@@ -383,13 +383,20 @@ describe("/rgpd — données obligatoires : la langue du compte (revue juridique
     expect(read("app/rgpd/RgpdEn.tsx")).toMatch(/you can change it in My profile \(until you next log in from a page\s+in the other language\)/);
   });
 
-  // Revue #497 cycle 4 : le BattleTag lui-même n'est traité qu'en Overwatch, et
-  // l'arbitre ne s'ajoute en jeu qu'en Overwatch.
+  // Revue #497 : le BattleTag n'est présenté qu'en Overwatch, mais sa présence
+  // et le compte Battle.net sont vérifiés en tout jeu pour caster ou arbitrer
+  // (`casterIdentityOf`) ; l'arbitre ne s'ajoute en jeu qu'en Overwatch.
   it("processingActivitiesT04_battletagCategoryAndRefereePurpose_limitedToOverwatchFrAndEn", () => {
     const t04 = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T04")!;
     const t04En = PROCESSING_ACTIVITIES_EN.find((activity) => activity.ref === "T04")!;
-    expect(t04.dataCategories).toContain("BattleTag (dans les seuls tournois Overwatch)");
-    expect(t04En.dataCategories).toContain("BattleTag (Overwatch tournaments only)");
+    expect(t04.dataCategories).toContain(
+      "BattleTag (présenté dans les seuls tournois Overwatch ; en tout jeu, sa présence et le compte Battle.net rattaché sont vérifiés pour caster ou arbitrer un match)",
+    );
+    expect(t04.dataCategories).not.toContain("BattleTag (dans les seuls tournois Overwatch)");
+    expect(t04En.dataCategories).toContain(
+      "BattleTag (shown in Overwatch tournaments only; in every game, its presence and the linked Battle.net account are checked to cast or referee a match)",
+    );
+    expect(t04En.dataCategories).not.toContain("BattleTag (Overwatch tournaments only)");
     expect(t04.dataCategories).not.toContain("BattleTag");
     expect(t04En.dataCategories).not.toContain("BattleTag");
     // … et l'arbitre ne s'ajoute en jeu qu'en Overwatch.
