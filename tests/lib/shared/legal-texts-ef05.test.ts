@@ -149,7 +149,8 @@ describe("PRIVACY_CHANGES — entrée rectificative de la marque de session", ()
   it("existe en français et en anglais, datée de la mise en ligne prévue, en fin de liste", () => {
     expect(entry?.publishedAt).toBe("2026-10-30");
     expect(english).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(id);
+    // Suivie de l'entrée du BattleTag des casters et de l'arbitre (décision 35), même jour.
+    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(id);
     expect(id.length).toBeLessThanOrEqual(PRIVACY_CHANGE_ID_MAX_LENGTH);
     expect([english?.details.length, english?.linkLabels?.length]).toEqual([entry?.details.length, entry?.links?.length]);
   });
@@ -162,9 +163,9 @@ describe("PRIVACY_CHANGES — entrée rectificative de la marque de session", ()
     // Fermer la fenêtre (Échap, voile), son bouton vers la certification de « Mon profil »
     // (`DIALOG`) et le refus d'un clic dont le tag n'est plus le bon (`STATE_CHANGED`) répondent tous « Plus tard ».
     expect(fr).toContain("(« Plus tard », la fermeture de la fenêtre ou son bouton qui ouvre la certification de « Mon profil », « Ne plus voir »");
-    expect(fr).toContain("ou la certification, réussie ou refusée parce que ton tag Discord ne peut plus être certifié depuis la fenêtre)");
+    expect(fr).toContain("ou la certification, réussie ou refusée parce que ton tag Discord ne peut plus être certifié depuis cette fenêtre)");
     expect(en).toContain("(“Later”, closing the window or its button that opens verification in “My profile”, “Don't show again”");
-    expect(en).toContain("or verification, whether it succeeds or is refused because your Discord tag can no longer be verified from the window)");
+    expect(en).toContain("or verification, whether it succeeds or is refused because your Discord tag can no longer be verified from this window)");
     expect(en).toContain("the mark is set at login and cleared at your first answer");
     expect(en).toContain("isn't included in the export of your data");
   });

@@ -1047,7 +1047,8 @@ function RgpdFr({
           <p id="arbitre-designe">
             <strong>Arbitre désigné d&apos;un match.</strong> Un membre du staff qui peut arbitrer (permission
             d&apos;arbitrage, tag Discord certifié et compte Battle.net rattaché) prend un match, ou le staff le lui
-            confie. Son pseudo et son BattleTag (même masqué) — jamais son tag Discord à ce titre (s&apos;il caste aussi le
+            confie. Son pseudo et, dans un tournoi Overwatch seulement (en Marvel Rivals, on ne s&apos;invite pas par
+            BattleTag), son BattleTag (même masqué) — jamais son tag Discord à ce titre (s&apos;il caste aussi le
             match, ses contacts de caster suivent la règle des casters) — sont alors présentés dans
             les fenêtres « Contacts » et de lancement du match et sur la page du match, aux mêmes parties et aux mêmes moments que les
             contacts du match : aux deux équipes et aux arbitres dès que ses deux adversaires sont connus et

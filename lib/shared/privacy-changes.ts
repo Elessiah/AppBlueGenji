@@ -1222,8 +1222,27 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     summary:
       "Précision sur l'information du 21 octobre 2026 : à chaque connexion par Discord ou Blizzard, tant que ton tag Discord n'est pas certifié et que tu n'as pas choisi « Ne plus voir », ta session de connexion note que la fenêtre de certification reste à te proposer, une fois par connexion.",
     details: [
-      "L'information du 21 octobre disait l'inverse : que la session note, après « Plus tard », que la fenêtre n'est plus à proposer. En fait, la marque est posée à la connexion et levée à ta première réponse (« Plus tard », la fermeture de la fenêtre ou son bouton qui ouvre la certification de « Mon profil », « Ne plus voir » — qui la lève sur toutes tes sessions —, ou la certification, réussie ou refusée parce que ton tag Discord ne peut plus être certifié depuis la fenêtre), ou dès qu'il n'y a plus rien à te proposer.",
+      "L'information du 21 octobre disait l'inverse : que la session note, après « Plus tard », que la fenêtre n'est plus à proposer. En fait, la marque est posée à la connexion et levée à ta première réponse (« Plus tard », la fermeture de la fenêtre ou son bouton qui ouvre la certification de « Mon profil », « Ne plus voir » — qui la lève sur toutes tes sessions —, ou la certification, réussie ou refusée parce que ton tag Discord ne peut plus être certifié depuis cette fenêtre), ou dès qu'il n'y a plus rien à te proposer.",
       "Cette marque ne contient rien d'autre, part avec la session et ne figure pas dans l'export de tes données. Rien d'autre ne change : « Ne plus voir » reste gardé sur ton compte, avec sa date.",
+    ],
+  },
+  {
+    // Décision de l'utilisateur 35 (2026-10-28) : le BattleTag des casters et
+    // de l'arbitre désigné ne sert qu'à les inviter dans une partie Overwatch.
+    // Hors Overwatch, la lecture des contacts ne l'envoie plus
+    // (`withGameBattletag`, `match-launch-info.ts`) : moins de lecteurs.
+    id: "2026-10-battletag-casters-arbitre-overwatch-seulement",
+    publishedAt: "2026-10-30",
+    title: "BattleTag des casters et de l'arbitre : en Overwatch seulement",
+    links: [
+      { href: "/conditions-utilisation#contacts-de-match", label: "Lire la section « Contacts de match »" },
+      { href: "/rgpd#arbitre-designe", label: "Lire le paragraphe « Arbitre désigné d'un match »" },
+    ],
+    summary:
+      "Dans un tournoi Marvel Rivals, le BattleTag des casters et celui de l'arbitre désigné d'un match ne sont plus présentés dans les fenêtres du match ni sur sa page : on ne s'y invite pas par BattleTag. En Overwatch, rien ne change.",
+    details: [
+      "Marvel Rivals : la fenêtre « Contacts » du match, sa fenêtre de lancement et la page du match ne montrent plus le BattleTag d'un caster ni celui de l'arbitre désigné, ni s'il est vérifié, et le site ne l'envoie plus du tout à ces fenêtres. Un caster y garde son tag Discord certifié, l'arbitre désigné son pseudo ; la page du match n'y porte plus la consigne « À inviter ».",
+      "Les contacts des équipes ne changent pas, dans les deux jeux.",
     ],
   },
 ];
