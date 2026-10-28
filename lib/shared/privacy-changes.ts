@@ -1141,7 +1141,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Si tu gères une équipe engagée (propriétaire ou manager) ou joues un tournoi individuel, le site t'envoie, à l'ouverture du salon d'un match, les réglages de la partie en message privé Discord et en notification push.",
     details: [
       "Le message dit qui joue à gauche (l'hôte) et à droite, la première carte, le premier ban, le rappel de trier les joueurs par rôle si le match est casté, et s'il a un arbitre désigné ou passe en autogestion, avec les noms d'équipe, le tournoi, la manche et le lien de la page du match. Il ne contient ni BattleTag, ni tag Discord, ni pseudo de joueur : en tournoi individuel, il dit « toi » et « ton adversaire ». Il part à l'ouverture du salon, et de nouveau s'il rouvre, par exemple après un changement d'horaire.",
-      "Le message privé ne part qu'à un tag Discord certifié et se coupe, comme les autres messages de match, par la case « Messages privés Discord de mes matchs » de « Mon profil » ; la notification push a son propre réglage, « Réglages du salon ».",
+      "Le message privé ne part qu'à un tag Discord certifié et se coupe, comme les autres messages de match, par la case « Messages privés Discord de mes matchs » de « Mon profil » ; la notification push a son propre sujet, « Réglages du salon », actif par défaut pour qui a activé les notifications push, que tu peux couper dans « Mon profil ».",
     ],
   },
 ];

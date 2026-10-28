@@ -785,7 +785,7 @@ export function RgpdEn({
         <div className={styles.prose}>
           <p>
             You can be notified on your phone or computer of the start of your matches, of a score to confirm or confirmed automatically without an answer, of a
-            tournament&apos;s kickoff, of your match times (set, changed or removed) and their reminders, and of what
+            tournament&apos;s kickoff, of your match times (set, changed or removed) and their reminders, of the lobby settings of a match you manage (owner or manager of a team, player of a solo tournament), and of what
             concerns your account or your team; a staff member, also of the alerts of their role (referee alerts, disputes settled, results corrected,
             opponents&apos; withdrawals imposed or automatic confirmations paused by a staff member who plays in the match, scheduled matches, refereeing schedule, incoming reports); a caster, of the removal of their registration for a match by someone else, with the reason, as long as they hold the streaming permission; an assigned referee, of the removal of their refereeing by someone else or automatically, with the reason, as long as they hold the refereeing permission.{" "}
             <strong>Nothing is sent without your action</strong>: notifications are turned on device by device,

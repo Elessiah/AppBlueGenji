@@ -965,7 +965,7 @@ function RgpdFr({
           <p>
             Vous pouvez être prévenu sur votre téléphone ou votre ordinateur du départ de vos matchs, d&apos;un
             score à confirmer ou validé automatiquement faute de réponse, du coup d&apos;envoi d&apos;un tournoi, de l&apos;horaire de vos matchs (posé,
-            changé ou retiré) et de ses rappels, et de ce qui concerne votre compte ou votre équipe ; un membre du staff, aussi des
+            changé ou retiré) et de ses rappels, des réglages du salon d&apos;un match que vous gérez (propriétaire ou manager d&apos;une équipe, joueur d&apos;un tournoi individuel), et de ce qui concerne votre compte ou votre équipe ; un membre du staff, aussi des
             alertes de son rôle (alertes d&apos;arbitrage, litiges tranchés, résultats corrigés, abandons imposés à l&apos;adversaire ou validations automatiques suspendues par un membre du staff qui joue le match, matchs planifiés, programme d&apos;arbitrage, signalements reçus) ; un caster, du retrait de son inscription sur un match par un autre que lui, avec le motif, tant qu&apos;il détient la permission de diffusion ; un arbitre désigné, du retrait de son arbitrage par un autre que lui ou d&apos;office, avec le motif, tant qu&apos;il détient la permission d&apos;arbitrage. <strong>Rien ne part sans votre geste</strong> :
             les notifications s&apos;activent appareil par appareil, depuis{" "}
             <Link href="/profil#notifications">Mon profil</Link>, où vous choisissez aussi les sujets.
