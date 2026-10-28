@@ -130,7 +130,7 @@ describe("dispatchLobbyBriefs", () => {
     expect(team2.dm("en")).toContain("• Left (host): “Renards”");
   });
 
-  it("ne réserve que si le salon est encore ouvert pour cet appariement (lancement défait entre-temps : rien)", async () => {
+  it("ne réserve que si le salon est encore ouvert pour cet appariement et ces équipes (lancement défait ou réappariement entre-temps : rien)", async () => {
     const { execute } = mockDb([MATCH], [false, false]);
     expect(await dispatchLobbyBriefs()).toBe(0);
     const [sql] = execute.mock.calls[0];
@@ -138,6 +138,8 @@ describe("dispatchLobbyBriefs", () => {
     expect(sql).toMatch(/INSERT IGNORE INTO bg_match_start_notices \(match_id, pairing, phase\)\s+SELECT m\.id, m\.launch_pairing, \? FROM bg_matches m/);
     expect(sql).toMatch(/m\.id = \? AND m\.launch_pairing = \? AND m\.status = 'READY' AND m\.is_bye = 0/);
     expect(sql).toMatch(/m\.lobby_opened_at IS NOT NULL/);
+    // Réapparié entre-temps (équipes changées, `launch_pairing` resté) : rien pour les anciennes équipes.
+    expect(sql).toMatch(/AND m\.launch_pairing = CONCAT\(m\.team1_id, ':', m\.team2_id\)/);
     expect(sql).not.toMatch(/VALUES/);
     expect(notifyUsers).not.toHaveBeenCalled();
   });
