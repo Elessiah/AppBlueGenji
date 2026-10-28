@@ -545,8 +545,9 @@ d'opposition (`REGISTRATION_STREAM_NOTICE_SHORT`, `register.streamNoticeShort`),
 le bouton « i » porte la mention entière et le lien vers `/rgpd#retransmission` ;
 la confirmation, elle, relit la mention entière. Les phrases viennent d'un module pur,
 `lib/shared/stream-notice.ts`, partagé avec la section « Retransmission des
-matchs » des conditions d'utilisation (une précision : `TERMS_VERSION` ne bouge
-pas) ; le détail est sur `/rgpd#retransmission`. L'opposition se demande par
+matchs » des conditions d'utilisation (depuis leur version 7 : le message #live
+de la soirée nomme équipes et joueurs avant le début d'un match programmé dans
+la soirée et une fois le match terminé, pas seulement à son départ) ; le détail est sur `/rgpd#retransmission`. L'opposition se demande par
 « Signaler un problème », catégorie RGPD : le joueur apparaît alors sous un nom
 neutre, et un lien de rediffusion qui le montre est retiré.
 

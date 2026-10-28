@@ -264,9 +264,10 @@ describe("revue légale #445 — T08 et l'alerte AutoMod (FR et EN)", () => {
   const fr = (ref: string) => PROCESSING_ACTIVITIES.find((a) => a.ref === ref)!;
   const en = (ref: string) => PROCESSING_ACTIVITIES_EN.find((a) => a.ref === ref)!;
 
-  it("T08 remet l'avis « Match retiré » et nomme les modérateurs destinataires d'une alerte AutoMod", () => {
-    expect(fr("T08").subPurposes.join(" ")).toMatch(/horaires et rappels de match et avis de retrait d'un match \(« Match retiré » ; ces messages de match aux seuls tags Discord certifiés\), avis de modération/);
-    expect(en("T08").subPurposes.join(" ")).toMatch(/match times and reminders and notices of removal from a match \(“Match retiré”; these match messages to certified Discord tags only\), moderation notices/);
+  // Revue de #491 (TERMS v7) : T08 liste aussi les réglages du salon (MR-4) et l'avis du retrait d'un cast (LN-1), comme les conditions du bot.
+  it("T08 remet l'avis « Match retiré », les réglages du salon et l'avis du retrait d'un cast, et nomme les modérateurs destinataires d'une alerte AutoMod", () => {
+    expect(fr("T08").subPurposes.join(" ")).toMatch(/horaires et rappels de match, avis de retrait d'un match \(« Match retiré »\), réglages du salon d'un match envoyés à ceux qui gèrent ses engagées et avis envoyé à un caster dont l'inscription est retirée par un autre que lui \(ces messages de match aux seuls tags Discord certifiés\), avis de modération/);
+    expect(en("T08").subPurposes.join(" ")).toMatch(/match times and reminders, notices of removal from a match \(“Match retiré”\), the lobby settings of a match sent to those who manage its entrants and the notice sent to a caster whose registration for a match is removed by someone else \(these match messages to certified Discord tags only\), moderation notices/);
     expect(fr("T08").recipients).toContain("Modérateurs du serveur Discord de l'association, si une règle AutoMod de Discord bloque ou signale une annonce #live (traitement T16)");
     expect(en("T08").recipients).toContain("Moderators of the association's Discord server, if a Discord AutoMod rule blocks or flags a #live announcement (processing activity T16)");
   });

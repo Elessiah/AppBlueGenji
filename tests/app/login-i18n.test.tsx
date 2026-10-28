@@ -487,7 +487,7 @@ describe("modale d'entrée — conditions mises à jour (LEGAL-FOLLOWUP-444)", (
     expect(text.replace(/\s+/g, " ")).toContain(
       `Les conditions d'utilisation ont changé (version ${TERMS_VERSION}, en vigueur depuis le ${formatTermsDateIn("fr")}) : relis-les avant de les accepter de nouveau.`,
     );
-    expect(formatTermsDateIn("fr")).toBe("19 octobre 2026");
+    expect(formatTermsDateIn("fr")).toBe("30 octobre 2026");
   });
 
   it("le dit en anglais sous /en", () => {
@@ -495,7 +495,7 @@ describe("modale d'entrée — conditions mises à jour (LEGAL-FOLLOWUP-444)", (
     expect(text.replace(/\s+/g, " ")).toContain(
       `The terms of use have changed (version ${TERMS_VERSION}, in force since ${formatTermsDateIn("en")}): read them again before accepting them anew.`,
     );
-    expect(formatTermsDateIn("en")).toBe("October 19, 2026");
+    expect(formatTermsDateIn("en")).toBe("October 30, 2026");
   });
 
   it("« relis-les » / « read them again » mène aux conditions de la langue lue (revue UI/UX #445)", () => {

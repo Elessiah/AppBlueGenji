@@ -8,6 +8,10 @@ import {
   registrationStreamNotice,
 } from "@/lib/shared/stream-notice";
 import { TERMS_SECTIONS, TERMS_VERSION } from "@/lib/shared/terms-of-use";
+import { TERMS_SECTIONS_EN } from "@/lib/shared/terms-of-use-en";
+import { STREAM_NOTICE_LIVE_EN } from "@/lib/shared/legal-text-en";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 describe("information sur la retransmission des matchs", () => {
   it("renvoie à la section de /rgpd qui la détaille", () => {
@@ -60,5 +64,33 @@ describe("conditions d'utilisation — retransmission des matchs", () => {
 
   it("sa base légale (exécution du service) est une règle de fond du tournoi : version 4 au moins", () => {
     expect(TERMS_VERSION).toBeGreaterThanOrEqual(4);
+  });
+});
+
+// TERMS v7 (report de LOGS-NOTIFS) : le message #live de la soirée liste un
+// match avant son début s'il est programmé dans la soirée et une fois terminé —
+// pas seulement à son départ ; /rgpd dit que cette liste ne laisse aucune trace.
+describe("message #live de la soirée (conditions v7)", () => {
+  const readSource = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
+
+  it("dit la mention #live avant, pendant et après le match, en français et en anglais", () => {
+    expect(STREAM_NOTICE_LIVE).toContain("par un message de soirée qui liste chaque match à son heure — avant son début s'il est programmé dans la soirée, pendant sa diffusion, puis une fois terminé, avec son score —");
+    expect(STREAM_NOTICE_LIVE_EN).toContain("by an evening message that lists each match at its time — before it starts if it is scheduled that evening, while it is streamed, then once finished, with its score —");
+  });
+
+  it("est reprise par la section « Retransmission des matchs » des conditions (FR et EN)", () => {
+    expect(TERMS_SECTIONS.find((s) => s.id === "retransmission")?.paragraphs.join(" ")).toContain(STREAM_NOTICE_LIVE);
+    expect(TERMS_SECTIONS_EN.find((s) => s.id === "retransmission")?.paragraphs.join(" ")).toContain(STREAM_NOTICE_LIVE_EN);
+  });
+
+  it("le dit aussi à l'inscription, en équipe comme en individuel", () => {
+    for (const solo of [true, false]) {
+      expect(registrationStreamNotice(solo)).toContain("Au début d'un match diffusé — et avant, s'il est programmé dans la soirée, puis une fois terminé —,");
+    }
+  });
+
+  it("dit sur /rgpd qu'un match listé avant son passage à l'antenne ne laisse aucune trace sur le site (FR et EN)", () => {
+    expect(readSource("app/rgpd/page.tsx").replace(/\s+/g, " ")).toContain("programmé dans la soirée, ne laisse aucune trace sur le site");
+    expect(readSource("app/rgpd/RgpdEn.tsx").replace(/\s+/g, " ")).toContain("scheduled that evening, leaves no trace on the site");
   });
 });

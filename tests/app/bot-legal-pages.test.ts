@@ -494,18 +494,19 @@ describe("politique du bot — pseudo solo dans #live et messages de match (RGPD
   });
 
   it("renvoie à « Mon profil » pour couper les messages de match, et avance sa date (FR et EN)", () => {
-    expect(fr).toContain("un joueur, propriétaire ou manager d'équipe peut couper ceux de ses matchs (horaire, rappel, retrait d'un match, réglages du salon) dans « Mon profil »");
-    expect(fr).toContain("(horaire, rappel, retrait d'un match, réglages du salon)");
-    expect(en).toContain("(time, reminder, removal from a match, lobby settings)");
+    expect(fr).toContain("un joueur, propriétaire ou manager d'équipe, ou un caster, peut couper ceux de ses matchs (horaire, rappel, retrait d'un match, réglages du salon, retrait d'un cast) dans « Mon profil »");
+    expect(fr).toContain("(horaire, rappel, retrait d'un match, réglages du salon, retrait d'un cast)");
+    expect(en).toContain("(time, reminder, removal from a match, lobby settings, removal of a cast)");
     expect(fr).toContain("« un joueur » pour une entrée sans compte, un compte supprimé ou une inscription antérieure au 16 octobre 2026");
-    expect(en).toContain("a player, team owner or manager can turn off those about their matches (time, reminder, removal from a match, lobby settings) in “My profile”");
+    expect(en).toContain("a player, team owner or manager, or a caster, can turn off those about their matches (time, reminder, removal from a match, lobby settings, removal of a cast) in “My profile”");
     // The solo #live username rests on performance of the service, not legitimate interest (user decision 2026-10-14).
     expect(fr).toContain("Le pseudo d'un joueur dans l'annonce #live d'un tournoi individuel n'en relève pas : il repose sur l'exécution du service auquel il s'inscrit — ne pas y être nommé revient à ne pas s'inscrire");
     expect(en).toContain("A player's username in the #live announcement of a solo tournament is not covered: it rests on performance of the service they register for — not being named in it means not registering");
     // Retention of the #live post, as on the site (T16).
     expect(fr).toContain("**Annonces #live** (message de la soirée des matchs diffusés : noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs) : gardées dans le salon tant qu'il existe, même après la suppression du compte du joueur");
     expect(en).toContain("**#live announcements** (evening message of the streamed matches: team names or, in a solo tournament, the players' public BlueGenji username): kept in the channel as long as it exists, even after the player's account is deleted");
-    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["28 octobre 2026", "28 October 2026"]);
+    // TERMS v7 : datée du lendemain de la mise en ligne prévue (nuit du 28 au 29 octobre 2026, § Dates corrigées).
+    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["30 octobre 2026", "30 October 2026"]);
   });
 });
 
@@ -514,14 +515,14 @@ describe("politique du bot — réglages du salon (MATCH-REFEREE MR-4)", () => {
   const en = JSON.stringify(PRIVACY_POLICY.en);
 
   it("liste le brief parmi les messages remis, certifiés et opposables, avec sa base (FR et EN)", () => {
-    expect(fr).toContain("réglages du salon d'un match envoyés à ceux qui gèrent ses engagées, alerte d'arbitrage");
-    expect(fr).toContain("(code, horaire, rappel, retrait d'un match, réglages du salon, avis de modération");
-    expect(fr).toContain("ceux des matchs (horaire, rappel, retrait d'un match, réglages du salon) ne partent qu'aux comptes dont le tag Discord est certifié");
-    expect(fr).toContain("intérêt légitime pour les messages privés de match d'un joueur (horaire, rappels, « Match retiré ») et les réglages du salon envoyés à ceux qui gèrent les engagées d'un match, auxquels chacun s'oppose");
-    expect(en).toContain("lobby settings of a match sent to those who manage its entrants, referee alert");
-    expect(en).toContain("(code, match time, reminder, removal from a match, lobby settings, moderation notice");
-    expect(en).toContain("those about matches (time, reminder, removal from a match, lobby settings) only go to accounts with a Discord tag certified");
-    expect(en).toContain("and the lobby settings sent to those who manage the entrants of a match, which each of them objects to");
+    expect(fr).toContain("réglages du salon d'un match envoyés à ceux qui gèrent ses engagées, avis envoyé à un caster dont l'inscription est retirée par un autre que lui, alerte d'arbitrage");
+    expect(fr).toContain("(code, horaire, rappel, retrait d'un match, réglages du salon, retrait d'un cast, avis de modération");
+    expect(fr).toContain("ceux des matchs (horaire, rappel, retrait d'un match, réglages du salon, retrait d'un cast) ne partent qu'aux comptes dont le tag Discord est certifié");
+    expect(fr).toContain("intérêt légitime pour les messages privés de match d'un joueur (horaire, rappels, « Match retiré »), les réglages du salon envoyés à ceux qui gèrent les engagées d'un match et l'avis envoyé à un caster dont l'inscription est retirée par un autre que lui, auxquels chacun s'oppose");
+    expect(en).toContain("lobby settings of a match sent to those who manage its entrants, notice to a caster that someone else removed their registration for a match, referee alert");
+    expect(en).toContain("(code, match time, reminder, removal from a match, lobby settings, removal of a cast, moderation notice");
+    expect(en).toContain("those about matches (time, reminder, removal from a match, lobby settings, removal of a cast) only go to accounts with a Discord tag certified");
+    expect(en).toContain("the lobby settings sent to those who manage the entrants of a match and the notice sent to a caster whose registration someone else removes, which each of them objects to");
   });
 });
 
@@ -531,9 +532,9 @@ describe("politique du bot — avis « Match retiré », AutoMod et bases (LEGAL
 
   it("déclare l'avis de retrait d'un match parmi les messages remis (FR et EN)", () => {
     expect(fr).toContain("horaire ou rappel de match, avis de retrait d'un match (« Match retiré »), réglages du salon");
-    expect(fr).toContain("(code, horaire, rappel, retrait d'un match, réglages du salon, avis de modération");
+    expect(fr).toContain("(code, horaire, rappel, retrait d'un match, réglages du salon, retrait d'un cast, avis de modération");
     expect(en).toContain("match time or reminder, notice of removal from a match (“Match retiré”), lobby settings");
-    expect(en).toContain("(code, match time, reminder, removal from a match, lobby settings, moderation notice");
+    expect(en).toContain("(code, match time, reminder, removal from a match, lobby settings, removal of a cast, moderation notice");
   });
 
   it("donne une base à l'alerte AutoMod d'une annonce #live bloquée ou signalée (FR et EN)", () => {
@@ -542,12 +543,21 @@ describe("politique du bot — avis « Match retiré », AutoMod et bases (LEGAL
   });
 
   it("les conditions du bot citent aussi l'avis « Match retiré » parmi les messages remis (FR et EN)", () => {
-    expect(JSON.stringify(TERMS_OF_SERVICE.fr)).toContain("rappels de match et avis de retrait d'un match (« Match retiré »)");
-    expect(JSON.stringify(TERMS_OF_SERVICE.en)).toContain("match reminders and notices of removal from a match (“Match retiré”)");
+    expect(JSON.stringify(TERMS_OF_SERVICE.fr)).toContain("rappels de match, réglages du salon d'un match, avis de retrait d'un match (« Match retiré ») et avis envoyé à un caster dont l'inscription est retirée par un autre que lui");
+    expect(JSON.stringify(TERMS_OF_SERVICE.en)).toContain("match reminders, the lobby settings of a match, notices of removal from a match (“Match retiré”) and the notice sent to a caster whose registration for a match is removed by someone else");
     // DM-CERTIFIED-ONLY (revue légale) : les conditions disent, comme la politique, que ces messages de match ne partent qu'aux tags certifiés.
     expect(JSON.stringify(TERMS_OF_SERVICE.fr)).toContain("— ces messages de match aux seuls comptes dont le tag Discord est certifié sur le site —");
     expect(JSON.stringify(TERMS_OF_SERVICE.en)).toContain("— these match messages only to accounts with a Discord tag certified on the website —");
-    expect([TERMS_OF_SERVICE.fr.lastUpdated, TERMS_OF_SERVICE.en.lastUpdated]).toEqual(["19 octobre 2026", "19 October 2026"]);
+  });
+
+  // TERMS v7 : l'article 01 des conditions du bot cite les réglages du salon
+  // (MATCH-REFEREE MR-4) parmi les messages de match remis, réservés aux tags
+  // certifiés comme les autres ; date avancée à la mise en ligne prévue.
+  it("les conditions du bot citent les réglages du salon parmi les messages de match remis, datées du 30 octobre 2026 (FR et EN)", () => {
+    const terms = { fr: JSON.stringify(TERMS_OF_SERVICE.fr), en: JSON.stringify(TERMS_OF_SERVICE.en) };
+    expect(terms.fr).toMatch(/rappels de match, réglages du salon d'un match, avis de retrait d'un match \(« Match retiré »\) et avis envoyé à un caster dont l'inscription est retirée par un autre que lui — ces messages de match aux seuls comptes dont le tag Discord est certifié/);
+    expect(terms.en).toMatch(/match reminders, the lobby settings of a match, notices of removal from a match \(“Match retiré”\) and the notice sent to a caster whose registration for a match is removed by someone else — these match messages only to accounts with a Discord tag certified/);
+    expect([TERMS_OF_SERVICE.fr.lastUpdated, TERMS_OF_SERVICE.en.lastUpdated]).toEqual(["30 octobre 2026", "30 October 2026"]);
   });
 
   it("déclare qu'un blocage ou un signalement AutoMod peut porter l'annonce #live aux modérateurs (FR et EN)", () => {

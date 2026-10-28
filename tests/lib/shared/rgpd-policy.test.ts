@@ -10,6 +10,9 @@ import {
   AUTOMOD_ALERT_SCOPE,
   BATTLETAG_MATCH_SCOPE,
   REFEREE_BATTLETAG_SCOPE,
+  REFEREE_BATTLETAG_BEFORE_V7_SCOPE,
+  REFEREE_USERNAME_SCOPE,
+  REFEREE_USERNAME_BEFORE_V7_SCOPE,
   VERIFIED_BADGE_SCOPE,
   MATCH_CONTACTS_SCOPE,
   LIVE_PSEUDO_SCOPE,
@@ -57,19 +60,27 @@ describe("contacts du lancement d'un match — base légale", () => {
     expect(BATTLETAG_MATCH_SCOPE).toMatch(/arbitres et administrateurs n'y ont pas d'autre accès \(conditions d'utilisation, « Contacts de match »\)$/);
   });
 
-  // Revue juridique de #487 : le BattleTag de l'arbitre désigné a sa propre
-  // portée, sur l'intérêt légitime — aucune clause des conditions ne le couvre
-  // avant leur version 7.
-  it("fonde la lecture du BattleTag de l'arbitre désigné sur l'intérêt légitime, sans citer les conditions", () => {
+  // TERMS v7 (décision de l'utilisateur du 2026-10-27) : le BattleTag de
+  // l'arbitre désigné garde sa propre portée, et passe de l'intérêt légitime
+  // à l'exécution du contrat une fois la version 7 acceptée par cet arbitre ;
+  // jusque-là, l'intérêt légitime et son opposition (portée distincte).
+  it("fonde la lecture du BattleTag de l'arbitre désigné sur le contrat une fois la v7 acceptée, l'intérêt légitime opposable avant", () => {
+    expect(REFEREE_BATTLETAG_SCOPE).toMatch(/^BattleTag de l'arbitre désigné d'un match, même masqué, dans ses fenêtres « Contacts » et de lancement et sur la page du match/);
     expect(
       REFEREE_BATTLETAG_SCOPE.endsWith(
-        "— opposition par le formulaire de signalement, catégorie RGPD (retenue, le staff ne lui confie plus de match) ; retrait d'un match à tout moment, le staff pouvant sinon lui confier de nouveau ce match, sans avis",
+        "; retrait d'un match à tout moment, le staff pouvant lui confier de nouveau ce match, sans avis (conditions d'utilisation, « Contacts de match », une fois leur version 7 acceptée par l'arbitre)",
       ),
     ).toBe(true);
-    expect(REFEREE_BATTLETAG_SCOPE).not.toMatch(/conditions d'utilisation/);
+    expect(REFEREE_BATTLETAG_SCOPE).not.toMatch(/opposition/);
+    // Revue juridique de #491 : la fenêtre de lancement ne s'ouvre pas aux arbitres.
+    expect(REFEREE_BATTLETAG_SCOPE).toContain("(la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné)");
+    expect(REFEREE_BATTLETAG_BEFORE_V7_SCOPE).toBe(
+      "la même présentation du BattleTag de l'arbitre désigné, tant que cet arbitre n'a pas accepté la version 7 des conditions d'utilisation — opposition par le formulaire de signalement, catégorie RGPD (retenue, le staff ne lui confie plus de match, même une fois la version 7 acceptée)",
+    );
     expect(DONNEES_PROFIL.find((d) => d.donnee === "Pseudo Overwatch")?.extraBases).toEqual([
       { base: "Exécution du contrat", scope: BATTLETAG_MATCH_SCOPE },
-      { base: "Intérêt légitime", scope: REFEREE_BATTLETAG_SCOPE },
+      { base: "Exécution du contrat", scope: REFEREE_BATTLETAG_SCOPE },
+      { base: "Intérêt légitime", scope: REFEREE_BATTLETAG_BEFORE_V7_SCOPE },
       { base: "Intérêt légitime", scope: VERIFIED_BADGE_SCOPE },
     ]);
   });
@@ -175,11 +186,11 @@ describe("DONNEES_PROFIL", () => {
     expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Discord username")?.finalite).toMatch(/bot codes by direct message \(login, linking, certification\), bot notifications \(certified tag only\)/);
     // La certification filtre les messages de match : la base de ceux-ci (intérêt légitime) y figure.
     expect(DONNEES_PROFIL.find((d) => d.donnee === "Certification du pseudo Discord")?.extraBases).toContainEqual({ base: "Intérêt légitime", scope: MATCH_TIME_DM_SCOPE });
-    expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Certification of the Discord username")?.extraBases).toContainEqual({ base: "Intérêt légitime", scope: "match time notices, reminders and match removal notices by direct message" });
+    expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Certification of the Discord username")?.extraBases).toContainEqual({ base: "Intérêt légitime", scope: "match time notices, reminders, match removal notices, lobby settings and cast removal notices by direct message" });
     // L'ID sert aussi, certifié ou non, aux avis passant par la portée « proven ».
     const id = DONNEES_PROFIL.find((d) => d.donnee === "ID Discord");
-    expect(id?.finalite).toMatch(/horaires, rappels et retrait de match — seulement si ton tag est certifié —, demande d'adhésion à une équipe que tu gères, avis de suspension ou de modération, information sur tes données/);
-    expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Discord ID")?.finalite).toMatch(/match times, reminders and removal — only if your tag is certified —, request to join a team you manage, suspension or moderation notices, information about your data/);
+    expect(id?.finalite).toMatch(/horaires, rappels, retrait de match, réglages du salon si tu gères une engagée ou joues un tournoi individuel, et retrait de ton cast — seulement si ton tag est certifié —, demande d'adhésion à une équipe que tu gères, avis de suspension ou de modération, information sur tes données/);
+    expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Discord ID")?.finalite).toMatch(/match times, reminders, removal, lobby settings if you manage an entrant or play a solo tournament, and removal of your cast — only if your tag is certified —, request to join a team you manage, suspension or moderation notices, information about your data/);
   });
 
   it("déclare, sur la certification, chaque public qu'elle ouvre — et celui qu'on choisit", () => {
@@ -433,10 +444,11 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
   it("le droit d'opposition les nomme, en français et en anglais", () => {
     expect(DROITS.find((d) => d.title === "Droit d'opposition")?.text).toContain(MATCH_TIME_DM_SCOPE);
     expect(DROITS_EN.find((d) => d.title === "Right to object")?.text).toContain(
-      "match time notices, reminders and match removal notices by direct message",
+      "match time notices, reminders, match removal notices, lobby settings and cast removal notices by direct message",
     );
-    // L'avis « Match retiré » et la case de Mon profil (revue juridique #444).
-    expect(MATCH_TIME_DM_SCOPE).toBe("annonces d'horaire, rappels et avis de retrait de match en message privé");
+    // L'avis « Match retiré » et la case de Mon profil (revue juridique #444) ;
+    // réglages du salon (MR-4) et retrait d'un cast (revue juridique de #491).
+    expect(MATCH_TIME_DM_SCOPE).toBe("annonces d'horaire, rappels, avis de retrait de match, réglages du salon et avis du retrait d'un cast en message privé");
     expect(DROITS.find((d) => d.title === "Droit d'opposition")?.text).toMatch(/case « Messages privés Discord de mes matchs » de Mon profil/);
     expect(DROITS_EN.find((d) => d.title === "Right to object")?.text).toMatch(/“Discord direct messages about my matches” box in My profile/);
   });
@@ -453,11 +465,19 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
     expect(pseudo?.extraBases).toEqual([
       { base: "Exécution du contrat", scope: LIVE_PSEUDO_SCOPE },
       { base: "Intérêt légitime", scope: AUTOMOD_ALERT_SCOPE },
+      // Revue juridique de #491 : le pseudo de l'arbitre désigné, même base que son BattleTag.
+      { base: "Exécution du contrat", scope: REFEREE_USERNAME_SCOPE },
+      { base: "Intérêt légitime", scope: REFEREE_USERNAME_BEFORE_V7_SCOPE },
     ]);
     expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Site username")?.extraBases).toEqual([
       { base: "Exécution du contrat", scope: "#live announcement of a solo tournament, kept in the Discord channel until deleted on request" },
       { base: "Intérêt légitime", scope: "AutoMod alert for such an announcement when blocked or flagged, kept in the moderators' alert channel until they delete it or on request" },
+      { base: "Exécution du contrat", scope: "the username of a match's assigned referee, in its “Contacts” and launch windows and on the match page, to the same readers at the same times as their BattleTag (see “Overwatch username”), and alone as soon as the launch window shows the match (terms of use, “Match contacts”, once the referee has accepted their version 7)" },
+      { base: "Intérêt légitime", scope: "the same presentation of the assigned referee's username, as long as that referee has not accepted version 7 of the terms of use — objection through the report form, GDPR category (once upheld, the staff no longer assigns them matches, even once version 7 is accepted)" },
     ]);
+    expect(REFEREE_USERNAME_SCOPE).toContain("une fois leur version 7 acceptée par l'arbitre");
+    expect(REFEREE_USERNAME_BEFORE_V7_SCOPE).toContain("tant que cet arbitre n'a pas accepté la version 7");
+    expect(REFEREE_USERNAME_BEFORE_V7_SCOPE).toContain("(retenue, le staff ne lui confie plus de match, même une fois la version 7 acceptée)");
     const choice = DONNEES_PROFIL.find((d) => d.donnee === "Choix des messages privés de match");
     // LEGAL-OPTOUT-BASIS : garder le choix relève d'une obligation légale (honorer l'opposition), comme T04.
     expect(choice?.base).toBe("Obligation légale");
@@ -488,7 +508,7 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
   it("la portée est traduite en anglais", () => {
     const entry = DONNEES_PROFIL_EN.find((d) => d.donnee === "Discord ID");
     expect(entry?.extraBases).toEqual([
-      { base: "Intérêt légitime", scope: "match time notices, reminders and match removal notices by direct message" },
+      { base: "Intérêt légitime", scope: "match time notices, reminders, match removal notices, lobby settings and cast removal notices by direct message" },
       { base: "Intérêt légitime", scope: "suspension or moderation notices by direct message" },
       { base: "Obligation légale", scope: "information about your data by direct message" },
     ]);

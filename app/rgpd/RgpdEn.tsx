@@ -861,22 +861,28 @@ export function RgpdEn({
           <p id="arbitre-designe">
             <strong>Assigned referee of a match.</strong> A staff member who can referee (refereeing permission,
             certified Discord tag and linked Battle.net account) takes a match, or the staff assigns it to them.
-            Their username and BattleTag (even when hidden) — never their Discord tag — are then presented in the
+            Their username and BattleTag (even when hidden) — never their Discord tag in that capacity (if they also
+            cast the match, their caster contacts follow the casters&apos; rule) — are then presented in the
             match&apos;s “Contacts” and launch windows and on the match page, to the same parties and at the same times as the match
             contacts: to both teams and to the referees as soon as both its opponents are known until its end, to
             its casters while the match is being played; the username alone appears there as soon as the launch
             window shows the match. The public and other players only read “Referee assigned”. Their “Ready” is
-            expected like those of the teams and casters. If they no longer meet these requirements or now play
-            the match, they are no longer shown (and are removed from it before the launch); the refereeing of a
+            expected like those of the teams and casters. If they no longer meet these requirements or become
+            a player of the match before its launch, they are no longer shown (and are removed from it before the launch); the refereeing of a
             deleted account is removed from all its matches. When someone else removes it from them (the staff,
             another referee the match is assigned to, self-management) or it is removed automatically, they are
             notified by push notification only, with the reason. These actions, a match&apos;s self-management and
             its first map are noted in the staff log on Discord without naming anyone, and a match that enters its
             launch with neither a referee nor self-management is flagged to the referees. Their presentation to
-            the parties to the match falls under <strong>legitimate interest</strong> (they know who referees and
-            can add them in game): they may object to it through the report form (GDPR category) — once upheld, their objection means the staff no longer assigns them matches — and withdraw from a match at any time, the staff otherwise being able to assign that match to them again, without notice; collecting
-            their “Ready” and the removal notice fall under <strong>performance of the service</strong>, the
-            referees acting for the association (<LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>).
+            the parties to the match falls under <strong>performance of the service</strong> once they have
+            accepted version 7 of the terms of use, which provide for it (“Match contacts” section), so that the
+            parties know who referees and can add them in game; until they accept it, it falls under{" "}
+            <strong>legitimate interest</strong> (same aim), and they may object to it through the report form
+            (GDPR category) — once upheld, their objection means the staff no longer assigns them matches, and still stands once version 7
+            is accepted. They can withdraw from a match at any time, the staff being able to
+            assign that match to them again, without notice; until they have accepted version 7, as the acceptance window
+            covers the tournament pages, they withdraw by asking for it through that same form. Collecting their “Ready” and the removal notice also fall under performance of the service,
+            the referees acting for the association (<LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>).
           </p>
         </div>
       </section>
@@ -984,7 +990,11 @@ export function RgpdEn({
             not want their username in that announcement does not register for the solo tournament. If a Discord
             AutoMod rule blocks or flags an announcement, its text (including the username in a solo tournament) may reach the
             server moderators&apos; alert channel, where the alert stays until the moderators delete it, under the
-            association&apos;s legitimate interest in moderating its server (to object: ask for its deletion). These
+            association&apos;s legitimate interest in moderating its server (to object: ask for its deletion). A
+            match listed in that message before it goes on air, scheduled that evening, leaves no trace on the
+            site: the site only keeps the trace of a match&apos;s announcement when it goes on air
+            (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>), which appears, in a solo tournament,
+            in the export of your data — neither the text of the message nor the list of scheduled matches it gives. These
             announcements stay in the channel as long as the #live channel exists; the team or player concerned can
             ask for their deletion, and for that of these alerts,
             through the “Report a problem” button, GDPR category.

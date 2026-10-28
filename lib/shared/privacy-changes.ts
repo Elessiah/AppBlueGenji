@@ -1131,10 +1131,10 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // MATCH-REFEREE MR-4 : brief du salon — nouveau message privé de match et
     // nouveau sujet push, adressés à ceux qui gèrent les engagées (propriétaires,
     // managers, joueur d'une entrée solo). Joueurs concernés : pas de public.
-    // Daté comme les entrées MR-1 et MR-2 (mise en ligne groupée, heure
-    // inconnue — § Dates corrigées).
+    // Daté du lendemain de la mise en ligne groupée prévue dans la nuit du 28
+    // au 29 octobre (§ Dates corrigées), comme l'entrée des conditions v7.
     id: "2026-10-reglages-du-salon-aux-managers",
-    publishedAt: "2026-10-29",
+    publishedAt: "2026-10-30",
     title: "Réglages du salon envoyés aux managers",
     links: [MATCH_DM_PARAGRAPH_LINK],
     summary:
@@ -1142,6 +1142,40 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     details: [
       "Le message dit qui joue à gauche (l'hôte) et à droite, la première carte, le premier ban, le rappel de trier les joueurs par rôle si le match est casté, et s'il a un arbitre désigné ou passe en autogestion, avec les noms d'équipe, le tournoi, la manche et le lien de la page du match. Il ne contient ni BattleTag, ni tag Discord, ni pseudo de joueur : en tournoi individuel, il dit « toi » et « ton adversaire ». Il part à l'ouverture du salon, et de nouveau s'il rouvre, par exemple après un changement d'horaire.",
       "Le message privé ne part qu'à un tag Discord certifié et se coupe, comme les autres messages de match, par la case « Messages privés Discord de mes matchs » de « Mon profil » ; la notification push a son propre sujet, « Réglages du salon », actif par défaut pour qui a activé les notifications push, que tu peux couper dans « Mon profil ».",
+    ],
+  },
+  {
+    // TERMS v7 : les conditions passent en version 7 (`TERMS_VERSION`) —
+    // « Contacts de match » (casters au pluriel, arbitre désigné, page du
+    // match), « Retransmission des matchs » (message #live de la soirée, avant
+    // et après le match) et « Acceptation » (suppression du compte depuis la
+    // fenêtre d'acceptation). La présentation de l'arbitre désigné passe de
+    // l'intérêt légitime à l'exécution du service (décision de l'utilisateur
+    // du 2026-10-27) dès que cet arbitre accepte la version 7 — jusque-là,
+    // l'intérêt légitime et l'opposition restent : un changement de base, à
+    // annoncer. La page du match
+    // (MR-3), nouveau lieu des contacts des casters et du BattleTag de
+    // l'arbitre, est annoncée ici (l'entrée de l'arbitre ne nomme que les deux
+    // fenêtres). Pour tous les comptes : pas de public. Daté du lendemain de la
+    // mise en ligne groupée prévue dans la nuit du 28 au 29 octobre (§ Dates
+    // corrigées).
+    id: "2026-10-conditions-v7-casters-et-arbitre",
+    publishedAt: "2026-10-30",
+    title: "Conditions d'utilisation : version 7 (casters, arbitre désigné, page du match)",
+    links: [
+      { href: "/conditions-utilisation#contacts-de-match", label: "Lire la section « Contacts de match »" },
+      { href: "/conditions-utilisation#retransmission", label: "Lire la section « Retransmission des matchs »" },
+      { href: "/rgpd#arbitre-designe", label: "Lire le paragraphe « Arbitre désigné d'un match »" },
+    ],
+    summary:
+      "Les conditions d'utilisation passent en version 7 : leur section « Contacts de match » prévoit plusieurs casters par match, l'arbitre désigné et la page du match, et la présentation de l'arbitre désigné repose désormais sur l'exécution du service, et non plus sur l'intérêt légitime, dès que cet arbitre a accepté cette version.",
+    details: [
+      "Contacts de match : les contacts d'un match vont à chacun de ses casters le temps du match, et ceux de chaque caster aussi aux autres casters du match. L'arbitre désigné y est présenté — son pseudo et son BattleTag, même masqué, jamais son tag Discord à ce titre (s'il caste aussi le match, ses contacts de caster suivent la règle des casters) — aux deux équipes et aux arbitres dès que les deux adversaires sont connus et jusqu'à la fin du match, et aux casters le temps du match.",
+      "Page du match : elle reprend les contacts des casters (tag Discord certifié et BattleTag, même masqué) et le pseudo et le BattleTag, même masqué, de l'arbitre désigné, aux mêmes personnes et aux mêmes moments que la fenêtre « Contacts » du match ; les contacts des équipes restent dans les fenêtres « Contacts » et de lancement. Un BattleTag masqué ne se lit nulle part ailleurs sur le site.",
+      "Si tu arbitres : dès que tu as accepté la version 7, la présentation de ton pseudo et de ton BattleTag aux parties de tes matchs repose sur l'exécution du service — les conditions d'utilisation la prévoient —, et non plus sur l'intérêt légitime : l'opposition par le formulaire de signalement ne s'y applique plus, et une opposition déjà retenue continue de valoir (le staff ne te confie plus de match). Tant que tu ne l'as pas acceptée, elle reste fondée sur l'intérêt légitime, et tu peux t'y opposer par le formulaire de signalement (catégorie RGPD) ; la fenêtre d'acceptation couvrant alors les pages des tournois, tu te retires d'un match en le demandant par ce même formulaire. Tu peux toujours te retirer d'un match à tout moment, le staff pouvant te le confier de nouveau ; si tu ne remplis plus les conditions pour arbitrer (permission d'arbitrage, tag Discord certifié, compte Battle.net rattaché), ou si tu deviens joueur du match avant son lancement, tu n'es plus présenté.",
+      "Retransmission : les conditions disent maintenant que le message #live de la soirée nomme les équipes et, en tournoi individuel, les joueurs par leur pseudo public avant le début d'un match programmé dans la soirée et une fois le match terminé, pas seulement à son départ. La présence d'un match dans ce message avant son passage à l'antenne ne laisse aucune trace sur le site.",
+      "Acceptation : sans accepter les conditions, tu peux supprimer ton compte directement depuis la fenêtre qui te les présente, comme depuis ton profil.",
+      "Conditions d'utilisation : la version 7, en vigueur depuis le 30 octobre 2026, le dit dans ses sections « Contacts de match », « Retransmission des matchs » et « Acceptation ». Une fenêtre te la présente tant que tu ne l'as pas acceptée : l'accepter permet de continuer à utiliser le site.",
     ],
   },
 ];

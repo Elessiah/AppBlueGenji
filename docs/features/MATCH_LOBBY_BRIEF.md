@@ -81,9 +81,12 @@ opposable par l'interrupteur de « Mon profil ») et T12 (sujet push), `/rgpd`
 FR/EN § « Messages privés Discord de match », entrée
 `2026-10-reglages-du-salon-aux-managers` (FR/EN), politique de confidentialité
 du bot (`bot-legal-content.ts` : messages remis, tag certifié, interrupteur,
-base légale ; copie LegalTerms du bot à régénérer avec le lot TERMS v7), garde
+base légale), conditions du bot (article 01 : « réglages du salon » parmi
+les messages de match remis, depuis TERMS v7, copie LegalTerms du bot
+régénérée dans le même lot), garde
 des réservations (T04). Le brief repart quand le salon rouvre (horaire changé,
-retour à planifier, nouvel appariement). Conditions d'utilisation inchangées.
+retour à planifier, nouvel appariement). Conditions d'utilisation du site
+inchangées.
 
 ## Tests
 

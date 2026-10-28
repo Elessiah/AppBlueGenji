@@ -1045,22 +1045,28 @@ function RgpdFr({
           <p id="arbitre-designe">
             <strong>Arbitre désigné d&apos;un match.</strong> Un membre du staff qui peut arbitrer (permission
             d&apos;arbitrage, tag Discord certifié et compte Battle.net rattaché) prend un match, ou le staff le lui
-            confie. Son pseudo et son BattleTag (même masqué) — jamais son tag Discord — sont alors présentés dans
+            confie. Son pseudo et son BattleTag (même masqué) — jamais son tag Discord à ce titre (s&apos;il caste aussi le
+            match, ses contacts de caster suivent la règle des casters) — sont alors présentés dans
             les fenêtres « Contacts » et de lancement du match et sur la page du match, aux mêmes parties et aux mêmes moments que les
             contacts du match : aux deux équipes et aux arbitres dès que ses deux adversaires sont connus et
             jusqu&apos;à sa fin, à ses casters le temps du match ; le pseudo seul y paraît dès que la fenêtre de
             lancement montre le match. Le public et les autres joueurs ne lisent que « Arbitre désigné ». Son
             « Prêt » est attendu comme celui des équipes et des casters. S&apos;il ne remplit plus ces conditions ou
-            joue désormais le match, il n&apos;est plus montré (et en est retiré avant le lancement) ; l&apos;arbitrage
+            devient joueur du match avant son lancement, il n&apos;est plus montré (et en est retiré avant le lancement) ; l&apos;arbitrage
             d&apos;un compte supprimé est retiré de tous ses matchs. Quand un autre que lui le lui retire (le staff,
             un autre arbitre à qui le match est confié, l&apos;autogestion) ou qu&apos;il lui est retiré d&apos;office, il
             en est prévenu en notification push seulement, avec le motif. Ces gestes, l&apos;autogestion d&apos;un match
             et sa première carte sont notés au journal du staff sur Discord sans nommer personne, et un match qui
             entre en lancement sans arbitre ni autogestion est signalé aux arbitres. Sa présentation aux parties
-            du match relève de l&apos;<strong>intérêt légitime</strong> (qu&apos;elles sachent qui arbitre et
-            puissent l&apos;ajouter en jeu) : il peut s&apos;y opposer par le formulaire de signalement (catégorie RGPD) — retenue, son opposition fait que le staff ne lui confie plus de match — et se retirer d&apos;un match à tout moment, le staff pouvant sinon lui confier de nouveau ce match, sans avis ; le
-            recueil de son « Prêt » et l&apos;avis du retrait, de l&apos;<strong>exécution du service</strong>, les
-            arbitres agissant pour l&apos;association (<Link href="/rgpd/registre#t04">registre, T04</Link>).
+            du match relève de l&apos;<strong>exécution du service</strong> dès qu&apos;il a accepté la version 7
+            des conditions d&apos;utilisation, qui la prévoient (section « Contacts de match »), pour que les
+            parties sachent qui arbitre et puissent l&apos;ajouter en jeu ; tant qu&apos;il ne l&apos;a pas
+            acceptée, elle relève de l&apos;<strong>intérêt légitime</strong> (même but), et il peut s&apos;y
+            opposer par le formulaire de signalement (catégorie RGPD) — retenue, son opposition fait que le staff
+            ne lui confie plus de match, et continue de valoir une fois la version 7 acceptée. Il peut se retirer d&apos;un match à tout moment, le staff
+            pouvant lui confier de nouveau ce match, sans avis ; tant qu&apos;il n&apos;a pas accepté la version 7, la fenêtre
+            d&apos;acceptation couvrant les pages des tournois, il s&apos;en retire en le demandant par ce même formulaire. Le recueil de son « Prêt » et l&apos;avis du retrait relèvent aussi de l&apos;exécution
+            du service, les arbitres agissant pour l&apos;association (<Link href="/rgpd/registre#t04">registre, T04</Link>).
           </p>
         </div>
       </section>
@@ -1186,7 +1192,11 @@ function RgpdFr({
             une règle AutoMod de Discord bloque ou signale une annonce, son texte (pseudo compris en tournoi
             individuel) peut parvenir au salon d&apos;alertes des modérateurs du serveur, où l&apos;alerte
             reste jusqu&apos;à sa suppression par les modérateurs, au titre de l&apos;intérêt légitime de
-            l&apos;association à modérer son serveur (s&apos;y opposer : demander sa suppression). Ces annonces restent dans le salon tant
+            l&apos;association à modérer son serveur (s&apos;y opposer : demander sa suppression). Un match listé dans
+            ce message avant son passage à l&apos;antenne, programmé dans la soirée, ne laisse aucune trace sur
+            le site : le site ne garde que la trace de l&apos;annonce d&apos;un match à son passage à l&apos;antenne
+            (<Link href="/rgpd/registre#t16">registre, T16</Link>), qui figure, en tournoi individuel, dans
+            l&apos;export de vos données — ni le texte du message, ni la liste des matchs programmés qu&apos;il donne. Ces annonces restent dans le salon tant
             que le salon #live existe ; l&apos;équipe ou le joueur concerné peut en demander la
             suppression, comme celle de ces alertes, par le bouton « Signaler
             un problème », catégorie RGPD.
