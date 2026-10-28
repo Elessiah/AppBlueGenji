@@ -162,11 +162,18 @@ describe("PRIVACY_CHANGES — entrée rectificative de la marque de session", ()
     // Fermer la fenêtre (Échap, voile), son bouton vers la certification de « Mon profil »
     // (`DIALOG`) et le refus d'un clic dont le tag n'est plus le bon (`STATE_CHANGED`) répondent tous « Plus tard ».
     expect(fr).toContain("(« Plus tard », la fermeture de la fenêtre ou son bouton qui ouvre la certification de « Mon profil », « Ne plus voir »");
-    expect(fr).toContain("ou la certification, réussie ou refusée parce que ton tag ou ton compte Discord n'est plus celui que la fenêtre montrait)");
+    expect(fr).toContain("ou la certification, réussie ou refusée parce que ton tag Discord ne peut plus être certifié depuis la fenêtre)");
     expect(en).toContain("(“Later”, closing the window or its button that opens verification in “My profile”, “Don't show again”");
-    expect(en).toContain("or verification, whether it succeeds or is refused because your Discord tag or account is no longer the one the window showed)");
+    expect(en).toContain("or verification, whether it succeeds or is refused because your Discord tag can no longer be verified from the window)");
     expect(en).toContain("the mark is set at login and cleared at your first answer");
     expect(en).toContain("isn't included in the export of your data");
+  });
+
+  it("ne réduit plus le refus à un tag ou un compte changé (tag non attesté, absent, Discord délié)", () => {
+    const fr = entry?.details.join(" ");
+    const en = english?.details.join(" ");
+    expect(fr).not.toContain("n'est plus celui que la fenêtre montrait");
+    expect(en).not.toContain("no longer the one the window showed");
   });
 
   it("laisse intacte l'entrée publiée du 21 octobre", () => {

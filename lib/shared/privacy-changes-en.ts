@@ -629,7 +629,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     summary:
       "A clarification of the information of October 21, 2026: at each login with Discord or Blizzard, as long as your Discord tag isn't verified and you haven't chosen “Don't show again”, your login session records that the verification window still needs to be suggested to you, once per login.",
     details: [
-      "The information of October 21 said the opposite: that the session records, after “Later”, that the window no longer needs to be suggested. In fact, the mark is set at login and cleared at your first answer (“Later”, closing the window or its button that opens verification in “My profile”, “Don't show again” — which clears it on all your sessions —, or verification, whether it succeeds or is refused because your Discord tag or account is no longer the one the window showed), or as soon as there is nothing left to suggest.",
+      "The information of October 21 said the opposite: that the session records, after “Later”, that the window no longer needs to be suggested. In fact, the mark is set at login and cleared at your first answer (“Later”, closing the window or its button that opens verification in “My profile”, “Don't show again” — which clears it on all your sessions —, or verification, whether it succeeds or is refused because your Discord tag can no longer be verified from the window), or as soon as there is nothing left to suggest.",
       "This mark contains nothing else, goes with the session and isn't included in the export of your data. Nothing else changes: “Don't show again” is still kept on your account, with its date.",
     ],
   },
