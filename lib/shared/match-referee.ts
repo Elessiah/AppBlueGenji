@@ -174,6 +174,32 @@ export function missingRefereeNamesKey(
   return missing.join(",");
 }
 
+/** Nombre de désignations montrées dont le pseudo manque dans `names`. */
+function missingRefereeNamesCount(
+  matches: readonly { id: number; refereeKey: string | null }[],
+  names: readonly RefereeNameEntry[],
+): number {
+  let missing = 0;
+  for (const match of matches) {
+    if (match.refereeKey !== null && refereeNameOf(match, names) === null) missing += 1;
+  }
+  return missing;
+}
+
+/**
+ * Une liste de pseudos relue **améliore**-t-elle celle qu'on a ? Vrai quand
+ * elle laisse moins de désignations montrées sans pseudo. Une réponse en
+ * retard (lue avant une désignation plus récente, ou doublée par le contexte
+ * d'une reconnexion) n'écrase ainsi jamais une liste plus à jour.
+ */
+export function refereeNamesImprove(
+  matches: readonly { id: number; refereeKey: string | null }[],
+  current: readonly RefereeNameEntry[],
+  incoming: readonly RefereeNameEntry[],
+): boolean {
+  return missingRefereeNamesCount(matches, incoming) < missingRefereeNamesCount(matches, current);
+}
+
 /** Liste de pseudos d'arbitre reçue d'une réponse (forme contrôlée), `null` si elle n'en est pas une. */
 export function parseRefereeNames(value: unknown): RefereeNameEntry[] | null {
   if (!Array.isArray(value)) return null;

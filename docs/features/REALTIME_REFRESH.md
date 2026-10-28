@@ -58,7 +58,9 @@ Il est donc scindé en deux :
   nom côté client, `useTournamentLive` relit une seule fois
   `GET /api/tournaments/[id]/referee-names` (session requise, étalée sur 2 s
   pour éviter la ruée des abonnés), et `live-state.ts` garde les noms d'un
-  instantané à l'autre.
+  instantané à l'autre. Une réponse n'est retenue que si elle laisse moins de
+  désignations sans nom (`refereeNamesImprove`) : une réponse en retard
+  n'écrase jamais une liste plus à jour.
 
 `TournamentDetail = TournamentSnapshot & TournamentViewerContext` : les
 appelants existants ne voient aucune différence.

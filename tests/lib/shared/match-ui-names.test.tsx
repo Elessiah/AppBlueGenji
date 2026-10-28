@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { applyLiveMessage } from "@/app/(secured)/tournois/[id]/_lib/live-state";
 import { MapScoreList } from "@/app/(secured)/tournois/[id]/_components/MapScoreList";
 import { refereeReadyRereadDue } from "@/components/match-launch/MatchContactsDialog";
-import { missingRefereeNamesKey, parseRefereeNames, refereeNameOf } from "@/lib/shared/match-referee";
+import { missingRefereeNamesKey, parseRefereeNames, refereeNameOf, refereeNamesImprove } from "@/lib/shared/match-referee";
 import type { MatchLaunchInfo } from "@/lib/shared/match-launch";
 import { matchMapNames, type RoundMapConfig } from "@/lib/shared/round-maps";
 import { bracketMatch } from "../../helpers/bracket-match";
@@ -43,6 +43,28 @@ describe("missingRefereeNamesKey", () => {
     ];
 
     expect(missingRefereeNamesKey(matches, NAMES)).toBe("6:k6,8:k8");
+  });
+});
+
+describe("refereeNamesImprove", () => {
+  const shownB = [{ id: 5, refereeKey: "kB" }];
+  const namedA = [{ matchId: 5, refereeKey: "kA", pseudo: "Ancien" }];
+  const namedB = [{ matchId: 5, refereeKey: "kB", pseudo: "Nouveau" }];
+
+  it("refereeNamesImprove_lateResponseForOlderDesignation_returnsFalse", () => {
+    expect(refereeNamesImprove(shownB, namedB, namedA)).toBe(false);
+  });
+
+  it("refereeNamesImprove_incomingNamesMissingDesignation_returnsTrue", () => {
+    expect(refereeNamesImprove(shownB, [], namedB)).toBe(true);
+  });
+
+  it("refereeNamesImprove_sameCoverage_returnsFalse", () => {
+    expect(refereeNamesImprove(shownB, [], namedA)).toBe(false);
+  });
+
+  it("refereeNamesImprove_matchesWithoutReferee_returnsFalse", () => {
+    expect(refereeNamesImprove([{ id: 5, refereeKey: null }], [], namedB)).toBe(false);
   });
 });
 

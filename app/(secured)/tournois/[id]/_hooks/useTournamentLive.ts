@@ -31,7 +31,7 @@ import {
 import { announceViewerChanges } from "../_lib/live-alerts";
 import { openLiveConnection } from "../_lib/live-connection";
 import { createLiveRenderGate, createQuietStream } from "../_lib/live-render-gate";
-import { missingRefereeNamesKey, parseRefereeNames } from "@/lib/shared/match-referee";
+import { missingRefereeNamesKey, parseRefereeNames, refereeNamesImprove } from "@/lib/shared/match-referee";
 
 /** Plafond d'un `setTimeout` (~24,8 jours) : au-delà, il se déclencherait tout de suite. */
 const MAX_TIMEOUT_MS = 2_147_483_647;
@@ -294,6 +294,9 @@ export function useTournamentLive(tournamentId: number) {
           const names = parseRefereeNames(payload.refereeNames);
           const current = stateRef.current;
           if (names === null || !current.detail || current.detail.card.id !== forTournament) return;
+          // Réponse en retard (deux désignations rapprochées, contexte d'une
+          // reconnexion arrivé entre-temps) : elle n'écrase pas plus à jour.
+          if (!refereeNamesImprove(current.detail.matches, current.detail.refereeNames, names)) return;
           commit({ ...current, detail: { ...current.detail, refereeNames: names } });
         } catch {
           // Réseau coupé : « Arbitre désigné » reste, le prochain instantané relit.

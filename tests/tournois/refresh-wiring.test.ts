@@ -250,6 +250,14 @@ describe("pseudos d'arbitre — relecture légère (MATCH-UI-NAMES, revue #507)"
     expect(body).toMatch(/catch \{[^}]*retryLater\(\);\s*\}/);
   });
 
+  it("refreshRefereeNames_lateResponse_commitsOnlyWhenNamesImprove", () => {
+    const body = hook.slice(hook.indexOf("const refreshRefereeNames"), hook.indexOf("useEffect(", hook.indexOf("const refreshRefereeNames")));
+    const guard = body.indexOf("if (!refereeNamesImprove(current.detail.matches, current.detail.refereeNames, names)) return;");
+
+    expect(guard).toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(body.indexOf("commit("));
+  });
+
   it("refereeKey_secret_survivesModuleReevaluation", () => {
     const names = read("lib/server/tournaments/referee-names.ts");
     expect(names).toContain("holder.__bgRefereeKeySecret ??= randomBytes(32);");
