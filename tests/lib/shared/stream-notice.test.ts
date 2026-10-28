@@ -88,17 +88,18 @@ describe("message #live de la soirée (conditions v7)", () => {
   // EF-19 : seul un match en `START_TIME` est listé avant son passage à
   // l'antenne (`loadEveningMatches`) — pas tout match daté de la soirée.
   it("le dit aussi à l'inscription, en équipe comme en individuel, pour un direct réglé sur l'heure de début", () => {
-    expect(registrationStreamNotice(true)).toContain("Au début d'un match diffusé — et avant, si sa diffusion doit s'ouvrir à son heure de début dans la soirée, puis une fois terminé —,");
-    expect(registrationStreamNotice(false)).toContain("Au début d'un match diffusé — et avant, si sa diffusion doit s'ouvrir à son heure de début dans la soirée, puis une fois terminé —,");
-    expect(registrationStreamNotice(true)).not.toContain("s'il est programmé dans la soirée");
-    expect(registrationStreamNotice(false)).not.toContain("s'il est programmé dans la soirée");
+    for (const solo of [true, false]) {
+      const notice = registrationStreamNotice(solo);
+      expect(notice).toContain("Au début d'un match diffusé — et avant, si sa diffusion doit s'ouvrir à son heure de début dans la soirée, puis une fois terminé —,");
+      expect(notice).not.toContain("s'il est programmé dans la soirée");
+    }
   });
 
   it("la mention affichée à l'inscription (FR et EN) dit la même chose que registrationStreamNotice", () => {
-    expect(frActions.register.streamNotice.SOLO).toBe(registrationStreamNotice(true));
-    expect(frActions.register.streamNotice.TEAM).toBe(registrationStreamNotice(false));
-    expect(enActions.register.streamNotice.SOLO).toContain("— and before, if its broadcast is set to open at its start time that evening, then once finished —");
-    expect(enActions.register.streamNotice.TEAM).toContain("— and before, if its broadcast is set to open at its start time that evening, then once finished —");
+    expect([frActions.register.streamNotice.SOLO, frActions.register.streamNotice.TEAM]).toEqual([registrationStreamNotice(true), registrationStreamNotice(false)]);
+    for (const notice of Object.values(enActions.register.streamNotice)) {
+      expect(notice).toContain("— and before, if its broadcast is set to open at its start time that evening, then once finished —");
+    }
   });
 
   it("dit sur /rgpd qu'un match listé avant son passage à l'antenne ne laisse aucune trace sur le site (FR et EN)", () => {

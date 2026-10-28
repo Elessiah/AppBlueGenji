@@ -331,42 +331,51 @@ describe("buildPrivacyChangesMessage", () => {
     expect(buildPrivacyChangesMessage([A], null, "en")).not.toMatch(/https?:/);
   });
 
-  // EF-19 : un changement qui annonce des conditions à accepter (`termsVersion`)
-  // ne peut pas finir sur « aucun accord » sans exception.
-  it("buildPrivacyChangesMessage_namedChangeWithTermsVersion_footerSaysTermsMustBeAccepted", () => {
-    const terms = change("conditions", "2026-02-01", { termsVersion: 7 });
+  // EF-19 : des conditions à accepter (`asksTermsAcceptance`) parmi les changements
+  // dus, nommés ou seulement comptés : le pied ne dit plus « aucun accord » sans exception.
+  const TERMS_FOOTER = {
+    fr: "Seules les nouvelles conditions d'utilisation demandent ton accord, si tu ne les as pas encore acceptées ; pour le reste, aucun accord ne t'est demandé : la politique",
+    en: "Only the new terms of use need your agreement, if you haven't accepted them yet; for the rest, no consent is asked of you: the privacy policy",
+  } as const;
+  const PLAIN_FOOTER = { fr: "Aucun accord ne t'est demandé : la politique", en: "No consent is asked of you: the privacy policy" } as const;
+  const LOCALES = ["fr", "en"] as const;
+  const terms = change("conditions", "2026-02-01", { summary: "y".repeat(300), asksTermsAcceptance: true });
 
-    const fr = buildPrivacyChangesMessage([A, terms], "https://bluegenji.fr");
-    const en = buildPrivacyChangesMessage([A, terms], "https://bluegenji.fr", "en");
-
-    expect(fr).toContain(
-      "Les nouvelles conditions d'utilisation sont à accepter pour continuer à utiliser le site ; pour le reste, aucun accord ne t'est demandé : la politique de confidentialité",
-    );
-    expect(en).toContain(
-      "The new terms of use must be accepted to keep using the site; for the rest, no consent is asked of you: the privacy policy",
-    );
+  it("buildPrivacyChangesMessage_namedChangeAsksTermsAcceptance_footerSaysOnlyTheTermsNeedAgreement", () => {
+    for (const locale of LOCALES) {
+      expect(buildPrivacyChangesMessage([A, terms], "https://bluegenji.fr", locale)).toContain(TERMS_FOOTER[locale]);
+    }
   });
 
-  it("buildPrivacyChangesMessage_noChangeWithTermsVersion_footerKeepsPlainNoConsent", () => {
-    const fr = buildPrivacyChangesMessage([A, C], "https://bluegenji.fr");
-    const en = buildPrivacyChangesMessage([A, C], "https://bluegenji.fr", "en");
-
-    expect(fr).toContain("visite sur https://bluegenji.fr. Aucun accord ne t'est demandé : la politique");
-    expect(fr).not.toContain("conditions d'utilisation");
-    expect(en).toContain("visit to https://bluegenji.fr. No consent is asked of you: the privacy policy");
-    expect(en).not.toContain("terms of use");
+  it("buildPrivacyChangesMessage_noChangeAsksTermsAcceptance_footerKeepsPlainNoConsent", () => {
+    for (const locale of LOCALES) {
+      const message = buildPrivacyChangesMessage([A, C], "https://bluegenji.fr", locale);
+      expect(message).toContain(PLAIN_FOOTER[locale]);
+      expect(message).not.toContain(TERMS_FOOTER[locale]);
+    }
   });
 
-  it("buildPrivacyChangesMessage_termsChangeOnlyCountedAsOmitted_footerDoesNotMentionTerms", () => {
+  it("buildPrivacyChangesMessage_termsChangeOnlyCounted_footerStillSaysTheTermsNeedAgreement", () => {
     const filler = Array.from({ length: 6 }, (_, i) => change(`long-${i}`, "2026-02-01", { summary: "x".repeat(300) }));
-    const terms = change("conditions", "2026-02-01", { summary: "y".repeat(300), termsVersion: 7 });
 
     const message = buildPrivacyChangesMessage([...filler, terms], "https://bluegenji.fr");
 
     expect(message).toMatch(/… et \d+ autre\(s\) changement\(s\)\./);
     expect(message).not.toContain("Titre conditions");
-    expect(message).not.toContain("conditions d'utilisation");
+    expect(message).toContain(TERMS_FOOTER.fr);
     expect(message.length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+  });
+});
+
+// EF-19 : depuis la version 7, toute entrée qui annonce une version des
+// conditions la dit à accepter, pour le pied du message privé.
+describe("PRIVACY_CHANGES — versions des conditions à accepter", () => {
+  it("PRIVACY_CHANGES_termsVersionEntriesSinceV7_carryAsksTermsAcceptance", () => {
+    const termsEntries = PRIVACY_CHANGES.filter(
+      (entry) => entry.publishedAt >= "2026-10-29" && entry.title.startsWith("Conditions d'utilisation : version"),
+    );
+    expect(termsEntries.map((entry) => entry.id)).toContain("2026-10-conditions-v7-casters-et-arbitre");
+    expect(termsEntries.filter((entry) => entry.asksTermsAcceptance !== true)).toEqual([]);
   });
 });
 
@@ -1725,8 +1734,8 @@ describe("PRIVACY_CHANGES — arbitre désigné des matchs (MATCH-REFEREE MR-2)"
     // EF-19 : arbitre qui caste aussi le match, désignation et remplacement notés au journal (`refereeLogChange`).
     expect(fr).toContain("jamais son tag Discord à ce titre (s'il caste aussi le match, ses contacts de caster suivent la règle des casters)");
     expect(en).toContain("never their Discord tag in that capacity (if they also cast the match, their caster contacts follow the casters' rule)");
-    expect(fr).toContain("La prise d'un match, la désignation ou le remplacement de son arbitre par le staff, le retrait de l'arbitrage,");
-    expect(en).toContain("Taking a match, the staff assigning or replacing its referee, the removal of the refereeing,");
+    expect(fr).toContain("La prise d'un match, la désignation ou le remplacement de son arbitre par le staff, le retrait de l'arbitrage, l'autogestion, la première carte et les cartes choisies dans le pool du round sont notés");
+    expect(en).toContain("Taking a match, the staff assigning or replacing its referee, the removal of the refereeing, self-management, the first map and the maps picked from the round's pool are noted");
     expect(english.details).toHaveLength(entry.details.length);
     expect(english.linkLabels).toHaveLength(1);
   });
@@ -1784,13 +1793,10 @@ describe("PRIVACY_CHANGES — conditions v7 : casters, arbitre désigné et page
     expect(TERMS_UPDATED_AT).toBe("2026-10-29");
   });
 
-  it("PRIVACY_CHANGES_v7_termsVersionEqualsTERMS_VERSION : à accepter, dit dans le résumé et au pied du message (FR et EN)", () => {
-    expect(entry.termsVersion).toBe(TERMS_VERSION);
-    expect(entry.summary).toContain("Elle est à accepter : une fenêtre te la présente à ta prochaine visite.");
-    expect(english.summary).toContain("It must be accepted: a window presents it to you on your next visit.");
-    expect(buildPrivacyChangesMessage([entry], "https://site.test")).toContain("Les nouvelles conditions d'utilisation sont à accepter");
-    const [englishEntry] = localizedPrivacyChanges([entry], "en");
-    expect(buildPrivacyChangesMessage([englishEntry], "https://site.test", "en")).toContain("The new terms of use must be accepted");
+  it("PRIVACY_CHANGES_v7_asksTermsAcceptance : à accepter, dit dans le résumé (FR et EN)", () => {
+    expect(entry.asksTermsAcceptance).toBe(true);
+    expect(entry.summary).toContain("Elle est à accepter : une fenêtre te la présente tant que tu ne l'as pas acceptée.");
+    expect(english.summary).toContain("It must be accepted: a window presents it to you until you have accepted it.");
   });
 
   it("annonce la version en vigueur et sa date, avec un libellé anglais par lien (FR et EN)", () => {
@@ -1837,10 +1843,10 @@ describe("PRIVACY_CHANGES — conditions v7 : casters, arbitre désigné et page
   it("dit le message #live de la soirée avant et après le match, et la suppression depuis la fenêtre d'acceptation (FR et EN)", () => {
     const fr = entry.details.join(" ");
     const en = english.details.join(" ");
-    expect(fr).toContain("avant le début d'un match programmé dans la soirée et une fois le match terminé, pas seulement à son départ");
+    expect(fr).toContain("avant le début d'un match programmé dans la soirée (un match dont la diffusion doit s'ouvrir à son heure de début) et une fois le match terminé, pas seulement à son départ");
     expect(fr).toContain("ne laisse aucune trace sur le site");
     expect(fr).toContain("supprimer ton compte directement depuis la fenêtre qui te les présente");
-    expect(en).toContain("before a match scheduled that evening starts and once the match is finished, not only when it starts");
+    expect(en).toContain("before a match scheduled that evening starts (a match whose broadcast is set to open at its start time) and once the match is finished, not only when it starts");
     expect(en).toContain("leaves no trace on the site");
     expect(en).toContain("delete your account directly from the window that presents them to you");
   });
