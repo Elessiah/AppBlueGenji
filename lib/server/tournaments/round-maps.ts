@@ -31,6 +31,7 @@ import {
   type TournamentMapRules,
 } from "@/lib/shared/round-maps";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
+import { retryOnDeadlock } from "./deadlock-retry";
 import { resolveMatchParty } from "./match-launch";
 import { publishMatchUpdatedEvent } from "./notifications";
 import { queueRefereeChange } from "./referee-notices";
@@ -102,20 +103,23 @@ export function parseRoundKey(body: { phaseId?: unknown; roundNumber?: unknown; 
   return { phaseId, bracket, roundNumber };
 }
 
+/** Transaction sur une connexion déjà prise : journal du staff envoyé au commit seulement. */
+async function transact<T>(connection: PoolConnection, run: (connection: PoolConnection) => Promise<T>): Promise<T> {
+  await connection.beginTransaction();
+  try {
+    const result = await run(connection);
+    await connection.commit();
+    flushBotLogs(connection);
+    return result;
+  } catch (error) {
+    await connection.rollback().catch(() => undefined);
+    discardBotLogs(connection);
+    throw error;
+  }
+}
+
 async function inTransaction<T>(run: (connection: PoolConnection) => Promise<T>): Promise<T> {
-  return withConnection(async (connection) => {
-    await connection.beginTransaction();
-    try {
-      const result = await run(connection);
-      await connection.commit();
-      flushBotLogs(connection);
-      return result;
-    } catch (error) {
-      await connection.rollback().catch(() => undefined);
-      discardBotLogs(connection);
-      throw error;
-    }
-  });
+  return withConnection((connection) => transact(connection, run));
 }
 
 type TournamentRow = RowDataPacket & { id: number; name: string; format: string };
@@ -295,36 +299,41 @@ export async function pickMatchMap(
   slot: unknown,
   rawMap: unknown,
 ): Promise<void> {
-  // Le match lu hors de la transaction, sans verrou : sous REPEATABLE READ, une
-  // lecture avant le verrou figerait la vue, et le pool relu ensuite serait
-  // celui d'avant un `setRoundMaps` simultané (règle « verrou en premier »).
-  // Le droit de choisir s'y vérifie aussi : un compte quelconque qui appelle
-  // en boucle ne prend jamais le verrou exclusif du tournoi.
-  const ownerId = await withConnection(async (connection) => {
-    const [rows] = await connection.execute<PickMatchRow[]>(`${PICK_MATCH_SELECT} LIMIT 1`, [matchId]);
-    if (!rows[0]) throw new Error("MATCH_NOT_FOUND");
-    await assertMapPicker(connection, rows[0], viewer);
-    return Number(rows[0].tournament_id);
-  });
-  const tournamentId = await inTransaction(async (connection) => {
-    // Le tournoi d'abord, comme `setRoundMaps` : un choix ne se valide pas
-    // contre un pool que le staff remplace au même instant.
-    await lockTournament(connection, ownerId);
-    const [rows] = await connection.execute<PickMatchRow[]>(`${PICK_MATCH_SELECT} LIMIT 1 FOR UPDATE`, [matchId]);
-    const row = rows[0];
-    if (!row || Number(row.tournament_id) !== ownerId) throw new Error("MATCH_NOT_FOUND");
-    if (row.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
-    const byTeam = await assertMapPicker(connection, row, viewer);
-    const slots = await loadRoundSlots(connection, Number(row.tournament_id), {
-      phaseId: Number(row.phase_id),
-      bracket: String(row.bracket),
-      roundNumber: Number(row.round_number),
-    });
-    const map = validateMapPick(slots, slot, rawMap);
-    if (!(await writeMapPick(connection, matchId, row, slot as number, map))) return null;
-    queueRefereeChange(connection, { kind: "MAP_PICK", matchId, set: map !== null, byTeam });
-    return Number(row.tournament_id);
-  });
+  // Rejouée sur interblocage : le verrou tournoi puis match croise les
+  // écritures d'arbitrage qui prennent le match puis le tournoi.
+  const tournamentId = await retryOnDeadlock(() =>
+    withConnection(async (connection) => {
+      // Le match lu avant la transaction (lecture autonome) : sous REPEATABLE
+      // READ, une lecture dans la transaction avant le verrou figerait la vue, et
+      // le pool relu ensuite serait celui d'avant un `setRoundMaps` simultané
+      // (règle « verrou en premier »). Droit de choisir et match joué s'y
+      // vérifient aussi : un appel refusé ne prend jamais le verrou du tournoi.
+      const [pre] = await connection.execute<PickMatchRow[]>(`${PICK_MATCH_SELECT} LIMIT 1`, [matchId]);
+      if (!pre[0]) throw new Error("MATCH_NOT_FOUND");
+      await assertMapPicker(connection, pre[0], viewer);
+      if (pre[0].status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
+      const ownerId = Number(pre[0].tournament_id);
+      return transact(connection, async () => {
+        // Le tournoi d'abord, comme `setRoundMaps` : un choix ne se valide pas
+        // contre un pool que le staff remplace au même instant.
+        await lockTournament(connection, ownerId);
+        const [rows] = await connection.execute<PickMatchRow[]>(`${PICK_MATCH_SELECT} LIMIT 1 FOR UPDATE`, [matchId]);
+        const row = rows[0];
+        if (!row) throw new Error("MATCH_NOT_FOUND");
+        if (row.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
+        const byTeam = await assertMapPicker(connection, row, viewer);
+        const slots = await loadRoundSlots(connection, ownerId, {
+          phaseId: Number(row.phase_id),
+          bracket: String(row.bracket),
+          roundNumber: Number(row.round_number),
+        });
+        const map = validateMapPick(slots, slot, rawMap);
+        if (!(await writeMapPick(connection, matchId, row, slot as number, map))) return null;
+        queueRefereeChange(connection, { kind: "MAP_PICK", matchId, set: map !== null, byTeam });
+        return ownerId;
+      });
+    }),
+  );
   if (tournamentId !== null) publishMatchUpdatedEvent(tournamentId);
 }
 

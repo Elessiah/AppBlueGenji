@@ -63,9 +63,10 @@ Tout arbitre porte la permission `tournaments` : « l'arbitre d'une autre
 manche » n'a pas de droit distinct, la porte est la permission elle-même.
 Un membre du staff qui **joue** le match suit la règle des joueurs (comme
 `REFEREE_IS_PLAYER`) : hors autogestion, il ne choisit pas pour son équipe.
-`pickMatchMap` lit le tournoi du match **hors** transaction, puis prend son
-verrou en première instruction : le pool est relu à jour, jamais figé avant le
-verrou.
+`pickMatchMap` lit le match **avant** la transaction (droit de choisir et match
+joué vérifiés là : un refus ne prend aucun verrou), puis prend le verrou du
+tournoi en première instruction et revérifie tout : le pool est relu à jour,
+jamais figé avant le verrou. Rejoué sur interblocage (`retryOnDeadlock`).
 
 ## Temps réel, journal, brief
 

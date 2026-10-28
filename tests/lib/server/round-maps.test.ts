@@ -249,16 +249,29 @@ describe("pickMatchMap", () => {
     expect(calls.find((call) => call.order > begin)?.sql).toMatch(/FROM bg_tournaments[\s\S]*FOR UPDATE/);
   });
 
-  it("un match qui n'appartient plus au tournoi verrouillé est refusé", async () => {
-    route(connection.execute, [
-      { pattern: /FROM bg_tournaments/, rows: [TOURNAMENT] },
-      { pattern: /FROM bg_matches[\s\S]*FOR UPDATE/, rows: [{ ...MATCH, tournament_id: 8 }] },
-      { pattern: /FROM bg_matches/, rows: [MATCH] },
-      { pattern: /FROM bg_tournament_round_maps/, rows: [POOL_ROUND] },
-    ]);
-    await expect(pickMatchMap(42, { userId: 3, staff: true }, 1, "Ilios")).rejects.toThrow("MATCH_NOT_FOUND");
-    expect(writes(/^\s*UPDATE/)).toHaveLength(0);
-    expect(connection.rollback).toHaveBeenCalled();
+  it("un match joué est refusé avant tout verrou, même au staff", async () => {
+    withMatch({ ...MATCH, status: "COMPLETED" });
+    await expect(pickMatchMap(42, { userId: 3, staff: true }, 1, "Ilios")).rejects.toThrow("MATCH_ALREADY_COMPLETED");
+    expect(connection.beginTransaction).not.toHaveBeenCalled();
+    expect(writes(/FOR UPDATE/)).toHaveLength(0);
+  });
+
+  it("un interblocage au verrou rejoue le choix, une connexion par essai", async () => {
+    withMatch(MATCH);
+    const routed = connection.execute.getMockImplementation();
+    let deadlocked = false;
+    connection.execute.mockImplementation(async (sql: string, params?: unknown) => {
+      if (!deadlocked && /FROM bg_tournaments[\s\S]*FOR UPDATE/.test(sql)) {
+        deadlocked = true;
+        throw Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK" });
+      }
+      return routed!(sql, params);
+    });
+    await pickMatchMap(42, { userId: 3, staff: true }, 1, "Ilios");
+    expect(withConnection).toHaveBeenCalledTimes(2);
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
+    expect(writes(/UPDATE bg_matches SET first_map/)).toHaveLength(1);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
   });
 
   it("un membre du staff qui joue le match ne choisit pas hors autogestion", async () => {
