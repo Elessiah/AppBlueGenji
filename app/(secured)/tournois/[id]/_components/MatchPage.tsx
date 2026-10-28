@@ -160,6 +160,12 @@ function useCopy() {
 }
 
 /** Création de la partie : côtés (hôte à gauche), première carte, premier ban, rappel du cast. */
+/** Le lecteur, partie du match, peut-il déclarer son « Prêt » (donc choisir une carte en autogestion) ? */
+function canDeclareFor(launch: MatchLaunchInfo | null): boolean {
+  if (!launch) return false;
+  return (launch.viewer.role === "TEAM1" || launch.viewer.role === "TEAM2") && launch.viewer.canDeclareReady;
+}
+
 function LobbySection({
   detail,
   match,
@@ -482,7 +488,7 @@ export function MatchPage({
         sides={sides}
         staff={canSchedule && !frozen}
         editable={editable}
-        canPick={!spectator && !frozen && canPickMatchMap({ staff: canSchedule, myTeamId }, match)}
+        canPick={!spectator && !frozen && canPickMatchMap({ staff: canSchedule, myTeamId, canDeclareReady: canDeclareFor(shownLaunch) }, match)}
       />
       <OfficiatingSection match={match} staff={canSchedule} launch={shownLaunch} onCopy={onCopy} />
       <CastSection match={match} matchLabel={matchLabel} launch={shownLaunch} onCopy={onCopy} />

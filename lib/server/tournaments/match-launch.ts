@@ -29,6 +29,7 @@ import {
   type MatchLaunchInput,
 } from "@/lib/shared/match-launch";
 import { normalizeStreamUrl } from "@/lib/shared/live-streams";
+import { parseStoredSlots, validateMapPick } from "@/lib/shared/round-maps";
 import {
   groupNoRefereeAlerts,
   normalizeFirstMap,
@@ -1156,17 +1157,36 @@ async function announceRoundSelfManagement(sampleMatchId: number, enabled: boole
 /**
  * Première carte du match, saisie par le staff ; `null` (ou vide) la retire.
  *
- * @throws `INVALID_FIRST_MAP` | `MATCH_NOT_FOUND` | `MATCH_ALREADY_COMPLETED`
+ * @throws `INVALID_FIRST_MAP` | `INVALID_MAP_PICK` | `MATCH_NOT_FOUND` | `MATCH_ALREADY_COMPLETED`
  */
 export async function setMatchFirstMap(matchId: number, rawMap: unknown): Promise<void> {
-  const map = normalizeFirstMap(rawMap);
+  const typed = normalizeFirstMap(rawMap);
   const tournamentId = await inTransaction(async (connection) => {
     const [rows] = await connection.execute<
-      (RowDataPacket & { tournament_id: number; status: MatchStatus; first_map: string | null })[]
-    >(`SELECT tournament_id, status, first_map FROM bg_matches WHERE id = ? LIMIT 1 FOR UPDATE`, [matchId]);
+      (RowDataPacket & {
+        tournament_id: number;
+        status: MatchStatus;
+        first_map: string | null;
+        phase_id: number;
+        bracket: string;
+        round_number: number;
+      })[]
+    >(
+      `SELECT tournament_id, status, first_map, phase_id, bracket, round_number FROM bg_matches WHERE id = ? LIMIT 1 FOR UPDATE`,
+      [matchId],
+    );
     const row = rows[0];
     if (!row) throw new Error("MATCH_NOT_FOUND");
     if (row.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
+    // Carte 1 réglée pour la manche (`ROUND_MAPS.md`) : imposée, elle ne se
+    // saisit pas ; en pool, la saisie doit en sortir (graphie du pool).
+    const [roundRows] = await connection.execute<(RowDataPacket & { slots_json: string | null })[]>(
+      `SELECT slots_json FROM bg_tournament_round_maps
+        WHERE tournament_id = ? AND phase_id = ? AND bracket = ? AND round_number = ? LIMIT 1`,
+      [row.tournament_id, row.phase_id, row.bracket, row.round_number],
+    );
+    const slots = parseStoredSlots(roundRows[0]?.slots_json);
+    const map = slots.length > 0 ? validateMapPick(slots, 1, typed) : typed;
     if ((row.first_map ?? null) === map) return null;
     await connection.execute(`UPDATE bg_matches SET first_map = ? WHERE id = ?`, [map, matchId]);
     queueRefereeChange(connection, { kind: "FIRST_MAP", matchId, set: map !== null });

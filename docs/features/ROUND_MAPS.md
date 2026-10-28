@@ -42,7 +42,13 @@ Tout se règle **à tout moment** (avant, pendant, après la manche) : bloc
 - Un pool montre le choix du match (`first_map` pour la carte 1, `map_picks`
   `{"2":"Ilios"}` ensuite) ; un choix sorti du pool depuis reste lisible.
 - Dès qu'une carte 1 est réglée pour la manche, la saisie libre de la première
-  carte disparaît de la page du match.
+  carte disparaît de la page du match, et le serveur la tranche aussi
+  (`setMatchFirstMap`, route `first-map`) : carte imposée refusée, saisie hors
+  du pool refusée (`INVALID_MAP_PICK`), saisie du pool gardée dans sa graphie.
+- Un choix verrouille le tournoi avant de relire le match et son pool, comme
+  `setRoundMaps` : il ne se valide pas contre un pool remplacé au même instant.
+- L'écran n'ouvre la liste d'un pool à une équipe que si le lecteur déclare son
+  « Prêt » (`canDeclareReady` du lancement), comme le serveur.
 
 ## Routes (codes seuls, `fail`)
 
@@ -50,6 +56,7 @@ Tout se règle **à tout moment** (avant, pendant, après la manche) : bloc
 |---|---|---|
 | `PUT /api/admin/tournaments/[id]/round-maps` `{phaseId, bracket, roundNumber, slots}` (`slots: []` retire) | `can(user, "tournaments")` | 401, 403 `FORBIDDEN`, 400 `INVALID_ROUND` / `INVALID_ROUND_MAPS`, 404 `TOURNAMENT_NOT_FOUND` |
 | `PUT /api/admin/tournaments/[id]/map-rules` `{firstBan, nextBan, nextPick}` | `can(user, "tournaments")` | 401, 403, 400 `INVALID_MAP_RULES`, 404 |
+| `PUT /api/admin/matches/[matchId]/first-map` (existante) | `can(user, "tournaments")` | en plus : 400 `INVALID_MAP_PICK` quand la carte 1 de la manche est réglée |
 | `PUT /api/matches/[matchId]/map-pick` `{slot, map \| null}` | staff, ou équipe du match en autogestion | 401, 400 `INVALID_MAP_PICK`, 403 `NOT_MAP_PICKER`, 404, 409 `MATCH_ALREADY_COMPLETED` |
 
 Tout arbitre porte la permission `tournaments` : « l'arbitre d'une autre

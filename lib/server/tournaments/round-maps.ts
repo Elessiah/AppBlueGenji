@@ -26,6 +26,7 @@ import {
   type FirstBanRule,
   type NextBanRule,
   type NextPickRule,
+  type RoundKey,
   type RoundMapConfig,
   type TournamentMapRules,
 } from "@/lib/shared/round-maps";
@@ -34,8 +35,8 @@ import { resolveMatchParty } from "./match-launch";
 import { publishMatchUpdatedEvent } from "./notifications";
 import { queueRefereeChange } from "./referee-notices";
 
-/** Une manche : phase (0 sans phases), tableau, numéro. */
-export type RoundKey = { phaseId: number; bracket: string; roundNumber: number };
+/** Une manche : phase (0 sans phases), tableau, numéro (`lib/shared/round-maps.ts`). */
+export type { RoundKey };
 
 type RulesRow = RowDataPacket & {
   first_ban_rule: string | null;
@@ -287,6 +288,14 @@ export async function pickMatchMap(
   rawMap: unknown,
 ): Promise<void> {
   const tournamentId = await inTransaction(async (connection) => {
+    // Le tournoi d'abord, comme `setRoundMaps` : un choix ne se valide pas
+    // contre un pool que le staff remplace au même instant.
+    const [owner] = await connection.execute<(RowDataPacket & { tournament_id: number })[]>(
+      `SELECT tournament_id FROM bg_matches WHERE id = ? LIMIT 1`,
+      [matchId],
+    );
+    if (!owner[0]) throw new Error("MATCH_NOT_FOUND");
+    await lockTournament(connection, Number(owner[0].tournament_id));
     const [rows] = await connection.execute<PickMatchRow[]>(
       `SELECT tournament_id, status, phase_id, bracket, round_number, self_managed, team1_id, team2_id,
               first_map, map_picks

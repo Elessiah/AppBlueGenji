@@ -212,10 +212,23 @@ describe("pickMatchMap", () => {
 
   function withMatch(match: Record<string, unknown>) {
     route(connection.execute, [
+      { pattern: /FROM bg_tournaments/, rows: [TOURNAMENT] },
       { pattern: /FROM bg_matches/, rows: [match] },
       { pattern: /FROM bg_tournament_round_maps/, rows: [POOL_ROUND] },
     ]);
   }
+
+  it("verrouille le tournoi avant de relire le match et son pool", async () => {
+    withMatch(MATCH);
+    await pickMatchMap(42, { userId: 3, staff: true }, 1, "Ilios");
+    const sqls = connection.execute.mock.calls.map(([sql]) => sql);
+    const tournamentLock = sqls.findIndex((sql) => /FROM bg_tournaments[\s\S]*FOR UPDATE/.test(sql));
+    const matchLock = sqls.findIndex((sql) => /FROM bg_matches[\s\S]*FOR UPDATE/.test(sql));
+    const pool = sqls.findIndex((sql) => /FROM bg_tournament_round_maps/.test(sql));
+    expect(tournamentLock).toBeGreaterThanOrEqual(0);
+    expect(tournamentLock).toBeLessThan(matchLock);
+    expect(matchLock).toBeLessThan(pool);
+  });
 
   it("le staff choisit la carte 1 : c'est `first_map`", async () => {
     withMatch(MATCH);

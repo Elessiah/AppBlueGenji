@@ -213,17 +213,21 @@ describe("canPickMatchMap", () => {
   const match = { status: "READY", selfManaged: true, team1Id: 10, team2Id: 20 };
 
   it("le staff choisit toujours, tant que le match n'est pas joué", () => {
-    expect(canPickMatchMap({ staff: true, myTeamId: null }, { ...match, selfManaged: false })).toBe(true);
-    expect(canPickMatchMap({ staff: true, myTeamId: null }, { ...match, status: "COMPLETED" })).toBe(false);
+    expect(canPickMatchMap({ staff: true, myTeamId: null, canDeclareReady: false }, { ...match, selfManaged: false })).toBe(true);
+    expect(canPickMatchMap({ staff: true, myTeamId: null, canDeclareReady: false }, { ...match, status: "COMPLETED" })).toBe(false);
   });
 
   it("une équipe du match choisit en autogestion seulement", () => {
-    expect(canPickMatchMap({ staff: false, myTeamId: 20 }, match)).toBe(true);
-    expect(canPickMatchMap({ staff: false, myTeamId: 20 }, { ...match, selfManaged: false })).toBe(false);
+    expect(canPickMatchMap({ staff: false, myTeamId: 20, canDeclareReady: true }, match)).toBe(true);
+    expect(canPickMatchMap({ staff: false, myTeamId: 20, canDeclareReady: true }, { ...match, selfManaged: false })).toBe(false);
+  });
+
+  it("un joueur de roster qui ne déclare pas « Prêt » ne choisit pas, comme au serveur", () => {
+    expect(canPickMatchMap({ staff: false, myTeamId: 20, canDeclareReady: false }, match)).toBe(false);
   });
 
   it("refuse une autre équipe ou un lecteur sans équipe", () => {
-    expect(canPickMatchMap({ staff: false, myTeamId: 30 }, match)).toBe(false);
-    expect(canPickMatchMap({ staff: false, myTeamId: null }, match)).toBe(false);
+    expect(canPickMatchMap({ staff: false, myTeamId: 30, canDeclareReady: true }, match)).toBe(false);
+    expect(canPickMatchMap({ staff: false, myTeamId: null, canDeclareReady: true }, match)).toBe(false);
   });
 });

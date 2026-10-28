@@ -212,5 +212,9 @@ describe("PUT autogestion et première carte", () => {
     const res = await firstMapPut(jsonRequest("PUT", { map: "x".repeat(80) }), params("42"));
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: "INVALID_FIRST_MAP" });
+    jest.mocked(setMatchFirstMap).mockRejectedValue(new Error("INVALID_MAP_PICK"));
+    const outOfPool = await firstMapPut(jsonRequest("PUT", { map: "Busan" }), params("42"));
+    expect(outOfPool.status).toBe(400);
+    await expect(outOfPool.json()).resolves.toEqual({ error: "INVALID_MAP_PICK" });
   });
 });

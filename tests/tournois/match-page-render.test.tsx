@@ -246,7 +246,15 @@ describe("page d'un match — cartes du round et bans", () => {
   it("sans autogestion, une équipe du match lit le pool sans le choisir ; en autogestion, elle choisit", () => {
     const pool = rules([["Ilios", "Nepal"]]);
     expect(render(match(), "player", false, "fr", pool)).not.toContain("<select");
+    mockLaunch = launch();
     expect(render(match({ selfManaged: true }), "player", false, "fr", pool)).toContain("<select");
+  });
+
+  it("en autogestion, un joueur de roster qui ne déclare pas « Prêt » lit le pool sans le choisir", () => {
+    mockLaunch = launch({
+      viewer: { role: "TEAM1", canDeclareReady: false, isReferee: false, isCaster: false, earlyContacts: true, ready: false },
+    });
+    expect(render(match({ selfManaged: true }), "player", false, "fr", rules([["Ilios", "Nepal"]]))).not.toContain("<select");
   });
 
   it("en anglais", () => {
