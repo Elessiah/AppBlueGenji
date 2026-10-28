@@ -192,6 +192,8 @@
     "heading": "{count, plural, one {Our privacy rules have changed} other {# changes to our privacy rules}}",
     "introOne": "The way BlueGenji processes your data has changed. We owe you this information: no agreement is asked of you.",
     "introMany": "Since your last visit, the way BlueGenji processes your data has changed. We owe you this information: no agreement is asked of you.",
+    "introOneTerms": "The way BlueGenji processes your data has changed. We owe you this information: only the new terms of use need your agreement, if you haven't accepted them yet; for the rest, no agreement is asked of you.",
+    "introManyTerms": "Since your last visit, the way BlueGenji processes your data has changed. We owe you this information: only the new terms of use need your agreement, if you haven't accepted them yet; for the rest, no agreement is asked of you.",
     "detailsLabel": "Details of the changes",
     "policy": "What depends on your choice is set in “My profile”, without losing anything else. You can object to a processing activity or exercise your other rights as explained in the <policy>privacy policy</policy>.",
     "acknowledge": "I have read this",

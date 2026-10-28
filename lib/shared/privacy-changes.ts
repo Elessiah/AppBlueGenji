@@ -1439,7 +1439,9 @@ export const PRIVACY_DM_MAX_LENGTH = 1800;
  * Le message privé Discord qui annonce des changements.
  *
  * Un **résumé**, pas le texte complet : le détail vit sur le site, où le
- * joueur est connecté. Aucun accord n'est demandé, ni ici ni là-bas. Le
+ * joueur est connecté. Aucun accord n'est demandé, ni ici ni là-bas, hors des
+ * conditions d'utilisation qu'une entrée annonce à accepter (`asksTermsAcceptance`,
+ * dit par le pied). Le
  * message nomme chaque changement par son titre et son résumé, puis dit où
  * décider. Borné sous le plafond du bot : au-delà, les derniers changements
  * sont comptés plutôt que coupés au milieu d'une phrase.
@@ -1527,7 +1529,8 @@ function layoutPrivacyChangesMessage(
 }
 
 /**
- * Les changements qu'**un** message privé peut nommer tous, dans l'ordre.
+ * Les changements qu'**un** message privé peut nommer tous, dans l'ordre (conditions
+ * à accepter en tête, voir plus bas).
  *
  * Le registre entier ne tient plus sous le plafond du bot, et le repli de
  * `buildPrivacyChangesMessage` — compter ce qui ne tient pas — convient à un
@@ -1555,8 +1558,10 @@ export function privacyChangesForOneMessage(
   // du message plus long. Avec `english` (les mêmes changements, dans le même
   // ordre, en anglais), le lot doit tenir **dans les deux langues** : chaque
   // compte le reçoit dans la sienne (BOT-NOTIF-LANG).
-  const ordered = termsFirst(changes);
-  const orderedEnglish = english && termsFirst(english);
+  // Un seul ordre, tiré des entrées françaises, appliqué aux deux langues.
+  const order = termsFirst(changes.map((change, index) => ({ change, index })));
+  const ordered = order.map(({ change }) => change);
+  const orderedEnglish = english && order.map(({ index }) => english[index]);
   for (let count = ordered.length; count > 1; count -= 1) {
     const batch = ordered.slice(0, count);
     const fits = layoutPrivacyChangesMessage(batch, siteUrl).named === count;
@@ -1568,8 +1573,8 @@ export function privacyChangesForOneMessage(
 }
 
 /** Les conditions à accepter d'abord, le reste dans son ordre (tri stable). */
-function termsFirst(changes: readonly PrivacyChange[]): readonly PrivacyChange[] {
-  return [...changes.filter((change) => change.asksTermsAcceptance), ...changes.filter((change) => !change.asksTermsAcceptance)];
+function termsFirst<T extends { change: PrivacyChange }>(items: readonly T[]): T[] {
+  return [...items.filter(({ change }) => change.asksTermsAcceptance), ...items.filter(({ change }) => !change.asksTermsAcceptance)];
 }
 
 /**
