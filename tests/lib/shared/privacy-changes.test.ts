@@ -1986,10 +1986,10 @@ describe("PRIVACY_CHANGES — BattleTag des matchs en Overwatch seulement (déci
   const entry = PRIVACY_CHANGES.find((c) => c.id === id)!;
   const english = PRIVACY_CHANGES_EN[id];
 
-  it("privacyChanges_battletagMatchesOverwatchOnly_closesListDated1031ForAllAccounts", () => {
+  it("privacyChanges_battletagMatchesOverwatchOnly_closesListDated1030ForAllAccounts", () => {
     expectStandaloneEntry(entry, english, {
       fromEnd: 1,
-      publishedAt: "2026-10-31",
+      publishedAt: "2026-10-30",
       audience: undefined,
       links: [
         { href: "/rgpd#donnees-collectees", label: "Lire la section « Données collectées »" },

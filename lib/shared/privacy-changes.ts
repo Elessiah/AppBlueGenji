@@ -1239,10 +1239,10 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // la lecture des contacts ne l'envoie plus — ni celui des casters et de
     // l'arbitre désigné, ni celui des contacts des équipes (`withGameBattletag`,
     // `sideContacts`, `match-launch-info.ts`) : moins de lecteurs. Datée du
-    // lendemain de la mise en ligne prévue (nuit du 29 au 30 octobre). Les
+    // lendemain de la mise en ligne prévue (nuit du 28 au 29 octobre). Les
     // conditions d'utilisation v7, publiées, ne changent pas.
     id: "2026-10-battletag-des-matchs-overwatch-seulement",
-    publishedAt: "2026-10-31",
+    publishedAt: "2026-10-30",
     title: "BattleTag dans les matchs : en Overwatch seulement",
     links: [
       DATA_COLLECTED_SECTION_LINK,
