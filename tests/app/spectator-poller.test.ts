@@ -226,6 +226,20 @@ describe("relecteur de la page sans compte", () => {
     expect(h.fetchMock.mock.calls[2][1]).toMatchObject({ headers: {} });
   });
 
+  it("ne republie pas un introuvable identique à chaque revérification", async () => {
+    const notFound = { status: 404, body: { error: "TOURNAMENT_NOT_FOUND" } };
+    const h = harness([notFound, notFound, notFound]);
+    await h.poller.start();
+    const published = h.states.length;
+
+    await h.advance(SPECTATOR_NOT_FOUND_RETRY_MS);
+    await h.advance(SPECTATOR_NOT_FOUND_RETRY_MS);
+
+    expect(h.fetchMock).toHaveBeenCalledTimes(3);
+    // La carte n'est pas redessinée : aucun nouvel état.
+    expect(h.states).toHaveLength(published);
+  });
+
   it("relit aussi au plafond une adresse illisible (400)", async () => {
     const h = harness([{ status: 400, body: { error: "INVALID_TOURNAMENT_ID" } }]);
     await h.poller.start();

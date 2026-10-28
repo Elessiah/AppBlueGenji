@@ -3,6 +3,10 @@ import {
   chargeRateLimit,
   checkRateLimit,
   consumeRateLimit,
+  peekTokenBucket,
+  refundTokenBucket,
+  takeTokenBucket,
+  type TokenBucketRule,
   rateLimitIdentity,
   resetRateLimit,
   type RateLimitRule,
@@ -124,5 +128,63 @@ describe("rate-limit — remise à zéro", () => {
     resetRateLimit();
     expect(checkRateLimit(RULE, "a").remaining).toBe(3);
     expect(checkRateLimit(other, "a").remaining).toBe(1);
+  });
+});
+
+describe("rate-limit — seau à jetons", () => {
+  const BUCKET: TokenBucketRule = { name: "bucket-test", capacity: 3, refillMs: 1_000 };
+
+  it("accorde la rafale entière, dernier jeton compris, puis refuse", () => {
+    const granted = [1, 2, 3].map(() => takeTokenBucket(BUCKET, "k", 0));
+    expect(granted.map((state) => state.allowed)).toEqual([true, true, true]);
+    expect(granted.map((state) => state.remaining)).toEqual([2, 1, 0]);
+    const refused = takeTokenBucket(BUCKET, "k", 0);
+    expect(refused).toEqual({ allowed: false, remaining: 0, retryAfterMs: 1_000 });
+  });
+
+  it("rend un jeton par pas, sans dépasser la capacité", () => {
+    for (let i = 0; i < 3; i += 1) takeTokenBucket(BUCKET, "k", 0);
+    expect(takeTokenBucket(BUCKET, "k", 500).allowed).toBe(false);
+    expect(takeTokenBucket(BUCKET, "k", 500).retryAfterMs).toBe(500);
+    expect(takeTokenBucket(BUCKET, "k", 1_000).allowed).toBe(true);
+    expect(peekTokenBucket(BUCKET, "k", 1_000_000).remaining).toBe(3);
+  });
+
+  it("un refus ne prend rien, un aperçu non plus", () => {
+    for (let i = 0; i < 3; i += 1) takeTokenBucket(BUCKET, "k", 0);
+    takeTokenBucket(BUCKET, "k", 0);
+    peekTokenBucket(BUCKET, "k", 0);
+    expect(takeTokenBucket(BUCKET, "k", 1_000).allowed).toBe(true);
+  });
+
+  it("rend un jeton remboursé, jamais au-delà de la capacité", () => {
+    takeTokenBucket(BUCKET, "k", 0);
+    refundTokenBucket(BUCKET, "k", 0);
+    refundTokenBucket(BUCKET, "k", 0);
+    refundTokenBucket(BUCKET, "inconnu", 0);
+    expect(peekTokenBucket(BUCKET, "k", 0).remaining).toBe(3);
+    expect(peekTokenBucket(BUCKET, "inconnu", 0).remaining).toBe(3);
+  });
+
+  it("sépare les clés et les seaux", () => {
+    for (let i = 0; i < 3; i += 1) takeTokenBucket(BUCKET, "a", 0);
+    expect(takeTokenBucket(BUCKET, "b", 0).allowed).toBe(true);
+    expect(takeTokenBucket({ ...BUCKET, name: "other" }, "a", 0).allowed).toBe(true);
+  });
+
+  it("borne les clés suivies : les seaux pleins partent d'abord", () => {
+    const small: TokenBucketRule = { ...BUCKET, name: "small", maxKeys: 2 };
+    takeTokenBucket(small, "a", 0);
+    takeTokenBucket(small, "b", 900);
+    // « a » s'est rempli : oublié, il vaut un seau neuf ; « b » garde sa dette.
+    takeTokenBucket(small, "c", 1_000);
+    expect(peekTokenBucket(small, "b", 1_000).remaining).toBe(2);
+    expect(peekTokenBucket(small, "a", 1_000).remaining).toBe(3);
+  });
+
+  it("se remet à zéro avec les plafonds", () => {
+    for (let i = 0; i < 3; i += 1) takeTokenBucket(BUCKET, "k", 0);
+    resetRateLimit(BUCKET.name);
+    expect(peekTokenBucket(BUCKET, "k", 0).remaining).toBe(3);
   });
 });

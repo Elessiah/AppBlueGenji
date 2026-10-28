@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import {
+  CACHE_SWEEP_INTERVAL_MS,
   cached,
+  cachedEntryCount,
+  cachedStale,
   clearCache,
   invalidateCached,
   invalidateCachedPrefix,
@@ -236,5 +239,88 @@ describe("cache — clé prête ou à calculer", () => {
   it("ne garde rien d'une durée de vie nulle : prête seulement pendant le calcul", async () => {
     await cached("nulle", 0, async () => 1);
     expect(isCachedOrLoading("nulle")).toBe(false);
+  });
+});
+
+describe("cached — durée calculée, appel avant calcul, copie périmée, purge", () => {
+  const FAKE: { doNotFake: Array<"nextTick" | "setImmediate" | "queueMicrotask"> } = {
+  doNotFake: ["nextTick", "setImmediate", "queueMicrotask"],
+};
+
+  it("tient la durée de vie de la valeur obtenue", async () => {
+    jest.useFakeTimers({ now: 1_000, ...FAKE });
+    const loader = jest.fn(async () => ({ life: 5_000 }));
+    await cached("ttl-fn", (value: { life: number }) => value.life, loader);
+    jest.setSystemTime(1_000 + 4_999);
+    await cached("ttl-fn", (value: { life: number }) => value.life, loader);
+    expect(loader).toHaveBeenCalledTimes(1);
+    jest.setSystemTime(1_000 + 5_000);
+    await cached("ttl-fn", (value: { life: number }) => value.life, loader);
+    expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  it("n'appelle `beforeLoad` que pour l'appel qui lance le calcul", async () => {
+    const gate = deferred<string>();
+    const beforeLoad = jest.fn();
+    const first = cached("before", 60_000, () => gate.promise, { beforeLoad });
+    const second = cached("before", 60_000, () => gate.promise, { beforeLoad });
+    gate.resolve("x");
+    await Promise.all([first, second]);
+    await cached("before", 60_000, async () => "y", { beforeLoad });
+    expect(beforeLoad).toHaveBeenCalledTimes(1);
+  });
+
+  it("un `beforeLoad` qui lève ne lance rien et ne laisse rien en vol", async () => {
+    const loader = jest.fn(async () => "x");
+    await expect(
+      cached("refused", 60_000, loader, {
+        beforeLoad: () => {
+          throw new Error("REFUSED");
+        },
+      }),
+    ).rejects.toThrow("REFUSED");
+    expect(loader).not.toHaveBeenCalled();
+    expect(isCachedOrLoading("refused")).toBe(false);
+  });
+
+  it("garde la valeur échue `retainMs` après son écriture, pour `cachedStale` seul", async () => {
+    jest.useFakeTimers({ now: 10_000, ...FAKE });
+    await cached("stale", 1_000, async () => "v", { retainMs: 5_000 });
+    jest.setSystemTime(10_000 + 2_000);
+    expect(isCachedOrLoading("stale")).toBe(false);
+    expect(cachedStale<string>("stale")).toBe("v");
+    jest.setSystemTime(10_000 + 5_000);
+    expect(cachedStale<string>("stale")).toBeUndefined();
+  });
+
+  it("sans `retainMs`, aucune copie échue n'est rendue", async () => {
+    jest.useFakeTimers({ now: 10_000, ...FAKE });
+    await cached("plain", 1_000, async () => "v");
+    expect(cachedStale<string>("plain")).toBe("v");
+    jest.setSystemTime(10_000 + 1_000);
+    expect(cachedStale<string>("plain")).toBeUndefined();
+  });
+
+  it("purge les entrées échues sous le plafond, au plus une fois par pas", async () => {
+    jest.useFakeTimers({ now: 100_000, ...FAKE });
+    await cached("a", 1_000, async () => 1);
+    await cached("b", 1_000, async () => 2);
+    expect(cachedEntryCount()).toBe(2);
+    // Échues, mais le pas de purge n'est pas écoulé : elles restent.
+    jest.setSystemTime(100_000 + 2_000);
+    await cached("c", 60_000, async () => 3);
+    expect(cachedEntryCount()).toBe(3);
+    // Le pas écoulé, la prochaine écriture les retire.
+    jest.setSystemTime(100_000 + CACHE_SWEEP_INTERVAL_MS + 1);
+    await cached("d", 60_000, async () => 4);
+    expect(cachedEntryCount()).toBe(2);
+  });
+
+  it("ne purge pas une copie encore conservée", async () => {
+    jest.useFakeTimers({ now: 200_000, ...FAKE });
+    await cached("kept", 1_000, async () => 1, { retainMs: 4 * CACHE_SWEEP_INTERVAL_MS });
+    jest.setSystemTime(200_000 + CACHE_SWEEP_INTERVAL_MS + 1);
+    await cached("other", 60_000, async () => 2);
+    expect(cachedStale<number>("kept")).toBe(1);
   });
 });

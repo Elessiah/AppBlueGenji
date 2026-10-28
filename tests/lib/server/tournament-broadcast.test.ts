@@ -20,6 +20,7 @@ import {
   acquireStreamSlot,
   budgetDelayMs,
   joinTournamentRoom,
+  openStreamCount,
   resetTournamentBroadcast,
   tournamentAudience,
   tournamentRoomCard,
@@ -333,6 +334,36 @@ describe("tournament-broadcast — cycle de vie", () => {
     expect(tournamentAudience(1)).toBe(2);
     leave();
     expect(tournamentAudience(1)).toBe(1);
+  });
+
+  it("tient le total des flux ouverts à l'arrivée et au départ, sans double compte", () => {
+    const one = subscriber();
+    const two = subscriber();
+    const leaveOne = joinTournamentRoom(1, one.handle);
+    const leaveTwo = joinTournamentRoom(2, two.handle);
+    // Le même abonné rejoint deux fois : compté une fois.
+    joinTournamentRoom(1, one.handle);
+    expect(openStreamCount()).toBe(2);
+
+    leaveOne();
+    leaveOne();
+    expect(openStreamCount()).toBe(1);
+    leaveTwo();
+    expect(openStreamCount()).toBe(0);
+  });
+
+  it("décompte l'abonné retiré sur une connexion tombée", async () => {
+    const broken = {
+      tier: "PRIORITY" as const,
+      send: () => {
+        throw new Error("STREAM_CLOSED");
+      },
+    };
+    joinTournamentRoom(1, broken);
+    expect(openStreamCount()).toBe(1);
+    publish();
+    await advance(60_000);
+    expect(openStreamCount()).toBe(0);
   });
 
   it("ne compte rien pour un tournoi que personne ne suit", () => {

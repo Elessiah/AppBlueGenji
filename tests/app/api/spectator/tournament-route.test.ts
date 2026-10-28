@@ -7,18 +7,21 @@ import { GET } from "@/app/api/spectator/tournaments/[id]/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getVisibleTournamentCard, getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
 import { clearCache } from "@/lib/server/cache";
-import { resetRateLimit } from "@/lib/server/rate-limit";
+import { peekTokenBucket, resetRateLimit } from "@/lib/server/rate-limit";
 import { SPECTATOR_READ_RULE, SPECTATOR_REBUILD_RULE } from "@/lib/server/api-guard";
 import { resetSpectatorLoad, spectatorReadsPerMinute } from "@/lib/server/spectator-load";
 import {
   SPECTATOR_FRESHNESS_HEADER,
   SPECTATOR_HIDDEN_USER_ID,
+  SPECTATOR_MAX_COPY_AGE_MS,
   SPECTATOR_MAX_POLL_MS,
   SPECTATOR_POLL_HEADER,
   SPECTATOR_PRE_LAUNCH_POLL_MS,
   SPECTATOR_RUNNING_POLL_MS,
 } from "@/lib/shared/spectator-view";
 import type { TournamentSnapshot } from "@/lib/shared/types";
+import { gunzipSync } from "node:zlib";
+import { SPECTATOR_MAX_CONCURRENT_REBUILDS } from "@/lib/server/spectator-snapshot";
 import { tournamentSnapshot } from "../../../helpers/tournament-detail";
 import { tournamentCard } from "../../../helpers/tournament-card";
 import { bracketMatch, matchCaster } from "../../../helpers/bracket-match";
@@ -254,13 +257,13 @@ describe("GET /api/spectator/tournaments/[id]", () => {
   it("plafonne à part les lectures qui font reconstruire la réponse, pas celles servies par le cache", async () => {
     mockedSnapshot.mockResolvedValue(snapshot());
     // Une adresse parcourt des tournois froids : chacun coûte un instantané entier.
-    for (let i = 1; i <= SPECTATOR_REBUILD_RULE.limit; i += 1) {
+    for (let i = 1; i <= SPECTATOR_REBUILD_RULE.capacity; i += 1) {
       expect((await GET(req(String(i)), params(String(i)))).status).toBe(200);
     }
-    expect(mockedSnapshot).toHaveBeenCalledTimes(SPECTATOR_REBUILD_RULE.limit);
+    expect(mockedSnapshot).toHaveBeenCalledTimes(SPECTATOR_REBUILD_RULE.capacity);
 
     // Une reconstruction ne lit la carte qu'une fois.
-    expect(mockedCard).toHaveBeenCalledTimes(SPECTATOR_REBUILD_RULE.limit);
+    expect(mockedCard).toHaveBeenCalledTimes(SPECTATOR_REBUILD_RULE.capacity);
 
     mockedCard.mockClear();
     const refused = await GET(req("1000"), params("1000"));
@@ -268,13 +271,13 @@ describe("GET /api/spectator/tournaments/[id]", () => {
     expect(refused.headers.get("retry-after")).not.toBeNull();
     // Refusée avant toute lecture en base, carte comprise.
     expect(mockedCard).not.toHaveBeenCalled();
-    expect(mockedSnapshot).toHaveBeenCalledTimes(SPECTATOR_REBUILD_RULE.limit);
+    expect(mockedSnapshot).toHaveBeenCalledTimes(SPECTATOR_REBUILD_RULE.capacity);
 
     // Un tournoi déjà prêt reste servi à cette adresse : il ne coûte que le cache.
     expect((await GET(req("1"), params("1"))).status).toBe(200);
     // Et une autre adresse fait toujours reconstruire.
     expect((await GET(req("1000", { "x-forwarded-for": "198.51.100.9" }), params("1000"))).status).toBe(200);
-    expect(mockedSnapshot).toHaveBeenCalledTimes(SPECTATOR_REBUILD_RULE.limit + 1);
+    expect(mockedSnapshot).toHaveBeenCalledTimes(SPECTATOR_REBUILD_RULE.capacity + 1);
   });
 
   it("ne fait pas payer au plafond des reconstructions un identifiant inconnu ou pas encore publié", async () => {
@@ -282,7 +285,7 @@ describe("GET /api/spectator/tournaments/[id]", () => {
     mockedCard.mockResolvedValue(null);
     // Des sondes au hasard (ou une salle qui ouvre un lien avant la publication)
     // reçoivent leur « introuvable », jamais un 429…
-    for (let i = 1; i <= SPECTATOR_REBUILD_RULE.limit + 5; i += 1) {
+    for (let i = 1; i <= SPECTATOR_REBUILD_RULE.capacity + 5; i += 1) {
       const res = await GET(req(String(i)), params(String(i)));
       expect(res.status).toBe(404);
       expect(await res.json()).toEqual({ error: "TOURNAMENT_NOT_FOUND" });
@@ -312,8 +315,99 @@ describe("GET /api/spectator/tournaments/[id]", () => {
     expect((await first).status).toBe(200);
     expect((await second).status).toBe(200);
     expect(mockedSnapshot).toHaveBeenCalledTimes(1);
-    // Une seule lecture de la carte pour les deux.
+    // Une seule lecture de la carte pour les deux, et un seul jeton.
     expect(mockedCard).toHaveBeenCalledTimes(1);
+    expect(peekTokenBucket(SPECTATOR_REBUILD_RULE, "203.0.113.7").remaining).toBe(SPECTATOR_REBUILD_RULE.capacity - 1);
+  });
+
+  it("rend le jeton d'une reconstruction qui échoue : une panne brève n'épuise pas une salle", async () => {
+    mockedSnapshot.mockRejectedValue(new Error("ECONNREFUSED"));
+    for (let i = 0; i < SPECTATOR_REBUILD_RULE.capacity + 3; i += 1) {
+      expect((await GET(req("5"), params("5"))).status).toBe(503);
+    }
+    mockedSnapshot.mockResolvedValue(snapshot());
+    expect((await GET(req("5"), params("5"))).status).toBe(200);
+  });
+
+  it("sert la dernière réponse, même échue, à un réseau sans jeton", async () => {
+    jest.useFakeTimers({ now: 5_000_000, doNotFake: ["nextTick", "setImmediate", "queueMicrotask"] });
+    try {
+      mockedSnapshot.mockResolvedValue(snapshot());
+      expect((await GET(req("5"), params("5"))).status).toBe(200);
+      // La réponse expire (15 s au calme) ; le réseau vide ensuite son seau.
+      jest.setSystemTime(5_000_000 + 20_000);
+      for (let i = 1; i <= SPECTATOR_REBUILD_RULE.capacity; i += 1) {
+        expect((await GET(req(String(100 + i)), params(String(100 + i)))).status).toBe(200);
+      }
+      mockedSnapshot.mockClear();
+
+      const served = await GET(req("5"), params("5"));
+      expect(served.status).toBe(200);
+      expect(mockedSnapshot).not.toHaveBeenCalled();
+      // L'âge annoncé est celui de la copie la plus vieille servie.
+      expect(Number(served.headers.get(SPECTATOR_FRESHNESS_HEADER))).toBeGreaterThanOrEqual(SPECTATOR_MAX_COPY_AGE_MS);
+      // Sans copie récente, le refus.
+      expect((await GET(req("999"), params("999"))).status).toBe(429);
+      // Au-delà de l'âge déclaré, la copie n'est plus servie.
+      jest.setSystemTime(5_000_000 + SPECTATOR_MAX_COPY_AGE_MS);
+      for (let i = 1; i <= SPECTATOR_REBUILD_RULE.capacity; i += 1) {
+        await GET(req(String(200 + i)), params(String(200 + i)));
+      }
+      expect((await GET(req("5"), params("5"))).status).toBe(429);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("répond 503 quand toutes les places de construction sont prises, sans faire payer", async () => {
+    const releases: Array<() => void> = [];
+    mockedSnapshot.mockImplementation(
+      (id) =>
+        new Promise<TournamentSnapshot>((resolve) => {
+          releases.push(() => resolve(snapshot({ card: tournamentCard({ id, state: "RUNNING" }) })));
+        }),
+    );
+    const running = Array.from({ length: SPECTATOR_MAX_CONCURRENT_REBUILDS }, (_, index) =>
+      GET(req(String(index + 1), { "x-forwarded-for": `198.51.100.${index + 1}` }), params(String(index + 1))),
+    );
+    for (let i = 0; i < 5; i += 1) await new Promise((resolve) => setImmediate(resolve));
+    expect(releases).toHaveLength(SPECTATOR_MAX_CONCURRENT_REBUILDS);
+
+    const busy = await GET(req("40"), params("40"));
+    expect(busy.status).toBe(503);
+    expect(busy.headers.get("retry-after")).not.toBeNull();
+    expect(await busy.json()).toEqual({ error: "TOURNAMENT_LOAD_FAILED" });
+    expect(peekTokenBucket(SPECTATOR_REBUILD_RULE, "203.0.113.7").remaining).toBe(SPECTATOR_REBUILD_RULE.capacity);
+
+    for (const release of releases) release();
+    expect((await Promise.all(running)).map((res) => res.status)).toEqual(
+      Array.from({ length: SPECTATOR_MAX_CONCURRENT_REBUILDS }, () => 200),
+    );
+  });
+
+  it("compresse le corps quand le client l'accepte, une fois pour tous", async () => {
+    mockedSnapshot.mockResolvedValue(snapshot());
+    const plain = await GET(req("5"), params("5"));
+    const body = await plain.text();
+    expect(plain.headers.get("content-encoding")).toBeNull();
+    expect(plain.headers.get("vary")).toBe("Accept-Encoding");
+
+    const zipped = await GET(req("5", { "accept-encoding": "gzip, deflate, br" }), params("5"));
+    expect(zipped.headers.get("content-encoding")).toBe("gzip");
+    expect(zipped.headers.get("vary")).toBe("Accept-Encoding");
+    expect(gunzipSync(Buffer.from(await zipped.arrayBuffer())).toString("utf8")).toBe(body);
+  });
+
+  it("compte un réseau IPv6 /64 comme un seul client", async () => {
+    mockedSnapshot.mockResolvedValue(snapshot());
+    for (let i = 0; i < SPECTATOR_READ_RULE.limit; i += 1) {
+      // Une adresse différente à chaque lecture, dans le même /64.
+      const ip = `2001:db8:1:2::${(i + 1).toString(16)}`;
+      expect((await GET(req("5", { "x-forwarded-for": ip }), params("5"))).status).toBe(200);
+    }
+    expect((await GET(req("5", { "x-forwarded-for": "2001:db8:1:2:ffff::9" }), params("5"))).status).toBe(429);
+    // Un autre /64 passe.
+    expect((await GET(req("5", { "x-forwarded-for": "2001:db8:1:3::1" }), params("5"))).status).toBe(200);
   });
 
   it("ne lit qu'une fois la carte d'un identifiant introuvable demandé par plusieurs lectures simultanées", async () => {
