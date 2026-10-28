@@ -22,8 +22,21 @@ import styles from "./DiscordCertifyPrompt.module.css";
  */
 export const CERTIFY_PROMPT_GROUPS = [
   { group: "seen", rows: ["admins", "referees", "match", "players", "visitors"] },
-  { group: "effects", rows: ["badge", "dms"] },
+  { group: "effects", rows: ["badge", "dms", "link"] },
 ] as const;
+
+/**
+ * Lignes du seul parcours `DIALOG` : certifier par un code en message privé
+ * rattache aussi le compte Discord à un compte qui n'en a pas
+ * (`startDiscordHandleUpdate`, `discord_link_method = 'DM_CODE'`). En
+ * `ONE_CLICK`, Discord est déjà rattaché : rien n'y change.
+ */
+export const CERTIFY_PROMPT_DIALOG_ONLY_ROWS: ReadonlySet<string> = new Set(["link"]);
+
+/** Les lignes d'un groupe que montre ce parcours. */
+export function certifyPromptRowsFor<Row extends string>(rows: readonly Row[], mode: CertifyPrompt["mode"]): Row[] {
+  return rows.filter((row) => mode === "DIALOG" || !CERTIFY_PROMPT_DIALOG_ONLY_ROWS.has(row));
+}
 
 /** Refus de `POST /api/profile/discord` qui disent que l'état du tag a changé sous la fenêtre. */
 const STATE_CHANGED = new Set(["DISCORD_TAG_CHANGED", "DISCORD_NOT_LINKED", "DISCORD_TAG_MISSING", "DISCORD_TAG_NOT_ATTESTED"]);
@@ -244,7 +257,7 @@ export function DiscordCertifyPrompt({ prompt, userId, canOpen, onProfile, onAns
                     {t(`groups.${group}`)}
                   </th>
                 </tr>
-                {rows.map((row) => (
+                {certifyPromptRowsFor(rows, prompt.mode).map((row) => (
                   <tr key={row}>
                     <th scope="row">{t(`rows.${row}.label`)}</th>
                     <td>{t(`rows.${row}.without`)}</td>

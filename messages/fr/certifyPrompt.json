@@ -45,6 +45,11 @@
       "label": "Messages privés de match (bot)",
       "without": "Aucun",
       "with": "Oui, sauf si tu les coupes"
+    },
+    "link": {
+      "label": "Rattachement de ton compte Discord",
+      "without": "Aucun",
+      "with": "S'il n'est pas encore rattaché, le code reçu en message privé le rattache : tu pourras te connecter par Discord"
     }
   },
   "undo": "Retirer ton tag ou changer de pseudo Discord retire la certification.",

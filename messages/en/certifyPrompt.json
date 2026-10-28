@@ -45,6 +45,11 @@
       "label": "Match DMs from the bot",
       "without": "None",
       "with": "Yes, unless you turn them off"
+    },
+    "link": {
+      "label": "Linking of your Discord account",
+      "without": "None",
+      "with": "If it isn't linked yet, the code received by direct message links it: you can then log in through Discord"
     }
   },
   "undo": "Removing your tag or changing your Discord username removes the verification.",

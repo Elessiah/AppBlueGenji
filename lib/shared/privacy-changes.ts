@@ -1189,11 +1189,29 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     title: "« Ne plus voir » de l'invitation à certifier : retenu sur le compte",
     links: [{ href: "/rgpd#cookies", label: "Lire la section « Cookies & traceurs »" }],
     summary:
-      "Le choix « Ne plus voir » de la fenêtre qui t'invite, sur la fiche d'un tournoi, à certifier ton tag Discord et ton BattleTag est désormais gardé sur ton compte, et non plus dans le navigateur : il vaut dans tous tes navigateurs, et ne s'applique plus aux autres comptes utilisés dans le même navigateur.",
+      "Le choix « Ne plus voir » de la fenêtre qui t'invite, sur la fiche d'un tournoi, à certifier ton tag Discord (et ton BattleTag selon le jeu) est désormais gardé sur ton compte, et non plus dans le navigateur : il vaut dans tous tes navigateurs, et ne s'applique plus aux autres comptes utilisés dans le même navigateur.",
     details: [
       "Ce qui est gardé : la date du choix, sur ton compte. Elle figure dans l'export de tes données et est effacée à l'anonymisation du compte.",
       "Un « Ne plus voir » coché avant ce changement, gardé dans le navigateur, n'est pas repris sur ton compte : la fenêtre peut revenir une fois, à cocher de nouveau. Cette ancienne valeur du stockage local n'est plus lue, et elle est effacée à l'ouverture de la fiche d'un tournoi.",
       "La fermeture simple de la fenêtre reste retenue pour l'onglet seulement (stockage de session, jamais transmise au serveur).",
+    ],
+  },
+  {
+    // ERREUR-FIX EF-05 : entrée rectificative. Celle du 21 octobre, publiée,
+    // décrit la marque de session comme posée par « Plus tard » (« plus à
+    // proposer ») ; le code la pose à chaque connexion Discord ou Blizzard
+    // d'un compte non certifié sans « Ne plus voir » (`createSession`) et la
+    // lève à la première réponse. Rien ne change dans le code : la description
+    // s'aligne sur /rgpd et le registre (T01). Datée comme l'entrée précédente.
+    id: "2026-10-proposition-certification-discord-marque-de-session",
+    publishedAt: "2026-10-30",
+    title: "Proposition de certification du tag Discord : ce que note ta session",
+    links: [{ href: "/rgpd#donnees-collectees", label: "Lire la section « Données collectées »" }],
+    summary:
+      "Précision sur l'information du 21 octobre 2026 : à chaque connexion par Discord ou Blizzard, tant que ton tag Discord n'est pas certifié et que tu n'as pas choisi « Ne plus voir », ta session de connexion note que la fenêtre de certification reste à te proposer, une fois par connexion.",
+    details: [
+      "L'information du 21 octobre disait l'inverse : que la session note, après « Plus tard », que la fenêtre n'est plus à proposer. En fait, la marque est posée à la connexion et levée à ta première réponse (« Plus tard », « Ne plus voir » — qui la lève sur toutes tes sessions — ou la certification), ou dès qu'il n'y a plus rien à te proposer.",
+      "Cette marque ne contient rien d'autre, part avec la session et ne figure pas dans l'export de tes données. Rien d'autre ne change : « Ne plus voir » reste gardé sur ton compte, avec sa date.",
     ],
   },
 ];

@@ -500,7 +500,7 @@ export function RgpdEn({
             </li>
             <li>
               <strong>bg_cert_prompt_closed</strong> — a session storage value, erased when the tab is closed, set
-              only <strong>if you close the window inviting you to verify your Discord tag and your BattleTag</strong>{" "}
+              only <strong>if you close the window inviting you to verify your Discord tag (and your BattleTag depending on the game)</strong>{" "}
               (tournament page), so as not to reopen it in that tab. It only contains the value “1”, never an
               identifier of a person, and is never sent to the server. If you tick “Don&apos;t show again” — also
               kept if the window steps aside for another one (a match launch) —, that choice is not kept in the
@@ -843,7 +843,7 @@ export function RgpdEn({
             unticking “Discord direct messages about my matches” in{" "}
             <EnglishLegalLink href="/profil#notifications">My profile</EnglishLegalLink> — your push notifications
             keep their own settings. The site keeps this choice for the lifetime of the account, under a{" "}
-            <strong>legal obligation</strong> (that is what lets it keep honouring your objection); it appears in the
+            <strong>legal obligation</strong> (that is what lets it keep honouring your objection — this keeping is therefore not subject to the right to object); it appears in the
             export of your data. Referee alerts and the refereeing schedule sent to referees and administrators fall
             under <strong>performance of the service</strong> and are not turned off this way (
             <LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>). When a staff member settles a
