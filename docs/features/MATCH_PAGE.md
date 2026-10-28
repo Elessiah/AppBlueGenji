@@ -48,8 +48,8 @@ fiche.
    n'héberge pas). Match casté : le rappel « triez les joueurs par rôle ».
 3. **Arbitrage** (`matchPageDecision`) : « Arbitre désigné » pour tous — son
    explication derrière le « i » —, son
-   pseudo et son BattleTag (« À inviter dans la partie ») aux seuls lecteurs
-   que sert la lecture des contacts ; ou l'aide-mémoire de l'**autogestion**
+   pseudo et — en Overwatch seulement — son BattleTag (« À inviter dans la
+   partie ») aux seuls lecteurs que sert la lecture des contacts ; ou l'aide-mémoire de l'**autogestion**
    (l'hôte crée la partie, les managers s'invitent, les paramètres, les casters
    — cette étape seulement avec un caster, `selfManagementSteps`) ; ou, au
    **staff seul**, « Aucune décision ». Rien sur un match terminé ou une
@@ -61,7 +61,19 @@ fiche.
    visible ne le porte, comme sur la carte. Deux liens au même texte prennent
    leur numéro (« YouTube 2 »). Les liens suivent la règle de la carte : tus
    tant que le match n'est pas annoncé casté. Puis les fiches des casters, BattleTag marqué
-   « À inviter — obligatoire » (pas sur sa propre fiche).
+   « À inviter — obligatoire » (pas sur sa propre fiche) sous « Casters à
+   inviter ».
+
+## Hors Overwatch (décision 35, 2026-10-28)
+
+En Marvel Rivals, on ne s'invite pas par BattleTag : la lecture des contacts
+n'envoie **pas du tout** le BattleTag (ni `battletagVerified`) des casters ni de
+l'arbitre désigné (`withGameBattletag`, `match-launch-info.ts`, jeu lu par
+`battletagRelevantFor`) — ni à la page, ni à la modale de lancement, ni à la
+fenêtre « Contacts », staff compris. Les fiches n'en dessinent pas la ligne
+(`CasterCard`, `RefereeCard`), la page tait les deux consignes « À inviter » et
+titre « Contacts des casters » (tag Discord certifié seul). Les contacts des
+équipes, eux, gardent leur BattleTag dans les deux jeux.
 
 ## Données : aucune nouvelle
 

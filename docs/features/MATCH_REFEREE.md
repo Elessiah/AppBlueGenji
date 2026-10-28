@@ -88,7 +88,8 @@ modale) ; sinon l'équipe 1. L'hôte joue à **gauche** ; l'autre équipe
   « Autogestion » à tous, « Sans arbitre » au staff seul (`refereeStripState`).
   **Jamais de nom** dans l'instantané ni dans `TournamentViewerContext`.
 - **Parties du match** (deux équipes, casters) : `MatchLaunchInfo.referee` —
-  pseudo, « Prêt », et BattleTag (même masqué, `sharesLiveMatch`) **seulement
+  pseudo, « Prêt », et — **en Overwatch seulement**, champ absent ailleurs
+  (`withGameBattletag`, décision 35) — BattleTag (même masqué, `sharesLiveMatch`) **seulement
   quand les contacts du match sont ouverts** (`ctx.exposes` : dès que les deux
   adversaires sont connus pour les équipes et le staff, le temps du match pour
   les casters). Jamais son tag Discord. Carte `RefereeCard`
