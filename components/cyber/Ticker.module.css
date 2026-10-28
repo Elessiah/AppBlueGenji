@@ -54,7 +54,7 @@
 }
 
 /* Résultat (TICKER_RESULTS.md) : chaque camp a sa teinte, et un repère qui
-   ne tient pas à la couleur (« ▲ » / « ▼ », graisse) ; l'issue est dite en
+   ne tient pas à la couleur (« ✓ » / « ✕ », graisse) ; l'issue est dite en
    texte masqué. Forfait et nul gardent l'encre du bandeau. Aucun ambre :
    il ne dit qu'un avertissement. */
 .side {
@@ -68,6 +68,11 @@
 
 .loser {
   color: var(--result-loss-ink);
+}
+
+/* Mots d'issue masqués : lus à voix haute, jamais copiés avec le texte du bandeau. */
+.item :global(.sr-only) {
+  user-select: none;
 }
 
 .mark {
