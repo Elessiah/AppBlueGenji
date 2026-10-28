@@ -75,6 +75,13 @@ export type LobbyBriefRow = RowDataPacket & {
   referee_user_id: number | null;
 };
 
+/**
+ * Un match qui porte déjà un score est joué : le staff qui le replanifie ou
+ * allume l'arbitrage planifié le tient pour lancé (`lobby_opened_at` posé,
+ * `match-schedule`, `referee-scheduling`), sans qu'aucun salon ne s'ouvre.
+ */
+const NO_SCORE_SQL = "AND m.team1_score IS NULL AND m.team2_score IS NULL";
+
 type Db = Awaited<ReturnType<typeof getDatabase>>;
 type ClaimedSide = { row: LobbyBriefRow; slot: LobbyBriefSlot };
 
@@ -95,7 +102,7 @@ async function claimLobbyBrief(db: Db, claim: ClaimedSide): Promise<boolean> {
      SELECT m.id, m.launch_pairing, ? FROM bg_matches m
       WHERE m.id = ? AND m.launch_pairing = ? AND m.status = 'READY' AND m.is_bye = 0
         AND m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id)
-        AND m.lobby_opened_at IS NOT NULL`,
+        AND m.lobby_opened_at IS NOT NULL ${NO_SCORE_SQL}`,
     [lobbyBriefPhase(claim.slot), Number(claim.row.id), String(claim.row.launch_pairing)],
   );
   return (result as { affectedRows?: number }).affectedRows === 1;
@@ -259,7 +266,7 @@ async function runLobbyBriefSweep(): Promise<number> {
        ${seedJoins("m")}
       WHERE m.status = 'READY' AND m.is_bye = 0
         AND m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id)
-        AND m.lobby_opened_at > NOW() - INTERVAL ? MINUTE
+        AND m.lobby_opened_at > NOW() - INTERVAL ? MINUTE ${NO_SCORE_SQL}
         AND (SELECT COUNT(*) FROM bg_match_start_notices n
               WHERE n.match_id = m.id AND n.pairing = m.launch_pairing AND n.phase IN (?, ?)) < 2
       ORDER BY m.id`,
