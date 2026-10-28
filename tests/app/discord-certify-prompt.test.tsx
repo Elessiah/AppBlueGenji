@@ -7,7 +7,7 @@ jest.mock("next/navigation", () => ({
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { ToastProvider } from "@/components/ui/toast";
-import { CERTIFY_PROMPT_GROUPS, DiscordCertifyPrompt } from "@/components/discord/DiscordCertifyPrompt";
+import { CERTIFY_PROMPT_GROUPS, DiscordCertifyPrompt, certifyPromptRowsFor } from "@/components/discord/DiscordCertifyPrompt";
 import { scopedText } from "@/lib/shared/scoped-text";
 import frCertify from "@/messages/fr/certifyPrompt.json";
 import enCertify from "@/messages/en/certifyPrompt.json";
@@ -286,14 +286,27 @@ describe("textes (certifyPrompt) — FR et EN", () => {
   });
 
   it("sans certification, personne d'autre que toi : ce que dit canViewDiscordTag", () => {
-    const frNone: Record<string, string> = { badge: "Non", dms: "Aucun" };
-    const enNone: Record<string, string> = { badge: "No", dms: "None" };
+    const frNone: Record<string, string> = { badge: "Non", dms: "Aucun", link: "Aucun" };
+    const enNone: Record<string, string> = { badge: "No", dms: "None", link: "None" };
     for (const row of CERTIFY_PROMPT_ROWS) {
       expect([row, fr.rows[row].without]).toEqual([row, frNone[row] ?? "Jamais"]);
       expect([row, en.rows[row].without]).toEqual([row, enNone[row] ?? "Never"]);
     }
     // Visiteurs sans compte : jamais, même certifié.
     expect([fr.rows.visitors.with, en.rows.visitors.with]).toEqual(["Jamais", "Never"]);
+  });
+
+  it("rattachement du compte Discord : au seul parcours DIALOG, où le code en message privé le rattache (EF-05)", () => {
+    const effects = CERTIFY_PROMPT_GROUPS.find(({ group }) => group === "effects")?.rows ?? [];
+    expect(certifyPromptRowsFor(effects, "DIALOG")).toEqual(["badge", "dms", "link"]);
+    expect(certifyPromptRowsFor(effects, "ONE_CLICK")).toEqual(["badge", "dms"]);
+    // Les publics ne dépendent pas du parcours.
+    const seen = CERTIFY_PROMPT_GROUPS.find(({ group }) => group === "seen")?.rows ?? [];
+    expect(certifyPromptRowsFor(seen, "ONE_CLICK")).toEqual([...seen]);
+    expect(certifyPromptRowsFor([], "DIALOG")).toEqual([]);
+    expect(SOURCE).toContain("{certifyPromptRowsFor(rows, prompt.mode).map((row) => (");
+    expect(fr.rows.link.with).toContain("le code reçu en message privé le rattache");
+    expect(en.rows.link.with).toContain("the code received by direct message links it");
   });
 
   it("arbitres : engagé dans un tournoi, ou caster d'un match dès que ses adversaires sont connus (CASTER-CONTACTS-REFEREES)", () => {
