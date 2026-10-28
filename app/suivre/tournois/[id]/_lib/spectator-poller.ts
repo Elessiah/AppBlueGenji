@@ -125,6 +125,19 @@ export function createSpectatorPoller(
     if (!env.isHidden()) arm(wait);
   };
 
+  /**
+   * Introuvable (ou adresse illisible). La fiche déjà affichée part aussi : un
+   * tournoi supprimé ne reste pas à l'écran, et la carte « introuvable » le dit
+   * (`TournamentFatal`). Revérifié toutes les dix minutes : un introuvable
+   * toujours introuvable ne republie rien, la carte ne se redessine pas.
+   */
+  function notFound(current: SpectatorState): void {
+    etag = null; // plus rien en main : la prochaine réponse doit porter un corps
+    const next: SpectatorState = { ...INITIAL_SPECTATOR_STATE, fatal: "TOURNAMENT_NOT_FOUND", cadenceMs: null };
+    if (!sameState(current, next)) commit(next);
+    schedule(SPECTATOR_NOT_FOUND_RETRY_MS);
+  }
+
   async function load(): Promise<void> {
     if (inflight || disposed) return;
     inflight = true;
@@ -140,11 +153,7 @@ export function createSpectatorPoller(
       if (disposed) return;
 
       if (response.status === 404 || response.status === 400) {
-        // La fiche déjà affichée part aussi : un tournoi supprimé ne reste pas à
-        // l'écran, et la carte « introuvable » le dit (`TournamentFatal`).
-        etag = null; // plus rien en main : la prochaine réponse doit porter un corps
-        commit({ ...INITIAL_SPECTATOR_STATE, fatal: "TOURNAMENT_NOT_FOUND", cadenceMs: null });
-        schedule(SPECTATOR_NOT_FOUND_RETRY_MS);
+        notFound(current);
         return;
       }
       if (response.status !== 200 && response.status !== 304) {

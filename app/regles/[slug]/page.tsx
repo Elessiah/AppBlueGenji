@@ -25,6 +25,8 @@ import { formatMessage, type MessageValues } from "@/lib/shared/message-format";
 import { breadcrumbJsonLd } from "@/lib/shared/structured-data";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
+import { publicTournamentSnapshotForRequest } from "@/lib/server/spectator-request";
+import { memberTournamentPath, spectatorTournamentPath } from "@/lib/shared/spectator-view";
 import { can } from "@/lib/shared/permissions";
 import { parseRulesTournamentParam } from "@/lib/shared/rules-tournament-link";
 import type { TournamentSettingsGroup } from "@/lib/shared/tournament-settings";
@@ -43,14 +45,23 @@ type PageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-type TournamentSettingsView = { id: number; name: string; groups: TournamentSettingsGroup[] };
+type TournamentSettingsView = {
+  id: number;
+  name: string;
+  groups: TournamentSettingsGroup[];
+  /** Fiche du tournoi pour ce lecteur : connectée, ou page sans compte. */
+  backHref: string;
+};
 
 /**
  * Réglages du tournoi désigné par `?tournoi=<id>` — le lien du bouton d'aide
- * d'une fiche de tournoi le porte. Même règle de lecture que la fiche : il faut
- * être connecté (l'espace des tournois l'est), et un tournoi non publié n'existe
- * que pour la permission `tournaments`. Tout refus, toute panne de lecture, rend
- * simplement la page générale du mode.
+ * d'une fiche de tournoi le porte. Même règle de lecture que la fiche : un
+ * membre connecté lit l'instantané avec ses droits (un tournoi non publié
+ * n'existe que pour la permission `tournaments`) ; un visiteur **sans session**
+ * lit la réponse publique mutualisée (`publicTournamentSnapshotForRequest`, un
+ * tournoi publié seulement, jamais une lecture hors cache), et le retour mène à
+ * la page sans compte. Tout refus, toute panne de lecture, rend simplement la
+ * page générale du mode.
  */
 async function loadTournamentSettings(
   tournamentId: number | null,
@@ -58,14 +69,14 @@ async function loadTournamentSettings(
 ): Promise<TournamentSettingsView | null> {
   if (tournamentId === null) return null;
   try {
-    const user = await getCurrentUser();
-    if (!user) return null;
-    const snapshot = await getVisibleTournamentSnapshot(tournamentId, {
-      canManage: can(user, "tournaments"),
-    });
+    const user = await getCurrentUser().catch(() => null);
+    const snapshot = user
+      ? await getVisibleTournamentSnapshot(tournamentId, { canManage: can(user, "tournaments") })
+      : await publicTournamentSnapshotForRequest(tournamentId);
     if (!snapshot) return null;
     return {
       id: snapshot.card.id,
+      backHref: user ? memberTournamentPath(snapshot.card.id) : spectatorTournamentPath(snapshot.card.id),
       name: snapshot.card.name,
       // Dans la langue de la page (lot 8a-2) : le français reste celui de
       // `tournamentSettingsGroups`.
@@ -244,7 +255,7 @@ export default async function RuleModePage({ params, searchParams }: Readonly<Pa
                   </h2>
                   <p className={styles.settingsIntro}>{text.tournamentIntro}</p>
                   <LocaleLink
-                    href={`/tournois/${tournamentSettings.id}`}
+                    href={tournamentSettings.backHref}
                     className={`entity-link ${styles.backToTournament}`}
                   >
                     {text.backToTournament}

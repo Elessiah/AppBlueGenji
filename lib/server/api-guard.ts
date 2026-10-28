@@ -17,8 +17,12 @@ import {
   ANONYMOUS_IDENTITY,
   checkRateLimit,
   consumeRateLimit,
+  peekTokenBucket,
   rateLimitIdentity,
+  refundTokenBucket,
+  takeTokenBucket,
   type RateLimitRule,
+  type TokenBucketRule,
 } from "./rate-limit";
 import { clientIpFromForwardedFor, parseTrustedProxyHops } from "@/lib/shared/site-visits";
 
@@ -131,7 +135,8 @@ export const LANDING_READ_RULE: RateLimitRule = {
 };
 
 /**
- * Lectures publiques d'un tournoi (`/suivre/tournois/[id]`), par IP.
+ * Lectures publiques d'un tournoi (`/suivre/tournois/[id]`), par réseau
+ * (`clientNetworkKey` : une adresse IPv4, un préfixe IPv6 `/64`).
  *
  * Un onglet en relit une toutes les 27 s au plus vite (30 s, gigue de −10 %
  * comprise) : un peu plus de deux par minute, sans compter les ouvertures et
@@ -150,20 +155,50 @@ export const SPECTATOR_READ_RULE: RateLimitRule = {
 
 /**
  * Lectures publiques d'un tournoi qui font **reconstruire** sa réponse (aucune
- * réponse fraîche ni calcul en vol), par IP.
+ * réponse fraîche ni calcul en vol), par réseau (`clientNetworkKey`) : un
+ * **seau à jetons**, dix d'avance puis un par seconde.
  *
  * Le plafond des lectures ne suffit pas : une seule adresse qui parcourt des
  * dizaines de tournois publiés, chacun hors du cache, ferait reconstruire six
  * instantanés entiers (matchs, rejeu des classements) par seconde. Une salle
  * de LAN qui suit un tournoi n'en provoque qu'une par durée de vie (quatre par
- * minute au calme) ; soixante laissent une marge large à qui en suit
- * plusieurs, et ramènent une boucle hostile au rythme d'un compte connecté.
+ * minute au calme) ; soixante par minute laissent une marge large à qui en suit
+ * plusieurs. Un débit plutôt qu'une fenêtre : une fenêtre fixe laissait passer
+ * soixante reconstructions d'un coup, puis soixante autres juste après sa remise
+ * à zéro — ici, jamais plus de dix à la fois sur le pool MySQL.
  */
-export const SPECTATOR_REBUILD_RULE: RateLimitRule = {
+export const SPECTATOR_REBUILD_RULE: TokenBucketRule = {
   name: "spectator-rebuild",
-  limit: 60,
-  windowMs: 60_000,
+  capacity: 10,
+  refillMs: 1_000,
 };
+
+/**
+ * Identité de débit d'un **réseau** : l'adresse IPv4 telle quelle, une adresse
+ * IPv6 ramenée à son préfixe `/64` — ce qu'un seul abonné reçoit d'ordinaire,
+ * et dans lequel il peut tirer une adresse neuve à chaque requête. Sans ce
+ * regroupement, un seul hôte IPv6 contournait tout plafond par adresse.
+ * Une adresse IPv4 écrite en IPv6 (`::ffff:203.0.113.7`) redevient IPv4 ; une
+ * valeur illisible est rendue telle quelle.
+ */
+export function clientNetworkKey(ip: string | null): string | null {
+  if (ip === null) return null;
+  const address = ip.trim().replace(/^\[|\]$/g, "").split("%")[0].toLowerCase();
+  if (!address.includes(":")) return address || null;
+  const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/.exec(address);
+  if (mapped) return mapped[1];
+  const halves = address.split("::");
+  if (halves.length > 2) return address;
+  const groupsOf = (part: string) =>
+    part === "" ? [] : part.split(":").flatMap((group) => (group.includes(".") ? ["0", "0"] : [group]));
+  const head = groupsOf(halves[0]);
+  const tail = halves.length === 2 ? groupsOf(halves[1]) : [];
+  const missing = 8 - head.length - tail.length;
+  if (halves.length === 2 ? missing < 1 : missing !== 0) return address;
+  const groups = [...head, ...Array.from({ length: missing }, () => "0"), ...tail];
+  if (!groups.every((group) => /^[0-9a-f]{1,4}$/.test(group))) return address;
+  return `${groups.slice(0, 4).map((group) => Number.parseInt(group, 16).toString(16)).join(":")}::/64`;
+}
 
 /**
  * Lectures de l'annuaire et des fiches, par utilisateur : `/api/players`,
@@ -474,9 +509,12 @@ export const DISCORD_VERIFY_CONFIRM_RULE: RateLimitRule = {
  * `Retry-After` est renseigné : un client correct saura attendre plutôt que
  * réessayer aussitôt.
  */
+/** Identité plafonnée : compte, réseau, ou inconnue (jamais plafonnée). */
+type RateIdentity = string | number | null | undefined;
+
 export function enforceRateLimit(
   rule: RateLimitRule,
-  identity: string | number | null | undefined,
+  identity: RateIdentity,
 ): NextResponse | null {
   const key = rateLimitIdentity(identity);
   if (key === ANONYMOUS_IDENTITY) return null;
@@ -494,12 +532,43 @@ export function enforceRateLimit(
  */
 export function peekRateLimit(
   rule: RateLimitRule,
-  identity: string | number | null | undefined,
+  identity: RateIdentity,
 ): NextResponse | null {
   const key = rateLimitIdentity(identity);
   if (key === ANONYMOUS_IDENTITY) return null;
   const state = checkRateLimit(rule, key);
   return state.allowed ? null : tooManyRequests(state.retryAfterMs);
+}
+
+/**
+ * Prend un jeton du seau `rule` pour cette identité : `null` s'il est pris (ou
+ * si l'identité est inconnue, jamais plafonnée), sinon le refus `429` à servir.
+ */
+export function takeRateToken(
+  rule: TokenBucketRule,
+  identity: RateIdentity,
+): NextResponse | null {
+  const key = rateLimitIdentity(identity);
+  if (key === ANONYMOUS_IDENTITY) return null;
+  const state = takeTokenBucket(rule, key);
+  return state.allowed ? null : tooManyRequests(state.retryAfterMs);
+}
+
+/** Le refus de {@link takeRateToken}, sans rien prendre. */
+export function peekRateToken(
+  rule: TokenBucketRule,
+  identity: RateIdentity,
+): NextResponse | null {
+  const key = rateLimitIdentity(identity);
+  if (key === ANONYMOUS_IDENTITY) return null;
+  const state = peekTokenBucket(rule, key);
+  return state.allowed ? null : tooManyRequests(state.retryAfterMs);
+}
+
+/** Rend le jeton pris par {@link takeRateToken} pour un travail qui n'a pas eu lieu. */
+export function refundRateToken(rule: TokenBucketRule, identity: RateIdentity): void {
+  const key = rateLimitIdentity(identity);
+  if (key !== ANONYMOUS_IDENTITY) refundTokenBucket(rule, key);
 }
 
 function tooManyRequests(retryAfterMs: number): NextResponse {

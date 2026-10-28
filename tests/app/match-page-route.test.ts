@@ -8,7 +8,13 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 let mockLocale: "fr" | "en" = "fr";
 jest.mock("@/lib/server/request-locale", () => ({ requestLocale: async () => mockLocale }));
 jest.mock("@/lib/server/auth", () => ({ getCurrentUser: jest.fn(async () => null) }));
-jest.mock("@/lib/server/tournaments-service", () => ({ getVisibleTournamentCard: jest.fn() }));
+jest.mock("@/lib/server/tournaments-service", () => ({
+  getVisibleTournamentCard: jest.fn(),
+  getVisibleTournamentSnapshot: jest.fn(),
+}));
+jest.mock("next/headers", () => ({
+  headers: async () => new Headers({ "x-forwarded-for": "203.0.113.7" }),
+}));
 jest.mock("@/lib/server/database", () => ({ withConnection: jest.fn() }));
 jest.mock("next/navigation", () => ({
   notFound: jest.fn(() => {
@@ -19,13 +25,16 @@ jest.mock("next/navigation", () => ({
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/server/auth";
 import { withConnection } from "@/lib/server/database";
-import { getVisibleTournamentCard } from "@/lib/server/tournaments-service";
+import { getVisibleTournamentCard, getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
+import { clearCache } from "@/lib/server/cache";
+import { resetRateLimit } from "@/lib/server/rate-limit";
 import { getMatchPagePosition, matchPageExists, matchPageMetadata } from "@/lib/server/match-page";
 import MemberLayout, { generateMetadata as memberMetadata } from "@/app/(secured)/tournois/[id]/matchs/[matchId]/layout";
 import SpectatorLayout, { generateMetadata as spectatorMetadata } from "@/app/suivre/tournois/[id]/matchs/[matchId]/layout";
 import { connectionMock, fakeConnection } from "../helpers/sql-double";
 import { authUser } from "../helpers/auth-user";
 import { tournamentCard } from "../helpers/tournament-card";
+import { tournamentSnapshot } from "../helpers/tournament-detail";
 import { isMigratedRoute } from "@/lib/shared/locales";
 
 const connection = connectionMock();
@@ -53,7 +62,13 @@ beforeEach(() => {
   mockLocale = "fr";
   jest.mocked(withConnection).mockImplementation((run) => run(fakeConnection(connection)));
   seedPosition();
+  clearCache();
+  resetRateLimit();
   card.mockResolvedValue(tournamentCard({ id: 12, name: "Coupe d'hiver" }));
+  // Sans compte : la carte de la réponse publique mutualisée.
+  jest
+    .mocked(getVisibleTournamentSnapshot)
+    .mockResolvedValue(tournamentSnapshot({ card: tournamentCard({ id: 12, name: "Coupe d'hiver" }) }));
   user.mockResolvedValue(null);
 });
 

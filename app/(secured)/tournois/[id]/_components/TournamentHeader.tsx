@@ -30,7 +30,7 @@ import {
   type HeaderMetaItem,
   type HeaderTone,
 } from "../_lib/header-meta";
-import { LiveIndicator } from "./LiveIndicator";
+import { LiveIndicator, useLiveIndicatorText } from "./LiveIndicator";
 import { TournamentLiveLink } from "./TournamentLiveLink";
 import s from "./TournamentHeader.module.css";
 
@@ -131,6 +131,8 @@ export function TournamentHeader({
   // Sans compte, la liste des tournois est derrière la connexion : le lien
   // mène à l'accueil, dont le tableau des tournois tient lieu de liste.
   const spectator = useSpectatorView();
+  // La phrase du témoin, reprise dans le panneau du « i » sans compte.
+  const liveText = useLiveIndicatorText({ isLive, tier, cadenceMs, fatal });
   const backHref = spectator ? "/" : "/tournois";
   const backFallback = spectator ? t("header.backHome") : t("header.allTournaments");
   // Figé au premier rendu : l'en-tête n'est rendu que côté client (la page
@@ -173,6 +175,9 @@ export function TournamentHeader({
           {spectator && (
             <InfoHint id="tournament-spectator-hint" subject={t("header.spectator")}>
               <p>{t("header.spectatorTitle")}</p>
+              {/* La cadence accordée et le sens de « Hors ligne » : le `title`
+                  du témoin ne s'atteint ni au toucher ni au clavier. */}
+              <p>{liveText.title}</p>
             </InfoHint>
           )}
         </div>

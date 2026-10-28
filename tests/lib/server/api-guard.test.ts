@@ -4,11 +4,15 @@ import {
   STREAM_OPEN_RULE,
   TOURNAMENT_READ_RULE,
   VISIT_REQUEST_RULE,
+  clientNetworkKey,
   enforceRateLimit,
+  peekRateToken,
+  refundRateToken,
+  takeRateToken,
   peekRateLimit,
   requestClientIp,
 } from "@/lib/server/api-guard";
-import { resetRateLimit, type RateLimitRule } from "@/lib/server/rate-limit";
+import { resetRateLimit, type RateLimitRule, type TokenBucketRule } from "@/lib/server/rate-limit";
 
 const RULE: RateLimitRule = { name: "guard-test", limit: 2, windowMs: 60_000 };
 
@@ -190,5 +194,60 @@ describe("plafonds des routes", () => {
     // Une fermeture libère aussitôt la place : sans ce seau, une boucle
     // ouverture/fermeture referait indéfiniment le travail le plus cher.
     expect(STREAM_OPEN_RULE.limit).toBeLessThan(TOURNAMENT_READ_RULE.limit);
+  });
+});
+
+describe("clientNetworkKey", () => {
+  it("garde une adresse IPv4 telle quelle", () => {
+    expect(clientNetworkKey("203.0.113.7")).toBe("203.0.113.7");
+  });
+
+  it("ramène une IPv4 encapsulée à son adresse", () => {
+    expect(clientNetworkKey("::ffff:203.0.113.7")).toBe("203.0.113.7");
+  });
+
+  it("réduit une IPv6 à son /64, quelle que soit l'écriture", () => {
+    const key = "2001:db8:1:2::/64";
+    expect(clientNetworkKey("2001:db8:1:2::1")).toBe(key);
+    expect(clientNetworkKey("2001:0DB8:0001:0002:ffff:ffff:ffff:ffff")).toBe(key);
+    expect(clientNetworkKey("[2001:db8:1:2:a::9]")).toBe(key);
+    expect(clientNetworkKey("2001:db8:1:2::1%eth0")).toBe(key);
+    expect(clientNetworkKey("2001:db8:1:3::1")).not.toBe(key);
+    expect(clientNetworkKey("::1")).toBe("0:0:0:0::/64");
+    expect(clientNetworkKey("2001:db8:1:2:3:4:1.2.3.4")).toBe(key);
+  });
+
+  it("rend une valeur illisible telle quelle, et null pour un inconnu", () => {
+    expect(clientNetworkKey("2001:db8::1::2")).toBe("2001:db8::1::2");
+    expect(clientNetworkKey("2001:db8:zz::1")).toBe("2001:db8:zz::1");
+    expect(clientNetworkKey("1:2:3:4:5:6:7")).toBe("1:2:3:4:5:6:7");
+    expect(clientNetworkKey(null)).toBeNull();
+    expect(clientNetworkKey("  ")).toBeNull();
+  });
+});
+
+describe("takeRateToken / peekRateToken / refundRateToken", () => {
+  const BUCKET: TokenBucketRule = { name: "guard-bucket", capacity: 2, refillMs: 60_000 };
+
+  it("refuse en 429 une fois la rafale prise, sans rien prendre de plus", async () => {
+    expect(takeRateToken(BUCKET, "1.2.3.4")).toBeNull();
+    expect(takeRateToken(BUCKET, "1.2.3.4")).toBeNull();
+    const refused = takeRateToken(BUCKET, "1.2.3.4");
+    expect(refused?.status).toBe(429);
+    expect(refused?.headers.get("retry-after")).not.toBeNull();
+    expect(peekRateToken(BUCKET, "1.2.3.4")?.status).toBe(429);
+  });
+
+  it("rend le jeton remboursé", () => {
+    takeRateToken(BUCKET, "1.2.3.4");
+    takeRateToken(BUCKET, "1.2.3.4");
+    refundRateToken(BUCKET, "1.2.3.4");
+    expect(takeRateToken(BUCKET, "1.2.3.4")).toBeNull();
+  });
+
+  it("ne plafonne jamais l'identité inconnue", () => {
+    for (let i = 0; i < 5; i += 1) expect(takeRateToken(BUCKET, null)).toBeNull();
+    expect(peekRateToken(BUCKET, null)).toBeNull();
+    refundRateToken(BUCKET, null);
   });
 });

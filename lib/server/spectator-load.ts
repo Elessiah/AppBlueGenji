@@ -50,7 +50,8 @@ let previousReads = 0;
 const readsByClient = new Map<string, number>();
 
 /**
- * Part d'un même client (adresse IP) dans le signal, par fenêtre. Un onglet en
+ * Part d'un même client (réseau, `clientNetworkKey` : une adresse IPv4, un
+ * préfixe IPv6 `/64`) dans le signal, par fenêtre. Un onglet en
  * fait un peu plus de deux par minute : le plafond laisse passer quelques
  * onglets, mais une poignée d'adresses qui martèlent la route ne peuvent plus
  * pousser à elles seules le niveau de charge — et ralentir tous les visiteurs

@@ -37,6 +37,7 @@ import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { localizedPlaceholder, versusText } from "@/lib/shared/tournament-page-text";
 import type { TournamentActionsText } from "@/lib/shared/tournament-actions-text";
 import { useActionsText } from "../_lib/actions-text";
+import { useSpectatorView } from "@/components/spectator-view";
 
 
 /**
@@ -50,19 +51,25 @@ function adminScoreButtonLabel(text: TournamentActionsText, scoreEntryClosed: bo
 }
 
 /** Ligne d'état d'une proposition en attente (`pendingReportState`), dans la langue de la page. */
-function pendingReportText(text: TournamentActionsText, state: PendingReportState | null): string | null {
+export function pendingReportText(
+  text: TournamentActionsText,
+  state: PendingReportState | null,
+  spectator: boolean,
+): string | null {
   if (state === null) return null;
   if (state.kind === "conflict") return text.t("cardActions.reportConflict");
   const reporter = state.reporter ?? text.t("cardActions.reportSide", { side: state.side });
+  // Sans compte, les scores proposés ne sont pas servis (`spectatorSnapshot`) :
+  // qu'une proposition attende, sans un « 0 – 0 » qui n'a jamais été proposé —
+  // l'échéance et la suspension, qui ne disent rien de personnel, restent.
+  const key = spectator ? "cardActions.reportPendingSpectator" : "cardActions.reportPending";
   // Échéance de la validation d'office, lisible des deux équipes (et de tous) :
   // à l'heure de Paris, la même pour chacun (`SCORE_DISPUTE_LOCK.md`).
   const values = { score1: state.team1Score, score2: state.team2Score, reporter };
   // Suspendue par un « Enregistrer » d'arbitrage : aucune heure ne vaut plus.
-  if (state.paused) return text.t("cardActions.reportPendingPaused", values);
+  if (state.paused) return text.t(`${key}Paused`, values);
   const deadline = autoValidateTimeText(state.deadlineAt, text.locale);
-  return deadline
-    ? text.t("cardActions.reportPendingDeadline", { ...values, deadline })
-    : text.t("cardActions.reportPending", values);
+  return deadline ? text.t(`${key}Deadline`, { ...values, deadline }) : text.t(key, values);
 }
 
 interface MatchRowProps {
@@ -101,6 +108,7 @@ export const MatchRow = memo(function MatchRow({
   // vingt-sept cartes qui ne concernent pas le lecteur ne fait que les
   // alourdir toutes.
   const text = useTournamentPageText();
+  const spectator = useSpectatorView();
   // Gestes du lot 8b (score, signalement, lancement) et outils du staff.
   const actionText = useActionsText();
   const { canReport, openReport } = useIssueReport();
@@ -132,7 +140,7 @@ export const MatchRow = memo(function MatchRow({
   const playerScoreLabel = playerScoreKey === null ? null : actionText.t(`cardActions.playerScore.${playerScoreKey}`);
   // Proposition en attente, lisible de tous : sans elle, un match joué et
   // reporté se lisait exactement comme un match pas encore joué.
-  const reportNotice = pendingReportText(actionText, pendingReportState(match));
+  const reportNotice = pendingReportText(actionText, pendingReportState(match), spectator);
   // Cible d'une ancre `#match-[id]` : la carte est surlignée quelques secondes
   // à l'arrivée. Sans ce repère, la page s'ouvre défilée au bon endroit mais le
   // lecteur ne sait pas laquelle des cartes visibles il venait voir.

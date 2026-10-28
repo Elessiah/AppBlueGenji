@@ -6,6 +6,7 @@ import type { BracketMatch } from "@/lib/shared/types";
 import { firstBanTeamName, hostTeamName, refereeStripState } from "../_lib/launch-strip";
 import styles from "./MatchLaunchStrip.module.css";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { useSpectatorView } from "@/components/spectator-view";
 
 /**
  * Bandeau de **lancement** d'un match (`lib/shared/match-launch.ts`) : ce
@@ -25,6 +26,7 @@ import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 function LaunchPhaseBadge({ match, phase }: Readonly<{ match: BracketMatch; phase: MatchLaunchPhase }>) {
   // Libellés de `LAUNCH_PHASE_LABELS` (`match-planning.ts`, français égal testé).
   const { t, locale } = useTournamentPageText();
+  const spectator = useSpectatorView();
   if (phase === "TO_PLAN") {
     return (
       <span className={styles.toPlan} title={t("launch.toPlanTitle")}>
@@ -42,6 +44,15 @@ function LaunchPhaseBadge({ match, phase }: Readonly<{ match: BracketMatch; phas
             la répète que pour les lecteurs d'écran, qui lisent ce libellé
             seul. */}
         {startAtTitle && <span className="sr-only">{t("launch.scheduledSr", { date: startAtTitle })}</span>}
+      </span>
+    );
+  }
+  if (phase === "LOBBY" && spectator) {
+    // Sans compte, les « Prêt » ne sont pas servis (`spectatorSnapshot`) : la
+    // phase seule, sans un décompte qui dirait toujours « 0 ».
+    return (
+      <span className={styles.lobby}>
+        <span aria-hidden="true">⏳</span> {t("launch.lobby")}
       </span>
     );
   }
@@ -86,6 +97,9 @@ export function MatchLaunchStrip({
   staff?: boolean;
 }>) {
   const { t } = useTournamentPageText();
+  // Sans compte, aucun « Prêt » n'est servi : pas d'« En attente » trompeur.
+  const spectator = useSpectatorView();
+  const showReady = phase === "LOBBY" && !spectator;
   const showHost = phase !== "NONE";
   const hostName = hostTeamName(match);
   const firstBanName = showHost ? firstBanTeamName(match) : null;
@@ -127,7 +141,7 @@ export function MatchLaunchStrip({
       {referee === "REFEREE" && (
         <span className={styles.fact} title={t("launch.refereeTitle")}>
           <span aria-hidden="true">🧑‍⚖️</span> {t("launch.referee")}
-          {phase === "LOBBY" && (
+          {showReady && (
             <span className={match.refereeReady ? styles.ok : styles.wait}>
               {match.refereeReady ? t("launch.casterReady") : t("launch.casterWaiting")}
             </span>
@@ -150,7 +164,7 @@ export function MatchLaunchStrip({
           <span aria-hidden="true">🎙</span>
           <span className="sr-only">{t("launch.casterSr")}</span>
           <span className={styles.name}>{caster.pseudo}</span>
-          {phase === "LOBBY" && (
+          {showReady && (
             <span className={caster.ready ? styles.ok : styles.wait}>
               {caster.ready ? t("launch.casterReady") : t("launch.casterWaiting")}
             </span>

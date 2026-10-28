@@ -11,6 +11,7 @@ import {
   SPECTATOR_CACHE_TTL_MS,
   SPECTATOR_HIDDEN_USER_ID,
   SPECTATOR_LOAD_THRESHOLDS,
+  SPECTATOR_MAX_COPY_AGE_MS,
   SPECTATOR_MAX_POLL_MS,
   SPECTATOR_MIN_POLL_MS,
   SPECTATOR_NOT_FOUND_RECHECK_MINUTES,
@@ -35,11 +36,21 @@ import type {
   BracketMatch,
   EnduranceMeta,
   EndurancePenaltyRow,
+  EnduranceStandingRow,
+  MatchCaster,
   MatchScoreReport,
+  SurvivalMeta,
+  SurvivalStandingRow,
+  SwissMeta,
+  SwissStandingRow,
+  TournamentCard,
+  TournamentPhase,
+  TournamentPhaseStanding,
   TournamentSnapshot,
 } from "@/lib/shared/types";
 import { bracketMatch, matchCaster } from "../../helpers/bracket-match";
 import { tournamentSnapshot } from "../../helpers/tournament-detail";
+import { tournamentCard } from "../../helpers/tournament-card";
 
 const calm: SpectatorLoadSignals = { eventLoopDelayMs: 5, openStreams: 10, spectatorReadsPerMinute: 30 };
 
@@ -195,6 +206,16 @@ describe("cadence de relecture", () => {
     expect(spectatorFreshnessMs(30_000, spectatorCacheTtlMs(3))).toBe(33_000 + 10 * SPECTATOR_CACHE_TTL_MS);
   });
 
+  it("garde un tournoi terminé l'âge déclaré entier, jamais au-delà", () => {
+    expect(SPECTATOR_MAX_COPY_AGE_MS).toBe(150_000);
+    expect(spectatorCacheTtlMs(0, "FINISHED")).toBe(SPECTATOR_MAX_COPY_AGE_MS);
+    expect(spectatorCacheTtlMs(3, "FINISHED")).toBe(SPECTATOR_MAX_COPY_AGE_MS);
+    expect(spectatorCacheTtlMs(0, "RUNNING")).toBe(SPECTATOR_CACHE_TTL_MS);
+    for (const level of [0, 1, 2, 3] as const) {
+      expect(spectatorCacheTtlMs(level, "RUNNING")).toBeLessThanOrEqual(SPECTATOR_MAX_COPY_AGE_MS);
+    }
+  });
+
   it("allonge aussi la durée de vie de la réponse partagée", () => {
     expect(spectatorCacheTtlMs(0)).toBe(SPECTATOR_CACHE_TTL_MS);
     expect(spectatorCacheTtlMs(3)).toBe(10 * SPECTATOR_CACHE_TTL_MS);
@@ -276,6 +297,56 @@ describe("ce que lit le visiteur sans compte", () => {
     expect(JSON.stringify(out)).not.toContain("ABC123");
   });
 
+  it("retire les « Prêt » d'un lancement, engagés, arbitre et casters", () => {
+    const snapshot = tournamentSnapshot({
+      matches: [
+        bracketMatch({
+          id: 1,
+          team1Ready: true,
+          team2Ready: true,
+          refereeReady: true,
+          casters: [matchCaster({ ready: true })],
+        }),
+      ],
+    });
+    const [match] = spectatorSnapshot(snapshot).matches;
+    expect([match.team1Ready, match.team2Ready, match.refereeReady, match.casters[0].ready]).toEqual([
+      false,
+      false,
+      false,
+      false,
+    ]);
+    // L'instantané des membres n'est pas touché.
+    expect(snapshot.matches[0].team1Ready).toBe(true);
+  });
+
+  it("garde la proposition de score signalée, sans ses chiffres", () => {
+    const snapshot = tournamentSnapshot({
+      matches: [bracketMatch({ id: 1, team1Report: report, team2Report: { ...report, team1Score: 0, team2Score: 3 } })],
+    });
+    const [match] = spectatorSnapshot(snapshot).matches;
+    const hidden = { team1Score: 0, team2Score: 0, reportedAt: report.reportedAt, maps: [] };
+    expect(match.team1Report).toEqual(hidden);
+    expect(match.team2Report).toEqual(hidden);
+    expect(snapshot.matches[0].team1Report?.team1Score).toBe(1);
+  });
+
+  it("efface la date d'inscription d'un joueur en individuel, pas celle d'une équipe", () => {
+    const at = "2026-10-01T10:00:00.000Z";
+    const row = { teamName: "Alpha", logoUrl: null, seed: null, registeredAt: at, finalRank: null };
+    const snapshot = tournamentSnapshot({
+      soloUserIds: { 4: 9 },
+      registrations: [
+        { ...row, teamId: 3 },
+        { ...row, teamId: 4 },
+      ],
+    });
+    const out = spectatorSnapshot(snapshot);
+    expect(out.registrations.map((registration) => registration.registeredAt)).toEqual([at, ""]);
+    expect(Object.keys(out.registrations[0]).sort()).toEqual(Object.keys(REGISTRATION_FIELDS).sort());
+    expect(JSON.stringify(out.registrations[1])).not.toContain("2026-10-01");
+  });
+
   it("masque qui caste sans masquer qui est inscrit, garde les entrées solo", () => {
     const snapshot = tournamentSnapshot({
       soloUserIds: { 4: 9 },
@@ -292,10 +363,10 @@ describe("ce que lit le visiteur sans compte", () => {
     const out = spectatorSnapshot(snapshot);
     // Le podium est public : un joueur solo garde sa marche sur la page sans compte.
     expect(out.soloUserIds).toEqual({ 4: 9 });
-    // Les casters sont inscrits (le lancement les compte dans les « prêts »),
+    // Les casters sont inscrits (leur « Prêt » effacé avec les autres),
     // sans dire quels comptes — deux co-casters restent deux.
     expect(out.matches[0].casters).toEqual([
-      { userId: SPECTATOR_HIDDEN_USER_ID, pseudo: "Caster", streamId: 1, ready: true },
+      { userId: SPECTATOR_HIDDEN_USER_ID, pseudo: "Caster", streamId: 1, ready: false },
       { userId: SPECTATOR_HIDDEN_USER_ID - 1, pseudo: "CoCaster", streamId: 2, ready: false },
     ]);
     expect(JSON.stringify(out)).not.toMatch(/"userId":3[34]\b/);
@@ -393,14 +464,14 @@ const SNAPSHOT_FIELDS = {
 
 const MATCH_FIELDS = {
   bracket: "public",
-  // `userId` remplacé, pseudo (à l'antenne), stream et « Prêt » publics.
+  // `userId` remplacé et « Prêt » effacé ; pseudo (à l'antenne) et stream publics.
   casters: "parcouru",
   doubleForfeit: "public",
   forfeitTeamId: "public",
   hostTeamId: "public",
   firstBanTeamId: "public",
   refereeAssigned: "public",
-  refereeReady: "public",
+  refereeReady: "retiré",
   selfManaged: "public",
   firstMap: "public",
   id: "public",
@@ -428,13 +499,13 @@ const MATCH_FIELDS = {
   team1Id: "public",
   team1Name: "public",
   team1Placeholder: "public",
-  team1Ready: "public",
+  team1Ready: "retiré",
   team1Report: "parcouru",
   team1Score: "public",
   team2Id: "public",
   team2Name: "public",
   team2Placeholder: "public",
-  team2Ready: "public",
+  team2Ready: "retiré",
   team2Report: "parcouru",
   team2Score: "public",
   tournamentId: "public",
@@ -451,9 +522,10 @@ const MAP_FIELDS = {
 
 const REPORT_FIELDS = {
   maps: "retiré",
+  // La proposition reste signalée (en attente, en litige), sans ses chiffres.
   reportedAt: "public",
-  team1Score: "public",
-  team2Score: "public",
+  team1Score: "retiré",
+  team2Score: "retiré",
 } as const satisfies Record<keyof MatchScoreReport, Disposition>;
 
 const PENALTY_FIELDS = {
@@ -467,6 +539,190 @@ const PENALTY_FIELDS = {
   teamId: "public",
   teamName: "public",
 } as const satisfies Record<keyof EndurancePenaltyRow, Disposition>;
+
+const CASTER_FIELDS = {
+  pseudo: "public",
+  ready: "retiré",
+  streamId: "public",
+  userId: "retiré",
+} as const satisfies Record<keyof MatchCaster, Disposition>;
+
+type RegistrationRow = TournamentSnapshot["registrations"][number];
+
+const REGISTRATION_FIELDS = {
+  finalRank: "public",
+  logoUrl: "public",
+  // Celle d'une équipe reste ; celle d'un joueur en individuel est effacée.
+  registeredAt: "parcouru",
+  seed: "public",
+  teamId: "public",
+  teamName: "public",
+} as const satisfies Record<keyof RegistrationRow, Disposition>;
+
+/*
+ * Types recopiés en bloc : aucun champ n'y est retiré. Les classer ici force
+ * la décision pour tout champ ajouté, sans quoi il partirait en public sans
+ * qu'aucun contrôle ne le signale.
+ */
+const CARD_FIELDS = {
+  champion: "public",
+  description: "public",
+  endurancePlayoffFormat: "public",
+  finishedAt: "public",
+  format: "public",
+  game: "public",
+  hasThirdPlaceMatch: "public",
+  id: "public",
+  image: "public",
+  launchPhase: "public",
+  liveUrl: "public",
+  matchFormat: "public",
+  maxTeams: "public",
+  name: "public",
+  participantType: "public",
+  phases: "public",
+  refereeScheduling: "public",
+  registeredTeams: "public",
+  registrationCloseAt: "public",
+  registrationFilters: "public",
+  registrationOpenAt: "public",
+  runningProgress: "public",
+  startAt: "public",
+  startVisibilityAt: "public",
+  state: "public",
+  survivalRoundsBeforeFirstCut: "public",
+  survivalRoundsPerCut: "public",
+} as const satisfies Record<keyof TournamentCard, Disposition>;
+
+const PHASE_FIELDS = {
+  entrants: "public",
+  finishedAt: "public",
+  format: "public",
+  hasThirdPlaceMatch: "public",
+  id: "public",
+  maxRounds: "public",
+  name: "public",
+  position: "public",
+  qualifierMode: "public",
+  qualifierValue: "public",
+  qualifiers: "public",
+  startedAt: "public",
+  state: "public",
+  survivalRoundsBeforeFirstCut: "public",
+  survivalRoundsPerCut: "public",
+  swissTotalRounds: "public",
+} as const satisfies Record<keyof TournamentPhase, Disposition>;
+
+const PHASE_STANDING_FIELDS = {
+  logoUrl: "public",
+  qualified: "public",
+  rank: "public",
+  seed: "public",
+  teamId: "public",
+  teamName: "public",
+} as const satisfies Record<keyof TournamentPhaseStanding, Disposition>;
+
+const SURVIVAL_FIELDS = {
+  barrageRounds: "public",
+  cancellableForfeitTeamIds: "public",
+  currentRound: "public",
+  roundsBeforeFirstCut: "public",
+  roundsPerCut: "public",
+  standings: "public",
+} as const satisfies Record<keyof SurvivalMeta, Disposition>;
+
+const SURVIVAL_ROW_FIELDS = {
+  eliminatedRound: "public",
+  logoUrl: "public",
+  losses: "public",
+  rank: "public",
+  seed: "public",
+  status: "public",
+  teamId: "public",
+  teamName: "public",
+  wins: "public",
+} as const satisfies Record<keyof SurvivalStandingRow, Disposition>;
+
+const SWISS_FIELDS = {
+  cancellableForfeitTeamIds: "public",
+  currentRound: "public",
+  pointsForBye: "public",
+  pointsForDraw: "public",
+  pointsForLoss: "public",
+  pointsForWin: "public",
+  standings: "public",
+  tiebreakers: "public",
+  totalRounds: "public",
+} as const satisfies Record<keyof SwissMeta, Disposition>;
+
+const SWISS_ROW_FIELDS = {
+  buchholz: "public",
+  byes: "public",
+  draws: "public",
+  logoUrl: "public",
+  losses: "public",
+  points: "public",
+  rank: "public",
+  seed: "public",
+  status: "public",
+  teamId: "public",
+  teamName: "public",
+  wins: "public",
+} as const satisfies Record<keyof SwissStandingRow, Disposition>;
+
+const ENDURANCE_FIELDS = {
+  cancellableForfeitTeamIds: "public",
+  currentRound: "public",
+  earlyExit: "public",
+  forfeitMaps: "public",
+  lossDelta: "public",
+  maxRounds: "public",
+  penalties: "parcouru",
+  playoffSize: "public",
+  playoffsStarted: "public",
+  rounds: "public",
+  standings: "public",
+  startPoints: "public",
+  winDelta: "public",
+} as const satisfies Record<keyof EnduranceMeta, Disposition>;
+
+const ENDURANCE_ROW_FIELDS = {
+  draws: "public",
+  eliminatedRound: "public",
+  logoUrl: "public",
+  losses: "public",
+  penaltyPoints: "public",
+  points: "public",
+  rank: "public",
+  rounds: "public",
+  seed: "public",
+  status: "public",
+  teamId: "public",
+  teamName: "public",
+  wins: "public",
+} as const satisfies Record<keyof EnduranceStandingRow, Disposition>;
+
+describe("inventaire des types recopiés en bloc", () => {
+  it("couvre la carte de la fabrique de test", () => {
+    expect(Object.keys(CARD_FIELDS).sort()).toEqual(Object.keys(tournamentCard()).sort());
+  });
+
+  it("ne classe rien en « retiré » que `spectatorSnapshot` laisserait passer", () => {
+    const wholesale = [
+      CARD_FIELDS,
+      PHASE_FIELDS,
+      PHASE_STANDING_FIELDS,
+      SURVIVAL_FIELDS,
+      SURVIVAL_ROW_FIELDS,
+      SWISS_FIELDS,
+      SWISS_ROW_FIELDS,
+      ENDURANCE_ROW_FIELDS,
+    ];
+    for (const fields of wholesale) {
+      expect(Object.values(fields).every((disposition) => disposition === "public")).toBe(true);
+    }
+  });
+});
 
 describe("inventaire des champs publics", () => {
   it("couvre exactement les champs des fabriques de test", () => {
@@ -485,7 +741,7 @@ describe("inventaire des champs publics", () => {
     const match = out.matches[0];
     expect(Object.keys(match).sort()).toEqual(Object.keys(snapshot.matches[0]).sort());
     expect(Object.keys(match.maps[0]).sort()).toEqual(Object.keys(MAP_FIELDS).sort());
-    expect(Object.keys(match.casters[0]).sort()).toEqual(Object.keys(matchCaster()).sort());
+    expect(Object.keys(match.casters[0]).sort()).toEqual(Object.keys(CASTER_FIELDS).sort());
     expect(Object.keys(match.team1Report!).sort()).toEqual(Object.keys(REPORT_FIELDS).sort());
   });
 
@@ -516,7 +772,8 @@ describe("inventaire des champs publics", () => {
       penalties: [penalty],
       standings: [],
     };
-    const out = spectatorSnapshot(tournamentSnapshot({ endurance })).endurance!.penalties[0];
-    expect(Object.keys(out).sort()).toEqual(Object.keys(PENALTY_FIELDS).sort());
+    const meta = spectatorSnapshot(tournamentSnapshot({ endurance })).endurance!;
+    expect(Object.keys(meta).sort()).toEqual(Object.keys(ENDURANCE_FIELDS).sort());
+    expect(Object.keys(meta.penalties[0]).sort()).toEqual(Object.keys(PENALTY_FIELDS).sort());
   });
 });

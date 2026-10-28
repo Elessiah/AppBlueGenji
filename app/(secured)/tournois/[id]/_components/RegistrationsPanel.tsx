@@ -93,10 +93,13 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
   const { t } = text;
   // Ordre de départ et retraits (outils du staff posés sur la fiche) : lot 8b.
   const a = useActionsText().t;
-  const registeredAt = (iso: string) =>
-    text.locale === "fr"
+  // Vide : date d'une entrée solo, que la page sans compte ne sert pas.
+  const registeredAt = (iso: string) => {
+    if (iso === "") return "-";
+    return text.locale === "fr"
       ? formatLocalDateTime(iso)
       : pageDateTime(iso, text.locale, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  };
   const [busy, setBusy] = useState(false);
 
   // Ordre affiché en attendant que le flux rapporte l'écriture : sans lui, la

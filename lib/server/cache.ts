@@ -19,7 +19,23 @@
  * suivante retente.
  */
 
-type CacheEntry = { value: unknown; expiresAt: number };
+/**
+ * `expiresAt` : fin de la durée de vie (la valeur est servie par `cached`).
+ * `retainUntil` : fin de la conservation — égale à `expiresAt`, sauf pour une
+ * clé écrite avec `retainMs`, que {@link cachedStale} sert encore après son
+ * échéance (réponse publique d'un tournoi, servie périmée au refus).
+ */
+type CacheEntry = { value: unknown; expiresAt: number; retainUntil: number };
+
+/**
+ * Pas de la purge des entrées échues. Le plafond ne suffit pas : sous lui, une
+ * entrée expirée restait en mémoire jusqu'à ce que 500 clés soient écrites —
+ * un parcours de tournois laissait ainsi des instantanés entiers (~1 Mo chacun)
+ * bien après leur durée de vie de quelques secondes. La purge passe au plus une
+ * fois par pas, à l'écriture : un parcours de 500 entrées au plus, rien de plus.
+ */
+export const CACHE_SWEEP_INTERVAL_MS = 10_000;
+let lastSweepAt = 0;
 
 /**
  * Plafond d'entrées conservées. Deux familles de clés s'y côtoient : quelques
@@ -72,13 +88,26 @@ function releasePending(key: string): void {
   else pending.set(key, current - 1);
 }
 
-/** Évince les entrées expirées, puis les moins récemment lues si le plafond tient encore. */
-function evictIfNeeded(now: number): void {
-  if (store.size < MAX_ENTRIES) return;
-
+/** Retire les entrées dont la conservation est échue. */
+function sweepExpired(now: number): void {
+  lastSweepAt = now;
   for (const [key, entry] of store) {
-    if (entry.expiresAt <= now) store.delete(key);
+    if (entry.retainUntil <= now) store.delete(key);
   }
+}
+
+/**
+ * Purge les entrées échues (au plus une fois par {@link CACHE_SWEEP_INTERVAL_MS},
+ * ou dès que le plafond est atteint), puis évince les moins récemment lues si
+ * le plafond tient encore.
+ */
+function evictIfNeeded(now: number): void {
+  if (store.size < MAX_ENTRIES) {
+    if (now - lastSweepAt >= CACHE_SWEEP_INTERVAL_MS) sweepExpired(now);
+    return;
+  }
+
+  sweepExpired(now);
 
   // `Map` itère dans l'ordre d'insertion, et une lecture réinsère sa clé
   // (`cached`) : les premières clés sont les moins récemment servies.
@@ -100,15 +129,38 @@ function evictIfNeeded(now: number): void {
   }
 }
 
+/** Réglages facultatifs de {@link cached}. */
+export type CachedOptions = {
+  /**
+   * Appelé **juste avant** le chargeur, de façon synchrone, et seulement quand
+   * cet appel le lance (ni valeur fraîche ni calcul en vol) : c'est là qu'un
+   * appelant fait payer le calcul qu'il provoque, sans écart possible entre ce
+   * contrôle et le lancement. S'il lève, rien n'est lancé ni mis en vol, et
+   * l'erreur ne touche que cet appel.
+   */
+  beforeLoad?: () => void;
+  /**
+   * Conservation, depuis l'écriture, au-delà de la durée de vie : la valeur
+   * reste lisible par {@link cachedStale} jusque-là (jamais par `cached`).
+   */
+  retainMs?: number;
+};
+
 /**
  * Valeur associée à `key`, calculée par `loader` au plus une fois par fenêtre de
  * `ttlMs` — et au plus une fois à la fois.
  *
  * Un `ttlMs` nul ou négatif désactive la mise en cache mais **conserve le vol
  * unique** : c'est le réglage utile pour une donnée qui doit rester exacte tout
- * en supportant une pointe de lecteurs simultanés.
+ * en supportant une pointe de lecteurs simultanés. Une fonction le calcule
+ * d'après la valeur obtenue (une durée selon l'état d'un tournoi).
  */
-export async function cached<T>(key: string, ttlMs: number, loader: () => Promise<T>): Promise<T> {
+export async function cached<T>(
+  key: string,
+  ttlMs: number | ((value: T) => number),
+  loader: () => Promise<T>,
+  options: CachedOptions = {},
+): Promise<T> {
   const now = Date.now();
 
   const entry = store.get(key);
@@ -122,16 +174,21 @@ export async function cached<T>(key: string, ttlMs: number, loader: () => Promis
   const running = inflight.get(key);
   if (running) return running as Promise<T>;
 
+  options.beforeLoad?.();
+
   const generationAtStart = generationOf(key);
   retainPending(key);
   const promise = (async () => {
     const value = await loader();
-    if (ttlMs > 0 && generationOf(key) === generationAtStart) {
+    const lifeMs = typeof ttlMs === "function" ? ttlMs(value) : ttlMs;
+    if (lifeMs > 0 && generationOf(key) === generationAtStart) {
       // Retirée d'abord : `Map.set` sur une clé présente (valeur expirée) la
       // laisserait à sa place d'origine, en tête de l'éviction.
       store.delete(key);
-      evictIfNeeded(Date.now());
-      store.set(key, { value, expiresAt: Date.now() + ttlMs });
+      const writtenAt = Date.now();
+      evictIfNeeded(writtenAt);
+      const expiresAt = writtenAt + lifeMs;
+      store.set(key, { value, expiresAt, retainUntil: Math.max(expiresAt, writtenAt + (options.retainMs ?? 0)) });
     }
     return value;
   })();
@@ -146,6 +203,17 @@ export async function cached<T>(key: string, ttlMs: number, loader: () => Promis
     // peut encore le lire, c'est-à-dire jusqu'ici.
     releasePending(key);
   }
+}
+
+/**
+ * Dernière valeur écrite pour `key`, **même échue**, tant que sa conservation
+ * (`retainMs` de {@link cached}) court ; `undefined` sinon. Pour servir une
+ * réponse périmée, bornée, quand le calcul est refusé. Ne change pas l'ordre
+ * d'éviction : une valeur seulement relue périmée part la première.
+ */
+export function cachedStale<T>(key: string, now: number = Date.now()): T | undefined {
+  const entry = store.get(key);
+  return entry !== undefined && entry.retainUntil > now ? (entry.value as T) : undefined;
 }
 
 /**
@@ -180,10 +248,16 @@ export function isCachedOrLoading(key: string, now: number = Date.now()): boolea
   return (entry !== undefined && entry.expiresAt > now) || inflight.has(key);
 }
 
+/** Entrées gardées, échues comprises. Réservé aux tests (purge). */
+export function cachedEntryCount(): number {
+  return store.size;
+}
+
 /** Vide le cache. Réservé aux tests. */
 export function clearCache(): void {
   store.clear();
   inflight.clear();
   generations.clear();
   pending.clear();
+  lastSweepAt = 0;
 }

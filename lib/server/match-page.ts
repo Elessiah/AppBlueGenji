@@ -3,7 +3,11 @@ import type { RowDataPacket } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
-import { tournamentPageMetadata, type TournamentMetadataRights } from "@/lib/server/tournament-metadata";
+import {
+  tournamentPageMetadata,
+  type TournamentMetadataCardLoader,
+  type TournamentMetadataRights,
+} from "@/lib/server/tournament-metadata";
 import { getVisibleTournamentCard } from "@/lib/server/tournaments-service";
 import { parseEntityPageId } from "@/lib/shared/entity-page-titles";
 import { matchPagePath } from "@/lib/shared/match-page";
@@ -79,6 +83,7 @@ export async function matchPageMetadata(
   rawMatchId: string,
   spectator: boolean,
   rights: () => Promise<TournamentMetadataRights | null>,
+  loadCard?: TournamentMetadataCardLoader,
 ): Promise<Metadata> {
   const matchId = parseEntityPageId(rawMatchId);
   const tournamentId = parseEntityPageId(rawTournamentId);
@@ -87,6 +92,7 @@ export async function matchPageMetadata(
     rawTournamentId,
     (id) => (matchId === null ? `/tournois/${id}` : matchPagePath(id, matchId, spectator)),
     async () => granted,
+    loadCard,
   );
   if (matchId === null || tournamentId === null || granted === null) return metadata;
   const position = await getMatchPagePosition(tournamentId, matchId).catch(() => null);

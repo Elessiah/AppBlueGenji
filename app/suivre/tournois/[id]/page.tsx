@@ -2,6 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { TournamentSheet } from "@/app/(secured)/tournois/[id]/_components/TournamentSheet";
+import { parseTournamentId } from "@/lib/shared/spectator-view";
 import { useSpectatorTournament } from "./_hooks/useSpectatorTournament";
 
 /**
@@ -11,7 +12,9 @@ import { useSpectatorTournament } from "./_hooks/useSpectatorTournament";
  */
 export default function SpectatorTournamentPage() {
   const params = useParams<{ id: string }>();
-  const tournamentId = Number(params.id);
+  // La règle de la mise en page, qui a déjà refusé un identifiant illisible
+  // (`notFound`) : elle ne vit qu'à un endroit (`parseTournamentId`).
+  const tournamentId = parseTournamentId(params.id) ?? 0;
   const source = useSpectatorTournament(tournamentId);
   return <TournamentSheet tournamentId={tournamentId} source={source} />;
 }

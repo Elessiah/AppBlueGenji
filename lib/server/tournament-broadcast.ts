@@ -431,6 +431,24 @@ const rooms = new Map<number, Room>();
 const streamsPerUser = new Map<number, number>();
 
 /**
+ * Abonnés ouverts, toutes salles confondues — tenu à chaque arrivée et à chaque
+ * départ (`addSubscriber` / `removeSubscriber`, seuls à toucher
+ * `room.subscribers`) : la charge que lit chaque lecture publique
+ * (`openStreamCount`) ne parcourt plus toutes les salles.
+ */
+let openSubscribers = 0;
+
+function addSubscriber(room: Room, subscriber: TournamentSubscriber): void {
+  if (room.subscribers.has(subscriber)) return;
+  room.subscribers.add(subscriber);
+  openSubscribers += 1;
+}
+
+function removeSubscriber(room: Room, subscriber: TournamentSubscriber): void {
+  if (room.subscribers.delete(subscriber)) openSubscribers -= 1;
+}
+
+/**
  * État d'un abonné. Un abonné inconnu est réputé n'avoir rien reçu : il est donc
  * dû sur-le-champ — mieux vaut un envoi de trop qu'un abonné muet.
  */
@@ -553,7 +571,7 @@ function pushToSubscriber(
     state.lastSentAt = now;
   } catch {
     // Connexion fermée entre-temps : on la retire et on continue.
-    room.subscribers.delete(subscriber);
+    removeSubscriber(room, subscriber);
     room.states.delete(subscriber);
   }
   return Number.POSITIVE_INFINITY;
@@ -701,7 +719,7 @@ async function flush(tournamentId: number, room: Room): Promise<void> {
  */
 function closeGoneRoom(tournamentId: number, room: Room): void {
   for (const subscriber of [...room.subscribers]) { // NOSONAR typescript:S7747 — instantané voulu : `close()` peut retirer d'autres abonnés pendant le parcours
-    room.subscribers.delete(subscriber);
+    removeSubscriber(room, subscriber);
     room.states.delete(subscriber);
     try {
       subscriber.close?.();
@@ -790,7 +808,7 @@ export function joinTournamentRoom(
   known?: TournamentSnapshot,
 ): () => void {
   const room = rooms.get(tournamentId) ?? openRoom(tournamentId, known);
-  room.subscribers.add(subscriber);
+  addSubscriber(room, subscriber);
   // Ce que l'abonné tient déjà : la salle ne lui réécrira cette version-là que
   // s'il ne l'a pas. Omettre `version` revient à dire « je n'ai rien » — le
   // premier envoi lui parviendra alors, quitte à faire double emploi.
@@ -806,7 +824,7 @@ export function joinTournamentRoom(
   if (subscriber.version) scheduleFlush(tournamentId, room, 0);
 
   return () => {
-    room.subscribers.delete(subscriber);
+    removeSubscriber(room, subscriber);
     room.states.delete(subscriber);
     if (room.subscribers.size === 0 && rooms.get(tournamentId) === room) {
       closeRoom(tournamentId, room);
@@ -853,9 +871,7 @@ export function tournamentAudience(tournamentId: number): number {
  * la cadence des visiteurs sans compte (`lib/server/spectator-load.ts`).
  */
 export function openStreamCount(): number {
-  let total = 0;
-  for (const room of rooms.values()) total += room.subscribers.size;
-  return total;
+  return openSubscribers;
 }
 
 /** Remet la diffusion à zéro. Réservé aux tests. */
@@ -863,4 +879,5 @@ export function resetTournamentBroadcast(): void {
   for (const [tournamentId, room] of rooms) closeRoom(tournamentId, room);
   rooms.clear();
   streamsPerUser.clear();
+  openSubscribers = 0;
 }

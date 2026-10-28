@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/server/auth";
 import { matchPageExists, matchPageMetadata } from "@/lib/server/match-page";
+import { publicTournamentSnapshotForRequest } from "@/lib/server/spectator-request";
 
 type LayoutProps = {
   params: Promise<{ id: string; matchId: string }>;
@@ -10,8 +11,13 @@ type LayoutProps = {
 /** Encart d'un lien de page de match sans compte : aucun droit lu (`matchPageMetadata`). */
 export async function generateMetadata({ params }: LayoutProps): Promise<Metadata> {
   const { id, matchId } = await params;
-  const metadata = await matchPageMetadata(id, matchId, true, async () =>
-    (await getCurrentUser().catch(() => null)) ? null : { canManage: false },
+  const metadata = await matchPageMetadata(
+    id,
+    matchId,
+    true,
+    async () => ((await getCurrentUser().catch(() => null)) ? null : { canManage: false }),
+    // La carte de la réponse publique mutualisée, comme l'encart de la fiche.
+    async (tournamentId) => (await publicTournamentSnapshotForRequest(tournamentId))?.card ?? null,
   );
   return { ...metadata, robots: { index: false, follow: false } };
 }

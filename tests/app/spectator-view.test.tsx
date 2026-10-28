@@ -6,7 +6,10 @@ let mockPathname: string | null = "/tournois/12";
 let mockSearch: string | null = null;
 jest.mock("@/lib/server/request-locale", () => ({ requestLocale: async () => mockLocale }));
 jest.mock("@/lib/server/auth", () => ({ getCurrentUser: jest.fn(async () => null) }));
-jest.mock("@/lib/server/tournaments-service", () => ({ getVisibleTournamentCard: jest.fn() }));
+jest.mock("@/lib/server/tournaments-service", () => ({
+  getVisibleTournamentCard: jest.fn(),
+  getVisibleTournamentSnapshot: jest.fn(),
+}));
 jest.mock("next/headers", () => ({
   headers: async () =>
     new Headers({
@@ -50,6 +53,12 @@ import { MapResultList } from "@/app/(secured)/tournois/[id]/_components/MatchMa
 import { LiveIndicator } from "@/app/(secured)/tournois/[id]/_components/LiveIndicator";
 import { TournamentHeader } from "@/app/(secured)/tournois/[id]/_components/TournamentHeader";
 import { TournamentLoading } from "@/app/(secured)/tournois/[id]/_components/TournamentLoading";
+import { MatchLaunchStrip } from "@/app/(secured)/tournois/[id]/_components/MatchLaunchStrip";
+import { pendingReportText } from "@/app/(secured)/tournois/[id]/_components/MatchRow";
+import { RegistrationsPanel } from "@/app/(secured)/tournois/[id]/_components/RegistrationsPanel";
+import { messagesFor } from "@/lib/server/i18n-messages";
+import { tournamentActionsText } from "@/lib/shared/tournament-actions-text";
+import { bracketMatch, matchCaster } from "../helpers/bracket-match";
 import { ToastProvider } from "@/components/ui/toast";
 import { buildEntrantLogoMap } from "@/lib/shared/entrant-logos";
 import { isMigratedRoute } from "@/lib/shared/locales";
@@ -59,6 +68,9 @@ import enTournament from "@/messages/en/tournament.json";
 import { authUser } from "../helpers/auth-user";
 import { tournamentCard } from "../helpers/tournament-card";
 import { tournamentSnapshot } from "../helpers/tournament-detail";
+import { clearCache } from "@/lib/server/cache";
+import { resetRateLimit } from "@/lib/server/rate-limit";
+import { getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
 import { readSource } from "../helpers/read-source";
 import { withoutInfoHintButtons } from "../helpers/info-hint-markup";
 
@@ -83,6 +95,8 @@ function member(ui: ReactElement): string {
 const noop = () => undefined;
 
 beforeEach(() => {
+  clearCache();
+  resetRateLimit();
   mockLocale = "fr";
   mockPathname = "/tournois/12";
   mockSearch = null;
@@ -207,12 +221,34 @@ describe("page sans compte — mise en page", () => {
   });
 
   it("porte l'encart du tournoi, sans droit, à sa propre adresse, hors des moteurs", async () => {
-    jest.mocked(getVisibleTournamentCard).mockResolvedValue(tournamentCard({ id: 12, name: "Cup" }));
+    const card = tournamentCard({ id: 12, name: "Cup" });
+    jest.mocked(getVisibleTournamentCard).mockResolvedValue(card);
+    jest.mocked(getVisibleTournamentSnapshot).mockResolvedValue(tournamentSnapshot({ card }));
     const meta = await generateMetadata(params("12"));
 
-    expect(getVisibleTournamentCard).toHaveBeenCalledWith(12, { canManage: false });
+    // La réponse publique mutualisée, sans aucun droit : la porte de visibilité seule.
+    expect(getVisibleTournamentSnapshot).toHaveBeenCalledWith(12);
+    expect(JSON.stringify(meta)).toContain("Cup");
     expect((meta.openGraph as { url?: string }).url).toBe("/suivre/tournois/12");
     expect(meta.robots).toEqual({ index: false, follow: false });
+  });
+
+  it("mutualise l'encart : des rendus en rafale ne relisent pas la base", async () => {
+    const card = tournamentCard({ id: 12, name: "Cup" });
+    jest.mocked(getVisibleTournamentCard).mockResolvedValue(card);
+    jest.mocked(getVisibleTournamentSnapshot).mockResolvedValue(tournamentSnapshot({ card }));
+    for (let i = 0; i < 5; i += 1) await generateMetadata(params("12"));
+    expect(getVisibleTournamentSnapshot).toHaveBeenCalledTimes(1);
+    expect(getVisibleTournamentCard).toHaveBeenCalledTimes(1);
+  });
+
+  it("garde un encart général quand le tournoi n'est pas public ou que la base ne répond pas", async () => {
+    jest.mocked(getVisibleTournamentCard).mockResolvedValue(null);
+    const hidden = await generateMetadata(params("12"));
+    expect(JSON.stringify(hidden)).not.toContain("Cup");
+
+    jest.mocked(getVisibleTournamentCard).mockRejectedValue(new Error("ECONNREFUSED"));
+    await expect(generateMetadata(params("12"))).resolves.toBeDefined();
   });
 
   it("ne lit pas la carte pour un membre connecté : il est redirigé vers sa fiche", async () => {
@@ -332,8 +368,10 @@ describe("fiche commune sous SpectatorViewProvider", () => {
   });
 
   it("dit qu'un tournoi introuvable est revérifié, sans compte seulement", () => {
+    // Le témoin ne parle plus de la revérification : un introuvable rend
+    // `TournamentFatal`, jamais l'en-tête — c'est la carte qui la dit.
     const notFound = <LiveIndicator isLive={false} tier="STANDARD" cadenceMs={null} fatal="TOURNAMENT_NOT_FOUND" />;
-    expect(spectator(notFound)).toContain("revérifie seule toutes les 11 minutes au plus");
+    expect(spectator(notFound)).not.toContain("revérifie");
     expect(member(notFound)).toContain("plus rien à suivre");
     const sheet = readSource("app/(secured)/tournois/[id]/_components/TournamentSheet.tsx");
     expect(sheet).toContain("{spectator && !expired ? (");
@@ -384,6 +422,8 @@ describe("fiche commune sous SpectatorViewProvider", () => {
     expect(groupEnd).toBeGreaterThan(pillAt);
     expect(html.indexOf('aria-controls="tournament-spectator-hint"')).toBeGreaterThan(groupEnd);
     expect(html).toContain(`<p>${frTournament.header.spectatorTitle.replaceAll("'", "&#x27;")}</p>`);
+    // La cadence accordée, hors du seul `title` du témoin : lisible au toucher.
+    expect(html).toMatch(/<p>[^<]*toutes les 2 minutes au plus[^<]*<\/p>/);
     expect(html).not.toContain(`title="${frTournament.header.spectatorTitle.replaceAll("'", "&#x27;")}"`);
     expect(withoutInfoHintButtons(html)).not.toContain("<button");
     expect(html).not.toContain("/connexion");
@@ -410,11 +450,12 @@ describe("fiche commune sous SpectatorViewProvider", () => {
       expect(messages.live.loadingRetry).toBeTruthy();
       expect(messages.page.fatal.backHome).toBeTruthy();
       expect(messages.page.fatal.spectatorRecheck).toContain("{minutes}");
-      expect(messages.live.spectatorNotFoundTitle).toContain("{minutes}");
     }
     // « au plus » : en anglais aussi, une borne haute de l'attente.
     expect(enTournament.page.fatal.spectatorRecheck).toContain("at most every {minutes} minutes");
-    expect(enTournament.live.spectatorNotFoundTitle).toContain("at most every {minutes} minutes");
+    // Branche inatteignable retirée : un introuvable rend `TournamentFatal`, jamais le témoin.
+    expect("spectatorNotFoundTitle" in enTournament.live).toBe(false);
+    expect("spectatorNotFoundTitle" in frTournament.live).toBe(false);
   });
 });
 
@@ -457,5 +498,108 @@ describe("textes de la fiche", () => {
     expect(spectator).toContain("<TournamentSheetText locale={locale}>");
     expect(spectator).not.toContain("TournamentPageTextProvider");
     expect(spectator).not.toContain("TournamentActionsTextProvider");
+  });
+});
+
+describe("page sans compte — ce que la fiche tait des données retirées", () => {
+  const lobby = bracketMatch({
+    id: 3,
+    status: "READY",
+    team1Id: 1,
+    team2Id: 2,
+    team1Ready: true,
+    casters: [matchCaster({ pseudo: "Caster", ready: true })],
+  });
+
+  it("dit la phase de lancement sans décompte ni « prêt » sans compte, et les garde aux membres", () => {
+    const strip = <MatchLaunchStrip match={lobby} phase="LOBBY" />;
+    const shown = spectator(strip);
+    expect(shown).toContain(frTournament.launch.lobby);
+    expect(shown).toContain("Caster");
+    expect(shown).not.toContain(frTournament.launch.ready);
+    expect(shown).not.toContain(frTournament.launch.casterReady);
+    expect(shown).not.toContain(frTournament.launch.casterWaiting);
+    expect(shown).not.toMatch(/\d+\/\d+/);
+
+    const members = member(strip);
+    expect(members).toContain(frTournament.launch.ready);
+    expect(members).toContain(frTournament.launch.casterReady);
+    expect(members).toMatch(/\d+\/\d+/);
+  });
+
+  it("signale un score proposé sans ses chiffres, en français et en anglais", () => {
+    const state = {
+      kind: "proposed" as const,
+      team1Score: 0,
+      team2Score: 0,
+      reporter: "Alpha",
+      side: 1 as const,
+      deadlineAt: null,
+      paused: false,
+    };
+    const fr = tournamentActionsText("fr", messagesFor("fr").tournamentActions);
+    const en = tournamentActionsText("en", messagesFor("en").tournamentActions);
+    expect(pendingReportText(fr, state, true)).toBe("Score proposé par Alpha · à confirmer");
+    expect(pendingReportText(en, state, true)).toBe("Score proposed by Alpha · awaiting confirmation");
+    // Échéance et suspension restent dites, toujours sans chiffres.
+    const due = { ...state, deadlineAt: "2026-10-28T10:13:00.000Z" };
+    expect(pendingReportText(fr, due, true)).toBe(
+      "Score proposé par Alpha · validation automatique à 11:13 (heure de Paris) sans réponse",
+    );
+    expect(pendingReportText(en, due, true)).toMatch(/^Score proposed by Alpha · automatic confirmation at .+ \(Paris time\) without an answer$/);
+    expect(pendingReportText(fr, { ...due, paused: true }, true)).toBe(
+      "Score proposé par Alpha · validation automatique suspendue par l'arbitrage",
+    );
+    expect(pendingReportText(en, { ...due, paused: true }, true)).toBe(
+      "Score proposed by Alpha · automatic confirmation paused by a referee",
+    );
+    // Membre : le score proposé, comme avant.
+    expect(pendingReportText(fr, { ...state, team1Score: 2, team2Score: 1 }, false)).toContain("2 – 1");
+    // Un litige reste dit tel quel.
+    expect(pendingReportText(fr, { kind: "conflict" }, true)).toBe(fr.t("cardActions.reportConflict"));
+    expect(pendingReportText(fr, null, true)).toBeNull();
+  });
+
+  it("montre un tiret à la place de la date d'inscription retirée", () => {
+    const at = "2026-10-01T10:00:00.000Z";
+    const row = { logoUrl: null, seed: null, finalRank: null };
+    const detail = {
+      ...tournamentSnapshot({
+        card: tournamentCard({ id: 12, participantType: "SOLO", state: "REGISTRATION" }),
+        soloUserIds: { 4: 9 },
+        registrations: [
+          { ...row, teamId: 3, teamName: "Alpha", registeredAt: at },
+          { ...row, teamId: 4, teamName: "Bravo", registeredAt: "" },
+        ],
+      }),
+      ...SPECTATOR_VIEWER_CONTEXT,
+    };
+    const html = spectator(<RegistrationsPanel detail={detail} canAct={false} onChanged={noop} />);
+    expect(html).toMatch(/>-<\/span>/);
+    expect(html).not.toContain("Invalid Date");
+    expect(html).not.toContain("NaN");
+  });
+
+  it("fige le squelette quand la première lecture a échoué", () => {
+    expect(spectator(<TournamentLoading retrying />)).toContain("data-retrying");
+    expect(spectator(<TournamentLoading />)).not.toContain("data-retrying");
+    const css = readSource("app/(secured)/tournois/[id]/_components/TournamentLoading.module.css");
+    expect(css).toMatch(/\.root\[data-retrying\] \.bar,\s*\.root\[data-retrying\] \.fact,\s*\.root\[data-retrying\] \.card \{\s*animation: none;/);
+  });
+
+  it("garde le « i » sur la ligne du témoin : le groupe prend la place libre", () => {
+    const css = readSource("app/(secured)/tournois/[id]/_components/TournamentHeader.module.css");
+    const viewer = /\.viewer \{([^}]*)\}/.exec(css)?.[1] ?? "";
+    expect(viewer).toContain("flex: 1 1 0;");
+    expect(viewer).toContain("justify-content: flex-end;");
+    expect(viewer).not.toContain("margin-inline-start: auto");
+  });
+
+  it("annonce le retour d'un tournoi introuvable, et rend le focus à la carte", () => {
+    const sheet = readSource("app/(secured)/tournois/[id]/_components/TournamentSheet.tsx");
+    expect(sheet).toContain('<h1 ref={titleRef} tabIndex={-1}');
+    expect(sheet).toContain('setNotice(t("page.fatal.nowAvailable"))');
+    expect(frTournament.page.fatal.nowAvailable).toBe("Le tournoi est maintenant accessible.");
+    expect(enTournament.page.fatal.nowAvailable).toBe("The tournament is now available.");
   });
 });

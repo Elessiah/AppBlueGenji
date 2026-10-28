@@ -29,7 +29,7 @@ import { createHash } from "node:crypto";
 import type { RowDataPacket } from "mysql2/promise";
 import type { TournamentCard, TournamentSnapshot } from "@/lib/shared/types";
 import { getDatabase } from "@/lib/server/database";
-import { cached, invalidateCached } from "@/lib/server/cache";
+import { cached, invalidateCached, isCachedOrLoading } from "@/lib/server/cache";
 import { loadSoloUserIds } from "@/lib/server/solo-entries-service";
 import { toIso } from "@/lib/server/serialization";
 import { isSoloTournament } from "@/lib/shared/participants";
@@ -108,6 +108,15 @@ const encoder = new TextEncoder();
 
 function cacheKey(tournamentId: number): string {
   return `tournament-snapshot:${tournamentId}`;
+}
+
+/**
+ * L'instantané des membres est-il prêt (ou en cours de calcul) ? Une réponse
+ * publique qui le trouve chaud ne coûte que son filtrage et sa sérialisation
+ * (`lib/server/spectator-snapshot.ts`).
+ */
+export function isTournamentSnapshotWarm(tournamentId: number): boolean {
+  return isCachedOrLoading(cacheKey(tournamentId));
 }
 
 /**
