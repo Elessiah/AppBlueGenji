@@ -244,7 +244,7 @@ describe("pickMatchMap", () => {
       order: connection.execute.mock.invocationCallOrder[index],
     }));
     expect(calls.filter((call) => call.order < begin).map((call) => call.sql)).toEqual([
-      expect.stringMatching(/SELECT tournament_id FROM bg_matches/),
+      expect.stringMatching(/^SELECT tournament_id[\s\S]*FROM bg_matches WHERE id = \? LIMIT 1$/),
     ]);
     expect(calls.find((call) => call.order > begin)?.sql).toMatch(/FROM bg_tournaments[\s\S]*FOR UPDATE/);
   });
@@ -310,10 +310,30 @@ describe("pickMatchMap", () => {
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 
-  it("un joueur hors autogestion est refusé", async () => {
+  it("un joueur hors autogestion est refusé avant toute transaction", async () => {
     withMatch(MATCH);
     await expect(pickMatchMap(42, { userId: 5, staff: false }, 1, "Ilios")).rejects.toThrow("NOT_MAP_PICKER");
     expect(resolveMatchParty).not.toHaveBeenCalled();
+    expect(connection.beginTransaction).not.toHaveBeenCalled();
+  });
+
+  it("un compte hors du match est refusé sans verrou, même sur un match joué", async () => {
+    withMatch({ ...MATCH, status: "COMPLETED" });
+    await expect(pickMatchMap(42, { userId: 5, staff: false }, 1, "Ilios")).rejects.toThrow("NOT_MAP_PICKER");
+    expect(connection.beginTransaction).not.toHaveBeenCalled();
+    expect(writes(/FOR UPDATE/)).toHaveLength(0);
+  });
+
+  it("l'autogestion retirée avant le verrou : le choix d'équipe est refusé à la relecture", async () => {
+    route(connection.execute, [
+      { pattern: /FROM bg_tournaments/, rows: [TOURNAMENT] },
+      { pattern: /FROM bg_matches[\s\S]*FOR UPDATE/, rows: [MATCH] },
+      { pattern: /FROM bg_matches/, rows: [{ ...MATCH, self_managed: 1 }] },
+      { pattern: /FROM bg_tournament_round_maps/, rows: [POOL_ROUND] },
+    ]);
+    jest.mocked(resolveMatchParty).mockResolvedValue({ role: "TEAM1", canDeclareReady: true });
+    await expect(pickMatchMap(42, { userId: 5, staff: false }, 1, "Ilios")).rejects.toThrow("NOT_MAP_PICKER");
+    expect(writes(/^\s*UPDATE/)).toHaveLength(0);
     expect(connection.rollback).toHaveBeenCalled();
   });
 

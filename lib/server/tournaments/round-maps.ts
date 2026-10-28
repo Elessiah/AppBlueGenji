@@ -216,6 +216,10 @@ export async function setTournamentMapRules(tournamentId: number, rules: MapRule
   );
 }
 
+const PICK_MATCH_SELECT = `SELECT tournament_id, status, phase_id, bracket, round_number, self_managed, team1_id, team2_id,
+         first_map, map_picks
+    FROM bg_matches WHERE id = ?`;
+
 type PickMatchRow = RowDataPacket & {
   tournament_id: number;
   status: string;
@@ -283,7 +287,7 @@ async function writeMapPick(
  * peuvent déclarer son « Prêt » (ou à l'engagé solo). La carte 1 est
  * `first_map` ; les suivantes, `map_picks`.
  *
- * @throws `MATCH_NOT_FOUND` | `MATCH_ALREADY_COMPLETED` | `INVALID_MAP_PICK` | `NOT_MAP_PICKER`
+ * @throws `MATCH_NOT_FOUND` | `TOURNAMENT_NOT_FOUND` | `MATCH_ALREADY_COMPLETED` | `INVALID_MAP_PICK` | `NOT_MAP_PICKER`
  */
 export async function pickMatchMap(
   matchId: number,
@@ -291,27 +295,22 @@ export async function pickMatchMap(
   slot: unknown,
   rawMap: unknown,
 ): Promise<void> {
-  // Le tournoi du match, lu hors de la transaction : sous REPEATABLE READ, une
+  // Le match lu hors de la transaction, sans verrou : sous REPEATABLE READ, une
   // lecture avant le verrou figerait la vue, et le pool relu ensuite serait
   // celui d'avant un `setRoundMaps` simultané (règle « verrou en premier »).
+  // Le droit de choisir s'y vérifie aussi : un compte quelconque qui appelle
+  // en boucle ne prend jamais le verrou exclusif du tournoi.
   const ownerId = await withConnection(async (connection) => {
-    const [owner] = await connection.execute<(RowDataPacket & { tournament_id: number })[]>(
-      `SELECT tournament_id FROM bg_matches WHERE id = ? LIMIT 1`,
-      [matchId],
-    );
-    if (!owner[0]) throw new Error("MATCH_NOT_FOUND");
-    return Number(owner[0].tournament_id);
+    const [rows] = await connection.execute<PickMatchRow[]>(`${PICK_MATCH_SELECT} LIMIT 1`, [matchId]);
+    if (!rows[0]) throw new Error("MATCH_NOT_FOUND");
+    await assertMapPicker(connection, rows[0], viewer);
+    return Number(rows[0].tournament_id);
   });
   const tournamentId = await inTransaction(async (connection) => {
     // Le tournoi d'abord, comme `setRoundMaps` : un choix ne se valide pas
     // contre un pool que le staff remplace au même instant.
     await lockTournament(connection, ownerId);
-    const [rows] = await connection.execute<PickMatchRow[]>(
-      `SELECT tournament_id, status, phase_id, bracket, round_number, self_managed, team1_id, team2_id,
-              first_map, map_picks
-         FROM bg_matches WHERE id = ? LIMIT 1 FOR UPDATE`,
-      [matchId],
-    );
+    const [rows] = await connection.execute<PickMatchRow[]>(`${PICK_MATCH_SELECT} LIMIT 1 FOR UPDATE`, [matchId]);
     const row = rows[0];
     if (!row || Number(row.tournament_id) !== ownerId) throw new Error("MATCH_NOT_FOUND");
     if (row.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");

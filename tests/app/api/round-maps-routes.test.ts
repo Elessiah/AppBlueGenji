@@ -146,6 +146,7 @@ describe("PUT /api/matches/[matchId]/map-pick", () => {
     ["INVALID_MAP_PICK", 400],
     ["NOT_MAP_PICKER", 403],
     ["MATCH_NOT_FOUND", 404],
+    ["TOURNAMENT_NOT_FOUND", 404],
     ["MATCH_ALREADY_COMPLETED", 409],
   ])("traduit %s en %i", async (code, status) => {
     jest.mocked(getCurrentUser).mockResolvedValue(player);
