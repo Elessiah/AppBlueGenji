@@ -27,7 +27,8 @@ commit : `lib/server/tournaments/referee-notices.ts`. Fenêtre du staff :
 
 `refereeBlockReason` : la permission `tournaments` (`NOT_REFEREE`), un tag
 Discord certifié **et** un compte Battle.net rattaché
-(`REFEREE_IDENTITY_REQUIRED`) — les équipes l'ajoutent en jeu. Conditions
+(`REFEREE_IDENTITY_REQUIRED`) — en Overwatch, les équipes l'ajoutent en jeu
+par son BattleTag (hors Overwatch, ni BattleTag ni « ajoute-le en jeu », décision 35). Conditions
 relues en base à chaque geste (`loadRefereeEligibility`, jamais les rôles d'une
 session). Il **peut caster** le match, il **ne peut pas le jouer**
 (`REFEREE_IS_PLAYER`).
