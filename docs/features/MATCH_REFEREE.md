@@ -68,7 +68,8 @@ toast par `launchErrorText`.
 Décision 42b (2026-10-28) : l'arbitre s'oppose (formulaire de signalement,
 catégorie RGPD) à être présenté aux parties de ses matchs ; le staff la retient
 dans la fenêtre « Arbitrage » (section « Opposition d'un arbitre » : liste des
-oppositions retenues avec « Lever », choix d'un arbitre parmi les comptes
+oppositions retenues avec « Lever » — toutes, même sur un compte qui n'arbitre
+plus, pour qu'elles restent levables —, choix d'un arbitre parmi les comptes
 `tournaments` puis confirmation). `lib/server/tournaments/referee-objection.ts` :
 
 - `bg_users.referee_objection_at` (date, `NULL` sinon ; `CREATE TABLE` +

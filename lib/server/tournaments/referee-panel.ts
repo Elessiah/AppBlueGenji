@@ -77,7 +77,8 @@ export async function loadRefereePanel(matchId: number): Promise<RefereePanel | 
       `SELECT id, pseudo, discord_verified_at, discord_pseudo, blizzard_sub, overwatch_battletag,
               is_deleted, is_admin, platform_roles_json, referee_objection_at
          FROM bg_users
-        WHERE is_deleted = 0 AND (is_admin = 1 OR platform_roles_json IS NOT NULL OR id = ?)`,
+        WHERE is_deleted = 0
+          AND (is_admin = 1 OR platform_roles_json IS NOT NULL OR id = ? OR referee_objection_at IS NOT NULL)`,
       [match.referee_user_id ?? 0],
     );
     const byId = new Map(staff.map((row) => [Number(row.id), row]));
@@ -119,7 +120,9 @@ export async function loadRefereePanel(matchId: number): Promise<RefereePanel | 
         .filter((row) => refereeEligibilityBlock(row) === null && !players.has(Number(row.id)) && !objected(row))
         .map(panelUser)
         .sort(byPseudo),
-      objections: referees.filter(objected).map(panelUser).sort(byPseudo),
+      // Toute opposition retenue, même sur un compte qui n'arbitre plus : elle
+      // doit rester visible et pouvoir être levée (la route le permet).
+      objections: staff.filter(objected).map(panelUser).sort(byPseudo),
       objectable: referees.map(panelUser).sort(byPseudo),
     };
   });

@@ -158,10 +158,16 @@ describe("loadRefereePanel", () => {
     ]);
   });
 
-  it("loadRefereePanel_nonRefereeAccount_neitherObjectableNorObjection", async () => {
+  it("loadRefereePanel_objectionOnAccountThatNoLongerReferees_stillListedForLift_notObjectable", async () => {
     users = [staffUser(5, "Caster", { platform_roles_json: JSON.stringify(["CASTER"]), referee_objection_at: STAMP })];
     const panel = await loadRefereePanel(42);
-    expect(panel).toMatchObject({ objections: [], objectable: [] });
+    expect(panel).toMatchObject({ objections: [{ userId: 5, pseudo: "Caster" }], objectable: [] });
+  });
+
+  it("loadRefereePanel_readsEveryObjectedAccount_evenWithoutRoles", async () => {
+    await loadRefereePanel(42);
+    const [sql] = execute.mock.calls.find(([query]) => query.includes("FROM bg_users")) ?? [""];
+    expect(sql).toContain("OR referee_objection_at IS NOT NULL");
   });
 
   it("loadRefereePanel_currentRefereeObjected_notEligible", async () => {
