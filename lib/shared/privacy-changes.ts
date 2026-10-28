@@ -1191,7 +1191,8 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     summary:
       "Le choix « Ne plus voir » de la fenêtre qui t'invite, sur la fiche d'un tournoi, à certifier ton tag Discord et ton BattleTag est désormais gardé sur ton compte, et non plus dans le navigateur : il vaut dans tous tes navigateurs, et ne s'applique plus aux autres comptes utilisés dans le même navigateur.",
     details: [
-      "Ce qui est gardé : la date du choix, sur ton compte. Elle figure dans l'export de tes données et est effacée à l'anonymisation du compte ; l'ancienne valeur du stockage local est retirée de ton navigateur.",
+      "Ce qui est gardé : la date du choix, sur ton compte. Elle figure dans l'export de tes données et est effacée à l'anonymisation du compte.",
+      "Un « Ne plus voir » coché avant ce changement, gardé dans le navigateur, n'est pas repris sur ton compte : la fenêtre peut revenir une fois, à cocher de nouveau. Cette ancienne valeur du stockage local n'est plus lue, et elle est effacée à l'ouverture de la fiche d'un tournoi.",
       "La fermeture simple de la fenêtre reste retenue pour l'onglet seulement (stockage de session, jamais transmise au serveur).",
     ],
   },
