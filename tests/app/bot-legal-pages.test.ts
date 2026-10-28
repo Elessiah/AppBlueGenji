@@ -506,7 +506,7 @@ describe("politique du bot — pseudo solo dans #live et messages de match (RGPD
     expect(fr).toContain("**Annonces #live** (message de la soirée des matchs diffusés : noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs) : gardées dans le salon tant qu'il existe, même après la suppression du compte du joueur");
     expect(en).toContain("**#live announcements** (evening message of the streamed matches: team names or, in a solo tournament, the players' public BlueGenji username): kept in the channel as long as it exists, even after the player's account is deleted");
     // TERMS v7 : datée du lendemain de la mise en ligne prévue (nuit du 28 au 29 octobre 2026, § Dates corrigées).
-    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["30 octobre 2026", "30 October 2026"]);
+    expect([PRIVACY_POLICY.fr.lastUpdated, PRIVACY_POLICY.en.lastUpdated]).toEqual(["29 octobre 2026", "29 October 2026"]);
   });
 });
 
@@ -553,11 +553,11 @@ describe("politique du bot — avis « Match retiré », AutoMod et bases (LEGAL
   // TERMS v7 : l'article 01 des conditions du bot cite les réglages du salon
   // (MATCH-REFEREE MR-4) parmi les messages de match remis, réservés aux tags
   // certifiés comme les autres ; date avancée à la mise en ligne prévue.
-  it("les conditions du bot citent les réglages du salon parmi les messages de match remis, datées du 30 octobre 2026 (FR et EN)", () => {
+  it("les conditions du bot citent les réglages du salon parmi les messages de match remis, datées du 29 octobre 2026 (FR et EN)", () => {
     const terms = { fr: JSON.stringify(TERMS_OF_SERVICE.fr), en: JSON.stringify(TERMS_OF_SERVICE.en) };
     expect(terms.fr).toMatch(/rappels de match, réglages du salon d'un match, avis de retrait d'un match \(« Match retiré »\) et avis envoyé à un caster dont l'inscription est retirée par un autre que lui — ces messages de match aux seuls comptes dont le tag Discord est certifié/);
     expect(terms.en).toMatch(/match reminders, the lobby settings of a match, notices of removal from a match \(“Match retiré”\) and the notice sent to a caster whose registration for a match is removed by someone else — these match messages only to accounts with a Discord tag certified/);
-    expect([TERMS_OF_SERVICE.fr.lastUpdated, TERMS_OF_SERVICE.en.lastUpdated]).toEqual(["30 octobre 2026", "30 October 2026"]);
+    expect([TERMS_OF_SERVICE.fr.lastUpdated, TERMS_OF_SERVICE.en.lastUpdated]).toEqual(["29 octobre 2026", "29 October 2026"]);
   });
 
   it("déclare qu'un blocage ou un signalement AutoMod peut porter l'annonce #live aux modérateurs (FR et EN)", () => {

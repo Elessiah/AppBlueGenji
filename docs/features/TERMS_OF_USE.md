@@ -127,7 +127,7 @@ la mise en page, elle garde le texte d'une première acceptation.
 | 4 | 14 octobre 2026 | Annonce #live d'un tournoi individuel : le pseudo public du joueur y figure au titre de l'exécution du service (pas de nom neutre ; ne pas y être nommé = ne pas s'inscrire). Date d'entrée en vigueur fixée par l'association (décision du 2026-10-14), non le lendemain de la mise en ligne. |
 | 5 | 19 octobre 2026 | Section « Contacts de match » : contacts (BattleTag même masqué compris) communiqués aux deux équipes et aux arbitres d'un match, et à son caster le temps du match, par la fenêtre « Contacts » du match (détail ci-dessous). Redemandée comme la version 4 (connexion, gestion d'équipe). |
 | 6 | 19 octobre 2026 | « Acceptation » : **tout compte connecté** les accepte dans une fenêtre bloquante pour continuer à utiliser le site (plus de report « Plus tard ») ; « Contacts de match » : le BattleTag masqué se lit aussi dans la fenêtre de lancement. La version 5, déjà en ligne, n'est pas réécrite : nouvelle version et nouvelle entrée `PRIVACY_CHANGES` (`2026-10-conditions-v6-acceptation-pour-tous`). Retouchée le 21 octobre 2026 sans nouvelle version : contacts du caster aux arbitres dès que les deux adversaires sont connus (entrée `2026-10-contacts-du-caster-aux-arbitres`). |
-| 7 | 30 octobre 2026 | « Contacts de match » : casters au pluriel (chacun voit aussi les contacts des autres casters du match), **arbitre désigné** (pseudo et BattleTag, même masqué, jamais le tag Discord) et **page du match** comme troisième lieu ; la présentation de l'arbitre passe de l'intérêt légitime au contrat dès que cet arbitre accepte la version 7. « Retransmission des matchs » : message #live de la soirée avant et après le match. « Acceptation » : suppression du compte depuis la fenêtre d'acceptation. Entrée `2026-10-conditions-v7-casters-et-arbitre`. |
+| 7 | 29 octobre 2026 | « Contacts de match » : casters au pluriel (chacun voit aussi les contacts des autres casters du match), **arbitre désigné** (pseudo et BattleTag, même masqué, jamais le tag Discord) et **page du match** comme troisième lieu ; la présentation de l'arbitre passe de l'intérêt légitime au contrat dès que cet arbitre accepte la version 7. « Retransmission des matchs » : message #live de la soirée avant et après le match. « Acceptation » : suppression du compte depuis la fenêtre d'acceptation. Entrée `2026-10-conditions-v7-casters-et-arbitre`. |
 
 **Redemander, et le dire** : à la connexion, la modale d'entrée de `/connexion`
 revient dès que la version gardée par le navigateur (`bg_terms_consent`) n'est
@@ -184,7 +184,7 @@ caster** dès que les deux adversaires sont connus, comme ceux des équipes ; le
 (membres du staff porteurs de `live`) sont concernés : annoncé par l'entrée
 `2026-10-contacts-du-caster-aux-arbitres`, sans réacceptation.
 
-**Version 7** (2026-10-30, lendemain de la mise en ligne prévue dans la nuit du 28 au 29 octobre — § Dates corrigées de `PRIVACY_CHANGES_CONSENT.md` —, TERMS v7, après MR-1 à MR-4 et LOGS-NOTIFS) :
+**Version 7** (2026-10-29, lendemain de la mise en ligne du 28 octobre — § Dates corrigées de `PRIVACY_CHANGES_CONSENT.md` —, TERMS v7, après MR-1 à MR-4 et LOGS-NOTIFS) :
 section « Contacts de match » — les contacts vont à **chacun des casters** d'un
 match (un match peut en avoir plusieurs), ceux de chaque caster aussi aux
 autres casters ; l'**arbitre désigné** y est présenté (pseudo et BattleTag,

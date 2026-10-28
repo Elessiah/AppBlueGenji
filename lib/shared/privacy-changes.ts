@@ -1146,7 +1146,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // Daté du lendemain de la mise en ligne groupée prévue dans la nuit du 28
     // au 29 octobre (§ Dates corrigées), comme l'entrée des conditions v7.
     id: "2026-10-reglages-du-salon-aux-managers",
-    publishedAt: "2026-10-30",
+    publishedAt: "2026-10-29",
     title: "Réglages du salon envoyés aux managers",
     links: [MATCH_DM_PARAGRAPH_LINK],
     summary:
@@ -1172,7 +1172,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // mise en ligne groupée prévue dans la nuit du 28 au 29 octobre (§ Dates
     // corrigées).
     id: "2026-10-conditions-v7-casters-et-arbitre",
-    publishedAt: "2026-10-30",
+    publishedAt: "2026-10-29",
     title: "Conditions d'utilisation : version 7 (casters, arbitre désigné, page du match)",
     links: [
       { href: "/conditions-utilisation#contacts-de-match", label: "Lire la section « Contacts de match »" },
@@ -1187,7 +1187,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Si tu arbitres : dès que tu as accepté la version 7, la présentation de ton pseudo et de ton BattleTag aux parties de tes matchs repose sur l'exécution du service — les conditions d'utilisation la prévoient —, et non plus sur l'intérêt légitime : l'opposition par le formulaire de signalement ne s'y applique plus, et une opposition déjà retenue continue de valoir (le staff ne te confie plus de match). Tant que tu ne l'as pas acceptée, elle reste fondée sur l'intérêt légitime, et tu peux t'y opposer par le formulaire de signalement (catégorie RGPD) ; la fenêtre d'acceptation couvrant alors les pages des tournois, tu te retires d'un match en le demandant par ce même formulaire. Tu peux toujours te retirer d'un match à tout moment, le staff pouvant te le confier de nouveau ; si tu ne remplis plus les conditions pour arbitrer (permission d'arbitrage, tag Discord certifié, compte Battle.net rattaché), ou si tu deviens joueur du match avant son lancement, tu n'es plus présenté.",
       "Retransmission : les conditions disent maintenant que le message #live de la soirée nomme les équipes et, en tournoi individuel, les joueurs par leur pseudo public avant le début d'un match programmé dans la soirée et une fois le match terminé, pas seulement à son départ. La présence d'un match dans ce message avant son passage à l'antenne ne laisse aucune trace sur le site.",
       "Acceptation : sans accepter les conditions, tu peux supprimer ton compte directement depuis la fenêtre qui te les présente, comme depuis ton profil.",
-      "Conditions d'utilisation : la version 7, en vigueur depuis le 30 octobre 2026, le dit dans ses sections « Contacts de match », « Retransmission des matchs » et « Acceptation ». Une fenêtre te la présente tant que tu ne l'as pas acceptée : l'accepter permet de continuer à utiliser le site.",
+      "Conditions d'utilisation : la version 7, en vigueur depuis le 29 octobre 2026, le dit dans ses sections « Contacts de match », « Retransmission des matchs » et « Acceptation ». Une fenêtre te la présente tant que tu ne l'as pas acceptée : l'accepter permet de continuer à utiliser le site.",
     ],
   },
   {
@@ -1197,7 +1197,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // l'anonymisation). Une donnée de plus sur le serveur : à annoncer. Joueurs
     // invités concernés : pas de public. Daté comme l'entrée précédente.
     id: "2026-10-ne-plus-voir-invitation-certification-sur-le-compte",
-    publishedAt: "2026-10-30",
+    publishedAt: "2026-10-29",
     title: "« Ne plus voir » de l'invitation à certifier : retenu sur le compte",
     links: [COOKIES_SECTION_LINK],
     summary:
@@ -1216,7 +1216,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // lève à la première réponse. Rien ne change dans le code : la description
     // s'aligne sur /rgpd et le registre (T01). Datée comme l'entrée précédente.
     id: "2026-10-proposition-certification-discord-marque-de-session",
-    publishedAt: "2026-10-30",
+    publishedAt: "2026-10-29",
     title: "Proposition de certification du tag Discord : ce que note ta session",
     links: [DATA_COLLECTED_SECTION_LINK],
     summary:
