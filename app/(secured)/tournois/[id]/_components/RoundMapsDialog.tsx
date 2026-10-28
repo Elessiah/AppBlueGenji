@@ -21,7 +21,7 @@ import {
 import type { BracketType, TournamentDetail } from "@/lib/shared/types";
 import { launchErrorText, useActionsText } from "../_lib/actions-text";
 import { useErrorsText } from "../_lib/error-map";
-import { useDialogsText } from "../_lib/dialogs-text";
+import { useRoundMapsText } from "../_lib/round-maps-text";
 import { TournamentDialogFrame } from "./TournamentDialogFrame";
 import styles from "./RoundMapsDialog.module.css";
 
@@ -75,7 +75,7 @@ export function RoundMapsDialog({
   initialRound,
   onClose,
 }: Readonly<{ detail: TournamentDetail; initialRound?: RoundKey | null; onClose: () => void }>) {
-  const { t } = useDialogsText();
+  const { t } = useRoundMapsText();
   const actionText = useActionsText();
   const errorsText = useErrorsText();
   const { showError, showSuccess } = useToast();
@@ -114,7 +114,7 @@ export function RoundMapsDialog({
     event.preventDefault();
     void run(async () => {
       await putJson(`/api/admin/tournaments/${tournamentId}/map-rules`, { firstBan, nextBan, nextPick });
-      showSuccess(t("roundMaps.rulesSaved"));
+      showSuccess(t("dialog.rulesSaved"));
     });
   };
 
@@ -122,7 +122,7 @@ export function RoundMapsDialog({
     if (!round) return;
     void run(async () => {
       await putJson(`/api/admin/tournaments/${tournamentId}/round-maps`, { ...round, slots });
-      showSuccess(t(slots.length === 0 ? "roundMaps.roundCleared" : "roundMaps.roundSaved"));
+      showSuccess(t(slots.length === 0 ? "dialog.roundCleared" : "dialog.roundSaved"));
       if (slots.length === 0) setFields([""]);
     });
   };
@@ -137,49 +137,49 @@ export function RoundMapsDialog({
     <TournamentDialogFrame titleId={titleId} maxWidth={560} zIndex={90} deferMount busy={busy} onClose={onClose}>
       <div className={styles.titleRow}>
         <h3 id={titleId} className={styles.title}>
-          {t("roundMaps.title")}
+          {t("dialog.title")}
         </h3>
-        <InfoHint id={`${ids}-hint`} subject={t("roundMaps.title")}>
-          {t("roundMaps.hint")}
+        <InfoHint id={`${ids}-hint`} subject={t("dialog.title")}>
+          {t("dialog.hint")}
         </InfoHint>
       </div>
 
       <form onSubmit={saveRules} aria-busy={busy}>
         <fieldset className={styles.section}>
-          <legend className={styles.legend}>{t("roundMaps.rulesTitle")}</legend>
+          <legend className={styles.legend}>{t("dialog.rulesTitle")}</legend>
           <div className="field">
-            <label htmlFor={`${ids}-first`}>{t("roundMaps.firstBan")}</label>
+            <label htmlFor={`${ids}-first`}>{t("dialog.firstBan")}</label>
             <select id={`${ids}-first`} value={firstBan} onChange={(event) => setFirstBan(event.target.value as FirstBanRule)}>
               {FIRST_BAN_RULES.map((rule) => (
                 <option key={rule} value={rule}>
-                  {t(`roundMaps.firstBanOptions.${rule}`)}
+                  {t(`dialog.firstBanOptions.${rule}`)}
                 </option>
               ))}
             </select>
           </div>
           <div className="field">
-            <label htmlFor={`${ids}-next`}>{t("roundMaps.nextBan")}</label>
+            <label htmlFor={`${ids}-next`}>{t("dialog.nextBan")}</label>
             <select id={`${ids}-next`} value={nextBan} onChange={(event) => setNextBan(event.target.value as NextBanRule)}>
               {NEXT_BAN_RULES.map((rule) => (
                 <option key={rule} value={rule}>
-                  {t(`roundMaps.nextBanOptions.${rule}`)}
+                  {t(`dialog.nextBanOptions.${rule}`)}
                 </option>
               ))}
             </select>
           </div>
           <div className="field">
-            <label htmlFor={`${ids}-pick`}>{t("roundMaps.nextPick")}</label>
+            <label htmlFor={`${ids}-pick`}>{t("dialog.nextPick")}</label>
             <select id={`${ids}-pick`} value={nextPick} onChange={(event) => setNextPick(event.target.value as NextPickRule)}>
               {NEXT_PICK_RULES.map((rule) => (
                 <option key={rule} value={rule}>
-                  {t(`roundMaps.nextPickOptions.${rule}`)}
+                  {t(`dialog.nextPickOptions.${rule}`)}
                 </option>
               ))}
             </select>
           </div>
           <div className={styles.actions}>
             <button type="submit" className="btn ghost" aria-disabled={busy || undefined}>
-              {t("roundMaps.saveRules")}
+              {t("dialog.saveRules")}
             </button>
           </div>
         </fieldset>
@@ -194,9 +194,9 @@ export function RoundMapsDialog({
           aria-busy={busy}
         >
           <fieldset className={styles.section}>
-            <legend className={styles.legend}>{t("roundMaps.roundTitle")}</legend>
+            <legend className={styles.legend}>{t("dialog.roundTitle")}</legend>
             <div className="field">
-              <label htmlFor={`${ids}-round`}>{t("roundMaps.round")}</label>
+              <label htmlFor={`${ids}-round`}>{t("dialog.round")}</label>
               <select id={`${ids}-round`} value={roundId} onChange={(event) => selectRound(event.target.value)}>
                 {rounds.map((item) => (
                   <option key={roundKeyId(item)} value={roundKeyId(item)}>
@@ -213,12 +213,12 @@ export function RoundMapsDialog({
                   // L'ordre des créneaux est leur identité (carte 1, carte 2…).
                   <li key={`slot-${number}`} className={styles.slot}>
                     <div className={`field ${styles.slotField}`}>
-                      <label htmlFor={fieldId}>{t("roundMaps.slot", { number })}</label>
+                      <label htmlFor={fieldId}>{t("dialog.slot", { number })}</label>
                       <input
                         id={fieldId}
                         type="text"
                         value={field}
-                        placeholder={t("roundMaps.slotPlaceholder")}
+                        placeholder={t("dialog.slotPlaceholder")}
                         maxLength={SLOT_FIELD_MAX_LENGTH}
                         readOnly={busy}
                         onChange={(event) =>
@@ -230,7 +230,7 @@ export function RoundMapsDialog({
                       <button
                         type="button"
                         className="btn ghost"
-                        aria-label={t("roundMaps.removeSlot", { number })}
+                        aria-label={t("dialog.removeSlot", { number })}
                         aria-disabled={busy || undefined}
                         onClick={() => {
                           if (!busy) setFields((current) => current.filter((_, at) => at !== index));
@@ -253,18 +253,18 @@ export function RoundMapsDialog({
                     if (!busy) setFields((current) => [...current, ""]);
                   }}
                 >
-                  {t("roundMaps.addSlot")}
+                  {t("dialog.addSlot")}
                 </button>
               </div>
             ) : (
-              <p className={styles.muted}>{t("roundMaps.slotsLimit", { max: ROUND_MAP_SLOTS_MAX })}</p>
+              <p className={styles.muted}>{t("dialog.slotsLimit", { max: ROUND_MAP_SLOTS_MAX })}</p>
             )}
             <div className={styles.actions}>
               <button type="button" className="btn ghost" aria-disabled={busy || undefined} onClick={() => saveRound([])}>
-                {t("roundMaps.clearRound")}
+                {t("dialog.clearRound")}
               </button>
               <button type="submit" className="btn" aria-disabled={busy || undefined}>
-                {t("roundMaps.saveRound")}
+                {t("dialog.saveRound")}
               </button>
             </div>
           </fieldset>
@@ -273,7 +273,7 @@ export function RoundMapsDialog({
 
       <div className={styles.footer}>
         <button type="button" className="btn ghost" onClick={onClose} aria-disabled={busy || undefined}>
-          {t("roundMaps.close")}
+          {t("dialog.close")}
         </button>
       </div>
     </TournamentDialogFrame>

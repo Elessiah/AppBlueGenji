@@ -182,6 +182,14 @@ function mapsLine(side: LobbyBriefSide, locale: Locale, quote: (name: string) =>
     .join(" · ");
 }
 
+/** Ligne des cartes : celles du round s'il est réglé, sinon la première carte. */
+function mapsOrFirstMapLine(side: LobbyBriefSide, locale: Locale, quote: (name: string) => string): string {
+  const text = DM_TEXT[locale];
+  if (side.maps.length > 0) return `• ${text.maps}${mapsLine(side, locale, quote)}`;
+  const firstMap = side.firstMap === null ? text.noFirstMap : quote(side.firstMap);
+  return `• ${text.firstMap}${firstMap}`;
+}
+
 /**
  * Le message privé Discord. `url` : la page du match, adresse absolue en
  * français (`localizedSiteUrl` la passe sous `/en` pour un compte anglais).
@@ -196,9 +204,7 @@ export function formatLobbyBriefDm(side: LobbyBriefSide, url: string, locale: Lo
     text.opening(text.subject(side, quote), round, quote(side.tournamentName)),
     `• ${text.left}${names.left}`,
     `• ${text.right}${names.right}`,
-    side.maps.length === 0
-      ? `• ${text.firstMap}${side.firstMap === null ? text.noFirstMap : quote(side.firstMap)}`
-      : `• ${text.maps}${mapsLine(side, locale, quote)}`,
+    mapsOrFirstMapLine(side, locale, quote),
     `• ${text.firstBan(names.ban, names.banNext)}`,
     `• ${text.nextBans[side.nextBan]}`,
     ...(side.cast ? [`• ${text.cast}`] : []),

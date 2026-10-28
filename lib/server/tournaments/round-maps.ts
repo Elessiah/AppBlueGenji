@@ -229,6 +229,49 @@ type PickMatchRow = RowDataPacket & {
 };
 
 /**
+ * Qui choisit : le staff toujours ; sinon, sur un match en autogestion, un
+ * joueur d'une des deux équipes qui peut déclarer « Prêt ».
+ * @returns `true` quand le choix vient d'une équipe. @throws `NOT_MAP_PICKER`
+ */
+async function assertMapPicker(
+  connection: PoolConnection,
+  row: PickMatchRow,
+  viewer: { userId: number; staff: boolean },
+): Promise<boolean> {
+  if (viewer.staff) return false;
+  const party =
+    Number(row.self_managed) === 1
+      ? await resolveMatchParty(connection, { team1_id: row.team1_id, team2_id: row.team2_id, casters: [] }, viewer.userId)
+      : null;
+  if (!party || (party.role !== "TEAM1" && party.role !== "TEAM2") || !party.canDeclareReady) {
+    throw new Error("NOT_MAP_PICKER");
+  }
+  return true;
+}
+
+/** Écrit le choix (carte 1 : `first_map`, suivantes : `map_picks`) ; `false` s'il ne change rien. */
+async function writeMapPick(
+  connection: PoolConnection,
+  matchId: number,
+  row: PickMatchRow,
+  slot: number,
+  map: string | null,
+): Promise<boolean> {
+  if (slot === 1) {
+    if ((row.first_map ?? null) === map) return false;
+    await connection.execute(`UPDATE bg_matches SET first_map = ? WHERE id = ?`, [map, matchId]);
+    return true;
+  }
+  const picks = parseMapPicks(row.map_picks);
+  if ((picks[String(slot)] ?? null) === map) return false;
+  if (map === null) delete picks[String(slot)];
+  else picks[String(slot)] = map;
+  const json = Object.keys(picks).length === 0 ? null : JSON.stringify(picks);
+  await connection.execute(`UPDATE bg_matches SET map_picks = ? WHERE id = ?`, [json, matchId]);
+  return true;
+}
+
+/**
  * Choisit la carte `slot` d'un match dans le pool de sa manche (`null` retire
  * le choix). Permis à l'arbitrage (`staff`, permission `tournaments`) et, sur un
  * match **en autogestion** seulement, aux joueurs d'une des deux équipes qui
@@ -253,35 +296,14 @@ export async function pickMatchMap(
     const row = rows[0];
     if (!row) throw new Error("MATCH_NOT_FOUND");
     if (row.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
-    let byTeam = false;
-    if (!viewer.staff) {
-      const party =
-        Number(row.self_managed) === 1
-          ? await resolveMatchParty(connection, { team1_id: row.team1_id, team2_id: row.team2_id, casters: [] }, viewer.userId)
-          : null;
-      if (!party || (party.role !== "TEAM1" && party.role !== "TEAM2") || !party.canDeclareReady) {
-        throw new Error("NOT_MAP_PICKER");
-      }
-      byTeam = true;
-    }
+    const byTeam = await assertMapPicker(connection, row, viewer);
     const slots = await loadRoundSlots(connection, Number(row.tournament_id), {
       phaseId: Number(row.phase_id),
       bracket: String(row.bracket),
       roundNumber: Number(row.round_number),
     });
     const map = validateMapPick(slots, slot, rawMap);
-    const slotNumber = slot as number;
-    if (slotNumber === 1) {
-      if ((row.first_map ?? null) === map) return null;
-      await connection.execute(`UPDATE bg_matches SET first_map = ? WHERE id = ?`, [map, matchId]);
-    } else {
-      const picks = parseMapPicks(row.map_picks);
-      if ((picks[String(slotNumber)] ?? null) === map) return null;
-      if (map === null) delete picks[String(slotNumber)];
-      else picks[String(slotNumber)] = map;
-      const json = Object.keys(picks).length === 0 ? null : JSON.stringify(picks);
-      await connection.execute(`UPDATE bg_matches SET map_picks = ? WHERE id = ?`, [json, matchId]);
-    }
+    if (!(await writeMapPick(connection, matchId, row, slot as number, map))) return null;
     queueRefereeChange(connection, { kind: "MAP_PICK", matchId, set: map !== null, byTeam });
     return Number(row.tournament_id);
   });

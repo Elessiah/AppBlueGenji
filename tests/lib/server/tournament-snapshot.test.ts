@@ -29,6 +29,7 @@ jest.mock("@/lib/server/ranking-service");
 jest.mock("@/lib/server/tournaments/player-pushes");
 jest.mock("@/lib/server/tournaments/match-maps");
 jest.mock("@/lib/server/tournaments/match-casters");
+jest.mock("@/lib/server/tournaments/round-maps");
 
 import {
   getTournamentSnapshot,
@@ -52,6 +53,8 @@ import { invalidateStats } from "@/lib/server/stats-cache";
 import { getDatabase } from "@/lib/server/database";
 import { loadMapsByMatch } from "@/lib/server/tournaments/match-maps";
 import { loadMatchCasters, loadMatchStreams } from "@/lib/server/tournaments/match-casters";
+import { loadMapRules } from "@/lib/server/tournaments/round-maps";
+import { EMPTY_MAP_RULES } from "@/lib/shared/round-maps";
 import { loadSwissMeta } from "@/lib/server/tournaments/swiss";
 import { loadSurvivalMeta } from "@/lib/server/tournaments/survival";
 import { loadEnduranceMeta } from "@/lib/server/tournaments/bg-survie/meta";
@@ -126,6 +129,7 @@ beforeEach(() => {
   expiredRows = [];
 
   jest.mocked(loadMapsByMatch).mockResolvedValue(new Map());
+  jest.mocked(loadMapRules).mockResolvedValue(EMPTY_MAP_RULES);
   jest.mocked(loadMatchCasters).mockResolvedValue(new Map());
   jest.mocked(loadMatchStreams).mockResolvedValue(new Map());
   jest.mocked(getDatabase).mockResolvedValue(fakePool({

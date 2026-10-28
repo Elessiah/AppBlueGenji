@@ -38,6 +38,7 @@ import { MatchRow } from "./MatchRow";
 import { MatchRoundMaps } from "./MatchRoundMaps";
 import { StreamLink } from "./MatchLiveStrip";
 import { MatchPageScope } from "../_lib/match-page-context";
+import { useRoundMapsText } from "../_lib/round-maps-text";
 import styles from "./MatchPage.module.css";
 
 const FIRST_MAP_FIELD_ERRORS = { INVALID_FIRST_MAP: "map" } as const;
@@ -180,6 +181,7 @@ function LobbySection({
   const banSide = sides.find((side) => side.firstBan) ?? null;
   const banName = useSideName(banSide ?? left);
   const otherName = useSideName(banSide === right ? left : right);
+  const rm = useRoundMapsText();
   const rules = detail.mapRules;
   // Ordre des bans de la carte 1 (règlement §10) : les deux équipes bannissent.
   const banOrder = firstBanOrder(rules.firstBan, match.hostTeamId, match.team1Id, match.team2Id);
@@ -203,18 +205,18 @@ function LobbySection({
           <dd>{match.firstMap ?? <span className={styles.muted}>{t("matchPage.firstMapUnset")}</span>}</dd>
         </div>
         <div>
-          <dt>{t("matchPage.banOrder")}</dt>
+          <dt>{rm.t("page.banOrder")}</dt>
           <dd>
             {banSide && banOrder ? (
-              t("matchPage.banOrderValue", { first: banName, second: otherName })
+              rm.t("page.banOrderValue", { first: banName, second: otherName })
             ) : (
               <span className={styles.muted}>{t("matchPage.opponentsPending")}</span>
             )}
           </dd>
         </div>
         <div>
-          <dt>{t("matchPage.nextBans")}</dt>
-          <dd className={styles.ruleText}>{t(rules.nextBan === "WINNER" ? "matchPage.nextBansWINNER" : "matchPage.nextBansLOSER")}</dd>
+          <dt>{rm.t("page.nextBans")}</dt>
+          <dd className={styles.ruleText}>{rm.t(rules.nextBan === "WINNER" ? "page.nextBansWINNER" : "page.nextBansLOSER")}</dd>
         </div>
       </dl>
       <MatchRoundMaps detail={detail} match={match} canPick={canPick && editable} staff={staff} />

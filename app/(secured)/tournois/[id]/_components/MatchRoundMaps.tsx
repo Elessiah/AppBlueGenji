@@ -2,13 +2,13 @@
 
 import dynamic from "next/dynamic";
 import { useId, useState } from "react";
-import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { useToast } from "@/components/ui/toast";
 import { InfoHint } from "@/components/ui/info-hint";
 import { MATCH_LAUNCH_REFRESH_EVENT } from "@/lib/shared/match-launch";
 import { resolveMatchMaps, roundMapsOf, type ResolvedMapSlot, type TournamentMapRules } from "@/lib/shared/round-maps";
 import type { BracketMatch, TournamentDetail } from "@/lib/shared/types";
 import { launchErrorText, useActionsText } from "../_lib/actions-text";
+import { useRoundMapsText } from "../_lib/round-maps-text";
 import { useErrorsText } from "../_lib/error-map";
 import styles from "./MatchPage.module.css";
 
@@ -16,7 +16,7 @@ const RoundMapsDialog = dynamic(() => import("./RoundMapsDialog").then((m) => m.
 
 /** Choix d'une carte dans un pool, par le staff ou une équipe en autogestion. */
 function MapPickSelect({ match, slot }: Readonly<{ match: Pick<BracketMatch, "id">; slot: ResolvedMapSlot }>) {
-  const { t } = useTournamentPageText();
+  const { t } = useRoundMapsText();
   const actionText = useActionsText();
   const errorsText = useErrorsText();
   const { showError, showSuccess } = useToast();
@@ -34,7 +34,7 @@ function MapPickSelect({ match, slot }: Readonly<{ match: Pick<BracketMatch, "id
       });
       const payload = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "UNKNOWN");
-      showSuccess(t(map === "" ? "matchPage.pickCleared" : "matchPage.picked"));
+      showSuccess(t(map === "" ? "page.pickCleared" : "page.picked"));
       window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
     } catch (error) {
       showError(launchErrorText(actionText, errorsText, (error as Error).message));
@@ -46,7 +46,7 @@ function MapPickSelect({ match, slot }: Readonly<{ match: Pick<BracketMatch, "id
   return (
     <span className={`field ${styles.mapPick}`}>
       <label htmlFor={selectId} className="sr-only">
-        {t("matchPage.pickLabel", { number: slot.number })}
+        {t("page.pickLabel", { number: slot.number })}
       </label>
       <select
         id={selectId}
@@ -55,7 +55,7 @@ function MapPickSelect({ match, slot }: Readonly<{ match: Pick<BracketMatch, "id
         aria-disabled={busy || undefined}
         onChange={(event) => void pick(event.target.value)}
       >
-        <option value="">{t("matchPage.pickNone")}</option>
+        <option value="">{t("page.pickNone")}</option>
         {/* Un choix sorti du pool depuis reste lisible plutôt que perdu en silence. */}
         {slot.map !== null && !slot.candidates.includes(slot.map) && <option value={slot.map}>{slot.map}</option>}
         {slot.candidates.map((candidate) => (
@@ -75,23 +75,23 @@ function MapSlotLine({
   rules,
   canPick,
 }: Readonly<{ match: Pick<BracketMatch, "id">; slot: ResolvedMapSlot; rules: TournamentMapRules; canPick: boolean }>) {
-  const { t } = useTournamentPageText();
+  const { t } = useRoundMapsText();
   const loserPick = slot.kind === "POOL" && slot.number > 1 && rules.nextPick === "LOSER";
   return (
     <li className={styles.mapSlot}>
-      <span className={styles.mapNumber}>{t("matchPage.mapN", { number: slot.number })}</span>
+      <span className={styles.mapNumber}>{t("page.mapN", { number: slot.number })}</span>
       <span className={styles.mapValue}>
         {slot.kind === "IMPOSED" && (
           <>
-            <strong>{slot.map}</strong> <span className="pill pill-neutral">{t("matchPage.imposed")}</span>
+            <strong>{slot.map}</strong> <span className="pill pill-neutral">{t("page.imposed")}</span>
           </>
         )}
         {slot.kind === "POOL" && canPick && <MapPickSelect match={match} slot={slot} />}
         {slot.kind === "POOL" && !canPick && slot.map !== null && <strong>{slot.map}</strong>}
         {slot.kind === "POOL" && (canPick || slot.map === null) && (
-          <span className={styles.muted}>{t("matchPage.toChoose", { maps: slot.candidates.join(", ") })}</span>
+          <span className={styles.muted}>{t("page.toChoose", { maps: slot.candidates.join(", ") })}</span>
         )}
-        {loserPick && <span className={styles.muted}>{t("matchPage.loserPick")}</span>}
+        {loserPick && <span className={styles.muted}>{t("page.loserPick")}</span>}
       </span>
     </li>
   );
@@ -109,7 +109,7 @@ export function MatchRoundMaps({
   canPick,
   staff,
 }: Readonly<{ detail: TournamentDetail; match: BracketMatch; canPick: boolean; staff: boolean }>) {
-  const { t } = useTournamentPageText();
+  const { t } = useRoundMapsText();
   const [open, setOpen] = useState(false);
   const rules = detail.mapRules;
   const round = roundMapsOf(rules.rounds, match);
@@ -121,7 +121,7 @@ export function MatchRoundMaps({
       {slots.length > 0 && (
         <>
           <h3 id={titleId} className={styles.subTitle}>
-            {t("matchPage.mapsTitle")}
+            {t("page.mapsTitle")}
           </h3>
           <ol className={styles.mapSlots} aria-labelledby={titleId}>
             {slots.map((slot) => (
@@ -133,7 +133,7 @@ export function MatchRoundMaps({
       {staff && (
         <div>
           <button type="button" className="btn ghost" onClick={() => setOpen(true)}>
-            {t("matchPage.configureMaps")}
+            {t("page.configureMaps")}
           </button>
         </div>
       )}
@@ -153,20 +153,20 @@ export function MatchRoundMaps({
  * `tournaments`) : ouvre la fenêtre de réglage sur la première manche.
  */
 export function RoundMapsPanel({ detail }: Readonly<{ detail: TournamentDetail }>) {
-  const { t } = useTournamentPageText();
+  const { t } = useRoundMapsText();
   const [open, setOpen] = useState(false);
   const titleId = useId();
   return (
     <section className={`ds-block ${styles.block}`} aria-labelledby={titleId}>
       <div className="ds-section-title blue">
-        <h2 id={titleId}>{t("page.roundMaps.title")}</h2>
-        <InfoHint id={`${titleId}-hint`} subject={t("page.roundMaps.title")}>
-          {t("page.roundMaps.lead")}
+        <h2 id={titleId}>{t("sheet.title")}</h2>
+        <InfoHint id={`${titleId}-hint`} subject={t("sheet.title")}>
+          {t("sheet.lead")}
         </InfoHint>
       </div>
       <div>
         <button type="button" className="btn ghost" onClick={() => setOpen(true)}>
-          {t("page.roundMaps.open")}
+          {t("sheet.open")}
         </button>
       </div>
       {open && <RoundMapsDialog detail={detail} onClose={() => setOpen(false)} />}

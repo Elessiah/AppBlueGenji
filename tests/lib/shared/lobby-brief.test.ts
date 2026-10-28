@@ -117,6 +117,25 @@ describe("formatLobbyBriefDm", () => {
   });
 });
 
+describe("formatLobbyBriefDm — cartes du round", () => {
+  it("liste imposées et pools, avec le choix du perdant à partir de la carte 2", () => {
+    const text = formatLobbyBriefDm(
+      side({
+        maps: [
+          { number: 1, kind: "IMPOSED", map: "Ilios", candidates: ["Ilios"] },
+          { number: 2, kind: "POOL", map: null, candidates: ["Busan", "Nepal"] },
+        ],
+        nextPick: "LOSER",
+      }),
+      URL,
+    );
+    expect(text).toContain("Cartes :");
+    expect(text).toContain("Ilios");
+    expect(text).toContain("• Cartes : 1. « Ilios » · 2. à choisir parmi « Busan », « Nepal » (choisie par l'équipe qui a perdu la carte précédente)");
+    expect(text).toContain("(choisie par l'équipe qui a perdu la carte précédente)");
+  });
+});
+
 describe("lobbyBriefPush", () => {
   it("résume les réglages, vers la page du match, sans remplacer l'appel aux « Prêt »", () => {
     const push = lobbyBriefPush(side({ cast: true }));

@@ -1,0 +1,58 @@
+{
+  "page": {
+    "mapsTitle": "Cartes du round",
+    "mapN": "Carte {number}",
+    "imposed": "Imposée",
+    "toChoose": "À choisir parmi {maps}",
+    "loserPick": "Choisie par l'équipe qui a perdu la carte précédente",
+    "pickLabel": "Choisir la carte {number}",
+    "pickNone": "À choisir",
+    "picked": "Carte choisie.",
+    "pickCleared": "Choix de carte retiré.",
+    "banOrder": "Bans de la carte 1",
+    "banOrderValue": "{first} d'abord, puis {second}",
+    "nextBans": "Bans des cartes suivantes",
+    "nextBansLOSER": "L'équipe qui a perdu la carte précédente bannit en premier ; en cas d'égalité, même ordre qu'à la carte précédente.",
+    "nextBansWINNER": "L'équipe qui a gagné la carte précédente bannit en premier ; en cas d'égalité, même ordre qu'à la carte précédente.",
+    "configureMaps": "Paramétrer les cartes du round"
+  },
+  "sheet": {
+    "title": "Cartes et bans",
+    "lead": "Cartes imposées ou pools par manche, et ordre des bans.",
+    "open": "Paramétrer les cartes et les bans"
+  },
+  "dialog": {
+    "title": "Cartes et bans",
+    "hint": "Une carte par créneau l'impose à tous les matchs de la manche ; plusieurs, séparées par des virgules, forment un pool où l'arbitrage ou l'équipe choisit.",
+    "rulesTitle": "Règles de ban",
+    "firstBan": "Premier ban de la carte 1",
+    "firstBanOptions": {
+      "NON_HOST": "L'équipe qui n'héberge pas",
+      "HOST": "L'équipe hôte"
+    },
+    "nextBan": "Premier ban des cartes suivantes",
+    "nextBanOptions": {
+      "LOSER": "Le perdant de la carte précédente",
+      "WINNER": "Le gagnant de la carte précédente"
+    },
+    "nextPick": "Carte suivante d'un pool",
+    "nextPickOptions": {
+      "LOSER": "Choisie par le perdant de la carte précédente",
+      "FREE": "Choisie par l'arbitrage"
+    },
+    "saveRules": "Enregistrer les règles",
+    "rulesSaved": "Règles de ban enregistrées.",
+    "roundTitle": "Cartes d'une manche",
+    "round": "Manche",
+    "slot": "Carte {number}",
+    "slotPlaceholder": "Ex. : Ilios ou Ilios, Lijiang Tower",
+    "addSlot": "Ajouter une carte",
+    "removeSlot": "Retirer la carte {number}",
+    "slotsLimit": "{max} cartes au plus par manche.",
+    "saveRound": "Enregistrer les cartes",
+    "clearRound": "Retirer le réglage",
+    "roundSaved": "Cartes de la manche enregistrées.",
+    "roundCleared": "Réglage de la manche retiré.",
+    "close": "Fermer"
+  }
+}

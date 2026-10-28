@@ -55,12 +55,7 @@
       "THIRD_PLACE": "Third-place match"
     },
     "phaseContext": "Stage {position}",
-    "phaseContextNamed": "Stage {position} — {name}",
-    "roundMaps": {
-      "title": "Maps and bans",
-      "lead": "Set maps or pools per round, and the ban order.",
-      "open": "Set up maps and bans"
-    }
+    "phaseContextNamed": "Stage {position} — {name}"
   },
   "header": {
     "back": "Back",
@@ -459,21 +454,6 @@
     },
     "missingTitle": "Match not found",
     "missingText": "This match doesn't exist in this tournament.",
-    "missingBack": "Back to the tournament",
-    "mapsTitle": "Round maps",
-    "mapN": "Map {number}",
-    "imposed": "Set",
-    "toChoose": "To choose from {maps}",
-    "loserPick": "Picked by the team that lost the previous map",
-    "pickLabel": "Pick map {number}",
-    "pickNone": "To choose",
-    "picked": "Map picked.",
-    "pickCleared": "Map pick cleared.",
-    "banOrder": "Map 1 bans",
-    "banOrderValue": "{first} first, then {second}",
-    "nextBans": "Bans on later maps",
-    "nextBansLOSER": "The team that lost the previous map bans first; on a draw, same order as on the previous map.",
-    "nextBansWINNER": "The team that won the previous map bans first; on a draw, same order as on the previous map.",
-    "configureMaps": "Set up the round maps"
+    "missingBack": "Back to the tournament"
   }
 }

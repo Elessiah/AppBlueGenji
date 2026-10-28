@@ -167,3 +167,7 @@ production depuis #487, n'est pas réécrite ; l'entrée
 `2026-10-conditions-v7-casters-et-arbitre` annonce le passage au contrat à
 l'acceptation de la version 7. Devenir joueur du match ne retire l'arbitre qu'avant le
 lancement (`keepEligibleReferees`) : conditions, `/rgpd` et T04 le disent.
+
+## Cartes par manche
+
+Une manche peut imposer ses cartes ou ouvrir des pools, et le tournoi porte ses règles de ban (ordre, perdant de la carte précédente) : `ROUND_MAPS.md`.
