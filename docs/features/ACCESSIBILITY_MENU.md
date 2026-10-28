@@ -193,9 +193,12 @@ bouton flottant, que rien ne peut plus faire défiler en fin de page.
 - La copie qui fait boucler la piste est `aria-hidden` : chaque élément n'est
   plus lu deux fois. Le bandeau est un `role="marquee"` nommé.
 - Un résultat ne tient pas qu'à la couleur (WCAG 1.4.1) : vainqueur en gras
-  avec « ▲ », perdant avec « ▼ », et l'issue dite en texte masqué
-  (« vainqueur », « perdant », « forfait », « sans vainqueur ») —
-  `TICKER_RESULTS.md`.
+  avec « ✓ », perdant avec « ✕ », et l'issue dite en texte masqué
+  (« vainqueur », « perdant », « sans vainqueur ») ; « forfait », lui, **s'affiche**
+  (sans teinte ni repère, un forfait se lirait comme une défaite), de même que
+  « sans vainqueur » quand les scores d'un nul diffèrent. Les mots masqués
+  ne sont rendus que dans la copie lue de la piste et ne se copient pas
+  (`user-select: none`) — `TICKER_RESULTS.md`.
 
 ## Tests
 
