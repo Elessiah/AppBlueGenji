@@ -122,15 +122,29 @@ jamais figé avant le verrou. Rejoué sur interblocage (`retryOnDeadlock`).
   `BracketMatch.mapPicks` : la même charge sert le flux SSE et le REST de
   secours ; chaque écriture appelle `publishMatchUpdatedEvent` (une seule pour
   une copie sur plusieurs tours, `setRoundsMaps` : une transaction, verrou du
-  tournoi en tête, une ligne de journal « N tours »).
-- Journal du staff anonyme (`formatRoundMapsLog`, `formatMapRulesLog`, choix
+  tournoi en tête).
+- **Une seule annonce par série d'enregistrements** (`round-maps-notice.ts`) :
+  régler cinq manches à la suite ne fait plus cinq lignes Discord. L'écriture met
+  les manches modifiées (une remise à zéro en est une) en attente dans
+  `bg_round_maps_notices` (une ligne par tournoi, écrite dans la transaction) et
+  repousse l'envoi de 60 s après le dernier changement
+  (`ROUND_MAPS_NOTICE_WINDOW_SECONDS`) ; une seule ligne
+  (`formatRoundMapsSummaryLog`, 8 manches nommées, le reste compté) part ensuite.
+  L'état est en base, donc survit à un redémarrage : le trafic l'envoie
+  (`dispatchDueRoundMapsNotices`, appelé par la liste des tournois, étranglé à
+  15 s), un minuteur de processus n'est qu'un accélérateur. La fermeture de
+  l'écran appelle `POST /api/admin/tournaments/[id]/round-maps/flush` (permission
+  `tournaments`) pour envoyer tout de suite — jamais le seul déclencheur : un
+  onglet fermé n'y perd rien. La ligne est revendiquée par
+  `DELETE … WHERE changes = ?` : pas de doublon, pas de changement perdu.
+- Journal du staff anonyme (`formatRoundMapsSummaryLog`, `formatMapRulesLog`, choix
   `MAP_PICKED*` de `referee-notices`) : aucune personne nommée.
 - Brief du salon (`MATCH_LOBBY_BRIEF.md`) : ligne « Cartes : » quand la manche
   est réglée, ordre des bans de la carte 1, règle des cartes suivantes.
 
 ## Schéma
 
-Table `bg_tournament_round_maps` (clé unique `(tournament_id, phase_id, bracket,
+Tables `bg_round_maps_notices` (annonce en attente, une ligne par tournoi, `CASCADE`) et `bg_tournament_round_maps` (clé unique `(tournament_id, phase_id, bracket,
 round_number)`, `CASCADE` avec le tournoi) ; colonnes `bg_tournaments.first_ban_rule`,
 `next_ban_rule`, `next_pick_rule`, `bg_matches.map_picks` (`DATABASE_SCHEMA.md`).
 

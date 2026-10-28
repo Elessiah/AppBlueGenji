@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/auth");
+jest.mock("@/lib/server/tournaments/round-maps-notice");
 jest.mock("@/lib/server/tournaments/round-maps", () => {
   const actual = jest.requireActual<typeof import("@/lib/server/tournaments/round-maps")>(
     "@/lib/server/tournaments/round-maps",
@@ -15,6 +16,8 @@ jest.mock("@/lib/server/tournaments/round-maps", () => {
   };
 });
 
+import { POST as flushPost } from "@/app/api/admin/tournaments/[id]/round-maps/flush/route";
+import { flushRoundMapsNotice } from "@/lib/server/tournaments/round-maps-notice";
 import { PUT as roundMapsPut } from "@/app/api/admin/tournaments/[id]/round-maps/route";
 import { PUT as mapRulesPut } from "@/app/api/admin/tournaments/[id]/map-rules/route";
 import { PUT as mapPickPut } from "@/app/api/matches/[matchId]/map-pick/route";
@@ -173,5 +176,39 @@ describe("PUT /api/matches/[matchId]/map-pick", () => {
     const res = await mapPickPut(put({ slot: 1, map: "Ilios" }), match("42"));
     expect(res.status).toBe(status);
     await expect(res.json()).resolves.toEqual({ error: code });
+  });
+});
+
+describe("POST /round-maps/flush", () => {
+  const post = () => new Request("http://localhost/api/x", { method: "POST" });
+
+  it("flush_anonymous_returns401", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
+    expect((await flushPost(post(), tournament("7"))).status).toBe(401);
+    expect(flushRoundMapsNotice).not.toHaveBeenCalled();
+  });
+
+  it("flush_player_returns403", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(player);
+    expect((await flushPost(post(), tournament("7"))).status).toBe(403);
+  });
+
+  it("flush_badTournamentId_returns400", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    expect((await flushPost(post(), tournament("abc"))).status).toBe(400);
+  });
+
+  it("flush_referee_sendsThePendingNotice", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(flushRoundMapsNotice).mockResolvedValue(true);
+    const response = await flushPost(post(), tournament("7"));
+    expect(response.status).toBe(200);
+    expect(flushRoundMapsNotice).toHaveBeenCalledWith(7);
+  });
+
+  it("flush_serviceThrows_returns500WithCode", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(flushRoundMapsNotice).mockRejectedValue(new Error("db"));
+    expect((await flushPost(post(), tournament("7"))).status).toBe(500);
   });
 });

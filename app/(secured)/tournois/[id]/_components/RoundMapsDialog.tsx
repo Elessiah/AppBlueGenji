@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { useToast } from "@/components/ui/toast";
 import { InfoHint } from "@/components/ui/info-hint";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
@@ -289,6 +289,20 @@ export function RoundMapsDialog({
   const overwatch = detail.card.game !== "MR";
   const rounds = useMemo(() => dialogRounds(detail), [detail]);
 
+  // Une seule annonce Discord par série d'enregistrements : à la fermeture de
+  // l'écran on demande son envoi tout de suite. Un accélérateur — sans lui
+  // (onglet fermé), le serveur envoie quand sa fenêtre de silence est échue.
+  const savedRounds = useRef(false);
+  useEffect(
+    () => () => {
+      if (!savedRounds.current) return;
+      void fetch(`/api/admin/tournaments/${tournamentId}/round-maps/flush`, { method: "POST", keepalive: true }).catch(
+        () => undefined,
+      );
+    },
+    [tournamentId],
+  );
+
   const [firstBan, setFirstBan] = useState<FirstBanRule>(rules.firstBan);
   const [nextBan, setNextBan] = useState<NextBanRule>(rules.nextBan);
   const [nextPick, setNextPick] = useState<NextPickRule>(rules.nextPick);
@@ -352,6 +366,7 @@ export function RoundMapsDialog({
     run(async () => {
       for (const chunk of chunkRounds(targets, ROUND_MAPS_BULK_MAX)) {
         await putJson(`/api/admin/tournaments/${tournamentId}/round-maps`, { rounds: chunk, slots: payload });
+        savedRounds.current = true;
       }
       showSuccess(success);
     });

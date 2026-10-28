@@ -147,7 +147,11 @@ describe("setRoundMaps", () => {
     expect(insert[1]).toEqual([7, 0, "UPPER", 2, '[["Ilios"],["Busan","Nepal"]]']);
     expect(connection.commit).toHaveBeenCalled();
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
-    expect(jest.mocked(sendBotLog).mock.calls[0][0]).toContain("2 cartes (1 imposée, 1 pool), par le staff");
+    // Aucune ligne Discord à l'enregistrement : la manche est mise en attente.
+    expect(sendBotLog).not.toHaveBeenCalled();
+    expect(writes(/INSERT INTO bg_round_maps_notices/).map(([, params]) => params)).toEqual([
+      [7, '[{"phaseId":0,"bracket":"UPPER","roundNumber":2}]', 60],
+    ]);
   });
 
   it("une liste vide retire le réglage", async () => {
@@ -157,7 +161,8 @@ describe("setRoundMaps", () => {
     ]);
     await expect(setRoundMaps(7, ROUND, [])).resolves.toEqual([]);
     expect(writes(/DELETE FROM bg_tournament_round_maps/)).toHaveLength(1);
-    expect(jest.mocked(sendBotLog).mock.calls[0][0]).toContain("Cartes de manche retirées");
+    expect(sendBotLog).not.toHaveBeenCalled();
+    expect(writes(/INSERT INTO bg_round_maps_notices/)).toHaveLength(1); // un retrait est un changement
   });
 
   it("un réglage inchangé n'écrit ni ne publie rien", async () => {
@@ -232,7 +237,12 @@ describe("setRoundsMaps", () => {
       [7, 0, "UPPER", 3, '[["Ilios"]]'],
     ]);
     expect(publishMatchUpdatedEvent).toHaveBeenCalledTimes(1);
-    expect(jest.mocked(sendBotLog).mock.calls[0][0]).toContain("2 tours");
+    expect(sendBotLog).not.toHaveBeenCalled();
+    const [notice] = writes(/INSERT INTO bg_round_maps_notices/);
+    expect(JSON.parse(String((notice[1] as unknown[])[1]))).toEqual([
+      { phaseId: 0, bracket: "UPPER", roundNumber: 2 },
+      { phaseId: 0, bracket: "UPPER", roundNumber: 3 },
+    ]);
   });
 
   it("setRoundsMaps_everyRoundUnchanged_publishesNothing", async () => {

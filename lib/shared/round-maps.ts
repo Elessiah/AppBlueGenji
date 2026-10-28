@@ -27,6 +27,10 @@ export const ROUND_MAP_CANDIDATES_MAX = 20;
 
 /** Tours qu'une seule écriture « copier / appliquer à tous » peut viser ; l'écran découpe au-delà. */
 export const ROUND_MAPS_BULK_MAX = 128;
+/** Silence (secondes) après la dernière modification avant l'annonce Discord unique des cartes de manche. */
+export const ROUND_MAPS_NOTICE_WINDOW_SECONDS = 60;
+/** Manches nommées au plus dans cette annonce ; les suivantes sont comptées. */
+export const ROUND_MAPS_NOTICE_LISTED = 8;
 /** Tableaux d'une manche (ceux de `bg_matches.bracket`). */
 export const ROUND_BRACKETS: readonly string[] = ["UPPER", "LOWER", "GRAND", "THIRD_PLACE"];
 

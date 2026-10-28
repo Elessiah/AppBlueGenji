@@ -9,8 +9,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
 import { sendBotLog } from "@/lib/server/bot-integration";
-import { formatMapRulesLog, formatRoundMapsLog } from "@/lib/shared/bot-logs";
-import { matchRoundLabel } from "@/lib/shared/discord-notifications";
+import { formatMapRulesLog } from "@/lib/shared/bot-logs";
 import {
   normalizeRoundMapSlots,
   parseFirstBanRule,
@@ -36,6 +35,7 @@ import { retryOnDeadlock } from "./deadlock-retry";
 import { resolveMatchParty } from "./match-launch";
 import { publishMatchUpdatedEvent } from "./notifications";
 import { queueRefereeChange } from "./referee-notices";
+import { queueRoundMapsNotice, scheduleRoundMapsNotice } from "./round-maps-notice";
 
 /** Une manche : phase (0 sans phases), tableau, numéro (`lib/shared/round-maps.ts`). */
 export type { RoundKey };
@@ -198,26 +198,18 @@ export async function setRoundsMaps(
   if (rounds.length === 0 || rounds.length > ROUND_MAPS_BULK_MAX) throw new Error("INVALID_ROUND");
   const result = await inTransaction(async (connection) => {
     const tournament = await lockTournament(connection, tournamentId);
-    let changed = false;
+    const changedRounds: RoundKey[] = [];
     for (const round of rounds) {
-      if (await writeRoundSlots(connection, tournamentId, round, slots)) changed = true;
+      if (await writeRoundSlots(connection, tournamentId, round, slots)) changedRounds.push(round);
     }
-    return changed ? tournament : null;
+    // L'annonce Discord ne part pas ici : elle est mise en attente dans la
+    // transaction et une seule ligne résume la série (`./round-maps-notice`).
+    await queueRoundMapsNotice(connection, tournamentId, changedRounds);
+    return changedRounds.length > 0 ? tournament : null;
   });
   if (result !== null) {
     publishMatchUpdatedEvent(tournamentId);
-    const roundLabel =
-      rounds.length === 1
-        ? matchRoundLabel(rounds[0].bracket, rounds[0].roundNumber, result.format === "SWISS")
-        : `${rounds.length} tours`;
-    void sendBotLog(
-      formatRoundMapsLog({
-        tournament: { id: Number(result.id), name: result.name },
-        roundLabel,
-        slots: slots.length,
-        imposed: slots.filter((slot) => slot.length === 1).length,
-      }),
-    ).catch((error: unknown) => console.error("[round-maps] journal non envoyé", error));
+    scheduleRoundMapsNotice();
   }
   return slots;
 }
