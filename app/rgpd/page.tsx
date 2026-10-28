@@ -1051,7 +1051,7 @@ function RgpdFr({
             jusqu&apos;à sa fin, à ses casters le temps du match ; le pseudo seul y paraît dès que la fenêtre de
             lancement montre le match. Le public et les autres joueurs ne lisent que « Arbitre désigné ». Son
             « Prêt » est attendu comme celui des équipes et des casters. S&apos;il ne remplit plus ces conditions ou
-            joue désormais le match, il n&apos;est plus montré (et en est retiré avant le lancement) ; l&apos;arbitrage
+            devient joueur du match avant son lancement, il n&apos;est plus montré (et en est retiré avant le lancement) ; l&apos;arbitrage
             d&apos;un compte supprimé est retiré de tous ses matchs. Quand un autre que lui le lui retire (le staff,
             un autre arbitre à qui le match est confié, l&apos;autogestion) ou qu&apos;il lui est retiré d&apos;office, il
             en est prévenu en notification push seulement, avec le motif. Ces gestes, l&apos;autogestion d&apos;un match
@@ -1060,8 +1060,7 @@ function RgpdFr({
             du match relève de l&apos;<strong>exécution du service</strong> : les conditions d&apos;utilisation la
             prévoient (section « Contacts de match », depuis leur version 7), pour que les parties sachent qui
             arbitre et puissent l&apos;ajouter en jeu. Il peut se retirer d&apos;un match à tout moment, le staff
-            pouvant lui confier de nouveau ce match, sans avis ; sans la permission d&apos;arbitrage, il n&apos;est
-            plus présenté. Le recueil de son « Prêt » et l&apos;avis du retrait relèvent aussi de l&apos;exécution
+            pouvant lui confier de nouveau ce match, sans avis. Le recueil de son « Prêt » et l&apos;avis du retrait relèvent aussi de l&apos;exécution
             du service, les arbitres agissant pour l&apos;association (<Link href="/rgpd/registre#t04">registre, T04</Link>).
           </p>
         </div>

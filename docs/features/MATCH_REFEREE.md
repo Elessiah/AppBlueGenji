@@ -159,7 +159,9 @@ d'un match à tout moment, le staff pouvant lui confier de nouveau ce match,
 sans avis ; exécution du service (les arbitres agissant pour l'association)
 pour son « Prêt » et l'avis du retrait. Jusqu'à la version 6, cette
 présentation reposait sur l'intérêt légitime, avec une opposition par le
-formulaire de signalement : l'entrée `2026-10-arbitre-designe-des-matchs` le
-dit encore, l'entrée `2026-10-conditions-v7-casters-et-arbitre` annonce le
-changement de base, et le droit d'opposition de `/rgpd` ne cite plus
-l'arbitre.
+formulaire de signalement. L'entrée `2026-10-arbitre-designe-des-matchs`,
+jamais publiée avant la version 7 et mise en ligne avec elle, suit la base de
+la v7 (revue de #491) ; l'entrée `2026-10-conditions-v7-casters-et-arbitre`
+annonce le changement de base, et le droit d'opposition de `/rgpd` ne cite
+plus l'arbitre. Devenir joueur du match ne retire l'arbitre qu'avant le
+lancement (`keepEligibleReferees`) : conditions, `/rgpd` et T04 le disent.

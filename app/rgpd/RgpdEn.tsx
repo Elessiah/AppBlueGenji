@@ -866,8 +866,8 @@ export function RgpdEn({
             contacts: to both teams and to the referees as soon as both its opponents are known until its end, to
             its casters while the match is being played; the username alone appears there as soon as the launch
             window shows the match. The public and other players only read “Referee assigned”. Their “Ready” is
-            expected like those of the teams and casters. If they no longer meet these requirements or now play
-            the match, they are no longer shown (and are removed from it before the launch); the refereeing of a
+            expected like those of the teams and casters. If they no longer meet these requirements or become
+            a player of the match before its launch, they are no longer shown (and are removed from it before the launch); the refereeing of a
             deleted account is removed from all its matches. When someone else removes it from them (the staff,
             another referee the match is assigned to, self-management) or it is removed automatically, they are
             notified by push notification only, with the reason. These actions, a match&apos;s self-management and
@@ -876,8 +876,7 @@ export function RgpdEn({
             the parties to the match falls under <strong>performance of the service</strong>: the terms of use
             provide for it (“Match contacts” section, since their version 7), so that the parties know who
             referees and can add them in game. They can withdraw from a match at any time, the staff being able to
-            assign that match to them again, without notice; without the refereeing permission, they are no longer
-            presented. Collecting their “Ready” and the removal notice also fall under performance of the service,
+            assign that match to them again, without notice. Collecting their “Ready” and the removal notice also fall under performance of the service,
             the referees acting for the association (<LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>).
           </p>
         </div>

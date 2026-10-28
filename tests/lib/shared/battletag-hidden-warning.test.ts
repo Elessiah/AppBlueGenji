@@ -208,8 +208,9 @@ describe("conditions d'utilisation — arbitre désigné (version 7)", () => {
 
   it("ne montre au public que « Arbitre désigné », et dit le retrait et la fin de la présentation (FR et EN)", () => {
     expect(fr).toContain("Le public et les autres joueurs ne lisent que « Arbitre désigné ».");
-    expect(fr).toContain("L'arbitre peut se retirer d'un match à tout moment, le staff pouvant le lui confier de nouveau ; il n'est plus présenté s'il ne remplit plus ces conditions ou s'il joue désormais le match.");
+    // Revue de #491 : devenir joueur du match ne retire l'arbitre qu'avant le lancement (`keepEligibleReferees`).
+    expect(fr).toContain("L'arbitre peut se retirer d'un match à tout moment, le staff pouvant le lui confier de nouveau ; il n'est plus présenté s'il ne remplit plus ces conditions ou si, avant le lancement du match, il devient l'un de ses joueurs.");
     expect(en).toContain("The public and other players only read “Referee assigned”.");
-    expect(en).toContain("The referee can withdraw from a match at any time, the staff being able to assign it to them again; they are no longer presented if they no longer meet these requirements or now play the match.");
+    expect(en).toContain("The referee can withdraw from a match at any time, the staff being able to assign it to them again; they are no longer presented if they no longer meet these requirements or if, before the match is launched, they become one of its players.");
   });
 });

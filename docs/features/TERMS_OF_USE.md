@@ -204,8 +204,10 @@ ajoute qu'un match listé avant son passage à l'antenne ne laisse aucune trace
 sur le site. Section « Acceptation » : le compte se supprime aussi depuis la
 fenêtre d'acceptation (`TermsAccountDeletion`). Annoncée par l'entrée
 `2026-10-conditions-v7-casters-et-arbitre` (FR et EN) ; l'entrée
-`2026-10-arbitre-designe-des-matchs`, qui dit l'intérêt légitime d'avant la
-version 7, n'est pas réécrite. **Tout compte la réaccepte** dans la fenêtre
+`2026-10-arbitre-designe-des-matchs`, encore jamais publiée et mise en ligne
+avec la version 7, suit sa base (exécution du service, sans opposition).
+Conditions du bot (article 01) et registre T08 : réglages du salon et avis
+du retrait d'un cast parmi les messages remis. **Tout compte la réaccepte** dans la fenêtre
 bloquante.
 
 Tout texte qui dit où se lit un BattleTag masqué (avertissement, modale de

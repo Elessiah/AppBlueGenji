@@ -363,20 +363,19 @@ describe("arbitre désigné — registre, /rgpd et annonce (revue juridique)", (
     expect(en).not.toContain("the staff see");
   });
 
-  // Revue juridique de #487, passe 3 : sans clause des conditions (version 6)
-  // et sans demande de l'arbitre que le staff désigne, la présentation de
-  // l'arbitre repose sur l'intérêt légitime, opposable par le formulaire de
-  // signalement. L'annonce MR-2 le dit ; la version 7 des conditions change
-  // cette base (annonce v7), ce que /rgpd dit désormais.
-  it("l'annonce de l'arbitre dit l'intérêt légitime d'avant la version 7, et /rgpd la base contractuelle depuis (FR et EN)", () => {
+  // Revue juridique de #487, passe 3 : sans clause des conditions (version 6),
+  // la présentation de l'arbitre reposait sur l'intérêt légitime, opposable.
+  // TERMS v7 (décision de l'utilisateur du 2026-10-27, revue de #491) : la
+  // version 7 la prévoit ; l'annonce MR-2, jamais publiée avant elle et mise en
+  // ligne avec elle, suit sa base (exécution du service, sans opposition), comme /rgpd.
+  it("fonde la présentation de l'arbitre sur l'exécution du service depuis la version 7, sans opposition (FR et EN)", () => {
     const fr = PRIVACY_CHANGES.find((c) => c.id === REFEREE_ENTRY)?.details.join(" ") ?? "";
     const en = PRIVACY_CHANGES_EN[REFEREE_ENTRY]?.details.join(" ") ?? "";
-    expect(fr).toContain("au titre de l'intérêt légitime (qu'elles sachent qui arbitre) : tu t'y opposes par le formulaire de signalement (catégorie RGPD) — retenue, ton opposition fait que le staff ne te confie plus de match — et tu peux te retirer d'un match à tout moment, le staff pouvant sinon te confier de nouveau ce match, sans avis");
-    expect(en).toContain("on the basis of legitimate interest (they know who referees): you object to it through the report form (GDPR category) — once upheld, your objection means the staff no longer assigns you matches — and you can withdraw from a match at any time, the staff otherwise being able to assign that match to you again, without notice");
-    expect(fr).not.toContain("présentés ainsi aux parties de tes matchs, au titre de l'exécution du service");
-    // Passe 5 : ce que fait une opposition retenue, et le droit d'opposition de /rgpd qui la cite.
-    expect(fr).toContain("retenue, ton opposition fait que le staff ne te confie plus de match");
-    expect(en).toContain("once upheld, your objection means the staff no longer assigns you matches");
+    expect(PRIVACY_CHANGES.find((c) => c.id === REFEREE_ENTRY)?.publishedAt).toBe("2026-10-29");
+    expect(fr).toContain("présentés ainsi aux parties de tes matchs, au titre de l'exécution du service (qu'elles sachent qui arbitre : les conditions d'utilisation le prévoient depuis leur version 7) ; tu peux te retirer d'un match à tout moment, le staff pouvant te confier de nouveau ce match, sans avis");
+    expect(en).toContain("presented in this way to the parties to your matches, under the performance of the service (they know who referees: the terms of use provide for it since their version 7); you can withdraw from a match at any time, the staff being able to assign that match to you again, without notice");
+    expect(fr).not.toMatch(/intérêt légitime|opposition|formulaire de signalement/);
+    expect(en).not.toMatch(/legitimate interest|objection|object to|report form/);
     const objectFr = DROITS.find((d) => d.title === "Droit d'opposition")?.text ?? "";
     const objectEn = DROITS_EN.find((d) => d.title === "Right to object")?.text ?? "";
     // Version 7 : le droit d'opposition de /rgpd ne cite plus la présentation de l'arbitre.
