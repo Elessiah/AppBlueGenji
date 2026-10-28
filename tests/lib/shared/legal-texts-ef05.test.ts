@@ -159,12 +159,12 @@ describe("PRIVACY_CHANGES — entrée rectificative de la marque de session", ()
     const en = [english?.summary, ...(english?.details ?? [])].join(" ");
     expect(fr).toContain("la marque est posée à la connexion et levée à ta première réponse");
     expect(fr).toContain("ne figure pas dans l'export de tes données");
-    // Fermer la fenêtre (Échap, voile), son bouton vers « Mon profil » (`DIALOG`)
-    // et le refus d'un clic dont le tag a changé répondent tous « Plus tard ».
-    expect(fr).toContain("(« Plus tard », la fermeture de la fenêtre ou son bouton qui mène à « Mon profil », « Ne plus voir »");
-    expect(fr).toContain("ou la certification, réussie ou refusée parce que ton compte Discord a changé depuis ta connexion)");
-    expect(en).toContain("(“Later”, closing the window or its button leading to “My profile”, “Don't show again”");
-    expect(en).toContain("or verification, whether it succeeds or is refused because your Discord account changed since you logged in)");
+    // Fermer la fenêtre (Échap, voile), son bouton vers la certification de « Mon profil »
+    // (`DIALOG`) et le refus d'un clic dont le tag n'est plus le bon (`STATE_CHANGED`) répondent tous « Plus tard ».
+    expect(fr).toContain("(« Plus tard », la fermeture de la fenêtre ou son bouton qui ouvre la certification de « Mon profil », « Ne plus voir »");
+    expect(fr).toContain("ou la certification, réussie ou refusée parce que ton tag ou ton compte Discord n'est plus celui que la fenêtre montrait)");
+    expect(en).toContain("(“Later”, closing the window or its button that opens verification in “My profile”, “Don't show again”");
+    expect(en).toContain("or verification, whether it succeeds or is refused because your Discord tag or account is no longer the one the window showed)");
     expect(en).toContain("the mark is set at login and cleared at your first answer");
     expect(en).toContain("isn't included in the export of your data");
   });

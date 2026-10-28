@@ -132,7 +132,7 @@ Le BattleTag n'y figure pas : il est vérifié par Battle.net au rattachement
 
 | Geste | Effet |
 | --- | --- |
-| « Certifier mon tag » | certifie (`ONE_CLICK`) ou mène au dialogue (`DIALOG`, la proposition est close pour la session) |
+| « Certifier mon tag » | certifie (`ONE_CLICK`) ou mène au dialogue (`DIALOG`, la proposition est close pour la session) ; un refus `STATE_CHANGED` d'un clic (tag changé, absent ou non attesté, Discord détaché — et un 2xx sans `VERIFIED`) close aussi la proposition pour la session (`LATER`), toast `certifyChanged` — l'entrée `PRIVACY_CHANGES` rectificative le nomme |
 | « Plus tard », Échap, clic sur le voile | `POST … { action: "LATER", userId }` (`keepalive` : un lien qui change de document ne l'annule pas) — fermée tout de suite ; un échec d'écriture la fait seulement revenir au prochain chargement (un changement de parcours `ONE_CLICK` → `DIALOG` ne la rouvre pas) |
 | « Ne plus voir » | `POST … { action: "NEVER", userId }` — `bg_users.discord_certify_prompt_dismissed_at` (date du premier choix, `COALESCE`) puis **toutes** les sessions du compte (au mieux : un échec de cette seconde écriture est journalisé, le choix reste gardé et le chargeur, qui filtre sur la date, lève la marque restée), et l'invitation de la fiche tournoi retenue pour ce compte est oubliée (`forgetCertificationPromptsOf`) ; succès en toast, échec en toast et fenêtre gardée (compte supprimé entre-temps : fenêtre fermée, toast dédié) |
 
