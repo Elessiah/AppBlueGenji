@@ -55,7 +55,12 @@
       "THIRD_PLACE": "Petite Finale"
     },
     "phaseContext": "Phase {position}",
-    "phaseContextNamed": "Phase {position} — {name}"
+    "phaseContextNamed": "Phase {position} — {name}",
+    "roundMaps": {
+      "title": "Cartes et bans",
+      "lead": "Cartes imposées ou pools par manche, et ordre des bans.",
+      "open": "Paramétrer les cartes et les bans"
+    }
   },
   "header": {
     "back": "Retour",
@@ -454,6 +459,21 @@
     },
     "missingTitle": "Match introuvable",
     "missingText": "Ce match n'existe pas dans ce tournoi.",
-    "missingBack": "Retour au tournoi"
+    "missingBack": "Retour au tournoi",
+    "mapsTitle": "Cartes du round",
+    "mapN": "Carte {number}",
+    "imposed": "Imposée",
+    "toChoose": "À choisir parmi {maps}",
+    "loserPick": "Choisie par l'équipe qui a perdu la carte précédente",
+    "pickLabel": "Choisir la carte {number}",
+    "pickNone": "À choisir",
+    "picked": "Carte choisie.",
+    "pickCleared": "Choix de carte retiré.",
+    "banOrder": "Bans de la carte 1",
+    "banOrderValue": "{first} d'abord, puis {second}",
+    "nextBans": "Bans des cartes suivantes",
+    "nextBansLOSER": "L'équipe qui a perdu la carte précédente bannit en premier ; en cas d'égalité, même ordre qu'à la carte précédente.",
+    "nextBansWINNER": "L'équipe qui a gagné la carte précédente bannit en premier ; en cas d'égalité, même ordre qu'à la carte précédente.",
+    "configureMaps": "Paramétrer les cartes du round"
   }
 }

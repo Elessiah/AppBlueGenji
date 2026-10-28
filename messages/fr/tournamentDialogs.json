@@ -414,5 +414,39 @@
     "neverAgain": "Ne plus voir",
     "later": "Plus tard",
     "go": "Certifier depuis mon profil"
+  },
+  "roundMaps": {
+    "title": "Cartes et bans",
+    "hint": "Une carte par créneau l'impose à tous les matchs de la manche ; plusieurs, séparées par des virgules, forment un pool où l'arbitrage ou l'équipe choisit.",
+    "rulesTitle": "Règles de ban",
+    "firstBan": "Premier ban de la carte 1",
+    "firstBanOptions": {
+      "NON_HOST": "L'équipe qui n'héberge pas",
+      "HOST": "L'équipe hôte"
+    },
+    "nextBan": "Premier ban des cartes suivantes",
+    "nextBanOptions": {
+      "LOSER": "Le perdant de la carte précédente",
+      "WINNER": "Le gagnant de la carte précédente"
+    },
+    "nextPick": "Carte suivante d'un pool",
+    "nextPickOptions": {
+      "LOSER": "Choisie par le perdant de la carte précédente",
+      "FREE": "Choisie par l'arbitrage"
+    },
+    "saveRules": "Enregistrer les règles",
+    "rulesSaved": "Règles de ban enregistrées.",
+    "roundTitle": "Cartes d'une manche",
+    "round": "Manche",
+    "slot": "Carte {number}",
+    "slotPlaceholder": "Ex. : Ilios ou Ilios, Lijiang Tower",
+    "addSlot": "Ajouter une carte",
+    "removeSlot": "Retirer la carte {number}",
+    "slotsLimit": "{max} cartes au plus par manche.",
+    "saveRound": "Enregistrer les cartes",
+    "clearRound": "Retirer le réglage",
+    "roundSaved": "Cartes de la manche enregistrées.",
+    "roundCleared": "Réglage de la manche retiré.",
+    "close": "Fermer"
   }
 }

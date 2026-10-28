@@ -27,6 +27,7 @@ import {
 import { FIRST_MAP_MAX_LENGTH, normalizeFirstMap } from "@/lib/shared/match-referee";
 import { streamLinkText } from "@/lib/shared/live-streams";
 import { localizedPlaceholder, matchPositionText, versusText } from "@/lib/shared/tournament-page-text";
+import { canPickMatchMap, firstBanOrder, roundMapsOf } from "@/lib/shared/round-maps";
 import type { BracketMatch, TournamentDetail } from "@/lib/shared/types";
 import { launchStripControls } from "../_lib/launch-strip";
 import { useLiveControls } from "../_lib/live-context";
@@ -34,6 +35,7 @@ import { launchErrorText, useActionsText } from "../_lib/actions-text";
 import { useErrorsText } from "../_lib/error-map";
 import { EntrantName } from "./EntrantName";
 import { MatchRow } from "./MatchRow";
+import { MatchRoundMaps } from "./MatchRoundMaps";
 import { StreamLink } from "./MatchLiveStrip";
 import { MatchPageScope } from "../_lib/match-page-context";
 import styles from "./MatchPage.module.css";
@@ -158,16 +160,31 @@ function useCopy() {
 
 /** Création de la partie : côtés (hôte à gauche), première carte, premier ban, rappel du cast. */
 function LobbySection({
+  detail,
   match,
   sides,
   staff,
   editable,
-}: Readonly<{ match: BracketMatch; sides: [MatchPageSide, MatchPageSide]; staff: boolean; editable: boolean }>) {
+  canPick,
+}: Readonly<{
+  detail: TournamentDetail;
+  match: BracketMatch;
+  sides: [MatchPageSide, MatchPageSide];
+  staff: boolean;
+  editable: boolean;
+  canPick: boolean;
+}>) {
   const { t } = useTournamentPageText();
   const titleId = useId();
   const [left, right] = sides;
   const banSide = sides.find((side) => side.firstBan) ?? null;
   const banName = useSideName(banSide ?? left);
+  const otherName = useSideName(banSide === right ? left : right);
+  const rules = detail.mapRules;
+  // Ordre des bans de la carte 1 (règlement §10) : les deux équipes bannissent.
+  const banOrder = firstBanOrder(rules.firstBan, match.hostTeamId, match.team1Id, match.team2Id);
+  // Une carte 1 réglée pour la manche (imposée ou pool) remplace la saisie libre.
+  const firstSlotSet = (roundMapsOf(rules.rounds, match)?.slots.length ?? 0) > 0;
   return (
     <section className={`ds-block ${styles.block}`} aria-labelledby={titleId}>
       <div className="ds-section-title blue">
@@ -186,11 +203,22 @@ function LobbySection({
           <dd>{match.firstMap ?? <span className={styles.muted}>{t("matchPage.firstMapUnset")}</span>}</dd>
         </div>
         <div>
-          <dt>{t("matchPage.firstBan")}</dt>
-          <dd>{banSide ? banName : <span className={styles.muted}>{t("matchPage.opponentsPending")}</span>}</dd>
+          <dt>{t("matchPage.banOrder")}</dt>
+          <dd>
+            {banSide && banOrder ? (
+              t("matchPage.banOrderValue", { first: banName, second: otherName })
+            ) : (
+              <span className={styles.muted}>{t("matchPage.opponentsPending")}</span>
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt>{t("matchPage.nextBans")}</dt>
+          <dd className={styles.ruleText}>{t(rules.nextBan === "WINNER" ? "matchPage.nextBansWINNER" : "matchPage.nextBansLOSER")}</dd>
         </div>
       </dl>
-      {staff && editable && <FirstMapForm match={match} />}
+      <MatchRoundMaps detail={detail} match={match} canPick={canPick && editable} staff={staff} />
+      {staff && editable && !firstSlotSet && <FirstMapForm match={match} />}
       {match.casters.length > 0 && (
         <p className={styles.reminder}>
           <span aria-hidden="true">🎙</span> {t("matchPage.sortByRole")}
@@ -446,7 +474,14 @@ export function MatchPage({
         </div>
       </section>
 
-      <LobbySection match={match} sides={sides} staff={canSchedule && !frozen} editable={editable} />
+      <LobbySection
+        detail={detail}
+        match={match}
+        sides={sides}
+        staff={canSchedule && !frozen}
+        editable={editable}
+        canPick={!spectator && !frozen && canPickMatchMap({ staff: canSchedule, myTeamId }, match)}
+      />
       <OfficiatingSection match={match} staff={canSchedule} launch={shownLaunch} onCopy={onCopy} />
       <CastSection match={match} matchLabel={matchLabel} launch={shownLaunch} onCopy={onCopy} />
     </>

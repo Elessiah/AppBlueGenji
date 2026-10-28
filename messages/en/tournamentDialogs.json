@@ -414,5 +414,39 @@
     "neverAgain": "Don't show again",
     "later": "Later",
     "go": "Verify from my profile"
+  },
+  "roundMaps": {
+    "title": "Maps and bans",
+    "hint": "One map per slot sets it for every match of the round; several, separated by commas, make a pool the referee or the team picks from.",
+    "rulesTitle": "Ban rules",
+    "firstBan": "First ban on map 1",
+    "firstBanOptions": {
+      "NON_HOST": "The team that is not hosting",
+      "HOST": "The host team"
+    },
+    "nextBan": "First ban on later maps",
+    "nextBanOptions": {
+      "LOSER": "The loser of the previous map",
+      "WINNER": "The winner of the previous map"
+    },
+    "nextPick": "Next map from a pool",
+    "nextPickOptions": {
+      "LOSER": "Picked by the loser of the previous map",
+      "FREE": "Picked by the referee"
+    },
+    "saveRules": "Save the rules",
+    "rulesSaved": "Ban rules saved.",
+    "roundTitle": "Maps of a round",
+    "round": "Round",
+    "slot": "Map {number}",
+    "slotPlaceholder": "E.g. Ilios or Ilios, Lijiang Tower",
+    "addSlot": "Add a map",
+    "removeSlot": "Remove map {number}",
+    "slotsLimit": "{max} maps at most per round.",
+    "saveRound": "Save the maps",
+    "clearRound": "Clear the round",
+    "roundSaved": "Round maps saved.",
+    "roundCleared": "Round setting cleared.",
+    "close": "Close"
   }
 }
