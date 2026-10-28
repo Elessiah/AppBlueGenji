@@ -78,10 +78,21 @@ export type LobbyBriefRow = RowDataPacket & {
 type Db = Awaited<ReturnType<typeof getDatabase>>;
 type ClaimedSide = { row: LobbyBriefRow; slot: LobbyBriefSlot };
 
+/**
+ * Réserve un côté **si le salon est toujours ouvert pour cet appariement** :
+ * la condition relit le match dans l'instruction même. Entre la lecture des
+ * candidats et la réservation, un lancement défait (`match-schedule`,
+ * `referee-scheduling`) efface les réservations et referme le salon ; une
+ * réservation posée après coup enverrait des réglages périmés, puis ferait
+ * taire le brief de la réouverture (même appariement).
+ */
 async function claimLobbyBrief(db: Db, claim: ClaimedSide): Promise<boolean> {
   const [result] = await db.execute(
-    `INSERT IGNORE INTO bg_match_start_notices (match_id, pairing, phase) VALUES (?, ?, ?)`,
-    [Number(claim.row.id), String(claim.row.launch_pairing), lobbyBriefPhase(claim.slot)],
+    `INSERT IGNORE INTO bg_match_start_notices (match_id, pairing, phase)
+     SELECT m.id, m.launch_pairing, ? FROM bg_matches m
+      WHERE m.id = ? AND m.launch_pairing = ? AND m.status = 'READY' AND m.is_bye = 0
+        AND m.lobby_opened_at IS NOT NULL`,
+    [lobbyBriefPhase(claim.slot), Number(claim.row.id), String(claim.row.launch_pairing)],
   );
   return (result as { affectedRows?: number }).affectedRows === 1;
 }
