@@ -60,8 +60,8 @@ Il est donc scindé en deux :
   pour éviter la ruée des abonnés), et `live-state.ts` garde les noms d'un
   instantané à l'autre. Une réponse n'est retenue que si elle laisse moins de
   désignations sans nom (`refereeNamesImprove`) : une réponse en retard
-  n'écrase jamais une liste plus à jour. La lecture REST de secours garde le
-  tableau précédent à contenu égal (`shareRefereeNames`) : `LiveProvider` ne
+  n'écrase jamais une liste plus à jour. La lecture REST de secours et la reconnexion
+  du flux gardent le tableau précédent à contenu égal (`shareRefereeNames`) : `LiveProvider` ne
   redessine pas le plateau pour des pseudos inchangés.
 
 `TournamentDetail = TournamentSnapshot & TournamentViewerContext` : les
