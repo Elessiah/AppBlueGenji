@@ -8,6 +8,7 @@
  * Chaque phrase gardée ici dit un fait du code, en français et en anglais.
  */
 import { describe, expect, it } from "@jest/globals";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { PRIVACY_POLICY } from "@/lib/shared/bot-legal-content";
@@ -45,6 +46,9 @@ describe("/rgpd — choix « Ne plus voir » de la certification Discord", () =>
   it("dit une fois par connexion (« Plus tard » la fait revenir)", () => {
     expect(fr).toContain("une fois par connexion : « Plus tard » la ferme jusqu'à ta prochaine connexion");
     expect(en).toContain("once per login: “Later” closes it until your next login");
+    // Seule une connexion par Discord ou Blizzard la rouvre (CERTIFY_PROMPT_DOORS).
+    expect(fr).toContain("jusqu'à ta prochaine connexion par Discord ou Blizzard");
+    expect(en).toContain("until your next login with Discord or Blizzard");
   });
 
   it("nomme le parcours « ajouter un tag » d'un compte qui n'en a pas", () => {
@@ -98,6 +102,9 @@ describe("registre — T01 (marque de session, langue) et T04 (invitation, code)
 
   it("T01 : les alertes au staff partent toujours dans les deux langues", () => {
     expect(activity(PROCESSING_ACTIVITIES, "T01")).toContain("alertes adressées au staff");
+    expect(activity(PROCESSING_ACTIVITIES, "T01")).toContain("Proposer, une fois par connexion par Discord ou Blizzard,");
+    expect(activity(PROCESSING_ACTIVITIES, "T01")).not.toContain("Proposer une fois");
+    expect(activity(PROCESSING_ACTIVITIES_EN, "T01")).toContain("Suggesting, once per login with Discord or Blizzard,");
     expect(activity(PROCESSING_ACTIVITIES_EN, "T01")).toContain("alerts sent to staff");
   });
 
@@ -148,13 +155,20 @@ describe("PRIVACY_CHANGES — entrée rectificative de la marque de session", ()
     const en = [english?.summary, ...(english?.details ?? [])].join(" ");
     expect(fr).toContain("la marque est posée à la connexion et levée à ta première réponse");
     expect(fr).toContain("ne figure pas dans l'export de tes données");
+    // Fermer la fenêtre (Échap, voile, « Certifier → ») répond « Plus tard ».
+    expect(fr).toContain("(« Plus tard » ou la fermeture de la fenêtre, « Ne plus voir »");
+    expect(en).toContain("(“Later” or closing the window, “Don't show again”");
     expect(en).toContain("the mark is set at login and cleared at your first answer");
     expect(en).toContain("isn't included in the export of your data");
   });
 
   it("laisse intacte l'entrée publiée du 21 octobre", () => {
-    const published = PRIVACY_CHANGES.find((change) => change.id === "2026-10-proposition-certification-discord");
+    const publishedId = "2026-10-proposition-certification-discord";
+    const published = PRIVACY_CHANGES.find((change) => change.id === publishedId);
     expect(published?.publishedAt).toBe("2026-10-21");
+    // Empreinte du texte publié (FR et EN, liens compris) : toute retouche la change.
+    const fingerprint = createHash("sha256").update(JSON.stringify([published, PRIVACY_CHANGES_EN[publishedId]])).digest("hex");
+    expect(fingerprint).toBe("19953e98609ad2083d8788fffa38424109b607c47fa400cd9b850dd56f87ea69");
   });
 });
 
@@ -175,8 +189,14 @@ describe("avis de la connexion et du profil", () => {
   });
 
   it("la langue du compte ne vaut pas pour les alertes adressées au staff", () => {
-    expect(frProfile.accountLocale.hint).toContain("(hors alertes adressées au staff, toujours en français puis en anglais)");
-    expect(enProfile.accountLocale.hint).toContain("(except alerts sent to staff, always in French then English)");
+    // bilingualDm : le français seul quand les deux langues dépassent un message.
+    expect(frProfile.accountLocale.hint).toContain(
+      "(hors alertes adressées au staff en message privé, en français puis en anglais — en français seul si les deux ne tiennent pas dans un message)",
+    );
+    expect(enProfile.accountLocale.hint).toContain(
+      "(except alerts sent to staff by direct message, in French then English — French alone if both do not fit in one message)",
+    );
+    expect(frProfile.accountLocale.hint).not.toContain("toujours en français");
   });
 });
 

@@ -400,8 +400,8 @@ describe("/rgpd — données obligatoires : la langue du compte (revue juridique
     expect(read("lib/shared/rgpd-policy-en.ts")).toMatch(/the language of push notifications and of the site's Discord direct messages \(sent to the bot with the code sent by direct message only\)/);
     expect(read("messages/fr/login.json")).toMatch(/pour t'écrire dans cette langue tes notifications push et les messages privés Discord du site/);
     expect(read("messages/en/login.json")).toMatch(/to write your push notifications and the site's Discord direct messages in that language/);
-    expect(read("messages/fr/profile.json")).toMatch(/Tes notifications push et les messages privés Discord du site \(hors alertes adressées au staff, toujours en français puis en anglais\) arrivent dans cette langue/);
-    expect(read("messages/en/profile.json")).toMatch(/Your push notifications and the site's Discord direct messages \(except alerts sent to staff, always in French then English\) arrive in this language/);
+    expect(read("messages/fr/profile.json")).toMatch(/Tes notifications push et les messages privés Discord du site \(hors alertes adressées au staff[^)]*\) arrivent dans cette langue/);
+    expect(read("messages/en/profile.json")).toMatch(/Your push notifications and the site's Discord direct messages \(except alerts sent to staff[^)]*\) arrive in this language/);
 
     const find = (list: readonly (typeof PROCESSING_ACTIVITIES)[number][], ref: string) =>
       list.find((activity) => activity.ref === ref)!;
