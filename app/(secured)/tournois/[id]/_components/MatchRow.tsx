@@ -60,17 +60,16 @@ export function pendingReportText(
   if (state.kind === "conflict") return text.t("cardActions.reportConflict");
   const reporter = state.reporter ?? text.t("cardActions.reportSide", { side: state.side });
   // Sans compte, les scores proposés ne sont pas servis (`spectatorSnapshot`) :
-  // qu'une proposition attende, sans un « 0 – 0 » qui n'a jamais été proposé.
-  if (spectator) return text.t("cardActions.reportPendingSpectator", { reporter });
+  // qu'une proposition attende, sans un « 0 – 0 » qui n'a jamais été proposé —
+  // l'échéance et la suspension, qui ne disent rien de personnel, restent.
+  const key = spectator ? "cardActions.reportPendingSpectator" : "cardActions.reportPending";
   // Échéance de la validation d'office, lisible des deux équipes (et de tous) :
   // à l'heure de Paris, la même pour chacun (`SCORE_DISPUTE_LOCK.md`).
   const values = { score1: state.team1Score, score2: state.team2Score, reporter };
   // Suspendue par un « Enregistrer » d'arbitrage : aucune heure ne vaut plus.
-  if (state.paused) return text.t("cardActions.reportPendingPaused", values);
+  if (state.paused) return text.t(`${key}Paused`, values);
   const deadline = autoValidateTimeText(state.deadlineAt, text.locale);
-  return deadline
-    ? text.t("cardActions.reportPendingDeadline", { ...values, deadline })
-    : text.t("cardActions.reportPending", values);
+  return deadline ? text.t(`${key}Deadline`, { ...values, deadline }) : text.t(key, values);
 }
 
 interface MatchRowProps {

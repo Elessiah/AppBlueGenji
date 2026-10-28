@@ -237,6 +237,8 @@
     "reportPendingPaused": "{score1} – {score2} proposé par {reporter} · validation automatique suspendue par l'arbitrage",
     "reportPendingDeadline": "{score1} – {score2} proposé par {reporter} · validation automatique à {deadline} (heure de Paris) sans réponse",
     "reportPendingSpectator": "Score proposé par {reporter} · à confirmer",
+    "reportPendingSpectatorPaused": "Score proposé par {reporter} · validation automatique suspendue par l'arbitrage",
+    "reportPendingSpectatorDeadline": "Score proposé par {reporter} · validation automatique à {deadline} (heure de Paris) sans réponse",
     "locked": "Score verrouillé",
     "lockedTitle": "La manche suivante a déjà des scores : le résultat de ce match ne peut plus être modifié.",
     "lockedReason": ": la manche suivante a déjà des scores, le résultat de ce match ne peut plus être modifié.",
