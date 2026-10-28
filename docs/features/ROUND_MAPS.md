@@ -28,13 +28,14 @@ mode (Contrôle, Escorte, Hybride, Offensive, Flashpoint, Affrontement), avec un
 recherche sans casse ni accents (`filterOverwatchMaps`) et des cases à cocher
 (groupe `data-tap-zone`) ; une carte absente se **saisit à la main** (64
 caractères, `visibleText`). Les cartes retenues paraissent en pastilles qu'un ✕
-retire. **Marvel Rivals : saisie libre seule.** Le stockage ne change pas : des
+retire. Un créneau vide **entre** deux cartes refuse l'enregistrement (`slotGap`) :
+l'écarter décalerait les cartes suivantes. **Marvel Rivals : saisie libre seule.** Le stockage ne change pas : des
 noms (anglais, ceux du jeu ; la graphie française n'a pas pu être vérifiée).
 
 **Tous les tours, y compris à venir** — le sélecteur liste les tours générés,
 ceux que le format annonce et ceux déjà réglés (`plannedRoundKeys`) :
 élimination simple (+ petite finale), double (haut, bas, grande finale), ronde
-suisse (rondes annoncées), BlueGenji Survie (manches qualificatives jusqu'au
+suisse (rondes annoncées, sinon ⌈log₂(N)⌉ + 1 comme le moteur au coup d'envoi), BlueGenji Survie (manches qualificatives jusqu'au
 plafond, puis play-offs à partir de `PLAYOFF_ROUND_OFFSET`), multi-phases (phase
 par phase, effectif déduit des qualifiés). Avant le coup d'envoi, l'effectif
 retenu est la capacité (au moins les inscrites) ; ensuite, les inscrites. Survie,
@@ -50,7 +51,8 @@ créneaux, sans dépasser `ROUND_MAP_SLOTS_MAX` (9).
 
 **Copier** — « Copier » vers un tour choisi, ou « Appliquer à tous les tours » :
 une seule écriture (`rounds`), une confirmation (`ConfirmActionDialog`) quand
-un tour déjà réglé autrement serait remplacé (`overwrittenRounds`).
+un tour déjà réglé autrement serait remplacé (`overwrittenRounds`). Au-delà de
+`ROUND_MAPS_BULK_MAX` (128) tours, l'écran envoie un lot par requête.
 
 **Verrou d'échelle et réinitialisation** — dès qu'un tour a des cartes, elles
 valent pour **tous** ses matchs : la carte 1 ne se saisit plus match par match

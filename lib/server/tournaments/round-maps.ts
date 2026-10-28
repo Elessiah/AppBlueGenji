@@ -23,6 +23,7 @@ import {
   NEXT_BAN_RULES,
   NEXT_PICK_RULES,
   ROUND_BRACKETS,
+  ROUND_MAPS_BULK_MAX,
   type FirstBanRule,
   type NextBanRule,
   type NextPickRule,
@@ -133,8 +134,8 @@ async function lockTournament(connection: PoolConnection, tournamentId: number):
   return rows[0];
 }
 
-/** Tours au plus d'une copie « à tous les tours » : borne une requête aberrante. */
-export const ROUND_MAPS_BULK_MAX = 128;
+/** Tours au plus d'une copie « à tous les tours » (partagé avec l'écran, qui découpe). */
+export { ROUND_MAPS_BULK_MAX };
 
 /**
  * Tours lus d'un corps de requête : une liste (copie vers plusieurs tours),

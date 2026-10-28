@@ -49,3 +49,9 @@
   font-size: 13px;
   color: var(--ink);
 }
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}

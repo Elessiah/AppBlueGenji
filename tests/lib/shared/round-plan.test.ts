@@ -83,6 +83,16 @@ describe("plannedRoundKeys", () => {
     expect(plannedRoundKeys(input, [], [])).toEqual([upper(1), upper(2), upper(3), upper(4)]);
   });
 
+  it("plannedRoundKeys_swissWithoutTotal_usesRecommendedRounds", () => {
+    const input = planInput({ format: "SWISS", swissTotalRounds: null });
+    expect(plannedRoundKeys(input, [], [])).toEqual([upper(1), upper(2), upper(3), upper(4)]);
+  });
+
+  it("plannedRoundKeys_swissTotalZero_usesRecommendedRounds", () => {
+    const input = planInput({ format: "SWISS", swissTotalRounds: 0 });
+    expect(plannedRoundKeys(input, [], [])).toHaveLength(4);
+  });
+
   it("plannedRoundKeys_survival_offersGeneratedAndNextRound", () => {
     const input = planInput({ format: "SURVIVAL", state: "RUNNING" });
     expect(plannedRoundKeys(input, [upper(1), upper(2)], [])).toEqual([upper(1), upper(2), upper(3)]);

@@ -48,6 +48,24 @@ export function slotsToSave(slots: readonly (readonly string[])[]): string[][] {
   return slots.filter((slot) => slot.length > 0).map((slot) => [...slot]);
 }
 
+/**
+ * Numéro (1, 2…) du premier créneau vide suivi d'un créneau rempli, `null`
+ * sinon : l'enregistrer écarterait le vide et décalerait les cartes suivantes
+ * (la carte 3 deviendrait la carte 2). Seuls les vides de fin s'écartent.
+ */
+export function slotGap(slots: readonly (readonly string[])[]): number | null {
+  const lastFilled = slots.findLastIndex((slot) => slot.length > 0);
+  const gap = slots.findIndex((slot, index) => slot.length === 0 && index < lastFilled);
+  return gap === -1 ? null : gap + 1;
+}
+
+/** Tours découpés en lots d'au plus `size` (une écriture par lot). */
+export function chunkRounds<T>(rounds: readonly T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let start = 0; start < rounds.length; start += size) chunks.push(rounds.slice(start, start + size));
+  return chunks;
+}
+
 /** Créneaux à éditer pour un tour : son réglage, ou une carte vide à remplir. */
 export function slotsToEdit(rounds: readonly RoundMapConfig[], round: RoundKey | null): string[][] {
   const saved = round ? (roundMapsOf(rounds, round)?.slots ?? []) : [];

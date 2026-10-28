@@ -24,6 +24,9 @@ import { visibleText } from "./visible-text";
 export const ROUND_MAP_SLOTS_MAX = 9;
 /** Cartes candidates au plus par créneau. */
 export const ROUND_MAP_CANDIDATES_MAX = 20;
+
+/** Tours qu'une seule écriture « copier / appliquer à tous » peut viser ; l'écran découpe au-delà. */
+export const ROUND_MAPS_BULK_MAX = 128;
 /** Tableaux d'une manche (ceux de `bg_matches.bracket`). */
 export const ROUND_BRACKETS: readonly string[] = ["UPPER", "LOWER", "GRAND", "THIRD_PLACE"];
 

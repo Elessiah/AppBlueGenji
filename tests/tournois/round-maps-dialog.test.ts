@@ -1,10 +1,12 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   addMapToSlot,
+  chunkRounds,
   findRound,
   overwrittenRounds,
   removeMapFromSlot,
   sameSlots,
+  slotGap,
   slotHasMap,
   slotsToEdit,
   slotsToSave,
@@ -87,6 +89,30 @@ describe("slotsToSave / slotsToEdit / sameSlots", () => {
 
   it("sameSlots_differentOrder_returnsFalse", () => {
     expect(sameSlots([["Ilios"], ["Busan"]], [["Busan"], ["Ilios"]])).toBe(false);
+  });
+});
+
+describe("slotGap", () => {
+  it("slotGap_emptyMiddleSlot_returnsItsNumber", () => {
+    expect(slotGap([["Ilios"], [], ["Busan"]])).toBe(2);
+  });
+
+  it("slotGap_onlyTrailingEmpty_returnsNull", () => {
+    expect(slotGap([["Ilios"], []])).toBeNull();
+  });
+
+  it("slotGap_allEmpty_returnsNull", () => {
+    expect(slotGap([[]])).toBeNull();
+  });
+});
+
+describe("chunkRounds", () => {
+  it("chunkRounds_overSize_splitsIntoBatches", () => {
+    expect(chunkRounds([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
+  });
+
+  it("chunkRounds_exactlySize_singleBatch", () => {
+    expect(chunkRounds([1, 2], 2)).toEqual([[1, 2]]);
   });
 });
 

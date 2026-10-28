@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 
 import { useToast } from "@/components/ui/toast";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { FieldErrorText } from "@/components/ui/field-error-text";
+import { InfoHint } from "@/components/ui/info-hint";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { FIRST_MAP_MAX_LENGTH } from "@/lib/shared/match-referee";
 import { MATCH_LAUNCH_REFRESH_EVENT } from "@/lib/shared/match-launch";
@@ -286,7 +287,12 @@ export function RefereeDialog({
 
             {panel.roundSlots.length > 0 ? (
               <div className={styles.body}>
-                <p className={styles.status}>{t("cardActions.refereeDialog.roundMapsTitle")}</p>
+                <div className={styles.titleRow}>
+                  <p className={styles.status}>{t("cardActions.refereeDialog.roundMapsTitle")}</p>
+                  <InfoHint id={`${mapId}-locked`} subject={t("cardActions.refereeDialog.roundMapsTitle")}>
+                    {t("cardActions.refereeDialog.roundMapsLocked")}
+                  </InfoHint>
+                </div>
                 <ol className={styles.roundMaps}>
                   {panel.roundSlots.map((candidates, index) => (
                     // L'ordre des créneaux est leur identité (carte 1, carte 2…).
@@ -297,7 +303,6 @@ export function RefereeDialog({
                     </li>
                   ))}
                 </ol>
-                <p className={styles.muted}>{t("cardActions.refereeDialog.roundMapsLocked")}</p>
               </div>
             ) : (
               <form className={styles.row} onSubmit={saveMap}>

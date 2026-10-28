@@ -11,6 +11,7 @@ import { nextPowerOfTwo } from "./bracket-seeds";
 import { PLAYOFF_ROUND_OFFSET, tournamentMatchFormat } from "./bg-survie/rounds";
 import { matchMaxMaps, type MatchFormat } from "./match-format";
 import { ROUND_MAP_SLOTS_MAX, roundKeysOf, type RoundKey } from "./round-maps";
+import { computeRecommendedRounds } from "./swiss";
 import { resolvePhaseQualifiers } from "./tournament-phases";
 import type { TournamentFormat, TournamentPhase, TournamentState } from "./types";
 
@@ -72,7 +73,11 @@ function formatRounds(
 ): RoundKey[] {
   if (format === "SINGLE") return eliminationRounds(phaseId, entrants, false, settings.thirdPlace);
   if (format === "DOUBLE") return eliminationRounds(phaseId, entrants, true, false);
-  if (format === "SWISS") return upperRounds(phaseId, settings.swissTotalRounds);
+  if (format === "SWISS") {
+    // Sans total fixé, le moteur retient ⌈log₂(N)⌉ + 1 au coup d'envoi (`swiss.ts`).
+    const total = settings.swissTotalRounds ?? 0;
+    return upperRounds(phaseId, total > 0 ? total : computeRecommendedRounds(entrants));
+  }
   // Survie : le nombre de manches dépend des coupes et des forfaits — seuls les
   // tours générés et le suivant sont proposés (`nextRounds`).
   return [];

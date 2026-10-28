@@ -14,6 +14,7 @@ import {
   NEXT_BAN_RULES,
   NEXT_PICK_RULES,
   ROUND_MAP_SLOTS_MAX,
+  ROUND_MAPS_BULK_MAX,
   roundKeyId,
   roundKeysOf,
   roundMapsOf,
@@ -29,9 +30,11 @@ import { launchErrorText, useActionsText } from "../_lib/actions-text";
 import { useErrorsText } from "../_lib/error-map";
 import {
   addMapToSlot,
+  chunkRounds,
   findRound,
   overwrittenRounds,
   removeMapFromSlot,
+  slotGap,
   slotHasMap,
   slotsToEdit,
   slotsToSave,
@@ -336,20 +339,30 @@ export function RoundMapsDialog({
     });
   };
 
+  // Au-delà de ROUND_MAPS_BULK_MAX tours, une écriture par lot (le serveur borne chaque requête).
   const sendRounds = (targets: readonly RoundKey[], payload: string[][], success: string) =>
     run(async () => {
-      await putJson(`/api/admin/tournaments/${tournamentId}/round-maps`, { rounds: targets, slots: payload });
+      for (const chunk of chunkRounds(targets, ROUND_MAPS_BULK_MAX)) {
+        await putJson(`/api/admin/tournaments/${tournamentId}/round-maps`, { rounds: chunk, slots: payload });
+      }
       showSuccess(success);
     });
 
+  /** Un créneau vide entre deux cartes décalerait les suivantes : refusé avant l'envoi. */
+  const gapRefused = () => {
+    const gap = slotGap(slots);
+    if (gap !== null) showError(t("dialog.slotGap", { number: gap }));
+    return gap !== null;
+  };
+
   const saveRound = (event: FormEvent) => {
     event.preventDefault();
-    if (!round) return;
+    if (!round || gapRefused()) return;
     void sendRounds([round], toSave, t(toSave.length === 0 ? "dialog.roundCleared" : "dialog.roundSaved"));
   };
 
   const applyAll = () => {
-    if (busy || toSave.length === 0) return;
+    if (busy || toSave.length === 0 || gapRefused()) return;
     const others = rounds.filter((key) => roundKeyId(key) !== roundId);
     const overwritten = overwrittenRounds(rules.rounds, others, toSave).length;
     if (overwritten > 0) setPending({ kind: "applyAll", overwritten });
@@ -358,7 +371,7 @@ export function RoundMapsDialog({
 
   const copy = () => {
     const target = findRound(rounds, copyTarget);
-    if (busy || !target || toSave.length === 0) return;
+    if (busy || !target || toSave.length === 0 || gapRefused()) return;
     if (overwrittenRounds(rules.rounds, [target], toSave).length > 0) setPending({ kind: "copy", target });
     else void sendRounds([target], toSave, t("dialog.copied", { round: roundLabel(target) }));
   };
