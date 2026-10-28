@@ -11,6 +11,8 @@ import {
   BATTLETAG_MATCH_SCOPE,
   REFEREE_BATTLETAG_SCOPE,
   REFEREE_BATTLETAG_BEFORE_V7_SCOPE,
+  REFEREE_USERNAME_SCOPE,
+  REFEREE_USERNAME_BEFORE_V7_SCOPE,
   VERIFIED_BADGE_SCOPE,
   MATCH_CONTACTS_SCOPE,
   LIVE_PSEUDO_SCOPE,
@@ -463,11 +465,18 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
     expect(pseudo?.extraBases).toEqual([
       { base: "Exécution du contrat", scope: LIVE_PSEUDO_SCOPE },
       { base: "Intérêt légitime", scope: AUTOMOD_ALERT_SCOPE },
+      // Revue juridique de #491 : le pseudo de l'arbitre désigné, même base que son BattleTag.
+      { base: "Exécution du contrat", scope: REFEREE_USERNAME_SCOPE },
+      { base: "Intérêt légitime", scope: REFEREE_USERNAME_BEFORE_V7_SCOPE },
     ]);
     expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Site username")?.extraBases).toEqual([
       { base: "Exécution du contrat", scope: "#live announcement of a solo tournament, kept in the Discord channel until deleted on request" },
       { base: "Intérêt légitime", scope: "AutoMod alert for such an announcement when blocked or flagged, kept in the moderators' alert channel until they delete it or on request" },
+      { base: "Exécution du contrat", scope: "the username of a match's assigned referee, in its “Contacts” and launch windows and on the match page, to the same readers at the same times as their BattleTag (see “Overwatch username”), and alone as soon as the launch window shows the match (terms of use, “Match contacts”, once the referee has accepted their version 7)" },
+      { base: "Intérêt légitime", scope: "the same presentation of the assigned referee's username, as long as that referee has not accepted version 7 of the terms of use — objection through the report form, GDPR category" },
     ]);
+    expect(REFEREE_USERNAME_SCOPE).toContain("une fois leur version 7 acceptée par l'arbitre");
+    expect(REFEREE_USERNAME_BEFORE_V7_SCOPE).toContain("tant que cet arbitre n'a pas accepté la version 7");
     const choice = DONNEES_PROFIL.find((d) => d.donnee === "Choix des messages privés de match");
     // LEGAL-OPTOUT-BASIS : garder le choix relève d'une obligation légale (honorer l'opposition), comme T04.
     expect(choice?.base).toBe("Obligation légale");

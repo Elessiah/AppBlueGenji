@@ -72,6 +72,17 @@ export const REFEREE_BATTLETAG_BEFORE_V7_SCOPE =
   "la même présentation du BattleTag de l'arbitre désigné, tant que cet arbitre n'a pas accepté la version 7 des conditions d'utilisation — opposition par le formulaire de signalement, catégorie RGPD (retenue, le staff ne lui confie plus de match, même une fois la version 7 acceptée)";
 
 /**
+ * Pseudo de l'arbitre désigné présenté aux parties de ses matchs, sur la même
+ * base que son BattleTag (`REFEREE_BATTLETAG_SCOPE`, `_BEFORE_V7_SCOPE`) —
+ * revue juridique de #491 : la ligne « Pseudo site » le déclare aussi.
+ */
+export const REFEREE_USERNAME_SCOPE =
+  "pseudo de l'arbitre désigné d'un match, dans ses fenêtres « Contacts » et de lancement et sur la page du match, aux mêmes lecteurs et aux mêmes moments que son BattleTag (voir « Pseudo Overwatch »), et seul dès que la fenêtre de lancement montre le match (conditions d'utilisation, « Contacts de match », une fois leur version 7 acceptée par l'arbitre)";
+
+export const REFEREE_USERNAME_BEFORE_V7_SCOPE =
+  "la même présentation du pseudo de l'arbitre désigné, tant que cet arbitre n'a pas accepté la version 7 des conditions d'utilisation — opposition par le formulaire de signalement, catégorie RGPD";
+
+/**
  * Pastilles de certification de la fiche (tag Discord certifié, BattleTag tiré
  * d'un compte Battle.net rattaché) : lues par tout joueur connecté, tag masqué
  * compris (`canSeeDiscordVerification`, `canSeeBattletagVerification`). Pas un
@@ -130,6 +141,8 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     extraBases: [
       { base: "Exécution du contrat", scope: LIVE_PSEUDO_SCOPE },
       { base: "Intérêt légitime", scope: AUTOMOD_ALERT_SCOPE },
+      { base: "Exécution du contrat", scope: REFEREE_USERNAME_SCOPE },
+      { base: "Intérêt légitime", scope: REFEREE_USERNAME_BEFORE_V7_SCOPE },
     ],
     duree: "Durée du compte",
   },

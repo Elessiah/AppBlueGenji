@@ -201,9 +201,9 @@ describe("conditions d'utilisation — arbitre désigné (version 7)", () => {
 
   it("présente son pseudo et son BattleTag, jamais son tag Discord, aux équipes et aux arbitres dès que les adversaires sont connus, aux casters le temps du match (FR et EN)", () => {
     expect(fr).toContain("Un match peut aussi avoir un **arbitre désigné** : une personne du staff habilitée à arbitrer (permission d'arbitrage, tag Discord certifié et compte Battle.net rattaché)");
-    expect(fr).toContain("son **pseudo** et son **BattleTag**, **même masqué** — jamais son tag Discord à ce titre — sont communiqués aux membres des deux équipes et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, et aux casters du match le temps du match");
+    expect(fr).toContain("son **pseudo** et son **BattleTag**, **même masqué** — jamais son tag Discord à ce titre — sont communiqués aux membres des deux équipes et aux arbitres (administrateurs compris) dès que ses deux adversaires sont connus et jusqu'à sa fin, et aux casters du match le temps du match");
     expect(en).toContain("A match may also have an **assigned referee**: a staff member entitled to referee (refereeing permission, certified Discord tag and linked Battle.net account)");
-    expect(en).toContain("their **username** and **BattleTag**, **even when hidden** — never their Discord tag in that capacity — are shared with the members of both teams and with the referees from the moment both its opponents are known until its end, and with the casters of the match while the match is being played");
+    expect(en).toContain("their **username** and **BattleTag**, **even when hidden** — never their Discord tag in that capacity — are shared with the members of both teams and with the referees (administrators included) from the moment both its opponents are known until its end, and with the casters of the match while the match is being played");
   });
 
   it("ne montre au public que « Arbitre désigné », et dit le retrait et la fin de la présentation (FR et EN)", () => {
