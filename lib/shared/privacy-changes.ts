@@ -1252,7 +1252,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Dans un tournoi Marvel Rivals, aucun BattleTag n'est plus présenté dans les fenêtres d'un match ni sur sa page — ni celui des contacts des équipes, ni celui des casters, ni celui de l'arbitre désigné : on ne s'y invite pas par BattleTag. En Overwatch, rien ne change.",
     details: [
       "Marvel Rivals : la fenêtre « Contacts » du match, sa fenêtre de lancement et la page du match ne montrent plus le BattleTag des contacts des équipes, d'un caster ni de l'arbitre désigné, ni s'il est vérifié, et le site ne l'envoie plus du tout à ces fenêtres. Un caster y garde son tag Discord certifié, l'arbitre désigné son pseudo ; la page du match n'y porte plus la consigne « À inviter ».",
-      "Le contact présenté pour une équipe se choisit alors sur le seul tag Discord certifié : un BattleTag vérifié ne fait plus passer devant. Une équipe dont aucun membre n'a certifié son tag Discord est présentée par le pseudo et le rôle d'équipe d'un de ses membres (capitaine, manager, propriétaire, puis un joueur), sans autre identifiant.",
+      "Une équipe n'y présente plus qu'un seul contact, qui se choisit alors sur le seul tag Discord certifié : un BattleTag vérifié ne fait plus passer devant ni présenter un second membre. Une équipe dont aucun membre n'a certifié son tag Discord est présentée par le pseudo et le rôle d'équipe d'un de ses membres (capitaine, manager, propriétaire, puis un joueur), sans autre identifiant.",
     ],
   },
 ];

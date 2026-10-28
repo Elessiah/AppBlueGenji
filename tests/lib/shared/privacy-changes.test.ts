@@ -2013,6 +2013,18 @@ describe("PRIVACY_CHANGES — BattleTag des matchs en Overwatch seulement (déci
     expect(english.details).toHaveLength(entry.details.length);
   });
 
+  // `sideContacts` : hors Overwatch, le pool n'a plus de BattleTag, donc
+  // `pickLaunchContacts` ne rend qu'un contact par équipe.
+  it("privacyChanges_battletagMatchesOverwatchOnly_statesSingleTeamContactFrAndEn", () => {
+    const fr = entry.details.join(" ");
+    const en = english.details.join(" ");
+
+    expect(fr).toContain("Une équipe n'y présente plus qu'un seul contact");
+    expect(fr).toContain("un BattleTag vérifié ne fait plus passer devant ni présenter un second membre");
+    expect(en).toContain("A team now presents only one contact there");
+    expect(en).toContain("a verified BattleTag no longer moves a player up nor brings in a second member");
+  });
+
   // `sideContacts` : sans membre certifié, le premier par rôle sort quand même,
   // sans tag Discord ni BattleTag — le texte ne promet pas de tag à chaque contact.
   it("privacyChanges_battletagMatchesOverwatchOnly_statesNoCertifiedMemberFallbackFrAndEn", () => {

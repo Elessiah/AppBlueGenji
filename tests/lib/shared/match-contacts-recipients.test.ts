@@ -27,10 +27,10 @@ describe("contacts d'un match — destinataires et personnes présentées", () =
   it("le registre T04 nomme les membres des deux équipes, pas seulement les joueurs", () => {
     expect(T04?.recipients).toContain("Membres des deux équipes d'un même match et arbitres, dès que ses deux adversaires sont connus et jusqu'à sa fin, et ses casters inscrits le temps du match (de son départ à sa fin) ; contacts de chaque caster aux deux équipes et aux autres casters du match le temps du match, et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin");
     expect(T04?.subPurposes.join("\n")).toMatch(/membres des deux équipes \(joueurs, coachs, managers, propriétaires\)/);
-    expect(T04?.subPurposes.join("\n")).toMatch(/d'un ou deux membres par équipe/);
+    expect(T04?.subPurposes.join("\n")).toMatch(/d'un ou deux membres par équipe \(un seul dans les tournois Marvel Rivals\)/);
     expect(T04_EN?.recipients.join("\n")).toMatch(/Members of both teams of the same match and referees, from the moment both its opponents are known to its end, and its registered casters while the match is being played/);
     expect(T04_EN?.subPurposes.join("\n")).toMatch(/members of both teams \(players, coaches, managers, owners\)/);
-    expect(T04_EN?.subPurposes.join("\n")).toMatch(/one or two members per team/);
+    expect(T04_EN?.subPurposes.join("\n")).toMatch(/one or two members per team \(only one in Marvel Rivals tournaments\)/);
   });
 
   it("le registre T04 borne les « Prêt » aux tournois qui ont la phase de lancement", () => {
