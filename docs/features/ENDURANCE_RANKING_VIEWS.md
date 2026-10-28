@@ -165,6 +165,7 @@ déjà public. Logique pure : `_lib/endurance-ranking-views.ts`.
 - Barre des vues collante sous l'en-tête du site (`--sticky-header-h`). Le
   plateau (`.ds-block`, `overflow: hidden`) aurait annulé `position: sticky` :
   `.board` le passe en `overflow: clip` (`page.module.css`).
+  Safari < 16 ignore `clip` : hors des navigateurs pris en charge.
 - Les flèches ‹ › et la navigation basse ne déplacent pas le focus : le titre de
   la vue atteinte est annoncé par une région `aria-live="polite"` (un onglet
   s'annonce de lui-même). La navigation basse ramène le haut du classement à
