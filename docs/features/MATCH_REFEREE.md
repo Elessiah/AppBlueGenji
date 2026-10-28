@@ -147,14 +147,19 @@ avec la carte `SEED_FIRST_MAP`, autogestion, ou sans décision.
 
 Registre T04 (présentation de l'arbitre aux parties, « Prêt », avis push),
 T12 (avis push « Arbitrage retiré ») et T05 (journal), `/rgpd#arbitre-designe`
-et la ligne BattleTag de `/rgpd` (finalité et portée « Intérêt légitime »
+et la ligne BattleTag de `/rgpd` (finalité et portée « Exécution du contrat »
 de l'arbitre), les listes « BattleTag masqué » (profil,
 connexion, fiche joueur, clé `asReferee`) et la modale de masquage, entrée
-`2026-10-arbitre-designe-des-matchs`. Base : intérêt légitime pour la
-présentation de l'arbitre aux parties (pseudo et BattleTag, portée
-`REFEREE_BATTLETAG_SCOPE` sur la ligne BattleTag de `/rgpd`), avec une
-opposition par le formulaire de signalement (retenue, le staff ne lui confie plus de match ; se retirer d'un match l'en retire, le staff pouvant sinon lui confier de nouveau ce match, sans avis ; le staff peut le désigner sans qu'il l'ait demandé) ; exécution du service (les arbitres agissant pour
-l'association) pour son « Prêt » et l'avis du retrait. Les conditions d'utilisation ne changent
-pas (version 6) : le registre ne rattache donc pas l'arbitre désigné à une
-clause des conditions ; la clause « Contacts de match » le reprendra à la
-version 7.
+`2026-10-arbitre-designe-des-matchs`. Base : depuis la version 7 des
+conditions d'utilisation (TERMS v7, décision de l'utilisateur du 2026-10-27),
+**exécution du contrat** pour la présentation de l'arbitre aux parties
+(pseudo et BattleTag, portée `REFEREE_BATTLETAG_SCOPE` sur la ligne BattleTag
+de `/rgpd`) — la section « Contacts de match » la prévoit ; il peut se retirer
+d'un match à tout moment, le staff pouvant lui confier de nouveau ce match,
+sans avis ; exécution du service (les arbitres agissant pour l'association)
+pour son « Prêt » et l'avis du retrait. Jusqu'à la version 6, cette
+présentation reposait sur l'intérêt légitime, avec une opposition par le
+formulaire de signalement : l'entrée `2026-10-arbitre-designe-des-matchs` le
+dit encore, l'entrée `2026-10-conditions-v7-casters-et-arbitre` annonce le
+changement de base, et le droit d'opposition de `/rgpd` ne cite plus
+l'arbitre.

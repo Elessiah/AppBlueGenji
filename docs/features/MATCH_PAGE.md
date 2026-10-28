@@ -74,9 +74,9 @@ sur une fiche figée. Le serveur décide seul de ce qu'il rend
 ils restent dans la fenêtre « Contacts ». Le registre et `/rgpd` nomment la page
 parmi les lieux où ces contacts paraissent, avec leur base
 (registre T01, T04 ; tableau de `/rgpd` par `rgpd-policy.ts`) : contrat pour les
-contacts des casters, intérêt légitime pour le BattleTag de l'arbitre, comme dans
-les fenêtres. La section « Contacts de match » des conditions (version 6) ne
-nomme que les deux fenêtres : la page ne se déploie qu'avec la version 7.
+contacts des casters et pour le BattleTag de l'arbitre, comme dans les
+fenêtres. La section « Contacts de match » des conditions la nomme depuis
+leur version 7 (TERMS v7) : la page ne se déploie qu'avec elle.
 
 ## Liens vers la page
 
