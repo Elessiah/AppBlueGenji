@@ -153,7 +153,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 ## Vitrine
 
 - `EDITABLE_SITE_COPY.md` — Textes éditables (`site-copy.ts`, `<EditableCopy>`), bilingues (anglais obligatoire) et rattrapage de l’anglais.
-- `LANDING_HERO_FOLD.md` — Accueil en desktop : l'appel principal au premier écran.
+- `LANDING_HERO_FOLD.md` — Accueil en desktop : l'appel principal au premier écran ; bf-cache de `/` volontairement non restauré (`no-store`).
 - `LANDING_MOBILE_LAYOUT.md` — Accueil en mobile.
 - `LANDING_LEADERBOARD.md` — Classement de l'accueil.
 - `TICKER_RESULTS.md` — Bandeau défilant : résultats habillés par camp (vainqueur `--teal-400` + « ✓ », perdant encre de défaite + « ✕ », forfait et nul neutres, score en avant, issue en texte masqué FR / EN), issue lue sur le résultat enregistré et calculée au chargement.
