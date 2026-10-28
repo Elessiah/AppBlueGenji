@@ -316,3 +316,10 @@ describe("registre — cartes choisies dans le pool de la manche (T04, T05)", ()
     );
   });
 });
+
+describe("/rgpd — opposition retenue d'un arbitre (décision L430, comportement actuel)", () => {
+  it("rgpdArbitreDesigne_upheldObjection_saysExistingAssignmentsStayFrAndEn", () => {
+    expect(source("app/rgpd/page.tsx")).toContain("ne lui confie plus de nouveau match (ceux qui lui sont déjà confiés lui restent)");
+    expect(source("app/rgpd/RgpdEn.tsx")).toContain("no longer assigns them new matches (those already assigned to them stay theirs)");
+  });
+});

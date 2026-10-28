@@ -1863,7 +1863,7 @@ describe("PRIVACY_CHANGES — conditions v7 : casters, arbitre désigné et page
     expect(en).toContain("objecting through the report form no longer applies to it");
     expect(en).toContain("Until you accept it, it still rests on legitimate interest, and you can object to it through the report form (GDPR category)");
     // Revue juridique de #491 : opposition déjà retenue, arbitre devenu joueur, arbitre qui caste aussi.
-    expect(fr).toContain("une opposition déjà retenue continue de valoir (le staff ne te confie plus de match)");
+    expect(fr).toContain("une opposition déjà retenue continue de valoir (le staff ne te confie plus de nouveau match)");
     // Avant l'acceptation, la fenêtre bloquante couvre les tournois : le retrait passe par le formulaire (/signalements, page libre).
     expect(fr).toContain("la fenêtre d'acceptation couvrant alors les pages des tournois, tu te retires d'un match en le demandant par ce même formulaire");
     expect(en).toContain("as the acceptance window then covers the tournament pages, you withdraw from a match by asking for it through that same form");
@@ -1871,7 +1871,7 @@ describe("PRIVACY_CHANGES — conditions v7 : casters, arbitre désigné et page
     // Revue juridique de #491 : la page du match montre aussi le pseudo de l'arbitre désigné.
     expect(fr).toContain("et le pseudo et le BattleTag, même masqué, de l'arbitre désigné, aux mêmes personnes");
     expect(en).toContain("and the assigned referee's username and BattleTag, even when hidden, to the same people");
-    expect(en).toContain("an objection already upheld still stands (the staff no longer assigns you matches)");
+    expect(en).toContain("an objection already upheld still stands (the staff no longer assigns you new matches)");
     expect(fr).toContain("ou si tu deviens joueur du match avant son lancement, tu n'es plus présenté");
     expect(en).toContain("or become a player of the match before its launch, you are no longer presented");
     expect(fr).toContain("jamais son tag Discord à ce titre (s'il caste aussi le match, ses contacts de caster suivent la règle des casters)");
