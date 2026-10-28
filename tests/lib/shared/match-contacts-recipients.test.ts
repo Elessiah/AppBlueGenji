@@ -312,8 +312,8 @@ describe("arbitre désigné — registre, /rgpd et annonce (revue juridique)", (
     expect(T04_EN?.legalBasis).toContain(
       "for presenting the assigned referee to the parties to the match, in its “Contacts” and launch windows and on the match page, once that referee has accepted version 7 of the terms — until they accept it, legitimate interest (same aim), and they may object to it (art. 21) through the report form (GDPR category): once upheld, their objection means the staff no longer assigns them matches, and still stands once version 7 is accepted — (they can withdraw from a match at any time, the staff being able to assign that match to them again, without notice)",
     );
-    expect(T01?.legalBasis).toContain("pour celui de l'arbitre, intérêt légitime, avec droit d'opposition, tant qu'il n'a pas accepté la version 7 des conditions");
-    expect(T01_EN?.legalBasis).toContain("for the referee's, legitimate interest, with a right to object, until they have accepted version 7 of the terms");
+    expect(T01?.legalBasis).toContain("pour celui de l'arbitre désigné, dans ces fenêtres comme sur la page du match, intérêt légitime, avec droit d'opposition, tant qu'il n'a pas accepté la version 7 des conditions (registre T04)");
+    expect(T01_EN?.legalBasis).toContain("for the assigned referee's, in these windows as on the match page, legitimate interest, with a right to object, until they have accepted version 7 of the terms (record T04)");
     // Revue juridique de #491 : la preuve d'acceptation (T13) fixe aussi cette base.
     const T13 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T13");
     const T13_EN = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T13");
@@ -403,7 +403,7 @@ describe("arbitre désigné — registre, /rgpd et annonce (revue juridique)", (
     const index = DONNEES_PROFIL.findIndex((d) => d.donnee === "Pseudo Overwatch");
     expect(DONNEES_PROFIL_EN[index]?.extraBases?.map((b) => b.scope)).toEqual(
       expect.arrayContaining([
-        "the BattleTag of a match's assigned referee, even when hidden, in its “Contacts” and launch windows and on the match page: read by both its teams and the referees as soon as both its opponents are known until its end, by its casters while the match is being played; withdrawal from a match at any time, the staff being able to assign that match to them again, without notice (terms of use, “Match contacts”, once the referee has accepted their version 7)",
+        "the BattleTag of a match's assigned referee, even when hidden, in its “Contacts” and launch windows and on the match page: read by both its teams and the referees as soon as both its opponents are known until its end, by its casters while the match is being played (the launch window, at the start of the match, only opens for both teams, the casters and the assigned referee); withdrawal from a match at any time, the staff being able to assign that match to them again, without notice (terms of use, “Match contacts”, once the referee has accepted their version 7)",
         "the same presentation of the assigned referee's BattleTag, as long as that referee has not accepted version 7 of the terms of use — objection through the report form, GDPR category (once upheld, the staff no longer assigns them matches, even once version 7 is accepted)",
       ]),
     );

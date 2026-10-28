@@ -61,7 +61,7 @@ export const BATTLETAG_MATCH_SCOPE =
  * match.
  */
 export const REFEREE_BATTLETAG_SCOPE =
-  "BattleTag de l'arbitre désigné d'un match, même masqué, dans ses fenêtres « Contacts » et de lancement et sur la page du match : lu par ses deux équipes et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, par ses casters le temps du match ; retrait d'un match à tout moment, le staff pouvant lui confier de nouveau ce match, sans avis (conditions d'utilisation, « Contacts de match », une fois leur version 7 acceptée par l'arbitre)";
+  "BattleTag de l'arbitre désigné d'un match, même masqué, dans ses fenêtres « Contacts » et de lancement et sur la page du match : lu par ses deux équipes et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, par ses casters le temps du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné) ; retrait d'un match à tout moment, le staff pouvant lui confier de nouveau ce match, sans avis (conditions d'utilisation, « Contacts de match », une fois leur version 7 acceptée par l'arbitre)";
 
 /**
  * Même présentation, pour un arbitre qui n'a pas encore accepté la version 7
