@@ -22,7 +22,8 @@ au plus. Les deux purges effacent les archives âgées d'au moins
 `RETENTION_DAYS × 24 − 1` heures (719 h, `--min-age` en heures, bot
 `scripts/sync-uploads-onedrive.sh` et `scripts/backup-onedrive.sh`) : passant
 chaque heure, la purge horaire efface une archive entre 29 j 23 h et 30 j
-d'âge, jamais au-delà — un `--min-age 30d` la laissait vivre jusqu'à 30 j 59 min.
+d'âge — sauf passage manqué (verrou tenu plus de 10 min, serveur arrêté),
+rattrapé au suivant ; un `--min-age 30d` la laissait vivre jusqu'à 30 j 59 min.
 
 Les suppressions côté stockage distant doivent être **définitives** : une
 corbeille ou un historique de versions garderait sinon tout ce qu'on efface au
