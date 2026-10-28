@@ -110,8 +110,8 @@ describe("dispatchLobbyBriefs", () => {
     expect(await dispatchLobbyBriefs()).toBe(2);
 
     expect(execute.mock.calls.map(([, params]) => params)).toEqual([
-      [40, "1:2", "LOBBY_BRIEF_1"],
-      [40, "1:2", "LOBBY_BRIEF_2"],
+      ["LOBBY_BRIEF_1", 40, "1:2"],
+      ["LOBBY_BRIEF_2", 40, "1:2"],
     ]);
     expect(loadEntrantManagerIds).toHaveBeenCalledWith([1, 2]);
     // Message de match : tag certifié seul, interrupteur du profil respecté.
@@ -128,6 +128,18 @@ describe("dispatchLobbyBriefs", () => {
     expect(team2.userIds).toEqual([20]);
     expect(team2.dm()).toContain("ton match « Nova » contre « Renards »");
     expect(team2.dm("en")).toContain("• Left (host): “Renards”");
+  });
+
+  it("ne réserve que si le salon est encore ouvert pour cet appariement (lancement défait entre-temps : rien)", async () => {
+    const { execute } = mockDb([MATCH], [false, false]);
+    expect(await dispatchLobbyBriefs()).toBe(0);
+    const [sql] = execute.mock.calls[0];
+    // La réservation relit le match dans la même instruction.
+    expect(sql).toMatch(/INSERT IGNORE INTO bg_match_start_notices \(match_id, pairing, phase\)\s+SELECT m\.id, m\.launch_pairing, \? FROM bg_matches m/);
+    expect(sql).toMatch(/m\.id = \? AND m\.launch_pairing = \? AND m\.status = 'READY' AND m\.is_bye = 0/);
+    expect(sql).toMatch(/m\.lobby_opened_at IS NOT NULL/);
+    expect(sql).not.toMatch(/VALUES/);
+    expect(notifyUsers).not.toHaveBeenCalled();
   });
 
   it("n'envoie rien quand un autre balayage a pris les réservations", async () => {
