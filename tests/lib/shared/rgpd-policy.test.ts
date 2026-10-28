@@ -383,6 +383,19 @@ describe("/rgpd — données obligatoires : la langue du compte (revue juridique
     expect(read("app/rgpd/RgpdEn.tsx")).toMatch(/you can change it in My profile \(until you next log in from a page\s+in the other language\)/);
   });
 
+  // Revue #497 cycle 4 : le BattleTag lui-même n'est traité qu'en Overwatch, et
+  // l'arbitre ne s'ajoute en jeu qu'en Overwatch.
+  it("processingActivitiesT04_battletagCategoryAndRefereePurpose_limitedToOverwatchFrAndEn", () => {
+    const t04 = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T04")!;
+    const t04En = PROCESSING_ACTIVITIES_EN.find((activity) => activity.ref === "T04")!;
+    expect(t04.dataCategories).toContain("BattleTag (dans les seuls tournois Overwatch)");
+    expect(t04En.dataCategories).toContain("BattleTag (Overwatch tournaments only)");
+    expect(t04.dataCategories).not.toContain("BattleTag");
+    expect(t04En.dataCategories).not.toContain("BattleTag");
+    // … et l'arbitre ne s'ajoute en jeu qu'en Overwatch.
+    expect(t04En.legalBasis).toContain("know who referees it and, in Overwatch, can add them in game");
+  });
+
   // Revue juridique BOT-NOTIF-LANG : le code de certification ou de changement
   // du tag part aussi au bot avec une langue — celle du compte déjà rattaché à
   // ce Discord, bilingue sans compte — et un bilingue trop long part en français seul.

@@ -468,11 +468,12 @@ les abonnés du flux : l'instantané ne porte que les « Prêt », l'hôte et le
 **pseudo** du caster, publics comme tout pseudo du site.
 
 Le caster compte parmi les parties : il reçoit le BattleTag **masqué** des
-contacts, et les équipes le sien — en Overwatch seulement : hors Overwatch, le
-BattleTag d'un caster, de l'arbitre désigné (décision 35) et des contacts des
-équipes (décision 38) n'est pas envoyé du tout, `withGameBattletag` — dans les deux sens **le temps du match
+contacts, et les équipes le sien, dans les deux sens **le temps du match
 seulement** (`exposesCaster`, lancement ouvert ou lancé) ; avant, la carte
-montre aux équipes leurs contacts sans ceux du caster. Les arbitres lisent ceux
+montre aux équipes leurs contacts sans ceux du caster. Tout cela en Overwatch
+seulement : hors Overwatch, le BattleTag d'un caster, de l'arbitre désigné
+(décision 35) et des contacts des équipes (décision 38) n'est pas envoyé du
+tout (`withGameBattletag`). Les arbitres lisent ceux
 du caster, comme ceux des équipes, dès que les deux adversaires sont connus
 (2026-10-21). Hors de la fenêtre « Contacts », un BattleTag masqué n'est lisible
 de personne, arbitres et administrateurs compris (`battletag-visibility.ts`). `docs/AUTHORIZATION_RULES.md` §2.3 l'écrit

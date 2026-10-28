@@ -880,7 +880,7 @@ export function RgpdEn({
             launch with neither a referee nor self-management is flagged to the referees. Their presentation to
             the parties to the match falls under <strong>performance of the service</strong> once they have
             accepted version 7 of the terms of use, which provide for it (“Match contacts” section), so that the
-            parties know who referees and can add them in game; until they accept it, it falls under{" "}
+            parties know who referees and, in Overwatch, can add them in game; until they accept it, it falls under{" "}
             <strong>legitimate interest</strong> (same aim), and they may object to it through the report form
             (GDPR category) — once upheld, their objection means the staff no longer assigns them matches (those they already hold stay theirs), and still stands once version 7
             is accepted. They can withdraw from a match at any time, the staff being able to

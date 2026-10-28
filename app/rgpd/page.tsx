@@ -1063,7 +1063,7 @@ function RgpdFr({
             entre en lancement sans arbitre ni autogestion est signalé aux arbitres. Sa présentation aux parties
             du match relève de l&apos;<strong>exécution du service</strong> dès qu&apos;il a accepté la version 7
             des conditions d&apos;utilisation, qui la prévoient (section « Contacts de match »), pour que les
-            parties sachent qui arbitre et puissent l&apos;ajouter en jeu ; tant qu&apos;il ne l&apos;a pas
+            parties sachent qui arbitre et, en Overwatch, puissent l&apos;ajouter en jeu ; tant qu&apos;il ne l&apos;a pas
             acceptée, elle relève de l&apos;<strong>intérêt légitime</strong> (même but), et il peut s&apos;y
             opposer par le formulaire de signalement (catégorie RGPD) — retenue, son opposition fait que le staff
             ne lui confie plus de match (ceux qu'il tient déjà lui restent), et continue de valoir une fois la version 7 acceptée. Il peut se retirer d&apos;un match à tout moment, le staff
