@@ -94,7 +94,9 @@ Ce qui ne dépend d'aucun droit se règle par `SpectatorViewProvider`
   vide `registeredAt` d'une entrée solo (celle d'une équipe reste). La fiche
   en tient compte : le bandeau de lancement dit « Lancement » sans décompte ni
   « prêt / attendu » (`MatchLaunchStrip`), la carte dit « Score proposé par … ·
-  à confirmer » (`cardActions.reportPendingSpectator`, FR et EN), le volet des
+  à confirmer » (`cardActions.reportPendingSpectator`, FR et EN — l'échéance de
+  validation d'office ou sa suspension restent dites, sans chiffres :
+  `…SpectatorDeadline` / `…SpectatorPaused`), le volet des
   inscriptions affiche « - » ;
 - **en-tête** : « Accueil » au lieu de « Tous les tournois », pastille
   « Spectateur » (qui dit pourquoi aucun bouton n'apparaît, explication aussi
