@@ -231,15 +231,26 @@ describe("dispatchLobbyBriefs", () => {
     error.mockRestore();
   });
 
-  it("un côté en échec rend sa seule réservation et n'empêche pas les autres d'être briefés", async () => {
+  it("destinataires illisibles d'un côté : il rend sa seule réservation, les autres sont briefés", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(loadNotificationRecipients).mockRejectedValueOnce(new Error("DB_DOWN"));
+    const { execute } = mockDb([MATCH, { ...MATCH, id: 41 }]);
+    expect(await dispatchLobbyBriefs()).toBe(3);
+    expect(notifyUsers).toHaveBeenCalledTimes(3);
+    expect(error.mock.calls.some(([message]) => String(message).includes("destinataires du match 40 illisibles"))).toBe(true);
+    const releases = execute.mock.calls.filter(([sql]) => sql.startsWith("DELETE FROM bg_match_start_notices"));
+    expect(releases.map(([, params]) => params)).toEqual([[40, "1:2", "LOBBY_BRIEF_1"]]);
+    error.mockRestore();
+  });
+
+  it("un envoi qui lève garde sa réservation (une partie a pu partir) : jamais deux fois", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
     jest.mocked(notifyUsers).mockRejectedValueOnce(new Error("PUSH_DOWN"));
     const { execute } = mockDb([MATCH, { ...MATCH, id: 41 }]);
     expect(await dispatchLobbyBriefs()).toBe(3);
     expect(notifyUsers).toHaveBeenCalledTimes(4);
     expect(error.mock.calls.some(([message]) => String(message).includes("brief du match 40 non envoyé"))).toBe(true);
-    const releases = execute.mock.calls.filter(([sql]) => sql.startsWith("DELETE FROM bg_match_start_notices"));
-    expect(releases.map(([, params]) => params)).toEqual([[40, "1:2", "LOBBY_BRIEF_1"]]);
+    expect(execute.mock.calls.some(([sql]) => sql.startsWith("DELETE FROM bg_match_start_notices"))).toBe(false);
     error.mockRestore();
   });
 
