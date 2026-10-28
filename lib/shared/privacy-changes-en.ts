@@ -590,7 +590,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     summary:
       "If you manage an entered team (owner or manager) or play a solo tournament, the site sends you the game settings by Discord direct message and push notification when the lobby of a match opens.",
     details: [
-      "The message says who plays on the left (the host) and on the right, the first map, the first ban, the reminder to sort the players by role if the match is cast, and whether it has an assigned referee or is self-managed, with the team names, the tournament, the round and the link to the match page. It contains no BattleTag, no Discord tag and no player username: in a solo tournament, it says “you” and “your opponent”. It is sent once per opponent.",
+      "The message says who plays on the left (the host) and on the right, the first map, the first ban, the reminder to sort the players by role if the match is cast, and whether it has an assigned referee or is self-managed, with the team names, the tournament, the round and the link to the match page. It contains no BattleTag, no Discord tag and no player username: in a solo tournament, it says “you” and “your opponent”. It is sent when the lobby opens, and again if it reopens, for instance after a change of time.",
       "The direct message only goes to a certified Discord tag and is turned off, like the other match messages, with the “Discord direct messages about my matches” box in “My profile”; the push notification has its own setting, “Lobby settings”.",
     ],
   },

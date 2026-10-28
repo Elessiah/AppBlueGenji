@@ -1012,7 +1012,7 @@ function RgpdFr({
             rappels (24 h et 10 h avant), quand vous êtes retiré d&apos;un match et, si vous castez, quand votre
             inscription de caster sur un match est retirée par le staff ou d&apos;office (avec le motif) et, si vous gérez une
             équipe engagée (propriétaire ou manager) ou jouez un tournoi individuel, à l&apos;ouverture du salon d&apos;un
-            match, une fois par adversaire, les réglages de la partie (équipe à gauche — l&apos;hôte — et à droite, première
+            match (de nouveau s&apos;il rouvre, par exemple après un changement d&apos;horaire), les réglages de la partie (équipe à gauche — l&apos;hôte — et à droite, première
             carte, premier ban, tri des joueurs par rôle si le match est casté, arbitre désigné ou autogestion), avec les noms
             d&apos;équipe et le lien de la page du match, sans BattleTag, tag Discord ni pseudo de joueur (en tournoi
             individuel, le message ne nomme ni vous ni votre adversaire) — seulement si votre tag

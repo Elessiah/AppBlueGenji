@@ -830,7 +830,7 @@ export function RgpdEn({
             the time of one of your matches is set, changed or removed, for its reminders (24 h and 10 h before),
             when you are removed from a match and, if you cast, when your caster registration for a match is removed
             by the staff or automatically (with the reason) and, if you manage an entered team (owner or manager) or play
-            a solo tournament, when the lobby of a match opens, once per opponent, the game settings (team on the left —
+            a solo tournament, when the lobby of a match opens (again if it reopens, for instance after a change of time), the game settings (team on the left —
             the host — and on the right, first map, first ban, sorting the players by role if the match is cast, assigned
             referee or self-management), with the team names and the link to the match page, without any BattleTag,
             Discord tag or player username (in a solo tournament, the message names neither you nor your opponent) — only if your Discord tag is <strong>certified</strong>: an
