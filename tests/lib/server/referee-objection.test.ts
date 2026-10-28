@@ -40,6 +40,16 @@ describe("setRefereeObjection", () => {
     expect(releaseObjectingReferee).toHaveBeenNthCalledWith(2, 12, REFEREE);
   });
 
+  it("setRefereeObjection_unfinishedMatchesUnreadable_countsFailure_doesNotThrow", async () => {
+    execute.mockResolvedValueOnce([{ affectedRows: 1 }, []]).mockRejectedValueOnce(new Error("connection lost"));
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const result = await setRefereeObjection(REFEREE, true);
+
+    expect(result).toEqual({ changed: true, released: 0, failed: 1 });
+    expect(releaseObjectingReferee).not.toHaveBeenCalled();
+  });
+
   it("setRefereeObjection_matchAlreadyFreed_notCounted", async () => {
     execute.mockResolvedValueOnce([{ affectedRows: 1 }, []]).mockResolvedValueOnce([[{ id: 11 }], []]);
     jest.mocked(releaseObjectingReferee).mockResolvedValueOnce(false);

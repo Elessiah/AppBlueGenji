@@ -77,10 +77,18 @@ export async function setRefereeObjection(refereeId: number, upheld: boolean): P
  */
 async function releaseFromUnfinishedMatches(refereeId: number): Promise<{ released: number; failed: number }> {
   const db = await getDatabase();
-  const [matches] = await db.execute<(RowDataPacket & { id: number })[]>(
-    `SELECT id FROM bg_matches WHERE referee_user_id = ? AND status <> 'COMPLETED' ORDER BY id`,
-    [refereeId],
-  );
+  let matches: (RowDataPacket & { id: number })[];
+  try {
+    [matches] = await db.execute<(RowDataPacket & { id: number })[]>(
+      `SELECT id FROM bg_matches WHERE referee_user_id = ? AND status <> 'COMPLETED' ORDER BY id`,
+      [refereeId],
+    );
+  } catch (error) {
+    // L'opposition est déjà écrite : compter l'échec, pour que la route trace
+    // le geste (auteur dans pm2) avant de répondre 500, plutôt que lever.
+    console.error("[referee-objection] matchs non terminés illisibles :", error);
+    return { released: 0, failed: 1 };
+  }
   let released = 0;
   let failed = 0;
   for (const match of matches) {

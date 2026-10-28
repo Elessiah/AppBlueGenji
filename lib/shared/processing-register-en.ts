@@ -337,7 +337,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     ],
     dataCategories: [
       "On Discord: team names, scores, tournament names, match times and rounds — no player username (“a player”, including in solo tournaments) and no staff member or caster named (“the staff”, “a caster”; reason for a caster's automatic removal — they no longer meet the casting requirements, or they now play in the match; “a staff member who plays in this match”, with the tournament name only, for a dispute settled, a result corrected, a withdrawal imposed or an automatic confirmation paused by them)",
-      "In the server logs: username and identifier of the staff member who carried out a refereeing action, with the action (match number; for a referee who plays in the match, also: tournament, round and, except for a pause, outcome and team names, none in a solo tournament); for a referee's objection upheld or lifted, the referee's account identifier and the number of matches they are removed from; and, when a staff log line could not be composed, the action and the match or tournament number, without its author",
+      "In the server logs: username and identifier of the staff member who carried out a refereeing action, with the action (match number; for a referee who plays in the match, also: tournament, round and, except for a pause, outcome and team names, none in a solo tournament); for a referee's objection upheld or lifted, the referee's account identifier (when upheld, with the number of matches they are removed from); and, when a staff log line could not be composed, the action and the match or tournament number, without its author",
     ],
     sensitiveData: "None",
     retention: [
