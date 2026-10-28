@@ -99,3 +99,7 @@ neutralisation, push, sujet, registre), `tests/lib/server/lobby-brief.test.ts`
 (requête, réservation, destinataires, fantôme, solo, hôte/tête de série,
 cast, arbitre inéligible, bot injoignable, pannes, étranglement),
 `notify.test.ts` (`loadEntrantManagerIds`).
+
+## Cartes par manche
+
+Une manche peut imposer ses cartes ou ouvrir des pools, et le tournoi porte ses règles de ban (ordre, perdant de la carte précédente) : `ROUND_MAPS.md`.

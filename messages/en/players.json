@@ -164,11 +164,11 @@
   },
   "audience": {
     "battletag": {
-      "title": "Hidden, your BattleTag can only be read in the “Contacts” window of your matches, in their launch window and, if you cast or referee a match of an Overwatch tournament, on its page:",
+      "title": "Hidden, your BattleTag can only be read in an Overwatch tournament, in the “Contacts” window of your matches, in their launch window and, if you cast or referee a match, on its page:",
       "match": "if you're shown there as a contact: the members of both teams, referees and administrators, from the moment the opponents are known until the end of the match, and the casters while the match is being played;",
-      "asCaster": "if you cast a match of an Overwatch tournament: both its teams and its other casters while the match is being played, and referees and administrators from the moment its opponents are known until its end;",
-      "asReferee": "if you are the assigned referee of a match of an Overwatch tournament: both its teams, referees and administrators from the moment its opponents are known until its end, and its casters while the match is being played;",
-      "launch": "the launch window only opens for both teams, the casters and the assigned referee; in an Overwatch tournament, the match page repeats the BattleTag of its casters and its assigned referee, to the same people at the same times as the “Contacts” window.",
+      "asCaster": "if you cast a match: both its teams and its other casters while the match is being played, and referees and administrators from the moment its opponents are known until its end;",
+      "asReferee": "if you are the assigned referee of a match: both its teams, referees and administrators from the moment its opponents are known until its end, and its casters while the match is being played;",
+      "launch": "the launch window only opens for both teams, the casters and the assigned referee; the match page repeats the BattleTag of its casters and its assigned referee, to the same people at the same times as the “Contacts” window.",
       "footer": "To stop sharing it entirely, clear it from your profile (if it comes from Battle.net, unlink Battle.net first, after adding another way to log in if it is your only one)."
     }
   }

@@ -444,6 +444,14 @@ qu'il tient, son « Prêt »). Code : `lib/server/tournaments/match-casters.ts`.
    avec son BattleTag marqué « non vérifié ». Un tag Discord **non certifié**
    n'est jamais montré (`canViewDiscordTag`).
 
+**Hors Overwatch** (Marvel Rivals, décision de l'utilisateur 38, 2026-10-28 ;
+`sideContacts`, `match-launch-info.ts`) : le BattleTag ne joint personne. Le
+choix lit les candidats sans BattleTag ni Battle.net — seul le tag Discord
+certifié fait passer devant, comme `teamHasContact` de l'invitation à
+certifier — et le contact sort **sans** les champs `battletag` /
+`battletagVerified` (`withGameBattletag`, type `LaunchSideContact`) : la fiche
+n'en dessine pas la ligne.
+
 Une fantôme n'a pas de contact. Dans la modale de lancement, un match
 `SCHEDULED` n'expose encore rien ; le bouton « Contacts » de la carte, lui,
 les expose dès cette phase, et même « À planifier » (voir plus haut).
@@ -461,8 +469,8 @@ les abonnés du flux : l'instantané ne porte que les « Prêt », l'hôte et le
 
 Le caster compte parmi les parties : il reçoit le BattleTag **masqué** des
 contacts, et les équipes le sien — en Overwatch seulement : hors Overwatch, le
-BattleTag d'un caster (et celui de l'arbitre désigné) n'est pas envoyé du tout,
-`withGameBattletag`, décision 35 — dans les deux sens **le temps du match
+BattleTag d'un caster, de l'arbitre désigné (décision 35) et des contacts des
+équipes (décision 38) n'est pas envoyé du tout, `withGameBattletag` — dans les deux sens **le temps du match
 seulement** (`exposesCaster`, lancement ouvert ou lancé) ; avant, la carte
 montre aux équipes leurs contacts sans ceux du caster. Les arbitres lisent ceux
 du caster, comme ceux des équipes, dès que les deux adversaires sont connus
@@ -494,7 +502,7 @@ Changement déclaré dans `PRIVACY_CHANGES` (`2026-09-lancement-des-matchs`),
   confidentialité dû soit fait (`launchModalWaits`, signal
   `PRIVACY_CHANGES_ANSWERED_EVENT`) : ouvertes ensemble, la modale de lancement,
   empilée en dernier, prenait le piège de focus sous l'autre. Sur téléphone,
-  la barre d'actions (« Prêt », « Voir le match » — la page du match,
+  la barre d'actions (« Prêt », « Page du match » — la page du match,
   `MATCH_PAGE.md` —, « Fermer ») et la
   confirmation restent **au bas** de la modale, hors de la zone qui défile (une
   `ScrollArea` porte en-tête, fiches et notifications) : les fiches contacts la

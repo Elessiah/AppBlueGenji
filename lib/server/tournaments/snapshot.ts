@@ -61,6 +61,8 @@ import { ACTIONABLE_EXPIRED_REPORT_SQL } from "./score-report-sql";
 import { localUploadUrl } from "@/lib/shared/uploads";
 import { pickChampion } from "@/lib/shared/tournament-card-summary";
 import { computeRunningRatio } from "@/lib/shared/tournament-progress";
+import { applyMapRules } from "@/lib/shared/round-maps";
+import { loadMapRules } from "./round-maps";
 
 /**
  * Durée de vie d'un instantané. Volontairement courte : elle ne sert qu'à
@@ -474,13 +476,16 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
     const matchIds = matches.map((row) => Number(row.id));
     const castersByMatch = await loadMatchCasters(connection, matchIds);
     const streamsByMatch = await loadMatchStreams(connection, matchIds);
+    // Cartes par manche et règles de ban, dans l'instantané commun : flux et
+    // REST de secours les portent ensemble (`docs/features/ROUND_MAPS.md`).
+    const mapRules = await loadMapRules(connection, tournamentId);
     const mappedMatches = attachMatchMaps(
-      matches.map((row) =>
+      applyMapRules(matches.map((row) =>
         mapMatch(row, {
           casters: castersByMatch.get(Number(row.id)),
           streams: streamsByMatch.get(Number(row.id)),
         }),
-      ),
+      ), mapRules),
       await loadMapsByMatch(connection, matchIds),
     );
     const phases = phasesDetail?.phases ?? null;
@@ -536,6 +541,7 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
       phaseStandings: phasesDetail?.phaseStandings ?? {},
       soloUserIds,
       seedingSource: source,
+      mapRules,
     };
 
     const payloadJson = JSON.stringify(payload);

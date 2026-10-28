@@ -22,21 +22,25 @@ import {
   matchPageSides,
   matchPageStreams,
   selfManagementSteps,
+  OW_SELF_MANAGEMENT_SETTINGS,
   type MatchPageSide,
 } from "@/lib/shared/match-page";
 import { battletagRelevantFor } from "@/lib/shared/certification-prompt";
 import { FIRST_MAP_MAX_LENGTH, normalizeFirstMap } from "@/lib/shared/match-referee";
 import { streamLinkText } from "@/lib/shared/live-streams";
 import { localizedPlaceholder, matchPositionText, versusText } from "@/lib/shared/tournament-page-text";
-import type { BracketMatch, TournamentDetail } from "@/lib/shared/types";
+import { canPickMatchMap, firstBanOrder, roundMapsOf } from "@/lib/shared/round-maps";
+import type { BracketMatch, TournamentDetail, TournamentGame } from "@/lib/shared/types";
 import { launchStripControls } from "../_lib/launch-strip";
 import { useLiveControls } from "../_lib/live-context";
 import { launchErrorText, useActionsText } from "../_lib/actions-text";
 import { useErrorsText } from "../_lib/error-map";
 import { EntrantName } from "./EntrantName";
 import { MatchRow } from "./MatchRow";
+import { MatchRoundMaps } from "./MatchRoundMaps";
 import { StreamLink } from "./MatchLiveStrip";
 import { MatchPageScope } from "../_lib/match-page-context";
+import { useRoundMapsText } from "../_lib/round-maps-text";
 import styles from "./MatchPage.module.css";
 
 const FIRST_MAP_FIELD_ERRORS = { INVALID_FIRST_MAP: "map" } as const;
@@ -158,17 +162,39 @@ function useCopy() {
 }
 
 /** Création de la partie : côtés (hôte à gauche), première carte, premier ban, rappel du cast. */
+/** Le lecteur, partie du match, peut-il déclarer son « Prêt » (donc choisir une carte en autogestion) ? */
+function canDeclareFor(launch: MatchLaunchInfo | null): boolean {
+  if (!launch) return false;
+  return (launch.viewer.role === "TEAM1" || launch.viewer.role === "TEAM2") && launch.viewer.canDeclareReady;
+}
+
 function LobbySection({
+  detail,
   match,
   sides,
   staff,
   editable,
-}: Readonly<{ match: BracketMatch; sides: [MatchPageSide, MatchPageSide]; staff: boolean; editable: boolean }>) {
+  canPick,
+}: Readonly<{
+  detail: TournamentDetail;
+  match: BracketMatch;
+  sides: [MatchPageSide, MatchPageSide];
+  staff: boolean;
+  editable: boolean;
+  canPick: boolean;
+}>) {
   const { t } = useTournamentPageText();
   const titleId = useId();
   const [left, right] = sides;
   const banSide = sides.find((side) => side.firstBan) ?? null;
   const banName = useSideName(banSide ?? left);
+  const otherName = useSideName(banSide === right ? left : right);
+  const rm = useRoundMapsText();
+  const rules = detail.mapRules;
+  // Ordre des bans de la carte 1 (règlement §10) : les deux équipes bannissent.
+  const banOrder = firstBanOrder(rules.firstBan, match.hostTeamId, match.team1Id, match.team2Id);
+  // Une carte 1 réglée pour la manche (imposée ou pool) remplace la saisie libre.
+  const firstSlotSet = (roundMapsOf(rules.rounds, match)?.slots.length ?? 0) > 0;
   return (
     <section className={`ds-block ${styles.block}`} aria-labelledby={titleId}>
       <div className="ds-section-title blue">
@@ -182,16 +208,30 @@ function LobbySection({
         <SideBlock side={right} position="right" />
       </div>
       <dl className={styles.facts}>
+        {/* Une carte 1 réglée pour le tour s'affiche dans « Cartes du tour » : « Pas encore choisie » la contredirait. */}
+        {!firstSlotSet && (
+          <div>
+            <dt>{t("matchPage.firstMap")}</dt>
+            <dd>{match.firstMap ?? <span className={styles.muted}>{t("matchPage.firstMapUnset")}</span>}</dd>
+          </div>
+        )}
         <div>
-          <dt>{t("matchPage.firstMap")}</dt>
-          <dd>{match.firstMap ?? <span className={styles.muted}>{t("matchPage.firstMapUnset")}</span>}</dd>
+          <dt>{rm.t("page.banOrder")}</dt>
+          <dd>
+            {banSide && banOrder ? (
+              rm.t("page.banOrderValue", { first: banName, second: otherName })
+            ) : (
+              <span className={styles.muted}>{t("matchPage.opponentsPending")}</span>
+            )}
+          </dd>
         </div>
         <div>
-          <dt>{t("matchPage.firstBan")}</dt>
-          <dd>{banSide ? banName : <span className={styles.muted}>{t("matchPage.opponentsPending")}</span>}</dd>
+          <dt>{rm.t("page.nextBans")}</dt>
+          <dd className={styles.ruleText}>{rm.t(rules.nextBan === "WINNER" ? "page.nextBansWINNER" : "page.nextBansLOSER")}</dd>
         </div>
       </dl>
-      {staff && editable && <FirstMapForm match={match} />}
+      <MatchRoundMaps detail={detail} match={match} canPick={canPick && editable} staff={staff} />
+      {staff && editable && !firstSlotSet && <FirstMapForm match={match} />}
       {match.casters.length > 0 && (
         <p className={styles.reminder}>
           <span aria-hidden="true">🎙</span> {t("matchPage.sortByRole")}
@@ -223,12 +263,14 @@ function DecisionLine({
 /** Arbitrage : l'arbitre (nommé aux seules parties du match), l'autogestion et ses étapes, ou l'absence de décision (staff). */
 function OfficiatingSection({
   match,
+  game,
   staff,
   launch,
   onCopy,
   invitesByBattletag,
 }: Readonly<{
   match: BracketMatch;
+  game: TournamentGame;
   staff: boolean;
   launch: MatchLaunchInfo | null;
   onCopy: (value: string, label: string) => Promise<void>;
@@ -274,7 +316,17 @@ function OfficiatingSection({
           />
           <ol className={styles.steps} aria-label={t("matchPage.stepsLabel")}>
             {selfManagementSteps(match.casters.length).map((step) => (
-              <li key={step}>{t(`matchPage.steps.${step}`)}</li>
+              <li key={step}>
+                {t(`matchPage.steps.${step}`)}
+                {/* Réglages propres à Overwatch : rien à lister pour Marvel Rivals. */}
+                {step === "settings" && game === "OW" && (
+                  <ul className={styles.stepSettings}>
+                    {OW_SELF_MANAGEMENT_SETTINGS.map((setting) => (
+                      <li key={setting}>{t(`matchPage.owSettings.${setting}`)}</li>
+                    ))}
+                  </ul>
+                )}
+              </li>
             ))}
           </ol>
         </>
@@ -432,17 +484,17 @@ export function MatchPage({
   return (
     <>
       <div className={styles.topbar}>
-        <nav className={styles.crumbs} aria-label={t("matchPage.crumbsLabel")}>
-          <LocaleLink href={tournamentMatchHref(detail.card.id, match.id, spectator)} className={`${styles.back} tap-target`}>
-            <span aria-hidden="true">←</span> {detail.card.name}
-          </LocaleLink>
-        </nav>
+        {/* Le retour du site (`← Retour` de la fiche, même style) : un vrai lien
+            qui ramène à la carte de ce match, dans la bonne vue (`MATCH_PAGE.md`). */}
+        <LocaleLink href={tournamentMatchHref(detail.card.id, match.id, spectator)} className={`${styles.back} tap-target`}>
+          <span aria-hidden="true">←</span> {t("matchPage.backToTournament")}
+        </LocaleLink>
         {status}
       </div>
       <header className={styles.header}>
         <h1 className={styles.title}>{matchLabel}</h1>
         <p className={styles.meta}>
-          {[phaseName, matchPositionText(text, match)].filter(Boolean).join(" · ")}
+          {[detail.card.name, phaseName, matchPositionText(text, match)].filter(Boolean).join(" · ")}
         </p>
       </header>
 
@@ -460,9 +512,17 @@ export function MatchPage({
         </div>
       </section>
 
-      <LobbySection match={match} sides={sides} staff={canSchedule && !frozen} editable={editable} />
+      <LobbySection
+        detail={detail}
+        match={match}
+        sides={sides}
+        staff={canSchedule && !frozen}
+        editable={editable}
+        canPick={!spectator && !frozen && canPickMatchMap({ staff: canSchedule, myTeamId, canDeclareReady: canDeclareFor(shownLaunch) }, match)}
+      />
       <OfficiatingSection
         match={match}
+        game={detail.card.game}
         staff={canSchedule}
         launch={shownLaunch}
         onCopy={onCopy}

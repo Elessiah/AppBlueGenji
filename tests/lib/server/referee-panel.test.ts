@@ -32,12 +32,14 @@ function staffUser(id: number, pseudo: string, overrides: Record<string, unknown
 let match: Record<string, unknown> | null;
 let users: Record<string, unknown>[];
 let players: number[];
+let roundSlotsJson: string | null;
 let execute: jest.Mock<SqlQuery>;
 
 beforeEach(() => {
   jest.clearAllMocks();
   match = {
     id: 42,
+    tournament_id: 7,
     phase_id: 0,
     round_number: 2,
     bracket: "UPPER",
@@ -51,10 +53,12 @@ beforeEach(() => {
   };
   users = [];
   players = [];
+  roundSlotsJson = null;
   execute = jest.fn<SqlQuery>(async (sql) => {
     if (sql.includes("FROM bg_matches")) return [match ? [match] : [], []];
     if (sql.includes("FROM bg_users")) return [users, []];
     if (sql.includes("FROM bg_team_members")) return [players.map((user_id) => ({ user_id })), []];
+    if (sql.includes("FROM bg_tournament_round_maps")) return [roundSlotsJson === null ? [] : [{ slots_json: roundSlotsJson }], []];
     throw new Error(`requête inattendue : ${sql}`);
   });
   jest.mocked(withConnection).mockImplementation((run) => run(fakeConnection({ execute })));
@@ -91,6 +95,18 @@ describe("loadRefereePanel", () => {
     expect(panel?.firstMap).toBe("Ilios");
     // L'arbitre en place est relu même sans rôle (paramètre de la lecture).
     expect(execute.mock.calls[1][1]).toEqual([5]);
+  });
+
+  it("loadRefereePanel_roundWithMaps_returnsRoundSlots", async () => {
+    roundSlotsJson = '[["Ilios"],["Busan","Nepal"]]';
+    const panel = await loadRefereePanel(42);
+    expect(panel?.roundSlots).toEqual([["Ilios"], ["Busan", "Nepal"]]);
+    const roundQuery = execute.mock.calls.find(([sql]) => sql.includes("FROM bg_tournament_round_maps"));
+    expect(roundQuery?.[1]).toEqual([7, 0, "UPPER", 2]);
+  });
+
+  it("loadRefereePanel_roundWithoutMaps_returnsNoSlot", async () => {
+    await expect(loadRefereePanel(42)).resolves.toMatchObject({ roundSlots: [] });
   });
 
   it("un arbitre disparu se lit « — », inéligible", async () => {

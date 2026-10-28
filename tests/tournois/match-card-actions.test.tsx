@@ -8,6 +8,7 @@ import type { CastBlock } from "@/lib/shared/match-launch";
 import {
   groupMatchCardActions,
   matchCardActionList,
+  offersMatchPage,
   matchCardActionName,
   type MatchCardActionInput,
 } from "@/app/(secured)/tournois/[id]/_lib/match-card-actions";
@@ -49,6 +50,7 @@ const NOTHING: MatchCardActionInput = {
   showReplay: false,
   hasReplay: false,
   canReport: false,
+  showMatchPage: false,
 };
 
 const ids = (input: Partial<MatchCardActionInput>) => matchCardActionList({ ...NOTHING, ...input }).map((a) => a.id);
@@ -279,6 +281,71 @@ describe("MatchCardActions — rendu du pied", () => {
   });
 });
 
+describe("« Page du match » dans le pied d'action", () => {
+  const list = (input: Partial<MatchCardActionInput>) => matchCardActionList({ ...NOTHING, ...input });
+
+  it("s'offre après « Contacts » quand la carte la permet, jamais sinon", () => {
+    expect(list({ showMatchPage: true }).map((a) => ({ id: a.id, label: a.label, tone: a.tone }))).toEqual([
+      { id: "matchPage", label: "Page du match", tone: "neutral" },
+    ]);
+    expect(ids({ launch: { ...NO_LAUNCH, showContacts: true, showPlan: true }, showMatchPage: true })).toEqual([
+      "contacts",
+      "matchPage",
+      "plan",
+    ]);
+    expect(ids({ showMatchPage: false })).toEqual([]);
+  });
+
+  it("tient le pied d'un lecteur sans geste à faire, signalement au menu", () => {
+    expect(groupMatchCardActions(list({ showMatchPage: true }))).toMatchObject({ primary: { id: "matchPage" }, more: [] });
+    const grouped = groupMatchCardActions(list({ showMatchPage: true, canReport: true }));
+    expect(grouped.primary?.id).toBe("matchPage");
+    expect(grouped.more.map((a) => a.id)).toEqual(["report"]);
+  });
+
+  it("cède la place visible à la saisie du score et passe au menu", () => {
+    const grouped = groupMatchCardActions(list({ showMatchPage: true, playerScoreLabel: "Saisir le score" }));
+    expect(grouped.primary?.id).toBe("playerScore");
+    expect(grouped.more.map((a) => a.id)).toEqual(["matchPage"]);
+  });
+
+  it("se rend en lien vers la page du match, au nom accessible qui commence par le texte", () => {
+    const html = renderFooter({ showMatchPage: true });
+    expect(html).toMatch(/<a [^>]*data-action="matchPage"/);
+    expect(html).toContain('href="/tournois/1/matchs/42"');
+    expect(html).toContain('aria-label="Page du match : Alpha contre Bravo"');
+    expect(html).not.toContain("<button");
+  });
+});
+
+describe("« Page du match » dans le panneau — câblage", () => {
+  const source = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/MatchCardActions.tsx"), "utf8");
+
+  it("ne referme le panneau que sur un clic ordinaire (un clic avec modificateur ouvre un onglet)", () => {
+    expect(source).toMatch(/if \(isPlainLeftClick\(event\)\) onNavigate\?\.\(\);/);
+  });
+
+  it("prend son icône du tableau ICONS, source unique", () => {
+    expect(source).toContain("Icon={Icon}");
+    expect(source).not.toMatch(/<FileText size/);
+  });
+});
+
+describe("offersMatchPage — où le lien se tait", () => {
+  const versus = { team1Id: 10, team2Id: 20, status: "READY" as const };
+
+  it("s'offre sur un match à deux engagés, et sur un match qui attend encore son adversaire", () => {
+    expect(offersMatchPage(versus, false)).toBe(true);
+    expect(offersMatchPage({ team1Id: 10, team2Id: null, status: "PENDING" }, false)).toBe(true);
+  });
+
+  it("se tait sous la page du match et sur une exemption jouée, d'un côté comme de l'autre", () => {
+    expect(offersMatchPage(versus, true)).toBe(false);
+    expect(offersMatchPage({ team1Id: 10, team2Id: null, status: "COMPLETED" }, false)).toBe(false);
+    expect(offersMatchPage({ team1Id: null, team2Id: 20, status: "COMPLETED" }, false)).toBe(false);
+  });
+});
+
 describe("closePanelOnTabOut — la tabulation qui sort du panneau le referme", () => {
   const first = { id: "a" };
   const middle = { id: "b" };
@@ -294,6 +361,13 @@ describe("closePanelOnTabOut — la tabulation qui sort du panneau le referme", 
   it("referme par un bout : Tab sur le dernier, Maj+Tab sur le premier", () => {
     expect(press("Tab", false, last)).toEqual({ closed: 1, prevented: 1 });
     expect(press("Tab", true, first)).toEqual({ closed: 1, prevented: 1 });
+  });
+
+  it("compte les liens du panneau comme des éléments à parcourir", () => {
+    const seen: string[] = [];
+    const spy = { querySelectorAll: (selector: string) => (seen.push(selector), [first]) } as unknown as ParentNode;
+    closePanelOnTabOut({ key: "Tab", shiftKey: false, currentTarget: first as Element, preventDefault: () => undefined }, spy, () => undefined);
+    expect(seen).toEqual(["button:not(:disabled), a[href]"]);
   });
 
   it("laisse circuler à l'intérieur, et ignore les autres touches", () => {
@@ -381,7 +455,11 @@ describe("MatchCardActions — clavier et focus (branchements)", () => {
   });
 
   it("le focus entre dans le panneau à l'ouverture", () => {
-    expect(source).toContain('panelRef.current?.querySelector("button")?.focus({ preventScroll: true });');
+    // Un panneau qui ne contient que le lien « Page du match » reçoit aussi le focus ;
+    // le lien choisi rend le focus au bouton « ... », comme ses voisins.
+    expect(source).toContain("panelRef.current?.querySelector<HTMLElement>(PANEL_FOCUSABLE)?.focus({ preventScroll: true });");
+    expect(source).toContain('const PANEL_FOCUSABLE = "button:not(:disabled), a[href]";');
+    expect(source).toMatch(/setOpen\(false\);\s*toggleRef\.current\?\.focus\(\);\s*\}\s*:\s*undefined/);
   });
 
   it("la tabulation qui sort du pied et du panneau le referme ; par un bout du panneau, rend le focus", () => {
@@ -399,7 +477,7 @@ describe("MatchCardActions — clavier et focus (branchements)", () => {
   });
 
   it("une action du menu rend le focus au bouton avant de s'exécuter", () => {
-    expect(source).toMatch(/setOpen\(false\);\s*toggleRef\.current\?\.focus\(\);\s*\}\s*handlers\[action\.id\]\(\);/);
+    expect(source).toMatch(/setOpen\(false\);\s*toggleRef\.current\?\.focus\(\);\s*\}\s*handlers\[id\]\(\);/);
   });
 
   it("un panneau retiré par le flux se referme, et ne revient pas déplié", () => {

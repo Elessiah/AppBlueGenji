@@ -4,7 +4,8 @@
  * lancement ou se jouent, avec les contacts que chaque partie doit avoir sous
  * la main.
  *
- * **Exposition bornée.** Les contacts (tag Discord certifié, BattleTag) ne sont
+ * **Exposition bornée.** Les contacts (tag Discord certifié, BattleTag — en
+ * Overwatch seulement, `withGameBattletag`) ne sont
  * rendus qu'aux parties d'un match : dans la modale, **en lancement ou lancé** ;
  * par le bouton « Contacts » d'une carte, dès que ses deux adversaires sont
  * connus pour ses joueurs et pour les arbitres (permission `tournaments`), le
@@ -40,6 +41,7 @@ import {
   type LaunchContact,
   type LaunchReferee,
   type LaunchSide,
+  type LaunchSideContact,
   type MatchLaunchInfo,
   type MatchLaunchViewerRole,
 } from "@/lib/shared/match-launch";
@@ -517,30 +519,54 @@ function keepEligibleReferees(
   }
 }
 
+/**
+ * Contacts d'une engagée, choisis puis filtrés **à la sortie**. Hors Overwatch
+ * (décision de l'utilisateur 38, 2026-10-28), le BattleTag ne joint personne :
+ * il ne pèse pas sur le choix (seul le tag Discord certifié départage, comme
+ * `teamHasContact` de l'invitation à certifier) et ne sort pas — ni lui, ni
+ * s'il est vérifié (`withGameBattletag`, minimisation).
+ */
+function sideContacts(
+  candidates: readonly ContactCandidate[],
+  visibleOverwatch: ReadonlyMap<number, boolean>,
+  game: TournamentGame,
+  ctx: LaunchContext,
+): LaunchSideContact[] {
+  const relevant = battletagRelevantFor(game);
+  const pool = relevant ? candidates : candidates.map((c) => ({ ...c, battletag: null, blizzardLinked: false }));
+  return pickLaunchContacts(pool).map((picked) => {
+    const contact = filterContact(picked, ctx.viewer, visibleOverwatch.get(picked.userId) ?? false);
+    return withGameBattletag(
+      game,
+      { userId: contact.userId, pseudo: contact.pseudo, roles: contact.roles, discordTag: contact.discordTag },
+      { battletag: contact.battletag, battletagVerified: contact.battletagVerified },
+    );
+  });
+}
+
 /** Contacts d'une entrée solo : le joueur lui-même, s'il existe encore. */
-function soloContacts(soloUserId: number, ctx: LaunchContext): LaunchContact[] {
+function soloContacts(soloUserId: number, game: TournamentGame, ctx: LaunchContext): LaunchSideContact[] {
   const user = ctx.users.get(Number(soloUserId));
   if (!user || Number(user.is_deleted) !== 0) return [];
-  return pickLaunchContacts([toCandidate({ ...user, user_id: user.id, roles: [] })]).map((contact) =>
-    filterContact(contact, ctx.viewer, Number(user.visible_overwatch) === 1),
-  );
+  const visibility = new Map([[Number(user.id), Number(user.visible_overwatch) === 1]]);
+  return sideContacts([toCandidate({ ...user, user_id: user.id, roles: [] })], visibility, game, ctx);
 }
 
 /** Contacts d'une équipe : choisis dans son roster en cours. */
-function rosterContacts(teamId: number, ctx: LaunchContext): LaunchContact[] {
+function rosterContacts(teamId: number, game: TournamentGame, ctx: LaunchContext): LaunchSideContact[] {
   const members = ctx.rosters.get(teamId) ?? [];
   const visibility = new Map(members.map((m) => [Number(m.user_id), Number(m.visible_overwatch) === 1]));
-  return pickLaunchContacts(members.map((m) => toCandidate({ ...m, roles: parseRoles(m.roles_json) }))).map(
-    (contact) => filterContact(contact, ctx.viewer, visibility.get(contact.userId) ?? false),
-  );
+  const candidates = members.map((m) => toCandidate({ ...m, roles: parseRoles(m.roles_json) }));
+  return sideContacts(candidates, visibility, game, ctx);
 }
 
 function buildLaunchSide(row: CandidateRow, index: 1 | 2, ctx: LaunchContext): LaunchSide {
   const side = rowSide(row, index);
   const teamId = Number(side.teamId);
-  let contacts: LaunchContact[] = [];
+  const game = row.tournament_game;
+  let contacts: LaunchSideContact[] = [];
   if (ctx.exposes && !side.isGhost) {
-    contacts = side.soloUserId === null ? rosterContacts(teamId, ctx) : soloContacts(side.soloUserId, ctx);
+    contacts = side.soloUserId === null ? rosterContacts(teamId, game, ctx) : soloContacts(side.soloUserId, game, ctx);
   }
   return {
     teamId,
@@ -555,10 +581,11 @@ function buildLaunchSide(row: CandidateRow, index: 1 | 2, ctx: LaunchContext): L
 }
 
 /**
- * Le BattleTag d'un caster ou de l'arbitre désigné sert à l'inviter dans la
- * partie : il ne sort qu'en Overwatch (décision de l'utilisateur 35,
- * 2026-10-28). Hors Overwatch, les deux champs ne sont pas même envoyés
- * (minimisation) : ni BattleTag, ni la pastille qui dirait s'il est vérifié.
+ * Le BattleTag d'un caster, de l'arbitre désigné (décision de l'utilisateur 35)
+ * ou d'un contact d'équipe (décision 38) sert à l'inviter dans la partie : il
+ * ne sort qu'en Overwatch. Hors Overwatch, les deux champs ne sont pas même
+ * envoyés (minimisation) : ni BattleTag, ni la pastille qui dirait s'il est
+ * vérifié.
  */
 function withGameBattletag<T extends object>(
   game: TournamentGame,

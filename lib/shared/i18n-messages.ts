@@ -44,8 +44,9 @@ import type frReports from "@/messages/fr/reports.json";
 import type frImageCrop from "@/messages/fr/imageCrop.json";
 import type frPush from "@/messages/fr/push.json";
 import type frPushMessages from "@/messages/fr/pushMessages.json";
+import type frRoundMaps from "@/messages/fr/roundMaps.json";
 
-export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot", "association", "volunteers", "recruitment", "legal", "tournaments", "tournament", "tournamentViews", "tournamentErrors", "tournamentActions", "tournamentDialogs", "tournamentImage", "tournamentForm", "launchModal", "certifyPrompt", "teams", "team", "teamErrors", "teamRoles", "players", "profile", "reports", "imageCrop", "push", "pushMessages"] as const;
+export const MESSAGE_NAMESPACES = ["common", "landing", "shell", "rules", "ranking", "stats", "labels", "share", "login", "bot", "association", "volunteers", "recruitment", "legal", "tournaments", "tournament", "tournamentViews", "tournamentErrors", "tournamentActions", "tournamentDialogs", "tournamentImage", "tournamentForm", "launchModal", "certifyPrompt", "teams", "team", "teamErrors", "teamRoles", "players", "profile", "reports", "imageCrop", "push", "pushMessages", "roundMaps"] as const;
 export type MessageNamespace = (typeof MESSAGE_NAMESPACES)[number];
 
 export type Messages = {
@@ -138,6 +139,7 @@ export type Messages = {
    * `lib/shared/push-messages.ts`.
    */
   pushMessages: typeof frPushMessages;
+  roundMaps: typeof frRoundMaps;
 };
 
 /**

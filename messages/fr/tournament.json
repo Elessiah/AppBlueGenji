@@ -277,9 +277,7 @@
     "byeWin": "✓ Victoire d'office",
     "champion": "🏆 Championne —",
     "moreStreams": "+{count}",
-    "moreStreamsLabel": "+{count} : les autres streams de {match}",
-    "viewMatch": "Voir le match",
-    "viewMatchLabel": "Voir le match : {match}"
+    "moreStreamsLabel": "+{count} : les autres streams de {match}"
   },
   "launch": {
     "toPlan": "À planifier",
@@ -420,7 +418,7 @@
     "date": "{day} à {hour}"
   },
   "matchPage": {
-    "crumbsLabel": "Fil d'Ariane",
+    "backToTournament": "Retour au tournoi",
     "left": "Gauche",
     "right": "Droite",
     "host": "Hôte : crée la partie",
@@ -438,6 +436,11 @@
       "managersInvite": "Les managers des deux équipes s'ajoutent en ami et s'invitent.",
       "settings": "Réglez les paramètres de la partie.",
       "inviteCasters": "Invitez les casters du match."
+    },
+    "owSettings": {
+      "competitive": "Paramètres compétitifs",
+      "killcamOff": "Killcam désactivée",
+      "pauseOnDisconnect": "Pause lors de la déconnexion d'un joueur"
     },
     "undecided": "Aucune décision",
     "undecidedLead": "Ni arbitre ni autogestion : à décider.",

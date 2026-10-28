@@ -21,6 +21,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `MATCH_LAUNCH.md` — Lancement d'un match : lobby, trois « Prêt », contacts, inscription du caster ; option du tournoi (éteinte par défaut) et bouton « Contacts » de la carte.
 - `MATCH_REFEREE.md` — Arbitre désigné d'un match (4e « Prêt », nommé aux seules parties du match), autogestion par match ou par manche, première carte, hôte à gauche et premier ban ; avertissement « sans arbitre » au staff, jamais d'autogestion d'office.
 - `MATCH_LOBBY_BRIEF.md` — Brief du salon : à son ouverture, réglages de la partie (gauche/hôte, droite, première carte, premier ban, tri par rôle si casté, arbitre ou autogestion) aux propriétaires/managers en DM + push `MATCH_LOBBY_BRIEF`, sans BattleTag, tag Discord ni pseudo.
+- `ROUND_MAPS.md` — Cartes par tour du tournoi (une carte = imposée, plusieurs = pool choisi par l'arbitrage ou l'équipe en autogestion ; liste Overwatch, tours à venir, copie vers tous les tours, verrou d'échelle sur la carte du match et réinitialisation) et règles de ban du tournoi, réglables à tout moment par le staff.
 - `CAST_NOTICES.md` — Casts : journal anonyme du staff (inscription, reprise, retrait) et avis au caster retiré (DM + push `CAST_RELEASED`, avec le motif).
 - `STAFF_ACTION_LOGS.md` — Gestes du staff sans trace (résultat validé, lancement forcé, hôte, diffusion, rediffusion, édition, seeding, fantômes, image) : une ligne anonyme au journal Discord, rien dans pm2.
 - `CERTIFICATION_PROMPT.md` — Fiche tournoi : modale d'office invitant à certifier Discord et BattleTag (manager à qui il en manque un, joueur d'une équipe sans contact), tableau fait / ne fait pas, « Ne plus voir ».
@@ -51,7 +52,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 
 - `TOURNAMENT_HEADER.md` — En-tête de la fiche : outils du lecteur, identité, faits, actions.
 - `TOURNAMENT_PAGE_PATH.md` — Arrivée, retour et confirmations de la fiche tournoi.
-- `MATCH_PAGE.md` — Page d'un match (`/tournois/[id]/matchs/[matchId]`) : hôte, première map, arbitrage ou autogestion, tous les streams et leurs casters ; BattleTag des casters et de l'arbitre en Overwatch seulement.
+- `MATCH_PAGE.md` — Page d'un match (`/tournois/[id]/matchs/[matchId]`) : hôte, première map, arbitrage ou autogestion, tous les streams et leurs casters ; BattleTag (contacts des équipes, casters, arbitre) en Overwatch seulement.
 - `SPECTATOR_VIEW.md` — Suivi d'un tournoi sans compte (`/suivre/tournois/[id]`) : redirections entre espaces, fiche commune, relecture réglée par la charge du serveur, prix des reconstructions (seau à jetons par réseau, copie périmée bornée).
 - `ADMIN_CONFIRMATIONS.md` — Audit des gestes du staff qui défont quelque chose, et quand ils se font confirmer.
 - `TOURNAMENT_PROGRESS.md` — Frise de progression, de masqué à terminé.
@@ -152,7 +153,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 ## Vitrine
 
 - `EDITABLE_SITE_COPY.md` — Textes éditables (`site-copy.ts`, `<EditableCopy>`), bilingues (anglais obligatoire) et rattrapage de l’anglais.
-- `LANDING_HERO_FOLD.md` — Accueil en desktop : l'appel principal au premier écran.
+- `LANDING_HERO_FOLD.md` — Accueil en desktop : l'appel principal au premier écran ; bf-cache de `/` volontairement non restauré (`no-store`).
 - `LANDING_MOBILE_LAYOUT.md` — Accueil en mobile.
 - `LANDING_LEADERBOARD.md` — Classement de l'accueil.
 - `TICKER_RESULTS.md` — Bandeau défilant : résultats habillés par camp (vainqueur `--teal-400` + « ✓ », perdant encre de défaite + « ✕ », forfait et nul neutres, score en avant, issue en texte masqué FR / EN), issue lue sur le résultat enregistré et calculée au chargement.

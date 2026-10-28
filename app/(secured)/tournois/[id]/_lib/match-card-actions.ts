@@ -1,4 +1,6 @@
 import type { LaunchStripControls } from "./launch-strip";
+import { isByeMatch } from "@/lib/shared/match-page";
+import type { BracketMatch } from "@/lib/shared/types";
 import type { TournamentActionsText } from "@/lib/shared/tournament-actions-text";
 import { FR_ACTIONS_TEXT } from "./actions-text";
 
@@ -17,6 +19,7 @@ export type MatchCardActionId =
   | "playerScore"
   | "openLaunch"
   | "contacts"
+  | "matchPage"
   | "plan"
   | "adminScore"
   | "schedule"
@@ -63,6 +66,11 @@ export type MatchCardActionInput = {
   showReplay: boolean;
   hasReplay: boolean;
   canReport: boolean;
+  /**
+   * « Page du match » offerte : pas sur la page elle-même, pas sur une
+   * exemption (un seul engagé, rien à jouer) — `MatchRow` en décide.
+   */
+  showMatchPage: boolean;
 };
 
 /**
@@ -87,6 +95,7 @@ export function matchCardActionList(
     [input.playerScoreLabel !== null, "playerScore", input.playerScoreLabel ?? "", "primary"],
     [launch.showOpen, "openLaunch", either(input.inLobby, t("cardActions.openLaunch"), t("cardActions.matchInfo")), "primary"],
     [launch.showContacts, "contacts", t("cardActions.contacts"), "neutral"],
+    [input.showMatchPage, "matchPage", t("cardActions.matchPage"), "neutral"],
     [launch.showPlan, "plan", t("cardActions.plan"), "warn"],
     [input.adminScoreLabel !== null, "adminScore", input.adminScoreLabel ?? "", "staff"],
     [input.showSchedule, "schedule", either(input.hasStartAt, t("cardActions.editDate"), t("cardActions.setDate")), "staff"],
@@ -118,6 +127,18 @@ export function matchCardActionList(
     );
 }
 
+/**
+ * « Page du match » offerte sur cette carte ? Pas sous la page elle-même
+ * (`onMatchPage`), pas sur une exemption (un seul engagé, rien à jouer — un
+ * match encore en attente d'adversaire, lui, a déjà sa page).
+ */
+export function offersMatchPage(
+  match: Pick<BracketMatch, "team1Id" | "team2Id" | "status">,
+  onMatchPage: boolean,
+): boolean {
+  return !onMatchPage && !isByeMatch(match);
+}
+
 export type MatchCardActionGroups = {
   primary: MatchCardAction | null;
   more: MatchCardAction[];
@@ -135,10 +156,14 @@ export function groupMatchCardActions(actions: readonly MatchCardAction[]): Matc
   // le verrou ; pour l'engagé, le litige reste le bouton visible.
   const disputeView = actions.find((a) => a.id === "playerScore" && a.readOnly === true);
   const adminScore = actions.find((a) => a.id === "adminScore");
+  // Aucun geste attendu de ce lecteur : « Page du match » tient le pied (un
+  // lien, jamais derrière un menu quand rien d'autre ne le précède).
   const primary =
     disputeView && adminScore
       ? adminScore
-      : PRIMARY_ORDER.map((id) => actions.find((a) => a.id === id)).find(Boolean) ?? null;
+      : PRIMARY_ORDER.map((id) => actions.find((a) => a.id === id)).find(Boolean) ??
+        actions.find((a) => a.id === "matchPage") ??
+        null;
   return { primary, more: actions.filter((a) => a !== primary) };
 }
 

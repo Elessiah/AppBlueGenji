@@ -108,7 +108,8 @@ export function lobbyBriefPush(side: LobbyBriefSide, locale: Locale = DEFAULT_LO
   const own = side.solo ? text.t("lobbyBrief.own") : side.teamName;
   const other = side.solo ? text.t("lobbyBrief.other") : side.opponentName;
   // Ni l'appariement ni la manche : gauche et droite nomment déjà les deux
-  // engagées ; la droite (celle qui n'héberge pas) bannit la première, donc
+  // engagées ; le « 1er ban » se pose sur le côté que la règle du tournoi
+  // désigne (`ROUND_MAPS.md` : la droite, qui n'héberge pas, par défaut), donc
   // aucun nom n'est répété. Le rappel du tri par rôle vient en tête et la carte
   // (texte libre) en dernier : la coupe à `PUSH_BODY_MAX` ne retire qu'elle.
   const values = {
@@ -116,9 +117,12 @@ export function lobbyBriefPush(side: LobbyBriefSide, locale: Locale = DEFAULT_LO
     right: side.hosting ? other : own,
     map: side.firstMap ?? text.t("lobbyBrief.noMap"),
   };
+  const hostBans = side.banFirst === side.hosting;
+  const castKey = hostBans ? "lobbyBrief.bodyCastHostBans" : "lobbyBrief.bodyCast";
+  const plainKey = hostBans ? "lobbyBrief.bodyHostBans" : "lobbyBrief.body";
   return {
     title: text.t("lobbyBrief.title"),
-    body: side.cast ? text.t("lobbyBrief.bodyCast", values) : text.t("lobbyBrief.body", values),
+    body: text.t(side.cast ? castKey : plainKey, values),
     url: localeHref(matchPageHref(side.tournamentId, side.matchId), locale),
     tag: `${matchTag(side.matchId)}-salon`,
   };
@@ -687,7 +691,8 @@ export function suspensionPush(kind: "SUSPENDED" | "LIFTED", locale: Locale = DE
 
 /**
  * Des changements du traitement des données sont à lire — une information,
- * aucun accord n'est demandé. `titles` : les titres **dans la langue du
+ * aucun accord n'est demandé, hors des conditions d'utilisation qu'une entrée
+ * annonce à accepter (fenêtre des conditions). `titles` : les titres **dans la langue du
  * destinataire** (`localizedPrivacyChanges`).
  */
 export function privacyChangePush(titles: readonly string[], locale: Locale = DEFAULT_LOCALE): PushContent {

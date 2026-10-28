@@ -26,7 +26,11 @@ function side(overrides: Partial<LobbyBriefSide> = {}): LobbyBriefSide {
     teamName: "Renards",
     opponentName: "Nova",
     hosting: true,
+    banFirst: false,
     firstMap: "Ilios",
+    maps: [],
+    nextBan: "LOSER",
+    nextPick: "LOSER",
     cast: false,
     decision: "UNDECIDED",
     ...overrides,
@@ -41,17 +45,18 @@ describe("formatLobbyBriefDm", () => {
         "• Gauche (hôte) : « Renards »",
         "• Droite : « Nova »",
         "• Première carte : « Ilios »",
-        "• Premier ban : « Nova »",
+        "• Bans de la carte 1 : « Nova » d'abord, puis « Renards »",
+        "• Cartes suivantes : l'équipe qui a perdu la carte précédente bannit en premier ; en cas d'égalité, même ordre qu'à la carte précédente.",
         `BattleTags à inviter et réglages à jour : ${URL}`,
       ].join("\n"),
     );
   });
 
   it("vu du côté qui n'héberge pas : l'adversaire à gauche, ton équipe à droite et au premier ban", () => {
-    const text = formatLobbyBriefDm(side({ hosting: false }), URL);
+    const text = formatLobbyBriefDm(side({ hosting: false, banFirst: true }), URL);
     expect(text).toContain("• Gauche (hôte) : « Nova »");
     expect(text).toContain("• Droite : « Renards »");
-    expect(text).toContain("• Premier ban : « Renards »");
+    expect(text).toContain("• Bans de la carte 1 : « Renards » d'abord, puis « Nova »");
   });
 
   it("dit la carte pas encore fixée, rappelle le tri par rôle d'un match casté et la décision d'arbitrage", () => {
@@ -74,7 +79,8 @@ describe("formatLobbyBriefDm", () => {
         "• Left (host): “Renards”",
         "• Right: “Nova”",
         "• First map: not set yet",
-        "• First ban: “Nova”",
+        "• Map 1 bans: “Nova” first, then “Renards”",
+        "• Next maps: the team that lost the previous map bans first; on a draw, same order as on the previous map.",
         "• Cast match: sort the players by role in the lobby.",
         "• Self-managed: the host team creates the game, the managers of both teams invite each other, then invite the casters.",
         `BattleTags to invite and up-to-date settings: ${localizedSiteUrl(URL, "en")}`,
@@ -103,7 +109,7 @@ describe("formatLobbyBriefDm", () => {
   });
 
   it("en tournoi individuel, ne nomme personne : « toi » et « ton adversaire »", () => {
-    const solo = side({ solo: true, teamName: "PseudoA", opponentName: "PseudoB", hosting: false, decision: "SELF_MANAGED" });
+    const solo = side({ solo: true, teamName: "PseudoA", opponentName: "PseudoB", hosting: false, banFirst: true, decision: "SELF_MANAGED" });
     const fr = formatLobbyBriefDm(solo, URL);
     const en = formatLobbyBriefDm(solo, URL, "en");
     for (const text of [fr, en]) {
@@ -112,23 +118,42 @@ describe("formatLobbyBriefDm", () => {
     }
     expect(fr).toContain("Le salon de ton match est ouvert");
     expect(fr).toContain("• Gauche (hôte) : ton adversaire");
-    expect(fr).toContain("• Premier ban : toi");
+    expect(fr).toContain("• Bans de la carte 1 : toi d'abord, puis ton adversaire");
     expect(fr).toContain("l'hôte crée la partie et invite son adversaire, puis les casters.");
     expect(en).toContain("• Left (host): your opponent");
-    expect(en).toContain("• First ban: you");
+    expect(en).toContain("• Map 1 bans: you first, then your opponent");
   });
 
   it("n'écrit ni BattleTag ni tag Discord, et neutralise les textes saisis (noms, carte)", () => {
     const text = formatLobbyBriefDm(
-      side({ teamName: "Ren\nards <@&1>", opponentName: "@everyone", firstMap: "Ilios\n• Premier ban : faux" }),
+      side({ teamName: "Ren\nards <@&1>", opponentName: "@everyone", firstMap: "Ilios\n• Bans de la carte 1 : faux" }),
       URL,
     );
     expect(text).not.toMatch(/#\d{4,}/);
     expect(text).not.toContain("<@&1>");
     expect(text).not.toContain("@everyone");
-    // Six lignes, toutes rédigées par le site : un nom ne peut pas en ouvrir une fausse.
-    expect(text.split("\n")).toHaveLength(6);
-    expect(text.split("\n").filter((line) => line.startsWith("• Premier ban"))).toHaveLength(1);
+    // Sept lignes, toutes rédigées par le site : un nom ne peut pas en ouvrir une fausse.
+    expect(text.split("\n")).toHaveLength(7);
+    expect(text.split("\n").filter((line) => line.startsWith("• Bans de la carte 1"))).toHaveLength(1);
+  });
+});
+
+describe("formatLobbyBriefDm — cartes du round", () => {
+  it("liste imposées et pools, avec le choix du perdant à partir de la carte 2", () => {
+    const text = formatLobbyBriefDm(
+      side({
+        maps: [
+          { number: 1, kind: "IMPOSED", map: "Ilios", candidates: ["Ilios"] },
+          { number: 2, kind: "POOL", map: null, candidates: ["Busan", "Nepal"] },
+        ],
+        nextPick: "LOSER",
+      }),
+      URL,
+    );
+    expect(text).toContain("Cartes :");
+    expect(text).toContain("Ilios");
+    expect(text).toContain("• Cartes : 1. « Ilios » · 2. à choisir parmi « Busan », « Nepal » (choisie par l'équipe qui a perdu la carte précédente)");
+    expect(text).toContain("(choisie par l'équipe qui a perdu la carte précédente)");
   });
 });
 
@@ -146,7 +171,7 @@ describe("lobbyBriefPush", () => {
   });
 
   it("en anglais, et en individuel sans pseudo", () => {
-    const en = lobbyBriefPush(side({ hosting: false, firstMap: null }), "en");
+    const en = lobbyBriefPush(side({ hosting: false, banFirst: true, firstMap: null }), "en");
     expect(en.title).toBe("Lobby open: match settings");
     expect(en.body).toBe("Left (host): Nova · Right (1st ban): Renards · 1st map: not set yet.");
     expect(en.url).toBe(localeHref(matchPageHref(4, 40), "en"));

@@ -46,8 +46,8 @@ export function registrationStreamNotice(solo: boolean): string {
   // individuelle par son pseudo public (exception décidée le 2026-10-14) :
   // chacun lit ce qui, de lui, part sur le Discord.
   const discord = solo
-    ? " Au début d'un match diffusé — et avant, s'il est programmé dans la soirée, puis une fois terminé —, ton pseudo est aussi annoncé sur le Discord de l'association : cette annonce fait partie du tournoi auquel tu t'inscris, le nom neutre ne s'y applique pas, et elle est supprimée sur demande."
-    : " Au début d'un match diffusé — et avant, s'il est programmé dans la soirée, puis une fois terminé —, le nom de ton équipe est aussi annoncé sur le Discord de l'association.";
+    ? " Au début d'un match diffusé — et avant, si sa diffusion doit s'ouvrir à son heure de début dans la soirée, puis une fois terminé —, ton pseudo est aussi annoncé sur le Discord de l'association : cette annonce fait partie du tournoi auquel tu t'inscris, le nom neutre ne s'y applique pas, et elle est supprimée sur demande."
+    : " Au début d'un match diffusé — et avant, si sa diffusion doit s'ouvrir à son heure de début dans la soirée, puis une fois terminé —, le nom de ton équipe est aussi annoncé sur le Discord de l'association.";
   return `Les matchs de ce tournoi peuvent être diffusés en direct et enregistrés, avec ${shown} — jamais de webcam ni de chat vocal. Tu peux t'y opposer et apparaître sous un nom neutre.${discord}`;
 }
 

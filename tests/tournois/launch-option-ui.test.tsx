@@ -460,6 +460,24 @@ describe("fiches hors Overwatch : BattleTag absent", () => {
     expect(html).not.toContain("À inviter");
   });
 
+  it("SideCard_contactWithoutBattletagField_drawsNoBattletagLine", () => {
+    const side: LaunchSide = {
+      teamId: 42,
+      name: "Les Bleus",
+      logoUrl: null,
+      isGhost: false,
+      isSolo: false,
+      ready: false,
+      contacts: [{ userId: 7, pseudo: "Alice", roles: ["CAPITAINE"], discordTag: "alice" }],
+      contactsShown: true,
+    };
+
+    const html = renderToStaticMarkup(<SideCard side={side} isHost={false} phase="LAUNCHED" onCopy={noop} laterText="—" />);
+
+    expect(html).toContain("alice");
+    expect(html).not.toContain("BattleTag");
+  });
+
   it("RefereeCard_battletagAbsent_rendersPseudoWithoutBattletagLine", () => {
     const html = renderToStaticMarkup(
       <RefereeCard

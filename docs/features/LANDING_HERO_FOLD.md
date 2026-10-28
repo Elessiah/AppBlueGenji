@@ -25,3 +25,5 @@ Relevé par l'audit UI/UX de l'accueil (2026-09-25) : sur un portable, le bouton
 Aucun défilement horizontal à ces quatre largeurs.
 
 Tests : `tests/app/landing-hero-fold.test.ts` (déclarations CSS ; la position elle-même ne se mesure qu'en navigateur).
+
+Le bf-cache (retour arrière) ne restaure pas `/` : la page est servie en `no-store` (défaut de Next en rendu à la demande). C'est voulu — le lever réafficherait le compte précédent après une déconnexion ; ne pas « réparer ». Aucune ligne du dépôt ne pose ce `no-store` : c'est le défaut de Next pour une page rendue à la demande, et toutes le sont (la mise en page racine dépend du nonce, `lib/shared/csp.ts`). L'écraser dans le middleware rendrait la page restituable après une déconnexion (pseudo et avatar précédents sur un poste partagé) ; `Clear-Site-Data: "cache"` à la déconnexion a été écarté (support inégal selon les navigateurs).

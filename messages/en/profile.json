@@ -135,7 +135,7 @@
     "recruitmentTitle": "Recruitment",
     "openToOffers": "Open to team offers",
     "recruitmentHint": "Ticked, you show up in the directory's “Free agents” filter, marked “FREE AGENT”, as long as you have no team. Unticked by default.",
-    "battletagNotice": "Unticked, your BattleTag stays readable in the “Contacts” window of your matches, in their launch window and, if you cast or referee a match of an Overwatch tournament, on its page."
+    "battletagNotice": "Unticked, your BattleTag stays readable, in an Overwatch tournament, in the “Contacts” window of your matches, in their launch window and, if you cast or referee a match, on its page."
   },
   "save": "Save",
   "saved": "Profile updated.",
@@ -355,14 +355,14 @@
   },
   "battletagNotice": {
     "eyebrow": "VISIBILITY · BATTLETAG",
-    "warning": "You can hide your BattleTag: it stays visible to the members of both teams, admins and referees in a tournament match from the moment both its opponents are known until its end, and to its casters only while the match is being played, in the match's “Contacts” window (and, for the teams, the casters and the assigned referee, its launch window), if you're among the contacts shown. If you cast a match of an Overwatch tournament, both its teams and its other casters also see it while the match is being played, and referees and admins from the moment both its opponents are known until its end. If you are the assigned referee of a match of an Overwatch tournament, both its teams, referees and admins also see it from the moment both its opponents are known until its end, and its casters while the match is being played. In both cases, the match page also shows it, to the same people at the same times as the “Contacts” window. If you don't want them to see it, remove it from your profile (if it comes from Battle.net, unlink your Battle.net account first — after adding another way to log in if it is your only one).",
+    "warning": "You can hide your BattleTag. In a Marvel Rivals tournament, no match shows it; in an Overwatch tournament, it stays visible to the members of both teams, admins and referees in a tournament match from the moment both its opponents are known until its end, and to its casters only while the match is being played, in the match's “Contacts” window (and, for the teams, the casters and the assigned referee, its launch window), if you're among the contacts shown. If you cast a match, both its teams and its other casters also see it while the match is being played, and referees and admins from the moment both its opponents are known until its end. If you are the assigned referee of a match, both its teams, referees and admins also see it from the moment both its opponents are known until its end, and its casters while the match is being played. In both cases, the match page also shows it, to the same people at the same times as the “Contacts” window. If you don't want them to see it, remove it from your profile (if it comes from Battle.net, unlink your Battle.net account first — after adding another way to log in if it is your only one).",
     "title": "Hidden, but not from everyone",
-    "intro": "Your BattleTag will no longer appear anywhere — profile, directory, rosters —, not even to referees and administrators. If it comes from a linked Battle.net account, your player page still says so with a badge — without showing it. It stays readable only in a match's “Contacts” window and in its launch window, at the start of the match — and, if you cast or referee the match in an Overwatch tournament, on its page —, where it's needed to add each other in game:",
+    "intro": "Your BattleTag will no longer appear anywhere — profile, directory, rosters —, not even to referees and administrators. If it comes from a linked Battle.net account, your player page still says so with a badge — without showing it. It stays readable, in Overwatch tournaments only, in a match's “Contacts” window alone and in its launch window, at the start of the match — and, if you cast or referee the match, on its page —, where it's needed to add each other in game:",
     "players": "<strong>The members of both teams of your match</strong>, from the moment both its opponents are known to its end, if you're among the contacts shown — it's how you add each other in game to start the match.",
     "caster": "<strong>The casters of your match</strong>, only while the match is being played (from its start to its end), if you're among the contacts shown.",
-    "asCaster": "<strong>Both teams and the other casters of a match you cast</strong> (Overwatch tournaments only), only while the match is being played (from its start to its end).",
-    "asReferee": "<strong>Both teams and the casters of a match you are the assigned referee of</strong> (Overwatch tournaments only), from the moment both its opponents are known to its end for the teams, only while the match is being played for the casters.",
-    "staff": "<strong>Referees and administrators</strong>, in the same “Contacts” window of the tournament's matches: at the same times as both teams for a match you play, from the moment both its opponents are known until its end for a match you cast or referee in an Overwatch tournament (the launch window only opens for the teams, the casters and the assigned referee; the page of a match you cast or referee repeats it at the same times) — never anywhere else.",
+    "asCaster": "<strong>Both teams and the other casters of a match you cast</strong>, only while the match is being played (from its start to its end).",
+    "asReferee": "<strong>Both teams and the casters of a match you are the assigned referee of</strong>, from the moment both its opponents are known to its end for the teams, only while the match is being played for the casters.",
+    "staff": "<strong>Referees and administrators</strong>, in the same “Contacts” window of the tournament's matches: at the same times as both teams for a match you play, from the moment both its opponents are known until its end for a match you cast or referee (the launch window only opens for the teams, the casters and the assigned referee; the page of a match you cast or referee repeats it at the same times) — never anywhere else.",
     "outro": "To stop sharing it entirely, you have to clear the field — but your opponents will then no longer be able to add you in game. And if a Blizzard account is linked, it controls this field: you have to remove it first (after adding another way to log in if it is your only one).",
     "ok": "Got it"
   },
@@ -438,11 +438,11 @@
       "footer": "Nobody else."
     },
     "battletag": {
-      "title": "Hidden, your BattleTag can only be read in the “Contacts” window of your matches, in their launch window and, if you cast or referee a match of an Overwatch tournament, on its page:",
+      "title": "Hidden, your BattleTag can only be read in an Overwatch tournament, in the “Contacts” window of your matches, in their launch window and, if you cast or referee a match, on its page:",
       "match": "if you're shown there as a contact: the members of both teams, referees and administrators, from the moment the opponents are known until the end of the match, and the casters while the match is being played;",
-      "asCaster": "if you cast a match of an Overwatch tournament: both its teams and its other casters while the match is being played, and referees and administrators from the moment its opponents are known until its end;",
-      "asReferee": "if you are the assigned referee of a match of an Overwatch tournament: both its teams, referees and administrators from the moment its opponents are known until its end, and its casters while the match is being played;",
-      "launch": "the launch window only opens for both teams, the casters and the assigned referee; in an Overwatch tournament, the match page repeats the BattleTag of its casters and its assigned referee, to the same people at the same times as the “Contacts” window.",
+      "asCaster": "if you cast a match: both its teams and its other casters while the match is being played, and referees and administrators from the moment its opponents are known until its end;",
+      "asReferee": "if you are the assigned referee of a match: both its teams, referees and administrators from the moment its opponents are known until its end, and its casters while the match is being played;",
+      "launch": "the launch window only opens for both teams, the casters and the assigned referee; the match page repeats the BattleTag of its casters and its assigned referee, to the same people at the same times as the “Contacts” window.",
       "footer": "To stop sharing it entirely, clear it from your profile (if it comes from Battle.net, unlink Battle.net first, after adding another way to log in if it is your only one)."
     }
   }

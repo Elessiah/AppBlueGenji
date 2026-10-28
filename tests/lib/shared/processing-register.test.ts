@@ -112,7 +112,7 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(subPurposes).toMatch(/aux arbitres tant que le joueur est inscrit à un tournoi qui n'est pas terminé/);
     // Décisions du 2026-10-19 : plus d'accès propre au BattleTag masqué pour le staff,
     // seulement la fenêtre « Contacts », aux mêmes durées que les équipes.
-    expect(subPurposes).toMatch(/Ne présenter aux administrateurs et aux arbitres le BattleTag masqué d'un joueur que dans la fenêtre « Contacts » d'un match du tournoi, aux mêmes durées que pour ses deux équipes/);
+    expect(subPurposes).toMatch(/Ne présenter aux administrateurs et aux arbitres le BattleTag masqué d'un joueur que dans la fenêtre « Contacts » d'un match d'un tournoi Overwatch, aux mêmes durées que pour ses deux équipes/);
   });
 
   it("déclare les transferts vers Discord partout où Discord achemine des messages", () => {

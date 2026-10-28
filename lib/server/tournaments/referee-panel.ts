@@ -10,6 +10,7 @@
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
+import { parseStoredSlots } from "@/lib/shared/round-maps";
 import { visibleText } from "@/lib/shared/visible-text";
 import { refereeEligibilityBlock, type CastEligibilityRow } from "./cast-eligibility";
 
@@ -24,12 +25,19 @@ export type RefereePanel = {
   firstMap: string | null;
   /** La manche du match, pour l'autogestion groupée. */
   round: { phaseId: number; roundNumber: number; bracket: string };
+  /**
+   * Cartes réglées pour la manche (`ROUND_MAPS.md`), vides sans réglage : la
+   * saisie de la première carte est alors fermée et la fenêtre les montre en
+   * lecture seule.
+   */
+  roundSlots: string[][];
   /** Comptes qui remplissent la condition d'arbitrage, par pseudo. */
   candidates: RefereePanelUser[];
 };
 
 type PanelMatchRow = RowDataPacket & {
   id: number;
+  tournament_id: number;
   phase_id: number;
   round_number: number;
   bracket: string;
@@ -48,7 +56,7 @@ type StaffRow = CastEligibilityRow & { id: number; pseudo: string };
 export async function loadRefereePanel(matchId: number): Promise<RefereePanel | null> {
   return withConnection(async (connection) => {
     const [matches] = await connection.execute<PanelMatchRow[]>(
-      `SELECT id, phase_id, round_number, bracket, self_managed, first_map, referee_user_id,
+      `SELECT id, tournament_id, phase_id, round_number, bracket, self_managed, first_map, referee_user_id,
               team1_id, team2_id, status, launched_at
          FROM bg_matches WHERE id = ? LIMIT 1`,
       [matchId],
@@ -66,6 +74,11 @@ export async function loadRefereePanel(matchId: number): Promise<RefereePanel | 
     );
     const byId = new Map(staff.map((row) => [Number(row.id), row]));
     const players = await loadMatchPlayers(connection, match);
+    const [roundRows] = await connection.execute<(RowDataPacket & { slots_json: string | null })[]>(
+      `SELECT slots_json FROM bg_tournament_round_maps
+        WHERE tournament_id = ? AND phase_id = ? AND bracket = ? AND round_number = ? LIMIT 1`,
+      [match.tournament_id, match.phase_id, match.bracket, match.round_number],
+    );
     // Avant le départ, l'arbitre qui joue désormais le match ne compte plus —
     // la règle de l'instantané (`refereeKept`), que le bandeau du staff lit déjà.
     const beforeStart = match.status !== "COMPLETED" && match.launched_at === null;
@@ -85,6 +98,7 @@ export async function loadRefereePanel(matchId: number): Promise<RefereePanel | 
       selfManaged: Number(match.self_managed) === 1,
       firstMap: firstMap === "" ? null : firstMap,
       round: { phaseId: Number(match.phase_id), roundNumber: Number(match.round_number), bracket: String(match.bracket) },
+      roundSlots: parseStoredSlots(roundRows[0]?.slots_json),
       candidates: staff
         // Un joueur du match ne l'arbitre pas (`REFEREE_IS_PLAYER`) : pas proposé.
         .filter((row) => refereeEligibilityBlock(row) === null && !players.has(Number(row.id)))

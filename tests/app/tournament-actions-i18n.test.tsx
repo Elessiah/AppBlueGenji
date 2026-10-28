@@ -324,9 +324,9 @@ describe("français inchangé — les messages égalent les textes d'origine", (
     expect(fr(frActions.cardActions.reportPending, { score1: 2, score2: 1, reporter: fr(frActions.cardActions.reportSide, { side: 2 }) })).toBe(pendingReportNotice(pending));
     expect(frActions.cardActions.reportConflict).toBe(pendingReportNotice({ ...pending, team1Report: report }));
     const launch: Parameters<typeof matchCardActionList>[0]["launch"] = { ...LAUNCH_ALL, isCaster: false, releasesOthers: false };
-    const input: Parameters<typeof matchCardActionList>[0] = { playerScoreLabel: null, launch, inLobby: true, adminScoreLabel: null, showSchedule: true, hasStartAt: true, showOnAir: true, onAir: false, showLiveConfig: true, liveConfigured: false, showReplay: true, hasReplay: false, canReport: true };
+    const input: Parameters<typeof matchCardActionList>[0] = { playerScoreLabel: null, launch, inLobby: true, adminScoreLabel: null, showSchedule: true, hasStartAt: true, showOnAir: true, onAir: false, showLiveConfig: true, liveConfigured: false, showReplay: true, hasReplay: false, canReport: true, showMatchPage: true };
     expect(matchCardActionList(input).map((a) => a.label)).toEqual([
-      "Ouvrir le lancement", "Contacts", "Planifier", "Modifier la date", "Forcer le lancement", "Changer l'équipe hôte", "Arbitrage", "Caster ce match", "Retirer le caster", "Lancer le direct", "Diffuser ce match", "Ajouter la rediff", "Signaler un problème",
+      "Ouvrir le lancement", "Contacts", "Page du match", "Planifier", "Modifier la date", "Forcer le lancement", "Changer l'équipe hôte", "Arbitrage", "Caster ce match", "Retirer le caster", "Lancer le direct", "Diffuser ce match", "Ajouter la rediff", "Signaler un problème",
     ]);
     expect(matchCardActionName("Planifier", "Alpha vs Bravo")).toBe("Planifier : Alpha vs Bravo");
   });

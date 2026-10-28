@@ -189,18 +189,3 @@
   font-size: 12px;
   color: var(--ink-mute);
 }
-
-/* « Voir le match » : vers la page du match (`MATCH_PAGE.md`). */
-.pageLink {
-  margin: 0;
-  padding: 4px 12px;
-  border-top: 1px solid var(--line-strong-cy);
-  font-size: 12px;
-  text-align: center;
-}
-
-.pageLink a {
-  color: var(--blue-300);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}

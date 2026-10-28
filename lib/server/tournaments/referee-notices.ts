@@ -32,7 +32,9 @@ export type RefereeChange =
   /** Autogestion allumée ou éteinte ; allumée, elle retire l'arbitre (`replacedRefereeId`). */
   | { kind: "SELF_MANAGED"; matchId: number; enabled: boolean; replacedRefereeId: number | null }
   /** Première carte posée ou retirée. */
-  | { kind: "FIRST_MAP"; matchId: number; set: boolean };
+  | { kind: "FIRST_MAP"; matchId: number; set: boolean }
+  /** Carte choisie (ou retirée) dans le pool de la manche, par l'arbitrage ou une équipe (`byTeam`). */
+  | { kind: "MAP_PICK"; matchId: number; set: boolean; byTeam: boolean };
 
 /** Ligne du journal de ce changement. */
 export function refereeLogChange(change: RefereeChange): RefereeLogChange {
@@ -49,6 +51,9 @@ export function refereeLogChange(change: RefereeChange): RefereeLogChange {
       return change.enabled ? "SELF_MANAGED_ON" : "SELF_MANAGED_OFF";
     case "FIRST_MAP":
       return change.set ? "FIRST_MAP_SET" : "FIRST_MAP_CLEARED";
+    case "MAP_PICK":
+      if (!change.set) return "MAP_PICK_CLEARED";
+      return change.byTeam ? "MAP_PICKED_BY_TEAM" : "MAP_PICKED";
   }
 }
 

@@ -102,8 +102,16 @@ const played = bracketMatch({
 });
 
 describe("MatchRow — chaque public retrouve ses actions", () => {
-  it("spectateur : aucune action", () => {
-    expect(card(launched())).not.toContain("data-action=");
+  it("spectateur : aucun geste, seulement la page du match en principale", () => {
+    const html = card(launched());
+    expect(html.match(/data-action="/g)).toHaveLength(1);
+    expect(html).toContain('data-action="matchPage" data-primary="true"');
+  });
+
+  it("engagé : la page du match passe au menu, derrière son score", () => {
+    const html = card(launched(), { myTeamId: 10, canReport: true, playerScore: true });
+    expect(html).toContain('data-action="matchPage">');
+    expect(html).not.toContain('data-action="matchPage" data-primary');
   });
 
   it("engagé : saisie du score en principale, lancement et signalement au menu", () => {

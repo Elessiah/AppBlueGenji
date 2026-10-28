@@ -56,7 +56,7 @@ première instruction ; un match joué (`MATCH_ALREADY_COMPLETED`) ou exempt
 | `PUT /api/admin/matches/[id]/referee` | désigner `{ userId }` ou retirer `{ userId: null }` | `tournaments` |
 | `PUT /api/admin/matches/[id]/self-management` | autogestion du match `{ enabled }` | `tournaments` |
 | `PUT /api/admin/tournaments/[id]/self-management` | autogestion d'une manche entière `{ phaseId, roundNumber, bracket, enabled }` (`INVALID_ROUND`) | `tournaments` |
-| `PUT /api/admin/matches/[id]/first-map` | première carte `{ map }`, vide = retirer (`INVALID_FIRST_MAP`, rattaché au champ) | `tournaments` |
+| `PUT /api/admin/matches/[id]/first-map` | première carte `{ map }`, vide = retirer (`INVALID_FIRST_MAP`, rattaché au champ ; 409 `ROUND_MAPS_SET` quand le tour a des cartes — la fenêtre les montre alors en lecture seule, `ROUND_MAPS.md`) | `tournaments` |
 
 Désigner un arbitre éteint l'autogestion ; l'allumer retire l'arbitre (prévenu,
 motif `SELF_MANAGED`). Les erreurs ne portent qu'un code (`fail`), traduites en
@@ -164,8 +164,16 @@ T04) — aucun interrupteur dans le code, le texte seul le dit. Il peut se
 retirer d'un match à tout moment, le staff pouvant lui confier de nouveau ce
 match, sans avis ; exécution du service (les arbitres agissant pour
 l'association) pour son « Prêt » et l'avis du retrait. L'entrée
-`2026-10-arbitre-designe-des-matchs` (intérêt légitime, opposition), en
-production depuis #487, n'est pas réécrite ; l'entrée
+`2026-10-arbitre-designe-des-matchs` (intérêt légitime, opposition), datée du
+2026-10-29, a été rectifiée en place avant sa publication (EF-19, #501). Une
+opposition retenue fait que le staff ne confie plus de match à cet arbitre, ceux qu'il
+tient déjà lui restant (décision L430 : mesure d'organisation, rien ne
+l'impose dans le code ; le retrait de ses matchs non terminés (décision du 2026-10-28 : « ceux de l'équipe opposante », portée à préciser au lancement du lot, l'opposition étant celle de l'arbitre)
+viendra avec le lot REFEREE-OBJECTION et sa propre entrée rectificative) ; l'entrée
 `2026-10-conditions-v7-casters-et-arbitre` annonce le passage au contrat à
 l'acceptation de la version 7. Devenir joueur du match ne retire l'arbitre qu'avant le
 lancement (`keepEligibleReferees`) : conditions, `/rgpd` et T04 le disent.
+
+## Cartes par manche
+
+Une manche peut imposer ses cartes ou ouvrir des pools, et le tournoi porte ses règles de ban (ordre, perdant de la carte précédente) : `ROUND_MAPS.md`.

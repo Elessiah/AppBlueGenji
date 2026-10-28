@@ -89,8 +89,10 @@ comprise), du BattleTag (`canViewBattletag`), pastilles de
 certification lues par tout joueur connecté même tag masqué (registre),
 contacts présentés aux deux équipes, au caster, aux arbitres et administrateurs
 du site dès que les deux adversaires sont connus (T04, bouton « Contacts ») —
-le BattleTag d'un contact, vérifié ou non, sort même masqué, **quel que soit le
-jeu** (Marvel Rivals compris), la certification ne faisant que passer devant —,
+le BattleTag d'un contact, vérifié ou non, sort même masqué, **en Overwatch
+seulement** (hors Overwatch, le lancement ne l'envoie pas, décision 38 : la
+variante « Discord seul » n'en parle plus), la certification ne faisant que
+passer devant —,
 messages privés du bot (match : tag certifié, coupables ; adhésion,
 modération, données : Discord rattaché, ce que fait la certification par code),
 rattachement (le compte rattaché pour certifier devient un moyen de connexion ;
@@ -156,8 +158,8 @@ l'onglet.
 - Lecture : `lib/server/tournaments/certification-prompt.ts`
   (`loadCertificationPrompt`, une requête sur le roster en cours — `loadRosters`
   et `toCandidate` du lancement, `match-launch-info.ts` : les certifications se
-  lisent comme au lancement ; seule différence voulue, en Marvel Rivals un
-  BattleTag vérifié ne compte pas comme contact), appelée par
+  lisent comme au lancement ; en Marvel Rivals un BattleTag vérifié ne compte
+  pas comme contact, au lancement non plus — `sideContacts`, décision 38), appelée par
   `getTournamentViewerContext` — **porte commune** du flux SSE et de la lecture
   REST de secours — seulement pour une équipe engagée dans un tournoi non clos :
   une requête indexée, gardée une minute par lecteur

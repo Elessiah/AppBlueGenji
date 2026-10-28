@@ -226,7 +226,7 @@ nouvelle, le bot n'écrit qu'aux membres du serveur BlueGenji.
   processus concurrents pourraient tous deux l'enjamber.
 - **Un message par compte**, qui résume (titre, date, résumé) tous les
   changements qu'il n'a ni lus sur le site ni déjà reçus, et renvoie au site
-  pour le détail — en disant qu'aucun accord n'est demandé. Borné à 1 800 caractères (plafond du bot) : le balayage n'envoie et
+  pour le détail — en disant qu'aucun accord n'est demandé, sauf quand le message porte des conditions d'utilisation à accepter (`asksTermsAcceptance` sur l'entrée, posé pour toute version des conditions depuis la version 7) : `privacyChangesForOneMessage` les met **en tête** du lot, si bien qu'elles partent toujours dans le premier message, et le pied dit alors que seules ces conditions demandent l'accord, si elles ne sont pas encore acceptées, « pour le reste » aucun accord (dans un aperçu, `buildPrivacyChangesMessage` le dit aussi quand elles ne sont que comptées). Borné à 1 800 caractères (plafond du bot) : le balayage n'envoie et
   ne **réserve** que les changements qu'un message peut nommer tous
   (`privacyChangesForOneMessage`), et le reste part au message suivant — un mois plus tard au plus tôt, l'intervalle minimal valant pour lui aussi (revers : un premier message parti tard dans la fenêtre de 60 jours peut en laisser sortir ce reste avant le suivant ; la modale, elle, l'a présenté). Le
   repli qui *compte* les derniers (« … et 1 autre ») ne suffit pas à l'envoi :

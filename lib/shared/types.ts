@@ -8,6 +8,7 @@ import type { MatchLiveTrigger } from "./live-streams";
 import type { CastBlock } from "./match-launch";
 import type { CertificationPrompt } from "./certification-prompt";
 import type { ParticipantType } from "./participants";
+import type { TournamentMapRules } from "./round-maps";
 import type {
   RegistrationFilterError,
   RegistrationFilters,
@@ -646,7 +647,10 @@ export type BracketMatch = {
    * `lib/shared/match-referee.ts`).
    */
   hostTeamId: number | null;
-  /** L'équipe qui bannit la première : celle qui n'héberge pas (`firstBanTeamId`). */
+  /**
+   * L'équipe qui bannit sur la carte 1, selon la règle du tournoi
+   * (`mapRules.firstBan` : celle qui n'héberge pas par défaut — `ROUND_MAPS.md`).
+   */
   firstBanTeamId: number | null;
   /**
    * Le match a-t-il un arbitre désigné (`docs/features/MATCH_REFEREE.md`) ?
@@ -660,8 +664,13 @@ export type BracketMatch = {
   refereeReady: boolean;
   /** Match en autogestion : sans arbitre, les équipes créent et règlent la partie. */
   selfManaged: boolean;
-  /** Première carte, saisie par le staff ; `null` = pas encore fixée. */
+  /**
+   * Première carte **affichée** ; `null` = pas encore fixée. Une carte imposée
+   * par la manche l'emporte sur la saisie du match (`ROUND_MAPS.md`).
+   */
   firstMap: string | null;
+  /** Cartes choisies dans un pool au-delà de la carte 1 (`{"2":"Ilios"}`). */
+  mapPicks: Record<string, string>;
   /**
    * Casters inscrits sur ce match, dans l'ordre d'inscription (aucun plafond) ;
    * un caster devenu inéligible avant le lancement en est tu.
@@ -732,6 +741,12 @@ export type TournamentSnapshot = {
    * rang, `null` pour une engagée sans rang figé (rangée en dernier).
    */
   seedingSource: SeedingSource;
+  /**
+   * Cartes par manche et règles de ban du tournoi (`docs/features/ROUND_MAPS.md`) :
+   * dans l'instantané commun, donc servies à l'identique par le flux et par le
+   * REST de secours. Aucune donnée personnelle (noms de cartes).
+   */
+  mapRules: TournamentMapRules;
   /**
    * Empreinte du contenu ci-dessus. Deux instantanés de même version portent la
    * même information : le serveur s'abstient alors de les envoyer, et le client

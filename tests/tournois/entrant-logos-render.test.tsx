@@ -190,6 +190,7 @@ function match(overrides: Partial<BracketMatch> = {}): BracketMatch {
     refereeReady: false,
     selfManaged: false,
     firstMap: null,
+    mapPicks: {},
     casters: [],
     lobbyOpenedAt: null,
     launchedAt: null,

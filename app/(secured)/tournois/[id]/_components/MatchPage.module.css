@@ -15,15 +15,9 @@
   margin-bottom: 8px;
 }
 
-.crumbs {
-  min-width: 0;
-  font-size: 13px;
-}
-
+/* Retour à la fiche : le style du « ← Retour » de l'en-tête du tournoi, repris tel quel. */
 .back {
-  color: var(--blue-300);
-  text-decoration: underline;
-  overflow-wrap: anywhere;
+  composes: back from "./TournamentHeader.module.css";
 }
 
 .header {
@@ -39,6 +33,7 @@
 
 .meta {
   margin: 4px 0 0;
+  overflow-wrap: anywhere;
   color: var(--ink-soft);
   font-size: 13px;
 }
@@ -163,6 +158,15 @@
   font-size: 13px;
 }
 
+.stepSettings {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  list-style: disc;
+  display: grid;
+  gap: 2px;
+  color: var(--ink-mute);
+}
+
 .streams {
   list-style: none;
   margin: 0;
@@ -234,4 +238,68 @@
     text-align: left;
     align-items: flex-start;
   }
+}
+
+/* Cartes du round (`MatchRoundMaps`) : liste ordonnée, choix dans un pool. */
+.roundMaps {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.roundMapsActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.subTitle {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.mapSlots {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mapSlot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+
+.mapNumber {
+  flex: 0 0 auto;
+  min-width: 64px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.mapValue {
+  display: flex;
+  flex: 1 1 200px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.mapPick {
+  flex: 0 1 220px;
+  min-width: 0;
+}
+
+.ruleText {
+  font-weight: 400;
+  font-size: 13px;
 }

@@ -79,9 +79,9 @@ async function accountChoiceSet(
  * pas besoin, s'il n'est plus dans le roster (départ entre deux lectures), ou
  * s'il a coché « Ne plus voir » dans cette modale (gardé sur **son** compte,
  * `bg_users.certification_prompt_dismissed_at` : jamais celui d'un autre
- * compte du même navigateur). Seule différence voulue avec le lancement : en
- * Marvel Rivals, un BattleTag vérifié ne compte pas comme contact
- * (`teamHasContact`), même si le lancement le présente.
+ * compte du même navigateur). En Marvel Rivals, un BattleTag vérifié ne compte
+ * pas comme contact (`teamHasContact`) : le lancement ne le présente pas non
+ * plus (`sideContacts`, décision de l'utilisateur 38).
  */
 export async function loadCertificationPrompt(
   executor: Pick<PoolConnection, "execute">,

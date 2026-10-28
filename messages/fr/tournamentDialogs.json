@@ -391,7 +391,7 @@
         "does": "Tu passes devant les membres qui n'ont rien certifié pour être présenté comme contact de ton équipe — aux deux équipes du match, à ses casters, aux arbitres et aux administrateurs du site —, avec ton tag Discord certifié et ton BattleTag marqué « vérifié ».",
         "doesDiscordOnly": "Tu passes devant les membres qui n'ont rien certifié pour être présenté comme contact de ton équipe — aux deux équipes du match, à ses casters, aux arbitres et aux administrateurs du site —, avec ton tag Discord certifié.",
         "doesNot": "Ne publie pas ton tag sur ta fiche : les autres joueurs y voient une pastille, et ton tag seulement si tes réglages de visibilité l'ouvrent (case « Tag Discord » pour le tag Discord, même cochée avant). Certifié ou non, présenté comme contact, ton BattleTag est montré même masqué, dès que les deux adversaires du match sont connus et jusqu'à sa fin.",
-        "doesNotDiscordOnly": "Ne publie pas ton tag sur ta fiche : les autres joueurs y voient une pastille, et ton tag seulement si tu as coché « Tag Discord » dans tes réglages (même avant). Si ta fiche porte un BattleTag, présenté comme contact, il est montré même masqué, dès que les deux adversaires du match sont connus et jusqu'à sa fin."
+        "doesNotDiscordOnly": "Ne publie pas ton tag sur ta fiche : les autres joueurs y voient une pastille, et ton tag seulement si tu as coché « Tag Discord » dans tes réglages (même avant)."
       },
       "messages": {
         "topic": "Les messages du bot",

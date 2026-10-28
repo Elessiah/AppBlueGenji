@@ -92,6 +92,8 @@ type World = {
   writes: string[];
   /** Réservations d'alerte d'arbitrage (`bg_referee_alerts`), `match:clé`. */
   alerts?: string[];
+  /** Cartes réglées de la manche du match (`bg_tournament_round_maps.slots_json`), aucune par défaut. */
+  roundSlots?: string;
 };
 
 const STAMP = "2026-09-24 20:00:00";
@@ -267,6 +269,17 @@ function readCastRows(state: World, sql: string): unknown[] | null {
   return null;
 }
 
+/** Lectures de la première carte et des cartes de la manche (`ROUND_MAPS.md`), `null` pour les autres requêtes. */
+function readFirstMapRows(state: World, sql: string): [unknown, unknown[]] | null {
+  if (sql.startsWith("SELECT tournament_id, status, first_map, phase_id, bracket, round_number FROM bg_matches")) {
+    return [state.match ? [{ ...state.match }] : [], []];
+  }
+  if (sql.startsWith("SELECT slots_json FROM bg_tournament_round_maps")) {
+    return [state.roundSlots ? [{ slots_json: state.roundSlots }] : [], []];
+  }
+  return null;
+}
+
 /** Lectures et réservations du bloc « arbitre désigné », `null` pour les autres requêtes. */
 function readRefereeRows(state: World, sql: string, params: unknown[]): [unknown, unknown[]] | null {
   if (sql.startsWith("SELECT 1 FROM bg_referee_alerts")) {
@@ -276,9 +289,8 @@ function readRefereeRows(state: World, sql: string, params: unknown[]): [unknown
     state.alerts = [...(state.alerts ?? []), `${params[0]}:${params[1]}`];
     return [{ affectedRows: 1, insertId: state.alerts.length }, []];
   }
-  if (sql.startsWith("SELECT tournament_id, status, first_map FROM bg_matches")) {
-    return [state.match ? [{ ...state.match }] : [], []];
-  }
+  const mapRows = readFirstMapRows(state, sql);
+  if (mapRows) return mapRows;
   if (sql.startsWith("SELECT id FROM bg_tournaments")) {
     return [state.match ? [{ id: state.match.tournament_id }] : [], []];
   }
@@ -1271,6 +1283,41 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
     await expect(setMatchFirstMap(42, 12)).rejects.toThrow("INVALID_FIRST_MAP");
     state.match = matchState({ status: "COMPLETED" });
     await expect(setMatchFirstMap(42, "Ilios")).rejects.toThrow("MATCH_ALREADY_COMPLETED");
+  });
+
+  it("setMatchFirstMap_roundWithPool_refusesRoundMapsSet", async () => {
+    state.roundSlots = '[["Ilios","Nepal"]]';
+    await expect(setMatchFirstMap(42, "Nepal")).rejects.toThrow("ROUND_MAPS_SET");
+    expect(state.match?.first_map).toBeNull();
+  });
+
+  it("setMatchFirstMap_roundWithImposedMap_refusesRoundMapsSet", async () => {
+    state.roundSlots = '[["Busan"]]';
+    await expect(setMatchFirstMap(42, "")).rejects.toThrow("ROUND_MAPS_SET");
+    expect(queueRefereeChange).not.toHaveBeenCalled();
+  });
+
+  it("setMatchFirstMap_inTransaction_locksTournamentFirst", async () => {
+    const base = executeFor(state);
+    const statements: string[] = [];
+    jest.mocked(withConnection).mockImplementation((run) =>
+      run(
+        fakeConnection({
+          execute: async (sql: string, params: unknown[] = []) => {
+            statements.push(sql);
+            return base(sql, params);
+          },
+          beginTransaction: async () => {
+            statements.push("BEGIN");
+          },
+          commit: async () => undefined,
+          rollback: async () => undefined,
+        }),
+      ),
+    );
+    await setMatchFirstMap(42, "Ilios");
+    const begin = statements.indexOf("BEGIN");
+    expect(statements[begin + 1]).toMatch(/FROM bg_tournaments WHERE id = \? FOR UPDATE/);
   });
 
   it("retire d'office un arbitre devenu inéligible avant le lancement, jamais après", async () => {

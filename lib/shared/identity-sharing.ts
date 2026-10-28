@@ -55,12 +55,12 @@ export const DISCORD_TAG_AUDIENCE: IdentityAudience = {
  * connexion par Blizzard) et sur la fiche de son titulaire.
  */
 export const HIDDEN_BATTLETAG_AUDIENCE: IdentityAudience = {
-  title: "Masqué, ton BattleTag ne se lit plus que dans la fenêtre « Contacts » de tes matchs, dans leur fenêtre de lancement et, si tu castes ou arbitres un match d'un tournoi Overwatch, sur sa page :",
+  title: "Masqué, ton BattleTag ne se lit plus que dans un tournoi Overwatch, dans la fenêtre « Contacts » de tes matchs, dans leur fenêtre de lancement et, si tu castes ou arbitres un match, sur sa page :",
   items: [
     "si tu y es présenté comme contact : les membres des deux équipes, les arbitres et les administrateurs, dès que les adversaires sont connus et jusqu'à la fin du match, et les casters le temps du match ;",
-    "si tu castes un match d'un tournoi Overwatch : ses deux équipes et ses autres casters le temps du match, et les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin ;",
-    "si tu es l'arbitre désigné d'un match d'un tournoi Overwatch : ses deux équipes, les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin, et ses casters le temps du match ;",
-    "la fenêtre de lancement, elle, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné ; dans un tournoi Overwatch, la page du match reprend le BattleTag de ses casters et de son arbitre désigné, aux mêmes personnes et aux mêmes moments que la fenêtre « Contacts ».",
+    "si tu castes un match : ses deux équipes et ses autres casters le temps du match, et les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin ;",
+    "si tu es l'arbitre désigné d'un match : ses deux équipes, les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin, et ses casters le temps du match ;",
+    "la fenêtre de lancement, elle, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné ; la page du match reprend le BattleTag de ses casters et de son arbitre désigné, aux mêmes personnes et aux mêmes moments que la fenêtre « Contacts ».",
   ],
   footer:
     "Pour ne plus le partager du tout, efface-le de ton profil (s'il vient de Battle.net, détache d'abord Battle.net, après avoir ajouté un autre moyen de connexion si c'est le seul).",

@@ -330,6 +330,53 @@ describe("buildPrivacyChangesMessage", () => {
     expect(buildPrivacyChangesMessage([A], "https://x.fr", "en")).toContain("our privacy rules have changed");
     expect(buildPrivacyChangesMessage([A], null, "en")).not.toMatch(/https?:/);
   });
+
+  // EF-19 : des conditions à accepter (`asksTermsAcceptance`) parmi les changements
+  // dus, nommés ou seulement comptés : le pied ne dit plus « aucun accord » sans exception.
+  const TERMS_FOOTER = {
+    fr: "Seules les nouvelles conditions d'utilisation demandent ton accord, si tu ne les as pas encore acceptées ; pour le reste, aucun accord ne t'est demandé : la politique",
+    en: "Only the new terms of use need your agreement, if you haven't accepted them yet; for the rest, no consent is asked of you: the privacy policy",
+  } as const;
+  const PLAIN_FOOTER = { fr: "Aucun accord ne t'est demandé : la politique", en: "No consent is asked of you: the privacy policy" } as const;
+  const LOCALES = ["fr", "en"] as const;
+  const terms = change("conditions", "2026-02-01", { summary: "y".repeat(300), asksTermsAcceptance: true });
+
+  it("buildPrivacyChangesMessage_namedChangeAsksTermsAcceptance_footerSaysOnlyTheTermsNeedAgreement", () => {
+    for (const locale of LOCALES) {
+      expect(buildPrivacyChangesMessage([A, terms], "https://bluegenji.fr", locale)).toContain(TERMS_FOOTER[locale]);
+    }
+  });
+
+  it("buildPrivacyChangesMessage_noChangeAsksTermsAcceptance_footerKeepsPlainNoConsent", () => {
+    for (const locale of LOCALES) {
+      const message = buildPrivacyChangesMessage([A, C], "https://bluegenji.fr", locale);
+      expect(message).toContain(PLAIN_FOOTER[locale]);
+      expect(message).not.toContain(TERMS_FOOTER[locale]);
+    }
+  });
+
+  it("buildPrivacyChangesMessage_termsChangeOnlyCounted_footerStillSaysTheTermsNeedAgreement", () => {
+    const filler = Array.from({ length: 6 }, (_, i) => change(`long-${i}`, "2026-02-01", { summary: "x".repeat(300) }));
+
+    const message = buildPrivacyChangesMessage([...filler, terms], "https://bluegenji.fr");
+
+    expect(message).toMatch(/… et \d+ autre\(s\) changement\(s\)\./);
+    expect(message).not.toContain("Titre conditions");
+    expect(message).toContain(TERMS_FOOTER.fr);
+    expect(message.length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+  });
+});
+
+// EF-19 : depuis la version 7, toute entrée qui annonce une version des
+// conditions la dit à accepter, pour le pied du message privé.
+describe("PRIVACY_CHANGES — versions des conditions à accepter", () => {
+  it("PRIVACY_CHANGES_termsVersionEntriesSinceV7_carryAsksTermsAcceptance", () => {
+    const termsEntries = PRIVACY_CHANGES.filter(
+      (entry) => entry.publishedAt >= "2026-10-29" && entry.title.startsWith("Conditions d'utilisation : version"),
+    );
+    expect(termsEntries.map((entry) => entry.id)).toContain("2026-10-conditions-v7-casters-et-arbitre");
+    expect(termsEntries.filter((entry) => entry.asksTermsAcceptance !== true)).toEqual([]);
+  });
 });
 
 describe("announceablePrivacyChanges", () => {
@@ -370,6 +417,39 @@ describe("privacyChangesForOneMessage", () => {
     expect(privacyChangesForOneMessage([], null)).toEqual([]);
   });
 
+  // EF-19 : des conditions à accepter partent toujours dans le premier message.
+  it("privacyChangesForOneMessage_termsToAcceptAfterLongChanges_putsTheTermsFirstInBothLanguages", () => {
+    const terms = change("conditions", "2026-01-20", { asksTermsAcceptance: true });
+    const fr = [long("a"), long("b"), long("c"), terms];
+    const en = fr.map((entry) => ({ ...entry, summary: `${entry.summary} (en)` }));
+
+    const batch = privacyChangesForOneMessage(fr, "https://bluegenji.fr", en);
+
+    expect(batch.map((c) => c.id)).toEqual(["conditions", "a"]);
+    expect(buildPrivacyChangesMessage(batch, "https://bluegenji.fr")).toContain("Seules les nouvelles conditions d'utilisation demandent ton accord");
+  });
+
+  it("privacyChangesForOneMessage_flagOnFrenchOnly_englishFollowsFrenchOrder", () => {
+    const fr = [long("a"), long("b"), change("conditions", "2026-01-20", { asksTermsAcceptance: true })];
+    // Anglais sans drapeau, et des conditions longues : seules, elles tiennent ;
+    // suivies de « a » (même ordre qu'en français), plus.
+    const en = fr.map(({ asksTermsAcceptance: _flag, ...entry }) =>
+      entry.id === "conditions" ? { ...entry, summary: "y".repeat(1100) } : entry,
+    );
+
+    const batch = privacyChangesForOneMessage(fr, "https://bluegenji.fr", en);
+
+    expect(batch.map((c) => c.id)).toEqual(["conditions"]);
+  });
+
+  it("privacyChangesForOneMessage_realRegistryDueSinceOct29_firstMessageCarriesTheV7Terms", () => {
+    const due = PRIVACY_CHANGES.filter((entry) => entry.publishedAt === "2026-10-29");
+
+    const batch = privacyChangesForOneMessage(due, "https://bluegenji.fr", localizedPrivacyChanges(due, "en"));
+
+    expect(batch[0]?.id).toBe("2026-10-conditions-v7-casters-et-arbitre");
+  });
+
   it("avec l'anglais, le lot doit tenir dans les deux langues (BOT-NOTIF-LANG)", () => {
     const fr = [long("a"), long("b"), long("c")];
     // Les mêmes changements, plus longs en anglais : seuls deux tiennent ensemble.
@@ -387,9 +467,10 @@ describe("privacyChangesForOneMessage", () => {
     while (rest.length > 0) {
       const english = localizedPrivacyChanges(rest, "en");
       const batch = privacyChangesForOneMessage(rest, "https://bluegenji.fr", english);
-      const message = buildPrivacyChangesMessage(english.slice(0, batch.length), "https://bluegenji.fr", "en");
-      for (const entry of english.slice(0, batch.length)) expect(message).toContain(entry.title);
-      rest = rest.slice(batch.length);
+      const englishBatch = localizedPrivacyChanges(batch, "en");
+      const message = buildPrivacyChangesMessage(englishBatch, "https://bluegenji.fr", "en");
+      for (const entry of englishBatch) expect(message).toContain(entry.title);
+      rest = rest.filter((entry) => !batch.includes(entry));
     }
   });
 
@@ -399,7 +480,7 @@ describe("privacyChangesForOneMessage", () => {
       const batch = privacyChangesForOneMessage(rest, "https://bluegenji.fr");
       const message = buildPrivacyChangesMessage(batch, "https://bluegenji.fr");
       for (const entry of batch) expect(message).toContain(entry.title);
-      rest = rest.slice(batch.length);
+      rest = rest.filter((entry) => !batch.includes(entry));
     }
   });
 });
@@ -1689,8 +1770,8 @@ describe("PRIVACY_CHANGES — réglages du salon envoyés aux managers (MATCH-RE
   const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-reglages-du-salon-aux-managers")!;
   const english = PRIVACY_CHANGES_EN["2026-10-reglages-du-salon-aux-managers"];
 
-  it("précède l'entrée des conditions v7 : datée comme elle, lendemain de la mise en ligne prévue (§ Dates corrigées), pour tous les comptes, et tient seule dans un message privé (FR et EN)", () => {
-    expectStandaloneEntry(entry, english, { fromEnd: 5, publishedAt: "2026-10-30", audience: undefined, links: [
+  it("précède l'entrée des conditions v7 : datée comme elle, lendemain de la mise en ligne (§ Dates corrigées), pour tous les comptes, et tient seule dans un message privé (FR et EN)", () => {
+    expectStandaloneEntry(entry, english, { fromEnd: 5, publishedAt: "2026-10-29", audience: undefined, links: [
       { href: "/rgpd#messages-de-match", label: "Lire le paragraphe « Messages privés Discord de match »" },
     ] });
   });
@@ -1734,7 +1815,13 @@ describe("PRIVACY_CHANGES — conditions v7 : casters, arbitre désigné et page
         { href: "/rgpd#arbitre-designe", label: "Lire le paragraphe « Arbitre désigné d'un match »" },
       ],
     });
-    expect(TERMS_UPDATED_AT).toBe("2026-10-30");
+    expect(TERMS_UPDATED_AT).toBe("2026-10-29");
+  });
+
+  it("PRIVACY_CHANGES_v7_asksTermsAcceptance : à accepter, dit dans le résumé (FR et EN)", () => {
+    expect(entry.asksTermsAcceptance).toBe(true);
+    expect(entry.summary).toContain("Elle est à accepter : une fenêtre te la présente tant que tu ne l'as pas acceptée.");
+    expect(english.summary).toContain("It must be accepted: a window presents it to you until you have accepted it.");
   });
 
   it("annonce la version en vigueur et sa date, avec un libellé anglais par lien (FR et EN)", () => {
@@ -1742,7 +1829,7 @@ describe("PRIVACY_CHANGES — conditions v7 : casters, arbitre désigné et page
     expect(entry.summary).toMatch(new RegExp(`conditions d'utilisation passent en version ${TERMS_VERSION}`));
     expect(entry.details.at(-1)).toContain(`version ${TERMS_VERSION}, en vigueur depuis le ${formatTermsDate(TERMS_UPDATED_AT)}`);
     expect(english.summary).toMatch(new RegExp(`terms of use move to version ${TERMS_VERSION}`));
-    expect(english.details.at(-1)).toContain(`version ${TERMS_VERSION}, in force since 30 October 2026`);
+    expect(english.details.at(-1)).toContain(`version ${TERMS_VERSION}, in force since 29 October 2026`);
     expect([english.details.length, english.linkLabels?.length ?? 0]).toEqual([entry.details.length, entry.links?.length ?? 0]);
   });
 
@@ -1762,7 +1849,7 @@ describe("PRIVACY_CHANGES — conditions v7 : casters, arbitre désigné et page
     expect(en).toContain("objecting through the report form no longer applies to it");
     expect(en).toContain("Until you accept it, it still rests on legitimate interest, and you can object to it through the report form (GDPR category)");
     // Revue juridique de #491 : opposition déjà retenue, arbitre devenu joueur, arbitre qui caste aussi.
-    expect(fr).toContain("une opposition déjà retenue continue de valoir (le staff ne te confie plus de match)");
+    expect(fr).toContain("une opposition déjà retenue continue de valoir (le staff ne te confie plus de match ; ceux que tu tiens déjà te restent)");
     // Avant l'acceptation, la fenêtre bloquante couvre les tournois : le retrait passe par le formulaire (/signalements, page libre).
     expect(fr).toContain("la fenêtre d'acceptation couvrant alors les pages des tournois, tu te retires d'un match en le demandant par ce même formulaire");
     expect(en).toContain("as the acceptance window then covers the tournament pages, you withdraw from a match by asking for it through that same form");
@@ -1770,7 +1857,7 @@ describe("PRIVACY_CHANGES — conditions v7 : casters, arbitre désigné et page
     // Revue juridique de #491 : la page du match montre aussi le pseudo de l'arbitre désigné.
     expect(fr).toContain("et le pseudo et le BattleTag, même masqué, de l'arbitre désigné, aux mêmes personnes");
     expect(en).toContain("and the assigned referee's username and BattleTag, even when hidden, to the same people");
-    expect(en).toContain("an objection already upheld still stands (the staff no longer assigns you matches)");
+    expect(en).toContain("an objection already upheld still stands (the staff no longer assigns you matches; those you already hold stay yours)");
     expect(fr).toContain("ou si tu deviens joueur du match avant son lancement, tu n'es plus présenté");
     expect(en).toContain("or become a player of the match before its launch, you are no longer presented");
     expect(fr).toContain("jamais son tag Discord à ce titre (s'il caste aussi le match, ses contacts de caster suivent la règle des casters)");
@@ -1781,10 +1868,10 @@ describe("PRIVACY_CHANGES — conditions v7 : casters, arbitre désigné et page
   it("dit le message #live de la soirée avant et après le match, et la suppression depuis la fenêtre d'acceptation (FR et EN)", () => {
     const fr = entry.details.join(" ");
     const en = english.details.join(" ");
-    expect(fr).toContain("avant le début d'un match programmé dans la soirée et une fois le match terminé, pas seulement à son départ");
+    expect(fr).toContain("avant le début d'un match programmé dans la soirée (un match dont la diffusion doit s'ouvrir à son heure de début) et une fois le match terminé, pas seulement à son départ");
     expect(fr).toContain("ne laisse aucune trace sur le site");
     expect(fr).toContain("supprimer ton compte directement depuis la fenêtre qui te les présente");
-    expect(en).toContain("before a match scheduled that evening starts and once the match is finished, not only when it starts");
+    expect(en).toContain("before a match scheduled that evening starts (a match whose broadcast is set to open at its start time) and once the match is finished, not only when it starts");
     expect(en).toContain("leaves no trace on the site");
     expect(en).toContain("delete your account directly from the window that presents them to you");
   });
@@ -1801,7 +1888,7 @@ describe("PRIVACY_CHANGES — « Ne plus voir » de l'invitation à certifier su
   it("précède l'entrée rectificative EF-05, datée comme l'entrée précédente, pour tous les comptes, et tient seule dans un message privé (FR et EN)", () => {
     expectStandaloneEntry(entry, english, {
       fromEnd: 3,
-      publishedAt: "2026-10-30",
+      publishedAt: "2026-10-29",
       audience: undefined,
       links: [{ href: "/rgpd#cookies", label: "Lire la section « Cookies & traceurs »" }],
     });
@@ -1856,54 +1943,73 @@ describe("PRIVACY_CHANGES — marque de session de la proposition de certificati
   it("précède l'entrée du BattleTag hors Overwatch, datée comme l'entrée précédente, pour tous les comptes, et tient seule dans un message privé (FR et EN)", () => {
     expectStandaloneEntry(entry, english, {
       fromEnd: 2,
-      publishedAt: "2026-10-30",
+      publishedAt: "2026-10-29",
       audience: undefined,
       links: [{ href: "/rgpd#donnees-collectees", label: "Lire la section « Données collectées »" }],
     });
     expect(english.linkLabels).toEqual(["Read the “Data collected” section"]);
   });
 
+  // Son texte n'est figé qu'à un endroit : tests/lib/shared/legal-texts-ef05.test.ts.
   it("rectifie l'entrée du 21 octobre sans la réécrire (FR et EN)", () => {
-    expectEntryTexts(entry, english, {
-      fr: ["Précision sur l'information du 21 octobre 2026", "levée à ta première réponse", "ne figure pas dans l'export de tes données"],
-      en: ["A clarification of the information of October 21, 2026", "cleared at your first answer", "isn't included in the export of your data"],
-    });
+    expect([english.details.length, english.linkLabels?.length ?? 0]).toEqual([entry.details.length, entry.links?.length ?? 0]);
     const published = PRIVACY_CHANGES.find((c) => c.id === "2026-10-proposition-certification-discord")!;
     expect(PRIVACY_CHANGES.indexOf(published)).toBeLessThan(PRIVACY_CHANGES.indexOf(entry));
   });
 });
 
-// Décision de l'utilisateur 35 (2026-10-28) : hors Overwatch, le BattleTag des
-// casters et de l'arbitre désigné n'est plus envoyé (`withGameBattletag`).
-describe("PRIVACY_CHANGES — BattleTag des casters et de l'arbitre en Overwatch seulement (décision 35)", () => {
-  const id = "2026-10-battletag-casters-arbitre-overwatch-seulement";
+describe("PRIVACY_CHANGES — EF-19 : entrées du 2026-10-29 rectifiées avant publication", () => {
+  const caster = PRIVACY_CHANGES.find((c) => c.id === "2026-10-plusieurs-casters-par-match")!;
+  const casterEn = PRIVACY_CHANGES_EN["2026-10-plusieurs-casters-par-match"];
+  const referee = PRIVACY_CHANGES.find((c) => c.id === "2026-10-arbitre-designe-des-matchs")!;
+  const refereeEn = PRIVACY_CHANGES_EN["2026-10-arbitre-designe-des-matchs"];
+
+  it("EF-19 : un lien inchangé n'est pas réécrit (`setStaffStreamUrl`) ; posé hors cast, il reste à l'organisation (FR et EN)", () => {
+    expect(caster.details.join(" ")).toContain("(posée avant ton inscription comme caster ou après l'avoir quitté, elle reste le lien de l'organisation ; réenregistrer un lien déjà posé n'en change pas l'auteur)");
+    expect(casterEn.details.join(" ")).toContain("(set before you signed up as its caster or after you left it, it stays the organizers' link; re-saving a link already set does not change its author)");
+    expect(readFileSync(join(process.cwd(), "app/rgpd/page.tsx"), "utf8")).not.toContain("qui ne caste pas encore ce match");
+  });
+
+  it("EF-19 : arbitre qui caste aussi le match, désignation, remplacement et cartes du pool notés au journal (`refereeLogChange`)", () => {
+    const [fr, en] = [referee, refereeEn].map(({ details }) => details.join(" "));
+    expect(fr).toContain("jamais son tag Discord à ce titre (s'il caste aussi le match, ses contacts de caster suivent la règle des casters)");
+    expect(en).toContain("never their Discord tag in that capacity (if they also cast the match, their caster contacts follow the casters' rule)");
+    expect(fr).toContain("La prise d'un match, la désignation ou le remplacement de son arbitre par le staff, le retrait de l'arbitrage, l'autogestion, la première carte et les cartes choisies dans le pool de la manche sont notés");
+    expect(en).toContain("Taking a match, the staff assigning or replacing its referee, the removal of the refereeing, self-management, the first map and the maps picked from the round's pool are noted");
+  });
+});
+
+// Décisions de l'utilisateur 35 et 38 (2026-10-28) : hors Overwatch, aucun
+// BattleTag n'est plus envoyé par la lecture des contacts (`withGameBattletag`).
+describe("PRIVACY_CHANGES — BattleTag des matchs en Overwatch seulement (décisions 35 et 38)", () => {
+  const id = "2026-10-battletag-des-matchs-overwatch-seulement";
   const entry = PRIVACY_CHANGES.find((c) => c.id === id)!;
   const english = PRIVACY_CHANGES_EN[id];
 
-  it("privacyChanges_battletagOverwatchOnly_closesListDatedWithBatchForAllAccounts", () => {
+  it("privacyChanges_battletagMatchesOverwatchOnly_closesListDated1031ForAllAccounts", () => {
     expectStandaloneEntry(entry, english, {
       fromEnd: 1,
-      publishedAt: "2026-10-30",
+      publishedAt: "2026-10-31",
       audience: undefined,
       links: [
-        { href: "/conditions-utilisation#contacts-de-match", label: "Lire la section « Contacts de match »" },
+        { href: "/rgpd#donnees-collectees", label: "Lire la section « Données collectées »" },
         { href: "/rgpd#arbitre-designe", label: "Lire le paragraphe « Arbitre désigné d'un match »" },
       ],
     });
-    expect(english.linkLabels).toEqual(["Read the “Match contacts” section", "Read the “Assigned referee of a match” paragraph"]);
+    expect(english.linkLabels).toEqual(["Read the “Data collected” section", "Read the “Assigned referee of a match” paragraph"]);
     expect(id.length).toBeLessThanOrEqual(PRIVACY_CHANGE_ID_MAX_LENGTH);
   });
 
-  it("privacyChanges_battletagOverwatchOnly_saysMarvelRivalsWithoutBattletagAndTeamsUnchanged", () => {
+  it("privacyChanges_battletagMatchesOverwatchOnly_namesTeamsCastersRefereeFrAndEn", () => {
     const fr = [entry.title, entry.summary, ...entry.details].join(" ");
     const en = [english.title, english.summary, ...english.details].join(" ");
 
-    expect(fr).toContain("Dans un tournoi Marvel Rivals, le BattleTag des casters et celui de l'arbitre désigné d'un match ne sont plus présentés");
+    expect(fr).toContain("ni celui des contacts des équipes, ni celui des casters, ni celui de l'arbitre désigné");
     expect(fr).toContain("le site ne l'envoie plus du tout à ces fenêtres");
-    expect(fr).toContain("Les contacts des équipes ne changent pas, dans les deux jeux.");
-    expect(en).toContain("In a Marvel Rivals tournament, the casters' BattleTag and that of a match's assigned referee are no longer presented");
+    expect(fr).toContain("se choisit alors sur le seul tag Discord certifié");
+    expect(en).toContain("neither the teams' contacts', nor the casters', nor the assigned referee's");
     expect(en).toContain("the site no longer sends it to these windows at all");
-    expect(en).toContain("The teams' contacts don't change, in either game.");
+    expect(en).toContain("chosen on the certified Discord tag alone");
     expect(english.details).toHaveLength(entry.details.length);
   });
 });

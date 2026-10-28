@@ -624,7 +624,10 @@ export type RefereeLogChange =
   | "SELF_MANAGED_ON"
   | "SELF_MANAGED_OFF"
   | "FIRST_MAP_SET"
-  | "FIRST_MAP_CLEARED";
+  | "FIRST_MAP_CLEARED"
+  | "MAP_PICKED"
+  | "MAP_PICKED_BY_TEAM"
+  | "MAP_PICK_CLEARED";
 
 const REFEREE_LOG_WORDING: Record<RefereeLogChange, { kind: string; detail: string }> = {
   TAKEN: { kind: "Arbitre désigné", detail: "un arbitre prend le match" },
@@ -641,6 +644,9 @@ const REFEREE_LOG_WORDING: Record<RefereeLogChange, { kind: string; detail: stri
   SELF_MANAGED_OFF: { kind: "Autogestion désactivée", detail: `par ${ANONYMOUS_STAFF_LABEL}` },
   FIRST_MAP_SET: { kind: "Première carte réglée", detail: `par ${ANONYMOUS_STAFF_LABEL}` },
   FIRST_MAP_CLEARED: { kind: "Première carte retirée", detail: `par ${ANONYMOUS_STAFF_LABEL}` },
+  MAP_PICKED: { kind: "Carte choisie dans le pool", detail: `par ${ANONYMOUS_STAFF_LABEL}` },
+  MAP_PICKED_BY_TEAM: { kind: "Carte choisie dans le pool", detail: "par une équipe du match (autogestion)" },
+  MAP_PICK_CLEARED: { kind: "Choix de carte retiré", detail: "le pool reste ouvert" },
 };
 
 /**
@@ -679,6 +685,29 @@ export function formatRoundSelfManagementLog(context: {
   const plural = context.count > 1 ? "s" : "";
   const kind = context.enabled ? "Autogestion activée" : "Autogestion désactivée";
   return `${lead("🧑‍⚖️", kind, context.tournament)} : ${context.roundLabel} — ${context.count} match${plural}, par ${ANONYMOUS_STAFF_LABEL}.`;
+}
+
+/**
+ * Cartes de manche modifiées : **une** ligne pour une série d'enregistrements
+ * (`lib/server/tournaments/round-maps-notice.ts`). Nomme les manches (au plus
+ * `listed`, le reste compté), jamais les cartes ni le staff.
+ */
+export function formatRoundMapsSummaryLog(context: {
+  tournament: BotLogTournament;
+  roundLabels: readonly string[];
+  listed: number;
+}): string {
+  const shown = context.roundLabels.slice(0, context.listed);
+  const rest = context.roundLabels.length - shown.length;
+  const others = rest > 1 ? "autres" : "autre";
+  const names = rest > 0 ? `${shown.join(", ")} et ${rest} ${others}` : shown.join(", ");
+  const count = context.roundLabels.length;
+  return `${lead("🗺️", "Cartes de manche modifiées", context.tournament)} : ${names} (${count} manche${count > 1 ? "s" : ""}), par ${ANONYMOUS_STAFF_LABEL}.`;
+}
+
+/** Règles de ban et de choix des cartes d'un tournoi modifiées. */
+export function formatMapRulesLog(context: { tournament: BotLogTournament }): string {
+  return `${lead("🗺️", "Règles de ban modifiées", context.tournament)}, par ${ANONYMOUS_STAFF_LABEL}.`;
 }
 
 /**

@@ -10,6 +10,8 @@ export type RefereePanelView = {
   selfManaged: boolean;
   firstMap: string | null;
   round: { phaseId: number; roundNumber: number; bracket: string };
+  /** Cartes réglées pour la manche : vides sans réglage (saisie par match ouverte). */
+  roundSlots: ReadonlyArray<ReadonlyArray<string>>;
   candidates: ReadonlyArray<{ userId: number; pseudo: string }>;
 };
 

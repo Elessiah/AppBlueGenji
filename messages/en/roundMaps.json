@@ -1,0 +1,118 @@
+{
+  "page": {
+    "mapsTitle": "Maps for this round",
+    "mapN": "Map {number}",
+    "imposed": "Set",
+    "toChoose": "To choose from {maps}",
+    "loserPick": "Picked by the team that lost the previous map",
+    "pickLabel": "Pick map {number}",
+    "pickNone": "To choose",
+    "picked": "Map picked.",
+    "pickCleared": "Map pick cleared.",
+    "banOrder": "Map 1 bans",
+    "banOrderValue": "{first} first, then {second}",
+    "nextBans": "Bans on later maps",
+    "nextBansLOSER": "The team that lost the previous map bans first; on a draw, same order as on the previous map.",
+    "nextBansWINNER": "The team that won the previous map bans first; on a draw, same order as on the previous map.",
+    "configureMaps": "Set up this round's maps",
+    "resetRound": "Reset the round",
+    "scaleHint": "These maps apply to every match of the round: the map is no longer entered match by match. “Reset the round” brings back the per-match entry.",
+    "resetConfirmBody": "This round's maps are removed for all its matches: the map is entered match by match again. Picks already made on matches stay."
+  },
+  "sheet": {
+    "title": "Maps and bans",
+    "lead": "Set maps or pools per tournament round, and the ban order.",
+    "open": "Set up maps and bans"
+  },
+  "dialog": {
+    "title": "Maps and bans",
+    "hint": "For each tournament round, one map per slot sets it for every match; several make a pool the referee or the team picks from.",
+    "rulesTitle": "Ban rules",
+    "firstBan": "First ban on map 1",
+    "firstBanOptions": {
+      "NON_HOST": "The team that is not hosting",
+      "HOST": "The host team"
+    },
+    "nextBan": "First ban on later maps",
+    "nextBanOptions": {
+      "LOSER": "The loser of the previous map",
+      "WINNER": "The winner of the previous map"
+    },
+    "nextPick": "Next map from a pool",
+    "nextPickOptions": {
+      "LOSER": "Picked by the loser of the previous map",
+      "FREE": "Picked by the referee"
+    },
+    "saveRules": "Save the rules",
+    "rulesSaved": "Ban rules saved.",
+    "roundTitle": "Maps of a tournament round",
+    "round": "Tournament round",
+    "slot": "Map {number}",
+    "addSlot": "Add a map",
+    "removeSlot": "Remove map {number}",
+    "slotsLimit": "{max} maps at most per round.",
+    "saveRound": "Save the round's maps",
+    "clearRound": "Reset the round",
+    "roundSaved": "Round maps saved.",
+    "roundCleared": "Round reset: maps match by match.",
+    "close": "Close",
+    "roundN": "Round {number}",
+    "playoffRoundN": "Playoffs · round {number}",
+    "summaryNone": "maps match by match",
+    "summarySet": "{maps, plural, one {# map} other {# maps}} · {pools, plural, =0 {no pool} one {# pool} other {# pools}}",
+    "scaleHint": "A set round fixes its maps for all its matches: entering the map match by match is closed there. “Reset the round” reopens it; picks already made on matches stay.",
+    "slotImposed": "Set",
+    "slotPool": "Pool · {count} maps",
+    "slotEmpty": "To fill in",
+    "removeMap": "Remove {map} from map {number}",
+    "chooseMaps": "Choose the maps",
+    "hideMaps": "Hide the list",
+    "searchLabel": "Search for a map",
+    "searchPlaceholder": "E.g. Ilios",
+    "noResult": "No map in the list matches.",
+    "customLabel": "Other map (free entry)",
+    "customLabelFree": "Map name",
+    "customAdd": "Add",
+    "customAddLabel": "Add the typed map to map {number}",
+    "modes": {
+      "CONTROL": "Control",
+      "ESCORT": "Escort",
+      "HYBRID": "Hybrid",
+      "PUSH": "Push",
+      "FLASHPOINT": "Flashpoint",
+      "CLASH": "Clash"
+    },
+    "maxMaps": "{max} maps at most per match (tournament format).",
+    "overMaxMaps": "This round has more maps than the format plays ({max} at most).",
+    "mapEmpty": "Type a map name.",
+    "mapTooLong": "Map name too long (64 characters at most).",
+    "poolFull": "20 maps at most per pool.",
+    "applyAll": "Apply to every round",
+    "applyAllConfirm": {
+      "title": "Apply these maps to every round?",
+      "body": "{count, plural, one {# round already set will be replaced} other {# rounds already set will be replaced}} by these maps. Picks already made on matches stay.",
+      "confirm": "Apply to every round"
+    },
+    "appliedAll": "Maps applied to every round.",
+    "copyLabel": "Copy these maps to",
+    "copy": "Copy",
+    "copyConfirm": {
+      "title": "Replace this round's maps?",
+      "body": "{round} already has its maps: they will be replaced by these.",
+      "confirm": "Replace"
+    },
+    "copied": "Maps copied to {round}.",
+    "resetConfirm": {
+      "title": "Reset the round's maps?",
+      "body": "The maps of {round} go back to being entered match by match. Picks already made on matches stay.",
+      "confirm": "Reset"
+    },
+    "switchConfirm": {
+      "title": "Discard unsaved maps?",
+      "body": "The maps entered for {round} and not yet saved will be lost.",
+      "confirm": "Discard"
+    },
+    "pending": "Sending…",
+    "slotGap": "Map {number} is empty: fill it or remove it, otherwise the following maps would shift."
+  }
+}

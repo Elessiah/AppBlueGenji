@@ -3,6 +3,7 @@ import type {
   TournamentSnapshot,
   TournamentViewerContext,
 } from "@/lib/shared/types";
+import { EMPTY_MAP_RULES } from "@/lib/shared/round-maps";
 import { tournamentCard } from "./tournament-card";
 
 /**
@@ -25,6 +26,7 @@ export function tournamentSnapshot(
     phaseStandings: null,
     soloUserIds: {},
     seedingSource: "REGISTRATION",
+    mapRules: EMPTY_MAP_RULES,
     version: "v1",
     ...overrides,
   };

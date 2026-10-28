@@ -187,6 +187,7 @@ describe("fenêtre « Arbitrage » : gestes offerts", () => {
     selfManaged: false,
     firstMap: null,
     round: { phaseId: 0, roundNumber: 1, bracket: "UPPER" },
+    roundSlots: [],
     candidates: [
       { userId: 1, pseudo: "Moi" },
       { userId: 2, pseudo: "Autre" },

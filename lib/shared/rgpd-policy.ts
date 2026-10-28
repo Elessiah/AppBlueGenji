@@ -48,7 +48,7 @@ export const MATCH_CONTACTS_SCOPE =
  * 2026-10-19), prévue par les conditions d'utilisation.
  */
 export const BATTLETAG_MATCH_SCOPE =
-  "lecture, même masqué, dans la seule fenêtre « Contacts » d'un match où tu es présenté comme contact et dans sa fenêtre de lancement : par ses deux équipes et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, par ses casters le temps du match ; celui d'un caster, dans les seuls tournois Overwatch, par les deux équipes et les autres casters du match le temps du match et par les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, dans ces fenêtres et sur la page du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné) — arbitres et administrateurs n'y ont pas d'autre accès (conditions d'utilisation, « Contacts de match »)";
+  "lecture, même masqué, dans un tournoi Overwatch seulement (jamais en Marvel Rivals), dans la seule fenêtre « Contacts » d'un match où tu es présenté comme contact et dans sa fenêtre de lancement : par ses deux équipes et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, par ses casters le temps du match ; celui d'un caster, par les deux équipes et les autres casters du match le temps du match et par les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, dans ces fenêtres et sur la page du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné) — arbitres et administrateurs n'y ont pas d'autre accès (conditions d'utilisation, « Contacts de match »)";
 
 /**
  * BattleTag de l'arbitre désigné d'un match, même masqué, présenté aux parties
@@ -70,7 +70,7 @@ export const REFEREE_BATTLETAG_SCOPE =
  * l'utilisateur du 2026-10-27 — aucun interrupteur dans le code).
  */
 export const REFEREE_BATTLETAG_BEFORE_V7_SCOPE =
-  "la même présentation du BattleTag de l'arbitre désigné, tant que cet arbitre n'a pas accepté la version 7 des conditions d'utilisation — opposition par le formulaire de signalement, catégorie RGPD (retenue, le staff ne lui confie plus de match, même une fois la version 7 acceptée)";
+  "la même présentation du BattleTag de l'arbitre désigné, tant que cet arbitre n'a pas accepté la version 7 des conditions d'utilisation — opposition par le formulaire de signalement, catégorie RGPD (retenue, le staff ne lui confie plus de match — ceux qu'il tient déjà lui restent —, même une fois la version 7 acceptée)";
 
 /**
  * Pseudo de l'arbitre désigné présenté aux parties de ses matchs, sur la même
@@ -81,7 +81,7 @@ export const REFEREE_USERNAME_SCOPE =
   "pseudo de l'arbitre désigné d'un match, dans ses fenêtres « Contacts » et de lancement et sur la page du match, aux mêmes lecteurs et aux mêmes moments que son BattleTag en Overwatch (voir « Pseudo Overwatch »), quel que soit le jeu, et seul dès que la fenêtre de lancement montre le match (conditions d'utilisation, « Contacts de match », une fois leur version 7 acceptée par l'arbitre)";
 
 export const REFEREE_USERNAME_BEFORE_V7_SCOPE =
-  "la même présentation du pseudo de l'arbitre désigné, tant que cet arbitre n'a pas accepté la version 7 des conditions d'utilisation — opposition par le formulaire de signalement, catégorie RGPD (retenue, le staff ne lui confie plus de match, même une fois la version 7 acceptée)";
+  "la même présentation du pseudo de l'arbitre désigné, tant que cet arbitre n'a pas accepté la version 7 des conditions d'utilisation — opposition par le formulaire de signalement, catégorie RGPD (retenue, le staff ne lui confie plus de match — ceux qu'il tient déjà lui restent —, même une fois la version 7 acceptée)";
 
 /**
  * Pastilles de certification de la fiche (tag Discord certifié, BattleTag tiré
@@ -298,7 +298,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // préférence d'affichage, exportée et effacée à l'anonymisation. La marque
     // de session (`bg_user_sessions.certify_prompt_due`) part avec la session.
     finalite:
-      "Non par défaut : après une connexion par Discord ou Blizzard, tant que ton tag Discord n'est pas certifié, une fenêtre te propose de le certifier (ou, si tu n'en as pas, de l'ajouter puis de le certifier), une fois par connexion : « Plus tard » la ferme pour cette connexion-là ; elle revient à ta prochaine connexion par Discord ou Blizzard. La session de connexion note seulement qu'elle reste à proposer : marque levée à ta première réponse (« Ne plus voir » la lève sur toutes tes sessions) ou dès qu'il n'y a plus rien à proposer, effacée avec la session, hors de l'export de tes données. « Ne plus voir » : elle ne s'ouvre plus, sur aucun appareil (date du choix gardée) — et, sur la fiche d'un tournoi, l'invitation à certifier faite à qui mène une équipe ne s'ouvre plus quand seul son tag Discord manque (jamais quand ton équipe n'a aucun contact) ; la certification reste possible dans Mon profil. Ce choix figure dans l'export de tes données, effacé si le compte est anonymisé",
+      "Non par défaut : après une connexion par Discord ou Blizzard, tant que ton tag Discord n'est pas certifié, une fenêtre te propose de le certifier (ou, si tu n'en as pas, de l'ajouter puis de le certifier), une fois par connexion : « Plus tard » la ferme pour cette connexion-là ; elle revient à ta prochaine connexion par Discord ou Blizzard. La session de connexion note seulement qu'elle reste à proposer : marque levée à ta première réponse (« Ne plus voir » la lève sur toutes tes sessions) ou dès qu'il n'y a plus rien à proposer, effacée avec la session, hors de l'export de tes données. Une réponse qui ne parvient pas au site, ou qu'il refuse (autre compte connecté depuis dans ce navigateur, compte introuvable), ne lève pas la marque : la fenêtre peut revenir au chargement suivant. « Ne plus voir » : elle ne s'ouvre plus, sur aucun appareil (date du choix gardée) — et, sur la fiche d'un tournoi, l'invitation à certifier faite à qui mène une équipe ne s'ouvre plus quand seul son tag Discord manque (jamais quand ton équipe n'a aucun contact) ; la certification reste possible dans Mon profil. Ce choix figure dans l'export de tes données, effacé si le compte est anonymisé",
     base: "Exécution du contrat",
     duree: "Durée du compte",
   },

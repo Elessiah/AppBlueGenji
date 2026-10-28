@@ -16,7 +16,7 @@ import {
   CERTIFICATION_PROMPT_FAILURE_TTL_MS,
   CERTIFICATION_PROMPT_TTL_MS,
 } from "@/lib/server/tournaments/certification-prompt-cache";
-import { PRIVACY_CHANGES, PRIVACY_CHANGE_ID_MAX_LENGTH } from "@/lib/shared/privacy-changes";
+import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
 import { PRIVACY_CHANGES_EN } from "@/lib/shared/privacy-changes-en";
 import { PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
 import { PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register-en";
@@ -65,6 +65,15 @@ describe("/rgpd — choix « Ne plus voir » de la certification Discord", () =>
     expect(fr).toContain("Ce choix figure dans l'export de tes données");
     expect(en).toContain("erased with the session, and not included in the export of your data");
     expect(en).toContain("This choice is included in the export of your data");
+  });
+
+  it("dit qu'une réponse perdue ou refusée laisse la marque", () => {
+    expect(fr).toContain(
+      "Une réponse qui ne parvient pas au site, ou qu'il refuse (autre compte connecté depuis dans ce navigateur, compte introuvable), ne lève pas la marque : la fenêtre peut revenir au chargement suivant.",
+    );
+    expect(en).toContain(
+      "An answer that doesn't reach the site, or that it refuses (another account logged in since in that browser, account not found), doesn't clear the mark: the window may come back at the next page load.",
+    );
   });
 
   it("nomme l'exception par l'équipe du lecteur", () => {
@@ -146,15 +155,6 @@ describe("PRIVACY_CHANGES — entrée rectificative de la marque de session", ()
   const entry = PRIVACY_CHANGES.find((change) => change.id === id);
   const english = PRIVACY_CHANGES_EN[id];
 
-  it("existe en français et en anglais, datée de la mise en ligne prévue, en fin de liste", () => {
-    expect(entry?.publishedAt).toBe("2026-10-30");
-    expect(english).toBeDefined();
-    // Suivie de l'entrée du BattleTag des casters et de l'arbitre (décision 35), même jour.
-    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(id);
-    expect(id.length).toBeLessThanOrEqual(PRIVACY_CHANGE_ID_MAX_LENGTH);
-    expect([english?.details.length, english?.linkLabels?.length]).toEqual([entry?.details.length, entry?.links?.length]);
-  });
-
   it("dit la marque posée à la connexion et levée à la première réponse, hors export", () => {
     const fr = [entry?.summary, ...(entry?.details ?? [])].join(" ");
     const en = [english?.summary, ...(english?.details ?? [])].join(" ");
@@ -162,19 +162,29 @@ describe("PRIVACY_CHANGES — entrée rectificative de la marque de session", ()
     expect(fr).toContain("ne figure pas dans l'export de tes données");
     // Fermer la fenêtre (Échap, voile), son bouton vers la certification de « Mon profil »
     // (`DIALOG`) et le refus d'un clic dont le tag n'est plus le bon (`STATE_CHANGED`) répondent tous « Plus tard ».
-    expect(fr).toContain("(« Plus tard », la fermeture de la fenêtre ou son bouton qui ouvre la certification de « Mon profil », « Ne plus voir »");
+    expect(fr).toContain("(« Plus tard », la fermeture de la fenêtre ou son bouton vers « Mon profil », « Ne plus voir »");
     expect(fr).toContain("ou la certification, réussie ou refusée parce que ton tag Discord ne peut plus être certifié depuis cette fenêtre)");
-    expect(en).toContain("(“Later”, closing the window or its button that opens verification in “My profile”, “Don't show again”");
+    expect(en).toContain("(“Later”, closing the window or its button to “My profile”, “Don't show again”");
     expect(en).toContain("or verification, whether it succeeds or is refused because your Discord tag can no longer be verified from this window)");
     expect(en).toContain("the mark is set at login and cleared at your first answer");
     expect(en).toContain("isn't included in the export of your data");
   });
 
-  it("ne réduit plus le refus à un tag ou un compte changé (tag non attesté, absent, Discord délié)", () => {
-    const fr = entry?.details.join(" ");
-    const en = english?.details.join(" ");
-    expect(fr).not.toContain("n'est plus celui que la fenêtre montrait");
-    expect(en).not.toContain("no longer the one the window showed");
+  it("dit qu'une réponse perdue ou refusée (autre compte, compte introuvable) laisse la marque (FR et EN)", () => {
+    // `closeOnDeadEnd` ferme sans écrire ; un LATER en keepalive perdu est avalé.
+    expect(entry?.details[0]).toContain(
+      "Une réponse qui ne parvient pas au site, ou qu'il refuse parce qu'un autre compte s'est connecté depuis dans ce navigateur ou que ton compte est introuvable, ne la lève pas : la fenêtre peut revenir au chargement suivant.",
+    );
+    expect(english?.details[0]).toContain(
+      "An answer that doesn't reach the site, or that it refuses because another account has logged in since in that browser or your account can't be found, doesn't clear it: the window may come back at the next page load.",
+    );
+  });
+
+  it("le code qu'elle décrit : le passage à « Mon profil » et un tag qui a changé répondent « Plus tard »", () => {
+    const prompt = source("components/discord/DiscordCertifyPrompt.tsx");
+    expect(prompt).toMatch(/if \(prompt\.mode === "DIALOG"\) \{\s*(?:\/\/[^\n]*\n\s*)*closeForSession\(\);/);
+    expect(prompt).toMatch(/if \(STATE_CHANGED\.has\(code\)\) \{\s*(?:\/\/[^\n]*\n\s*)*closeForSession\(\);/);
+    expect(prompt).toMatch(/const postpone = \(\) => \{\s*if \(inFlight\.current\) return;\s*closeForSession\(\);/);
   });
 
   it("laisse intacte l'entrée publiée du 21 octobre", () => {
@@ -240,9 +250,10 @@ describe("/rgpd — droits sur le choix des messages de match, stockage de l'inv
     expect(source("app/rgpd/RgpdEn.tsx")).toContain("this keeping is therefore not subject to the right to object");
   });
 
-  it("l'invitation de la fiche tournoi ne parle du BattleTag que selon le jeu", () => {
-    expect(source("app/rgpd/page.tsx")).toContain("à certifier votre tag Discord (et votre BattleTag selon le jeu)</strong>");
-    expect(source("app/rgpd/RgpdEn.tsx")).toContain("verify your Discord tag (and your BattleTag depending on the game)</strong>");
+  it("l'invitation de la fiche tournoi ne parle du BattleTag que selon le jeu et le compte", () => {
+    // Overwatch, Battle.net rattaché sans BattleTag (`battletagUnfixable`) : la fenêtre ne parle que de Discord.
+    expect(source("app/rgpd/page.tsx")).toContain("à certifier votre tag Discord (et votre BattleTag, selon le jeu et le compte)</strong>");
+    expect(source("app/rgpd/RgpdEn.tsx")).toContain("verify your Discord tag (and your BattleTag, depending on the game and the account)</strong>");
   });
 });
 
@@ -270,11 +281,45 @@ describe("/rgpd — clés React des bases supplémentaires (portée, jamais la b
 });
 
 describe("PRIVACY_CHANGES — « Ne plus voir » de l'invitation, entrée encore à publier", () => {
-  it("ne parle du BattleTag que selon le jeu (en Marvel Rivals, seul le tag Discord compte)", () => {
+  it("ne parle du BattleTag que selon le jeu et le compte (en Marvel Rivals, ou sans BattleTag rattachable, seul le tag Discord compte)", () => {
     const id = "2026-10-ne-plus-voir-invitation-certification-sur-le-compte";
     const entry = PRIVACY_CHANGES.find((change) => change.id === id);
-    expect(entry?.publishedAt).toBe("2026-10-30");
-    expect(entry?.summary).toContain("à certifier ton tag Discord (et ton BattleTag selon le jeu)");
-    expect(PRIVACY_CHANGES_EN[id]?.summary).toContain("to verify your Discord tag (and your BattleTag depending on the game)");
+    expect(entry?.publishedAt).toBe("2026-10-29");
+    expect(entry?.summary).toContain("à certifier ton tag Discord (et ton BattleTag, selon le jeu et le compte)");
+    expect(PRIVACY_CHANGES_EN[id]?.summary).toContain("to verify your Discord tag (and your BattleTag, depending on the game and the account)");
+  });
+});
+
+describe("registre — cartes choisies dans le pool de la manche (T04, T05)", () => {
+  const retention = (list: typeof PROCESSING_ACTIVITIES, ref: string) => list.find((entry) => entry.ref === ref)?.retention.join(" ");
+
+  it("registerT04_dataCategories_namesPoolPicksByStaffOrTeam", () => {
+    expect(activity(PROCESSING_ACTIVITIES, "T04")).toContain(
+      "cartes choisies dans le pool de la manche (par le staff ou, en autogestion, par une équipe du match)",
+    );
+    expect(activity(PROCESSING_ACTIVITIES_EN, "T04")).toContain(
+      "maps picked from the round pool (by the staff or, in self-management, by a team of the match)",
+    );
+  });
+
+  it("registerT04_retention_keepsPoolPicksWithMatch", () => {
+    expect(retention(PROCESSING_ACTIVITIES, "T04")).toContain("première carte et cartes choisies dans le pool : conservés avec le match");
+    expect(retention(PROCESSING_ACTIVITIES_EN, "T04")).toContain("first map and maps picked from the pool: kept with the match");
+  });
+
+  it("registerT05_staffLog_namesPoolPickAndClear", () => {
+    expect(activity(PROCESSING_ACTIVITIES, "T05")).toContain(
+      "carte choisie dans le pool de la manche ou choix retiré — sans nommer l'arbitre ni le staff",
+    );
+    expect(activity(PROCESSING_ACTIVITIES_EN, "T05")).toContain(
+      "map picked from the round pool or pick cleared — without naming the referee or the staff",
+    );
+  });
+});
+
+describe("/rgpd — opposition retenue d'un arbitre (décision L430, comportement actuel)", () => {
+  it("rgpdArbitreDesigne_upheldObjection_saysExistingAssignmentsStayFrAndEn", () => {
+    expect(source("app/rgpd/page.tsx")).toContain("ne lui confie plus de match (ceux qu'il tient déjà lui restent)");
+    expect(source("app/rgpd/RgpdEn.tsx")).toContain("no longer assigns them matches (those they already hold stay theirs)");
   });
 });

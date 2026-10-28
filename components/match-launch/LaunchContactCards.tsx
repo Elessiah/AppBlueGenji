@@ -19,7 +19,7 @@ import {
   type CasterArrival,
   type CasterArrivalSeen,
   type LaunchCaster,
-  type LaunchContact,
+  type LaunchSideContact,
   type LaunchReferee,
   type LaunchSide,
   type MatchLaunchInfo,
@@ -90,7 +90,7 @@ function ContactRow({
   contact,
   onCopy,
   linkName,
-}: Readonly<{ contact: LaunchContact; onCopy: CopyFn; linkName: boolean }>) {
+}: Readonly<{ contact: LaunchSideContact; onCopy: CopyFn; linkName: boolean }>) {
   const { t } = useLaunchText();
   // Dans l'ordre de la priorité de choix (capitaine, manager, propriétaire),
   // pas dans l'ordre de saisie : la pastille la plus parlante vient en tête.
@@ -112,7 +112,10 @@ function ContactRow({
         ))}
       </div>
       <IdentityLine kind="Discord" value={contact.discordTag} verified={contact.discordTag !== null} onCopy={onCopy} />
-      <IdentityLine kind="BattleTag" value={contact.battletag} verified={contact.battletagVerified} onCopy={onCopy} />
+      {/* Hors Overwatch, le serveur n'envoie pas le BattleTag (décision 38) : pas de ligne. */}
+      {contact.battletag !== undefined && (
+        <IdentityLine kind="BattleTag" value={contact.battletag} verified={contact.battletagVerified === true} onCopy={onCopy} />
+      )}
     </li>
   );
 }
