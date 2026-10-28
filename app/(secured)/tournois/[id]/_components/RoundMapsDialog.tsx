@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useToast } from "@/components/ui/toast";
 import { InfoHint } from "@/components/ui/info-hint";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
@@ -120,14 +120,13 @@ function MapPicker({
     onEdit((current) => addMapToSlot(current, custom));
     setCustom("");
   };
+  // Posé sur chaque champ, pas sur le conteneur : un `div` muni d'un gestionnaire
+  // clavier passe pour un faux contrôle (Sonar S6848).
+  const blockSubmit = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (blocksImplicitSubmit(event.key, event.currentTarget.type)) event.preventDefault();
+  };
   return (
-    <div
-      className={styles.picker}
-      onKeyDown={(event) => {
-        const target = event.target;
-        if (target instanceof HTMLInputElement && blocksImplicitSubmit(event.key, target.type)) event.preventDefault();
-      }}
-    >
+    <div className={styles.picker}>
       {overwatch && (
         <>
           <div className="field">
@@ -139,6 +138,7 @@ function MapPicker({
               placeholder={t("dialog.searchPlaceholder")}
               maxLength={FIRST_MAP_MAX_LENGTH}
               onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={blockSubmit}
             />
           </div>
           {groups.length === 0 && <p className={styles.muted}>{t("dialog.noResult")}</p>}
@@ -152,6 +152,7 @@ function MapPicker({
                       type="checkbox"
                       checked={slotHasMap(slot, map)}
                       onChange={() => onEdit((current) => toggleMapInSlot(current, map))}
+                      onKeyDown={blockSubmit}
                     />
                     <span>{map}</span>
                   </label>
