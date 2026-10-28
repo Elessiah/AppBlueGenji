@@ -230,8 +230,11 @@ type PickMatchRow = RowDataPacket & {
 };
 
 /**
- * Qui choisit : le staff toujours ; sinon, sur un match en autogestion, un
- * joueur d'une des deux équipes qui peut déclarer « Prêt ».
+ * Qui choisit : le staff qui ne joue pas le match, toujours ; sinon, sur un
+ * match en autogestion, un joueur d'une des deux équipes qui peut déclarer
+ * « Prêt ». Un membre du staff qui joue le match suit la règle des joueurs,
+ * comme l'arbitrage (`REFEREE_IS_PLAYER`) : il ne choisit pas pour son équipe
+ * hors autogestion.
  * @returns `true` quand le choix vient d'une équipe. @throws `NOT_MAP_PICKER`
  */
 async function assertMapPicker(
@@ -239,14 +242,14 @@ async function assertMapPicker(
   row: PickMatchRow,
   viewer: { userId: number; staff: boolean },
 ): Promise<boolean> {
-  if (viewer.staff) return false;
+  const selfManaged = Number(row.self_managed) === 1;
   const party =
-    Number(row.self_managed) === 1
+    viewer.staff || selfManaged
       ? await resolveMatchParty(connection, { team1_id: row.team1_id, team2_id: row.team2_id, casters: [] }, viewer.userId)
       : null;
-  if (!party || (party.role !== "TEAM1" && party.role !== "TEAM2") || !party.canDeclareReady) {
-    throw new Error("NOT_MAP_PICKER");
-  }
+  const plays = party?.role === "TEAM1" || party?.role === "TEAM2";
+  if (viewer.staff && !plays) return false;
+  if (!selfManaged || !plays || !party?.canDeclareReady) throw new Error("NOT_MAP_PICKER");
   return true;
 }
 
@@ -274,7 +277,8 @@ async function writeMapPick(
 
 /**
  * Choisit la carte `slot` d'un match dans le pool de sa manche (`null` retire
- * le choix). Permis à l'arbitrage (`staff`, permission `tournaments`) et, sur un
+ * le choix). Permis à l'arbitrage (`staff`, permission `tournaments`, s'il ne
+ * joue pas le match) et, sur un
  * match **en autogestion** seulement, aux joueurs d'une des deux équipes qui
  * peuvent déclarer son « Prêt » (ou à l'engagé solo). La carte 1 est
  * `first_map` ; les suivantes, `map_picks`.
@@ -287,15 +291,21 @@ export async function pickMatchMap(
   slot: unknown,
   rawMap: unknown,
 ): Promise<void> {
-  const tournamentId = await inTransaction(async (connection) => {
-    // Le tournoi d'abord, comme `setRoundMaps` : un choix ne se valide pas
-    // contre un pool que le staff remplace au même instant.
+  // Le tournoi du match, lu hors de la transaction : sous REPEATABLE READ, une
+  // lecture avant le verrou figerait la vue, et le pool relu ensuite serait
+  // celui d'avant un `setRoundMaps` simultané (règle « verrou en premier »).
+  const ownerId = await withConnection(async (connection) => {
     const [owner] = await connection.execute<(RowDataPacket & { tournament_id: number })[]>(
       `SELECT tournament_id FROM bg_matches WHERE id = ? LIMIT 1`,
       [matchId],
     );
     if (!owner[0]) throw new Error("MATCH_NOT_FOUND");
-    await lockTournament(connection, Number(owner[0].tournament_id));
+    return Number(owner[0].tournament_id);
+  });
+  const tournamentId = await inTransaction(async (connection) => {
+    // Le tournoi d'abord, comme `setRoundMaps` : un choix ne se valide pas
+    // contre un pool que le staff remplace au même instant.
+    await lockTournament(connection, ownerId);
     const [rows] = await connection.execute<PickMatchRow[]>(
       `SELECT tournament_id, status, phase_id, bracket, round_number, self_managed, team1_id, team2_id,
               first_map, map_picks
@@ -303,7 +313,7 @@ export async function pickMatchMap(
       [matchId],
     );
     const row = rows[0];
-    if (!row) throw new Error("MATCH_NOT_FOUND");
+    if (!row || Number(row.tournament_id) !== ownerId) throw new Error("MATCH_NOT_FOUND");
     if (row.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
     const byTeam = await assertMapPicker(connection, row, viewer);
     const slots = await loadRoundSlots(connection, Number(row.tournament_id), {

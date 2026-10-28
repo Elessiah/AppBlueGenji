@@ -217,6 +217,15 @@ describe("canPickMatchMap", () => {
     expect(canPickMatchMap({ staff: true, myTeamId: null, canDeclareReady: false }, { ...match, status: "COMPLETED" })).toBe(false);
   });
 
+  it("un membre du staff qui joue le match suit la règle des joueurs", () => {
+    expect(canPickMatchMap({ staff: true, myTeamId: 10, canDeclareReady: true }, { ...match, selfManaged: false })).toBe(false);
+    expect(canPickMatchMap({ staff: true, myTeamId: 10, canDeclareReady: true }, match)).toBe(true);
+  });
+
+  it("un membre du staff d'une autre équipe choisit toujours", () => {
+    expect(canPickMatchMap({ staff: true, myTeamId: 30, canDeclareReady: false }, { ...match, selfManaged: false })).toBe(true);
+  });
+
   it("une équipe du match choisit en autogestion seulement", () => {
     expect(canPickMatchMap({ staff: false, myTeamId: 20, canDeclareReady: true }, match)).toBe(true);
     expect(canPickMatchMap({ staff: false, myTeamId: 20, canDeclareReady: true }, { ...match, selfManaged: false })).toBe(false);

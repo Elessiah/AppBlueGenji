@@ -210,6 +210,11 @@ describe("setTournamentMapRules", () => {
 describe("pickMatchMap", () => {
   const POOL_ROUND = { ...ROUND, slots_json: '[["Ilios","Nepal"],["Busan","Oasis"],["Numbani"]]' };
 
+  beforeEach(() => {
+    // Par défaut, le lecteur ne joue pas le match (`clearAllMocks` garde les implémentations).
+    jest.mocked(resolveMatchParty).mockResolvedValue(null);
+  });
+
   function withMatch(match: Record<string, unknown>) {
     route(connection.execute, [
       { pattern: /FROM bg_tournaments/, rows: [TOURNAMENT] },
@@ -228,6 +233,53 @@ describe("pickMatchMap", () => {
     expect(tournamentLock).toBeGreaterThanOrEqual(0);
     expect(tournamentLock).toBeLessThan(matchLock);
     expect(matchLock).toBeLessThan(pool);
+  });
+
+  it("lit le tournoi du match hors transaction : le verrou du tournoi est la première instruction", async () => {
+    withMatch(MATCH);
+    await pickMatchMap(42, { userId: 3, staff: true }, 1, "Ilios");
+    const begin = connection.beginTransaction.mock.invocationCallOrder[0];
+    const calls = connection.execute.mock.calls.map(([sql], index) => ({
+      sql,
+      order: connection.execute.mock.invocationCallOrder[index],
+    }));
+    expect(calls.filter((call) => call.order < begin).map((call) => call.sql)).toEqual([
+      expect.stringMatching(/SELECT tournament_id FROM bg_matches/),
+    ]);
+    expect(calls.find((call) => call.order > begin)?.sql).toMatch(/FROM bg_tournaments[\s\S]*FOR UPDATE/);
+  });
+
+  it("un match qui n'appartient plus au tournoi verrouillé est refusé", async () => {
+    route(connection.execute, [
+      { pattern: /FROM bg_tournaments/, rows: [TOURNAMENT] },
+      { pattern: /FROM bg_matches[\s\S]*FOR UPDATE/, rows: [{ ...MATCH, tournament_id: 8 }] },
+      { pattern: /FROM bg_matches/, rows: [MATCH] },
+      { pattern: /FROM bg_tournament_round_maps/, rows: [POOL_ROUND] },
+    ]);
+    await expect(pickMatchMap(42, { userId: 3, staff: true }, 1, "Ilios")).rejects.toThrow("MATCH_NOT_FOUND");
+    expect(writes(/^\s*UPDATE/)).toHaveLength(0);
+    expect(connection.rollback).toHaveBeenCalled();
+  });
+
+  it("un membre du staff qui joue le match ne choisit pas hors autogestion", async () => {
+    withMatch(MATCH);
+    jest.mocked(resolveMatchParty).mockResolvedValue({ role: "TEAM1", canDeclareReady: true });
+    await expect(pickMatchMap(42, { userId: 3, staff: true }, 1, "Ilios")).rejects.toThrow("NOT_MAP_PICKER");
+    expect(writes(/^\s*UPDATE/)).toHaveLength(0);
+  });
+
+  it("un membre du staff qui joue un match en autogestion choisit au nom de son équipe", async () => {
+    withMatch({ ...MATCH, self_managed: 1 });
+    jest.mocked(resolveMatchParty).mockResolvedValue({ role: "TEAM2", canDeclareReady: true });
+    await pickMatchMap(42, { userId: 3, staff: true }, 1, "Ilios");
+    expect(queueRefereeChange).toHaveBeenCalledWith(expect.anything(), { kind: "MAP_PICK", matchId: 42, set: true, byTeam: true });
+  });
+
+  it("un membre du staff qui ne joue pas le match choisit en arbitre, même s'il le caste", async () => {
+    withMatch(MATCH);
+    jest.mocked(resolveMatchParty).mockResolvedValue({ role: "CASTER", canDeclareReady: true });
+    await pickMatchMap(42, { userId: 3, staff: true }, 1, "Ilios");
+    expect(queueRefereeChange).toHaveBeenCalledWith(expect.anything(), { kind: "MAP_PICK", matchId: 42, set: true, byTeam: false });
   });
 
   it("le staff choisit la carte 1 : c'est `first_map`", async () => {

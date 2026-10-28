@@ -298,7 +298,7 @@ export function roundKeysOf(matches: readonly RoundKey[]): RoundKey[] {
 
 /**
  * Le lecteur peut-il choisir dans un pool de ce match ? Le staff (permission
- * `tournaments`) toujours ; sinon une équipe du match, en autogestion
+ * `tournaments`) qui ne le joue pas, toujours ; sinon une équipe du match, en autogestion
  * seulement, par un rôle qui déclare son « Prêt » (`canDeclareReady`, comme
  * `assertMapPicker`). Le serveur tranche (`pickMatchMap`) : ceci ne règle que l'écran.
  */
@@ -307,7 +307,8 @@ export function canPickMatchMap(
   match: { status: string; selfManaged: boolean; team1Id: number | null; team2Id: number | null },
 ): boolean {
   if (match.status === "COMPLETED") return false;
-  if (viewer.staff) return true;
-  if (!match.selfManaged || !viewer.canDeclareReady || viewer.myTeamId === null) return false;
-  return viewer.myTeamId === match.team1Id || viewer.myTeamId === match.team2Id;
+  const plays = viewer.myTeamId !== null && (viewer.myTeamId === match.team1Id || viewer.myTeamId === match.team2Id);
+  // Un membre du staff qui joue le match suit la règle des joueurs.
+  if (viewer.staff && !plays) return true;
+  return plays && match.selfManaged && viewer.canDeclareReady;
 }
