@@ -1057,8 +1057,8 @@ function RgpdFr({
             devient joueur du match avant son lancement, il n&apos;est plus montré (et en est retiré avant le lancement) ; l&apos;arbitrage
             d&apos;un compte supprimé est retiré de tous ses matchs. Quand un autre que lui le lui retire (le staff,
             un autre arbitre à qui le match est confié, l&apos;autogestion) ou qu&apos;il lui est retiré d&apos;office, il
-            en est prévenu en notification push seulement, avec le motif. Ces gestes, l&apos;autogestion d&apos;un match
-            et sa première carte sont notés au journal du staff sur Discord sans nommer personne, et un match qui
+            en est prévenu en notification push seulement, avec le motif. Ces gestes, l&apos;autogestion d&apos;un match,
+            sa première carte et les cartes choisies dans le pool du round sont notés au journal du staff sur Discord sans nommer personne, et un match qui
             entre en lancement sans arbitre ni autogestion est signalé aux arbitres. Sa présentation aux parties
             du match relève de l&apos;<strong>exécution du service</strong> dès qu&apos;il a accepté la version 7
             des conditions d&apos;utilisation, qui la prévoient (section « Contacts de match »), pour que les

@@ -98,11 +98,11 @@ export type PrivacyChange = {
    */
   links?: readonly PrivacyChangeLink[];
   /**
-   * Version des conditions d'utilisation que l'entrée annonce, quand elle est
-   * **à accepter** (`TERMS_VERSION`). Le message privé qui la nomme ne dit
-   * alors plus « aucun accord » sans exception (`PRIVACY_DM_FRAME`).
+   * L'entrée annonce une version des conditions d'utilisation **à accepter**
+   * (`TERMS_VERSION`) : le message privé qui la porte ne dit alors plus
+   * « aucun accord » sans exception (`PRIVACY_DM_FRAME`).
    */
-  termsVersion?: number;
+  asksTermsAcceptance?: true;
 };
 
 /** Un lien d'une entrée : chemin du site et libellé. */
@@ -1142,7 +1142,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     details: [
       "Si tu joues ou castes un match : son arbitre désigné t'est présenté dans les fenêtres « Contacts » et de lancement du match, aux mêmes moments que les contacts du match (dès que tes deux adversaires sont connus si tu joues, le temps du match si tu castes) — son pseudo et son BattleTag, même masqué, jamais son tag Discord à ce titre (s'il caste aussi le match, ses contacts de caster suivent la règle des casters) ; son pseudo seul y paraît dès que la fenêtre de lancement montre le match. La fenêtre de lancement s'ouvre aussi à lui : il y lit les contacts du match, BattleTag masqué compris, qu'il lit déjà comme arbitre dans la fenêtre « Contacts ». Rien d'autre ne change pour tes propres données.",
       "Si tu arbitres : ton pseudo et ton BattleTag (même masqué) sont présentés ainsi aux parties de tes matchs, au titre de l'intérêt légitime (qu'elles sachent qui arbitre) : tu t'y opposes par le formulaire de signalement (catégorie RGPD) — retenue, ton opposition fait que le staff ne te confie plus de match — et tu peux te retirer d'un match à tout moment, le staff pouvant sinon te confier de nouveau ce match, sans avis ; ton « Prêt » est attendu avant le lancement. Si l'arbitrage t'est retiré par le staff (retrait, match confié à un autre arbitre ou passé en autogestion) ou d'office (conditions plus remplies, ou tu joues désormais le match), tu es prévenu en notification push seulement, avec le motif, tant que tu détiens la permission d'arbitrage — réglage « Arbitrage retiré ». À la suppression de ton compte, tu es retiré de tous tes matchs.",
-      "La prise d'un match, la désignation ou le remplacement de son arbitre par le staff, le retrait de l'arbitrage, l'autogestion et la première carte sont notés au journal du staff sur Discord sans nommer personne ; un match qui entre en lancement sans arbitre ni autogestion est signalé aux arbitres, sans rien basculer d'office.",
+      "La prise d'un match, la désignation ou le remplacement de son arbitre par le staff, le retrait de l'arbitrage, l'autogestion, la première carte et les cartes choisies dans le pool du round sont notés au journal du staff sur Discord sans nommer personne ; un match qui entre en lancement sans arbitre ni autogestion est signalé aux arbitres, sans rien basculer d'office.",
     ],
   },
   {
@@ -1186,13 +1186,13 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       { href: "/rgpd#arbitre-designe", label: "Lire le paragraphe « Arbitre désigné d'un match »" },
     ],
     summary:
-      "Les conditions d'utilisation passent en version 7 : leur section « Contacts de match » prévoit plusieurs casters par match, l'arbitre désigné et la page du match, et la présentation de l'arbitre désigné repose désormais sur l'exécution du service, et non plus sur l'intérêt légitime, dès que cet arbitre a accepté cette version. Elle est à accepter : une fenêtre te la présente à ta prochaine visite.",
-    termsVersion: 7,
+      "Les conditions d'utilisation passent en version 7 : leur section « Contacts de match » prévoit plusieurs casters par match, l'arbitre désigné et la page du match, et la présentation de l'arbitre désigné repose désormais sur l'exécution du service, et non plus sur l'intérêt légitime, dès que cet arbitre a accepté cette version. Elle est à accepter : une fenêtre te la présente tant que tu ne l'as pas acceptée.",
+    asksTermsAcceptance: true,
     details: [
       "Contacts de match : les contacts d'un match vont à chacun de ses casters le temps du match, et ceux de chaque caster aussi aux autres casters du match. L'arbitre désigné y est présenté — son pseudo et son BattleTag, même masqué, jamais son tag Discord à ce titre (s'il caste aussi le match, ses contacts de caster suivent la règle des casters) — aux deux équipes et aux arbitres dès que les deux adversaires sont connus et jusqu'à la fin du match, et aux casters le temps du match.",
       "Page du match : elle reprend les contacts des casters (tag Discord certifié et BattleTag, même masqué) et le pseudo et le BattleTag, même masqué, de l'arbitre désigné, aux mêmes personnes et aux mêmes moments que la fenêtre « Contacts » du match ; les contacts des équipes restent dans les fenêtres « Contacts » et de lancement. Un BattleTag masqué ne se lit nulle part ailleurs sur le site.",
       "Si tu arbitres : dès que tu as accepté la version 7, la présentation de ton pseudo et de ton BattleTag aux parties de tes matchs repose sur l'exécution du service — les conditions d'utilisation la prévoient —, et non plus sur l'intérêt légitime : l'opposition par le formulaire de signalement ne s'y applique plus, et une opposition déjà retenue continue de valoir (le staff ne te confie plus de match). Tant que tu ne l'as pas acceptée, elle reste fondée sur l'intérêt légitime, et tu peux t'y opposer par le formulaire de signalement (catégorie RGPD) ; la fenêtre d'acceptation couvrant alors les pages des tournois, tu te retires d'un match en le demandant par ce même formulaire. Tu peux toujours te retirer d'un match à tout moment, le staff pouvant te le confier de nouveau ; si tu ne remplis plus les conditions pour arbitrer (permission d'arbitrage, tag Discord certifié, compte Battle.net rattaché), ou si tu deviens joueur du match avant son lancement, tu n'es plus présenté.",
-      "Retransmission : les conditions disent maintenant que le message #live de la soirée nomme les équipes et, en tournoi individuel, les joueurs par leur pseudo public avant le début d'un match programmé dans la soirée et une fois le match terminé, pas seulement à son départ. La présence d'un match dans ce message avant son passage à l'antenne ne laisse aucune trace sur le site.",
+      "Retransmission : les conditions disent maintenant que le message #live de la soirée nomme les équipes et, en tournoi individuel, les joueurs par leur pseudo public avant le début d'un match programmé dans la soirée (un match dont la diffusion doit s'ouvrir à son heure de début) et une fois le match terminé, pas seulement à son départ. La présence d'un match dans ce message avant son passage à l'antenne ne laisse aucune trace sur le site.",
       "Acceptation : sans accepter les conditions, tu peux supprimer ton compte directement depuis la fenêtre qui te les présente, comme depuis ton profil.",
       "Conditions d'utilisation : la version 7, en vigueur depuis le 29 octobre 2026, le dit dans ses sections « Contacts de match », « Retransmission des matchs » et « Acceptation ». Une fenêtre te la présente tant que tu ne l'as pas acceptée : l'accepter permet de continuer à utiliser le site.",
     ],
@@ -1473,9 +1473,7 @@ const PRIVACY_DM_FRAME: Record<
         : "🔐 **BlueGenji — nos règles de confidentialité ont changé**",
     footer: (siteUrl, asksTerms) =>
       `Le détail t'attend à ta prochaine visite${siteUrl ? " sur " + siteUrl : " sur le site"}. ` +
-      (asksTerms
-        ? "Les nouvelles conditions d'utilisation sont à accepter pour continuer à utiliser le site ; pour le reste, aucun accord ne t'est demandé : "
-        : "Aucun accord ne t'est demandé : ") +
+      (asksTerms ? "Seules les nouvelles conditions d'utilisation demandent ton accord, si tu ne les as pas encore acceptées ; pour le reste, aucun accord ne t'est demandé : " : "Aucun accord ne t'est demandé : ") +
       "la politique de confidentialité dit comment t'opposer à un traitement ou exercer tes autres droits. Politique complète : " +
       (siteUrl ? `${siteUrl.replace(/\/$/, "")}/rgpd` : "page « RGPD » du site") +
       ".",
@@ -1488,9 +1486,7 @@ const PRIVACY_DM_FRAME: Record<
         : "🔐 **BlueGenji — our privacy rules have changed**",
     footer: (siteUrl, asksTerms) =>
       `The details are waiting for you on your next visit${siteUrl ? " to " + siteUrl : " to the site"}. ` +
-      (asksTerms
-        ? "The new terms of use must be accepted to keep using the site; for the rest, no consent is asked of you: "
-        : "No consent is asked of you: ") +
+      (asksTerms ? "Only the new terms of use need your agreement, if you haven't accepted them yet; for the rest, no consent is asked of you: " : "No consent is asked of you: ") +
       "the privacy policy explains how to object to a processing or exercise your other rights. Full policy: " +
       (siteUrl ? `${siteUrl.replace(/\/$/, "")}/en/rgpd` : "the site's “GDPR” page") +
       ".",
@@ -1510,26 +1506,24 @@ function layoutPrivacyChangesMessage(
 ): { text: string; named: number } {
   const frame = PRIVACY_DM_FRAME[locale];
   const header = frame.header(changes.length);
+  // Des conditions à accepter parmi les changements dus, nommés ou seulement
+  // comptés : le pied ne dit plus « aucun accord » sans exception.
+  const footer = frame.footer(siteUrl, changes.some((change) => change.asksTermsAcceptance === true));
   const omittedLine = frame.omitted;
-  // Le pied ne parle des conditions à accepter que si un changement **nommé**
-  // les annonce : compté seulement, il partira nommé dans un message suivant.
-  const assemble = (lines: string[], omitted: number, asksTerms: boolean) =>
-    [header, ...lines, ...(omitted > 0 ? [omittedLine(omitted)] : []), frame.footer(siteUrl, asksTerms)].join("\n\n");
+  const assemble = (lines: string[], omitted: number) =>
+    [header, ...lines, ...(omitted > 0 ? [omittedLine(omitted)] : []), footer].join("\n\n");
 
   // Chaque changement n'est gardé que si le message **complet** — y compris la
   // mention de ceux qui ne tiendraient plus après lui — reste sous le plafond.
   const lines: string[] = [];
-  let asksTerms = false;
   for (const [index, change] of changes.entries()) {
     const line = `• **${change.title}** (${formatPrivacyChangeDateIn(change.publishedAt, locale)}) — ${change.summary}`;
-    const withTerms: boolean = asksTerms || change.termsVersion !== undefined;
-    if (assemble([...lines, line], changes.length - index - 1, withTerms).length > PRIVACY_DM_MAX_LENGTH) {
-      return { text: assemble(lines, changes.length - index, asksTerms), named: lines.length };
+    if (assemble([...lines, line], changes.length - index - 1).length > PRIVACY_DM_MAX_LENGTH) {
+      return { text: assemble(lines, changes.length - index), named: lines.length };
     }
     lines.push(line);
-    asksTerms = withTerms;
   }
-  return { text: assemble(lines, 0, asksTerms), named: lines.length };
+  return { text: assemble(lines, 0), named: lines.length };
 }
 
 /**

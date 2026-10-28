@@ -874,8 +874,8 @@ export function RgpdEn({
             a player of the match before its launch, they are no longer shown (and are removed from it before the launch); the refereeing of a
             deleted account is removed from all its matches. When someone else removes it from them (the staff,
             another referee the match is assigned to, self-management) or it is removed automatically, they are
-            notified by push notification only, with the reason. These actions, a match&apos;s self-management and
-            its first map are noted in the staff log on Discord without naming anyone, and a match that enters its
+            notified by push notification only, with the reason. These actions, a match&apos;s self-management,
+            its first map and the maps picked from the round&apos;s pool are noted in the staff log on Discord without naming anyone, and a match that enters its
             launch with neither a referee nor self-management is flagged to the referees. Their presentation to
             the parties to the match falls under <strong>performance of the service</strong> once they have
             accepted version 7 of the terms of use, which provide for it (“Match contacts” section), so that the
