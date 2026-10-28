@@ -686,7 +686,7 @@ describe("invitation à certifier poussée après la connexion (EF-04)", () => {
   });
 
   it("écarte une invitation absente ou de motif inconnu", () => {
-    for (const certificationPrompt of [null, undefined, {}, { ...prompt, reason: "ADMIN" }]) {
+    for (const certificationPrompt of [undefined, {}, { ...prompt, reason: "ADMIN" }]) {
       expect(parseLiveMessage(JSON.stringify({ type: "certificationPrompt", tournamentId: 7, certificationPrompt }))).toBeNull();
     }
   });
@@ -704,5 +704,38 @@ describe("invitation à certifier poussée après la connexion (EF-04)", () => {
     expect(applyLiveMessage(INITIAL_LIVE_STATE, message)).toBe(INITIAL_LIVE_STATE);
     const state = connected();
     expect(applyLiveMessage(state, { ...message, tournamentId: 8 })).toBe(state);
+  });
+});
+
+describe("reconnexion pendant la lecture de l'invitation (certificationPromptPending, EF-04)", () => {
+  const prompt = { reason: "MANAGER", discordVerified: false, battletagVerified: true, battletagRelevant: true } as const;
+  const withPrompt = () => applyLiveMessage(connected(), { type: "certificationPrompt", tournamentId: 7, certificationPrompt: prompt });
+  const reconnect = (state: LiveState, pending: boolean, tournamentId = 7) =>
+    applyLiveMessage(state, {
+      type: "connected",
+      tournamentId,
+      tier: "PRIORITY",
+      viewer: viewer({ certificationPrompt: null }),
+      snapshot: snapshot(),
+      ...(pending ? { certificationPromptPending: true } : {}),
+    });
+
+  it("lit le drapeau, absent sinon", () => {
+    const base = { type: "connected", tournamentId: 7, tier: "PRIORITY", viewer: viewer(), snapshot: snapshot() };
+    expect(parseLiveMessage(JSON.stringify({ ...base, certificationPromptPending: true }))).toMatchObject({ certificationPromptPending: true });
+    expect(parseLiveMessage(JSON.stringify({ ...base, certificationPromptPending: "oui" }))).not.toHaveProperty("certificationPromptPending");
+  });
+
+  it("en attente : l'invitation du même tournoi reste posée ; sinon le contexte la remplace", () => {
+    expect(reconnect(withPrompt(), true).detail?.certificationPrompt).toEqual(prompt);
+    expect(reconnect(withPrompt(), false).detail?.certificationPrompt).toBeNull();
+    expect(reconnect(withPrompt(), true, 8).detail?.certificationPrompt).toBeNull();
+  });
+
+  it("la trame qui suit tranche, `null` compris", () => {
+    const raw = JSON.stringify({ type: "certificationPrompt", tournamentId: 7, certificationPrompt: null });
+    const message = parseLiveMessage(raw);
+    expect(message).toEqual({ type: "certificationPrompt", tournamentId: 7, certificationPrompt: null });
+    expect(applyLiveMessage(reconnect(withPrompt(), true), message!).detail?.certificationPrompt).toBeNull();
   });
 });

@@ -7,6 +7,8 @@ jest.mock("@/lib/server/tournaments/registration-eligibility");
 jest.mock("@/lib/server/tournaments/certification-prompt", () => ({
   loadCertificationPrompt: jest.fn(),
   peekCertificationPrompt: jest.fn(),
+  // Issue finale : la même lecture ici (le cache réel est testé à part).
+  finalCertificationPrompt: (_key: string, load: () => Promise<unknown>) => load().catch(() => null),
   // Sans mémoire ici : chaque lecture du contexte relit ; un échec rend `null`, journalisé.
   cachedCertificationPrompt: (_key: string, load: () => Promise<unknown>) =>
     load().catch((error: unknown) => {
@@ -153,16 +155,24 @@ describe("flux SSE : l'invitation n'est pas attendue (onLateCertificationPrompt,
     expect(late).toHaveBeenCalledWith(PROMPT);
   });
 
-  it("lue sans rien à proposer, ou en échec : aucun rappel", async () => {
-    const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
+  it("lue sans rien à proposer, ou en échec : `null` remis (retire celle d'avant une reconnexion)", async () => {
     for (const outcome of [Promise.resolve(null), Promise.reject(new Error("pool épuisé"))]) {
       jest.mocked(loadCertificationPrompt).mockReturnValueOnce(outcome);
       const late = jest.fn();
       await getTournamentViewerContext(snapshot("RUNNING", true), 7, {}, { onLateCertificationPrompt: late });
       await flush();
-      expect(late).not.toHaveBeenCalled();
+      expect(late).toHaveBeenCalledWith(null);
     }
-    errors.mockRestore();
+  });
+
+  it("dit qu'elle suivra (onCertificationPromptDeferred) — seulement quand elle n'est pas connue", async () => {
+    const deferred = jest.fn();
+    await getTournamentViewerContext(snapshot("RUNNING", true), 7, {}, { onLateCertificationPrompt: jest.fn(), onCertificationPromptDeferred: deferred });
+    expect(deferred).toHaveBeenCalledTimes(1);
+    jest.mocked(peekCertificationPrompt).mockReturnValue({ prompt: PROMPT });
+    deferred.mockClear();
+    await getTournamentViewerContext(snapshot("RUNNING", true), 7, {}, { onLateCertificationPrompt: jest.fn(), onCertificationPromptDeferred: deferred });
+    expect(deferred).not.toHaveBeenCalled();
   });
 
   it("hors cible (non engagé) : ni consultation de la mémoire ni lecture", async () => {

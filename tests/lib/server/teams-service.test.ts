@@ -4,10 +4,10 @@ jest.mock("@/lib/server/terms-acceptance", () =>
   jest.requireActual<typeof import("../../helpers/terms-acceptance-double")>("../../helpers/terms-acceptance-double").termsAcceptanceDouble(),
 );
 jest.mock("@/lib/server/database");
-jest.mock("@/lib/server/session-streams", () => ({ closeUserStreams: jest.fn() }));
+jest.mock("@/lib/server/session-streams", () => ({ reconnectUserStreams: jest.fn() }));
 
 import { getDatabase } from "@/lib/server/database";
-import { closeUserStreams } from "@/lib/server/session-streams";
+import { reconnectUserStreams } from "@/lib/server/session-streams";
 import { canManageTeam } from "@/lib/server/teams/access";
 import { leaveTeam, removeTeamMember, updateTeamMemberRoles } from "@/lib/server/teams/roster";
 import type { TeamRole } from "@/lib/shared/types";
@@ -191,17 +191,17 @@ describe("removeTeamMember", () => {
   });
 
   it("ferme les flux de tournoi du joueur exclu, pour que son contexte soit recalculé (EF-04)", async () => {
-    jest.mocked(closeUserStreams).mockClear();
+    jest.mocked(reconnectUserStreams).mockClear();
     await removeTeamMember(OWNER_ID, TEAM_ID, DPS_ID);
-    expect(closeUserStreams).toHaveBeenCalledTimes(1);
-    expect(closeUserStreams).toHaveBeenCalledWith(DPS_ID);
+    expect(reconnectUserStreams).toHaveBeenCalledTimes(1);
+    expect(reconnectUserStreams).toHaveBeenCalledWith(DPS_ID);
   });
 
   it("rend MEMBER_NOT_FOUND si la cible est partie entre-temps", async () => {
-    jest.mocked(closeUserStreams).mockClear();
+    jest.mocked(reconnectUserStreams).mockClear();
     useDatabase(ROSTER, 0);
     await expect(removeTeamMember(OWNER_ID, TEAM_ID, DPS_ID)).rejects.toThrow("MEMBER_NOT_FOUND");
-    expect(closeUserStreams).not.toHaveBeenCalled();
+    expect(reconnectUserStreams).not.toHaveBeenCalled();
   });
 });
 
@@ -217,11 +217,11 @@ describe("leaveTeam", () => {
   });
 
   it("ferme les flux de tournoi de celui qui part, jamais sur un refus (EF-04)", async () => {
-    jest.mocked(closeUserStreams).mockClear();
+    jest.mocked(reconnectUserStreams).mockClear();
     await expect(leaveTeam(OUTSIDER_ID, TEAM_ID)).rejects.toThrow("NOT_A_MEMBER");
-    expect(closeUserStreams).not.toHaveBeenCalled();
+    expect(reconnectUserStreams).not.toHaveBeenCalled();
     await leaveTeam(DPS_ID, TEAM_ID);
-    expect(jest.mocked(closeUserStreams).mock.calls).toEqual([[DPS_ID]]);
+    expect(jest.mocked(reconnectUserStreams).mock.calls).toEqual([[DPS_ID]]);
   });
 
   it.each([

@@ -10,6 +10,7 @@ import {
   CERTIFICATION_PROMPT_STUCK_READ_MS,
   CERTIFICATION_PROMPT_TTL_MS,
   cachedCertificationPrompt,
+  finalCertificationPrompt,
   forgetCertificationPrompts,
   forgetCertificationPromptsOf,
   loadCertificationPrompt,
@@ -442,6 +443,92 @@ describe("mémoire courte des invitations", () => {
     const load = jest.fn(async () => null);
     expect(await cachedCertificationPrompt("7:42:1:1", load, now)).toBeNull();
     expect(load).toHaveBeenCalledTimes(1);
+  });
+
+  it("issue finale : la réponse tardive d'une lecture abandonnée, `null` si elle échoue ou pend trop (EF-04)", async () => {
+    forgetCertificationPrompts();
+    jest.useFakeTimers();
+    const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      clock = 0;
+      const control: { finish?: (value: typeof PROMPT) => void; fail?: (error: Error) => void } = {};
+      const slow = () => new Promise<typeof PROMPT>((resolve, reject) => Object.assign(control, { finish: resolve, fail: reject }));
+      const final = finalCertificationPrompt("20:42:1:1", slow, now);
+      const raced = cachedCertificationPrompt("20:42:1:1", slow, now);
+      await jest.advanceTimersByTimeAsync(CERTIFICATION_PROMPT_READ_TIMEOUT_MS);
+      expect(await raced).toBeNull();
+      control.finish?.(PROMPT);
+      expect(await final).toEqual(PROMPT);
+
+      const failing = finalCertificationPrompt("21:42:1:1", slow, now);
+      await jest.advanceTimersByTimeAsync(CERTIFICATION_PROMPT_READ_TIMEOUT_MS);
+      control.fail?.(new Error("pool"));
+      expect(await failing).toBeNull();
+
+      const hanging = finalCertificationPrompt("22:42:1:1", () => new Promise<null>(() => undefined), now);
+      await jest.advanceTimersByTimeAsync(CERTIFICATION_PROMPT_READ_TIMEOUT_MS);
+      await jest.advanceTimersByTimeAsync(CERTIFICATION_PROMPT_TTL_MS);
+      expect(await hanging).toBeNull();
+      // Une lecture tranchée à temps : la même issue que la course.
+      expect(await finalCertificationPrompt("23:42:1:1", async () => PROMPT, now)).toEqual(PROMPT);
+    } finally {
+      jest.clearAllTimers();
+      errors.mockRestore();
+      jest.useRealTimers();
+      forgetCertificationPrompts();
+    }
+  });
+
+  it("pleine, la mémoire ne chasse pas une lecture abandonnée qui pend encore (EF-04)", async () => {
+    forgetCertificationPrompts();
+    jest.useFakeTimers();
+    const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      clock = 0;
+      const stuck = jest.fn(() => new Promise<null>(() => undefined));
+      const hung = cachedCertificationPrompt("pendante", stuck, now);
+      jest.advanceTimersByTime(CERTIFICATION_PROMPT_READ_TIMEOUT_MS);
+      await hung;
+      for (let i = 0; i < CERTIFICATION_PROMPT_CACHE_MAX - 1; i += 1) await cachedCertificationPrompt(`k${i}`, async () => null, now);
+      // Pleine : une nouvelle clé chasse `k0`, jamais la lecture pendante (la plus ancienne).
+      await cachedCertificationPrompt("neuve", async () => null, now);
+      expect(await cachedCertificationPrompt("pendante", stuck, now)).toBeNull();
+      expect(stuck).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.clearAllTimers();
+      errors.mockRestore();
+      jest.useRealTimers();
+      forgetCertificationPrompts();
+    }
+  });
+
+  it("oubliée, une lecture abandonnée qui pend reste une garde, et sa réponse tardive est écartée (EF-04)", async () => {
+    forgetCertificationPrompts();
+    jest.useFakeTimers();
+    const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      clock = 0;
+      const control: { finish?: (value: typeof PROMPT) => void } = {};
+      const load = jest.fn(() => new Promise<typeof PROMPT>((resolve) => (control.finish = resolve)));
+      const hung = cachedCertificationPrompt("7:42:1:1", load, now);
+      jest.advanceTimersByTime(CERTIFICATION_PROMPT_READ_TIMEOUT_MS);
+      await hung;
+      forgetCertificationPromptsOf(7);
+      expect(peekCertificationPrompt("7:42:1:1", now)).toBeUndefined();
+      // Pas de seconde acquisition en file derrière elle.
+      expect(await cachedCertificationPrompt("7:42:1:1", load, now)).toBeNull();
+      expect(load).toHaveBeenCalledTimes(1);
+      // Sa réponse tardive date d'avant le geste : jamais servie.
+      control.finish?.(PROMPT);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(await cachedCertificationPrompt("7:42:1:1", load, now)).toBeNull();
+    } finally {
+      jest.clearAllTimers();
+      errors.mockRestore();
+      jest.useRealTimers();
+      forgetCertificationPrompts();
+    }
   });
 
   it("reste bornée : la plus ancienne part", async () => {

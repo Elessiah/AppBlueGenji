@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import {
   closeSessionStreams,
   closeUserStreams,
+  reconnectUserStreams,
   registerSessionStream,
   registeredStreamCount,
   resetSessionStreams,
@@ -158,5 +159,23 @@ describe("revokedSince", () => {
     closeUserStreams(1);
     jest.advanceTimersByTime(REVOCATION_MEMORY_MS);
     expect(revokedSince(1, "h", mark)).toBe(false);
+  });
+});
+
+describe("reconnectUserStreams (EF-04)", () => {
+  it("ferme tous les flux du compte, seulement les siens, sans noter de révocation", () => {
+    const a1 = jest.fn();
+    const a2 = jest.fn();
+    const b = jest.fn();
+    register(1, "h1", a1);
+    register(1, "h2", a2);
+    register(2, "h3", b);
+    const mark = revocationMark();
+    expect(reconnectUserStreams(1)).toBe(2);
+    expect([a1, a2].every((close) => close.mock.calls.length === 1)).toBe(true);
+    expect(b).not.toHaveBeenCalled();
+    // Un flux en cours d'ouverture de cette session n'est pas refusé (401).
+    expect(revokedSince(1, "h1", mark)).toBe(false);
+    expect(registeredStreamCount()).toBe(1);
   });
 });

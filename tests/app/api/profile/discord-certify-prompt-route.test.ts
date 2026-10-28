@@ -109,16 +109,22 @@ describe("POST /api/profile/discord/certify-prompt", () => {
     expect(recordDiscordCertifyPromptOff).not.toHaveBeenCalled();
   });
 
-  it("session qui ne doit plus rien (déjà répondue) : ok sans aucune écriture (EF-04)", async () => {
+  it("session qui ne doit plus rien (déjà répondue) : « Plus tard » ok sans aucune écriture (EF-04)", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7, certifyPromptDue: false }));
-    for (const action of ["LATER", "NEVER"]) {
-      const response = await POST(post({ action, userId: 7 }));
-      expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({ action });
-    }
+    const response = await POST(post({ action: "LATER", userId: 7 }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ action: "LATER" });
     expect(markDiscordCertifyPromptSeen).not.toHaveBeenCalled();
     expect(recordDiscordCertifyPromptOff).not.toHaveBeenCalled();
     expect(currentTokenHash).not.toHaveBeenCalled();
+  });
+
+  it("« Ne plus voir » toujours gardé, même quand un « Plus tard » d'un autre onglet a levé la marque", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7, certifyPromptDue: false }));
+    const response = await POST(post({ action: "NEVER", userId: 7 }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ action: "NEVER" });
+    expect(recordDiscordCertifyPromptOff).toHaveBeenCalledWith(7);
   });
 
   it("compte absent ou malformé : 400 INVALID_ACTION, jamais dit « autre compte » (EF-04)", async () => {

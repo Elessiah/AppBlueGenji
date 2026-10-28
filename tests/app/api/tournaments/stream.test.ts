@@ -738,7 +738,7 @@ describe("GET /api/tournaments/[id]/stream — place prise avant les lectures (E
 
 describe("GET /api/tournaments/[id]/stream — invitation à certifier poussée après coup (EF-04)", () => {
   const PROMPT = { reason: "MANAGER", discordVerified: false, battletagVerified: true, battletagRelevant: true } as const;
-  type Late = (prompt: typeof PROMPT) => void;
+  type Late = (prompt: typeof PROMPT | null) => void;
   const lateCallback = (): Late =>
     (jest.mocked(getTournamentViewerContext).mock.calls[0][3] as { onLateCertificationPrompt: Late }).onLateCertificationPrompt;
 
@@ -780,6 +780,25 @@ describe("GET /api/tournaments/[id]/stream — invitation à certifier poussée 
     const [patch] = await messages(reader, 1);
     expect(patch).toEqual({ type: "certificationPrompt", tournamentId: 5, certificationPrompt: PROMPT });
     await reader.cancel();
+  });
+
+  it("en attente : la connexion le dit, et un `null` final est poussé aussi", async () => {
+    jest.mocked(getTournamentViewerContext).mockImplementation(async (_snapshot, _userId, _rights, options) => {
+      options?.onCertificationPromptDeferred?.();
+      return viewerWith();
+    });
+    const reader = (await GET(new Request("http://t/"), params("5"))).body!.getReader();
+    const [connected] = await messages(reader, 1);
+    expect(connected.certificationPromptPending).toBe(true);
+    lateCallback()(null);
+    const [patch] = await messages(reader, 1);
+    expect(patch).toEqual({ type: "certificationPrompt", tournamentId: 5, certificationPrompt: null });
+    await reader.cancel();
+  });
+
+  it("connue d'emblée : la connexion ne dit rien d'une attente", async () => {
+    const [connected] = await messages((await GET(new Request("http://t/"), params("5"))).body!.getReader(), 1);
+    expect(connected).not.toHaveProperty("certificationPromptPending");
   });
 
   it("flux fermé entre-temps : rien n'est écrit, rien ne lève", async () => {
