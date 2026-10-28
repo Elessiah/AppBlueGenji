@@ -45,8 +45,10 @@ ouvre un lancement, lecture de la liste des tournois).
 
 - Candidats : tournoi `RUNNING`, match `READY` non exempt, appariement courant,
   `lobby_opened_at` des 20 dernières minutes (délai du lancement d'office + 5).
-- **Réservation** `bg_match_start_notices` phase `LOBBY_BRIEF`, une par match
-  et par appariement (`INSERT IGNORE`), **avant** les destinataires. Un
+- **Réservation** `bg_match_start_notices` phases `LOBBY_BRIEF_1` /
+  `LOBBY_BRIEF_2`, une par engagée et par appariement (`INSERT IGNORE`),
+  **avant** les destinataires ; un match reste candidat tant qu'un côté est
+  libre. Un
   réappariement est un autre appariement (nouveau brief) ; un lancement défait
   (horaire changé, retour à planifier) efface les réservations du match : le
   salon rouvert est briefé de nouveau.
@@ -59,9 +61,10 @@ ouvre un lancement, lecture de la liste des tournois).
 - **Indépendant du push** (pas de garde `webPushConfig`). Bot injoignable : le
   push part, pm2 dit combien de comptes n'ont pas reçu le message
   (`[lobby-brief] bot injoignable`), **sans nouvel essai**. Une panne de lecture
-  des arbitres envoie le brief sans cette ligne ; une panne de lecture des
-  managers ou des casters, avant tout envoi, **rend les réservations** (le
-  balayage suivant réessaie) ; l'échec d'un côté n'empêche pas les autres.
+  des casters ou des arbitres envoie le brief sans ces lignes. Une panne avant
+  tout envoi (réservation, lecture des managers) **rend les réservations
+  prises**, en une instruction ; un côté dont l'envoi lève rend **sa seule**
+  réservation, sans gêner les autres : le balayage suivant réessaie.
 
 ## RGPD
 
