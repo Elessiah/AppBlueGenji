@@ -33,6 +33,8 @@ Rédacteurs : `formatLobbyBriefDm` (`lib/shared/lobby-brief.ts`, FR/EN en dur
 comme les autres messages privés) et `lobbyBriefPush`
 (`lib/shared/push-messages.ts`, clés `pushMessages.lobbyBrief`), étiquette
 `rencontre-<id>-salon` : le brief ne remplace pas l'appel aux « Prêt ».
+Le push tient sous `PUSH_BODY_MAX` : rappel du tri par rôle en tête, « Droite
+(1er ban) » (aucun nom répété), carte en dernier — la coupe ne retire qu'elle.
 
 ## Envoi
 
@@ -57,7 +59,9 @@ ouvre un lancement, lecture de la liste des tournois).
 - **Indépendant du push** (pas de garde `webPushConfig`). Bot injoignable : le
   push part, pm2 dit combien de comptes n'ont pas reçu le message
   (`[lobby-brief] bot injoignable`), **sans nouvel essai**. Une panne de lecture
-  des casters ou des arbitres envoie le brief sans ces lignes.
+  des arbitres envoie le brief sans cette ligne ; une panne de lecture des
+  managers ou des casters, avant tout envoi, **rend les réservations** (le
+  balayage suivant réessaie) ; l'échec d'un côté n'empêche pas les autres.
 
 ## RGPD
 
