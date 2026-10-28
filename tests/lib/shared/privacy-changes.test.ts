@@ -2012,4 +2012,20 @@ describe("PRIVACY_CHANGES — BattleTag des matchs en Overwatch seulement (déci
     expect(en).toContain("chosen on the certified Discord tag alone");
     expect(english.details).toHaveLength(entry.details.length);
   });
+
+  // `sideContacts` : sans membre certifié, le premier par rôle sort quand même,
+  // sans tag Discord ni BattleTag — le texte ne promet pas de tag à chaque contact.
+  it("privacyChanges_battletagMatchesOverwatchOnly_statesNoCertifiedMemberFallbackFrAndEn", () => {
+    const fr = [entry.title, entry.summary, ...entry.details].join(" ");
+    const en = [english.title, english.summary, ...english.details].join(" ");
+
+    expect(fr).toContain(
+      "Une équipe dont aucun membre n'a certifié son tag Discord est présentée par le pseudo et le rôle d'équipe d'un de ses membres (capitaine, manager, propriétaire, puis un joueur), sans autre identifiant.",
+    );
+    expect(en).toContain(
+      "A team none of whose members has certified their Discord tag is presented by one member's username and team role (captain, manager, owner, then a player), with no other identifier.",
+    );
+    expect(fr).not.toContain("Un contact d'équipe et un caster y gardent leur tag Discord certifié");
+    expect(en).not.toContain("A team contact and a caster keep their certified Discord tag");
+  });
 });

@@ -520,6 +520,22 @@ describe("listViewerMatchLaunches — exposition des contacts", () => {
     expect(info.team2.contacts).toEqual([{ userId: 5, pseudo: "Joueur5", roles: ["OWNER"], discordTag: "own" }]);
   });
 
+  // Sans membre certifié, le choix retombe sur le rôle : le BattleTag vérifié
+  // d'un joueur ne le fait pas passer devant, et rien d'autre que le pseudo et
+  // le rôle ne sort (texte de PRIVACY_CHANGES).
+  it("listViewerMatchLaunches_marvelRivalsNoCertifiedMember_presentsFirstByRoleWithoutIdentifier", async () => {
+    state.candidates = [candidate({ tournament_game: "MR" })];
+    state.members = [
+      member(TEAM1, 1, { roles_json: JSON.stringify(["CAPITAINE"]), discord_pseudo: "cap" }),
+      member(TEAM1, 2, { overwatch_battletag: "Deux#2", blizzard_sub: "s2" }),
+    ];
+
+    const [info] = await listViewerMatchLaunches(viewer);
+
+    expect(info.team1.contacts).toEqual([{ userId: 1, pseudo: "Joueur1", roles: ["CAPITAINE"], discordTag: null }]);
+    expect(JSON.stringify(info)).not.toContain("Deux#2");
+  });
+
   it("listViewerMatchLaunches_marvelRivalsSoloEntry_omitsBattletagFields", async () => {
     state.candidates = [candidate({ tournament_game: "MR", team2_solo_user_id: 30 })];
     state.users = [
