@@ -15,15 +15,9 @@
   margin-bottom: 8px;
 }
 
-.crumbs {
-  min-width: 0;
-  font-size: 13px;
-}
-
+/* Retour à la fiche : le style du « ← Retour » de l'en-tête du tournoi, repris tel quel. */
 .back {
-  color: var(--blue-300);
-  text-decoration: underline;
-  overflow-wrap: anywhere;
+  composes: back from "./TournamentHeader.module.css";
 }
 
 .header {
@@ -39,6 +33,7 @@
 
 .meta {
   margin: 4px 0 0;
+  overflow-wrap: anywhere;
   color: var(--ink-soft);
   font-size: 13px;
 }
@@ -161,6 +156,15 @@
   display: grid;
   gap: 4px;
   font-size: 13px;
+}
+
+.stepSettings {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  list-style: disc;
+  display: grid;
+  gap: 2px;
+  color: var(--ink-mute);
 }
 
 .streams {

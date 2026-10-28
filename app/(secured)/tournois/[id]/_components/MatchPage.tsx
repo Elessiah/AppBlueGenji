@@ -22,13 +22,14 @@ import {
   matchPageSides,
   matchPageStreams,
   selfManagementSteps,
+  OW_SELF_MANAGEMENT_SETTINGS,
   type MatchPageSide,
 } from "@/lib/shared/match-page";
 import { FIRST_MAP_MAX_LENGTH, normalizeFirstMap } from "@/lib/shared/match-referee";
 import { streamLinkText } from "@/lib/shared/live-streams";
 import { localizedPlaceholder, matchPositionText, versusText } from "@/lib/shared/tournament-page-text";
 import { canPickMatchMap, firstBanOrder, roundMapsOf } from "@/lib/shared/round-maps";
-import type { BracketMatch, TournamentDetail } from "@/lib/shared/types";
+import type { BracketMatch, TournamentDetail, TournamentGame } from "@/lib/shared/types";
 import { launchStripControls } from "../_lib/launch-strip";
 import { useLiveControls } from "../_lib/live-context";
 import { launchErrorText, useActionsText } from "../_lib/actions-text";
@@ -261,11 +262,13 @@ function DecisionLine({
 /** Arbitrage : l'arbitre (nommé aux seules parties du match), l'autogestion et ses étapes, ou l'absence de décision (staff). */
 function OfficiatingSection({
   match,
+  game,
   staff,
   launch,
   onCopy,
 }: Readonly<{
   match: BracketMatch;
+  game: TournamentGame;
   staff: boolean;
   launch: MatchLaunchInfo | null;
   onCopy: (value: string, label: string) => Promise<void>;
@@ -309,7 +312,17 @@ function OfficiatingSection({
           />
           <ol className={styles.steps} aria-label={t("matchPage.stepsLabel")}>
             {selfManagementSteps(match.casters.length).map((step) => (
-              <li key={step}>{t(`matchPage.steps.${step}`)}</li>
+              <li key={step}>
+                {t(`matchPage.steps.${step}`)}
+                {/* Réglages propres à Overwatch : rien à lister pour Marvel Rivals. */}
+                {step === "settings" && game === "OW" && (
+                  <ul className={styles.stepSettings}>
+                    {OW_SELF_MANAGEMENT_SETTINGS.map((setting) => (
+                      <li key={setting}>{t(`matchPage.owSettings.${setting}`)}</li>
+                    ))}
+                  </ul>
+                )}
+              </li>
             ))}
           </ol>
         </>
@@ -457,17 +470,17 @@ export function MatchPage({
   return (
     <>
       <div className={styles.topbar}>
-        <nav className={styles.crumbs} aria-label={t("matchPage.crumbsLabel")}>
-          <LocaleLink href={tournamentMatchHref(detail.card.id, match.id, spectator)} className={`${styles.back} tap-target`}>
-            <span aria-hidden="true">←</span> {detail.card.name}
-          </LocaleLink>
-        </nav>
+        {/* Le retour du site (`← Retour` de la fiche, même style) : un vrai lien
+            qui ramène à la carte de ce match, dans la bonne vue (`MATCH_PAGE.md`). */}
+        <LocaleLink href={tournamentMatchHref(detail.card.id, match.id, spectator)} className={`${styles.back} tap-target`}>
+          <span aria-hidden="true">←</span> {t("matchPage.backToTournament")}
+        </LocaleLink>
         {status}
       </div>
       <header className={styles.header}>
         <h1 className={styles.title}>{matchLabel}</h1>
         <p className={styles.meta}>
-          {[phaseName, matchPositionText(text, match)].filter(Boolean).join(" · ")}
+          {[detail.card.name, phaseName, matchPositionText(text, match)].filter(Boolean).join(" · ")}
         </p>
       </header>
 
@@ -493,7 +506,7 @@ export function MatchPage({
         editable={editable}
         canPick={!spectator && !frozen && canPickMatchMap({ staff: canSchedule, myTeamId, canDeclareReady: canDeclareFor(shownLaunch) }, match)}
       />
-      <OfficiatingSection match={match} staff={canSchedule} launch={shownLaunch} onCopy={onCopy} />
+      <OfficiatingSection match={match} game={detail.card.game} staff={canSchedule} launch={shownLaunch} onCopy={onCopy} />
       <CastSection match={match} matchLabel={matchLabel} launch={shownLaunch} onCopy={onCopy} />
     </>
   );

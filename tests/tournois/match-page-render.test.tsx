@@ -22,13 +22,14 @@ jest.mock("@/components/match-launch/MatchContactsDialog", () => ({
 
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
+import { MatchPageScope } from "@/app/(secured)/tournois/[id]/_lib/match-page-context";
 import { MatchPage } from "@/app/(secured)/tournois/[id]/_components/MatchPage";
 import { MatchRow } from "@/app/(secured)/tournois/[id]/_components/MatchRow";
 import { LiveProvider } from "@/app/(secured)/tournois/[id]/_lib/live-context";
 import { SpectatorViewProvider } from "@/components/spectator-view";
 import { ToastProvider } from "@/components/ui/toast";
 import type { LaunchCaster, LaunchSide, MatchLaunchInfo } from "@/lib/shared/match-launch";
-import type { BracketMatch } from "@/lib/shared/types";
+import type { BracketMatch, TournamentGame } from "@/lib/shared/types";
 import { EMPTY_MAP_RULES, type TournamentMapRules } from "@/lib/shared/round-maps";
 import { bracketMatch, matchCaster } from "../helpers/bracket-match";
 import { tournamentDetail } from "../helpers/tournament-detail";
@@ -114,9 +115,10 @@ function render(
   frozen = false,
   locale: "fr" | "en" = "fr",
   mapRules: TournamentMapRules = EMPTY_MAP_RULES,
+  game: TournamentGame = "OW",
 ): string {
   const detail = tournamentDetail({
-    card: tournamentCard({ id: 12, name: "Coupe d'hiver", state: "RUNNING" }),
+    card: tournamentCard({ id: 12, name: "Coupe d'hiver", state: "RUNNING", game }),
     matches: [page],
     mapRules,
   });
@@ -181,6 +183,19 @@ describe("page d'un match — ce que tout le monde lit", () => {
     expect(lobby).toContain("Hôte : crée la partie");
     expect(lobby).toContain("Premier ban");
     expect(lobby).toContain("Tokyo");
+  });
+
+  it("retour à la fiche : le style du retour de l'en-tête, libellé « Retour au tournoi », ancré sur la carte du match", () => {
+    const html = render(match(), "staff");
+    expect(html).toMatch(/<a [^>]*class="back tap-target"[^>]*href="\/tournois\/12#match-34"|<a [^>]*href="\/tournois\/12#match-34"[^>]*class="back tap-target"/);
+    expect(visible(html)).toContain("← Retour au tournoi");
+    expect(html).not.toContain("<nav");
+    expect(visible(render(match(), "public", false, "en"))).toContain("← Back to the tournament");
+    expect(render(match(), "public", false, "en")).toContain('href="/en/suivre/tournois/12#match-34"');
+  });
+
+  it("le nom du tournoi, qui n'est plus le bouton de retour, ouvre la ligne de situation", () => {
+    expect(visible(render(match(), "public"))).toContain("Coupe d'hiver · Manche 2 · Match 3");
   });
 
   it("première map pas encore choisie, adversaires à venir", () => {
@@ -301,7 +316,28 @@ describe("page d'un match — arbitrage × lecteur", () => {
       expect(visible(html)).toContain("Arbitre désigné");
       expect(html).toContain("Juge#3333");
       expect(visible(html)).toContain("À inviter dans la partie");
+      expect(html).not.toContain("Killcam");
     }
+  });
+
+  it("autogestion Overwatch : les trois réglages en sous-liste de l'étape des paramètres", () => {
+    const html = render(match({ selfManaged: true }), "public");
+    const nested = /Réglez les paramètres de la partie\.\s*<ul[^>]*>(.*?)<\/ul>/.exec(html);
+    expect(nested).not.toBeNull();
+    expect(visible(nested?.[1] ?? "")).toBe(
+      " Paramètres compétitifs Killcam désactivée Pause lors de la déconnexion d'un joueur ",
+    );
+  });
+
+  it("autogestion Overwatch en anglais : les trois réglages traduits", () => {
+    const html = visible(render(match({ selfManaged: true }), "public", false, "en"));
+    expect(html).toContain("Competitive settings Killcam disabled Pause when a player disconnects");
+  });
+
+  it("autogestion Marvel Rivals : l'étape reste, sans la sous-liste Overwatch", () => {
+    const html = visible(render(match({ selfManaged: true }), "public", false, "fr", EMPTY_MAP_RULES, "MR"));
+    expect(html).toContain("Réglez les paramètres de la partie.");
+    expect(html).not.toContain("Killcam");
   });
 
   it("autogestion : l'aide-mémoire pour tous, l'invitation des casters avec un caster", () => {
@@ -475,7 +511,7 @@ describe("page d'un match — contacts : qui les demande", () => {
 });
 
 describe("« Page du match » sur la carte du plateau", () => {
-  function card(page: BracketMatch, spectator = false) {
+  function card(page: BracketMatch, spectator = false, onPage = false) {
     const row = (
       <ToastProvider>
         <LiveProvider
@@ -490,17 +526,24 @@ describe("« Page du match » sur la carte du plateau", () => {
           myTeamId={null}
           castBlock="NOT_CASTER"
         >
-          <MatchRow match={page} adminResolvable={false} onOpenAdminModal={() => undefined} scoreLocked={false} roundNumber={2} />
+          <MatchPageScope value={onPage}>
+            <MatchRow match={page} adminResolvable={false} onOpenAdminModal={() => undefined} scoreLocked={false} roundNumber={2} />
+          </MatchPageScope>
         </LiveProvider>
       </ToastProvider>
     );
     return renderToStaticMarkup(spectator ? <SpectatorViewProvider>{row}</SpectatorViewProvider> : row);
   }
 
-  it("mène à la page du match, dans l'espace du lecteur ; nom accessible qui commence par le texte", () => {
-    expect(card(match())).toContain('href="/tournois/12/matchs/34"');
-    expect(card(match(), true)).toContain('href="/suivre/tournois/12/matchs/34"');
-    expect(card(match())).toContain('aria-label="Page du match : Alpha contre Bravo"');
+  it("rejoint les actions de la carte : une entrée du pied, nom accessible qui commence par le texte, plus de lien à part", () => {
+    const html = card(match());
+    expect(html).toContain('data-action="matchPage" data-primary="true">Page du match : Alpha contre Bravo');
+    expect(html).not.toContain("pageLink");
+    expect(html).not.toContain("<p");
+  });
+
+  it("se tait sous la page du match elle-même", () => {
+    expect(card(match(), false, true)).not.toContain('data-action="matchPage"');
   });
 
   it("tu sur une exemption, présent sur un match en attente d'adversaire", () => {

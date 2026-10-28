@@ -51,7 +51,12 @@ fiche.
    pseudo et son BattleTag (« À inviter dans la partie ») aux seuls lecteurs
    que sert la lecture des contacts ; ou l'aide-mémoire de l'**autogestion**
    (l'hôte crée la partie, les managers s'invitent, les paramètres, les casters
-   — cette étape seulement avec un caster, `selfManagementSteps`) ; ou, au
+   — cette étape seulement avec un caster, `selfManagementSteps`) ; à
+   l'étape des paramètres, un match **Overwatch** liste en sous-liste
+   (`<ul>` imbriquée, `OW_SELF_MANAGEMENT_SETTINGS`) : paramètres compétitifs,
+   killcam désactivée, pause lors de la déconnexion d'un joueur (clés
+   `matchPage.owSettings.*`, FR et EN) — rien pour Marvel Rivals ; ni le DM de
+   lancement ni le bot ne reprennent cette étape ; ou, au
    **staff seul**, « Aucune décision ». Rien sur un match terminé ou une
    exemption. Prendre, rendre ou confier l'arbitrage reste le geste de la carte
    (`MATCH_REFEREE.md`).
@@ -80,10 +85,24 @@ leur version 7 (TERMS v7) : la page ne se déploie qu'avec elle.
 
 ## Liens vers la page
 
-- La carte d'un match : « Page du match » (tu sur une exemption) et, quand le
-  match a plusieurs streams, « +N » après le premier lien (`MatchLiveStrip`).
+- La carte d'un match : « Page du match » est **une action du pied de la carte**
+  (`MatchCardActions`, id `matchPage`, `MATCH_CARD_LAYOUT.md`), pas un lien posé
+  à part : un vrai lien (`LocaleLink`, ouvrable dans un onglet) au gabarit des
+  boutons du pied, nom accessible « Page du match : A contre B ». Elle tient le
+  pied (pleine largeur) quand le lecteur n'a aucun geste à faire — le public —,
+  et passe derrière « Plus d'actions » après « Contacts » dès qu'il en a un
+  (score à saisir, planification…). Absente sous la page elle-même
+  (`MatchPageScope`) et sur une exemption. Quand le match a plusieurs streams,
+  « +N » après le premier lien (`MatchLiveStrip`).
 - La fenêtre de lancement : « Page du match ».
-- L'ancre `#match-<id>` de la fiche reste valable (retour de la page).
+- **Retour à la fiche** : « ← Retour au tournoi », au style du « ← Retour » de
+  l'en-tête de la fiche (`composes` de sa feuille de style : une seule définition),
+  un vrai lien vers `tournamentMatchHref` — l'ancre `#match-<id>` de la fiche
+  (`match-anchor.ts`, `useMatchAnchor`) pose la fiche **sur la carte du match**,
+  dans la bonne phase, surlignée et focalisée. Ce n'est pas `router.back()` : la
+  fiche se remplit par le flux après son montage, la position d'un retour
+  d'historique ne tiendrait pas. Le nom du tournoi, qui faisait le bouton, ouvre
+  la ligne de situation sous le titre (« Tournoi · phase · Manche R · Match N »).
 
 ## Texte des liens de diffusion
 
