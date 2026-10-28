@@ -72,7 +72,11 @@ affichées dans le tableau « Données collectées ») :
   rattachement, tag et date de certification, identifiants Google et Blizzard,
   langue du compte `account.locale`, choix des messages privés de match
   `account.matchDmEnabled`, « Ne plus afficher » de la modale du recrutement
-  `account.recruitmentModalOff`, `account.recruitmentModalBackOn`), les traces d'annonce #live des matchs de ses
+  `account.recruitmentModalOff`, `account.recruitmentModalBackOn`, « Ne plus voir »
+  de la proposition de certification du tag Discord
+  `account.discordCertifyPromptDismissedAt` et de l'invitation à certifier de la
+  fiche tournoi `account.certificationPromptDismissedAt` — la marque de session
+  `certify_prompt_due` n'y est pas, l'export ne rendant aucune session), les traces d'annonce #live des matchs de ses
   entrées en tournoi individuel (`liveAnnouncements` : match, tournoi, date —
   `live-announcement-export.ts` ; une trace = une annonce tentée, nommant le
   joueur seulement pour une inscription faite depuis le 16 octobre 2026 ; la

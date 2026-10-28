@@ -159,7 +159,10 @@ ton match (dès que les adversaires sont connus, caster — et équipes d'un mat
 que l'on caste — le temps du match),
 autres joueurs (case « Tag Discord »), visiteurs (jamais). « Autres effets » :
 pastille sur la fiche (joueurs connectés), messages privés de match (sauf
-opposition). Soi-même n'a pas de ligne : on voit toujours son propre tag, rien
+opposition) et, au seul parcours `DIALOG`, le rattachement du compte Discord
+par le code reçu en message privé quand il ne l'est pas encore
+(`CERTIFY_PROMPT_DIALOG_ONLY_ROWS`, `certifyPromptRowsFor` ; en `ONE_CLICK`,
+Discord est déjà rattaché). Soi-même n'a pas de ligne : on voit toujours son propre tag, rien
 n'y change. Sans certification : personne d'autre que toi. Puis une
 ligne : retirer son tag ou changer de pseudo Discord retire la certification.
 Textes de l'espace `certifyPrompt` (FR et EN) ; le détail complet reste dans le
@@ -182,9 +185,16 @@ du parcours `DIALOG` est décorative (`aria-hidden`).
 
 `bg_users.discord_certify_prompt_dismissed_at` : exporté
 (`discordCertifyPromptDismissedAt`), remis à `NULL` à l'anonymisation.
-`bg_user_sessions.certify_prompt_due` : part avec la session. Déclaré :
-`PRIVACY_CHANGES` `2026-10-proposition-certification-discord` (FR et EN),
-registre T01, ligne du tableau des données de `/rgpd` (`rgpd-policy.ts`, FR et EN).
+`bg_user_sessions.certify_prompt_due` : part avec la session, jamais exportée
+(l'export ne rend aucune session ; `/rgpd` le dit). Déclaré :
+`PRIVACY_CHANGES` `2026-10-proposition-certification-discord` puis l'entrée
+rectificative `2026-10-proposition-certification-discord-marque-de-session`
+(la marque posée à chaque connexion, levée à la première réponse — FR et EN),
+registre T01 (choix et marque) et T04 (« Ne plus voir » tait aussi
+l'invitation de la fiche tournoi faite au meneur quand Discord seul manque),
+lignes « Choix « Ne plus voir » de la certification Discord » et
+« Certification du pseudo Discord » du tableau des données de `/rgpd`
+(`rgpd-policy.ts`, FR et EN).
 Les deux colonnes sont tolérées absentes (`ALTER` échoué) : session écrite sans
 la marque, fenêtre muette, export et anonymisation intacts. Le repli se fait
 **colonne par colonne** (`selectUserRows`, `exportOwnData`, toutes les
