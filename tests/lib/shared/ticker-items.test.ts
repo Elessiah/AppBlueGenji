@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
-import { tickerItemText, tickerOutcomes, tickerScores, type TickerMatchOutcomeInput } from "@/lib/shared/ticker-items";
+import { tickerOutcomes, tickerScores, type TickerMatchOutcomeInput } from "@/lib/shared/ticker-items";
+import { tickerItemText } from "../../helpers/ticker-text";
 
 /** Issue des camps d'un résultat du bandeau, lue sur le résultat enregistré (TICKER_RESULTS.md). */
 function match(overrides: Partial<TickerMatchOutcomeInput> = {}): TickerMatchOutcomeInput {
@@ -30,10 +31,24 @@ describe("tickerOutcomes", () => {
     expect(tickerOutcomes(match({ winnerTeamId: null }))).toEqual(["none", "none"]);
   });
 
-  it("vainqueur étranger au match ou camp absent : ni faux vainqueur, ni faux perdant", () => {
+  it("vainqueur étranger au match : ni faux vainqueur, ni faux perdant", () => {
     expect(tickerOutcomes(match({ winnerTeamId: 9 }))).toEqual(["none", "none"]);
-    expect(tickerOutcomes(match({ team2Id: null }))).toEqual(["win", "none"]);
     expect(tickerOutcomes(match({ team1Id: null, team2Id: null, winnerTeamId: null }))).toEqual(["none", "none"]);
+    expect(tickerOutcomes(match({ team1Id: null, team2Id: null, winnerTeamId: null, forfeitTeamId: null }))).toEqual(["none", "none"]);
+  });
+
+  it("ligne incohérente (vainqueur = camp forfait) : le vainqueur enregistré est suivi, comme l'arbre et le classement", () => {
+    expect(tickerOutcomes(match({ winnerTeamId: 1, forfeitTeamId: 1 }))).toEqual(["win", "loss"]);
+    expect(tickerOutcomes(match({ winnerTeamId: 2, forfeitTeamId: 2 }))).toEqual(["loss", "win"]);
+  });
+
+  it("forfait de l'adversaire d'un vainqueur enregistré : il reste « forfait », pas « perdant »", () => {
+    expect(tickerOutcomes(match({ winnerTeamId: 1, forfeitTeamId: 2 }))).toEqual(["win", "forfeit"]);
+  });
+
+  it("un identifiant de camp nul ne se confond pas avec un vainqueur ou un forfait nul", () => {
+    expect(tickerOutcomes(match({ team1Id: null, winnerTeamId: null, forfeitTeamId: null }))).toEqual(["none", "none"]);
+    expect(tickerOutcomes(match({ team1Id: null, winnerTeamId: 2 }))).toEqual(["loss", "win"]);
   });
 });
 

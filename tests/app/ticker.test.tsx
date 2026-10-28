@@ -41,13 +41,19 @@ describe("Ticker — résultats habillés par camp (TICKER_RESULTS.md)", () => {
   const FR: SrWords = { win: "vainqueur", loss: "perdant", forfeit: "forfait", none: null };
   const EN: SrWords = { win: "winner", loss: "loser", forfeit: "forfeit", none: null };
 
-  function result(left: TickerOutcome, right: TickerOutcome, sr: SrWords = FR, note: string | null = null): TickerResultItem {
+  function result(
+    left: TickerOutcome,
+    right: TickerOutcome,
+    sr: SrWords = FR,
+    note: string | null = null,
+    scores: readonly [string, string] = ["2", "1"],
+  ): TickerResultItem {
     return {
       kind: "result",
       lead: "RÉSULTAT · Alpha Cup ·",
       sides: [
-        { name: "Alpha", score: "2", outcome: left, sr: sr[left] },
-        { name: "Beta", score: "1", outcome: right, sr: sr[right] },
+        { name: "Alpha", score: scores[0], outcome: left, sr: sr[left] },
+        { name: "Beta", score: scores[1], outcome: right, sr: sr[right] },
       ],
       sr: note,
     };
@@ -61,16 +67,16 @@ describe("Ticker — résultats habillés par camp (TICKER_RESULTS.md)", () => {
   it("vainqueur et perdant : chacun sa classe, son repère de forme et son issue en texte masqué", () => {
     const html = firstCopy(renderToStaticMarkup(<Ticker items={[result("win", "loss")]} />));
     expect(html).toContain(
-      '<span class="side winner" data-outcome="win"><i class="mark" aria-hidden="true">▲</i><span>Alpha</span><span class="sr-only"> (vainqueur)</span> <b class="score">2</b></span>',
+      '<span class="side winner" data-outcome="win"><i class="mark" aria-hidden="true">✓</i><span>Alpha</span><span class="sr-only"> (vainqueur)</span> <b class="score">2</b></span>',
     );
     expect(html).toContain(
-      '<span class="side loser" data-outcome="loss"><i class="mark" aria-hidden="true">▼</i><span>Beta</span><span class="sr-only"> (perdant)</span> <b class="score">1</b></span>',
+      '<span class="side loser" data-outcome="loss"><i class="mark" aria-hidden="true">✕</i><span>Beta</span><span class="sr-only"> (perdant)</span> <b class="score">1</b></span>',
     );
   });
 
   it("garde la phrase visible et l'ordre du match", () => {
     const html = firstCopy(renderToStaticMarkup(<Ticker items={[result("loss", "win")]} />));
-    expect(visible(html)).toContain("RÉSULTAT · Alpha Cup · ▼Alpha 2 — ▲Beta 1");
+    expect(visible(html)).toContain("RÉSULTAT · Alpha Cup · ✕Alpha 2 — ✓Beta 1");
   });
 
   it("anglais : l'issue masquée suit la langue reçue", () => {
@@ -83,7 +89,7 @@ describe("Ticker — résultats habillés par camp (TICKER_RESULTS.md)", () => {
     const html = renderToStaticMarkup(<Ticker items={[result("forfeit", "win")]} />);
     expect(html).toContain('<span class="side" data-outcome="forfeit"><span>Alpha</span><span> (forfait)</span>');
     expect(html).not.toContain("loser");
-    expect(html).not.toContain("▼");
+    expect(html).not.toContain("✕");
   });
 
   it("forfait : le mot se voit aussi, sans quoi un forfait se lirait comme une défaite ordinaire (FR et EN)", () => {
@@ -107,11 +113,41 @@ describe("Ticker — résultats habillés par camp (TICKER_RESULTS.md)", () => {
   });
 
   it("nul : deux camps neutres, score en avant, note « sans vainqueur »", () => {
-    const html = firstCopy(renderToStaticMarkup(<Ticker items={[result("none", "none", FR, "sans vainqueur")]} />));
+    const html = firstCopy(renderToStaticMarkup(<Ticker items={[result("none", "none", FR, "sans vainqueur", ["2", "2"])]} />));
     expect(html.match(/<span class="side" data-outcome="none">/g)).toHaveLength(2);
     expect(html.match(/<b class="score">/g)).toHaveLength(2);
-    expect(html).not.toMatch(/winner|loser|▲|▼/);
+    expect(html).not.toMatch(/winner|loser|✓|✕/);
     expect(html).toContain('<span class="sr-only"> (sans vainqueur)</span>');
+  });
+
+  it("nul aux scores inégaux (2-1 sans vainqueur) : la note se voit, FR et EN", () => {
+    const html = firstCopy(renderToStaticMarkup(<Ticker items={[result("none", "none", FR, "sans vainqueur")]} />));
+    expect(html).toContain('<span> (sans vainqueur)</span>');
+    expect(visible(html)).toContain("Alpha 2 — Beta 1 (sans vainqueur)");
+    const en = firstCopy(renderToStaticMarkup(<Ticker items={[result("none", "none", EN, "no winner")]} />));
+    expect(visible(en)).toContain("(no winner)");
+  });
+
+  it("nul aux scores égaux : la note reste dite au lecteur d'écran seul", () => {
+    const html = firstCopy(renderToStaticMarkup(<Ticker items={[result("none", "none", FR, "sans vainqueur", ["1", "1"])]} />));
+    expect(visible(html)).not.toContain("sans vainqueur");
+  });
+
+  it("seconde copie (aria-hidden) : ni mots d'issue ni note masqués, mais le mot « forfait » et la note visible restent", () => {
+    const render = (items: Parameters<typeof Ticker>[0]["items"]) => renderToStaticMarkup(<Ticker items={items} />).split('<div class="copy" aria-hidden="true">')[1];
+    const second = render([result("win", "loss"), result("none", "none", FR, "sans vainqueur", ["1", "1"])]);
+    expect(second).not.toContain("sr-only");
+    expect(second).toContain("Alpha");
+    expect(render([result("forfeit", "win")])).toContain("<span> (forfait)</span>");
+    expect(render([result("none", "none", FR, "sans vainqueur")])).toContain("<span> (sans vainqueur)</span>");
+  });
+
+  it("le champion et le vainqueur d'un résultat partagent le même habillage", () => {
+    const champion = firstCopy(renderToStaticMarkup(<Ticker items={[{ kind: "champion", lead: "V ·", name: "Alpha", known: true }]} />));
+    const winner = firstCopy(renderToStaticMarkup(<Ticker items={[result("win", "loss")]} />));
+    const opening = '<span class="side winner" data-outcome="win"><i class="mark" aria-hidden="true">✓</i>';
+    expect(champion).toContain(opening);
+    expect(winner).toContain(opening);
   });
 
   it("champion : connu mis en valeur, inconnu en texte simple", () => {
@@ -119,7 +155,7 @@ describe("Ticker — résultats habillés par camp (TICKER_RESULTS.md)", () => {
     const unknown: TickerChampionItem = { kind: "champion", lead: "VAINQUEUR · Cup ·", name: "Champion inconnu", known: false };
     const html = firstCopy(renderToStaticMarkup(<Ticker items={[known, unknown]} />));
     expect(html).toContain(
-      'VAINQUEUR · Cup · <span class="side winner" data-outcome="win"><i class="mark" aria-hidden="true">▲</i><span>Alpha</span></span>',
+      'VAINQUEUR · Cup · <span class="side winner" data-outcome="win"><i class="mark" aria-hidden="true">✓</i><span>Alpha</span></span>',
     );
     expect(html).toContain('<span class="item">VAINQUEUR · Cup · Champion inconnu<i class="sep"');
   });
@@ -145,6 +181,10 @@ describe("Ticker — feuille de style des résultats", () => {
    * site, prise seule, est le cas le plus défavorable.
    */
   const SURFACE = hex(root, "--cyber-bg-3");
+
+  it("les mots d'issue masqués ne se copient pas avec le texte du bandeau", () => {
+    expect(css).toMatch(/\.item :global\(\.sr-only\)\s*\{[^}]*user-select: none/);
+  });
 
   it("n'emploie jamais l'ambre (avertissement seulement)", () => {
     expect(css).not.toMatch(/--amber|245,\s*165,\s*36/);
