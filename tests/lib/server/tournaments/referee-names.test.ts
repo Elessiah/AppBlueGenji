@@ -88,6 +88,22 @@ describe("loadRefereeNames", () => {
     expect(names).toEqual([]);
   });
 
+  it("loadRefereeNames_query_excludesUpheldObjection", async () => {
+    rows();
+
+    await loadRefereeNames(snapshotWith(bracketMatch({ id: 5, refereeKey: refereeKey(5, 9) })));
+
+    expect(String(connection.query.mock.calls[0][0])).toContain("u.referee_objection_at IS NULL");
+  });
+
+  it("loadRefereeNames_query_excludesDeletedAccounts", async () => {
+    rows();
+
+    await loadRefereeNames(snapshotWith(bracketMatch({ id: 5, refereeKey: refereeKey(5, 9) })));
+
+    expect(String(connection.query.mock.calls[0][0])).toContain("u.is_deleted = 0");
+  });
+
   it("loadRefereeNames_cachesPerTournamentAndVersion", async () => {
     rows();
 

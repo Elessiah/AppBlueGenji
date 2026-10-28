@@ -53,7 +53,10 @@ type RefereeNameRow = RowDataPacket & { id: number; referee_user_id: number; pse
 
 /**
  * Pseudos des arbitres que l'instantané montre (`refereeKey` non nul : arbitre
- * désigné **et** encore éligible). Une ligne relue après une nouvelle
+ * désigné **et** encore éligible). Jamais celui d'un compte supprimé ni d'un
+ * arbitre dont l'opposition est retenue (`referee_objection_at`) : entre
+ * l'écriture de l'opposition et le retrait de ses matchs — ou si ce balayage
+ * échoue en partie —, le match reste « Arbitre désigné ». Une ligne relue après une nouvelle
  * désignation porte une autre empreinte que l'instantané : elle est écartée,
  * le client gardant « Arbitre désigné » jusqu'à l'instantané suivant.
  */
@@ -69,7 +72,8 @@ export async function loadRefereeNames(snapshot: TournamentSnapshot): Promise<Ma
         `SELECT m.id, m.referee_user_id, u.pseudo
            FROM bg_matches m
            JOIN bg_users u ON u.id = m.referee_user_id
-          WHERE m.tournament_id = ? AND m.referee_user_id IS NOT NULL`,
+          WHERE m.tournament_id = ? AND m.referee_user_id IS NOT NULL
+            AND u.is_deleted = 0 AND u.referee_objection_at IS NULL`,
         [snapshot.card.id],
       );
       return result;

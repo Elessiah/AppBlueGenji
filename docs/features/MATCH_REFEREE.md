@@ -154,7 +154,10 @@ modale) ; sinon l'équipe 1. L'hôte joue à **gauche** ; l'autre équipe
   empreinte sans nom (`missingRefereeNamesKey`) déclenche une seule relecture
   de `GET /api/tournaments/[id]/referee-names` (session requise, étalée sur
   2 s) ; `live-state.ts` garde les noms d'un instantané à l'autre. Les deux
-  portes passent par `getTournamentViewerContext`.
+  portes passent par `getTournamentViewerContext`. Jamais le pseudo d'un
+  compte supprimé ni d'un arbitre dont l'opposition est retenue (filtre SQL
+  de `loadRefereeNames`) : pendant le retrait de ses matchs, ou si ce
+  balayage échoue en partie, le match reste « Arbitre désigné ».
 - **Visiteur sans compte, `/suivre`** : `spectatorSnapshot` vide
   `refereeKey`, `SPECTATOR_VIEWER_CONTEXT.refereeNames = []` — « Arbitre
   désigné » seulement. Le bandeau dit « Autogestion » à tous, « Sans
