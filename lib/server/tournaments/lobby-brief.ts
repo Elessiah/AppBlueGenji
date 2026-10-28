@@ -84,13 +84,17 @@ type ClaimedSide = { row: LobbyBriefRow; slot: LobbyBriefSlot };
  * candidats et la réservation, un lancement défait (`match-schedule`,
  * `referee-scheduling`) efface les réservations et referme le salon ; une
  * réservation posée après coup enverrait des réglages périmés, puis ferait
- * taire le brief de la réouverture (même appariement).
+ * taire le brief de la réouverture (même appariement). Et l'appariement doit
+ * rester celui des équipes du match : un réappariement (suisse, survie, BG
+ * Survie) change `team1_id` / `team2_id` sans toucher `launch_pairing` — le
+ * brief partirait aux managers d'équipes qui ne jouent plus ce match.
  */
 async function claimLobbyBrief(db: Db, claim: ClaimedSide): Promise<boolean> {
   const [result] = await db.execute(
     `INSERT IGNORE INTO bg_match_start_notices (match_id, pairing, phase)
      SELECT m.id, m.launch_pairing, ? FROM bg_matches m
       WHERE m.id = ? AND m.launch_pairing = ? AND m.status = 'READY' AND m.is_bye = 0
+        AND m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id)
         AND m.lobby_opened_at IS NOT NULL`,
     [lobbyBriefPhase(claim.slot), Number(claim.row.id), String(claim.row.launch_pairing)],
   );
