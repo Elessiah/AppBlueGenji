@@ -1047,7 +1047,8 @@ function RgpdFr({
           <p id="arbitre-designe">
             <strong>Arbitre désigné d&apos;un match.</strong> Un membre du staff qui peut arbitrer (permission
             d&apos;arbitrage, tag Discord certifié et compte Battle.net rattaché) prend un match, ou le staff le lui
-            confie. Son pseudo et son BattleTag (même masqué) — jamais son tag Discord à ce titre (s&apos;il caste aussi le
+            confie. Son pseudo et, dans un tournoi Overwatch seulement (en Marvel Rivals, on ne s&apos;invite pas par
+            BattleTag), son BattleTag (même masqué) — jamais son tag Discord à ce titre (s&apos;il caste aussi le
             match, ses contacts de caster suivent la règle des casters) — sont alors présentés dans
             les fenêtres « Contacts » et de lancement du match et sur la page du match, aux mêmes parties et aux mêmes moments que les
             contacts du match : aux deux équipes et aux arbitres dès que ses deux adversaires sont connus et
@@ -1062,7 +1063,7 @@ function RgpdFr({
             entre en lancement sans arbitre ni autogestion est signalé aux arbitres. Sa présentation aux parties
             du match relève de l&apos;<strong>exécution du service</strong> dès qu&apos;il a accepté la version 7
             des conditions d&apos;utilisation, qui la prévoient (section « Contacts de match »), pour que les
-            parties sachent qui arbitre et puissent l&apos;ajouter en jeu ; tant qu&apos;il ne l&apos;a pas
+            parties sachent qui arbitre et, en Overwatch, puissent l&apos;ajouter en jeu ; tant qu&apos;il ne l&apos;a pas
             acceptée, elle relève de l&apos;<strong>intérêt légitime</strong> (même but), et il peut s&apos;y
             opposer par le formulaire de signalement (catégorie RGPD) — retenue, son opposition fait que le staff
             ne lui confie plus de match (ceux qu'il tient déjà lui restent), et continue de valoir une fois la version 7 acceptée. Il peut se retirer d&apos;un match à tout moment, le staff

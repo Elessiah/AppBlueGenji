@@ -6,7 +6,8 @@
  * - Un **arbitre** se désigne lui-même (« Je prends ce match ») ou est désigné
  *   par le staff (permission `tournaments`). Il lui faut la permission
  *   `tournaments`, un tag Discord certifié **et** un compte Battle.net
- *   rattaché : les équipes l'ajoutent en jeu. Il peut aussi caster le match ;
+ *   rattaché : en Overwatch, les équipes l'ajoutent en jeu (hors Overwatch, on
+ *   ne s'invite pas par BattleTag, décision 35). Il peut aussi caster le match ;
  *   il ne peut pas le jouer.
  * - L'**autogestion** s'allume à la main, par le staff : désigner un arbitre
  *   l'éteint, l'allumer retire l'arbitre. Sans l'un ni l'autre, le match reste

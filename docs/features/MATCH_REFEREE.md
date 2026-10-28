@@ -27,7 +27,8 @@ commit : `lib/server/tournaments/referee-notices.ts`. Fenêtre du staff :
 
 `refereeBlockReason` : la permission `tournaments` (`NOT_REFEREE`), un tag
 Discord certifié **et** un compte Battle.net rattaché
-(`REFEREE_IDENTITY_REQUIRED`) — les équipes l'ajoutent en jeu. Conditions
+(`REFEREE_IDENTITY_REQUIRED`) — en Overwatch, les équipes l'ajoutent en jeu
+par son BattleTag (hors Overwatch, ni BattleTag ni « ajoute-le en jeu », décision 35). Conditions
 relues en base à chaque geste (`loadRefereeEligibility`, jamais les rôles d'une
 session). Il **peut caster** le match, il **ne peut pas le jouer**
 (`REFEREE_IS_PLAYER`).
@@ -88,7 +89,8 @@ modale) ; sinon l'équipe 1. L'hôte joue à **gauche** ; l'autre équipe
   « Autogestion » à tous, « Sans arbitre » au staff seul (`refereeStripState`).
   **Jamais de nom** dans l'instantané ni dans `TournamentViewerContext`.
 - **Parties du match** (deux équipes, casters) : `MatchLaunchInfo.referee` —
-  pseudo, « Prêt », et BattleTag (même masqué, `sharesLiveMatch`) **seulement
+  pseudo, « Prêt », et — **en Overwatch seulement**, champ absent ailleurs
+  (`withGameBattletag`, décision 35) — BattleTag (même masqué, `sharesLiveMatch`) **seulement
   quand les contacts du match sont ouverts** (`ctx.exposes` : dès que les deux
   adversaires sont connus pour les équipes et le staff, le temps du match pour
   les casters). Jamais son tag Discord. Carte `RefereeCard`

@@ -112,7 +112,7 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(subPurposes).toMatch(/aux arbitres tant que le joueur est inscrit à un tournoi qui n'est pas terminé/);
     // Décisions du 2026-10-19 : plus d'accès propre au BattleTag masqué pour le staff,
     // seulement la fenêtre « Contacts », aux mêmes durées que les équipes.
-    expect(subPurposes).toMatch(/Ne présenter aux administrateurs et aux arbitres le BattleTag masqué d'un joueur que dans la fenêtre « Contacts » d'un match du tournoi, aux mêmes durées que pour ses deux équipes/);
+    expect(subPurposes).toMatch(/Ne présenter aux administrateurs et aux arbitres le BattleTag masqué d'un joueur que dans la fenêtre « Contacts » d'un match d'un tournoi Overwatch, aux mêmes durées que pour ses deux équipes/);
   });
 
   it("déclare les transferts vers Discord partout où Discord achemine des messages", () => {
@@ -477,7 +477,7 @@ describe("bases légales : le registre et la politique disent la même chose", (
 
   it("fonde les contacts du lancement d'un match sur l'exécution des conditions d'utilisation", () => {
     expect(byRef("T04").legalBasis).toMatch(
-      /exécution du service demandé par le joueur \(contrat — conditions d'utilisation, section « Contacts de match »\) pour la présentation des contacts aux parties d'un match dans sa fenêtre « Contacts » et dans sa fenêtre de lancement — et, pour les contacts des casters, sur la page du match — \(à ses deux équipes et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, à ses casters le temps du match, et ceux de chaque caster — service qu'il demande en s'inscrivant sur le match — à ses deux équipes et aux autres casters du match le temps du match et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin ; la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné\), BattleTag masqué compris — arbitres et administrateurs n'y ont pas d'autre accès, sur la même base —,/,
+      /exécution du service demandé par le joueur \(contrat — conditions d'utilisation, section « Contacts de match »\) pour la présentation des contacts aux parties d'un match dans sa fenêtre « Contacts » et dans sa fenêtre de lancement — et, pour les contacts des casters, sur la page du match — \(à ses deux équipes et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, à ses casters le temps du match, et ceux de chaque caster — service qu'il demande en s'inscrivant sur le match — à ses deux équipes et aux autres casters du match le temps du match et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin ; la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné\), BattleTag masqué compris dans les seuls tournois Overwatch — arbitres et administrateurs n'y ont pas d'autre accès, sur la même base —,/,
     );
   });
 

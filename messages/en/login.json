@@ -126,7 +126,7 @@
       "footer": "Nobody else."
     },
     "battletag": {
-      "title": "Hidden, your BattleTag can only be read in the “Contacts” window of your matches, in their launch window and, if you cast or referee a match, on its page:",
+      "title": "Hidden, your BattleTag can only be read in the “Contacts” window of your Overwatch matches, in their launch window and, if you cast or referee an Overwatch match, on its page:",
       "match": "if you're shown there as a contact: the members of both teams, referees and administrators, from the moment the opponents are known until the end of the match, and the casters while the match is being played;",
       "asCaster": "if you cast a match: both its teams and its other casters while the match is being played, and referees and administrators from the moment its opponents are known until its end;",
       "asReferee": "if you are the assigned referee of a match: both its teams, referees and administrators from the moment its opponents are known until its end, and its casters while the match is being played;",

@@ -633,6 +633,16 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "This mark contains nothing else, goes with the session and isn't included in the export of your data. Nothing else changes: “Don't show again” is still kept on your account, with its date.",
     ],
   },
+  "2026-10-battletag-des-matchs-overwatch-seulement": {
+    title: "BattleTag in matches: Overwatch only",
+    linkLabels: ["Read the “Data collected” section", "Read the “Assigned referee of a match” paragraph"],
+    summary:
+      "In a Marvel Rivals tournament, no BattleTag is presented any more in a match's windows or on its page — neither the teams' contacts', nor the casters', nor the assigned referee's: players don't invite each other by BattleTag there. In Overwatch, nothing changes.",
+    details: [
+      "Marvel Rivals: the match's “Contacts” window, its launch window and the match page no longer show the BattleTag of the teams' contacts, of a caster or of the assigned referee, nor whether it is verified, and the site no longer sends it to these windows at all. A caster keeps their certified Discord tag there, the assigned referee their username; the match page no longer shows the “To invite” instruction there.",
+      "A team now presents only one contact there, chosen on the certified Discord tag alone: a verified BattleTag no longer moves a player up nor brings in a second member. A team none of whose members has certified their Discord tag is presented by one member's username and team role (captain, manager, owner, then a player), with no other identifier.",
+    ],
+  },
 };
 
 /**

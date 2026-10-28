@@ -6,11 +6,11 @@ import { closedNoticeText } from "@/app/(secured)/tournois/[id]/_components/Play
 import { startAtHint, startAtNotice } from "@/app/(secured)/tournois/[id]/_components/MatchScheduleDialog";
 import { anotherModalOpen } from "@/lib/shared/dialog-focus";
 import { launchSidesLaterText } from "@/components/match-launch/MatchLaunchCenter";
-import { CasterCard, CasterCards, SideCard } from "@/components/match-launch/LaunchContactCards";
+import { CasterCard, CasterCards, RefereeCard, SideCard } from "@/components/match-launch/LaunchContactCards";
 import { contactsErrorText } from "@/components/match-launch/MatchContactsDialog";
 import { FR_LAUNCH_TEXT } from "@/components/match-launch/launch-text";
 import { tournamentDialogsText } from "@/lib/shared/tournament-actions-text";
-import { CASTER_ARRIVAL_ANNOUNCE_MS, exposesCasterContacts, nextCasterArrival, viewerIsCaster, type LaunchSide, type MatchLaunchInfo } from "@/lib/shared/match-launch";
+import { CASTER_ARRIVAL_ANNOUNCE_MS, casterHasContacts, exposesCasterContacts, nextCasterArrival, viewerIsCaster, type LaunchSide, type MatchLaunchInfo } from "@/lib/shared/match-launch";
 import frDialogs from "@/messages/fr/tournamentDialogs.json";
 import enDialogs from "@/messages/en/tournamentDialogs.json";
 import frActions from "@/messages/fr/tournamentActions.json";
@@ -433,5 +433,64 @@ describe("fiches de contact — noms cliquables", () => {
     expect(viewerIsCaster({ viewer: { role: "CASTER", isCaster: true } })).toBe(true);
     expect(viewerIsCaster({ viewer: { role: "TEAM1", isCaster: true } })).toBe(true);
     expect(viewerIsCaster({ viewer: { role: "TEAM1", isCaster: false } })).toBe(false);
+  });
+});
+
+// Décision 35 (2026-10-28) : hors Overwatch, le serveur n'envoie pas le
+// BattleTag des casters ni de l'arbitre — les fiches n'en dessinent pas la ligne.
+describe("fiches hors Overwatch : BattleTag absent", () => {
+  const noop = async () => undefined;
+  const mrCaster = { userId: 9, pseudo: "Voix", discordTag: "voix", ready: false, contactsShown: true, isViewer: false };
+
+  it("casterHasContacts_absentBattletagNoDiscord_returnsFalse", () => {
+    expect(casterHasContacts({ discordTag: null })).toBe(false);
+  });
+
+  it("casterHasContacts_absentBattletagWithDiscord_returnsTrue", () => {
+    expect(casterHasContacts({ discordTag: "voix" })).toBe(true);
+  });
+
+  it("CasterCard_battletagAbsent_rendersDiscordOnlyNoNote", () => {
+    const html = renderToStaticMarkup(
+      <CasterCard caster={mrCaster} phase="LAUNCHED" onCopy={noop} battletagNote="À inviter — obligatoire" />,
+    );
+
+    expect(html).toContain("voix");
+    expect(html).not.toContain("BattleTag");
+    expect(html).not.toContain("À inviter");
+  });
+
+  it("SideCard_contactWithoutBattletagField_drawsNoBattletagLine", () => {
+    const side: LaunchSide = {
+      teamId: 42,
+      name: "Les Bleus",
+      logoUrl: null,
+      isGhost: false,
+      isSolo: false,
+      ready: false,
+      contacts: [{ userId: 7, pseudo: "Alice", roles: ["CAPITAINE"], discordTag: "alice" }],
+      contactsShown: true,
+    };
+
+    const html = renderToStaticMarkup(<SideCard side={side} isHost={false} phase="LAUNCHED" onCopy={noop} laterText="—" />);
+
+    expect(html).toContain("alice");
+    expect(html).not.toContain("BattleTag");
+  });
+
+  it("RefereeCard_battletagAbsent_rendersPseudoWithoutBattletagLine", () => {
+    const html = renderToStaticMarkup(
+      <RefereeCard
+        referee={{ userId: 77, pseudo: "Juge", ready: false, isViewer: false }}
+        selfManaged={false}
+        phase="LAUNCHED"
+        onCopy={noop}
+        battletagNote="À inviter dans la partie"
+      />,
+    );
+
+    expect(html).toContain("Juge");
+    expect(html).not.toContain("BattleTag");
+    expect(html).not.toContain("À inviter");
   });
 });

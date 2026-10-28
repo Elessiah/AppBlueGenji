@@ -28,6 +28,7 @@ import { isMissingTableError } from "@/lib/server/mysql-errors";
 import { loadEntrantManagerIds, loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
 import { siteCanonicalBase } from "@/lib/server/site-url";
 import { formatLobbyBriefDm, type LobbyBriefSide } from "@/lib/shared/lobby-brief";
+import type { TournamentGame } from "@/lib/shared/types";
 import { LAUNCH_AUTO_DELAY_MINUTES } from "@/lib/shared/match-launch";
 import { matchPageHref } from "@/lib/shared/match-anchor";
 import { matchHostTeamId, refereeDecision } from "@/lib/shared/match-referee";
@@ -69,6 +70,7 @@ export type LobbyBriefRow = RowDataPacket & {
   tournament_id: number;
   tournament_name: string;
   participant_type: string;
+  game: TournamentGame;
   bracket: string;
   round_number: number;
   swiss_round: number | null;
@@ -196,6 +198,7 @@ export function lobbyBriefSides(
     bracket: String(row.bracket),
     roundNumber: Number(row.round_number),
     swiss: isSwissRound(row),
+    game: row.game,
     solo: row.participant_type === "SOLO",
     firstMap: effectiveFirstMap(slots, storedFirstMap),
     maps: resolveMatchMaps(slots, storedFirstMap, parseMapPicks(row.map_picks)),
@@ -276,7 +279,7 @@ async function runLobbyBriefSweep(): Promise<number> {
   // Appariement courant seulement, comme l'appel aux « Prêt » : un salon ouvert
   // pour une paire que le moteur a depuis remplacée ne compte pas.
   const [rows] = await db.query<LobbyBriefRow[]>(
-    `SELECT m.id, m.tournament_id, t.name AS tournament_name, t.participant_type,
+    `SELECT m.id, m.tournament_id, t.name AS tournament_name, t.participant_type, t.game,
             m.bracket, m.round_number, ${swissRoundSql("m", "t")},
             m.team1_id, m.team2_id, t1.name AS team1_name, t2.name AS team2_name,
             m.launch_pairing, m.host_team_id, es1.rank AS team1_seed, es2.rank AS team2_seed,

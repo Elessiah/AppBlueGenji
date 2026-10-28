@@ -444,6 +444,14 @@ qu'il tient, son « Prêt »). Code : `lib/server/tournaments/match-casters.ts`.
    avec son BattleTag marqué « non vérifié ». Un tag Discord **non certifié**
    n'est jamais montré (`canViewDiscordTag`).
 
+**Hors Overwatch** (Marvel Rivals, décision de l'utilisateur 38, 2026-10-28 ;
+`sideContacts`, `match-launch-info.ts`) : le BattleTag ne joint personne. Le
+choix lit les candidats sans BattleTag ni Battle.net — seul le tag Discord
+certifié fait passer devant, comme `teamHasContact` de l'invitation à
+certifier — et le contact sort **sans** les champs `battletag` /
+`battletagVerified` (`withGameBattletag`, type `LaunchSideContact`) : la fiche
+n'en dessine pas la ligne.
+
 Une fantôme n'a pas de contact. Dans la modale de lancement, un match
 `SCHEDULED` n'expose encore rien ; le bouton « Contacts » de la carte, lui,
 les expose dès cette phase, et même « À planifier » (voir plus haut).
@@ -460,9 +468,12 @@ les abonnés du flux : l'instantané ne porte que les « Prêt », l'hôte et le
 **pseudo** du caster, publics comme tout pseudo du site.
 
 Le caster compte parmi les parties : il reçoit le BattleTag **masqué** des
-contacts, et les équipes le sien — dans les deux sens **le temps du match
+contacts, et les équipes le sien, dans les deux sens **le temps du match
 seulement** (`exposesCaster`, lancement ouvert ou lancé) ; avant, la carte
-montre aux équipes leurs contacts sans ceux du caster. Les arbitres lisent ceux
+montre aux équipes leurs contacts sans ceux du caster. Tout cela en Overwatch
+seulement : hors Overwatch, le BattleTag d'un caster, de l'arbitre désigné
+(décision 35) et des contacts des équipes (décision 38) n'est pas envoyé du
+tout (`withGameBattletag`). Les arbitres lisent ceux
 du caster, comme ceux des équipes, dès que les deux adversaires sont connus
 (2026-10-21). Hors de la fenêtre « Contacts », un BattleTag masqué n'est lisible
 de personne, arbitres et administrateurs compris (`battletag-visibility.ts`). `docs/AUTHORIZATION_RULES.md` §2.3 l'écrit

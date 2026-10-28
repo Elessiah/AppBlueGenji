@@ -1233,6 +1233,28 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Cette marque ne contient rien d'autre, part avec la session et ne figure pas dans l'export de tes données. Rien d'autre ne change : « Ne plus voir » reste gardé sur ton compte, avec sa date.",
     ],
   },
+  {
+    // Décisions de l'utilisateur 35 et 38 (2026-10-28) : le BattleTag ne sert,
+    // dans un match, qu'à s'inviter dans une partie Overwatch. Hors Overwatch,
+    // la lecture des contacts ne l'envoie plus — ni celui des casters et de
+    // l'arbitre désigné, ni celui des contacts des équipes (`withGameBattletag`,
+    // `sideContacts`, `match-launch-info.ts`) : moins de lecteurs. Datée du
+    // lendemain de la mise en ligne prévue (nuit du 28 au 29 octobre). Les
+    // conditions d'utilisation v7, publiées, ne changent pas.
+    id: "2026-10-battletag-des-matchs-overwatch-seulement",
+    publishedAt: "2026-10-30",
+    title: "BattleTag dans les matchs : en Overwatch seulement",
+    links: [
+      DATA_COLLECTED_SECTION_LINK,
+      { href: "/rgpd#arbitre-designe", label: "Lire le paragraphe « Arbitre désigné d'un match »" },
+    ],
+    summary:
+      "Dans un tournoi Marvel Rivals, aucun BattleTag n'est plus présenté dans les fenêtres d'un match ni sur sa page — ni celui des contacts des équipes, ni celui des casters, ni celui de l'arbitre désigné : on ne s'y invite pas par BattleTag. En Overwatch, rien ne change.",
+    details: [
+      "Marvel Rivals : la fenêtre « Contacts » du match, sa fenêtre de lancement et la page du match ne montrent plus le BattleTag des contacts des équipes, d'un caster ni de l'arbitre désigné, ni s'il est vérifié, et le site ne l'envoie plus du tout à ces fenêtres. Un caster y garde son tag Discord certifié, l'arbitre désigné son pseudo ; la page du match n'y porte plus la consigne « À inviter ».",
+      "Une équipe n'y présente plus qu'un seul contact, qui se choisit alors sur le seul tag Discord certifié : un BattleTag vérifié ne fait plus passer devant ni présenter un second membre. Une équipe dont aucun membre n'a certifié son tag Discord est présentée par le pseudo et le rôle d'équipe d'un de ses membres (capitaine, manager, propriétaire, puis un joueur), sans autre identifiant.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

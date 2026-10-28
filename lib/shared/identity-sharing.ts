@@ -55,7 +55,7 @@ export const DISCORD_TAG_AUDIENCE: IdentityAudience = {
  * connexion par Blizzard) et sur la fiche de son titulaire.
  */
 export const HIDDEN_BATTLETAG_AUDIENCE: IdentityAudience = {
-  title: "Masqué, ton BattleTag ne se lit plus que dans la fenêtre « Contacts » de tes matchs, dans leur fenêtre de lancement et, si tu castes ou arbitres un match, sur sa page :",
+  title: "Masqué, ton BattleTag ne se lit plus que dans la fenêtre « Contacts » de tes matchs Overwatch, dans leur fenêtre de lancement et, si tu castes ou arbitres un match Overwatch, sur sa page :",
   items: [
     "si tu y es présenté comme contact : les membres des deux équipes, les arbitres et les administrateurs, dès que les adversaires sont connus et jusqu'à la fin du match, et les casters le temps du match ;",
     "si tu castes un match : ses deux équipes et ses autres casters le temps du match, et les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin ;",

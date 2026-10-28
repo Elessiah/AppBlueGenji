@@ -864,7 +864,8 @@ export function RgpdEn({
           <p id="arbitre-designe">
             <strong>Assigned referee of a match.</strong> A staff member who can referee (refereeing permission,
             certified Discord tag and linked Battle.net account) takes a match, or the staff assigns it to them.
-            Their username and BattleTag (even when hidden) — never their Discord tag in that capacity (if they also
+            Their username and, in an Overwatch tournament only (in Marvel Rivals, players don&apos;t invite each other by
+            BattleTag), their BattleTag (even when hidden) — never their Discord tag in that capacity (if they also
             cast the match, their caster contacts follow the casters&apos; rule) — are then presented in the
             match&apos;s “Contacts” and launch windows and on the match page, to the same parties and at the same times as the match
             contacts: to both teams and to the referees as soon as both its opponents are known until its end, to
@@ -879,7 +880,7 @@ export function RgpdEn({
             launch with neither a referee nor self-management is flagged to the referees. Their presentation to
             the parties to the match falls under <strong>performance of the service</strong> once they have
             accepted version 7 of the terms of use, which provide for it (“Match contacts” section), so that the
-            parties know who referees and can add them in game; until they accept it, it falls under{" "}
+            parties know who referees and, in Overwatch, can add them in game; until they accept it, it falls under{" "}
             <strong>legitimate interest</strong> (same aim), and they may object to it through the report form
             (GDPR category) — once upheld, their objection means the staff no longer assigns them matches (those they already hold stay theirs), and still stands once version 7
             is accepted. They can withdraw from a match at any time, the staff being able to

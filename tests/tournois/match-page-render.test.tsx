@@ -478,6 +478,24 @@ describe("page d'un match — streams et casters", () => {
     expect(visible(pub)).not.toContain("À inviter — obligatoire");
   });
 
+  // Décision 35 (2026-10-28) : en Marvel Rivals, on n'invite pas par BattleTag.
+  it("MatchPage_marvelRivals_noInviteNotesAndNeutralHeading", () => {
+    const mrCaster: LaunchCaster = { userId: 900, pseudo: "Voix", discordTag: "voix", ready: false, contactsShown: true, isViewer: false };
+    mockLaunch = launch({ casters: [mrCaster], referee: { userId: 77, pseudo: "Juge", ready: false, isViewer: false } });
+    const page = cast({ refereeAssigned: true });
+
+    const fr = visible(render(page, "player", false, "fr", EMPTY_MAP_RULES, "MR"));
+    const en = visible(render(page, "player", false, "en", EMPTY_MAP_RULES, "MR"));
+
+    expect(fr).toContain("Contacts des casters");
+    expect(fr).toContain("voix");
+    expect(fr).toContain("Juge");
+    expect(fr).not.toContain("À inviter");
+    expect(fr).not.toContain("Casters à inviter");
+    expect(en).toContain("Caster contacts");
+    expect(en).not.toContain("To invite");
+  });
+
   it("sa propre fiche de caster ne porte pas la note d'invitation", () => {
     mockLaunch = launch({ casters: [caster({ isViewer: true })], viewer: { role: "CASTER", canDeclareReady: true, isReferee: false, isCaster: true, earlyContacts: false, ready: false } });
     const html = visible(render(cast(), "caster"));

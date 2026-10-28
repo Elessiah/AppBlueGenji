@@ -7,7 +7,9 @@
  * qui joue à gauche (l'hôte) et à droite, la première carte, le premier ban, le
  * rappel de trier les joueurs par rôle quand le match est casté, et ce que dit
  * la décision d'arbitrage (arbitre désigné ou autogestion). Puis le lien de la
- * page du match, qui seule montre les BattleTags à inviter.
+ * page du match, qui seule montre les BattleTags à inviter — en Overwatch : en
+ * Marvel Rivals, où l'on ne s'invite pas par BattleTag, ni le lien ni la ligne
+ * de l'arbitre n'en parlent (décision 35, 2026-10-28).
  *
  * **Ni BattleTag, ni tag Discord, ni pseudo de joueur** (décision de
  * l'utilisateur, 2026-10-27) : seuls les noms d'équipe sont écrits ; en tournoi
@@ -20,9 +22,11 @@
 import { discordInline } from "./discord-text";
 import { localizedSiteUrl } from "./dm-language";
 import type { Locale } from "./locales";
+import { battletagRelevantFor } from "./certification-prompt";
 import type { RefereeDecision } from "./match-referee";
 import { pushRoundLabel } from "./push-messages";
 import type { NextBanRule, NextPickRule, ResolvedMapSlot } from "./round-maps";
+import type { TournamentGame } from "./types";
 
 /** Ce que le brief dit d'un match, vu d'une des deux engagées. */
 export type LobbyBriefSide = {
@@ -32,6 +36,8 @@ export type LobbyBriefSide = {
   bracket: string;
   roundNumber: number;
   swiss?: boolean;
+  /** Le jeu du tournoi : hors Overwatch, le brief ne parle d'aucun BattleTag ni ajout en jeu de l'arbitre. */
+  game: TournamentGame;
   /** Tournoi individuel : les noms des engagés sont des pseudos, jamais écrits. */
   solo: boolean;
   /** L'engagée du destinataire. */
@@ -83,17 +89,19 @@ export function lobbyBriefNames(
   return side.banFirst ? { ...seats, ban: own, banNext: other } : { ...seats, ban: other, banNext: own };
 }
 
-type DecisionLine = "REFEREE" | "SELF_MANAGED_TEAM" | "SELF_MANAGED_SOLO";
+type DecisionLine = "REFEREE" | "REFEREE_NO_BATTLETAG" | "SELF_MANAGED_TEAM" | "SELF_MANAGED_SOLO";
 
 const DECISION_LINES: Readonly<Record<Locale, Readonly<Record<DecisionLine, string>>>> = {
   fr: {
     REFEREE: "Arbitre désigné : ajoute-le en jeu, il invitera les joueurs dans le salon.",
+    REFEREE_NO_BATTLETAG: "Arbitre désigné : il invitera les joueurs dans le salon.",
     SELF_MANAGED_TEAM:
       "Autogestion : l'équipe hôte crée la partie, les managers des deux équipes s'invitent mutuellement, puis invitent les casters.",
     SELF_MANAGED_SOLO: "Autogestion : l'hôte crée la partie et invite son adversaire, puis les casters.",
   },
   en: {
     REFEREE: "Assigned referee: add them in game, they will invite the players to the lobby.",
+    REFEREE_NO_BATTLETAG: "Assigned referee: they will invite the players to the lobby.",
     SELF_MANAGED_TEAM:
       "Self-managed: the host team creates the game, the managers of both teams invite each other, then invite the casters.",
     SELF_MANAGED_SOLO: "Self-managed: the host creates the game and invites their opponent, then the casters.",
@@ -102,7 +110,9 @@ const DECISION_LINES: Readonly<Record<Locale, Readonly<Record<DecisionLine, stri
 
 /** La ligne de la décision d'arbitrage ; `null` sans décision (le staff en est averti à part). */
 function decisionLine(side: LobbyBriefSide, locale: Locale): string | null {
-  if (side.decision === "REFEREE") return DECISION_LINES[locale].REFEREE;
+  if (side.decision === "REFEREE") {
+    return DECISION_LINES[locale][battletagRelevantFor(side.game) ? "REFEREE" : "REFEREE_NO_BATTLETAG"];
+  }
   if (side.decision === "SELF_MANAGED") {
     return DECISION_LINES[locale][side.solo ? "SELF_MANAGED_SOLO" : "SELF_MANAGED_TEAM"];
   }
@@ -126,6 +136,7 @@ const DM_TEXT: Readonly<
       loserPick: string;
       cast: string;
       link: string;
+      linkNoBattletag: string;
     }
   >
 > = {
@@ -149,6 +160,7 @@ const DM_TEXT: Readonly<
     loserPick: " (choisie par l'équipe qui a perdu la carte précédente)",
     cast: "Match casté : trie les joueurs par rôle dans le salon.",
     link: "BattleTags à inviter et réglages à jour : ",
+    linkNoBattletag: "Réglages à jour : ",
   },
   en: {
     opening: (subject, round, tournament) => `🎮 BlueGenji — The lobby of ${subject} is open (${round}, ${tournament}).`,
@@ -167,6 +179,7 @@ const DM_TEXT: Readonly<
     loserPick: " (picked by the team that lost the previous map)",
     cast: "Cast match: sort the players by role in the lobby.",
     link: "BattleTags to invite and up-to-date settings: ",
+    linkNoBattletag: "Up-to-date settings: ",
   },
 };
 
@@ -209,6 +222,6 @@ export function formatLobbyBriefDm(side: LobbyBriefSide, url: string, locale: Lo
     `• ${text.nextBans[side.nextBan]}`,
     ...(side.cast ? [`• ${text.cast}`] : []),
     ...(decision === null ? [] : [`• ${decision}`]),
-    `${text.link}${localizedSiteUrl(url, locale)}`,
+    `${battletagRelevantFor(side.game) ? text.link : text.linkNoBattletag}${localizedSiteUrl(url, locale)}`,
   ].join("\n");
 }

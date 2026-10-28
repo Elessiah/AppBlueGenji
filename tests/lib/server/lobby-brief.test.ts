@@ -26,6 +26,7 @@ const MATCH = {
   tournament_id: 4,
   tournament_name: "Coupe",
   participant_type: "TEAM",
+  game: "OW",
   bracket: "UPPER",
   round_number: 1,
   swiss_round: null,
@@ -182,6 +183,18 @@ describe("dispatchLobbyBriefs", () => {
       }
     }
     expect(sends()[0].dm()).toContain("• Gauche (hôte) : toi");
+  });
+
+  it("dispatchLobbyBriefs_marvelRivalsTournament_dmSpeaksOfNoBattletag", async () => {
+    jest.mocked(loadEligibleRefereeIds).mockResolvedValue(new Set([9]));
+    const { query } = mockDb([{ ...MATCH, game: "MR", referee_user_id: 9 }]);
+
+    await dispatchLobbyBriefs();
+
+    expect(query.mock.calls[0][0]).toMatch(/t\.game/);
+    const dm = sends()[0].dm();
+    expect(dm).toContain("• Arbitre désigné : il invitera les joueurs dans le salon.");
+    expect(dm).not.toContain("BattleTag");
   });
 
   it("suit l'hôte choisi, la tête de série en BG Survie, le cast et l'arbitre encore éligible", async () => {

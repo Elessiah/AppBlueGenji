@@ -114,8 +114,8 @@ describe("CertificationPromptDialog", () => {
     expect(html).not.toContain("Battle.net");
     expect(html).not.toContain("BattleTag y est montré");
     expect(html).not.toContain(">BattleTag<");
-    // Un contact de match montre son BattleTag même masqué, quel que soit le jeu.
-    expect(html).toContain("Si ta fiche porte un BattleTag, présenté comme contact, il est montré même masqué");
+    // Décision 38 : en Marvel Rivals, aucun contact de match ne montre de BattleTag.
+    expect(html).not.toContain("Si ta fiche porte un BattleTag");
   });
 
   it("dit tout ce que la certification ouvre : messages privés du bot, arbitres du site, BattleTag dès les adversaires connus", () => {
@@ -123,7 +123,6 @@ describe("CertificationPromptDialog", () => {
       expect(html).toContain("le bot t&#x27;envoie en message privé l&#x27;horaire et les rappels de tes matchs");
       expect(html).toContain("devient un moyen de connexion");
       expect(html).toContain("aux arbitres et aux administrateurs du site");
-      expect(html).toContain("dès que les deux adversaires du match sont connus et jusqu&#x27;à sa fin");
       expect(html).toContain("retirer ton tag Discord de ton profil retire sa certification");
       // Certifier par code rattache Discord : la modale dit comment le détacher.
       expect(html).toContain("se détache depuis « Applications connectées » tant qu&#x27;il te reste une autre façon de te connecter");
@@ -131,9 +130,10 @@ describe("CertificationPromptDialog", () => {
     expect(render(OW_MANAGER)).toContain("tu peux être présenté comme son contact à l&#x27;adversaire et à l&#x27;arbitrage dès que vos adversaires sont connus, et aux casters le temps du match");
     expect(render(OW_MANAGER)).toContain("Battle.net remplace ton BattleTag par le sien, verrouillé tant qu&#x27;il reste rattaché");
     expect(render(OW_MANAGER)).toContain("Certifié ou non, présenté comme contact, ton BattleTag est montré même masqué");
+    expect(render(OW_MANAGER)).toContain("dès que les deux adversaires du match sont connus et jusqu&#x27;à sa fin");
     const en = render(MR_TEAM, "en");
     expect(en).toContain("the bot sends you your match times and reminders by direct message");
-    expect(en).toContain("If your profile holds a BattleTag");
+    expect(en).not.toContain("If your profile holds a BattleTag");
   });
 
   it("chaque cellule du tableau porte son libellé de colonne (rendu mobile)", () => {

@@ -54,8 +54,13 @@ describe("avertissement du BattleTag masqué", () => {
   });
 
   it("garde dans la modale de masquage son propre avertissement, avant la liste", () => {
-    expect(frProfile.battletagNotice.warning).toMatch(/^Tu peux masquer ton BattleTag : il reste visible/);
-    expect(enProfile.battletagNotice.warning).toMatch(/^You can hide your BattleTag: it stays visible/);
+    // Décision 38 : en Marvel Rivals, aucun match ne présente le BattleTag.
+    expect(frProfile.battletagNotice.warning).toMatch(
+      /^Tu peux masquer ton BattleTag\. Dans un tournoi Marvel Rivals, aucun match ne le présente ; dans un tournoi Overwatch, il reste visible/,
+    );
+    expect(enProfile.battletagNotice.warning).toMatch(
+      /^You can hide your BattleTag\. In a Marvel Rivals tournament, no match shows it; in an Overwatch tournament, it stays visible/,
+    );
     const notice = readSource("app/(secured)/profil/BattletagVisibilityNotice.tsx");
     expect(notice.indexOf('t("battletagNotice.warning")')).toBeGreaterThan(-1);
     expect(notice.indexOf('t("battletagNotice.warning")')).toBeLessThan(notice.indexOf('t("battletagNotice.intro")'));

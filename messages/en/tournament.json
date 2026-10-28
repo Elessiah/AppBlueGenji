@@ -448,6 +448,7 @@
     "stream": "Stream {number}",
     "noLink": "Link not published yet",
     "castersToInvite": "Casters to invite",
+    "castersContacts": "Caster contacts",
     "battletagRequired": "To invite — required",
     "sections": {
       "match": "The match",
