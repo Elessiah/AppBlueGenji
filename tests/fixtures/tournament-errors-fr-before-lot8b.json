@@ -1,5 +1,5 @@
 {
-  "count": 181,
+  "count": 183,
   "unknown": "L'action n'a pas abouti pour une raison inattendue. Si le problème persiste, préviens le staff.",
   "errors": {
     "MATCH_NOT_FOUND": "Match introuvable.",
@@ -182,6 +182,8 @@
     "INVALID_MAP_RULES": "Règle de ban invalide.",
     "INVALID_MAP_PICK": "Cette carte ne fait pas partie du pool du tour.",
     "NOT_MAP_PICKER": "Seuls l'arbitrage et, en autogestion, les équipes du match choisissent la carte.",
-    "ROUND_MAPS_SET": "Les cartes de ce tour sont réglées pour tout le tour : réinitialise le tour pour saisir la carte match par match."
+    "ROUND_MAPS_SET": "Les cartes de ce tour sont réglées pour tout le tour : réinitialise le tour pour saisir la carte match par match.",
+    "INVALID_REFEREE_OBJECTION": "Choix invalide pour l'opposition de l'arbitre.",
+    "REFEREE_OBJECTION": "Ce compte a une opposition retenue à l'arbitrage : il ne peut plus arbitrer de match."
   }
 }

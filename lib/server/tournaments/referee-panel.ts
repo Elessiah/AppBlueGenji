@@ -93,7 +93,7 @@ export async function loadRefereePanel(matchId: number): Promise<RefereePanel | 
     const refereeId = match.referee_user_id === null ? null : Number(match.referee_user_id);
     const refereeRow = refereeId === null ? undefined : byId.get(refereeId);
     const firstMap = match.first_map ? visibleText(match.first_map) : "";
-    const objected = (row: StaffRow) => row.referee_objection_at !== null;
+    const objected = (row: StaffRow) => (row.referee_objection_at ?? null) !== null;
     // Un arbitre : la permission `tournaments`, quelle que soit son identité.
     const referees = staff.filter((row) => refereeEligibilityBlock(row) !== "NOT_REFEREE");
     return {

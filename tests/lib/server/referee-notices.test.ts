@@ -81,6 +81,7 @@ describe("refereeLogChange / refereeReleaseNotice", () => {
     [{ kind: "ASSIGNED", matchId: 1, replacedRefereeId: 5 }, "SWAPPED", { refereeId: 5, reason: "REPLACED" }],
     [{ kind: "RELEASED", matchId: 1, refereeId: 5, byStaff: false }, "RELEASED", null],
     [{ kind: "RELEASED", matchId: 1, refereeId: 5, byStaff: true }, "RELEASED_BY_STAFF", { refereeId: 5, reason: "STAFF" }],
+    [{ kind: "OBJECTION_RELEASED", matchId: 1, refereeId: 5 }, "RELEASED_BY_STAFF", { refereeId: 5, reason: "OBJECTION" }],
     [{ kind: "AUTO_RELEASED", matchId: 1, refereeId: 5, reason: "INELIGIBLE" }, "INELIGIBLE", { refereeId: 5, reason: "INELIGIBLE" }],
     [{ kind: "AUTO_RELEASED", matchId: 1, refereeId: 5, reason: "JOINED_TEAM" }, "JOINED_TEAM", { refereeId: 5, reason: "JOINED_TEAM" }],
     [{ kind: "SELF_MANAGED", matchId: 1, enabled: true, replacedRefereeId: null }, "SELF_MANAGED_ON", null],

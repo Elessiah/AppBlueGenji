@@ -215,6 +215,11 @@ describe("fenêtre « Arbitrage » : gestes offerts", () => {
     });
     expect(refereeDialogActions(panel({ userId: 2, pseudo: "Autre", eligible: false }), 1).take).toBe(true);
   });
+
+  it("refereeDialogActions_viewerObjectionUpheld_hidesTake", () => {
+    const view = { ...panel(null), objections: [{ userId: 1, pseudo: "Moi" }] };
+    expect(refereeDialogActions(view, 1).take).toBe(false);
+  });
 });
 
 describe("refereeFocusTarget (fenêtre « Arbitrage »)", () => {

@@ -25,6 +25,7 @@ function staffUser(id: number, pseudo: string, overrides: Record<string, unknown
     is_deleted: 0,
     is_admin: 0,
     platform_roles_json: JSON.stringify(["ARBITRE"]),
+    referee_objection_at: null,
     ...overrides,
   };
 }
@@ -143,5 +144,26 @@ describe("loadRefereePanel", () => {
     users = [staffUser(4, "Libre")];
     await loadRefereePanel(42);
     expect(execute.mock.calls.some(([sql]) => sql.includes("FROM bg_team_members"))).toBe(false);
+  });
+
+  it("loadRefereePanel_objectedStaff_listedInObjectionsNotCandidates", async () => {
+    users = [staffUser(3, "Zoé"), staffUser(4, "Ana", { referee_objection_at: STAMP })];
+    const panel = await loadRefereePanel(42);
+    expect(panel?.candidates).toEqual([{ userId: 3, pseudo: "Zoé" }]);
+    expect(panel?.objections).toEqual([{ userId: 4, pseudo: "Ana" }]);
+    expect(panel?.objectable).toEqual([{ userId: 3, pseudo: "Zoé" }]);
+  });
+
+  it("loadRefereePanel_nonRefereeAccount_neitherObjectableNorObjection", async () => {
+    users = [staffUser(5, "Caster", { platform_roles_json: JSON.stringify(["CASTER"]), referee_objection_at: STAMP })];
+    const panel = await loadRefereePanel(42);
+    expect(panel).toMatchObject({ objections: [], objectable: [] });
+  });
+
+  it("loadRefereePanel_currentRefereeObjected_notEligible", async () => {
+    match = { ...match, referee_user_id: 4 };
+    users = [staffUser(4, "Ana", { referee_objection_at: STAMP })];
+    const panel = await loadRefereePanel(42);
+    expect(panel?.referee).toEqual({ userId: 4, pseudo: "Ana", eligible: false });
   });
 });
