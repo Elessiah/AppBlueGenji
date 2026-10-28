@@ -146,7 +146,7 @@ describe("PROCESSING_ACTIVITIES", () => {
     // Décision du 2026-10-14 : le staff est prévenu en exécution du service ;
     // les messages de match des joueurs restent d'intérêt légitime, opposables.
     expect(t04.legalBasis).toMatch(/exécution du service[^;]*programme d'arbitrage adressés au staff/);
-    expect(t04.legalBasis).toMatch(/intérêt légitime[^;]*rappels de match envoyés aux joueurs, et l'avis du retrait de son inscription envoyé à un caster, avec un droit d'opposition \(art\. 21\) honoré par un interrupteur de « Mon profil »/);
+    expect(t04.legalBasis).toMatch(/intérêt légitime[^;]*rappels de match envoyés aux joueurs, les réglages du salon envoyés à ceux qui gèrent les engagées d'un match, et l'avis du retrait de son inscription envoyé à un caster, avec un droit d'opposition \(art\. 21\) honoré par un interrupteur de « Mon profil »/);
     expect(t04.subPurposes.join(" ")).toMatch(/couper ces messages privés depuis « Mon profil »/);
     // L'avis « Match retiré de ton programme » est l'un des messages coupés par l'interrupteur.
     expect(t04.subPurposes.join(" ")).toMatch(/l'avis qu'un match quitte son programme/);
@@ -175,7 +175,7 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(t04.dataCategories.join(" ")).toMatch(/recevoir ou non les messages privés Discord de ses matchs/);
     expect(t04.retention.join(" ")).toMatch(/Choix des messages privés de match : jusqu'à sa modification/);
     expect(t04.retention.join(" ")).toMatch(/Traces d'envoi des rappels, alertes et programmes d'arbitrage/);
-    expect(t04.recipients.join(" ")).toMatch(/Service de push du navigateur de chaque destinataire abonné \(joueur : [^;]*; caster : [^;]*; arbitre désigné : [^;]*; arbitre ou administrateur : programme d'arbitrage, litige tranché, résultat corrigé, abandon imposé à l'adversaire ou validation automatique suspendue par un membre du staff qui joue le match ; traitement T12\), qui/);
+    expect(t04.recipients.join(" ")).toMatch(/Service de push du navigateur de chaque destinataire abonné \(joueur : [^;]*; propriétaire, manager ou joueur d'un tournoi individuel : réglages du salon ; caster : [^;]*; arbitre désigné : [^;]*; arbitre ou administrateur : programme d'arbitrage, litige tranché, résultat corrigé, abandon imposé à l'adversaire ou validation automatique suspendue par un membre du staff qui joue le match ; traitement T12\), qui/);
     expect(t04.subPurposes.join(" ")).toMatch(/en message privé Discord et en push l'annonce/);
     expect(t04.recipients.join(" ")).toMatch(/Staff de l'association ayant accès au canal de logs Discord/);
     expect(byRef("T05").dataCategories.join(" ")).toMatch(/Sur Discord : [^—]*horaires et manches des matchs/);
