@@ -164,9 +164,9 @@ match, sans avis ; exécution du service (les arbitres agissant pour
 l'association) pour son « Prêt » et l'avis du retrait. L'entrée
 `2026-10-arbitre-designe-des-matchs` (intérêt légitime, opposition), datée du
 2026-10-29, a été rectifiée en place avant sa publication (EF-19, #501). Une
-opposition retenue fait que le staff ne confie plus de match à cet arbitre, ceux qui
-lui sont déjà confiés lui restant (décision L430 : mesure d'organisation, rien ne
-l'impose dans le code ; le retrait de ses matchs non terminés avec l'équipe opposante
+opposition retenue fait que le staff ne confie plus de match à cet arbitre, ceux qu'il
+tient déjà lui restant (décision L430 : mesure d'organisation, rien ne
+l'impose dans le code ; le retrait de ses matchs non terminés (décision du 2026-10-28 : « ceux de l'équipe opposante », portée à préciser au lancement du lot, l'opposition étant celle de l'arbitre)
 viendra avec le lot REFEREE-OBJECTION et sa propre entrée rectificative) ; l'entrée
 `2026-10-conditions-v7-casters-et-arbitre` annonce le passage au contrat à
 l'acceptation de la version 7. Devenir joueur du match ne retire l'arbitre qu'avant le
