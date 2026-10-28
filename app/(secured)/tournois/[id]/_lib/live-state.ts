@@ -236,6 +236,19 @@ export function shareUnchanged(
 }
 
 /**
+ * Pseudos d'arbitre d'une relecture REST : la liste précédente elle-même quand
+ * le contenu n'a pas bougé. Ils alimentent `LiveProvider`, lu par chaque carte
+ * de match : un nouveau tableau au même contenu redessinerait tout le plateau
+ * à chaque relecture.
+ */
+export function shareRefereeNames(
+  previous: TournamentViewerContext["refereeNames"],
+  next: TournamentViewerContext["refereeNames"],
+): TournamentViewerContext["refereeNames"] {
+  return sameValue(previous, next) ? previous : next;
+}
+
+/**
  * Liste où chaque élément inchangé (même clé, même contenu) est l'élément
  * précédent. Si rien n'a bougé — mêmes éléments, même ordre —, la liste
  * précédente elle-même.

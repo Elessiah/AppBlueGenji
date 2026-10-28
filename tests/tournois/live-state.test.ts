@@ -17,6 +17,7 @@ import {
   shouldCommitFetched,
   shouldRefreshViewerContext,
   reconnectDelayMs,
+  shareRefereeNames,
   shareUnchanged,
   type LiveState,
 } from "@/app/(secured)/tournois/[id]/_lib/live-state";
@@ -672,6 +673,22 @@ describe("shareUnchanged", () => {
     const previous = snapshot({ matches: [], registrations: [], soloUserIds: { 1: 2 } });
     const next = snapshot({ version: "v2", matches: [match()] });
     expect(shareUnchanged(previous, next)).toBe(next);
+  });
+});
+
+describe("shareRefereeNames", () => {
+  const previous = [{ matchId: 5, refereeKey: "k5", pseudo: "Juge" }];
+
+  it("shareRefereeNames_sameContentNewArray_returnsPreviousArray", () => {
+    const next = [{ matchId: 5, refereeKey: "k5", pseudo: "Juge" }];
+
+    expect(shareRefereeNames(previous, next)).toBe(previous);
+  });
+
+  it("shareRefereeNames_changedPseudo_returnsNextArray", () => {
+    const next = [{ matchId: 5, refereeKey: "k5-bis", pseudo: "Autre" }];
+
+    expect(shareRefereeNames(previous, next)).toBe(next);
   });
 });
 

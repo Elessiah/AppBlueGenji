@@ -21,6 +21,7 @@ import {
   applyLiveMessage,
   fatalFailure,
   INITIAL_LIVE_STATE,
+  shareRefereeNames,
   shareUnchanged,
   shouldCommitFetched,
   shouldRefreshViewerContext,
@@ -199,7 +200,13 @@ export function useTournamentLive(tournamentId: number) {
         if (!shouldCommitFetched(current, payload, force)) return null;
         // Même partage structurel que pour le flux : une relecture ne doit pas
         // redessiner les cartes qu'elle n'a pas changées.
-        const detail = current ? { ...payload, ...shareUnchanged(current, payload) } : payload;
+        const detail = current
+          ? {
+              ...payload,
+              ...shareUnchanged(current, payload),
+              refereeNames: shareRefereeNames(current.refereeNames, payload.refereeNames),
+            }
+          : payload;
         commit({ tier: stateRef.current.tier, detail });
         return null;
       } catch (e) {
