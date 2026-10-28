@@ -64,18 +64,26 @@ ouverture, et toute ouverture au-delà du délai, relit d'abord la proposition (
 **fermée en cas de doute** (panne : la marque reste, elle revient au chargement
 suivant ou au prochain `router.refresh()` qui la dit due, lequel annule aussi
 une relecture en cours ; une réponse **tranchée** « plus due », elle, ne se
-rouvre pas sur ce chargement) ; la relecture peut changer le parcours. Affichée, elle
-se relit au retour de l'onglet (`visibilitychange`, `pageshow`), au plus une
-fois par `RECHECK_AFTER_MS`, et ne se ferme alors que sur une réponse
-**tranchée** (`{ prompt: null }`, 401) — un réseau pas encore revenu ne
-l'escamote pas, le doute est retenté **une** fois (`online`, `focus`). Une
-réponse écrite dans un autre onglet du navigateur (même session) la ferme sans
-requête (`BroadcastChannel` `bg:certify-prompt`, posté par
-`answerCertifyPrompt` sur un canal aussitôt refermé). Répondue (ici, ailleurs,
-ou sur un refus sans issue) ou certifiée, le relais démonte le morceau : canal
-et écoutes fermés. Aucun sondage, aucune requête abandonnée qui continue
-(`AbortController`) ; une session sans marque répond au `GET` sans la lecture
-du chargeur (seule celle de la session).
+rouvre pas sur ce chargement) ; la relecture peut changer le parcours. Une
+lecture de la mise en page n'est datée qu'après une relecture tranchée depuis
+le montage (une lecture partie avant le montage peut avoir manqué une réponse).
+Affichée — ou de nouveau permise après une page qui la taisait, sans perdre
+sa confirmation —, elle se relit par `useAutoRefresh` (`intervalMs: null`,
+`pageShow`, `freshAt`, `runOnEnable`) au retour de l'onglet (`visibilitychange`,
+`pageshow`), au plus une fois par `RECHECK_AFTER_MS`, et ne se ferme alors que
+sur une réponse **tranchée** (`{ prompt: null }`, 401) — un réseau pas encore
+revenu ne l'escamote pas : le rafraîchissement rend `"RETRY"` et le crochet le
+retente **une** fois (`online`, `focus`). Une réponse écrite dans un autre
+onglet du navigateur **par le même compte** la ferme sans requête
+(`BroadcastChannel` `bg:certify-prompt`, message `{ type, userId, from }`
+vérifié par `isAnsweredMessageFor`, posté par `answerCertifyPrompt` sur un
+canal aussitôt refermé) ; celle d'un autre compte, connecté entre-temps dans
+ce navigateur, ne ferme rien. Répondue (ici, ailleurs, ou sur un refus sans
+issue) ou certifiée, le relais démonte le morceau : canal et écoutes fermés.
+Aucun sondage, aucune requête abandonnée qui continue (`AbortController`) ;
+une session sans marque répond au `GET` sans la lecture du chargeur (seule
+celle de la session), et le `GET` n'écrit jamais (`loadDiscordCertifyPrompt(…,
+{ clearStale: false })` : la marque périmée est levée par la page suivante).
 
 Le contournement de développement (`DEV_AUTH_USER_ID`) n'a pas de session : la
 fenêtre ne s'y montre pas. Pour la voir en local, se connecter vraiment par
@@ -106,7 +114,11 @@ Discord ou Blizzard (ou poser la marque à la main sur sa ligne de session).
   sur `/profil`, émet `CERTIFY_DIALOG_EVENT`) : `useCertifyRequest` ouvre
   **le** `DiscordVerificationDialog` une fois l'état Discord lu — code en
   message privé, ou passage par Discord pour un compte rattaché sans pseudo
-  nommé. Rien du dialogue n'est recopié ; le paramètre est retiré de l'adresse.
+  nommé. L'adresse seule ne l'ouvre pas : la page qui y mène pose une demande
+  en mémoire (`requestCertifyDialog`, valable `CERTIFY_DIALOG_REQUEST_TTL_MS`,
+  une minute), consommée par `/profil` (`takeCertifyDialogRequest`) — un lien
+  venu d'un autre site, ou ouvert dans un nouvel onglet, mène au profil sans
+  ouvrir le dialogue (EF-04). Rien du dialogue n'est recopié ; le paramètre est retiré de l'adresse.
   Tag certifié entre-temps : un toast le dit au lieu d'ouvrir le dialogue.
   Certifié depuis ce dialogue, `/profil` émet `DISCORD_CERTIFIED_EVENT`
   (`certifiedFromProfileEvent`, qu'il ne relit pas lui-même) : une fenêtre
@@ -121,12 +133,16 @@ Le BattleTag n'y figure pas : il est vérifié par Battle.net au rattachement
 | Geste | Effet |
 | --- | --- |
 | « Certifier mon tag » | certifie (`ONE_CLICK`) ou mène au dialogue (`DIALOG`, la proposition est close pour la session) |
-| « Plus tard », Échap, clic sur le voile | `POST … { action: "LATER" }` (`keepalive` : un lien qui change de document ne l'annule pas) — fermée tout de suite ; un échec d'écriture la fait seulement revenir au prochain chargement (un changement de parcours `ONE_CLICK` → `DIALOG` ne la rouvre pas) |
-| « Ne plus voir » | `POST … { action: "NEVER" }` — `bg_users.discord_certify_prompt_dismissed_at` (date du premier choix, `COALESCE`) puis **toutes** les sessions du compte (au mieux : un échec de cette seconde écriture est journalisé, le choix reste gardé et le chargeur, qui filtre sur la date, lève la marque restée) ; succès en toast, échec en toast et fenêtre gardée (compte supprimé entre-temps : fenêtre fermée, toast dédié) |
+| « Plus tard », Échap, clic sur le voile | `POST … { action: "LATER", userId }` (`keepalive` : un lien qui change de document ne l'annule pas) — fermée tout de suite ; un échec d'écriture la fait seulement revenir au prochain chargement (un changement de parcours `ONE_CLICK` → `DIALOG` ne la rouvre pas) |
+| « Ne plus voir » | `POST … { action: "NEVER", userId }` — `bg_users.discord_certify_prompt_dismissed_at` (date du premier choix, `COALESCE`) puis **toutes** les sessions du compte (au mieux : un échec de cette seconde écriture est journalisé, le choix reste gardé et le chargeur, qui filtre sur la date, lève la marque restée), et l'invitation de la fiche tournoi retenue pour ce compte est oubliée (`forgetCertificationPromptsOf`) ; succès en toast, échec en toast et fenêtre gardée (compte supprimé entre-temps : fenêtre fermée, toast dédié) |
 
 Route : `GET` (relecture, ci-dessus : 401 sans session, 500
-`CERTIFY_PROMPT_FAILED`) ; `POST` : 401 sans session, 400 `INVALID_ACTION`, 409 `ACCOUNT_DELETED` (compte
-supprimé entre-temps), 503 `CERTIFY_PROMPT_UNAVAILABLE` (colonne absente), 500
+`CERTIFY_PROMPT_FAILED`) ; `POST` : 401 sans session, 400 `INVALID_ACTION`
+(action ou compte `userId` absent ou malformé — un client d'avant ce champ
+n'est jamais dit « autre compte »), 409 `CERTIFY_PROMPT_OTHER_ACCOUNT` (la
+fenêtre a été montrée à un autre compte que celui de la session : rien n'est
+écrit, la fenêtre se ferme, toast `otherAccount`), 409 `ACCOUNT_DELETED` (compte
+supprimé entre-temps) ; une session qui ne doit plus rien répond sans écrire, 503 `CERTIFY_PROMPT_UNAVAILABLE` (colonne absente), 500
 `CERTIFY_PROMPT_FAILED`. Provenance vérifiée par le middleware. Aucune réponse
 ne certifie. Il n'existe pas de geste pour réafficher la fenêtre : la
 certification reste offerte dans « Mon profil », que la fenêtre nomme.

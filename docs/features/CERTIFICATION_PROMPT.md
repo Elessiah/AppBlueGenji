@@ -112,32 +112,43 @@ faite au **meneur** et **quand Discord est seul à manquer** (un BattleTag à
 vérifier n'était pas l'objet de ce refus ; un BattleTag inactionnable, absent de
 la variante « Discord seul », ne compte pas) — jamais quand l'équipe n'a aucun
 contact, meneur compris : lu seulement dans ce cas (`loadCertificationPrompt`), colonne absente
-= sans choix. L'inverse n'est pas vrai : la case de cette modale reste une
-préférence d'affichage du navigateur.
+= sans choix. L'inverse n'est pas vrai : la case de cette modale ne tait que
+cette modale.
 
 - **« Plus tard »** ou fermeture (Échap, voile) : `bg_cert_prompt_closed` = « 1 »
   en **stockage de session** — la modale ne se rouvre pas dans cet onglet.
   La case « Ne plus voir », visible, vaut pour **toute** fermeture, Échap et
   voile compris ;
 - case **« Ne plus voir »** cochée puis fermeture (ou clic sur le bouton du
-  profil) : `bg_cert_prompt_off` = « 1 » en **stockage local**, en plus. Un
-  clic qui ouvre le profil dans un nouvel onglet (Ctrl, Cmd, Maj, bouton du
+  profil) : gardée **sur le compte** (EF-04, décision 16) —
+  `POST /api/profile/certification-prompt` pose
+  `bg_users.certification_prompt_dismissed_at` (date du premier choix, rejoué
+  sans rien écrire) ; la modale ne s'ouvre plus pour ce compte, sur aucun
+  tournoi ni appareil, et jamais pour un autre compte du même navigateur.
+  L'envoi part en `keepalive` (survit à la navigation vers le profil) ; un
+  échec est muet (la modale se rouvrira, rien n'est perdu). L'invitation gardée
+  en mémoire pour ce compte est oubliée (`forgetCertificationPromptsOf`). Aucun
+  geste ne la réaffiche : la certification reste offerte dans « Mon profil ».
+  Un clic qui ouvre le profil dans un nouvel onglet (Ctrl, Cmd, Maj, bouton du
   milieu) ne ferme rien et ne retient rien.
 
-Traitement inscrit au registre (T04, sous-finalité « Inviter … à certifier »).
-Valeurs sans identifiant de personne, jamais transmises au serveur : un
-navigateur partagé tait la modale pour tous ses comptes, ce qu'une préférence
-d'affichage peut se permettre. Stockage bloqué (navigation privée) : la modale
-s'ouvre et se ferme normalement, sans mémoire. Déclarées sur `/rgpd` (FR et EN)
-mais **pas** dans `PRIVACY_CHANGES` — même raisonnement que `bg_a11y` : aucune
-donnée sur une personne, déposées à la demande du lecteur.
+L'ancienne clé `bg_cert_prompt_off` (stockage local, sans identifiant) n'est
+plus posée ; elle est effacée à l'ouverture d'une fiche tournoi
+(`LEGACY_CERTIFICATION_PROMPT_OFF_KEY`). Traitement inscrit au registre (T04,
+sous-finalité « Inviter … à certifier » : catégorie et durée — jusqu'à la
+suppression du compte, effacé à l'anonymisation `anonymizeAccount`), exporté
+(`certificationPromptDismissedAt`, `RGPD_DATA_RIGHTS.md`), déclaré sur `/rgpd`
+(FR et EN) et dans `PRIVACY_CHANGES`
+(`2026-10-ne-plus-voir-invitation-certification-sur-le-compte`). Stockage de
+session bloqué (navigation privée) : « Plus tard » ne se retient pas dans
+l'onglet.
 
 ## Câblage
 
 - Règle pure, clés et lecture du stockage : `lib/shared/certification-prompt.ts`
   (`certificationPromptFor`, `teamHasContact`, `battletagRelevantFor`,
   `shouldOpenCertificationPrompt`,
-  `rememberCertificationPromptClosed`).
+  `rememberCertificationPromptClosed`, `CERTIFICATION_PROMPT_OFF_PATH`).
 - Lecture : `lib/server/tournaments/certification-prompt.ts`
   (`loadCertificationPrompt`, une requête sur le roster en cours — `loadRosters`
   et `toCandidate` du lancement, `match-launch-info.ts` : les certifications se
@@ -146,15 +157,30 @@ donnée sur une personne, déposées à la demande du lecteur.
   `getTournamentViewerContext` — **porte commune** du flux SSE et de la lecture
   REST de secours — seulement pour une équipe engagée dans un tournoi non clos :
   une requête indexée, gardée une minute par lecteur
-  (`cachedCertificationPrompt`, `CERTIFICATION_PROMPT_TTL_MS`, mémoire bornée,
+  (`certification-prompt-cache.ts` : `cachedCertificationPrompt`,
+  `CERTIFICATION_PROMPT_TTL_MS`, mémoire bornée à `CERTIFICATION_PROMPT_CACHE_MAX`
+  entrées en vol et retenues comprises — au-delà, `null` servi sans lecture —,
   lecture en cours partagée, échec retenu dix secondes, lecture abandonnée après
-  trois secondes retenue une minute — tardive mais réussie, elle sert) : le contexte se relit
-  à chaque lecture REST (geste, proposition de score, repli du flux). Une
-  certification faite entre-temps se voit au plus une minute plus tard. La case
-  « Ne plus voir » de la modale vit dans le navigateur ; le serveur ne lit que
-  celui de la proposition de la connexion (compte, § « Ne plus voir »). Une
-  lecture en échec
+  trois secondes retenue une minute — tardive mais réussie, elle sert —, lecture
+  coincée plus de dix minutes oubliée) : le contexte se relit à chaque lecture
+  REST (geste, proposition de score, repli du flux). La requête ne lit que des
+  drapeaux (vérifié ou non, contact présent), jamais un pseudo. Une
+  certification (code Discord, un clic, rattachement OAuth) ou un « Ne plus
+  voir » oublie sur-le-champ l'invitation retenue pour ce compte
+  (`forgetCertificationPromptsOf`, clé préfixée `userId:`) ; sinon elle se voit
+  au plus une minute plus tard. Les deux « Ne plus voir » (cette modale, la
+  proposition de la connexion) sont lus sur le compte. Une lecture en échec
   tait l'invitation (`null`, journal pm2) sans faire tomber le contexte.
+- **Flux SSE** : l'invitation n'y est pas attendue (base lente : elle ne
+  retarde pas l'ouverture). Connue en mémoire (`peekCertificationPrompt`), elle
+  part avec le contexte ; sinon le contexte part sans elle et elle suit par une
+  trame `certificationPrompt` (`onLateCertificationPrompt`,
+  `viewerPatchFrameBytes`), posée par `applyLiveMessage` sur le contexte du
+  même tournoi. La lecture REST de secours l'attend. La place de flux est prise
+  **avant** toute lecture : une boucle au-delà du plafond ne coûte aucune
+  requête. Quitter une équipe, en être retiré ou la dissoudre ferme les flux
+  du compte (`closeUserStreams`) : le client se reconnecte et relit un contexte
+  sans l'équipe.
 - Champ `TournamentViewerContext.certificationPrompt`, rejoué tel quel d'un
   instantané à l'autre (`live-state.ts`), `null` pour le spectateur sans compte.
 - Ouverture une fois par page — par tournoi, la fiche étant réutilisée d'un
@@ -167,5 +193,8 @@ Tests : `tests/lib/shared/certification-prompt.test.ts`,
 `tests/tournois/certification-prompt-context.test.ts`,
 `tests/tournois/certification-prompt-dialog.test.tsx`,
 `tests/tournois/certification-prompt-hook.test.ts` (décision, effacement,
-retrait, changement de tournoi), `tests/lib/shared/dialog-focus.test.ts`
+retrait, changement de tournoi, envoi du « Ne plus voir »),
+`tests/app/api/profile/certification-prompt-route.test.ts`,
+`tests/app/api/tournaments/stream.test.ts` (trame tardive, place prise d'abord),
+`tests/tournois/live-state.test.ts`, `tests/lib/server/sse-gzip.test.ts`, `tests/lib/shared/dialog-focus.test.ts`
 (`anotherModalOpen`, `watchUrgentModalOpened`, `handOffRestoreTargets`).
