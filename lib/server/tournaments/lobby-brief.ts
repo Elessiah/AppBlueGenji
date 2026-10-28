@@ -7,7 +7,7 @@
  * l'ouverture du salon (`lobby_opened_at`) est posée par des transactions qui
  * n'ont pas à connaître les notifications. Le balayage relit après coup les
  * salons ouverts récemment, **réserve** le brief dans `bg_match_start_notices`
- * (phase `LOBBY_BRIEF`, une fois par match et par appariement — deux balayages
+ * (phases `LOBBY_BRIEF_1` / `LOBBY_BRIEF_2`, une par engagée et par appariement — deux balayages
  * concurrents n'envoient qu'une fois), puis l'envoie. Mêmes déclencheurs que
  * les départs de match.
  *
@@ -37,8 +37,16 @@ import { seedJoins } from "./match-host-seeds";
 import { readMatchCasters } from "./player-pushes";
 import { isSwissRound, swissRoundSql } from "./swiss-round-sql";
 
-/** Phase de la réservation dans `bg_match_start_notices`. */
-export const LOBBY_BRIEF_PHASE = "LOBBY_BRIEF";
+/** Place d'une engagée dans le match (`team1_id` / `team2_id`). */
+export type LobbyBriefSlot = 1 | 2;
+
+/**
+ * Phase de la réservation dans `bg_match_start_notices`, une par engagée : un
+ * côté en échec rend la sienne sans toucher à l'autre (16 caractères au plus).
+ */
+export function lobbyBriefPhase(slot: LobbyBriefSlot): string {
+  return `LOBBY_BRIEF_${slot}`;
+}
 
 /**
  * Au-delà, un salon ouvert n'est plus briefé : le match est parti d'office
@@ -67,27 +75,51 @@ export type LobbyBriefRow = RowDataPacket & {
   referee_user_id: number | null;
 };
 
-async function claimLobbyBrief(matchId: number, pairing: string): Promise<boolean> {
-  const db = await getDatabase();
+type Db = Awaited<ReturnType<typeof getDatabase>>;
+type ClaimedSide = { row: LobbyBriefRow; slot: LobbyBriefSlot };
+
+async function claimLobbyBrief(db: Db, claim: ClaimedSide): Promise<boolean> {
   const [result] = await db.execute(
     `INSERT IGNORE INTO bg_match_start_notices (match_id, pairing, phase) VALUES (?, ?, ?)`,
-    [matchId, pairing, LOBBY_BRIEF_PHASE],
+    [Number(claim.row.id), String(claim.row.launch_pairing), lobbyBriefPhase(claim.slot)],
   );
   return (result as { affectedRows?: number }).affectedRows === 1;
 }
 
 /**
- * Rend les réservations d'un balayage qui n'a pas pu lire ses destinataires :
- * une panne de base avant tout envoi ne doit pas perdre le brief pour de bon.
+ * Réserve chaque côté encore libre. Une panne en cours de route rend ce qui a
+ * déjà été pris, puis remonte : rien n'est parti.
  */
-async function releaseLobbyBriefs(rows: readonly LobbyBriefRow[]): Promise<void> {
-  const db = await getDatabase();
-  for (const row of rows) {
-    await db.execute(`DELETE FROM bg_match_start_notices WHERE match_id = ? AND pairing = ? AND phase = ?`, [
-      Number(row.id),
-      String(row.launch_pairing),
-      LOBBY_BRIEF_PHASE,
-    ]);
+async function claimLobbyBriefs(db: Db, rows: readonly LobbyBriefRow[]): Promise<ClaimedSide[]> {
+  const claimed: ClaimedSide[] = [];
+  try {
+    for (const row of rows) {
+      for (const slot of [1, 2] as const) {
+        if (await claimLobbyBrief(db, { row, slot })) claimed.push({ row, slot });
+      }
+    }
+    return claimed;
+  } catch (error) {
+    await releaseQuietly(db, claimed);
+    throw error;
+  }
+}
+
+/**
+ * Rend des réservations dont le brief n'est pas parti : une panne de base ne
+ * doit pas le perdre pour de bon, le balayage suivant réessaie. Une seule
+ * instruction : tout est rendu, ou rien. Jamais d'exception (journal pm2).
+ */
+async function releaseQuietly(db: Db, claims: readonly ClaimedSide[]): Promise<void> {
+  if (claims.length === 0) return;
+  try {
+    await db.execute(
+      `DELETE FROM bg_match_start_notices
+        WHERE ${claims.map(() => "(match_id = ? AND pairing = ? AND phase = ?)").join(" OR ")}`,
+      claims.flatMap((claim) => [Number(claim.row.id), String(claim.row.launch_pairing), lobbyBriefPhase(claim.slot)]),
+    );
+  } catch (error) {
+    console.error("[lobby-brief] réservations non rendues", error);
   }
 }
 
@@ -140,20 +172,12 @@ export function lobbyBriefSides(
   }));
 }
 
-/** Managers des engagées et casters des matchs réservés ; une panne rend les réservations, puis remonte. */
-async function readBriefRecipients(
-  db: Awaited<ReturnType<typeof getDatabase>>,
-  planned: readonly LobbyBriefRow[],
-): Promise<{ managers: Map<number, number[]>; castersByMatch: Map<number, number[]> }> {
+/** Managers des engagées réservées ; une panne rend les réservations, puis remonte. */
+async function readBriefManagers(db: Db, claims: readonly ClaimedSide[]): Promise<Map<number, number[]>> {
   try {
-    const managers = await loadEntrantManagerIds(planned.flatMap((row) => [Number(row.team1_id), Number(row.team2_id)]));
-    const castersByMatch = await readMatchCasters(db, planned.map((row) => Number(row.id)));
-    return { managers, castersByMatch };
+    return await loadEntrantManagerIds(claims.map(({ row, slot }) => Number(slot === 1 ? row.team1_id : row.team2_id)));
   } catch (error) {
-    // Rien n'est parti : on rend les réservations, le balayage suivant réessaie.
-    await releaseLobbyBriefs(planned).catch((releaseError: unknown) =>
-      console.error("[lobby-brief] réservations non rendues", releaseError),
-    );
+    await releaseQuietly(db, claims);
     throw error;
   }
 }
@@ -200,35 +224,37 @@ async function runLobbyBriefSweep(): Promise<number> {
       WHERE m.status = 'READY' AND m.is_bye = 0
         AND m.launch_pairing = CONCAT(m.team1_id, ':', m.team2_id)
         AND m.lobby_opened_at > NOW() - INTERVAL ? MINUTE
-        AND NOT EXISTS (SELECT 1 FROM bg_match_start_notices n
-                         WHERE n.match_id = m.id AND n.pairing = m.launch_pairing AND n.phase = ?)
+        AND (SELECT COUNT(*) FROM bg_match_start_notices n
+              WHERE n.match_id = m.id AND n.pairing = m.launch_pairing AND n.phase IN (?, ?)) < 2
       ORDER BY m.id`,
-    [LOBBY_BRIEF_WINDOW_MINUTES, LOBBY_BRIEF_PHASE],
+    [LOBBY_BRIEF_WINDOW_MINUTES, lobbyBriefPhase(1), lobbyBriefPhase(2)],
   );
   if (rows.length === 0) return 0;
 
   // Réservation d'abord, destinataires ensuite : c'est elle qui interdit le doublon.
-  const planned: LobbyBriefRow[] = [];
-  for (const row of rows) {
-    if (await claimLobbyBrief(Number(row.id), String(row.launch_pairing))) planned.push(row);
-  }
-  if (planned.length === 0) return 0;
+  const claims = await claimLobbyBriefs(db, rows);
+  if (claims.length === 0) return 0;
 
-  const { managers, castersByMatch } = await readBriefRecipients(db, planned);
+  const managers = await readBriefManagers(db, claims);
+  const planned = [...new Set(claims.map((claim) => claim.row))];
+  // Ces deux lectures ne lèvent pas : une panne envoie le brief sans la ligne.
+  const castersByMatch = await readMatchCasters(db, planned.map((row) => Number(row.id)));
   const referees = await readEligibleReferees(db, planned);
 
   let sent = 0;
-  for (const row of planned) {
-    const sides = lobbyBriefSides(row, {
+  for (const claim of claims) {
+    const { row, slot } = claim;
+    const { teamId, side } = lobbyBriefSides(row, {
       cast: (castersByMatch.get(Number(row.id)) ?? []).length > 0,
       refereeEligible: row.referee_user_id !== null && referees.has(Number(row.referee_user_id)),
-    });
+    })[slot - 1];
+    // Fantôme : personne, la réservation reste.
+    const userIds = managers.get(teamId) ?? [];
+    if (userIds.length === 0) continue;
     const url = `${siteCanonicalBase()}${matchPageHref(Number(row.tournament_id), Number(row.id))}`;
-    for (const { teamId, side } of sides) {
-      const userIds = managers.get(teamId) ?? [];
-      if (userIds.length === 0) continue;
-      if (await sendSideBrief(Number(row.id), userIds, side, url)) sent += 1;
-    }
+    if (await sendSideBrief(Number(row.id), userIds, side, url)) sent += 1;
+    // Rien n'est parti pour ce côté : il rend sa réservation, l'autre garde la sienne.
+    else await releaseQuietly(db, [claim]);
   }
   return sent;
 }

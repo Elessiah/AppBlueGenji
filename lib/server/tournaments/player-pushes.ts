@@ -167,7 +167,7 @@ async function runMatchStartSweep(): Promise<number> {
              OR m.launched_at > NOW() - INTERVAL ? MINUTE)
         AND NOT EXISTS (SELECT 1 FROM bg_match_start_notices n
                          WHERE n.match_id = m.id AND n.pairing = m.launch_pairing
-                           -- Le brief du salon (\`LOBBY_BRIEF\`, ./lobby-brief) partage la
+                           -- Le brief du salon (\`LOBBY_BRIEF_1\` / \`_2\`, ./lobby-brief) partage la
                            -- table : il ne tient lieu ni de l'appel aux « Prêt » ni du départ.
                            AND (n.phase = 'LOBBY' OR (n.phase = 'LAUNCHED' AND m.launched_at IS NOT NULL)))
       ORDER BY m.id`,
