@@ -129,11 +129,99 @@ export function consumeRateLimit(
   return chargeRateLimit(rule, key, now);
 }
 
+/**
+ * Seau **à jetons** : un débit, pas une fenêtre. La fenêtre fixe laisse passer
+ * deux plafonds d'affilée de part et d'autre de sa remise à zéro (60 actions
+ * juste avant, 60 juste après : ~120 en une seconde) ; ici, une rafale ne
+ * dépasse jamais `capacity`, puis le seau ne rend qu'un jeton par `refillMs`.
+ */
+export type TokenBucketRule = {
+  /** Nom du seau, préfixé aux clés. */
+  name: string;
+  /** Jetons au plus (la rafale permise). */
+  capacity: number;
+  /** Délai de retour d'un jeton, en millisecondes. */
+  refillMs: number;
+  /** Plafond de clés suivies, comme {@link RateLimitRule.maxKeys}. */
+  maxKeys?: number;
+};
+
+type Tokens = { tokens: number; updatedAt: number };
+
+const tokenBuckets = new Map<string, Map<string, Tokens>>();
+
+function tokenBucketOf(rule: TokenBucketRule): Map<string, Tokens> {
+  let bucket = tokenBuckets.get(rule.name);
+  if (!bucket) {
+    bucket = new Map<string, Tokens>();
+    tokenBuckets.set(rule.name, bucket);
+  }
+  return bucket;
+}
+
+/** Jetons disponibles à l'instant (fractions comprises). */
+function tokensAt(rule: TokenBucketRule, state: Tokens | undefined, now: number): number {
+  if (!state) return rule.capacity;
+  return Math.min(rule.capacity, state.tokens + Math.max(0, now - state.updatedAt) / rule.refillMs);
+}
+
+function tokenState(rule: TokenBucketRule, tokens: number): { allowed: boolean; remaining: number; retryAfterMs: number } {
+  const allowed = tokens >= 1;
+  return {
+    allowed,
+    remaining: Math.floor(tokens),
+    retryAfterMs: allowed ? 0 : Math.ceil((1 - tokens) * rule.refillMs),
+  };
+}
+
+/** Le seau de cette clé permet-il une action ? Rien n'est pris. */
+export function peekTokenBucket(
+  rule: TokenBucketRule,
+  key: string,
+  now: number = Date.now(),
+): { allowed: boolean; remaining: number; retryAfterMs: number } {
+  return tokenState(rule, tokensAt(rule, tokenBucketOf(rule).get(key), now));
+}
+
+/** Prend un jeton s'il y en a un ; `allowed: false` : rien n'est pris. */
+export function takeTokenBucket(
+  rule: TokenBucketRule,
+  key: string,
+  now: number = Date.now(),
+): { allowed: boolean; remaining: number; retryAfterMs: number } {
+  const bucket = tokenBucketOf(rule);
+  const tokens = tokensAt(rule, bucket.get(key), now);
+  if (tokens < 1) return tokenState(rule, tokens);
+  if (!bucket.has(key) && bucket.size >= (rule.maxKeys ?? DEFAULT_MAX_KEYS)) {
+    // Un seau plein vaut un seau absent : on les oublie d'abord, et on repart
+    // de zéro si cela ne suffit pas (mémoire bornée).
+    for (const [trackedKey, tracked] of bucket) {
+      if (tokensAt(rule, tracked, now) >= rule.capacity) bucket.delete(trackedKey);
+    }
+    if (bucket.size >= (rule.maxKeys ?? DEFAULT_MAX_KEYS)) bucket.clear();
+  }
+  bucket.set(key, { tokens: tokens - 1, updatedAt: now });
+  // Accordé : le dernier jeton pris laisse un seau vide, pas un refus.
+  return { ...tokenState(rule, tokens - 1), allowed: true, retryAfterMs: 0 };
+}
+
+/** Rend un jeton pris pour une action qui n'a finalement rien coûté. */
+export function refundTokenBucket(rule: TokenBucketRule, key: string, now: number = Date.now()): void {
+  const bucket = tokenBucketOf(rule);
+  const state = bucket.get(key);
+  if (!state) return;
+  const tokens = Math.min(rule.capacity, tokensAt(rule, state, now) + 1);
+  if (tokens >= rule.capacity) bucket.delete(key);
+  else bucket.set(key, { tokens, updatedAt: now });
+}
+
 /** Vide un seau, ou tous les seaux. Réservé aux tests. */
 export function resetRateLimit(ruleName?: string): void {
   if (ruleName === undefined) {
     counters.clear();
+    tokenBuckets.clear();
     return;
   }
   counters.delete(ruleName);
+  tokenBuckets.delete(ruleName);
 }

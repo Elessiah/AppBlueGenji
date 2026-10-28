@@ -13,6 +13,7 @@
  * chemins que le serveur. Voir `docs/features/SPECTATOR_VIEW.md`.
  */
 import type {
+  MatchScoreReport,
   TournamentSnapshot,
   TournamentState,
   TournamentViewerContext,
@@ -194,9 +195,26 @@ export function spectatorPollIntervalMs(state: TournamentState, level: Spectator
  */
 export const SPECTATOR_CACHE_TTL_MS = 15_000;
 
-/** Durée de vie de la réponse publique, allongée avec la charge. */
-export function spectatorCacheTtlMs(level: SpectatorLoadLevel): number {
-  return Math.min(SPECTATOR_MAX_POLL_MS, SPECTATOR_CACHE_TTL_MS * SPECTATOR_LOAD_FACTOR[level]);
+/**
+ * Âge maximal d'une réponse publique servie : la durée de vie la plus longue
+ * (sous la pire charge), et le délai que `/rgpd` déclare (« renouvelée au plus
+ * tard toutes les deux minutes et demie »). Une réponse refusée de
+ * reconstruction (plafond, machine occupée) peut être servie périmée jusqu'à
+ * cet âge, jamais au-delà.
+ */
+export const SPECTATOR_MAX_COPY_AGE_MS = SPECTATOR_CACHE_TTL_MS * SPECTATOR_LOAD_FACTOR[3];
+
+/**
+ * Durée de vie de la réponse publique, allongée avec la charge. Un tournoi
+ * **terminé** garde la plus longue d'emblée : il n'est relu que toutes les
+ * dix minutes, et une durée de 15 s faisait reconstruire l'instantané entier
+ * (rejeu compris) à presque chaque relecture, pour répondre `304`. Elle reste
+ * dans l'âge déclaré ({@link SPECTATOR_MAX_COPY_AGE_MS}) : un retour en arrière
+ * sur la finale s'y lit au plus tard après ce délai.
+ */
+export function spectatorCacheTtlMs(level: SpectatorLoadLevel, state: TournamentState | null = null): number {
+  if (state === "FINISHED") return SPECTATOR_MAX_COPY_AGE_MS;
+  return Math.min(SPECTATOR_MAX_COPY_AGE_MS, SPECTATOR_CACHE_TTL_MS * SPECTATOR_LOAD_FACTOR[level]);
 }
 
 /**
@@ -238,11 +256,16 @@ export function spectatorFreshnessMs(pollMs: number, cacheTtlMs: number): number
  * propositions en attente est déjà vide dans l'instantané diffusé ; il l'est
  * ici aussi, explicitement.
  *
+ * Ce que `/rgpd` ne déclare pas public n'y part pas non plus : ni les **« prêts »**
+ * d'un lancement (engagés, arbitre, casters), ni les **scores proposés** par
+ * chaque camp d'un match en attente ou en litige (la proposition reste signalée,
+ * sans ses chiffres), ni la **date d'inscription** d'un joueur engagé en
+ * individuel (celle d'une équipe reste).
+ *
  * L'identifiant de chaque **caster** est remplacé par un identifiant négatif
  * ({@link SPECTATOR_HIDDEN_USER_ID}, puis `-2`, `-3`… dans l'ordre d'inscription,
  * pour que deux co-casters restent deux) : la fiche sait qui est inscrit (son
- * pseudo, à l'antenne, s'affiche et il compte dans les « prêts » du lancement)
- * sans savoir quel compte. `soloUserIds`
+ * pseudo, à l'antenne, s'affiche) sans savoir quel compte. `soloUserIds`
  * reste en revanche : il porte la marche du podium d'un joueur engagé en
  * individuel (`useEntrantPodium`), et le podium est public.
  *
@@ -252,8 +275,13 @@ export function spectatorFreshnessMs(pollMs: number, cacheTtlMs: number): number
  * quelqu'un.
  */
 export function spectatorSnapshot(snapshot: TournamentSnapshot): TournamentSnapshot {
+  const hiddenReport = (report: MatchScoreReport | null): MatchScoreReport | null =>
+    report ? { ...report, team1Score: 0, team2Score: 0, maps: [] } : null;
   return {
     ...snapshot,
+    registrations: snapshot.registrations.map((registration) =>
+      snapshot.soloUserIds[registration.teamId] === undefined ? registration : { ...registration, registeredAt: "" },
+    ),
     endurance: snapshot.endurance
       ? {
           ...snapshot.endurance,
@@ -262,13 +290,20 @@ export function spectatorSnapshot(snapshot: TournamentSnapshot): TournamentSnaps
       : null,
     matches: snapshot.matches.map((match) => ({
       ...match,
-      casters: match.casters.map((caster, index) => ({ ...caster, userId: SPECTATOR_HIDDEN_USER_ID - index })),
+      team1Ready: false,
+      team2Ready: false,
+      refereeReady: false,
+      casters: match.casters.map((caster, index) => ({
+        ...caster,
+        userId: SPECTATOR_HIDDEN_USER_ID - index,
+        ready: false,
+      })),
       // Le lien de rediffusion que l'interface masque (match rouvert…) ne part
       // pas non plus dans la réponse publique.
       replayUrl: visibleReplayUrl(match),
       maps: match.maps.map((map) => ({ ...map, replayCode: "" })),
-      team1Report: match.team1Report ? { ...match.team1Report, maps: [] } : null,
-      team2Report: match.team2Report ? { ...match.team2Report, maps: [] } : null,
+      team1Report: hiddenReport(match.team1Report),
+      team2Report: hiddenReport(match.team2Report),
     })),
   };
 }

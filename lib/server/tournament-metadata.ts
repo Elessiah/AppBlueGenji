@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getVisibleTournamentCard } from "@/lib/server/tournaments-service";
+import type { TournamentCard } from "@/lib/shared/types";
 import { SITE_DESCRIPTION, SITE_NAME, tournamentShareTitle } from "@/lib/shared/share-metadata";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
@@ -9,6 +10,12 @@ import { parseTournamentId } from "@/lib/shared/spectator-view";
 
 /** Droits du lecteur qui pèsent sur la visibilité d'un tournoi. */
 export type TournamentMetadataRights = { canManage: boolean };
+
+/** Lecture de la carte d'un tournoi visible pour ces droits (`null` : illisible). */
+export type TournamentMetadataCardLoader = (
+  tournamentId: number,
+  rights: TournamentMetadataRights,
+) => Promise<TournamentCard | null>;
 
 /**
  * Ce qu'un lien de tournoi raconte là où on le colle — titre, description,
@@ -37,11 +44,16 @@ export type TournamentMetadataRights = { canManage: boolean };
  * @param rights Droits du lecteur, lus seulement pour un identifiant valide ;
  *   `null` : la page ne sera pas servie à ce lecteur (redirection), l'encart du
  *   site suffit et la base n'est pas interrogée.
+ * @param loadCard Lecture de la carte : par défaut `getVisibleTournamentCard`.
+ *   La page sans compte lit celle de la réponse publique mutualisée
+ *   (`publicTournamentSnapshot`) : une rafale de F5 ou une annonce Discord ne
+ *   coûte plus une requête par vue.
  */
 export async function tournamentPageMetadata(
   rawId: string,
   pathOf: (tournamentId: number) => string,
   rights: () => Promise<TournamentMetadataRights | null>,
+  loadCard: TournamentMetadataCardLoader = getVisibleTournamentCard,
 ): Promise<Metadata> {
   const locale = await requestLocale();
   const messages = messagesFor(locale);
@@ -62,7 +74,7 @@ export async function tournamentPageMetadata(
   // filet, une panne de lecture rendrait la fiche inaccessible au lieu de la
   // laisser afficher son propre message d'erreur.
   const card = await rights()
-    .then((granted) => (granted ? getVisibleTournamentCard(tournamentId, granted) : null))
+    .then((granted) => (granted ? loadCard(tournamentId, granted) : null))
     .catch(() => null);
 
   if (!card) return fallback;

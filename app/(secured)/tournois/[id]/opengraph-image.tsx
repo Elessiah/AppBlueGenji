@@ -3,6 +3,7 @@ import { ShareCard, SHARE_CARD_SIZE, SHARE_CARD_CONTENT_TYPE } from "@/component
 import { shareCardLogo } from "@/lib/server/share-card-logo";
 import { getVisibleTournamentCard } from "@/lib/server/tournaments-service";
 import { SITE_NAME, SITE_SHARE_CARD, tournamentShareCard } from "@/lib/shared/share-metadata";
+import { parseTournamentId } from "@/lib/shared/spectator-view";
 
 /**
  * Image d'aperçu d'un tournoi — la carte qui s'affiche sous le lien partagé.
@@ -36,15 +37,14 @@ export const revalidate = 300;
 
 export default async function Image({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   const { id } = await params;
-  const tournamentId = Number(id);
+  // La règle de lecture des fiches (`parseTournamentId`), la même que la page
+  // et la route publique : elle ne vit qu'à un endroit.
+  const tournamentId = parseTournamentId(id);
 
   // La carte seule, par la lecture légère : l'image ne dessine rien d'autre, et
   // l'instantané entier (matchs, inscrites, classements) coûterait une passe en
   // base à chaque robot d'aperçu.
-  const card =
-    Number.isInteger(tournamentId) && tournamentId > 0
-      ? await getVisibleTournamentCard(tournamentId).catch(() => null)
-      : null;
+  const card = tournamentId === null ? null : await getVisibleTournamentCard(tournamentId).catch(() => null);
 
   const logoSrc = await shareCardLogo();
 

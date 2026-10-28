@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/server/auth";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
+import { publicTournamentSnapshotForRequest } from "@/lib/server/spectator-request";
 import { tournamentPageMetadata } from "@/lib/server/tournament-metadata";
 import { PATHNAME_HEADER, SEARCH_HEADER } from "@/lib/shared/csp";
 import { matchPageIdsFromSpectatorPath, matchPagePath } from "@/lib/shared/match-page";
@@ -36,11 +37,18 @@ type LayoutProps = {
  * Un membre connecté est redirigé vers sa fiche : pour lui, la carte n'est pas
  * lue. La session est mémoïsée pour la requête (`getCurrentUser`), la mise en
  * page la relit sans nouvelle requête. Aucun droit n'est jamais accordé ici.
+ *
+ * La carte vient de la réponse publique mutualisée (`spectator-request.ts`) :
+ * une rafale de F5 ou un lien collé dans un gros salon ne coûte plus une
+ * requête par vue, et la lecture qui suit l'hydratation la trouve prête.
  */
 export async function generateMetadata({ params }: LayoutProps): Promise<Metadata> {
   const { id } = await params;
-  const metadata = await tournamentPageMetadata(id, spectatorTournamentPath, async () =>
-    (await getCurrentUser().catch(() => null)) ? null : { canManage: false },
+  const metadata = await tournamentPageMetadata(
+    id,
+    spectatorTournamentPath,
+    async () => ((await getCurrentUser().catch(() => null)) ? null : { canManage: false }),
+    async (tournamentId) => (await publicTournamentSnapshotForRequest(tournamentId))?.card ?? null,
   );
   return { ...metadata, robots: { index: false, follow: false } };
 }
