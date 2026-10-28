@@ -18,7 +18,7 @@ import styles from "./RefereeDialog.module.css";
 const FIRST_MAP_FIELD_ERRORS = { INVALID_FIRST_MAP: "map" } as const;
 
 /** Geste qui attend sa confirmation : il retire quelqu'un, ou touche toute une manche. */
-type PendingConfirm = "removeReferee" | "selfOn" | "roundOn" | "roundOff";
+type PendingConfirm = "removeReferee" | "selfOn" | "roundOn" | "roundOff" | "objection";
 
 async function send(url: string, method: string, body?: unknown): Promise<unknown> {
   const response = await fetch(url, {
@@ -41,7 +41,8 @@ function refereeStatusText(panel: RefereePanelView, t: ReturnType<typeof useActi
  * Fenêtre « Arbitrage » d'un match, pour le staff (permission `tournaments`) —
  * `docs/features/MATCH_REFEREE.md` : prendre le match, s'en retirer, désigner
  * ou remplacer l'arbitre, passer le match (ou toute sa manche) en
- * autogestion, fixer la première carte. Lue à l'ouverture et après chaque
+ * autogestion, fixer la première carte, retenir ou lever l'opposition d'un
+ * arbitre (`PUT /api/admin/referees/[id]/objection`). Lue à l'ouverture et après chaque
  * geste (`GET /api/admin/matches/[id]/referee`) : l'arbitre n'est nommé que
  * là, jamais dans l'instantané diffusé.
  */
@@ -63,6 +64,7 @@ export function RefereeDialog({
   const titleId = useId();
   const pickId = useId();
   const mapId = useId();
+  const objectionId = useId();
   const [panel, setPanel] = useState<RefereePanelView | null>(null);
   // Échec de lecture : un toast, jamais un message en ligne ; à l'ouverture,
   // la fenêtre se referme (rien à montrer). Ref : `load` reste stable.
@@ -76,6 +78,7 @@ export function RefereeDialog({
   const [busy, setBusy] = useState(false);
   const [pick, setPick] = useState("");
   const [map, setMap] = useState("");
+  const [objectionPick, setObjectionPick] = useState("");
   const [confirm, setConfirm] = useState<PendingConfirm | null>(null);
   // Le contrôle d'un geste est désactivé le temps de l'envoi (le navigateur
   // lâche alors le focus), et un geste retire souvent son propre bouton
@@ -119,12 +122,17 @@ export function RefereeDialog({
     void load(true);
   }, [load]);
 
-  const run = async (request: () => Promise<unknown>, success: string, resetMap = false): Promise<boolean> => {
+  // `success` : le texte du toast, ou sa forme lue sur la réponse (nombre de matchs retirés).
+  const run = async (
+    request: () => Promise<unknown>,
+    success: string | ((payload: unknown) => string),
+    resetMap = false,
+  ): Promise<boolean> => {
     triggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setBusy(true);
     try {
-      await request();
-      showSuccess(success);
+      const payload = await request();
+      showSuccess(typeof success === "string" ? success : success(payload));
       window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
       await load(false, resetMap);
       return true;
@@ -149,6 +157,12 @@ export function RefereeDialog({
   const saveMap = (event: FormEvent) => {
     event.preventDefault();
     void run(() => send(`${base}/first-map`, "PUT", { map: map.trim() === "" ? null : map }), t("cardActions.refereeDialog.mapSaved"), true);
+  };
+  const objectionPseudo = panel?.objectable.find((referee) => String(referee.userId) === objectionPick)?.pseudo ?? "";
+  const objectionUrl = (userId: number | string) => `/api/admin/referees/${userId}/objection`;
+  const upholdObjection = (event: FormEvent) => {
+    event.preventDefault();
+    if (objectionPick !== "") setConfirm("objection");
   };
   const roundBody = (enabled: boolean) =>
     panel ? { phaseId: panel.round.phaseId, roundNumber: panel.round.roundNumber, bracket: panel.round.bracket, enabled } : {};
@@ -186,6 +200,22 @@ export function RefereeDialog({
           () => send(`/api/admin/tournaments/${match.tournamentId}/self-management`, "PUT", roundBody(false)),
           t("cardActions.refereeDialog.roundOff"),
         ),
+    },
+    objection: {
+      title: t("cardActions.refereeDialog.objection.confirm.title", { pseudo: objectionPseudo }),
+      body: t("cardActions.refereeDialog.objection.confirm.body"),
+      confirm: t("cardActions.refereeDialog.objection.confirm.confirm"),
+      action: async () => {
+        const done = await run(
+          () => send(objectionUrl(objectionPick), "PUT", { upheld: true }),
+          (payload) =>
+            t("cardActions.refereeDialog.objection.upheld", {
+              count: Number((payload as { released?: unknown }).released ?? 0),
+            }),
+        );
+        if (done) setObjectionPick("");
+        return done;
+      },
     },
   };
   const pending = confirm === null ? null : confirmations[confirm];
@@ -327,6 +357,59 @@ export function RefereeDialog({
                 </button>
               </form>
             )}
+
+            <div className={styles.body}>
+              <div className={styles.titleRow}>
+                <p className={styles.status}>{t("cardActions.refereeDialog.objection.title")}</p>
+                <InfoHint id={`${objectionId}-hint`} subject={t("cardActions.refereeDialog.objection.title")}>
+                  {t("cardActions.refereeDialog.objection.hint")}
+                </InfoHint>
+              </div>
+              {panel.objections.length > 0 && (
+                <ul className={styles.objections}>
+                  {panel.objections.map((referee) => (
+                    <li key={referee.userId} className={styles.objection}>
+                      <span>{referee.pseudo}</span>
+                      <button
+                        type="button"
+                        className="btn ghost"
+                        disabled={busy}
+                        aria-label={t("cardActions.refereeDialog.objection.liftAria", { pseudo: referee.pseudo })}
+                        onClick={() =>
+                          void run(
+                            () => send(objectionUrl(referee.userId), "PUT", { upheld: false }),
+                            t("cardActions.refereeDialog.objection.lifted"),
+                          )
+                        }
+                      >
+                        {t("cardActions.refereeDialog.objection.lift")}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <form className={styles.row} onSubmit={upholdObjection}>
+                <div className={`field ${styles.control}`}>
+                  <label htmlFor={objectionId}>{t("cardActions.refereeDialog.objection.label")}</label>
+                  <select
+                    id={objectionId}
+                    value={objectionPick}
+                    onChange={(event) => setObjectionPick(event.target.value)}
+                    disabled={busy}
+                  >
+                    <option value="">{t("cardActions.refereeDialog.assignPlaceholder")}</option>
+                    {panel.objectable.map((referee) => (
+                      <option key={referee.userId} value={referee.userId}>
+                        {referee.pseudo}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button type="submit" className="btn ghost" disabled={busy || objectionPick === ""}>
+                  {t("cardActions.refereeDialog.objection.uphold")}
+                </button>
+              </form>
+            </div>
           </div>
         )}
 

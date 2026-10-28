@@ -333,6 +333,21 @@
         "title": "End the round's self-management?",
         "body": "The matches still to play in this round wait again for a referee or a decision.",
         "confirm": "End self-management"
+      },
+      "objection": {
+        "title": "A referee's objection",
+        "hint": "When the staff upholds a referee's objection (report form, GDPR category), that referee is removed from all their unfinished matches and can no longer referee until it is lifted; their played matches keep their referee.",
+        "label": "Uphold the objection of",
+        "uphold": "Uphold the objection",
+        "upheld": "{count, plural, =0 {Objection upheld: no match to remove them from.} =1 {Objection upheld: referee removed from one match.} other {Objection upheld: referee removed from # matches.}}",
+        "lift": "Lift",
+        "liftAria": "Lift {pseudo}'s objection",
+        "lifted": "Objection lifted: they can referee again.",
+        "confirm": {
+          "title": "Uphold {pseudo}'s objection?",
+          "body": "They are removed from all their unfinished matches, in every tournament, and notified; they can no longer referee until the objection is lifted. Then assign another referee to those matches.",
+          "confirm": "Uphold the objection"
+        }
       }
     }
   },

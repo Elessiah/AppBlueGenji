@@ -35,6 +35,7 @@ function sampleExport(): PersonalDataExport {
       recruitmentModalBackOn: false,
       discordCertifyPromptDismissedAt: null,
       certificationPromptDismissedAt: null,
+      refereeObjectionAt: null,
       createdAt: "2026-01-01T00:00:00.000Z",
     },
     profile: {

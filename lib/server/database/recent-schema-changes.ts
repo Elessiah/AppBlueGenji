@@ -346,6 +346,9 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     `ALTER TABLE bg_tournaments ADD COLUMN first_ban_rule ENUM('NON_HOST', 'HOST') NOT NULL DEFAULT 'NON_HOST'`,
     `ALTER TABLE bg_tournaments ADD COLUMN next_ban_rule ENUM('LOSER', 'WINNER') NOT NULL DEFAULT 'LOSER'`,
     `ALTER TABLE bg_tournaments ADD COLUMN next_pick_rule ENUM('LOSER', 'FREE') NOT NULL DEFAULT 'LOSER'`,
+    // Opposition retenue d'un arbitre (`docs/features/MATCH_REFEREE.md`) : plus
+    // aucun arbitrage tant qu'elle n'est pas levée.
+    `ALTER TABLE bg_users ADD COLUMN referee_objection_at DATETIME NULL`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

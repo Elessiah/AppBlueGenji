@@ -47,6 +47,7 @@ const ANONYMIZED_OPTIONAL_COLUMNS = [
   "recruitment_modal_off = 0",
   "discord_certify_prompt_dismissed_at = NULL",
   "certification_prompt_dismissed_at = NULL",
+  "referee_objection_at = NULL",
 ] as const;
 
 /** Remet une colonne du compte supprimé au défaut ; colonne absente = rien à effacer. */

@@ -6,7 +6,7 @@
  * - **toujours** une ligne au journal du staff sur Discord, sans personne
  *   nommée (« un arbitre », « le staff ») et sans ligne nominative dans pm2 ;
  * - **à l'arbitre**, quand un autre que lui retire son arbitrage (staff,
- *   remplacement, autogestion, retrait d'office) : une notification push
+ *   remplacement, autogestion, opposition retenue, retrait d'office) : une notification push
  *   `REFEREE_RELEASED`, avec le motif, dans la langue de son compte. Pas de
  *   message privé Discord.
  *
@@ -27,6 +27,12 @@ export type RefereeChange =
   | { kind: "ASSIGNED"; matchId: number; replacedRefereeId: number | null }
   /** Arbitrage retiré par son arbitre (`byStaff: false`) ou par le staff. */
   | { kind: "RELEASED"; matchId: number; refereeId: number; byStaff: boolean }
+  /**
+   * Arbitrage retiré parce que l'opposition de l'arbitre est retenue par le
+   * staff : le journal dit « retiré par le staff » (rien sur l'opposition),
+   * l'avis à l'arbitre en donne le motif.
+   */
+  | { kind: "OBJECTION_RELEASED"; matchId: number; refereeId: number }
   /** Arbitrage retiré d'office. */
   | { kind: "AUTO_RELEASED"; matchId: number; refereeId: number; reason: "INELIGIBLE" | "JOINED_TEAM" }
   /** Autogestion allumée ou éteinte ; allumée, elle retire l'arbitre (`replacedRefereeId`). */
@@ -45,6 +51,8 @@ export function refereeLogChange(change: RefereeChange): RefereeLogChange {
       return change.replacedRefereeId === null ? "ASSIGNED" : "SWAPPED";
     case "RELEASED":
       return change.byStaff ? "RELEASED_BY_STAFF" : "RELEASED";
+    case "OBJECTION_RELEASED":
+      return "RELEASED_BY_STAFF";
     case "AUTO_RELEASED":
       return change.reason;
     case "SELF_MANAGED":
@@ -66,6 +74,8 @@ export function refereeReleaseNotice(
       return change.replacedRefereeId === null ? null : { refereeId: change.replacedRefereeId, reason: "REPLACED" };
     case "RELEASED":
       return change.byStaff ? { refereeId: change.refereeId, reason: "STAFF" } : null;
+    case "OBJECTION_RELEASED":
+      return { refereeId: change.refereeId, reason: "OBJECTION" };
     case "AUTO_RELEASED":
       return { refereeId: change.refereeId, reason: change.reason };
     case "SELF_MANAGED":

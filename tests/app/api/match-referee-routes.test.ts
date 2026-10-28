@@ -50,6 +50,8 @@ const PANEL: RefereePanel = {
   round: { phaseId: 0, roundNumber: 1, bracket: "UPPER" },
   roundSlots: [],
   candidates: [{ userId: 3, pseudo: "Arbitre" }],
+  objections: [],
+  objectable: [{ userId: 3, pseudo: "Arbitre" }],
 };
 
 beforeEach(() => {

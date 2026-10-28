@@ -927,7 +927,7 @@ export function castReleasedPush(input: CastReleasedMatch, locale: Locale = DEFA
 }
 
 /** Motif du retrait d'un arbitre désigné (`REFEREE_RELEASED`). */
-export type RefereeReleaseReason = "STAFF" | "REPLACED" | "SELF_MANAGED" | "INELIGIBLE" | "JOINED_TEAM";
+export type RefereeReleaseReason = "STAFF" | "REPLACED" | "SELF_MANAGED" | "OBJECTION" | "INELIGIBLE" | "JOINED_TEAM";
 
 /** Le match dont l'arbitrage est retiré, et pourquoi. */
 export type RefereeReleasedMatch = {

@@ -168,6 +168,7 @@
       "STAFF": "staff decision",
       "REPLACED": "the staff gave it to another referee",
       "SELF_MANAGED": "the staff switched it to self-management",
+      "OBJECTION": "the staff upheld your objection to refereeing",
       "INELIGIBLE": "you no longer meet the refereeing requirements",
       "JOINED_TEAM": "you now play this match"
     }

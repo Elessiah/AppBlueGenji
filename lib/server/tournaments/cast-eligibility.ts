@@ -16,6 +16,7 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { castBlockReason, type CastBlock, type CasterIdentity } from "@/lib/shared/match-launch";
 import { refereeBlockReason, type RefereeBlock } from "@/lib/shared/match-referee";
 import { can, sanitizePlatformRoles } from "@/lib/shared/permissions";
+import { isUnknownColumnError } from "@/lib/server/mysql-errors";
 
 type CasterIdentityFields = {
   discord_verified_at: Date | string | null;
@@ -114,4 +115,24 @@ export async function loadEligibleRefereeIds(
     ids,
   );
   return new Set(rows.filter((row) => refereeEligibilityBlock(row) === null).map((row) => Number(row.id)));
+}
+
+/**
+ * L'opposition d'arbitre de ce compte est-elle retenue
+ * (`bg_users.referee_objection_at`, `docs/features/MATCH_REFEREE.md`) ? Elle
+ * lui ferme tout arbitrage. `lock` : lecture verrouillée en partage — celle
+ * d'une désignation, que l'écriture exclusive de l'opposition sérialise. Une
+ * colonne absente (son `ALTER` a échoué) ne retient rien.
+ */
+export async function refereeObjectionUpheld(executor: Executor, userId: number, lock = false): Promise<boolean> {
+  try {
+    const [rows] = await executor.execute<(RowDataPacket & { referee_objection_at: Date | string | null })[]>(
+      `SELECT referee_objection_at FROM bg_users WHERE id = ? LIMIT 1${lock ? " LOCK IN SHARE MODE" : ""}`,
+      [userId],
+    );
+    return (rows[0]?.referee_objection_at ?? null) !== null;
+  } catch (error) {
+    if (isUnknownColumnError(error)) return false;
+    throw error;
+  }
 }

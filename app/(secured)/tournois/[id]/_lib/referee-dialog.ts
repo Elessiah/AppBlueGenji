@@ -13,10 +13,17 @@ export type RefereePanelView = {
   /** Cartes réglées pour la manche : vides sans réglage (saisie par match ouverte). */
   roundSlots: ReadonlyArray<ReadonlyArray<string>>;
   candidates: ReadonlyArray<{ userId: number; pseudo: string }>;
+  /** Arbitres dont l'opposition est retenue (`MATCH_REFEREE.md`). */
+  objections: ReadonlyArray<{ userId: number; pseudo: string }>;
+  /** Arbitres dont l'opposition peut être retenue. */
+  objectable: ReadonlyArray<{ userId: number; pseudo: string }>;
 };
 
 export type RefereeDialogActions = {
-  /** Prendre le match : personne ne l'arbitre, ou son arbitre ne le peut plus. */
+  /**
+   * Prendre le match : personne ne l'arbitre, ou son arbitre ne le peut plus —
+   * jamais pour un lecteur dont l'opposition est retenue.
+   */
   take: boolean;
   /** Se retirer : le lecteur est l'arbitre du match. */
   releaseSelf: boolean;
@@ -30,7 +37,10 @@ export function refereeDialogActions(panel: RefereePanelView, viewerUserId: numb
   const current = panel.referee;
   const mine = current !== null && current.userId === viewerUserId;
   return {
-    take: !mine && (current === null || !current.eligible),
+    take:
+      !mine &&
+      (current === null || !current.eligible) &&
+      !panel.objections.some((objection) => objection.userId === viewerUserId),
     releaseSelf: mine,
     removeOther: current !== null && !mine,
     candidates: panel.candidates.filter((candidate) => candidate.userId !== current?.userId),

@@ -192,6 +192,8 @@ describe("fenêtre « Arbitrage » : gestes offerts", () => {
       { userId: 1, pseudo: "Moi" },
       { userId: 2, pseudo: "Autre" },
     ],
+    objections: [],
+    objectable: [],
   });
 
   it("sans arbitre : prendre le match, tout compte désignable", () => {

@@ -1075,6 +1075,8 @@ export type PersonalDataExport = {
     discordCertifyPromptDismissedAt: string | null;
     /** « Ne plus voir » coché sur l'invitation à certifier de la fiche tournoi (ISO), sinon `null`. */
     certificationPromptDismissedAt: string | null;
+    /** Opposition d'arbitre retenue par le staff (ISO), sinon `null` (`MATCH_REFEREE.md`). */
+    refereeObjectionAt: string | null;
     createdAt: string;
   };
   profile: {
