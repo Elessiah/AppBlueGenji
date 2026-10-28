@@ -46,7 +46,7 @@ export const STREAM_NOTICE_OBJECTION_EN =
 
 /** `STREAM_NOTICE_LIVE` (`stream-notice.ts`). */
 export const STREAM_NOTICE_LIVE_EN =
-  "When a streamed match starts, an announcement posted in the #live channel of the association's Discord names the teams and, in a solo tournament, the players by their public username. That announcement is part of the solo tournament the player registers for (performance of the service, not legitimate interest): the neutral name does not apply to it, and a player who does not want to be named in it does not register for the solo tournament. An announcement is deleted on request, through the same button.";
+  "Streamed matches are announced in the #live channel of the association's Discord, by an evening message that lists each match at its time — before it starts if it is scheduled that evening, while it is streamed, then once finished, with its score — and that names the teams and, in a solo tournament, the players by their public username. That announcement is part of the solo tournament the player registers for (performance of the service, not legitimate interest): the neutral name does not apply to it, and a player who does not want to be named in it does not register for the solo tournament. An announcement is deleted on request, through the same button.";
 
 /** `AUTHORITY_CONTACT_LANGUAGES` (`legal-contact.ts`), same order. */
 export const AUTHORITY_CONTACT_LANGUAGES_EN: readonly string[] = ["French", "English"];

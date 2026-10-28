@@ -67,8 +67,26 @@ import { STREAM_NOTICE_LIVE, STREAM_NOTICE_OBJECTION, STREAM_NOTICE_PRIVACY_PATH
  * que les deux adversaires sont connus, sans nouvelle version (décision de
  * l'utilisateur : seuls les casters, membres du staff, sont concernés),
  * annoncé par sa propre entrée de `PRIVACY_CHANGES`.
+ *
+ * Version 7 : section « Contacts de match » — un match a des casters, au
+ * pluriel (les contacts de chaque caster vont aussi aux autres casters du
+ * match), et peut avoir un arbitre désigné, dont le pseudo et le BattleTag
+ * (même masqué) sont communiqués aux parties du match au titre de
+ * l'organisation du tournoi : la base de cette présentation passe de
+ * l'intérêt légitime, retenu jusque-là faute de clause, à l'exécution du
+ * contrat (décision de l'utilisateur du 2026-10-27) ; la page du match
+ * s'ajoute aux fenêtres « Contacts » et de lancement comme lieu où se lisent
+ * les contacts des casters et le BattleTag de l'arbitre désigné. Section
+ * « Acceptation » — le compte se supprime aussi directement depuis la fenêtre
+ * d'acceptation. Section « Retransmission des matchs » (`STREAM_NOTICE_LIVE`)
+ * — le message #live de la soirée nomme les joueurs d'un tournoi individuel
+ * avant le début d'un match programmé et après sa fin, pas seulement à son
+ * départ. La version 6, déjà en ligne, ne se réécrit pas : d'où une nouvelle
+ * version, annoncée par sa propre entrée de `PRIVACY_CHANGES`
+ * (`2026-10-conditions-v7-casters-et-arbitre`) ; en vigueur au 29 octobre 2026,
+ * date de la mise en ligne prévue (nuit du 28 au 29 octobre).
  */
-export const TERMS_VERSION = 6;
+export const TERMS_VERSION = 7;
 
 /** Âge minimum pour créer un compte (défini dans `lib/shared/legal-durations.ts`). */
 export { SITE_MINIMUM_AGE };
@@ -81,7 +99,7 @@ export { SITE_MINIMUM_AGE };
 export const TERMS_AGE_DECLARATION = `je déclare avoir au moins ${SITE_MINIMUM_AGE} ans`;
 
 /** Date d'entrée en vigueur de la version courante (AAAA-MM-JJ). */
-export const TERMS_UPDATED_AT = "2026-10-19";
+export const TERMS_UPDATED_AT = "2026-10-29";
 
 /** Adresse de la page publique des conditions. */
 export const TERMS_PATH = "/conditions-utilisation";
@@ -217,7 +235,7 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
     id: "acceptation",
     title: "Acceptation",
     paragraphs: [
-      "Les conditions s'acceptent en **créant un compte**, en **créant une équipe** et en **recevant la gestion d'une équipe** (propriété transférée ou rôle de gérant), ainsi qu'en les acceptant sur la **page de connexion**, qui les présente tant qu'elles n'ont pas été acceptées dans le navigateur, ou dans la **fenêtre d'acceptation** présentée à tout compte connecté qui n'a pas accepté la version en vigueur. Sans cette acceptation, le compte ne peut pas être créé, l'équipe ne peut pas être gérée, et un compte existant ne peut continuer à utiliser le site qu'après les avoir acceptées — il peut toujours se déconnecter, lire les pages légales du site et du bot (politique de confidentialité, mentions légales, déclaration d'accessibilité) et les règles des tournois, suivre ou contester ses signalements depuis leur page, signaler un contenu par le bouton « Signaler un problème » de ces pages, et ouvrir son profil, notamment pour exporter ses données ou supprimer son compte. Ne pas les accepter ne retire le compte ni de ses équipes ni de ses inscriptions : ses contacts restent communiqués aux parties de ses matchs et les messages de match continuent ; pour y mettre fin sans les accepter, il peut supprimer son compte depuis son profil.",
+      "Les conditions s'acceptent en **créant un compte**, en **créant une équipe** et en **recevant la gestion d'une équipe** (propriété transférée ou rôle de gérant), ainsi qu'en les acceptant sur la **page de connexion**, qui les présente tant qu'elles n'ont pas été acceptées dans le navigateur, ou dans la **fenêtre d'acceptation** présentée à tout compte connecté qui n'a pas accepté la version en vigueur. Sans cette acceptation, le compte ne peut pas être créé, l'équipe ne peut pas être gérée, et un compte existant ne peut continuer à utiliser le site qu'après les avoir acceptées — il peut toujours se déconnecter, lire les pages légales du site et du bot (politique de confidentialité, mentions légales, déclaration d'accessibilité) et les règles des tournois, suivre ou contester ses signalements depuis leur page, signaler un contenu par le bouton « Signaler un problème » de ces pages, et ouvrir son profil, notamment pour exporter ses données ou supprimer son compte. Ne pas les accepter ne retire le compte ni de ses équipes ni de ses inscriptions : ses contacts restent communiqués aux parties de ses matchs et les messages de match continuent ; pour y mettre fin sans les accepter, il peut supprimer son compte depuis son profil ou directement depuis la fenêtre d'acceptation.",
       "L'association peut modifier ces conditions. Une modification de fond donne lieu à une **nouvelle version**, présentée à l'acceptation de chaque compte connecté avant qu'il puisse continuer à utiliser le site.",
     ],
   },
@@ -255,7 +273,9 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
   // et à la politique de confidentialité), sans changer `TERMS_VERSION`. La règle
   // de l'annonce #live d'un tournoi individuel (`STREAM_NOTICE_LIVE`), elle, a
   // fait passer les conditions en version 4 (décision du 2026-10-14) : une
-  // modification de fond de cet article demande une nouvelle version.
+  // modification de fond de cet article demande une nouvelle version — ainsi
+  // en version 7, le message de la soirée qui nomme aussi les joueurs avant et
+  // après le match.
   {
     id: "retransmission",
     title: "Retransmission des matchs",
@@ -265,16 +285,19 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
     ],
     links: [{ href: STREAM_NOTICE_PRIVACY_PATH, label: "Politique de confidentialité — retransmission des matchs" }],
   },
-  // Version 5 (2026-10-19, précisée en version 6 : fenêtre de lancement) : la
-  // base « exécution du contrat » des contacts de
-  // match (registre T04, `/rgpd`) renvoie à cette section. Elle suit le code :
-  // `match-launch-info.ts` (qui, quand) et `battletag-visibility.ts`.
+  // Version 5 (2026-10-19, précisée en version 6 : fenêtre de lancement ; en
+  // version 7 : plusieurs casters, arbitre désigné, page du match) : la base
+  // « exécution du contrat » des contacts de match et de la présentation de
+  // l'arbitre désigné (registre T01 et T04, `/rgpd`) renvoie à cette section.
+  // Elle suit le code : `match-launch-info.ts` (qui, quand),
+  // `battletag-visibility.ts` et `lib/shared/match-referee.ts`.
   {
     id: "contacts-de-match",
     title: "Contacts de match",
     paragraphs: [
-      "Pour qu'un match de tournoi se joue, ses parties doivent pouvoir se joindre et s'ajouter en jeu. Au titre de l'organisation du tournoi, les **coordonnées de contact** d'un ou deux membres de chaque équipe — **tag Discord** certifié, **BattleTag**, **même masqué**, et **rôle d'équipe** — sont communiquées aux **membres des deux équipes** du match et aux **arbitres** (administrateurs compris), dès que ses deux adversaires sont connus et jusqu'à sa fin, et à son **caster** inscrit **le temps du match** seulement, de son départ à sa fin ; celles du caster le sont aux deux équipes sur ce même temps du match, et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin (en vigueur depuis le 21 octobre 2026 : auparavant, aux arbitres aussi le temps du match seulement).",
-      "Ce partage passe par la seule fenêtre « Contacts » du match et par sa fenêtre de lancement, qui la reprend au départ du match : un BattleTag masqué n'est lisible nulle part ailleurs sur le site, pour personne — arbitres et administrateurs compris. Le jeu, lui, affiche les identifiants de jeu des joueurs : le code de replay d'une map, visible de tout utilisateur connecté sur la fiche du tournoi, permet de revoir la partie et de les y lire. Masquer son BattleTag ne le retire donc pas de ces fenêtres : pour ne pas le communiquer, il faut le retirer de son profil (un BattleTag reçu de Battle.net ne s'efface qu'une fois le compte Battle.net détaché, ce qui suppose un autre moyen de connexion). Un tag Discord non certifié n'est jamais communiqué.",
+      "Pour qu'un match de tournoi se joue, ses parties doivent pouvoir se joindre et s'ajouter en jeu. Au titre de l'organisation du tournoi, les **coordonnées de contact** d'un ou deux membres de chaque équipe — **tag Discord** certifié, **BattleTag**, **même masqué**, et **rôle d'équipe** — sont communiquées aux **membres des deux équipes** du match et aux **arbitres** (administrateurs compris), dès que ses deux adversaires sont connus et jusqu'à sa fin, et à ses **casters** inscrits — un match peut en avoir plusieurs — **le temps du match** seulement, de son départ à sa fin ; celles de chaque caster le sont aux deux équipes et aux **autres casters** du match sur ce même temps du match, et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin (en vigueur depuis le 21 octobre 2026 : auparavant, aux arbitres aussi le temps du match seulement).",
+      "Un match peut aussi avoir un **arbitre désigné** : une personne du staff habilitée à arbitrer (permission d'arbitrage, tag Discord certifié et compte Battle.net rattaché), qui prend le match ou à qui le staff le confie. Au titre de cette même organisation, son **pseudo** et son **BattleTag**, **même masqué** — jamais son tag Discord — sont communiqués aux membres des deux équipes et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, et aux casters du match le temps du match ; son pseudo seul, sans le BattleTag, se lit dès que la fenêtre de lancement montre le match. Le public et les autres joueurs ne lisent que « Arbitre désigné ». L'arbitre peut se retirer d'un match à tout moment, le staff pouvant le lui confier de nouveau ; il n'est plus présenté s'il ne remplit plus ces conditions ou s'il joue désormais le match.",
+      "Ce partage passe par la fenêtre « Contacts » du match, par sa fenêtre de lancement, qui la reprend au départ du match et ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné, et par la **page du match**, qui reprend les contacts des casters et le BattleTag de l'arbitre désigné — jamais les contacts des équipes — aux mêmes personnes et aux mêmes moments que la fenêtre « Contacts » : un BattleTag masqué n'est lisible nulle part ailleurs sur le site, pour personne — arbitres et administrateurs compris. Le jeu, lui, affiche les identifiants de jeu des joueurs : le code de replay d'une map, visible de tout utilisateur connecté sur la fiche du tournoi, permet de revoir la partie et de les y lire. Masquer son BattleTag ne le retire donc ni de ces fenêtres ni de cette page : pour ne pas le communiquer, il faut le retirer de son profil (un BattleTag reçu de Battle.net ne s'efface qu'une fois le compte Battle.net détaché, ce qui suppose un autre moyen de connexion). Un tag Discord non certifié n'est jamais communiqué.",
     ],
     links: [{ href: "/rgpd#donnees-collectees", label: "Politique de confidentialité — données collectées" }],
   },

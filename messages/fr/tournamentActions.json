@@ -65,8 +65,8 @@
   },
   "register": {
     "streamNotice": {
-      "TEAM": "Les matchs de ce tournoi peuvent être diffusés en direct et enregistrés, avec ton pseudo, le nom de ton équipe et tes résultats en jeu — jamais de webcam ni de chat vocal. Tu peux t'y opposer et apparaître sous un nom neutre. Au début d'un match diffusé, le nom de ton équipe est aussi annoncé sur le Discord de l'association.",
-      "SOLO": "Les matchs de ce tournoi peuvent être diffusés en direct et enregistrés, avec ton pseudo et tes résultats en jeu — jamais de webcam ni de chat vocal. Tu peux t'y opposer et apparaître sous un nom neutre. Au début d'un match diffusé, ton pseudo est aussi annoncé sur le Discord de l'association : cette annonce fait partie du tournoi auquel tu t'inscris, le nom neutre ne s'y applique pas, et elle est supprimée sur demande."
+      "TEAM": "Les matchs de ce tournoi peuvent être diffusés en direct et enregistrés, avec ton pseudo, le nom de ton équipe et tes résultats en jeu — jamais de webcam ni de chat vocal. Tu peux t'y opposer et apparaître sous un nom neutre. Au début d'un match diffusé — et avant, s'il est programmé dans la soirée, puis une fois terminé —, le nom de ton équipe est aussi annoncé sur le Discord de l'association.",
+      "SOLO": "Les matchs de ce tournoi peuvent être diffusés en direct et enregistrés, avec ton pseudo et tes résultats en jeu — jamais de webcam ni de chat vocal. Tu peux t'y opposer et apparaître sous un nom neutre. Au début d'un match diffusé — et avant, s'il est programmé dans la soirée, puis une fois terminé —, ton pseudo est aussi annoncé sur le Discord de l'association : cette annonce fait partie du tournoi auquel tu t'inscris, le nom neutre ne s'y applique pas, et elle est supprimée sur demande."
     },
     "streamNoticeLink": "En savoir plus",
     "notManager": "Seuls le propriétaire et les managers de ton équipe peuvent l'inscrire à un tournoi.",
