@@ -417,6 +417,26 @@ describe("privacyChangesForOneMessage", () => {
     expect(privacyChangesForOneMessage([], null)).toEqual([]);
   });
 
+  // EF-19 : des conditions à accepter partent toujours dans le premier message.
+  it("privacyChangesForOneMessage_termsToAcceptAfterLongChanges_putsTheTermsFirstInBothLanguages", () => {
+    const terms = change("conditions", "2026-01-20", { asksTermsAcceptance: true });
+    const fr = [long("a"), long("b"), long("c"), terms];
+    const en = fr.map((entry) => ({ ...entry, summary: `${entry.summary} (en)` }));
+
+    const batch = privacyChangesForOneMessage(fr, "https://bluegenji.fr", en);
+
+    expect(batch.map((c) => c.id)).toEqual(["conditions", "a"]);
+    expect(buildPrivacyChangesMessage(batch, "https://bluegenji.fr")).toContain("Seules les nouvelles conditions d'utilisation demandent ton accord");
+  });
+
+  it("privacyChangesForOneMessage_realRegistryDueSinceOct29_firstMessageCarriesTheV7Terms", () => {
+    const due = PRIVACY_CHANGES.filter((entry) => entry.publishedAt === "2026-10-29");
+
+    const batch = privacyChangesForOneMessage(due, "https://bluegenji.fr", localizedPrivacyChanges(due, "en"));
+
+    expect(batch[0]?.id).toBe("2026-10-conditions-v7-casters-et-arbitre");
+  });
+
   it("avec l'anglais, le lot doit tenir dans les deux langues (BOT-NOTIF-LANG)", () => {
     const fr = [long("a"), long("b"), long("c")];
     // Les mêmes changements, plus longs en anglais : seuls deux tiennent ensemble.
@@ -434,9 +454,10 @@ describe("privacyChangesForOneMessage", () => {
     while (rest.length > 0) {
       const english = localizedPrivacyChanges(rest, "en");
       const batch = privacyChangesForOneMessage(rest, "https://bluegenji.fr", english);
-      const message = buildPrivacyChangesMessage(english.slice(0, batch.length), "https://bluegenji.fr", "en");
-      for (const entry of english.slice(0, batch.length)) expect(message).toContain(entry.title);
-      rest = rest.slice(batch.length);
+      const englishBatch = localizedPrivacyChanges(batch, "en");
+      const message = buildPrivacyChangesMessage(englishBatch, "https://bluegenji.fr", "en");
+      for (const entry of englishBatch) expect(message).toContain(entry.title);
+      rest = rest.filter((entry) => !batch.includes(entry));
     }
   });
 
@@ -446,7 +467,7 @@ describe("privacyChangesForOneMessage", () => {
       const batch = privacyChangesForOneMessage(rest, "https://bluegenji.fr");
       const message = buildPrivacyChangesMessage(batch, "https://bluegenji.fr");
       for (const entry of batch) expect(message).toContain(entry.title);
-      rest = rest.slice(batch.length);
+      rest = rest.filter((entry) => !batch.includes(entry));
     }
   });
 });
@@ -1734,7 +1755,7 @@ describe("PRIVACY_CHANGES — arbitre désigné des matchs (MATCH-REFEREE MR-2)"
     // EF-19 : arbitre qui caste aussi le match, désignation et remplacement notés au journal (`refereeLogChange`).
     expect(fr).toContain("jamais son tag Discord à ce titre (s'il caste aussi le match, ses contacts de caster suivent la règle des casters)");
     expect(en).toContain("never their Discord tag in that capacity (if they also cast the match, their caster contacts follow the casters' rule)");
-    expect(fr).toContain("La prise d'un match, la désignation ou le remplacement de son arbitre par le staff, le retrait de l'arbitrage, l'autogestion, la première carte et les cartes choisies dans le pool du round sont notés");
+    expect(fr).toContain("La prise d'un match, la désignation ou le remplacement de son arbitre par le staff, le retrait de l'arbitrage, l'autogestion, la première carte et les cartes choisies dans le pool de la manche sont notés");
     expect(en).toContain("Taking a match, the staff assigning or replacing its referee, the removal of the refereeing, self-management, the first map and the maps picked from the round's pool are noted");
     expect(english.details).toHaveLength(entry.details.length);
     expect(english.linkLabels).toHaveLength(1);
