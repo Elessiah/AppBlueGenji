@@ -48,6 +48,7 @@ export function bracketMatch(overrides: Partial<BracketMatch> = {}): BracketMatc
     refereeReady: false,
     selfManaged: false,
     firstMap: null,
+    mapPicks: {},
     casters: [],
     lobbyOpenedAt: null,
     launchedAt: null,

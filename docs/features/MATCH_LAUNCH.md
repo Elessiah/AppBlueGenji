@@ -492,7 +492,7 @@ Changement déclaré dans `PRIVACY_CHANGES` (`2026-09-lancement-des-matchs`),
   confidentialité dû soit fait (`launchModalWaits`, signal
   `PRIVACY_CHANGES_ANSWERED_EVENT`) : ouvertes ensemble, la modale de lancement,
   empilée en dernier, prenait le piège de focus sous l'autre. Sur téléphone,
-  la barre d'actions (« Prêt », « Voir le match » — la page du match,
+  la barre d'actions (« Prêt », « Page du match » — la page du match,
   `MATCH_PAGE.md` —, « Fermer ») et la
   confirmation restent **au bas** de la modale, hors de la zone qui défile (une
   `ScrollArea` porte en-tête, fiches et notifications) : les fiches contacts la

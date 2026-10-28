@@ -697,6 +697,11 @@ export const LAUNCH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   MATCH_ALREADY_REFEREED: "Ce match a déjà un arbitre.",
   NOT_MATCH_REFEREE: "Tu n'arbitres pas ce match.",
   INVALID_FIRST_MAP: "Nom de carte invalide (64 caractères au plus).",
+  INVALID_ROUND: "Manche invalide.",
+  INVALID_ROUND_MAPS: "Cartes invalides : 9 cartes au plus par manche, 20 au plus par pool, 64 caractères par nom.",
+  INVALID_MAP_RULES: "Règle de ban invalide.",
+  INVALID_MAP_PICK: "Cette carte ne fait pas partie du pool de la manche.",
+  NOT_MAP_PICKER: "Seuls l'arbitrage et, en autogestion, les équipes du match choisissent la carte.",
 };
 
 /** Message français d'un refus du lancement. */

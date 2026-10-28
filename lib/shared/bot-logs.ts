@@ -624,7 +624,10 @@ export type RefereeLogChange =
   | "SELF_MANAGED_ON"
   | "SELF_MANAGED_OFF"
   | "FIRST_MAP_SET"
-  | "FIRST_MAP_CLEARED";
+  | "FIRST_MAP_CLEARED"
+  | "MAP_PICKED"
+  | "MAP_PICKED_BY_TEAM"
+  | "MAP_PICK_CLEARED";
 
 const REFEREE_LOG_WORDING: Record<RefereeLogChange, { kind: string; detail: string }> = {
   TAKEN: { kind: "Arbitre désigné", detail: "un arbitre prend le match" },
@@ -641,6 +644,9 @@ const REFEREE_LOG_WORDING: Record<RefereeLogChange, { kind: string; detail: stri
   SELF_MANAGED_OFF: { kind: "Autogestion désactivée", detail: `par ${ANONYMOUS_STAFF_LABEL}` },
   FIRST_MAP_SET: { kind: "Première carte réglée", detail: `par ${ANONYMOUS_STAFF_LABEL}` },
   FIRST_MAP_CLEARED: { kind: "Première carte retirée", detail: `par ${ANONYMOUS_STAFF_LABEL}` },
+  MAP_PICKED: { kind: "Carte choisie dans le pool", detail: `par ${ANONYMOUS_STAFF_LABEL}` },
+  MAP_PICKED_BY_TEAM: { kind: "Carte choisie dans le pool", detail: "par une équipe du match (autogestion)" },
+  MAP_PICK_CLEARED: { kind: "Choix de carte retiré", detail: "le pool reste ouvert" },
 };
 
 /**
@@ -679,6 +685,36 @@ export function formatRoundSelfManagementLog(context: {
   const plural = context.count > 1 ? "s" : "";
   const kind = context.enabled ? "Autogestion activée" : "Autogestion désactivée";
   return `${lead("🧑‍⚖️", kind, context.tournament)} : ${context.roundLabel} — ${context.count} match${plural}, par ${ANONYMOUS_STAFF_LABEL}.`;
+}
+
+/**
+ * Cartes d'une manche réglées ou retirées (`docs/features/ROUND_MAPS.md`) :
+ * une ligne pour la manche, sans nommer le staff ni les cartes (la page du
+ * match les dit).
+ */
+export function formatRoundMapsLog(context: {
+  tournament: BotLogTournament;
+  roundLabel: string;
+  /** Créneaux retenus ; 0 = réglage retiré. */
+  slots: number;
+  /** Dont imposés (une seule carte). */
+  imposed: number;
+}): string {
+  if (context.slots === 0) {
+    return `${lead("🗺️", "Cartes de manche retirées", context.tournament)} : ${context.roundLabel}, par ${ANONYMOUS_STAFF_LABEL}.`;
+  }
+  const plural = context.slots > 1 ? "s" : "";
+  const pools = context.slots - context.imposed;
+  return (
+    `${lead("🗺️", "Cartes de manche réglées", context.tournament)} : ${context.roundLabel} — ` +
+    `${context.slots} carte${plural} (${context.imposed} imposée${context.imposed > 1 ? "s" : ""}, ` +
+    `${pools} pool${pools > 1 ? "s" : ""}), par ${ANONYMOUS_STAFF_LABEL}.`
+  );
+}
+
+/** Règles de ban et de choix des cartes d'un tournoi modifiées. */
+export function formatMapRulesLog(context: { tournament: BotLogTournament }): string {
+  return `${lead("🗺️", "Règles de ban modifiées", context.tournament)}, par ${ANONYMOUS_STAFF_LABEL}.`;
 }
 
 /**

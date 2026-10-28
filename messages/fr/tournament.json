@@ -278,8 +278,8 @@
     "champion": "🏆 Championne —",
     "moreStreams": "+{count}",
     "moreStreamsLabel": "+{count} : les autres streams de {match}",
-    "viewMatch": "Voir le match",
-    "viewMatchLabel": "Voir le match : {match}"
+    "viewMatch": "Page du match",
+    "viewMatchLabel": "Page du match : {match}"
   },
   "launch": {
     "toPlan": "À planifier",

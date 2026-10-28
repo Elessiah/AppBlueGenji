@@ -190,7 +190,7 @@
   color: var(--ink-mute);
 }
 
-/* « Voir le match » : vers la page du match (`MATCH_PAGE.md`). */
+/* « Page du match » : vers la page du match (`MATCH_PAGE.md`). */
 .pageLink {
   margin: 0;
   padding: 4px 12px;

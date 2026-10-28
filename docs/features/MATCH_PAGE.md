@@ -39,7 +39,7 @@ fiche.
 ## Ce qu'elle montre
 
 1. **Le match** : la carte du plateau (`MatchRow`), tous ses gestes compris.
-   Sous la page, la carte tait ses liens vers la page elle-même (« Voir le
+   Sous la page, la carte tait ses liens vers la page elle-même (« Page du
    match », « +N » des streams) — contexte `MatchPageScope`.
 2. **La partie** : les deux côtés, **hôte à gauche** (« Hôte : crée la partie »),
    l'autre à droite (`matchPageSides`) ; la première map — le staff (permission
@@ -80,9 +80,9 @@ leur version 7 (TERMS v7) : la page ne se déploie qu'avec elle.
 
 ## Liens vers la page
 
-- La carte d'un match : « Voir le match » (tu sur une exemption) et, quand le
+- La carte d'un match : « Page du match » (tu sur une exemption) et, quand le
   match a plusieurs streams, « +N » après le premier lien (`MatchLiveStrip`).
-- La fenêtre de lancement : « Voir le match ».
+- La fenêtre de lancement : « Page du match ».
 - L'ancre `#match-<id>` de la fiche reste valable (retour de la page).
 
 ## Texte des liens de diffusion
@@ -103,5 +103,5 @@ libellé : ce sont des appels à l'action, pas des liens de match.
 `tests/app/match-page-route.test.ts` (404, tournoi non publié, base en panne,
 encart, `/en`), `tests/tournois/match-page-render.test.tsx` (matrice arbitre /
 autogestion / sans décision × public / membre / joueur / staff / caster, streams,
-contacts demandés, « Voir le match », « +N »), `tests/app/spectator-view.test.tsx`
+contacts demandés, « Page du match », « +N »), `tests/app/spectator-view.test.tsx`
 (redirections).

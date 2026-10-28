@@ -340,6 +340,12 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // « Ne plus voir » de l'invitation à certifier de la fiche tournoi, gardé
     // sur le compte et non plus dans le navigateur (`CERTIFICATION_PROMPT.md`).
     `ALTER TABLE bg_users ADD COLUMN certification_prompt_dismissed_at DATETIME NULL`,
+    // Cartes par manche et règles de ban (`docs/features/ROUND_MAPS.md`) ; la
+    // table `bg_tournament_round_maps` est neuve, son `CREATE TABLE` suffit.
+    `ALTER TABLE bg_matches ADD COLUMN map_picks TEXT NULL AFTER first_map`,
+    `ALTER TABLE bg_tournaments ADD COLUMN first_ban_rule ENUM('NON_HOST', 'HOST') NOT NULL DEFAULT 'NON_HOST'`,
+    `ALTER TABLE bg_tournaments ADD COLUMN next_ban_rule ENUM('LOSER', 'WINNER') NOT NULL DEFAULT 'LOSER'`,
+    `ALTER TABLE bg_tournaments ADD COLUMN next_pick_rule ENUM('LOSER', 'FREE') NOT NULL DEFAULT 'LOSER'`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

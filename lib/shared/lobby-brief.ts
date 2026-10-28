@@ -22,6 +22,7 @@ import { localizedSiteUrl } from "./dm-language";
 import type { Locale } from "./locales";
 import type { RefereeDecision } from "./match-referee";
 import { pushRoundLabel } from "./push-messages";
+import type { NextBanRule, NextPickRule, ResolvedMapSlot } from "./round-maps";
 
 /** Ce que le brief dit d'un match, vu d'une des deux engagées. */
 export type LobbyBriefSide = {
@@ -36,10 +37,16 @@ export type LobbyBriefSide = {
   /** L'engagée du destinataire. */
   teamName: string;
   opponentName: string;
-  /** L'engagée du destinataire héberge-t-elle (gauche) ? Sinon elle joue à droite et bannit la première. */
+  /** L'engagée du destinataire héberge-t-elle (gauche) ? */
   hosting: boolean;
-  /** Première carte posée par le staff, texte libre ; `null` tant qu'elle ne l'est pas. */
+  /** L'engagée du destinataire bannit-elle la première sur la carte 1 (règle du tournoi) ? */
+  banFirst: boolean;
+  /** Première carte affichée (l'imposée de la manche l'emporte) ; `null` tant qu'elle n'est pas fixée. */
   firstMap: string | null;
+  /** Cartes de la manche (`ROUND_MAPS.md`), vide sans réglage : on garde alors la seule première carte. */
+  maps: ResolvedMapSlot[];
+  nextBan: NextBanRule;
+  nextPick: NextPickRule;
   /** Au moins un caster inscrit (et éligible) : rappel du tri par rôle. */
   cast: boolean;
   decision: RefereeDecision;
@@ -49,8 +56,11 @@ function quoted(value: string, locale: Locale): string {
   return locale === "en" ? `“${discordInline(value)}”` : `« ${discordInline(value)} »`;
 }
 
-/** Les noms à écrire, par place : les équipes entre guillemets, « toi » / « ton adversaire » en individuel. */
-export type LobbyBriefNames = { left: string; right: string; ban: string };
+/**
+ * Les noms à écrire, par place : les équipes entre guillemets, « toi » / « ton
+ * adversaire » en individuel. `ban` bannit en premier sur la carte 1, `banNext` ensuite.
+ */
+export type LobbyBriefNames = { left: string; right: string; ban: string; banNext: string };
 
 const SOLO_NAMES: Readonly<Record<Locale, { own: string; other: string }>> = {
   fr: { own: "toi", other: "ton adversaire" },
@@ -58,8 +68,9 @@ const SOLO_NAMES: Readonly<Record<Locale, { own: string; other: string }>> = {
 };
 
 /**
- * Qui joue à gauche (l'hôte), à droite, et qui bannit le premier (celle qui
- * n'héberge pas). `quote` met un nom d'équipe en forme pour son canal.
+ * Qui joue à gauche (l'hôte), à droite, et l'ordre des bans de la carte 1
+ * (règle du tournoi : celle qui n'héberge pas d'abord, par défaut). `quote`
+ * met un nom d'équipe en forme pour son canal.
  */
 export function lobbyBriefNames(
   side: LobbyBriefSide,
@@ -68,7 +79,8 @@ export function lobbyBriefNames(
 ): LobbyBriefNames {
   const own = side.solo ? SOLO_NAMES[locale].own : quote(side.teamName);
   const other = side.solo ? SOLO_NAMES[locale].other : quote(side.opponentName);
-  return side.hosting ? { left: own, right: other, ban: other } : { left: other, right: own, ban: own };
+  const seats = side.hosting ? { left: own, right: other } : { left: other, right: own };
+  return side.banFirst ? { ...seats, ban: own, banNext: other } : { ...seats, ban: other, banNext: own };
 }
 
 type DecisionLine = "REFEREE" | "SELF_MANAGED_TEAM" | "SELF_MANAGED_SOLO";
@@ -107,7 +119,11 @@ const DM_TEXT: Readonly<
       right: string;
       firstMap: string;
       noFirstMap: string;
-      firstBan: string;
+      firstBan: (first: string, then: string) => string;
+      nextBans: Readonly<Record<NextBanRule, string>>;
+      maps: string;
+      toChoose: (pool: string) => string;
+      loserPick: string;
       cast: string;
       link: string;
     }
@@ -121,7 +137,16 @@ const DM_TEXT: Readonly<
     right: "Droite : ",
     firstMap: "Première carte : ",
     noFirstMap: "pas encore fixée",
-    firstBan: "Premier ban : ",
+    firstBan: (first, then) => `Bans de la carte 1 : ${first} d'abord, puis ${then}`,
+    nextBans: {
+      LOSER:
+        "Cartes suivantes : l'équipe qui a perdu la carte précédente bannit en premier ; en cas d'égalité, même ordre qu'à la carte précédente.",
+      WINNER:
+        "Cartes suivantes : l'équipe qui a gagné la carte précédente bannit en premier ; en cas d'égalité, même ordre qu'à la carte précédente.",
+    },
+    maps: "Cartes : ",
+    toChoose: (pool) => `à choisir parmi ${pool}`,
+    loserPick: " (choisie par l'équipe qui a perdu la carte précédente)",
     cast: "Match casté : trie les joueurs par rôle dans le salon.",
     link: "BattleTags à inviter et réglages à jour : ",
   },
@@ -132,11 +157,30 @@ const DM_TEXT: Readonly<
     right: "Right: ",
     firstMap: "First map: ",
     noFirstMap: "not set yet",
-    firstBan: "First ban: ",
+    firstBan: (first, then) => `Map 1 bans: ${first} first, then ${then}`,
+    nextBans: {
+      LOSER: "Next maps: the team that lost the previous map bans first; on a draw, same order as on the previous map.",
+      WINNER: "Next maps: the team that won the previous map bans first; on a draw, same order as on the previous map.",
+    },
+    maps: "Maps: ",
+    toChoose: (pool) => `to choose from ${pool}`,
+    loserPick: " (picked by the team that lost the previous map)",
     cast: "Cast match: sort the players by role in the lobby.",
     link: "BattleTags to invite and up-to-date settings: ",
   },
 };
+
+/** Les cartes de la manche, dans l'ordre : « 1. « Ilios » · 2. à choisir parmi … ». */
+function mapsLine(side: LobbyBriefSide, locale: Locale, quote: (name: string) => string): string {
+  const text = DM_TEXT[locale];
+  return side.maps
+    .map((slot) => {
+      const shown = slot.map === null ? text.toChoose(slot.candidates.map(quote).join(", ")) : quote(slot.map);
+      const picker = slot.kind === "POOL" && slot.number > 1 && side.nextPick === "LOSER" ? text.loserPick : "";
+      return `${slot.number}. ${shown}${picker}`;
+    })
+    .join(" · ");
+}
 
 /**
  * Le message privé Discord. `url` : la page du match, adresse absolue en
@@ -152,8 +196,11 @@ export function formatLobbyBriefDm(side: LobbyBriefSide, url: string, locale: Lo
     text.opening(text.subject(side, quote), round, quote(side.tournamentName)),
     `• ${text.left}${names.left}`,
     `• ${text.right}${names.right}`,
-    `• ${text.firstMap}${side.firstMap === null ? text.noFirstMap : quote(side.firstMap)}`,
-    `• ${text.firstBan}${names.ban}`,
+    side.maps.length === 0
+      ? `• ${text.firstMap}${side.firstMap === null ? text.noFirstMap : quote(side.firstMap)}`
+      : `• ${text.maps}${mapsLine(side, locale, quote)}`,
+    `• ${text.firstBan(names.ban, names.banNext)}`,
+    `• ${text.nextBans[side.nextBan]}`,
     ...(side.cast ? [`• ${text.cast}`] : []),
     ...(decision === null ? [] : [`• ${decision}`]),
     `${text.link}${localizedSiteUrl(url, locale)}`,

@@ -278,8 +278,8 @@
     "champion": "🏆 Champion —",
     "moreStreams": "+{count}",
     "moreStreamsLabel": "+{count}: the other streams of {match}",
-    "viewMatch": "View match",
-    "viewMatchLabel": "View match: {match}"
+    "viewMatch": "Match page",
+    "viewMatchLabel": "Match page: {match}"
   },
   "launch": {
     "toPlan": "To schedule",

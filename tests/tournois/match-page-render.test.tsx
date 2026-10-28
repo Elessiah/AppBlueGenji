@@ -188,7 +188,7 @@ describe("page d'un match — ce que tout le monde lit", () => {
 
   it("la carte qu'elle reprend ne renvoie pas vers la page elle-même", () => {
     const html = render(match(), "public");
-    expect(html).not.toContain("Voir le match");
+    expect(html).not.toContain("Page du match");
     expect(html).not.toContain('href="/suivre/tournois/12/matchs/34"');
   });
 });
@@ -381,7 +381,7 @@ describe("page d'un match — contacts : qui les demande", () => {
   });
 });
 
-describe("« Voir le match » sur la carte du plateau", () => {
+describe("« Page du match » sur la carte du plateau", () => {
   function card(page: BracketMatch, spectator = false) {
     const row = (
       <ToastProvider>
@@ -407,12 +407,12 @@ describe("« Voir le match » sur la carte du plateau", () => {
   it("mène à la page du match, dans l'espace du lecteur ; nom accessible qui commence par le texte", () => {
     expect(card(match())).toContain('href="/tournois/12/matchs/34"');
     expect(card(match(), true)).toContain('href="/suivre/tournois/12/matchs/34"');
-    expect(card(match())).toContain('aria-label="Voir le match : Alpha contre Bravo"');
+    expect(card(match())).toContain('aria-label="Page du match : Alpha contre Bravo"');
   });
 
   it("tu sur une exemption, présent sur un match en attente d'adversaire", () => {
-    expect(card(match({ team2Id: null, team2Name: null, status: "COMPLETED", winnerTeamId: ALPHA }))).not.toContain("Voir le match");
-    expect(card(match({ team2Id: null, team2Name: null, status: "PENDING" }))).toContain("Voir le match");
+    expect(card(match({ team2Id: null, team2Name: null, status: "COMPLETED", winnerTeamId: ALPHA }))).not.toContain("Page du match");
+    expect(card(match({ team2Id: null, team2Name: null, status: "PENDING" }))).toContain("Page du match");
   });
 
   it("le « +N » des streams suivants mène à la page, le premier lien seul reste sur la carte", () => {

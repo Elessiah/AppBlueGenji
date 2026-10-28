@@ -9,7 +9,7 @@ import { useOnMatchPage } from "../_lib/match-page-context";
 import styles from "./MatchRow.module.css";
 
 /**
- * « Voir le match » : la carte mène à la page du match (`MATCH_PAGE.md`), où
+ * « Page du match » : la carte mène à la page du match (`MATCH_PAGE.md`), où
  * se lisent tous ses streams, l'arbitrage et la création de la partie. Tu sur
  * une exemption (un seul engagé, rien à jouer) et sur la page elle-même.
  */
