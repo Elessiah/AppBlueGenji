@@ -880,7 +880,8 @@ export function RgpdEn({
             <strong>legitimate interest</strong> (same aim), and they may object to it through the report form
             (GDPR category) — once upheld, their objection means the staff no longer assigns them matches, and still stands once version 7
             is accepted. They can withdraw from a match at any time, the staff being able to
-            assign that match to them again, without notice. Collecting their “Ready” and the removal notice also fall under performance of the service,
+            assign that match to them again, without notice; until they have accepted version 7, as the acceptance window
+            covers the tournament pages, they withdraw by asking for it through that same form. Collecting their “Ready” and the removal notice also fall under performance of the service,
             the referees acting for the association (<LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>).
           </p>
         </div>

@@ -1,3 +1,4 @@
+import { TERMS_FREE_PATHS } from "@/lib/shared/global-modals";
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -1760,6 +1761,10 @@ describe("PRIVACY_CHANGES — conditions v7 : casters, arbitre désigné et page
     expect(en).toContain("Until you accept it, it still rests on legitimate interest, and you can object to it through the report form (GDPR category)");
     // Revue juridique de #491 : opposition déjà retenue, arbitre devenu joueur, arbitre qui caste aussi.
     expect(fr).toContain("une opposition déjà retenue continue de valoir (le staff ne te confie plus de match)");
+    // Avant l'acceptation, la fenêtre bloquante couvre les tournois : le retrait passe par le formulaire (/signalements, page libre).
+    expect(fr).toContain("la fenêtre d'acceptation couvrant alors les pages des tournois, tu te retires d'un match en le demandant par ce même formulaire");
+    expect(en).toContain("as the acceptance window then covers the tournament pages, you withdraw from a match by asking for it through that same form");
+    expect(TERMS_FREE_PATHS).toContain("/signalements");
     expect(en).toContain("an objection already upheld still stands (the staff no longer assigns you matches)");
     expect(fr).toContain("ou si tu deviens joueur du match avant son lancement, tu n'es plus présenté");
     expect(en).toContain("or become a player of the match before its launch, you are no longer presented");

@@ -1064,7 +1064,8 @@ function RgpdFr({
             acceptée, elle relève de l&apos;<strong>intérêt légitime</strong> (même but), et il peut s&apos;y
             opposer par le formulaire de signalement (catégorie RGPD) — retenue, son opposition fait que le staff
             ne lui confie plus de match, et continue de valoir une fois la version 7 acceptée. Il peut se retirer d&apos;un match à tout moment, le staff
-            pouvant lui confier de nouveau ce match, sans avis. Le recueil de son « Prêt » et l&apos;avis du retrait relèvent aussi de l&apos;exécution
+            pouvant lui confier de nouveau ce match, sans avis ; tant qu&apos;il n&apos;a pas accepté la version 7, la fenêtre
+            d&apos;acceptation couvrant les pages des tournois, il s&apos;en retire en le demandant par ce même formulaire. Le recueil de son « Prêt » et l&apos;avis du retrait relèvent aussi de l&apos;exécution
             du service, les arbitres agissant pour l&apos;association (<Link href="/rgpd/registre#t04">registre, T04</Link>).
           </p>
         </div>
