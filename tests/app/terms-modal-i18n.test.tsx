@@ -241,17 +241,17 @@ describe("TermsAcceptanceModal — langue de la page", () => {
     expect(flow).toContain("useEnglishMessagesUntilRemount(locale, englishProfile)");
   });
 
-  it("les textes publiés (conditions v6, entrée v6) restent tels quels : la mention des issues attend la prochaine version (FR et EN)", () => {
+  it("l'entrée v6 publiée reste telle quelle ; la version 7 des conditions dit la suppression depuis la fenêtre (FR et EN)", () => {
     // Un texte déjà publié en production ne se réécrit pas en place ; la déconnexion qu'il cite reste offerte (lien des issues).
     expect(readSource("lib/shared/terms-of-use.ts")).toContain("il peut toujours se déconnecter, lire les pages légales");
-    expect(readSource("lib/shared/terms-of-use.ts")).toContain("il peut supprimer son compte depuis son profil.");
     expect(readSource("lib/shared/terms-of-use-en.ts")).toContain("it can still log out, read the legal pages");
-    expect(readSource("lib/shared/terms-of-use-en.ts")).toContain("it can delete its account from its profile.");
     expect(readSource("lib/shared/privacy-changes.ts")).toContain("Sans accepter, tu peux te déconnecter, lire cette politique");
     expect(readSource("lib/shared/privacy-changes-en.ts")).toContain("Without accepting, you can log out, read this policy");
-    for (const path of ["lib/shared/terms-of-use.ts", "lib/shared/terms-of-use-en.ts", "lib/shared/privacy-changes.ts", "lib/shared/privacy-changes-en.ts"]) {
-      expect(readSource(path)).not.toMatch(/directement depuis (?:la|cette) fenêtre|directly from (?:the acceptance|that) window/);
-    }
+    // TERMS v7 : la mention reportée entre dans la section « Acceptation » et son annonce.
+    expect(readSource("lib/shared/terms-of-use.ts")).toContain("il peut supprimer son compte depuis son profil ou directement depuis la fenêtre d'acceptation.");
+    expect(readSource("lib/shared/terms-of-use-en.ts")).toMatch(/it can delete its account from its profile or directly from the acceptance window\./);
+    expect(readSource("lib/shared/privacy-changes.ts")).toContain("supprimer ton compte directement depuis la fenêtre qui te les présente");
+    expect(readSource("lib/shared/privacy-changes-en.ts")).toContain("delete your account directly from the window that presents them to you");
   });
 
   it("aucun texte de la fenêtre n'est perdu : FR et EN ont les mêmes clés, sans « logout » orphelin", () => {

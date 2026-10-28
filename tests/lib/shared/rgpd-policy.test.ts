@@ -57,19 +57,21 @@ describe("contacts du lancement d'un match — base légale", () => {
     expect(BATTLETAG_MATCH_SCOPE).toMatch(/arbitres et administrateurs n'y ont pas d'autre accès \(conditions d'utilisation, « Contacts de match »\)$/);
   });
 
-  // Revue juridique de #487 : le BattleTag de l'arbitre désigné a sa propre
-  // portée, sur l'intérêt légitime — aucune clause des conditions ne le couvre
-  // avant leur version 7.
-  it("fonde la lecture du BattleTag de l'arbitre désigné sur l'intérêt légitime, sans citer les conditions", () => {
+  // TERMS v7 (décision de l'utilisateur du 2026-10-27) : le BattleTag de
+  // l'arbitre désigné garde sa propre portée, mais passe de l'intérêt légitime
+  // à l'exécution du contrat — la section « Contacts de match » le prévoit
+  // depuis la version 7 ; l'opposition ne s'y applique donc plus.
+  it("fonde la lecture du BattleTag de l'arbitre désigné sur le contrat, en citant les conditions, sans opposition", () => {
+    expect(REFEREE_BATTLETAG_SCOPE).toMatch(/^BattleTag de l'arbitre désigné d'un match, même masqué, dans ses fenêtres « Contacts » et de lancement et sur la page du match/);
     expect(
       REFEREE_BATTLETAG_SCOPE.endsWith(
-        "— opposition par le formulaire de signalement, catégorie RGPD (retenue, le staff ne lui confie plus de match) ; retrait d'un match à tout moment, le staff pouvant sinon lui confier de nouveau ce match, sans avis",
+        "; retrait d'un match à tout moment, le staff pouvant lui confier de nouveau ce match, sans avis (conditions d'utilisation, « Contacts de match »)",
       ),
     ).toBe(true);
-    expect(REFEREE_BATTLETAG_SCOPE).not.toMatch(/conditions d'utilisation/);
+    expect(REFEREE_BATTLETAG_SCOPE).not.toMatch(/opposition/);
     expect(DONNEES_PROFIL.find((d) => d.donnee === "Pseudo Overwatch")?.extraBases).toEqual([
       { base: "Exécution du contrat", scope: BATTLETAG_MATCH_SCOPE },
-      { base: "Intérêt légitime", scope: REFEREE_BATTLETAG_SCOPE },
+      { base: "Exécution du contrat", scope: REFEREE_BATTLETAG_SCOPE },
       { base: "Intérêt légitime", scope: VERIFIED_BADGE_SCOPE },
     ]);
   });

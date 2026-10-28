@@ -110,7 +110,8 @@ describe("français : le texte qui fait foi ne bouge pas", () => {
   });
 
   it("la version des conditions n'avance pas pour une traduction", () => {
-    expect(TERMS_VERSION).toBe(6);
+    // Version 7 : la clause de l'arbitre désigné et la page du match (TERMS v7), pas une traduction.
+    expect(TERMS_VERSION).toBe(7);
   });
 });
 
