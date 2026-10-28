@@ -91,7 +91,9 @@ plus, pour qu'elles restent levables —, choix d'un arbitre parmi les comptes
   match » caché ; le verrou du lancement (`lockLaunchMatch`) ne le compte plus
   (le lancement ne l'attend pas, un autre peut prendre le match) ; le cast
   reste ouvert ;
-- levée : il peut de nouveau arbitrer, rien ne lui est rendu ;
+- levée, à sa seule demande (même formulaire ; « Lever » passe par une
+  confirmation qui le rappelle) : il peut de nouveau arbitrer, rien ne lui est
+  rendu ;
 - journal : `publishStaffAction`, une seule ligne Discord (« un arbitre »,
   « le staff », sans nombre de matchs) ; auteur, `#id` de l'arbitre et nombre
   de matchs retirés dans pm2, sur un vrai changement ou un

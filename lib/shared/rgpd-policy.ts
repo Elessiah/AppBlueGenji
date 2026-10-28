@@ -70,7 +70,7 @@ export const REFEREE_BATTLETAG_SCOPE =
  * l'utilisateur du 2026-10-27 — aucun interrupteur dans le code).
  */
 export const REFEREE_BATTLETAG_BEFORE_V7_SCOPE =
-  "la même présentation du BattleTag de l'arbitre désigné, tant que cet arbitre n'a pas accepté la version 7 des conditions d'utilisation — opposition par le formulaire de signalement, catégorie RGPD (retenue, il est retiré de tous ses matchs non terminés et ne peut plus en prendre un ni s'en voir confier un tant qu'elle n'est pas levée, même une fois la version 7 acceptée)";
+  "la même présentation du BattleTag de l'arbitre désigné, tant que cet arbitre n'a pas accepté la version 7 des conditions d'utilisation — opposition par le formulaire de signalement, catégorie RGPD (retenue, il est retiré de tous ses matchs non terminés et ne peut plus en prendre un ni s'en voir confier un tant qu'elle n'est pas levée — à sa seule demande —, même une fois la version 7 acceptée)";
 
 /**
  * Pseudo de l'arbitre désigné présenté aux parties de ses matchs, sur la même
@@ -81,7 +81,7 @@ export const REFEREE_USERNAME_SCOPE =
   "pseudo de l'arbitre désigné d'un match, dans ses fenêtres « Contacts » et de lancement et sur la page du match, quel que soit le jeu : à ses deux équipes et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, et à ses casters le temps du match (dans un tournoi Overwatch, à côté de son BattleTag — voir « Pseudo Overwatch »), et seul dès que la fenêtre de lancement montre le match (conditions d'utilisation, « Contacts de match », une fois leur version 7 acceptée par l'arbitre)";
 
 export const REFEREE_USERNAME_BEFORE_V7_SCOPE =
-  "la même présentation du pseudo de l'arbitre désigné, tant que cet arbitre n'a pas accepté la version 7 des conditions d'utilisation — opposition par le formulaire de signalement, catégorie RGPD (retenue, il est retiré de tous ses matchs non terminés et ne peut plus en prendre un ni s'en voir confier un tant qu'elle n'est pas levée, même une fois la version 7 acceptée)";
+  "la même présentation du pseudo de l'arbitre désigné, tant que cet arbitre n'a pas accepté la version 7 des conditions d'utilisation — opposition par le formulaire de signalement, catégorie RGPD (retenue, il est retiré de tous ses matchs non terminés et ne peut plus en prendre un ni s'en voir confier un tant qu'elle n'est pas levée — à sa seule demande —, même une fois la version 7 acceptée)";
 
 /**
  * Pastilles de certification de la fiche (tag Discord certifié, BattleTag tiré

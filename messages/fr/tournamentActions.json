@@ -343,6 +343,11 @@
         "lift": "Lever",
         "liftAria": "Lever l'opposition de {pseudo}",
         "lifted": "Opposition levée : il peut de nouveau arbitrer.",
+        "liftConfirm": {
+          "title": "Lever l'opposition de {pseudo} ?",
+          "body": "À ne faire qu'à sa demande (formulaire de signalement) : il pourra de nouveau prendre un match ou s'en voir confier un, et être présenté aux parties de ses matchs.",
+          "confirm": "Lever l'opposition"
+        },
         "confirm": {
           "title": "Retenir l'opposition de {pseudo} ?",
           "body": "Il est retiré de tous ses matchs non terminés, dans tous les tournois, et en est prévenu ; il ne peut plus arbitrer tant que l'opposition n'est pas levée. Désigne ensuite un autre arbitre pour ces matchs.",

@@ -18,7 +18,7 @@ import styles from "./RefereeDialog.module.css";
 const FIRST_MAP_FIELD_ERRORS = { INVALID_FIRST_MAP: "map" } as const;
 
 /** Geste qui attend sa confirmation : il retire quelqu'un, ou touche toute une manche. */
-type PendingConfirm = "removeReferee" | "selfOn" | "roundOn" | "roundOff" | "objection";
+type PendingConfirm = "removeReferee" | "selfOn" | "roundOn" | "roundOff" | "objection" | "liftObjection";
 
 async function send(url: string, method: string, body?: unknown): Promise<unknown> {
   const response = await fetch(url, {
@@ -79,6 +79,8 @@ export function RefereeDialog({
   const [pick, setPick] = useState("");
   const [map, setMap] = useState("");
   const [objectionPick, setObjectionPick] = useState("");
+  // Opposition à lever, confirmée d'abord : la lever n'est fait qu'à la demande de l'arbitre.
+  const [liftTarget, setLiftTarget] = useState<{ userId: number; pseudo: string } | null>(null);
   const [confirm, setConfirm] = useState<PendingConfirm | null>(null);
   // Le contrôle d'un geste est désactivé le temps de l'envoi (le navigateur
   // lâche alors le focus), et un geste retire souvent son propre bouton
@@ -214,6 +216,20 @@ export function RefereeDialog({
             }),
         );
         if (done) setObjectionPick("");
+        return done;
+      },
+    },
+    liftObjection: {
+      title: t("cardActions.refereeDialog.objection.liftConfirm.title", { pseudo: liftTarget?.pseudo ?? "" }),
+      body: t("cardActions.refereeDialog.objection.liftConfirm.body"),
+      confirm: t("cardActions.refereeDialog.objection.liftConfirm.confirm"),
+      action: async () => {
+        if (!liftTarget) return false;
+        const done = await run(
+          () => send(objectionUrl(liftTarget.userId), "PUT", { upheld: false }),
+          t("cardActions.refereeDialog.objection.lifted"),
+        );
+        if (done) setLiftTarget(null);
         return done;
       },
     },
@@ -375,12 +391,10 @@ export function RefereeDialog({
                         className="btn ghost"
                         disabled={busy}
                         aria-label={t("cardActions.refereeDialog.objection.liftAria", { pseudo: referee.pseudo })}
-                        onClick={() =>
-                          void run(
-                            () => send(objectionUrl(referee.userId), "PUT", { upheld: false }),
-                            t("cardActions.refereeDialog.objection.lifted"),
-                          )
-                        }
+                        onClick={() => {
+                          setLiftTarget(referee);
+                          setConfirm("liftObjection");
+                        }}
                       >
                         {t("cardActions.refereeDialog.objection.lift")}
                       </button>

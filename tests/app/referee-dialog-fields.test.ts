@@ -60,3 +60,19 @@ describe("RefereeDialog — gestes qui ne perdent rien", () => {
     expect(source).toMatch(/if \(busy \|\| confirm !== null\) return;/);
   });
 });
+
+describe("RefereeDialog — levée d'une opposition", () => {
+  const fr = JSON.parse(readFileSync(join(process.cwd(), "messages/fr/tournamentActions.json"), "utf8"));
+  const en = JSON.parse(readFileSync(join(process.cwd(), "messages/en/tournamentActions.json"), "utf8"));
+
+  it("« Lever » ouvre une confirmation au lieu de lever l'opposition d'un clic", () => {
+    const button = source.slice(source.indexOf("objection.liftAria"), source.indexOf("objection.lift\")"));
+    expect(button).toContain('setConfirm("liftObjection")');
+    expect(button).not.toContain("upheld: false");
+  });
+
+  it("la confirmation rappelle, en français et en anglais, qu'on ne lève qu'à la demande de l'arbitre", () => {
+    expect(fr.cardActions.refereeDialog.objection.liftConfirm.body).toContain("qu'à sa demande");
+    expect(en.cardActions.refereeDialog.objection.liftConfirm.body).toContain("Only at their request");
+  });
+});

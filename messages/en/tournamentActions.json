@@ -343,6 +343,11 @@
         "lift": "Lift",
         "liftAria": "Lift {pseudo}'s objection",
         "lifted": "Objection lifted: they can referee again.",
+        "liftConfirm": {
+          "title": "Lift {pseudo}'s objection?",
+          "body": "Only at their request (report form): they will again be able to take a match or be assigned one, and be presented to the parties to their matches.",
+          "confirm": "Lift the objection"
+        },
         "confirm": {
           "title": "Uphold {pseudo}'s objection?",
           "body": "They are removed from all their unfinished matches, in every tournament, and notified; they can no longer referee until the objection is lifted. Then assign another referee to those matches.",
