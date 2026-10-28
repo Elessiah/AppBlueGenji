@@ -10,7 +10,9 @@ import {
   BOT_STAFF_LOG_RETENTION_DAYS,
   SUPPORT_TICKET_RETENTION_MONTHS,
   WEB_ACCESS_LOG_RETENTION_DAYS,
+  PROCESSING_ACTIVITIES,
 } from "@/lib/shared/processing-register";
+import { PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register-en";
 import { SITE_MINIMUM_AGE, TERMS_PATH, TERMS_UPDATED_AT, TERMS_VERSION, formatTermsDate } from "@/lib/shared/terms-of-use";
 import { PUSH_TOPICS } from "@/lib/shared/push-notifications";
 import { MATCH_REMINDER_LOOKAHEAD_MS } from "@/lib/shared/discord-notifications";
@@ -1818,5 +1820,27 @@ describe("PRIVACY_CHANGES — « Ne plus voir » de l'invitation à certifier su
     expect(en).toContain("It is included in the export of your data and erased when the account is anonymised");
     expect(en).toContain("is still remembered for the tab only");
     expect([english.details.length, english.linkLabels?.length ?? 0]).toEqual([entry.details.length, entry.links?.length ?? 0]);
+  });
+
+  it("dit qu'un ancien choix du navigateur n'est pas repris et n'est effacé qu'à l'ouverture d'une fiche de tournoi (FR et EN)", () => {
+    const fr = entry.details.join(" ");
+    const en = english.details.join(" ");
+    expect(fr).toContain("n'est pas repris sur ton compte : la fenêtre peut revenir une fois, à cocher de nouveau");
+    expect(fr).toContain("elle est effacée à l'ouverture de la fiche d'un tournoi");
+    expect(fr).not.toContain("est retirée de ton navigateur");
+    expect(en).toContain("is not carried over to your account: the window may come back once, to be ticked again");
+    expect(en).toContain("it is erased when a tournament page opens");
+    expect(en).not.toContain("is removed from your browser");
+  });
+
+  it("donne au registre (T04, FR et EN) une base légale pour garder ce choix sur le compte", () => {
+    const fr = PROCESSING_ACTIVITIES.find((a) => a.ref === "T04")!;
+    const en = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T04")!;
+    expect(fr.legalBasis).toContain(
+      "exécution du service demandé par le joueur (contrat) pour la conservation sur son compte de son choix « Ne plus voir » de l'invitation à certifier",
+    );
+    expect(en.legalBasis).toContain(
+      "performance of the service requested by the player (contract) for keeping on their account their “Don't show again” choice on the invitation to verify",
+    );
   });
 });
