@@ -164,6 +164,12 @@ describe("mapMatch — arbitre désigné dans l'instantané (`docs/features/MATC
     expect(text).not.toContain("Arbitre#1");
   });
 
+  // MATCH-UI-NAMES : un match joué ne nomme plus son arbitre aux membres.
+  it("mapMatchLaunch_completedMatch_hasNullRefereeKey", () => {
+    const match = mapMatch(row({ ...eligible, status: "COMPLETED" }));
+    expect(match.refereeKey).toBeNull();
+  });
+
   it("tait un arbitre qui ne remplit plus la condition, et son « Prêt » d'un autre appariement", () => {
     expect(mapMatch(row({ ...eligible, referee_platform_roles_json: JSON.stringify(["CASTER"]) })).refereeAssigned).toBe(false);
     expect(mapMatch(row({ ...eligible, referee_platform_roles_json: JSON.stringify(["CASTER"]) })).refereeKey).toBeNull();

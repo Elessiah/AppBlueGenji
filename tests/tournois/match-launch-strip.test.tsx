@@ -16,7 +16,7 @@ import { MatchRow } from "@/app/(secured)/tournois/[id]/_components/MatchRow";
 import { LiveProvider } from "@/app/(secured)/tournois/[id]/_lib/live-context";
 import { ToastProvider } from "@/components/ui/toast";
 import { matchLaunchPhase, type CastBlock } from "@/lib/shared/match-launch";
-import type { BracketMatch } from "@/lib/shared/types";
+import type { BracketMatch, MatchRefereeName } from "@/lib/shared/types";
 import { bracketMatch, matchCaster } from "../helpers/bracket-match";
 
 /**
@@ -32,6 +32,7 @@ type Viewer = {
   viewerUserId?: number | null;
   myTeamId?: number | null;
   castBlock?: CastBlock | null;
+  refereeNames?: MatchRefereeName[];
 };
 
 function providers(viewer: Viewer, child: ReactNode) {
@@ -48,6 +49,7 @@ function providers(viewer: Viewer, child: ReactNode) {
         viewerUserId={viewer.viewerUserId ?? 1}
         myTeamId={viewer.myTeamId ?? null}
         castBlock={viewer.castBlock === undefined ? "NOT_CASTER" : viewer.castBlock}
+        refereeNames={viewer.refereeNames}
       >
         {child}
       </LiveProvider>
@@ -240,5 +242,28 @@ describe("MatchLaunchStrip — planification par l'arbitrage", () => {
     const html = render(lobby());
     expect(html).not.toContain("À planifier");
     expect(html).toContain("Lancement");
+  });
+});
+
+describe("MatchLaunchStrip — nom de l'arbitre (MATCH-UI-NAMES, décisions 47 et 52)", () => {
+  const refereed = () => lobby({ refereeAssigned: true, refereeKey: "k-juge" });
+
+  it("MatchLaunchStrip_nameKnown_showsArbitreColonPseudo", () => {
+    const html = render(refereed(), { refereeNames: [{ matchId: 42, refereeKey: "k-juge", pseudo: "Juge" }] });
+
+    expect(html).toContain("Arbitre : Juge");
+  });
+
+  it("MatchLaunchStrip_nameUnknown_showsArbitreDesigne", () => {
+    const html = render(refereed());
+
+    expect(html).toContain("Arbitre désigné");
+    expect(html).not.toContain("Arbitre : ");
+  });
+
+  it("MatchLaunchStrip_referee_isNotCountedInReadyTally", () => {
+    const html = render(refereed());
+
+    expect(html).toContain(">0/2<");
   });
 });
