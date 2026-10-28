@@ -69,6 +69,12 @@ export async function createTournamentTables(db: Pool): Promise<void> {
       endurance_playoff_format_type ENUM('BO', 'FT') NULL,
       endurance_playoff_format_value INT NULL,
       current_phase_id BIGINT NULL,
+      -- Règles de ban et de choix du tournoi (\`docs/features/ROUND_MAPS.md\`) :
+      -- qui bannit sur la carte 1, puis sur les suivantes, et qui choisit une
+      -- carte de pool dès la carte 2. Défauts = le règlement de l'association.
+      first_ban_rule ENUM('NON_HOST', 'HOST') NOT NULL DEFAULT 'NON_HOST',
+      next_ban_rule ENUM('LOSER', 'WINNER') NOT NULL DEFAULT 'LOSER',
+      next_pick_rule ENUM('LOSER', 'FREE') NOT NULL DEFAULT 'LOSER',
       live_url VARCHAR(255) NULL,
       -- Illustration ou logo, facultatif (\`lib/shared/tournament-image.ts\`) :
       -- fichier stocké sans recadrage, cadrage décidé au rendu.
@@ -160,6 +166,9 @@ export async function createTournamentTables(db: Pool): Promise<void> {
       referee_ready_at DATETIME NULL,
       self_managed TINYINT(1) NOT NULL DEFAULT 0,
       first_map VARCHAR(64) NULL,
+      -- Cartes choisies dans un pool, au-delà de la première (JSON {"2":"Ilios"}) —
+      -- la carte 1 reste \`first_map\` (\`docs/features/ROUND_MAPS.md\`).
+      map_picks TEXT NULL,
       caster_user_id BIGINT NULL,
       lobby_opened_at DATETIME NULL,
       launch_pairing VARCHAR(48) NULL,
@@ -276,6 +285,25 @@ export async function createTournamentTables(db: Pool): Promise<void> {
         REFERENCES bg_matches(id) ON DELETE CASCADE,
       CONSTRAINT fk_bg_match_maps_user FOREIGN KEY (submitted_by_user_id)
         REFERENCES bg_users(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  // Cartes d'une manche (`docs/features/ROUND_MAPS.md`) : liste ordonnée de
+  // créneaux, chacun une liste de cartes candidates (une seule = imposée,
+  // plusieurs = pool où l'on choisit). Manche = (phase, tableau, numéro), comme
+  // l'autogestion groupée ; posable avant que ses matchs existent.
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_tournament_round_maps (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      tournament_id BIGINT NOT NULL,
+      phase_id BIGINT NOT NULL DEFAULT 0,
+      bracket VARCHAR(16) NOT NULL,
+      round_number INT NOT NULL,
+      slots_json TEXT NOT NULL,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_bg_round_maps_round (tournament_id, phase_id, bracket, round_number),
+      CONSTRAINT fk_bg_round_maps_tournament FOREIGN KEY (tournament_id)
+        REFERENCES bg_tournaments(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 }

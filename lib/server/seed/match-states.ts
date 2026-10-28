@@ -259,6 +259,7 @@ export async function applyMatchLaunchCases(
       [matchId]
     );
     await applyRefereeCase(db, matchId, SEED_REFEREE_CASES[index % SEED_REFEREE_CASES.length], refereeId);
+    await applyRoundMapCase(db, matchId, SEED_ROUND_MAP_CASES[index]);
     const castCase = coCasterId === null ? "ONE" : SEED_CAST_CASES[index % SEED_CAST_CASES.length];
     const streamId = await seedStream(db, matchId);
     await seedCaster(db, matchId, casterId, streamId);
@@ -271,6 +272,40 @@ export async function applyMatchLaunchCases(
       );
       await seedCaster(db, matchId, coCasterId, Number(own.insertId));
     }
+  }
+}
+
+/**
+ * Cartes de manche seedées (`docs/features/ROUND_MAPS.md`), sur la manche du
+ * premier match des deux premiers tournois à lancement : cinq cartes imposées
+ * (la carte 1 l'emporte sur la première carte de l'arbitre), puis une manche
+ * à pools, en autogestion, où la carte 2 est déjà choisie.
+ */
+export const SEED_ROUND_MAP_CASES: readonly (readonly (readonly string[])[] | undefined)[] = [
+  [["King's Row"], ["Lijiang Tower"], ["Numbani"], ["Eichenwalde"], ["Oasis"]],
+  [["Ilios", "Nepal", "Busan"], ["King's Row", "Eichenwalde"], ["Numbani"], ["Oasis", "Lijiang Tower"], ["Dorado"]],
+];
+/** Choix seedé dans le pool de la carte 2 de la manche à pools. */
+export const SEED_ROUND_MAP_PICK = "Eichenwalde";
+
+async function applyRoundMapCase(
+  db: Pool,
+  matchId: number,
+  slots: readonly (readonly string[])[] | undefined,
+): Promise<void> {
+  if (!slots) return;
+  await db.execute(
+    `INSERT INTO bg_tournament_round_maps (tournament_id, phase_id, bracket, round_number, slots_json)
+     SELECT tournament_id, COALESCE(phase_id, 0), bracket, round_number, ?
+     FROM bg_matches WHERE id = ?
+     ON DUPLICATE KEY UPDATE slots_json = VALUES(slots_json)`,
+    [JSON.stringify(slots), matchId]
+  );
+  if (slots[1] && slots[1].length > 1) {
+    await db.execute(`UPDATE bg_matches SET map_picks = ? WHERE id = ?`, [
+      JSON.stringify({ "2": SEED_ROUND_MAP_PICK }),
+      matchId,
+    ]);
   }
 }
 

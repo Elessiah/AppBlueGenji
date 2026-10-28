@@ -235,3 +235,60 @@
     align-items: flex-start;
   }
 }
+
+/* Cartes du round (`MatchRoundMaps`) : liste ordonnée, choix dans un pool. */
+.roundMaps {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.subTitle {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.mapSlots {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mapSlot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+
+.mapNumber {
+  flex: 0 0 auto;
+  min-width: 64px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.mapValue {
+  display: flex;
+  flex: 1 1 200px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.mapPick {
+  flex: 0 1 220px;
+  min-width: 0;
+}
+
+.ruleText {
+  font-weight: 400;
+  font-size: 13px;
+}

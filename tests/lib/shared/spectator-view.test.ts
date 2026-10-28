@@ -455,6 +455,8 @@ const SNAPSHOT_FIELDS = {
   phases: "public",
   registrations: "public",
   seedingSource: "public",
+  // Cartes par manche et règles de ban (ROUND_MAPS.md) : aucune donnée personnelle.
+  mapRules: "public",
   // Marche du podium d'une entrée solo (public, déclaré au RGPD).
   soloUserIds: "public",
   survival: "public",
@@ -474,6 +476,8 @@ const MATCH_FIELDS = {
   refereeReady: "retiré",
   selfManaged: "public",
   firstMap: "public",
+  // Cartes choisies dans un pool (noms de cartes, aucune donnée personnelle).
+  mapPicks: "public",
   id: "public",
   launchedAt: "public",
   liveStartedAt: "public",

@@ -13,6 +13,7 @@ import { normalizeReplayUrl } from "@/lib/shared/match-replay";
 import { parseTournamentImage } from "@/lib/shared/tournament-image";
 import { currentLaunchState, launchReadiness, launchStateIsCurrent } from "@/lib/shared/match-launch";
 import { firstBanTeamId, matchHostTeamId } from "@/lib/shared/match-referee";
+import { parseMapPicks } from "@/lib/shared/round-maps";
 import { visibleText } from "@/lib/shared/visible-text";
 import { localizeBracketPlaceholder } from "@/lib/shared/bracket-placeholders";
 import { castEligibilityBlock, refereeEligibilityBlock } from "./cast-eligibility";
@@ -148,6 +149,7 @@ export type MatchRow = RowDataPacket & {
   referee_ready_at?: Date | null;
   self_managed?: number | null;
   first_map?: string | null;
+  map_picks?: string | null;
   /** Condition d'arbitrage de l'arbitre désigné (`refereeEligibilitySql`). */
   referee_discord_verified_at?: Date | null;
   referee_discord_pseudo?: string | null;
@@ -487,6 +489,7 @@ function mapMatchLaunch(row: MatchRow, allCasters: readonly MatchCasterRow[]) {
     refereeReady: readiness.referee?.ready ?? false,
     selfManaged: Number(row.self_managed ?? 0) === 1,
     firstMap: firstMap === "" ? null : firstMap,
+    mapPicks: parseMapPicks(row.map_picks),
     casters: casters.map((caster, index) => ({
       userId: caster.userId,
       pseudo: caster.pseudo,

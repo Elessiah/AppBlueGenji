@@ -177,7 +177,12 @@
     "REFEREE_IS_PLAYER": "This account plays this match: it cannot referee it.",
     "MATCH_ALREADY_REFEREED": "This match already has a referee.",
     "NOT_MATCH_REFEREE": "You are not refereeing this match.",
-    "INVALID_FIRST_MAP": "Invalid map name (64 characters at most)."
+    "INVALID_FIRST_MAP": "Invalid map name (64 characters at most).",
+    "INVALID_ROUND": "Invalid round.",
+    "INVALID_ROUND_MAPS": "Invalid maps: 9 maps at most per round, 20 at most per pool, 64 characters per name.",
+    "INVALID_MAP_RULES": "Invalid ban rule.",
+    "INVALID_MAP_PICK": "This map is not in the round's pool.",
+    "NOT_MAP_PICKER": "Only the referees and, when the match is self-managed, its teams choose the map."
   },
   "soloCodes": {
     "TEAM_NOT_FORFEITED": "This player hasn't withdrawn: there is nothing to cancel.",

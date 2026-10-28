@@ -94,6 +94,7 @@ const EndurancePenaltyDialog = dynamic(() => orReload(import("./EndurancePenalty
 // Ouverte d'office : sa place est tenue pendant le chargement (`anotherModalOpen`),
 // et cédée à une modale urgente (`data-modal-yields`).
 const CertificationPromptDialog = dynamic(() => orReload(import("./CertificationPromptDialog").then((m) => m.CertificationPromptDialog)), { ssr: false, loading: () => <span data-modal-pending data-modal-yields hidden /> });
+const RoundMapsPanel = dynamic(() => orReload(import("./MatchRoundMaps").then((m) => m.RoundMapsPanel)), { ssr: false });
 const AdvanceTournamentDialog = dynamic(() => orReload(import("./AdvanceTournamentDialog").then((m) => m.AdvanceTournamentDialog)), { ssr: false });
 const TournamentImageDialog = dynamic(() => orReload(import("./TournamentImageDialog").then((m) => m.TournamentImageDialog)), { ssr: false });
 const ConfirmActionDialog = dynamic(() => orReload(import("@/components/ui/confirm-action-dialog").then((m) => m.ConfirmActionDialog)), { ssr: false });
@@ -1315,6 +1316,9 @@ function TournamentSheetView({
             (`tournamentGrantsContactAccess`) : le besoin de joindre un engagé
             naît du tournoi et s'éteint avec lui, et la route refuse de toute
             façon — un panneau qui ne rendrait qu'un toast n'a rien à faire là. */}
+        {/* Cartes et bans (`ROUND_MAPS.md`) : réglables à tout moment par le staff. */}
+        {detail.isAdmin && !frozen && detail.matches.length > 0 && <RoundMapsPanel detail={detail} />}
+
         {detail.isAdmin && tournamentGrantsContactAccess(detail.card.state) && (
           <EntrantContactsPanel tournamentId={detail.card.id} />
         )}

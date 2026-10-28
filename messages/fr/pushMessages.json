@@ -11,6 +11,8 @@
     "title": "Salon ouvert : réglages du match",
     "body": "Gauche (hôte) : {left} · Droite (1er ban) : {right} · 1re carte : {map}.",
     "bodyCast": "Match casté : trie les joueurs par rôle. Gauche (hôte) : {left} · Droite (1er ban) : {right} · 1re carte : {map}.",
+    "bodyHostBans": "Gauche (hôte, 1er ban) : {left} · Droite : {right} · 1re carte : {map}.",
+    "bodyCastHostBans": "Match casté : trie les joueurs par rôle. Gauche (hôte, 1er ban) : {left} · Droite : {right} · 1re carte : {map}.",
     "noMap": "pas encore fixée",
     "own": "toi",
     "other": "ton adversaire"

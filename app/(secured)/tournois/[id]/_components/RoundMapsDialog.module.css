@@ -1,0 +1,67 @@
+/* Fenêtre « Cartes et bans » d'un tournoi (`RoundMapsDialog`). */
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.title {
+  margin: 0;
+  font-size: 16px;
+}
+
+.section {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin: 0 0 16px;
+  padding: 0;
+  border: 0;
+}
+
+.legend {
+  margin: 0 0 4px;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.slots {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.slot {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.slotField {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.muted {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}

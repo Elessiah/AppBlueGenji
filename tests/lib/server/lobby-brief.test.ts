@@ -124,7 +124,7 @@ describe("dispatchLobbyBriefs", () => {
     expect(team1.notification.discord?.context).toBe("lobby-brief");
     expect(team1.dm()).toContain("ton match « Renards » contre « Nova »");
     expect(team1.dm()).toContain("• Gauche (hôte) : « Renards »");
-    expect(team1.dm()).toContain("• Premier ban : « Nova »");
+    expect(team1.dm()).toContain("• Bans de la carte 1 : « Nova » d'abord, puis « Renards »");
     expect(team1.dm()).toContain("https://bluegenji.test/tournois/4/matchs/40");
     expect(team1.push().url).toBe("/tournois/4/matchs/40");
     expect(team2.userIds).toEqual([20]);
@@ -195,7 +195,7 @@ describe("dispatchLobbyBriefs", () => {
     await dispatchLobbyBriefs();
     const [m40, , m41, , m42] = sends();
     expect(m40.dm()).toContain("• Gauche (hôte) : « Nova »");
-    expect(m40.dm()).toContain("• Premier ban : « Renards »");
+    expect(m40.dm()).toContain("• Bans de la carte 1 : « Renards » d'abord, puis « Nova »");
     expect(m40.dm()).toContain("Match casté");
     expect(m40.dm()).toContain("Arbitre désigné");
     expect(m41.dm()).toContain("• Gauche (hôte) : « Nova »");

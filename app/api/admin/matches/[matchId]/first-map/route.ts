@@ -7,6 +7,7 @@ import { can } from "@/lib/shared/permissions";
 
 const STATUSES: Readonly<Record<string, number>> = {
   INVALID_FIRST_MAP: 400,
+  INVALID_MAP_PICK: 400,
   MATCH_NOT_FOUND: 404,
   MATCH_ALREADY_COMPLETED: 409,
 };
