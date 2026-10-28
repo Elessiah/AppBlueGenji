@@ -54,6 +54,7 @@ lire les drapeaux déjà calculés (`launchStripControls`, `canToggleOnAir`,
 | Lancer / Couper le direct | `live`, mode `MANUAL` | `POST …/live` |
 | Diffuser ce match / Configurer la diffusion | `live` | configuration du direct |
 | Ajouter / Modifier la rediff | `live` (`canEditReplay`) | dialogue de rediff |
+| Page du match | tous, sauf sous la page elle-même et sur une exemption | **lien** vers la page du match (`MATCH_PAGE.md`) — la seule action qui navigue |
 | Signaler un problème | engagé inscrit, sur **son** match | signalement |
 
 ## Règle de rangement
@@ -63,13 +64,15 @@ lire les drapeaux déjà calculés (`launchStripControls`, `canToggleOnAir`,
 - **une seule action** offerte : elle reste visible, quelle qu'elle soit (un
   menu d'un élément n'ajouterait qu'un clic) ;
 - sinon, l'action principale est la première offerte dans l'ordre
-  **saisie joueur → ouvrir le lancement → planifier → score d'arbitrage** ;
+  **saisie joueur → ouvrir le lancement → planifier → score d'arbitrage →
+  contacts**, à défaut **Page du match** (le lien tient le pied de qui n'a
+  rien d'autre à faire) ;
   tout le reste passe derrière « Plus d'actions », dans l'ordre du tableau ;
 - aucune principale (seules des actions secondaires) : « Plus d'actions »
   prend la largeur et montre son libellé.
 
 En pratique : un engagé voit son score à saisir (ou son lancement), un spectateur
-ne voit aucun bouton, l'arbitrage voit « Planifier » ou « Éditer le score ».
+ne voit que « Page du match », l'arbitrage voit « Planifier » ou « Éditer le score ».
 
 ## « Plus d'actions » — clavier et accessibilité
 
