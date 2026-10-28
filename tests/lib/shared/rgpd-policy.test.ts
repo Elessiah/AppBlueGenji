@@ -49,8 +49,17 @@ describe("contacts du lancement d'un match — base légale", () => {
       expect(entry?.finalite).not.toMatch(/non sur ce consentement/);
     }
     expect(MATCH_CONTACTS_SCOPE).toBe(
-      "présentation, dans la fenêtre « Contacts » du match et dans sa fenêtre de lancement, aux membres de ses deux équipes et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, et à ses casters le temps du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné) ; les contacts de chaque caster (son BattleTag dans les seuls tournois Overwatch) aux deux équipes et aux autres casters du match le temps du match, et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin — contacts que la page du match reprend aussi, aux mêmes lecteurs et aux mêmes moments que la fenêtre « Contacts » — (conditions d'utilisation, « Contacts de match »)",
+      "présentation (le BattleTag, des contacts d'équipe comme des casters, dans les seuls tournois Overwatch), dans la fenêtre « Contacts » du match et dans sa fenêtre de lancement, aux membres de ses deux équipes et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, et à ses casters le temps du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné) ; les contacts de chaque caster aux deux équipes et aux autres casters du match le temps du match, et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin — contacts que la page du match reprend aussi, aux mêmes lecteurs et aux mêmes moments que la fenêtre « Contacts » — (conditions d'utilisation, « Contacts de match »)",
     );
+  });
+
+  // Décision 38 (2026-10-28) : hors Overwatch, ni les contacts d'équipe ni les
+  // casters ne présentent de BattleTag — l'anglais le dit pour les deux.
+  it("donneesProfilEn_discordCertificationMatchContactsScope_qualifiesTeamAndCasterBattletagOverwatchOnly", () => {
+    const scope = DONNEES_PROFIL_EN.find((d) => d.donnee === "Certification of the Discord username")?.extraBases?.[0]?.scope;
+
+    expect(scope).toMatch(/^presentation \(the BattleTag, of team contacts as of casters, in Overwatch tournaments only\), in the match's “Contacts” window/);
+    expect(scope).not.toContain("(their BattleTag in Overwatch tournaments only)");
   });
 
   // Décision du 2026-10-19 : masqué, le BattleTag reste lu par les parties de
@@ -173,8 +182,9 @@ describe("DONNEES_PROFIL", () => {
 
   it("dit qui lit encore un BattleTag masqué, et jusqu'à quand", () => {
     const overwatch = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo Overwatch");
-    // Décision du 2026-10-19 : la seule fenêtre « Contacts » d'un match, staff compris.
-    expect(overwatch?.finalite).toMatch(/Masqué, il n'est lisible de personne — arbitres et administrateurs compris — sauf dans la fenêtre « Contacts » d'un match où tu fais partie des contacts présentés/);
+    // Décision du 2026-10-19 : la seule fenêtre « Contacts » d'un match, staff compris ;
+    // décisions 35 et 38 (2026-10-28) : dans les seuls tournois Overwatch.
+    expect(overwatch?.finalite).toMatch(/Masqué, il n'est lisible de personne — arbitres et administrateurs compris — sauf, dans un tournoi Overwatch seulement \(jamais en Marvel Rivals\), dans la fenêtre « Contacts » d'un match où tu fais partie des contacts présentés/);
     expect(overwatch?.finalite).toMatch(/de ses casters le temps du match seulement \(de son départ à sa fin\)/);
     expect(overwatch?.finalite).not.toMatch(/de l'arbitrage tant que tu es inscrit/);
   });

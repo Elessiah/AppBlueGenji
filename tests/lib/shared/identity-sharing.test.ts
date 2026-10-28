@@ -54,6 +54,14 @@ describe("HIDDEN_BATTLETAG_AUDIENCE", () => {
     expect(HIDDEN_BATTLETAG_AUDIENCE.title).toContain("fenêtre de lancement");
   });
 
+  // Revue #497 cycle 2 : « dans un tournoi Overwatch » en tête de liste se
+  // lisait comme un lieu de plus ; le qualificatif porte sur les matchs.
+  it("hiddenBattletagAudience_title_namesOverwatchMatchesNotAPlace", () => {
+    expect(HIDDEN_BATTLETAG_AUDIENCE.title).toContain("fenêtre « Contacts » de tes matchs Overwatch");
+    expect(HIDDEN_BATTLETAG_AUDIENCE.title).toContain("si tu castes ou arbitres un match Overwatch");
+    expect(HIDDEN_BATTLETAG_AUDIENCE.title).not.toContain("ne se lit plus que dans un tournoi Overwatch,");
+  });
+
   it("dit qui le lit, et quand, comme contact et comme caster", () => {
     expect(battletag).toContain("si tu y es présenté comme contact");
     expect(battletag).toContain("dès que les adversaires sont connus et jusqu'à la fin du match, et les casters le temps du match");
