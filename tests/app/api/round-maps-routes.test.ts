@@ -1,24 +1,28 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/auth");
+jest.mock("@/lib/server/tournaments/round-maps-notice");
 jest.mock("@/lib/server/tournaments/round-maps", () => {
   const actual = jest.requireActual<typeof import("@/lib/server/tournaments/round-maps")>(
     "@/lib/server/tournaments/round-maps",
   );
   return {
     parseRoundKey: actual.parseRoundKey,
+    parseRoundKeys: actual.parseRoundKeys,
     parseMapRulesInput: actual.parseMapRulesInput,
-    setRoundMaps: jest.fn(),
+    setRoundsMaps: jest.fn(),
     setTournamentMapRules: jest.fn(),
     pickMatchMap: jest.fn(),
   };
 });
 
+import { POST as flushPost } from "@/app/api/admin/tournaments/[id]/round-maps/flush/route";
+import { flushRoundMapsNotice } from "@/lib/server/tournaments/round-maps-notice";
 import { PUT as roundMapsPut } from "@/app/api/admin/tournaments/[id]/round-maps/route";
 import { PUT as mapRulesPut } from "@/app/api/admin/tournaments/[id]/map-rules/route";
 import { PUT as mapPickPut } from "@/app/api/matches/[matchId]/map-pick/route";
 import { getCurrentUser } from "@/lib/server/auth";
-import { pickMatchMap, setRoundMaps, setTournamentMapRules, type MapRulesInput } from "@/lib/server/tournaments/round-maps";
+import { pickMatchMap, setRoundsMaps, setTournamentMapRules, type MapRulesInput } from "@/lib/server/tournaments/round-maps";
 import { authUser } from "../../helpers/auth-user";
 
 /**
@@ -59,7 +63,7 @@ describe("PUT /api/admin/tournaments/[id]/round-maps", () => {
       jest.mocked(getCurrentUser).mockResolvedValue(user);
       expect((await roundMapsPut(put({ ...ROUND, slots: [] }), tournament("7"))).status).toBe(403);
     }
-    expect(setRoundMaps).not.toHaveBeenCalled();
+    expect(setRoundsMaps).not.toHaveBeenCalled();
   });
 
   it("refuse une manche invalide (400 INVALID_ROUND)", async () => {
@@ -69,24 +73,42 @@ describe("PUT /api/admin/tournaments/[id]/round-maps", () => {
       expect(res.status).toBe(400);
       await expect(res.json()).resolves.toEqual({ error: "INVALID_ROUND" });
     }
-    expect(setRoundMaps).not.toHaveBeenCalled();
+    expect(setRoundsMaps).not.toHaveBeenCalled();
   });
 
   it("refuse des cartes invalides (400) et un tournoi absent (404)", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
-    jest.mocked(setRoundMaps).mockRejectedValueOnce(new Error("INVALID_ROUND_MAPS"));
+    jest.mocked(setRoundsMaps).mockRejectedValueOnce(new Error("INVALID_ROUND_MAPS"));
     expect((await roundMapsPut(put({ ...ROUND, slots: "x" }), tournament("7"))).status).toBe(400);
-    jest.mocked(setRoundMaps).mockRejectedValueOnce(new Error("TOURNAMENT_NOT_FOUND"));
+    jest.mocked(setRoundsMaps).mockRejectedValueOnce(new Error("TOURNAMENT_NOT_FOUND"));
     expect((await roundMapsPut(put({ ...ROUND, slots: [] }), tournament("7"))).status).toBe(404);
   });
 
   it("pose les cartes de la manche et rend les créneaux retenus", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
-    jest.mocked(setRoundMaps).mockResolvedValue([["Ilios"]]);
+    jest.mocked(setRoundsMaps).mockResolvedValue([["Ilios"]]);
     const res = await roundMapsPut(put({ ...ROUND, slots: [[" Ilios "]] }), tournament("7"));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ slots: [["Ilios"]] });
-    expect(setRoundMaps).toHaveBeenCalledWith(7, ROUND, [[" Ilios "]]);
+    expect(setRoundsMaps).toHaveBeenCalledWith(7, [ROUND], [[" Ilios "]]);
+  });
+  it("PUT_roundsList_appliesSlotsToEveryRound", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(setRoundsMaps).mockResolvedValue([["Ilios"]]);
+    const rounds = [ROUND, { ...ROUND, roundNumber: 3 }];
+    const res = await roundMapsPut(put({ rounds, slots: [["Ilios"]] }), tournament("7"));
+    expect(res.status).toBe(200);
+    expect(setRoundsMaps).toHaveBeenCalledWith(7, rounds, [["Ilios"]]);
+  });
+
+  it("PUT_invalidRoundsList_returns400InvalidRound", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    for (const rounds of [[], [{ ...ROUND, bracket: "SIDE" }], "x"]) {
+      const res = await roundMapsPut(put({ rounds, slots: [] }), tournament("7"));
+      expect(res.status).toBe(400);
+      await expect(res.json()).resolves.toEqual({ error: "INVALID_ROUND" });
+    }
+    expect(setRoundsMaps).not.toHaveBeenCalled();
   });
 });
 
@@ -154,5 +176,39 @@ describe("PUT /api/matches/[matchId]/map-pick", () => {
     const res = await mapPickPut(put({ slot: 1, map: "Ilios" }), match("42"));
     expect(res.status).toBe(status);
     await expect(res.json()).resolves.toEqual({ error: code });
+  });
+});
+
+describe("POST /round-maps/flush", () => {
+  const post = () => new Request("http://localhost/api/x", { method: "POST" });
+
+  it("flush_anonymous_returns401", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
+    expect((await flushPost(post(), tournament("7"))).status).toBe(401);
+    expect(flushRoundMapsNotice).not.toHaveBeenCalled();
+  });
+
+  it("flush_player_returns403", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(player);
+    expect((await flushPost(post(), tournament("7"))).status).toBe(403);
+  });
+
+  it("flush_badTournamentId_returns400", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    expect((await flushPost(post(), tournament("abc"))).status).toBe(400);
+  });
+
+  it("flush_referee_sendsThePendingNotice", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(flushRoundMapsNotice).mockResolvedValue(true);
+    const response = await flushPost(post(), tournament("7"));
+    expect(response.status).toBe(200);
+    expect(flushRoundMapsNotice).toHaveBeenCalledWith(7);
+  });
+
+  it("flush_serviceThrows_returns500WithCode", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(flushRoundMapsNotice).mockRejectedValue(new Error("db"));
+    expect((await flushPost(post(), tournament("7"))).status).toBe(500);
   });
 });

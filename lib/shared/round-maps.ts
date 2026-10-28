@@ -10,6 +10,9 @@
  *   par le staff (`bg_matches.first_map`).
  * - Le choix de la carte 1 est `first_map` lui-même ; les suivants vivent dans
  *   `bg_matches.map_picks` (`{"2":"Ilios"}`).
+ * - **Échelle** : dès qu'une manche porte un réglage, la carte ne se saisit plus
+ *   match par match (`ROUND_MAPS_SET`) ; seul le choix dans un pool reste
+ *   ouvert. Réinitialiser la manche (liste vide) rend la saisie par match.
  * - **Préséance** : une carte imposée l'emporte toujours à l'affichage ; un
  *   pool montre le choix explicite du match s'il existe (même sorti du pool
  *   depuis : un choix n'est jamais perdu en silence), sinon « à choisir ».
@@ -21,6 +24,13 @@ import { visibleText } from "./visible-text";
 export const ROUND_MAP_SLOTS_MAX = 9;
 /** Cartes candidates au plus par créneau. */
 export const ROUND_MAP_CANDIDATES_MAX = 20;
+
+/** Tours qu'une seule écriture « copier / appliquer à tous » peut viser ; l'écran découpe au-delà. */
+export const ROUND_MAPS_BULK_MAX = 128;
+/** Silence (secondes) après la dernière modification avant l'annonce Discord unique des cartes de manche. */
+export const ROUND_MAPS_NOTICE_WINDOW_SECONDS = 60;
+/** Manches nommées au plus dans cette annonce ; les suivantes sont comptées. */
+export const ROUND_MAPS_NOTICE_LISTED = 8;
 /** Tableaux d'une manche (ceux de `bg_matches.bracket`). */
 export const ROUND_BRACKETS: readonly string[] = ["UPPER", "LOWER", "GRAND", "THIRD_PLACE"];
 
@@ -267,6 +277,12 @@ export function applyMapRules<
     if (firstMap === match.firstMap && firstBanTeamId === match.firstBanTeamId) return match;
     return { ...match, firstMap, firstBanTeamId };
   });
+}
+
+/** Décompte d'un réglage, pour le résumé d'un tour (« 5 cartes · 2 pools »). */
+export function roundMapsSummary(slots: readonly string[][]): { maps: number; imposed: number; pools: number } {
+  const imposed = slots.filter((slot) => slot.length === 1).length;
+  return { maps: slots.length, imposed, pools: slots.length - imposed };
 }
 
 /** Une manche du plateau, telle que l'écran de réglage la propose. */

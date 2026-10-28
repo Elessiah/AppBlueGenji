@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 
 import { useToast } from "@/components/ui/toast";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { FieldErrorText } from "@/components/ui/field-error-text";
+import { InfoHint } from "@/components/ui/info-hint";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { FIRST_MAP_MAX_LENGTH } from "@/lib/shared/match-referee";
 import { MATCH_LAUNCH_REFRESH_EVENT } from "@/lib/shared/match-launch";
@@ -284,27 +285,48 @@ export function RefereeDialog({
               </button>
             </div>
 
-            <form className={styles.row} onSubmit={saveMap}>
-              <div className={`field ${styles.control}`}>
-                <label htmlFor={mapId}>{t("cardActions.refereeDialog.mapLabel")}</label>
-                <input
-                  id={mapId}
-                  type="text"
-                  value={map}
-                  maxLength={FIRST_MAP_MAX_LENGTH}
-                  onChange={(event) => {
-                    setMap(event.target.value);
-                    fieldErrors.clear("map");
-                  }}
-                  disabled={busy}
-                  {...fieldErrors.aria("map")}
-                />
-                <FieldErrorText fieldId={mapId} message={fieldErrors.message("map")} />
+            {panel.roundSlots.length > 0 ? (
+              <div className={styles.body}>
+                <div className={styles.titleRow}>
+                  <p className={styles.status}>{t("cardActions.refereeDialog.roundMapsTitle")}</p>
+                  <InfoHint id={`${mapId}-locked`} subject={t("cardActions.refereeDialog.roundMapsTitle")}>
+                    {t("cardActions.refereeDialog.roundMapsLocked")}
+                  </InfoHint>
+                </div>
+                <ol className={styles.roundMaps}>
+                  {panel.roundSlots.map((candidates, index) => (
+                    // L'ordre des créneaux est leur identité (carte 1, carte 2…).
+                    <li key={`slot-${index + 1}`}>
+                      {candidates.length === 1
+                        ? t("cardActions.refereeDialog.roundMapsImposed", { number: index + 1, map: candidates[0] })
+                        : t("cardActions.refereeDialog.roundMapsPool", { number: index + 1, maps: candidates.join(", ") })}
+                    </li>
+                  ))}
+                </ol>
               </div>
-              <button type="submit" className="btn ghost" disabled={busy}>
-                {t("cardActions.refereeDialog.mapSave")}
-              </button>
-            </form>
+            ) : (
+              <form className={styles.row} onSubmit={saveMap}>
+                <div className={`field ${styles.control}`}>
+                  <label htmlFor={mapId}>{t("cardActions.refereeDialog.mapLabel")}</label>
+                  <input
+                    id={mapId}
+                    type="text"
+                    value={map}
+                    maxLength={FIRST_MAP_MAX_LENGTH}
+                    onChange={(event) => {
+                      setMap(event.target.value);
+                      fieldErrors.clear("map");
+                    }}
+                    disabled={busy}
+                    {...fieldErrors.aria("map")}
+                  />
+                  <FieldErrorText fieldId={mapId} message={fieldErrors.message("map")} />
+                </div>
+                <button type="submit" className="btn ghost" disabled={busy}>
+                  {t("cardActions.refereeDialog.mapSave")}
+                </button>
+              </form>
+            )}
           </div>
         )}
 

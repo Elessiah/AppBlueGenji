@@ -215,7 +215,7 @@ describe("page d'un match — cartes du round et bans", () => {
     const lobby = visible(render(match(), "public"));
     expect(lobby).toContain("Bans de la carte 1 Alpha d'abord, puis Bravo");
     expect(lobby).toContain("L'équipe qui a perdu la carte précédente bannit en premier ; en cas d'égalité");
-    expect(lobby).not.toContain("Cartes du round");
+    expect(lobby).not.toContain("Cartes du tour");
   });
 
   it("règle du gagnant : le texte des cartes suivantes suit le réglage", () => {
@@ -227,20 +227,40 @@ describe("page d'un match — cartes du round et bans", () => {
   it("liste imposées et pools au public, choix du perdant à partir de la carte 2", () => {
     const html = render(match({ mapPicks: { "3": "Oasis" } }), "public", false, "fr", rules([["Ilios"], ["Busan", "Nepal"], ["Oasis", "Dorado"]]));
     const text = visible(html);
-    expect(text).toContain("Cartes du round");
+    expect(text).toContain("Cartes du tour");
     expect(text).toContain("Carte 1 Ilios Imposée");
     expect(text).toContain("Carte 2 À choisir parmi Busan, Nepal Choisie par l'équipe qui a perdu la carte précédente");
     expect(text).toContain("Carte 3 Oasis");
     expect(html).not.toContain("<select");
-    expect(text).not.toContain("Paramétrer les cartes du round");
+    expect(text).not.toContain("Paramétrer les cartes du tour");
+    expect(text).not.toContain("Réinitialiser le tour");
   });
 
   it("le staff choisit dans le pool et règle les cartes du round ; la saisie libre de la carte 1 disparaît", () => {
     const html = render(match(), "staff", false, "fr", rules([["Ilios", "Nepal"]]));
     expect(html).toContain("<select");
     expect(visible(html)).toContain("Choisir la carte 1");
-    expect(visible(html)).toContain("Paramétrer les cartes du round");
+    expect(visible(html)).toContain("Paramétrer les cartes du tour");
     expect(html).not.toContain("Enregistrer la carte");
+  });
+
+  it("render_roundMapsSet_hidesFirstMapRowThatWouldContradictThem", () => {
+    const text = visible(render(match(), "public", false, "fr", rules([["Ilios"]])));
+    expect(text).not.toContain("Première map");
+    expect(text).not.toContain("Pas encore choisie");
+    expect(text).toContain("Carte 1 Ilios Imposée");
+  });
+
+  it("render_noRoundMaps_keepsFirstMapRow", () => {
+    expect(visible(render(match(), "public", false, "fr", rules([])))).toContain("Pas encore choisie");
+  });
+
+  it("render_staffOnConfiguredRound_offersRoundReset", () => {
+    expect(visible(render(match(), "staff", false, "fr", rules([["Ilios"]])))).toContain("Réinitialiser le tour");
+  });
+
+  it("render_staffOnUnsetRound_hidesRoundReset", () => {
+    expect(visible(render(match(), "staff", false, "fr", rules([])))).not.toContain("Réinitialiser le tour");
   });
 
   it("sans autogestion, une équipe du match lit le pool sans le choisir ; en autogestion, elle choisit", () => {
@@ -259,10 +279,10 @@ describe("page d'un match — cartes du round et bans", () => {
 
   it("en anglais", () => {
     const text = visible(render(match(), "staff", false, "en", rules([["Ilios"]])));
-    expect(text).toContain("Round maps");
+    expect(text).toContain("Maps for this round");
     expect(text).toContain("Map 1 Ilios Set");
     expect(text).toContain("Map 1 bans Alpha first, then Bravo");
-    expect(text).toContain("Set up the round maps");
+    expect(text).toContain("Set up this round's maps");
   });
 });
 

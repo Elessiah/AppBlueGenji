@@ -243,6 +243,13 @@
   margin-top: 14px;
 }
 
+.roundMapsActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
 .subTitle {
   margin: 0;
   font-size: 11px;

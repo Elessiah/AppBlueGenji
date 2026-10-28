@@ -1285,14 +1285,39 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
     await expect(setMatchFirstMap(42, "Ilios")).rejects.toThrow("MATCH_ALREADY_COMPLETED");
   });
 
-  it("première carte réglée pour la manche : pool respecté, carte imposée non saisissable", async () => {
+  it("setMatchFirstMap_roundWithPool_refusesRoundMapsSet", async () => {
     state.roundSlots = '[["Ilios","Nepal"]]';
-    await setMatchFirstMap(42, "nepal");
-    expect(state.match?.first_map).toBe("Nepal");
-    await expect(setMatchFirstMap(42, "Busan")).rejects.toThrow("INVALID_MAP_PICK");
-    expect(state.match?.first_map).toBe("Nepal");
+    await expect(setMatchFirstMap(42, "Nepal")).rejects.toThrow("ROUND_MAPS_SET");
+    expect(state.match?.first_map).toBeNull();
+  });
+
+  it("setMatchFirstMap_roundWithImposedMap_refusesRoundMapsSet", async () => {
     state.roundSlots = '[["Busan"]]';
-    await expect(setMatchFirstMap(42, "Ilios")).rejects.toThrow("INVALID_MAP_PICK");
+    await expect(setMatchFirstMap(42, "")).rejects.toThrow("ROUND_MAPS_SET");
+    expect(queueRefereeChange).not.toHaveBeenCalled();
+  });
+
+  it("setMatchFirstMap_inTransaction_locksTournamentFirst", async () => {
+    const base = executeFor(state);
+    const statements: string[] = [];
+    jest.mocked(withConnection).mockImplementation((run) =>
+      run(
+        fakeConnection({
+          execute: async (sql: string, params: unknown[] = []) => {
+            statements.push(sql);
+            return base(sql, params);
+          },
+          beginTransaction: async () => {
+            statements.push("BEGIN");
+          },
+          commit: async () => undefined,
+          rollback: async () => undefined,
+        }),
+      ),
+    );
+    await setMatchFirstMap(42, "Ilios");
+    const begin = statements.indexOf("BEGIN");
+    expect(statements[begin + 1]).toMatch(/FROM bg_tournaments WHERE id = \? FOR UPDATE/);
   });
 
   it("retire d'office un arbitre devenu inéligible avant le lancement, jamais après", async () => {

@@ -42,11 +42,12 @@
     "MATCH_ALREADY_REFEREED": "Ce match a déjà un arbitre.",
     "NOT_MATCH_REFEREE": "Tu n'arbitres pas ce match.",
     "INVALID_FIRST_MAP": "Nom de carte invalide (64 caractères au plus).",
-    "INVALID_ROUND": "Manche invalide.",
-    "INVALID_ROUND_MAPS": "Cartes invalides : 9 cartes au plus par manche, 20 au plus par pool, 64 caractères par nom.",
+    "INVALID_ROUND": "Tour du tournoi invalide.",
+    "INVALID_ROUND_MAPS": "Cartes invalides : 9 cartes au plus par tour, 20 au plus par pool, 64 caractères par nom.",
     "INVALID_MAP_RULES": "Règle de ban invalide.",
-    "INVALID_MAP_PICK": "Cette carte ne fait pas partie du pool de la manche.",
-    "NOT_MAP_PICKER": "Seuls l'arbitrage et, en autogestion, les équipes du match choisissent la carte."
+    "INVALID_MAP_PICK": "Cette carte ne fait pas partie du pool du tour.",
+    "NOT_MAP_PICKER": "Seuls l'arbitrage et, en autogestion, les équipes du match choisissent la carte.",
+    "ROUND_MAPS_SET": "Les cartes de ce tour sont réglées pour tout le tour : réinitialise le tour pour saisir la carte match par match."
   },
   "readyNoted": "C'est noté, tu es prêt.",
   "readyCanceled": "« Prêt » annulé.",

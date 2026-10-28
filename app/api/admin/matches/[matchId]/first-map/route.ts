@@ -7,7 +7,7 @@ import { can } from "@/lib/shared/permissions";
 
 const STATUSES: Readonly<Record<string, number>> = {
   INVALID_FIRST_MAP: 400,
-  INVALID_MAP_PICK: 400,
+  ROUND_MAPS_SET: 409,
   MATCH_NOT_FOUND: 404,
   MATCH_ALREADY_COMPLETED: 409,
 };
@@ -15,6 +15,8 @@ const STATUSES: Readonly<Record<string, number>> = {
 /**
  * Fixe la première carte du match (`docs/features/MATCH_REFEREE.md`). Corps :
  * `{ map: string | null }` — `null` ou vide la retire. Réservé à l'arbitrage.
+ * Fermée (409 `ROUND_MAPS_SET`) quand la manche porte des cartes réglées au
+ * tour (`docs/features/ROUND_MAPS.md`).
  */
 export async function PUT(req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();

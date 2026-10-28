@@ -29,7 +29,7 @@ import {
   type MatchLaunchInput,
 } from "@/lib/shared/match-launch";
 import { normalizeStreamUrl } from "@/lib/shared/live-streams";
-import { parseStoredSlots, validateMapPick } from "@/lib/shared/round-maps";
+import { parseStoredSlots } from "@/lib/shared/round-maps";
 import {
   groupNoRefereeAlerts,
   normalizeFirstMap,
@@ -55,6 +55,7 @@ import {
   type MatchStreamRow,
 } from "./match-casters";
 import { retryOnDeadlock } from "./deadlock-retry";
+import { lockTournamentRow } from "./registration";
 import { announceRefereeChange, queueRefereeChange } from "./referee-notices";
 import { loadMatchLogRow, matchLogSubject } from "./match-log-subject";
 import { discardBotLogs, flushBotLogs, queueRefereeAlert, queueRoundNoRefereeAlert } from "./bot-logs";
@@ -1154,44 +1155,60 @@ async function announceRoundSelfManagement(sampleMatchId: number, enabled: boole
   }
 }
 
+type FirstMapRow = RowDataPacket & {
+  tournament_id: number;
+  status: MatchStatus;
+  first_map: string | null;
+  phase_id: number;
+  bracket: string;
+  round_number: number;
+};
+
+const FIRST_MAP_SELECT = `SELECT tournament_id, status, first_map, phase_id, bracket, round_number FROM bg_matches WHERE id = ? LIMIT 1`;
+
 /**
  * Première carte du match, saisie par le staff ; `null` (ou vide) la retire.
  *
- * @throws `INVALID_FIRST_MAP` | `INVALID_MAP_PICK` | `MATCH_NOT_FOUND` | `MATCH_ALREADY_COMPLETED`
+ * **Échelle** (`ROUND_MAPS.md`) : dès que la manche du match porte des cartes
+ * réglées au tour, la saisie par match est fermée (`ROUND_MAPS_SET`) — une carte
+ * de pool se choisit par `pickMatchMap`, et réinitialiser la manche rouvre la
+ * saisie. Le tournoi est verrouillé en première instruction (`lockTournamentRow`,
+ * comme `setRoundMaps`) : la saisie ne passe pas à côté d'un réglage posé au même
+ * instant. Le match est lu avant, hors transaction (lecture autonome), pour
+ * connaître son tournoi ; tout est relu sous verrou.
+ *
+ * @throws `INVALID_FIRST_MAP` | `ROUND_MAPS_SET` | `MATCH_NOT_FOUND` | `MATCH_ALREADY_COMPLETED`
  */
 export async function setMatchFirstMap(matchId: number, rawMap: unknown): Promise<void> {
   const typed = normalizeFirstMap(rawMap);
-  const tournamentId = await inTransaction(async (connection) => {
-    const [rows] = await connection.execute<
-      (RowDataPacket & {
-        tournament_id: number;
-        status: MatchStatus;
-        first_map: string | null;
-        phase_id: number;
-        bracket: string;
-        round_number: number;
-      })[]
-    >(
-      `SELECT tournament_id, status, first_map, phase_id, bracket, round_number FROM bg_matches WHERE id = ? LIMIT 1 FOR UPDATE`,
-      [matchId],
-    );
-    const row = rows[0];
-    if (!row) throw new Error("MATCH_NOT_FOUND");
-    if (row.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
-    // Carte 1 réglée pour la manche (`ROUND_MAPS.md`) : imposée, elle ne se
-    // saisit pas ; en pool, la saisie doit en sortir (graphie du pool).
-    const [roundRows] = await connection.execute<(RowDataPacket & { slots_json: string | null })[]>(
-      `SELECT slots_json FROM bg_tournament_round_maps
-        WHERE tournament_id = ? AND phase_id = ? AND bracket = ? AND round_number = ? LIMIT 1`,
-      [row.tournament_id, row.phase_id, row.bracket, row.round_number],
-    );
-    const slots = parseStoredSlots(roundRows[0]?.slots_json);
-    const map = slots.length > 0 ? validateMapPick(slots, 1, typed) : typed;
-    if ((row.first_map ?? null) === map) return null;
-    await connection.execute(`UPDATE bg_matches SET first_map = ? WHERE id = ?`, [map, matchId]);
-    queueRefereeChange(connection, { kind: "FIRST_MAP", matchId, set: map !== null });
-    return Number(row.tournament_id);
+  const pre = await withConnection(async (connection) => {
+    const [rows] = await connection.execute<FirstMapRow[]>(FIRST_MAP_SELECT, [matchId]);
+    return rows[0];
   });
+  if (!pre) throw new Error("MATCH_NOT_FOUND");
+  if (pre.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
+  const ownerId = Number(pre.tournament_id);
+  // Rejouée sur interblocage : le verrou tournoi puis match croise les
+  // écritures d'arbitrage qui prennent le match puis le tournoi.
+  const tournamentId = await retryOnDeadlock(() =>
+    inTransaction(async (connection) => {
+      await lockTournamentRow(connection, ownerId);
+      const [rows] = await connection.execute<FirstMapRow[]>(`${FIRST_MAP_SELECT} FOR UPDATE`, [matchId]);
+      const row = rows[0];
+      if (!row) throw new Error("MATCH_NOT_FOUND");
+      if (row.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
+      const [roundRows] = await connection.execute<(RowDataPacket & { slots_json: string | null })[]>(
+        `SELECT slots_json FROM bg_tournament_round_maps
+          WHERE tournament_id = ? AND phase_id = ? AND bracket = ? AND round_number = ? LIMIT 1`,
+        [ownerId, row.phase_id, row.bracket, row.round_number],
+      );
+      if (parseStoredSlots(roundRows[0]?.slots_json).length > 0) throw new Error("ROUND_MAPS_SET");
+      if ((row.first_map ?? null) === typed) return null;
+      await connection.execute(`UPDATE bg_matches SET first_map = ? WHERE id = ?`, [typed, matchId]);
+      queueRefereeChange(connection, { kind: "FIRST_MAP", matchId, set: typed !== null });
+      return ownerId;
+    }),
+  );
   if (tournamentId !== null) publishMatchUpdatedEvent(tournamentId);
 }
 

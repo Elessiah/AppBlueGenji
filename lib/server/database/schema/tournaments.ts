@@ -306,4 +306,16 @@ export async function createTournamentTables(db: Pool): Promise<void> {
         REFERENCES bg_tournaments(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
+  // Annonce Discord en attente des cartes de manche : une ligne par tournoi,
+  // envoyée quand plus rien ne change (`round-maps-notice.ts`).
+  await createTable(db, `
+    CREATE TABLE IF NOT EXISTS bg_round_maps_notices (
+      tournament_id BIGINT NOT NULL PRIMARY KEY,
+      rounds_json TEXT NOT NULL,
+      changes INT NOT NULL DEFAULT 1,
+      send_after DATETIME NOT NULL,
+      CONSTRAINT fk_bg_round_maps_notice_tournament FOREIGN KEY (tournament_id)
+        REFERENCES bg_tournaments(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
 }

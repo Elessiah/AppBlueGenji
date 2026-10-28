@@ -1,6 +1,6 @@
 {
   "page": {
-    "mapsTitle": "Cartes du round",
+    "mapsTitle": "Cartes du tour",
     "mapN": "Carte {number}",
     "imposed": "Imposée",
     "toChoose": "À choisir parmi {maps}",
@@ -14,16 +14,19 @@
     "nextBans": "Bans des cartes suivantes",
     "nextBansLOSER": "L'équipe qui a perdu la carte précédente bannit en premier ; en cas d'égalité, même ordre qu'à la carte précédente.",
     "nextBansWINNER": "L'équipe qui a gagné la carte précédente bannit en premier ; en cas d'égalité, même ordre qu'à la carte précédente.",
-    "configureMaps": "Paramétrer les cartes du round"
+    "configureMaps": "Paramétrer les cartes du tour",
+    "resetRound": "Réinitialiser le tour",
+    "scaleHint": "Ces cartes valent pour tous les matchs du tour : la carte ne se saisit plus match par match. « Réinitialiser le tour » rend la saisie par match.",
+    "resetConfirmBody": "Les cartes de ce tour sont retirées pour tous ses matchs : la carte se saisit de nouveau match par match. Les choix déjà faits sur les matchs restent."
   },
   "sheet": {
     "title": "Cartes et bans",
-    "lead": "Cartes imposées ou pools par manche, et ordre des bans.",
+    "lead": "Cartes imposées ou pools par tour du tournoi, et ordre des bans.",
     "open": "Paramétrer les cartes et les bans"
   },
   "dialog": {
     "title": "Cartes et bans",
-    "hint": "Une carte par créneau l'impose à tous les matchs de la manche ; plusieurs, séparées par des virgules, forment un pool où l'arbitrage ou l'équipe choisit.",
+    "hint": "Pour chaque tour du tournoi, une carte par créneau l'impose à tous ses matchs ; plusieurs forment un pool où l'arbitrage ou l'équipe choisit.",
     "rulesTitle": "Règles de ban",
     "firstBan": "Premier ban de la carte 1",
     "firstBanOptions": {
@@ -42,17 +45,74 @@
     },
     "saveRules": "Enregistrer les règles",
     "rulesSaved": "Règles de ban enregistrées.",
-    "roundTitle": "Cartes d'une manche",
-    "round": "Manche",
+    "roundTitle": "Cartes d'un tour du tournoi",
+    "round": "Tour du tournoi",
     "slot": "Carte {number}",
-    "slotPlaceholder": "Ex. : Ilios ou Ilios, Lijiang Tower",
     "addSlot": "Ajouter une carte",
     "removeSlot": "Retirer la carte {number}",
-    "slotsLimit": "{max} cartes au plus par manche.",
-    "saveRound": "Enregistrer les cartes",
-    "clearRound": "Retirer le réglage",
-    "roundSaved": "Cartes de la manche enregistrées.",
-    "roundCleared": "Réglage de la manche retiré.",
-    "close": "Fermer"
+    "slotsLimit": "{max} cartes au plus par tour.",
+    "saveRound": "Enregistrer les cartes du tour",
+    "clearRound": "Réinitialiser le tour",
+    "roundSaved": "Cartes du tour enregistrées.",
+    "roundCleared": "Tour réinitialisé : cartes match par match.",
+    "close": "Fermer",
+    "roundN": "Tour {number}",
+    "playoffRoundN": "Play-offs · tour {number}",
+    "summaryNone": "cartes match par match",
+    "summarySet": "{maps, plural, one {# carte} other {# cartes}} · {pools, plural, =0 {aucun pool} one {# pool} other {# pools}}",
+    "scaleHint": "Un tour réglé fixe ses cartes pour tous ses matchs : la saisie match par match y est fermée. « Réinitialiser le tour » la rouvre ; les choix déjà faits sur les matchs restent.",
+    "slotImposed": "Imposée",
+    "slotPool": "Pool · {count} cartes",
+    "slotEmpty": "À compléter",
+    "removeMap": "Retirer {map} de la carte {number}",
+    "chooseMaps": "Choisir les cartes",
+    "hideMaps": "Masquer la liste",
+    "searchLabel": "Rechercher une carte",
+    "searchPlaceholder": "Ex. : Ilios",
+    "noResult": "Aucune carte de la liste ne correspond.",
+    "customLabel": "Autre carte (saisie libre)",
+    "customLabelFree": "Nom de la carte",
+    "customAdd": "Ajouter",
+    "customAddLabel": "Ajouter la carte saisie à la carte {number}",
+    "modes": {
+      "CONTROL": "Contrôle",
+      "ESCORT": "Escorte",
+      "HYBRID": "Hybride",
+      "PUSH": "Offensive",
+      "FLASHPOINT": "Flashpoint",
+      "CLASH": "Affrontement"
+    },
+    "maxMaps": "{max} cartes au plus par match (format du tournoi).",
+    "overMaxMaps": "Ce tour a plus de cartes que le format n'en joue ({max} au plus).",
+    "mapEmpty": "Saisis un nom de carte.",
+    "mapTooLong": "Nom de carte trop long (64 caractères au plus).",
+    "poolFull": "20 cartes au plus par pool.",
+    "applyAll": "Appliquer à tous les tours",
+    "applyAllConfirm": {
+      "title": "Appliquer ces cartes à tous les tours ?",
+      "body": "{count, plural, one {# tour déjà réglé sera remplacé} other {# tours déjà réglés seront remplacés}} par ces cartes. Les choix déjà faits sur les matchs restent.",
+      "confirm": "Appliquer à tous les tours"
+    },
+    "appliedAll": "Cartes appliquées à tous les tours.",
+    "copyLabel": "Copier ces cartes vers",
+    "copy": "Copier",
+    "copyConfirm": {
+      "title": "Remplacer les cartes de ce tour ?",
+      "body": "{round} a déjà ses cartes : elles seront remplacées par celles-ci.",
+      "confirm": "Remplacer"
+    },
+    "copied": "Cartes copiées vers {round}.",
+    "resetConfirm": {
+      "title": "Réinitialiser les cartes du tour ?",
+      "body": "Les cartes de {round} redeviennent saisies match par match. Les choix déjà faits sur les matchs restent.",
+      "confirm": "Réinitialiser"
+    },
+    "switchConfirm": {
+      "title": "Abandonner les cartes non enregistrées ?",
+      "body": "Les cartes saisies pour {round} et pas encore enregistrées seront perdues.",
+      "confirm": "Abandonner"
+    },
+    "pending": "Envoi…",
+    "slotGap": "La carte {number} est vide : remplis-la ou retire-la, sinon les cartes suivantes seraient décalées."
   }
 }

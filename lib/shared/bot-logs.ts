@@ -688,28 +688,21 @@ export function formatRoundSelfManagementLog(context: {
 }
 
 /**
- * Cartes d'une manche réglées ou retirées (`docs/features/ROUND_MAPS.md`) :
- * une ligne pour la manche, sans nommer le staff ni les cartes (la page du
- * match les dit).
+ * Cartes de manche modifiées : **une** ligne pour une série d'enregistrements
+ * (`lib/server/tournaments/round-maps-notice.ts`). Nomme les manches (au plus
+ * `listed`, le reste compté), jamais les cartes ni le staff.
  */
-export function formatRoundMapsLog(context: {
+export function formatRoundMapsSummaryLog(context: {
   tournament: BotLogTournament;
-  roundLabel: string;
-  /** Créneaux retenus ; 0 = réglage retiré. */
-  slots: number;
-  /** Dont imposés (une seule carte). */
-  imposed: number;
+  roundLabels: readonly string[];
+  listed: number;
 }): string {
-  if (context.slots === 0) {
-    return `${lead("🗺️", "Cartes de manche retirées", context.tournament)} : ${context.roundLabel}, par ${ANONYMOUS_STAFF_LABEL}.`;
-  }
-  const plural = context.slots > 1 ? "s" : "";
-  const pools = context.slots - context.imposed;
-  return (
-    `${lead("🗺️", "Cartes de manche réglées", context.tournament)} : ${context.roundLabel} — ` +
-    `${context.slots} carte${plural} (${context.imposed} imposée${context.imposed > 1 ? "s" : ""}, ` +
-    `${pools} pool${pools > 1 ? "s" : ""}), par ${ANONYMOUS_STAFF_LABEL}.`
-  );
+  const shown = context.roundLabels.slice(0, context.listed);
+  const rest = context.roundLabels.length - shown.length;
+  const others = rest > 1 ? "autres" : "autre";
+  const names = rest > 0 ? `${shown.join(", ")} et ${rest} ${others}` : shown.join(", ");
+  const count = context.roundLabels.length;
+  return `${lead("🗺️", "Cartes de manche modifiées", context.tournament)} : ${names} (${count} manche${count > 1 ? "s" : ""}), par ${ANONYMOUS_STAFF_LABEL}.`;
 }
 
 /** Règles de ban et de choix des cartes d'un tournoi modifiées. */
