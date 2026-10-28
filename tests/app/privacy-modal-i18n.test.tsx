@@ -15,7 +15,9 @@ import { ToastProvider } from "@/components/ui/toast";
 import type { Locale } from "@/lib/shared/locales";
 import { PRIVACY_CHANGES, privacyChangesHeading } from "@/lib/shared/privacy-changes";
 import { PRIVACY_CHANGES_EN, localizedPrivacyChanges } from "@/lib/shared/privacy-changes-en";
+import type { PrivacyChange } from "@/lib/shared/privacy-changes";
 import enShell from "@/messages/en/shell.json";
+import frShell from "@/messages/fr/shell.json";
 import { legalPageText } from "../helpers/legal-text";
 
 function render(locale: Locale): string {
@@ -87,5 +89,62 @@ describe("PrivacyChangesModal — langue de la page", () => {
       );
     expect(legalPageText(markup("en"))).toContain("Our privacy rules have changed");
     expect(legalPageText(markup("fr"))).toContain("Nos règles de confidentialité ont changé");
+  });
+});
+
+/**
+ * EF-19 : la phrase d'ouverture ne dit « aucun accord » sans exception que si
+ * aucun changement montré n'annonce des conditions d'utilisation à accepter.
+ */
+describe("PrivacyChangesModal — phrase d'ouverture et conditions à accepter", () => {
+  const TERMS_FR = "seules les nouvelles conditions d'utilisation demandent ton accord";
+  const TERMS_EN = "only the new terms of use need your agreement";
+  const plain: PrivacyChange = { id: "a", publishedAt: "2026-10-29", title: "Titre a", summary: "Résumé a.", details: ["Détail a"] };
+  const terms: PrivacyChange = { ...plain, id: "conditions", title: "Titre conditions", asksTermsAcceptance: true };
+  const intro = (changes: PrivacyChange[], locale: Locale = "fr") =>
+    legalPageText(
+      renderToStaticMarkup(
+        <AppLocaleProvider locale={locale}>
+          <ShellTextProvider locale={locale} messages={locale === "en" ? enShell : undefined}>
+            <ToastProvider>
+              <PrivacyChangesModal changes={changes} />
+            </ToastProvider>
+          </ShellTextProvider>
+        </AppLocaleProvider>,
+      ),
+    );
+
+  it("intro_oneChangeWithoutTerms_saysNoAgreementWithoutException", () => {
+    const text = intro([plain]);
+    expect(text).toContain(frShell.privacyModal.introOne);
+    expect(text).not.toContain(TERMS_FR);
+  });
+
+  it("intro_oneChangeWithTerms_namesTheTermsException", () => {
+    expect(intro([terms])).toContain(`La façon dont BlueGenji traite tes données a changé. Nous te devons cette information : ${TERMS_FR}`);
+  });
+
+  it("intro_manyChangesWithOneTerms_usesManyTermsVariant", () => {
+    expect(intro([plain, terms])).toContain(`Depuis ta dernière visite, la façon dont BlueGenji traite tes données a changé. Nous te devons cette information : ${TERMS_FR}`);
+  });
+
+  it("intro_manyChangesWithoutTerms_usesPlainManyVariant", () => {
+    const text = intro([plain, { ...plain, id: "b", title: "Titre b" }]);
+    expect(text).toContain(frShell.privacyModal.introMany);
+    expect(text).not.toContain(TERMS_FR);
+  });
+
+  it("intro_englishPageWithTerms_namesTheTermsExceptionInEnglish", () => {
+    const text = intro([terms], "en");
+    expect(text).toContain(`The way BlueGenji processes your data has changed. We owe you this information: ${TERMS_EN}`);
+    expect(text).not.toContain(TERMS_FR);
+  });
+
+  it("shellMessages_fourIntroKeys_presentInFrAndEn", () => {
+    for (const shell of [frShell, enShell]) {
+      for (const key of ["introOne", "introMany", "introOneTerms", "introManyTerms"] as const) {
+        expect(shell.privacyModal[key].length).toBeGreaterThan(40);
+      }
+    }
   });
 });

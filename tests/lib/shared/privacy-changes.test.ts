@@ -429,6 +429,19 @@ describe("privacyChangesForOneMessage", () => {
     expect(buildPrivacyChangesMessage(batch, "https://bluegenji.fr")).toContain("Seules les nouvelles conditions d'utilisation demandent ton accord");
   });
 
+  it("privacyChangesForOneMessage_flagOnFrenchOnly_englishFollowsFrenchOrder", () => {
+    const fr = [long("a"), long("b"), change("conditions", "2026-01-20", { asksTermsAcceptance: true })];
+    // Anglais sans drapeau, et des conditions longues : seules, elles tiennent ;
+    // suivies de « a » (même ordre qu'en français), plus.
+    const en = fr.map(({ asksTermsAcceptance: _flag, ...entry }) =>
+      entry.id === "conditions" ? { ...entry, summary: "y".repeat(1100) } : entry,
+    );
+
+    const batch = privacyChangesForOneMessage(fr, "https://bluegenji.fr", en);
+
+    expect(batch.map((c) => c.id)).toEqual(["conditions"]);
+  });
+
   it("privacyChangesForOneMessage_realRegistryDueSinceOct29_firstMessageCarriesTheV7Terms", () => {
     const due = PRIVACY_CHANGES.filter((entry) => entry.publishedAt === "2026-10-29");
 
