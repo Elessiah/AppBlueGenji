@@ -40,7 +40,16 @@ type NoticeRow = RowDataPacket & {
   format: string;
 };
 
+type PhaseRow = RowDataPacket & { id: number; position: number; format: string };
+
 const SWEEP_THROTTLE_MS = 15_000;
+/**
+ * Plafond du signal de fermeture, par tournoi : au plus un envoi anticipé par
+ * fenêtre. Sans lui, enregistrer puis fermer en boucle postait une ligne par
+ * tour de boucle et défaisait le regroupement.
+ */
+const FLUSH_MIN_INTERVAL_MS = ROUND_MAPS_NOTICE_WINDOW_SECONDS * 1000;
+const lastFlushAt = new Map<number, number>();
 let lastSweepAt = 0;
 let sweeping: Promise<number> | null = null;
 let timer: ReturnType<typeof setTimeout> | null = null;
@@ -95,6 +104,34 @@ export async function queueRoundMapsNotice(
   );
 }
 
+/**
+ * Libellés des manches. Un multi-phases préfixe la phase (« Phase 2 · Manche 1 »)
+ * et lit le format suisse **de la phase** : sans cela, deux « Manche 1 » de
+ * phases différentes se confondaient dans le journal.
+ */
+async function labelRounds(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  row: NoticeRow,
+  rounds: NoticeRound[],
+): Promise<string[]> {
+  const phases = new Map<number, PhaseRow>();
+  if (rounds.some((round) => round.phaseId > 0)) {
+    const [phaseRows] = await db.execute<PhaseRow[]>(
+      `SELECT id, position, format FROM bg_tournament_phases WHERE tournament_id = ?`,
+      [row.tournament_id],
+    );
+    for (const phase of phaseRows) phases.set(Number(phase.id), phase);
+  }
+  const position = (round: NoticeRound) => Number(phases.get(round.phaseId)?.position ?? 0);
+  return [...rounds]
+    .sort((a, b) => position(a) - position(b) || a.bracket.localeCompare(b.bracket) || a.roundNumber - b.roundNumber)
+    .map((round) => {
+      const phase = phases.get(round.phaseId);
+      const label = matchRoundLabel(round.bracket, round.roundNumber, (phase?.format ?? row.format) === "SWISS");
+      return phase ? `Phase ${Number(phase.position)} · ${label}` : label;
+    });
+}
+
 /** Revendique puis envoie les lignes données ; rend le nombre de messages partis. */
 async function sendClaimed(rows: readonly NoticeRow[]): Promise<number> {
   const db = await getDatabase();
@@ -105,11 +142,9 @@ async function sendClaimed(rows: readonly NoticeRow[]): Promise<number> {
       [row.tournament_id, row.changes],
     );
     if (result.affectedRows !== 1) continue; // un autre l'a prise, ou un changement a rouvert la fenêtre
-    const swiss = row.format === "SWISS";
-    const roundLabels = parsePending(row.rounds_json)
-      .sort((a, b) => a.phaseId - b.phaseId || a.bracket.localeCompare(b.bracket) || a.roundNumber - b.roundNumber)
-      .map((round) => matchRoundLabel(round.bracket, round.roundNumber, swiss));
-    if (roundLabels.length === 0) continue;
+    const rounds = parsePending(row.rounds_json);
+    if (rounds.length === 0) continue;
+    const roundLabels = await labelRounds(db, row, rounds);
     await sendBotLog(
       formatRoundMapsSummaryLog({
         tournament: { id: Number(row.tournament_id), name: row.name },
@@ -152,12 +187,21 @@ export async function dispatchDueRoundMapsNotices(): Promise<number> {
 
 /**
  * Envoie tout de suite l'annonce de ce tournoi, fenêtre ou non (écran fermé).
+ * Au plus une fois par fenêtre et par tournoi ({@link FLUSH_MIN_INTERVAL_MS}) :
+ * au-delà, rien ne part et la fenêtre de silence enverra l'annonce.
  * @returns `true` si un message est parti.
  */
 export async function flushRoundMapsNotice(tournamentId: number): Promise<boolean> {
+  const now = Date.now();
+  if (now - (lastFlushAt.get(tournamentId) ?? 0) < FLUSH_MIN_INTERVAL_MS) return false;
   const db = await getDatabase();
   const [rows] = await db.execute<NoticeRow[]>(`${NOTICE_SELECT} WHERE n.tournament_id = ?`, [tournamentId]);
-  return (await sendClaimed(rows)) > 0;
+  const sent = (await sendClaimed(rows)) > 0;
+  if (sent) {
+    for (const [id, at] of lastFlushAt) if (now - at >= FLUSH_MIN_INTERVAL_MS) lastFlushAt.delete(id);
+    lastFlushAt.set(tournamentId, now);
+  }
+  return sent;
 }
 
 /**
@@ -177,6 +221,7 @@ export function scheduleRoundMapsNotice(): void {
 /** Remet l'état du processus à zéro. Réservé aux tests. */
 export function resetRoundMapsNoticeState(): void {
   lastSweepAt = 0;
+  lastFlushAt.clear();
   sweeping = null;
   if (timer) clearTimeout(timer);
   timer = null;

@@ -31,8 +31,11 @@ const dueRow = (rounds: unknown, changes = 1, format = "SINGLE") => ({
 
 let execute: jest.Mock<SqlQuery>;
 
-function pool(select: unknown[], claimed = 1) {
-  execute = jest.fn<SqlQuery>(async (sql) => (/^\s*SELECT/.test(sql) ? [select, []] : [{ affectedRows: claimed }, []]));
+function pool(select: unknown[], claimed = 1, phases: unknown[] = []) {
+  execute = jest.fn<SqlQuery>(async (sql) => {
+    if (/bg_tournament_phases/.test(sql)) return [phases, []];
+    return /^\s*SELECT/.test(sql) ? [select, []] : [{ affectedRows: claimed }, []];
+  });
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 }
 
@@ -161,6 +164,93 @@ describe("flushRoundMapsNotice", () => {
   it("flushRoundMapsNotice_sweepAlreadyClaimedIt_returnsFalse", async () => {
     pool([dueRow([R2])], 0);
     await expect(flushRoundMapsNotice(7)).resolves.toBe(false);
+  });
+});
+
+describe("dispatchDueRoundMapsNotices — phases", () => {
+  it("dispatchDueRoundMapsNotices_singlePhaseRounds_skipsThePhaseQuery", async () => {
+    pool([dueRow([R2])]);
+    await dispatchDueRoundMapsNotices();
+    expect(execute.mock.calls.some(([sql]) => /bg_tournament_phases/.test(sql))).toBe(false);
+    expect(jest.mocked(sendBotLog).mock.calls[0][0]).not.toContain("Phase");
+  });
+
+  it("dispatchDueRoundMapsNotices_twoPhasesSameRoundNumber_prefixesEachPhase", async () => {
+    const rounds = [
+      { phaseId: 11, bracket: "UPPER", roundNumber: 1 },
+      { phaseId: 12, bracket: "UPPER", roundNumber: 1 },
+    ];
+    const phases = [
+      { id: 11, position: 2, format: "SINGLE" },
+      { id: 12, position: 1, format: "SINGLE" },
+    ];
+    pool([dueRow(rounds, 1, "MULTI")], 1, phases);
+    await dispatchDueRoundMapsNotices();
+    expect(jest.mocked(sendBotLog).mock.calls[0][0]).toContain("Phase 1 · Manche 1, Phase 2 · Manche 1 (2 manches)");
+  });
+
+  it("dispatchDueRoundMapsNotices_swissPhaseInMultiTournament_usesSwissLabel", async () => {
+    pool([dueRow([{ phaseId: 11, bracket: "UPPER", roundNumber: 2 }], 1, "MULTI")], 1, [
+      { id: 11, position: 1, format: "SWISS" },
+    ]);
+    await dispatchDueRoundMapsNotices();
+    expect(jest.mocked(sendBotLog).mock.calls[0][0]).toContain("Phase 1 · Ronde 2 (1 manche)");
+  });
+
+  it("dispatchDueRoundMapsNotices_unknownPhaseId_fallsBackToTournamentFormat", async () => {
+    pool([dueRow([{ phaseId: 99, bracket: "UPPER", roundNumber: 2 }], 1, "SWISS")], 1, []);
+    await dispatchDueRoundMapsNotices();
+    const message = jest.mocked(sendBotLog).mock.calls[0][0];
+    expect(message).toContain(": Ronde 2 (1 manche)");
+    expect(message).not.toContain("Phase");
+  });
+});
+
+describe("flushRoundMapsNotice — cap per tournament", () => {
+  it("flushRoundMapsNotice_secondFlushWithinWindow_sendsNothing", async () => {
+    pool([dueRow([R2])]);
+    await flushRoundMapsNotice(7);
+    execute.mockClear();
+    await expect(flushRoundMapsNotice(7)).resolves.toBe(false);
+    expect(execute).not.toHaveBeenCalled();
+    expect(sendBotLog).toHaveBeenCalledTimes(1);
+  });
+
+  it("flushRoundMapsNotice_flushAfterWindow_sendsAgain", async () => {
+    const now = jest.spyOn(Date, "now").mockReturnValue(1_000_000);
+    pool([dueRow([R2])]);
+    await flushRoundMapsNotice(7);
+    now.mockReturnValue(1_060_000);
+    await expect(flushRoundMapsNotice(7)).resolves.toBe(true);
+  });
+
+  it("flushRoundMapsNotice_oneMillisecondBeforeWindowEnds_sendsNothing", async () => {
+    const now = jest.spyOn(Date, "now").mockReturnValue(1_000_000);
+    pool([dueRow([R2])]);
+    await flushRoundMapsNotice(7);
+    now.mockReturnValue(1_059_999);
+    await expect(flushRoundMapsNotice(7)).resolves.toBe(false);
+  });
+
+  it("flushRoundMapsNotice_otherTournament_notCapped", async () => {
+    pool([dueRow([R2])]);
+    await flushRoundMapsNotice(7);
+    pool([{ ...dueRow([R2]), tournament_id: 8 }]);
+    await expect(flushRoundMapsNotice(8)).resolves.toBe(true);
+  });
+
+  it("flushRoundMapsNotice_previousFlushSentNothing_doesNotCap", async () => {
+    pool([]);
+    await flushRoundMapsNotice(7);
+    pool([dueRow([R2])]);
+    await expect(flushRoundMapsNotice(7)).resolves.toBe(true);
+  });
+
+  it("flushRoundMapsNotice_afterReset_capCleared", async () => {
+    pool([dueRow([R2])]);
+    await flushRoundMapsNotice(7);
+    resetRoundMapsNoticeState();
+    await expect(flushRoundMapsNotice(7)).resolves.toBe(true);
   });
 });
 

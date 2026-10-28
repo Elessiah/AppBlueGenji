@@ -134,8 +134,11 @@ jamais figé avant le verrou. Rejoué sur interblocage (`retryOnDeadlock`).
   (`dispatchDueRoundMapsNotices`, appelé par la liste des tournois, étranglé à
   15 s), un minuteur de processus n'est qu'un accélérateur. La fermeture de
   l'écran appelle `POST /api/admin/tournaments/[id]/round-maps/flush` (permission
-  `tournaments`) pour envoyer tout de suite — jamais le seul déclencheur : un
-  onglet fermé n'y perd rien. La ligne est revendiquée par
+  `tournaments`) pour envoyer tout de suite — au plus un envoi anticipé par
+  tournoi et par fenêtre de 60 s (au-delà, la fenêtre de silence enverra), et
+  jamais le seul déclencheur : un onglet fermé n'y perd rien. Un multi-phases
+  préfixe la phase (« Phase 2 · Manche 1 ») et prend le format suisse de la
+  phase. La ligne est revendiquée par
   `DELETE … WHERE changes = ?` : pas de doublon, pas de changement perdu.
 - Journal du staff anonyme (`formatRoundMapsSummaryLog`, `formatMapRulesLog`, choix
   `MAP_PICKED*` de `referee-notices`) : aucune personne nommée.
