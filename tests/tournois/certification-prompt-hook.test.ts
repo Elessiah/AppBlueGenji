@@ -94,14 +94,22 @@ import {
 
 type HookResult = ReturnType<typeof useCertificationPrompt>;
 
+/** Le compte du lecteur à qui l'invitation est montrée. */
+const VIEWER_ID = 7;
+
 /** Un rendu, puis ses effets, jusqu'à ce que plus aucun état ne change. */
-function render(prompt: CertificationPrompt | null | undefined, frozen = false, tournamentId = 5): HookResult {
+function render(
+  prompt: CertificationPrompt | null | undefined,
+  frozen = false,
+  tournamentId = 5,
+  viewerUserId: number | null = VIEWER_ID,
+): HookResult {
   let result: HookResult;
   let rounds = 0;
   do {
     bench.dirty = false;
     bench.index = { state: 0, ref: 0, callback: 0, effect: 0 };
-    result = runHook(tournamentId, prompt, frozen);
+    result = runHook(tournamentId, prompt, frozen, viewerUserId);
     for (const slot of bench.effects) {
       if (!slot.pending) continue;
       if (typeof slot.cleanup === "function") slot.cleanup();
@@ -192,8 +200,29 @@ describe("useCertificationPrompt", () => {
     first.setNeverAgain(true);
     act(() => first.close(), PROMPT);
     expect(neverAgainPosts()).toHaveLength(1);
-    expect(fetchMock.mock.calls[0][1]).toEqual({ method: "POST", keepalive: true });
+    expect(fetchMock.mock.calls[0][1]).toEqual({
+      method: "POST",
+      keepalive: true,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: VIEWER_ID }),
+    });
     expect(local.values.size).toBe(0);
+  });
+
+  it("« Ne plus voir » désigne le compte à qui la modale a été montrée, pas celui d'un contexte relu depuis", () => {
+    const first = render(PROMPT, false, 5, VIEWER_ID);
+    first.setNeverAgain(true);
+    first.close();
+    render(PROMPT, false, 5, 8);
+    expect(neverAgainPosts()).toHaveLength(1);
+    expect(neverAgainPosts()[0][1]?.body).toBe(JSON.stringify({ userId: VIEWER_ID }));
+  });
+
+  it("lecteur inconnu : « Ne plus voir » n'envoie rien plutôt qu'un compte deviné", () => {
+    const first = render(PROMPT, false, 5, null);
+    first.setNeverAgain(true);
+    act(() => first.close(), PROMPT);
+    expect(neverAgainPosts()).toHaveLength(0);
   });
 
   it("une sauvegarde du « Ne plus voir » en échec reste muette : la modale se ferme quand même", async () => {
