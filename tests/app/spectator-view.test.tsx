@@ -541,6 +541,18 @@ describe("page sans compte — ce que la fiche tait des données retirées", () 
     const en = tournamentActionsText("en", messagesFor("en").tournamentActions);
     expect(pendingReportText(fr, state, true)).toBe("Score proposé par Alpha · à confirmer");
     expect(pendingReportText(en, state, true)).toBe("Score proposed by Alpha · awaiting confirmation");
+    // Échéance et suspension restent dites, toujours sans chiffres.
+    const due = { ...state, deadlineAt: "2026-10-28T10:13:00.000Z" };
+    expect(pendingReportText(fr, due, true)).toBe(
+      "Score proposé par Alpha · validation automatique à 11:13 (heure de Paris) sans réponse",
+    );
+    expect(pendingReportText(en, due, true)).toMatch(/^Score proposed by Alpha · automatic confirmation at .+ \(Paris time\) without an answer$/);
+    expect(pendingReportText(fr, { ...due, paused: true }, true)).toBe(
+      "Score proposé par Alpha · validation automatique suspendue par l'arbitrage",
+    );
+    expect(pendingReportText(en, { ...due, paused: true }, true)).toBe(
+      "Score proposed by Alpha · automatic confirmation paused by a referee",
+    );
     // Membre : le score proposé, comme avant.
     expect(pendingReportText(fr, { ...state, team1Score: 2, team2Score: 1 }, false)).toContain("2 – 1");
     // Un litige reste dit tel quel.
