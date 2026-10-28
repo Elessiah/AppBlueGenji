@@ -594,6 +594,24 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "The direct message only goes to a certified Discord tag and is turned off, like the other match messages, with the “Discord direct messages about my matches” box in “My profile”; the push notification has its own topic, “Lobby settings”, on by default for anyone who turned on push notifications, which you can turn off in “My profile”.",
     ],
   },
+  "2026-10-conditions-v7-casters-et-arbitre": {
+    linkLabels: [
+      "Read the “Match contacts” section",
+      "Read the “Match streaming” section",
+      "Read the “Assigned referee of a match” paragraph",
+    ],
+    title: "Terms of use: version 7 (casters, assigned referee, match page)",
+    summary:
+      "The terms of use move to version 7: their “Match contacts” section provides for several casters per match, the assigned referee and the match page, and presenting the assigned referee now rests on the performance of the service, no longer on legitimate interest.",
+    details: [
+      "Match contacts: a match's contacts go to each of its casters while the match is being played, and each caster's also to the other casters of the match. The assigned referee is presented there — their username and BattleTag, even when hidden, never their Discord tag — to both teams and to the referees from the moment both opponents are known until the end of the match, and to the casters while the match is being played.",
+      "Match page: it repeats the casters' contacts (certified Discord tag and BattleTag, even when hidden) and the assigned referee's BattleTag, even when hidden, to the same people at the same times as the match's “Contacts” window; the teams' contacts stay in the “Contacts” and launch windows. A hidden BattleTag can be read nowhere else on the site.",
+      "If you referee: presenting your username and BattleTag to the parties to your matches now rests on the performance of the service — the terms of use provide for it —, no longer on legitimate interest: objecting through the report form no longer applies to it. You can still withdraw from a match at any time, the staff being able to assign it to you again; without the refereeing permission, you are no longer presented.",
+      "Streaming: the terms now say that the evening #live message names the teams and, in a solo tournament, the players by their public username before a match scheduled that evening starts and once the match is finished, not only when it starts. A match being listed in that message before it goes on air leaves no trace on the site.",
+      "Acceptance: without accepting the terms, you can delete your account directly from the window that presents them to you, as from your profile.",
+      "Terms of use: version 7, in force since 29 October 2026, says so in its “Match contacts”, “Match streaming” and “Acceptance” sections. A window presents it to you until you have accepted it: accepting it lets you keep using the site.",
+    ],
+  },
 };
 
 /**
