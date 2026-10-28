@@ -23,6 +23,10 @@ Vu de l'engagée du destinataire (« ton match « A » contre « B » ») :
 - le lien de la **page du match** (`/tournois/[id]/matchs/[matchId]`,
   `matchPageHref`, sous `/en` pour un compte anglais une fois la route traduite
   par MR-3), seule à montrer les BattleTags à inviter.
+- **Hors Overwatch** (Marvel Rivals, décision 35, 2026-10-28 ; `side.game`,
+  `battletagRelevantFor`) : on ne s'y invite pas par BattleTag — la ligne de
+  l'arbitre perd « ajoute-le en jeu » (« il invitera les joueurs dans le
+  salon ») et le lien devient « Réglages à jour » / “Up-to-date settings”.
 
 **Jamais** de BattleTag, de tag Discord ni de pseudo de joueur (décision du
 2026-10-27). Noms d'équipe neutralisés (`discordInline`, une ligne). En

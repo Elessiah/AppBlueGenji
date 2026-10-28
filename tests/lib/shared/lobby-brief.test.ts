@@ -22,6 +22,7 @@ function side(overrides: Partial<LobbyBriefSide> = {}): LobbyBriefSide {
     bracket: "UPPER",
     roundNumber: 2,
     solo: false,
+    game: "OW",
     teamName: "Renards",
     opponentName: "Nova",
     hosting: true,
@@ -79,6 +80,26 @@ describe("formatLobbyBriefDm", () => {
         `BattleTags to invite and up-to-date settings: ${localizedSiteUrl(URL, "en")}`,
       ].join("\n"),
     );
+  });
+
+  it("formatLobbyBriefDm_marvelRivalsReferee_noBattletagNorInGameAdd", () => {
+    const fr = formatLobbyBriefDm(side({ game: "MR", decision: "REFEREE" }), URL);
+    const en = formatLobbyBriefDm(side({ game: "MR", decision: "REFEREE" }), URL, "en");
+
+    expect(fr).toContain("• Arbitre désigné : il invitera les joueurs dans le salon.");
+    expect(fr.endsWith(`Réglages à jour : ${URL}`)).toBe(true);
+    expect(en).toContain("• Assigned referee: they will invite the players to the lobby.");
+    expect(en.endsWith(`Up-to-date settings: ${localizedSiteUrl(URL, "en")}`)).toBe(true);
+    for (const text of [fr, en]) {
+      expect(text).not.toMatch(/BattleTag|ajoute-le|add them/);
+    }
+  });
+
+  it("formatLobbyBriefDm_marvelRivalsSelfManaged_keepsDecisionLineWithoutBattletag", () => {
+    const fr = formatLobbyBriefDm(side({ game: "MR", decision: "SELF_MANAGED" }), URL);
+
+    expect(fr).toContain("les managers des deux équipes s'invitent mutuellement, puis invitent les casters.");
+    expect(fr).not.toContain("BattleTag");
   });
 
   it("en tournoi individuel, ne nomme personne : « toi » et « ton adversaire »", () => {
