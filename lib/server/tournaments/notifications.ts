@@ -31,6 +31,10 @@ function scheduleMatchStartNotices(): void {
   void import("./player-pushes")
     .then(({ dispatchMatchStartNotices }) => dispatchMatchStartNotices())
     .catch(() => undefined);
+  // Le brief du salon (`./lobby-brief`) part du même moment : l'ouverture du salon.
+  void import("./lobby-brief")
+    .then(({ dispatchLobbyBriefs }) => dispatchLobbyBriefs())
+    .catch(() => undefined);
   void import("./live-announcements")
     .then(({ dispatchLiveAnnouncements }) => dispatchLiveAnnouncements())
     .catch(() => undefined);

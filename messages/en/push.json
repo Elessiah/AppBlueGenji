@@ -4,6 +4,10 @@
       "label": "Match start",
       "description": "Your match is entering its launch: mark yourself ready, or it has just been launched."
     },
+    "MATCH_LOBBY_BRIEF": {
+      "label": "Lobby settings",
+      "description": "When the lobby of a match you manage opens (team owner or manager, player of a solo tournament): who plays left (host) and right, the first map, the first ban and, if it is cast, the reminder to sort the players by role."
+    },
     "SCORE_TO_CONFIRM": {
       "label": "Score to confirm",
       "description": "The opposing team entered a score that you need to confirm or dispute, or an entered score was confirmed automatically after at least 2 hours without an answer."

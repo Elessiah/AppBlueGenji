@@ -45,6 +45,11 @@ export const PUSH_TOPICS = {
     description: "Ton match entre en lancement : déclare-toi prêt, ou il vient d'être lancé.",
     audience: null,
   },
+  MATCH_LOBBY_BRIEF: {
+    label: "Réglages du salon",
+    description: "À l'ouverture du salon d'un match que tu gères (propriétaire ou manager d'une équipe, joueur d'un tournoi individuel) : qui joue à gauche (hôte) et à droite, la première carte, le premier ban et, s'il est casté, le rappel de trier les joueurs par rôle.",
+    audience: null,
+  },
   SCORE_TO_CONFIRM: {
     label: "Score à confirmer",
     description: "L'équipe adverse a saisi un score que tu dois confirmer ou contester, ou un score saisi a été validé automatiquement faute de réponse après au moins 2 h.",

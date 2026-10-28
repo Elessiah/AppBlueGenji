@@ -127,7 +127,7 @@ async function planStartNotice(row: StartingMatchRow): Promise<MatchStartPhase |
  * condition du cast. Une panne de lecture n'en appelle aucun — les joueurs
  * gardent leur annonce.
  */
-async function readMatchCasters(
+export async function readMatchCasters(
   db: Awaited<ReturnType<typeof getDatabase>>,
   matchIds: readonly number[],
 ): Promise<Map<number, number[]>> {
@@ -167,7 +167,9 @@ async function runMatchStartSweep(): Promise<number> {
              OR m.launched_at > NOW() - INTERVAL ? MINUTE)
         AND NOT EXISTS (SELECT 1 FROM bg_match_start_notices n
                          WHERE n.match_id = m.id AND n.pairing = m.launch_pairing
-                           AND (n.phase = 'LOBBY' OR m.launched_at IS NOT NULL))
+                           -- Le brief du salon (\`LOBBY_BRIEF\`, ./lobby-brief) partage la
+                           -- table : il ne tient lieu ni de l'appel aux « Prêt » ni du départ.
+                           AND (n.phase = 'LOBBY' OR (n.phase = 'LAUNCHED' AND m.launched_at IS NOT NULL)))
       ORDER BY m.id`,
     [LOBBY_NOTICE_WINDOW_MINUTES, LAUNCH_NOTICE_WINDOW_MINUTES],
   );

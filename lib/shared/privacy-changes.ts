@@ -1127,6 +1127,23 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "La prise d'un match, son retrait, l'autogestion et la première carte sont notés au journal du staff sur Discord sans nommer personne ; un match qui entre en lancement sans arbitre ni autogestion est signalé aux arbitres, sans rien basculer d'office.",
     ],
   },
+  {
+    // MATCH-REFEREE MR-4 : brief du salon — nouveau message privé de match et
+    // nouveau sujet push, adressés à ceux qui gèrent les engagées (propriétaires,
+    // managers, joueur d'une entrée solo). Joueurs concernés : pas de public.
+    // Daté comme les entrées MR-1 et MR-2 (mise en ligne groupée, heure
+    // inconnue — § Dates corrigées).
+    id: "2026-10-reglages-du-salon-aux-managers",
+    publishedAt: "2026-10-29",
+    title: "Réglages du salon envoyés aux managers",
+    links: [MATCH_DM_PARAGRAPH_LINK],
+    summary:
+      "Si tu gères une équipe engagée (propriétaire ou manager) ou joues un tournoi individuel, le site t'envoie, à l'ouverture du salon d'un match, les réglages de la partie en message privé Discord et en notification push.",
+    details: [
+      "Le message dit qui joue à gauche (l'hôte) et à droite, la première carte, le premier ban, le rappel de trier les joueurs par rôle si le match est casté, et s'il a un arbitre désigné ou passe en autogestion, avec les noms d'équipe, le tournoi, la manche et le lien de la page du match. Il ne contient ni BattleTag, ni tag Discord, ni pseudo de joueur : en tournoi individuel, il dit « toi » et « ton adversaire ». Il part une fois par adversaire.",
+      "Le message privé ne part qu'à un tag Discord certifié et se coupe, comme les autres messages de match, par la case « Messages privés Discord de mes matchs » de « Mon profil » ; la notification push a son propre réglage, « Réglages du salon ».",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

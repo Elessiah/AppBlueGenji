@@ -1010,7 +1010,12 @@ function RgpdFr({
             <strong>Messages privés Discord de match.</strong> Le bot vous écrit aussi en privé, dans la
             langue de votre compte, quand l&apos;horaire d&apos;un de vos matchs est posé, changé ou retiré, pour ses
             rappels (24 h et 10 h avant), quand vous êtes retiré d&apos;un match et, si vous castez, quand votre
-            inscription de caster sur un match est retirée par le staff ou d&apos;office (avec le motif) — seulement si votre tag
+            inscription de caster sur un match est retirée par le staff ou d&apos;office (avec le motif) et, si vous gérez une
+            équipe engagée (propriétaire ou manager) ou jouez un tournoi individuel, à l&apos;ouverture du salon d&apos;un
+            match, une fois par adversaire, les réglages de la partie (équipe à gauche — l&apos;hôte — et à droite, première
+            carte, premier ban, tri des joueurs par rôle si le match est casté, arbitre désigné ou autogestion), avec les noms
+            d&apos;équipe et le lien de la page du match, sans BattleTag, tag Discord ni pseudo de joueur (en tournoi
+            individuel, le message ne nomme ni vous ni votre adversaire) — seulement si votre tag
             Discord est <strong>certifié</strong> : un tag non certifié, même rattaché par la connexion Discord,
             n&apos;en reçoit aucun, pour
             éviter le spam (vos notifications push, elles, partent quand même). Ces messages reposent

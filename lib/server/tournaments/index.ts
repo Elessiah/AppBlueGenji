@@ -186,6 +186,7 @@ import { cachedTournamentList, invalidateTournamentLists } from "./list-cache";
 import { getTournamentPreview } from "./preview-cache";
 import { dispatchDueMatchReminders } from "./match-reminders";
 import { dispatchMatchStartNotices, notifyScoreToConfirm } from "./player-pushes";
+import { dispatchLobbyBriefs } from "./lobby-brief";
 import { dispatchLiveAnnouncements } from "./live-announcements";
 import { purgeExpiredConnectionLogs } from "@/lib/server/connection-logs";
 import { maintainSiteVisitRetention } from "@/lib/server/site-visits-service";
@@ -642,6 +643,8 @@ export async function listTournamentBuckets(
   // Même raison pour les départs de match : un lancement ouvert par l'horloge
   // n'a pas toujours d'écriture derrière lui pour déclencher son annonce.
   void dispatchMatchStartNotices().catch(() => undefined);
+  // Et le brief du salon des managers (`./lobby-brief`), ouvert au même moment.
+  void dispatchLobbyBriefs().catch(() => undefined);
   // Et pour l'annonce des lives : le mode `START_TIME` passe à l'antenne à
   // l'heure dite, sans aucune écriture.
   void dispatchLiveAnnouncements().catch(() => undefined);

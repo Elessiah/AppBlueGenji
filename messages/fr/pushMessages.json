@@ -7,6 +7,14 @@
     "bodyLobby": "{pairing} · {tournament}. Déclare-toi prêt.",
     "bodyLaunched": "{pairing} · {tournament}. Bonne partie !"
   },
+  "lobbyBrief": {
+    "title": "Salon ouvert : réglages du match",
+    "body": "{pairing} · Gauche (hôte) : {left} · Droite : {right} · 1re carte : {map} · 1er ban : {ban}.",
+    "bodyCast": "{pairing} · Gauche (hôte) : {left} · Droite : {right} · 1re carte : {map} · 1er ban : {ban}. Match casté : trie les joueurs par rôle.",
+    "noMap": "pas encore fixée",
+    "own": "toi",
+    "other": "ton adversaire"
+  },
   "matchReminder": {
     "title": "Match dans {offset}",
     "titleScheduled": "Match programmé",

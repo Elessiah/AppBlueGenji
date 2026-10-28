@@ -129,3 +129,12 @@ export function phaseRevealingMatch(
 
   return match.phaseId;
 }
+
+/**
+ * Chemin de la page du match (`/tournois/[id]/matchs/[matchId]`, MR-3). Écrit
+ * ici pour le brief du salon (`./lobby-brief`) tant que la page n'est pas
+ * sur `main` : `matchPagePath` (`lib/shared/match-page.ts`) le remplacera.
+ */
+export function matchPageHref(tournamentId: number, matchId: number): string {
+  return `/tournois/${tournamentId}/matchs/${matchId}`;
+}
