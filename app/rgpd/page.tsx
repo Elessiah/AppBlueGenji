@@ -1065,9 +1065,8 @@ function RgpdFr({
             des conditions d&apos;utilisation, qui la prévoient (section « Contacts de match »), pour que les
             parties sachent qui arbitre et, en Overwatch, puissent l&apos;ajouter en jeu ; tant qu&apos;il ne l&apos;a pas
             acceptée, elle relève de l&apos;<strong>intérêt légitime</strong> (même but), et il peut s&apos;y
-            opposer par le formulaire de signalement (catégorie RGPD) — retenue, son opposition fait que le staff
-            ne lui confie plus de match (ceux qu'il tient déjà lui restent), et continue de valoir une fois la version 7 acceptée. Il peut se retirer d&apos;un match à tout moment, le staff
-            pouvant lui confier de nouveau ce match, sans avis ; tant qu&apos;il n&apos;a pas accepté la version 7, la fenêtre
+            opposer par le formulaire de signalement (catégorie RGPD) — retenue, son opposition le retire de tous ses matchs non terminés (le staff en désigne un autre ; ses matchs joués gardent leur arbitre) et l&apos;empêche d'en prendre un ou de s&apos;en voir confier un tant qu&apos;elle n'est pas levée, et continue de valoir une fois la version 7 acceptée ; la date à laquelle elle est retenue reste sur son compte jusqu&apos;à sa levée par le staff ou la suppression du compte. Il peut se retirer d&apos;un match à tout moment, le staff
+            pouvant lui confier de nouveau ce match (sauf opposition retenue), sans avis ; tant qu&apos;il n&apos;a pas accepté la version 7, la fenêtre
             d&apos;acceptation couvrant les pages des tournois, il s&apos;en retire en le demandant par ce même formulaire. Le recueil de son « Prêt » et l&apos;avis du retrait relèvent aussi de l&apos;exécution
             du service, les arbitres agissant pour l&apos;association (<Link href="/rgpd/registre#t04">registre, T04</Link>).
           </p>

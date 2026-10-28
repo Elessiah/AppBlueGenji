@@ -317,9 +317,15 @@ describe("registre — cartes choisies dans le pool de la manche (T04, T05)", ()
   });
 });
 
-describe("/rgpd — opposition retenue d'un arbitre (décision L430, comportement actuel)", () => {
-  it("rgpdArbitreDesigne_upheldObjection_saysExistingAssignmentsStayFrAndEn", () => {
-    expect(source("app/rgpd/page.tsx")).toContain("ne lui confie plus de match (ceux qu'il tient déjà lui restent)");
-    expect(source("app/rgpd/RgpdEn.tsx")).toContain("no longer assigns them matches (those they already hold stay theirs)");
+describe("/rgpd — opposition retenue d'un arbitre (décision 42b, REFEREE-OBJECTION)", () => {
+  it("rgpdArbitreDesigne_upheldObjection_saysRemovedFromUnfinishedMatchesFrAndEn", () => {
+    const fr = source("app/rgpd/page.tsx").replace(/\s+/g, " ");
+    const en = source("app/rgpd/RgpdEn.tsx").replace(/\s+/g, " ");
+    expect(fr).toContain("son opposition le retire de tous ses matchs non terminés (le staff en désigne un autre ; ses matchs joués gardent leur arbitre)");
+    expect(fr).toContain("le staff pouvant lui confier de nouveau ce match (sauf opposition retenue)");
+    expect(fr).not.toContain("ceux qu'il tient déjà lui restent");
+    expect(en).toContain("their objection removes them from all their unfinished matches (the staff assigns another referee; their played matches keep their referee)");
+    expect(en).toContain("assign that match to them again (unless an objection is upheld)");
+    expect(en).not.toContain("those they already hold stay theirs");
   });
 });

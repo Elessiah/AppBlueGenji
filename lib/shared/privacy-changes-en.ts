@@ -643,6 +643,17 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "A team now presents only one contact there, chosen on the certified Discord tag alone: a verified BattleTag no longer moves a player up nor brings in a second member. A team none of whose members has certified their Discord tag is presented by one member's username and team role (captain, manager, owner, then a player), with no other identifier.",
     ],
   },
+  "2026-10-opposition-arbitre-retrait-des-matchs": {
+    title: "A referee's objection: removal from their ongoing matches",
+    linkLabels: ["Read the “Assigned referee of a match” paragraph"],
+    summary:
+      "When the staff upholds a referee's objection to being presented to the parties to their matches, that referee is now removed from all their unfinished matches and can no longer referee — neither take a match nor be assigned one — until it is lifted. Until now, the matches they already held stayed theirs.",
+    details: [
+      "If you referee: once upheld, your objection (report form, GDPR category) removes you from all your unfinished matches, launched ones included — you are notified by push notification, match by match — and the staff assigns another referee; your played matches keep their referee. You can no longer take a match nor be assigned one until the staff lifts it; it still stands once version 7 of the terms is accepted.",
+      "The date your objection was upheld is kept on your account until it is lifted or the account is deleted, and is included in your data export. The staff log on Discord notes the action, its lifting and each removal without naming anyone; the staff member who took it and your account identifier only appear in the server logs.",
+      "If you play or cast a match: its referee may thus change before or during the match; the new referee is presented to you like the previous one.",
+    ],
+  },
 };
 
 /**

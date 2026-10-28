@@ -882,9 +882,7 @@ export function RgpdEn({
             accepted version 7 of the terms of use, which provide for it (“Match contacts” section), so that the
             parties know who referees and, in Overwatch, can add them in game; until they accept it, it falls under{" "}
             <strong>legitimate interest</strong> (same aim), and they may object to it through the report form
-            (GDPR category) — once upheld, their objection means the staff no longer assigns them matches (those they already hold stay theirs), and still stands once version 7
-            is accepted. They can withdraw from a match at any time, the staff being able to
-            assign that match to them again, without notice; until they have accepted version 7, as the acceptance window
+            (GDPR category) — once upheld, their objection removes them from all their unfinished matches (the staff assigns another referee; their played matches keep their referee) and stops them taking or being assigned one until it is lifted, and still stands once version 7 is accepted; the date it was upheld is kept on their account until the staff lifts it or the account is deleted. They can withdraw from a match at any time, the staff being able to assign that match to them again (unless an objection is upheld), without notice; until they have accepted version 7, as the acceptance window
             covers the tournament pages, they withdraw by asking for it through that same form. Collecting their “Ready” and the removal notice also fall under performance of the service,
             the referees acting for the association (<LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>).
           </p>
