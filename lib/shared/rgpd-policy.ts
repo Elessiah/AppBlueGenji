@@ -48,7 +48,7 @@ export const MATCH_CONTACTS_SCOPE =
  * 2026-10-19), prévue par les conditions d'utilisation.
  */
 export const BATTLETAG_MATCH_SCOPE =
-  "lecture, même masqué, dans un tournoi Overwatch seulement (jamais en Marvel Rivals), dans la seule fenêtre « Contacts » d'un match où tu es présenté comme contact et dans sa fenêtre de lancement : par ses deux équipes et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, par ses casters le temps du match ; celui d'un caster, par les deux équipes et les autres casters du match le temps du match et par les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, dans ces fenêtres et sur la page du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné) — arbitres et administrateurs n'y ont pas d'autre accès (conditions d'utilisation, « Contacts de match »)";
+  "lecture, même masqué, dans un tournoi Overwatch seulement (jamais en Marvel Rivals), dans la seule fenêtre « Contacts » d'un match où tu es présenté comme contact et dans sa fenêtre de lancement : par ses deux équipes et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, par ses casters le temps du match ; celui d'un caster, dans les seuls tournois Overwatch, par les deux équipes et les autres casters du match le temps du match et par les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, dans ces fenêtres et sur la page du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné) — arbitres et administrateurs n'y ont pas d'autre accès (conditions d'utilisation, « Contacts de match »)";
 
 /**
  * BattleTag de l'arbitre désigné d'un match, même masqué, présenté aux parties
@@ -78,7 +78,7 @@ export const REFEREE_BATTLETAG_BEFORE_V7_SCOPE =
  * revue juridique de #491 : la ligne « Pseudo site » le déclare aussi.
  */
 export const REFEREE_USERNAME_SCOPE =
-  "pseudo de l'arbitre désigné d'un match, dans ses fenêtres « Contacts » et de lancement et sur la page du match, aux mêmes lecteurs et aux mêmes moments que son BattleTag en Overwatch (voir « Pseudo Overwatch »), quel que soit le jeu, et seul dès que la fenêtre de lancement montre le match (conditions d'utilisation, « Contacts de match », une fois leur version 7 acceptée par l'arbitre)";
+  "pseudo de l'arbitre désigné d'un match, dans ses fenêtres « Contacts » et de lancement et sur la page du match, quel que soit le jeu, aux lecteurs et aux moments où, dans un tournoi Overwatch, se lit aussi son BattleTag (voir « Pseudo Overwatch »), et seul dès que la fenêtre de lancement montre le match (conditions d'utilisation, « Contacts de match », une fois leur version 7 acceptée par l'arbitre)";
 
 export const REFEREE_USERNAME_BEFORE_V7_SCOPE =
   "la même présentation du pseudo de l'arbitre désigné, tant que cet arbitre n'a pas accepté la version 7 des conditions d'utilisation — opposition par le formulaire de signalement, catégorie RGPD (retenue, le staff ne lui confie plus de match — ceux qu'il tient déjà lui restent —, même une fois la version 7 acceptée)";
