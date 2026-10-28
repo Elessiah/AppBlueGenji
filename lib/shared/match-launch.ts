@@ -709,6 +709,7 @@ export const LAUNCH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   REFEREE_IDENTITY_REQUIRED: "Pour arbitrer un match, certifie ton tag Discord et rattache ton compte Battle.net depuis ton profil.",
   REFEREE_IS_PLAYER: "Ce compte joue ce match : il ne peut pas l'arbitrer.",
   REFEREE_OBJECTION: "Ce compte a une opposition retenue à l'arbitrage : il ne peut plus arbitrer de match.",
+  REFEREE_OBJECTION_FAILED: "L'opposition est retenue, mais l'arbitre n'a pas pu être retiré de tous ses matchs : retiens-la de nouveau pour réessayer.",
   INVALID_REFEREE_OBJECTION: "Choix invalide pour l'opposition de l'arbitre.",
   USER_NOT_FOUND: "Compte introuvable.",
   MATCH_ALREADY_REFEREED: "Ce match a déjà un arbitre.",

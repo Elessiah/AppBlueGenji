@@ -1443,6 +1443,7 @@ describe("opposition d'arbitre retenue (`releaseObjectingReferee`, `REFEREE_OBJE
   });
 
   it("releaseObjectingReferee_unfinishedMatch_clearsRefereeAndQueuesObjectionRelease", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
     state.match = matchState({ referee_user_id: REFEREE, referee_ready_at: STAMP });
 
     const released = await releaseObjectingReferee(42, REFEREE);
@@ -1459,6 +1460,7 @@ describe("opposition d'arbitre retenue (`releaseObjectingReferee`, `REFEREE_OBJE
   });
 
   it("releaseObjectingReferee_launchedMatch_stillReleases", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
     state.match = matchState({ referee_user_id: REFEREE, launched_at: STAMP });
 
     const released = await releaseObjectingReferee(42, REFEREE);
@@ -1488,10 +1490,45 @@ describe("opposition d'arbitre retenue (`releaseObjectingReferee`, `REFEREE_OBJE
   });
 
   it("releaseObjectingReferee_onlyRefereeMissing_launchesMatch", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
     state.match = matchState({ referee_user_id: REFEREE, team1_ready_at: STAMP, team2_ready_at: STAMP });
 
     await releaseObjectingReferee(42, REFEREE);
 
     expect(state.match?.launched_at).toBe(STAMP);
+  });
+
+  it("releaseObjectingReferee_objectionLiftedMeanwhile_returnsFalseNoWrite", async () => {
+    state.match = matchState({ referee_user_id: REFEREE });
+
+    const released = await releaseObjectingReferee(42, REFEREE);
+
+    expect(released).toBe(false);
+    expect(state.match?.referee_user_id).toBe(REFEREE);
+    expect(queueRefereeChange).not.toHaveBeenCalled();
+  });
+
+  it("assignMatchReferee_sameObjectingReferee_throwsRefereeObjection", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
+    state.match = matchState({ referee_user_id: REFEREE });
+
+    await expect(assignMatchReferee(42, 1, REFEREE)).rejects.toThrow("REFEREE_OBJECTION");
+  });
+
+  it("takeMatchReferee_selfAlreadyRefereeWithObjection_throwsRefereeObjection", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
+    state.match = matchState({ referee_user_id: REFEREE });
+
+    await expect(takeMatchReferee(42, REFEREE)).rejects.toThrow("REFEREE_OBJECTION");
+  });
+
+  it("takeMatchReferee_currentRefereeObjecting_otherRefereeTakesOver", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
+    state.users[961] = { ...refereeUser, overwatch_battletag: "Autre#1" };
+    state.match = matchState({ referee_user_id: REFEREE });
+
+    await takeMatchReferee(42, 961);
+
+    expect(state.match?.referee_user_id).toBe(961);
   });
 });

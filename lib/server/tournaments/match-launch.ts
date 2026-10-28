@@ -317,6 +317,10 @@ async function lockLaunchMatch(
   const refereeEligible =
     refereeId !== null &&
     (await loadRefereeEligibility(connection, refereeId)) === null &&
+    // Une opposition retenue ferme l'arbitrage : un arbitre que le balayage
+    // n'aurait pas retiré (échec en cours de route) ne compte plus, comme un
+    // inéligible — le lancement ne l'attend pas, un autre peut prendre le match.
+    !(await refereeObjectionUpheld(connection, refereeId)) &&
     (base.launched_at !== null || (await resolveTeamParty(connection, base, refereeId)) === null);
   const row: LaunchMatchRow = Object.assign(base, {
     casters: await lockMatchCasters(connection, matchId),
@@ -964,7 +968,10 @@ export async function takeMatchReferee(matchId: number, userId: number): Promise
       const row = await lockLaunchMatch(connection, matchId);
       assertRefereeable(row);
       const current = nullableId(row.referee_user_id);
-      if (current === userId) return null;
+      if (current === userId) {
+        if (await refereeObjectionUpheld(connection, userId, true)) throw new Error("REFEREE_OBJECTION");
+        return null;
+      }
       if (current !== null && row.refereeEligible) throw new Error("MATCH_ALREADY_REFEREED");
       await writeReferee(connection, row, userId);
       if (current !== null) {
@@ -1027,7 +1034,10 @@ export async function assignMatchReferee(
       const row = await lockLaunchMatch(connection, matchId);
       assertRefereeable(row);
       const current = nullableId(row.referee_user_id);
-      if (current === refereeId) return null;
+      if (current === refereeId) {
+        if (await refereeObjectionUpheld(connection, refereeId, true)) throw new Error("REFEREE_OBJECTION");
+        return null;
+      }
       await writeReferee(connection, row, refereeId);
       queueRefereeChange(connection, { kind: "ASSIGNED", matchId, replacedRefereeId: current });
       return Number(row.tournament_id);
@@ -1262,7 +1272,7 @@ export async function releaseIneligibleReferee(matchId: number, refereeId: numbe
  * (`referee-objection.ts`) — **quel que soit l'état du match tant qu'il n'est
  * pas joué**, lancé compris, contrairement au retrait d'office. Relu sous le
  * verrou du match ; s'il n'en est plus l'arbitre ou que le match est joué,
- * rien ne change. Un match qui n'attendait plus que lui part ; l'arbitre est
+ * rien ne change, de même si l'opposition a été levée entre-temps. Un match qui n'attendait plus que lui part ; l'arbitre est
  * prévenu (motif `OBJECTION`), le journal dit « retiré par le staff ».
  *
  * @returns vrai si l'arbitre a été retiré.
@@ -1272,6 +1282,9 @@ export async function releaseObjectingReferee(matchId: number, refereeId: number
     inTransaction(async (connection) => {
       const row = await lockLaunchMatch(connection, matchId);
       if (!row || nullableId(row.referee_user_id) !== refereeId || row.status === "COMPLETED") return null;
+      // Relue sous le verrou du match (même ordre que `writeReferee` : match
+      // puis compte) : levée entre-temps, l'opposition ne retire plus rien.
+      if (!(await refereeObjectionUpheld(connection, refereeId, true))) return null;
       await connection.execute(`UPDATE bg_matches SET referee_user_id = NULL, referee_ready_at = NULL WHERE id = ?`, [
         matchId,
       ]);

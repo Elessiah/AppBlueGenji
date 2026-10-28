@@ -146,12 +146,16 @@ describe("loadRefereePanel", () => {
     expect(execute.mock.calls.some(([sql]) => sql.includes("FROM bg_team_members"))).toBe(false);
   });
 
-  it("loadRefereePanel_objectedStaff_listedInObjectionsNotCandidates", async () => {
+  it("loadRefereePanel_objectedStaff_listedInObjectionsNotCandidates_stillObjectable", async () => {
     users = [staffUser(3, "Zoé"), staffUser(4, "Ana", { referee_objection_at: STAMP })];
     const panel = await loadRefereePanel(42);
     expect(panel?.candidates).toEqual([{ userId: 3, pseudo: "Zoé" }]);
     expect(panel?.objections).toEqual([{ userId: 4, pseudo: "Ana" }]);
-    expect(panel?.objectable).toEqual([{ userId: 3, pseudo: "Zoé" }]);
+    // Une opposition retenue reste proposée : la retenir de nouveau rejoue le retrait.
+    expect(panel?.objectable).toEqual([
+      { userId: 4, pseudo: "Ana" },
+      { userId: 3, pseudo: "Zoé" },
+    ]);
   });
 
   it("loadRefereePanel_nonRefereeAccount_neitherObjectableNorObjection", async () => {

@@ -77,7 +77,7 @@ describe("PUT /api/admin/referees/[userId]/objection", () => {
   });
 
   it("PUT_newObjection_returnsCount_logsAnonymouslyOnDiscord", async () => {
-    jest.mocked(setRefereeObjection).mockResolvedValue({ changed: true, released: 2 });
+    jest.mocked(setRefereeObjection).mockResolvedValue({ changed: true, released: 2, failed: 0 });
 
     const res = await PUT(putRequest({ upheld: true }), params("9"));
 
@@ -92,7 +92,7 @@ describe("PUT /api/admin/referees/[userId]/objection", () => {
   });
 
   it("PUT_lift_logsLiftLine", async () => {
-    jest.mocked(setRefereeObjection).mockResolvedValue({ changed: true, released: 0 });
+    jest.mocked(setRefereeObjection).mockResolvedValue({ changed: true, released: 0, failed: 0 });
 
     const res = await PUT(putRequest({ upheld: false }), params("9"));
 
@@ -101,13 +101,32 @@ describe("PUT /api/admin/referees/[userId]/objection", () => {
     expect(jest.mocked(publishStaffAction).mock.calls[0][0]).toBe("🛡 Opposition d'un arbitre levée par le staff.");
   });
 
-  it("PUT_unchanged_doesNotLog", async () => {
-    jest.mocked(setRefereeObjection).mockResolvedValue({ changed: false, released: 1 });
+  it("PUT_unchangedNothingReleased_doesNotLog", async () => {
+    jest.mocked(setRefereeObjection).mockResolvedValue({ changed: false, released: 0, failed: 0 });
 
     const res = await PUT(putRequest({ upheld: true }), params("9"));
 
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ upheld: true, changed: false, released: 1 });
+    await expect(res.json()).resolves.toEqual({ upheld: true, changed: false, released: 0 });
     expect(publishStaffAction).not.toHaveBeenCalled();
+  });
+
+  it("PUT_replayedSweepReleasesMatches_logs", async () => {
+    jest.mocked(setRefereeObjection).mockResolvedValue({ changed: false, released: 1, failed: 0 });
+
+    const res = await PUT(putRequest({ upheld: true }), params("9"));
+
+    expect(res.status).toBe(200);
+    expect(jest.mocked(publishStaffAction).mock.calls[0][0]).toContain("(1)");
+  });
+
+  it("PUT_incompleteSweep_logsThenReturns500", async () => {
+    jest.mocked(setRefereeObjection).mockResolvedValue({ changed: true, released: 1, failed: 1 });
+
+    const res = await PUT(putRequest({ upheld: true }), params("9"));
+
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toEqual({ error: "REFEREE_OBJECTION_FAILED" });
+    expect(publishStaffAction).toHaveBeenCalledTimes(1);
   });
 });

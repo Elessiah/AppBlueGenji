@@ -80,11 +80,15 @@ oppositions retenues avec « Lever », choix d'un arbitre parmi les comptes
   `REFEREE_RELEASED` motif `OBJECTION`, journal « retiré par le staff » par
   match ; les matchs joués gardent leur arbitre ; le staff en désigne un autre ;
 - tant qu'elle tient : ni « Je prends ce match » ni désignation
-  (`REFEREE_OBJECTION`, 409, contrôlé dans `writeReferee`), absent des
-  candidats, bouton « Arbitrer ce match » caché ; le cast reste ouvert ;
+  (`REFEREE_OBJECTION`, 409, contrôlé dans `writeReferee` et sur une
+  re-désignation du même arbitre), absent des candidats, bouton « Arbitrer ce
+  match » caché ; le verrou du lancement (`lockLaunchMatch`) ne le compte plus
+  (le lancement ne l'attend pas, un autre peut prendre le match) ; le cast
+  reste ouvert ;
 - levée : il peut de nouveau arbitrer, rien ne lui est rendu ;
 - journal : `publishStaffAction` (« un arbitre », « le staff » sur Discord ;
-  auteur et `#id` de l'arbitre dans pm2), seulement sur un vrai changement.
+  auteur et `#id` de l'arbitre dans pm2), sur un vrai changement ou un
+  balayage rejoué qui retire encore un match.
 
 Concurrence : l'écriture de l'opposition est une instruction seule (verrou
 exclusif sur la ligne du compte) ; `writeReferee` lit l'opposition en
@@ -93,8 +97,15 @@ avant (et le balayage, lancé après l'écriture, voit le match) ou après (et
 elle est refusée). Une transaction par match plutôt qu'une pour tous : ses
 matchs couvrent plusieurs tournois, et tenir tous leurs verrous le temps du
 balayage bloquerait le maintien des lancements, qui en prend un à la fois. Le
-balayage est rejouable (retenir de nouveau refait le tour) ; un échec sur un
-match n'arrête pas les autres et remonte à la fin (500).
+balayage est rejouable : une opposition déjà retenue reste proposée au
+formulaire, la retenir de nouveau refait le tour. Un échec sur un match
+n'arrête pas les autres ; il est compté, et la route répond 500
+(`REFEREE_OBJECTION_FAILED`) **après** le journal. `releaseObjectingReferee`
+relit l'opposition sous le verrou du match (ordre match puis compte, celui de
+`writeReferee`) : levée pendant le balayage, elle ne retire plus rien.
+L'instantané et la lecture de la modale (`refereeKept`, `keepEligibleReferees`)
+ne relisent pas l'opposition : seul un balayage resté incomplet y laisserait
+l'arbitre visible (consigné dans `ERREUR.txt`).
 
 ## « Prêt » : une quatrième partie
 

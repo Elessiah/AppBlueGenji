@@ -28,8 +28,12 @@ import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { releaseObjectingReferee } from "./match-launch";
 
-/** Ce que le geste a fait : `changed` faux s'il était déjà dans cet état ; `released` : matchs retirés. */
-export type RefereeObjectionResult = { changed: boolean; released: number };
+/**
+ * Ce que le geste a fait : `changed` faux s'il était déjà dans cet état ;
+ * `released` : matchs retirés ; `failed` : matchs que le balayage n'a pas pu
+ * traiter (le geste se rejoue en retenant de nouveau l'opposition).
+ */
+export type RefereeObjectionResult = { changed: boolean; released: number; failed: number };
 
 /**
  * Retient (`upheld`) ou lève l'opposition d'arbitre du compte `refereeId`.
@@ -53,29 +57,30 @@ export async function setRefereeObjection(refereeId: number, upheld: boolean): P
     ]);
     if (rows.length === 0) throw new Error("USER_NOT_FOUND");
   }
-  if (!upheld) return { changed, released: 0 };
-  return { changed, released: await releaseFromUnfinishedMatches(refereeId) };
+  if (!upheld) return { changed, released: 0, failed: 0 };
+  return { changed, ...(await releaseFromUnfinishedMatches(refereeId)) };
 }
 
 /**
  * Retire l'arbitre de chacun de ses matchs non terminés, un par un. Un échec
- * n'arrête pas les autres ; le premier est relevé à la fin (le geste se rejoue).
+ * n'arrête pas les autres ; il est compté (et journalisé), jamais levé : le
+ * geste, déjà écrit, doit rester tracé par la route.
  */
-async function releaseFromUnfinishedMatches(refereeId: number): Promise<number> {
+async function releaseFromUnfinishedMatches(refereeId: number): Promise<{ released: number; failed: number }> {
   const db = await getDatabase();
   const [matches] = await db.execute<(RowDataPacket & { id: number })[]>(
     `SELECT id FROM bg_matches WHERE referee_user_id = ? AND status <> 'COMPLETED' ORDER BY id`,
     [refereeId],
   );
   let released = 0;
-  let failure: unknown = null;
+  let failed = 0;
   for (const match of matches) {
     try {
       if (await releaseObjectingReferee(Number(match.id), refereeId)) released += 1;
     } catch (error) {
-      failure ??= error;
+      failed += 1;
+      console.error(`[referee-objection] retrait du match #${match.id} impossible :`, error);
     }
   }
-  if (failure !== null) throw failure;
-  return released;
+  return { released, failed };
 }

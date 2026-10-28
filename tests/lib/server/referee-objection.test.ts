@@ -30,7 +30,7 @@ describe("setRefereeObjection", () => {
 
     const result = await setRefereeObjection(REFEREE, true);
 
-    expect(result).toEqual({ changed: true, released: 2 });
+    expect(result).toEqual({ changed: true, released: 2, failed: 0 });
     expect(execute.mock.calls[0][0]).toContain("SET referee_objection_at = NOW()");
     expect(execute.mock.calls[1][0]).toContain("status <> 'COMPLETED'");
     expect(releaseObjectingReferee).toHaveBeenNthCalledWith(1, 11, REFEREE);
@@ -43,7 +43,7 @@ describe("setRefereeObjection", () => {
 
     const result = await setRefereeObjection(REFEREE, true);
 
-    expect(result).toEqual({ changed: true, released: 0 });
+    expect(result).toEqual({ changed: true, released: 0, failed: 0 });
   });
 
   it("setRefereeObjection_alreadyUpheld_changedFalse_sweepsAgain", async () => {
@@ -54,7 +54,7 @@ describe("setRefereeObjection", () => {
 
     const result = await setRefereeObjection(REFEREE, true);
 
-    expect(result).toEqual({ changed: false, released: 1 });
+    expect(result).toEqual({ changed: false, released: 1, failed: 0 });
     expect(releaseObjectingReferee).toHaveBeenCalledWith(11, REFEREE);
   });
 
@@ -63,7 +63,7 @@ describe("setRefereeObjection", () => {
 
     const result = await setRefereeObjection(REFEREE, false);
 
-    expect(result).toEqual({ changed: true, released: 0 });
+    expect(result).toEqual({ changed: true, released: 0, failed: 0 });
     expect(execute.mock.calls[0][0]).toContain("SET referee_objection_at = NULL");
     expect(execute).toHaveBeenCalledTimes(1);
     expect(releaseObjectingReferee).not.toHaveBeenCalled();
@@ -76,11 +76,16 @@ describe("setRefereeObjection", () => {
     expect(releaseObjectingReferee).not.toHaveBeenCalled();
   });
 
-  it("setRefereeObjection_oneMatchFails_othersReleasedThenThrows", async () => {
+  it("setRefereeObjection_oneMatchFails_othersReleased_countsFailure", async () => {
     execute.mockResolvedValueOnce([{ affectedRows: 1 }, []]).mockResolvedValueOnce([[{ id: 11 }, { id: 12 }], []]);
     jest.mocked(releaseObjectingReferee).mockRejectedValueOnce(new Error("ER_LOCK_DEADLOCK"));
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined);
 
-    await expect(setRefereeObjection(REFEREE, true)).rejects.toThrow("ER_LOCK_DEADLOCK");
+    const result = await setRefereeObjection(REFEREE, true);
+
+    expect(result).toEqual({ changed: true, released: 1, failed: 1 });
     expect(releaseObjectingReferee).toHaveBeenCalledWith(12, REFEREE);
+    expect(consoleError).toHaveBeenCalledTimes(1);
+    consoleError.mockRestore();
   });
 });

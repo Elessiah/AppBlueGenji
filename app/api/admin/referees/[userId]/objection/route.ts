@@ -14,6 +14,8 @@ import { can } from "@/lib/shared/permissions";
  *
  * Journal : « un arbitre » et « le staff » sur Discord, le compte et l'auteur
  * dans pm2 seulement (`publishStaffAction`), et seulement sur un vrai changement.
+ * Un balayage incomplet répond 500 (`REFEREE_OBJECTION_FAILED`) après le
+ * journal : retenir de nouveau l'opposition le rejoue.
  */
 export async function PUT(req: Request, context: { params: Promise<{ userId: string }> }) {
   const user = await getCurrentUser();
@@ -29,12 +31,15 @@ export async function PUT(req: Request, context: { params: Promise<{ userId: str
 
   try {
     const result = await setRefereeObjection(refereeId, upheld);
-    if (result.changed) {
+    // Tracé dès que quelque chose a changé — y compris un balayage rejoué —,
+    // et avant le refus d'un balayage incomplet : l'opposition, elle, est écrite.
+    if (result.changed || result.released > 0) {
       const discordLine = upheld
         ? `🛡 Opposition d'un arbitre retenue par le staff : il est retiré de ses matchs non terminés (${result.released}).`
         : "🛡 Opposition d'un arbitre levée par le staff.";
       publishStaffAction(discordLine, { id: user.id, pseudo: user.pseudo }, `${discordLine} Arbitre : #${refereeId}.`);
     }
+    if (result.failed > 0) return fail("REFEREE_OBJECTION_FAILED", 500);
     return ok({ upheld, changed: result.changed, released: result.released });
   } catch (error) {
     return launchFailure(error, { USER_NOT_FOUND: 404 }, "REFEREE_OBJECTION_FAILED");

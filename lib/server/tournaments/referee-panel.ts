@@ -36,7 +36,7 @@ export type RefereePanel = {
   candidates: RefereePanelUser[];
   /** Arbitres (permission `tournaments`) dont l'opposition est retenue, par pseudo. */
   objections: RefereePanelUser[];
-  /** Arbitres dont le staff peut retenir l'opposition : les autres, par pseudo. */
+  /** Arbitres dont le staff peut retenir l'opposition, par pseudo — une opposition déjà retenue comprise : la retenir de nouveau rejoue le retrait de ses matchs. */
   objectable: RefereePanelUser[];
 };
 
@@ -120,7 +120,7 @@ export async function loadRefereePanel(matchId: number): Promise<RefereePanel | 
         .map(panelUser)
         .sort(byPseudo),
       objections: referees.filter(objected).map(panelUser).sort(byPseudo),
-      objectable: referees.filter((row) => !objected(row)).map(panelUser).sort(byPseudo),
+      objectable: referees.map(panelUser).sort(byPseudo),
     };
   });
 }

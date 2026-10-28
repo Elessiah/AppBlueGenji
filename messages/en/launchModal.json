@@ -40,6 +40,7 @@
     "REFEREE_IDENTITY_REQUIRED": "To referee a match, certify your Discord tag and link your Battle.net account from your profile.",
     "REFEREE_IS_PLAYER": "This account plays this match: it cannot referee it.",
     "REFEREE_OBJECTION": "This account has an upheld objection to refereeing: it can no longer referee a match.",
+    "REFEREE_OBJECTION_FAILED": "The objection is upheld, but the referee could not be removed from all their matches: uphold it again to retry.",
     "INVALID_REFEREE_OBJECTION": "Invalid choice for the referee's objection.",
     "USER_NOT_FOUND": "Account not found.",
     "MATCH_ALREADY_REFEREED": "This match already has a referee.",
