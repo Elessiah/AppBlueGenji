@@ -128,9 +128,14 @@ export function applyLiveMessage(state: LiveState, message: LiveMessage): LiveSt
       message.certificationPromptPending && state.detail?.card.id === message.tournamentId
         ? { certificationPrompt: state.detail.certificationPrompt }
         : {};
+    // Pseudos d'arbitre inchangés : même tableau, `LiveProvider` ne redessine
+    // pas le plateau à chaque reconnexion (`shareRefereeNames`).
+    const refereeNames = state.detail
+      ? shareRefereeNames(state.detail.refereeNames, message.viewer.refereeNames)
+      : message.viewer.refereeNames;
     return {
       tier: message.tier,
-      detail: { ...snapshot, ...message.viewer, ...kept },
+      detail: { ...snapshot, ...message.viewer, refereeNames, ...kept },
     };
   }
 
