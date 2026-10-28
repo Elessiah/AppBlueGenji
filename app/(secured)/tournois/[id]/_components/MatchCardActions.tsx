@@ -103,18 +103,18 @@ const samePlacement = (a: PanelPlacement | null, b: PanelPlacement) =>
   a.up === b.up;
 
 /**
+ * Éléments du panneau qui reçoivent le focus : boutons actifs et liens (« Page
+ * du match » est un lien — seul, il doit pourtant recevoir le focus d'entrée).
+ */
+const PANEL_FOCUSABLE = "button:not(:disabled), a[href]";
+
+/**
  * Porté en fin de page, le panneau n'a pas de « suivant » naturel : la
  * tabulation qui en sort par un bout le referme et rend le focus au bouton
  * (`close`). Écoutée sur **chaque bouton** du panneau, pas sur son conteneur :
  * un `<div>` qui reçoit des touches se présente comme un contrôle qu'il n'est
  * pas (SonarQube S6848).
  */
-/**
- * Éléments du panneau qui reçoivent le focus : boutons actifs et liens (« Page
- * du match » est un lien — seul, il doit pourtant recevoir le focus d'entrée).
- */
-const PANEL_FOCUSABLE = "button:not(:disabled), a[href]";
-
 export function closePanelOnTabOut(
   e: { key: string; shiftKey: boolean; currentTarget: Element; preventDefault: () => void },
   panel: ParentNode | null,
