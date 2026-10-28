@@ -330,6 +330,44 @@ describe("buildPrivacyChangesMessage", () => {
     expect(buildPrivacyChangesMessage([A], "https://x.fr", "en")).toContain("our privacy rules have changed");
     expect(buildPrivacyChangesMessage([A], null, "en")).not.toMatch(/https?:/);
   });
+
+  // EF-19 : un changement qui annonce des conditions à accepter (`termsVersion`)
+  // ne peut pas finir sur « aucun accord » sans exception.
+  it("buildPrivacyChangesMessage_namedChangeWithTermsVersion_footerSaysTermsMustBeAccepted", () => {
+    const terms = change("conditions", "2026-02-01", { termsVersion: 7 });
+
+    const fr = buildPrivacyChangesMessage([A, terms], "https://bluegenji.fr");
+    const en = buildPrivacyChangesMessage([A, terms], "https://bluegenji.fr", "en");
+
+    expect(fr).toContain(
+      "Les nouvelles conditions d'utilisation sont à accepter pour continuer à utiliser le site ; pour le reste, aucun accord ne t'est demandé : la politique de confidentialité",
+    );
+    expect(en).toContain(
+      "The new terms of use must be accepted to keep using the site; for the rest, no consent is asked of you: the privacy policy",
+    );
+  });
+
+  it("buildPrivacyChangesMessage_noChangeWithTermsVersion_footerKeepsPlainNoConsent", () => {
+    const fr = buildPrivacyChangesMessage([A, C], "https://bluegenji.fr");
+    const en = buildPrivacyChangesMessage([A, C], "https://bluegenji.fr", "en");
+
+    expect(fr).toContain("visite sur https://bluegenji.fr. Aucun accord ne t'est demandé : la politique");
+    expect(fr).not.toContain("conditions d'utilisation");
+    expect(en).toContain("visit to https://bluegenji.fr. No consent is asked of you: the privacy policy");
+    expect(en).not.toContain("terms of use");
+  });
+
+  it("buildPrivacyChangesMessage_termsChangeOnlyCountedAsOmitted_footerDoesNotMentionTerms", () => {
+    const filler = Array.from({ length: 6 }, (_, i) => change(`long-${i}`, "2026-02-01", { summary: "x".repeat(300) }));
+    const terms = change("conditions", "2026-02-01", { summary: "y".repeat(300), termsVersion: 7 });
+
+    const message = buildPrivacyChangesMessage([...filler, terms], "https://bluegenji.fr");
+
+    expect(message).toMatch(/… et \d+ autre\(s\) changement\(s\)\./);
+    expect(message).not.toContain("Titre conditions");
+    expect(message).not.toContain("conditions d'utilisation");
+    expect(message.length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+  });
 });
 
 describe("announceablePrivacyChanges", () => {
@@ -1645,6 +1683,10 @@ describe("PRIVACY_CHANGES — plusieurs casters par match (MATCH-REFEREE MR-1)",
     expect(en).toContain("only the link set in the match's live configuration stays with the match");
     expect(en).toContain("When your account is deleted, the link you provided — when opening your stream or in that configuration — also goes, played matches included, even if another caster still holds that stream");
     expect(en).toContain("A caster no longer replaces another");
+    // EF-19 : un lien inchangé n'est pas réécrit (`setStaffStreamUrl`) ; posé hors cast, il reste à l'organisation.
+    expect(fr).toContain("(posée avant ton inscription comme caster ou après l'avoir quitté, elle reste le lien de l'organisation ; réenregistrer un lien déjà posé n'en change pas l'auteur)");
+    expect(en).toContain("(set before you signed up as its caster or after you left it, it stays the organizers' link; re-saving a link already set does not change its author)");
+    expect(readFileSync(join(process.cwd(), "app/rgpd/page.tsx"), "utf8")).not.toContain("qui ne caste pas encore ce match");
     expect(english.details).toHaveLength(entry.details.length);
     expect(english.linkLabels).toHaveLength(1);
   });
@@ -1680,6 +1722,11 @@ describe("PRIVACY_CHANGES — arbitre désigné des matchs (MATCH-REFEREE MR-2)"
     expect(en).toContain("by push notification only, with the reason");
     expect(en).toContain("When your account is deleted, you are removed from all your matches");
     expect(en).toContain("without naming anyone");
+    // EF-19 : arbitre qui caste aussi le match, désignation et remplacement notés au journal (`refereeLogChange`).
+    expect(fr).toContain("jamais son tag Discord à ce titre (s'il caste aussi le match, ses contacts de caster suivent la règle des casters)");
+    expect(en).toContain("never their Discord tag in that capacity (if they also cast the match, their caster contacts follow the casters' rule)");
+    expect(fr).toContain("La prise d'un match, la désignation ou le remplacement de son arbitre par le staff, le retrait de l'arbitrage,");
+    expect(en).toContain("Taking a match, the staff assigning or replacing its referee, the removal of the refereeing,");
     expect(english.details).toHaveLength(entry.details.length);
     expect(english.linkLabels).toHaveLength(1);
   });
@@ -1735,6 +1782,15 @@ describe("PRIVACY_CHANGES — conditions v7 : casters, arbitre désigné et page
       ],
     });
     expect(TERMS_UPDATED_AT).toBe("2026-10-29");
+  });
+
+  it("PRIVACY_CHANGES_v7_termsVersionEqualsTERMS_VERSION : à accepter, dit dans le résumé et au pied du message (FR et EN)", () => {
+    expect(entry.termsVersion).toBe(TERMS_VERSION);
+    expect(entry.summary).toContain("Elle est à accepter : une fenêtre te la présente à ta prochaine visite.");
+    expect(english.summary).toContain("It must be accepted: a window presents it to you on your next visit.");
+    expect(buildPrivacyChangesMessage([entry], "https://site.test")).toContain("Les nouvelles conditions d'utilisation sont à accepter");
+    const [englishEntry] = localizedPrivacyChanges([entry], "en");
+    expect(buildPrivacyChangesMessage([englishEntry], "https://site.test", "en")).toContain("The new terms of use must be accepted");
   });
 
   it("annonce la version en vigueur et sa date, avec un libellé anglais par lien (FR et EN)", () => {
@@ -1863,11 +1919,9 @@ describe("PRIVACY_CHANGES — marque de session de la proposition de certificati
     expect(english.linkLabels).toEqual(["Read the “Data collected” section"]);
   });
 
+  // Son texte n'est figé qu'à un endroit : tests/lib/shared/legal-texts-ef05.test.ts.
   it("rectifie l'entrée du 21 octobre sans la réécrire (FR et EN)", () => {
-    expectEntryTexts(entry, english, {
-      fr: ["Précision sur l'information du 21 octobre 2026", "levée à ta première réponse", "ne figure pas dans l'export de tes données"],
-      en: ["A clarification of the information of October 21, 2026", "cleared at your first answer", "isn't included in the export of your data"],
-    });
+    expect([english.details.length, english.linkLabels?.length ?? 0]).toEqual([entry.details.length, entry.links?.length ?? 0]);
     const published = PRIVACY_CHANGES.find((c) => c.id === "2026-10-proposition-certification-discord")!;
     expect(PRIVACY_CHANGES.indexOf(published)).toBeLessThan(PRIVACY_CHANGES.indexOf(entry));
   });
