@@ -1057,9 +1057,12 @@ function RgpdFr({
             en est prévenu en notification push seulement, avec le motif. Ces gestes, l&apos;autogestion d&apos;un match
             et sa première carte sont notés au journal du staff sur Discord sans nommer personne, et un match qui
             entre en lancement sans arbitre ni autogestion est signalé aux arbitres. Sa présentation aux parties
-            du match relève de l&apos;<strong>exécution du service</strong> : les conditions d&apos;utilisation la
-            prévoient (section « Contacts de match », depuis leur version 7), pour que les parties sachent qui
-            arbitre et puissent l&apos;ajouter en jeu. Il peut se retirer d&apos;un match à tout moment, le staff
+            du match relève de l&apos;<strong>exécution du service</strong> dès qu&apos;il a accepté la version 7
+            des conditions d&apos;utilisation, qui la prévoient (section « Contacts de match »), pour que les
+            parties sachent qui arbitre et puissent l&apos;ajouter en jeu ; tant qu&apos;il ne l&apos;a pas
+            acceptée, elle relève de l&apos;<strong>intérêt légitime</strong> (même but), et il peut s&apos;y
+            opposer par le formulaire de signalement (catégorie RGPD) — retenue, son opposition fait que le staff
+            ne lui confie plus de match. Il peut se retirer d&apos;un match à tout moment, le staff
             pouvant lui confier de nouveau ce match, sans avis. Le recueil de son « Prêt » et l&apos;avis du retrait relèvent aussi de l&apos;exécution
             du service, les arbitres agissant pour l&apos;association (<Link href="/rgpd/registre#t04">registre, T04</Link>).
           </p>

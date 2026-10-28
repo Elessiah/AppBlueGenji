@@ -150,18 +150,20 @@ T12 (avis push « Arbitrage retiré ») et T05 (journal), `/rgpd#arbitre-designe
 et la ligne BattleTag de `/rgpd` (finalité et portée « Exécution du contrat »
 de l'arbitre), les listes « BattleTag masqué » (profil,
 connexion, fiche joueur, clé `asReferee`) et la modale de masquage, entrée
-`2026-10-arbitre-designe-des-matchs`. Base : depuis la version 7 des
-conditions d'utilisation (TERMS v7, décision de l'utilisateur du 2026-10-27),
-**exécution du contrat** pour la présentation de l'arbitre aux parties
-(pseudo et BattleTag, portée `REFEREE_BATTLETAG_SCOPE` sur la ligne BattleTag
-de `/rgpd`) — la section « Contacts de match » la prévoit ; il peut se retirer
-d'un match à tout moment, le staff pouvant lui confier de nouveau ce match,
-sans avis ; exécution du service (les arbitres agissant pour l'association)
-pour son « Prêt » et l'avis du retrait. Jusqu'à la version 6, cette
-présentation reposait sur l'intérêt légitime, avec une opposition par le
-formulaire de signalement. L'entrée `2026-10-arbitre-designe-des-matchs`,
-jamais publiée avant la version 7 et mise en ligne avec elle, suit la base de
-la v7 (revue de #491) ; l'entrée `2026-10-conditions-v7-casters-et-arbitre`
-annonce le changement de base, et le droit d'opposition de `/rgpd` ne cite
-plus l'arbitre. Devenir joueur du match ne retire l'arbitre qu'avant le
+`2026-10-arbitre-designe-des-matchs`. Base (TERMS v7, décision de
+l'utilisateur du 2026-10-27) : **exécution du contrat** pour la présentation
+de l'arbitre aux parties (pseudo et BattleTag, portée
+`REFEREE_BATTLETAG_SCOPE` sur la ligne BattleTag de `/rgpd`) une fois que cet
+arbitre a accepté la version 7 des conditions, dont la section « Contacts de
+match » la prévoit ; **tant qu'il ne l'a pas acceptée**, intérêt légitime,
+avec une opposition par le formulaire de signalement (portée
+`REFEREE_BATTLETAG_BEFORE_V7_SCOPE`, droit d'opposition de `/rgpd`, T01 et
+T04) — aucun interrupteur dans le code, le texte seul le dit. Il peut se
+retirer d'un match à tout moment, le staff pouvant lui confier de nouveau ce
+match, sans avis ; exécution du service (les arbitres agissant pour
+l'association) pour son « Prêt » et l'avis du retrait. L'entrée
+`2026-10-arbitre-designe-des-matchs` (intérêt légitime, opposition), en
+production depuis #487, n'est pas réécrite ; l'entrée
+`2026-10-conditions-v7-casters-et-arbitre` annonce le passage au contrat à
+l'acceptation de la version 7. Devenir joueur du match ne retire l'arbitre qu'avant le
 lancement (`keepEligibleReferees`) : conditions, `/rgpd` et T04 le disent.

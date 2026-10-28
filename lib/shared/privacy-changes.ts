@@ -1114,9 +1114,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // retrait de son arbitrage, journal anonyme. Joueurs (qui le lisent) comme
     // arbitres (dont les données sont présentées) concernés : pas de public.
     // Daté comme les entrées MR-1 (mise en ligne groupée, heure inconnue —
-    // § Dates corrigées). Jamais publiée avant la version 7 des conditions,
-    // mise en ligne avec elle : sa base suit la v7 (exécution du service,
-    // décision de l'utilisateur du 2026-10-27), sans opposition.
+    // § Dates corrigées).
     id: "2026-10-arbitre-designe-des-matchs",
     publishedAt: "2026-10-29",
     title: "Arbitre désigné des matchs",
@@ -1125,7 +1123,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Un membre du staff peut désormais arbitrer un match : il le prend, ou le staff le lui confie. Les deux équipes et les arbitres voient son pseudo et son BattleTag dès que les deux adversaires sont connus, les casters du match le temps du match ; le public ne lit que « Arbitre désigné ».",
     details: [
       "Si tu joues ou castes un match : son arbitre désigné t'est présenté dans les fenêtres « Contacts » et de lancement du match, aux mêmes moments que les contacts du match (dès que tes deux adversaires sont connus si tu joues, le temps du match si tu castes) — son pseudo et son BattleTag, même masqué, jamais son tag Discord ; son pseudo seul y paraît dès que la fenêtre de lancement montre le match. La fenêtre de lancement s'ouvre aussi à lui : il y lit les contacts du match, BattleTag masqué compris, qu'il lit déjà comme arbitre dans la fenêtre « Contacts ». Rien d'autre ne change pour tes propres données.",
-      "Si tu arbitres : ton pseudo et ton BattleTag (même masqué) sont présentés ainsi aux parties de tes matchs, au titre de l'exécution du service (qu'elles sachent qui arbitre : les conditions d'utilisation le prévoient depuis leur version 7) ; tu peux te retirer d'un match à tout moment, le staff pouvant te confier de nouveau ce match, sans avis ; ton « Prêt » est attendu avant le lancement. Si l'arbitrage t'est retiré par le staff (retrait, match confié à un autre arbitre ou passé en autogestion) ou d'office (conditions plus remplies, ou tu joues désormais le match), tu es prévenu en notification push seulement, avec le motif, tant que tu détiens la permission d'arbitrage — réglage « Arbitrage retiré ». À la suppression de ton compte, tu es retiré de tous tes matchs.",
+      "Si tu arbitres : ton pseudo et ton BattleTag (même masqué) sont présentés ainsi aux parties de tes matchs, au titre de l'intérêt légitime (qu'elles sachent qui arbitre) : tu t'y opposes par le formulaire de signalement (catégorie RGPD) — retenue, ton opposition fait que le staff ne te confie plus de match — et tu peux te retirer d'un match à tout moment, le staff pouvant sinon te confier de nouveau ce match, sans avis ; ton « Prêt » est attendu avant le lancement. Si l'arbitrage t'est retiré par le staff (retrait, match confié à un autre arbitre ou passé en autogestion) ou d'office (conditions plus remplies, ou tu joues désormais le match), tu es prévenu en notification push seulement, avec le motif, tant que tu détiens la permission d'arbitrage — réglage « Arbitrage retiré ». À la suppression de ton compte, tu es retiré de tous tes matchs.",
       "La prise d'un match, son retrait, l'autogestion et la première carte sont notés au journal du staff sur Discord sans nommer personne ; un match qui entre en lancement sans arbitre ni autogestion est signalé aux arbitres, sans rien basculer d'office.",
     ],
   },
@@ -1133,10 +1131,10 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // MATCH-REFEREE MR-4 : brief du salon — nouveau message privé de match et
     // nouveau sujet push, adressés à ceux qui gèrent les engagées (propriétaires,
     // managers, joueur d'une entrée solo). Joueurs concernés : pas de public.
-    // Daté comme les entrées MR-1 et MR-2 (mise en ligne groupée, heure
-    // inconnue — § Dates corrigées).
+    // Daté du lendemain de la mise en ligne groupée prévue dans la nuit du 28
+    // au 29 octobre (§ Dates corrigées), comme l'entrée des conditions v7.
     id: "2026-10-reglages-du-salon-aux-managers",
-    publishedAt: "2026-10-29",
+    publishedAt: "2026-10-30",
     title: "Réglages du salon envoyés aux managers",
     links: [MATCH_DM_PARAGRAPH_LINK],
     summary:
@@ -1153,14 +1151,16 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // et après le match) et « Acceptation » (suppression du compte depuis la
     // fenêtre d'acceptation). La présentation de l'arbitre désigné passe de
     // l'intérêt légitime à l'exécution du service (décision de l'utilisateur
-    // du 2026-10-27) : un changement de base, à annoncer. La page du match
+    // du 2026-10-27) dès que cet arbitre accepte la version 7 — jusque-là,
+    // l'intérêt légitime et l'opposition restent : un changement de base, à
+    // annoncer. La page du match
     // (MR-3), nouveau lieu des contacts des casters et du BattleTag de
     // l'arbitre, est annoncée ici (l'entrée de l'arbitre ne nomme que les deux
-    // fenêtres). Pour tous les comptes : pas de public. Daté comme les entrées
-    // MR-1 à MR-4, de la mise en ligne groupée prévue dans la nuit du 28 au
-    // 29 octobre (§ Dates corrigées).
+    // fenêtres). Pour tous les comptes : pas de public. Daté du lendemain de la
+    // mise en ligne groupée prévue dans la nuit du 28 au 29 octobre (§ Dates
+    // corrigées).
     id: "2026-10-conditions-v7-casters-et-arbitre",
-    publishedAt: "2026-10-29",
+    publishedAt: "2026-10-30",
     title: "Conditions d'utilisation : version 7 (casters, arbitre désigné, page du match)",
     links: [
       { href: "/conditions-utilisation#contacts-de-match", label: "Lire la section « Contacts de match »" },
@@ -1168,14 +1168,14 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       { href: "/rgpd#arbitre-designe", label: "Lire le paragraphe « Arbitre désigné d'un match »" },
     ],
     summary:
-      "Les conditions d'utilisation passent en version 7 : leur section « Contacts de match » prévoit plusieurs casters par match, l'arbitre désigné et la page du match, et la présentation de l'arbitre désigné repose désormais sur l'exécution du service, et non plus sur l'intérêt légitime.",
+      "Les conditions d'utilisation passent en version 7 : leur section « Contacts de match » prévoit plusieurs casters par match, l'arbitre désigné et la page du match, et la présentation de l'arbitre désigné repose désormais sur l'exécution du service, et non plus sur l'intérêt légitime, dès que cet arbitre a accepté cette version.",
     details: [
       "Contacts de match : les contacts d'un match vont à chacun de ses casters le temps du match, et ceux de chaque caster aussi aux autres casters du match. L'arbitre désigné y est présenté — son pseudo et son BattleTag, même masqué, jamais son tag Discord — aux deux équipes et aux arbitres dès que les deux adversaires sont connus et jusqu'à la fin du match, et aux casters le temps du match.",
       "Page du match : elle reprend les contacts des casters (tag Discord certifié et BattleTag, même masqué) et le BattleTag, même masqué, de l'arbitre désigné, aux mêmes personnes et aux mêmes moments que la fenêtre « Contacts » du match ; les contacts des équipes restent dans les fenêtres « Contacts » et de lancement. Un BattleTag masqué ne se lit nulle part ailleurs sur le site.",
-      "Si tu arbitres : la présentation de ton pseudo et de ton BattleTag aux parties de tes matchs repose désormais sur l'exécution du service — les conditions d'utilisation la prévoient —, et non plus sur l'intérêt légitime : l'opposition par le formulaire de signalement ne s'y applique plus. Tu peux toujours te retirer d'un match à tout moment, le staff pouvant te le confier de nouveau ; si tu ne remplis plus les conditions pour arbitrer (permission d'arbitrage, tag Discord certifié, compte Battle.net rattaché), tu n'es plus présenté.",
+      "Si tu arbitres : dès que tu as accepté la version 7, la présentation de ton pseudo et de ton BattleTag aux parties de tes matchs repose sur l'exécution du service — les conditions d'utilisation la prévoient —, et non plus sur l'intérêt légitime : l'opposition par le formulaire de signalement ne s'y applique plus. Tant que tu ne l'as pas acceptée, elle reste fondée sur l'intérêt légitime, et tu peux t'y opposer par le formulaire de signalement (catégorie RGPD). Tu peux toujours te retirer d'un match à tout moment, le staff pouvant te le confier de nouveau ; si tu ne remplis plus les conditions pour arbitrer (permission d'arbitrage, tag Discord certifié, compte Battle.net rattaché), tu n'es plus présenté.",
       "Retransmission : les conditions disent maintenant que le message #live de la soirée nomme les équipes et, en tournoi individuel, les joueurs par leur pseudo public avant le début d'un match programmé dans la soirée et une fois le match terminé, pas seulement à son départ. La présence d'un match dans ce message avant son passage à l'antenne ne laisse aucune trace sur le site.",
       "Acceptation : sans accepter les conditions, tu peux supprimer ton compte directement depuis la fenêtre qui te les présente, comme depuis ton profil.",
-      "Conditions d'utilisation : la version 7, en vigueur depuis le 29 octobre 2026, le dit dans ses sections « Contacts de match », « Retransmission des matchs » et « Acceptation ». Une fenêtre te la présente tant que tu ne l'as pas acceptée : l'accepter permet de continuer à utiliser le site.",
+      "Conditions d'utilisation : la version 7, en vigueur depuis le 30 octobre 2026, le dit dans ses sections « Contacts de match », « Retransmission des matchs » et « Acceptation ». Une fenêtre te la présente tant que tu ne l'as pas acceptée : l'accepter permet de continuer à utiliser le site.",
     ],
   },
 ];

@@ -1686,8 +1686,8 @@ describe("PRIVACY_CHANGES — réglages du salon envoyés aux managers (MATCH-RE
   const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-reglages-du-salon-aux-managers")!;
   const english = PRIVACY_CHANGES_EN["2026-10-reglages-du-salon-aux-managers"];
 
-  it("précède l'entrée des conditions v7 : datée comme l'entrée précédente (mise en ligne groupée), pour tous les comptes, et tient seule dans un message privé (FR et EN)", () => {
-    expectStandaloneEntry(entry, english, { fromEnd: 2, publishedAt: "2026-10-29", audience: undefined, links: [
+  it("précède l'entrée des conditions v7 : datée comme elle, lendemain de la mise en ligne prévue (§ Dates corrigées), pour tous les comptes, et tient seule dans un message privé (FR et EN)", () => {
+    expectStandaloneEntry(entry, english, { fromEnd: 2, publishedAt: "2026-10-30", audience: undefined, links: [
       { href: "/rgpd#messages-de-match", label: "Lire le paragraphe « Messages privés Discord de match »" },
     ] });
   });
@@ -1731,7 +1731,7 @@ describe("PRIVACY_CHANGES — conditions v7 : casters, arbitre désigné et page
         { href: "/rgpd#arbitre-designe", label: "Lire le paragraphe « Arbitre désigné d'un match »" },
       ],
     });
-    expect(TERMS_UPDATED_AT).toBe("2026-10-29");
+    expect(TERMS_UPDATED_AT).toBe("2026-10-30");
   });
 
   it("annonce la version en vigueur et sa date, avec un libellé anglais par lien (FR et EN)", () => {
@@ -1739,7 +1739,7 @@ describe("PRIVACY_CHANGES — conditions v7 : casters, arbitre désigné et page
     expect(entry.summary).toMatch(new RegExp(`conditions d'utilisation passent en version ${TERMS_VERSION}`));
     expect(entry.details.at(-1)).toContain(`version ${TERMS_VERSION}, en vigueur depuis le ${formatTermsDate(TERMS_UPDATED_AT)}`);
     expect(english.summary).toMatch(new RegExp(`terms of use move to version ${TERMS_VERSION}`));
-    expect(english.details.at(-1)).toContain(`version ${TERMS_VERSION}, in force since 29 October 2026`);
+    expect(english.details.at(-1)).toContain(`version ${TERMS_VERSION}, in force since 30 October 2026`);
     expect([english.details.length, english.linkLabels?.length ?? 0]).toEqual([entry.details.length, entry.links?.length ?? 0]);
   });
 
@@ -1748,13 +1748,16 @@ describe("PRIVACY_CHANGES — conditions v7 : casters, arbitre désigné et page
     const en = [english.title, english.summary, ...english.details].join(" ");
     expect(fr).toContain("ceux de chaque caster aussi aux autres casters du match");
     expect(fr).toContain("son pseudo et son BattleTag, même masqué, jamais son tag Discord");
-    expect(fr).toContain("repose désormais sur l'exécution du service, et non plus sur l'intérêt légitime");
+    expect(fr).toContain("repose désormais sur l'exécution du service, et non plus sur l'intérêt légitime, dès que cet arbitre a accepté cette version");
     expect(fr).toContain("l'opposition par le formulaire de signalement ne s'y applique plus");
+    // Décision du gestionnaire (revue juridique de #491) : avant l'acceptation, l'intérêt légitime et l'opposition.
+    expect(fr).toContain("Tant que tu ne l'as pas acceptée, elle reste fondée sur l'intérêt légitime, et tu peux t'y opposer par le formulaire de signalement (catégorie RGPD)");
     expect(fr).toContain("les contacts des équipes restent dans les fenêtres « Contacts » et de lancement");
     expect(en).toContain("each caster's also to the other casters of the match");
     expect(en).toContain("their username and BattleTag, even when hidden, never their Discord tag");
-    expect(en).toContain("now rests on the performance of the service, no longer on legitimate interest");
+    expect(en).toContain("now rests on the performance of the service, no longer on legitimate interest, once that referee has accepted this version");
     expect(en).toContain("objecting through the report form no longer applies to it");
+    expect(en).toContain("Until you accept it, it still rests on legitimate interest, and you can object to it through the report form (GDPR category)");
     expect(en).toContain("the teams' contacts stay in the “Contacts” and launch windows");
   });
 

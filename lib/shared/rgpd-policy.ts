@@ -52,14 +52,24 @@ export const BATTLETAG_MATCH_SCOPE =
 
 /**
  * BattleTag de l'arbitre désigné d'un match, même masqué, présenté aux parties
- * du match : exécution du contrat depuis la version 7 des conditions
- * d'utilisation, dont la section « Contacts de match » le prévoit (décision de
- * l'utilisateur du 2026-10-27 ; avant, faute de clause, l'intérêt légitime,
- * avec un droit d'opposition — revue juridique de #487). Se retirer d'un match
- * l'en retire, sans empêcher le staff de lui confier de nouveau ce match.
+ * du match : exécution du contrat une fois la version 7 des conditions
+ * d'utilisation acceptée par cet arbitre, sa section « Contacts de match » le
+ * prévoyant (décision de l'utilisateur du 2026-10-27) ; tant qu'il ne l'a pas
+ * acceptée, l'intérêt légitime, avec un droit d'opposition
+ * (`REFEREE_BATTLETAG_BEFORE_V7_SCOPE` — revue juridique de #487). Se retirer
+ * d'un match l'en retire, sans empêcher le staff de lui confier de nouveau ce
+ * match.
  */
 export const REFEREE_BATTLETAG_SCOPE =
-  "BattleTag de l'arbitre désigné d'un match, même masqué, dans ses fenêtres « Contacts » et de lancement et sur la page du match : lu par ses deux équipes et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, par ses casters le temps du match ; retrait d'un match à tout moment, le staff pouvant lui confier de nouveau ce match, sans avis (conditions d'utilisation, « Contacts de match »)";
+  "BattleTag de l'arbitre désigné d'un match, même masqué, dans ses fenêtres « Contacts » et de lancement et sur la page du match : lu par ses deux équipes et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, par ses casters le temps du match ; retrait d'un match à tout moment, le staff pouvant lui confier de nouveau ce match, sans avis (conditions d'utilisation, « Contacts de match », une fois leur version 7 acceptée par l'arbitre)";
+
+/**
+ * Même présentation, pour un arbitre qui n'a pas encore accepté la version 7
+ * des conditions : intérêt légitime, avec un droit d'opposition (décision de
+ * l'utilisateur du 2026-10-27 — aucun interrupteur dans le code).
+ */
+export const REFEREE_BATTLETAG_BEFORE_V7_SCOPE =
+  "la même présentation du BattleTag de l'arbitre désigné, tant que cet arbitre n'a pas accepté la version 7 des conditions d'utilisation — opposition par le formulaire de signalement, catégorie RGPD (retenue, le staff ne lui confie plus de match)";
 
 /**
  * Pastilles de certification de la fiche (tag Discord certifié, BattleTag tiré
@@ -140,6 +150,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     extraBases: [
       { base: "Exécution du contrat", scope: BATTLETAG_MATCH_SCOPE },
       { base: "Exécution du contrat", scope: REFEREE_BATTLETAG_SCOPE },
+      { base: "Intérêt légitime", scope: REFEREE_BATTLETAG_BEFORE_V7_SCOPE },
       { base: "Intérêt légitime", scope: VERIFIED_BADGE_SCOPE },
     ],
     duree: "Durée du compte",
@@ -340,7 +351,7 @@ export const DROITS: DroitEntry[] = [
   },
   {
     title: "Droit d'opposition",
-    text: "Vous pouvez vous opposer au traitement de vos données fondé sur l'intérêt légitime (historique de tournois, annonces d'horaire, rappels et avis de retrait de match en message privé — ces messages se coupent directement par la case « Messages privés Discord de mes matchs » de Mon profil — et pastilles de certification de votre fiche, tag Discord certifié et « BattleTag vérifié », par le formulaire de signalement, catégorie RGPD). Le pseudo publié dans l'annonce #live d'un tournoi individuel n'en fait pas partie : il relève de l'exécution du service auquel vous vous inscrivez — ne pas y être nommé revient à ne pas s'inscrire ; une annonce passée est supprimée sur demande. L'alerte AutoMod d'une telle annonce bloquée ou signalée, gardée pour la modération du serveur Discord (intérêt légitime), est supprimée sur demande : c'est ainsi qu'on s'y oppose.",
+    text: "Vous pouvez vous opposer au traitement de vos données fondé sur l'intérêt légitime (historique de tournois, annonces d'horaire, rappels et avis de retrait de match en message privé — ces messages se coupent directement par la case « Messages privés Discord de mes matchs » de Mon profil — et pastilles de certification de votre fiche, tag Discord certifié et « BattleTag vérifié », ainsi que la présentation de l'arbitre désigné aux parties de ses matchs tant qu'il n'a pas accepté la version 7 des conditions d'utilisation, par le formulaire de signalement, catégorie RGPD). Le pseudo publié dans l'annonce #live d'un tournoi individuel n'en fait pas partie : il relève de l'exécution du service auquel vous vous inscrivez — ne pas y être nommé revient à ne pas s'inscrire ; une annonce passée est supprimée sur demande. L'alerte AutoMod d'une telle annonce bloquée ou signalée, gardée pour la modération du serveur Discord (intérêt légitime), est supprimée sur demande : c'est ainsi qu'on s'y oppose.",
   },
   {
     title: "Droit à la portabilité",
