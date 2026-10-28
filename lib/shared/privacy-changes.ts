@@ -1178,6 +1178,23 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Conditions d'utilisation : la version 7, en vigueur depuis le 30 octobre 2026, le dit dans ses sections « Contacts de match », « Retransmission des matchs » et « Acceptation ». Une fenêtre te la présente tant que tu ne l'as pas acceptée : l'accepter permet de continuer à utiliser le site.",
     ],
   },
+  {
+    // ERREUR-FIX EF-04 : le « Ne plus voir » de l'invitation à certifier
+    // (fiche d'un tournoi) quitte le stockage local du navigateur pour le
+    // compte (bg_users.certification_prompt_dismissed_at, exportée, effacée à
+    // l'anonymisation). Une donnée de plus sur le serveur : à annoncer. Joueurs
+    // invités concernés : pas de public. Daté comme l'entrée précédente.
+    id: "2026-10-ne-plus-voir-invitation-certification-sur-le-compte",
+    publishedAt: "2026-10-30",
+    title: "« Ne plus voir » de l'invitation à certifier : retenu sur le compte",
+    links: [{ href: "/rgpd#cookies", label: "Lire la section « Cookies & traceurs »" }],
+    summary:
+      "Le choix « Ne plus voir » de la fenêtre qui t'invite, sur la fiche d'un tournoi, à certifier ton tag Discord et ton BattleTag est désormais gardé sur ton compte, et non plus dans le navigateur : il vaut dans tous tes navigateurs, et ne s'applique plus aux autres comptes utilisés dans le même navigateur.",
+    details: [
+      "Ce qui est gardé : la date du choix, sur ton compte. Elle figure dans l'export de tes données et est effacée à l'anonymisation du compte ; l'ancienne valeur du stockage local est retirée de ton navigateur.",
+      "La fermeture simple de la fenêtre reste retenue pour l'onglet seulement (stockage de session, jamais transmise au serveur).",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

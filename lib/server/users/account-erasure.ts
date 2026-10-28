@@ -39,6 +39,30 @@ export async function eraseAccount(connection: PoolConnection, userId: number): 
 const ANONYMOUS_PSEUDO_ATTEMPTS = 5;
 
 /**
+ * Réglages du compte remis au défaut à l'anonymisation, chacun par une
+ * instruction à part (colonne tolérée, `resetOptionalColumn`).
+ */
+const ANONYMIZED_OPTIONAL_COLUMNS = [
+  "match_dm_enabled = 1",
+  "recruitment_modal_off = 0",
+  "discord_certify_prompt_dismissed_at = NULL",
+  "certification_prompt_dismissed_at = NULL",
+] as const;
+
+/** Remet une colonne du compte supprimé au défaut ; colonne absente = rien à effacer. */
+async function resetOptionalColumn(
+  connection: PoolConnection,
+  assignment: (typeof ANONYMIZED_OPTIONAL_COLUMNS)[number],
+  userId: number,
+): Promise<void> {
+  try {
+    await connection.execute(`UPDATE bg_users SET ${assignment} WHERE id = ? AND is_deleted = 1`, [userId]);
+  } catch (error) {
+    if (!isUnknownColumnError(error)) throw error;
+  }
+}
+
+/**
  * L'anonymisation : la ligne reste — ses matchs et son palmarès en dépendent —,
  * sous un **pseudo d'emprunt** (`lib/shared/anonymous-pseudos.ts`), et tout ce
  * qui désigne une personne part : tags de jeu et Discord, identités de
@@ -115,28 +139,13 @@ export async function anonymizeAccount(connection: PoolConnection, userId: numbe
     }
   }
   await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
-  // L'opposition aux messages privés de match revient au défaut. À part, et
-  // colonne tolérée : une migration en échec (`reportSchemaFailure`) ne doit
-  // pas empêcher l'effacement d'un compte.
-  try {
-    await connection.execute(`UPDATE bg_users SET match_dm_enabled = 1 WHERE id = ? AND is_deleted = 1`, [userId]);
-  } catch (error) {
-    if (!isUnknownColumnError(error)) throw error;
-  }
-  // Même régime pour le « Ne plus afficher » de la modale du recrutement.
-  try {
-    await connection.execute(`UPDATE bg_users SET recruitment_modal_off = 0 WHERE id = ? AND is_deleted = 1`, [userId]);
-  } catch (error) {
-    if (!isUnknownColumnError(error)) throw error;
-  }
-  // Et pour le « Ne plus voir » de la fenêtre de certification du tag Discord.
-  try {
-    await connection.execute(
-      `UPDATE bg_users SET discord_certify_prompt_dismissed_at = NULL WHERE id = ? AND is_deleted = 1`,
-      [userId],
-    );
-  } catch (error) {
-    if (!isUnknownColumnError(error)) throw error;
+  // L'opposition aux messages privés de match revient au défaut, le « Ne plus
+  // afficher » de la modale du recrutement, le « Ne plus voir » de la fenêtre
+  // de certification du tag Discord et celui de l'invitation à certifier de la
+  // fiche tournoi sont effacés. À part, et colonnes tolérées : une migration en
+  // échec (`reportSchemaFailure`) ne doit pas empêcher l'effacement d'un compte.
+  for (const assignment of ANONYMIZED_OPTIONAL_COLUMNS) {
+    await resetOptionalColumn(connection, assignment, userId);
   }
   // Les consentements aux changements de traitement et la trace des messages
   // privés envoyés : ils ne concernent plus personne, et le compte ne sera plus

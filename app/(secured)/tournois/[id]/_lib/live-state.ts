@@ -20,6 +20,7 @@ import type {
 } from "@/lib/shared/types";
 import { isRefreshTier, type RefreshTier } from "@/lib/shared/refresh-tiers";
 import { isSoloTournament } from "@/lib/shared/participants";
+import type { CertificationPrompt } from "@/lib/shared/certification-prompt";
 
 /** Messages émis par le flux. Tout le reste est ignoré. */
 export type LiveMessage =
@@ -30,7 +31,12 @@ export type LiveMessage =
       viewer: TournamentViewerContext;
       snapshot: TournamentSnapshot;
     }
-  | { type: "snapshot"; tournamentId: number; version: string; snapshot: TournamentSnapshot };
+  | { type: "snapshot"; tournamentId: number; version: string; snapshot: TournamentSnapshot }
+  /**
+   * Invitation à certifier du lecteur, lue après l'ouverture du flux (base
+   * lente : elle ne retarde pas la connexion) — `CERTIFICATION_PROMPT.md`.
+   */
+  | { type: "certificationPrompt"; tournamentId: number; certificationPrompt: CertificationPrompt };
 
 /** État local dérivé du flux. */
 export type LiveState = {
@@ -60,6 +66,21 @@ export function parseLiveMessage(raw: string): LiveMessage | null {
       tier: isRefreshTier(message.tier) ? message.tier : "STANDARD",
       viewer: message.viewer as TournamentViewerContext,
       snapshot: message.snapshot as TournamentSnapshot,
+    };
+  }
+
+  if (message.type === "certificationPrompt") {
+    const prompt = message.certificationPrompt as Partial<CertificationPrompt> | null | undefined;
+    if (!prompt || (prompt.reason !== "MANAGER" && prompt.reason !== "TEAM_WITHOUT_CONTACT")) return null;
+    return {
+      type: "certificationPrompt",
+      tournamentId: Number(message.tournamentId),
+      certificationPrompt: {
+        reason: prompt.reason,
+        discordVerified: prompt.discordVerified === true,
+        battletagVerified: prompt.battletagVerified === true,
+        battletagRelevant: prompt.battletagRelevant === true,
+      },
     };
   }
 
@@ -95,6 +116,13 @@ export function applyLiveMessage(state: LiveState, message: LiveMessage): LiveSt
       tier: message.tier,
       detail: { ...snapshot, ...message.viewer },
     };
+  }
+
+  // Invitation arrivée après la connexion : posée sur le contexte établi, du
+  // même tournoi seulement (fiche réutilisée d'un tournoi à l'autre).
+  if (message.type === "certificationPrompt") {
+    if (!state.detail || state.detail.card.id !== message.tournamentId) return state;
+    return { tier: state.tier, detail: { ...state.detail, certificationPrompt: message.certificationPrompt } };
   }
 
   // Un instantané seul ne suffit pas à afficher la page : sans le contexte du

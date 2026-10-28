@@ -16,6 +16,7 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { isUnknownColumnError } from "@/lib/server/mysql-errors";
+import { forgetCertificationPromptsOf } from "@/lib/server/tournaments/certification-prompt-cache";
 import { certifyPromptFor, type CertifyPrompt } from "@/lib/shared/discord-certify-prompt";
 
 type PromptRow = RowDataPacket & {
@@ -34,9 +35,16 @@ type PromptRow = RowDataPacket & {
  *
  * Rien à proposer (tag déjà certifié, « Ne plus voir », compte supprimé) : la
  * marque de la session est levée sur-le-champ (sans l'attendre), sans quoi
- * chaque page de ses trente jours relancerait cette lecture pour rien.
+ * chaque page de ses trente jours relancerait cette lecture pour rien — sauf
+ * `{ clearStale: false }` : la relecture `GET` de la fenêtre n'écrit rien (une
+ * lecture hors du contrôle de provenance des écritures), la page suivante
+ * lèvera la marque.
  */
-export async function loadDiscordCertifyPrompt(userId: number, tokenHash: string): Promise<CertifyPrompt | null> {
+export async function loadDiscordCertifyPrompt(
+  userId: number,
+  tokenHash: string,
+  { clearStale = true }: { clearStale?: boolean } = {},
+): Promise<CertifyPrompt | null> {
   if (!Number.isInteger(userId) || userId <= 0 || !tokenHash) return null;
   const db = await getDatabase();
   try {
@@ -55,6 +63,7 @@ export async function loadDiscordCertifyPrompt(userId: number, tokenHash: string
     );
     const row = rows[0];
     if (!row) {
+      if (!clearStale) return null;
       // Jamais attendue : la réponse (`null`) n'en dépend pas, et la page
       // (mise en page racine) n'a pas à payer un aller-retour de plus.
       void markDiscordCertifyPromptSeen(userId, tokenHash).catch((error: unknown) =>
@@ -69,6 +78,7 @@ export async function loadDiscordCertifyPrompt(userId: number, tokenHash: string
     });
   } catch (error) {
     if (!isUnknownColumnError(error)) throw error;
+    if (!clearStale) return null;
     // Colonne du compte absente : lever la marque (colonne de session, elle,
     // présente puisque lue) évite une lecture vouée à l'échec à chaque page.
     void markDiscordCertifyPromptSeen(userId, tokenHash).catch(() => undefined);
@@ -103,6 +113,9 @@ export async function recordDiscordCertifyPromptOff(userId: number): Promise<boo
     [userId],
   );
   if (Number((result as { affectedRows?: number }).affectedRows ?? 0) === 0) return false;
+  // Ce refus tait aussi l'invitation de la fiche tournoi (meneur, Discord seul
+  // manquant) : celle retenue pour ce compte ne vaut plus.
+  forgetCertificationPromptsOf(userId);
   // Au mieux : le choix est déjà gardé, et le chargeur lève lui-même une
   // marque restée (il filtre sur `discord_certify_prompt_dismissed_at`).
   await db

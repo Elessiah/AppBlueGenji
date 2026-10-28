@@ -642,15 +642,17 @@ function RgpdFr({
               serveur.
             </li>
             <li>
-              <strong>bg_cert_prompt_closed</strong> et <strong>bg_cert_prompt_off</strong> — posés
-              seulement <strong>si vous fermez la fenêtre qui vous invite à certifier votre tag Discord
-              et votre BattleTag</strong> (fiche d&apos;un tournoi) : le premier, une valeur du stockage
-              de session effacée à la fermeture de l&apos;onglet, pour ne pas vous la rouvrir dans cet
-              onglet ; le second, une valeur du stockage local, seulement si vous cochez « Ne plus
-              voir » — retenue aussi si la fenêtre s&apos;efface devant une autre (lancement d&apos;un
-              match). Ils ne contiennent que la valeur « 1 », jamais d&apos;identifiant de personne — ils valent donc
-              pour tous les comptes utilisés dans ce navigateur — et
-              ne sont jamais transmis au serveur.
+              <strong>bg_cert_prompt_closed</strong> — une valeur du stockage de session, effacée à la
+              fermeture de l&apos;onglet, posée seulement <strong>si vous fermez la fenêtre qui vous invite
+              à certifier votre tag Discord et votre BattleTag</strong> (fiche d&apos;un tournoi), pour ne
+              pas vous la rouvrir dans cet onglet. Elle ne contient que la valeur « 1 », jamais
+              d&apos;identifiant de personne, et n&apos;est jamais transmise au serveur. Si vous cochez
+              « Ne plus voir » — retenu aussi si la fenêtre s&apos;efface devant une autre (lancement
+              d&apos;un match) —, ce choix n&apos;est pas gardé dans le navigateur mais sur votre compte
+              (date du choix, comprise dans l&apos;export, effacée à l&apos;anonymisation) : il tait
+              l&apos;invitation sur tous les tournois et dans tous vos navigateurs. L&apos;ancienne valeur
+              du stockage local <strong>bg_cert_prompt_off</strong> n&apos;est plus posée : celle qu&apos;un
+              passage antérieur aurait laissée est effacée à l&apos;ouverture de la fiche d&apos;un tournoi.
             </li>
             <li>
               <strong>bg_lazy_chunk_reload_at</strong> — une valeur du stockage de session,

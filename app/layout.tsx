@@ -365,9 +365,10 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
               Discord ou Blizzard, après la confidentialité et les conditions.
               Chargée seulement quand elle est due : hors du premier
               chargement de chaque page. */}
-          {certifyPrompt && (
+          {certifyPrompt && user && (
             <DiscordCertifyPromptLazy
               prompt={certifyPrompt}
+              userId={user.id}
               privacyPending={privacyChanges.length > 0}
               termsPending={termsRequired}
             />

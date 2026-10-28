@@ -5,6 +5,7 @@ import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { anotherModalOpen } from "@/lib/shared/dialog-focus";
 import { isPlainLeftClick } from "@/lib/shared/site-back";
 import { certificationProfileHref, type CertificationPrompt } from "@/lib/shared/certification-prompt";
+import { requestCertifyDialog } from "@/lib/shared/discord-certify-events";
 import { useDialogsText } from "../_lib/dialogs-text";
 import { TournamentDialogFrame } from "./TournamentDialogFrame";
 import s from "./CertificationPromptDialog.module.css";
@@ -168,8 +169,11 @@ function CertificationPromptDialogView({
             className="btn"
             onClick={(event) => {
               // Ouvert dans un nouvel onglet (Ctrl, Cmd, Maj, clic du milieu) :
-              // la modale reste là, rien n'est retenu.
-              if (isPlainLeftClick(event)) onClose();
+              // la modale reste là, rien n'est retenu — et le profil s'y ouvre
+              // sans le dialogue, qui ne suit qu'une demande de cette page.
+              if (!isPlainLeftClick(event)) return;
+              if (!prompt.discordVerified) requestCertifyDialog();
+              onClose();
             }}
           >
             {t("certification.go")}

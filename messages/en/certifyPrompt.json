@@ -62,6 +62,7 @@
   "bodyLabel": "Discord tag verification suggestion",
   "accountDeleted": "This account has been deleted.",
   "sessionEnded": "Your session has ended: log in again.",
+  "otherAccount": "Another account is logged in on this browser: nothing was saved.",
   "titleNoTag": "Add and verify your Discord tag?",
   "introNoTag": "Your account has no Discord tag yet. Adding and verifying it lets the organizers reach you during a tournament. It's optional, but some tournaments require it to register, and so does casting a match.",
   "addTag": "Add my tag"

@@ -7,8 +7,15 @@
  * `POST { action: "NEVER" }` — « Ne plus voir » : posé sur le compte, et ses
  * sessions aussi. `GET` — la proposition est-elle **encore** due ? Relue par
  * la fenêtre avant de s'ouvrir sur une page chargée plus tôt (choix fait
- * entre-temps sur un autre appareil). Rien ici ne certifie : la certification reste
+ * entre-temps sur un autre appareil) ; il **n'écrit rien** (`clearStale:
+ * false`). Rien ici ne certifie : la certification reste
  * `POST /api/profile/discord`. Provenance vérifiée par le middleware.
+ *
+ * Le `POST` porte le compte à qui la fenêtre a été montrée (`userId`) : une
+ * session changée depuis (autre compte connecté dans ce navigateur) répond 409
+ * `CERTIFY_PROMPT_OTHER_ACCOUNT` sans rien écrire. Une session qui ne doit
+ * rien (marque déjà levée) répond sans écrire : rejouée, la réponse ne coûte
+ * aucune écriture.
  */
 import { currentTokenHash, getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
@@ -20,7 +27,11 @@ import {
   recordDiscordCertifyPromptOff,
 } from "@/lib/server/users/discord-certify-prompt";
 import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
-import { parseCertifyPromptAction } from "@/lib/shared/discord-certify-prompt";
+import {
+  CERTIFY_PROMPT_OTHER_ACCOUNT,
+  parseCertifyPromptAction,
+  parseCertifyPromptUserId,
+} from "@/lib/shared/discord-certify-prompt";
 
 /**
  * `{ prompt }` — le parcours encore offert à cette session, ou `null` (déjà
@@ -32,7 +43,7 @@ export async function GET() {
   if (!user) return fail("UNAUTHORIZED", 401);
   if (!user.certifyPromptDue) return ok({ prompt: null });
   try {
-    return ok({ prompt: await loadDiscordCertifyPrompt(user.id, await currentTokenHash()) });
+    return ok({ prompt: await loadDiscordCertifyPrompt(user.id, await currentTokenHash(), { clearStale: false }) });
   } catch (error) {
     console.error("[discord] GET certify-prompt failed:", error);
     return fail("CERTIFY_PROMPT_FAILED", 500);
@@ -44,13 +55,20 @@ export async function POST(req: Request) {
   if (!user) return fail("UNAUTHORIZED", 401);
 
   let action;
+  let shownTo;
   try {
-    const body = (await readJsonBody(req)) as { action?: unknown } | null;
+    const body = (await readJsonBody(req)) as { action?: unknown; userId?: unknown } | null;
     action = parseCertifyPromptAction(body?.action);
+    shownTo = parseCertifyPromptUserId(body?.userId);
   } catch {
     action = null;
   }
-  if (!action) return fail("INVALID_ACTION", 400);
+  // Sans compte (corps malformé, ou client d'avant ce champ) : refusé comme une
+  // action illisible — jamais dit « autre compte », qui serait faux.
+  if (!action || shownTo == null) return fail("INVALID_ACTION", 400);
+  if (shownTo !== user.id) return fail(CERTIFY_PROMPT_OTHER_ACCOUNT, 409);
+  // Rien de dû sur cette session (déjà répondue, jamais proposée) : rien à écrire.
+  if (!user.certifyPromptDue) return ok({ action });
 
   try {
     if (action === "NEVER") {

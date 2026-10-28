@@ -202,7 +202,7 @@ import {
   type DisputeBeforeResolution,
 } from "./dispute-self-resolution";
 import { loadViewerCastBlock } from "./match-launch";
-import { cachedCertificationPrompt, loadCertificationPrompt } from "./certification-prompt";
+import { cachedCertificationPrompt, loadCertificationPrompt, peekCertificationPrompt } from "./certification-prompt";
 import { battletagRelevantFor, type CertificationPrompt } from "@/lib/shared/certification-prompt";
 
 let pendingSync: Promise<void> | null = null;
@@ -1013,17 +1013,32 @@ export type TournamentViewerRights = {
  * chaque lecture REST (après chaque geste, proposition de score, repli du
  * flux), et l'invitation ne change qu'avec une certification.
  */
+function certificationPromptKey(userId: number, teamId: number, isManager: boolean, battletagRelevant: boolean): string {
+  return `${userId}:${teamId}:${isManager ? 1 : 0}:${battletagRelevant ? 1 : 0}`;
+}
+
 async function readCertificationPrompt(
   userId: number,
   teamId: number,
   isManager: boolean,
   battletagRelevant: boolean,
 ): Promise<CertificationPrompt | null> {
-  const key = `${userId}:${teamId}:${isManager ? 1 : 0}:${battletagRelevant ? 1 : 0}`;
-  return cachedCertificationPrompt(key, () =>
+  return cachedCertificationPrompt(certificationPromptKey(userId, teamId, isManager, battletagRelevant), () =>
     withConnection((connection) => loadCertificationPrompt(connection, userId, teamId, isManager, battletagRelevant)),
   );
 }
+
+/** Options de lecture du contexte propres à la porte qui le sert. */
+export type TournamentViewerContextOptions = {
+  /**
+   * Flux SSE seulement : l'invitation à certifier n'est pas attendue. Connue
+   * (mémoire), elle part avec le contexte ; sinon le contexte part sans elle
+   * (`null`) et elle est remise ici une fois lue — si elle existe — pour être
+   * poussée ensuite (trame `certificationPrompt`). La lecture REST de secours,
+   * qui ne peut rien pousser, l'attend.
+   */
+  onLateCertificationPrompt?: (prompt: CertificationPrompt) => void;
+};
 
 /**
  * Contexte propre au lecteur : ce qu'il a le droit de faire ici.
@@ -1036,6 +1051,7 @@ export async function getTournamentViewerContext(
   snapshot: TournamentSnapshot,
   userId: number,
   rights: TournamentViewerRights = {},
+  options: TournamentViewerContextOptions = {},
 ): Promise<TournamentViewerContext> {
   const {
     canManage = false,
@@ -1080,24 +1096,37 @@ export async function getTournamentViewerContext(
   // Invitation à certifier (`CERTIFICATION_PROMPT.md`) : au joueur d'une
   // équipe engagée dans un tournoi qui n'est pas clos. Une requête indexée sur
   // le roster, pour les seuls engagés, gardée une minute par lecteur
-  // (`readCertificationPrompt`). La case « Ne plus voir » de la modale vit dans le navigateur ;
-  // celui de la proposition de la connexion, gardé sur le compte, est lu ici
-  // (`loadCertificationPrompt`).
+  // (`readCertificationPrompt`). Les deux « Ne plus voir » — celui de cette
+  // modale et celui de la proposition de la connexion —, gardés sur le
+  // compte, sont lus ici (`loadCertificationPrompt`).
   // Lancée en dernier, seule : le contexte ne tient jamais deux places du
   // pool à la fois (une vague de reconnexions en demanderait le double). Une
   // lecture gardée ne coûte rien ; manquée, une requête indexée par minute.
   // Fonction, pour ne partir qu'au moment voulu ; elle ne rejette jamais.
-  const certificationPromptRead = (): Promise<CertificationPrompt | null> =>
+  // Le flux ne l'attend pas (`onLateCertificationPrompt`) : sur base lente, la
+  // lecture n'ajoute rien à son ouverture, l'invitation suit par une trame.
+  const promptTarget =
     !isSolo && activeTeam && alreadyRegistered && snapshot.card.state !== "FINISHED"
-      ? readCertificationPrompt(
-          userId,
-          activeTeam.teamId,
+      ? {
+          teamId: activeTeam.teamId,
           // Ceux qui mènent l'équipe en match — capitaine compris, premier
           // présenté par `pickLaunchContacts` à vérification égale.
-          canDeclareTeamReady(activeTeam.roles),
-          battletagRelevantFor(snapshot.card.game),
-        )
-      : Promise.resolve(null);
+          isManager: canDeclareTeamReady(activeTeam.roles),
+          battletagRelevant: battletagRelevantFor(snapshot.card.game),
+        }
+      : null;
+  const certificationPromptRead = async (): Promise<CertificationPrompt | null> => {
+    if (!promptTarget) return null;
+    const { teamId, isManager, battletagRelevant } = promptTarget;
+    const late = options.onLateCertificationPrompt;
+    if (!late) return readCertificationPrompt(userId, teamId, isManager, battletagRelevant);
+    const known = peekCertificationPrompt(certificationPromptKey(userId, teamId, isManager, battletagRelevant));
+    if (known) return known.prompt;
+    void readCertificationPrompt(userId, teamId, isManager, battletagRelevant).then((prompt) => {
+      if (prompt !== null) late(prompt);
+    });
+    return null;
+  };
 
   // Conditions d'inscription du tournoi (`lib/shared/registration-filters.ts`).
   //

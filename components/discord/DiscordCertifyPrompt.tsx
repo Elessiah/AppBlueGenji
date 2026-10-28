@@ -8,8 +8,8 @@ import { richNodes } from "@/components/i18n/shell-text";
 import { useToast } from "@/components/ui/toast";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
-import { CERTIFY_PROFILE_HREF, type CertifyPrompt } from "@/lib/shared/discord-certify-prompt";
-import { CERTIFY_DIALOG_EVENT, DISCORD_CERTIFIED_EVENT } from "@/lib/shared/discord-certify-events";
+import { CERTIFY_PROFILE_HREF, CERTIFY_PROMPT_OTHER_ACCOUNT, type CertifyPrompt } from "@/lib/shared/discord-certify-prompt";
+import { CERTIFY_DIALOG_EVENT, DISCORD_CERTIFIED_EVENT, requestCertifyDialog } from "@/lib/shared/discord-certify-events";
 import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
 import { visibleText } from "@/lib/shared/visible-text";
 import { answerCertifyPrompt as answerPrompt } from "./certify-prompt-answer";
@@ -29,19 +29,23 @@ export const CERTIFY_PROMPT_GROUPS = [
 const STATE_CHANGED = new Set(["DISCORD_TAG_CHANGED", "DISCORD_NOT_LINKED", "DISCORD_TAG_MISSING", "DISCORD_TAG_NOT_ATTESTED"]);
 
 /**
- * Refus sans issue depuis la fenêtre — compte supprimé, session close ailleurs :
+ * Refus sans issue depuis la fenêtre — compte supprimé, session close ailleurs,
+ * autre compte connecté depuis dans ce navigateur :
  * réessayer n'y changerait rien. La fenêtre se ferme, un toast dit pourquoi et
  * la page se relit. `null` : refus ordinaire, la fenêtre reste.
  */
-function deadEndText(code: string): "accountDeleted" | "sessionEnded" | null {
+function deadEndText(code: string): "accountDeleted" | "sessionEnded" | "otherAccount" | null {
   if (code === ACCOUNT_DELETED_ERROR || code === "PROFILE_NOT_FOUND") return "accountDeleted";
   if (code === "UNAUTHORIZED") return "sessionEnded";
+  if (code === CERTIFY_PROMPT_OTHER_ACCOUNT) return "otherAccount";
   return null;
 }
 
 export type DiscordCertifyPromptProps = {
   /** Parcours offert, décidé par la mise en page racine (montée seulement quand il y en a un). */
   prompt: CertifyPrompt;
+  /** Compte à qui la mise en page l'a faite : une réponse ne part qu'en son nom. */
+  userId: number;
   /** Une modale de confidentialité attend une réponse : celle-ci passe après. */
   privacyPending: boolean;
   /** Les conditions d'utilisation attendent une acceptation : celle-ci passe après. */
@@ -56,6 +60,8 @@ export type DiscordCertifyPromptProps = {
  */
 export type DiscordCertifyPromptViewProps = {
   prompt: CertifyPrompt;
+  /** Compte à qui elle est montrée : une session changée depuis refuse la réponse (409). */
+  userId: number;
   canOpen: boolean;
   /** La page affichée est `/profil` (lue par le relais) : le dialogue y est déjà. */
   onProfile: boolean;
@@ -80,7 +86,7 @@ export type DiscordCertifyPromptViewProps = {
  * par Discord. Elle attend la confidentialité et les conditions (attentes
  * suivies par `DiscordCertifyPromptLazy`).
  */
-export function DiscordCertifyPrompt({ prompt, canOpen, onProfile, onAnswered, text }: Readonly<DiscordCertifyPromptViewProps>) {
+export function DiscordCertifyPrompt({ prompt, userId, canOpen, onProfile, onAnswered, text }: Readonly<DiscordCertifyPromptViewProps>) {
   const { t, rich } = text;
   const { showError, showSuccess } = useToast();
   const router = useLocaleRouter();
@@ -101,8 +107,8 @@ export function DiscordCertifyPrompt({ prompt, canOpen, onProfile, onAnswered, t
   const closeForSession = useCallback(() => {
     setClosed(true);
     onAnswered();
-    answerPrompt("LATER").catch(() => undefined);
-  }, [onAnswered]);
+    answerPrompt("LATER", userId).catch(() => undefined);
+  }, [onAnswered, userId]);
 
   const open = canOpen && !closed;
 
@@ -120,7 +126,7 @@ export function DiscordCertifyPrompt({ prompt, canOpen, onProfile, onAnswered, t
 
   if (!open) return null;
 
-  /** Refus sans issue (compte supprimé, session close) : fermée, toast, page relue. `false` sinon. */
+  /** Refus sans issue (compte supprimé, session close, autre compte) : fermée, toast, page relue. `false` sinon. */
   const closeOnDeadEnd = (code: string): boolean => {
     const deadEnd = deadEndText(code);
     if (!deadEnd) return false;
@@ -136,7 +142,7 @@ export function DiscordCertifyPrompt({ prompt, canOpen, onProfile, onAnswered, t
     inFlight.current = true;
     setBusy("never");
     try {
-      await answerPrompt("NEVER");
+      await answerPrompt("NEVER", userId);
       setClosed(true);
       showSuccess(t("neverSaved"));
       onAnswered();
@@ -154,8 +160,12 @@ export function DiscordCertifyPrompt({ prompt, canOpen, onProfile, onAnswered, t
       // Le dialogue de `/profil` fait la suite (code ou passage par Discord) :
       // la proposition est close pour la session, rien n'est certifié ici.
       closeForSession();
-      if (onProfile) window.dispatchEvent(new Event(CERTIFY_DIALOG_EVENT));
-      else router.push(CERTIFY_PROFILE_HREF);
+      if (onProfile) {
+        window.dispatchEvent(new Event(CERTIFY_DIALOG_EVENT));
+      } else {
+        requestCertifyDialog();
+        router.push(CERTIFY_PROFILE_HREF);
+      }
       return;
     }
     inFlight.current = true;

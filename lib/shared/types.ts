@@ -1058,6 +1058,8 @@ export type PersonalDataExport = {
     recruitmentModalBackOn: boolean;
     /** « Ne plus voir » posé sur la fenêtre de certification du tag Discord (ISO), sinon `null`. */
     discordCertifyPromptDismissedAt: string | null;
+    /** « Ne plus voir » coché sur l'invitation à certifier de la fiche tournoi (ISO), sinon `null`. */
+    certificationPromptDismissedAt: string | null;
     createdAt: string;
   };
   profile: {

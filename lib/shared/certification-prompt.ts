@@ -17,8 +17,8 @@
  * En Marvel Rivals, le BattleTag (Battle.net, Overwatch) ne sert à rien : seul
  * le tag Discord est demandé.
  *
- * Module **pur** : la règle se rejoue sans base, et le client n'y lit que les
- * clés de son « Ne plus voir ».
+ * Module **pur** : la règle se rejoue sans base, et le client n'y lit que la
+ * clé de fermeture de l'onglet (« Ne plus voir » : sur le compte).
  */
 
 import { CERTIFY_PROFILE_HREF } from "./discord-certify-prompt";
@@ -90,11 +90,12 @@ export function certificationProfileHref(prompt: Pick<CertificationPrompt, "disc
 }
 
 /**
- * « Ne plus voir » : valeur « 1 » du stockage local, jamais transmise au
- * serveur. Sans identifiant de personne — un navigateur partagé tait la modale
- * pour tous ses comptes, ce qu'une préférence d'affichage peut se permettre.
+ * Ancienne clé du « Ne plus voir » (stockage local, commune à tous les comptes
+ * du navigateur) : ce choix vit désormais sur le compte
+ * (`POST /api/profile/certification-prompt`). Plus jamais lue ; effacée là où
+ * elle traîne encore (`forgetLegacyCertificationPromptOff`).
  */
-export const CERTIFICATION_PROMPT_OFF_KEY = "bg_cert_prompt_off";
+export const LEGACY_CERTIFICATION_PROMPT_OFF_KEY = "bg_cert_prompt_off";
 
 /**
  * Modale fermée sans « Ne plus voir » : valeur du stockage de session, effacée
@@ -102,6 +103,9 @@ export const CERTIFICATION_PROMPT_OFF_KEY = "bg_cert_prompt_off";
  * visitée dans la même session.
  */
 export const CERTIFICATION_PROMPT_CLOSED_KEY = "bg_cert_prompt_closed";
+
+/** Où le client garde ses choix « Ne plus voir » : `POST` de la route du compte. */
+export const CERTIFICATION_PROMPT_OFF_PATH = "/api/profile/certification-prompt";
 
 /** Stockage du navigateur tel que la décision le lit ; `null` s'il est inaccessible. */
 type StorageLike = Pick<Storage, "getItem" | "setItem">;
@@ -119,23 +123,27 @@ function writeFlag(storage: StorageLike | null, key: string): void {
     storage?.setItem(key, "1");
   } catch {
     // Stockage bloqué (navigation privée, données refusées) : la modale se
-    // ferme quand même, elle se rouvrira simplement à la prochaine visite.
+    // ferme quand même, elle se rouvrira simplement à la prochaine fiche.
   }
 }
 
-/** La modale doit-elle s'ouvrir d'office ? Ni « Ne plus voir », ni déjà fermée dans cet onglet. */
-export function shouldOpenCertificationPrompt(local: StorageLike | null, session: StorageLike | null): boolean {
-  return !readFlag(local, CERTIFICATION_PROMPT_OFF_KEY) && !readFlag(session, CERTIFICATION_PROMPT_CLOSED_KEY);
+/** La modale doit-elle s'ouvrir d'office ? Pas déjà fermée dans cet onglet (« Ne plus voir » : le serveur la tait). */
+export function shouldOpenCertificationPrompt(session: StorageLike | null): boolean {
+  return !readFlag(session, CERTIFICATION_PROMPT_CLOSED_KEY);
 }
 
-/** Retient la fermeture : pour l'onglet, et pour de bon si « Ne plus voir » est cochée. */
-export function rememberCertificationPromptClosed(
-  local: StorageLike | null,
-  session: StorageLike | null,
-  neverAgain: boolean,
-): void {
+/** Retient la fermeture pour l'onglet. */
+export function rememberCertificationPromptClosed(session: StorageLike | null): void {
   writeFlag(session, CERTIFICATION_PROMPT_CLOSED_KEY);
-  if (neverAgain) writeFlag(local, CERTIFICATION_PROMPT_OFF_KEY);
+}
+
+/** Efface l'ancienne clé du « Ne plus voir » d'un navigateur (sans effet si elle n'y est pas). */
+export function forgetLegacyCertificationPromptOff(local: Pick<Storage, "removeItem"> | null): void {
+  try {
+    local?.removeItem(LEGACY_CERTIFICATION_PROMPT_OFF_KEY);
+  } catch {
+    // Stockage bloqué : rien à effacer qu'on puisse atteindre.
+  }
 }
 
 /**
