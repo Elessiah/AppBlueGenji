@@ -232,6 +232,20 @@ describe("flushRoundMapsNotice — cap per tournament", () => {
     await expect(flushRoundMapsNotice(7)).resolves.toBe(false);
   });
 
+  it("flushRoundMapsNotice_twoConcurrentFlushes_onlyOneQueries", async () => {
+    pool([dueRow([R2])]);
+    const results = await Promise.all([flushRoundMapsNotice(7), flushRoundMapsNotice(7)]);
+    expect(results).toEqual([true, false]);
+    expect(execute.mock.calls.filter(([sql]) => /^\s*SELECT/.test(sql))).toHaveLength(1);
+  });
+
+  it("flushRoundMapsNotice_databaseFails_releasesTheCap", async () => {
+    jest.mocked(getDatabase).mockRejectedValueOnce(new Error("down"));
+    await expect(flushRoundMapsNotice(7)).rejects.toThrow("down");
+    pool([dueRow([R2])]);
+    await expect(flushRoundMapsNotice(7)).resolves.toBe(true);
+  });
+
   it("flushRoundMapsNotice_otherTournament_notCapped", async () => {
     pool([dueRow([R2])]);
     await flushRoundMapsNotice(7);

@@ -194,14 +194,19 @@ export async function dispatchDueRoundMapsNotices(): Promise<number> {
 export async function flushRoundMapsNotice(tournamentId: number): Promise<boolean> {
   const now = Date.now();
   if (now - (lastFlushAt.get(tournamentId) ?? 0) < FLUSH_MIN_INTERVAL_MS) return false;
-  const db = await getDatabase();
-  const [rows] = await db.execute<NoticeRow[]>(`${NOTICE_SELECT} WHERE n.tournament_id = ?`, [tournamentId]);
-  const sent = (await sendClaimed(rows)) > 0;
-  if (sent) {
-    for (const [id, at] of lastFlushAt) if (now - at >= FLUSH_MIN_INTERVAL_MS) lastFlushAt.delete(id);
-    lastFlushAt.set(tournamentId, now);
+  // Réservé avant le premier `await` : deux fermetures simultanées ne passent
+  // pas toutes deux le plafond. Rendu si rien n'est parti.
+  for (const [id, at] of lastFlushAt) if (now - at >= FLUSH_MIN_INTERVAL_MS) lastFlushAt.delete(id);
+  lastFlushAt.set(tournamentId, now);
+  let sent = false;
+  try {
+    const db = await getDatabase();
+    const [rows] = await db.execute<NoticeRow[]>(`${NOTICE_SELECT} WHERE n.tournament_id = ?`, [tournamentId]);
+    sent = (await sendClaimed(rows)) > 0;
+    return sent;
+  } finally {
+    if (!sent && lastFlushAt.get(tournamentId) === now) lastFlushAt.delete(tournamentId);
   }
-  return sent;
 }
 
 /**
