@@ -26,6 +26,7 @@ import {
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { useSpectatorView } from "@/components/spectator-view";
 import { matchPagePath } from "@/lib/shared/match-page";
+import { isPlainLeftClick } from "@/lib/shared/site-back";
 import { useToast } from "@/components/ui/toast";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import {
@@ -170,12 +171,14 @@ function actionClassName(tone: MatchCardAction["tone"], inMenu: boolean): string
 function MatchPageActionLink({
   href,
   className,
+  Icon,
   label,
   name,
   onKeyDown,
   onNavigate,
 }: Readonly<{
   href: string;
+  Icon: LucideIcon;
   className: string;
   label: string;
   name: string;
@@ -189,9 +192,13 @@ function MatchPageActionLink({
       aria-label={name}
       data-action="matchPage"
       onKeyDown={onKeyDown}
-      onClick={onNavigate}
+      // Clic ordinaire seulement : un clic avec Ctrl, ⌘ ou Maj (nouvel onglet)
+      // laisse le panneau ouvert, le focus ne disparaît pas avec lui.
+      onClick={(event) => {
+        if (isPlainLeftClick(event)) onNavigate?.();
+      }}
     >
-      <FileText size={16} aria-hidden />
+      <Icon size={16} aria-hidden />
       <span className={styles.label}>{label}</span>
     </LocaleLink>
   );
@@ -524,6 +531,7 @@ export function MatchCardActions({
           key={id}
           href={matchPagePath(match.tournamentId, match.id, spectator)}
           className={className}
+          Icon={Icon}
           label={action.label}
           name={actionName(action.label)}
           onKeyDown={inMenu ? onPanelKeyDown : undefined}

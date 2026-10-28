@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   firstMapFieldFollows,
+  isByeMatch,
   matchPageDecision,
   matchPageIdsFromMemberPath,
   matchPageIdsFromSpectatorPath,
@@ -131,6 +132,19 @@ describe("matchPageStreams", () => {
     ]);
     // Match pas annoncé casté : rien.
     expect(matchPageStreams(bracketMatch({ liveUrl: "https://twitch.tv/zz" }), "OFF")).toEqual([]);
+  });
+});
+
+describe("isByeMatch", () => {
+  it("vrai pour un seul engagé hors attente, d'un côté comme de l'autre", () => {
+    expect(isByeMatch({ team1Id: 1, team2Id: null, status: "COMPLETED" })).toBe(true);
+    expect(isByeMatch({ team1Id: null, team2Id: 2, status: "READY" })).toBe(true);
+  });
+
+  it("faux à deux engagés, sans engagé, ou en attente d'adversaire", () => {
+    expect(isByeMatch({ team1Id: 1, team2Id: 2, status: "READY" })).toBe(false);
+    expect(isByeMatch({ team1Id: null, team2Id: null, status: "PENDING" })).toBe(false);
+    expect(isByeMatch({ team1Id: 1, team2Id: null, status: "PENDING" })).toBe(false);
   });
 });
 

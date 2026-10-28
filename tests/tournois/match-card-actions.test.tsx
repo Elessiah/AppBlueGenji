@@ -318,6 +318,19 @@ describe("« Page du match » dans le pied d'action", () => {
   });
 });
 
+describe("« Page du match » dans le panneau — câblage", () => {
+  const source = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/MatchCardActions.tsx"), "utf8");
+
+  it("ne referme le panneau que sur un clic ordinaire (un clic avec modificateur ouvre un onglet)", () => {
+    expect(source).toMatch(/if \(isPlainLeftClick\(event\)\) onNavigate\?\.\(\);/);
+  });
+
+  it("prend son icône du tableau ICONS, source unique", () => {
+    expect(source).toContain("Icon={Icon}");
+    expect(source).not.toMatch(/<FileText size/);
+  });
+});
+
 describe("offersMatchPage — où le lien se tait", () => {
   const versus = { team1Id: 10, team2Id: 20, status: "READY" as const };
 

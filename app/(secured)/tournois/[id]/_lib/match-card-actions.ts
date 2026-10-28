@@ -1,4 +1,5 @@
 import type { LaunchStripControls } from "./launch-strip";
+import { isByeMatch } from "@/lib/shared/match-page";
 import type { BracketMatch } from "@/lib/shared/types";
 import type { TournamentActionsText } from "@/lib/shared/tournament-actions-text";
 import { FR_ACTIONS_TEXT } from "./actions-text";
@@ -135,8 +136,7 @@ export function offersMatchPage(
   match: Pick<BracketMatch, "team1Id" | "team2Id" | "status">,
   onMatchPage: boolean,
 ): boolean {
-  const bye = (match.team1Id === null) !== (match.team2Id === null) && match.status !== "PENDING";
-  return !onMatchPage && !bye;
+  return !onMatchPage && !isByeMatch(match);
 }
 
 export type MatchCardActionGroups = {

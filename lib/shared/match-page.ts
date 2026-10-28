@@ -137,6 +137,15 @@ export function matchPageStreams(
 }
 
 /**
+ * Exemption jouée d'avance : un seul engagé, et plus en attente d'adversaire
+ * (un match `PENDING` à un seul engagé attend encore le sien). Seule définition,
+ * partagée par la carte (lien « Page du match ») et la page (arbitrage).
+ */
+export function isByeMatch(match: Pick<BracketMatch, "team1Id" | "team2Id" | "status">): boolean {
+  return (match.team1Id === null) !== (match.team2Id === null) && match.status !== "PENDING";
+}
+
+/**
  * Ce que la page dit de l'arbitrage : l'arbitre, l'autogestion, ou — pour le
  * staff seul (permission `tournaments`) — l'absence de décision. `null` : rien
  * à dire (match terminé, exemption, ou lecteur hors staff sans décision).
@@ -148,8 +157,7 @@ export function matchPageDecision(
   staff: boolean,
 ): RefereeDecision | null {
   if (match.status === "COMPLETED") return null;
-  const byeLike = (match.team1Id === null) !== (match.team2Id === null) && match.status !== "PENDING";
-  if (byeLike) return null;
+  if (isByeMatch(match)) return null;
   const decision = refereeDecision(match);
   return decision === "UNDECIDED" && !staff ? null : decision;
 }
