@@ -336,7 +336,7 @@
       },
       "objection": {
         "title": "Opposition d'un arbitre",
-        "hint": "Quand le staff retient l'opposition d'un arbitre (formulaire de signalement, catégorie RGPD), celui-ci est retiré de tous ses matchs non terminés et ne peut plus arbitrer tant qu'elle n'est pas levée ; ses matchs joués gardent leur arbitre.",
+        "hint": "Quand le staff retient l'opposition d'un arbitre (formulaire de signalement, catégorie RGPD), celui-ci est retiré de tous ses matchs non terminés et ne peut plus arbitrer tant qu'elle n'est pas levée ; ses matchs terminés gardent leur arbitre.",
         "label": "Retenir l'opposition de",
         "uphold": "Retenir l'opposition",
         "upheld": "{count, plural, =0 {Opposition retenue : aucun match à lui retirer.} =1 {Opposition retenue : arbitre retiré d'un match.} other {Opposition retenue : arbitre retiré de # matchs.}}",

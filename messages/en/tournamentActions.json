@@ -336,7 +336,7 @@
       },
       "objection": {
         "title": "A referee's objection",
-        "hint": "When the staff upholds a referee's objection (report form, GDPR category), that referee is removed from all their unfinished matches and can no longer referee until it is lifted; their played matches keep their referee.",
+        "hint": "When the staff upholds a referee's objection (report form, GDPR category), that referee is removed from all their unfinished matches and can no longer referee until it is lifted; their finished matches keep their referee.",
         "label": "Uphold the objection of",
         "uphold": "Uphold the objection",
         "upheld": "{count, plural, =0 {Objection upheld: no match to remove them from.} =1 {Objection upheld: referee removed from one match.} other {Objection upheld: referee removed from # matches.}}",

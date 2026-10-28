@@ -8,7 +8,7 @@
  *   matchs non terminés (le staff en désigne un autre) et lui ferme tout
  *   arbitrage : ni « Je prends ce match », ni désignation par le staff
  *   (`REFEREE_OBJECTION`, contrôlé sous verrou dans `writeReferee`). Les
- *   matchs joués gardent leur arbitre.
+ *   matchs terminés gardent leur arbitre.
  * - Levée (à sa demande), il peut de nouveau arbitrer ; rien ne lui est rendu.
  *
  * Ordre des verrous : l'écriture de l'opposition est une instruction seule

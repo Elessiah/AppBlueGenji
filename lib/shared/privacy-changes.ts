@@ -1261,8 +1261,9 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // l'arbitrage ; sa date est gardée sur le compte. Rectifie, sans les
     // réécrire (publiées), les entrées du 2026-10-29 qui disaient « ceux que tu
     // tiens déjà te restent ». Joueurs (qui voient l'arbitre changer) comme
-    // arbitres concernés : pas de public. Datée du lendemain de la mise en ligne
-    // prévue (nuit du 29 au 30 octobre).
+    // arbitres concernés : pas de public. Datée du jour de la mise en ligne
+    // prévue (déploiement de la nuit du 29 au 30 octobre) ; fusionnée après le
+    // 29 octobre à 01 h 30 (Paris), elle passe au 31.
     id: "2026-10-opposition-arbitre-retrait-des-matchs",
     publishedAt: "2026-10-30",
     title: "Opposition d'un arbitre : retrait de ses matchs en cours",
@@ -1270,7 +1271,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     summary:
       "Quand le staff retient l'opposition d'un arbitre à être présenté aux parties de ses matchs, cet arbitre est désormais retiré de tous ses matchs non terminés et ne peut plus arbitrer — ni prendre un match, ni s'en voir confier un — tant qu'elle n'est pas levée. Jusqu'ici, les matchs qu'il tenait déjà lui restaient.",
     details: [
-      "Si tu arbitres : retenue, ton opposition (formulaire de signalement, catégorie RGPD) te retire de tous tes matchs non terminés, lancés compris — tu en es prévenu par notification push, match par match — et le staff en désigne un autre ; tes matchs joués gardent leur arbitre. Tu ne peux plus prendre un match ni t'en voir confier un tant que le staff ne l'a pas levée ; elle continue de valoir une fois la version 7 des conditions acceptée.",
+      "Si tu arbitres : retenue, ton opposition (formulaire de signalement, catégorie RGPD) te retire de tous tes matchs non terminés, lancés compris — tu en es prévenu par notification push, match par match — et le staff en désigne un autre ; tes matchs terminés gardent leur arbitre. Tu ne peux plus prendre un match ni t'en voir confier un tant que le staff ne l'a pas levée ; elle continue de valoir une fois la version 7 des conditions acceptée.",
       "La date à laquelle ton opposition a été retenue est gardée sur ton compte jusqu'à sa levée ou la suppression du compte, et figure dans l'export de tes données. Le journal du staff sur Discord note le geste et sa levée sans nommer personne ni les matchs retirés ; le membre du staff qui l'a fait, l'identifiant de ton compte et le nombre de matchs retirés ne figurent que dans les journaux du serveur.",
       "Si tu joues ou castes un match : son arbitre peut ainsi changer avant ou pendant le match ; le nouvel arbitre t'est présenté comme le précédent.",
     ],

@@ -3,8 +3,11 @@
  * change (`docs/features/MATCH_REFEREE.md`) — sur le modèle des avis de cast
  * (`./cast-notices`) :
  *
- * - **toujours** une ligne au journal du staff sur Discord, sans personne
- *   nommée (« un arbitre », « le staff ») et sans ligne nominative dans pm2 ;
+ * - une ligne au journal du staff sur Discord, sans personne nommée
+ *   (« un arbitre », « le staff ») et sans ligne nominative dans pm2 — sauf un
+ *   retrait sur opposition retenue, qui n'en a **aucune** (la route de
+ *   l'opposition écrit seule une ligne anonyme : nommer les matchs
+ *   désignerait leur arbitre) ;
  * - **à l'arbitre**, quand un autre que lui retire son arbitrage (staff,
  *   remplacement, autogestion, opposition retenue, retrait d'office) : une notification push
  *   `REFEREE_RELEASED`, avec le motif, dans la langue de son compte. Pas de

@@ -1057,15 +1057,15 @@ function RgpdFr({
             « Prêt » est attendu comme celui des équipes et des casters. S&apos;il ne remplit plus ces conditions ou
             devient joueur du match avant son lancement, il n&apos;est plus montré (et en est retiré avant le lancement) ; l&apos;arbitrage
             d&apos;un compte supprimé est retiré de tous ses matchs. Quand un autre que lui le lui retire (le staff,
-            un autre arbitre à qui le match est confié, l&apos;autogestion) ou qu&apos;il lui est retiré d&apos;office, il
-            en est prévenu en notification push seulement, avec le motif. Ces gestes, l&apos;autogestion d&apos;un match,
+            un autre arbitre à qui le match est confié, l&apos;autogestion, son opposition retenue) ou qu&apos;il lui est retiré d&apos;office, il
+            en est prévenu en notification push seulement, avec le motif. Ces gestes (hors retrait sur opposition, voir ci-dessous), l&apos;autogestion d&apos;un match,
             sa première carte et les cartes choisies dans le pool de la manche sont notés au journal du staff sur Discord sans nommer personne, et un match qui
             entre en lancement sans arbitre ni autogestion est signalé aux arbitres. Sa présentation aux parties
             du match relève de l&apos;<strong>exécution du service</strong> dès qu&apos;il a accepté la version 7
             des conditions d&apos;utilisation, qui la prévoient (section « Contacts de match »), pour que les
             parties sachent qui arbitre et, en Overwatch, puissent l&apos;ajouter en jeu ; tant qu&apos;il ne l&apos;a pas
             acceptée, elle relève de l&apos;<strong>intérêt légitime</strong> (même but), et il peut s&apos;y
-            opposer par le formulaire de signalement (catégorie RGPD) — retenue, son opposition le retire de tous ses matchs non terminés (le staff en désigne un autre ; ses matchs joués gardent leur arbitre) et l&apos;empêche d'en prendre un ou de s&apos;en voir confier un tant qu&apos;elle n'est pas levée, et continue de valoir une fois la version 7 acceptée ; la date à laquelle elle est retenue reste sur son compte jusqu&apos;à sa levée par le staff ou la suppression du compte. Il peut se retirer d&apos;un match à tout moment, le staff
+            opposer par le formulaire de signalement (catégorie RGPD) — retenue, son opposition le retire de tous ses matchs non terminés (le staff en désigne un autre ; ses matchs terminés gardent leur arbitre) et l&apos;empêche d'en prendre un ou de s&apos;en voir confier un tant qu&apos;elle n'est pas levée, et continue de valoir une fois la version 7 acceptée ; la date à laquelle elle est retenue reste sur son compte, et figure dans l&apos;export de ses données, jusqu&apos;à sa levée par le staff ou la suppression du compte ; le journal du staff sur Discord n&apos;en note que le geste et sa levée, sans nommer personne ni ses matchs, et les journaux du serveur l&apos;auteur, l&apos;identifiant de son compte et le nombre de matchs retirés. Il peut se retirer d&apos;un match à tout moment, le staff
             pouvant lui confier de nouveau ce match (sauf opposition retenue), sans avis ; tant qu&apos;il n&apos;a pas accepté la version 7, la fenêtre
             d&apos;acceptation couvrant les pages des tournois, il s&apos;en retire en le demandant par ce même formulaire. Le recueil de son « Prêt » et l&apos;avis du retrait relèvent aussi de l&apos;exécution
             du service, les arbitres agissant pour l&apos;association (<Link href="/rgpd/registre#t04">registre, T04</Link>).

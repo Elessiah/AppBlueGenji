@@ -77,12 +77,13 @@ oppositions retenues avec « Lever », choix d'un arbitre parmi les comptes
 - retenue seulement sur un compte qui a la permission `tournaments`, relue en
   base (409 `NOT_REFEREE` sinon — l'identifiant de la route ne suffit pas) ;
   la levée vaut pour tout compte qui en porte une ;
-- retenue : l'arbitre est retiré de **tous** ses matchs non terminés, lancés
+- retenue : l'arbitre est retiré de **tous** ses matchs non terminés (tout
+  statut sauf `COMPLETED`, score en attente de confirmation compris), lancés
   compris (`releaseObjectingReferee`, un match par transaction sous
   `lockLaunchMatch`, un match qui n'attendait que lui part) ; avis push
   `REFEREE_RELEASED` motif `OBJECTION`, **aucune** ligne Discord par match
   (nommer les matchs juste avant la ligne de l'opposition désignerait leur
-  arbitre) ; les matchs joués gardent leur arbitre ; le staff en désigne un autre ;
+  arbitre) ; les matchs terminés gardent leur arbitre ; le staff en désigne un autre ;
 - tant qu'elle tient : ni « Je prends ce match » ni désignation
   (`REFEREE_OBJECTION`, 409, contrôlé dans `writeReferee` et sur une
   re-désignation du même arbitre), absent des candidats, bouton « Arbitrer ce
