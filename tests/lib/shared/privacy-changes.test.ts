@@ -1726,12 +1726,14 @@ describe("PRIVACY_CHANGES — plusieurs casters par match (MATCH-REFEREE MR-1)",
     expect(en).toContain("only the link set in the match's live configuration stays with the match");
     expect(en).toContain("When your account is deleted, the link you provided — when opening your stream or in that configuration — also goes, played matches included, even if another caster still holds that stream");
     expect(en).toContain("A caster no longer replaces another");
-    // EF-19 : un lien inchangé n'est pas réécrit (`setStaffStreamUrl`) ; posé hors cast, il reste à l'organisation.
-    expect(fr).toContain("(posée avant ton inscription comme caster ou après l'avoir quitté, elle reste le lien de l'organisation ; réenregistrer un lien déjà posé n'en change pas l'auteur)");
-    expect(en).toContain("(set before you signed up as its caster or after you left it, it stays the organizers' link; re-saving a link already set does not change its author)");
-    expect(readFileSync(join(process.cwd(), "app/rgpd/page.tsx"), "utf8")).not.toContain("qui ne caste pas encore ce match");
     expect(english.details).toHaveLength(entry.details.length);
     expect(english.linkLabels).toHaveLength(1);
+  });
+
+  it("EF-19 : un lien inchangé n'est pas réécrit (`setStaffStreamUrl`) ; posé hors cast, il reste à l'organisation (FR et EN)", () => {
+    expect(entry.details.join(" ")).toContain("(posée avant ton inscription comme caster ou après l'avoir quitté, elle reste le lien de l'organisation ; réenregistrer un lien déjà posé n'en change pas l'auteur)");
+    expect(english.details.join(" ")).toContain("(set before you signed up as its caster or after you left it, it stays the organizers' link; re-saving a link already set does not change its author)");
+    expect(readFileSync(join(process.cwd(), "app/rgpd/page.tsx"), "utf8")).not.toContain("qui ne caste pas encore ce match");
   });
 });
 
@@ -1765,13 +1767,16 @@ describe("PRIVACY_CHANGES — arbitre désigné des matchs (MATCH-REFEREE MR-2)"
     expect(en).toContain("by push notification only, with the reason");
     expect(en).toContain("When your account is deleted, you are removed from all your matches");
     expect(en).toContain("without naming anyone");
-    // EF-19 : arbitre qui caste aussi le match, désignation et remplacement notés au journal (`refereeLogChange`).
+    expect(english.details).toHaveLength(entry.details.length);
+    expect(english.linkLabels).toHaveLength(1);
+  });
+
+  it("EF-19 : arbitre qui caste aussi le match, désignation, remplacement et cartes du pool notés au journal (`refereeLogChange`)", () => {
+    const [fr, en] = [entry, english].map(({ details }) => details.join(" "));
     expect(fr).toContain("jamais son tag Discord à ce titre (s'il caste aussi le match, ses contacts de caster suivent la règle des casters)");
     expect(en).toContain("never their Discord tag in that capacity (if they also cast the match, their caster contacts follow the casters' rule)");
     expect(fr).toContain("La prise d'un match, la désignation ou le remplacement de son arbitre par le staff, le retrait de l'arbitrage, l'autogestion, la première carte et les cartes choisies dans le pool de la manche sont notés");
     expect(en).toContain("Taking a match, the staff assigning or replacing its referee, the removal of the refereeing, self-management, the first map and the maps picked from the round's pool are noted");
-    expect(english.details).toHaveLength(entry.details.length);
-    expect(english.linkLabels).toHaveLength(1);
   });
 });
 
