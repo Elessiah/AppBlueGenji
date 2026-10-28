@@ -43,12 +43,16 @@ describe("/rgpd — choix « Ne plus voir » de la certification Discord", () =>
   const fr = row(DONNEES_PROFIL, "Choix « Ne plus voir » de la certification Discord");
   const en = row(DONNEES_PROFIL_EN, "Discord verification “Don't show again” choice");
 
-  it("dit une fois par connexion (« Plus tard » la fait revenir)", () => {
-    expect(fr).toContain("une fois par connexion : « Plus tard » la ferme jusqu'à ta prochaine connexion");
-    expect(en).toContain("once per login: “Later” closes it until your next login");
+  it("dit une fois par connexion (« Plus tard » ne vaut que pour la connexion en cours)", () => {
+    // LATER ne lève la marque que de la session qui répond (WHERE token_hash = ?) :
+    // une autre session encore marquée, sur un autre appareil, la propose encore.
+    expect(fr).toContain("une fois par connexion : « Plus tard » la ferme pour cette connexion-là");
+    expect(en).toContain("once per login: “Later” closes it for that login");
+    expect(fr).not.toContain("la ferme jusqu'à ta prochaine connexion");
+    expect(en).not.toContain("closes it until your next login");
     // Seule une connexion par Discord ou Blizzard la rouvre (CERTIFY_PROMPT_DOORS).
-    expect(fr).toContain("jusqu'à ta prochaine connexion par Discord ou Blizzard");
-    expect(en).toContain("until your next login with Discord or Blizzard");
+    expect(fr).toContain("elle revient à ta prochaine connexion par Discord ou Blizzard");
+    expect(en).toContain("it comes back at your next login with Discord or Blizzard");
   });
 
   it("nomme le parcours « ajouter un tag » d'un compte qui n'en a pas", () => {
