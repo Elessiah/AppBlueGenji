@@ -616,11 +616,21 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     title: "“Don't show again” on the verification invitation: kept on the account",
     linkLabels: ["Read the “Cookies & trackers” section"],
     summary:
-      "The “Don't show again” choice on the window inviting you, on a tournament page, to verify your Discord tag and your BattleTag is now kept on your account, no longer in the browser: it applies in all your browsers, and no longer to the other accounts used in the same browser.",
+      "The “Don't show again” choice on the window inviting you, on a tournament page, to verify your Discord tag (and your BattleTag depending on the game) is now kept on your account, no longer in the browser: it applies in all your browsers, and no longer to the other accounts used in the same browser.",
     details: [
       "What is kept: the date of the choice, on your account. It is included in the export of your data and erased when the account is anonymised.",
       "A “Don't show again” ticked before this change, kept in the browser, is not carried over to your account: the window may come back once, to be ticked again. That former local storage value is no longer read, and it is erased when a tournament page opens.",
       "Simply closing the window is still remembered for the tab only (session storage, never sent to the server).",
+    ],
+  },
+  "2026-10-proposition-certification-discord-marque-de-session": {
+    title: "Discord tag verification suggestion: what your session records",
+    linkLabels: ["Read the “Data collected” section"],
+    summary:
+      "A clarification of the information of October 21, 2026: at each login with Discord or Blizzard, as long as your Discord tag isn't verified and you haven't chosen “Don't show again”, your login session records that the verification window still needs to be suggested to you, once per login.",
+    details: [
+      "The information of October 21 said the opposite: that the session records, after “Later”, that the window no longer needs to be suggested. In fact, the mark is set at login and cleared at your first answer (“Later” or closing the window, “Don't show again” — which clears it on all your sessions —, or verification), or as soon as there is nothing left to suggest.",
+      "This mark contains nothing else, goes with the session and isn't included in the export of your data. Nothing else changes: “Don't show again” is still kept on your account, with its date.",
     ],
   },
 };

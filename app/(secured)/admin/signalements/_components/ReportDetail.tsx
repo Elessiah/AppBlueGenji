@@ -7,6 +7,7 @@ import {
   REPORT_RETENTION_DAYS_AFTER_RESOLUTION,
   REPORT_STATUS_LABELS,
   RIGHTS_RELATION_LABELS,
+  notifierMayContest,
   reportFollowUpDuty,
   type ReportAction,
   type ReportTargetRef,
@@ -14,7 +15,7 @@ import {
 } from "@/lib/shared/content-reports";
 import { REPORT_CATEGORY_DEFINITIONS } from "@/lib/shared/content-report-categories";
 import { leadsToApi } from "@/lib/shared/safe-redirect";
-import { formatQuarantineDate } from "@/lib/shared/logo-quarantine";
+import { LOGO_QUARANTINE_MONTHS, formatQuarantineDate } from "@/lib/shared/logo-quarantine";
 import { relativeAge } from "../_lib/report-filters";
 import { ReportTargetCard } from "./ReportTargetCard";
 import { StatusPill } from "./StatusPill";
@@ -54,6 +55,10 @@ export function ReportDetail({
   const definition = REPORT_CATEGORY_DEFINITIONS[report.category];
   // Le site n'envoie aucun courriel : ce retour part de l'association, à la main.
   const followUp = reportFollowUpDuty(report.category);
+  const heldForNotifier = notifierMayContest({
+    category: report.category,
+    reporterUserId: report.reporter?.userId ?? null,
+  });
   const [resolving, setResolving] = useState(false);
   const [note, setNote] = useState("");
 
@@ -140,8 +145,13 @@ export function ReportDetail({
               </button>
             </div>
             <p className={styles.muted}>
-              Archivé, le signalement est effacé {REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours plus tard — davantage
-              s&apos;il tient une image (logo, avatar) masquée ou supprimée encore contestable.
+              {/* La durée que tient la purge (`reportRetainedUntil`) : une notification de
+                  droit d'auteur ou de modération envoyée depuis un compte attend la fin du
+                  délai où son auteur peut contester la décision. */}
+              {heldForNotifier
+                ? `Archivé, le signalement est effacé ${LOGO_QUARANTINE_MONTHS} mois plus tard, le temps que son auteur puisse contester la décision`
+                : `Archivé, le signalement est effacé ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours plus tard`}{" "}
+              — davantage s&apos;il tient une image (logo, avatar) masquée ou supprimée encore contestable.
             </p>
           </div>
         )}

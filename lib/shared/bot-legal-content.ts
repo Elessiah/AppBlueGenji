@@ -583,12 +583,12 @@ export const PRIVACY_POLICY: BilingualDoc = {
               "**Rectification** : faire corriger une donnée inexacte.",
               "**Effacement** : faire supprimer vos données ; certaines fonctions du Bot peuvent alors ne plus vous être rendues.",
               "**Limitation** : faire geler l'utilisation d'une donnée le temps d'examiner une contestation.",
-              "**Opposition** : vous opposer, pour des raisons tenant à votre situation particulière, à un traitement fondé sur l'intérêt légitime. Le pseudo d'un joueur dans l'annonce #live d'un tournoi individuel n'en relève pas : il repose sur l'exécution du service auquel il s'inscrit — ne pas y être nommé revient à ne pas s'inscrire ; une annonce passée est supprimée sur demande (formulaire « Signaler un problème » du site, catégorie RGPD).",
+              "**Opposition** : vous opposer, pour des raisons tenant à votre situation particulière, à un traitement fondé sur l'intérêt légitime. Le pseudo d'un joueur dans l'annonce #live d'un tournoi individuel n'en relève pas : il repose sur l'exécution du service auquel il s'inscrit — ne pas y être nommé revient à ne pas s'inscrire ; une annonce passée est supprimée sur demande (formulaire « Signaler un problème » du site, catégorie RGPD). La conservation par le site de votre choix des messages privés de match n'en relève pas non plus : elle repose sur une obligation légale, celle de continuer d'honorer votre opposition à ces messages.",
             ],
           },
           {
             kind: "p",
-            text: "Le droit à la portabilité ne s'applique pas : ces traitements reposent sur l'intérêt légitime, non sur un consentement ou un contrat. Pour exercer vos droits, utilisez les moyens de la section Contact ; une réponse vous est apportée dans un délai d'un mois.",
+            text: `Le droit à la portabilité ne s'applique pas aux traitements propres au Bot : ils reposent sur l'intérêt légitime, non sur un consentement ou un contrat ; pour les messages du site qu'il remet, voir la [politique de confidentialité du site](${SITE_RIGHTS_HREF}). Pour exercer vos droits, utilisez les moyens de la section Contact ; une réponse vous est apportée dans un délai d'un mois.`,
           },
           {
             kind: "p",
@@ -791,12 +791,12 @@ export const PRIVACY_POLICY: BilingualDoc = {
               "**Rectification**: have inaccurate data corrected.",
               "**Erasure**: have your data deleted; some Bot features may then no longer be available to you.",
               "**Restriction**: have the use of data frozen while a dispute is examined.",
-              "**Objection**: object, on grounds relating to your particular situation, to processing based on legitimate interest. A player's username in the #live announcement of a solo tournament is not covered: it rests on performance of the service they register for — not being named in it means not registering; a past announcement is deleted on request (the website's “Report a problem” form, GDPR category).",
+              "**Objection**: object, on grounds relating to your particular situation, to processing based on legitimate interest. A player's username in the #live announcement of a solo tournament is not covered: it rests on performance of the service they register for — not being named in it means not registering; a past announcement is deleted on request (the website's “Report a problem” form, GDPR category). Nor is the site's keeping of your match direct messages choice: it rests on a legal obligation, that of continuing to honour your objection to those messages.",
             ],
           },
           {
             kind: "p",
-            text: "The right to data portability does not apply: this processing is based on legitimate interest, not on consent or a contract. To exercise your rights, use the means listed in the Contact section; you will receive a reply within one month.",
+            text: `The right to data portability does not apply to the Bot's own processing: it is based on legitimate interest, not on consent or a contract; for the website's messages it delivers, see the [website's privacy policy](${SITE_RIGHTS_HREF}). To exercise your rights, use the means listed in the Contact section; you will receive a reply within one month.`,
           },
           {
             kind: "p",

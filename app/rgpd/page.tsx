@@ -644,7 +644,7 @@ function RgpdFr({
             <li>
               <strong>bg_cert_prompt_closed</strong> — une valeur du stockage de session, effacée à la
               fermeture de l&apos;onglet, posée seulement <strong>si vous fermez la fenêtre qui vous invite
-              à certifier votre tag Discord et votre BattleTag</strong> (fiche d&apos;un tournoi), pour ne
+              à certifier votre tag Discord (et votre BattleTag selon le jeu)</strong> (fiche d&apos;un tournoi), pour ne
               pas vous la rouvrir dans cet onglet. Elle ne contient que la valeur « 1 », jamais
               d&apos;identifiant de personne, et n&apos;est jamais transmise au serveur. Si vous cochez
               « Ne plus voir » — retenu aussi si la fenêtre s&apos;efface devant une autre (lancement
@@ -1025,7 +1025,7 @@ function RgpdFr({
             tournois ; vous pouvez vous y opposer à tout moment en décochant « Messages privés Discord de
             mes matchs » dans <Link href="/profil#notifications">Mon profil</Link> — vos notifications push
             gardent leurs propres réglages. Le site garde ce choix le temps du compte, au titre d&apos;une{" "}
-            <strong>obligation légale</strong> (c&apos;est ce qui lui permet de continuer d&apos;honorer votre opposition) ; il figure dans
+            <strong>obligation légale</strong> (c&apos;est ce qui lui permet de continuer d&apos;honorer votre opposition — cette conservation ne relève donc pas du droit d&apos;opposition) ; il figure dans
             l&apos;export de vos données. Les alertes et le programme d&apos;arbitrage adressés aux
             arbitres et administrateurs relèvent de l&apos;<strong>exécution du service</strong> et ne
             se coupent pas ainsi (<Link href="/rgpd/registre#t04">registre, T04</Link>). Quand un membre du

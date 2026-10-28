@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { notifierMayContest } from "@/lib/shared/content-reports";
 import { PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
 import { publicSitemapRoutes } from "@/lib/shared/sitemap";
 import { LOGO_RIGHTS_LABEL, TERMS_CHECKBOX_LABEL } from "@/lib/shared/terms-of-use";
@@ -169,6 +170,19 @@ describe("dossier du panneau", () => {
   it("annonce la durée de conservation par la constante, pas par un nombre écrit", () => {
     expect(detail).toContain("{REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours plus tard");
     expect(detail).not.toMatch(/effacé 30 jours/);
+  });
+
+  it("annonce six mois quand l'auteur peut contester, comme la purge (EF-05)", () => {
+    // La même règle que `reportRetainedUntil` : notification de droit d'auteur
+    // ou de modération, envoyée depuis un compte.
+    expect(detail).toMatch(/const heldForNotifier = notifierMayContest\(\{\s*category: report\.category,\s*reporterUserId: report\.reporter\?\.userId \?\? null,\s*\}\);/);
+    expect(detail).toContain("? `Archivé, le signalement est effacé ${LOGO_QUARANTINE_MONTHS} mois plus tard, le temps que son auteur puisse contester la décision`");
+    expect(detail).toContain(": `Archivé, le signalement est effacé ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours plus tard`");
+    expect(notifierMayContest({ category: "COPYRIGHT", reporterUserId: 7 })).toBe(true);
+    expect(notifierMayContest({ category: "MODERATION", reporterUserId: 7 })).toBe(true);
+    // Sans compte (formulaire anonyme) ou hors de ces catégories : trente jours.
+    expect(notifierMayContest({ category: "COPYRIGHT", reporterUserId: null })).toBe(false);
+    expect(notifierMayContest({ category: "BUG", reporterUserId: 7 })).toBe(false);
   });
   it("n'ouvre jamais d'un clic une page d'origine qui mène à l'API (revue juridique #439)", () => {
     expect(detail).toContain("report.pagePath && !leadsToApi(report.pagePath) ? (");
