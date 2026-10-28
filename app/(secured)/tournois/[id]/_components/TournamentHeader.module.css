@@ -65,10 +65,13 @@
 /* Témoin de flux et rôle du lecteur : ce qui parle de *qui regarde*, tenu à
    l'écart des faits du tournoi — « À jour » au milieu des tags se lisait comme
    une propriété du tournoi. */
-/* Marge automatique : avec le « i » qui le suit, le groupe reste calé à droite
-   (sinon `space-between` le centrerait entre le retour et le bouton). */
+/* Le groupe prend toute la place libre et se cale à droite : à 375 px, avec
+   « Hors ligne » au témoin, ce sont ses pastilles qui passent à la ligne en son
+   sein, et le « i » qui le suit reste sur la ligne du retour — il ne saute plus
+   seul sous « ← Accueil » au gré du témoin. */
 .viewer {
-  margin-inline-start: auto;
+  flex: 1 1 0;
+  justify-content: flex-end;
   display: inline-flex;
   align-items: center;
   gap: 8px;

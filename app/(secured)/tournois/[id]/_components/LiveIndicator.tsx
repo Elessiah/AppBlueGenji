@@ -2,7 +2,6 @@
 
 import { Pill } from "@/components/cyber";
 import { useSpectatorView } from "@/components/spectator-view";
-import { SPECTATOR_NOT_FOUND_RECHECK_MINUTES } from "@/lib/shared/spectator-view";
 import { REFRESH_CADENCE, type RefreshTier } from "@/lib/shared/refresh-tiers";
 import type { LiveFailure } from "../_lib/live-state";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
@@ -37,6 +36,43 @@ function cadenceLabel(text: TournamentPageText, cadenceMs: number): string {
 }
 
 /**
+ * Libellé et explication du témoin, communs au témoin lui-même et au panneau du
+ * « i » de la pastille Spectateur (`TournamentHeader`) : sans compte, la cadence
+ * accordée par le serveur et ce que veut dire « Hors ligne » doivent rester
+ * lisibles au toucher et au clavier, qu'un `title` n'atteint pas.
+ */
+export function useLiveIndicatorText({
+  isLive,
+  tier,
+  cadenceMs,
+  fatal = null,
+}: Readonly<LiveIndicatorProps>): { label: string; title: string } {
+  // Témoin de flux (glossaire) : « À jour / Reconnexion… / Hors ligne » →
+  // « Up to date / Reconnecting… / Offline ». L'état vient du flux, le texte
+  // de la page : rien de localisé ne passe par l'instantané.
+  const text = useTournamentPageText();
+  const { t } = text;
+  // Page sans compte : pas de flux à rouvrir, une relecture qui réessaiera
+  // plus tard — « Hors ligne », jamais « Reconnexion… » (glossaire).
+  const spectator = useSpectatorView();
+  if (fatal) {
+    // Un introuvable ne rend jamais l'en-tête (la fiche montre
+    // `TournamentFatal`, qui dit lui-même quand la page revérifie) : seuls les
+    // échecs définitifs de l'espace connecté arrivent ici.
+    return { label: t("live.offline"), title: t(`live.fatal.${fatal}`) };
+  }
+  if (isLive) {
+    return {
+      label: t("live.upToDate"),
+      title: t("live.upToDateTitle", { cadence: cadenceLabel(text, cadenceMs ?? REFRESH_CADENCE[tier].pushCoalesceMs) }),
+    };
+  }
+  return spectator
+    ? { label: t("live.offline"), title: t("live.retryTitle") }
+    : { label: t("live.reconnecting"), title: t("live.reconnectingTitle") };
+}
+
+/**
  * Dit à quel point la page est à jour — et surtout, qu'il est inutile de la
  * recharger.
  *
@@ -56,34 +92,14 @@ function cadenceLabel(text: TournamentPageText, cadenceMs: number): string {
  * lecteurs d'écran sans interrompre la lecture en cours. Le nom accessible
  * reste le texte visible — court, puisqu'il est relu à chaque bascule ; un
  * `aria-label` portant toute l'explication ferait réciter une phrase entière à
- * la moindre coupure réseau. L'explication vit dans `title`.
+ * la moindre coupure réseau. L'explication vit dans `title` — et, sans compte,
+ * dans le panneau du « i » de la pastille Spectateur aussi.
  */
-export function LiveIndicator({ isLive, tier, cadenceMs, fatal = null }: Readonly<LiveIndicatorProps>) {
-  // Témoin de flux (glossaire) : « À jour / Reconnexion… / Hors ligne » →
-  // « Up to date / Reconnecting… / Offline ». L'état vient du flux, le texte
-  // de la page : rien de localisé ne passe par l'instantané.
-  const text = useTournamentPageText();
-  const { t } = text;
-  // Page sans compte : pas de flux à rouvrir, une relecture qui réessaiera
-  // plus tard — « Hors ligne », jamais « Reconnexion… » (glossaire).
-  const spectator = useSpectatorView();
-  let label = spectator ? t("live.offline") : t("live.reconnecting");
-  let title = spectator ? t("live.retryTitle") : t("live.reconnectingTitle");
-  if (fatal) {
-    label = t("live.offline");
-    // Sans compte, un introuvable est relu au plafond : rien n'est fini.
-    title =
-      spectator && fatal === "TOURNAMENT_NOT_FOUND"
-        ? t("live.spectatorNotFoundTitle", { minutes: SPECTATOR_NOT_FOUND_RECHECK_MINUTES })
-        : t(`live.fatal.${fatal}`);
-  } else if (isLive) {
-    label = t("live.upToDate");
-    title = t("live.upToDateTitle", { cadence: cadenceLabel(text, cadenceMs ?? REFRESH_CADENCE[tier].pushCoalesceMs) });
-  }
-
+export function LiveIndicator(props: Readonly<LiveIndicatorProps>) {
+  const { label, title } = useLiveIndicatorText(props);
   return (
     <Pill
-      variant={isLive ? "blue" : "neutral"}
+      variant={props.isLive ? "blue" : "neutral"}
       role="status"
       aria-live="polite"
       title={title}

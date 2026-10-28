@@ -25,6 +25,14 @@
   animation-play-state: var(--deco-anim-state);
 }
 
+/* Première lecture échouée, nouvel essai plus tard : rien ne charge, le
+   squelette se fige au lieu de miroiter comme un chargement en cours. */
+.root[data-retrying] .bar,
+.root[data-retrying] .fact,
+.root[data-retrying] .card {
+  animation: none;
+}
+
 .bar {
   height: 14px;
 }

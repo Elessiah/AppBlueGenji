@@ -107,9 +107,16 @@ const MatchPage = dynamic(() => orReload(import("./MatchPage").then((m) => m.Mat
 function MatchMissing({ tournamentId }: Readonly<{ tournamentId: number }>) {
   const { t } = useTournamentPageText();
   const spectator = useSpectatorView();
+  // La carte remplace la fiche (modale comprise) : le focus qui y était
+  // retomberait sur `<body>`. Seulement s'il est perdu — jamais volé à un champ.
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    const active = document.activeElement;
+    if (!active || active === document.body) titleRef.current?.focus();
+  }, []);
   return (
     <section className={`ds-block ${styles.status}`} role="alert">
-      <h1 className={styles.fatalTitle}>{t("matchPage.missingTitle")}</h1>
+      <h1 ref={titleRef} tabIndex={-1} className={styles.fatalTitle}>{t("matchPage.missingTitle")}</h1>
       <p className={styles.fatalText}>{t("matchPage.missingText")}</p>
       <CyberButton asChild variant="primary">
         <LocaleLink href={tournamentHref(tournamentId, spectator)}>{t("matchPage.missingBack")}</LocaleLink>
@@ -206,9 +213,16 @@ function TournamentFatal({ fatal }: Readonly<{ fatal: LiveFailure }>) {
     backHref = "/";
     backLabel = t("page.fatal.backHome");
   }
+  // La carte remplace la fiche (modale comprise) : le focus qui y était
+  // retomberait sur `<body>`. Seulement s'il est perdu — jamais volé à un champ.
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    const active = document.activeElement;
+    if (!active || active === document.body) titleRef.current?.focus();
+  }, []);
   return (
     <section className={`ds-block ${styles.status}`} role="alert">
-      <h1 className={styles.fatalTitle}>{expired ? t("page.fatal.expiredTitle") : t("page.fatal.notFoundTitle")}</h1>
+      <h1 ref={titleRef} tabIndex={-1} className={styles.fatalTitle}>{expired ? t("page.fatal.expiredTitle") : t("page.fatal.notFoundTitle")}</h1>
       <p className={styles.fatalText}>
         {/* Volontairement neutre : ce 404 recouvre le tournoi supprimé et le
             tournoi pas encore publié, que le serveur refuse sans dire lequel
@@ -458,11 +472,7 @@ export type TournamentSheetSource = {
  * Chaque action se décide sur les droits du lecteur : la page sans compte lui
  * passe un contexte qui n'en ouvre aucun (`SPECTATOR_VIEWER_CONTEXT`).
  */
-export function TournamentSheet({
-  tournamentId,
-  source,
-  matchId = null,
-}: Readonly<{
+type TournamentSheetProps = Readonly<{
   tournamentId: number;
   source: TournamentSheetSource;
   /**
@@ -470,7 +480,44 @@ export function TournamentSheet({
    * match seul (`MatchPage`) au lieu du plateau, avec ses fenêtres et ses droits.
    */
   matchId?: number | null;
-}>) {
+}>;
+
+/**
+ * Annonce le retour d'un tournoi introuvable (page sans compte, qui revérifie) :
+ * la fiche remplace la carte `role="alert"` sans rien dire, et un lecteur
+ * d'écran ne saurait pas que la page a changé. La région vit **hors** de ce qui
+ * se remplace — une région insérée avec son texte n'est pas annoncée.
+ */
+function useNowAvailableNotice(unavailable: boolean): string {
+  const { t } = useTournamentPageText();
+  const wasUnavailable = useRef(unavailable);
+  const [notice, setNotice] = useState("");
+  useEffect(() => {
+    if (wasUnavailable.current && !unavailable) setNotice(t("page.fatal.nowAvailable"));
+    else if (unavailable) setNotice("");
+    wasUnavailable.current = unavailable;
+  }, [unavailable, t]);
+  return notice;
+}
+
+export function TournamentSheet(props: TournamentSheetProps) {
+  const { fatal, tournament } = props.source;
+  const notice = useNowAvailableNotice(Boolean(fatal) && !tournament);
+  return (
+    <>
+      <TournamentSheetView {...props} />
+      <output className="sr-only" aria-live="polite">
+        {notice}
+      </output>
+    </>
+  );
+}
+
+function TournamentSheetView({
+  tournamentId,
+  source,
+  matchId = null,
+}: TournamentSheetProps) {
   const router = useLocaleRouter();
   const text = useTournamentPageText();
   const { t } = text;
