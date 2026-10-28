@@ -56,7 +56,7 @@ première instruction ; un match joué (`MATCH_ALREADY_COMPLETED`) ou exempt
 | `PUT /api/admin/matches/[id]/referee` | désigner `{ userId }` ou retirer `{ userId: null }` | `tournaments` |
 | `PUT /api/admin/matches/[id]/self-management` | autogestion du match `{ enabled }` | `tournaments` |
 | `PUT /api/admin/tournaments/[id]/self-management` | autogestion d'une manche entière `{ phaseId, roundNumber, bracket, enabled }` (`INVALID_ROUND`) | `tournaments` |
-| `PUT /api/admin/referees/[userId]/objection` | retenir `{ upheld: true }` ou lever `{ upheld: false }` l'opposition d'un arbitre (`INVALID_REFEREE_OBJECTION`, 404 `USER_NOT_FOUND`) — voir « Opposition retenue » | `tournaments` |
+| `PUT /api/admin/referees/[userId]/objection` | retenir `{ upheld: true }` ou lever `{ upheld: false }` l'opposition d'un arbitre (`INVALID_REFEREE_OBJECTION`, 404 `USER_NOT_FOUND`, 409 `NOT_REFEREE`) — voir « Opposition retenue » | `tournaments` |
 | `PUT /api/admin/matches/[id]/first-map` | première carte `{ map }`, vide = retirer (`INVALID_FIRST_MAP`, rattaché au champ ; 409 `ROUND_MAPS_SET` quand le tour a des cartes — la fenêtre les montre alors en lecture seule, `ROUND_MAPS.md`) | `tournaments` |
 
 Désigner un arbitre éteint l'autogestion ; l'allumer retire l'arbitre (prévenu,
@@ -74,6 +74,9 @@ oppositions retenues avec « Lever », choix d'un arbitre parmi les comptes
 - `bg_users.referee_objection_at` (date, `NULL` sinon ; `CREATE TABLE` +
   `RECENT_SCHEMA_CHANGES`) — rendu dans l'export (`refereeObjectionAt`), remis
   à `NULL` à l'anonymisation ;
+- retenue seulement sur un compte qui a la permission `tournaments`, relue en
+  base (409 `NOT_REFEREE` sinon — l'identifiant de la route ne suffit pas) ;
+  la levée vaut pour tout compte qui en porte une ;
 - retenue : l'arbitre est retiré de **tous** ses matchs non terminés, lancés
   compris (`releaseObjectingReferee`, un match par transaction sous
   `lockLaunchMatch`, un match qui n'attendait que lui part) ; avis push

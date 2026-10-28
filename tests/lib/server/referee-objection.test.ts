@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/tournaments/match-launch");
+jest.mock("@/lib/server/tournaments/cast-eligibility");
 
 import { getDatabase } from "@/lib/server/database";
+import { loadRefereeEligibility } from "@/lib/server/tournaments/cast-eligibility";
 import { releaseObjectingReferee } from "@/lib/server/tournaments/match-launch";
 import { setRefereeObjection } from "@/lib/server/tournaments/referee-objection";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
@@ -22,6 +24,7 @@ beforeEach(() => {
   execute = jest.fn<SqlQuery>();
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   jest.mocked(releaseObjectingReferee).mockResolvedValue(true);
+  jest.mocked(loadRefereeEligibility).mockResolvedValue(null);
 });
 
 describe("setRefereeObjection", () => {
@@ -87,5 +90,33 @@ describe("setRefereeObjection", () => {
     expect(releaseObjectingReferee).toHaveBeenCalledWith(12, REFEREE);
     expect(consoleError).toHaveBeenCalledTimes(1);
     consoleError.mockRestore();
+  });
+
+  it("setRefereeObjection_upheldOnNonReferee_throwsNotReferee", async () => {
+    jest.mocked(loadRefereeEligibility).mockResolvedValueOnce("NOT_REFEREE");
+
+    await expect(setRefereeObjection(REFEREE, true)).rejects.toThrow("NOT_REFEREE");
+    expect(execute).not.toHaveBeenCalled();
+    expect(releaseObjectingReferee).not.toHaveBeenCalled();
+  });
+
+  it("setRefereeObjection_upheldOnRefereeWithoutIdentity_stillUpholds", async () => {
+    jest.mocked(loadRefereeEligibility).mockResolvedValueOnce("REFEREE_IDENTITY_REQUIRED");
+    execute.mockResolvedValueOnce([{ affectedRows: 1 }, []]).mockResolvedValueOnce([[{ id: 11 }], []]);
+
+    const result = await setRefereeObjection(REFEREE, true);
+
+    expect(result).toEqual({ changed: true, released: 1, failed: 0 });
+    expect(execute.mock.calls[0][0]).toContain("SET referee_objection_at = NOW()");
+  });
+
+  it("setRefereeObjection_liftOnNonReferee_skipsGuard", async () => {
+    jest.mocked(loadRefereeEligibility).mockResolvedValue("NOT_REFEREE");
+    execute.mockResolvedValueOnce([{ affectedRows: 1 }, []]);
+
+    const result = await setRefereeObjection(REFEREE, false);
+
+    expect(result).toEqual({ changed: true, released: 0, failed: 0 });
+    expect(loadRefereeEligibility).not.toHaveBeenCalled();
   });
 });

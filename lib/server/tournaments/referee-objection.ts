@@ -26,6 +26,7 @@
  */
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { loadRefereeEligibility } from "./cast-eligibility";
 import { releaseObjectingReferee } from "./match-launch";
 
 /**
@@ -38,10 +39,18 @@ export type RefereeObjectionResult = { changed: boolean; released: number; faile
 /**
  * Retient (`upheld`) ou lève l'opposition d'arbitre du compte `refereeId`.
  *
- * @throws `USER_NOT_FOUND` — compte absent ou supprimé.
+ * Seul un arbitre (permission `tournaments`, relue en base) peut voir son
+ * opposition retenue : l'identifiant de la route ne suffit pas, sans quoi le
+ * staff écrirait une opposition sur n'importe quel compte. La lever reste
+ * possible sur tout compte qui en porte une (un arbitre privé depuis de la
+ * permission compris).
+ *
+ * @throws `USER_NOT_FOUND` — compte supprimé (ou absent, à la levée) ;
+ *   `NOT_REFEREE` — retenir sur un compte absent ou qui n'arbitre pas.
  */
 export async function setRefereeObjection(refereeId: number, upheld: boolean): Promise<RefereeObjectionResult> {
   const db = await getDatabase();
+  if (upheld && (await loadRefereeEligibility(db, refereeId)) === "NOT_REFEREE") throw new Error("NOT_REFEREE");
   const [result] = await db.execute<ResultSetHeader>(
     upheld
       ? `UPDATE bg_users SET referee_objection_at = NOW()

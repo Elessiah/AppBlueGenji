@@ -10,7 +10,8 @@ import { can } from "@/lib/shared/permissions";
  * Retient ou lève l'opposition d'un arbitre (`docs/features/MATCH_REFEREE.md`).
  * Corps : `{ upheld: boolean }`. Retenue, elle retire l'arbitre de tous ses
  * matchs non terminés et lui ferme l'arbitrage ; levée, il peut de nouveau
- * arbitrer. Réservé à la permission `tournaments`, celle qui désigne les arbitres.
+ * arbitrer. Réservé à la permission `tournaments`, celle qui désigne les arbitres ;
+ * retenir vise un arbitre (409 `NOT_REFEREE` sinon, `referee-objection.ts`).
  *
  * Journal : « un arbitre » et « le staff » sur Discord, le compte et l'auteur
  * dans pm2 seulement (`publishStaffAction`), et seulement sur un vrai changement.
@@ -42,6 +43,6 @@ export async function PUT(req: Request, context: { params: Promise<{ userId: str
     if (result.failed > 0) return fail("REFEREE_OBJECTION_FAILED", 500);
     return ok({ upheld, changed: result.changed, released: result.released });
   } catch (error) {
-    return launchFailure(error, { USER_NOT_FOUND: 404 }, "REFEREE_OBJECTION_FAILED");
+    return launchFailure(error, { USER_NOT_FOUND: 404, NOT_REFEREE: 409 }, "REFEREE_OBJECTION_FAILED");
   }
 }

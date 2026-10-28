@@ -76,6 +76,16 @@ describe("PUT /api/admin/referees/[userId]/objection", () => {
     await expect(res.json()).resolves.toEqual({ error: "USER_NOT_FOUND" });
   });
 
+  it("PUT_targetNotReferee_returns409", async () => {
+    jest.mocked(setRefereeObjection).mockRejectedValue(new Error("NOT_REFEREE"));
+
+    const res = await PUT(putRequest({ upheld: true }), params("9"));
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toEqual({ error: "NOT_REFEREE" });
+    expect(publishStaffAction).not.toHaveBeenCalled();
+  });
+
   it("PUT_newObjection_returnsCount_logsAnonymouslyOnDiscord", async () => {
     jest.mocked(setRefereeObjection).mockResolvedValue({ changed: true, released: 2, failed: 0 });
 
