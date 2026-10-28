@@ -36,6 +36,7 @@ import {
   removeMapFromSlot,
   slotGap,
   slotHasMap,
+  slotsDirty,
   slotsToEdit,
   slotsToSave,
   toggleMapInSlot,
@@ -92,7 +93,7 @@ async function putJson(url: string, body: unknown): Promise<void> {
   if (!response.ok) throw new Error(payload.error || "UNKNOWN");
 }
 
-type Pending = { kind: "reset" } | { kind: "applyAll"; overwritten: number } | { kind: "copy"; target: RoundKey };
+type Pending = { kind: "reset" } | { kind: "switch"; id: string } | { kind: "applyAll"; overwritten: number } | { kind: "copy"; target: RoundKey };
 
 /**
  * Liste des cartes d'Overwatch pour un créneau : recherche, cases groupées par
@@ -376,6 +377,13 @@ export function RoundMapsDialog({
     else void sendRounds([target], toSave, t("dialog.copied", { round: roundLabel(target) }));
   };
 
+  const changeRound = (id: string) => {
+    if (id === roundId) return;
+    // Des cartes saisies et non enregistrées seraient perdues en silence : on le demande.
+    if (slotsDirty(slots, rules.rounds, round)) setPending({ kind: "switch", id });
+    else selectRound(id);
+  };
+
   const selectRound = (id: string) => {
     setRoundId(id);
     setActiveSlot(null);
@@ -394,6 +402,18 @@ export function RoundMapsDialog({
           const ok = await sendRounds([round], [], t("dialog.roundCleared"));
           if (ok) setSlots([[]]);
           return ok;
+        },
+      };
+    }
+    if (pending.kind === "switch") {
+      const next = pending.id;
+      return {
+        title: t("dialog.switchConfirm.title"),
+        body: t("dialog.switchConfirm.body", { round: roundLabel(round) }),
+        confirm: t("dialog.switchConfirm.confirm"),
+        action: async () => {
+          selectRound(next);
+          return true;
         },
       };
     }
@@ -479,7 +499,7 @@ export function RoundMapsDialog({
                     {t("dialog.scaleHint")}
                   </InfoHint>
                 </div>
-                <select id={`${ids}-round`} value={roundId} onChange={(event) => selectRound(event.target.value)}>
+                <select id={`${ids}-round`} value={roundId} onChange={(event) => changeRound(event.target.value)}>
                   {rounds.map((item) => (
                     <option key={roundKeyId(item)} value={roundKeyId(item)}>
                       {optionLabel(item)}
@@ -593,7 +613,7 @@ export function RoundMapsDialog({
           title={confirmation.title}
           confirmLabel={confirmation.confirm}
           pendingLabel={t("dialog.pending")}
-          tone={pending?.kind === "reset" ? "danger" : "primary"}
+          tone={pending?.kind === "reset" || pending?.kind === "switch" ? "danger" : "primary"}
           onClose={() => setPending(null)}
           onConfirm={confirmation.action}
         >

@@ -206,10 +206,13 @@ function LobbySection({
         <SideBlock side={right} position="right" />
       </div>
       <dl className={styles.facts}>
-        <div>
-          <dt>{t("matchPage.firstMap")}</dt>
-          <dd>{match.firstMap ?? <span className={styles.muted}>{t("matchPage.firstMapUnset")}</span>}</dd>
-        </div>
+        {/* Une carte 1 réglée pour le tour s'affiche dans « Cartes du tour » : « Pas encore choisie » la contredirait. */}
+        {!firstSlotSet && (
+          <div>
+            <dt>{t("matchPage.firstMap")}</dt>
+            <dd>{match.firstMap ?? <span className={styles.muted}>{t("matchPage.firstMapUnset")}</span>}</dd>
+          </div>
+        )}
         <div>
           <dt>{rm.t("page.banOrder")}</dt>
           <dd>

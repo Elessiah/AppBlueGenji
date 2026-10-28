@@ -107,6 +107,11 @@
       "body": "Les cartes de {round} redeviennent saisies match par match. Les choix déjà faits sur les matchs restent.",
       "confirm": "Réinitialiser"
     },
+    "switchConfirm": {
+      "title": "Abandonner les cartes non enregistrées ?",
+      "body": "Les cartes saisies pour {round} et pas encore enregistrées seront perdues.",
+      "confirm": "Abandonner"
+    },
     "pending": "Envoi…",
     "slotGap": "La carte {number} est vide : remplis-la ou retire-la, sinon les cartes suivantes seraient décalées."
   }

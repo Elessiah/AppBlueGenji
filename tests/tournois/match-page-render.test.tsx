@@ -244,6 +244,17 @@ describe("page d'un match — cartes du round et bans", () => {
     expect(html).not.toContain("Enregistrer la carte");
   });
 
+  it("render_roundMapsSet_hidesFirstMapRowThatWouldContradictThem", () => {
+    const text = visible(render(match(), "public", false, "fr", rules([["Ilios"]])));
+    expect(text).not.toContain("Première map");
+    expect(text).not.toContain("Pas encore choisie");
+    expect(text).toContain("Carte 1 Ilios Imposée");
+  });
+
+  it("render_noRoundMaps_keepsFirstMapRow", () => {
+    expect(visible(render(match(), "public", false, "fr", rules([])))).toContain("Pas encore choisie");
+  });
+
   it("render_staffOnConfiguredRound_offersRoundReset", () => {
     expect(visible(render(match(), "staff", false, "fr", rules([["Ilios"]])))).toContain("Réinitialiser le tour");
   });

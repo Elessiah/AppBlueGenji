@@ -107,6 +107,11 @@
       "body": "The maps of {round} go back to being entered match by match. Picks already made on matches stay.",
       "confirm": "Reset"
     },
+    "switchConfirm": {
+      "title": "Discard unsaved maps?",
+      "body": "The maps entered for {round} and not yet saved will be lost.",
+      "confirm": "Discard"
+    },
     "pending": "Sending…",
     "slotGap": "Map {number} is empty: fill it or remove it, otherwise the following maps would shift."
   }

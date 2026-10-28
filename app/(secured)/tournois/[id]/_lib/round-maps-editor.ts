@@ -78,6 +78,19 @@ export function sameSlots(a: readonly (readonly string[])[], b: readonly (readon
 }
 
 /**
+ * Des cartes saisies et pas encore enregistrées pour ce tour ? Les créneaux
+ * vides ne comptent pas (rien à perdre) ; changer de tour les abandonnerait.
+ */
+export function slotsDirty(
+  slots: readonly (readonly string[])[],
+  rounds: readonly RoundMapConfig[],
+  round: RoundKey | null,
+): boolean {
+  const saved = round ? (roundMapsOf(rounds, round)?.slots ?? []) : [];
+  return !sameSlots(slotsToSave(slots), saved);
+}
+
+/**
  * Tours dont le réglage serait **remplacé** par une copie de `slots` vers
  * `targets` : ceux qui en portent déjà un, différent. Rien à confirmer quand
  * la liste est vide.

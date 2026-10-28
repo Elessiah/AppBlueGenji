@@ -8,6 +8,7 @@ import {
   sameSlots,
   slotGap,
   slotHasMap,
+  slotsDirty,
   slotsToEdit,
   slotsToSave,
   toggleMapInSlot,
@@ -123,6 +124,37 @@ describe("overwrittenRounds", () => {
 
   it("overwrittenRounds_onlyUnsetTargets_returnsEmpty", () => {
     expect(overwrittenRounds(SAVED, [ROUND_3], [["Ilios"]])).toEqual([]);
+  });
+});
+
+describe("slotsDirty", () => {
+  it("slotsDirty_nothingSavedAndOnlyEmptySlots_returnsFalse", () => {
+    expect(slotsDirty([[]], SAVED, ROUND_3)).toBe(false);
+  });
+
+  it("slotsDirty_slotsEqualToSavedConfig_returnsFalse", () => {
+    expect(slotsDirty([["Busan", "Nepal"]], SAVED, ROUND_2)).toBe(false);
+  });
+
+  it("slotsDirty_trailingEmptySlotAfterSavedConfig_returnsFalse", () => {
+    expect(slotsDirty([["Ilios"], []], SAVED, ROUND_1)).toBe(false);
+  });
+
+  it("slotsDirty_mapAddedToUnsetRound_returnsTrue", () => {
+    expect(slotsDirty([["Ilios"]], SAVED, ROUND_3)).toBe(true);
+  });
+
+  it("slotsDirty_mapAddedToSavedPool_returnsTrue", () => {
+    expect(slotsDirty([["Busan", "Nepal", "Oasis"]], SAVED, ROUND_2)).toBe(true);
+  });
+
+  it("slotsDirty_savedConfigEmptiedInEditor_returnsTrue", () => {
+    expect(slotsDirty([[]], SAVED, ROUND_1)).toBe(true);
+  });
+
+  it("slotsDirty_noRound_countsOnlyFilledSlots", () => {
+    expect(slotsDirty([[]], SAVED, null)).toBe(false);
+    expect(slotsDirty([["Ilios"]], SAVED, null)).toBe(true);
   });
 });
 
