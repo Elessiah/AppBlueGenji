@@ -1765,6 +1765,9 @@ describe("PRIVACY_CHANGES — conditions v7 : casters, arbitre désigné et page
     expect(fr).toContain("la fenêtre d'acceptation couvrant alors les pages des tournois, tu te retires d'un match en le demandant par ce même formulaire");
     expect(en).toContain("as the acceptance window then covers the tournament pages, you withdraw from a match by asking for it through that same form");
     expect(TERMS_FREE_PATHS).toContain("/signalements");
+    // Revue juridique de #491 : la page du match montre aussi le pseudo de l'arbitre désigné.
+    expect(fr).toContain("et le pseudo et le BattleTag, même masqué, de l'arbitre désigné, aux mêmes personnes");
+    expect(en).toContain("and the assigned referee's username and BattleTag, even when hidden, to the same people");
     expect(en).toContain("an objection already upheld still stands (the staff no longer assigns you matches)");
     expect(fr).toContain("ou si tu deviens joueur du match avant son lancement, tu n'es plus présenté");
     expect(en).toContain("or become a player of the match before its launch, you are no longer presented");

@@ -54,7 +54,7 @@ const SCOPE_EN: Record<string, string> = {
   [REFEREE_USERNAME_SCOPE]:
     "the username of a match's assigned referee, in its “Contacts” and launch windows and on the match page, to the same readers at the same times as their BattleTag (see “Overwatch username”), and alone as soon as the launch window shows the match (terms of use, “Match contacts”, once the referee has accepted their version 7)",
   [REFEREE_USERNAME_BEFORE_V7_SCOPE]:
-    "the same presentation of the assigned referee's username, as long as that referee has not accepted version 7 of the terms of use — objection through the report form, GDPR category",
+    "the same presentation of the assigned referee's username, as long as that referee has not accepted version 7 of the terms of use — objection through the report form, GDPR category (once upheld, the staff no longer assigns them matches, even once version 7 is accepted)",
   [VERIFIED_BADGE_SCOPE]:
     "certification badge on your player page, read by any logged-in player even when the tag is hidden (without the tag) — objection through the report form, GDPR category",
   [MATCH_TIME_DM_SCOPE]: "match time notices, reminders, match removal notices, lobby settings and cast removal notices by direct message",

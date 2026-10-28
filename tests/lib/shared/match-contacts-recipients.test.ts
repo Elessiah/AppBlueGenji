@@ -321,6 +321,11 @@ describe("arbitre désigné — registre, /rgpd et annonce (revue juridique)", (
     expect(T13_EN?.subPurposes).toContain("Setting the basis for presenting an assigned referee to the parties to their matches (record T04): legitimate interest until they have accepted version 7, the contract afterwards");
     expect(T04?.legalBasis).toContain("exécution du service (les arbitres agissant pour l'association) pour le recueil de son « Prêt »");
     expect(T04_EN?.legalBasis).toContain("performance of the service (the referees acting for the association) for collecting their “Ready”");
+    // Revue juridique de #491 : retrait d'office quand l'arbitre devient joueur du match avant son lancement.
+    expect(JSON.stringify(T04)).toContain("ou il devient joueur du match avant son lancement)");
+    expect(JSON.stringify(T04)).not.toContain("il joue désormais le match), avec le motif");
+    expect(JSON.stringify(T04_EN)).toContain("or they become a player of the match before its launch)");
+    expect(JSON.stringify(T04_EN)).not.toContain("or they now play the match)");
     expect(T04?.legalBasis).not.toContain("exécution du service (les arbitres agissant pour l'association) pour la présentation de l'arbitre");
     expect(T04?.legalBasis).not.toContain("conditions d'utilisation, les arbitres agissant pour l'association) pour la présentation de l'arbitre");
     expect(T04_EN?.legalBasis).not.toContain("terms of use, the referees acting for the association) for presenting the assigned referee");

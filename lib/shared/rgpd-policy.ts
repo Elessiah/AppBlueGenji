@@ -80,7 +80,7 @@ export const REFEREE_USERNAME_SCOPE =
   "pseudo de l'arbitre désigné d'un match, dans ses fenêtres « Contacts » et de lancement et sur la page du match, aux mêmes lecteurs et aux mêmes moments que son BattleTag (voir « Pseudo Overwatch »), et seul dès que la fenêtre de lancement montre le match (conditions d'utilisation, « Contacts de match », une fois leur version 7 acceptée par l'arbitre)";
 
 export const REFEREE_USERNAME_BEFORE_V7_SCOPE =
-  "la même présentation du pseudo de l'arbitre désigné, tant que cet arbitre n'a pas accepté la version 7 des conditions d'utilisation — opposition par le formulaire de signalement, catégorie RGPD";
+  "la même présentation du pseudo de l'arbitre désigné, tant que cet arbitre n'a pas accepté la version 7 des conditions d'utilisation — opposition par le formulaire de signalement, catégorie RGPD (retenue, le staff ne lui confie plus de match, même une fois la version 7 acceptée)";
 
 /**
  * Pastilles de certification de la fiche (tag Discord certifié, BattleTag tiré
