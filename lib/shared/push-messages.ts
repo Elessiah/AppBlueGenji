@@ -39,13 +39,14 @@ import {
 } from "./discord-notifications";
 import { isEndurancePlayoffRound, PLAYOFF_ROUND_OFFSET } from "./bg-survie/rounds";
 import { CHECK_IN_PATH } from "./discord";
-import { tournamentHref, tournamentMatchHref } from "./match-anchor";
+import { matchPageHref, tournamentHref, tournamentMatchHref } from "./match-anchor";
 import { reportConcernedHref, type ReportCategory } from "./content-reports";
 import { cached } from "./intl-cache";
 import { DEFAULT_LOCALE, INTL_LOCALE, localeHref, type Locale } from "./locales";
 import { scopedText, type Leaves, type ScopedText } from "./scoped-text";
 import { clipPushText, PUSH_BODY_MAX, type PushContent } from "./push-notifications";
 import type { CastReleasedMatch } from "./cast-notices";
+import type { LobbyBriefSide } from "./lobby-brief";
 
 type PushText = ScopedText<Leaves<typeof frPush>>;
 
@@ -93,6 +94,33 @@ export function matchStartPush(side: MatchSide, phase: "LOBBY" | "LAUNCHED", loc
     body: phase === "LOBBY" ? text.t("matchStart.bodyLobby", values) : text.t("matchStart.bodyLaunched", values),
     url: localeHref(tournamentMatchHref(side.tournamentId, side.matchId), locale),
     tag: matchTag(side.matchId),
+  };
+}
+
+/**
+ * Brief du salon (`MATCH_LOBBY_BRIEF`, `./lobby-brief`) : les réglages de la
+ * partie, vus de l'engagée du destinataire. Aucun BattleTag ni tag Discord ;
+ * en tournoi individuel, « toi » et « ton adversaire » plutôt que des pseudos.
+ * Sa propre étiquette : il ne remplace pas l'appel aux « Prêt » du même match.
+ */
+export function lobbyBriefPush(side: LobbyBriefSide, locale: Locale = DEFAULT_LOCALE): PushContent {
+  const text = TEXT[locale];
+  const own = side.solo ? text.t("lobbyBrief.own") : side.teamName;
+  const other = side.solo ? text.t("lobbyBrief.other") : side.opponentName;
+  // Ni l'appariement ni la manche : gauche et droite nomment déjà les deux
+  // engagées ; la droite (celle qui n'héberge pas) bannit la première, donc
+  // aucun nom n'est répété. Le rappel du tri par rôle vient en tête et la carte
+  // (texte libre) en dernier : la coupe à `PUSH_BODY_MAX` ne retire qu'elle.
+  const values = {
+    left: side.hosting ? own : other,
+    right: side.hosting ? other : own,
+    map: side.firstMap ?? text.t("lobbyBrief.noMap"),
+  };
+  return {
+    title: text.t("lobbyBrief.title"),
+    body: side.cast ? text.t("lobbyBrief.bodyCast", values) : text.t("lobbyBrief.body", values),
+    url: localeHref(matchPageHref(side.tournamentId, side.matchId), locale),
+    tag: `${matchTag(side.matchId)}-salon`,
   };
 }
 

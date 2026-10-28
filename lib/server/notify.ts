@@ -29,6 +29,7 @@ import { getDatabase } from "@/lib/server/database";
 import { isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { parseRoles } from "@/lib/server/serialization";
 import { canDeclareTeamReady } from "@/lib/shared/match-launch";
+import { hasTeamManagementRole } from "@/lib/shared/team-roles";
 import {
   pushDiscordDirectMessages,
   type DiscordDeliveryReport,
@@ -360,6 +361,23 @@ export async function loadEntrantPlayerIds(teamIds: readonly number[]): Promise<
  * enverrait un membre sportif vers un bouton qu'il n'a pas.
  */
 export async function loadEntrantMatchLeaderIds(teamIds: readonly number[]): Promise<Map<number, number[]>> {
+  return loadEntrantIdsByRole(teamIds, canDeclareTeamReady);
+}
+
+/**
+ * Ceux qui **gèrent** les engagées données, par engagée : `OWNER` et `MANAGER`
+ * d'une équipe (`hasTeamManagementRole`), le joueur d'une entrée solo ; une
+ * fantôme n'a personne. Le brief du salon (`./tournaments/lobby-brief`) leur
+ * revient : ce sont eux qui créent la partie ou s'invitent en autogestion.
+ */
+export async function loadEntrantManagerIds(teamIds: readonly number[]): Promise<Map<number, number[]>> {
+  return loadEntrantIdsByRole(teamIds, hasTeamManagementRole);
+}
+
+async function loadEntrantIdsByRole(
+  teamIds: readonly number[],
+  qualifies: (roles: ReturnType<typeof parseRoles>) => boolean,
+): Promise<Map<number, number[]>> {
   const byTeam = new Map<number, number[]>();
   const ids = [...new Set(teamIds)];
   if (ids.length === 0) return byTeam;
@@ -376,7 +394,7 @@ export async function loadEntrantMatchLeaderIds(teamIds: readonly number[]): Pro
     [...ids, ...ids],
   );
   for (const row of rows) {
-    if (Number(row.solo) !== 1 && !canDeclareTeamReady(parseRoles(row.roles_json))) continue;
+    if (Number(row.solo) !== 1 && !qualifies(parseRoles(row.roles_json))) continue;
     const teamId = Number(row.team_id);
     const users = byTeam.get(teamId) ?? [];
     if (!users.includes(Number(row.user_id))) users.push(Number(row.user_id));

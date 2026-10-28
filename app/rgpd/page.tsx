@@ -965,7 +965,7 @@ function RgpdFr({
           <p>
             Vous pouvez être prévenu sur votre téléphone ou votre ordinateur du départ de vos matchs, d&apos;un
             score à confirmer ou validé automatiquement faute de réponse, du coup d&apos;envoi d&apos;un tournoi, de l&apos;horaire de vos matchs (posé,
-            changé ou retiré) et de ses rappels, et de ce qui concerne votre compte ou votre équipe ; un membre du staff, aussi des
+            changé ou retiré) et de ses rappels, des réglages du salon d&apos;un match que vous gérez (propriétaire ou manager d&apos;une équipe, joueur d&apos;un tournoi individuel), et de ce qui concerne votre compte ou votre équipe ; un membre du staff, aussi des
             alertes de son rôle (alertes d&apos;arbitrage, litiges tranchés, résultats corrigés, abandons imposés à l&apos;adversaire ou validations automatiques suspendues par un membre du staff qui joue le match, matchs planifiés, programme d&apos;arbitrage, signalements reçus) ; un caster, du retrait de son inscription sur un match par un autre que lui, avec le motif, tant qu&apos;il détient la permission de diffusion ; un arbitre désigné, du retrait de son arbitrage par un autre que lui ou d&apos;office, avec le motif, tant qu&apos;il détient la permission d&apos;arbitrage. <strong>Rien ne part sans votre geste</strong> :
             les notifications s&apos;activent appareil par appareil, depuis{" "}
             <Link href="/profil#notifications">Mon profil</Link>, où vous choisissez aussi les sujets.
@@ -1010,7 +1010,12 @@ function RgpdFr({
             <strong>Messages privés Discord de match.</strong> Le bot vous écrit aussi en privé, dans la
             langue de votre compte, quand l&apos;horaire d&apos;un de vos matchs est posé, changé ou retiré, pour ses
             rappels (24 h et 10 h avant), quand vous êtes retiré d&apos;un match et, si vous castez, quand votre
-            inscription de caster sur un match est retirée par le staff ou d&apos;office (avec le motif) — seulement si votre tag
+            inscription de caster sur un match est retirée par le staff ou d&apos;office (avec le motif) et, si vous gérez une
+            équipe engagée (propriétaire ou manager) ou jouez un tournoi individuel, à l&apos;ouverture du salon d&apos;un
+            match (de nouveau s&apos;il rouvre, par exemple après un changement d&apos;horaire), les réglages de la partie (équipe à gauche — l&apos;hôte — et à droite, première
+            carte, premier ban, tri des joueurs par rôle si le match est casté, arbitre désigné ou autogestion), avec les noms
+            d&apos;équipe et le lien de la page du match, sans BattleTag, tag Discord ni pseudo de joueur (en tournoi
+            individuel, le message ne nomme ni vous ni votre adversaire) — seulement si votre tag
             Discord est <strong>certifié</strong> : un tag non certifié, même rattaché par la connexion Discord,
             n&apos;en reçoit aucun, pour
             éviter le spam (vos notifications push, elles, partent quand même). Ces messages reposent

@@ -584,6 +584,16 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "Taking a match, its removal, self-management and the first map are noted in the staff log on Discord without naming anyone; a match that enters its launch with neither a referee nor self-management is flagged to the referees, without switching anything automatically.",
     ],
   },
+  "2026-10-reglages-du-salon-aux-managers": {
+    linkLabels: ["Read the “Match Discord direct messages” paragraph"],
+    title: "Lobby settings sent to managers",
+    summary:
+      "If you manage an entered team (owner or manager) or play a solo tournament, the site sends you the game settings by Discord direct message and push notification when the lobby of a match opens.",
+    details: [
+      "The message says who plays on the left (the host) and on the right, the first map, the first ban, the reminder to sort the players by role if the match is cast, and whether it has an assigned referee or is self-managed, with the team names, the tournament, the round and the link to the match page. It contains no BattleTag, no Discord tag and no player username: in a solo tournament, it says “you” and “your opponent”. It is sent when the lobby opens, and again if it reopens, for instance after a change of time.",
+      "The direct message only goes to a certified Discord tag and is turned off, like the other match messages, with the “Discord direct messages about my matches” box in “My profile”; the push notification has its own topic, “Lobby settings”, on by default for anyone who turned on push notifications, which you can turn off in “My profile”.",
+    ],
+  },
 };
 
 /**

@@ -58,6 +58,8 @@ import { loadEnduranceMeta } from "@/lib/server/tournaments/bg-survie/meta";
 import { rankEntrantsBySiteRanking } from "@/lib/server/ranking-service";
 import { clearCache } from "@/lib/server/cache";
 import { dispatchMatchStartNotices } from "@/lib/server/tournaments/player-pushes";
+// Simulé pour toute la suite (`tests/setup-env.cjs`) : on vérifie ici qu'il est déclenché.
+import { dispatchLobbyBriefs } from "@/lib/server/tournaments/lobby-brief";
 import type { TournamentListRow, TournamentRow } from "@/lib/server/tournaments/_internal";
 import { fakePool } from "../../helpers/sql-double";
 import { ACTIONABLE_EXPIRED_REPORT_SQL } from "@/lib/server/tournaments/score-report-sql";
@@ -321,6 +323,8 @@ describe("getTournamentSnapshotFrame — entretien à la lecture", () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     expect(dispatchMatchStartNotices).toHaveBeenCalledTimes(1);
+    // Le brief du salon part de la même ouverture.
+    expect(dispatchLobbyBriefs).toHaveBeenCalledTimes(1);
   });
 
   it("ne relance pas les notifications quand aucun lancement n'a bougé", async () => {
@@ -328,6 +332,7 @@ describe("getTournamentSnapshotFrame — entretien à la lecture", () => {
     await getTournamentSnapshotFrame(TOURNAMENT_ID);
     await new Promise((resolve) => setImmediate(resolve));
     expect(dispatchMatchStartNotices).not.toHaveBeenCalled();
+    expect(dispatchLobbyBriefs).not.toHaveBeenCalled();
   });
 
   it("n'entretient pas quand aucun lancement n'est dû", async () => {

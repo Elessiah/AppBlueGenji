@@ -20,3 +20,11 @@ process.env.ACCOUNT_DELETION_JOURNAL_PATH = path.join(
 // push injectent leur propre configuration.
 process.env.VAPID_PUBLIC_KEY = "";
 process.env.VAPID_PRIVATE_KEY = "";
+
+// Brief du salon (`dispatchLobbyBriefs`) : son balayage ne dépend pas du push,
+// il partirait donc depuis tout test qui publie un évènement de tournoi, contre
+// une base simulée (ou réelle). Simulé pour toute la suite ; ses propres tests
+// le rétablissent par `jest.unmock`.
+jest.mock("@/lib/server/tournaments/lobby-brief", () => ({
+  dispatchLobbyBriefs: jest.fn(async () => 0),
+}));

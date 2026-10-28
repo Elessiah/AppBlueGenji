@@ -101,3 +101,17 @@ export async function loadRefereeEligibility(executor: Executor, userId: number)
   );
   return refereeEligibilityBlock(rows[0]);
 }
+
+/** Les comptes de la liste qui remplissent encore la condition d'arbitrage, en une lecture. */
+export async function loadEligibleRefereeIds(
+  executor: Executor,
+  userIds: readonly number[],
+): Promise<Set<number>> {
+  const ids = [...new Set(userIds)];
+  if (ids.length === 0) return new Set();
+  const [rows] = await executor.execute<(CastEligibilityRow & { id: number })[]>(
+    `SELECT id, ${CAST_ELIGIBILITY_COLUMNS} FROM bg_users WHERE id IN (${ids.map(() => "?").join(", ")})`,
+    ids,
+  );
+  return new Set(rows.filter((row) => refereeEligibilityBlock(row) === null).map((row) => Number(row.id)));
+}

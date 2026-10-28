@@ -555,6 +555,9 @@ describe("langue du compte (lot 9-3)", () => {
     const en = (await import("@/messages/en/profile.json")).default.matchDms;
     expect(fr.hint).toMatch(/quand ton inscription de caster sur un match est retirée par un autre que toi/);
     expect(en.hint).toMatch(/when someone else removes your caster registration for a match/);
+    // Et le brief du salon (MATCH_LOBBY_BRIEF.md) : l'aide le dit aussi.
+    expect(fr.hint).toMatch(/quand le salon d'un match que tu gères s'ouvre \(réglages de la partie\)/);
+    expect(en.hint).toMatch(/when the lobby of a match you manage opens \(game settings\)/);
     expect(readFileSync(join(__dirname, "..", "..", "app/(secured)/profil/page.tsx"), "utf8")).toMatch(
       /<MatchDmField\s+initial=\{data\?\.matchDmEnabled\}\s+discordReachable=/,
     );

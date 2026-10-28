@@ -248,6 +248,10 @@ async function loadMaintainedRow(tournamentId: number): Promise<TournamentRow | 
       void import("./player-pushes")
         .then(({ dispatchMatchStartNotices }) => dispatchMatchStartNotices())
         .catch(() => undefined);
+      // Le brief du salon aussi (`./lobby-brief`) : même ouverture, même raison.
+      void import("./lobby-brief")
+        .then(({ dispatchLobbyBriefs }) => dispatchLobbyBriefs())
+        .catch(() => undefined);
       // Même raison pour l'annonce des lives : un lancement d'office ouvre
       // l'antenne d'un match `AUTO` sans publication.
       void import("./live-announcements")

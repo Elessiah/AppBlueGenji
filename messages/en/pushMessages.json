@@ -7,6 +7,14 @@
     "bodyLobby": "{pairing} · {tournament}. Mark yourself ready.",
     "bodyLaunched": "{pairing} · {tournament}. Have a good game!"
   },
+  "lobbyBrief": {
+    "title": "Lobby open: match settings",
+    "body": "Left (host): {left} · Right (1st ban): {right} · 1st map: {map}.",
+    "bodyCast": "Cast match: sort the players by role. Left (host): {left} · Right (1st ban): {right} · 1st map: {map}.",
+    "noMap": "not set yet",
+    "own": "you",
+    "other": "your opponent"
+  },
   "matchReminder": {
     "title": "Match in {offset}",
     "titleScheduled": "Match scheduled",
