@@ -9,8 +9,8 @@
   },
   "lobbyBrief": {
     "title": "Salon ouvert : réglages du match",
-    "body": "{pairing} · Gauche (hôte) : {left} · Droite : {right} · 1re carte : {map} · 1er ban : {ban}.",
-    "bodyCast": "{pairing} · Gauche (hôte) : {left} · Droite : {right} · 1re carte : {map} · 1er ban : {ban}. Match casté : trie les joueurs par rôle.",
+    "body": "Gauche (hôte) : {left} · Droite (1er ban) : {right} · 1re carte : {map}.",
+    "bodyCast": "Match casté : trie les joueurs par rôle. Gauche (hôte) : {left} · Droite (1er ban) : {right} · 1re carte : {map}.",
     "noMap": "pas encore fixée",
     "own": "toi",
     "other": "ton adversaire"

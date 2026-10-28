@@ -76,6 +76,21 @@ async function claimLobbyBrief(matchId: number, pairing: string): Promise<boolea
   return (result as { affectedRows?: number }).affectedRows === 1;
 }
 
+/**
+ * Rend les réservations d'un balayage qui n'a pas pu lire ses destinataires :
+ * une panne de base avant tout envoi ne doit pas perdre le brief pour de bon.
+ */
+async function releaseLobbyBriefs(rows: readonly LobbyBriefRow[]): Promise<void> {
+  const db = await getDatabase();
+  for (const row of rows) {
+    await db.execute(`DELETE FROM bg_match_start_notices WHERE match_id = ? AND pairing = ? AND phase = ?`, [
+      Number(row.id),
+      String(row.launch_pairing),
+      LOBBY_BRIEF_PHASE,
+    ]);
+  }
+}
+
 /** Les arbitres de la liste qui remplissent encore la condition ; une panne n'en compte aucun. */
 async function readEligibleReferees(
   db: Awaited<ReturnType<typeof getDatabase>>,
@@ -125,6 +140,48 @@ export function lobbyBriefSides(
   }));
 }
 
+/** Managers des engagées et casters des matchs réservés ; une panne rend les réservations, puis remonte. */
+async function readBriefRecipients(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  planned: readonly LobbyBriefRow[],
+): Promise<{ managers: Map<number, number[]>; castersByMatch: Map<number, number[]> }> {
+  try {
+    const managers = await loadEntrantManagerIds(planned.flatMap((row) => [Number(row.team1_id), Number(row.team2_id)]));
+    const castersByMatch = await readMatchCasters(db, planned.map((row) => Number(row.id)));
+    return { managers, castersByMatch };
+  } catch (error) {
+    // Rien n'est parti : on rend les réservations, le balayage suivant réessaie.
+    await releaseLobbyBriefs(planned).catch((releaseError: unknown) =>
+      console.error("[lobby-brief] réservations non rendues", releaseError),
+    );
+    throw error;
+  }
+}
+
+/**
+ * Envoie le brief d'une engagée. Un côté en échec n'empêche pas les autres :
+ * leurs réservations sont prises. Rend `true` si l'envoi a eu lieu.
+ */
+async function sendSideBrief(matchId: number, userIds: number[], side: LobbyBriefSide, url: string): Promise<boolean> {
+  try {
+    const recipients = await loadNotificationRecipients(userIds, "certified", { matchDm: true });
+    const report = await notifyUsers(recipients, {
+      topic: "MATCH_LOBBY_BRIEF",
+      discord: { message: (locale) => formatLobbyBriefDm(side, url, locale), context: "lobby-brief" },
+      push: (locale) => lobbyBriefPush(side, locale),
+    });
+    if (report.discordUnreachedUserIds.length > 0) {
+      console.error(
+        `[lobby-brief] bot injoignable : brief du match ${matchId} non remis sur Discord à ${report.discordUnreachedUserIds.length} compte(s), sans nouvel essai`,
+      );
+    }
+    return true;
+  } catch (error) {
+    console.error(`[lobby-brief] brief du match ${matchId} non envoyé à une engagée`, error);
+    return false;
+  }
+}
+
 async function runLobbyBriefSweep(): Promise<number> {
   const db = await getDatabase();
   // Appariement courant seulement, comme l'appel aux « Prêt » : un salon ouvert
@@ -157,8 +214,7 @@ async function runLobbyBriefSweep(): Promise<number> {
   }
   if (planned.length === 0) return 0;
 
-  const managers = await loadEntrantManagerIds(planned.flatMap((row) => [Number(row.team1_id), Number(row.team2_id)]));
-  const castersByMatch = await readMatchCasters(db, planned.map((row) => Number(row.id)));
+  const { managers, castersByMatch } = await readBriefRecipients(db, planned);
   const referees = await readEligibleReferees(db, planned);
 
   let sent = 0;
@@ -171,18 +227,7 @@ async function runLobbyBriefSweep(): Promise<number> {
     for (const { teamId, side } of sides) {
       const userIds = managers.get(teamId) ?? [];
       if (userIds.length === 0) continue;
-      const recipients = await loadNotificationRecipients(userIds, "certified", { matchDm: true });
-      const report = await notifyUsers(recipients, {
-        topic: "MATCH_LOBBY_BRIEF",
-        discord: { message: (locale) => formatLobbyBriefDm(side, url, locale), context: "lobby-brief" },
-        push: (locale) => lobbyBriefPush(side, locale),
-      });
-      if (report.discordUnreachedUserIds.length > 0) {
-        console.error(
-          `[lobby-brief] bot injoignable : brief du match ${Number(row.id)} non remis sur Discord à ${report.discordUnreachedUserIds.length} compte(s), sans nouvel essai`,
-        );
-      }
-      sent += 1;
+      if (await sendSideBrief(Number(row.id), userIds, side, url)) sent += 1;
     }
   }
   return sent;

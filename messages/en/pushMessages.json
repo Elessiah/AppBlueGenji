@@ -9,8 +9,8 @@
   },
   "lobbyBrief": {
     "title": "Lobby open: match settings",
-    "body": "{pairing} · Left (host): {left} · Right: {right} · 1st map: {map} · 1st ban: {ban}.",
-    "bodyCast": "{pairing} · Left (host): {left} · Right: {right} · 1st map: {map} · 1st ban: {ban}. Cast match: sort the players by role.",
+    "body": "Left (host): {left} · Right (1st ban): {right} · 1st map: {map}.",
+    "bodyCast": "Cast match: sort the players by role. Left (host): {left} · Right (1st ban): {right} · 1st map: {map}.",
     "noMap": "not set yet",
     "own": "you",
     "other": "your opponent"

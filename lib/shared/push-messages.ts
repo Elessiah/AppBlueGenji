@@ -107,11 +107,13 @@ export function lobbyBriefPush(side: LobbyBriefSide, locale: Locale = DEFAULT_LO
   const text = TEXT[locale];
   const own = side.solo ? text.t("lobbyBrief.own") : side.teamName;
   const other = side.solo ? text.t("lobbyBrief.other") : side.opponentName;
+  // Ni l'appariement ni la manche : gauche et droite nomment déjà les deux
+  // engagées ; la droite (celle qui n'héberge pas) bannit la première, donc
+  // aucun nom n'est répété. Le rappel du tri par rôle vient en tête et la carte
+  // (texte libre) en dernier : la coupe à `PUSH_BODY_MAX` ne retire qu'elle.
   const values = {
-    pairing: pairing(side, text),
     left: side.hosting ? own : other,
     right: side.hosting ? other : own,
-    ban: side.hosting ? other : own,
     map: side.firstMap ?? text.t("lobbyBrief.noMap"),
   };
   return {
