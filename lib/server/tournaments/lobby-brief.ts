@@ -173,9 +173,13 @@ export function lobbyBriefSides(
 }
 
 /** Managers des engagées réservées ; une panne rend les réservations, puis remonte. */
-async function readBriefManagers(db: Db, claims: readonly ClaimedSide[]): Promise<Map<number, number[]>> {
+async function readBriefManagers(
+  db: Db,
+  claims: readonly ClaimedSide[],
+  teamIds: readonly number[],
+): Promise<Map<number, number[]>> {
   try {
-    return await loadEntrantManagerIds(claims.map(({ row, slot }) => Number(slot === 1 ? row.team1_id : row.team2_id)));
+    return await loadEntrantManagerIds(teamIds);
   } catch (error) {
     await releaseQuietly(db, claims);
     throw error;
@@ -183,12 +187,29 @@ async function readBriefManagers(db: Db, claims: readonly ClaimedSide[]): Promis
 }
 
 /**
- * Envoie le brief d'une engagée. Un côté en échec n'empêche pas les autres :
- * leurs réservations sont prises. Rend `true` si l'envoi a eu lieu.
+ * Envoie le brief d'une engagée ; un côté en échec n'empêche pas les autres.
+ *
+ * - `"sent"` : parti ;
+ * - `"retry"` : la lecture des destinataires a échoué, **rien** n'est parti — la
+ *   réservation de ce côté peut être rendue ;
+ * - `"failed"` : l'envoi a levé, une partie a pu partir (le push et le message
+ *   privé partent ensemble) — la réservation reste, pour ne jamais envoyer
+ *   deux fois.
  */
-async function sendSideBrief(matchId: number, userIds: number[], side: LobbyBriefSide, url: string): Promise<boolean> {
+async function sendSideBrief(
+  matchId: number,
+  userIds: number[],
+  side: LobbyBriefSide,
+  url: string,
+): Promise<"sent" | "retry" | "failed"> {
+  let recipients: Awaited<ReturnType<typeof loadNotificationRecipients>>;
   try {
-    const recipients = await loadNotificationRecipients(userIds, "certified", { matchDm: true });
+    recipients = await loadNotificationRecipients(userIds, "certified", { matchDm: true });
+  } catch (error) {
+    console.error(`[lobby-brief] destinataires du match ${matchId} illisibles, brief remis au balayage suivant`, error);
+    return "retry";
+  }
+  try {
     const report = await notifyUsers(recipients, {
       topic: "MATCH_LOBBY_BRIEF",
       discord: { message: (locale) => formatLobbyBriefDm(side, url, locale), context: "lobby-brief" },
@@ -199,10 +220,10 @@ async function sendSideBrief(matchId: number, userIds: number[], side: LobbyBrie
         `[lobby-brief] bot injoignable : brief du match ${matchId} non remis sur Discord à ${report.discordUnreachedUserIds.length} compte(s), sans nouvel essai`,
       );
     }
-    return true;
+    return "sent";
   } catch (error) {
-    console.error(`[lobby-brief] brief du match ${matchId} non envoyé à une engagée`, error);
-    return false;
+    console.error(`[lobby-brief] brief du match ${matchId} non envoyé à une engagée, sans nouvel essai`, error);
+    return "failed";
   }
 }
 
@@ -235,26 +256,40 @@ async function runLobbyBriefSweep(): Promise<number> {
   const claims = await claimLobbyBriefs(db, rows);
   if (claims.length === 0) return 0;
 
-  const managers = await readBriefManagers(db, claims);
   const planned = [...new Set(claims.map((claim) => claim.row))];
   // Ces deux lectures ne lèvent pas : une panne envoie le brief sans la ligne.
   const castersByMatch = await readMatchCasters(db, planned.map((row) => Number(row.id)));
   const referees = await readEligibleReferees(db, planned);
+  // Une fois par match : les deux côtés et le lien ; un côté réservé y lit le sien.
+  const briefs = new Map(
+    planned.map((row) => [
+      row,
+      {
+        sides: lobbyBriefSides(row, {
+          cast: (castersByMatch.get(Number(row.id)) ?? []).length > 0,
+          refereeEligible: row.referee_user_id !== null && referees.has(Number(row.referee_user_id)),
+        }),
+        url: `${siteCanonicalBase()}${matchPageHref(Number(row.tournament_id), Number(row.id))}`,
+      },
+    ]),
+  );
+  const sideOf = ({ row, slot }: ClaimedSide) => briefs.get(row)!.sides[slot - 1];
+  const managers = await readBriefManagers(
+    db,
+    claims,
+    claims.map((claim) => sideOf(claim).teamId),
+  );
 
   let sent = 0;
   for (const claim of claims) {
-    const { row, slot } = claim;
-    const { teamId, side } = lobbyBriefSides(row, {
-      cast: (castersByMatch.get(Number(row.id)) ?? []).length > 0,
-      refereeEligible: row.referee_user_id !== null && referees.has(Number(row.referee_user_id)),
-    })[slot - 1];
+    const { teamId, side } = sideOf(claim);
     // Fantôme : personne, la réservation reste.
     const userIds = managers.get(teamId) ?? [];
     if (userIds.length === 0) continue;
-    const url = `${siteCanonicalBase()}${matchPageHref(Number(row.tournament_id), Number(row.id))}`;
-    if (await sendSideBrief(Number(row.id), userIds, side, url)) sent += 1;
+    const outcome = await sendSideBrief(Number(claim.row.id), userIds, side, briefs.get(claim.row)!.url);
+    if (outcome === "sent") sent += 1;
     // Rien n'est parti pour ce côté : il rend sa réservation, l'autre garde la sienne.
-    else await releaseQuietly(db, [claim]);
+    else if (outcome === "retry") await releaseQuietly(db, [claim]);
   }
   return sent;
 }
