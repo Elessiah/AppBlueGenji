@@ -350,13 +350,16 @@ export function CasterCard({
       {caster.contactsShown && hasContacts && (
         <div className={styles.casterIds}>
           <IdentityLine kind="Discord" value={caster.discordTag} verified={caster.discordTag !== null} onCopy={onCopy} />
-          <IdentityLine
-            kind="BattleTag"
-            value={caster.battletag}
-            verified={caster.battletagVerified}
-            onCopy={onCopy}
-            note={self ? undefined : battletagNote}
-          />
+          {/* Hors Overwatch, le serveur n'envoie pas le BattleTag (`withGameBattletag`) : pas de ligne. */}
+          {caster.battletag !== undefined && (
+            <IdentityLine
+              kind="BattleTag"
+              value={caster.battletag}
+              verified={caster.battletagVerified === true}
+              onCopy={onCopy}
+              note={self ? undefined : battletagNote}
+            />
+          )}
         </div>
       )}
       {/* Contacts tus : une note plutôt que deux « — » qui laisseraient croire
@@ -368,8 +371,8 @@ export function CasterCard({
 }
 
 /**
- * Fiche de l'arbitre désigné (`docs/features/MATCH_REFEREE.md`) : son pseudo et
- * son BattleTag — exposés par le serveur aux deux engagées, aux casters du
+ * Fiche de l'arbitre désigné (`docs/features/MATCH_REFEREE.md`) : son pseudo et,
+ * en Overwatch seulement, son BattleTag — exposés par le serveur aux deux engagées, aux casters du
  * match et au staff seulement. Sans arbitre, la note d'autogestion, ou rien.
  */
 export function RefereeCard({
@@ -411,12 +414,12 @@ export function RefereeCard({
         </span>
         <ReadyChip ready={referee.ready} phase={phase} />
       </div>
-      {!referee.isViewer && referee.battletag !== null && (
+      {!referee.isViewer && referee.battletag != null && (
         <div className={styles.casterIds}>
           <IdentityLine
             kind="BattleTag"
             value={referee.battletag}
-            verified={referee.battletagVerified}
+            verified={referee.battletagVerified === true}
             onCopy={onCopy}
             note={battletagNote}
           />

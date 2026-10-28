@@ -24,6 +24,7 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
 import { parseRoles, toIso } from "@/lib/server/serialization";
 import { visibleBattletag } from "@/lib/shared/battletag-visibility";
+import { battletagRelevantFor } from "@/lib/shared/certification-prompt";
 import { visibleDiscordTag } from "@/lib/shared/discord-identity";
 import {
   autoLaunchAt,
@@ -45,7 +46,7 @@ import {
 import type { MatchCasterLink } from "./match-casters";
 import { loadCasterLinks } from "./match-casters";
 import { can, type PlatformRole } from "@/lib/shared/permissions";
-import type { TeamRole } from "@/lib/shared/types";
+import type { TeamRole, TournamentGame } from "@/lib/shared/types";
 import { localUploadUrl } from "@/lib/shared/uploads";
 import {
   maintainMatchLaunches,
@@ -75,6 +76,8 @@ export type LaunchViewer = { id: number; isAdmin?: boolean; roles?: readonly Pla
 
 type CandidateBaseRow = LaunchMatchBaseRow & {
   tournament_name: string;
+  /** Jeu du tournoi : le BattleTag des casters et de l'arbitre ne sort qu'en Overwatch. */
+  tournament_game: TournamentGame;
   team1_name: string | null;
   team2_name: string | null;
   team1_logo_url: string | null;
@@ -200,7 +203,7 @@ async function loadCandidates(
        m.start_at, m.lobby_opened_at, m.launch_pairing, m.launched_at, m.team1_ready_at, m.team2_ready_at,
        m.host_team_id, m.referee_user_id, m.referee_ready_at, m.self_managed,
        es1.\`rank\` AS team1_seed, es2.\`rank\` AS team2_seed,
-       t.name AS tournament_name,
+       t.name AS tournament_name, t.game AS tournament_game,
        t1.name AS team1_name, t2.name AS team2_name,
        t1.logo_url AS team1_logo_url, t2.logo_url AS team2_logo_url,
        t1.solo_user_id AS team1_solo_user_id, t2.solo_user_id AS team2_solo_user_id
@@ -551,7 +554,21 @@ function buildLaunchSide(row: CandidateRow, index: 1 | 2, ctx: LaunchContext): L
   };
 }
 
-function buildLaunchCaster(caster: MatchCasterLink, ctx: LaunchContext): LaunchCaster | null {
+/**
+ * Le BattleTag d'un caster ou de l'arbitre désigné sert à l'inviter dans la
+ * partie : il ne sort qu'en Overwatch (décision de l'utilisateur 35,
+ * 2026-10-28). Hors Overwatch, les deux champs ne sont pas même envoyés
+ * (minimisation) : ni BattleTag, ni la pastille qui dirait s'il est vérifié.
+ */
+function withGameBattletag<T extends object>(
+  game: TournamentGame,
+  entry: T,
+  battletag: { battletag: string | null; battletagVerified: boolean },
+): T & Partial<typeof battletag> {
+  return battletagRelevantFor(game) ? { ...entry, ...battletag } : entry;
+}
+
+function buildLaunchCaster(caster: MatchCasterLink, game: TournamentGame, ctx: LaunchContext): LaunchCaster | null {
   const user = ctx.users.get(caster.userId);
   if (!user || Number(user.is_deleted) !== 0) return null;
   const discordTag = user.discord_verified_at !== null ? user.discord_pseudo : null;
@@ -569,43 +586,52 @@ function buildLaunchCaster(caster: MatchCasterLink, ctx: LaunchContext): LaunchC
         Number(user.visible_overwatch) === 1,
       )
     : null;
-  return {
-    userId: Number(user.id),
-    pseudo: user.pseudo,
-    discordTag: contact?.discordTag ?? null,
-    battletag: contact?.battletag ?? null,
-    battletagVerified: contact?.battletagVerified ?? false,
-    ready: ctx.readiness.casters.some((entry) => entry.userId === caster.userId && entry.ready),
-    contactsShown: ctx.exposesCaster,
-    isViewer: Number(user.id) === ctx.viewer.id,
-  };
+  return withGameBattletag(
+    game,
+    {
+      userId: Number(user.id),
+      pseudo: user.pseudo,
+      discordTag: contact?.discordTag ?? null,
+      ready: ctx.readiness.casters.some((entry) => entry.userId === caster.userId && entry.ready),
+      contactsShown: ctx.exposesCaster,
+      isViewer: Number(user.id) === ctx.viewer.id,
+    },
+    { battletag: contact?.battletag ?? null, battletagVerified: contact?.battletagVerified ?? false },
+  );
 }
 
 /**
- * L'arbitre désigné tel que les parties du match le lisent : pseudo et
- * BattleTag (`visibleBattletag`, clause `sharesLiveMatch`), jamais son tag
- * Discord. `null` sans arbitre ou arbitre inéligible.
+ * L'arbitre désigné tel que les parties du match le lisent : pseudo et, en
+ * Overwatch seulement (`withGameBattletag`), BattleTag (`visibleBattletag`,
+ * clause `sharesLiveMatch`), jamais son tag Discord. `null` sans arbitre ou
+ * arbitre inéligible.
  */
 function buildLaunchReferee(row: CandidateRow, ctx: LaunchContext): LaunchReferee | null {
   if (!row.refereeEligible || row.referee_user_id === null) return null;
   const user = ctx.users.get(Number(row.referee_user_id));
   if (!user || Number(user.is_deleted) !== 0) return null;
-  return {
-    userId: Number(user.id),
-    pseudo: user.pseudo,
-    // Le BattleTag suit la fenêtre des contacts du match (`ctx.exposes`) : les
-    // équipes l'ajoutent en jeu au départ, pas avant.
-    battletag: ctx.exposes
-      ? visibleBattletag(user.overwatch_battletag, ctx.viewer, {
-          userId: Number(user.id),
-          visible: Number(user.visible_overwatch) === 1,
-          sharesLiveMatch: true,
-        })
-      : null,
-    battletagVerified: user.blizzard_sub !== null,
-    ready: ctx.readiness.referee?.ready ?? false,
-    isViewer: Number(user.id) === ctx.viewer.id,
-  };
+  return withGameBattletag(
+    row.tournament_game,
+    {
+      userId: Number(user.id),
+      pseudo: user.pseudo,
+      ready: ctx.readiness.referee?.ready ?? false,
+      isViewer: Number(user.id) === ctx.viewer.id,
+    },
+    {
+      // Le BattleTag suit la fenêtre des contacts du match (`ctx.exposes`) : les
+      // parties le lisent dès que les deux adversaires sont connus (le temps du
+      // match pour un caster), comme les contacts des engagées.
+      battletag: ctx.exposes
+        ? visibleBattletag(user.overwatch_battletag, ctx.viewer, {
+            userId: Number(user.id),
+            visible: Number(user.visible_overwatch) === 1,
+            sharesLiveMatch: true,
+          })
+        : null,
+      battletagVerified: user.blizzard_sub !== null,
+    },
+  );
 }
 
 function buildLaunchInfo(
@@ -616,7 +642,7 @@ function buildLaunchInfo(
 ): MatchLaunchInfo {
   const { readiness } = ctx;
   const casters = ctx.casters
-    .map((caster) => buildLaunchCaster(caster, ctx))
+    .map((caster) => buildLaunchCaster(caster, row.tournament_game, ctx))
     .filter((caster): caster is LaunchCaster => caster !== null);
   const self = casters.find((caster) => caster.userId === ctx.viewer.id);
   const referee = buildLaunchReferee(row, ctx);

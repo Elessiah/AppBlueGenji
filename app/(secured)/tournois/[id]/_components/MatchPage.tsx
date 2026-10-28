@@ -24,6 +24,7 @@ import {
   selfManagementSteps,
   type MatchPageSide,
 } from "@/lib/shared/match-page";
+import { battletagRelevantFor } from "@/lib/shared/certification-prompt";
 import { FIRST_MAP_MAX_LENGTH, normalizeFirstMap } from "@/lib/shared/match-referee";
 import { streamLinkText } from "@/lib/shared/live-streams";
 import { localizedPlaceholder, matchPositionText, versusText } from "@/lib/shared/tournament-page-text";
@@ -225,11 +226,14 @@ function OfficiatingSection({
   staff,
   launch,
   onCopy,
+  invitesByBattletag,
 }: Readonly<{
   match: BracketMatch;
   staff: boolean;
   launch: MatchLaunchInfo | null;
   onCopy: (value: string, label: string) => Promise<void>;
+  /** Overwatch : on invite par BattleTag (`battletagRelevantFor`) ; ailleurs, ni BattleTag ni consigne. */
+  invitesByBattletag: boolean;
 }>) {
   const { t } = useTournamentPageText();
   const titleId = useId();
@@ -255,7 +259,7 @@ function OfficiatingSection({
               phase={launch.phase}
               onCopy={onCopy}
               linkNames
-              battletagNote={t("matchPage.refereeBattletagNote")}
+              battletagNote={invitesByBattletag ? t("matchPage.refereeBattletagNote") : undefined}
             />
           )}
         </>
@@ -287,17 +291,23 @@ function OfficiatingSection({
   );
 }
 
-/** Cast et streams : chaque stream avec son lien et ses casters, puis les BattleTags des casters à inviter. */
+/**
+ * Cast et streams : chaque stream avec son lien et ses casters, puis les
+ * contacts des casters — en Overwatch, leurs BattleTags à inviter ; ailleurs,
+ * ni BattleTag (le serveur ne l'envoie pas) ni consigne d'invitation.
+ */
 function CastSection({
   match,
   matchLabel,
   launch,
   onCopy,
+  invitesByBattletag,
 }: Readonly<{
   match: BracketMatch;
   matchLabel: string;
   launch: MatchLaunchInfo | null;
   onCopy: (value: string, label: string) => Promise<void>;
+  invitesByBattletag: boolean;
 }>) {
   const { t } = useTournamentPageText();
   const launchText = useLaunchText();
@@ -355,14 +365,16 @@ function CastSection({
       )}
       {launch && launch.casters.length > 0 && (
         <div className={styles.castContacts}>
-          <h3 className={styles.subTitle}>{t("matchPage.castersToInvite")}</h3>
+          <h3 className={styles.subTitle}>
+            {t(invitesByBattletag ? "matchPage.castersToInvite" : "matchPage.castersContacts")}
+          </h3>
           <CasterCards
             casters={launch.casters}
             phase={launch.phase}
             onCopy={onCopy}
             laterText={launchText.t("contacts.casterLater")}
             linkNames
-            battletagNote={t("matchPage.battletagRequired")}
+            battletagNote={invitesByBattletag ? t("matchPage.battletagRequired") : undefined}
           />
         </div>
       )}
@@ -375,7 +387,8 @@ function CastSection({
  * ses gestes, puis ce qu'il faut pour créer la partie — côtés (hôte à
  * gauche), première carte, premier ban —, l'arbitrage ou l'autogestion, les
  * streams avec leurs casters et, aux seules parties du match et au staff, les
- * BattleTags à inviter (même lecture que la modale « Contacts »). Rendue dans
+ * BattleTags à inviter — en Overwatch seulement — (même lecture que la modale
+ * « Contacts »). Rendue dans
  * la fiche du tournoi (`TournamentSheet`), dont elle partage le flux, les
  * fenêtres et les droits du lecteur.
  */
@@ -414,6 +427,7 @@ export function MatchPage({
   const matchLabel = versusText(text, team1, team2);
   const phaseName = detail.phases?.find((item) => item.id === match.phaseId)?.name ?? null;
   const editable = match.status !== "COMPLETED" && match.team1Id !== null && match.team2Id !== null;
+  const invitesByBattletag = battletagRelevantFor(detail.card.game);
 
   return (
     <>
@@ -447,8 +461,20 @@ export function MatchPage({
       </section>
 
       <LobbySection match={match} sides={sides} staff={canSchedule && !frozen} editable={editable} />
-      <OfficiatingSection match={match} staff={canSchedule} launch={shownLaunch} onCopy={onCopy} />
-      <CastSection match={match} matchLabel={matchLabel} launch={shownLaunch} onCopy={onCopy} />
+      <OfficiatingSection
+        match={match}
+        staff={canSchedule}
+        launch={shownLaunch}
+        onCopy={onCopy}
+        invitesByBattletag={invitesByBattletag}
+      />
+      <CastSection
+        match={match}
+        matchLabel={matchLabel}
+        launch={shownLaunch}
+        onCopy={onCopy}
+        invitesByBattletag={invitesByBattletag}
+      />
     </>
   );
 }

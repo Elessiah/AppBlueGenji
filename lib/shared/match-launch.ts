@@ -456,9 +456,13 @@ export type LaunchCaster = {
   userId: number;
   pseudo: string;
   discordTag: string | null;
-  battletag: string | null;
-  /** `true` si le BattleTag vient d'un compte Battle.net rattaché. */
-  battletagVerified: boolean;
+  /**
+   * BattleTag, à inviter dans la partie : **Overwatch seulement** — hors
+   * Overwatch, le champ n'est pas envoyé (`withGameBattletag`, décision 35).
+   */
+  battletag?: string | null;
+  /** `true` si le BattleTag vient d'un compte Battle.net rattaché ; absent avec lui. */
+  battletagVerified?: boolean;
   ready: boolean;
   /**
    * Le serveur rend-il ses contacts à ce lecteur (`exposesCaster`) ? La carte
@@ -475,16 +479,17 @@ export type LaunchCaster = {
 };
 
 /**
- * L'arbitre désigné tel que la modale le présente : pseudo et BattleTag (à
- * ajouter en jeu), jamais son tag Discord. Rendu aux seules parties du match
+ * L'arbitre désigné tel que la modale le présente : pseudo et, en Overwatch
+ * seulement, BattleTag (à ajouter en jeu), jamais son tag Discord. Rendu aux seules parties du match
  * (équipes, casters) et à l'arbitrage — le public ne lit que « Arbitre
  * désigné » (`BracketMatch.refereeAssigned`).
  */
 export type LaunchReferee = {
   userId: number;
   pseudo: string;
-  battletag: string | null;
-  battletagVerified: boolean;
+  /** Absent hors Overwatch, comme celui d'un caster (`LaunchCaster.battletag`). */
+  battletag?: string | null;
+  battletagVerified?: boolean;
   ready: boolean;
   /** Cette fiche est-elle celle du lecteur ? */
   isViewer: boolean;
@@ -628,9 +633,9 @@ export function casterContactsPending(launch: {
   return launch.casters.some(casterCardPending);
 }
 
-/** Le caster a-t-il au moins un contact à montrer (tag Discord ou BattleTag) ? */
+/** Le caster a-t-il au moins un contact à montrer (tag Discord ou BattleTag, absent hors Overwatch) ? */
 export function casterHasContacts(caster: Pick<LaunchCaster, "discordTag" | "battletag">): boolean {
-  return caster.discordTag !== null || caster.battletag !== null;
+  return caster.discordTag !== null || (caster.battletag ?? null) !== null;
 }
 
 /** Arrivée des contacts du caster : avec au moins un contact, sans, ou aucune. */

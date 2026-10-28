@@ -28,7 +28,7 @@ import { LiveProvider } from "@/app/(secured)/tournois/[id]/_lib/live-context";
 import { SpectatorViewProvider } from "@/components/spectator-view";
 import { ToastProvider } from "@/components/ui/toast";
 import type { LaunchCaster, LaunchSide, MatchLaunchInfo } from "@/lib/shared/match-launch";
-import type { BracketMatch } from "@/lib/shared/types";
+import type { BracketMatch, TournamentGame } from "@/lib/shared/types";
 import { bracketMatch, matchCaster } from "../helpers/bracket-match";
 import { tournamentDetail } from "../helpers/tournament-detail";
 import { tournamentCard } from "../helpers/tournament-card";
@@ -107,8 +107,14 @@ function launch(overrides: Partial<MatchLaunchInfo> = {}): MatchLaunchInfo {
   };
 }
 
-function render(page: BracketMatch, viewer: Viewer, frozen = false, locale: "fr" | "en" = "fr"): string {
-  const detail = tournamentDetail({ card: tournamentCard({ id: 12, name: "Coupe d'hiver", state: "RUNNING" }), matches: [page] });
+function render(
+  page: BracketMatch,
+  viewer: Viewer,
+  frozen = false,
+  locale: "fr" | "en" = "fr",
+  game: TournamentGame = "OW",
+): string {
+  const detail = tournamentDetail({ card: tournamentCard({ id: 12, name: "Coupe d'hiver", state: "RUNNING", game }), matches: [page] });
   const body: ReactNode = (
     <ToastProvider>
       <LiveProvider
@@ -347,6 +353,24 @@ describe("page d'un match — streams et casters", () => {
     const pub = render(page, "public");
     expect(pub).not.toContain("Voix#2222");
     expect(visible(pub)).not.toContain("À inviter — obligatoire");
+  });
+
+  // Décision 35 (2026-10-28) : en Marvel Rivals, on n'invite pas par BattleTag.
+  it("MatchPage_marvelRivals_noInviteNotesAndNeutralHeading", () => {
+    const mrCaster: LaunchCaster = { userId: 900, pseudo: "Voix", discordTag: "voix", ready: false, contactsShown: true, isViewer: false };
+    mockLaunch = launch({ casters: [mrCaster], referee: { userId: 77, pseudo: "Juge", ready: false, isViewer: false } });
+    const page = cast({ refereeAssigned: true });
+
+    const fr = visible(render(page, "player", false, "fr", "MR"));
+    const en = visible(render(page, "player", false, "en", "MR"));
+
+    expect(fr).toContain("Contacts des casters");
+    expect(fr).toContain("voix");
+    expect(fr).toContain("Juge");
+    expect(fr).not.toContain("À inviter");
+    expect(fr).not.toContain("Casters à inviter");
+    expect(en).toContain("Casters' contacts");
+    expect(en).not.toContain("To invite");
   });
 
   it("sa propre fiche de caster ne porte pas la note d'invitation", () => {

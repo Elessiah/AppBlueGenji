@@ -46,6 +46,7 @@ function candidate(overrides: Candidate = {}): Candidate {
     caster_ready_at: null,
     host_team_id: null,
     tournament_name: "Coupe",
+    tournament_game: "OW",
     team1_name: "Alpha",
     team2_name: "Bravo",
     team1_logo_url: "/api/uploads/logos/a.webp",
@@ -470,6 +471,23 @@ describe("listViewerMatchLaunches — exposition des contacts", () => {
     expect(info.casters[0]).toMatchObject({ pseudo: "Caster", discordTag: "caster", battletag: "Caster#1", contactsShown: true });
   });
 
+  it("listViewerMatchLaunches_marvelRivalsCaster_omitsBattletagFields", async () => {
+    state.candidates = [candidate({ tournament_game: "MR", caster_user_id: CASTER })];
+    state.users = [casterUser(CASTER)];
+
+    const [info] = await listViewerMatchLaunches(viewer);
+
+    expect(info.casters[0]).toEqual({
+      userId: CASTER,
+      pseudo: "Caster",
+      discordTag: "caster",
+      ready: false,
+      contactsShown: true,
+      isViewer: false,
+    });
+    expect(JSON.stringify(info)).not.toContain("Caster#1");
+  });
+
   it("tait le caster d'un compte supprimé", async () => {
     state.candidates = [candidate({ caster_user_id: CASTER })];
     state.users = [{ id: CASTER, pseudo: "compte_supprime_1", discord_pseudo: null, discord_verified_at: null, overwatch_battletag: null, blizzard_sub: null, visible_overwatch: 0, is_deleted: 1, is_admin: 0, platform_roles_json: null }];
@@ -851,6 +869,18 @@ describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => 
       expect(info?.casters[0]).toMatchObject({ discordTag: "caster", battletag: "Caster#1" });
     });
 
+    // Décision 35 (2026-10-28) : hors Overwatch, seuls casters et arbitre perdent le BattleTag.
+    it("loadViewerMatchContacts_marvelRivalsStaffReferee_keepsTeamContactsWithoutCasterBattletag", async () => {
+      state.candidates = [candidate({ tournament_game: "MR", referee_scheduling: 1, start_at: null, caster_user_id: CASTER })];
+      state.users = [casterUser(CASTER)];
+
+      const info = await loadViewerMatchContacts(referee, 42);
+
+      expect(info?.team2.contacts).toEqual([expect.objectContaining({ userId: 5, battletag: "Cap#2" })]);
+      expect(info?.casters[0]).toEqual(expect.objectContaining({ discordTag: "caster", contactsShown: true }));
+      expect(info?.casters[0]).not.toHaveProperty("battletag");
+    });
+
     it("rend les contacts du caster d'un match programmé", async () => {
       const later = new Date(Date.now() + 3 * 3_600_000).toISOString();
       state.candidates = [candidate({ match_launch_phase: 0, start_at: later, lobby_opened_at: null, caster_user_id: CASTER })];
@@ -986,6 +1016,16 @@ describe("listViewerMatchLaunches — arbitre désigné (`docs/features/MATCH_RE
     });
     expect(info.selfManaged).toBe(false);
     expect(info.viewer.isReferee).toBe(false);
+  });
+
+  it("listViewerMatchLaunches_marvelRivalsReferee_omitsBattletagFields", async () => {
+    state.candidates = [candidate({ tournament_game: "MR", referee_user_id: REFEREE, self_managed: 0 })];
+    state.users = [refereeUser()];
+
+    const [info] = await listViewerMatchLaunches(viewer);
+
+    expect(info.referee).toEqual({ userId: REFEREE, pseudo: "Arbitre", ready: false, isViewer: false });
+    expect(JSON.stringify(info)).not.toContain("Arbitre#1");
   });
 
   it("son BattleTag attend la fenêtre des contacts : rien avant l'heure de début", async () => {
