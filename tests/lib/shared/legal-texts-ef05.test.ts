@@ -289,3 +289,30 @@ describe("PRIVACY_CHANGES — « Ne plus voir » de l'invitation, entrée encore
     expect(PRIVACY_CHANGES_EN[id]?.summary).toContain("to verify your Discord tag (and your BattleTag, depending on the game and the account)");
   });
 });
+
+describe("registre — cartes choisies dans le pool de la manche (T04, T05)", () => {
+  const retention = (list: typeof PROCESSING_ACTIVITIES, ref: string) => list.find((entry) => entry.ref === ref)?.retention.join(" ");
+
+  it("registerT04_dataCategories_namesPoolPicksByStaffOrTeam", () => {
+    expect(activity(PROCESSING_ACTIVITIES, "T04")).toContain(
+      "cartes choisies dans le pool de la manche (par le staff ou, en autogestion, par une équipe du match)",
+    );
+    expect(activity(PROCESSING_ACTIVITIES_EN, "T04")).toContain(
+      "maps picked from the round pool (by the staff or, in self-management, by a team of the match)",
+    );
+  });
+
+  it("registerT04_retention_keepsPoolPicksWithMatch", () => {
+    expect(retention(PROCESSING_ACTIVITIES, "T04")).toContain("première carte et cartes choisies dans le pool : conservés avec le match");
+    expect(retention(PROCESSING_ACTIVITIES_EN, "T04")).toContain("first map and maps picked from the pool: kept with the match");
+  });
+
+  it("registerT05_staffLog_namesPoolPickAndClear", () => {
+    expect(activity(PROCESSING_ACTIVITIES, "T05")).toContain(
+      "carte choisie dans le pool de la manche ou choix retiré — sans nommer l'arbitre ni le staff",
+    );
+    expect(activity(PROCESSING_ACTIVITIES_EN, "T05")).toContain(
+      "map picked from the round pool or pick cleared — without naming the referee or the staff",
+    );
+  });
+});
