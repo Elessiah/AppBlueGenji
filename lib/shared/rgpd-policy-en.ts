@@ -51,7 +51,7 @@ const SCOPE_EN: Record<string, string> = {
     "the same presentation of the assigned referee's BattleTag, as long as that referee has not accepted version 7 of the terms of use — objection through the report form, GDPR category (once upheld, the staff no longer assigns them matches)",
   [VERIFIED_BADGE_SCOPE]:
     "certification badge on your player page, read by any logged-in player even when the tag is hidden (without the tag) — objection through the report form, GDPR category",
-  [MATCH_TIME_DM_SCOPE]: "match time notices, reminders and match removal notices by direct message",
+  [MATCH_TIME_DM_SCOPE]: "match time notices, reminders, match removal notices, lobby settings and cast removal notices by direct message",
   [MODERATION_DM_SCOPE]: "suspension or moderation notices by direct message",
   [DATA_NOTICE_DM_SCOPE]: "information about your data by direct message",
   [LIVE_PSEUDO_SCOPE]: "#live announcement of a solo tournament, kept in the Discord channel until deleted on request",
@@ -79,7 +79,7 @@ const PROFIL_TEXT_EN: readonly (readonly [donnee: string, finalite: string])[] =
   ],
   [
     "Discord ID",
-    "Means of logging in (Discord button, or code received by direct message) — stored only if you link Discord. Also used by the bot to write to you by direct message (match times, reminders and removal — only if your tag is certified —, request to join a team you manage, suspension or moderation notices, information about your data). Removable from My profile as long as you have another one left",
+    "Means of logging in (Discord button, or code received by direct message) — stored only if you link Discord. Also used by the bot to write to you by direct message (match times, reminders, removal, lobby settings if you manage an entrant or play a solo tournament, and removal of your cast — only if your tag is certified —, request to join a team you manage, suspension or moderation notices, information about your data). Removable from My profile as long as you have another one left",
   ],
   [
     "Google identifier",
@@ -179,7 +179,7 @@ export const DROITS_EN: DroitEntry[] = [
   },
   {
     title: "Right to object",
-    text: "You can object to the processing of your data based on legitimate interest (tournament history, match time notices, reminders and match removal notices by direct message — these messages are turned off directly with the “Discord direct messages about my matches” box in My profile — and the certification badges on your player page, certified Discord tag and “Verified BattleTag”, as well as the presentation of the assigned referee to the parties to their matches as long as they have not accepted version 7 of the terms of use, through the report form, GDPR category). The username posted in the #live announcement of a solo tournament is not part of it: it falls under performance of the service you register for — not being named in it means not registering; a past announcement is deleted on request. The AutoMod alert for such an announcement when blocked or flagged, kept to moderate the Discord server (legitimate interest), is deleted on request: that is how you object to it.",
+    text: "You can object to the processing of your data based on legitimate interest (tournament history, match time notices, reminders, match removal notices, lobby settings and cast removal notices by direct message — these messages are turned off directly with the “Discord direct messages about my matches” box in My profile — and the certification badges on your player page, certified Discord tag and “Verified BattleTag”, as well as the presentation of the assigned referee to the parties to their matches as long as they have not accepted version 7 of the terms of use, through the report form, GDPR category). The username posted in the #live announcement of a solo tournament is not part of it: it falls under performance of the service you register for — not being named in it means not registering; a past announcement is deleted on request. The AutoMod alert for such an announcement when blocked or flagged, kept to moderate the Discord server (legitimate interest), is deleted on request: that is how you object to it.",
   },
   {
     title: "Right to data portability",
