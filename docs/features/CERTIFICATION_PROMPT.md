@@ -126,7 +126,11 @@ cette modale.
   sans rien écrire) ; la modale ne s'ouvre plus pour ce compte, sur aucun
   tournoi ni appareil, et jamais pour un autre compte du même navigateur.
   L'envoi part en `keepalive` (survit à la navigation vers le profil) ; un
-  échec est muet (la modale se rouvrira, rien n'est perdu). L'invitation gardée
+  échec est muet (la modale se rouvrira, rien n'est perdu). Le corps porte le
+  compte à qui la modale a été montrée (`{ userId }`, retenu à l'ouverture) :
+  une session changée depuis (autre compte connecté dans un autre onglet)
+  répond 409 `CERTIFY_PROMPT_OTHER_ACCOUNT` sans rien écrire, un corps sans
+  compte lisible 400 `INVALID_ACTION`. L'invitation gardée
   en mémoire pour ce compte est oubliée (`forgetCertificationPromptsOf`). Aucun
   geste ne la réaffiche : la certification reste offerte dans « Mon profil ».
   Un clic qui ouvre le profil dans un nouvel onglet (Ctrl, Cmd, Maj, bouton du
