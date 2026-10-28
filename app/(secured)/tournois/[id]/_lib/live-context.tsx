@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import type { CastBlock } from "@/lib/shared/match-launch";
-import type { BracketMatch } from "@/lib/shared/types";
+import type { BracketMatch, MatchRefereeName } from "@/lib/shared/types";
 
 type LiveControls = {
   /** Le viewer porte-t-il la permission `live` (ADMIN, ARBITRE, CASTER) ? */
@@ -39,7 +39,14 @@ type LiveControls = {
    * (`canManage`), dont la rediff est la suite.
    */
   openReplay: (match: BracketMatch) => void;
+  /**
+   * Pseudos des arbitres désignés (contexte du lecteur connecté, décision 52) ;
+   * vide sur la page sans compte, qui lit « Arbitre désigné » (`refereeNameOf`).
+   */
+  refereeNames: readonly MatchRefereeName[];
 };
+
+const NO_REFEREE_NAMES: readonly MatchRefereeName[] = [];
 
 const LiveContext = createContext<LiveControls>({
   canManage: false,
@@ -53,6 +60,7 @@ const LiveContext = createContext<LiveControls>({
   myTeamId: null,
   castBlock: "NOT_CASTER",
   openReplay: () => undefined,
+  refereeNames: NO_REFEREE_NAMES,
 });
 
 /**
@@ -76,8 +84,9 @@ export function LiveProvider({
   myTeamId,
   castBlock,
   openReplay,
+  refereeNames = NO_REFEREE_NAMES,
   children,
-}: Readonly<LiveControls & { children: ReactNode }>) {
+}: Readonly<Omit<LiveControls, "refereeNames"> & { refereeNames?: LiveControls["refereeNames"]; children: ReactNode }>) {
   const value = useMemo(
     () => ({
       canManage,
@@ -90,6 +99,7 @@ export function LiveProvider({
       myTeamId,
       castBlock,
       openReplay,
+      refereeNames,
     }),
     [
       canManage,
@@ -102,6 +112,7 @@ export function LiveProvider({
       myTeamId,
       castBlock,
       openReplay,
+      refereeNames,
     ],
   );
   return <LiveContext.Provider value={value}>{children}</LiveContext.Provider>;

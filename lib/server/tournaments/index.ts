@@ -203,6 +203,7 @@ import {
   type DisputeBeforeResolution,
 } from "./dispute-self-resolution";
 import { loadViewerCastBlock } from "./match-launch";
+import { loadRefereeNames } from "./referee-names";
 import {
   cachedCertificationPrompt,
   finalCertificationPrompt,
@@ -1190,6 +1191,11 @@ export async function getTournamentViewerContext(
 
   const certificationPrompt = await certificationPromptRead();
 
+  // Pseudo des arbitres désignés : à tout membre connecté (les deux portes qui
+  // servent ce contexte exigent une session), jamais dans l'instantané diffusé.
+  // Les mêmes pour tous : lus une fois par version d'instantané.
+  const refereeNames = await loadRefereeNames(snapshot);
+
   return {
     preview,
     // En individuel, un joueur sans entrée solo peut s'inscrire : elle sera
@@ -1210,6 +1216,7 @@ export async function getTournamentViewerContext(
     castBlock,
     matchProposals,
     certificationPrompt,
+    refereeNames,
   };
 }
 

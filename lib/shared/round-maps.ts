@@ -198,6 +198,34 @@ export function resolveMatchMaps(
   });
 }
 
+/**
+ * Nom de chaque carte d'un match, dans l'ordre (index 0 = carte 1), pour la
+ * saisie du score (« Map 1 : Ilios ») : celles de sa manche (`resolveMatchMaps`,
+ * imposée ou choisie dans le pool, `null` tant qu'un pool attend son choix),
+ * sinon la première carte posée sur le match. Vide quand rien n'est fixé.
+ */
+export function matchMapNames(
+  rounds: readonly RoundMapConfig[],
+  match: {
+    phaseId: number;
+    bracket: string;
+    roundNumber: number;
+    firstMap: string | null;
+    mapPicks: Readonly<Record<string, string>>;
+  },
+): (string | null)[] {
+  const round = roundMapsOf(rounds, match);
+  const names =
+    round && round.slots.length > 0
+      ? resolveMatchMaps(round.slots, match.firstMap, match.mapPicks).map((slot) => slot.map)
+      : [match.firstMap];
+  const shown = names.map((name) => {
+    const text = name === null ? "" : visibleText(name).trim();
+    return text === "" ? null : text;
+  });
+  return shown.some((name) => name !== null) ? shown : [];
+}
+
 /** Première carte **affichée** : l'imposée de la manche l'emporte sur la saisie du match. */
 export function effectiveFirstMap(slots: readonly string[][], firstMap: string | null): string | null {
   const first = slots[0];

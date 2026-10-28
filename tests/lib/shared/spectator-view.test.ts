@@ -297,25 +297,24 @@ describe("ce que lit le visiteur sans compte", () => {
     expect(JSON.stringify(out)).not.toContain("ABC123");
   });
 
-  it("retire les « Prêt » d'un lancement, engagés, arbitre et casters", () => {
+  it("retire les « Prêt » d'un lancement, engagés et casters, et l'empreinte de l'arbitre", () => {
     const snapshot = tournamentSnapshot({
       matches: [
         bracketMatch({
           id: 1,
           team1Ready: true,
           team2Ready: true,
-          refereeReady: true,
+          refereeAssigned: true,
+          refereeKey: "empreinte-1",
           casters: [matchCaster({ ready: true })],
         }),
       ],
     });
     const [match] = spectatorSnapshot(snapshot).matches;
-    expect([match.team1Ready, match.team2Ready, match.refereeReady, match.casters[0].ready]).toEqual([
-      false,
-      false,
-      false,
-      false,
-    ]);
+    expect([match.team1Ready, match.team2Ready, match.casters[0].ready]).toEqual([false, false, false]);
+    // Sans compte : « Arbitre désigné », ni pseudo ni empreinte (décision 52).
+    expect(match.refereeAssigned).toBe(true);
+    expect(match.refereeKey).toBeNull();
     // L'instantané des membres n'est pas touché.
     expect(snapshot.matches[0].team1Ready).toBe(true);
   });
@@ -473,7 +472,8 @@ const MATCH_FIELDS = {
   hostTeamId: "public",
   firstBanTeamId: "public",
   refereeAssigned: "public",
-  refereeReady: "retiré",
+  // Empreinte opaque de la désignation : retirée sans compte (décision 52).
+  refereeKey: "retiré",
   selfManaged: "public",
   firstMap: "public",
   // Cartes choisies dans un pool (noms de cartes, aucune donnée personnelle).

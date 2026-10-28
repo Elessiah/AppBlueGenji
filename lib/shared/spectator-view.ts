@@ -292,7 +292,8 @@ export function spectatorSnapshot(snapshot: TournamentSnapshot): TournamentSnaps
       ...match,
       team1Ready: false,
       team2Ready: false,
-      refereeReady: false,
+      // Ni pseudo ni empreinte de l'arbitre sans compte : « Arbitre désigné ».
+      refereeKey: null,
       casters: match.casters.map((caster, index) => ({
         ...caster,
         userId: SPECTATOR_HIDDEN_USER_ID - index,
@@ -336,6 +337,8 @@ export const SPECTATOR_VIEWER_CONTEXT: Readonly<TournamentViewerContext> = Objec
   castBlock: "NOT_CASTER",
   matchProposals: [],
   certificationPrompt: null,
+  // Sans compte, l'arbitre reste « Arbitre désigné » (décision 52).
+  refereeNames: [],
 });
 
 /**

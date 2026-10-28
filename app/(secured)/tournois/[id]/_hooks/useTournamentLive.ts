@@ -31,9 +31,18 @@ import {
 import { announceViewerChanges } from "../_lib/live-alerts";
 import { openLiveConnection } from "../_lib/live-connection";
 import { createLiveRenderGate, createQuietStream } from "../_lib/live-render-gate";
+import { missingRefereeNamesKey, parseRefereeNames } from "@/lib/shared/match-referee";
 
 /** Plafond d'un `setTimeout` (~24,8 jours) : au-delà, il se déclencherait tout de suite. */
 const MAX_TIMEOUT_MS = 2_147_483_647;
+
+/**
+ * Étalement de la relecture des pseudos d'arbitre (décision 52) : une
+ * désignation change l'instantané de tous les membres qui suivent le tournoi
+ * en même temps ; chacun relit dans une fenêtre tirée au hasard plutôt qu'au
+ * même instant.
+ */
+const REFEREE_NAMES_SPREAD_MS = 2_000;
 
 /** Point de départ du régime, avant la première lecture du magasin. */
 const FULL_POWER_INPUT: ClientPowerInput = { attention: "FOCUSED", matchFocus: false };
@@ -252,6 +261,49 @@ export function useTournamentLive(tournamentId: number) {
   }, [tournamentId, renderGate, quietStream]);
 
   /**
+   * Pseudos des arbitres (`TournamentViewerContext.refereeNames`) : arrivés avec
+   * le contexte, ils ne suivent pas une désignation faite depuis. Une empreinte
+   * (`refereeKey`) sans pseudo connu déclenche **une** relecture légère, étalée
+   * (`REFEREE_NAMES_SPREAD_MS`), par ensemble d'empreintes manquantes — la même
+   * ne relance rien (pseudo vide, réponse plus ancienne que l'instantané).
+   */
+  const namesAttemptRef = useRef("");
+  const namesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refreshRefereeNames = useCallback(() => {
+    const detail = stateRef.current.detail;
+    if (!detail) return;
+    const missing = missingRefereeNamesKey(detail.matches, detail.refereeNames);
+    if (missing === "" || missing === namesAttemptRef.current || namesTimerRef.current !== null) return;
+    namesAttemptRef.current = missing;
+    const forTournament = detail.card.id;
+    namesTimerRef.current = setTimeout(() => {
+      namesTimerRef.current = null;
+      void (async () => {
+        try {
+          const response = await fetch(`/api/tournaments/${forTournament}/referee-names`, { cache: "no-store" });
+          if (!response.ok) return;
+          const payload = (await response.json()) as { refereeNames?: unknown };
+          const names = parseRefereeNames(payload.refereeNames);
+          const current = stateRef.current;
+          if (names === null || !current.detail || current.detail.card.id !== forTournament) return;
+          commit({ ...current, detail: { ...current.detail, refereeNames: names } });
+        } catch {
+          // Réseau coupé : « Arbitre désigné » reste, la prochaine connexion relit.
+        }
+      })();
+    }, Math.random() * REFEREE_NAMES_SPREAD_MS); // NOSONAR typescript:S2245 — étalement de charge, aucune sécurité en jeu
+  }, [commit]);
+
+  useEffect(
+    () => () => {
+      if (namesTimerRef.current !== null) clearTimeout(namesTimerRef.current);
+      namesTimerRef.current = null;
+      namesAttemptRef.current = "";
+    },
+    [tournamentId],
+  );
+
+  /**
    * Message du flux : intégré tout de suite, puis — pour qui en a un — aperçu
    * du plateau relu quand il a bougé.
    */
@@ -270,8 +322,9 @@ export function useTournamentLive(tournamentId: number) {
       // `force` : on vient de commiter cette version, la déduplication par
       // version rejetterait la relecture avant d'en avoir pris l'aperçu.
       if (stalePreview) void load(true, true);
+      else if (message.type === "snapshot") refreshRefereeNames();
     },
-    [commit, load],
+    [commit, load, refreshRefereeNames],
   );
 
   useEffect(() => {

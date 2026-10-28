@@ -45,7 +45,7 @@ export function bracketMatch(overrides: Partial<BracketMatch> = {}): BracketMatc
     hostTeamId: null,
     firstBanTeamId: null,
     refereeAssigned: false,
-    refereeReady: false,
+    refereeKey: null,
     selfManaged: false,
     firstMap: null,
     mapPicks: {},

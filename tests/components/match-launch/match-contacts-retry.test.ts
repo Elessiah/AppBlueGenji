@@ -328,7 +328,7 @@ describe("contacts du caster en attente, modale ouverte", () => {
     team1Ready: false,
     team2Ready: false,
     refereeAssigned: false,
-    refereeReady: false,
+    refereeKey: null,
     selfManaged: false,
   };
   const key = (patch: Partial<ContactsCard> = {}) => contactsCardKey({ ...CARD, ...patch });
@@ -347,7 +347,7 @@ describe("contacts du caster en attente, modale ouverte", () => {
       { team1Ready: true },
       { team2Ready: true },
       { refereeAssigned: true }, // arbitre désigné
-      { refereeReady: true }, // « Prêt » de l'arbitre
+      { refereeKey: "k-autre-arbitre" }, // match confié à un autre arbitre
       { selfManaged: true }, // passé en autogestion
       { casters: [{ ...CARD.casters[0], ready: true }] }, // « Prêt » du caster
     ];

@@ -39,6 +39,7 @@ export function tournamentViewerContext(
   return {
     preview: null,
     matchProposals: [],
+    refereeNames: [],
     canRegister: false,
     canRegisterEntrant: true,
     registrationBlock: null,

@@ -654,14 +654,20 @@ export type BracketMatch = {
   firstBanTeamId: number | null;
   /**
    * Le match a-t-il un arbitre désigné (`docs/features/MATCH_REFEREE.md`) ?
-   * C'est **tout** ce que l'instantané en dit : diffusé à tous, il ne nomme
-   * personne — pseudo et BattleTag ne vont qu'aux parties du match et au
-   * staff (modale « Contacts », fenêtre « Arbitrage » du staff). Un arbitre devenu
-   * inéligible en est tu.
+   * L'instantané ne nomme personne et ne dit pas si l'arbitre est « Prêt »
+   * (décision 47) : le pseudo vient du contexte du lecteur connecté
+   * (`TournamentViewerContext.refereeNames`), le BattleTag et le « Prêt » ne
+   * vont qu'aux parties du match et au staff (modale « Contacts », fenêtre
+   * « Arbitrage » du staff). Un arbitre devenu inéligible en est tu.
    */
   refereeAssigned: boolean;
-  /** « Prêt » de l'arbitre désigné (faux sans arbitre). */
-  refereeReady: boolean;
+  /**
+   * Empreinte **opaque** de la désignation (`null` sans arbitre montré, et
+   * toujours sur la page sans compte) : elle change quand l'arbitre change,
+   * sans désigner aucun compte, et relie le match à son pseudo dans
+   * `TournamentViewerContext.refereeNames` (`lib/server/tournaments/referee-names.ts`).
+   */
+  refereeKey: string | null;
   /** Match en autogestion : sans arbitre, les équipes créent et règlent la partie. */
   selfManaged: boolean;
   /**
@@ -847,7 +853,17 @@ export type TournamentViewerContext = {
    * au plateau.
    */
   certificationPrompt: CertificationPrompt | null;
+  /**
+   * Pseudo de l'arbitre désigné de chaque match qui en montre un (décision 52) :
+   * à tout membre connecté, jamais à la page sans compte. Vaut pour le match
+   * tant que son `refereeKey` est le même ; sinon la fiche lit « Arbitre
+   * désigné » et relit le contexte (`refereeNamesNeedRefresh`).
+   */
+  refereeNames: MatchRefereeName[];
 };
+
+/** Pseudo de l'arbitre d'un match, lié à l'empreinte de sa désignation. */
+export type MatchRefereeName = { matchId: number; refereeKey: string; pseudo: string };
 
 /** Proposition map par map d'un engagé, datée de son dépôt. */
 export type ProposalMaps = { reportedAt: string; maps: MatchMapResult[] };

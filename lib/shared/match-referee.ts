@@ -140,3 +140,49 @@ export function groupNoRefereeAlerts(candidates: readonly NoRefereeCandidate[]):
   }
   return { perMatch, perRound: [...rounds.values()] };
 }
+
+/** Pseudo d'arbitre lié à l'empreinte de sa désignation (`TournamentViewerContext.refereeNames`). */
+type RefereeNameEntry = { matchId: number; refereeKey: string; pseudo: string };
+
+/**
+ * Pseudo de l'arbitre à montrer sur ce match (décision 52), `null` pour lire
+ * « Arbitre désigné » : sans arbitre montré, sur la page sans compte (empreinte
+ * nulle), ou quand le pseudo connu est celui d'une autre désignation.
+ */
+export function refereeNameOf(
+  match: { id: number; refereeKey: string | null },
+  names: readonly RefereeNameEntry[],
+): string | null {
+  if (match.refereeKey === null) return null;
+  const entry = names.find((name) => name.matchId === match.id && name.refereeKey === match.refereeKey);
+  return entry ? entry.pseudo : null;
+}
+
+/**
+ * Empreintes des désignations montrées dont le pseudo manque, en une clé
+ * stable (`""` : rien ne manque). Une nouvelle clé déclenche **une** relecture
+ * des pseudos ; la même ne la relance pas (pseudo vide, lecture en retard).
+ */
+export function missingRefereeNamesKey(
+  matches: readonly { id: number; refereeKey: string | null }[],
+  names: readonly RefereeNameEntry[],
+): string {
+  const missing: string[] = [];
+  for (const match of matches) {
+    if (match.refereeKey !== null && refereeNameOf(match, names) === null) missing.push(`${match.id}:${match.refereeKey}`);
+  }
+  return missing.join(",");
+}
+
+/** Liste de pseudos d'arbitre reçue d'une réponse (forme contrôlée), `null` si elle n'en est pas une. */
+export function parseRefereeNames(value: unknown): RefereeNameEntry[] | null {
+  if (!Array.isArray(value)) return null;
+  const names: RefereeNameEntry[] = [];
+  for (const item of value as unknown[]) {
+    if (!item || typeof item !== "object") continue;
+    const { matchId, refereeKey, pseudo } = item as Record<string, unknown>;
+    if (typeof matchId !== "number" || typeof refereeKey !== "string" || typeof pseudo !== "string") continue;
+    names.push({ matchId, refereeKey, pseudo });
+  }
+  return names;
+}

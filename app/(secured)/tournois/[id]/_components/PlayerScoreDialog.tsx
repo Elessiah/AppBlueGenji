@@ -48,6 +48,9 @@ import styles from "./ScoreDialog.module.css";
 
 interface PlayerScoreDialogProps {
   tournamentId: number;
+  /** Nom des cartes fixées du match (`matchMapNames`) : « Map 1 : Ilios ». */
+  mapNames?: ReadonlyArray<string | null>;
+
   /** Match **résolu à chaque rendu** depuis la liste rafraîchie par le flux. */
   match: BracketMatch;
   /** Engagé du lecteur — son équipe, ou son entrée solo. */
@@ -250,6 +253,7 @@ export function PlayerScoreDialog({
   canReportScore,
   canForfeit,
   proposals,
+  mapNames,
   onClose,
   onSubmitted,
   onRefresh,
@@ -587,6 +591,7 @@ export function PlayerScoreDialog({
                 team2Name={team2}
                 team1Id={match.team1Id}
                 team2Id={match.team2Id}
+                mapNames={mapNames}
                 disabled={submitting}
                 fieldErrors={fieldErrors}
               />
