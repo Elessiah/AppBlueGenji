@@ -25,15 +25,12 @@ function browserStorage(kind: "localStorage" | "sessionStorage"): Storage | null
  * visible : la modale reviendra simplement à une prochaine fiche, comme avant
  * le choix.
  */
-function saveNeverAgain(): void {
-  let request: Promise<Response>;
+async function saveNeverAgain(): Promise<void> {
   try {
-    request = fetch(CERTIFICATION_PROMPT_OFF_PATH, { method: "POST", keepalive: true });
+    await fetch(CERTIFICATION_PROMPT_OFF_PATH, { method: "POST", keepalive: true });
   } catch {
-    // `fetch` indisponible ou qui lève (document qui part) : rien de gardé.
-    return;
+    // Réseau, ou `fetch` indisponible (document qui part) : rien de gardé.
   }
-  void request.catch(() => undefined);
 }
 
 /**
@@ -110,7 +107,7 @@ export function useCertificationPrompt(
 
   const close = useCallback(() => {
     rememberCertificationPromptClosed(browserStorage("sessionStorage"));
-    if (neverAgain.current) saveNeverAgain();
+    if (neverAgain.current) void saveNeverAgain();
     doneForPage.current = true;
     setOpen(false);
   }, []);
@@ -122,7 +119,7 @@ export function useCertificationPrompt(
   // « Ne plus voir » déjà cochée vaut pourtant : gardée sur le compte, sans le
   // drapeau d'onglet d'une fermeture.
   const yieldPlace = useCallback(() => {
-    if (neverAgain.current) saveNeverAgain();
+    if (neverAgain.current) void saveNeverAgain();
     doneForPage.current = true;
     setOpen(false);
   }, []);
