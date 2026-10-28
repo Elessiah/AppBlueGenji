@@ -43,11 +43,13 @@ Le push tient sous `PUSH_BODY_MAX` : rappel du tri par rôle en tête, « Droite
 de match (publication d'un évènement de tournoi, entretien de l'instantané qui
 ouvre un lancement, lecture de la liste des tournois).
 
-- Candidats : tournoi `RUNNING`, match `READY` non exempt, appariement courant,
-  `lobby_opened_at` des 20 dernières minutes (délai du lancement d'office + 5).
+- Candidats : tournoi `RUNNING`, match `READY` non exempt et **sans score**
+  (un match noté que le staff replanifie est tenu pour lancé, sans salon),
+  appariement courant, `lobby_opened_at` des 20 dernières minutes (délai du
+  lancement d'office + 5).
 - **Réservation** `bg_match_start_notices` phases `LOBBY_BRIEF_1` /
   `LOBBY_BRIEF_2`, une par engagée et par appariement (`INSERT IGNORE …
-  SELECT` qui relit le match : salon encore ouvert, même appariement, qui est
+  SELECT` qui relit le match : salon encore ouvert, sans score, même appariement, qui est
   toujours celui de ses équipes, `READY` — un lancement défait ou un
   réappariement entre la lecture et la réservation ne laisse ni brief périmé,
   ni brief aux anciennes équipes, ni réservation qui ferait taire la
