@@ -87,20 +87,29 @@ import { useCertificationPrompt } from "@/app/(secured)/tournois/[id]/_hooks/use
 const runHook = useCertificationPrompt;
 import {
   CERTIFICATION_PROMPT_CLOSED_KEY,
-  CERTIFICATION_PROMPT_OFF_KEY,
+  CERTIFICATION_PROMPT_OFF_PATH,
+  LEGACY_CERTIFICATION_PROMPT_OFF_KEY,
   type CertificationPrompt,
 } from "@/lib/shared/certification-prompt";
 
 type HookResult = ReturnType<typeof useCertificationPrompt>;
 
+/** Le compte du lecteur à qui l'invitation est montrée. */
+const VIEWER_ID = 7;
+
 /** Un rendu, puis ses effets, jusqu'à ce que plus aucun état ne change. */
-function render(prompt: CertificationPrompt | null | undefined, frozen = false, tournamentId = 5): HookResult {
+function render(
+  prompt: CertificationPrompt | null | undefined,
+  frozen = false,
+  tournamentId = 5,
+  viewerUserId: number | null = VIEWER_ID,
+): HookResult {
   let result: HookResult;
   let rounds = 0;
   do {
     bench.dirty = false;
     bench.index = { state: 0, ref: 0, callback: 0, effect: 0 };
-    result = runHook(tournamentId, prompt, frozen);
+    result = runHook(tournamentId, prompt, frozen, viewerUserId);
     for (const slot of bench.effects) {
       if (!slot.pending) continue;
       if (typeof slot.cleanup === "function") slot.cleanup();
@@ -126,10 +135,18 @@ function memoryStorage() {
     setItem: (key: string, value: string) => {
       values.set(key, value);
     },
+    removeItem: (key: string) => {
+      values.delete(key);
+    },
   };
 }
 
-const globals = globalThis as unknown as { window?: unknown; document?: unknown };
+const globals = globalThis as unknown as { window?: unknown; document?: unknown; fetch?: unknown };
+/** Le « Ne plus voir » part au compte : `POST` gardé même si la page se ferme (keepalive). */
+let fetchMock = jest.fn<(input: string, init?: RequestInit) => Promise<Response>>();
+const savedFetch = globals.fetch;
+const neverAgainPosts = () =>
+  fetchMock.mock.calls.filter(([input, init]) => input === CERTIFICATION_PROMPT_OFF_PATH && init?.method === "POST");
 let local = memoryStorage();
 let session = memoryStorage();
 
@@ -152,11 +169,14 @@ beforeEach(() => {
   session = memoryStorage();
   globals.window = { localStorage: local, sessionStorage: session };
   globals.document = {};
+  fetchMock = jest.fn<(input: string, init?: RequestInit) => Promise<Response>>(async () => new Response("{}"));
+  globals.fetch = fetchMock;
 });
 
 afterEach(() => {
   delete globals.window;
   delete globals.document;
+  globals.fetch = savedFetch;
 });
 
 describe("useCertificationPrompt", () => {
@@ -170,26 +190,66 @@ describe("useCertificationPrompt", () => {
     const after = act(() => first.close(), PROMPT);
     expect(after.prompt).toBeNull();
     expect(session.values.get(CERTIFICATION_PROMPT_CLOSED_KEY)).toBe("1");
-    expect(local.values.has(CERTIFICATION_PROMPT_OFF_KEY)).toBe(false);
+    expect(local.values.size).toBe(0);
+    expect(neverAgainPosts()).toHaveLength(0);
     expect(render({ ...PROMPT }).prompt).toBeNull();
   });
 
-  it("« Ne plus voir » cochée : la fermeture la tait pour de bon", () => {
+  it("« Ne plus voir » cochée : la fermeture la garde sur le compte, rien dans le stockage local (EF-04)", () => {
     const first = render(PROMPT);
     first.setNeverAgain(true);
     act(() => first.close(), PROMPT);
-    expect(local.values.get(CERTIFICATION_PROMPT_OFF_KEY)).toBe("1");
+    expect(neverAgainPosts()).toHaveLength(1);
+    expect(fetchMock.mock.calls[0][1]).toEqual({
+      method: "POST",
+      keepalive: true,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: VIEWER_ID }),
+    });
+    expect(local.values.size).toBe(0);
   });
 
-  it("ne s'ouvre pas déjà fermée dans l'onglet, ni après « Ne plus voir »", () => {
+  it("« Ne plus voir » désigne le compte à qui la modale a été montrée, pas celui d'un contexte relu depuis", () => {
+    const first = render(PROMPT, false, 5, VIEWER_ID);
+    first.setNeverAgain(true);
+    first.close();
+    render(PROMPT, false, 5, 8);
+    expect(neverAgainPosts()).toHaveLength(1);
+    expect(neverAgainPosts()[0][1]?.body).toBe(JSON.stringify({ userId: VIEWER_ID }));
+  });
+
+  it("lecteur inconnu : « Ne plus voir » n'envoie rien plutôt qu'un compte deviné", () => {
+    const first = render(PROMPT, false, 5, null);
+    first.setNeverAgain(true);
+    act(() => first.close(), PROMPT);
+    expect(neverAgainPosts()).toHaveLength(0);
+  });
+
+  it("une sauvegarde du « Ne plus voir » en échec reste muette : la modale se ferme quand même", async () => {
+    fetchMock.mockRejectedValueOnce(new TypeError("offline"));
+    const first = render(PROMPT);
+    first.setNeverAgain(true);
+    const after = act(() => first.close(), PROMPT);
+    await Promise.resolve();
+    expect(after.prompt).toBeNull();
+    expect(neverAgainPosts()).toHaveLength(1);
+  });
+
+  it("`fetch` indisponible (document qui part) : la fermeture passe sans rien garder", () => {
+    delete globals.fetch;
+    const first = render(PROMPT);
+    first.setNeverAgain(true);
+    expect(() => act(() => first.close(), PROMPT)).not.toThrow();
+  });
+
+  it("efface l'ancienne clé locale du « Ne plus voir », qui ne tait plus rien (EF-04)", () => {
+    local.setItem(LEGACY_CERTIFICATION_PROMPT_OFF_KEY, "1");
+    expect(render(PROMPT).prompt).toEqual(PROMPT);
+    expect(local.values.has(LEGACY_CERTIFICATION_PROMPT_OFF_KEY)).toBe(false);
+  });
+
+  it("ne s'ouvre pas déjà fermée dans l'onglet", () => {
     session.setItem(CERTIFICATION_PROMPT_CLOSED_KEY, "1");
-    expect(render(PROMPT).prompt).toBeNull();
-    bench.states = [];
-    bench.refs = [];
-    bench.effects = [];
-    session = memoryStorage();
-    local.setItem(CERTIFICATION_PROMPT_OFF_KEY, "1");
-    globals.window = { localStorage: local, sessionStorage: session };
     expect(render(PROMPT).prompt).toBeNull();
   });
 
@@ -208,6 +268,7 @@ describe("useCertificationPrompt", () => {
     const yielded = act(() => modals.yieldWatchers[0](), PROMPT);
     expect(yielded.prompt).toBeNull();
     expect(session.values.size + local.values.size).toBe(0);
+    expect(neverAgainPosts()).toHaveLength(0);
     // L'annonce de lancement se ferme : l'invitation ne revient pas sur cette page…
     expect(render({ ...PROMPT }).prompt).toBeNull();
     // …même retirée puis revenue (lecture en échec à une reconnexion).
@@ -219,7 +280,7 @@ describe("useCertificationPrompt", () => {
     const first = render(PROMPT);
     first.setNeverAgain(true);
     act(() => modals.yieldWatchers.at(-1)?.(), PROMPT);
-    expect(local.values.get(CERTIFICATION_PROMPT_OFF_KEY)).toBe("1");
+    expect(neverAgainPosts()).toHaveLength(1);
     expect(session.values.has(CERTIFICATION_PROMPT_CLOSED_KEY)).toBe(false);
   });
 

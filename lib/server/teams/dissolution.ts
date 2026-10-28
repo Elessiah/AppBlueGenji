@@ -3,6 +3,7 @@ import { getDatabase } from "@/lib/server/database";
 import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
 import { invalidateLandingTeamViews } from "@/lib/server/landing-cache";
 import { invalidateRankingLists } from "@/lib/server/ranking-cache";
+import { reconnectUserStreams } from "@/lib/server/session-streams";
 import { ghostAdminOverride, lockMemberRoles, userOwnsTeam } from "./access";
 
 async function teamIsDeleted(teamId: number): Promise<boolean> {
@@ -34,6 +35,8 @@ export async function softDeleteTeam(
   }
 
   let previousLogoUrl: string | null = null;
+  /** Membres détachés par la dissolution : leurs flux de tournoi recalculent leur contexte. */
+  let detachedUserIds: number[] = [];
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
@@ -76,6 +79,11 @@ export async function softDeleteTeam(
     );
 
     // Détache tous les membres encore actifs.
+    const [members] = await connection.execute<(RowDataPacket & { user_id: number })[]>(
+      `SELECT user_id FROM bg_team_members WHERE team_id = ? AND left_at IS NULL`,
+      [teamId],
+    );
+    detachedUserIds = members.map((member) => Number(member.user_id));
     await connection.execute(
       `UPDATE bg_team_members SET left_at = NOW() WHERE team_id = ? AND left_at IS NULL`,
       [teamId],
@@ -103,6 +111,10 @@ export async function softDeleteTeam(
   // rejeu, lui, ne change pas : il reste en cache, comme les compteurs.
   invalidateRankingLists();
   invalidateLandingTeamViews();
+  // Un flux de tournoi ne lit l'équipe du lecteur qu'à son ouverture : les
+  // membres détachés gardaient l'invitation à certifier de l'équipe dissoute
+  // jusqu'à la reconnexion (`session-streams.ts`).
+  for (const userId of detachedUserIds) reconnectUserStreams(userId);
 
   // Vider la colonne ne retirait pas l'image : le fichier restait servi par
   // `/api/uploads/teams/…`, en cache public d'un an. Après le commit (un

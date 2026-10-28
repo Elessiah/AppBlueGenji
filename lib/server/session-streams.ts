@@ -145,6 +145,18 @@ export function closeUserStreams(userId: number, options: { keepTokenHash?: stri
 }
 
 /**
+ * Fait reconnecter les flux d'un compte **sans révoquer** sa session : rien
+ * n'est noté pour `revokedSince`, si bien qu'un flux en cours d'ouverture
+ * n'est pas refusé (401). Sert quand le contexte du lecteur change (équipe
+ * quittée, retirée, dissoute) : le client se reconnecte et la route le relit.
+ *
+ * @returns le nombre de flux fermés.
+ */
+export function reconnectUserStreams(userId: number): number {
+  return closeMatching((entry) => entry.userId === userId);
+}
+
+/**
  * Ferme les flux ouverts par une session précise (déconnexion de cet appareil).
  * Une empreinte vide ne désigne aucune session réelle et ne ferme rien.
  */

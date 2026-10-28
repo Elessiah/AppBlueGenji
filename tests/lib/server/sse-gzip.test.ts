@@ -10,6 +10,7 @@ import {
   connectedFrameBytes,
   pingFrameBytes,
   snapshotFrameBytes,
+  viewerPatchFrameBytes,
 } from "@/lib/server/tournament-stream-frames";
 import { buildFrame } from "@/lib/server/tournaments/snapshot";
 import type { TournamentSnapshotFrame } from "@/lib/server/tournaments/snapshot";
@@ -147,5 +148,21 @@ describe("trames du flux", () => {
         ": ping\n\n" +
         decoder.decode(frame.frame),
     );
+  });
+});
+
+describe("viewerPatchFrameBytes — trame propre au lecteur, poussée après l'ouverture (EF-04)", () => {
+  const patch = { type: "certificationPrompt", tournamentId: 7, certificationPrompt: { reason: "MANAGER" } };
+
+  it("rend un événement SSE complet en clair", () => {
+    const plain = decoder.decode(viewerPatchFrameBytes(patch, "identity"));
+    expect(plain).toBe(`data: ${JSON.stringify(patch)}\n\n`);
+  });
+
+  it("compressée, elle se recolle derrière la connexion dans un même flux", () => {
+    const frame = snapshotFrame({ card: { id: 7 } });
+    const connected = connectedFrameBytes({ type: "connected" }, frame.snapshot, frame, "gzip");
+    const decoded = browserDecode(connected, viewerPatchFrameBytes(patch, "gzip"));
+    expect(decoded.endsWith(`data: ${JSON.stringify(patch)}\n\n`)).toBe(true);
   });
 });

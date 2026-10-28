@@ -71,8 +71,26 @@ export function parseCertifyPromptAction(value: unknown): CertifyPromptAction | 
 }
 
 /**
+ * Refus d'une réponse partie au nom d'un autre compte que celui de la session
+ * (onglet périmé d'un compte, autre compte connecté depuis dans ce navigateur) :
+ * rien n'est écrit (409).
+ */
+export const CERTIFY_PROMPT_OTHER_ACCOUNT = "CERTIFY_PROMPT_OTHER_ACCOUNT";
+
+/**
+ * Compte annoncé par une réponse : un entier positif, `null` sinon (corps
+ * sans compte, ou malformé — refusé comme une action illisible, 400).
+ */
+export function parseCertifyPromptUserId(value: unknown): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : null;
+}
+
+/**
  * Paramètre de `/profil` qui ouvre le dialogue de certification à l'arrivée
- * (parcours `DIALOG`). Retiré de l'adresse dès qu'il est lu.
+ * (parcours `DIALOG`). Retiré de l'adresse dès qu'il est lu, et suivi
+ * seulement quand une page de ce site l'a demandé juste avant
+ * (`requestCertifyDialog`) : un lien venu d'ailleurs mène au profil, sans
+ * dialogue.
  */
 export const CERTIFY_QUERY_PARAM = "certifier";
 export const CERTIFY_QUERY_VALUE = "discord";

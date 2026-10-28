@@ -41,7 +41,8 @@ describe("GET /api/profile/discord/certify-prompt (relecture avant ouverture)", 
     const response = await GET();
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ prompt: { mode: "ONE_CLICK", tag: "keryan" } });
-    expect(loadDiscordCertifyPrompt).toHaveBeenCalledWith(7, HASH);
+    // Une lecture n'écrit rien : la marque périmée n'est pas levée ici (EF-04).
+    expect(loadDiscordCertifyPrompt).toHaveBeenCalledWith(7, HASH, { clearStale: false });
   });
 
   it("« Ne plus voir » ou certification faits ailleurs : null (le chargeur filtre)", async () => {
@@ -74,7 +75,7 @@ describe("GET /api/profile/discord/certify-prompt (relecture avant ouverture)", 
 
 describe("POST /api/profile/discord/certify-prompt", () => {
   it("LATER : lève la proposition de cette session, rien sur le compte", async () => {
-    const response = await POST(post({ action: "LATER" }));
+    const response = await POST(post({ action: "LATER", userId: 7 }));
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ action: "LATER" });
     expect(markDiscordCertifyPromptSeen).toHaveBeenCalledWith(7, HASH);
@@ -82,7 +83,7 @@ describe("POST /api/profile/discord/certify-prompt", () => {
   });
 
   it("NEVER : posé sur le compte et toutes ses sessions, en un appel", async () => {
-    const response = await POST(post({ action: "NEVER" }));
+    const response = await POST(post({ action: "NEVER", userId: 7 }));
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ action: "NEVER" });
     expect(recordDiscordCertifyPromptOff).toHaveBeenCalledWith(7);
@@ -91,15 +92,52 @@ describe("POST /api/profile/discord/certify-prompt", () => {
 
   it("sans session : 401, rien n'est écrit", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(null);
-    const response = await POST(post({ action: "NEVER" }));
+    const response = await POST(post({ action: "NEVER", userId: 7 }));
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error: "UNAUTHORIZED" });
     expect(recordDiscordCertifyPromptOff).not.toHaveBeenCalled();
     expect(markDiscordCertifyPromptSeen).not.toHaveBeenCalled();
   });
 
+  it("réponse au nom d'un autre compte (session changée dans ce navigateur) : 409, rien n'est écrit (EF-04)", async () => {
+    for (const action of ["LATER", "NEVER"]) {
+      const response = await POST(post({ action, userId: 8 }));
+      expect(response.status).toBe(409);
+      expect(await response.json()).toEqual({ error: "CERTIFY_PROMPT_OTHER_ACCOUNT" });
+    }
+    expect(markDiscordCertifyPromptSeen).not.toHaveBeenCalled();
+    expect(recordDiscordCertifyPromptOff).not.toHaveBeenCalled();
+  });
+
+  it("session qui ne doit plus rien (déjà répondue) : « Plus tard » ok sans aucune écriture (EF-04)", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7, certifyPromptDue: false }));
+    const response = await POST(post({ action: "LATER", userId: 7 }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ action: "LATER" });
+    expect(markDiscordCertifyPromptSeen).not.toHaveBeenCalled();
+    expect(recordDiscordCertifyPromptOff).not.toHaveBeenCalled();
+    expect(currentTokenHash).not.toHaveBeenCalled();
+  });
+
+  it("« Ne plus voir » toujours gardé, même quand un « Plus tard » d'un autre onglet a levé la marque", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7, certifyPromptDue: false }));
+    const response = await POST(post({ action: "NEVER", userId: 7 }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ action: "NEVER" });
+    expect(recordDiscordCertifyPromptOff).toHaveBeenCalledWith(7);
+  });
+
+  it("compte absent ou malformé : 400 INVALID_ACTION, jamais dit « autre compte » (EF-04)", async () => {
+    for (const userId of [undefined, null, "7", 0, -7, 7.5]) {
+      const response = await POST(post({ action: "LATER", userId }));
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: "INVALID_ACTION" });
+    }
+    expect(markDiscordCertifyPromptSeen).not.toHaveBeenCalled();
+  });
+
   it("action inconnue, absente ou corps illisible : 400 INVALID_ACTION", async () => {
-    for (const body of [{ action: "CERTIFY" }, {}, "pas du json"]) {
+    for (const body of [{ action: "CERTIFY", userId: 7 }, { userId: 7 }, {}, "pas du json"]) {
       const response = await POST(post(body));
       expect(response.status).toBe(400);
       expect(await response.json()).toEqual({ error: "INVALID_ACTION" });
@@ -109,7 +147,7 @@ describe("POST /api/profile/discord/certify-prompt", () => {
 
   it("compte supprimé entre-temps : 409 ACCOUNT_DELETED, session non touchée", async () => {
     jest.mocked(recordDiscordCertifyPromptOff).mockResolvedValue(false);
-    const response = await POST(post({ action: "NEVER" }));
+    const response = await POST(post({ action: "NEVER", userId: 7 }));
     expect(response.status).toBe(409);
     expect(await response.json()).toEqual({ error: "ACCOUNT_DELETED" });
     expect(markDiscordCertifyPromptSeen).not.toHaveBeenCalled();
@@ -117,13 +155,13 @@ describe("POST /api/profile/discord/certify-prompt", () => {
 
   it("colonne absente : 503 CERTIFY_PROMPT_UNAVAILABLE ; autre panne : 500, un code seulement", async () => {
     jest.mocked(markDiscordCertifyPromptSeen).mockRejectedValueOnce(Object.assign(new Error("x"), { code: "ER_BAD_FIELD_ERROR" }));
-    const missing = await POST(post({ action: "LATER" }));
+    const missing = await POST(post({ action: "LATER", userId: 7 }));
     expect(missing.status).toBe(503);
     expect(await missing.json()).toEqual({ error: "CERTIFY_PROMPT_UNAVAILABLE" });
 
     const spy = jest.spyOn(console, "error").mockImplementation(() => undefined);
     jest.mocked(markDiscordCertifyPromptSeen).mockRejectedValueOnce(new Error("gone"));
-    const failed = await POST(post({ action: "LATER" }));
+    const failed = await POST(post({ action: "LATER", userId: 7 }));
     expect(failed.status).toBe(500);
     expect(await failed.json()).toEqual({ error: "CERTIFY_PROMPT_FAILED" });
     spy.mockRestore();

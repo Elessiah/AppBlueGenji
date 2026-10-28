@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  CERTIFICATION_PROMPT_OFF_PATH,
+  forgetLegacyCertificationPromptOff,
   rememberCertificationPromptClosed,
   shouldOpenCertificationPrompt,
   type CertificationPrompt,
@@ -18,10 +20,32 @@ function browserStorage(kind: "localStorage" | "sessionStorage"): Storage | null
 }
 
 /**
+ * « Ne plus voir » coché : gardé sur le compte (`POST`, `keepalive` — la
+ * fermeture peut être un départ vers le profil). Le corps porte le compte à
+ * qui la modale a été montrée : une session changée depuis (autre compte
+ * connecté dans un autre onglet) est refusée sans rien écrire. Un échec n'a
+ * pas de suite visible : la modale reviendra simplement à une prochaine fiche,
+ * comme avant le choix.
+ */
+async function saveNeverAgain(shownTo: number | null): Promise<void> {
+  if (shownTo == null) return;
+  try {
+    await fetch(CERTIFICATION_PROMPT_OFF_PATH, {
+      method: "POST",
+      keepalive: true,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: shownTo }),
+    });
+  } catch {
+    // Réseau, ou `fetch` indisponible (document qui part) : rien de gardé.
+  }
+}
+
+/**
  * Ouverture d'office de l'invitation à certifier (`CERTIFICATION_PROMPT.md`) :
- * une fois par page, dès que le contexte du lecteur en porte une, sauf « Ne
- * plus voir » ou déjà fermée dans cet onglet. Les relectures du contexte ne la
- * rouvrent pas.
+ * une fois par page, dès que le contexte du lecteur en porte une, sauf déjà
+ * fermée dans cet onglet. « Ne plus voir » est gardé sur le compte : le serveur
+ * ne porte alors plus d'invitation. Les relectures du contexte ne la rouvrent pas.
  *
  * Jamais par-dessus une autre modale (lancement de match, changements de
  * confidentialité…) : une modale déjà ouverte à la décision l'écarte pour
@@ -31,8 +55,8 @@ function browserStorage(kind: "localStorage" | "sessionStorage"): Storage | null
  * (`data-modal-pending`, `TournamentSheet`). Elle **cède sa place**
  * (`data-modal-yields`) : une modale urgente — le lancement d'un match — passe
  * par-dessus ; l'invitation s'efface pour le reste de la page, sans rien
- * retenir dans le navigateur — sauf « Ne plus voir » déjà cochée : elle revient
- * à la prochaine fiche ouverte.
+ * retenir — sauf « Ne plus voir » déjà cochée, gardée sur le compte : elle
+ * revient à la prochaine fiche ouverte.
  *
  * Le serveur la calcule une fois par connexion du flux (ou lecture REST de
  * secours) : une certification faite entre-temps ne la retire qu'à la lecture
@@ -46,6 +70,7 @@ export function useCertificationPrompt(
   tournamentId: number,
   prompt: CertificationPrompt | null | undefined,
   frozen: boolean,
+  viewerUserId: number | null,
 ) {
   const [open, setOpen] = useState(false);
   // Case « Ne plus voir » : tenue ici pour valoir aussi quand la modale
@@ -54,6 +79,9 @@ export function useCertificationPrompt(
   // l'état local de la modale).
   const neverAgain = useRef(false);
   const decided = useRef(false);
+  // Le compte à qui la modale a été montrée, retenu à l'ouverture : c'est lui,
+  // pas la session du moment, que « Ne plus voir » désigne.
+  const shownTo = useRef<number | null>(null);
   // Les effets lisent l'invitation par sa présence, pas par son identité : une
   // relecture REST en renvoie une neuve au contenu identique.
   const present = prompt != null;
@@ -66,6 +94,12 @@ export function useCertificationPrompt(
   // La fiche est réutilisée d'un tournoi à l'autre (lien, Précédent) : « cette
   // page » change avec le tournoi, et la mémoire de la page repart de zéro —
   // avant la décision, déclarée après.
+  // L'ancienne clé du « Ne plus voir » (commune à tous les comptes du
+  // navigateur) n'est plus lue : effacée une fois.
+  useEffect(() => {
+    forgetLegacyCertificationPromptOff(browserStorage("localStorage"));
+  }, []);
+
   useEffect(() => {
     decided.current = false;
     doneForPage.current = false;
@@ -76,19 +110,19 @@ export function useCertificationPrompt(
   useEffect(() => {
     if (decided.current || doneForPage.current || !present || frozen) return;
     decided.current = true;
-    // Ni « Ne plus voir », ni déjà fermée dans l'onglet, ni une autre modale
+    // Ni déjà fermée dans l'onglet, ni une autre modale
     // déjà ouverte — l'attendre la ferait surgir au départ d'un match, sur le
     // plateau : sinon, pas sur cette page, sans rien retenir.
-    const allowed = shouldOpenCertificationPrompt(browserStorage("localStorage"), browserStorage("sessionStorage"));
-    if (allowed && !anotherModalOpen()) setOpen(true);
-  }, [tournamentId, present, frozen]);
+    const allowed = shouldOpenCertificationPrompt(browserStorage("sessionStorage"));
+    if (allowed && !anotherModalOpen()) {
+      shownTo.current = viewerUserId;
+      setOpen(true);
+    }
+  }, [tournamentId, present, frozen, viewerUserId]);
 
   const close = useCallback(() => {
-    rememberCertificationPromptClosed(
-      browserStorage("localStorage"),
-      browserStorage("sessionStorage"),
-      neverAgain.current,
-    );
+    rememberCertificationPromptClosed(browserStorage("sessionStorage"));
+    if (neverAgain.current) void saveNeverAgain(shownTo.current);
     doneForPage.current = true;
     setOpen(false);
   }, []);
@@ -97,10 +131,10 @@ export function useCertificationPrompt(
   // l'invitation n'a peut-être pas été lue — mais pour le reste de la page :
   // revenue à chaque fermeture d'une annonce de lancement, elle couvrirait le
   // plateau en plein match. Elle revient à la prochaine fiche ouverte.
-  // « Ne plus voir » déjà cochée vaut pourtant : retenue pour de bon, sans le
+  // « Ne plus voir » déjà cochée vaut pourtant : gardée sur le compte, sans le
   // drapeau d'onglet d'une fermeture.
   const yieldPlace = useCallback(() => {
-    if (neverAgain.current) rememberCertificationPromptClosed(browserStorage("localStorage"), null, true);
+    if (neverAgain.current) void saveNeverAgain(shownTo.current);
     doneForPage.current = true;
     setOpen(false);
   }, []);

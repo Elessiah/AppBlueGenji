@@ -8,13 +8,22 @@ const CHANNEL_NAME = "bg:certify-prompt";
 /** Cet onglet : il n'agit pas sur sa propre annonce. */
 const TAB_ID = Array.from(crypto.getRandomValues(new Uint32Array(2)), (part) => part.toString(36)).join("-");
 
-type CertifyPromptMessage = { from: string };
+/** Seul message du canal : une réponse écrite, au nom de ce compte, par cet onglet. */
+const ANSWERED_MESSAGE = "answered";
+type CertifyPromptMessage = { type: typeof ANSWERED_MESSAGE; userId: number; from: string };
+
+/** Message du canal recevable : de la bonne forme, d'un autre onglet, pour ce compte. */
+export function isAnsweredMessageFor(data: unknown, userId: number, tabId: string = TAB_ID): boolean {
+  if (!data || typeof data !== "object") return false;
+  const message = data as Partial<Record<keyof CertifyPromptMessage, unknown>>;
+  return message.type === ANSWERED_MESSAGE && message.userId === userId && typeof message.from === "string" && message.from !== tabId;
+}
 
 /**
  * Canal d'écoute, ouvert tant qu'un relais l'écoute et **fermé** au dernier
  * départ (un canal ouvert peut priver la page du cache avant/arrière).
  */
-let listening: { channel: BroadcastChannel; listeners: Set<() => void> } | null = null;
+let listening: { channel: BroadcastChannel; listeners: Set<{ userId: number; notify: () => void }> } | null = null;
 
 function hasBroadcastChannel(): boolean {
   return typeof BroadcastChannel === "function";
@@ -26,12 +35,16 @@ function hasBroadcastChannel(): boolean {
  * (`DiscordCertifyPromptLazy`), qui clôt la proposition quand le tag est
  * certifié avant qu'elle ne se charge.
  * Écrite, elle est annoncée aux autres onglets (`onCertifyPromptAnsweredElsewhere`).
+ * `userId` : le compte à qui la fenêtre a été montrée — une session changée
+ * depuis (autre compte connecté dans ce navigateur) refuse la réponse
+ * (409 `CERTIFY_PROMPT_OTHER_ACCOUNT`), qui ne coupe donc jamais la
+ * proposition d'un autre.
  */
-export async function answerCertifyPrompt(action: CertifyPromptAction): Promise<void> {
+export async function answerCertifyPrompt(action: CertifyPromptAction, userId: number): Promise<void> {
   const response = await fetch(PATH, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ action }),
+    body: JSON.stringify({ action, userId }),
     // « Plus tard » puis un lien qui charge un nouveau document (changement de
     // langue, passage par Discord) : sans `keepalive`, ce départ l'annulerait.
     keepalive: true,
@@ -44,7 +57,7 @@ export async function answerCertifyPrompt(action: CertifyPromptAction): Promise<
   try {
     // Canal le temps d'un message : rien ne reste ouvert pour l'onglet qui répond.
     const channel = new BroadcastChannel(CHANNEL_NAME);
-    channel.postMessage({ from: TAB_ID } satisfies CertifyPromptMessage);
+    channel.postMessage({ type: ANSWERED_MESSAGE, userId, from: TAB_ID } satisfies CertifyPromptMessage);
     channel.close();
   } catch {
     // Document qui part : la relecture avant ouverture suffit.
@@ -52,25 +65,26 @@ export async function answerCertifyPrompt(action: CertifyPromptAction): Promise<
 }
 
 /**
- * Une réponse donnée dans un autre onglet de ce navigateur. Rend le
+ * Une réponse donnée **par ce compte** dans un autre onglet de ce navigateur ;
+ * tout autre message (forme inattendue, autre compte) est ignoré. Rend le
  * désabonnement, qui ferme le canal au dernier départ. Sans
  * `BroadcastChannel` (navigateur ancien) : rien, seule la relecture tient.
  */
-export function onCertifyPromptAnsweredElsewhere(listener: () => void): () => void {
+export function onCertifyPromptAnsweredElsewhere(userId: number, listener: () => void): () => void {
   if (!hasBroadcastChannel()) return () => undefined;
   if (!listening) {
     const channel = new BroadcastChannel(CHANNEL_NAME);
-    const listeners = new Set<() => void>();
-    channel.addEventListener("message", (event: MessageEvent<CertifyPromptMessage | null>) => {
-      if (event.data?.from === TAB_ID) return;
-      for (const notify of listeners) notify();
+    const listeners = new Set<{ userId: number; notify: () => void }>();
+    channel.addEventListener("message", (event: MessageEvent<unknown>) => {
+      for (const entry of listeners) if (isAnsweredMessageFor(event.data, entry.userId)) entry.notify();
     });
     listening = { channel, listeners };
   }
   const current = listening;
-  current.listeners.add(listener);
+  const entry = { userId, notify: listener };
+  current.listeners.add(entry);
   return () => {
-    current.listeners.delete(listener);
+    current.listeners.delete(entry);
     if (current.listeners.size > 0 || listening !== current) return;
     current.channel.close();
     listening = null;

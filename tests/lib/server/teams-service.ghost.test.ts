@@ -152,6 +152,8 @@ describe("softDeleteTeam — dérogation staff", () => {
     const connectionExecute = jest
       .fn<SqlQuery>()
       .mockResolvedValueOnce([[{ logo_url: null, deleted_at: null, is_ghost: 1 }]]) // relue sous verrou
+      .mockResolvedValueOnce([{ affectedRows: 1 }]) // équipe anonymisée
+      .mockResolvedValueOnce([[]]) // aucun membre (fantôme)
       .mockResolvedValue([{ affectedRows: 1 }]);
     const connection = await mockDb(execute, connectionExecute);
 

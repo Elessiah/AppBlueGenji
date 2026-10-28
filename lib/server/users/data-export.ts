@@ -17,6 +17,23 @@ import { listOwnLiveAnnouncements } from "./live-announcement-export";
 import { matchDmEnabled } from "./match-dm-preference";
 import { recruitmentModalBackOn, recruitmentModalOff } from "./recruitment-modal-preference";
 
+/** « Ne plus voir » de l'invitation à certifier de la fiche tournoi (ISO), `null` sans choix ou colonne absente. */
+async function readCertificationPromptDismissedAt(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  userId: number,
+): Promise<string | null> {
+  try {
+    const [rows] = await db.execute<RowDataPacket[]>(
+      `SELECT certification_prompt_dismissed_at FROM bg_users WHERE id = ? AND is_deleted = 0 LIMIT 1`,
+      [userId],
+    );
+    return toIso((rows[0]?.certification_prompt_dismissed_at as Date | null | undefined) ?? null);
+  } catch (error) {
+    if (isUnknownColumnError(error)) return null;
+    throw error;
+  }
+}
+
 /**
  * Rassemble l'intégralité des données personnelles du propriétaire du compte
  * pour l'export RGPD (droit à la portabilité, art. 20). Retourne les données
@@ -90,6 +107,9 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
 
   if (rows.length === 0) throw new Error("PROFILE_NOT_FOUND");
   const row = rows[0];
+  // « Ne plus voir » de l'invitation à certifier de la fiche tournoi : lu à
+  // part, colonne tolérée absente (son `ALTER` a échoué) — l'export ne tombe pas.
+  const certificationPromptDismissedAt = await readCertificationPromptDismissedAt(db, userId);
 
   // Réutilise l'agrégation existante pour les stats, l'historique d'équipes et
   // le palmarès de tournois (vue « self » = données complètes non masquées).
@@ -125,6 +145,8 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
       recruitmentModalBackOn: recruitmentModalBackOn(row.recruitment_modal_off),
       // « Ne plus voir » la fenêtre de certification du tag Discord : donnée détenue, rendue.
       discordCertifyPromptDismissedAt: toIso(row.discord_certify_prompt_dismissed_at ?? null),
+      // Et celui de l'invitation à certifier de la fiche tournoi : rendu de même.
+      certificationPromptDismissedAt,
       createdAt: toIso(row.created_at) ?? new Date().toISOString(),
     },
     profile: {

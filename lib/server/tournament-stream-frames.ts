@@ -91,6 +91,15 @@ export function connectedFrameBytes(
   return concatBytes([deflateSegment(head), deflatedSnapshotJson(frame), deflateSegment(tail)]);
 }
 
+/**
+ * Trame propre au lecteur, poussée après l'ouverture (invitation à certifier
+ * lue après coup) : petite, sérialisée et comprimée à chaque envoi.
+ */
+export function viewerPatchFrameBytes(payload: Record<string, unknown>, encoding: StreamEncoding): Uint8Array {
+  const plain = encoder.encode(`data: ${JSON.stringify(payload)}\n\n`);
+  return encoding === "identity" ? plain : deflateSegment(plain);
+}
+
 const PING = encoder.encode(": ping\n\n");
 let deflatedPing: Uint8Array | null = null;
 

@@ -31,7 +31,7 @@ function sourceFiles(dir: string): string[] {
 const STORAGE_CONSTANT = /\b([A-Z_]*(?:KEY|COOKIE)[A-Z_]*)(?:\s*:[^=]+)?\s*=\s*"(bg[_:][^"]+)"/g;
 
 /** Clés que le site ne pose plus : il ne fait que les effacer. */
-const REMOVED_ONLY = new Set(["LEGACY_ONE_TAP_STORAGE_KEY"]);
+const REMOVED_ONLY = new Set(["LEGACY_ONE_TAP_STORAGE_KEY", "LEGACY_CERTIFICATION_PROMPT_OFF_KEY"]);
 
 function storageKeys(): Array<{ file: string; name: string; value: string }> {
   const files = [...sourceFiles(join(root, "app")), ...sourceFiles(join(root, "components")), ...sourceFiles(join(root, "lib"))];

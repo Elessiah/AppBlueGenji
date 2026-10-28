@@ -332,6 +332,9 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     `ALTER TABLE bg_matches ADD COLUMN referee_ready_at DATETIME NULL AFTER referee_user_id`,
     `ALTER TABLE bg_matches ADD COLUMN self_managed TINYINT(1) NOT NULL DEFAULT 0 AFTER referee_ready_at`,
     `ALTER TABLE bg_matches ADD COLUMN first_map VARCHAR(64) NULL AFTER self_managed`,
+    // « Ne plus voir » de l'invitation à certifier de la fiche tournoi, gardé
+    // sur le compte et non plus dans le navigateur (`CERTIFICATION_PROMPT.md`).
+    `ALTER TABLE bg_users ADD COLUMN certification_prompt_dismissed_at DATETIME NULL`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

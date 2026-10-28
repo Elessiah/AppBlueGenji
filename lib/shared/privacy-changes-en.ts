@@ -612,6 +612,17 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "Terms of use: version 7, in force since 30 October 2026, says so in its “Match contacts”, “Match streaming” and “Acceptance” sections. A window presents it to you until you have accepted it: accepting it lets you keep using the site.",
     ],
   },
+  "2026-10-ne-plus-voir-invitation-certification-sur-le-compte": {
+    title: "“Don't show again” on the verification invitation: kept on the account",
+    linkLabels: ["Read the “Cookies & trackers” section"],
+    summary:
+      "The “Don't show again” choice on the window inviting you, on a tournament page, to verify your Discord tag and your BattleTag is now kept on your account, no longer in the browser: it applies in all your browsers, and no longer to the other accounts used in the same browser.",
+    details: [
+      "What is kept: the date of the choice, on your account. It is included in the export of your data and erased when the account is anonymised.",
+      "A “Don't show again” ticked before this change, kept in the browser, is not carried over to your account: the window may come back once, to be ticked again. That former local storage value is no longer read, and it is erased when a tournament page opens.",
+      "Simply closing the window is still remembered for the tab only (session storage, never sent to the server).",
+    ],
+  },
 };
 
 /**

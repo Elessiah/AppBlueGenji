@@ -38,9 +38,11 @@ import { snapshotFrameOf } from "@/lib/server/tournaments/snapshot";
 import { dispatchLiveAnnouncements, liveAnnouncementsEnabled } from "@/lib/server/tournaments/live-announcements";
 import { computeTournamentState } from "@/lib/shared/tournament-state";
 import type { TournamentSnapshot } from "@/lib/shared/types";
+import type { CertificationPrompt } from "@/lib/shared/certification-prompt";
 import {
   connectedFrameBytes,
   pingFrameBytes,
+  viewerPatchFrameBytes,
   type StreamEncoding,
 } from "@/lib/server/tournament-stream-frames";
 
@@ -110,7 +112,14 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
     revoked = true;
     cleanup();
   });
+  /**
+   * Place de flux tenue avant que le flux ne la reprenne (`cleanup`) : toute
+   * sortie anticipée la rend.
+   */
+  let heldSlot: (() => void) | null = null;
   const refuse = (response: Response): Response => {
+    heldSlot?.();
+    heldSlot = null;
     unregister();
     return response;
   };
@@ -128,6 +137,19 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
     // la route (session, instantané, contexte du lecteur).
     const throttled = enforceRateLimit(STREAM_OPEN_RULE, user.id);
     if (throttled) return refuse(throttled);
+
+    // Un onglet ouvre un flux. Le plafond ne gêne personne d'ordinaire ; il évite
+    // qu'un client en boucle de reconnexion accapare la machine. Pris **avant**
+    // toute lecture (instantané, contexte du lecteur — équipe, propositions,
+    // invitation à certifier) : une boucle au-delà du plafond ne coûte plus
+    // aucune requête.
+    const releaseSlot = acquireStreamSlot(user.id);
+    if (!releaseSlot) {
+      const tooMany = fail("TOO_MANY_STREAMS", 429);
+      tooMany.headers.set("Retry-After", "30");
+      return refuse(tooMany);
+    }
+    heldSlot = releaseSlot;
 
     const { id } = await context.params;
     const tournamentId = Number(id);
@@ -156,6 +178,12 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
     // nominal : sans lui, un arbitre n'aurait ses commandes d'antenne qu'après
     // une coupure du direct.
     const narratesLive = canAny(user, ["tournaments", "casting"]);
+    // Invitation à certifier lue après l'ouverture (base lente : elle
+    // n'ajoute rien au délai d'ouverture) — poussée par une trame dès qu'elle
+    // est connue, si le flux est encore ouvert.
+    let promptDeferred = false;
+    let latePrompt: { prompt: CertificationPrompt | null } | null = null;
+    let deliverPrompt: ((prompt: CertificationPrompt | null) => void) | null = null;
     const viewer = await getTournamentViewerContext(snapshot, user.id, {
       canManage,
       canPreview: narratesLive,
@@ -166,6 +194,14 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
       canDelete: user.isAdmin === true,
       // Annuler un abandon : administrateur strict, par les deux portes aussi.
       canCancelForfeit: user.isAdmin === true,
+    }, {
+      onCertificationPromptDeferred: () => {
+        promptDeferred = true;
+      },
+      onLateCertificationPrompt: (prompt) => {
+        if (deliverPrompt) deliverPrompt(prompt);
+        else latePrompt = { prompt };
+      },
     });
 
     // Palier de fraîcheur : ceux qui font le tournoi — staff, cast, engagés — sont
@@ -190,18 +226,9 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
       ? "STANDARD"
       : resolveRefreshTier({ isStaff: narratesLive, isParticipant });
 
-    // Un onglet ouvre un flux. Le plafond ne gêne personne d'ordinaire ; il évite
-    // qu'un client en boucle de reconnexion accapare la machine.
     // Session révoquée pendant les lectures : la porte ordinaire répondrait 401.
     if (revoked) {
       return refuse(fail("UNAUTHORIZED", 401));
-    }
-
-    const releaseSlot = acquireStreamSlot(user.id);
-    if (!releaseSlot) {
-      const tooMany = fail("TOO_MANY_STREAMS", 429);
-      tooMany.headers.set("Retry-After", "30");
-      return refuse(tooMany);
     }
 
     // Rien à servir si le client est déjà parti : ni encoder l'instantané (jusqu'à
@@ -209,6 +236,7 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
     // C'est sous spam F5 que ce cas se présente — précisément quand ce travail
     // inutile coûte le plus cher.
     if (req.signal.aborted) {
+      heldSlot = null;
       releaseSlot();
       unregister();
       // 204 plutôt que le 499 d'nginx : ce dernier est un code de journal, pas un
@@ -224,6 +252,8 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
       ? "gzip"
       : "identity";
 
+    // Le flux reprend la place : son nettoyage la rend.
+    heldSlot = null;
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
         let closed = false;
@@ -291,6 +321,9 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
                 tournamentId,
                 tier,
                 viewer,
+                // L'invitation suit par une trame : le client garde celle qu'il
+                // avait (reconnexion), au lieu de lire ce `null` comme un retrait.
+                ...(promptDeferred ? { certificationPromptPending: true } : {}),
                 emittedAt: new Date().toISOString(),
               },
               snapshot,
@@ -309,6 +342,19 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
           // diffusion en héritait sans l'avoir reçue, et restait sur un plateau
           // périmé — jusqu'au prochain changement, c'est-à-dire indéfiniment sur
           // un tournoi calme.
+          // Invitation à certifier lue après l'ouverture : poussée dès qu'elle
+          // est connue (déjà là, ou à son arrivée), flux encore ouvert.
+          const pushPrompt = (prompt: CertificationPrompt | null): void => {
+            if (closed) return;
+            try {
+              write(viewerPatchFrameBytes({ type: "certificationPrompt", tournamentId, certificationPrompt: prompt }, encoding));
+            } catch {
+              // Flux fermé entre-temps : la prochaine connexion la relit.
+            }
+          };
+          if (latePrompt) pushPrompt(latePrompt.prompt);
+          deliverPrompt = pushPrompt;
+
           leaveRoom = joinTournamentRoom(
             tournamentId,
             {
@@ -388,6 +434,8 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
       },
     });
   } catch (error) {
+    heldSlot?.();
+    heldSlot = null;
     unregister();
     throw error;
   }

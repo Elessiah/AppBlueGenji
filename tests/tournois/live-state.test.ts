@@ -672,3 +672,70 @@ describe("shareUnchanged", () => {
     expect(shareUnchanged(previous, next)).toBe(next);
   });
 });
+
+describe("invitation à certifier poussée après la connexion (EF-04)", () => {
+  const prompt = { reason: "MANAGER", discordVerified: false, battletagVerified: true, battletagRelevant: true } as const;
+
+  it("lit le message, en ne gardant que des booléens", () => {
+    const raw = JSON.stringify({
+      type: "certificationPrompt",
+      tournamentId: "7",
+      certificationPrompt: { ...prompt, discordVerified: "oui", extra: 1 },
+    });
+    expect(parseLiveMessage(raw)).toEqual({ type: "certificationPrompt", tournamentId: 7, certificationPrompt: prompt });
+  });
+
+  it("écarte une invitation absente ou de motif inconnu", () => {
+    for (const certificationPrompt of [undefined, {}, { ...prompt, reason: "ADMIN" }]) {
+      expect(parseLiveMessage(JSON.stringify({ type: "certificationPrompt", tournamentId: 7, certificationPrompt }))).toBeNull();
+    }
+  });
+
+  it("se pose sur le contexte du même tournoi, sans toucher au reste", () => {
+    const state = connected();
+    const next = applyLiveMessage(state, { type: "certificationPrompt", tournamentId: 7, certificationPrompt: prompt });
+    expect(next.detail?.certificationPrompt).toEqual(prompt);
+    expect(next.tier).toBe(state.tier);
+    expect(next.detail?.matches).toBe(state.detail?.matches);
+  });
+
+  it("ignorée avant la connexion ou pour un autre tournoi", () => {
+    const message = { type: "certificationPrompt", tournamentId: 7, certificationPrompt: prompt } as const;
+    expect(applyLiveMessage(INITIAL_LIVE_STATE, message)).toBe(INITIAL_LIVE_STATE);
+    const state = connected();
+    expect(applyLiveMessage(state, { ...message, tournamentId: 8 })).toBe(state);
+  });
+});
+
+describe("reconnexion pendant la lecture de l'invitation (certificationPromptPending, EF-04)", () => {
+  const prompt = { reason: "MANAGER", discordVerified: false, battletagVerified: true, battletagRelevant: true } as const;
+  const withPrompt = () => applyLiveMessage(connected(), { type: "certificationPrompt", tournamentId: 7, certificationPrompt: prompt });
+  const reconnect = (state: LiveState, pending: boolean, tournamentId = 7) =>
+    applyLiveMessage(state, {
+      type: "connected",
+      tournamentId,
+      tier: "PRIORITY",
+      viewer: viewer({ certificationPrompt: null }),
+      snapshot: snapshot(),
+      ...(pending ? { certificationPromptPending: true } : {}),
+    });
+
+  it("lit le drapeau, absent sinon", () => {
+    const base = { type: "connected", tournamentId: 7, tier: "PRIORITY", viewer: viewer(), snapshot: snapshot() };
+    expect(parseLiveMessage(JSON.stringify({ ...base, certificationPromptPending: true }))).toMatchObject({ certificationPromptPending: true });
+    expect(parseLiveMessage(JSON.stringify({ ...base, certificationPromptPending: "oui" }))).not.toHaveProperty("certificationPromptPending");
+  });
+
+  it("en attente : l'invitation du même tournoi reste posée ; sinon le contexte la remplace", () => {
+    expect(reconnect(withPrompt(), true).detail?.certificationPrompt).toEqual(prompt);
+    expect(reconnect(withPrompt(), false).detail?.certificationPrompt).toBeNull();
+    expect(reconnect(withPrompt(), true, 8).detail?.certificationPrompt).toBeNull();
+  });
+
+  it("la trame qui suit tranche, `null` compris", () => {
+    const raw = JSON.stringify({ type: "certificationPrompt", tournamentId: 7, certificationPrompt: null });
+    const message = parseLiveMessage(raw);
+    expect(message).toEqual({ type: "certificationPrompt", tournamentId: 7, certificationPrompt: null });
+    expect(applyLiveMessage(reconnect(withPrompt(), true), message!).detail?.certificationPrompt).toBeNull();
+  });
+});

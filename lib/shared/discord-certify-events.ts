@@ -19,3 +19,30 @@ export const CERTIFY_DIALOG_EVENT = "bg:certify-dialog";
  */
 export const DISCORD_CERTIFIED_EVENT = "bg:discord-certified";
 
+
+/**
+ * Délai pendant lequel une demande d'ouverture du dialogue de certification
+ * vaut : le temps d'une navigation vers `/profil`.
+ */
+export const CERTIFY_DIALOG_REQUEST_TTL_MS = 60_000;
+
+/** Demande posée par une page du site, en mémoire de cette page seulement. */
+let certifyDialogRequestedAt: number | null = null;
+
+/**
+ * Une page du site (fenêtre de la connexion, invitation de la fiche tournoi)
+ * mène à `/profil?certifier=discord` : le dialogue s'y ouvrira. Gardée en
+ * mémoire de la page — jamais dans l'adresse ni le stockage —, si bien qu'un
+ * lien venu d'un autre site, ou ouvert dans un nouvel onglet, mène au profil
+ * sans ouvrir le dialogue.
+ */
+export function requestCertifyDialog(now: number = Date.now()): void {
+  certifyDialogRequestedAt = now;
+}
+
+/** La demande en cours, consommée : `true` une fois, dans le délai. */
+export function takeCertifyDialogRequest(now: number = Date.now()): boolean {
+  const at = certifyDialogRequestedAt;
+  certifyDialogRequestedAt = null;
+  return at !== null && now - at >= 0 && now - at <= CERTIFY_DIALOG_REQUEST_TTL_MS;
+}

@@ -669,7 +669,12 @@ export function TournamentSheet({
    */
   const frozen = fatal !== null;
   // Invitation à certifier Discord et BattleTag (`CERTIFICATION_PROMPT.md`).
-  const certificationPrompt = useCertificationPrompt(tournamentId, liveCertificationPrompt(detail, tournamentId), frozen);
+  const certificationPrompt = useCertificationPrompt(
+    tournamentId,
+    liveCertificationPrompt(detail, tournamentId),
+    frozen,
+    detail?.viewerUserId ?? null,
+  );
   const canReportScore = useCallback(
     (match: BracketMatch): boolean =>
       !frozen &&

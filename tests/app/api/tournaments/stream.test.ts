@@ -709,3 +709,101 @@ describe("GET /api/tournaments/[id]/stream — compression", () => {
     await response.body!.cancel();
   });
 });
+
+describe("GET /api/tournaments/[id]/stream — place prise avant les lectures (EF-04)", () => {
+  it("au-delà du plafond, aucune lecture n'est faite", async () => {
+    for (let i = 0; i < MAX_STREAMS_PER_USER; i += 1) await GET(new Request("http://t/"), params("5"));
+    jest.mocked(getVisibleTournamentSnapshot).mockClear();
+    jest.mocked(getTournamentViewerContext).mockClear();
+    expect((await GET(new Request("http://t/"), params("5"))).status).toBe(429);
+    expect(getVisibleTournamentSnapshot).not.toHaveBeenCalled();
+    expect(getTournamentViewerContext).not.toHaveBeenCalled();
+    closeUserStreams(1);
+  });
+
+  it("toute sortie anticipée rend la place (404, identifiant invalide, lecture qui lève)", async () => {
+    jest.mocked(getVisibleTournamentSnapshot).mockResolvedValue(null);
+    for (let i = 0; i < MAX_STREAMS_PER_USER; i += 1) {
+      expect((await GET(new Request("http://t/"), params("5"))).status).toBe(404);
+    }
+    expect((await GET(new Request("http://t/"), params("abc"))).status).toBe(400);
+    jest.mocked(getVisibleTournamentSnapshot).mockRejectedValue(new Error("db down"));
+    await expect(GET(new Request("http://t/"), params("5"))).rejects.toThrow("db down");
+    jest.mocked(getVisibleTournamentSnapshot).mockResolvedValue(snapshotWith([]));
+    const response = await GET(new Request("http://t/"), params("5"));
+    expect(response.status).toBe(200);
+    await response.body!.cancel();
+  });
+});
+
+describe("GET /api/tournaments/[id]/stream — invitation à certifier poussée après coup (EF-04)", () => {
+  const PROMPT = { reason: "MANAGER", discordVerified: false, battletagVerified: true, battletagRelevant: true } as const;
+  type Late = (prompt: typeof PROMPT | null) => void;
+  const lateCallback = (): Late =>
+    (jest.mocked(getTournamentViewerContext).mock.calls[0][3] as { onLateCertificationPrompt: Late }).onLateCertificationPrompt;
+
+  /** Lit les messages SSE jusqu'à en avoir `count`. */
+  async function messages(reader: ReadableStreamDefaultReader<Uint8Array>, count: number): Promise<Record<string, unknown>[]> {
+    const decoder = new TextDecoder();
+    let text = "";
+    const found = (): string[] => text.split("\n\n").filter((block) => block.startsWith("data: "));
+    while (found().length < count) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      text += decoder.decode(value);
+    }
+    return found().map((block) => JSON.parse(block.slice("data: ".length)) as Record<string, unknown>);
+  }
+
+  it("le flux passe le rappel ; la lecture REST n'en a pas besoin", async () => {
+    const response = await GET(new Request("http://t/"), params("5"));
+    expect(typeof lateCallback()).toBe("function");
+    await response.body!.cancel();
+  });
+
+  it("connue avant l'ouverture du flux : part juste après la connexion", async () => {
+    jest.mocked(getTournamentViewerContext).mockImplementation(async (_snapshot, _userId, _rights, options) => {
+      options?.onLateCertificationPrompt?.(PROMPT);
+      return viewerWith();
+    });
+    const reader = (await GET(new Request("http://t/"), params("5"))).body!.getReader();
+    const [connected, patch] = await messages(reader, 2);
+    expect(connected.type).toBe("connected");
+    expect(patch).toEqual({ type: "certificationPrompt", tournamentId: 5, certificationPrompt: PROMPT });
+    await reader.cancel();
+  });
+
+  it("connue après l'ouverture : poussée à son arrivée", async () => {
+    const reader = (await GET(new Request("http://t/"), params("5"))).body!.getReader();
+    await messages(reader, 1);
+    lateCallback()(PROMPT);
+    const [patch] = await messages(reader, 1);
+    expect(patch).toEqual({ type: "certificationPrompt", tournamentId: 5, certificationPrompt: PROMPT });
+    await reader.cancel();
+  });
+
+  it("en attente : la connexion le dit, et un `null` final est poussé aussi", async () => {
+    jest.mocked(getTournamentViewerContext).mockImplementation(async (_snapshot, _userId, _rights, options) => {
+      options?.onCertificationPromptDeferred?.();
+      return viewerWith();
+    });
+    const reader = (await GET(new Request("http://t/"), params("5"))).body!.getReader();
+    const [connected] = await messages(reader, 1);
+    expect(connected.certificationPromptPending).toBe(true);
+    lateCallback()(null);
+    const [patch] = await messages(reader, 1);
+    expect(patch).toEqual({ type: "certificationPrompt", tournamentId: 5, certificationPrompt: null });
+    await reader.cancel();
+  });
+
+  it("connue d'emblée : la connexion ne dit rien d'une attente", async () => {
+    const [connected] = await messages((await GET(new Request("http://t/"), params("5"))).body!.getReader(), 1);
+    expect(connected).not.toHaveProperty("certificationPromptPending");
+  });
+
+  it("flux fermé entre-temps : rien n'est écrit, rien ne lève", async () => {
+    const response = await GET(new Request("http://t/"), params("5"));
+    await response.body!.cancel();
+    expect(() => lateCallback()(PROMPT)).not.toThrow();
+  });
+});

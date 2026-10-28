@@ -68,13 +68,15 @@ const DiscordCertifyPromptEn = dynamic(
  * La garde contre un état périmé (relecture, autres onglets) vit dans le
  * morceau (`DiscordCertifyPromptGate`) : ce relais, sur chaque page, reste léger.
  */
-export function DiscordCertifyPromptLazy({ prompt, privacyPending, termsPending }: Readonly<DiscordCertifyPromptProps>) {
+export function DiscordCertifyPromptLazy({ prompt, userId, privacyPending, termsPending }: Readonly<DiscordCertifyPromptProps>) {
   const [privacyAnswered, setPrivacyAnswered] = useState(false);
   const [followedLink, setFollowedLink] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState<boolean | null>(null);
-  const [certified, setCertified] = useState(false);
   const [armed, setArmed] = useState(false);
-  /** Répondue sur ce chargement, ici ou dans un autre onglet : le morceau se démonte. */
+  /**
+   * Répondue sur ce chargement — ici, dans un autre onglet, plus due, ou tag
+   * certifié — : le morceau se démonte.
+   */
   const [done, setDone] = useState(false);
   /** Même fait, lu sans attendre un rendu : un seul `LATER`. */
   const answered = useRef(false);
@@ -97,11 +99,10 @@ export function DiscordCertifyPromptLazy({ prompt, privacyPending, termsPending 
     // close pour la session, qu'elle ne s'ouvre pas pour un tag déjà certifié.
     // Écriture chargée à la demande (rare) : rien de plus sur chaque page.
     const onCertified = () => {
-      setCertified(true);
       if (answered.current) return;
       markAnswered();
       import("./certify-prompt-answer")
-        .then(({ answerCertifyPrompt }) => answerCertifyPrompt("LATER"))
+        .then(({ answerCertifyPrompt }) => answerCertifyPrompt("LATER", userId))
         .catch(() => undefined);
     };
     window.addEventListener(PRIVACY_CHANGES_ANSWERED_EVENT, onPrivacy);
@@ -114,9 +115,9 @@ export function DiscordCertifyPromptLazy({ prompt, privacyPending, termsPending 
       window.removeEventListener(TERMS_REQUIRED_EVENT, onTermsRequired);
       window.removeEventListener(DISCORD_CERTIFIED_EVENT, onCertified);
     };
-  }, [markAnswered]);
+  }, [markAnswered, userId]);
 
-  const over = certified || followedLink || done;
+  const over = followedLink || done;
   const canOpen =
     !over &&
     certifyPromptOpen({
@@ -133,6 +134,7 @@ export function DiscordCertifyPromptLazy({ prompt, privacyPending, termsPending 
   return (
     <Gate
       prompt={prompt}
+      userId={userId}
       canOpen={canOpen}
       onProfile={pathname === "/profil"}
       answered={answered}

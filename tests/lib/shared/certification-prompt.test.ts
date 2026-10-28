@@ -1,11 +1,13 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   CERTIFICATION_PROMPT_CLOSED_KEY,
-  CERTIFICATION_PROMPT_OFF_KEY,
+  CERTIFICATION_PROMPT_OFF_PATH,
+  LEGACY_CERTIFICATION_PROMPT_OFF_KEY,
   battletagRelevantFor,
   certificationPromptFor,
   certificationProfileHref,
   liveCertificationPrompt,
+  forgetLegacyCertificationPromptOff,
   rememberCertificationPromptClosed,
   shouldOpenCertificationPrompt,
   teamHasContact,
@@ -37,6 +39,10 @@ function memoryStorage(initial: Record<string, string> = {}, failing = false) {
     setItem(key: string, value: string) {
       if (failing) throw new Error("QuotaExceededError");
       values.set(key, value);
+    },
+    removeItem(key: string) {
+      if (failing) throw new Error("SecurityError");
+      values.delete(key);
     },
   };
 }
@@ -116,46 +122,48 @@ describe("teamHasContact", () => {
   });
 });
 
-describe("« Ne plus voir » et fermeture", () => {
-  it("s'ouvre sur un navigateur vierge", () => {
-    expect(shouldOpenCertificationPrompt(memoryStorage(), memoryStorage())).toBe(true);
+describe("fermeture pour l'onglet, et « Ne plus voir » qui vit sur le compte (EF-04)", () => {
+  it("s'ouvre sur un onglet vierge", () => {
+    expect(shouldOpenCertificationPrompt(memoryStorage())).toBe(true);
   });
 
-  it("une fermeture simple la tait pour l'onglet seulement", () => {
-    const local = memoryStorage();
+  it("une fermeture la tait pour l'onglet seulement, valeur « 1 » sans identifiant", () => {
     const session = memoryStorage();
-    rememberCertificationPromptClosed(local, session, false);
-    expect(session.values.get(CERTIFICATION_PROMPT_CLOSED_KEY)).toBe("1");
-    expect(local.values.has(CERTIFICATION_PROMPT_OFF_KEY)).toBe(false);
-    expect(shouldOpenCertificationPrompt(local, session)).toBe(false);
+    rememberCertificationPromptClosed(session);
+    expect([...session.values.entries()]).toEqual([[CERTIFICATION_PROMPT_CLOSED_KEY, "1"]]);
+    expect(shouldOpenCertificationPrompt(session)).toBe(false);
     // Un nouvel onglet (session vierge) la rouvre.
-    expect(shouldOpenCertificationPrompt(local, memoryStorage())).toBe(true);
+    expect(shouldOpenCertificationPrompt(memoryStorage())).toBe(true);
   });
 
-  it("« Ne plus voir » la tait pour de bon, nouvel onglet compris", () => {
-    const local = memoryStorage();
-    rememberCertificationPromptClosed(local, memoryStorage(), true);
-    expect(local.values.get(CERTIFICATION_PROMPT_OFF_KEY)).toBe("1");
-    expect(shouldOpenCertificationPrompt(local, memoryStorage())).toBe(false);
+  it("l'ancienne clé locale du « Ne plus voir » n'est plus lue : elle ne tait plus rien", () => {
+    expect(shouldOpenCertificationPrompt(memoryStorage({ [LEGACY_CERTIFICATION_PROMPT_OFF_KEY]: "1" }))).toBe(true);
   });
 
-  it("ne garde que la valeur « 1 », sans identifiant de personne", () => {
-    const local = memoryStorage();
-    const session = memoryStorage();
-    rememberCertificationPromptClosed(local, session, true);
-    expect([...local.values.values(), ...session.values.values()]).toEqual(["1", "1"]);
+  it("efface l'ancienne clé locale, commune à tous les comptes du navigateur, sans toucher au reste", () => {
+    const local = memoryStorage({ [LEGACY_CERTIFICATION_PROMPT_OFF_KEY]: "1", bg_other: "x" });
+    forgetLegacyCertificationPromptOff(local);
+    expect([...local.values.keys()]).toEqual(["bg_other"]);
+    // Absente : sans effet.
+    expect(() => forgetLegacyCertificationPromptOff(local)).not.toThrow();
   });
 
-  it("un stockage bloqué ou absent ne casse rien : la modale s'ouvre, la fermeture passe", () => {
+  it("le « Ne plus voir » se garde par la route du compte", () => {
+    expect(CERTIFICATION_PROMPT_OFF_PATH).toBe("/api/profile/certification-prompt");
+  });
+
+  it("un stockage bloqué ou absent ne casse rien : la modale s'ouvre, la fermeture et l'effacement passent", () => {
     const blocked = memoryStorage({}, true);
-    expect(shouldOpenCertificationPrompt(blocked, blocked)).toBe(true);
-    expect(shouldOpenCertificationPrompt(null, null)).toBe(true);
-    expect(() => rememberCertificationPromptClosed(blocked, blocked, true)).not.toThrow();
-    expect(() => rememberCertificationPromptClosed(null, null, true)).not.toThrow();
+    expect(shouldOpenCertificationPrompt(blocked)).toBe(true);
+    expect(shouldOpenCertificationPrompt(null)).toBe(true);
+    expect(() => rememberCertificationPromptClosed(blocked)).not.toThrow();
+    expect(() => rememberCertificationPromptClosed(null)).not.toThrow();
+    expect(() => forgetLegacyCertificationPromptOff(blocked)).not.toThrow();
+    expect(() => forgetLegacyCertificationPromptOff(null)).not.toThrow();
   });
 
   it("ignore une valeur inattendue", () => {
-    expect(shouldOpenCertificationPrompt(memoryStorage({ [CERTIFICATION_PROMPT_OFF_KEY]: "0" }), memoryStorage())).toBe(true);
+    expect(shouldOpenCertificationPrompt(memoryStorage({ [CERTIFICATION_PROMPT_CLOSED_KEY]: "0" }))).toBe(true);
   });
 });
 

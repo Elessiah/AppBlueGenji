@@ -6,6 +6,9 @@ jest.mock("@/lib/server/tournaments/preview-cache");
 jest.mock("@/lib/server/tournaments/registration-eligibility");
 jest.mock("@/lib/server/tournaments/certification-prompt", () => ({
   loadCertificationPrompt: jest.fn(),
+  peekCertificationPrompt: jest.fn(),
+  // Issue finale : la même lecture ici (le cache réel est testé à part).
+  finalCertificationPrompt: (_key: string, load: () => Promise<unknown>) => load().catch(() => null),
   // Sans mémoire ici : chaque lecture du contexte relit ; un échec rend `null`, journalisé.
   cachedCertificationPrompt: (_key: string, load: () => Promise<unknown>) =>
     load().catch((error: unknown) => {
@@ -19,7 +22,7 @@ import { getTournamentViewerContext } from "@/lib/server/tournaments";
 import { withConnection } from "@/lib/server/database";
 import { getUserActiveTeam } from "@/lib/server/teams/roster";
 import { getTournamentPreview } from "@/lib/server/tournaments/preview-cache";
-import { loadCertificationPrompt } from "@/lib/server/tournaments/certification-prompt";
+import { loadCertificationPrompt, peekCertificationPrompt } from "@/lib/server/tournaments/certification-prompt";
 import { findSoloEntry } from "@/lib/server/solo-entries-service";
 import type { TournamentGame, TournamentSnapshot, TournamentState } from "@/lib/shared/types";
 import type { ParticipantType } from "@/lib/shared/participants";
@@ -56,6 +59,7 @@ beforeEach(() => {
   jest.mocked(findSoloEntry).mockResolvedValue(null);
   jest.mocked(getUserActiveTeam).mockResolvedValue({ teamId: 42, teamName: "Équipe", roles: ["MANAGER"] });
   jest.mocked(loadCertificationPrompt).mockResolvedValue(PROMPT);
+  jest.mocked(peekCertificationPrompt).mockReturnValue(undefined);
 });
 
 describe("certificationPrompt du contexte du lecteur", () => {
@@ -112,5 +116,75 @@ describe("certificationPrompt du contexte du lecteur", () => {
     const context = await getTournamentViewerContext(snapshot("RUNNING", true, "SOLO"), 7);
     expect(context.certificationPrompt).toBeNull();
     expect(loadCertificationPrompt).not.toHaveBeenCalled();
+  });
+});
+
+describe("flux SSE : l'invitation n'est pas attendue (onLateCertificationPrompt, EF-04)", () => {
+  const flush = async () => {
+    for (let i = 0; i < 5; i += 1) await Promise.resolve();
+  };
+
+  it("connue en mémoire : part avec le contexte, sans lecture ni rappel", async () => {
+    jest.mocked(peekCertificationPrompt).mockReturnValue({ prompt: PROMPT });
+    const late = jest.fn();
+    const context = await getTournamentViewerContext(snapshot("RUNNING", true), 7, {}, { onLateCertificationPrompt: late });
+    expect(context.certificationPrompt).toEqual(PROMPT);
+    expect(peekCertificationPrompt).toHaveBeenCalledWith("7:42:1:1");
+    expect(loadCertificationPrompt).not.toHaveBeenCalled();
+    await flush();
+    expect(late).not.toHaveBeenCalled();
+  });
+
+  it("connue comme « rien à proposer » : null, sans lecture", async () => {
+    jest.mocked(peekCertificationPrompt).mockReturnValue({ prompt: null });
+    const late = jest.fn();
+    const context = await getTournamentViewerContext(snapshot("RUNNING", true), 7, {}, { onLateCertificationPrompt: late });
+    expect(context.certificationPrompt).toBeNull();
+    expect(loadCertificationPrompt).not.toHaveBeenCalled();
+  });
+
+  it("inconnue : le contexte part sans elle, elle est remise une fois lue", async () => {
+    let resolve!: (value: typeof PROMPT) => void;
+    jest.mocked(loadCertificationPrompt).mockReturnValue(new Promise((r) => (resolve = r)));
+    const late = jest.fn();
+    const context = await getTournamentViewerContext(snapshot("RUNNING", true), 7, {}, { onLateCertificationPrompt: late });
+    expect(context.certificationPrompt).toBeNull();
+    expect(late).not.toHaveBeenCalled();
+    resolve(PROMPT);
+    await flush();
+    expect(late).toHaveBeenCalledWith(PROMPT);
+  });
+
+  it("lue sans rien à proposer, ou en échec : `null` remis (retire celle d'avant une reconnexion)", async () => {
+    for (const outcome of [Promise.resolve(null), Promise.reject(new Error("pool épuisé"))]) {
+      jest.mocked(loadCertificationPrompt).mockReturnValueOnce(outcome);
+      const late = jest.fn();
+      await getTournamentViewerContext(snapshot("RUNNING", true), 7, {}, { onLateCertificationPrompt: late });
+      await flush();
+      expect(late).toHaveBeenCalledWith(null);
+    }
+  });
+
+  it("dit qu'elle suivra (onCertificationPromptDeferred) — seulement quand elle n'est pas connue", async () => {
+    const deferred = jest.fn();
+    await getTournamentViewerContext(snapshot("RUNNING", true), 7, {}, { onLateCertificationPrompt: jest.fn(), onCertificationPromptDeferred: deferred });
+    expect(deferred).toHaveBeenCalledTimes(1);
+    jest.mocked(peekCertificationPrompt).mockReturnValue({ prompt: PROMPT });
+    deferred.mockClear();
+    await getTournamentViewerContext(snapshot("RUNNING", true), 7, {}, { onLateCertificationPrompt: jest.fn(), onCertificationPromptDeferred: deferred });
+    expect(deferred).not.toHaveBeenCalled();
+  });
+
+  it("hors cible (non engagé) : ni consultation de la mémoire ni lecture", async () => {
+    const late = jest.fn();
+    await getTournamentViewerContext(snapshot("RUNNING", false), 7, {}, { onLateCertificationPrompt: late });
+    expect(peekCertificationPrompt).not.toHaveBeenCalled();
+    expect(loadCertificationPrompt).not.toHaveBeenCalled();
+  });
+
+  it("lecture REST (sans rappel) : attend toujours l'invitation", async () => {
+    const context = await getTournamentViewerContext(snapshot("RUNNING", true), 7);
+    expect(context.certificationPrompt).toEqual(PROMPT);
+    expect(peekCertificationPrompt).not.toHaveBeenCalled();
   });
 });
