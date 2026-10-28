@@ -279,7 +279,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Time at which each party declared itself ready (each caster for themselves), registered casters and the stream each one joined (co-cast) or opened separately",
       "Reason for the removal of a caster's registration for a match (removed by the staff, casting requirements no longer met — streaming permission, certified Discord tag, Battle.net account —, or they now play in the match)",
       "Assigned referee of a match, time of their “Ready”, self-management of the match, first map set by the staff and maps picked from the round pool (by the staff or, in self-management, by a team of the match); reason for the removal of their refereeing (removed by the staff, match assigned to another referee or switched to self-management, refereeing requirements no longer met, or they become a player of the match before its launch), sent without being kept",
-      "Team roles and certification status (Discord username, BattleTag taken from a linked Battle.net account) of the contacts presented",
+      "Team roles and certification status (Discord username; in Overwatch tournaments only, BattleTag taken from a linked Battle.net account) of the contacts presented",
       "Reason for a report",
       "The player's choice to receive or not the Discord direct messages about their matches",
       "“Don't show again” choice on the window inviting to verify the Discord tag and BattleTag (date of the choice)",

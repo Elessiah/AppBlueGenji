@@ -456,7 +456,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Heure à laquelle chaque partie s'est déclarée prête (chaque caster pour lui-même), casters inscrits et stream que chacun a rejoint (co-cast) ou ouvert à part",
       "Motif du retrait de l'inscription d'un caster sur un match (retrait par le staff, conditions du cast plus remplies — permission de diffusion, tag Discord certifié, compte Battle.net —, ou il joue désormais le match)",
       "Arbitre désigné d'un match, heure de son « Prêt », autogestion du match, première carte posée par le staff et cartes choisies dans le pool de la manche (par le staff ou, en autogestion, par une équipe du match) ; motif du retrait de son arbitrage (retrait par le staff, match confié à un autre arbitre ou passé en autogestion, conditions de l'arbitrage plus remplies, ou il devient joueur du match avant son lancement), envoyé sans être conservé",
-      "Rôles d'équipe et statut de certification (tag Discord, BattleTag tiré d'un compte Battle.net rattaché) des contacts présentés",
+      "Rôles d'équipe et statut de certification (tag Discord ; dans les seuls tournois Overwatch, BattleTag tiré d'un compte Battle.net rattaché) des contacts présentés",
       "Motif d'un signalement",
       "Choix du joueur de recevoir ou non les messages privés Discord de ses matchs",
       "Choix « Ne plus voir » de la fenêtre qui invite à certifier son tag Discord et son BattleTag (date du choix)",

@@ -476,7 +476,7 @@ describe("anglais", () => {
     expect(html).toContain("Referee");
     expect(html).toContain("Owner, Support");
     expect(html).toContain("In progress");
-    expect(html).toContain("Hidden from everyone, except in your match contacts.");
+    expect(html).toContain("Hidden from everyone, except in your Overwatch match contacts.");
     // Qui le lit encore : la liste partagée, derrière le « i » du champ.
     expect(html).toContain('aria-controls="player-battletag-more"');
     expect(html).toContain("Hidden, your BattleTag can only be read in the “Contacts” window of your Overwatch matches");
@@ -620,6 +620,21 @@ describe("revue UI/UX", () => {
     } finally {
       loader.useResourceLoader = original;
     }
+  });
+
+  // Revue #497 cycle 3 (décision 38) : masqué, le BattleTag ne se lit plus que
+  // dans les contacts des matchs Overwatch.
+  it("playerPageFr_hiddenOwnBattletag_limitsHintToOverwatchMatchContacts", () => {
+    mockLocale = "fr";
+    mockPlayer = fullProfileResponse({
+      profile: { id: 5, pseudo: "Nova", overwatchBattletag: "Nova#1234", visibility: { avatar: true, overwatch: false, marvel: true, major: true, discord: false } },
+      isSelf: true,
+    });
+
+    const html = renderToStaticMarkup(<PlayerDetailPage />);
+
+    expect(html).toContain("Masqué pour tous, sauf dans les contacts de tes matchs Overwatch.");
+    mockLocale = "en";
   });
 
   it("fiche joueur en français sans historique : indique les deux états vides", () => {

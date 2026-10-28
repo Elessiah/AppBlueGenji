@@ -184,7 +184,7 @@ describe("DONNEES_PROFIL", () => {
     const overwatch = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo Overwatch");
     // Décision du 2026-10-19 : la seule fenêtre « Contacts » d'un match, staff compris ;
     // décisions 35 et 38 (2026-10-28) : dans les seuls tournois Overwatch.
-    expect(overwatch?.finalite).toMatch(/Masqué, il n'est lisible de personne — arbitres et administrateurs compris — sauf, dans un tournoi Overwatch seulement \(jamais en Marvel Rivals\), dans la fenêtre « Contacts » d'un match où tu fais partie des contacts présentés/);
+    expect(overwatch?.finalite).toMatch(/Masqué, il n'est lisible de personne — arbitres et administrateurs compris — sauf dans un tournoi Overwatch \(jamais en Marvel Rivals, où aucun des cas qui suivent ne s'applique\) : dans la fenêtre « Contacts » d'un match où tu fais partie des contacts présentés/);
     expect(overwatch?.finalite).toMatch(/de ses casters le temps du match seulement \(de son départ à sa fin\)/);
     expect(overwatch?.finalite).not.toMatch(/de l'arbitrage tant que tu es inscrit/);
   });
@@ -400,6 +400,10 @@ describe("/rgpd — données obligatoires : la langue du compte (revue juridique
 
     const items = (list: readonly (typeof PROCESSING_ACTIVITIES)[number][], ref: string) =>
       list.find((activity) => activity.ref === ref)!.dataCategories.join(" ");
+    // Revue #497 cycle 3 (décision 38) : le statut « BattleTag vérifié » des
+    // contacts n'est traité que dans les tournois Overwatch.
+    expect(items(PROCESSING_ACTIVITIES, "T04")).toContain("(tag Discord ; dans les seuls tournois Overwatch, BattleTag tiré d'un compte Battle.net rattaché)");
+    expect(items(PROCESSING_ACTIVITIES_EN, "T04")).toContain("(Discord username; in Overwatch tournaments only, BattleTag taken from a linked Battle.net account)");
     expect(items(PROCESSING_ACTIVITIES, "T01")).toMatch(/celle du compte déjà rattaché à ce compte Discord, en français puis en anglais s'il n'y en a pas/);
     expect(items(PROCESSING_ACTIVITIES_EN, "T01")).toMatch(/the language of the account already linked to that Discord account, French then English when there is none/);
     expect(items(PROCESSING_ACTIVITIES, "T08")).toMatch(/pour le seul code envoyé en message privé \(connexion, certification ou changement du tag\), la langue du compte du site/);
@@ -484,10 +488,16 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
     expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Site username")?.extraBases).toEqual([
       { base: "Exécution du contrat", scope: "#live announcement of a solo tournament, kept in the Discord channel until deleted on request" },
       { base: "Intérêt légitime", scope: "AutoMod alert for such an announcement when blocked or flagged, kept in the moderators' alert channel until they delete it or on request" },
-      { base: "Exécution du contrat", scope: "the username of a match's assigned referee, in its “Contacts” and launch windows and on the match page, whatever the game, to the readers and at the times at which, in an Overwatch tournament, their BattleTag can also be read (see “Overwatch username”), and alone as soon as the launch window shows the match (terms of use, “Match contacts”, once the referee has accepted their version 7)" },
+      { base: "Exécution du contrat", scope: "the username of a match's assigned referee, in its “Contacts” and launch windows and on the match page, whatever the game: to both its teams and the referees as soon as both its opponents are known until its end, and to its casters while the match is being played (in an Overwatch tournament, next to their BattleTag — see “Overwatch username”), and alone as soon as the launch window shows the match (terms of use, “Match contacts”, once the referee has accepted their version 7)" },
       { base: "Intérêt légitime", scope: "the same presentation of the assigned referee's username, as long as that referee has not accepted version 7 of the terms of use — objection through the report form, GDPR category (once upheld, the staff no longer assigns them matches — those they already hold stay theirs —, even once version 7 is accepted)" },
     ]);
     expect(REFEREE_USERNAME_SCOPE).toContain("une fois leur version 7 acceptée par l'arbitre");
+    // Revue #497 cycle 3 : l'audience du pseudo s'écrit en clair, sans renvoyer
+    // à une règle du BattleTag qui ne vaut qu'en Overwatch.
+    expect(REFEREE_USERNAME_SCOPE).toContain(
+      "quel que soit le jeu : à ses deux équipes et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, et à ses casters le temps du match",
+    );
+    expect(REFEREE_USERNAME_SCOPE).not.toContain("aux lecteurs et aux moments");
     expect(REFEREE_USERNAME_BEFORE_V7_SCOPE).toContain("tant que cet arbitre n'a pas accepté la version 7");
     expect(REFEREE_USERNAME_BEFORE_V7_SCOPE).toContain("(retenue, le staff ne lui confie plus de match — ceux qu'il tient déjà lui restent —, même une fois la version 7 acceptée)");
     const choice = DONNEES_PROFIL.find((d) => d.donnee === "Choix des messages privés de match");
