@@ -63,8 +63,10 @@ ouvre un lancement, lecture de la liste des tournois).
   (`[lobby-brief] bot injoignable`), **sans nouvel essai**. Une panne de lecture
   des casters ou des arbitres envoie le brief sans ces lignes. Une panne avant
   tout envoi (réservation, lecture des managers) **rend les réservations
-  prises**, en une instruction ; un côté dont l'envoi lève rend **sa seule**
-  réservation, sans gêner les autres : le balayage suivant réessaie.
+  prises**, en une instruction ; un côté dont les destinataires sont
+  illisibles rend **sa seule** réservation, sans gêner les autres : le
+  balayage suivant réessaie. Un envoi qui lève garde la sienne (le push et le
+  message privé partent ensemble, une partie a pu partir) : jamais deux fois.
 
 ## RGPD
 
