@@ -158,6 +158,45 @@ export function panelPlacement(
   };
 }
 
+/** Classes d'un bouton du pied (`inMenu` : élément du panneau, sans ton). */
+function actionClassName(tone: MatchCardAction["tone"], inMenu: boolean): string {
+  return ["tap-target", inMenu ? styles.item : `${styles.primary} ${TONE_CLASS[tone]}`].join(" ").trim();
+}
+
+/**
+ * « Page du match » : un vrai lien (ouvrable dans un onglet), au même gabarit
+ * que les boutons du pied ; choisi dans le panneau, il le referme.
+ */
+function MatchPageActionLink({
+  href,
+  className,
+  label,
+  name,
+  onKeyDown,
+  onNavigate,
+}: Readonly<{
+  href: string;
+  className: string;
+  label: string;
+  name: string;
+  onKeyDown?: (e: ReactKeyboardEvent<HTMLElement>) => void;
+  onNavigate?: () => void;
+}>) {
+  return (
+    <LocaleLink
+      href={href}
+      className={className}
+      aria-label={name}
+      data-action="matchPage"
+      onKeyDown={onKeyDown}
+      onClick={onNavigate}
+    >
+      <FileText size={16} aria-hidden />
+      <span className={styles.label}>{label}</span>
+    </LocaleLink>
+  );
+}
+
 const TONE_CLASS = {
   primary: styles.tonePrimary,
   staff: styles.toneStaff,
@@ -477,26 +516,19 @@ export function MatchCardActions({
 
   const renderButton = (action: MatchCardAction, inMenu: boolean) => {
     const Icon = action.readOnly ? Eye : ICONS[action.id];
-    const className = ["tap-target", inMenu ? styles.item : styles.primary, inMenu ? "" : TONE_CLASS[action.tone]]
-      .filter(Boolean)
-      .join(" ");
+    const className = actionClassName(action.tone, inMenu);
     const id = action.id;
     if (id === "matchPage") {
-      // Un vrai lien (ouvrable dans un onglet), au même gabarit que les
-      // boutons du pied ; choisi dans le panneau, il le referme.
       return (
-        <LocaleLink
-          key={action.id}
+        <MatchPageActionLink
+          key={id}
           href={matchPagePath(match.tournamentId, match.id, spectator)}
           className={className}
-          aria-label={actionName(action.label)}
-          data-action={action.id}
+          label={action.label}
+          name={actionName(action.label)}
           onKeyDown={inMenu ? onPanelKeyDown : undefined}
-          onClick={inMenu ? () => setOpen(false) : undefined}
-        >
-          <Icon size={16} aria-hidden />
-          <span className={styles.label}>{action.label}</span>
-        </LocaleLink>
+          onNavigate={inMenu ? () => setOpen(false) : undefined}
+        />
       );
     }
     const blocked = id === "claimCast" && castBlock !== null;

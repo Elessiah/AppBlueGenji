@@ -25,7 +25,7 @@ import { useOnMatchPage } from "../_lib/match-page-context";
 import { singlePendingReport } from "../_lib/score-form";
 import { matchSideViews } from "../_lib/match-row-sides";
 import { launchStripControls } from "../_lib/launch-strip";
-import { matchCardActionList } from "../_lib/match-card-actions";
+import { matchCardActionList, offersMatchPage } from "../_lib/match-card-actions";
 import { MatchLiveStrip } from "./MatchLiveStrip";
 import { MatchLaunchStrip } from "./MatchLaunchStrip";
 import { MatchReplayStrip, canEditReplay } from "./MatchReplayStrip";
@@ -128,8 +128,7 @@ export const MatchRow = memo(function MatchRow({
   const scoreEntryClosed = SCORE_ENTRY_CLOSED_PHASES.includes(launchPhase);
   // Sous la page du match, la carte tait le lien vers elle-même ; sur une
   // exemption (un seul engagé, rien à jouer), il n'a rien à montrer.
-  const onMatchPage = useOnMatchPage();
-  const isBye = (match.team1Id === null) !== (match.team2Id === null) && match.status !== "PENDING";
+  const showMatchPage = offersMatchPage(match, useOnMatchPage());
   const canReportMatch = canReportOwnMatch(canReport, myTeamId, match.team1Id, match.team2Id);
   // Saisie du score par un engagé : un bouton qui ouvre la modale joueur, et
   // non plus un formulaire en ligne — deux champs de 52 px sans libellé visible
@@ -219,7 +218,7 @@ export const MatchRow = memo(function MatchRow({
     showReplay: canEditReplay(match, canManage),
     hasReplay: match.replayUrl !== null,
     canReport: canReportMatch,
-    showMatchPage: !onMatchPage && !isBye,
+    showMatchPage,
   }, actionText);
 
   return (

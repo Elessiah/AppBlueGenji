@@ -8,6 +8,7 @@ import type { CastBlock } from "@/lib/shared/match-launch";
 import {
   groupMatchCardActions,
   matchCardActionList,
+  offersMatchPage,
   matchCardActionName,
   type MatchCardActionInput,
 } from "@/app/(secured)/tournois/[id]/_lib/match-card-actions";
@@ -314,6 +315,21 @@ describe("« Page du match » dans le pied d'action", () => {
     expect(html).toContain('href="/tournois/1/matchs/42"');
     expect(html).toContain('aria-label="Page du match : Alpha contre Bravo"');
     expect(html).not.toContain("<button");
+  });
+});
+
+describe("offersMatchPage — où le lien se tait", () => {
+  const versus = { team1Id: 10, team2Id: 20, status: "READY" as const };
+
+  it("s'offre sur un match à deux engagés, et sur un match qui attend encore son adversaire", () => {
+    expect(offersMatchPage(versus, false)).toBe(true);
+    expect(offersMatchPage({ team1Id: 10, team2Id: null, status: "PENDING" }, false)).toBe(true);
+  });
+
+  it("se tait sous la page du match et sur une exemption jouée, d'un côté comme de l'autre", () => {
+    expect(offersMatchPage(versus, true)).toBe(false);
+    expect(offersMatchPage({ team1Id: 10, team2Id: null, status: "COMPLETED" }, false)).toBe(false);
+    expect(offersMatchPage({ team1Id: null, team2Id: 20, status: "COMPLETED" }, false)).toBe(false);
   });
 });
 

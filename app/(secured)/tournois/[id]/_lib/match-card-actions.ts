@@ -1,4 +1,5 @@
 import type { LaunchStripControls } from "./launch-strip";
+import type { BracketMatch } from "@/lib/shared/types";
 import type { TournamentActionsText } from "@/lib/shared/tournament-actions-text";
 import { FR_ACTIONS_TEXT } from "./actions-text";
 
@@ -123,6 +124,19 @@ export function matchCardActionList(
       // Lecture seule : ni crayon ni bouton plein — rien n'y attend le lecteur.
       id === "playerScore" && input.playerScoreReadOnly ? { id, label, tone: "neutral" as const, readOnly: true as const } : { id, label, tone },
     );
+}
+
+/**
+ * « Page du match » offerte sur cette carte ? Pas sous la page elle-même
+ * (`onMatchPage`), pas sur une exemption (un seul engagé, rien à jouer — un
+ * match encore en attente d'adversaire, lui, a déjà sa page).
+ */
+export function offersMatchPage(
+  match: Pick<BracketMatch, "team1Id" | "team2Id" | "status">,
+  onMatchPage: boolean,
+): boolean {
+  const bye = (match.team1Id === null) !== (match.team2Id === null) && match.status !== "PENDING";
+  return !onMatchPage && !bye;
 }
 
 export type MatchCardActionGroups = {

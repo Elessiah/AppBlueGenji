@@ -43,7 +43,7 @@ describe("zones de tap étendues", () => {
     ["app/(secured)/joueurs/cards/PlayerCard.tsx", /\$\{s\.aboveOverlay\} tap-target/],
     ["app/recrutement/RecruitmentSection.tsx", /\$\{styles\.readMore\} tap-target/],
     // Page du match : « Page du match », « +N » des streams et retour à la fiche.
-    ["app/(secured)/tournois/[id]/_components/MatchCardActions.tsx", /const className = \["tap-target"/],
+    ["app/(secured)/tournois/[id]/_components/MatchCardActions.tsx", /\["tap-target", inMenu \? styles\.item/],
     ["app/(secured)/tournois/[id]/_components/MatchLiveStrip.tsx", /\$\{styles\.more\} tap-target/],
     ["app/(secured)/tournois/[id]/_components/MatchPage.tsx", /\$\{styles\.back\} tap-target/],
   ])("%s porte la zone étendue", (file, pattern) => {
