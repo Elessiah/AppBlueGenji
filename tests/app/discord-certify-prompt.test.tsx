@@ -35,7 +35,7 @@ describe("DiscordCertifyPrompt — rendu", () => {
   it("rien au rendu serveur (portail monté après l'hydratation), même due", () => {
     const render = (node: React.JSX.Element) => renderToStaticMarkup(<ToastProvider>{node}</ToastProvider>);
     const empty = render(<span />).replace("<span></span>", "");
-    expect(render(<DiscordCertifyPrompt prompt={{ mode: "ONE_CLICK", tag: "keryan" }} canOpen={false} onProfile={false} onAnswered={() => undefined} text={FR_TEXT} />)).toBe(empty);
+    expect(render(<DiscordCertifyPrompt prompt={{ mode: "ONE_CLICK", tag: "keryan" }} userId={7} canOpen={false} onProfile={false} onAnswered={() => undefined} text={FR_TEXT} />)).toBe(empty);
   });
 });
 
@@ -64,12 +64,14 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
   it("compte supprimé ou session close : fermée, toast dédié, pas de « Réessaie » sans fin (deux boutons)", () => {
     expect(SOURCE).toContain('if (code === ACCOUNT_DELETED_ERROR || code === "PROFILE_NOT_FOUND") return "accountDeleted";');
     expect(SOURCE).toContain('if (code === "UNAUTHORIZED") return "sessionEnded";');
+    // Réponse refusée parce qu'un autre compte est connecté ici : rien d'écrit, la fenêtre se ferme (EF-04).
+    expect(SOURCE).toContain('if (code === CERTIFY_PROMPT_OTHER_ACCOUNT) return "otherAccount";');
     expect(SOURCE).toMatch(/if \(!deadEnd\) return false;\s*setClosed\(true\);\s*showError\(t\(deadEnd\)\);\s*onAnswered\(\);\s*router\.refresh\(\);/);
     // Les deux boutons (« Ne plus voir », « Certifier ») passent par le même garde.
     expect(SOURCE.match(/closeOnDeadEnd\(/g)).toHaveLength(2);
     // « Close pour la session » écrit une seule fois : LATER, avec keepalive.
-    expect(SOURCE).toMatch(/const closeForSession = useCallback\(\(\) => \{\s*setClosed\(true\);\s*onAnswered\(\);\s*answerPrompt\("LATER"\)\.catch\(\(\) => undefined\);/);
-    expect(SOURCE.match(/answerPrompt\("LATER"\)/g)).toHaveLength(1);
+    expect(SOURCE).toMatch(/const closeForSession = useCallback\(\(\) => \{\s*setClosed\(true\);\s*onAnswered\(\);\s*answerPrompt\("LATER", userId\)\.catch\(\(\) => undefined\);/);
+    expect(SOURCE.match(/answerPrompt\("LATER"/g)).toHaveLength(1);
   });
 
   it("focus d'ouverture sur la fenêtre (titre en vue, Entrée inerte), flèche décorative hors du nom accessible", () => {
@@ -86,7 +88,8 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
   });
 
   it("parcours DIALOG : mène au dialogue de /profil, sans en recopier la logique", () => {
-    expect(SOURCE).toContain("router.push(CERTIFY_PROFILE_HREF)");
+    // Le dialogue ne s'ouvre qu'à la demande de cette fenêtre (jeton en mémoire), jamais d'un lien (EF-04).
+    expect(SOURCE).toMatch(/requestCertifyDialog\(\);\s*router\.push\(CERTIFY_PROFILE_HREF\);/);
     expect(SOURCE).toContain("window.dispatchEvent(new Event(CERTIFY_DIALOG_EVENT))");
     expect(SOURCE).not.toMatch(/method: "PUT"/);
     const profile = readSource("app/(secured)/profil/page.tsx");
@@ -100,8 +103,9 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
   });
 
   it("« Plus tard », Échap et le voile : LATER ; « Ne plus voir » : NEVER", () => {
-    expect(SOURCE).toContain('answerPrompt("LATER")');
-    expect(SOURCE).toContain('await answerPrompt("NEVER")');
+    // Chaque réponse porte le compte à qui la fenêtre a été montrée (EF-04).
+    expect(SOURCE).toContain('answerPrompt("LATER", userId)');
+    expect(SOURCE).toContain('await answerPrompt("NEVER", userId)');
     expect(SOURCE).toContain("useDialogBehavior({ open, onClose: postpone, locked: busy !== null, initialFocus: \"container\" })");
     expect(SOURCE).toContain("useBackdropDismiss(postpone, busy !== null)");
   });
@@ -116,9 +120,9 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
   });
 
   it("« Plus tard » survit à un départ de page (keepalive) ; un changement de parcours ne rouvre rien", () => {
-    expect(ANSWER).toMatch(/body: JSON\.stringify\(\{ action \}\),[\s\S]*?keepalive: true,/);
+    expect(ANSWER).toMatch(/body: JSON\.stringify\(\{ action, userId \}\),[\s\S]*?keepalive: true,/);
     // Montée seulement quand due : une proposition qui réapparaît la remonte neuve (relais).
-    expect(LAYOUT).toContain("{certifyPrompt && (");
+    expect(LAYOUT).toContain("{certifyPrompt && user && (");
     expect(LAZY).not.toContain("setFollowedLink(false)");
     expect(SOURCE).not.toContain("[prompt?.mode]");
   });
@@ -129,8 +133,10 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
     expect(SOURCE).not.toContain("addEventListener(DISCORD_CERTIFIED_EVENT");
     // Close pour la session (LATER), et seulement quand une proposition est due.
     // …et pas une seconde fois après « Plus tard », le dialogue ou « Ne plus voir ».
-    expect(LAZY).toMatch(/const onCertified = \(\) => \{\s*setCertified\(true\);\s*if \(answered\.current\) return;\s*markAnswered\(\);\s*import\("\.\/certify-prompt-answer"\)\s*\.then\(\(\{ answerCertifyPrompt \}\) => answerCertifyPrompt\("LATER"\)\)\s*\.catch\(\(\) => undefined\);/);
-    expect(SOURCE).toMatch(/await answerPrompt\("NEVER"\);\s*setClosed\(true\);\s*showSuccess\(t\("neverSaved"\)\);\s*onAnswered\(\);/);
+    // Le démontage suffit (`done`) : plus d'état `certified` en double (EF-04).
+    expect(LAZY).toMatch(/const onCertified = \(\) => \{\s*if \(answered\.current\) return;\s*markAnswered\(\);\s*import\("\.\/certify-prompt-answer"\)\s*\.then\(\(\{ answerCertifyPrompt \}\) => answerCertifyPrompt\("LATER", userId\)\)\s*\.catch\(\(\) => undefined\);/);
+    expect(LAZY).not.toContain("setCertified");
+    expect(SOURCE).toMatch(/await answerPrompt\("NEVER", userId\);\s*setClosed\(true\);\s*showSuccess\(t\("neverSaved"\)\);\s*onAnswered\(\);/);
     const profile = readSource("app/(secured)/profil/page.tsx");
     expect(profile).toMatch(/setDiscordState\(\(prev\) => \(\{ \.\.\.prev, tag, verified: true[^\n]*\n(?:\s*\/\/[^\n]*\n)*\s*window\.dispatchEvent\(certifiedFromProfileEvent\(\)\);/);
     // /profil ne se relit pas pour son propre événement.
@@ -148,7 +154,7 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
 
   it("ne couvre pas l'écran où un lien de la modale de confidentialité envoie agir", () => {
     expect(LAZY).toContain("if (privacyFollowedLink(event)) setFollowedLink(true);");
-    expect(LAZY).toContain("const over = certified || followedLink || done;");
+    expect(LAZY).toContain("const over = followedLink || done;");
     expect(LAZY).toContain("if (over || !armed) return null;");
     const privacy = readSource("components/privacy/PrivacyChangesModal.tsx");
     expect(privacy).toContain("window.dispatchEvent(privacyAnsweredEvent(followedLink));");
@@ -173,7 +179,7 @@ describe("DiscordCertifyPrompt — une proposition, jamais un consentement forc�
 describe("mise en page racine", () => {
   it("monte la fenêtre pour un compte connecté, avec ce qu'elle doit attendre", () => {
     expect(LAYOUT).toMatch(
-      /\{certifyPrompt && \(\s*<DiscordCertifyPromptLazy\s+prompt=\{certifyPrompt\}\s+privacyPending=\{privacyChanges\.length > 0\}\s+termsPending=\{termsRequired\}/,
+      /\{certifyPrompt && user && \(\s*<DiscordCertifyPromptLazy\s+prompt=\{certifyPrompt\}\s+userId=\{user\.id\}\s+privacyPending=\{privacyChanges\.length > 0\}\s+termsPending=\{termsRequired\}/,
     );
     // Rien de la fenêtre dans le premier chargement : ni import statique, ni textes de la coquille.
     expect(LAYOUT).not.toMatch(/from "@\/components\/discord\/DiscordCertifyPrompt"/);
@@ -209,36 +215,42 @@ describe("mise en page racine", () => {
   });
 
   it("jamais sur un état périmé : relue avant une ouverture tardive, fermée en cas de doute", () => {
-    // Une lecture vaut RECHECK_AFTER_MS ; au-delà, relire avant d'ouvrir.
+    // Une lecture faite canal ouvert vaut RECHECK_AFTER_MS ; au-delà, relire avant d'ouvrir.
     expect(GATE).toContain("export const RECHECK_AFTER_MS = 30_000;");
-    expect(GATE).toContain("if (!canOpen && confirmed) setConfirmed(false);");
-    expect(GATE).toMatch(/if \(!canOpen \|\| confirmed \|\| revoked \|\| answered\.current\) return;\s*if \(Date\.now\(\) - readAt\.current < RECHECK_AFTER_MS\) \{\s*setConfirmed\(true\);\s*return;\s*\}\s*const abort = new AbortController\(\);/);
-    expect(GATE).toMatch(/if \(result === "UNKNOWN"\) \{\s*setRevoked\("doubt"\);\s*\} else if \(result\.prompt\) \{\s*readAt\.current = Date\.now\(\);\s*setCurrent\(result\.prompt\);\s*setConfirmed\(true\);\s*\} else \{\s*setRevoked\("decided"\);/);
+    expect(GATE).toMatch(/if \(!canOpen \|\| confirmed \|\| doubt \|\| answered\.current\) return;\s*if \(readAt\.current !== 0 && Date\.now\(\) - readAt\.current < RECHECK_AFTER_MS\) \{\s*setConfirmed\(true\);\s*return;\s*\}\s*const abort = new AbortController\(\);/);
+    // Tranchée « plus due » : le relais démonte le morceau (EF-04) ; doute : fermée.
+    expect(GATE).toMatch(/if \(result === "UNKNOWN"\) \{\s*setDoubt\(true\);\s*\} else if \(result\.prompt\) \{\s*readAt\.current = Date\.now\(\);\s*setCurrent\(result\.prompt\);\s*setConfirmed\(true\);\s*\} else \{\s*onAnswered\(\);\s*\}/);
     // Aucune lecture d'avant le canal ne vaut : la première ouverture relit toujours.
     expect(GATE).toContain("const readAt = useRef(0);");
     expect(LAZY).not.toContain("loadedAt");
     expect(GATE).toContain("return () => abort.abort();");
-    // Une proposition fraîche de la mise en page (router.refresh) annule la relecture en cours et la rouvre.
-    expect(GATE).toContain("}, [canOpen, confirmed, revoked, layoutPrompt, answered]);");
-    expect(GATE).toMatch(/if \(prompt !== layoutPrompt\) \{\s*\/\/[^\n]*\n\s*setLayoutPrompt\(prompt\);\s*setCurrent\(prompt\);\s*if \(revoked !== "decided"\) \{\s*setRevoked\(null\);\s*setConfirmed\(canOpen\);/);
-    expect(GATE).toContain("const shown = canOpen && confirmed && revoked === null;");
-    expect(GATE).toContain("<DiscordCertifyPrompt prompt={current} canOpen={shown}");
+    // Une proposition fraîche de la mise en page (router.refresh) annule la relecture en cours et lève le doute.
+    expect(GATE).toContain("}, [canOpen, confirmed, doubt, layoutPrompt, answered, onAnswered]);");
+    expect(GATE).toMatch(/if \(prompt !== layoutPrompt\) \{\s*\/\/[^\n]*\n\s*setLayoutPrompt\(prompt\);\s*setCurrent\(prompt\);\s*if \(doubt\) setDoubt\(false\);\s*\}/);
+    // …mais n'est datée que canal ouvert, et après une relecture tranchée depuis le montage (EF-04) :
+    // une lecture de la mise en page partie avant le montage peut avoir manqué une réponse.
+    expect(GATE).toMatch(/if \(listening\.current && readAt\.current !== 0\) readAt\.current = Date\.now\(\);/);
+    expect(GATE).toContain("const shown = canOpen && confirmed && !doubt;");
+    expect(GATE).toContain("<DiscordCertifyPrompt\n      prompt={current}\n      userId={userId}\n      canOpen={shown}");
   });
 
-  it("affichée : relue au retour, au plus une fois par délai, fermée seulement sur réponse tranchée — sans sondage", () => {
-    expect(GATE).toContain('document.addEventListener("visibilitychange", onReturn);');
-    expect(GATE).toContain('window.addEventListener("pageshow", onReturn);');
-    expect(GATE).toContain("if (Date.now() - Math.max(readAt.current, triedAt.current) >= RECHECK_AFTER_MS) check(false);");
-    // Un doute (réseau pas revenu) est retenté une fois, au retour du réseau ou du focus.
-    expect(GATE).toContain('window.addEventListener("online", onRetry);');
-    expect(GATE).toContain('window.addEventListener("focus", onRetry);');
-    expect(GATE).toMatch(/if \(result === "UNKNOWN"\) \{\s*retry = !retrying;\s*return;\s*\}\s*readAt\.current = Date\.now\(\);\s*if \(result\.prompt\) setCurrent\(result\.prompt\);\s*else setRevoked\("decided"\);/);
-    expect(GATE).toContain("abort?.abort();");
+  it("une page qui la tait ne lui fait pas perdre sa confirmation ; revenue, elle se relit (EF-04)", () => {
+    expect(GATE).not.toMatch(/setConfirmed\(false\)/);
+    expect(GATE).toMatch(/useAutoRefresh\(recheckShown, \{\s*intervalMs: null,\s*enabled: shown,\s*focusMinIntervalMs: RECHECK_AFTER_MS,\s*pageShow: true,\s*freshAt: readAt,\s*runOnEnable: true,\s*\}\);/);
+  });
+
+  it("affichée : relue au retour par useAutoRefresh, fermée seulement sur réponse tranchée — sans sondage (EF-04)", () => {
+    // Plus d'écouteurs écrits à la main : le crochet commun porte retour d'onglet, cache avant/arrière et réseau.
+    expect(GATE).not.toMatch(/addEventListener\("(visibilitychange|pageshow|online|focus)"/);
+    expect(GATE).toMatch(/if \(result === "UNKNOWN"\) return "RETRY";\s*readAt\.current = Date\.now\(\);\s*if \(result\.prompt\) setCurrent\(result\.prompt\);\s*else onAnswered\(\);/);
     expect(GATE).not.toMatch(/setInterval|setTimeout/);
+    const hook = readSource("lib/shared/hooks/useAutoRefresh.ts");
+    expect(hook).toContain('export type AutoRefreshOutcome = void | "RETRY";');
   });
 
   it("une réponse d'un autre onglet la ferme ; répondue ici, le morceau se démonte (écoutes fermées)", () => {
-    expect(GATE).toMatch(/if \(revoked === "decided"\) return;\s*return onCertifyPromptAnsweredElsewhere\(onAnswered\);/);
+    // Canal fermé pendant un doute ; seules comptent les réponses de ce compte (EF-04).
+    expect(GATE).toMatch(/if \(doubt\) return;\s*const stop = onCertifyPromptAnsweredElsewhere\(userId, onAnswered\);\s*listening\.current = true;/);
     expect(LAZY).toMatch(/const markAnswered = useCallback\(\(\) => \{\s*answered\.current = true;\s*setDone\(true\);/);
     expect(ANSWER).toContain("channel.close();");
   });

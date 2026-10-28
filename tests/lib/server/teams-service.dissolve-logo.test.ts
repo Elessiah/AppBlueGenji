@@ -3,10 +3,12 @@ import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/stored-upload-cleanup");
+jest.mock("@/lib/server/session-streams", () => ({ closeUserStreams: jest.fn() }));
 
 import { getDatabase } from "@/lib/server/database";
 import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
 import { softDeleteTeam } from "@/lib/server/teams/dissolution";
+import { closeUserStreams } from "@/lib/server/session-streams";
 
 /**
  * Dissoudre une équipe remettait `logo_url` à NULL sans effacer le fichier : le
@@ -23,6 +25,7 @@ function mockDb(logoUrl: string | null, failOn?: RegExp) {
       return [[{ logo_url: logoUrl, deleted_at: null, is_ghost: 0 }], []];
     }
     if (/SELECT roles_json/.test(sql)) return [[{ roles_json: JSON.stringify(["OWNER"]) }], []];
+    if (/SELECT user_id FROM bg_team_members/.test(sql)) return [[{ user_id: 12 }, { user_id: 30 }], []];
     return [{ affectedRows: 1 }, []];
   });
   const connection = {
@@ -93,6 +96,23 @@ describe("softDeleteTeam — fichier du logo", () => {
 
     await expect(softDeleteTeam(1, 12)).rejects.toThrow("TEAM_ALREADY_DELETED");
     expect(connectionExecute).toHaveBeenCalledTimes(1);
+  });
+
+  it("ferme les flux des membres détachés après le commit, jamais quand la dissolution échoue (EF-04)", async () => {
+    const { connectionExecute, connection } = mockDb(null);
+    await softDeleteTeam(1, 12);
+    const select = connectionExecute.mock.calls.findIndex(([sql]) => /SELECT user_id FROM bg_team_members/.test(String(sql)));
+    const detach = connectionExecute.mock.calls.findIndex(([sql]) => /UPDATE bg_team_members SET left_at = NOW\(\)/.test(String(sql)));
+    expect(String(connectionExecute.mock.calls[select][0])).toMatch(/WHERE team_id = \? AND left_at IS NULL/);
+    expect(select).toBeLessThan(detach);
+    expect(jest.mocked(closeUserStreams).mock.calls).toEqual([[12], [30]]);
+    expect(jest.mocked(closeUserStreams).mock.invocationCallOrder[0])
+      .toBeGreaterThan(connection.commit.mock.invocationCallOrder[0]);
+
+    jest.mocked(closeUserStreams).mockClear();
+    mockDb(null, /UPDATE bg_team_members SET left_at/);
+    await expect(softDeleteTeam(1, 12)).rejects.toThrow("ER_LOCK_DEADLOCK");
+    expect(closeUserStreams).not.toHaveBeenCalled();
   });
 
   it("délègue sans adresse quand l'équipe n'a pas de logo", async () => {

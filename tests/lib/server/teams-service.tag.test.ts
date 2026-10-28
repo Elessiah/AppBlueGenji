@@ -280,6 +280,8 @@ describe("softDeleteTeam — sigle", () => {
     connectionExecute
       .mockResolvedValueOnce([[{ logo_url: null, deleted_at: null, is_ghost: 0 }], []]) // équipe sous verrou
       .mockResolvedValueOnce([[{ roles_json: JSON.stringify(["OWNER"]) }], []]) // OWNER, relu sous verrou
+      .mockResolvedValueOnce([{ affectedRows: 1 }, []]) // équipe anonymisée
+      .mockResolvedValueOnce([[{ user_id: 12 }], []]) // membres détachés
       .mockResolvedValue([{ affectedRows: 1 }, []]);
 
     await softDeleteTeam(1, 12);

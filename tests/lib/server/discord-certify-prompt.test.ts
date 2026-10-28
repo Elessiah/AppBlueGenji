@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
+jest.mock("@/lib/server/tournaments/certification-prompt-cache", () => ({ forgetCertificationPromptsOf: jest.fn() }));
 
 import { getDatabase } from "@/lib/server/database";
 import {
@@ -8,6 +9,9 @@ import {
   markDiscordCertifyPromptSeen,
   recordDiscordCertifyPromptOff,
 } from "@/lib/server/users/discord-certify-prompt";
+import { forgetCertificationPromptsOf } from "@/lib/server/tournaments/certification-prompt-cache";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 /** Fenêtre « Certifier ton tag Discord ? » — côté serveur (`bg_user_sessions.certify_prompt_due`, `bg_users.discord_certify_prompt_dismissed_at`). */
@@ -152,5 +156,47 @@ describe("recordDiscordCertifyPromptOff — « Ne plus voir »", () => {
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
     expect(await recordDiscordCertifyPromptOff(-1)).toBe(false);
     expect(execute).not.toHaveBeenCalled();
+  });
+});
+
+describe("loadDiscordCertifyPrompt — { clearStale: false } : la relecture GET n'écrit rien (EF-04)", () => {
+  it("rien de dû : null, aucune écriture", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    expect(await loadDiscordCertifyPrompt(7, HASH, { clearStale: false })).toBeNull();
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("colonne du compte absente : null, aucune écriture", async () => {
+    const execute = jest.fn<SqlQuery>().mockRejectedValueOnce(unknownColumn());
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    expect(await loadDiscordCertifyPrompt(7, HASH, { clearStale: false })).toBeNull();
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("invitation de la fiche tournoi oubliée quand elle ne vaut plus (EF-04)", () => {
+  it("« Ne plus voir » de la proposition gardé : l'invitation retenue pour ce compte est oubliée", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    await recordDiscordCertifyPromptOff(7);
+    expect(forgetCertificationPromptsOf).toHaveBeenCalledWith(7);
+  });
+
+  it("compte supprimé (rien d'écrit) : rien n'est oublié", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 0 }, []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    await recordDiscordCertifyPromptOff(7);
+    expect(forgetCertificationPromptsOf).not.toHaveBeenCalled();
+  });
+
+  it("certification Discord et rattachement OAuth oublient l'invitation du compte", () => {
+    const source = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
+    const verification = source("lib/server/discord-verification.ts");
+    // Tag écrit vérifié (code par message privé) et certification en un clic.
+    expect(verification).toMatch(/throw new Error\("DISCORD_ID_MISMATCH"\);\s*\}\s*\/\/[^\n]*\n\s*forgetCertificationPromptsOf\(userId\);/);
+    expect(verification).toMatch(/if \(Number\(result\.affectedRows\) > 0\) \{\s*\/\/[^\n]*\n\s*forgetCertificationPromptsOf\(userId\);\s*return \{ status: "VERIFIED", tag: expected \};/);
+    // Rattachement réussi seulement : après le retour d'échec.
+    expect(source("lib/server/oauth-flow.ts")).toMatch(/return linkFailure\([^;]*;\s*\}\s*(\/\/[^\n]*\n\s*)+forgetCertificationPromptsOf\(user\.id\);/);
   });
 });

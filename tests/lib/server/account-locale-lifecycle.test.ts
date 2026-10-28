@@ -172,3 +172,37 @@ describe("« Ne plus voir » de la certification Discord — anonymisation", () 
     await expect(anonymizeAccount(fakeConnection({ execute }), 42)).rejects.toThrow("lock");
   });
 });
+
+describe("« Ne plus voir » de l'invitation à certifier de la fiche tournoi — anonymisation (EF-04)", () => {
+  const isReset = (sql: unknown) => String(sql).includes("certification_prompt_dismissed_at") && !String(sql).includes("discord_certify");
+
+  it("efface le choix par une instruction à part, sur la ligne supprimée", async () => {
+    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(undefined);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
+    await anonymizeAccount(fakeConnection({ execute }), 42);
+    const reset = execute.mock.calls.find(([sql]) => isReset(sql));
+    expect(reset && [String(reset[0]).replace(/\s+/g, " ").trim(), reset[1]]).toEqual([
+      "UPDATE bg_users SET certification_prompt_dismissed_at = NULL WHERE id = ? AND is_deleted = 1",
+      [42],
+    ]);
+  });
+
+  it("n'empêche pas l'effacement quand la colonne manque (migration en échec)", async () => {
+    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(undefined);
+    const missing = Object.assign(new Error("Unknown column"), { code: "ER_BAD_FIELD_ERROR" });
+    const execute = jest.fn<SqlQuery>(async (sql) => {
+      if (isReset(sql)) throw missing;
+      return [[], []];
+    });
+    await expect(anonymizeAccount(fakeConnection({ execute }), 42)).resolves.not.toThrow();
+  });
+
+  it("laisse passer toute autre erreur", async () => {
+    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(undefined);
+    const execute = jest.fn<SqlQuery>(async (sql) => {
+      if (isReset(sql)) throw Object.assign(new Error("lock"), { code: "ER_LOCK_WAIT_TIMEOUT" });
+      return [[], []];
+    });
+    await expect(anonymizeAccount(fakeConnection({ execute }), 42)).rejects.toThrow("lock");
+  });
+});

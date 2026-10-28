@@ -117,6 +117,7 @@ describe("softDeleteTeam — cache du classement et des marches", () => {
         return [[{ logo_url: null, deleted_at: null, is_ghost: 0 }], []];
       }
       if (/SELECT roles_json/.test(sql)) return [[{ roles_json: JSON.stringify(["OWNER"]) }], []];
+      if (/SELECT user_id FROM bg_team_members/.test(sql)) return [[{ user_id: 12 }, { user_id: 30 }], []];
       if (failing && /SET deleted_at/.test(sql)) throw new Error("ER_LOCK_DEADLOCK");
       return [{ affectedRows: 1 }, []];
     });

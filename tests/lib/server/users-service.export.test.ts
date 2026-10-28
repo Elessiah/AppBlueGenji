@@ -80,6 +80,11 @@ function exportRow(overrides: Record<string, unknown> = {}) {
 }
 
 // getFullProfile (appelé en interne) réutilise une ligne bg_users au même format.
+/** Ligne de la lecture à part du « Ne plus voir » de l'invitation à certifier (fiche tournoi). */
+function promptRow(dismissedAt: Date | null = null) {
+  return { certification_prompt_dismissed_at: dismissedAt };
+}
+
 function fullProfileRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 42,
@@ -112,7 +117,8 @@ describe("exportOwnData", () => {
   it("includes raw account identifiers reserved to the owner (discord, google, blizzard)", async () => {
     const execute = jest
       .fn<SqlQuery>()
-      .mockResolvedValueOnce([[exportRow()]]) // identifiants bruts
+      .mockResolvedValueOnce([[exportRow()]])
+      .mockResolvedValueOnce([[promptRow()]]) // identifiants bruts
       .mockResolvedValueOnce([[fullProfileRow()]]) // getFullProfile: user row
       .mockResolvedValueOnce([[]]) // timeline
       .mockResolvedValueOnce([[]]) // stats: appartenances (aucune)
@@ -178,6 +184,7 @@ describe("exportOwnData", () => {
     const execute = jest
       .fn<SqlQuery>()
       .mockResolvedValueOnce([[exportRow({ visible_avatar: 0, open_to_recruitment: 0 })]])
+      .mockResolvedValueOnce([[promptRow()]])
       .mockResolvedValueOnce([[fullProfileRow({ visible_avatar: 0, open_to_recruitment: 0 })]])
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[]])
@@ -193,6 +200,7 @@ describe("exportOwnData", () => {
       const execute = jest
         .fn<SqlQuery>()
         .mockResolvedValueOnce([[exportRow({ locale })]])
+        .mockResolvedValueOnce([[promptRow()]])
         .mockResolvedValueOnce([[fullProfileRow({ locale })]])
         .mockResolvedValue([[]]);
       await mockDb(execute);
@@ -210,6 +218,7 @@ describe("exportOwnData", () => {
       const execute = jest
         .fn<SqlQuery>()
         .mockResolvedValueOnce([[exportRow({ recruitment_modal_off: value })]])
+        .mockResolvedValueOnce([[promptRow()]])
         .mockResolvedValueOnce([[fullProfileRow({})]])
         .mockResolvedValue([[]]);
       await mockDb(execute);
@@ -229,6 +238,7 @@ describe("exportOwnData", () => {
       const execute = jest
         .fn<SqlQuery>()
         .mockResolvedValueOnce([[exportRow({ discord_certify_prompt_dismissed_at: value })]])
+        .mockResolvedValueOnce([[promptRow()]])
         .mockResolvedValueOnce([[fullProfileRow({})]])
         .mockResolvedValue([[]]);
       await mockDb(execute);
@@ -248,6 +258,7 @@ describe("exportOwnData", () => {
       .mockRejectedValueOnce(unknownColumn)
       .mockRejectedValueOnce(unknownColumn)
       .mockResolvedValueOnce([[exportRow({ recruitment_modal_off: undefined })]])
+      .mockResolvedValueOnce([[promptRow()]])
       .mockResolvedValueOnce([[fullProfileRow({})]])
       .mockResolvedValue([[]]);
     await mockDb(execute);
@@ -268,12 +279,53 @@ describe("exportOwnData", () => {
       .fn<SqlQuery>()
       .mockRejectedValueOnce(unknownColumn)
       .mockResolvedValueOnce([[exportRow({ recruitment_modal_off: 1 })]])
+      .mockResolvedValueOnce([[promptRow()]])
       .mockResolvedValueOnce([[fullProfileRow({})]])
       .mockResolvedValue([[]]);
     await mockDb(execute);
     const data = await exportOwnData(42);
     expect(data.account.recruitmentModalOff).toBe(true);
     expect(execute.mock.calls[1][0]).toMatch(/recruitment_modal_off/);
+  });
+
+  it("rend la date du « Ne plus voir » de l'invitation à certifier (fiche tournoi), lue à part, null par défaut", async () => {
+    const run = async (value: Date | null) => {
+      const execute = jest
+        .fn<SqlQuery>()
+        .mockResolvedValueOnce([[exportRow()]])
+        .mockResolvedValueOnce([[promptRow(value)]])
+        .mockResolvedValueOnce([[fullProfileRow({})]])
+        .mockResolvedValue([[]]);
+      await mockDb(execute);
+      const data = await exportOwnData(42);
+      expect(execute.mock.calls[1][0]).toMatch(/SELECT certification_prompt_dismissed_at FROM bg_users WHERE id = \? AND is_deleted = 0/);
+      expect(execute.mock.calls[1][1]).toEqual([42]);
+      return data.account.certificationPromptDismissedAt;
+    };
+    expect(await run(new Date("2026-10-27T08:00:00.000Z"))).toBe("2026-10-27T08:00:00.000Z");
+    expect(await run(null)).toBeNull();
+  });
+
+  it("colonne certification_prompt_dismissed_at absente (ALTER échoué) : l'export est rendu quand même, date nulle", async () => {
+    const unknownColumn = Object.assign(new Error("Unknown column 'certification_prompt_dismissed_at'"), { code: "ER_BAD_FIELD_ERROR" });
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[exportRow()]])
+      .mockRejectedValueOnce(unknownColumn)
+      .mockResolvedValueOnce([[fullProfileRow({})]])
+      .mockResolvedValue([[]]);
+    await mockDb(execute);
+    const data = await exportOwnData(42);
+    expect(data.account.certificationPromptDismissedAt).toBeNull();
+  });
+
+  it("une autre panne de la lecture du « Ne plus voir » n'est pas masquée", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[exportRow()]])
+      .mockRejectedValueOnce(new Error("down"));
+    await mockDb(execute);
+    await expect(exportOwnData(42)).rejects.toThrow("down");
   });
 
   it("une autre panne de la lecture du compte n'est pas masquée par le repli", async () => {
@@ -297,6 +349,7 @@ describe("exportOwnData — plus aucune adresse", () => {
     const execute = jest
       .fn<SqlQuery>()
       .mockResolvedValueOnce([[exportRow()]])
+      .mockResolvedValueOnce([[promptRow()]])
       .mockResolvedValueOnce([[fullProfileRow()]])
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[]])
@@ -312,6 +365,7 @@ describe("exportOwnData — plus aucune adresse", () => {
     const execute = jest
       .fn<SqlQuery>()
       .mockResolvedValueOnce([[exportRow()]])
+      .mockResolvedValueOnce([[promptRow()]])
       .mockResolvedValueOnce([[fullProfileRow()]])
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[]])

@@ -89,36 +89,88 @@ describe("recheckCertifyPrompt", () => {
 });
 
 describe("answerCertifyPrompt — annonce aux autres onglets", () => {
-  it("réponse écrite : annoncée aux autres onglets, pas à soi-même ; canal d'envoi refermé", async () => {
+  it("envoie l'action et le compte à qui la fenêtre a été montrée, gardée au départ du document (EF-04)", async () => {
+    const fetchSpy = respond(200, { action: "LATER" });
+    await loadModule().answerCertifyPrompt("LATER", 7);
+    expect(fetchSpy).toHaveBeenCalledWith("/api/profile/discord/certify-prompt", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "LATER", userId: 7 }),
+      keepalive: true,
+    });
+  });
+
+  it("réponse écrite : annoncée aux autres onglets du même compte, pas à soi-même ; canal d'envoi refermé", async () => {
     const here = loadModule();
     const elsewhere = loadModule();
     const heard = jest.fn();
     const heardHere = jest.fn();
-    elsewhere.onCertifyPromptAnsweredElsewhere(heard);
-    here.onCertifyPromptAnsweredElsewhere(heardHere);
+    elsewhere.onCertifyPromptAnsweredElsewhere(7, heard);
+    here.onCertifyPromptAnsweredElsewhere(7, heardHere);
     respond(200, { action: "NEVER" });
-    await here.answerCertifyPrompt("NEVER");
+    await here.answerCertifyPrompt("NEVER", 7);
     expect(heard).toHaveBeenCalledTimes(1);
     expect(heardHere).not.toHaveBeenCalled();
     // Restent ouverts : les deux canaux d'écoute, pas celui de l'envoi.
     expect(FakeChannel.open()).toHaveLength(2);
   });
 
+  it("la réponse d'un autre compte (connecté entre-temps dans ce navigateur) ne ferme rien (EF-04)", async () => {
+    const here = loadModule();
+    const elsewhere = loadModule();
+    const otherAccount = jest.fn();
+    const sameAccount = jest.fn();
+    elsewhere.onCertifyPromptAnsweredElsewhere(8, otherAccount);
+    elsewhere.onCertifyPromptAnsweredElsewhere(7, sameAccount);
+    respond(200, { action: "NEVER" });
+    await here.answerCertifyPrompt("NEVER", 7);
+    expect(otherAccount).not.toHaveBeenCalled();
+    expect(sameAccount).toHaveBeenCalledTimes(1);
+  });
+
+  it("un message étranger sur le canal ne ferme rien (EF-04)", () => {
+    const tab = loadModule();
+    const heard = jest.fn();
+    tab.onCertifyPromptAnsweredElsewhere(7, heard);
+    const intruder = new FakeChannel("bg:certify-prompt");
+    for (const data of [null, "answered", 1, {}, { type: "other", userId: 7, from: "x" }, { type: "answered", userId: "7", from: "x" }, { type: "answered", userId: 7 }]) {
+      intruder.postMessage(data);
+    }
+    expect(heard).not.toHaveBeenCalled();
+    intruder.postMessage({ type: "answered", userId: 7, from: "autre-onglet" });
+    expect(heard).toHaveBeenCalledTimes(1);
+  });
+
+  it("isAnsweredMessageFor : forme, compte et onglet vérifiés", () => {
+    const { isAnsweredMessageFor } = loadModule();
+    expect(isAnsweredMessageFor({ type: "answered", userId: 7, from: "a" }, 7, "b")).toBe(true);
+    expect(isAnsweredMessageFor({ type: "answered", userId: 7, from: "b" }, 7, "b")).toBe(false);
+    expect(isAnsweredMessageFor({ type: "answered", userId: 8, from: "a" }, 7, "b")).toBe(false);
+    expect(isAnsweredMessageFor({ type: "answered", userId: 7, from: 3 }, 7, "b")).toBe(false);
+    expect(isAnsweredMessageFor({ type: "ANSWERED", userId: 7, from: "a" }, 7, "b")).toBe(false);
+    expect(isAnsweredMessageFor(undefined, 7, "b")).toBe(false);
+  });
+
   it("écriture refusée : rien n'est annoncé, le code remonte", async () => {
     const here = loadModule();
     const heard = jest.fn();
-    loadModule().onCertifyPromptAnsweredElsewhere(heard);
-    respond(409, { error: "ACCOUNT_DELETED" });
-    await expect(here.answerCertifyPrompt("NEVER")).rejects.toThrow("ACCOUNT_DELETED");
+    loadModule().onCertifyPromptAnsweredElsewhere(7, heard);
+    respond(409, { error: "CERTIFY_PROMPT_OTHER_ACCOUNT" });
+    await expect(here.answerCertifyPrompt("NEVER", 7)).rejects.toThrow("CERTIFY_PROMPT_OTHER_ACCOUNT");
     expect(heard).not.toHaveBeenCalled();
+  });
+
+  it("refus illisible : le statut HTTP remonte", async () => {
+    jest.spyOn(globalThis, "fetch").mockResolvedValue(new Response("<html>", { status: 502 }));
+    await expect(loadModule().answerCertifyPrompt("LATER", 7)).rejects.toThrow("HTTP 502");
   });
 
   it("un canal d'écoute partagé, fermé au dernier départ", async () => {
     const tab = loadModule();
     const first = jest.fn();
     const second = jest.fn();
-    const stopFirst = tab.onCertifyPromptAnsweredElsewhere(first);
-    const stopSecond = tab.onCertifyPromptAnsweredElsewhere(second);
+    const stopFirst = tab.onCertifyPromptAnsweredElsewhere(7, first);
+    const stopSecond = tab.onCertifyPromptAnsweredElsewhere(7, second);
     expect(FakeChannel.open()).toHaveLength(1);
     stopFirst();
     expect(FakeChannel.open()).toHaveLength(1);
@@ -126,7 +178,7 @@ describe("answerCertifyPrompt — annonce aux autres onglets", () => {
     expect(FakeChannel.open()).toHaveLength(0);
 
     respond(200, { action: "LATER" });
-    await loadModule().answerCertifyPrompt("LATER");
+    await loadModule().answerCertifyPrompt("LATER", 7);
     expect(first).not.toHaveBeenCalled();
     expect(second).not.toHaveBeenCalled();
   });
@@ -134,8 +186,8 @@ describe("answerCertifyPrompt — annonce aux autres onglets", () => {
   it("sans BroadcastChannel, rien ne casse", async () => {
     Object.defineProperty(globalThis, "BroadcastChannel", { value: undefined, configurable: true, writable: true });
     const bare = loadModule();
-    expect(bare.onCertifyPromptAnsweredElsewhere(jest.fn())()).toBeUndefined();
+    expect(bare.onCertifyPromptAnsweredElsewhere(7, jest.fn())()).toBeUndefined();
     respond(200, { action: "LATER" });
-    await expect(bare.answerCertifyPrompt("LATER")).resolves.toBeUndefined();
+    await expect(bare.answerCertifyPrompt("LATER", 7)).resolves.toBeUndefined();
   });
 });

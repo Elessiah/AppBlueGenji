@@ -672,3 +672,37 @@ describe("shareUnchanged", () => {
     expect(shareUnchanged(previous, next)).toBe(next);
   });
 });
+
+describe("invitation à certifier poussée après la connexion (EF-04)", () => {
+  const prompt = { reason: "MANAGER", discordVerified: false, battletagVerified: true, battletagRelevant: true } as const;
+
+  it("lit le message, en ne gardant que des booléens", () => {
+    const raw = JSON.stringify({
+      type: "certificationPrompt",
+      tournamentId: "7",
+      certificationPrompt: { ...prompt, discordVerified: "oui", extra: 1 },
+    });
+    expect(parseLiveMessage(raw)).toEqual({ type: "certificationPrompt", tournamentId: 7, certificationPrompt: prompt });
+  });
+
+  it("écarte une invitation absente ou de motif inconnu", () => {
+    for (const certificationPrompt of [null, undefined, {}, { ...prompt, reason: "ADMIN" }]) {
+      expect(parseLiveMessage(JSON.stringify({ type: "certificationPrompt", tournamentId: 7, certificationPrompt }))).toBeNull();
+    }
+  });
+
+  it("se pose sur le contexte du même tournoi, sans toucher au reste", () => {
+    const state = connected();
+    const next = applyLiveMessage(state, { type: "certificationPrompt", tournamentId: 7, certificationPrompt: prompt });
+    expect(next.detail?.certificationPrompt).toEqual(prompt);
+    expect(next.tier).toBe(state.tier);
+    expect(next.detail?.matches).toBe(state.detail?.matches);
+  });
+
+  it("ignorée avant la connexion ou pour un autre tournoi", () => {
+    const message = { type: "certificationPrompt", tournamentId: 7, certificationPrompt: prompt } as const;
+    expect(applyLiveMessage(INITIAL_LIVE_STATE, message)).toBe(INITIAL_LIVE_STATE);
+    const state = connected();
+    expect(applyLiveMessage(state, { ...message, tournamentId: 8 })).toBe(state);
+  });
+});

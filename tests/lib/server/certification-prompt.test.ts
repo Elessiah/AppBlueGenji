@@ -1,13 +1,22 @@
 import { describe, expect, it, jest } from "@jest/globals";
+
+jest.mock("@/lib/server/database");
+
+import { getDatabase } from "@/lib/server/database";
 import {
+  CERTIFICATION_PROMPT_CACHE_MAX,
   CERTIFICATION_PROMPT_FAILURE_TTL_MS,
   CERTIFICATION_PROMPT_READ_TIMEOUT_MS,
+  CERTIFICATION_PROMPT_STUCK_READ_MS,
   CERTIFICATION_PROMPT_TTL_MS,
   cachedCertificationPrompt,
   forgetCertificationPrompts,
+  forgetCertificationPromptsOf,
   loadCertificationPrompt,
+  peekCertificationPrompt,
+  recordCertificationPromptOff,
 } from "@/lib/server/tournaments/certification-prompt";
-import { fakeConnection, type SqlQuery } from "../../helpers/sql-double";
+import { fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 /**
  * Lecture de l'invitation à certifier depuis le roster en cours
@@ -35,13 +44,27 @@ const BARE: Omit<Member, "user_id"> = {
 const DISCORD = { discord_verified_at: "2026-10-01 10:00:00", discord_pseudo: "pseudo" };
 const BATTLETAG = { blizzard_sub: "sub", overwatch_battletag: "Joueur#1234" };
 
-/** Roster simulé ; `declined` : réponse à la lecture du « Ne plus voir » du compte (ou son échec). */
-function rosterOf(members: Member[], declined: number | Error = 0) {
-  const rows = members.map((member) => ({ team_id: 42, pseudo: `J${member.user_id}`, roles_json: "[]", ...member }));
+/**
+ * Roster simulé, rendu comme la requête le calcule (drapeaux seulement) ;
+ * `declined` : réponse à la lecture du « Ne plus voir » de la proposition de la
+ * connexion (ou son échec) ; `dismissed` : celle du « Ne plus voir » de cette
+ * invitation (ou son échec).
+ */
+function rosterOf(members: Member[], declined: number | Error = 0, dismissed: number | Error = 0) {
+  const rows = members.map((member) => ({
+    user_id: member.user_id,
+    discord_verified: member.discord_verified_at !== null && (member.discord_pseudo ?? "") !== "" ? 1 : 0,
+    battletag_verified: member.blizzard_sub !== null && (member.overwatch_battletag ?? "") !== "" ? 1 : 0,
+    blizzard_linked: member.blizzard_sub !== null ? 1 : 0,
+  }));
+  const answer = (value: number | Error) => {
+    if (value instanceof Error) throw value;
+    return [[{ chosen: value }], []];
+  };
   const execute = jest.fn<SqlQuery>().mockImplementation(async (sql) => {
-    if (!String(sql).includes("discord_certify_prompt_dismissed_at")) return [rows, []];
-    if (declined instanceof Error) throw declined;
-    return [[{ declined }], []];
+    if (String(sql).includes("discord_certify_prompt_dismissed_at")) return answer(declined);
+    if (String(sql).includes("certification_prompt_dismissed_at")) return answer(dismissed);
+    return [rows, []];
   });
   return { execute, executor: fakeConnection({ execute }) };
 }
@@ -54,6 +77,42 @@ describe("loadCertificationPrompt", () => {
     expect(sql).toContain("tm.left_at IS NULL");
     expect(sql).toContain("u.is_deleted = 0");
     expect(params).toEqual([42]);
+  });
+
+  it("ne sort de la base que des drapeaux : ni pseudo, ni tag, ni identifiant Battle.net, ni rôles (EF-04)", async () => {
+    const { execute, executor } = rosterOf([{ user_id: 7, ...BARE }]);
+    await loadCertificationPrompt(executor, 7, 42, false, true);
+    const select = String(execute.mock.calls[0][0]).split(/\bFROM\b/)[0];
+    expect(select).toMatch(/AS discord_verified/);
+    expect(select).toMatch(/AS battletag_verified/);
+    expect(select).toMatch(/AS blizzard_linked/);
+    // Les colonnes ne servent qu'au calcul : parenthèses retirées, chaque champ rendu est un drapeau nommé.
+    let flat = select.replace(/\s+/g, " ");
+    while (/\([^()]*\)/.test(flat)) flat = flat.replace(/\([^()]*\)/g, "");
+    expect(flat.replace(/^SELECT /, "").split(",").map((field) => field.trim())).toEqual([
+      "tm.user_id",
+      "AS discord_verified",
+      "AS battletag_verified",
+      "AS blizzard_linked",
+    ]);
+  });
+
+  it("« Ne plus voir » de cette invitation, posé sur le compte, la tait toute (équipe sans contact comprise) (EF-04)", async () => {
+    const { execute, executor } = rosterOf([{ user_id: 7, ...BARE }], 0, 1);
+    expect(await loadCertificationPrompt(executor, 7, 42, false, true)).toBeNull();
+    const { executor: leader } = rosterOf([{ user_id: 7, ...BARE, ...DISCORD }], 0, 1);
+    expect(await loadCertificationPrompt(leader, 7, 42, true, true)).toBeNull();
+    const choice = execute.mock.calls.find(([sql]) => String(sql).includes("certification_prompt_dismissed_at"));
+    expect(String(choice?.[0])).toMatch(/FROM bg_users WHERE id = \?/);
+    expect(choice?.[1]).toEqual([7]);
+  });
+
+  it("colonne du « Ne plus voir » de l'invitation absente : comme sans choix ; toute autre panne remonte (EF-04)", async () => {
+    const missing = Object.assign(new Error("Unknown column"), { code: "ER_BAD_FIELD_ERROR" });
+    const { executor } = rosterOf([{ user_id: 7, ...BARE }], 0, missing);
+    expect((await loadCertificationPrompt(executor, 7, 42, false, true))?.reason).toBe("TEAM_WITHOUT_CONTACT");
+    const { executor: failing } = rosterOf([{ user_id: 7, ...BARE }], 0, new Error("pool"));
+    await expect(loadCertificationPrompt(failing, 7, 42, false, true)).rejects.toThrow("pool");
   });
 
   it("invite le joueur d'une équipe sans aucun contact", async () => {
@@ -141,7 +200,9 @@ describe("loadCertificationPrompt", () => {
   it("ce refus ne tait pas une invitation qui ne porte que sur le BattleTag", async () => {
     const { execute, executor } = rosterOf([{ user_id: 7, ...BARE, ...DISCORD }], 1);
     expect((await loadCertificationPrompt(executor, 7, 42, true, true))?.reason).toBe("MANAGER");
-    expect(execute).toHaveBeenCalledTimes(1);
+    // Roster, puis le seul « Ne plus voir » de cette invitation : le refus de la connexion n'est pas lu.
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(execute.mock.calls.some(([sql]) => String(sql).includes("discord_certify_prompt_dismissed_at"))).toBe(false);
   });
 
   it("colonne du « Ne plus voir » absente : comme sans choix ; toute autre panne remonte", async () => {
@@ -247,7 +308,7 @@ describe("mémoire courte des invitations", () => {
     }
   });
 
-  it("une lecture qui pend pour de bon libère la clé au bout d'une minute", async () => {
+  it("une lecture abandonnée qui pend encore n'en relance pas d'autre ; tenue pour perdue après dix minutes (EF-04)", async () => {
     forgetCertificationPrompts();
     jest.useFakeTimers();
     const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
@@ -257,7 +318,14 @@ describe("mémoire courte des invitations", () => {
       const hung = cachedCertificationPrompt("11:42:0:1", load, now);
       jest.advanceTimersByTime(CERTIFICATION_PROMPT_READ_TIMEOUT_MS);
       await hung;
-      clock = CERTIFICATION_PROMPT_TTL_MS + 1;
+      // Chaque minute d'un blocage du pool : « rien », sans nouvelle acquisition en file.
+      for (const at of [CERTIFICATION_PROMPT_TTL_MS + 1, 3 * CERTIFICATION_PROMPT_TTL_MS, CERTIFICATION_PROMPT_STUCK_READ_MS - 1]) {
+        clock = at;
+        expect(await cachedCertificationPrompt("11:42:0:1", load, now)).toBeNull();
+      }
+      expect(load).toHaveBeenCalledTimes(1);
+      // Au-delà de dix minutes (et de l'échéance de la dernière minute servie) : relue.
+      clock = CERTIFICATION_PROMPT_STUCK_READ_MS + CERTIFICATION_PROMPT_TTL_MS;
       void cachedCertificationPrompt("11:42:0:1", load, now);
       expect(load).toHaveBeenCalledTimes(2);
       jest.clearAllTimers();
@@ -306,14 +374,74 @@ describe("mémoire courte des invitations", () => {
     clock = 0;
     const pending = () => new Promise<null>(() => undefined);
     for (let i = 0; i < 2_000; i += 1) void cachedCertificationPrompt(`p${i}`, pending, now);
-    const extra = jest.fn(async () => null);
-    await cachedCertificationPrompt("en-trop", extra, now);
-    await cachedCertificationPrompt("en-trop", extra, now);
-    // Non retenue : relue à chaque fois.
-    expect(extra).toHaveBeenCalledTimes(2);
+    const extra = jest.fn(async () => PROMPT);
+    // « Rien », sans lire : en pleine surcharge, une lecture par appel ajouterait à la charge (EF-04).
+    expect(await cachedCertificationPrompt("en-trop", extra, now)).toBeNull();
+    expect(await cachedCertificationPrompt("en-trop", extra, now)).toBeNull();
+    expect(extra).not.toHaveBeenCalled();
     jest.clearAllTimers();
     jest.useRealTimers();
     forgetCertificationPrompts();
+  });
+
+  it("pleine, une seule place libre sert à une lecture (borne exacte)", async () => {
+    forgetCertificationPrompts();
+    jest.useFakeTimers();
+    clock = 0;
+    const pending = () => new Promise<null>(() => undefined);
+    for (let i = 0; i < CERTIFICATION_PROMPT_CACHE_MAX - 1; i += 1) void cachedCertificationPrompt(`p${i}`, pending, now);
+    const last = jest.fn(async () => PROMPT);
+    expect(await cachedCertificationPrompt("derniere", last, now)).toEqual(PROMPT);
+    expect(last).toHaveBeenCalledTimes(1);
+    jest.clearAllTimers();
+    jest.useRealTimers();
+    forgetCertificationPrompts();
+  });
+
+  it("peek rend l'issue connue sans lire ; rien pour une clé inconnue, en cours ou expirée (EF-04)", async () => {
+    forgetCertificationPrompts();
+    clock = 0;
+    expect(peekCertificationPrompt("7:42:1:1", now)).toBeUndefined();
+    let finish!: (value: typeof PROMPT) => void;
+    const reading = cachedCertificationPrompt("7:42:1:1", () => new Promise((resolve) => (finish = resolve)), now);
+    expect(peekCertificationPrompt("7:42:1:1", now)).toBeUndefined();
+    finish(PROMPT);
+    await reading;
+    expect(peekCertificationPrompt("7:42:1:1", now)).toEqual({ prompt: PROMPT });
+    await cachedCertificationPrompt("8:42:1:1", async () => null, now);
+    expect(peekCertificationPrompt("8:42:1:1", now)).toEqual({ prompt: null });
+    clock = CERTIFICATION_PROMPT_TTL_MS;
+    expect(peekCertificationPrompt("7:42:1:1", now)).toBeUndefined();
+  });
+
+  it("oublie les invitations d'un compte, toutes équipes et tous rôles, sans toucher aux autres (EF-04)", async () => {
+    forgetCertificationPrompts();
+    clock = 0;
+    for (const key of ["7:42:1:1", "7:43:0:0", "70:42:1:1"]) await cachedCertificationPrompt(key, async () => PROMPT, now);
+    forgetCertificationPromptsOf(7);
+    expect(peekCertificationPrompt("7:42:1:1", now)).toBeUndefined();
+    expect(peekCertificationPrompt("7:43:0:0", now)).toBeUndefined();
+    // `70:` ne commence pas par `7:` : gardée.
+    expect(peekCertificationPrompt("70:42:1:1", now)).toEqual({ prompt: PROMPT });
+    const load = jest.fn(async () => null);
+    expect(await cachedCertificationPrompt("7:42:1:1", load, now)).toBeNull();
+    expect(load).toHaveBeenCalledTimes(1);
+  });
+
+  it("une lecture en cours oubliée n'est pas retenue : la suivante relit (EF-04)", async () => {
+    forgetCertificationPrompts();
+    clock = 0;
+    let finish!: (value: typeof PROMPT) => void;
+    const reading = cachedCertificationPrompt("7:42:1:1", () => new Promise((resolve) => (finish = resolve)), now);
+    forgetCertificationPromptsOf(7);
+    finish(PROMPT);
+    // L'appelant qui l'attendait reçoit sa réponse…
+    expect(await reading).toEqual(PROMPT);
+    // …mais elle n'est pas gardée.
+    expect(peekCertificationPrompt("7:42:1:1", now)).toBeUndefined();
+    const load = jest.fn(async () => null);
+    expect(await cachedCertificationPrompt("7:42:1:1", load, now)).toBeNull();
+    expect(load).toHaveBeenCalledTimes(1);
   });
 
   it("reste bornée : la plus ancienne part", async () => {
@@ -323,5 +451,38 @@ describe("mémoire courte des invitations", () => {
     const load = jest.fn(async () => null);
     await cachedCertificationPrompt("k0", load, now);
     expect(load).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("recordCertificationPromptOff (EF-04)", () => {
+  const PROMPT = { reason: "MANAGER", discordVerified: false, battletagVerified: true, battletagRelevant: true } as const;
+
+  it("pose la date du premier choix sur le compte, jamais sur un compte supprimé, et oublie ses invitations retenues", async () => {
+    forgetCertificationPrompts();
+    await cachedCertificationPrompt("7:42:1:1", async () => PROMPT);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, []]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    await recordCertificationPromptOff(7);
+    const [sql, params] = execute.mock.calls[0];
+    expect(String(sql)).toMatch(/UPDATE bg_users SET certification_prompt_dismissed_at = NOW\(\)/);
+    expect(String(sql)).toMatch(/WHERE id = \? AND is_deleted = 0 AND certification_prompt_dismissed_at IS NULL/);
+    expect(params).toEqual([7]);
+    expect(peekCertificationPrompt("7:42:1:1")).toBeUndefined();
+  });
+
+  it("ignore un identifiant invalide sans rien écrire", async () => {
+    const execute = jest.fn<SqlQuery>();
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    for (const id of [0, -1, 1.5, Number.NaN]) await recordCertificationPromptOff(id);
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("une panne d'écriture remonte, et la mémoire n'est pas oubliée", async () => {
+    forgetCertificationPrompts();
+    await cachedCertificationPrompt("7:42:1:1", async () => PROMPT);
+    const execute = jest.fn<SqlQuery>().mockRejectedValue(new Error("pool"));
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    await expect(recordCertificationPromptOff(7)).rejects.toThrow("pool");
+    expect(peekCertificationPrompt("7:42:1:1")).toEqual({ prompt: PROMPT });
   });
 });
