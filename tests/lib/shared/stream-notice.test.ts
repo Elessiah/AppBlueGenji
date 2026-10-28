@@ -12,6 +12,8 @@ import { TERMS_SECTIONS_EN } from "@/lib/shared/terms-of-use-en";
 import { STREAM_NOTICE_LIVE_EN } from "@/lib/shared/legal-text-en";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import frActions from "@/messages/fr/tournamentActions.json";
+import enActions from "@/messages/en/tournamentActions.json";
 
 describe("information sur la retransmission des matchs", () => {
   it("renvoie à la section de /rgpd qui la détaille", () => {
@@ -83,9 +85,20 @@ describe("message #live de la soirée (conditions v7)", () => {
     expect(TERMS_SECTIONS_EN.find((s) => s.id === "retransmission")?.paragraphs.join(" ")).toContain(STREAM_NOTICE_LIVE_EN);
   });
 
-  it("le dit aussi à l'inscription, en équipe comme en individuel", () => {
+  // EF-19 : seul un match en `START_TIME` est listé avant son passage à
+  // l'antenne (`loadEveningMatches`) — pas tout match daté de la soirée.
+  it("le dit aussi à l'inscription, en équipe comme en individuel, pour un direct réglé sur l'heure de début", () => {
     for (const solo of [true, false]) {
-      expect(registrationStreamNotice(solo)).toContain("Au début d'un match diffusé — et avant, s'il est programmé dans la soirée, puis une fois terminé —,");
+      const notice = registrationStreamNotice(solo);
+      expect(notice).toContain("Au début d'un match diffusé — et avant, si sa diffusion doit s'ouvrir à son heure de début dans la soirée, puis une fois terminé —,");
+      expect(notice).not.toContain("s'il est programmé dans la soirée");
+    }
+  });
+
+  it("la mention affichée à l'inscription (FR et EN) dit la même chose que registrationStreamNotice", () => {
+    expect([frActions.register.streamNotice.SOLO, frActions.register.streamNotice.TEAM]).toEqual([registrationStreamNotice(true), registrationStreamNotice(false)]);
+    for (const notice of Object.values(enActions.register.streamNotice)) {
+      expect(notice).toContain("— and before, if its broadcast is set to open at its start time that evening, then once finished —");
     }
   });
 

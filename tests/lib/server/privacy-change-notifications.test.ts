@@ -17,6 +17,7 @@ import {
   PRIVACY_DM_MIN_INTERVAL_DAYS,
   PRIVACY_DM_SETTLE_DAYS,
   PRIVACY_DM_WINDOW_DAYS,
+  privacyChangeDay,
   privacyChangesForOneMessage,
 } from "@/lib/shared/privacy-changes";
 import { siteBaseUrl } from "@/lib/server/site-url";
@@ -129,7 +130,8 @@ describe("dispatchPrivacyChangeNotifications", () => {
 
     const message = jest.mocked(pushDiscordDirectMessages).mock.calls[0][0] as string;
     // Le message suivant nomme à son tour ce qu'il peut, dans l'ordre du registre.
-    const second = privacyChangesForOneMessage(PRIVACY_CHANGES.slice(first.length), siteBaseUrl());
+    // (Des conditions à accepter passent en tête du lot : le reste se lit par identifiant, pas par position.)
+    const second = privacyChangesForOneMessage(PRIVACY_CHANGES.filter((change) => !first.includes(change)), siteBaseUrl());
     expect(second.length).toBeGreaterThan(0);
     for (const change of second) expect(message).toContain(change.title);
     for (const change of first) expect(message).not.toContain(change.title);
@@ -211,7 +213,8 @@ describe("dispatchPrivacyChangeNotifications", () => {
     expect(fresh.length).toBeGreaterThan(0);
 
     const calls = fakeDb({ candidates: [candidate()] });
-    await dispatchPrivacyChangeNotifications(at(first, PRIVACY_DM_SETTLE_DAYS));
+    const now = at(first, PRIVACY_DM_SETTLE_DAYS);
+    await dispatchPrivacyChangeNotifications(now);
 
     const select = calls.find((c) => c.sql.startsWith("SELECT u.id, u.pseudo"))!;
     expect(select.params).toEqual([
@@ -223,7 +226,8 @@ describe("dispatchPrivacyChangeNotifications", () => {
     // qu'il peut nommer sous le plafond du bot, le reste attendant le suivant.
     expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
     const message = jest.mocked(pushDiscordDirectMessages).mock.calls[0][0] as string;
-    const named = privacyChangesForOneMessage(PRIVACY_CHANGES, siteBaseUrl());
+    // Dus ce jour-là : les changements déjà publiés (pas une entrée datée d'après, mise en tête du lot).
+    const named = privacyChangesForOneMessage(PRIVACY_CHANGES.filter((change) => change.publishedAt <= privacyChangeDay(now)), siteBaseUrl());
     expect(named.some((change) => fresh.includes(change))).toBe(true);
     for (const change of named) expect(message).toContain(change.title);
   });

@@ -691,7 +691,8 @@ export function suspensionPush(kind: "SUSPENDED" | "LIFTED", locale: Locale = DE
 
 /**
  * Des changements du traitement des données sont à lire — une information,
- * aucun accord n'est demandé. `titles` : les titres **dans la langue du
+ * aucun accord n'est demandé, hors des conditions d'utilisation qu'une entrée
+ * annonce à accepter (fenêtre des conditions). `titles` : les titres **dans la langue du
  * destinataire** (`localizedPrivacyChanges`).
  */
 export function privacyChangePush(titles: readonly string[], locale: Locale = DEFAULT_LOCALE): PushContent {

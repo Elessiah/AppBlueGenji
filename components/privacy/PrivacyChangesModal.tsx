@@ -49,6 +49,17 @@ export const PRIVACY_POLICY_PATH = "/rgpd";
  * et les entrées arrivent **déjà traduites** de la mise en page
  * (`localizedPrivacyChanges`) — aucune traduction n'est chargée ici.
  */
+/**
+ * Phrase d'ouverture : « aucun accord » sans exception, sauf quand un
+ * changement montré annonce des conditions d'utilisation à accepter
+ * (`asksTermsAcceptance`) — comme le pied du message privé (EF-19).
+ */
+export function privacyModalIntroKey(changes: readonly PrivacyChange[]) {
+  const terms = changes.some((change) => change.asksTermsAcceptance === true);
+  if (changes.length > 1) return terms ? "privacyModal.introManyTerms" : "privacyModal.introMany";
+  return terms ? "privacyModal.introOneTerms" : "privacyModal.introOne";
+}
+
 export function PrivacyChangesModal({ changes }: Readonly<{ changes: PrivacyChange[] }>) {
   const { t, rich, locale } = useShellText();
   const { showError, showSuccess } = useToast();
@@ -142,7 +153,7 @@ export function PrivacyChangesModal({ changes }: Readonly<{ changes: PrivacyChan
           {t("privacyModal.heading", { count: changes.length })}
         </h2>
         <p id="privacy-changes-intro" className={styles.intro}>
-          {changes.length > 1 ? t("privacyModal.introMany") : t("privacyModal.introOne")}
+          {t(privacyModalIntroKey(changes))}
         </p>
 
         <ScrollArea orientation="y" className={styles.changes} ariaLabel={t("privacyModal.detailsLabel")}>
