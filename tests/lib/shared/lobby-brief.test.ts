@@ -4,6 +4,8 @@ import { localizedSiteUrl } from "@/lib/shared/dm-language";
 import { localeHref } from "@/lib/shared/locales";
 import { matchPageHref } from "@/lib/shared/match-anchor";
 import { clipPushText, PUSH_BODY_MAX, PUSH_TOPICS } from "@/lib/shared/push-notifications";
+import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
+import { PRIVACY_CHANGES_EN } from "@/lib/shared/privacy-changes-en";
 import { PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
 import { PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register-en";
 import { lobbyBriefPush, matchStartPush } from "@/lib/shared/push-messages";
@@ -166,5 +168,25 @@ describe("brief du salon — registre des traitements (T04, T12)", () => {
     const enPushActivity = PROCESSING_ACTIVITIES_EN.find((activity) => activity.ref === "T12")!;
     expect(frPushActivity.subPurposes.join(" ")).toContain("Réglages du salon de ses matchs");
     expect(enPushActivity.subPurposes.join(" ")).toContain("Lobby settings of their matches");
+  });
+
+  it("déclare la garde des réservations du brief, en français et en anglais", () => {
+    const fr = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T04")!;
+    const en = PROCESSING_ACTIVITIES_EN.find((activity) => activity.ref === "T04")!;
+    expect(fr.retention.join(" ")).toContain("et des réglages du salon (match, appariement et engagée) : conservées avec le match");
+    expect(en.retention.join(" ")).toContain("and of lobby settings sent (match, pairing and entrant): kept with the match");
+  });
+});
+
+describe("brief du salon — changement de politique (PRIVACY_CHANGES)", () => {
+  const ID = "2026-10-reglages-du-salon-aux-managers";
+
+  it("dit que le sujet push est actif par défaut et que le brief repart quand le salon rouvre", () => {
+    const fr = PRIVACY_CHANGES.find((change) => change.id === ID)!;
+    const en = PRIVACY_CHANGES_EN[ID];
+    expect(fr.details.join(" ")).toContain("« Réglages du salon », actif par défaut pour qui a activé les notifications push");
+    expect(fr.details.join(" ")).toContain("de nouveau s'il rouvre, par exemple après un changement d'horaire");
+    expect(en.details.join(" ")).toContain("“Lobby settings”, on by default for anyone who turned on push notifications");
+    expect(en.details.join(" ")).toContain("again if it reopens, for instance after a change of time");
   });
 });
