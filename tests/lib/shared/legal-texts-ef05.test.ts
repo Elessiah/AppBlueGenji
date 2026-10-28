@@ -146,7 +146,7 @@ describe("PRIVACY_CHANGES — entrée rectificative de la marque de session", ()
   const entry = PRIVACY_CHANGES.find((change) => change.id === id);
   const english = PRIVACY_CHANGES_EN[id];
 
-  it("existe en français et en anglais, datée de la mise en ligne prévue, en fin de liste", () => {
+  it("existe en français et en anglais, datée du lendemain de la mise en ligne, en fin de liste", () => {
     expect(entry?.publishedAt).toBe("2026-10-29");
     expect(english).toBeDefined();
     expect(PRIVACY_CHANGES.at(-1)?.id).toBe(id);

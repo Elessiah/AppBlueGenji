@@ -95,7 +95,7 @@ const LAST_UPDATED_EN = "29 October 2026";
 // sauvegarde deux fois par semaine au lieu d'une (BACKUP-SCHEDULE), la politique seule ;
 // réglages du salon remis aux gérants des engagées (MATCH-REFEREE MR-4), la
 // politique, puis l'article 01 des conditions (TERMS v7) — les deux datés du
-// lendemain de la mise en ligne prévue (nuit du 28 au 29 octobre 2026, § Dates corrigées).
+// lendemain de la mise en ligne du 28 octobre 2026 (§ Dates corrigées).
 const PRIVACY_LAST_UPDATED_FR = "29 octobre 2026";
 const PRIVACY_LAST_UPDATED_EN = "29 October 2026";
 

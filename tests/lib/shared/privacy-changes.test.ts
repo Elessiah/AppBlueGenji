@@ -1689,7 +1689,7 @@ describe("PRIVACY_CHANGES — réglages du salon envoyés aux managers (MATCH-RE
   const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-reglages-du-salon-aux-managers")!;
   const english = PRIVACY_CHANGES_EN["2026-10-reglages-du-salon-aux-managers"];
 
-  it("précède l'entrée des conditions v7 : datée comme elle, lendemain de la mise en ligne prévue (§ Dates corrigées), pour tous les comptes, et tient seule dans un message privé (FR et EN)", () => {
+  it("précède l'entrée des conditions v7 : datée comme elle, lendemain de la mise en ligne (§ Dates corrigées), pour tous les comptes, et tient seule dans un message privé (FR et EN)", () => {
     expectStandaloneEntry(entry, english, { fromEnd: 4, publishedAt: "2026-10-29", audience: undefined, links: [
       { href: "/rgpd#messages-de-match", label: "Lire le paragraphe « Messages privés Discord de match »" },
     ] });

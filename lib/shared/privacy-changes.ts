@@ -1143,8 +1143,8 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // MATCH-REFEREE MR-4 : brief du salon — nouveau message privé de match et
     // nouveau sujet push, adressés à ceux qui gèrent les engagées (propriétaires,
     // managers, joueur d'une entrée solo). Joueurs concernés : pas de public.
-    // Daté du lendemain de la mise en ligne groupée prévue dans la nuit du 28
-    // au 29 octobre (§ Dates corrigées), comme l'entrée des conditions v7.
+    // Daté du lendemain de la mise en ligne groupée du 28 octobre
+    // (§ Dates corrigées), comme l'entrée des conditions v7.
     id: "2026-10-reglages-du-salon-aux-managers",
     publishedAt: "2026-10-29",
     title: "Réglages du salon envoyés aux managers",
@@ -1169,7 +1169,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // (MR-3), nouveau lieu des contacts des casters et du BattleTag de
     // l'arbitre, est annoncée ici (l'entrée de l'arbitre ne nomme que les deux
     // fenêtres). Pour tous les comptes : pas de public. Daté du lendemain de la
-    // mise en ligne groupée prévue dans la nuit du 28 au 29 octobre (§ Dates
+    // mise en ligne groupée du 28 octobre (§ Dates
     // corrigées).
     id: "2026-10-conditions-v7-casters-et-arbitre",
     publishedAt: "2026-10-29",
