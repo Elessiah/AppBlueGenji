@@ -51,7 +51,12 @@ fiche.
    pseudo et son BattleTag (« À inviter dans la partie ») aux seuls lecteurs
    que sert la lecture des contacts ; ou l'aide-mémoire de l'**autogestion**
    (l'hôte crée la partie, les managers s'invitent, les paramètres, les casters
-   — cette étape seulement avec un caster, `selfManagementSteps`) ; ou, au
+   — cette étape seulement avec un caster, `selfManagementSteps`) ; à
+   l'étape des paramètres, un match **Overwatch** liste en sous-liste
+   (`<ul>` imbriquée, `OW_SELF_MANAGEMENT_SETTINGS`) : paramètres compétitifs,
+   killcam désactivée, pause lors de la déconnexion d'un joueur (clés
+   `matchPage.owSettings.*`, FR et EN) — rien pour Marvel Rivals ; ni le DM de
+   lancement ni le bot ne reprennent cette étape ; ou, au
    **staff seul**, « Aucune décision ». Rien sur un match terminé ou une
    exemption. Prendre, rendre ou confier l'arbitrage reste le geste de la carte
    (`MATCH_REFEREE.md`).

@@ -29,7 +29,7 @@ import { LiveProvider } from "@/app/(secured)/tournois/[id]/_lib/live-context";
 import { SpectatorViewProvider } from "@/components/spectator-view";
 import { ToastProvider } from "@/components/ui/toast";
 import type { LaunchCaster, LaunchSide, MatchLaunchInfo } from "@/lib/shared/match-launch";
-import type { BracketMatch } from "@/lib/shared/types";
+import type { BracketMatch, TournamentGame } from "@/lib/shared/types";
 import { EMPTY_MAP_RULES, type TournamentMapRules } from "@/lib/shared/round-maps";
 import { bracketMatch, matchCaster } from "../helpers/bracket-match";
 import { tournamentDetail } from "../helpers/tournament-detail";
@@ -115,9 +115,10 @@ function render(
   frozen = false,
   locale: "fr" | "en" = "fr",
   mapRules: TournamentMapRules = EMPTY_MAP_RULES,
+  game: TournamentGame = "OW",
 ): string {
   const detail = tournamentDetail({
-    card: tournamentCard({ id: 12, name: "Coupe d'hiver", state: "RUNNING" }),
+    card: tournamentCard({ id: 12, name: "Coupe d'hiver", state: "RUNNING", game }),
     matches: [page],
     mapRules,
   });
@@ -315,7 +316,28 @@ describe("page d'un match — arbitrage × lecteur", () => {
       expect(visible(html)).toContain("Arbitre désigné");
       expect(html).toContain("Juge#3333");
       expect(visible(html)).toContain("À inviter dans la partie");
+      expect(html).not.toContain("Killcam");
     }
+  });
+
+  it("autogestion Overwatch : les trois réglages en sous-liste de l'étape des paramètres", () => {
+    const html = render(match({ selfManaged: true }), "public");
+    const nested = /Réglez les paramètres de la partie\.\s*<ul[^>]*>(.*?)<\/ul>/.exec(html);
+    expect(nested).not.toBeNull();
+    expect(visible(nested?.[1] ?? "")).toBe(
+      " Paramètres compétitifs Killcam désactivée Pause lors de la déconnexion d'un joueur ",
+    );
+  });
+
+  it("autogestion Overwatch en anglais : les trois réglages traduits", () => {
+    const html = visible(render(match({ selfManaged: true }), "public", false, "en"));
+    expect(html).toContain("Competitive settings Killcam disabled Pause when a player disconnects");
+  });
+
+  it("autogestion Marvel Rivals : l'étape reste, sans la sous-liste Overwatch", () => {
+    const html = visible(render(match({ selfManaged: true }), "public", false, "fr", EMPTY_MAP_RULES, "MR"));
+    expect(html).toContain("Réglez les paramètres de la partie.");
+    expect(html).not.toContain("Killcam");
   });
 
   it("autogestion : l'aide-mémoire pour tous, l'invitation des casters avec un caster", () => {

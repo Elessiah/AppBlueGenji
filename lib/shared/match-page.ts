@@ -176,6 +176,9 @@ export function firstMapFieldFollows(current: string | null, edited: boolean, sa
 /** Étapes de l'autogestion, dans l'ordre (spécification de l'utilisateur, 2026-10-26). */
 export const SELF_MANAGEMENT_STEPS = ["hostCreates", "managersInvite", "settings", "inviteCasters"] as const;
 
+/** Réglages de la partie d'un match Overwatch en autogestion (sous l'étape « settings »). */
+export const OW_SELF_MANAGEMENT_SETTINGS = ["competitive", "killcamOff", "pauseOnDisconnect"] as const;
+
 export type SelfManagementStep = (typeof SELF_MANAGEMENT_STEPS)[number];
 
 /**

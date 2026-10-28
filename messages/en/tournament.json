@@ -437,6 +437,11 @@
       "settings": "Set the game settings.",
       "inviteCasters": "Invite the match's casters."
     },
+    "owSettings": {
+      "competitive": "Competitive settings",
+      "killcamOff": "Killcam disabled",
+      "pauseOnDisconnect": "Pause when a player disconnects"
+    },
     "undecided": "No decision",
     "undecidedLead": "Neither a referee nor self-management: to be decided.",
     "noCaster": "No caster signed up for this match.",

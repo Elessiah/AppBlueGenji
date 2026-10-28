@@ -437,6 +437,11 @@
       "settings": "Réglez les paramètres de la partie.",
       "inviteCasters": "Invitez les casters du match."
     },
+    "owSettings": {
+      "competitive": "Paramètres compétitifs",
+      "killcamOff": "Killcam désactivée",
+      "pauseOnDisconnect": "Pause lors de la déconnexion d'un joueur"
+    },
     "undecided": "Aucune décision",
     "undecidedLead": "Ni arbitre ni autogestion : à décider.",
     "noCaster": "Aucun caster inscrit pour ce match.",

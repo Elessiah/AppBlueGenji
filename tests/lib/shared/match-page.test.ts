@@ -9,6 +9,7 @@ import {
   matchPageSides,
   matchPageStreams,
   selfManagementSteps,
+  OW_SELF_MANAGEMENT_SETTINGS,
   SELF_MANAGEMENT_STEPS,
 } from "@/lib/shared/match-page";
 import { bracketMatch, matchCaster } from "../../helpers/bracket-match";
@@ -194,6 +195,10 @@ describe("selfManagementSteps", () => {
   it("donne les quatre étapes dans l'ordre, l'invitation des casters avec un caster", () => {
     expect(selfManagementSteps(1)).toEqual(["hostCreates", "managersInvite", "settings", "inviteCasters"]);
     expect(selfManagementSteps(3)).toEqual([...SELF_MANAGEMENT_STEPS]);
+  });
+
+  it("réglages Overwatch : compétitif, killcam, pause, dans cet ordre", () => {
+    expect(OW_SELF_MANAGEMENT_SETTINGS).toEqual(["competitive", "killcamOff", "pauseOnDisconnect"]);
   });
 
   it("sans caster, rien à inviter", () => {
