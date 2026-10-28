@@ -367,7 +367,7 @@ describe("closePanelOnTabOut — la tabulation qui sort du panneau le referme", 
     const seen: string[] = [];
     const spy = { querySelectorAll: (selector: string) => (seen.push(selector), [first]) } as unknown as ParentNode;
     closePanelOnTabOut({ key: "Tab", shiftKey: false, currentTarget: first as Element, preventDefault: () => undefined }, spy, () => undefined);
-    expect(seen).toEqual(["button, a[href]"]);
+    expect(seen).toEqual(["button:not(:disabled), a[href]"]);
   });
 
   it("laisse circuler à l'intérieur, et ignore les autres touches", () => {
@@ -455,7 +455,11 @@ describe("MatchCardActions — clavier et focus (branchements)", () => {
   });
 
   it("le focus entre dans le panneau à l'ouverture", () => {
-    expect(source).toContain('panelRef.current?.querySelector("button")?.focus({ preventScroll: true });');
+    // Un panneau qui ne contient que le lien « Page du match » reçoit aussi le focus ;
+    // le lien choisi rend le focus au bouton « ... », comme ses voisins.
+    expect(source).toContain("panelRef.current?.querySelector<HTMLElement>(PANEL_FOCUSABLE)?.focus({ preventScroll: true });");
+    expect(source).toContain('const PANEL_FOCUSABLE = "button:not(:disabled), a[href]";');
+    expect(source).toMatch(/setOpen\(false\);\s*toggleRef\.current\?\.focus\(\);\s*\}\s*:\s*undefined/);
   });
 
   it("la tabulation qui sort du pied et du panneau le referme ; par un bout du panneau, rend le focus", () => {

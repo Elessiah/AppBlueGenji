@@ -109,6 +109,12 @@ const samePlacement = (a: PanelPlacement | null, b: PanelPlacement) =>
  * un `<div>` qui reçoit des touches se présente comme un contrôle qu'il n'est
  * pas (SonarQube S6848).
  */
+/**
+ * Éléments du panneau qui reçoivent le focus : boutons actifs et liens (« Page
+ * du match » est un lien — seul, il doit pourtant recevoir le focus d'entrée).
+ */
+const PANEL_FOCUSABLE = "button:not(:disabled), a[href]";
+
 export function closePanelOnTabOut(
   e: { key: string; shiftKey: boolean; currentTarget: Element; preventDefault: () => void },
   panel: ParentNode | null,
@@ -116,7 +122,7 @@ export function closePanelOnTabOut(
 ): void {
   if (e.key !== "Tab") return;
   // Boutons et liens (« Page du match » est un lien : il se navigue, il n'agit pas).
-  const buttons: Element[] = Array.from(panel?.querySelectorAll("button, a[href]") ?? []);
+  const buttons: Element[] = Array.from(panel?.querySelectorAll(PANEL_FOCUSABLE) ?? []);
   const index = buttons.indexOf(e.currentTarget);
   if (index === -1) return;
   if ((e.shiftKey && index === 0) || (!e.shiftKey && index === buttons.length - 1)) {
@@ -345,7 +351,7 @@ export function MatchCardActions({
     if (!expanded) return;
     // À l'ouverture, le focus entre dans le panneau : porté hors de la carte,
     // il n'est pas sur le chemin de la tabulation depuis le bouton.
-    panelRef.current?.querySelector("button")?.focus({ preventScroll: true });
+    panelRef.current?.querySelector<HTMLElement>(PANEL_FOCUSABLE)?.focus({ preventScroll: true });
     const onKey = (e: KeyboardEvent) => {
       handleMenuEscape(e.key, document.activeElement, menu, toggleRef.current, () => setOpen(false));
     };
@@ -535,7 +541,14 @@ export function MatchCardActions({
           label={action.label}
           name={actionName(action.label)}
           onKeyDown={inMenu ? onPanelKeyDown : undefined}
-          onNavigate={inMenu ? () => setOpen(false) : undefined}
+          onNavigate={
+            inMenu
+              ? () => {
+                  setOpen(false);
+                  toggleRef.current?.focus();
+                }
+              : undefined
+          }
         />
       );
     }
