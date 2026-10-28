@@ -119,6 +119,7 @@ Ce qu'elle contient aujourd'hui :
 | — (CERTIFY-PROMPT) | `bg_user_sessions` | `certify_prompt_due` — `TINYINT(1)`, défaut `0` ; `1` posé par `createSession` pour une porte Discord ou Blizzard, levé par la première réponse à la fenêtre ; lu avec la session (`getCurrentUser`) |
 | #441 (horaires de match) | `bg_match_reminders` | `start_at` — sur `TOLD`, l'horaire que les joueurs ont reçu (cité par « au lieu du … » et l'avis de retrait ; `NULL` : un retrait remis) ; sur l'observation et un palier, l'horaire pour lequel la marque est prise (seul son envoi la rend) ; sur `STAFF` (clé ajoutée sans changement de schéma), l'horaire poussé aux arbitres, seul retiré chez eux — `docs/features/DISCORD_NOTIFICATIONS.md` |
 | #441 (horaires de match) | `bg_matches` | index `idx_bg_matches_start_at` — fenêtre de lecture du balayage des rappels (`lib/server/tournaments/match-reminders.ts`), sans lequel chaque passage relisait toute l'histoire des matchs |
+| — (EF-07) | `bg_matches` | index `idx_bg_matches_status_updated` `(status, updated_at)` — les trois derniers matchs terminés du bandeau de l'accueil (`loadLandingTicker`), lus sans trier tout l'historique terminé |
 
 `bg_matches.launched_at` n'est **pas** dans la liste, et c'est volontaire : son
 ajout s'accompagne d'un **remplissage** (les matchs déjà jouables au déploiement

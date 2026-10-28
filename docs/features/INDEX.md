@@ -155,7 +155,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `LANDING_HERO_FOLD.md` — Accueil en desktop : l'appel principal au premier écran.
 - `LANDING_MOBILE_LAYOUT.md` — Accueil en mobile.
 - `LANDING_LEADERBOARD.md` — Classement de l'accueil.
-- `TICKER_RESULTS.md` — Bandeau défilant : résultats habillés par camp (vainqueur `--teal-400` + « ▲ », perdant encre de défaite + « ▼ », forfait et nul neutres, score en avant, issue en texte masqué FR / EN), issue lue sur le résultat enregistré.
+- `TICKER_RESULTS.md` — Bandeau défilant : résultats habillés par camp (vainqueur `--teal-400` + « ✓ », perdant encre de défaite + « ✕ », forfait et nul neutres, score en avant, issue en texte masqué FR / EN), issue lue sur le résultat enregistré et calculée au chargement.
 - `LANDING_CALENDAR_LINKS.md` — Événements de l'accueil cliquables.
 - `LANDING_TOURNAMENT_BOARD.md` — Tableau des tournois de l'accueil.
 - `ABOUT_PILLARS_MANAGEMENT.md` — Piliers de « L'association ».

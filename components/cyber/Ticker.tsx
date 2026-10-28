@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState } from "react";
+import { memo, useState, type ReactNode } from "react";
 import { useLandingText } from "@/components/i18n/landing-text";
 import type { TickerItem, TickerOutcome, TickerResultSide } from "@/lib/shared/ticker-items";
 import styles from "./Ticker.module.css";
@@ -16,21 +16,45 @@ const OUTCOME_CLASS: Record<TickerOutcome, string | undefined> = {
   none: undefined,
 };
 
-/** Repère de forme, en plus de la teinte : la couleur n'est jamais seule (WCAG 1.4.1). */
-const OUTCOME_MARK: Partial<Record<TickerOutcome, string>> = { win: "▲", loss: "▼" };
+/**
+ * Repère de forme, en plus de la teinte : la couleur n'est jamais seule (WCAG 1.4.1).
+ * « ✓ » / « ✕ » et non « ▲ » / « ▼ » : ces derniers disent un mouvement de rang
+ * sur `/classement` et dans les vues d'endurance (« ▼Alpha 2 » se lisait « Alpha
+ * a perdu 2 places »).
+ */
+const OUTCOME_MARK: Partial<Record<TickerOutcome, string>> = { win: "✓", loss: "✕" };
 
-function ResultSide({ side }: Readonly<{ side: TickerResultSide }>) {
-  const mark = OUTCOME_MARK[side.outcome];
+/**
+ * Un nom habillé selon son issue : classe, `data-outcome` et repère aux mêmes
+ * endroits pour un camp de résultat et pour le champion (une seule copie du
+ * style du vainqueur).
+ */
+function OutcomeName({ outcome, children }: Readonly<{ outcome: TickerOutcome; children: ReactNode }>) {
+  const mark = OUTCOME_MARK[outcome];
   return (
-    <span className={[styles.side, OUTCOME_CLASS[side.outcome]].filter(Boolean).join(" ")} data-outcome={side.outcome}>
+    <span className={[styles.side, OUTCOME_CLASS[outcome]].filter(Boolean).join(" ")} data-outcome={outcome}>
       {mark ? (
         <i className={styles.mark} aria-hidden="true">
           {mark}
         </i>
       ) : null}
+      {children}
+    </span>
+  );
+}
+
+/**
+ * `hidden` : la seconde copie de la piste est masquée aux technologies d'assistance —
+ * les mots d'issue et notes dits au lecteur d'écran seul n'y sont pas rendus.
+ */
+function ResultSide({ side, hidden }: Readonly<{ side: TickerResultSide; hidden: boolean }>) {
+  return (
+    <OutcomeName outcome={side.outcome}>
       <span>{side.name}</span>
       {/* Un forfait se lit aussi à l'écran : sans teinte ni repère, le mot seul le dit. */}
-      {side.sr ? <span className={side.outcome === "forfeit" ? undefined : "sr-only"}> ({side.sr})</span> : null}
+      {side.sr && (side.outcome === "forfeit" || !hidden) ? (
+        <span className={side.outcome === "forfeit" ? undefined : "sr-only"}> ({side.sr})</span>
+      ) : null}
       {/* Double forfait : aucun score enregistré, pas de « 0 » qui ferait croire à un 0-0. */}
       {side.score === null ? null : (
         <>
@@ -38,32 +62,32 @@ function ResultSide({ side }: Readonly<{ side: TickerResultSide }>) {
           <b className={styles.score}>{side.score}</b>
         </>
       )}
-    </span>
+    </OutcomeName>
   );
 }
 
 /** Une entrée : phrase brute, ou résultat / champion habillés par camp. */
-function TickerEntry({ item }: Readonly<{ item: TickerItem }>) {
+function TickerEntry({ item, hidden }: Readonly<{ item: TickerItem; hidden: boolean }>) {
   if (typeof item === "string") return <>{item}</>;
   if (item.kind === "champion") {
     if (!item.known) return <>{`${item.lead} ${item.name}`}</>;
     return (
       <>
         {item.lead}{" "}
-        <span className={`${styles.side} ${styles.winner}`} data-outcome="win">
-          <i className={styles.mark} aria-hidden="true">
-            ▲
-          </i>
+        <OutcomeName outcome="win">
           <span>{item.name}</span>
-        </span>
+        </OutcomeName>
       </>
     );
   }
   const [left, right] = item.sides;
+  // Un nul aux scores inégaux (format à égalité permise : 2-1 sans vainqueur) se lirait
+  // comme une victoire du camp en tête : la note se voit alors, comme « forfait ».
+  const noteShown = item.sr !== null && left.score !== right.score;
   return (
     <>
-      {item.lead} <ResultSide side={left} /> — <ResultSide side={right} />
-      {item.sr ? <span className="sr-only"> ({item.sr})</span> : null}
+      {item.lead} <ResultSide side={left} hidden={hidden} /> — <ResultSide side={right} hidden={hidden} />
+      {item.sr && (noteShown || !hidden) ? <span className={noteShown ? undefined : "sr-only"}> ({item.sr})</span> : null}
     </>
   );
 }
@@ -94,8 +118,8 @@ interface TickerProps {
  * deux fois.
  *
  * Un **résultat** habille ses camps (`docs/features/TICKER_RESULTS.md`) :
- * vainqueur en `--teal-400`, gras, « ▲ » ; perdant dans l'encre de la
- * défaite (`--result-loss-ink`), « ▼ » ; forfait et nul neutres, le forfait dit en clair ; score en gras et plus grand ; l'issue dite
+ * vainqueur en `--teal-400`, gras, « ✓ » ; perdant dans l'encre de la
+ * défaite (`--result-loss-ink`), « ✕ » ; forfait et nul neutres, le forfait dit en clair ; score en gras et plus grand ; l'issue dite
  * en texte masqué aux lecteurs d'écran.
  */
 function TickerView({ items, labels }: Readonly<TickerProps>) {
@@ -110,7 +134,7 @@ function TickerView({ items, labels }: Readonly<TickerProps>) {
           <div key={copy} className={styles.copy} aria-hidden={copy === 1 ? true : undefined}>
             {items.map((item, i) => (
               <span key={i} /* NOSONAR S6479 — bandeau en lecture seule, entrées sans identifiant et possiblement en double */ className={styles.item}>
-                <TickerEntry item={item} />
+                <TickerEntry item={item} hidden={copy === 1} />
                 <i className={styles.sep} aria-hidden="true">
                   ◆
                 </i>

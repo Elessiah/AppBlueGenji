@@ -4,7 +4,7 @@ jest.mock("@/lib/server/database");
 
 import { getLandingTicker } from "@/lib/server/landing-service";
 import { clearCache } from "@/lib/server/cache";
-import { tickerItemText } from "@/lib/shared/ticker-items";
+import { tickerItemText } from "../../helpers/ticker-text";
 import { type SqlQuery, fakePool } from "../../helpers/sql-double";
 
 /**

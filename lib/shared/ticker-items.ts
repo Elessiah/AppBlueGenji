@@ -10,6 +10,7 @@
  */
 
 import { forfeitMapCount, type MatchFormat } from "./match-format";
+import { isMatchDoubleForfeit, isMatchDrawn } from "./match-outcome";
 
 /**
  * Issue d'un camp : `win` / `loss` d'un match tranché sur le jeu, `forfeit`
@@ -60,24 +61,39 @@ export type TickerMatchOutcomeInput = {
 /**
  * Issue de chaque camp, lue sur le **résultat enregistré** (`winner_team_id`,
  * `forfeit_team_id`, `double_forfeit`) — jamais devinée d'après les scores.
- * Double forfait : deux camps forfaits. Un forfait nominatif se lit **avant**
- * le vainqueur : son adversaire l'emporte, même si la colonne du vainqueur est
- * vide ou fausse. Sans vainqueur enregistré : nul.
+ * Bâtie sur `lib/shared/match-outcome.ts` (double forfait, nul), comme les
+ * fiches : une seule règle d'issue. La requête du bandeau ne retient que des
+ * matchs entre deux engagés (`team1_id` et `team2_id` non nuls).
+ *
+ * - double forfait : deux camps forfaits ;
+ * - **vainqueur enregistré** désignant un camp : il est suivi, l'arbre et le
+ *   classement le suivent aussi ; le forfait nominatif ne sert alors qu'à
+ *   marquer l'*autre* camp « forfait » (et non « perdant ») ;
+ * - sans vainqueur propre au match, un forfait nominatif donne la victoire à
+ *   son adversaire ;
+ * - sinon (nul, vainqueur étranger au match) : deux `none`.
  */
 export function tickerOutcomes(match: TickerMatchOutcomeInput): readonly [TickerOutcome, TickerOutcome] {
-  if (match.doubleForfeit) return ["forfeit", "forfeit"];
-  if (match.forfeitTeamId !== null) {
-    if (match.forfeitTeamId === match.team1Id) return ["forfeit", "win"];
-    if (match.forfeitTeamId === match.team2Id) return ["win", "forfeit"];
-  }
-  const winner = match.winnerTeamId;
-  if (winner === null || (winner !== match.team1Id && winner !== match.team2Id)) return ["none", "none"];
-  const side = (teamId: number | null): TickerOutcome => {
-    // Case vide (exemption, engagé retiré) : personne n'y a perdu.
-    if (teamId === null) return "none";
-    return teamId === winner ? "win" : "loss";
+  const shape = { status: "COMPLETED" as const, ...match };
+  if (isMatchDoubleForfeit(shape)) return ["forfeit", "forfeit"];
+  if (isMatchDrawn(shape)) return ["none", "none"];
+  const sideOf = (teamId: number | null): 0 | 1 | null => {
+    if (teamId === null) return null;
+    if (teamId === match.team1Id) return 0;
+    return teamId === match.team2Id ? 1 : null;
   };
-  return [side(match.team1Id), side(match.team2Id)];
+  const winnerSide = sideOf(match.winnerTeamId);
+  const forfeitSide = sideOf(match.forfeitTeamId);
+  const outcomes: [TickerOutcome, TickerOutcome] = ["none", "none"];
+  if (winnerSide !== null) {
+    const other = winnerSide === 0 ? 1 : 0;
+    outcomes[winnerSide] = "win";
+    outcomes[other] = forfeitSide === other ? "forfeit" : "loss";
+  } else if (forfeitSide !== null) {
+    outcomes[forfeitSide] = "forfeit";
+    outcomes[forfeitSide === 0 ? 1 : 0] = "win";
+  }
+  return outcomes;
 }
 
 /** Scores enregistrés d'un match terminé, avec le format de son tournoi. */
@@ -89,13 +105,14 @@ export type TickerMatchScoreInput = TickerMatchOutcomeInput & {
 };
 
 /**
- * Scores affichés, comme sur les fiches (`forfeitAwareMapScore`) : un double
- * forfait n'a **aucun** score (`DOUBLE_FORFEIT.md` — pas de « 0 — 0 », même si
- * une ancienne ligne en garde un) ; un forfait se chiffre au score plein du
- * format (FT3 → 3-0, `forfeitMapCount`) quand les colonnes sont vides ou à
- * 0-0 (forfaits antérieurs à la règle) ; un score de forfait déjà écrit, qui
- * suit le format de sa phase (play-offs d'une BG Survie), est gardé. Sinon,
- * les colonnes.
+ * Scores affichés : un double forfait n'a **aucun** score
+ * (`DOUBLE_FORFEIT.md` — pas de « 0 — 0 », même si une ancienne ligne en garde
+ * un) ; un forfait se chiffre au score plein du format du tournoi (FT3 → 3-0,
+ * `forfeitMapCount`) quand les colonnes sont vides ou à 0-0 (forfaits
+ * antérieurs à la règle) ; un score de forfait déjà écrit, qui suit le format
+ * de sa phase (play-offs d'une BG Survie), est gardé tel quel — le bandeau
+ * affiche donc 2-0 là où la fiche, qui recalcule toujours le score plein du
+ * format du tournoi (`forfeitAwareMapScore`), dit 3-0. Sinon, les colonnes.
  */
 export function tickerScores(match: TickerMatchScoreInput): readonly [number | null, number | null] {
   if (match.doubleForfeit) return [null, null];
@@ -109,13 +126,4 @@ export function tickerScores(match: TickerMatchScoreInput): readonly [number | n
     return left === "forfeit" ? [0, maps] : [maps, 0];
   }
   return [Number(match.score1 ?? 0), Number(match.score2 ?? 0)];
-}
-
-/** Texte brut d'une entrée (tests) : amorce, noms et scores, sans les repères « ▲ » / « ▼ » ni les mots d'issue. */
-export function tickerItemText(item: TickerItem): string {
-  if (typeof item === "string") return item;
-  if (item.kind === "champion") return `${item.lead} ${item.name}`;
-  const [left, right] = item.sides;
-  const side = (s: TickerResultSide) => (s.score === null ? s.name : `${s.name} ${s.score}`);
-  return `${item.lead} ${side(left)} — ${side(right)}`;
 }

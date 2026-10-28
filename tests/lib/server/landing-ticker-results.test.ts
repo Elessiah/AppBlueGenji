@@ -26,7 +26,8 @@ type ResultRow = {
   match_format_value: number | null;
 };
 
-function resultRow(overrides: Partial<ResultRow>, minute: number) {
+/** Les pilotes peuvent rendre un identifiant en chaîne (`bigNumberStrings`) : les surcharges l'admettent. */
+function resultRow(overrides: Partial<{ [K in keyof ResultRow]: ResultRow[K] | string }>, minute: number) {
   return {
     updated_at: new Date(`2026-10-05T10:${String(minute).padStart(2, "0")}:00Z`),
     tournament_name: "Alpha Cup",
@@ -175,6 +176,30 @@ describe("getLandingTicker — résultats", () => {
   });
 });
 
+describe("getLandingTicker — issue et noms calculés au chargement", () => {
+  it("identifiants rendus en chaîne par le pilote : l'issue reste lue, pas de résultat neutre", async () => {
+    await mockTicker([resultRow({ team1_id: "1", team2_id: "2", winner_team_id: "2" }, 1)]);
+    const [item] = results((await getLandingTicker()).items);
+    expect(item.sides.map((side) => side.outcome)).toEqual(["loss", "win"]);
+    expect(item.sr).toBeNull();
+  });
+
+  it("forfait de l'adversaire d'un vainqueur enregistré : « forfait », et le vainqueur enregistré est suivi", async () => {
+    await mockTicker([resultRow({ winner_team_id: 1, forfeit_team_id: 2 }, 1), resultRow({ winner_team_id: 1, forfeit_team_id: 1 }, 2)]);
+    // Le plus récent d'abord (minute 2 : vainqueur = camp forfait, incohérent).
+    const [incoherent, forfeit] = results((await getLandingTicker()).items);
+    expect(forfeit.sides.map((side) => side.outcome)).toEqual(["win", "forfeit"]);
+    expect(incoherent.sides.map((side) => side.outcome)).toEqual(["win", "loss"]);
+  });
+
+  it("un seul chargement sert les deux langues, sans relire la base", async () => {
+    const execute = await mockTicker([resultRow({}, 1)]);
+    await getLandingTicker();
+    await getLandingTicker("en");
+    expect(execute).toHaveBeenCalledTimes(4);
+  });
+});
+
 describe("getLandingTicker — champions", () => {
   it("champion connu mis en valeur ; champion inconnu laissé neutre", async () => {
     await mockTicker(
@@ -191,6 +216,20 @@ describe("getLandingTicker — champions", () => {
       { kind: "champion", lead: "VAINQUEUR · Gamma League ·", name: "Alpha", known: true },
       { kind: "champion", lead: "VAINQUEUR · Delta Cup ·", name: "Champion inconnu", known: false },
     ]);
+  });
+
+  it("ligne d'équipe disparue ou nom vide : repli « Équipe #id » en texte simple, jamais mis en valeur (FR et EN)", async () => {
+    await mockTicker(
+      [],
+      [
+        { finished_at: new Date("2026-10-03T10:00:00Z"), name: "Gamma League", winner_name: null, winner_team_id: 42 },
+        { finished_at: new Date("2026-10-02T10:00:00Z"), name: "Delta Cup", winner_name: "​", winner_team_id: 7 },
+      ],
+    );
+    const champions = async (locale?: "en") =>
+      (await getLandingTicker(locale)).items.filter((item): item is TickerChampionItem => typeof item !== "string" && item.kind === "champion");
+    expect((await champions()).map((c) => [c.name, c.known])).toEqual([["Équipe #42", false], ["Équipe #7", false]]);
+    expect((await champions("en")).map((c) => [c.name, c.known])).toEqual([["Team #42", false], ["Team #7", false]]);
   });
 });
 

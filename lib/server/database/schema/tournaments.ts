@@ -172,6 +172,7 @@ export async function createTournamentTables(db: Pool): Promise<void> {
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_bg_matches_tournament (tournament_id),
       INDEX idx_bg_matches_status (status),
+      INDEX idx_bg_matches_status_updated (status, updated_at),
       INDEX idx_bg_matches_round (round_number),
       INDEX idx_bg_matches_phase (tournament_id, phase_id),
       INDEX idx_bg_matches_live (live_trigger, status),

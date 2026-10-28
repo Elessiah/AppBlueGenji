@@ -213,6 +213,11 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // les 48 heures) à chaque lecture de `/tournois`, une fois par minute au plus :
     // sans index, toute l'histoire des matchs était relue à chaque passage.
     `ALTER TABLE bg_matches ADD INDEX idx_bg_matches_start_at (start_at)`,
+    // EF-07 — le bandeau de l'accueil lit les trois derniers matchs terminés
+    // (`WHERE status = 'COMPLETED' ORDER BY updated_at DESC LIMIT 3`) à chaque
+    // recalcul de son cache : avec le seul index sur `status`, tout l'historique
+    // terminé était lu puis trié pour en garder trois.
+    `ALTER TABLE bg_matches ADD INDEX idx_bg_matches_status_updated (status, updated_at)`,
     // Phase de lancement des matchs devenue une option du tournoi
     // (`docs/features/MATCH_LAUNCH.md`). Décision de l'utilisateur
     // (2026-10-13) : défaut 0, si bien que tout tournoi existant passe sans
