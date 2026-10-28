@@ -134,7 +134,7 @@ describe("dispatchMatchStartNotices", () => {
     expect(sql).toMatch(/t\.state = 'RUNNING'/);
     expect(sql).toMatch(/m\.status = 'READY' AND m\.is_bye = 0/);
     expect(sql).toMatch(/m\.launch_pairing = CONCAT\(m\.team1_id, ':', m\.team2_id\)/);
-    // Seules les phases du départ comptent : un brief du salon (`LOBBY_BRIEF`)
+    // Seules les phases du départ comptent : un brief du salon (`LOBBY_BRIEF_1`)
     // déjà réservé ne tait ni l'appel aux « Prêt » ni l'annonce du départ.
     expect(sql).toMatch(/n\.phase = 'LOBBY' OR \(n\.phase = 'LAUNCHED' AND m\.launched_at IS NOT NULL\)/);
     expect(params).toEqual([20, 10]);

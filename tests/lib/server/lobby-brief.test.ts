@@ -14,7 +14,7 @@ import { loadEligibleRefereeIds } from "@/lib/server/tournaments/cast-eligibilit
 import { readMatchCasters } from "@/lib/server/tournaments/player-pushes";
 import {
   dispatchLobbyBriefs,
-  LOBBY_BRIEF_PHASE,
+  lobbyBriefPhase,
   resetLobbyBriefThrottle,
 } from "@/lib/server/tournaments/lobby-brief";
 import { renderDm } from "@/lib/shared/dm-language";
@@ -97,17 +97,22 @@ describe("dispatchLobbyBriefs", () => {
     expect(sql).toMatch(/m\.status = 'READY' AND m\.is_bye = 0/);
     expect(sql).toMatch(/m\.launch_pairing = CONCAT\(m\.team1_id, ':', m\.team2_id\)/);
     expect(sql).toMatch(/m\.lobby_opened_at > NOW\(\) - INTERVAL \? MINUTE/);
-    expect(sql).toMatch(/n\.phase = \?/);
-    expect(params).toEqual([20, LOBBY_BRIEF_PHASE]);
+    // Un match reste candidat tant qu'un de ses deux côtés n'est pas réservé.
+    expect(sql).toMatch(/n\.phase IN \(\?, \?\)\) < 2/);
+    expect(params).toEqual([20, "LOBBY_BRIEF_1", "LOBBY_BRIEF_2"]);
+    expect(lobbyBriefPhase(2).length).toBeLessThanOrEqual(16);
     expect(notifyUsers).not.toHaveBeenCalled();
   });
 
-  it("réserve le brief par appariement, puis l'envoie aux managers de chaque engagée, de son côté", async () => {
+  it("réserve le brief par engagée et par appariement, puis l'envoie aux managers de chaque engagée, de son côté", async () => {
     const { execute } = mockDb([MATCH]);
 
     expect(await dispatchLobbyBriefs()).toBe(2);
 
-    expect(execute.mock.calls[0][1]).toEqual([40, "1:2", "LOBBY_BRIEF"]);
+    expect(execute.mock.calls.map(([, params]) => params)).toEqual([
+      [40, "1:2", "LOBBY_BRIEF_1"],
+      [40, "1:2", "LOBBY_BRIEF_2"],
+    ]);
     expect(loadEntrantManagerIds).toHaveBeenCalledWith([1, 2]);
     // Message de match : tag certifié seul, interrupteur du profil respecté.
     expect(loadNotificationRecipients).toHaveBeenCalledWith([10, 11], "certified", { matchDm: true });
@@ -125,11 +130,18 @@ describe("dispatchLobbyBriefs", () => {
     expect(team2.dm("en")).toContain("• Left (host): “Renards”");
   });
 
-  it("n'envoie rien quand un autre balayage a pris la réservation", async () => {
-    mockDb([MATCH], [false]);
+  it("n'envoie rien quand un autre balayage a pris les réservations", async () => {
+    mockDb([MATCH], [false, false]);
     expect(await dispatchLobbyBriefs()).toBe(0);
     expect(loadEntrantManagerIds).not.toHaveBeenCalled();
     expect(notifyUsers).not.toHaveBeenCalled();
+  });
+
+  it("n'envoie que le côté encore libre : l'autre est déjà briefé", async () => {
+    mockDb([MATCH], [false, true]);
+    expect(await dispatchLobbyBriefs()).toBe(1);
+    expect(loadEntrantManagerIds).toHaveBeenCalledWith([2]);
+    expect(sends().map((send) => send.userIds)).toEqual([[20]]);
   });
 
   it("une fantôme n'a personne : seule l'autre engagée est briefée", async () => {
@@ -185,10 +197,10 @@ describe("dispatchLobbyBriefs", () => {
     await dispatchLobbyBriefs();
     expect(notifyUsers).toHaveBeenCalledTimes(2);
     expect(error.mock.calls.some(([message]) => String(message).includes("non remis sur Discord à 2 compte(s)"))).toBe(true);
-    // Le balayage suivant ne retente pas : la réservation est prise.
+    // Le balayage suivant ne retente pas : les réservations sont prises.
     jest.mocked(notifyUsers).mockClear();
     resetLobbyBriefThrottle();
-    mockDb([MATCH], [false]);
+    mockDb([MATCH], [false, false]);
     await dispatchLobbyBriefs();
     expect(notifyUsers).not.toHaveBeenCalled();
     error.mockRestore();
@@ -209,22 +221,44 @@ describe("dispatchLobbyBriefs", () => {
     const { execute } = mockDb([MATCH, { ...MATCH, id: 41 }]);
     expect(await dispatchLobbyBriefs()).toBe(0);
     const releases = execute.mock.calls.filter(([sql]) => sql.startsWith("DELETE FROM bg_match_start_notices"));
-    expect(releases.map(([, params]) => params)).toEqual([
-      [40, "1:2", "LOBBY_BRIEF"],
-      [41, "1:2", "LOBBY_BRIEF"],
+    // Une seule instruction : tout est rendu, ou rien.
+    expect(releases).toHaveLength(1);
+    expect(releases[0][1]).toEqual([
+      40, "1:2", "LOBBY_BRIEF_1", 40, "1:2", "LOBBY_BRIEF_2", 41, "1:2", "LOBBY_BRIEF_1", 41, "1:2", "LOBBY_BRIEF_2",
     ]);
-    expect(String(releases[0][0])).toMatch(/WHERE match_id = \? AND pairing = \? AND phase = \?/);
+    expect(String(releases[0][0]).match(/\(match_id = \? AND pairing = \? AND phase = \?\)/g)).toHaveLength(4);
     expect(notifyUsers).not.toHaveBeenCalled();
     error.mockRestore();
   });
 
-  it("un côté en échec n'empêche pas les autres d'être briefés", async () => {
+  it("un côté en échec rend sa seule réservation et n'empêche pas les autres d'être briefés", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
     jest.mocked(notifyUsers).mockRejectedValueOnce(new Error("PUSH_DOWN"));
-    mockDb([MATCH, { ...MATCH, id: 41 }]);
+    const { execute } = mockDb([MATCH, { ...MATCH, id: 41 }]);
     expect(await dispatchLobbyBriefs()).toBe(3);
     expect(notifyUsers).toHaveBeenCalledTimes(4);
     expect(error.mock.calls.some(([message]) => String(message).includes("brief du match 40 non envoyé"))).toBe(true);
+    const releases = execute.mock.calls.filter(([sql]) => sql.startsWith("DELETE FROM bg_match_start_notices"));
+    expect(releases.map(([, params]) => params)).toEqual([[40, "1:2", "LOBBY_BRIEF_1"]]);
+    error.mockRestore();
+  });
+
+  it("une réservation qui échoue en cours de route rend celles déjà prises", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const { execute } = mockDb([MATCH, { ...MATCH, id: 41 }]);
+    let inserts = 0;
+    execute.mockImplementation(async (sql) => {
+      if (sql.startsWith("INSERT IGNORE")) {
+        inserts += 1;
+        if (inserts === 3) throw new Error("DB_DOWN");
+        return [{ affectedRows: 1 }];
+      }
+      return [{ affectedRows: 2 }];
+    });
+    expect(await dispatchLobbyBriefs()).toBe(0);
+    const releases = execute.mock.calls.filter(([sql]) => sql.startsWith("DELETE FROM bg_match_start_notices"));
+    expect(releases.map(([, params]) => params)).toEqual([[40, "1:2", "LOBBY_BRIEF_1", 40, "1:2", "LOBBY_BRIEF_2"]]);
+    expect(notifyUsers).not.toHaveBeenCalled();
     error.mockRestore();
   });
 
