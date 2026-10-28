@@ -307,13 +307,18 @@ describe("arbitre désigné — registre, /rgpd et annonce (revue juridique)", (
   // légitime et son opposition tant qu'il ne l'a pas acceptée.
   it("T04 rattache la présentation de l'arbitre aux conditions v7 une fois acceptées, l'intérêt légitime opposable avant (FR et EN)", () => {
     expect(T04?.legalBasis).toContain(
-      "exécution du service (contrat — conditions d'utilisation, section « Contacts de match », depuis leur version 7 : que les parties du match sachent qui l'arbitre et puissent l'ajouter en jeu) pour la présentation de l'arbitre désigné aux parties du match, dans ses fenêtres « Contacts » et de lancement et sur la page du match, une fois que cet arbitre a accepté la version 7 des conditions — tant qu'il ne l'a pas acceptée, intérêt légitime (même but), et il peut s'y opposer (art. 21) par le formulaire de signalement (catégorie RGPD) : retenue, son opposition fait que le staff ne lui confie plus de match — (il peut se retirer d'un match à tout moment, le staff pouvant lui confier de nouveau ce match, sans avis)",
+      "exécution du service (contrat — conditions d'utilisation, section « Contacts de match », depuis leur version 7 : que les parties du match sachent qui l'arbitre et puissent l'ajouter en jeu) pour la présentation de l'arbitre désigné aux parties du match, dans ses fenêtres « Contacts » et de lancement et sur la page du match, une fois que cet arbitre a accepté la version 7 des conditions — tant qu'il ne l'a pas acceptée, intérêt légitime (même but), et il peut s'y opposer (art. 21) par le formulaire de signalement (catégorie RGPD) : retenue, son opposition fait que le staff ne lui confie plus de match, et continue de valoir une fois la version 7 acceptée — (il peut se retirer d'un match à tout moment, le staff pouvant lui confier de nouveau ce match, sans avis)",
     );
     expect(T04_EN?.legalBasis).toContain(
-      "for presenting the assigned referee to the parties to the match, in its “Contacts” and launch windows and on the match page, once that referee has accepted version 7 of the terms — until they accept it, legitimate interest (same aim), and they may object to it (art. 21) through the report form (GDPR category): once upheld, their objection means the staff no longer assigns them matches — (they can withdraw from a match at any time, the staff being able to assign that match to them again, without notice)",
+      "for presenting the assigned referee to the parties to the match, in its “Contacts” and launch windows and on the match page, once that referee has accepted version 7 of the terms — until they accept it, legitimate interest (same aim), and they may object to it (art. 21) through the report form (GDPR category): once upheld, their objection means the staff no longer assigns them matches, and still stands once version 7 is accepted — (they can withdraw from a match at any time, the staff being able to assign that match to them again, without notice)",
     );
     expect(T01?.legalBasis).toContain("pour celui de l'arbitre, intérêt légitime, avec droit d'opposition, tant qu'il n'a pas accepté la version 7 des conditions");
     expect(T01_EN?.legalBasis).toContain("for the referee's, legitimate interest, with a right to object, until they have accepted version 7 of the terms");
+    // Revue juridique de #491 : la preuve d'acceptation (T13) fixe aussi cette base.
+    const T13 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T13");
+    const T13_EN = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T13");
+    expect(T13?.subPurposes).toContain("Fixer la base de la présentation d'un arbitre désigné aux parties de ses matchs (registre T04) : l'intérêt légitime tant qu'il n'a pas accepté la version 7, le contrat ensuite");
+    expect(T13_EN?.subPurposes).toContain("Setting the basis for presenting an assigned referee to the parties to their matches (record T04): legitimate interest until they have accepted version 7, the contract afterwards");
     expect(T04?.legalBasis).toContain("exécution du service (les arbitres agissant pour l'association) pour le recueil de son « Prêt »");
     expect(T04_EN?.legalBasis).toContain("performance of the service (the referees acting for the association) for collecting their “Ready”");
     expect(T04?.legalBasis).not.toContain("exécution du service (les arbitres agissant pour l'association) pour la présentation de l'arbitre");
@@ -399,7 +404,7 @@ describe("arbitre désigné — registre, /rgpd et annonce (revue juridique)", (
     expect(DONNEES_PROFIL_EN[index]?.extraBases?.map((b) => b.scope)).toEqual(
       expect.arrayContaining([
         "the BattleTag of a match's assigned referee, even when hidden, in its “Contacts” and launch windows and on the match page: read by both its teams and the referees as soon as both its opponents are known until its end, by its casters while the match is being played; withdrawal from a match at any time, the staff being able to assign that match to them again, without notice (terms of use, “Match contacts”, once the referee has accepted their version 7)",
-        "the same presentation of the assigned referee's BattleTag, as long as that referee has not accepted version 7 of the terms of use — objection through the report form, GDPR category (once upheld, the staff no longer assigns them matches)",
+        "the same presentation of the assigned referee's BattleTag, as long as that referee has not accepted version 7 of the terms of use — objection through the report form, GDPR category (once upheld, the staff no longer assigns them matches, even once version 7 is accepted)",
       ]),
     );
   });

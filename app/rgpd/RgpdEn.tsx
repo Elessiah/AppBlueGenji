@@ -878,7 +878,8 @@ export function RgpdEn({
             accepted version 7 of the terms of use, which provide for it (“Match contacts” section), so that the
             parties know who referees and can add them in game; until they accept it, it falls under{" "}
             <strong>legitimate interest</strong> (same aim), and they may object to it through the report form
-            (GDPR category) — once upheld, their objection means the staff no longer assigns them matches. They can withdraw from a match at any time, the staff being able to
+            (GDPR category) — once upheld, their objection means the staff no longer assigns them matches, and still stands once version 7
+            is accepted. They can withdraw from a match at any time, the staff being able to
             assign that match to them again, without notice. Collecting their “Ready” and the removal notice also fall under performance of the service,
             the referees acting for the association (<LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>).
           </p>

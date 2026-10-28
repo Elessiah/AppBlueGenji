@@ -71,7 +71,7 @@ describe("contacts du lancement d'un match — base légale", () => {
     ).toBe(true);
     expect(REFEREE_BATTLETAG_SCOPE).not.toMatch(/opposition/);
     expect(REFEREE_BATTLETAG_BEFORE_V7_SCOPE).toBe(
-      "la même présentation du BattleTag de l'arbitre désigné, tant que cet arbitre n'a pas accepté la version 7 des conditions d'utilisation — opposition par le formulaire de signalement, catégorie RGPD (retenue, le staff ne lui confie plus de match)",
+      "la même présentation du BattleTag de l'arbitre désigné, tant que cet arbitre n'a pas accepté la version 7 des conditions d'utilisation — opposition par le formulaire de signalement, catégorie RGPD (retenue, le staff ne lui confie plus de match, même une fois la version 7 acceptée)",
     );
     expect(DONNEES_PROFIL.find((d) => d.donnee === "Pseudo Overwatch")?.extraBases).toEqual([
       { base: "Exécution du contrat", scope: BATTLETAG_MATCH_SCOPE },
