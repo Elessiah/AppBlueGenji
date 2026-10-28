@@ -173,14 +173,21 @@ l'onglet.
   tait l'invitation (`null`, journal pm2) sans faire tomber le contexte.
 - **Flux SSE** : l'invitation n'y est pas attendue (base lente : elle ne
   retarde pas l'ouverture). Connue en mémoire (`peekCertificationPrompt`), elle
-  part avec le contexte ; sinon le contexte part sans elle et elle suit par une
-  trame `certificationPrompt` (`onLateCertificationPrompt`,
-  `viewerPatchFrameBytes`), posée par `applyLiveMessage` sur le contexte du
-  même tournoi. La lecture REST de secours l'attend. La place de flux est prise
+  part avec le contexte ; sinon le contexte part sans elle — la connexion
+  porte `certificationPromptPending`, si bien qu'une reconnexion garde
+  l'invitation déjà posée au lieu de lire ce `null` comme un retrait — et son
+  issue **finale** suit par une trame `certificationPrompt`, `null` compris
+  (`onLateCertificationPrompt`, `finalCertificationPrompt` : la réponse tardive
+  d'une lecture abandonnée après trois secondes compte, attendue au plus une
+  minute ; `viewerPatchFrameBytes`), posée par `applyLiveMessage` sur le
+  contexte du même tournoi. La lecture REST de secours l'attend. La place de flux est prise
   **avant** toute lecture : une boucle au-delà du plafond ne coûte aucune
   requête. Quitter une équipe, en être retiré ou la dissoudre ferme les flux
-  du compte (`closeUserStreams`) : le client se reconnecte et relit un contexte
-  sans l'équipe.
+  du compte sans révoquer sa session (`reconnectUserStreams` : aucun 401 pour
+  un flux en cours d'ouverture) : le client se reconnecte et relit un contexte
+  sans l'équipe. Mémoire pleine : une lecture abandonnée qui pend encore n'est
+  jamais chassée ; oubliée, elle reste une garde et sa réponse tardive est
+  écartée.
 - Champ `TournamentViewerContext.certificationPrompt`, rejoué tel quel d'un
   instantané à l'autre (`live-state.ts`), `null` pour le spectateur sans compte.
 - Ouverture une fois par page — par tournoi, la fiche étant réutilisée d'un

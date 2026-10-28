@@ -142,7 +142,9 @@ Route : `GET` (relecture, ci-dessus : 401 sans session, 500
 n'est jamais dit « autre compte »), 409 `CERTIFY_PROMPT_OTHER_ACCOUNT` (la
 fenêtre a été montrée à un autre compte que celui de la session : rien n'est
 écrit, la fenêtre se ferme, toast `otherAccount`), 409 `ACCOUNT_DELETED` (compte
-supprimé entre-temps) ; une session qui ne doit plus rien répond sans écrire, 503 `CERTIFY_PROMPT_UNAVAILABLE` (colonne absente), 500
+supprimé entre-temps) ; un « Plus tard » d'une session qui ne doit plus rien
+répond sans écrire — « Ne plus voir », lui, est toujours gardé (un « Plus tard »
+d'un autre onglet a pu lever la marque avant), 503 `CERTIFY_PROMPT_UNAVAILABLE` (colonne absente), 500
 `CERTIFY_PROMPT_FAILED`. Provenance vérifiée par le middleware. Aucune réponse
 ne certifie. Il n'existe pas de geste pour réafficher la fenêtre : la
 certification reste offerte dans « Mon profil », que la fenêtre nomme.
