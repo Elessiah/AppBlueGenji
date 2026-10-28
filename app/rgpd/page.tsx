@@ -1053,8 +1053,10 @@ function RgpdFr({
             les fenêtres « Contacts » et de lancement du match et sur la page du match, aux mêmes parties et aux mêmes moments que les
             contacts du match : aux deux équipes et aux arbitres dès que ses deux adversaires sont connus et
             jusqu&apos;à sa fin, à ses casters le temps du match ; le pseudo seul y paraît dès que la fenêtre de
-            lancement montre le match. Le public et les autres joueurs ne lisent que « Arbitre désigné ». Son
-            « Prêt » est attendu comme celui des équipes et des casters. S&apos;il ne remplit plus ces conditions ou
+            lancement montre le match. Tout membre connecté lit aussi son pseudo seul (jamais son BattleTag) sur la carte et la page
+            d&apos;un match qui n&apos;est pas joué ; les visiteurs sans compte ne lisent que « Arbitre désigné ». Son
+            « Prêt » est attendu comme celui des équipes et des casters ; seuls les parties du match et les arbitres le lisent, dans les
+            fenêtres « Contacts » et de lancement. S&apos;il ne remplit plus ces conditions ou
             devient joueur du match avant son lancement, il n&apos;est plus montré (et en est retiré avant le lancement) ; l&apos;arbitrage
             d&apos;un compte supprimé est retiré de tous ses matchs. Quand un autre que lui le lui retire (le staff,
             un autre arbitre à qui le match est confié, l&apos;autogestion, son opposition retenue) ou qu&apos;il lui est retiré d&apos;office, il
@@ -1065,7 +1067,8 @@ function RgpdFr({
             des conditions d&apos;utilisation, qui la prévoient (section « Contacts de match »), pour que les
             parties sachent qui arbitre et, en Overwatch, puissent l&apos;ajouter en jeu ; tant qu&apos;il ne l&apos;a pas
             acceptée, elle relève de l&apos;<strong>intérêt légitime</strong> (même but), et il peut s&apos;y
-            opposer par le formulaire de signalement (catégorie RGPD) — retenue, son opposition le retire de tous ses matchs non terminés (le staff en désigne un autre ; ses matchs terminés gardent leur arbitre) et l&apos;empêche d'en prendre un ou de s&apos;en voir confier un tant qu&apos;elle n'est pas levée (à sa seule demande, par ce même formulaire), et continue de valoir une fois la version 7 acceptée ; la date à laquelle elle est retenue reste sur son compte, pour continuer de l&apos;honorer (<strong>obligation légale</strong>), et figure dans l&apos;export de ses données, jusqu&apos;à sa levée par le staff ou la suppression du compte ; le journal du staff sur Discord n&apos;en note que le geste et sa levée, sans nommer personne ni ses matchs, et les journaux du serveur l&apos;auteur du geste et l&apos;identifiant du compte de l&apos;arbitre (retenue, avec le nombre de matchs dont il est retiré). Il peut se retirer d&apos;un match à tout moment, le staff
+            opposer par le formulaire de signalement (catégorie RGPD). L&apos;affichage de son pseudo à tout membre connecté relève de
+            l&apos;<strong>intérêt légitime</strong> (que les membres sachent qui arbitre un match), avec le même droit d&apos;opposition — retenue, son opposition le retire de tous ses matchs non terminés (le staff en désigne un autre ; ses matchs terminés gardent leur arbitre) et l&apos;empêche d'en prendre un ou de s&apos;en voir confier un tant qu&apos;elle n'est pas levée (à sa seule demande, par ce même formulaire), et continue de valoir une fois la version 7 acceptée ; la date à laquelle elle est retenue reste sur son compte, pour continuer de l&apos;honorer (<strong>obligation légale</strong>), et figure dans l&apos;export de ses données, jusqu&apos;à sa levée par le staff ou la suppression du compte ; le journal du staff sur Discord n&apos;en note que le geste et sa levée, sans nommer personne ni ses matchs, et les journaux du serveur l&apos;auteur du geste et l&apos;identifiant du compte de l&apos;arbitre (retenue, avec le nombre de matchs dont il est retiré). Il peut se retirer d&apos;un match à tout moment, le staff
             pouvant lui confier de nouveau ce match (sauf opposition retenue), sans avis ; tant qu&apos;il n&apos;a pas accepté la version 7, la fenêtre
             d&apos;acceptation couvrant les pages des tournois, il s&apos;en retire en le demandant par ce même formulaire. Le recueil de son « Prêt » et l&apos;avis du retrait relèvent aussi de l&apos;exécution
             du service, les arbitres agissant pour l&apos;association (<Link href="/rgpd/registre#t04">registre, T04</Link>).

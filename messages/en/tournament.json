@@ -305,7 +305,7 @@
     "firstMapSr": "First map: ",
     "referee": "Referee assigned",
     "refereeTitle": "A referee follows this match",
-    "refereeNamed": "Referee: {pseudo}",
+    "refereeNamed": "Referee: {name}",
     "selfManaged": "Self-managed",
     "selfManagedTitle": "No referee: the teams create and run the game themselves",
     "undecided": "No referee",

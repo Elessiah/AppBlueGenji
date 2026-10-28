@@ -327,7 +327,8 @@ describe("route et référencement", () => {
     const messages = (en.props as { messages?: Record<string, unknown> }).messages;
     expect(messages).toBeDefined();
     for (const serverOnly of ["meta", "settings", "share"]) expect(messages).not.toHaveProperty(serverOnly);
-    expect(JSON.stringify(messages).length).toBeLessThan(20_000);
+    // 20 500 : « Arbitre : <pseudo> » (MATCH-UI-NAMES) a passé l'ancien plafond de 20 000 de quelques octets.
+    expect(JSON.stringify(messages).length).toBeLessThan(20_500);
     expect(renderToStaticMarkup(en)).toContain("Loading the tournament…");
     mockLocale = "fr";
     const fr = sheetText((await DetailLayout({ children: <TournamentLoading /> })).props);

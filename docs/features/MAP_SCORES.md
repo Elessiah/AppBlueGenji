@@ -260,7 +260,9 @@ le tait.
 ## Saisie
 
 - **Engagé** (`PlayerScoreDialog`) : une
-  ligne par map (« Map N », code, score de chaque équipe en `<NumberInput>`,
+  ligne par map (« Map N », ou « Map N : <nom> » quand la carte de la manche
+  est connue — `matchMapNames` de `round-maps.ts`, cartes imposées ou première
+  carte, noms par `visibleText` ; même libellé dans `AdminScoreDialog` —, code, score de chaque équipe en `<NumberInput>`,
   retrait), score du match dérivé en direct.
 - **Lignes progressives** (demande du 2026-10-06, `progressiveMapRows`) : la
   modale s'ouvre sur **une** ligne vierge. Quand la dernière ligne est complète

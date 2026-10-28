@@ -653,6 +653,15 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "The date your objection was upheld is kept on your account until it is lifted or the account is deleted, and is included in your data export. The staff log on Discord notes the action and its lifting without naming anyone or the matches removed; the staff member who took it, your account identifier and the number of matches removed only appear in the server logs.",
       "If you play or cast a match: its referee may thus change before or during the match; the new referee is presented to you like the previous one.",
     ],
+  },  "2026-10-pseudo-arbitre-aux-membres": {
+    title: "A match referee's username can be read by all signed-in members",
+    linkLabels: ["Read the “Assigned referee of a match” paragraph"],
+    summary:
+      "On the card and page of a match that has not been played, any signed-in member now reads its assigned referee's username instead of “Referee assigned”. Visitors without an account and the public follow page still read “Referee assigned”. The referee's “Ready” can now only be read by the parties to the match and the referees.",
+    details: [
+      "If you referee: your username alone — never your BattleTag nor your Discord tag — can be read by any signed-in member on the card and page of the matches you referee, until they are played. This display falls under legitimate interest (members knowing who referees a match): you may object to it through the report form (GDPR category), with the same effect as an objection to being presented to the parties — once upheld, it removes you from your unfinished matches.",
+      "Your referee “Ready” is no longer sent to the whole audience of the tournament: only the parties to the match and the referees read it, in the “Contacts” and launch windows. The staff log on Discord still names no one.",
+    ],
   },
 };
 

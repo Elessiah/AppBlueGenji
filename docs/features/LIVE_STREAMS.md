@@ -130,6 +130,10 @@ exploitable **et** qu'au moins un de ses matchs est en état `LIVE`. Sinon il
 n'est pas rendu du tout — pas de version grisée : un bouton qui mène vers une
 chaîne hors ligne crée plus de confusion qu'il n'en lève.
 
+Le nom de la chaîne garde **sa casse d'origine** (décision 53) : la classe
+`keepCase` de `LiveCard.module.css` lève la mise en capitales du bandeau pour
+ce seul libellé ; ni l'URL ni la correspondance des chaînes ne changent.
+
 Le lien s'ouvre dans un nouvel onglet (`rel="noopener noreferrer"`) et pointe
 vers la **chaîne officielle** du tournoi, jamais vers un lien de match.
 

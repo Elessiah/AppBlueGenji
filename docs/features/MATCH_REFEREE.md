@@ -137,11 +137,28 @@ modale) ; sinon l'équipe 1. L'hôte joue à **gauche** ; l'autre équipe
 
 ## Ce que chacun voit
 
-- **Instantané public** (`TournamentSnapshot`) : des booléens seulement —
-  `refereeAssigned`, `refereeReady`, `selfManaged`, plus `firstMap`, `hostTeamId`,
-  `firstBanTeamId`. Le bandeau de la carte dit « Arbitre désigné » ou
-  « Autogestion » à tous, « Sans arbitre » au staff seul (`refereeStripState`).
-  **Jamais de nom** dans l'instantané ni dans `TournamentViewerContext`.
+- **Instantané public** (`TournamentSnapshot`) : `refereeAssigned`,
+  `selfManaged`, `firstMap`, `hostTeamId`, `firstBanTeamId` et une empreinte
+  opaque `refereeKey` (HMAC à secret aléatoire du processus sur
+  `matchId:userId`, 16 caractères, `referee-names.ts`), `null` sans arbitre
+  éligible ou pour un match joué. **Jamais de nom** dans l'instantané ;
+  plus de `refereeReady` (décision 47) : le « Prêt » de l'arbitre ne se lit
+  que dans `MatchLaunchInfo` (parties, staff). La fenêtre « Contacts » relit
+  toutes les 10 s en lobby tant qu'un arbitre n'est pas prêt
+  (`refereeReadyRereadDue`, `useClientPower().clocks`).
+- **Membre connecté** : `TournamentViewerContext.refereeNames`
+  (`{ matchId, refereeKey, pseudo }`, `loadRefereeNames`, cache 5 s par
+  version) — le bandeau et la page du match lisent « Arbitre : <pseudo> »
+  (`refereeNameOf`, pseudo par `visibleText`), sinon « Arbitre désigné ».
+  Le contexte n'arrivant qu'à la connexion SSE ou par le GET REST, une
+  empreinte sans nom (`missingRefereeNamesKey`) déclenche une seule relecture
+  de `GET /api/tournaments/[id]/referee-names` (session requise, étalée sur
+  2 s) ; `live-state.ts` garde les noms d'un instantané à l'autre. Les deux
+  portes passent par `getTournamentViewerContext`.
+- **Visiteur sans compte, `/suivre`** : `spectatorSnapshot` vide
+  `refereeKey`, `SPECTATOR_VIEWER_CONTEXT.refereeNames = []` — « Arbitre
+  désigné » seulement. Le bandeau dit « Autogestion » à tous, « Sans
+  arbitre » au staff seul (`refereeStripState`).
 - **Parties du match** (deux équipes, casters) : `MatchLaunchInfo.referee` —
   pseudo, « Prêt », et — **en Overwatch seulement**, champ absent ailleurs
   (`withGameBattletag`, décision 35) — BattleTag (même masqué, `sharesLiveMatch`) **seulement
@@ -229,6 +246,12 @@ remplace, sans les réécrire, les entrées publiées du 2026-10-29 qui disaient
 `2026-10-conditions-v7-casters-et-arbitre` annonce le passage au contrat à
 l'acceptation de la version 7. Devenir joueur du match ne retire l'arbitre qu'avant le
 lancement (`keepEligibleReferees`) : conditions, `/rgpd` et T04 le disent.
+Le pseudo seul de l'arbitre se lit par **tout membre connecté** sur la carte
+et la page d'un match non joué (lot MATCH-UI-NAMES, décision 52) : intérêt
+légitime, même opposition, même effet ; T04, `/rgpd#arbitre-designe` et
+l'entrée `2026-10-pseudo-arbitre-aux-membres` (2026-10-31) le disent. Les
+conditions v7, publiées, disent encore « Le public et les autres joueurs ne
+lisent que « Arbitre désigné » » : à reprendre à la prochaine version.
 
 ## Cartes par manche
 

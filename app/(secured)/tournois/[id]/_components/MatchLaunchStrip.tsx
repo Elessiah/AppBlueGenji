@@ -149,7 +149,7 @@ export function MatchLaunchStrip({
       {referee === "REFEREE" && (
         <span className={styles.fact} title={t("launch.refereeTitle")}>
           <span aria-hidden="true">🧑‍⚖️</span>{" "}
-          {refereeName ? t("launch.refereeNamed", { pseudo: refereeName }) : t("launch.referee")}
+          {refereeName ? t("launch.refereeNamed", { name: refereeName }) : t("launch.referee")}
         </span>
       )}
       {referee === "SELF_MANAGED" && (

@@ -692,7 +692,11 @@ describe("T04 / T05 — arbitre désigné d'un match (MATCH-REFEREE MR-2, FR et 
 
   it("déclare qui lit l'arbitre, ce qui est montré, l'avis push et ce qui est gardé", () => {
     expect(t04.subPurposes.join(" ")).toContain("jamais son tag Discord");
-    expect(t04.subPurposes.join(" ")).toContain("le public et les autres joueurs ne lisent que « Arbitre désigné »");
+    // MATCH-UI-NAMES (décisions 47 et 52) : pseudo seul aux membres connectés, « Prêt » aux seules parties.
+    expect(t04.subPurposes.join(" ")).toContain("montrer aussi son pseudo seul à tout membre connecté, sur la carte et la page d'un match qui n'est pas joué (les visiteurs sans compte ne lisent que « Arbitre désigné »)");
+    expect(t04.subPurposes.join(" ")).toContain("que seules ses parties et les arbitres lisent");
+    expect(t04.legalBasis).toContain("intérêt légitime (que les membres sachent qui arbitre un match) pour l'affichage de son pseudo à tout membre connecté");
+    expect(t04.recipients.join(" ")).toContain("son pseudo seul à tout membre connecté, sur la carte et la page du match tant qu'il n'est pas joué");
     expect(t04.subPurposes.join(" ")).toContain("en push seulement (jamais en message privé)");
     expect(t04.subPurposes.join(" ")).toContain("match entré en lancement sans arbitre désigné ni autogestion");
     expect(t04.legalBasis).toContain("pour la présentation de l'arbitre désigné aux parties du match");
@@ -709,6 +713,9 @@ describe("T04 / T05 — arbitre désigné d'un match (MATCH-REFEREE MR-2, FR et 
     expect(t05En.subPurposes).toHaveLength(t05.subPurposes.length);
     expect(t04En.subPurposes.join(" ")).toContain("never their Discord tag");
     expect(t04En.subPurposes.join(" ")).toContain("by push only (never by direct message)");
+    expect(t04En.subPurposes.join(" ")).toContain("also showing their username alone to any signed-in member, on the card and page of a match that has not been played (visitors without an account only read “Referee assigned”)");
+    expect(t04En.legalBasis).toContain("legitimate interest (members knowing who referees a match) for showing their username to any signed-in member");
+    expect(t04En.recipients.join(" ")).toContain("their username alone to any signed-in member, on the match card and page until it is played");
     expect(t04En.legalBasis).toContain("for presenting the assigned referee to the parties to the match");
     expect(t04En.retention.join(" ")).toContain("the referee of a deleted account is removed from all their matches, played ones included");
     expect(t05En.subPurposes.join(" ")).toContain("without naming the referee or the staff");

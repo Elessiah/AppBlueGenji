@@ -305,7 +305,7 @@
     "firstMapSr": "Première carte : ",
     "referee": "Arbitre désigné",
     "refereeTitle": "Un arbitre suit ce match",
-    "refereeNamed": "Arbitre : {pseudo}",
+    "refereeNamed": "Arbitre : {name}",
     "selfManaged": "Autogestion",
     "selfManagedTitle": "Sans arbitre : les équipes créent et règlent la partie elles-mêmes",
     "undecided": "Sans arbitre",

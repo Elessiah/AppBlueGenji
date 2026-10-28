@@ -84,6 +84,13 @@ export const REFEREE_USERNAME_BEFORE_V7_SCOPE =
   "la même présentation du pseudo de l'arbitre désigné, tant que cet arbitre n'a pas accepté la version 7 des conditions d'utilisation — opposition par le formulaire de signalement, catégorie RGPD (retenue, il est retiré de tous ses matchs non terminés et ne peut plus en prendre un ni s'en voir confier un tant qu'elle n'est pas levée — à sa seule demande —, même une fois la version 7 acceptée)";
 
 /**
+ * Pseudo seul de l'arbitre désigné lu par tout membre connecté (lot
+ * MATCH-UI-NAMES, décision 52) : intérêt légitime, même opposition.
+ */
+export const REFEREE_USERNAME_MEMBERS_SCOPE =
+  "pseudo seul de l'arbitre désigné d'un match qui n'est pas joué, sur la carte et la page du match, lu par tout membre connecté (jamais par un visiteur sans compte, qui lit « Arbitre désigné ») — opposition par le formulaire de signalement, catégorie RGPD, avec le même effet";
+
+/**
  * Pastilles de certification de la fiche (tag Discord certifié, BattleTag tiré
  * d'un compte Battle.net rattaché) : lues par tout joueur connecté, tag masqué
  * compris (`canSeeDiscordVerification`, `canSeeBattletagVerification`). Pas un
@@ -144,6 +151,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
       { base: "Intérêt légitime", scope: AUTOMOD_ALERT_SCOPE },
       { base: "Exécution du contrat", scope: REFEREE_USERNAME_SCOPE },
       { base: "Intérêt légitime", scope: REFEREE_USERNAME_BEFORE_V7_SCOPE },
+      { base: "Intérêt légitime", scope: REFEREE_USERNAME_MEMBERS_SCOPE },
     ],
     duree: "Durée du compte",
   },

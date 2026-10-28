@@ -295,7 +295,7 @@ function OfficiatingSection({
           <DecisionLine
             pill={
               <span className="pill pill-info">
-                {refereeName ? t("launch.refereeNamed", { pseudo: refereeName }) : t("launch.referee")}
+                {refereeName ? t("launch.refereeNamed", { name: refereeName }) : t("launch.referee")}
               </span>
             }
             subject={t("launch.referee")}
