@@ -1222,7 +1222,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     summary:
       "Précision sur l'information du 21 octobre 2026 : à chaque connexion par Discord ou Blizzard, tant que ton tag Discord n'est pas certifié et que tu n'as pas choisi « Ne plus voir », ta session de connexion note que la fenêtre de certification reste à te proposer, une fois par connexion.",
     details: [
-      "L'information du 21 octobre disait l'inverse : que la session note, après « Plus tard », que la fenêtre n'est plus à proposer. En fait, la marque est posée à la connexion et levée à ta première réponse (« Plus tard » ou la fermeture de la fenêtre, « Ne plus voir » — qui la lève sur toutes tes sessions —, ou la certification), ou dès qu'il n'y a plus rien à te proposer.",
+      "L'information du 21 octobre disait l'inverse : que la session note, après « Plus tard », que la fenêtre n'est plus à proposer. En fait, la marque est posée à la connexion et levée à ta première réponse (« Plus tard », la fermeture de la fenêtre ou son bouton qui mène à « Mon profil », « Ne plus voir » — qui la lève sur toutes tes sessions —, ou la certification, réussie ou refusée parce que ton compte Discord a changé depuis ta connexion), ou dès qu'il n'y a plus rien à te proposer.",
       "Cette marque ne contient rien d'autre, part avec la session et ne figure pas dans l'export de tes données. Rien d'autre ne change : « Ne plus voir » reste gardé sur ton compte, avec sa date.",
     ],
   },
