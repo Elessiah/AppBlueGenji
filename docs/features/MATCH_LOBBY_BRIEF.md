@@ -46,9 +46,11 @@ ouvre un lancement, lecture de la liste des tournois).
 - Candidats : tournoi `RUNNING`, match `READY` non exempt, appariement courant,
   `lobby_opened_at` des 20 dernières minutes (délai du lancement d'office + 5).
 - **Réservation** `bg_match_start_notices` phases `LOBBY_BRIEF_1` /
-  `LOBBY_BRIEF_2`, une par engagée et par appariement (`INSERT IGNORE`),
-  **avant** les destinataires ; un match reste candidat tant qu'un côté est
-  libre. Un
+  `LOBBY_BRIEF_2`, une par engagée et par appariement (`INSERT IGNORE …
+  SELECT` qui relit le match : salon encore ouvert, même appariement, `READY` —
+  un lancement défait entre la lecture et la réservation ne laisse ni brief
+  périmé ni réservation qui ferait taire la réouverture), **avant** les
+  destinataires ; un match reste candidat tant qu'un côté est libre. Un
   réappariement est un autre appariement (nouveau brief) ; un lancement défait
   (horaire changé, retour à planifier) efface les réservations du match : le
   salon rouvert est briefé de nouveau.
