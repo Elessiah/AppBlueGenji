@@ -97,6 +97,8 @@ describe("dispatchLobbyBriefs", () => {
     expect(sql).toMatch(/m\.status = 'READY' AND m\.is_bye = 0/);
     expect(sql).toMatch(/m\.launch_pairing = CONCAT\(m\.team1_id, ':', m\.team2_id\)/);
     expect(sql).toMatch(/m\.lobby_opened_at > NOW\(\) - INTERVAL \? MINUTE/);
+    // Un match qui porte un score est joué : aucun salon à régler.
+    expect(sql).toMatch(/AND m\.team1_score IS NULL AND m\.team2_score IS NULL/);
     // Un match reste candidat tant qu'un de ses deux côtés n'est pas réservé.
     expect(sql).toMatch(/n\.phase IN \(\?, \?\)\) < 2/);
     expect(params).toEqual([20, "LOBBY_BRIEF_1", "LOBBY_BRIEF_2"]);
@@ -137,7 +139,7 @@ describe("dispatchLobbyBriefs", () => {
     // La réservation relit le match dans la même instruction.
     expect(sql).toMatch(/INSERT IGNORE INTO bg_match_start_notices \(match_id, pairing, phase\)\s+SELECT m\.id, m\.launch_pairing, \? FROM bg_matches m/);
     expect(sql).toMatch(/m\.id = \? AND m\.launch_pairing = \? AND m\.status = 'READY' AND m\.is_bye = 0/);
-    expect(sql).toMatch(/m\.lobby_opened_at IS NOT NULL/);
+    expect(sql).toMatch(/m\.lobby_opened_at IS NOT NULL AND m\.team1_score IS NULL AND m\.team2_score IS NULL/);
     // Réapparié entre-temps (équipes changées, `launch_pairing` resté) : rien pour les anciennes équipes.
     expect(sql).toMatch(/AND m\.launch_pairing = CONCAT\(m\.team1_id, ':', m\.team2_id\)/);
     expect(sql).not.toMatch(/VALUES/);
