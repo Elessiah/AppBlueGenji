@@ -109,6 +109,12 @@ texte, effacée un jour après la fin de la soirée).
   retiré par un autre que lui reçoit le motif en message privé et en push
   (`CAST_NOTICES.md`).
 
+- **Brief du salon** (MR-4) : message privé et push aux propriétaires et
+  managers, avec les seuls noms d'équipe — ni BattleTag, ni tag Discord, ni
+  pseudo ; « toi » / « ton adversaire » en tournoi individuel. pm2 n'en garde
+  qu'un compte des non-remis quand le bot est injoignable
+  (`MATCH_LOBBY_BRIEF.md`).
+
 - **Autres gestes du staff** (même décision) : résultat validé, score
   enregistré, lancement forcé, hôte, diffusion, rediffusion, édition d'un
   tournoi, têtes de série, étape avancée, équipes fantômes, image et lien de

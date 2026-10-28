@@ -289,6 +289,9 @@ match à planifier, qui n'a rien à entretenir. La salle du flux SSE se réveill
 d'elle-même à l'heure de départ d'un match en attente et à son lancement
 d'office (`nextRoomWakeAt`), au lieu d'attendre son filet de cinq minutes.
 
+L'ouverture du salon (`lobby_opened_at`) déclenche aussi, après coup, le
+**brief du salon** aux propriétaires et managers (`MATCH_LOBBY_BRIEF.md`).
+
 ## S'inscrire pour caster
 
 Bouton **« 🎙 Caster »** sur la carte d'un match, pour la permission `live`.

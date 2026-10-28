@@ -105,6 +105,10 @@ modale) ; sinon l'équipe 1. L'hôte joue à **gauche** ; l'autre équipe
 
 ## Annonces
 
+- **Brief du salon** aux propriétaires et managers des deux engagées, à
+  l'ouverture du salon : hôte à gauche, droite, première carte, premier ban,
+  tri par rôle si casté, arbitre désigné ou autogestion (`MATCH_LOBBY_BRIEF.md`).
+
 - **Journal du staff** (`formatRefereeChangeLog`) : prise, désignation,
   remplacement, retrait (par lui-même, par le staff, d'office), autogestion,
   première carte — **sans nommer l'arbitre ni le staff**, noms d'équipe (« un
