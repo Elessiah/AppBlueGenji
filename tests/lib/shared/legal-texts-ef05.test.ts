@@ -146,8 +146,8 @@ describe("PRIVACY_CHANGES — entrée rectificative de la marque de session", ()
   const entry = PRIVACY_CHANGES.find((change) => change.id === id);
   const english = PRIVACY_CHANGES_EN[id];
 
-  it("existe en français et en anglais, datée de la mise en ligne prévue, en fin de liste", () => {
-    expect(entry?.publishedAt).toBe("2026-10-30");
+  it("existe en français et en anglais, datée du lendemain de la mise en ligne, en fin de liste", () => {
+    expect(entry?.publishedAt).toBe("2026-10-29");
     expect(english).toBeDefined();
     expect(PRIVACY_CHANGES.at(-1)?.id).toBe(id);
     expect(id.length).toBeLessThanOrEqual(PRIVACY_CHANGE_ID_MAX_LENGTH);
@@ -272,7 +272,7 @@ describe("PRIVACY_CHANGES — « Ne plus voir » de l'invitation, entrée encore
   it("ne parle du BattleTag que selon le jeu (en Marvel Rivals, seul le tag Discord compte)", () => {
     const id = "2026-10-ne-plus-voir-invitation-certification-sur-le-compte";
     const entry = PRIVACY_CHANGES.find((change) => change.id === id);
-    expect(entry?.publishedAt).toBe("2026-10-30");
+    expect(entry?.publishedAt).toBe("2026-10-29");
     expect(entry?.summary).toContain("à certifier ton tag Discord (et ton BattleTag selon le jeu)");
     expect(PRIVACY_CHANGES_EN[id]?.summary).toContain("to verify your Discord tag (and your BattleTag depending on the game)");
   });

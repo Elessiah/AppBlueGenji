@@ -1689,8 +1689,8 @@ describe("PRIVACY_CHANGES — réglages du salon envoyés aux managers (MATCH-RE
   const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-reglages-du-salon-aux-managers")!;
   const english = PRIVACY_CHANGES_EN["2026-10-reglages-du-salon-aux-managers"];
 
-  it("précède l'entrée des conditions v7 : datée comme elle, lendemain de la mise en ligne prévue (§ Dates corrigées), pour tous les comptes, et tient seule dans un message privé (FR et EN)", () => {
-    expectStandaloneEntry(entry, english, { fromEnd: 4, publishedAt: "2026-10-30", audience: undefined, links: [
+  it("précède l'entrée des conditions v7 : datée comme elle, lendemain de la mise en ligne (§ Dates corrigées), pour tous les comptes, et tient seule dans un message privé (FR et EN)", () => {
+    expectStandaloneEntry(entry, english, { fromEnd: 4, publishedAt: "2026-10-29", audience: undefined, links: [
       { href: "/rgpd#messages-de-match", label: "Lire le paragraphe « Messages privés Discord de match »" },
     ] });
   });
@@ -1734,7 +1734,7 @@ describe("PRIVACY_CHANGES — conditions v7 : casters, arbitre désigné et page
         { href: "/rgpd#arbitre-designe", label: "Lire le paragraphe « Arbitre désigné d'un match »" },
       ],
     });
-    expect(TERMS_UPDATED_AT).toBe("2026-10-30");
+    expect(TERMS_UPDATED_AT).toBe("2026-10-29");
   });
 
   it("annonce la version en vigueur et sa date, avec un libellé anglais par lien (FR et EN)", () => {
@@ -1742,7 +1742,7 @@ describe("PRIVACY_CHANGES — conditions v7 : casters, arbitre désigné et page
     expect(entry.summary).toMatch(new RegExp(`conditions d'utilisation passent en version ${TERMS_VERSION}`));
     expect(entry.details.at(-1)).toContain(`version ${TERMS_VERSION}, en vigueur depuis le ${formatTermsDate(TERMS_UPDATED_AT)}`);
     expect(english.summary).toMatch(new RegExp(`terms of use move to version ${TERMS_VERSION}`));
-    expect(english.details.at(-1)).toContain(`version ${TERMS_VERSION}, in force since 30 October 2026`);
+    expect(english.details.at(-1)).toContain(`version ${TERMS_VERSION}, in force since 29 October 2026`);
     expect([english.details.length, english.linkLabels?.length ?? 0]).toEqual([entry.details.length, entry.links?.length ?? 0]);
   });
 
@@ -1801,7 +1801,7 @@ describe("PRIVACY_CHANGES — « Ne plus voir » de l'invitation à certifier su
   it("précède l'entrée rectificative EF-05, datée comme l'entrée précédente, pour tous les comptes, et tient seule dans un message privé (FR et EN)", () => {
     expectStandaloneEntry(entry, english, {
       fromEnd: 2,
-      publishedAt: "2026-10-30",
+      publishedAt: "2026-10-29",
       audience: undefined,
       links: [{ href: "/rgpd#cookies", label: "Lire la section « Cookies & traceurs »" }],
     });
@@ -1856,7 +1856,7 @@ describe("PRIVACY_CHANGES — marque de session de la proposition de certificati
   it("ferme la liste, datée comme l'entrée précédente, pour tous les comptes, et tient seule dans un message privé (FR et EN)", () => {
     expectStandaloneEntry(entry, english, {
       fromEnd: 1,
-      publishedAt: "2026-10-30",
+      publishedAt: "2026-10-29",
       audience: undefined,
       links: [{ href: "/rgpd#donnees-collectees", label: "Lire la section « Données collectées »" }],
     });

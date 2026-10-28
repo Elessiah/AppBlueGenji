@@ -79,8 +79,8 @@ export const BOT_COPYRIGHT_HOLDER = "Keryan Houssin";
 // renvoient donc.
 const CONTACT_DISCORD = LEGAL_CONTACT_DISCORD;
 
-const LAST_UPDATED_FR = "30 octobre 2026";
-const LAST_UPDATED_EN = "30 October 2026";
+const LAST_UPDATED_FR = "29 octobre 2026";
+const LAST_UPDATED_EN = "29 October 2026";
 // La politique a sa propre date : une modification qui ne touche qu'elle (le
 // passage des sauvegardes chez Hetzner) laisse aux conditions la leur. Les
 // horaires de match remis en message privé touchent les deux ; l'annonce des
@@ -95,9 +95,9 @@ const LAST_UPDATED_EN = "30 October 2026";
 // sauvegarde deux fois par semaine au lieu d'une (BACKUP-SCHEDULE), la politique seule ;
 // réglages du salon remis aux gérants des engagées (MATCH-REFEREE MR-4), la
 // politique, puis l'article 01 des conditions (TERMS v7) — les deux datés du
-// lendemain de la mise en ligne prévue (nuit du 28 au 29 octobre 2026, § Dates corrigées).
-const PRIVACY_LAST_UPDATED_FR = "30 octobre 2026";
-const PRIVACY_LAST_UPDATED_EN = "30 October 2026";
+// lendemain de la mise en ligne du 28 octobre 2026 (§ Dates corrigées).
+const PRIVACY_LAST_UPDATED_FR = "29 octobre 2026";
+const PRIVACY_LAST_UPDATED_EN = "29 October 2026";
 
 const CONTACT_ITEMS_FR = [
   `Formulaire **« ${REPORT_FORM_NAME} »** en bas de chaque page du site (catégorie « RGPD » pour vos données)`,

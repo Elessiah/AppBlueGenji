@@ -83,8 +83,8 @@ import { STREAM_NOTICE_LIVE, STREAM_NOTICE_OBJECTION, STREAM_NOTICE_PRIVACY_PATH
  * avant le début d'un match programmé et après sa fin, pas seulement à son
  * départ. La version 6, déjà en ligne, ne se réécrit pas : d'où une nouvelle
  * version, annoncée par sa propre entrée de `PRIVACY_CHANGES`
- * (`2026-10-conditions-v7-casters-et-arbitre`) ; en vigueur au 30 octobre 2026,
- * lendemain de la mise en ligne prévue (nuit du 28 au 29 octobre, § Dates corrigées).
+ * (`2026-10-conditions-v7-casters-et-arbitre`) ; en vigueur au 29 octobre 2026,
+ * lendemain de la mise en ligne (28 octobre, § Dates corrigées).
  */
 export const TERMS_VERSION = 7;
 
@@ -99,7 +99,7 @@ export { SITE_MINIMUM_AGE };
 export const TERMS_AGE_DECLARATION = `je déclare avoir au moins ${SITE_MINIMUM_AGE} ans`;
 
 /** Date d'entrée en vigueur de la version courante (AAAA-MM-JJ). */
-export const TERMS_UPDATED_AT = "2026-10-30";
+export const TERMS_UPDATED_AT = "2026-10-29";
 
 /** Adresse de la page publique des conditions. */
 export const TERMS_PATH = "/conditions-utilisation";
