@@ -457,17 +457,17 @@ export function MatchPage({
   return (
     <>
       <div className={styles.topbar}>
-        <nav className={styles.crumbs} aria-label={t("matchPage.crumbsLabel")}>
-          <LocaleLink href={tournamentMatchHref(detail.card.id, match.id, spectator)} className={`${styles.back} tap-target`}>
-            <span aria-hidden="true">←</span> {detail.card.name}
-          </LocaleLink>
-        </nav>
+        {/* Le retour du site (`← Retour` de la fiche, même style) : un vrai lien
+            qui ramène à la carte de ce match, dans la bonne vue (`MATCH_PAGE.md`). */}
+        <LocaleLink href={tournamentMatchHref(detail.card.id, match.id, spectator)} className={`${styles.back} tap-target`}>
+          <span aria-hidden="true">←</span> {t("matchPage.backToTournament")}
+        </LocaleLink>
         {status}
       </div>
       <header className={styles.header}>
         <h1 className={styles.title}>{matchLabel}</h1>
         <p className={styles.meta}>
-          {[phaseName, matchPositionText(text, match)].filter(Boolean).join(" · ")}
+          {[detail.card.name, phaseName, matchPositionText(text, match)].filter(Boolean).join(" · ")}
         </p>
       </header>
 

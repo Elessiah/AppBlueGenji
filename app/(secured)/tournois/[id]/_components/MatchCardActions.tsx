@@ -10,6 +10,7 @@ import {
   Ellipsis,
   Eye,
   Film,
+  FileText,
   Info,
   Mic,
   MicOff,
@@ -22,6 +23,9 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
+import { LocaleLink } from "@/components/i18n/locale-navigation";
+import { useSpectatorView } from "@/components/spectator-view";
+import { matchPagePath } from "@/lib/shared/match-page";
 import { useToast } from "@/components/ui/toast";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import {
@@ -70,6 +74,7 @@ const ICONS: Record<MatchCardActionId, LucideIcon> = {
   playerScore: Pencil,
   openLaunch: Info,
   contacts: Users,
+  matchPage: FileText,
   plan: CalendarPlus,
   adminScore: Pencil,
   schedule: CalendarClock,
@@ -109,7 +114,8 @@ export function closePanelOnTabOut(
   close: () => void,
 ): void {
   if (e.key !== "Tab") return;
-  const buttons: Element[] = Array.from(panel?.querySelectorAll("button") ?? []);
+  // Boutons et liens (« Page du match » est un lien : il se navigue, il n'agit pas).
+  const buttons: Element[] = Array.from(panel?.querySelectorAll("button, a[href]") ?? []);
   const index = buttons.indexOf(e.currentTarget);
   if (index === -1) return;
   if ((e.shiftKey && index === 0) || (!e.shiftKey && index === buttons.length - 1)) {
@@ -235,6 +241,7 @@ export function MatchCardActions({
   onAdminScore: () => void;
   onReport: () => void;
 }>) {
+  const spectator = useSpectatorView();
   const { openSchedule, openConfig, openReplay, castBlock, launchPhase: launchPhaseEnabled, viewerUserId } = useLiveControls();
   const { showError, showSuccess } = useToast();
   const mapError = useMapError();
@@ -415,7 +422,8 @@ export function MatchCardActions({
     }
   };
 
-  const handlers: Record<MatchCardActionId, () => void> = {
+  // « Page du match » n'agit pas : c'est un lien (`renderButton`), sans geste.
+  const handlers: Record<Exclude<MatchCardActionId, "matchPage">, () => void> = {
     playerScore: onPlayerScore,
     openLaunch: () =>
       window.dispatchEvent(new CustomEvent(MATCH_LAUNCH_OPEN_EVENT, { detail: { matchId: match.id } })),
@@ -469,30 +477,46 @@ export function MatchCardActions({
 
   const renderButton = (action: MatchCardAction, inMenu: boolean) => {
     const Icon = action.readOnly ? Eye : ICONS[action.id];
-    const blocked = action.id === "claimCast" && castBlock !== null;
+    const className = ["tap-target", inMenu ? styles.item : styles.primary, inMenu ? "" : TONE_CLASS[action.tone]]
+      .filter(Boolean)
+      .join(" ");
+    const id = action.id;
+    if (id === "matchPage") {
+      // Un vrai lien (ouvrable dans un onglet), au même gabarit que les
+      // boutons du pied ; choisi dans le panneau, il le referme.
+      return (
+        <LocaleLink
+          key={action.id}
+          href={matchPagePath(match.tournamentId, match.id, spectator)}
+          className={className}
+          aria-label={actionName(action.label)}
+          data-action={action.id}
+          onKeyDown={inMenu ? onPanelKeyDown : undefined}
+          onClick={inMenu ? () => setOpen(false) : undefined}
+        >
+          <Icon size={16} aria-hidden />
+          <span className={styles.label}>{action.label}</span>
+        </LocaleLink>
+      );
+    }
+    const blocked = id === "claimCast" && castBlock !== null;
     return (
       <button
-        key={action.id}
+        key={id}
         type="button"
-        className={[
-          "tap-target",
-          inMenu ? styles.item : styles.primary,
-          inMenu ? "" : TONE_CLASS[action.tone],
-        ]
-          .filter(Boolean)
-          .join(" ")}
-        disabled={busy && writes(action.id)}
-        aria-disabled={action.id === "claimCast" ? blocked : undefined}
+        className={className}
+        disabled={busy && writes(id)}
+        aria-disabled={id === "claimCast" ? blocked : undefined}
         title={blocked && castBlock === "CASTER_IDENTITY_REQUIRED" ? castIdentityNotice : undefined}
         aria-label={actionName(action.label)}
-        data-action={action.id}
+        data-action={id}
         onKeyDown={inMenu ? onPanelKeyDown : undefined}
         onClick={() => {
           if (inMenu) {
             setOpen(false);
             toggleRef.current?.focus();
           }
-          handlers[action.id]();
+          handlers[id]();
         }}
       >
         <Icon size={16} aria-hidden />
@@ -506,7 +530,7 @@ export function MatchCardActions({
     if (expanded && focusLeftMenu(menu, e.relatedTarget)) setOpen(false);
   };
   // Écoutée sur chaque bouton du panneau (`closePanelOnTabOut`).
-  const onPanelKeyDown = (e: ReactKeyboardEvent<HTMLButtonElement>) =>
+  const onPanelKeyDown = (e: ReactKeyboardEvent<HTMLElement>) =>
     closePanelOnTabOut(e, panelRef.current, () => {
       setOpen(false);
       toggleRef.current?.focus();

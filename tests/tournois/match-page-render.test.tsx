@@ -22,6 +22,7 @@ jest.mock("@/components/match-launch/MatchContactsDialog", () => ({
 
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
+import { MatchPageScope } from "@/app/(secured)/tournois/[id]/_lib/match-page-context";
 import { MatchPage } from "@/app/(secured)/tournois/[id]/_components/MatchPage";
 import { MatchRow } from "@/app/(secured)/tournois/[id]/_components/MatchRow";
 import { LiveProvider } from "@/app/(secured)/tournois/[id]/_lib/live-context";
@@ -181,6 +182,19 @@ describe("page d'un match — ce que tout le monde lit", () => {
     expect(lobby).toContain("Hôte : crée la partie");
     expect(lobby).toContain("Premier ban");
     expect(lobby).toContain("Tokyo");
+  });
+
+  it("retour à la fiche : le style du retour de l'en-tête, libellé « Retour au tournoi », ancré sur la carte du match", () => {
+    const html = render(match(), "staff");
+    expect(html).toMatch(/<a [^>]*class="back tap-target"[^>]*href="\/tournois\/12#match-34"|<a [^>]*href="\/tournois\/12#match-34"[^>]*class="back tap-target"/);
+    expect(visible(html)).toContain("← Retour au tournoi");
+    expect(html).not.toContain("<nav");
+    expect(visible(render(match(), "public", false, "en"))).toContain("← Back to the tournament");
+    expect(render(match(), "public", false, "en")).toContain('href="/en/suivre/tournois/12#match-34"');
+  });
+
+  it("le nom du tournoi, qui n'est plus le bouton de retour, ouvre la ligne de situation", () => {
+    expect(visible(render(match(), "public"))).toContain("Coupe d'hiver · Manche 2 · Match 3");
   });
 
   it("première map pas encore choisie, adversaires à venir", () => {
@@ -475,7 +489,7 @@ describe("page d'un match — contacts : qui les demande", () => {
 });
 
 describe("« Page du match » sur la carte du plateau", () => {
-  function card(page: BracketMatch, spectator = false) {
+  function card(page: BracketMatch, spectator = false, onPage = false) {
     const row = (
       <ToastProvider>
         <LiveProvider
@@ -490,17 +504,24 @@ describe("« Page du match » sur la carte du plateau", () => {
           myTeamId={null}
           castBlock="NOT_CASTER"
         >
-          <MatchRow match={page} adminResolvable={false} onOpenAdminModal={() => undefined} scoreLocked={false} roundNumber={2} />
+          <MatchPageScope value={onPage}>
+            <MatchRow match={page} adminResolvable={false} onOpenAdminModal={() => undefined} scoreLocked={false} roundNumber={2} />
+          </MatchPageScope>
         </LiveProvider>
       </ToastProvider>
     );
     return renderToStaticMarkup(spectator ? <SpectatorViewProvider>{row}</SpectatorViewProvider> : row);
   }
 
-  it("mène à la page du match, dans l'espace du lecteur ; nom accessible qui commence par le texte", () => {
-    expect(card(match())).toContain('href="/tournois/12/matchs/34"');
-    expect(card(match(), true)).toContain('href="/suivre/tournois/12/matchs/34"');
-    expect(card(match())).toContain('aria-label="Page du match : Alpha contre Bravo"');
+  it("rejoint les actions de la carte : une entrée du pied, nom accessible qui commence par le texte, plus de lien à part", () => {
+    const html = card(match());
+    expect(html).toContain('data-action="matchPage" data-primary="true">Page du match : Alpha contre Bravo');
+    expect(html).not.toContain("pageLink");
+    expect(html).not.toContain("<p");
+  });
+
+  it("se tait sous la page du match elle-même", () => {
+    expect(card(match(), false, true)).not.toContain('data-action="matchPage"');
   });
 
   it("tu sur une exemption, présent sur un match en attente d'adversaire", () => {

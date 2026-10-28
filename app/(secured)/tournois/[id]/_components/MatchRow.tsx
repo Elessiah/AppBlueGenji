@@ -21,13 +21,13 @@ import { usePlayerScore } from "../_lib/player-score-context";
 import { useIssueReport } from "../_lib/issue-report-context";
 import { useLiveControls } from "../_lib/live-context";
 import { useHighlightedMatch } from "../_lib/match-anchor-context";
+import { useOnMatchPage } from "../_lib/match-page-context";
 import { singlePendingReport } from "../_lib/score-form";
 import { matchSideViews } from "../_lib/match-row-sides";
 import { launchStripControls } from "../_lib/launch-strip";
 import { matchCardActionList } from "../_lib/match-card-actions";
 import { MatchLiveStrip } from "./MatchLiveStrip";
 import { MatchLaunchStrip } from "./MatchLaunchStrip";
-import { MatchPageLink } from "./MatchPageLink";
 import { MatchReplayStrip, canEditReplay } from "./MatchReplayStrip";
 import { MatchMapDetails } from "./MatchMapDetails";
 import { MatchCardActions } from "./MatchCardActions";
@@ -126,6 +126,10 @@ export const MatchRow = memo(function MatchRow({
   // saisit aucun score : le seul geste du dialogue est le forfait, et le bouton
   // le dit plutôt que d'annoncer une édition refusée.
   const scoreEntryClosed = SCORE_ENTRY_CLOSED_PHASES.includes(launchPhase);
+  // Sous la page du match, la carte tait le lien vers elle-même ; sur une
+  // exemption (un seul engagé, rien à jouer), il n'a rien à montrer.
+  const onMatchPage = useOnMatchPage();
+  const isBye = (match.team1Id === null) !== (match.team2Id === null) && match.status !== "PENDING";
   const canReportMatch = canReportOwnMatch(canReport, myTeamId, match.team1Id, match.team2Id);
   // Saisie du score par un engagé : un bouton qui ouvre la modale joueur, et
   // non plus un formulaire en ligne — deux champs de 52 px sans libellé visible
@@ -215,6 +219,7 @@ export const MatchRow = memo(function MatchRow({
     showReplay: canEditReplay(match, canManage),
     hasReplay: match.replayUrl !== null,
     canReport: canReportMatch,
+    showMatchPage: !onMatchPage && !isBye,
   }, actionText);
 
   return (
@@ -277,8 +282,6 @@ export const MatchRow = memo(function MatchRow({
       <MatchReplayStrip match={match} />
 
       <MatchMapDetails match={match} />
-
-      <MatchPageLink match={match} matchLabel={actionMatchLabel} />
 
       {/* Pas de région live : un plateau de cent vingt-sept cartes en
           annoncerait autant à chaque instantané du flux. L'annonce qui compte,

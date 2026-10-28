@@ -277,9 +277,7 @@
     "byeWin": "✓ Walkover",
     "champion": "🏆 Champion —",
     "moreStreams": "+{count}",
-    "moreStreamsLabel": "+{count}: the other streams of {match}",
-    "viewMatch": "Match page",
-    "viewMatchLabel": "Match page: {match}"
+    "moreStreamsLabel": "+{count}: the other streams of {match}"
   },
   "launch": {
     "toPlan": "To schedule",
@@ -420,7 +418,7 @@
     "date": "{day} at {hour}"
   },
   "matchPage": {
-    "crumbsLabel": "Breadcrumb",
+    "backToTournament": "Back to the tournament",
     "left": "Left",
     "right": "Right",
     "host": "Host: creates the game",

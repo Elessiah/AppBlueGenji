@@ -166,6 +166,7 @@ describe("bouton « Contacts » de la carte", () => {
       showReplay: false,
       hasReplay: false,
       canReport: true,
+      showMatchPage: false,
     });
     expect(groupMatchCardActions(actions).primary).toMatchObject({ id: "contacts", label: "Contacts" });
   });
