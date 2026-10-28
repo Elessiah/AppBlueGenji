@@ -29,8 +29,8 @@ export type RefereeChange =
   | { kind: "RELEASED"; matchId: number; refereeId: number; byStaff: boolean }
   /**
    * Arbitrage retiré parce que l'opposition de l'arbitre est retenue par le
-   * staff : le journal dit « retiré par le staff » (rien sur l'opposition),
-   * l'avis à l'arbitre en donne le motif.
+   * staff : aucune ligne de journal par match (la route en écrit une seule,
+   * anonyme et sans nombre), l'avis à l'arbitre en donne le motif.
    */
   | { kind: "OBJECTION_RELEASED"; matchId: number; refereeId: number }
   /** Arbitrage retiré d'office. */
@@ -92,7 +92,11 @@ export async function deliverRefereeChange(change: RefereeChange, options: Refer
   const match = matchLogSubject(row);
   // Geste groupé (autogestion d'une manche) : une seule ligne de journal pour
   // toute la manche, écrite par l'appelant ; l'avis à chaque arbitre reste.
-  const log = options.log === false ? Promise.resolve() : sendBotLog(
+  // Opposition retenue : aucune ligne par match — N matchs nommés juste avant
+  // la ligne anonyme de la route désigneraient leur arbitre comme celui qui
+  // s'oppose ; seule cette ligne, sans nombre, part sur Discord.
+  const silent = options.log === false || change.kind === "OBJECTION_RELEASED";
+  const log = silent ? Promise.resolve() : sendBotLog(
     formatRefereeChangeLog({
       tournament: match.tournament,
       matchId: match.matchId,

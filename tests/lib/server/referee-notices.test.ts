@@ -96,6 +96,21 @@ describe("refereeLogChange / refereeReleaseNotice", () => {
 });
 
 describe("deliverRefereeChange", () => {
+  it("n'écrit aucune ligne Discord pour un retrait sur opposition retenue, mais prévient l'arbitre", async () => {
+    mockMatch(matchRow());
+    await deliverRefereeChange({ kind: "OBJECTION_RELEASED", matchId: 42, refereeId: REFEREE });
+    expect(sendBotLog).not.toHaveBeenCalled();
+    expect(loadNotificationRecipients).toHaveBeenCalledWith([REFEREE], "certified");
+    expect(notification().topic).toBe("REFEREE_RELEASED");
+  });
+
+  it("tait aussi la ligne d'un retrait sur opposition quand l'appelant demande `log: true`", async () => {
+    mockMatch(matchRow());
+    await deliverRefereeChange({ kind: "OBJECTION_RELEASED", matchId: 42, refereeId: REFEREE }, { log: true });
+    expect(sendBotLog).not.toHaveBeenCalled();
+    expect(notifyUsers).toHaveBeenCalledTimes(1);
+  });
+
   it("journalise une prise de match sans nommer l'arbitre ni prévenir personne", async () => {
     mockMatch(matchRow());
     await deliverRefereeChange({ kind: "TAKEN", matchId: 42 });

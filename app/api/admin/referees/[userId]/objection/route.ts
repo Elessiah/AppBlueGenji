@@ -13,8 +13,9 @@ import { can } from "@/lib/shared/permissions";
  * arbitrer. Réservé à la permission `tournaments`, celle qui désigne les arbitres ;
  * retenir vise un arbitre (409 `NOT_REFEREE` sinon, `referee-objection.ts`).
  *
- * Journal : « un arbitre » et « le staff » sur Discord, le compte et l'auteur
- * dans pm2 seulement (`publishStaffAction`), et seulement sur un vrai changement.
+ * Journal : une seule ligne Discord, « un arbitre » et « le staff », sans nombre
+ * ni ligne par match ; le compte, l'auteur et le nombre de matchs retirés dans
+ * pm2 seulement (`publishStaffAction`), et seulement sur un vrai changement.
  * Un balayage incomplet répond 500 (`REFEREE_OBJECTION_FAILED`) après le
  * journal : retenir de nouveau l'opposition le rejoue.
  */
@@ -35,10 +36,13 @@ export async function PUT(req: Request, context: { params: Promise<{ userId: str
     // Tracé dès que quelque chose a changé — y compris un balayage rejoué —,
     // et avant le refus d'un balayage incomplet : l'opposition, elle, est écrite.
     if (result.changed || result.released > 0) {
+      // Sur Discord, ni nombre ni ligne par match (`referee-notices.ts`) : les
+      // matchs retirés désigneraient leur arbitre. Le nombre va dans pm2.
       const discordLine = upheld
-        ? `🛡 Opposition d'un arbitre retenue par le staff : il est retiré de ses matchs non terminés (${result.released}).`
+        ? "🛡 Opposition d'un arbitre retenue par le staff : il est retiré de ses matchs non terminés."
         : "🛡 Opposition d'un arbitre levée par le staff.";
-      publishStaffAction(discordLine, { id: user.id, pseudo: user.pseudo }, `${discordLine} Arbitre : #${refereeId}.`);
+      const pm2Detail = upheld ? ` Matchs retirés : ${result.released}.` : "";
+      publishStaffAction(discordLine, { id: user.id, pseudo: user.pseudo }, `${discordLine} Arbitre : #${refereeId}.${pm2Detail}`);
     }
     if (result.failed > 0) return fail("REFEREE_OBJECTION_FAILED", 500);
     return ok({ upheld, changed: result.changed, released: result.released });

@@ -95,10 +95,12 @@ describe("PUT /api/admin/referees/[userId]/objection", () => {
     await expect(res.json()).resolves.toEqual({ upheld: true, changed: true, released: 2 });
     expect(setRefereeObjection).toHaveBeenCalledWith(9, true);
     const [discordLine, actor, pm2Line] = jest.mocked(publishStaffAction).mock.calls[0];
-    expect(discordLine).toContain("retiré de ses matchs non terminés (2)");
+    expect(discordLine).toBe("🛡 Opposition d'un arbitre retenue par le staff : il est retiré de ses matchs non terminés.");
     expect(discordLine).not.toContain("#9");
+    expect(discordLine).not.toContain("2");
     expect(actor).toEqual({ id: 3, pseudo: "Staff" });
     expect(pm2Line).toContain("Arbitre : #9.");
+    expect(pm2Line).toContain("Matchs retirés : 2.");
   });
 
   it("PUT_lift_logsLiftLine", async () => {
@@ -109,6 +111,14 @@ describe("PUT /api/admin/referees/[userId]/objection", () => {
     expect(res.status).toBe(200);
     expect(setRefereeObjection).toHaveBeenCalledWith(9, false);
     expect(jest.mocked(publishStaffAction).mock.calls[0][0]).toBe("🛡 Opposition d'un arbitre levée par le staff.");
+  });
+
+  it("PUT_lift_pm2LineHasNoReleasedCount", async () => {
+    jest.mocked(setRefereeObjection).mockResolvedValue({ changed: true, released: 0, failed: 0 });
+
+    await PUT(putRequest({ upheld: false }), params("9"));
+
+    expect(jest.mocked(publishStaffAction).mock.calls[0][2]).toBe("🛡 Opposition d'un arbitre levée par le staff. Arbitre : #9.");
   });
 
   it("PUT_unchangedNothingReleased_doesNotLog", async () => {
@@ -127,7 +137,9 @@ describe("PUT /api/admin/referees/[userId]/objection", () => {
     const res = await PUT(putRequest({ upheld: true }), params("9"));
 
     expect(res.status).toBe(200);
-    expect(jest.mocked(publishStaffAction).mock.calls[0][0]).toContain("(1)");
+    const [discordLine, , pm2Line] = jest.mocked(publishStaffAction).mock.calls[0];
+    expect(discordLine).not.toContain("1");
+    expect(pm2Line).toContain("Matchs retirés : 1.");
   });
 
   it("PUT_incompleteSweep_logsThenReturns500", async () => {

@@ -80,8 +80,9 @@ oppositions retenues avec « Lever », choix d'un arbitre parmi les comptes
 - retenue : l'arbitre est retiré de **tous** ses matchs non terminés, lancés
   compris (`releaseObjectingReferee`, un match par transaction sous
   `lockLaunchMatch`, un match qui n'attendait que lui part) ; avis push
-  `REFEREE_RELEASED` motif `OBJECTION`, journal « retiré par le staff » par
-  match ; les matchs joués gardent leur arbitre ; le staff en désigne un autre ;
+  `REFEREE_RELEASED` motif `OBJECTION`, **aucune** ligne Discord par match
+  (nommer les matchs juste avant la ligne de l'opposition désignerait leur
+  arbitre) ; les matchs joués gardent leur arbitre ; le staff en désigne un autre ;
 - tant qu'elle tient : ni « Je prends ce match » ni désignation
   (`REFEREE_OBJECTION`, 409, contrôlé dans `writeReferee` et sur une
   re-désignation du même arbitre), absent des candidats, bouton « Arbitrer ce
@@ -89,8 +90,9 @@ oppositions retenues avec « Lever », choix d'un arbitre parmi les comptes
   (le lancement ne l'attend pas, un autre peut prendre le match) ; le cast
   reste ouvert ;
 - levée : il peut de nouveau arbitrer, rien ne lui est rendu ;
-- journal : `publishStaffAction` (« un arbitre », « le staff » sur Discord ;
-  auteur et `#id` de l'arbitre dans pm2), sur un vrai changement ou un
+- journal : `publishStaffAction`, une seule ligne Discord (« un arbitre »,
+  « le staff », sans nombre de matchs) ; auteur, `#id` de l'arbitre et nombre
+  de matchs retirés dans pm2, sur un vrai changement ou un
   balayage rejoué qui retire encore un match.
 
 Concurrence : l'écriture de l'opposition est une instruction seule (verrou
