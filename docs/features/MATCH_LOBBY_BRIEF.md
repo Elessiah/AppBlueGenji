@@ -79,8 +79,11 @@ ouvre un lancement, lecture de la liste des tournois).
 Nouveau message de match : registre T04 (sous-finalité, intérêt légitime
 opposable par l'interrupteur de « Mon profil ») et T12 (sujet push), `/rgpd`
 FR/EN § « Messages privés Discord de match », entrée
-`2026-10-reglages-du-salon-aux-managers` (FR/EN). Conditions d'utilisation
-inchangées.
+`2026-10-reglages-du-salon-aux-managers` (FR/EN), politique de confidentialité
+du bot (`bot-legal-content.ts` : messages remis, tag certifié, interrupteur,
+base légale ; copie LegalTerms du bot à régénérer avec le lot TERMS v7), garde
+des réservations (T04). Le brief repart quand le salon rouvre (horaire changé,
+retour à planifier, nouvel appariement). Conditions d'utilisation inchangées.
 
 ## Tests
 
