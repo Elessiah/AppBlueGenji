@@ -1142,7 +1142,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     details: [
       "Si tu joues ou castes un match : son arbitre désigné t'est présenté dans les fenêtres « Contacts » et de lancement du match, aux mêmes moments que les contacts du match (dès que tes deux adversaires sont connus si tu joues, le temps du match si tu castes) — son pseudo et son BattleTag, même masqué, jamais son tag Discord à ce titre (s'il caste aussi le match, ses contacts de caster suivent la règle des casters) ; son pseudo seul y paraît dès que la fenêtre de lancement montre le match. La fenêtre de lancement s'ouvre aussi à lui : il y lit les contacts du match, BattleTag masqué compris, qu'il lit déjà comme arbitre dans la fenêtre « Contacts ». Rien d'autre ne change pour tes propres données.",
       "Si tu arbitres : ton pseudo et ton BattleTag (même masqué) sont présentés ainsi aux parties de tes matchs, au titre de l'intérêt légitime (qu'elles sachent qui arbitre) : tu t'y opposes par le formulaire de signalement (catégorie RGPD) — retenue, ton opposition fait que le staff ne te confie plus de match — et tu peux te retirer d'un match à tout moment, le staff pouvant sinon te confier de nouveau ce match, sans avis ; ton « Prêt » est attendu avant le lancement. Si l'arbitrage t'est retiré par le staff (retrait, match confié à un autre arbitre ou passé en autogestion) ou d'office (conditions plus remplies, ou tu joues désormais le match), tu es prévenu en notification push seulement, avec le motif, tant que tu détiens la permission d'arbitrage — réglage « Arbitrage retiré ». À la suppression de ton compte, tu es retiré de tous tes matchs.",
-      "La prise d'un match, la désignation ou le remplacement de son arbitre par le staff, le retrait de l'arbitrage, l'autogestion, la première carte et les cartes choisies dans le pool du round sont notés au journal du staff sur Discord sans nommer personne ; un match qui entre en lancement sans arbitre ni autogestion est signalé aux arbitres, sans rien basculer d'office.",
+      "La prise d'un match, la désignation ou le remplacement de son arbitre par le staff, le retrait de l'arbitrage, l'autogestion, la première carte et les cartes choisies dans le pool de la manche sont notés au journal du staff sur Discord sans nommer personne ; un match qui entre en lancement sans arbitre ni autogestion est signalé aux arbitres, sans rien basculer d'office.",
     ],
   },
   {
@@ -1539,6 +1539,11 @@ function layoutPrivacyChangesMessage(
  *
  * Toujours au moins un changement quand il y en a : une entrée seule tient dans
  * un message (le registre le vérifie).
+ *
+ * Des conditions d'utilisation à accepter (`asksTermsAcceptance`) passent en
+ * tête : elles partent toujours dans ce message, et son pied dit qu'elles
+ * demandent l'accord — jamais un « aucun accord » sans exception alors que
+ * leur fenêtre attend sur le site, ni leur annonce repoussée d'un mois.
  */
 export function privacyChangesForOneMessage(
   changes: readonly PrivacyChange[],
@@ -1550,14 +1555,21 @@ export function privacyChangesForOneMessage(
   // du message plus long. Avec `english` (les mêmes changements, dans le même
   // ordre, en anglais), le lot doit tenir **dans les deux langues** : chaque
   // compte le reçoit dans la sienne (BOT-NOTIF-LANG).
-  for (let count = changes.length; count > 1; count -= 1) {
-    const batch = changes.slice(0, count);
+  const ordered = termsFirst(changes);
+  const orderedEnglish = english && termsFirst(english);
+  for (let count = ordered.length; count > 1; count -= 1) {
+    const batch = ordered.slice(0, count);
     const fits = layoutPrivacyChangesMessage(batch, siteUrl).named === count;
-    if (fits && (!english || layoutPrivacyChangesMessage(english.slice(0, count), siteUrl, "en").named === count)) {
+    if (fits && (!orderedEnglish || layoutPrivacyChangesMessage(orderedEnglish.slice(0, count), siteUrl, "en").named === count)) {
       return batch;
     }
   }
-  return changes.slice(0, 1);
+  return ordered.slice(0, 1);
+}
+
+/** Les conditions à accepter d'abord, le reste dans son ordre (tri stable). */
+function termsFirst(changes: readonly PrivacyChange[]): readonly PrivacyChange[] {
+  return [...changes.filter((change) => change.asksTermsAcceptance), ...changes.filter((change) => !change.asksTermsAcceptance)];
 }
 
 /**
