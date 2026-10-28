@@ -30,6 +30,7 @@ import { launchErrorText, useActionsText } from "../_lib/actions-text";
 import { useErrorsText } from "../_lib/error-map";
 import {
   addMapToSlot,
+  blocksImplicitSubmit,
   chunkRounds,
   findRound,
   overwrittenRounds,
@@ -120,7 +121,13 @@ function MapPicker({
     setCustom("");
   };
   return (
-    <div className={styles.picker}>
+    <div
+      className={styles.picker}
+      onKeyDown={(event) => {
+        const target = event.target;
+        if (target instanceof HTMLInputElement && blocksImplicitSubmit(event.key, target.type)) event.preventDefault();
+      }}
+    >
       {overwatch && (
         <>
           <div className="field">

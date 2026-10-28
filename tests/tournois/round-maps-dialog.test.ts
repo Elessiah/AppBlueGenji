@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   addMapToSlot,
+  blocksImplicitSubmit,
   chunkRounds,
   findRound,
   overwrittenRounds,
@@ -155,6 +156,28 @@ describe("slotsDirty", () => {
   it("slotsDirty_noRound_countsOnlyFilledSlots", () => {
     expect(slotsDirty([[]], SAVED, null)).toBe(false);
     expect(slotsDirty([["Ilios"]], SAVED, null)).toBe(true);
+  });
+});
+
+describe("blocksImplicitSubmit", () => {
+  it("blocksImplicitSubmit_enterInSearchField_returnsTrue", () => {
+    expect(blocksImplicitSubmit("Enter", "search")).toBe(true);
+  });
+
+  it("blocksImplicitSubmit_enterOnCheckbox_returnsTrue", () => {
+    expect(blocksImplicitSubmit("Enter", "checkbox")).toBe(true);
+  });
+
+  it("blocksImplicitSubmit_enterInTextField_returnsFalse", () => {
+    expect(blocksImplicitSubmit("Enter", "text")).toBe(false);
+  });
+
+  it("blocksImplicitSubmit_otherKey_returnsFalse", () => {
+    expect(blocksImplicitSubmit(" ", "checkbox")).toBe(false);
+  });
+
+  it("blocksImplicitSubmit_targetIsNotAnInput_returnsFalse", () => {
+    expect(blocksImplicitSubmit("Enter", null)).toBe(false);
   });
 });
 

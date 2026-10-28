@@ -59,6 +59,15 @@ export function slotGap(slots: readonly (readonly string[])[]): number | null {
   return gap === -1 ? null : gap + 1;
 }
 
+/**
+ * Une touche Entrée dans la liste des cartes (recherche, case) ne doit pas
+ * envoyer le formulaire du tour : elle enregistrerait une saisie à moitié faite.
+ * La saisie libre, qui a son propre « Ajouter », se charge de la touche elle-même.
+ */
+export function blocksImplicitSubmit(key: string, inputType: string | null): boolean {
+  return key === "Enter" && inputType !== null && inputType !== "text";
+}
+
 /** Tours découpés en lots d'au plus `size` (une écriture par lot). */
 export function chunkRounds<T>(rounds: readonly T[], size: number): T[][] {
   const chunks: T[][] = [];
