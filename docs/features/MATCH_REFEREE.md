@@ -56,11 +56,65 @@ première instruction ; un match joué (`MATCH_ALREADY_COMPLETED`) ou exempt
 | `PUT /api/admin/matches/[id]/referee` | désigner `{ userId }` ou retirer `{ userId: null }` | `tournaments` |
 | `PUT /api/admin/matches/[id]/self-management` | autogestion du match `{ enabled }` | `tournaments` |
 | `PUT /api/admin/tournaments/[id]/self-management` | autogestion d'une manche entière `{ phaseId, roundNumber, bracket, enabled }` (`INVALID_ROUND`) | `tournaments` |
+| `PUT /api/admin/referees/[userId]/objection` | retenir `{ upheld: true }` ou lever `{ upheld: false }` l'opposition d'un arbitre (`INVALID_REFEREE_OBJECTION`, 404 `USER_NOT_FOUND`, 409 `NOT_REFEREE`) — voir « Opposition retenue » | `tournaments` |
 | `PUT /api/admin/matches/[id]/first-map` | première carte `{ map }`, vide = retirer (`INVALID_FIRST_MAP`, rattaché au champ ; 409 `ROUND_MAPS_SET` quand le tour a des cartes — la fenêtre les montre alors en lecture seule, `ROUND_MAPS.md`) | `tournaments` |
 
 Désigner un arbitre éteint l'autogestion ; l'allumer retire l'arbitre (prévenu,
 motif `SELF_MANAGED`). Les erreurs ne portent qu'un code (`fail`), traduites en
 toast par `launchErrorText`.
+
+## Opposition retenue
+
+Décision 42b (2026-10-28) : l'arbitre s'oppose (formulaire de signalement,
+catégorie RGPD) à être présenté aux parties de ses matchs ; le staff la retient
+dans la fenêtre « Arbitrage » (section « Opposition d'un arbitre » : liste des
+oppositions retenues avec « Lever » — toutes, même sur un compte qui n'arbitre
+plus, pour qu'elles restent levables —, choix d'un arbitre parmi les comptes
+`tournaments` puis confirmation). `lib/server/tournaments/referee-objection.ts` :
+
+- `bg_users.referee_objection_at` (date, `NULL` sinon ; `CREATE TABLE` +
+  `RECENT_SCHEMA_CHANGES`) — rendu dans l'export (`refereeObjectionAt`), remis
+  à `NULL` à l'anonymisation ;
+- retenue seulement sur un compte qui a la permission `tournaments`, relue en
+  base (409 `NOT_REFEREE` sinon — l'identifiant de la route ne suffit pas) ;
+  la levée vaut pour tout compte qui en porte une ;
+- retenue : l'arbitre est retiré de **tous** ses matchs non terminés (tout
+  statut sauf `COMPLETED`, score en attente de confirmation compris), lancés
+  compris (`releaseObjectingReferee`, un match par transaction sous
+  `lockLaunchMatch`, un match qui n'attendait que lui part) ; avis push
+  `REFEREE_RELEASED` motif `OBJECTION`, **aucune** ligne Discord par match
+  (nommer les matchs juste avant la ligne de l'opposition désignerait leur
+  arbitre) ; les matchs terminés gardent leur arbitre ; le staff en désigne un autre ;
+- tant qu'elle tient : ni « Je prends ce match » ni désignation
+  (`REFEREE_OBJECTION`, 409, contrôlé dans `writeReferee` et sur une
+  re-désignation du même arbitre), absent des candidats, bouton « Arbitrer ce
+  match » caché ; le verrou du lancement (`lockLaunchMatch`) ne le compte plus
+  (le lancement ne l'attend pas, un autre peut prendre le match) ; le cast
+  reste ouvert ;
+- levée, à sa seule demande (même formulaire ; « Lever » passe par une
+  confirmation qui le rappelle) : il peut de nouveau arbitrer, rien ne lui est
+  rendu ;
+- journal : `publishStaffAction`, une seule ligne Discord (« un arbitre »,
+  « le staff », sans nombre de matchs) ; auteur, `#id` de l'arbitre et nombre
+  de matchs retirés dans pm2, sur un vrai changement ou un
+  balayage rejoué qui retire encore un match.
+
+Concurrence : l'écriture de l'opposition est une instruction seule (verrou
+exclusif sur la ligne du compte) ; `writeReferee` lit l'opposition en
+`LOCK IN SHARE MODE` sous le verrou du match. Une prise concurrente passe donc
+avant (et le balayage, lancé après l'écriture, voit le match) ou après (et
+elle est refusée). Une transaction par match plutôt qu'une pour tous : ses
+matchs couvrent plusieurs tournois, et tenir tous leurs verrous le temps du
+balayage bloquerait le maintien des lancements, qui en prend un à la fois. Le
+balayage est rejouable : une opposition déjà retenue reste proposée au
+formulaire, la retenir de nouveau refait le tour. Un échec sur un match
+n'arrête pas les autres ; il est compté, et la route répond 500
+(`REFEREE_OBJECTION_FAILED`) **après** le journal. `releaseObjectingReferee`
+relit l'opposition sous le verrou du match (ordre match puis compte, celui de
+`writeReferee`) : levée pendant le balayage, elle ne retire plus rien.
+L'instantané et la lecture de la modale (`refereeKept`, `keepEligibleReferees`)
+ne relisent pas l'opposition : seul un balayage resté incomplet y laisserait
+l'arbitre visible (consigné dans `ERREUR.txt`).
 
 ## « Prêt » : une quatrième partie
 
@@ -118,7 +172,7 @@ modale) ; sinon l'équipe 1. L'hôte joue à **gauche** ; l'autre équipe
   ligne** (`formatRoundSelfManagementLog`), pas une par match.
 - **Avis à l'arbitre retiré** par un autre que lui : sujet push
   `REFEREE_RELEASED` (audience `tournaments`), **push seul**, jamais de message
-  privé, avec le motif (`STAFF`, `REPLACED`, `SELF_MANAGED`, `INELIGIBLE`,
+  privé, avec le motif (`STAFF`, `REPLACED`, `SELF_MANAGED`, `OBJECTION`, `INELIGIBLE`,
   `JOINED_TEAM`). File d'après commit `queueRefereeChange` /
   `flushRefereeChanges`, vidée par `flushBotLogs` et jetée par `discardBotLogs`.
 - **Sans arbitre ni autogestion** à l'entrée en lancement : alerte
@@ -166,10 +220,12 @@ match, sans avis ; exécution du service (les arbitres agissant pour
 l'association) pour son « Prêt » et l'avis du retrait. L'entrée
 `2026-10-arbitre-designe-des-matchs` (intérêt légitime, opposition), datée du
 2026-10-29, a été rectifiée en place avant sa publication (EF-19, #501). Une
-opposition retenue fait que le staff ne confie plus de match à cet arbitre, ceux qu'il
-tient déjà lui restant (décision L430 : mesure d'organisation, rien ne
-l'impose dans le code ; le retrait de ses matchs non terminés (décision du 2026-10-28 : « ceux de l'équipe opposante », portée à préciser au lancement du lot, l'opposition étant celle de l'arbitre)
-viendra avec le lot REFEREE-OBJECTION et sa propre entrée rectificative) ; l'entrée
+opposition retenue le retire de tous ses matchs non terminés et lui ferme
+l'arbitrage (« Opposition retenue », lot REFEREE-OBJECTION, décision 42b) :
+T04, `/rgpd`, les portées `_BEFORE_V7_SCOPE` le disent, et l'entrée
+rectificative `2026-10-opposition-arbitre-retrait-des-matchs` (2026-10-30)
+remplace, sans les réécrire, les entrées publiées du 2026-10-29 qui disaient
+« ceux que tu tiens déjà te restent » ; l'entrée
 `2026-10-conditions-v7-casters-et-arbitre` annonce le passage au contrat à
 l'acceptation de la version 7. Devenir joueur du match ne retire l'arbitre qu'avant le
 lancement (`keepEligibleReferees`) : conditions, `/rgpd` et T04 le disent.

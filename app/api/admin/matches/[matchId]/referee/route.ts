@@ -12,6 +12,7 @@ const STATUSES: Readonly<Record<string, number>> = {
   MATCH_NOT_LAUNCHABLE: 409,
   NOT_REFEREE: 409,
   REFEREE_IDENTITY_REQUIRED: 409,
+  REFEREE_OBJECTION: 409,
   REFEREE_IS_PLAYER: 409,
 };
 
@@ -40,7 +41,8 @@ export async function GET(_req: Request, context: { params: Promise<{ matchId: s
 /**
  * Désigne l'arbitre du match, le remplace ou le retire. Corps :
  * `{ userId: number | null }`. Le compte désigné doit remplir la condition
- * d'arbitrage (409 `NOT_REFEREE` / `REFEREE_IDENTITY_REQUIRED`).
+ * d'arbitrage (409 `NOT_REFEREE` / `REFEREE_IDENTITY_REQUIRED`) et ne
+ * pas avoir d'opposition retenue (409 `REFEREE_OBJECTION`).
  */
 export async function PUT(req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();

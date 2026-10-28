@@ -25,6 +25,7 @@ import {
   releaseIneligibleReferee,
   releaseMatchCast,
   releaseMatchReferee,
+  releaseObjectingReferee,
   setMatchFirstMap,
   setMatchHost,
   setMatchReady,
@@ -88,7 +89,7 @@ type World = {
   match: MatchState | null;
   memberships: Membership[];
   soloEntries: { userId: number; teamId: number }[];
-  users: Record<number, { discord_verified_at: string | null; discord_pseudo: string | null; blizzard_sub: string | null; overwatch_battletag: string | null; is_deleted: number; is_admin?: number; platform_roles_json?: string | null }>;
+  users: Record<number, { discord_verified_at: string | null; discord_pseudo: string | null; blizzard_sub: string | null; overwatch_battletag: string | null; is_deleted: number; is_admin?: number; platform_roles_json?: string | null; referee_objection_at?: string | null }>;
   writes: string[];
   /** Réservations d'alerte d'arbitrage (`bg_referee_alerts`), `match:clé`. */
   alerts?: string[];
@@ -1403,5 +1404,131 @@ describe("maintainMatchLaunches — avertissement « sans arbitre »", () => {
     state.match = matchState({ self_managed: 1 });
     await maintainMatchLaunches(connection(), 7);
     expect(state.alerts ?? []).toEqual([]);
+  });
+});
+
+describe("opposition d'arbitre retenue (`releaseObjectingReferee`, `REFEREE_OBJECTION`)", () => {
+  const REFEREE = 960;
+  const refereeUser = {
+    discord_verified_at: STAMP,
+    discord_pseudo: "arbitre",
+    blizzard_sub: "sub",
+    overwatch_battletag: "Arbitre#1",
+    is_deleted: 0,
+    is_admin: 0,
+    platform_roles_json: JSON.stringify(["ARBITRE"]),
+  };
+
+  beforeEach(() => {
+    state.users[REFEREE] = { ...refereeUser };
+  });
+
+  it("takeMatchReferee_objectionUpheld_throwsRefereeObjection", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
+    state.match = matchState();
+
+    await expect(takeMatchReferee(42, REFEREE)).rejects.toThrow("REFEREE_OBJECTION");
+
+    expect(state.match?.referee_user_id).toBeNull();
+    expect(queueRefereeChange).not.toHaveBeenCalled();
+  });
+
+  it("assignMatchReferee_objectionUpheld_throwsRefereeObjection", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
+    state.match = matchState();
+
+    await expect(assignMatchReferee(42, 1, REFEREE)).rejects.toThrow("REFEREE_OBJECTION");
+
+    expect(state.match?.referee_user_id).toBeNull();
+  });
+
+  it("releaseObjectingReferee_unfinishedMatch_clearsRefereeAndQueuesObjectionRelease", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
+    state.match = matchState({ referee_user_id: REFEREE, referee_ready_at: STAMP });
+
+    const released = await releaseObjectingReferee(42, REFEREE);
+
+    expect(released).toBe(true);
+    expect(state.match?.referee_user_id).toBeNull();
+    expect(state.match?.referee_ready_at).toBeNull();
+    expect(queueRefereeChange).toHaveBeenCalledWith(expect.anything(), {
+      kind: "OBJECTION_RELEASED",
+      matchId: 42,
+      refereeId: REFEREE,
+    });
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
+  });
+
+  it("releaseObjectingReferee_launchedMatch_stillReleases", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
+    state.match = matchState({ referee_user_id: REFEREE, launched_at: STAMP });
+
+    const released = await releaseObjectingReferee(42, REFEREE);
+
+    expect(released).toBe(true);
+    expect(state.match?.referee_user_id).toBeNull();
+  });
+
+  it("releaseObjectingReferee_completedMatch_returnsFalseNoWrite", async () => {
+    state.match = matchState({ referee_user_id: REFEREE, status: "COMPLETED" });
+
+    const released = await releaseObjectingReferee(42, REFEREE);
+
+    expect(released).toBe(false);
+    expect(state.match?.referee_user_id).toBe(REFEREE);
+    expect(state.writes).toEqual([]);
+  });
+
+  it("releaseObjectingReferee_otherReferee_returnsFalseNoWrite", async () => {
+    state.match = matchState({ referee_user_id: 961 });
+
+    const released = await releaseObjectingReferee(42, REFEREE);
+
+    expect(released).toBe(false);
+    expect(state.match?.referee_user_id).toBe(961);
+    expect(queueRefereeChange).not.toHaveBeenCalled();
+  });
+
+  it("releaseObjectingReferee_onlyRefereeMissing_launchesMatch", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
+    state.match = matchState({ referee_user_id: REFEREE, team1_ready_at: STAMP, team2_ready_at: STAMP });
+
+    await releaseObjectingReferee(42, REFEREE);
+
+    expect(state.match?.launched_at).toBe(STAMP);
+  });
+
+  it("releaseObjectingReferee_objectionLiftedMeanwhile_returnsFalseNoWrite", async () => {
+    state.match = matchState({ referee_user_id: REFEREE });
+
+    const released = await releaseObjectingReferee(42, REFEREE);
+
+    expect(released).toBe(false);
+    expect(state.match?.referee_user_id).toBe(REFEREE);
+    expect(queueRefereeChange).not.toHaveBeenCalled();
+  });
+
+  it("assignMatchReferee_sameObjectingReferee_throwsRefereeObjection", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
+    state.match = matchState({ referee_user_id: REFEREE });
+
+    await expect(assignMatchReferee(42, 1, REFEREE)).rejects.toThrow("REFEREE_OBJECTION");
+  });
+
+  it("takeMatchReferee_selfAlreadyRefereeWithObjection_throwsRefereeObjection", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
+    state.match = matchState({ referee_user_id: REFEREE });
+
+    await expect(takeMatchReferee(42, REFEREE)).rejects.toThrow("REFEREE_OBJECTION");
+  });
+
+  it("takeMatchReferee_currentRefereeObjecting_otherRefereeTakesOver", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
+    state.users[961] = { ...refereeUser, overwatch_battletag: "Autre#1" };
+    state.match = matchState({ referee_user_id: REFEREE });
+
+    await takeMatchReferee(42, 961);
+
+    expect(state.match?.referee_user_id).toBe(961);
   });
 });

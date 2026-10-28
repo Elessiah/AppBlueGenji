@@ -298,7 +298,7 @@ describe("exportOwnData", () => {
         .mockResolvedValue([[]]);
       await mockDb(execute);
       const data = await exportOwnData(42);
-      expect(execute.mock.calls[1][0]).toMatch(/SELECT certification_prompt_dismissed_at FROM bg_users WHERE id = \? AND is_deleted = 0/);
+      expect(execute.mock.calls[1][0]).toMatch(/SELECT certification_prompt_dismissed_at, referee_objection_at FROM bg_users WHERE id = \? AND is_deleted = 0/);
       expect(execute.mock.calls[1][1]).toEqual([42]);
       return data.account.certificationPromptDismissedAt;
     };

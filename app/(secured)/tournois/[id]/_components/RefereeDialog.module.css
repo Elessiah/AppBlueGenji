@@ -55,3 +55,23 @@
   align-items: center;
   gap: 6px;
 }
+
+/* Oppositions d'arbitre retenues : un pseudo, son bouton « Lever ». */
+.objections {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.objection {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}

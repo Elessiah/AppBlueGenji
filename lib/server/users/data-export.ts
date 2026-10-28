@@ -17,19 +17,26 @@ import { listOwnLiveAnnouncements } from "./live-announcement-export";
 import { matchDmEnabled } from "./match-dm-preference";
 import { recruitmentModalBackOn, recruitmentModalOff } from "./recruitment-modal-preference";
 
-/** « Ne plus voir » de l'invitation à certifier de la fiche tournoi (ISO), `null` sans choix ou colonne absente. */
-async function readCertificationPromptDismissedAt(
+/**
+ * Dates lues à part sur le compte (ISO, `null` sans valeur ou colonne absente) :
+ * le « Ne plus voir » de l'invitation à certifier de la fiche tournoi, et
+ * l'opposition d'arbitre retenue (`docs/features/MATCH_REFEREE.md`).
+ */
+async function readSeparateAccountDates(
   db: Awaited<ReturnType<typeof getDatabase>>,
   userId: number,
-): Promise<string | null> {
+): Promise<{ certificationPromptDismissedAt: string | null; refereeObjectionAt: string | null }> {
   try {
     const [rows] = await db.execute<RowDataPacket[]>(
-      `SELECT certification_prompt_dismissed_at FROM bg_users WHERE id = ? AND is_deleted = 0 LIMIT 1`,
+      `SELECT certification_prompt_dismissed_at, referee_objection_at FROM bg_users WHERE id = ? AND is_deleted = 0 LIMIT 1`,
       [userId],
     );
-    return toIso((rows[0]?.certification_prompt_dismissed_at as Date | null | undefined) ?? null);
+    return {
+      certificationPromptDismissedAt: toIso((rows[0]?.certification_prompt_dismissed_at as Date | null | undefined) ?? null),
+      refereeObjectionAt: toIso((rows[0]?.referee_objection_at as Date | null | undefined) ?? null),
+    };
   } catch (error) {
-    if (isUnknownColumnError(error)) return null;
+    if (isUnknownColumnError(error)) return { certificationPromptDismissedAt: null, refereeObjectionAt: null };
     throw error;
   }
 }
@@ -109,7 +116,7 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
   const row = rows[0];
   // « Ne plus voir » de l'invitation à certifier de la fiche tournoi : lu à
   // part, colonne tolérée absente (son `ALTER` a échoué) — l'export ne tombe pas.
-  const certificationPromptDismissedAt = await readCertificationPromptDismissedAt(db, userId);
+  const { certificationPromptDismissedAt, refereeObjectionAt } = await readSeparateAccountDates(db, userId);
 
   // Réutilise l'agrégation existante pour les stats, l'historique d'équipes et
   // le palmarès de tournois (vue « self » = données complètes non masquées).
@@ -147,6 +154,8 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
       discordCertifyPromptDismissedAt: toIso(row.discord_certify_prompt_dismissed_at ?? null),
       // Et celui de l'invitation à certifier de la fiche tournoi : rendu de même.
       certificationPromptDismissedAt,
+      // L'opposition d'arbitre retenue (date), donnée détenue : rendue.
+      refereeObjectionAt,
       createdAt: toIso(row.created_at) ?? new Date().toISOString(),
     },
     profile: {

@@ -12,6 +12,7 @@ import {
   privacyChangePush,
   pushRoundLabel,
   refereeAlertPush,
+  refereeReleasedPush,
   scoreToConfirmPush,
   staffReportPush,
   staffReportSaturatedPush,
@@ -241,5 +242,27 @@ describe("notifications push — anglais", () => {
 
   it("écrit « Playoffs » comme le reste du site anglais", () => {
     expect(pushRoundLabel("UPPER", PLAYOFF_ROUND_OFFSET, "en")).toBe("Playoffs · round 1");
+  });
+});
+
+describe("refereeReleasedPush — opposition retenue (REFEREE-OBJECTION)", () => {
+  const match = {
+    tournamentId: 3,
+    tournamentName: "Coupe",
+    matchId: 42,
+    bracket: "UPPER",
+    roundNumber: 1,
+    team1Name: "Alpha",
+    team2Name: "Beta",
+    solo: false,
+    reason: "OBJECTION" as const,
+  };
+
+  it("refereeReleasedPush_objectionReason_namesObjectionFr", () => {
+    expect(refereeReleasedPush(match, "fr").body).toContain("Tu n'arbitres plus ce match : le staff a retenu ton opposition à l'arbitrage.");
+  });
+
+  it("refereeReleasedPush_objectionReason_namesObjectionEn", () => {
+    expect(refereeReleasedPush(match, "en").body).toContain("You no longer referee this match: the staff upheld your objection to refereeing.");
   });
 });

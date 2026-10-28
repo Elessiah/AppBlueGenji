@@ -168,6 +168,7 @@
       "STAFF": "décision du staff",
       "REPLACED": "le staff l'a confié à un autre arbitre",
       "SELF_MANAGED": "le staff l'a passé en autogestion",
+      "OBJECTION": "le staff a retenu ton opposition à l'arbitrage",
       "INELIGIBLE": "tu ne remplis plus les conditions de l'arbitrage",
       "JOINED_TEAM": "tu joues désormais ce match"
     }

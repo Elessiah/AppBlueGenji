@@ -192,6 +192,8 @@ describe("fenêtre « Arbitrage » : gestes offerts", () => {
       { userId: 1, pseudo: "Moi" },
       { userId: 2, pseudo: "Autre" },
     ],
+    objections: [],
+    objectable: [],
   });
 
   it("sans arbitre : prendre le match, tout compte désignable", () => {
@@ -212,6 +214,11 @@ describe("fenêtre « Arbitrage » : gestes offerts", () => {
       removeOther: true,
     });
     expect(refereeDialogActions(panel({ userId: 2, pseudo: "Autre", eligible: false }), 1).take).toBe(true);
+  });
+
+  it("refereeDialogActions_viewerObjectionUpheld_hidesTake", () => {
+    const view = { ...panel(null), objections: [{ userId: 1, pseudo: "Moi" }] };
+    expect(refereeDialogActions(view, 1).take).toBe(false);
   });
 });
 

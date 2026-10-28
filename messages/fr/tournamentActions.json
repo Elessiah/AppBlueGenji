@@ -333,6 +333,26 @@
         "title": "Lever l'autogestion de la manche ?",
         "body": "Les matchs encore à jouer de cette manche attendent de nouveau un arbitre ou une décision.",
         "confirm": "Lever l'autogestion"
+      },
+      "objection": {
+        "title": "Opposition d'un arbitre",
+        "hint": "Quand le staff retient l'opposition d'un arbitre (formulaire de signalement, catégorie RGPD), celui-ci est retiré de tous ses matchs non terminés et ne peut plus arbitrer tant qu'elle n'est pas levée ; ses matchs terminés gardent leur arbitre.",
+        "label": "Retenir l'opposition de",
+        "uphold": "Retenir l'opposition",
+        "upheld": "{count, plural, =0 {Opposition retenue : aucun match à lui retirer.} =1 {Opposition retenue : arbitre retiré d'un match.} other {Opposition retenue : arbitre retiré de # matchs.}}",
+        "lift": "Lever",
+        "liftAria": "Lever l'opposition de {pseudo}",
+        "lifted": "Opposition levée : il peut de nouveau arbitrer.",
+        "liftConfirm": {
+          "title": "Lever l'opposition de {pseudo} ?",
+          "body": "À ne faire qu'à sa demande (formulaire de signalement) : il pourra de nouveau prendre un match ou s'en voir confier un, et être présenté aux parties de ses matchs.",
+          "confirm": "Lever l'opposition"
+        },
+        "confirm": {
+          "title": "Retenir l'opposition de {pseudo} ?",
+          "body": "Il est retiré de tous ses matchs non terminés, dans tous les tournois, et en est prévenu ; il ne peut plus arbitrer tant que l'opposition n'est pas levée. Désigne ensuite un autre arbitre pour ces matchs.",
+          "confirm": "Retenir l'opposition"
+        }
       }
     }
   },

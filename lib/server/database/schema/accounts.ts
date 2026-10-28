@@ -59,6 +59,7 @@ export async function createAccountTables(db: Pool): Promise<void> {
       recruitment_modal_off TINYINT(1) NOT NULL DEFAULT 0,
       discord_certify_prompt_dismissed_at DATETIME NULL,
       certification_prompt_dismissed_at DATETIME NULL,
+      referee_objection_at DATETIME NULL,
       is_admin TINYINT(1) NOT NULL DEFAULT 0,
       is_deleted TINYINT(1) NOT NULL DEFAULT 0,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

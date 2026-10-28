@@ -1,6 +1,11 @@
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it, jest } from "@jest/globals";
 import { mapMatch } from "@/lib/server/tournaments/_internal";
-import { castEligibilityBlock, type CastEligibilityFields } from "@/lib/server/tournaments/cast-eligibility";
+import {
+  castEligibilityBlock,
+  refereeObjectionUpheld,
+  type CastEligibilityFields,
+} from "@/lib/server/tournaments/cast-eligibility";
+import { fakeConnection, type SqlQuery } from "../../helpers/sql-double";
 import type { MatchCasterRow } from "@/lib/server/tournaments/match-casters";
 import { matchRow } from "../../helpers/tournament-rows";
 
@@ -179,5 +184,57 @@ describe("mapMatch — arbitre désigné dans l'instantané (`docs/features/MATC
     const match = mapMatch(row({ self_managed: 1, first_map: "  Ilios​ " }));
     expect(match.selfManaged).toBe(true);
     expect(match.firstMap).toBe("Ilios");
+  });
+});
+
+describe("refereeObjectionUpheld", () => {
+  const connectionWith = (execute: jest.Mock<SqlQuery>) => fakeConnection({ execute });
+
+  it("refereeObjectionUpheld_dateSet_returnsTrue", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ referee_objection_at: "2026-10-28 20:00:00" }], []]);
+
+    await expect(refereeObjectionUpheld(connectionWith(execute), 5)).resolves.toBe(true);
+  });
+
+  it("refereeObjectionUpheld_nullDate_returnsFalse", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ referee_objection_at: null }], []]);
+
+    await expect(refereeObjectionUpheld(connectionWith(execute), 5)).resolves.toBe(false);
+  });
+
+  it("refereeObjectionUpheld_noRow_returnsFalse", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
+
+    await expect(refereeObjectionUpheld(connectionWith(execute), 5)).resolves.toBe(false);
+  });
+
+  it("refereeObjectionUpheld_lockTrue_readsInShareMode", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
+
+    await refereeObjectionUpheld(connectionWith(execute), 5, true);
+
+    expect(execute.mock.calls[0][0]).toMatch(/WHERE id = \? LIMIT 1 LOCK IN SHARE MODE$/);
+    expect(execute.mock.calls[0][1]).toEqual([5]);
+  });
+
+  it("refereeObjectionUpheld_noLock_plainRead", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
+
+    await refereeObjectionUpheld(connectionWith(execute), 5);
+
+    expect(execute.mock.calls[0][0]).not.toContain("LOCK IN SHARE MODE");
+  });
+
+  it("refereeObjectionUpheld_unknownColumn_returnsFalse", async () => {
+    const unknownColumn = Object.assign(new Error("Unknown column 'referee_objection_at'"), { code: "ER_BAD_FIELD_ERROR" });
+    const execute = jest.fn<SqlQuery>().mockRejectedValue(unknownColumn);
+
+    await expect(refereeObjectionUpheld(connectionWith(execute), 5)).resolves.toBe(false);
+  });
+
+  it("refereeObjectionUpheld_otherError_rethrows", async () => {
+    const execute = jest.fn<SqlQuery>().mockRejectedValue(new Error("ER_LOCK_WAIT_TIMEOUT"));
+
+    await expect(refereeObjectionUpheld(connectionWith(execute), 5)).rejects.toThrow("ER_LOCK_WAIT_TIMEOUT");
   });
 });
