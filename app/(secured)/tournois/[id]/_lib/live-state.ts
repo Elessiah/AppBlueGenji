@@ -179,7 +179,7 @@ export function applyLiveMessage(state: LiveState, message: LiveMessage): LiveSt
     certificationPrompt: state.detail.certificationPrompt,
     // Pseudos des arbitres : rejoués tels quels ; une désignation changée se
     // repère à son empreinte (`refereeKey`) et se relit par la lecture REST
-    // (`refereeNamesNeedRefresh`, MATCH_REFEREE.md).
+    // (`missingRefereeNamesKey`, MATCH_REFEREE.md).
     refereeNames: state.detail.refereeNames,
     // L'aperçu du plateau n'arrive qu'à la connexion, comme le reste du contexte
     // du lecteur : le flux ne le transporte pas, il est réservé au staff et au

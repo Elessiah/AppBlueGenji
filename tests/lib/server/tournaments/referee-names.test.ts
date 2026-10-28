@@ -97,3 +97,15 @@ describe("loadRefereeNames", () => {
     expect(connection.query.mock.calls[0][1]).toEqual([7]);
   });
 });
+
+describe("refereeKey — secret du processus", () => {
+  it("refereeKey_moduleReevaluated_keepsSameKey", () => {
+    const before = refereeKey(5, 9);
+    let again: typeof import("@/lib/server/tournaments/referee-names") | undefined;
+    jest.isolateModules(() => {
+      again = jest.requireActual<typeof import("@/lib/server/tournaments/referee-names")>("@/lib/server/tournaments/referee-names");
+    });
+
+    expect(again?.refereeKey(5, 9)).toBe(before);
+  });
+});

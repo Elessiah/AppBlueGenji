@@ -23,7 +23,13 @@ import { withConnection } from "@/lib/server/database";
 import { visibleText } from "@/lib/shared/visible-text";
 import type { MatchRefereeName, TournamentSnapshot } from "@/lib/shared/types";
 
-const KEY_SECRET = randomBytes(32);
+/**
+ * Secret tenu sur `globalThis` : une seconde évaluation du module (rechargement
+ * à chaud, double bundle) garde celui des empreintes déjà mises en cache.
+ */
+const holder = globalThis as typeof globalThis & { __bgRefereeKeySecret?: Buffer };
+holder.__bgRefereeKeySecret ??= randomBytes(32);
+const KEY_SECRET = holder.__bgRefereeKeySecret;
 
 /** Longueur de l'empreinte (base64url) : 96 bits, assez pour ne jamais se répéter sur un plateau. */
 const REFEREE_KEY_LENGTH = 16;

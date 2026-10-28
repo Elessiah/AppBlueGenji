@@ -857,7 +857,7 @@ export type TournamentViewerContext = {
    * Pseudo de l'arbitre désigné de chaque match qui en montre un (décision 52) :
    * à tout membre connecté, jamais à la page sans compte. Vaut pour le match
    * tant que son `refereeKey` est le même ; sinon la fiche lit « Arbitre
-   * désigné » et relit le contexte (`refereeNamesNeedRefresh`).
+   * désigné » et relit le contexte (`missingRefereeNamesKey`).
    */
   refereeNames: MatchRefereeName[];
 };

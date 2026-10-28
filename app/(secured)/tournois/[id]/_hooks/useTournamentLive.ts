@@ -276,19 +276,28 @@ export function useTournamentLive(tournamentId: number) {
     if (missing === "" || missing === namesAttemptRef.current || namesTimerRef.current !== null) return;
     namesAttemptRef.current = missing;
     const forTournament = detail.card.id;
+    // Une lecture ratée (429, 5xx, réseau) rouvre le même ensemble : le
+    // prochain instantané retentera, étalé comme le premier essai.
+    const retryLater = () => {
+      if (namesAttemptRef.current === missing) namesAttemptRef.current = "";
+    };
     namesTimerRef.current = setTimeout(() => {
       namesTimerRef.current = null;
       void (async () => {
         try {
           const response = await fetch(`/api/tournaments/${forTournament}/referee-names`, { cache: "no-store" });
-          if (!response.ok) return;
+          if (!response.ok) {
+            retryLater();
+            return;
+          }
           const payload = (await response.json()) as { refereeNames?: unknown };
           const names = parseRefereeNames(payload.refereeNames);
           const current = stateRef.current;
           if (names === null || !current.detail || current.detail.card.id !== forTournament) return;
           commit({ ...current, detail: { ...current.detail, refereeNames: names } });
         } catch {
-          // Réseau coupé : « Arbitre désigné » reste, la prochaine connexion relit.
+          // Réseau coupé : « Arbitre désigné » reste, le prochain instantané relit.
+          retryLater();
         }
       })();
     }, Math.random() * REFEREE_NAMES_SPREAD_MS); // NOSONAR typescript:S2245 — étalement de charge, aucune sécurité en jeu
