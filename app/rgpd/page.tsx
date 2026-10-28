@@ -644,7 +644,7 @@ function RgpdFr({
             <li>
               <strong>bg_cert_prompt_closed</strong> — une valeur du stockage de session, effacée à la
               fermeture de l&apos;onglet, posée seulement <strong>si vous fermez la fenêtre qui vous invite
-              à certifier votre tag Discord (et votre BattleTag selon le jeu)</strong> (fiche d&apos;un tournoi), pour ne
+              à certifier votre tag Discord (et votre BattleTag, selon le jeu et le compte)</strong> (fiche d&apos;un tournoi), pour ne
               pas vous la rouvrir dans cet onglet. Elle ne contient que la valeur « 1 », jamais
               d&apos;identifiant de personne, et n&apos;est jamais transmise au serveur. Si vous cochez
               « Ne plus voir » — retenu aussi si la fenêtre s&apos;efface devant une autre (lancement
@@ -1167,7 +1167,7 @@ function RgpdFr({
             l&apos;organisation ou un caster) reste au match. Le lien qu&apos;un caster a fourni, là ou en ouvrant
             son stream, part aussi à la suppression de son compte, matchs joués compris, même si un autre caster
             tient encore ce stream ; un membre de l&apos;organisation qui caste déjà le match quand il y pose sa chaîne
-            compte comme caster — le lien qu&apos;y pose un membre de l&apos;organisation qui ne caste pas encore ce match
+            compte comme caster — le lien qu&apos;y pose un membre de l&apos;organisation qui ne caste pas ce match
             reste celui de l&apos;organisation, même s&apos;il le caste ensuite. Un lien
             posé dans cette configuration avant que le site n&apos;enregistre qui le fournit n&apos;a pas d&apos;auteur
             connu et reste au match.{" "}

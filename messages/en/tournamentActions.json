@@ -65,8 +65,8 @@
   },
   "register": {
     "streamNotice": {
-      "TEAM": "This tournament's matches may be streamed live and recorded, showing your username, your team's name and your in-game results — never a webcam or voice chat. You can object and appear under a neutral name. When a streamed match starts — and before, if it is scheduled that evening, then once finished — your team's name is also announced on the association's Discord.",
-      "SOLO": "This tournament's matches may be streamed live and recorded, showing your username and your in-game results — never a webcam or voice chat. You can object and appear under a neutral name. When a streamed match starts — and before, if it is scheduled that evening, then once finished — your username is also announced on the association's Discord: that announcement is part of the tournament you register for, the neutral name does not apply to it, and it is deleted on request."
+      "TEAM": "This tournament's matches may be streamed live and recorded, showing your username, your team's name and your in-game results — never a webcam or voice chat. You can object and appear under a neutral name. When a streamed match starts — and before, if its broadcast is set to open at its start time that evening, then once finished — your team's name is also announced on the association's Discord.",
+      "SOLO": "This tournament's matches may be streamed live and recorded, showing your username and your in-game results — never a webcam or voice chat. You can object and appear under a neutral name. When a streamed match starts — and before, if its broadcast is set to open at its start time that evening, then once finished — your username is also announced on the association's Discord: that announcement is part of the tournament you register for, the neutral name does not apply to it, and it is deleted on request."
     },
     "streamNoticeLink": "Learn more",
     "notManager": "Only your team's owner and managers can register it for a tournament.",

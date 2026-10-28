@@ -97,6 +97,12 @@ export type PrivacyChange = {
    * message Discord ne les porte pas : il renvoie déjà au site.
    */
   links?: readonly PrivacyChangeLink[];
+  /**
+   * Version des conditions d'utilisation que l'entrée annonce, quand elle est
+   * **à accepter** (`TERMS_VERSION`). Le message privé qui la nomme ne dit
+   * alors plus « aucun accord » sans exception (`PRIVACY_DM_FRAME`).
+   */
+  termsVersion?: number;
 };
 
 /** Un lien d'une entrée : chemin du site et libellé. */
@@ -1116,7 +1122,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Un match peut désormais avoir plusieurs casters : chacun rejoint un stream du match (co-cast) ou ouvre le sien, avec son propre lien. Les contacts de match présentés au caster le temps du match le sont à chaque caster inscrit, et ceux de chaque caster aussi aux autres casters du match.",
     details: [
       "Ce qui est montré et le moment ne changent pas : tag Discord certifié et BattleTag (même masqué), dans les fenêtres « Contacts » et de lancement du match, le temps du match seulement (aux arbitres, dès que ses deux adversaires sont connus), au titre de l'exécution du service.",
-      "Si tu castes : ton pseudo est montré avec le stream que tu rejoins. Le lien du stream que tu ouvres à part est publié avec le match ; ce stream part, avec son lien, quand plus aucun caster ne le tient — que tu le quittes ou que ton compte soit supprimé ; seul le lien posé dans la configuration du direct du match reste au match. À la suppression de ton compte, le lien que tu as fourni — en ouvrant ton stream ou dans cette configuration — part aussi, matchs joués compris, même si un autre caster tient encore ce stream. Membre de l'organisation, la chaîne que tu poses dans cette configuration sur un match que tu castes déjà compte comme la tienne (posée avant ton inscription comme caster, elle reste le lien de l'organisation) ; un lien posé avant que le site n'enregistre qui le fournit n'a pas d'auteur connu et reste au match.",
+      "Si tu castes : ton pseudo est montré avec le stream que tu rejoins. Le lien du stream que tu ouvres à part est publié avec le match ; ce stream part, avec son lien, quand plus aucun caster ne le tient — que tu le quittes ou que ton compte soit supprimé ; seul le lien posé dans la configuration du direct du match reste au match. À la suppression de ton compte, le lien que tu as fourni — en ouvrant ton stream ou dans cette configuration — part aussi, matchs joués compris, même si un autre caster tient encore ce stream. Membre de l'organisation, la chaîne que tu poses dans cette configuration sur un match que tu castes déjà compte comme la tienne (posée avant ton inscription comme caster ou après l'avoir quitté, elle reste le lien de l'organisation ; réenregistrer un lien déjà posé n'en change pas l'auteur) ; un lien posé avant que le site n'enregistre qui le fournit n'a pas d'auteur connu et reste au match.",
       "Un caster n'en remplace plus un autre : une nouvelle inscription s'ajoute sans retirer personne. Une inscription n'est plus retirée que par le caster lui-même, par le staff ou d'office.",
     ],
   },
@@ -1134,9 +1140,9 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     summary:
       "Un membre du staff peut désormais arbitrer un match : il le prend, ou le staff le lui confie. Les deux équipes et les arbitres voient son pseudo et son BattleTag dès que les deux adversaires sont connus, les casters du match le temps du match ; le public ne lit que « Arbitre désigné ».",
     details: [
-      "Si tu joues ou castes un match : son arbitre désigné t'est présenté dans les fenêtres « Contacts » et de lancement du match, aux mêmes moments que les contacts du match (dès que tes deux adversaires sont connus si tu joues, le temps du match si tu castes) — son pseudo et son BattleTag, même masqué, jamais son tag Discord ; son pseudo seul y paraît dès que la fenêtre de lancement montre le match. La fenêtre de lancement s'ouvre aussi à lui : il y lit les contacts du match, BattleTag masqué compris, qu'il lit déjà comme arbitre dans la fenêtre « Contacts ». Rien d'autre ne change pour tes propres données.",
+      "Si tu joues ou castes un match : son arbitre désigné t'est présenté dans les fenêtres « Contacts » et de lancement du match, aux mêmes moments que les contacts du match (dès que tes deux adversaires sont connus si tu joues, le temps du match si tu castes) — son pseudo et son BattleTag, même masqué, jamais son tag Discord à ce titre (s'il caste aussi le match, ses contacts de caster suivent la règle des casters) ; son pseudo seul y paraît dès que la fenêtre de lancement montre le match. La fenêtre de lancement s'ouvre aussi à lui : il y lit les contacts du match, BattleTag masqué compris, qu'il lit déjà comme arbitre dans la fenêtre « Contacts ». Rien d'autre ne change pour tes propres données.",
       "Si tu arbitres : ton pseudo et ton BattleTag (même masqué) sont présentés ainsi aux parties de tes matchs, au titre de l'intérêt légitime (qu'elles sachent qui arbitre) : tu t'y opposes par le formulaire de signalement (catégorie RGPD) — retenue, ton opposition fait que le staff ne te confie plus de match — et tu peux te retirer d'un match à tout moment, le staff pouvant sinon te confier de nouveau ce match, sans avis ; ton « Prêt » est attendu avant le lancement. Si l'arbitrage t'est retiré par le staff (retrait, match confié à un autre arbitre ou passé en autogestion) ou d'office (conditions plus remplies, ou tu joues désormais le match), tu es prévenu en notification push seulement, avec le motif, tant que tu détiens la permission d'arbitrage — réglage « Arbitrage retiré ». À la suppression de ton compte, tu es retiré de tous tes matchs.",
-      "La prise d'un match, son retrait, l'autogestion et la première carte sont notés au journal du staff sur Discord sans nommer personne ; un match qui entre en lancement sans arbitre ni autogestion est signalé aux arbitres, sans rien basculer d'office.",
+      "La prise d'un match, la désignation ou le remplacement de son arbitre par le staff, le retrait de l'arbitrage, l'autogestion et la première carte sont notés au journal du staff sur Discord sans nommer personne ; un match qui entre en lancement sans arbitre ni autogestion est signalé aux arbitres, sans rien basculer d'office.",
     ],
   },
   {
@@ -1180,7 +1186,8 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       { href: "/rgpd#arbitre-designe", label: "Lire le paragraphe « Arbitre désigné d'un match »" },
     ],
     summary:
-      "Les conditions d'utilisation passent en version 7 : leur section « Contacts de match » prévoit plusieurs casters par match, l'arbitre désigné et la page du match, et la présentation de l'arbitre désigné repose désormais sur l'exécution du service, et non plus sur l'intérêt légitime, dès que cet arbitre a accepté cette version.",
+      "Les conditions d'utilisation passent en version 7 : leur section « Contacts de match » prévoit plusieurs casters par match, l'arbitre désigné et la page du match, et la présentation de l'arbitre désigné repose désormais sur l'exécution du service, et non plus sur l'intérêt légitime, dès que cet arbitre a accepté cette version. Elle est à accepter : une fenêtre te la présente à ta prochaine visite.",
+    termsVersion: 7,
     details: [
       "Contacts de match : les contacts d'un match vont à chacun de ses casters le temps du match, et ceux de chaque caster aussi aux autres casters du match. L'arbitre désigné y est présenté — son pseudo et son BattleTag, même masqué, jamais son tag Discord à ce titre (s'il caste aussi le match, ses contacts de caster suivent la règle des casters) — aux deux équipes et aux arbitres dès que les deux adversaires sont connus et jusqu'à la fin du match, et aux casters le temps du match.",
       "Page du match : elle reprend les contacts des casters (tag Discord certifié et BattleTag, même masqué) et le pseudo et le BattleTag, même masqué, de l'arbitre désigné, aux mêmes personnes et aux mêmes moments que la fenêtre « Contacts » du match ; les contacts des équipes restent dans les fenêtres « Contacts » et de lancement. Un BattleTag masqué ne se lit nulle part ailleurs sur le site.",
@@ -1201,7 +1208,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     title: "« Ne plus voir » de l'invitation à certifier : retenu sur le compte",
     links: [COOKIES_SECTION_LINK],
     summary:
-      "Le choix « Ne plus voir » de la fenêtre qui t'invite, sur la fiche d'un tournoi, à certifier ton tag Discord (et ton BattleTag selon le jeu) est désormais gardé sur ton compte, et non plus dans le navigateur : il vaut dans tous tes navigateurs, et ne s'applique plus aux autres comptes utilisés dans le même navigateur.",
+      "Le choix « Ne plus voir » de la fenêtre qui t'invite, sur la fiche d'un tournoi, à certifier ton tag Discord (et ton BattleTag, selon le jeu et le compte) est désormais gardé sur ton compte, et non plus dans le navigateur : il vaut dans tous tes navigateurs, et ne s'applique plus aux autres comptes utilisés dans le même navigateur.",
     details: [
       "Ce qui est gardé : la date du choix, sur ton compte. Elle figure dans l'export de tes données et est effacée à l'anonymisation du compte.",
       "Un « Ne plus voir » coché avant ce changement, gardé dans le navigateur, n'est pas repris sur ton compte : la fenêtre peut revenir une fois, à cocher de nouveau. Cette ancienne valeur du stockage local n'est plus lue, et elle est effacée à l'ouverture de la fiche d'un tournoi.",
@@ -1222,7 +1229,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     summary:
       "Précision sur l'information du 21 octobre 2026 : à chaque connexion par Discord ou Blizzard, tant que ton tag Discord n'est pas certifié et que tu n'as pas choisi « Ne plus voir », ta session de connexion note que la fenêtre de certification reste à te proposer, une fois par connexion.",
     details: [
-      "L'information du 21 octobre disait l'inverse : que la session note, après « Plus tard », que la fenêtre n'est plus à proposer. En fait, la marque est posée à la connexion et levée à ta première réponse (« Plus tard », la fermeture de la fenêtre ou son bouton qui ouvre la certification de « Mon profil », « Ne plus voir » — qui la lève sur toutes tes sessions —, ou la certification, réussie ou refusée parce que ton tag Discord ne peut plus être certifié depuis la fenêtre), ou dès qu'il n'y a plus rien à te proposer.",
+      "L'information du 21 octobre disait l'inverse : que la session note, après « Plus tard », que la fenêtre n'est plus à proposer. En fait, la marque est posée à la connexion et levée à ta première réponse (« Plus tard », la fermeture de la fenêtre ou son bouton vers « Mon profil », « Ne plus voir » — qui la lève sur toutes tes sessions —, ou la certification, réussie ou refusée parce que ton tag Discord ne peut plus être certifié depuis cette fenêtre), ou dès qu'il n'y a plus rien à te proposer. Une réponse qui ne parvient pas au site, ou qu'il refuse parce qu'un autre compte s'est connecté depuis dans ce navigateur ou que ton compte est introuvable, ne la lève pas : la fenêtre peut revenir au chargement suivant.",
       "Cette marque ne contient rien d'autre, part avec la session et ne figure pas dans l'export de tes données. Rien d'autre ne change : « Ne plus voir » reste gardé sur ton compte, avec sa date.",
     ],
   },
@@ -1455,7 +1462,7 @@ const PRIVACY_DM_FRAME: Record<
   "fr" | "en",
   {
     header: (count: number) => string;
-    footer: (siteUrl: string | null) => string;
+    footer: (siteUrl: string | null, asksTerms: boolean) => string;
     omitted: (count: number) => string;
   }
 > = {
@@ -1464,8 +1471,11 @@ const PRIVACY_DM_FRAME: Record<
       count > 1
         ? `🔐 **BlueGenji — ${count} changements de nos règles de confidentialité**`
         : "🔐 **BlueGenji — nos règles de confidentialité ont changé**",
-    footer: (siteUrl) =>
-      `Le détail t'attend à ta prochaine visite${siteUrl ? " sur " + siteUrl : " sur le site"}. Aucun accord ne t'est demandé : ` +
+    footer: (siteUrl, asksTerms) =>
+      `Le détail t'attend à ta prochaine visite${siteUrl ? " sur " + siteUrl : " sur le site"}. ` +
+      (asksTerms
+        ? "Les nouvelles conditions d'utilisation sont à accepter pour continuer à utiliser le site ; pour le reste, aucun accord ne t'est demandé : "
+        : "Aucun accord ne t'est demandé : ") +
       "la politique de confidentialité dit comment t'opposer à un traitement ou exercer tes autres droits. Politique complète : " +
       (siteUrl ? `${siteUrl.replace(/\/$/, "")}/rgpd` : "page « RGPD » du site") +
       ".",
@@ -1476,8 +1486,11 @@ const PRIVACY_DM_FRAME: Record<
       count > 1
         ? `🔐 **BlueGenji — ${count} changes to our privacy rules**`
         : "🔐 **BlueGenji — our privacy rules have changed**",
-    footer: (siteUrl) =>
-      `The details are waiting for you on your next visit${siteUrl ? " to " + siteUrl : " to the site"}. No consent is asked of you: ` +
+    footer: (siteUrl, asksTerms) =>
+      `The details are waiting for you on your next visit${siteUrl ? " to " + siteUrl : " to the site"}. ` +
+      (asksTerms
+        ? "The new terms of use must be accepted to keep using the site; for the rest, no consent is asked of you: "
+        : "No consent is asked of you: ") +
       "the privacy policy explains how to object to a processing or exercise your other rights. Full policy: " +
       (siteUrl ? `${siteUrl.replace(/\/$/, "")}/en/rgpd` : "the site's “GDPR” page") +
       ".",
@@ -1497,22 +1510,26 @@ function layoutPrivacyChangesMessage(
 ): { text: string; named: number } {
   const frame = PRIVACY_DM_FRAME[locale];
   const header = frame.header(changes.length);
-  const footer = frame.footer(siteUrl);
   const omittedLine = frame.omitted;
-  const assemble = (lines: string[], omitted: number) =>
-    [header, ...lines, ...(omitted > 0 ? [omittedLine(omitted)] : []), footer].join("\n\n");
+  // Le pied ne parle des conditions à accepter que si un changement **nommé**
+  // les annonce : compté seulement, il partira nommé dans un message suivant.
+  const assemble = (lines: string[], omitted: number, asksTerms: boolean) =>
+    [header, ...lines, ...(omitted > 0 ? [omittedLine(omitted)] : []), frame.footer(siteUrl, asksTerms)].join("\n\n");
 
   // Chaque changement n'est gardé que si le message **complet** — y compris la
   // mention de ceux qui ne tiendraient plus après lui — reste sous le plafond.
   const lines: string[] = [];
+  let asksTerms = false;
   for (const [index, change] of changes.entries()) {
     const line = `• **${change.title}** (${formatPrivacyChangeDateIn(change.publishedAt, locale)}) — ${change.summary}`;
-    if (assemble([...lines, line], changes.length - index - 1).length > PRIVACY_DM_MAX_LENGTH) {
-      return { text: assemble(lines, changes.length - index), named: lines.length };
+    const withTerms: boolean = asksTerms || change.termsVersion !== undefined;
+    if (assemble([...lines, line], changes.length - index - 1, withTerms).length > PRIVACY_DM_MAX_LENGTH) {
+      return { text: assemble(lines, changes.length - index, asksTerms), named: lines.length };
     }
     lines.push(line);
+    asksTerms = withTerms;
   }
-  return { text: assemble(lines, 0), named: lines.length };
+  return { text: assemble(lines, 0, asksTerms), named: lines.length };
 }
 
 /**

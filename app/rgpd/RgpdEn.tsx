@@ -500,7 +500,7 @@ export function RgpdEn({
             </li>
             <li>
               <strong>bg_cert_prompt_closed</strong> — a session storage value, erased when the tab is closed, set
-              only <strong>if you close the window inviting you to verify your Discord tag (and your BattleTag depending on the game)</strong>{" "}
+              only <strong>if you close the window inviting you to verify your Discord tag (and your BattleTag, depending on the game and the account)</strong>{" "}
               (tournament page), so as not to reopen it in that tab. It only contains the value “1”, never an
               identifier of a person, and is never sent to the server. If you tick “Don&apos;t show again” — also
               kept if the window steps aside for another one (a match launch) —, that choice is not kept in the

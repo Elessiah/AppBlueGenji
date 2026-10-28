@@ -6,8 +6,11 @@
  *
  * - `bg_user_sessions.certify_prompt_due` — posé à l'ouverture d'une session
  *   par Discord ou Blizzard (`createSession`), levé par la première réponse
- *   (« Plus tard », fermeture, passage au dialogue) : **une fois par
- *   connexion**, pas une fois par page ;
+ *   (« Plus tard », fermeture, passage au dialogue de « Mon profil »,
+ *   certification réussie ou refusée parce que le tag ne peut plus être
+ *   certifié depuis la fenêtre — `STATE_CHANGED` —, « Ne plus voir », qui le
+ *   lève sur toutes les sessions du compte) ou dès qu'il n'y a plus rien à
+ *   proposer : **une fois par connexion**, pas une fois par page ;
  * - `bg_users.discord_certify_prompt_dismissed_at` — « Ne plus voir », gardé
  *   sur le compte, remis à `NULL` à l'anonymisation, rendu dans l'export.
  *
