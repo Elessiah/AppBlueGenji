@@ -3,7 +3,7 @@ import { formatLobbyBriefDm, type LobbyBriefSide } from "@/lib/shared/lobby-brie
 import { localizedSiteUrl } from "@/lib/shared/dm-language";
 import { localeHref } from "@/lib/shared/locales";
 import { matchPageHref } from "@/lib/shared/match-anchor";
-import { PUSH_TOPICS } from "@/lib/shared/push-notifications";
+import { clipPushText, PUSH_BODY_MAX, PUSH_TOPICS } from "@/lib/shared/push-notifications";
 import { PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
 import { PROCESSING_ACTIVITIES_EN } from "@/lib/shared/processing-register-en";
 import { lobbyBriefPush, matchStartPush } from "@/lib/shared/push-messages";
@@ -114,7 +114,7 @@ describe("lobbyBriefPush", () => {
     const push = lobbyBriefPush(side({ cast: true }));
     expect(push.title).toBe("Salon ouvert : réglages du match");
     expect(push.body).toBe(
-      "Renards contre Nova · Gauche (hôte) : Renards · Droite : Nova · 1re carte : Ilios · 1er ban : Nova. Match casté : trie les joueurs par rôle.",
+      "Match casté : trie les joueurs par rôle. Gauche (hôte) : Renards · Droite (1er ban) : Nova · 1re carte : Ilios.",
     );
     expect(push.url).toBe(localeHref(matchPageHref(4, 40), "fr"));
     expect(push.url).toBe("/tournois/4/matchs/40");
@@ -125,11 +125,19 @@ describe("lobbyBriefPush", () => {
   it("en anglais, et en individuel sans pseudo", () => {
     const en = lobbyBriefPush(side({ hosting: false, firstMap: null }), "en");
     expect(en.title).toBe("Lobby open: match settings");
-    expect(en.body).toBe("Renards vs Nova · Left (host): Nova · Right: Renards · 1st map: not set yet · 1st ban: Renards.");
+    expect(en.body).toBe("Left (host): Nova · Right (1st ban): Renards · 1st map: not set yet.");
     expect(en.url).toBe(localeHref(matchPageHref(4, 40), "en"));
     const solo = lobbyBriefPush(side({ solo: true, teamName: "PseudoA", opponentName: "PseudoB" }));
     expect(solo.body).not.toMatch(/PseudoA|PseudoB/);
-    expect(solo.body).toBe("Ton match · Gauche (hôte) : toi · Droite : ton adversaire · 1re carte : Ilios · 1er ban : ton adversaire.");
+    expect(solo.body).toBe("Gauche (hôte) : toi · Droite (1er ban) : ton adversaire · 1re carte : Ilios.");
+  });
+
+  it("aux noms et à la carte les plus longs, la coupe ne retire que la fin de la carte", () => {
+    const long = "N".repeat(60);
+    const push = lobbyBriefPush(side({ cast: true, teamName: long, opponentName: "M".repeat(60), firstMap: "C".repeat(64) }));
+    const shown = clipPushText(push.body, PUSH_BODY_MAX);
+    expect(shown.startsWith("Match casté : trie les joueurs par rôle.")).toBe(true);
+    expect(shown).toContain(`Droite (1er ban) : ${"M".repeat(60)} · 1re carte : C`);
   });
 
   it("a son sujet, ouvert à tous, juste après le départ de match, libellé en français et en anglais", () => {

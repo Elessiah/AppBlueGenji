@@ -1543,36 +1543,62 @@ describe("PRIVACY_CHANGES — sauvegardes deux fois par semaine, entrée rectifi
   });
 });
 
+
+/** Entrée du groupe MATCH-REFEREE / LOGS-NOTIFS : place, date, public, lien, et tient seule dans un message privé (FR et EN). */
+function expectStandaloneEntry(
+  entry: PrivacyChange,
+  english: unknown,
+  expected: { fromEnd: number; publishedAt: string; audience: PrivacyChange["audience"]; links: PrivacyChange["links"] },
+): void {
+  expect(entry).toBeDefined();
+  expect(english).toBeDefined();
+  expect(PRIVACY_CHANGES.indexOf(entry)).toBe(PRIVACY_CHANGES.length - expected.fromEnd);
+  expect([entry.publishedAt, entry.audience]).toEqual([expected.publishedAt, expected.audience]);
+  expect(PRIVACY_CHANGES.at(-(expected.fromEnd + 1))!.publishedAt <= entry.publishedAt).toBe(true);
+  expect(entry.links).toEqual(expected.links);
+  expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+  const [englishEntry] = localizedPrivacyChanges([entry], "en");
+  expect(buildPrivacyChangesMessage([englishEntry], "https://site.test", "en").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+}
+
+/** Ce que l'entrée dit, en français et en anglais, avec autant de détails et un libellé de lien par langue. */
+function expectEntryTexts(
+  entry: PrivacyChange,
+  english: (typeof PRIVACY_CHANGES_EN)[string],
+  expected: { fr: readonly string[]; en: readonly string[] },
+): void {
+  const fr = [entry.title, entry.summary, ...entry.details].join(" ");
+  for (const text of expected.fr) expect(fr).toContain(text);
+  const en = [english.title, english.summary, ...english.details].join(" ");
+  for (const text of expected.en) expect(en).toContain(text);
+  expect(english.details).toHaveLength(entry.details.length);
+  expect(english.linkLabels).toHaveLength(1);
+}
+
 describe("PRIVACY_CHANGES — avis de retrait du cast (LOGS-NOTIFS ln-1)", () => {
   const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-avis-de-retrait-du-cast")!;
   const english = PRIVACY_CHANGES_EN["2026-10-avis-de-retrait-du-cast"];
 
   it("ferme la liste : datée du 29 octobre (lendemain de la mise en ligne prévue), pour les seuls casters, et tient seule dans un message privé (FR et EN)", () => {
-    expect(entry).toBeDefined();
-    expect(english).toBeDefined();
-    expect(PRIVACY_CHANGES.indexOf(entry)).toBe(PRIVACY_CHANGES.length - 4);
-    expect([entry.publishedAt, entry.audience]).toEqual(["2026-10-29", "LIVE_STAFF"]);
-    expect(PRIVACY_CHANGES.at(-5)!.publishedAt <= entry.publishedAt).toBe(true);
-    expect(entry.links).toEqual([{ href: "/rgpd#messages-de-match", label: "Lire le paragraphe « Messages privés Discord de match »" }]);
-    expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
-    const [englishEntry] = localizedPrivacyChanges([entry], "en");
-    expect(buildPrivacyChangesMessage([englishEntry], "https://site.test", "en").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+    expectStandaloneEntry(entry, english, { fromEnd: 4, publishedAt: "2026-10-29", audience: "LIVE_STAFF", links: [{ href: "/rgpd#messages-de-match", label: "Lire le paragraphe « Messages privés Discord de match »" }] });
   });
 
   it("dit qui est prévenu, comment, avec quel motif, et le journal anonyme (FR et EN)", () => {
-    const fr = [entry.title, entry.summary, ...entry.details].join(" ");
-    expect(fr).toContain("en message privé Discord et en notification push, avec le motif");
-    expect(fr).toContain("jamais qui a retiré l'inscription");
-    expect(fr).toContain("ne part qu'à un tag Discord certifié");
-    expect(fr).toContain("« Messages privés Discord de mes matchs »");
-    expect(fr).toContain("sans nommer personne (« un caster », « le staff »)");
-    const en = [english.title, english.summary, ...english.details].join(" ");
-    expect(en).toContain("by Discord direct message and push notification, with the reason");
-    expect(en).toContain("never who removed the registration");
-    expect(en).toContain("only goes to a certified Discord tag");
-    expect(en).toContain("without naming anyone (“a caster”, “the staff”)");
-    expect(english.details).toHaveLength(entry.details.length);
-    expect(english.linkLabels).toHaveLength(1);
+    expectEntryTexts(entry, english, {
+      fr: [
+        "en message privé Discord et en notification push, avec le motif",
+        "jamais qui a retiré l'inscription",
+        "ne part qu'à un tag Discord certifié",
+        "« Messages privés Discord de mes matchs »",
+        "sans nommer personne (« un caster », « le staff »)",
+      ],
+      en: [
+        "by Discord direct message and push notification, with the reason",
+        "never who removed the registration",
+        "only goes to a certified Discord tag",
+        "without naming anyone (“a caster”, “the staff”)",
+      ],
+    });
   });
 });
 
@@ -1581,15 +1607,7 @@ describe("PRIVACY_CHANGES — plusieurs casters par match (MATCH-REFEREE MR-1)",
   const english = PRIVACY_CHANGES_EN["2026-10-plusieurs-casters-par-match"];
 
   it("précède l'entrée de l'arbitre désigné : datée comme l'entrée précédente (mise en ligne groupée), pour tous les comptes, et tient seule dans un message privé (FR et EN)", () => {
-    expect(entry).toBeDefined();
-    expect(english).toBeDefined();
-    expect(PRIVACY_CHANGES.indexOf(entry)).toBe(PRIVACY_CHANGES.length - 3);
-    expect([entry.publishedAt, entry.audience]).toEqual(["2026-10-29", undefined]);
-    expect(PRIVACY_CHANGES.at(-4)!.publishedAt <= entry.publishedAt).toBe(true);
-    expect(entry.links).toEqual([{ href: "/rgpd#retransmission", label: "Lire le paragraphe « Retransmission des matchs »" }]);
-    expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
-    const [englishEntry] = localizedPrivacyChanges([entry], "en");
-    expect(buildPrivacyChangesMessage([englishEntry], "https://site.test", "en").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+    expectStandaloneEntry(entry, english, { fromEnd: 3, publishedAt: "2026-10-29", audience: undefined, links: [{ href: "/rgpd#retransmission", label: "Lire le paragraphe « Retransmission des matchs »" }] });
   });
 
   it("dit les nouveaux destinataires, ce qui part avec un caster et la fin des reprises (FR et EN)", () => {
@@ -1619,33 +1637,27 @@ describe("PRIVACY_CHANGES — arbitre désigné des matchs (MATCH-REFEREE MR-2)"
   const english = PRIVACY_CHANGES_EN["2026-10-arbitre-designe-des-matchs"];
 
   it("précède l'entrée des réglages du salon : datée comme l'entrée précédente (mise en ligne groupée), pour tous les comptes, et tient seule dans un message privé (FR et EN)", () => {
-    expect(entry).toBeDefined();
-    expect(english).toBeDefined();
-    expect(PRIVACY_CHANGES.indexOf(entry)).toBe(PRIVACY_CHANGES.length - 2);
-    expect([entry.publishedAt, entry.audience]).toEqual(["2026-10-29", undefined]);
-    expect(PRIVACY_CHANGES.at(-3)!.publishedAt <= entry.publishedAt).toBe(true);
-    expect(entry.links).toEqual([{ href: "/rgpd#arbitre-designe", label: "Lire le paragraphe « Arbitre désigné d'un match »" }]);
-    expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
-    const [englishEntry] = localizedPrivacyChanges([entry], "en");
-    expect(buildPrivacyChangesMessage([englishEntry], "https://site.test", "en").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+    expectStandaloneEntry(entry, english, { fromEnd: 2, publishedAt: "2026-10-29", audience: undefined, links: [{ href: "/rgpd#arbitre-designe", label: "Lire le paragraphe « Arbitre désigné d'un match »" }] });
   });
 
   it("dit qui voit l'arbitre, ce qui est montré, l'avis push et le journal anonyme (FR et EN)", () => {
-    const fr = [entry.title, entry.summary, ...entry.details].join(" ");
-    expect(fr).toContain("le public ne lit que « Arbitre désigné »");
-    expect(fr).toContain("son pseudo et son BattleTag, même masqué, jamais son tag Discord");
-    expect(fr).toContain("en notification push seulement, avec le motif");
-    expect(fr).toContain("À la suppression de ton compte, tu es retiré de tous tes matchs");
-    expect(fr).toContain("sans nommer personne");
-    expect(fr).toContain("sans rien basculer d'office");
-    const en = [english.title, english.summary, ...english.details].join(" ");
-    expect(en).toContain("the public only reads “Referee assigned”");
-    expect(en).toContain("their username and BattleTag, even when hidden, never their Discord tag");
-    expect(en).toContain("by push notification only, with the reason");
-    expect(en).toContain("When your account is deleted, you are removed from all your matches");
-    expect(en).toContain("without naming anyone");
-    expect(english.details).toHaveLength(entry.details.length);
-    expect(english.linkLabels).toHaveLength(1);
+    expectEntryTexts(entry, english, {
+      fr: [
+        "le public ne lit que « Arbitre désigné »",
+        "son pseudo et son BattleTag, même masqué, jamais son tag Discord",
+        "en notification push seulement, avec le motif",
+        "À la suppression de ton compte, tu es retiré de tous tes matchs",
+        "sans nommer personne",
+        "sans rien basculer d'office",
+      ],
+      en: [
+        "the public only reads “Referee assigned”",
+        "their username and BattleTag, even when hidden, never their Discord tag",
+        "by push notification only, with the reason",
+        "When your account is deleted, you are removed from all your matches",
+        "without naming anyone",
+      ],
+    });
   });
 });
 
@@ -1654,33 +1666,27 @@ describe("PRIVACY_CHANGES — réglages du salon envoyés aux managers (MATCH-RE
   const english = PRIVACY_CHANGES_EN["2026-10-reglages-du-salon-aux-managers"];
 
   it("ferme la liste : datée comme l'entrée précédente (mise en ligne groupée), pour tous les comptes, et tient seule dans un message privé (FR et EN)", () => {
-    expect(entry).toBeDefined();
-    expect(english).toBeDefined();
-    expect(PRIVACY_CHANGES.indexOf(entry)).toBe(PRIVACY_CHANGES.length - 1);
-    expect([entry.publishedAt, entry.audience]).toEqual(["2026-10-29", undefined]);
-    expect(PRIVACY_CHANGES.at(-2)!.publishedAt <= entry.publishedAt).toBe(true);
-    expect(entry.links).toEqual([
+    expectStandaloneEntry(entry, english, { fromEnd: 1, publishedAt: "2026-10-29", audience: undefined, links: [
       { href: "/rgpd#messages-de-match", label: "Lire le paragraphe « Messages privés Discord de match »" },
-    ]);
-    expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
-    const [englishEntry] = localizedPrivacyChanges([entry], "en");
-    expect(buildPrivacyChangesMessage([englishEntry], "https://site.test", "en").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+    ] });
   });
 
   it("dit qui reçoit quoi, ce qui n'y est jamais, et comment le couper (FR et EN)", () => {
-    const fr = [entry.title, entry.summary, ...entry.details].join(" ");
-    expect(fr).toContain("propriétaire ou manager");
-    expect(fr).toContain("Il ne contient ni BattleTag, ni tag Discord, ni pseudo de joueur");
-    expect(fr).toContain("« toi » et « ton adversaire »");
-    expect(fr).toContain("ne part qu'à un tag Discord certifié");
-    expect(fr).toContain("« Réglages du salon »");
-    const en = [english.title, english.summary, ...english.details].join(" ");
-    expect(en).toContain("owner or manager");
-    expect(en).toContain("It contains no BattleTag, no Discord tag and no player username");
-    expect(en).toContain("“you” and “your opponent”");
-    expect(en).toContain("only goes to a certified Discord tag");
-    expect(en).toContain("“Lobby settings”");
-    expect(english.details).toHaveLength(entry.details.length);
-    expect(english.linkLabels).toHaveLength(1);
+    expectEntryTexts(entry, english, {
+      fr: [
+        "propriétaire ou manager",
+        "Il ne contient ni BattleTag, ni tag Discord, ni pseudo de joueur",
+        "« toi » et « ton adversaire »",
+        "ne part qu'à un tag Discord certifié",
+        "« Réglages du salon »",
+      ],
+      en: [
+        "owner or manager",
+        "It contains no BattleTag, no Discord tag and no player username",
+        "“you” and “your opponent”",
+        "only goes to a certified Discord tag",
+        "“Lobby settings”",
+      ],
+    });
   });
 });

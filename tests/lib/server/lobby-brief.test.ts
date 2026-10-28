@@ -49,6 +49,7 @@ function mockDb(candidates: unknown[], claims: boolean[] = []) {
     if (sql.startsWith("INSERT IGNORE INTO bg_match_start_notices")) {
       return [{ affectedRows: (queue.length > 0 ? queue.shift() : true) ? 1 : 0 }];
     }
+    if (sql.startsWith("DELETE FROM bg_match_start_notices")) return [{ affectedRows: 1 }];
     throw new Error(`requête inattendue : ${sql}`);
   });
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ query, execute }));
@@ -199,6 +200,31 @@ describe("dispatchLobbyBriefs", () => {
     mockDb([{ ...MATCH, referee_user_id: 9 }]);
     expect(await dispatchLobbyBriefs()).toBe(2);
     expect(sends()[0].dm()).not.toContain("Arbitre");
+    error.mockRestore();
+  });
+
+  it("une panne de lecture des managers rend les réservations : le balayage suivant réessaie", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(loadEntrantManagerIds).mockRejectedValueOnce(new Error("DB_DOWN"));
+    const { execute } = mockDb([MATCH, { ...MATCH, id: 41 }]);
+    expect(await dispatchLobbyBriefs()).toBe(0);
+    const releases = execute.mock.calls.filter(([sql]) => sql.startsWith("DELETE FROM bg_match_start_notices"));
+    expect(releases.map(([, params]) => params)).toEqual([
+      [40, "1:2", "LOBBY_BRIEF"],
+      [41, "1:2", "LOBBY_BRIEF"],
+    ]);
+    expect(String(releases[0][0])).toMatch(/WHERE match_id = \? AND pairing = \? AND phase = \?/);
+    expect(notifyUsers).not.toHaveBeenCalled();
+    error.mockRestore();
+  });
+
+  it("un côté en échec n'empêche pas les autres d'être briefés", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(notifyUsers).mockRejectedValueOnce(new Error("PUSH_DOWN"));
+    mockDb([MATCH, { ...MATCH, id: 41 }]);
+    expect(await dispatchLobbyBriefs()).toBe(3);
+    expect(notifyUsers).toHaveBeenCalledTimes(4);
+    expect(error.mock.calls.some(([message]) => String(message).includes("brief du match 40 non envoyé"))).toBe(true);
     error.mockRestore();
   });
 
