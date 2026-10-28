@@ -47,6 +47,13 @@ type Slot = {
   timedOut: boolean;
   /** Oubliée pendant la lecture : son issue n'est pas retenue. */
   forgotten: boolean;
+  /**
+   * Issue **finale** : celle de `value`, ou — abandonnée après trois secondes —
+   * la réponse tardive si elle réussit (`null` si elle échoue ou pend plus de
+   * `CERTIFICATION_PROMPT_TTL_MS`). Sert au flux, qui pousse l'invitation à
+   * son arrivée au lieu de l'attendre.
+   */
+  final: Promise<CertificationPrompt | null>;
 };
 
 /** Lectures en cours, partagées ; sans échéance tant qu'elles n'ont pas d'issue. */
@@ -63,8 +70,25 @@ export function cachedCertificationPrompt(
   load: () => Promise<CertificationPrompt | null>,
   now: () => number = Date.now,
 ): Promise<CertificationPrompt | null> {
+  return slotFor(key, load, now)?.value ?? Promise.resolve(null);
+}
+
+/**
+ * Comme `cachedCertificationPrompt`, mais rend l'issue **finale** (`Slot.final`) :
+ * une lecture abandonnée après trois secondes qui réussit plus tard la donne.
+ */
+export function finalCertificationPrompt(
+  key: string,
+  load: () => Promise<CertificationPrompt | null>,
+  now: () => number = Date.now,
+): Promise<CertificationPrompt | null> {
+  return slotFor(key, load, now)?.final ?? Promise.resolve(null);
+}
+
+/** Lecture partagée de `key` ; `null` si la mémoire n'est faite que de lectures en cours. */
+function slotFor(key: string, load: () => Promise<CertificationPrompt | null>, now: () => number): Slot | null {
   const flying = inFlight.get(key);
-  if (flying) return flying.value;
+  if (flying) return flying;
   const entry = recent.get(key);
   if (entry) {
     recent.delete(key);
@@ -72,19 +96,19 @@ export function cachedCertificationPrompt(
     if (entry.expiresAt > at) {
       // Servie : remise en fin d'ordre — les plus anciennes restent en tête.
       recent.set(key, entry);
-      return entry.value;
+      return entry;
     }
     if (entry.reading && at - entry.startedAt < CERTIFICATION_PROMPT_STUCK_READ_MS) {
       // Abandonnée, mais elle pend encore : pas une seconde acquisition en file
       // derrière elle. « Rien », une minute de plus.
       entry.expiresAt = at + CERTIFICATION_PROMPT_TTL_MS;
       recent.set(key, entry);
-      return entry.value;
+      return entry;
     }
   }
   // Mémoire pleine de lectures en cours : « rien », sans lire — en pleine
   // surcharge, une lecture non partagée par appel ajouterait à la charge.
-  if (!makeRoom()) return Promise.resolve(null);
+  if (!makeRoom()) return null;
 
   const slot: Slot = {
     value: Promise.resolve(null),
@@ -94,6 +118,7 @@ export function cachedCertificationPrompt(
     startedAt: now(),
     timedOut: false,
     forgotten: false,
+    final: Promise.resolve(null),
   };
   const reading = load();
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -106,8 +131,9 @@ export function cachedCertificationPrompt(
   );
   void outcomeOf.then((late) => {
     slot.reading = false;
-    // Finie tard mais réussie, après l'abandon : elle sert quand même.
-    if (late.ok && slot.timedOut) {
+    // Finie tard mais réussie, après l'abandon : elle sert quand même — sauf
+    // oubliée entre-temps (certification) : elle daterait d'avant le geste.
+    if (late.ok && slot.timedOut && !slot.forgotten) {
       slot.settled = { prompt: late.prompt };
       slot.value = Promise.resolve(late.prompt);
       slot.expiresAt = now() + CERTIFICATION_PROMPT_TTL_MS;
@@ -131,8 +157,19 @@ export function cachedCertificationPrompt(
     logCertificationPromptFailure(now(), outcome.error);
     return settle(null, CERTIFICATION_PROMPT_FAILURE_TTL_MS);
   });
+  slot.final = slot.value.then((prompt) => {
+    if (!slot.timedOut) return prompt;
+    // Abandonnée : la réponse tardive, bornée — une lecture qui pend ne
+    // retient pas indéfiniment celui qui l'attend.
+    let lateTimer: ReturnType<typeof setTimeout> | undefined;
+    const giveUp = new Promise<null>((resolve) => {
+      lateTimer = setTimeout(() => resolve(null), CERTIFICATION_PROMPT_TTL_MS);
+    });
+    const late = outcomeOf.then((outcome) => (outcome.ok && !slot.forgotten ? outcome.prompt : null));
+    return Promise.race([late, giveUp]).finally(() => clearTimeout(lateTimer));
+  });
   inFlight.set(key, slot);
-  return slot.value;
+  return slot;
 }
 
 /**
@@ -150,15 +187,18 @@ export function peekCertificationPrompt(
 
 /**
  * Place pour une lecture de plus : la moins récemment servie des issues
- * connues part — jamais une lecture en cours, qui ne serait plus partagée.
+ * connues part — jamais une lecture en cours, ni une lecture abandonnée qui
+ * pend encore (elle garde sa clé d'une seconde acquisition en file).
  * `false` : la mémoire n'est faite que de lectures en cours.
  */
 function makeRoom(): boolean {
   if (inFlight.size + recent.size < CERTIFICATION_PROMPT_CACHE_MAX) return true;
-  const oldest = recent.keys().next();
-  if (oldest.done) return false;
-  recent.delete(oldest.value);
-  return true;
+  for (const [key, slot] of recent) {
+    if (slot.reading) continue;
+    recent.delete(key);
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -187,7 +227,17 @@ function logCertificationPromptFailure(at: number, error: unknown): void {
  */
 export function forgetCertificationPromptsOf(userId: number): void {
   const prefix = `${userId}:`;
-  for (const key of recent.keys()) if (key.startsWith(prefix)) recent.delete(key);
+  for (const [key, slot] of recent) {
+    if (!key.startsWith(prefix)) continue;
+    if (slot.reading) {
+      // Abandonnée mais pendante : gardée comme garde (« rien » à la lecture
+      // suivante, pas une seconde acquisition), son issue tardive écartée.
+      slot.forgotten = true;
+      slot.expiresAt = 0;
+      continue;
+    }
+    recent.delete(key);
+  }
   for (const [key, slot] of inFlight) {
     if (!key.startsWith(prefix)) continue;
     slot.forgotten = true;

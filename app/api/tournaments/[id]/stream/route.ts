@@ -181,8 +181,9 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
     // Invitation à certifier lue après l'ouverture (base lente : elle
     // n'ajoute rien au délai d'ouverture) — poussée par une trame dès qu'elle
     // est connue, si le flux est encore ouvert.
-    let latePrompt: CertificationPrompt | null = null;
-    let deliverPrompt: ((prompt: CertificationPrompt) => void) | null = null;
+    let promptDeferred = false;
+    let latePrompt: { prompt: CertificationPrompt | null } | null = null;
+    let deliverPrompt: ((prompt: CertificationPrompt | null) => void) | null = null;
     const viewer = await getTournamentViewerContext(snapshot, user.id, {
       canManage,
       canPreview: narratesLive,
@@ -194,9 +195,12 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
       // Annuler un abandon : administrateur strict, par les deux portes aussi.
       canCancelForfeit: user.isAdmin === true,
     }, {
+      onCertificationPromptDeferred: () => {
+        promptDeferred = true;
+      },
       onLateCertificationPrompt: (prompt) => {
         if (deliverPrompt) deliverPrompt(prompt);
-        else latePrompt = prompt;
+        else latePrompt = { prompt };
       },
     });
 
@@ -317,6 +321,9 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
                 tournamentId,
                 tier,
                 viewer,
+                // L'invitation suit par une trame : le client garde celle qu'il
+                // avait (reconnexion), au lieu de lire ce `null` comme un retrait.
+                ...(promptDeferred ? { certificationPromptPending: true } : {}),
                 emittedAt: new Date().toISOString(),
               },
               snapshot,
@@ -337,7 +344,7 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
           // un tournoi calme.
           // Invitation à certifier lue après l'ouverture : poussée dès qu'elle
           // est connue (déjà là, ou à son arrivée), flux encore ouvert.
-          const pushPrompt = (prompt: CertificationPrompt): void => {
+          const pushPrompt = (prompt: CertificationPrompt | null): void => {
             if (closed) return;
             try {
               write(viewerPatchFrameBytes({ type: "certificationPrompt", tournamentId, certificationPrompt: prompt }, encoding));
@@ -345,7 +352,7 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
               // Flux fermé entre-temps : la prochaine connexion la relit.
             }
           };
-          if (latePrompt) pushPrompt(latePrompt);
+          if (latePrompt) pushPrompt(latePrompt.prompt);
           deliverPrompt = pushPrompt;
 
           leaveRoom = joinTournamentRoom(

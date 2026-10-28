@@ -3,7 +3,7 @@ import { getDatabase } from "@/lib/server/database";
 import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
 import { invalidateLandingTeamViews } from "@/lib/server/landing-cache";
 import { invalidateRankingLists } from "@/lib/server/ranking-cache";
-import { closeUserStreams } from "@/lib/server/session-streams";
+import { reconnectUserStreams } from "@/lib/server/session-streams";
 import { ghostAdminOverride, lockMemberRoles, userOwnsTeam } from "./access";
 
 async function teamIsDeleted(teamId: number): Promise<boolean> {
@@ -114,7 +114,7 @@ export async function softDeleteTeam(
   // Un flux de tournoi ne lit l'équipe du lecteur qu'à son ouverture : les
   // membres détachés gardaient l'invitation à certifier de l'équipe dissoute
   // jusqu'à la reconnexion (`session-streams.ts`).
-  for (const userId of detachedUserIds) closeUserStreams(userId);
+  for (const userId of detachedUserIds) reconnectUserStreams(userId);
 
   // Vider la colonne ne retirait pas l'image : le fichier restait servi par
   // `/api/uploads/teams/…`, en cache public d'un an. Après le commit (un

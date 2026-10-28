@@ -202,7 +202,12 @@ import {
   type DisputeBeforeResolution,
 } from "./dispute-self-resolution";
 import { loadViewerCastBlock } from "./match-launch";
-import { cachedCertificationPrompt, loadCertificationPrompt, peekCertificationPrompt } from "./certification-prompt";
+import {
+  cachedCertificationPrompt,
+  finalCertificationPrompt,
+  loadCertificationPrompt,
+  peekCertificationPrompt,
+} from "./certification-prompt";
 import { battletagRelevantFor, type CertificationPrompt } from "@/lib/shared/certification-prompt";
 
 let pendingSync: Promise<void> | null = null;
@@ -1022,8 +1027,10 @@ async function readCertificationPrompt(
   teamId: number,
   isManager: boolean,
   battletagRelevant: boolean,
+  { final = false }: { final?: boolean } = {},
 ): Promise<CertificationPrompt | null> {
-  return cachedCertificationPrompt(certificationPromptKey(userId, teamId, isManager, battletagRelevant), () =>
+  const read = final ? finalCertificationPrompt : cachedCertificationPrompt;
+  return read(certificationPromptKey(userId, teamId, isManager, battletagRelevant), () =>
     withConnection((connection) => loadCertificationPrompt(connection, userId, teamId, isManager, battletagRelevant)),
   );
 }
@@ -1033,11 +1040,15 @@ export type TournamentViewerContextOptions = {
   /**
    * Flux SSE seulement : l'invitation à certifier n'est pas attendue. Connue
    * (mémoire), elle part avec le contexte ; sinon le contexte part sans elle
-   * (`null`) et elle est remise ici une fois lue — si elle existe — pour être
-   * poussée ensuite (trame `certificationPrompt`). La lecture REST de secours,
-   * qui ne peut rien pousser, l'attend.
+   * (`null`, `onCertificationPromptDeferred` appelé avant le retour) et son
+   * issue **finale** — `null` compris, réponse tardive d'une lecture abandonnée
+   * comprise — est remise ici pour être poussée ensuite (trame
+   * `certificationPrompt`). La lecture REST de secours, qui ne peut rien
+   * pousser, l'attend.
    */
-  onLateCertificationPrompt?: (prompt: CertificationPrompt) => void;
+  onLateCertificationPrompt?: (prompt: CertificationPrompt | null) => void;
+  /** L'invitation suivra (`onLateCertificationPrompt`) : le `null` du contexte n'est pas une réponse. */
+  onCertificationPromptDeferred?: () => void;
 };
 
 /**
@@ -1122,9 +1133,8 @@ export async function getTournamentViewerContext(
     if (!late) return readCertificationPrompt(userId, teamId, isManager, battletagRelevant);
     const known = peekCertificationPrompt(certificationPromptKey(userId, teamId, isManager, battletagRelevant));
     if (known) return known.prompt;
-    void readCertificationPrompt(userId, teamId, isManager, battletagRelevant).then((prompt) => {
-      if (prompt !== null) late(prompt);
-    });
+    options.onCertificationPromptDeferred?.();
+    void readCertificationPrompt(userId, teamId, isManager, battletagRelevant, { final: true }).then(late);
     return null;
   };
 

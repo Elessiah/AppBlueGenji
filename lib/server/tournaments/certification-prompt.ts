@@ -152,6 +152,7 @@ export {
   CERTIFICATION_PROMPT_STUCK_READ_MS,
   CERTIFICATION_PROMPT_TTL_MS,
   cachedCertificationPrompt,
+  finalCertificationPrompt,
   forgetCertificationPrompts,
   forgetCertificationPromptsOf,
   peekCertificationPrompt,

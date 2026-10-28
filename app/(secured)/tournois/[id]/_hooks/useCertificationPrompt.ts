@@ -26,11 +26,14 @@ function browserStorage(kind: "localStorage" | "sessionStorage"): Storage | null
  * le choix.
  */
 function saveNeverAgain(): void {
+  let request: Promise<Response>;
   try {
-    void fetch(CERTIFICATION_PROMPT_OFF_PATH, { method: "POST", keepalive: true }).catch(() => undefined);
+    request = fetch(CERTIFICATION_PROMPT_OFF_PATH, { method: "POST", keepalive: true });
   } catch {
-    // `fetch` indisponible (document qui part) : rien de gardé.
+    // `fetch` indisponible ou qui lève (document qui part) : rien de gardé.
+    return;
   }
+  void request.catch(() => undefined);
 }
 
 /**

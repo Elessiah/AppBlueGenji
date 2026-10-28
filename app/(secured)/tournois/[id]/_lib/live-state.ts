@@ -30,13 +30,15 @@ export type LiveMessage =
       tier: RefreshTier;
       viewer: TournamentViewerContext;
       snapshot: TournamentSnapshot;
+      /** L'invitation à certifier suit par une trame : le `null` du contexte n'est pas une réponse. */
+      certificationPromptPending?: boolean;
     }
   | { type: "snapshot"; tournamentId: number; version: string; snapshot: TournamentSnapshot }
   /**
    * Invitation à certifier du lecteur, lue après l'ouverture du flux (base
    * lente : elle ne retarde pas la connexion) — `CERTIFICATION_PROMPT.md`.
    */
-  | { type: "certificationPrompt"; tournamentId: number; certificationPrompt: CertificationPrompt };
+  | { type: "certificationPrompt"; tournamentId: number; certificationPrompt: CertificationPrompt | null };
 
 /** État local dérivé du flux. */
 export type LiveState = {
@@ -45,6 +47,26 @@ export type LiveState = {
 };
 
 export const INITIAL_LIVE_STATE: LiveState = { detail: null, tier: "STANDARD" };
+
+/** Trame `certificationPrompt` : une invitation lue, ou `null` (rien à proposer). */
+function parseCertificationPromptMessage(message: Record<string, unknown>): LiveMessage | null {
+  const prompt = message.certificationPrompt as Partial<CertificationPrompt> | null | undefined;
+  // `null` : lue, rien à proposer (retire celle gardée d'avant la reconnexion).
+  if (prompt === null) {
+    return { type: "certificationPrompt", tournamentId: Number(message.tournamentId), certificationPrompt: null };
+  }
+  if (!prompt || (prompt.reason !== "MANAGER" && prompt.reason !== "TEAM_WITHOUT_CONTACT")) return null;
+  return {
+    type: "certificationPrompt",
+    tournamentId: Number(message.tournamentId),
+    certificationPrompt: {
+      reason: prompt.reason,
+      discordVerified: prompt.discordVerified === true,
+      battletagVerified: prompt.battletagVerified === true,
+      battletagRelevant: prompt.battletagRelevant === true,
+    },
+  };
+}
 
 /** Analyse un message reçu, ou `null` s'il n'est pas exploitable. */
 export function parseLiveMessage(raw: string): LiveMessage | null {
@@ -66,23 +88,11 @@ export function parseLiveMessage(raw: string): LiveMessage | null {
       tier: isRefreshTier(message.tier) ? message.tier : "STANDARD",
       viewer: message.viewer as TournamentViewerContext,
       snapshot: message.snapshot as TournamentSnapshot,
+      ...(message.certificationPromptPending === true ? { certificationPromptPending: true } : {}),
     };
   }
 
-  if (message.type === "certificationPrompt") {
-    const prompt = message.certificationPrompt as Partial<CertificationPrompt> | null | undefined;
-    if (!prompt || (prompt.reason !== "MANAGER" && prompt.reason !== "TEAM_WITHOUT_CONTACT")) return null;
-    return {
-      type: "certificationPrompt",
-      tournamentId: Number(message.tournamentId),
-      certificationPrompt: {
-        reason: prompt.reason,
-        discordVerified: prompt.discordVerified === true,
-        battletagVerified: prompt.battletagVerified === true,
-        battletagRelevant: prompt.battletagRelevant === true,
-      },
-    };
-  }
+  if (message.type === "certificationPrompt") return parseCertificationPromptMessage(message);
 
   if (message.type === "snapshot") {
     if (!message.snapshot) return null;
@@ -112,9 +122,15 @@ export function applyLiveMessage(state: LiveState, message: LiveMessage): LiveSt
     const snapshot = state.detail
       ? shareUnchanged(state.detail, message.snapshot)
       : message.snapshot;
+    // Invitation encore en lecture (elle suit par une trame) : celle du même
+    // tournoi reste posée — un `null` d'attente la retirerait puis la rendrait.
+    const kept =
+      message.certificationPromptPending && state.detail?.card.id === message.tournamentId
+        ? { certificationPrompt: state.detail.certificationPrompt }
+        : {};
     return {
       tier: message.tier,
-      detail: { ...snapshot, ...message.viewer },
+      detail: { ...snapshot, ...message.viewer, ...kept },
     };
   }
 

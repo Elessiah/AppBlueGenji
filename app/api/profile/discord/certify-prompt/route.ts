@@ -67,8 +67,11 @@ export async function POST(req: Request) {
   // action illisible — jamais dit « autre compte », qui serait faux.
   if (!action || shownTo == null) return fail("INVALID_ACTION", 400);
   if (shownTo !== user.id) return fail(CERTIFY_PROMPT_OTHER_ACCOUNT, 409);
-  // Rien de dû sur cette session (déjà répondue, jamais proposée) : rien à écrire.
-  if (!user.certifyPromptDue) return ok({ action });
+  // « Plus tard » sur une session qui ne doit rien (déjà répondue, jamais
+  // proposée) : rien à écrire. « Ne plus voir », lui, est toujours gardé — un
+  // « Plus tard » donné dans un autre onglet a pu lever la marque avant (écriture
+  // idempotente : la date du premier choix reste).
+  if (action === "LATER" && !user.certifyPromptDue) return ok({ action });
 
   try {
     if (action === "NEVER") {

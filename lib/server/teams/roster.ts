@@ -5,7 +5,7 @@ import type { TeamRole } from "@/lib/shared/types";
 import { withoutInvisibles } from "@/lib/shared/visible-text";
 import { sanitizeRoles } from "@/lib/server/users/roles";
 import { assertTermsAccepted } from "@/lib/server/terms-acceptance";
-import { closeUserStreams } from "@/lib/server/session-streams";
+import { reconnectUserStreams } from "@/lib/server/session-streams";
 import { lockMemberRoles, withTeamRosterLock, writeActiveMembership } from "./access";
 
 /*
@@ -97,7 +97,7 @@ export async function removeTeamMember(requesterId: number, teamId: number, memb
   // il gardait l'invitation à certifier de son ancienne équipe (et son
   // engagement) jusqu'à la reconnexion. Le fermer fait reconnecter le client,
   // et la route recalcule le contexte (`session-streams.ts`).
-  closeUserStreams(memberUserId);
+  reconnectUserStreams(memberUserId);
 }
 
 /**
@@ -116,7 +116,7 @@ export async function leaveTeam(userId: number, teamId: number): Promise<void> {
     await writeActiveMembership(connection, "left_at = NOW()", [], teamId, userId);
   });
   // Parti : ses flux de tournoi recalculent son contexte (voir `removeTeamMember`).
-  closeUserStreams(userId);
+  reconnectUserStreams(userId);
 }
 
 /**
