@@ -15,7 +15,7 @@ import { useToast } from "@/components/ui/toast";
 import { useClientPower } from "@/lib/shared/hooks/useClientPower";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { anotherModalOpen, watchModalsClosed } from "@/lib/shared/dialog-focus";
-import { tournamentMatchHref } from "@/lib/shared/match-anchor";
+import { matchPagePath } from "@/lib/shared/match-page";
 import {
   launchModalKey,
   launchModalWaits,
@@ -481,7 +481,7 @@ export function MatchLaunchCenter({
               )}
               <LocaleLink
                 className="btn ghost"
-                href={tournamentMatchHref(current.tournamentId, current.matchId)}
+                href={matchPagePath(current.tournamentId, current.matchId)}
                 onClick={close}
               >
                 {t("viewMatch")}

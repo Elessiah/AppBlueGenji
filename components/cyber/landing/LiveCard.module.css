@@ -254,7 +254,12 @@
   letter-spacing: inherit;
   text-transform: inherit;
   font-weight: 600;
-  white-space: nowrap;
+  /* Le nom de la chaîne (jusqu'à 25 caractères, 31 pour un nom YouTube) peut
+     dépasser une carte de 375 px : le texte passe à la ligne plutôt que de
+     faire déborder le bouton. */
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
   transition: background-color 0.18s ease;
 }
 

@@ -119,6 +119,15 @@ describe("LiveCard — taille des cibles de l'accueil", () => {
     );
   });
 
+  it("laisse le bouton de diffusion passer à la ligne plutôt que déborder la carte", () => {
+    // Le nom d'une chaîne (25 caractères, 31 pour YouTube) allonge le texte du
+    // bouton : à 375 px, un `nowrap` le ferait sortir de sa carte.
+    const button = declarations(".streamButton");
+    expect(button.get("white-space")).toBe("normal");
+    expect(button.get("overflow-wrap")).toBe("anywhere");
+    expect(button.get("max-width")).toBe("100%");
+  });
+
   it("applique bien la classe au lien de l'engagé", () => {
     // Une règle CSS que personne ne porte ne corrige rien.
     const live = {

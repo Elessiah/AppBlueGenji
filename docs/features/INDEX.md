@@ -50,6 +50,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 
 - `TOURNAMENT_HEADER.md` — En-tête de la fiche : outils du lecteur, identité, faits, actions.
 - `TOURNAMENT_PAGE_PATH.md` — Arrivée, retour et confirmations de la fiche tournoi.
+- `MATCH_PAGE.md` — Page d'un match (`/tournois/[id]/matchs/[matchId]`) : hôte, première map, arbitrage ou autogestion, tous les streams et leurs casters.
 - `SPECTATOR_VIEW.md` — Suivi d'un tournoi sans compte (`/suivre/tournois/[id]`) : redirections entre espaces, fiche commune, relecture réglée par la charge du serveur.
 - `ADMIN_CONFIRMATIONS.md` — Audit des gestes du staff qui défont quelque chose, et quand ils se font confirmer.
 - `TOURNAMENT_PROGRESS.md` — Frise de progression, de masqué à terminé.

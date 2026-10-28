@@ -7,7 +7,7 @@ import { CyberCard, Pill, TeamSigil } from "@/components/cyber";
 import { EntityLink } from "@/components/entity-link";
 import type { LandingLive, LandingLiveMatch } from "@/lib/shared/landing";
 import { featuredMatchPill, inferPhaseLabel, visibleLiveViewerCount } from "@/lib/shared/landing";
-import { PLATFORM_LABELS, streamPlatform, type MatchLiveState } from "@/lib/shared/live-streams";
+import { PLATFORM_LABELS, streamChannelName, streamPlatform, type MatchLiveState } from "@/lib/shared/live-streams";
 import { matchFormatLabel } from "@/lib/shared/match-format";
 import { tournamentMatchHref } from "@/lib/shared/match-anchor";
 import { useClock } from "@/lib/shared/hooks/useClock";
@@ -85,6 +85,27 @@ function EntrantName({ href, name, spectator }: Readonly<{ href: string | null; 
  * pastille « En direct » le dit déjà : le bandeau ne porte plus que le bouton,
  * et disparaît sans lien public.
  */
+type LandingT = ReturnType<typeof useLandingText>["t"];
+
+/** Texte du bouton de stream : la chaîne, sinon la plateforme, sinon « Regarder en direct ». */
+export function streamBannerText(t: LandingT, platformName: string | null, channel: string | null): string {
+  if (platformName && channel) return t("live.watchChannel", { channel });
+  return platformName ? t("live.watchOn", { platform: platformName }) : t("common.watchLive");
+}
+
+/** Nom accessible du bouton de stream : il commence par son texte visible (WCAG 2.5.3). */
+export function streamBannerLabel(
+  t: LandingT,
+  matchLabel: string,
+  platformName: string | null,
+  channel: string | null,
+): string {
+  if (platformName && channel) return t("live.watchChannelLabel", { channel, match: matchLabel, platform: platformName });
+  return platformName
+    ? t("live.watchMatchLabelOn", { match: matchLabel, platform: platformName })
+    : t("live.watchMatchLabel", { match: matchLabel });
+}
+
 function MatchStreamBanner({
   liveState,
   liveUrl,
@@ -102,6 +123,8 @@ function MatchStreamBanner({
   if (!streamHref) return null;
   const platform = streamPlatform(streamHref);
   const platformName = platform ? PLATFORM_LABELS[platform] : null;
+  // Le nom de la chaîne quand le lien en nomme une (« Regarder bluegenji »).
+  const channel = streamChannelName(streamHref);
   return (
     <div className={styles.streamBanner}>
       <a
@@ -109,14 +132,11 @@ function MatchStreamBanner({
         href={streamHref}
         target="_blank"
         rel="noopener noreferrer"
-        aria-label={
-          platformName
-            ? t("live.watchMatchLabelOn", { match: matchLabel, platform: platformName })
-            : t("live.watchMatchLabel", { match: matchLabel })
-        }
+        aria-label={streamBannerLabel(t, matchLabel, platformName, channel)}
+        title={channel ?? undefined}
       >
         <span aria-hidden="true">▶</span>
-        {platformName ? t("live.watchOn", { platform: platformName }) : t("common.watchLive")}
+        {streamBannerText(t, platformName, channel)}
       </a>
     </div>
   );

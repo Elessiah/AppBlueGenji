@@ -20,6 +20,7 @@
  */
 import { matchStartAtTime } from "./match-schedule";
 import type { MatchStatus } from "./types";
+import { visibleText } from "./visible-text";
 
 /**
  * Mode de passage à l'antenne d'un match casté.
@@ -115,6 +116,71 @@ export const PLATFORM_LABELS: Record<LivePlatform, string> = {
   "youtu.be": "YouTube",
   "kick.com": "Kick",
 };
+
+/**
+ * Premiers segments de chemin qui ne nomment pas une chaîne Twitch ou Kick
+ * (pages du site lui-même) : leur lien garde le nom de la plateforme.
+ */
+const NON_CHANNEL_SEGMENTS: ReadonlySet<string> = new Set([
+  "videos",
+  "video",
+  "directory",
+  "categories",
+  "category",
+  "search",
+  "settings",
+  "p",
+  "popout",
+  "embed",
+  "clip",
+  "clips",
+  "downloads",
+  "jobs",
+  "turbo",
+  "subscriptions",
+  "inventory",
+  "wallet",
+  "drops",
+  "friends",
+  "messages",
+]);
+
+/** Nom de chaîne Twitch ou Kick : lettres, chiffres, `_` (et `-` chez Kick), 2 à 25 signes. */
+const CHANNEL_SEGMENT = /^[A-Za-z0-9_-]{2,25}$/;
+
+/** Poignée YouTube (`/@nom`) : la forme publique et lisible d'une chaîne. */
+const YOUTUBE_HANDLE = /^@[A-Za-z0-9._-]{3,30}$/;
+
+/**
+ * Nom de la chaîne d'un lien de diffusion **déjà normalisé**, pour le texte du
+ * lien (« bluegenji » plutôt que « Twitch ») : le premier segment du chemin sur
+ * Twitch et Kick (`twitch.tv/bluegenji`), la poignée d'une chaîne YouTube
+ * (`youtube.com/@bluegenji` → `@bluegenji`). `null` quand le lien ne nomme pas
+ * de chaîne (vidéo, page du site, plateforme inconnue) : le texte reste alors
+ * le nom de la plateforme. Passé par `visibleText` : le chemin est saisi.
+ */
+export function streamChannelName(url: string | null | undefined): string | null {
+  const platform = streamPlatform(url);
+  if (!url || platform === null || platform === "youtu.be") return null;
+  let first: string;
+  try {
+    first = decodeURIComponent(new URL(url).pathname.split("/")[1] ?? "");
+  } catch {
+    return null;
+  }
+  if (platform === "youtube.com") return YOUTUBE_HANDLE.test(first) ? visibleText(first) : null;
+  if (!CHANNEL_SEGMENT.test(first) || NON_CHANNEL_SEGMENTS.has(first.toLowerCase())) return null;
+  return visibleText(first);
+}
+
+/**
+ * Texte d'un lien de diffusion : le nom de la chaîne (`streamChannelName`),
+ * sinon celui de la plateforme, sinon `fallback` (« Chaîne »).
+ */
+export function streamLinkText(url: string | null | undefined, fallback: string): string {
+  const platform = streamPlatform(url);
+  return streamChannelName(url) ?? (platform ? PLATFORM_LABELS[platform] : fallback);
+}
 
 /**
  * Valide et normalise une URL de diffusion.

@@ -5,6 +5,7 @@ import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation
 import { usePathname, useSearchParams } from "next/navigation";
 import { splitLocalePrefix } from "@/lib/shared/locales";
 import { spectatorTournamentPath, tournamentIdFromMemberPath } from "@/lib/shared/spectator-view";
+import { matchPageIdsFromMemberPath, matchPagePath } from "@/lib/shared/match-page";
 import { CyberButton, CyberCard } from "@/components/cyber";
 import frLogin from "@/messages/fr/login.json";
 import styles from "./AuthGate.module.css";
@@ -63,7 +64,13 @@ export function AuthGate({ text = frLogin.authGate }: Readonly<{ text?: AuthGate
   // venue d'un **préchargement**, que Next sert sans le chemin demandé
   // (`x-pathname`) et réutilise à la navigation. Requête et ancre `#match-…`
   // suivent.
-  const spectatorId = tournamentIdFromMemberPath(splitLocalePrefix(pathname).path);
+  const memberPath = splitLocalePrefix(pathname).path;
+  const spectatorId = tournamentIdFromMemberPath(memberPath);
+  // La page d'un match se suit de même, sur sa page sans compte (`MATCH_PAGE.md`).
+  const matchPage = matchPageIdsFromMemberPath(memberPath);
+  let spectatorPath: string | null = null;
+  if (spectatorId !== null) spectatorPath = spectatorTournamentPath(spectatorId);
+  else if (matchPage !== null) spectatorPath = matchPagePath(matchPage.tournamentId, matchPage.matchId, true);
   // Ancre lue après hydratation (le rendu serveur ne la connaît pas), relue à
   // chaque changement de page ou d'ancre native — elle pose le `href` du lien
   // (clic du milieu, copie). Une navigation client qui ne change que l'ancre ne
@@ -78,15 +85,15 @@ export function AuthGate({ text = frLogin.authGate }: Readonly<{ text?: AuthGate
     return () => globalThis.removeEventListener("hashchange", read);
   }, [pathname, query]);
   useEffect(() => {
-    if (spectatorId === null) return;
+    if (spectatorPath === null) return;
     // Lu à l'instant du relais : l'état `hash` n'est pas encore posé au premier effet.
     const { search, hash: anchor } = globalThis.location;
-    router.replace(`${spectatorTournamentPath(spectatorId)}${search}${anchor}`);
-  }, [spectatorId, router]);
+    router.replace(`${spectatorPath}${search}${anchor}`);
+  }, [spectatorPath, router]);
   // Pendant le relais, aucune carte « Connexion requise » : la fiche se lit
   // sans compte, l'annoncer fermée le temps d'un rendu serait faux. Un état
   // annoncé plutôt qu'une page vide, si le relais tarde.
-  if (spectatorId !== null) {
+  if (spectatorPath !== null) {
     return (
       <output className={styles.shell}>
         <p className={styles.body}>{text.redirecting}</p>

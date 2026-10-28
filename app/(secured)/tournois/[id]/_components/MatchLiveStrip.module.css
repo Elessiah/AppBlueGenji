@@ -44,7 +44,22 @@
   color: var(--red-live);
 }
 
+/* Nom de chaîne : abrégé d'une ellipse au-delà d'une largeur raisonnable
+   (le nom accessible et l'infobulle le portent en entier). */
 .link {
+  display: inline-block;
+  max-width: 18ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
   color: var(--blue-300);
   text-decoration: underline;
+}
+
+/* « +N » : les autres streams du match, sur sa page. */
+.more {
+  color: var(--blue-300);
+  text-decoration: underline;
+  white-space: nowrap;
 }

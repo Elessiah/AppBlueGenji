@@ -91,10 +91,10 @@ describe("textes joueur et règles — mêmes lecteurs que le code", () => {
     // Fiche du titulaire : la liste partagée, derrière le « i ».
     expect(readSource("messages/fr/players.json")).toContain("si tu y es présenté comme contact : les membres des deux équipes, les arbitres et les administrateurs, dès que les adversaires sont connus et jusqu'à la fin du match, et les casters le temps du match ;");
     expect(readSource("messages/fr/players.json")).toContain("si tu castes un match : ses deux équipes et ses autres casters le temps du match, et les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin ;");
-    expect(readSource("messages/fr/players.json")).toContain("la fenêtre de lancement, elle, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné.");
+    expect(readSource("messages/fr/players.json")).toContain("la fenêtre de lancement, elle, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné ; la page du match reprend le BattleTag de ses casters et de son arbitre désigné, aux mêmes personnes et aux mêmes moments que la fenêtre « Contacts ».");
     expect(readSource("messages/en/players.json")).toContain("if you're shown there as a contact: the members of both teams, referees and administrators, from the moment the opponents are known until the end of the match, and the casters while the match is being played;");
     expect(readSource("messages/en/players.json")).toContain("if you cast a match: both its teams and its other casters while the match is being played, and referees and administrators from the moment its opponents are known until its end;");
-    expect(readSource("messages/en/players.json")).toContain("the launch window only opens for both teams, the casters and the assigned referee.");
+    expect(readSource("messages/en/players.json")).toContain("the launch window only opens for both teams, the casters and the assigned referee; the match page repeats the BattleTag of its casters and its assigned referee, to the same people at the same times as the “Contacts” window.");
   });
 
   it("la règle « Lancement d'un match » renvoie au bouton « Contacts » ouvert dès que les adversaires sont connus", () => {
@@ -382,7 +382,7 @@ describe("arbitre désigné — registre, /rgpd et annonce (revue juridique)", (
     expect(row?.extraBases?.find((b) => b.base === "Exécution du contrat")?.scope).not.toMatch(/arbitre désigné d'un match,/);
     const index = DONNEES_PROFIL.findIndex((d) => d.donnee === "Pseudo Overwatch");
     expect(DONNEES_PROFIL_EN[index]?.extraBases?.map((b) => b.scope)).toContain(
-      "the BattleTag of a match's assigned referee, even when hidden, in its “Contacts” and launch windows: read by both its teams and the referees as soon as both its opponents are known until its end, by its casters while the match is being played — objection through the report form, GDPR category (once upheld, the staff no longer assigns them matches); withdrawal from a match at any time, the staff otherwise being able to assign that match to them again, without notice",
+      "the BattleTag of a match's assigned referee, even when hidden, in its “Contacts” and launch windows and on the match page: read by both its teams and the referees as soon as both its opponents are known until its end, by its casters while the match is being played — objection through the report form, GDPR category (once upheld, the staff no longer assigns them matches); withdrawal from a match at any time, the staff otherwise being able to assign that match to them again, without notice",
     );
   });
 });

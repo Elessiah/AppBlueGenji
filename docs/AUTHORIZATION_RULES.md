@@ -352,7 +352,9 @@ comme partout ailleurs.
 
 **Le BattleTag masqué ne se lit que dans la fenêtre « Contacts » d'un match et
 dans sa fenêtre de lancement**, qui la reprend au départ du match pour les
-équipes et le caster (décision de l'utilisateur, 2026-10-19). Masqué, il quitte la fiche, l'annuaire
+équipes et le caster (décision de l'utilisateur, 2026-10-19) ; la page du match
+(`docs/features/MATCH_PAGE.md`) reprend celui de l'arbitre désigné et des casters
+par la même lecture, aux mêmes lecteurs et aux mêmes moments. Masqué, il quitte la fiche, l'annuaire
 et les rosters **pour tous**, arbitres et administrateurs compris : la fiche
 (`getFullProfile`) ne le repose plus pour personne. `canViewBattletag`
 (`lib/shared/battletag-visibility.ts`) ne l'ouvre qu'avec `sharesLiveMatch`, que

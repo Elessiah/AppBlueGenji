@@ -78,6 +78,10 @@ export const MIGRATED_ROUTES: readonly string[] = [
   // Suivi sans compte d'un tournoi (`docs/features/SPECTATOR_VIEW.md`) : la
   // même fiche, mêmes textes que `/tournois/[id]`. `noindex`, hors sitemap.
   "/suivre/tournois/[id]",
+  // Page d'un match (`docs/features/MATCH_PAGE.md`), dans les deux espaces :
+  // textes de la fiche. `noindex`, hors sitemap.
+  "/tournois/[id]/matchs/[id]",
+  "/suivre/tournois/[id]/matchs/[id]",
   // Lot 8b-2 — création et édition d'un tournoi (staff, `noindex`, hors
   // sitemap). Restent français, annoncés `lang="fr"` : la modale de
   // recadrage commune au site et le réglage des notifications (lot 9).

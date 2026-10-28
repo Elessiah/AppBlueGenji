@@ -1,7 +1,7 @@
 "use client";
 
 import { TERMS_ACCEPTANCE_REQUIRED, TERMS_REQUIRED_EVENT } from "@/lib/shared/terms-of-use";
-import { useCallback, useMemo, useState, useEffect, useRef } from "react";
+import { useCallback, useMemo, useState, useEffect, useRef, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
@@ -52,12 +52,15 @@ import {
 import { EntrantProvider } from "../_lib/entrant-link";
 import { buildEntrantLogoMap } from "@/lib/shared/entrant-logos";
 import { MatchAnchorProvider } from "../_lib/match-anchor-context";
+import { tournamentHref } from "@/lib/shared/match-anchor";
+import { isMatchScoreLocked } from "../_lib/score-lock";
 import { useMatchAnchor } from "../_hooks/useMatchAnchor";
 import { useCertificationPrompt } from "../_hooks/useCertificationPrompt";
 import { liveCertificationPrompt } from "@/lib/shared/certification-prompt";
 import { TournamentProgress } from "./TournamentProgress";
 import { TournamentLoading } from "./TournamentLoading";
 import { TournamentHeader } from "./TournamentHeader";
+import { LiveIndicator } from "./LiveIndicator";
 import styles from "../page.module.css";
 import { orReload } from "@/lib/shared/lazy-component";
 import { buildSeedMap } from "@/lib/shared/match-sections";
@@ -94,6 +97,71 @@ const CertificationPromptDialog = dynamic(() => orReload(import("./Certification
 const AdvanceTournamentDialog = dynamic(() => orReload(import("./AdvanceTournamentDialog").then((m) => m.AdvanceTournamentDialog)), { ssr: false });
 const TournamentImageDialog = dynamic(() => orReload(import("./TournamentImageDialog").then((m) => m.TournamentImageDialog)), { ssr: false });
 const ConfirmActionDialog = dynamic(() => orReload(import("@/components/ui/confirm-action-dialog").then((m) => m.ConfirmActionDialog)), { ssr: false });
+// Page d'un match (`MATCH_PAGE.md`) : son propre fichier, jamais chargé par la fiche.
+const MatchPage = dynamic(() => orReload(import("./MatchPage").then((m) => m.MatchPage)), { ssr: false });
+
+/**
+ * Match introuvable dans ce tournoi (adresse fausse, ou match retiré depuis par
+ * un retour en arrière) : le dire, et ramener à la fiche.
+ */
+function MatchMissing({ tournamentId }: Readonly<{ tournamentId: number }>) {
+  const { t } = useTournamentPageText();
+  const spectator = useSpectatorView();
+  return (
+    <section className={`ds-block ${styles.status}`} role="alert">
+      <h1 className={styles.fatalTitle}>{t("matchPage.missingTitle")}</h1>
+      <p className={styles.fatalText}>{t("matchPage.missingText")}</p>
+      <CyberButton asChild variant="primary">
+        <LocaleLink href={tournamentHref(tournamentId, spectator)}>{t("matchPage.missingBack")}</LocaleLink>
+      </CyberButton>
+    </section>
+  );
+}
+
+/**
+ * Corps de la page d'un match : le match lu dans le plateau — introuvable, il
+ * le dit —, avec le format de sa phase (celui qui décide de son verrou de
+ * score, comme sur le plateau). Sans match désigné (`matchId` nul), la fiche
+ * elle-même (`children`).
+ */
+function MatchPageSection({
+  detail,
+  matchId,
+  frozen,
+  canAdminResolve,
+  onOpenAdminModal,
+  status,
+  children,
+}: Readonly<{
+  detail: TournamentDetail;
+  matchId: number | null;
+  frozen: boolean;
+  status: ReactNode;
+  canAdminResolve: (match: BracketMatch) => boolean;
+  onOpenAdminModal: (match: BracketMatch) => void;
+  children: ReactNode;
+}>) {
+  if (matchId === null) return <>{children}</>;
+  const match = detail.matches.find((item) => item.id === matchId) ?? null;
+  const format = detail.phases?.find((phase) => phase.id === match?.phaseId)?.format ?? detail.card.format;
+  return (
+    <section className={`fade-in ${styles.sheet}`}>
+      {match ? (
+        <MatchPage
+          detail={detail}
+          match={match}
+          adminResolvable={canAdminResolve(match)}
+          scoreLocked={isMatchScoreLocked(match.id, detail.matches, format)}
+          onOpenAdminModal={onOpenAdminModal}
+          frozen={frozen}
+          status={status}
+        />
+      ) : (
+        <MatchMissing tournamentId={detail.card.id} />
+      )}
+    </section>
+  );
+}
 
 /** Confirmation en attente d'un geste irréversible (abandon, retrait de pénalité). */
 interface PendingConfirm {
@@ -390,7 +458,19 @@ export type TournamentSheetSource = {
  * Chaque action se décide sur les droits du lecteur : la page sans compte lui
  * passe un contexte qui n'en ouvre aucun (`SPECTATOR_VIEWER_CONTEXT`).
  */
-export function TournamentSheet({ tournamentId, source }: Readonly<{ tournamentId: number; source: TournamentSheetSource }>) {
+export function TournamentSheet({
+  tournamentId,
+  source,
+  matchId = null,
+}: Readonly<{
+  tournamentId: number;
+  source: TournamentSheetSource;
+  /**
+   * Page d'un match (`/tournois/[id]/matchs/[matchId]`) : la fiche rend ce
+   * match seul (`MatchPage`) au lieu du plateau, avec ses fenêtres et ses droits.
+   */
+  matchId?: number | null;
+}>) {
   const router = useLocaleRouter();
   const text = useTournamentPageText();
   const { t } = text;
@@ -652,6 +732,7 @@ export function TournamentSheet({ tournamentId, source }: Readonly<{ tournamentI
   // Vocabulaire de l'affichage : un tournoi individuel parle de joueurs, pas
   // d'équipes (`lib/shared/participants.ts`).
   const entrantType = toParticipantType(detail.card.participantType);
+
 
   const canAdminResolve = (match: BracketMatch): boolean => {
     if (frozen) return false;
@@ -1107,6 +1188,14 @@ export function TournamentSheet({ tournamentId, source }: Readonly<{ tournamentI
         open={openPlayerScore}
       >
       <RulesHelpFab format={visibleFormat} contextLabel={contextLabel} tournamentId={detail.card.id} />
+      <MatchPageSection
+        detail={detail}
+        matchId={matchId}
+        frozen={frozen}
+        canAdminResolve={canAdminResolve}
+        onOpenAdminModal={openAdminScore}
+        status={<LiveIndicator isLive={isLive} tier={tier} cadenceMs={cadenceMs} fatal={fatal} />}
+      >
       <section className={`fade-in ${styles.sheet}`}>
         <TournamentHeader
           detail={detail}
@@ -1198,6 +1287,7 @@ export function TournamentSheet({ tournamentId, source }: Readonly<{ tournamentI
           />
         )}
       </section>
+      </MatchPageSection>
 
       {matchForAdminScore && (
         <AdminScoreDialog

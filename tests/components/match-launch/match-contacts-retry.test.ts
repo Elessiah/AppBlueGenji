@@ -397,7 +397,10 @@ describe("contacts du caster en attente, modale ouverte", () => {
 
   it("câblage : carte transmise, relecture passagère silencieuse, affichage à la phase du serveur", () => {
     const dialog = readSource("components/match-launch/MatchContactsDialog.tsx");
-    expect(dialog).toContain("}, [matchId, readKey]);");
+    // Lecture partagée avec la page du match (`useMatchContacts`) : rien n'est lu hors `enabled`.
+    expect(dialog).toContain("}, [matchId, readKey, enabled]);");
+    expect(dialog).toContain("if (!enabled) return;");
+    expect(dialog).toContain("const { state, launch } = useMatchContacts(matchId, card);");
     expect(dialog).toContain("rereadOnCardChange(previousCard.current, card, launch)");
     expect(dialog).toContain("Math.max(REREAD_RETRY_MS, rereadWait)");
     expect(dialog).toContain('if (launch?.viewer.role !== "REFEREE") window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));');

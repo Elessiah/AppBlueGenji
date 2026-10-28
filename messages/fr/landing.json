@@ -86,7 +86,9 @@
       "next": "Match suivant",
       "pause": "Mettre en pause le défilement des matchs",
       "play": "Reprendre le défilement des matchs"
-    }
+    },
+    "watchChannel": "Regarder {channel}",
+    "watchChannelLabel": "Regarder {channel} : {match} en direct sur {platform} (nouvel onglet)"
   },
   "ticker": {
     "label": "Fil d'actualité",

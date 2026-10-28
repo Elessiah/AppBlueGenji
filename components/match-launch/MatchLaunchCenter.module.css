@@ -307,6 +307,14 @@
   font-weight: 700;
 }
 
+/* Ce que le lecteur doit faire du BattleTag (page du match) : une consigne,
+   en bleu glacier — l'ambre reste réservé aux avertissements. */
+.identityNote {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--blue-300);
+}
+
 .unverified {
   font-size: 11px;
   color: rgba(255, 176, 92, 0.95);
