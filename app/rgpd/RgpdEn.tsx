@@ -873,10 +873,12 @@ export function RgpdEn({
             notified by push notification only, with the reason. These actions, a match&apos;s self-management and
             its first map are noted in the staff log on Discord without naming anyone, and a match that enters its
             launch with neither a referee nor self-management is flagged to the referees. Their presentation to
-            the parties to the match falls under <strong>legitimate interest</strong> (they know who referees and
-            can add them in game): they may object to it through the report form (GDPR category) — once upheld, their objection means the staff no longer assigns them matches — and withdraw from a match at any time, the staff otherwise being able to assign that match to them again, without notice; collecting
-            their “Ready” and the removal notice fall under <strong>performance of the service</strong>, the
-            referees acting for the association (<LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>).
+            the parties to the match falls under <strong>performance of the service</strong>: the terms of use
+            provide for it (“Match contacts” section, since their version 7), so that the parties know who
+            referees and can add them in game. They can withdraw from a match at any time, the staff being able to
+            assign that match to them again, without notice; without the refereeing permission, they are no longer
+            presented. Collecting their “Ready” and the removal notice also fall under performance of the service,
+            the referees acting for the association (<LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>).
           </p>
         </div>
       </section>
@@ -984,7 +986,11 @@ export function RgpdEn({
             not want their username in that announcement does not register for the solo tournament. If a Discord
             AutoMod rule blocks or flags an announcement, its text (including the username in a solo tournament) may reach the
             server moderators&apos; alert channel, where the alert stays until the moderators delete it, under the
-            association&apos;s legitimate interest in moderating its server (to object: ask for its deletion). These
+            association&apos;s legitimate interest in moderating its server (to object: ask for its deletion). A
+            match listed in that message before it goes on air, scheduled that evening, leaves no trace on the
+            site: the site only keeps the trace of a match&apos;s announcement when it goes on air
+            (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>), which appears, in a solo tournament,
+            in the export of your data — neither the text of the message nor the list of scheduled matches it gives. These
             announcements stay in the channel as long as the #live channel exists; the team or player concerned can
             ask for their deletion, and for that of these alerts,
             through the “Report a problem” button, GDPR category.
