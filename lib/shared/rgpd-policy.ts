@@ -88,7 +88,7 @@ export const REFEREE_USERNAME_BEFORE_V7_SCOPE =
  * MATCH-UI-NAMES, décision 52) : intérêt légitime, même opposition.
  */
 export const REFEREE_USERNAME_MEMBERS_SCOPE =
-  "pseudo seul de l'arbitre désigné d'un match qui n'est pas joué, sur la carte et la page du match, lu par tout membre connecté (jamais par un visiteur sans compte, qui lit « Arbitre désigné ») — opposition par le formulaire de signalement, catégorie RGPD, avec le même effet";
+  "pseudo seul de l'arbitre désigné d'un match, sur la carte et la page du match jusqu'à la déclaration de son score ou la fin du tournoi, lu par tout membre connecté (jamais par un visiteur sans compte, qui lit « Arbitre désigné ») — opposition par le formulaire de signalement, catégorie RGPD, avec le même effet qu'une opposition à sa présentation aux parties (retrait de ses matchs non terminés)";
 
 /**
  * Pastilles de certification de la fiche (tag Discord certifié, BattleTag tiré

@@ -1054,7 +1054,7 @@ function RgpdFr({
             contacts du match : aux deux équipes et aux arbitres dès que ses deux adversaires sont connus et
             jusqu&apos;à sa fin, à ses casters le temps du match ; le pseudo seul y paraît dès que la fenêtre de
             lancement montre le match. Tout membre connecté lit aussi son pseudo seul (jamais son BattleTag) sur la carte et la page
-            d&apos;un match qui n&apos;est pas joué ; les visiteurs sans compte ne lisent que « Arbitre désigné ». Son
+            d&apos;un match, jusqu&apos;à la déclaration de son score ou la fin du tournoi ; les visiteurs sans compte ne lisent que « Arbitre désigné ». Son
             « Prêt » est attendu comme celui des équipes et des casters ; seuls les parties du match et les arbitres le lisent, dans les
             fenêtres « Contacts » et de lancement. S&apos;il ne remplit plus ces conditions ou
             devient joueur du match avant son lancement, il n&apos;est plus montré (et en est retiré avant le lancement) ; l&apos;arbitrage

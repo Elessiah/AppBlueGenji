@@ -1281,9 +1281,9 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     title: "Le pseudo de l'arbitre d'un match se lit par tous les membres connectés",
     links: [{ href: "/rgpd#arbitre-designe", label: "Lire le paragraphe « Arbitre désigné d'un match »" }],
     summary:
-      "Sur la carte et la page d'un match qui n'est pas joué, tout membre connecté lit désormais le pseudo de son arbitre désigné à la place de « Arbitre désigné ». Les visiteurs sans compte et la page de suivi public lisent toujours « Arbitre désigné ». Le « Prêt » de l'arbitre ne se lit plus que par les parties du match et les arbitres.",
+      "Sur la carte et la page d'un match, jusqu'à la déclaration de son score ou la fin du tournoi, tout membre connecté lit désormais le pseudo de son arbitre désigné à la place de « Arbitre désigné ». Les visiteurs sans compte et la page de suivi public lisent toujours « Arbitre désigné ». Le « Prêt » de l'arbitre ne se lit plus que par les parties du match et les arbitres.",
     details: [
-      "Si tu arbitres : ton pseudo seul — jamais ton BattleTag ni ton tag Discord — se lit par tout membre connecté sur la carte et la page des matchs que tu arbitres, tant qu'ils ne sont pas joués. Cet affichage relève de l'intérêt légitime (que les membres sachent qui arbitre un match) : tu peux t'y opposer par le formulaire de signalement (catégorie RGPD), avec le même effet qu'une opposition à ta présentation aux parties — retenue, elle te retire de tes matchs non terminés.",
+      "Si tu arbitres : ton pseudo seul — jamais ton BattleTag ni ton tag Discord — se lit par tout membre connecté sur la carte et la page des matchs que tu arbitres, jusqu'à la déclaration de leur score ou la fin du tournoi. Cet affichage relève de l'intérêt légitime (que les membres sachent qui arbitre un match) : tu peux t'y opposer par le formulaire de signalement (catégorie RGPD), avec le même effet qu'une opposition à ta présentation aux parties — retenue, elle te retire de tes matchs non terminés.",
       "Ton « Prêt » d'arbitre n'est plus envoyé à tout le public du tournoi : seuls les parties du match et les arbitres le lisent, dans les fenêtres « Contacts » et de lancement. Le journal du staff sur Discord ne nomme toujours personne.",
     ],
   },

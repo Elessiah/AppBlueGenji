@@ -871,7 +871,7 @@ export function RgpdEn({
             contacts: to both teams and to the referees as soon as both its opponents are known until its end, to
             its casters while the match is being played; the username alone appears there as soon as the launch
             window shows the match. Any signed-in member also reads their username alone (never their BattleTag) on the card and
-            page of a match that has not been played; visitors without an account only read “Referee assigned”. Their “Ready” is
+            page of a match, until its score is reported or the tournament ends; visitors without an account only read “Referee assigned”. Their “Ready” is
             expected like those of the teams and casters; only the parties to the match and the referees read it, in the
             “Contacts” and launch windows. If they no longer meet these requirements or become
             a player of the match before its launch, they are no longer shown (and are removed from it before the launch); the refereeing of a
