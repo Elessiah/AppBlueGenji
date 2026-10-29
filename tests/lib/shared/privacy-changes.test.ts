@@ -2172,8 +2172,16 @@ describe("PRIVACY_CHANGES — BattleTag tapé gardé, jamais vérifié (D3)", ()
 
   it("privacyChanges_typedBattletagKept_statesLegacyAccountsSwitchAtNextSignInFrAndEn", () => {
     expectEntryTexts(entry, english, {
-      fr: ["la règle s'applique à ta prochaine connexion par Battle.net", "ton BattleTag garde son état actuel"],
-      en: ["the rule applies at your next Battle.net sign-in", "your BattleTag keeps its current state"],
+      fr: [
+        "déjà rattaché avec un BattleTag",
+        "la règle s'applique à ta prochaine connexion par Battle.net",
+        "ton BattleTag garde son état actuel",
+      ],
+      en: [
+        "already linked with a BattleTag",
+        "the rule applies at your next Battle.net sign-in",
+        "your BattleTag keeps its current state",
+      ],
     });
   });
 

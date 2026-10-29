@@ -384,6 +384,17 @@ describe("/rgpd — données obligatoires : la langue du compte (revue juridique
     expect(read("app/rgpd/RgpdEn.tsx")).toMatch(/you can change it in My profile \(until you next log in from a page\s+in the other language\)/);
   });
 
+  // EF-23 (D3) : un BattleTag tapé sous un Battle.net rattaché ne suffit pas
+  // pour caster ; la politique le dit, comme le registre (T04).
+  it("rgpdPolicy_casterCondition_requiresBattletagFromBattleNetFrAndEn", () => {
+    expect(read("app/rgpd/page.tsx")).toMatch(
+      /sans les deux \(un BattleTag tiré de ce compte Battle\.net,\s+pas saisi à la main\)/,
+    );
+    expect(read("app/rgpd/RgpdEn.tsx")).toMatch(
+      /without both \(a BattleTag taken from that Battle\.net account,\s+not typed in by hand\)/,
+    );
+  });
+
   // Revue #497 : le BattleTag n'est présenté qu'en Overwatch, mais sa présence
   // et le compte Battle.net sont vérifiés en tout jeu pour caster ou arbitrer
   // (`casterIdentityOf`) ; l'arbitre ne s'ajoute en jeu qu'en Overwatch.
