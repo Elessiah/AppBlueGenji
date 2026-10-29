@@ -40,15 +40,19 @@ describe("certifyPromptFor — parcours du bouton principal", () => {
   });
 
   it("mène au dialogue sans Discord rattaché (connexion Blizzard)", () => {
-    expect(certifyPromptFor({ ...base, discordId: null })).toEqual({ mode: "DIALOG", hasTag: true });
-    expect(certifyPromptFor({ discordId: null, discordPseudo: null, pseudoFromDiscord: false })).toEqual({ mode: "DIALOG", hasTag: false });
+    expect(certifyPromptFor({ ...base, discordId: null })).toEqual({ mode: "DIALOG", hasTag: true, discordLinked: false });
+    expect(certifyPromptFor({ discordId: null, discordPseudo: null, pseudoFromDiscord: false })).toEqual({
+      mode: "DIALOG",
+      hasTag: false,
+      discordLinked: false,
+    });
   });
 
-  it("mène au dialogue pour un tag tapé à la main, absent ou numérique", () => {
-    expect(certifyPromptFor({ ...base, pseudoFromDiscord: false })).toEqual({ mode: "DIALOG", hasTag: true });
-    expect(certifyPromptFor({ ...base, discordPseudo: null })).toEqual({ mode: "DIALOG", hasTag: false });
-    expect(certifyPromptFor({ ...base, discordPseudo: "   " })).toEqual({ mode: "DIALOG", hasTag: false });
-    expect(certifyPromptFor({ ...base, discordPseudo: "123456789012345678" })).toEqual({ mode: "DIALOG", hasTag: true });
+  it("mène au dialogue pour un tag tapé à la main, absent ou numérique — Discord déjà rattaché (EF-23)", () => {
+    expect(certifyPromptFor({ ...base, pseudoFromDiscord: false })).toEqual({ mode: "DIALOG", hasTag: true, discordLinked: true });
+    expect(certifyPromptFor({ ...base, discordPseudo: null })).toEqual({ mode: "DIALOG", hasTag: false, discordLinked: true });
+    expect(certifyPromptFor({ ...base, discordPseudo: "   " })).toEqual({ mode: "DIALOG", hasTag: false, discordLinked: true });
+    expect(certifyPromptFor({ ...base, discordPseudo: "123456789012345678" })).toEqual({ mode: "DIALOG", hasTag: true, discordLinked: true });
   });
 });
 

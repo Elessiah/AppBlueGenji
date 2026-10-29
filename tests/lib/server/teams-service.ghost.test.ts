@@ -156,7 +156,8 @@ describe("softDeleteTeam — dérogation staff", () => {
       .mockResolvedValueOnce([[{ logo_url: null, deleted_at: null, is_ghost: 1 }]]) // relue sous verrou
       .mockResolvedValueOnce([{ affectedRows: 1 }]) // équipe anonymisée
       .mockResolvedValueOnce([[]]) // aucun membre (fantôme)
-      .mockResolvedValue([{ affectedRows: 1 }]);
+      // Écritures ; les tournois dont les flux lisent l'équipe : aucun.
+      .mockImplementation(async (sql) => (/UNION\s+SELECT id FROM bg_tournaments/.test(sql) ? [[]] : [{ affectedRows: 1 }]));
     const connection = await mockDb(execute, connectionExecute);
 
     await softDeleteTeam(99, 3, true);

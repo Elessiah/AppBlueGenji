@@ -26,6 +26,7 @@ function mockDb(logoUrl: string | null, failOn?: RegExp) {
     }
     if (/SELECT roles_json/.test(sql)) return [[{ roles_json: JSON.stringify(["OWNER"]) }], []];
     if (/SELECT user_id FROM bg_team_members/.test(sql)) return [[{ user_id: 12 }, { user_id: 30 }], []];
+    if (/UNION\s+SELECT id FROM bg_tournaments/.test(sql)) return [[{ id: 40 }, { id: 41 }], []];
     return [{ affectedRows: 1 }, []];
   });
   const connection = {
@@ -105,7 +106,8 @@ describe("softDeleteTeam — fichier du logo", () => {
     const detach = connectionExecute.mock.calls.findIndex(([sql]) => /UPDATE bg_team_members SET left_at = NOW\(\)/.test(String(sql)));
     expect(String(connectionExecute.mock.calls[select][0])).toMatch(/WHERE team_id = \? AND left_at IS NULL/);
     expect(select).toBeLessThan(detach);
-    expect(jest.mocked(reconnectUserStreams).mock.calls).toEqual([[12], [30]]);
+    // Un seul passage pour tous les membres, limité aux tournois de l'équipe.
+    expect(jest.mocked(reconnectUserStreams).mock.calls).toEqual([[[12, 30], { tournamentIds: new Set([40, 41]) }]]);
     expect(jest.mocked(reconnectUserStreams).mock.invocationCallOrder[0])
       .toBeGreaterThan(connection.commit.mock.invocationCallOrder[0]);
 

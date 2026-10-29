@@ -1,7 +1,8 @@
 {
-  "count": 184,
+  "count": 185,
   "unknown": "L'action n'a pas abouti pour une raison inattendue. Si le problème persiste, préviens le staff.",
   "errors": {
+    "CERTIFY_PROMPT_OTHER_ACCOUNT": "Un autre compte est connecté dans ce navigateur : « Ne plus voir » n'a pas été enregistré.",
     "MATCH_NOT_FOUND": "Match introuvable.",
     "MATCH_NOT_IN_LOBBY": "Ce match n'est pas en lancement.",
     "MATCH_NOT_LAUNCHABLE": "Ce match ne peut pas être lancé : ses deux engagées ne sont pas connues ou il est terminé.",

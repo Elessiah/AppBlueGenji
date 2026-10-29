@@ -2132,12 +2132,14 @@ describe("PRIVACY_CHANGES — rôles de plateforme au journal du staff (ADMIN-SE
   });
 });
 
-describe("PRIVACY_CHANGES — BattleTag effacé quand Battle.net n'en donne aucun (EF-09)", () => {
-  const id = "2026-10-battletag-efface-sans-battle-net";
+// D3 (EF-23) : remplace l'entrée EF-09 jamais publiée (« effacé ») — le
+// BattleTag tapé est gardé, sans jamais passer pour vérifié.
+describe("PRIVACY_CHANGES — BattleTag tapé gardé, jamais vérifié (D3)", () => {
+  const id = "2026-10-battletag-tape-garde-non-verifie";
   const entry = PRIVACY_CHANGES.find((c) => c.id === id)!;
   const english = PRIVACY_CHANGES_EN[id];
 
-  it("privacyChanges_battletagErased_closesListDated1031ForAllAccounts", () => {
+  it("privacyChanges_typedBattletagKept_closesListDated1031ForAllAccounts", () => {
     expect(PRIVACY_CHANGES.at(-1)).toBe(entry);
     expect(PRIVACY_CHANGES.at(-2)?.id).toBe("2026-10-roles-de-plateforme-journal-du-staff");
     expect(id.length).toBeLessThanOrEqual(PRIVACY_CHANGE_ID_MAX_LENGTH);
@@ -2149,18 +2151,27 @@ describe("PRIVACY_CHANGES — BattleTag effacé quand Battle.net n'en donne aucu
     });
   });
 
-  it("privacyChanges_battletagErased_statesWhatIsErasedAndHowToTypeOneFrAndEn", () => {
+  it("privacyChanges_typedBattletagKept_statesKeptUnverifiedAndItsEffectsFrAndEn", () => {
     expectEntryTexts(entry, english, {
       fr: [
-        "Blizzard ne donne aucun BattleTag, le BattleTag de ta fiche est désormais effacé",
-        "y compris celui que tu avais saisi à la main",
-        "détache Battle.net depuis « Applications connectées »",
+        "celui que tu avais saisi à la main reste sur ta fiche, mais n'est plus tenu pour vérifié",
+        "ni contact certifié de ton équipe",
+        "ni identité suffisante pour caster ou arbitrer un match",
+        "il remplace toujours le tien, et lui seul est vérifié",
+        "reste modifiable depuis « Mon profil », même avec Battle.net rattaché",
       ],
       en: [
-        "Blizzard gives no BattleTag, the BattleTag on your profile is now erased",
-        "including one you had typed in by hand",
-        "unlink Battle.net from “Connected apps”",
+        "the one you had typed in by hand stays on your profile, but is no longer treated as verified",
+        "no certified contact for your team",
+        "not enough identity to cast or referee a match",
+        "it always replaces yours, and only that one is verified",
+        "can still be changed from “My profile”, even with Battle.net linked",
       ],
     });
+  });
+
+  it("privacyChanges_erasedEntry_neverPublished", () => {
+    expect(PRIVACY_CHANGES.some((c) => c.id === "2026-10-battletag-efface-sans-battle-net")).toBe(false);
+    expect(PRIVACY_CHANGES_EN).not.toHaveProperty("2026-10-battletag-efface-sans-battle-net");
   });
 });

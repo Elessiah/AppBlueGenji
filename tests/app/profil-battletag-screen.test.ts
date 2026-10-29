@@ -86,7 +86,9 @@ describe("champ BattleTag — le verrou à l'écran", () => {
     // confondre ouvrirait le champ pendant l'aller-retour, donc au moment
     // précis où la sauvegarde partirait vers un 409.
     expect(page).toContain("connections === null");
-    expect(page).toContain("isBattletagLocked({ linked: blizzardLinked })");
+    expect(page).toMatch(/isBattletagLocked\(\{\s*linked: blizzardLinked,/);
+    // Seul un BattleTag venu de Battle.net verrouille ; un tag tapé reste ouvert (D3).
+    expect(page).toContain("verified: data?.profile.battletagVerified === true");
   });
 });
 

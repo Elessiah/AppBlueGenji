@@ -203,25 +203,27 @@ describe("avis de la connexion et du profil", () => {
     expect(enLogin.consent.discordTag).toContain("in your profile or in the window that offers it after you log in");
   });
 
-  it("le code de connexion part dans la langue du compte déjà rattaché à ce Discord", () => {
+  // EF-23 : la parenthèse imbriquée (langue du code de connexion) quitte l'avis
+  // de consentement, qui renvoie à la politique — où le détail reste écrit.
+  it("consentPseudonyms_codeLanguageDetail_movedToThePolicyFrAndEn", () => {
     expect(source("lib/server/discord-verification.ts")).toContain("accountLocaleForDiscordId(");
-    expect(frLogin.consent.pseudonyms).toContain(
-      "dans la langue du compte déjà rattaché à ce Discord — en français puis en anglais s'il n'y en a pas",
-    );
-    expect(enLogin.consent.pseudonyms).toContain(
-      "in the language of the account already linked to that Discord — French then English if there is none",
-    );
+    expect(frLogin.consent.pseudonyms).toContain("les exceptions sont détaillées dans la politique de confidentialité");
+    expect(enLogin.consent.pseudonyms).toContain("the exceptions are detailed in the privacy policy");
+    expect(frLogin.consent.pseudonyms).not.toContain("(le code reçu");
+    expect(source("app/rgpd/page.tsx")).toMatch(/la langue du compte déjà rattaché à ce compte Discord — en\s+français puis en anglais s&apos;il n&apos;y en a pas/);
+    expect(source("app/rgpd/RgpdEn.tsx")).toMatch(/account already linked to that Discord account — French then English when there is none/);
   });
 
-  it("la langue du compte ne vaut pas pour les alertes adressées au staff", () => {
-    // bilingualDm : le français seul quand les deux langues dépassent un message.
-    expect(frProfile.accountLocale.hint).toContain(
-      "(hors alertes adressées au staff en message privé, en français puis en anglais — en français seul si les deux ne tiennent pas dans un message)",
-    );
-    expect(enProfile.accountLocale.hint).toContain(
-      "(except alerts sent to staff by direct message, in French then English — French alone if both do not fit in one message)",
-    );
+  it("accountLocaleHint_staffAlerts_namedWithoutNestedParenthesisFrAndEn", () => {
+    // bilingualDm : le détail (français seul si les deux langues dépassent un
+    // message) reste sur /rgpd ; l'indication du profil garde l'exception.
+    expect(frProfile.accountLocale.hint).toContain("sauf les alertes adressées au staff, en français puis en anglais.");
+    expect(enProfile.accountLocale.hint).toContain("except alerts sent to staff, in French then English.");
+    expect(frProfile.accountLocale.hint).not.toContain("(");
+    expect(enProfile.accountLocale.hint).not.toContain("(");
     expect(frProfile.accountLocale.hint).not.toContain("toujours en français");
+    expect(source("app/rgpd/page.tsx")).toContain("en français seul si les deux ne tiennent pas dans un message");
+    expect(source("app/rgpd/RgpdEn.tsx")).toMatch(/French\s+alone when both do not fit in one message/);
   });
 });
 

@@ -223,7 +223,7 @@ describe("connexions OAuth — une ligne supprimée ne reprend pas son identité
     await createOrGetBlizzardUser("sub-412", "Nova#2143", { termsAccepted: true });
 
     const update = execute.mock.calls.find(([sql]) =>
-      String(sql).includes("SET overwatch_battletag = ?"),
+      String(sql).includes("SET overwatch_battletag = COALESCE(?, overwatch_battletag)"),
     ) as [string, unknown[]];
     expect(update).toBeDefined();
     expect(update[0]).toMatch(/is_deleted = 0/);

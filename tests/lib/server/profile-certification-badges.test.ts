@@ -113,7 +113,7 @@ describe("pastille BattleTag vérifié", () => {
     const profile = await getFullProfile({ id: 20 }, 7);
 
     const select = sqls.find((sql) => sql.startsWith("SELECT id, pseudo, avatar_url")) ?? "";
-    expect(select).toContain("(blizzard_sub IS NOT NULL) AS blizzard_linked");
+    expect(select).toContain("(blizzard_sub IS NOT NULL AND overwatch_battletag_typed = 0) AS blizzard_linked");
     expect(select).not.toMatch(/blizzard_sub,/);
     expect(JSON.stringify(profile)).not.toMatch(/blizzard/i);
   });

@@ -36,6 +36,10 @@ const ROSTER: Record<number, TeamRole[]> = {
   [DPS_ID]: ["DPS"],
 };
 
+/** Tournois dont les flux lisent l'équipe (engagée, ou pas encore commencés). */
+const STREAM_TOURNAMENTS = [40, 41];
+const STREAM_SCOPE = { tournamentIds: new Set(STREAM_TOURNAMENTS) };
+
 type Execute = (sql: string, params?: unknown[]) => Promise<unknown>;
 let execute: jest.Mock<Execute>;
 let connection: ReturnType<typeof connectionMock>;
@@ -53,6 +57,7 @@ function useDatabase(roster: Record<number, TeamRole[]> = ROSTER, affectedRows =
       return [roles ? [{ roles_json: JSON.stringify(roles) }] : [], []];
     }
     if (/FROM bg_teams WHERE id = \? FOR UPDATE/.test(sql)) return [[{ id: TEAM_ID }], []];
+    if (/UNION\s+SELECT id FROM bg_tournaments/.test(sql)) return [STREAM_TOURNAMENTS.map((id) => ({ id })), []];
     return [{ affectedRows }, []];
   });
   connection = connectionMock();
@@ -126,6 +131,24 @@ describe("updateTeamMemberRoles", () => {
     expect(updates()[0][1]).toEqual([JSON.stringify(["COACH"]), TEAM_ID, DPS_ID]);
   });
 
+  it("updateTeamMemberRoles_roleChanged_reconnectsMemberOnTeamTournaments", async () => {
+    await updateTeamMemberRoles(OWNER_ID, TEAM_ID, MANAGER_ID, ["DPS"]);
+    expect(jest.mocked(reconnectUserStreams).mock.calls).toEqual([[[MANAGER_ID], STREAM_SCOPE]]);
+  });
+
+  it("updateTeamMemberRoles_refused_reconnectsNobody", async () => {
+    await expect(updateTeamMemberRoles(DPS_ID, TEAM_ID, CAPTAIN_ID, ["HEAL"])).rejects.toThrow("FORBIDDEN");
+    expect(reconnectUserStreams).not.toHaveBeenCalled();
+  });
+
+  it("updateTeamMemberRoles_teamTournaments_readUnderTheRosterLock", async () => {
+    await updateTeamMemberRoles(OWNER_ID, TEAM_ID, DPS_ID, ["HEAL"]);
+    const scopeRead = connection.execute.mock.calls.find(([sql]) => /UNION\s+SELECT id FROM bg_tournaments/.test(String(sql)));
+    expect(scopeRead?.[0]).toMatch(/FROM bg_tournament_registrations WHERE team_id = \?/);
+    expect(scopeRead?.[0]).toMatch(/state IN \('UPCOMING', 'REGISTRATION'\)/);
+    expect(scopeRead?.[1]).toEqual([TEAM_ID]);
+  });
+
   it("garde OWNER au propriétaire, en tête de ses rôles", async () => {
     await updateTeamMemberRoles(OWNER_ID, TEAM_ID, OWNER_ID, ["DPS"]);
     expect(updates()[0][1]).toEqual([JSON.stringify(["OWNER", "DPS"]), TEAM_ID, OWNER_ID]);
@@ -194,7 +217,7 @@ describe("removeTeamMember", () => {
     jest.mocked(reconnectUserStreams).mockClear();
     await removeTeamMember(OWNER_ID, TEAM_ID, DPS_ID);
     expect(reconnectUserStreams).toHaveBeenCalledTimes(1);
-    expect(reconnectUserStreams).toHaveBeenCalledWith(DPS_ID);
+    expect(reconnectUserStreams).toHaveBeenCalledWith([DPS_ID], STREAM_SCOPE);
   });
 
   it("rend MEMBER_NOT_FOUND si la cible est partie entre-temps", async () => {
@@ -221,7 +244,7 @@ describe("leaveTeam", () => {
     await expect(leaveTeam(OUTSIDER_ID, TEAM_ID)).rejects.toThrow("NOT_A_MEMBER");
     expect(reconnectUserStreams).not.toHaveBeenCalled();
     await leaveTeam(DPS_ID, TEAM_ID);
-    expect(jest.mocked(reconnectUserStreams).mock.calls).toEqual([[DPS_ID]]);
+    expect(jest.mocked(reconnectUserStreams).mock.calls).toEqual([[[DPS_ID], STREAM_SCOPE]]);
   });
 
   it.each([

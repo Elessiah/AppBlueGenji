@@ -348,28 +348,29 @@ describe("linkOAuthIdentity — on ne déplace jamais une porte", () => {
     );
 
     const update = find(statements, "UPDATE bg_users SET blizzard_sub")!;
-    expect(update.sql).toContain("overwatch_battletag = ?");
-    expect(update.params).toEqual(["bz-1", "Nova#2143", 7, "bz-1"]);
+    expect(update.sql).toContain("overwatch_battletag = COALESCE(?, overwatch_battletag)");
+    expect(update.sql).toContain("overwatch_battletag_typed = CASE WHEN ? IS NULL THEN 1 ELSE 0 END");
+    expect(update.params).toEqual(["bz-1", "Nova#2143", "Nova#2143", 7, "bz-1"]);
   });
 
-  it("linkOAuthIdentity_blizzardWithoutBattletag_erasesTypedBattletag : un BattleTag saisi ne passe pas pour vérifié", async () => {
-    // Gardé sous un Battle.net rattaché, il serait « vérifié »
-    // (`hasVerifiedBattletag`) sans que Blizzard l'ait jamais nommé.
+  it("linkOAuthIdentity_blizzardWithoutBattletag_keepsTypedBattletagUnverified : un BattleTag saisi ne passe pas pour vérifié (D3)", async () => {
+    // Gardé (COALESCE), mais marqué tapé : `battletagFromBlizzard` le tient
+    // pour non vérifié, sans que Blizzard l'ait jamais nommé.
     const { statements } = fakeDb({ ...emptyRow, overwatch_battletag: "Saisi#1111" });
 
     await linkOAuthIdentity(7, identity({ provider: "BLIZZARD", subject: "bz-1", handle: null }));
 
     const update = find(statements, "UPDATE bg_users SET blizzard_sub")!;
-    expect(update.sql).toContain("overwatch_battletag = ?");
-    expect(update.params).toEqual(["bz-1", null, 7, "bz-1"]);
+    expect(update.sql).not.toMatch(/overwatch_battletag = \?/);
+    expect(update.params).toEqual(["bz-1", null, null, 7, "bz-1"]);
   });
 
-  it("linkOAuthIdentity_blizzardBlankBattletag_erasesTypedBattletag : un BattleTag fait d'espaces ne vaut rien", async () => {
+  it("linkOAuthIdentity_blizzardBlankBattletag_keepsTypedBattletagUnverified : un BattleTag fait d'espaces ne vaut rien (D3)", async () => {
     const { statements } = fakeDb({ ...emptyRow, overwatch_battletag: "Saisi#1111" });
 
     await linkOAuthIdentity(7, identity({ provider: "BLIZZARD", subject: "bz-1", handle: "   " }));
 
-    expect(find(statements, "UPDATE bg_users SET blizzard_sub")!.params).toEqual(["bz-1", null, 7, "bz-1"]);
+    expect(find(statements, "UPDATE bg_users SET blizzard_sub")!.params).toEqual(["bz-1", null, null, 7, "bz-1"]);
   });
 
   it("n'écrit que le `sub` pour Google", async () => {

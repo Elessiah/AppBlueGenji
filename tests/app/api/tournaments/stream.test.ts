@@ -21,6 +21,7 @@ import { currentTokenHash, getCurrentUser } from "@/lib/server/auth";
 import {
   closeSessionStreams,
   closeUserStreams,
+  reconnectUserStreams,
   registeredStreamCount,
   resetSessionStreams,
 } from "@/lib/server/session-streams";
@@ -382,6 +383,40 @@ describe("GET /api/tournaments/[id]/stream — révocation de la session", () =>
 
     const response = await GET(new Request("http://t/"), params("5"));
     expect(response.status).toBe(200);
+    await response.body!.cancel();
+  });
+
+  it("GET_reconnectDuringOpening_answersWithoutRefusalAndEndsTheStream (EF-23)", async () => {
+    // Rôle changé, équipe quittée pendant l'ouverture : pas un 401 — le client
+    // se reconnecte sur un contexte relu, sans passer par le REST de secours.
+    jest.mocked(getVisibleTournamentSnapshot).mockImplementation(async () => {
+      reconnectUserStreams(1, { tournamentIds: new Set([5]) });
+      return snapshotWith([]);
+    });
+
+    const response = await GET(new Request("http://t/"), params("5"));
+
+    expect(response.status).toBe(200);
+    expect(await drainsToEnd(response)).toBe(true);
+    expect(registeredStreamCount()).toBe(0);
+    expect(tournamentAudience(5)).toBe(0);
+  });
+
+  it("GET_reconnectOfOpenStream_endsIt (EF-23)", async () => {
+    const response = await GET(new Request("http://t/"), params("5"));
+
+    expect(reconnectUserStreams(1, { tournamentIds: new Set([5]) })).toBe(1);
+
+    expect(await drainsToEnd(response)).toBe(true);
+    expect(registeredStreamCount()).toBe(0);
+  });
+
+  it("GET_reconnectOfAnotherTournament_leavesThisStreamOpen (EF-23)", async () => {
+    const response = await GET(new Request("http://t/"), params("5"));
+
+    expect(reconnectUserStreams(1, { tournamentIds: new Set([6]) })).toBe(0);
+
+    expect(registeredStreamCount()).toBe(1);
     await response.body!.cancel();
   });
 

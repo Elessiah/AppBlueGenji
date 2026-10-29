@@ -76,7 +76,7 @@ describe("loadDiscordCertifyPrompt — due, et pour qui", () => {
 
   it("connexion Blizzard sans Discord : le dialogue de /profil", async () => {
     setUp([{ discord_id: null, discord_pseudo: null, discord_pseudo_from_discord: 0 }]);
-    expect(await loadDiscordCertifyPrompt(7, HASH)).toEqual({ mode: "DIALOG", hasTag: false });
+    expect(await loadDiscordCertifyPrompt(7, HASH)).toEqual({ mode: "DIALOG", hasTag: false, discordLinked: false });
   });
 
   it("sans session (contournement de développement) ou identifiant invalide : aucune requête", async () => {
@@ -190,13 +190,14 @@ describe("invitation de la fiche tournoi oubliée quand elle ne vaut plus (EF-04
     expect(forgetCertificationPromptsOf).not.toHaveBeenCalled();
   });
 
-  it("certification Discord et rattachement OAuth oublient l'invitation du compte", () => {
+  it("certification Discord et rattachement OAuth oublient l'invitation du compte et de son équipe (EF-23)", () => {
     const source = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
     const verification = source("lib/server/discord-verification.ts");
-    // Tag écrit vérifié (code par message privé) et certification en un clic.
-    expect(verification).toMatch(/throw new Error\("DISCORD_ID_MISMATCH"\);\s*\}\s*\/\/[^\n]*\n\s*forgetCertificationPromptsOf\(userId\);/);
-    expect(verification).toMatch(/if \(Number\(result\.affectedRows\) > 0\) \{\s*\/\/[^\n]*\n\s*forgetCertificationPromptsOf\(userId\);\s*return \{ status: "VERIFIED", tag: expected \};/);
+    // Tag écrit vérifié (code par message privé) et certification en un clic :
+    // le compte, et ses coéquipiers (« équipe sans contact », invitation du meneur).
+    expect(verification).toMatch(/throw new Error\("DISCORD_ID_MISMATCH"\);\s*\}\s*(\/\/[^\n]*\n\s*)+await forgetCertificationPromptsAround\(userId\);/);
+    expect(verification).toMatch(/if \(Number\(result\.affectedRows\) > 0\) \{\s*(\/\/[^\n]*\n\s*)+await forgetCertificationPromptsAround\(userId\);\s*return \{ status: "VERIFIED", tag: expected \};/);
     // Rattachement réussi seulement : après le retour d'échec.
-    expect(source("lib/server/oauth-flow.ts")).toMatch(/return linkFailure\([^;]*;\s*\}\s*(\/\/[^\n]*\n\s*)+forgetCertificationPromptsOf\(user\.id\);/);
+    expect(source("lib/server/oauth-flow.ts")).toMatch(/return linkFailure\([^;]*;\s*\}\s*(\/\/[^\n]*\n\s*)+await forgetCertificationPromptsAround\(user\.id\);/);
   });
 });
