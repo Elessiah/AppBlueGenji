@@ -232,7 +232,7 @@ export default async function RuleModePage({ params, searchParams }: Readonly<Pa
             </span>
           </p>
         )}
-        <KeyFacts facts={mode.facts.map((fact) => ({ id: fact.label, label: fact.label, value: fact.value }))} />
+        <KeyFacts facts={mode.facts.map((fact, index) => ({ id: `fact-${index}`, label: fact.label, value: fact.value }))} />
       </section>
 
       <div className={`${styles.shell} ${styles.layout} ${tones.tone}`} data-tone={RULE_MODE_TONE[mode.diagram]}>

@@ -135,6 +135,7 @@
 }
 
 .factList {
+  align-self: stretch;
   display: grid;
   gap: 4px;
   margin: 0;
@@ -327,14 +328,22 @@
   }
 
   /* Au téléphone, l'emblème au-dessus du nom : deux noms longs tiennent côte à côte. */
-  .teamName {
+  .team .teamName {
     flex-direction: column;
     align-items: flex-start;
     font-size: 15px;
   }
 
+  .team .teamName > :first-child {
+    align-self: flex-start;
+  }
+
   .team[data-position="right"] .teamName {
     align-items: flex-end;
+  }
+
+  .team[data-position="right"] .teamName > :first-child {
+    align-self: flex-end;
   }
 }
 
