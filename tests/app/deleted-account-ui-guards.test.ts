@@ -110,7 +110,7 @@ describe("interface — discret dans l'annuaire, évident sur la fiche", () => {
   it("fait de la bascule de l'annuaire une icône sans texte visible", () => {
     expect(ANNUAIRE).not.toContain("<Coche");
     expect(ANNUAIRE).toContain("<UserX");
-    expect(ANNUAIRE).toContain("aria-pressed={showDeleted}");
+    expect(ANNUAIRE).toContain("aria-pressed={deletedShown}");
     expect(ANNUAIRE).toContain('aria-label={t("list.showDeleted", { count: deletedCount })}');
     // Infobulle et nom accessible disent la même action ; l'état passe par
     // `aria-pressed`, jamais par un libellé qui changerait sous le pointeur.

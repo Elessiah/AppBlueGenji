@@ -4,6 +4,7 @@ import {
   checkRateLimit,
   consumeRateLimit,
   peekTokenBucket,
+  refundRateLimit,
   refundTokenBucket,
   takeTokenBucket,
   type TokenBucketRule,
@@ -88,6 +89,32 @@ describe("rate-limit — contrôle et débit séparés", () => {
     // La fenêtre ne se prolonge pas à chaque tentative refusée.
     expect(first.retryAfterMs).toBe(990);
     expect(second.retryAfterMs).toBe(980);
+  });
+});
+
+describe("refundRateLimit", () => {
+  it("refundRateLimit_afterConsume_givesTheSlotBack", () => {
+    const now = 1_000_000;
+    for (let i = 0; i < 3; i += 1) consumeRateLimit(RULE, "a", now);
+
+    refundRateLimit(RULE, "a", now + 1);
+
+    expect(consumeRateLimit(RULE, "a", now + 2).allowed).toBe(true);
+  });
+
+  it("refundRateLimit_unknownKey_doesNothing", () => {
+    refundRateLimit(RULE, "nobody");
+
+    expect(checkRateLimit(RULE, "nobody").remaining).toBe(3);
+  });
+
+  it("refundRateLimit_afterWindowReset_doesNotGoBelowFreshQuota", () => {
+    const now = 1_000_000;
+    consumeRateLimit(RULE, "a", now);
+
+    refundRateLimit(RULE, "a", now + 2_000);
+
+    expect(checkRateLimit(RULE, "a", now + 2_000).remaining).toBe(3);
   });
 });
 

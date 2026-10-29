@@ -79,12 +79,28 @@ describe("updateTeamLogo", () => {
   it("updateTeamLogo_committed_invalidatesIdentityViewsAfterCommit", async () => {
     install([manager], [lockLogo(null), [/UPDATE bg_teams SET logo_url = \?/, () => [{}]]]);
 
-    await updateTeamLogo(1, 7, null);
+    await updateTeamLogo(1, 7, "/api/uploads/teams/new.webp");
 
     expect(invalidateTeamIdentityViews).toHaveBeenCalledTimes(1);
     expect(jest.mocked(invalidateTeamIdentityViews).mock.invocationCallOrder[0]).toBeGreaterThan(
       connection.commit.mock.invocationCallOrder[0],
     );
+  });
+
+  it("updateTeamLogo_removingAbsentLogo_invalidatesNothing", async () => {
+    install([manager], [lockLogo(null), [/UPDATE bg_teams SET logo_url = \?/, () => [{}]]]);
+
+    await updateTeamLogo(1, 7, null);
+
+    expect(invalidateTeamIdentityViews).not.toHaveBeenCalled();
+  });
+
+  it("updateTeamLogo_removingExistingLogo_invalidatesIdentityViews", async () => {
+    install([manager], [lockLogo("/api/uploads/teams/old.webp"), [/UPDATE bg_teams SET logo_url = \?/, () => [{}]]]);
+
+    await updateTeamLogo(1, 7, null);
+
+    expect(invalidateTeamIdentityViews).toHaveBeenCalledTimes(1);
   });
 
   it("updateTeamLogo_writeFails_rollsBackAndInvalidatesNothing", async () => {

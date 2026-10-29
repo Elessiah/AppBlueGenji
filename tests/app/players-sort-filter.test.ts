@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   compareNewestFirst,
+  deletedToggleState,
   filterPlayers,
   matchesPlayerStatusFilter,
   roleAfterStatusChoice,
@@ -74,6 +75,21 @@ describe("statusFilterExcludesDeleted / statusFilterAllowsRoles", () => {
   it("statusFilterAllowsRoles_rosterlessFilters_returnFalse", () => {
     expect(statusFilterAllowsRoles("free")).toBe(false);
     expect(statusFilterAllowsRoles("unaffiliated")).toBe(false);
+  });
+});
+
+describe("deletedToggleState", () => {
+  it("deletedToggleState_allFilterAndShown_isPressedAndActive", () => {
+    expect(deletedToggleState(true, "all")).toEqual({ inert: false, pressed: true });
+  });
+
+  it("deletedToggleState_shownThenRosterlessFilter_isInertAndNotPressed", () => {
+    expect(deletedToggleState(true, "unaffiliated")).toEqual({ inert: true, pressed: false });
+    expect(deletedToggleState(true, "free")).toEqual({ inert: true, pressed: false });
+  });
+
+  it("deletedToggleState_hidden_isNotPressed", () => {
+    expect(deletedToggleState(false, "all")).toEqual({ inert: false, pressed: false });
   });
 });
 

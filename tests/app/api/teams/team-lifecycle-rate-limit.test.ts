@@ -78,6 +78,19 @@ describe("POST /api/teams — plafond de création", () => {
     expect((await create()).status).toBe(201);
   });
 
+  it("POST_parallelRequestsAtLastSlot_onlyOnePasses", async () => {
+    for (let i = 0; i < TEAM_LIFECYCLE_RULE.limit - 1; i += 1) await create();
+    const pending: ((id: number) => void)[] = [];
+    jest.mocked(createTeam).mockImplementation(() => new Promise<number>((resolve) => pending.push(resolve)));
+
+    const first = create();
+    const second = await create();
+    pending[0](11);
+
+    expect(second.status).toBe(429);
+    expect((await first).status).toBe(201);
+  });
+
   it("POST_staffTournaments_isNotCapped", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(staff);
     await useUpTheBucket(create);
@@ -107,6 +120,19 @@ describe("DELETE /api/teams/[id] — plafond de dissolution", () => {
     jest.mocked(softDeleteTeam).mockResolvedValue(undefined);
 
     expect((await dissolve()).status).toBe(200);
+  });
+
+  it("DELETE_parallelRequestsAtLastSlot_onlyOnePasses", async () => {
+    for (let i = 0; i < TEAM_LIFECYCLE_RULE.limit - 1; i += 1) await dissolve();
+    const pending: (() => void)[] = [];
+    jest.mocked(softDeleteTeam).mockImplementation(() => new Promise<void>((resolve) => pending.push(() => resolve())));
+
+    const first = dissolve();
+    const second = await dissolve();
+    pending[0]();
+
+    expect(second.status).toBe(429);
+    expect((await first).status).toBe(200);
   });
 
   it("DELETE_staffTournaments_isNotCapped", async () => {
