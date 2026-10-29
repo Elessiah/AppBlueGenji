@@ -683,7 +683,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     details: [
       "When Blizzard gives a BattleTag, it always replaces yours, and only that one is verified.",
       "A typed BattleTag can still be changed from “My profile”, even with Battle.net linked.",
-      "If your Battle.net was already linked, the rule applies at your next Battle.net sign-in: until then, your BattleTag keeps its current state.",
+      "If your Battle.net was already linked with a BattleTag, the rule applies at your next Battle.net sign-in: until then, your BattleTag keeps its current state.",
     ],
   },
 };

@@ -278,7 +278,7 @@ function RgpdFr({
             saisis, certification du tag Discord, avatar téléversé, majorité) est facultatif,
             et le compte fonctionne sans, à trois limites près : un tournoi peut exiger, pour s&apos;y inscrire, un tag Discord certifié ou un
             compte Battle.net rattaché, et un membre du staff de diffusion ne peut
-            s&apos;inscrire comme caster d&apos;un match sans les deux ; sans tag Discord certifié, enfin,
+            s&apos;inscrire comme caster d&apos;un match sans les deux (un BattleTag tiré de ce compte Battle.net, pas saisi à la main) ; sans tag Discord certifié, enfin,
             aucun message privé Discord de match ne vous est envoyé.
           </p>
           <p id="age-minimum">

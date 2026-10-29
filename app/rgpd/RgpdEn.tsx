@@ -218,7 +218,7 @@ export function RgpdEn({
             you fill in yourself (game usernames entered, certification of the Discord tag, uploaded avatar,
             adulthood) is optional, and the account works without it, with three limits: a tournament may require,
             to register, a certified Discord tag or a linked Battle.net account, and a member of the streaming
-            staff cannot register as the caster of a match without both; lastly, without a certified Discord tag,
+            staff cannot register as the caster of a match without both (a BattleTag taken from that Battle.net account, not typed in by hand); lastly, without a certified Discord tag,
             no match Discord direct message is sent to you.
           </p>
           <p id="age-minimum">
