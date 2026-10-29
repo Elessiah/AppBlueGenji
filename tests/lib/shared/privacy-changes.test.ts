@@ -2231,4 +2231,9 @@ describe("PRIVACY_CHANGES — conditions v8 : arbitre désigné et BattleTag tap
     expect(en).toContain("a hand-typed BattleTag is not enough");
     expect(en).toContain("without being treated as verified");
   });
+
+  it("privacyChanges_termsV8_statesCasterDiscordTagInLaunchWindowFrAndEn", () => {
+    expect(entry.details.join(" ")).toContain("que le tag Discord certifié d'un caster se lit aussi dans la fenêtre de lancement du match, par ses deux équipes, ses autres casters et son arbitre désigné le temps du match");
+    expect(english.details.join(" ")).toContain("that a caster's certified Discord tag can also be read in the match's launch window, by both its teams, its other casters and its assigned referee while the match is being played");
+  });
 });
