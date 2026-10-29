@@ -46,6 +46,7 @@ import { ProfileSection } from "./_components/ProfileSection";
 import { AccountLocaleField } from "./_components/AccountLocaleField";
 import { MatchDmField } from "./_components/MatchDmField";
 import { RecruitmentModalField } from "./_components/RecruitmentModalField";
+import { SelfRolesSection } from "./_components/SelfRolesField";
 import { DiscordVerificationDialog } from "./DiscordVerificationDialog";
 import { useCertifyRequest } from "./useCertifyRequest";
 import { certifiedFromProfileEvent } from "@/lib/shared/discord-certify-prompt";
@@ -727,6 +728,11 @@ export default function ProfilePage() {
    */
   const [battletagNoticeOpen, setBattletagNoticeOpen] = useState(false);
 
+  /** Rôles enregistrés depuis « Mes rôles » : la page garde ce que la route a rendu. */
+  const saveOwnRoles = useCallback((roles: FullProfileResponse["roles"]) => {
+    setData((prev) => (prev ? { ...prev, roles } : prev));
+  }, []);
+
   if (!data) {
     return (
       <section className="ds-block" style={{ color: "var(--ink-soft)" }}>
@@ -740,7 +746,7 @@ export default function ProfilePage() {
   // section absente. La **recherche par ancre**, elle, reste totale — indexer la
   // liste filtrée rendrait `undefined` sur la section conditionnelle, sans que
   // le typage le voie.
-  const sections = visibleProfileSections({ invitations: invitations.length });
+  const sections = visibleProfileSections({ invitations: invitations.length, adminRoles: Number(data.isAdmin) });
   const sectionById = PROFILE_SECTION_BY_ID;
 
   const discordLockedActions = (
@@ -1160,6 +1166,16 @@ export default function ProfilePage() {
           </div>
         </ProfileSection>
       )}
+
+      {/* Un administrateur seulement (la section se tait sinon) : la route
+          refuse tout autre compte sur ses propres rôles (`CANNOT_MODIFY_SELF`). */}
+      <SelfRolesSection
+        section={sectionById.roles}
+        isAdmin={data.isAdmin}
+        userId={data.profile.id}
+        roles={data.roles}
+        onSaved={saveOwnRoles}
+      />
 
       <ProfileSection section={sectionById.statistiques}>
         <div className={s.stats}>

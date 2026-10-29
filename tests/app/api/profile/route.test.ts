@@ -50,6 +50,27 @@ describe("GET /api/profile", () => {
     expect(getFullProfile).toHaveBeenCalledWith({ id: 42 }, 42);
   });
 
+  // ADMIN-SELF-ROLES : « Mes rôles » lit ses propres rôles dans la réponse.
+  it("get_adminSession_returnsOwnRolesAndIsAdmin", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 42, isAdmin: true, roles: ["ADMIN", "CASTER"] }));
+    jest.mocked(getFullProfile).mockResolvedValue(profile);
+
+    const body = (await (await GET()).json()) as { isAdmin: boolean; roles: string[] };
+
+    expect(body.isAdmin).toBe(true);
+    expect(body.roles).toEqual(["ADMIN", "CASTER"]);
+  });
+
+  it("get_nonAdminWithScopedRoles_keepsIsAdminFalseAndNoRoles", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 42, isAdmin: false, roles: ["ARBITRE"] }));
+    jest.mocked(getFullProfile).mockResolvedValue(fullProfileResponse({ isAdmin: false, roles: [] }));
+
+    const body = (await (await GET()).json()) as { isAdmin: boolean; roles: string[] };
+
+    expect(body.isAdmin).toBe(false);
+    expect(body.roles).toEqual([]);
+  });
+
   it("joint le « Ne plus afficher » du recrutement lu avec la session, sans autre lecture", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 42, recruitmentModalOff: true }));
     jest.mocked(getFullProfile).mockResolvedValue(profile);

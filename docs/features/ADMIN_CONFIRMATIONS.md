@@ -87,6 +87,7 @@ sans question ; sinon la modale liste ce que le joueur **gagne** et **perd**,
 rôle par rôle avec son périmètre (`ROLE_DESCRIPTIONS`), et souligne
 l'administration accordée (tous les droits, dont retirer ceux de l'auteur) ou
 retirée (ne restent que les rôles encore cochés). Ton `danger` dès qu'un rôle
-est retiré ou que l'administration est accordée, `primary` sinon. Retirer
-**son propre** accès est impossible : le panneau n'est pas rendu sur sa propre
-fiche et la route refuse en `CANNOT_MODIFY_SELF` — aucune phrase dédiée.
+est retiré ou que l'administration est accordée, `primary` sinon. Le panneau
+n'est pas rendu sur sa propre fiche : un administrateur règle les siens depuis
+« Mon profil » (`SelfRolesField`, même confirmation gagne / perd), sans pouvoir
+se retirer l'administration (`CANNOT_REMOVE_OWN_ADMIN`, `PERMISSION_ROLES.md`).

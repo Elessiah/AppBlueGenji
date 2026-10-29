@@ -280,7 +280,7 @@ export function RgpdEn({
           from your account but kept until their own deadline (section <a href="#signalements">“Reports”</a>), and to
           the #live announcements of a solo tournament, which keep your username in the Discord channel until they
           are deleted on request, as does the moderation alert for such an announcement blocked or flagged by AutoMod (<a href="#retransmission">“Match streaming”</a>);
-          for a staff member, their refereeing actions remain named in the server logs, according to their
+          for a staff member, their refereeing actions and the platform roles they granted or removed remain named in the server logs, according to their
           rotation (<LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>). The web server also keeps,
           for {WEB_ACCESS_LOG_RETENTION_DAYS} days at most, a technical log of each request (
           {WEB_ACCESS_LOG_FIELDS_EN}), for its security (<LocaleLink href="/rgpd/registre#t17">register, T17</LocaleLink>
@@ -860,6 +860,12 @@ export function RgpdEn({
             solo tournament), without naming their author (“the staff”, or “a caster” for broadcasting); this line adds nothing to the server logs, where a dispute
             settled, a result corrected or a confirmation paused keeps its named trace (<LocaleLink href="/rgpd/registre#t05">register,
             T05</LocaleLink>), except, when it could not be composed, the action and the match or tournament number, without its author.
+            When an administrator grants or removes a platform role (administrator, referee, caster, community
+            manager, recruiter), including on their own account, where they cannot remove their own administration, the
+            staff log on Discord notes it without naming anyone; the server logs keep its author, the identifier of the
+            account concerned and the roles saved, on the basis of legitimate interest (administration of the
+            platform), to which the person concerned may object (section{" "}
+            <a href="#exercer-vos-droits">“Exercising your rights”</a>; <LocaleLink href="/rgpd/registre#t05">register, T05</LocaleLink>).
           </p>
           <p id="arbitre-designe">
             <strong>Assigned referee of a match.</strong> A staff member who can referee (refereeing permission,

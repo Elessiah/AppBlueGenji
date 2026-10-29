@@ -215,6 +215,16 @@ export const PROFILE_FIELD_ERRORS: FieldErrorMap<ProfileField> = {
 };
 
 /**
+ * Ses propres rôles de plateforme (`/profil`, ADMIN-SELF-ROLES) : le refus de
+ * se retirer l'administration désigne la case « Administrateur ».
+ */
+export type SelfRolesField = "admin";
+
+export const SELF_ROLES_FIELD_ERRORS: FieldErrorMap<SelfRolesField> = {
+  CANNOT_REMOVE_OWN_ADMIN: "admin",
+};
+
+/**
  * Connexion par code Discord (`/connexion`). Le pseudo de première connexion
  * n'y figure pas : la route n'en refuse aucun, elle départage elle-même un
  * pseudo déjà pris.

@@ -36,6 +36,26 @@ const THEME_COLORS: Record<CocheTheme, { base: string; rgb: string }> = {
   equipe: { base: "#a78bfa", rgb: "167,139,250" },
 };
 
+/** Les teintes de la pastille, selon qu'elle est cochée et qu'elle accepte le geste. */
+export function pillColors(
+  rgbColor: string,
+  checked: boolean,
+  inert: boolean,
+): { pillBorder: string; markBorder: string; labelColor: string } {
+  if (inert) {
+    return {
+      pillBorder: checked ? `rgba(${rgbColor},0.22)` : "rgba(255,255,255,0.12)",
+      markBorder: checked ? `rgba(${rgbColor},0.45)` : "rgba(255,255,255,0.2)",
+      labelColor: "var(--ink-mute)",
+    };
+  }
+  return {
+    pillBorder: checked ? `rgba(${rgbColor},0.4)` : "var(--line)",
+    markBorder: checked ? `rgba(${rgbColor},0.8)` : "rgba(255,255,255,0.2)",
+    labelColor: checked ? "var(--ink)" : "var(--ink-soft)",
+  };
+}
+
 export function Coche({
   label,
   checked,
@@ -49,8 +69,12 @@ export function Coche({
   // `rgba(#ff0000,0.28)` — déclaration invalide, donc anneau de focus muet. Il
   // n'avait aucun appelant : il est retiré plutôt que rafistolé.
   const { base: color, rgb: rgbColor } = THEME_COLORS[theme];
-  const pillBorder = checked ? `rgba(${rgbColor},0.4)` : "var(--line)";
-  const markBorder = checked ? `rgba(${rgbColor},0.8)` : "rgba(255,255,255,0.2)";
+  // `aria-disabled` (et non `disabled`, refusé plus haut) garde la case
+  // focalisable — un lecteur d'écran l'entend, sa raison avec — mais l'appelant
+  // ignore alors le geste : la pastille doit le **dire**, en couleurs et en
+  // curseur, jamais en `opacity` (`globals.css`, cases désactivées).
+  const inert = props["aria-disabled"] === true || props["aria-disabled"] === "true";
+  const { pillBorder, markBorder, labelColor } = pillColors(rgbColor, checked, inert);
 
   return (
     // L'anneau de focus se pose en CSS (`.coche-input:focus-visible ~ .coche-pill`,
@@ -63,7 +87,7 @@ export function Coche({
         {
           display: "inline-flex",
           position: "relative",
-          cursor: "pointer",
+          cursor: inert ? "not-allowed" : "pointer",
           "--coche-rgb": rgbColor,
         } as CSSProperties
       }
@@ -125,7 +149,7 @@ export function Coche({
         >
           {checked && "✓"}
         </span>
-        <span style={{ color: checked ? "var(--ink)" : "var(--ink-soft)" }}>
+        <span style={{ color: labelColor }}>
           {label}
         </span>
       </span>

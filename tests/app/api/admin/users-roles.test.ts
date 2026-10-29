@@ -74,7 +74,7 @@ describe("POST /api/admin/users/[id]/roles", () => {
     jest.mocked(service.setUserRoles).mockResolvedValue(["ARBITRE"]);
     const res = await POST(jsonReq({ roles: ["ARBITRE"] }), params("7"));
     expect(res.status).toBe(200);
-    expect(service.setUserRoles).toHaveBeenCalledWith(7, ["ARBITRE"]);
+    expect(service.setUserRoles).toHaveBeenCalledWith(7, ["ARBITRE"], 4);
   });
 
   it("rejects invalid ids with 400", async () => {
@@ -84,12 +84,93 @@ describe("POST /api/admin/users/[id]/roles", () => {
     expect(await res.json()).toEqual({ error: "INVALID_ID" });
   });
 
-  it("prevents an admin from modifying their own roles", async () => {
+  // ADMIN-SELF-ROLES : un administrateur règle ses rôles cumulables, jamais son ADMIN.
+  it("post_adminOnSelfWithoutAdmin_returns400CannotRemoveOwnAdmin", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
-    const res = await POST(jsonReq({ roles: [] }), params("1"));
+    const res = await POST(jsonReq({ roles: ["ARBITRE"] }), params("1"));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "CANNOT_REMOVE_OWN_ADMIN" });
+    expect(service.setOwnPlatformRoles).not.toHaveBeenCalled();
+    expect(service.setUserRoles).not.toHaveBeenCalled();
+    expect(service.publishRolesChange).not.toHaveBeenCalled();
+  });
+
+  it("post_adminOnSelfKeepingAdmin_returns200AndUsesOwnPath", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.setOwnPlatformRoles).mockResolvedValue(["ADMIN", "CASTER"]);
+
+    const res = await POST(jsonReq({ roles: ["ADMIN", "CASTER"] }), params("1"));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ roles: ["ADMIN", "CASTER"] });
+    expect(service.setOwnPlatformRoles).toHaveBeenCalledWith(1, ["ADMIN", "CASTER"]);
+    expect(service.setUserRoles).not.toHaveBeenCalled();
+    expect(service.publishRolesChange).toHaveBeenCalledWith({ id: 1, pseudo: admin.pseudo }, 1, ["ADMIN", "CASTER"]);
+  });
+
+  it("post_rolesOnlyAdminWithoutColumnOnSelf_returns400CannotModifySelf", async () => {
+    const rolesAdmin = authUser({ id: 4, isAdmin: false, roles: ["ADMIN"] });
+    jest.mocked(getCurrentUser).mockResolvedValue(rolesAdmin);
+
+    const res = await POST(jsonReq({ roles: ["ADMIN"] }), params("4"));
+
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "CANNOT_MODIFY_SELF" });
-    expect(service.setUserRoles).not.toHaveBeenCalled();
+    expect(service.setOwnPlatformRoles).not.toHaveBeenCalled();
+  });
+
+  it("post_selfDemotedDuringSave_returns403Forbidden", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.setOwnPlatformRoles).mockRejectedValue(new Error("NOT_ADMIN"));
+
+    const res = await POST(jsonReq({ roles: ["ADMIN"] }), params("1"));
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: "FORBIDDEN" });
+    expect(service.publishRolesChange).not.toHaveBeenCalled();
+  });
+
+  it("post_otherAccountWhileActorDemoted_returns403ForbiddenWithoutAudit", async () => {
+    // Deux administrateurs qui se retirent l'administration au même instant :
+    // l'écriture du second ne trouve plus d'auteur administrateur.
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.setUserRoles).mockRejectedValue(new Error("NOT_ADMIN"));
+
+    const res = await POST(jsonReq({ roles: [] }), params("7"));
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: "FORBIDDEN" });
+    expect(service.publishRolesChange).not.toHaveBeenCalled();
+  });
+
+  it("post_selfInvalidPayload_returns400InvalidPayload", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+
+    const res = await POST(jsonReq({ roles: ["ADMIN", "NOPE"] }), params("1"));
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "INVALID_PAYLOAD" });
+    expect(service.setOwnPlatformRoles).not.toHaveBeenCalled();
+  });
+
+  it("post_otherAccountSaved_publishesAuditWithActorAndTarget", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.setUserRoles).mockResolvedValue(["RECRUTEUR"]);
+
+    await POST(jsonReq({ roles: ["RECRUTEUR"] }), params("7"));
+
+    expect(service.publishRolesChange).toHaveBeenCalledWith({ id: 1, pseudo: admin.pseudo }, 7, ["RECRUTEUR"]);
+  });
+
+  it("post_serviceThrowsUnknownError_returns500WithGenericCode", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.setUserRoles).mockRejectedValue(new Error("ER_LOCK_DEADLOCK: Deadlock found"));
+
+    const res = await POST(jsonReq({ roles: ["ARBITRE"] }), params("7"));
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "ROLES_UPDATE_FAILED" });
+    expect(service.publishRolesChange).not.toHaveBeenCalled();
   });
 
   it("rejects a non-array roles payload with 400", async () => {
@@ -115,7 +196,7 @@ describe("POST /api/admin/users/[id]/roles", () => {
     const res = await POST(jsonReq({ roles: ["ARBITRE", "RECRUTEUR"] }), params("7"));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ roles: ["ARBITRE", "RECRUTEUR"] });
-    expect(service.setUserRoles).toHaveBeenCalledWith(7, ["ARBITRE", "RECRUTEUR"]);
+    expect(service.setUserRoles).toHaveBeenCalledWith(7, ["ARBITRE", "RECRUTEUR"], admin.id);
   });
 
   it("accepts an empty roles array (revokes all)", async () => {
@@ -124,7 +205,7 @@ describe("POST /api/admin/users/[id]/roles", () => {
 
     const res = await POST(jsonReq({ roles: [] }), params("7"));
     expect(res.status).toBe(200);
-    expect(service.setUserRoles).toHaveBeenCalledWith(7, []);
+    expect(service.setUserRoles).toHaveBeenCalledWith(7, [], admin.id);
   });
 
   it("returns 404 when the target user does not exist", async () => {

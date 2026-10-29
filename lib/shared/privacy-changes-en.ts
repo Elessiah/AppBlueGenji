@@ -664,6 +664,17 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "Your referee “Ready” is no longer sent to the whole audience of the tournament: only the parties to the match and the referees read it, in the “Contacts” and launch windows. The staff log on Discord still names no one.",
     ],
   },
+  "2026-10-roles-de-plateforme-journal-du-staff": {
+    title: "Platform roles: noted in the staff log",
+    linkLabels: ["Read entry T05 of the register"],
+    summary:
+      "When an administrator grants or removes a platform role (administrator, referee, caster, community manager, recruiter) — including on their own account, from “My profile” — the action is now noted in the staff log, without naming anyone on Discord.",
+    details: [
+      "On Discord, the private staff log only says that an account's roles were changed by the staff: neither your username, nor the administrator's, nor the roles.",
+      "In the server logs, the line keeps the username and identifier of the administrator who did it, the identifier of the account concerned and the roles saved, according to their automatic rotation.",
+      "An administrator can now set their own roles from “My profile”, but never remove their own administration there: only another administrator can.",
+    ],
+  },
 };
 
 /**

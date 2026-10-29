@@ -246,6 +246,29 @@
   margin-top: 14px;
 }
 
+/* « Mes rôles » (ADMIN-SELF-ROLES) : une case par rôle, sa portée dessous.
+   Le `fieldset` perd le cadre du navigateur — le titre de la section en tient
+   lieu. */
+.rolesList {
+  border: 0;
+  margin: 10px 0 0;
+  padding: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.roleItem .hint {
+  margin-top: 4px;
+}
+
+.rolesActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
 /* L'aide d'un champ s'adresse au lecteur : elle mérite mieux qu'un gris de
    mention légale. 12 px et `--ink-soft`, contre 11 px et `--ink-quiet` partout
    avant. */

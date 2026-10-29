@@ -390,7 +390,7 @@ function RgpdFr({
           <a href="#signalements">« Signalements »</a>), et des annonces #live d&apos;un tournoi
           individuel, qui gardent votre pseudo dans le salon Discord jusqu&apos;à leur suppression sur
           demande, comme l&apos;alerte de modération d&apos;une telle annonce bloquée ou signalée par AutoMod (<a href="#retransmission">« Retransmission des matchs »</a>) ; pour un membre du staff, ses gestes
-          d&apos;arbitrage restent nommés dans les journaux du serveur, selon leur rotation
+          d&apos;arbitrage et les rôles de plateforme qu&apos;il a attribués ou retirés restent nommés dans les journaux du serveur, selon leur rotation
           (<Link href="/rgpd/registre#t05">registre, T05</Link>). Le serveur web
           garde en outre, {WEB_ACCESS_LOG_RETENTION_DAYS} jours au plus, un journal technique de
           chaque requête ({WEB_ACCESS_LOG_FIELDS}), pour sa sécurité (<Link href="/rgpd/registre#t17">registre,
@@ -1043,6 +1043,12 @@ function RgpdFr({
             « un caster » pour la diffusion) ; cette ligne n&apos;ajoute rien aux journaux du serveur, où un litige tranché,
             un résultat corrigé ou une validation suspendue garde sa trace nominative (<Link href="/rgpd/registre#t05">registre,
             T05</Link>), sauf, quand elle n&apos;a pu être rédigée, le geste et le numéro du match ou du tournoi, sans auteur.
+            Quand un administrateur attribue ou retire un rôle de plateforme (administrateur, arbitre, caster, community
+            manager, recruteur), y compris sur son propre compte, où il ne peut pas se retirer l&apos;administration, le
+            journal du staff sur Discord le note sans nommer personne ; les journaux du serveur gardent son auteur,
+            l&apos;identifiant du compte visé et les rôles enregistrés, au titre de l&apos;intérêt légitime
+            (administration de la plateforme), auquel la personne concernée peut s&apos;opposer (section{" "}
+            <a href="#exercer-vos-droits">« Exercer vos droits »</a> ; <Link href="/rgpd/registre#t05">registre, T05</Link>).
           </p>
           <p id="arbitre-designe">
             <strong>Arbitre désigné d&apos;un match.</strong> Un membre du staff qui peut arbitrer (permission
