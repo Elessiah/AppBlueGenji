@@ -3,6 +3,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { FieldErrorText } from "@/components/ui/field-error-text";
+import { useOptionalToast } from "@/components/ui/toast";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import {
   LIVE_PLATFORMS,
@@ -71,6 +72,15 @@ export function CastClaimDialog({
   const fieldErrors = useFieldErrors(CAST_FIELD_ERRORS, { url: urlId });
   const fieldsetRef = useRef<HTMLFieldSetElement>(null);
   const gone = choice === null;
+  // Le refus se notifie aussi en bas à gauche (règle des erreurs) : le texte
+  // de la modale explique seulement pourquoi « Caster ce match » est désarmé.
+  const toast = useOptionalToast();
+  const goneMessage = t("cardActions.claimDialog.gone");
+  const notifyGone = useRef({ toast, goneMessage });
+  notifyGone.current = { toast, goneMessage };
+  useEffect(() => {
+    if (gone) notifyGone.current.toast?.showError(notifyGone.current.goneMessage);
+  }, [gone]);
   useEffect(() => {
     // Le bouton radio qui avait le focus a été démonté : le focus serait tombé
     // sur <body>, derrière la modale. Un focus ailleurs (« Annuler ») reste.

@@ -384,7 +384,7 @@ qu'il tient, son « Prêt »). Code : `lib/server/tournaments/match-casters.ts`.
   le stream d'un caster que la lecture tait (retiré d'office avant le lancement)
   n'est pas proposé.
   Un stream choisi qui disparaît pendant que la fenêtre est ouverte n'est pas
-  remplacé par un autre : plus rien n'est coché, l'envoi est désarmé, une annonce
+  remplacé par un autre : plus rien n'est coché, l'envoi est désarmé, un toast d'erreur (règle des erreurs) et une annonce
   (`aria-live`) le dit et le focus passe au premier choix restant. Le focus
   d'ouverture va à « Annuler » (un Entrée réflexe sur une radio n'inscrit
   personne) ; les casters d'un stream se joignent par `Intl.ListFormat`. Inscrit,

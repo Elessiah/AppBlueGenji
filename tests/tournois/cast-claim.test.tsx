@@ -246,6 +246,16 @@ describe("CastClaimDialog — un stream choisi qui disparaît", () => {
     ]);
   });
 
+  it("le stream disparu se notifie aussi par un toast, sans exiger le ToastProvider", () => {
+    expectContains(source, [
+      'import { useOptionalToast } from "@/components/ui/toast";',
+      "if (gone) notifyGone.current.toast?.showError(notifyGone.current.goneMessage);",
+    ]);
+    expect(source).not.toContain("= useToast(");
+    // Sans fournisseur de toasts, la fenêtre se rend quand même (renderDialog n'en monte aucun).
+    expect(renderDialog("fr")).toContain("Alpha contre Bravo");
+  });
+
   it("oublie le choix disparu : un stream qui revient ne se recoche pas sans nouveau choix", () => {
     expect(source).toContain('if (choice === null && choiceKey !== "") setChoiceKey("");');
   });
