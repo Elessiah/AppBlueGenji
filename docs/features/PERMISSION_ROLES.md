@@ -48,8 +48,43 @@ s'additionnent.
 - **Résolution** : `resolveRoles(isAdmin, platform_roles_json)` (dans
   `lib/server/auth.ts`) reconstitue la liste complète ; elle est exposée sur
   `AuthUser.roles` et via `GET /api/auth/me`.
-- **Attribution** : `setUserRoles(userId, roles)` remplace l'ensemble des rôles.
-  Un administrateur ne peut pas modifier ses propres rôles (anti-auto-verrouillage).
+- **Attribution** : `setUserRoles(userId, roles)` remplace l'ensemble des rôles
+  d'un **autre** compte.
+- **Ses propres rôles** (ADMIN-SELF-ROLES) : `setOwnPlatformRoles(adminId, roles)`
+  — voir § « Un administrateur règle ses propres rôles ».
+- **Journal du staff** : tout enregistrement réussi passe par
+  `publishRolesChange` (`publishStaffAction`) — sur Discord une ligne sans
+  personne nommée (`ROLES_CHANGE_DISCORD_LINE`), dans pm2 l'auteur, le compte
+  visé par son identifiant (« son propre compte » quand c'est le sien) et les
+  rôles enregistrés (`rolesChangeAuditLine`). Un refus ne laisse aucune trace.
+
+## Un administrateur règle ses propres rôles
+
+`POST /api/admin/users/[id]/roles` avec `id` = l'appelant :
+
+- ✅ un **administrateur** (colonne `is_admin`) règle ses rôles cumulables
+  (`ARBITRE`, `CASTER`, `COMMUNITY_MANAGER`, `RECRUTEUR`) — ils s'affichent en
+  titres sur sa fiche (`displayRoles`) et lui restent si un autre administrateur
+  lui retire l'administration ;
+- ❌ il ne retire **jamais** son propre `ADMIN` : la sélection doit le contenir,
+  sinon `400 CANNOT_REMOVE_OWN_ADMIN` (rattaché à la case « Administrateur » par
+  `SELF_ROLES_FIELD_ERRORS`). Se retirer l'administration reste le geste d'un
+  autre administrateur — sans quoi le dernier fermerait la plateforme ;
+- ❌ tout autre compte reste refusé : `403` sans la permission `roles`, et
+  `400 CANNOT_MODIFY_SELF` pour un `ADMIN` porté par le seul cumul sans la
+  colonne `is_admin` (la colonne est ce que l'écriture conditionne) ;
+- **course** avec une rétrogradation : l'écriture ne touche que
+  `platform_roles_json`, sous `WHERE … AND is_admin = 1`. Un autre
+  administrateur qui retire l'administration entre la lecture de la session et
+  l'écriture fait échouer celle-ci (`NOT_ADMIN` → `403 FORBIDDEN`) au lieu de
+  voir sa décision annulée par un `is_admin = 1` réécrit.
+
+L'écran : section « Mes rôles » de `/profil` (`SelfRolesField`, FR + EN,
+espace `profile.platformRoles`), rendue pour un administrateur seulement
+(`requires: "adminRoles"` dans `profile-sections.ts`). La case
+« Administrateur » reste cochée et focalisable (`aria-disabled`), avec son
+« i » ; tout écart passe par une confirmation (gagne / perd), puis
+`router.refresh()`.
 
 ## Contrôle d'accès dans une route
 
@@ -75,7 +110,8 @@ const canPreview = canAny(user, ["tournaments", "casting"]);
 
 La gestion des rôles se fait depuis la fiche joueur (`/joueurs/[id]`), section
 « Rôles & permissions », visible uniquement par un administrateur consultant le
-profil d'un autre utilisateur. Les cases à cocher sont cumulables et
+profil d'un autre utilisateur ; ses propres rôles, un administrateur les règle
+depuis « Mon profil » (§ ci-dessus). Les cases à cocher sont cumulables et
 enregistrées via `POST /api/admin/users/[id]/roles`.
 
 Les rôles sont par ailleurs affichés publiquement comme badges (titres staff) en

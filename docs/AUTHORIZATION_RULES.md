@@ -323,7 +323,9 @@ modifier le profil d'autrui.
   pouvoir y mettre à la place (§6.1).
 - ❌ Se donner des rôles : `POST /api/admin/users/[id]/roles` refuse en
   `400 CANNOT_MODIFY_SELF` quand la cible est l'appelant. Un compte sans `ADMIN`
-  est de toute façon refusé en `403` avant d'y arriver.
+  est de toute façon refusé en `403` avant d'y arriver. Seule exception : un
+  administrateur règle ses propres rôles cumulables, sans jamais se retirer
+  `ADMIN` (§7).
 - ❌ Lire les champs qu'un autre a masqués (§2.3).
 
 ### 2.3 Informations privées d'un profil
@@ -1067,8 +1069,12 @@ un « interdit » confirmerait son existence) et le contestent (`POST /api/repor
 
 - ❌ un non-admin est refusé en `403`, quel que soit son cumul de rôles : aucun
   chemin ne permet de s'accorder ou d'accorder un privilège qu'on n'a pas ;
-- ❌ un administrateur ne peut pas modifier **ses propres** rôles
-  (`CANNOT_MODIFY_SELF`, 400) — garde anti-auto-verrouillage ;
+- ✅ un administrateur (colonne `is_admin`) règle **ses propres** rôles
+  cumulables depuis « Mon profil », mais ne se retire jamais `ADMIN`
+  (`CANNOT_REMOVE_OWN_ADMIN`, 400) — garde anti-auto-verrouillage ; l'écriture
+  ne touche pas `is_admin` et échoue si l'administration lui a été retirée entre
+  temps (`403`) ; tout autre compte reste refusé sur lui-même
+  (`CANNOT_MODIFY_SELF`, 400) — `PERMISSION_ROLES.md` ;
 - ✅ le corps est validé rôle par rôle (`isPlatformRole`) puis normalisé
   (`sanitizePlatformRoles`) : une valeur inconnue est écartée, jamais persistée ;
 - l'appel **remplace** l'ensemble des rôles de la cible ; `ADMIN` est stocké dans

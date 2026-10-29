@@ -80,7 +80,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `SAFE_LOGIN_REDIRECT.md` — Destination d'après connexion : chemin du site seulement.
 - `SECURITY_HEADERS_CSP.md` — En-têtes de sécurité et CSP en application (page cassée : lire `/api/csp-report`).
 - `DEV_AUTH_BYPASS.md` — `DEV_AUTH_USER_ID`, en développement seulement.
-- `PERMISSION_ROLES.md` — Rôles de plateforme cumulables et permissions `can(user, …)`.
+- `PERMISSION_ROLES.md` — Rôles de plateforme cumulables et permissions `can(user, …)` ; un administrateur règle les siens depuis « Mon profil », sans se retirer `ADMIN`.
 - `PROFILE_SCREEN.md` — Écran « Mon profil ».
 - `ACCOUNT_MENU.md` — Menu du compte, hauteur des barres de navigation.
 - `ACCOUNT_DELETION.md` — Suppression d'un compte : effacement ou anonymisation.
