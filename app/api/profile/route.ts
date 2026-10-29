@@ -19,10 +19,14 @@ const ACCOUNT_DELETION_REFUSALS: ReadonlySet<string> = new Set([
 /**
  * Ce que « Mon profil » lit de la session, sans requête de plus : le « Ne
  * plus afficher » de la modale de recrutement (`bg_users.recruitment_modal_off`,
- * déjà lu par `getCurrentUser`).
+ * déjà lu par `getCurrentUser`), et, pour un administrateur, ses propres rôles
+ * (ADMIN-SELF-ROLES, section « Mes rôles »). `getFullProfile` ne rend `isAdmin`
+ * et `roles` qu'à un lecteur administrateur d'une **autre** fiche ; un compte
+ * sans `is_admin` garde `false` et `[]` — la section ne lui est pas rendue.
  */
 function withSessionPreferences(profile: FullProfileResponse, user: AuthUser): FullProfileResponse {
-  return { ...profile, recruitmentModalOff: user.recruitmentModalOff };
+  const ownRoles = user.isAdmin ? { isAdmin: true, roles: user.roles } : {};
+  return { ...profile, ...ownRoles, recruitmentModalOff: user.recruitmentModalOff };
 }
 
 export async function GET() {
