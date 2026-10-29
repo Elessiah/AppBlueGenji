@@ -295,12 +295,18 @@ export function useMatchContacts(
     setReadKey((key) => key + 1);
   };
   useEffect(() => {
-    if (!launch) return;
+    if (!launch) {
+      // Lecture coupée : l'empreinte suit la carte, sans quoi la lecture
+      // rouverte comparerait la carte du moment à celle d'avant la coupure et
+      // relirait aussitôt les contacts (seconde requête, quota entamé).
+      if (!enabled) previousCard.current = card;
+      return;
+    }
     if (rereadOnCardChange(previousCard.current, card, launch)) rereadNow();
     previousCard.current = card;
     // L'empreinte suit les champs de la carte, pas l'identité de l'objet.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cardKey, launch]);
+  }, [cardKey, launch, enabled]);
 
   // Relecture échouée : quelques nouvelles tentatives espacées, jamais avant
   // l'attente qu'un refus de quota demande.
