@@ -33,14 +33,20 @@ rendu.
   sinon (inscriptions ouvertes ou closes, à venir, terminé).
 - **Mini-arbre** (`loadMiniBracket`, `lib/server/tournaments/bracket-loader.ts`) —
   les matchs de la **manche en cours** du tableau principal
-  (`pickMiniBracketMatches` : première phase puis première manche qui gardent
-  un match à jouer, sinon les dernières ; `UPPER` d'abord ; quatre matchs au
-  plus) — et non plus toujours la manche 1, qui faisait passer les premiers
-  résultats d'un tournoi Suisse ou multi-phases pour son plateau. La place vide
-  d'une exemption (`is_bye`) se lit « Exempt » / « Bye » (`board.bye`), jamais
-  « À venir ». Noms par `shownEntrantName` (`lib/shared/visible-text.ts`),
-  règle partagée avec le direct et le bandeau. Cache de 15 s sous le préfixe
-  `landing:` : vidé à chaque écriture de tournoi, à une dissolution et à une
-  suppression de compte (`invalidateLandingTeamViews`).
+  (`pickMiniBracketMatches` : première phase — dans l'ordre
+  `bg_tournament_phases.position` — puis premier tableau (`UPPER`, `LOWER`,
+  `GRAND`, petite finale) et première manche qui gardent un match à jouer,
+  sinon les derniers ; quatre matchs au plus, ceux à jouer d'abord) — et non
+  plus toujours la manche 1 de l'`UPPER`, qui faisait passer les premiers
+  résultats d'un tournoi Suisse ou multi-phases, ou la finale du haut d'une
+  double élimination à sa grande finale, pour son plateau. La place vide d'une
+  exemption se lit « Exempt » / « Bye » (`board.bye`), jamais « À venir » :
+  `is_bye` (Survie) ou place vide d'un match **clos** (les arbres à élimination
+  ferment l'exemption sans poser `is_bye`, `byes.ts`). Noms par
+  `shownEntrantName` (`lib/shared/visible-text.ts`), règle partagée avec le
+  direct et le bandeau. Cache de 15 s sous le préfixe `landing:` : vidé à
+  chaque écriture de tournoi, à une dissolution, à un renommage ou un
+  changement de logo d'équipe et à une suppression de compte
+  (`invalidateLandingTeamViews`).
 - **Horloge** — une seule lecture de `Date.now()` par rendu de la section, pour
   que deux cartes ne se contredisent pas sur une échéance.

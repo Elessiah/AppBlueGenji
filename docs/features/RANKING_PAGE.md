@@ -176,9 +176,11 @@ tranchent, comme sur la page.
   toutes les équipes, **mutualisé** avec le leaderboard de l'accueil (entrée
   `landing:leaderboard:<jeu>`) : la page, rendue à chaque visite, ne refait plus
   ses deux rejeux à chaque rendu. L'entrée est vidée à chaque score avec le
-  classement du site (`invalidateTeamRanking`), à chaque écriture de tournoi et
-  à une dissolution — la page reste à jour ; une erreur n'est jamais mise en
-  cache ; la page en tire « il en reste » et la présence d'un
+  classement du site (`invalidateTeamRanking`), à chaque écriture de tournoi, à
+  une dissolution, à un renommage, à un changement de logo et à un retrait ou
+  masquage de logo par la modération (`invalidateLandingTeamViews`,
+  `teams/identity.ts`, `logo-quarantine.ts`) — la page reste à jour ; une
+  erreur n'est jamais mise en cache ; la page en tire « il en reste » et la présence d'un
   nul (colonne « N » stable d'une page à l'autre, `anyDraws`), puis ne rend
   que les `n` premières : le rendu et le poids de la page sont bornés, et le
   rang reste celui du classement complet.

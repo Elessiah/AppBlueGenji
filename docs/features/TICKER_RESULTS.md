@@ -68,7 +68,9 @@ l'actualité est écartée. Champions : **une** ligne par tournoi (la plus ancie
 inscription au rang 1) — deux inscriptions au rang 1 occupaient sinon les deux
 places et le champion suivant disparaissait. Inscriptions : au plus autant de
 tournois que le bandeau montre d'entrées (`TICKER_MAX_ITEMS`). Les quatre
-lectures partent ensemble sur **une seule** connexion du pool. L'issue de chaque camp et les noms nettoyés se calculent **une fois**, au
+lectures partent ensemble sur **une seule** connexion du pool, rendue au pool
+une fois **toutes** terminées (`Promise.allSettled`) : un échec ne la rend pas
+pendant que les autres y attendent encore. L'issue de chaque camp et les noms nettoyés se calculent **une fois**, au
 chargement mis en cache (`loadLandingTicker`) ; la langue ne rédige que les
 textes à la sortie (`formatTickerEntry`). Les identifiants de camp passent par
 `Number()` comme ceux du vainqueur et du forfait. Un champion dont le nom ne se
