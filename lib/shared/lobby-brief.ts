@@ -25,7 +25,7 @@ import type { Locale } from "./locales";
 import { battletagRelevantFor } from "./certification-prompt";
 import type { RefereeDecision } from "./match-referee";
 import { pushRoundLabel } from "./push-messages";
-import type { NextBanRule, NextPickRule, ResolvedMapSlot } from "./round-maps";
+import type { NextBanRule, ResolvedMapSlot } from "./round-maps";
 import type { TournamentGame } from "./types";
 
 /** Ce que le brief dit d'un match, vu d'une des deux engagées. */
@@ -52,7 +52,6 @@ export type LobbyBriefSide = {
   /** Cartes de la manche (`ROUND_MAPS.md`), vide sans réglage : on garde alors la seule première carte. */
   maps: ResolvedMapSlot[];
   nextBan: NextBanRule;
-  nextPick: NextPickRule;
   /** Au moins un caster inscrit (et éligible) : rappel du tri par rôle. */
   cast: boolean;
   decision: RefereeDecision;
@@ -133,7 +132,8 @@ const DM_TEXT: Readonly<
       nextBans: Readonly<Record<NextBanRule, string>>;
       maps: string;
       toChoose: (pool: string) => string;
-      loserPick: string;
+      /** Fin d'une ligne des cartes coupée (`MAPS_LINE_MAX`). */
+      moreMaps: string;
       cast: string;
       link: string;
       linkNoBattletag: string;
@@ -157,7 +157,7 @@ const DM_TEXT: Readonly<
     },
     maps: "Cartes : ",
     toChoose: (pool) => `à choisir parmi ${pool}`,
-    loserPick: " (choisie par l'équipe qui a perdu la carte précédente)",
+    moreMaps: "… (suite sur la page du match)",
     cast: "Match casté : trie les joueurs par rôle dans le salon.",
     link: "BattleTags à inviter et réglages à jour : ",
     linkNoBattletag: "Réglages à jour : ",
@@ -176,23 +176,36 @@ const DM_TEXT: Readonly<
     },
     maps: "Maps: ",
     toChoose: (pool) => `to choose from ${pool}`,
-    loserPick: " (picked by the team that lost the previous map)",
+    moreMaps: "… (more on the match page)",
     cast: "Cast match: sort the players by role in the lobby.",
     link: "BattleTags to invite and up-to-date settings: ",
     linkNoBattletag: "Up-to-date settings: ",
   },
 };
 
+/**
+ * Longueur au plus de la ligne des cartes : 9 créneaux de 20 cartes de 64
+ * caractères dépasseraient les 2 000 caractères d'un message Discord, qui ne
+ * serait pas remis. Au-delà, la ligne s'arrête à un créneau entier et renvoie
+ * à la page du match (le lien suit).
+ */
+export const MAPS_LINE_MAX = 700;
+
 /** Les cartes de la manche, dans l'ordre : « 1. « Ilios » · 2. à choisir parmi … ». */
 function mapsLine(side: LobbyBriefSide, locale: Locale, quote: (name: string) => string): string {
   const text = DM_TEXT[locale];
-  return side.maps
-    .map((slot) => {
-      const shown = slot.map === null ? text.toChoose(slot.candidates.map(quote).join(", ")) : quote(slot.map);
-      const picker = slot.kind === "POOL" && slot.number > 1 && side.nextPick === "LOSER" ? text.loserPick : "";
-      return `${slot.number}. ${shown}${picker}`;
-    })
-    .join(" · ");
+  const parts = side.maps.map((slot) => {
+    const shown = slot.map === null ? text.toChoose(slot.candidates.map(quote).join(", ")) : quote(slot.map);
+    return `${slot.number}. ${shown}`;
+  });
+  let line = "";
+  for (const part of parts) {
+    const next = line === "" ? part : `${line} · ${part}`;
+    // Coupé à un créneau entier : jamais au milieu d'un nom cité.
+    if (next.length > MAPS_LINE_MAX) return line === "" ? text.moreMaps : `${line} · ${text.moreMaps}`;
+    line = next;
+  }
+  return line;
 }
 
 /** Ligne des cartes : celles du round s'il est réglé, sinon la première carte. */

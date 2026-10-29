@@ -100,6 +100,27 @@ export function slotsDirty(
 }
 
 /**
+ * Créneaux à garder quand l'instantané change pendant que la fenêtre est
+ * ouverte (un autre membre du staff, ou son propre enregistrement) : la saisie
+ * suit le réglage du serveur tant qu'elle n'a pas été modifiée (`before`), ou
+ * quand elle vaut déjà le nouveau réglage (`after`, son propre envoi : les
+ * créneaux vides écartés et renumérotés comme au serveur). Une saisie en cours
+ * n'est jamais écrasée ; rien ne bouge si le réglage de ce tour n'a pas changé.
+ */
+export function resyncSlots(
+  current: readonly (readonly string[])[],
+  before: readonly RoundMapConfig[],
+  after: readonly RoundMapConfig[],
+  round: RoundKey | null,
+): readonly (readonly string[])[] {
+  const savedBefore = round ? (roundMapsOf(before, round)?.slots ?? []) : [];
+  const savedAfter = round ? (roundMapsOf(after, round)?.slots ?? []) : [];
+  if (sameSlots(savedBefore, savedAfter)) return current;
+  if (slotsDirty(current, before, round) && slotsDirty(current, after, round)) return current;
+  return slotsToEdit(after, round);
+}
+
+/**
  * Tours dont le réglage serait **remplacé** par une copie de `slots` vers
  * `targets` : ceux qui en portent déjà un, différent. Rien à confirmer quand
  * la liste est vide.

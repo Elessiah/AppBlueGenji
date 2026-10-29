@@ -730,6 +730,9 @@ export const LAUNCH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   NOT_MAP_PICKER: "Seuls l'arbitrage et, en autogestion, les équipes du match choisissent la carte.",
   ROUND_MAPS_SET:
     "Les cartes de ce tour sont réglées pour tout le tour : réinitialise le tour pour saisir la carte match par match.",
+  TOURNAMENT_NOT_FOUND: "Tournoi introuvable.",
+  CONCURRENT_UPDATE_RETRY: "Une autre modification du tournoi est passée au même moment : rien n'a été enregistré. Réessaie.",
+  TOO_MANY_REQUESTS: "Trop de requêtes coup sur coup. Patiente quelques minutes.",
 };
 
 /** Message français d'un refus du lancement. */

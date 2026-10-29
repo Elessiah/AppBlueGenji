@@ -23,6 +23,7 @@ import {
   NEXT_PICK_RULES,
   ROUND_BRACKETS,
   ROUND_MAPS_BULK_MAX,
+  ROUND_NUMBER_MAX,
   type FirstBanRule,
   type NextBanRule,
   type NextPickRule,
@@ -30,21 +31,25 @@ import {
   type RoundMapConfig,
   type TournamentMapRules,
 } from "@/lib/shared/round-maps";
-import { discardBotLogs, flushBotLogs } from "./bot-logs";
 import { retryOnDeadlock } from "./deadlock-retry";
 import { resolveMatchParty } from "./match-launch";
 import { publishMatchUpdatedEvent } from "./notifications";
 import { queueRefereeChange } from "./referee-notices";
+import { loadRoundSlots } from "./round-map-slots";
 import { queueRoundMapsNotice, scheduleRoundMapsNotice } from "./round-maps-notice";
+import { inTransaction, transact } from "./transaction";
 
 /** Une manche : phase (0 sans phases), tableau, numéro (`lib/shared/round-maps.ts`). */
 export type { RoundKey };
 
-type RulesRow = RowDataPacket & {
-  first_ban_rule: string | null;
-  next_ban_rule: string | null;
-  next_pick_rule: string | null;
+/** Colonnes des règles de ban sur la ligne du tournoi. */
+export type MapRulesColumns = {
+  first_ban_rule?: string | null;
+  next_ban_rule?: string | null;
+  next_pick_rule?: string | null;
 };
+
+type RulesRow = RowDataPacket & MapRulesColumns;
 
 type RoundMapsRow = RowDataPacket & {
   phase_id: number;
@@ -53,12 +58,28 @@ type RoundMapsRow = RowDataPacket & {
   slots_json: string | null;
 };
 
-/** Cartes et bans du tournoi, pour l'instantané. Deux lectures, quel que soit le plateau. */
-export async function loadMapRules(connection: PoolConnection, tournamentId: number): Promise<TournamentMapRules> {
-  const [rules] = await connection.execute<RulesRow[]>(
-    `SELECT first_ban_rule, next_ban_rule, next_pick_rule FROM bg_tournaments WHERE id = ? LIMIT 1`,
-    [tournamentId],
-  );
+/**
+ * Cartes et bans du tournoi, pour l'instantané : une lecture des tours réglés,
+ * plus celle des règles quand l'appelant n'a pas déjà la ligne du tournoi
+ * (`tournamentRow` portant ces colonnes, que l'instantané lit de toute façon). Les tours réglés sans
+ * match encore créé sont portés aussi : l'écran de réglage les liste et les
+ * résume (`plannedRoundKeys`).
+ */
+export async function loadMapRules(
+  connection: PoolConnection,
+  tournamentId: number,
+  tournamentRow?: MapRulesColumns | null,
+): Promise<TournamentMapRules> {
+  // Une ligne lue sans ces colonnes (`undefined`) ne vaut pas règles par défaut : on relit.
+  let rules: MapRulesColumns | undefined =
+    tournamentRow && tournamentRow.first_ban_rule !== undefined ? tournamentRow : undefined;
+  if (!rules) {
+    const [ruleRows] = await connection.execute<RulesRow[]>(
+      `SELECT first_ban_rule, next_ban_rule, next_pick_rule FROM bg_tournaments WHERE id = ? LIMIT 1`,
+      [tournamentId],
+    );
+    rules = ruleRows[0];
+  }
   const [rows] = await connection.execute<RoundMapsRow[]>(
     `SELECT phase_id, bracket, round_number, slots_json FROM bg_tournament_round_maps
       WHERE tournament_id = ? ORDER BY phase_id, bracket, round_number`,
@@ -76,62 +97,82 @@ export async function loadMapRules(connection: PoolConnection, tournamentId: num
     });
   }
   return {
-    firstBan: parseFirstBanRule(rules[0]?.first_ban_rule),
-    nextBan: parseNextBanRule(rules[0]?.next_ban_rule),
-    nextPick: parseNextPickRule(rules[0]?.next_pick_rule),
+    firstBan: parseFirstBanRule(rules?.first_ban_rule),
+    nextBan: parseNextBanRule(rules?.next_ban_rule),
+    nextPick: parseNextPickRule(rules?.next_pick_rule),
     rounds,
   };
 }
 
-/** Les créneaux de la manche d'un match, vides sans réglage. */
-export async function loadRoundSlots(connection: PoolConnection, tournamentId: number, round: RoundKey): Promise<string[][]> {
-  const [rows] = await connection.execute<RoundMapsRow[]>(
-    `SELECT phase_id, bracket, round_number, slots_json FROM bg_tournament_round_maps
-      WHERE tournament_id = ? AND phase_id = ? AND bracket = ? AND round_number = ? LIMIT 1`,
-    [tournamentId, round.phaseId, round.bracket, round.roundNumber],
-  );
-  return parseStoredSlots(rows[0]?.slots_json);
-}
+/** Les créneaux de la manche d'un match, vides sans réglage (`./round-map-slots`). */
+export { loadRoundSlots };
 
-/** Manche lue d'un corps de requête. @throws `INVALID_ROUND` */
+/**
+ * Manche lue d'un corps de requête : sa **forme** seulement (numéro de 1 à
+ * {@link ROUND_NUMBER_MAX}) ; son appartenance au tournoi se vérifie sous
+ * verrou (`assertRoundsBelong`). @throws `INVALID_ROUND`
+ */
 export function parseRoundKey(body: { phaseId?: unknown; roundNumber?: unknown; bracket?: unknown }): RoundKey {
   const { phaseId, roundNumber, bracket } = body;
   if (typeof phaseId !== "number" || !Number.isInteger(phaseId) || phaseId < 0) throw new Error("INVALID_ROUND");
-  if (typeof roundNumber !== "number" || !Number.isInteger(roundNumber) || roundNumber < 1) {
+  if (typeof roundNumber !== "number" || !Number.isInteger(roundNumber) || roundNumber < 1 || roundNumber > ROUND_NUMBER_MAX) {
     throw new Error("INVALID_ROUND");
   }
   if (typeof bracket !== "string" || !ROUND_BRACKETS.includes(bracket)) throw new Error("INVALID_ROUND");
   return { phaseId, bracket, roundNumber };
 }
 
-/** Transaction sur une connexion déjà prise : journal du staff envoyé au commit seulement. */
-async function transact<T>(connection: PoolConnection, run: (connection: PoolConnection) => Promise<T>): Promise<T> {
-  await connection.beginTransaction();
-  try {
-    const result = await run(connection);
-    await connection.commit();
-    flushBotLogs(connection);
-    return result;
-  } catch (error) {
-    await connection.rollback().catch(() => undefined);
-    discardBotLogs(connection);
-    throw error;
-  }
-}
+type TournamentRow = RowDataPacket & MapRulesColumns & { id: number; name: string; format: string };
 
-async function inTransaction<T>(run: (connection: PoolConnection) => Promise<T>): Promise<T> {
-  return withConnection((connection) => transact(connection, run));
-}
-
-type TournamentRow = RowDataPacket & { id: number; name: string; format: string };
-
+/**
+ * Verrou exclusif du tournoi, en première instruction (règle « verrou en
+ * premier ») : la ligne lue porte aussi les règles de ban, à jour sous verrou.
+ */
 async function lockTournament(connection: PoolConnection, tournamentId: number): Promise<TournamentRow> {
   const [rows] = await connection.execute<TournamentRow[]>(
-    `SELECT id, name, format FROM bg_tournaments WHERE id = ? LIMIT 1 FOR UPDATE`,
+    `SELECT id, name, format, first_ban_rule, next_ban_rule, next_pick_rule
+       FROM bg_tournaments WHERE id = ? LIMIT 1 FOR UPDATE`,
     [tournamentId],
   );
   if (!rows[0]) throw new Error("TOURNAMENT_NOT_FOUND");
   return rows[0];
+}
+
+/**
+ * Verrou **partagé** du tournoi, pour un choix dans un pool : il attend un
+ * `setRoundsMaps` en cours (verrou exclusif) et le retient le temps du choix,
+ * sans mettre en file les choix des autres matchs entre eux. Écriture
+ * MariaDB (`LOCK IN SHARE MODE`, requête sans jointure — `CLAUDE.md`).
+ */
+async function lockTournamentShared(connection: PoolConnection, tournamentId: number): Promise<void> {
+  const [rows] = await connection.execute<(RowDataPacket & { id: number })[]>(
+    `SELECT id FROM bg_tournaments WHERE id = ? LIMIT 1 LOCK IN SHARE MODE`,
+    [tournamentId],
+  );
+  if (!rows[0]) throw new Error("TOURNAMENT_NOT_FOUND");
+}
+
+/**
+ * Les tours visés appartiennent-ils au tournoi ? Sans phases, la phase est 0 ;
+ * en multi-phases, une phase **de ce** tournoi. Sinon une ligne orpheline
+ * serait écrite et servie à tous dans l'instantané. @throws `INVALID_ROUND`
+ */
+async function assertRoundsBelong(
+  connection: PoolConnection,
+  tournament: Pick<TournamentRow, "id" | "format">,
+  rounds: readonly RoundKey[],
+): Promise<void> {
+  const phaseIds = [...new Set(rounds.map((round) => round.phaseId))];
+  if (tournament.format !== "MULTI") {
+    if (phaseIds.some((phaseId) => phaseId !== 0)) throw new Error("INVALID_ROUND");
+    return;
+  }
+  if (phaseIds.includes(0)) throw new Error("INVALID_ROUND");
+  const [rows] = await connection.execute<(RowDataPacket & { id: number })[]>(
+    `SELECT id FROM bg_tournament_phases WHERE tournament_id = ? AND id IN (${phaseIds.map(() => "?").join(", ")})`,
+    [Number(tournament.id), ...phaseIds],
+  );
+  if (rows.length !== phaseIds.length) throw new Error("INVALID_ROUND");
 }
 
 /** Tours au plus d'une copie « à tous les tours » (partagé avec l'écran, qui découpe). */
@@ -198,6 +239,7 @@ export async function setRoundsMaps(
   if (rounds.length === 0 || rounds.length > ROUND_MAPS_BULK_MAX) throw new Error("INVALID_ROUND");
   const result = await inTransaction(async (connection) => {
     const tournament = await lockTournament(connection, tournamentId);
+    await assertRoundsBelong(connection, tournament, rounds);
     const changedRounds: RoundKey[] = [];
     for (const round of rounds) {
       if (await writeRoundSlots(connection, tournamentId, round, slots)) changedRounds.push(round);
@@ -232,20 +274,16 @@ export function parseMapRulesInput(body: { firstBan?: unknown; nextBan?: unknown
 
 /**
  * Règles de ban et de choix du tournoi, modifiables à tout moment par
- * l'arbitrage. @throws `TOURNAMENT_NOT_FOUND`
+ * l'arbitrage. Les règles en place se lisent sur la ligne verrouillée.
+ * @throws `TOURNAMENT_NOT_FOUND`
  */
 export async function setTournamentMapRules(tournamentId: number, rules: MapRulesInput): Promise<void> {
   const tournament = await inTransaction(async (connection) => {
     const row = await lockTournament(connection, tournamentId);
-    const [current] = await connection.execute<RulesRow[]>(
-      `SELECT first_ban_rule, next_ban_rule, next_pick_rule FROM bg_tournaments WHERE id = ? LIMIT 1`,
-      [tournamentId],
-    );
-    const before = current[0];
     if (
-      parseFirstBanRule(before?.first_ban_rule) === rules.firstBan &&
-      parseNextBanRule(before?.next_ban_rule) === rules.nextBan &&
-      parseNextPickRule(before?.next_pick_rule) === rules.nextPick
+      parseFirstBanRule(row.first_ban_rule) === rules.firstBan &&
+      parseNextBanRule(row.next_ban_rule) === rules.nextBan &&
+      parseNextPickRule(row.next_pick_rule) === rules.nextPick
     ) {
       return null;
     }
@@ -357,13 +395,16 @@ export async function pickMatchMap(
       const ownerId = Number(pre[0].tournament_id);
       return transact(connection, async () => {
         // Le tournoi d'abord, comme `setRoundMaps` : un choix ne se valide pas
-        // contre un pool que le staff remplace au même instant.
-        await lockTournament(connection, ownerId);
+        // contre un pool que le staff remplace au même instant. Verrou partagé :
+        // les choix de deux matchs ne s'attendent pas l'un l'autre.
+        await lockTournamentShared(connection, ownerId);
         const [rows] = await connection.execute<PickMatchRow[]>(`${PICK_MATCH_SELECT} LIMIT 1 FOR UPDATE`, [matchId]);
         const row = rows[0];
         if (!row) throw new Error("MATCH_NOT_FOUND");
-        if (row.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
+        // Le droit d'abord : qui l'a perdu entre les deux lectures reçoit 403,
+        // pas l'état du match.
         const byTeam = await assertMapPicker(connection, row, viewer);
+        if (row.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
         const slots = await loadRoundSlots(connection, ownerId, {
           phaseId: Number(row.phase_id),
           bracket: String(row.bracket),

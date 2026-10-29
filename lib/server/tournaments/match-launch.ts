@@ -29,7 +29,6 @@ import {
   type MatchLaunchInput,
 } from "@/lib/shared/match-launch";
 import { normalizeStreamUrl } from "@/lib/shared/live-streams";
-import { parseStoredSlots } from "@/lib/shared/round-maps";
 import {
   groupNoRefereeAlerts,
   normalizeFirstMap,
@@ -59,8 +58,10 @@ import { retryOnDeadlock } from "./deadlock-retry";
 import { lockTournamentRow } from "./registration";
 import { announceRefereeChange, queueRefereeChange } from "./referee-notices";
 import { loadMatchLogRow, matchLogSubject } from "./match-log-subject";
-import { discardBotLogs, flushBotLogs, queueRefereeAlert, queueRoundNoRefereeAlert } from "./bot-logs";
+import { queueRefereeAlert, queueRoundNoRefereeAlert } from "./bot-logs";
 import { publishMatchUpdatedEvent } from "./notifications";
+import { loadRoundSlots } from "./round-map-slots";
+import { inTransaction } from "./transaction";
 
 /** La ligne d'un match telle que le lancement la lit, sans ses casters. */
 export type LaunchMatchBaseRow = RowDataPacket & {
@@ -334,22 +335,6 @@ async function lockLaunchMatch(
   return row;
 }
 
-async function inTransaction<T>(run: (connection: PoolConnection) => Promise<T>): Promise<T> {
-  return withConnection(async (connection) => {
-    await connection.beginTransaction();
-    try {
-      const result = await run(connection);
-      await connection.commit();
-      // Journal, alertes d'arbitrage, avis de cast et d'arbitrage : partis après le commit.
-      flushBotLogs(connection);
-      return result;
-    } catch (error) {
-      await connection.rollback().catch(() => undefined);
-      discardBotLogs(connection);
-      throw error;
-    }
-  });
-}
 
 /** Partie que le lecteur représente dans ce match, et sa qualité à y agir. */
 export type MatchParty = { role: LaunchViewerRole; canDeclareReady: boolean };
@@ -1213,12 +1198,12 @@ export async function setMatchFirstMap(matchId: number, rawMap: unknown): Promis
       const row = rows[0];
       if (!row) throw new Error("MATCH_NOT_FOUND");
       if (row.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
-      const [roundRows] = await connection.execute<(RowDataPacket & { slots_json: string | null })[]>(
-        `SELECT slots_json FROM bg_tournament_round_maps
-          WHERE tournament_id = ? AND phase_id = ? AND bracket = ? AND round_number = ? LIMIT 1`,
-        [ownerId, row.phase_id, row.bracket, row.round_number],
-      );
-      if (parseStoredSlots(roundRows[0]?.slots_json).length > 0) throw new Error("ROUND_MAPS_SET");
+      const slots = await loadRoundSlots(connection, ownerId, {
+        phaseId: Number(row.phase_id),
+        bracket: String(row.bracket),
+        roundNumber: Number(row.round_number),
+      });
+      if (slots.length > 0) throw new Error("ROUND_MAPS_SET");
       if ((row.first_map ?? null) === typed) return null;
       await connection.execute(`UPDATE bg_matches SET first_map = ? WHERE id = ?`, [typed, matchId]);
       queueRefereeChange(connection, { kind: "FIRST_MAP", matchId, set: typed !== null });

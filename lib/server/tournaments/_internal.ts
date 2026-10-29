@@ -74,6 +74,14 @@ export type TournamentRow = RowDataPacket & {
   /** Chaîne officielle du tournoi ; NULL = aucune diffusion annoncée. */
   live_url: string | null;
   /**
+   * Règles de ban (`docs/features/ROUND_MAPS.md`). Facultatives : seule
+   * `loadTournamentRow` les sélectionne, et l'instantané les reprend sans
+   * relire la ligne (`loadMapRules`).
+   */
+  first_ban_rule?: string | null;
+  next_ban_rule?: string | null;
+  next_pick_rule?: string | null;
+  /**
    * Illustration ou logo (`lib/shared/tournament-image.ts`) ; NULL = aucune.
    * Facultatifs dans le type : seules les lectures qui rendent une carte les
    * sélectionnent.

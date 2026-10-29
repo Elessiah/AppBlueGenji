@@ -1,12 +1,12 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useToast } from "@/components/ui/toast";
 import { InfoHint } from "@/components/ui/info-hint";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { MATCH_LAUNCH_REFRESH_EVENT } from "@/lib/shared/match-launch";
-import { resolveMatchMaps, roundMapsOf, type ResolvedMapSlot, type TournamentMapRules } from "@/lib/shared/round-maps";
+import { resolveMatchMaps, roundMapsOf, type ResolvedMapSlot } from "@/lib/shared/round-maps";
 import type { BracketMatch, TournamentDetail } from "@/lib/shared/types";
 import { launchErrorText, useActionsText } from "../_lib/actions-text";
 import { useRoundMapsText } from "../_lib/round-maps-text";
@@ -15,7 +15,12 @@ import styles from "./MatchPage.module.css";
 
 const RoundMapsDialog = dynamic(() => import("./RoundMapsDialog").then((m) => m.RoundMapsDialog), { ssr: false });
 
-/** Choix d'une carte dans un pool, par le staff ou une équipe en autogestion. */
+/**
+ * Choix d'une carte dans un pool, par le staff ou une équipe en autogestion.
+ * Valeur **optimiste** : la liste garde le choix envoyé (au lieu de revenir à
+ * l'ancienne carte jusqu'à l'instantané suivant, d'où un second envoi possible
+ * sur un flux lent) ; elle la relâche à l'arrivée de l'instantané ou sur refus.
+ */
 function MapPickSelect({ match, slot }: Readonly<{ match: Pick<BracketMatch, "id">; slot: ResolvedMapSlot }>) {
   const { t } = useRoundMapsText();
   const actionText = useActionsText();
@@ -23,10 +28,16 @@ function MapPickSelect({ match, slot }: Readonly<{ match: Pick<BracketMatch, "id
   const { showError, showSuccess } = useToast();
   const selectId = useId();
   const [busy, setBusy] = useState(false);
+  const [optimistic, setOptimistic] = useState<string | null>(null);
+  const stored = slot.map ?? "";
+  // L'instantané fait foi dès qu'il change : la valeur locale s'efface.
+  useEffect(() => setOptimistic(null), [stored]);
+  const shown = optimistic ?? stored;
 
   const pick = async (map: string) => {
-    if (busy) return;
+    if (busy || map === shown) return;
     setBusy(true);
+    setOptimistic(map);
     try {
       const response = await fetch(`/api/matches/${match.id}/map-pick`, {
         method: "PUT",
@@ -38,6 +49,7 @@ function MapPickSelect({ match, slot }: Readonly<{ match: Pick<BracketMatch, "id
       showSuccess(t(map === "" ? "page.pickCleared" : "page.picked"));
       window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
     } catch (error) {
+      setOptimistic(null);
       showError(launchErrorText(actionText, errorsText, (error as Error).message));
     } finally {
       setBusy(false);
@@ -51,7 +63,7 @@ function MapPickSelect({ match, slot }: Readonly<{ match: Pick<BracketMatch, "id
       </label>
       <select
         id={selectId}
-        value={slot.map ?? ""}
+        value={shown}
         aria-busy={busy || undefined}
         aria-disabled={busy || undefined}
         onChange={(event) => void pick(event.target.value)}
@@ -69,15 +81,16 @@ function MapPickSelect({ match, slot }: Readonly<{ match: Pick<BracketMatch, "id
   );
 }
 
-/** Une carte du tour : imposée, choisie, ou « à choisir parmi … ». */
+/**
+ * Une carte du tour : imposée, choisie, ou « à choisir parmi … » — ce dernier
+ * seulement sans liste de choix (la liste montre déjà le pool).
+ */
 function MapSlotLine({
   match,
   slot,
-  rules,
   canPick,
-}: Readonly<{ match: Pick<BracketMatch, "id">; slot: ResolvedMapSlot; rules: TournamentMapRules; canPick: boolean }>) {
+}: Readonly<{ match: Pick<BracketMatch, "id">; slot: ResolvedMapSlot; canPick: boolean }>) {
   const { t } = useRoundMapsText();
-  const loserPick = slot.kind === "POOL" && slot.number > 1 && rules.nextPick === "LOSER";
   return (
     <li className={styles.mapSlot}>
       <span className={styles.mapNumber}>{t("page.mapN", { number: slot.number })}</span>
@@ -89,10 +102,9 @@ function MapSlotLine({
         )}
         {slot.kind === "POOL" && canPick && <MapPickSelect match={match} slot={slot} />}
         {slot.kind === "POOL" && !canPick && slot.map !== null && <strong>{slot.map}</strong>}
-        {slot.kind === "POOL" && (canPick || slot.map === null) && (
+        {slot.kind === "POOL" && !canPick && slot.map === null && (
           <span className={styles.muted}>{t("page.toChoose", { maps: slot.candidates.join(", ") })}</span>
         )}
-        {loserPick && <span className={styles.muted}>{t("page.loserPick")}</span>}
       </span>
     </li>
   );
@@ -148,7 +160,7 @@ export function MatchRoundMaps({
           </h3>
           <ol className={styles.mapSlots} aria-labelledby={titleId}>
             {slots.map((slot) => (
-              <MapSlotLine key={slot.number} match={match} slot={slot} rules={rules} canPick={canPick} />
+              <MapSlotLine key={slot.number} match={match} slot={slot} canPick={canPick} />
             ))}
           </ol>
         </>

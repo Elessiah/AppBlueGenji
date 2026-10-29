@@ -2,9 +2,8 @@
   "page": {
     "mapsTitle": "Maps for this round",
     "mapN": "Map {number}",
-    "imposed": "Set",
+    "imposed": "Fixed",
     "toChoose": "To choose from {maps}",
-    "loserPick": "Picked by the team that lost the previous map",
     "pickLabel": "Pick map {number}",
     "pickNone": "To choose",
     "picked": "Map picked.",
@@ -38,12 +37,8 @@
       "LOSER": "The loser of the previous map",
       "WINNER": "The winner of the previous map"
     },
-    "nextPick": "Next map from a pool",
-    "nextPickOptions": {
-      "LOSER": "Picked by the loser of the previous map",
-      "FREE": "Picked by the referee"
-    },
     "saveRules": "Save the rules",
+    "unsaved": "Unsaved changes.",
     "rulesSaved": "Ban rules saved.",
     "roundTitle": "Maps of a tournament round",
     "round": "Tournament round",

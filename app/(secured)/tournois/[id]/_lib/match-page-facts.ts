@@ -39,17 +39,17 @@ export type MatchPageMapFact = {
   imposed: boolean;
   /** Pool encore ouvert (vide quand la map est connue). */
   candidates: string[];
-  /** À choisir par l'équipe qui a perdu la map précédente (règle du tournoi). */
-  loserPick: boolean;
 };
 
 /**
  * Maps du match selon le réglage de son tour (`ROUND_MAPS.md`) : « Map 1 :
  * Ilios », ou le pool à choisir — vide sans réglage (la page dit alors la
- * première map saisie match par match).
+ * première map saisie match par match). La règle « choisie par le perdant »
+ * n'est pas dite : elle n'est pas appliquée tant que les scores par carte
+ * n'existent pas (`NextPickRule`).
  */
 export function matchPageMapFacts(
-  rules: Pick<TournamentMapRules, "rounds" | "nextPick">,
+  rules: Pick<TournamentMapRules, "rounds">,
   match: Pick<BracketMatch, "phaseId" | "bracket" | "roundNumber" | "firstMap" | "mapPicks">,
 ): MatchPageMapFact[] {
   const round = roundMapsOf(rules.rounds, match);
@@ -63,7 +63,6 @@ export function matchPageMapFacts(
       map: known,
       imposed: slot.kind === "IMPOSED",
       candidates: known === null ? slot.candidates : [],
-      loserPick: known === null && slot.kind === "POOL" && slot.number > 1 && rules.nextPick === "LOSER",
     };
   });
 }

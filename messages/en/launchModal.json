@@ -51,7 +51,10 @@
     "INVALID_MAP_RULES": "Invalid ban rule.",
     "INVALID_MAP_PICK": "This map is not in the tournament round's pool.",
     "NOT_MAP_PICKER": "Only the referees and, when the match is self-managed, its teams choose the map.",
-    "ROUND_MAPS_SET": "This tournament round has its maps set for the whole round: reset the round to enter the map match by match."
+    "ROUND_MAPS_SET": "This tournament round has its maps set for the whole round: reset the round to enter the map match by match.",
+    "TOURNAMENT_NOT_FOUND": "Tournament not found.",
+    "CONCURRENT_UPDATE_RETRY": "Another change to the tournament went through at the same moment: nothing was saved. Try again.",
+    "TOO_MANY_REQUESTS": "Too many requests in a row. Wait a few minutes."
   },
   "readyNoted": "Got it, you're ready.",
   "readyCanceled": "“Ready” canceled.",

@@ -22,7 +22,6 @@
     "mapPool": "Map {number}: to choose from {maps}",
     "mapOpen": "Map {number}: to choose",
     "mapImposed": "set",
-    "loserPick": "loser's pick",
     "format": "Format",
     "sides": "Sides",
     "sideLeft": "Left: {team}",

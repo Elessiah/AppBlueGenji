@@ -37,6 +37,7 @@ import {
   versusText,
 } from "@/lib/shared/tournament-page-text";
 import { canPickMatchMap, firstBanOrder, roundMapsOf } from "@/lib/shared/round-maps";
+import { roundMaxMaps } from "@/lib/shared/round-plan";
 import type { BracketMatch, TournamentDetail, TournamentGame } from "@/lib/shared/types";
 import { useLiveControls } from "../_lib/live-context";
 import { launchErrorText, useActionsText } from "../_lib/actions-text";
@@ -377,7 +378,7 @@ function useOfficiatingFact(match: BracketMatch, decision: ReturnType<typeof mat
   return null;
 }
 
-/** Maps du tour dans les faits clés : « Map 1 : Ilios · imposée », pool à choisir, choix du perdant. */
+/** Maps du tour dans les faits clés : « Map 1 : Ilios · imposée », ou pool à choisir. */
 function MapFactList({ mapFacts }: Readonly<{ mapFacts: readonly MatchPageMapFact[] }>) {
   const page = useMatchPageText();
   return (
@@ -390,7 +391,6 @@ function MapFactList({ mapFacts }: Readonly<{ mapFacts: readonly MatchPageMapFac
           )}
           {slot.map === null && slot.candidates.length === 0 && <Muted>{page.t("facts.mapOpen", { number: slot.number })}</Muted>}
           {slot.imposed && <span className={styles.factNote}> · {page.t("facts.mapImposed")}</span>}
-          {slot.loserPick && <span className={styles.factNote}> · {page.t("facts.loserPick")}</span>}
         </li>
       ))}
     </ol>
@@ -572,6 +572,8 @@ function MapsSection({
   const banOrder = firstBanOrder(rules.firstBan, match.hostTeamId, match.team1Id, match.team2Id);
   // Une carte 1 réglée pour la manche (imposée ou pool) remplace la saisie libre.
   const firstSlotSet = (roundMapsOf(rules.rounds, match)?.slots.length ?? 0) > 0;
+  // Un match en une seule carte n'a pas de « cartes suivantes » : la règle n'y dirait rien.
+  const singleMap = roundMaxMaps(detail.card, match.roundNumber) === 1;
   const picking = canPick && editable;
   return (
     <section className={`ds-block ${styles.block}`} aria-labelledby={titleId}>
@@ -587,10 +589,12 @@ function MapsSection({
             )}
           </dd>
         </div>
-        <div>
-          <dt>{rm.t("page.nextBans")}</dt>
-          <dd className={styles.ruleText}>{rm.t(rules.nextBan === "WINNER" ? "page.nextBansWINNER" : "page.nextBansLOSER")}</dd>
-        </div>
+        {!singleMap && (
+          <div>
+            <dt>{rm.t("page.nextBans")}</dt>
+            <dd className={styles.ruleText}>{rm.t(rules.nextBan === "WINNER" ? "page.nextBansWINNER" : "page.nextBansLOSER")}</dd>
+          </div>
+        )}
       </dl>
       {/* Les cartes se lisent dans les faits clés ; la liste ne revient ici que
           pour qui choisit dans un pool ou règle le tour. */}
@@ -900,7 +904,15 @@ function MatchPageContent({ detail, match, adminResolvable, scoreLocked, onOpenA
             canPick={
               !spectator &&
               !frozen &&
-              canPickMatchMap({ staff: canSchedule, myTeamId, canDeclareReady: canDeclareFor(shownLaunch) }, match)
+              canPickMatchMap(
+                {
+                  staff: canSchedule,
+                  myTeamId,
+                  canDeclareReady: canDeclareFor(shownLaunch),
+                  launchRole: shownLaunch?.viewer.role ?? null,
+                },
+                match,
+              )
             }
           />
         </div>
