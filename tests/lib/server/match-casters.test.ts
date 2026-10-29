@@ -1,6 +1,8 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import {
   firstStreamUrlSql,
+  lockMatchCasters,
+  lockMatchStreams,
   orphanStreamIds,
   pruneMatchStreams,
   staffStream,
@@ -189,6 +191,50 @@ describe("pruneMatchStreams — ménage sous verrou", () => {
     const held = world([{ id: 3, live_url: null }], [{ user_id: 9, stream_id: 3 }]);
     await pruneMatchStreams(held.connection, 42);
     expect(held.execute.mock.calls.some(([sql]) => sql.startsWith("DELETE"))).toBe(false);
+  });
+});
+
+describe("pruneMatchStreams — lectures déjà faites par l'appelant", () => {
+  it("ne relit pas les casters fournis : un seul SELECT verrouillant (les streams)", async () => {
+    const w = world([{ id: 3, live_url: null }, { id: 4, live_url: "https://kick.com/x" }], [
+      { user_id: 9, stream_id: 3 },
+      { user_id: 12, stream_id: 4 },
+    ]);
+    // 12 vient de partir : l'appelant passe les casters restants.
+    await pruneMatchStreams(w.connection, 42, { casters: [{ streamId: 3 }] });
+    expect(w.state.streams.map((s) => s.id)).toEqual([3]);
+    expect(w.sqls().filter((sql) => sql.includes("FROM bg_match_casters"))).toEqual([]);
+  });
+
+  it("ne relit pas les streams fournis, et lit les casters sous verrou", async () => {
+    const w = world([{ id: 3, live_url: null }], [{ user_id: 9, stream_id: 3 }]);
+    await pruneMatchStreams(w.connection, 42, { streams: [stream(3, null), stream(8, null)] });
+    expect(w.sqls().filter((sql) => sql.includes("FROM bg_match_streams") && sql.includes("SELECT"))).toEqual([]);
+    expect(w.sqls().some((sql) => sql.includes("FROM bg_match_casters") && sql.endsWith("FOR UPDATE"))).toBe(true);
+    // Le stream 8, que personne ne tient, est effacé.
+    expect(w.execute.mock.calls.find(([sql]) => sql.startsWith("DELETE"))?.[1]).toEqual([42, 8]);
+  });
+});
+
+describe("lockMatchCasters / lockMatchStreams — verrou du match déjà tenu", () => {
+  it("held : lecture ordinaire, sans FOR UPDATE ; par défaut, lecture verrouillante", async () => {
+    const execute = jest.fn<SqlQuery>(async () => [[]]);
+    const connection = fakeConnection({ execute });
+    await lockMatchCasters(connection, 42, true);
+    await lockMatchStreams(connection, 42, true);
+    await lockMatchCasters(connection, 42);
+    await lockMatchStreams(connection, 42);
+    const sqls = execute.mock.calls.map(([sql]) => flat(sql));
+    expect(sqls.map((sql) => sql.endsWith("FOR UPDATE"))).toEqual([false, false, true, true]);
+  });
+});
+
+describe("CAST_ELIGIBLE_SQL — aligné sur la règle JS (shownStreams / castEligibilityBlock)", () => {
+  it("couvre les quatre conditions du cast : compte, tag Discord, Battle.net, permission live", () => {
+    const sql = firstStreamUrlSql("m");
+    for (const clause of ["is_deleted", "discord_verified_at", "discord_pseudo", "overwatch_battletag", LIVE_STAFF_SQL]) {
+      expect(sql).toContain(clause);
+    }
   });
 });
 

@@ -606,9 +606,9 @@ describe("décisions de l'association du 2026-09-30", () => {
     expect(sheet.retention.join(" ")).toMatch(/conservé dans le salon tant que le salon #live existe, même après la suppression du compte du joueur, et supprimé sur demande de l'équipe, du joueur ou du caster concerné/);
     // EF-21 : la suppression du compte d'un caster retire son lien du message d'une soirée en cours qui garde un autre lien.
     expect(sheet.retention.join(" ")).toContain("à la suppression du compte d'un caster, le message d'une soirée encore en cours est remis à jour sans le lien de sa chaîne s'il garde un autre lien, sinon, ou une fois la soirée finie, il le garde");
-    expect(sheet.dataCategories).toContain("Compte qui a fourni le lien d'un stream (caster, ou membre de l'organisation qui caste le match), pour retirer ce lien à la suppression de son compte");
+    expect(sheet.dataCategories).toContain("Compte qui a fourni le lien d'un stream (caster, ou membre de l'organisation qui dit poser sa propre chaîne), pour retirer ce lien à la suppression de son compte");
     const english = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T16")!;
-    expect(english.dataCategories).toContain("Account that provided a stream's link (a caster, or a member of the organizers who casts the match), to remove that link when that account is deleted");
+    expect(english.dataCategories).toContain("Account that provided a stream's link (a caster, or a member of the organizers who says it is their own channel), to remove that link when that account is deleted");
     expect(english.retention.join(" ")).toContain("when a caster's account is deleted, the message of an evening still under way is updated without their channel link if it keeps another link, otherwise, or once the evening has ended, it keeps it");
     expect(sheet.recipients.join(" ")).toMatch(/pseudo public BlueGenji des joueurs d'un tournoi individuel/);
     // Le pseudo publié dans #live est une catégorie de données de T16.

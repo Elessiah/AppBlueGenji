@@ -71,6 +71,48 @@ describe("PUT /api/admin/tournaments/[id]/live", () => {
     expect(setTournamentLiveUrl).not.toHaveBeenCalled();
   });
 
+  it("un membre de l'organisation décoche « lien de l'organisation » : c'est sa propre chaîne", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(setMatchLiveConfig).mockResolvedValue(undefined);
+
+    const res = await putMatchLive(
+      matchReq("PUT", { trigger: "AUTO", liveUrl: "kick.com/bg", organisationLink: false }),
+      matchParams("42"),
+    );
+
+    expect(res.status).toBe(200);
+    expect(setMatchLiveConfig).toHaveBeenCalledWith(42, {
+      trigger: "AUTO",
+      liveUrl: "kick.com/bg",
+      setter: { userId: arbitre.id, asOrganisation: false },
+    });
+  });
+
+  it("refuse en 403 « lien de l'organisation » à qui n'a pas la permission tournaments, sans rien écrire", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+
+    const res = await putMatchLive(
+      matchReq("PUT", { trigger: "AUTO", liveUrl: "kick.com/bg", organisationLink: true }),
+      matchParams("42"),
+    );
+
+    expect(res.status).toBe(403);
+    expect(setMatchLiveConfig).not.toHaveBeenCalled();
+  });
+
+  it("refuse en 400 un organisationLink qui n'est pas un booléen", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+
+    const res = await putMatchLive(
+      matchReq("PUT", { trigger: "AUTO", organisationLink: "oui" }),
+      matchParams("42"),
+    );
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "INVALID_ORGANISATION_LINK" });
+    expect(setMatchLiveConfig).not.toHaveBeenCalled();
+  });
+
   it("rejette un community manager avec 403", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(cm);
     expect(
@@ -164,7 +206,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
     expect(setMatchLiveConfig).toHaveBeenCalledWith(42, {
       trigger: "MANUAL",
       liveUrl: "kick.com/bg",
-      setter: { userId: caster.id, organisation: false },
+      setter: { userId: caster.id, asOrganisation: false },
     });
   });
 
@@ -174,12 +216,12 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
     expect((await putMatchLive(matchReq("PUT", { trigger: "AUTO" }), matchParams("42"))).status).toBe(
       200,
     );
-    // L'organisation (permission tournaments) : le service rattache le lien à
-    // l'arbitre s'il caste ce match, sinon à l'organisation.
+    // L'organisation (permission tournaments), sans rien dire de plus : le lien
+    // est celui de l'organisation — jamais déduit de ce que l'arbitre caste.
     expect(setMatchLiveConfig).toHaveBeenCalledWith(42, {
       trigger: "AUTO",
       liveUrl: null,
-      setter: { userId: arbitre.id, organisation: true },
+      setter: { userId: arbitre.id, asOrganisation: true },
     });
   });
 
@@ -198,7 +240,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
     expect(setMatchLiveConfig).toHaveBeenCalledWith(42, {
       trigger: null,
       liveUrl: null,
-      setter: { userId: caster.id, organisation: false },
+      setter: { userId: caster.id, asOrganisation: false },
     });
   });
 
@@ -212,7 +254,7 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
     expect(setMatchLiveConfig).toHaveBeenCalledWith(42, {
       trigger: "START_TIME",
       liveUrl: null,
-      setter: { userId: caster.id, organisation: false },
+      setter: { userId: caster.id, asOrganisation: false },
     });
   });
 
@@ -253,6 +295,11 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
     expect((await putMatchLive(matchReq("PUT", { trigger: "AUTO" }), matchParams("42"))).status).toBe(
       400,
     );
+
+    jest.mocked(setMatchLiveConfig).mockRejectedValue(new Error("MATCH_NOT_CASTABLE"));
+    const refused = await putMatchLive(matchReq("PUT", { trigger: "AUTO" }), matchParams("42"));
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toEqual({ error: "MATCH_NOT_CASTABLE" });
 
     // Conflit d'état, pas de saisie : la date manque sur le match, pas dans la
     // requête — c'est un 409, comme les autres refus de l'antenne.

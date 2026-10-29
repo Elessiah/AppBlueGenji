@@ -120,6 +120,36 @@ describe("POST / DELETE /api/matches/[matchId]/caster", () => {
     expect(claimMatchCast).toHaveBeenLastCalledWith(42, 4, true, { liveUrl: null });
   });
 
+  it("refuse un corps illisible au lieu de le prendre pour un corps vide", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    const broken = new Request("http://localhost/api/matches/42", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{ pas du json",
+    });
+
+    const res = await casterPost(broken, params("42"));
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({ error: "INVALID_CAST_TARGET" });
+    expect(claimMatchCast).not.toHaveBeenCalled();
+  });
+
+  it("refuse un corps non déclaré en JSON (415) et accepte l'absence de corps", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    const text = new Request("http://localhost/api/matches/42", {
+      method: "POST",
+      headers: { "content-type": "text/plain" },
+      body: "{}",
+    });
+    expect((await casterPost(text, params("42"))).status).toBe(415);
+    expect(claimMatchCast).not.toHaveBeenCalled();
+
+    const none = new Request("http://localhost/api/matches/42", { method: "POST" });
+    expect((await casterPost(none, params("42"))).status).toBe(200);
+    expect(claimMatchCast).toHaveBeenLastCalledWith(42, 4, true, { liveUrl: null });
+  });
+
   it("refuse un choix de stream mal formé, sans appeler le service", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
     const bodies: unknown[] = [

@@ -42,7 +42,7 @@ function tournamentRow(liveUrl: string | null) {
   } as never;
 }
 
-function matchRow(liveUrl: string | null, startAt: Date | null = null) {
+function matchRow(startAt: Date | null = null, overrides: Record<string, unknown> = {}) {
   return {
     id: 5,
     tournament_id: 1,
@@ -77,8 +77,30 @@ function matchRow(liveUrl: string | null, startAt: Date | null = null) {
     phase_position: null,
     start_at: startAt,
     live_trigger: "AUTO",
-    live_url: liveUrl,
     live_started_at: null,
+    ...overrides,
+  } as never;
+}
+
+/** Un caster du match 5 sur le stream `streamId`, éligible sauf `eligibility`. */
+function casterRow(userId: number, streamId: number, eligibility: Record<string, unknown> = {}) {
+  return {
+    matchId: 5,
+    userId,
+    streamId,
+    readyAt: null,
+    pseudo: `Caster${userId}`,
+    eligibility: {
+      discord_verified_at: new Date("2026-08-01T00:00:00Z"),
+      discord_pseudo: "caster#0",
+      blizzard_sub: "sub",
+      overwatch_battletag: "Caster#1234",
+      overwatch_battletag_typed: null,
+      is_deleted: 0,
+      is_admin: 0,
+      platform_roles_json: JSON.stringify(["CASTER"]),
+      ...eligibility,
+    },
   } as never;
 }
 
@@ -101,15 +123,53 @@ describe("mapCard — chaîne officielle", () => {
   });
 });
 
+/** Un stream du match 5, tel que le lit `loadMatchStreams`. */
+const stream = (id: number, liveUrl: string | null, staff = false) => ({ id, matchId: 5, liveUrl, staff });
+
 describe("mapMatch — chaîne du match", () => {
   it("normalise et filtre de la même façon", () => {
-    expect(mapMatch(matchRow("kick.com/bg")).liveUrl).toBe("https://kick.com/bg");
-    expect(mapMatch(matchRow("https://exemple.com/live")).liveUrl).toBeNull();
-    expect(mapMatch(matchRow(null)).liveUrl).toBeNull();
+    expect(mapMatch(matchRow(), { streams: [stream(1, "kick.com/bg", true)] }).liveUrl).toBe("https://kick.com/bg");
+    expect(mapMatch(matchRow(), { streams: [stream(1, "https://exemple.com/live", true)] }).liveUrl).toBeNull();
+    expect(mapMatch(matchRow(), { streams: [stream(1, null, true)] }).liveUrl).toBeNull();
+    expect(mapMatch(matchRow()).liveUrl).toBeNull();
+  });
+
+  it("le premier lien est celui du staff, même ouvert après celui d'un caster", () => {
+    const match = mapMatch(matchRow(), {
+      streams: [stream(1, "https://twitch.tv/caster"), stream(2, "https://twitch.tv/staff", true)],
+      casters: [casterRow(1, 1)],
+    });
+    expect(match.liveUrl).toBe("https://twitch.tv/staff");
+  });
+
+  it("sans stream du staff, le premier lien est celui du plus petit stream montré", () => {
+    const match = mapMatch(matchRow(), {
+      streams: [stream(4, "https://twitch.tv/b"), stream(2, "https://twitch.tv/a"), stream(3, null)],
+      casters: [casterRow(1, 4), casterRow(2, 2), casterRow(3, 3)],
+    });
+    expect(match.liveUrl).toBe("https://twitch.tv/a");
+  });
+
+  it("avant le lancement, ne montre ni le stream ni le lien d'un caster devenu inéligible", () => {
+    const match = mapMatch(matchRow(), {
+      streams: [stream(1, "https://twitch.tv/caster")],
+      casters: [casterRow(1, 1, { is_deleted: 1 })],
+    });
+    expect(match.liveUrl).toBeNull();
+    expect(match.streams).toEqual([]);
+  });
+
+  it("un match lancé garde tous ses streams et son premier lien : on ne réécrit pas une diffusion en cours", () => {
+    const match = mapMatch(matchRow(null, { launched_at: new Date("2026-08-20T10:00:00Z") }), {
+      streams: [stream(1, "https://twitch.tv/caster")],
+      casters: [casterRow(1, 1, { is_deleted: 1 })],
+    });
+    expect(match.liveUrl).toBe("https://twitch.tv/caster");
+    expect(match.streams).toHaveLength(1);
   });
 
   it("expose le mode et l'antenne tels quels", () => {
-    const match = mapMatch(matchRow("https://twitch.tv/bg"));
+    const match = mapMatch(matchRow());
     expect(match.liveTrigger).toBe("AUTO");
     expect(match.liveStartedAt).toBeNull();
   });
@@ -118,18 +178,18 @@ describe("mapMatch — chaîne du match", () => {
 describe("mapMatch — date de début", () => {
   it("sérialise l'horaire en ISO", () => {
     const startAt = new Date("2026-08-29T18:30:00Z");
-    expect(mapMatch(matchRow(null, startAt)).startAt).toBe("2026-08-29T18:30:00.000Z");
+    expect(mapMatch(matchRow(startAt)).startAt).toBe("2026-08-29T18:30:00.000Z");
   });
 
   it("garde null quand aucun horaire n'est annoncé", () => {
-    expect(mapMatch(matchRow(null)).startAt).toBeNull();
+    expect(mapMatch(matchRow()).startAt).toBeNull();
   });
 
   it("tolère une ligne antérieure à la colonne", () => {
     // La migration ajoute la colonne, mais un appelant qui construit une ligne
     // sans elle (test, cache d'un ancien format) ne doit pas produire `undefined`
     // dans la charge utile poussée par le flux.
-    const row = matchRow(null) as unknown as Record<string, unknown>;
+    const row = matchRow() as unknown as Record<string, unknown>;
     delete row.start_at;
     expect(mapMatch(row as never).startAt).toBeNull();
   });
