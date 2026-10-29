@@ -252,7 +252,7 @@ describe("PROCESSING_ACTIVITIES", () => {
 
   it("compte les joueurs d'un même match parmi les destinataires des profils", () => {
     // Un BattleTag masqué leur reste lisible (`lib/shared/battletag-visibility.ts`).
-    expect(byRef("T01").recipients.join(" ")).toMatch(/Parties d'un même match : dans sa fenêtre « Contacts » et dans sa fenêtre de lancement seulement pour le BattleTag d'un joueur présenté comme contact.*BattleTag même masqué/);
+    expect(byRef("T01").recipients.join(" ")).toMatch(/Parties d'un même match : dans sa fenêtre « Contacts » et dans sa fenêtre de lancement, pour le BattleTag de tout contact présenté.*BattleTag même masqué/);
   });
 
   it("ne déclare aucune adresse e-mail collectée", () => {

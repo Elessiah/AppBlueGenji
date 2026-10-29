@@ -125,8 +125,8 @@ describe("registre et avis — tout ce que montre une fiche de contact", () => {
     expect(T04_EN?.dataCategories.join("\n")).toMatch(/Team roles and certification status/);
     const t01 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T01");
     const t01En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T01");
-    expect(t01?.recipients.join("\n")).toMatch(/Parties d'un même match : dans sa fenêtre « Contacts » et dans sa fenêtre de lancement seulement/);
-    expect(t01En?.recipients.join("\n")).toMatch(/Parties to the same match: only in its “Contacts” window/);
+    expect(t01?.recipients.join("\n")).toMatch(/Parties d'un même match : dans sa fenêtre « Contacts » et dans sa fenêtre de lancement, pour le BattleTag de tout contact présenté/);
+    expect(t01En?.recipients.join("\n")).toMatch(/Parties to the same match: in its “Contacts” window and its launch window, for the BattleTag of any contact presented/);
   });
 
   it("l'avis dit que « les joueurs » des anciens textes étaient tous les membres des deux équipes (FR et EN)", () => {
@@ -247,10 +247,10 @@ describe("BattleTag masqué — arbitre désigné", () => {
       const fr = load("fr", ns).audience.battletag;
       const en = load("en", ns).audience.battletag;
       expect(fr.asReferee).toBe(
-        "si tu es l'arbitre désigné d'un match : ses deux équipes, les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin, et ses casters le temps du match (tu peux te retirer d'un match à tout moment) ;",
+        "si tu es l'arbitre désigné d'un match : ses deux équipes, les arbitres et les administrateurs dès que ses adversaires sont connus et jusqu'à sa fin, et ses casters le temps du match (tu peux te retirer d'un match à tout moment ; effacer ton BattleTag te retirerait l'arbitrage, qui demande celui de Battle.net) ;",
       );
       expect(en.asReferee).toBe(
-        "if you are the assigned referee of a match: both its teams, referees and administrators from the moment its opponents are known until its end, and its casters while the match is being played (you can withdraw from a match at any time);",
+        "if you are the assigned referee of a match: both its teams, referees and administrators from the moment its opponents are known until its end, and its casters while the match is being played (you can withdraw from a match at any time; erasing your BattleTag would remove your refereeing, which requires the one from Battle.net);",
       );
       expect(Object.keys(fr)).toEqual(["title", "match", "asCaster", "asReferee", "launch", "footer"]);
       expect(Object.keys(en)).toEqual(Object.keys(fr));

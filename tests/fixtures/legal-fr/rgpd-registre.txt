@@ -48,7 +48,7 @@ Durée du compte
 Sessions de connexion : 30 jours après la connexion
 Destinataires
 Public du site (seules les données que le joueur rend visibles)
-Parties d'un même match : dans sa fenêtre « Contacts » et dans sa fenêtre de lancement seulement pour le BattleTag d'un joueur présenté comme contact, aussi sur la page du match pour celui de l'arbitre désigné et des casters — (BattleTag même masqué, pour s'ajouter en jeu, dans les seuls tournois Overwatch ; durées du traitement T04)
+Parties d'un même match : dans sa fenêtre « Contacts » et dans sa fenêtre de lancement, pour le BattleTag de tout contact présenté (joueur, caster, arbitre désigné) ; sur la page du match aussi, pour le seul BattleTag de l'arbitre désigné et des casters — (BattleTag même masqué, pour s'ajouter en jeu, dans les seuls tournois Overwatch ; durées du traitement T04)
 Joueurs connectés du site : pseudo Discord certifié, si le joueur le rend visible ; pastilles de certification de la fiche (tag Discord certifié, « BattleTag vérifié » — BattleTag tiré d'un compte Battle.net rattaché), même tag masqué, sans le tag
 Staff de l'association selon son rôle (administration, arbitrage)
 Bot Discord de l'association (T08) : la langue du compte, avec le seul code envoyé en message privé
