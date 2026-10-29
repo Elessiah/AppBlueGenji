@@ -176,7 +176,7 @@ export function RecruitmentModalField({
 
   return (
     <div className={`field ${s.matchDms}`}>
-      <InfoHintRow>
+      <InfoHintRow separated>
         <Coche
           id={FIELD_ID}
           label={t("recruitmentModal.label")}

@@ -74,8 +74,9 @@ export function OtherSessionsPanel({ version }: Readonly<{ version: number }>): 
       <button
         type="button"
         className={`btn ghost ${s.sessionsButton}`}
-        onClick={revoke}
-        disabled={busy || count === 0}
+        onClick={() => !busy && count !== 0 && void revoke()}
+        aria-disabled={busy || count === 0 || undefined}
+        aria-busy={busy || undefined}
         aria-describedby="other-sessions-summary"
       >
         {busy ? text.t("connections.sessions.revoking") : text.t("connections.sessions.revoke")}

@@ -3,7 +3,15 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Info } from "lucide-react";
 import { useAppLocale } from "@/components/i18n/locale-context";
-import { infoHintFocusLeftToContainer, infoHintLabel, infoHintReaction } from "@/lib/shared/info-hint";
+import {
+  infoHintLabel,
+  infoHintLocale,
+  infoHintOwnsEscape,
+  infoHintReaction,
+  infoHintRefocusAfterEscape,
+  isInteractivePointerTarget,
+  topOpenModal,
+} from "@/lib/shared/info-hint";
 import s from "./info-hint.module.css";
 
 /**
@@ -21,9 +29,10 @@ import s from "./info-hint.module.css";
  * lecteur d'écran l'entend, l'œil voit le « i ». Une erreur de champ ne s'y
  * met jamais (`FieldErrorText`).
  *
- * Se referme par Échap (focus rendu au bouton), par un clic ailleurs — un
- * autre « i » compris —, par un second clic sur le bouton. Le clic donne le
- * focus au bouton (Safari ne le fait pas de lui-même), pour qu'Échap porte.
+ * Se referme par Échap (écouté sur `document` tant qu'il est ouvert, focus
+ * rendu au bouton s'il n'est pas sur un champ), par un clic ailleurs — un
+ * autre « i » compris, et au toucher le relâchement sur du texte, que Safari
+ * iOS ne transmet pas en `click` —, par un second clic sur le bouton.
  *
  * Le parent pose le libellé et ce composant dans une rangée qui passe à la
  * ligne (`InfoHintRow`) : l'explication y prend toute la largeur, sous eux.
@@ -39,39 +48,53 @@ export function InfoHint({
   subject: string;
   children: ReactNode;
 }>): React.ReactElement {
-  const locale = useAppLocale();
+  const pageLocale = useAppLocale();
+  // La langue du nom du bouton suit l'élément ambiant qui en déclare une : une
+  // modale de personnel `lang="fr"` sous `/en` garde « Plus d'infos », lu en
+  // français avec son sujet. Lue après le montage (le DOM seul la porte).
+  const [locale, setLocale] = useState(pageLocale);
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
+    setLocale(infoHintLocale(rootRef.current?.closest("[lang]")?.getAttribute("lang"), pageLocale));
+  }, [pageLocale]);
+
+  useEffect(() => {
     if (!open) return;
+    const isOutside = (event: Event) => !(event.target instanceof Node && rootRef.current?.contains(event.target));
     const onClick = (event: MouseEvent) => {
-      const inside = event.target instanceof Node && rootRef.current?.contains(event.target);
-      if (infoHintReaction({ kind: inside ? "insideClick" : "outsideClick" }) === "close") setOpen(false);
-      // Un clic sur le texte de l'explication donne le focus au conteneur de la
-      // modale (`tabIndex={-1}`) : rendu au bouton, Échap replie encore le « i »
-      // au lieu de fermer la modale (`data-escape-owner` suit la cible). Sans
-      // défilement : le bouton a pu sortir de la vue pendant la lecture.
-      else if (inside && infoHintFocusLeftToContainer(rootRef.current, document.activeElement, document.body))
-        buttonRef.current?.focus({ preventScroll: true });
+      const kind = isOutside(event) ? "outsideClick" : "insideClick";
+      if (infoHintReaction({ kind }) === "close") setOpen(false);
     };
-    // Échap écouté sur le composant seul (bouton et explication) : une modale
-    // ouverte par-dessus garde le sien, sans que le focus reparte derrière son
-    // voile. Posé ici plutôt qu'en `onKeyDown` : le conteneur n'est pas un
-    // contrôle.
-    const root = rootRef.current;
+    // Safari iOS n'envoie pas `click` au `document` pour un élément non
+    // cliquable (texte, fond) : le relâchement referme, sauf sur un contrôle,
+    // qui referme à son `click`. Un défilement tactile finit en `pointercancel`.
+    const onPointerUp = (event: PointerEvent) => {
+      if (!isOutside(event)) return;
+      const interactive = isInteractivePointerTarget(event.target as Element | null);
+      if (infoHintReaction({ kind: "outsidePointerUp", interactive }) === "close") setOpen(false);
+    };
+    // Échap écouté sur `document` tant que l'explication est ouverte : le focus
+    // peut être ailleurs (texte cliqué, champ voisin atteint par Tab) sans que
+    // la touche cesse de la replier. Une modale ouverte **par-dessus** garde la
+    // sienne ; une modale qui porte le « i » laisse la touche passer
+    // (`escapeBelongsElsewhere`, `data-escape-owner`).
     const onKeyDown = (event: KeyboardEvent) => {
       if (infoHintReaction({ kind: "key", key: event.key }) !== "closeAndFocus") return;
+      if (!infoHintOwnsEscape(rootRef.current, topOpenModal(document))) return;
       event.stopPropagation();
       setOpen(false);
-      buttonRef.current?.focus();
+      if (infoHintRefocusAfterEscape(rootRef.current, document.activeElement, document.body)) buttonRef.current?.focus();
     };
     document.addEventListener("click", onClick);
-    root?.addEventListener("keydown", onKeyDown);
+    document.addEventListener("pointerup", onPointerUp);
+    document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("click", onClick);
-      root?.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("pointerup", onPointerUp);
+      document.removeEventListener("keydown", onKeyDown);
     };
   }, [open]);
 
@@ -102,8 +125,27 @@ export function InfoHint({
 }
 
 /** La rangée « libellé + bouton i » : passe à la ligne, l'explication dessous sur toute la largeur. */
-export function InfoHintRow({ children }: Readonly<{ children: ReactNode }>): React.ReactElement {
-  return <div className={s.row}>{children}</div>;
+export function InfoHintRow({
+  children,
+  inline = false,
+  separated = false,
+}: Readonly<{
+  children: ReactNode;
+  /**
+   * La phrase qui précède est une **phrase en clair** (note, aide) : le « i »
+   * se pose à sa suite, en ligne, et passe à la ligne avec elle au lieu de
+   * tomber seul dessous. Pour un libellé court, la rangée suffit.
+   */
+  inline?: boolean;
+  /**
+   * Le libellé qui précède est celui d'une **case enregistrée au changement** :
+   * un écart plus large, pour qu'un toucher un peu à côté du « i » n'en
+   * bascule pas le réglage.
+   */
+  separated?: boolean;
+}>): React.ReactElement {
+  const className = [s.row, inline ? s.rowInline : "", separated ? s.rowSeparated : ""].filter(Boolean).join(" ");
+  return <div className={className}>{children}</div>;
 }
 
 /**

@@ -148,7 +148,7 @@ export function OAuthButtons({
             </CyberButton>
             {note ? (
               <div style={{ marginTop: 6 }}>
-                <InfoHintRow>
+                <InfoHintRow inline>
                   <p id={noteId} style={{ ...LOGIN_HELP_TEXT_STYLE, margin: 0 }}>
                     {note}
                   </p>

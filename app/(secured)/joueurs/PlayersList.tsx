@@ -165,7 +165,7 @@ export default function PlayersList() {
   } as React.CSSProperties;
 
   return (
-    <div style={accentStyle}>
+    <div className="page-wide" style={accentStyle}>
       <BgCanvas rgb={ACCENT_RGB} />
 
       <header className={s.page}>

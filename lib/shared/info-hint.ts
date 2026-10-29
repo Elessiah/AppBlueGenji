@@ -6,7 +6,7 @@
  */
 import frCommon from "@/messages/fr/common.json";
 import enCommon from "@/messages/en/common.json";
-import type { Locale } from "@/lib/shared/locales";
+import { LOCALES, type Locale } from "@/lib/shared/locales";
 
 /**
  * Le gabarit du nom accessible, par langue (`common.infoHint.label`).
@@ -29,7 +29,8 @@ export function infoHintLabel(locale: Locale, subject: string): string {
 export type InfoHintGesture =
   | { kind: "key"; key: string }
   | { kind: "outsideClick" }
-  | { kind: "insideClick" };
+  | { kind: "insideClick" }
+  | { kind: "outsidePointerUp"; interactive: boolean };
 
 /**
  * Ce que le geste fait de l'explication ouverte : `closeAndFocus` (Échap — le
@@ -38,25 +39,81 @@ export type InfoHintGesture =
  * Le clic ailleurs referme au **clic** et non à l'appui : l'explication est
  * dans le flux de la page, et la replier à l'appui ferait remonter le contrôle
  * visé sous le pointeur — le relâchement tomberait à côté et le clic serait
- * perdu.
+ * perdu. Une cible **non interactive** (du texte, un fond) ne risque pas cela,
+ * et Safari iOS n'envoie aucun `click` au `document` pour elle : elle referme
+ * donc au relâchement (`outsidePointerUp`). Une cible interactive attend son
+ * `click`.
  */
 export function infoHintReaction(gesture: InfoHintGesture): "closeAndFocus" | "close" | "keep" {
-  if (gesture.kind === "key") return gesture.key === "Escape" ? "closeAndFocus" : "keep";
-  return gesture.kind === "outsideClick" ? "close" : "keep";
+  switch (gesture.kind) {
+    case "key":
+      return gesture.key === "Escape" ? "closeAndFocus" : "keep";
+    case "outsideClick":
+      return "close";
+    case "outsidePointerUp":
+      return gesture.interactive ? "keep" : "close";
+    default:
+      return "keep";
+  }
+}
+
+/** Ce que la recherche d'une cible interactive lit de l'élément touché. */
+export interface PointerTarget {
+  closest?(selector: string): unknown;
+}
+
+/** Contrôles qui reçoivent un `click` sur iOS : le geste leur revient. */
+const INTERACTIVE_SELECTOR =
+  'a[href], button, input, select, textarea, label, summary, [role="button"], [role="link"], [role="checkbox"], [role="menuitem"]';
+
+/** La cible d'un relâchement est-elle un contrôle (qui fermera au `click`) ? */
+export function isInteractivePointerTarget(target: PointerTarget | null | undefined): boolean {
+  return Boolean(target?.closest?.(INTERACTIVE_SELECTOR));
 }
 
 /**
- * Après un clic dans l'explication ouverte, faut-il rendre le focus au « i » ?
- * Seulement quand il est parti à un conteneur qui porte le composant (la
- * modale, `tabIndex={-1}`) : Échap y fermerait la modale au lieu de replier le
- * « i ». Sur une page ordinaire il va à `body` — rien à rendre, la lecture
- * reste où elle est.
+ * Après Échap, faut-il rendre le focus au « i » ? Quand il est sur `body`, sur
+ * le conteneur d'une modale qui porte le composant (`tabIndex={-1}`, focus donné
+ * par un clic sur le texte) ou dans le « i » lui-même ; jamais quand il est sur
+ * un champ voisin (Tab depuis l'explication) : l'arracher à la saisie serait
+ * une rupture.
  */
-export function infoHintFocusLeftToContainer(
+export function infoHintRefocusAfterEscape(
   root: Node | null,
   active: Node | null,
   body: Node | null,
 ): boolean {
-  if (!root || !active || active === body) return false;
-  return !root.contains(active) && active.contains(root);
+  if (!root || !active || active === body) return true;
+  return root.contains(active) || active.contains(root);
+}
+
+/** Ce que la recherche de la modale du dessus lit du document. */
+export interface ModalSearchRoot {
+  querySelectorAll(selector: string): { length: number; item(index: number): Node | null };
+}
+
+/** La modale ouverte en dernier (la plus haute : les modales se portent dans `body` dans l'ordre d'ouverture). */
+export function topOpenModal(root: ModalSearchRoot): Node | null {
+  const modals = root.querySelectorAll('[aria-modal="true"]');
+  return modals.item(modals.length - 1);
+}
+
+/**
+ * Le « i » ouvert écoute Échap sur `document` : il ne doit pas le prendre à une
+ * modale ouverte **au-dessus** de lui (`topModal`, la dernière ouverte). Sans
+ * modale, ou une modale qui le porte, la touche est la sienne.
+ */
+export function infoHintOwnsEscape(root: Node | null, topModal: Node | null): boolean {
+  return !topModal || (root !== null && topModal.contains(root));
+}
+
+/**
+ * La langue du nom du bouton : celle de l'élément ambiant le plus proche qui
+ * en déclare une (`lang`) quand elle est connue, sinon celle de la page. Une
+ * modale de personnel `lang="fr"` ouverte sous `/en` garde « Plus d'infos »,
+ * prononcé en français comme le reste du texte qui l'entoure.
+ */
+export function infoHintLocale(ambientLang: string | null | undefined, pageLocale: Locale): Locale {
+  const primary = ambientLang?.trim().toLowerCase().split("-")[0];
+  return LOCALES.find((candidate) => candidate === primary) ?? pageLocale;
 }

@@ -140,7 +140,10 @@ export function AccountMenuPanel({
           </span>
         </LocaleLink>
       )}
-      <button type="button" className={`${s.item} ${s.logout}`} onClick={onLogout} disabled={leaving}>
+      <button type="button" className={`${s.item} ${s.logout}`} onClick={() => !leaving && onLogout()}
+        aria-disabled={leaving || undefined}
+        aria-busy={leaving || undefined}
+      >
         <LogOut className={s.itemIcon} size={16} aria-hidden="true" />
         <span className={s.itemText}>{leaving ? t("account.loggingOut") : t("account.logout")}</span>
       </button>

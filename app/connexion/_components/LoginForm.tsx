@@ -10,7 +10,7 @@ import { CyberCard } from "@/components/cyber/CyberCard";
 import { RgpdConsentModal } from "@/components/cyber/RgpdConsentModal";
 import { DEFAULT_REDIRECT, loginDestination } from "@/lib/shared/safe-redirect";
 import { codeExpiryTime, suspendedLoginText } from "@/lib/shared/login-text";
-import { loginErrorMessage, oauthErrorMessage } from "../_lib/login-errors";
+import { loginErrorMessage, oauthErrorMessage, refusalNeedsServerInvite } from "../_lib/login-errors";
 import {
   detectLoginEnvironment,
   loginEnvironmentNotice,
@@ -103,6 +103,8 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
   const [code, setCode] = useState("");
   const [requested, setRequested] = useState(false);
   const [loading, setLoading] = useState(false);
+  /** Un refus du code qui se lève en rejoignant le serveur : le lien d'invitation s'affiche sous le champ. */
+  const [inviteAfterRefusal, setInviteAfterRefusal] = useState(false);
   // Exposé d'une suspension à afficher : retour OAuth (cookie relu par la
   // page) ou refus du code Discord (corps de la réponse).
   const [suspension, setSuspension] = useState<SuspensionNotice | null>(null);
@@ -208,6 +210,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
   const requestCode = async (event: FormEvent) => {
     event.preventDefault();
     fieldErrors.clear();
+    setInviteAfterRefusal(false);
     setLoading(true);
     try {
       const response = await fetch("/api/auth/discord/request", {
@@ -229,6 +232,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
       showSuccess(t("page.codeSent", { time: codeExpiryTime(text.locale, payload.expiresAt) }));
     } catch (e) {
       fieldErrors.report(errorCode(e), (e as Error).message);
+      setInviteAfterRefusal(refusalNeedsServerInvite(errorCode(e)));
       showError((e as Error).message);
     } finally {
       setLoading(false);
@@ -365,6 +369,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
                   value={handle}
                   onChange={(e) => {
                     setHandle(e.target.value);
+                    setInviteAfterRefusal(false);
                     fieldErrors.clear("handle");
                   }}
                   placeholder={t("page.handlePlaceholder")}
@@ -372,6 +377,21 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
                   {...fieldErrors.aria("handle", "login-discord-handle-help")}
                 />
                 <FieldErrorText fieldId={LOGIN_FIELD_IDS.handle} message={fieldErrors.message("handle")} />
+                {/* Le seul lien d'invitation était derrière le « i » : après un
+                    refus qui se lève en rejoignant le serveur, il se lit à découvert. */}
+                {inviteAfterRefusal && (
+                  <p style={{ ...LOGIN_HELP_TEXT_STYLE, margin: "6px 0 0" }}>
+                    {richNodes(
+                      text.rich("page.inviteAfterRefusal", {}, {
+                        join: (children) => (
+                          <a href={DISCORD_INVITE_URL} target="_blank" rel="noopener noreferrer">
+                            {richNodes(children)}
+                          </a>
+                        ),
+                      }),
+                    )}
+                  </p>
+                )}
               </div>
               <CyberButton
                 variant="ghost"
@@ -424,7 +444,7 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
                 */}
                 {isCertifiableDiscordHandle(handle) && (
                   <div style={{ marginTop: 4 }}>
-                    <InfoHintRow>
+                    <InfoHintRow inline>
                       <span style={LOGIN_HELP_TEXT_STYLE}>
                         {richNodes(
                           text.rich("page.tagNotice", {}, {

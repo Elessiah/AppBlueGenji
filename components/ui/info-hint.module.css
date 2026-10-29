@@ -14,6 +14,55 @@
   row-gap: 0;
 }
 
+/* Le premier élément (libellé, titre) cède la place du bouton : sa largeur de
+   rangée est bornée à « rangée - bouton - écart » (24 + 6 px). Sans cela, un
+   titre qui occupe exactement la rangée à l'arrondi près laissait le bouton
+   tomber seul sur la ligne suivante ; borné, c'est le texte qui passe à la
+   ligne, le « i » reste à sa suite. */
+.row > :first-child {
+  max-inline-size: calc(100% - 30px);
+}
+
+/* Une case enregistrée au changement et son « i » : un écart de 16 px (au lieu
+   de 6) pour qu'un toucher un peu à côté du bouton n'aille pas basculer le
+   réglage par le libellé voisin. */
+.rowSeparated {
+  column-gap: 16px;
+}
+
+.rowSeparated > :first-child {
+  max-inline-size: calc(100% - 40px);
+}
+
+/* Phrase en clair + « i » : la phrase et le bouton sont du texte en ligne dans
+   un bloc, le bouton à la suite du dernier mot ; l'explication, en bloc, passe
+   dessous. La marge de la phrase (haute, basse) ne compte plus : une marge
+   verticale d'un élément en ligne est sans effet, rien ne décale le « i ». */
+.rowInline {
+  display: block;
+}
+
+.rowInline > :first-child {
+  display: inline;
+  max-inline-size: none;
+  margin: 0;
+}
+
+.rowInline .trigger {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-inline-start: 4px;
+  margin-block: -4px;
+}
+
+.rowInline .panel {
+  display: block;
+}
+
+.rowInline .panel[hidden] {
+  display: none;
+}
+
 /* Cible de 24 × 24 px au moins (WCAG 2.5.8), l'icône de 16 px centrée. */
 .trigger {
   flex: none;
@@ -32,9 +81,13 @@
   cursor: pointer;
 }
 
-.trigger:hover {
-  background: var(--blue-glow);
-  color: var(--blue-100);
+/* Survol : souris seulement. Au toucher, `:hover` reste collé après le second
+   toucher et le « i » refermé gardait son fond lumineux. */
+@media (hover: hover) {
+  .trigger:hover {
+    background: var(--blue-glow);
+    color: var(--blue-100);
+  }
 }
 
 .trigger[aria-expanded="true"] {

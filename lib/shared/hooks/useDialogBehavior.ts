@@ -122,7 +122,7 @@ export function useDialogBehavior({ open, onClose, locked = false, initialFocus 
         // leur revient (l'écouteur est posé en capture sur `window`, il
         // passerait avant eux et fermerait la modale entière — saisie comprise).
         if (lockedRef.current) return;
-        if (escapeBelongsElsewhere(layers, event.target as HTMLElement | null)) return;
+        if (escapeBelongsElsewhere(layers, event.target as HTMLElement | null, containerRef.current)) return;
         event.stopPropagation();
         closeRef.current();
         return;

@@ -428,6 +428,18 @@
 
 /* ── Applications connectées ──────────────────────────────────────────────── */
 
+/* Ligne en deux colonnes — texte, puis actions — au lieu des quatre du
+   `.table-row` : l'explication du « i » s'ouvre sur toute la colonne de texte
+   (et non dans ~35 % de la ligne), et le bouton Détacher/Rattacher se cale à
+   droite, centré sur la ligne. Sous 920 px, la pile du `.table-row` reprend. */
+@media (min-width: 921px) {
+  .connectionRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 12px;
+  }
+}
+
 .connectionName {
   display: inline-flex;
   align-items: center;

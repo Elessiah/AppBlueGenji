@@ -282,15 +282,17 @@ export default function PlayerDetailPage() {
                 et le titulaire ne saurait pas qui le lit encore.
               */}
               {battletagHint && (
-                <InfoHintRow>
-                  <p id="player-battletag-hint" className={styles.hint}>
-                    {battletagHint.status}
-                  </p>
-                  <InfoHint id="player-battletag-more" subject={t("page.battletag")}>
-                    <AudienceList lines={hiddenBattletagAudienceLines(t)} />
-                    {battletagHint.badge ? <p>{t("page.battletagHiddenSelfBadge")}</p> : null}
-                  </InfoHint>
-                </InfoHintRow>
+                <div className={styles.hintRow}>
+                  <InfoHintRow inline>
+                    <p id="player-battletag-hint" className={styles.hint}>
+                      {battletagHint.status}
+                    </p>
+                    <InfoHint id="player-battletag-more" subject={t("page.battletag")}>
+                      <AudienceList lines={hiddenBattletagAudienceLines(t)} />
+                      {battletagHint.badge ? <p>{t("page.battletagHiddenSelfBadge")}</p> : null}
+                    </InfoHint>
+                  </InfoHintRow>
+                </div>
               )}
             </div>
             <div className="field">
