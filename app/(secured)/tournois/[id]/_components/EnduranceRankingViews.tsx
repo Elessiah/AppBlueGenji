@@ -378,8 +378,13 @@ export function EnduranceRankingViews({
       count: (previous?.count ?? 0) + 1,
     }));
     setSelectedKey(targetKey);
-    if (focus) tabRefs.current[target]?.focus();
-    else announce(viewTitle(views[target], text));
+    if (focus) {
+      // Un onglet s'annonce de lui-même : une annonce encore en attente
+      // (navigation du bas, < 60 ms) dirait une vue qui n'est plus affichée.
+      if (announceTimer.current !== null) clearTimeout(announceTimer.current);
+      setAnnouncement("");
+      tabRefs.current[target]?.focus();
+    } else announce(viewTitle(views[target], text));
   };
 
   const onTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {

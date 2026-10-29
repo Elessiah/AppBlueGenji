@@ -119,6 +119,8 @@ describe("EnduranceRankingViews — gestes réservés au Général", () => {
     expect(RANKING).toContain('setAnnouncement("");');
     expect(RANKING).toContain("setTimeout(() => setAnnouncement(title), 60)");
     expect(RANKING).toContain("clearTimeout(announceTimer.current)");
+    // Un onglet cliqué annule l'annonce en attente de la navigation du bas.
+    expect(RANKING).toMatch(/if \(focus\) \{[^}]*clearTimeout\(announceTimer\.current\);[^}]*setAnnouncement\(""\);/);
     // Un onglet cliqué garde le focus et s'annonce de lui-même.
     expect(RANKING).toContain("onClick={() => go(candidateIndex, true)}");
   });
