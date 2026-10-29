@@ -16,7 +16,12 @@
  * c'est-à-dire trop tard, et le joueur cherche alors une faute dans un champ
  * qu'il a pourtant corrigé.
  *
- * La règle est donc : **un compte Blizzard rattaché possède son BattleTag.**
+ * La règle est donc : **un compte Blizzard rattaché possède le BattleTag qu'il
+ * a donné.** Un Battle.net qui n'en donne **aucun** ne possède rien : la saisie
+ * du joueur reste en place à la connexion, marquée tapée et jamais vérifiée
+ * (`lib/server/battletag-origin.ts`, décision D3), et le champ reste donc
+ * ouvert — la prochaine connexion ne l'écrasera que par un BattleTag de
+ * Blizzard.
  *
  * **Le retrait n'y fait pas exception, et c'est là que la règle s'écarte de
  * celle du tag Discord** (`lib/shared/discord-tag-lock.ts`), qui l'autorise.
@@ -32,7 +37,8 @@
  *
  * Module **pur** : l'état du rattachement est un fait que l'appelant a déjà
  * établi (le serveur sur la ligne du compte, l'écran depuis
- * `GET /api/profile/connections`).
+ * `GET /api/profile/connections`), comme l'origine du BattleTag (le serveur
+ * sur la ligne, l'écran par `battletagVerified` du profil).
  */
 
 /**
@@ -52,13 +58,12 @@ export const BATTLETAG_LOCKED = "BATTLETAG_LOCKED";
 /**
  * Le BattleTag est-il encore saisissable ? `null` = oui.
  *
- * Le rattachement seul décide — jamais le tag stocké. Un compte Battle.net qui
- * n'a donné **aucun** BattleTag reste verrouillé : ce que le joueur saisirait
- * là serait réécrit à sa prochaine connexion Battle.net (par le BattleTag de
- * Blizzard, ou effacé s'il n'en donne toujours aucun), et un champ ouvert sur
- * une valeur vouée à disparaître est un piège, pas une liberté.
+ * `verified` : le BattleTag stocké vient de Battle.net (`battletagFromBlizzard`
+ * et non vide). Faux, rien ne le possède — aucun Battle.net, ou un Battle.net
+ * qui n'en a donné aucun : la saisie est gardée à la connexion, le champ est
+ * ouvert, quel que soit l'état connu du rattachement.
  *
- * **Un rattachement inconnu verrouille aussi**, et ce défaut-là est le seul
+ * Vérifié, **un rattachement inconnu verrouille aussi**, et ce défaut-là est le seul
  * tenable — même arbitrage que pour le tag Discord. Les deux erreurs ne se
  * valent pas : verrouiller à tort fait attendre un rechargement, ouvrir à tort
  * laisse saisir une valeur que la route refusera en 409, et ce refus emporte
@@ -67,7 +72,10 @@ export const BATTLETAG_LOCKED = "BATTLETAG_LOCKED";
  */
 export function checkBattletagEdit(state: {
   linked: boolean | null;
+  verified: boolean;
 }): BattletagEditRefusal | null {
+  // `=== false` et non `!` : seule une origine connue pour non vérifiée ouvre.
+  if (state.verified === false) return null;
   // Le test porte sur les deux valeurs **connues**, et tout le reste retombe
   // sur l'inconnu. Écrit dans l'autre sens (`linked === null` d'abord), un
   // `undefined` glisserait entre les branches et **ouvrirait** le champ —
@@ -78,7 +86,7 @@ export function checkBattletagEdit(state: {
 }
 
 /** Raccourci de lecture, pour les écrans qui n'ont qu'un booléen à poser. */
-export function isBattletagLocked(state: { linked: boolean | null }): boolean {
+export function isBattletagLocked(state: { linked: boolean | null; verified: boolean }): boolean {
   return checkBattletagEdit(state) !== null;
 }
 
@@ -100,7 +108,6 @@ export type BattletagLockNotice = { status: string; details: readonly string[] }
  * se lit comme une panne.
  */
 export function battletagLockNotice(state: {
-  tag: string | null;
   linked: boolean | null;
   /**
    * La lecture de l'état est **en cours**.
@@ -126,12 +133,8 @@ export function battletagLockNotice(state: {
   }
   const change =
     "Pour en changer, retire Blizzard des « Applications connectées » (après avoir ajouté un autre moyen de connexion si c'est le seul), puis rattache le bon compte.";
-  if (!state.tag) {
-    // Rattaché sans BattleTag : le cas existe (un compte Battle.net peut n'en
-    // porter aucun), et le champ reste fermé parce que la prochaine connexion
-    // écrira celui de la source par-dessus.
-    return { status: "Compte Blizzard rattaché, sans BattleTag : Blizzard le remplira à ta prochaine connexion.", details: [change] };
-  }
+  // Verrouillé et rattaché : le BattleTag vient de Blizzard (un Battle.net
+  // sans BattleTag laisse le champ ouvert, `checkBattletagEdit`).
   return {
     status: "Fourni par ton compte Blizzard, et mis à jour à chaque connexion.",
     details: [change, "Pour le retirer de ta fiche, de l'annuaire et des rosters, décoche « BattleTag OW » plus bas."],

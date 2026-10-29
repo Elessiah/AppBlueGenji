@@ -77,6 +77,12 @@ interface SpecialUserDef {
    * qu'il faut pour s'inscrire comme caster d'un match (`castBlockReason`).
    */
   blizzardSub?: string;
+  /**
+   * BattleTag tapé, gardé sous un Battle.net qui n'en a donné aucun
+   * (`overwatch_battletag_typed`, `lib/server/battletag-origin.ts`) : jamais
+   * vérifié.
+   */
+  battletagTyped?: boolean;
 }
 
 const SPECIAL_USERS: SpecialUserDef[] = [
@@ -121,6 +127,14 @@ const SPECIAL_USERS: SpecialUserDef[] = [
     discordTag: "test_cocaster",
     discordVerified: true,
     blizzardSub: "seed-blizzard-cocaster",
+  },
+  {
+    pseudo: "BattletagTape",
+    purpose:
+      "Battle.net rattaché qui n'a donné aucun BattleTag : le BattleTag tapé est gardé, sans pastille « vérifié », et reste modifiable",
+    isAdult: 1,
+    blizzardSub: "seed-blizzard-tape",
+    battletagTyped: true,
   },
   {
     pseudo: "CommunityManager",
@@ -281,6 +295,7 @@ function specialUserInsertParams(def: SpecialUserDef, pseudo: string): (string |
     def.discordTag ?? null,
     def.blizzardSub ?? null,
     withTags ? `${def.pseudo}#1000` : null,
+    def.battletagTyped ? 1 : 0,
     withTags ? `${def.pseudo}#2023` : null,
     visibility.avatar,
     visibility.overwatch,
@@ -308,10 +323,10 @@ export async function createSpecialUsers(db: Pool): Promise<Map<string, number>>
       const [result] = await db.execute<ResultSetHeader>(
         `INSERT INTO bg_users
          (pseudo, discord_id, discord_pseudo, discord_verified_at,
-          blizzard_sub, overwatch_battletag, marvel_rivals_tag,
+          blizzard_sub, overwatch_battletag, overwatch_battletag_typed, marvel_rivals_tag,
           visible_avatar, visible_overwatch, visible_marvel, visible_major, visible_discord,
           open_to_recruitment, is_adult, is_admin, is_deleted, platform_roles_json)
-         VALUES (?, ?, ?, ${def.discordVerified ? "NOW()" : "NULL"}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ${def.discordVerified ? "NOW()" : "NULL"}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         specialUserInsertParams(def, pseudo),
       );
       const id = result.insertId as number;

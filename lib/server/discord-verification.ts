@@ -38,7 +38,7 @@ import { getDatabase } from "@/lib/server/database";
 import { resolveDiscordUser, sendDiscordLoginCode } from "@/lib/server/bot-integration";
 import { accountLocaleForDiscordId } from "@/lib/server/users/account-locale";
 import { isDuplicateEntryError } from "@/lib/server/mysql-errors";
-import { forgetCertificationPromptsOf } from "@/lib/server/tournaments/certification-prompt-cache";
+import { forgetCertificationPromptsAround } from "@/lib/server/tournaments/certification-prompt";
 import type { ConnectionMethod } from "@/lib/shared/account-connections";
 import {
   consumeDiscordLoginChallenge,
@@ -182,8 +182,9 @@ async function writeVerifiedTag(userId: number, discordId: string, tag: string):
     if (!(await loadDiscordRow(userId))) throw new Error("PROFILE_NOT_FOUND");
     throw new Error("DISCORD_ID_MISMATCH");
   }
-  // Certifié : l'invitation de la fiche tournoi retenue pour ce compte ne vaut plus.
-  forgetCertificationPromptsOf(userId);
+  // Certifié : l'invitation de la fiche tournoi retenue pour ce compte — et
+  // celles de ses coéquipiers, « équipe sans contact » — ne valent plus.
+  await forgetCertificationPromptsAround(userId);
 }
 
 
@@ -239,8 +240,9 @@ export async function certifyLinkedDiscordTag(
       [userId, expected],
     );
     if (Number(result.affectedRows) > 0) {
-      // Certifié : l'invitation de la fiche tournoi retenue pour ce compte ne vaut plus.
-      forgetCertificationPromptsOf(userId);
+      // Certifié : l'invitation de la fiche tournoi retenue pour ce compte — et
+      // celles de ses coéquipiers — ne valent plus.
+      await forgetCertificationPromptsAround(userId);
       return { status: "VERIFIED", tag: expected };
     }
   }

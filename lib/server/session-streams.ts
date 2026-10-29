@@ -20,11 +20,20 @@
  * tant que l'application tourne en instance unique.
  */
 
+/**
+ * Pourquoi un flux est fermé : `REVOKED`, la session ne l'autorise plus (la
+ * route répondra 401) ; `RECONNECT`, seul le contexte du lecteur a changé — le
+ * client se reconnecte et la route le relit, sans refus.
+ */
+export type StreamCloseReason = "REVOKED" | "RECONNECT";
+
 type Entry = {
   userId: number;
   /** Empreinte de la session — `""` pour le contournement de développement. */
   tokenHash: string;
-  close: () => void;
+  /** Tournoi suivi par le flux, `null` s'il n'en désigne aucun. */
+  tournamentId: number | null;
+  close: (reason: StreamCloseReason) => void;
 };
 
 /**
@@ -100,27 +109,29 @@ function registry(): Set<Entry> {
 
 /**
  * Inscrit un flux ouvert. Rend la désinscription, à appeler à sa fermeture
- * (idempotente).
+ * (idempotente). `close` reçoit la raison de la fermeture : seule `REVOKED`
+ * doit refuser un flux encore en ouverture.
  */
 export function registerSessionStream(
   userId: number,
   tokenHash: string,
-  close: () => void,
+  close: (reason: StreamCloseReason) => void,
+  tournamentId: number | null = null,
 ): () => void {
-  const entry: Entry = { userId, tokenHash, close };
+  const entry: Entry = { userId, tokenHash, tournamentId, close };
   registry().add(entry);
   return () => {
     registry().delete(entry);
   };
 }
 
-function closeMatching(predicate: (entry: Entry) => boolean): number {
+function closeMatching(predicate: (entry: Entry) => boolean, reason: StreamCloseReason = "REVOKED"): number {
   // Copie d'abord : `close` désinscrit l'entrée pendant le parcours.
   const targets = [...registry()].filter(predicate);
   for (const entry of targets) {
     registry().delete(entry);
     try {
-      entry.close();
+      entry.close(reason);
     } catch {
       // Un flux déjà terminé ne doit pas empêcher de fermer les suivants.
     }
@@ -145,15 +156,31 @@ export function closeUserStreams(userId: number, options: { keepTokenHash?: stri
 }
 
 /**
- * Fait reconnecter les flux d'un compte **sans révoquer** sa session : rien
- * n'est noté pour `revokedSince`, si bien qu'un flux en cours d'ouverture
- * n'est pas refusé (401). Sert quand le contexte du lecteur change (équipe
- * quittée, retirée, dissoute) : le client se reconnecte et la route le relit.
+ * Fait reconnecter les flux de ces comptes **sans révoquer** leur session :
+ * rien n'est noté pour `revokedSince`, et le rappel reçoit `RECONNECT` — un
+ * flux en cours d'ouverture n'est pas refusé (401), il se ferme sitôt ouvert.
+ * Sert quand le contexte du lecteur change (équipe quittée, retirée, dissoute,
+ * rôle changé) : le client se reconnecte et la route le relit.
+ *
+ * `tournamentIds` : seuls les flux de ces tournois (ceux où l'équipe est
+ * engagée, ou ouverts aux inscriptions) — un tournoi sans rapport n'est pas
+ * dérangé. Un seul passage sur le registre, quel que soit le nombre de comptes.
  *
  * @returns le nombre de flux fermés.
  */
-export function reconnectUserStreams(userId: number): number {
-  return closeMatching((entry) => entry.userId === userId);
+export function reconnectUserStreams(
+  userIds: number | Iterable<number>,
+  options: { tournamentIds?: ReadonlySet<number> } = {},
+): number {
+  const users = new Set(typeof userIds === "number" ? [userIds] : userIds);
+  if (users.size === 0) return 0;
+  const { tournamentIds } = options;
+  return closeMatching(
+    (entry) =>
+      users.has(entry.userId) &&
+      (tournamentIds === undefined || (entry.tournamentId !== null && tournamentIds.has(entry.tournamentId))),
+    "RECONNECT",
+  );
 }
 
 /**

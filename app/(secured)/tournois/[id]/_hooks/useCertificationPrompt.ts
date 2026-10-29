@@ -8,6 +8,7 @@ import {
   shouldOpenCertificationPrompt,
   type CertificationPrompt,
 } from "@/lib/shared/certification-prompt";
+import { CERTIFY_PROMPT_OTHER_ACCOUNT } from "@/lib/shared/discord-certify-prompt";
 import { anotherModalOpen, watchUrgentModalOpened } from "@/lib/shared/dialog-focus";
 
 /** Un stockage du navigateur, `null` s'il est inaccessible (accès refusé, rendu serveur). */
@@ -23,19 +24,23 @@ function browserStorage(kind: "localStorage" | "sessionStorage"): Storage | null
  * « Ne plus voir » coché : gardé sur le compte (`POST`, `keepalive` — la
  * fermeture peut être un départ vers le profil). Le corps porte le compte à
  * qui la modale a été montrée : une session changée depuis (autre compte
- * connecté dans un autre onglet) est refusée sans rien écrire. Un échec n'a
- * pas de suite visible : la modale reviendra simplement à une prochaine fiche,
- * comme avant le choix.
+ * connecté dans un autre onglet) est refusée sans rien écrire : ce refus-là
+ * est dit (`onOtherAccount`), le choix n'ayant pas été gardé pour le compte
+ * qui l'a fait. Un autre échec n'a pas de suite visible : la modale reviendra
+ * simplement à une prochaine fiche, comme avant le choix.
  */
-async function saveNeverAgain(shownTo: number | null): Promise<void> {
+export async function saveNeverAgain(shownTo: number | null, onOtherAccount: () => void): Promise<void> {
   if (shownTo == null) return;
   try {
-    await fetch(CERTIFICATION_PROMPT_OFF_PATH, {
+    const response = await fetch(CERTIFICATION_PROMPT_OFF_PATH, {
       method: "POST",
       keepalive: true,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId: shownTo }),
     });
+    if (response.ok) return;
+    const payload = (await response.json().catch(() => null)) as { error?: unknown } | null;
+    if (payload?.error === CERTIFY_PROMPT_OTHER_ACCOUNT) onOtherAccount();
   } catch {
     // Réseau, ou `fetch` indisponible (document qui part) : rien de gardé.
   }
@@ -65,13 +70,24 @@ async function saveNeverAgain(shownTo: number | null): Promise<void> {
  * ouverte, « Ne plus voir »). Tournoi clos ou équipe retirée
  * depuis : masquée sur-le-champ (`liveCertificationPrompt`, instantané à
  * jour). Une fiche figée la masque aussi.
+ *
+ * `onOtherAccount` : « Ne plus voir » refusé parce qu'un autre compte est
+ * connecté depuis dans ce navigateur — l'appelant le notifie.
  */
 export function useCertificationPrompt(
   tournamentId: number,
   prompt: CertificationPrompt | null | undefined,
   frozen: boolean,
   viewerUserId: number | null,
+  onOtherAccount: () => void,
 ) {
+  // Lu au moment du refus : un rappel neuf à chaque rendu ne recrée pas
+  // `close` ni ne réarme l'observateur des modales urgentes.
+  const onOtherAccountRef = useRef(onOtherAccount);
+  useEffect(() => {
+    onOtherAccountRef.current = onOtherAccount;
+  }, [onOtherAccount]);
+  const refused = useCallback(() => onOtherAccountRef.current(), []);
   const [open, setOpen] = useState(false);
   // Case « Ne plus voir » : son seul état, tenu ici pour valoir aussi quand la
   // modale s'efface devant une urgente. La modale l'affiche (case, libellé
@@ -122,10 +138,10 @@ export function useCertificationPrompt(
 
   const close = useCallback(() => {
     rememberCertificationPromptClosed(browserStorage("sessionStorage"));
-    if (neverAgain) void saveNeverAgain(shownTo.current);
+    if (neverAgain) void saveNeverAgain(shownTo.current, refused);
     doneForPage.current = true;
     setOpen(false);
-  }, [neverAgain]);
+  }, [neverAgain, refused]);
 
   // S'effacer devant une modale urgente, sans rien retenir dans le navigateur —
   // l'invitation n'a peut-être pas été lue — mais pour le reste de la page :
@@ -134,10 +150,10 @@ export function useCertificationPrompt(
   // « Ne plus voir » déjà cochée vaut pourtant : gardée sur le compte, sans le
   // drapeau d'onglet d'une fermeture.
   const yieldPlace = useCallback(() => {
-    if (neverAgain) void saveNeverAgain(shownTo.current);
+    if (neverAgain) void saveNeverAgain(shownTo.current, refused);
     doneForPage.current = true;
     setOpen(false);
-  }, [neverAgain]);
+  }, [neverAgain, refused]);
 
   // Invitation retirée (certifiée entre-temps, lecture en échec) : la modale se
   // ferme sans rien retenir, et la décision reprend à son retour — autre

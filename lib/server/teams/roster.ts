@@ -6,7 +6,42 @@ import { withoutInvisibles } from "@/lib/shared/visible-text";
 import { sanitizeRoles } from "@/lib/server/users/roles";
 import { assertTermsAccepted } from "@/lib/server/terms-acceptance";
 import { reconnectUserStreams } from "@/lib/server/session-streams";
+import { forgetCertificationPromptsOfTeam } from "@/lib/server/tournaments/certification-prompt-cache";
 import { lockMemberRoles, withTeamRosterLock, writeActiveMembership } from "./access";
+
+/**
+ * Tournois dont le flux lit l'équipe `teamId` dans le contexte du lecteur :
+ * ceux où elle est engagée, et ceux qui ne sont pas commencés (inscription
+ * possible). Les autres ne changent pas d'un geste de roster.
+ */
+export async function teamStreamTournamentIds(
+  connection: Pick<PoolConnection, "execute">,
+  teamId: number,
+): Promise<Set<number>> {
+  const [rows] = await connection.execute<(RowDataPacket & { id: number })[]>(
+    `SELECT tournament_id AS id FROM bg_tournament_registrations WHERE team_id = ?
+     UNION
+     SELECT id FROM bg_tournaments WHERE state IN ('UPCOMING', 'REGISTRATION')`,
+    [teamId],
+  );
+  return new Set(rows.map((row) => Number(row.id)));
+}
+
+/**
+ * Après un geste de roster commité : un flux de tournoi ne lit l'équipe du
+ * lecteur (et ses rôles) qu'à son ouverture. Ceux de ces comptes, sur les
+ * tournois concernés, sont fermés pour se reconnecter, et les invitations à
+ * certifier de toute l'équipe sont oubliées (« équipe sans contact »,
+ * invitation du meneur) — `session-streams.ts`, `certification-prompt-cache.ts`.
+ */
+export function refreshTeamViewers(
+  teamId: number,
+  userIds: Iterable<number>,
+  tournamentIds: ReadonlySet<number>,
+): void {
+  forgetCertificationPromptsOfTeam(teamId);
+  reconnectUserStreams(userIds, { tournamentIds });
+}
 
 /*
  * Roster d'une équipe en place : rôles des membres, exclusion, départ,
@@ -28,6 +63,7 @@ export async function updateTeamMemberRoles(
   memberUserId: number,
   roles: TeamRole[],
 ): Promise<void> {
+  let tournamentIds = new Set<number>();
   await withTeamRosterLock(teamId, async (connection) => {
     const requesterRoles = await lockMemberRoles(connection, teamId, requesterId);
     if (!requesterRoles) throw new Error("FORBIDDEN");
@@ -60,7 +96,11 @@ export async function updateTeamMemberRoles(
       teamId,
       memberUserId,
     );
+    tournamentIds = await teamStreamTournamentIds(connection, teamId);
   });
+  // Rôle changé : un MANAGER rétrogradé gardait l'invitation du meneur (et les
+  // gestes de gestion) jusqu'à sa reconnexion, un promu ne la recevait pas.
+  refreshTeamViewers(teamId, [memberUserId], tournamentIds);
 }
 
 /**
@@ -73,6 +113,7 @@ export async function updateTeamMemberRoles(
  * `CANNOT_KICK_OWNER`, emportant le seul `OWNER` de l'équipe.
  */
 export async function removeTeamMember(requesterId: number, teamId: number, memberUserId: number): Promise<void> {
+  let tournamentIds = new Set<number>();
   await withTeamRosterLock(teamId, async (connection) => {
     const requesterRoles = await lockMemberRoles(connection, teamId, requesterId);
     if (!requesterRoles) throw new Error("FORBIDDEN");
@@ -92,12 +133,13 @@ export async function removeTeamMember(requesterId: number, teamId: number, memb
     }
 
     await writeActiveMembership(connection, "left_at = NOW()", [], teamId, memberUserId);
+    tournamentIds = await teamStreamTournamentIds(connection, teamId);
   });
   // Un flux de tournoi ne lit l'équipe du lecteur qu'à son ouverture : exclu,
   // il gardait l'invitation à certifier de son ancienne équipe (et son
   // engagement) jusqu'à la reconnexion. Le fermer fait reconnecter le client,
   // et la route recalcule le contexte (`session-streams.ts`).
-  reconnectUserStreams(memberUserId);
+  refreshTeamViewers(teamId, [memberUserId], tournamentIds);
 }
 
 /**
@@ -108,15 +150,17 @@ export async function removeTeamMember(requesterId: number, teamId: number, memb
  * pendant son départ partait avec, et l'équipe restait sans propriétaire.
  */
 export async function leaveTeam(userId: number, teamId: number): Promise<void> {
+  let tournamentIds = new Set<number>();
   await withTeamRosterLock(teamId, async (connection) => {
     const roles = await lockMemberRoles(connection, teamId, userId);
     if (!roles) throw new Error("NOT_A_MEMBER");
     if (roles.includes("OWNER")) throw new Error("OWNER_MUST_TRANSFER");
 
     await writeActiveMembership(connection, "left_at = NOW()", [], teamId, userId);
+    tournamentIds = await teamStreamTournamentIds(connection, teamId);
   });
   // Parti : ses flux de tournoi recalculent son contexte (voir `removeTeamMember`).
-  reconnectUserStreams(userId);
+  refreshTeamViewers(teamId, [userId], tournamentIds);
 }
 
 /**
@@ -188,6 +232,7 @@ export async function transferTeamOwnership(
   }
 
   let targetDeleted = false;
+  let tournamentIds = new Set<number>();
   await withTeamRosterLock(
     teamId,
     async (connection) => {
@@ -225,6 +270,7 @@ export async function transferTeamOwnership(
         teamId,
         newOwnerUserId,
       );
+      tournamentIds = await teamStreamTournamentIds(connection, teamId);
     },
     async (connection) => {
       const [targetAccount] = await connection.execute<(RowDataPacket & { is_deleted: 0 | 1 })[]>(
@@ -234,4 +280,6 @@ export async function transferTeamOwnership(
       targetDeleted = targetAccount.length === 0 || targetAccount[0].is_deleted === 1;
     },
   );
+  // Les deux rôles ont changé : les deux contextes se relisent.
+  refreshTeamViewers(teamId, [requesterId, newOwnerUserId], tournamentIds);
 }

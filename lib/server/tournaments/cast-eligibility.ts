@@ -17,11 +17,11 @@ import { castBlockReason, type CastBlock, type CasterIdentity } from "@/lib/shar
 import { refereeBlockReason, type RefereeBlock } from "@/lib/shared/match-referee";
 import { can, sanitizePlatformRoles } from "@/lib/shared/permissions";
 import { isUnknownColumnError } from "@/lib/server/mysql-errors";
+import { battletagFromBlizzard, type BattletagOriginFields } from "@/lib/server/battletag-origin";
 
-type CasterIdentityFields = {
+type CasterIdentityFields = BattletagOriginFields & {
   discord_verified_at: Date | string | null;
   discord_pseudo: string | null;
-  blizzard_sub: string | null;
   overwatch_battletag: string | null;
   is_deleted: number;
 };
@@ -39,7 +39,7 @@ export type CastEligibilityRow = RowDataPacket & CastEligibilityFields;
 /** Ce qui s'exécute : une connexion ou le pool. */
 type Executor = Pick<PoolConnection, "execute">;
 
-const CAST_ELIGIBILITY_COLUMNS = `discord_verified_at, discord_pseudo, blizzard_sub, overwatch_battletag,
+const CAST_ELIGIBILITY_COLUMNS = `discord_verified_at, discord_pseudo, blizzard_sub, overwatch_battletag, overwatch_battletag_typed,
         is_deleted, is_admin, platform_roles_json`;
 
 /** Identité d'un caster lue sur sa ligne ; un compte absent ou supprimé n'en a aucune. */
@@ -47,7 +47,9 @@ export function casterIdentityOf(row: CasterIdentityFields | undefined): CasterI
   if (!row || Number(row.is_deleted) === 1) return { discordVerified: false, blizzardLinked: false };
   return {
     discordVerified: row.discord_verified_at !== null && Boolean(row.discord_pseudo),
-    blizzardLinked: row.blizzard_sub !== null && Boolean(row.overwatch_battletag),
+    // Un BattleTag tapé, gardé sous un Battle.net qui n'en donne aucun, n'est
+    // pas vérifié (`battletag-origin.ts`).
+    blizzardLinked: battletagFromBlizzard(row) && Boolean(row.overwatch_battletag),
   };
 }
 

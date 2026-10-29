@@ -70,7 +70,7 @@ import { DEFAULT_LOCALE, isLocale, localeHref, type Locale } from "@/lib/shared/
 import { TERMS_REQUIRED, TERMS_VERSION } from "@/lib/shared/terms-of-use";
 import { recordLoginLocale } from "@/lib/server/users/account-locale";
 import { startedOnSitePage } from "@/lib/server/request-origin";
-import { forgetCertificationPromptsOf } from "@/lib/server/tournaments/certification-prompt-cache";
+import { forgetCertificationPromptsAround } from "@/lib/server/tournaments/certification-prompt";
 
 /** Où retombe un rattachement, réussi ou non. */
 const PROFILE_PATH = "/profil";
@@ -314,8 +314,9 @@ async function completeLink(
     return linkFailure(base, provider, isLinkRefusal(message) ? message : "LINK_FAILED", locale);
   }
   // Rattachement (Battle.net : BattleTag vérifié ; Discord) : l'invitation à
-  // certifier retenue pour ce compte ne vaut plus (`CERTIFICATION_PROMPT.md`).
-  forgetCertificationPromptsOf(user.id);
+  // certifier retenue pour ce compte — et pour ses coéquipiers — ne vaut plus
+  // (`CERTIFICATION_PROMPT.md`).
+  await forgetCertificationPromptsAround(user.id);
 
   const url = new URL(localeHref(PROFILE_PATH, locale), base);
   url.searchParams.set("connected", OAUTH_PROVIDER_SLUGS[provider]);

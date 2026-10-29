@@ -359,6 +359,12 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // Opposition retenue d'un arbitre (`docs/features/MATCH_REFEREE.md`) : plus
     // aucun arbitrage tant qu'elle n'est pas levée.
     `ALTER TABLE bg_users ADD COLUMN referee_objection_at DATETIME NULL`,
+    // Origine du BattleTag (`lib/server/battletag-origin.ts`) : un BattleTag
+    // tapé est gardé sous un Battle.net qui n'en donne aucun, sans passer pour
+    // vérifié. `0` et **aucun remplissage** : les tags antérieurs gardent la
+    // règle d'avant jusqu'à la prochaine connexion Battle.net.
+    `ALTER TABLE bg_users ADD COLUMN overwatch_battletag_typed TINYINT(1) NOT NULL DEFAULT 0
+       AFTER overwatch_battletag`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

@@ -527,7 +527,7 @@ export async function loadCasterIdentity(
   userId: number,
 ): Promise<CasterIdentity> {
   const [rows] = await connection.execute<CasterIdentityRow[]>(
-    `SELECT discord_verified_at, discord_pseudo, blizzard_sub, overwatch_battletag, is_deleted
+    `SELECT discord_verified_at, discord_pseudo, blizzard_sub, overwatch_battletag, overwatch_battletag_typed, is_deleted
      FROM bg_users WHERE id = ? LIMIT 1`,
     [userId],
   );

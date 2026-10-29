@@ -12,7 +12,11 @@
  * 409 `CERTIFY_PROMPT_OTHER_ACCOUNT` sans rien écrire ; un corps sans compte
  * lisible, 400 `INVALID_ACTION`. Il n'existe pas de
  * geste pour la réafficher : la certification reste offerte dans « Mon profil ».
+ *
+ * Plafonné par compte (`CERTIFICATION_PROMPT_OFF_RULE`, 429) ; un choix déjà
+ * gardé n'écrit rien et ne parcourt pas la mémoire des invitations.
  */
+import { CERTIFICATION_PROMPT_OFF_RULE, enforceRateLimit } from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { isUnknownColumnError } from "@/lib/server/mysql-errors";
@@ -32,6 +36,8 @@ export async function POST(req: Request) {
   }
   if (shownTo == null) return fail("INVALID_ACTION", 400);
   if (shownTo !== user.id) return fail(CERTIFY_PROMPT_OTHER_ACCOUNT, 409);
+  const throttled = enforceRateLimit(CERTIFICATION_PROMPT_OFF_RULE, user.id);
+  if (throttled) return throttled;
   try {
     await recordCertificationPromptOff(user.id);
     return ok({ saved: true });

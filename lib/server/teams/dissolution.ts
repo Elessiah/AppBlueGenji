@@ -4,8 +4,8 @@ import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
 import { invalidateLandingCounters } from "@/lib/server/landing-cache";
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
 import { invalidateStats, invalidateStatsOf } from "@/lib/server/stats-cache";
-import { reconnectUserStreams } from "@/lib/server/session-streams";
 import { ghostAdminOverride, lockMemberRoles, userOwnsTeam } from "./access";
+import { refreshTeamViewers, teamStreamTournamentIds } from "./roster";
 
 async function teamIsDeleted(teamId: number): Promise<boolean> {
   const db = await getDatabase();
@@ -40,6 +40,7 @@ export async function softDeleteTeam(
   let detachedUserIds: number[] = [];
   /** Inscrite au moins une fois à un tournoi : d'autres vues la nomment. */
   let everRegistered = false;
+  let streamTournamentIds = new Set<number>();
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
@@ -107,6 +108,7 @@ export async function softDeleteTeam(
       [teamId],
     );
     everRegistered = registrations.length > 0;
+    streamTournamentIds = await teamStreamTournamentIds(connection, teamId);
 
     await connection.commit();
   } catch (error) {
@@ -135,8 +137,9 @@ export async function softDeleteTeam(
   }
   // Un flux de tournoi ne lit l'équipe du lecteur qu'à son ouverture : les
   // membres détachés gardaient l'invitation à certifier de l'équipe dissoute
-  // jusqu'à la reconnexion (`session-streams.ts`).
-  for (const userId of detachedUserIds) reconnectUserStreams(userId);
+  // jusqu'à la reconnexion (`session-streams.ts`). Un seul passage sur le
+  // registre pour tous les membres, limité aux tournois concernés.
+  refreshTeamViewers(teamId, detachedUserIds, streamTournamentIds);
 
   // Vider la colonne ne retirait pas l'image : le fichier restait servi par
   // `/api/uploads/teams/…`, en cache public d'un an. Après le commit (un

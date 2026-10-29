@@ -47,6 +47,7 @@ import {
   type TermsConsent,
 } from "@/lib/server/users/sign-in";
 import { normalizeBattletag, normalizeDiscordHandle } from "@/lib/server/users/tag-normalization";
+import { BLIZZARD_BATTLETAG_SET_SQL } from "@/lib/server/battletag-origin";
 import {
   buildAccountConnections,
   checkConnectionUnlink,
@@ -253,16 +254,15 @@ async function writeLinkedIdentity(
     return result;
   }
   if (identity.provider === "BLIZZARD") {
-    // Même règle qu'à la connexion : Blizzard fait foi sur le BattleTag, même
-    // quand il n'en a pas à donner. Un BattleTag tapé avant le rattachement
-    // est alors effacé : gardé, il passerait pour « vérifié »
-    // (`hasVerifiedBattletag` : Battle.net rattaché et un BattleTag), et le
-    // verrou (`battletag-lock.ts`) l'empêcherait d'être corrigé.
+    // Même règle qu'à la connexion : le BattleTag de Blizzard remplace celui du
+    // joueur. Sans BattleTag à donner, celui tapé avant le rattachement reste,
+    // marqué tapé (`battletag-origin.ts`) : jamais tenu pour vérifié, et le
+    // champ reste saisissable (`battletag-lock.ts`).
     const tag = normalizeBattletag(identity.handle);
     const [result] = await db.execute<ResultSetHeader>(
-      `UPDATE bg_users SET blizzard_sub = ?, overwatch_battletag = ?
+      `UPDATE bg_users SET blizzard_sub = ?, ${BLIZZARD_BATTLETAG_SET_SQL}
        WHERE id = ? AND is_deleted = 0 AND ${UNMOVED_SUBJECT_SQL.BLIZZARD}`,
-      [identity.subject, tag, userId, identity.subject],
+      [identity.subject, tag, tag, userId, identity.subject],
     );
     return result;
   }

@@ -57,6 +57,7 @@ import { tournamentHref } from "@/lib/shared/match-anchor";
 import { isMatchScoreLocked } from "../_lib/score-lock";
 import { useMatchAnchor } from "../_hooks/useMatchAnchor";
 import { useCertificationPrompt } from "../_hooks/useCertificationPrompt";
+import { CERTIFY_PROMPT_OTHER_ACCOUNT } from "@/lib/shared/discord-certify-prompt";
 import { liveCertificationPrompt } from "@/lib/shared/certification-prompt";
 import { TournamentProgress } from "./TournamentProgress";
 import { TournamentLoading } from "./TournamentLoading";
@@ -718,11 +719,16 @@ function TournamentSheetView({
    */
   const frozen = fatal !== null;
   // Invitation à certifier Discord et BattleTag (`CERTIFICATION_PROMPT.md`).
+  const certificationPromptRefused = useCallback(
+    () => showError(mapError(CERTIFY_PROMPT_OTHER_ACCOUNT)),
+    [showError, mapError],
+  );
   const certificationPrompt = useCertificationPrompt(
     tournamentId,
     liveCertificationPrompt(detail, tournamentId),
     frozen,
     detail?.viewerUserId ?? null,
+    certificationPromptRefused,
   );
   const canReportScore = useCallback(
     (match: BracketMatch): boolean =>

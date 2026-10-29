@@ -250,6 +250,18 @@ export const TEAM_LIFECYCLE_RULE: RateLimitRule = {
 };
 
 /**
+ * « Ne plus voir » de l'invitation à certifier de la fiche tournoi
+ * (`POST /api/profile/certification-prompt`), par compte. Un lecteur le coche
+ * une fois ; le plafond borne un client en boucle, qui jouait une requête par
+ * appel. Réservé d'une seule instruction ({@link enforceRateLimit}).
+ */
+export const CERTIFICATION_PROMPT_OFF_RULE: RateLimitRule = {
+  name: "certification-prompt-off",
+  limit: 10,
+  windowMs: 60 * 60_000,
+};
+
+/**
  * Ouvertures du flux temps réel, par utilisateur.
  *
  * Distinct du plafond de flux *simultanés* (`MAX_STREAMS_PER_USER`) : celui-ci

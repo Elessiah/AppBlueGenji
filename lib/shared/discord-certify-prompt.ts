@@ -49,15 +49,19 @@ export type CertifyPromptAccount = {
  */
 export type CertifyPrompt =
   | { mode: "ONE_CLICK"; tag: string }
-  /** `hasTag: false` : aucun tag enregistré (souvent Blizzard seul) — la fenêtre propose de l'**ajouter**. */
-  | { mode: "DIALOG"; hasTag: boolean };
+  /**
+   * `hasTag: false` : aucun tag enregistré (souvent Blizzard seul) — la fenêtre
+   * propose de l'**ajouter**. `discordLinked` : un Discord est déjà rattaché au
+   * compte — le code ne rattache alors rien (ligne « Rattachement » tue).
+   */
+  | { mode: "DIALOG"; hasTag: boolean; discordLinked: boolean };
 
 export function certifyPromptFor(account: CertifyPromptAccount): CertifyPrompt {
   const tag = account.discordPseudo?.trim() ?? "";
   if (account.discordId && account.pseudoFromDiscord && isCertifiableDiscordHandle(tag)) {
     return { mode: "ONE_CLICK", tag };
   }
-  return { mode: "DIALOG", hasTag: tag !== "" };
+  return { mode: "DIALOG", hasTag: tag !== "", discordLinked: Boolean(account.discordId) };
 }
 
 /** Réponses du lecteur : la fenêtre se ferme pour la session, ou pour le compte. */

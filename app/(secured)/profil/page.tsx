@@ -138,7 +138,7 @@ function discordFieldNotice(
 function battletagFieldNotice(
   text: ProfileText,
   locked: boolean,
-  state: { tag: string | null; linked: boolean | null; pending: boolean },
+  state: { linked: boolean | null; pending: boolean },
 ): BattletagLockNotice {
   if (locked) return battletagLockText(text, state);
   return { status: text.t("games.gameTagNotice"), details: [text.t("games.blizzardNotice")] };
@@ -712,9 +712,13 @@ export default function ProfilePage() {
   // `null` n'est pas « aucun rattachement » mais « pas encore lue » : le verrou
   // porte donc, comme celui du tag Discord, sur un état à trois valeurs.
   const blizzardLinked = blizzardLinkState(connections);
-  const battletagLocked = isBattletagLocked({ linked: blizzardLinked });
+  // Seul un BattleTag venu de Battle.net verrouille : celui tapé, gardé sous un
+  // Battle.net qui n'en donne aucun, reste saisissable (`battletag-lock.ts`).
+  const battletagLocked = isBattletagLocked({
+    linked: blizzardLinked,
+    verified: data?.profile.battletagVerified === true,
+  });
   const battletagNotice = battletagFieldNotice(text, battletagLocked, {
-    tag: overwatchBattletag.trim() || null,
     linked: blizzardLinked,
     pending: connectionsPending,
   });

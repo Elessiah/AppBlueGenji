@@ -49,7 +49,7 @@
     "link": {
       "label": "Rattachement de ton compte Discord",
       "without": "Aucun",
-      "with": "S'il n'est pas encore rattaché, le code reçu en message privé le rattache : tu pourras te connecter par Discord"
+      "with": "Le code reçu en message privé le rattache, si ce Discord n'est pas déjà rattaché à un autre compte : tu pourras te connecter par Discord"
     }
   },
   "undo": "Retirer ton tag ou changer de pseudo Discord retire la certification.",

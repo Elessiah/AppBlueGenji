@@ -109,6 +109,7 @@ export async function anonymizeAccount(connection: PoolConnection, userId: numbe
              discord_link_method = NULL,
              google_sub = NULL,
              blizzard_sub = NULL,
+             overwatch_battletag_typed = 0,
              visible_avatar = 0,
              visible_overwatch = 0,
              visible_marvel = 0,

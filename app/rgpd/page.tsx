@@ -272,8 +272,8 @@ function RgpdFr({
             s&apos;inscrire à un tournoi. Le fournisseur transmet en outre ce que le tableau
             décrit pour lui, qui vient avec la connexion : le pseudo Discord par Discord, le
             BattleTag par Blizzard (tenu à jour à chaque connexion tant que le compte
-            Battle.net est rattaché, et effacé si Battle.net n&apos;en donne aucun — y compris un
-            BattleTag saisi à la main avant le rattachement), la photo par Google ou Discord (copiée, et masquée
+            Battle.net est rattaché ; s&apos;il n&apos;en donne aucun, le BattleTag saisi à la main reste,
+            sans être tenu pour vérifié), la photo par Google ou Discord (copiée, et masquée
             tant que vous ne l&apos;affichez pas). Ce que vous renseignez vous-même (pseudos de jeu
             saisis, certification du tag Discord, avatar téléversé, majorité) est facultatif,
             et le compte fonctionne sans, à trois limites près : un tournoi peut exiger, pour s&apos;y inscrire, un tag Discord certifié ou un

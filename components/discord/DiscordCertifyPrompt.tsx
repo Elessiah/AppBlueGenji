@@ -25,17 +25,31 @@ export const CERTIFY_PROMPT_GROUPS = [
   { group: "effects", rows: ["badge", "dms", "link"] },
 ] as const;
 
+/** Une ligne du tableau, tous groupes confondus. */
+export type CertifyPromptRow = (typeof CERTIFY_PROMPT_GROUPS)[number]["rows"][number];
+
 /**
- * Lignes du seul parcours `DIALOG` : certifier par un code en message privé
- * rattache aussi le compte Discord à un compte qui n'en a pas
- * (`startDiscordHandleUpdate`, `discord_link_method = 'DM_CODE'`). En
- * `ONE_CLICK`, Discord est déjà rattaché : rien n'y change.
+ * Quand chaque ligne se montre — une entrée par ligne, exigée par le type : une
+ * ligne ajoutée à `CERTIFY_PROMPT_GROUPS` sans dire ici où elle vaut ne compile
+ * pas. « Rattachement » : certifier par un code en message privé rattache aussi
+ * le compte Discord à un compte qui n'en a pas (`startDiscordHandleUpdate`,
+ * `discord_link_method = 'DM_CODE'`) — ni en `ONE_CLICK`, ni en `DIALOG` avec
+ * un Discord déjà rattaché, rien n'y change.
  */
-export const CERTIFY_PROMPT_DIALOG_ONLY_ROWS: ReadonlySet<string> = new Set(["link"]);
+export const CERTIFY_PROMPT_ROW_SHOWN: Readonly<Record<CertifyPromptRow, (prompt: CertifyPrompt) => boolean>> = {
+  admins: () => true,
+  referees: () => true,
+  match: () => true,
+  players: () => true,
+  visitors: () => true,
+  badge: () => true,
+  dms: () => true,
+  link: (prompt) => prompt.mode === "DIALOG" && !prompt.discordLinked,
+};
 
 /** Les lignes d'un groupe que montre ce parcours. */
-export function certifyPromptRowsFor<Row extends string>(rows: readonly Row[], mode: CertifyPrompt["mode"]): Row[] {
-  return rows.filter((row) => mode === "DIALOG" || !CERTIFY_PROMPT_DIALOG_ONLY_ROWS.has(row));
+export function certifyPromptRowsFor<Row extends CertifyPromptRow>(rows: readonly Row[], prompt: CertifyPrompt): Row[] {
+  return rows.filter((row) => CERTIFY_PROMPT_ROW_SHOWN[row](prompt));
 }
 
 /** Refus de `POST /api/profile/discord` qui disent que l'état du tag a changé sous la fenêtre. */
@@ -257,7 +271,7 @@ export function DiscordCertifyPrompt({ prompt, userId, canOpen, onProfile, onAns
                     {t(`groups.${group}`)}
                   </th>
                 </tr>
-                {certifyPromptRowsFor(rows, prompt.mode).map((row) => (
+                {certifyPromptRowsFor(rows, prompt).map((row) => (
                   <tr key={row}>
                     <th scope="row">{t(`rows.${row}.label`)}</th>
                     <td>{t(`rows.${row}.without`)}</td>

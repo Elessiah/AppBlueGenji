@@ -56,14 +56,12 @@ export function discordTagLockText(
 /** `battletagLockNotice` dans la langue du texte (mêmes cas, même ordre). */
 export function battletagLockText(
   text: ProfileText,
-  state: { tag: string | null; linked: boolean | null; pending?: boolean },
+  state: { linked: boolean | null; pending?: boolean },
 ): BattletagLockNotice {
   const { t } = text;
   if (state.pending && state.linked !== true) return { status: t("battletagLock.pending"), details: [] };
   if (state.linked !== true) return { status: t("battletagLock.unknown"), details: [] };
-  const change = t("battletagLock.change");
-  if (!state.tag) return { status: t("battletagLock.noTag"), details: [change] };
-  return { status: t("battletagLock.tagged"), details: [change, t("battletagLock.hide")] };
+  return { status: t("battletagLock.tagged"), details: [t("battletagLock.change"), t("battletagLock.hide")] };
 }
 
 /** Qui voit un tag Discord certifié, dans la langue du texte. */

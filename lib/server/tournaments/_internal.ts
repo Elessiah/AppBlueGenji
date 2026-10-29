@@ -163,6 +163,7 @@ export type MatchRow = RowDataPacket & {
   referee_discord_verified_at?: Date | null;
   referee_discord_pseudo?: string | null;
   referee_blizzard_sub?: string | null;
+  referee_overwatch_battletag_typed?: number | null;
   referee_overwatch_battletag?: string | null;
   referee_is_deleted?: number | null;
   referee_is_admin?: number | null;
@@ -452,6 +453,7 @@ function refereeKept(row: MatchRow): boolean {
       discord_pseudo: row.referee_discord_pseudo ?? null,
       blizzard_sub: row.referee_blizzard_sub ?? null,
       overwatch_battletag: row.referee_overwatch_battletag ?? null,
+      overwatch_battletag_typed: row.referee_overwatch_battletag_typed ?? null,
       is_deleted: Number(row.referee_is_deleted ?? 1),
       is_admin: Number(row.referee_is_admin ?? 0),
       platform_roles_json: row.referee_platform_roles_json ?? null,

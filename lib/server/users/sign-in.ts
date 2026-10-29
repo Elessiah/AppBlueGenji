@@ -1,6 +1,7 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { getDatabase } from "@/lib/server/database";
+import { BLIZZARD_BATTLETAG_SET_SQL } from "@/lib/server/battletag-origin";
 import type { ConnectionMethod } from "@/lib/shared/account-connections";
 import { ensureUniquePseudo } from "@/lib/server/auth";
 import { normalizePseudo } from "@/lib/server/serialization";
@@ -370,9 +371,9 @@ export async function createOrGetDiscordUser(
  * donnée, elle ne publie rien.
  *
  * `null` quand le compte Battle.net n'a pas de BattleTag (absent ou vide) :
- * le champ est alors **effacé**. Un BattleTag laissé là — tapé
- * avant le rattachement — passerait pour vérifié (`hasVerifiedBattletag` :
- * Battle.net rattaché et un BattleTag) sans que Blizzard l'ait jamais nommé.
+ * le BattleTag tapé par le joueur **reste**, marqué tapé
+ * (`BLIZZARD_BATTLETAG_SET_SQL`, décision D3) — jamais tenu pour vérifié,
+ * Blizzard ne l'ayant pas nommé.
  */
 export async function createOrGetBlizzardUser(
   sub: string,
@@ -396,8 +397,8 @@ export async function createOrGetBlizzardUser(
     // force `visible_overwatch` à 0), mais c'est la même chose : une
     // coordonnée personnelle qui repousse sur un compte vidé.
     await db.execute(
-      `UPDATE bg_users SET overwatch_battletag = ? WHERE id = ? AND is_deleted = 0`,
-      [tag, userId],
+      `UPDATE bg_users SET ${BLIZZARD_BATTLETAG_SET_SQL} WHERE id = ? AND is_deleted = 0`,
+      [tag, tag, userId],
     );
     await settleTermsAfterLogin(userId, false, consent);
     return userId;

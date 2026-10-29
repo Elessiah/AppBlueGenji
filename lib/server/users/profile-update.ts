@@ -3,6 +3,7 @@ import { getDatabase } from "@/lib/server/database";
 import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
 import { isDuplicateEntryError } from "@/lib/server/mysql-errors";
 import { BATTLETAG_LOCKED, isBattletagLocked } from "@/lib/shared/battletag-lock";
+import { battletagFromBlizzard, verifiedBattletagSql } from "@/lib/server/battletag-origin";
 import { DISCORD_TAG_LOCKED, isDiscordTagLocked } from "@/lib/shared/discord-tag-lock";
 import { normalizePseudo } from "@/lib/server/serialization";
 import { syncSoloEntryIdentity } from "@/lib/server/solo-entries-service";
@@ -87,9 +88,15 @@ async function assertBattletagWritable(
   const [lockRows] = await db.execute<(RowDataPacket & {
     blizzard_sub: string | null;
     overwatch_battletag: string | null;
-  })[]>(`SELECT blizzard_sub, overwatch_battletag FROM bg_users WHERE id = ? LIMIT 1`, [userId]);
+    overwatch_battletag_typed: number | null;
+  })[]>(
+    `SELECT blizzard_sub, overwatch_battletag, overwatch_battletag_typed FROM bg_users WHERE id = ? LIMIT 1`,
+    [userId],
+  );
   const lockRow = lockRows[0];
-  if (lockRow && isBattletagLocked({ linked: Boolean(lockRow.blizzard_sub) })) {
+  // Seul un BattleTag venu de Battle.net verrouille (`battletag-origin.ts`).
+  const verified = lockRow !== undefined && battletagFromBlizzard(lockRow) && Boolean(lockRow.overwatch_battletag);
+  if (lockRow && isBattletagLocked({ linked: Boolean(lockRow.blizzard_sub), verified })) {
     // Comparaison **exacte**, casse comprise : un BattleTag la conserve, et
     // c'est Blizzard qui la fixe. Le client ne soumet ce champ que s'il a
     // changé, si bien qu'une différence de casse ne peut plus venir que d'un
@@ -225,8 +232,13 @@ export async function updateOwnProfile(
   // `discord_verified_at`, qui n'a alors aucune raison de tomber puisque rien ne
   // change.
   //
-  // `overwatch_battletag` est **gardé tel quel** dès qu'un `blizzard_sub` est
-  // posé, pour la même raison que `discord_pseudo` l'est sous un `discord_id` :
+  // `overwatch_battletag` est **gardé tel quel** dès qu'il vient de Battle.net
+  // (`verifiedBattletagSql`, `battletag-origin.ts` ; une saisie gardée sous un
+  // Battle.net muet reste saisissable, et toute saisie écrite est marquée
+  // tapée — `overwatch_battletag_typed`, affecté **avant** le BattleTag : il
+  // ne change que là où le BattleTag change, si bien que la condition rejouée
+  // sur la ligne déjà mise à jour donne la même réponse), pour la même raison
+  // que `discord_pseudo` l'est sous un `discord_id` :
   // le refus lisible ci-dessus nomme la règle, cette branche la tient — une
   // lecture puis une écriture laissent un `await` entre elles, et le
   // rattachement Battle.net peut tomber dans cet intervalle. Sans la clause
@@ -259,9 +271,14 @@ export async function updateOwnProfile(
     [result] = await db.execute<ResultSetHeader>(
       `UPDATE bg_users
        SET pseudo = COALESCE(?, pseudo),
+           overwatch_battletag_typed = CASE
+             WHEN NOT ? THEN overwatch_battletag_typed
+             WHEN ${verifiedBattletagSql()} THEN overwatch_battletag_typed
+             ELSE 1
+           END,
            overwatch_battletag = CASE
              WHEN NOT ? THEN overwatch_battletag
-             WHEN blizzard_sub IS NOT NULL THEN overwatch_battletag
+             WHEN ${verifiedBattletagSql()} THEN overwatch_battletag
              ELSE ?
            END,
            marvel_rivals_tag = CASE WHEN ? THEN ? ELSE marvel_rivals_tag END,
@@ -292,6 +309,7 @@ export async function updateOwnProfile(
        WHERE id = ? AND is_deleted = 0`,
       [
         nextPseudo,
+        touchesBattletag,
         touchesBattletag,
         nextBattletag,
         patch.marvelRivalsTag !== undefined,
