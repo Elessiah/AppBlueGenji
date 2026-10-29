@@ -14,6 +14,8 @@ jest.mock("@/app/(secured)/tournois/[id]/_components/MatchCardActions", () =>
 let mockLaunch: MatchLaunchInfo | null = null;
 /** Pseudos d'arbitre du contexte du lecteur (MATCH-UI-NAMES). */
 let refereeNames: MatchRefereeName[] = [];
+/** Format des matchs du contexte de la fiche (`MatchFormatProvider`). */
+let matchFormat: MatchFormat | null = null;
 const mockEnabled: boolean[] = [];
 jest.mock("@/components/match-launch/MatchContactsDialog", () => ({
   useMatchContacts: (_matchId: number, _card: unknown, enabled = true) => {
@@ -25,6 +27,8 @@ jest.mock("@/components/match-launch/MatchContactsDialog", () => ({
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
 import { MatchPageScope } from "@/app/(secured)/tournois/[id]/_lib/match-page-context";
+import { MatchFormatProvider } from "@/app/(secured)/tournois/[id]/_lib/match-format-context";
+import type { MatchFormat } from "@/lib/shared/match-format";
 import { MatchPage } from "@/app/(secured)/tournois/[id]/_components/MatchPage";
 import { MatchRow } from "@/app/(secured)/tournois/[id]/_components/MatchRow";
 import { LiveProvider } from "@/app/(secured)/tournois/[id]/_lib/live-context";
@@ -156,7 +160,12 @@ function render(
       </LiveProvider>
     </ToastProvider>
   );
-  const tree = viewer === "public" ? <SpectatorViewProvider>{body}</SpectatorViewProvider> : body;
+  const withFormat = (
+    <MatchFormatProvider format={matchFormat} playoffFormat={null} tournamentFormat="SINGLE">
+      {body}
+    </MatchFormatProvider>
+  );
+  const tree = viewer === "public" ? <SpectatorViewProvider>{withFormat}</SpectatorViewProvider> : withFormat;
   if (locale === "fr") return renderToStaticMarkup(tree);
   return renderToStaticMarkup(
     <AppLocaleProvider locale="en">
@@ -177,6 +186,7 @@ const visible = (html: string) =>
 beforeEach(() => {
   mockLaunch = null;
   refereeNames = [];
+  matchFormat = null;
   mockEnabled.length = 0;
 });
 
@@ -212,6 +222,44 @@ describe("page d'un match — ce que tout le monde lit", () => {
   it("render_noHost_noSidesFact", () => {
     const html = render(match({ hostTeamId: null }), "public");
     expect(html).not.toContain('data-fact="sides"');
+  });
+
+  it("render_bothOpponentsKnownWithoutHost_hostAndFirstBanFactsSilent", () => {
+    const html = render(match({ hostTeamId: null, firstBanTeamId: null }), "public");
+    expect(html).not.toContain('data-fact="host"');
+    expect(html).not.toContain('data-fact="firstBan"');
+    expect(visible(html.slice(html.indexOf("<h1"), html.indexOf("Maps et bans")))).not.toContain("Adversaires à venir");
+  });
+
+  it("render_opponentMissing_hostFactSaysOpponentsPending", () => {
+    const html = render(match({ team2Id: null, team2Name: null, hostTeamId: null, firstBanTeamId: null }), "public");
+    expect(visible(html.slice(html.indexOf('data-fact="host"')))).toContain("Hôte Adversaires à venir Premier ban Adversaires à venir");
+  });
+
+  it("render_firstRoundBye_emptySideReadsBye", () => {
+    const html = render(match({ roundNumber: 1, team2Id: null, team2Name: null, hostTeamId: null, firstBanTeamId: null }), "public");
+    expect(visible(html)).toContain("Alpha contre BYE");
+  });
+
+  it("render_noFormat_plainValueWithoutHint", () => {
+    const html = render(match(), "public");
+    const fact = html.slice(html.indexOf('data-fact="format"'), html.indexOf('data-fact="sides"'));
+    expect(visible(fact)).toContain("Format Score libre");
+    expect(fact).not.toContain("aria-label");
+  });
+
+  it("render_format_descriptionBehindInfoHint", () => {
+    matchFormat = { type: "FT", value: 3 };
+    const html = render(match(), "public");
+    const fact = html.slice(html.indexOf('data-fact="format"'));
+    expect(fact).toContain(`aria-label="${infoHintLabel("fr", "Format").replaceAll("'", "&#x27;")}"`);
+  });
+
+  it("render_missingStartAtForStaff_warningKeepsTitleAndReaderPrefix", () => {
+    const html = render(match({ liveTrigger: "START_TIME", casters: [matchCaster()], startAt: null }), "staff");
+    const header = html.slice(html.indexOf("<h1"), html.indexOf('data-fact="'));
+    expect(header).toContain("title=\"Ce match passe à l&#x27;antenne à sa date de début, mais aucune date n&#x27;est fixée.\"");
+    expect(header).toContain('<span class="sr-only">Attention : </span>');
   });
 
   it("retour à la fiche : le style du retour de l'en-tête, libellé « Retour au tournoi », ancré sur la carte du match", () => {
@@ -272,7 +320,7 @@ describe("page d'un match — cartes du round et bans", () => {
     const html = render(match({ mapPicks: { "3": "Oasis" } }), "public", false, "fr", rules([["Ilios"], ["Busan", "Nepal"], ["Oasis", "Dorado"]]));
     const text = visible(html);
     // Le public lit les maps dans les faits clés, sans la liste outillée du tour.
-    expect(text).toContain("Maps Map 1 : Ilios Map 2 : à choisir parmi Busan, Nepal · choix du perdant Map 3 : Oasis");
+    expect(text).toContain("Maps Map 1 : Ilios · imposée Map 2 : à choisir parmi Busan, Nepal · choix du perdant Map 3 : Oasis");
     expect(text).not.toContain("Cartes du tour");
     expect(html).not.toContain("<select");
     expect(text).not.toContain("Paramétrer les cartes du tour");

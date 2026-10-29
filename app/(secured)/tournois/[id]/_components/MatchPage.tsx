@@ -44,7 +44,8 @@ import { useErrorsText } from "../_lib/error-map";
 import { useMatchCardModel } from "../_lib/match-card-model";
 import { useMatchFormat } from "../_lib/match-format-context";
 import { useMatchPageText } from "../_lib/match-page-text";
-import { matchPageHeaderScore, matchPageMapFacts } from "../_lib/match-page-facts";
+import { matchPageHeaderScore, matchPageMapFacts, type MatchPageMapFact } from "../_lib/match-page-facts";
+import { matchSideViews } from "../_lib/match-row-sides";
 import { EntrantName, type EntrantLogoSize } from "./EntrantName";
 import { MatchCardActions } from "./MatchCardActions";
 import { LaunchPhaseBadge, hasLaunchPhaseBadge } from "./MatchLaunchStrip";
@@ -58,11 +59,28 @@ import styles from "./MatchPage.module.css";
 
 const FIRST_MAP_FIELD_ERRORS = { INVALID_FIRST_MAP: "map" } as const;
 
+/**
+ * Côté de la page, avec le repli de sa case vide — celui de la carte
+ * (`matchSideViews`) : « BYE » au premier tour face à une engagée, « TBD » sinon.
+ */
+type PageSide = MatchPageSide & { emptyLabel: "BYE" | "TBD" };
+
+/** Côtés de la page (`matchPageSides`, hôte à gauche), chacun avec le repli de sa case vide. */
+function pageSides(match: BracketMatch): [PageSide, PageSide] {
+  const views = matchSideViews(match, match.roundNumber, false);
+  const [left, right] = matchPageSides(match);
+  return [
+    { ...left, emptyLabel: views[left.slot - 1].emptyLabel },
+    { ...right, emptyLabel: views[right.slot - 1].emptyLabel },
+  ];
+}
+
 /** Nom d'un côté (ou de sa case vide), dans la langue de la page. */
-function useSideName(side: MatchPageSide | null): string {
+function useSideName(side: PageSide | null): string {
   const text = useTournamentPageText();
   if (side === null) return text.t("match.tbd");
-  return side.name ?? localizedPlaceholder(text, side.placeholder) ?? text.t("match.tbd");
+  const empty = text.t(side.emptyLabel === "BYE" ? "match.bye" : "match.tbd");
+  return side.name ?? localizedPlaceholder(text, side.placeholder) ?? empty;
 }
 
 /** Un engagé de la page, son emblème compris, cliquable vers sa fiche (`EntrantName`). */
@@ -71,7 +89,7 @@ function SideName({
   logoSize,
   className,
   truncate = false,
-}: Readonly<{ side: MatchPageSide; logoSize: EntrantLogoSize; className?: string; truncate?: boolean }>) {
+}: Readonly<{ side: PageSide; logoSize: EntrantLogoSize; className?: string; truncate?: boolean }>) {
   const name = useSideName(side);
   return <EntrantName teamId={side.teamId} name={name} title={name} logoSize={logoSize} truncate={truncate} className={className} />;
 }
@@ -200,7 +218,7 @@ function MatchHeader({
 }: Readonly<{
   detail: TournamentDetail;
   match: BracketMatch;
-  sides: [MatchPageSide, MatchPageSide];
+  sides: [PageSide, PageSide];
   liveState: MatchLiveState;
   reportNotice: string | null;
 }>) {
@@ -273,8 +291,9 @@ function MatchHeader({
         )}
         {liveState === "SCHEDULED" && <span className="pill pill-info">{page.t("header.castAnnounced")}</span>}
         {missingStartAt && (
-          <span className="pill pill-warning">
-            <span aria-hidden="true">⚠</span> {page.t("header.missingDate")}
+          <span className="pill pill-warning" title={t("launch.missingDateTitle")}>
+            <span aria-hidden="true">⚠</span>
+            <span className="sr-only">{t("launch.missingDateSr")}</span> {page.t("header.missingDate")}
           </span>
         )}
       </div>
@@ -301,6 +320,79 @@ function DecisionValue({ value, subject, hintId, hint }: Readonly<{ value: React
   );
 }
 
+/** Fait « Arbitre » / « Arbitrage » selon la décision (`matchPageDecision`) ; rien sur un match sans objet. */
+function useOfficiatingFact(match: BracketMatch, decision: ReturnType<typeof matchPageDecision>, hintId: string): KeyFact | null {
+  const { t } = useTournamentPageText();
+  const page = useMatchPageText();
+  const { refereeNames } = useLiveControls();
+  const refereeName = refereeNameOf(match, refereeNames);
+  if (decision === "REFEREE") {
+    return {
+      id: "officiating",
+      label: page.t("facts.referee"),
+      // Pseudo de l'arbitre pour un membre connecté (décision 52), « Arbitre
+      // désigné » sans compte, ou tant que le pseudo de la désignation manque.
+      value: (
+        <DecisionValue
+          value={<strong>{refereeName ?? page.t("facts.refereeDesignated")}</strong>}
+          subject={t("launch.referee")}
+          hintId={`${hintId}-referee`}
+          hint={t("matchPage.refereeLead")}
+        />
+      ),
+    };
+  }
+  if (decision === "SELF_MANAGED") {
+    return {
+      id: "officiating",
+      label: page.t("facts.officiating"),
+      value: (
+        <DecisionValue
+          value={<strong>{t("launch.selfManaged")}</strong>}
+          subject={t("launch.selfManaged")}
+          hintId={`${hintId}-self`}
+          hint={t("launch.selfManagedTitle")}
+        />
+      ),
+    };
+  }
+  if (decision === "UNDECIDED") {
+    return {
+      id: "officiating",
+      label: page.t("facts.officiating"),
+      value: (
+        <DecisionValue
+          value={<span className="pill pill-warning">{t("matchPage.undecided")}</span>}
+          subject={t("matchPage.undecided")}
+          hintId={`${hintId}-undecided`}
+          hint={t("matchPage.undecidedLead")}
+        />
+      ),
+    };
+  }
+  return null;
+}
+
+/** Maps du tour dans les faits clés : « Map 1 : Ilios · imposée », pool à choisir, choix du perdant. */
+function MapFactList({ mapFacts }: Readonly<{ mapFacts: readonly MatchPageMapFact[] }>) {
+  const page = useMatchPageText();
+  return (
+    <ol className={styles.factList}>
+      {mapFacts.map((slot) => (
+        <li key={slot.number}>
+          {slot.map !== null && page.t("facts.mapSlot", { number: slot.number, map: slot.map })}
+          {slot.map === null && slot.candidates.length > 0 && (
+            <Muted>{page.t("facts.mapPool", { number: slot.number, maps: slot.candidates.join(", ") })}</Muted>
+          )}
+          {slot.map === null && slot.candidates.length === 0 && <Muted>{page.t("facts.mapOpen", { number: slot.number })}</Muted>}
+          {slot.imposed && <span className={styles.factNote}> · {page.t("facts.mapImposed")}</span>}
+          {slot.loserPick && <span className={styles.factNote}> · {page.t("facts.loserPick")}</span>}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 /**
  * Faits clés du match, au gabarit de l'en-tête des pages de règles
  * (`KeyFacts`) : chacun titré en toutes lettres — hôte, premier ban, arbitre ou
@@ -317,7 +409,7 @@ function MatchKeyFacts({
 }: Readonly<{
   detail: TournamentDetail;
   match: BracketMatch;
-  sides: [MatchPageSide, MatchPageSide];
+  sides: [PageSide, PageSide];
   phase: MatchLaunchPhase;
   staff: boolean;
 }>) {
@@ -326,8 +418,6 @@ function MatchKeyFacts({
   const page = useMatchPageText();
   const spectator = useSpectatorView();
   const hintId = useId();
-  const { refereeNames } = useLiveControls();
-  const refereeName = refereeNameOf(match, refereeNames);
   const format = useMatchFormat(match);
   const [left, right] = sides;
   const leftName = useSideName(left);
@@ -337,80 +427,36 @@ function MatchKeyFacts({
   const decision = matchPageDecision(match, staff);
   const mapFacts = matchPageMapFacts(detail.mapRules, match);
   const pending = <Muted>{t("matchPage.opponentsPending")}</Muted>;
+  // « Adversaires à venir » seulement quand une case attend encore son engagé ;
+  // deux adversaires connus sans hôte désigné (lancement sans phase, exemption,
+  // match clos) : le fait se tait, comme l'ancienne pastille.
+  const opponentsPending = match.team1Id === null || match.team2Id === null;
 
-  const facts: KeyFact[] = [
-    {
+  const facts: KeyFact[] = [];
+  if (hostSide || opponentsPending) {
+    facts.push({
       id: "host",
       label: page.t("facts.host"),
       value: hostSide ? <SideName side={hostSide} logoSize={20} /> : pending,
       detail: hostSide ? page.t("facts.hostDetail") : undefined,
-    },
-    {
+    });
+  }
+  if (banSide || opponentsPending) {
+    facts.push({
       id: "firstBan",
       label: page.t("facts.firstBan"),
       value: banSide ? <SideName side={banSide} logoSize={20} /> : pending,
-    },
-  ];
-  if (decision === "REFEREE") {
-    facts.push({
-      id: "officiating",
-      label: page.t("facts.referee"),
-      // Pseudo de l'arbitre pour un membre connecté (décision 52), « Arbitre
-      // désigné » sans compte, ou tant que le pseudo de la désignation manque.
-      value: (
-        <DecisionValue
-          value={<strong>{refereeName ?? page.t("facts.refereeDesignated")}</strong>}
-          subject={t("launch.referee")}
-          hintId={`${hintId}-referee`}
-          hint={t("matchPage.refereeLead")}
-        />
-      ),
-    });
-  } else if (decision === "SELF_MANAGED") {
-    facts.push({
-      id: "officiating",
-      label: page.t("facts.officiating"),
-      value: (
-        <DecisionValue
-          value={<strong>{t("launch.selfManaged")}</strong>}
-          subject={t("launch.selfManaged")}
-          hintId={`${hintId}-self`}
-          hint={t("launch.selfManagedTitle")}
-        />
-      ),
-    });
-  } else if (decision === "UNDECIDED") {
-    facts.push({
-      id: "officiating",
-      label: page.t("facts.officiating"),
-      value: (
-        <DecisionValue
-          value={<span className="pill pill-warning">{t("matchPage.undecided")}</span>}
-          subject={t("matchPage.undecided")}
-          hintId={`${hintId}-undecided`}
-          hint={t("matchPage.undecidedLead")}
-        />
-      ),
     });
   }
+  const officiating = useOfficiatingFact(match, decision, hintId);
+  if (officiating) facts.push(officiating);
   if (mapFacts.length > 0) {
     facts.push({
       id: "maps",
       label: page.t("facts.maps"),
       wide: mapFacts.length > 1,
       value: (
-        <ol className={styles.factList}>
-          {mapFacts.map((slot) => (
-            <li key={slot.number}>
-              {slot.map !== null && page.t("facts.mapSlot", { number: slot.number, map: slot.map })}
-              {slot.map === null && slot.candidates.length > 0 && (
-                <Muted>{page.t("facts.mapPool", { number: slot.number, maps: slot.candidates.join(", ") })}</Muted>
-              )}
-              {slot.map === null && slot.candidates.length === 0 && <Muted>{page.t("facts.mapOpen", { number: slot.number })}</Muted>}
-              {slot.loserPick && <span className={styles.factNote}> · {page.t("facts.loserPick")}</span>}
-            </li>
-          ))}
-        </ol>
+<MapFactList mapFacts={mapFacts} />
       ),
     });
   } else {
@@ -423,8 +469,17 @@ function MatchKeyFacts({
   facts.push({
     id: "format",
     label: page.t("facts.format"),
-    value: matchFormatText(text, format),
-    detail: format ? capitalize(matchFormatDescriptionText(text, format)) : undefined,
+    // Le détail du format est une explication : derrière le « i » (`INFO_HINTS.md`).
+    value: format ? (
+      <DecisionValue
+        value={matchFormatText(text, format)}
+        subject={page.t("facts.format")}
+        hintId={`${hintId}-format`}
+        hint={capitalize(matchFormatDescriptionText(text, format))}
+      />
+    ) : (
+      matchFormatText(text, format)
+    ),
   });
   // Règlement §14 : l'équipe du haut (l'hôte) prend le côté gauche.
   if (hostSide) {
@@ -495,7 +550,7 @@ function MapsSection({
 }: Readonly<{
   detail: TournamentDetail;
   match: BracketMatch;
-  sides: [MatchPageSide, MatchPageSide];
+  sides: [PageSide, PageSide];
   staff: boolean;
   editable: boolean;
   canPick: boolean;
@@ -702,7 +757,7 @@ function CastSection({
 }
 
 /** Détail map par map d'un match joué : scores et codes de replay (ceux-ci aux seuls membres). */
-function ResultSection({ match, sides }: Readonly<{ match: BracketMatch; sides: [MatchPageSide, MatchPageSide] }>) {
+function ResultSection({ match, sides }: Readonly<{ match: BracketMatch; sides: [PageSide, PageSide] }>) {
   const { t } = useTournamentPageText();
   const page = useMatchPageText();
   const titleId = useId();
@@ -761,7 +816,7 @@ function MatchPageContent({ detail, match, adminResolvable, scoreLocked, onOpenA
   const { launch } = useMatchContacts(match.id, match, readsContacts);
   const shownLaunch = readsContacts ? launch : null;
   const onCopy = useCopy();
-  const sides = matchPageSides(match);
+  const sides = pageSides(match);
   const team1 = match.team1Name ?? localizedPlaceholder(text, match.team1Placeholder) ?? t("match.tbd");
   const team2 = match.team2Name ?? localizedPlaceholder(text, match.team2Placeholder) ?? t("match.tbd");
   const matchLabel = versusText(text, team1, team2);
@@ -812,7 +867,7 @@ function MatchPageContent({ detail, match, adminResolvable, scoreLocked, onOpenA
                 />
               )}
               {locked && (
-                <p className={styles.locked}>
+                <p className={styles.locked} title={actionText.t("cardActions.lockedTitle")}>
                   <span aria-hidden="true">🔒</span> {actionText.t("cardActions.locked")}
                   <span className="sr-only"> {actionText.t("cardActions.lockedReason")}</span>
                 </p>

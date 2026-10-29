@@ -56,21 +56,33 @@ describe("matchPageMapFacts", () => {
     );
 
     expect(actual).toEqual([
-      { number: 1, map: "Ilios", candidates: [], loserPick: false },
-      { number: 2, map: "Nepal", candidates: [], loserPick: false },
+      { number: 1, map: "Ilios", imposed: true, candidates: [], loserPick: false },
+      { number: 2, map: "Nepal", imposed: false, candidates: [], loserPick: false },
     ]);
   });
 
   it("matchPageMapFacts_unchosenPoolAfterMap1_loserRule_flagsLoserPick", () => {
     const actual = matchPageMapFacts(rules([["Ilios"], ["Busan", "Nepal"]], { nextPick: "LOSER" }), roundTwo());
 
-    expect(actual[1]).toEqual({ number: 2, map: null, candidates: ["Busan", "Nepal"], loserPick: true });
+    expect(actual[1]).toEqual({ number: 2, map: null, imposed: false, candidates: ["Busan", "Nepal"], loserPick: true });
   });
 
   it("matchPageMapFacts_unchosenPoolOnMap1_noLoserPick", () => {
     const actual = matchPageMapFacts(rules([["Ilios", "Nepal"]], { nextPick: "LOSER" }), roundTwo());
 
-    expect(actual[0]).toEqual({ number: 1, map: null, candidates: ["Ilios", "Nepal"], loserPick: false });
+    expect(actual[0]).toEqual({ number: 1, map: null, imposed: false, candidates: ["Ilios", "Nepal"], loserPick: false });
+  });
+
+  it("matchPageMapFacts_pickWithInvisibleCharacters_showsVisibleTextOnly", () => {
+    const actual = matchPageMapFacts(rules([["Ilios", "Nepal"]]), roundTwo({ firstMap: "‮Nepal​ " }));
+
+    expect(actual[0].map).toBe("Nepal");
+  });
+
+  it("matchPageMapFacts_pickOfInvisibleCharactersOnly_staysToChoose", () => {
+    const actual = matchPageMapFacts(rules([["Ilios", "Nepal"]]), roundTwo({ firstMap: "​" }));
+
+    expect(actual[0]).toEqual({ number: 1, map: null, imposed: false, candidates: ["Ilios", "Nepal"], loserPick: false });
   });
 
   it("matchPageMapFacts_nextPickNotLoser_noLoserPick", () => {

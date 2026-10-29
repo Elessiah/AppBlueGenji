@@ -46,7 +46,7 @@ anciennes clés `tournament.matchPage.*` restant pour les sections.
 
 1. **En-tête** : ligne de situation, titre « A contre B » et tableau
    d'affichage **dans l'ordre des côtés** (hôte à gauche, `matchPageSides`),
-   chaque engagé par `EntrantName` (logo 40 px, nom qui passe à la ligne, logo
+   chaque engagé par `EntrantName` (case vide « BYE » ou « TBD » comme la carte, logo 40 px, nom qui passe à la ligne, logo
    au-dessus du nom sous 560 px) ; score au centre (`matchPageHeaderScore`,
    « FF » sur forfait, « VS » avant tout score ; nom accessible « Score : A x,
    B y »). Dessous : vainqueur, nul ou double forfait, horaire, état de
@@ -54,12 +54,13 @@ anciennes clés `tournament.matchPage.*` restant pour les sections.
    manquante (staff), rediffusion et proposition de score en attente.
 2. **Faits clés** (`KeyFacts`, `components/cyber/` — la grille des pages de
    règles `/regles/[slug]`, une seule définition) : « Hôte » (crée la partie),
-   « Premier ban », « Arbitre » (pseudo pour un lecteur connecté qui le reçoit
+   « Premier ban » (« Adversaires à venir » tant qu'une case attend ; tus quand
+   les deux adversaires sont connus sans hôte désigné), « Arbitre » (pseudo pour un lecteur connecté qui le reçoit
    déjà, `refereeNameOf` ; « Arbitre désigné » sinon) ou « Arbitrage :
    Autogestion » (au staff seul : « Aucune décision »), « Maps » (« Map 1 :
-   Ilios », pool « à choisir parmi … », « · choix du perdant » —
-   `matchPageMapFacts`) ou « Première map » sans réglage du tour, « Format »
-   (FT, maps max), « Côtés » (avec un hôte), « Casters » (prêt / attendu dans
+   Ilios · imposée », pool « à choisir parmi … », « · choix du perdant » —
+   `matchPageMapFacts`, noms passés par `visibleText`) ou « Première map » sans
+   réglage du tour, « Format » (FT3 ; son explication derrière le « i »), « Côtés » (avec un hôte), « Casters » (prêt / attendu dans
    le salon, sauf sans compte) et « Lancement » (`LaunchPhaseBadge`).
 3. **Actions** : exactement les gestes de la carte, par le **même modèle**
    (`useMatchCardModel`, `_lib/match-card-model.ts`, partagé avec `MatchRow`) et

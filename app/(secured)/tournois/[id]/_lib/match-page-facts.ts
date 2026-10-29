@@ -1,6 +1,7 @@
 import type { BracketMatch } from "@/lib/shared/types";
 import type { MatchPageSide } from "@/lib/shared/match-page";
 import { resolveMatchMaps, roundMapsOf, type TournamentMapRules } from "@/lib/shared/round-maps";
+import { visibleText } from "@/lib/shared/visible-text";
 import { matchSideViews } from "./match-row-sides";
 
 /**
@@ -32,8 +33,10 @@ export function matchPageHeaderScore(
 /** Une map des faits clés : jouée (imposée ou choisie), ou à choisir dans un pool. */
 export type MatchPageMapFact = {
   number: number;
-  /** Map jouée ; `null` = à choisir. */
+  /** Map jouée (texte visible, `visibleText`) ; `null` = à choisir. */
   map: string | null;
+  /** Imposée par le réglage du tour (seule map de sa case). */
+  imposed: boolean;
   /** Pool encore ouvert (vide quand la map est connue). */
   candidates: string[];
   /** À choisir par l'équipe qui a perdu la map précédente (règle du tournoi). */
@@ -51,10 +54,16 @@ export function matchPageMapFacts(
 ): MatchPageMapFact[] {
   const round = roundMapsOf(rules.rounds, match);
   if (!round) return [];
-  return resolveMatchMaps(round.slots, match.firstMap, match.mapPicks).map((slot) => ({
-    number: slot.number,
-    map: slot.map,
-    candidates: slot.map === null ? slot.candidates : [],
-    loserPick: slot.map === null && slot.kind === "POOL" && slot.number > 1 && rules.nextPick === "LOSER",
-  }));
+  return resolveMatchMaps(round.slots, match.firstMap, match.mapPicks).map((slot) => {
+    // Saisie libre (première map, choix) : texte visible seulement, comme `matchMapNames`.
+    const map = slot.map === null ? "" : visibleText(slot.map).trim();
+    const known = map === "" ? null : map;
+    return {
+      number: slot.number,
+      map: known,
+      imposed: slot.kind === "IMPOSED",
+      candidates: known === null ? slot.candidates : [],
+      loserPick: known === null && slot.kind === "POOL" && slot.number > 1 && rules.nextPick === "LOSER",
+    };
+  });
 }

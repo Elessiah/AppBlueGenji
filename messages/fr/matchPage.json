@@ -21,6 +21,7 @@
     "mapSlot": "Map {number} : {map}",
     "mapPool": "Map {number} : à choisir parmi {maps}",
     "mapOpen": "Map {number} : à choisir",
+    "mapImposed": "imposée",
     "loserPick": "choix du perdant",
     "format": "Format",
     "sides": "Côtés",
