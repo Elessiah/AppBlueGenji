@@ -31,7 +31,7 @@ affichées dans le tableau « Données collectées ») :
 
 ### Affirmations alignées sur le code
 
-- **Session** : le cookie `bg_session` expire **30 jours après la connexion**
+- **Session** : le cookie `__Host-bg_session` (`bg_session` hors production) expire **30 jours après la connexion**
   (TTL absolu fixé dans `createSession`, jamais rafraîchi) — et non « après
   30 jours d'inactivité ».
 - **Suppression de compte** : deux gestes, décidés par `deleteOwnAccount`
