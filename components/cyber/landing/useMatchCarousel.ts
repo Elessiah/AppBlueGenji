@@ -79,6 +79,7 @@ export type MatchCarousel = {
    */
   holdHandlers: {
     onPointerDown: (event: PointerEvent<HTMLElement>) => void;
+    onPointerCancel: (event: PointerEvent<HTMLElement>) => void;
     onPointerEnter: (event: PointerEvent<HTMLElement>) => void;
     onPointerLeave: (event: PointerEvent<HTMLElement>) => void;
     onFocus: (event: FocusEvent<HTMLElement>) => void;
@@ -154,6 +155,13 @@ export function useMatchCarousel(ids: readonly number[], featuredId: number | nu
     if (!held) setHeldId(ids[index] ?? null);
   };
 
+  /** Lève la prise du toucher et son échéance. */
+  const releaseTouch = () => {
+    if (touchTimer.current !== null) clearTimeout(touchTimer.current);
+    touchTimer.current = null;
+    setTouched(false);
+  };
+
   // L'échéance du toucher ne survit pas à la carte.
   useEffect(
     () => () => {
@@ -178,7 +186,13 @@ export function useMatchCarousel(ids: readonly number[], featuredId: number | nu
       if (count === 0) return;
       setActiveId(ids[(((index + delta) % count) + count) % count]);
     },
-    togglePaused: () => setPaused((value) => !value),
+    // « Pause » / « Reprendre » règle le défilement à lui seul : une prise
+    // tactile encore posée (match touché juste avant) le tenait figé jusqu'à
+    // son échéance, et « Reprendre » paraissait sans effet pendant 10 s.
+    togglePaused: () => {
+      releaseTouch();
+      setPaused((value) => !value);
+    },
     holdRef,
     holdHandlers: {
       onPointerDown: (event) => {
@@ -192,6 +206,12 @@ export function useMatchCarousel(ids: readonly number[], featuredId: number | nu
           touchTimer.current = null;
           setTouched(false);
         }, LANDING_CAROUSEL_TOUCH_HOLD_MS);
+      },
+      // `pointercancel` : le navigateur a repris le geste pour défiler la page.
+      // Ce n'était pas une lecture de la carte — la prise posée par l'appui
+      // qui l'a commencé tombe, au lieu de figer la carte 10 s.
+      onPointerCancel: (event) => {
+        if (event.pointerType !== "mouse") releaseTouch();
       },
       onPointerEnter: (event) => {
         if (event.pointerType !== "mouse") return;

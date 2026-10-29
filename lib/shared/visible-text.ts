@@ -78,3 +78,19 @@ export function withoutInvisibles(raw: string): string {
     .replaceAll(JOINER_PLACEHOLDER, ZERO_WIDTH_JOINER)
     .trim();
 }
+
+/**
+ * Nom d'engagé (équipe, entrée solo) tel qu'un écran lu sans compte le montre :
+ * sans invisibles ({@link withoutInvisibles}, `UNTRUSTED_NAMES.md`), `null`
+ * quand il ne garde rien de visible — un nom resté en base peut en porter
+ * encore (sosie refusé par `UNIQUE`). Sans NFKC : le nom se lit comme sur sa
+ * fiche. Chaque appelant choisit son repli. Règle unique de la vitrine :
+ * direct, bandeau et mini-arbre de l'accueil.
+ *
+ * @param name Nom lu en base, `null` quand la ligne a disparu.
+ * @returns Le nom affichable, ou `null`.
+ */
+export function shownEntrantName(name: string | null): string | null {
+  if (name === null) return null;
+  return withoutInvisibles(name) || null;
+}

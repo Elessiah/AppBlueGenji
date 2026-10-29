@@ -11,6 +11,8 @@ import { getDatabase } from "@/lib/server/database";
 import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
 import { ANONYMOUS_PSEUDOS } from "@/lib/shared/anonymous-pseudos";
 import { fakePool } from "../../helpers/sql-double";
+import { clearCache } from "@/lib/server/cache";
+import { LANDING_TICKER_KEY, LANDING_TTL_MS, cachedLanding } from "@/lib/server/landing-cache";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -271,6 +273,30 @@ describe("reconcileDeletedAccounts", () => {
     await reconcileDeletedAccounts();
 
     expect(recordAccountDeletion).not.toHaveBeenCalled();
+  });
+
+  it("reconcileDeletedAccounts_accountErased_clearsLandingTeamViews", async () => {
+    clearCache();
+    fakeDb({ 5122: { pseudo: "compte_supprime_5122" } });
+    const loader = jest.fn(async () => "bandeau");
+    await cachedLanding(LANDING_TICKER_KEY, LANDING_TTL_MS, loader);
+
+    await reconcileDeletedAccounts();
+    await cachedLanding(LANDING_TICKER_KEY, LANDING_TTL_MS, loader);
+
+    expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  it("reconcileDeletedAccounts_nothingChanged_keepsLandingViews", async () => {
+    clearCache();
+    fakeDb({});
+    const loader = jest.fn(async () => "bandeau");
+    await cachedLanding(LANDING_TICKER_KEY, LANDING_TTL_MS, loader);
+
+    await reconcileDeletedAccounts();
+    await cachedLanding(LANDING_TICKER_KEY, LANDING_TTL_MS, loader);
+
+    expect(loader).toHaveBeenCalledTimes(1);
   });
 
   it("ne fait rien sans compte supprimé", async () => {

@@ -21,10 +21,13 @@ import {
 /** Au plus une purge par heure et par processus : elle suit les connexions. */
 const PURGE_INTERVAL_MS = 60 * 60 * 1000;
 let lastPurgeAt = 0;
+/** Purge en cours, partagée par les appels qui arrivent pendant qu'elle tourne. */
+let purgeInFlight: Promise<number> | null = null;
 
 /** Pour les tests : oublie la dernière purge. */
 export function resetConnectionLogPurgeForTests(): void {
   lastPurgeAt = 0;
+  purgeInFlight = null;
 }
 
 /**
@@ -67,9 +70,24 @@ export async function recordConnection(userId: number, event: ConnectionLogEvent
 /**
  * Efface les lignes arrivées à échéance. Étranglée à une passe par heure et
  * par processus ; lève en cas d'échec (l'appelant l'avale).
+ *
+ * Une purge **en cours** est partagée (vol unique, comme
+ * `syncVisibleTournaments`) : l'heure n'est notée qu'à son succès, si bien que
+ * deux appels rapprochés — l'accueil et sa carte du direct, lancés ensemble, ou
+ * deux visiteurs — lançaient deux `DELETE` simultanés, le second attendant les
+ * verrous du premier sur une connexion du pool.
  */
-export async function purgeExpiredConnectionLogs(now: number = Date.now()): Promise<number> {
-  if (now - lastPurgeAt < PURGE_INTERVAL_MS) return 0;
+export function purgeExpiredConnectionLogs(now: number = Date.now()): Promise<number> {
+  if (purgeInFlight) return purgeInFlight;
+  if (now - lastPurgeAt < PURGE_INTERVAL_MS) return Promise.resolve(0);
+  const purge = runPurge(now).finally(() => {
+    if (purgeInFlight === purge) purgeInFlight = null;
+  });
+  purgeInFlight = purge;
+  return purge;
+}
+
+async function runPurge(now: number): Promise<number> {
   const db = await getDatabase();
   const [result] = await db.execute(
     `DELETE FROM bg_connection_logs WHERE created_at < NOW() - INTERVAL ? DAY`,

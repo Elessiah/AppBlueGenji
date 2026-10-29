@@ -5,7 +5,7 @@ jest.mock("@/lib/server/database");
 import { getLandingTicker } from "@/lib/server/landing-service";
 import { clearCache } from "@/lib/server/cache";
 import type { TickerChampionItem, TickerItem, TickerResultItem } from "@/lib/shared/ticker-items";
-import { type SqlQuery, fakePool } from "../../helpers/sql-double";
+import { type SqlQuery, poolWithConnection } from "../../helpers/sql-double";
 
 /**
  * Résultats du bandeau de l'accueil (TICKER_RESULTS.md) : l'issue de chaque
@@ -19,6 +19,8 @@ type ResultRow = {
   team2_score: number | null;
   team1_id: number | null;
   team2_id: number | null;
+  team1_solo_user_id: number | null;
+  team2_solo_user_id: number | null;
   winner_team_id: number | null;
   forfeit_team_id: number | null;
   double_forfeit: number;
@@ -37,6 +39,8 @@ function resultRow(overrides: Partial<{ [K in keyof ResultRow]: ResultRow[K] | s
     team2_score: 1,
     team1_id: 1,
     team2_id: 2,
+    team1_solo_user_id: null,
+    team2_solo_user_id: null,
     winner_team_id: 1,
     forfeit_team_id: null,
     double_forfeit: 0,
@@ -54,7 +58,7 @@ async function mockTicker(results: ReturnType<typeof resultRow>[], winners: unkn
     .mockResolvedValueOnce([winners])
     .mockResolvedValueOnce([[]]);
   const { getDatabase } = await import("@/lib/server/database");
-  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+  jest.mocked(getDatabase).mockResolvedValue(poolWithConnection(execute).pool);
   return execute;
 }
 
@@ -184,12 +188,12 @@ describe("getLandingTicker — issue et noms calculés au chargement", () => {
     expect(item.sr).toBeNull();
   });
 
-  it("forfait de l'adversaire d'un vainqueur enregistré : « forfait », et le vainqueur enregistré est suivi", async () => {
+  it("forfait de l'adversaire d'un vainqueur enregistré : « forfait » ; vainqueur = camp forfait : ce camp « forfait », l'autre gagne", async () => {
     await mockTicker([resultRow({ winner_team_id: 1, forfeit_team_id: 2 }, 1), resultRow({ winner_team_id: 1, forfeit_team_id: 1 }, 2)]);
     // Le plus récent d'abord (minute 2 : vainqueur = camp forfait, incohérent).
     const [incoherent, forfeit] = results((await getLandingTicker()).items);
     expect(forfeit.sides.map((side) => side.outcome)).toEqual(["win", "forfeit"]);
-    expect(incoherent.sides.map((side) => side.outcome)).toEqual(["win", "loss"]);
+    expect(incoherent.sides.map((side) => side.outcome)).toEqual(["forfeit", "win"]);
   });
 
   it("un seul chargement sert les deux langues, sans relire la base", async () => {
@@ -245,7 +249,7 @@ describe("getLandingTicker — lectures côte à côte", () => {
         }),
     );
     const { getDatabase } = await import("@/lib/server/database");
-    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    jest.mocked(getDatabase).mockResolvedValue(poolWithConnection(execute).pool);
 
     const pending = getLandingTicker();
     for (let tick = 0; tick < 5; tick += 1) await Promise.resolve();
@@ -263,10 +267,132 @@ describe("getLandingTicker — lectures côte à côte", () => {
       .mockResolvedValueOnce([[]])
       .mockRejectedValueOnce(new Error("news down"));
     const { getDatabase } = await import("@/lib/server/database");
-    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    jest.mocked(getDatabase).mockResolvedValue(poolWithConnection(execute).pool);
 
     const { items } = await getLandingTicker();
     expect(results(items)).toEqual([]);
     expect(items).toHaveLength(3);
   });
 });
+
+// EF-24 : une seule connexion, inscriptions bornées, un champion par tournoi,
+// repli « Joueur » des entrées solo, lignes incohérentes écartées, titres
+// d'actualité nettoyés.
+describe("getLandingTicker — lectures et repli (EF-24)", () => {
+  async function mockReads(reads: { results?: unknown[]; registrations?: unknown[]; winners?: unknown[]; news?: unknown[] }) {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([reads.results ?? []])
+      .mockResolvedValueOnce([reads.registrations ?? []])
+      .mockResolvedValueOnce([reads.winners ?? []])
+      .mockResolvedValueOnce([reads.news ?? []]);
+    const doubles = poolWithConnection(execute);
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(doubles.pool);
+    return { execute, ...doubles };
+  }
+
+  it("loadLandingTicker_fourReads_shareOneConnectionReleasedOnce", async () => {
+    const { getConnection, release } = await mockReads({ results: [resultRow({}, 1)] });
+    await getLandingTicker();
+    expect(getConnection).toHaveBeenCalledTimes(1);
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it("loadLandingTicker_readFails_connectionStillReleased", async () => {
+    const execute = jest.fn<SqlQuery>().mockRejectedValue(new Error("down"));
+    const { pool, release } = poolWithConnection(execute);
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(pool);
+    expect((await getLandingTicker()).items).toHaveLength(3);
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it("loadLandingTicker_oneReadFails_releasesOnlyAfterOthersSettle", async () => {
+    // Une lecture en échec ne rend pas la connexion pendant que les autres y attendent.
+    const pending: Array<(value: unknown) => void> = [];
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockRejectedValueOnce(new Error("down"))
+      .mockImplementation(() => new Promise((resolve) => { pending.push(resolve); }));
+    const { pool, release } = poolWithConnection(execute);
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(pool);
+
+    const ticker = getLandingTicker();
+    for (let tick = 0; tick < 10; tick += 1) await Promise.resolve();
+    expect(release).not.toHaveBeenCalled();
+    for (const resolve of pending) resolve([[]]);
+
+    expect((await ticker).items).toHaveLength(3);
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it("loadLandingTicker_registrationsQuery_isBoundedByShownEntries", async () => {
+    const { execute } = await mockReads({});
+    await getLandingTicker();
+    expect(String(execute.mock.calls[1][0])).toMatch(/LIMIT 10\b/);
+  });
+
+  it("loadLandingTicker_championsQuery_joinsOneRegistrationPerTournament", async () => {
+    const { execute } = await mockReads({});
+    await getLandingTicker();
+    const sql = String(execute.mock.calls[2][0]).replace(/\s+/g, " ");
+    expect(sql).toContain("r.id = ( SELECT MIN(r1.id) FROM bg_tournament_registrations r1 WHERE r1.tournament_id = t.id AND r1.final_rank = 1 )");
+    expect(sql).toContain("w.solo_user_id AS winner_solo_user_id");
+  });
+
+  it("formatTickerEntry_soloResultWithoutVisibleName_saysPlayerWithoutId", async () => {
+    await mockReads({ results: [resultRow({ team2_name: "\u200B", team2_id: 7, team2_solo_user_id: 33 }, 1)] });
+    expect(results((await getLandingTicker()).items)[0].sides[1].name).toBe("Joueur");
+    expect(results((await getLandingTicker("en")).items)[0].sides[1].name).toBe("Player");
+  });
+
+  it("formatTickerEntry_soloResultWithName_keepsName", async () => {
+    await mockReads({ results: [resultRow({ team2_name: "Pseudo", team2_solo_user_id: 33 }, 1)] });
+    expect(results((await getLandingTicker()).items)[0].sides[1].name).toBe("Pseudo");
+  });
+
+  it("formatTickerEntry_soloChampionWithoutName_saysPlayerWithoutId", async () => {
+    await mockReads({
+      winners: [{ finished_at: new Date("2026-10-03T10:00:00Z"), name: "Gamma League", winner_name: null, winner_team_id: 42, winner_solo_user_id: 33 }],
+    });
+    const isChampion = (item: TickerItem): item is TickerChampionItem => typeof item !== "string" && item.kind === "champion";
+    expect((await getLandingTicker()).items.filter(isChampion)[0].name).toBe("Joueur");
+    expect((await getLandingTicker("en")).items.filter(isChampion)[0].name).toBe("Player");
+  });
+
+  it("loadLandingTicker_unequalScoresWithoutOutcome_dropsRow", async () => {
+    // Vainqueur hors des deux camps (équipe remplacée après le rapport).
+    await mockReads({ results: [resultRow({ winner_team_id: 99, team1_score: 3, team2_score: 0 }, 1), resultRow({}, 2)] });
+    const shown = results((await getLandingTicker()).items);
+    expect(shown).toHaveLength(1);
+    expect(shown[0].sides.map((side) => side.score)).toEqual(["2", "1"]);
+  });
+
+  it("loadLandingTicker_equalScoresWithoutWinner_keepsDraw", async () => {
+    await mockReads({ results: [resultRow({ winner_team_id: null, team1_score: 1, team2_score: 1 }, 1)] });
+    expect(results((await getLandingTicker()).items)).toHaveLength(1);
+  });
+
+  it("loadNewsEntries_titleWithInvisibles_isCleaned", async () => {
+    await mockReads({ news: [{ title: "\u202ESaison\u200B 2", created_at: new Date("2026-10-04T10:00:00Z") }] });
+    expect((await getLandingTicker()).items).toContain("NEWS · Saison 2");
+  });
+
+  it("loadNewsEntries_titleOnlyInvisibles_isDropped", async () => {
+    await mockReads({
+      results: [resultRow({}, 1)],
+      news: [{ title: "\u200B\u200B", created_at: new Date("2026-10-04T10:00:00Z") }],
+    });
+    const items = (await getLandingTicker()).items;
+    expect(items.filter((item) => typeof item === "string" && item.startsWith("NEWS"))).toEqual([]);
+  });
+
+  it("getLandingTicker_manyEntries_keepsTenItems", async () => {
+    const many = Array.from({ length: 12 }, (_, index) => resultRow({}, index));
+    await mockReads({ results: many });
+    expect((await getLandingTicker()).items).toHaveLength(10);
+  });
+});
+

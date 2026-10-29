@@ -6,7 +6,7 @@ import { RuleText } from "@/components/rules/RuleText";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { getCurrentUser } from "@/lib/server/auth";
 import { messagesFor } from "@/lib/server/i18n-messages";
-import { loadLeaderboardRows } from "@/lib/server/landing-service";
+import { getLeaderboardRows } from "@/lib/server/landing-service";
 import { requestLocale } from "@/lib/server/request-locale";
 import { getSiteCopy, getSiteCopyEditor } from "@/lib/server/site-copy-service";
 import { siteCanonicalBase } from "@/lib/server/site-url";
@@ -72,7 +72,7 @@ export default async function ClassementPage({ searchParams }: Readonly<PageProp
   // sous `/en`, l'anglais enregistré ou l'anglais d'origine, jamais le français
   // (`resolveSiteCopy`). La session est déjà lue par le layout (mémoïsée par requête).
   const [loaded, forms, copy, user] = await Promise.all([
-    loadLeaderboardRows(game).catch((): LandingLeaderboardRow[] | null => null),
+    getLeaderboardRows(game).catch((): LandingLeaderboardRow[] | null => null),
     game === undefined ? loadCachedTeamForms().catch(() => null) : Promise.resolve(null),
     getSiteCopy(locale),
     getCurrentUser().catch(() => null),

@@ -1,6 +1,13 @@
 import { describe, expect, it } from "@jest/globals";
 import { renderToStaticMarkup } from "react-dom/server";
-import { LiveCard, slideClock, slideNearActive } from "@/components/cyber/landing/LiveCard";
+import {
+  type MatchSlideProps,
+  LiveCard,
+  sameSlideProps,
+  slideClock,
+  slideLoadsLogos,
+  slideNearActive,
+} from "@/components/cyber/landing/LiveCard";
 import { LANDING_CAROUSEL_TOUCH_HOLD_MS, pointerDownHoldsCarousel } from "@/components/cyber/landing/useMatchCarousel";
 import { LandingTextProvider } from "@/components/i18n/landing-text";
 import { landingClientMessages } from "@/lib/shared/landing-text";
@@ -95,9 +102,16 @@ describe("LiveCard — audience", () => {
     const fr = render(live([match(1)], 128));
     expect(fr).toContain('<span class="sr-only">128 personnes suivent le tournoi</span>');
     expect(fr).toMatch(/<span class="mono" aria-hidden="true">128<\/span>/);
-    expect(fr).toMatch(/<svg[^>]*aria-hidden="true"[^>]*lucide-eye|<svg[^>]*lucide-eye[^>]*aria-hidden="true"/);
+    expect(fr).toMatch(/<svg[^>]*aria-hidden="true"[^>]*lucide-users|<svg[^>]*lucide-users[^>]*aria-hidden="true"/);
+    expect(fr).not.toContain("lucide-eye");
     const en = renderEn(live([match(1)], 128));
     expect(en).toContain('<span class="sr-only">128 people following the tournament</span>');
+  });
+
+  it("LiveCard_viewersAboveThreshold_labelRepeatedAsTooltip", () => {
+    // Un visiteur voyant lisait « œil 128 » comme des spectateurs de la diffusion.
+    expect(render(live([match(1)], 128))).toContain('title="128 personnes suivent le tournoi"');
+    expect(renderEn(live([match(1)], 128))).toContain('title="128 people following the tournament"');
   });
 
   it("sous le seuil, ni nombre ni libellé", () => {
@@ -148,6 +162,17 @@ describe("LiveCard — logos des diapositives", () => {
     expect(new Set(sources)).toEqual(new Set(["a1", "b1", "a2", "b2", "a12", "b12"]));
   });
 
+  it("LiveCard_featuredMatchFarFromActive_preloadsItsLogos", () => {
+    // Le serveur met en avant le 6e : un sondage qui le change fait sauter la
+    // carte vers lui, ses logos sont déjà là.
+    const twelve = Array.from({ length: 12 }, (_, index) => match(index + 1));
+    const value = { ...live(twelve), currentMatch: twelve[5] };
+    const sources = new Set(logoSources(render(value)));
+    expect(sources.has("a6")).toBe(true);
+    expect(sources.has("b6")).toBe(true);
+    expect(sources.has("a8")).toBe(false);
+  });
+
   it("les diapositives sans logo gardent l'initiale", () => {
     const twelve = Array.from({ length: 12 }, (_, index) => match(index + 1));
     const html = render(live(twelve));
@@ -168,6 +193,60 @@ describe("slideNearActive", () => {
     expect(slideNearActive(1, 0, 12)).toBe(true);
     expect(slideNearActive(2, 0, 12)).toBe(false);
     expect(slideNearActive(6, 0, 12)).toBe(false);
+  });
+});
+
+describe("slideLoadsLogos", () => {
+  it("slideLoadsLogos_featuredFarSlide_loads", () => {
+    expect(slideLoadsLogos(6, 0, 12, true)).toBe(true);
+  });
+
+  it("slideLoadsLogos_notFeaturedFarSlide_doesNotLoad", () => {
+    expect(slideLoadsLogos(6, 0, 12, false)).toBe(false);
+  });
+
+  it("slideLoadsLogos_neighbourNotFeatured_loads", () => {
+    expect(slideLoadsLogos(11, 0, 12, false)).toBe(true);
+  });
+});
+
+describe("sameSlideProps", () => {
+  const props = (overrides: Partial<MatchSlideProps> = {}): MatchSlideProps => ({
+    match: match(1),
+    clock: null,
+    showLogos: true,
+    spectator: false,
+    ...overrides,
+  });
+
+  it("sameSlideProps_freshButEqualMatch_skipsRender", () => {
+    // Chaque relève du direct remplace les objets, manche comprise.
+    expect(sameSlideProps(props(), props())).toBe(true);
+  });
+
+  it("sameSlideProps_scoreChanged_renders", () => {
+    expect(sameSlideProps(props(), props({ match: match(1, { team1Score: 1 }) }))).toBe(false);
+  });
+
+  it("sameSlideProps_nestedRoundChanged_renders", () => {
+    expect(sameSlideProps(props(), props({ match: match(1, { round: { kind: "round", number: 2 } }) }))).toBe(false);
+  });
+
+  it("sameSlideProps_clockLogosOrSpectatorChanged_renders", () => {
+    expect(sameSlideProps(props(), props({ clock: 42 }))).toBe(false);
+    expect(sameSlideProps(props(), props({ showLogos: false }))).toBe(false);
+    expect(sameSlideProps(props(), props({ spectator: true }))).toBe(false);
+  });
+
+  it("sameSlideProps_extraField_renders", () => {
+    const widened: LandingLiveMatch = Object.assign(match(1), { extra: 1 });
+    expect(sameSlideProps(props(), props({ match: widened }))).toBe(false);
+  });
+
+  it("MatchSlide_source_memoUsesFieldComparatorAndStickyLogos", () => {
+    const source = readSource("components/cyber/landing/LiveCard.tsx");
+    expect(source).toContain("}, sameSlideProps);");
+    expect(source).toContain("const showLogos = useStickyFlag(requested);");
   });
 });
 
@@ -201,14 +280,38 @@ describe("useMatchCarousel — prise au toucher", () => {
     expect(source).toContain("if (touchTimer.current !== null) clearTimeout(touchTimer.current);");
     expect(source).toContain("}, LANDING_CAROUSEL_TOUCH_HOLD_MS);");
   });
+
+  it("useMatchCarousel_togglePaused_releasesTouchHoldFirst", () => {
+    const source = readSource("components/cyber/landing/useMatchCarousel.ts");
+    expect(source).toMatch(/togglePaused: \(\) => \{\s*releaseTouch\(\);\s*setPaused\(\(value\) => !value\);/);
+  });
+
+  it("useMatchCarousel_pointerCancel_releasesTouchButNotMouse", () => {
+    const source = readSource("components/cyber/landing/useMatchCarousel.ts");
+    expect(source).toMatch(/onPointerCancel: \(event\) => \{\s*if \(event\.pointerType !== "mouse"\) releaseTouch\(\);/);
+    expect(source).toMatch(/const releaseTouch = \(\) => \{[^}]*clearTimeout\(touchTimer\.current\);[^}]*setTouched\(false\);/);
+  });
 });
 
 describe("LiveCard.module.css", () => {
   const css = readSource("components/cyber/landing/LiveCard.module.css");
 
   it("le survol des commandes est réservé à un vrai pointeur", () => {
-    expect(css).toContain("@media (hover: hover) and (pointer: fine) {\n  .carouselButton:hover {");
+    expect(css).toContain("@media (any-hover: hover) and (any-pointer: fine) {\n  .carouselButton:hover {");
     expect(css).not.toMatch(/\.carouselButton:hover,/);
+  });
+
+  it("LiveCard_css_streamButtonAndFooterHoverOnlyWithRealPointer", () => {
+    expect(css).toContain("@media (any-hover: hover) and (any-pointer: fine) {\n  .streamButton:hover {");
+    expect(css).toContain("@media (any-hover: hover) and (any-pointer: fine) {\n  .root:hover .footer {");
+    // Hors de la garde, aucun survol nu ne subsiste (le mouvement réduit l'annule seulement).
+    const outside = css.replace(/@media \(any-hover: hover\) and \(any-pointer: fine\) \{(?:[^{}]*\{[^}]*\})*\s*\}/g, "");
+    expect(outside).not.toMatch(/\.streamButton:hover|\.root:hover \.footer \{/);
+  });
+
+  it("LiveCard_css_keyboardFocusKeepsFooterAndButtonFeedback", () => {
+    expect(css).toMatch(/\.cardOverlay:focus-visible ~ \.footer \{/);
+    expect(css).toMatch(/\.streamButton:focus-visible \{/);
   });
 
   it("les diapositives cachées figent leurs animations par le jeton hérité", () => {

@@ -7,6 +7,7 @@ import {
 } from "@/lib/shared/account-deletion";
 import { isReferencedRowError } from "@/lib/server/mysql-errors";
 import { closeUserStreams } from "@/lib/server/session-streams";
+import { invalidateLandingTeamViews } from "@/lib/server/landing-cache";
 import { deleteStoredImage } from "@/lib/server/image-upload";
 import { toDiskUploadPath } from "@/lib/shared/uploads";
 import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
@@ -295,6 +296,12 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
   // Ses sessions sont parties avec la transaction, pas ses flux de tournoi
   // ouverts, qui ne relisent pas la session (`session-streams.ts`).
   closeUserStreams(userId);
+
+  // L'accueil, lu sans compte, garde en cache des vues qui nomment l'entrée
+  // solo du compte (bandeau, mini-arbre, leaderboard) et le compteur de
+  // joueurs : sans cela, le pseudo d'un compte supprimé y resterait servi
+  // jusqu'à l'échéance de ces caches.
+  invalidateLandingTeamViews();
 
   // Les deux modes effacent la photo : l'un fait disparaître la ligne, l'autre
   // met `avatar_url` à `NULL` — dans les deux cas le fichier resterait servi

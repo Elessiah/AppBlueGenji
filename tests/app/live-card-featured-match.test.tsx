@@ -264,8 +264,9 @@ describe("LiveCard — état du match et état du tournoi", () => {
     // Le passage « En attente » → « Lancement » ne vient que de l'horloge :
     // sans relecture, l'ancien libellé tiendrait jusqu'au sondage (5 min).
     const source = readFileSync(join(process.cwd(), "components/cyber/landing/LiveCard.tsx"), "utf8");
+    // Daté **et** hors antenne : la condition même de `slideClock`.
     expect(source).toMatch(
-      /useClock\(LIVE_CARD_CLOCK_MS, matches\.some\(\(match\) => match\.launchPhase === "SCHEDULED"\)\)/,
+      /useClock\(LIVE_CARD_CLOCK_MS, matches\.some\(\(match\) => slideClock\(match, 0\) !== null\)\)/,
     );
     expect(source).toContain("featuredMatchPill(match, clock, text.locale)");
   });

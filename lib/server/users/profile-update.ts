@@ -6,6 +6,7 @@ import { BATTLETAG_LOCKED, isBattletagLocked } from "@/lib/shared/battletag-lock
 import { DISCORD_TAG_LOCKED, isDiscordTagLocked } from "@/lib/shared/discord-tag-lock";
 import { normalizePseudo } from "@/lib/server/serialization";
 import { syncSoloEntryIdentity } from "@/lib/server/solo-entries-service";
+import { invalidateLandingTeamViews } from "@/lib/server/landing-cache";
 import { rotateHiddenAvatarFile } from "@/lib/server/avatar-rotation";
 import { PSEUDO_MAX_LENGTH, pseudoLength } from "@/lib/shared/pseudo";
 
@@ -339,6 +340,10 @@ export async function updateOwnProfile(
   if (patch.pseudo || patch.visibility?.avatar !== undefined) {
     await syncSoloEntryIdentity(userId);
   }
+  // Le bandeau et le mini-arbre de la vitrine, mis en cache sans compte,
+  // nomment l'entrée solo à son pseudo : l'ancien y resterait jusqu'à une
+  // minute après le renommage — comme pour une équipe renommée.
+  if (patch.pseudo) invalidateLandingTeamViews();
 
   // Masqué, l'avatar disparaît des réponses mais son fichier restait servi sans
   // session à la même adresse : on le renomme, l'ancienne adresse meurt. Un

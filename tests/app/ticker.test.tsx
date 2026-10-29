@@ -120,12 +120,14 @@ describe("Ticker — résultats habillés par camp (TICKER_RESULTS.md)", () => {
     expect(html).toContain('<span class="sr-only"> (sans vainqueur)</span>');
   });
 
-  it("nul aux scores inégaux (2-1 sans vainqueur) : la note se voit, FR et EN", () => {
+  it("Ticker_drawUnequalScores_noteStaysScreenReaderOnly", () => {
+    // Plus de note visible : une telle ligne (donnée incohérente) est écartée
+    // au chargement ; si elle arrivait, la note resterait au lecteur d'écran.
     const html = firstCopy(renderToStaticMarkup(<Ticker items={[result("none", "none", FR, "sans vainqueur")]} />));
-    expect(html).toContain('<span> (sans vainqueur)</span>');
-    expect(visible(html)).toContain("Alpha 2 — Beta 1 (sans vainqueur)");
+    expect(html).toContain('<span class="sr-only"> (sans vainqueur)</span>');
+    expect(visible(html)).not.toContain("sans vainqueur");
     const en = firstCopy(renderToStaticMarkup(<Ticker items={[result("none", "none", EN, "no winner")]} />));
-    expect(visible(en)).toContain("(no winner)");
+    expect(en).toContain('<span class="sr-only"> (no winner)</span>');
   });
 
   it("nul aux scores égaux : la note reste dite au lecteur d'écran seul", () => {
@@ -133,13 +135,13 @@ describe("Ticker — résultats habillés par camp (TICKER_RESULTS.md)", () => {
     expect(visible(html)).not.toContain("sans vainqueur");
   });
 
-  it("seconde copie (aria-hidden) : ni mots d'issue ni note masqués, mais le mot « forfait » et la note visible restent", () => {
+  it("seconde copie (aria-hidden) : ni mots d'issue ni note masqués, mais le mot « forfait » reste", () => {
     const render = (items: Parameters<typeof Ticker>[0]["items"]) => renderToStaticMarkup(<Ticker items={items} />).split('<div class="copy" aria-hidden="true">')[1];
     const second = render([result("win", "loss"), result("none", "none", FR, "sans vainqueur", ["1", "1"])]);
     expect(second).not.toContain("sr-only");
+    expect(second).not.toContain("sans vainqueur");
     expect(second).toContain("Alpha");
     expect(render([result("forfeit", "win")])).toContain("<span> (forfait)</span>");
-    expect(render([result("none", "none", FR, "sans vainqueur")])).toContain("<span> (sans vainqueur)</span>");
   });
 
   it("le champion et le vainqueur d'un résultat partagent le même habillage", () => {
@@ -182,8 +184,12 @@ describe("Ticker — feuille de style des résultats", () => {
    */
   const SURFACE = hex(root, "--cyber-bg-3");
 
-  it("les mots d'issue masqués ne se copient pas avec le texte du bandeau", () => {
-    expect(css).toMatch(/\.item :global\(\.sr-only\)\s*\{[^}]*user-select: none/);
+  it("Ticker_css_hiddenWordsMarksSeparatorsAndSecondCopyAreNotCopied", () => {
+    const block = css.match(/\.item :global\(\.sr-only\),[^{]*\{[^}]*\}/)?.[0] ?? "";
+    expect(block).toMatch(/user-select: none/);
+    for (const selector of [".mark", ".sep", '.copy[aria-hidden="true"]']) {
+      expect(block).toContain(selector);
+    }
   });
 
   it("n'emploie jamais l'ambre (avertissement seulement)", () => {

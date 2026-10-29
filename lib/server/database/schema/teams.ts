@@ -32,7 +32,8 @@ export async function createTeamTables(db: Pool): Promise<void> {
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       UNIQUE KEY uniq_bg_teams_tag (tag),
-      UNIQUE KEY uniq_bg_teams_solo_user (solo_user_id)
+      UNIQUE KEY uniq_bg_teams_solo_user (solo_user_id),
+      INDEX idx_bg_teams_solo_deleted (solo_user_id, deleted_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 

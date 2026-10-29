@@ -89,10 +89,11 @@ describe("chaque consommateur lit la liste filtrée", () => {
     expect(source(path)).toMatch(/loadTeamRanking\(/);
   });
 
-  it("la page /classement et l'API passent par loadLeaderboardRows", () => {
-    expect(source("app/classement/page.tsx")).toContain("loadLeaderboardRows(game)");
+  it("la page /classement et l'API passent par la même entrée mutualisée (getLeaderboardRows)", () => {
+    expect(source("app/classement/page.tsx")).toContain("getLeaderboardRows(game)");
     expect(source("app/api/landing/leaderboard/route.ts")).toContain("getLandingLeaderboard");
-    expect(source("lib/server/landing-service.ts")).toMatch(/return await loadLeaderboardRows\(game\)/);
+    expect(source("lib/server/landing-service.ts")).toMatch(/await getLeaderboardRows\(game\)/);
+    expect(source("lib/server/landing-service.ts")).toMatch(/\(\) =>\s+loadLeaderboardRows\(game\)/);
   });
 
   it("le filtre est posé une fois, dans loadTeamRanking", () => {

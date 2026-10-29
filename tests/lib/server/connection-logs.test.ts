@@ -123,6 +123,36 @@ describe("journal des données de connexion (serveur)", () => {
     expect(execute).toHaveBeenCalledTimes(2);
   });
 
+  it("purgeExpiredConnectionLogs_concurrentCalls_shareOneDelete", async () => {
+    // L'accueil et sa carte du direct lancés ensemble : un seul `DELETE`.
+    const start = 1_000_000_000_000;
+    const pending: Array<(value: unknown) => void> = [];
+    execute.mockImplementationOnce(() => new Promise((resolve) => { pending.push(resolve); }));
+
+    const first = purgeExpiredConnectionLogs(start);
+    const second = purgeExpiredConnectionLogs(start + 10);
+    for (let tick = 0; tick < 5; tick += 1) await Promise.resolve();
+    expect(pending).toHaveLength(1);
+    pending[0]([{ affectedRows: 4 }]);
+
+    expect(await first).toBe(4);
+    expect(await second).toBe(4);
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("purgeExpiredConnectionLogs_inFlightPurgeFails_nextCallRetries", async () => {
+    const start = 1_000_000_000_000;
+    execute.mockRejectedValueOnce(new Error("ER_LOCK_WAIT_TIMEOUT"));
+    const first = purgeExpiredConnectionLogs(start);
+    const shared = purgeExpiredConnectionLogs(start);
+    await expect(first).rejects.toThrow("ER_LOCK_WAIT_TIMEOUT");
+    await expect(shared).rejects.toThrow("ER_LOCK_WAIT_TIMEOUT");
+
+    await purgeExpiredConnectionLogs(start + 1_000);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
   it("rend au titulaire ses lignes pour l'export", async () => {
     execute.mockResolvedValue([
       [{ event_type: "LOGIN_GOOGLE", ip: "203.0.113.7", created_at: new Date("2026-07-01T10:00:00.000Z") }],

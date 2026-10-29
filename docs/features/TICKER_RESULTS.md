@@ -31,9 +31,11 @@ un 0-0) : le bandeau n'affiche pas un « 0 — 0 » de match joué. L'issue
 est bâtie sur `lib/shared/match-outcome.ts` (double forfait, nul), comme les
 fiches. Un **vainqueur enregistré** qui désigne un camp est suivi, comme l'arbre
 et le classement : le forfait nominatif ne sert alors qu'à marquer l'*autre*
-camp « forfait » plutôt que « perdant » (une ligne incohérente — vainqueur =
-camp forfait — se lit comme son vainqueur). Sans vainqueur propre au match, un
-forfait nominatif donne la victoire à son adversaire. Un forfait se chiffre au
+camp « forfait » plutôt que « perdant ». Une ligne incohérente — vainqueur =
+camp forfait — dit ce camp « forfait » et donne la victoire à l'autre : un camp
+forfait n'a pas gagné (il s'affichait « ✓ » et l'autre « perdant »). Sans
+vainqueur propre au match, un forfait nominatif donne la victoire à son
+adversaire. Un forfait se chiffre au
 score plein du format du tournoi (`tickerScores`, `forfeitMapCount` : FT3 →
 3-0, saisie libre → 1-0) quand les colonnes sont vides ou à 0-0 (forfaits
 antérieurs à la règle) ; un score de forfait déjà écrit, qui suit le format de
@@ -48,15 +50,27 @@ La requête ne retient que les matchs entre **deux engagés** (`is_bye = FALSE`,
 « Équipe #null 0 — Équipe B 1 ». Elle exige aussi une **issue enregistrée** —
 vainqueur, forfait, double forfait, ou nul à scores égaux (comme
 `playedMatchSql`) : une ligne close sans rien de cela se serait lue « A 0 — B 0
-(sans vainqueur) ». Résultats, inscriptions et champions ne lisent que les
+(sans vainqueur) ». Une ligne sans issue propre aux scores **inégaux** (vainqueur
+hors des deux camps, équipe remplacée après le rapport) est écartée au
+chargement : elle se serait lue « Alpha 3 — Beta 0 (sans vainqueur) ». Résultats, inscriptions et champions ne lisent que les
 tournois **publiés** (`start_visibility_at <= NOW()`, comme le compteur de
 l'accueil) : un tournoi encore masqué n'y montre ni nom, ni engagés, ni score.
 Aucune donnée nouvelle n'est collectée : trois colonnes déjà publiques (tournois publiés seulement) et le
 format de match du tournoi (le vainqueur d'un match se voit sur la fiche du tournoi) rejoignent la requête.
 
-Noms : forme affichable (`visibleText`, `UNTRUSTED_NAMES.md`), repli
+Noms : forme affichable (`shownEntrantName`, `UNTRUSTED_NAMES.md`), repli
 « Équipe #id » / « Team #id » quand la ligne a disparu ou que le nom ne garde
-rien. L'issue de chaque camp et les noms nettoyés se calculent **une fois**, au
+rien — « Joueur » / « Player » (`ticker.playerFallback`) pour une entrée solo
+(`bg_teams.solo_user_id`) : le bandeau public n'appelle pas un joueur « équipe »
+et ne montre pas l'identifiant interne de sa ligne. Le titre d'une actualité
+est nettoyé au chargement comme les autres textes (`withoutInvisibles`) ; vide,
+l'actualité est écartée. Champions : **une** ligne par tournoi (la plus ancienne
+inscription au rang 1) — deux inscriptions au rang 1 occupaient sinon les deux
+places et le champion suivant disparaissait. Inscriptions : au plus autant de
+tournois que le bandeau montre d'entrées (`TICKER_MAX_ITEMS`). Les quatre
+lectures partent ensemble sur **une seule** connexion du pool, rendue au pool
+une fois **toutes** terminées (`Promise.allSettled`) : un échec ne la rend pas
+pendant que les autres y attendent encore. L'issue de chaque camp et les noms nettoyés se calculent **une fois**, au
 chargement mis en cache (`loadLandingTicker`) ; la langue ne rédige que les
 textes à la sortie (`formatTickerEntry`). Les identifiants de camp passent par
 `Number()` comme ceux du vainqueur et du forfait. Un champion dont le nom ne se
@@ -71,7 +85,7 @@ bandeau ne porte aucun lien (inchangé).
 | Vainqueur | `--teal-400` (néon de réussite) | gras 700, « ✓ » | « (vainqueur) » / « (winner) » |
 | Perdant | `--result-loss-ink` (encre réservée à la défaite, `DESIGN_SYSTEM.md` § Défaite) | « ✕ » | « (perdant) » / « (loser) » |
 | Forfait | encre du bandeau (`--ink`) — un forfait n'est pas une défaite | le mot « (forfait) » / « (forfeit) » **affiché** après le nom | — (le mot visible suffit) |
-| Nul | `--ink` pour les deux | — | « (sans vainqueur) » en fin d'entrée ; **affichée** quand les scores diffèrent (format à égalité permise : 2-1 sans vainqueur) |
+| Nul | `--ink` pour les deux | — | « (sans vainqueur) » en fin d'entrée (un nul passe toujours à scores égaux : les scores le disent à l'écran) |
 
 - Le mot « forfait » se voit : sans teinte ni repère, un forfait se lirait
   sinon comme une défaite ordinaire.
@@ -91,13 +105,20 @@ bandeau ne porte aucun lien (inchangé).
   (`#ff7a9b`), `--ink` 15,67:1.
 - Les repères « ✓ » / « ✕ » sont `aria-hidden` : l'issue passe par le texte
   masqué (`.sr-only`), rendu dans la seule copie lue de la piste — la seconde,
-  `aria-hidden`, ne l'embarque pas (le mot « forfait » et la note d'un nul aux
-  scores inégaux, visibles, y restent). Le texte masqué est `user-select: none`
-  dans le bandeau : copier une entrée en pause ne colle pas de mots invisibles. En couleurs forcées, la graisse et les repères demeurent.
+  `aria-hidden`, ne l'embarque pas (le mot « forfait », visible, y reste). Le
+  texte masqué, les repères, les losanges et la seconde copie sont
+  `user-select: none` (§ Copie du texte) : copier une entrée en pause ne colle
+  ni mots invisibles ni doublon. En couleurs forcées, la graisse et les repères demeurent.
 - Animation inchangée : `animation-play-state: var(--deco-anim-state)`, pause
   au survol et au bouton, réglage « Réduire les animations »
   (`ACCESSIBILITY_MENU.md`). Le bandeau n'a aucune boucle JS (pas de
   `useClientPower()` à lire).
+
+## Copie du texte
+
+Seul le texte du bandeau se copie : les mots d'issue masqués, les repères
+« ✓ » / « ✕ », les losanges et la seconde copie de la piste (masquée aux
+technologies d'assistance) portent `user-select: none`.
 
 ## Base de données
 

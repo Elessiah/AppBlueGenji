@@ -44,3 +44,14 @@ export function connectionMock() {
     release: jest.fn<() => void>(),
   };
 }
+
+/**
+ * Pool dont `getConnection` rend une connexion qui partage le même `execute`
+ * (lectures envoyées sur une seule connexion, `loadLandingTicker`). `release`
+ * est rendu pour vérifier que la connexion revient au pool.
+ */
+export function poolWithConnection(execute: SqlMock) {
+  const release = jest.fn<() => void>();
+  const getConnection = jest.fn(async () => fakeConnection({ execute, release }));
+  return { pool: fakePool({ execute, getConnection }), release, getConnection };
+}

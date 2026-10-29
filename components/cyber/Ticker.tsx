@@ -81,13 +81,13 @@ function TickerEntry({ item, hidden }: Readonly<{ item: TickerItem; hidden: bool
     );
   }
   const [left, right] = item.sides;
-  // Un nul aux scores inégaux (format à égalité permise : 2-1 sans vainqueur) se lirait
-  // comme une victoire du camp en tête : la note se voit alors, comme « forfait ».
-  const noteShown = item.sr !== null && left.score !== right.score;
+  // La note « sans vainqueur » n'accompagne qu'un nul à scores égaux — le
+  // chargeur écarte une ligne sans issue aux scores inégaux, donnée incohérente :
+  // les scores le disent déjà à l'écran, elle n'est dite qu'au lecteur d'écran.
   return (
     <>
       {item.lead} <ResultSide side={left} hidden={hidden} /> — <ResultSide side={right} hidden={hidden} />
-      {item.sr && (noteShown || !hidden) ? <span className={noteShown ? undefined : "sr-only"}> ({item.sr})</span> : null}
+      {item.sr && !hidden ? <span className="sr-only"> ({item.sr})</span> : null}
     </>
   );
 }

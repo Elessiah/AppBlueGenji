@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { getLandingLeaderboard } from "@/lib/server/landing-service";
+import { getLandingLeaderboard, getLeaderboardRows } from "@/lib/server/landing-service";
 import { clearCache } from "@/lib/server/cache";
 import { loadTeamRanking } from "@/lib/server/ranking-service";
 import { RANKING_BASE_POINTS } from "@/lib/shared/ranking";
@@ -309,5 +309,44 @@ describe("leaderboard de la landing", () => {
 
     expect(rows.slice(0, 2).map((row) => row.teamName)).toEqual(["Yann", "Zed"]);
     expect(rows[0].points).toBe(rows[1].points);
+  });
+});
+
+// EF-24 : `/classement` et l'accueil partagent la même entrée de cache.
+describe("getLeaderboardRows — liste mutualisée", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    clearCache();
+  });
+
+  it("getLeaderboardRows_afterLandingSlice_reusesCachedList", async () => {
+    const execute = await mockDb([teamRow(1, "Alpha"), teamRow(2, "Bravo")], [matchRow(1, 1, 2, 1)]);
+    await getLandingLeaderboard(1);
+    const calls = execute.mock.calls.length;
+
+    const rows = await getLeaderboardRows(undefined);
+
+    expect(execute.mock.calls).toHaveLength(calls);
+    expect(rows.map((row) => row.teamName)).toEqual(["Alpha", "Bravo"]);
+  });
+
+  it("getLandingLeaderboard_limit_slicesSharedList", async () => {
+    await mockDb([teamRow(1, "Alpha"), teamRow(2, "Bravo")], [matchRow(1, 1, 2, 1)]);
+    expect((await getLandingLeaderboard(1)).map((row) => row.teamName)).toEqual(["Alpha"]);
+  });
+
+  it("getLeaderboardRows_readFails_rejectsWithoutCaching", async () => {
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockRejectedValueOnce(new Error("down"));
+    await expect(getLeaderboardRows(undefined)).rejects.toThrow("down");
+
+    await mockDb([teamRow(1, "Alpha"), teamRow(2, "Bravo")], [matchRow(1, 1, 2, 1)]);
+    expect(await getLeaderboardRows(undefined)).toHaveLength(2);
+  });
+
+  it("getLandingLeaderboard_readFails_returnsEmpty", async () => {
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockRejectedValueOnce(new Error("down"));
+    expect(await getLandingLeaderboard(8)).toEqual([]);
   });
 });

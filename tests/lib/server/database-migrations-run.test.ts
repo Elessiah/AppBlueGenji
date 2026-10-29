@@ -294,6 +294,19 @@ describe("runMigrations — tolérance d'un ALTER récent", () => {
     expect(errorSpy).not.toHaveBeenCalled();
   });
 
+  it("runMigrations_statusIndexAlreadyDropped_staysSilent", async () => {
+    // EF-24 : `idx_bg_matches_status` retiré (préfixe de `idx_bg_matches_status_updated`).
+    fail(/^ALTER TABLE bg_matches DROP INDEX idx_bg_matches_status$/, "ER_CANT_DROP_FIELD_OR_KEY");
+    fail(/^ALTER TABLE bg_teams ADD INDEX idx_bg_teams_solo_deleted/, "ER_DUP_KEYNAME");
+
+    await getDatabase();
+
+    expect(rank(/^ALTER TABLE bg_matches DROP INDEX idx_bg_matches_status$/)).toBeGreaterThan(
+      rank(/^ALTER TABLE bg_matches ADD INDEX idx_bg_matches_status_updated/),
+    );
+    expect(errorSpy).not.toHaveBeenCalled();
+  });
+
   it("dit un index dupliqué sur un ADD COLUMN, qui n'a pas posé la colonne", async () => {
     fail(/ADD COLUMN lookup_hash/, "ER_DUP_KEYNAME");
 

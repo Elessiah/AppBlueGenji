@@ -307,7 +307,11 @@ stylet) la pose pour `LANDING_CAROUSEL_TOUCH_HOLD_MS` (10 s), échéance repouss
 la lecture et un tapotement au moment du changement ouvrait l'ancre du match
 suivant. Un toucher sur un bouton de la carte (précédent, suivant, pause) ne
 retient rien : il règle lui-même le défilement, et « Reprendre » paraîtrait
-sans effet (`pointerDownHoldsCarousel`). Le focus laissé par un clic ne retient
+sans effet (`pointerDownHoldsCarousel`) ; « Pause » / « Reprendre » lève aussi une
+prise tactile déjà posée (match touché juste avant), qui tenait sinon la carte
+figée jusqu'à son échéance. Un appui suivi d'un `pointercancel` — le navigateur
+reprend le geste pour défiler la page — lève la prise : un défilement commencé
+sur la carte ne la fige plus 10 s. Le focus laissé par un clic ne retient
 pas non plus : rien ne viendrait le relâcher. L'enveloppe `.hold`
 (`display: contents`) porte les écouteurs, la plaque de lien couvrant les
 matchs. Le match affiché est suivi **par identifiant** (`resolveCarouselIndex`) :
@@ -341,25 +345,35 @@ parti ailleurs, ou carte démontée, il relâche la prise. La position n'est ann
 défilement arrêté. La plaque de lien et son intitulé suivent le match affiché.
 
 **Coût des diapositives cachées.** Les diapositives empilées dans la case
-visible ne retiennent pas `loading="lazy"` : seules l'affichée et ses deux
-voisines (circulaires, `slideNearActive`) chargent leurs logos, les autres
-gardent l'initiale. `MatchSlide` est mémoïsée, et l'horloge de la carte
-(30 s) n'est transmise qu'aux matchs datés hors antenne (`slideClock`) : un pas
-du carrousel ou un tic ne refait que les diapositives concernées. Une
+visible ne retiennent pas `loading="lazy"` : seules l'affichée, ses deux
+voisines (circulaires, `slideNearActive`) et le match mis en avant
+(`slideLoadsLogos` — un sondage qui le change fait sauter la carte vers lui, ses
+logos sont déjà là) demandent leurs logos, les autres gardent l'initiale ; une
+fois demandés, les logos restent (une diapositive qui s'éloigne ne retombe pas
+sur l'initiale). `MatchSlide` est mémoïsée et compare le match **champ par
+champ** (`sameSlideProps`) : chaque relève du direct remplace les objets, et la
+comparaison par référence refaisait toutes les diapositives. L'horloge de la
+carte (30 s) ne tourne que si un match la lit et n'est transmise qu'à lui —
+daté hors antenne (`slideClock`) : un pas du carrousel ou un tic ne refait que
+les diapositives concernées. Une
 diapositive cachée fige toutes ses animations infinies (lueur de « En attente
 de lancement », point de « En direct ») : `.slide:not(.slideActive)` pose
 `--deco-anim-state: paused`, jeton hérité que lisent toutes ces animations ; figées
 plutôt que retirées, la sortante ne s'éteint pas au milieu du fondu. Le survol des
-commandes est gardé par `@media (hover: hover) and (pointer: fine)` : au
-toucher, « Match suivant » restait allumé après le tapotement.
+commandes, du bouton « Regarder sur … » et du pied de carte est gardé par
+`@media (any-hover: hover) and (any-pointer: fine)` : au toucher, ils restaient
+allumés après le tapotement ; `any-*` plutôt que le seul pointeur principal,
+pour qu'une souris ou un pavé sur un appareil tactile (iPad à trackpad) garde
+son retour de survol.
 
 **Noms et audience.** Sans compte (`spectator`), les noms des engagés restent du
 texte : les fiches d'équipe et de joueur sont derrière la connexion, la plaque
 mène à la vue sans compte. Connecté, leur titre au survol est neutre
 (« Voir la fiche de … » / « View …'s page »), juste pour une équipe comme pour un
 joueur. Le nombre de personnes qui suivent le tournoi porte un libellé lu par
-le lecteur d'écran (`live.viewers`, FR + EN), l'icône et le chiffre restant
-visuels.
+le lecteur d'écran (`live.viewers`, FR + EN), répété en infobulle (`title`), et
+une icône de **personnes** (`Users`) plutôt qu'un œil : « œil 12 » se lisait
+comme 12 spectateurs de la diffusion, même sans diffusion.
 
 ## Fichiers
 

@@ -105,6 +105,7 @@
     "winnerLead": "VAINQUEUR · {name} ·",
     "unknownChampion": "Champion inconnu",
     "teamFallback": "Équipe #{id}",
+    "playerFallback": "Joueur",
     "news": "NEWS · {title}",
     "defaultResult": "RÉSULTAT · En attente de nouveaux matches",
     "defaultRegistration": "INSCRIPTIONS · Prochains brackets à venir",
@@ -118,6 +119,7 @@
     "start": "DÉBUT",
     "teams": "ÉQUIPES",
     "tbd": "À venir",
+    "bye": "Exempt",
     "state": {
       "full": "Complet",
       "registration": "Inscriptions ouvertes",

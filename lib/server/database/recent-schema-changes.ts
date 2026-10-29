@@ -218,6 +218,16 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // recalcul de son cache : avec le seul index sur `status`, tout l'historique
     // terminé était lu puis trié pour en garder trois.
     `ALTER TABLE bg_matches ADD INDEX idx_bg_matches_status_updated (status, updated_at)`,
+    // EF-24 — `idx_bg_matches_status (status)` est un préfixe strict de
+    // `idx_bg_matches_status_updated` : tenu à chaque écriture de match sans
+    // servir une lecture de plus (aucune requête ne le force). Retiré **après**
+    // la pose du composé, pour qu'aucune lecture par statut ne reste sans index ;
+    // sur une base où il est déjà parti, `ER_CANT_DROP_FIELD_OR_KEY` est un no-op.
+    `ALTER TABLE bg_matches DROP INDEX idx_bg_matches_status`,
+    // EF-24 — compteur « Équipes actives » de l'accueil (`loadSiteCounts` :
+    // `solo_user_id IS NULL AND deleted_at IS NULL`) lu dans l'index seul, sans
+    // parcourir chaque ligne d'équipe à chaque reconstruction des statistiques.
+    `ALTER TABLE bg_teams ADD INDEX idx_bg_teams_solo_deleted (solo_user_id, deleted_at)`,
     // Phase de lancement des matchs devenue une option du tournoi
     // (`docs/features/MATCH_LAUNCH.md`). Décision de l'utilisateur
     // (2026-10-13) : défaut 0, si bien que tout tournoi existant passe sans
