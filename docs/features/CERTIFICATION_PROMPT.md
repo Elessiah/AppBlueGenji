@@ -199,9 +199,14 @@ l'onglet.
   les invitations retenues pour ce compte **et pour toute son équipe active**
   (`forgetCertificationPromptsAround` : « équipe sans contact » et invitation
   du meneur changent pour les coéquipiers) ; un « Ne plus voir » oublie celles
-  du compte (`forgetCertificationPromptsOf`, clé préfixée `userId:`). Une
-  lecture déjà en cours au moment de l'oubli rend `null` au lieu de l'issue
-  d'avant le geste (le slot `forgotten`). Sinon le changement se voit au plus
+  du compte (`forgetCertificationPromptsOf`, clé préfixée `userId:`) ; une
+  arrivée dans l'équipe (invitation ou demande acceptée) oublie celles de
+  l'équipe. Une lecture déjà en cours au moment de l'oubli n'en sert pas
+  l'issue, d'avant le geste : ceux qui l'attendaient reçoivent une relecture
+  partie après lui (`successor` du slot `forgotten`) — une issue tardive
+  d'une lecture abandonnée, oubliée, reste inconnue au flux (aucune trame).
+  Une certification perdue (tag Discord changé, rattachement retiré) n'oublie
+  rien chez les coéquipiers. Sinon le changement se voit au plus
   une minute plus tard. Les deux « Ne plus voir » (cette modale, la
   proposition de la connexion) sont lus sur le compte, par un seul SELECT
   (repli colonne par colonne si l'une manque). Une lecture en échec
