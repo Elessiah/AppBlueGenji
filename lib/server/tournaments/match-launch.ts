@@ -932,7 +932,10 @@ function assertRefereeable(row: LaunchMatchRow | null): asserts row is LaunchMat
  * sa modale le montre prêt, le lancement ne doit pas l'attendre une seconde fois.
  */
 async function writeReferee(connection: PoolConnection, row: LaunchMatchRow, refereeId: number): Promise<void> {
-  const block = await loadRefereeEligibility(connection, refereeId);
+  // Lecture verrouillée : une suppression du compte en cours (verrou exclusif
+  // sur sa ligne) est attendue puis lue, sans quoi l'arbitre désigné serait le
+  // compte anonymisé, sur un match que son retrait n'avait pas vu.
+  const block = await loadRefereeEligibility(connection, refereeId, true);
   if (block) throw new Error(block);
   // Opposition retenue : plus aucun arbitrage. Lecture verrouillée (partagée)
   // sur la ligne du compte : retenir l'opposition l'écrit en exclusif, donc ou
