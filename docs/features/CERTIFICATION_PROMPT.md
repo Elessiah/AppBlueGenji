@@ -66,9 +66,9 @@ retirée, plus rien. Une fiche figée la masque aussi.
 En **Marvel Rivals**, les lignes qui parlent de Blizzard ou de Battle.net
 (identité, matchs, « ensuite ») prennent leur variante `…DiscordOnly`. Le tableau est
 en rôles ARIA (`role="table"`, comme le roster d'équipe) : quand **le tableau**
-fait moins de 560 px (requête de conteneur `certification-table` : la modale
-pleine en offre près de 600, une modale rétrécie garderait sinon trois colonnes
-étroites) ses lignes passent en cartes sans perdre leur sémantique, chaque
+fait 575 px ou moins (requête de conteneur `certification-table` : la modale
+pleine en offre 594, 577 sous une barre de défilement ; une modale rétrécie
+garderait sinon trois colonnes étroites) ses lignes passent en cartes sans perdre leur sémantique, chaque
 cellule libellée par `data-label` (libellé visuel seulement, texte de
 remplacement vide). En tableau, l'en-tête « Sujet » s'affiche, et la première
 et la dernière colonne n'ont pas de retrait extérieur : le tableau s'aligne sur

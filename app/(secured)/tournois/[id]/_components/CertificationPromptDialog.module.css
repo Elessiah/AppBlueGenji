@@ -119,10 +119,10 @@
   margin-left: auto;
 }
 
-/* Tableau plus étroit que dans la modale pleine (près de 600 px de contenu,
-   ~580 avec une barre de défilement) : chaque ligne devient une carte, chaque
-   cellule nommée par son intitulé de colonne (RESPONSIVE_TABLES.md). */
-@container certification-table (max-width: 560px) {
+/* Tableau plus étroit que dans la modale pleine (594 px de contenu, 577 sous
+   la barre de défilement la plus large) : chaque ligne devient une carte,
+   chaque cellule nommée par son intitulé de colonne (RESPONSIVE_TABLES.md). */
+@container certification-table (max-width: 575px) {
   /* Masqué à l'œil, lu par les lecteurs d'écran : copie de `.sr-only`
      (`globals.css`), qu'un module ne peut composer sous une requête. */
   .head {
