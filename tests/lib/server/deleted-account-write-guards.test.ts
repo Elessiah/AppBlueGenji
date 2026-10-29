@@ -8,7 +8,7 @@ jest.mock("@/lib/server/database");
 import { updateOwnProfile } from "@/lib/server/users/profile-update";
 import { getUserIdByPseudo, setUserRoles } from "@/lib/server/users/roles";
 import { createOrGetBlizzardUser, createOrGetDiscordUser } from "@/lib/server/users/sign-in";
-import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
+import { type SqlQuery, type SqlMock, connectionMock, fakeConnection, fakePool } from "../../helpers/sql-double";
 import { readSources } from "../../helpers/read-source";
 
 /**
@@ -132,32 +132,40 @@ describe("setUserRoles — la course se dit, elle ne se tait pas", () => {
     jest.restoreAllMocks();
   });
 
+  async function mockRolesTransaction() {
+    const connection = connectionMock();
+    connection.rollback.mockResolvedValue(undefined);
+    connection.commit.mockResolvedValue(undefined);
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ getConnection: async () => fakeConnection(connection) }));
+    return connection;
+  }
+
   it("refuse le rôle posé sur une ligne morte au lieu de l'annoncer enregistré", async () => {
-    // Le `SELECT` trouve un compte vivant, la suppression se glisse dans le
-    // `await`, l'`UPDATE` n'apparie plus rien. Sans ce refus, l'écran
-    // d'administration affichait les rôles comme sauvegardés alors qu'aucune
-    // ligne n'avait bougé.
-    const execute = jest
-      .fn<SqlQuery>()
-      .mockResolvedValueOnce([[{ id: 7 }]])
-      .mockResolvedValueOnce([{ affectedRows: 0 }])
-      .mockResolvedValueOnce([[{ id: 1 }]]); // l'auteur est toujours administrateur
-    await mockDb(execute);
+    // La suppression du compte a été validée avant le verrou : la lecture
+    // verrouillée (`is_deleted = 0`) ne rend plus que l'auteur, et rien n'est
+    // écrit. Sans ce refus, l'écran d'administration affichait les rôles comme
+    // sauvegardés alors qu'aucune ligne n'avait bougé.
+    const connection = await mockRolesTransaction();
+    connection.execute.mockResolvedValueOnce([[{ id: 1, is_admin: 1 }]]);
 
     await expect(setUserRoles(7, ["ARBITRE"], 1)).rejects.toThrow("USER_NOT_FOUND");
+
+    expect(connection.execute).toHaveBeenCalledTimes(1);
+    const [lockSql] = connection.execute.mock.calls[0] as [string];
+    expect(lockSql).toMatch(/is_deleted = 0 .*FOR UPDATE/);
   });
 
-  it("rend les rôles normalisés quand l'écriture a bien apparié la ligne", async () => {
-    const execute = jest
-      .fn<SqlQuery>()
-      .mockResolvedValueOnce([[{ id: 7 }]])
+  it("borne l'écriture aux comptes vivants quand la ligne est bien là", async () => {
+    const connection = await mockRolesTransaction();
+    connection.execute
+      .mockResolvedValueOnce([[{ id: 1, is_admin: 1 }, { id: 7, is_admin: 0 }]])
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
-    await mockDb(execute);
 
     await expect(setUserRoles(7, ["ARBITRE"], 1)).resolves.toEqual(["ARBITRE"]);
 
-    const [sql] = execute.mock.calls[1] as [string];
-    expect(sql).toMatch(/WHERE target\.id = \? AND target\.is_deleted = 0/);
+    const [sql] = connection.execute.mock.calls[1] as [string];
+    expect(sql).toMatch(/WHERE id = \? AND is_deleted = 0/);
   });
 });
 

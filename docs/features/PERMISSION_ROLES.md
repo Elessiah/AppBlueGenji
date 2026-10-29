@@ -80,12 +80,17 @@ s'additionnent.
   voir sa décision annulée par un `is_admin = 1` réécrit.
 
 **Aucune plateforme sans administrateur** : sur le compte d'un autre aussi,
-l'écriture (`setUserRoles(cible, rôles, auteur)`) est jointe à la ligne de
-l'auteur et exige qu'il soit **encore** administrateur, dans la même
-instruction. Deux administrateurs qui se retirent l'administration l'un l'autre
-au même instant ne passent donc pas tous deux : la seconde écriture attend la
-première puis ne trouve plus d'auteur administrateur (`NOT_ADMIN` → `403
-FORBIDDEN`), ou InnoDB rompt l'interblocage (`500 ROLES_UPDATE_FAILED`).
+l'écriture (`setUserRoles(cible, rôles, auteur)`) exige que l'auteur soit
+**encore** administrateur. Elle verrouille les deux lignes (auteur et cible) en
+première instruction d'une transaction, par une seule requête sans jointure
+(`WHERE id IN (?, ?) … FOR UPDATE`, syntaxe commune à MySQL et MariaDB),
+avant de relire l'auteur et d'écrire. InnoDB prend les verrous dans l'ordre de
+la clé primaire : deux administrateurs qui se modifient l'un l'autre au même
+instant s'attendent au lieu de s'interbloquer, et le second relit l'état validé
+par le premier — s'il vient de perdre l'administration, `NOT_ADMIN` → `403
+FORBIDDEN`. Une jointure dans l'`UPDATE` (première version) prenait les deux
+lignes dans un ordre propre à chaque requête : interblocage, `500`, dès que deux
+administrateurs se modifiaient l'un l'autre.
 
 L'écran : section « Mes rôles » de `/profil` (`SelfRolesField`, FR + EN,
 espace `profile.platformRoles`), rendue pour un administrateur seulement
