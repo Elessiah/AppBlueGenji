@@ -85,11 +85,13 @@ function refusedRead(
   refusal: SpectatorRebuildRefused,
   level: SpectatorLoadLevel,
   ifNoneMatch: string | null,
+  gzipped: boolean,
 ): SpectatorPayload | Response {
   const stale = staleSpectatorPayload(tournamentId);
   if (refusal.kind === "rate") {
-    // Les deux codages : le client porte l'`ETag` du corps qu'il a reçu.
-    if (stale && (matchesEtag(ifNoneMatch, etagOf(stale)) || matchesEtag(ifNoneMatch, etagOf(stale, true)))) return stale;
+    // Seul l'`ETag` du codage demandé : une version d'un autre codage n'aurait
+    // pas de `304` derrière et tirerait le corps entier d'un réseau refusé.
+    if (stale && matchesEtag(ifNoneMatch, etagOf(stale, gzipped))) return stale;
     return refusal.response ?? unavailable(level);
   }
   return stale ?? refusal.response ?? unavailable(level);
@@ -111,12 +113,13 @@ async function readPayload(
   tournamentId: number,
   level: SpectatorLoadLevel,
   client: string | null,
+  gzipped: boolean,
 ): Promise<{ payload: SpectatorPayload | null; stale: boolean } | Response> {
   try {
     return { payload: await getSpectatorPayload(tournamentId, level, client), stale: false };
   } catch (error) {
     if (error instanceof SpectatorRebuildRefused) {
-      const served = refusedRead(tournamentId, error, level, req.headers.get("if-none-match"));
+      const served = refusedRead(tournamentId, error, level, req.headers.get("if-none-match"), gzipped);
       return served instanceof Response ? served : { payload: served, stale: true };
     }
     // Base injoignable ou saturée : la copie de moins de 150 s tient la page
@@ -140,7 +143,8 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   if (tournamentId === null) return fail("INVALID_TOURNAMENT_ID", 400);
   const level = currentSpectatorLoadLevel();
 
-  const read = await readPayload(req, tournamentId, level, client);
+  const gzipped = acceptsGzip(req.headers.get("accept-encoding"));
+  const read = await readPayload(req, tournamentId, level, client, gzipped);
   if (read instanceof Response) return read;
   const { payload, stale } = read;
   if (!payload) return fail("TOURNAMENT_NOT_FOUND", 404);
@@ -153,7 +157,6 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   // Une copie servie périmée peut avoir jusqu'à l'âge déclaré : c'est lui que
   // le témoin annonce alors, pas la durée de vie qu'elle avait reçue.
   const ageMs = stale ? SPECTATOR_MAX_COPY_AGE_MS : payload.ttlMs;
-  const gzipped = acceptsGzip(req.headers.get("accept-encoding"));
   // Un `ETag` par codage (RFC 9110) : un cache partagé qui revalide ne sert pas
   // le corps gzip à qui attend le corps brut.
   const etag = etagOf(payload, gzipped);

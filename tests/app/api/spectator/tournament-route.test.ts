@@ -397,6 +397,24 @@ describe("GET /api/spectator/tournaments/[id]", () => {
       }
     });
 
+    it("répond 429 à une version d'un autre codage que celui demandé, sans corps", async () => {
+      jest.useFakeTimers({ ...CLOCK, doNotFake: [...CLOCK.doNotFake] });
+      try {
+        mockedSnapshot.mockResolvedValue(snapshot());
+        const first = await GET(req("5", { "accept-encoding": "gzip" }), params("5"));
+        jest.setSystemTime(5_000_000 + 20_000);
+        for (let i = 1; i <= SPECTATOR_REBUILD_RULE.capacity; i += 1) await GET(req(String(300 + i)), params(String(300 + i)));
+
+        const res = await GET(
+          req("5", { "accept-encoding": "identity", "if-none-match": first.headers.get("etag") ?? "" }),
+          params("5"),
+        );
+        expect(res.status).toBe(429);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     it("répond 429 au-delà de l'âge déclaré, même avec la version en main", async () => {
       jest.useFakeTimers({ ...CLOCK, doNotFake: [...CLOCK.doNotFake] });
       try {
