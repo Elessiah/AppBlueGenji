@@ -199,7 +199,7 @@ export {
 
 /**
  * Après un geste qui change la certification d'un compte (Discord certifié,
- * Battle.net rattaché, tag retiré) : oublie ses invitations **et** celles de
+ * Battle.net rattaché) : oublie ses invitations **et** celles de
  * ses coéquipiers, dont l'état « équipe sans contact » dépend de lui. Son
  * équipe active est relue (une requête indexée) ; une lecture en échec n'oublie
  * que le compte (journal pm2) — les coéquipiers relisent au plus une minute

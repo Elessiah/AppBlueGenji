@@ -47,7 +47,7 @@ import {
   type TermsConsent,
 } from "@/lib/server/users/sign-in";
 import { normalizeBattletag, normalizeDiscordHandle } from "@/lib/server/users/tag-normalization";
-import { BLIZZARD_BATTLETAG_SET_SQL } from "@/lib/server/battletag-origin";
+import { BLIZZARD_BATTLETAG_SET_SQL, battletagFromBlizzard } from "@/lib/server/battletag-origin";
 import {
   buildAccountConnections,
   checkConnectionUnlink,
@@ -93,13 +93,14 @@ type IdentityRow = RowDataPacket & {
   blizzard_sub: string | null;
   discord_pseudo: string | null;
   overwatch_battletag: string | null;
+  overwatch_battletag_typed: number | null;
 };
 
 async function loadIdentityRow(userId: number): Promise<IdentityRow | null> {
   const db = await getDatabase();
   const [rows] = await db.execute<IdentityRow[]>(
     `SELECT google_sub, discord_id, discord_link_method, blizzard_sub,
-            discord_pseudo, overwatch_battletag
+            discord_pseudo, overwatch_battletag, overwatch_battletag_typed
      FROM bg_users
      WHERE id = ? AND is_deleted = 0
      LIMIT 1`,
@@ -116,7 +117,9 @@ function connectionsFromRow(row: IdentityRow): AccountConnection[] {
       handle: row.discord_pseudo,
       method: row.discord_link_method,
     },
-    BLIZZARD: { subject: row.blizzard_sub, handle: row.overwatch_battletag },
+    // Un BattleTag tapé, gardé sous un Battle.net qui n'en donnait aucun, ne
+    // se présente pas comme l'identité Battle.net rattachée (D3).
+    BLIZZARD: { subject: row.blizzard_sub, handle: battletagFromBlizzard(row) ? row.overwatch_battletag : null },
   });
 }
 

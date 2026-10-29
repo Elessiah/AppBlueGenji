@@ -51,6 +51,11 @@ type Slot = {
   /** Oubliée pendant la lecture : son issue n'est pas retenue. */
   forgotten: boolean;
   /**
+   * Oubliée pendant la lecture puis répondue : la relecture qui la remplace,
+   * partie après le geste (`null` : mémoire pleine, issue inconnue).
+   */
+  successor?: Slot | null;
+  /**
    * Issue **finale** : celle de `value`, ou — abandonnée après trois secondes —
    * la réponse tardive si elle réussit (`undefined`, inconnue, si elle échoue
    * ou pend plus de `CERTIFICATION_PROMPT_TTL_MS`). Sert au flux, qui pousse
@@ -146,15 +151,24 @@ function slotFor(key: string, load: () => Promise<CertificationPrompt | null>, n
     }
   });
   const settle = (prompt: CertificationPrompt | null, ttl: number) => {
-    // Oubliée pendant la lecture (certification, « Ne plus voir », roster) :
-    // son issue date d'avant le geste — ceux qui l'attendaient reçoivent
-    // « rien », pas une invitation que le geste a peut-être levée.
+    // Oubliée pendant la lecture (abandon ou échec) : « rien », non retenue.
     const kept = slot.forgotten ? null : prompt;
     slot.settled = { prompt: kept };
     slot.expiresAt = now() + ttl;
     if (inFlight.get(key) === slot) inFlight.delete(key);
     if (!slot.forgotten) recent.set(key, slot);
     return kept;
+  };
+  // Oubliée pendant la lecture (certification, « Ne plus voir », roster) puis
+  // répondue : son issue date d'avant le geste — ni servie (elle montrerait
+  // une invitation levée) ni remplacée par « rien » (elle tairait une
+  // invitation due, « équipe sans contact »). Ceux qui l'attendaient reçoivent
+  // une relecture partie après le geste, partagée comme toute lecture.
+  const reread = (): Promise<CertificationPrompt | null> => {
+    slot.settled = { prompt: null };
+    slot.expiresAt = 0;
+    slot.successor = slotFor(key, load, now);
+    return slot.successor?.value ?? Promise.resolve(null);
   };
   slot.value = Promise.race([outcomeOf, expired]).then((outcome) => {
     clearTimeout(timer);
@@ -163,21 +177,25 @@ function slotFor(key: string, load: () => Promise<CertificationPrompt | null>, n
       slot.timedOut = true;
       return settle(null, CERTIFICATION_PROMPT_TTL_MS);
     }
-    if (outcome.ok) return settle(outcome.prompt, CERTIFICATION_PROMPT_TTL_MS);
+    if (outcome.ok) return slot.forgotten ? reread() : settle(outcome.prompt, CERTIFICATION_PROMPT_TTL_MS);
     logCertificationPromptFailure(now(), outcome.error);
     return settle(null, CERTIFICATION_PROMPT_FAILURE_TTL_MS);
   });
   slot.final = slot.value.then((prompt): Promise<CertificationPrompt | null | undefined> | CertificationPrompt | null => {
+    // Relue après un oubli : l'issue finale est celle de la relecture —
+    // inconnue si la mémoire pleine n'a pas permis de la lancer.
+    if (slot.successor !== undefined) return slot.successor ? slot.successor.final : Promise.resolve(undefined);
     if (!slot.timedOut) return prompt;
     // Abandonnée : la réponse tardive, bornée — une lecture qui pend ne
-    // retient pas indéfiniment celui qui l'attend. Échouée ou trop tardive,
-    // l'issue reste inconnue (`undefined`) ; oubliée entre-temps, « rien ».
+    // retient pas indéfiniment celui qui l'attend. Échouée, trop tardive ou
+    // oubliée entre-temps (elle daterait d'avant le geste), l'issue reste
+    // inconnue (`undefined`) : rien à pousser, pas un retrait décidé.
     let lateTimer: ReturnType<typeof setTimeout> | undefined;
     const giveUp = new Promise<undefined>((resolve) => {
       lateTimer = setTimeout(() => resolve(undefined), CERTIFICATION_PROMPT_TTL_MS);
     });
     const late = outcomeOf.then((outcome) => {
-      if (slot.forgotten) return null;
+      if (slot.forgotten) return undefined;
       return outcome.ok ? outcome.prompt : undefined;
     });
     return Promise.race([late, giveUp]).finally(() => clearTimeout(lateTimer));

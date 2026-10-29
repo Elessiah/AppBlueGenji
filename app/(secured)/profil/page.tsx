@@ -716,7 +716,9 @@ export default function ProfilePage() {
   // Battle.net qui n'en donne aucun, reste saisissable (`battletag-lock.ts`).
   const battletagLocked = isBattletagLocked({
     linked: blizzardLinked,
-    verified: data?.profile.battletagVerified === true,
+    // Profil pas encore lu : origine inconnue, verrouillé comme un
+    // rattachement inconnu (`checkBattletagEdit`).
+    verified: data?.profile.battletagVerified !== false,
   });
   const battletagNotice = battletagFieldNotice(text, battletagLocked, {
     linked: blizzardLinked,
