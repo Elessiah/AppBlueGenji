@@ -6,6 +6,10 @@ import { bracketMatch } from "../helpers/bracket-match";
 // Faits de la page d'un match (`docs/features/MATCH_PAGE.md`) : score de
 // l'en-tête rangé hôte à gauche, maps des faits clés.
 
+// Caractères invisibles construits par leur point de code : jamais écrits tels quels dans la source.
+const RIGHT_TO_LEFT_OVERRIDE = String.fromCodePoint(0x202e);
+const ZERO_WIDTH_SPACE = String.fromCodePoint(0x200b);
+
 const HOST_RIGHT_SLOTS = [{ slot: 1 }, { slot: 2 }] as const;
 const HOST_LEFT_SLOTS = [{ slot: 2 }, { slot: 1 }] as const;
 
@@ -74,13 +78,13 @@ describe("matchPageMapFacts", () => {
   });
 
   it("matchPageMapFacts_pickWithInvisibleCharacters_showsVisibleTextOnly", () => {
-    const actual = matchPageMapFacts(rules([["Ilios", "Nepal"]]), roundTwo({ firstMap: "‮Nepal​ " }));
+    const actual = matchPageMapFacts(rules([["Ilios", "Nepal"]]), roundTwo({ firstMap: `${RIGHT_TO_LEFT_OVERRIDE}Nepal${ZERO_WIDTH_SPACE} ` }));
 
     expect(actual[0].map).toBe("Nepal");
   });
 
   it("matchPageMapFacts_pickOfInvisibleCharactersOnly_staysToChoose", () => {
-    const actual = matchPageMapFacts(rules([["Ilios", "Nepal"]]), roundTwo({ firstMap: "​" }));
+    const actual = matchPageMapFacts(rules([["Ilios", "Nepal"]]), roundTwo({ firstMap: ZERO_WIDTH_SPACE }));
 
     expect(actual[0]).toEqual({ number: 1, map: null, imposed: false, candidates: ["Ilios", "Nepal"], loserPick: false });
   });
