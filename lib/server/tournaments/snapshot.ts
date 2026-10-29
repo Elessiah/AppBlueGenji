@@ -479,7 +479,7 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
     const streamsByMatch = await loadMatchStreams(connection, matchIds);
     // Cartes par manche et règles de ban, dans l'instantané commun : flux et
     // REST de secours les portent ensemble (`docs/features/ROUND_MAPS.md`).
-    const mapRules = await loadMapRules(connection, tournamentId);
+    const mapRules = await loadMapRules(connection, tournamentId, tournament);
     const mappedMatches = attachMatchMaps(
       applyMapRules(matches.map((row) =>
         mapMatch(row, {

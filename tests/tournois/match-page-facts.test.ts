@@ -60,21 +60,22 @@ describe("matchPageMapFacts", () => {
     );
 
     expect(actual).toEqual([
-      { number: 1, map: "Ilios", imposed: true, candidates: [], loserPick: false },
-      { number: 2, map: "Nepal", imposed: false, candidates: [], loserPick: false },
+      { number: 1, map: "Ilios", imposed: true, candidates: [] },
+      { number: 2, map: "Nepal", imposed: false, candidates: [] },
     ]);
   });
 
-  it("matchPageMapFacts_unchosenPoolAfterMap1_loserRule_flagsLoserPick", () => {
+  it("matchPageMapFacts_unchosenPoolAfterMap1_loserRuleStored_saysNoLoserPick", () => {
+    // « Choisie par le perdant » n'est pas appliquée (pas de scores par carte) : la page ne la dit pas.
     const actual = matchPageMapFacts(rules([["Ilios"], ["Busan", "Nepal"]], { nextPick: "LOSER" }), roundTwo());
 
-    expect(actual[1]).toEqual({ number: 2, map: null, imposed: false, candidates: ["Busan", "Nepal"], loserPick: true });
+    expect(actual[1]).toEqual({ number: 2, map: null, imposed: false, candidates: ["Busan", "Nepal"] });
   });
 
-  it("matchPageMapFacts_unchosenPoolOnMap1_noLoserPick", () => {
+  it("matchPageMapFacts_unchosenPoolOnMap1_listsCandidates", () => {
     const actual = matchPageMapFacts(rules([["Ilios", "Nepal"]], { nextPick: "LOSER" }), roundTwo());
 
-    expect(actual[0]).toEqual({ number: 1, map: null, imposed: false, candidates: ["Ilios", "Nepal"], loserPick: false });
+    expect(actual[0]).toEqual({ number: 1, map: null, imposed: false, candidates: ["Ilios", "Nepal"] });
   });
 
   it("matchPageMapFacts_pickWithInvisibleCharacters_showsVisibleTextOnly", () => {
@@ -86,12 +87,6 @@ describe("matchPageMapFacts", () => {
   it("matchPageMapFacts_pickOfInvisibleCharactersOnly_staysToChoose", () => {
     const actual = matchPageMapFacts(rules([["Ilios", "Nepal"]]), roundTwo({ firstMap: ZERO_WIDTH_SPACE }));
 
-    expect(actual[0]).toEqual({ number: 1, map: null, imposed: false, candidates: ["Ilios", "Nepal"], loserPick: false });
-  });
-
-  it("matchPageMapFacts_nextPickNotLoser_noLoserPick", () => {
-    const actual = matchPageMapFacts(rules([["Ilios"], ["Busan", "Nepal"]], { nextPick: "FREE" }), roundTwo());
-
-    expect(actual[1].loserPick).toBe(false);
+    expect(actual[0]).toEqual({ number: 1, map: null, imposed: false, candidates: ["Ilios", "Nepal"] });
   });
 });

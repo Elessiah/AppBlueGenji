@@ -154,7 +154,10 @@ export async function loadTournamentRow(
       registration_min_players,
       referee_scheduling,
       match_launch_phase,
-      live_url
+      live_url,
+      first_ban_rule,
+      next_ban_rule,
+      next_pick_rule
      FROM bg_tournaments
      WHERE id = ?
      LIMIT 1`,

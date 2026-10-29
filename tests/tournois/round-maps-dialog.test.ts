@@ -6,6 +6,7 @@ import {
   findRound,
   overwrittenRounds,
   removeMapFromSlot,
+  resyncSlots,
   sameSlots,
   slotGap,
   slotHasMap,
@@ -91,6 +92,41 @@ describe("slotsToSave / slotsToEdit / sameSlots", () => {
 
   it("sameSlots_differentOrder_returnsFalse", () => {
     expect(sameSlots([["Ilios"], ["Busan"]], [["Busan"], ["Ilios"]])).toBe(false);
+  });
+});
+
+describe("resyncSlots", () => {
+  const OTHER: RoundMapConfig[] = [SAVED[0], { ...ROUND_2, slots: [["Oasis"]] }];
+
+  it("resyncSlots_roundUnchangedOnServer_keepsCurrent", () => {
+    const current = [["Busan", "Nepal"], ["Dorado"]];
+
+    expect(resyncSlots(current, SAVED, [...SAVED, { ...ROUND_3, slots: [["Oasis"]] }], ROUND_2)).toBe(current);
+  });
+
+  it("resyncSlots_untouchedEditAndOtherStaffSaved_followsServer", () => {
+    expect(resyncSlots([["Busan", "Nepal"]], SAVED, OTHER, ROUND_2)).toEqual([["Oasis"]]);
+  });
+
+  it("resyncSlots_editInProgressAndOtherStaffSaved_keepsEdit", () => {
+    const current = [["Dorado"]];
+
+    expect(resyncSlots(current, SAVED, OTHER, ROUND_2)).toBe(current);
+  });
+
+  it("resyncSlots_ownSaveWithEmptySlot_readsServerShape", () => {
+    // Son propre envoi : la saisie vaut le nouveau réglage, créneau vide écarté.
+    expect(resyncSlots([["Oasis"], []], SAVED, OTHER, ROUND_2)).toEqual([["Oasis"]]);
+  });
+
+  it("resyncSlots_roundClearedOnServer_opensOneEmptySlot", () => {
+    expect(resyncSlots([["Busan", "Nepal"]], SAVED, [SAVED[0]], ROUND_2)).toEqual([[]]);
+  });
+
+  it("resyncSlots_noRound_keepsCurrent", () => {
+    const current = [["Ilios"]];
+
+    expect(resyncSlots(current, SAVED, OTHER, null)).toBe(current);
   });
 });
 

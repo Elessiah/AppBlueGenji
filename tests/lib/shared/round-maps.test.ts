@@ -136,6 +136,16 @@ describe("validateMapPick", () => {
   it("refuse une carte hors du pool", () => {
     expect(() => validateMapPick(slots, 1, "Oasis")).toThrow("INVALID_MAP_PICK");
   });
+
+  it("validateMapPick_clearOnImposedSlot_returnsNull", () => {
+    // Un ancien choix sur un créneau devenu imposé s'efface toujours.
+    expect(validateMapPick(slots, 2, null)).toBeNull();
+    expect(validateMapPick(slots, 2, "")).toBeNull();
+  });
+
+  it("validateMapPick_clearOnMissingSlot_throwsInvalidMapPick", () => {
+    expect(() => validateMapPick(slots, 3, null)).toThrow("INVALID_MAP_PICK");
+  });
 });
 
 describe("règles de ban", () => {
@@ -238,5 +248,30 @@ describe("canPickMatchMap", () => {
   it("refuse une autre équipe ou un lecteur sans équipe", () => {
     expect(canPickMatchMap({ staff: false, myTeamId: 30, canDeclareReady: true }, match)).toBe(false);
     expect(canPickMatchMap({ staff: false, myTeamId: null, canDeclareReady: true }, match)).toBe(false);
+  });
+
+  it("canPickMatchMap_staffWithLaunchRoleTeam_followsPlayerRule", () => {
+    // Le rôle de lancement (comme au serveur) prime sur l'équipe de la session.
+    const viewer = { staff: true, myTeamId: 30, canDeclareReady: true, launchRole: "TEAM1" };
+
+    expect(canPickMatchMap(viewer, { ...match, selfManaged: false })).toBe(false);
+  });
+
+  it("canPickMatchMap_staffWithLaunchRoleCaster_picksAsReferee", () => {
+    const viewer = { staff: true, myTeamId: 10, canDeclareReady: true, launchRole: "CASTER" };
+
+    expect(canPickMatchMap(viewer, { ...match, selfManaged: false })).toBe(true);
+  });
+
+  it("canPickMatchMap_playerWithLaunchRoleTeamSelfManaged_picks", () => {
+    const viewer = { staff: false, myTeamId: null, canDeclareReady: true, launchRole: "TEAM2" };
+
+    expect(canPickMatchMap(viewer, match)).toBe(true);
+  });
+
+  it("canPickMatchMap_nullLaunchRole_fallsBackToMyTeamId", () => {
+    const viewer = { staff: true, myTeamId: 10, canDeclareReady: true, launchRole: null };
+
+    expect(canPickMatchMap(viewer, { ...match, selfManaged: false })).toBe(false);
   });
 });

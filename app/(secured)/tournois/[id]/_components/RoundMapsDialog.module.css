@@ -169,6 +169,12 @@
   gap: 8px;
 }
 
+/* Témoin « non enregistré » : à gauche des boutons de son formulaire. */
+.unsaved {
+  margin-right: auto;
+  align-self: center;
+}
+
 .muted {
   margin: 0;
   font-size: 12px;

@@ -120,6 +120,19 @@ export const MATCH_SCHEDULE_WRITE_RULE: RateLimitRule = {
   windowMs: 5 * 60_000,
 };
 
+/**
+ * Choix d'une carte dans un pool (`PUT /api/matches/[id]/map-pick`), par
+ * compte. Chaque choix écrit une ligne au journal du staff et reconstruit
+ * l'instantané : cent vingt en cinq minutes couvrent le staff qui choisit pour
+ * tout un tour, une équipe n'en fait que quelques-uns ; au-delà, c'est une
+ * bascule en boucle.
+ */
+export const MAP_PICK_WRITE_RULE: RateLimitRule = {
+  name: "map-pick-write",
+  limit: 120,
+  windowMs: 5 * 60_000,
+};
+
 /** Lectures d'un utilisateur connecté : liste et détail des tournois. */
 export const TOURNAMENT_READ_RULE: RateLimitRule = {
   name: "tournament-read",

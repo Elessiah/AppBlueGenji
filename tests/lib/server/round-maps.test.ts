@@ -22,6 +22,7 @@ import {
   setRoundsMaps,
   setTournamentMapRules,
 } from "@/lib/server/tournaments/round-maps";
+import { ROUND_NUMBER_MAX } from "@/lib/shared/round-maps";
 import { connectionMock, fakeConnection, type SqlMock } from "../../helpers/sql-double";
 
 /**
@@ -86,6 +87,14 @@ describe("parseRoundKey", () => {
     expect(() => parseRoundKey({ phaseId: 0, bracket: "SIDE", roundNumber: 1 })).toThrow("INVALID_ROUND");
     expect(() => parseRoundKey({ phaseId: 0, roundNumber: 1 })).toThrow("INVALID_ROUND");
   });
+
+  it("parseRoundKey_roundNumberAtMax_accepted", () => {
+    expect(parseRoundKey({ phaseId: 0, bracket: "UPPER", roundNumber: ROUND_NUMBER_MAX }).roundNumber).toBe(2000);
+  });
+
+  it("parseRoundKey_roundNumberOverMax_throwsInvalidRound", () => {
+    expect(() => parseRoundKey({ phaseId: 0, bracket: "UPPER", roundNumber: ROUND_NUMBER_MAX + 1 })).toThrow("INVALID_ROUND");
+  });
 });
 
 describe("parseMapRulesInput", () => {
@@ -123,6 +132,27 @@ describe("loadMapRules", () => {
       nextPick: "FREE",
       rounds: [{ phaseId: 0, bracket: "UPPER", roundNumber: 1, slots: [["Ilios"]] }],
     });
+  });
+
+  it("loadMapRules_tournamentRowWithRules_skipsRulesSelect", async () => {
+    route(connection.execute, []);
+    const row = { first_ban_rule: "HOST", next_ban_rule: "WINNER", next_pick_rule: "FREE" };
+
+    const actual = await loadMapRules(fakeConnection(connection), 7, row);
+
+    expect(actual).toMatchObject({ firstBan: "HOST", nextBan: "WINNER", nextPick: "FREE" });
+    expect(writes(/FROM bg_tournaments\b/)).toHaveLength(0);
+  });
+
+  it("loadMapRules_tournamentRowWithoutRuleColumns_readsRules", async () => {
+    route(connection.execute, [
+      { pattern: /SELECT first_ban_rule/, rows: [{ first_ban_rule: "HOST", next_ban_rule: "WINNER", next_pick_rule: "FREE" }] },
+    ]);
+
+    const actual = await loadMapRules(fakeConnection(connection), 7, {});
+
+    expect(actual.firstBan).toBe("HOST");
+    expect(writes(/SELECT first_ban_rule/)).toHaveLength(1);
   });
 
   it("sans ligne de tournoi, les règles par défaut", async () => {
@@ -256,6 +286,71 @@ describe("setRoundsMaps", () => {
     expect(sendBotLog).not.toHaveBeenCalled();
   });
 
+  it("setRoundsMaps_phaseOnNonMultiTournament_throwsInvalidRoundWithoutWriting", async () => {
+    route(connection.execute, [{ pattern: /FROM bg_tournaments/, rows: [TOURNAMENT] }]);
+
+    await expect(setRoundsMaps(7, [{ ...ROUND, phaseId: 4 }], [["Ilios"]])).rejects.toThrow("INVALID_ROUND");
+
+    expect(writes(/^\s*(INSERT|DELETE)/)).toHaveLength(0);
+    expect(connection.rollback).toHaveBeenCalled();
+  });
+
+  it("setRoundsMaps_phaseZeroOnMultiTournament_throwsInvalidRound", async () => {
+    route(connection.execute, [{ pattern: /FROM bg_tournaments/, rows: [{ ...TOURNAMENT, format: "MULTI" }] }]);
+
+    await expect(setRoundsMaps(7, [ROUND], [["Ilios"]])).rejects.toThrow("INVALID_ROUND");
+
+    expect(writes(/FROM bg_tournament_phases/)).toHaveLength(0);
+  });
+
+  it("setRoundsMaps_phaseOfAnotherTournament_throwsInvalidRound", async () => {
+    route(connection.execute, [
+      { pattern: /FROM bg_tournaments/, rows: [{ ...TOURNAMENT, format: "MULTI" }] },
+      { pattern: /FROM bg_tournament_phases/, rows: [] },
+    ]);
+
+    await expect(setRoundsMaps(7, [{ ...ROUND, phaseId: 99 }], [["Ilios"]])).rejects.toThrow("INVALID_ROUND");
+
+    expect(writes(/FROM bg_tournament_phases/)[0][1]).toEqual([7, 99]);
+    expect(writes(/^\s*(INSERT|DELETE)/)).toHaveLength(0);
+  });
+
+  it("setRoundsMaps_ownPhaseOnMultiTournament_writesRound", async () => {
+    route(connection.execute, [
+      { pattern: /FROM bg_tournaments/, rows: [{ ...TOURNAMENT, format: "MULTI" }] },
+      { pattern: /FROM bg_tournament_phases/, rows: [{ id: 3 }] },
+      { pattern: /SELECT[\s\S]*FROM bg_tournament_round_maps/, rows: [] },
+    ]);
+
+    await setRoundsMaps(7, [{ ...ROUND, phaseId: 3 }], [["Ilios"]]);
+
+    expect(writes(/INSERT INTO bg_tournament_round_maps/)[0][1]).toEqual([7, 3, "UPPER", 2, '[["Ilios"]]']);
+  });
+
+  it("setRoundsMaps_mixedOwnAndForeignRounds_writesOwnOnly", async () => {
+    route(connection.execute, [
+      { pattern: /FROM bg_tournaments/, rows: [{ ...TOURNAMENT, format: "MULTI" }] },
+      { pattern: /FROM bg_tournament_phases/, rows: [{ id: 3 }] },
+      { pattern: /SELECT[\s\S]*FROM bg_tournament_round_maps/, rows: [] },
+    ]);
+
+    await setRoundsMaps(7, [{ ...ROUND, phaseId: 3 }, { ...ROUND, phaseId: 99 }], [["Ilios"]]);
+
+    expect(writes(/INSERT INTO bg_tournament_round_maps/).map(([, params]) => params)).toEqual([[7, 3, "UPPER", 2, '[["Ilios"]]']]);
+  });
+
+  it("setRoundsMaps_clearOrphanRound_deletesWithoutPhaseCheck", async () => {
+    route(connection.execute, [
+      { pattern: /FROM bg_tournaments/, rows: [TOURNAMENT] },
+      { pattern: /SELECT[\s\S]*FROM bg_tournament_round_maps/, rows: [{ ...ROUND, phaseId: 4, slots_json: '[["Ilios"]]' }] },
+    ]);
+
+    await setRoundsMaps(7, [{ ...ROUND, phaseId: 4 }], []);
+
+    expect(writes(/DELETE FROM bg_tournament_round_maps/)).toHaveLength(1);
+    expect(writes(/FROM bg_tournament_phases/)).toHaveLength(0);
+  });
+
   it("setRoundsMaps_noRound_throwsInvalidRoundBeforeQuery", async () => {
     await expect(setRoundsMaps(7, [], [["Ilios"]])).rejects.toThrow("INVALID_ROUND");
     expect(withConnection).not.toHaveBeenCalled();
@@ -267,8 +362,7 @@ describe("setTournamentMapRules", () => {
 
   it("enregistre des règles changées et publie", async () => {
     route(connection.execute, [
-      { pattern: /SELECT id, name, format/, rows: [TOURNAMENT] },
-      { pattern: /SELECT first_ban_rule/, rows: [{ first_ban_rule: "NON_HOST", next_ban_rule: "LOSER", next_pick_rule: "LOSER" }] },
+      { pattern: /SELECT id, name, format/, rows: [{ ...TOURNAMENT, first_ban_rule: "NON_HOST", next_ban_rule: "LOSER", next_pick_rule: "LOSER" }] },
     ]);
     await setTournamentMapRules(7, rules);
     const [update] = writes(/UPDATE bg_tournaments SET first_ban_rule/);
@@ -279,12 +373,22 @@ describe("setTournamentMapRules", () => {
 
   it("des règles inchangées n'écrivent rien", async () => {
     route(connection.execute, [
-      { pattern: /SELECT id, name, format/, rows: [TOURNAMENT] },
-      { pattern: /SELECT first_ban_rule/, rows: [{ first_ban_rule: "HOST", next_ban_rule: "LOSER", next_pick_rule: "LOSER" }] },
+      { pattern: /SELECT id, name, format/, rows: [{ ...TOURNAMENT, first_ban_rule: "HOST", next_ban_rule: "LOSER", next_pick_rule: "LOSER" }] },
     ]);
     await setTournamentMapRules(7, rules);
     expect(writes(/^\s*UPDATE/)).toHaveLength(0);
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("setTournamentMapRules_anyRules_comparesAgainstLockedRowWithoutSecondSelect", async () => {
+    route(connection.execute, [
+      { pattern: /SELECT id, name, format/, rows: [{ ...TOURNAMENT, first_ban_rule: "NON_HOST", next_ban_rule: "LOSER", next_pick_rule: "LOSER" }] },
+    ]);
+
+    await setTournamentMapRules(7, rules);
+
+    expect(writes(/FROM bg_tournaments/)).toHaveLength(1);
+    expect(writes(/FROM bg_tournaments/)[0][0]).toMatch(/first_ban_rule[\s\S]*FOR UPDATE/);
   });
 });
 
@@ -308,7 +412,7 @@ describe("pickMatchMap", () => {
     withMatch(MATCH);
     await pickMatchMap(42, { userId: 3, staff: true }, 1, "Ilios");
     const sqls = connection.execute.mock.calls.map(([sql]) => sql);
-    const tournamentLock = sqls.findIndex((sql) => /FROM bg_tournaments[\s\S]*FOR UPDATE/.test(sql));
+    const tournamentLock = sqls.findIndex((sql) => /FROM bg_tournaments[\s\S]*LOCK IN SHARE MODE/.test(sql));
     const matchLock = sqls.findIndex((sql) => /FROM bg_matches[\s\S]*FOR UPDATE/.test(sql));
     const pool = sqls.findIndex((sql) => /FROM bg_tournament_round_maps/.test(sql));
     expect(tournamentLock).toBeGreaterThanOrEqual(0);
@@ -327,7 +431,42 @@ describe("pickMatchMap", () => {
     expect(calls.filter((call) => call.order < begin).map((call) => call.sql)).toEqual([
       expect.stringMatching(/^SELECT tournament_id[\s\S]*FROM bg_matches WHERE id = \? LIMIT 1$/),
     ]);
-    expect(calls.find((call) => call.order > begin)?.sql).toMatch(/FROM bg_tournaments[\s\S]*FOR UPDATE/);
+    expect(calls.find((call) => call.order > begin)?.sql).toMatch(/FROM bg_tournaments[\s\S]*LOCK IN SHARE MODE/);
+  });
+
+  it("pickMatchMap_tournamentLock_isSharedNotExclusive", async () => {
+    withMatch(MATCH);
+
+    await pickMatchMap(42, { userId: 3, staff: true }, 1, "Ilios");
+
+    expect(writes(/FROM bg_tournaments[\s\S]*LOCK IN SHARE MODE/)).toHaveLength(1);
+    expect(writes(/FROM bg_tournaments[\s\S]*FOR UPDATE/)).toHaveLength(0);
+  });
+
+  it("pickMatchMap_tournamentGoneUnderLock_throwsTournamentNotFound", async () => {
+    route(connection.execute, [{ pattern: /FROM bg_matches/, rows: [MATCH] }]);
+
+    await expect(pickMatchMap(42, { userId: 3, staff: true }, 1, "Ilios")).rejects.toThrow("TOURNAMENT_NOT_FOUND");
+    expect(connection.rollback).toHaveBeenCalled();
+  });
+
+  it("pickMatchMap_rightLostAndMatchCompletedUnderLock_throwsNotMapPicker", async () => {
+    route(connection.execute, [
+      { pattern: /FROM bg_tournaments/, rows: [TOURNAMENT] },
+      { pattern: /FROM bg_matches[\s\S]*FOR UPDATE/, rows: [{ ...MATCH, status: "COMPLETED" }] },
+      { pattern: /FROM bg_matches/, rows: [{ ...MATCH, self_managed: 1 }] },
+    ]);
+    jest.mocked(resolveMatchParty).mockResolvedValue({ role: "TEAM1", canDeclareReady: true });
+
+    await expect(pickMatchMap(42, { userId: 5, staff: false }, 1, "Ilios")).rejects.toThrow("NOT_MAP_PICKER");
+  });
+
+  it("pickMatchMap_clearPickOnSlotNowImposed_clearsIt", async () => {
+    withMatch({ ...MATCH, map_picks: '{"3":"Oasis"}' });
+
+    await pickMatchMap(42, { userId: 3, staff: true }, 3, null);
+
+    expect(writes(/UPDATE bg_matches SET map_picks/)[0][1]).toEqual([null, 42]);
   });
 
   it("un match joué est refusé avant tout verrou, même au staff", async () => {
@@ -342,7 +481,7 @@ describe("pickMatchMap", () => {
     const routed = connection.execute.getMockImplementation();
     let deadlocked = false;
     connection.execute.mockImplementation(async (sql: string, params?: unknown) => {
-      if (!deadlocked && /FROM bg_tournaments[\s\S]*FOR UPDATE/.test(sql)) {
+      if (!deadlocked && /FROM bg_tournaments[\s\S]*LOCK IN SHARE MODE/.test(sql)) {
         deadlocked = true;
         throw Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK" });
       }

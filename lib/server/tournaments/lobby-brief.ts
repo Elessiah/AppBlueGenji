@@ -39,7 +39,6 @@ import {
   parseFirstBanRule,
   parseMapPicks,
   parseNextBanRule,
-  parseNextPickRule,
   parseStoredSlots,
   resolveMatchMaps,
 } from "@/lib/shared/round-maps";
@@ -90,7 +89,6 @@ export type LobbyBriefRow = RowDataPacket & {
   round_slots_json?: string | null;
   first_ban_rule?: string | null;
   next_ban_rule?: string | null;
-  next_pick_rule?: string | null;
 };
 
 /**
@@ -203,7 +201,6 @@ export function lobbyBriefSides(
     firstMap: effectiveFirstMap(slots, storedFirstMap),
     maps: resolveMatchMaps(slots, storedFirstMap, parseMapPicks(row.map_picks)),
     nextBan: parseNextBanRule(row.next_ban_rule),
-    nextPick: parseNextPickRule(row.next_pick_rule),
     cast: options.cast,
     decision: refereeDecision({
       refereeAssigned: row.referee_user_id !== null && options.refereeEligible,
@@ -284,7 +281,7 @@ async function runLobbyBriefSweep(): Promise<number> {
             m.team1_id, m.team2_id, t1.name AS team1_name, t2.name AS team2_name,
             m.launch_pairing, m.host_team_id, es1.rank AS team1_seed, es2.rank AS team2_seed,
             m.first_map, m.self_managed, m.referee_user_id, m.map_picks,
-            t.first_ban_rule, t.next_ban_rule, t.next_pick_rule,
+            t.first_ban_rule, t.next_ban_rule,
             (SELECT rm.slots_json FROM bg_tournament_round_maps rm
               WHERE rm.tournament_id = m.tournament_id AND rm.phase_id = m.phase_id
                 AND rm.bracket = m.bracket AND rm.round_number = m.round_number) AS round_slots_json

@@ -31,6 +31,12 @@ export const ROUND_MAPS_BULK_MAX = 128;
 export const ROUND_MAPS_NOTICE_WINDOW_SECONDS = 60;
 /** Manches nommées au plus dans cette annonce ; les suivantes sont comptées. */
 export const ROUND_MAPS_NOTICE_LISTED = 8;
+/**
+ * Numéro de tour au plus qu'un réglage peut viser : au-delà des play-offs de
+ * BlueGenji Survie (numérotés à partir de 1000, `PLAYOFF_ROUND_OFFSET`), aucun
+ * format n'en crée.
+ */
+export const ROUND_NUMBER_MAX = 2000;
 /** Tableaux d'une manche (ceux de `bg_matches.bracket`). */
 export const ROUND_BRACKETS: readonly string[] = ["UPPER", "LOWER", "GRAND", "THIRD_PLACE"];
 
@@ -50,8 +56,14 @@ export type NextBanRule = "LOSER" | "WINNER";
 
 /**
  * Qui choisit une carte de pool à partir de la carte 2 : le perdant de la carte
- * précédente (« loserpick », défaut) ou personne en particulier (arbitrage ou
- * équipes en autogestion, sans règle affichée).
+ * précédente (« loserpick », défaut de la colonne) ou personne en particulier
+ * (arbitrage ou équipes en autogestion).
+ *
+ * **`LOSER` n'est ni proposé ni affiché** tant que les scores par carte
+ * n'existent pas (seul le résultat retenu est stocké) : rien ne sait qui a
+ * perdu la carte précédente, la règle ne serait pas appliquée. La valeur
+ * stockée reste lue et renvoyée telle quelle (décision du 2026-10-28,
+ * `ROUND_MAPS.md`).
  */
 export type NextPickRule = "LOSER" | "FREE";
 
@@ -236,7 +248,7 @@ export function effectiveFirstMap(slots: readonly string[][], firstMap: string |
 /**
  * Valide un choix dans un pool : le créneau existe, c'est un pool, et la carte
  * en fait partie (comparée sans casse ; la forme du pool est retenue).
- * `null` / vide retire le choix.
+ * `null` / vide retire le choix, sur tout créneau existant.
  *
  * @throws `INVALID_MAP_PICK`
  */
@@ -244,9 +256,11 @@ export function validateMapPick(slots: readonly string[][], slot: unknown, raw: 
   if (typeof slot !== "number" || !Number.isInteger(slot) || slot < 1 || slot > slots.length) {
     throw new Error("INVALID_MAP_PICK");
   }
+  // Effacer est toujours permis, même sur un créneau devenu imposé : un ancien
+  // choix ne doit pas rester coincé et revenir quand le réglage est retiré.
+  if (raw === null || raw === undefined || raw === "") return null;
   const candidates = slots[slot - 1];
   if (candidates.length < 2) throw new Error("INVALID_MAP_PICK");
-  if (raw === null || raw === undefined || raw === "") return null;
   const name = normalizeMapName(raw, "INVALID_MAP_PICK").toLocaleLowerCase("fr");
   const found = candidates.find((candidate) => candidate.toLocaleLowerCase("fr") === name);
   if (found === undefined) throw new Error("INVALID_MAP_PICK");
@@ -298,8 +312,10 @@ export function applyMapRules<
   },
 >(matches: readonly M[], rules: TournamentMapRules): M[] {
   if (rules.rounds.length === 0 && rules.firstBan === DEFAULT_FIRST_BAN_RULE) return [...matches];
+  // Un index par tour : une recherche par match, pas un parcours des tours.
+  const byRound = new Map(rules.rounds.map((round) => [roundKeyId(round), round]));
   return matches.map((match) => {
-    const round = roundMapsOf(rules.rounds, match);
+    const round = byRound.get(roundKeyId(match)) ?? null;
     const firstMap = round ? effectiveFirstMap(round.slots, match.firstMap) : match.firstMap;
     const firstBanTeamId = firstBanTeamFor(rules.firstBan, match.hostTeamId, match.team1Id, match.team2Id);
     if (firstMap === match.firstMap && firstBanTeamId === match.firstBanTeamId) return match;
@@ -345,13 +361,21 @@ export function roundKeysOf(matches: readonly RoundKey[]): RoundKey[] {
  * `tournaments`) qui ne le joue pas, toujours ; sinon une équipe du match, en autogestion
  * seulement, par un rôle qui déclare son « Prêt » (`canDeclareReady`, comme
  * `assertMapPicker`). Le serveur tranche (`pickMatchMap`) : ceci ne règle que l'écran.
+ *
+ * « Joue le match » se lit d'abord dans le rôle que le serveur a calculé pour
+ * le lecteur (`launchRole`, `launch.viewer.role` : appartenance **en cours**,
+ * entrées solo comprises, comme `resolveMatchParty`) ; à défaut de lancement
+ * lu, dans `myTeamId`.
  */
 export function canPickMatchMap(
-  viewer: { staff: boolean; myTeamId: number | null; canDeclareReady: boolean },
+  viewer: { staff: boolean; myTeamId: number | null; canDeclareReady: boolean; launchRole?: string | null },
   match: { status: string; selfManaged: boolean; team1Id: number | null; team2Id: number | null },
 ): boolean {
   if (match.status === "COMPLETED") return false;
-  const plays = viewer.myTeamId !== null && (viewer.myTeamId === match.team1Id || viewer.myTeamId === match.team2Id);
+  const plays =
+    viewer.launchRole !== undefined && viewer.launchRole !== null
+      ? viewer.launchRole === "TEAM1" || viewer.launchRole === "TEAM2"
+      : viewer.myTeamId !== null && (viewer.myTeamId === match.team1Id || viewer.myTeamId === match.team2Id);
   // Un membre du staff qui joue le match suit la règle des joueurs.
   if (viewer.staff && !plays) return true;
   return plays && match.selfManaged && viewer.canDeclareReady;

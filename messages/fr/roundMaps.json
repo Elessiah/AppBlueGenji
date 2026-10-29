@@ -4,7 +4,6 @@
     "mapN": "Carte {number}",
     "imposed": "Imposée",
     "toChoose": "À choisir parmi {maps}",
-    "loserPick": "Choisie par l'équipe qui a perdu la carte précédente",
     "pickLabel": "Choisir la carte {number}",
     "pickNone": "À choisir",
     "picked": "Carte choisie.",
@@ -38,12 +37,8 @@
       "LOSER": "Le perdant de la carte précédente",
       "WINNER": "Le gagnant de la carte précédente"
     },
-    "nextPick": "Carte suivante d'un pool",
-    "nextPickOptions": {
-      "LOSER": "Choisie par le perdant de la carte précédente",
-      "FREE": "Choisie par l'arbitrage"
-    },
     "saveRules": "Enregistrer les règles",
+    "unsaved": "Modifications non enregistrées.",
     "rulesSaved": "Règles de ban enregistrées.",
     "roundTitle": "Cartes d'un tour du tournoi",
     "round": "Tour du tournoi",

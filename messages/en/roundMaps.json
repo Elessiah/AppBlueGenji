@@ -2,9 +2,8 @@
   "page": {
     "mapsTitle": "Maps for this round",
     "mapN": "Map {number}",
-    "imposed": "Set",
+    "imposed": "Fixed",
     "toChoose": "To choose from {maps}",
-    "loserPick": "Picked by the team that lost the previous map",
     "pickLabel": "Pick map {number}",
     "pickNone": "To choose",
     "picked": "Map picked.",
@@ -38,12 +37,8 @@
       "LOSER": "The loser of the previous map",
       "WINNER": "The winner of the previous map"
     },
-    "nextPick": "Next map from a pool",
-    "nextPickOptions": {
-      "LOSER": "Picked by the loser of the previous map",
-      "FREE": "Picked by the referee"
-    },
     "saveRules": "Save the rules",
+    "unsaved": "Unsaved changes.",
     "rulesSaved": "Ban rules saved.",
     "roundTitle": "Maps of a tournament round",
     "round": "Tournament round",
@@ -61,7 +56,7 @@
     "summaryNone": "maps match by match",
     "summarySet": "{maps, plural, one {# map} other {# maps}} · {pools, plural, =0 {no pool} one {# pool} other {# pools}}",
     "scaleHint": "A set round fixes its maps for all its matches: entering the map match by match is closed there. “Reset the round” reopens it; picks already made on matches stay.",
-    "slotImposed": "Set",
+    "slotImposed": "Fixed",
     "slotPool": "Pool · {count} maps",
     "slotEmpty": "To fill in",
     "removeMap": "Remove {map} from map {number}",

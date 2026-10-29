@@ -316,11 +316,12 @@ describe("page d'un match — cartes du round et bans", () => {
     );
   });
 
-  it("liste imposées et pools au public, choix du perdant à partir de la carte 2", () => {
+  it("liste imposées et pools au public, sans « choix du perdant » (règle non appliquée)", () => {
     const html = render(match({ mapPicks: { "3": "Oasis" } }), "public", false, "fr", rules([["Ilios"], ["Busan", "Nepal"], ["Oasis", "Dorado"]]));
     const text = visible(html);
     // Le public lit les maps dans les faits clés, sans la liste outillée du tour.
-    expect(text).toContain("Maps Map 1 : Ilios · imposée Map 2 : à choisir parmi Busan, Nepal · choix du perdant Map 3 : Oasis");
+    expect(text).toContain("Maps Map 1 : Ilios · imposée Map 2 : à choisir parmi Busan, Nepal Map 3 : Oasis");
+    expect(text).not.toContain("choix du perdant");
     expect(text).not.toContain("Cartes du tour");
     expect(html).not.toContain("<select");
     expect(text).not.toContain("Paramétrer les cartes du tour");
@@ -371,7 +372,7 @@ describe("page d'un match — cartes du round et bans", () => {
   it("en anglais", () => {
     const text = visible(render(match(), "staff", false, "en", rules([["Ilios"]])));
     expect(text).toContain("Maps for this round");
-    expect(text).toContain("Map 1 Ilios Set");
+    expect(text).toContain("Map 1 Ilios Fixed");
     expect(text).toContain("Map 1 bans Alpha first, then Bravo");
     expect(text).toContain("Set up this round's maps");
   });

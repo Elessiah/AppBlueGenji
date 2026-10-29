@@ -69,15 +69,38 @@ la saisie par match revient ; les choix déjà faits sur les matchs restent.
 | Premier ban des cartes suivantes | `next_ban_rule` | `LOSER` (perdant de la carte précédente) | `WINNER` |
 | Carte suivante d'un pool | `next_pick_rule` | `LOSER` (choisie par le perdant de la carte précédente) | `FREE` (arbitrage) |
 
+**« Choisie par le perdant » n'est ni proposée ni affichée** (décision du
+2026-10-28) : les scores par carte n'existant pas, rien ne sait qui a perdu la
+carte précédente et la règle ne serait pas appliquée — l'une ou l'autre équipe
+en autogestion peut choisir. La fenêtre n'offre plus ce réglage (elle renvoie la
+valeur stockée telle quelle) ; page du match, faits clés et brief n'en disent
+rien. La colonne reste lue : la règle reviendra avec les scores par carte.
+
 Les deux équipes bannissent : l'écran dit l'**ordre** (« X d'abord, puis Y »).
 Sur un match nul, l'ordre est celui de la carte précédente. Les scores par carte
 n'existant qu'au résultat retenu, les bans des cartes suivantes sont dits en
-règle, pas en nom d'équipe.
+règle, pas en nom d'équipe — et pas du tout sur un match en une seule carte
+(`roundMaxMaps` = 1).
 
 Tout se règle **à tout moment** (avant, pendant, après la manche) : bloc
 « Cartes et bans » de la fiche (staff `tournaments`, hors suivi gelé) et bouton
 « Paramétrer les cartes du tour » de la page du match, ouvert sur son tour. Le
 bloc de la fiche paraît dès la création : les tours à venir se règlent avant tout match.
+
+**Fenêtre ouverte pendant qu'un autre règle** — règles de ban et cartes du tour
+suivent l'instantané tant qu'elles n'ont pas été modifiées dans la fenêtre
+(`resyncSlots`) ; une saisie en cours n'est jamais écrasée, et son propre
+enregistrement est relu tel que le serveur l'a rangé (créneaux vides écartés).
+Chaque formulaire dit « Modifications non enregistrées » (`<output>`)
+tant qu'il diffère du serveur. Un créneau vide entre deux cartes, ou un refus
+`INVALID_ROUND_MAPS`, est **rattaché** au bouton de liste du créneau
+(`useFieldErrors`, `aria-invalid`, focus) en plus de la notification.
+
+**Un membre du staff qui joue** (décision du 2026-10-28) garde le réglage des
+cartes du tour, des règles de ban **et** de la première carte de son propre
+match (route `first-map`) : la permission `tournaments` suffit, comme pour tout
+réglage du tournoi. Seul le **choix dans un pool** de son match suit la règle
+des joueurs (ci-dessous).
 
 ## Préséance
 
@@ -95,6 +118,11 @@ bloc de la fiche paraît dès la création : les tours à venir se règlent avan
   verrou. Le choix dans un pool passe par `map-pick`.
 - Un choix verrouille le tournoi avant de relire le match et son pool, comme
   `setRoundMaps` : il ne se valide pas contre un pool remplacé au même instant.
+  Verrou **partagé** (`LOCK IN SHARE MODE`) : il attend une écriture des cartes
+  du tour, mais les choix de deux matchs ne s'attendent pas entre eux.
+- **Effacer** un choix (`map: null`) est permis sur tout créneau existant, même
+  devenu imposé : un ancien choix ne reste pas coincé pour revenir quand le
+  réglage est retiré.
 - L'écran n'ouvre la liste d'un pool à une équipe que si le lecteur déclare son
   « Prêt » (`canDeclareReady` du lancement), comme le serveur.
 
@@ -102,10 +130,10 @@ bloc de la fiche paraît dès la création : les tours à venir se règlent avan
 
 | Route | Droit | Refus |
 |---|---|---|
-| `PUT /api/admin/tournaments/[id]/round-maps` `{phaseId, bracket, roundNumber, slots}` ou `{rounds: [{phaseId, bracket, roundNumber}…], slots}` (1 à 128 tours, `ROUND_MAPS_BULK_MAX` ; `slots: []` retire) | `can(user, "tournaments")` | 401, 403 `FORBIDDEN`, 400 `INVALID_ROUND` / `INVALID_ROUND_MAPS`, 404 `TOURNAMENT_NOT_FOUND` |
+| `PUT /api/admin/tournaments/[id]/round-maps` `{phaseId, bracket, roundNumber, slots}` ou `{rounds: [{phaseId, bracket, roundNumber}…], slots}` (1 à 128 tours, `ROUND_MAPS_BULK_MAX` ; `slots: []` retire ; numéro de 1 à `ROUND_NUMBER_MAX` = 2000 ; cartes posées seulement sur un tour **de ce** tournoi — phase 0 sans phases, sinon une de ses phases, vérifiée sous verrou ; les autres clés d'une copie sont écartées, `INVALID_ROUND` si aucune ne reste ; retirer est permis sur toute clé, pour qu'une ligne restée d'une phase supprimée puisse partir) | `can(user, "tournaments")` | 401, 403 `FORBIDDEN`, 400 `INVALID_ROUND` / `INVALID_ROUND_MAPS`, 404 `TOURNAMENT_NOT_FOUND` |
 | `PUT /api/admin/tournaments/[id]/map-rules` `{firstBan, nextBan, nextPick}` | `can(user, "tournaments")` | 401, 403, 400 `INVALID_MAP_RULES`, 404 |
 | `PUT /api/admin/matches/[matchId]/first-map` (existante) | `can(user, "tournaments")` | en plus : 409 `ROUND_MAPS_SET` quand le tour a des cartes |
-| `PUT /api/matches/[matchId]/map-pick` `{slot, map \| null}` | staff, ou équipe du match en autogestion | 401, 400 `INVALID_MAP_PICK`, 403 `NOT_MAP_PICKER`, 404, 409 `MATCH_ALREADY_COMPLETED` |
+| `PUT /api/matches/[matchId]/map-pick` `{slot, map \| null}` | staff, ou équipe du match en autogestion | 401, 400 `INVALID_MAP_PICK`, 403 `NOT_MAP_PICKER`, 404, 409 `MATCH_ALREADY_COMPLETED` / `CONCURRENT_UPDATE_RETRY`, 429 `TOO_MANY_REQUESTS` (`MAP_PICK_WRITE_RULE` : 120 par compte en 5 min) |
 
 Tout arbitre porte la permission `tournaments` : « l'arbitre d'une autre
 manche » n'a pas de droit distinct, la porte est la permission elle-même.
@@ -113,8 +141,15 @@ Un membre du staff qui **joue** le match suit la règle des joueurs (comme
 `REFEREE_IS_PLAYER`) : hors autogestion, il ne choisit pas pour son équipe.
 `pickMatchMap` lit le match **avant** la transaction (droit de choisir et match
 joué vérifiés là : un refus ne prend aucun verrou), puis prend le verrou du
-tournoi en première instruction et revérifie tout : le pool est relu à jour,
-jamais figé avant le verrou. Rejoué sur interblocage (`retryOnDeadlock`).
+tournoi en première instruction et revérifie tout — le droit d'abord, l'état
+du match ensuite : le pool est relu à jour, jamais figé avant le verrou. Rejoué
+sur interblocage ou conflit d'instantané MariaDB (`retryOnDeadlock`) ; un
+conflit qui persiste rend 409 `CONCURRENT_UPDATE_RETRY` (`launchFailure`), pas
+une panne. Un 404 (match absent) se distingue d'un 403 (match d'autrui) :
+l'identifiant d'un match n'est pas un secret, l'instantané public le porte.
+Transactions : `lib/server/tournaments/transaction.ts` (commun avec le
+lancement) — un `rollback()` en échec détruit la connexion au lieu de la rendre
+au pool.
 
 ## Temps réel, journal, brief
 
@@ -143,7 +178,13 @@ jamais figé avant le verrou. Rejoué sur interblocage (`retryOnDeadlock`).
 - Journal du staff anonyme (`formatRoundMapsSummaryLog`, `formatMapRulesLog`, choix
   `MAP_PICKED*` de `referee-notices`) : aucune personne nommée.
 - Brief du salon (`MATCH_LOBBY_BRIEF.md`) : ligne « Cartes : » quand la manche
-  est réglée, ordre des bans de la carte 1, règle des cartes suivantes.
+  est réglée, ordre des bans de la carte 1, règle des cartes suivantes. La ligne
+  des cartes est coupée à un créneau entier au-delà de `MAPS_LINE_MAX` (700
+  caractères) et renvoie à la page du match : neuf pools de vingt cartes
+  dépasseraient les 2 000 caractères d'un message Discord.
+- L'instantané lit les règles de ban avec la ligne du tournoi qu'il charge déjà
+  (`loadMapRules(connection, id, tournamentRow)`) ; `applyMapRules` indexe les
+  tours (`roundKeyId`) au lieu d'un parcours par match.
 
 ## Schéma
 
@@ -166,4 +207,6 @@ autogestion avec la carte 2 déjà choisie.
 (saisie, copie, résumé), `tests/tournois/match-page-render.test.tsx` (§ cartes du
 round et bans, réinitialisation), `tests/lib/server/match-launch.test.ts`
 (`ROUND_MAPS_SET`, verrou en tête), `tests/lib/server/referee-panel.test.ts`
-(`roundSlots`), `tests/lib/shared/lobby-brief.test.ts`.
+(`roundSlots`), `tests/lib/shared/lobby-brief.test.ts` (ligne coupée),
+`tests/lib/server/tournament-transaction.test.ts` (rollback en échec),
+`tests/tournois/round-maps-dialog.test.ts` (`resyncSlots`).
