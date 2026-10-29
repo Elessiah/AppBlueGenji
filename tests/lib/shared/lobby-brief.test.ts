@@ -246,8 +246,8 @@ describe("brief du salon — registre des traitements (T04, T12)", () => {
   it("déclare la garde des réservations du brief, en français et en anglais", () => {
     const fr = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T04")!;
     const en = PROCESSING_ACTIVITIES_EN.find((activity) => activity.ref === "T04")!;
-    expect(fr.retention.join(" ")).toContain("et des réglages du salon (match, appariement et engagée) : conservées avec le match");
-    expect(en.retention.join(" ")).toContain("and of lobby settings sent (match, pairing and entrant): kept with the match");
+    expect(fr.retention.join(" ")).toContain("celles des réglages du salon (match, appariement et engagée) : jusqu'à la réouverture du salon (lancement annulé, horaire changé, retour arrière), sinon avec le match");
+    expect(en.retention.join(" ")).toContain("those of lobby settings sent (match, pairing and entrant): until the lobby reopens (launch cancelled, time changed, rollback), otherwise with the match");
   });
 });
 

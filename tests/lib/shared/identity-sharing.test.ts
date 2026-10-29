@@ -63,7 +63,7 @@ describe("HIDDEN_BATTLETAG_AUDIENCE", () => {
   });
 
   it("dit qui le lit, et quand, comme contact et comme caster", () => {
-    expect(battletag).toContain("si tu y es présenté comme contact");
+    expect(battletag).toContain("si tu es présenté comme contact (fenêtres « Contacts » et de lancement)");
     expect(battletag).toContain("dès que les adversaires sont connus et jusqu'à la fin du match, et les casters le temps du match");
     expect(battletag).toContain("si tu castes un match : ses deux équipes et ses autres casters le temps du match");
   });

@@ -20,6 +20,7 @@ import {
   MATCH_TIME_DM_SCOPE,
   MODERATION_DM_SCOPE,
   DATA_NOTICE_DM_SCOPE,
+  groupedExtraBases,
 } from "@/lib/shared/rgpd-policy";
 import { DONNEES_PROFIL_EN, DROITS_EN } from "@/lib/shared/rgpd-policy-en";
 import { PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
@@ -67,7 +68,7 @@ describe("contacts du lancement d'un match — base légale", () => {
   // tes matchs au titre du service, pas du consentement (le réglage n'y peut rien).
   it("fonde la lecture du BattleTag masqué par les parties d'un match sur le contrat, pas le consentement", () => {
     expect(BATTLETAG_MATCH_SCOPE).toMatch(
-      /^lecture, même masqué, dans un tournoi Overwatch seulement \(jamais en Marvel Rivals\), dans la seule fenêtre « Contacts » d'un match où tu es présenté comme contact/,
+      /^lecture, même masqué, dans un tournoi Overwatch seulement \(jamais en Marvel Rivals\) : présenté comme contact d'un match, dans sa fenêtre « Contacts » et dans sa fenêtre de lancement seulement/,
     );
     expect(BATTLETAG_MATCH_SCOPE).toMatch(/arbitres et administrateurs n'y ont pas d'autre accès \(conditions d'utilisation, « Contacts de match »\)$/);
   });
@@ -80,14 +81,14 @@ describe("contacts du lancement d'un match — base légale", () => {
     expect(REFEREE_BATTLETAG_SCOPE).toMatch(/^BattleTag de l'arbitre désigné d'un match d'un tournoi Overwatch \(jamais en Marvel Rivals\), même masqué, dans ses fenêtres « Contacts » et de lancement et sur la page du match/);
     expect(
       REFEREE_BATTLETAG_SCOPE.endsWith(
-        "; retrait d'un match à tout moment, le staff pouvant lui confier de nouveau ce match, sans avis (conditions d'utilisation, « Contacts de match », une fois leur version 7 acceptée par l'arbitre)",
+        "; retrait d'un match à tout moment, le staff pouvant lui confier de nouveau ce match, sans avis (conditions d'utilisation, « Contacts de match », une fois leur version 7 ou une suivante acceptée par l'arbitre)",
       ),
     ).toBe(true);
     expect(REFEREE_BATTLETAG_SCOPE).not.toMatch(/opposition/);
     // Revue juridique de #491 : la fenêtre de lancement ne s'ouvre pas aux arbitres.
     expect(REFEREE_BATTLETAG_SCOPE).toContain("(la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné)");
     expect(REFEREE_BATTLETAG_BEFORE_V7_SCOPE).toBe(
-      "la même présentation du BattleTag de l'arbitre désigné, tant que cet arbitre n'a pas accepté la version 7 des conditions d'utilisation — opposition par le formulaire de signalement, catégorie RGPD (retenue, il est retiré de tous ses matchs non terminés et ne peut plus en prendre un ni s'en voir confier un tant qu'elle n'est pas levée — à sa seule demande —, même une fois la version 7 acceptée)",
+      "la même présentation du BattleTag de l'arbitre désigné, tant que cet arbitre n'a pas accepté la version 7 des conditions d'utilisation ou une version suivante — opposition par le formulaire de signalement, catégorie RGPD (retenue, il est retiré de tous ses matchs non terminés et ne peut plus en prendre un ni s'en voir confier un tant qu'elle n'est pas levée — à sa seule demande —, même une fois la version 7 ou une suivante acceptée)",
     );
     expect(DONNEES_PROFIL.find((d) => d.donnee === "Pseudo Overwatch")?.extraBases).toEqual([
       { base: "Exécution du contrat", scope: BATTLETAG_MATCH_SCOPE },
@@ -522,12 +523,12 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
     expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Site username")?.extraBases).toEqual([
       { base: "Exécution du contrat", scope: "#live announcement of a solo tournament, kept in the Discord channel until deleted on request" },
       { base: "Intérêt légitime", scope: "AutoMod alert for such an announcement when blocked or flagged, kept in the moderators' alert channel until they delete it or on request" },
-      { base: "Exécution du contrat", scope: "the username of a match's assigned referee, in its “Contacts” and launch windows and on the match page, whatever the game: to both its teams and the referees as soon as both its opponents are known until its end, and to its casters while the match is being played (in an Overwatch tournament, next to their BattleTag — see “Overwatch username”), and alone as soon as the launch window shows the match (terms of use, “Match contacts”, once the referee has accepted their version 7)" },
-      { base: "Intérêt légitime", scope: "the same presentation of the assigned referee's username, as long as that referee has not accepted version 7 of the terms of use — objection through the report form, GDPR category (once upheld, they are removed from all their unfinished matches and can no longer take or be assigned one until it is lifted — at their request only —, even once version 7 is accepted)" },
+      { base: "Exécution du contrat", scope: "the username of a match's assigned referee, in its “Contacts” and launch windows and on the match page, whatever the game: to both its teams and the referees as soon as both its opponents are known until its end, and to its casters while the match is being played (in an Overwatch tournament, next to their BattleTag — see “Overwatch username”), and alone as soon as the launch window shows the match (terms of use, “Match contacts”, once the referee has accepted their version 7 or a later one)" },
+      { base: "Intérêt légitime", scope: "the same presentation of the assigned referee's username, as long as that referee has not accepted version 7 of the terms of use or a later version — objection through the report form, GDPR category (once upheld, they are removed from all their unfinished matches and can no longer take or be assigned one until it is lifted — at their request only —, even once version 7 or a later one is accepted)" },
       { base: "Intérêt légitime", scope: "the username alone of the assigned referee of a match, on the match card and page until its score is reported or the tournament ends, read by any signed-in member (never by a visitor without an account, who reads “Referee assigned”) — objection through the report form, GDPR category, with the same effect as an objection to being presented to the parties (removal from their unfinished matches)" },
     ]);
     expect(REFEREE_USERNAME_MEMBERS_SCOPE).toContain("lu par tout membre connecté (jamais par un visiteur sans compte");
-    expect(REFEREE_USERNAME_SCOPE).toContain("une fois leur version 7 acceptée par l'arbitre");
+    expect(REFEREE_USERNAME_SCOPE).toContain("une fois leur version 7 ou une suivante acceptée par l'arbitre");
     // Revue #497 cycle 3 : l'audience du pseudo s'écrit en clair, sans renvoyer
     // à une règle du BattleTag qui ne vaut qu'en Overwatch.
     expect(REFEREE_USERNAME_SCOPE).toContain(
@@ -535,7 +536,7 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
     );
     expect(REFEREE_USERNAME_SCOPE).not.toContain("aux lecteurs et aux moments");
     expect(REFEREE_USERNAME_BEFORE_V7_SCOPE).toContain("tant que cet arbitre n'a pas accepté la version 7");
-    expect(REFEREE_USERNAME_BEFORE_V7_SCOPE).toContain("(retenue, il est retiré de tous ses matchs non terminés et ne peut plus en prendre un ni s'en voir confier un tant qu'elle n'est pas levée — à sa seule demande —, même une fois la version 7 acceptée)");
+    expect(REFEREE_USERNAME_BEFORE_V7_SCOPE).toContain("(retenue, il est retiré de tous ses matchs non terminés et ne peut plus en prendre un ni s'en voir confier un tant qu'elle n'est pas levée — à sa seule demande —, même une fois la version 7 ou une suivante acceptée)");
     const choice = DONNEES_PROFIL.find((d) => d.donnee === "Choix des messages privés de match");
     // LEGAL-OPTOUT-BASIS : garder le choix relève d'une obligation légale (honorer l'opposition), comme T04.
     expect(choice?.base).toBe("Obligation légale");
@@ -569,6 +570,34 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
       { base: "Intérêt légitime", scope: "match time notices, reminders, match removal notices, lobby settings and cast removal notices by direct message" },
       { base: "Intérêt légitime", scope: "suspension or moderation notices by direct message" },
       { base: "Obligation légale", scope: "information about your data by direct message" },
+    ]);
+  });
+});
+
+// EF-20 (revue de #491) : une seule pastille pour des portées de même base qui se suivent.
+describe("groupedExtraBases", () => {
+  it("groupedExtraBases_undefined_returnsEmpty", () => {
+    expect(groupedExtraBases(undefined)).toEqual([]);
+  });
+
+  it("groupedExtraBases_consecutiveSameBase_mergesScopesInOrder", () => {
+    const groups = groupedExtraBases([
+      { base: "Intérêt légitime", scope: "portée A" },
+      { base: "Intérêt légitime", scope: "portée B" },
+    ]);
+    expect(groups).toEqual([{ base: "Intérêt légitime", scopes: ["portée A", "portée B"] }]);
+  });
+
+  it("groupedExtraBases_sameBaseSeparatedByAnother_keepsSeparateGroups", () => {
+    const groups = groupedExtraBases([
+      { base: "Intérêt légitime", scope: "portée A" },
+      { base: "Exécution du contrat", scope: "portée B" },
+      { base: "Intérêt légitime", scope: "portée C" },
+    ]);
+    expect(groups).toEqual([
+      { base: "Intérêt légitime", scopes: ["portée A"] },
+      { base: "Exécution du contrat", scopes: ["portée B"] },
+      { base: "Intérêt légitime", scopes: ["portée C"] },
     ]);
   });
 });
