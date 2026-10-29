@@ -127,9 +127,12 @@ déjà posée pré-remplit les trois champs (`matchStartEntryOf`).
   ouverte fait d'abord paraître l'avertissement, qui défile dans la vue (à
   375 px il pouvait être sous le pli et le clic sembler sans effet) et que sa
   région d'état fait lire, puis « Enregistrer » qu'il repousse ; le focus reste
-  sur l'envoi, et l'envoi suivant part. Le second clic d'un double-clic
-  (`event.detail > 1`, au délai du système) et la répétition d'« Entrée » tenue
-  n'envoient pas : ils confirmeraient sans laisser lire l'avertissement. « Vider
+  sur l'envoi, et l'envoi suivant part. Le clic qui prolonge un double-clic
+  (`event.detail > 1`, au délai du système) **juste après** l'envoi retenu, et
+  la répétition d'« Entrée » tenue, n'envoient pas : ils confirmeraient sans
+  laisser lire l'avertissement (`shouldHoldSubmit`, `isUnreadConfirmationClick`,
+  purs, `lib/shared/match-start-entry.ts` — la garde ne vaut que pour ce clic,
+  le suivant part). « Vider
   la date » et « Annuler » ignorent aussi ce second clic : l'avertissement qui
   apparaît repousse la rangée sous le pointeur (date vidée ou perdue).
 - **Date déjà passée : avertie** (`pastStartWarning`, `pastWarningKey`,
@@ -148,8 +151,12 @@ déjà posée pré-remplit les trois champs (`matchStartEntryOf`).
 - **Aide et avis aux joueurs** : l'aide sous les champs (`startAtHint`) dit ce
   que la date produit ; qui en est prévenu (`startAtNotice`) passe derrière un
   « i » (`InfoHint`, `INFO_HINTS.md`) — aucun pour un match joué. Le sous-titre
-  relie les engagés par `schedule.versus` (« contre » / « vs »), une place vide
-  par `schedule.tbd`.
+  est **un seul message à deux emplacements** (`schedule.versus` :
+  « {team1} contre {team2} » / « {team1} vs {team2} », chaque emplacement rendu
+  par `EntrantName`), une place vide se dit `schedule.tbd` (« À venir » / « TBD »,
+  comme `rollback.tbd`). L'avertissement « à l'antenne » (`schedule.warnLive`)
+  ne paraît que si le match avait une date (`match.startAt !== null`) : le
+  mois présélectionné d'un match sans date n'efface rien.
 - **Quarts d'heure seulement** (`MATCH_ENTRY_QUARTER_HOURS`) : une liste native se
   parcourt au clavier (flèches, première lettre) et ouvre le sélecteur du
   système sur mobile, sans saisie partielle à gérer.
@@ -160,7 +167,8 @@ déjà posée pré-remplit les trois champs (`matchStartEntryOf`).
 - **Le serveur ne l'impose pas** : `normalizeMatchStartAt` accepte toujours
   n'importe quelle minute — les dates existantes et les autres chemins
   d'écriture ne cassent pas. C'est une aide de saisie, pas une règle.
-- **Sans jour ni mois, aucune date** (`readMatchStartEntry` → `empty`) : la
+- **Sans jour, aucune date** (`readMatchStartEntry` → `empty`, le mois
+  présélectionné ne compte pas ; l'aide dit « Sans jour = aucun horaire ») : la
   liste des heures garde toujours une valeur, et une heure seule ne programme
   rien. Jour et mois vidés (ou bouton « Vider la date ») = horaire effacé.
 
