@@ -89,7 +89,11 @@ fantômes** : listées si elles ont joué, masquées sinon, comme les autres.
 classée pour le moment : le premier match ouvrira le bal. » / « No ranked
 teams yet: the first match will kick things off. » ; sous trois équipes, pas
 de podium (tout au tableau). La carte « cote de départ » de « Comment marche la
-cote » dit qu'une équipe entre au classement à son premier match joué (FR/EN).
+cote » dit qu'une équipe entre au classement à son premier match **compté**,
+forfait compris (règle d'`isRankedTeam`, FR/EN) ; la description de la page et
+le sous-titre de sa carte d'aperçu parlent de « chaque équipe classée ». Une
+légende dit le sens de l'étoile (`newcomer` : entrée ces 7 derniers jours), dont
+la couleur (`trendNew`) n'est plus celle d'une montée.
 
 **Jeu de test.** `npm run seed` crée « Test - Sans Match » (`NOMT`), équipe
 ordinaire gardée hors du pool des tournois : présente à `/equipes` sans rang,
@@ -97,6 +101,42 @@ absente de `/classement`.
 
 `isRankedTeam` ne décide pas de l'ordre : il décide qui figure à la liste, la
 légende de la cote (« Aucun match joué ») et si la fiche affiche une place.
+
+**Une seule photo** (`loadTeamRankingSnapshot`) : la liste **et** l'état rejoué
+dont elle sort. L'annuaire (`listTeams`) et la fiche (`getTeamRankingPosition`)
+lisent place, total et cote dans la même photo — relire l'état à part pouvait
+tomber sur un autre classement qu'une invalidation aurait glissé entre les deux,
+et relancer un rejeu. La cote d'une équipe hors liste se lit par
+`rankingPointsOf` (ligne, sinon état rejoué, sinon cote de départ). Les
+identités (`ranking:list:identities`) sont mutualisées sous `ranking:list:`.
+Dernier départage à cote et bilan égaux : le nom, par un `Intl.Collator`
+français partagé (même ordre que `localeCompare(…, "fr")`, sans en recréer un
+par comparaison).
+
+**Vues d'identité** (`invalidateTeamIdentityViews`, `ranking-cache.ts`) : un
+renommage, un logo changé, retiré, mis en quarantaine ou rétabli, une adoption
+de fantôme et une dissolution vident la liste (identités, podium, cartes
+d'aperçu et leurs PNG) et les vues de l'accueil qui nomment des équipes ; le
+rejeu reste en cache. Le logo se relit **sous verrou** (`updateTeamLogo`,
+`SELECT … FOR UPDATE` puis écriture dans une transaction) : l'ancien fichier
+supprimé par la route est bien celui que l'écriture a remplacé, et le vidage a
+lieu après le commit. La synchronisation d'une entrée solo (pseudo ou avatar
+changés) ne vide l'accueil que si une entrée a été réécrite.
+
+**Dissolution ciblée** : une équipe jamais inscrite à un tournoi n'est nommée
+que sur sa fiche et celles de ses membres — seules celles-ci (`invalidateStatsOf`)
+et le compteur de l'accueil (`invalidateLandingCounters`) sont vidés ; une
+équipe déjà inscrite vide les vues d'identité et tous les bilans. Créations et
+dissolutions partagent un plafond par compte (`TEAM_LIFECYCLE_RULE`, 10 gestes
+par heure, 429 `TOO_MANY_REQUESTS`) : seul un geste réussi est décompté, le
+staff `tournaments` n'est pas plafonné. Une boucle « créer → dissoudre » ne fait
+plus recalculer le classement et le podium aux visiteurs.
+
+**Nuls à l'annuaire** : `TeamListItem.draws` — la carte d'équipe ajoute une
+colonne « Matchs nuls » quand il y en a, le podium de l'annuaire
+(`HighlightStrip`, lu sur la liste déjà triée par rang, sans recopie) et le
+leaderboard de l'accueil les écrivent (« 1 N » à l'écran, « 1 match nul » lu).
+La carte d'une équipe sans rang ne réserve plus la marge du badge.
 
 **Place sur la fiche** (`getTeamRankingPosition`) : comptée sur la même liste
 que `/classement` (les équipes classées), « #n sur N équipes ». La place est
@@ -293,6 +333,13 @@ les deux langues.
   — badge absent, podium de l'annuaire.
 - `tests/lib/server/ranking-service.test.ts` — liste et seeding avec le même
   ordre.
+- `tests/lib/server/ranking-service.test.ts` (`loadTeamRankingSnapshot`,
+  `rankingPointsOf`), `tests/lib/server/ranking-cache.test.ts`,
+  `tests/lib/server/share-image-cache.test.ts`,
+  `tests/lib/server/team-identity-invalidation.test.ts`,
+  `tests/lib/server/logo-quarantine.test.ts`,
+  `tests/app/api/teams/team-lifecycle-rate-limit.test.ts` — photo unique, vues
+  d'identité vidées après commit, cartes d'aperçu oubliées, plafond partagé.
 - `tests/lib/shared/ranking-page.test.ts` — filtre, adresses, écarts,
   lecture et bornes de `?n=`, lien de page suivante (onglet gardé, ancre).
 - `tests/app/ranking-board.test.tsx` — podium, couleurs de défaite, forme,
