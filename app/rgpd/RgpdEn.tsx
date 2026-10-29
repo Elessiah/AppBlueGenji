@@ -1012,8 +1012,8 @@ export function RgpdEn({
             caster registrations (with your “Ready”), the channel links you provided and the matches you are the assigned
             referee of also appear in the export of your data. These
             announcements stay in the channel as long as the #live channel exists; when a caster&apos;s account is deleted,
-            their channel link is removed from the evening message as long as that message is still edited (at most four hours
-            after the evening ends) — a message that no longer is keeps it. The team, player or caster concerned can
+            the message of an evening still under way is updated without their channel link if it keeps another link —
+            otherwise, or once the evening has ended, it keeps it. The team, player or caster concerned can
             ask for their deletion, and for that of these alerts,
             through the “Report a problem” button, GDPR category.
           </p>

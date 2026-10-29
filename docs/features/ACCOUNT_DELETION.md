@@ -372,7 +372,10 @@ attend puis refuse le compte supprimé (`REFEREE_IDENTITY_REQUIRED`) au lieu
 de poser comme arbitre un compte anonymisé. Après le commit, chaque tournoi
 touché reçoit `publishMatchUpdatedEvent` : les instantanés ouverts perdent le
 caster, son lien ou l'arbitre, et le message #live de la soirée est remis à
-jour sans le lien (tant qu'il est encore modifié). Même chose au rattrapage
+jour sans le lien. Seule une soirée encore en cours qui garde un autre lien
+est sûre de l'être : une soirée sans plus aucun lien n'est pas modifiée
+(`refreshEvening` rend `unchanged`), ni une soirée finie dont le processus n'a
+pas publié le texte (redémarrage) — les textes légaux le disent. Même chose au rattrapage
 `reconcileDeletedAccounts`.
 
 Ils ne sont pas **retirés** de la réponse : c'est le seul moyen de retrouver un

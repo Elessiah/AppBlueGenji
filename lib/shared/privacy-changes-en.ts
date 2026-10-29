@@ -702,10 +702,10 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     linkLabels: ["Read the “Match streaming” paragraph"],
     title: "Account deletion and export: directory, #live message, casts and refereeing",
     summary:
-      "The player directory no longer shows a deleted account's identifier or creation date, deleting a caster's account removes their channel link from the evening's #live message while it is still edited, and the export of your data now gives your casts, the channel links you provided, your refereeing and the origin of your BattleTag.",
+      "The player directory no longer shows a deleted account's identifier or creation date, deleting a caster's account removes their channel link from the #live message of an evening still under way that keeps another link, and the export of your data now gives your casts, the channel links you provided, your refereeing and the origin of your BattleTag.",
     details: [
       "Player directory: a deleted account keeps its stand-in username, its team and its record there, but no longer its identifier or creation date; its card no longer opens a page, and the “Newest” sort puts it at the end of the list.",
-      "Evening #live message: when a caster's account is deleted, it is updated without their channel link as long as it is still edited (at most four hours after the evening ends); a message that no longer is keeps it, and the caster concerned can, like the team or player, ask for its deletion through the report form (GDPR category).",
+      "Evening #live message: when a caster's account is deleted, the message of an evening still under way is updated without their channel link if it keeps another link; otherwise, or once the evening has ended, it keeps it, and the caster concerned can, like the team or player, ask for its deletion through the report form (GDPR category).",
       "Export of your data: it also gives your caster registrations (with your “Ready”), the channel links you provided on a match, the matches you are the assigned referee of (with your “Ready”) and whether your BattleTag comes from Battle.net or was typed in by hand.",
     ],
   },

@@ -1214,9 +1214,9 @@ function RgpdFr({
             l&apos;export de vos données — ni le texte du message, ni la liste des matchs programmés qu&apos;il donne. Vos
             inscriptions de caster (avec votre « Prêt »), les liens de chaîne que vous avez fournis et les matchs dont vous
             êtes l&apos;arbitre désigné figurent aussi dans l&apos;export de vos données. Ces annonces restent dans le salon tant
-            que le salon #live existe ; à la suppression du compte d&apos;un caster, le lien de sa chaîne est retiré du
-            message de la soirée tant que celui-ci est encore modifié (au plus quatre heures après la fin de la soirée) — un
-            message qui ne l&apos;est plus le garde. L&apos;équipe, le joueur ou le caster concerné peut en demander la
+            que le salon #live existe ; à la suppression du compte d&apos;un caster, le message d&apos;une soirée encore en
+            cours est remis à jour sans le lien de sa chaîne s&apos;il garde un autre lien — sinon, ou une fois la soirée
+            finie, il le garde. L&apos;équipe, le joueur ou le caster concerné peut en demander la
             suppression, comme celle de ces alertes, par le bouton « Signaler
             un problème », catégorie RGPD.
           </p>

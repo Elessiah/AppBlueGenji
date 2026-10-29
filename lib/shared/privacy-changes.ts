@@ -1367,10 +1367,10 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     title: "Suppression de compte et export : annuaire, message #live, casts et arbitrages",
     links: [{ href: "/rgpd#retransmission", label: "Lire le paragraphe « Retransmission des matchs »" }],
     summary:
-      "L'annuaire des joueurs ne montre plus l'identifiant ni la date de création d'un compte supprimé, la suppression du compte d'un caster retire le lien de sa chaîne du message #live de la soirée encore modifié, et l'export de tes données rend désormais tes casts, les liens de chaîne que tu as fournis, tes arbitrages et l'origine de ton BattleTag.",
+      "L'annuaire des joueurs ne montre plus l'identifiant ni la date de création d'un compte supprimé, la suppression du compte d'un caster retire le lien de sa chaîne du message #live d'une soirée encore en cours qui garde un autre lien, et l'export de tes données rend désormais tes casts, les liens de chaîne que tu as fournis, tes arbitrages et l'origine de ton BattleTag.",
     details: [
       "Annuaire des joueurs : un compte supprimé y garde son pseudo d'emprunt, son équipe et son bilan, mais plus son identifiant ni sa date de création ; sa carte n'ouvre plus de fiche, et le tri « Plus récents » le range en fin de liste.",
-      "Message #live de la soirée : à la suppression du compte d'un caster, il est remis à jour sans le lien de sa chaîne tant qu'il est encore modifié (au plus quatre heures après la fin de la soirée) ; un message qui ne l'est plus le garde, et le caster concerné peut, comme l'équipe ou le joueur, en demander la suppression par le formulaire de signalement (catégorie RGPD).",
+      "Message #live de la soirée : à la suppression du compte d'un caster, le message d'une soirée encore en cours est remis à jour sans le lien de sa chaîne s'il garde un autre lien ; sinon, ou une fois la soirée finie, il le garde, et le caster concerné peut, comme l'équipe ou le joueur, en demander la suppression par le formulaire de signalement (catégorie RGPD).",
       "Export de tes données : il rend aussi tes inscriptions de caster (avec ton « Prêt »), les liens de chaîne que tu as fournis sur un match, les matchs dont tu es l'arbitre désigné (avec ton « Prêt ») et si ton BattleTag vient de Battle.net ou a été tapé à la main.",
     ],
   },
