@@ -487,10 +487,14 @@ function mapMatchLaunch(row: MatchRow, allCasters: readonly MatchCasterRow[]) {
     hostTeamId,
     firstBanTeamId: firstBanTeamId(hostTeamId, team1Id, team2Id),
     refereeAssigned: referee,
-    // Empreinte de la désignation (pseudo aux membres, décision 52) : un match
-    // joué n'en montre plus — ni bandeau ni page ne nomment son arbitre.
+    // Empreinte de la désignation (pseudo aux membres, décision 52) : seul un
+    // match pas encore joué (`PENDING`/`READY`) en montre une — dès le score
+    // déclaré, ni bandeau ni page ne nomment son arbitre (textes RGPD :
+    // « match qui n'est pas joué »). Tournoi terminé : voir `snapshot.ts`.
     refereeKey:
-      referee && row.status !== "COMPLETED" ? refereeKey(Number(row.id), Number(row.referee_user_id)) : null,
+      referee && (row.status === "PENDING" || row.status === "READY")
+        ? refereeKey(Number(row.id), Number(row.referee_user_id))
+        : null,
     selfManaged: Number(row.self_managed ?? 0) === 1,
     firstMap: firstMap === "" ? null : firstMap,
     mapPicks: parseMapPicks(row.map_picks),

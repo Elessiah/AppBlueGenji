@@ -47,6 +47,16 @@ export function refereeKey(matchId: number, refereeUserId: number): string {
  * version, toute écriture en fait une autre ; la durée ne sert qu'à absorber
  * une vague d'ouvertures de flux (tous les membres lisent les mêmes pseudos).
  */
+/**
+ * Matchs d'un tournoi terminé, sans empreinte d'arbitre : un match resté non
+ * joué (reset de grande finale inutile, fin forcée) ne nomme plus son arbitre
+ * aux membres une fois le tournoi fini. Garde la même référence si rien ne change.
+ */
+export function withoutRefereeKeys<T extends { refereeKey: string | null }>(matches: T[]): T[] {
+  if (!matches.some((match) => match.refereeKey !== null)) return matches;
+  return matches.map((match) => (match.refereeKey === null ? match : { ...match, refereeKey: null }));
+}
+
 const REFEREE_NAMES_TTL_MS = 5_000;
 
 type RefereeNameRow = RowDataPacket & { id: number; referee_user_id: number; pseudo: string };

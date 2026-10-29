@@ -170,6 +170,18 @@ describe("mapMatch — arbitre désigné dans l'instantané (`docs/features/MATC
     expect(match.refereeKey).toBeNull();
   });
 
+  it("mapMatchLaunch_pendingMatch_hasRefereeKey", () => {
+    const match = mapMatch(row({ ...eligible, status: "PENDING" }));
+    expect(match.refereeKey).toMatch(/^[\w-]{16}$/);
+  });
+
+  // Score déclaré : le match est joué, les membres relisent « Arbitre désigné ».
+  it("mapMatchLaunch_awaitingConfirmationMatch_hasNullRefereeKey", () => {
+    const match = mapMatch(row({ ...eligible, status: "AWAITING_CONFIRMATION" }));
+    expect(match.refereeKey).toBeNull();
+    expect(match.refereeAssigned).toBe(true);
+  });
+
   it("tait un arbitre qui ne remplit plus la condition, et son « Prêt » d'un autre appariement", () => {
     expect(mapMatch(row({ ...eligible, referee_platform_roles_json: JSON.stringify(["CASTER"]) })).refereeAssigned).toBe(false);
     expect(mapMatch(row({ ...eligible, referee_platform_roles_json: JSON.stringify(["CASTER"]) })).refereeKey).toBeNull();

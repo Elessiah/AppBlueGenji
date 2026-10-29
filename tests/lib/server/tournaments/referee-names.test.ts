@@ -5,7 +5,7 @@ jest.mock("@/lib/server/cache", () => ({ cached: jest.fn() }));
 
 import { cached } from "@/lib/server/cache";
 import { withConnection } from "@/lib/server/database";
-import { loadRefereeNames, refereeKey } from "@/lib/server/tournaments/referee-names";
+import { loadRefereeNames, refereeKey, withoutRefereeKeys } from "@/lib/server/tournaments/referee-names";
 import { bracketMatch } from "../../../helpers/bracket-match";
 import { connectionMock, fakeConnection } from "../../../helpers/sql-double";
 import { tournamentCard } from "../../../helpers/tournament-card";
@@ -123,5 +123,22 @@ describe("refereeKey — secret du processus", () => {
     });
 
     expect(again?.refereeKey(5, 9)).toBe(before);
+  });
+});
+
+describe("withoutRefereeKeys", () => {
+  it("withoutRefereeKeys_matchesWithKeys_nullsEveryKeyKeepsOtherFields", () => {
+    const keyed = bracketMatch({ id: 5, refereeKey: "k-arbitre", refereeAssigned: true });
+    const unkeyed = bracketMatch({ id: 6, refereeKey: null });
+
+    const actual = withoutRefereeKeys([keyed, unkeyed]);
+
+    expect(actual).toEqual([{ ...keyed, refereeKey: null }, unkeyed]);
+  });
+
+  it("withoutRefereeKeys_noKeys_returnsSameArray", () => {
+    const matches = [bracketMatch({ id: 5, refereeKey: null })];
+
+    expect(withoutRefereeKeys(matches)).toBe(matches);
   });
 });

@@ -141,7 +141,10 @@ modale) ; sinon l'équipe 1. L'hôte joue à **gauche** ; l'autre équipe
   `selfManaged`, `firstMap`, `hostTeamId`, `firstBanTeamId` et une empreinte
   opaque `refereeKey` (HMAC à secret aléatoire du processus sur
   `matchId:userId`, 16 caractères, `referee-names.ts`), `null` sans arbitre
-  éligible ou pour un match joué. **Jamais de nom** dans l'instantané ;
+  éligible, pour un match joué (seuls `PENDING`/`READY` en portent une :
+  dès le score déclaré, plus de pseudo) et pour tout match d'un tournoi
+  terminé (`withoutRefereeKeys`, `snapshot.ts` — un match resté non joué ne
+  nomme pas son arbitre indéfiniment). **Jamais de nom** dans l'instantané ;
   plus de `refereeReady` (décision 47) : le « Prêt » de l'arbitre ne se lit
   que dans `MatchLaunchInfo` (parties, staff). La fenêtre « Contacts » relit
   toutes les 10 s en lobby tant qu'un arbitre n'est pas prêt
