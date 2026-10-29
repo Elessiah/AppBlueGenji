@@ -217,7 +217,7 @@ une ligne visible courte, le détail derrière le bouton « i » (`INFO_HINTS.md
 | Constante | Ce qu'elle promet |
 | --- | --- |
 | `DISCORD_TAG_AUDIENCE` | Liste de ceux qui lisent un tag certifié : administrateurs à tout moment, arbitres tant que le titulaire est inscrit à un tournoi non terminé, parties de ses matchs (joués ou castés) aux moments de la fenêtre « Contacts », autres joueurs seulement par la case « Tag Discord » — **personne d'autre**. |
-| `HIDDEN_BATTLETAG_AUDIENCE` | Liste de ceux qui lisent encore un BattleTag masqué, dans la fenêtre « Contacts » et la fenêtre de lancement d'un match, et comment cesser de le partager. |
+| `HIDDEN_BATTLETAG_AUDIENCE` | Liste de ceux qui lisent encore un BattleTag masqué, dans la fenêtre « Contacts » et la fenêtre de lancement d'un match — et sur la page du match pour celui d'un caster inscrit ou de l'arbitre désigné —, et comment cesser de le partager. |
 | `DISCORD_TAG_UNVERIFIED_NOTICE` / `…_CONSEQUENCE` | Ce qu'un tag non certifié vaut : rien, pour personne — et l'organisation ne peut pas joindre le joueur. |
 | `DISCORD_CERTIFICATION_UNDO` | Le seul geste qui défait la certification (il n'existe aucune route de décertification) — **le retrait du tag**, et non sa modification : un tag certifié appartient à un compte rattaché, dont le champ est en lecture seule. |
 | `BLIZZARD_BATTLETAG_NOTICE` | Blizzard renseigne le BattleTag et **remplace** la saisie à chaque connexion. |

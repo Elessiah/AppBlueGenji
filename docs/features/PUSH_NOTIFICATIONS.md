@@ -57,6 +57,11 @@ un appareil abonné. Le message privé, lui, garde ses règles (`proven` : un
 identifiant ou un tag certifié ; `certified` — tag certifié seul — pour les
 messages de match : un tag saisi n'a que ses push).
 
+Un sujet ajouté au registre (ainsi `MATCH_LOBBY_BRIEF`, `CAST_RELEASED`,
+`REFEREE_RELEASED`) part **actif** pour les appareils déjà abonnés : décidé le
+2026-10-28 (décision 34 de l'utilisateur), sans coupure par défaut ; chacun le
+coupe depuis ses réglages de notifications.
+
 ## Départ de match
 
 `lobby_opened_at` est posé par l'entretien passif, un « Prêt » ou un lancement

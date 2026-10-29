@@ -277,6 +277,10 @@ raison d'être. L'identifiant, déjà publié, garde son « 2026-10 ».
 Règle qui en découle : quand l'heure du déploiement n'est pas connue, dater
 une entrée du **lendemain** de sa mise en ligne.
 
+Même règle pour le lot des conditions v7 (#491, #499) : mis en ligne le
+**28 octobre 2026 dans l'après-midi**, ses entrées et la version 7 datées du
+30 sont ramenées au **29**, lendemain de la mise en ligne.
+
 ## Mise en production initiale
 
 Deux entrées ouvrent le registre, datées du 23 septembre 2026 :

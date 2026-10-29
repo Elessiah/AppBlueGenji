@@ -251,7 +251,7 @@ connexion, fiche joueur, clé `asReferee`) et la modale de masquage, entrée
 l'utilisateur du 2026-10-27) : **exécution du contrat** pour la présentation
 de l'arbitre aux parties (pseudo et BattleTag, portée
 `REFEREE_BATTLETAG_SCOPE` sur la ligne BattleTag de `/rgpd`) une fois que cet
-arbitre a accepté la version 7 des conditions, dont la section « Contacts de
+arbitre a accepté la version 7 des conditions ou une suivante, dont la section « Contacts de
 match » la prévoit ; **tant qu'il ne l'a pas acceptée**, intérêt légitime,
 avec une opposition par le formulaire de signalement (portée
 `REFEREE_BATTLETAG_BEFORE_V7_SCOPE`, droit d'opposition de `/rgpd`, T01 et

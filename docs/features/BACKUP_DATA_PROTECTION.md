@@ -15,10 +15,11 @@ garde une copie de données personnelles, donc chacune est un traitement.
 | Journal des suppressions (`data/account-deletions.jsonl`) | Copié chiffré avec les images, chaque heure | 60 jours par ligne (`ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS`) |
 
 La purge des archives est refaite **chaque heure** par le cron des images, et
-pas seulement par les sauvegardes (dimanche et mardi) : seules, elles laisseraient une
-archive vivre jusqu'à 35 jours (30 jours au passage d'avant, donc gardée),
-davantage si une exécution échouait avant sa purge — et `/rgpd` annonce 30 jours
-au plus. Les deux purges effacent les archives âgées d'au moins
+pas seulement par les sauvegardes (dimanche et mardi) : seules, elles laisseraient
+une archive dépasser 30 jours dès qu'une sauvegarde est ratée ou échoue avant
+sa purge, ou qu'un écart de transfert de plus d'une heure décale l'archive
+au-delà du seuil de la sauvegarde qui devait l'effacer — et `/rgpd` annonce
+30 jours au plus. Les deux purges effacent les archives âgées d'au moins
 `RETENTION_DAYS × 24 − 1` heures (719 h, `--min-age` en heures, bot
 `scripts/sync-uploads-onedrive.sh` et `scripts/backup-onedrive.sh`) : passant
 chaque heure, la purge horaire efface une archive entre 29 j 23 h et 30 j

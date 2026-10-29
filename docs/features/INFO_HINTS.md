@@ -106,7 +106,8 @@ après le libellé qu'elles expliquent, et se réécrivent **court**.
 Le paragraphe recopié six fois (560–900 caractères) est remplacé par **deux
 listes** courtes, rédigées une fois dans `lib/shared/identity-sharing.ts` :
 `DISCORD_TAG_AUDIENCE` (tag Discord certifié) et `HIDDEN_BATTLETAG_AUDIENCE`
-(BattleTag masqué : fenêtre « Contacts » et fenêtre de lancement nommées). Chaque
+(BattleTag masqué : fenêtre « Contacts » et fenêtre de lancement nommées, et la
+page du match pour celui d'un caster ou de l'arbitre désigné). Chaque
 espace qui les montre (`profile`, `login`, `players`) porte la même forme sous
 `audience.discord.*` / `audience.battletag.*` ; `lib/shared/identity-audience.ts`
 les assemble, `<AudienceList>` les rend. Tests : le français de chaque espace

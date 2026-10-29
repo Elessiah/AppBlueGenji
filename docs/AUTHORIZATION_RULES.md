@@ -352,8 +352,8 @@ geste le bouton qui permet de le retirer sur signalement. Le sélecteur de cible
 ouvert à tout membre qui rédige un signalement, lui, applique `visibleAvatarUrl`
 comme partout ailleurs.
 
-**Le BattleTag masqué ne se lit que dans la fenêtre « Contacts » d'un match et
-dans sa fenêtre de lancement**, qui la reprend au départ du match pour les
+**Le BattleTag masqué d'un joueur présenté comme contact ne se lit que dans la fenêtre « Contacts » d'un match et
+dans sa fenêtre de lancement** (celui d'un caster ou de l'arbitre désigné, aussi sur la page du match), qui la reprend au départ du match pour les
 équipes et le caster (décision de l'utilisateur, 2026-10-19) ; la page du match
 (`docs/features/MATCH_PAGE.md`) reprend celui de l'arbitre désigné et des casters
 par la même lecture, aux mêmes lecteurs et aux mêmes moments. Masqué, il quitte la fiche, l'annuaire
