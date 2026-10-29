@@ -67,7 +67,7 @@ describe("SessionPageShell — en-tête selon la session", () => {
     const html = await render();
     expect(html).not.toContain("en-tête vitrine");
     expect(html).toContain('aria-label="Navigation principale"');
-    const current = [...html.matchAll(/<a [^>]*aria-current="page"[^>]*>([^<]*)<\/a>/g)].map((m) => m[1]);
+    const current = [...new Set([...html.matchAll(/<a [^>]*aria-current="page"[^>]*>([^<]*)<\/a>/g)].map((m) => m[1]))];
     expect(current).toEqual(["Classement"]);
     // Le contenu garde son `<main>` vitrine : rien ne bouge d'un état à l'autre.
     expect(html).toContain('<main style="position:relative;z-index:1"><h1>Classement</h1></main>');

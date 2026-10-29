@@ -26,9 +26,45 @@ const siteNav = (activeTeam: { teamId: number; teamName: string } | null = null)
     </ToastProvider>,
   );
 
-/** Les liens `<a>` du rendu qui portent `aria-current="page"`. */
+/** Les liens `<a>` du rendu qui portent `aria-current="page"` (une fois chacun : les liens existent en deux copies, une seule visible). */
 const currentLinks = (html: string) =>
-  [...html.matchAll(/<a [^>]*aria-current="page"[^>]*>([^<]*)<\/a>/g)].map((m) => m[1]);
+  [...new Set([...html.matchAll(/<a [^>]*aria-current="page"[^>]*>([^<]*)<\/a>/g)].map((m) => m[1]))];
+
+describe("SiteNav — ordre du clavier selon la largeur (D8)", () => {
+  const css = readSource("components/site-nav.module.css");
+  const mobileBlock = css.slice(css.indexOf("@media (max-width: 720px)"));
+
+  it("ordonne le DOM : logo mobile, liens, logo, outils, puis liens mobiles", () => {
+    const html = siteNav();
+    const at = (needle: string, from = 0) => html.indexOf(needle, from);
+    const logoMobile = at('class="navLogoMobile"');
+    const linksDesktop = at('class="navLeft"');
+    const logo = at('class="navLogo"');
+    const right = at('class="navRight"');
+    const linksMobile = at('class="navLeftMobile"');
+    expect(logoMobile).toBeGreaterThan(-1);
+    expect([logoMobile, linksDesktop, logo, right, linksMobile]).toEqual(
+      [logoMobile, linksDesktop, logo, right, linksMobile].toSorted((a, b) => a - b),
+    );
+    expect(html.match(/href="\/joueurs"/g)).toHaveLength(2);
+  });
+
+  it("n'affiche qu'une copie des liens par largeur", () => {
+    expect(css).toMatch(/\.navLeftMobile \{\s*display: none;/);
+    expect(mobileBlock).toMatch(/\.navLeft \{\s*display: none;/);
+    expect(mobileBlock).toMatch(/\.navLeftMobile \{\s*display: flex;\s*grid-area: left;/);
+  });
+
+  it("donne aux deux copies le même nom accessible, une seule étant visible", () => {
+    const html = siteNav();
+    expect(html.match(/<a [^>]*aria-label="Accueil"[^>]*href="\/"/g)).toHaveLength(2);
+    // Bureau : la copie mobile est cachée (display: none retire l'arbre d'accessibilité et le focus).
+    expect(css).toMatch(/\.navLogoMobile \{\s*display: none;/);
+    // Mobile : c'est la copie de bureau qui l'est.
+    expect(mobileBlock).toMatch(/\.navLogo \{\s*display: none;/);
+    expect(mobileBlock).toMatch(/\.navLogoMobile \{\s*display: grid;\s*grid-area: logo;/);
+  });
+});
 
 describe("SiteNav — page courante et pictogrammes", () => {
   afterEach(() => {
@@ -74,7 +110,8 @@ describe("SiteNav — page courante et pictogrammes", () => {
     // L'accueil passe par le logo, l'équipe par le menu du compte.
     expect(html).not.toContain("navHome");
     expect(html).not.toContain('href="/equipes/3"');
-    expect(html.match(/<a [^>]*href="\/"/g)).toHaveLength(1);
+    // Deux copies du logo, une seule visible selon la largeur (cf. « ordre du clavier »).
+    expect(html.match(/<a [^>]*href="\/"/g)).toHaveLength(2);
     expect(html).toContain('<a class="navLogo" aria-label="Accueil" title="Accueil" href="/">');
   });
 

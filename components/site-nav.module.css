@@ -44,6 +44,11 @@
   gap: 28px;
 }
 
+/* Copie des liens réservée aux largeurs étroites (après le compte dans le DOM). */
+.navLeftMobile {
+  display: none;
+}
+
 .navLink {
   position: relative;
   font-family: var(--font-mono);
@@ -99,7 +104,8 @@
   box-shadow: 0 0 calc(10px * var(--glow, 1)) rgba(var(--nav-rgb), 0.6);
 }
 
-.navLogo {
+.navLogo,
+.navLogoMobile {
   display: grid;
   place-items: center;
   width: 52px;
@@ -111,7 +117,8 @@
   text-decoration: none;
 }
 
-.navLogo::before {
+.navLogo::before,
+.navLogoMobile::before {
   content: "";
   position: absolute;
   inset: -6px;
@@ -122,7 +129,8 @@
   pointer-events: none;
 }
 
-.navLogo::after {
+.navLogo::after,
+.navLogoMobile::after {
   content: "";
   position: absolute;
   inset: -12px;
@@ -131,6 +139,13 @@
   animation: ringSpin 28s linear infinite reverse;
   animation-play-state: var(--deco-anim-state);
   pointer-events: none;
+}
+
+/* Copie du logo réservée aux largeurs étroites (première dans le DOM, pour que
+   l'ordre du clavier suive l'ordre visuel) ; `display: none` la retire de
+   l'arbre d'accessibilité et du focus. */
+.navLogoMobile {
+  display: none;
 }
 
 @keyframes ringSpin {
@@ -269,13 +284,19 @@
     padding: 8px 0 4px;
   }
 
+  /* La copie de bureau (après les liens dans le DOM) cède la place à celle-ci. */
   .navLogo {
+    display: none;
+  }
+
+  .navLogoMobile {
+    display: grid;
     grid-area: logo;
     width: 40px;
     height: 40px;
   }
 
-  .navLogo::after {
+  .navLogoMobile::after {
     inset: -8px;
   }
 
@@ -293,6 +314,11 @@
   }
 
   .navLeft {
+    display: none;
+  }
+
+  .navLeftMobile {
+    display: flex;
     grid-area: left;
     justify-content: center;
     flex-wrap: wrap;
@@ -308,7 +334,7 @@
 
 /* ── Très petits écrans : liens plus compacts ── */
 @media (max-width: 380px) {
-  .navLeft {
+  .navLeftMobile {
     gap: 10px 8px;
   }
 
