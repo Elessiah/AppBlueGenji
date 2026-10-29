@@ -221,8 +221,8 @@ sont partis, et une connexion **crée un nouveau compte** (et recollecte les
 données du fournisseur) ; elle le dit. Côté serveur, une panne de
 `clearSession()` **après** la suppression (sessions déjà parties avec la
 transaction) est journalisée sans changer la réponse (`deleted: true`), et le
-cookie expire quand même (`expireSessionCookies`, sans la base) : `bg_session`
-ne reste pas sur l'appareil.
+cookie expire quand même (`expireSessionCookies`, sans la base) : le cookie de session
+(`__Host-bg_session` en production) ne reste pas sur l'appareil.
 
 Depuis la fenêtre des conditions, le conseil du motif `OWNED_TEAMS`
 (« transfère-la ou dissous-la d'abord pour un effacement complet ») n'est pas

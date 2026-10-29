@@ -117,7 +117,7 @@ export async function DELETE() {
     await clearSession();
   } catch (error) {
     console.error("[profile] DELETE: session cleanup failed after deletion:", error);
-    // Le cookie part quand même (`bg_session` : « supprimé à la déconnexion »,
+    // Le cookie part quand même (`__Host-bg_session` : « supprimé à la déconnexion »,
     // dit /rgpd) — seule l'écriture en base a échoué.
     await expireSessionCookies();
   }

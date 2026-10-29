@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@jest/globals";
+import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import { NextRequest } from "next/server";
 import { LEGACY_GOOGLE_ONE_TAP_COOKIE, middleware } from "@/middleware";
 import { SUSPENSION_NOTICE_COOKIE, SUSPENSION_NOTICE_HEADER } from "@/lib/shared/account-suspension";
@@ -53,5 +53,45 @@ describe("middleware — exposé d'une suspension lu une seule fois", () => {
   it("ne touche à rien ailleurs, ni sans le cookie", () => {
     expect(onPath("/tournois", `${SUSPENSION_NOTICE_COOKIE}=abc`).headers.get("set-cookie")).toBeNull();
     expect(onPath("/connexion", "bg_session=abc").headers.get("set-cookie")).toBeNull();
+  });
+});
+
+describe("middleware — cookies d'authentification d'avant le préfixe __Host-", () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+  const inProduction = () => jest.replaceProperty(process, "env", { ...process.env, NODE_ENV: "production" });
+
+  it("middleware_production_clearsBareSessionCookie", () => {
+    inProduction();
+    const setCookie = middleware(request("bg_session=abc")).headers.get("set-cookie") ?? "";
+    expect(setCookie).toMatch(/^bg_session=;/);
+    expect(setCookie).toMatch(/Max-Age=0/i);
+    expect(setCookie).toMatch(/Path=\//i);
+    expect(setCookie).toMatch(/Secure/i);
+  });
+
+  it("middleware_production_clearsBareOauthCookie", () => {
+    inProduction();
+    const setCookie = middleware(request("bg_oauth=xyz")).headers.get("set-cookie") ?? "";
+    expect(setCookie).toMatch(/^bg_oauth=;/);
+    expect(setCookie).toMatch(/Max-Age=0/i);
+  });
+
+  it("middleware_production_keepsHostPrefixedCookie", () => {
+    inProduction();
+    expect(middleware(request("__Host-bg_session=abc")).headers.get("set-cookie")).toBeNull();
+  });
+
+  it("middleware_production_clearsLegacyAlongsideSuspensionLegacyPath", () => {
+    inProduction();
+    const response = middleware(
+      new NextRequest("https://bluegenji.test/connexion", {
+        headers: { cookie: `${SUSPENSION_NOTICE_COOKIE}=abc; bg_session=old` },
+      }),
+    );
+    const setCookie = response.headers.get("set-cookie") ?? "";
+    expect(setCookie).toMatch(/bg_session=;/);
+    expect(setCookie).toContain("Path=/connexion");
   });
 });

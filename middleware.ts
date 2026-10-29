@@ -6,6 +6,7 @@ import { CSP_HEADER, CSP_NONCE_HEADER, PATHNAME_HEADER, SEARCH_HEADER, contentSe
 import { apiWriteNeedsProvenance } from "@/lib/shared/request-origin";
 import { leadsToApi } from "@/lib/shared/safe-redirect";
 import { SUSPENSION_NOTICE_COOKIE, SUSPENSION_NOTICE_HEADER } from "@/lib/shared/account-suspension";
+import { legacyAuthCookieNames } from "@/lib/shared/auth-cookies";
 import { DOCUMENT_REQUEST_HEADER, LOCALE_HEADER, isApiPath, isMigratedRoute, splitLocalePrefix, type Locale } from "@/lib/shared/locales";
 
 /** Cookie de l'invite Google One Tap (retirée), effacé chez qui le porte encore. */
@@ -97,6 +98,15 @@ export function middleware(request: NextRequest) {
   // — un compte connecté ne repasse jamais par `/connexion`.
   if (request.cookies.has(LEGACY_GOOGLE_ONE_TAP_COOKIE)) {
     response.cookies.delete(LEGACY_GOOGLE_ONE_TAP_COOKIE);
+  }
+  // Les cookies de session et d'état OAuth d'avant le préfixe `__Host-`
+  // (`lib/shared/auth-cookies.ts`) : plus lus en production, ils resteraient
+  // sinon trente jours sur l'appareil. L'effacement reprend `Secure` et
+  // `Path=/` de leur pose, sans quoi le navigateur ne le leur appliquerait pas.
+  for (const name of legacyAuthCookieNames()) {
+    if (request.cookies.has(name)) {
+      response.cookies.set(name, "", { path: "/", maxAge: 0, secure: true, httpOnly: true, sameSite: "lax" });
+    }
   }
   if (onLoginPage && request.cookies.has(SUSPENSION_NOTICE_COOKIE)) {
     response.cookies.set(SUSPENSION_NOTICE_COOKIE, "", { path: "/", maxAge: 0 });

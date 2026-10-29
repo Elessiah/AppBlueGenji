@@ -276,7 +276,7 @@ compte que plus rien ne prouve être celui de l'appelant. Le contrôle de l'alle
 n'est pas inutile pour autant : il évite de promener quelqu'un chez Discord pour
 lui annoncer au retour qu'il n'était pas connecté.
 
-**Un seul cookie pour trois portes** (`bg_oauth`, dix minutes). C'est le champ
+**Un seul cookie pour trois portes** (`bg_oauth`, `__Host-bg_oauth` en production — `AUTH_SYSTEM.md` ; dix minutes). C'est le champ
 `provider` qui empêche de les confondre : sans lui, un état obtenu sur la porte
 Google serait recevable sur le rappel de Blizzard. Le cookie n'est **pas signé**
 — assumé : le `state` ne vaut que par son égalité avec celui de l'URL, et la

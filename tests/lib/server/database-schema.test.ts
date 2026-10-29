@@ -351,8 +351,8 @@ describe("Schéma — la règle des deux endroits", () => {
     // remplissage), chacune sous son propre libellé, et la reprise unique des
     // empreintes de visiteurs dans `bg_site_visitors`, et les cinq signalements de
     // `cleanStoredNames` (connexion, délai de verrou, lecture d'une colonne,
-    // écriture d'un nom, marqueur).
-    expect([...migrations.matchAll(/reportSchemaFailure\(error, /g)]).toHaveLength(17);
+    // écriture d'un nom, marqueur), `purgePreHostCookieSessions` (marqueur, purge).
+    expect([...migrations.matchAll(/reportSchemaFailure\(error, /g)]).toHaveLength(19);
     expect(migrations).not.toMatch(/catch\s*\{\s*\}/);
     expect(migrations).not.toMatch(/catch\s*\{\s*\/\/[^\n]*\n\s*\}/);
   });
