@@ -675,6 +675,16 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "An administrator can now set their own roles from “My profile”, but never remove their own administration there: only another administrator can.",
     ],
   },
+  "2026-10-battletag-efface-sans-battle-net": {
+    title: "BattleTag erased when Battle.net gives none",
+    linkLabels: ["Read “Data collected”"],
+    summary:
+      "When you link Battle.net or sign in with it and Blizzard gives no BattleTag, the BattleTag on your profile is now erased — including one you had typed in by hand. Before, it stayed, and passed as verified without Blizzard confirming it.",
+    details: [
+      "A linked Battle.net account holds your BattleTag: the one Blizzard gives always replaces yours, and nothing is kept when it gives none.",
+      "To type in a BattleTag by hand, unlink Battle.net from “Connected apps”.",
+    ],
+  },
 };
 
 /**

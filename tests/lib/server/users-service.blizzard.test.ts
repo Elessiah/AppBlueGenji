@@ -111,12 +111,23 @@ describe("createOrGetBlizzardUser", () => {
     expect(find(statements, "visible_overwatch")).toBeUndefined();
   });
 
-  it("n'efface rien quand le compte Battle.net n'a pas de BattleTag", async () => {
+  it("createOrGetBlizzardUser_existingWithoutBattletag_erasesField : Blizzard fait foi, même sans BattleTag", async () => {
+    // Un BattleTag tapé avant le rattachement passerait sinon pour vérifié.
     const { statements } = fakeDb([{ id: 7, blizzard_sub: "bz-1" }]);
 
     await expect(createOrGetBlizzardUser("bz-1", null, { termsAccepted: true })).resolves.toBe(7);
 
-    expect(find(statements, "UPDATE bg_users SET overwatch_battletag")).toBeUndefined();
+    const update = find(statements, "UPDATE bg_users SET overwatch_battletag")!;
+    expect(update.params).toEqual([null, 7]);
+    expect(update.sql).toContain("is_deleted = 0");
+  });
+
+  it("createOrGetBlizzardUser_existingBlankBattletag_erasesField : un BattleTag fait d'espaces efface aussi", async () => {
+    const { statements } = fakeDb([{ id: 7, blizzard_sub: "bz-1" }]);
+
+    await createOrGetBlizzardUser("bz-1", "   ", { termsAccepted: true });
+
+    expect(find(statements, "UPDATE bg_users SET overwatch_battletag")!.params).toEqual([null, 7]);
   });
 
   it("fabrique un pseudo de repli quand il n'y a pas de BattleTag du tout", async () => {

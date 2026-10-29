@@ -34,6 +34,12 @@ export type CertificationPrompt = {
   battletagVerified: boolean;
   /** `false` en Marvel Rivals : la modale ne parle alors que de Discord. */
   battletagRelevant: boolean;
+  /**
+   * L'équipe a-t-elle un contact à présenter (`teamHasContact`) ? Toujours
+   * `false` au motif `TEAM_WITHOUT_CONTACT` ; au motif `MANAGER`, `false` dit
+   * au meneur que son équipe est injoignable — le fait le plus urgent.
+   */
+  teamHasContact: boolean;
 };
 
 /** Ce que la règle lit d'un compte : ses deux certifications. */
@@ -66,7 +72,9 @@ export function certificationPromptFor(input: {
   let reason: CertificationPromptReason | null = null;
   if (input.isManager) reason = "MANAGER";
   else if (!input.teamHasContact) reason = "TEAM_WITHOUT_CONTACT";
-  return reason ? { reason, discordVerified, battletagVerified, battletagRelevant } : null;
+  return reason
+    ? { reason, discordVerified, battletagVerified, battletagRelevant, teamHasContact: input.teamHasContact }
+    : null;
 }
 
 /**

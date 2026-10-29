@@ -4,6 +4,7 @@ import { ReactNode, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
+import s from "./TournamentDialogFrame.module.css";
 
 /** Bordure ordinaire du cadre ; une confirmation destructive passe la sienne. */
 export const DIALOG_FRAME_BORDER = "1px solid var(--line-strong-cy, var(--line-soft))";
@@ -92,7 +93,7 @@ export function TournamentDialogFrame({
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        className="dialog-bounded"
+        className={`dialog-bounded ${s.frame}`}
         aria-labelledby={titleId}
         aria-describedby={describedBy}
         data-modal-yields={yields ? "" : undefined}

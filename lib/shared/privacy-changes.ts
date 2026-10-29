@@ -1307,6 +1307,22 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     ],
     links: [{ href: "/rgpd/registre#t05", label: "Lire la fiche T05 du registre" }],
   },
+  {
+    // ERREUR-FIX EF-09 (2026-10-29) : un Battle.net qui ne donne aucun
+    // BattleTag gardait celui tapé à la main, ensuite tenu pour « vérifié ».
+    // Il est désormais effacé, au rattachement comme à la connexion. Datée du
+    // 31 octobre (déploiement de la nuit du 29 au 30 au plus tôt).
+    id: "2026-10-battletag-efface-sans-battle-net",
+    publishedAt: "2026-10-31",
+    title: "BattleTag effacé quand Battle.net n'en donne aucun",
+    summary:
+      "Quand tu rattaches Battle.net ou te connectes par lui et que Blizzard ne donne aucun BattleTag, le BattleTag de ta fiche est désormais effacé — y compris celui que tu avais saisi à la main. Avant, il restait, et passait pour vérifié sans que Blizzard l'ait confirmé.",
+    details: [
+      "Un compte Battle.net rattaché tient ton BattleTag : celui que Blizzard donne remplace toujours le tien, et rien ne se garde quand il n'en donne pas.",
+      "Pour saisir un BattleTag à la main, détache Battle.net depuis « Applications connectées ».",
+    ],
+    links: [{ href: "/rgpd#donnees-collectees", label: "Lire « Données collectées »" }],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

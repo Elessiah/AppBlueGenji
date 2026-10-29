@@ -118,8 +118,18 @@ BattleTag mal recopié ne se voit pas, il se constate le jour où l'ajout en jeu
 échoue. Ce qui n'est pas touché, c'est `visible_overwatch` : la connexion corrige
 une donnée, elle ne publie rien.
 
-Un compte Battle.net sans BattleTag n'efface rien — on ne détruit pas une saisie
-avec du vide.
+Un compte Battle.net sans BattleTag **efface** celui du champ, au rattachement
+(`writeLinkedIdentity`) comme à la connexion (`createOrGetBlizzardUser`) : un
+BattleTag tapé avant le rattachement, gardé, passerait pour vérifié
+(`hasVerifiedBattletag` : Battle.net rattaché **et** un BattleTag) sans que
+Blizzard l'ait jamais nommé — et le verrou l'empêcherait d'être corrigé. Le
+joueur qui veut en saisir un détache Battle.net.
+
+**Les lignes antérieures ne guérissent qu'à la connexion Battle.net suivante.**
+Un BattleTag tapé puis gardé sous un Battle.net sans BattleTag avant cette règle
+reste tenu pour vérifié tant que le compte ne se reconnecte pas par Battle.net :
+rien ne le distingue en base d'un BattleTag donné par Blizzard (aucune colonne
+de provenance), donc aucun rattrapage n'est possible sans changer le schéma.
 
 **Et le champ cesse d'être saisissable** (`lib/shared/battletag-lock.ts`). Deux
 écrivains qui ne se connaissaient pas ne pouvaient produire qu'une promesse

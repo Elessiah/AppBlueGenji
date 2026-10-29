@@ -213,7 +213,8 @@ export function RgpdEn({
             remain readable, but you can neither join a team nor register for a tournament. The provider also
             sends what the table describes for it, which comes with the login: the Discord username from
             Discord, the BattleTag from Blizzard (kept up to date at each login as long as the Battle.net
-            account is linked), the picture from Google or Discord (copied, and hidden until you show it). What
+            account is linked, and erased if Battle.net gives none — including a BattleTag typed in by hand
+            before linking), the picture from Google or Discord (copied, and hidden until you show it). What
             you fill in yourself (game usernames entered, certification of the Discord tag, uploaded avatar,
             adulthood) is optional, and the account works without it, with three limits: a tournament may require,
             to register, a certified Discord tag or a linked Battle.net account, and a member of the streaming

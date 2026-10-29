@@ -155,6 +155,7 @@ const PROMPT: CertificationPrompt = {
   discordVerified: false,
   battletagVerified: true,
   battletagRelevant: true,
+  teamHasContact: true,
 };
 
 beforeEach(() => {
@@ -197,8 +198,8 @@ describe("useCertificationPrompt", () => {
 
   it("« Ne plus voir » cochée : la fermeture la garde sur le compte, rien dans le stockage local (EF-04)", () => {
     const first = render(PROMPT);
-    first.setNeverAgain(true);
-    act(() => first.close(), PROMPT);
+    const checked = act(() => first.setNeverAgain(true), PROMPT);
+    act(() => checked.close(), PROMPT);
     expect(neverAgainPosts()).toHaveLength(1);
     expect(fetchMock.mock.calls[0][1]).toEqual({
       method: "POST",
@@ -212,7 +213,7 @@ describe("useCertificationPrompt", () => {
   it("« Ne plus voir » désigne le compte à qui la modale a été montrée, pas celui d'un contexte relu depuis", () => {
     const first = render(PROMPT, false, 5, VIEWER_ID);
     first.setNeverAgain(true);
-    first.close();
+    render(PROMPT, false, 5, VIEWER_ID).close();
     render(PROMPT, false, 5, 8);
     expect(neverAgainPosts()).toHaveLength(1);
     expect(neverAgainPosts()[0][1]?.body).toBe(JSON.stringify({ userId: VIEWER_ID }));
@@ -221,15 +222,16 @@ describe("useCertificationPrompt", () => {
   it("lecteur inconnu : « Ne plus voir » n'envoie rien plutôt qu'un compte deviné", () => {
     const first = render(PROMPT, false, 5, null);
     first.setNeverAgain(true);
-    act(() => first.close(), PROMPT);
+    const checked = render(PROMPT, false, 5, null);
+    act(() => checked.close(), PROMPT);
     expect(neverAgainPosts()).toHaveLength(0);
   });
 
   it("une sauvegarde du « Ne plus voir » en échec reste muette : la modale se ferme quand même", async () => {
     fetchMock.mockRejectedValueOnce(new TypeError("offline"));
     const first = render(PROMPT);
-    first.setNeverAgain(true);
-    const after = act(() => first.close(), PROMPT);
+    const checked = act(() => first.setNeverAgain(true), PROMPT);
+    const after = act(() => checked.close(), PROMPT);
     await Promise.resolve();
     expect(after.prompt).toBeNull();
     expect(neverAgainPosts()).toHaveLength(1);
@@ -238,8 +240,8 @@ describe("useCertificationPrompt", () => {
   it("`fetch` indisponible (document qui part) : la fermeture passe sans rien garder", () => {
     delete globals.fetch;
     const first = render(PROMPT);
-    first.setNeverAgain(true);
-    expect(() => act(() => first.close(), PROMPT)).not.toThrow();
+    const checked = act(() => first.setNeverAgain(true), PROMPT);
+    expect(() => act(() => checked.close(), PROMPT)).not.toThrow();
   });
 
   it("efface l'ancienne clé locale du « Ne plus voir », qui ne tait plus rien (EF-04)", () => {
@@ -278,7 +280,8 @@ describe("useCertificationPrompt", () => {
 
   it("cédant sa place, une case « Ne plus voir » cochée est retenue pour de bon", () => {
     const first = render(PROMPT);
-    first.setNeverAgain(true);
+    act(() => first.setNeverAgain(true), PROMPT);
+    // Le guet est réarmé avec le rappel qui voit la case cochée.
     act(() => modals.yieldWatchers.at(-1)?.(), PROMPT);
     expect(neverAgainPosts()).toHaveLength(1);
     expect(session.values.has(CERTIFICATION_PROMPT_CLOSED_KEY)).toBe(false);
@@ -305,6 +308,34 @@ describe("useCertificationPrompt", () => {
     expect(render({ ...PROMPT }).prompt).toBeNull();
     expect(render({ ...PROMPT }, false, 6).prompt).toEqual(PROMPT);
     expect(first.prompt).toEqual(PROMPT);
+  });
+
+  it("useCertificationPrompt_setNeverAgain_exposesCheckedState : la case n'a qu'un état, tenu ici", () => {
+    const first = render(PROMPT);
+    expect(first.neverAgain).toBe(false);
+    const checked = act(() => first.setNeverAgain(true), PROMPT);
+    expect(checked.neverAgain).toBe(true);
+    const unchecked = act(() => checked.setNeverAgain(false), PROMPT);
+    expect(unchecked.neverAgain).toBe(false);
+  });
+
+  it("useCertificationPrompt_uncheckedAgain_closeSavesNothing : décochée avant de fermer, rien ne part", () => {
+    const first = render(PROMPT);
+    act(() => first.setNeverAgain(true), PROMPT);
+    const unchecked = act(() => first.setNeverAgain(false), PROMPT);
+    act(() => unchecked.close(), PROMPT);
+    expect(neverAgainPosts()).toHaveLength(0);
+  });
+
+  it("useCertificationPrompt_otherTournament_resetsNeverAgain : la case repart décochée", () => {
+    const first = render(PROMPT);
+    act(() => first.setNeverAgain(true), PROMPT);
+    expect(render({ ...PROMPT }, false, 6).neverAgain).toBe(false);
+  });
+
+  it("useCertificationPrompt_teamWithoutContact_keepsTeamHasContactInPrompt : le meneur d'une équipe injoignable le reste", () => {
+    const unreachable: CertificationPrompt = { ...PROMPT, teamHasContact: false };
+    expect(render(unreachable).prompt).toEqual(unreachable);
   });
 
   it("une relecture au contenu identique rend le même objet (modale mémoïsée)", () => {

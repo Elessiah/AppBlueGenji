@@ -38,18 +38,21 @@ const OW_MANAGER: CertificationPrompt = {
   discordVerified: true,
   battletagVerified: false,
   battletagRelevant: true,
+  teamHasContact: true,
 };
 const MR_TEAM: CertificationPrompt = {
   reason: "TEAM_WITHOUT_CONTACT",
   discordVerified: false,
   battletagVerified: false,
   battletagRelevant: false,
+  teamHasContact: false,
 };
 
-function render(prompt: CertificationPrompt, locale: "fr" | "en" = "fr"): string {
+function render(prompt: CertificationPrompt, locale: "fr" | "en" = "fr", neverAgain = false): string {
   const ui: ReactElement = (
     <CertificationPromptDialog
       prompt={prompt}
+      neverAgain={neverAgain}
       onNeverAgainChange={() => undefined}
       onClose={() => undefined}
     />
@@ -80,7 +83,9 @@ describe("CertificationPromptDialog", () => {
     expect(html).not.toContain("Certifie ton Discord");
     expect(html).toContain("Certifie ce qui te manque encore.");
     expect(html).toContain("pill-success");
-    expect(html).toContain("pill-warning");
+    // « À certifier » : une étape refusable, en couleur d'information (décision 17).
+    expect(html).toContain('class="pill pill-info">À certifier<');
+    expect(html).not.toContain("pill-warning");
     expect(html).toContain('href="/profil#connexions"');
     expect(html).toContain("Ne plus voir");
   });
@@ -129,7 +134,7 @@ describe("CertificationPromptDialog", () => {
     }
     expect(render(OW_MANAGER)).toContain("tu peux être présenté comme son contact à l&#x27;adversaire et à l&#x27;arbitrage dès que vos adversaires sont connus, et aux casters le temps du match");
     expect(render(OW_MANAGER)).toContain("Battle.net remplace ton BattleTag par le sien, verrouillé tant qu&#x27;il reste rattaché");
-    expect(render(OW_MANAGER)).toContain("Certifié ou non, présenté comme contact, ton BattleTag est montré même masqué");
+    expect(render(OW_MANAGER)).toContain("Ne masque pas non plus ton BattleTag dans tes matchs : certifié ou non, présenté comme contact, il est montré même masqué");
     expect(render(OW_MANAGER)).toContain("dès que les deux adversaires du match sont connus et jusqu&#x27;à sa fin");
     const en = render(MR_TEAM, "en");
     expect(en).toContain("the bot sends you your match times and reminders by direct message");
@@ -148,12 +153,77 @@ describe("CertificationPromptDialog", () => {
     expect(html.match(/role="rowheader"/g)).toHaveLength(5);
     expect(html.match(/role="columnheader"/g)).toHaveLength(3);
     // L'en-tête masqué garde sa case de grille : seul son texte est `sr-only`.
-    expect(html).toContain('<span role="columnheader"><span class="sr-only">');
+    // En tableau, la première colonne a son intitulé visible.
+    expect(html).toContain('<span role="columnheader">Sujet</span>');
+    expect(html).not.toContain("sr-only");
     expect(html.match(/role="cell"/g)).toHaveLength(10);
   });
 
-  it("la case « Ne plus voir » part décochée", () => {
-    expect(render(OW_MANAGER)).toContain('<input type="checkbox"/>');
+  it("render_neverAgainFalse_laterLabelAndUnchecked : case décochée, le bouton dit « Plus tard »", () => {
+    const html = render(OW_MANAGER);
+    expect(html).toContain('<input type="checkbox"/>');
+    expect(html).toContain(">Plus tard</button>");
+    expect(html).not.toContain(">Fermer</button>");
+  });
+
+  it("render_neverAgainTrue_closeLabelAndChecked : case cochée, le refus est définitif — le bouton dit « Fermer »", () => {
+    const html = render(OW_MANAGER, "fr", true);
+    expect(html).toContain('<input type="checkbox" checked=""/>');
+    expect(html).toContain(">Fermer</button>");
+    expect(html).not.toContain(">Plus tard</button>");
+    expect(render(OW_MANAGER, "en", true)).toContain(">Close</button>");
+    expect(render(OW_MANAGER, "en")).toContain(">Later</button>");
+  });
+
+  it("render_statusList_hasRoleList : la liste des pastilles garde son rôle sous WebKit", () => {
+    expect(render(OW_MANAGER)).toContain('role="list" aria-label="Où tu en es"');
+  });
+
+  it("render_managerTeamWithoutContact_OW : le meneur apprend que son équipe est injoignable", () => {
+    const html = render({ ...OW_MANAGER, discordVerified: false, teamHasContact: false });
+    expect(html).toContain(
+      "Tu mènes une équipe engagée dans ce tournoi, et personne n&#x27;y a certifié son tag Discord ni son BattleTag : l&#x27;adversaire et l&#x27;arbitrage n&#x27;ont aucun moyen sûr de vous joindre.",
+    );
+    expect(html).not.toContain("tu peux être présenté comme son contact à l&#x27;adversaire");
+    // Non certifiée, l'équipe présente déjà son premier membre : ce qui manque, c'est un contact **vérifié**.
+    expect(html).toContain("Certifie ce qui te manque encore pour être son contact vérifié.");
+    expect(render({ ...OW_MANAGER, teamHasContact: false }, "en")).toContain(
+      "You lead a team entered in this tournament, and nobody on it has verified their Discord tag or their BattleTag",
+    );
+  });
+
+  it("render_managerTeamWithoutContact_MR : variante Discord seul, sans BattleTag", () => {
+    const html = render({ ...MR_TEAM, reason: "MANAGER" });
+    expect(html).toContain("Tu mènes une équipe engagée dans ce tournoi, et personne n&#x27;y a certifié son tag Discord :");
+    expect(html).toContain("Certifie ton tag Discord pour être son contact vérifié.");
+    expect(html).not.toContain("BattleTag");
+    expect(render({ ...MR_TEAM, reason: "MANAGER" }, "en")).toContain(
+      "Verify your Discord tag to be its verified contact.",
+    );
+  });
+
+  it("render_managerWithContact_keepsLeadManager : équipe joignable, le chapeau ordinaire du meneur", () => {
+    expect(render(OW_MANAGER)).toContain("Tu mènes une équipe engagée dans ce tournoi : tu peux être présenté comme son contact");
+  });
+
+  it("render_tableTexts : cellules corrigées (EF-09), en français et en anglais", () => {
+    const fr = render(OW_MANAGER);
+    expect(fr).toContain("Te fait passer devant les membres qui n&#x27;ont rien certifié");
+    expect(fr).toContain("avec ton tag Discord et ton BattleTag certifiés.");
+    expect(fr).toContain("Pour t&#x27;écrire, le bot doit partager un serveur avec toi.");
+    expect(fr).toContain(
+      "Compte pour les tournois qui exigent un Discord certifié ou un compte Battle.net (de tout le roster si le tournoi l&#x27;exige).",
+    );
+    expect(render(MR_TEAM)).toContain("Compte pour les tournois qui exigent un Discord certifié (de tout le roster si le tournoi l&#x27;exige).");
+    expect(render(MR_TEAM)).toContain("Te fait passer devant les membres");
+    const en = render(OW_MANAGER, "en");
+    expect(en).toContain("Puts you ahead of members who have verified nothing");
+    expect(en).toContain("Does not give the site access to your password");
+    expect(en).toContain("Nor does it hide your BattleTag in your matches");
+    expect(en).toContain("To write to you, the bot has to share a server with you.");
+    expect(en).toContain(">The organizers<");
+    expect(en).toContain("(from the whole roster if the tournament requires it)");
+    expect(en).not.toContain("organisers");
   });
 
   it("en anglais, ni français ni lien sans préfixe de langue", () => {

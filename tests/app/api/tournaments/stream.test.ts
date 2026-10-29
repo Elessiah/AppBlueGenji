@@ -738,7 +738,7 @@ describe("GET /api/tournaments/[id]/stream — place prise avant les lectures (E
 });
 
 describe("GET /api/tournaments/[id]/stream — invitation à certifier poussée après coup (EF-04)", () => {
-  const PROMPT = { reason: "MANAGER", discordVerified: false, battletagVerified: true, battletagRelevant: true } as const;
+  const PROMPT = { reason: "MANAGER", discordVerified: false, battletagVerified: true, battletagRelevant: true, teamHasContact: true } as const;
   type Late = (prompt: typeof PROMPT | null) => void;
   const lateCallback = (): Late =>
     (jest.mocked(getTournamentViewerContext).mock.calls[0][3] as { onLateCertificationPrompt: Late }).onLateCertificationPrompt;

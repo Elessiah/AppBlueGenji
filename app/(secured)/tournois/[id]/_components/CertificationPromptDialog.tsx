@@ -29,9 +29,11 @@ type DiscordOnlyCell = keyof typeof DISCORD_ONLY_CELLS;
 interface CertificationPromptDialogProps {
   prompt: CertificationPrompt;
   /**
-   * Case « Ne plus voir » : affichée ici, retenue par `useCertificationPrompt`
-   * (cochée, elle vaut aussi quand la modale s'efface devant une urgente).
+   * Case « Ne plus voir » : son état vit dans `useCertificationPrompt` (cochée,
+   * elle vaut aussi quand la modale s'efface devant une urgente) ; la modale
+   * l'affiche seulement.
    */
+  neverAgain: boolean;
   onNeverAgainChange: (value: boolean) => void;
   /** Fermeture ; la case cochée vaut pour toute fermeture. */
   onClose: () => void;
@@ -48,11 +50,11 @@ interface CertificationPromptDialogProps {
  */
 function CertificationPromptDialogView({
   prompt,
+  neverAgain,
   onNeverAgainChange,
   onClose,
 }: Readonly<CertificationPromptDialogProps>) {
   const { t } = useDialogsText();
-  const [neverAgain, setNeverAgain] = useState(false);
   // Lu une fois, au montage (morceau chargé côté client seulement) : une
   // modale urgente ouverte entre la décision et l'arrivée du morceau garde la
   // main — celle-ci, montée après, prendrait sinon le dessus de la pile. Le
@@ -79,9 +81,13 @@ function CertificationPromptDialogView({
   if (withBattletag && !prompt.battletagVerified) {
     title = t(prompt.discordVerified ? "certification.titleBattletagOnly" : "certification.title");
   }
+  // Équipe sans aucun contact : le meneur l'apprend aussi, c'est le fait le
+  // plus urgent — l'adversaire et l'arbitrage ne peuvent pas la joindre.
   let lead = t("certification.leadManager");
   if (prompt.reason === "TEAM_WITHOUT_CONTACT") {
     lead = t(withBattletag ? "certification.leadTeam" : "certification.leadTeamDiscordOnly");
+  } else if (!prompt.teamHasContact) {
+    lead = t(withBattletag ? "certification.leadManagerNoContact" : "certification.leadManagerNoContactDiscordOnly");
   }
 
   if (preempted) return null;
@@ -106,11 +112,15 @@ function CertificationPromptDialogView({
         {lead}
       </p>
 
-      <ul className={s.status} aria-label={t("certification.statusLabel")}>
+      {/* `role="list"` : sans puces (`list-style: none`), WebKit retire le rôle
+          de liste et VoiceOver n'annonce plus « Où tu en es ». */}
+      <ul className={s.status} role="list" aria-label={t("certification.statusLabel")}>{/* NOSONAR S6822 — Safari retire le rôle d'une liste sans puces, voir plus haut */}
         {status.map((item) => (
           <li key={item.key} className={s.statusItem}>
             <span>{item.label}</span>
-            <span className={`pill ${item.ok ? "pill-success" : "pill-warning"}`}>
+            {/* « À certifier » : une étape refusable, pas un avertissement —
+                l'ambre reste aux avertissements (décision 17). */}
+            <span className={`pill ${item.ok ? "pill-success" : "pill-info"}`}>
               {t(item.ok ? "certification.done" : "certification.missing")}
             </span>
           </li>
@@ -126,10 +136,7 @@ function CertificationPromptDialogView({
       <div className={s.table} role="table" aria-labelledby="certification-prompt-caption">
         <div role="rowgroup" className={s.head}>
           <div role="row" className={s.row}>
-            {/* L'en-tête garde sa case de grille ; seul son texte est masqué. */}
-            <span role="columnheader">
-              <span className="sr-only">{t("certification.colTopic")}</span>
-            </span>
+            <span role="columnheader">{t("certification.colTopic")}</span>
             <span role="columnheader">{t("certification.colDoes")}</span>
             <span role="columnheader">{t("certification.colDoesNot")}</span>
           </div>
@@ -153,16 +160,18 @@ function CertificationPromptDialogView({
 
       <div className={s.footer}>
         <label className={s.neverAgain}>
-          <input type="checkbox" checked={neverAgain} onChange={(e) => {
-              setNeverAgain(e.target.checked);
-              onNeverAgainChange(e.target.checked);
-            }} />
+          <input
+            type="checkbox"
+            checked={neverAgain}
+            onChange={(event) => onNeverAgainChange(event.target.checked)}
+          />
           {/* NOSONAR S6772 — label en flex avec `gap` */}
           {t("certification.neverAgain")}
         </label>
         <div className={s.actions}>
+          {/* Case cochée, le refus est définitif : « Plus tard » mentirait. */}
           <button type="button" className="btn ghost" onClick={onClose}>
-            {t("certification.later")}
+            {t(neverAgain ? "certification.close" : "certification.later")}
           </button>
           <LocaleLink
             href={certificationProfileHref(prompt)}

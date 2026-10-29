@@ -123,6 +123,7 @@ describe("loadCertificationPrompt", () => {
       discordVerified: false,
       battletagVerified: false,
       battletagRelevant: true,
+      teamHasContact: false,
     });
   });
 
@@ -138,6 +139,18 @@ describe("loadCertificationPrompt", () => {
       discordVerified: true,
       battletagVerified: false,
       battletagRelevant: true,
+      teamHasContact: true,
+    });
+  });
+
+  it("loadCertificationPrompt_managerOfTeamWithoutContact_saysTeamUnreachable : le meneur apprend que l'équipe est injoignable", async () => {
+    const { executor } = rosterOf([{ user_id: 7, ...BARE }, { user_id: 8, ...BARE }]);
+    expect(await loadCertificationPrompt(executor, 7, 42, true, true)).toEqual({
+      reason: "MANAGER",
+      discordVerified: false,
+      battletagVerified: false,
+      battletagRelevant: true,
+      teamHasContact: false,
     });
   });
 
@@ -157,6 +170,7 @@ describe("loadCertificationPrompt", () => {
       discordVerified: false,
       battletagVerified: false,
       battletagRelevant: false,
+      teamHasContact: false,
     });
   });
 
@@ -232,7 +246,7 @@ describe("loadCertificationPrompt", () => {
 });
 
 describe("mémoire courte des invitations", () => {
-  const PROMPT = { reason: "MANAGER", discordVerified: false, battletagVerified: true, battletagRelevant: true } as const;
+  const PROMPT = { reason: "MANAGER", discordVerified: false, battletagVerified: true, battletagRelevant: true, teamHasContact: true } as const;
   let clock = 0;
   const now = () => clock;
 
@@ -278,7 +292,7 @@ describe("mémoire courte des invitations", () => {
     forgetCertificationPrompts();
     jest.useFakeTimers();
     const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
-    const PROMPT_LATE = { reason: "MANAGER", discordVerified: false, battletagVerified: true, battletagRelevant: true } as const;
+    const PROMPT_LATE = { reason: "MANAGER", discordVerified: false, battletagVerified: true, battletagRelevant: true, teamHasContact: true } as const;
     try {
       const control: { finish?: (value: typeof PROMPT_LATE) => void } = {};
       const load = jest.fn(
@@ -542,7 +556,7 @@ describe("mémoire courte des invitations", () => {
 });
 
 describe("recordCertificationPromptOff (EF-04)", () => {
-  const PROMPT = { reason: "MANAGER", discordVerified: false, battletagVerified: true, battletagRelevant: true } as const;
+  const PROMPT = { reason: "MANAGER", discordVerified: false, battletagVerified: true, battletagRelevant: true, teamHasContact: true } as const;
 
   it("pose la date du premier choix sur le compte, jamais sur un compte supprimé, et oublie ses invitations retenues", async () => {
     forgetCertificationPrompts();

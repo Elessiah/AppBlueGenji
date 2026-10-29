@@ -54,6 +54,7 @@ describe("certificationPromptFor", () => {
         reason: "MANAGER",
         ...viewer,
         battletagRelevant: true,
+        teamHasContact: true,
       });
     }
   });
@@ -63,11 +64,18 @@ describe("certificationPromptFor", () => {
       reason: "TEAM_WITHOUT_CONTACT",
       ...NONE,
       battletagRelevant: true,
+      teamHasContact: false,
     });
   });
 
   it("le motif manager passe devant l'équipe sans contact", () => {
     expect(certificationPromptFor({ isManager: true, viewer: NONE, teamHasContact: false, battletagRelevant: true })?.reason).toBe("MANAGER");
+  });
+
+  it("certificationPromptFor_managerTeamWithoutContact_carriesTeamHasContactFalse : la modale peut dire au meneur que l'équipe est injoignable", () => {
+    expect(
+      certificationPromptFor({ isManager: true, viewer: NONE, teamHasContact: false, battletagRelevant: true })?.teamHasContact,
+    ).toBe(false);
   });
 
   it("n'invite pas un joueur dont l'équipe a déjà un contact", () => {
@@ -95,7 +103,7 @@ describe("Marvel Rivals : Discord seul", () => {
   it("invite un manager sans Discord certifié, et le dit à la modale", () => {
     expect(
       certificationPromptFor({ isManager: true, viewer: BATTLETAG_ONLY, teamHasContact: true, battletagRelevant: false }),
-    ).toEqual({ reason: "MANAGER", ...BATTLETAG_ONLY, battletagRelevant: false });
+    ).toEqual({ reason: "MANAGER", ...BATTLETAG_ONLY, battletagRelevant: false, teamHasContact: true });
   });
 
   it("invite le joueur d'une équipe sans contact, sans Discord certifié", () => {
@@ -173,7 +181,7 @@ it("mène au dialogue de certification Discord si le tag manque, sinon à « App
 });
 
 describe("liveCertificationPrompt", () => {
-  const prompt = { reason: "MANAGER", discordVerified: false, battletagVerified: true, battletagRelevant: true } as const;
+  const prompt = { reason: "MANAGER", discordVerified: false, battletagVerified: true, battletagRelevant: true, teamHasContact: true } as const;
   const detail = (state: TournamentState, registered: boolean, certificationPrompt: typeof prompt | null = prompt) =>
     tournamentDetail({
       card: tournamentCard({ id: 5, state }),
