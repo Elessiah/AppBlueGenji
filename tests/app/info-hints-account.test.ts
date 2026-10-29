@@ -21,7 +21,7 @@ function visibleLines(profile: typeof frProfile, login: typeof frLogin, players:
     "identity.pseudoHint": profile.identity.pseudoHint,
     "games.gameTagNotice": profile.games.gameTagNotice,
     ...Object.fromEntries(
-      (["pending", "unknown", "tagged", "noTag"] as const).map((key) => [`battletagLock.${key}`, profile.battletagLock[key]]),
+      (["pending", "unknown", "tagged"] as const).map((key) => [`battletagLock.${key}`, profile.battletagLock[key]]),
     ),
     ...Object.fromEntries(
       (["pending", "unknown", "noTag", "unverified", "verified"] as const).map((key) => [`discord.lock.${key}`, profile.discord.lock[key]]),

@@ -675,14 +675,15 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "An administrator can now set their own roles from “My profile”, but never remove their own administration there: only another administrator can.",
     ],
   },
-  "2026-10-battletag-efface-sans-battle-net": {
-    title: "BattleTag erased when Battle.net gives none",
+  "2026-10-battletag-tape-garde-non-verifie": {
+    title: "Typed BattleTag: kept, never “verified”",
     linkLabels: ["Read “Data collected”"],
     summary:
-      "When you link Battle.net or sign in with it and Blizzard gives no BattleTag, the BattleTag on your profile is now erased — including one you had typed in by hand. Before, it stayed, and passed as verified without Blizzard confirming it.",
+      "When you link Battle.net or sign in with it and Blizzard gives no BattleTag, the one you had typed in by hand stays on your profile, but is no longer treated as verified: no “verified” badge, no certified contact for your team, and not enough identity to cast or referee a match. Before, it passed as verified without Blizzard confirming it.",
     details: [
-      "A linked Battle.net account holds your BattleTag: the one Blizzard gives always replaces yours, and nothing is kept when it gives none.",
-      "To type in a BattleTag by hand, unlink Battle.net from “Connected apps”.",
+      "When Blizzard gives a BattleTag, it always replaces yours, and only that one is verified.",
+      "A typed BattleTag can still be changed from “My profile”, even with Battle.net linked.",
+      "If your Battle.net was already linked with a BattleTag, the rule applies at your next Battle.net sign-in: until then, your BattleTag keeps its current state.",
     ],
   },
 };

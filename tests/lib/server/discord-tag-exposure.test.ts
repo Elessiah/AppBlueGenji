@@ -80,8 +80,9 @@ const find = (queries: Query[], needle: string) =>
  */
 function tagParams(params: unknown[]): { touches: unknown[]; tags: unknown[] } {
   return {
-    touches: [params[5], params[8]],
-    tags: [params[6], params[7], params[9], params[10]],
+    // Après le pseudo, le BattleTag (son origine, puis lui-même) et le tag Marvel.
+    touches: [params[6], params[9]],
+    tags: [params[7], params[8], params[10], params[11]],
   };
 }
 
@@ -706,15 +707,16 @@ describe("updateOwnProfile — un patch partiel ne vide pas les champs voisins",
   it("garde le BattleTag, le tag Marvel et la majorité quand le patch n'en parle pas", async () => {
     const update = await partial({ discordPseudo: null });
 
-    // Positions 1, 3 et 14 : « le patch parle-t-il de ce champ ? »
-    expect([update.params[1], update.params[3], update.params[14]]).toEqual([false, false, false]);
+    // Positions 1 et 2 (origine du BattleTag, puis lui-même), 4 et 15 : « le
+    // patch parle-t-il de ce champ ? »
+    expect([update.params[1], update.params[2], update.params[4], update.params[15]]).toEqual([false, false, false, false]);
   });
 
   it("les écrit dès que le patch les mentionne, valeur vide comprise", async () => {
     const update = await partial({ overwatchBattletag: null, isAdult: false });
 
-    expect([update.params[1], update.params[2]]).toEqual([true, null]);
-    expect([update.params[14], update.params[15]]).toEqual([true, false]);
+    expect([update.params[1], update.params[2], update.params[3]]).toEqual([true, true, null]);
+    expect([update.params[15], update.params[16]]).toEqual([true, false]);
   });
 
   it("un tag saisi perd son origine Discord : il ne se certifie plus d'un clic", async () => {
@@ -725,7 +727,7 @@ describe("updateOwnProfile — un patch partiel ne vide pas les champs voisins",
     // Lu **avant** l'affectation du pseudo, sinon il comparerait la valeur neuve.
     expect(flag).toBeLessThan(update.sql.indexOf("discord_pseudo = CASE"));
     expect(update.sql).toMatch(/WHEN discord_pseudo <=> \? THEN discord_pseudo_from_discord\s+ELSE 0/);
-    expect(update.params.slice(5, 8)).toEqual([true, "tape_a_la_main", "tape_a_la_main"]);
+    expect(update.params.slice(6, 9)).toEqual([true, "tape_a_la_main", "tape_a_la_main"]);
   });
 
   it("passe les quatre colonnes par le même `CASE`", async () => {
@@ -740,7 +742,21 @@ describe("updateOwnProfile — un patch partiel ne vide pas les champs voisins",
     // branche la tient — une lecture puis une écriture laissent un `await`
     // entre elles, et le rattachement peut tomber dans cet intervalle.
     expect(update.sql).toContain("WHEN NOT ? THEN overwatch_battletag");
-    expect(update.sql).toContain("WHEN blizzard_sub IS NOT NULL THEN overwatch_battletag");
+    expect(update.sql).toContain(
+      "WHEN ((blizzard_sub IS NOT NULL AND overwatch_battletag_typed = 0) AND COALESCE(overwatch_battletag, '') <> '') THEN overwatch_battletag ELSE ?",
+    );
+  });
+
+  it("updateOwnProfile_battletagTyped_marksItTypedBeforeWritingIt", async () => {
+    const update = await partial({ overwatchBattletag: "Tape#1234" });
+
+    // L'origine se lit **avant** l'affectation du tag : le `SET` s'évalue de
+    // gauche à droite, et la condition « vérifié » lit encore l'ancien tag.
+    const typed = update.sql.indexOf("overwatch_battletag_typed = CASE");
+    expect(typed).toBeGreaterThan(-1);
+    expect(typed).toBeLessThan(update.sql.indexOf("overwatch_battletag = CASE"));
+    expect(update.sql).toMatch(/overwatch_battletag_typed = CASE\s+WHEN NOT \? THEN overwatch_battletag_typed\s+WHEN .+ THEN overwatch_battletag_typed\s+ELSE 1/);
+    expect(update.params.slice(1, 4)).toEqual([true, true, "Tape#1234"]);
   });
 
   it("laisse les colonnes NOT NULL à COALESCE, qui suffit", async () => {

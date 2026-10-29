@@ -162,7 +162,7 @@ Casters inscrits sur un match
 Tout titulaire de compte, pour son choix des messages privés de match
 Données
 Pseudo et identifiant Discord
-BattleTag (présenté dans les seuls tournois Overwatch ; en tout jeu, sa présence et le compte Battle.net rattaché sont vérifiés pour caster ou arbitrer un match)
+BattleTag (présenté dans les seuls tournois Overwatch ; en tout jeu, sa présence et sa provenance d'un compte Battle.net rattaché — un BattleTag saisi à la main n'y suffit pas — sont vérifiées pour caster ou arbitrer un match)
 Date et adversaire du match
 Heure à laquelle chaque partie s'est déclarée prête (chaque caster pour lui-même), casters inscrits et stream que chacun a rejoint (co-cast) ou ouvert à part
 Motif du retrait de l'inscription d'un caster sur un match (retrait par le staff, conditions du cast plus remplies — permission de diffusion, tag Discord certifié, compte Battle.net —, ou il joue désormais le match)

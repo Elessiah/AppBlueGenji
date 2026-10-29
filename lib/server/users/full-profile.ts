@@ -1,5 +1,6 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { battletagFromBlizzardSql } from "@/lib/server/battletag-origin";
 import type { PlayerPageIdentity } from "@/lib/shared/entity-page-titles";
 import { resolveRoles } from "@/lib/server/auth";
 import { parseRoles, toIso } from "@/lib/server/serialization";
@@ -111,7 +112,7 @@ export async function getFullProfile(
       marvel_rivals_tag,
       discord_pseudo,
       discord_verified_at,
-      (blizzard_sub IS NOT NULL) AS blizzard_linked,
+      ${battletagFromBlizzardSql()} AS blizzard_linked,
       is_adult,
       visible_avatar,
       visible_overwatch,
@@ -146,7 +147,9 @@ export async function getFullProfile(
   const discordVerified = userRows[0].discord_verified_at != null;
   // Lu **avant** `applyVisibility`, qui efface le BattleTag masqué : la pastille
   // dit qu'un BattleTag est prouvé par Battle.net, pas lequel. L'identifiant
-  // Blizzard lui-même ne quitte jamais la base (`blizzard_linked` n'est qu'un booléen).
+  // Blizzard lui-même ne quitte jamais la base (`blizzard_linked` n'est qu'un
+  // booléen : Battle.net rattaché **et** BattleTag venu de lui — une saisie
+  // gardée sous un Battle.net muet n'a pas la pastille, `battletag-origin.ts`).
   const battletagVerified = Boolean(Number(userRows[0].blizzard_linked)) && Boolean(userRows[0].overwatch_battletag);
 
   if (!isSelf) applyVisibility(profile, false);

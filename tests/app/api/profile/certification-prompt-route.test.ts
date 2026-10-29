@@ -8,6 +8,8 @@ jest.mock("@/lib/server/tournaments/certification-prompt", () => ({
 import { POST } from "@/app/api/profile/certification-prompt/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { recordCertificationPromptOff } from "@/lib/server/tournaments/certification-prompt";
+import { CERTIFICATION_PROMPT_OFF_RULE } from "@/lib/server/api-guard";
+import { resetRateLimit } from "@/lib/server/rate-limit";
 import { authUser } from "../../../helpers/auth-user";
 
 /** Le `POST` de la modale : le corps porte le compte à qui elle a été montrée. */
@@ -23,9 +25,38 @@ function postFor(body: unknown): Request {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  resetRateLimit();
   jest.spyOn(console, "error").mockImplementation(() => undefined);
   jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7 }));
   jest.mocked(recordCertificationPromptOff).mockResolvedValue(undefined);
+});
+
+describe("POST /api/profile/certification-prompt — quota (EF-23)", () => {
+  it("POST_overQuota_answers429WithoutWriting", async () => {
+    for (let i = 0; i < CERTIFICATION_PROMPT_OFF_RULE.limit; i += 1) {
+      expect((await POST(postFor({ userId: 7 }))).status).toBe(200);
+    }
+    jest.mocked(recordCertificationPromptOff).mockClear();
+
+    const response = await POST(postFor({ userId: 7 }));
+
+    expect(response.status).toBe(429);
+    expect(await response.json()).toEqual({ error: "TOO_MANY_REQUESTS" });
+    expect(recordCertificationPromptOff).not.toHaveBeenCalled();
+  });
+
+  it("POST_quotaIsPerAccount_otherAccountStillSaves", async () => {
+    for (let i = 0; i <= CERTIFICATION_PROMPT_OFF_RULE.limit; i += 1) await POST(postFor({ userId: 7 }));
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 8 }));
+
+    expect((await POST(postFor({ userId: 8 }))).status).toBe(200);
+  });
+
+  it("POST_otherAccountRefusal_doesNotSpendQuota", async () => {
+    for (let i = 0; i < CERTIFICATION_PROMPT_OFF_RULE.limit; i += 1) await POST(postFor({ userId: 8 }));
+
+    expect((await POST(postFor({ userId: 7 }))).status).toBe(200);
+  });
 });
 
 describe("POST /api/profile/certification-prompt", () => {

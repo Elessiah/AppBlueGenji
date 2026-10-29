@@ -26,14 +26,22 @@ const all = (notice: BattletagLockNotice) => [notice.status, ...notice.details].
  */
 
 describe("checkBattletagEdit", () => {
-  it("verrouille dès qu'un compte Blizzard est rattaché", () => {
-    expect(checkBattletagEdit({ linked: true })).toBe("LINKED_ACCOUNT");
-    expect(isBattletagLocked({ linked: true })).toBe(true);
+  it("verrouille dès qu'un compte Blizzard rattaché a fourni le BattleTag", () => {
+    expect(checkBattletagEdit({ linked: true, verified: true })).toBe("LINKED_ACCOUNT");
+    expect(isBattletagLocked({ linked: true, verified: true })).toBe(true);
   });
 
   it("laisse le champ ouvert quand rien n'est rattaché", () => {
-    expect(checkBattletagEdit({ linked: false })).toBeNull();
-    expect(isBattletagLocked({ linked: false })).toBe(false);
+    expect(checkBattletagEdit({ linked: false, verified: true })).toBeNull();
+    expect(isBattletagLocked({ linked: false, verified: true })).toBe(false);
+  });
+
+  it("checkBattletagEdit_typedTagUnderBattleNet_staysOpen (D3)", () => {
+    // Battle.net n'a donné aucun BattleTag : la saisie gardée n'appartient à
+    // personne, le champ reste ouvert — rattaché, inconnu ou non.
+    expect(checkBattletagEdit({ linked: true, verified: false })).toBeNull();
+    expect(checkBattletagEdit({ linked: null, verified: false })).toBeNull();
+    expect(isBattletagLocked({ linked: true, verified: false })).toBe(false);
   });
 
   it("verrouille aussi sur un état **inconnu**, et c'est le seul défaut tenable", () => {
@@ -41,8 +49,8 @@ describe("checkBattletagEdit", () => {
     // rechargement, ouvrir à tort laisse saisir une valeur que la route refusera
     // en 409 — et ce refus emporte **toute** la sauvegarde, le `PATCH` étant
     // indivisible.
-    expect(checkBattletagEdit({ linked: null })).toBe("UNKNOWN_LINK");
-    expect(isBattletagLocked({ linked: null })).toBe(true);
+    expect(checkBattletagEdit({ linked: null, verified: true })).toBe("UNKNOWN_LINK");
+    expect(isBattletagLocked({ linked: null, verified: true })).toBe(true);
   });
 
   it("range toute valeur hors des deux booléens dans l'inconnu", () => {
@@ -50,7 +58,7 @@ describe("checkBattletagEdit", () => {
     // corps sans `linked` produit `undefined`, qui ne doit surtout pas **ouvrir**
     // le champ. Écrit dans l'autre sens (`=== null` d'abord), il y glissait.
     for (const linked of [undefined, "true", 1, {}]) {
-      expect(isBattletagLocked({ linked } as never)).toBe(true);
+      expect(isBattletagLocked({ linked, verified: true } as never)).toBe(true);
     }
   });
 });
@@ -60,7 +68,7 @@ describe("battletagLockNotice", () => {
     // Le profil se rend dès que `GET /api/profile` répond, régulièrement avant
     // la liste des rattachements : annoncer une panne pendant ce temps-là
     // ferait chercher une cause qui n'existe pas.
-    const notice = battletagLockNotice({ tag: null, linked: null, pending: true });
+    const notice = battletagLockNotice({ linked: null, pending: true });
 
     expect(notice.status).toContain("Lecture");
     expect(all(notice)).not.toContain("illisible");
@@ -68,7 +76,7 @@ describe("battletagLockNotice", () => {
   });
 
   it("nomme le verrou et sa sortie quand la lecture a échoué", () => {
-    const notice = battletagLockNotice({ tag: null, linked: null });
+    const notice = battletagLockNotice({ linked: null });
 
     expect(notice.status).toContain("illisible");
     expect(notice.status).toContain("Recharge la page");
@@ -77,7 +85,7 @@ describe("battletagLockNotice", () => {
   });
 
   it("explique le verrou, et nomme les deux gestes qui restent", () => {
-    const notice = all(battletagLockNotice({ tag: "Nova#2143", linked: true }));
+    const notice = all(battletagLockNotice({ linked: true }));
 
     // Le geste qui **change** la valeur…
     expect(notice).toContain("Applications connectées");
@@ -91,21 +99,13 @@ describe("battletagLockNotice", () => {
     expect(notice).toContain("fiche");
   });
 
-  it("couvre le compte rattaché **sans** BattleTag sans inventer de cause", () => {
-    const notice = battletagLockNotice({ tag: null, linked: true });
-
-    expect(notice.status).toContain("sans BattleTag");
-    expect(all(notice)).toContain("Applications connectées");
-    // Rien à décocher : il n'y a aucun BattleTag à publier.
-    expect(all(notice)).not.toContain("BattleTag OW");
-  });
 
   it("ne laisse jamais sortir un jeton en capitales", () => {
     for (const state of [
-      { tag: null, linked: null, pending: true },
-      { tag: null, linked: null },
-      { tag: null, linked: true },
-      { tag: "Nova#2143", linked: true },
+      { linked: null, pending: true },
+      { linked: null },
+      { linked: true },
+      { linked: true },
     ]) {
       expect(all(battletagLockNotice(state))).not.toContain(BATTLETAG_LOCKED);
       expect(all(battletagLockNotice(state))).not.toMatch(/[A-Z]{4,}_[A-Z]{4,}/);
@@ -114,10 +114,10 @@ describe("battletagLockNotice", () => {
 
   it("garde la ligne d'état courte : le détail passe derrière le « i »", () => {
     for (const state of [
-      { tag: null, linked: null, pending: true },
-      { tag: null, linked: null },
-      { tag: null, linked: true },
-      { tag: "Nova#2143", linked: true },
+      { linked: null, pending: true },
+      { linked: null },
+      { linked: true },
+      { linked: true },
     ]) {
       expect(battletagLockNotice(state).status.length).toBeLessThanOrEqual(120);
     }

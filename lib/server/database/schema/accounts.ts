@@ -26,6 +26,10 @@ export async function createAccountTables(db: Pool): Promise<void> {
   // C'est la condition de la certification **en un clic** d'un compte rattaché
   // (`certifyLinkedDiscordTag`) : on n'y certifie jamais ce qu'un joueur a tapé.
   //
+  // `overwatch_battletag_typed` dit d'où vient `overwatch_battletag` : `1` pour
+  // une saisie gardée sous un Battle.net qui n'en donne aucun, jamais tenue
+  // pour vérifiée (`lib/server/battletag-origin.ts`).
+  //
   // `visible_pseudo` survit sans lecteur : le pseudo n'est plus masquable (c'est
   // l'identité de base du joueur : brackets, rosters, feuilles de match), la
   // colonne est conservée pour ne pas casser les installs.
@@ -43,6 +47,7 @@ export async function createAccountTables(db: Pool): Promise<void> {
       blizzard_sub VARCHAR(191) NULL UNIQUE,
       is_adult TINYINT(1) NULL DEFAULT NULL,
       overwatch_battletag VARCHAR(64) NULL,
+      overwatch_battletag_typed TINYINT(1) NOT NULL DEFAULT 0,
       marvel_rivals_tag VARCHAR(64) NULL,
       visible_avatar TINYINT(1) NOT NULL DEFAULT 1,
       visible_pseudo TINYINT(1) NOT NULL DEFAULT 1,

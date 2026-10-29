@@ -14,6 +14,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { LIVE_STAFF_SQL } from "@/lib/server/privacy-consent";
 import { staffStream } from "@/lib/shared/live-streams";
+import { verifiedBattletagSql } from "@/lib/server/battletag-origin";
 import type { CastEligibilityFields } from "./cast-eligibility";
 
 export { staffStream };
@@ -28,7 +29,7 @@ type Executor = Pick<PoolConnection, "execute">;
  */
 const CAST_ELIGIBLE_SQL = `(COALESCE(u.is_deleted, 0) = 0
              AND u.discord_verified_at IS NOT NULL AND COALESCE(u.discord_pseudo, '') <> ''
-             AND u.blizzard_sub IS NOT NULL AND COALESCE(u.overwatch_battletag, '') <> ''
+             AND ${verifiedBattletagSql("u")}
              AND ${LIVE_STAFF_SQL})`;
 
 /**
@@ -163,7 +164,7 @@ export async function loadMatchCasters(
   const [rows] = await executor.execute<CasterUserRow[]>(
     `SELECT c.match_id, c.user_id, c.stream_id, c.ready_at, u.pseudo,
             u.discord_verified_at, u.discord_pseudo, u.blizzard_sub, u.overwatch_battletag,
-            u.is_deleted, u.is_admin, u.platform_roles_json
+            u.overwatch_battletag_typed, u.is_deleted, u.is_admin, u.platform_roles_json
      FROM bg_match_casters c
      JOIN bg_users u ON u.id = c.user_id
      WHERE c.match_id IN (${placeholders(ids)})
@@ -179,6 +180,7 @@ export async function loadMatchCasters(
         discord_pseudo: row.discord_pseudo,
         blizzard_sub: row.blizzard_sub,
         overwatch_battletag: row.overwatch_battletag,
+        overwatch_battletag_typed: row.overwatch_battletag_typed,
         is_deleted: Number(row.is_deleted),
         is_admin: Number(row.is_admin),
         platform_roles_json: row.platform_roles_json,

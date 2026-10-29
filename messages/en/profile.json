@@ -72,13 +72,12 @@
     "battletagPlaceholder": "Username#1234",
     "marvel": "Marvel Rivals tag",
     "gameTagNotice": "Only used to add you in game, never for statistics.",
-    "blizzardNotice": "If you link Battle.net, Blizzard fills in this field and updates it at every login, replacing what you typed."
+    "blizzardNotice": "If you link Battle.net, Blizzard fills in this field and updates it at every login, replacing what you typed. If it gives none, what you typed stays, without the “verified” mark."
   },
   "battletagLock": {
     "pending": "Reading your connected apps… The field is read-only meanwhile.",
     "unknown": "Couldn't read your connected apps for now: the field is read-only. Reload the page to try again.",
     "tagged": "Provided by your Blizzard account, and updated at every login.",
-    "noTag": "Blizzard account linked, without a BattleTag: Blizzard will fill it in at your next login.",
     "change": "To change it, remove Blizzard from “Connected apps” (after adding another way to log in if it is your only one), then link the right account.",
     "hide": "To remove it from your player page, the directory and rosters, untick “OW BattleTag” below."
   },
@@ -145,7 +144,7 @@
   "saved": "Profile updated.",
   "accountLocale": {
     "label": "Notification language",
-    "hint": "Your push notifications and the site's Discord direct messages (except alerts sent to staff by direct message, in French then English — French alone if both do not fit in one message) arrive in this language. It takes the page's language again each time you log in.",
+    "hint": "Your push notifications and the site's Discord direct messages arrive in this language, except alerts sent to staff, in French then English. It takes the page's language again each time you log in.",
     "saved": "Notification language saved."
   },
   "matchDms": {

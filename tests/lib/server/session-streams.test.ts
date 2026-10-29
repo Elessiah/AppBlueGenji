@@ -178,4 +178,58 @@ describe("reconnectUserStreams (EF-04)", () => {
     expect(revokedSince(1, "h1", mark)).toBe(false);
     expect(registeredStreamCount()).toBe(1);
   });
+
+  it("reconnectUserStreams_anyStream_closesWithReconnectReason (EF-23)", () => {
+    const close = jest.fn();
+    register(1, "h1", close);
+
+    reconnectUserStreams(1);
+
+    expect(close).toHaveBeenCalledWith("RECONNECT");
+  });
+
+  it("closeUserStreams_revocation_closesWithRevokedReason (EF-23)", () => {
+    const close = jest.fn();
+    register(1, "h1", close);
+
+    closeUserStreams(1);
+
+    expect(close).toHaveBeenCalledWith("REVOKED");
+  });
+
+  it("reconnectUserStreams_tournamentFilter_closesOnlyThoseTournamentsStreams (EF-23)", () => {
+    const inScope = jest.fn();
+    const otherTournament = jest.fn();
+    const noTournament = jest.fn();
+    cleanups.push(registerSessionStream(1, "h1", inScope, 40));
+    cleanups.push(registerSessionStream(1, "h2", otherTournament, 99));
+    cleanups.push(registerSessionStream(1, "h3", noTournament));
+
+    expect(reconnectUserStreams(1, { tournamentIds: new Set([40, 41]) })).toBe(1);
+
+    expect(inScope).toHaveBeenCalledTimes(1);
+    expect(otherTournament).not.toHaveBeenCalled();
+    expect(noTournament).not.toHaveBeenCalled();
+  });
+
+  it("reconnectUserStreams_severalAccounts_closesEachOnesStreams (EF-23)", () => {
+    const a = jest.fn();
+    const b = jest.fn();
+    const c = jest.fn();
+    register(1, "h1", a);
+    register(2, "h2", b);
+    register(3, "h3", c);
+
+    expect(reconnectUserStreams(new Set([1, 2]))).toBe(2);
+
+    expect(c).not.toHaveBeenCalled();
+  });
+
+  it("reconnectUserStreams_noAccount_closesNothing (EF-23)", () => {
+    const close = jest.fn();
+    register(1, "h1", close);
+
+    expect(reconnectUserStreams([])).toBe(0);
+    expect(close).not.toHaveBeenCalled();
+  });
 });

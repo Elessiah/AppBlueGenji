@@ -92,7 +92,7 @@ export async function loadRefereePanel(matchId: number, viewerUserId: number): P
     // rejouée ici (`refereeEligibilityBlock`), jamais prise d'une session.
     const [staff] = await connection.execute<StaffRow[]>(
       `SELECT id, pseudo, discord_verified_at, discord_pseudo, blizzard_sub, overwatch_battletag,
-              is_deleted, is_admin, platform_roles_json, referee_objection_at
+              overwatch_battletag_typed, is_deleted, is_admin, platform_roles_json, referee_objection_at
          FROM bg_users
         WHERE is_deleted = 0
           AND (is_admin = 1 OR platform_roles_json IS NOT NULL OR id IN (?, ?) OR referee_objection_at IS NOT NULL)`,

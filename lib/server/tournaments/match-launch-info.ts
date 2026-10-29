@@ -23,6 +23,7 @@
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
+import { battletagFromBlizzard } from "@/lib/server/battletag-origin";
 import { parseRoles, toIso } from "@/lib/server/serialization";
 import { visibleBattletag } from "@/lib/shared/battletag-visibility";
 import { battletagRelevantFor } from "@/lib/shared/certification-prompt";
@@ -106,6 +107,7 @@ type MemberRow = RowDataPacket & {
   discord_verified_at: Date | string | null;
   overwatch_battletag: string | null;
   blizzard_sub: string | null;
+  overwatch_battletag_typed: number | null;
   visible_overwatch: number;
 };
 
@@ -116,6 +118,7 @@ type UserRow = RowDataPacket & {
   discord_verified_at: Date | string | null;
   overwatch_battletag: string | null;
   blizzard_sub: string | null;
+  overwatch_battletag_typed: number | null;
   visible_overwatch: number;
   is_deleted: number;
   is_admin: number;
@@ -244,6 +247,7 @@ export function toCandidate(row: {
   discord_verified_at: Date | string | null;
   overwatch_battletag: string | null;
   blizzard_sub: string | null;
+  overwatch_battletag_typed?: number | null;
 }): ContactCandidate {
   return {
     userId: Number(row.user_id),
@@ -252,7 +256,8 @@ export function toCandidate(row: {
     discordTag: row.discord_pseudo,
     discordVerified: row.discord_verified_at !== null,
     battletag: row.overwatch_battletag,
-    blizzardLinked: row.blizzard_sub !== null,
+    // Un BattleTag tapé, gardé sous un Battle.net muet, ne compte pas (`battletag-origin.ts`).
+    blizzardLinked: battletagFromBlizzard(row),
   };
 }
 
@@ -422,7 +427,8 @@ export async function loadRosters(
   const ids = [...rosterTeamIds];
   const [members] = await connection.execute<MemberRow[]>(
     `SELECT tm.team_id, u.id AS user_id, u.pseudo, tm.roles_json, u.discord_pseudo,
-            u.discord_verified_at, u.overwatch_battletag, u.blizzard_sub, u.visible_overwatch
+            u.discord_verified_at, u.overwatch_battletag, u.blizzard_sub, u.overwatch_battletag_typed,
+            u.visible_overwatch
      FROM bg_team_members tm
      JOIN bg_users u ON u.id = tm.user_id
      WHERE tm.team_id IN (${ids.map(() => "?").join(", ")})
@@ -443,7 +449,7 @@ async function loadUsers(connection: PoolConnection, userIds: Set<number>): Prom
   const ids = [...userIds];
   const [found] = await connection.execute<UserRow[]>(
     `SELECT id, pseudo, discord_pseudo, discord_verified_at, overwatch_battletag, blizzard_sub,
-            visible_overwatch, is_deleted, is_admin, platform_roles_json
+            overwatch_battletag_typed, visible_overwatch, is_deleted, is_admin, platform_roles_json
      FROM bg_users WHERE id IN (${ids.map(() => "?").join(", ")})`,
     ids,
   );
@@ -607,7 +613,7 @@ function buildLaunchCaster(caster: MatchCasterLink, game: TournamentGame, ctx: L
           roles: [],
           discordTag,
           battletag: user.overwatch_battletag,
-          battletagVerified: user.blizzard_sub !== null,
+          battletagVerified: battletagFromBlizzard(user),
         },
         ctx.viewer,
         Number(user.visible_overwatch) === 1,
@@ -656,7 +662,7 @@ function buildLaunchReferee(row: CandidateRow, ctx: LaunchContext): LaunchRefere
             sharesLiveMatch: true,
           })
         : null,
-      battletagVerified: user.blizzard_sub !== null,
+      battletagVerified: battletagFromBlizzard(user),
     },
   );
 }

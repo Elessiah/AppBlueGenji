@@ -3,6 +3,7 @@
   "entrant": "{name} — {message}",
   "batch": "{message} Nothing was saved.",
   "codes": {
+    "CERTIFY_PROMPT_OTHER_ACCOUNT": "Another account is logged in on this browser: “Don't show again” wasn't saved.",
     "MATCH_NOT_FOUND": "Match not found.",
     "MATCH_NOT_IN_LOBBY": "This match isn't in its launch phase.",
     "MATCH_NOT_LAUNCHABLE": "This match can't be launched: its two entrants aren't known yet, or it's over.",

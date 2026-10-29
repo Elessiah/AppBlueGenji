@@ -108,10 +108,23 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   // repère (`revokedSince`).
   const tokenHash = await currentTokenHash();
   let revoked = false;
-  const unregister = registerSessionStream(user.id, tokenHash, () => {
-    revoked = true;
-    cleanup();
-  });
+  // Contexte du lecteur changé (équipe quittée, rôle changé…) pendant
+  // l'ouverture : pas un refus — le flux se ferme sitôt ouvert, et le client se
+  // reconnecte sur un contexte relu, sans passer par le REST de secours.
+  let reconnectRequested = false;
+  // Le tournoi suivi, pour qu'un geste de roster ne reconnecte que les flux
+  // des tournois concernés (`reconnectUserStreams`) ; validé plus bas.
+  const streamedTournamentId = Number((await context.params).id);
+  const unregister = registerSessionStream(
+    user.id,
+    tokenHash,
+    (reason) => {
+      if (reason === "REVOKED") revoked = true;
+      else reconnectRequested = true;
+      cleanup();
+    },
+    Number.isInteger(streamedTournamentId) && streamedTournamentId > 0 ? streamedTournamentId : null,
+  );
   /**
    * Place de flux tenue avant que le flux ne la reprenne (`cleanup`) : toute
    * sortie anticipée la rend.
@@ -387,7 +400,9 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
           // Course résiduelle : le contrôle plus haut a pu passer juste avant que
           // le client ne parte. Un signal DÉJÀ avorté ne déclenche jamais son
           // écouteur.
-          if (req.signal.aborted) {
+          // Reconnexion demandée pendant l'ouverture : le registre a déjà
+          // retiré ce flux — ouvert, plus rien ne le fermerait à une révocation.
+          if (req.signal.aborted || reconnectRequested) {
             cleanup();
             return;
           }

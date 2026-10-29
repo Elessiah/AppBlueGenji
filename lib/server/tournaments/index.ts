@@ -1026,16 +1026,25 @@ function certificationPromptKey(userId: number, teamId: number, isManager: boole
   return `${userId}:${teamId}:${isManager ? 1 : 0}:${battletagRelevant ? 1 : 0}`;
 }
 
-async function readCertificationPrompt(
+function certificationPromptLoader(
   userId: number,
   teamId: number,
   isManager: boolean,
   battletagRelevant: boolean,
-  { final = false }: { final?: boolean } = {},
+): () => Promise<CertificationPrompt | null> {
+  return () =>
+    withConnection((connection) => loadCertificationPrompt(connection, userId, teamId, isManager, battletagRelevant));
+}
+
+function readCertificationPrompt(
+  userId: number,
+  teamId: number,
+  isManager: boolean,
+  battletagRelevant: boolean,
 ): Promise<CertificationPrompt | null> {
-  const read = final ? finalCertificationPrompt : cachedCertificationPrompt;
-  return read(certificationPromptKey(userId, teamId, isManager, battletagRelevant), () =>
-    withConnection((connection) => loadCertificationPrompt(connection, userId, teamId, isManager, battletagRelevant)),
+  return cachedCertificationPrompt(
+    certificationPromptKey(userId, teamId, isManager, battletagRelevant),
+    certificationPromptLoader(userId, teamId, isManager, battletagRelevant),
   );
 }
 
@@ -1046,8 +1055,8 @@ export type TournamentViewerContextOptions = {
    * (mémoire), elle part avec le contexte ; sinon le contexte part sans elle
    * (`null`, `onCertificationPromptDeferred` appelé avant le retour) et son
    * issue **finale** — `null` compris, réponse tardive d'une lecture abandonnée
-   * comprise — est remise ici pour être poussée ensuite (trame
-   * `certificationPrompt`). La lecture REST de secours, qui ne peut rien
+   * comprise ; jamais une issue inconnue — est remise ici pour être poussée
+   * ensuite (trame `certificationPrompt`). La lecture REST de secours, qui ne peut rien
    * pousser, l'attend.
    */
   onLateCertificationPrompt?: (prompt: CertificationPrompt | null) => void;
@@ -1138,7 +1147,14 @@ export async function getTournamentViewerContext(
     const known = peekCertificationPrompt(certificationPromptKey(userId, teamId, isManager, battletagRelevant));
     if (known) return known.prompt;
     options.onCertificationPromptDeferred?.();
-    void readCertificationPrompt(userId, teamId, isManager, battletagRelevant, { final: true }).then(late);
+    // Issue inconnue (`undefined`) : rien n'est poussé — le client, prévenu
+    // (`certificationPromptPending`), garde l'invitation qu'il avait.
+    void finalCertificationPrompt(
+      certificationPromptKey(userId, teamId, isManager, battletagRelevant),
+      certificationPromptLoader(userId, teamId, isManager, battletagRelevant),
+    ).then((prompt) => {
+      if (prompt !== undefined) late(prompt);
+    });
     return null;
   };
 

@@ -275,7 +275,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     ],
     dataCategories: [
       "Discord username and identifier",
-      "BattleTag (shown in Overwatch tournaments only; in every game, its presence and the linked Battle.net account are checked to cast or referee a match)",
+      "BattleTag (shown in Overwatch tournaments only; in every game, its presence and that it comes from a linked Battle.net account — a BattleTag typed in by hand is not enough — are checked to cast or referee a match)",
       "Date and opponent of the match",
       "Time at which each party declared itself ready (each caster for themselves), registered casters and the stream each one joined (co-cast) or opened separately",
       "Reason for the removal of a caster's registration for a match (removed by the staff, casting requirements no longer met — streaming permission, certified Discord tag, Battle.net account —, or they now play in the match)",

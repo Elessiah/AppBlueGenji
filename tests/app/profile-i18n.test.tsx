@@ -304,7 +304,7 @@ describe("français inchangé — profil", () => {
             const state = { tag, verified, linked, pending };
             expect(discordTagLockText(FR_PROFILE, state)).toEqual(discordTagLockNotice(state));
           }
-          expect(battletagLockText(FR_PROFILE, { tag, linked, pending })).toEqual(battletagLockNotice({ tag, linked, pending }));
+          expect(battletagLockText(FR_PROFILE, { linked, pending })).toEqual(battletagLockNotice({ linked, pending }));
         }
       }
     }

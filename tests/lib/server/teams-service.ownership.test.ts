@@ -1,12 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { transferTeamOwnership } from "@/lib/server/teams/roster";
 import { assertTermsAccepted } from "@/lib/server/terms-acceptance";
+import { reconnectUserStreams } from "@/lib/server/session-streams";
 import { type SqlQuery, connectionMock, fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/terms-acceptance", () =>
   jest.requireActual<typeof import("../../helpers/terms-acceptance-double")>("../../helpers/terms-acceptance-double").termsAcceptanceDouble(),
 );
 jest.mock("@/lib/server/database");
+jest.mock("@/lib/server/session-streams", () => ({ reconnectUserStreams: jest.fn() }));
 
 const TEAM_ID = 7;
 const REQUESTER_ID = 1;
@@ -49,6 +51,7 @@ async function mockDb(scenario: Scenario) {
       if (scenario.failUpdateAt === index) throw new Error("DB_DOWN");
       return [{ affectedRows: scenario.affected?.[index] ?? 1 }, []];
     }
+    if (/UNION\s+SELECT id FROM bg_tournaments/.test(sql)) return [[{ id: 40 }], []];
     throw new Error(`requête inattendue : ${sql}`);
   });
   jest.mocked(getDatabase).mockResolvedValue(fakePool({
@@ -209,6 +212,23 @@ describe("transferTeamOwnership", () => {
     await mockDb({ roster: {} });
 
     await expect(transferTeamOwnership(REQUESTER_ID, TEAM_ID, TARGET_ID)).rejects.toThrow("FORBIDDEN");
+  });
+
+  it("transferTeamOwnership_committed_reconnectsBothAccountsOnTeamTournaments", async () => {
+    await mockDb({ roster: { [REQUESTER_ID]: ["OWNER"], [TARGET_ID]: ["DPS"] } });
+
+    await transferTeamOwnership(REQUESTER_ID, TEAM_ID, TARGET_ID);
+
+    expect(jest.mocked(reconnectUserStreams).mock.calls).toEqual([
+      [[REQUESTER_ID, TARGET_ID], { tournamentIds: new Set([40]) }],
+    ]);
+  });
+
+  it("transferTeamOwnership_writeFails_reconnectsNobody", async () => {
+    await mockDb({ roster: { [REQUESTER_ID]: ["OWNER"], [TARGET_ID]: ["DPS"] }, failUpdateAt: 1 });
+
+    await expect(transferTeamOwnership(REQUESTER_ID, TEAM_ID, TARGET_ID)).rejects.toThrow("DB_DOWN");
+    expect(reconnectUserStreams).not.toHaveBeenCalled();
   });
 
   it("annule la transaction si une écriture échoue", async () => {

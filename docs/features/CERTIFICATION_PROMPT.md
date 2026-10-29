@@ -75,8 +75,9 @@ et la dernière colonne n'ont pas de retrait extérieur : le tableau s'aligne su
 le chapeau et le pied. Le cadre (`TournamentDialogFrame`) prend le focus à
 l'ouverture : anneau bleu au clavier seulement (`:focus-visible`).
 
-Battle.net rattaché **sans** BattleTag enregistré : rien à faire depuis le
-profil (rattachement déjà là, BattleTag tapé refusé) — la modale ne lui en
+Battle.net rattaché **sans** BattleTag venu de lui : rien à faire depuis le
+profil (rattachement déjà là, un BattleTag tapé n'y est jamais vérifié,
+`BATTLETAG_ORIGIN.md`) — la modale ne lui en
 parle pas (variante « Discord seul », `battletagRelevant: false`), mais il ne
 fait toujours pas un contact pour l'équipe.
 
@@ -147,9 +148,12 @@ cette modale.
   échec est muet (la modale se rouvrira, rien n'est perdu). Le corps porte le
   compte à qui la modale a été montrée (`{ userId }`, retenu à l'ouverture) :
   une session changée depuis (autre compte connecté dans un autre onglet)
-  répond 409 `CERTIFY_PROMPT_OTHER_ACCOUNT` sans rien écrire, un corps sans
-  compte lisible 400 `INVALID_ACTION`. L'invitation gardée
-  en mémoire pour ce compte est oubliée (`forgetCertificationPromptsOf`). Aucun
+  répond 409 `CERTIFY_PROMPT_OTHER_ACCOUNT` sans rien écrire — ce refus-là est
+  notifié (`showError`, `tournamentErrors.codes`, FR et EN) —, un corps sans
+  compte lisible 400 `INVALID_ACTION`. Plafonné par compte
+  (`CERTIFICATION_PROMPT_OFF_RULE`, dix par heure, 429). L'invitation gardée
+  en mémoire pour ce compte est oubliée (`forgetCertificationPromptsOf`) au
+  premier choix seulement : rejoué, il ne parcourt pas la mémoire. Aucun
   geste ne la réaffiche : la certification reste offerte dans « Mon profil ».
   Un clic qui ouvre le profil dans un nouvel onglet (Ctrl, Cmd, Maj, bouton du
   milieu) ne ferme rien et ne retient rien.
@@ -185,29 +189,51 @@ l'onglet.
   lecture en cours partagée, échec retenu dix secondes, lecture abandonnée après
   trois secondes retenue une minute — tardive mais réussie, elle sert —, lecture
   coincée plus de dix minutes oubliée) : le contexte se relit à chaque lecture
-  REST (geste, proposition de score, repli du flux). La requête ne lit que des
-  drapeaux (vérifié ou non, contact présent), jamais un pseudo. Une
-  certification (code Discord, un clic, rattachement OAuth) ou un « Ne plus
-  voir » oublie sur-le-champ l'invitation retenue pour ce compte
-  (`forgetCertificationPromptsOf`, clé préfixée `userId:`) ; sinon elle se voit
-  au plus une minute plus tard. Les deux « Ne plus voir » (cette modale, la
-  proposition de la connexion) sont lus sur le compte. Une lecture en échec
+  REST (geste, proposition de score, repli du flux). La requête lit les colonnes
+  brutes (pseudo, identifiant Battle.net, origine du BattleTag) en mémoire du
+  serveur seulement, et n'en tire que des drapeaux (vérifié ou non, contact
+  présent) — jamais un pseudo ne sort — calculés par les règles du lancement
+  (`hasVerifiedDiscord`, `hasVerifiedBattletag`, `battletagFromBlizzard`), pas
+  réécrits en SQL. Une
+  certification (code Discord, un clic, rattachement OAuth) oublie sur-le-champ
+  les invitations retenues pour ce compte **et pour toute son équipe active**
+  (`forgetCertificationPromptsAround` : « équipe sans contact » et invitation
+  du meneur changent pour les coéquipiers) ; un « Ne plus voir » oublie celles
+  du compte (`forgetCertificationPromptsOf`, clé préfixée `userId:`) ; une
+  arrivée dans l'équipe (invitation ou demande acceptée) oublie celles de
+  l'équipe. Une lecture déjà en cours au moment de l'oubli n'en sert pas
+  l'issue, d'avant le geste : ceux qui l'attendaient reçoivent une relecture
+  partie après lui (`successor` du slot `forgotten`) — une issue tardive
+  d'une lecture abandonnée, oubliée, reste inconnue au flux (aucune trame).
+  Une certification perdue (tag Discord changé, rattachement retiré) n'oublie
+  rien chez les coéquipiers. Sinon le changement se voit au plus
+  une minute plus tard. Les deux « Ne plus voir » (cette modale, la
+  proposition de la connexion) sont lus sur le compte, par un seul SELECT
+  (repli colonne par colonne si l'une manque). Une lecture en échec
   tait l'invitation (`null`, journal pm2) sans faire tomber le contexte.
 - **Flux SSE** : l'invitation n'y est pas attendue (base lente : elle ne
   retarde pas l'ouverture). Connue en mémoire (`peekCertificationPrompt`), elle
   part avec le contexte ; sinon le contexte part sans elle — la connexion
   porte `certificationPromptPending`, si bien qu'une reconnexion garde
   l'invitation déjà posée au lieu de lire ce `null` comme un retrait — et son
-  issue **finale** suit par une trame `certificationPrompt`, `null` compris
+  issue **finale** suit par une trame `certificationPrompt`, `null` compris —
+  mais aucune trame si l'issue reste inconnue (mémoire pleine, lecture en
+  échec ou jamais revenue : `undefined`), le client gardant l'invitation déjà
+  posée
   (`onLateCertificationPrompt`, `finalCertificationPrompt` : la réponse tardive
   d'une lecture abandonnée après trois secondes compte, attendue au plus une
   minute ; `viewerPatchFrameBytes`), posée par `applyLiveMessage` sur le
   contexte du même tournoi. La lecture REST de secours l'attend. La place de flux est prise
   **avant** toute lecture : une boucle au-delà du plafond ne coûte aucune
-  requête. Quitter une équipe, en être retiré ou la dissoudre ferme les flux
-  du compte sans révoquer sa session (`reconnectUserStreams` : aucun 401 pour
-  un flux en cours d'ouverture) : le client se reconnecte et relit un contexte
-  sans l'équipe. Mémoire pleine : une lecture abandonnée qui pend encore n'est
+  requête. Quitter une équipe, en être retiré, la dissoudre, y changer de rôle
+  ou en transférer la propriété ferme les flux des comptes touchés sans
+  révoquer leur session (`refreshTeamViewers`, `reconnectUserStreams` en
+  motif `RECONNECT` : la route ne répond pas 401, même à un flux en cours
+  d'ouverture, qui se ferme simplement), **sur les seuls tournois concernés**
+  (`teamStreamTournamentIds` : engagée, ou pas encore commencé), en un seul
+  passage sur le registre pour tous les membres d'une dissolution ; les
+  invitations de l'équipe sont oubliées (`forgetCertificationPromptsOfTeam`).
+  Le client se reconnecte et relit son contexte. Mémoire pleine : une lecture abandonnée qui pend encore n'est
   jamais chassée ; oubliée, elle reste une garde et sa réponse tardive est
   écartée.
 - Champ `TournamentViewerContext.certificationPrompt`, rejoué tel quel d'un

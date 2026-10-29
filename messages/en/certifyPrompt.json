@@ -49,7 +49,7 @@
     "link": {
       "label": "Linking of your Discord account",
       "without": "None",
-      "with": "If it isn't linked yet, the code received by direct message links it: you can then log in through Discord"
+      "with": "The code received by direct message links it, unless that Discord is already linked to another account: you can then log in through Discord"
     }
   },
   "undo": "Removing your tag or changing your Discord username removes the verification.",

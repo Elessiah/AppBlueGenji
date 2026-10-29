@@ -159,10 +159,11 @@ ton match (dès que les adversaires sont connus, caster — et équipes d'un mat
 que l'on caste — le temps du match),
 autres joueurs (case « Tag Discord »), visiteurs (jamais). « Autres effets » :
 pastille sur la fiche (joueurs connectés), messages privés de match (sauf
-opposition) et, au seul parcours `DIALOG`, le rattachement du compte Discord
-par le code reçu en message privé quand il ne l'est pas encore
-(`CERTIFY_PROMPT_DIALOG_ONLY_ROWS`, `certifyPromptRowsFor` ; en `ONE_CLICK`,
-Discord est déjà rattaché). Soi-même n'a pas de ligne : on voit toujours son propre tag, rien
+opposition) et, au seul parcours `DIALOG` d'un compte **sans Discord
+rattaché** (`discordLinked: false`), le rattachement du compte Discord par le
+code reçu en message privé, si ce Discord n'est pas déjà rattaché à un autre
+compte (`CERTIFY_PROMPT_ROW_SHOWN`, une règle par ligne exigée par le type
+`CertifyPromptRow` ; `certifyPromptRowsFor`). Soi-même n'a pas de ligne : on voit toujours son propre tag, rien
 n'y change. Sans certification : personne d'autre que toi. Puis une
 ligne : retirer son tag ou changer de pseudo Discord retire la certification.
 Textes de l'espace `certifyPrompt` (FR et EN) ; le détail complet reste dans le

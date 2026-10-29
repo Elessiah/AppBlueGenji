@@ -348,6 +348,7 @@ export async function getMatchRows(
       ru.discord_pseudo AS referee_discord_pseudo,
       ru.blizzard_sub AS referee_blizzard_sub,
       ru.overwatch_battletag AS referee_overwatch_battletag,
+      ru.overwatch_battletag_typed AS referee_overwatch_battletag_typed,
       ru.is_deleted AS referee_is_deleted,
       ru.is_admin AS referee_is_admin,
       ru.platform_roles_json AS referee_platform_roles_json,

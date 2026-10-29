@@ -8,6 +8,10 @@ jest.mock("next/navigation", () => ({
 import { renderToStaticMarkup } from "react-dom/server";
 import { ToastProvider } from "@/components/ui/toast";
 import { CERTIFY_PROMPT_GROUPS, DiscordCertifyPrompt, certifyPromptRowsFor } from "@/components/discord/DiscordCertifyPrompt";
+import type { CertifyPrompt } from "@/lib/shared/discord-certify-prompt";
+
+const DIALOG_UNLINKED: CertifyPrompt = { mode: "DIALOG", hasTag: false, discordLinked: false };
+const ONE_CLICK: CertifyPrompt = { mode: "ONE_CLICK", tag: "keryan" };
 import { scopedText } from "@/lib/shared/scoped-text";
 import frCertify from "@/messages/fr/certifyPrompt.json";
 import enCertify from "@/messages/en/certifyPrompt.json";
@@ -298,15 +302,22 @@ describe("textes (certifyPrompt) — FR et EN", () => {
 
   it("rattachement du compte Discord : au seul parcours DIALOG, où le code en message privé le rattache (EF-05)", () => {
     const effects = CERTIFY_PROMPT_GROUPS.find(({ group }) => group === "effects")?.rows ?? [];
-    expect(certifyPromptRowsFor(effects, "DIALOG")).toEqual(["badge", "dms", "link"]);
-    expect(certifyPromptRowsFor(effects, "ONE_CLICK")).toEqual(["badge", "dms"]);
+    expect(certifyPromptRowsFor(effects, DIALOG_UNLINKED)).toEqual(["badge", "dms", "link"]);
+    expect(certifyPromptRowsFor(effects, ONE_CLICK)).toEqual(["badge", "dms"]);
     // Les publics ne dépendent pas du parcours.
     const seen = CERTIFY_PROMPT_GROUPS.find(({ group }) => group === "seen")?.rows ?? [];
-    expect(certifyPromptRowsFor(seen, "ONE_CLICK")).toEqual([...seen]);
-    expect(certifyPromptRowsFor([], "DIALOG")).toEqual([]);
-    expect(SOURCE).toContain("{certifyPromptRowsFor(rows, prompt.mode).map((row) => (");
-    expect(fr.rows.link.with).toContain("le code reçu en message privé le rattache");
-    expect(en.rows.link.with).toContain("the code received by direct message links it");
+    expect(certifyPromptRowsFor(seen, ONE_CLICK)).toEqual([...seen]);
+    expect(certifyPromptRowsFor([], DIALOG_UNLINKED)).toEqual([]);
+    expect(SOURCE).toContain("{certifyPromptRowsFor(rows, prompt).map((row) => (");
+    expect(fr.rows.link.with).toContain("Le code reçu en message privé le rattache, si ce Discord n'est pas déjà rattaché à un autre compte");
+    expect(en.rows.link.with).toContain("The code received by direct message links it, unless that Discord is already linked to another account");
+  });
+
+  it("certifyPromptRowsFor_dialogWithDiscordAlreadyLinked_omitsLinkRow (EF-23)", () => {
+    // Un Discord déjà rattaché (tag tapé à la main) : rien à rattacher, la
+    // ligne promettrait un effet qui n'aura pas lieu.
+    const effects = CERTIFY_PROMPT_GROUPS.find(({ group }) => group === "effects")?.rows ?? [];
+    expect(certifyPromptRowsFor(effects, { mode: "DIALOG", hasTag: true, discordLinked: true })).toEqual(["badge", "dms"]);
   });
 
   it("arbitres : engagé dans un tournoi, ou caster d'un match dès que ses adversaires sont connus (CASTER-CONTACTS-REFEREES)", () => {

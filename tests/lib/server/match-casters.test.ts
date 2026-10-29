@@ -36,7 +36,8 @@ describe("firstStreamUrlSql — le premier lien, seule définition", () => {
     // La condition du cast, comme `castEligibilityBlock` : identité et permission `live`.
     expect(sql).toContain("COALESCE(u.is_deleted, 0) = 0");
     expect(sql).toContain("u.discord_verified_at IS NOT NULL AND COALESCE(u.discord_pseudo, '') <> ''");
-    expect(sql).toContain("u.blizzard_sub IS NOT NULL AND COALESCE(u.overwatch_battletag, '') <> ''");
+    // Un BattleTag tapé sous un Battle.net qui n'en donnait aucun ne vaut pas (D3).
+    expect(sql).toContain("((u.blizzard_sub IS NOT NULL AND u.overwatch_battletag_typed = 0) AND COALESCE(u.overwatch_battletag, '') <> '')");
     expect(sql).toContain(`AND ${LIVE_STAFF_SQL})`);
   });
 });

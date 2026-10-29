@@ -72,13 +72,12 @@
     "battletagPlaceholder": "Pseudo#1234",
     "marvel": "Tag Marvel Rivals",
     "gameTagNotice": "Sert seulement à t'ajouter en jeu, jamais pour des statistiques.",
-    "blizzardNotice": "Si tu rattaches Battle.net, Blizzard remplit ce champ et le met à jour à chaque connexion, à la place de ta saisie."
+    "blizzardNotice": "Si tu rattaches Battle.net, Blizzard remplit ce champ et le met à jour à chaque connexion, à la place de ta saisie. S'il n'en donne aucun, ta saisie reste, sans la mention « vérifié »."
   },
   "battletagLock": {
     "pending": "Lecture de tes applications connectées… Champ en lecture seule en attendant.",
     "unknown": "Applications connectées illisibles pour l'instant : champ en lecture seule. Recharge la page pour réessayer.",
     "tagged": "Fourni par ton compte Blizzard, et mis à jour à chaque connexion.",
-    "noTag": "Compte Blizzard rattaché, sans BattleTag : Blizzard le remplira à ta prochaine connexion.",
     "change": "Pour en changer, retire Blizzard des « Applications connectées » (après avoir ajouté un autre moyen de connexion si c'est le seul), puis rattache le bon compte.",
     "hide": "Pour le retirer de ta fiche, de l'annuaire et des rosters, décoche « BattleTag OW » plus bas."
   },
@@ -145,7 +144,7 @@
   "saved": "Profil mis à jour.",
   "accountLocale": {
     "label": "Langue des notifications",
-    "hint": "Tes notifications push et les messages privés Discord du site (hors alertes adressées au staff en message privé, en français puis en anglais — en français seul si les deux ne tiennent pas dans un message) arrivent dans cette langue. Elle reprend celle de la page à chaque connexion.",
+    "hint": "Tes notifications push et les messages privés Discord du site arrivent dans cette langue, sauf les alertes adressées au staff, en français puis en anglais. Elle reprend celle de la page à chaque connexion.",
     "saved": "Langue des notifications enregistrée."
   },
   "matchDms": {

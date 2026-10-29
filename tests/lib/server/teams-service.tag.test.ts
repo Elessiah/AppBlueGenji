@@ -284,7 +284,8 @@ describe("softDeleteTeam — sigle", () => {
       .mockResolvedValueOnce([[{ roles_json: JSON.stringify(["OWNER"]) }], []]) // OWNER, relu sous verrou
       .mockResolvedValueOnce([{ affectedRows: 1 }, []]) // équipe anonymisée
       .mockResolvedValueOnce([[{ user_id: 12 }], []]) // membres détachés
-      .mockResolvedValue([{ affectedRows: 1 }, []]);
+      // Écritures ; les tournois dont les flux lisent l'équipe : aucun.
+      .mockImplementation(async (sql) => (/UNION\s+SELECT id FROM bg_tournaments/.test(sql) ? [[], []] : [{ affectedRows: 1 }, []]));
 
     await softDeleteTeam(1, 12);
 

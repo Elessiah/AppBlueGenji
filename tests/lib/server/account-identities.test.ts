@@ -66,6 +66,7 @@ type Row = {
   blizzard_sub: string | null;
   discord_pseudo: string | null;
   overwatch_battletag: string | null;
+  overwatch_battletag_typed?: number;
 };
 
 type Statement = { sql: string; params: unknown[] };
@@ -220,6 +221,21 @@ describe("listAccountConnections", () => {
     ]);
   });
 
+  it("listAccountConnections_typedTagUnderBattleNet_showsNoBattleNetHandle (D3)", async () => {
+    // Battle.net n'a donné aucun BattleTag : celui tapé à la main ne se
+    // présente pas comme l'identité Battle.net rattachée.
+    fakeDb({ ...emptyRow, blizzard_sub: "bz-1", overwatch_battletag: "Tape#1111", overwatch_battletag_typed: 1 });
+
+    const connections = await listAccountConnections(7);
+
+    expect(connections.find(({ provider }) => provider === "BLIZZARD")).toEqual({
+      provider: "BLIZZARD",
+      linked: true,
+      handle: null,
+      method: null,
+    });
+  });
+
   it("refuse un compte introuvable", async () => {
     fakeDb(null);
     await expect(listAccountConnections(7)).rejects.toThrow("PROFILE_NOT_FOUND");
@@ -348,28 +364,29 @@ describe("linkOAuthIdentity — on ne déplace jamais une porte", () => {
     );
 
     const update = find(statements, "UPDATE bg_users SET blizzard_sub")!;
-    expect(update.sql).toContain("overwatch_battletag = ?");
-    expect(update.params).toEqual(["bz-1", "Nova#2143", 7, "bz-1"]);
+    expect(update.sql).toContain("overwatch_battletag = COALESCE(?, overwatch_battletag)");
+    expect(update.sql).toContain("overwatch_battletag_typed = CASE WHEN ? IS NULL THEN 1 ELSE 0 END");
+    expect(update.params).toEqual(["bz-1", "Nova#2143", "Nova#2143", 7, "bz-1"]);
   });
 
-  it("linkOAuthIdentity_blizzardWithoutBattletag_erasesTypedBattletag : un BattleTag saisi ne passe pas pour vérifié", async () => {
-    // Gardé sous un Battle.net rattaché, il serait « vérifié »
-    // (`hasVerifiedBattletag`) sans que Blizzard l'ait jamais nommé.
+  it("linkOAuthIdentity_blizzardWithoutBattletag_keepsTypedBattletagUnverified : un BattleTag saisi ne passe pas pour vérifié (D3)", async () => {
+    // Gardé (COALESCE), mais marqué tapé : `battletagFromBlizzard` le tient
+    // pour non vérifié, sans que Blizzard l'ait jamais nommé.
     const { statements } = fakeDb({ ...emptyRow, overwatch_battletag: "Saisi#1111" });
 
     await linkOAuthIdentity(7, identity({ provider: "BLIZZARD", subject: "bz-1", handle: null }));
 
     const update = find(statements, "UPDATE bg_users SET blizzard_sub")!;
-    expect(update.sql).toContain("overwatch_battletag = ?");
-    expect(update.params).toEqual(["bz-1", null, 7, "bz-1"]);
+    expect(update.sql).not.toMatch(/overwatch_battletag = \?/);
+    expect(update.params).toEqual(["bz-1", null, null, 7, "bz-1"]);
   });
 
-  it("linkOAuthIdentity_blizzardBlankBattletag_erasesTypedBattletag : un BattleTag fait d'espaces ne vaut rien", async () => {
+  it("linkOAuthIdentity_blizzardBlankBattletag_keepsTypedBattletagUnverified : un BattleTag fait d'espaces ne vaut rien (D3)", async () => {
     const { statements } = fakeDb({ ...emptyRow, overwatch_battletag: "Saisi#1111" });
 
     await linkOAuthIdentity(7, identity({ provider: "BLIZZARD", subject: "bz-1", handle: "   " }));
 
-    expect(find(statements, "UPDATE bg_users SET blizzard_sub")!.params).toEqual(["bz-1", null, 7, "bz-1"]);
+    expect(find(statements, "UPDATE bg_users SET blizzard_sub")!.params).toEqual(["bz-1", null, null, 7, "bz-1"]);
   });
 
   it("n'écrit que le `sub` pour Google", async () => {

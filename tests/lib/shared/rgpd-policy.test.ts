@@ -384,6 +384,17 @@ describe("/rgpd — données obligatoires : la langue du compte (revue juridique
     expect(read("app/rgpd/RgpdEn.tsx")).toMatch(/you can change it in My profile \(until you next log in from a page\s+in the other language\)/);
   });
 
+  // EF-23 (D3) : un BattleTag tapé sous un Battle.net rattaché ne suffit pas
+  // pour caster ; la politique le dit, comme le registre (T04).
+  it("rgpdPolicy_casterCondition_requiresBattletagFromBattleNetFrAndEn", () => {
+    expect(read("app/rgpd/page.tsx")).toMatch(
+      /sans les deux \(un BattleTag tiré de ce compte Battle\.net,\s+pas saisi à la main\)/,
+    );
+    expect(read("app/rgpd/RgpdEn.tsx")).toMatch(
+      /without both \(a BattleTag taken from that Battle\.net account,\s+not typed in by hand\)/,
+    );
+  });
+
   // Revue #497 : le BattleTag n'est présenté qu'en Overwatch, mais sa présence
   // et le compte Battle.net sont vérifiés en tout jeu pour caster ou arbitrer
   // (`casterIdentityOf`) ; l'arbitre ne s'ajoute en jeu qu'en Overwatch.
@@ -391,11 +402,11 @@ describe("/rgpd — données obligatoires : la langue du compte (revue juridique
     const t04 = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T04")!;
     const t04En = PROCESSING_ACTIVITIES_EN.find((activity) => activity.ref === "T04")!;
     expect(t04.dataCategories).toContain(
-      "BattleTag (présenté dans les seuls tournois Overwatch ; en tout jeu, sa présence et le compte Battle.net rattaché sont vérifiés pour caster ou arbitrer un match)",
+      "BattleTag (présenté dans les seuls tournois Overwatch ; en tout jeu, sa présence et sa provenance d'un compte Battle.net rattaché — un BattleTag saisi à la main n'y suffit pas — sont vérifiées pour caster ou arbitrer un match)",
     );
     expect(t04.dataCategories).not.toContain("BattleTag (dans les seuls tournois Overwatch)");
     expect(t04En.dataCategories).toContain(
-      "BattleTag (shown in Overwatch tournaments only; in every game, its presence and the linked Battle.net account are checked to cast or referee a match)",
+      "BattleTag (shown in Overwatch tournaments only; in every game, its presence and that it comes from a linked Battle.net account — a BattleTag typed in by hand is not enough — are checked to cast or referee a match)",
     );
     expect(t04En.dataCategories).not.toContain("BattleTag (Overwatch tournaments only)");
     expect(t04.dataCategories).not.toContain("BattleTag");
@@ -437,8 +448,8 @@ describe("/rgpd — données obligatoires : la langue du compte (revue juridique
     expect(read("lib/shared/rgpd-policy-en.ts")).toMatch(/the language of push notifications and of the site's Discord direct messages \(sent to the bot with the code sent by direct message only\)/);
     expect(read("messages/fr/login.json")).toMatch(/pour t'écrire dans cette langue tes notifications push et les messages privés Discord du site/);
     expect(read("messages/en/login.json")).toMatch(/to write your push notifications and the site's Discord direct messages in that language/);
-    expect(read("messages/fr/profile.json")).toMatch(/Tes notifications push et les messages privés Discord du site \(hors alertes adressées au staff[^)]*\) arrivent dans cette langue/);
-    expect(read("messages/en/profile.json")).toMatch(/Your push notifications and the site's Discord direct messages \(except alerts sent to staff[^)]*\) arrive in this language/);
+    expect(read("messages/fr/profile.json")).toMatch(/Tes notifications push et les messages privés Discord du site arrivent dans cette langue, sauf les alertes adressées au staff/);
+    expect(read("messages/en/profile.json")).toMatch(/Your push notifications and the site's Discord direct messages arrive in this language, except alerts sent to staff/);
 
     const find = (list: readonly (typeof PROCESSING_ACTIVITIES)[number][], ref: string) =>
       list.find((activity) => activity.ref === ref)!;

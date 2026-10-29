@@ -27,7 +27,9 @@ import { fakePool } from "../../helpers/sql-double";
 
 type Query = { sql: string; params: unknown[] };
 
-function fakeDb(row: { blizzard_sub: string | null; overwatch_battletag: string | null } | null) {
+type LockRow = { blizzard_sub: string | null; overwatch_battletag: string | null; overwatch_battletag_typed?: number };
+
+function fakeDb(row: LockRow | null) {
   const queries: Query[] = [];
   const execute = jest.fn(async (sql: string, params: unknown[] = []) => {
     const q = String(sql).replace(/\s+/g, " ").trim();
@@ -47,6 +49,9 @@ const find = (queries: Query[], fragment: string) =>
 
 const linked = (tag: string | null) => fakeDb({ blizzard_sub: "bz-1", overwatch_battletag: tag });
 const free = (tag: string | null) => fakeDb({ blizzard_sub: null, overwatch_battletag: tag });
+/** Battle.net rattaché sans BattleTag donné : le tag tapé est gardé, non vérifié (D3). */
+const typedUnderBattleNet = (tag: string | null) =>
+  fakeDb({ blizzard_sub: "bz-1", overwatch_battletag: tag, overwatch_battletag_typed: 1 });
 
 describe("updateOwnProfile — le BattleTag d'un compte rattaché", () => {
   it("refuse une réécriture, sans rien écrire", async () => {
@@ -110,7 +115,44 @@ describe("updateOwnProfile — le BattleTag d'un compte rattaché", () => {
     await updateOwnProfile(7, { overwatchBattletag: "Autre#9999" });
 
     const update = find(queries, "UPDATE bg_users")!;
-    expect(update.sql).toContain("WHEN blizzard_sub IS NOT NULL THEN overwatch_battletag");
+    expect(update.sql).toContain(
+      "WHEN ((blizzard_sub IS NOT NULL AND overwatch_battletag_typed = 0) AND COALESCE(overwatch_battletag, '') <> '') THEN overwatch_battletag ELSE ?",
+    );
+  });
+
+  it("assertBattletagWritable_lockRead_selectsTheOriginColumn (D3)", async () => {
+    const { queries } = linked("Nova#2143");
+
+    await updateOwnProfile(7, { overwatchBattletag: "Nova#2143" });
+
+    expect(find(queries, "SELECT blizzard_sub, overwatch_battletag")!.sql).toContain("overwatch_battletag_typed");
+  });
+});
+
+describe("updateOwnProfile — le BattleTag tapé sous un Battle.net qui n'en donnait aucun (D3)", () => {
+  it("updateOwnProfile_typedTagUnderBattleNet_canBeRewritten", async () => {
+    const { queries } = typedUnderBattleNet("Tape#1111");
+
+    await updateOwnProfile(7, { overwatchBattletag: "Autre#9999" });
+
+    const update = find(queries, "UPDATE bg_users")!;
+    expect(update.params.slice(1, 4)).toEqual([true, true, "Autre#9999"]);
+  });
+
+  it("updateOwnProfile_typedTagUnderBattleNet_canBeErased", async () => {
+    const { queries } = typedUnderBattleNet("Tape#1111");
+
+    await updateOwnProfile(7, { overwatchBattletag: null });
+
+    expect(find(queries, "UPDATE bg_users")!.params.slice(1, 4)).toEqual([true, true, null]);
+  });
+
+  it("updateOwnProfile_battleNetWithoutAnyTag_letsATagBeTyped", async () => {
+    const { queries } = fakeDb({ blizzard_sub: "bz-1", overwatch_battletag: null });
+
+    await updateOwnProfile(7, { overwatchBattletag: "Nova#2143" });
+
+    expect(find(queries, "UPDATE bg_users")!.params.slice(1, 4)).toEqual([true, true, "Nova#2143"]);
   });
 });
 
@@ -121,8 +163,10 @@ describe("updateOwnProfile — le BattleTag d'un compte libre", () => {
     await updateOwnProfile(7, { overwatchBattletag: "Nova#2143" });
 
     const update = find(queries, "UPDATE bg_users")!;
+    // Origine du BattleTag, puis lui-même : une saisie le marque tapé.
     expect(update.params[1]).toBe(true);
-    expect(update.params[2]).toBe("Nova#2143");
+    expect(update.params[2]).toBe(true);
+    expect(update.params[3]).toBe("Nova#2143");
   });
 
   it("s'efface normalement", async () => {
@@ -134,7 +178,8 @@ describe("updateOwnProfile — le BattleTag d'un compte libre", () => {
     // La chaîne vide et `null` sont le **même** geste, et aucune chaîne vide ne
     // part en base.
     expect(update.params[1]).toBe(true);
-    expect(update.params[2]).toBeNull();
+    expect(update.params[2]).toBe(true);
+    expect(update.params[3]).toBeNull();
   });
 });
 

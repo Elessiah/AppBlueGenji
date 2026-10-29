@@ -15,7 +15,10 @@
  * — et tant qu'elle pend encore (dix minutes au plus), sa clé n'en relance pas
  * une autre : pendant un blocage du pool, chaque lecteur n'ajoute qu'une
  * acquisition à la file, pas une par minute. Mémoire pleine de lectures en
- * cours : « rien » servi sans lire.
+ * cours : « rien » servi sans lire (et « inconnu » au flux, qui ne pousse rien).
+ *
+ * Clés : `userId:teamId:…` — l'équipe en second segment, pour oublier d'un
+ * geste toutes les invitations d'une équipe (`forgetCertificationPromptsOfTeam`).
  */
 import type { CertificationPrompt } from "@/lib/shared/certification-prompt";
 
@@ -48,12 +51,18 @@ type Slot = {
   /** Oubliée pendant la lecture : son issue n'est pas retenue. */
   forgotten: boolean;
   /**
-   * Issue **finale** : celle de `value`, ou — abandonnée après trois secondes —
-   * la réponse tardive si elle réussit (`null` si elle échoue ou pend plus de
-   * `CERTIFICATION_PROMPT_TTL_MS`). Sert au flux, qui pousse l'invitation à
-   * son arrivée au lieu de l'attendre.
+   * Oubliée pendant la lecture puis répondue : la relecture qui la remplace,
+   * partie après le geste (`null` : mémoire pleine, issue inconnue).
    */
-  final: Promise<CertificationPrompt | null>;
+  successor?: Slot | null;
+  /**
+   * Issue **finale** : celle de `value`, ou — abandonnée après trois secondes —
+   * la réponse tardive si elle réussit (`undefined`, inconnue, si elle échoue
+   * ou pend plus de `CERTIFICATION_PROMPT_TTL_MS`). Sert au flux, qui pousse
+   * l'invitation à son arrivée au lieu de l'attendre — et ne pousse rien d'une
+   * issue inconnue : `null` y dirait « retrait décidé ».
+   */
+  final: Promise<CertificationPrompt | null | undefined>;
 };
 
 /** Lectures en cours, partagées ; sans échéance tant qu'elles n'ont pas d'issue. */
@@ -76,13 +85,15 @@ export function cachedCertificationPrompt(
 /**
  * Comme `cachedCertificationPrompt`, mais rend l'issue **finale** (`Slot.final`) :
  * une lecture abandonnée après trois secondes qui réussit plus tard la donne.
+ * `undefined` : issue inconnue (mémoire pleine de lectures en cours, réponse
+ * tardive en échec ou trop tardive) — rien à pousser.
  */
 export function finalCertificationPrompt(
   key: string,
   load: () => Promise<CertificationPrompt | null>,
   now: () => number = Date.now,
-): Promise<CertificationPrompt | null> {
-  return slotFor(key, load, now)?.final ?? Promise.resolve(null);
+): Promise<CertificationPrompt | null | undefined> {
+  return slotFor(key, load, now)?.final ?? Promise.resolve(undefined);
 }
 
 /** Lecture partagée de `key` ; `null` si la mémoire n'est faite que de lectures en cours. */
@@ -118,7 +129,7 @@ function slotFor(key: string, load: () => Promise<CertificationPrompt | null>, n
     startedAt: now(),
     timedOut: false,
     forgotten: false,
-    final: Promise.resolve(null),
+    final: Promise.resolve(undefined),
   };
   const reading = load();
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -140,11 +151,24 @@ function slotFor(key: string, load: () => Promise<CertificationPrompt | null>, n
     }
   });
   const settle = (prompt: CertificationPrompt | null, ttl: number) => {
-    slot.settled = { prompt };
+    // Oubliée pendant la lecture (abandon ou échec) : « rien », non retenue.
+    const kept = slot.forgotten ? null : prompt;
+    slot.settled = { prompt: kept };
     slot.expiresAt = now() + ttl;
     if (inFlight.get(key) === slot) inFlight.delete(key);
     if (!slot.forgotten) recent.set(key, slot);
-    return prompt;
+    return kept;
+  };
+  // Oubliée pendant la lecture (certification, « Ne plus voir », roster) puis
+  // répondue : son issue date d'avant le geste — ni servie (elle montrerait
+  // une invitation levée) ni remplacée par « rien » (elle tairait une
+  // invitation due, « équipe sans contact »). Ceux qui l'attendaient reçoivent
+  // une relecture partie après le geste, partagée comme toute lecture.
+  const reread = (): Promise<CertificationPrompt | null> => {
+    slot.settled = { prompt: null };
+    slot.expiresAt = 0;
+    slot.successor = slotFor(key, load, now);
+    return slot.successor?.value ?? Promise.resolve(null);
   };
   slot.value = Promise.race([outcomeOf, expired]).then((outcome) => {
     clearTimeout(timer);
@@ -153,19 +177,27 @@ function slotFor(key: string, load: () => Promise<CertificationPrompt | null>, n
       slot.timedOut = true;
       return settle(null, CERTIFICATION_PROMPT_TTL_MS);
     }
-    if (outcome.ok) return settle(outcome.prompt, CERTIFICATION_PROMPT_TTL_MS);
+    if (outcome.ok) return slot.forgotten ? reread() : settle(outcome.prompt, CERTIFICATION_PROMPT_TTL_MS);
     logCertificationPromptFailure(now(), outcome.error);
     return settle(null, CERTIFICATION_PROMPT_FAILURE_TTL_MS);
   });
-  slot.final = slot.value.then((prompt) => {
+  slot.final = slot.value.then((prompt): Promise<CertificationPrompt | null | undefined> | CertificationPrompt | null => {
+    // Relue après un oubli : l'issue finale est celle de la relecture —
+    // inconnue si la mémoire pleine n'a pas permis de la lancer.
+    if (slot.successor !== undefined) return slot.successor ? slot.successor.final : Promise.resolve(undefined);
     if (!slot.timedOut) return prompt;
     // Abandonnée : la réponse tardive, bornée — une lecture qui pend ne
-    // retient pas indéfiniment celui qui l'attend.
+    // retient pas indéfiniment celui qui l'attend. Échouée, trop tardive ou
+    // oubliée entre-temps (elle daterait d'avant le geste), l'issue reste
+    // inconnue (`undefined`) : rien à pousser, pas un retrait décidé.
     let lateTimer: ReturnType<typeof setTimeout> | undefined;
-    const giveUp = new Promise<null>((resolve) => {
-      lateTimer = setTimeout(() => resolve(null), CERTIFICATION_PROMPT_TTL_MS);
+    const giveUp = new Promise<undefined>((resolve) => {
+      lateTimer = setTimeout(() => resolve(undefined), CERTIFICATION_PROMPT_TTL_MS);
     });
-    const late = outcomeOf.then((outcome) => (outcome.ok && !slot.forgotten ? outcome.prompt : null));
+    const late = outcomeOf.then((outcome) => {
+      if (slot.forgotten) return undefined;
+      return outcome.ok ? outcome.prompt : undefined;
+    });
     return Promise.race([late, giveUp]).finally(() => clearTimeout(lateTimer));
   });
   inFlight.set(key, slot);
@@ -227,8 +259,24 @@ function logCertificationPromptFailure(at: number, error: unknown): void {
  */
 export function forgetCertificationPromptsOf(userId: number): void {
   const prefix = `${userId}:`;
+  forgetMatching((key) => key.startsWith(prefix));
+}
+
+/**
+ * Oublie les invitations retenues pour **tous** les lecteurs de l'équipe
+ * `teamId` : l'état « équipe sans contact » de chacun dépend des autres — un
+ * coéquipier qui certifie, part, est exclu ou change de rôle change la réponse
+ * de tous. Même règle que `forgetCertificationPromptsOf` pour une lecture en
+ * cours.
+ */
+export function forgetCertificationPromptsOfTeam(teamId: number): void {
+  const segment = String(teamId);
+  forgetMatching((key) => key.split(":", 2)[1] === segment);
+}
+
+function forgetMatching(matches: (key: string) => boolean): void {
   for (const [key, slot] of recent) {
-    if (!key.startsWith(prefix)) continue;
+    if (!matches(key)) continue;
     if (slot.reading) {
       // Abandonnée mais pendante : gardée comme garde (« rien » à la lecture
       // suivante, pas une seconde acquisition), son issue tardive écartée.
@@ -239,7 +287,7 @@ export function forgetCertificationPromptsOf(userId: number): void {
     recent.delete(key);
   }
   for (const [key, slot] of inFlight) {
-    if (!key.startsWith(prefix)) continue;
+    if (!matches(key)) continue;
     slot.forgotten = true;
     inFlight.delete(key);
   }

@@ -81,7 +81,8 @@ jest.mock("@/lib/shared/dialog-focus", () => ({
   },
 }));
 
-import { useCertificationPrompt } from "@/app/(secured)/tournois/[id]/_hooks/useCertificationPrompt";
+import { saveNeverAgain, useCertificationPrompt } from "@/app/(secured)/tournois/[id]/_hooks/useCertificationPrompt";
+import { CERTIFY_PROMPT_OTHER_ACCOUNT } from "@/lib/shared/discord-certify-prompt";
 
 // Appelé hors composant, par le banc : le nom neutre le dit aux règles des crochets.
 const runHook = useCertificationPrompt;
@@ -109,7 +110,7 @@ function render(
   do {
     bench.dirty = false;
     bench.index = { state: 0, ref: 0, callback: 0, effect: 0 };
-    result = runHook(tournamentId, prompt, frozen, viewerUserId);
+    result = runHook(tournamentId, prompt, frozen, viewerUserId, onOtherAccount);
     for (const slot of bench.effects) {
       if (!slot.pending) continue;
       if (typeof slot.cleanup === "function") slot.cleanup();
@@ -149,6 +150,8 @@ const neverAgainPosts = () =>
   fetchMock.mock.calls.filter(([input, init]) => input === CERTIFICATION_PROMPT_OFF_PATH && init?.method === "POST");
 let local = memoryStorage();
 let session = memoryStorage();
+/** Le toast « un autre compte est connecté » de la fiche (EF-23). */
+let onOtherAccount = jest.fn<() => void>();
 
 const PROMPT: CertificationPrompt = {
   reason: "MANAGER",
@@ -171,6 +174,7 @@ beforeEach(() => {
   globals.window = { localStorage: local, sessionStorage: session };
   globals.document = {};
   fetchMock = jest.fn<(input: string, init?: RequestInit) => Promise<Response>>(async () => new Response("{}"));
+  onOtherAccount = jest.fn<() => void>();
   globals.fetch = fetchMock;
 });
 
@@ -349,6 +353,15 @@ describe("useCertificationPrompt", () => {
     expect(modals.yieldWatchers).toHaveLength(0);
   });
 
+  it("useCertificationPrompt_neverAgainRefusedForOtherAccount_reportsIt (EF-23)", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ error: CERTIFY_PROMPT_OTHER_ACCOUNT }), { status: 409 }));
+    const first = render(PROMPT);
+    const checked = act(() => first.setNeverAgain(true), PROMPT);
+    act(() => checked.close(), PROMPT);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(onOtherAccount).toHaveBeenCalledTimes(1);
+  });
+
   it("stockage inaccessible : la modale s'ouvre et se ferme sans mémoire", () => {
     delete globals.window;
     const first = render(PROMPT);
@@ -357,5 +370,44 @@ describe("useCertificationPrompt", () => {
     // Retirée puis revenue : fermée, elle ne se rouvre pas sur cette page.
     render(null);
     expect(render({ ...PROMPT }).prompt).toBeNull();
+  });
+});
+
+describe("saveNeverAgain (EF-23)", () => {
+  it("saveNeverAgain_otherAccountRefusal_callsOnOtherAccount", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ error: CERTIFY_PROMPT_OTHER_ACCOUNT }), { status: 409 }));
+
+    await saveNeverAgain(VIEWER_ID, onOtherAccount);
+
+    expect(onOtherAccount).toHaveBeenCalledTimes(1);
+  });
+
+  it("saveNeverAgain_otherFailure_staysSilent", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ error: "RATE_LIMITED" }), { status: 429 }));
+
+    await saveNeverAgain(VIEWER_ID, onOtherAccount);
+
+    expect(onOtherAccount).not.toHaveBeenCalled();
+  });
+
+  it("saveNeverAgain_bodyNotJson_staysSilent", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("<html>", { status: 502 }));
+
+    await expect(saveNeverAgain(VIEWER_ID, onOtherAccount)).resolves.toBeUndefined();
+
+    expect(onOtherAccount).not.toHaveBeenCalled();
+  });
+
+  it("saveNeverAgain_saved_staysSilent", async () => {
+    await saveNeverAgain(VIEWER_ID, onOtherAccount);
+
+    expect(neverAgainPosts()).toHaveLength(1);
+    expect(onOtherAccount).not.toHaveBeenCalled();
+  });
+
+  it("saveNeverAgain_unknownViewer_sendsNothing", async () => {
+    await saveNeverAgain(null, onOtherAccount);
+
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
