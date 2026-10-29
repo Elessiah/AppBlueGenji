@@ -16,7 +16,15 @@ jest.mock("next/headers", () => ({ cookies: jest.fn(), redirect: jest.fn() }));
 
 import { cookies } from "next/headers";
 import { getDatabase } from "@/lib/server/database";
-import { createSession, expireSessionCookies, getCurrentUser } from "@/lib/server/auth";
+import { createHash } from "node:crypto";
+import {
+  clearSession,
+  countOtherSessions,
+  createSession,
+  expireSessionCookies,
+  getCurrentUser,
+  revokeOtherSessions,
+} from "@/lib/server/auth";
 import { consumeOAuthState, saveOAuthState } from "@/lib/server/oauth-state";
 import { type SqlQuery, fakePool } from "../../helpers/sql-double";
 import { fakeCookieStore } from "../../helpers/cookie-store";
@@ -126,5 +134,44 @@ describe("état OAuth — production", () => {
     storeWith("bg_oauth", encode({ ...OAUTH_PAYLOAD, termsAccepted: true }));
 
     expect(await consumeOAuthState()).toBeNull();
+  });
+});
+
+describe("sessions du compte — production", () => {
+  const hashOf = (token: string) => createHash("sha256").update(token).digest("hex");
+
+  it("clearSession_production_deletesRowOfHostPrefixedToken", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }, undefined]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    const store = storeWith("__Host-bg_session", "tok");
+
+    await clearSession();
+
+    expect(execute).toHaveBeenCalledWith("DELETE FROM bg_user_sessions WHERE token_hash = ?", [hashOf("tok")]);
+    expect(store.set).toHaveBeenCalledWith("__Host-bg_session", "", expect.objectContaining({ maxAge: 0 }));
+  });
+
+  it("revokeOtherSessions_production_keepsCurrentHostPrefixedSession", async () => {
+    // Lu sous le mauvais nom, le jeton vaudrait "" et `token_hash <> ''`
+    // fermerait aussi la session courante.
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 2 }, undefined]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    storeWith("__Host-bg_session", "tok");
+
+    await revokeOtherSessions(7);
+
+    expect(execute.mock.calls.map(([, params]) => params)).toEqual([
+      [7, hashOf("tok")],
+      [7, hashOf("tok")],
+    ]);
+  });
+
+  it("countOtherSessions_production_excludesCurrentHostPrefixedSession", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ c: 1 }], undefined]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    storeWith("__Host-bg_session", "tok");
+
+    expect(await countOtherSessions(7)).toBe(1);
+    expect(execute.mock.calls[0][1]).toEqual([7, hashOf("tok")]);
   });
 });
