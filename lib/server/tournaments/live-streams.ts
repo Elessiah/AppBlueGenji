@@ -202,6 +202,11 @@ export async function setMatchLiveConfig(
       );
       if (locked.length === 0) throw new Error("MATCH_NOT_FOUND");
       assertConfigurable(locked[0]);
+      // Rejugé lui aussi : une date de début retirée entre les deux lectures
+      // poserait une antenne à l'heure dite qui ne s'ouvrirait jamais.
+      if (requiresMatchStartAt(trigger) && locked[0].start_at === null) {
+        throw new Error("MATCH_START_AT_REQUIRED");
+      }
       let streams: MatchStreamRow[] | undefined;
       if (trigger === null) {
         await connection.execute(
