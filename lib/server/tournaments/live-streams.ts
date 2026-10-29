@@ -14,6 +14,7 @@ import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/prom
 import { getDatabase, withConnection } from "@/lib/server/database";
 import {
   canConfigureLive,
+  isMatchCastable,
   isMatchLive,
   isMatchLiveTrigger,
   normalizeStreamUrl,
@@ -128,14 +129,21 @@ async function loadMatchLiveRow(matchId: number): Promise<MatchLiveRow> {
   return rows[0];
 }
 
-/** `MATCH_NOT_CASTABLE` quand rien ne peut plus être réglé sur ce match (`canConfigureLive`). */
-function assertConfigurable(row: MatchLiveRow): void {
-  const configurable = canConfigureLive({
+/**
+ * `MATCH_NOT_CASTABLE` quand ce réglage ne peut plus être posé sur ce match
+ * (`canConfigureLive`). Un match joué (ou en attente de confirmation) déjà
+ * marqué ne reste ouvert que pour être **démarqué** (`trigger: null`) : y
+ * changer le mode ou le lien remplacerait le lien d'un match joué — celui de
+ * l'organisation compris — par la chaîne de qui le pose.
+ */
+function assertConfigurable(row: MatchLiveRow, trigger: MatchLiveTrigger | null): void {
+  const match = {
     status: row.status,
     liveTrigger: row.live_trigger,
     liveStartedAt: row.live_started_at,
     launchedAt: null,
-  });
+  };
+  const configurable = trigger === null ? canConfigureLive(match) : isMatchCastable(match);
   if (!configurable) throw new Error("MATCH_NOT_CASTABLE");
 }
 
@@ -163,7 +171,8 @@ function assertConfigurable(row: MatchLiveRow): void {
  * Un match qui ne peut plus passer à l'antenne (score saisi, en attente de
  * confirmation) et qui n'est pas déjà casté n'a rien à configurer
  * (`canConfigureLive`, appliqué ici et non seulement par l'interface) : un
- * appel direct ne pose pas un lien sur un match que l'écran garde fermé.
+ * appel direct ne pose pas un lien sur un match que l'écran garde fermé. Déjà
+ * casté, il ne peut plus qu'être démarqué (`assertConfigurable`).
  *
  * @throws `MATCH_NOT_FOUND` | `INVALID_LIVE_TRIGGER` | `INVALID_STREAM_URL`
  *         | `MATCH_START_AT_REQUIRED` | `MATCH_NOT_CASTABLE`
@@ -180,7 +189,7 @@ export async function setMatchLiveConfig(
   // vaut sous le verrou du match, ci-dessous : un score validé entre les deux
   // ferme la porte (`assertConfigurable`).
   const row = await loadMatchLiveRow(matchId);
-  assertConfigurable(row);
+  assertConfigurable(row, config.trigger);
   if (requiresMatchStartAt(config.trigger) && row.start_at === null) {
     throw new Error("MATCH_START_AT_REQUIRED");
   }
@@ -201,7 +210,7 @@ export async function setMatchLiveConfig(
         [matchId],
       );
       if (locked.length === 0) throw new Error("MATCH_NOT_FOUND");
-      assertConfigurable(locked[0]);
+      assertConfigurable(locked[0], trigger);
       // Rejugé lui aussi : une date de début retirée entre les deux lectures
       // poserait une antenne à l'heure dite qui ne s'ouvrirait jamais.
       if (requiresMatchStartAt(trigger) && locked[0].start_at === null) {

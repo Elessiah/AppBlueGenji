@@ -30,7 +30,7 @@ function mapLiveError(error: unknown) {
  * `trigger: null` démarque le match (et efface lien et antenne) ; `START_TIME`
  * exige une date de début déjà posée sur le match (409 sinon) ; un match qui ne
  * peut plus passer à l'antenne et n'est pas déjà casté refuse tout réglage
- * (`MATCH_NOT_CASTABLE`, 409).
+ * (`MATCH_NOT_CASTABLE`, 409) ; déjà casté, il ne peut plus qu'être démarqué.
  *
  * `organisationLink` dit de qui est le lien posé : `true` pour un
  * membre de l'organisation (permission `tournaments`) = le lien de
