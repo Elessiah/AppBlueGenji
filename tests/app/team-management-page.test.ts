@@ -301,7 +301,7 @@ describe("correctifs de la première revue", () => {
   it("Échap revient d'abord au contrôle qui a quelque chose d'ouvert", () => {
     const hook = readFileSync(join(ROOT, "lib", "shared", "hooks", "useDialogBehavior.ts"), "utf8");
     const escape = hook.slice(hook.indexOf('event.key === "Escape"'), hook.indexOf("closeRef.current()"));
-    expect(escape).toMatch(/if \(escapeBelongsElsewhere\(layers, event\.target as HTMLElement \| null\)\) return;/);
+    expect(escape).toMatch(/if \(escapeBelongsElsewhere\(layers, event\.target as HTMLElement \| null, containerRef\.current\)\) return;/);
     // Le rôle est exigé : un bouton de dépliage porte aussi `aria-expanded`,
     // et n'écoute pas Échap — la modale ne se fermerait plus du tout.
     const rule = readFileSync(join(ROOT, "lib", "shared", "dialog-focus.ts"), "utf8");

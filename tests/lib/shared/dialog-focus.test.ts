@@ -34,6 +34,13 @@ describe("escapeBelongsElsewhere", () => {
     expect(escapeBelongsElsewhere([], inside(false))).toBe(false);
   });
 
+  it("laisse Échap à un « i » déplié n'importe où dans la modale, focus parti sur un champ", () => {
+    const container = (owner: boolean) => ({ querySelector: (selector: string) => (owner && selector === "[data-escape-owner]" ? {} : null) });
+    expect(escapeBelongsElsewhere([], target({}), container(true))).toBe(true);
+    expect(escapeBelongsElsewhere([], target({}), container(false))).toBe(false);
+    expect(escapeBelongsElsewhere([], target({}), null)).toBe(false);
+  });
+
   it("tolère une cible sans getAttribute (window, document)", () => {
     expect(escapeBelongsElsewhere([layer(false)], {})).toBe(false);
     expect(escapeBelongsElsewhere([], undefined)).toBe(false);
