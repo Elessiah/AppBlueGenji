@@ -391,11 +391,11 @@ describe("/rgpd — données obligatoires : la langue du compte (revue juridique
     const t04 = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T04")!;
     const t04En = PROCESSING_ACTIVITIES_EN.find((activity) => activity.ref === "T04")!;
     expect(t04.dataCategories).toContain(
-      "BattleTag (présenté dans les seuls tournois Overwatch ; en tout jeu, sa présence et le compte Battle.net rattaché sont vérifiés pour caster ou arbitrer un match)",
+      "BattleTag (présenté dans les seuls tournois Overwatch ; en tout jeu, sa présence et sa provenance d'un compte Battle.net rattaché — un BattleTag saisi à la main n'y suffit pas — sont vérifiées pour caster ou arbitrer un match)",
     );
     expect(t04.dataCategories).not.toContain("BattleTag (dans les seuls tournois Overwatch)");
     expect(t04En.dataCategories).toContain(
-      "BattleTag (shown in Overwatch tournaments only; in every game, its presence and the linked Battle.net account are checked to cast or referee a match)",
+      "BattleTag (shown in Overwatch tournaments only; in every game, its presence and that it comes from a linked Battle.net account — a BattleTag typed in by hand is not enough — are checked to cast or referee a match)",
     );
     expect(t04En.dataCategories).not.toContain("BattleTag (Overwatch tournaments only)");
     expect(t04.dataCategories).not.toContain("BattleTag");
