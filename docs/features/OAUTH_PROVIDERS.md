@@ -125,6 +125,12 @@ BattleTag tapé avant le rattachement, gardé, passerait pour vérifié
 Blizzard l'ait jamais nommé — et le verrou l'empêcherait d'être corrigé. Le
 joueur qui veut en saisir un détache Battle.net.
 
+**Les lignes antérieures ne guérissent qu'à la connexion Battle.net suivante.**
+Un BattleTag tapé puis gardé sous un Battle.net sans BattleTag avant cette règle
+reste tenu pour vérifié tant que le compte ne se reconnecte pas par Battle.net :
+rien ne le distingue en base d'un BattleTag donné par Blizzard (aucune colonne
+de provenance), donc aucun rattrapage n'est possible sans changer le schéma.
+
 **Et le champ cesse d'être saisissable** (`lib/shared/battletag-lock.ts`). Deux
 écrivains qui ne se connaissaient pas ne pouvaient produire qu'une promesse
 intenable : le formulaire acceptait une correction, l'écrivait, l'affichait — et
