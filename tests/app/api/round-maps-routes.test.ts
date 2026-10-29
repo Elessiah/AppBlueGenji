@@ -21,6 +21,7 @@ import { flushRoundMapsNotice } from "@/lib/server/tournaments/round-maps-notice
 import { PUT as roundMapsPut } from "@/app/api/admin/tournaments/[id]/round-maps/route";
 import { PUT as mapRulesPut } from "@/app/api/admin/tournaments/[id]/map-rules/route";
 import { PUT as mapPickPut } from "@/app/api/matches/[matchId]/map-pick/route";
+import { MAP_PICK_WRITE_RULE } from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
 import { pickMatchMap, setRoundsMaps, setTournamentMapRules, type MapRulesInput } from "@/lib/server/tournaments/round-maps";
 import { authUser } from "../../helpers/auth-user";
@@ -162,6 +163,22 @@ describe("PUT /api/matches/[matchId]/map-pick", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(player);
     await mapPickPut(put({ slot: 2 }), match("42"));
     expect(pickMatchMap).toHaveBeenLastCalledWith(42, { userId: 2, staff: false }, 2, null);
+  });
+
+  it("PUT_overRateLimit_returns429WithoutPicking", async () => {
+    // Compte propre à ce test : le plafond (`MAP_PICK_WRITE_RULE`) est en mémoire.
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 9_001, roles: ["ARBITRE"] }));
+    jest.mocked(pickMatchMap).mockResolvedValue();
+    for (let call = 0; call < MAP_PICK_WRITE_RULE.limit; call += 1) {
+      await mapPickPut(put({ slot: 1, map: "Ilios" }), match("42"));
+    }
+    jest.mocked(pickMatchMap).mockClear();
+
+    const res = await mapPickPut(put({ slot: 1, map: "Ilios" }), match("42"));
+
+    expect(res.status).toBe(429);
+    await expect(res.json()).resolves.toEqual({ error: "TOO_MANY_REQUESTS" });
+    expect(pickMatchMap).not.toHaveBeenCalled();
   });
 
   it.each<[string, number]>([

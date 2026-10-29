@@ -74,6 +74,15 @@ describe("launchFailure — interblocage", () => {
     }
   });
 
+  it("launchFailure_snapshotConflict_returns409RetryCode", async () => {
+    const conflict = Object.assign(new Error("Record has changed since last read"), { code: "ER_CHECKREAD", errno: 1020 });
+
+    const response = launchFailure(conflict, {}, "MATCH_READY_FAILED");
+
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toBe(CONCURRENT_UPDATE_RETRY);
+  });
+
   it("garde le code de repli pour une erreur imprévue", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => {});
     try {

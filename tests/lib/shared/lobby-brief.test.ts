@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { formatLobbyBriefDm, type LobbyBriefSide } from "@/lib/shared/lobby-brief";
+import { formatLobbyBriefDm, MAPS_LINE_MAX, type LobbyBriefSide } from "@/lib/shared/lobby-brief";
 import { localizedSiteUrl } from "@/lib/shared/dm-language";
 import { localeHref } from "@/lib/shared/locales";
 import { matchPageHref } from "@/lib/shared/match-anchor";
@@ -30,7 +30,6 @@ function side(overrides: Partial<LobbyBriefSide> = {}): LobbyBriefSide {
     firstMap: "Ilios",
     maps: [],
     nextBan: "LOSER",
-    nextPick: "LOSER",
     cast: false,
     decision: "UNDECIDED",
     ...overrides,
@@ -139,21 +138,49 @@ describe("formatLobbyBriefDm", () => {
 });
 
 describe("formatLobbyBriefDm — cartes du round", () => {
-  it("liste imposées et pools, avec le choix du perdant à partir de la carte 2", () => {
+  it("formatLobbyBriefDm_imposedAndPoolSlots_listsThemWithoutLoserPick", () => {
     const text = formatLobbyBriefDm(
       side({
         maps: [
           { number: 1, kind: "IMPOSED", map: "Ilios", candidates: ["Ilios"] },
           { number: 2, kind: "POOL", map: null, candidates: ["Busan", "Nepal"] },
         ],
-        nextPick: "LOSER",
       }),
       URL,
     );
-    expect(text).toContain("Cartes :");
-    expect(text).toContain("Ilios");
-    expect(text).toContain("• Cartes : 1. « Ilios » · 2. à choisir parmi « Busan », « Nepal » (choisie par l'équipe qui a perdu la carte précédente)");
-    expect(text).toContain("(choisie par l'équipe qui a perdu la carte précédente)");
+
+    // La règle « choisie par le perdant » n'est pas appliquée (pas de scores par carte) : le brief la tait.
+    expect(text).toContain("• Cartes : 1. « Ilios » · 2. à choisir parmi « Busan », « Nepal »\n");
+    expect(text).not.toContain("perdu la carte précédente)");
+  });
+
+  it("formatLobbyBriefDm_mapsLineOverMax_cutAtWholeSlotWithPointerToMatchPage", () => {
+    const pool = Array.from({ length: 20 }, (_, index) => `Carte-${String(index).padStart(2, "0")}-${"x".repeat(50)}`);
+    const maps = Array.from({ length: 9 }, (_, index) => ({ number: index + 1, kind: "POOL" as const, map: null, candidates: pool }));
+
+    const text = formatLobbyBriefDm(side({ maps }), URL);
+
+    const line = text.split("\n").find((row) => row.startsWith("• Cartes : ")) ?? "";
+    expect(line.length).toBeLessThanOrEqual("• Cartes : ".length + MAPS_LINE_MAX);
+    expect(line.endsWith("… (suite sur la page du match)")).toBe(true);
+    expect(text.length).toBeLessThan(2000);
+  });
+
+  it("formatLobbyBriefDm_mapsLineOverMaxInEnglish_pointsToMatchPage", () => {
+    const pool = Array.from({ length: 20 }, (_, index) => `Map-${String(index).padStart(2, "0")}-${"x".repeat(50)}`);
+    const maps = Array.from({ length: 9 }, (_, index) => ({ number: index + 1, kind: "POOL" as const, map: null, candidates: pool }));
+
+    const text = formatLobbyBriefDm(side({ maps }), URL, "en");
+
+    expect(text).toContain("… (more on the match page)");
+  });
+
+  it("formatLobbyBriefDm_mapsLineUnderMax_keptWhole", () => {
+    const maps = [{ number: 1, kind: "POOL" as const, map: null, candidates: ["Busan", "Nepal"] }];
+
+    const text = formatLobbyBriefDm(side({ maps }), URL);
+
+    expect(text).not.toContain("suite sur la page du match");
   });
 });
 
