@@ -109,8 +109,8 @@ texte, effacée un jour après la fin de la soirée).
   retiré par un autre que lui reçoit le motif en message privé et en push
   (`CAST_NOTICES.md`).
 
-- **Arbitrage désigné** (MR-2) : désignation, retrait, « Prêt » et passage en
-  autogestion partent au journal sans nom (« un arbitre », « le staff ») et
+- **Arbitrage désigné** (MR-2) : prise, désignation, retrait (par le staff, d'office
+  ou sur opposition) et passage en autogestion partent au journal sans nom (« un arbitre », « le staff ») et
   sans ligne pm2 (`sendBotLog` seul). Seule exception : l'opposition à un
   arbitre (`/api/admin/referees/[userId]/objection`) nomme son auteur dans pm2
   par `publishStaffAction` (`MATCH_REFEREE.md`).
