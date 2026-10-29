@@ -48,7 +48,7 @@ export const MATCH_CONTACTS_SCOPE =
  * 2026-10-19), prévue par les conditions d'utilisation.
  */
 export const BATTLETAG_MATCH_SCOPE =
-  "lecture, même masqué, dans un tournoi Overwatch seulement (jamais en Marvel Rivals), dans la seule fenêtre « Contacts » d'un match où tu es présenté comme contact et dans sa fenêtre de lancement : par ses deux équipes et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, par ses casters le temps du match ; celui d'un caster, dans les seuls tournois Overwatch, par les deux équipes et les autres casters du match le temps du match et par les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, dans ces fenêtres et sur la page du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné) — arbitres et administrateurs n'y ont pas d'autre accès (conditions d'utilisation, « Contacts de match »)";
+  "lecture, même masqué, dans un tournoi Overwatch seulement (jamais en Marvel Rivals) : présenté comme contact d'un match, dans sa fenêtre « Contacts » et dans sa fenêtre de lancement seulement, par ses deux équipes et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, par ses casters le temps du match ; celui d'un caster, dans ces fenêtres et aussi sur la page du match, par les deux équipes et les autres casters du match le temps du match et par les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné) — arbitres et administrateurs n'y ont pas d'autre accès (conditions d'utilisation, « Contacts de match »)";
 
 /**
  * BattleTag de l'arbitre désigné d'un match, même masqué, présenté aux parties
@@ -62,7 +62,7 @@ export const BATTLETAG_MATCH_SCOPE =
  * match.
  */
 export const REFEREE_BATTLETAG_SCOPE =
-  "BattleTag de l'arbitre désigné d'un match d'un tournoi Overwatch (jamais en Marvel Rivals), même masqué, dans ses fenêtres « Contacts » et de lancement et sur la page du match : lu par ses deux équipes et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, par ses casters le temps du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné) ; retrait d'un match à tout moment, le staff pouvant lui confier de nouveau ce match, sans avis (conditions d'utilisation, « Contacts de match », une fois leur version 7 acceptée par l'arbitre)";
+  "BattleTag de l'arbitre désigné d'un match d'un tournoi Overwatch (jamais en Marvel Rivals), même masqué, dans ses fenêtres « Contacts » et de lancement et sur la page du match : lu par ses deux équipes et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, par ses casters le temps du match (la fenêtre de lancement, au départ du match, ne s'ouvre qu'aux deux équipes, aux casters et à l'arbitre désigné) ; retrait d'un match à tout moment, le staff pouvant lui confier de nouveau ce match, sans avis (conditions d'utilisation, « Contacts de match », une fois leur version 7 ou une suivante acceptée par l'arbitre)";
 
 /**
  * Même présentation, pour un arbitre qui n'a pas encore accepté la version 7
@@ -70,7 +70,7 @@ export const REFEREE_BATTLETAG_SCOPE =
  * l'utilisateur du 2026-10-27 — aucun interrupteur dans le code).
  */
 export const REFEREE_BATTLETAG_BEFORE_V7_SCOPE =
-  "la même présentation du BattleTag de l'arbitre désigné, tant que cet arbitre n'a pas accepté la version 7 des conditions d'utilisation — opposition par le formulaire de signalement, catégorie RGPD (retenue, il est retiré de tous ses matchs non terminés et ne peut plus en prendre un ni s'en voir confier un tant qu'elle n'est pas levée — à sa seule demande —, même une fois la version 7 acceptée)";
+  "la même présentation du BattleTag de l'arbitre désigné, tant que cet arbitre n'a pas accepté la version 7 des conditions d'utilisation ou une version suivante — opposition par le formulaire de signalement, catégorie RGPD (retenue, il est retiré de tous ses matchs non terminés et ne peut plus en prendre un ni s'en voir confier un tant qu'elle n'est pas levée — à sa seule demande —, même une fois la version 7 ou une suivante acceptée)";
 
 /**
  * Pseudo de l'arbitre désigné présenté aux parties de ses matchs, sur la même
@@ -78,10 +78,10 @@ export const REFEREE_BATTLETAG_BEFORE_V7_SCOPE =
  * revue juridique de #491 : la ligne « Pseudo site » le déclare aussi.
  */
 export const REFEREE_USERNAME_SCOPE =
-  "pseudo de l'arbitre désigné d'un match, dans ses fenêtres « Contacts » et de lancement et sur la page du match, quel que soit le jeu : à ses deux équipes et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, et à ses casters le temps du match (dans un tournoi Overwatch, à côté de son BattleTag — voir « Pseudo Overwatch »), et seul dès que la fenêtre de lancement montre le match (conditions d'utilisation, « Contacts de match », une fois leur version 7 acceptée par l'arbitre)";
+  "pseudo de l'arbitre désigné d'un match, dans ses fenêtres « Contacts » et de lancement et sur la page du match, quel que soit le jeu : à ses deux équipes et aux arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, et à ses casters le temps du match (dans un tournoi Overwatch, à côté de son BattleTag — voir « Pseudo Overwatch »), et seul dès que la fenêtre de lancement montre le match (conditions d'utilisation, « Contacts de match », une fois leur version 7 ou une suivante acceptée par l'arbitre)";
 
 export const REFEREE_USERNAME_BEFORE_V7_SCOPE =
-  "la même présentation du pseudo de l'arbitre désigné, tant que cet arbitre n'a pas accepté la version 7 des conditions d'utilisation — opposition par le formulaire de signalement, catégorie RGPD (retenue, il est retiré de tous ses matchs non terminés et ne peut plus en prendre un ni s'en voir confier un tant qu'elle n'est pas levée — à sa seule demande —, même une fois la version 7 acceptée)";
+  "la même présentation du pseudo de l'arbitre désigné, tant que cet arbitre n'a pas accepté la version 7 des conditions d'utilisation ou une version suivante — opposition par le formulaire de signalement, catégorie RGPD (retenue, il est retiré de tous ses matchs non terminés et ne peut plus en prendre un ni s'en voir confier un tant qu'elle n'est pas levée — à sa seule demande —, même une fois la version 7 ou une suivante acceptée)";
 
 /**
  * Pseudo seul de l'arbitre désigné lu par tout membre connecté (lot
@@ -129,6 +129,29 @@ export interface DonneEntry {
    */
   extraBases?: readonly { base: LegalBase; scope: string }[];
   duree: string;
+}
+
+/** Une base d'appoint et les portées qui la suivent sans interruption. */
+export interface ExtraBaseGroup {
+  base: LegalBase;
+  scopes: string[];
+}
+
+/**
+ * Les bases d'appoint d'une ligne, regroupées quand des portées qui se suivent
+ * ont la même base : une seule pastille pour elles (revue de #491 — deux
+ * pastilles identiques côte à côte se lisaient comme deux bases). L'ordre des
+ * portées est gardé ; deux portées de même base séparées par une autre restent
+ * deux groupes.
+ */
+export function groupedExtraBases(extraBases: DonneEntry["extraBases"]): ExtraBaseGroup[] {
+  const groups: ExtraBaseGroup[] = [];
+  for (const extra of extraBases ?? []) {
+    const last = groups.at(-1);
+    if (last?.base === extra.base) last.scopes.push(extra.scope);
+    else groups.push({ base: extra.base, scopes: [extra.scope] });
+  }
+  return groups;
 }
 
 export interface DroitEntry {
@@ -203,7 +226,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // ne doit pas coûter la porte Discord. D'où une base « Consentement » qui
     // tient — le geste est libre, spécifique, et se retire.
     finalite:
-      "Ouvre ton tag Discord à l'organisation pour te joindre : administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), membres des deux équipes de ton match dès que ses deux adversaires sont connus et jusqu'à sa fin, ses casters le temps du match seulement (et, si tu castes un match, ses deux équipes et ses autres casters le temps du match, et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin) ; les autres joueurs connectés seulement si tu coches « Tag Discord ». Que ton tag soit certifié (pastille ✅, sans le tag) se lit sur ta fiche par tout joueur connecté. Sans la certification, le bot ne t'envoie aucun message privé de match. Donnée seulement par toi, depuis Mon profil (un clic si ton Discord est rattaché, un code en message privé sinon) ou, d'un clic, depuis la fenêtre qui te la propose après une connexion par Discord ou Blizzard (sinon, elle te mène à Mon profil) — se connecter par Discord ne la donne pas. Les conditions d'inscription d'un tournoi peuvent l'exiger, et caster un match l'exige. Retirée en retirant ton tag ; perdue si ton pseudo change",
+      "Ouvre ton tag Discord à l'organisation pour te joindre : administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), membres des deux équipes de ton match dès que ses deux adversaires sont connus et jusqu'à sa fin, ses casters le temps du match seulement (et, si tu castes un match, ses deux équipes et ses autres casters le temps du match, et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, dans sa fenêtre « Contacts » et sur sa page) ; les autres joueurs connectés seulement si tu coches « Tag Discord ». Que ton tag soit certifié (pastille ✅, sans le tag) se lit sur ta fiche par tout joueur connecté. Sans la certification, le bot ne t'envoie aucun message privé de match. Donnée seulement par toi, depuis Mon profil (un clic si ton Discord est rattaché, un code en message privé sinon) ou, d'un clic, depuis la fenêtre qui te la propose après une connexion par Discord ou Blizzard (sinon, elle te mène à Mon profil) — se connecter par Discord ne la donne pas. Les conditions d'inscription d'un tournoi peuvent l'exiger, et caster ou arbitrer un match l'exige. Retirée en retirant ton tag ; perdue si ton pseudo change",
     base: "Consentement",
     // La certification décide aussi qui reçoit les messages privés de match,
     // qui reposent sur l'intérêt légitime (opposition par la case du profil).
@@ -373,7 +396,7 @@ export const DROITS: DroitEntry[] = [
   },
   {
     title: "Droit d'opposition",
-    text: "Vous pouvez vous opposer au traitement de vos données fondé sur l'intérêt légitime (historique de tournois, annonces d'horaire, rappels, avis de retrait de match, réglages du salon et avis du retrait d'un cast en message privé — ces messages se coupent directement par la case « Messages privés Discord de mes matchs » de Mon profil — et pastilles de certification de votre fiche, tag Discord certifié et « BattleTag vérifié », ainsi que la présentation de l'arbitre désigné aux parties de ses matchs tant qu'il n'a pas accepté la version 7 des conditions d'utilisation, par le formulaire de signalement, catégorie RGPD). Le pseudo publié dans l'annonce #live d'un tournoi individuel n'en fait pas partie : il relève de l'exécution du service auquel vous vous inscrivez — ne pas y être nommé revient à ne pas s'inscrire ; une annonce passée est supprimée sur demande. L'alerte AutoMod d'une telle annonce bloquée ou signalée, gardée pour la modération du serveur Discord (intérêt légitime), est supprimée sur demande : c'est ainsi qu'on s'y oppose.",
+    text: "Vous pouvez vous opposer au traitement de vos données fondé sur l'intérêt légitime (historique de tournois, annonces d'horaire, rappels, avis de retrait de match, réglages du salon et avis du retrait d'un cast en message privé — ces messages se coupent directement par la case « Messages privés Discord de mes matchs » de Mon profil — et pastilles de certification de votre fiche, tag Discord certifié et « BattleTag vérifié », la vérification, quand un membre du staff arbitre un match, qu'il ne le joue pas (impartialité de l'arbitrage), l'affichage du pseudo de l'arbitre désigné à tout membre connecté, ainsi que la présentation de l'arbitre désigné aux parties de ses matchs tant qu'il n'a pas accepté la version 7 des conditions d'utilisation ou une version suivante, par le formulaire de signalement, catégorie RGPD). Le pseudo publié dans l'annonce #live d'un tournoi individuel n'en fait pas partie : il relève de l'exécution du service auquel vous vous inscrivez — ne pas y être nommé revient à ne pas s'inscrire ; une annonce passée est supprimée sur demande. L'alerte AutoMod d'une telle annonce bloquée ou signalée, gardée pour la modération du serveur Discord (intérêt légitime), est supprimée sur demande : c'est ainsi qu'on s'y oppose.",
   },
   {
     title: "Droit à la portabilité",

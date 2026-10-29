@@ -47,7 +47,7 @@ import {
   transferBasisEn,
 } from "@/lib/shared/processing-register-en";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
-import type { DonneEntry } from "@/lib/shared/rgpd-policy";
+import { groupedExtraBases, type DonneEntry } from "@/lib/shared/rgpd-policy";
 import {
   DONNEES_PROFIL_EN,
   DONNEE_CONNEXIONS_EN,
@@ -90,11 +90,12 @@ function DataRow({ entry, accent = false, mark = "" }: Readonly<{ entry: DonneEn
       </DataCell>
       <DataCell column={2}>
         <span className={accent ? `${styles.badge} ${styles.badgeAccent}` : styles.badge}>{LEGAL_BASE_EN[entry.base]}</span>
-        {entry.extraBases?.map((extra) => (
-          <span key={extra.scope} className={styles.extraBase}>
+        {/* Scopes in a row under the same basis: one badge (`groupedExtraBases`, cf. page FR). */}
+        {groupedExtraBases(entry.extraBases).map((group) => (
+          <span key={group.scopes.join("|")} className={styles.extraBase}>
             {/* Même base que la principale : pas de second badge identique, mais « including » (cf. page FR). */}
-            {extra.base === entry.base ? "including: " : <><span className={styles.badge}>{LEGAL_BASE_EN[extra.base]}</span> </>}
-            {extra.scope}
+            {group.base === entry.base ? "including: " : <><span className={styles.badge}>{LEGAL_BASE_EN[group.base]}</span> </>}
+            {group.scopes.join("; ")}
           </span>
         ))}
       </DataCell>
@@ -792,7 +793,7 @@ export function RgpdEn({
             You can be notified on your phone or computer of the start of your matches, of a score to confirm or confirmed automatically without an answer, of a
             tournament&apos;s kickoff, of your match times (set, changed or removed) and their reminders, of the lobby settings of a match you manage (owner or manager of a team, player of a solo tournament), and of what
             concerns your account or your team; a staff member, also of the alerts of their role (referee alerts, disputes settled, results corrected,
-            opponents&apos; withdrawals imposed or automatic confirmations paused by a staff member who plays in the match, scheduled matches, refereeing schedule, incoming reports); a caster, of the removal of their registration for a match by someone else, with the reason, as long as they hold the streaming permission; an assigned referee, of the removal of their refereeing by someone else or automatically, with the reason, as long as they hold the refereeing permission.{" "}
+            opponents&apos; withdrawals imposed or automatic confirmations paused by a staff member who plays in the match, scheduled matches, refereeing schedule, incoming reports); a caster, of the start of the match they cast and of the removal of their registration for a match by someone else, with the reason, as long as they hold the streaming permission; an assigned referee, of the removal of their refereeing by someone else or automatically, with the reason, as long as they hold the refereeing permission.{" "}
             <strong>Nothing is sent without your action</strong>: notifications are turned on device by device,
             from <EnglishLegalLink href="/profil#notifications">My profile</EnglishLegalLink>, where you also choose the topics.
           </p>
@@ -837,7 +838,7 @@ export function RgpdEn({
             by the staff or automatically (with the reason) and, if you manage an entered team (owner or manager) or play
             a solo tournament, when the lobby of a match opens (again if it reopens, for instance after a change of time), the game settings (team on the left —
             the host — and on the right, first map, first ban, sorting the players by role if the match is cast, assigned
-            referee or self-management), with the team names and the link to the match page, without any BattleTag,
+            referee or self-management), with the team names, the tournament, the round and the link to the match page, without any BattleTag,
             Discord tag or player username (in a solo tournament, the message names neither you nor your opponent) — only if your Discord tag is <strong>certified</strong>: an
             uncertified tag, even one linked by signing in with Discord, receives none, to avoid spam (your push notifications are still sent). These messages
             are based on the association&apos;s{" "}
@@ -871,14 +872,14 @@ export function RgpdEn({
           </p>
           <p id="arbitre-designe">
             <strong>Assigned referee of a match.</strong> A staff member who can referee (refereeing permission,
-            certified Discord tag and linked Battle.net account) takes a match, or the staff assigns it to them.
+            certified Discord tag and a BattleTag taken from a linked Battle.net account — a hand-typed BattleTag is not enough) takes a match, or the staff assigns it to them.
             Their username and, in an Overwatch tournament only (in Marvel Rivals, players don&apos;t invite each other by
             BattleTag), their BattleTag (even when hidden) — never their Discord tag in that capacity (if they also
             cast the match, their caster contacts follow the casters&apos; rule) — are then presented in the
-            match&apos;s “Contacts” and launch windows and on the match page, to the same parties and at the same times as the match
+            match&apos;s “Contacts” and launch windows and on the match page (which does not repeat the teams&apos; contacts), to the same parties and at the same times as the match
             contacts: to both teams and to the referees as soon as both its opponents are known until its end, to
             its casters while the match is being played; the username alone appears there as soon as the launch
-            window shows the match. Any signed-in member also reads their username alone (never their BattleTag) on the card and
+            window shows the match. The staff who manage tournaments read at any time, in a match&apos;s “Refereeing” window, the username of its assigned referee and of the accounts that can referee. Any signed-in member also reads their username alone (never their BattleTag) on the card and
             page of a match, until its score is reported or the tournament ends; visitors without an account only read “Referee assigned”. Their “Ready” is
             expected like those of the teams and casters; only the parties to the match and the referees read it, in the
             “Contacts” and launch windows. If they no longer meet these requirements or become
@@ -889,13 +890,13 @@ export function RgpdEn({
             its first map and the maps picked from the round&apos;s pool are noted in the staff log on Discord without naming anyone, and a match that enters its
             launch with neither a referee nor self-management is flagged to the referees. Their presentation to
             the parties to the match falls under <strong>performance of the service</strong> once they have
-            accepted version 7 of the terms of use, which provide for it (“Match contacts” section), so that the
+            accepted version 7 or a later version of the terms of use, which provide for it (“Match contacts” section), so that the
             parties know who referees and, in Overwatch, can add them in game; until they accept it, it falls under{" "}
             <strong>legitimate interest</strong> (same aim), and they may object to it through the report form
             (GDPR category). Showing their username to any signed-in member falls under <strong>legitimate interest</strong>{" "}
-            (members knowing who referees a match), with the same right to object — once upheld, their objection removes them from all their unfinished matches (the staff assigns another referee; their finished matches keep their referee) and stops them taking or being assigned one until it is lifted (at their request only, through that same form), and still stands once version 7 is accepted; the date it was upheld is kept on their account, so that it keeps being honoured (<strong>legal obligation</strong>), and included in their data export, until the staff lifts it or the account is deleted; the staff log on Discord only notes the action and its lifting, naming neither anyone nor their matches, and the server logs the author of the action and the referee&apos;s account identifier (when upheld, with the number of matches they are removed from). They can withdraw from a match at any time, the staff being able to assign that match to them again (unless an objection is upheld), without notice; until they have accepted version 7, as the acceptance window
-            covers the tournament pages, they withdraw by asking for it through that same form. Collecting their “Ready” and the removal notice also fall under performance of the service,
-            the referees acting for the association (<LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>).
+            (members knowing who referees a match), with the same right to object — once upheld, their objection removes them from all their unfinished matches (the staff assigns another referee; their finished matches keep their referee) and stops them taking or being assigned one until it is lifted (at their request only, through that same form), and still stands once version 7 or a later one is accepted; the date it was upheld is kept on their account, so that it keeps being honoured (<strong>legal obligation</strong>), and included in their data export, until the staff lifts it or the account is deleted; the staff log on Discord only notes the action and its lifting, naming neither anyone nor their matches, and the server logs the author of the action and the referee&apos;s account identifier (when upheld, with the number of matches they are removed from). They can withdraw from a match at any time, the staff being able to assign that match to them again (unless an objection is upheld), without notice; until they have accepted version 7 or a later one, as the acceptance window
+            covers the tournament pages, they withdraw by asking for it through that same form. Collecting their “Ready” also falls under performance of the service,
+            the referees acting for the association (<LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>); the removal notice, sent as a push notification, falls under the consent given by turning them on (<LocaleLink href="/rgpd/registre#t12">register, T12</LocaleLink>).
           </p>
         </div>
       </section>
@@ -977,7 +978,7 @@ export function RgpdEn({
             <strong>Match streaming.</strong> A tournament match may be streamed live and recorded on{" "}
             <strong>YouTube, Twitch or Kick</strong>, on the association&apos;s channel or that of one or more
             casters: each caster joins a stream of the match or opens their own, with its own link (optional),
-            published with the match. That stream goes, with its link, once no caster holds it any more; only the link
+            published with the match; the channel name, read from that link (often the caster&apos;s username), is its visible text. That stream goes, with its link, once no caster holds it any more; only the link
             set in the match&apos;s live configuration (by the organizers or a caster) stays with the match. The link a
             caster provided, there or when opening their stream, also goes when their account is deleted, played
             matches included, even if another caster still holds that stream; a member of the organizers who already

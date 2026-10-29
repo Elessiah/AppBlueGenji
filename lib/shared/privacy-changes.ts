@@ -1326,6 +1326,34 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     ],
     links: [{ href: "/rgpd#donnees-collectees", label: "Lire « Données collectées »" }],
   },
+  {
+    // ERREUR-FIX EF-20 (décision de l'utilisateur D2, 2026-10-29) : les
+    // conditions passent en version 8 (`TERMS_VERSION`), la version 7 disant
+    // encore des règles changées depuis — pseudo de l'arbitre aux membres
+    // (#507, intérêt légitime confirmé par la décision D1), condition
+    // d'arbitrage (BattleTag tiré de Battle.net, EF-23), BattleTag tapé gardé
+    // (D3). Rien de neuf n'est collecté ni lu : la version met le texte
+    // accepté au niveau du site. Les précisions de /rgpd et du registre du
+    // même lot (EF-20) suivent, sans rien changer à ce que fait le site. Pour
+    // tous les comptes : pas de public. Datée du lendemain de la mise en ligne
+    // (déploiement de la nuit du 29 au 30 au plus tôt).
+    id: "2026-10-conditions-v8-arbitre-et-battletag",
+    publishedAt: "2026-10-31",
+    title: "Conditions d'utilisation : version 8 (arbitre désigné, BattleTag tapé)",
+    links: [
+      { href: "/conditions-utilisation#contacts-de-match", label: "Lire la section « Contacts de match »" },
+      { href: "/conditions-utilisation#contenus", label: "Lire la section « Contenus publiés par les utilisateurs »" },
+    ],
+    summary:
+      "Les conditions d'utilisation passent en version 8 : elles disent désormais que tout membre connecté lit le pseudo de l'arbitre désigné d'un match, qu'arbitrer demande un BattleTag tiré d'un compte Battle.net rattaché, et qu'un BattleTag tapé à la main est gardé sans être tenu pour vérifié. Elle est à accepter : une fenêtre te la présente tant que tu ne l'as pas acceptée.",
+    asksTermsAcceptance: true,
+    details: [
+      "Arbitre désigné : son pseudo seul — jamais son BattleTag ni son tag Discord — se lit par tout membre connecté sur la carte et la page du match, jusqu'à la déclaration de son score ou la fin du tournoi, au titre de l'intérêt légitime (savoir qui arbitre) ; il peut s'y opposer par le formulaire de signalement (catégorie RGPD). Les visiteurs sans compte lisent toujours « Arbitre désigné ». Pour arbitrer, il faut la permission d'arbitrage, un tag Discord certifié et un BattleTag tiré d'un compte Battle.net rattaché : un BattleTag tapé à la main ne suffit pas.",
+      "BattleTag : quand Battle.net n'en donne aucun, celui que tu as tapé à la main reste sur ton profil, modifiable et effaçable depuis « Mon profil », sans être tenu pour vérifié ; un BattleTag reçu de Battle.net ne s'efface toujours qu'une fois Battle.net détaché.",
+      "Politique de confidentialité : elle précise aussi, sans rien changer à ce que fait le site, que chaque caster inscrit reçoit en push l'avis du départ du match qu'il caste, que le staff qui gère les tournois lit dans la fenêtre « Arbitrage » d'un match le pseudo de son arbitre et des comptes qui peuvent arbitrer, et que l'avis push du retrait d'un arbitrage relève de ton accord aux notifications push.",
+      "Conditions d'utilisation : la version 8, en vigueur depuis le 31 octobre 2026, le dit dans ses sections « Contacts de match » et « Contenus publiés par les utilisateurs ». Une fenêtre te la présente tant que tu ne l'as pas acceptée : l'accepter permet de continuer à utiliser le site.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

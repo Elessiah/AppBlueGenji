@@ -205,8 +205,9 @@ export function DiscordCertifyPrompt({ prompt, userId, canOpen, onProfile, onAns
       });
       const payload = (await response.json().catch(() => ({}))) as { error?: string; status?: string };
       if (!response.ok) throw new Error(payload.error ?? "");
-      // Un 2xx sans `VERIFIED` (code envoyé en message privé) : le tag n'est
-      // plus celui que Discord a nommé, la suite se fait depuis « Mon profil ».
+      // Branche défensive : avec `linkedOnly`, la route rend `VERIFIED` ou un
+      // refus, jamais un 2xx sans `VERIFIED` (code envoyé en message privé). Si
+      // `linkedOnly` sautait, la suite se ferait depuis « Mon profil ».
       if (payload.status !== "VERIFIED") throw new Error("DISCORD_TAG_CHANGED");
       showSuccess(t("certified"));
       // L'événement close la proposition pour la session (relais, `onCertified`) et

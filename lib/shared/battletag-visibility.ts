@@ -4,7 +4,8 @@
  * Décocher « BattleTag OW » sur `/profil` le retire de **partout** — fiche,
  * annuaire, rosters —, pour tout le monde, arbitres et administrateurs compris,
  * **sauf** dans la fenêtre « Contacts » d'un match, quand elle est ouverte au
- * lecteur (décision de l'utilisateur, 2026-10-19) : membres des deux équipes et
+ * lecteur — et, pour un caster inscrit ou l'arbitre désigné, sur la page du
+ * match, qui reprend leurs contacts (jamais ceux des équipes) — (décision de l'utilisateur, 2026-10-19) : membres des deux équipes et
  * arbitres (permission `tournaments`) dès que les deux adversaires sont connus,
  * caster inscrit le temps du match seulement ; ceux du caster, aux équipes le
  * temps du match, aux arbitres dès que les adversaires sont connus (décision
@@ -32,7 +33,8 @@ export type BattletagSubject = {
   /** Réglage `visible_overwatch` du titulaire. */
   visible: boolean;
   /**
-   * Le tag est-il lu dans la fenêtre « Contacts » d'un match ouverte au lecteur ?
+   * Le tag est-il lu dans la fenêtre « Contacts » d'un match ouverte au lecteur
+   * (ou, pour un caster inscrit ou l'arbitre désigné, sur la page du match) ?
    * Posé par `match-launch-info.ts` seulement.
    */
   sharesLiveMatch?: boolean;
@@ -44,7 +46,8 @@ export type BattletagSubject = {
  * 1. **soi-même** — toujours ;
  * 2. **visible** — tout le monde, visiteur sans compte compris ;
  * 3. **masqué** — seulement dans la fenêtre « Contacts » d'un match ouverte au
- *    lecteur (`sharesLiveMatch`) ; aucun passe-droit de rôle.
+ *    lecteur, ou sur la page du match pour le BattleTag d'un caster inscrit ou
+ *    de l'arbitre désigné (`sharesLiveMatch`) ; aucun passe-droit de rôle.
  */
 export function canViewBattletag(
   viewer: BattletagViewer | null | undefined,
