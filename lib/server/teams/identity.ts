@@ -10,7 +10,8 @@ import {
 import { checkTeamName, TEAM_NAME_ALREADY_USED } from "@/lib/shared/team-name";
 import { recordTermsAcceptance } from "@/lib/server/terms-acceptance";
 import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
-import { assertCanActOnTeam, userCanManageTeam, userOwnsTeam } from "./access";
+import { hasTeamManagementRole } from "@/lib/shared/team-roles";
+import { assertCanActOnTeam, lockMemberRoles, userCanManageTeam, userOwnsTeam } from "./access";
 
 /*
  * Identité d'une équipe : création, nom, sigle et description, logo (par la
@@ -186,23 +187,29 @@ export async function updateTeamLogo(
 ): Promise<{ previousLogoUrl: string | null }> {
   // Retirer un logo n'attend aucune acceptation : c'est justement le geste
   // qu'on veut voir faire à qui doute de ses droits sur l'image.
-  await assertCanActOnTeam(
-    await userCanManageTeam(teamId, requesterId),
-    requesterId,
-    teamId,
-    viewerManagesGhostTeams,
-    logoPath !== null,
-  );
+  const viaRole = await userCanManageTeam(teamId, requesterId);
+  await assertCanActOnTeam(viaRole, requesterId, teamId, viewerManagesGhostTeams, logoPath !== null);
   const db = await getDatabase();
   const connection = await db.getConnection();
   let previousLogoUrl: string | null = null;
   try {
     await connection.beginTransaction();
-    const [rows] = await connection.execute<(RowDataPacket & { logo_url: string | null })[]>(
-      `SELECT logo_url FROM bg_teams WHERE id = ? FOR UPDATE`,
-      [teamId],
-    );
-    previousLogoUrl = rows[0]?.logo_url ?? null;
+    // Le droit est **rejugé** sous le verrou, comme à la dissolution
+    // (`softDeleteTeam`) : lu seulement avant, un envoi croisé avec une
+    // dissolution reposait un logo sur l'équipe anonymisée, et un gérant
+    // rétrogradé (ou le staff sur une fantôme reprise) l'écrivait encore.
+    const [rows] = await connection.execute<
+      (RowDataPacket & { logo_url: string | null; deleted_at: Date | null; is_ghost: 0 | 1 })[]
+    >(`SELECT logo_url, deleted_at, is_ghost FROM bg_teams WHERE id = ? FOR UPDATE`, [teamId]);
+    if (rows.length === 0 || rows[0].deleted_at) throw new Error("FORBIDDEN");
+    if (viaRole) {
+      if (!hasTeamManagementRole(await lockMemberRoles(connection, teamId, requesterId))) {
+        throw new Error("FORBIDDEN");
+      }
+    } else if (rows[0].is_ghost !== 1) {
+      throw new Error("FORBIDDEN");
+    }
+    previousLogoUrl = rows[0].logo_url ?? null;
     await connection.execute(`UPDATE bg_teams SET logo_url = ? WHERE id = ?`, [logoPath, teamId]);
     await connection.commit();
   } catch (error) {
