@@ -29,9 +29,14 @@ de liste publique.
   « Connexion requise » le temps du relais (un état « Ouverture du tournoi… »,
   `<output>`, à sa place) ;
 - membre **connecté** sur `/suivre/tournois/[id]` → `/tournois/[id]`
-  (`app/suivre/tournois/[id]/layout.tsx`), où sont ses actions. L'encart de la
-  page sans compte ne lit alors pas la carte du tournoi (session mémoïsée pour
-  la requête, la redirection la jetterait).
+  (`app/suivre/tournois/[id]/layout.tsx`), où sont ses actions — la page du
+  match de son espace pour `/suivre/tournois/<id>/matchs/<match>`
+  (`memberPathForSpectatorPath`). L'encart de la page sans compte ne lit alors
+  pas la carte du tournoi (session mémoïsée pour la requête, la redirection la
+  jetterait). Une mise en page **préchargée** est servie sans `x-pathname` : le
+  renvoi serveur ne sait plus quelle page on visait, donc la mise en page rend
+  `MemberRelay` (`router.replace` sur le chemin lu par `usePathname`, requête et
+  ancre comprises), qui mène à la page du match quand c'en est une.
 
 La langue suit l'adresse (`localeHref`). L'ancre `#match-[id]` traverse la
 redirection serveur d'une navigation complète (le navigateur la conserve ; une
@@ -91,7 +96,12 @@ Ce qui ne dépend d'aucun droit se règle par `SpectatorViewProvider`
   (décision de l'auteur, 2026-10-27) : `spectatorSnapshot` met à `false` les
   « Prêt » des engagés, de l'arbitre et des casters, garde un rapport de score
   en attente ou en litige **sans ses chiffres** (scores à 0, maps vides), et
-  vide `registeredAt` d'une entrée solo (celle d'une équipe reste). La fiche
+  vide `registeredAt` d'une entrée solo (celle d'une équipe reste ; le tiret qui
+  la remplace est annoncé « Date non communiquée » aux lecteurs d'écran, et
+  l'ordre du tableau est celui du tirage — le plateau le publie de toute façon).
+  `updatedAt` (vidé) et `lobbyOpenedAt` (`null`) des matchs partent aussi :
+  chaque bascule « prêt » les touche, et deux lectures rapprochées diraient à la
+  seconde près qu'une équipe vient de se dire prête. La fiche
   en tient compte : le bandeau de lancement dit « Lancement » sans décompte ni
   « prêt / attendu » (`MatchLaunchStrip`), la carte dit « Score proposé par … ·
   à confirmer » (`cardActions.reportPendingSpectator`, FR et EN — l'échéance de
@@ -141,8 +151,12 @@ lui-même).
 
 - **réseau, pas adresse** : plafonds, part dans la charge et jetons se
   comptent par `clientNetworkKey` (`lib/server/api-guard.ts`) — une IPv4 telle
-  quelle, une IPv6 réduite à son `/64` (une IPv4 encapsulée redevient IPv4) :
-  un hôte qui tourne dans son préfixe reste un seul client ;
+  quelle, une IPv6 réduite à son `/64` (une IPv4 encapsulée redevient IPv4),
+  **port retiré** (`1.2.3.4:51234`, `[v6]:port`) : un hôte qui tourne dans son
+  préfixe, ou change de port à chaque connexion, reste un seul client. Le seau
+  à jetons plein de clés (`maxKeys`) évince d'abord les seaux pleins, puis les
+  **plus pleins** (jamais tout : vider le seau rendrait ses jetons à celui qui le
+  sature) ;
 - la réponse publique est **mutualisée** par tournoi
   (`lib/server/spectator-snapshot.ts`, `cached`) : au plus une reconstruction
   par durée de vie (15 s au calme, ×1 à ×10 selon la charge, plafonnée à
@@ -162,20 +176,27 @@ lui-même).
   propre porte de visibilité. Un « introuvable » n'entre **pas** dans le
   cache (le chargeur lève une sentinelle, `cached` ne garde jamais un échec). Le
   corps est sérialisé **une fois** (version vide), et **compressé une fois**
-  (gzip, `gzippedSpectatorBody`) pour tous les lecteurs qui l'acceptent
+  (gzip **asynchrone**, `gzippedSpectatorBody` : la promesse est rangée dans une
+  `WeakMap`, la boucle d'événements des salons SSE n'est plus bloquée par un
+  corps d'environ 1 Mo) pour tous les lecteurs qui l'acceptent
   (`Content-Encoding: gzip`, `Vary: Accept-Encoding` ; Next ne recompresse pas
   une réponse déjà encodée) ;
 - le cache commun purge ses entrées échues toutes les 10 s au plus
   (`CACHE_SWEEP_INTERVAL_MS`, à l'écriture), et non plus seulement au plafond
   de 500 : un parcours de tournois ne laisse plus d'instantanés en mémoire
-  après leur durée de vie ;
+  après leur durée de vie. Une minuterie `unref`, née à la première écriture et
+  éteinte quand le cache est vide, balaie aussi **sans trafic** ;
+- la réponse ne garde en mémoire que la carte et les réglages
+  (`PublicTournamentView`) de l'instantané, jamais ses matchs ni ses inscrites
+  (déjà dans le corps sérialisé) ;
 - en-tête `x-bg-fresh-within-ms` : l'âge maximal de l'affichage (attente entre
   deux lectures, gigue comprise, **plus** la durée de vie de la réponse servie,
   celle reçue à sa construction, peut-être sous une charge plus forte) — c'est
   lui que le témoin annonce, pour ne pas promettre mieux que le cache ;
 - `ETag` = empreinte du **corps public** (et non la version des membres, qui
-  bouge avec les champs retirés), qui ne voyage que dans l'en-tête ; une relecture sans nouveauté répond **`304`
-  sans corps** ;
+  bouge avec les champs retirés), qui ne voyage que dans l'en-tête ; **un par
+  codage** (RFC 9110) : le corps gzip porte le suffixe `-gzip`. Une relecture
+  sans nouveauté répond **`304` sans corps** ;
 - seules les lectures d'un tournoi servi pèsent dans la charge : des
   identifiants au hasard ne ralentissent pas les vrais spectateurs ;
 - plafond par réseau (`SPECTATOR_READ_RULE`, 360/min : une salle de LAN d'une
@@ -194,14 +215,22 @@ lui-même).
   - au plus **4 constructions en vol**, tous réseaux confondus
     (`SPECTATOR_MAX_CONCURRENT_REBUILDS`) : quelques dizaines d'adresses ne
     font plus reconstruire tous les tournois publiés à chaque durée de vie ;
-  - une reconstruction **refusée** (plus de jeton, places prises) sert la
-    dernière réponse du tournoi **même échue**, tant qu'elle a moins de 150 s
-    (`cached` … `retainMs`, `cachedStale`, `SPECTATOR_MAX_COPY_AGE_MS` — l'âge
-    déclaré dans `/rgpd`), l'âge annoncé passant alors à ce maximum ; sans
-    copie récente, le `429` (jetons) ou un `503` (places). Une adresse
-    partagée garde ainsi son plateau, et la réponse ne dit plus si quelqu'un
-    d'autre vient de lire ce tournoi ;
-- base injoignable → `503` +
+  - une reconstruction **refusée** pour **places prises** (toutes adresses
+    confondues) sert la dernière réponse du tournoi **même échue**, tant
+    qu'elle a moins de 150 s (`cached` … `retainMs`, `cachedStale`,
+    `SPECTATOR_MAX_COPY_AGE_MS` — l'âge déclaré dans `/rgpd`), l'âge annoncé
+    passant alors à ce maximum ; sans copie récente, `503`. Refusée pour
+    **plafond du réseau** (plus de jeton), la réponse est le `429`, **que la
+    copie existe ou non** : elle ne dit pas si quelqu'un d'autre vient de lire
+    ce tournoi, et un réseau sans jeton ne tire plus de corps de la copie
+    (bande passante plafonnée). Seul un client qui détient déjà la version de
+    la copie (`If-None-Match`) reçoit un `304` ; l'instantané des membres
+    chaud ne coûte rien et se sert donc toujours ;
+  - le chargeur **revérifie** la chaleur de l'instantané des membres : si elle
+    est tombée entre le contrôle de `beforeLoad` et la lecture, le jeton et la
+    place sont pris à ce moment ;
+- base injoignable → la **copie de moins de 150 s** si elle existe (l'âge annoncé
+  passe à ce maximum), sinon `503` +
   `Retry-After` du double de la cadence au niveau du moment
   (`spectatorUnavailableRetryMs` : 1 min au calme, 10 au pire), puis recul
   doublé par le relecteur — le `Retry-After` n'est qu'un plancher : des `503`
@@ -244,15 +273,21 @@ pour elle. L'encart (`tournamentPageMetadata`, `lib/server/tournament-metadata.t
 commun aux deux espaces) et l'image d'aperçu (réexport de
 `app/(secured)/tournois/[id]/opengraph-image.tsx`, identifiant lu par
 `parseTournamentId` comme la page et la route) appliquent la même règle. Sur la
-page sans compte, l'encart lit la **réponse publique mutualisée**
-(`publicTournamentSnapshotForRequest`, `lib/server/spectator-request.ts`), au
-même prix pour le réseau qui demande la page : une annonce Discord ou des F5
-en rafale ne coûtent plus une lecture de la carte par vue.
+page sans compte, l'encart lit la **carte seule**
+(`publicTournamentCardForRequest`, `lib/server/spectator-request.ts` →
+`publicTournamentCard`) : la copie de la réponse publique si elle a moins de
+150 s, sinon la carte (une requête indexée) gardée 10 s — jamais une
+reconstruction de l'instantané entier payée par le réseau d'un robot d'aperçu.
+L'état en est **recalculé depuis les dates** (la copie garde celui de sa
+construction). Chaque rendu de page sans session compte dans
+`SPECTATOR_READ_RULE` ; au plafond, encart ou page générale.
 
 **Règles du mode** — le « ? » de la fiche (`RulesHelpFab`) mène à
 `/regles/<mode>?tournoi=<id>`. Sans session aussi, les réglages du tournoi
-publié y sont rendus, par la même réponse publique mutualisée (décision de
-l'auteur, 2026-10-27), et « Retour au tournoi » mène à la page sans compte ;
+publié y sont rendus, par la réponse publique mutualisée (décision de
+l'auteur, 2026-10-27 ; `publicTournamentSnapshotForRequest`, plafonnée par
+`SPECTATOR_READ_RULE`), et « Retour au tournoi » mène à la page sans compte ;
+une session **illisible** n'est pas une visite sans compte : page générale ;
 un membre lit l'instantané avec ses droits et revient à `/tournois/[id]`.
 Un robot d'aperçu, sans session, suit la redirection et lit l'encart du
 tournoi sur la page sans compte.
