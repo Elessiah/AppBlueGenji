@@ -48,6 +48,11 @@ interface MapScoreListProps {
   replayCodeOptional?: boolean;
   disabled: boolean;
   fieldErrors: FieldErrors<string>;
+  /**
+   * Nom de chaque carte fixée du match (index 0 = map 1, `matchMapNames`) :
+   * la ligne lit « Map 1 : Ilios » ; sans nom, « Map 1 ».
+   */
+  mapNames?: ReadonlyArray<string | null>;
 }
 
 /** `id` du contrôle d'un champ de la liste. */
@@ -86,6 +91,7 @@ export function MapScoreList({
   replayCodeOptional = false,
   disabled,
   fieldErrors,
+  mapNames = [],
 }: Readonly<MapScoreListProps>) {
   const text = useDialogsText();
   const { t } = text;
@@ -203,10 +209,11 @@ export function MapScoreList({
             const codeId = mapFieldId(idPrefix, index, "replayCode");
             const t1Id = mapFieldId(idPrefix, index, "team1Score");
             const t2Id = mapFieldId(idPrefix, index, "team2Score");
+            const mapName = mapNames[index] ?? null;
             return (
               <li key={keys.current[index]} className={styles.row}>
                 <span className={styles.mapLabel} aria-hidden="true">
-                  {t("score.maps.map", { index: index + 1 })}
+                  {mapName ? t("score.maps.mapNamed", { index: index + 1, name: mapName }) : t("score.maps.map", { index: index + 1 })}
                 </span>
                 {/* Chaque nom de champ porte le numéro de map (masqué à l'œil) : sur
                     cinq lignes, « Code de replay » seul ne dirait pas laquelle. La
@@ -214,7 +221,11 @@ export function MapScoreList({
                     dans le nom du champ et serait lue deux fois. */}
                 <div className={styles.code}>
                   <label className={styles.fieldLabel} htmlFor={codeId}>
-                    <span className="sr-only">{t("score.maps.mapPrefix", { index: index + 1 })}</span>
+                    <span className="sr-only">
+                      {mapName
+                        ? t("score.maps.mapNamedPrefix", { index: index + 1, name: mapName })
+                        : t("score.maps.mapPrefix", { index: index + 1 })}
+                    </span>
                     {replayCodeOptional ? t("score.maps.replayCodeOptional") : t("score.maps.replayCode")}
                   </label>
                   <input

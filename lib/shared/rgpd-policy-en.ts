@@ -18,6 +18,7 @@ import {
   REFEREE_BATTLETAG_BEFORE_V7_SCOPE,
   REFEREE_USERNAME_SCOPE,
   REFEREE_USERNAME_BEFORE_V7_SCOPE,
+  REFEREE_USERNAME_MEMBERS_SCOPE,
   VERIFIED_BADGE_SCOPE,
   LIVE_PSEUDO_SCOPE,
   MATCH_CONTACTS_SCOPE,
@@ -55,6 +56,8 @@ const SCOPE_EN: Record<string, string> = {
     "the username of a match's assigned referee, in its “Contacts” and launch windows and on the match page, whatever the game: to both its teams and the referees as soon as both its opponents are known until its end, and to its casters while the match is being played (in an Overwatch tournament, next to their BattleTag — see “Overwatch username”), and alone as soon as the launch window shows the match (terms of use, “Match contacts”, once the referee has accepted their version 7)",
   [REFEREE_USERNAME_BEFORE_V7_SCOPE]:
     "the same presentation of the assigned referee's username, as long as that referee has not accepted version 7 of the terms of use — objection through the report form, GDPR category (once upheld, they are removed from all their unfinished matches and can no longer take or be assigned one until it is lifted — at their request only —, even once version 7 is accepted)",
+  [REFEREE_USERNAME_MEMBERS_SCOPE]:
+    "the username alone of the assigned referee of a match, on the match card and page until its score is reported or the tournament ends, read by any signed-in member (never by a visitor without an account, who reads “Referee assigned”) — objection through the report form, GDPR category, with the same effect as an objection to being presented to the parties (removal from their unfinished matches)",
   [VERIFIED_BADGE_SCOPE]:
     "certification badge on your player page, read by any logged-in player even when the tag is hidden (without the tag) — objection through the report form, GDPR category",
   [MATCH_TIME_DM_SCOPE]: "match time notices, reminders, match removal notices, lobby settings and cast removal notices by direct message",

@@ -18,6 +18,7 @@ import { visibleText } from "@/lib/shared/visible-text";
 import { localizeBracketPlaceholder } from "@/lib/shared/bracket-placeholders";
 import { castEligibilityBlock, refereeEligibilityBlock } from "./cast-eligibility";
 import type { MatchCasterRow, MatchStreamRow } from "./match-casters";
+import { refereeKey } from "./referee-names";
 
 export type TournamentRow = RowDataPacket & {
   id: number;
@@ -486,7 +487,13 @@ function mapMatchLaunch(row: MatchRow, allCasters: readonly MatchCasterRow[]) {
     hostTeamId,
     firstBanTeamId: firstBanTeamId(hostTeamId, team1Id, team2Id),
     refereeAssigned: referee,
-    refereeReady: readiness.referee?.ready ?? false,
+    // Empreinte de la désignation, jusqu'à la fin du match : la fenêtre
+    // « Contacts » s'y relit quand l'arbitre change. Le pseudo aux membres
+    // (décision 52) ne se montre, lui, que tant que le score n'est pas déclaré
+    // (`showsRefereeName` : `PENDING`/`READY` — textes RGPD « jusqu'à la
+    // déclaration de son score ou la fin du tournoi »). Tournoi terminé : `snapshot.ts`.
+    refereeKey:
+      referee && row.status !== "COMPLETED" ? refereeKey(Number(row.id), Number(row.referee_user_id)) : null,
     selfManaged: Number(row.self_managed ?? 0) === 1,
     firstMap: firstMap === "" ? null : firstMap,
     mapPicks: parseMapPicks(row.map_picks),

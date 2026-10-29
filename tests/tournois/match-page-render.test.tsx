@@ -12,6 +12,8 @@ jest.mock("@/app/(secured)/tournois/[id]/_components/MatchCardActions", () =>
 // Lecture des contacts simulée : un rendu statique ne joue aucun effet. La
 // page ne doit montrer ce qu'elle lit qu'aux lecteurs à qui elle le demande.
 let mockLaunch: MatchLaunchInfo | null = null;
+/** Pseudos d'arbitre du contexte du lecteur (MATCH-UI-NAMES). */
+let refereeNames: MatchRefereeName[] = [];
 const mockEnabled: boolean[] = [];
 jest.mock("@/components/match-launch/MatchContactsDialog", () => ({
   useMatchContacts: (_matchId: number, _card: unknown, enabled = true) => {
@@ -29,7 +31,7 @@ import { LiveProvider } from "@/app/(secured)/tournois/[id]/_lib/live-context";
 import { SpectatorViewProvider } from "@/components/spectator-view";
 import { ToastProvider } from "@/components/ui/toast";
 import type { LaunchCaster, LaunchSide, MatchLaunchInfo } from "@/lib/shared/match-launch";
-import type { BracketMatch, TournamentGame } from "@/lib/shared/types";
+import type { BracketMatch, MatchRefereeName, TournamentGame } from "@/lib/shared/types";
 import { EMPTY_MAP_RULES, type TournamentMapRules } from "@/lib/shared/round-maps";
 import { bracketMatch, matchCaster } from "../helpers/bracket-match";
 import { tournamentDetail } from "../helpers/tournament-detail";
@@ -135,6 +137,7 @@ function render(
         viewerUserId={viewer === "caster" ? 900 : 1}
         myTeamId={viewer === "player" ? ALPHA : null}
         castBlock="NOT_CASTER"
+        refereeNames={refereeNames}
       >
         <MatchPage
           detail={detail}
@@ -168,6 +171,7 @@ const visible = (html: string) =>
 
 beforeEach(() => {
   mockLaunch = null;
+  refereeNames = [];
   mockEnabled.length = 0;
 });
 
@@ -302,6 +306,23 @@ describe("page d'un match — cartes du round et bans", () => {
 });
 
 describe("page d'un match — arbitrage × lecteur", () => {
+  it("render_officiatingLine_nameKnown_showsNamedForm", () => {
+    refereeNames = [{ matchId: 34, refereeKey: "k-juge", pseudo: "Juge" }];
+
+    const html = render(match({ refereeAssigned: true, refereeKey: "k-juge" }), "other");
+
+    expect(visible(html)).toContain("Arbitre : Juge");
+  });
+
+  it("render_officiatingLine_staleKey_keepsArbitreDesigne", () => {
+    refereeNames = [{ matchId: 34, refereeKey: "k-ancien", pseudo: "Ancien" }];
+
+    const html = render(match({ refereeAssigned: true, refereeKey: "k-juge" }), "other");
+
+    expect(visible(html)).toContain("Arbitre désigné");
+    expect(html).not.toContain("Ancien");
+  });
+
   it("arbitre : « Arbitre désigné » pour tous, sa fiche aux seules parties du match et au staff", () => {
     const referee = { userId: 77, pseudo: "Juge", battletag: "Juge#3333", battletagVerified: true, ready: false, isViewer: false };
     mockLaunch = launch({ referee });

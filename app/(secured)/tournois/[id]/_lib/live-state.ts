@@ -128,9 +128,14 @@ export function applyLiveMessage(state: LiveState, message: LiveMessage): LiveSt
       message.certificationPromptPending && state.detail?.card.id === message.tournamentId
         ? { certificationPrompt: state.detail.certificationPrompt }
         : {};
+    // Pseudos d'arbitre inchangés : même tableau, `LiveProvider` ne redessine
+    // pas le plateau à chaque reconnexion (`shareRefereeNames`).
+    const refereeNames = state.detail
+      ? shareRefereeNames(state.detail.refereeNames, message.viewer.refereeNames)
+      : message.viewer.refereeNames;
     return {
       tier: message.tier,
-      detail: { ...snapshot, ...message.viewer, ...kept },
+      detail: { ...snapshot, ...message.viewer, refereeNames, ...kept },
     };
   }
 
@@ -177,6 +182,10 @@ export function applyLiveMessage(state: LiveState, message: LiveMessage): LiveSt
     matchProposals: state.detail.matchProposals,
     // Invitation à certifier : tient au roster et aux comptes, pas au plateau.
     certificationPrompt: state.detail.certificationPrompt,
+    // Pseudos des arbitres : rejoués tels quels ; une désignation changée se
+    // repère à son empreinte (`refereeKey`) et se relit par la lecture REST
+    // (`missingRefereeNamesKey`, MATCH_REFEREE.md).
+    refereeNames: state.detail.refereeNames,
     // L'aperçu du plateau n'arrive qu'à la connexion, comme le reste du contexte
     // du lecteur : le flux ne le transporte pas, il est réservé au staff et au
     // cast (`docs/features/TOURNAMENT_PREVIEW.md`).
@@ -229,6 +238,19 @@ export function shareUnchanged(
     return next;
   }
   return { ...next, matches, registrations, soloUserIds };
+}
+
+/**
+ * Pseudos d'arbitre d'une relecture REST : la liste précédente elle-même quand
+ * le contenu n'a pas bougé. Ils alimentent `LiveProvider`, lu par chaque carte
+ * de match : un nouveau tableau au même contenu redessinerait tout le plateau
+ * à chaque relecture.
+ */
+export function shareRefereeNames(
+  previous: TournamentViewerContext["refereeNames"],
+  next: TournamentViewerContext["refereeNames"],
+): TournamentViewerContext["refereeNames"] {
+  return sameValue(previous, next) ? previous : next;
 }
 
 /**

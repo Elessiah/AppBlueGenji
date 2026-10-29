@@ -6,6 +6,7 @@ import { ScrollArea } from "@/components/cyber/ScrollArea";
 import { useToast } from "@/components/ui/toast";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
+import { useClientPower } from "@/lib/shared/hooks/useClientPower";
 import {
   MATCH_LAUNCH_REFRESH_EVENT,
   casterContactsPending,
@@ -86,6 +87,18 @@ export function shouldRetryReread(failures: number): boolean {
   return failures > 0 && failures <= REREAD_RETRIES;
 }
 
+/**
+ * Relève de la modale pendant le lancement tant que l'arbitre désigné n'est pas
+ * « Prêt » : son « Prêt » ne voyage plus dans l'instantané diffusé (décision 47),
+ * il ne se lit que par cette lecture, réservée aux parties du match.
+ */
+export const REFEREE_READY_REREAD_MS = 10_000;
+
+/** Relever la modale pour suivre le « Prêt » de l'arbitre ? En lancement, arbitre présenté et pas encore prêt. */
+export function refereeReadyRereadDue(launch: MatchLaunchInfo | null): boolean {
+  return launch !== null && launch.phase === "LOBBY" && launch.referee !== null && !launch.referee.ready;
+}
+
 /** Plus longue attente que `setTimeout` accepte (≈ 24,8 jours). */
 const MAX_TIMER_MS = 2_147_483_647;
 
@@ -122,7 +135,7 @@ export type ContactsCard = Pick<
   | "team1Ready"
   | "team2Ready"
   | "refereeAssigned"
-  | "refereeReady"
+  | "refereeKey"
   | "selfManaged"
 >;
 
@@ -136,7 +149,10 @@ const CARD_FIELDS = [
   "team1Ready",
   "team2Ready",
   "refereeAssigned",
-  "refereeReady",
+  // Empreinte de la désignation : un match confié à un autre arbitre relit la
+  // modale (pseudo, BattleTag). Le « Prêt » de l'arbitre n'est plus dans
+  // l'instantané (décision 47) : la relève `REFEREE_READY_REREAD_MS` le suit.
+  "refereeKey",
   "selfManaged",
 ] as const satisfies readonly (keyof ContactsCard)[];
 
@@ -278,6 +294,16 @@ export function useMatchContacts(
     const timer = setTimeout(() => setReadKey((key) => key + 1), Math.max(REREAD_RETRY_MS, rereadWait));
     return () => clearTimeout(timer);
   }, [rereadFailures, rereadWait]);
+
+  // « Prêt » de l'arbitre : relevé pendant le lancement, onglet visible
+  // seulement (`clocks`), jusqu'à ce qu'il soit prêt ou que la phase change.
+  const { clocks } = useClientPower();
+  const followReferee = clocks && refereeReadyRereadDue(launch);
+  useEffect(() => {
+    if (!followReferee) return;
+    const timer = setInterval(rereadNow, REFEREE_READY_REREAD_MS);
+    return () => clearInterval(timer);
+  }, [followReferee]);
 
   // Contacts du caster en attente : une relecture à l'heure de départ du serveur.
   useEffect(() => {

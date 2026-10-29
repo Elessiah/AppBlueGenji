@@ -128,7 +128,9 @@ function MatchStreamBanner({
   return (
     <div className={styles.streamBanner}>
       <a
-        className={`${styles.streamButton} ${styles.nested}`}
+        // Le nom de la chaîne garde ses majuscules (« Regarder BlueGenji ») : le
+        // bandeau, en capitales, les effacerait.
+        className={[styles.streamButton, styles.nested, channel ? styles.keepCase : null].filter(Boolean).join(" ")}
         href={streamHref}
         target="_blank"
         rel="noopener noreferrer"

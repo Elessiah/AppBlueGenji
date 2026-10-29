@@ -63,6 +63,7 @@ import { pickChampion } from "@/lib/shared/tournament-card-summary";
 import { computeRunningRatio } from "@/lib/shared/tournament-progress";
 import { applyMapRules } from "@/lib/shared/round-maps";
 import { loadMapRules } from "./round-maps";
+import { withoutRefereeKeys } from "./referee-names";
 
 /**
  * Durée de vie d'un instantané. Volontairement courte : elle ne sert qu'à
@@ -531,7 +532,10 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
 
     const payload: Omit<TournamentSnapshot, "version"> = {
       card: summarizedCard,
-      matches: mappedMatches,
+      // Tournoi terminé : un match resté non joué (reset de grande finale
+      // inutile, fin forcée) ne nomme plus son arbitre — l'affichage aux
+      // membres ne dure pas au-delà du tournoi.
+      matches: card.state === "FINISHED" ? withoutRefereeKeys(mappedMatches) : mappedMatches,
       registrations: orderedRegistrations,
       survival,
       swiss,

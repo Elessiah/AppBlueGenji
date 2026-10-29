@@ -70,6 +70,8 @@ interface AdminScoreDialogProps {
   proposals?: MatchProposalMaps[];
   /** Relit le contexte du lecteur quand une proposition a changé. */
   onRefreshProposals?: () => void | Promise<unknown>;
+  /** Nom des cartes fixées du match (`matchMapNames`) : « Map 1 : Ilios ». */
+  mapNames?: ReadonlyArray<string | null>;
   onClose: () => void;
   onSubmitted: () => void;
 }
@@ -261,6 +263,7 @@ export function AdminScoreDialog({
   match: liveMatch,
   proposals = NO_PROPOSALS,
   onRefreshProposals = NO_REFRESH,
+  mapNames,
   onClose,
   onSubmitted,
 }: Readonly<AdminScoreDialogProps>) {
@@ -571,6 +574,7 @@ export function AdminScoreDialog({
               team1Id={match.team1Id}
               team2Id={match.team2Id}
               replayCodeOptional
+              mapNames={mapNames}
               disabled={form.submitting}
               fieldErrors={mapFieldErrors}
             />

@@ -187,7 +187,7 @@ function match(overrides: Partial<BracketMatch> = {}): BracketMatch {
     hostTeamId: 1,
     firstBanTeamId: null,
     refereeAssigned: false,
-    refereeReady: false,
+    refereeKey: null,
     selfManaged: false,
     firstMap: null,
     mapPicks: {},

@@ -241,3 +241,25 @@ describe("compteur de visites — déduplication dans l'onglet", () => {
     expect(visitTracker).not.toContain(".then(() => rememberPing())");
   });
 });
+
+describe("pseudos d'arbitre — relecture légère (MATCH-UI-NAMES, revue #507)", () => {
+  it("refreshRefereeNames_failedRead_reopensSameMissingSet", () => {
+    const body = hook.slice(hook.indexOf("const refreshRefereeNames"), hook.indexOf("useEffect(", hook.indexOf("const refreshRefereeNames")));
+    expect(body).toContain('if (namesAttemptRef.current === missing) namesAttemptRef.current = "";');
+    expect(body).toMatch(/if \(!response\.ok\) \{\s*retryLater\(\);\s*return;\s*\}/);
+    expect(body).toMatch(/catch \{[^}]*retryLater\(\);\s*\}/);
+  });
+
+  it("refreshRefereeNames_lateResponse_commitsOnlyWhenNamesImprove", () => {
+    const body = hook.slice(hook.indexOf("const refreshRefereeNames"), hook.indexOf("useEffect(", hook.indexOf("const refreshRefereeNames")));
+    const guard = body.indexOf("if (!refereeNamesImprove(current.detail.matches, current.detail.refereeNames, names)) return;");
+
+    expect(guard).toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(body.indexOf("commit("));
+  });
+
+  it("refereeKey_secret_survivesModuleReevaluation", () => {
+    const names = read("lib/server/tournaments/referee-names.ts");
+    expect(names).toContain("holder.__bgRefereeKeySecret ??= randomBytes(32);");
+  });
+});

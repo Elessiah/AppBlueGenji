@@ -13,6 +13,7 @@ import {
   REFEREE_BATTLETAG_BEFORE_V7_SCOPE,
   REFEREE_USERNAME_SCOPE,
   REFEREE_USERNAME_BEFORE_V7_SCOPE,
+  REFEREE_USERNAME_MEMBERS_SCOPE,
   VERIFIED_BADGE_SCOPE,
   MATCH_CONTACTS_SCOPE,
   LIVE_PSEUDO_SCOPE,
@@ -504,13 +505,17 @@ describe("messages privés d'horaire et de rappel de match — base légale (rev
       // Revue juridique de #491 : le pseudo de l'arbitre désigné, même base que son BattleTag.
       { base: "Exécution du contrat", scope: REFEREE_USERNAME_SCOPE },
       { base: "Intérêt légitime", scope: REFEREE_USERNAME_BEFORE_V7_SCOPE },
+      // MATCH-UI-NAMES : le pseudo seul lu par tout membre connecté.
+      { base: "Intérêt légitime", scope: REFEREE_USERNAME_MEMBERS_SCOPE },
     ]);
     expect(DONNEES_PROFIL_EN.find((d) => d.donnee === "Site username")?.extraBases).toEqual([
       { base: "Exécution du contrat", scope: "#live announcement of a solo tournament, kept in the Discord channel until deleted on request" },
       { base: "Intérêt légitime", scope: "AutoMod alert for such an announcement when blocked or flagged, kept in the moderators' alert channel until they delete it or on request" },
       { base: "Exécution du contrat", scope: "the username of a match's assigned referee, in its “Contacts” and launch windows and on the match page, whatever the game: to both its teams and the referees as soon as both its opponents are known until its end, and to its casters while the match is being played (in an Overwatch tournament, next to their BattleTag — see “Overwatch username”), and alone as soon as the launch window shows the match (terms of use, “Match contacts”, once the referee has accepted their version 7)" },
       { base: "Intérêt légitime", scope: "the same presentation of the assigned referee's username, as long as that referee has not accepted version 7 of the terms of use — objection through the report form, GDPR category (once upheld, they are removed from all their unfinished matches and can no longer take or be assigned one until it is lifted — at their request only —, even once version 7 is accepted)" },
+      { base: "Intérêt légitime", scope: "the username alone of the assigned referee of a match, on the match card and page until its score is reported or the tournament ends, read by any signed-in member (never by a visitor without an account, who reads “Referee assigned”) — objection through the report form, GDPR category, with the same effect as an objection to being presented to the parties (removal from their unfinished matches)" },
     ]);
+    expect(REFEREE_USERNAME_MEMBERS_SCOPE).toContain("lu par tout membre connecté (jamais par un visiteur sans compte");
     expect(REFEREE_USERNAME_SCOPE).toContain("une fois leur version 7 acceptée par l'arbitre");
     // Revue #497 cycle 3 : l'audience du pseudo s'écrit en clair, sans renvoyer
     // à une règle du BattleTag qui ne vaut qu'en Overwatch.

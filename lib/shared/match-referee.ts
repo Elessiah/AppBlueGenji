@@ -19,6 +19,7 @@
  */
 import type { CasterIdentity } from "./match-launch";
 import { visibleText } from "./visible-text";
+import type { MatchStatus } from "./types";
 
 /** Ce qui empêche un compte d'arbitrer un match. */
 export type RefereeBlock = "NOT_REFEREE" | "REFEREE_IDENTITY_REQUIRED";
@@ -139,4 +140,90 @@ export function groupNoRefereeAlerts(candidates: readonly NoRefereeCandidate[]):
     }
   }
   return { perMatch, perRound: [...rounds.values()] };
+}
+
+/** Pseudo d'arbitre lié à l'empreinte de sa désignation (`TournamentViewerContext.refereeNames`). */
+type RefereeNameEntry = { matchId: number; refereeKey: string; pseudo: string };
+
+/** Ce qu'il faut d'un match pour savoir s'il nomme son arbitre. */
+type RefereeNamedMatch = { id: number; refereeKey: string | null; status: MatchStatus };
+
+/**
+ * Ce match nomme-t-il son arbitre aux membres (décision 52) ? Désignation
+ * montrée (empreinte non nulle) **et** score pas encore déclaré
+ * (`PENDING`/`READY`) : textes RGPD « jusqu'à la déclaration de son score ou
+ * la fin du tournoi ». L'empreinte, elle, reste jusqu'à la fin du match pour
+ * la fenêtre « Contacts ».
+ */
+export function showsRefereeName(match: RefereeNamedMatch): boolean {
+  return match.refereeKey !== null && (match.status === "PENDING" || match.status === "READY");
+}
+
+/**
+ * Pseudo de l'arbitre à montrer sur ce match (décision 52), `null` pour lire
+ * « Arbitre désigné » : sans arbitre montré, sur la page sans compte (empreinte
+ * nulle), ou quand le pseudo connu est celui d'une autre désignation.
+ */
+export function refereeNameOf(
+  match: RefereeNamedMatch,
+  names: readonly RefereeNameEntry[],
+): string | null {
+  if (!showsRefereeName(match)) return null;
+  const entry = names.find((name) => name.matchId === match.id && name.refereeKey === match.refereeKey);
+  return entry ? entry.pseudo : null;
+}
+
+/**
+ * Empreintes des désignations montrées dont le pseudo manque, en une clé
+ * stable (`""` : rien ne manque). Une nouvelle clé déclenche **une** relecture
+ * des pseudos ; la même ne la relance pas (pseudo vide, lecture en retard).
+ */
+export function missingRefereeNamesKey(
+  matches: readonly RefereeNamedMatch[],
+  names: readonly RefereeNameEntry[],
+): string {
+  const missing: string[] = [];
+  for (const match of matches) {
+    if (showsRefereeName(match) && refereeNameOf(match, names) === null) missing.push(`${match.id}:${match.refereeKey}`);
+  }
+  return missing.join(",");
+}
+
+/** Nombre de désignations montrées dont le pseudo manque dans `names`. */
+function missingRefereeNamesCount(
+  matches: readonly RefereeNamedMatch[],
+  names: readonly RefereeNameEntry[],
+): number {
+  let missing = 0;
+  for (const match of matches) {
+    if (showsRefereeName(match) && refereeNameOf(match, names) === null) missing += 1;
+  }
+  return missing;
+}
+
+/**
+ * Une liste de pseudos relue **améliore**-t-elle celle qu'on a ? Vrai quand
+ * elle laisse moins de désignations montrées sans pseudo. Une réponse en
+ * retard (lue avant une désignation plus récente, ou doublée par le contexte
+ * d'une reconnexion) n'écrase ainsi jamais une liste plus à jour.
+ */
+export function refereeNamesImprove(
+  matches: readonly RefereeNamedMatch[],
+  current: readonly RefereeNameEntry[],
+  incoming: readonly RefereeNameEntry[],
+): boolean {
+  return missingRefereeNamesCount(matches, incoming) < missingRefereeNamesCount(matches, current);
+}
+
+/** Liste de pseudos d'arbitre reçue d'une réponse (forme contrôlée), `null` si elle n'en est pas une. */
+export function parseRefereeNames(value: unknown): RefereeNameEntry[] | null {
+  if (!Array.isArray(value)) return null;
+  const names: RefereeNameEntry[] = [];
+  for (const item of value as unknown[]) {
+    if (!item || typeof item !== "object") continue;
+    const { matchId, refereeKey, pseudo } = item as Record<string, unknown>;
+    if (typeof matchId !== "number" || typeof refereeKey !== "string" || typeof pseudo !== "string") continue;
+    names.push({ matchId, refereeKey, pseudo });
+  }
+  return names;
 }

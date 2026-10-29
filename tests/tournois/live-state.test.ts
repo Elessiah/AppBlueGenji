@@ -17,6 +17,7 @@ import {
   shouldCommitFetched,
   shouldRefreshViewerContext,
   reconnectDelayMs,
+  shareRefereeNames,
   shareUnchanged,
   type LiveState,
 } from "@/app/(secured)/tournois/[id]/_lib/live-state";
@@ -103,6 +104,7 @@ const snapshot = (overrides: Partial<TournamentSnapshot> = {}): TournamentSnapsh
 const viewer = (overrides: Partial<TournamentViewerContext> = {}): TournamentViewerContext => ({
   canRegister: false,
   matchProposals: [],
+  refereeNames: [],
   certificationPrompt: null,
   // Qualité pour engager son équipe : le cas ordinaire. Le refus a son propre
   // test — sans ce défaut, tous les autres testeraient le mauvais refus.
@@ -671,6 +673,48 @@ describe("shareUnchanged", () => {
     const previous = snapshot({ matches: [], registrations: [], soloUserIds: { 1: 2 } });
     const next = snapshot({ version: "v2", matches: [match()] });
     expect(shareUnchanged(previous, next)).toBe(next);
+  });
+});
+
+describe("shareRefereeNames", () => {
+  const previous = [{ matchId: 5, refereeKey: "k5", pseudo: "Juge" }];
+
+  it("shareRefereeNames_sameContentNewArray_returnsPreviousArray", () => {
+    const next = [{ matchId: 5, refereeKey: "k5", pseudo: "Juge" }];
+
+    expect(shareRefereeNames(previous, next)).toBe(previous);
+  });
+
+  const reconnect = (state: LiveState, refereeNames: TournamentViewerContext["refereeNames"]) =>
+    applyLiveMessage(state, {
+      type: "connected",
+      tournamentId: 7,
+      tier: "PRIORITY",
+      viewer: viewer({ refereeNames }),
+      snapshot: snapshot({ version: "v2" }),
+    });
+
+  it("applyLiveMessage_reconnectSameRefereeNames_keepsPreviousArray", () => {
+    const established = reconnect(INITIAL_LIVE_STATE, previous);
+
+    const next = reconnect(established, [{ matchId: 5, refereeKey: "k5", pseudo: "Juge" }]);
+
+    expect(next.detail?.refereeNames).toBe(previous);
+  });
+
+  it("applyLiveMessage_reconnectChangedRefereeNames_takesNewArray", () => {
+    const established = reconnect(INITIAL_LIVE_STATE, previous);
+    const changed = [{ matchId: 5, refereeKey: "k5-bis", pseudo: "Autre" }];
+
+    const next = reconnect(established, changed);
+
+    expect(next.detail?.refereeNames).toBe(changed);
+  });
+
+  it("shareRefereeNames_changedPseudo_returnsNextArray", () => {
+    const next = [{ matchId: 5, refereeKey: "k5-bis", pseudo: "Autre" }];
+
+    expect(shareRefereeNames(previous, next)).toBe(next);
   });
 });
 

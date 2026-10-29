@@ -17,6 +17,7 @@ import { toParticipantType } from "@/lib/shared/participants";
 import { remainingSlots } from "@/lib/shared/ghost-registration";
 import { useToast } from "@/components/ui/toast";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
+import { matchMapNames } from "@/lib/shared/round-maps";
 import { CyberButton } from "@/components/cyber";
 import { useSpectatorView } from "@/components/spectator-view";
 import { SPECTATOR_NOT_FOUND_RECHECK_MINUTES } from "@/lib/shared/spectator-view";
@@ -1225,6 +1226,7 @@ function TournamentSheetView({
         myTeamId={detail.myTeamId}
         castBlock={detail.castBlock}
         openReplay={openMatchReplay}
+        refereeNames={detail.refereeNames}
       >
       {/* Le bouton **par match** suit la règle de `frozen` : le plateau affiché
           ne bouge plus, et signaler « ce match » depuis une manche périmée
@@ -1351,6 +1353,7 @@ function TournamentSheetView({
           match={matchForAdminScore}
           proposals={detail.matchProposals}
           onRefreshProposals={refreshProposals}
+          mapNames={matchMapNames(detail.mapRules.rounds, matchForAdminScore)}
           onClose={() => setSelectedMatchForAdminId(null)}
           onSubmitted={() => {
             setSelectedMatchForAdminId(null);
@@ -1368,6 +1371,7 @@ function TournamentSheetView({
           canReportScore={canReportScore(matchForPlayerScore)}
           canForfeit={detail.canRegisterEntrant}
           proposals={detail.matchProposals}
+          mapNames={matchMapNames(detail.mapRules.rounds, matchForPlayerScore)}
           onClose={() => setPlayerScoreMatchId(null)}
           onSubmitted={() => void refresh()}
           onRefresh={refreshProposals}

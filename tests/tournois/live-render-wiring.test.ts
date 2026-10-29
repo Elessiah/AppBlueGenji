@@ -33,6 +33,10 @@ describe("cartes de match mémorisées — ce qui descend jusqu'à elles reste s
   it("partage aussi ce que relit la lecture REST de secours", () => {
     expect(hook).toContain("shareUnchanged(current, payload)");
   });
+
+  it("load_restReread_sharesRefereeNames", () => {
+    expect(hook).toContain("refereeNames: shareRefereeNames(current.refereeNames, payload.refereeNames)");
+  });
 });
 
 describe("modale de lancement — alimentée par le flux de la fiche", () => {

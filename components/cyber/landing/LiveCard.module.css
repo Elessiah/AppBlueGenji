@@ -263,6 +263,13 @@
   transition: background-color 0.18s ease;
 }
 
+/* Bouton au nom d'une chaîne : la casse saisie dans le lien reste
+   (« BlueGenji », pas « BLUEGENJI ») — LIVE_STREAMS.md. */
+.streamButton.keepCase {
+  text-transform: none;
+  letter-spacing: 0.04em;
+}
+
 .streamButton:hover,
 .streamButton:focus-visible {
   background: rgba(255, 74, 92, 0.18);

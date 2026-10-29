@@ -154,16 +154,37 @@ describe("mapMatch — arbitre désigné dans l'instantané (`docs/features/MATC
 
   it("ne porte que des drapeaux : jamais l'identité de l'arbitre", () => {
     const match = mapMatch(row({ ...eligible, referee_ready_at: new Date() }));
-    expect(match).toMatchObject({ refereeAssigned: true, refereeReady: true, selfManaged: false });
+    expect(match).toMatchObject({ refereeAssigned: true, selfManaged: false });
+    // Ni « Prêt » de l'arbitre (décision 47) ni compte : une empreinte opaque.
+    expect(match).not.toHaveProperty("refereeReady");
+    expect(match.refereeKey).toMatch(/^[\w-]{16}$/);
     const text = JSON.stringify(match);
     expect(text).not.toContain("950");
     expect(text).not.toContain("arbitre");
     expect(text).not.toContain("Arbitre#1");
   });
 
+  // MATCH-UI-NAMES : un match joué ne nomme plus son arbitre aux membres.
+  it("mapMatchLaunch_completedMatch_hasNullRefereeKey", () => {
+    const match = mapMatch(row({ ...eligible, status: "COMPLETED" }));
+    expect(match.refereeKey).toBeNull();
+  });
+
+  it("mapMatchLaunch_pendingMatch_hasRefereeKey", () => {
+    const match = mapMatch(row({ ...eligible, status: "PENDING" }));
+    expect(match.refereeKey).toMatch(/^[\w-]{16}$/);
+  });
+
+  // Score déclaré : l'empreinte reste (relève de la fenêtre « Contacts ») ;
+  // c'est `showsRefereeName` qui tait le pseudo aux membres.
+  it("mapMatchLaunch_awaitingConfirmationMatch_keepsRefereeKey", () => {
+    const match = mapMatch(row({ ...eligible, status: "AWAITING_CONFIRMATION" }));
+    expect(match.refereeKey).toMatch(/^[\w-]{16}$/);
+  });
+
   it("tait un arbitre qui ne remplit plus la condition, et son « Prêt » d'un autre appariement", () => {
     expect(mapMatch(row({ ...eligible, referee_platform_roles_json: JSON.stringify(["CASTER"]) })).refereeAssigned).toBe(false);
-    expect(mapMatch(row({ ...eligible, referee_ready_at: new Date(), launch_pairing: "1:3" })).refereeReady).toBe(false);
+    expect(mapMatch(row({ ...eligible, referee_platform_roles_json: JSON.stringify(["CASTER"]) })).refereeKey).toBeNull();
   });
 
   it("tait, avant le départ, un arbitre qui joue désormais le match ; le garde une fois le match lancé", () => {

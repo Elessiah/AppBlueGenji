@@ -27,6 +27,8 @@
       "drawHint": "A drawn map gives a point to no one.",
       "map": "Map {index}",
       "mapPrefix": "Map {index}, ",
+      "mapNamed": "Map {index}: {name}",
+      "mapNamedPrefix": "Map {index}: {name}, ",
       "replayCode": "Replay code",
       "replayCodeOptional": "Replay code (optional)",
       "scoreOf": "Map {index}, score of ",

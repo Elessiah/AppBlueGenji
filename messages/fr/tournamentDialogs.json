@@ -27,6 +27,8 @@
       "drawHint": "Une map nulle ne rapporte de point à personne.",
       "map": "Map {index}",
       "mapPrefix": "Map {index}, ",
+      "mapNamed": "Map {index} : {name}",
+      "mapNamedPrefix": "Map {index} : {name}, ",
       "replayCode": "Code de replay",
       "replayCodeOptional": "Code de replay (facultatif)",
       "scoreOf": "Map {index}, score de ",

@@ -52,6 +52,18 @@ Il est donc scindé en deux :
   (`liveTrigger`, `liveUrl`, `liveStartedAt`) reste dans l'instantané — il est
   le même pour tout le monde, et c'est ce qui le fait arriver en direct.
 
+  Même raison pour `refereeNames` (pseudo de l'arbitre désigné, membres
+  connectés seulement, `docs/features/MATCH_REFEREE.md`) : l'instantané ne
+  porte qu'une empreinte opaque `refereeKey` ; quand une empreinte n'a pas de
+  nom côté client, `useTournamentLive` relit une seule fois
+  `GET /api/tournaments/[id]/referee-names` (session requise, étalée sur 2 s
+  pour éviter la ruée des abonnés), et `live-state.ts` garde les noms d'un
+  instantané à l'autre. Une réponse n'est retenue que si elle laisse moins de
+  désignations sans nom (`refereeNamesImprove`) : une réponse en retard
+  n'écrase jamais une liste plus à jour. La lecture REST de secours et la reconnexion
+  du flux gardent le tableau précédent à contenu égal (`shareRefereeNames`) : `LiveProvider` ne
+  redessine pas le plateau pour des pseudos inchangés.
+
 `TournamentDetail = TournamentSnapshot & TournamentViewerContext` : les
 appelants existants ne voient aucune différence.
 

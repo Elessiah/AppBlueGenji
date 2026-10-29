@@ -26,7 +26,7 @@ import {
   type MatchPageSide,
 } from "@/lib/shared/match-page";
 import { battletagRelevantFor } from "@/lib/shared/certification-prompt";
-import { FIRST_MAP_MAX_LENGTH, normalizeFirstMap } from "@/lib/shared/match-referee";
+import { FIRST_MAP_MAX_LENGTH, normalizeFirstMap, refereeNameOf } from "@/lib/shared/match-referee";
 import { streamLinkText } from "@/lib/shared/live-streams";
 import { localizedPlaceholder, matchPositionText, versusText } from "@/lib/shared/tournament-page-text";
 import { canPickMatchMap, firstBanOrder, roundMapsOf } from "@/lib/shared/round-maps";
@@ -279,6 +279,10 @@ function OfficiatingSection({
 }>) {
   const { t } = useTournamentPageText();
   const titleId = useId();
+  // Pseudo de l'arbitre pour un membre connecté (décision 52), « Arbitre
+  // désigné » sans compte.
+  const { refereeNames } = useLiveControls();
+  const refereeName = refereeNameOf(match, refereeNames);
   const decision = matchPageDecision(match, staff);
   if (decision === null) return null;
   return (
@@ -289,7 +293,11 @@ function OfficiatingSection({
       {decision === "REFEREE" && (
         <>
           <DecisionLine
-            pill={<span className="pill pill-info">{t("launch.referee")}</span>}
+            pill={
+              <span className="pill pill-info">
+                {refereeName ? t("launch.refereeNamed", { name: refereeName }) : t("launch.referee")}
+              </span>
+            }
             subject={t("launch.referee")}
             hintId={`${titleId}-referee`}
             hint={t("matchPage.refereeLead")}

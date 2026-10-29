@@ -7,6 +7,8 @@ import { firstBanTeamName, hostTeamName, refereeStripState } from "../_lib/launc
 import styles from "./MatchLaunchStrip.module.css";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { useSpectatorView } from "@/components/spectator-view";
+import { refereeNameOf } from "@/lib/shared/match-referee";
+import { useLiveControls } from "../_lib/live-context";
 
 /**
  * Bandeau de **lancement** d'un match (`lib/shared/match-launch.ts`) : ce
@@ -58,12 +60,14 @@ function LaunchPhaseBadge({ match, phase }: Readonly<{ match: BracketMatch; phas
   }
   if (phase === "LOBBY") {
     // Les « Prêt » arrivent déjà résolus dans l'instantané (une fantôme y est
-    // prête d'office) : on ne fait que les compter.
+    // prête d'office) : on ne fait que les compter. Celui de l'arbitre n'y est
+    // pas (décision 47) : le décompte public est celui des équipes et des
+    // casters ; les parties du match lisent le sien dans la fenêtre de lancement.
     const count = readyCount({
       team1Ready: match.team1Ready,
       team2Ready: match.team2Ready,
       casters: match.casters,
-      referee: match.refereeAssigned ? { ready: match.refereeReady } : null,
+      referee: null,
     });
     return (
       <span className={styles.lobby}>
@@ -104,6 +108,10 @@ export function MatchLaunchStrip({
   const hostName = hostTeamName(match);
   const firstBanName = showHost ? firstBanTeamName(match) : null;
   const referee = refereeStripState(match, phase, staff);
+  // Pseudo de l'arbitre pour un membre connecté (décision 52) ; « Arbitre
+  // désigné » sans compte, ou tant que le pseudo de la désignation manque.
+  const { refereeNames } = useLiveControls();
+  const refereeName = refereeNameOf(match, refereeNames);
   const badge = <LaunchPhaseBadge match={match} phase={phase} />;
   const hasBadge = phase === "TO_PLAN" || phase === "SCHEDULED" || phase === "LOBBY" || (phase === "LAUNCHED" && match.status === "READY");
 
@@ -140,12 +148,8 @@ export function MatchLaunchStrip({
 
       {referee === "REFEREE" && (
         <span className={styles.fact} title={t("launch.refereeTitle")}>
-          <span aria-hidden="true">🧑‍⚖️</span> {t("launch.referee")}
-          {showReady && (
-            <span className={match.refereeReady ? styles.ok : styles.wait}>
-              {match.refereeReady ? t("launch.casterReady") : t("launch.casterWaiting")}
-            </span>
-          )}
+          <span aria-hidden="true">🧑‍⚖️</span>{" "}
+          {refereeName ? t("launch.refereeNamed", { name: refereeName }) : t("launch.referee")}
         </span>
       )}
       {referee === "SELF_MANAGED" && (
