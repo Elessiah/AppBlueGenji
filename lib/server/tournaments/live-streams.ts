@@ -10,19 +10,21 @@
  * avec la fonction partagée, pour qu'il n'existe qu'une définition de « ce match
  * est à l'antenne ».
  */
-import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase, withConnection } from "@/lib/server/database";
 import {
+  canConfigureLive,
   isMatchLive,
   isMatchLiveTrigger,
   normalizeStreamUrl,
+  parseStreamUrlInput,
   requiresMatchStartAt,
   type MatchLiveTrigger,
 } from "@/lib/shared/live-streams";
 import { launchPairingKey } from "@/lib/shared/match-launch";
 import type { MatchStatus } from "@/lib/shared/types";
 import { retryOnDeadlock } from "./deadlock-retry";
-import { lockMatchCasters, lockMatchStreams, pruneMatchStreams, staffStream } from "./match-casters";
+import { lockMatchStreams, pruneMatchStreams, staffStream, type MatchStreamRow } from "./match-casters";
 import { publishMatchUpdatedEvent, publishUpdatedEvent } from "./notifications";
 
 /** Cible du bouton d'accueil : un tournoi en cours réellement à l'antenne. */
@@ -38,21 +40,25 @@ export type MatchLiveConfig = {
   /** `null` = casté sans lien public (badge seul). */
   liveUrl: string | null;
   /**
-   * Qui pose le réglage : son compte, et s'il est de l'organisation
-   * (permission `tournaments`). Le lien posé est rattaché à ce compte
-   * (`bg_match_streams.link_user_id`, retiré à la suppression du compte par
-   * `withdrawUserCasts`) sauf quand l'organisation le pose sans caster ce
-   * match : c'est alors le lien de l'organisation (`link_user_id` nul), qui
-   * reste au match. Absent ou `null` : lien de l'organisation.
+   * Qui pose le réglage — **obligatoire** : un appelant qui l'oublierait
+   * enregistrerait la chaîne d'un caster comme celle de l'organisation.
    */
-  setter?: MatchLiveSetter | null;
+  setter: MatchLiveSetter;
 };
 
-/** L'auteur d'un réglage de diffusion (`MatchLiveConfig.setter`). */
+/**
+ * L'auteur d'un réglage de diffusion (`MatchLiveConfig.setter`) et la
+ * provenance du lien qu'il pose, **dite par lui** : jamais déduite de ce qu'il
+ * caste (`docs/features/MATCH_LAUNCH.md` § Casters et streams).
+ * - `asOrganisation` : le lien de l'organisation (`bg_match_streams.link_user_id`
+ *   nul), qui reste au match quel que soit le sort du compte. Seule la
+ *   permission `tournaments` peut le dire (la route le refuse aux autres) ;
+ * - sinon, la chaîne de `userId` : le lien lui est rattaché et part avec son
+ *   compte (`withdrawUserCasts`).
+ */
 export type MatchLiveSetter = {
   userId: number;
-  /** Permission `tournaments` : il parle pour l'organisation. */
-  organisation: boolean;
+  asOrganisation: boolean;
 };
 
 type TournamentStateRow = RowDataPacket & { id: number; state: string };
@@ -101,10 +107,7 @@ export async function setTournamentLiveUrl(
 
   // Une chaîne vide vaut effacement : le formulaire renvoie "" quand le staff
   // vide le champ, et exiger `null` là serait un piège.
-  const url = rawUrl === null || rawUrl.trim() === "" ? null : normalizeStreamUrl(rawUrl);
-  if (rawUrl !== null && rawUrl.trim() !== "" && url === null) {
-    throw new Error("INVALID_STREAM_URL");
-  }
+  const url = parseStreamUrlInput(rawUrl);
 
   await db.execute(`UPDATE bg_tournaments SET live_url = ? WHERE id = ?`, [url, tournamentId]);
   publishUpdatedEvent(tournamentId);
@@ -146,8 +149,13 @@ async function loadMatchLiveRow(matchId: number): Promise<MatchLiveRow> {
  * verrait qu'à l'heure du match. La date, elle, reste effaçable ensuite — le
  * calendrier est du ressort du staff `tournaments`, pas de la diffusion.
  *
+ * Un match qui ne peut plus passer à l'antenne (score saisi, en attente de
+ * confirmation) et qui n'est pas déjà casté n'a rien à configurer
+ * (`canConfigureLive`, appliqué ici et non seulement par l'interface) : un
+ * appel direct ne pose pas un lien sur un match que l'écran garde fermé.
+ *
  * @throws `MATCH_NOT_FOUND` | `INVALID_LIVE_TRIGGER` | `INVALID_STREAM_URL`
- *         | `MATCH_START_AT_REQUIRED`
+ *         | `MATCH_START_AT_REQUIRED` | `MATCH_NOT_CASTABLE`
  */
 export async function setMatchLiveConfig(
   matchId: number,
@@ -159,16 +167,22 @@ export async function setMatchLiveConfig(
 
   const row = await loadMatchLiveRow(matchId);
 
+  if (
+    !canConfigureLive({
+      status: row.status,
+      liveTrigger: row.live_trigger,
+      liveStartedAt: row.live_started_at,
+      launchedAt: null,
+    })
+  ) {
+    throw new Error("MATCH_NOT_CASTABLE");
+  }
   if (requiresMatchStartAt(config.trigger) && row.start_at === null) {
     throw new Error("MATCH_START_AT_REQUIRED");
   }
 
   const trigger = config.trigger;
-  const rawUrl = trigger === null ? null : config.liveUrl;
-  const url = rawUrl === null || rawUrl.trim() === "" ? null : normalizeStreamUrl(rawUrl);
-  if (rawUrl !== null && rawUrl.trim() !== "" && url === null) {
-    throw new Error("INVALID_STREAM_URL");
-  }
+  const url = parseStreamUrlInput(trigger === null ? null : config.liveUrl);
 
   // Les verrous d'intervalle des streams et des casters peuvent opposer deux
   // matchs voisins (inscription, ménage) : la transaction se rejoue.
@@ -178,6 +192,7 @@ export async function setMatchLiveConfig(
       // Verrou du match d'abord, puis ses streams et casters : le même ordre
       // que l'inscription d'un caster (`claimMatchCast`).
       await connection.execute(`SELECT id FROM bg_matches WHERE id = ? FOR UPDATE`, [matchId]);
+      let streams: MatchStreamRow[] | undefined;
       if (trigger === null) {
         await connection.execute(
           `UPDATE bg_matches SET live_trigger = NULL, live_started_at = NULL WHERE id = ?`,
@@ -194,9 +209,11 @@ export async function setMatchLiveConfig(
             : `UPDATE bg_matches SET live_trigger = ?, live_started_at = NULL WHERE id = ?`,
           [trigger, matchId],
         );
-        await setStaffStreamUrl(connection, matchId, url, config.setter ?? null);
+        streams = await setStaffStreamUrl(connection, matchId, url, config.setter);
       }
-      await pruneMatchStreams(connection, matchId);
+      // Les streams déjà lus sous verrou (et mis à jour en mémoire) ne sont pas
+      // relus : deux lectures verrouillantes, non quatre.
+      await pruneMatchStreams(connection, matchId, { streams });
       await connection.commit();
     } catch (error) {
       await connection.rollback();
@@ -213,53 +230,46 @@ export async function setMatchLiveConfig(
  * ouvre un : le lien du staff n'attend pas qu'un caster s'inscrive. Effacer le
  * lien ne prend jamais un stream de caster.
  *
- * Chaque lien posé est rattaché à qui le fournit (`linkProvider`, `NULL` pour
- * l'organisation). Un lien inchangé n'est pas réécrit : il reste à qui l'a
- * fourni — un réglage réenregistré (mode changé, même lien) ne le prend ni à
- * un caster, ni à l'organisation.
+ * Chaque lien posé est rattaché à ce que dit le réglage (`linkProvider`) : le
+ * compte de l'auteur, ou `NULL` pour l'organisation. Un lien inchangé n'est
+ * pas réécrit : il reste à qui l'a fourni — un réglage réenregistré (mode
+ * changé, même lien) ne le prend ni à un caster, ni à l'organisation.
+ *
+ * Rend les streams du match **tels qu'ils sont après l'écriture**, pour le
+ * ménage qui suit.
  */
 async function setStaffStreamUrl(
   connection: PoolConnection,
   matchId: number,
   url: string | null,
-  setter: MatchLiveSetter | null,
-): Promise<void> {
-  const target = staffStream(await lockMatchStreams(connection, matchId));
+  setter: MatchLiveSetter,
+): Promise<MatchStreamRow[]> {
+  const streams = await lockMatchStreams(connection, matchId);
+  const target = staffStream(streams);
   if (target !== null && (target.staff || url !== null)) {
-    if (target.liveUrl !== url || !target.staff) {
-      const providerId = url === null ? null : await linkProvider(connection, matchId, setter);
-      await connection.execute(
-        `UPDATE bg_match_streams SET live_url = ?, staff_owned = 1, link_user_id = ? WHERE id = ?`,
-        [url, providerId, target.id],
-      );
-    }
-    return;
-  }
-  if (url !== null) {
+    if (target.liveUrl === url && target.staff) return streams;
     await connection.execute(
-      `INSERT INTO bg_match_streams (match_id, live_url, staff_owned, link_user_id) VALUES (?, ?, 1, ?)`,
-      [matchId, url, await linkProvider(connection, matchId, setter)],
+      `UPDATE bg_match_streams SET live_url = ?, staff_owned = 1, link_user_id = ? WHERE id = ?`,
+      [url, url === null ? null : linkProvider(setter), target.id],
     );
+    return streams.map((stream) => (stream.id === target.id ? { ...stream, liveUrl: url, staff: true } : stream));
   }
+  if (url === null) return streams;
+  const [created] = await connection.execute<ResultSetHeader>(
+    `INSERT INTO bg_match_streams (match_id, live_url, staff_owned, link_user_id) VALUES (?, ?, 1, ?)`,
+    [matchId, url, linkProvider(setter)],
+  );
+  return [...streams, { id: Number(created.insertId), matchId, liveUrl: url, staff: true }];
 }
 
 /**
- * Le compte auquel rattacher un lien que pose `setter` : le sien, sauf s'il
- * parle pour l'organisation sans caster ce match — `null`, le lien de
- * l'organisation. Un membre de l'organisation qui caste le match y pose sa
- * propre chaîne : elle part avec son compte, comme celle de tout caster. Les
- * casters sont relus sous verrou, après les streams (ordre de
- * `pruneMatchStreams`), sous le verrou du match.
+ * Le compte auquel rattacher le lien que pose `setter` : aucun s'il le dit de
+ * l'organisation, le sien sinon. **Rien n'est déduit** de ce qu'il caste :
+ * qu'un membre de l'organisation caste le match ne dit pas de quelle chaîne
+ * il parle — c'est la case « lien de l'organisation » de la fenêtre.
  */
-async function linkProvider(
-  connection: PoolConnection,
-  matchId: number,
-  setter: MatchLiveSetter | null,
-): Promise<number | null> {
-  if (setter === null) return null;
-  if (!setter.organisation) return setter.userId;
-  const casters = await lockMatchCasters(connection, matchId);
-  return casters.some((caster) => caster.userId === setter.userId) ? setter.userId : null;
+function linkProvider(setter: MatchLiveSetter): number | null {
+  return setter.asOrganisation ? null : setter.userId;
 }
 
 /**

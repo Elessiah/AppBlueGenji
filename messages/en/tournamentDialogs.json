@@ -264,7 +264,11 @@
     "autoStop": "The live stops on its own as soon as a score is entered.",
     "url": "Match channel (optional)",
     "urlInvalid": "Link not recognized. Accepted platforms: {platforms}.",
-    "urlHint": "Leave empty to flag the match without a live setup link: its Discord announcement will then point to the first link opened by a caster, otherwise to the tournament's official channel, or will not be posted if it has none. If you already cast this match, the link entered here is your own channel. Accepted platforms: {platforms}."
+    "urlOwnChannel": "The link entered here is your own channel: it is removed from the match if your account is deleted.",
+    "organisationLink": "This link is the organisation's",
+    "organisationLinkSubject": "organisation link",
+    "organisationLinkHint": "Ticked, the link stays on the match whatever happens to your account. Unticked, it is your own channel: it is removed from the match if your account is deleted. A saved link you leave unchanged keeps its origin.",
+    "urlHint": "Leave empty to flag the match without a live setup link: its Discord announcement will then point to the first link opened by a caster, otherwise to the tournament's official channel, or will not be posted if it has none. Accepted platforms: {platforms}."
   },
   "replay": {
     "removed": "Replay removed.",

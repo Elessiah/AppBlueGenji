@@ -19,14 +19,24 @@ function mapLiveError(error: unknown) {
   if (message === "LIVE_TRIGGER_NOT_MANUAL") return fail(message, 409);
   if (message === "MATCH_NOT_LIVE_READY") return fail(message, 409);
   if (message === "MATCH_START_AT_REQUIRED") return fail(message, 409);
+  if (message === "MATCH_NOT_CASTABLE") return fail(message, 409);
   return fail(message || "MATCH_LIVE_UPDATE_FAILED", 500);
 }
 
 /**
  * Configure la diffusion d'un match.
- * Corps : `{ trigger: "AUTO" | "START_TIME" | "MANUAL" | null, liveUrl?: string | null }`.
+ * Corps : `{ trigger: "AUTO" | "START_TIME" | "MANUAL" | null, liveUrl?: string | null,
+ * organisationLink?: boolean }`.
  * `trigger: null` démarque le match (et efface lien et antenne) ; `START_TIME`
- * exige une date de début déjà posée sur le match (409 sinon).
+ * exige une date de début déjà posée sur le match (409 sinon) ; un match qui ne
+ * peut plus passer à l'antenne et n'est pas déjà casté refuse tout réglage
+ * (`MATCH_NOT_CASTABLE`, 409).
+ *
+ * `organisationLink` dit de qui est le lien posé : `true` (ou absent) pour un
+ * membre de l'organisation (permission `tournaments`) = le lien de
+ * l'organisation, qui reste au match ; `false` = sa propre chaîne, qui part avec
+ * son compte. Sans la permission `tournaments`, le lien est toujours le sien, et
+ * `true` est refusé (403) plutôt que silencieusement ignoré.
  */
 export async function PUT(req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();
@@ -40,6 +50,7 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
   const body = (await readJsonBody(req).catch(() => ({}))) as {
     trigger?: unknown;
     liveUrl?: unknown;
+    organisationLink?: unknown;
   };
 
   const trigger = body.trigger ?? null;
@@ -50,14 +61,21 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
     return fail("INVALID_STREAM_URL", 400);
   }
 
+  if (body.organisationLink !== undefined && typeof body.organisationLink !== "boolean") {
+    return fail("INVALID_ORGANISATION_LINK", 400);
+  }
+  const organisation = can(user, "tournaments");
+  if (body.organisationLink === true && !organisation) return fail("FORBIDDEN", 403);
+
   try {
-    // Le lien posé reste rattaché à qui le pose — sauf l'organisation quand
-    // elle ne caste pas ce match : la suppression de son compte le retire
-    // (`withdrawUserCasts`).
+    // Le lien posé reste rattaché à qui le pose, sauf quand un membre de
+    // l'organisation le dit « de l'organisation » (case de la fenêtre, vraie
+    // par défaut) : la suppression de son compte retire sa chaîne à lui, jamais
+    // celle de l'organisation (`withdrawUserCasts`).
     await setMatchLiveConfig(matchId, {
       trigger,
       liveUrl: (body.liveUrl as string) ?? null,
-      setter: { userId: user.id, organisation: can(user, "tournaments") },
+      setter: { userId: user.id, asOrganisation: organisation && body.organisationLink !== false },
     });
     announceStaffMatchAction(matchId, trigger === null ? "LIVE_REMOVED" : "LIVE_CONFIGURED", staffActionAuthor(user));
     return ok({ trigger });

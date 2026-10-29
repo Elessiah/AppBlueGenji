@@ -1,6 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { readJsonBody } from "@/lib/server/request-body";
+import { bodyReadRefusal, readJsonBody } from "@/lib/server/request-body";
 import { claimMatchCast, releaseMatchCast } from "@/lib/server/tournaments/match-launch";
 import {
   isPositiveId,
@@ -28,7 +28,9 @@ const STATUSES: Readonly<Record<string, number>> = {
  * équipes dans la modale de lancement (`lib/shared/match-launch.ts`).
  * Corps : `{ streamId: number }` (co-caster un stream du match) ou
  * `{ liveUrl?: string | null }` (ouvrir son propre stream) — vide : un stream
- * sans lien.
+ * sans lien. Pas de corps du tout : un stream sans lien ; un corps **illisible**
+ * (JSON cassé, trop lourd, mauvais type) est refusé, jamais pris pour un corps
+ * vide.
  */
 export async function POST(req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();
@@ -37,7 +39,15 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
   const matchId = parseMatchIdParam((await context.params).matchId);
   if (matchId === null) return fail("INVALID_MATCH_ID", 400);
 
-  const target = parseCastTarget(await readJsonBody(req).catch(() => ({})));
+  let body: unknown = {};
+  if (req.body !== null) {
+    try {
+      body = await readJsonBody(req);
+    } catch (error) {
+      return fail(bodyReadRefusal(error) ?? "INVALID_CAST_TARGET", 400);
+    }
+  }
+  const target = parseCastTarget(body);
   if (target === null) return fail("INVALID_CAST_TARGET", 400);
 
   try {

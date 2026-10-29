@@ -5,7 +5,6 @@ import { forfeitMapCount, parseMatchFormat, type MatchFormat } from "@/lib/share
 import { tournamentMatchFormat } from "@/lib/shared/bg-survie/rounds";
 import { TournamentRow, RegistrationRow, MatchRow, TournamentListRow } from "./_internal";
 import { queueBotLog } from "./bot-logs";
-import { firstStreamUrlSql } from "./match-casters";
 import { AUTO_VALIDATION_PAUSED_SQL } from "./score-report-sql";
 
 /**
@@ -329,7 +328,6 @@ export async function getMatchRows(
       m.phase_id,
       m.start_at,
       m.live_trigger,
-      ${firstStreamUrlSql("m")} AS live_url,
       m.live_started_at,
       m.host_team_id,
       m.lobby_opened_at,

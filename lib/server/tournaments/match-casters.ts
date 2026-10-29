@@ -126,11 +126,24 @@ function toStream(row: StreamRow): MatchStreamRow {
  * inscrit par une transaction validée après le début de celle-ci est vu). La
  * table est lue seule — jamais de verrou posé à travers une jointure (MariaDB,
  * `CLAUDE.md`). Ordre d'inscription.
+ *
+ * `held` : l'appelant tient **déjà le verrou de la ligne du match, pris en
+ * première instruction de sa transaction** (`lockLaunchMatch`) — toute écriture
+ * d'un caster ou d'un stream passe par lui, donc une lecture ordinaire suffit,
+ * et le `FOR UPDATE` n'est pas posé : sur un match sans caster il verrouillerait
+ * l'intervalle vide de l'index, partagé par tous les matchs voisins sans caster,
+ * et deux inscriptions simultanées sur deux matchs neufs s'interbloqueraient.
+ * Quand un instantané a précédé le verrou (entretien des lancements, effacement
+ * de compte), `held` reste faux : la lecture verrouillante est la seule *courante*.
  */
-export async function lockMatchCasters(connection: Executor, matchId: number): Promise<MatchCasterLink[]> {
+export async function lockMatchCasters(
+  connection: Executor,
+  matchId: number,
+  held = false,
+): Promise<MatchCasterLink[]> {
   const [rows] = await connection.execute<CasterLinkRow[]>(
     `SELECT match_id, user_id, stream_id, ready_at FROM bg_match_casters
-     WHERE match_id = ? ORDER BY created_at, user_id FOR UPDATE`,
+     WHERE match_id = ? ORDER BY created_at, user_id${held ? "" : " FOR UPDATE"}`,
     [matchId],
   );
   return rows.map(toLink);
@@ -204,10 +217,18 @@ export async function loadMatchStreams(
   return groupByMatch(rows.map(toStream));
 }
 
-/** Streams d'**un** match, relus sous verrou (table seule), du plus ancien au plus récent. */
-export async function lockMatchStreams(connection: Executor, matchId: number): Promise<MatchStreamRow[]> {
+/**
+ * Streams d'**un** match, relus sous verrou (table seule), du plus ancien au
+ * plus récent. `held` : voir `lockMatchCasters`.
+ */
+export async function lockMatchStreams(
+  connection: Executor,
+  matchId: number,
+  held = false,
+): Promise<MatchStreamRow[]> {
   const [rows] = await connection.execute<StreamRow[]>(
-    `SELECT id, match_id, live_url, staff_owned FROM bg_match_streams WHERE match_id = ? ORDER BY id FOR UPDATE`,
+    `SELECT id, match_id, live_url, staff_owned FROM bg_match_streams
+     WHERE match_id = ? ORDER BY id${held ? "" : " FOR UPDATE"}`,
     [matchId],
   );
   return rows.map(toStream);
@@ -235,11 +256,20 @@ export function orphanStreamIds(
  * après tout retrait de caster, dans la même transaction, sous le verrou du
  * match. Deux lectures et une écriture : un `DELETE` ne peut pas relire sa
  * propre table en sous-requête.
+ *
+ * `known` : ce que l'appelant tient déjà sous le verrou du match, **tel que la
+ * transaction l'a laissé** — les streams (`setMatchLiveConfig`) ou les casters
+ * restants (un retrait : ceux de la ligne verrouillée moins le caster parti).
+ * Ce qui est fourni n'est pas relu ; ce qui manque est lu sous verrou.
  */
-export async function pruneMatchStreams(connection: Executor, matchId: number): Promise<void> {
-  const streams = await lockMatchStreams(connection, matchId);
+export async function pruneMatchStreams(
+  connection: Executor,
+  matchId: number,
+  known: { streams?: readonly MatchStreamRow[]; casters?: readonly Pick<MatchCasterLink, "streamId">[] } = {},
+): Promise<void> {
+  const streams = known.streams ?? (await lockMatchStreams(connection, matchId));
   if (streams.length === 0) return;
-  const casters = await lockMatchCasters(connection, matchId);
+  const casters = known.casters ?? (await lockMatchCasters(connection, matchId));
   const orphans = orphanStreamIds(streams, casters);
   if (orphans.length === 0) return;
   await connection.execute(
@@ -293,10 +323,12 @@ async function pruneStreamsOf(connection: Executor, matchIds: readonly number[])
  * laisserait seul).
  *
  * Dans les deux cas, chaque lien de chaîne qu'il a fourni (`link_user_id` : en
- * ouvrant son stream, ou dans la configuration du direct sans être de
- * l'organisation) est retiré, **matchs joués compris** et même d'un stream
- * qu'un co-caster tient encore : le stream reste à ce co-caster, sans lien. Le
- * lien de l'organisation (`link_user_id` nul) n'est jamais touché.
+ * ouvrant son stream, ou dans la configuration du direct quand il l'a posé
+ * comme **sa** chaîne — la case « lien de l'organisation » décochée, ou sans
+ * la permission `tournaments`) est retiré, **matchs joués compris** et même
+ * d'un stream qu'un co-caster tient encore : le stream reste à ce co-caster,
+ * sans lien. Le lien de l'organisation (`link_user_id` nul) n'est jamais touché,
+ * même quand celui qui l'a posé castait le match.
  *
  * Tous les matchs touchés — castés, liens fournis, arbitrés — sont verrouillés
  * **en une liste triée par id** (une seule instruction, table seule), avant
