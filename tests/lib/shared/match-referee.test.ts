@@ -18,6 +18,7 @@ import {
   type LaunchStripViewer,
 } from "@/app/(secured)/tournois/[id]/_lib/launch-strip";
 import {
+  refereeConfirmTone,
   refereeDialogActions,
   refereeFocusTarget,
   type RefereePanelView,
@@ -93,6 +94,16 @@ describe("« Prêt » de l'arbitre : une 4e partie", () => {
     expect(allPartiesReady({ ...base, referee: { ready: false } })).toBe(false);
     expect(allPartiesReady({ ...base, referee: { ready: true } })).toBe(true);
     expect(readyCount({ ...base, referee: null })).toEqual({ ready: 2, expected: 2 });
+  });
+
+  it("readyCount_refereeAlsoCaster_countedOnce", () => {
+    const count = readyCount({ ...base, casters: [{ userId: 5, ready: false }], referee: { userId: 5, ready: false } });
+    expect(count).toEqual({ ready: 2, expected: 3 });
+  });
+
+  it("readyCount_refereeNotCaster_countedSeparately", () => {
+    const count = readyCount({ ...base, casters: [{ userId: 5, ready: true }], referee: { userId: 6, ready: false } });
+    expect(count).toEqual({ ready: 3, expected: 4 });
   });
 });
 
@@ -186,7 +197,8 @@ describe("fenêtre « Arbitrage » : gestes offerts", () => {
     referee,
     selfManaged: false,
     firstMap: null,
-    round: { phaseId: 0, roundNumber: 1, bracket: "UPPER" },
+    viewerBlock: null,
+    round: { phaseId: 0, roundNumber: 1, bracket: "UPPER", open: 2, selfManaged: 0, refereed: 0 },
     roundSlots: [],
     candidates: [
       { userId: 1, pseudo: "Moi" },
@@ -203,22 +215,97 @@ describe("fenêtre « Arbitrage » : gestes offerts", () => {
   });
 
   it("arbitre du match : s'en retirer, sans se proposer à soi-même", () => {
-    const actions = refereeDialogActions(panel({ userId: 1, pseudo: "Moi", eligible: true }), 1);
+    const actions = refereeDialogActions(panel({ userId: 1, pseudo: "Moi", eligible: true, reason: null }), 1);
     expect(actions).toMatchObject({ take: false, releaseSelf: true, removeOther: false });
     expect(actions.candidates.map((c) => c.userId)).toEqual([2]);
   });
 
   it("un autre arbitre : le retirer ; le reprendre seulement s'il ne peut plus arbitrer", () => {
-    expect(refereeDialogActions(panel({ userId: 2, pseudo: "Autre", eligible: true }), 1)).toMatchObject({
+    expect(refereeDialogActions(panel({ userId: 2, pseudo: "Autre", eligible: true, reason: null }), 1)).toMatchObject({
       take: false,
       removeOther: true,
     });
-    expect(refereeDialogActions(panel({ userId: 2, pseudo: "Autre", eligible: false }), 1).take).toBe(true);
+    expect(refereeDialogActions(panel({ userId: 2, pseudo: "Autre", eligible: false, reason: "NOT_REFEREE" }), 1).take).toBe(true);
   });
 
   it("refereeDialogActions_viewerObjectionUpheld_hidesTake", () => {
     const view = { ...panel(null), objections: [{ userId: 1, pseudo: "Moi" }] };
     expect(refereeDialogActions(view, 1).take).toBe(false);
+  });
+
+  it("refereeDialogActions_objectionListedOnly_takeBlockedObjection", () => {
+    const view = { ...panel(null), objections: [{ userId: 1, pseudo: "Moi" }] };
+    expect(refereeDialogActions(view, 1).takeBlocked).toBe("REFEREE_OBJECTION");
+  });
+
+  it("refereeDialogActions_viewerBlockPlayer_hidesTakeAndReportsReason", () => {
+    const actions = refereeDialogActions({ ...panel(null), viewerBlock: "REFEREE_IS_PLAYER" }, 1);
+    expect(actions).toMatchObject({ take: false, takeBlocked: "REFEREE_IS_PLAYER" });
+  });
+
+  it("refereeDialogActions_viewerIdentityRequired_hidesTake", () => {
+    const actions = refereeDialogActions({ ...panel(null), viewerBlock: "REFEREE_IDENTITY_REQUIRED" }, 1);
+    expect(actions).toMatchObject({ take: false, takeBlocked: "REFEREE_IDENTITY_REQUIRED" });
+  });
+
+  it("refereeDialogActions_viewerFree_noTakeBlocked", () => {
+    expect(refereeDialogActions(panel(null), 1)).toMatchObject({ take: true, takeBlocked: null });
+  });
+
+  it("refereeDialogActions_eligibleRefereeInPlace_noTakeBlocked", () => {
+    const view = { ...panel({ userId: 2, pseudo: "Autre", eligible: true, reason: null }), viewerBlock: "REFEREE_IS_PLAYER" as const };
+    expect(refereeDialogActions(view, 1)).toMatchObject({ take: false, takeBlocked: null });
+  });
+
+  it("refereeDialogActions_roundAllOpenSelfManaged_offersOffOnly", () => {
+    const view = { ...panel(null), round: { ...panel(null).round, open: 3, selfManaged: 3 } };
+    expect(refereeDialogActions(view, 1)).toMatchObject({ roundOn: false, roundOff: true });
+  });
+
+  it("refereeDialogActions_roundNoneSelfManaged_offersOnOnly", () => {
+    const view = { ...panel(null), round: { ...panel(null).round, open: 3, selfManaged: 0 } };
+    expect(refereeDialogActions(view, 1)).toMatchObject({ roundOn: true, roundOff: false });
+  });
+
+  it("refereeDialogActions_roundMixed_offersBoth", () => {
+    const view = { ...panel(null), round: { ...panel(null).round, open: 3, selfManaged: 1 } };
+    expect(refereeDialogActions(view, 1)).toMatchObject({ roundOn: true, roundOff: true });
+  });
+
+  it("refereeDialogActions_roundNoOpenMatch_offersNeither", () => {
+    const view = { ...panel(null), round: { ...panel(null).round, open: 0, selfManaged: 0 } };
+    expect(refereeDialogActions(view, 1)).toMatchObject({ roundOn: false, roundOff: false });
+  });
+});
+
+describe("refereeConfirmTone (fenêtre « Arbitrage »)", () => {
+  const round = { phaseId: 0, roundNumber: 1, bracket: "UPPER", open: 2, selfManaged: 0, refereed: 0 };
+  const referee = { userId: 2, pseudo: "Autre", eligible: true, reason: null };
+
+  it("refereeConfirmTone_removeAndObjection_danger", () => {
+    expect(refereeConfirmTone("removeReferee", { referee, round })).toBe("danger");
+    expect(refereeConfirmTone("objection", { referee: null, round })).toBe("danger");
+  });
+
+  it("refereeConfirmTone_selfOnWithoutReferee_primary", () => {
+    expect(refereeConfirmTone("selfOn", { referee: null, round })).toBe("primary");
+  });
+
+  it("refereeConfirmTone_selfOnWithReferee_danger", () => {
+    expect(refereeConfirmTone("selfOn", { referee, round })).toBe("danger");
+  });
+
+  it("refereeConfirmTone_roundOnWithRefereed_danger", () => {
+    expect(refereeConfirmTone("roundOn", { referee: null, round: { ...round, refereed: 1 } })).toBe("danger");
+  });
+
+  it("refereeConfirmTone_roundOnWithoutRefereed_primary", () => {
+    expect(refereeConfirmTone("roundOn", { referee: null, round })).toBe("primary");
+  });
+
+  it("refereeConfirmTone_roundOffAndLift_primary", () => {
+    expect(refereeConfirmTone("roundOff", { referee, round })).toBe("primary");
+    expect(refereeConfirmTone("liftObjection", { referee, round })).toBe("primary");
   });
 });
 
@@ -248,5 +335,13 @@ describe("refereeFocusTarget (fenêtre « Arbitrage »)", () => {
 
   it("sans phrase d'état montée, rien", () => {
     expect(refereeFocusTarget({ active: body, body, trigger: null, status: null })).toBeNull();
+  });
+
+  it("refereeFocusTarget_firstArrival_focusesStatusEvenWhenCloseFocused", () => {
+    expect(refereeFocusTarget({ active: node("Fermer"), body, trigger: null, status, firstArrival: true })).toBe(status);
+  });
+
+  it("refereeFocusTarget_firstArrivalWithoutStatus_fallsBackToNormalRule", () => {
+    expect(refereeFocusTarget({ active: node("Fermer"), body, trigger: null, status: null, firstArrival: true })).toBeNull();
   });
 });

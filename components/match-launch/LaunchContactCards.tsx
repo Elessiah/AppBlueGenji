@@ -59,7 +59,6 @@ function IdentityLine({
   return (
     <div className={styles.identity}>
       <span className={styles.identityKind}>{kind}</span>
-      {note && value && <span className={styles.identityNote}>{note}</span>}
       {value ? (
         <>
           <span className={`mono ${styles.identityValue}`}>{value}</span>
@@ -78,6 +77,9 @@ function IdentityLine({
           >
             {t("copy")}
           </button>
+          {/* La consigne passe sur sa propre ligne, sous la valeur : avant elle, à
+              375 px, elle repoussait le BattleTag et laissait « Copier » seul. */}
+          {note && <span className={styles.identityNote}>{note}</span>}
         </>
       ) : (
         <span className={styles.missing}>—</span>
@@ -397,12 +399,13 @@ export function RefereeCard({
   const { t } = useLaunchText();
   if (!referee) {
     if (!selfManaged) return null;
+    // Pas de région « Arbitre » sur un match qui n'en a pas : une simple note.
     return (
-      <section className={styles.caster} aria-label={t("referee")}>
+      <div className={styles.caster}>
         <p className={styles.note}>
           <span aria-hidden="true">🤝</span> {t("selfManaged")}
         </p>
-      </section>
+      </div>
     );
   }
   return (

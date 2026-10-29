@@ -75,8 +75,10 @@ anciennes clés `tournament.matchPage.*` restant pour les sections.
 5. **Arbitrage** (colonne de droite, `matchPageDecision`) : « Arbitre désigné » pour tous — son
    explication derrière le « i » —, son
    pseudo et — en Overwatch seulement — son BattleTag (« À inviter dans la
-   partie ») aux seuls lecteurs que sert la lecture des contacts ; ou l'aide-mémoire de l'**autogestion**
-   (l'hôte crée la partie, les managers s'invitent, les paramètres, les casters
+   partie ») aux seuls lecteurs que sert la lecture des contacts ; ou l'aide-mémoire de l'**autogestion**,
+   à l'impératif, aux seuls lecteurs qui organisent le match (joueur, caster
+   inscrit, staff — les autres, spectateurs de /suivre compris, lisent
+   l'autogestion dans les faits clés) (l'hôte crée la partie, les managers s'invitent, les paramètres, les casters
    — cette étape seulement avec un caster, `selfManagementSteps`) ; à
    l'étape des paramètres, un match **Overwatch** liste en sous-liste
    (`<ul>` imbriquée, `OW_SELF_MANAGEMENT_SETTINGS`) : paramètres compétitifs,

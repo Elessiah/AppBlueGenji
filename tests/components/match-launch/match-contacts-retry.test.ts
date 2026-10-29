@@ -404,7 +404,7 @@ describe("contacts du caster en attente, modale ouverte", () => {
     expect(dialog).toContain("rereadOnCardChange(previousCard.current, card, launch)");
     expect(dialog).toContain("Math.max(REREAD_RETRY_MS, rereadWait)");
     expect(dialog).toContain('if (launch?.viewer.role !== "REFEREE") window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));');
-    expect(dialog).toContain("}, [cardKey, launch]);");
+    expect(dialog).toContain("}, [cardKey, launch, enabled]);");
     expect(dialog).toContain("const timer = setTimeout(rereadNow, delay);");
     expect(dialog).toContain("const transient = !isFinalRefusal(read.error);");
     expect(dialog).toContain("shouldRetryReread(rereadFailures)");
@@ -418,5 +418,37 @@ describe("contacts du caster en attente, modale ouverte", () => {
     expect(dialog).toContain("casters={launch.casters}");
     const card = readSource("app/(secured)/tournois/[id]/_components/MatchCardActions.tsx");
     expect(card).toMatch(/<MatchContactsDialog[\s\S]*?card=\{match\}[\s\S]*?\/>/);
+  });
+});
+
+describe("useMatchContacts — lecture coupée (`enabled` à faux)", () => {
+  const hook = readSource("components/match-launch/MatchContactsDialog.tsx");
+  const body = hook.slice(hook.indexOf("export function useMatchContacts"), hook.indexOf("Modale « Contacts » d'une carte"));
+
+  it("useMatchContacts_disabled_resetsReadStateDuringRender", () => {
+    expect(body).toMatch(/if \(readEnabled !== enabled\) \{\s*setReadEnabled\(enabled\);\s*if \(!enabled\) \{\s*setState\(\{ kind: "loading" \}\);\s*setServerDate\(null\);\s*setRereadFailures\(0\);\s*setRereadWait\(0\);/);
+  });
+
+  it("useMatchContacts_disabled_noTimerRuns", () => {
+    expect(body).toContain("if (!enabled || !shouldRetryReread(rereadFailures)) return;");
+    expect(body).toContain("const followReferee = enabled && clocks && refereeReadyRereadDue(launch);");
+    expect(body).toContain("if (!enabled || !launch) return;");
+  });
+
+  it("useMatchContacts_readOff_fingerprintFollowsCard", () => {
+    // Lecture coupée : l'empreinte suit la carte, la lecture rouverte ne relit pas aussitôt.
+    expect(body).toMatch(/if \(!launch\) \{[^}]*?if \(!enabled\) previousCard\.current = card;\s*return;\s*\}/);
+  });
+
+  it("useMatchContacts_enabledToggles_fingerprintEffectReruns", () => {
+    expect(body).toContain("}, [cardKey, launch, enabled]);");
+    expect(body).not.toContain("}, [cardKey, launch]);");
+  });
+});
+
+describe("fenêtre de lancement — « Page du match »", () => {
+  it("MatchLaunchCenter_onCurrentMatchPage_hidesViewMatch", () => {
+    const center = readSource("components/match-launch/MatchLaunchCenter.tsx");
+    expect(center).toMatch(/\{!isMemberMatchPageOf\(pathname, current\) && \(\s*<LocaleLink[\s\S]*?\{t\("viewMatch"\)\}/);
   });
 });

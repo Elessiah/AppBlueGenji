@@ -123,7 +123,8 @@ L'arbitre désigné est une partie du lancement (`LaunchViewerRole`
 chaque caster (`readyCount` / `allPartiesReady`, `referee: { ready } | null`).
 Sans arbitre, rien n'est attendu de plus. L'auto-lancement à l'échéance du
 lobby reste inchangé. Un arbitre qui caste aussi le match donne les deux
-« Prêt » d'un clic ; un caster déjà prêt qui devient arbitre garde ce « Prêt »
+« Prêt » d'un clic et ne compte qu'**une** fois dans « N/M prêts » de la
+fenêtre de lancement (`readyCount` reconnaît son `userId` parmi les casters) ; un caster déjà prêt qui devient arbitre garde ce « Prêt »
 (`writeReferee`). Un match joué ou exempt garde son arbitre : ni retrait ni
 remplacement (`assertRefereeable`, retrait compris).
 
@@ -184,7 +185,20 @@ modale) ; sinon l'équipe 1. L'hôte joue à **gauche** ; l'autre équipe
   départ, s'y lit « ne peut plus arbitrer » — la règle du bandeau
   (`refereeKept`). Champs habillés par `.field` ; la carte saisie survit aux
   autres gestes ; au retour d'un geste, le focus revient à son contrôle, ou à
-  la phrase d'état quand le geste a retiré son bouton (`refereeFocusTarget`).
+  la phrase d'état quand le geste a retiré son bouton (`refereeFocusTarget`) ;
+  à l'arrivée du panneau, le focus passe de « Fermer » à la phrase d'état.
+  Le panneau (`loadRefereePanel(matchId, lecteur)`) dit aussi pourquoi
+  l'arbitre en place ne peut plus arbitrer (`reason` : rôle retiré, identité
+  à certifier, joueur du match, opposition retenue, compte supprimé —
+  `RefereeIneligibility`, traduit FR/EN), ce qui empêche le **lecteur**
+  d'arbitrer (`viewerBlock` : « Arbitrer ce match » n'est offert qu'à qui le
+  peut, les autres lisent le message du refus) et l'état de la manche (matchs
+  encore à jouer, en autogestion, arbitrés) : « Toute la manche en
+  autogestion » et « Lever l'autogestion de la manche » ne s'offrent que s'ils
+  changent quelque chose (sinon « Rien à changer »). Sans autre compte
+  désignable, une phrase le dit à la place de la liste ; le choix se vide
+  après « Désigner ». Les confirmations ne prennent le ton `danger` que pour
+  un geste qui retire quelqu'un (`refereeConfirmTone`).
 
 ## Annonces
 

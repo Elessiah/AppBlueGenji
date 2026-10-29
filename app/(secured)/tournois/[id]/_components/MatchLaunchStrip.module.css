@@ -60,3 +60,9 @@
 .wait {
   color: var(--ink-mute);
 }
+
+/* « Sans arbitre » : une décision attendue du staff — ambre, l'avertissement. */
+.alert {
+  color: var(--amber);
+  white-space: nowrap;
+}

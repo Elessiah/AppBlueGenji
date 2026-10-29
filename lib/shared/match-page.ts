@@ -57,6 +57,16 @@ export function matchPageIdsFromSpectatorPath(path: string | null | undefined): 
   return matchPageIdsUnder("/suivre/tournois/", path);
 }
 
+/**
+ * Le chemin (sans préfixe de langue) est-il la page de **ce** match, dans
+ * l'espace connecté ? La fenêtre de lancement n'y propose pas « Page du
+ * match », qui ne ferait que se fermer sur la page où l'on est déjà.
+ */
+export function isMemberMatchPageOf(path: string | null | undefined, ids: MatchPageIds): boolean {
+  const here = matchPageIdsFromMemberPath(path);
+  return here !== null && here.tournamentId === ids.tournamentId && here.matchId === ids.matchId;
+}
+
 /** Le côté d'une partie : l'engagé (ou sa case vide) et son rôle à la création. */
 export type MatchPageSide = {
   slot: 1 | 2;

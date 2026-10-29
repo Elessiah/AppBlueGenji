@@ -288,7 +288,7 @@
     "lobby": "Lancement",
     "ready": "prêts",
     "launched": "Lancé",
-    "hostTitle": "Équipe qui crée le salon en jeu",
+    "hostTitle": "Équipe qui crée le salon en jeu (côté gauche)",
     "hostSr": "Équipe hôte : ",
     "casterTitle": "Caster du match",
     "casterSr": "Caster : ",
@@ -300,7 +300,7 @@
     "hostLeftSr": " (côté gauche)",
     "firstBanTitle": "Équipe qui bannit la première : celle qui n'héberge pas",
     "firstBanSr": "Premier ban : ",
-    "firstMapTitle": "Première carte, fixée par l'arbitrage",
+    "firstMapTitle": "Première carte, fixée par l'arbitrage : {map}",
     "firstMapSr": "Première carte : ",
     "referee": "Arbitre désigné",
     "refereeTitle": "Un arbitre suit ce match",
@@ -308,7 +308,9 @@
     "selfManaged": "Autogestion",
     "selfManagedTitle": "Sans arbitre : les équipes créent et règlent la partie elles-mêmes",
     "undecided": "Sans arbitre",
-    "undecidedTitle": "Ni arbitre ni autogestion : une décision est attendue"
+    "undecidedTitle": "Ni arbitre ni autogestion : une décision est attendue",
+    "undecidedSr": "Attention : ",
+    "undecidedDetailSr": " (ni arbitre ni autogestion : une décision est attendue)"
   },
   "ranking": {
     "title": "Classement",

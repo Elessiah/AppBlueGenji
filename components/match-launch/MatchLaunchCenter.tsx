@@ -15,7 +15,7 @@ import { useToast } from "@/components/ui/toast";
 import { useClientPower } from "@/lib/shared/hooks/useClientPower";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { anotherModalOpen, watchModalsClosed } from "@/lib/shared/dialog-focus";
-import { matchPagePath } from "@/lib/shared/match-page";
+import { isMemberMatchPageOf, matchPagePath } from "@/lib/shared/match-page";
 import {
   launchModalKey,
   launchModalWaits,
@@ -479,13 +479,15 @@ export function MatchLaunchCenter({
                   {t("otherMatch", { count: pending.filter((info) => info.matchId !== current.matchId).length })}
                 </button>
               )}
-              <LocaleLink
-                className="btn ghost"
-                href={matchPagePath(current.tournamentId, current.matchId)}
-                onClick={close}
-              >
-                {t("viewMatch")}
-              </LocaleLink>
+              {!isMemberMatchPageOf(pathname, current) && (
+                <LocaleLink
+                  className="btn ghost"
+                  href={matchPagePath(current.tournamentId, current.matchId)}
+                  onClick={close}
+                >
+                  {t("viewMatch")}
+                </LocaleLink>
+              )}
               <button type="button" className="btn ghost" onClick={close}>
                 {t("close")}
               </button>

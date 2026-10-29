@@ -248,7 +248,8 @@
    qui diffuse reellement. */
 .streamButton {
   display: inline-flex;
-  align-items: center;
+  /* Nom de chaîne sur plusieurs lignes : le ▶ reste à la première. */
+  align-items: flex-start;
   gap: 6px;
   border: 1px solid currentColor;
   border-radius: var(--r-cy-sm);

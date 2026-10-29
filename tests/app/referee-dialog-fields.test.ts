@@ -1,6 +1,8 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { LAUNCH_ERROR_MESSAGES } from "@/lib/shared/match-launch";
+import { REFEREE_INELIGIBILITIES } from "@/lib/shared/match-referee";
 
 /**
  * Fenêtre « Arbitrage » (`RefereeDialog`) : la liste des arbitres et le champ
@@ -74,5 +76,56 @@ describe("RefereeDialog — levée d'une opposition", () => {
   it("la confirmation rappelle, en français et en anglais, qu'on ne lève qu'à la demande de l'arbitre", () => {
     expect(fr.cardActions.refereeDialog.objection.liftConfirm.body).toContain("qu'à sa demande");
     expect(en.cardActions.refereeDialog.objection.liftConfirm.body).toContain("Only at their request");
+  });
+});
+
+describe("RefereeDialog — gestes et textes (EF-30)", () => {
+  const fr = JSON.parse(readFileSync(join(process.cwd(), "messages/fr/tournamentActions.json"), "utf8"));
+  const en = JSON.parse(readFileSync(join(process.cwd(), "messages/en/tournamentActions.json"), "utf8"));
+
+  it("RefereeDialog_assignSucceeded_resetsPick", () => {
+    const assign = source.slice(source.indexOf("const assign ="), source.indexOf("const saveMap ="));
+    expect(assign).toContain('if (done) setPick("")');
+    // Un choix qui n'est plus proposé (le compte désigné a quitté la liste) n'envoie rien.
+    expect(assign).toContain("if (!pickOffered) return;");
+    expect(source).toContain("disabled={busy || !pickOffered}");
+  });
+
+  it("RefereeDialog_noCandidate_saysWhyInsteadOfEmptyList", () => {
+    expect(source).toMatch(/actions\.candidates\.length === 0 \? \(\s*<p className=\{styles\.muted\}>\{t\("cardActions\.refereeDialog\.noCandidate"\)\}<\/p>/);
+    expect(fr.cardActions.refereeDialog.noCandidate).toBe("Aucun autre compte ne peut arbitrer ce match.");
+    expect(en.cardActions.refereeDialog.noCandidate).toBe("No other account can referee this match.");
+  });
+
+  it("RefereeDialog_roundGestures_offeredOnlyWhenUseful", () => {
+    expect(source).toMatch(/\{actions\.roundOn && \(\s*<button[^\n]*setConfirm\("roundOn"\)/);
+    expect(source).toMatch(/\{actions\.roundOff && \(\s*<button[^\n]*setConfirm\("roundOff"\)/);
+    expect(source).toContain('roundDone(t("cardActions.refereeDialog.roundOn"))');
+    expect(source).toContain('roundDone(t("cardActions.refereeDialog.roundOff"))');
+    expect(fr.cardActions.refereeDialog.roundUnchanged).toBe("Rien à changer : la manche était déjà dans cet état.");
+    expect(en.cardActions.refereeDialog.roundUnchanged).toBe("Nothing to change: the round was already in that state.");
+  });
+
+  it("RefereeDialog_confirmations_toneFromGesture", () => {
+    expect(source).toContain('tone={panel ? refereeConfirmTone(confirm ?? "removeReferee", panel) : "danger"}');
+  });
+
+  it("RefereeDialog_takeBlocked_saysWhyWithServerMessage", () => {
+    expect(source).toContain("{actions.takeBlocked && <p className={styles.muted}>{errorText(actions.takeBlocked)}</p>}");
+  });
+
+  it("RefereeDialog_ineligibleReason_everyCodeInFrenchAndEnglish", () => {
+    expect(fr.cardActions.refereeDialog.ineligible).toBe("(ne peut plus arbitrer : {reason})");
+    expect(en.cardActions.refereeDialog.ineligible).toBe("(can no longer referee: {reason})");
+    for (const code of REFEREE_INELIGIBILITIES) {
+      expect(typeof fr.cardActions.refereeDialog.ineligibleReason[code]).toBe("string");
+      expect(typeof en.cardActions.refereeDialog.ineligibleReason[code]).toBe("string");
+    }
+  });
+
+  it("RefereeDialog_viewerBlockCodes_haveLaunchErrorMessages", () => {
+    for (const code of ["NOT_REFEREE", "REFEREE_IDENTITY_REQUIRED", "REFEREE_IS_PLAYER", "REFEREE_OBJECTION"]) {
+      expect(Object.hasOwn(LAUNCH_ERROR_MESSAGES, code)).toBe(true);
+    }
   });
 });

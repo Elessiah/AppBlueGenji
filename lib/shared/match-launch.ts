@@ -221,7 +221,7 @@ export type LaunchReadiness = {
    * L'arbitre désigné, quatrième partie (`docs/features/MATCH_REFEREE.md`) ;
    * absent ou `null` : le match n'a pas d'arbitre, rien à attendre de ce côté.
    */
-  referee?: { ready: boolean } | null;
+  referee?: { ready: boolean; userId?: number } | null;
 };
 
 /** Ce qu'il faut savoir d'un match pour compter ses « Prêt ». */
@@ -260,10 +260,18 @@ export function allPartiesReady(readiness: LaunchReadiness): boolean {
   );
 }
 
-/** Nombre de parties prêtes sur le nombre attendu (« 3/4 prêts » : deux équipes, un caster, l'arbitre). */
+/**
+ * Nombre de parties prêtes sur le nombre attendu (« 3/4 prêts » : deux équipes,
+ * un caster, l'arbitre). L'arbitre qui caste aussi le match (son `userId` parmi
+ * les casters) est **une** personne, dont un seul « Prêt » vaut pour les deux
+ * (`writeCasterReady`) : compté une fois, comme caster.
+ */
 export function readyCount(readiness: LaunchReadiness): { ready: number; expected: number } {
   const parties = [readiness.team1Ready, readiness.team2Ready, ...readiness.casters.map((caster) => caster.ready)];
-  if (readiness.referee) parties.push(readiness.referee.ready);
+  const referee = readiness.referee;
+  const refereeCasts =
+    referee?.userId !== undefined && readiness.casters.some((caster) => caster.userId === referee.userId);
+  if (referee && !refereeCasts) parties.push(referee.ready);
   return { ready: parties.filter(Boolean).length, expected: parties.length };
 }
 

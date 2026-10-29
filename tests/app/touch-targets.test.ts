@@ -50,3 +50,31 @@ describe("zones de tap étendues", () => {
     expect(readFileSync(join(ROOT, file), "utf8")).toMatch(pattern);
   });
 });
+
+describe("liens de stream rognés par l'ellipse : 24 px par la hauteur de ligne (EF-30)", () => {
+  const css = (file: string) => readFileSync(join(ROOT, file), "utf8");
+
+  it("MatchLiveStrip_link_atLeast24pxHigh", () => {
+    const block = blockFor(/^\.link \{/m, css("app/(secured)/tournois/[id]/_components/MatchLiveStrip.module.css"));
+    expect(block).toContain("min-height: 24px");
+    expect(block).toContain("line-height: 24px");
+  });
+
+  it("MatchPage_streamLink_atLeast24pxHigh", () => {
+    const block = blockFor(/^\.streamLink \{/m, css("app/(secured)/tournois/[id]/_components/MatchPage.module.css"));
+    expect(block).toContain("min-height: 24px");
+    expect(block).toContain("line-height: 24px");
+  });
+
+  it("LiveCard_streamButton_playIconStaysOnFirstLine", () => {
+    const block = blockFor(/^\.streamButton \{/m, css("components/cyber/landing/LiveCard.module.css"));
+    expect(block).toContain("align-items: flex-start");
+  });
+
+  it("MatchPage_mapForm_errorBelowInputAndButtonRow", () => {
+    const page = css("app/(secured)/tournois/[id]/_components/MatchPage.tsx");
+    const form = page.slice(page.indexOf("<form className={styles.mapForm}"), page.indexOf("</form>", page.indexOf("styles.mapForm")));
+    expect(form.indexOf('type="submit"')).toBeLessThan(form.indexOf("<FieldErrorText"));
+    expect(form.indexOf("<div className={styles.mapRow}>")).toBeLessThan(form.indexOf('type="submit"'));
+  });
+});

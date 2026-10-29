@@ -267,3 +267,31 @@ describe("MatchLaunchStrip — nom de l'arbitre (MATCH-UI-NAMES, décisions 47 e
     expect(html).toContain(">0/2<");
   });
 });
+
+describe("MatchLaunchStrip — faits lisibles (EF-30)", () => {
+  const renderStaff = (match: BracketMatch) =>
+    providers(
+      { canSchedule: true },
+      <MatchLaunchStrip match={match} phase={matchLaunchPhase({ ...match, refereeScheduling: false }, Date.now())} staff />,
+    );
+
+  it("MatchLaunchStrip_undecided_warningToneAndScreenReaderTexts", () => {
+    const html = renderStaff(lobby({ refereeAssigned: false, selfManaged: false }));
+
+    expect(html).toMatch(/<span class="alert" title="Ni arbitre ni autogestion : une décision est attendue">/);
+    expect(html).toContain('<span class="sr-only">Attention : </span> Sans arbitre');
+    expect(html).toContain('<span class="sr-only"> (ni arbitre ni autogestion : une décision est attendue)</span>');
+  });
+
+  it("MatchLaunchStrip_firstMap_titleCarriesFullName", () => {
+    const html = render(lobby({ firstMap: "Une très longue carte au nom vraiment interminable" }));
+
+    expect(html).toContain('title="Première carte, fixée par l&#x27;arbitrage : Une très longue carte au nom vraiment interminable"');
+  });
+
+  it("MatchLaunchStrip_host_titleSaysLeftSide", () => {
+    const html = render(lobby());
+
+    expect(html).toContain('title="Équipe qui crée le salon en jeu (côté gauche)"');
+  });
+});

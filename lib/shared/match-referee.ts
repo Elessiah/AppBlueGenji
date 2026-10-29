@@ -25,6 +25,22 @@ import type { MatchStatus } from "./types";
 export type RefereeBlock = "NOT_REFEREE" | "REFEREE_IDENTITY_REQUIRED";
 
 /**
+ * Pourquoi un compte ne peut pas arbitrer **ce** match, tel que la fenêtre
+ * « Arbitrage » le dit : la condition d'arbitrage (`RefereeBlock`), le compte
+ * qui joue le match, l'opposition retenue, ou le compte disparu (arbitre en
+ * place seulement). Les codes du serveur, traduits FR/EN.
+ */
+export type RefereeIneligibility = RefereeBlock | "REFEREE_IS_PLAYER" | "REFEREE_OBJECTION" | "ACCOUNT_GONE";
+
+export const REFEREE_INELIGIBILITIES: readonly RefereeIneligibility[] = [
+  "NOT_REFEREE",
+  "REFEREE_IDENTITY_REQUIRED",
+  "REFEREE_IS_PLAYER",
+  "REFEREE_OBJECTION",
+  "ACCOUNT_GONE",
+];
+
+/**
  * Motif qui empêche d'arbitrer, `null` si rien ne l'empêche.
  * `hasTournamentsPermission` est la permission `tournaments`.
  */

@@ -225,14 +225,20 @@
 }
 
 .mapForm {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 8px;
   margin-top: 12px;
 }
 
-.mapField {
+/* Saisie et bouton côte à côte, l'erreur de champ sous la ligne (dans le
+   `.field`) : l'apparition de l'erreur ne déplace pas le bouton. */
+.mapRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* `flex-basis` l'emporte sur la largeur pleine de `.field input`. */
+.mapRow > input:not([type="checkbox"]):not([type="radio"]) {
   flex: 1 1 200px;
   min-width: 0;
 }
@@ -286,8 +292,12 @@
   color: var(--ink-soft);
 }
 
+/* 24 px de haut (WCAG 2.5.8) par la hauteur de ligne : `overflow: hidden`
+   (l'ellipse) rognerait l'extension de `tap-target`. */
 .streamLink {
   display: inline-block;
+  min-height: 24px;
+  line-height: 24px;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;

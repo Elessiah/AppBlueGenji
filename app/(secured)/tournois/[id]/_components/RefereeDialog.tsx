@@ -12,7 +12,12 @@ import type { BracketMatch } from "@/lib/shared/types";
 import { TournamentDialogFrame } from "./TournamentDialogFrame";
 import { launchErrorText, useActionsText } from "../_lib/actions-text";
 import { useErrorsText } from "../_lib/error-map";
-import { refereeDialogActions, refereeFocusTarget, type RefereePanelView } from "../_lib/referee-dialog";
+import {
+  refereeConfirmTone,
+  refereeDialogActions,
+  refereeFocusTarget,
+  type RefereePanelView,
+} from "../_lib/referee-dialog";
 import styles from "./RefereeDialog.module.css";
 
 const FIRST_MAP_FIELD_ERRORS = { INVALID_FIRST_MAP: "map" } as const;
@@ -91,13 +96,18 @@ export function RefereeDialog({
   // alors un bouton disparu (`refereeFocusTarget`).
   const statusRef = useRef<HTMLParagraphElement>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
+  // Première arrivée du panneau : le focus quitte « Fermer » pour la phrase d'état.
+  const arrivedRef = useRef(false);
   useEffect(() => {
     if (busy || confirm !== null) return;
+    const firstArrival = panel !== null && !arrivedRef.current;
+    if (firstArrival) arrivedRef.current = true;
     const target = refereeFocusTarget<Element>({
       active: document.activeElement,
       body: document.body,
       trigger: triggerRef.current,
       status: statusRef.current,
+      firstArrival,
     });
     triggerRef.current = null;
     if (target instanceof HTMLElement) target.focus();
@@ -151,10 +161,17 @@ export function RefereeDialog({
 
   const base = `/api/admin/matches/${match.id}`;
   const actions = panel ? refereeDialogActions(panel, viewerUserId) : null;
+  // Le compte choisi doit encore être proposé : une fois désigné, il quitte la
+  // liste, et un choix resté sur lui renverrait le même compte.
+  const pickOffered = actions?.candidates.some((candidate) => String(candidate.userId) === pick) ?? false;
   const assign = (event: FormEvent) => {
     event.preventDefault();
-    if (pick === "") return;
-    void run(() => send(`${base}/referee`, "PUT", { userId: Number(pick) }), t("cardActions.refereeDialog.assigned"));
+    if (!pickOffered) return;
+    void run(() => send(`${base}/referee`, "PUT", { userId: Number(pick) }), t("cardActions.refereeDialog.assigned")).then(
+      (done) => {
+        if (done) setPick("");
+      },
+    );
   };
   const saveMap = (event: FormEvent) => {
     event.preventDefault();
@@ -168,8 +185,14 @@ export function RefereeDialog({
   };
   const roundBody = (enabled: boolean) =>
     panel ? { phaseId: panel.round.phaseId, roundNumber: panel.round.roundNumber, bracket: panel.round.bracket, enabled } : {};
+  // La manche a pu changer depuis la lecture : « rien à changer » plutôt qu'un succès qui ne fait rien.
+  const roundDone = (done: string) => (payload: unknown) =>
+    Number((payload as { changed?: unknown }).changed ?? 0) === 0 ? t("cardActions.refereeDialog.roundUnchanged") : done;
 
-  const confirmations: Record<PendingConfirm, { title: string; body: string; confirm: string; action: () => Promise<boolean> }> = {
+  const confirmations: Record<
+    PendingConfirm,
+    { title: string; body: string; confirm: string; action: () => Promise<boolean> }
+  > = {
     removeReferee: {
       title: t("cardActions.refereeDialog.removeConfirm.title", { match: matchLabel }),
       body: t("cardActions.refereeDialog.removeConfirm.body"),
@@ -190,7 +213,7 @@ export function RefereeDialog({
       action: () =>
         run(
           () => send(`/api/admin/tournaments/${match.tournamentId}/self-management`, "PUT", roundBody(true)),
-          t("cardActions.refereeDialog.roundOn"),
+          roundDone(t("cardActions.refereeDialog.roundOn")),
         ),
     },
     roundOff: {
@@ -200,7 +223,7 @@ export function RefereeDialog({
       action: () =>
         run(
           () => send(`/api/admin/tournaments/${match.tournamentId}/self-management`, "PUT", roundBody(false)),
-          t("cardActions.refereeDialog.roundOff"),
+          roundDone(t("cardActions.refereeDialog.roundOff")),
         ),
     },
     objection: {
@@ -250,9 +273,15 @@ export function RefereeDialog({
             <p ref={statusRef} tabIndex={-1} className={styles.status}>
               {refereeStatusText(panel, t)}
               {panel.referee && !panel.referee.eligible && (
-                <span className={styles.warn}> {t("cardActions.refereeDialog.ineligible")}</span>
+                <span className={styles.warn}>
+                  {" "}
+                  {t("cardActions.refereeDialog.ineligible", {
+                    reason: t(`cardActions.refereeDialog.ineligibleReason.${panel.referee.reason ?? "NOT_REFEREE"}`),
+                  })}
+                </span>
               )}
             </p>
+            {actions.takeBlocked && <p className={styles.muted}>{errorText(actions.takeBlocked)}</p>}
 
             <div className={styles.row}>
               {actions.take && (
@@ -286,6 +315,9 @@ export function RefereeDialog({
               )}
             </div>
 
+            {actions.candidates.length === 0 ? (
+              <p className={styles.muted}>{t("cardActions.refereeDialog.noCandidate")}</p>
+            ) : (
             <form className={styles.row} onSubmit={assign}>
               <div className={`field ${styles.control}`}>
                 <label htmlFor={pickId}>{t("cardActions.refereeDialog.assignLabel")}</label>
@@ -298,10 +330,11 @@ export function RefereeDialog({
                   ))}
                 </select>
               </div>
-              <button type="submit" className="btn ghost" disabled={busy || pick === ""}>
+              <button type="submit" className="btn ghost" disabled={busy || !pickOffered}>
                 {t("cardActions.refereeDialog.assign")}
               </button>
             </form>
+            )}
 
             <div className={styles.row}>
               {panel.selfManaged ? (
@@ -323,12 +356,16 @@ export function RefereeDialog({
                   {t("cardActions.refereeDialog.selfOnAction")}
                 </button>
               )}
-              <button type="button" className="btn ghost" disabled={busy} onClick={() => setConfirm("roundOn")}>
-                {t("cardActions.refereeDialog.roundOnAction")}
-              </button>
-              <button type="button" className="btn ghost" disabled={busy} onClick={() => setConfirm("roundOff")}>
-                {t("cardActions.refereeDialog.roundOffAction")}
-              </button>
+              {actions.roundOn && (
+                <button type="button" className="btn ghost" disabled={busy} onClick={() => setConfirm("roundOn")}>
+                  {t("cardActions.refereeDialog.roundOnAction")}
+                </button>
+              )}
+              {actions.roundOff && (
+                <button type="button" className="btn ghost" disabled={busy} onClick={() => setConfirm("roundOff")}>
+                  {t("cardActions.refereeDialog.roundOffAction")}
+                </button>
+              )}
             </div>
 
             {panel.roundSlots.length > 0 ? (
@@ -438,6 +475,7 @@ export function RefereeDialog({
           title={pending.title}
           confirmLabel={pending.confirm}
           pendingLabel={t("cardActions.refereeDialog.pending")}
+          tone={panel ? refereeConfirmTone(confirm ?? "removeReferee", panel) : "danger"}
           onClose={() => setConfirm(null)}
           onConfirm={pending.action}
         >

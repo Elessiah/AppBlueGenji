@@ -109,3 +109,22 @@ describe("hostTeamName", () => {
     expect(hostTeamName(bracketMatch({ ...match, hostTeamId: null }))).toBeNull();
   });
 });
+
+describe("launchStripControls — `showOpen` implique `showContacts` (page du match, `readsContacts`)", () => {
+  const player: LaunchStripViewer = { ...nobody, myTeamId: 10 };
+  const cast = bracketMatch({ ...match, casters: [matchCaster({ userId: 1 })] });
+
+  it("launchStripControls_playerUnderway_opensAndReadsContacts", () => {
+    expect(launchStripControls(match, "LOBBY", player)).toMatchObject({ showOpen: true, showContacts: true });
+    expect(launchStripControls(match, "LAUNCHED", player)).toMatchObject({ showOpen: true, showContacts: true });
+  });
+
+  it("launchStripControls_casterUnderway_opensAndReadsContacts", () => {
+    expect(launchStripControls(cast, "LOBBY", nobody)).toMatchObject({ showOpen: true, showContacts: true });
+    expect(launchStripControls(cast, "LAUNCHED", nobody)).toMatchObject({ showOpen: true, showContacts: true });
+  });
+
+  it("launchStripControls_casterBeforeStart_neither", () => {
+    expect(launchStripControls(cast, "SCHEDULED", nobody)).toMatchObject({ showOpen: false, showContacts: false });
+  });
+});
