@@ -61,34 +61,13 @@ export function SiteNav({
   return (
     <nav className={s.nav} aria-label={t("nav.mainLabel")} data-sticky-header>
       <div className={`container ${s.navInner}`}>
-        <div className={s.navLeft}>
-          {links.map((link) => {
-            const isActive = isNavLinkActive(pathname, link.href);
-            return (
-              <LocaleLink
-                key={link.href}
-                href={link.href}
-                aria-current={isActive ? "page" : undefined}
-                className={`${s.navLink} ${isActive ? s.navLinkActive : ""}`}
-                style={{ "--nav-rgb": link.rgb } as React.CSSProperties}
-              >
-                {t(link.labelKey)}
-              </LocaleLink>
-            );
-          })}
-        </div>
+        {/* Largeur étroite : logo, compte, puis liens (ordre visuel = ordre du clavier).
+            Logo et liens existent en deux copies qui s'excluent en CSS par `display: none`, qui les retire
+            de l'arbre d'accessibilité et de l'ordre du focus : une seule est lue. */}
+        <HomeLogo className={s.navLogoMobile} />
+        <NavLinks className={s.navLeft} pathname={pathname} />
 
-        <LocaleLink href="/" className={s.navLogo} aria-label={t("nav.home")} title={t("nav.home")}>
-          <LogoWithGlow
-            src="/logo_bg.webp"
-            alt={t("nav.logoAlt")}
-            width={32}
-            height={32}
-            size="sm"
-            borderRadius={8}
-            borderColor="rgba(0,0,0,0)"
-          />
-        </LocaleLink>
+        <HomeLogo className={s.navLogo} />
 
         <div className={s.navRight}>
           {/* Barre allégée : l'accueil passe par le logo, « Mon équipe » par le
@@ -124,8 +103,53 @@ export function SiteNav({
           {/* Profil, équipe et déconnexion, à portée de main sur toutes les largeurs. */}
           <AccountMenu pseudo={pseudo} avatarUrl={avatarUrl} activeTeam={activeTeam} />
         </div>
+        <NavLinks className={s.navLeftMobile} pathname={pathname} />
       </div>
     </nav>
+  );
+}
+
+/**
+ * Les liens de section, rendus deux fois (voir `SiteNav`) : en bureau avant le
+ * logo, en largeur étroite après le compte, comme à l'écran.
+ */
+function NavLinks({ className, pathname }: Readonly<{ className: string; pathname: string }>) {
+  const { t } = useShellText();
+  return (
+    <div className={className}>
+      {links.map((link) => {
+        const isActive = isNavLinkActive(pathname, link.href);
+        return (
+          <LocaleLink
+            key={link.href}
+            href={link.href}
+            aria-current={isActive ? "page" : undefined}
+            className={`${s.navLink} ${isActive ? s.navLinkActive : ""}`}
+            style={{ "--nav-rgb": link.rgb } as React.CSSProperties}
+          >
+            {t(link.labelKey)}
+          </LocaleLink>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Lien d'accueil par le logo (rendu deux fois, une seule copie visible : voir `SiteNav`). */
+function HomeLogo({ className }: Readonly<{ className: string }>) {
+  const { t } = useShellText();
+  return (
+    <LocaleLink href="/" className={className} aria-label={t("nav.home")} title={t("nav.home")}>
+      <LogoWithGlow
+        src="/logo_bg.webp"
+        alt={t("nav.logoAlt")}
+        width={32}
+        height={32}
+        size="sm"
+        borderRadius={8}
+        borderColor="rgba(0,0,0,0)"
+      />
+    </LocaleLink>
   );
 }
 
