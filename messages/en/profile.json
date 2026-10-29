@@ -413,7 +413,7 @@
     "exposure": {
       "admins": "The site's administrators can see your Discord tag at all times.",
       "referees": "Referees can see it only while you're entered in an ongoing or upcoming tournament — not after —, or, for a match you cast, from the moment both its opponents are known until its end.",
-      "match": "The members of both teams of your match can see it from the moment both its opponents are known until its end, and its casters only while the match is being played (from its start to its end) — to add each other and create the channel. If you cast a match, both its teams and its other casters see yours only while the match is being played, in the match's “Contacts” and launch windows and on its page, and the referees from the moment both its opponents are known until its end, in its “Contacts” window and on its page.",
+      "match": "The members of both teams of your match can see it from the moment both its opponents are known until its end, and its casters only while the match is being played (from its start to its end) — to add each other and create the channel. If you cast a match, both its teams, its other casters and its assigned referee see yours only while the match is being played, in the match's “Contacts” and launch windows and on its page, and the other referees from the moment both its opponents are known until its end, in its “Contacts” window and on its page.",
       "players": "Other players on the site only see it if you make it visible in your privacy settings. It doesn't appear on any public page. That your tag is verified (✅ badge, without the tag) can, however, be read on your player page by any logged-in player.",
       "undo": "You can cancel at any time by removing your tag from “My profile”: the verification is lost, and the exposure with it. Logging in with Discord then saves your username again, but without verifying it: only this step verifies it."
     },
@@ -470,7 +470,7 @@
       "admins": "administrators, at any time;",
       "referees": "referees, while you're registered for a tournament that isn't finished;",
       "match": "the members of both teams of your match, from the moment its opponents are known until its end, and its casters while the match is being played;",
-      "asCaster": "if you cast a match: both its teams and its other casters while the match is being played, in its “Contacts” and launch windows and on its page, and referees from the moment its opponents are known until its end, in its “Contacts” window and on its page;",
+      "asCaster": "if you cast a match: both its teams, its other casters and its assigned referee while the match is being played, in its “Contacts” and launch windows and on its page, and other referees from the moment its opponents are known until its end, in its “Contacts” window and on its page;",
       "players": "other players, only if you tick “Discord tag” in your privacy settings.",
       "footer": "Nobody else."
     },
