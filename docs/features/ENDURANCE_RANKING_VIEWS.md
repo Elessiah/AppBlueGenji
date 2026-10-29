@@ -198,7 +198,7 @@ du registre.
 ## Suites de la revue (EF-10)
 
 - **Bandeau** : entre deux manches (close, suivante pas tirée) il dit « Manche n
-  terminée · la suite arrive bientôt » (« play-offs bientôt » après la dernière
+  terminée · prochaine manche pas encore tirée » (« play-offs pas encore lancés » après la dernière
   manche prévue) ; la barre des play-offs porte son propre nom ; l'horloge de
   60 s ne tourne que si un match non joué de la manche est daté. L'arbre final
   ne compte pas les exemptions (ni jouées ni à jouer) et ne projette pas de

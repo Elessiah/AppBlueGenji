@@ -602,12 +602,14 @@ export function EnduranceRankingViews({
       </div>
 
       {/* « S3 » ne s'explique ni au survol ni au toucher : un « i » le dit. */}
-      <InfoHintRow>
-        <span className={`mono ${styles.seedHintLabel}`}>{t("endurance.seedHintLabel")}</span>
-        <InfoHint id={`${baseId}-seed-hint`} subject={t("endurance.seedHintSubject")}>
-          {t("endurance.seedHint")}
-        </InfoHint>
-      </InfoHintRow>
+      {rows.length > 0 && (
+        <InfoHintRow>
+          <span className={`mono ${styles.seedHintLabel}`}>{t("endurance.seedHintLabel")}</span>
+          <InfoHint id={`${baseId}-seed-hint`} subject={t("endurance.seedHintSubject")}>
+            {t("endurance.seedHint")}
+          </InfoHint>
+        </InfoHintRow>
+      )}
 
       {hasBar && (
         <nav className={styles.bottomNav} aria-label={t("endurance.viewsNavLabel")}>
