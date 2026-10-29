@@ -2081,3 +2081,50 @@ describe("PRIVACY_CHANGES — pseudo de l'arbitre lu par les membres connectés 
     expect(PRIVACY_CHANGES.indexOf(older)).toBe(PRIVACY_CHANGES.length - 3);
   });
 });
+
+describe("PRIVACY_CHANGES — rôles de plateforme au journal du staff (ADMIN-SELF-ROLES)", () => {
+  const id = "2026-10-roles-de-plateforme-journal-du-staff";
+  const entry = PRIVACY_CHANGES.find((c) => c.id === id)!;
+  const english = PRIVACY_CHANGES_EN[id];
+
+  it("privacyChanges_platformRolesLog_closesListDated1031ForAllAccountsWithRegisterLink", () => {
+    expectStandaloneEntry(entry, english, {
+      fromEnd: 1,
+      publishedAt: "2026-10-31",
+      audience: undefined,
+      links: [{ href: "/rgpd/registre#t05", label: "Lire la fiche T05 du registre" }],
+    });
+    expect(english.linkLabels).toEqual(["Read entry T05 of the register"]);
+    expect(id.length).toBeLessThanOrEqual(PRIVACY_CHANGE_ID_MAX_LENGTH);
+    expect(english.details).toHaveLength(entry.details.length);
+  });
+
+  it("privacyChanges_platformRolesLog_statesDiscordAnonymityAndServerLogContentFrAndEn", () => {
+    const fr = [entry.title, entry.summary, ...entry.details].join(" ");
+    const en = [english.title, english.summary, ...english.details].join(" ");
+
+    expect(fr).toContain("ni ton pseudo, ni celui de l'administrateur, ni les rôles");
+    expect(fr).toContain("le pseudo et l'identifiant de l'administrateur qui l'a fait, l'identifiant du compte visé et les rôles enregistrés");
+    expect(fr).toContain("jamais s'y retirer l'administration");
+    expect(en).toContain("neither your username, nor the administrator's, nor the roles");
+    expect(en).toContain("the username and identifier of the administrator who did it, the identifier of the account concerned and the roles saved");
+    expect(en).toContain("never remove their own administration there");
+  });
+
+  it("privacyChanges_platformRolesLog_leavesPublishedEntriesBeforeIt", () => {
+    const previous = PRIVACY_CHANGES[PRIVACY_CHANGES.length - 2];
+    expect(previous.id).toBe("2026-10-pseudo-arbitre-aux-membres");
+    expect(PRIVACY_CHANGES.filter((c) => c.publishedAt > "2026-10-30").map((c) => c.id)).toContain(id);
+  });
+
+  it("processingRegister_t05PlatformRoles_namesTheAccountOnlyOnSelfEditFrAndEn", () => {
+    const t05 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T05")!;
+    const t05En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T05")!;
+    expect(t05.dataSubjects).toContain(
+      "Comptes dont un administrateur attribue ou retire un rôle de plateforme (désignés par l'identifiant de leur compte ; nommés seulement quand un administrateur règle les siens, comme auteur du geste)",
+    );
+    expect(t05En.dataSubjects).toContain(
+      "Accounts whose platform role an administrator grants or removes (designated by their account identifier; named only when an administrator sets their own, as the author of the action)",
+    );
+  });
+});

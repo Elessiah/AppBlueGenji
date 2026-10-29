@@ -512,7 +512,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Staff",
       "Joueurs et équipes engagés dans un tournoi (désignés par le nom d'équipe, jamais par leur pseudo)",
       "Casters inscrits sur un match (jamais nommés)",
-      "Comptes dont un administrateur attribue ou retire un rôle de plateforme (jamais nommés)",
+      "Comptes dont un administrateur attribue ou retire un rôle de plateforme (désignés par l'identifiant de leur compte ; nommés seulement quand un administrateur règle les siens, comme auteur du geste)",
     ],
     dataCategories: [
       "Sur Discord : noms d'équipe, scores, noms des tournois, horaires et manches des matchs — aucun pseudo de joueur (« un joueur », y compris en tournoi individuel) et aucun membre du staff ni caster nommé (« le staff », « un caster » ; motif du retrait d'office d'un caster — il ne remplit plus les conditions du cast, ou il joue désormais le match ; « un membre du staff qui joue ce match », avec le seul nom du tournoi, pour un litige tranché, un résultat corrigé, un abandon imposé ou une validation automatique suspendue par lui)",

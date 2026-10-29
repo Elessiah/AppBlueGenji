@@ -666,6 +666,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
   },
   "2026-10-roles-de-plateforme-journal-du-staff": {
     title: "Platform roles: noted in the staff log",
+    linkLabels: ["Read entry T05 of the register"],
     summary:
       "When an administrator grants or removes a platform role (administrator, referee, caster, community manager, recruiter) — including on their own account, from “My profile” — the action is now noted in the staff log, without naming anyone on Discord.",
     details: [

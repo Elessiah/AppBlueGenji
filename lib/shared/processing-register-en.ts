@@ -335,7 +335,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Staff",
       "Players and teams taking part in a tournament (referred to by team name, never by their username)",
       "Casters registered for a match (never named)",
-      "Accounts whose platform role an administrator grants or removes (never named)",
+      "Accounts whose platform role an administrator grants or removes (designated by their account identifier; named only when an administrator sets their own, as the author of the action)",
     ],
     dataCategories: [
       "On Discord: team names, scores, tournament names, match times and rounds — no player username (“a player”, including in solo tournaments) and no staff member or caster named (“the staff”, “a caster”; reason for a caster's automatic removal — they no longer meet the casting requirements, or they now play in the match; “a staff member who plays in this match”, with the tournament name only, for a dispute settled, a result corrected, a withdrawal imposed or an automatic confirmation paused by them)",
