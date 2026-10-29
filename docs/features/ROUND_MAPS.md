@@ -91,7 +91,7 @@ bloc de la fiche paraît dès la création : les tours à venir se règlent avan
 suivent l'instantané tant qu'elles n'ont pas été modifiées dans la fenêtre
 (`resyncSlots`) ; une saisie en cours n'est jamais écrasée, et son propre
 enregistrement est relu tel que le serveur l'a rangé (créneaux vides écartés).
-Chaque formulaire dit « Modifications non enregistrées » (`role="status"`)
+Chaque formulaire dit « Modifications non enregistrées » (`<output>`)
 tant qu'il diffère du serveur. Un créneau vide entre deux cartes, ou un refus
 `INVALID_ROUND_MAPS`, est **rattaché** au bouton de liste du créneau
 (`useFieldErrors`, `aria-invalid`, focus) en plus de la notification.
