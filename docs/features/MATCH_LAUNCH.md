@@ -446,7 +446,8 @@ qu'il tient, son « Prêt »). Code : `lib/server/tournaments/match-casters.ts`.
   intervalle vide partagé par les matchs voisins ; l'entretien et l'autogestion d'une manche, qui
   lisent avant le verrou, gardent la lecture verrouillante. `pruneMatchStreams` ne relit pas ce
   que l'appelant tient déjà. `PUT /api/admin/matches/:id/live` applique `canConfigureLive` côté
-  serveur (`MATCH_NOT_CASTABLE`, 409).
+  serveur (`MATCH_NOT_CASTABLE`, 409) ; déjà marqué, il ne peut plus qu'être démarqué
+  (`trigger: null`) — ni son mode ni son lien ne se changent sur un match joué.
 - **Interblocages** : inscription, retrait et retrait d'office se rejouent sur
   un interblocage d'InnoDB (`retryOnDeadlock`) ; tout geste qui touche les
   casters verrouille d'abord la ligne du match (`setRefereeScheduling` compris).
