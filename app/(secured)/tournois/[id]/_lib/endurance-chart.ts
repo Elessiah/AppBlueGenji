@@ -246,8 +246,10 @@ export function chartColoredIds(
  * recolorent plus les courbes. `previous` (les attributions déjà faites, même
  * pour des engagés aujourd'hui masqués) est repris ; un engagé sans couleur —
  * ou dont la couleur est déjà prise par un engagé tracé avant lui — reçoit la
- * première couleur libre. Au-delà de huit tracés les couleurs se répètent
- * (l'aide le dit, la légende et l'encart départagent).
+ * première couleur libre. Palette saturée (plus de huit tracés) : les couleurs
+ * se répètent — l'aide le dit, la légende et l'encart départagent — et un
+ * engagé qui avait déjà la sienne la **garde** (retirer l'un des répétés ne
+ * décale pas les autres).
  */
 export function assignChartColors(previous: ReadonlyMap<number, number>, ids: readonly number[]): Map<number, number> {
   const size = ENDURANCE_CHART_PALETTE.length;
@@ -264,7 +266,7 @@ export function assignChartColors(previous: ReadonlyMap<number, number>, ids: re
     let index = 0;
     while (index < size && taken.has(index)) index += 1;
     if (index === size) {
-      index = wrapped % size;
+      index = previous.get(id) ?? wrapped % size;
       wrapped += 1;
     } else {
       taken.add(index);

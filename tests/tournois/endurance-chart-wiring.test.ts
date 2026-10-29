@@ -58,7 +58,7 @@ describe("performance (64 engagés × 12 manches)", () => {
 
   it("l'avancement de l'animation ne vit que dans le composant des courbes, jamais à la racine", () => {
     expect(CHART).not.toMatch(/setProgress|\bdrawn\b|chartAnimationFrame|requestAnimationFrame|chartLine\(/);
-    expect(LINES).toContain("const [progress, setProgress] = useState(shown);");
+    expect(LINES).toContain("const [progress, setProgress] = useState(animate ? 0 : shown);");
     expect(LINES).toContain("export const EnduranceChartLines = memo(");
     expect(LINES).toContain("chartLine(item, shown, drawn, geometry)");
     expect(CHART).toContain("<EnduranceChartLines");
@@ -167,7 +167,8 @@ describe("légende : survol, focus, lecteur d'écran", () => {
   });
 
   it("un retri de la légende recale le survol et garde le bouton focalisé visible", () => {
-    expect(CHART).toMatch(/setHover\(focusedRef\.current\);[^]*?scrollIntoView\(\{ block: "nearest" \}\);[^]*?\}, \[order\]\);/);
+    expect(CHART).toMatch(/setHover\(focusedRef\.current\);\s*\}, \[series\]\);/);
+    expect(CHART).toMatch(/scrollIntoView\(\{ block: "nearest" \}\);[^]*?\}, \[order\]\);/);
     expect(CHART).toContain('data-legend-item=""');
   });
 

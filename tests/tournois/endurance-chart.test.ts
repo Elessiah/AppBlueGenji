@@ -363,6 +363,13 @@ describe("couleurs attribuées une fois", () => {
     expect(assignChartColors(first, ids)).toEqual(first);
   });
 
+  it("palette saturée : retirer un engagé répété ne décale pas les autres", () => {
+    const ids = Array.from({ length: 12 }, (_, i) => i + 1);
+    const first = assignChartColors(new Map(), ids);
+    const without = assignChartColors(first, ids.filter((id) => id !== 9));
+    for (const id of ids.filter((value) => value !== 9)) expect(without.get(id)).toBe(first.get(id));
+  });
+
   it("ne modifie pas les attributions reçues et garde celles des engagés masqués", () => {
     const previous = new Map([[1, 4]]);
     const next = assignChartColors(previous, [2]);

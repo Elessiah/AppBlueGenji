@@ -100,7 +100,9 @@ export const EnduranceChartLines = memo(function EnduranceChartLines({
   onLeave,
   onToggle,
 }: Props) {
-  const [progress, setProgress] = useState(shown);
+  // Animée : la courbe part du départ dès la première image (sinon elle serait
+  // peinte entière une image avant que l'effet de montage ne la redessine).
+  const [progress, setProgress] = useState(animate ? 0 : shown);
   const progressRef = useRef(progress);
   progressRef.current = progress;
   const frame = useRef<number | null>(null);

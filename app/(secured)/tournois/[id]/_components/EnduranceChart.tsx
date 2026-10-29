@@ -324,11 +324,15 @@ export function EnduranceChart({
     [hovered, colors],
   );
 
-  // Un résultat poussé retrie la légende : l'engagé sous un pointeur immobile
-  // n'est plus celui du survol (on revient au focus clavier), et le bouton
-  // focalisé reste dans la partie visible de la zone défilante.
+  // Un résultat poussé (nouvelles séries) retrie la légende et déplace les
+  // courbes : l'engagé sous un pointeur immobile n'est plus celui du survol,
+  // on revient au focus clavier. Un simple changement de manche n'y touche pas.
   useEffect(() => {
     setHover(focusedRef.current);
+  }, [series]);
+
+  // Le bouton focalisé reste dans la partie visible de la zone défilante.
+  useEffect(() => {
     const active = document.activeElement;
     if (active instanceof HTMLElement && active.dataset.legendItem !== undefined && typeof active.scrollIntoView === "function") {
       active.scrollIntoView({ block: "nearest" });
