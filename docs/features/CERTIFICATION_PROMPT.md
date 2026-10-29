@@ -20,7 +20,15 @@ La fiche d'un tournoi ouvre donc d'office une modale qui invite à certifier :
 | Tout autre membre (joueur, coach) d'une équipe engagée | l'équipe n'a **aucun** membre certifié (ni Discord ni BattleTag ; Discord seul compte en Marvel Rivals), et il lui en manque une | `TEAM_WITHOUT_CONTACT` |
 
 Rien pour qui a déjà les deux, pour un tournoi terminé (`FINISHED`), en tournoi
-individuel, ni pour une équipe non engagée. Le motif `MANAGER` passe devant.
+individuel, ni pour une équipe non engagée. Le motif `MANAGER` passe devant ;
+le prompt porte aussi `teamHasContact`, et un meneur dont l'équipe n'a aucun
+contact lit un chapeau qui le dit (`leadManagerNoContact`, variante « Discord
+seul ») — le fait le plus urgent : l'adversaire et l'arbitrage ne peuvent pas
+la joindre.
+
+Les pastilles d'état (« Où tu en es », `role="list"` gardé sous WebKit malgré
+`list-style: none`) : « Certifié » en `pill-success`, « À certifier » en
+`pill-info` — une étape refusable, pas un avertissement (décision 17).
 
 **Marvel Rivals** : le BattleTag (Battle.net) ne sert à rien à ce jeu
 (`battletagRelevantFor`, `battletagRelevant` du prompt). Seul le tag Discord est
@@ -57,9 +65,15 @@ retirée, plus rien. Une fiche figée la masque aussi.
 
 En **Marvel Rivals**, les lignes qui parlent de Blizzard ou de Battle.net
 (identité, matchs, « ensuite ») prennent leur variante `…DiscordOnly`. Le tableau est
-en rôles ARIA (`role="table"`, comme le roster d'équipe) : sous 560 px ses
-lignes passent en cartes sans perdre leur sémantique, chaque cellule libellée
-par `data-label` (libellé visuel seulement, texte de remplacement vide).
+en rôles ARIA (`role="table"`, comme le roster d'équipe) : quand **le tableau**
+fait moins de 560 px (requête de conteneur `certification-table` : la modale
+pleine en offre près de 600, une modale rétrécie garderait sinon trois colonnes
+étroites) ses lignes passent en cartes sans perdre leur sémantique, chaque
+cellule libellée par `data-label` (libellé visuel seulement, texte de
+remplacement vide). En tableau, l'en-tête « Sujet » s'affiche, et la première
+et la dernière colonne n'ont pas de retrait extérieur : le tableau s'aligne sur
+le chapeau et le pied. Le cadre (`TournamentDialogFrame`) prend le focus à
+l'ouverture : anneau bleu au clavier seulement (`:focus-visible`).
 
 Battle.net rattaché **sans** BattleTag enregistré : rien à faire depuis le
 profil (rattachement déjà là, BattleTag tapé refusé) — la modale ne lui en
@@ -117,10 +131,12 @@ contact, meneur compris : lu seulement dans ce cas (`loadCertificationPrompt`), 
 = sans choix. L'inverse n'est pas vrai : la case de cette modale ne tait que
 cette modale.
 
-- **« Plus tard »** ou fermeture (Échap, voile) : `bg_cert_prompt_closed` = « 1 »
+- **« Plus tard »** (le bouton dit **« Fermer »** une fois la case cochée : le
+  refus est alors définitif) ou fermeture (Échap, voile) : `bg_cert_prompt_closed` = « 1 »
   en **stockage de session** — la modale ne se rouvre pas dans cet onglet.
   La case « Ne plus voir », visible, vaut pour **toute** fermeture, Échap et
-  voile compris ;
+  voile compris ; son seul état vit dans `useCertificationPrompt` (la modale
+  l'affiche), pour valoir aussi quand elle s'efface devant une urgente ;
 - case **« Ne plus voir »** cochée puis fermeture (ou clic sur le bouton du
   profil) : gardée **sur le compte** (EF-04, décision 16) —
   `POST /api/profile/certification-prompt` pose
