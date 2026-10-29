@@ -360,13 +360,31 @@ export function EnduranceRankingViews({
     const bar = barRef.current;
     const sentinel = sentinelRef.current;
     if (!hasBar || bar === null || sentinel === null || typeof IntersectionObserver === "undefined") return;
-    const top = Number.parseFloat(getComputedStyle(bar).top) || 0;
-    const observer = new IntersectionObserver(
-      ([entry]) => setStuck(!entry.isIntersecting && entry.boundingClientRect.top < top),
-      { rootMargin: `-${Math.ceil(top)}px 0px 0px 0px` },
-    );
-    observer.observe(sentinel);
-    return () => observer.disconnect();
+    let observer: IntersectionObserver | null = null;
+    let observedTop = Number.NaN;
+    // La hauteur de l'en-tête (`--sticky-header-h`, posée sur <html>) change à la
+    // rotation ou au redimensionnement : le seuil est relu, l'observateur refait
+    // seulement si la valeur a bougé.
+    const observe = () => {
+      const top = Number.parseFloat(getComputedStyle(bar).top) || 0;
+      if (top === observedTop) return;
+      observedTop = top;
+      observer?.disconnect();
+      observer = new IntersectionObserver(
+        ([entry]) => setStuck(!entry.isIntersecting && entry.boundingClientRect.top < top),
+        { rootMargin: `-${Math.ceil(top)}px 0px 0px 0px` },
+      );
+      observer.observe(sentinel);
+    };
+    observe();
+    window.addEventListener("resize", observe);
+    const mutations = typeof MutationObserver === "undefined" ? null : new MutationObserver(observe);
+    mutations?.observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
+    return () => {
+      window.removeEventListener("resize", observe);
+      mutations?.disconnect();
+      observer?.disconnect();
+    };
   }, [hasBar]);
 
   const go = (target: number, focus = false) => {

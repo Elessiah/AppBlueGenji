@@ -325,6 +325,14 @@ describe("EnduranceRankingViews — repères et noms accessibles", () => {
     expect(RANKING_CSS).toMatch(/@media \(max-width: 720px\) \{[^@]*\.barStuck \.viewSub \{\s*display: none;/);
   });
 
+  it("le seuil de la barre collée suit la hauteur de l'en-tête (redimensionnement, style de <html>)", () => {
+    expect(RANKING).toContain('window.addEventListener("resize", observe)');
+    expect(RANKING).toContain('window.removeEventListener("resize", observe)');
+    expect(RANKING).toContain('mutations?.observe(document.documentElement, { attributes: true, attributeFilter: ["style"] })');
+    expect(RANKING).toContain("if (top === observedTop) return;");
+    expect(RANKING).toContain("mutations?.disconnect();");
+  });
+
   it("« S3 » s'explique derrière un « i », en français et en anglais", () => {
     expect(RANKING).toContain("<InfoHint");
     for (const lang of ["fr", "en"]) {
