@@ -1,9 +1,8 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import {
-  chargeRateLimitFor,
   DIRECTORY_READ_RULE,
   enforceRateLimit,
-  peekRateLimit,
+  refundRateLimitFor,
   TEAM_LIFECYCLE_RULE,
 } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
@@ -53,8 +52,9 @@ function refuseTermsAcceptance(body: { acceptTerms?: boolean; termsVersion?: unk
 
 /**
  * Création soumise au plafond des créations et dissolutions d'un compte
- * (`TEAM_LIFECYCLE_RULE`) — le staff `tournaments` n'y est pas soumis. Seule
- * une création réussie est décomptée.
+ * (`TEAM_LIFECYCLE_RULE`) — le staff `tournaments` n'y est pas soumis. La
+ * place est réservée avant l'écriture (en une instruction) et rendue si la
+ * création échoue : seule une création réussie est décomptée.
  */
 async function createCappedTeam(
   user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>,
@@ -63,11 +63,14 @@ async function createCappedTeam(
   tag: string | null,
 ) {
   const capped = !can(user, "tournaments");
-  const throttled = capped ? peekRateLimit(TEAM_LIFECYCLE_RULE, user.id) : null;
+  const throttled = capped ? enforceRateLimit(TEAM_LIFECYCLE_RULE, user.id) : null;
   if (throttled) return throttled;
-  const teamId = await createTeam(user.id, name, description, tag);
-  if (capped) chargeRateLimitFor(TEAM_LIFECYCLE_RULE, user.id);
-  return ok({ teamId }, 201);
+  try {
+    return ok({ teamId: await createTeam(user.id, name, description, tag) }, 201);
+  } catch (error) {
+    if (capped) refundRateLimitFor(TEAM_LIFECYCLE_RULE, user.id);
+    throw error;
+  }
 }
 
 export async function POST(req: Request) {

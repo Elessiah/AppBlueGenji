@@ -112,6 +112,7 @@ export async function updateTeamMeta(
 
   const updates: string[] = [];
   const params: SqlParams = [];
+  let renamed = false;
 
   if (patch.name !== undefined) {
     // Mêmes bornes qu'à la création : le renommage n'en contrôlait aucune, si
@@ -119,9 +120,20 @@ export async function updateTeamMeta(
     // erreur MySQL brute jusqu'à la notification.
     const check = checkTeamName(patch.name);
     if (!check.ok) throw new Error(check.reason);
-    await assertTeamNameAvailable(db, check.name, teamId);
-    updates.push("name = ?");
-    params.push(check.name);
+    // Le formulaire renvoie toujours le nom : seul un nom **changé** (casse
+    // comprise, comparaison exacte) s'écrit et vide les vues qui le montrent —
+    // sans quoi chaque enregistrement d'une description ferait recalculer
+    // podium et cartes d'aperçu aux visiteurs.
+    const [current] = await db.execute<(RowDataPacket & { name: string })[]>(
+      `SELECT name FROM bg_teams WHERE id = ?`,
+      [teamId],
+    );
+    renamed = current[0]?.name !== check.name;
+    if (renamed) {
+      await assertTeamNameAvailable(db, check.name, teamId);
+      updates.push("name = ?");
+      params.push(check.name);
+    }
   }
 
   if (patch.description !== undefined) {
@@ -153,7 +165,7 @@ export async function updateTeamMeta(
   // Le nom est servi par l'accueil et `/classement` depuis le cache de la
   // vitrine (leaderboard, bandeau, mini-arbre) et par la liste du classement
   // (podium, cartes d'aperçu) : sans cela, l'ancien nom y restait jusqu'à 60 s.
-  if (patch.name !== undefined) invalidateTeamIdentityViews();
+  if (renamed) invalidateTeamIdentityViews();
 }
 
 /**
@@ -200,8 +212,9 @@ export async function updateTeamLogo(
     connection.release();
   }
   // Logo servi par le leaderboard de l'accueil et de `/classement` (cache de la
-  // vitrine), le podium et les cartes d'aperçu (liste du classement).
-  invalidateTeamIdentityViews();
+  // vitrine), le podium et les cartes d'aperçu (liste du classement) — vidés
+  // seulement s'il a changé : retirer un logo absent ne coûte rien aux visiteurs.
+  if (previousLogoUrl !== logoPath) invalidateTeamIdentityViews();
   return { previousLogoUrl };
 }
 

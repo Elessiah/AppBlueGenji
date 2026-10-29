@@ -40,6 +40,19 @@ export function statusFilterExcludesDeleted(filter: PlayerStatusFilter): boolean
 }
 
 /**
+ * État du bouton « Afficher les comptes supprimés » : inerte sous un filtre qui
+ * les écarte, et alors jamais « enfoncé » (la liste n'en montre aucun), même si
+ * la case avait été activée avant le choix du filtre.
+ */
+export function deletedToggleState(
+  showDeleted: boolean,
+  filter: PlayerStatusFilter,
+): { inert: boolean; pressed: boolean } {
+  const inert = statusFilterExcludesDeleted(filter);
+  return { inert, pressed: showDeleted && !inert };
+}
+
+/**
  * Les rôles d'un joueur ne viennent que de son équipe (`listPlayers`) : sous un
  * filtre « sans roster », un filtre de rôle rendrait toujours une liste vide.
  * Les puces de rôle sont alors désactivées.

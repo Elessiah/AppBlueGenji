@@ -9,7 +9,7 @@ import {
   sortLocaleOf,
   sortPlayers,
   statusFilterAllowsRoles,
-  statusFilterExcludesDeleted,
+  deletedToggleState,
   type PlayerSortKey,
   type PlayerStatusFilter,
 } from "@/lib/shared/player-directory";
@@ -131,7 +131,7 @@ export default function PlayersList() {
     setStatusFilter(next);
     setRoleFilter((role) => roleAfterStatusChoice(role, next));
   };
-  const deletedToggleInert = statusFilterExcludesDeleted(statusFilter);
+  const { inert: deletedToggleInert, pressed: deletedShown } = deletedToggleState(showDeleted, statusFilter);
 
   // Rendu borné à une page de cartes ; tout filtre modifié repart de la première.
   const gridRef = useRef<HTMLDivElement>(null);
@@ -291,11 +291,12 @@ export default function PlayersList() {
               {deletedCount > 0 && (
                 <button
                   type="button"
-                  className={`${s.deletedToggle} ${showDeleted ? s.deletedToggleOn : ""}`}
+                  className={`${s.deletedToggle} ${deletedShown ? s.deletedToggleOn : ""}`}
                   // Un nom **constant**, l'état porté par `aria-pressed` : une
                   // infobulle qui passerait à « Masquer » contredirait le nom
                   // accessible, et les deux publics liraient deux actions.
-                  aria-pressed={showDeleted}
+                  // Inerte, il n'est pas enfoncé : la liste n'en montre aucun.
+                  aria-pressed={deletedShown}
                   // « Free agents » / « Sans équipe » écartent déjà les comptes
                   // supprimés : la case ne changerait rien, elle est inerte.
                   aria-disabled={deletedToggleInert ? true : undefined}

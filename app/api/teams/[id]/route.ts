@@ -1,9 +1,8 @@
 ﻿import { getCurrentUser } from "@/lib/server/auth";
 import {
-  chargeRateLimitFor,
   DIRECTORY_READ_RULE,
   enforceRateLimit,
-  peekRateLimit,
+  refundRateLimitFor,
   TEAM_LIFECYCLE_RULE,
 } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
@@ -82,15 +81,16 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
   // (équipes fantômes) n'y est pas soumis.
   const capped = !can(user, "tournaments");
   if (capped) {
-    const throttled = peekRateLimit(TEAM_LIFECYCLE_RULE, user.id);
+    // Réservée en une instruction, rendue si la dissolution est refusée.
+    const throttled = enforceRateLimit(TEAM_LIFECYCLE_RULE, user.id);
     if (throttled) return throttled;
   }
 
   try {
     await softDeleteTeam(user.id, teamId, can(user, "tournaments"));
-    if (capped) chargeRateLimitFor(TEAM_LIFECYCLE_RULE, user.id);
     return ok({ deleted: true });
   } catch (error) {
+    if (capped) refundRateLimitFor(TEAM_LIFECYCLE_RULE, user.id);
     const message = (error as Error).message;
     return fail(message || "TEAM_DELETE_FAILED", teamErrorStatus(TEAM_DELETE_ERROR_STATUS, message));
   }

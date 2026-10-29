@@ -15,7 +15,7 @@
 import { NextResponse } from "next/server";
 import {
   ANONYMOUS_IDENTITY,
-  chargeRateLimit,
+  refundRateLimit,
   checkRateLimit,
   consumeRateLimit,
   peekTokenBucket,
@@ -238,8 +238,10 @@ export const DIRECTORY_READ_RULE: RateLimitRule = {
  * `sharp` du podium) : une boucle « créer → dissoudre » le commandait à volonté.
  * Dix gestes par heure couvrent une équipe créée par erreur puis refaite ; le
  * staff `tournaments` (équipes fantômes) n'est pas plafonné. Seul un geste
- * **réussi** est décompté (`peekRateLimit` puis {@link chargeRateLimitFor}) :
- * un nom déjà pris ne coûte rien.
+ * **réussi** est décompté : le geste est réservé d'une seule instruction
+ * ({@link enforceRateLimit}, sans `await` entre contrôle et décompte — des
+ * requêtes parallèles ne passent pas toutes), puis rendu s'il échoue
+ * ({@link refundRateLimitFor}) : un nom déjà pris ne coûte rien.
  */
 export const TEAM_LIFECYCLE_RULE: RateLimitRule = {
   name: "team-lifecycle",
@@ -572,13 +574,13 @@ export function peekRateLimit(
 }
 
 /**
- * Décompte une action **réussie** dans le seau `rule`, après un
- * {@link peekRateLimit} qui l'a laissée passer : un refus métier (nom pris,
- * droit manquant) ne consomme ainsi rien. Sans effet pour une identité inconnue.
+ * Rend une action réservée par {@link enforceRateLimit} qui a échoué : un refus
+ * métier (nom pris, droit manquant) ne consomme ainsi rien. Sans effet pour une
+ * identité inconnue.
  */
-export function chargeRateLimitFor(rule: RateLimitRule, identity: RateIdentity): void {
+export function refundRateLimitFor(rule: RateLimitRule, identity: RateIdentity): void {
   const key = rateLimitIdentity(identity);
-  if (key !== ANONYMOUS_IDENTITY) chargeRateLimit(rule, key);
+  if (key !== ANONYMOUS_IDENTITY) refundRateLimit(rule, key);
 }
 
 /**
