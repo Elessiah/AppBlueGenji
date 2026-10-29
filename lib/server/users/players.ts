@@ -4,7 +4,7 @@ import { parseRoles, toIso } from "@/lib/server/serialization";
 import { visibleAvatarUrl } from "@/lib/shared/avatar";
 import { loadAllPlayerRecords } from "@/lib/server/stats-service";
 import { cachedStats } from "@/lib/server/stats-cache";
-import type { PublicUserProfile } from "@/lib/shared/types";
+import type { DirectoryPlayer, PublicUserProfile } from "@/lib/shared/types";
 import { withoutInvisibles } from "@/lib/shared/visible-text";
 
 /*
@@ -109,7 +109,7 @@ export async function getUserById(userId: number): Promise<PublicUserProfile | n
   return mapPublicUser(rows[0]);
 }
 
-export async function listPlayers(viewerId: number): Promise<PublicUserProfile[]> {
+export async function listPlayers(viewerId: number): Promise<DirectoryPlayer[]> {
   const db = await getDatabase();
   const [rows] = await db.execute<UserRow[]>(
     `SELECT
@@ -153,7 +153,7 @@ export async function listPlayers(viewerId: number): Promise<PublicUserProfile[]
     }),
   );
 
-  if (baseUsers.length === 0) return baseUsers;
+  if (baseUsers.length === 0) return [];
 
   // Appartenances en cours de **tout le site** : l'annuaire lit tous les
   // comptes, une liste `IN (?, …)` de tous leurs identifiants ne filtrait rien
@@ -200,7 +200,7 @@ export async function listPlayers(viewerId: number): Promise<PublicUserProfile[]
       tournamentsPlayed: 0,
     };
 
-    return {
+    const directoryRow = {
       ...user,
       team: membership
         ? {
@@ -215,5 +215,16 @@ export async function listPlayers(viewerId: number): Promise<PublicUserProfile[]
       wins: record.wins,
       losses: record.losses,
     };
+    return directoryIdentity(directoryRow);
   });
+}
+
+/**
+ * L'identité d'une ligne de l'annuaire : un compte supprimé y perd son
+ * identifiant et sa date de création (`DirectoryPlayer`) — le reste (pseudo
+ * d'emprunt, équipe, bilan) sert encore à retrouver un adversaire passé.
+ */
+export function directoryIdentity(row: PublicUserProfile & { isDeleted: boolean }): DirectoryPlayer {
+  if (!row.isDeleted) return { ...row, isDeleted: false };
+  return { ...row, id: null, createdAt: null, isDeleted: true };
 }

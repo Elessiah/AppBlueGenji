@@ -1,7 +1,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { ignoreMissingTable, isDuplicateEntryError, isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
-import { withdrawUserCasts } from "@/lib/server/tournaments/match-casters";
+import { type MatchWithdrawal, withdrawUserCasts } from "@/lib/server/tournaments/match-casters";
 import { ANONYMOUS_PSEUDOS, pickAnonymousPseudo } from "@/lib/shared/anonymous-pseudos";
 import { DEFAULT_LOCALE } from "@/lib/shared/locales";
 
@@ -13,8 +13,11 @@ import { DEFAULT_LOCALE } from "@/lib/shared/locales";
  * .`created_by` passent à `NULL`, la sanction restant due et l'invitation
  * restant l'acte de l'équipe. Les visites n'ont rien à suivre : elles ne
  * désignent aucun compte.
+ *
+ * Rend les matchs touchés (casts, liens, arbitrages) : l'appelant prévient
+ * leurs tournois après le commit.
  */
-export async function eraseAccount(connection: PoolConnection, userId: number): Promise<void> {
+export async function eraseAccount(connection: PoolConnection, userId: number): Promise<MatchWithdrawal> {
   // Une entrée solo jamais inscrite ni jouée part avec le compte : elle n'a pas
   // de clé étrangère, et son nom d'engagé est le pseudo du joueur — laissée en
   // place, elle le nommerait encore. Les deux `NOT EXISTS` ne sont pas une
@@ -30,9 +33,11 @@ export async function eraseAccount(connection: PoolConnection, userId: number): 
   );
   // La cascade emporterait ses inscriptions de caster, mais pas le stream
   // séparé qu'il avait ouvert — ni son lien, qui désigne sa chaîne, retiré
-  // aussi d'un stream qu'un co-caster tient encore.
-  await withdrawUserCasts(connection, userId, true);
+  // aussi d'un stream qu'un co-caster tient encore. Ni le « Prêt » de ses
+  // arbitrages : la clé étrangère ne vide que `referee_user_id`.
+  const withdrawal = await withdrawUserCasts(connection, userId, true);
   await connection.execute(`DELETE FROM bg_users WHERE id = ?`, [userId]);
+  return withdrawal;
 }
 
 /** Tentatives de pose d'un pseudo d'emprunt avant d'abandonner. */
@@ -78,8 +83,10 @@ async function resetOptionalColumn(
  * c'est l'index unique de `bg_users.pseudo` qui tranche — le perdant retire
  * son tirage et recommence. Sous MySQL, une instruction refusée n'annule pas
  * la transaction, seulement elle-même.
+ *
+ * Rend les matchs touchés (casts, liens, arbitrages), comme `eraseAccount`.
  */
-export async function anonymizeAccount(connection: PoolConnection, userId: number): Promise<void> {
+export async function anonymizeAccount(connection: PoolConnection, userId: number): Promise<MatchWithdrawal> {
   const [takenRows] = await connection.execute<(RowDataPacket & { pseudo: string })[]>(
     `SELECT pseudo FROM bg_users
       WHERE id <> ?
@@ -207,17 +214,15 @@ export async function anonymizeAccount(connection: PoolConnection, userId: numbe
   // gardent la leur — l'histoire ne se réécrit pas, et le pseudo est anonymisé.
   // Un stream séparé qu'il était seul à tenir part avec lui, et chaque lien de
   // chaîne qu'il a fourni est retiré — matchs joués compris, même d'un stream
-  // qu'un co-caster tient encore.
-  await withdrawUserCasts(connection, userId, false);
-  // Arbitre désigné (`docs/features/MATCH_REFEREE.md`) : retiré de tous ses
-  // matchs, joués compris — rien n'en a besoin après coup, et le lien entre
-  // le compte et l'arbitrage disparaît avec l'identité.
-  await connection.execute(
-    `UPDATE bg_matches SET referee_user_id = NULL, referee_ready_at = NULL WHERE referee_user_id = ?`,
-    [userId],
-  );
+  // qu'un co-caster tient encore. Arbitre désigné
+  // (`docs/features/MATCH_REFEREE.md`) : retiré de tous ses matchs, joués
+  // compris, avec son « Prêt » — rien n'en a besoin après coup, et le lien
+  // entre le compte et l'arbitrage disparaît avec l'identité. Matchs castés et
+  // arbitrés verrouillés ensemble, dans l'ordre des id.
+  const withdrawal = await withdrawUserCasts(connection, userId, false);
   // Le pseudo anonymisé doit aussi remplacer le nom affiché en tournoi — sur la
   // connexion de la transaction, sans quoi le renommage survivrait à un
   // rollback de l'anonymisation qui l'a motivé.
   await syncSoloEntryIdentityOn(connection, userId);
+  return withdrawal;
 }

@@ -1001,6 +1001,12 @@ export interface ReportView {
   resolvedAt: string | null;
   /** Date d'effacement, pour un signalement archivé. */
   purgeAt: string | null;
+  /**
+   * L'archivage attend la fin du délai de contestation de son auteur
+   * (`notifierMayContest`), calculé par le serveur sur `reporter_user_id` —
+   * la colonne que lit la purge, et non le pseudo affiché, qui peut manquer.
+   */
+  heldForNotifier: boolean;
   reporter: ReportPerson | null;
   contactName: string | null;
   contactEmail: string | null;

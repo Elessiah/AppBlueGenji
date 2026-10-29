@@ -1,10 +1,11 @@
-import type { RowDataPacket } from "mysql2/promise";
+import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { accountDeletionPlan } from "@/lib/shared/account-deletion";
 import { isLegacyDeletedPseudo } from "@/lib/shared/anonymous-pseudos";
 import { accountTraceSql, loadAccountTrace } from "./account-deletion";
 import { anonymizeAccount, eraseAccount } from "./account-erasure";
 import { invalidateLandingTeamViews } from "@/lib/server/landing-cache";
+import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
 
 /** Ce que le rattrapage des comptes supprimés a fait. */
 export type DeletedAccountsReconciliation = {
@@ -15,6 +16,33 @@ export type DeletedAccountsReconciliation = {
   /** Comptes laissés en l'état faute d'avoir pu être traités (reportés au prochain démarrage). */
   failed: number;
 };
+
+/**
+ * Applique à un compte supprimé, verrouillé, la règle d'aujourd'hui : effacé
+ * s'il n'a rien laissé, sinon anonymisé s'il porte encore l'ancien pseudo ou
+ * des droits. Compte le geste dans `outcome` ; rend les tournois dont un match
+ * le nommait, à prévenir après le commit.
+ */
+async function settleDeletedAccount(
+  connection: PoolConnection,
+  userId: number,
+  row: { pseudo: string; is_admin: 0 | 1; platform_roles_json: unknown },
+  outcome: DeletedAccountsReconciliation,
+): Promise<number[]> {
+  const plan = accountDeletionPlan(await loadAccountTrace(connection, userId));
+  if (plan.mode === "ERASE") {
+    const { tournamentIds } = await eraseAccount(connection, userId);
+    outcome.erased += 1;
+    return tournamentIds;
+  }
+  if (isLegacyDeletedPseudo(row.pseudo) || Number(row.is_admin) === 1 || row.platform_roles_json !== null) {
+    const { tournamentIds } = await anonymizeAccount(connection, userId);
+    outcome.renamed += 1;
+    return tournamentIds;
+  }
+  return [];
+}
+
 
 /**
  * Applique la règle de suppression **en vigueur** aux comptes déjà supprimés.
@@ -57,6 +85,7 @@ export async function reconcileDeletedAccounts(): Promise<DeletedAccountsReconci
       ORDER BY u.id`,
   );
   const outcome: DeletedAccountsReconciliation = { erased: 0, renamed: 0, failed: 0 };
+  const touchedTournaments = new Set<number>();
 
   // L'anonymisation efface désormais la dernière acceptation des conditions
   // d'utilisation ; les comptes anonymisés avant la règle la gardent encore.
@@ -97,19 +126,9 @@ export async function reconcileDeletedAccounts(): Promise<DeletedAccountsReconci
         await connection.rollback();
         continue;
       }
-      const plan = accountDeletionPlan(await loadAccountTrace(connection, userId));
-      if (plan.mode === "ERASE") {
-        await eraseAccount(connection, userId);
-        outcome.erased += 1;
-      } else if (
-        isLegacyDeletedPseudo(row.pseudo)
-        || Number(row.is_admin) === 1
-        || row.platform_roles_json !== null
-      ) {
-        await anonymizeAccount(connection, userId);
-        outcome.renamed += 1;
-      }
+      const tournamentIds = await settleDeletedAccount(connection, userId, row, outcome);
       await connection.commit();
+      for (const tournamentId of tournamentIds) touchedTournaments.add(tournamentId);
     } catch (error) {
       // Sur une connexion morte — la panne même qu'on traite —, l'annulation
       // lève à son tour : sans garde, elle sortirait de la boucle et laisserait
@@ -128,5 +147,7 @@ export async function reconcileDeletedAccounts(): Promise<DeletedAccountsReconci
   // Même raison que la suppression elle-même (`deleteOwnAccount`) : les vues
   // de l'accueil qui nomment une entrée solo ne gardent pas l'ancien pseudo.
   if (outcome.erased + outcome.renamed > 0) invalidateLandingTeamViews();
+  // Et les matchs qui le nommaient (caster, lien, arbitre), comme `deleteOwnAccount`.
+  for (const tournamentId of touchedTournaments) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
   return outcome;
 }

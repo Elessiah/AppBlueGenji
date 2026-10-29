@@ -1008,8 +1008,12 @@ export function RgpdEn({
             match listed in that message before it goes on air, scheduled that evening, leaves no trace on the
             site: the site only keeps the trace of a match&apos;s announcement when it goes on air
             (<LocaleLink href="/rgpd/registre#t16">register, T16</LocaleLink>), which appears, in a solo tournament,
-            in the export of your data — neither the text of the message nor the list of scheduled matches it gives. These
-            announcements stay in the channel as long as the #live channel exists; the team or player concerned can
+            in the export of your data — neither the text of the message nor the list of scheduled matches it gives. Your
+            caster registrations (with your “Ready”), the channel links you provided and the matches you are the assigned
+            referee of also appear in the export of your data. These
+            announcements stay in the channel as long as the #live channel exists; when a caster&apos;s account is deleted,
+            their channel link is removed from the evening message as long as that message is still edited (at most four hours
+            after the evening ends) — a message that no longer is keeps it. The team, player or caster concerned can
             ask for their deletion, and for that of these alerts,
             through the “Report a problem” button, GDPR category.
           </p>

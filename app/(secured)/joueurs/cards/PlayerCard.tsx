@@ -4,7 +4,7 @@ import { memo } from "react";
 import Image from "next/image";
 import { PlayerPodiumName } from "@/components/podium-tiers";
 import { UserX } from "lucide-react";
-import type { PublicUserProfile } from "@/lib/shared/types";
+import type { DirectoryPlayer } from "@/lib/shared/types";
 import { avatarInitial } from "@/lib/shared/avatar";
 import { getPaletteColor } from "@/lib/shared/palette";
 import { playerRosterStatus } from "@/lib/shared/player-roster-status";
@@ -31,7 +31,7 @@ function cardRoleLabel(text: PlayersText, role: string): string {
  * transparente posée par-dessus (`.cardOverlay`), que le lien d'équipe traverse
  * en repassant au-dessus d'elle (`.aboveOverlay`).
  */
-function PlayerCardView({ player }: Readonly<{ player: PublicUserProfile }>) {
+function PlayerCardView({ player }: Readonly<{ player: DirectoryPlayer }>) {
   const text = usePlayersText();
   const { t } = text;
   // Le statut d'un compte sans équipe est une **invitation à recruter** —
@@ -52,11 +52,15 @@ function PlayerCardView({ player }: Readonly<{ player: PublicUserProfile }>) {
       className={`${s.plCard} ${player.isDeleted ? s.plCardDeleted : ""}`}
       style={{ "--c": teamColor } as React.CSSProperties}
     >
-      <LocaleLink
-        href={`/joueurs/${player.id}`}
-        className={s.cardOverlay}
-        aria-label={t("card.viewProfile", { name: player.pseudo })}
-      />
+      {/* Un compte supprimé n'a plus d'adresse dans l'annuaire (`DirectoryPlayer`) :
+          sa carte n'ouvre aucune fiche. */}
+      {player.isDeleted ? null : (
+        <LocaleLink
+          href={`/joueurs/${player.id}`}
+          className={s.cardOverlay}
+          aria-label={t("card.viewProfile", { name: player.pseudo })}
+        />
+      )}
       <div className={s.plHead}>
         <div className={s.plAvatarWrap}>
           <div className={s.plAvatar}>

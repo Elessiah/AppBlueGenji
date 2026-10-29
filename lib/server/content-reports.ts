@@ -1085,6 +1085,7 @@ export async function listReports(): Promise<ReportView[]> {
   return rows.map((row) => {
     const resolvedAt = row.resolved_at ? new Date(row.resolved_at) : null;
     const held = quarantines.filter((quarantine) => quarantine.reportId === Number(row.id));
+    const heldForNotifier = notifierMayContest({ category: row.category, reporterUserId: row.reporter_user_id });
     return {
       id: Number(row.id),
       category: row.category,
@@ -1096,12 +1097,9 @@ export async function listReports(): Promise<ReportView[]> {
       resolvedAt: resolvedAt ? resolvedAt.toISOString() : null,
       purgeAt:
         row.status === "RESOLVED" && resolvedAt
-          ? reportRetainedUntil(
-              resolvedAt,
-              held,
-              notifierMayContest({ category: row.category, reporterUserId: row.reporter_user_id }),
-            ).toISOString()
+          ? reportRetainedUntil(resolvedAt, held, heldForNotifier).toISOString()
           : null,
+      heldForNotifier,
       reporter: person(row.reporter_user_id, row.reporter_pseudo),
       contactName: row.contact_name,
       contactEmail: row.contact_email,

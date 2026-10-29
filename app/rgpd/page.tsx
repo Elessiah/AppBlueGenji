@@ -1211,8 +1211,12 @@ function RgpdFr({
             ce message avant son passage à l&apos;antenne, programmé dans la soirée, ne laisse aucune trace sur
             le site : le site ne garde que la trace de l&apos;annonce d&apos;un match à son passage à l&apos;antenne
             (<Link href="/rgpd/registre#t16">registre, T16</Link>), qui figure, en tournoi individuel, dans
-            l&apos;export de vos données — ni le texte du message, ni la liste des matchs programmés qu&apos;il donne. Ces annonces restent dans le salon tant
-            que le salon #live existe ; l&apos;équipe ou le joueur concerné peut en demander la
+            l&apos;export de vos données — ni le texte du message, ni la liste des matchs programmés qu&apos;il donne. Vos
+            inscriptions de caster (avec votre « Prêt »), les liens de chaîne que vous avez fournis et les matchs dont vous
+            êtes l&apos;arbitre désigné figurent aussi dans l&apos;export de vos données. Ces annonces restent dans le salon tant
+            que le salon #live existe ; à la suppression du compte d&apos;un caster, le lien de sa chaîne est retiré du
+            message de la soirée tant que celui-ci est encore modifié (au plus quatre heures après la fin de la soirée) — un
+            message qui ne l&apos;est plus le garde. L&apos;équipe, le joueur ou le caster concerné peut en demander la
             suppression, comme celle de ces alertes, par le bouton « Signaler
             un problème », catégorie RGPD.
           </p>

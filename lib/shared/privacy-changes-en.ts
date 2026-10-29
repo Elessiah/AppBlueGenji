@@ -698,6 +698,17 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "Terms of use: version 8, in force since 31 October 2026, says so in its “Match contacts” and “Content published by users” sections. A window presents it to you until you have accepted it: accepting it lets you keep using the site.",
     ],
   },
+  "2026-10-suppression-compte-et-export": {
+    linkLabels: ["Read the “Match streaming” paragraph"],
+    title: "Account deletion and export: directory, #live message, casts and refereeing",
+    summary:
+      "A deleted account is no longer tied to its former address in the player directory, deleting a caster's account removes their channel link from the evening's #live message while it is still edited, and the export of your data now gives your casts, the channel links you provided, your refereeing and the origin of your BattleTag.",
+    details: [
+      "Player directory: a deleted account keeps its stand-in username, its team and its record there, but no longer its identifier or creation date; its card no longer opens a page, and the “Newest” sort puts it at the end of the list.",
+      "Evening #live message: when a caster's account is deleted, it is updated without their channel link as long as it is still edited (at most four hours after the evening ends); a message that no longer is keeps it, and the caster concerned can, like the team or player, ask for its deletion through the report form (GDPR category).",
+      "Export of your data: it also gives your caster registrations (with your “Ready”), the channel links you provided on a match, the matches you are the assigned referee of (with your “Ready”) and whether your BattleTag comes from Battle.net or was typed in by hand.",
+    ],
+  },
 };
 
 /**

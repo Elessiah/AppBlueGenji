@@ -7,7 +7,6 @@ import {
   REPORT_RETENTION_DAYS_AFTER_RESOLUTION,
   REPORT_STATUS_LABELS,
   RIGHTS_RELATION_LABELS,
-  notifierMayContest,
   reportFollowUpDuty,
   type ReportAction,
   type ReportTargetRef,
@@ -55,10 +54,9 @@ export function ReportDetail({
   const definition = REPORT_CATEGORY_DEFINITIONS[report.category];
   // Le site n'envoie aucun courriel : ce retour part de l'association, à la main.
   const followUp = reportFollowUpDuty(report.category);
-  const heldForNotifier = notifierMayContest({
-    category: report.category,
-    reporterUserId: report.reporter?.userId ?? null,
-  });
+  // Calculé par le serveur sur `reporter_user_id`, comme la purge : le pseudo
+  // de l'auteur peut manquer quand son compte, lui, compte encore.
+  const heldForNotifier = report.heldForNotifier;
   const [resolving, setResolving] = useState(false);
   const [note, setNote] = useState("");
 
@@ -149,9 +147,8 @@ export function ReportDetail({
                   droit d'auteur ou de modération envoyée depuis un compte attend la fin du
                   délai où son auteur peut contester la décision. */}
               {heldForNotifier
-                ? `Archivé, le signalement est effacé ${LOGO_QUARANTINE_MONTHS} mois plus tard, le temps que son auteur puisse contester la décision`
-                : `Archivé, le signalement est effacé ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours plus tard`}{" "}
-              — davantage s&apos;il tient une image (logo, avatar) masquée ou supprimée encore contestable.
+                ? `Archivé, le signalement est effacé ${LOGO_QUARANTINE_MONTHS} mois plus tard, le temps que son auteur puisse contester la décision — au-delà de ces ${LOGO_QUARANTINE_MONTHS} mois s'il tient une image (logo, avatar) masquée ou supprimée encore contestable.`
+                : `Archivé, le signalement est effacé ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours plus tard — au-delà de ces ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours s'il tient une image (logo, avatar) masquée ou supprimée encore contestable.`}
             </p>
           </div>
         )}
