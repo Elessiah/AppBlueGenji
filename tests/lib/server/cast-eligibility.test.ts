@@ -2,6 +2,7 @@ import { describe, expect, it, jest } from "@jest/globals";
 import { mapMatch } from "@/lib/server/tournaments/_internal";
 import {
   castEligibilityBlock,
+  loadRefereeEligibility,
   refereeObjectionUpheld,
   type CastEligibilityFields,
 } from "@/lib/server/tournaments/cast-eligibility";
@@ -257,5 +258,28 @@ describe("refereeObjectionUpheld", () => {
     const execute = jest.fn<SqlQuery>().mockRejectedValue(new Error("ER_LOCK_WAIT_TIMEOUT"));
 
     await expect(refereeObjectionUpheld(connectionWith(execute), 5)).rejects.toThrow("ER_LOCK_WAIT_TIMEOUT");
+  });
+});
+
+describe("loadRefereeEligibility", () => {
+  const connectionWith = (execute: jest.Mock<SqlQuery>) => fakeConnection({ execute });
+  const referee: CastEligibilityFields = { ...ELIGIBLE, platform_roles_json: JSON.stringify(["ARBITRE"]) };
+
+  it("loadRefereeEligibility_lockRequested_appendsShareLock", async () => {
+    // Une désignation attend la suppression du compte en cours (verrou exclusif).
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[referee], []]);
+
+    await expect(loadRefereeEligibility(connectionWith(execute), 950, true)).resolves.toBeNull();
+
+    expect(execute.mock.calls[0][0]).toMatch(/WHERE id = \? LIMIT 1 LOCK IN SHARE MODE$/);
+    expect(execute.mock.calls[0][1]).toEqual([950]);
+  });
+
+  it("loadRefereeEligibility_defaultCall_readsWithoutLock", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[referee], []]);
+
+    await loadRefereeEligibility(connectionWith(execute), 950);
+
+    expect(execute.mock.calls[0][0]).not.toContain("LOCK IN SHARE MODE");
   });
 });

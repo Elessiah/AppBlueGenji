@@ -1163,6 +1163,30 @@ describe("arbitre désigné (`docs/features/MATCH_REFEREE.md`)", () => {
     expect(state.match?.referee_user_id).toBeNull();
   });
 
+  it("takeMatchReferee_anyTake_readsEligibilityUnderShareLock", async () => {
+    // Une suppression du compte en cours tient sa ligne en exclusif : la
+    // désignation l'attend puis lit le compte supprimé.
+    state.match = matchState();
+    state.issued = [];
+    await takeMatchReferee(42, REFEREE);
+    const eligibilityRead = state.issued.find((sql) => sql.includes("platform_roles_json FROM bg_users"));
+    expect(eligibilityRead).toMatch(/WHERE id = \? LIMIT 1 LOCK IN SHARE MODE$/);
+  });
+
+  it("takeMatchReferee_accountDeleted_refusesAndSetsNoReferee", async () => {
+    state.users[REFEREE] = { ...refereeUser, is_deleted: 1 };
+    state.match = matchState();
+    await expect(takeMatchReferee(42, REFEREE)).rejects.toThrow("REFEREE_IDENTITY_REQUIRED");
+    expect(state.match?.referee_user_id).toBeNull();
+  });
+
+  it("assignMatchReferee_deletedAccount_refuses", async () => {
+    state.users[REFEREE] = { ...refereeUser, is_deleted: 1 };
+    state.match = matchState();
+    await expect(assignMatchReferee(42, 1, REFEREE)).rejects.toThrow("REFEREE_IDENTITY_REQUIRED");
+    expect(state.match?.referee_user_id).toBeNull();
+  });
+
   it("refuse un match introuvable, joué, ou une exemption", async () => {
     state.match = null;
     await expect(takeMatchReferee(42, REFEREE)).rejects.toThrow("MATCH_NOT_FOUND");
