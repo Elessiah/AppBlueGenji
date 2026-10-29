@@ -615,20 +615,22 @@ async function streamShown(connection: PoolConnection, row: LaunchMatchRow, stre
  * lancements) — l'éligibilité se relit alors en lecture *courante*, sinon une
  * permission retirée depuis l'instantané ne serait pas vue et le lancement
  * rendrait public le caster.
+ *
+ * Rend `true` quand au moins un caster a été retiré.
  */
 async function releaseIneligibleCasters(
   connection: PoolConnection,
   row: LaunchMatchRow,
   currentRead = false,
-): Promise<void> {
-  if (row.casters.length === 0 || row.launched_at !== null || row.status === "COMPLETED") return;
+): Promise<boolean> {
+  if (row.casters.length === 0 || row.launched_at !== null || row.status === "COMPLETED") return false;
   const eligible = await loadEligibleCasterIds(
     connection,
     row.casters.map((caster) => caster.userId),
     currentRead,
   );
   const leaving = row.casters.filter((caster) => !eligible.has(caster.userId));
-  if (leaving.length === 0) return;
+  if (leaving.length === 0) return false;
   await connection.execute(
     `DELETE FROM bg_match_casters WHERE match_id = ? AND user_id IN (${leaving.map(() => "?").join(", ")})`,
     [row.id, ...leaving.map((caster) => caster.userId)],
@@ -643,6 +645,7 @@ async function releaseIneligibleCasters(
       reason: "INELIGIBLE",
     });
   }
+  return true;
 }
 
 /**
@@ -955,7 +958,9 @@ export async function maintainMatchLaunches(
     await adoptCurrentPairing(connection, row);
     // Ni le décompte des « Prêt » ni le lancement (qui rend publics le pseudo
     // et le lien du stream) ne comptent un caster devenu inéligible.
-    await releaseIneligibleCasters(connection, row, true);
+    // Un retrait change ce que voient les lecteurs : il compte comme un
+    // changement à publier, même sans lancement.
+    const released = await releaseIneligibleCasters(connection, row, true);
     const undecidedMatch = undecidedCandidate(row);
     if (undecidedMatch) undecided.push(undecidedMatch);
     const launch =
@@ -976,7 +981,7 @@ export async function maintainMatchLaunches(
         [row.id],
       );
       changed += 1;
-    } else if (stale) {
+    } else if (stale || released) {
       changed += 1;
     }
   }
