@@ -40,7 +40,7 @@ export const DISCORD_TAG_AUDIENCE: IdentityAudience = {
     "les administrateurs, à tout moment ;",
     "les arbitres, tant que tu es inscrit à un tournoi non terminé ;",
     "les membres des deux équipes de ton match, dès que ses adversaires sont connus et jusqu'à sa fin, et ses casters le temps du match ;",
-    "si tu castes un match : ses deux équipes et ses autres casters le temps du match, et les arbitres dès que ses adversaires sont connus et jusqu'à sa fin, dans ses fenêtres « Contacts » et de lancement et sur sa page ;",
+    "si tu castes un match : ses deux équipes et ses autres casters le temps du match, dans ses fenêtres « Contacts » et de lancement et sur sa page, et les arbitres dès que ses adversaires sont connus et jusqu'à sa fin, dans sa fenêtre « Contacts » et sur sa page ;",
     "les autres joueurs, seulement si tu coches « Tag Discord » dans tes réglages de confidentialité.",
   ],
   footer: "Personne d'autre.",
