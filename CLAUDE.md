@@ -35,7 +35,7 @@ npx jest tests/path/to/file.test.ts  # un seul fichier
 - `/api/*` : REST uniquement (ni tRPC ni server actions).
 
 ### Auth (`lib/server/auth.ts`) → `AUTH_SYSTEM.md`
-Sessions `bg_user_sessions` (30 j, cookie `bg_session`). **Aucun mot de passe** : OAuth Google/Discord/Blizzard, code Discord par message privé, Google One Tap. Un quota se **réserve en une instruction** (`UPDATE … WHERE attempts < ?` + `affectedRows`), jamais lu puis écrit après un `await`. Écritures `/api/` : provenance vérifiée (403 `CROSS_SITE_REQUEST`). Une réponse d'erreur ne porte **qu'un code** (`fail`), jamais une phrase. Un geste qui change la barre de navigation appelle `router.refresh()`.
+Sessions `bg_user_sessions` (30 j, cookie `__Host-bg_session` en prod, `bg_session` en dev). **Aucun mot de passe** : OAuth Google/Discord/Blizzard, code Discord par message privé, Google One Tap. Un quota se **réserve en une instruction** (`UPDATE … WHERE attempts < ?` + `affectedRows`), jamais lu puis écrit après un `await`. Écritures `/api/` : provenance vérifiée (403 `CROSS_SITE_REQUEST`). Une réponse d'erreur ne porte **qu'un code** (`fail`), jamais une phrase. Un geste qui change la barre de navigation appelle `router.refresh()`.
 
 ### Database (`lib/server/database.ts`, schéma sous `lib/server/database/`) → `docs/DATABASE_SCHEMA.md`
 **Un changement de schéma s'écrit à deux endroits** : dans le `CREATE TABLE` (`database/schema/`, bases neuves) **et** en `ALTER TABLE` tolérant dans `RECENT_SCHEMA_CHANGES` (bases existantes, où `CREATE TABLE IF NOT EXISTS` ne fait rien) — la seconde entrée se retire une fois jouée partout.

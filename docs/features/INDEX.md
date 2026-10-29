@@ -72,7 +72,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 
 ## Authentification et comptes
 
-- `AUTH_SYSTEM.md` — Sessions, portes d'entrée sans mot de passe, quotas du code Discord, provenance des écritures.
+- `AUTH_SYSTEM.md` — Sessions (cookies `__Host-` en production), portes d'entrée sans mot de passe, quotas du code Discord, provenance des écritures.
 - `OAUTH_PROVIDERS.md` — OAuth Google / Discord / Blizzard, une seule mécanique ; rattachement depuis le profil ; pastille « BattleTag vérifié » de la fiche.
 - `BATTLETAG_ORIGIN.md` — Origine du BattleTag (`overwatch_battletag_typed`) : un BattleTag tapé gardé sous un Battle.net muet, jamais vérifié, champ ouvert.
 - `DISCORD_VERIFICATION.md` — Certification du tag Discord, visibilité du tag.
