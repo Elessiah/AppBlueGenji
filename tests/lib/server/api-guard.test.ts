@@ -6,7 +6,6 @@ import {
   VISIT_REQUEST_RULE,
   clientNetworkKey,
   enforceRateLimit,
-  peekRateToken,
   refundRateToken,
   takeRateToken,
   peekRateLimit,
@@ -217,6 +216,18 @@ describe("clientNetworkKey", () => {
     expect(clientNetworkKey("2001:db8:1:2:3:4:1.2.3.4")).toBe(key);
   });
 
+  it("retire le port d'une adresse : une clé par connexion contournerait les plafonds", () => {
+    expect(clientNetworkKey("203.0.113.7:51234")).toBe("203.0.113.7");
+    expect(clientNetworkKey("203.0.113.7:51235")).toBe(clientNetworkKey("203.0.113.7:51234"));
+    expect(clientNetworkKey("[2001:db8:1:2::1]:51234")).toBe("2001:db8:1:2::/64");
+    expect(clientNetworkKey("[::ffff:203.0.113.7]:80")).toBe("203.0.113.7");
+  });
+
+  it("ne prend pas les deux-points d'une IPv6 sans crochets pour un port", () => {
+    expect(clientNetworkKey("2001:db8:1:2:3:4:5:6")).toBe("2001:db8:1:2::/64");
+    expect(clientNetworkKey("203.0.113.7:99999999")).toBe("203.0.113.7:99999999");
+  });
+
   it("rend une valeur illisible telle quelle, et null pour un inconnu", () => {
     expect(clientNetworkKey("2001:db8::1::2")).toBe("2001:db8::1::2");
     expect(clientNetworkKey("2001:db8:zz::1")).toBe("2001:db8:zz::1");
@@ -226,7 +237,7 @@ describe("clientNetworkKey", () => {
   });
 });
 
-describe("takeRateToken / peekRateToken / refundRateToken", () => {
+describe("takeRateToken / refundRateToken", () => {
   const BUCKET: TokenBucketRule = { name: "guard-bucket", capacity: 2, refillMs: 60_000 };
 
   it("refuse en 429 une fois la rafale prise, sans rien prendre de plus", async () => {
@@ -235,7 +246,6 @@ describe("takeRateToken / peekRateToken / refundRateToken", () => {
     const refused = takeRateToken(BUCKET, "1.2.3.4");
     expect(refused?.status).toBe(429);
     expect(refused?.headers.get("retry-after")).not.toBeNull();
-    expect(peekRateToken(BUCKET, "1.2.3.4")?.status).toBe(429);
   });
 
   it("rend le jeton remboursé", () => {
@@ -247,7 +257,6 @@ describe("takeRateToken / peekRateToken / refundRateToken", () => {
 
   it("ne plafonne jamais l'identité inconnue", () => {
     for (let i = 0; i < 5; i += 1) expect(takeRateToken(BUCKET, null)).toBeNull();
-    expect(peekRateToken(BUCKET, null)).toBeNull();
     refundRateToken(BUCKET, null);
   });
 });

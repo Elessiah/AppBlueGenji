@@ -11,7 +11,7 @@ import type { TournamentPageText } from "@/lib/shared/tournament-page-text";
 // réessayer indéfiniment laisserait « Reconnexion… » à l'écran pour
 // l'éternité, sans jamais dire quoi faire.
 
-type LiveIndicatorProps = {
+export type LiveIndicatorProps = {
   /** Le flux temps réel est-il établi ? */
   isLive: boolean;
   /** Palier de fraîcheur accordé par le serveur. */

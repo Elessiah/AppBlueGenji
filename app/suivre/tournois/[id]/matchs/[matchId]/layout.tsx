@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/server/auth";
 import { matchPageExists, matchPageMetadata } from "@/lib/server/match-page";
-import { publicTournamentSnapshotForRequest } from "@/lib/server/spectator-request";
+import { publicTournamentCardForRequest } from "@/lib/server/spectator-request";
 
 type LayoutProps = {
   params: Promise<{ id: string; matchId: string }>;
@@ -16,8 +16,8 @@ export async function generateMetadata({ params }: LayoutProps): Promise<Metadat
     matchId,
     true,
     async () => ((await getCurrentUser().catch(() => null)) ? null : { canManage: false }),
-    // La carte de la réponse publique mutualisée, comme l'encart de la fiche.
-    async (tournamentId) => (await publicTournamentSnapshotForRequest(tournamentId))?.card ?? null,
+    // La carte publique (copie récente ou carte seule), comme l'encart de la fiche.
+    publicTournamentCardForRequest,
   );
   return { ...metadata, robots: { index: false, follow: false } };
 }

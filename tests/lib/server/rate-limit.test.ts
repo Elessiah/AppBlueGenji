@@ -3,7 +3,6 @@ import {
   chargeRateLimit,
   checkRateLimit,
   consumeRateLimit,
-  peekTokenBucket,
   refundRateLimit,
   refundTokenBucket,
   takeTokenBucket,
@@ -12,13 +11,13 @@ import {
   resetRateLimit,
   type RateLimitRule,
 } from "@/lib/server/rate-limit";
+import { tokensLeft } from "../../helpers/token-bucket";
 
 const RULE: RateLimitRule = { name: "test", limit: 3, windowMs: 1_000 };
 
 afterEach(() => {
   resetRateLimit();
 });
-
 describe("rate-limit — décompte", () => {
   it("laisse passer jusqu'au plafond", () => {
     for (let i = 0; i < 3; i += 1) {
@@ -174,13 +173,13 @@ describe("rate-limit — seau à jetons", () => {
     expect(takeTokenBucket(BUCKET, "k", 500).allowed).toBe(false);
     expect(takeTokenBucket(BUCKET, "k", 500).retryAfterMs).toBe(500);
     expect(takeTokenBucket(BUCKET, "k", 1_000).allowed).toBe(true);
-    expect(peekTokenBucket(BUCKET, "k", 1_000_000).remaining).toBe(3);
+    expect(tokensLeft(BUCKET, "k", 1_000_000)).toBe(3);
   });
 
   it("un refus ne prend rien, un aperçu non plus", () => {
     for (let i = 0; i < 3; i += 1) takeTokenBucket(BUCKET, "k", 0);
     takeTokenBucket(BUCKET, "k", 0);
-    peekTokenBucket(BUCKET, "k", 0);
+    tokensLeft(BUCKET, "k", 0);
     expect(takeTokenBucket(BUCKET, "k", 1_000).allowed).toBe(true);
   });
 
@@ -189,8 +188,8 @@ describe("rate-limit — seau à jetons", () => {
     refundTokenBucket(BUCKET, "k", 0);
     refundTokenBucket(BUCKET, "k", 0);
     refundTokenBucket(BUCKET, "inconnu", 0);
-    expect(peekTokenBucket(BUCKET, "k", 0).remaining).toBe(3);
-    expect(peekTokenBucket(BUCKET, "inconnu", 0).remaining).toBe(3);
+    expect(tokensLeft(BUCKET, "k", 0)).toBe(3);
+    expect(tokensLeft(BUCKET, "inconnu", 0)).toBe(3);
   });
 
   it("sépare les clés et les seaux", () => {
@@ -205,13 +204,26 @@ describe("rate-limit — seau à jetons", () => {
     takeTokenBucket(small, "b", 900);
     // « a » s'est rempli : oublié, il vaut un seau neuf ; « b » garde sa dette.
     takeTokenBucket(small, "c", 1_000);
-    expect(peekTokenBucket(small, "b", 1_000).remaining).toBe(2);
-    expect(peekTokenBucket(small, "a", 1_000).remaining).toBe(3);
+    expect(tokensLeft(small, "b", 1_000)).toBe(2);
+    expect(tokensLeft(small, "a", 1_000)).toBe(3);
+  });
+
+  it("plein de seaux entamés, évince les plus pleins et jamais tout : un seau vide garde sa dette", () => {
+    const small: TokenBucketRule = { name: "evict", capacity: 10, refillMs: 60_000, maxKeys: 10 };
+    // Un réseau épuisé, puis neuf autres à peine entamés : le seau est plein de clés actives.
+    for (let i = 0; i < 10; i += 1) takeTokenBucket(small, "attaquant", 0);
+    for (let i = 0; i < 9; i += 1) takeTokenBucket(small, `k${i}`, 0);
+
+    expect(takeTokenBucket(small, "nouveau", 0).allowed).toBe(true);
+    // La clé épuisée n'a pas retrouvé ses jetons (le seau n'a pas été vidé)…
+    expect(takeTokenBucket(small, "attaquant", 0).allowed).toBe(false);
+    // …et la nouvelle clé a bien sa place, jeton pris.
+    expect(tokensLeft(small, "nouveau", 0)).toBe(9);
   });
 
   it("se remet à zéro avec les plafonds", () => {
     for (let i = 0; i < 3; i += 1) takeTokenBucket(BUCKET, "k", 0);
     resetRateLimit(BUCKET.name);
-    expect(peekTokenBucket(BUCKET, "k", 0).remaining).toBe(3);
+    expect(tokensLeft(BUCKET, "k", 0)).toBe(3);
   });
 });

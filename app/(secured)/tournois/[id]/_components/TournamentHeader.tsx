@@ -31,9 +31,27 @@ import {
   type HeaderMetaItem,
   type HeaderTone,
 } from "../_lib/header-meta";
-import { LiveIndicator, useLiveIndicatorText } from "./LiveIndicator";
+import { LiveIndicator, useLiveIndicatorText, type LiveIndicatorProps } from "./LiveIndicator";
 import { TournamentLiveLink } from "./TournamentLiveLink";
 import s from "./TournamentHeader.module.css";
+
+/**
+ * Le « i » de la pastille Spectateur. Dans un composant à part : la phrase du
+ * témoin (`useLiveIndicatorText`) n'est calculée que pour la page sans compte,
+ * et non à chaque rendu poussé par le flux d'un membre.
+ */
+function SpectatorHint(props: Readonly<LiveIndicatorProps>) {
+  const { t } = useTournamentPageText();
+  // La cadence accordée et le sens de « Hors ligne » : le `title` du témoin ne
+  // s'atteint ni au toucher ni au clavier.
+  const liveText = useLiveIndicatorText(props);
+  return (
+    <InfoHint id="tournament-spectator-hint" subject={t("header.spectator")}>
+      <p>{t("header.spectatorTitle")}</p>
+      <p>{liveText.title}</p>
+    </InfoHint>
+  );
+}
 
 /** Ce que `canReturnInSite` a besoin de lire du navigateur, à l'instant. */
 function readSiteBackInput() {
@@ -132,8 +150,6 @@ export function TournamentHeader({
   // Sans compte, la liste des tournois est derrière la connexion : le lien
   // mène à l'accueil, dont le tableau des tournois tient lieu de liste.
   const spectator = useSpectatorView();
-  // La phrase du témoin, reprise dans le panneau du « i » sans compte.
-  const liveText = useLiveIndicatorText({ isLive, tier, cadenceMs, fatal });
   const backHref = spectator ? "/" : "/tournois";
   const backFallback = spectator ? t("header.backHome") : t("header.allTournaments");
   // Figé au premier rendu : l'en-tête n'est rendu que côté client (la page
@@ -173,14 +189,7 @@ export function TournamentHeader({
               même, hors du groupe `.viewer` : ouverte, l'explication passe à la
               ligne sur toute la barre, au lieu d'élargir le groupe — qui, en
               s'élargissant, déplaçait le bouton qu'on vient de cliquer. */}
-          {spectator && (
-            <InfoHint id="tournament-spectator-hint" subject={t("header.spectator")}>
-              <p>{t("header.spectatorTitle")}</p>
-              {/* La cadence accordée et le sens de « Hors ligne » : le `title`
-                  du témoin ne s'atteint ni au toucher ni au clavier. */}
-              <p>{liveText.title}</p>
-            </InfoHint>
-          )}
+          {spectator && <SpectatorHint isLive={isLive} tier={tier} cadenceMs={cadenceMs} fatal={fatal} />}
         </div>
 
         {/* Illustration : un bandeau entre les outils du lecteur et l'identité,

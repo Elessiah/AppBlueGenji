@@ -60,9 +60,11 @@ type TournamentSettingsView = {
  * membre connecté lit l'instantané avec ses droits (un tournoi non publié
  * n'existe que pour la permission `tournaments`) ; un visiteur **sans session**
  * lit la réponse publique mutualisée (`publicTournamentSnapshotForRequest`, un
- * tournoi publié seulement, jamais une lecture hors cache), et le retour mène à
- * la page sans compte. Tout refus, toute panne de lecture, rend simplement la
- * page générale du mode.
+ * tournoi publié seulement, jamais une lecture hors cache ni hors plafond), et
+ * le retour mène à la page sans compte. Tout refus, toute panne de lecture, rend
+ * simplement la page générale du mode — y compris une **session illisible** : elle
+ * n'est pas une visite sans compte (le retour mènerait à la page sans compte, et
+ * un tournoi non publié resterait invisible à son gérant).
  */
 async function loadTournamentSettings(
   tournamentId: number | null,
@@ -70,7 +72,7 @@ async function loadTournamentSettings(
 ): Promise<TournamentSettingsView | null> {
   if (tournamentId === null) return null;
   try {
-    const user = await getCurrentUser().catch(() => null);
+    const user = await getCurrentUser();
     const snapshot = user
       ? await getVisibleTournamentSnapshot(tournamentId, { canManage: can(user, "tournaments") })
       : await publicTournamentSnapshotForRequest(tournamentId);

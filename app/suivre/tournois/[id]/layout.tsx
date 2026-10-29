@@ -4,14 +4,13 @@ import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/server/auth";
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { requestLocale } from "@/lib/server/request-locale";
-import { publicTournamentSnapshotForRequest } from "@/lib/server/spectator-request";
+import { publicTournamentCardForRequest } from "@/lib/server/spectator-request";
 import { tournamentPageMetadata } from "@/lib/server/tournament-metadata";
 import { PATHNAME_HEADER, SEARCH_HEADER } from "@/lib/shared/csp";
-import { matchPageIdsFromSpectatorPath, matchPagePath } from "@/lib/shared/match-page";
+import { memberPathForSpectatorPath } from "@/lib/shared/spectator-member-path";
 import { localeHref } from "@/lib/shared/locales";
 import {
   forwardedSearch,
-  memberTournamentPath,
   parseTournamentId,
   spectatorTournamentPath,
 } from "@/lib/shared/spectator-view";
@@ -19,6 +18,7 @@ import { tournamentsClientMessages } from "@/lib/shared/tournaments-text";
 import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import { TournamentsTextProvider } from "@/components/i18n/tournaments-text";
 import { SpectatorViewProvider } from "@/components/spectator-view";
+import { MemberRelay } from "./_components/MemberRelay";
 import { TournamentSheetText } from "@/app/(secured)/tournois/[id]/_components/TournamentSheetText";
 
 type LayoutProps = {
@@ -38,9 +38,11 @@ type LayoutProps = {
  * lue. La session est mémoïsée pour la requête (`getCurrentUser`), la mise en
  * page la relit sans nouvelle requête. Aucun droit n'est jamais accordé ici.
  *
- * La carte vient de la réponse publique mutualisée (`spectator-request.ts`) :
- * une rafale de F5 ou un lien collé dans un gros salon ne coûte plus une
- * requête par vue, et la lecture qui suit l'hydratation la trouve prête.
+ * La carte vient de `publicTournamentCardForRequest` (`spectator-request.ts`) :
+ * la copie de la réponse publique si elle est récente, sinon la carte seule,
+ * gardée quelques secondes — jamais une reconstruction de l'instantané entier
+ * payée par le réseau d'un robot d'aperçu. L'état en est recalculé depuis les
+ * dates.
  */
 export async function generateMetadata({ params }: LayoutProps): Promise<Metadata> {
   const { id } = await params;
@@ -48,7 +50,7 @@ export async function generateMetadata({ params }: LayoutProps): Promise<Metadat
     id,
     spectatorTournamentPath,
     async () => ((await getCurrentUser().catch(() => null)) ? null : { canManage: false }),
-    async (tournamentId) => (await publicTournamentSnapshotForRequest(tournamentId))?.card ?? null,
+    publicTournamentCardForRequest,
   );
   return { ...metadata, robots: { index: false, follow: false } };
 }
@@ -74,16 +76,19 @@ export default async function SpectatorTournamentLayout({
   // Une base injoignable ne bloque pas la page : sans session lisible, on la
   // sert telle qu'au visiteur sans compte.
   const user = await getCurrentUser().catch(() => null);
+  let relay = false;
   if (user) {
     const requestHeaders = await headers();
-    const search = forwardedSearch(requestHeaders.get(SEARCH_HEADER));
-    // Page d'un match : la page du match de son espace (`MATCH_PAGE.md`).
-    const matchPage = matchPageIdsFromSpectatorPath(requestHeaders.get(PATHNAME_HEADER));
-    const memberPath =
-      matchPage?.tournamentId === tournamentId
-        ? matchPagePath(tournamentId, matchPage.matchId)
-        : memberTournamentPath(tournamentId);
-    redirect(localeHref(`${memberPath}${search}`, locale));
+    const requestPath = requestHeaders.get(PATHNAME_HEADER);
+    if (requestPath === null) {
+      // Mise en page préchargée, servie sans le chemin demandé : le renvoi
+      // revient au navigateur, qui le connaît (`MemberRelay`).
+      relay = true;
+    } else {
+      const search = forwardedSearch(requestHeaders.get(SEARCH_HEADER));
+      // Page d'un match : la page du match de son espace (`MATCH_PAGE.md`).
+      redirect(localeHref(`${memberPathForSpectatorPath(requestPath, tournamentId)}${search}`, locale));
+    }
   }
 
   const catalog = locale === "en" ? messagesFor(locale) : null;
@@ -92,6 +97,7 @@ export default async function SpectatorTournamentLayout({
       <TournamentSheetText locale={locale}>
         <SpectatorViewProvider>
           <PublicPageShell>
+            {relay && <MemberRelay tournamentId={tournamentId} />}
             <div className="page-shell">{children}</div>
           </PublicPageShell>
         </SpectatorViewProvider>

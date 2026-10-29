@@ -260,7 +260,9 @@ export function spectatorFreshnessMs(pollMs: number, cacheTtlMs: number): number
  * d'un lancement (engagés, arbitre, casters), ni les **scores proposés** par
  * chaque camp d'un match en attente ou en litige (la proposition reste signalée,
  * sans ses chiffres), ni la **date d'inscription** d'un joueur engagé en
- * individuel (celle d'une équipe reste).
+ * individuel (celle d'une équipe reste), ni la **date de dernière écriture** d'un
+ * match ni l'ouverture de son salon de lancement (`updatedAt`, `lobbyOpenedAt` :
+ * elles bougent à chaque « prêt »).
  *
  * L'identifiant de chaque **caster** est remplacé par un identifiant négatif
  * ({@link SPECTATOR_HIDDEN_USER_ID}, puis `-2`, `-3`… dans l'ordre d'inscription,
@@ -292,6 +294,12 @@ export function spectatorSnapshot(snapshot: TournamentSnapshot): TournamentSnaps
       ...match,
       team1Ready: false,
       team2Ready: false,
+      // Chaque bascule « prêt » touche `updatedAt` (et la première pose
+      // `lobbyOpenedAt`) : deux lectures rapprochées diraient à la seconde près
+      // qu'une équipe vient de se dire prête. La fiche sans compte ne lit ni
+      // l'une ni l'autre (seules les alertes d'un membre s'en servent).
+      updatedAt: "",
+      lobbyOpenedAt: null,
       // Ni pseudo ni empreinte de l'arbitre sans compte : « Arbitre désigné ».
       refereeKey: null,
       casters: match.casters.map((caster, index) => ({

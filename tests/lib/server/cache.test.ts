@@ -316,6 +316,21 @@ describe("cached — durée calculée, appel avant calcul, copie périmée, purg
     expect(cachedEntryCount()).toBe(2);
   });
 
+  it("purge aussi sans trafic, par une minuterie qui s'éteint avec le cache", async () => {
+    jest.useFakeTimers({ now: 300_000, ...FAKE });
+    await cached("a", 1_000, async () => 1);
+    await cached("b", 60_000, async () => 2);
+    expect(cachedEntryCount()).toBe(2);
+
+    // Aucune lecture ni écriture : seule la minuterie peut retirer « a ».
+    jest.advanceTimersByTime(CACHE_SWEEP_INTERVAL_MS + 1);
+    expect(cachedEntryCount()).toBe(1);
+    jest.advanceTimersByTime(60_000 + CACHE_SWEEP_INTERVAL_MS);
+    expect(cachedEntryCount()).toBe(0);
+    // Cache vide : plus aucune minuterie en attente.
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
   it("ne purge pas une copie encore conservée", async () => {
     jest.useFakeTimers({ now: 200_000, ...FAKE });
     await cached("kept", 1_000, async () => 1, { retainMs: 4 * CACHE_SWEEP_INTERVAL_MS });

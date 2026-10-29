@@ -184,13 +184,26 @@ function tokenState(rule: TokenBucketRule, tokens: number): { allowed: boolean; 
   };
 }
 
-/** Le seau de cette clé permet-il une action ? Rien n'est pris. */
-export function peekTokenBucket(
-  rule: TokenBucketRule,
-  key: string,
-  now: number = Date.now(),
-): { allowed: boolean; remaining: number; retryAfterMs: number } {
-  return tokenState(rule, tokensAt(rule, tokenBucketOf(rule).get(key), now));
+/**
+ * Libère une place quand le seau suit déjà `maxKeys` clés. Un seau plein vaut un
+ * seau absent : ceux-là partent d'abord. S'il en reste trop, on évince les
+ * **plus pleins** (une dizaine de pour cent des places, d'un seul parcours),
+ * jamais tout : vider le seau rendrait ses jetons à chaque réseau, celui qui
+ * le sature compris — alors que les seaux les plus pleins sont ceux dont la
+ * remise à neuf coûte le moins.
+ */
+function makeRoomForTokenKey(rule: TokenBucketRule, bucket: Map<string, Tokens>, now: number): void {
+  const maxKeys = rule.maxKeys ?? DEFAULT_MAX_KEYS;
+  if (bucket.size < maxKeys) return;
+  for (const [trackedKey, tracked] of bucket) {
+    if (tokensAt(rule, tracked, now) >= rule.capacity) bucket.delete(trackedKey);
+  }
+  if (bucket.size < maxKeys) return;
+  const fullest = [...bucket.entries()]
+    .map(([trackedKey, tracked]) => [trackedKey, tokensAt(rule, tracked, now)] as const)
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, Math.max(1, Math.ceil(maxKeys / 10)));
+  for (const [trackedKey] of fullest) bucket.delete(trackedKey);
 }
 
 /** Prend un jeton s'il y en a un ; `allowed: false` : rien n'est pris. */
@@ -202,14 +215,7 @@ export function takeTokenBucket(
   const bucket = tokenBucketOf(rule);
   const tokens = tokensAt(rule, bucket.get(key), now);
   if (tokens < 1) return tokenState(rule, tokens);
-  if (!bucket.has(key) && bucket.size >= (rule.maxKeys ?? DEFAULT_MAX_KEYS)) {
-    // Un seau plein vaut un seau absent : on les oublie d'abord, et on repart
-    // de zéro si cela ne suffit pas (mémoire bornée).
-    for (const [trackedKey, tracked] of bucket) {
-      if (tokensAt(rule, tracked, now) >= rule.capacity) bucket.delete(trackedKey);
-    }
-    if (bucket.size >= (rule.maxKeys ?? DEFAULT_MAX_KEYS)) bucket.clear();
-  }
+  if (!bucket.has(key)) makeRoomForTokenKey(rule, bucket, now);
   bucket.set(key, { tokens: tokens - 1, updatedAt: now });
   // Accordé : le dernier jeton pris laisse un seau vide, pas un refus.
   return { ...tokenState(rule, tokens - 1), allowed: true, retryAfterMs: 0 };

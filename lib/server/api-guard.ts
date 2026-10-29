@@ -18,7 +18,6 @@ import {
   refundRateLimit,
   checkRateLimit,
   consumeRateLimit,
-  peekTokenBucket,
   rateLimitIdentity,
   refundTokenBucket,
   takeTokenBucket,
@@ -188,6 +187,19 @@ export const SPECTATOR_REBUILD_RULE: TokenBucketRule = {
 };
 
 /**
+ * Retire le port d'une adresse qui en porte un (`1.2.3.4:51234`,
+ * `[2001:db8::1]:51234`) : un client qui change de port à chaque connexion
+ * resterait sinon une clé par connexion, hors de tout plafond. Une adresse IPv6
+ * sans crochets reste telle quelle (ses deux-points ne sont pas un port).
+ */
+function withoutPort(value: string): string {
+  const bracketed = /^(\[[^\]]*\]):\d{1,5}$/.exec(value);
+  if (bracketed) return bracketed[1];
+  const ipv4 = /^(\d{1,3}(?:\.\d{1,3}){3}):\d{1,5}$/.exec(value);
+  return ipv4 ? ipv4[1] : value;
+}
+
+/**
  * Identité de débit d'un **réseau** : l'adresse IPv4 telle quelle, une adresse
  * IPv6 ramenée à son préfixe `/64` — ce qu'un seul abonné reçoit d'ordinaire,
  * et dans lequel il peut tirer une adresse neuve à chaque requête. Sans ce
@@ -197,7 +209,7 @@ export const SPECTATOR_REBUILD_RULE: TokenBucketRule = {
  */
 export function clientNetworkKey(ip: string | null): string | null {
   if (ip === null) return null;
-  const address = ip.trim().replace(/^\[|\]$/g, "").split("%")[0].toLowerCase();
+  const address = withoutPort(ip.trim()).replace(/^\[|\]$/g, "").split("%")[0].toLowerCase();
   if (!address.includes(":")) return address || null;
   const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/.exec(address);
   if (mapped) return mapped[1];
@@ -606,17 +618,6 @@ export function takeRateToken(
   const key = rateLimitIdentity(identity);
   if (key === ANONYMOUS_IDENTITY) return null;
   const state = takeTokenBucket(rule, key);
-  return state.allowed ? null : tooManyRequests(state.retryAfterMs);
-}
-
-/** Le refus de {@link takeRateToken}, sans rien prendre. */
-export function peekRateToken(
-  rule: TokenBucketRule,
-  identity: RateIdentity,
-): NextResponse | null {
-  const key = rateLimitIdentity(identity);
-  if (key === ANONYMOUS_IDENTITY) return null;
-  const state = peekTokenBucket(rule, key);
   return state.allowed ? null : tooManyRequests(state.retryAfterMs);
 }
 
