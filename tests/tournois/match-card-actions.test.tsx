@@ -512,7 +512,7 @@ describe("MatchCardActions — clavier et focus (branchements)", () => {
     // Un caster du staff qui peut aussi retirer les autres choisit d'abord qui.
     expect(source).toMatch(/releaseCast: \(\) => \{[\s\S]*?if \(!isCaster \|\| releasesOthers\) \{\s*openRelease\(\);\s*return;/);
     expect(source).toContain('t("cardActions.releaseConfirm.title", { match: matchLabel })');
-    expect(source).toContain('<p>{t("cardActions.releaseConfirm.body")}</p>');
+    expect(source).toContain('t("cardActions.releaseConfirm.body", { caster: releasedCaster.pseudo })');
     // Refermée si l'action disparaît (instantané du flux), comme « Forcer ».
     expect(source).toContain("const [open, setOpen] = useConfirmWhile(present);");
     expect(source).toMatch(/useReleaseConfirm\(\s*actions\.some\(\(a\) => a\.id === "releaseCast"\),/);

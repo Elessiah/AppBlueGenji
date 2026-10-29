@@ -119,11 +119,11 @@ describe("castClaimBody — le corps envoyé à POST /api/matches/[id]/caster", 
   });
 });
 
-function renderDialog(locale: "fr" | "en") {
+function renderDialog(locale: "fr" | "en", match: typeof TWO_STREAMS = TWO_STREAMS) {
   effects.armed = true;
   const dialog = (
     <CastClaimDialog
-      match={TWO_STREAMS}
+      match={match}
       matchLabel="Alpha contre Bravo"
       onClose={() => undefined}
       onClaim={async () => ({ ok: true })}
@@ -138,18 +138,56 @@ function renderDialog(locale: "fr" | "en") {
 }
 
 describe("CastClaimDialog — rendu", () => {
-  it("un bouton radio par choix, le premier coché et focalisé ; casters et plateforme nommés", () => {
+  it("un bouton radio par choix, le premier coché ; casters et plateforme nommés", () => {
     const html = renderDialog("fr");
     expect(html.match(/type="radio"/g)).toHaveLength(3);
     const first = /<input[^>]*value="join-3"[^>]*>/.exec(html)?.[0] ?? "";
     expect(first).toContain('checked=""');
-    expect(first).toContain('data-autofocus="true"');
     expect(/<input[^>]*value="separate"[^>]*>/.exec(html)?.[0]).not.toContain("checked");
-    expect(html).toContain("Co-caster avec Voix, Écho");
+    expect(html).toContain("Co-caster avec Voix et Écho");
     expect(html).toContain("Twitch");
     expect(html).toContain("sans lien");
     expect(html).toContain("Ouvrir mon propre stream");
     expect(html).toContain("<legend");
+  });
+
+  it("le focus d'ouverture va à « Annuler », jamais à un bouton radio (un Entrée réflexe n'inscrit personne)", () => {
+    const html = renderDialog("fr");
+    expect(/<input[^>]*type="radio"[^>]*>/.exec(html)?.[0]).not.toContain("data-autofocus");
+    expect(html).not.toContain("aria-describedby=\"\"");
+    expect(/<button[^>]*data-autofocus="true"[^>]*>Annuler<\/button>/.test(html)).toBe(true);
+  });
+
+  it("joint trois casters par la conjonction de la langue : « A, B et C » / \"A, B, and C\"", () => {
+    const three = bracketMatch({
+      streams: [{ id: 3, liveUrl: null, staff: true }],
+      casters: [
+        matchCaster({ userId: 9, pseudo: "Voix", streamId: 3 }),
+        matchCaster({ userId: 12, pseudo: "Écho", streamId: 3 }),
+        matchCaster({ userId: 13, pseudo: "Solo", streamId: 3 }),
+      ],
+    });
+    expect(renderDialog("fr", three)).toContain("Co-caster avec Voix, Écho et Solo");
+    expect(renderDialog("en", three)).toContain("Co-cast with Voix, Écho, and Solo");
+  });
+
+  it("un caster seul se nomme sans conjonction", () => {
+    const one = bracketMatch({
+      streams: [{ id: 3, liveUrl: null, staff: true }],
+      casters: [matchCaster({ userId: 9, pseudo: "Voix", streamId: 3 })],
+    });
+    expect(renderDialog("fr", one)).toContain("Co-caster avec Voix<");
+  });
+
+  it("un match sans stream ouvre la fenêtre avec le seul choix « ouvrir mon propre stream » et son champ de lien", () => {
+    const html = renderDialog("fr", bracketMatch());
+    expect(html.match(/type="radio"/g)).toHaveLength(1);
+    expect(html).toContain("Ouvrir mon propre stream");
+    expect(html).toContain('inputMode="url"');
+  });
+
+  it("l'annonce du stream disparu est une zone vive toujours montée, vide tant que le choix existe", () => {
+    expect(renderDialog("fr")).toContain('<output class="gone" aria-live="polite"></output>');
   });
 
   it("le champ du lien n'apparaît qu'en choisissant son propre stream", () => {
@@ -158,7 +196,7 @@ describe("CastClaimDialog — rendu", () => {
 
   it("parle anglais sous /en", () => {
     const html = renderDialog("en");
-    expect(html).toContain("Co-cast with Voix, Écho");
+    expect(html).toContain("Co-cast with Voix and Écho");
     expect(html).toContain("Open my own stream");
     expect(html).toContain("no link");
     expect(html).not.toContain("Ouvrir mon propre stream");
@@ -184,43 +222,132 @@ describe("matchStreamLinks — tous les liens du bandeau, le premier en tête", 
   });
 });
 
+/** Chaque extrait attendu figure dans la source. */
+function expectContains(source: string, snippets: readonly string[]): void {
+  for (const snippet of snippets) expect(source).toContain(snippet);
+}
+
 describe("CastClaimDialog — un stream choisi qui disparaît", () => {
   const source = readSource("app/(secured)/tournois/[id]/_components/CastClaimDialog.tsx");
 
   it("n'est pas remplacé en silence par le premier : plus rien n'est choisi, l'envoi est désarmé", () => {
-    expect(source).toContain("choices.find((option) => castClaimChoiceKey(option) === choiceKey) ?? null;");
-    expect(source).toContain("disabled={choice === null || urlInvalid}");
-    expect(source).toContain("if (choice === null) return false;");
+    expectContains(source, [
+      "choices.find((option) => castClaimChoiceKey(option) === choiceKey) ?? null;",
+      "disabled={choice === null || urlInvalid}",
+      "if (choice === null) return false;",
+    ]);
+  });
+
+  it("le focus passe au premier choix restant quand celui qui l'avait est démonté, et une annonce dit pourquoi", () => {
+    expectContains(source, [
+      "if (!gone || document.activeElement !== document.body) return;",
+      'fieldsetRef.current?.querySelector<HTMLInputElement>("input[type=radio]")?.focus();',
+      '{gone ? t("cardActions.claimDialog.gone") : ""}',
+    ]);
+  });
+
+  it("le stream disparu se notifie aussi par un toast, sans exiger le ToastProvider", () => {
+    expectContains(source, [
+      'import { useOptionalToast } from "@/components/ui/toast";',
+      "if (gone) notifyGone.current.toast?.showError(notifyGone.current.goneMessage);",
+    ]);
+    expect(source).not.toContain("= useToast(");
+    // Sans fournisseur de toasts, la fenêtre se rend quand même (renderDialog n'en monte aucun).
+    expect(renderDialog("fr")).toContain("Alpha contre Bravo");
+  });
+
+  it("oublie le choix disparu : un stream qui revient ne se recoche pas sans nouveau choix", () => {
+    expect(source).toContain('if (choice === null && choiceKey !== "") setChoiceKey("");');
+  });
+
+  it("ouvre sans focusContent ni radio focalisée : « Annuler » prend le focus", () => {
+    expect(source).not.toContain("focusContent");
+    expect(source).not.toContain("data-autofocus");
+  });
+
+  it("joint les casters par Intl.ListFormat dans la langue de la page", () => {
+    expect(source).toContain('useMemo(() => new Intl.ListFormat(locale, { style: "long", type: "conjunction" }), [locale])');
+    expect(source).not.toContain('casterPseudos.join(", ")');
   });
 });
 
 describe("MatchCardActions — branchements du cast", () => {
   const card = readSource("app/(secured)/tournois/[id]/_components/MatchCardActions.tsx");
 
-  it("sans stream, « Caster » inscrit d'un clic ; sinon la fenêtre fait choisir", () => {
-    expect(card).toContain("if (match.streams.length === 0) {");
-    expect(card).toContain('send(`/api/matches/${match.id}/caster`, "POST", {})');
+  it("« Caster » ouvre toujours la fenêtre (une seule règle, castClaimChoices, décide des choix)", () => {
+    expect(card).not.toContain("match.streams.length === 0");
+    expect(card).not.toContain('send(`/api/matches/${match.id}/caster`, "POST", {})');
+    expect(card).toMatch(/claimCast: \(\) => \{[\s\S]*?setClaimOpen\(true\);/);
     expect(card).toContain("<CastClaimDialog match={match}");
   });
 
+  it("inscrit, le focus passe au bouton qui remplace « Caster » (« Ne plus caster », sinon « Plus d'actions »)", () => {
+    expectContains(card, [
+      "claimedRef.current = true;",
+      "if (!claimedRef.current || hasClaimCast) return;",
+      'querySelector<HTMLElement>(\'[data-action="releaseCast"]\')',
+      "(release ?? toggleRef.current)?.focus({ preventScroll: true });",
+    ]);
+  });
+
   it("le staff choisit le caster retiré, désigné par ?userId= ; le caster se retire sans paramètre", () => {
-    expect(card).toContain("/api/matches/${match.id}/caster?userId=${encodeURIComponent(");
-    expect(card).toContain('send(`/api/matches/${match.id}/caster`, "DELETE")');
-    expect(card).toContain("{match.casters.length > 1 && (");
+    expectContains(card, [
+      "/api/matches/${match.id}/caster?userId=${encodeURIComponent(",
+      'send(`/api/matches/${match.id}/caster`, "DELETE")',
+      "{match.casters.length > 1 && (",
+    ]);
     // Un arbitre qui caste aussi le match passe par ce choix, lui compris.
     expect(card).toContain("if (!isCaster || releasesOthers) {");
   });
 
   it("le caster à retirer est fixé à l'ouverture ; parti entre-temps, la fenêtre se ferme au lieu d'en viser un autre", () => {
-    expect(card).toContain("setReleaseTarget(casters[0]?.userId ?? null);");
-    expect(card).toContain("const releasedCaster = casters.find((caster) => caster.userId === releaseTarget) ?? null;");
-    expect(card).toContain("if (open && releasedCaster === null) setOpen(false);");
-    expect(card).toContain("confirmRelease: open && releasedCaster !== null");
+    expectContains(card, [
+      "setReleaseTarget(casters[0]?.userId ?? null);",
+      "const releasedCaster = casters.find((caster) => caster.userId === releaseTarget) ?? null;",
+      "if (open && releasedCaster === null) setOpen(false);",
+      "const shown = open && releasedCaster !== null;",
+      "confirmRelease: shown,",
+    ]);
     expect(card).not.toContain("?? match.casters[0] ?? null");
   });
 
+  it("le caster choisi qui part pendant le choix : un toast le dit, sauf pour le retrait que le lecteur vient de confirmer", () => {
+    expectContains(card, [
+      "wasShown.current && !shown && releasedCaster === null && !ownRelease.current",
+      '() => showError(t("cardActions.releaseConfirm.gone"))',
+      "markOwnRelease(true);",
+    ]);
+    // Un retrait refusé laisse la fenêtre ouverte : le départ suivant doit se dire.
+    expectContains(card, [
+      "if (!done) markOwnRelease(false);",
+      "ownRelease.current = false;",
+    ]);
+  });
+
+  it("un arbitre qui se choisit lui-même : textes « Ne plus caster », sans avis, comme un départ volontaire", () => {
+    expectContains(card, [
+      "const releasingSelf = releasedCaster.userId === viewerUserId;",
+      't("cardActions.releaseConfirm.selfTitle", { match: matchLabel })',
+      't("cardActions.releaseConfirm.selfConfirm")',
+      't("cardActions.releaseConfirm.selfBody")',
+      'self ? t("cardActions.notCasting") : t("cardActions.casterRemoved")',
+    ]);
+  });
+
+  it("un seul caster : le corps de l'avis le nomme", () => {
+    expect(card).toContain('t("cardActions.releaseConfirm.body", { caster: releasedCaster.pseudo })');
+  });
+
+  it("les choix restent figés pendant l'envoi, sans disabled natif (le focus ne se perd pas)", () => {
+    expectContains(card, [
+      "aria-disabled={busy || undefined}",
+      "if (!busy) onPick(caster.userId);",
+    ]);
+    expect(card).not.toMatch(/<fieldset[^>]*disabled/);
+  });
+
   it("le choix du caster à retirer garde le focus sur « Annuler » : un Entrée réflexe sur un bouton radio ne retire personne", () => {
-    const start = card.indexOf("{confirmRelease && (");
+    const start = card.indexOf("function ReleaseCastDialog(");
     const dialog = card.slice(start, card.indexOf("</ConfirmActionDialog>", start));
     expect(dialog).toContain('name={`release-caster-${match.id}`}');
     expect(dialog).not.toContain("focusContent");
@@ -228,10 +355,65 @@ describe("MatchCardActions — branchements du cast", () => {
   });
 });
 
-describe("Configuration du direct — l'aide du lien du staff", () => {
+describe("Configuration du direct — l'aide du lien", () => {
   it("dit qu'un champ vide laisse le premier lien d'un caster à l'annonce (FR et EN)", () => {
-    expect(frDialogs.live.urlHint).toContain("sans lien du staff : son annonce sur Discord renverra alors au premier lien ouvert par un caster");
-    expect(enDialogs.live.urlHint).toContain("without a staff link: its Discord announcement will then point to the first link opened by a caster");
+    expect(frDialogs.live.urlHint).toContain("sans lien de configuration du direct : son annonce sur Discord renverra alors au premier lien ouvert par un caster");
+    expect(enDialogs.live.urlHint).toContain("without a live setup link: its Discord announcement will then point to the first link opened by a caster");
+  });
+
+  it("dit qu'un caster du match qui pose un lien ici y met sa propre chaîne (FR et EN)", () => {
+    expect(frDialogs.live.urlHint).toContain("Si tu castes déjà ce match, le lien saisi ici est celui de ta propre chaîne.");
+    expect(enDialogs.live.urlHint).toContain("If you already cast this match, the link entered here is your own channel.");
+  });
+});
+
+describe("Textes de caster — pluriel, parité FR/EN, clé retirée", () => {
+  const read = (locale: string, file: string) =>
+    JSON.parse(readSource(`messages/${locale}/${file}.json`)) as Record<string, any>;
+
+  it("l'aide du lien ne promet plus un bouton « Regarder » (FR et EN)", () => {
+    expect(frActions.cardActions.claimDialog.urlHint).toContain("sans lien, ton stream n'apparaît pas sur la carte du match.");
+    expect(enActions.cardActions.claimDialog.urlHint).toContain("without a link, your stream does not appear on the match card.");
+    expect(frActions.cardActions.claimDialog.gone).toBe("Ce stream n'existe plus : choisis-en un autre.");
+    expect(enActions.cardActions.claimDialog.gone).toBe("This stream no longer exists: pick another one.");
+  });
+
+  it("le retrait par le staff a ses variantes « Ne plus caster » et nomme le caster, en FR et EN", () => {
+    const fr = frActions.cardActions.releaseConfirm as Record<string, string>;
+    const en = enActions.cardActions.releaseConfirm as Record<string, string>;
+    expect(fr.body).toContain("{caster}");
+    expect(en.body).toContain("{caster}");
+    expect(fr.selfConfirm).toBe("Ne plus caster");
+    expect(en.selfConfirm).toBe("Stop casting");
+    expect(fr.selfTitle).toContain("{match}");
+    expect(en.selfTitle).toContain("{match}");
+    expect(fr.gone).toBe("Ce caster ne caste plus ce match.");
+    expect(en.gone).toBe("This caster is no longer casting this match.");
+  });
+
+  it("les annonces des contacts parlent des casters au pluriel", () => {
+    expect(read("fr", "launchModal").contacts.casterShown).toBe("Les contacts des casters sont maintenant affichés.");
+    expect(read("fr", "launchModal").contacts.casterShownEmpty).toBe("Aucun contact de caster disponible.");
+    expect(read("en", "launchModal").contacts.casterShown).toBe("The casters' contacts are now shown.");
+  });
+
+  it("la région d'un caster passe par une clé à paramètre, pas par une concaténation", () => {
+    expect(read("fr", "launchModal").casterRegion).toBe("Caster {pseudo}");
+    expect(read("en", "launchModal").casterRegion).toBe("Caster {pseudo}");
+    const cards = readSource("components/match-launch/LaunchContactCards.tsx");
+    expect(cards).toContain('t("casterRegion", { pseudo: caster.pseudo })');
+    expect(cards).not.toContain('`${t("caster")} ${caster.pseudo}`');
+  });
+
+  it("la clé launch.caster, plus lue, est retirée des deux catalogues", () => {
+    expect(read("fr", "tournament").launch).not.toHaveProperty("caster");
+    expect(read("en", "tournament").launch).not.toHaveProperty("caster");
+  });
+
+  it("la phase de lancement attend chacun des casters inscrits (FR et EN)", () => {
+    const text = (locale: string) => JSON.stringify(read(locale, "tournamentForm"));
+    expect(text("fr")).toContain("(et chacun de ses casters) cliquent");
+    expect(text("en")).toContain("(and each of its casters) to click");
   });
 });
 

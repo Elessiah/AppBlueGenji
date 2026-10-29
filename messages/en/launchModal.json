@@ -92,6 +92,7 @@
   "casterContactsAtLaunch": "Their contacts show up at launch.",
   "noContact": "No contact available.",
   "caster": "Caster",
+  "casterRegion": "Caster {pseudo}",
   "noCaster": "No caster signed up: the match starts as soon as both teams are ready.",
   "vs": "VS",
   "fabTeams": "{team1} vs {team2}",
@@ -104,7 +105,7 @@
     "notShown": "Contacts not shown.",
     "noCaster": "No caster signed up for this match.",
     "casterLater": "Their contacts will show once the match starts.",
-    "casterShown": "The caster's contacts are now shown.",
+    "casterShown": "The casters' contacts are now shown.",
     "casterShownEmpty": "No caster contact available.",
     "unavailable": "This match's contacts aren't available to you right now (for the caster: once the match starts).",
     "failed": "Contacts could not be loaded. Try again in a moment."

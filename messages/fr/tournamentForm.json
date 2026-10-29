@@ -183,7 +183,7 @@
     },
     "launchPhase": {
       "label": "Phase de lancement des matchs",
-      "description": "Allumée : à son heure, chaque match attend que les deux équipes (et le caster) cliquent « Prêt » ; l'arbitrage peut le forcer, et il part d'office après {launchDelay} minutes. Éteinte (par défaut) : un match part dès son heure ou, sans heure, dès que ses deux adversaires sont connus (sauf planification par l'arbitrage).",
+      "description": "Allumée : à son heure, chaque match attend que les deux équipes (et chacun de ses casters) cliquent « Prêt » ; l'arbitrage peut le forcer, et il part d'office après {launchDelay} minutes. Éteinte (par défaut) : un match part dès son heure ou, sans heure, dès que ses deux adversaires sont connus (sauf planification par l'arbitrage).",
       "scope": "Modifiable jusqu'au début du tournoi, puis figée.",
       "locked": "Le tournoi a commencé : l'option n'est plus modifiable."
     },
