@@ -334,6 +334,17 @@ describe("setMatchLiveConfig", () => {
     expect(world.state.matchWrites).toEqual([]);
   });
 
+  it("setMatchLiveConfig_playedMatchAlreadyMarked_refusesNewLinkOrMode", async () => {
+    const world = liveWorld(matchRow({ status: "COMPLETED", live_trigger: "AUTO" }), [dbStream(1, "https://twitch.tv/x", true)]);
+    await mockLiveDb(world);
+
+    await expect(
+      setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "twitch.tv/me", setter: CASTER_12 }),
+    ).rejects.toThrow("MATCH_NOT_CASTABLE");
+    expect(world.state.matchWrites).toEqual([]);
+    expect(world.state.streams[0]?.live_url).toBe("https://twitch.tv/x");
+  });
+
   it("setMatchLiveConfig_startAtClearedBeforeLock_rejectsStartTimeUnderLock", async () => {
     const row = matchRow({ start_at: "2026-11-02 20:00:00" });
     const world = liveWorld(row);
