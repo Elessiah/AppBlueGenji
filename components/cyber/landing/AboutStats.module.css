@@ -106,6 +106,12 @@
   cursor: not-allowed;
 }
 
+.actionPrimary:disabled:hover,
+.actionPrimary[aria-disabled="true"]:hover {
+  background: var(--blue-400, #5ac8ff);
+  border-color: var(--blue-400, #5ac8ff);
+}
+
 .addBtn {
   margin-top: 14px;
   width: 100%;

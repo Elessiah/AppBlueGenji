@@ -82,22 +82,41 @@ export async function createAboutStat(input: AboutStatInput): Promise<AboutStat>
   return { id: Number(res.insertId), value, valueEn, label, labelEn };
 }
 
-/** Met à jour une carte existante et renvoie sa version mise à jour. */
+/**
+ * Met à jour une carte existante et renvoie sa version mise à jour. `valueEn`
+ * absent (`undefined`) conserve la valeur anglaise enregistrée ; `null` ou vide l'efface.
+ */
 export async function updateAboutStat(id: number, input: AboutStatInput): Promise<AboutStat> {
   const validation = validateAboutStatInput(input);
   if (!validation.ok) throw new Error(validation.error);
   const { value, valueEn, label, labelEn } = validation.value;
 
+  // Clé `valueEn` absente (onglet resté sur un ancien bundle) : l'anglais
+  // enregistré n'est pas touché, plutôt qu'effacé sans avertissement.
+  const keepValueEn = input.valueEn === undefined;
   const db = await getDatabase();
-  const [res] = await db.execute<ResultSetHeader>(
-    `UPDATE bg_about_stats SET value = ?, value_en = ?, label = ?, label_en = ? WHERE id = ?`,
-    [value, valueEn, label, labelEn, id],
-  );
+  const [res] = keepValueEn
+    ? await db.execute<ResultSetHeader>(`UPDATE bg_about_stats SET value = ?, label = ?, label_en = ? WHERE id = ?`, [
+        value,
+        label,
+        labelEn,
+        id,
+      ])
+    : await db.execute<ResultSetHeader>(
+        `UPDATE bg_about_stats SET value = ?, value_en = ?, label = ?, label_en = ? WHERE id = ?`,
+        [value, valueEn, label, labelEn, id],
+      );
   if (res.affectedRows === 0) throw new Error("ABOUT_STAT_NOT_FOUND");
+
+  let keptValueEn = valueEn;
+  if (keepValueEn) {
+    const [rows] = await db.execute<AboutStatRow[]>(`SELECT value_en FROM bg_about_stats WHERE id = ?`, [id]);
+    keptValueEn = rows?.[0]?.value_en ?? null;
+  }
 
   // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
   invalidateShowcase();
-  return { id, value, valueEn, label, labelEn };
+  return { id, value, valueEn: keptValueEn, label, labelEn };
 }
 
 /**

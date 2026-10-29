@@ -46,6 +46,8 @@ type BilingualFieldProps<F extends string> = {
    * l'anglais appelle `onEnter` (enregistrer le formulaire).
    */
   onEnter?: () => void;
+  /** Champs en lecture seule (enregistrement en cours : une frappe tardive ne serait pas envoyée). */
+  readOnly?: boolean;
 };
 
 /** Avec `onEnter` : le français mène à l'anglais, l'anglais enregistre. */
@@ -79,6 +81,7 @@ export function BilingualField<F extends string>({
   counterClassName,
   enterKeyHint,
   onEnter,
+  readOnly = false,
 }: Readonly<BilingualFieldProps<F>>) {
   const hintId = `${ids.en}-hint`;
   // L'aide du rattrapage se tait dès que l'anglais est saisi.
@@ -104,6 +107,7 @@ export function BilingualField<F extends string>({
       maxLength,
       placeholder: placeholders?.[lang],
       required: lang === "fr" ? required : enRequired,
+      readOnly,
       ...errors.aria(
         fields[lang],
         describedBy,
@@ -154,11 +158,7 @@ export function BilingualField<F extends string>({
           </label>
           {control("en")}
           {counterText("en")}
-          {showHint && (
-            <span id={hintId} className={styles.hint}>
-              {ENGLISH_BACKFILL_HINT}
-            </span>
-          )}
+          {showHint && <EnglishMissingHint id={hintId}>{ENGLISH_BACKFILL_HINT}</EnglishMissingHint>}
           <FieldErrorText fieldId={ids.en} message={errors.message(fields.en)} />
         </div>
       </div>
