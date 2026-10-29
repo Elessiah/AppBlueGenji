@@ -110,7 +110,7 @@ export { loadRoundSlots };
 /**
  * Manche lue d'un corps de requête : sa **forme** seulement (numéro de 1 à
  * {@link ROUND_NUMBER_MAX}) ; son appartenance au tournoi se vérifie sous
- * verrou (`assertRoundsBelong`). @throws `INVALID_ROUND`
+ * verrou (`roundsOfTournament`). @throws `INVALID_ROUND`
  */
 export function parseRoundKey(body: { phaseId?: unknown; roundNumber?: unknown; bracket?: unknown }): RoundKey {
   const { phaseId, roundNumber, bracket } = body;
@@ -153,26 +153,26 @@ async function lockTournamentShared(connection: PoolConnection, tournamentId: nu
 }
 
 /**
- * Les tours visés appartiennent-ils au tournoi ? Sans phases, la phase est 0 ;
- * en multi-phases, une phase **de ce** tournoi. Sinon une ligne orpheline
- * serait écrite et servie à tous dans l'instantané. @throws `INVALID_ROUND`
+ * Tours de `rounds` qui appartiennent au tournoi verrouillé : phase 0 hors
+ * MULTI, sinon une phase **de ce** tournoi. Les autres (clé inventée, ou ligne
+ * restée d'une phase supprimée par une édition du tournoi) sont écartés : on
+ * n'y écrit pas de cartes, mais une copie « à tous les tours » qui en contient
+ * ne refuse pas pour autant les tours valides.
  */
-async function assertRoundsBelong(
+async function roundsOfTournament(
   connection: PoolConnection,
   tournament: Pick<TournamentRow, "id" | "format">,
   rounds: readonly RoundKey[],
-): Promise<void> {
-  const phaseIds = [...new Set(rounds.map((round) => round.phaseId))];
-  if (tournament.format !== "MULTI") {
-    if (phaseIds.some((phaseId) => phaseId !== 0)) throw new Error("INVALID_ROUND");
-    return;
-  }
-  if (phaseIds.includes(0)) throw new Error("INVALID_ROUND");
+): Promise<RoundKey[]> {
+  if (tournament.format !== "MULTI") return rounds.filter((round) => round.phaseId === 0);
+  const phaseIds = [...new Set(rounds.map((round) => round.phaseId).filter((phaseId) => phaseId !== 0))];
+  if (phaseIds.length === 0) return [];
   const [rows] = await connection.execute<(RowDataPacket & { id: number })[]>(
     `SELECT id FROM bg_tournament_phases WHERE tournament_id = ? AND id IN (${phaseIds.map(() => "?").join(", ")})`,
     [Number(tournament.id), ...phaseIds],
   );
-  if (rows.length !== phaseIds.length) throw new Error("INVALID_ROUND");
+  const owned = new Set(rows.map((row) => Number(row.id)));
+  return rounds.filter((round) => owned.has(round.phaseId));
 }
 
 /** Tours au plus d'une copie « à tous les tours » (partagé avec l'écran, qui découpe). */
@@ -239,9 +239,12 @@ export async function setRoundsMaps(
   if (rounds.length === 0 || rounds.length > ROUND_MAPS_BULK_MAX) throw new Error("INVALID_ROUND");
   const result = await inTransaction(async (connection) => {
     const tournament = await lockTournament(connection, tournamentId);
-    await assertRoundsBelong(connection, tournament, rounds);
+    // Retirer est permis sur toute clé (une ligne orpheline doit pouvoir partir) ;
+    // poser des cartes, seulement sur les tours du tournoi.
+    const targets = slots.length === 0 ? rounds : await roundsOfTournament(connection, tournament, rounds);
+    if (targets.length === 0) throw new Error("INVALID_ROUND");
     const changedRounds: RoundKey[] = [];
-    for (const round of rounds) {
+    for (const round of targets) {
       if (await writeRoundSlots(connection, tournamentId, round, slots)) changedRounds.push(round);
     }
     // L'annonce Discord ne part pas ici : elle est mise en attente dans la

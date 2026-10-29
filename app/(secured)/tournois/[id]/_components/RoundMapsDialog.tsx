@@ -359,9 +359,10 @@ export function RoundMapsDialog({
   useEffect(() => {
     const before = synced.current;
     synced.current = { firstBan: rules.firstBan, nextBan: rules.nextBan, rounds: rules.rounds, round };
-    if (before.round !== null && round !== null && roundKeyId(before.round) !== roundKeyId(round)) return;
     setFirstBan((current) => (current === before.firstBan ? rules.firstBan : current));
     setNextBan((current) => (current === before.nextBan ? rules.nextBan : current));
+    // Changement de tour : `changeRound` a déjà posé ses créneaux.
+    if (before.round !== null && round !== null && roundKeyId(before.round) !== roundKeyId(round)) return;
     setSlots((current) => {
       const next = resyncSlots(current, before.rounds, rules.rounds, round);
       return next === current ? current : next.map((slot) => [...slot]);
