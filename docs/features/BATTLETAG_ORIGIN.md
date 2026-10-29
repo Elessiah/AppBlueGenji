@@ -47,8 +47,9 @@ prochaine connexion Battle.net, qui réécrit la colonne.
 ## Données personnelles
 
 Entrée `PRIVACY_CHANGES` `2026-10-battletag-tape-garde-non-verifie` (31 octobre)
-et `/rgpd` § Données collectées (FR + EN). Le registre (T04) parlait déjà d'un
-« BattleTag tiré d'un compte Battle.net rattaché » : inchangé.
+et `/rgpd` § Données collectées (FR + EN). Registre T04 (FR + EN) : la catégorie BattleTag dit que sa provenance
+d'un compte Battle.net rattaché est vérifiée pour caster ou arbitrer ; `/rgpd`
+dit de même pour l'inscription comme caster.
 
 ## Seed
 
