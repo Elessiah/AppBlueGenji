@@ -1322,6 +1322,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     details: [
       "Quand Blizzard donne un BattleTag, il remplace toujours le tien, et lui seul est vérifié.",
       "Un BattleTag tapé reste modifiable depuis « Mon profil », même avec Battle.net rattaché.",
+      "Si ton Battle.net était déjà rattaché, la règle s'applique à ta prochaine connexion par Battle.net : jusque-là, ton BattleTag garde son état actuel.",
     ],
     links: [{ href: "/rgpd#donnees-collectees", label: "Lire « Données collectées »" }],
   },
