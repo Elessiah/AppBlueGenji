@@ -54,9 +54,9 @@ export const BATTLETAG_LOCKED = "BATTLETAG_LOCKED";
  *
  * Le rattachement seul décide — jamais le tag stocké. Un compte Battle.net qui
  * n'a donné **aucun** BattleTag reste verrouillé : ce que le joueur saisirait
- * là serait écrasé à sa prochaine connexion dès que Blizzard en nommerait un,
- * et un champ ouvert sur une valeur vouée à disparaître est un piège, pas une
- * liberté.
+ * là serait réécrit à sa prochaine connexion Battle.net (par le BattleTag de
+ * Blizzard, ou effacé s'il n'en donne toujours aucun), et un champ ouvert sur
+ * une valeur vouée à disparaître est un piège, pas une liberté.
  *
  * **Un rattachement inconnu verrouille aussi**, et ce défaut-là est le seul
  * tenable — même arbitrage que pour le tag Discord. Les deux erreurs ne se

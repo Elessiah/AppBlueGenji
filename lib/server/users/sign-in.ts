@@ -369,8 +369,8 @@ export async function createOrGetDiscordUser(
  * (`visible_overwatch`), lui, n'est pas touché : la connexion corrige une
  * donnée, elle ne publie rien.
  *
- * `null` quand le compte Battle.net n'a pas de BattleTag (ou un BattleTag
- * illisible) : le champ est alors **effacé**. Un BattleTag laissé là — tapé
+ * `null` quand le compte Battle.net n'a pas de BattleTag (absent ou vide) :
+ * le champ est alors **effacé**. Un BattleTag laissé là — tapé
  * avant le rattachement — passerait pour vérifié (`hasVerifiedBattletag` :
  * Battle.net rattaché et un BattleTag) sans que Blizzard l'ait jamais nommé.
  */

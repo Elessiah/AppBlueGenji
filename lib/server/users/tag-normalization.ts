@@ -26,9 +26,11 @@ export function normalizeDiscordHandle(raw: string | null | undefined): string |
 /**
  * Le BattleTag tel qu'il s'écrit en base, ou `null`.
  *
- * Borné à la largeur de la colonne (64), et vidé s'il est vide : un compte
- * Battle.net sans BattleTag existe, et écrire une chaîne vide par-dessus une
- * saisie du joueur serait la détruire pour rien.
+ * Borné à la largeur de la colonne (64), et `null` s'il est vide : un compte
+ * Battle.net sans BattleTag existe, et la colonne dit alors « aucun » plutôt
+ * qu'une chaîne vide. Les deux écrivains Blizzard écrivent ce `null` **par-
+ * dessus** une saisie du joueur (`writeLinkedIdentity`,
+ * `createOrGetBlizzardUser`) : gardée, elle passerait pour vérifiée.
  */
 export function normalizeBattletag(raw: string | null | undefined): string | null {
   const trimmed = (raw ?? "").trim();
