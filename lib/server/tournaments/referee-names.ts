@@ -21,6 +21,7 @@ import type { RowDataPacket } from "mysql2/promise";
 import { cached } from "@/lib/server/cache";
 import { withConnection } from "@/lib/server/database";
 import { visibleText } from "@/lib/shared/visible-text";
+import { showsRefereeName } from "@/lib/shared/match-referee";
 import type { MatchRefereeName, TournamentSnapshot } from "@/lib/shared/types";
 
 /**
@@ -73,7 +74,7 @@ type RefereeNameRow = RowDataPacket & { id: number; referee_user_id: number; pse
 export async function loadRefereeNames(snapshot: TournamentSnapshot): Promise<MatchRefereeName[]> {
   const shown = new Map<number, string>();
   for (const match of snapshot.matches) {
-    if (match.refereeKey !== null) shown.set(match.id, match.refereeKey);
+    if (showsRefereeName(match) && match.refereeKey !== null) shown.set(match.id, match.refereeKey);
   }
   if (shown.size === 0) return [];
   return cached(`referee-names:${snapshot.card.id}:${snapshot.version}`, REFEREE_NAMES_TTL_MS, async () => {

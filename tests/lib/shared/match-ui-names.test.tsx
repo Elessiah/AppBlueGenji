@@ -3,43 +3,72 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { applyLiveMessage } from "@/app/(secured)/tournois/[id]/_lib/live-state";
 import { MapScoreList } from "@/app/(secured)/tournois/[id]/_components/MapScoreList";
 import { refereeReadyRereadDue } from "@/components/match-launch/MatchContactsDialog";
-import { missingRefereeNamesKey, parseRefereeNames, refereeNameOf, refereeNamesImprove } from "@/lib/shared/match-referee";
+import { missingRefereeNamesKey, parseRefereeNames, refereeNameOf, refereeNamesImprove, showsRefereeName } from "@/lib/shared/match-referee";
 import type { MatchLaunchInfo } from "@/lib/shared/match-launch";
 import { matchMapNames, type RoundMapConfig } from "@/lib/shared/round-maps";
 import { bracketMatch } from "../../helpers/bracket-match";
 import { tournamentDetail, tournamentSnapshot } from "../../helpers/tournament-detail";
 import { readSource } from "../../helpers/read-source";
 import type { FieldErrors } from "@/lib/shared/hooks/useFieldErrors";
+import type { MatchStatus } from "@/lib/shared/types";
 
 /** Noms de cartes, d'arbitre et de chaînes sur les matchs (MATCH-UI-NAMES). */
 
 const NAMES = [{ matchId: 5, refereeKey: "k5", pseudo: "Juge" }];
 
+/** Match d'un instantané, réduit à ce qui décide du pseudo d'arbitre. */
+function shown(id: number, refereeKey: string | null, status: MatchStatus = "READY") {
+  return { id, refereeKey, status };
+}
+
+describe("showsRefereeName", () => {
+  it("showsRefereeName_readyWithKey_returnsTrue", () => {
+    expect(showsRefereeName(shown(5, "k5", "READY"))).toBe(true);
+  });
+
+  // Score déclaré : les membres relisent « Arbitre désigné » (textes RGPD).
+  it("showsRefereeName_awaitingConfirmationWithKey_returnsFalse", () => {
+    expect(showsRefereeName(shown(5, "k5", "AWAITING_CONFIRMATION"))).toBe(false);
+  });
+
+  it("showsRefereeName_readyNullKey_returnsFalse", () => {
+    expect(showsRefereeName(shown(5, null, "READY"))).toBe(false);
+  });
+});
+
 describe("refereeNameOf", () => {
+  it("refereeNameOf_awaitingConfirmationMatchingKey_returnsNull", () => {
+    expect(refereeNameOf(shown(5, "k5", "AWAITING_CONFIRMATION"), NAMES)).toBeNull();
+  });
+
   it("refereeNameOf_nullKey_returnsNull", () => {
-    expect(refereeNameOf({ id: 5, refereeKey: null }, NAMES)).toBeNull();
+    expect(refereeNameOf(shown(5, null), NAMES)).toBeNull();
   });
 
   it("refereeNameOf_matchingIdAndKey_returnsPseudo", () => {
-    expect(refereeNameOf({ id: 5, refereeKey: "k5" }, NAMES)).toBe("Juge");
+    expect(refereeNameOf(shown(5, "k5"), NAMES)).toBe("Juge");
   });
 
   it("refereeNameOf_staleKey_returnsNull", () => {
-    expect(refereeNameOf({ id: 5, refereeKey: "k-nouveau" }, NAMES)).toBeNull();
+    expect(refereeNameOf(shown(5, "k-nouveau"), NAMES)).toBeNull();
   });
 });
 
 describe("missingRefereeNamesKey", () => {
+  it("missingRefereeNamesKey_awaitingConfirmationWithoutName_isNotMissing", () => {
+    expect(missingRefereeNamesKey([shown(6, "k6", "AWAITING_CONFIRMATION")], NAMES)).toBe("");
+  });
+
   it("missingRefereeNamesKey_allNamed_returnsEmptyString", () => {
-    expect(missingRefereeNamesKey([{ id: 5, refereeKey: "k5" }], NAMES)).toBe("");
+    expect(missingRefereeNamesKey([shown(5, "k5")], NAMES)).toBe("");
   });
 
   it("missingRefereeNamesKey_someMissing_joinsIdKeyPairsSkippingNullKeys", () => {
     const matches = [
-      { id: 5, refereeKey: "k5" },
-      { id: 6, refereeKey: "k6" },
-      { id: 7, refereeKey: null },
-      { id: 8, refereeKey: "k8" },
+      shown(5, "k5"),
+      shown(6, "k6"),
+      shown(7, null),
+      shown(8, "k8"),
     ];
 
     expect(missingRefereeNamesKey(matches, NAMES)).toBe("6:k6,8:k8");
@@ -47,7 +76,7 @@ describe("missingRefereeNamesKey", () => {
 });
 
 describe("refereeNamesImprove", () => {
-  const shownB = [{ id: 5, refereeKey: "kB" }];
+  const shownB = [shown(5, "kB")];
   const namedA = [{ matchId: 5, refereeKey: "kA", pseudo: "Ancien" }];
   const namedB = [{ matchId: 5, refereeKey: "kB", pseudo: "Nouveau" }];
 
@@ -64,7 +93,7 @@ describe("refereeNamesImprove", () => {
   });
 
   it("refereeNamesImprove_matchesWithoutReferee_returnsFalse", () => {
-    expect(refereeNamesImprove([{ id: 5, refereeKey: null }], [], namedB)).toBe(false);
+    expect(refereeNamesImprove([shown(5, null)], [], namedB)).toBe(false);
   });
 });
 
@@ -140,7 +169,7 @@ describe("refereeReadyRereadDue", () => {
 describe("applyLiveMessage — pseudos d'arbitre", () => {
   it("applyLiveMessage_snapshot_keepsPreviousRefereeNames", () => {
     const state = { detail: tournamentDetail({ version: "v1", refereeNames: NAMES }), tier: "STANDARD" as const };
-    const snapshot = tournamentSnapshot({ version: "v2", matches: [bracketMatch({ id: 5, refereeKey: "k5" })] });
+    const snapshot = tournamentSnapshot({ version: "v2", matches: [bracketMatch(shown(5, "k5"))] });
 
     const next = applyLiveMessage(state, { type: "snapshot", tournamentId: snapshot.card.id, version: "v2", snapshot });
 

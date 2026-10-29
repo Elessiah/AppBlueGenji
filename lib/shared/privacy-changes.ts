@@ -1275,7 +1275,8 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "La date à laquelle ton opposition a été retenue est gardée sur ton compte jusqu'à sa levée ou la suppression du compte, et figure dans l'export de tes données. Le journal du staff sur Discord note le geste et sa levée sans nommer personne ni les matchs retirés ; le membre du staff qui l'a fait, l'identifiant de ton compte et le nombre de matchs retirés ne figurent que dans les journaux du serveur.",
       "Si tu joues ou castes un match : son arbitre peut ainsi changer avant ou pendant le match ; le nouvel arbitre t'est présenté comme le précédent.",
     ],
-  },  {
+  },
+  {
     id: "2026-10-pseudo-arbitre-aux-membres",
     publishedAt: "2026-10-31",
     title: "Le pseudo de l'arbitre d'un match se lit par tous les membres connectés",

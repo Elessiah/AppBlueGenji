@@ -19,6 +19,7 @@
  */
 import type { CasterIdentity } from "./match-launch";
 import { visibleText } from "./visible-text";
+import type { MatchStatus } from "./types";
 
 /** Ce qui empêche un compte d'arbitrer un match. */
 export type RefereeBlock = "NOT_REFEREE" | "REFEREE_IDENTITY_REQUIRED";
@@ -144,16 +145,30 @@ export function groupNoRefereeAlerts(candidates: readonly NoRefereeCandidate[]):
 /** Pseudo d'arbitre lié à l'empreinte de sa désignation (`TournamentViewerContext.refereeNames`). */
 type RefereeNameEntry = { matchId: number; refereeKey: string; pseudo: string };
 
+/** Ce qu'il faut d'un match pour savoir s'il nomme son arbitre. */
+type RefereeNamedMatch = { id: number; refereeKey: string | null; status: MatchStatus };
+
+/**
+ * Ce match nomme-t-il son arbitre aux membres (décision 52) ? Désignation
+ * montrée (empreinte non nulle) **et** score pas encore déclaré
+ * (`PENDING`/`READY`) : textes RGPD « jusqu'à la déclaration de son score ou
+ * la fin du tournoi ». L'empreinte, elle, reste jusqu'à la fin du match pour
+ * la fenêtre « Contacts ».
+ */
+export function showsRefereeName(match: RefereeNamedMatch): boolean {
+  return match.refereeKey !== null && (match.status === "PENDING" || match.status === "READY");
+}
+
 /**
  * Pseudo de l'arbitre à montrer sur ce match (décision 52), `null` pour lire
  * « Arbitre désigné » : sans arbitre montré, sur la page sans compte (empreinte
  * nulle), ou quand le pseudo connu est celui d'une autre désignation.
  */
 export function refereeNameOf(
-  match: { id: number; refereeKey: string | null },
+  match: RefereeNamedMatch,
   names: readonly RefereeNameEntry[],
 ): string | null {
-  if (match.refereeKey === null) return null;
+  if (!showsRefereeName(match)) return null;
   const entry = names.find((name) => name.matchId === match.id && name.refereeKey === match.refereeKey);
   return entry ? entry.pseudo : null;
 }
@@ -164,24 +179,24 @@ export function refereeNameOf(
  * des pseudos ; la même ne la relance pas (pseudo vide, lecture en retard).
  */
 export function missingRefereeNamesKey(
-  matches: readonly { id: number; refereeKey: string | null }[],
+  matches: readonly RefereeNamedMatch[],
   names: readonly RefereeNameEntry[],
 ): string {
   const missing: string[] = [];
   for (const match of matches) {
-    if (match.refereeKey !== null && refereeNameOf(match, names) === null) missing.push(`${match.id}:${match.refereeKey}`);
+    if (showsRefereeName(match) && refereeNameOf(match, names) === null) missing.push(`${match.id}:${match.refereeKey}`);
   }
   return missing.join(",");
 }
 
 /** Nombre de désignations montrées dont le pseudo manque dans `names`. */
 function missingRefereeNamesCount(
-  matches: readonly { id: number; refereeKey: string | null }[],
+  matches: readonly RefereeNamedMatch[],
   names: readonly RefereeNameEntry[],
 ): number {
   let missing = 0;
   for (const match of matches) {
-    if (match.refereeKey !== null && refereeNameOf(match, names) === null) missing += 1;
+    if (showsRefereeName(match) && refereeNameOf(match, names) === null) missing += 1;
   }
   return missing;
 }
@@ -193,7 +208,7 @@ function missingRefereeNamesCount(
  * d'une reconnexion) n'écrase ainsi jamais une liste plus à jour.
  */
 export function refereeNamesImprove(
-  matches: readonly { id: number; refereeKey: string | null }[],
+  matches: readonly RefereeNamedMatch[],
   current: readonly RefereeNameEntry[],
   incoming: readonly RefereeNameEntry[],
 ): boolean {

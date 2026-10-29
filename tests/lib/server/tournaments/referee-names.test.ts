@@ -80,6 +80,15 @@ describe("loadRefereeNames", () => {
     expect(names).toEqual([]);
   });
 
+  it("loadRefereeNames_onlyScoreDeclaredMatches_returnsEmptyWithoutQuery", async () => {
+    const names = await loadRefereeNames(
+      snapshotWith(bracketMatch({ id: 5, status: "AWAITING_CONFIRMATION", refereeKey: refereeKey(5, 9) })),
+    );
+
+    expect(names).toEqual([]);
+    expect(connection.query).not.toHaveBeenCalled();
+  });
+
   it("loadRefereeNames_blankOrInvisiblePseudo_isSkipped", async () => {
     rows({ id: 5, referee_user_id: 9, pseudo: "\u200B\u200B" });
 

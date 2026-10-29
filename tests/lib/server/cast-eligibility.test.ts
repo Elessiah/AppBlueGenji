@@ -175,11 +175,11 @@ describe("mapMatch — arbitre désigné dans l'instantané (`docs/features/MATC
     expect(match.refereeKey).toMatch(/^[\w-]{16}$/);
   });
 
-  // Score déclaré : le match est joué, les membres relisent « Arbitre désigné ».
-  it("mapMatchLaunch_awaitingConfirmationMatch_hasNullRefereeKey", () => {
+  // Score déclaré : l'empreinte reste (relève de la fenêtre « Contacts ») ;
+  // c'est `showsRefereeName` qui tait le pseudo aux membres.
+  it("mapMatchLaunch_awaitingConfirmationMatch_keepsRefereeKey", () => {
     const match = mapMatch(row({ ...eligible, status: "AWAITING_CONFIRMATION" }));
-    expect(match.refereeKey).toBeNull();
-    expect(match.refereeAssigned).toBe(true);
+    expect(match.refereeKey).toMatch(/^[\w-]{16}$/);
   });
 
   it("tait un arbitre qui ne remplit plus la condition, et son « Prêt » d'un autre appariement", () => {

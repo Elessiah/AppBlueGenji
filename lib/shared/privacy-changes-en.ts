@@ -653,7 +653,8 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "The date your objection was upheld is kept on your account until it is lifted or the account is deleted, and is included in your data export. The staff log on Discord notes the action and its lifting without naming anyone or the matches removed; the staff member who took it, your account identifier and the number of matches removed only appear in the server logs.",
       "If you play or cast a match: its referee may thus change before or during the match; the new referee is presented to you like the previous one.",
     ],
-  },  "2026-10-pseudo-arbitre-aux-membres": {
+  },
+  "2026-10-pseudo-arbitre-aux-membres": {
     title: "A match referee's username can be read by all signed-in members",
     linkLabels: ["Read the “Assigned referee of a match” paragraph"],
     summary:
