@@ -347,18 +347,20 @@ qui porte le premier lien du match, puisque c'est le lien de sa chaîne.
 Dans les deux cas, **chaque lien qu'il a fourni** (`bg_match_streams.link_user_id`,
 posé à l'ouverture de son stream, ou dans la configuration du direct par un
 compte sans la permission `tournaments` — un caster à la seule permission
-`live` —, ou par un membre de l'organisation qui caste ce match : sa propre
-chaîne) est retiré, matchs joués compris et même d'un stream qu'un co-caster
+`live` —, ou par un membre de l'organisation qui **décoche** « Ce lien est celui de
+l'organisation » : sa propre chaîne) est retiré, matchs joués compris et même d'un stream qu'un co-caster
 tient encore : le stream reste à ce co-caster, sans lien. Le lien de
-l'organisation (`link_user_id` nul : posé par un membre de l'organisation qui
-ne caste pas ce match) n'est jamais touché. Qu'il caste se lit sous le verrou
-du match, au moment où il pose le lien (`linkProvider`, `live-streams.ts`) :
-qui s'inscrit après ne reprend pas un lien déjà posé, qui quitte le match garde
-le sien. Un réglage du direct réenregistré avec le même lien ne change pas son
-fournisseur ; un lien neuf prend celui qui le pose. Limite : un lien posé avant
+l'organisation (`link_user_id` nul : posé par un membre de l'organisation avec la
+case cochée, valeur par défaut) n'est jamais touché, **même si ce membre caste le
+match** : la provenance se *dit* (`MatchLiveSetter.asOrganisation`, champ
+`organisationLink` du PUT, 403 sans la permission `tournaments`), elle ne se déduit
+plus de l'inscription (décision 48, EF-29). Un réglage du direct
+réenregistré avec le même lien ne change pas son fournisseur ; un lien neuf prend
+celui que dit celui qui le pose. Limite : un lien posé avant
 `link_user_id` (ancien `live_url`, migré en stream du staff) n'a pas de
 fournisseur connu — impossible à retrouver — et reste comme lien de
-l'organisation.
+l'organisation. Les liens posés avant EF-29 par un membre qui castait le match
+gardent le fournisseur que l'ancienne règle leur avait donné.
 
 ## Casters et streams
 
@@ -427,6 +429,24 @@ qu'il tient, son « Prêt »). Code : `lib/server/tournaments/match-casters.ts`.
   porte un lien (gardé au match). Le lien d'un stream de caster est rattaché à
   qui l'a fourni (`link_user_id`) : la suppression de son compte le retire
   (`withdrawUserCasts`), même quand un co-caster garde le stream.
+- **Lancement** : un caster qui ne remplit plus la condition du cast est retiré, avec le
+  stream qu'il était seul à tenir, **dans la transaction qui décide du décompte des « Prêt » ou
+  du lancement** (`releaseIneligibleCasters` : « Prêt » d'un autre, lancement forcé, entretien) —
+  le match n'attend plus un « Prêt » qui ne viendra pas, et un lancement d'office ne rend pas
+  publics son pseudo ni le lien de sa chaîne. Un match déjà lancé garde ses casters. Retirer un
+  caster d'un match **joué** est refusé (`MATCH_ALREADY_COMPLETED`, 409) ; un retrait qui ne
+  retire rien ne publie rien. L'éligibilité des co-casters se relit, à l'inscription, en une
+  lecture courante par lot (`LOCK IN SHARE MODE`).
+- **Règle « stream montré »** : `shownStreams` / `firstStreamUrl` (`lib/shared/live-streams.ts`)
+  sont lus par l'instantané (`mapMatch`, premier lien tiré des streams — plus de sous-requête par
+  match dans `getMatchRows`) et par l'inscription ; l'accueil et l'annonce #live la rejouent en
+  SQL (`firstStreamUrlSql`, `CAST_ELIGIBLE_SQL`), un test garde les conditions alignées.
+- **Verrous** : le verrou du match, pris en première instruction, rend la lecture ordinaire des
+  casters et des streams suffisante (`lockLaunchMatch`, `held`) — pas de `FOR UPDATE` sur un
+  intervalle vide partagé par les matchs voisins ; l'entretien et l'autogestion d'une manche, qui
+  lisent avant le verrou, gardent la lecture verrouillante. `pruneMatchStreams` ne relit pas ce
+  que l'appelant tient déjà. `PUT /api/admin/matches/:id/live` applique `canConfigureLive` côté
+  serveur (`MATCH_NOT_CASTABLE`, 409).
 - **Interblocages** : inscription, retrait et retrait d'office se rejouent sur
   un interblocage d'InnoDB (`retryOnDeadlock`) ; tout geste qui touche les
   casters verrouille d'abord la ligne du match (`setRefereeScheduling` compris).
