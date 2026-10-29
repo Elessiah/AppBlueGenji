@@ -1,7 +1,12 @@
 import { describe, expect, it } from "@jest/globals";
 import { DEFAULT_ENDURANCE_CONFIG } from "@/lib/shared/bg-survie/config";
 import type { EnduranceMatchOutcome } from "@/lib/shared/bg-survie/match-outcome";
-import { replayEnduranceDetailed, type ReplayEnduranceInput } from "@/lib/shared/bg-survie/replay";
+import {
+  enduranceRecordAfterRound,
+  replayEnduranceDetailed,
+  type EnduranceRoundCell,
+  type ReplayEnduranceInput,
+} from "@/lib/shared/bg-survie/replay";
 
 /**
  * Rang et bilan **par manche** posés par le rejeu sur chaque case
@@ -114,7 +119,10 @@ describe("replayEnduranceDetailed — rang et bilan par manche", () => {
       forfeits: [{ teamId: 1, round: 2 }],
     });
     expect(history.get(1)?.[0]?.rank).toBe(1);
-    expect(history.get(1)?.[1]).toMatchObject({ kind: "FORFEIT", rank: 4, wins: 1 });
+    expect(history.get(1)?.[1]).toMatchObject({ kind: "FORFEIT", rank: 4 });
+    // Le forfait ne bouge pas le bilan : la case ne le réécrit pas, il se reporte.
+    expect(history.get(1)?.[1]).not.toHaveProperty("wins");
+    expect(enduranceRecordAfterRound(history.get(1) ?? [], 2)).toEqual({ wins: 1, losses: 0, draws: 0 });
   });
 
   it("fait descendre une équipe pénalisée dès la manche de la sanction", () => {
@@ -135,7 +143,10 @@ describe("replayEnduranceDetailed — rang et bilan par manche", () => {
     });
     const cells = history.get(2) ?? [];
     expect(cells[2]).toMatchObject({ kind: "POINTS", points: 0, rank: 4, losses: 3 });
-    expect(cells[3]).toMatchObject({ kind: "OUT", rank: 4, losses: 3 });
+    expect(cells[3]).toMatchObject({ kind: "OUT", rank: 4 });
+    expect(cells[3]).not.toHaveProperty("wins");
+    expect(cells[3]).not.toHaveProperty("losses");
+    expect(enduranceRecordAfterRound(cells, 4)).toEqual({ wins: 0, losses: 3, draws: 0 });
   });
 
   it("écarte en sortie anticipée sans perdre le rang", () => {
@@ -146,5 +157,79 @@ describe("replayEnduranceDetailed — rang et bilan par manche", () => {
     });
     expect(history.get(3)?.[1]?.rank).toBeGreaterThan(2);
     expect(history.get(1)?.[1]?.rank).toBe(1);
+  });
+});
+
+describe("bilan des cases non jouées (instantané allégé)", () => {
+  it("une case jouée écrit toujours son bilan, même s'il n'a pas bougé (exemption)", () => {
+    const { history } = replay({
+      teams: teams(3),
+      lastRound: 2,
+      matches: [win(1, 1, 2), win(2, 1, 3)],
+    });
+    // Équipe 3 : exemptée en manche 1, perd en manche 2 ; équipe 1 : victoires aux deux.
+    expect(history.get(3)?.[0]).toMatchObject({ kind: "POINTS", wins: 0, losses: 0 });
+    expect(history.get(1)?.[1]).toMatchObject({ kind: "POINTS", wins: 2 });
+  });
+
+  it("sortie : la case répétant le bilan l'omet, avec le rang", () => {
+    const { history } = replay({
+      lastRound: 4,
+      matches: [win(1, 1, 2), win(2, 1, 2), win(3, 1, 2), win(4, 1, 3)],
+    });
+    const out = history.get(2)?.[3];
+    expect(out).toEqual({ round: 4, kind: "OUT", points: null, rank: 4 });
+  });
+
+  it("les nuls déjà cumulés se reportent aussi", () => {
+    const { history } = replay({
+      lastRound: 2,
+      matches: [{ round: 1, completed: true, winnerTeamId: null, loserTeamId: null, drawTeamIds: [1, 2], drawMaps: 1 }],
+      forfeits: [{ teamId: 1, round: 2 }],
+    });
+    const cells = history.get(1) ?? [];
+    expect(cells[1]).toMatchObject({ kind: "FORFEIT" });
+    expect(cells[1]).not.toHaveProperty("draws");
+    expect(enduranceRecordAfterRound(cells, 2)).toEqual({ wins: 0, losses: 0, draws: 1 });
+  });
+
+  it("un forfait qui change le bilan réécrit la case", () => {
+    const { history } = replay({ lastRound: 1, matches: [], forfeits: [{ teamId: 1, round: 1 }] });
+    const cell = history.get(2)?.[0];
+    expect(cell).toMatchObject({ kind: "POINTS" });
+    const forfeited = history.get(1)?.[0];
+    expect(forfeited).toMatchObject({ kind: "FORFEIT", wins: 0, losses: 0 });
+  });
+});
+
+describe("enduranceRecordAfterRound", () => {
+  const cell = (round: number, extra: Partial<EnduranceRoundCell>): EnduranceRoundCell => ({
+    round,
+    kind: "POINTS",
+    points: 9,
+    ...extra,
+  });
+
+  it("lit le bilan de la case de la manche", () => {
+    const cells = [cell(1, { wins: 1, losses: 0 }), cell(2, { wins: 1, losses: 1, draws: 2 })];
+    expect(enduranceRecordAfterRound(cells, 2)).toEqual({ wins: 1, losses: 1, draws: 2 });
+  });
+
+  it("case sans bilan : reporte celui de la dernière case antérieure qui le porte", () => {
+    const cells = [cell(1, { wins: 1, losses: 2 }), cell(2, { kind: "OUT", points: null }), cell(3, { kind: "OUT", points: null })];
+    expect(enduranceRecordAfterRound(cells, 3)).toEqual({ wins: 1, losses: 2, draws: 0 });
+  });
+
+  it("manche absente de l'instantané : zéros", () => {
+    expect(enduranceRecordAfterRound([cell(1, { wins: 1, losses: 0 })], 5)).toEqual({ wins: 0, losses: 0, draws: 0 });
+  });
+
+  it("ancien format sans aucun bilan : zéros", () => {
+    expect(enduranceRecordAfterRound([cell(1, {}), cell(2, {})], 2)).toEqual({ wins: 0, losses: 0, draws: 0 });
+  });
+
+  it("ne reporte jamais un bilan d'une manche postérieure", () => {
+    const cells = [cell(1, { kind: "OUT", points: null }), cell(2, { wins: 3, losses: 0 })];
+    expect(enduranceRecordAfterRound(cells, 1)).toEqual({ wins: 0, losses: 0, draws: 0 });
   });
 });
