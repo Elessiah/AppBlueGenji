@@ -1485,6 +1485,7 @@ function TournamentSheetView({
       {certificationPrompt.prompt && (
         <CertificationPromptDialog
           prompt={certificationPrompt.prompt}
+          neverAgain={certificationPrompt.neverAgain}
           onNeverAgainChange={certificationPrompt.setNeverAgain}
           onClose={certificationPrompt.close}
         />

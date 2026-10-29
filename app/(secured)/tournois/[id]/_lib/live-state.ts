@@ -64,6 +64,9 @@ function parseCertificationPromptMessage(message: Record<string, unknown>): Live
       discordVerified: prompt.discordVerified === true,
       battletagVerified: prompt.battletagVerified === true,
       battletagRelevant: prompt.battletagRelevant === true,
+      // Absent (serveur d'avant le champ) : pas d'alerte « équipe injoignable »
+      // au meneur ; le motif `TEAM_WITHOUT_CONTACT` la porte toujours.
+      teamHasContact: prompt.reason === "MANAGER" && prompt.teamHasContact !== false,
     },
   };
 }

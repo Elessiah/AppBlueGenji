@@ -73,11 +73,11 @@ export function useCertificationPrompt(
   viewerUserId: number | null,
 ) {
   const [open, setOpen] = useState(false);
-  // Case « Ne plus voir » : tenue ici pour valoir aussi quand la modale
-  // s'efface, mais dans une référence — la cocher ne relance pas le rendu de
-  // toute la fiche, ni les rappels ci-dessous (l'affichage de la case est
-  // l'état local de la modale).
-  const neverAgain = useRef(false);
+  // Case « Ne plus voir » : son seul état, tenu ici pour valoir aussi quand la
+  // modale s'efface devant une urgente. La modale l'affiche (case, libellé
+  // « Fermer » du bouton) ; la cocher rend la fiche une fois, comme un
+  // instantané du flux.
+  const [neverAgain, setNeverAgain] = useState(false);
   const decided = useRef(false);
   // Le compte à qui la modale a été montrée, retenu à l'ouverture : c'est lui,
   // pas la session du moment, que « Ne plus voir » désigne.
@@ -103,7 +103,7 @@ export function useCertificationPrompt(
   useEffect(() => {
     decided.current = false;
     doneForPage.current = false;
-    neverAgain.current = false;
+    setNeverAgain(false);
     setOpen(false);
   }, [tournamentId]);
 
@@ -122,10 +122,10 @@ export function useCertificationPrompt(
 
   const close = useCallback(() => {
     rememberCertificationPromptClosed(browserStorage("sessionStorage"));
-    if (neverAgain.current) void saveNeverAgain(shownTo.current);
+    if (neverAgain) void saveNeverAgain(shownTo.current);
     doneForPage.current = true;
     setOpen(false);
-  }, []);
+  }, [neverAgain]);
 
   // S'effacer devant une modale urgente, sans rien retenir dans le navigateur —
   // l'invitation n'a peut-être pas été lue — mais pour le reste de la page :
@@ -134,10 +134,10 @@ export function useCertificationPrompt(
   // « Ne plus voir » déjà cochée vaut pourtant : gardée sur le compte, sans le
   // drapeau d'onglet d'une fermeture.
   const yieldPlace = useCallback(() => {
-    if (neverAgain.current) void saveNeverAgain(shownTo.current);
+    if (neverAgain) void saveNeverAgain(shownTo.current);
     doneForPage.current = true;
     setOpen(false);
-  }, []);
+  }, [neverAgain]);
 
   // Invitation retirée (certifiée entre-temps, lecture en échec) : la modale se
   // ferme sans rien retenir, et la décision reprend à son retour — autre
@@ -161,23 +161,21 @@ export function useCertificationPrompt(
     return watchUrgentModalOpened(yieldPlace);
   }, [shown, yieldPlace]);
 
-  const setNeverAgain = useCallback((value: boolean) => {
-    neverAgain.current = value;
-  }, []);
-
   // Même contenu, même objet : une relecture REST en renvoie un neuf, et la
   // modale mémoïsée ne doit pas se rendre pour rien.
   const reason = prompt?.reason;
   const discordVerified = prompt?.discordVerified === true;
   const battletagVerified = prompt?.battletagVerified === true;
   const battletagRelevant = prompt?.battletagRelevant === true;
+  const teamHasContact = prompt?.teamHasContact === true;
   const stablePrompt = useMemo<CertificationPrompt | null>(
-    () => (reason ? { reason, discordVerified, battletagVerified, battletagRelevant } : null),
-    [reason, discordVerified, battletagVerified, battletagRelevant],
+    () => (reason ? { reason, discordVerified, battletagVerified, battletagRelevant, teamHasContact } : null),
+    [reason, discordVerified, battletagVerified, battletagRelevant, teamHasContact],
   );
 
   return {
     prompt: shown ? stablePrompt : null,
+    neverAgain,
     setNeverAgain,
     close,
   };

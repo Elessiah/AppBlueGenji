@@ -1,0 +1,13 @@
+/* Cadre des modales de la fiche tournoi (TournamentDialogFrame.tsx). */
+
+/* Le cadre peut porter le focus (focus d'ouverture `initialFocus="container"`,
+   clic sur son texte) : un anneau bleu de la charte le montre au clavier
+   (`:focus-visible`), jamais au clic — comme `DiscordCertifyPrompt`. */
+.frame:focus {
+  outline: none;
+}
+
+.frame:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: -2px;
+}
