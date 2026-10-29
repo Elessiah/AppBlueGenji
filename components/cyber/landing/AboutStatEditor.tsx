@@ -46,7 +46,7 @@ const VALUE_EN_STALE_TEXT =
 /** Entrée dans un champ d'une ligne : passe au champ suivant (touche « Suivant » du clavier mobile comprise). */
 function focusNextOnEnter(nextId: string) {
   return (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key !== "Enter") return;
+    if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
     e.preventDefault();
     document.getElementById(nextId)?.focus();
   };

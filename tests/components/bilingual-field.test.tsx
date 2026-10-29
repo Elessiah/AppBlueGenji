@@ -132,6 +132,7 @@ describe("refus d'anglais — un code, un champ, la phrase de l'éditeur des tex
     expect(ad.ok ? null : fieldForError(ad.error, RECRUITMENT_FIELD_ERRORS)).toBe("rolesEn");
     expect(englishErrorMessage(ad.ok ? null : ad.error)).toBe("La traduction anglaise est requise.");
   });
+});
 
 describe("BilingualField — lecture seule pendant l'envoi", () => {
   function renderReadOnly(readOnly: boolean | undefined): string {
@@ -156,5 +157,4 @@ describe("BilingualField — lecture seule pendant l'envoi", () => {
   it("par défaut, les champs restent modifiables", () => {
     expect(renderReadOnly(undefined)).not.toContain("readonly");
   });
-});
 });
