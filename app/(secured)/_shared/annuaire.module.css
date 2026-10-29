@@ -231,6 +231,37 @@
 .chipOn .num {
   color: var(--g-300, var(--blue-300));
 }
+/* Puce inerte (rôle sous un filtre « sans roster ») : couleurs éteintes, jamais d'opacité. */
+.chip[aria-disabled="true"],
+.chip[aria-disabled="true"]:hover {
+  color: var(--ink-dim);
+  border-style: dashed;
+  border-color: rgba(180, 210, 230, 0.18);
+  background: transparent;
+  cursor: not-allowed;
+}
+
+/* Compteur, séparateur et pastilles de statut de l'annuaire des joueurs. */
+.statusRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  align-items: center;
+}
+.statusSep { color: var(--ink-faint); }
+.statusOpts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  align-items: center;
+}
+/* Sous 720 px, les pastilles passent à la ligne : le « · » resterait pendant
+   en fin de première ligne. */
+@media (max-width: 719px) {
+  .statusSep {
+    display: none;
+  }
+}
 
 /* sort row */
 .sortRow {
@@ -299,6 +330,15 @@
   color: var(--ink-mute);
   outline: 2px solid var(--g-300, var(--blue-300));
   outline-offset: 2px;
+}
+/* Inerte sous un filtre qui écarte déjà les comptes supprimés : couleurs
+   éteintes, jamais d'opacité. */
+.deletedToggle[aria-disabled="true"],
+.deletedToggle[aria-disabled="true"]:hover {
+  color: var(--ink-dim);
+  border: 1px dashed rgba(180, 210, 230, 0.18);
+  background: transparent;
+  cursor: not-allowed;
 }
 .deletedToggleOn,
 .deletedToggleOn:hover {

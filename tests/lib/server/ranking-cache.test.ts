@@ -6,8 +6,11 @@ import {
   RANKING_LIST_KEY_PREFIX,
   cachedRanking,
   invalidateRankingLists,
+  invalidateTeamIdentityViews,
   invalidateTeamRanking,
 } from "@/lib/server/ranking-cache";
+import { LANDING_TICKER_KEY } from "@/lib/server/landing-cache";
+import { cachedShareImage, clearShareImageCache } from "@/lib/server/share-image-cache";
 
 /**
  * Les deux invalidateurs du classement : `invalidateTeamRanking` (un score
@@ -79,5 +82,68 @@ describe("cache du classement", () => {
     for (const path of ["lib/server/podium-tiers.ts", "lib/server/share-podium.ts", "lib/server/share-team.ts"]) {
       expect(readFileSync(path, "utf8")).toMatch(/cachedRanking\(`\$\{RANKING_LIST_KEY_PREFIX\}/);
     }
+  });
+});
+
+describe("invalidateTeamIdentityViews", () => {
+  beforeEach(() => {
+    clearCache();
+    clearShareImageCache();
+  });
+  afterEach(() => {
+    clearCache();
+    clearShareImageCache();
+  });
+
+  const png = () => new Response("png", { headers: { "cache-control": "public, max-age=60" } });
+
+  it("invalidateTeamIdentityViews_listEntry_reloads", async () => {
+    const loader = jest.fn(async () => "identités");
+    await cachedRanking(`${RANKING_LIST_KEY_PREFIX}identities`, loader);
+
+    invalidateTeamIdentityViews();
+    await cachedRanking(`${RANKING_LIST_KEY_PREFIX}identities`, loader);
+
+    expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  it("invalidateTeamIdentityViews_replayState_staysCached", async () => {
+    const loader = jest.fn(async () => "rejeu");
+    await cachedRanking("state:all:all", loader);
+
+    invalidateTeamIdentityViews();
+    await cachedRanking("state:all:all", loader);
+
+    expect(loader).toHaveBeenCalledTimes(1);
+  });
+
+  it("invalidateTeamIdentityViews_landingTicker_reloads", async () => {
+    const loader = jest.fn(async () => "bandeau");
+    await cachedLanding(LANDING_TICKER_KEY, LANDING_TTL_MS, loader);
+
+    invalidateTeamIdentityViews();
+    await cachedLanding(LANDING_TICKER_KEY, LANDING_TTL_MS, loader);
+
+    expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  it("invalidateTeamIdentityViews_rankingShareImage_rendersAgain", async () => {
+    const build = jest.fn(async () => png());
+    await cachedShareImage("fr:team:4", 60_000, build, "team", true);
+
+    invalidateTeamIdentityViews();
+    await cachedShareImage("fr:team:4", 60_000, build, "team", true);
+
+    expect(build).toHaveBeenCalledTimes(2);
+  });
+
+  it("invalidateTeamRanking_rankingShareImage_rendersAgain", async () => {
+    const build = jest.fn(async () => png());
+    await cachedShareImage("fr:podium", 60_000, build, "fixed", true);
+
+    invalidateTeamRanking();
+    await cachedShareImage("fr:podium", 60_000, build, "fixed", true);
+
+    expect(build).toHaveBeenCalledTimes(2);
   });
 });

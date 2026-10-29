@@ -127,6 +127,11 @@ qui y mènent. Demandes et invitations en attente se lisent d'un seul appel
   dissolution** au propriétaire ; **logo** à toute la gestion. Le formulaire
   complet s'affichait à un manager, dont chaque enregistrement finissait en
   `FORBIDDEN` : il voit désormais le logo et une phrase.
+- **Logo** : « Retirer le logo » passe par `ConfirmActionDialog` (geste sans
+  retour, le fichier est supprimé). L'ancien chemin est relu sous verrou par
+  `updateTeamLogo` (transaction, `FOR UPDATE`), qui le rend à la route : deux
+  envois croisés ne suppriment plus le fichier du logo gardé. Un renommage
+  réussi appelle `router.refresh()` (le nom figure dans la navigation).
 - « Enregistrer » n'est actif que si quelque chose a changé et que la saisie est
   valide ; « Annuler les modifications » apparaît dès qu'il y a une modification.
 - **Le renommage est validé** (`lib/shared/team-name.ts`, partagé avec la

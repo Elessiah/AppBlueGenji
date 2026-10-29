@@ -34,7 +34,7 @@
 
 import type { Pool, PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "./database";
-import { cachedRanking } from "./ranking-cache";
+import { cachedRanking, RANKING_LIST_KEY_PREFIX } from "./ranking-cache";
 import {
   baseRankedTeamState,
   compareRankedTeams,
@@ -368,14 +368,57 @@ export async function loadRankingState(
  * pour les entrées solo — rejouées, hors liste.
  */
 export async function loadTeamRanking(options: TeamRankingOptions = {}): Promise<TeamRankingRow[]> {
-  const db = options.connection ?? (await getDatabase());
-  const states = await loadRankingState(options);
+  return (await loadTeamRankingSnapshot(options)).rows;
+}
 
-  const [teams] = await db.execute<TeamIdentityRow[]>(
-    `SELECT id, name, logo_url
-     FROM bg_teams
-     WHERE solo_user_id IS NULL AND deleted_at IS NULL`,
-  );
+/**
+ * La liste du classement **et** l'état rejoué dont elle sort : une seule photo.
+ *
+ * Pour les vues qui lisent aussi la cote d'une équipe **hors liste** (sans
+ * match compté, dissoute) : relire l'état à part pouvait tomber sur une autre
+ * photo qu'une invalidation aurait glissée entre les deux lectures, et relancer
+ * un second rejeu complet pour une seule fiche. Leur cote se lit par
+ * {@link rankingPointsOf}.
+ */
+export type TeamRankingSnapshot = {
+  rows: TeamRankingRow[];
+  states: Map<number, RankedTeamState>;
+};
+
+/** Clé des identités de la liste (`ranking:list:identities`), vidée avec la liste. */
+const RANKING_IDENTITIES_KEY = `${RANKING_LIST_KEY_PREFIX}identities`;
+
+/**
+ * Identité des équipes que la liste peut montrer (ni solo, ni dissoute).
+ *
+ * Mutualisée comme le rejeu quand la lecture l'est (`shared`) : `/classement`
+ * la lisait deux fois par rendu, chaque fiche une fois, sans cache. Elle vit
+ * sous `ranking:list:` — vidée à chaque score (`invalidateTeamRanking`) et à
+ * chaque écriture d'identité (`invalidateTeamIdentityViews` : nom, logo,
+ * dissolution).
+ */
+async function loadRankingIdentities(
+  options: Pick<TeamRankingOptions, "connection" | "shared">,
+): Promise<TeamIdentityRow[]> {
+  const read = async () => {
+    const db = options.connection ?? (await getDatabase());
+    const [teams] = await db.execute<TeamIdentityRow[]>(
+      `SELECT id, name, logo_url
+       FROM bg_teams
+       WHERE solo_user_id IS NULL AND deleted_at IS NULL`,
+    );
+    return teams;
+  };
+  const shared = options.shared ?? options.connection === undefined;
+  return shared ? cachedRanking(RANKING_IDENTITIES_KEY, read) : read();
+}
+
+/** {@link loadTeamRanking}, avec l'état rejoué qui l'a produite. */
+export async function loadTeamRankingSnapshot(options: TeamRankingOptions = {}): Promise<TeamRankingSnapshot> {
+  // Enchaînées : `connection` peut être celle d'une transaction, qui n'exécute
+  // qu'une requête à la fois.
+  const states = await loadRankingState(options);
+  const teams = await loadRankingIdentities(options);
 
   const rows: TeamRankingRow[] = [];
   for (const team of teams) {
@@ -395,12 +438,29 @@ export async function loadTeamRanking(options: TeamRankingOptions = {}): Promise
     });
   }
 
-  return rows.sort((a, b) =>
+  rows.sort((a, b) =>
     compareRankedTeams(
       { points: a.points, wins: a.wins, losses: a.losses, draws: a.draws, name: a.teamName },
       { points: b.points, wins: b.wins, losses: b.losses, draws: b.draws, name: b.teamName },
     ),
   );
+  return { rows, states };
+}
+
+/**
+ * Cote d'une équipe dans une photo du classement : celle de sa ligne si elle
+ * est classée, sinon celle de l'état rejoué (une équipe qui n'a que des points
+ * de placement, ou une dissoute qui a joué, n'est pas à la cote de départ),
+ * sinon la cote de départ. La règle unique de l'annuaire et de la fiche ;
+ * `listed` est la ligne de l'équipe dans `rows`, ou `undefined` si elle n'y est
+ * pas.
+ */
+export function rankingPointsOf(
+  states: TeamRankingSnapshot["states"],
+  teamId: number,
+  listed: Pick<TeamRankingRow, "points"> | undefined,
+): number {
+  return listed?.points ?? states.get(teamId)?.points ?? RANKING_BASE_POINTS;
 }
 
 /** Une engagée dans l'ordre du classement du site. */
@@ -510,32 +570,24 @@ function rankingKey(state: RankedTeamState) {
  * joué ») et ne compte pas dans `total`, puisqu'elle ne figure pas à la page.
  */
 export async function getTeamRankingPosition(teamId: number): Promise<TeamRankingPosition> {
-  const listed = await loadTeamRanking();
-  const self = listed.find((row) => row.teamId === teamId);
-
-  const states = await loadRankingState();
-
-  if (self) {
-    return {
-      // L'index dans la liste triée, comme le rang affiché par `/classement`
-      // (`loadLeaderboardRows`) : à cote égale, les départages documentés
-      // (`compareRankedTeams`) tranchent, ici comme là.
-      position: listed.indexOf(self) + 1,
-      total: listed.length,
-      points: self.points,
-      placementPoints: states.get(teamId)?.placementPoints ?? 0,
-    };
-  }
+  // Une seule photo : place, total et cote sortent du même rejeu.
+  const snapshot = await loadTeamRankingSnapshot();
+  const listed = snapshot.rows;
+  const index = listed.findIndex((row) => row.teamId === teamId);
+  const self = index === -1 ? undefined : listed[index];
+  const placementPoints = snapshot.states.get(teamId)?.placementPoints ?? 0;
 
   // Hors liste : équipe sans match, entrée solo, ou équipe dissoute. La cote se
   // lit alors sur l'état rejoué et non sur la valeur de départ — une dissoute a
   // joué, et afficher 500 sur sa fiche à côté d'un bilan de vingt matchs ferait
-  // dire deux choses à la même page. Les deux lectures passent par la photo
-  // mutualisée : c'est le même rejeu, pas un second.
+  // dire deux choses à la même page (`rankingPointsOf`).
   return {
-    position: null,
+    // L'index dans la liste triée, comme le rang affiché par `/classement`
+    // (`loadLeaderboardRows`) : à cote égale, les départages documentés
+    // (`compareRankedTeams`) tranchent, ici comme là.
+    position: self ? index + 1 : null,
     total: listed.length,
-    points: states.get(teamId)?.points ?? RANKING_BASE_POINTS,
-    placementPoints: states.get(teamId)?.placementPoints ?? 0,
+    points: rankingPointsOf(snapshot.states, teamId, self),
+    placementPoints,
   };
 }

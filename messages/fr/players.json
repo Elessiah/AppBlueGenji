@@ -26,6 +26,8 @@
       "COACH": "Coach"
     },
     "count": "{count, plural, one {# joueur} other {# joueurs}}",
+    "statusHint": "« Sans équipe » liste tous les joueurs sans équipe, y compris ceux qui ne sont pas ouverts aux propositions — seuls les « Free agents » le sont. Les rôles venant de l'équipe, leur filtre est désactivé sous ces deux filtres.",
+    "statusHintSubject": "Filtres de statut",
     "statusFilter": {
       "all": "TOUS",
       "free": "FREE AGENTS",
@@ -35,7 +37,7 @@
     "sort": {
       "pseudo": "Pseudo",
       "tournaments": "Tournois",
-      "created": "Date de création"
+      "created": "Plus récents"
     },
     "showDeleted": "Afficher les comptes supprimés ({count})",
     "sectionTitle": "PROFILS",

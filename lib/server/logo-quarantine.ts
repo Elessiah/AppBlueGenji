@@ -32,8 +32,11 @@ import { copyFile, mkdir, rename, unlink } from "node:fs/promises";
 import path from "node:path";
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
-// Logo d'équipe servi par le leaderboard de l'accueil et de `/classement`.
+// Logo d'équipe servi par le leaderboard de l'accueil et de `/classement`, le
+// podium et les cartes d'aperçu ; avatar recopié sur l'entrée solo, que nomment
+// les vues de la vitrine.
 import { invalidateLandingTeamViews } from "@/lib/server/landing-cache";
+import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
 import { notifyUsers, toNotificationRecipient, type NotificationRecipient } from "@/lib/server/notify";
 import { moderationPush } from "@/lib/shared/push-messages";
 import { publishStaffAction } from "@/lib/server/staff-audit";
@@ -341,7 +344,7 @@ export async function deleteTeamLogoForReport(
     );
     quarantineId = Number(inserted.insertId);
     await connection.commit();
-    invalidateLandingTeamViews();
+    invalidateTeamIdentityViews();
   } catch (error) {
     await connection.rollback();
     throw error;
@@ -436,6 +439,8 @@ export async function deleteUserAvatarForReport(
     });
   }
 
+  // L'avatar est le logo de l'entrée solo, nommée par les vues de la vitrine.
+  invalidateLandingTeamViews();
   publishStaffAction(`🗑️ Avatar d'${ANONYMOUS_PLAYER_LABEL} supprimé sans délai par le staff (signalement #${reportId}).`, {
     id: actor.userId,
     pseudo: actor.pseudo,
@@ -528,7 +533,7 @@ export async function hideTeamLogo(reportId: number, teamId: number, actor: Repo
     );
     quarantineId = Number(inserted.insertId);
     await connection.commit();
-    invalidateLandingTeamViews();
+    invalidateTeamIdentityViews();
   } catch (error) {
     await connection.rollback();
     // Le fichier revient en ligne : la base n'a rien retenu du masquage. Une
@@ -645,6 +650,8 @@ export async function hideUserAvatarForReport(
     connection.release();
   }
 
+  // L'avatar est le logo de l'entrée solo, nommée par les vues de la vitrine.
+  invalidateLandingTeamViews();
   publishStaffAction(formatAvatarHiddenLog({ reportId, purgeAfter }), { id: actor.userId, pseudo: actor.pseudo });
   const url = `${siteCanonicalBase()}${reportConcernedHref(reportId)}`;
   void userRecipient(userId)
@@ -800,7 +807,8 @@ export async function restoreReportedImage(quarantineId: number, actor: ReportPe
         [quarantineId],
       );
       await connection.commit();
-      invalidateLandingTeamViews();
+      if (isTeam) invalidateTeamIdentityViews();
+      else invalidateLandingTeamViews();
     } catch (error) {
       await moveFile(files.live, files.quarantined).catch(() => undefined);
       throw error;

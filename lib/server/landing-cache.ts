@@ -93,6 +93,15 @@ export function invalidateLandingLeaderboards(): void {
 }
 
 /**
+ * Oublie les seuls compteurs de la vitrine (`getLandingStats`) : pour une
+ * écriture qui change le nombre d'équipes sans qu'aucune autre vue la nomme —
+ * la dissolution d'une équipe jamais inscrite à un tournoi.
+ */
+export function invalidateLandingCounters(): void {
+  invalidateCached(`${PREFIX}${LANDING_STATS_KEY}`);
+}
+
+/**
  * Oublie les vues de la vitrine qui **nomment ou comptent des équipes** : les
  * leaderboards, le bandeau (noms des derniers résultats), le mini-arbre et les
  * compteurs (« Équipes actives » écarte les équipes dissoutes, « Joueurs »
@@ -105,6 +114,6 @@ export function invalidateLandingLeaderboards(): void {
 export function invalidateLandingTeamViews(): void {
   invalidateLandingLeaderboards();
   invalidateCached(`${PREFIX}${LANDING_TICKER_KEY}`);
-  invalidateCached(`${PREFIX}${LANDING_STATS_KEY}`);
+  invalidateLandingCounters();
   invalidateCachedPrefix(`${PREFIX}${LANDING_MINI_BRACKET_KEY_PREFIX}`);
 }

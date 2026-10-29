@@ -37,6 +37,7 @@ function team(overrides: Partial<TeamListItem> = {}): TeamListItem {
     points: 21,
     wins: 6,
     losses: 3,
+    draws: 0,
     form: ["w", "l", "w"],
     games: ["OW"],
     rosterPreview: [{ userId: 1, pseudo: "Kite", avatarUrl: null }],
@@ -212,5 +213,27 @@ describe("TeamCard — badge de rang", () => {
     );
     expect(markup).toContain("#05");
     expect(markup).not.toContain("Aucun match");
+  });
+});
+
+describe("TeamCard — nuls et en-tête sans rang", () => {
+  it("TeamCard_teamWithDraws_addsDrawsColumn", () => {
+    const markup = renderToStaticMarkup(<TeamCard team={team({ wins: 0, losses: 0, draws: 1, rank: 4 })} />);
+    expect(markup).toContain("statsWithDraws");
+    expect(markup).toContain('<span class="sr-only">Matchs nuls</span>');
+  });
+
+  it("TeamCard_teamWithoutDraws_keepsThreeColumns", () => {
+    const markup = renderToStaticMarkup(<TeamCard team={team({ draws: 0 })} />);
+    expect(markup).not.toContain("statsWithDraws");
+    expect(markup).not.toContain("Matchs nuls");
+  });
+
+  it("TeamCard_unrankedTeam_dropsBadgeMarginFromHead", () => {
+    expect(renderToStaticMarkup(<TeamCard team={team({ rank: null })} />)).toContain("headUnranked");
+  });
+
+  it("TeamCard_rankedTeam_keepsBadgeMargin", () => {
+    expect(renderToStaticMarkup(<TeamCard team={team({ rank: 2 })} />)).not.toContain("headUnranked");
   });
 });

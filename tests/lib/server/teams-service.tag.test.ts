@@ -229,6 +229,8 @@ describe("updateTeamMeta — sigle", () => {
   it("ne touche pas au sigle quand le patch ne le mentionne pas", async () => {
     const { poolExecute } = await mockDb();
     asOwner(poolExecute);
+    poolExecute.mockResolvedValueOnce([[{ name: "Ancien nom" }], []]); // nom actuel
+    poolExecute.mockResolvedValueOnce([[], []]); // nom libre
     poolExecute.mockResolvedValueOnce([{ affectedRows: 1 }, []]);
 
     await updateTeamMeta(1, 12, { name: "Nouveau nom" });

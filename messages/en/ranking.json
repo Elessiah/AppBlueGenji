@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Team ranking",
-    "description": "The BlueGenji Esport team ranking: every team's rating, podium, record and recent form, overall or by game (Overwatch, Marvel Rivals).",
+    "description": "The BlueGenji Esport team ranking: every ranked team's rating, podium, record and recent form, overall or by game (Overwatch, Marvel Rivals).",
     "shareDescription": "Who's on top? The team ranking of the BlueGenji scene."
   },
   "breadcrumb": {
@@ -80,7 +80,8 @@
   },
   "how": {
     "title": "How the rating works",
-    "base": "<b>{base} pts</b> to start, for every team: a team enters the ranking with its first match played.",
+    "base": "<b>{base} pts</b> to start, for every team: a team enters the ranking with its first counted match (forfeits included).",
+    "newcomer": "<b>★</b>: entered the ranking in the last 7 days.",
     "match": "<b>Every match</b> moves points from the loser to the winner — a lot for an unlikely win, almost nothing for an expected one.",
     "score": "<b>The score</b> matters too: a win without dropping a map (3-0, 2-0) moves up to {marginMax} times the points of a hard-fought win (3-2, 2-1) — as much gained by the winner, as much lost by the loser. A single-map match and a forfeit count as a plain win.",
     "placement": "<b>Final placement</b> in a tournament also hands out points, more so when the field was strong. Floor at {floor} pts."

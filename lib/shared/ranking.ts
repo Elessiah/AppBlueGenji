@@ -547,6 +547,9 @@ export function compareDirectoryRank(a: { rank: number | null }, b: { rank: numb
   return a.rank - b.rank;
 }
 
+/** Comparateur des noms d'équipe de {@link compareRankedTeams}, créé une fois. */
+const TEAM_NAME_COLLATOR = new Intl.Collator("fr");
+
 /**
  * Ordre du classement du site, appliqué **en mémoire** pour que toutes les vues
  * trient à l'identique — leaderboard, page `/classement`, annuaire **et**
@@ -565,6 +568,11 @@ export function compareDirectoryRank(a: { rank: number | null }, b: { rank: numb
  * Le tri final se fait ici et non en SQL — la collation MySQL et
  * `localeCompare("fr")` ne départagent pas les noms de la même façon, et deux
  * vues triées chacune de son côté finiraient par afficher deux ordres.
+ *
+ * Le nom se compare par un `Intl.Collator("fr")` gardé au niveau du module :
+ * même ordre que `localeCompare(…, "fr")`, sans résoudre la locale à chaque
+ * comparaison — les équipes sans rang, toutes à la cote de départ, se
+ * départagent presque toutes par le nom.
  */
 export function compareRankedTeams(
   a: { points: number; wins: number; losses: number; draws?: number; name: string },
@@ -576,7 +584,7 @@ export function compareRankedTeams(
   const drawsA = a.draws ?? 0;
   const drawsB = b.draws ?? 0;
   if (drawsB !== drawsA) return drawsB - drawsA;
-  return a.name.localeCompare(b.name, "fr");
+  return TEAM_NAME_COLLATOR.compare(a.name, b.name);
 }
 
 /** Intitulé du total de points, partout où il s'affiche. */

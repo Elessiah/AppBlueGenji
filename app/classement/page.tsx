@@ -140,7 +140,7 @@ export default async function ClassementPage({ searchParams }: Readonly<PageProp
       <section className={`${styles.section} ${styles.how}`} aria-labelledby="classement-how">
         <h2 id="classement-how" className={styles.howTitle}>{messages.how.title}</h2>
         <ul className={styles.howList}>
-          {([messages.how.base, messages.how.match, messages.how.score, messages.how.placement] as const).map((item) => (
+          {([messages.how.base, messages.how.match, messages.how.score, messages.how.placement, messages.how.newcomer] as const).map((item) => (
             <li key={item}>
               <RuleText text={item} locale={locale} values={howValues} />
             </li>

@@ -36,6 +36,13 @@ describe("barre de navigation — rafraîchie après les gestes qui la changent"
     expect(gesture(read(file), marker)).toContain("router.refresh()");
   });
 
+  it("TeamIdentityForm_tagOrDescriptionOnly_doesNotRefreshLayout", () => {
+    // Le menu du compte ne rappelle que le nom de l'équipe.
+    expect(gesture(read("app/(secured)/equipes/[id]/_components/TeamSettings.tsx"), 'showSuccess(t("settings.updated"))')).toContain(
+      "if (name.trim() !== saved.name) router.refresh()",
+    );
+  });
+
   it("l'invitation refusée ne relance pas la mise en page pour rien", () => {
     expect(gesture(read("app/(secured)/profil/page.tsx"), 't("invitations.accepted")')).toContain(
       "if (accept) router.refresh()",

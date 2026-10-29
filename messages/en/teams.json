@@ -65,10 +65,13 @@
     "wins": "Wins",
     "lossesShort": "L",
     "losses": "Losses",
+    "drawsShort": "D",
+    "draws": "Draws",
     "roster": "Roster",
     "founded": "FOUNDED · {date}",
     "cta": "View the team →",
     "record": "{wins}W – <loss>{losses}L</loss>",
+    "recordDraws": "{wins}W – <loss>{losses}L</loss> – {draws}D",
     "ptsShort": "PTS"
   },
   "points": {

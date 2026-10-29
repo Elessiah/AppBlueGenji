@@ -419,6 +419,13 @@ réserve, un tel robot obtient des réponses plus lentes, pas un processeur satu
   `team`, servie en `max-age=300`. Énumérer des identifiants ne coûte ni rendu
   ni mémoire.
 - Un échec de rendu n'est jamais gardé.
+- **Cartes tirées du classement** (`followsRanking` : podium, équipe
+  nominative) : `invalidateRankingShareImages` les oublie — rendues ou en vol —
+  à chaque vidage du classement (`invalidateTeamRanking`, score) et à chaque
+  écriture d'identité (`invalidateTeamIdentityViews` : nom, logo, dissolution).
+  Un compteur de génération empêche de garder un rendu lancé avant le vidage et
+  fini après : il est servi à qui l'attendait, jamais gardé. Les cartes fixes
+  restent (elles ne changent qu'au déploiement).
 
 ### Vie privée : pourquoi les cartes de l'espace membre sont génériques
 

@@ -3,13 +3,8 @@ import { getDatabase } from "@/lib/server/database";
 import { toIso } from "@/lib/server/serialization";
 import type { TeamListItem } from "@/lib/shared/types";
 import { cachedStats } from "@/lib/server/stats-cache";
-import { loadRankingState, loadTeamRanking } from "@/lib/server/ranking-service";
-import {
-  compareDirectoryRank,
-  compareRankedTeams,
-  RANKING_BASE_POINTS,
-  rankingMatchJoinSql,
-} from "@/lib/shared/ranking";
+import { loadTeamRankingSnapshot, rankingPointsOf } from "@/lib/server/ranking-service";
+import { compareDirectoryRank, compareRankedTeams, rankingMatchJoinSql } from "@/lib/shared/ranking";
 import { visibleAvatarUrl } from "@/lib/shared/avatar";
 import { localUploadUrl } from "@/lib/shared/uploads";
 
@@ -144,9 +139,11 @@ export async function listTeams(viewerId: number | null = null): Promise<TeamLis
   // cote de départ, mais **sans rang** — le rang est sa place à `/classement`.
   // Hors liste, la cote se lit sur l'état rejoué (même photo mutualisée que la
   // liste, pas un second rejeu) : une équipe qui n'a que des points de
-  // placement n'est pas à 500, et la fiche affiche la même cote.
-  const [ranking, states] = await Promise.all([loadTeamRanking(), loadRankingState()]);
-  const rankingByTeam = new Map(ranking.map((row, index) => [row.teamId, { row, rank: index + 1 }]));
+  // placement n'est pas à 500, et la fiche affiche la même cote. Liste et état
+  // sortent d'**une** photo (`loadTeamRankingSnapshot`) : une invalidation
+  // glissée entre deux lectures ne mêle plus deux classements.
+  const ranking = await loadTeamRankingSnapshot();
+  const rankingByTeam = new Map(ranking.rows.map((row, index) => [row.teamId, { row, rank: index + 1 }]));
 
   // Get roster preview
   const [rosterRows] = await db.execute<
@@ -222,7 +219,8 @@ export async function listTeams(viewerId: number | null = null): Promise<TeamLis
   // Transform rows and calculate rank
   const unsorted: TeamListItem[] = teamRows.map((row) => {
     const id = Number(row.id);
-    const ranked = rankingByTeam.get(id)?.row;
+    const listed = rankingByTeam.get(id);
+    const ranked = listed?.row;
     return {
       id,
       name: row.name,
@@ -232,14 +230,15 @@ export async function listTeams(viewerId: number | null = null): Promise<TeamLis
       createdAt: toIso(row.created_at)!,
       wins: ranked?.wins ?? 0,
       losses: ranked?.losses ?? 0,
-      points: ranked?.points ?? states.get(id)?.points ?? RANKING_BASE_POINTS,
+      draws: ranked?.draws ?? 0,
+      points: rankingPointsOf(ranking.states, id, ranked),
       // Copie : la table vient du cache, partagée entre tous les lecteurs.
       form: [...(formByTeam.get(id) ?? [])],
       games: gamesByTeam.get(id) || [],
       rosterPreview: rosterByTeam.get(id) || [],
       region: null,
       isGhost: row.is_ghost === 1,
-      rank: rankingByTeam.get(id)?.rank ?? null,
+      rank: listed?.rank ?? null,
     };
   });
 

@@ -116,6 +116,16 @@ export function chargeRateLimit(
 }
 
 /**
+ * Rend une action décomptée (`consumeRateLimit`) qui n'a finalement pas eu
+ * lieu — un refus métier après la réservation. Sans effet si la fenêtre a été
+ * remise à zéro entre-temps.
+ */
+export function refundRateLimit(rule: RateLimitRule, key: string, now: number = Date.now()): void {
+  const counter = bucketOf(rule).get(key);
+  if (counter && now < counter.resetAt && counter.count > 0) counter.count -= 1;
+}
+
+/**
  * Contrôle **et** décompte en une fois. `allowed: false` signifie que le quota
  * était déjà épuisé : rien n'a été décompté de plus.
  */

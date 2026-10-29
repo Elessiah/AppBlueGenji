@@ -9,7 +9,7 @@ import { DELETE, POST } from "@/app/api/teams/[id]/logo/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { deleteStoredImage, processAndStoreImage } from "@/lib/server/image-upload";
 import { canManageTeam, isGhostTeam } from "@/lib/server/teams/access";
-import { getTeamLogoUrl, updateTeamLogo } from "@/lib/server/teams/identity";
+import { updateTeamLogo } from "@/lib/server/teams/identity";
 import { authUser } from "../../../helpers/auth-user";
 
 const user = authUser({ id: 7 });
@@ -30,6 +30,7 @@ function pngFile() {
 describe("POST /api/teams/[id]/logo", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.mocked(updateTeamLogo).mockResolvedValue({ previousLogoUrl: null });
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -62,7 +63,7 @@ describe("POST /api/teams/[id]/logo", () => {
   it("stores the logo under its served url (not the raw disk path)", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(user);
     jest.mocked(canManageTeam).mockResolvedValue(true);
-    jest.mocked(getTeamLogoUrl).mockResolvedValue(null);
+    jest.mocked(updateTeamLogo).mockResolvedValue({ previousLogoUrl: null });
     jest.mocked(processAndStoreImage).mockResolvedValue("/uploads/teams/3-abc.webp");
 
     const res = await POST(fileReq(pngFile()), params("3"));
@@ -79,7 +80,7 @@ describe("POST /api/teams/[id]/logo", () => {
   it("deletes the previous logo file (served url → disk path)", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(user);
     jest.mocked(canManageTeam).mockResolvedValue(true);
-    jest.mocked(getTeamLogoUrl).mockResolvedValue("/api/uploads/teams/old.webp");
+    jest.mocked(updateTeamLogo).mockResolvedValue({ previousLogoUrl: "/api/uploads/teams/old.webp" });
     jest.mocked(processAndStoreImage).mockResolvedValue("/uploads/teams/new.webp");
 
     await POST(fileReq(pngFile()), params("3"));
@@ -89,7 +90,7 @@ describe("POST /api/teams/[id]/logo", () => {
   it("does not delete external logo urls", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(user);
     jest.mocked(canManageTeam).mockResolvedValue(true);
-    jest.mocked(getTeamLogoUrl).mockResolvedValue("https://cdn.example.com/x.png");
+    jest.mocked(updateTeamLogo).mockResolvedValue({ previousLogoUrl: "https://cdn.example.com/x.png" });
     jest.mocked(processAndStoreImage).mockResolvedValue("/uploads/teams/new.webp");
 
     await POST(fileReq(pngFile()), params("3"));
@@ -99,7 +100,7 @@ describe("POST /api/teams/[id]/logo", () => {
   it("surfaces processing errors as 400", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(user);
     jest.mocked(canManageTeam).mockResolvedValue(true);
-    jest.mocked(getTeamLogoUrl).mockResolvedValue(null);
+    jest.mocked(updateTeamLogo).mockResolvedValue({ previousLogoUrl: null });
     jest.mocked(processAndStoreImage).mockRejectedValue(new Error("IMAGE_TOO_LARGE"));
 
     const res = await POST(fileReq(pngFile()), params("3"));
@@ -111,9 +112,10 @@ describe("POST /api/teams/[id]/logo", () => {
 describe("POST /api/teams/[id]/logo — droits et conditions", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.mocked(updateTeamLogo).mockResolvedValue({ previousLogoUrl: null });
     jest.mocked(getCurrentUser).mockResolvedValue(user);
     jest.mocked(canManageTeam).mockResolvedValue(true);
-    jest.mocked(getTeamLogoUrl).mockResolvedValue(null);
+    jest.mocked(updateTeamLogo).mockResolvedValue({ previousLogoUrl: null });
     jest.mocked(processAndStoreImage).mockResolvedValue("/uploads/teams/3-new.webp");
   });
 
@@ -159,6 +161,7 @@ describe("POST /api/teams/[id]/logo — droits et conditions", () => {
 describe("DELETE /api/teams/[id]/logo", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.mocked(updateTeamLogo).mockResolvedValue({ previousLogoUrl: null });
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -172,7 +175,7 @@ describe("DELETE /api/teams/[id]/logo", () => {
 
   it("clears the logo and removes the stored file", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(user);
-    jest.mocked(getTeamLogoUrl).mockResolvedValue("/api/uploads/teams/old.webp");
+    jest.mocked(updateTeamLogo).mockResolvedValue({ previousLogoUrl: "/api/uploads/teams/old.webp" });
 
     const res = await DELETE(new Request("http://localhost/api/teams/3/logo"), params("3"));
     expect(res.status).toBe(200);

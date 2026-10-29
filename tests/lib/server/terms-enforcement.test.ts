@@ -105,7 +105,14 @@ describe("gestion d'une équipe — les conditions après le rôle", () => {
   });
 
   it("exige les conditions pour envoyer un logo, jamais pour le retirer", async () => {
-    install([rolesOf({ 1: ["MANAGER"] }), [/UPDATE bg_teams SET logo_url/, () => [{}]]]);
+    install(
+      [rolesOf({ 1: ["MANAGER"] })],
+      [
+        [/SELECT logo_url, deleted_at, is_ghost FROM bg_teams WHERE id = \? FOR UPDATE/, () => [[{ logo_url: null, deleted_at: null, is_ghost: 0 }]]],
+        rolesOf({ 1: ["MANAGER"] }),
+        [/UPDATE bg_teams SET logo_url/, () => [{}]],
+      ],
+    );
 
     await updateTeamLogo(1, 7, null);
     expect(assertTermsAccepted).not.toHaveBeenCalled();
@@ -118,6 +125,8 @@ describe("gestion d'une équipe — les conditions après le rôle", () => {
     install([
       rolesOf({}),
       [/SELECT is_ghost, deleted_at FROM bg_teams/, () => [[{ is_ghost: 1, deleted_at: null }]]],
+    ], [
+      [/SELECT logo_url, deleted_at, is_ghost FROM bg_teams WHERE id = \? FOR UPDATE/, () => [[{ logo_url: null, deleted_at: null, is_ghost: 1 }]]],
       [/UPDATE bg_teams SET logo_url/, () => [{}]],
     ]);
     await updateTeamLogo(9, 7, "/api/uploads/teams/7-a.webp", true);

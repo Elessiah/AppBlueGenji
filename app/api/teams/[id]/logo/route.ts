@@ -3,7 +3,7 @@ import { fail, ok } from "@/lib/server/http";
 import { TEAM_LOGO_ERROR_STATUS, parseTeamId, teamErrorStatus } from "@/lib/server/team-route-errors";
 import { deleteStoredImage, processAndStoreImage } from "@/lib/server/image-upload";
 import { canManageTeam, isGhostTeam } from "@/lib/server/teams/access";
-import { getTeamLogoUrl, updateTeamLogo } from "@/lib/server/teams/identity";
+import { updateTeamLogo } from "@/lib/server/teams/identity";
 import { toDiskUploadPath, toServedUploadUrl } from "@/lib/shared/uploads";
 import { can } from "@/lib/shared/permissions";
 import { IMAGE_CROP_FIELD, IMAGE_CROP_INVALID, parseImageCropField } from "@/lib/shared/image-crop";
@@ -43,11 +43,12 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   if (form.get(LOGO_RIGHTS_FIELD) !== "1") return fail(LOGO_RIGHTS_NOT_CERTIFIED, 400);
 
   try {
-    const currentLogo = await getTeamLogoUrl(teamId);
     const diskPath = await processAndStoreImage(file, "team-logo", teamId, crop.crop);
     const servedUrl = toServedUploadUrl(diskPath);
+    // L'ancien logo est celui que l'écriture a remplacé, relu sous son verrou.
+    let previousLogoUrl: string | null;
     try {
-      await updateTeamLogo(user.id, teamId, servedUrl, managesGhostTeams);
+      ({ previousLogoUrl } = await updateTeamLogo(user.id, teamId, servedUrl, managesGhostTeams));
     } catch (error) {
       // Refusé entre-temps (rôle retiré, course) : le fichier neuf ne désigne
       // rien, il part.
@@ -58,7 +59,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
       }
       throw error;
     }
-    await deleteStoredImage(toDiskUploadPath(currentLogo));
+    await deleteStoredImage(toDiskUploadPath(previousLogoUrl));
     return ok({ logoUrl: servedUrl });
   } catch (error) {
     const message = (error as Error).message;
@@ -75,9 +76,8 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
   if (teamId === null) return fail("INVALID_TEAM_ID", 400);
 
   try {
-    const currentLogo = await getTeamLogoUrl(teamId);
-    await updateTeamLogo(user.id, teamId, null, can(user, "tournaments"));
-    await deleteStoredImage(toDiskUploadPath(currentLogo));
+    const { previousLogoUrl } = await updateTeamLogo(user.id, teamId, null, can(user, "tournaments"));
+    await deleteStoredImage(toDiskUploadPath(previousLogoUrl));
     return ok({ logoUrl: null });
   } catch (error) {
     const message = (error as Error).message;

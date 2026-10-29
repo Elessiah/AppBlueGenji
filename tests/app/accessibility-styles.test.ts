@@ -136,6 +136,7 @@ describe("réglages d'accessibilité — feuille globale", () => {
     // Séparateurs `/` et `·`, seuls textes autorisés à rester pâles.
     const allowed = new Set([
       ".bot-crumb .sep { color: var(--ink-faint); }",
+      ".statusSep { color: var(--ink-faint); }",
       '<span style={{ color: "var(--ink-faint)" }}>·</span>',
     ]);
     const files = [".css", ".tsx"].flatMap((suffix) => [

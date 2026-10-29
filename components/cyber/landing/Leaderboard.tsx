@@ -25,7 +25,7 @@ const TREND_CLASSES: Record<LandingLeaderboardRow["trend"], string | undefined> 
   up: styles.trendUp,
   down: styles.trendDown,
   flat: styles.trendFlat,
-  new: styles.trendUp,
+  new: styles.trendNew,
 };
 
 /** Évolution affichée : un tiret quand rien n'a bougé, une étoile pour une entrée, sinon la variation signée. */
@@ -140,6 +140,13 @@ export function Leaderboard({ initialRows }: Readonly<LeaderboardProps>) {
                   <span className={styles.losses}>–</span>
                   {/* Une défaite se lit dans sa couleur ; zéro reste neutre. */}
                   <span className={row.losses > 0 ? "result-loss" : styles.losses}>{row.losses}</span>
+                  {/* Les nuls, s'il y en a : une équipe classée sur un seul nul lisait « 0–0 ». */}
+                  {row.draws > 0 ? (
+                    <span className={styles.draws}>
+                      <span aria-hidden="true">{t("leaderboard.draws", { count: String(row.draws) })}</span>
+                      <span className="sr-only">{t("leaderboard.drawsLabel", { count: row.draws })}</span>
+                    </span>
+                  ) : null}
                 </span>
                 <span className="num" role="cell">{row.points}</span>
                 <span className={`${styles.trend} ${trendClass}`} role="cell">

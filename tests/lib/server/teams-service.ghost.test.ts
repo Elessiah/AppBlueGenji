@@ -69,13 +69,14 @@ describe("updateTeamMeta — dérogation staff sur les équipes fantômes", () =
       .fn<SqlQuery>()
       .mockResolvedValueOnce(NOT_A_MEMBER) // userOwnsTeam
       .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]]) // isGhostTeam
+      .mockResolvedValueOnce([[{ name: "Ancien nom" }]]) // nom actuel
       .mockResolvedValueOnce([[]]) // nom libre (assertTeamNameAvailable)
       .mockResolvedValueOnce([{ affectedRows: 1 }]); // UPDATE
     await mockDb(execute);
 
     await updateTeamMeta(99, 3, { name: "Nouveau nom" }, true);
 
-    const [sql, params] = execute.mock.calls[3] as [string, unknown[]];
+    const [sql, params] = execute.mock.calls[4] as [string, unknown[]];
     expect(sql).toMatch(/UPDATE bg_teams SET name = \?/);
     expect(params).toEqual(["Nouveau nom", 3]);
   });
@@ -114,12 +115,13 @@ describe("updateTeamLogo — dérogation staff", () => {
       .fn<SqlQuery>()
       .mockResolvedValueOnce(NOT_A_MEMBER) // getMemberRoles
       .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]])
+      .mockResolvedValueOnce([[{ logo_url: null, deleted_at: null, is_ghost: 1 }]]) // logo précédent et droit, sous verrou
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
     await mockDb(execute);
 
     await updateTeamLogo(99, 3, "/api/uploads/teams/x.webp", true);
 
-    const [sql, params] = execute.mock.calls[2] as [string, unknown[]];
+    const [sql, params] = execute.mock.calls[3] as [string, unknown[]];
     expect(sql).toMatch(/UPDATE bg_teams SET logo_url = \?/);
     expect(params).toEqual(["/api/uploads/teams/x.webp", 3]);
   });

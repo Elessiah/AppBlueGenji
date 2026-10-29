@@ -442,6 +442,8 @@
 .trendUp { color: var(--cyan-400); }
 .trendDown { color: var(--violet-300); }
 .trendFlat { color: var(--ink-dim); }
+/* Entrée au classement : ni montée (cyan) ni descente (violet). */
+.trendNew { color: var(--pink-400); }
 
 /* ---------- Comment ça marche ---------- */
 

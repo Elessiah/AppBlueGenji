@@ -53,6 +53,7 @@ describe("updateTeamMeta — nom", () => {
   it("refuse un nom déjà porté par une autre équipe, avant d'écrire", async () => {
     execute
       .mockResolvedValueOnce(owner)
+      .mockResolvedValueOnce([[{ name: "Ancien Nom" }]]) // nom actuel
       .mockResolvedValueOnce([[{ id: 9 }]]); // nom pris
 
     await expect(updateTeamMeta(1, 7, { name: "Dragon Squad" })).rejects.toThrow("TEAM_NAME_ALREADY_USED");
@@ -62,15 +63,16 @@ describe("updateTeamMeta — nom", () => {
   it("laisse l'équipe garder son propre nom (casse comprise)", async () => {
     execute
       .mockResolvedValueOnce(owner)
+      .mockResolvedValueOnce([[{ name: "rolex" }]]) // nom actuel, autre casse
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
 
     await updateTeamMeta(1, 7, { name: "  Rolex  " });
 
-    const [sql, params] = execute.mock.calls[1] as [string, unknown[]];
+    const [sql, params] = execute.mock.calls[2] as [string, unknown[]];
     expect(sql).toMatch(/WHERE name = \? AND id <> \?/);
     expect(params).toEqual(["Rolex", 7]);
-    const [, updateParams] = execute.mock.calls[2] as [string, unknown[]];
+    const [, updateParams] = execute.mock.calls[3] as [string, unknown[]];
     // Le nom écrit est rogné.
     expect(updateParams).toEqual(["Rolex", 7]);
   });
@@ -78,6 +80,7 @@ describe("updateTeamMeta — nom", () => {
   it("traduit la course entre deux renommages vers le même nom", async () => {
     execute
       .mockResolvedValueOnce(owner)
+      .mockResolvedValueOnce([[{ name: "Ancien Nom" }]])
       .mockResolvedValueOnce([[]])
       .mockRejectedValueOnce(dupError("bg_teams.name"));
 
@@ -158,6 +161,7 @@ describe("updateTeamMeta — vues de l'accueil", () => {
   it("updateTeamMeta_renamed_clearsLandingLeaderboard", async () => {
     execute
       .mockResolvedValueOnce(owner)
+      .mockResolvedValueOnce([[{ name: "Ancien Nom" }]])
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
     const loader = jest.fn(async () => "rangs");
@@ -167,6 +171,33 @@ describe("updateTeamMeta — vues de l'accueil", () => {
     await cachedLanding("leaderboard:all", LANDING_TTL_MS, loader);
 
     expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  it("updateTeamMeta_unchangedNameResent_keepsLandingLeaderboard", async () => {
+    execute
+      .mockResolvedValueOnce(owner)
+      .mockResolvedValueOnce([[{ name: "Nouveau Nom" }]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+    const loader = jest.fn(async () => "rangs");
+    await cachedLanding("leaderboard:all", LANDING_TTL_MS, loader);
+
+    await updateTeamMeta(1, 7, { name: "Nouveau Nom", description: "Texte" });
+    await cachedLanding("leaderboard:all", LANDING_TTL_MS, loader);
+
+    expect(loader).toHaveBeenCalledTimes(1);
+  });
+
+  it("updateTeamMeta_unchangedNameResent_skipsNameCheckAndWrite", async () => {
+    execute
+      .mockResolvedValueOnce(owner)
+      .mockResolvedValueOnce([[{ name: "Nouveau Nom" }]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+
+    await updateTeamMeta(1, 7, { name: "Nouveau Nom", description: "Texte" });
+
+    const sqls = execute.mock.calls.map(([sql]) => String(sql));
+    expect(sqls.some((sql) => /WHERE name = \?/.test(sql))).toBe(false);
+    expect(sqls.at(-1)).toMatch(/UPDATE bg_teams SET description = \? WHERE id = \?/);
   });
 
   it("updateTeamMeta_descriptionOnly_keepsLandingLeaderboard", async () => {

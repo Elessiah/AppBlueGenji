@@ -9,8 +9,9 @@ import {
 } from "@/lib/server/team-tags";
 import { checkTeamName, TEAM_NAME_ALREADY_USED } from "@/lib/shared/team-name";
 import { recordTermsAcceptance } from "@/lib/server/terms-acceptance";
-import { invalidateLandingTeamViews } from "@/lib/server/landing-cache";
-import { assertCanActOnTeam, userCanManageTeam, userOwnsTeam } from "./access";
+import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
+import { hasTeamManagementRole } from "@/lib/shared/team-roles";
+import { assertCanActOnTeam, lockMemberRoles, userCanManageTeam, userOwnsTeam } from "./access";
 
 /*
  * Identité d'une équipe : création, nom, sigle et description, logo (par la
@@ -112,6 +113,7 @@ export async function updateTeamMeta(
 
   const updates: string[] = [];
   const params: SqlParams = [];
+  let renamed = false;
 
   if (patch.name !== undefined) {
     // Mêmes bornes qu'à la création : le renommage n'en contrôlait aucune, si
@@ -119,9 +121,20 @@ export async function updateTeamMeta(
     // erreur MySQL brute jusqu'à la notification.
     const check = checkTeamName(patch.name);
     if (!check.ok) throw new Error(check.reason);
-    await assertTeamNameAvailable(db, check.name, teamId);
-    updates.push("name = ?");
-    params.push(check.name);
+    // Le formulaire renvoie toujours le nom : seul un nom **changé** (casse
+    // comprise, comparaison exacte) s'écrit et vide les vues qui le montrent —
+    // sans quoi chaque enregistrement d'une description ferait recalculer
+    // podium et cartes d'aperçu aux visiteurs.
+    const [current] = await db.execute<(RowDataPacket & { name: string })[]>(
+      `SELECT name FROM bg_teams WHERE id = ?`,
+      [teamId],
+    );
+    renamed = current[0]?.name !== check.name;
+    if (renamed) {
+      await assertTeamNameAvailable(db, check.name, teamId);
+      updates.push("name = ?");
+      params.push(check.name);
+    }
   }
 
   if (patch.description !== undefined) {
@@ -151,30 +164,65 @@ export async function updateTeamMeta(
     throw error;
   }
   // Le nom est servi par l'accueil et `/classement` depuis le cache de la
-  // vitrine (leaderboard, bandeau, mini-arbre) : sans cela, l'ancien nom y
-  // restait jusqu'à 60 s.
-  if (patch.name !== undefined) invalidateLandingTeamViews();
+  // vitrine (leaderboard, bandeau, mini-arbre) et par la liste du classement
+  // (podium, cartes d'aperçu) : sans cela, l'ancien nom y restait jusqu'à 60 s.
+  if (renamed) invalidateTeamIdentityViews();
 }
 
+/**
+ * Pose (ou retire, `null`) le logo d'une équipe et rend l'adresse de celui
+ * qu'il remplace, que l'appelant efface **après** le commit.
+ *
+ * L'ancienne adresse se relit **sous verrou**, dans la transaction de
+ * l'écriture : lue avant, deux envois (ou un envoi et un retrait) simultanés
+ * lisaient le même ancien logo, et le fichier posé par le premier n'était plus
+ * désigné par rien — servi à son adresse publique, hors de portée de la
+ * conservation et de la modération. Même règle que `removeTeamLogoAsModerator`.
+ */
 export async function updateTeamLogo(
   requesterId: number,
   teamId: number,
   logoPath: string | null,
   viewerManagesGhostTeams = false,
-): Promise<void> {
+): Promise<{ previousLogoUrl: string | null }> {
   // Retirer un logo n'attend aucune acceptation : c'est justement le geste
   // qu'on veut voir faire à qui doute de ses droits sur l'image.
-  await assertCanActOnTeam(
-    await userCanManageTeam(teamId, requesterId),
-    requesterId,
-    teamId,
-    viewerManagesGhostTeams,
-    logoPath !== null,
-  );
+  const viaRole = await userCanManageTeam(teamId, requesterId);
+  await assertCanActOnTeam(viaRole, requesterId, teamId, viewerManagesGhostTeams, logoPath !== null);
   const db = await getDatabase();
-  await db.execute(`UPDATE bg_teams SET logo_url = ? WHERE id = ?`, [logoPath, teamId]);
-  // Logo servi par le leaderboard de l'accueil et de `/classement` (cache de la vitrine).
-  invalidateLandingTeamViews();
+  const connection = await db.getConnection();
+  let previousLogoUrl: string | null = null;
+  try {
+    await connection.beginTransaction();
+    // Le droit est **rejugé** sous le verrou, comme à la dissolution
+    // (`softDeleteTeam`) : lu seulement avant, un envoi croisé avec une
+    // dissolution reposait un logo sur l'équipe anonymisée, et un gérant
+    // rétrogradé (ou le staff sur une fantôme reprise) l'écrivait encore.
+    const [rows] = await connection.execute<
+      (RowDataPacket & { logo_url: string | null; deleted_at: Date | null; is_ghost: 0 | 1 })[]
+    >(`SELECT logo_url, deleted_at, is_ghost FROM bg_teams WHERE id = ? FOR UPDATE`, [teamId]);
+    if (rows.length === 0 || rows[0].deleted_at) throw new Error("FORBIDDEN");
+    if (viaRole) {
+      if (!hasTeamManagementRole(await lockMemberRoles(connection, teamId, requesterId))) {
+        throw new Error("FORBIDDEN");
+      }
+    } else if (rows[0].is_ghost !== 1) {
+      throw new Error("FORBIDDEN");
+    }
+    previousLogoUrl = rows[0].logo_url ?? null;
+    await connection.execute(`UPDATE bg_teams SET logo_url = ? WHERE id = ?`, [logoPath, teamId]);
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+  // Logo servi par le leaderboard de l'accueil et de `/classement` (cache de la
+  // vitrine), le podium et les cartes d'aperçu (liste du classement) — vidés
+  // seulement s'il a changé : retirer un logo absent ne coûte rien aux visiteurs.
+  if (previousLogoUrl !== logoPath) invalidateTeamIdentityViews();
+  return { previousLogoUrl };
 }
 
 /**
@@ -212,8 +260,8 @@ export async function removeTeamLogoAsModerator(
       [logoUrl, teamId],
     );
     await connection.commit();
-    // Un logo retiré par la modération ne reste pas servi par le cache de la vitrine.
-    invalidateLandingTeamViews();
+    // Un logo retiré par la modération ne reste servi par aucun cache.
+    invalidateTeamIdentityViews();
     return {
       teamName: rows[0].name,
       removedLogoUrl: logoUrl,
@@ -227,12 +275,3 @@ export async function removeTeamLogoAsModerator(
   }
 }
 
-export async function getTeamLogoUrl(teamId: number): Promise<string | null> {
-  const db = await getDatabase();
-  const [rows] = await db.execute<(RowDataPacket & { logo_url: string | null })[]>(
-    `SELECT logo_url FROM bg_teams WHERE id = ? LIMIT 1`,
-    [teamId],
-  );
-  if (rows.length === 0) return null;
-  return rows[0].logo_url;
-}

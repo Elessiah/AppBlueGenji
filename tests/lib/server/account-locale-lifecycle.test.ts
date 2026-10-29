@@ -63,7 +63,7 @@ describe("langue du compte — lecture", () => {
 
 describe("langue du compte — anonymisation", () => {
   it("revient au français", async () => {
-    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(undefined);
+    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(true);
     const execute = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
 
     await anonymizeAccount(fakeConnection({ execute }), 42);
@@ -80,7 +80,7 @@ describe("langue du compte — anonymisation", () => {
 
 describe("messages privés de match — anonymisation", () => {
   it("remet le choix au défaut par une instruction à part, sur la ligne supprimée", async () => {
-    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(undefined);
+    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(true);
     const execute = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
     await anonymizeAccount(fakeConnection({ execute }), 42);
     const reset = execute.mock.calls.find(([sql]) => String(sql).includes("match_dm_enabled"));
@@ -88,7 +88,7 @@ describe("messages privés de match — anonymisation", () => {
   });
 
   it("n'empêche pas l'effacement quand la colonne manque (migration en échec)", async () => {
-    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(undefined);
+    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(true);
     const missing = Object.assign(new Error("Unknown column"), { code: "ER_BAD_FIELD_ERROR" });
     const execute = jest.fn<SqlQuery>(async (sql) => {
       if (sql.includes("match_dm_enabled")) throw missing;
@@ -98,7 +98,7 @@ describe("messages privés de match — anonymisation", () => {
   });
 
   it("laisse passer toute autre erreur", async () => {
-    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(undefined);
+    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(true);
     const execute = jest.fn<SqlQuery>(async (sql) => {
       if (sql.includes("match_dm_enabled")) throw Object.assign(new Error("lock"), { code: "ER_LOCK_WAIT_TIMEOUT" });
       return [[], []];
@@ -109,7 +109,7 @@ describe("messages privés de match — anonymisation", () => {
 
 describe("« Ne plus afficher » du recrutement — anonymisation", () => {
   it("remet le choix au défaut par une instruction à part, sur la ligne supprimée", async () => {
-    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(undefined);
+    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(true);
     const execute = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
     await anonymizeAccount(fakeConnection({ execute }), 42);
     const reset = execute.mock.calls.find(([sql]) => String(sql).includes("recruitment_modal_off"));
@@ -117,7 +117,7 @@ describe("« Ne plus afficher » du recrutement — anonymisation", () => {
   });
 
   it("n'empêche pas l'effacement quand la colonne manque (migration en échec)", async () => {
-    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(undefined);
+    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(true);
     const missing = Object.assign(new Error("Unknown column"), { code: "ER_BAD_FIELD_ERROR" });
     const execute = jest.fn<SqlQuery>(async (sql) => {
       if (sql.includes("recruitment_modal_off")) throw missing;
@@ -143,7 +143,7 @@ describe("« Ne plus voir » de la certification Discord — anonymisation", () 
   const isReset = (sql: unknown) => String(sql).includes("discord_certify_prompt_dismissed_at");
 
   it("efface le choix par une instruction à part, sur la ligne supprimée", async () => {
-    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(undefined);
+    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(true);
     const execute = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
     await anonymizeAccount(fakeConnection({ execute }), 42);
     const reset = execute.mock.calls.find(([sql]) => isReset(sql));
@@ -154,7 +154,7 @@ describe("« Ne plus voir » de la certification Discord — anonymisation", () 
   });
 
   it("n'empêche pas l'effacement quand la colonne manque (migration en échec)", async () => {
-    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(undefined);
+    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(true);
     const missing = Object.assign(new Error("Unknown column"), { code: "ER_BAD_FIELD_ERROR" });
     const execute = jest.fn<SqlQuery>(async (sql) => {
       if (isReset(sql)) throw missing;
@@ -164,7 +164,7 @@ describe("« Ne plus voir » de la certification Discord — anonymisation", () 
   });
 
   it("laisse passer toute autre erreur", async () => {
-    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(undefined);
+    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(true);
     const execute = jest.fn<SqlQuery>(async (sql) => {
       if (isReset(sql)) throw Object.assign(new Error("lock"), { code: "ER_LOCK_WAIT_TIMEOUT" });
       return [[], []];
@@ -177,7 +177,7 @@ describe("« Ne plus voir » de l'invitation à certifier de la fiche tournoi �
   const isReset = (sql: unknown) => String(sql).includes("certification_prompt_dismissed_at") && !String(sql).includes("discord_certify");
 
   it("efface le choix par une instruction à part, sur la ligne supprimée", async () => {
-    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(undefined);
+    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(true);
     const execute = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
     await anonymizeAccount(fakeConnection({ execute }), 42);
     const reset = execute.mock.calls.find(([sql]) => isReset(sql));
@@ -188,7 +188,7 @@ describe("« Ne plus voir » de l'invitation à certifier de la fiche tournoi �
   });
 
   it("n'empêche pas l'effacement quand la colonne manque (migration en échec)", async () => {
-    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(undefined);
+    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(true);
     const missing = Object.assign(new Error("Unknown column"), { code: "ER_BAD_FIELD_ERROR" });
     const execute = jest.fn<SqlQuery>(async (sql) => {
       if (isReset(sql)) throw missing;
@@ -198,7 +198,7 @@ describe("« Ne plus voir » de l'invitation à certifier de la fiche tournoi �
   });
 
   it("laisse passer toute autre erreur", async () => {
-    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(undefined);
+    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(true);
     const execute = jest.fn<SqlQuery>(async (sql) => {
       if (isReset(sql)) throw Object.assign(new Error("lock"), { code: "ER_LOCK_WAIT_TIMEOUT" });
       return [[], []];

@@ -1,5 +1,10 @@
 import { getCurrentUser } from "@/lib/server/auth";
-import { DIRECTORY_READ_RULE, enforceRateLimit } from "@/lib/server/api-guard";
+import {
+  DIRECTORY_READ_RULE,
+  enforceRateLimit,
+  refundRateLimitFor,
+  TEAM_LIFECYCLE_RULE,
+} from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
 import { listTeams } from "@/lib/server/teams/directory";
 import { createTeam } from "@/lib/server/teams/identity";
@@ -45,6 +50,29 @@ function refuseTermsAcceptance(body: { acceptTerms?: boolean; termsVersion?: unk
   return null;
 }
 
+/**
+ * Création soumise au plafond des créations et dissolutions d'un compte
+ * (`TEAM_LIFECYCLE_RULE`) — le staff `tournaments` n'y est pas soumis. La
+ * place est réservée avant l'écriture (en une instruction) et rendue si la
+ * création échoue : seule une création réussie est décomptée.
+ */
+async function createCappedTeam(
+  user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>,
+  name: string,
+  description: string | null,
+  tag: string | null,
+) {
+  const capped = !can(user, "tournaments");
+  const throttled = capped ? enforceRateLimit(TEAM_LIFECYCLE_RULE, user.id) : null;
+  if (throttled) return throttled;
+  try {
+    return ok({ teamId: await createTeam(user.id, name, description, tag) }, 201);
+  } catch (error) {
+    if (capped) refundRateLimitFor(TEAM_LIFECYCLE_RULE, user.id);
+    throw error;
+  }
+}
+
 export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
@@ -82,8 +110,7 @@ export async function POST(req: Request) {
     // du formulaire. Refusé avant toute écriture, pas après.
     const termsRefusal = refuseTermsAcceptance(body);
     if (termsRefusal) return termsRefusal;
-    const teamId = await createTeam(user.id, name, body.description ?? null, tagCheck.tag);
-    return ok({ teamId }, 201);
+    return await createCappedTeam(user, name, body.description ?? null, tagCheck.tag);
   } catch (error) {
     const message = (error as Error).message;
     if (message === "USER_ALREADY_IN_TEAM") return fail(message, 409);

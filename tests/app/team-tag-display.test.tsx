@@ -30,6 +30,7 @@ function team(overrides: Partial<TeamListItem> = {}): TeamListItem {
     points: 21,
     wins: 6,
     losses: 3,
+    draws: 0,
     form: [],
     games: [],
     rosterPreview: [],

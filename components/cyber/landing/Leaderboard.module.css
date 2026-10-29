@@ -126,6 +126,16 @@
   color: var(--ink-dim);
 }
 
+/* Entrée au classement : une couleur à elle, jamais celle d'une montée. */
+.trendNew {
+  color: var(--pink-400);
+}
+
+.draws {
+  color: var(--ink-dim);
+  margin-left: 6px;
+}
+
 .empty {
   padding: 24px 0;
   color: var(--ink-mute);

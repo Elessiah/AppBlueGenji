@@ -65,10 +65,13 @@
     "wins": "Victoires",
     "lossesShort": "Déf.",
     "losses": "Défaites",
+    "drawsShort": "Nuls",
+    "draws": "Matchs nuls",
     "roster": "Roster",
     "founded": "FONDÉE · {date}",
     "cta": "Voir l'équipe →",
     "record": "{wins}V – <loss>{losses}D</loss>",
+    "recordDraws": "{wins}V – <loss>{losses}D</loss> – {draws}N",
     "ptsShort": "PTS"
   },
   "points": {

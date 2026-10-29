@@ -16,7 +16,6 @@ import { useTeamsText } from "@/components/i18n/teams-text";
 import { richNodes } from "@/components/i18n/shell-text";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { compareLocalText } from "@/lib/shared/dates";
-import { compareDirectoryRank } from "@/lib/shared/ranking";
 import s from "../_shared/annuaire.module.css";
 
 // Violet néon (`--violet-400-rgb`, littéral : le canevas de fond ne lit pas les variables CSS).
@@ -102,8 +101,9 @@ export default function TeamsList() {
   // Trié une fois par liste et par ordre choisi ; la recherche ne fait ensuite
   // qu'un filtre, qui garde l'ordre (revue de performance du lot 9-2).
   const sorted = useMemo(() => {
+    // `listTeams` rend déjà la liste dans l'ordre du classement : rien à retrier.
+    if (sort === "rank") return teams;
     const r = [...teams];
-    if (sort === "rank") r.sort(compareDirectoryRank);
     if (sort === "name") {
       const compare = compareLocalText(text.locale);
       r.sort((a, b) => compare(a.name, b.name));

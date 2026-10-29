@@ -46,6 +46,7 @@
     "GHOST_TEAM_CREATE_FAILED": "The ghost team couldn't be created.",
     "TEAMS_LOAD_FAILED": "The team list couldn't be loaded.",
     "TEAM_DELETE_FAILED": "The team couldn't be disbanded.",
+    "TOO_MANY_REQUESTS": "Too many requests in a row. Wait a while before trying again.",
     "TEAM_CLAIM_FAILED": "The takeover offer couldn't be sent.",
     "TEAM_OWNERSHIP_TRANSFER_FAILED": "Ownership couldn't be transferred.",
     "LOGO_UPLOAD_FAILED": "The logo couldn't be uploaded.",
