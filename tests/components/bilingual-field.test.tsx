@@ -133,3 +133,28 @@ describe("refus d'anglais — un code, un champ, la phrase de l'éditeur des tex
     expect(englishErrorMessage(ad.ok ? null : ad.error)).toBe("La traduction anglaise est requise.");
   });
 });
+
+describe("BilingualField — lecture seule pendant l'envoi", () => {
+  function renderReadOnly(readOnly: boolean | undefined): string {
+    return renderToStaticMarkup(
+      <BilingualField
+        label="Rôle"
+        ids={{ fr: IDS.role, en: IDS.roleEn }}
+        fields={{ fr: "role", en: "roleEn" }}
+        errors={errors(null)}
+        values={{ fr: "Président", en: "Chair" }}
+        onChange={() => undefined}
+        maxLength={120}
+        readOnly={readOnly}
+      />,
+    );
+  }
+
+  it("readOnly pose readonly sur les deux champs", () => {
+    expect(renderReadOnly(true).match(/readonly=""/g)).toHaveLength(2);
+  });
+
+  it("par défaut, les champs restent modifiables", () => {
+    expect(renderReadOnly(undefined)).not.toContain("readonly");
+  });
+});

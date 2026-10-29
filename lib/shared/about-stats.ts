@@ -24,6 +24,7 @@ export type AboutStat = {
 
 export type AboutStatInput = {
   value: string;
+  /** `undefined` (clé absente d'une mise à jour) : l'anglais enregistré est conservé ; `null` ou vide l'efface. */
   valueEn?: string | null;
   label: string;
   labelEn?: string | null;
@@ -100,9 +101,10 @@ export function aboutStatValueIsFrench(stat: Pick<AboutStat, "value" | "valueEn"
 
 /**
  * Écriture propre au français dans une valeur : groupe de milliers espacé
- * (« 4 200 »), virgule décimale (« 1,5 », pas « 1,000 ») ou euro en suffixe (« 0 € »).
+ * (« 4 200 », espace fine comprise), virgule décimale (« 1,5 », pas « 1,000 »),
+ * euro en suffixe (« 0 € ») ou espace avant « % » (« 100 % »).
  */
-const FRENCH_NUMBER_FORMAT = /\d[ \u00a0\u202f]\d{3}(?!\d)|\d,(?!\d{3}(?!\d))\d|\d\s*€/u;
+const FRENCH_NUMBER_FORMAT = /\d[ \u00a0\u2009\u202f]\d{3}(?!\d)|\d,(?!\d{3}(?!\d))\d|\d\s*€|\d\s+%/u;
 
 /**
  * La valeur attend-elle une valeur anglaise ? Sans anglais saisi, quand elle
@@ -111,7 +113,7 @@ const FRENCH_NUMBER_FORMAT = /\d[ \u00a0\u202f]\d{3}(?!\d)|\d,(?!\d{3}(?!\d))\d|
  * « €4200 » se lisent aussi bien en anglais.
  */
 export function aboutStatValueNeedsEnglish(stat: Pick<AboutStat, "value" | "valueEn">): boolean {
-  return aboutStatValueIsFrench(stat, "en") || (!hasEnglish(stat.valueEn) && FRENCH_NUMBER_FORMAT.test(stat.value));
+  return !hasEnglish(stat.valueEn) && (/\p{L}/u.test(stat.value) || FRENCH_NUMBER_FORMAT.test(stat.value));
 }
 
 /**

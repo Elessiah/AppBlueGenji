@@ -215,7 +215,7 @@ describe("LandingDialog — fermeture d'en-tête et listes déroulantes", () => 
 
 describe("modales de gestion des pages publiques", () => {
   it.each([
-    "components/cyber/landing/AboutStats.tsx",
+    "components/cyber/landing/AboutStatEditor.tsx",
     "components/cyber/landing/AboutPillars.tsx",
     "components/cyber/landing/SponsorsGrid.tsx",
     "components/cyber/landing/FooterContact.tsx",

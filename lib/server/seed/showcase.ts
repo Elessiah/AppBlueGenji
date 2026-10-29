@@ -248,8 +248,8 @@ export async function createAboutStats(db: Pool): Promise<void> {
     try {
       await db.execute(
         `INSERT INTO bg_about_stats (value, value_en, label, label_en, display_order)
-         VALUES (?, ?, ?, ?, ?)`,
-        [s.value, s.value_en, s.label, s.label_en, (i + 1) * 10]
+         VALUES (?, ?, ?, ?, (SELECT COALESCE(MAX(display_order), 0) + 10 FROM bg_about_stats AS s))`,
+        [s.value, s.value_en, s.label, s.label_en]
       );
     } catch (error) {
       console.error(`  ✗ ${s.label}:`, (error as Error).message);

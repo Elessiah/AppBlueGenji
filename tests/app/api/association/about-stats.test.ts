@@ -164,6 +164,24 @@ describe("PUT /api/association/about-stats/[id]", () => {
     expect(service.updateAboutStat).toHaveBeenCalledWith(3, expect.objectContaining({ valueEn: "X en" }));
   });
 
+  it("leaves valueEn undefined when the key is absent, so the stored English survives", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.updateAboutStat).mockResolvedValue({ id: 3, value: "X", valueEn: "kept", label: "Y", labelEn: "Y en" });
+
+    await PUT(jsonReq("PUT", { value: "X", label: "Y", labelEn: "Y en" }), params("3"));
+    const input = jest.mocked(service.updateAboutStat).mock.calls[0][1];
+    expect(input.valueEn).toBeUndefined();
+  });
+
+  it("clears valueEn when the key is present but not text (null, number)", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.updateAboutStat).mockResolvedValue({ id: 3, value: "X", valueEn: null, label: "Y", labelEn: "Y en" });
+
+    await PUT(jsonReq("PUT", { value: "X", valueEn: null, label: "Y", labelEn: "Y en" }), params("3"));
+    await PUT(jsonReq("PUT", { value: "X", valueEn: 5, label: "Y", labelEn: "Y en" }), params("3"));
+    expect(jest.mocked(service.updateAboutStat).mock.calls.map((c) => c[1].valueEn)).toEqual([null, null]);
+  });
+
   it("returns 404 when the stat does not exist", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
     jest.mocked(service.updateAboutStat).mockRejectedValue(new Error("ABOUT_STAT_NOT_FOUND"));
