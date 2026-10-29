@@ -160,6 +160,15 @@ describe("withoutInvisibles — drapeaux de subdivision et suites d'espaces", ()
     expect(withoutInvisibles(`${cp(0x1f3f4)}${tag("abcdefghi")}${cp(0xe007f)}`)).toBe(cp(0x1f3f4));
   });
 
+  it.each(["gbeng", "gbwls"])("withoutInvisibles_subdivisionFlag_keeps%s", (code) => {
+    const flag = `${cp(0x1f3f4)}${tag(code)}${cp(0xe007f)}`;
+    expect(withoutInvisibles(flag)).toBe(flag);
+  });
+
+  it("withoutInvisibles_flagWithArbitraryTagPayload_removesTags", () => {
+    expect(withoutInvisibles(`${cp(0x1f3f4)}${tag("secret")}${cp(0xe007f)}`)).toBe(cp(0x1f3f4));
+  });
+
   it("withoutInvisibles_runsOfSpaces_collapsedToOne", () => {
     expect(withoutInvisibles(`A${cp(0xa0)}${cp(0xa0)}${cp(0x3000)}  B`)).toBe("A B");
   });

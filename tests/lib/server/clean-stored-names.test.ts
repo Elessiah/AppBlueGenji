@@ -211,6 +211,43 @@ describe("cleanStoredNames", () => {
     expect(execute.mock.calls.some(([sql]) => sql.startsWith("INSERT INTO bg_settings"))).toBe(false);
   });
 
+  it("arrête la passe à la première écriture en échec (verrou tenu) : une seule attente, pas de marqueur", async () => {
+    const { execute, pool } = database(
+      {
+        bg_teams: [
+          { id: 1, name: "A​b" },
+          { id: 2, name: "C​d" },
+        ],
+        bg_users: [{ id: 3, name: "E​f" }],
+      },
+      () => {
+        throw mysqlError("ER_LOCK_WAIT_TIMEOUT");
+      },
+    );
+
+    await expect(cleanStoredNames(pool)).resolves.toBeUndefined();
+
+    expect(updates(execute)).toHaveLength(1);
+    expect(execute.mock.calls.some(([sql]) => sql.startsWith("INSERT INTO bg_settings"))).toBe(false);
+  });
+
+  it("détruit la connexion de passe quand le délai ne peut lui être rendu", async () => {
+    const release = jest.fn<() => void>();
+    const destroy = jest.fn<() => void>();
+    const execute = jest.fn<SqlQuery>(async (sql) => {
+      if (sql.startsWith("SELECT 1 FROM bg_settings")) return [[], undefined];
+      if (sql === "SET SESSION innodb_lock_wait_timeout = DEFAULT") throw mysqlError("PROTOCOL_CONNECTION_LOST");
+      if (sql.startsWith("SELECT")) return [[], undefined];
+      return [{ affectedRows: 1 }, undefined];
+    });
+    const getConnection = jest.fn(async () => fakeConnection({ execute, release, destroy }));
+
+    await cleanStoredNames(fakePool({ execute, getConnection }));
+
+    expect(destroy).toHaveBeenCalledTimes(1);
+    expect(release).not.toHaveBeenCalled();
+  });
+
   it("ne lit rien quand le marqueur est posé", async () => {
     const { execute, pool } = database({ bg_teams: [{ id: 1, name: "A\u200Bb" }] }, undefined, true);
 

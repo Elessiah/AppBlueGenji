@@ -31,8 +31,8 @@ const CONTROL = /\p{Cc}/gu;
  * commandes de direction, césure conditionnelle, étiquettes Unicode…
  *
  * Deux exceptions. La **suite d'étiquettes d'un drapeau de subdivision**
- * (U+1F3F4 puis 2 à 8 lettres ou chiffres en étiquettes, close par U+E007F :
- * le drapeau de l'Écosse d'une « Scotland Cup ») : sans elle, le drapeau
+ * (U+1F3F4 puis `gbeng`, `gbsct` ou `gbwls` en étiquettes, close par U+E007F :
+ * les trois seuls drapeaux de subdivision d'Unicode, dont l'Écosse d'une « Scotland Cup ») : sans elle, le drapeau
  * retombe sur le drapeau noir. Hors de ce motif complet et borné, les
  * étiquettes restent retirées — invisibles, elles pourraient cacher du texte.
  *
@@ -41,7 +41,7 @@ const CONTROL = /\p{Cc}/gu;
  * peau comprise (le modificateur se place avant le liant). Hors de ce rôle, il
  * est invisible comme les autres.
  */
-const FORMAT = /(\u{1F3F4}[\u{E0030}-\u{E0039}\u{E0061}-\u{E007A}]{2,8}\u{E007F})|\p{Cf}/gu;
+const FORMAT = /(\u{1F3F4}\u{E0067}\u{E0062}(?:\u{E0065}\u{E006E}\u{E0067}|\u{E0073}\u{E0063}\u{E0074}|\u{E0077}\u{E006C}\u{E0073})\u{E007F})|\p{Cf}/gu;
 const EMOJI_JOINER = /(?<=\p{Extended_Pictographic}(?:\uFE0F|\p{Emoji_Modifier})?)\u200D(?=\p{Extended_Pictographic})/gu;
 
 /**

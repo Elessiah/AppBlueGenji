@@ -389,15 +389,25 @@ export async function cleanStoredNames(db: Pool): Promise<void> {
     // verrou de migration.
     await connection.execute(`SET SESSION innodb_lock_wait_timeout = ${CLEAN_NAMES_LOCK_WAIT_SECONDS}`);
     for (const target of STORED_NAME_COLUMNS) {
-      complete = (await cleanNameColumn(connection, target)) && complete;
+      // Une écriture en échec (verrou tenu : 5 s d'attente par ligne) arrête la passe : elle reprendra au démarrage suivant.
+      const done = await cleanNameColumn(connection, target);
+      if (done === "aborted") {
+        complete = false;
+        break;
+      }
+      complete = done && complete;
     }
   } catch (error) {
     complete = false;
     reportSchemaFailure(error, "SET SESSION innodb_lock_wait_timeout (nettoyage des noms)");
   } finally {
-    // Délai rendu au pool ; une connexion perdue n'y retournera de toute façon pas.
-    await connection.execute("SET SESSION innodb_lock_wait_timeout = DEFAULT").catch(() => undefined);
-    connection.release();
+    // Délai rendu au pool ; une connexion qui ne répond plus est détruite, pas rendue avec son délai de 5 s.
+    const reset = await connection
+      .execute("SET SESSION innodb_lock_wait_timeout = DEFAULT")
+      .then(() => true)
+      .catch(() => false);
+    if (reset) connection.release();
+    else connection.destroy();
   }
   if (complete) await markCleanNamesDone(db);
 }
@@ -428,8 +438,11 @@ async function markCleanNamesDone(db: Pool): Promise<void> {
 
 type CleanTarget = (typeof STORED_NAME_COLUMNS)[number];
 
-/** Une colonne de `cleanStoredNames` : lue d'un trait, réécrite ligne à ligne. Vrai si menée à bout. */
-async function cleanNameColumn(db: PoolConnection, { table, column, logIds }: CleanTarget): Promise<boolean> {
+/** Une colonne de `cleanStoredNames` : lue d'un trait, réécrite ligne à ligne. Vrai si menée à bout ; `"aborted"` si une écriture a échoué (la passe s'arrête). */
+async function cleanNameColumn(
+  db: PoolConnection,
+  { table, column, logIds }: CleanTarget,
+): Promise<boolean | "aborted"> {
   let rows: StoredNameRow[];
   try {
     [rows] = await db.execute<StoredNameRow[]>(`SELECT id, ${column} AS name FROM ${table}`);
@@ -443,8 +456,10 @@ async function cleanNameColumn(db: PoolConnection, { table, column, logIds }: Cl
   for (const row of rows) {
     const outcome = await rewriteName(db, table, column, row);
     if (outcome === "kept") keptIds.push(row.id);
-    else if (outcome === "failed") failed = true;
-    else cleaned += outcome;
+    else if (outcome === "failed") {
+      failed = true;
+      break;
+    } else cleaned += outcome;
   }
   if (cleaned > 0 || keptIds.length > 0) {
     const ids = logIds && keptIds.length > 0 ? ` (id : ${keptIds.join(", ")})` : "";
@@ -453,7 +468,7 @@ async function cleanNameColumn(db: PoolConnection, { table, column, logIds }: Cl
         `${keptIds.length} laissé(s) tel(s) quel(s) (vide une fois nettoyé, ou doublon)${ids}.`,
     );
   }
-  return !failed;
+  return failed ? "aborted" : true;
 }
 
 /** Lignes réécrites (0 si le nom est déjà propre ou a changé depuis), `"kept"` ou `"failed"`. */
