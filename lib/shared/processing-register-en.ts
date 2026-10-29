@@ -157,7 +157,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     ],
     recipients: [
       "The site's public (only the data the player makes visible)",
-      "Parties to the same match: only in its “Contacts” window and its launch window for the BattleTag of a player presented as a contact, also on the match page for that of the assigned referee and those of the casters — (BattleTag even when hidden, to add each other in game, in Overwatch tournaments only; durations of record T04)",
+      "Parties to the same match: in its “Contacts” window and its launch window, for the BattleTag of any contact presented (player, caster, assigned referee); on the match page as well, for the BattleTag of the assigned referee and the casters only — (BattleTag even when hidden, to add each other in game, in Overwatch tournaments only; durations of record T04)",
       "Logged-in players of the site: certified Discord username, if the player makes it visible; certification badges on the player page (certified Discord tag, “Verified BattleTag” — BattleTag taken from a linked Battle.net account), even when the tag is hidden, without the tag",
       "The association's staff according to their role (administration, refereeing)",
       "The association's Discord bot (T08): the account language, with the code sent by direct message only",
