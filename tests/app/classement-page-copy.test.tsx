@@ -9,7 +9,7 @@ jest.mock("next/navigation", () => ({
 jest.mock("@/lib/server/request-locale", () => ({ requestLocale: async () => "fr" }));
 jest.mock("@/lib/server/auth", () => ({ getCurrentUser: jest.fn() }));
 jest.mock("@/lib/server/site-copy-service", () => ({ getSiteCopy: jest.fn(), getSiteCopyEditor: jest.fn() }));
-jest.mock("@/lib/server/landing-service", () => ({ loadLeaderboardRows: jest.fn() }));
+jest.mock("@/lib/server/landing-service", () => ({ getLeaderboardRows: jest.fn() }));
 jest.mock("@/lib/server/teams/directory", () => ({ loadCachedTeamForms: jest.fn() }));
 // Le gabarit (asynchrone) a ses propres tests : seul le contenu compte ici.
 jest.mock("@/components/cyber/landing/SessionPageShell", () => ({
@@ -21,7 +21,7 @@ import ClassementPage, { generateMetadata } from "@/app/classement/page";
 import { ToastProvider } from "@/components/ui/toast";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getSiteCopy } from "@/lib/server/site-copy-service";
-import { loadLeaderboardRows } from "@/lib/server/landing-service";
+import { getLeaderboardRows } from "@/lib/server/landing-service";
 import { loadCachedTeamForms } from "@/lib/server/teams/directory";
 import { defaultSiteCopy } from "@/lib/shared/site-copy";
 import { authUser } from "../helpers/auth-user";
@@ -41,7 +41,7 @@ async function render(): Promise<string> {
 describe("/classement — en-tête éditable", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.mocked(loadLeaderboardRows).mockResolvedValue([]);
+    jest.mocked(getLeaderboardRows).mockResolvedValue([]);
     jest.mocked(loadCachedTeamForms).mockResolvedValue(new Map());
     jest.mocked(getSiteCopy).mockResolvedValue(defaultSiteCopy());
     jest.mocked(getCurrentUser).mockResolvedValue(null);

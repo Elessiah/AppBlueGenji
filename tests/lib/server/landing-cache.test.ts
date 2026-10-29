@@ -5,6 +5,9 @@ import {
   cachedLanding,
   LANDING_LIVE_KEY,
   LANDING_TICKER_KEY,
+  LANDING_STATS_KEY,
+  LANDING_MINI_BRACKET_KEY_PREFIX,
+  invalidateLandingLeaderboards,
   invalidateLandingAggregates,
   invalidateLandingTeamViews,
   invalidateLandingLive,
@@ -91,19 +94,62 @@ describe("cache de la vitrine", () => {
     expect(loader).toHaveBeenCalledTimes(2);
   });
 
-  it.each(["stats", "live"])(
-    "garde l'entrée « %s » à l'invalidation des vues d'équipes",
-    async (key) => {
-      // Une dissolution ne change pas les compteurs ; le direct vit 5 s.
-      const loader = jest.fn(async () => "valeur");
-      await cachedLanding(key, LANDING_TTL_MS, loader as () => Promise<string>);
+  it("garde l'entrée « live » à l'invalidation des vues d'équipes", async () => {
+    // Le direct vit 5 s : une dissolution ne change aucun match.
+    const loader = jest.fn(async () => "valeur");
+    await cachedLanding("live", LANDING_TTL_MS, loader as () => Promise<string>);
 
-      invalidateLandingTeamViews();
-      await cachedLanding(key, LANDING_TTL_MS, loader as () => Promise<string>);
+    invalidateLandingTeamViews();
+    await cachedLanding("live", LANDING_TTL_MS, loader as () => Promise<string>);
 
-      expect(loader).toHaveBeenCalledTimes(1);
-    },
-  );
+    expect(loader).toHaveBeenCalledTimes(1);
+  });
+
+  it("invalidateLandingTeamViews_cachedStats_reloadsActiveTeamCount", async () => {
+    // « Équipes actives » filtre `deleted_at` : une dissolution doit le vider.
+    const loader = jest.fn(async () => "valeur");
+    await cachedLanding(LANDING_STATS_KEY, LANDING_TTL_MS, loader as () => Promise<string>);
+
+    invalidateLandingTeamViews();
+    await cachedLanding(LANDING_STATS_KEY, LANDING_TTL_MS, loader as () => Promise<string>);
+
+    expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  it("invalidateLandingTeamViews_cachedMiniBracket_reloadsTeamNames", async () => {
+    const loader = jest.fn(async () => "valeur");
+    await cachedLanding(`${LANDING_MINI_BRACKET_KEY_PREFIX}7`, LANDING_TTL_MS, loader as () => Promise<string>);
+
+    invalidateLandingTeamViews();
+    await cachedLanding(`${LANDING_MINI_BRACKET_KEY_PREFIX}7`, LANDING_TTL_MS, loader as () => Promise<string>);
+
+    expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  it("invalidateLandingAggregates_cachedMiniBracket_reloadsAfterScore", async () => {
+    // Clé sous le préfixe `landing:` : un score la vide avec le reste de l'accueil.
+    const loader = jest.fn(async () => "valeur");
+    await cachedLanding(`${LANDING_MINI_BRACKET_KEY_PREFIX}7`, LANDING_TTL_MS, loader as () => Promise<string>);
+
+    invalidateLandingAggregates();
+    await cachedLanding(`${LANDING_MINI_BRACKET_KEY_PREFIX}7`, LANDING_TTL_MS, loader as () => Promise<string>);
+
+    expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  it("invalidateLandingLeaderboards_cachedLeaderboardAndStats_reloadsLeaderboardOnly", async () => {
+    const leaderboard = jest.fn(async () => "rangs");
+    const stats = jest.fn(async () => "compteurs");
+    await cachedLanding("leaderboard:all", LANDING_TTL_MS, leaderboard as () => Promise<string>);
+    await cachedLanding(LANDING_STATS_KEY, LANDING_TTL_MS, stats as () => Promise<string>);
+
+    invalidateLandingLeaderboards();
+    await cachedLanding("leaderboard:all", LANDING_TTL_MS, leaderboard as () => Promise<string>);
+    await cachedLanding(LANDING_STATS_KEY, LANDING_TTL_MS, stats as () => Promise<string>);
+
+    expect(leaderboard).toHaveBeenCalledTimes(2);
+    expect(stats).toHaveBeenCalledTimes(1);
+  });
 
   it("range ses entrées sous un préfixe qui lui est propre", async () => {
     // Sans préfixe distinct, invalider la vitrine emporterait les instantanés

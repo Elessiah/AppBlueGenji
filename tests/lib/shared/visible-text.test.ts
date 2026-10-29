@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { visibleText, withoutInvisibles } from "@/lib/shared/visible-text";
+import { shownEntrantName, visibleText, withoutInvisibles } from "@/lib/shared/visible-text";
 import { checkTeamName } from "@/lib/shared/team-name";
 import { normalizePseudo } from "@/lib/server/serialization";
 
@@ -118,5 +118,24 @@ describe("withoutInvisibles — saisie du staff à la typographie gardée", () =
     const family = `👨${cp(0x200d)}👩${cp(0x200d)}👧`;
     expect(withoutInvisibles(family)).toBe(family);
     expect(withoutInvisibles("Prize" + String.fromCodePoint(10) + "pool")).toBe("Prize pool");
+  });
+});
+
+describe("shownEntrantName — nom d'engagé lu sans compte", () => {
+  it("shownEntrantName_nameWithInvisibles_keepsVisibleText", () => {
+    expect(shownEntrantName(`${cp(0x202e)}Alpha${cp(0x200b)}`)).toBe("Alpha");
+  });
+
+  it("shownEntrantName_onlyInvisibles_returnsNull", () => {
+    expect(shownEntrantName(`${cp(0x200b)}${cp(0x2060)}`)).toBeNull();
+  });
+
+  it("shownEntrantName_null_returnsNull", () => {
+    expect(shownEntrantName(null)).toBeNull();
+  });
+
+  it("shownEntrantName_compatibilityForms_notFolded", () => {
+    // Sans NFKC ni réduction des espaces (`UNTRUSTED_NAMES.md`).
+    expect(shownEntrantName("Ｔeam  A")).toBe("Ｔeam  A");
   });
 });

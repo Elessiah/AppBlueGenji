@@ -10,6 +10,8 @@ import { getDatabase } from "@/lib/server/database";
 import { deleteStoredImage } from "@/lib/server/image-upload";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
 import { fakePool } from "../../helpers/sql-double";
+import { clearCache } from "@/lib/server/cache";
+import { LANDING_STATS_KEY, LANDING_TICKER_KEY, LANDING_TTL_MS, cachedLanding } from "@/lib/server/landing-cache";
 import { ANONYMOUS_PSEUDOS } from "@/lib/shared/anonymous-pseudos";
 
 /**
@@ -620,5 +622,40 @@ describe("deleteOwnAccount — l'inscription solo est une question à part", () 
     expect(played).toContain("s.solo_user_id = u.id");
     expect(played).not.toContain("bg_tournament_registrations");
     expect(rest.split("AS solo_registered")[0]).toContain("bg_tournament_registrations");
+  });
+});
+
+// EF-24 : l'accueil nomme l'entrée solo du compte (bandeau, mini-arbre,
+// leaderboard) et compte les équipes : ses vues sont vidées après la suppression.
+describe("deleteOwnAccount — vues de l'accueil", () => {
+  beforeEach(() => {
+    clearCache();
+  });
+
+  async function warmLanding(loader: () => Promise<string>) {
+    await cachedLanding(LANDING_TICKER_KEY, LANDING_TTL_MS, loader);
+    await cachedLanding(LANDING_STATS_KEY, LANDING_TTL_MS, loader);
+  }
+
+  it("deleteOwnAccount_committed_clearsLandingTeamViews", async () => {
+    fakeDb(EMPTY);
+    const loader = jest.fn(async () => "vue");
+    await warmLanding(loader);
+
+    await deleteOwnAccount(7);
+    await warmLanding(loader);
+
+    expect(loader).toHaveBeenCalledTimes(4);
+  });
+
+  it("deleteOwnAccount_rolledBack_keepsLandingViews", async () => {
+    fakeDb(EMPTY, { failOn: "DELETE FROM bg_users" });
+    const loader = jest.fn(async () => "vue");
+    await warmLanding(loader);
+
+    await expect(deleteOwnAccount(7)).rejects.toThrow("DB_DOWN");
+    await warmLanding(loader);
+
+    expect(loader).toHaveBeenCalledTimes(2);
   });
 });

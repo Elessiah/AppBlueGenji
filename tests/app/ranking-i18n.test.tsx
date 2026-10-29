@@ -15,7 +15,7 @@ jest.mock("next/navigation", () => ({
 }));
 jest.mock("@/lib/server/auth", () => ({ getCurrentUser: jest.fn(async () => null) }));
 jest.mock("@/lib/server/site-copy-service", () => ({ getSiteCopy: jest.fn(), getSiteCopyEditor: jest.fn() }));
-jest.mock("@/lib/server/landing-service", () => ({ loadLeaderboardRows: jest.fn() }));
+jest.mock("@/lib/server/landing-service", () => ({ getLeaderboardRows: jest.fn() }));
 jest.mock("@/lib/server/teams/directory", () => ({ loadCachedTeamForms: jest.fn() }));
 jest.mock("@/components/cyber/landing/SessionPageShell", () => ({
   SessionPageShell: ({ children }: { children: ReactNode }) => <main>{children}</main>,
@@ -27,7 +27,7 @@ import { RankingBoard, podiumGapText } from "@/app/classement/RankingBoard";
 import { AppLocaleProvider } from "@/components/i18n/locale-context";
 import { ToastProvider } from "@/components/ui/toast";
 import { messagesFor } from "@/lib/server/i18n-messages";
-import { loadLeaderboardRows } from "@/lib/server/landing-service";
+import { getLeaderboardRows } from "@/lib/server/landing-service";
 import { getSiteCopy } from "@/lib/server/site-copy-service";
 import { loadCachedTeamForms } from "@/lib/server/teams/directory";
 import { MIGRATED_ROUTES } from "@/lib/shared/i18n-routes";
@@ -102,7 +102,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockLocale = "en";
   jest.mocked(getSiteCopy).mockImplementation(async (locale) => defaultSiteCopy(locale));
-  jest.mocked(loadLeaderboardRows).mockResolvedValue(ROWS);
+  jest.mocked(getLeaderboardRows).mockResolvedValue(ROWS);
   jest.mocked(loadCachedTeamForms).mockResolvedValue(FORMS);
 });
 
@@ -166,7 +166,7 @@ describe("rendu anglais — aucune phrase française sous /en/classement", () =>
   });
 
   it("liens dans la langue de la page ; une route pas encore traduite reste française", async () => {
-    jest.mocked(loadLeaderboardRows).mockResolvedValue(Array.from({ length: 60 }, (_, index) => row(index + 1)));
+    jest.mocked(getLeaderboardRows).mockResolvedValue(Array.from({ length: 60 }, (_, index) => row(index + 1)));
     const html = await renderPage("en");
     expect(html).toContain('href="/en/classement?jeu=ow"');
     expect(html).toContain('href="/en/classement"');

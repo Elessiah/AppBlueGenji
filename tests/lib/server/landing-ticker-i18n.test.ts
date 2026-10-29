@@ -5,7 +5,7 @@ jest.mock("@/lib/server/database");
 import { getLandingTicker } from "@/lib/server/landing-service";
 import { clearCache } from "@/lib/server/cache";
 import { tickerItemText } from "../../helpers/ticker-text";
-import { type SqlQuery, fakePool } from "../../helpers/sql-double";
+import { type SqlQuery, poolWithConnection } from "../../helpers/sql-double";
 
 /**
  * Bandeau de l'accueil dans les deux langues (lot 2) : un seul chargement mis
@@ -14,7 +14,7 @@ import { type SqlQuery, fakePool } from "../../helpers/sql-double";
  */
 async function mockRows(execute: jest.Mock<SqlQuery>) {
   const { getDatabase } = await import("@/lib/server/database");
-  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+  jest.mocked(getDatabase).mockResolvedValue(poolWithConnection(execute).pool);
 }
 
 function rowsExecute() {
