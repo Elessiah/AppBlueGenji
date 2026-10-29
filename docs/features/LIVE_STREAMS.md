@@ -24,9 +24,9 @@ son propre stream (`staff_owned`), jamais celui qu'un caster a ouvert ; « pas
 de cast » n'efface que ce lien du staff. Le stream d'un caster part, avec son
 lien, quand plus aucun caster ne le tient ; le lien qu'un caster a fourni
 (`link_user_id` : en ouvrant son stream, ou dans la configuration du direct
-quand celui qui le pose le dit sa propre chaîne : toujours sans la permission `tournaments`, case « lien de l'organisation » décochée avec elle) part aussi à la suppression de son compte,
+quand celui qui le pose le dit sa propre chaîne : toujours sans la permission `tournaments`, case « lien de l'organisation » décochée avec elle, par défaut) part aussi à la suppression de son compte,
 matchs joués compris, même d'un stream qu'un co-caster tient encore. Le lien de l'organisation
-(`link_user_id` nul : posé par un membre de l'organisation, case « lien de l'organisation » cochée, par défaut)
+(`link_user_id` nul : posé par un membre de l'organisation, case « lien de l'organisation » cochée)
 est gardé, **même si ce membre caste le match** — rien ne se déduit de ce qu'il caste ; un lien posé avant
 `link_user_id` (ancien `live_url`) n'a pas de fournisseur connu et compte comme
 tel. Voir

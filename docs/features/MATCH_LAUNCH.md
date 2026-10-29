@@ -347,11 +347,11 @@ qui porte le premier lien du match, puisque c'est le lien de sa chaîne.
 Dans les deux cas, **chaque lien qu'il a fourni** (`bg_match_streams.link_user_id`,
 posé à l'ouverture de son stream, ou dans la configuration du direct par un
 compte sans la permission `tournaments` — un caster à la seule permission
-`live` —, ou par un membre de l'organisation qui **décoche** « Ce lien est celui de
-l'organisation » : sa propre chaîne) est retiré, matchs joués compris et même d'un stream qu'un co-caster
+`live` —, ou par un membre de l'organisation qui laisse **décochée** « Ce lien est celui de
+l'organisation », valeur par défaut : sa propre chaîne) est retiré, matchs joués compris et même d'un stream qu'un co-caster
 tient encore : le stream reste à ce co-caster, sans lien. Le lien de
 l'organisation (`link_user_id` nul : posé par un membre de l'organisation avec la
-case cochée, valeur par défaut) n'est jamais touché, **même si ce membre caste le
+case cochée) n'est jamais touché, **même si ce membre caste le
 match** : la provenance se *dit* (`MatchLiveSetter.asOrganisation`, champ
 `organisationLink` du PUT, 403 sans la permission `tournaments`), elle ne se déduit
 plus de l'inscription (décision 48, EF-29). Un réglage du direct
