@@ -348,6 +348,29 @@ filtre de plus : tout ce que la page montre ou compte descend de la même liste,
 sans quoi elle changerait les cartes sans changer les compteurs qui les
 surmontent.
 
+Un compte supprimé n'y porte **ni identifiant ni date de création**
+(`DirectoryPlayer`, `directoryIdentity` — décision 11, EF-21) : l'identifiant
+est l'adresse de sa fiche, qu'un ancien lien suffisait à rapprocher de la
+ligne anonymisée. Sa carte n'ouvre donc aucune fiche (pas de plaque
+`.cardOverlay`), et « Plus récents » le range en fin de liste, par pseudo
+(`compareNewestFirst`). La fiche `/joueurs/<id>` elle-même répond toujours
+pour un compte supprimé (brackets et feuilles de match y mènent).
+
+## Matchs d'un compte supprimé
+
+`withdrawUserCasts` (`match-casters.ts`) retire en une passe ses casts, les
+liens de chaîne qu'il a fournis et ses arbitrages (avec `referee_ready_at`,
+que la clé étrangère de l'effacement laisserait seul) : les matchs touchés
+sont verrouillés **en une liste triée par id**, puis chaque écriture vaut pour
+tous. Les listes de départ sont des lectures ordinaires : `claimMatchCast`
+verrouille d'abord la ligne du compte (`LOCK IN SHARE MODE`), que la
+suppression tient en exclusif — une inscription lancée pendant la suppression
+lit le compte supprimé ou est vue par elle. Après le commit, chaque tournoi
+touché reçoit `publishMatchUpdatedEvent` : les instantanés ouverts perdent le
+caster, son lien ou l'arbitre, et le message #live de la soirée est remis à
+jour sans le lien (tant qu'il est encore modifié). Même chose au rattrapage
+`reconcileDeletedAccounts`.
+
 Ils ne sont pas **retirés** de la réponse : c'est le seul moyen de retrouver un
 adversaire d'un tournoi passé, et la ligne ne porte plus rien de personnel.
 `listPlayers` rend donc `isDeleted`, et le filtre est côté client comme les

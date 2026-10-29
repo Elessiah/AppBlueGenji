@@ -80,7 +80,12 @@ affichées dans le tableau « Données collectées ») :
   entrées en tournoi individuel (`liveAnnouncements` : match, tournoi, date —
   `live-announcement-export.ts` ; une trace = une annonce tentée, nommant le
   joueur seulement pour une inscription faite depuis le 16 octobre 2026 ; la
-  trace part avec le match, le message Discord reste),
+  trace part avec le match, le message Discord reste), ses **rôles de match**
+  (`match-roles-export.ts`, EF-21) — inscriptions de caster (`casts` : match,
+  tournoi, stream, « Prêt », date), liens de chaîne fournis
+  (`providedStreamLinks`, `bg_match_streams.link_user_id`) et arbitrages
+  désignés (`refereeAssignments`, avec le « Prêt ») —, l'origine du BattleTag
+  (`account.overwatchBattletagTyped`, `profile.battletagFromBlizzard`),
   le profil et ses réglages de visibilité, les statistiques, l'historique
   d'équipes, le palmarès, les changements de traitement dont le joueur a pris
   connaissance, ses **acceptations des conditions d'utilisation**, les
@@ -89,6 +94,12 @@ affichées dans le tableau « Données collectées ») :
   `PersonalDataExport` (`lib/shared/types.ts`). Le compte ne porte plus
   d'adresse électronique ; seule celle qu'un signalement a pu laisser pour la
   réponse y figure, avec ce signalement.
+- **Colonnes récentes** : les colonnes du compte encore dans
+  `RECENT_SCHEMA_CHANGES` (`OPTIONAL_ACCOUNT_COLUMNS`) sont lues dans **la**
+  lecture du compte ; une colonne refusée (`ALTER` échoué) en est retirée seule
+  — celle que nomme l'erreur, à défaut la plus récente — et garde sa valeur
+  par défaut, sans faire taire les autres. Les lectures des rôles de match
+  tolèrent de même une table ou une colonne absente.
 - **Format** : JSON téléchargeable (`Content-Disposition: attachment`,
   `bluegenji-donnees-<id>.json`).
 - **UI** : bouton « Exporter mes données » sur `/profil`.
