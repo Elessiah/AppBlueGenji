@@ -53,7 +53,9 @@ beforeEach(() => {
   jest.replaceProperty(process, "env", { ...process.env, NODE_ENV: "production" });
 });
 
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => {
+  jest.restoreAllMocks();
+});
 
 describe("session — production", () => {
   it("createSession_production_setsHostPrefixedSecureCookie", async () => {

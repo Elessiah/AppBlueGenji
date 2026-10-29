@@ -22,7 +22,9 @@ describe("hostCookieName", () => {
 });
 
 describe("sessionCookieName / oauthCookieName", () => {
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it("sessionCookieName_nodeEnvProduction_readsEnvAtCallTime", () => {
     jest.replaceProperty(process, "env", { ...process.env, NODE_ENV: "production" });

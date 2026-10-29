@@ -57,7 +57,9 @@ describe("middleware — exposé d'une suspension lu une seule fois", () => {
 });
 
 describe("middleware — cookies d'authentification d'avant le préfixe __Host-", () => {
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
   const inProduction = () => jest.replaceProperty(process, "env", { ...process.env, NODE_ENV: "production" });
 
   it("middleware_production_clearsBareSessionCookie", () => {
