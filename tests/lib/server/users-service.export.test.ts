@@ -313,8 +313,16 @@ describe("exportOwnData", () => {
     expect(execute.mock.calls[1][0]).not.toMatch(/certification_prompt_dismissed_at/);
   });
 
+  it("une colonne inconnue hors des colonnes récentes : la panne remonte sans repli", async () => {
+    const unknownColumn = Object.assign(new Error("Unknown column 'pseudo' in 'field list'"), { code: "ER_BAD_FIELD_ERROR" });
+    const execute = jest.fn<SqlQuery>().mockRejectedValue(unknownColumn);
+    await mockDb(execute);
+    await expect(exportOwnData(42)).rejects.toBe(unknownColumn);
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
   it("toutes les colonnes récentes refusées : relu sans aucune, puis la panne remonte si la lecture tombe encore", async () => {
-    const unknownColumn = Object.assign(new Error("Unknown column 'x'"), { code: "ER_BAD_FIELD_ERROR" });
+    const unknownColumn = Object.assign(new Error("ER_BAD_FIELD_ERROR"), { code: "ER_BAD_FIELD_ERROR" });
     const execute = jest.fn<SqlQuery>().mockRejectedValue(unknownColumn);
     await mockDb(execute);
     await expect(exportOwnData(42)).rejects.toBe(unknownColumn);
@@ -337,6 +345,8 @@ describe("exportOwnData", () => {
     expect(await run({ blizzard_sub: "sub-1", overwatch_battletag_typed: 1 })).toEqual([true, false]);
     expect(await run({ blizzard_sub: "sub-1", overwatch_battletag_typed: 0 })).toEqual([false, true]);
     expect(await run({ blizzard_sub: null, overwatch_battletag_typed: 0 })).toEqual([false, false]);
+    // Compte Battle.net sans BattleTag gardé : rien à dire fourni par Battle.net.
+    expect(await run({ blizzard_sub: "sub-1", overwatch_battletag: null, overwatch_battletag_typed: 0 })).toEqual([false, false]);
     // Colonne absente : défaut « non tapé ».
     expect(await run({ blizzard_sub: "sub-1" })).toEqual([false, true]);
   });
@@ -411,9 +421,13 @@ describe("refusedOptionalColumn — la colonne récente qu'une erreur désigne",
     expect(refusedOptionalColumn(new Error("Unknown column 'bg_users.recruitment_modal_off'"), [...all])).toBe("recruitment_modal_off");
   });
 
-  it("à défaut d'une colonne connue, la plus récente encore lue", () => {
-    expect(refusedOptionalColumn(new Error("Unknown column 'autre'"), [...all])).toBe("overwatch_battletag_typed");
+  it("sans colonne nommée, la plus récente encore lue", () => {
+    expect(refusedOptionalColumn(Object.assign(new Error("ER_BAD_FIELD_ERROR"), { code: "ER_BAD_FIELD_ERROR" }), [...all])).toBe("overwatch_battletag_typed");
     expect(refusedOptionalColumn("pas une erreur", [...all])).toBe("overwatch_battletag_typed");
+  });
+
+  it("une colonne nommée hors de la liste : aucun repli, l'erreur remonte", () => {
+    expect(refusedOptionalColumn(new Error("Unknown column 'autre' in 'field list'"), [...all])).toBeUndefined();
   });
 
   it("plus rien à retirer : undefined", () => {

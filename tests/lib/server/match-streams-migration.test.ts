@@ -103,7 +103,7 @@ describe("bg_match_streams / bg_match_casters — migration du caster unique", (
     const all = [...RECENT.matchAll(/`([^`]*)`/g)].map((match) => flat(match[1]));
     const backfill = all.findIndex((statement) => statement.startsWith("UPDATE bg_match_streams s SET s.link_user_id"));
     const cleanup = all.indexOf(
-      "UPDATE bg_match_streams s JOIN bg_users u ON u.id = s.link_user_id SET s.live_url = NULL, s.link_user_id = NULL WHERE u.is_deleted = 1",
+      "UPDATE bg_match_streams s LEFT JOIN bg_users u ON u.id = s.link_user_id SET s.live_url = NULL, s.link_user_id = NULL WHERE s.link_user_id IS NOT NULL AND (u.id IS NULL OR u.is_deleted = 1)",
     );
     expect(cleanup).toBeGreaterThan(backfill);
   });
