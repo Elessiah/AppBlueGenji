@@ -21,9 +21,9 @@ import { rolesErrorMessage } from "../_lib/roles-errors";
  * d'un compte supprimé, que la route refuse).
  *
  * Tout enregistrement qui accorde ou retire un rôle passe par une modale qui
- * dit ce que le joueur gagne et perd (`ADMIN_CONFIRMATIONS.md`). Retirer son
- * propre accès est impossible ici : le panneau n'est jamais rendu sur sa
- * propre fiche, et la route refuse en `CANNOT_MODIFY_SELF`.
+ * dit ce que le joueur gagne et perd (`ADMIN_CONFIRMATIONS.md`). Le panneau
+ * n'est jamais rendu sur sa propre fiche : un administrateur règle les siens
+ * depuis « Mon profil » (`SelfRolesField`), sans pouvoir s'y retirer `ADMIN`.
  *
  * Outil de l'administration : il reste **français** sous `/en` (D4), annoncé
  * `lang="fr"` — panneau, confirmation et notifications.

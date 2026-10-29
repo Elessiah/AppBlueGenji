@@ -38,6 +38,10 @@
       "title": "Team invitations",
       "lead": "The teams that invited you to join them."
     },
+    "roles": {
+      "title": "My roles",
+      "lead": "The platform roles you hold on top of administration."
+    },
     "statistiques": {
       "title": "Statistics",
       "lead": "Your record on the platform."
@@ -171,6 +175,40 @@
     "refused": "Invitation declined.",
     "acceptLabel": "Accept the invitation from {team}",
     "refuseLabel": "Decline the invitation from {team}"
+  },
+  "platformRoles": {
+    "legend": "My platform roles",
+    "hint": "Administrator already gives you every right. The other roles show as titles on your player page, and they are the ones you would keep if another administrator removed your administration.",
+    "adminLocked": "You can't remove your own administrator role: only another administrator can do it.",
+    "labels": {
+      "ADMIN": "Administrator",
+      "ARBITRE": "Referee",
+      "CASTER": "Caster",
+      "COMMUNITY_MANAGER": "Community Manager",
+      "RECRUTEUR": "Recruiter"
+    },
+    "descriptions": {
+      "ADMIN": "Every right, including assigning roles.",
+      "ARBITRE": "Create and manage tournaments.",
+      "CASTER": "Prepare and broadcast matches live (bracket preview, on-air).",
+      "COMMUNITY_MANAGER": "Manage the showcase site and the association.",
+      "RECRUTEUR": "Manage the recruitment page."
+    },
+    "save": "Save my roles",
+    "saving": "Saving…",
+    "saved": "Your roles are up to date.",
+    "confirmTitle": "Change your roles?",
+    "gains": "You gain:",
+    "loses": "You lose:",
+    "errors": {
+      "UNAUTHORIZED": "Your session has expired: log in again.",
+      "FORBIDDEN": "You are no longer an administrator: your roles were not changed.",
+      "CANNOT_MODIFY_SELF": "Only an administrator can change their own roles.",
+      "CANNOT_REMOVE_OWN_ADMIN": "You can't remove your own administrator role.",
+      "INVALID_PAYLOAD": "The role selection is invalid.",
+      "USER_NOT_FOUND": "Your account can't be found.",
+      "fallback": "Updating your roles failed."
+    }
   },
   "stats": {
     "tournamentsPlayed": "Tournaments played",

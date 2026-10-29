@@ -38,6 +38,10 @@
       "title": "Invitations d'équipe",
       "lead": "Les équipes qui t'ont proposé de les rejoindre."
     },
+    "roles": {
+      "title": "Mes rôles",
+      "lead": "Les rôles de plateforme que tu portes en plus de l'administration."
+    },
     "statistiques": {
       "title": "Statistiques",
       "lead": "Ton bilan sur la plateforme."
@@ -171,6 +175,40 @@
     "refused": "Invitation refusée.",
     "acceptLabel": "Accepter l'invitation de {team}",
     "refuseLabel": "Refuser l'invitation de {team}"
+  },
+  "platformRoles": {
+    "legend": "Mes rôles de plateforme",
+    "hint": "Administrateur te donne déjà tous les droits. Les autres rôles s'affichent en titres sur ta fiche de joueur, et ce sont ceux que tu garderais si un autre administrateur te retirait l'administration.",
+    "adminLocked": "Tu ne peux pas retirer ton propre rôle d'administrateur : seul un autre administrateur peut le faire.",
+    "labels": {
+      "ADMIN": "Administrateur",
+      "ARBITRE": "Arbitre",
+      "CASTER": "Caster",
+      "COMMUNITY_MANAGER": "Community Manager",
+      "RECRUTEUR": "Recruteur"
+    },
+    "descriptions": {
+      "ADMIN": "Tous les droits, dont l'attribution des rôles.",
+      "ARBITRE": "Créer et gérer les tournois.",
+      "CASTER": "Préparer et diffuser les matchs en direct (aperçu du plateau, antenne).",
+      "COMMUNITY_MANAGER": "Gérer le site vitrine et l'association.",
+      "RECRUTEUR": "Gérer la page recrutement."
+    },
+    "save": "Enregistrer mes rôles",
+    "saving": "Enregistrement…",
+    "saved": "Tes rôles sont à jour.",
+    "confirmTitle": "Modifier tes rôles ?",
+    "gains": "Tu gagnes :",
+    "loses": "Tu perds :",
+    "errors": {
+      "UNAUTHORIZED": "Ta session a expiré : reconnecte-toi.",
+      "FORBIDDEN": "Tu n'es plus administrateur : tes rôles n'ont pas été modifiés.",
+      "CANNOT_MODIFY_SELF": "Seul un administrateur peut modifier ses propres rôles.",
+      "CANNOT_REMOVE_OWN_ADMIN": "Tu ne peux pas retirer ton propre rôle d'administrateur.",
+      "INVALID_PAYLOAD": "La sélection de rôles est invalide.",
+      "USER_NOT_FOUND": "Ton compte est introuvable.",
+      "fallback": "La mise à jour de tes rôles a échoué."
+    }
   },
   "stats": {
     "tournamentsPlayed": "Tournois joués",

@@ -2,7 +2,9 @@ import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { normalizePseudo, parseRoles } from "@/lib/server/serialization";
 import { closeUserStreams } from "@/lib/server/session-streams";
-import { type PlatformRole, sanitizePlatformRoles } from "@/lib/shared/permissions";
+import { publishStaffAction } from "@/lib/server/staff-audit";
+import type { StaffActor } from "@/lib/shared/log-privacy";
+import { ROLE_LABELS, type PlatformRole, sanitizePlatformRoles } from "@/lib/shared/permissions";
 import type { TeamRole } from "@/lib/shared/types";
 
 /**
@@ -60,6 +62,78 @@ export async function setUserRoles(
   closeUserStreams(targetUserId);
 
   return sanitized;
+}
+
+/**
+ * Un administrateur règle **ses propres** rôles de plateforme (ADMIN-SELF-ROLES).
+ *
+ * Seuls les rôles cumulables (`platform_roles_json`) changent : `ADMIN` doit
+ * figurer dans la sélection (`CANNOT_REMOVE_OWN_ADMIN` sinon) et la colonne
+ * `is_admin` n'est **jamais écrite** ici. Se retirer l'administration reste le
+ * geste d'un autre administrateur — sans quoi le dernier d'entre eux pourrait
+ * fermer la plateforme à tout le monde, lui compris.
+ *
+ * La condition `is_admin = 1` tranche la **course** avec une rétrogradation
+ * concurrente : la route a lu le droit dans la session, un autre administrateur
+ * peut le retirer avant cette écriture. Réécrire `is_admin = 1` ici aurait
+ * annulé sa décision ; la condition fait échouer l'écriture à la place
+ * (`NOT_ADMIN`, que la route rend en `403 FORBIDDEN`). Même partage que
+ * {@link setUserRoles} : zéro ligne appariée veut dire « l'état a changé entre
+ * les deux », jamais « rien à modifier » (`FOUND_ROWS`).
+ *
+ * @returns la liste normalisée des rôles enregistrés, `ADMIN` en tête.
+ */
+export async function setOwnPlatformRoles(
+  adminUserId: number,
+  roles: PlatformRole[],
+): Promise<PlatformRole[]> {
+  const sanitized = sanitizePlatformRoles(roles);
+  if (!sanitized.includes("ADMIN")) throw new Error("CANNOT_REMOVE_OWN_ADMIN");
+  const scopedRoles = sanitized.filter((role) => role !== "ADMIN");
+
+  const db = await getDatabase();
+  const [result] = await db.execute<ResultSetHeader>(
+    `UPDATE bg_users SET platform_roles_json = ? WHERE id = ? AND is_deleted = 0 AND is_admin = 1`,
+    [JSON.stringify(scopedRoles), adminUserId],
+  );
+  if (result.affectedRows === 0) throw new Error("NOT_ADMIN");
+
+  // Mêmes flux à fermer que pour un autre compte : un rôle d'arbitre retiré
+  // ne doit pas survivre dans un onglet de tournoi resté ouvert.
+  closeUserStreams(adminUserId);
+
+  return sanitized;
+}
+
+/** La ligne du journal du staff sur Discord : aucun compte nommé, ni l'auteur. */
+export const ROLES_CHANGE_DISCORD_LINE = "🛡️ Rôles de plateforme d'un compte modifiés par le staff.";
+
+/**
+ * La ligne des journaux du serveur (pm2) : le compte visé par son seul
+ * identifiant, les rôles enregistrés, et — ajouté par `staffAuditLine` —
+ * l'auteur. Un administrateur qui règle les siens est dit tel.
+ */
+export function rolesChangeAuditLine(targetUserId: number, roles: readonly PlatformRole[], self: boolean): string {
+  const target = self ? `de son propre compte (#${targetUserId})` : `du compte #${targetUserId}`;
+  const saved = roles.length > 0 ? roles.map((role) => ROLE_LABELS[role]).join(", ") : "aucun";
+  return `🛡️ Rôles de plateforme ${target} enregistrés : ${saved}.`;
+}
+
+/**
+ * Publie l'enregistrement des rôles d'un compte : anonyme sur Discord, nominatif
+ * dans pm2 (`publishStaffAction`). Appelé après l'écriture seulement — un refus
+ * ne laisse aucune trace.
+ */
+export function publishRolesChange(
+  actor: StaffActor,
+  targetUserId: number,
+  roles: readonly PlatformRole[],
+): void {
+  publishStaffAction(
+    ROLES_CHANGE_DISCORD_LINE,
+    actor,
+    rolesChangeAuditLine(targetUserId, roles, targetUserId === actor.id),
+  );
 }
 
 /**

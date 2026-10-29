@@ -53,6 +53,11 @@ export type ProfileSection = {
 export type ProfileSectionAvailability = {
   /** Nombre d'invitations d'équipe en attente. */
   invitations: number;
+  /**
+   * `1` pour un administrateur, `0` sinon : seul un administrateur règle ses
+   * propres rôles de plateforme (ADMIN-SELF-ROLES).
+   */
+  adminRoles: number;
 };
 
 export const PROFILE_SECTIONS = [
@@ -98,6 +103,13 @@ export const PROFILE_SECTIONS = [
     lead: "Les équipes qui t'ont proposé de les rejoindre.",
     tone: "violet",
     requires: "invitations",
+  },
+  {
+    id: "roles",
+    title: "Mes rôles",
+    lead: "Les rôles de plateforme que tu portes en plus de l'administration.",
+    tone: "violet",
+    requires: "adminRoles",
   },
   {
     id: "statistiques",
