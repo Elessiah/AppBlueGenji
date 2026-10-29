@@ -149,8 +149,11 @@ function FirstMapForm({ match }: Readonly<{ match: Pick<BracketMatch, "id" | "fi
 
   return (
     <form className={styles.mapForm} onSubmit={(event) => void save(event)} aria-busy={busy}>
-      <div className={`field ${styles.mapField}`}>
+      {/* Saisie et bouton sur une même ligne, l'erreur dessous : le bouton reste
+          aligné sur la saisie quand l'erreur paraît ou s'efface. */}
+      <div className="field">
         <label htmlFor={inputId}>{t("matchPage.firstMap")}</label>
+        <div className={styles.mapRow}>
         <input
           id={inputId}
           type="text"
@@ -165,11 +168,12 @@ function FirstMapForm({ match }: Readonly<{ match: Pick<BracketMatch, "id" | "fi
           }}
           {...fieldErrors.aria("map")}
         />
+        <button type="submit" className="btn ghost" aria-disabled={busy || undefined}>
+          {actionText.t("cardActions.refereeDialog.mapSave")}
+        </button>
+        </div>
         <FieldErrorText fieldId={inputId} message={fieldErrors.message("map")} />
       </div>
-      <button type="submit" className="btn ghost" aria-disabled={busy || undefined}>
-        {actionText.t("cardActions.refereeDialog.mapSave")}
-      </button>
     </form>
   );
 }
@@ -615,10 +619,18 @@ function OfficiatingSection({
   launch,
   onCopy,
   invitesByBattletag,
+  forParties,
 }: Readonly<{
   match: BracketMatch;
   game: TournamentGame;
   staff: boolean;
+  /**
+   * Le lecteur organise-t-il le match (joueur, caster inscrit, staff) ? Les
+   * étapes, à l'impératif, ne s'adressent qu'à lui ; les autres (spectateurs de
+   * /suivre compris) lisent l'autogestion dans les faits clés, en description
+   * neutre, et la section n'a rien de plus à leur dire.
+   */
+  forParties: boolean;
   launch: MatchLaunchInfo | null;
   onCopy: (value: string, label: string) => Promise<void>;
   /** Overwatch : on invite par BattleTag (`battletagRelevantFor`) ; ailleurs, ni BattleTag ni consigne. */
@@ -629,7 +641,8 @@ function OfficiatingSection({
   const titleId = useId();
   const decision = matchPageDecision(match, staff);
   const refereeCard = decision === "REFEREE" && launch?.referee ? launch.referee : null;
-  if (refereeCard === null && decision !== "SELF_MANAGED") return null;
+  const showSteps = decision === "SELF_MANAGED" && forParties;
+  if (refereeCard === null && !showSteps) return null;
   return (
     <section className={`ds-block ${styles.block}`} aria-labelledby={titleId}>
       <SectionTitle id={titleId}>{page.t("sections.officiating")}</SectionTitle>
@@ -643,7 +656,7 @@ function OfficiatingSection({
           battletagNote={invitesByBattletag ? t("matchPage.refereeBattletagNote") : undefined}
         />
       )}
-      {decision === "SELF_MANAGED" && (
+      {showSteps && (
         <ol className={styles.steps} aria-label={t("matchPage.stepsLabel")}>
           {selfManagementSteps(match.casters.length).map((step) => (
             <li key={step}>
@@ -812,7 +825,10 @@ function MatchPageContent({ detail, match, adminResolvable, scoreLocked, onOpenA
   const { liveState } = model;
   const actionsId = useId();
   // Les parties du match et le staff lisent ses contacts, comme sur la carte.
-  const readsContacts = !spectator && !frozen && (model.launch.showContacts || model.launch.showOpen);
+  // `showContacts` seul : `showOpen` (match en cours, joueur ou caster) l'implique.
+  const readsContacts = !spectator && !frozen && model.launch.showContacts;
+  const playsMatch = myTeamId !== null && (match.team1Id === myTeamId || match.team2Id === myTeamId);
+  const organizes = !spectator && (canSchedule || model.launch.isCaster || playsMatch);
   const { launch } = useMatchContacts(match.id, match, readsContacts);
   const shownLaunch = readsContacts ? launch : null;
   const onCopy = useCopy();
@@ -893,6 +909,7 @@ function MatchPageContent({ detail, match, adminResolvable, scoreLocked, onOpenA
             match={match}
             game={detail.card.game}
             staff={canSchedule}
+            forParties={organizes}
             launch={shownLaunch}
             onCopy={onCopy}
             invitesByBattletag={invitesByBattletag}

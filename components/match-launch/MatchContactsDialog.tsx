@@ -267,6 +267,21 @@ export function useMatchContacts(
   const [rereadFailures, setRereadFailures] = useState(0);
   // Attente demandée par le dernier refus de quota (`Retry-After`), 0 sans.
   const [rereadWait, setRereadWait] = useState(0);
+  // Lecture coupée (`enabled` à faux : caster retiré, plateau figé) : ce qui
+  // était lu s'efface, nouvelles tentatives comprises. Réactivée, la page
+  // attend la nouvelle lecture au lieu de remontrer un instant les anciens
+  // contacts. Ajusté pendant le rendu (et non dans un effet) : aucun rendu
+  // intermédiaire ne les montre.
+  const [readEnabled, setReadEnabled] = useState(enabled);
+  if (readEnabled !== enabled) {
+    setReadEnabled(enabled);
+    if (!enabled) {
+      setState({ kind: "loading" });
+      setServerDate(null);
+      setRereadFailures(0);
+      setRereadWait(0);
+    }
+  }
   const startAt = card?.startAt ?? null;
   const launchedAt = card?.launchedAt ?? null;
   // Empreinte de la carte vue par la dernière lecture réussie : un changement
@@ -290,15 +305,16 @@ export function useMatchContacts(
   // Relecture échouée : quelques nouvelles tentatives espacées, jamais avant
   // l'attente qu'un refus de quota demande.
   useEffect(() => {
-    if (!shouldRetryReread(rereadFailures)) return;
+    if (!enabled || !shouldRetryReread(rereadFailures)) return;
     const timer = setTimeout(() => setReadKey((key) => key + 1), Math.max(REREAD_RETRY_MS, rereadWait));
     return () => clearTimeout(timer);
-  }, [rereadFailures, rereadWait]);
+  }, [enabled, rereadFailures, rereadWait]);
 
   // « Prêt » de l'arbitre : relevé pendant le lancement, onglet visible
   // seulement (`clocks`), jusqu'à ce qu'il soit prêt ou que la phase change.
   const { clocks } = useClientPower();
-  const followReferee = clocks && refereeReadyRereadDue(launch);
+  // Jamais lecture coupée : la relève poserait deux états toutes les 10 s sans rien lire.
+  const followReferee = enabled && clocks && refereeReadyRereadDue(launch);
   useEffect(() => {
     if (!followReferee) return;
     const timer = setInterval(rereadNow, REFEREE_READY_REREAD_MS);
@@ -307,12 +323,12 @@ export function useMatchContacts(
 
   // Contacts du caster en attente : une relecture à l'heure de départ du serveur.
   useEffect(() => {
-    if (!launch) return;
+    if (!enabled || !launch) return;
     const delay = casterRereadDelay(launch, serverDate);
     if (delay === null) return;
     const timer = setTimeout(rereadNow, delay);
     return () => clearTimeout(timer);
-  }, [launch, serverDate]);
+  }, [enabled, launch, serverDate]);
 
   useEffect(() => {
     if (!enabled) return;

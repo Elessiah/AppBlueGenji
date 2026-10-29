@@ -127,6 +127,7 @@ export function MatchLaunchStrip({
       {badge}
 
       {showHost && hostName && (
+        // Le côté de l'hôte, dit aux voyants par l'infobulle comme au lecteur d'écran.
         <span className={styles.fact} title={t("launch.hostTitle")}>
           <span aria-hidden="true">🏠</span>
           <span className="sr-only">{t("launch.hostSr")}</span>
@@ -144,7 +145,8 @@ export function MatchLaunchStrip({
       )}
 
       {showHost && match.firstMap && (
-        <span className={styles.fact} title={t("launch.firstMapTitle")}>
+        // Le nom est coupé à 150 px (64 caractères permis) : l'infobulle le porte en entier.
+        <span className={styles.fact} title={t("launch.firstMapTitle", { map: match.firstMap })}>
           <span aria-hidden="true">🗺</span>
           <span className="sr-only">{t("launch.firstMapSr")}</span>
           <span className={styles.name}>{match.firstMap}</span>
@@ -163,8 +165,12 @@ export function MatchLaunchStrip({
         </span>
       )}
       {referee === "UNDECIDED" && (
-        <span className={styles.wait} title={t("launch.undecidedTitle")}>
-          <span aria-hidden="true">⚠</span> {t("launch.undecided")}
+        // Alerte du staff : teinte d'avertissement et préfixe lu, comme « sans date »
+        // (`MatchLiveStrip`) ; la décision attendue est dite aussi au lecteur d'écran.
+        <span className={styles.alert} title={t("launch.undecidedTitle")}>
+          <span aria-hidden="true">⚠</span>
+          <span className="sr-only">{t("launch.undecidedSr")}</span> {t("launch.undecided")}
+          <span className="sr-only">{t("launch.undecidedDetailSr")}</span>
         </span>
       )}
 

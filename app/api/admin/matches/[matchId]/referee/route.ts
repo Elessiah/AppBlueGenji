@@ -30,7 +30,7 @@ export async function GET(_req: Request, context: { params: Promise<{ matchId: s
   if (matchId === null) return fail("INVALID_MATCH_ID", 400);
 
   try {
-    const panel = await loadRefereePanel(matchId);
+    const panel = await loadRefereePanel(matchId, user.id);
     if (!panel) return fail("MATCH_NOT_FOUND", 404);
     return ok({ panel });
   } catch (error) {
