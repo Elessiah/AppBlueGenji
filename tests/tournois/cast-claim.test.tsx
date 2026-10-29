@@ -35,8 +35,6 @@ import { TournamentActionsTextProvider } from "@/components/i18n/tournament-acti
 import { messagesFor } from "@/lib/server/i18n-messages";
 import { tournamentActionsMessages } from "@/lib/shared/tournament-actions-text";
 import { bracketMatch, matchCaster } from "../helpers/bracket-match";
-import fs from "node:fs";
-import path from "node:path";
 import { readSource } from "../helpers/read-source";
 import frActions from "@/messages/fr/tournamentActions.json";
 import frDialogs from "@/messages/fr/tournamentDialogs.json";
@@ -224,19 +222,28 @@ describe("matchStreamLinks — tous les liens du bandeau, le premier en tête", 
   });
 });
 
+/** Chaque extrait attendu figure dans la source. */
+function expectContains(source: string, snippets: readonly string[]): void {
+  for (const snippet of snippets) expect(source).toContain(snippet);
+}
+
 describe("CastClaimDialog — un stream choisi qui disparaît", () => {
   const source = readSource("app/(secured)/tournois/[id]/_components/CastClaimDialog.tsx");
 
   it("n'est pas remplacé en silence par le premier : plus rien n'est choisi, l'envoi est désarmé", () => {
-    expect(source).toContain("choices.find((option) => castClaimChoiceKey(option) === choiceKey) ?? null;");
-    expect(source).toContain("disabled={choice === null || urlInvalid}");
-    expect(source).toContain("if (choice === null) return false;");
+    expectContains(source, [
+      "choices.find((option) => castClaimChoiceKey(option) === choiceKey) ?? null;",
+      "disabled={choice === null || urlInvalid}",
+      "if (choice === null) return false;",
+    ]);
   });
 
   it("le focus passe au premier choix restant quand celui qui l'avait est démonté, et une annonce dit pourquoi", () => {
-    expect(source).toContain("if (!gone || document.activeElement !== document.body) return;");
-    expect(source).toContain('fieldsetRef.current?.querySelector<HTMLInputElement>("input[type=radio]")?.focus();');
-    expect(source).toContain('{gone ? t("cardActions.claimDialog.gone") : ""}');
+    expectContains(source, [
+      "if (!gone || document.activeElement !== document.body) return;",
+      'fieldsetRef.current?.querySelector<HTMLInputElement>("input[type=radio]")?.focus();',
+      '{gone ? t("cardActions.claimDialog.gone") : ""}',
+    ]);
   });
 
   it("oublie le choix disparu : un stream qui revient ne se recoche pas sans nouveau choix", () => {
@@ -265,44 +272,56 @@ describe("MatchCardActions — branchements du cast", () => {
   });
 
   it("inscrit, le focus passe au bouton qui remplace « Caster » (« Ne plus caster », sinon « Plus d'actions »)", () => {
-    expect(card).toContain("claimedRef.current = true;");
-    expect(card).toContain("if (!claimedRef.current || hasClaimCast) return;");
-    expect(card).toContain('querySelector<HTMLElement>(\'[data-action="releaseCast"]\')');
-    expect(card).toContain("(release ?? toggleRef.current)?.focus({ preventScroll: true });");
+    expectContains(card, [
+      "claimedRef.current = true;",
+      "if (!claimedRef.current || hasClaimCast) return;",
+      'querySelector<HTMLElement>(\'[data-action="releaseCast"]\')',
+      "(release ?? toggleRef.current)?.focus({ preventScroll: true });",
+    ]);
   });
 
   it("le staff choisit le caster retiré, désigné par ?userId= ; le caster se retire sans paramètre", () => {
-    expect(card).toContain("/api/matches/${match.id}/caster?userId=${encodeURIComponent(");
-    expect(card).toContain('send(`/api/matches/${match.id}/caster`, "DELETE")');
-    expect(card).toContain("{match.casters.length > 1 && (");
+    expectContains(card, [
+      "/api/matches/${match.id}/caster?userId=${encodeURIComponent(",
+      'send(`/api/matches/${match.id}/caster`, "DELETE")',
+      "{match.casters.length > 1 && (",
+    ]);
     // Un arbitre qui caste aussi le match passe par ce choix, lui compris.
     expect(card).toContain("if (!isCaster || releasesOthers) {");
   });
 
   it("le caster à retirer est fixé à l'ouverture ; parti entre-temps, la fenêtre se ferme au lieu d'en viser un autre", () => {
-    expect(card).toContain("setReleaseTarget(casters[0]?.userId ?? null);");
-    expect(card).toContain("const releasedCaster = casters.find((caster) => caster.userId === releaseTarget) ?? null;");
-    expect(card).toContain("if (open && releasedCaster === null) setOpen(false);");
-    expect(card).toContain("const shown = open && releasedCaster !== null;");
-    expect(card).toContain("confirmRelease: shown,");
+    expectContains(card, [
+      "setReleaseTarget(casters[0]?.userId ?? null);",
+      "const releasedCaster = casters.find((caster) => caster.userId === releaseTarget) ?? null;",
+      "if (open && releasedCaster === null) setOpen(false);",
+      "const shown = open && releasedCaster !== null;",
+      "confirmRelease: shown,",
+    ]);
     expect(card).not.toContain("?? match.casters[0] ?? null");
   });
 
   it("le caster choisi qui part pendant le choix : un toast le dit, sauf pour le retrait que le lecteur vient de confirmer", () => {
-    expect(card).toContain("wasShown.current && !shown && releasedCaster === null && !ownRelease.current");
-    expect(card).toContain('() => showError(t("cardActions.releaseConfirm.gone"))');
-    expect(card).toContain("markOwnRelease(true);");
+    expectContains(card, [
+      "wasShown.current && !shown && releasedCaster === null && !ownRelease.current",
+      '() => showError(t("cardActions.releaseConfirm.gone"))',
+      "markOwnRelease(true);",
+    ]);
     // Un retrait refusé laisse la fenêtre ouverte : le départ suivant doit se dire.
-    expect(card).toContain("if (!done) markOwnRelease(false);");
-    expect(card).toContain("ownRelease.current = false;");
+    expectContains(card, [
+      "if (!done) markOwnRelease(false);",
+      "ownRelease.current = false;",
+    ]);
   });
 
   it("un arbitre qui se choisit lui-même : textes « Ne plus caster », sans avis, comme un départ volontaire", () => {
-    expect(card).toContain("const releasingSelf = releasedCaster.userId === viewerUserId;");
-    expect(card).toContain('t("cardActions.releaseConfirm.selfTitle", { match: matchLabel })');
-    expect(card).toContain('t("cardActions.releaseConfirm.selfConfirm")');
-    expect(card).toContain('t("cardActions.releaseConfirm.selfBody")');
-    expect(card).toContain('self ? t("cardActions.notCasting") : t("cardActions.casterRemoved")');
+    expectContains(card, [
+      "const releasingSelf = releasedCaster.userId === viewerUserId;",
+      't("cardActions.releaseConfirm.selfTitle", { match: matchLabel })',
+      't("cardActions.releaseConfirm.selfConfirm")',
+      't("cardActions.releaseConfirm.selfBody")',
+      'self ? t("cardActions.notCasting") : t("cardActions.casterRemoved")',
+    ]);
   });
 
   it("un seul caster : le corps de l'avis le nomme", () => {
@@ -310,8 +329,10 @@ describe("MatchCardActions — branchements du cast", () => {
   });
 
   it("les choix restent figés pendant l'envoi, sans disabled natif (le focus ne se perd pas)", () => {
-    expect(card).toContain("aria-disabled={busy || undefined}");
-    expect(card).toContain("if (!busy) onPick(caster.userId);");
+    expectContains(card, [
+      "aria-disabled={busy || undefined}",
+      "if (!busy) onPick(caster.userId);",
+    ]);
     expect(card).not.toMatch(/<fieldset[^>]*disabled/);
   });
 
@@ -338,7 +359,7 @@ describe("Configuration du direct — l'aide du lien", () => {
 
 describe("Textes de caster — pluriel, parité FR/EN, clé retirée", () => {
   const read = (locale: string, file: string) =>
-    JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "messages", locale, `${file}.json`), "utf8")) as Record<string, any>;
+    JSON.parse(readSource(`messages/${locale}/${file}.json`)) as Record<string, any>;
 
   it("l'aide du lien ne promet plus un bouton « Regarder » (FR et EN)", () => {
     expect(frActions.cardActions.claimDialog.urlHint).toContain("sans lien, ton stream n'apparaît pas sur la carte du match.");
