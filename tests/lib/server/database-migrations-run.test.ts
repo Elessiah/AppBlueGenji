@@ -100,8 +100,8 @@ function healthyRules(): Rule[] {
     { match: /^UPDATE bg_site_visits SET authenticated/, reply: () => { throw mysqlError("ER_BAD_FIELD_ERROR"); } },
     { match: /^SELECT 1 FROM bg_site_visitors/, reply: () => [[{ 1: 1 }], undefined] },
     { match: /^UPDATE bg_recruitment_ads SET priority/, reply: () => { throw mysqlError("ER_BAD_FIELD_ERROR"); } },
-    // Noms déjà propres : rien à réécrire (`cleanStoredNames`).
-    { match: /^SELECT id, (name|pseudo) AS name FROM/, reply: () => [[{ id: 1, name: "Dragon Squad" }], undefined] },
+    // Passe des noms déjà menée à bout : le marqueur est posé (`cleanStoredNames`).
+    { match: /^SELECT 1 FROM bg_settings WHERE setting_key = \?/, reply: () => [[{ 1: 1 }], undefined] },
     {
       match: /^SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE/,
       reply: () => [
@@ -218,9 +218,7 @@ describe("runMigrations — une base déjà à jour", () => {
       /^ALTER TABLE bg_site_visits DROP COLUMN user_id/,
       /^SELECT 1 FROM bg_site_visitors/,
       /^UPDATE bg_recruitment_ads SET priority/,
-      /^SELECT id, name AS name FROM bg_teams/, // noms réécrits avant la copie des pseudos
-      /^SELECT id, pseudo AS name FROM bg_users/,
-      /^SELECT id, name AS name FROM bg_tournaments/,
+      /^SELECT 1 FROM bg_settings WHERE setting_key/, // marqueur des noms réécrits, avant la copie des pseudos
       /^UPDATE bg_settings SET setting_value = \?/, // rattrapages permanents
       /^UPDATE bg_teams t JOIN bg_users u/,
       /^SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE/, // filet

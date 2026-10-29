@@ -166,8 +166,8 @@ describe("MatchScheduleDialog — sous-titre", () => {
   it("rend les engagés par EntrantName (forme affichable, lien de fiche), jamais le nom brut", () => {
     // Un seul message à deux emplacements : l'ordre vient de la traduction.
     expect(SOURCE).toContain('"schedule.versus"');
-    expect(SOURCE).toContain('first: (chunks) => <EntrantName teamId={match.team1Id} name={chunks.join("")} />');
-    expect(SOURCE).toContain('second: (chunks) => <EntrantName teamId={match.team2Id} name={chunks.join("")} />');
+    expect(SOURCE).toContain('first: (chunks) => <EntrantName plain teamId={match.team1Id} name={chunks.join("")} />');
+    expect(SOURCE).toContain('second: (chunks) => <EntrantName plain teamId={match.team2Id} name={chunks.join("")} />');
     expect(SOURCE).not.toContain('"TBD"');
     expect(SOURCE).not.toMatch(/\/> vs\{" "\}/);
     expect(frDialogs.schedule.versus).toBe("<first>{team1}</first> contre <second>{team2}</second>");

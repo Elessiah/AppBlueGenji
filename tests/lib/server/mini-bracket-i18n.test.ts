@@ -54,17 +54,25 @@ describe("loadMiniBracket", () => {
     expect(execute).toHaveBeenCalledTimes(1);
   });
 
-  it("nom saisi : forme affichable, « #id » s'il ne garde rien de visible (page lue sans compte)", async () => {
+  it("nom saisi : forme affichable, « Team #id » s'il ne garde rien de visible (page lue sans compte)", async () => {
     await mockRows([{ ...ROWS[0], team1_name: "\u202EAlpha\u200B", team2_id: 12, team2_name: "\u200B\u200B" }]);
     const [row] = await loadMiniBracket(5, "en");
     expect(row.a).toBe("Alpha");
-    expect(row.b).toBe("#12");
+    expect(row.b).toBe("Team #12");
   });
 
   it("une place occupée sans ligne d'équipe ne se dit pas « à venir »", async () => {
     await mockRows([{ ...ROWS[0], team1_id: 11, team1_name: null }]);
     const [row] = await loadMiniBracket(5);
-    expect(row.a).toBe("#11");
+    expect(row.a).toBe("Équipe #11");
+  });
+
+  it("une entrée solo sans nom affichable se replie sur « Joueur » / « Player », jamais « Équipe #id »", async () => {
+    await mockRows([{ ...ROWS[0], team1_id: 11, team1_name: "​", team1_solo: 1 }]);
+    const [fr] = await loadMiniBracket(5);
+    const [en] = await loadMiniBracket(5, "en");
+    expect(fr.a).toBe("Joueur");
+    expect(en.a).toBe("Player");
   });
 
   it("aucun match : liste vide", async () => {
@@ -288,6 +296,6 @@ describe("loadMiniBracket — requête confrontée au schéma réel", () => {
     expect(undeclared).toEqual([]);
     // Toute colonne lue est qualifiée : une colonne nue échapperait à ce contrôle.
     const selectList = query.slice(query.indexOf("SELECT") + 6, query.indexOf("FROM"));
-    for (const item of selectList.split(",")) expect(item.trim()).toMatch(/^(m|p|t1|t2)\./);
+    for (const item of selectList.split(",")) expect(item.trim()).toMatch(/^(\(?(m|p|t1|t2)\.)/);
   });
 });

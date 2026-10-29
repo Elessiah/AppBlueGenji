@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { shownEntrantName, visibleText, withoutInvisibles } from "@/lib/shared/visible-text";
+import { shownEntrantName, visibleText, withoutInvisibles, withoutInvisiblesKeepingSpaces } from "@/lib/shared/visible-text";
 import { checkTeamName } from "@/lib/shared/team-name";
 import { normalizePseudo } from "@/lib/server/serialization";
 
@@ -135,7 +135,40 @@ describe("shownEntrantName — nom d'engagé lu sans compte", () => {
   });
 
   it("shownEntrantName_compatibilityForms_notFolded", () => {
-    // Sans NFKC ni réduction des espaces (`UNTRUSTED_NAMES.md`).
-    expect(shownEntrantName("Ｔeam  A")).toBe("Ｔeam  A");
+    // Sans NFKC (`UNTRUSTED_NAMES.md`) ; les suites d'espaces sont réduites à une.
+    expect(shownEntrantName("Ｔeam  A")).toBe("Ｔeam A");
+  });
+});
+
+describe("withoutInvisibles — drapeaux de subdivision et suites d'espaces", () => {
+  const tag = (text: string) => Array.from(text, (letter) => cp(0xe0000 + (letter.codePointAt(0) ?? 0))).join("");
+  const SCOTLAND = `${cp(0x1f3f4)}${tag("gbsct")}${cp(0xe007f)}`;
+
+  it("withoutInvisibles_subdivisionFlag_keepsCompleteTagSequence", () => {
+    expect(withoutInvisibles(`${SCOTLAND} Scotland Cup`)).toBe(`${SCOTLAND} Scotland Cup`);
+  });
+
+  it("withoutInvisibles_tagsAfterPlainText_removed", () => {
+    expect(withoutInvisibles(`Cup${tag("hidden")}${cp(0xe007f)}`)).toBe("Cup");
+  });
+
+  it("withoutInvisibles_flagWithoutCancelTag_removesTags", () => {
+    expect(withoutInvisibles(`${cp(0x1f3f4)}${tag("gbsct")}`)).toBe(cp(0x1f3f4));
+  });
+
+  it("withoutInvisibles_flagWithOverlongTagRun_removesTags", () => {
+    expect(withoutInvisibles(`${cp(0x1f3f4)}${tag("abcdefghi")}${cp(0xe007f)}`)).toBe(cp(0x1f3f4));
+  });
+
+  it("withoutInvisibles_runsOfSpaces_collapsedToOne", () => {
+    expect(withoutInvisibles(`A${cp(0xa0)}${cp(0xa0)}${cp(0x3000)}  B`)).toBe("A B");
+  });
+
+  it("withoutInvisibles_isolatedThinNoBreakSpace_kept", () => {
+    expect(withoutInvisibles(`4${cp(0x202f)}200 €`)).toBe(`4${cp(0x202f)}200 €`);
+  });
+
+  it("withoutInvisiblesKeepingSpaces_runsOfSpaces_kept", () => {
+    expect(withoutInvisiblesKeepingSpaces(`A${ZERO_WIDTH_SPACE}   B `)).toBe("A   B");
   });
 });

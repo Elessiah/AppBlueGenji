@@ -92,8 +92,11 @@ describe("saisie du score par un engagé — modale, plus de formulaire en ligne
 describe("nom d'équipe — même repli sur la carte et dans la modale", () => {
   it("MatchRow et la modale passent par le même repli à trois niveaux", () => {
     // Le libellé d'attente passe d'abord par la langue de la page (lot 8a-2).
-    expect(MATCH_ROW).toMatch(/teamLabel\(\s*match\.team1Name,\s*localizedPlaceholder\(text, match\.team1Placeholder\),/);
-    expect(PLAYER_DIALOG).toMatch(/teamLabel\(match\.team1Name, localizedPlaceholder\(pageText, match\.team1Placeholder\),/);
+    // Le nom y est d'abord nettoyé (`useShownEntrantName`), puis replié.
+    expect(MATCH_ROW).toContain("useShownEntrantName(match.team1Id, match.team1Name)");
+    expect(MATCH_ROW).toMatch(/teamLabel\(\s*team1Shown,\s*localizedPlaceholder\(text, match\.team1Placeholder\),/);
+    expect(PLAYER_DIALOG).toContain("useShownEntrantName(match.team1Id, match.team1Name)");
+    expect(PLAYER_DIALOG).toMatch(/teamLabel\(shown1, localizedPlaceholder\(pageText, match\.team1Placeholder\),/);
   });
 });
 

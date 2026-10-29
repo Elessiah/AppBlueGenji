@@ -38,11 +38,19 @@ describe("validateTournamentInput", () => {
     expect(validateTournamentInput({ ...base, name: "   " })).toEqual({ error: "MISSING_NAME" });
   });
 
+  it("accepte un nom de 120 caractères, refuse 121 (NAME_TOO_LONG) en comptant les points de code", () => {
+    expect("value" in validateTournamentInput({ ...base, name: "a".repeat(120) })).toBe(true);
+    expect(validateTournamentInput({ ...base, name: "a".repeat(121) })).toEqual({ error: "NAME_TOO_LONG" });
+    // 120 pictogrammes hors plan multilingue de base : 240 unités UTF-16, mais 120 caractères pour la base.
+    expect("value" in validateTournamentInput({ ...base, name: "😀".repeat(120) })).toBe(true);
+    expect(validateTournamentInput({ ...base, name: "😀".repeat(121) })).toEqual({ error: "NAME_TOO_LONG" });
+  });
+
   it("enregistre le nom sans invisibles, et refuse un nom fait seulement d'invisibles", () => {
     const rlo = String.fromCodePoint(0x202e);
     const zwsp = String.fromCodePoint(0x200b);
     const result = validateTournamentInput({ ...base, name: `  Coupe${zwsp}  d'hiver${rlo} ` });
-    expect("value" in result && result.value.name).toBe("Coupe  d'hiver");
+    expect("value" in result && result.value.name).toBe("Coupe d'hiver");
     expect(validateTournamentInput({ ...base, name: `${zwsp}${rlo}` })).toEqual({ error: "MISSING_NAME" });
     // Un nom qui n'est pas du texte (corps JSON forgé) est absent, sans lever.
     expect(validateTournamentInput({ ...base, name: 42 as unknown as string })).toEqual({ error: "MISSING_NAME" });

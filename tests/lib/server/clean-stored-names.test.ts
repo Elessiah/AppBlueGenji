@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { cleanStoredNames } from "@/lib/server/database/data-migrations";
-import { fakePool, type SqlQuery } from "../../helpers/sql-double";
+import { CLEAN_STORED_NAMES_MARKER } from "@/lib/server/database/data-migrations";
+import { fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 /**
  * `cleanStoredNames` retire une fois, par `withoutInvisibles`, les invisibles et
@@ -28,15 +29,27 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-/** Base simulée : chaque table rend ses lignes ; `updateReply` décide de chaque écriture. */
-function database(rows: Rows, updateReply: (params: unknown[]) => unknown = () => [{ affectedRows: 1 }, undefined]) {
+/**
+ * Base simulée : chaque table rend ses lignes ; `updateReply` décide de chaque
+ * écriture ; `marked` dit si la passe a déjà été menée à bout (marqueur posé).
+ * Le pool et sa connexion de passe partagent le même `execute`.
+ */
+function database(
+  rows: Rows,
+  updateReply: (params: unknown[]) => unknown = () => [{ affectedRows: 1 }, undefined],
+  marked = false,
+) {
+  const release = jest.fn<() => void>();
   const execute = jest.fn<SqlQuery>(async (sql, params) => {
+    if (sql.startsWith("SELECT 1 FROM bg_settings")) return [marked ? [{ 1: 1 }] : [], undefined];
+    if (sql.startsWith("INSERT INTO bg_settings") || sql.startsWith("SET SESSION")) return [{ affectedRows: 1 }, undefined];
     const select = /^SELECT id, \w+ AS name FROM (\w+)$/.exec(sql);
     if (select) return [rows[select[1]] ?? [], undefined];
     if (sql.startsWith("UPDATE")) return updateReply(params as unknown[]);
     throw new Error(`requête inattendue : ${sql}`);
   });
-  return { execute, pool: fakePool({ execute }) };
+  const getConnection = jest.fn(async () => fakeConnection({ execute, release }));
+  return { execute, release, pool: fakePool({ execute, getConnection }) };
 }
 
 function updates(execute: jest.Mock<SqlQuery>): { sql: string; params: unknown }[] {
@@ -180,17 +193,77 @@ describe("cleanStoredNames", () => {
     expect(guards.map((match) => match?.[2])).toEqual([" COLLATE utf8mb4_bin", " COLLATE utf8mb4_bin", " COLLATE utf8mb4_bin"]);
   });
 
-  it("dit une table illisible sans faire tomber le démarrage, et passe à la suivante", async () => {
+  it("dit une table illisible sans faire tomber le démarrage, passe à la suivante, et ne pose pas le marqueur", async () => {
+    const release = jest.fn<() => void>();
     const execute = jest.fn<SqlQuery>(async (sql) => {
+      if (sql.startsWith("SELECT 1 FROM bg_settings")) return [[], undefined];
       if (sql.includes("FROM bg_teams")) throw mysqlError("ER_LOCK_WAIT_TIMEOUT");
       if (sql.startsWith("SELECT")) return [[{ id: 2, name: "B\u200Bob" }], undefined];
       return [{ affectedRows: 1 }, undefined];
     });
+    const getConnection = jest.fn(async () => fakeConnection({ execute, release }));
 
-    await expect(cleanStoredNames(fakePool({ execute }))).resolves.toBeUndefined();
+    await expect(cleanStoredNames(fakePool({ execute, getConnection }))).resolves.toBeUndefined();
 
     expect(errorSpy).toHaveBeenCalledTimes(1);
     expect(String(errorSpy.mock.calls[0][0])).toContain("nettoyage des noms");
     expect(execute.mock.calls.filter(([sql]) => sql.startsWith("UPDATE"))).toHaveLength(2);
+    expect(execute.mock.calls.some(([sql]) => sql.startsWith("INSERT INTO bg_settings"))).toBe(false);
+  });
+
+  it("ne lit rien quand le marqueur est posé", async () => {
+    const { execute, pool } = database({ bg_teams: [{ id: 1, name: "A\u200Bb" }] }, undefined, true);
+
+    await cleanStoredNames(pool);
+
+    expect(execute.mock.calls.map(([sql]) => sql)).toEqual(["SELECT 1 FROM bg_settings WHERE setting_key = ? LIMIT 1"]);
+  });
+
+  it("pose le marqueur une fois la passe menée à bout, lignes laissées comprises", async () => {
+    const { execute, pool } = database({ bg_teams: [{ id: 1, name: "\u200B" }] });
+
+    await cleanStoredNames(pool);
+
+    const marker = execute.mock.calls.find(([sql]) => sql.startsWith("INSERT INTO bg_settings"));
+    expect(marker?.[1]).toEqual([CLEAN_STORED_NAMES_MARKER]);
+  });
+
+  it("n'attrape que le doublon : une autre erreur d'écriture est signalée, la passe reste à rejouer", async () => {
+    const { execute, pool } = database({ bg_teams: [{ id: 1, name: "A\u200Bb" }] }, () => {
+      throw mysqlError("ER_LOCK_WAIT_TIMEOUT");
+    });
+
+    await cleanStoredNames(pool);
+
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    expect(String(errorSpy.mock.calls[0][0])).toContain("UPDATE bg_teams.name");
+    expect(logged()).not.toContain("laissé(s)");
+    expect(execute.mock.calls.some(([sql]) => sql.startsWith("INSERT INTO bg_settings"))).toBe(false);
+  });
+
+  it("raccourcit l'attente de verrou pour la passe, la rend au pool, et libère la connexion", async () => {
+    const { execute, release, pool } = database({ bg_teams: [{ id: 1, name: "Ab" }] });
+
+    await cleanStoredNames(pool);
+
+    const sets = execute.mock.calls.map(([sql]) => sql).filter((sql) => sql.startsWith("SET SESSION"));
+    expect(sets).toEqual(["SET SESSION innodb_lock_wait_timeout = 5", "SET SESSION innodb_lock_wait_timeout = DEFAULT"]);
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it("journalise les identifiants des équipes et tournois laissés, jamais ceux des joueurs ni un nom", async () => {
+    const { pool } = database(
+      {
+        bg_teams: [{ id: 11, name: "\u200B" }],
+        bg_users: [{ id: 22, name: "\u200B" }],
+        bg_tournaments: [{ id: 33, name: "\u2060" }],
+      },
+    );
+
+    await cleanStoredNames(pool);
+
+    expect(logged()).toContain("bg_teams.name : 0 nom(s) réécrit(s) sans caractère invisible, 1 laissé(s) tel(s) quel(s) (vide une fois nettoyé, ou doublon) (id : 11).");
+    expect(logged()).toContain("(id : 33)");
+    expect(logged()).not.toContain("22");
   });
 });

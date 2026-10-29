@@ -76,7 +76,7 @@ describe("Leaderboard — nom qui ne garde rien de visible", () => {
       </ToastProvider>,
     );
     expect(markup).toContain(">Équipe #12<");
-    expect(markup).toContain('title="Voir la fiche de Équipe #12"');
+    expect(markup).toContain('title="Voir la fiche de l&#x27;équipe #12"');
     // La pastille prend l'initiale du repli, plus « # ».
     expect(markup).toMatch(/--size:24px[^"]*">É<\/div>/);
     expect(markup).not.toContain(">#12<");

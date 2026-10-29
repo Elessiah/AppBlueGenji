@@ -46,9 +46,9 @@ jest.mock("@/lib/server/share-team", () => ({
 }));
 
 const PODIUM = [
-  { teamName: "Alpha", points: 1240, logoSrc: null },
-  { teamName: "Bravo", points: 1180, logoSrc: null },
-  { teamName: "Charlie", points: 1100, logoSrc: null },
+  { teamId: 1, teamName: "Alpha", points: 1240, logoSrc: null },
+  { teamId: 2, teamName: "Bravo", points: 1180, logoSrc: null },
+  { teamId: 3, teamName: "Charlie", points: 1100, logoSrc: null },
 ];
 
 async function render(key: string, locale: "fr" | "en" = "fr") {
@@ -65,7 +65,7 @@ beforeEach(() => {
 });
 
 describe("renderPageShareImage — coût d'un rendu", () => {
-  const TEAM_ROW = { teamName: "Dragon Squad", logoUrl: null, wins: 1, losses: 0, draws: 0, points: 1000 };
+  const TEAM_ROW = { teamId: 7, teamName: "Dragon Squad", logoUrl: null, wins: 1, losses: 0, draws: 0, points: 1000 };
 
   it("rend une carte fixe une fois, puis la ressert depuis la mémoire", async () => {
     const first = await renderPageShareImage("association", "fr");
@@ -113,7 +113,7 @@ describe("renderPageShareImage — coût d'un rendu", () => {
 });
 
 describe("carte nominative d'une équipe", () => {
-  const TEAM = { teamName: "Dragon Squad", wins: 12, losses: 3, draws: 0, points: 1240, logoSrc: null };
+  const TEAM = { teamId: 7, teamName: "Dragon Squad", wins: 12, losses: 3, draws: 0, points: 1240, logoSrc: null };
 
   it("rend nom, cote et bilan, en cache court, sans lire le podium", async () => {
     jest.mocked(loadShareTeam).mockResolvedValue(TEAM);
