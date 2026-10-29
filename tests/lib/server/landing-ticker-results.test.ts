@@ -308,6 +308,26 @@ describe("getLandingTicker — lectures et repli (EF-24)", () => {
     expect(release).toHaveBeenCalledTimes(1);
   });
 
+  it("loadLandingTicker_oneReadFails_releasesOnlyAfterOthersSettle", async () => {
+    // Une lecture en échec ne rend pas la connexion pendant que les autres y attendent.
+    const pending: Array<(value: unknown) => void> = [];
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockRejectedValueOnce(new Error("down"))
+      .mockImplementation(() => new Promise((resolve) => { pending.push(resolve); }));
+    const { pool, release } = poolWithConnection(execute);
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(pool);
+
+    const ticker = getLandingTicker();
+    for (let tick = 0; tick < 10; tick += 1) await Promise.resolve();
+    expect(release).not.toHaveBeenCalled();
+    for (const resolve of pending) resolve([[]]);
+
+    expect((await ticker).items).toHaveLength(3);
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
   it("loadLandingTicker_registrationsQuery_isBoundedByShownEntries", async () => {
     const { execute } = await mockReads({});
     await getLandingTicker();

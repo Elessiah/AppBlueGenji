@@ -9,6 +9,8 @@ import { updateTeamMeta } from "@/lib/server/teams/identity";
 import { assertTeamNameAvailable, isTeamNameConflict } from "@/lib/server/team-tags";
 import { getDatabase } from "@/lib/server/database";
 import { type SqlMock, fakePool } from "../../helpers/sql-double";
+import { clearCache } from "@/lib/server/cache";
+import { LANDING_TTL_MS, cachedLanding } from "@/lib/server/landing-cache";
 
 /**
  * Renommer une équipe : mêmes bornes qu'à la création, unicité dite en
@@ -144,5 +146,48 @@ describe("isTeamNameConflict", () => {
   it("ignore toute autre erreur", () => {
     expect(isTeamNameConflict(new Error("boom"))).toBe(false);
     expect(isTeamNameConflict(null)).toBe(false);
+  });
+});
+
+// EF-24 : `/classement` et l'accueil servent le nom depuis le cache de la vitrine.
+describe("updateTeamMeta — vues de l'accueil", () => {
+  beforeEach(() => {
+    clearCache();
+  });
+
+  it("updateTeamMeta_renamed_clearsLandingLeaderboard", async () => {
+    execute
+      .mockResolvedValueOnce(owner)
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+    const loader = jest.fn(async () => "rangs");
+    await cachedLanding("leaderboard:all", LANDING_TTL_MS, loader);
+
+    await updateTeamMeta(1, 7, { name: "Nouveau Nom" });
+    await cachedLanding("leaderboard:all", LANDING_TTL_MS, loader);
+
+    expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  it("updateTeamMeta_descriptionOnly_keepsLandingLeaderboard", async () => {
+    execute.mockResolvedValueOnce(owner).mockResolvedValueOnce([{ affectedRows: 1 }]);
+    const loader = jest.fn(async () => "rangs");
+    await cachedLanding("leaderboard:all", LANDING_TTL_MS, loader);
+
+    await updateTeamMeta(1, 7, { description: "Texte" });
+    await cachedLanding("leaderboard:all", LANDING_TTL_MS, loader);
+
+    expect(loader).toHaveBeenCalledTimes(1);
+  });
+
+  it("updateTeamMeta_nameRefused_keepsLandingLeaderboard", async () => {
+    execute.mockResolvedValueOnce(owner);
+    const loader = jest.fn(async () => "rangs");
+    await cachedLanding("leaderboard:all", LANDING_TTL_MS, loader);
+
+    await expect(updateTeamMeta(1, 7, { name: "" })).rejects.toThrow("INVALID_TEAM_NAME");
+    await cachedLanding("leaderboard:all", LANDING_TTL_MS, loader);
+
+    expect(loader).toHaveBeenCalledTimes(1);
   });
 });

@@ -37,6 +37,8 @@ import {
   restoreReportedImage,
 } from "@/lib/server/logo-quarantine";
 import { logoQuarantinePurgeDate } from "@/lib/shared/logo-quarantine";
+import { clearCache } from "@/lib/server/cache";
+import { LANDING_TTL_MS, cachedLanding } from "@/lib/server/landing-cache";
 import { connectionMock, fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 type Route = [RegExp, (params: unknown) => unknown];
@@ -767,5 +769,74 @@ describe("quarantinedLogoFile", () => {
       [/SELECT logo_url, team_id, user_id, status FROM bg_logo_quarantines/, () => [[{ logo_url: AVATAR, team_id: null, user_id: 9, status: "HIDDEN" }]]],
     ]);
     await expect(quarantinedLogoFile(30)).resolves.toBe(HIDDEN_AVATAR);
+  });
+});
+
+// EF-24 : un logo retiré ou masqué par la modération ne reste pas servi par le
+// leaderboard de l'accueil et de `/classement` (cache de la vitrine, 60 s).
+describe("modération d'un logo d'équipe — vues de l'accueil", () => {
+  const reportTargets: Route = [/JOIN bg_report_targets t ON t.report_id = r.id AND t.target_type = \?/, () => [[{ category: "COPYRIGHT" }]]];
+  const members: Route = [/FROM bg_team_members tm\s+JOIN bg_users u/, () => [[]]];
+
+  beforeEach(() => {
+    clearCache();
+  });
+
+  it("deleteTeamLogoForReport_committed_clearsLandingLeaderboard", async () => {
+    install(
+      [reportTargets, members],
+      [
+        [/SELECT name, logo_url FROM bg_teams WHERE id = \? AND solo_user_id IS NULL FOR UPDATE/, () => [[{ name: "Alpha", logo_url: LOGO }]]],
+        [/UPDATE bg_teams SET logo_url = NULL/, () => [{}]],
+        [/COUNT\(\*\) AS total FROM bg_teams WHERE logo_url = \?/, () => [[{ total: 0 }]]],
+        [/INSERT INTO bg_logo_quarantines/, () => [{ insertId: 33 }]],
+      ],
+    );
+    const loader = jest.fn(async () => "rangs");
+    await cachedLanding("leaderboard:all", LANDING_TTL_MS, loader);
+
+    await deleteTeamLogoForReport(12, 4, actor);
+    await flush();
+    await cachedLanding("leaderboard:all", LANDING_TTL_MS, loader);
+
+    expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  it("hideTeamLogo_committed_clearsLandingLeaderboard", async () => {
+    install(
+      [
+        reportTargets,
+        [/SELECT name, logo_url FROM bg_teams/, () => [[{ name: "Alpha", logo_url: LOGO }]]],
+        [/COUNT\(\*\) AS total FROM bg_teams WHERE logo_url = \? AND id <> \?/, () => [[{ total: 0 }]]],
+        members,
+      ],
+      [
+        [/SELECT logo_url FROM bg_teams WHERE id = \? FOR UPDATE/, () => [[{ logo_url: LOGO }]]],
+        [/UPDATE bg_teams SET logo_url = NULL/, () => [{}]],
+        [/INSERT INTO bg_logo_quarantines/, () => [{ insertId: 30 }]],
+      ],
+    );
+    const loader = jest.fn(async () => "rangs");
+    await cachedLanding("leaderboard:all", LANDING_TTL_MS, loader);
+
+    await hideTeamLogo(12, 4, actor);
+    await flush();
+    await cachedLanding("leaderboard:all", LANDING_TTL_MS, loader);
+
+    expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  it("deleteTeamLogoForReport_refused_keepsLandingLeaderboard", async () => {
+    install(
+      [reportTargets, members],
+      [[/SELECT name, logo_url FROM bg_teams WHERE id = \? AND solo_user_id IS NULL FOR UPDATE/, () => [[{ name: "Alpha", logo_url: null }]]]],
+    );
+    const loader = jest.fn(async () => "rangs");
+    await cachedLanding("leaderboard:all", LANDING_TTL_MS, loader);
+
+    await expect(deleteTeamLogoForReport(12, 4, actor)).rejects.toThrow();
+    await cachedLanding("leaderboard:all", LANDING_TTL_MS, loader);
+
+    expect(loader).toHaveBeenCalledTimes(1);
   });
 });
