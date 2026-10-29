@@ -1,6 +1,6 @@
 import type { AuthUser } from "@/lib/server/auth";
 import { emptyDeepStats } from "@/lib/shared/stats";
-import type { FullProfileResponse, PublicUserProfile } from "@/lib/shared/types";
+import type { DirectoryPlayer, FullProfileResponse, PublicUserProfile } from "@/lib/shared/types";
 
 /**
  * Un `AuthUser` **complet** — ce que rend `getCurrentUser()` —, surchargé champ
@@ -43,6 +43,20 @@ export function publicUserProfile(overrides: Partial<PublicUserProfile> = {}): P
     createdAt: "2026-01-01T00:00:00.000Z",
     ...overrides,
   };
+}
+
+/**
+ * Une ligne d'annuaire `DirectoryPlayer` complète (`listPlayers`) : un compte
+ * vivant par défaut ; `deleted: true` rend un compte supprimé, sans
+ * identifiant ni date de création.
+ */
+export function directoryPlayer(
+  overrides: Partial<Omit<PublicUserProfile, "id" | "createdAt" | "isDeleted">> & { id?: number; deleted?: boolean } = {},
+): DirectoryPlayer {
+  const { id = 1, deleted = false, ...rest } = overrides;
+  const base = publicUserProfile(rest);
+  if (deleted) return { ...base, id: null, createdAt: null, isDeleted: true };
+  return { ...base, id, isDeleted: false };
 }
 
 /**

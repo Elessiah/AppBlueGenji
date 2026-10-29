@@ -175,9 +175,18 @@ describe("dossier du panneau", () => {
   it("annonce six mois quand l'auteur peut contester, comme la purge (EF-05)", () => {
     // La même règle que `reportRetainedUntil` : notification de droit d'auteur
     // ou de modération, envoyée depuis un compte.
-    expect(detail).toMatch(/const heldForNotifier = notifierMayContest\(\{\s*category: report\.category,\s*reporterUserId: report\.reporter\?\.userId \?\? null,\s*\}\);/);
-    expect(detail).toContain("? `Archivé, le signalement est effacé ${LOGO_QUARANTINE_MONTHS} mois plus tard, le temps que son auteur puisse contester la décision`");
-    expect(detail).toContain(": `Archivé, le signalement est effacé ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours plus tard`");
+    // La règle est tranchée côté serveur (`ReportView.heldForNotifier`), une seule fois.
+    expect(detail).toContain("const heldForNotifier = report.heldForNotifier;");
+    // …par la règle même de la purge : la date annoncée et le texte ne divergent pas.
+    const server = read("lib/server/content-reports.ts");
+    expect(server).toContain("const heldForNotifier = notifierMayContest({ category: row.category, reporterUserId: row.reporter_user_id });");
+    expect(server).toContain("reportRetainedUntil(resolvedAt, held, heldForNotifier).toISOString()");
+    expect(server).toMatch(/heldForNotifier,\s*reporter: person\(/);
+    expect(detail).not.toContain("notifierMayContest");
+    expect(detail).toContain("? `Archivé, le signalement est effacé ${LOGO_QUARANTINE_MONTHS} mois plus tard, le temps que son auteur puisse contester la décision — au-delà");
+    expect(detail).toContain(": `Archivé, le signalement est effacé ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours plus tard — au-delà");
+    // Une image retenue en quarantaine prolonge la garde : le panneau le dit.
+    expect(detail).toContain("s'il tient une image (logo, avatar) masquée ou supprimée encore contestable.");
     expect(notifierMayContest({ category: "COPYRIGHT", reporterUserId: 7 })).toBe(true);
     expect(notifierMayContest({ category: "MODERATION", reporterUserId: 7 })).toBe(true);
     // Sans compte (formulaire anonyme) ou hors de ces catégories : trente jours.

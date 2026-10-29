@@ -86,6 +86,8 @@ type MatchOverrides = Partial<MatchState> & { caster_user_id?: number | null; ca
 type Membership = { userId: number; teamId: number; roles: string[] };
 
 type World = {
+  /** Toutes les instructions reçues, réduites à une ligne, dans l'ordre. */
+  issued?: string[];
   match: MatchState | null;
   memberships: Membership[];
   soloEntries: { userId: number; teamId: number }[];
@@ -306,6 +308,7 @@ function readRefereeRows(state: World, sql: string, params: unknown[]): [unknown
 function executeFor(state: World) {
   return async (rawSql: string, params: unknown[] = []) => {
     const sql = rawSql.replace(/\s+/g, " ").trim();
+    state.issued?.push(sql);
     const castResult = applyCastWrite(state, sql, params) ?? readCastRows(state, sql);
     if (castResult) return castResult;
     if (sql.startsWith("UPDATE")) {
@@ -621,6 +624,15 @@ describe("claimMatchCast", () => {
     // Aucun lien neuf : l'accueil n'a rien à relire.
     expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: false });
     expect(announceCastChange).toHaveBeenCalledWith({ kind: "CLAIMED", matchId: 42, replacedCasterId: null });
+  });
+
+  it("claimMatchCast_anyClaim_locksTheAccountRowFirst", async () => {
+    // Même ordre que la suppression du compte (compte, puis ses matchs) : une
+    // inscription ne peut pas se glisser derrière un retrait déjà parti.
+    state.users[CASTER] = verified;
+    state.issued = [];
+    await claimMatchCast(42, CASTER, true);
+    expect(state.issued[0]).toMatch(/FROM bg_users WHERE id = \? LIMIT 1 LOCK IN SHARE MODE$/);
   });
 
   it("ouvre un stream à part avec son lien, normalisé : l'accueil relit", async () => {

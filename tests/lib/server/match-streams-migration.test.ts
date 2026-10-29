@@ -91,6 +91,23 @@ describe("bg_match_streams / bg_match_casters — migration du caster unique", (
     expect(sql).not.toMatch(/\(SELECT[^)]*FROM bg_match_streams/);
   });
 
+  it("ne rattache le lien qu'au caster qui a ouvert le stream, jamais à un co-caster resté seul", () => {
+    const all = [...RECENT.matchAll(/`([^`]*)`/g)].map((match) => flat(match[1]));
+    const sql = all.find((statement) => statement.startsWith("UPDATE bg_match_streams s SET s.link_user_id")) ?? "";
+    expect(sql).toContain(
+      "(SELECT COUNT(*) FROM bg_match_casters c WHERE c.match_id = s.match_id AND c.stream_id = s.id AND c.created_at <= s.created_at + INTERVAL 1 SECOND) = 1",
+    );
+  });
+
+  it("retire, après le rattrapage, le lien encore rattaché à un compte supprimé", () => {
+    const all = [...RECENT.matchAll(/`([^`]*)`/g)].map((match) => flat(match[1]));
+    const backfill = all.findIndex((statement) => statement.startsWith("UPDATE bg_match_streams s SET s.link_user_id"));
+    const cleanup = all.indexOf(
+      "UPDATE bg_match_streams s JOIN bg_users u ON u.id = s.link_user_id SET s.live_url = NULL, s.link_user_id = NULL WHERE u.is_deleted = 1",
+    );
+    expect(cleanup).toBeGreaterThan(backfill);
+  });
+
   it("n'ouvre jamais un second stream à un match qui en a déjà un", () => {
     const [streams] = migrationStatements();
     expect(streams).toContain("WHERE (m.live_url IS NOT NULL OR m.caster_user_id IS NOT NULL)");

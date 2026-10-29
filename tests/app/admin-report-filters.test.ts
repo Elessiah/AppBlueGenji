@@ -23,6 +23,7 @@ function report(overrides: Partial<ReportView> = {}): ReportView {
     updatedAt: "2026-09-20T10:00:00.000Z",
     resolvedAt: null,
     purgeAt: null,
+    heldForNotifier: false,
     reporter: null,
     contactName: null,
     contactEmail: null,

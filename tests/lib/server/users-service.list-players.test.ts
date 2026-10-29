@@ -154,6 +154,18 @@ describe("listPlayers — comptes anonymisés", () => {
     );
     expect(rows).toHaveLength(2);
   });
+
+  it("listPlayers_deletedRow_dropsIdAndCreationDate", async () => {
+    // Décision 11 : un compte supprimé ne se lie plus à rien — ni identifiant
+    // (fiche), ni date d'inscription.
+    const [deleted] = await runList([userRow({ id: 8, is_deleted: 1, pseudo: "compte_supprime_8" })], 999);
+    expect(deleted).toMatchObject({ isDeleted: true, id: null, createdAt: null, pseudo: "compte_supprime_8" });
+  });
+
+  it("listPlayers_activeRow_keepsIdAndCreationDate", async () => {
+    const [open] = await runList([userRow()], 999);
+    expect(open).toMatchObject({ isDeleted: false, id: 7, createdAt: "2026-01-01T00:00:00.000Z" });
+  });
 });
 
 /**
