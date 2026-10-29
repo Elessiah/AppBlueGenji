@@ -217,10 +217,27 @@ describe("PUT /api/admin/matches/[matchId]/live", () => {
       200,
     );
     // L'organisation (permission tournaments), sans rien dire de plus : le lien
-    // est celui de l'organisation — jamais déduit de ce que l'arbitre caste.
+    // est le sien (protection par défaut) — jamais déduit de ce qu'il caste.
     expect(setMatchLiveConfig).toHaveBeenCalledWith(42, {
       trigger: "AUTO",
       liveUrl: null,
+      setter: { userId: arbitre.id, asOrganisation: false },
+    });
+  });
+
+  it("PUT_tournamentsMemberOrganisationLinkTrue_marksOrganisationLink", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(setMatchLiveConfig).mockResolvedValue(undefined);
+
+    const res = await putMatchLive(
+      matchReq("PUT", { trigger: "AUTO", liveUrl: "kick.com/bg", organisationLink: true }),
+      matchParams("42"),
+    );
+
+    expect(res.status).toBe(200);
+    expect(setMatchLiveConfig).toHaveBeenCalledWith(42, {
+      trigger: "AUTO",
+      liveUrl: "kick.com/bg",
       setter: { userId: arbitre.id, asOrganisation: true },
     });
   });

@@ -2275,12 +2275,12 @@ describe("PRIVACY_CHANGES — lien de l'organisation choisi, non déduit (EF-29,
   const entry = PRIVACY_CHANGES.find((c) => c.id === id)!;
   const english = PRIVACY_CHANGES_EN[id];
 
-  it("privacyChanges_organisationLinkChoice_closesListDated1031ForAllAccounts", () => {
+  it("privacyChanges_organisationLinkChoice_closesListDated1031ForLiveStaff", () => {
     expect(id.length).toBeLessThanOrEqual(PRIVACY_CHANGE_ID_MAX_LENGTH);
     expectStandaloneEntry(entry, english, {
       fromEnd: 1,
       publishedAt: "2026-10-31",
-      audience: undefined,
+      audience: "LIVE_STAFF",
       links: [{ href: "/rgpd#retransmission", label: "Lire le paragraphe « Retransmission des matchs »" }],
     });
     expect(english.linkLabels).toEqual(["Read the “Match streaming” paragraph"]);
@@ -2297,6 +2297,17 @@ describe("PRIVACY_CHANGES — lien de l'organisation choisi, non déduit (EF-29,
     expect(en).toContain("This link is the organisation's");
     expect(en).toContain("even if they cast that match");
     expect(en).toContain("goes when their account is deleted");
+  });
+
+  it("privacyChanges_organisationLinkChoice_reachesOnlyLiveStaffAndStaysPolicyVersion", () => {
+    expect(privacyChangeReachesAccount(entry, {})).toBe(false);
+    expect(privacyChangeReachesAccount(entry, { liveStaff: true })).toBe(true);
+    expect(isPrivacyPolicyVersion(entry)).toBe(true);
+  });
+
+  it("privacyChanges_organisationLinkChoice_statesUntickedDefaultFrAndEn", () => {
+    expect(entry.details.join(" ")).toContain("décoché par défaut");
+    expect(english.details.join(" ")).toContain("unticked by default");
   });
 
   it("privacyChanges_organisationLinkChoice_leavesThePublishedCasterEntryIntact", () => {

@@ -253,6 +253,13 @@ describe("table des refus (error-map)", () => {
     }
   });
 
+  it("mapError_liveDialogRefusals_translatedFrAndEnNotGeneric (EF-29)", () => {
+    expect(mapError("MATCH_NOT_CASTABLE")).toBe("Ce match ne peut plus être diffusé.");
+    expect(mapError("MATCH_NOT_CASTABLE", EN_ERRORS)).toBe("This match can no longer be broadcast.");
+    expect(mapError("INVALID_ORGANISATION_LINK")).toBe("Le choix « lien de l'organisation » est invalide.");
+    expect(mapError("INVALID_ORGANISATION_LINK", EN_ERRORS)).toBe("The “organisation's link” choice is invalid.");
+  });
+
   it("anglais : code connu, code inconnu, phrase déjà rédigée", () => {
     expect(mapError("TOURNAMENT_FULL", EN_ERRORS)).toBe("This tournament is full.");
     expect(mapError("SOMETHING_NEW", EN_ERRORS)).toBe(EN.tournamentErrors.unknown);

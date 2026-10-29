@@ -1657,6 +1657,45 @@ describe("maintainMatchLaunches — éligibilité des casters relue en lecture c
   });
 });
 
+describe("autogestion : lecture des casters au lancement qui suit (EF-29)", () => {
+  const REFEREE = 950;
+
+  it("setRoundSelfManaged_runningMatchRefereeRemoved_launchRereadsCastersAndEligibilityCurrent", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({
+      referee_user_id: REFEREE,
+      team1_is_ghost: 1,
+      team2_is_ghost: 1,
+      caster_user_id: CASTER,
+    });
+    state.issued = [];
+
+    await setRoundSelfManaged(7, { phaseId: 0, roundNumber: 1, bracket: null }, true);
+
+    // Les candidats de la manche sont lus avant le verrou du match : le
+    // lancement relit casters et éligibilité en lecture courante.
+    expect(state.issued.some((sql) => /FROM bg_match_casters .*FOR UPDATE$/.test(sql))).toBe(true);
+    expect(state.issued.some((sql) => /FROM bg_users WHERE id IN \(\?\) LOCK IN SHARE MODE$/.test(sql))).toBe(true);
+  });
+
+  it("setMatchSelfManaged_runningMatchRefereeRemoved_launchKeepsPlainCasterRead", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({
+      referee_user_id: REFEREE,
+      team1_is_ghost: 1,
+      team2_is_ghost: 1,
+      caster_user_id: CASTER,
+    });
+    state.issued = [];
+
+    await setMatchSelfManaged(42, true);
+
+    // Le verrou du match est la première instruction : lecture ordinaire.
+    expect(state.issued.some((sql) => /FROM bg_match_casters /.test(sql))).toBe(true);
+    expect(state.issued.some((sql) => /FROM bg_match_casters .*FOR UPDATE$/.test(sql))).toBe(false);
+  });
+});
+
 describe("releaseMatchCast / claimMatchCast : gardes et publications (EF-29)", () => {
   it("releaseMatchCast_completedMatch_refusesAndKeepsCasterStreamAndLink", async () => {
     state.users[CASTER] = ELIGIBLE_CASTER;

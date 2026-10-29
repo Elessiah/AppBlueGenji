@@ -177,10 +177,10 @@ describe("MatchLiveDialog — rendu inchangé", () => {
 describe("MatchLiveDialog — provenance du lien (EF-29)", () => {
   const live = bracketMatch({ id: 11, liveTrigger: "MANUAL", liveUrl: "https://twitch.tv/bluegenji" });
 
-  it("membre de l'organisation : la case « lien de l'organisation » est offerte, cochée par défaut", () => {
+  it("MatchLiveDialog_organisationMember_offersUntickedOrganisationCheckbox", () => {
     const html = String(render(<MatchLiveDialog match={live} onClose={noop} onSaved={noop} canSpeakForOrganisation />));
     expect(html).toContain("Ce lien est celui de l&#x27;organisation");
-    expect(html).toMatch(/type="checkbox"[^>]*checked=""[^>]*\/?>\s*Ce lien est celui/);
+    expect(html).toMatch(/<input type="checkbox"\/>Ce lien est celui/);
   });
 
   it("sans la permission tournaments : pas de case, le lien est dit sa propre chaîne", () => {
