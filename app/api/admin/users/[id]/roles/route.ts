@@ -28,7 +28,7 @@ const SERVICE_ERROR_STATUS: Readonly<Record<string, number>> = {
  *
  * @returns `200 { roles }` (liste normalisée), ou une erreur `401`
  *   (non authentifié), `403` (`FORBIDDEN` : non admin, ou administration
- *   retirée pendant l'enregistrement de ses propres rôles), `400`
+ *   retirée à l'auteur pendant l'enregistrement), `400`
  *   (`INVALID_ID` / `INVALID_PAYLOAD` / `CANNOT_MODIFY_SELF` /
  *   `CANNOT_REMOVE_OWN_ADMIN`) ou `404` (`USER_NOT_FOUND`).
  */
@@ -58,13 +58,14 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   if (self && !body.roles.includes("ADMIN")) return fail("CANNOT_REMOVE_OWN_ADMIN", 400);
 
   try {
-    const roles = self ? await setOwnPlatformRoles(user.id, body.roles) : await setUserRoles(targetId, body.roles);
+    const roles = self ? await setOwnPlatformRoles(user.id, body.roles) : await setUserRoles(targetId, body.roles, user.id);
     publishRolesChange({ id: user.id, pseudo: user.pseudo }, targetId, roles);
     return ok({ roles });
   } catch (e) {
     const msg = (e as Error).message;
     // Administration retirée par un autre entre la lecture de la session et
-    // l'écriture : le geste n'est plus permis, il se refuse comme tel.
+    // l'écriture — sur son compte comme sur celui d'un autre : le geste n'est
+    // plus permis, il se refuse comme tel.
     if (msg === "NOT_ADMIN") return fail("FORBIDDEN", 403);
     return Object.hasOwn(SERVICE_ERROR_STATUS, msg)
       ? fail(msg, SERVICE_ERROR_STATUS[msg])

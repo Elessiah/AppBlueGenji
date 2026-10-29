@@ -76,10 +76,14 @@ export function SelfRolesField({
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<PlatformRoleChange | null>(null);
 
-  // Resynchronise la sélection à chaque relecture du profil.
+  // Resynchronise la sélection quand les rôles **enregistrés** changent — sur
+  // leur contenu, pas sur l'identité du tableau : toute autre mise à jour du
+  // profil (pseudo, préférences) en recrée un, et effaçait une case cochée
+  // mais pas encore enregistrée.
+  const savedKey = roles.join(",");
   useEffect(() => {
-    setSelected([...roles]);
-  }, [roles]);
+    setSelected(savedKey ? (savedKey.split(",") as PlatformRole[]) : []);
+  }, [savedKey]);
 
   const toggle = (role: PlatformRole) => {
     if (role === "ADMIN" || busy) return;

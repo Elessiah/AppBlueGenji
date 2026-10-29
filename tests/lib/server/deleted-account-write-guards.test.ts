@@ -140,10 +140,11 @@ describe("setUserRoles — la course se dit, elle ne se tait pas", () => {
     const execute = jest
       .fn<SqlQuery>()
       .mockResolvedValueOnce([[{ id: 7 }]])
-      .mockResolvedValueOnce([{ affectedRows: 0 }]);
+      .mockResolvedValueOnce([{ affectedRows: 0 }])
+      .mockResolvedValueOnce([[{ id: 1 }]]); // l'auteur est toujours administrateur
     await mockDb(execute);
 
-    await expect(setUserRoles(7, ["ARBITRE"])).rejects.toThrow("USER_NOT_FOUND");
+    await expect(setUserRoles(7, ["ARBITRE"], 1)).rejects.toThrow("USER_NOT_FOUND");
   });
 
   it("rend les rôles normalisés quand l'écriture a bien apparié la ligne", async () => {
@@ -153,10 +154,10 @@ describe("setUserRoles — la course se dit, elle ne se tait pas", () => {
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
     await mockDb(execute);
 
-    await expect(setUserRoles(7, ["ARBITRE"])).resolves.toEqual(["ARBITRE"]);
+    await expect(setUserRoles(7, ["ARBITRE"], 1)).resolves.toEqual(["ARBITRE"]);
 
     const [sql] = execute.mock.calls[1] as [string];
-    expect(sql).toMatch(/WHERE id = \? AND is_deleted = 0/);
+    expect(sql).toMatch(/WHERE target\.id = \? AND target\.is_deleted = 0/);
   });
 });
 

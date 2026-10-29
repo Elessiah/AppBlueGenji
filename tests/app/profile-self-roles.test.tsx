@@ -5,6 +5,8 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 jest.mock("next/navigation", () => ({
   usePathname: () => "/profil",
@@ -18,6 +20,7 @@ jest.mock("@/components/ui/toast", () => ({
 }));
 
 import { SelfRolesField, SelfRolesSection, selfRolesErrorMessage } from "@/app/(secured)/profil/_components/SelfRolesField";
+import { Coche, pillColors } from "@/components/Coche";
 import { FR_PROFILE_TEXT, ProfileTextProvider } from "@/components/i18n/profile-text";
 import { AppLocaleProvider } from "@/components/i18n/locale-context";
 import { ShellTextProvider } from "@/components/i18n/shell-text";
@@ -124,5 +127,52 @@ describe("SelfRolesSection", () => {
     );
     expect(html).toContain('id="roles"');
     expect(html).toContain('id="profile-role-ADMIN"');
+  });
+});
+
+describe("SelfRolesField — resync", () => {
+  it("selfRolesField_source_resyncsOnSavedContentNotArrayIdentity", () => {
+    // Un PATCH du pseudo recrée le tableau des rôles : resynchroniser sur son
+    // identité effaçait une case cochée mais pas encore enregistrée.
+    const source = readFileSync(
+      join(process.cwd(), "app", "(secured)", "profil", "_components", "SelfRolesField.tsx"),
+      "utf8",
+    );
+    expect(source).toContain("}, [savedKey]);");
+    expect(source).not.toContain("}, [roles]);");
+  });
+});
+
+describe("Coche — aria-disabled", () => {
+  it("pillColors_inert_mutesBorderAndLabel", () => {
+    expect(pillColors("89,212,255", true, true)).toEqual({
+      pillBorder: "rgba(89,212,255,0.22)",
+      markBorder: "rgba(89,212,255,0.45)",
+      labelColor: "var(--ink-mute)",
+    });
+    expect(pillColors("89,212,255", false, true).pillBorder).toBe("rgba(255,255,255,0.12)");
+  });
+
+  it("pillColors_active_keepsThemeColours", () => {
+    expect(pillColors("89,212,255", true, false)).toEqual({
+      pillBorder: "rgba(89,212,255,0.4)",
+      markBorder: "rgba(89,212,255,0.8)",
+      labelColor: "var(--ink)",
+    });
+  });
+
+  it("coche_ariaDisabled_showsNotAllowedCursorWithoutOpacity", () => {
+    const html = renderToStaticMarkup(
+      <Coche id="x" label="Administrateur" checked aria-disabled onChange={() => undefined} />,
+    );
+    const label = /<label[^>]*>/.exec(html)?.[0] ?? "";
+    expect(label).toContain("cursor:not-allowed");
+    expect(html).toContain("color:var(--ink-mute)");
+    expect(html).not.toMatch(/opacity:0\.\d/);
+  });
+
+  it("coche_enabled_keepsPointerCursor", () => {
+    const html = renderToStaticMarkup(<Coche id="y" label="Arbitre" checked={false} onChange={() => undefined} />);
+    expect(/<label[^>]*>/.exec(html)?.[0]).toContain("cursor:pointer");
   });
 });

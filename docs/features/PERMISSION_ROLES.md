@@ -79,6 +79,14 @@ s'additionnent.
   l'écriture fait échouer celle-ci (`NOT_ADMIN` → `403 FORBIDDEN`) au lieu de
   voir sa décision annulée par un `is_admin = 1` réécrit.
 
+**Aucune plateforme sans administrateur** : sur le compte d'un autre aussi,
+l'écriture (`setUserRoles(cible, rôles, auteur)`) est jointe à la ligne de
+l'auteur et exige qu'il soit **encore** administrateur, dans la même
+instruction. Deux administrateurs qui se retirent l'administration l'un l'autre
+au même instant ne passent donc pas tous deux : la seconde écriture attend la
+première puis ne trouve plus d'auteur administrateur (`NOT_ADMIN` → `403
+FORBIDDEN`), ou InnoDB rompt l'interblocage (`500 ROLES_UPDATE_FAILED`).
+
 L'écran : section « Mes rôles » de `/profil` (`SelfRolesField`, FR + EN,
 espace `profile.platformRoles`), rendue pour un administrateur seulement
 (`requires: "adminRoles"` dans `profile-sections.ts`). La case

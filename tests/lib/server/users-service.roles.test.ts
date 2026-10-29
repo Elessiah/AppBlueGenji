@@ -31,13 +31,13 @@ describe("setUserRoles", () => {
       .mockResolvedValueOnce([{ affectedRows: 1 }]); // update
     await mockDb(execute);
 
-    const result = await setUserRoles(7, ["ADMIN", "ARBITRE"]);
+    const result = await setUserRoles(7, ["ADMIN", "ARBITRE"], 1);
 
     expect(result).toEqual(["ADMIN", "ARBITRE"]);
     const [updateSql, params] = execute.mock.calls[1] as [string, unknown[]];
-    expect(updateSql).toMatch(/UPDATE bg_users SET is_admin = \?, platform_roles_json = \?/);
-    // is_admin = 1, JSON excludes ADMIN, target id last.
-    expect(params).toEqual([1, JSON.stringify(["ARBITRE"]), 7]);
+    expect(updateSql).toMatch(/SET target\.is_admin = \?, target\.platform_roles_json = \?/);
+    // Actor id first (still-admin guard), is_admin = 1, JSON excludes ADMIN, target id last.
+    expect(params).toEqual([1, 1, JSON.stringify(["ARBITRE"]), 7]);
   });
 
   it("clears is_admin when ADMIN is absent", async () => {
@@ -47,10 +47,10 @@ describe("setUserRoles", () => {
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
     await mockDb(execute);
 
-    await setUserRoles(7, ["COMMUNITY_MANAGER"]);
+    await setUserRoles(7, ["COMMUNITY_MANAGER"], 1);
 
     const [, params] = execute.mock.calls[1] as [string, unknown[]];
-    expect(params).toEqual([0, JSON.stringify(["COMMUNITY_MANAGER"]), 7]);
+    expect(params).toEqual([1, 0, JSON.stringify(["COMMUNITY_MANAGER"]), 7]);
   });
 
   it("normalizes: dedupes, drops invalid roles, stable order", async () => {
@@ -61,11 +61,11 @@ describe("setUserRoles", () => {
     await mockDb(execute);
 
     // @ts-expect-error — testing sanitization of untyped input
-    const result = await setUserRoles(7, ["RECRUTEUR", "RECRUTEUR", "NOPE", "ARBITRE"]);
+    const result = await setUserRoles(7, ["RECRUTEUR", "RECRUTEUR", "NOPE", "ARBITRE"], 1);
 
     expect(result).toEqual(["ARBITRE", "RECRUTEUR"]);
     const [, params] = execute.mock.calls[1] as [string, unknown[]];
-    expect(params).toEqual([0, JSON.stringify(["ARBITRE", "RECRUTEUR"]), 7]);
+    expect(params).toEqual([1, 0, JSON.stringify(["ARBITRE", "RECRUTEUR"]), 7]);
   });
 
   it("persists an empty roles set (revokes everything)", async () => {
@@ -75,18 +75,57 @@ describe("setUserRoles", () => {
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
     await mockDb(execute);
 
-    await setUserRoles(7, []);
+    await setUserRoles(7, [], 1);
 
     const [, params] = execute.mock.calls[1] as [string, unknown[]];
-    expect(params).toEqual([0, JSON.stringify([]), 7]);
+    expect(params).toEqual([1, 0, JSON.stringify([]), 7]);
   });
 
   it("throws USER_NOT_FOUND without updating when the user does not exist", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[]]); // existence check → empty
     await mockDb(execute);
 
-    await expect(setUserRoles(999, ["ADMIN"])).rejects.toThrow("USER_NOT_FOUND");
+    await expect(setUserRoles(999, ["ADMIN"], 1)).rejects.toThrow("USER_NOT_FOUND");
     expect(execute).toHaveBeenCalledTimes(1); // no UPDATE issued
+  });
+});
+
+describe("setUserRoles — the actor must still be an administrator", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetSessionStreams();
+  });
+
+  it("setUserRoles_write_joinsActorRowRequiringLiveAdmin", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ id: 7 }]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+    await mockDb(execute);
+
+    await setUserRoles(7, ["ARBITRE"], 3);
+
+    const [sql, params] = execute.mock.calls[1] as [string, unknown[]];
+    expect(sql).toMatch(/JOIN bg_users AS actor ON actor\.id = \? AND actor\.is_admin = 1 AND actor\.is_deleted = 0/);
+    expect(params[0]).toBe(3);
+  });
+
+  it("setUserRoles_actorDemotedConcurrently_throwsNotAdminAndKeepsStreams", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ id: 7 }]])
+      .mockResolvedValueOnce([{ affectedRows: 0 }])
+      .mockResolvedValueOnce([[]]); // the actor is no longer an administrator
+    await mockDb(execute);
+    const close = jest.fn();
+    registerSessionStream(7, "hash-a", close);
+
+    await expect(setUserRoles(7, [], 3)).rejects.toThrow("NOT_ADMIN");
+
+    const [reasonSql, reasonParams] = execute.mock.calls[2] as [string, unknown[]];
+    expect(reasonSql).toMatch(/is_admin = 1 AND is_deleted = 0/);
+    expect(reasonParams).toEqual([3]);
+    expect(close).not.toHaveBeenCalled();
   });
 });
 
@@ -115,7 +154,7 @@ describe("setUserRoles — open tournament streams", () => {
     registerSessionStream(7, "hash-b", closeB);
     registerSessionStream(8, "hash-c", closeOther);
 
-    await setUserRoles(7, []);
+    await setUserRoles(7, [], 1);
 
     expect(closeA).toHaveBeenCalledTimes(1);
     expect(closeB).toHaveBeenCalledTimes(1);
@@ -128,7 +167,7 @@ describe("setUserRoles — open tournament streams", () => {
     const close = jest.fn();
     registerSessionStream(7, "hash-a", close);
 
-    await setUserRoles(7, ["ARBITRE"]);
+    await setUserRoles(7, ["ARBITRE"], 1);
 
     expect(close).toHaveBeenCalledTimes(1);
   });
@@ -137,7 +176,7 @@ describe("setUserRoles — open tournament streams", () => {
     await mockDb(grantedDb());
     const mark = revocationMark();
 
-    await setUserRoles(7, []);
+    await setUserRoles(7, [], 1);
 
     expect(revokedSince(7, "hash-a", mark)).toBe(true);
     expect(revokedSince(8, "hash-c", mark)).toBe(false);
@@ -149,7 +188,7 @@ describe("setUserRoles — open tournament streams", () => {
     const close = jest.fn();
     registerSessionStream(999, "hash-a", close);
 
-    await expect(setUserRoles(999, ["ADMIN"])).rejects.toThrow("USER_NOT_FOUND");
+    await expect(setUserRoles(999, ["ADMIN"], 1)).rejects.toThrow("USER_NOT_FOUND");
 
     expect(close).not.toHaveBeenCalled();
   });
@@ -159,12 +198,13 @@ describe("setUserRoles — open tournament streams", () => {
       jest
         .fn<SqlQuery>()
         .mockResolvedValueOnce([[{ id: 7 }]])
-        .mockResolvedValueOnce([{ affectedRows: 0 }]),
+        .mockResolvedValueOnce([{ affectedRows: 0 }])
+        .mockResolvedValueOnce([[{ id: 1 }]]), // actor still admin
     );
     const close = jest.fn();
     registerSessionStream(7, "hash-a", close);
 
-    await expect(setUserRoles(7, [])).rejects.toThrow("USER_NOT_FOUND");
+    await expect(setUserRoles(7, [], 1)).rejects.toThrow("USER_NOT_FOUND");
 
     expect(close).not.toHaveBeenCalled();
   });

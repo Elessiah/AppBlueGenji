@@ -74,7 +74,7 @@ describe("POST /api/admin/users/[id]/roles", () => {
     jest.mocked(service.setUserRoles).mockResolvedValue(["ARBITRE"]);
     const res = await POST(jsonReq({ roles: ["ARBITRE"] }), params("7"));
     expect(res.status).toBe(200);
-    expect(service.setUserRoles).toHaveBeenCalledWith(7, ["ARBITRE"]);
+    expect(service.setUserRoles).toHaveBeenCalledWith(7, ["ARBITRE"], 4);
   });
 
   it("rejects invalid ids with 400", async () => {
@@ -124,6 +124,19 @@ describe("POST /api/admin/users/[id]/roles", () => {
     jest.mocked(service.setOwnPlatformRoles).mockRejectedValue(new Error("NOT_ADMIN"));
 
     const res = await POST(jsonReq({ roles: ["ADMIN"] }), params("1"));
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: "FORBIDDEN" });
+    expect(service.publishRolesChange).not.toHaveBeenCalled();
+  });
+
+  it("post_otherAccountWhileActorDemoted_returns403ForbiddenWithoutAudit", async () => {
+    // Deux administrateurs qui se retirent l'administration au même instant :
+    // l'écriture du second ne trouve plus d'auteur administrateur.
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.setUserRoles).mockRejectedValue(new Error("NOT_ADMIN"));
+
+    const res = await POST(jsonReq({ roles: [] }), params("7"));
 
     expect(res.status).toBe(403);
     expect(await res.json()).toEqual({ error: "FORBIDDEN" });
@@ -183,7 +196,7 @@ describe("POST /api/admin/users/[id]/roles", () => {
     const res = await POST(jsonReq({ roles: ["ARBITRE", "RECRUTEUR"] }), params("7"));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ roles: ["ARBITRE", "RECRUTEUR"] });
-    expect(service.setUserRoles).toHaveBeenCalledWith(7, ["ARBITRE", "RECRUTEUR"]);
+    expect(service.setUserRoles).toHaveBeenCalledWith(7, ["ARBITRE", "RECRUTEUR"], admin.id);
   });
 
   it("accepts an empty roles array (revokes all)", async () => {
@@ -192,7 +205,7 @@ describe("POST /api/admin/users/[id]/roles", () => {
 
     const res = await POST(jsonReq({ roles: [] }), params("7"));
     expect(res.status).toBe(200);
-    expect(service.setUserRoles).toHaveBeenCalledWith(7, []);
+    expect(service.setUserRoles).toHaveBeenCalledWith(7, [], admin.id);
   });
 
   it("returns 404 when the target user does not exist", async () => {

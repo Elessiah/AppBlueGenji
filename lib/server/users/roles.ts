@@ -8,6 +8,22 @@ import { ROLE_LABELS, type PlatformRole, sanitizePlatformRoles } from "@/lib/sha
 import type { TeamRole } from "@/lib/shared/types";
 
 /**
+ * Pourquoi l'écriture conditionnelle de {@link setUserRoles} n'a touché aucune
+ * ligne : l'auteur a perdu l'administration (`NOT_ADMIN`), sinon la cible a
+ * disparu (`USER_NOT_FOUND`).
+ */
+async function missingRowReason(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  actorUserId: number,
+): Promise<"NOT_ADMIN" | "USER_NOT_FOUND"> {
+  const [rows] = await db.execute<(RowDataPacket & { id: number })[]>(
+    `SELECT id FROM bg_users WHERE id = ? AND is_admin = 1 AND is_deleted = 0 LIMIT 1`,
+    [actorUserId],
+  );
+  return rows.length === 0 ? "NOT_ADMIN" : "USER_NOT_FOUND";
+}
+
+/**
  * Remplace l'intégralité des rôles de permission d'un utilisateur.
  * Le rôle `ADMIN` est persisté via la colonne `is_admin` ; les autres rôles
  * cumulables (ARBITRE, COMMUNITY_MANAGER, RECRUTEUR) dans `platform_roles_json`.
@@ -18,6 +34,7 @@ import type { TeamRole } from "@/lib/shared/types";
 export async function setUserRoles(
   targetUserId: number,
   roles: PlatformRole[],
+  actorUserId: number,
 ): Promise<PlatformRole[]> {
   const db = await getDatabase();
   const [rows] = await db.execute<(RowDataPacket & { id: number })[]>(
@@ -41,9 +58,20 @@ export async function setUserRoles(
   // plateforme posé sur une ligne anonymisée — invisible de `getCurrentUser`,
   // qui filtre déjà les lignes mortes, mais bien listé à l'écran des rôles, qui
   // rend les comptes supprimés.
+  //
+  // L'écriture exige aussi que l'**auteur** soit encore administrateur, dans la
+  // même instruction : la session lue par la route date d'avant l'`await`, et
+  // deux administrateurs qui se retiraient l'administration l'un l'autre au
+  // même instant passaient tous deux — plus aucun administrateur, plateforme
+  // fermée. Jointe à la ligne de l'auteur, la seconde écriture attend la
+  // première (verrou de ligne) puis ne trouve plus d'auteur administrateur, ou
+  // InnoDB rompt l'interblocage : dans les deux cas, l'une des deux échoue.
   const [result] = await db.execute<ResultSetHeader>(
-    `UPDATE bg_users SET is_admin = ?, platform_roles_json = ? WHERE id = ? AND is_deleted = 0`,
-    [isAdmin ? 1 : 0, JSON.stringify(nonAdminRoles), targetUserId],
+    `UPDATE bg_users AS target
+       JOIN bg_users AS actor ON actor.id = ? AND actor.is_admin = 1 AND actor.is_deleted = 0
+        SET target.is_admin = ?, target.platform_roles_json = ?
+      WHERE target.id = ? AND target.is_deleted = 0`,
+    [actorUserId, isAdmin ? 1 : 0, JSON.stringify(nonAdminRoles), targetUserId],
   );
   // Et la course se **dit**, elle ne se tait pas : `affectedRows` compte les
   // lignes appariées (mysql2 pose `FOUND_ROWS`), donc zéro ne signifie pas
@@ -52,7 +80,7 @@ export async function setUserRoles(
   // l'écran d'administration alors que rien ne l'avait été. C'est le refus que
   // le `SELECT` ci-dessus donne déjà, et le même geste que `updateOwnProfile`
   // et `updateUserAvatar`, qui refusent bruyamment sur la même condition.
-  if (result.affectedRows === 0) throw new Error("USER_NOT_FOUND");
+  if (result.affectedRows === 0) throw new Error(await missingRowReason(db, actorUserId));
 
   // Un flux SSE de tournoi ne lit les droits qu'à son ouverture : il gardait
   // le palier, l'aperçu du plateau et l'accès aux tournois non publiés d'un
