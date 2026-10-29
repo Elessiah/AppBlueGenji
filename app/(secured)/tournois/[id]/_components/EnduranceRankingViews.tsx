@@ -23,6 +23,7 @@ import {
   enduranceViewKey,
   playoffCutIndex,
   resolveEnduranceViewIndex,
+  signedDelta,
   type EnduranceRankingRow,
   type EnduranceRankingView,
   type EnduranceRoundColumnCell,
@@ -99,13 +100,6 @@ function navLabel(view: EnduranceRankingView, text: TournamentPageText): string 
   if (view.kind === "GENERAL") return text.t("endurance.tabGeneral");
   if (view.kind === "CURRENT") return text.t("endurance.navCurrent", { round: String(view.round) });
   return text.t("endurance.navRound", { round: String(view.round) });
-}
-
-/** Signe typographique d'une variation (« +2 », « −1 », « 0 »). */
-function signed(value: number): string {
-  if (value > 0) return `+${value}`;
-  if (value < 0) return `−${-value}`;
-  return "0";
 }
 
 function deltaClass(delta: number): string {
@@ -232,7 +226,7 @@ function RoundColumn({
     <span data-label={label} className={styles.roundCell}>
       <span className={styles.roundLine}>
         <span className={`mono ${deltaClass(cell.delta)}`}>
-          {signed(cell.delta)}
+          {signedDelta(cell.delta)}
         </span>
         {/* La variation compte la pénalité de la manche : elle se dit à côté. */}
         {cell.penalty > 0 && (

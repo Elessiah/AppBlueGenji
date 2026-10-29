@@ -86,9 +86,14 @@ export type EnduranceRoundCell = {
    * second départage côté client.
    */
   rank?: number;
-  /** Victoires cumulées jusqu'à cette manche incluse. */
+  /**
+   * Victoires cumulées jusqu'à cette manche incluse. **Absent quand une case
+   * non jouée (sortie, forfait reporté) répète le bilan de la précédente** :
+   * se lit par `enduranceRecordAfterRound`, qui le reporte depuis la dernière
+   * case qui le porte.
+   */
   wins?: number;
-  /** Défaites cumulées jusqu'à cette manche incluse. */
+  /** Défaites cumulées jusqu'à cette manche incluse (même règle que `wins`). */
   losses?: number;
   /**
    * Nuls cumulés jusqu'à cette manche incluse. **Absent à 0** (le cas courant :
@@ -144,15 +149,54 @@ function enduranceRoundCell(
   round: number,
   penalty: number,
   rank: number,
+  earlier: readonly EnduranceRoundCell[] = [],
 ): EnduranceRoundCell {
-  const cell: EnduranceRoundCell = {
-    ...enduranceRoundCellBase(standing, round, penalty),
-    rank,
-    wins: standing.wins,
-    losses: standing.losses,
-  };
+  const base = enduranceRoundCellBase(standing, round, penalty);
+  const cell: EnduranceRoundCell = { ...base, rank };
+  // Une case non jouée (sortie, forfait reporté) qui répète le bilan de la
+  // précédente ne le réécrit pas : sur 64 équipes × 12 manches, c'est ~20 Ko
+  // de moins par instantané (`enduranceRecordAfterRound` le reporte).
+  if (base.kind !== "POINTS") {
+    const known = lastRecord(earlier);
+    if (
+      known !== null &&
+      known.wins === standing.wins &&
+      known.losses === standing.losses &&
+      known.draws === standing.draws
+    ) {
+      return cell;
+    }
+  }
+  cell.wins = standing.wins;
+  cell.losses = standing.losses;
   if (standing.draws > 0) cell.draws = standing.draws;
   return cell;
+}
+
+type EnduranceRecord = { wins: number; losses: number; draws: number };
+
+/** Bilan porté par la dernière case qui en écrit un, `null` s'il n'y en a pas. */
+function lastRecord(cells: readonly EnduranceRoundCell[], before: number = Infinity): EnduranceRecord | null {
+  for (let index = cells.length - 1; index >= 0; index -= 1) {
+    const cell = cells[index];
+    if (cell.round >= before || cell.wins === undefined) continue;
+    return { wins: cell.wins, losses: cell.losses ?? 0, draws: cell.draws ?? 0 };
+  }
+  return null;
+}
+
+/**
+ * Bilan (V / D / N) cumulé **à l'issue** d'une manche : celui de sa case, ou —
+ * case non jouée qui ne le réécrit pas — celui de la dernière case antérieure
+ * qui le porte. 0 / 0 / 0 si l'instantané ne porte pas la manche ou aucun
+ * bilan (ancien format). Lecture commune des vues « après la manche n » et de
+ * l'encart du graphique.
+ */
+export function enduranceRecordAfterRound(cells: readonly EnduranceRoundCell[], round: number): EnduranceRecord {
+  const cell = cells.find((entry) => entry.round === round);
+  if (cell === undefined) return { wins: 0, losses: 0, draws: 0 };
+  if (cell.wins !== undefined) return { wins: cell.wins, losses: cell.losses ?? 0, draws: cell.draws ?? 0 };
+  return lastRecord(cells, round) ?? { wins: 0, losses: 0, draws: 0 };
 }
 
 function enduranceRoundCellBase(
@@ -381,7 +425,8 @@ function recordRoundHistory(
     if (removed > 0) {
       penaltyTotals.set(standing.teamId, (penaltyTotals.get(standing.teamId) ?? 0) + removed);
     }
-    history.get(standing.teamId)?.push(enduranceRoundCell(standing, round, removed, ranks.get(standing.teamId) ?? standing.rank));
+    const cells = history.get(standing.teamId);
+    cells?.push(enduranceRoundCell(standing, round, removed, ranks.get(standing.teamId) ?? standing.rank, cells));
   }
   return ranking;
 }

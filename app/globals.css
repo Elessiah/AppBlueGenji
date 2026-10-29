@@ -56,6 +56,10 @@
   --blue-500-rgb: 90, 200, 255;
   --blue-600: #2aa8e6;
   --blue-700: #1b6a8f;
+  /* Le bleu profond du 6e tracé du graphique d'endurance : `--blue-700`
+     s'éclaircit en contraste élevé et se confondait alors avec `--blue-500` ;
+     ce jeton-ci n'est redéfini nulle part. */
+  --chart-blue-deep: #1b6a8f;
   --blue-glow: rgba(90, 200, 255, 0.14);
   --amber: #f5a524;
   --amber-rgb: 245, 165, 36;

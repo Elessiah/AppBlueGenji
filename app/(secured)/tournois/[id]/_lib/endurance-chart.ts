@@ -1,4 +1,7 @@
 import type { BracketMatch, EnduranceMeta, EnduranceStandingRow } from "@/lib/shared/types";
+import { enduranceRecordAfterRound } from "@/lib/shared/bg-survie/replay";
+import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
+import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import { enduranceRoundColumnCell, pointsAfterRound, rankAfterRound } from "./endurance-ranking-views";
 
 /**
@@ -16,7 +19,11 @@ import { enduranceRoundColumnCell, pointsAfterRound, rankAfterRound } from "./en
  * Palette des courbes : huit néons froids **du site** (jetons de
  * `app/globals.css`), chacun ≥ 3:1 sur le fond du graphique, et deux couleurs
  * voisines (rangs qui se suivent dans la légende) séparées aussi par leur
- * clarté. Jamais d'ambre : il ne signale que les avertissements.
+ * clarté. Jamais d'ambre : il ne signale que les avertissements. Le sixième
+ * est un jeton **propre au graphique** (`--chart-blue-deep`) : `--blue-700`
+ * s'éclaircit en contraste élevé et se confondait alors avec le premier. Le
+ * seuil des play-offs (`.cut`) prend un gris-bleu **hors palette**
+ * (`--ink-mute`, en tirets) : le vert de la 3e courbe ne s'y confond plus.
  */
 export const ENDURANCE_CHART_PALETTE = [
   { token: "--blue-500", hex: "#5ac8ff" },
@@ -24,7 +31,7 @@ export const ENDURANCE_CHART_PALETTE = [
   { token: "--accent-green", hex: "#4fe0a2" },
   { token: "--pink-400", hex: "#f78ad8" },
   { token: "--blue-100", hex: "#dff2ff" },
-  { token: "--blue-700", hex: "#1b6a8f" },
+  { token: "--chart-blue-deep", hex: "#1b6a8f" },
   { token: "--violet-300", hex: "#c4b5fd" },
   { token: "--cyan-400", hex: "#3ee6ff" },
 ] as const;
@@ -34,6 +41,17 @@ export const ENDURANCE_CHART_PICK_MAX = ENDURANCE_CHART_PALETTE.length;
 
 /** Durée d'animation d'une manche à la suivante. */
 export const ENDURANCE_CHART_ROUND_MS = 650;
+
+/** Durée totale d'une animation, quel que soit le nombre de manches parcourues. */
+export const ENDURANCE_CHART_TOTAL_MS = 2400;
+
+/**
+ * Durée par manche d'une animation qui en parcourt `distance` : 650 ms, sans
+ * dépasser 2,4 s au total (12 manches : 200 ms chacune, pas 7,8 s de rendus).
+ */
+export function chartRoundMs(distance: number): number {
+  return Math.min(ENDURANCE_CHART_ROUND_MS, ENDURANCE_CHART_TOTAL_MS / Math.max(1, distance));
+}
 
 export type EnduranceChartMode = "TOP" | "PICK" | "ALL";
 
@@ -45,8 +63,14 @@ export type EnduranceChartMode = "TOP" | "PICK" | "ALL";
  * - `OUT` — déjà sorti lors d'une manche antérieure.
  */
 export type EnduranceChartRoundState =
-  | { kind: "PLAYED"; points: number; delta: number }
-  | { kind: "PENDING" }
+  | {
+      kind: "PLAYED";
+      points: number;
+      delta: number;
+      /** Points retirés par pénalité d'arbitrage **dans cette manche** (0 sans sanction). */
+      penalty: number;
+    }
+  | { kind: "PENDING"; penalty: number }
   | { kind: "FORFEIT" }
   | { kind: "OUT" };
 
@@ -89,14 +113,26 @@ export function enduranceChartSeries(endurance: EnduranceMeta, matches: BracketM
         let state: EnduranceChartRoundState;
         if (cell.kind === "PLAYED" || cell.kind === "BYE") {
           const points = pointsAfterRound(standing, round, endurance.startPoints);
-          state = { kind: "PLAYED", points, delta: points - previous };
+          state = { kind: "PLAYED", points, delta: points - previous, penalty: cell.penalty };
           previous = points;
+        } else if (cell.kind === "PENDING") {
+          state = { kind: "PENDING", penalty: cell.penalty };
         } else {
           state = { kind: cell.kind };
         }
         states.push(state);
         if (open && state.kind === "PLAYED") values.push(state.points);
-        else open = false;
+        else {
+          // Sanction posée avant que le match de la **dernière** manche soit
+          // joué : la courbe va jusqu'au capital que lisent déjà la légende,
+          // l'ordre du Top N et le seuil (pénalité déduite), au lieu de
+          // s'arrêter au capital précédent — sinon le seuil tombe sous toutes
+          // les courbes.
+          if (open && state.kind === "PENDING" && state.penalty > 0 && round === lastRound) {
+            values.push(standing.points);
+          }
+          open = false;
+        }
       }
       return { teamId: standing.teamId, teamName: standing.teamName, seed: standing.seed, states, values, standing };
     });
@@ -125,8 +161,7 @@ export function chartRecordAt(
 ): { wins: number; draws: number; losses: number } {
   const { standing } = series;
   if (round >= lastRound) return { wins: standing.wins, draws: standing.draws, losses: standing.losses };
-  const cell = standing.rounds.find((entry) => entry.round === round);
-  return { wins: cell?.wins ?? 0, draws: cell?.draws ?? 0, losses: cell?.losses ?? 0 };
+  return enduranceRecordAfterRound(standing.rounds, round);
 }
 
 /** Capital d'un engagé à la manche affichée (dernier capital connu au-delà). */
@@ -177,35 +212,94 @@ export function chartThresholdOf(
 }
 
 /**
- * Bascule d'un engagé dans « Ma sélection ». Hors de ce mode, le geste ouvre
- * une sélection réduite à lui ; au plafond, un ajout est ignoré (le retrait,
- * lui, reste possible).
+ * Bascule d'un engagé dans « Ma sélection ». Le geste mène toujours à ce
+ * mode : hors de lui, une sélection déjà construite est **gardée** et
+ * l'engagé s'y ajoute (sélection vide : elle s'ouvre sur lui seul) ; un
+ * engagé déjà choisi se retire, sauf hors du mode, où le geste ne fait que l'y
+ * ramener. Au plafond, un ajout est refusé (`full`, pour que l'écran le dise) ;
+ * le retrait, lui, reste possible.
  */
 export function togglePick(
   mode: EnduranceChartMode,
   picked: readonly number[],
   teamId: number,
-): { mode: EnduranceChartMode; picked: number[] } {
-  if (mode !== "PICK") return { mode: "PICK", picked: [teamId] };
-  if (picked.includes(teamId)) return { mode, picked: picked.filter((id) => id !== teamId) };
-  if (picked.length >= ENDURANCE_CHART_PICK_MAX) return { mode, picked: [...picked] };
-  return { mode, picked: [...picked, teamId] };
+): { mode: EnduranceChartMode; picked: number[]; full: boolean } {
+  if (picked.includes(teamId)) {
+    return { mode: "PICK", picked: mode === "PICK" ? picked.filter((id) => id !== teamId) : [...picked], full: false };
+  }
+  if (picked.length >= ENDURANCE_CHART_PICK_MAX) return { mode: "PICK", picked: [...picked], full: true };
+  return { mode: "PICK", picked: [...picked, teamId], full: false };
+}
+
+/** Engagés mis en couleur (et donc tracés), dans l'ordre où ils prennent une couleur. */
+export function chartColoredIds(
+  mode: EnduranceChartMode,
+  ctx: { top: readonly number[]; picked: readonly number[]; series: readonly EnduranceChartSeries[] },
+): number[] {
+  if (mode === "ALL") return ctx.series.map((item) => item.teamId);
+  return mode === "TOP" ? [...ctx.top] : [...ctx.picked];
 }
 
 /**
- * Indice de couleur d'un engagé, `null` s'il n'est pas mis en couleur (et donc
- * pas tracé, sauf au survol). « Toutes » reprend la palette en boucle : au-delà
- * de huit, la légende et l'encart départagent.
+ * Couleurs des engagés, **attribuées une fois** puis gardées : un échange de
+ * places, un résultat poussé par le flux ou le retrait d'un premier choix ne
+ * recolorent plus les courbes. `previous` (les attributions déjà faites, même
+ * pour des engagés aujourd'hui masqués) est repris ; un engagé sans couleur —
+ * ou dont la couleur est déjà prise par un engagé tracé avant lui — reçoit la
+ * première couleur libre. Au-delà de huit tracés les couleurs se répètent
+ * (l'aide le dit, la légende et l'encart départagent).
  */
-export function chartColorIndex(
-  mode: EnduranceChartMode,
-  teamId: number,
-  ctx: { top: readonly number[]; picked: readonly number[]; generalIndex: number },
-): number | null {
+export function assignChartColors(previous: ReadonlyMap<number, number>, ids: readonly number[]): Map<number, number> {
   const size = ENDURANCE_CHART_PALETTE.length;
-  if (mode === "ALL") return ctx.generalIndex % size;
-  const index = mode === "TOP" ? ctx.top.indexOf(teamId) : ctx.picked.indexOf(teamId);
-  return index === -1 ? null : index % size;
+  const next = new Map(previous);
+  const taken = new Set<number>();
+  const waiting: number[] = [];
+  for (const id of ids) {
+    const index = previous.get(id);
+    if (index !== undefined && !taken.has(index)) taken.add(index);
+    else waiting.push(id);
+  }
+  let wrapped = 0;
+  for (const id of waiting) {
+    let index = 0;
+    while (index < size && taken.has(index)) index += 1;
+    if (index === size) {
+      index = wrapped % size;
+      wrapped += 1;
+    } else {
+      taken.add(index);
+    }
+    next.set(id, index);
+  }
+  return next;
+}
+
+/**
+ * Clé de **contenu** de ce que lit le graphique : une poussée du flux apporte
+ * de nouveaux objets `endurance` / `matches` même quand rien de visible n'a
+ * bougé (score de play-off, autre champ du tournoi). Deux entrées de même clé
+ * donnent les mêmes séries : le graphique garde alors les précédentes — ni
+ * séries, ni ordre, ni légende, ni tableau pour lecteurs d'écran recalculés.
+ */
+export function enduranceChartInputKey(endurance: EnduranceMeta, matches: readonly BracketMatch[]): string {
+  const sep = "\u0001";
+  const parts: string[] = [
+    [endurance.currentRound, endurance.maxRounds ?? "", endurance.startPoints, endurance.playoffSize].join(","),
+  ];
+  for (const s of endurance.standings) {
+    parts.push(
+      [s.teamId, s.teamName, s.seed, s.rank, s.points, s.wins, s.draws, s.losses, s.status, s.eliminatedRound ?? "", s.penaltyPoints].join(sep),
+    );
+    for (const c of s.rounds) {
+      parts.push([c.round, c.kind, c.points ?? "", c.penalty ?? "", c.rank ?? "", c.wins ?? "", c.losses ?? "", c.draws ?? ""].join(","));
+    }
+  }
+  for (const match of matches) {
+    // Les play-offs ne changent ni les séries ni l'avancement des manches.
+    if (match.roundNumber >= PLAYOFF_ROUND_OFFSET) continue;
+    parts.push(`${match.roundNumber}:${match.team1Id ?? ""}:${match.team2Id ?? ""}:${isMatchPlayed(match) ? 1 : 0}`);
+  }
+  return parts.join(sep);
 }
 
 /**
@@ -260,8 +354,6 @@ const fmt = (n: number) => String(Math.round(n * 10) / 10);
 export type ChartLine = {
   /** Tracé visible, coupé à l'avancement de l'animation. */
   d: string;
-  /** Zone de survol : la courbe entière jusqu'à la manche affichée. */
-  hit: string;
   head: { x: number; y: number };
   /**
    * Tête creuse : l'engagé n'a pas joué la manche affichée (match à jouer,
@@ -271,6 +363,20 @@ export type ChartLine = {
   /** « FF » à côté de la tête : retiré par forfait à la manche affichée. */
   forfeit: boolean;
 };
+
+/**
+ * Zone de survol d'un engagé : la courbe **entière** jusqu'à la manche `target`.
+ * Ne dépend ni de l'avancement de l'animation ni du survol : à calculer une
+ * fois par série, manche et géométrie, pas à chaque image.
+ */
+export function chartHitPath(series: EnduranceChartSeries, target: number, geometry: ChartGeometry): string {
+  const values = series.values.slice(0, target + 1);
+  let hit = `M${fmt(chartX(geometry, 0))} ${fmt(chartY(geometry, values[0]))}`;
+  for (let k = 1; k < values.length; k += 1) {
+    hit += ` L${fmt(chartX(geometry, k))} ${fmt(chartY(geometry, values[k]))}`;
+  }
+  return hit;
+}
 
 /**
  * Courbe d'un engagé jusqu'à la manche `target`, l'animation étant arrivée à
@@ -284,21 +390,20 @@ export function chartLine(
 ): ChartLine {
   const values = series.values.slice(0, target + 1);
   const lastIdx = values.length - 1;
-  const point = (index: number, value: number) => `${fmt(chartX(geometry, index))} ${fmt(chartY(geometry, value))}`;
-  let d = `M${point(0, values[0])}`;
-  let hit = d;
+  let d = `M${fmt(chartX(geometry, 0))} ${fmt(chartY(geometry, values[0]))}`;
   let head = { x: chartX(geometry, 0), y: chartY(geometry, values[0]) };
   for (let k = 0; k < lastIdx; k += 1) {
-    hit += ` L${point(k + 1, values[k + 1])}`;
     if (progress <= k) continue;
     const f = Math.min(1, progress - k);
     const value = values[k] + (values[k + 1] - values[k]) * f;
     head = { x: chartX(geometry, k + f), y: chartY(geometry, value) };
     d += ` L${fmt(head.x)} ${fmt(head.y)}`;
   }
-  const hollow = lastIdx < target && progress >= lastIdx;
   const shownState = series.states[target - 1];
-  return { d, hit, head, hollow, forfeit: hollow && shownState?.kind === "FORFEIT" };
+  // Tête creuse : l'engagé n'a pas joué la manche affichée — y compris une
+  // sanction prise avant son match, qui a déjà avancé la courbe jusqu'à elle.
+  const hollow = shownState !== undefined && shownState.kind !== "PLAYED" && progress >= lastIdx;
+  return { d, head, hollow, forfeit: hollow && shownState.kind === "FORFEIT" };
 }
 
 // ---------- Animation ----------
@@ -316,7 +421,7 @@ export function chartAnimationFrame(
   from: number,
   to: number,
   elapsedMs: number,
-  perRoundMs: number = ENDURANCE_CHART_ROUND_MS,
+  perRoundMs: number = chartRoundMs(Math.abs(to - from)),
 ): { progress: number; done: boolean } {
   const distance = Math.abs(to - from);
   const u = Math.max(0, elapsedMs) / perRoundMs;
