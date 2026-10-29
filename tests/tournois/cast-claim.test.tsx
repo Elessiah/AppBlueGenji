@@ -189,7 +189,7 @@ describe("CastClaimDialog — rendu", () => {
   });
 
   it("l'annonce du stream disparu est une zone vive toujours montée, vide tant que le choix existe", () => {
-    expect(renderDialog("fr")).toContain('role="status" aria-live="polite"></p>');
+    expect(renderDialog("fr")).toContain('<output class="gone" aria-live="polite"></output>');
   });
 
   it("le champ du lien n'apparaît qu'en choisissant son propre stream", () => {
@@ -292,25 +292,25 @@ describe("MatchCardActions — branchements du cast", () => {
   });
 
   it("un arbitre qui se choisit lui-même : textes « Ne plus caster », sans avis, comme un départ volontaire", () => {
-    expect(card).toContain("releasedCaster.userId === viewerUserId");
+    expect(card).toContain("const releasingSelf = releasedCaster.userId === viewerUserId;");
     expect(card).toContain('t("cardActions.releaseConfirm.selfTitle", { match: matchLabel })');
     expect(card).toContain('t("cardActions.releaseConfirm.selfConfirm")');
     expect(card).toContain('t("cardActions.releaseConfirm.selfBody")');
-    expect(card).toContain('releasingSelf ? t("cardActions.notCasting") : t("cardActions.casterRemoved")');
+    expect(card).toContain('self ? t("cardActions.notCasting") : t("cardActions.casterRemoved")');
   });
 
   it("un seul caster : le corps de l'avis le nomme", () => {
-    expect(card).toContain('t("cardActions.releaseConfirm.body", { caster: releasedCaster?.pseudo ?? "" })');
+    expect(card).toContain('t("cardActions.releaseConfirm.body", { caster: releasedCaster.pseudo })');
   });
 
   it("les choix restent figés pendant l'envoi, sans disabled natif (le focus ne se perd pas)", () => {
     expect(card).toContain("aria-disabled={busy || undefined}");
-    expect(card).toContain("if (!busy) setReleaseTarget(caster.userId);");
+    expect(card).toContain("if (!busy) onPick(caster.userId);");
     expect(card).not.toMatch(/<fieldset[^>]*disabled/);
   });
 
   it("le choix du caster à retirer garde le focus sur « Annuler » : un Entrée réflexe sur un bouton radio ne retire personne", () => {
-    const start = card.indexOf("{confirmRelease && (");
+    const start = card.indexOf("function ReleaseCastDialog(");
     const dialog = card.slice(start, card.indexOf("</ConfirmActionDialog>", start));
     expect(dialog).toContain('name={`release-caster-${match.id}`}');
     expect(dialog).not.toContain("focusContent");
