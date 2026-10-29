@@ -334,6 +334,26 @@ describe("setMatchLiveConfig", () => {
     expect(world.state.matchWrites).toEqual([]);
   });
 
+  it("setMatchLiveConfig_startAtClearedBeforeLock_rejectsStartTimeUnderLock", async () => {
+    const row = matchRow({ start_at: "2026-11-02 20:00:00" });
+    const world = liveWorld(row);
+    await mockLiveDb(world);
+    const real = world.execute.getMockImplementation()!;
+    let reads = 0;
+    world.execute.mockImplementation(async (sql, params) => {
+      const result = await real(sql, params);
+      reads += 1;
+      // La date de début est retirée dès que la lecture ordinaire a rendu sa ligne.
+      if (reads === 1) row.start_at = null;
+      return result;
+    });
+
+    await expect(
+      setMatchLiveConfig(42, { trigger: "START_TIME", liveUrl: null, setter: ORGANISER_5 }),
+    ).rejects.toThrow("MATCH_START_AT_REQUIRED");
+    expect(world.state.matchWrites).toEqual([]);
+  });
+
   it("laisse démarquer un match terminé encore casté : une diffusion posée ne devient pas ineffaçable", async () => {
     const world = liveWorld(matchRow({ status: "COMPLETED", live_trigger: "AUTO" }), [dbStream(1, "https://twitch.tv/x", true)]);
     await mockLiveDb(world);
