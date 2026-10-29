@@ -2088,15 +2088,18 @@ describe("PRIVACY_CHANGES — rôles de plateforme au journal du staff (ADMIN-SE
   const english = PRIVACY_CHANGES_EN[id];
 
   it("privacyChanges_platformRolesLog_closesListDated1031ForAllAccountsWithRegisterLink", () => {
+    expect(PRIVACY_CHANGES.at(-1)).toBe(entry);
+    expect(entry.publishedAt).toBe("2026-10-31");
+    expect(entry.audience).toBeUndefined();
+    expect(entry.links).toEqual([{ href: "/rgpd/registre#t05", label: "Lire la fiche T05 du registre" }]);
+    expect(english).toMatchObject({ linkLabels: ["Read entry T05 of the register"] });
+    expect([english.details.length, id.length <= PRIVACY_CHANGE_ID_MAX_LENGTH]).toEqual([entry.details.length, true]);
     expectStandaloneEntry(entry, english, {
       fromEnd: 1,
-      publishedAt: "2026-10-31",
-      audience: undefined,
-      links: [{ href: "/rgpd/registre#t05", label: "Lire la fiche T05 du registre" }],
+      publishedAt: entry.publishedAt,
+      audience: entry.audience,
+      links: entry.links,
     });
-    expect(english.linkLabels).toEqual(["Read entry T05 of the register"]);
-    expect(id.length).toBeLessThanOrEqual(PRIVACY_CHANGE_ID_MAX_LENGTH);
-    expect(english.details).toHaveLength(entry.details.length);
   });
 
   it("privacyChanges_platformRolesLog_statesDiscordAnonymityAndServerLogContentFrAndEn", () => {

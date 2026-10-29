@@ -1298,7 +1298,6 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     id: "2026-10-roles-de-plateforme-journal-du-staff",
     publishedAt: "2026-10-31",
     title: "Rôles de plateforme : notés au journal du staff",
-    links: [{ href: "/rgpd/registre#t05", label: "Lire la fiche T05 du registre" }],
     summary:
       "Quand un administrateur attribue ou retire un rôle de plateforme (administrateur, arbitre, caster, community manager, recruteur) — y compris sur son propre compte, depuis « Mon profil » —, le geste est désormais noté au journal du staff, sans nommer personne sur Discord.",
     details: [
@@ -1306,6 +1305,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Dans les journaux du serveur, la ligne garde le pseudo et l'identifiant de l'administrateur qui l'a fait, l'identifiant du compte visé et les rôles enregistrés, selon leur rotation automatique.",
       "Un administrateur peut désormais régler ses propres rôles depuis « Mon profil », mais jamais s'y retirer l'administration : seul un autre administrateur le peut.",
     ],
+    links: [{ href: "/rgpd/registre#t05", label: "Lire la fiche T05 du registre" }],
   },
 ];
 
