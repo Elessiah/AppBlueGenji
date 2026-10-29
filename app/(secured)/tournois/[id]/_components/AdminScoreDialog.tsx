@@ -1,6 +1,7 @@
 "use client";
 
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
+import { useShownEntrantName } from "./EntrantName";
 import { matchFormatDescriptionText, matchFormatText } from "@/lib/shared/tournament-page-text";
 import type { TournamentDialogsText } from "@/lib/shared/tournament-actions-text";
 import { FormEvent, useEffect, useState } from "react";
@@ -318,8 +319,9 @@ export function AdminScoreDialog({
   const backdrop = useBackdropDismiss(onClose, form.submitting);
   const [forfeitOpen, setForfeitOpen] = useState(false);
 
-  const team1 = match.team1Name || t("score.team", { side: 1 });
-  const team2 = match.team2Name || t("score.team", { side: 2 });
+  // Noms nettoyés comme sur la carte du match (`useShownEntrantName`).
+  const team1 = useShownEntrantName(match.team1Id, match.team1Name) || t("score.team", { side: 1 });
+  const team2 = useShownEntrantName(match.team2Id, match.team2Name) || t("score.team", { side: 2 });
   // Score qu'emporte le vainqueur d'un forfait : celui du format, 1 en saisie
   // libre — la même valeur que celle écrite en base par la route.
   const forfeitMaps = forfeitMapCount(matchFormat);

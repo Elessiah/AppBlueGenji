@@ -89,8 +89,8 @@ export function Hero({ stats, live: initialLive, nextUpcoming, copy, canEditCopy
                      puisqu'on prononce ce qui est écrit (WCAG 2.5.3). */
                   aria-label={
                     platform
-                      ? t("hero.watchLiveLabelOn", { tournament: stream.tournamentName, platform: PLATFORM_LABELS[platform] })
-                      : t("hero.watchLiveLabel", { tournament: stream.tournamentName })
+                      ? t("hero.watchLiveLabelOn", { tournament: stream.tournamentName || t("live.tournamentFallback", { id: String(stream.tournamentId) }), platform: PLATFORM_LABELS[platform] })
+                      : t("hero.watchLiveLabel", { tournament: stream.tournamentName || t("live.tournamentFallback", { id: String(stream.tournamentId) }) })
                   }
                 >
                   <span aria-hidden="true">▶</span>

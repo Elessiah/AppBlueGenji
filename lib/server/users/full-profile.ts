@@ -1,6 +1,7 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { battletagFromBlizzardSql } from "@/lib/server/battletag-origin";
+import { withoutInvisibles } from "@/lib/shared/visible-text";
 import type { PlayerPageIdentity } from "@/lib/shared/entity-page-titles";
 import { resolveRoles } from "@/lib/server/auth";
 import { parseRoles, toIso } from "@/lib/server/serialization";
@@ -73,7 +74,7 @@ export async function getPlayerPageIdentity(userId: number): Promise<PlayerPageI
     [userId],
   );
   if (rows.length === 0) return null;
-  return { pseudo: rows[0].pseudo, isDeleted: Boolean(rows[0].is_deleted) };
+  return { pseudo: withoutInvisibles(rows[0].pseudo), isDeleted: Boolean(rows[0].is_deleted) };
 }
 
 /** Le lecteur d'une fiche, tel que les règles de visibilité le demandent. */

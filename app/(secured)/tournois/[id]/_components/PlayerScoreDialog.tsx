@@ -34,6 +34,7 @@ import {
   toReporterScores,
 } from "@/lib/shared/player-score-report";
 import { useProposalMaps } from "../_hooks/useProposalMaps";
+import { useShownEntrantName } from "./EntrantName";
 import { useMatchFormat, useTournamentGame } from "../_lib/match-format-context";
 import { useLiveControls } from "../_lib/live-context";
 import { useMatchLaunchPhase } from "@/lib/shared/hooks/useMatchLaunchPhase";
@@ -280,8 +281,10 @@ export function PlayerScoreDialog({
 
   const view = playerReportView(match, myTeamId);
   const myTeamIsTeam1 = isMyTeamTeam1(myTeamId, match.team1Id);
-  const team1 = teamLabel(match.team1Name, localizedPlaceholder(pageText, match.team1Placeholder), t("score.team", { side: 1 }));
-  const team2 = teamLabel(match.team2Name, localizedPlaceholder(pageText, match.team2Placeholder), t("score.team", { side: 2 }));
+  const shown1 = useShownEntrantName(match.team1Id, match.team1Name);
+  const shown2 = useShownEntrantName(match.team2Id, match.team2Name);
+  const team1 = teamLabel(shown1, localizedPlaceholder(pageText, match.team1Placeholder), t("score.team", { side: 1 }));
+  const team2 = teamLabel(shown2, localizedPlaceholder(pageText, match.team2Placeholder), t("score.team", { side: 2 }));
   const [myName, opponentName] = myTeamIsTeam1 ? [team1, team2] : [team2, team1];
 
   const game = useTournamentGame();

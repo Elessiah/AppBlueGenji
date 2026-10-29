@@ -5,6 +5,7 @@ import { visibleAvatarUrl } from "@/lib/shared/avatar";
 import { loadAllPlayerRecords } from "@/lib/server/stats-service";
 import { cachedStats } from "@/lib/server/stats-cache";
 import type { PublicUserProfile } from "@/lib/shared/types";
+import { withoutInvisibles } from "@/lib/shared/visible-text";
 
 /*
  * Profil public d'un joueur et annuaire des joueurs, sous les réglages de
@@ -36,7 +37,8 @@ export type UserRow = RowDataPacket & {
 export function mapPublicUser(row: UserRow): PublicUserProfile {
   return {
     id: Number(row.id),
-    pseudo: row.pseudo,
+    // Un pseudo ancien peut garder des invisibles (`cleanStoredNames` laisse un sosie) : lu sans invisibles.
+    pseudo: withoutInvisibles(row.pseudo),
     avatarUrl: row.avatar_url,
     overwatchBattletag: row.overwatch_battletag,
     marvelRivalsTag: row.marvel_rivals_tag,

@@ -59,6 +59,16 @@ const MISSING_FIELD_KEYS = {
 
 const DAYS = Array.from({ length: 31 }, (_, index) => index + 1);
 
+/**
+ * Nom d'un côté pour le sous-titre : « TBD » seulement quand la place est
+ * vide ; un engagé connu au nom absent passe vide, `EntrantName` posant alors
+ * son repli « Engagé #id ».
+ */
+function versusName(name: string | null, teamId: number | null, tbd: string): string {
+  if (name !== null) return name;
+  return teamId === null ? tbd : "";
+}
+
 /** Refus de saisie, avant tout envoi. */
 function entryRefusal(text: TournamentDialogsText, state: MatchStartEntryState): string | null {
   if (state.kind === "incomplete") return text.t("schedule.refusal.incomplete");
@@ -436,10 +446,13 @@ export function MatchScheduleDialog({
             {richNodes(
               text.rich(
                 "schedule.versus",
-                { team1: match.team1Name ?? t("schedule.tbd"), team2: match.team2Name ?? t("schedule.tbd") },
                 {
-                  first: (chunks) => <EntrantName teamId={match.team1Id} name={chunks.join("")} />,
-                  second: (chunks) => <EntrantName teamId={match.team2Id} name={chunks.join("")} />,
+                  team1: versusName(match.team1Name, match.team1Id, t("schedule.tbd")),
+                  team2: versusName(match.team2Name, match.team2Id, t("schedule.tbd")),
+                },
+                {
+                  first: (chunks) => <EntrantName plain teamId={match.team1Id} name={chunks.join("")} />,
+                  second: (chunks) => <EntrantName plain teamId={match.team2Id} name={chunks.join("")} />,
                 },
               ),
             )}

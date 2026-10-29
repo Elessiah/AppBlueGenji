@@ -40,6 +40,9 @@ export type MiniBracketRow = {
   team2Placeholder: string | null;
   team1Score: number | null;
   team2Score: number | null;
+  /** Le camp est une entrée solo (`bg_teams.solo_user_id`) : son repli dit « Joueur ». */
+  team1Solo?: boolean;
+  team2Solo?: boolean;
 };
 
 /**
@@ -117,16 +120,25 @@ export async function loadMiniBracket(
     locale === DEFAULT_LOCALE ? (localizeBracketPlaceholder(placeholder) ?? t("board.tbd")) : t("board.tbd");
   // Lu sans compte : la forme affichable d'un nom saisi, même règle que le
   // direct et le bandeau (`shownEntrantName`). Une place occupée dont le nom ne
-  // garde rien de visible retombe sur « #id », neutre en langue comme au
+  // garde rien de visible retombe sur « Équipe #id » (« Joueur » pour une entrée solo), traduit comme au
   // classement — jamais sur un libellé d'attente, qui dirait la place encore à
   // pourvoir.
-  const entrant = (row: MiniBracketRow, teamId: number | null, name: string | null, placeholder: string | null) => {
-    if (teamId !== null) return shownEntrantName(name) ?? `#${teamId}`;
+  const entrant = (
+    row: MiniBracketRow,
+    teamId: number | null,
+    name: string | null,
+    placeholder: string | null,
+    solo: boolean | undefined,
+  ) => {
+    if (teamId !== null) {
+      // Repli traduit, comme le bandeau : « Joueur » pour une entrée solo.
+      return shownEntrantName(name) ?? (solo ? t("ticker.playerFallback") : t("ticker.teamFallback", { id: String(teamId) }));
+    }
     return row.isBye || row.status === "COMPLETED" ? t("board.bye") : pending(placeholder);
   };
   return pickMiniBracketMatches(rows).map((row) => ({
-    a: entrant(row, row.team1Id, row.team1Name, row.team1Placeholder),
-    b: entrant(row, row.team2Id, row.team2Name, row.team2Placeholder),
+    a: entrant(row, row.team1Id, row.team1Name, row.team1Placeholder, row.team1Solo),
+    b: entrant(row, row.team2Id, row.team2Name, row.team2Placeholder, row.team2Solo),
     sa: row.team1Score ?? "—",
     sb: row.team2Score ?? "—",
   }));
@@ -147,6 +159,8 @@ type MatchRow = RowDataPacket & {
   team2_placeholder: string | null;
   team1_score: number | null;
   team2_score: number | null;
+  team1_solo: number | boolean | null;
+  team2_solo: number | boolean | null;
 };
 
 const orNull = (value: number | string | null) => (value === null ? null : Number(value));
@@ -178,7 +192,9 @@ async function loadMiniBracketRows(tournamentId: number): Promise<MiniBracketRow
       m.team1_placeholder,
       m.team2_placeholder,
       m.team1_score,
-      m.team2_score
+      m.team2_score,
+      (t1.solo_user_id IS NOT NULL) AS team1_solo,
+      (t2.solo_user_id IS NOT NULL) AS team2_solo
      FROM bg_matches m
      LEFT JOIN bg_tournament_phases p ON p.id = m.phase_id
      LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
@@ -202,5 +218,7 @@ async function loadMiniBracketRows(tournamentId: number): Promise<MiniBracketRow
     team2Placeholder: row.team2_placeholder,
     team1Score: row.team1_score,
     team2Score: row.team2_score,
+    team1Solo: Boolean(Number(row.team1_solo ?? 0)),
+    team2Solo: Boolean(Number(row.team2_solo ?? 0)),
   }));
 }

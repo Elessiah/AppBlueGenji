@@ -109,6 +109,7 @@
   },
   "teamProfile": {
     "eyebrow": "Team",
+    "teamFallback": "Team #{id}",
     "subtitle": "A team on the BlueGenji amateur scene.",
     "rating": "Rating",
     "record": "Record",
@@ -123,6 +124,7 @@
     "title": "The BlueGenji podium",
     "alt": "BlueGenji team ranking",
     "points": "pts",
+    "teamFallback": "Team #{id}",
     "places": ["1st", "2nd", "3rd"]
   }
 }

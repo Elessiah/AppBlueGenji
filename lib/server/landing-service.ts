@@ -482,10 +482,10 @@ async function loadLeaderboardRows(game: TournamentGame | undefined): Promise<La
     return {
       rank,
       teamId: row.teamId,
-      // Lu sans compte (accueil, `/classement`) : déjà la forme affichable
-      // (`loadTeamRanking`) ; vide, la vue pose son repli traduit — la ligne
-      // est commune aux deux langues.
-      teamName: row.teamName || null,
+      // Lu sans compte (accueil, `/classement`) : la forme affichable
+      // (`shownEntrantName`, `null` quand rien ne reste) ; la vue pose alors son
+      // repli traduit — la ligne est commune aux deux langues.
+      teamName: shownEntrantName(row.teamName),
       logoUrl: localUploadUrl(row.logoUrl),
       wins: row.wins,
       losses: row.losses,
@@ -551,8 +551,9 @@ export async function getLandingCalendar(bucketsOrLimit?: TournamentBuckets | nu
 type TickerEntry = { sortAt: number } & (
   | {
       kind: "result";
-      /** Nom du tournoi, invisibles retirés. */
+      /** Nom du tournoi, invisibles retirés (vide : repli « Tournoi #id » à la sortie). */
       tournament: string;
+      tournamentId: number;
       /** Nom affichable de chaque camp, `null` quand la ligne a disparu ou que le nom ne garde rien (repli traduit à la sortie). */
       team1: string | null;
       team1Id: number | null;
@@ -566,8 +567,8 @@ type TickerEntry = { sortAt: number } & (
       /** Issue de chaque camp, lue sur le résultat enregistré (`tickerOutcomes`). */
       outcomes: readonly [TickerOutcome, TickerOutcome];
     }
-  | { kind: "registration"; name: string; registered: number; max: number }
-  | { kind: "winner"; name: string; winner: string | null; winnerTeamId: number | null; winnerSolo: boolean }
+  | { kind: "registration"; name: string; tournamentId: number; registered: number; max: number }
+  | { kind: "winner"; name: string; tournamentId: number; winner: string | null; winnerTeamId: number | null; winnerSolo: boolean }
   | { kind: "news"; title: string }
 );
 
@@ -592,6 +593,8 @@ function formatTickerEntry(entry: TickerEntry, locale: Locale): TickerItem | nul
   // vaut quand la ligne a disparu ou que le nom ne garde rien. Une entrée solo
   // se replie sur « Joueur » : le bandeau public n'appelle pas un joueur
   // « équipe » et ne montre pas l'identifiant interne de sa ligne `bg_teams`.
+  // Nom de tournoi vidé par le nettoyage : « Tournoi #id », jamais un blanc.
+  const tournamentName = (name: string, id: number) => name || t("ticker.tournamentFallback", { id: String(id) });
   const team = (name: string | null, id: number | null, solo: boolean) => {
     if (name !== null) return name;
     return solo ? t("ticker.playerFallback") : t("ticker.teamFallback", { id: String(id) });
@@ -605,7 +608,7 @@ function formatTickerEntry(entry: TickerEntry, locale: Locale): TickerItem | nul
       };
       return {
         kind: "result",
-        lead: t("ticker.resultLead", { tournament: entry.tournament }),
+        lead: t("ticker.resultLead", { tournament: entry.tournament || tournamentName("", entry.tournamentId) }),
         sides: [
           side(entry.team1, entry.team1Id, entry.team1Solo, entry.score1, outcomes[0]),
           side(entry.team2, entry.team2Id, entry.team2Solo, entry.score2, outcomes[1]),
@@ -615,7 +618,7 @@ function formatTickerEntry(entry: TickerEntry, locale: Locale): TickerItem | nul
       };
     }
     case "registration":
-      return t("ticker.registration", { name: entry.name, registered: String(entry.registered), max: String(entry.max) });
+      return t("ticker.registration", { name: tournamentName(entry.name, entry.tournamentId), registered: String(entry.registered), max: String(entry.max) });
     case "winner": {
       // Mis en valeur seulement sous un vrai nom : une ligne d'équipe disparue (ou un nom
       // qui ne garde rien) s'écrit « Équipe #id » (« Joueur » pour une entrée solo) en
@@ -625,7 +628,7 @@ function formatTickerEntry(entry: TickerEntry, locale: Locale): TickerItem | nul
         entry.winnerTeamId === null ? t("ticker.unknownChampion") : team(null, entry.winnerTeamId, entry.winnerSolo);
       return {
         kind: "champion",
-        lead: t("ticker.winnerLead", { name: entry.name }),
+        lead: t("ticker.winnerLead", { name: tournamentName(entry.name, entry.tournamentId) }),
         name: entry.winner ?? fallback,
         known,
       };
@@ -637,6 +640,7 @@ function formatTickerEntry(entry: TickerEntry, locale: Locale): TickerItem | nul
 
 type MatchResultRow = RowDataPacket & {
   updated_at: Date;
+  tournament_id: number;
   tournament_name: string;
   team1_name: string | null;
   team2_name: string | null;
@@ -656,6 +660,7 @@ type MatchResultRow = RowDataPacket & {
 };
 
 type RegistrationRow = RowDataPacket & {
+  id: number;
   start_at: Date;
   registration_open_at: Date;
   name: string;
@@ -664,6 +669,7 @@ type RegistrationRow = RowDataPacket & {
 };
 
 type WinnerRow = RowDataPacket & {
+  id: number;
   finished_at: Date | null;
   name: string;
   winner_name: string | null;
@@ -749,6 +755,7 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
         connection.execute<MatchResultRow[]>(
           `SELECT
             m.updated_at,
+            m.tournament_id,
             t.name AS tournament_name,
             t1.name AS team1_name,
             t2.name AS team2_name,
@@ -789,6 +796,7 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
         ),
         connection.execute<RegistrationRow[]>(
           `SELECT
+            t.id,
             t.start_at,
             t.registration_open_at,
             t.name,
@@ -809,6 +817,7 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
         // refuserait sous `ONLY_FULL_GROUP_BY`).
         connection.execute<WinnerRow[]>(
           `SELECT
+            t.id,
             t.finished_at,
             t.name,
             w.name AS winner_name,
@@ -879,6 +888,7 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
         return [{
           kind: "result" as const,
           tournament: withoutInvisibles(row.tournament_name),
+          tournamentId: Number(row.tournament_id),
           team1: shownEntrantName(row.team1_name),
           team1Id: outcome.team1Id,
           team1Solo: (row.team1_solo_user_id ?? null) !== null,
@@ -897,6 +907,7 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
       ...registrationRows.map((row) => ({
         kind: "registration" as const,
         name: withoutInvisibles(row.name),
+        tournamentId: Number(row.id),
         registered: Number(row.registered_teams),
         max: Number(row.max_teams),
         sortAt: new Date(row.registration_open_at).getTime(),
@@ -907,6 +918,7 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
       ...winnerRows.map((row) => ({
         kind: "winner" as const,
         name: withoutInvisibles(row.name),
+        tournamentId: Number(row.id),
         winner: shownEntrantName(row.winner_name),
         winnerTeamId: row.winner_team_id === null ? null : Number(row.winner_team_id),
         winnerSolo: (row.winner_solo_user_id ?? null) !== null,

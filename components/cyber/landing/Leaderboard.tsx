@@ -131,7 +131,7 @@ export function Leaderboard({ initialRows }: Readonly<LeaderboardProps>) {
                 <span className={styles.rank} role="cell">{String(row.rank).padStart(2, "0")}</span>
                 <span className={styles.team} role="cell">
                   <TeamSigil label={teamName.charAt(0)} size={24} logoUrl={row.logoUrl} />
-                  <TeamLink teamId={row.teamId} truncate={2} title={t("common.teamPageTitle", { name: teamName })}>
+                  <TeamLink teamId={row.teamId} truncate={2} title={row.teamName === null ? t("common.teamPageTitleFallback", { id: String(row.teamId) }) : t("common.teamPageTitle", { name: teamName })}>
                     {teamName}
                   </TeamLink>
                 </span>

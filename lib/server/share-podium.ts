@@ -54,6 +54,7 @@ async function computeSharePodium(): Promise<PodiumShareInput[]> {
   const top = ranking.slice(0, PODIUM_TIER_COUNT);
   return Promise.all(
     top.map(async (row) => ({
+      teamId: row.teamId,
       teamName: row.teamName,
       points: row.points,
       logoSrc: await teamLogoDataUrl(row.logoUrl),

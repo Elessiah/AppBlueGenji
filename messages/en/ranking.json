@@ -28,6 +28,7 @@
       "third": "3rd place"
     },
     "teamLinkTitle": "View {team}'s profile",
+    "teamLinkTitleFallback": "View team #{id}'s profile",
     "teamFallback": "Team #{id}",
     "pointsUnit": "pts",
     "record": {

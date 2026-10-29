@@ -291,6 +291,7 @@ export type TournamentFormField =
 
 export const TOURNAMENT_FIELD_ERRORS: FieldErrorMap<TournamentFormField> = {
   MISSING_NAME: "name",
+  NAME_TOO_LONG: "name",
   INVALID_MAX_TEAMS: "maxTeams",
   INVALID_MATCH_FORMAT: "matchFormatValue",
   INVALID_ENDURANCE_EARLY_EXIT: "enduranceEarlyExit",
@@ -306,6 +307,9 @@ export type MatchScheduleField = "day" | "month" | "time";
 
 export const MATCH_SCHEDULE_FIELD_ERRORS: FieldErrorMap<MatchScheduleField> = {
   INVALID_MATCH_START_AT: "day",
+  // Refus de lecture du corps (`bodyReadRefusal`) : rattachés au champ de date.
+  PAYLOAD_TOO_LARGE: "day",
+  UNSUPPORTED_CONTENT_TYPE: "day",
 };
 
 /** Refus de date du serveur, rattachés au premier jalon mal placé. */

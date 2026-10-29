@@ -491,10 +491,11 @@ export function LiveCard({ live, nextUpcomingISO, spectator = false }: Readonly<
   }
 
   const shown = matches[carousel.index] ?? null;
-  const title = live.tournament.name.toUpperCase();
+  // Un nom qui ne garde rien de visible : repli traduit, jamais un titre vide.
+  const tournament = live.tournament.name || t("live.tournamentFallback", { id: String(live.tournament.id) });
+  const title = tournament.toUpperCase();
   const visibleViewers = visibleLiveViewerCount(live.viewers);
   const href = tournamentMatchHref(live.tournament.id, shown?.id ?? null, spectator);
-  const tournament = live.tournament.name;
   const openLabel = shown
     ? t("live.openMatch", {
         tournament,

@@ -18,7 +18,7 @@ import { RULE_MODE_DEFINITIONS } from "./rule-mode-definitions";
 import { DEFAULT_LOCALE, isLocale, type Locale } from "./locales";
 import { PODIUM_TIER_COUNT, type PodiumTier } from "./podium-tiers";
 import { truncateForShare } from "./share-metadata";
-import { visibleText } from "./visible-text";
+import { withoutInvisibles } from "./visible-text";
 
 export type ShareMessages = typeof frShare;
 
@@ -250,7 +250,7 @@ export type PodiumShareEntry = {
   place: PodiumTier;
   /** Libellé de la marche dans la langue (« 1re », « 2nd »…). */
   placeLabel: string;
-  /** Nom d'équipe nettoyé (`visibleText`) et borné. */
+  /** Nom d'équipe nettoyé (`withoutInvisibles`) et borné. */
   name: string;
   /** Initiale de repli quand l'équipe n'a pas de logo lisible. */
   initial: string;
@@ -260,7 +260,7 @@ export type PodiumShareEntry = {
   logoSrc: string | null;
 };
 
-export type PodiumShareInput = { teamName: string; points: number; logoSrc: string | null };
+export type PodiumShareInput = { teamId: number; teamName: string; points: number; logoSrc: string | null };
 
 /**
  * Les trois marches, dans l'ordre du classement — ou `null` sous trois équipes,
@@ -274,9 +274,8 @@ export function podiumShareEntries(
   if (rows.length < PODIUM_TIER_COUNT) return null;
   return rows.slice(0, PODIUM_TIER_COUNT).map((row, index) => {
     const place = (index + 1) as PodiumTier;
-    const cleaned = visibleText(row.teamName).trim();
-    // Un nom sans caractère visible garde une marche lisible plutôt qu'un vide.
-    const name = cleaned === "" ? "?" : truncateForShare(cleaned, PODIUM_NAME_MAX_LENGTH);
+    // Un nom sans caractère visible garde une marche lisible : « Équipe #id ».
+    const name = shareTeamName(row.teamName, row.teamId, messages.podium.teamFallback, PODIUM_NAME_MAX_LENGTH);
     return {
       place,
       placeLabel: messages.podium.places[index] ?? String(place),
@@ -298,6 +297,7 @@ export const TEAM_SHARE_NAME_MAX_LENGTH = 48;
 
 /** Ce que la carte d'une équipe montre : le sous-ensemble du classement public. */
 export type TeamShareInput = {
+  teamId: number;
   teamName: string;
   wins: number;
   losses: number;
@@ -315,19 +315,28 @@ export type TeamShareCard = {
   footer: string;
 };
 
+/**
+ * Nom d'équipe tel que le site l'affiche (`withoutInvisibles`, sans NFKC),
+ * borné ; un nom qui ne garde rien de visible retombe sur le repli traduit
+ * « Équipe #id » — le même que le classement, jamais un nom ni une initiale vides.
+ */
+function shareTeamName(rawName: string, teamId: number, fallback: string, maxLength: number): string {
+  const cleaned = withoutInvisibles(rawName);
+  return cleaned === "" ? fallback.replace("{id}", String(teamId)) : truncateForShare(cleaned, maxLength);
+}
+
 function fill(template: string, values: Readonly<Record<string, number>>): string {
   return template.replace(/\{(\w+)\}/gu, (whole, name: string) => (name in values ? String(values[name]) : whole));
 }
 
 /**
  * Rédige la carte nominative d'une équipe : nom saisi repassé par
- * `visibleText` puis borné, cote et bilan **tels que `/classement` les
+ * `withoutInvisibles` puis borné, cote et bilan **tels que `/classement` les
  * affiche** (cote arrondie, sans séparateur de milliers ; nuls seulement s'il
  * y en a). Aucun joueur : ni pseudo ni avatar.
  */
 export function teamShareCard(team: TeamShareInput, messages: ShareMessages): TeamShareCard {
-  const cleaned = visibleText(team.teamName).trim();
-  const title = cleaned === "" ? "?" : truncateForShare(cleaned, TEAM_SHARE_NAME_MAX_LENGTH);
+  const title = shareTeamName(team.teamName, team.teamId, messages.teamProfile.teamFallback, TEAM_SHARE_NAME_MAX_LENGTH);
   const texts = messages.teamProfile;
   const counts = { wins: team.wins, losses: team.losses, draws: team.draws };
   return {

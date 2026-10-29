@@ -65,12 +65,19 @@ function boardText(locale: Locale): RankingText {
   return rankingText(locale, messagesFor(locale).ranking);
 }
 
-/** Une défaite se lit dans sa couleur ; zéro défaite reste neutre (`DESIGN_SYSTEM.md`). */
 /** Nom affiché : un nom qui ne garde rien de visible retombe sur « Équipe #id ». */
 function shownTeamName(row: Pick<LandingLeaderboardRow, "teamId" | "teamName">, text: RankingText): string {
   return row.teamName ?? text.t("board.teamFallback", { id: String(row.teamId) });
 }
 
+/** Infobulle du lien : le repli porte son propre titre (« l'équipe #12 », sans élision fautive). */
+function teamLinkTitle(row: Pick<LandingLeaderboardRow, "teamId" | "teamName">, text: RankingText): string {
+  return row.teamName === null
+    ? text.t("board.teamLinkTitleFallback", { id: String(row.teamId) })
+    : text.t("board.teamLinkTitle", { team: row.teamName });
+}
+
+/** Une défaite se lit dans sa couleur ; zéro défaite reste neutre (`DESIGN_SYSTEM.md`). */
 function lossClass(losses: number): string {
   return losses > 0 ? "result-loss" : styles.neutral;
 }
@@ -163,7 +170,7 @@ function Podium({
               <TeamSigil label={teamName.charAt(0)} size={40} logoUrl={row.logoUrl} />
             </div>
             <h3 className={styles.podiumName}>
-              <TeamLink teamId={row.teamId} podiumTier={PODIUM_TIERS[index]} title={text.t("board.teamLinkTitle", { team: teamName })}>
+              <TeamLink teamId={row.teamId} podiumTier={PODIUM_TIERS[index]} title={teamLinkTitle(row, text)}>
                 {teamName}
               </TeamLink>
             </h3>
@@ -260,7 +267,7 @@ function RankingTable({ rows, forms, showDraws, afterPodium, text }: Readonly<Ra
               <TeamLink
                 teamId={row.teamId}
                 podiumTier={null}
-                title={text.t("board.teamLinkTitle", { team: teamName })}>
+                title={teamLinkTitle(row, text)}>
                 {teamName}
               </TeamLink>
             </span>

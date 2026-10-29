@@ -14,7 +14,7 @@ import { MatchLaunchStrip } from "./MatchLaunchStrip";
 import { MatchReplayStrip } from "./MatchReplayStrip";
 import { MatchMapDetails } from "./MatchMapDetails";
 import { MatchCardActions } from "./MatchCardActions";
-import { EntrantName } from "./EntrantName";
+import { EntrantName, useShownEntrantName } from "./EntrantName";
 import styles from "./MatchRow.module.css";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { localizedPlaceholder, versusText } from "@/lib/shared/tournament-page-text";
@@ -98,8 +98,11 @@ export const MatchRow = memo(function MatchRow({
   const { win: team2Win, forfeits: team2Forfeits, score: team2Score } = side2;
   // Libellés d'attente : français dans l'instantané (commun à tous les
   // lecteurs), rédigés dans la langue de la page au rendu.
-  const team1Display = teamLabel(match.team1Name, localizedPlaceholder(text, match.team1Placeholder), side1.emptyLabel);
-  const team2Display = teamLabel(match.team2Name, localizedPlaceholder(text, match.team2Placeholder), side2.emptyLabel);
+  // Noms nettoyés une fois : carte, infobulle et noms accessibles des actions.
+  const team1Shown = useShownEntrantName(match.team1Id, match.team1Name);
+  const team2Shown = useShownEntrantName(match.team2Id, match.team2Name);
+  const team1Display = teamLabel(team1Shown, localizedPlaceholder(text, match.team1Placeholder), side1.emptyLabel);
+  const team2Display = teamLabel(team2Shown, localizedPlaceholder(text, match.team2Placeholder), side2.emptyLabel);
   const actionMatchLabel = versusText(text, team1Display, team2Display);
 
   return (
