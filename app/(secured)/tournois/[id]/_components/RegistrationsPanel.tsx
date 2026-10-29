@@ -95,7 +95,15 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
   const a = useActionsText().t;
   // Vide : date d'une entrée solo, que la page sans compte ne sert pas.
   const registeredAt = (iso: string) => {
-    if (iso === "") return "-";
+    if (iso === "") {
+      // Le tiret seul ne dit rien à un lecteur d'écran : il annonce la raison.
+      return (
+        <>
+          <span aria-hidden="true">-</span>
+          <span className="sr-only">{t("registrations.registeredAtHidden")}</span>
+        </>
+      );
+    }
     return text.locale === "fr"
       ? formatLocalDateTime(iso)
       : pageDateTime(iso, text.locale, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });

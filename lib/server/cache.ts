@@ -97,6 +97,30 @@ function sweepExpired(now: number): void {
 }
 
 /**
+ * Minuterie de la purge, **sans trafic** : le balayage de `evictIfNeeded` ne
+ * passe qu'à une écriture, et un site qui s'endort laissait ses dernières copies
+ * échues (instantanés d'environ 1 Mo) en mémoire. Elle naît à la première
+ * écriture, balaie à chaque pas, et s'éteint d'elle-même quand le cache est vide
+ * (`unref` : elle ne retient jamais l'arrêt du processus).
+ */
+let sweepTimer: ReturnType<typeof setInterval> | null = null;
+
+function stopSweepTimer(): void {
+  if (sweepTimer === null) return;
+  clearInterval(sweepTimer);
+  sweepTimer = null;
+}
+
+function ensureSweepTimer(): void {
+  if (sweepTimer !== null) return;
+  sweepTimer = setInterval(() => {
+    sweepExpired(Date.now());
+    if (store.size === 0) stopSweepTimer();
+  }, CACHE_SWEEP_INTERVAL_MS);
+  sweepTimer.unref?.();
+}
+
+/**
  * Purge les entrées échues (au plus une fois par {@link CACHE_SWEEP_INTERVAL_MS},
  * ou dès que le plafond est atteint), puis évince les moins récemment lues si
  * le plafond tient encore.
@@ -189,6 +213,7 @@ export async function cached<T>(
       evictIfNeeded(writtenAt);
       const expiresAt = writtenAt + lifeMs;
       store.set(key, { value, expiresAt, retainUntil: Math.max(expiresAt, writtenAt + (options.retainMs ?? 0)) });
+      ensureSweepTimer();
     }
     return value;
   })();
@@ -255,6 +280,7 @@ export function cachedEntryCount(): number {
 
 /** Vide le cache. Réservé aux tests. */
 export function clearCache(): void {
+  stopSweepTimer();
   store.clear();
   inflight.clear();
   generations.clear();

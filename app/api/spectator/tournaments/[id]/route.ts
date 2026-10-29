@@ -68,15 +68,63 @@ function unavailable(level: SpectatorLoadLevel): Response {
   return response;
 }
 
-/** La réponse à servir pour une reconstruction refusée : la copie récente, ou le refus. */
+/**
+ * La réponse à servir pour une reconstruction refusée.
+ *
+ * - **Plafond du réseau** (`rate`) : le refus `429`, pour tous — qu'une copie
+ *   récente existe ou non, la réponse ne dit pas si quelqu'un d'autre vient de
+ *   lire ce tournoi, et un réseau sans jeton ne tire plus de corps de la copie
+ *   (bande passante plafonnée). La seule exception est le `304` : un client qui
+ *   détient déjà la version de la copie apprend qu'elle n'a pas bougé, sans
+ *   corps. La copie est alors rendue, et le chemin commun répond `304`.
+ * - **Places prises** (`busy`, toutes adresses confondues) : la copie récente
+ *   si elle existe, sinon `503`.
+ */
 function refusedRead(
   tournamentId: number,
   refusal: SpectatorRebuildRefused,
   level: SpectatorLoadLevel,
+  ifNoneMatch: string | null,
 ): SpectatorPayload | Response {
   const stale = staleSpectatorPayload(tournamentId);
-  if (stale) return stale;
-  return refusal.response ?? unavailable(level);
+  if (refusal.kind === "rate") {
+    if (stale && matchesEtag(ifNoneMatch, etagOf(stale))) return stale;
+    return refusal.response ?? unavailable(level);
+  }
+  return stale ?? refusal.response ?? unavailable(level);
+}
+
+/** `ETag` fort de la réponse, un par codage (le corps gzip porte le suffixe `-gzip`). */
+function etagOf(payload: SpectatorPayload, gzip = false): string {
+  return `"${payload.version}${gzip ? "-gzip" : ""}"`;
+}
+
+/**
+ * La réponse publique à servir, ou la réponse d'erreur : reconstruction refusée
+ * ({@link refusedRead}), base injoignable (la copie de moins de 150 s tient la
+ * page, sinon `503`). `stale` : la copie servie est périmée, son âge annoncé
+ * passe au maximum déclaré.
+ */
+async function readPayload(
+  req: Request,
+  tournamentId: number,
+  level: SpectatorLoadLevel,
+  client: string | null,
+): Promise<{ payload: SpectatorPayload | null; stale: boolean } | Response> {
+  try {
+    return { payload: await getSpectatorPayload(tournamentId, level, client), stale: false };
+  } catch (error) {
+    if (error instanceof SpectatorRebuildRefused) {
+      const served = refusedRead(tournamentId, error, level, req.headers.get("if-none-match"));
+      return served instanceof Response ? served : { payload: served, stale: true };
+    }
+    // Base injoignable ou saturée : la copie de moins de 150 s tient la page
+    // (sinon les spectateurs passaient en « réessaie » alors que le plateau
+    // de la minute précédente était encore là).
+    console.error("[spectator] lecture publique impossible :", error);
+    const copy = staleSpectatorPayload(tournamentId);
+    return copy === null ? unavailable(level) : { payload: copy, stale: true };
+  }
 }
 
 export async function GET(req: Request, context: { params: Promise<{ id: string }> }) {
@@ -91,33 +139,23 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   if (tournamentId === null) return fail("INVALID_TOURNAMENT_ID", 400);
   const level = currentSpectatorLoadLevel();
 
-  let payload: SpectatorPayload | null;
-  let stale = false;
-  try {
-    payload = await getSpectatorPayload(tournamentId, level, client);
-  } catch (error) {
-    if (error instanceof SpectatorRebuildRefused) {
-      const served = refusedRead(tournamentId, error, level);
-      if (served instanceof Response) return served;
-      payload = served;
-      stale = true;
-    } else {
-      // Base injoignable ou saturée.
-      console.error("[spectator] lecture publique impossible :", error);
-      return unavailable(level);
-    }
-  }
+  const read = await readPayload(req, tournamentId, level, client);
+  if (read instanceof Response) return read;
+  const { payload, stale } = read;
   if (!payload) return fail("TOURNAMENT_NOT_FOUND", 404);
   // Seules les lectures d'un tournoi servi pèsent dans la charge : des
   // identifiants au hasard ne ralentissent pas les vrais spectateurs, et la
   // part d'un même réseau est plafonnée (`SPECTATOR_READS_PER_CLIENT`).
   recordSpectatorRead(Date.now(), client);
 
-  const etag = `"${payload.version}"`;
   const pollMs = spectatorPollIntervalMs(payload.state, level);
   // Une copie servie périmée peut avoir jusqu'à l'âge déclaré : c'est lui que
   // le témoin annonce alors, pas la durée de vie qu'elle avait reçue.
   const ageMs = stale ? SPECTATOR_MAX_COPY_AGE_MS : payload.ttlMs;
+  const gzipped = acceptsGzip(req.headers.get("accept-encoding"));
+  // Un `ETag` par codage (RFC 9110) : un cache partagé qui revalide ne sert pas
+  // le corps gzip à qui attend le corps brut.
+  const etag = etagOf(payload, gzipped);
   const headers = {
     ...pollHeaders(pollMs),
     [SPECTATOR_FRESHNESS_HEADER]: String(spectatorFreshnessMs(pollMs, ageMs)),
@@ -128,10 +166,10 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
     return new Response(null, { status: 304, headers });
   }
   const jsonHeaders = { ...headers, "Content-Type": "application/json; charset=utf-8" };
-  if (acceptsGzip(req.headers.get("accept-encoding"))) {
+  if (gzipped) {
     // Compressé une fois pour tous ses lecteurs ; Next laisse passer une
     // réponse déjà encodée sans la recompresser.
-    const bytes = gzippedSpectatorBody(payload);
+    const bytes = await gzippedSpectatorBody(payload);
     return new Response(bytes, { status: 200, headers: { ...jsonHeaders, "Content-Encoding": "gzip" } });
   }
   return new Response(payload.body, { status: 200, headers: jsonHeaders });

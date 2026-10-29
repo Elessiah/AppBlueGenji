@@ -326,6 +326,7 @@
     "empty": "No registrations yet.",
     "rank": "Rank",
     "registeredAt": "Registered",
+    "registeredAtHidden": "Date not shared",
     "finalRank": "Final rank",
     "collapse": "Show less",
     "showAll": "Show the whole list ({count} more)"

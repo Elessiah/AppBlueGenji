@@ -326,6 +326,7 @@
     "empty": "Aucune inscription pour le moment.",
     "rank": "Rang",
     "registeredAt": "Inscription",
+    "registeredAtHidden": "Date non communiquée",
     "finalRank": "Classement final",
     "collapse": "Réduire la liste",
     "showAll": "Voir toute la liste ({count} de plus)"

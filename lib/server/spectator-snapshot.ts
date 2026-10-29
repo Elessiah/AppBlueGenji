@@ -26,7 +26,8 @@
  *   s'arrête là), puis une des {@link SPECTATOR_MAX_CONCURRENT_REBUILDS} places
  *   de construction, toutes adresses confondues.
  */
-import { gzipSync } from "node:zlib";
+import { gzip } from "node:zlib";
+import { promisify } from "node:util";
 import { createHash } from "node:crypto";
 import { refundRateToken, SPECTATOR_REBUILD_RULE, takeRateToken } from "@/lib/server/api-guard";
 import { cached, cachedStale } from "@/lib/server/cache";
@@ -38,7 +39,15 @@ import {
   spectatorSnapshot,
   type SpectatorLoadLevel,
 } from "@/lib/shared/spectator-view";
-import type { TournamentSnapshot, TournamentState } from "@/lib/shared/types";
+import { computeTournamentState } from "@/lib/shared/tournament-state";
+import type { TournamentCard, TournamentSnapshot, TournamentState } from "@/lib/shared/types";
+
+/**
+ * Ce que la réponse publique garde en mémoire de l'instantané : la carte et ce
+ * que les réglages de `/regles?tournoi=` lisent (`tournamentSettingsGroups`) —
+ * jamais les matchs ni les inscrites, que `body` porte déjà sérialisés.
+ */
+export type PublicTournamentView = Pick<TournamentSnapshot, "card" | "phases" | "swiss" | "endurance" | "seedingSource">;
 
 /**
  * Ce que la route sert : l'empreinte, l'état (pour la cadence) et le corps prêt
@@ -52,8 +61,8 @@ export type SpectatorPayload = {
   body: string;
   /** Durée de vie reçue à la construction : l'âge maximal annoncé en dépend. */
   ttlMs: number;
-  /** L'instantané public que `body` sérialise (réglages, encart) — jamais celui des membres. */
-  snapshot: TournamentSnapshot;
+  /** Carte et réglages du corps public (encart, page des règles) — jamais l'instantané des membres. */
+  snapshot: PublicTournamentView;
 };
 
 /**
@@ -97,19 +106,30 @@ export function isSpectatorTournamentPublic(tournamentId: number): Promise<boole
 /** Refus du chargeur : rien à servir, et rien à mettre en cache. */
 class SpectatorNotFound extends Error {}
 
+const gzipAsync = promisify(gzip);
+
 /** Corps compressés, un par réponse construite (une fois pour tous ses lecteurs). */
-const gzippedBodies = new WeakMap<SpectatorPayload, Uint8Array<ArrayBuffer>>();
+const gzippedBodies = new WeakMap<SpectatorPayload, Promise<Uint8Array<ArrayBuffer>>>();
 
 /**
  * Le corps compressé (gzip), calculé à la première lecture qui l'accepte puis
  * resservi : Next ne recompresse pas une réponse déjà encodée, et un gros
  * tournoi suivi par des centaines d'onglets ne coûte plus un gzip par `200`.
+ *
+ * **Asynchrone** : compresser un corps d'environ 1 Mo d'un seul bloc occupait la
+ * boucle d'événements (salons SSE, API des membres) à chaque réponse
+ * reconstruite. La promesse est rangée tout de suite : des lecteurs simultanés
+ * partagent la même compression, et un échec n'est pas gardé.
  */
-export function gzippedSpectatorBody(payload: SpectatorPayload): Uint8Array<ArrayBuffer> {
+export function gzippedSpectatorBody(payload: SpectatorPayload): Promise<Uint8Array<ArrayBuffer>> {
   let bytes = gzippedBodies.get(payload);
   if (!bytes) {
-    bytes = new Uint8Array(gzipSync(payload.body));
-    gzippedBodies.set(payload, bytes);
+    const pending = gzipAsync(payload.body).then((buffer) => new Uint8Array(buffer));
+    bytes = pending;
+    gzippedBodies.set(payload, pending);
+    pending.catch(() => {
+      if (gzippedBodies.get(payload) === pending) gzippedBodies.delete(payload);
+    });
   }
   return bytes;
 }
@@ -156,7 +176,17 @@ export async function getSpectatorPayload(
       (payload: SpectatorPayload) => payload.ttlMs,
       async () => {
         let slot = false;
-        if (!membersWarm) {
+        // Chaud au lancement, refroidi depuis (une attente s'est glissée entre
+        // les deux) : la reconstruction qui part n'a pas été payée, elle l'est
+        // ici, comme si elle avait été froide dès le départ.
+        let warm = membersWarm;
+        if (warm && !isTournamentSnapshotWarm(tournamentId)) {
+          const refused = takeRateToken(SPECTATOR_REBUILD_RULE, client);
+          if (refused) throw new SpectatorRebuildRefused("rate", refused);
+          charged = true;
+          warm = false;
+        }
+        if (!warm) {
           // La carte d'abord : une requête indexée, sans écriture. Un tournoi
           // inconnu ou pas encore publié s'arrête là, sans faire construire son
           // instantané entier par un visiteur qui parcourt les identifiants.
@@ -191,7 +221,13 @@ export async function getSpectatorPayload(
           state: snapshot.card.state,
           body,
           ttlMs: spectatorCacheTtlMs(level, snapshot.card.state),
-          snapshot: publicSnapshot,
+          snapshot: {
+            card: publicSnapshot.card,
+            phases: publicSnapshot.phases,
+            swiss: publicSnapshot.swiss,
+            endurance: publicSnapshot.endurance,
+            seedingSource: publicSnapshot.seedingSource,
+          },
         };
       },
       {
@@ -227,11 +263,42 @@ export async function publicTournamentSnapshot(
   tournamentId: number,
   level: SpectatorLoadLevel,
   client: string | null,
-): Promise<TournamentSnapshot | null> {
+): Promise<PublicTournamentView | null> {
   try {
     return (await getSpectatorPayload(tournamentId, level, client))?.snapshot ?? null;
   } catch (error) {
     if (error instanceof SpectatorRebuildRefused) return staleSpectatorPayload(tournamentId)?.snapshot ?? null;
+    return null;
+  }
+}
+
+/** Durée de garde de la carte d'un tournoi lue pour un encart de lien. */
+export const SPECTATOR_CARD_TTL_MS = 10_000;
+
+/**
+ * La carte d'un tournoi tel que le public la voit, pour l'**encart d'un lien**
+ * (titre, description) : jamais une reconstruction. La copie de la réponse
+ * publique, si elle a moins de {@link SPECTATOR_MAX_COPY_AGE_MS}, sinon la
+ * carte seule, une requête indexée gardée {@link SPECTATOR_CARD_TTL_MS} (un
+ * robot qui colle un lien dans un salon ne coûte pas une lecture par vue). Un
+ * « introuvable » n'est pas gardé : des identifiants parcourus au hasard ne
+ * chassent pas les clés chaudes du cache.
+ *
+ * L'état est **recalculé depuis les dates** à chaque lecture : la copie garde
+ * celui de sa construction (jusqu'à 150 s), et un lien partagé juste après
+ * l'ouverture des inscriptions ne dirait plus « à venir ». `null` : introuvable,
+ * ou base injoignable — l'appelant se rabat sur l'encart général.
+ */
+export async function publicTournamentCard(tournamentId: number): Promise<TournamentCard | null> {
+  const copy = staleSpectatorPayload(tournamentId);
+  if (copy) return { ...copy.snapshot.card, state: computeTournamentState(copy.snapshot.card) };
+  try {
+    return await cached(
+      `spectator-card:${tournamentId}`,
+      (card: TournamentCard | null) => (card ? SPECTATOR_CARD_TTL_MS : 0),
+      () => getVisibleTournamentCard(tournamentId),
+    );
+  } catch {
     return null;
   }
 }
