@@ -37,14 +37,19 @@ const OPTIONAL_ACCOUNT_COLUMNS = [
 
 type OptionalAccountColumn = (typeof OPTIONAL_ACCOUNT_COLUMNS)[number];
 
-/** La colonne optionnelle qu'une erreur « Unknown column » désigne, sinon la plus récente encore lue. */
+/**
+ * La colonne optionnelle qu'une erreur « Unknown column » désigne ; sans nom
+ * dans le message, la plus récente encore lue. Une colonne nommée hors de la
+ * liste n'est pas un repli possible : `undefined`, l'erreur remonte.
+ */
 export function refusedOptionalColumn(
   error: unknown,
   remaining: readonly OptionalAccountColumn[],
 ): OptionalAccountColumn | undefined {
   const message = error instanceof Error ? error.message : "";
   const named = /Unknown column '(?:[^'.]*\.)?([^']+)'/i.exec(message)?.[1];
-  return remaining.find((column) => column === named) ?? remaining.at(-1);
+  if (named === undefined) return remaining.at(-1);
+  return remaining.find((column) => column === named);
 }
 
 /**
@@ -159,7 +164,8 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
       avatarUrl: row.avatar_url,
       overwatchBattletag: row.overwatch_battletag,
       // Fourni par Battle.net (donc tenu pour vérifié) ou non.
-      battletagFromBlizzard: battletagFromBlizzard({
+      // Sans BattleTag, rien n'a d'origine : jamais « fourni par Battle.net ».
+      battletagFromBlizzard: Boolean(row.overwatch_battletag) && battletagFromBlizzard({
         blizzard_sub: row.blizzard_sub,
         overwatch_battletag_typed: battletagTyped ? 1 : 0,
       }),

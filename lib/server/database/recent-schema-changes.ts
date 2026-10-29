@@ -333,14 +333,15 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
                 AND c.created_at <= s.created_at + INTERVAL 1 SECOND) = 1
         AND (SELECT COUNT(*) FROM bg_match_casters c
               WHERE c.match_id = s.match_id AND c.stream_id = s.id) = 1`,
-    // 2 ter. Le lien rattaché à un compte **supprimé** avant ce rattrapage :
+    // 2 ter. Le lien rattaché à un compte **supprimé** (anonymisé, ou effacé :
+    //    `link_user_id` n'a pas de clé étrangère) avant ce rattrapage :
     //    la suppression d'aujourd'hui l'aurait retiré (`withdrawUserCasts`),
     //    celle d'hier ne savait pas le trouver. Idempotent : ne touche que des
     //    liens d'un compte supprimé, qui n'en garde aucun.
     `UPDATE bg_match_streams s
-        JOIN bg_users u ON u.id = s.link_user_id
+        LEFT JOIN bg_users u ON u.id = s.link_user_id
         SET s.live_url = NULL, s.link_user_id = NULL
-      WHERE u.is_deleted = 1`,
+      WHERE s.link_user_id IS NOT NULL AND (u.id IS NULL OR u.is_deleted = 1)`,
     // 3. Les anciennes colonnes sont vidées — plus rien ne les écrit : un
     //    redémarrage ne recopie rien, et rien de périmé ne revient. Seulement
     //    ce qui est **arrivé** dans les nouvelles tables : si 1 ou 2 a échoué,
