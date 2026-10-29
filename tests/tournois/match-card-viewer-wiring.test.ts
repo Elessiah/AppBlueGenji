@@ -20,6 +20,8 @@ const read = (path: string) => readFileSync(join(ROOT, path), "utf8");
 
 const TOURNAMENT_DIR = join("app", "(secured)", "tournois", "[id]");
 const MATCH_ROW = read(join(TOURNAMENT_DIR, "_components", "MatchRow.tsx"));
+/** Modèle de la carte, partagé avec la page du match : c'est lui qui décide des gestes. */
+const CARD_MODEL = read(join(TOURNAMENT_DIR, "_lib", "match-card-model.ts"));
 const BRACKET_TREE = read(join(TOURNAMENT_DIR, "_components", "BracketTree.tsx"));
 const PAGE = read(join(TOURNAMENT_DIR, "_components/TournamentSheet.tsx"));
 const PLAYER_DIALOG = read(join(TOURNAMENT_DIR, "_components", "PlayerScoreDialog.tsx"));
@@ -29,16 +31,17 @@ const HEADER = read(join(TOURNAMENT_DIR, "_components", "TournamentHeader.tsx"))
 
 describe("bouton « Signaler un problème » — réservé au match du lecteur", () => {
   it("MatchRow calcule la visibilité avec le module pur, pas une comparaison recopiée", () => {
-    expect(MATCH_ROW).toContain('from "@/lib/shared/match-card-viewer"');
-    expect(MATCH_ROW).toContain("canReportOwnMatch(canReport, myTeamId, match.team1Id, match.team2Id)");
+    expect(MATCH_ROW).toContain("useMatchCardModel(");
+    expect(CARD_MODEL).toContain('from "@/lib/shared/match-card-viewer"');
+    expect(CARD_MODEL).toContain("canReportOwnMatch(canReport, myTeamId, match.team1Id, match.team2Id)");
   });
 
   it("lit myTeamId depuis LiveContext, qui le porte déjà, plutôt que de le dupliquer", () => {
     // `LiveProvider` enveloppe déjà `IssueReportProvider` dans `page.tsx` et
     // reçoit `myTeamId={detail.myTeamId}` : une seconde copie sur le contexte
     // de signalement décrirait la même donnée depuis deux sources.
-    expect(MATCH_ROW).toContain('from "../_lib/live-context"');
-    expect(MATCH_ROW).toContain("useLiveControls()");
+    expect(CARD_MODEL).toContain('from "./live-context"');
+    expect(CARD_MODEL).toContain("useLiveControls()");
     expect(ISSUE_REPORT_CONTEXT).not.toContain("myTeamId");
     expect(PAGE).not.toMatch(/<IssueReportProvider[\s\S]{0,120}myTeamId=/);
   });
@@ -56,16 +59,17 @@ describe("saisie du score par un engagé — modale, plus de formulaire en ligne
   it("MatchRow n'a plus de champ de score, mais un bouton qui ouvre la modale joueur", () => {
     expect(MATCH_ROW).not.toContain('type="number"');
     expect(MATCH_ROW).not.toContain("<form");
-    expect(MATCH_ROW).toContain("usePlayerScore()");
-    expect(MATCH_ROW).toContain("playerScore.open(match)");
+    expect(CARD_MODEL).toContain("usePlayerScore()");
+    expect(CARD_MODEL).toContain("playerScore.open(match)");
     // Le libellé annonce le geste attendu (saisir, confirmer, corriger), décidé
     // par le module pur plutôt qu'écrit sur place.
     // (lot 8b : le module pur rend une clé, traduite par l'écran.)
-    expect(MATCH_ROW).toContain("playerScoreButtonKey(playerReportView(match, myTeamId)");
+    expect(CARD_MODEL).toContain("playerScoreButtonKey(playerReportView(match, myTeamId)");
   });
 
   it("la carte annonce la proposition en attente, lisible de tous", () => {
-    expect(MATCH_ROW).toContain("pendingReportState(match)");
+    expect(CARD_MODEL).toContain("pendingReportState(match)");
+    expect(MATCH_ROW).toContain("{reportNotice && ");
   });
 
   it("la modale saisit map par map, colonnes ordonnées comme la carte (MAP_SCORES.md)", () => {

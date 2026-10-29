@@ -9,8 +9,8 @@ import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { EntrantLink, useEntrantLogo } from "../_lib/entrant-link";
 import styles from "./EntrantName.module.css";
 
-/** Côtés d'emblème en usage : 16 px dans une ligne de texte, 20 px en exergue. */
-export type EntrantLogoSize = 16 | 20;
+/** Côtés d'emblème en usage : 16 px dans une ligne de texte, 20 px en exergue, 40 px au tableau d'affichage de la page d'un match. */
+export type EntrantLogoSize = 16 | 20 | 40;
 
 type EntrantLogoProps = {
   /** Engagé représenté ; `null` pour une case vide (TBD, exemption). */

@@ -1,0 +1,41 @@
+{
+  "header": {
+    "scoreLabel": "Score : {team1} {score1}, {team2} {score2}",
+    "versus": "VS",
+    "completed": "Terminé",
+    "winner": "Victoire de {team}",
+    "startAt": "Début : {date}",
+    "liveNow": "En direct",
+    "castAnnounced": "Cast annoncé",
+    "missingDate": "Casté sans date de début"
+  },
+  "facts": {
+    "label": "L'essentiel du match",
+    "host": "Hôte",
+    "hostDetail": "Crée la partie",
+    "firstBan": "Premier ban",
+    "referee": "Arbitre",
+    "officiating": "Arbitrage",
+    "refereeDesignated": "Arbitre désigné",
+    "maps": "Maps",
+    "mapSlot": "Map {number} : {map}",
+    "mapPool": "Map {number} : à choisir parmi {maps}",
+    "mapOpen": "Map {number} : à choisir",
+    "mapImposed": "imposée",
+    "loserPick": "choix du perdant",
+    "format": "Format",
+    "sides": "Côtés",
+    "sideLeft": "Gauche : {team}",
+    "sideRight": "Droite : {team}",
+    "casters": "Casters",
+    "noCaster": "Aucun caster",
+    "launch": "Lancement"
+  },
+  "sections": {
+    "actions": "Actions",
+    "result": "Résultat",
+    "maps": "Maps et bans",
+    "officiating": "Arbitrage",
+    "casts": "Casts"
+  }
+}

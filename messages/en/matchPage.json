@@ -1,0 +1,41 @@
+{
+  "header": {
+    "scoreLabel": "Score: {team1} {score1}, {team2} {score2}",
+    "versus": "VS",
+    "completed": "Finished",
+    "winner": "{team} wins",
+    "startAt": "Starts: {date}",
+    "liveNow": "Live",
+    "castAnnounced": "Cast announced",
+    "missingDate": "Cast without a start date"
+  },
+  "facts": {
+    "label": "Match key facts",
+    "host": "Host",
+    "hostDetail": "Creates the game",
+    "firstBan": "First ban",
+    "referee": "Referee",
+    "officiating": "Officiating",
+    "refereeDesignated": "Designated referee",
+    "maps": "Maps",
+    "mapSlot": "Map {number}: {map}",
+    "mapPool": "Map {number}: to choose from {maps}",
+    "mapOpen": "Map {number}: to choose",
+    "mapImposed": "set",
+    "loserPick": "loser's pick",
+    "format": "Format",
+    "sides": "Sides",
+    "sideLeft": "Left: {team}",
+    "sideRight": "Right: {team}",
+    "casters": "Casters",
+    "noCaster": "No caster",
+    "launch": "Launch"
+  },
+  "sections": {
+    "actions": "Actions",
+    "result": "Result",
+    "maps": "Maps and bans",
+    "officiating": "Officiating",
+    "casts": "Casts"
+  }
+}

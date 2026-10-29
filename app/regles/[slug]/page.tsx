@@ -7,6 +7,7 @@ import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { RuleDiagramFigure } from "@/components/rules/RuleDiagram";
 import { RuleText } from "@/components/rules/RuleText";
 import { RulesToc } from "@/components/rules/RulesToc";
+import { KeyFacts } from "@/components/cyber/KeyFacts";
 import {
   RULE_MODE_DEFINITIONS,
   TOURNAMENT_RULE_MODES,
@@ -231,14 +232,7 @@ export default async function RuleModePage({ params, searchParams }: Readonly<Pa
             </span>
           </p>
         )}
-        <dl className={styles.facts}>
-          {mode.facts.map((fact) => (
-            <div key={fact.label} className={styles.fact}>
-              <dt className={styles.factLabel}>{fact.label}</dt>
-              <dd className={styles.factValue}>{fact.value}</dd>
-            </div>
-          ))}
-        </dl>
+        <KeyFacts facts={mode.facts.map((fact, index) => ({ id: `fact-${index}`, label: fact.label, value: fact.value }))} />
       </section>
 
       <div className={`${styles.shell} ${styles.layout} ${tones.tone}`} data-tone={RULE_MODE_TONE[mode.diagram]}>

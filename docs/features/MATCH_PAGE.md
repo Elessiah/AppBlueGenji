@@ -38,15 +38,41 @@ fiche.
 
 ## Ce qu'elle montre
 
-1. **Le match** : la carte du plateau (`MatchRow`), tous ses gestes compris.
-   Sous la page, la carte tait ses liens vers la page elle-même (« Page du
-   match », « +N » des streams) — contexte `MatchPageScope`.
-2. **La partie** : les deux côtés, **hôte à gauche** (« Hôte : crée la partie »),
-   l'autre à droite (`matchPageSides`) ; la première map — le staff (permission
-   `tournaments`) la règle en ligne, même route que la fenêtre d'arbitrage
-   (`PUT /api/admin/matches/[id]/first-map`) — et le premier ban (l'équipe qui
-   n'héberge pas). Match casté : le rappel « triez les joueurs par rôle ».
-3. **Arbitrage** (`matchPageDecision`) : « Arbitre désigné » pour tous — son
+La page ne reprend plus la carte du plateau : un **en-tête**, une grille de
+**faits clés**, puis deux colonnes de sections (une seule sous 900 px, et
+quand l'une est vide). Textes propres à la page : espace de noms `matchPage`
+(`messages/{fr,en}/matchPage.json`, chargé à part — `useMatchPageText`), les
+anciennes clés `tournament.matchPage.*` restant pour les sections.
+
+1. **En-tête** : ligne de situation, titre « A contre B » et tableau
+   d'affichage **dans l'ordre des côtés** (hôte à gauche, `matchPageSides`),
+   chaque engagé par `EntrantName` (case vide « BYE » ou « TBD » comme la carte, logo 40 px, nom qui passe à la ligne, logo
+   au-dessus du nom sous 560 px) ; score au centre (`matchPageHeaderScore`,
+   « FF » sur forfait, « VS » avant tout score ; nom accessible « Score : A x,
+   B y »). Dessous : vainqueur, nul ou double forfait, horaire, état de
+   diffusion (`pill-live` seulement à l'antenne, « Cast annoncé » sinon), date
+   manquante (staff), rediffusion et proposition de score en attente.
+2. **Faits clés** (`KeyFacts`, `components/cyber/` — la grille des pages de
+   règles `/regles/[slug]`, une seule définition) : « Hôte » (crée la partie),
+   « Premier ban » (« Adversaires à venir » tant qu'une case attend ; tus quand
+   les deux adversaires sont connus sans hôte désigné), « Arbitre » (pseudo pour un lecteur connecté qui le reçoit
+   déjà, `refereeNameOf` ; « Arbitre désigné » sinon) ou « Arbitrage :
+   Autogestion » (au staff seul : « Aucune décision »), « Maps » (« Map 1 :
+   Ilios · imposée », pool « à choisir parmi … », « · choix du perdant » —
+   `matchPageMapFacts`, noms passés par `visibleText`) ou « Première map » sans
+   réglage du tour, « Format » (FT3 ; son explication derrière le « i »), « Côtés » (avec un hôte), « Casters » (prêt / attendu dans
+   le salon, sauf sans compte) et « Lancement » (`LaunchPhaseBadge`).
+3. **Actions** : exactement les gestes de la carte, par le **même modèle**
+   (`useMatchCardModel`, `_lib/match-card-model.ts`, partagé avec `MatchRow`) et
+   le même pied (`MatchCardActions` : une principale, le reste derrière « Plus
+   d'actions »), moins « Page du match » (`MatchPageScope`). Section tue quand
+   le lecteur n'a aucun geste.
+4. **Résultat** (maps jouées), puis **Maps et bans** : ordre des bans,
+   première map réglable par le staff (`PUT /api/admin/matches/[id]/first-map`)
+   sans réglage du tour, liste outillée du tour (`MatchRoundMaps`) au staff et
+   aux équipes qui choisissent — le public lit les maps dans les faits clés —,
+   rappel « triez les joueurs par rôle » d'un match casté.
+5. **Arbitrage** (colonne de droite, `matchPageDecision`) : « Arbitre désigné » pour tous — son
    explication derrière le « i » —, son
    pseudo et — en Overwatch seulement — son BattleTag (« À inviter dans la
    partie ») aux seuls lecteurs que sert la lecture des contacts ; ou l'aide-mémoire de l'**autogestion**
@@ -60,7 +86,7 @@ fiche.
    **staff seul**, « Aucune décision ». Rien sur un match terminé ou une
    exemption. Prendre, rendre ou confier l'arbitrage reste le geste de la carte
    (`MATCH_REFEREE.md`).
-4. **Casts** (`matchPageStreams`) : **tous** les streams du match, chacun avec
+6. **Casts** (`matchPageStreams`) : **tous** les streams du match, chacun avec
    son lien et ses casters (co-cast compris, chacun par `PlayerLink` — sans compte, pseudo seul : l'identifiant y est masqué), le
    premier lien des vues compactes en tête — gardé même quand aucun stream
    visible ne le porte, comme sur la carte. Deux liens au même texte prennent
@@ -135,5 +161,7 @@ libellé : ce sont des appels à l'action, pas des liens de match.
 `tests/app/match-page-route.test.ts` (404, tournoi non publié, base en panne,
 encart, `/en`), `tests/tournois/match-page-render.test.tsx` (matrice arbitre /
 autogestion / sans décision × public / membre / joueur / staff / caster, streams,
-contacts demandés, « Page du match », « +N »), `tests/app/spectator-view.test.tsx`
+contacts demandés, « Page du match », « +N », en-tête, faits clés, mêmes
+actions que la carte), `tests/tournois/match-page-facts.test.ts`,
+`tests/components/key-facts.test.tsx`, `tests/app/spectator-view.test.tsx`
 (redirections).
