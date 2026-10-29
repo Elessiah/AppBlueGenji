@@ -72,10 +72,11 @@ anciennes clés `tournament.matchPage.*` restant pour les sections.
    sans réglage du tour, liste outillée du tour (`MatchRoundMaps`) au staff et
    aux équipes qui choisissent — le public lit les maps dans les faits clés —,
    rappel « triez les joueurs par rôle » d'un match casté.
-5. **Arbitrage** (colonne de droite, `matchPageDecision`) : « Arbitre désigné » pour tous — son
-   explication derrière le « i » —, son
-   pseudo et — en Overwatch seulement — son BattleTag (« À inviter dans la
-   partie ») aux seuls lecteurs que sert la lecture des contacts ; ou l'aide-mémoire de l'**autogestion**,
+5. **Arbitrage** (colonne de droite, `matchPageDecision`) : « Arbitre désigné » aux visiteurs sans
+   compte — son explication derrière le « i » —, « Arbitre : <pseudo> » à
+   tout membre connecté jusqu'à la déclaration de son score ou la fin du
+   tournoi (#507, conditions v8), son pseudo et — en Overwatch seulement — son BattleTag (« À inviter
+   dans la partie ») aux seuls lecteurs que sert la lecture des contacts ; ou l'aide-mémoire de l'**autogestion**,
    à l'impératif, aux seuls lecteurs qui organisent le match (joueur, caster
    inscrit, staff — les autres, spectateurs de /suivre compris, lisent
    l'autogestion dans les faits clés) (l'hôte crée la partie, les managers s'invitent, les paramètres, les casters
@@ -120,8 +121,11 @@ sur une fiche figée. Le serveur décide seul de ce qu'il rend
 ils restent dans la fenêtre « Contacts ». Le registre et `/rgpd` nomment la page
 parmi les lieux où ces contacts paraissent, avec leur base
 (registre T01, T04 ; tableau de `/rgpd` par `rgpd-policy.ts`) : contrat pour les
-contacts des casters et pour le BattleTag de l'arbitre, comme dans les
-fenêtres. La section « Contacts de match » des conditions la nomme depuis
+contacts des casters et, une fois que l'arbitre a accepté la version 7 des
+conditions ou une suivante, pour son pseudo et son BattleTag ; tant qu'il ne
+l'a pas acceptée, intérêt légitime, avec opposition par le formulaire de
+signalement — comme dans les fenêtres (`MATCH_REFEREE.md`). Son pseudo seul
+se lit aussi par tout membre connecté (intérêt légitime, opposition). La section « Contacts de match » des conditions la nomme depuis
 leur version 7 (TERMS v7) : la page ne se déploie qu'avec elle.
 
 ## Liens vers la page

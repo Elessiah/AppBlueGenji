@@ -128,6 +128,7 @@ la mise en page, elle garde le texte d'une première acceptation.
 | 5 | 19 octobre 2026 | Section « Contacts de match » : contacts (BattleTag même masqué compris) communiqués aux deux équipes et aux arbitres d'un match, et à son caster le temps du match, par la fenêtre « Contacts » du match (détail ci-dessous). Redemandée comme la version 4 (connexion, gestion d'équipe). |
 | 6 | 19 octobre 2026 | « Acceptation » : **tout compte connecté** les accepte dans une fenêtre bloquante pour continuer à utiliser le site (plus de report « Plus tard ») ; « Contacts de match » : le BattleTag masqué se lit aussi dans la fenêtre de lancement. La version 5, déjà en ligne, n'est pas réécrite : nouvelle version et nouvelle entrée `PRIVACY_CHANGES` (`2026-10-conditions-v6-acceptation-pour-tous`). Retouchée le 21 octobre 2026 sans nouvelle version : contacts du caster aux arbitres dès que les deux adversaires sont connus (entrée `2026-10-contacts-du-caster-aux-arbitres`). |
 | 7 | 29 octobre 2026 | « Contacts de match » : casters au pluriel (chacun voit aussi les contacts des autres casters du match), **arbitre désigné** (pseudo et BattleTag, même masqué, jamais le tag Discord) et **page du match** comme troisième lieu ; la présentation de l'arbitre passe de l'intérêt légitime au contrat dès que cet arbitre accepte la version 7. « Retransmission des matchs » : message #live de la soirée avant et après le match. « Acceptation » : suppression du compte depuis la fenêtre d'acceptation. Entrée `2026-10-conditions-v7-casters-et-arbitre`. |
+| 8 | 31 octobre 2026 | « Contacts de match » : arbitrer demande un BattleTag tiré d'un compte Battle.net rattaché (un BattleTag tapé n'y suffit pas) ; le pseudo seul de l'arbitre désigné se lit par tout membre connecté (intérêt légitime, opposition), les visiteurs sans compte lisant « Arbitre désigné ». « Contacts de match » et « Contenus » : un BattleTag tapé à la main, gardé quand Battle.net n'en donne aucun, reste modifiable et effaçable, sans valoir BattleTag vérifié. Entrée `2026-10-conditions-v8-arbitre-et-battletag`. |
 
 **Redemander, et le dire** : à la connexion, la modale d'entrée de `/connexion`
 revient dès que la version gardée par le navigateur (`bg_terms_consent`) n'est
@@ -211,6 +212,22 @@ légitime, opposition), n'est pas réécrite.
 Conditions du bot (article 01) et registre T08 : réglages du salon et avis
 du retrait d'un cast parmi les messages remis. **Tout compte la réaccepte** dans la fenêtre
 bloquante.
+
+**Version 8** (2026-10-31, lendemain de la mise en ligne, décision de
+l'utilisateur D2, ERREUR-FIX EF-20) : la version 7 disait encore des règles
+changées depuis. Section « Contacts de match » — condition d'arbitrage alignée
+sur le code et le registre T04 (permission d'arbitrage, tag Discord certifié,
+BattleTag tiré d'un compte Battle.net rattaché, EF-23) ; le pseudo seul de
+l'arbitre désigné se lit par tout membre connecté sur la carte et la page du
+match (#507, intérêt légitime, opposition — décision D1). Sections « Contenus »
+et « Contacts de match » — un BattleTag tapé à la main, gardé quand Battle.net
+n'en donne aucun (décision D3), reste modifiable et effaçable depuis le profil,
+sans être tenu pour vérifié. La présentation de l'arbitre désigné aux parties
+reste fondée sur le contrat pour tout arbitre qui a accepté la version 7 **ou
+une suivante**. Annoncée par l'entrée `2026-10-conditions-v8-arbitre-et-battletag`
+(FR et EN) ; le texte de la version 7, déjà publié, n'est pas réécrit et ne se
+relit que dans l'historique git (le site n'archive pas les versions). **Tout
+compte la réaccepte** dans la fenêtre bloquante.
 
 Tout texte qui dit où se lit un BattleTag masqué (avertissement, modale de
 masquage, fiche joueur, conditions, `/rgpd`, registre, `PRIVACY_CHANGES`)

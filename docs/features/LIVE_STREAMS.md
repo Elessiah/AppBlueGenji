@@ -551,7 +551,10 @@ la confirmation, elle, relit la mention entière. Les phrases viennent d'un modu
 `lib/shared/stream-notice.ts`, partagé avec la section « Retransmission des
 matchs » des conditions d'utilisation (depuis leur version 7 : le message #live
 de la soirée nomme équipes et joueurs avant le début d'un match programmé dans
-la soirée et une fois le match terminé, pas seulement à son départ) ; le détail est sur `/rgpd#retransmission`. L'opposition se demande par
+la soirée et une fois le match terminé, pas seulement à son départ ; décidé le
+2026-10-28, décision 33 de l'utilisateur : en tournoi individuel, un joueur
+qui n'a accepté que la version 6 y est nommé aussi avant et après son match,
+sans attendre qu'il accepte la version 7) ; le détail est sur `/rgpd#retransmission`. L'opposition se demande par
 « Signaler un problème », catégorie RGPD : le joueur apparaît alors sous un nom
 neutre, et un lien de rediffusion qui le montre est retiré.
 

@@ -132,8 +132,8 @@ describe("PROCESSING_ACTIVITIES", () => {
     const t04En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T04")!;
     expect(t04.subPurposes.join(" ")).toMatch(/Prévenir un caster, en message privé Discord et en push, que son inscription sur un match a été retirée par un autre que lui[^"]*avec le motif[^"]*sans nommer qui l'a retirée ; le message privé ne part qu'à un tag Discord certifié/);
     expect(t04En.subPurposes.join(" ")).toMatch(/Notifying a caster, by Discord direct message and by push, that their registration for a match was removed by someone other than themselves[^"]*with the reason[^"]*without naming who removed it; the direct message only goes to a certified Discord tag/);
-    expect(t04.recipients.join(" ")).toContain("caster : retrait de son inscription sur un match");
-    expect(t04En.recipients.join(" ")).toContain("caster: removal of their registration for a match");
+    expect(t04.recipients.join(" ")).toContain("caster : départ du match qu'il caste, retrait de son inscription sur un match");
+    expect(t04En.recipients.join(" ")).toContain("caster: start of the match they cast, removal of their registration for a match");
     expect(byRef("T05").subPurposes.join(" ")).toContain("sans nommer le caster ni le staff — et sans trace dans les journaux du serveur");
     expect(PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T05")!.subPurposes.join(" ")).toContain("without naming the caster or the staff — and without any trace in the server logs");
     expect(byRef("T05").dataCategories.join(" ")).toContain("aucun membre du staff ni caster nommé (« le staff », « un caster »");
@@ -252,7 +252,7 @@ describe("PROCESSING_ACTIVITIES", () => {
 
   it("compte les joueurs d'un même match parmi les destinataires des profils", () => {
     // Un BattleTag masqué leur reste lisible (`lib/shared/battletag-visibility.ts`).
-    expect(byRef("T01").recipients.join(" ")).toMatch(/Parties d'un même match, dans sa seule fenêtre « Contacts ».*BattleTag même masqué/);
+    expect(byRef("T01").recipients.join(" ")).toMatch(/Parties d'un même match : dans sa fenêtre « Contacts » et dans sa fenêtre de lancement, pour le BattleTag de tout contact présenté.*BattleTag même masqué/);
   });
 
   it("ne déclare aucune adresse e-mail collectée", () => {

@@ -98,8 +98,8 @@ describe("/rgpd — certification du pseudo Discord", () => {
   });
 
   it("dit que des tournois et le cast l'exigent", () => {
-    expect(fr).toContain("Les conditions d'inscription d'un tournoi peuvent l'exiger, et caster un match l'exige.");
-    expect(en).toContain("A tournament's registration conditions may require it, and casting a match requires it.");
+    expect(fr).toContain("Les conditions d'inscription d'un tournoi peuvent l'exiger, et caster ou arbitrer un match l'exige.");
+    expect(en).toContain("A tournament's registration conditions may require it, and casting or refereeing a match requires it.");
   });
 });
 
@@ -262,8 +262,8 @@ describe("/rgpd — droits sur le choix des messages de match, stockage de l'inv
 describe("/rgpd — clés React des bases supplémentaires (portée, jamais la base)", () => {
   it("les deux pages indexent une base supplémentaire par sa portée", () => {
     for (const path of ["app/rgpd/page.tsx", "app/rgpd/RgpdEn.tsx"]) {
-      expect([path, source(path).includes("key={extra.scope}")]).toEqual([path, true]);
-      expect([path, source(path).includes("key={extra.base}")]).toEqual([path, false]);
+      expect([path, source(path).includes('key={group.scopes.join("|")}')]).toEqual([path, true]);
+      expect([path, source(path).includes("key={group.base}")]).toEqual([path, false]);
     }
   });
 

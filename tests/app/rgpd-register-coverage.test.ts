@@ -49,12 +49,12 @@ describe("/rgpd — couverture du registre", () => {
   });
 
   it("rend les bases supplémentaires d'une donnée à côté de sa base principale", () => {
-    expect(page).toContain("d.extraBases?.map((extra) =>");
+    expect(page).toContain("groupedExtraBases(d.extraBases).map((group) =>");
   });
 
   it("une base supplémentaire identique à la principale (pseudo dans #live) n'affiche pas un second badge, FR comme EN (revue UI/UX #445)", () => {
-    expect(page).toContain('extra.base === d.base ? "y compris : " :');
-    expect(readFileSync(join(process.cwd(), "app/rgpd/RgpdEn.tsx"), "utf8")).toContain('extra.base === entry.base ? "including: " :');
+    expect(page).toContain('group.base === d.base ? "y compris : " :');
+    expect(readFileSync(join(process.cwd(), "app/rgpd/RgpdEn.tsx"), "utf8")).toContain('group.base === entry.base ? "including: " :');
   });
 
   it("dit ce que le journal des connexions ne garde pas", () => {

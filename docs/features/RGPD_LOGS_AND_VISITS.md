@@ -109,6 +109,12 @@ texte, effacée un jour après la fin de la soirée).
   retiré par un autre que lui reçoit le motif en message privé et en push
   (`CAST_NOTICES.md`).
 
+- **Arbitrage désigné** (MR-2) : prise, désignation, retrait (par le staff, d'office
+  ou sur opposition) et passage en autogestion partent au journal sans nom (« un arbitre », « le staff ») et
+  sans ligne pm2 (`sendBotLog` seul). Seule exception : l'opposition à un
+  arbitre (`/api/admin/referees/[userId]/objection`) nomme son auteur dans pm2
+  par `publishStaffAction` (`MATCH_REFEREE.md`).
+
 - **Brief du salon** (MR-4) : message privé et push aux propriétaires et
   managers, avec les seuls noms d'équipe — ni BattleTag, ni tag Discord, ni
   pseudo ; « toi » / « ton adversaire » en tournoi individuel. pm2 n'en garde

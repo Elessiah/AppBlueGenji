@@ -10,6 +10,7 @@ import {
   DONNEE_SAUVEGARDES,
   DONNEE_TOURNOIS,
   DROITS,
+  groupedExtraBases,
 } from "@/lib/shared/rgpd-policy";
 import {
   ASSOCIATION_NAME,
@@ -315,12 +316,13 @@ function RgpdFr({
                 <DataCell column={1}>{d.finalite}</DataCell>
                 <DataCell column={2}>
                   <span className={styles.badge}>{d.base}</span>
-                  {d.extraBases?.map((extra) => (
-                    <span key={extra.scope} className={styles.extraBase}>
+                  {/* Portées qui se suivent sous la même base : une seule pastille (`groupedExtraBases`). */}
+                  {groupedExtraBases(d.extraBases).map((group) => (
+                    <span key={group.scopes.join("|")} className={styles.extraBase}>
                       {/* Même base que la principale (pseudo dans #live) : pas de second badge identique, mais
                           « y compris » — seule sous le badge, la portée semblerait restreindre la base principale. */}
-                      {extra.base === d.base ? "y compris : " : <><span className={styles.badge}>{extra.base}</span> </>}
-                      {extra.scope}
+                      {group.base === d.base ? "y compris : " : <><span className={styles.badge}>{group.base}</span> </>}
+                      {group.scopes.join(" ; ")}
                     </span>
                   ))}
                 </DataCell>
@@ -970,7 +972,7 @@ function RgpdFr({
             Vous pouvez être prévenu sur votre téléphone ou votre ordinateur du départ de vos matchs, d&apos;un
             score à confirmer ou validé automatiquement faute de réponse, du coup d&apos;envoi d&apos;un tournoi, de l&apos;horaire de vos matchs (posé,
             changé ou retiré) et de ses rappels, des réglages du salon d&apos;un match que vous gérez (propriétaire ou manager d&apos;une équipe, joueur d&apos;un tournoi individuel), et de ce qui concerne votre compte ou votre équipe ; un membre du staff, aussi des
-            alertes de son rôle (alertes d&apos;arbitrage, litiges tranchés, résultats corrigés, abandons imposés à l&apos;adversaire ou validations automatiques suspendues par un membre du staff qui joue le match, matchs planifiés, programme d&apos;arbitrage, signalements reçus) ; un caster, du retrait de son inscription sur un match par un autre que lui, avec le motif, tant qu&apos;il détient la permission de diffusion ; un arbitre désigné, du retrait de son arbitrage par un autre que lui ou d&apos;office, avec le motif, tant qu&apos;il détient la permission d&apos;arbitrage. <strong>Rien ne part sans votre geste</strong> :
+            alertes de son rôle (alertes d&apos;arbitrage, litiges tranchés, résultats corrigés, abandons imposés à l&apos;adversaire ou validations automatiques suspendues par un membre du staff qui joue le match, matchs planifiés, programme d&apos;arbitrage, signalements reçus) ; un caster, du départ du match qu&apos;il caste et du retrait de son inscription sur un match par un autre que lui, avec le motif, tant qu&apos;il détient la permission de diffusion ; un arbitre désigné, du retrait de son arbitrage par un autre que lui ou d&apos;office, avec le motif, tant qu&apos;il détient la permission d&apos;arbitrage. <strong>Rien ne part sans votre geste</strong> :
             les notifications s&apos;activent appareil par appareil, depuis{" "}
             <Link href="/profil#notifications">Mon profil</Link>, où vous choisissez aussi les sujets.
           </p>
@@ -1018,7 +1020,7 @@ function RgpdFr({
             équipe engagée (propriétaire ou manager) ou jouez un tournoi individuel, à l&apos;ouverture du salon d&apos;un
             match (de nouveau s&apos;il rouvre, par exemple après un changement d&apos;horaire), les réglages de la partie (équipe à gauche — l&apos;hôte — et à droite, première
             carte, premier ban, tri des joueurs par rôle si le match est casté, arbitre désigné ou autogestion), avec les noms
-            d&apos;équipe et le lien de la page du match, sans BattleTag, tag Discord ni pseudo de joueur (en tournoi
+            d&apos;équipe, le tournoi, la manche et le lien de la page du match, sans BattleTag, tag Discord ni pseudo de joueur (en tournoi
             individuel, le message ne nomme ni vous ni votre adversaire) — seulement si votre tag
             Discord est <strong>certifié</strong> : un tag non certifié, même rattaché par la connexion Discord,
             n&apos;en reçoit aucun, pour
@@ -1054,14 +1056,14 @@ function RgpdFr({
           </p>
           <p id="arbitre-designe">
             <strong>Arbitre désigné d&apos;un match.</strong> Un membre du staff qui peut arbitrer (permission
-            d&apos;arbitrage, tag Discord certifié et compte Battle.net rattaché) prend un match, ou le staff le lui
+            d&apos;arbitrage, tag Discord certifié et BattleTag tiré d&apos;un compte Battle.net rattaché — un BattleTag tapé à la main n&apos;y suffit pas) prend un match, ou le staff le lui
             confie. Son pseudo et, dans un tournoi Overwatch seulement (en Marvel Rivals, on ne s&apos;invite pas par
             BattleTag), son BattleTag (même masqué) — jamais son tag Discord à ce titre (s&apos;il caste aussi le
             match, ses contacts de caster suivent la règle des casters) — sont alors présentés dans
-            les fenêtres « Contacts » et de lancement du match et sur la page du match, aux mêmes parties et aux mêmes moments que les
+            les fenêtres « Contacts » et de lancement du match et sur la page du match (qui ne reprend pas les contacts des équipes), aux mêmes parties et aux mêmes moments que les
             contacts du match : aux deux équipes et aux arbitres dès que ses deux adversaires sont connus et
             jusqu&apos;à sa fin, à ses casters le temps du match ; le pseudo seul y paraît dès que la fenêtre de
-            lancement montre le match. Tout membre connecté lit aussi son pseudo seul (jamais son BattleTag) sur la carte et la page
+            lancement montre le match. Le staff qui gère les tournois lit à tout moment, dans la fenêtre « Arbitrage » d&apos;un match, le pseudo de son arbitre désigné et des comptes qui peuvent arbitrer. Tout membre connecté lit aussi son pseudo seul (jamais son BattleTag) sur la carte et la page
             d&apos;un match, jusqu&apos;à la déclaration de son score ou la fin du tournoi ; les visiteurs sans compte ne lisent que « Arbitre désigné ». Son
             « Prêt » est attendu comme celui des équipes et des casters ; seuls les parties du match et les arbitres le lisent, dans les
             fenêtres « Contacts » et de lancement. S&apos;il ne remplit plus ces conditions ou
@@ -1071,15 +1073,15 @@ function RgpdFr({
             en est prévenu en notification push seulement, avec le motif. Ces gestes (hors retrait sur opposition, voir ci-dessous), l&apos;autogestion d&apos;un match,
             sa première carte et les cartes choisies dans le pool de la manche sont notés au journal du staff sur Discord sans nommer personne, et un match qui
             entre en lancement sans arbitre ni autogestion est signalé aux arbitres. Sa présentation aux parties
-            du match relève de l&apos;<strong>exécution du service</strong> dès qu&apos;il a accepté la version 7
+            du match relève de l&apos;<strong>exécution du service</strong> dès qu&apos;il a accepté la version 7 ou une suivante
             des conditions d&apos;utilisation, qui la prévoient (section « Contacts de match »), pour que les
             parties sachent qui arbitre et, en Overwatch, puissent l&apos;ajouter en jeu ; tant qu&apos;il ne l&apos;a pas
             acceptée, elle relève de l&apos;<strong>intérêt légitime</strong> (même but), et il peut s&apos;y
             opposer par le formulaire de signalement (catégorie RGPD). L&apos;affichage de son pseudo à tout membre connecté relève de
-            l&apos;<strong>intérêt légitime</strong> (que les membres sachent qui arbitre un match), avec le même droit d&apos;opposition — retenue, son opposition le retire de tous ses matchs non terminés (le staff en désigne un autre ; ses matchs terminés gardent leur arbitre) et l&apos;empêche d'en prendre un ou de s&apos;en voir confier un tant qu&apos;elle n'est pas levée (à sa seule demande, par ce même formulaire), et continue de valoir une fois la version 7 acceptée ; la date à laquelle elle est retenue reste sur son compte, pour continuer de l&apos;honorer (<strong>obligation légale</strong>), et figure dans l&apos;export de ses données, jusqu&apos;à sa levée par le staff ou la suppression du compte ; le journal du staff sur Discord n&apos;en note que le geste et sa levée, sans nommer personne ni ses matchs, et les journaux du serveur l&apos;auteur du geste et l&apos;identifiant du compte de l&apos;arbitre (retenue, avec le nombre de matchs dont il est retiré). Il peut se retirer d&apos;un match à tout moment, le staff
-            pouvant lui confier de nouveau ce match (sauf opposition retenue), sans avis ; tant qu&apos;il n&apos;a pas accepté la version 7, la fenêtre
-            d&apos;acceptation couvrant les pages des tournois, il s&apos;en retire en le demandant par ce même formulaire. Le recueil de son « Prêt » et l&apos;avis du retrait relèvent aussi de l&apos;exécution
-            du service, les arbitres agissant pour l&apos;association (<Link href="/rgpd/registre#t04">registre, T04</Link>).
+            l&apos;<strong>intérêt légitime</strong> (que les membres sachent qui arbitre un match), avec le même droit d&apos;opposition — retenue, son opposition le retire de tous ses matchs non terminés (le staff en désigne un autre ; ses matchs terminés gardent leur arbitre) et l&apos;empêche d'en prendre un ou de s&apos;en voir confier un tant qu&apos;elle n'est pas levée (à sa seule demande, par ce même formulaire), et continue de valoir une fois la version 7 ou une suivante acceptée ; la date à laquelle elle est retenue reste sur son compte, pour continuer de l&apos;honorer (<strong>obligation légale</strong>), et figure dans l&apos;export de ses données, jusqu&apos;à sa levée par le staff ou la suppression du compte ; le journal du staff sur Discord n&apos;en note que le geste et sa levée, sans nommer personne ni ses matchs, et les journaux du serveur l&apos;auteur du geste et l&apos;identifiant du compte de l&apos;arbitre (retenue, avec le nombre de matchs dont il est retiré). Il peut se retirer d&apos;un match à tout moment, le staff
+            pouvant lui confier de nouveau ce match (sauf opposition retenue), sans avis ; tant qu&apos;il n&apos;a pas accepté la version 7 ou une suivante, la fenêtre
+            d&apos;acceptation couvrant les pages des tournois, il s&apos;en retire en le demandant par ce même formulaire. Le recueil de son « Prêt » relève aussi de l&apos;exécution
+            du service, les arbitres agissant pour l&apos;association (<Link href="/rgpd/registre#t04">registre, T04</Link>) ; l&apos;avis du retrait, envoyé en notification push, relève du consentement donné en les activant (<Link href="/rgpd/registre#t12">registre, T12</Link>).
           </p>
         </div>
       </section>
@@ -1173,7 +1175,7 @@ function RgpdFr({
             <strong>Retransmission des matchs.</strong> Un match de tournoi peut être diffusé en
             direct et enregistré sur <strong>YouTube, Twitch ou Kick</strong>, par la chaîne de l&apos;association
             ou d&apos;un ou plusieurs casters : chaque caster rejoint un stream du match ou ouvre le sien,
-            avec son propre lien (facultatif), publié avec le match. Ce stream part, avec son lien, quand
+            avec son propre lien (facultatif), publié avec le match ; le nom de la chaîne, lu dans ce lien (souvent le pseudo du caster), en est le texte visible. Ce stream part, avec son lien, quand
             plus aucun caster ne le tient ; seul le lien posé dans la configuration du direct du match (par
             l&apos;organisation ou un caster) reste au match. Le lien qu&apos;un caster a fourni, là ou en ouvrant
             son stream, part aussi à la suppression de son compte, matchs joués compris, même si un autre caster

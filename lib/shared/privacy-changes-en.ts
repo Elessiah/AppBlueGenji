@@ -686,6 +686,18 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "If your Battle.net was already linked with a BattleTag, the rule applies at your next Battle.net sign-in: until then, your BattleTag keeps its current state.",
     ],
   },
+  "2026-10-conditions-v8-arbitre-et-battletag": {
+    linkLabels: ["Read the “Match contacts” section", "Read the “Content published by users” section"],
+    title: "Terms of use: version 8 (assigned referee, typed BattleTag)",
+    summary:
+      "The terms of use move to version 8: they now say that any signed-in member reads the username of a match's assigned referee, that refereeing requires a BattleTag taken from a linked Battle.net account, and that a hand-typed BattleTag is kept without being treated as verified. It must be accepted: a window presents it to you until you have accepted it.",
+    details: [
+      "Assigned referee: their username alone — never their BattleTag or Discord tag — is read by any signed-in member on the match card and page, until its score is reported or the tournament ends, under legitimate interest (knowing who referees); they may object to it through the report form (GDPR category). Visitors without an account still read “Referee assigned”. To referee, you need the refereeing permission, a certified Discord tag and a BattleTag taken from a linked Battle.net account: a hand-typed BattleTag is not enough.",
+      "BattleTag: when Battle.net gives none, the one you typed in by hand stays on your profile, and can be changed or erased from “My profile”, without being treated as verified; a BattleTag received from Battle.net can still only be erased once Battle.net is unlinked.",
+      "Privacy policy: it also states, without changing anything the site does, that each registered caster gets a push notice when the match they cast starts, that the staff who manage tournaments read in a match's “Refereeing” window the username of its referee and of the accounts that can referee, that a caster's certified Discord tag can also be read in the match's launch window, by both its teams, its other casters and its assigned referee while the match is being played, and that the push notice of a refereeing removal falls under your consent to push notifications.",
+      "Terms of use: version 8, in force since 31 October 2026, says so in its “Match contacts” and “Content published by users” sections. A window presents it to you until you have accepted it: accepting it lets you keep using the site.",
+    ],
+  },
 };
 
 /**

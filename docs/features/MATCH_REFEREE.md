@@ -251,7 +251,7 @@ connexion, fiche joueur, clé `asReferee`) et la modale de masquage, entrée
 l'utilisateur du 2026-10-27) : **exécution du contrat** pour la présentation
 de l'arbitre aux parties (pseudo et BattleTag, portée
 `REFEREE_BATTLETAG_SCOPE` sur la ligne BattleTag de `/rgpd`) une fois que cet
-arbitre a accepté la version 7 des conditions, dont la section « Contacts de
+arbitre a accepté la version 7 des conditions ou une suivante, dont la section « Contacts de
 match » la prévoit ; **tant qu'il ne l'a pas acceptée**, intérêt légitime,
 avec une opposition par le formulaire de signalement (portée
 `REFEREE_BATTLETAG_BEFORE_V7_SCOPE`, droit d'opposition de `/rgpd`, T01 et
@@ -273,9 +273,9 @@ lancement (`keepEligibleReferees`) : conditions, `/rgpd` et T04 le disent.
 Le pseudo seul de l'arbitre se lit par **tout membre connecté** sur la carte
 et la page d'un match non joué (lot MATCH-UI-NAMES, décision 52) : intérêt
 légitime, même opposition, même effet ; T04, `/rgpd#arbitre-designe` et
-l'entrée `2026-10-pseudo-arbitre-aux-membres` (2026-10-31) le disent. Les
-conditions v7, publiées, disent encore « Le public et les autres joueurs ne
-lisent que « Arbitre désigné » » : à reprendre à la prochaine version.
+l'entrée `2026-10-pseudo-arbitre-aux-membres` (2026-10-31) le disent, ainsi
+que les conditions v8 (« Contacts de match » ; la v7 disait encore « Le
+public et les autres joueurs ne lisent que « Arbitre désigné » »).
 
 ## Cartes par manche
 

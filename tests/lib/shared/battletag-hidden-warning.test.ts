@@ -88,7 +88,7 @@ describe("conditions d'utilisation — contacts de match (version 7)", () => {
     expect(text).toContain("Un tag Discord non certifié n'est jamais communiqué.");
     // Seule porte d'un BattleTag masqué, staff compris ; contacts du caster le temps du match.
     // Détacher Battle.net suppose un autre moyen de connexion (refus LAST_CONNECTION sinon).
-    expect(text).toContain("ne s'efface qu'une fois le compte Battle.net détaché, ce qui suppose un autre moyen de connexion)");
+    expect(text).toContain("ne s'efface qu'une fois le compte Battle.net détaché, ce qui suppose un autre moyen de connexion ; un BattleTag tapé à la main, que le site garde quand Battle.net n'en donne aucun, reste modifiable et effaçable depuis le profil, sans être tenu pour vérifié)");
     expect(frProfile.battletagNotice.outro).toContain("après avoir ajouté un autre moyen de connexion si c'est le seul");
     expect(enProfile.battletagNotice.outro).toContain("after adding another way to log in if it is your only one");
     expect(frProfile.battletagLock.change).toContain("après avoir ajouté un autre moyen de connexion si c'est le seul");
@@ -114,7 +114,7 @@ describe("conditions d'utilisation — contacts de match (version 7)", () => {
     expect(text).toContain("**even when hidden**");
     // L'annonce v5 (PRIVACY_CHANGES) donne la même marche pour un BattleTag reçu de Battle.net.
     expect(JSON.stringify(PRIVACY_CHANGES.find((c) => c.id === "2026-10-contacts-de-match-caster-et-conditions-v5"))).toContain("après avoir ajouté un autre moyen de connexion si c'est le seul");
-    expect(text).toContain("once the Battle.net account is unlinked, which requires another means of logging in)");
+    expect(text).toContain("once the Battle.net account is unlinked, which requires another means of logging in; a hand-typed BattleTag, which the site keeps when Battle.net gives none, can still be changed or erased from the profile, without being treated as verified)");
     expect(text).toContain("**only while the match is being played**, from its start to its end");
     expect(text).toContain("a hidden BattleTag is readable nowhere else on the site, by anyone — referees and administrators included");
     // Le jeu affiche les identifiants : le code de replay le dit (FR et EN), comme /rgpd.
@@ -205,17 +205,21 @@ describe("conditions d'utilisation — arbitre désigné (version 7)", () => {
   const en = TERMS_SECTIONS_EN.find((s) => s.id === "contacts-de-match")?.paragraphs.join(" ") ?? "";
 
   it("présente son pseudo et son BattleTag, jamais son tag Discord, aux équipes et aux arbitres dès que les adversaires sont connus, aux casters le temps du match (FR et EN)", () => {
-    expect(fr).toContain("Un match peut aussi avoir un **arbitre désigné** : une personne du staff habilitée à arbitrer (permission d'arbitrage, tag Discord certifié et compte Battle.net rattaché)");
+    expect(fr).toContain("Un match peut aussi avoir un **arbitre désigné** : une personne du staff habilitée à arbitrer (permission d'arbitrage, tag Discord certifié et BattleTag tiré d'un compte Battle.net rattaché — un BattleTag tapé à la main n'y suffit pas)");
     expect(fr).toContain("son **pseudo** et son **BattleTag**, **même masqué** — jamais son tag Discord à ce titre — sont communiqués aux membres des deux équipes et aux arbitres (administrateurs compris) dès que ses deux adversaires sont connus et jusqu'à sa fin, et aux casters du match le temps du match");
-    expect(en).toContain("A match may also have an **assigned referee**: a staff member entitled to referee (refereeing permission, certified Discord tag and linked Battle.net account)");
+    expect(en).toContain("A match may also have an **assigned referee**: a staff member entitled to referee (refereeing permission, certified Discord tag and a BattleTag taken from a linked Battle.net account — a hand-typed BattleTag is not enough)");
     expect(en).toContain("their **username** and **BattleTag**, **even when hidden** — never their Discord tag in that capacity — are shared with the members of both teams and with the referees (administrators included) from the moment both its opponents are known until its end, and with the casters of the match while the match is being played");
   });
 
   it("ne montre au public que « Arbitre désigné », et dit le retrait et la fin de la présentation (FR et EN)", () => {
-    expect(fr).toContain("Le public et les autres joueurs ne lisent que « Arbitre désigné ».");
+    // Version 8 (EF-20, D2) : pseudo seul aux utilisateurs connectés (#507), « Arbitre désigné » aux visiteurs.
+    expect(fr).toContain("Son pseudo seul se lit aussi par tout utilisateur connecté, sur la carte et la page du match, jusqu'à la déclaration de son score ou la fin du tournoi, au titre de l'intérêt légitime");
+    expect(fr).toContain("les visiteurs sans compte ne lisent que « Arbitre désigné ».");
+    expect(fr).not.toContain("Le public et les autres joueurs ne lisent que « Arbitre désigné ».");
     // Revue de #491 : devenir joueur du match ne retire l'arbitre qu'avant le lancement (`keepEligibleReferees`).
     expect(fr).toContain("L'arbitre peut se retirer d'un match à tout moment, le staff pouvant le lui confier de nouveau ; il n'est plus présenté s'il ne remplit plus ces conditions ou si, avant le lancement du match, il devient l'un de ses joueurs.");
-    expect(en).toContain("The public and other players only read “Referee assigned”.");
+    expect(en).toContain("Their username alone can also be read by any signed-in user, on the match card and page, until its score is reported or the tournament ends, under the association's legitimate interest");
+    expect(en).toContain("visitors without an account only read “Referee assigned”.");
     // Revue juridique de #491 : un arbitre qui caste aussi le match est présenté comme caster, tag Discord certifié compris.
     expect(fr).toContain("S'il caste aussi le match, ses contacts de caster, tag Discord certifié compris, suivent la règle des casters ci-dessus.");
     expect(fr).toContain("qui reprend les contacts des casters et le pseudo et le BattleTag de l'arbitre désigné");
