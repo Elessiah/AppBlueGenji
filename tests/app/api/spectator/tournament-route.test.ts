@@ -7,7 +7,8 @@ import { GET } from "@/app/api/spectator/tournaments/[id]/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getVisibleTournamentCard, getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
 import { clearCache } from "@/lib/server/cache";
-import { peekTokenBucket, resetRateLimit } from "@/lib/server/rate-limit";
+import { resetRateLimit } from "@/lib/server/rate-limit";
+import { tokensLeft } from "../../../helpers/token-bucket";
 import { SPECTATOR_READ_RULE, SPECTATOR_REBUILD_RULE } from "@/lib/server/api-guard";
 import { resetSpectatorLoad, spectatorReadsPerMinute } from "@/lib/server/spectator-load";
 import {
@@ -317,7 +318,7 @@ describe("GET /api/spectator/tournaments/[id]", () => {
     expect(mockedSnapshot).toHaveBeenCalledTimes(1);
     // Une seule lecture de la carte pour les deux, et un seul jeton.
     expect(mockedCard).toHaveBeenCalledTimes(1);
-    expect(peekTokenBucket(SPECTATOR_REBUILD_RULE, "203.0.113.7").remaining).toBe(SPECTATOR_REBUILD_RULE.capacity - 1);
+    expect(tokensLeft(SPECTATOR_REBUILD_RULE, "203.0.113.7")).toBe(SPECTATOR_REBUILD_RULE.capacity - 1);
   });
 
   it("rend le jeton d'une reconstruction qui échoue : une panne brève n'épuise pas une salle", async () => {
@@ -329,34 +330,107 @@ describe("GET /api/spectator/tournaments/[id]", () => {
     expect((await GET(req("5"), params("5"))).status).toBe(200);
   });
 
-  it("sert la dernière réponse, même échue, à un réseau sans jeton", async () => {
-    jest.useFakeTimers({ now: 5_000_000, doNotFake: ["nextTick", "setImmediate", "queueMicrotask"] });
-    try {
+  describe("réseau sans jeton, copie échue de moins de 150 s", () => {
+    const CLOCK = { now: 5_000_000, doNotFake: ["nextTick", "setImmediate", "queueMicrotask"] as const };
+
+    /** Une réponse construite, expirée, puis le seau du réseau vidé. */
+    async function exhaustedNetworkWithCopy(): Promise<Response> {
       mockedSnapshot.mockResolvedValue(snapshot());
-      expect((await GET(req("5"), params("5"))).status).toBe(200);
-      // La réponse expire (15 s au calme) ; le réseau vide ensuite son seau.
+      const first = await GET(req("5", { "accept-encoding": "identity" }), params("5"));
       jest.setSystemTime(5_000_000 + 20_000);
       for (let i = 1; i <= SPECTATOR_REBUILD_RULE.capacity; i += 1) {
         expect((await GET(req(String(100 + i)), params(String(100 + i)))).status).toBe(200);
       }
       mockedSnapshot.mockClear();
+      return first;
+    }
+
+    it("refuse en 429, copie ou non : la réponse ne dit pas si le tournoi vient d'être lu", async () => {
+      jest.useFakeTimers({ ...CLOCK, doNotFake: [...CLOCK.doNotFake] });
+      try {
+        await exhaustedNetworkWithCopy();
+
+        const refused = await GET(req("5", { "accept-encoding": "identity" }), params("5"));
+        expect(refused.status).toBe(429);
+        expect(refused.headers.get("retry-after")).not.toBeNull();
+        expect(mockedSnapshot).not.toHaveBeenCalled();
+        // Sans copie non plus.
+        expect((await GET(req("999"), params("999"))).status).toBe(429);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it("répond 304 à qui détient déjà la version de la copie, sans corps", async () => {
+      jest.useFakeTimers({ ...CLOCK, doNotFake: [...CLOCK.doNotFake] });
+      try {
+        const first = await exhaustedNetworkWithCopy();
+
+        const res = await GET(
+          req("5", { "accept-encoding": "identity", "if-none-match": first.headers.get("etag") ?? "" }),
+          params("5"),
+        );
+        expect(res.status).toBe(304);
+        expect(await res.text()).toBe("");
+        expect(Number(res.headers.get(SPECTATOR_FRESHNESS_HEADER))).toBeGreaterThanOrEqual(SPECTATOR_MAX_COPY_AGE_MS);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it("répond 429 au-delà de l'âge déclaré, même avec la version en main", async () => {
+      jest.useFakeTimers({ ...CLOCK, doNotFake: [...CLOCK.doNotFake] });
+      try {
+        const first = await exhaustedNetworkWithCopy();
+        jest.setSystemTime(5_000_000 + SPECTATOR_MAX_COPY_AGE_MS);
+        for (let i = 1; i <= SPECTATOR_REBUILD_RULE.capacity; i += 1) {
+          await GET(req(String(200 + i)), params(String(200 + i)));
+        }
+
+        const res = await GET(
+          req("5", { "accept-encoding": "identity", "if-none-match": first.headers.get("etag") ?? "" }),
+          params("5"),
+        );
+        expect(res.status).toBe(429);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+  });
+
+  it("sert la copie de moins de 150 s quand la base échoue, au lieu d'un 503", async () => {
+    jest.useFakeTimers({ now: 6_000_000, doNotFake: ["nextTick", "setImmediate", "queueMicrotask"] });
+    try {
+      mockedSnapshot.mockResolvedValue(snapshot());
+      expect((await GET(req("5"), params("5"))).status).toBe(200);
+      jest.setSystemTime(6_000_000 + 20_000);
+      mockedSnapshot.mockRejectedValue(new Error("ECONNREFUSED"));
 
       const served = await GET(req("5"), params("5"));
       expect(served.status).toBe(200);
-      expect(mockedSnapshot).not.toHaveBeenCalled();
-      // L'âge annoncé est celui de la copie la plus vieille servie.
       expect(Number(served.headers.get(SPECTATOR_FRESHNESS_HEADER))).toBeGreaterThanOrEqual(SPECTATOR_MAX_COPY_AGE_MS);
-      // Sans copie récente, le refus.
-      expect((await GET(req("999"), params("999"))).status).toBe(429);
-      // Au-delà de l'âge déclaré, la copie n'est plus servie.
-      jest.setSystemTime(5_000_000 + SPECTATOR_MAX_COPY_AGE_MS);
-      for (let i = 1; i <= SPECTATOR_REBUILD_RULE.capacity; i += 1) {
-        await GET(req(String(200 + i)), params(String(200 + i)));
-      }
-      expect((await GET(req("5"), params("5"))).status).toBe(429);
+      // Au-delà de l'âge déclaré : le 503.
+      jest.setSystemTime(6_000_000 + SPECTATOR_MAX_COPY_AGE_MS);
+      expect((await GET(req("5"), params("5"))).status).toBe(503);
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  it("donne un ETag par codage : le corps gzip porte le suffixe -gzip", async () => {
+    mockedSnapshot.mockResolvedValue(snapshot());
+    const plain = await GET(req("5", { "accept-encoding": "identity" }), params("5"));
+    const gzipped = await GET(req("5", { "accept-encoding": "gzip" }), params("5"));
+
+    expect(gzipped.headers.get("content-encoding")).toBe("gzip");
+    expect(plain.headers.get("etag")).toMatch(/^"[\w-]{22}"$/);
+    expect(gzipped.headers.get("etag")).toBe(`${plain.headers.get("etag")?.slice(0, -1)}-gzip"`);
+    // La version d'un codage ne valide pas l'autre.
+    const crossed = await GET(
+      req("5", { "accept-encoding": "gzip", "if-none-match": plain.headers.get("etag") ?? "" }),
+      params("5"),
+    );
+    expect(crossed.status).toBe(200);
   });
 
   it("répond 503 quand toutes les places de construction sont prises, sans faire payer", async () => {
@@ -377,7 +451,7 @@ describe("GET /api/spectator/tournaments/[id]", () => {
     expect(busy.status).toBe(503);
     expect(busy.headers.get("retry-after")).not.toBeNull();
     expect(await busy.json()).toEqual({ error: "TOURNAMENT_LOAD_FAILED" });
-    expect(peekTokenBucket(SPECTATOR_REBUILD_RULE, "203.0.113.7").remaining).toBe(SPECTATOR_REBUILD_RULE.capacity);
+    expect(tokensLeft(SPECTATOR_REBUILD_RULE, "203.0.113.7")).toBe(SPECTATOR_REBUILD_RULE.capacity);
 
     for (const release of releases) release();
     expect((await Promise.all(running)).map((res) => res.status)).toEqual(

@@ -319,6 +319,18 @@ describe("ce que lit le visiteur sans compte", () => {
     expect(snapshot.matches[0].team1Ready).toBe(true);
   });
 
+  it("tait l'instant des bascules « prêt » : ni updatedAt ni ouverture du salon", () => {
+    const snapshot = tournamentSnapshot({
+      matches: [bracketMatch({ id: 1, updatedAt: "2026-01-01T10:00:07.000Z", lobbyOpenedAt: "2026-01-01T09:58:41.000Z" })],
+    });
+    const [match] = spectatorSnapshot(snapshot).matches;
+    expect(match.updatedAt).toBe("");
+    expect(match.lobbyOpenedAt).toBeNull();
+    // L'instantané des membres garde les deux.
+    expect(snapshot.matches[0].updatedAt).toBe("2026-01-01T10:00:07.000Z");
+    expect(snapshot.matches[0].lobbyOpenedAt).toBe("2026-01-01T09:58:41.000Z");
+  });
+
   it("garde la proposition de score signalée, sans ses chiffres", () => {
     const snapshot = tournamentSnapshot({
       matches: [bracketMatch({ id: 1, team1Report: report, team2Report: { ...report, team1Score: 0, team2Score: 3 } })],

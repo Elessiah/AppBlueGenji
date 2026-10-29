@@ -69,6 +69,7 @@ import { authUser } from "../helpers/auth-user";
 import { tournamentCard } from "../helpers/tournament-card";
 import { tournamentSnapshot } from "../helpers/tournament-detail";
 import { clearCache } from "@/lib/server/cache";
+import { getSpectatorPayload, publicTournamentCard } from "@/lib/server/spectator-snapshot";
 import { resetRateLimit } from "@/lib/server/rate-limit";
 import { getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
 import { readSource } from "../helpers/read-source";
@@ -226,20 +227,38 @@ describe("page sans compte — mise en page", () => {
     jest.mocked(getVisibleTournamentSnapshot).mockResolvedValue(tournamentSnapshot({ card }));
     const meta = await generateMetadata(params("12"));
 
-    // La réponse publique mutualisée, sans aucun droit : la porte de visibilité seule.
-    expect(getVisibleTournamentSnapshot).toHaveBeenCalledWith(12);
+    // La carte seule, sans aucun droit : jamais l'instantané entier.
+    expect(getVisibleTournamentCard).toHaveBeenCalledWith(12);
+    expect(getVisibleTournamentSnapshot).not.toHaveBeenCalled();
     expect(JSON.stringify(meta)).toContain("Cup");
     expect((meta.openGraph as { url?: string }).url).toBe("/suivre/tournois/12");
     expect(meta.robots).toEqual({ index: false, follow: false });
   });
 
-  it("mutualise l'encart : des rendus en rafale ne relisent pas la base", async () => {
+  it("mutualise l'encart : des rendus en rafale ne relisent pas la base, ni ne reconstruisent l'instantané", async () => {
     const card = tournamentCard({ id: 12, name: "Cup" });
     jest.mocked(getVisibleTournamentCard).mockResolvedValue(card);
-    jest.mocked(getVisibleTournamentSnapshot).mockResolvedValue(tournamentSnapshot({ card }));
     for (let i = 0; i < 5; i += 1) await generateMetadata(params("12"));
-    expect(getVisibleTournamentSnapshot).toHaveBeenCalledTimes(1);
+    expect(getVisibleTournamentSnapshot).not.toHaveBeenCalled();
     expect(getVisibleTournamentCard).toHaveBeenCalledTimes(1);
+  });
+
+  it("recalcule l'état de la copie récente depuis les dates : un lien partagé à l'ouverture ne dit pas « à venir »", async () => {
+    const stored = tournamentCard({
+      id: 12,
+      name: "Cup",
+      state: "UPCOMING",
+      registrationOpenAt: "2000-01-01T00:00:00.000Z",
+      registrationCloseAt: "2999-01-01T00:00:00.000Z",
+      startAt: "2999-02-01T00:00:00.000Z",
+    });
+    jest.mocked(getVisibleTournamentSnapshot).mockResolvedValue(tournamentSnapshot({ card: stored }));
+    jest.mocked(getVisibleTournamentCard).mockResolvedValue(stored);
+    // Une lecture de la réponse publique (route) laisse sa copie, état stocké « à venir ».
+    await getSpectatorPayload(12, 0, null);
+
+    const card = await publicTournamentCard(12);
+    expect(card?.state).toBe("REGISTRATION");
   });
 
   it("garde un encart général quand le tournoi n'est pas public ou que la base ne répond pas", async () => {
@@ -249,6 +268,21 @@ describe("page sans compte — mise en page", () => {
 
     jest.mocked(getVisibleTournamentCard).mockRejectedValue(new Error("ECONNREFUSED"));
     await expect(generateMetadata(params("12"))).resolves.toBeDefined();
+  });
+
+  it("sert la page sans rien relayer au visiteur sans session, même sans chemin posé", async () => {
+    mockPathname = null;
+    const html = renderToStaticMarkup(await SpectatorLayout({ children: <p>plateau</p>, ...params("12") }));
+    expect(html).toContain("plateau");
+    expect(redirect).not.toHaveBeenCalled();
+  });
+
+  it("confie le renvoi du membre au navigateur quand la mise en page préchargée n'a pas le chemin", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7 }));
+    mockPathname = null;
+    const html = renderToStaticMarkup(await SpectatorLayout({ children: <p>plateau</p>, ...params("12") }));
+    expect(html).toContain("plateau");
+    expect(redirect).not.toHaveBeenCalled();
   });
 
   it("ne lit pas la carte pour un membre connecté : il est redirigé vers sa fiche", async () => {
@@ -575,7 +609,10 @@ describe("page sans compte — ce que la fiche tait des données retirées", () 
       ...SPECTATOR_VIEWER_CONTEXT,
     };
     const html = spectator(<RegistrationsPanel detail={detail} canAct={false} onChanged={noop} />);
-    expect(html).toMatch(/>-<\/span>/);
+    expect(html).toMatch(/<span aria-hidden="true">-<\/span>/);
+    // Le tiret n'est pas muet pour un lecteur d'écran : la raison est annoncée.
+    expect(html).toContain(`<span class="sr-only">${frTournament.registrations.registeredAtHidden}</span>`);
+    expect(enTournament.registrations.registeredAtHidden).toBe("Date not shared");
     expect(html).not.toContain("Invalid Date");
     expect(html).not.toContain("NaN");
   });

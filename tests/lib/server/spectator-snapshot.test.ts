@@ -6,12 +6,15 @@ jest.mock("@/lib/server/tournaments-service");
 import { getVisibleTournamentCard, getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
 import { tournamentCard } from "../../helpers/tournament-card";
 import { cached, clearCache } from "@/lib/server/cache";
-import { peekRateToken, SPECTATOR_REBUILD_RULE } from "@/lib/server/api-guard";
-import { peekTokenBucket, resetRateLimit } from "@/lib/server/rate-limit";
+import { isTournamentSnapshotWarm } from "@/lib/server/tournaments/snapshot";
+import { SPECTATOR_REBUILD_RULE } from "@/lib/server/api-guard";
+import { resetRateLimit } from "@/lib/server/rate-limit";
+import { tokensLeft as bucketTokensLeft } from "../../helpers/token-bucket";
 import {
   getSpectatorPayload,
   gzippedSpectatorBody,
   isSpectatorTournamentPublic,
+  publicTournamentCard,
   publicTournamentSnapshot,
   SPECTATOR_MAX_CONCURRENT_REBUILDS,
   SpectatorRebuildRefused,
@@ -29,7 +32,7 @@ const CLIENT = "203.0.113.7";
 
 /** Jetons de reconstruction restants au réseau. */
 function tokensLeft(client: string = CLIENT): number {
-  return peekTokenBucket(SPECTATOR_REBUILD_RULE, client).remaining;
+  return bucketTokensLeft(SPECTATOR_REBUILD_RULE, client);
 }
 
 /** Instantané des membres déjà en cache (salon SSE ouvert). */
@@ -126,7 +129,7 @@ describe("getSpectatorPayload", () => {
     const payload = await getSpectatorPayload(5, 0, CLIENT);
 
     expect(JSON.parse(payload!.body).version).toBe("");
-    expect(payload!.snapshot.version).toBe("");
+    expect(payload!.snapshot).not.toHaveProperty("version");
     expect(payload!.version).toMatch(/^[\w-]{22}$/);
   });
 
@@ -201,7 +204,6 @@ describe("getSpectatorPayload — prix d'une reconstruction", () => {
 
     expect(refusal.kind).toBe("rate");
     expect(refusal.response?.status).toBe(429);
-    expect(peekRateToken(SPECTATOR_REBUILD_RULE, CLIENT)?.status).toBe(429);
     // Un autre réseau n'en pâtit pas.
     await expect(getSpectatorPayload(99, 0, "198.51.100.1")).resolves.not.toBeNull();
   });
@@ -273,16 +275,16 @@ describe("copie périmée et corps compressé", () => {
     mockedSnapshot.mockResolvedValue(tournamentSnapshot());
     const payload = (await getSpectatorPayload(5, 0, CLIENT))!;
 
-    const bytes = gzippedSpectatorBody(payload);
-    expect(gzippedSpectatorBody(payload)).toBe(bytes);
-    expect(gunzipSync(bytes).toString("utf8")).toBe(payload.body);
+    const pending = gzippedSpectatorBody(payload);
+    expect(gzippedSpectatorBody(payload)).toBe(pending);
+    expect(gunzipSync(await pending).toString("utf8")).toBe(payload.body);
   });
 });
 
 describe("publicTournamentSnapshot", () => {
   it("rend l'instantané public, sans la version des membres", async () => {
     mockedSnapshot.mockResolvedValue(tournamentSnapshot({ version: "membres-v7" }));
-    expect((await publicTournamentSnapshot(5, 0, CLIENT))?.version).toBe("");
+    expect(await publicTournamentSnapshot(5, 0, CLIENT)).not.toHaveProperty("version");
   });
 
   it("refus : la copie récente s'il y en a une, sinon null", async () => {
@@ -327,5 +329,98 @@ describe("isSpectatorTournamentPublic", () => {
   it("laisse passer l'échec de la base (la route répond 503)", async () => {
     jest.mocked(getVisibleTournamentCard).mockRejectedValue(new Error("ECONNREFUSED"));
     await expect(isSpectatorTournamentPublic(5)).rejects.toThrow("ECONNREFUSED");
+  });
+});
+
+describe("réponse publique : ce qui reste en mémoire", () => {
+  it("ne garde que la carte et les réglages, jamais les matchs ni les inscrites", async () => {
+    mockedSnapshot.mockResolvedValue(tournamentSnapshot({ version: "membres-v7" }));
+    const payload = await getSpectatorPayload(5, 0, CLIENT);
+
+    expect(Object.keys(payload!.snapshot).sort()).toEqual(["card", "endurance", "phases", "seedingSource", "swiss"]);
+    // Le corps, lui, garde tout ce que lit le visiteur.
+    expect(JSON.parse(payload!.body)).toHaveProperty("matches");
+  });
+
+  it("compresse sans bloquer, une fois pour des lecteurs simultanés", async () => {
+    mockedSnapshot.mockResolvedValue(tournamentSnapshot());
+    const payload = (await getSpectatorPayload(5, 0, CLIENT))!;
+
+    const [first, second] = await Promise.all([gzippedSpectatorBody(payload), gzippedSpectatorBody(payload)]);
+    expect(second).toBe(first);
+    expect(gunzipSync(first).toString("utf8")).toBe(payload.body);
+  });
+});
+
+describe("instantané des membres refroidi entre le contrôle et la lecture", () => {
+  it("paie alors la reconstruction : jeton pris, place prise, comme à froid", async () => {
+    mockedSnapshot.mockResolvedValue(tournamentSnapshot());
+    await warmMembers(5, tournamentSnapshot());
+    expect(isTournamentSnapshotWarm(5)).toBe(true);
+    // Chaud au contrôle de `beforeLoad`, froid quand le chargeur démarre.
+    const warm = jest.spyOn(await import("@/lib/server/tournaments/snapshot"), "isTournamentSnapshotWarm");
+    warm.mockReturnValueOnce(true).mockReturnValue(false);
+
+    await expect(getSpectatorPayload(5, 0, CLIENT)).resolves.not.toBeNull();
+
+    expect(tokensLeft()).toBe(SPECTATOR_REBUILD_RULE.capacity - 1);
+    warm.mockRestore();
+  });
+
+  it("refuse alors comme à froid quand le réseau n'a plus de jeton", async () => {
+    mockedSnapshot.mockResolvedValue(tournamentSnapshot());
+    await spendAllTokens();
+    await warmMembers(50, tournamentSnapshot());
+    const warm = jest.spyOn(await import("@/lib/server/tournaments/snapshot"), "isTournamentSnapshotWarm");
+    warm.mockReturnValueOnce(true).mockReturnValue(false);
+
+    const refusal = await refusalOf(getSpectatorPayload(50, 0, CLIENT));
+
+    expect(refusal.kind).toBe("rate");
+    warm.mockRestore();
+  });
+});
+
+describe("publicTournamentCard", () => {
+  it("lit la carte seule, gardée quelques secondes : jamais l'instantané entier", async () => {
+    jest.mocked(getVisibleTournamentCard).mockResolvedValue(tournamentCard({ id: 5, name: "Cup" }));
+
+    expect((await publicTournamentCard(5))?.name).toBe("Cup");
+    await publicTournamentCard(5);
+
+    expect(getVisibleTournamentCard).toHaveBeenCalledTimes(1);
+    expect(mockedSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("ne garde pas un introuvable : un tournoi publié une seconde plus tard s'ouvre aussitôt", async () => {
+    jest.mocked(getVisibleTournamentCard).mockResolvedValueOnce(null).mockResolvedValue(tournamentCard({ id: 5 }));
+
+    expect(await publicTournamentCard(5)).toBeNull();
+    expect(await publicTournamentCard(5)).not.toBeNull();
+  });
+
+  it("rend null quand la base ne répond pas", async () => {
+    jest.mocked(getVisibleTournamentCard).mockRejectedValue(new Error("ECONNREFUSED"));
+    expect(await publicTournamentCard(5)).toBeNull();
+  });
+
+  it("préfère la copie récente de la réponse publique, état recalculé depuis les dates", async () => {
+    const stored = tournamentCard({
+      id: 5,
+      name: "Copie",
+      state: "UPCOMING",
+      registrationOpenAt: "2000-01-01T00:00:00.000Z",
+      registrationCloseAt: "2999-01-01T00:00:00.000Z",
+      startAt: "2999-02-01T00:00:00.000Z",
+    });
+    mockedSnapshot.mockResolvedValue(tournamentSnapshot({ card: stored }));
+    await getSpectatorPayload(5, 0, CLIENT);
+    jest.mocked(getVisibleTournamentCard).mockClear();
+
+    const card = await publicTournamentCard(5);
+
+    expect(card?.name).toBe("Copie");
+    expect(card?.state).toBe("REGISTRATION");
+    expect(getVisibleTournamentCard).not.toHaveBeenCalled();
   });
 });

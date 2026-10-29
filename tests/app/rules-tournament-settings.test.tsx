@@ -106,10 +106,12 @@ describe("réglages d'un tournoi sur la page des règles", () => {
     expect(getVisibleTournamentSnapshot).toHaveBeenCalledWith(5, { canManage: false });
   });
 
-  it("session illisible : lue comme une visite sans compte", async () => {
+  it("session illisible : page générale, jamais lue comme une visite sans compte", async () => {
     jest.mocked(getCurrentUser).mockRejectedValue(new Error("ECONNREFUSED"));
     const html = await renderRules();
-    expect(html).toContain('href="/suivre/tournois/5"');
+    expect(html).not.toContain('href="/suivre/tournois/5"');
+    expect(html).not.toContain("Coupe Test_");
+    expect(getVisibleTournamentSnapshot).not.toHaveBeenCalled();
   });
 
   it("sans `?tournoi=` : rien à lire", async () => {
