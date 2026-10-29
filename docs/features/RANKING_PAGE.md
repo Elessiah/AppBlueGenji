@@ -114,7 +114,8 @@ français partagé (même ordre que `localeCompare(…, "fr")`, sans en recréer
 par comparaison).
 
 **Vues d'identité** (`invalidateTeamIdentityViews`, `ranking-cache.ts`) : un
-renommage, un logo changé, retiré, mis en quarantaine ou rétabli, une adoption
+renommage (seulement si le nom change vraiment — le formulaire renvoie toujours
+le nom, relu et comparé à l'exact), un logo changé, retiré (s'il y en avait un), mis en quarantaine ou rétabli, une adoption
 de fantôme et une dissolution vident la liste (identités, podium, cartes
 d'aperçu et leurs PNG) et les vues de l'accueil qui nomment des équipes ; le
 rejeu reste en cache. Le logo se relit **sous verrou** (`updateTeamLogo`,
@@ -128,8 +129,10 @@ que sur sa fiche et celles de ses membres — seules celles-ci (`invalidateStats
 et le compteur de l'accueil (`invalidateLandingCounters`) sont vidés ; une
 équipe déjà inscrite vide les vues d'identité et tous les bilans. Créations et
 dissolutions partagent un plafond par compte (`TEAM_LIFECYCLE_RULE`, 10 gestes
-par heure, 429 `TOO_MANY_REQUESTS`) : seul un geste réussi est décompté, le
-staff `tournaments` n'est pas plafonné. Une boucle « créer → dissoudre » ne fait
+par heure, 429 `TOO_MANY_REQUESTS`) : la place est réservée d'une instruction
+avant l'écriture (`enforceRateLimit`, des requêtes parallèles ne passent pas
+toutes) et rendue si le geste échoue (`refundRateLimitFor`) — seul un geste
+réussi compte ; le staff `tournaments` n'est pas plafonné. Une boucle « créer → dissoudre » ne fait
 plus recalculer le classement et le podium aux visiteurs.
 
 **Nuls à l'annuaire** : `TeamListItem.draws` — la carte d'équipe ajoute une
