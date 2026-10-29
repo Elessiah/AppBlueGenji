@@ -10,12 +10,15 @@ import {
   ENDURANCE_CHART_PALETTE,
   ENDURANCE_CHART_PICK_MAX,
   chartAnimationFrame,
-  chartColorIndex,
+  assignChartColors,
+  chartColoredIds,
   chartGeometry,
+  chartHitPath,
   chartLine,
   chartOrderAt,
   chartRankAt,
   chartRecordAt,
+  chartRoundMs,
   chartShownRound,
   chartTargetFor,
   chartThresholdAt,
@@ -27,6 +30,9 @@ import {
   chartX,
   chartY,
   easeInOutQuad,
+  ENDURANCE_CHART_ROUND_MS,
+  ENDURANCE_CHART_TOTAL_MS,
+  enduranceChartInputKey,
   enduranceChartRoundCount,
   enduranceChartSeries,
   togglePick,
@@ -130,14 +136,14 @@ describe("séries du graphique", () => {
     expect(series.map((s) => s.teamId)).toEqual([1, 2, 3, 4]);
     expect(series[0].values).toEqual([9, 12, 14]);
     expect(series[0].states).toEqual([
-      { kind: "PLAYED", points: 12, delta: 3 },
-      { kind: "PLAYED", points: 14, delta: 2 },
+      { kind: "PLAYED", points: 12, delta: 3, penalty: 0 },
+      { kind: "PLAYED", points: 14, delta: 2, penalty: 0 },
     ]);
   });
 
   it("arrête la courbe à la manche pas encore jouée", () => {
     expect(series[1].values).toEqual([9, 10]);
-    expect(series[1].states[1]).toEqual({ kind: "PENDING" });
+    expect(series[1].states[1]).toEqual({ kind: "PENDING", penalty: 0 });
   });
 
   it("marque le forfait sur la manche de sa sortie", () => {
@@ -226,7 +232,8 @@ describe("tracés", () => {
   it("courbe complète : un segment par manche, tête pleine sur la dernière", () => {
     const line = chartLine(series[0], 2, 2, geometry);
     expect(line.d.split(" L")).toHaveLength(3);
-    expect(line.d).toBe(line.hit);
+    expect(line.d).toBe(chartHitPath(series[0], 2, geometry));
+    expect(line).not.toHaveProperty("hit");
     expect(line.head).toEqual({ x: chartX(geometry, 2), y: chartY(geometry, 14) });
     expect(line.hollow).toBe(false);
     expect(line.forfeit).toBe(false);
@@ -236,7 +243,7 @@ describe("tracés", () => {
     const line = chartLine(series[0], 2, 1.5, geometry);
     expect(line.head.x).toBeCloseTo(chartX(geometry, 1.5));
     expect(line.head.y).toBeCloseTo(chartY(geometry, 13));
-    expect(line.hit.split(" L")).toHaveLength(3);
+    expect(chartHitPath(series[0], 2, geometry).split(" L")).toHaveLength(3);
     expect(line.d.split(" L")).toHaveLength(3);
   });
 
@@ -270,30 +277,220 @@ describe("tracés", () => {
 });
 
 describe("modes et sélection", () => {
-  it("un clic hors « Ma sélection » isole l'engagé", () => {
-    expect(togglePick("TOP", [], 7)).toEqual({ mode: "PICK", picked: [7] });
-    expect(togglePick("ALL", [1, 2], 7)).toEqual({ mode: "PICK", picked: [7] });
+  it("sélection vide hors « Ma sélection » : elle s'ouvre sur l'engagé seul", () => {
+    expect(togglePick("TOP", [], 7)).toEqual({ mode: "PICK", picked: [7], full: false });
+    expect(togglePick("ALL", [], 7)).toEqual({ mode: "PICK", picked: [7], full: false });
   });
 
-  it("ajoute puis retire", () => {
-    expect(togglePick("PICK", [1], 2)).toEqual({ mode: "PICK", picked: [1, 2] });
-    expect(togglePick("PICK", [1, 2], 1)).toEqual({ mode: "PICK", picked: [2] });
+  it("sélection déjà construite hors « Ma sélection » : gardée, l'engagé s'y ajoute", () => {
+    expect(togglePick("TOP", [1, 2, 3, 4, 5], 7)).toEqual({ mode: "PICK", picked: [1, 2, 3, 4, 5, 7], full: false });
   });
 
-  it("plafonne à huit, le retrait restant possible", () => {
+  it("engagé déjà choisi, hors « Ma sélection » : on revient au mode sans rien retirer", () => {
+    expect(togglePick("ALL", [1, 2], 2)).toEqual({ mode: "PICK", picked: [1, 2], full: false });
+  });
+
+  it("ajoute puis retire en « Ma sélection »", () => {
+    expect(togglePick("PICK", [1], 2)).toEqual({ mode: "PICK", picked: [1, 2], full: false });
+    expect(togglePick("PICK", [1, 2], 1)).toEqual({ mode: "PICK", picked: [2], full: false });
+  });
+
+  it("plafonne à huit en le disant (full), le retrait restant possible", () => {
     const full = [1, 2, 3, 4, 5, 6, 7, 8];
     expect(ENDURANCE_CHART_PICK_MAX).toBe(8);
-    expect(togglePick("PICK", full, 9).picked).toEqual(full);
-    expect(togglePick("PICK", full, 8).picked).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(togglePick("PICK", full, 9)).toEqual({ mode: "PICK", picked: full, full: true });
+    expect(togglePick("PICK", full, 8)).toEqual({ mode: "PICK", picked: [1, 2, 3, 4, 5, 6, 7], full: false });
   });
 
-  it("couleurs : Top N par place, sélection par ordre de choix, toutes en boucle", () => {
-    const ctx = { top: [5, 3], picked: [3], generalIndex: 9 };
-    expect(chartColorIndex("TOP", 3, ctx)).toBe(1);
-    expect(chartColorIndex("TOP", 4, ctx)).toBeNull();
-    expect(chartColorIndex("PICK", 3, ctx)).toBe(0);
-    expect(chartColorIndex("PICK", 5, ctx)).toBeNull();
-    expect(chartColorIndex("ALL", 4, ctx)).toBe(1);
+  it("sélection pleine hors « Ma sélection » : le mode change, l'ajout est refusé et signalé", () => {
+    const full = [1, 2, 3, 4, 5, 6, 7, 8];
+    expect(togglePick("TOP", full, 9)).toEqual({ mode: "PICK", picked: full, full: true });
+  });
+
+  it("ne modifie jamais la sélection reçue", () => {
+    const picked = [1, 2];
+    togglePick("PICK", picked, 3);
+    togglePick("PICK", picked, 1);
+    expect(picked).toEqual([1, 2]);
+  });
+});
+
+describe("couleurs attribuées une fois", () => {
+  const series = enduranceChartSeries(fixture().endurance, fixture().matches);
+
+  it("engagés mis en couleur : Top N dans l'ordre, sélection dans l'ordre de choix, toutes les séries", () => {
+    const ctx = { top: [5, 3], picked: [3], series };
+    expect(chartColoredIds("TOP", ctx)).toEqual([5, 3]);
+    expect(chartColoredIds("PICK", ctx)).toEqual([3]);
+    expect(chartColoredIds("ALL", ctx)).toEqual([1, 2, 3, 4]);
+  });
+
+  it("à l'ouverture : une couleur par engagé, dans l'ordre", () => {
+    expect([...assignChartColors(new Map(), [5, 3, 9])]).toEqual([[5, 0], [3, 1], [9, 2]]);
+  });
+
+  it("deux engagés qui s'échangent leurs places gardent chacun leur couleur", () => {
+    const first = assignChartColors(new Map(), [5, 3]);
+    expect(assignChartColors(first, [3, 5])).toEqual(first);
+  });
+
+  it("retirer le premier choix ne recolore pas les autres", () => {
+    const first = assignChartColors(new Map(), [5, 3, 9]);
+    const next = assignChartColors(first, [3, 9]);
+    expect(next.get(3)).toBe(1);
+    expect(next.get(9)).toBe(2);
+  });
+
+  it("un engagé qui entre prend la première couleur libre", () => {
+    const first = assignChartColors(new Map(), [5, 3]);
+    expect(assignChartColors(first, [5, 3, 8]).get(8)).toBe(2);
+    expect(assignChartColors(first, [3, 8]).get(8)).toBe(0);
+  });
+
+  it("une couleur déjà prise par un engagé tracé avant lui est réattribuée", () => {
+    const first = assignChartColors(new Map(), [5, 3]);
+    // 7 prend la couleur libre 0 pendant que 5 est masqué ; 5 revient et trouve 0 prise.
+    const second = assignChartColors(first, [3, 7]);
+    const third = assignChartColors(second, [7, 3, 5]);
+    expect(third.get(7)).toBe(second.get(7));
+    expect(new Set([third.get(7), third.get(3), third.get(5)]).size).toBe(3);
+  });
+
+  it("au-delà de huit tracés les couleurs se répètent, sans changer d'un appel à l'autre", () => {
+    const ids = Array.from({ length: 12 }, (_, i) => i + 1);
+    const first = assignChartColors(new Map(), ids);
+    expect(new Set(ids.map((id) => first.get(id))).size).toBe(ENDURANCE_CHART_PALETTE.length);
+    expect(assignChartColors(first, ids)).toEqual(first);
+  });
+
+  it("palette saturée : retirer un engagé répété ne décale pas les autres", () => {
+    const ids = Array.from({ length: 12 }, (_, i) => i + 1);
+    const first = assignChartColors(new Map(), ids);
+    const without = assignChartColors(first, ids.filter((id) => id !== 9));
+    for (const id of ids.filter((value) => value !== 9)) expect(without.get(id)).toBe(first.get(id));
+  });
+
+  it("ne modifie pas les attributions reçues et garde celles des engagés masqués", () => {
+    const previous = new Map([[1, 4]]);
+    const next = assignChartColors(previous, [2]);
+    expect([...previous]).toEqual([[1, 4]]);
+    expect(next.get(1)).toBe(4);
+    expect(next.get(2)).toBe(0);
+  });
+});
+
+describe("clé de contenu des entrées", () => {
+  it("de nouveaux objets de même contenu donnent la même clé", () => {
+    const a = fixture();
+    const b = fixture();
+    expect(enduranceChartInputKey(a.endurance, a.matches)).toBe(enduranceChartInputKey(b.endurance, b.matches));
+  });
+
+  it("un résultat qualificatif change la clé", () => {
+    const a = fixture();
+    const b = fixture();
+    b.matches[3] = match(4, 2, 2, 3, [2, 0]);
+    expect(enduranceChartInputKey(b.endurance, b.matches)).not.toBe(enduranceChartInputKey(a.endurance, a.matches));
+  });
+
+  it("un capital, un rang ou une case de manche change la clé", () => {
+    const base = fixture();
+    const baseKey = enduranceChartInputKey(base.endurance, base.matches);
+    const points = fixture();
+    points.endurance.standings[0] = { ...points.endurance.standings[0], points: 15 };
+    const rank = fixture();
+    rank.endurance.standings[1] = { ...rank.endurance.standings[1], rank: 3 };
+    const cell = fixture();
+    cell.endurance.standings[2] = { ...cell.endurance.standings[2], rounds: [pts(1, 8, 3), pts(2, 7, 3)] };
+    for (const changed of [points, rank, cell]) {
+      expect(enduranceChartInputKey(changed.endurance, changed.matches)).not.toBe(baseKey);
+    }
+  });
+
+  it("un match de play-off ne change pas la clé", () => {
+    const base = fixture();
+    const withPlayoff = fixture();
+    withPlayoff.matches.push(match(90, 1001, 1, 2, [3, 1]));
+    expect(enduranceChartInputKey(withPlayoff.endurance, withPlayoff.matches)).toBe(
+      enduranceChartInputKey(base.endurance, base.matches),
+    );
+  });
+
+  it("deux noms qui se touchent ne se confondent pas avec un seul", () => {
+    const a = fixture();
+    const b = fixture();
+    a.endurance.standings[0] = { ...a.endurance.standings[0], teamName: "AB", seed: 1 };
+    b.endurance.standings[0] = { ...b.endurance.standings[0], teamName: "A", seed: 1 };
+    expect(enduranceChartInputKey(a.endurance, a.matches)).not.toBe(enduranceChartInputKey(b.endurance, b.matches));
+  });
+});
+
+describe("pénalités d'arbitrage dans le graphique", () => {
+  /** Manche 2 en cours : l'équipe 2 est sanctionnée de 3 points avant son match. */
+  function penalised(): { endurance: EnduranceMeta; matches: BracketMatch[] } {
+    const { endurance, matches } = fixture();
+    const standings = endurance.standings.map((standing) =>
+      standing.teamId === 2
+        ? { ...standing, points: 7, penaltyPoints: 3, rounds: [pts(1, 10, 2), { ...pts(2, 7, 3), penalty: 3 }] }
+        : standing,
+    );
+    return { endurance: { ...endurance, standings }, matches };
+  }
+
+  it("une manche jouée porte la pénalité de sa case", () => {
+    const { endurance, matches } = fixture();
+    const standings = endurance.standings.map((standing) =>
+      standing.teamId === 1 ? { ...standing, rounds: [pts(1, 12, 1), { ...pts(2, 11, 1), penalty: 3 }] } : standing,
+    );
+    const [first] = enduranceChartSeries({ ...endurance, standings }, matches);
+    expect(first.states[1]).toEqual({ kind: "PLAYED", points: 11, delta: -1, penalty: 3 });
+    expect(first.states[0]).toMatchObject({ kind: "PLAYED", penalty: 0 });
+  });
+
+  it("sanction avant le match de la dernière manche : la courbe va jusqu'au capital de la légende", () => {
+    const { endurance, matches } = penalised();
+    const second = enduranceChartSeries(endurance, matches).find((item) => item.teamId === 2)!;
+    expect(second.states[1]).toEqual({ kind: "PENDING", penalty: 3 });
+    expect(second.values).toEqual([9, 10, 7]);
+    expect(chartValueAt(second, 2, 2)).toBe(second.values.at(-1));
+  });
+
+  it("le seuil lit un capital que la courbe atteint", () => {
+    const { endurance, matches } = penalised();
+    const all = enduranceChartSeries(endurance, matches);
+    const threshold = chartThresholdAt(all, 2, 2, 3);
+    expect(all.some((item) => item.values.includes(threshold ?? -1))).toBe(true);
+  });
+
+  it("la tête reste creuse : l'engagé n'a pas joué la manche affichée", () => {
+    const { endurance, matches } = penalised();
+    const all = enduranceChartSeries(endurance, matches);
+    const geometry = chartGeometry(all, 4, endurance.startPoints);
+    const second = all.find((item) => item.teamId === 2)!;
+    const line = chartLine(second, 2, 2, geometry);
+    expect(line.hollow).toBe(true);
+    expect(line.head).toEqual({ x: chartX(geometry, 2), y: chartY(geometry, 7) });
+  });
+
+  it("sans sanction, la courbe d'un match à jouer s'arrête toujours au capital précédent", () => {
+    const [, second] = enduranceChartSeries(fixture().endurance, fixture().matches);
+    expect(second.states[1]).toEqual({ kind: "PENDING", penalty: 0 });
+    expect(second.values).toEqual([9, 10]);
+  });
+});
+
+describe("zone de survol", () => {
+  const { endurance, matches } = fixture();
+  const series = enduranceChartSeries(endurance, matches);
+  const geometry = chartGeometry(series, 4, endurance.startPoints);
+
+  it("la courbe entière jusqu'à la manche affichée, un point par manche", () => {
+    expect(chartHitPath(series[0], 2, geometry).split(" L")).toHaveLength(3);
+    expect(chartHitPath(series[0], 1, geometry).split(" L")).toHaveLength(2);
+  });
+
+  it("s'arrête à la dernière manche jouée d'un engagé", () => {
+    expect(chartHitPath(series[1], 2, geometry).split(" L")).toHaveLength(2);
   });
 });
 
@@ -324,6 +521,13 @@ describe("palette", () => {
       expect(token).not.toMatch(/amber|orange|danger|red|loss/);
       expect(hex.toLowerCase()).not.toBe("#f5a524");
     }
+  });
+
+  it("le 6e tracé est un jeton propre au graphique, que le contraste élevé ne redéfinit pas", () => {
+    expect(ENDURANCE_CHART_PALETTE[5].token).toBe("--chart-blue-deep");
+    const contrastBlock = css.slice(css.indexOf(':root[data-a11y~="contrast"],'));
+    expect(contrastBlock.slice(0, contrastBlock.indexOf("}"))).not.toContain("--chart-blue-deep");
+    expect(ENDURANCE_CHART_PALETTE.map((entry) => entry.token)).not.toContain("--blue-700");
   });
 
   it("chaque couleur ≥ 3:1 sur les fonds du graphique", () => {
@@ -362,6 +566,20 @@ describe("animation", () => {
 
   it("cible déjà atteinte : une seule image", () => {
     expect(chartAnimationFrame(2, 2, 0)).toEqual({ progress: 2, done: true });
+  });
+
+  it("durée par manche : 650 ms, plafonnée à 2,4 s au total", () => {
+    expect(ENDURANCE_CHART_ROUND_MS).toBe(650);
+    expect(chartRoundMs(1)).toBe(650);
+    expect(chartRoundMs(3)).toBe(650);
+    expect(chartRoundMs(12)).toBe(200);
+    expect(chartRoundMs(12) * 12).toBeLessThanOrEqual(ENDURANCE_CHART_TOTAL_MS);
+    expect(chartRoundMs(0)).toBe(650);
+  });
+
+  it("sur douze manches, l'animation par défaut est finie en 2,4 s", () => {
+    expect(chartAnimationFrame(0, 12, 2399).done).toBe(false);
+    expect(chartAnimationFrame(0, 12, 2400)).toEqual({ progress: 12, done: true });
   });
 });
 

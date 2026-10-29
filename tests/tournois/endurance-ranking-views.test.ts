@@ -20,6 +20,7 @@ import {
   pointsAfterRound,
   rankMove,
   resolveEnduranceViewIndex,
+  signedDelta,
   statusAfterRound,
   type EnduranceRankingView,
 } from "@/app/(secured)/tournois/[id]/_lib/endurance-ranking-views";
@@ -574,5 +575,39 @@ describe("enduranceRankingRows — instantané sans rang ni nuls", () => {
       [1, 2, 0],
       [3, 3, 0],
     ]);
+  });
+});
+
+describe("enduranceRankingRows — bilan d'une manche passée, cases non jouées allégées", () => {
+  it("une équipe sortie garde son bilan dans les vues des manches suivantes (reporté)", () => {
+    const standings = [
+      row(1, {
+        rank: 2,
+        status: "ELIMINATED",
+        eliminatedRound: 1,
+        rounds: [
+          { round: 1, kind: "POINTS", points: 0, rank: 2, wins: 0, losses: 3 },
+          { round: 2, kind: "OUT", points: null, rank: 2 },
+        ],
+      }),
+      row(2, {
+        rank: 1,
+        rounds: [
+          { round: 1, kind: "POINTS", points: 12, rank: 1, wins: 1, losses: 0 },
+          { round: 2, kind: "POINTS", points: 14, rank: 1, wins: 2, losses: 0 },
+        ],
+      }),
+    ];
+    const rows = enduranceRankingRows({ kind: "ROUND", round: 2 }, meta(standings, { rounds: [1, 2], currentRound: 2 }), []);
+    const out = rows.find((r) => r.standing.teamId === 1)!;
+    expect([out.wins, out.losses, out.draws]).toEqual([0, 3, 0]);
+  });
+});
+
+describe("signedDelta — variation typographique", () => {
+  it("signe positif, vrai moins, zéro nu", () => {
+    expect(signedDelta(2)).toBe("+2");
+    expect(signedDelta(-1)).toBe("−1");
+    expect(signedDelta(0)).toBe("0");
   });
 });

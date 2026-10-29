@@ -6,6 +6,7 @@ import type { BracketMatch, EnduranceMeta } from "@/lib/shared/types";
 import { useTournamentViewText } from "@/components/i18n/tournament-page-text";
 import { orReload } from "@/lib/shared/lazy-component";
 import { ACCENT } from "../_lib/bracket-sections";
+import { useEnduranceChartAnimate } from "../_lib/use-endurance-chart-animate";
 import { FR_VIEWS_TEXT } from "../_lib/views-text";
 import { BoardPanel, PanelPill } from "./BoardPanel";
 
@@ -29,6 +30,8 @@ export function EnduranceChartPanel({
   const { t } = useTournamentViewText(FR_VIEWS_TEXT);
   const [open, setOpen] = useState(false);
   const panelId = useId();
+  // « graphique animé » ne se dit que si la courbe s'anime vraiment.
+  const animate = useEnduranceChartAnimate();
 
   // Avant la première manche, il n'y a pas de courbe à tracer.
   if (endurance.currentRound < 1 || endurance.standings.length === 0) return null;
@@ -41,7 +44,7 @@ export function EnduranceChartPanel({
         open={open}
         onToggle={() => setOpen((value) => !value)}
         panelId={panelId}
-        meta={<PanelPill>{t("endurance.chartMeta")}</PanelPill>}
+        meta={<PanelPill>{t(animate ? "endurance.chartMeta" : "endurance.chartMetaStatic")}</PanelPill>}
       >
         <EnduranceChart endurance={endurance} matches={matches} />
       </BoardPanel>

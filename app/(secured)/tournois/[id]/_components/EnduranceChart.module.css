@@ -5,6 +5,9 @@
  * du SVG est en unités utilisateur, mises à l'échelle avec le schéma.
  */
 .chart {
+  /* Conteneur de requête : sous ~800 px la légende passe sous le tracé, et
+     l'encart réserve alors sa hauteur (plus de saut à chaque tap). */
+  container: enduranceChart / inline-size;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -117,6 +120,9 @@
 }
 
 .plot {
+  /* Conteneur de requête : le texte du SVG grossit (en unités utilisateur)
+     quand le tracé se rétrécit, au lieu de tomber à ~4 px à l'écran. */
+  container: endurancePlot / inline-size;
   flex: 999 1 520px;
   min-width: 0;
   display: flex;
@@ -211,16 +217,54 @@
   fill: var(--ink-dim);
 }
 
+/* Seuil des play-offs : gris-bleu hors palette, en tirets — le vert est celui
+   de la 3e courbe, avec lequel il se confondait. */
 .cut {
-  stroke: var(--accent-green);
+  stroke: var(--ink-mute);
   stroke-width: 1;
   stroke-dasharray: 5 5;
 }
 
 .cutLabel {
-  fill: var(--accent-green);
+  fill: var(--ink-mute);
   font-size: 11px;
   text-anchor: end;
+}
+
+/* Tracé étroit (375 px : l'échelle tombe à ~0,33) : texte du SVG par paliers,
+   pour rester lisible une fois mis à l'échelle ; « Départ » s'efface quand il
+   toucherait « M1 ». */
+@container endurancePlot (max-width: 599px) {
+  .svg {
+    overflow: visible;
+  }
+  .axisY,
+  .axisX,
+  .cutLabel,
+  .forfeit {
+    font-size: 16px;
+  }
+}
+
+@container endurancePlot (max-width: 429px) {
+  .axisY,
+  .axisX,
+  .cutLabel,
+  .forfeit {
+    font-size: 22px;
+  }
+  .axisStart {
+    display: none;
+  }
+}
+
+@container endurancePlot (max-width: 319px) {
+  .axisY,
+  .axisX,
+  .cutLabel,
+  .forfeit {
+    font-size: 28px;
+  }
 }
 
 .line {
@@ -239,8 +283,14 @@
   font-weight: 600;
 }
 
-.dimmed {
+/* Les autres courbes s'atténuent quand l'une est survolée ; elle-même est
+   redessinée dans `.overlay`, au-dessus, sans événements. */
+.lines[data-hovering] > .curve {
   opacity: 0.3;
+}
+
+.overlay {
+  pointer-events: none;
 }
 
 .hit {
@@ -303,6 +353,23 @@
   border: 1px dashed rgba(143, 213, 255, 0.4);
 }
 
+/* Manche affichée : soulignée ; les manches qui la suivent : en retrait. */
+.stepShown {
+  color: var(--ink);
+  box-shadow: inset 0 -2px 0 var(--blue-500);
+}
+
+.stepAfter {
+  color: var(--ink-dim);
+}
+
+/* Sanction d'arbitrage : l'ambre signale un avertissement (comme les vues du classement). */
+.penaltyMark {
+  margin-left: 4px;
+  font-weight: 700;
+  color: rgba(var(--amber-rgb), 0.9);
+}
+
 .swatch,
 .swatchEmpty {
   flex: none;
@@ -314,6 +381,16 @@
 
 .swatchEmpty {
   border: 1.5px solid var(--ink-dim);
+}
+
+/* Survol d'un engagé hors Top N : pastille en tirets, comme son trait. */
+.swatchHover {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-sizing: border-box;
+  border: 1.5px dashed var(--ink);
 }
 
 .legend {
@@ -334,11 +411,11 @@
 .legendItem {
   width: 100%;
   display: grid;
-  grid-template-columns: 12px 22px minmax(0, 1fr) 26px 54px;
+  grid-template-columns: 12px 22px minmax(0, 1fr) 26px 60px;
   gap: 8px;
   align-items: center;
   min-height: 32px;
-  padding: 0 8px;
+  padding: 3px 8px;
   border-radius: 6px;
   border: 1px solid transparent;
   background: transparent;
@@ -362,11 +439,16 @@
   color: var(--ink-dim);
 }
 
+/* Deux lignes au plus : des équipes au même préfixe se distinguent sans survol. */
 .legendName {
   font-size: 12px;
+  line-height: 1.25;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
 .legendValue {
@@ -396,4 +478,41 @@
 
 .toneMute {
   color: var(--ink-dim);
+}
+
+/* Légende sous le tracé (sous ~800 px) : l'encart garde sa hauteur d'une
+   sélection à l'autre — sinon la liste saute à chaque tap et le suivant tombe
+   sur un autre engagé. */
+@container enduranceChart (max-width: 797px) {
+  .info {
+    min-height: 190px;
+  }
+}
+
+/* Légende étroite (375 px : le nom n'a que ~90 px sur une ligne) : le nom prend
+   toute la largeur, capital et écart passent dessous. */
+@container enduranceChart (max-width: 520px) {
+  .legendItem {
+    grid-template-columns: 12px 22px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "swatch rank name name"
+      "swatch rank value state";
+    row-gap: 0;
+  }
+  .legendSwatch {
+    grid-area: swatch;
+  }
+  .legendRank {
+    grid-area: rank;
+  }
+  .legendName {
+    grid-area: name;
+  }
+  .legendValue {
+    grid-area: value;
+    text-align: left;
+  }
+  .legendState {
+    grid-area: state;
+  }
 }

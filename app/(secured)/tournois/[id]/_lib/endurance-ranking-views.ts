@@ -1,5 +1,5 @@
 import type { BracketMatch, EnduranceMeta, EnduranceStandingRow } from "@/lib/shared/types";
-import type { EnduranceRoundCell } from "@/lib/shared/bg-survie/replay";
+import { enduranceRecordAfterRound, type EnduranceRoundCell } from "@/lib/shared/bg-survie/replay";
 import type { EnduranceStatus } from "@/lib/shared/bg-survie/standings";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
@@ -165,6 +165,13 @@ function cellAt(standing: EnduranceStandingRow, round: number): EnduranceRoundCe
   return cellIndex(standing.rounds).get(round);
 }
 
+/** Signe typographique d'une variation (« +2 », « −1 », « 0 ») : classement et graphique. */
+export function signedDelta(value: number): string {
+  if (value > 0) return `+${value}`;
+  if (value < 0) return `−${-value}`;
+  return "0";
+}
+
 /** Rang après une manche ; la manche 0 est l'ordre de départ (seed). */
 export function rankAfterRound(standing: EnduranceStandingRow, round: number): number | null {
   if (round <= 0) return standing.seed;
@@ -279,14 +286,15 @@ function pastRow(
   const penaltyPoints = standing.rounds
     .filter((c) => c.round <= round)
     .reduce((sum, c) => sum + (c.penalty ?? 0), 0);
+  const record = enduranceRecordAfterRound(standing.rounds, round);
   return {
     standing,
     rank,
     move: rankMove(rankAfterRound(standing, round - 1), rank),
     points: pointsAfterRound(standing, round, startPoints),
-    wins: cell?.wins ?? 0,
-    losses: cell?.losses ?? 0,
-    draws: cell?.draws ?? 0,
+    wins: record.wins,
+    losses: record.losses,
+    draws: record.draws,
     status,
     eliminatedRound: status === "ACTIVE" ? null : standing.eliminatedRound,
     penaltyPoints,

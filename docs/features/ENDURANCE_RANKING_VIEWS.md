@@ -106,8 +106,8 @@ pure dans `_lib/endurance-chart.ts`.
   (manches à venir grisées), sinon jusqu'à la dernière tirée.
 - **Manche affichée** : boutons « Manche n » (terminée / en cours · 7/11 / à
   venir) ; une manche à venir est désactivée. Le rang, le Top N, la légende et
-  le **seuil** (pointillé vert « SEUIL TOP N » = capital du N-ième, N =
-  `playoffSize`) suivent la manche affichée ; la dernière lit le général.
+  le **seuil** (tirets gris-bleu « SEUIL TOP N » = capital du N-ième, N =
+  `playoffSize`, hors palette : aucune courbe ne lui ressemble) suivent la manche affichée ; la dernière lit le général.
   Sans choix, le graphique **suit la dernière manche tirée** : une manche
   poussée par le flux, volet ouvert, s'affiche d'elle-même (la courbe avance
   sans rejouer depuis le départ) ; une manche passée choisie reste affichée
@@ -115,32 +115,82 @@ pure dans `_lib/endurance-chart.ts`.
 - **Modes** : « Top N » (les N premiers de la manche affichée, les autres
   masqués), « Ma sélection » (8 au plus, état du composant seulement — ni
   stockage local, ni serveur), « Toutes » / « Tous » (palette en boucle).
+  Un clic (ou un tap) sur un engagé mène toujours à « Ma sélection » : une
+  sélection déjà construite est **gardée** et l'engagé s'y ajoute (`togglePick`) ;
+  au plafond de 8, l'ajout est refusé **avec un toast** (`chartPickMax*`). Au
+  toucher, le survol n'existe pas : l'aide du Top N dit « cliquez ou touchez ».
+  Au-delà de 8 engagés en couleur (Top N > 8, « Toutes »), les couleurs se
+  répètent — l'aide le dit (`chartHintWrap*`).
   L'aide de chaque mode (`chartHint*`) est derrière un `<InfoHint>` à côté des
   modes (`INFO_HINTS.md`) ; seul l'état vide de l'encart reste visible — en
   « Ma sélection » vide, il reprend l'aide d'ajout (`chartHintPickEmpty*`).
   « Effacer la sélection » (monté dès « Ma sélection », `aria-disabled` une fois
-  vide : le focus reste sur lui) et « Rejouer l'animation ».
+  vide : le focus reste sur lui) et « Rejouer l'animation » — ce dernier
+  **n'est affiché que si la courbe s'anime** (`useEnduranceChartAnimate`) ; en
+  mouvement réduit ou régime économe, l'en-tête du volet dit « manche par
+  manche » (`chartMetaStatic`), sans « graphique animé ».
 - **Survol, focus, clic** : un bouton de la légende (au focus comme au survol)
   ou la zone de survol d'une courbe met la courbe en avant et remplit l'encart
-  (nom, « #rang · S seed · bilan » **à l'issue de la manche affichée** — `chartRecordAt`, comme le rang —, capital manche par manche). Un clic ajoute
+  (nom, « #rang · S seed · bilan » **à l'issue de la manche affichée** — `chartRecordAt`, comme le rang —, capital manche par manche ; la puce de la
+  manche affichée est soulignée, les suivantes en retrait). Un clic ajoute
   ou retire l'engagé de « Ma sélection ». Le clavier passe par la légende.
+  Le survol d'une courbe s'efface en la quittant ; un `mouseleave` revient à
+  l'engagé qui a le **focus clavier** (jamais un encart vidé sous un focus), et
+  un retri de la légende (résultat poussé) recale le survol et garde le
+  bouton focalisé visible (`scrollIntoView({ block: "nearest" })`).
+  Hors Top N / sélection, la courbe survolée est en **tirets** (pastille
+  comprise), jamais prise pour une courbe de la palette.
+- **Pénalités d'arbitrage** : une manche sanctionnée porte un repère ambre « ! »
+  (titre et texte pour lecteurs d'écran = ceux des vues du classement) dans la
+  légende, l'encart et le tableau `sr-only` — une équipe qui gagne mais prend
+  3 points de sanction ne se lit plus comme une équipe qui perd trois maps. Une
+  sanction posée **avant le match de la dernière manche** prolonge la courbe
+  jusqu'au capital que lisent la légende, l'ordre et le seuil (tête creuse :
+  le match n'est pas joué) : le seuil ne tombe jamais sous toutes les courbes.
+- **Couleurs** : attribuées **une fois par engagé** (`assignChartColors`) puis
+  gardées — un échange de places, un résultat poussé ou le retrait d'un premier
+  choix ne recolorent plus les courbes. Un engagé qui entre prend la première
+  couleur libre ; une couleur déjà prise par un engagé tracé avant lui est
+  réattribuée.
 - **Palette** : huit jetons froids (`ENDURANCE_CHART_PALETTE` : `--blue-500`,
-  `--violet-400`, `--accent-green`, `--pink-400`, `--blue-100`, `--blue-700`,
-  `--violet-300`, `--cyan-400`), chacun ≥ 3:1 sur le fond, deux voisins écartés
-  aussi par la clarté. **Pas d'ambre** (avertissements seulement) : l'ambre de la
+  `--violet-400`, `--accent-green`, `--pink-400`, `--blue-100`,
+  `--chart-blue-deep`, `--violet-300`, `--cyan-400`), chacun ≥ 3:1 sur le
+  fond, deux voisins écartés aussi par la clarté. `--chart-blue-deep` (#1b6a8f)
+  est propre au graphique : `--blue-700` s'éclaircit en contraste élevé et se
+  confondait alors avec le 1er tracé. **Pas d'ambre** (avertissements seulement) : l'ambre de la
   maquette a été remplacé.
 - **Animation** : `requestAnimationFrame` seulement volet ouvert, 650 ms par
-  manche, annulée au repli (démontage) ; **une seule image** sous
+  manche **sans dépasser 2,4 s au total** (`chartRoundMs` : 12 manches = 200 ms
+  chacune), annulée au repli (démontage) ; **une seule image** sous
   `prefers-reduced-motion` ou en régime économe (`useClientPower()`,
   `CLIENT_POWER_MODES.md`). Aucune animation CSS infinie. Revenir à une manche
   antérieure saute sans animer (la courbe est déjà coupée à la manche affichée).
-- **Coût par image** (64 engagés × 12 manches ≈ 470 images à l'ouverture) :
-  seules les courbes tracées lisent l'avancement. Ordre, Top N, seuil, couleurs,
-  fond du tracé, légende et tableau `sr-only` sont mémoïsés sur la manche
-  affichée, le mode, la sélection et le survol ; les séries sont recalculées à
-  chaque instantané poussé, les matchs rangés par manche une fois.
-- **Accessibilité** : SVG `role="img"` avec un `aria-label` réel (nombre
-  d'engagés, manche affichée, seuil) ; légende dans une `<ScrollArea ariaLabel>` ;
+- **Coût par image** (64 engagés × 12 manches, ≤ 2,4 s d'images à l'ouverture) :
+  l'avancement vit **dans `EnduranceChartLines`**, seul composant re-rendu à
+  chaque image (courbes tracées) ; la barre d'outils, la légende, l'encart et le
+  tableau `sr-only` ne le voient pas. Les courbes sont dans l'ordre stable du
+  général : la courbe survolée est redessinée dans un calque supérieur sans
+  événements, les autres s'atténuent par un attribut du groupe — un survol ne
+  déplace aucun nœud. La zone de survol (`chartHitPath`) est calculée une fois
+  par manche et géométrie. Ordre, Top N, seuil, couleurs, fond du tracé et
+  tableau `sr-only` sont mémoïsés ; les lignes de la légende le sont aussi
+  (`LegendRow`) : un survol ne reconstruit que les deux lignes concernées. Les
+  séries ne sont recalculées que si le **contenu** change (`enduranceChartInputKey`) :
+  un instantané poussé identique pour le graphique (score de play-off, autre
+  champ du tournoi) garde séries, ordre, légende et tableau.
+- **Tracé étroit** : `.plot` est un conteneur de requête ; le texte du SVG (en
+  unités utilisateur) passe de 11 à 16, 22 puis 28 quand le tracé tombe sous 600,
+  430 puis 320 px, pour rester lisible une fois mis à l'échelle (375 px :
+  ~0,32) ; « Départ » s'efface sous 430 px. Sous ~800 px la légende passe sous
+  le tracé et l'encart **réserve sa hauteur** (plus de saut à chaque tap) ;
+  sous 520 px chaque ligne de légende met le nom sur toute la largeur, capital
+  et écart dessous (noms sur deux lignes au plus partout).
+- **Accessibilité** : SVG `role="img"` avec un `aria-label` réel (nombre de
+  **courbes tracées**, manche affichée, seuil ; « Aucune courbe tracée » en
+  sélection vide) ; légende dans une `<ScrollArea ariaLabel>` (la liste n'est pas
+  nommée une seconde fois) ; chaque bouton de légende dit « place », « points »,
+  « écart » et « courbe tracée / masquée » aux lecteurs d'écran (texte
+  `sr-only`) — `aria-pressed` reste réservé à « Ma sélection » ;
   un **tableau `sr-only`** engagé × manche (capital, « à jouer », « Forfait »,
   « sortie ») remplace pour les lecteurs d'écran le tableau « manche par
   manche » retiré. Texte HTML ≥ 11 px ; le texte du SVG est en unités
@@ -154,6 +204,15 @@ Le rang et le bilan de chaque manche viennent du **rejeu**
 facultatifs : un instantané antérieur n'en porte pas, et une vue de manche
 retombe alors sur le capital (puis l'ordre du général) pour ranger ses lignes.
 Rien n'est redépartagé côté client — deux règles feraient deux vérités.
+
+**Bilan des cases non jouées** : une case « sortie » ou « forfait » qui répète
+le bilan de la case précédente **ne le réécrit pas** (`wins` / `losses` /
+`draws` absents ; le `rank` reste) — ~20 Ko de moins par instantané à 64 équipes
+× 12 manches. Une case `POINTS` écrit toujours son bilan. Toute lecture passe
+par `enduranceRecordAfterRound(cells, round)` (`lib/shared/bg-survie/replay.ts`),
+qui reporte le bilan de la dernière case antérieure qui le porte : les vues
+« après la manche n » (`pastRow`) et l'encart du graphique (`chartRecordAt`)
+s'y lisent, jamais `cell.wins` directement.
 
 Le détail d'une rencontre (score, adversaire, date) se lit sur `detail.matches`,
 déjà public. Logique pure : `_lib/endurance-ranking-views.ts`.
