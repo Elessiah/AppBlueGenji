@@ -32,10 +32,10 @@ function mapLiveError(error: unknown) {
  * peut plus passer à l'antenne et n'est pas déjà casté refuse tout réglage
  * (`MATCH_NOT_CASTABLE`, 409).
  *
- * `organisationLink` dit de qui est le lien posé : `true` (ou absent) pour un
+ * `organisationLink` dit de qui est le lien posé : `true` pour un
  * membre de l'organisation (permission `tournaments`) = le lien de
- * l'organisation, qui reste au match ; `false` = sa propre chaîne, qui part avec
- * son compte. Sans la permission `tournaments`, le lien est toujours le sien, et
+ * l'organisation, qui reste au match ; `false` (ou absent) = sa propre chaîne,
+ * qui part avec son compte. Sans la permission `tournaments`, le lien est toujours le sien, et
  * `true` est refusé (403) plutôt que silencieusement ignoré.
  */
 export async function PUT(req: Request, context: { params: Promise<{ matchId: string }> }) {
@@ -69,13 +69,13 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
 
   try {
     // Le lien posé reste rattaché à qui le pose, sauf quand un membre de
-    // l'organisation le dit « de l'organisation » (case de la fenêtre, vraie
+    // l'organisation le dit « de l'organisation » (case de la fenêtre, décochée
     // par défaut) : la suppression de son compte retire sa chaîne à lui, jamais
     // celle de l'organisation (`withdrawUserCasts`).
     await setMatchLiveConfig(matchId, {
       trigger,
       liveUrl: (body.liveUrl as string) ?? null,
-      setter: { userId: user.id, asOrganisation: organisation && body.organisationLink !== false },
+      setter: { userId: user.id, asOrganisation: organisation && body.organisationLink === true },
     });
     announceStaffMatchAction(matchId, trigger === null ? "LIVE_REMOVED" : "LIVE_CONFIGURED", staffActionAuthor(user));
     return ok({ trigger });

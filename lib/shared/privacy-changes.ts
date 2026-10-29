@@ -1385,12 +1385,16 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     // publiée, n'est pas réécrite.
     id: "2026-10-lien-organisation-choix-explicite",
     publishedAt: "2026-10-31",
+    // Seuls ceux qui règlent la diffusion d'un match (permission `live`) font
+    // ce choix ou voient leur lien concerné : les autres comptes ne sont pas
+    // avertis, la politique change pour tous (`isPrivacyPolicyVersion`).
+    audience: "LIVE_STAFF",
     title: "Retransmission : le lien de l'organisation se choisit, il ne se déduit plus",
     links: [{ href: "/rgpd#retransmission", label: "Lire le paragraphe « Retransmission des matchs »" }],
     summary:
       "Un membre de l'organisation qui règle la diffusion d'un match indique désormais, par une case, si le lien posé est celui de l'organisation ou sa propre chaîne, au lieu que le site le déduise de ce qu'il caste : seule sa propre chaîne part avec son compte.",
     details: [
-      "Ce qui change : dans la fenêtre de diffusion d'un match, un membre de l'organisation (permission de gérer les tournois) coche « Ce lien est celui de l'organisation » — coché par défaut — ou le décoche pour dire que c'est sa propre chaîne. Coché, le lien reste au match quoi qu'il arrive à son compte, même s'il caste ce match ; décoché, il lui est rattaché et part à la suppression de son compte, matchs joués compris, comme celui d'un caster. Un compte sans cette permission pose toujours sa propre chaîne.",
+      "Ce qui change : dans la fenêtre de diffusion d'un match, un membre de l'organisation (permission de gérer les tournois) coche « Ce lien est celui de l'organisation » — décoché par défaut — pour dire que le lien est celui de l'organisation, ou le laisse décoché si c'est sa propre chaîne. Coché, le lien reste au match quoi qu'il arrive à son compte, même s'il caste ce match ; décoché, il lui est rattaché et part à la suppression de son compte, matchs joués compris, comme celui d'un caster. Un compte sans cette permission pose toujours sa propre chaîne.",
       "Ce qui ne change pas : un lien déjà enregistré garde son auteur d'alors ; réenregistrer le même lien n'en change pas l'auteur ; le lien qu'un caster ouvre à part et celui posé avant que le site n'enregistre qui le fournit sont traités comme avant.",
     ],
   },

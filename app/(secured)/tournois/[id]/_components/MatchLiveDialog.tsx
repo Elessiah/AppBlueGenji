@@ -53,9 +53,10 @@ export function MatchLiveDialog({ match, onClose, onSaved, canSpeakForOrganisati
   const [liveUrl, setLiveUrl] = useState(
     (match.streams.length > 0 ? staffStream(match.streams)?.liveUrl : match.liveUrl) ?? "",
   );
-  // Vraie par défaut : un membre de l'organisation qui pose une chaîne parle le
-  // plus souvent pour elle, et ce choix n'est jamais déduit de ce qu'il caste.
-  const [organisationLink, setOrganisationLink] = useState(true);
+  // Fausse par défaut (protection des données dès la conception) : un lien
+  // n'est celui de l'organisation — gardé après la suppression du compte de qui
+  // le pose — que si ce membre le coche ; rien ne se déduit de ce qu'il caste.
+  const [organisationLink, setOrganisationLink] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const urlTouched = liveUrl.trim().length > 0;

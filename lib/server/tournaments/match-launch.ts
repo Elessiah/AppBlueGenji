@@ -417,15 +417,24 @@ async function resolveTeamParty(
 /**
  * Lance le match si toutes les parties attendues sont prêtes. Appelée après
  * chaque écriture qui peut compléter la liste (un « Prêt », le départ d'un caster).
+ *
+ * `snapshotBeforeLock` : la transaction a lu avant le verrou du match
+ * (autogestion d'une manche) — casters et éligibilité se relisent alors en
+ * lecture courante, sinon un caster inscrit depuis l'instantané ne serait pas
+ * attendu (`lockLaunchMatch`, `releaseIneligibleCasters`).
  */
-async function launchIfAllReady(connection: PoolConnection, matchId: number): Promise<boolean> {
-  const row = await lockLaunchMatch(connection, matchId);
+async function launchIfAllReady(
+  connection: PoolConnection,
+  matchId: number,
+  snapshotBeforeLock = false,
+): Promise<boolean> {
+  const row = await lockLaunchMatch(connection, matchId, snapshotBeforeLock);
   if (!row) return false;
   await adoptCurrentPairing(connection, row);
   if (matchLaunchPhase(toLaunchInput(row), Date.now()) !== "LOBBY") return false;
   // Un caster devenu inéligible ne donnera plus son « Prêt » : il est retiré
   // avant le décompte, sinon le match l'attendrait jusqu'au lancement d'office.
-  await releaseIneligibleCasters(connection, row);
+  await releaseIneligibleCasters(connection, row, snapshotBeforeLock);
   if (!allPartiesReady(rowReadiness(row))) return false;
   await connection.execute(`UPDATE bg_matches SET launched_at = NOW() WHERE id = ?`, [matchId]);
   return true;
@@ -1111,12 +1120,14 @@ export async function assignMatchReferee(
 /**
  * Autogestion du match verrouillé : l'allumer retire l'arbitre (rendu à
  * l'appelant pour qu'il le prévienne), l'éteindre ne fait que l'éteindre.
- * Rend `undefined` quand rien ne change.
+ * Rend `undefined` quand rien ne change. `snapshotBeforeLock` : comme pour
+ * `launchIfAllReady`, que l'appelant a lu avant le verrou du match.
  */
 async function writeSelfManaged(
   connection: PoolConnection,
   row: LaunchMatchRow,
   enabled: boolean,
+  snapshotBeforeLock = false,
 ): Promise<{ replacedRefereeId: number | null } | undefined> {
   if ((Number(row.self_managed ?? 0) === 1) === enabled) return undefined;
   const replacedRefereeId = enabled ? nullableId(row.referee_user_id) : null;
@@ -1127,7 +1138,7 @@ async function writeSelfManaged(
     [row.id],
   );
   if (enabled && replacedRefereeId !== null && row.tournament_state === "RUNNING") {
-    await launchIfAllReady(connection, Number(row.id));
+    await launchIfAllReady(connection, Number(row.id), snapshotBeforeLock);
   }
   return { replacedRefereeId };
 }
@@ -1195,7 +1206,7 @@ export async function setRoundSelfManaged(
       for (const candidate of candidates) {
         const row = await lockLaunchMatch(connection, Number(candidate.id), true);
         if (row?.status === "COMPLETED" || !row || Number(row.is_bye) === 1) continue;
-        const result = await writeSelfManaged(connection, row, enabled);
+        const result = await writeSelfManaged(connection, row, enabled, true);
         if (result) written.push({ matchId: Number(row.id), replacedRefereeId: result.replacedRefereeId });
       }
       return written;

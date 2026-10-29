@@ -715,7 +715,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     summary:
       "A member of the organizers who sets up a match's broadcast now states, with a checkbox, whether the link they set is the organizers' or their own channel, instead of the site inferring it from what they cast: only their own channel goes with their account.",
     details: [
-      "What changes: in a match's broadcast window, a member of the organizers (permission to manage tournaments) ticks “This link is the organisation's” — ticked by default — or unticks it to say it is their own channel. Ticked, the link stays with the match whatever happens to their account, even if they cast that match; unticked, it is attached to them and goes when their account is deleted, played matches included, like a caster's. An account without that permission always sets its own channel.",
+      "What changes: in a match's broadcast window, a member of the organizers (permission to manage tournaments) ticks “This link is the organisation's” — unticked by default — to say the link is the organisation's, or leaves it unticked if it is their own channel. Ticked, the link stays with the match whatever happens to their account, even if they cast that match; unticked, it is attached to them and goes when their account is deleted, played matches included, like a caster's. An account without that permission always sets its own channel.",
       "What does not change: a link already saved keeps its author at the time; saving the same link again does not change its author; the link a caster opens separately and a link set before the site recorded who provided it are handled as before.",
     ],
   },
