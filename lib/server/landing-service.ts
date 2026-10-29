@@ -734,9 +734,18 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
     // comme avant (repli sur les phrases d'attente) ; les actualités gardent
     // leur propre repli.
     const connection = await db.getConnection();
-    let reads: [[MatchResultRow[], unknown], [RegistrationRow[], unknown], [WinnerRow[], unknown], TickerEntry[]];
+    // `allSettled` : la connexion ne revient au pool qu'une fois **toutes** ses
+    // lectures terminées. Avec `Promise.all`, un échec la rendait pendant que
+    // les autres commandes y attendaient encore, et l'emprunteur suivant (une
+    // transaction) passait derrière elles.
+    let settled: [
+      PromiseSettledResult<[MatchResultRow[], unknown]>,
+      PromiseSettledResult<[RegistrationRow[], unknown]>,
+      PromiseSettledResult<[WinnerRow[], unknown]>,
+      PromiseSettledResult<TickerEntry[]>,
+    ];
     try {
-      reads = await Promise.all([
+      settled = await Promise.allSettled([
         connection.execute<MatchResultRow[]>(
           `SELECT
             m.updated_at,
@@ -824,7 +833,11 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
     } finally {
       connection.release();
     }
-    const [[resultRows], [registrationRows], [winnerRows], newsEntries] = reads;
+    const failed = settled.find((read) => read.status === "rejected");
+    if (failed) throw failed.reason;
+    const [[resultRows], [registrationRows], [winnerRows], newsEntries] = settled.map(
+      (read) => (read as PromiseFulfilledResult<unknown>).value,
+    ) as [[MatchResultRow[], unknown], [RegistrationRow[], unknown], [WinnerRow[], unknown], TickerEntry[]];
 
     // Un résultat oppose deux engagés : une exemption (`is_bye`) ou une case
     // restée vide n'en est pas un — le bandeau affichait « Équipe #null 0 ».

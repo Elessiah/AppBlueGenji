@@ -25,7 +25,8 @@ const BRACKET_ORDER: readonly BracketType[] = ["UPPER", "LOWER", "GRAND", "THIRD
 
 /** Un match du tournoi, tel que la vignette le lit (`bg_matches` + noms de `bg_teams`). */
 export type MiniBracketRow = {
-  phaseId: number;
+  /** Rang de la phase (`bg_tournament_phases.position`), 0 hors phases. */
+  phaseOrder: number;
   bracket: BracketType;
   roundNumber: number;
   matchNumber: number;
@@ -59,18 +60,25 @@ function pickLevel(candidates: readonly MiniBracketRow[], level: (row: MiniBrack
  * la manche 1, qui faisait passer les premiers résultats d'un tournoi Suisse,
  * Survie ou multi-phases en manche 4 pour « le » plateau.
  *
- * - phase : la première qui garde un match à jouer, sinon la dernière ;
- * - tableau : `UPPER` s'il existe dans cette phase, sinon le premier présent ;
+ * - phase (dans l'ordre `position`) : la première qui garde un match à jouer,
+ *   sinon la dernière ;
+ * - tableau : le premier (`UPPER`, `LOWER`, `GRAND`, petite finale) qui garde
+ *   un match à jouer — un `UPPER` fini laisse la place à la finale du bas ou à
+ *   la grande finale —, sinon le premier présent ;
  * - manche : la première qui garde un match à jouer, sinon la dernière ;
- * - au plus {@link MINI_BRACKET_SIZE} matchs, dans l'ordre des numéros.
+ * - au plus {@link MINI_BRACKET_SIZE} matchs, les matchs à jouer d'abord, puis
+ *   dans l'ordre des numéros.
  */
 export function pickMiniBracketMatches(rows: readonly MiniBracketRow[]): MiniBracketRow[] {
   if (rows.length === 0) return [];
-  const inPhase = pickLevel(rows, (row) => row.phaseId);
-  const bracket = BRACKET_ORDER.find((name) => inPhase.some((row) => row.bracket === name));
+  const inPhase = pickLevel(rows, (row) => row.phaseOrder);
+  const present = BRACKET_ORDER.filter((name) => inPhase.some((row) => row.bracket === name));
+  const bracket =
+    present.find((name) => inPhase.some((row) => row.bracket === name && row.status !== "COMPLETED")) ?? present[0];
   const inBracket = inPhase.filter((row) => row.bracket === bracket);
+  const done = (row: MiniBracketRow) => (row.status === "COMPLETED" ? 1 : 0);
   return pickLevel(inBracket, (row) => row.roundNumber)
-    .sort((left, right) => left.matchNumber - right.matchNumber)
+    .sort((left, right) => done(left) - done(right) || left.matchNumber - right.matchNumber)
     .slice(0, MINI_BRACKET_SIZE);
 }
 
@@ -80,9 +88,12 @@ export function pickMiniBracketMatches(rows: readonly MiniBracketRow[]): MiniBra
  *
  * En anglais, une place vide se lit « TBD » : les libellés d'attente sont
  * **écrits en base** en français (`bracket-placeholders.ts`), et l'accueil
- * anglais ne doit en montrer aucun. La place vide d'une **exemption** (`is_bye`)
- * se lit « Exempt » / « Bye » : son adversaire ne viendra jamais, « À venir »
- * le ferait attendre.
+ * anglais ne doit en montrer aucun. La place vide d'une **exemption** se lit
+ * « Exempt » / « Bye » : son adversaire ne viendra jamais, « À venir » le
+ * ferait attendre. Exemption = `is_bye` (Survie) **ou** place vide d'un match
+ * clos : les arbres à élimination ferment une exemption sans poser `is_bye`
+ * (`byes.ts`), et une place encore à pourvoir n'appartient jamais à un match
+ * terminé.
  */
 export async function loadMiniBracket(
   tournamentId: number,
@@ -111,7 +122,7 @@ export async function loadMiniBracket(
   // pourvoir.
   const entrant = (row: MiniBracketRow, teamId: number | null, name: string | null, placeholder: string | null) => {
     if (teamId !== null) return shownEntrantName(name) ?? `#${teamId}`;
-    return row.isBye ? t("board.bye") : pending(placeholder);
+    return row.isBye || row.status === "COMPLETED" ? t("board.bye") : pending(placeholder);
   };
   return pickMiniBracketMatches(rows).map((row) => ({
     a: entrant(row, row.team1Id, row.team1Name, row.team1Placeholder),
@@ -122,7 +133,7 @@ export async function loadMiniBracket(
 }
 
 type MatchRow = RowDataPacket & {
-  phase_id: number | string | null;
+  phase_position: number | string | null;
   bracket: BracketType;
   round_number: number | string;
   match_number: number | string;
@@ -154,7 +165,7 @@ async function loadMiniBracketRows(tournamentId: number): Promise<MiniBracketRow
   const db = await getDatabase();
   const [rows] = await db.execute<MatchRow[]>(
     `SELECT
-      m.phase_id,
+      p.position AS phase_position,
       m.bracket,
       m.round_number,
       m.match_number,
@@ -169,6 +180,7 @@ async function loadMiniBracketRows(tournamentId: number): Promise<MiniBracketRow
       m.team1_score,
       m.team2_score
      FROM bg_matches m
+     LEFT JOIN bg_tournament_phases p ON p.id = m.phase_id
      LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
      LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
      WHERE m.tournament_id = ?`,
@@ -176,7 +188,7 @@ async function loadMiniBracketRows(tournamentId: number): Promise<MiniBracketRow
   );
 
   return rows.map((row) => ({
-    phaseId: Number(row.phase_id ?? 0),
+    phaseOrder: Number(row.phase_position ?? 0),
     bracket: row.bracket,
     roundNumber: Number(row.round_number),
     matchNumber: Number(row.match_number),

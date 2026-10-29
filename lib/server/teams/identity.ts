@@ -9,6 +9,7 @@ import {
 } from "@/lib/server/team-tags";
 import { checkTeamName, TEAM_NAME_ALREADY_USED } from "@/lib/shared/team-name";
 import { recordTermsAcceptance } from "@/lib/server/terms-acceptance";
+import { invalidateLandingTeamViews } from "@/lib/server/landing-cache";
 import { assertCanActOnTeam, userCanManageTeam, userOwnsTeam } from "./access";
 
 /*
@@ -149,6 +150,10 @@ export async function updateTeamMeta(
     if (isTeamNameConflict(error)) throw new Error(TEAM_NAME_ALREADY_USED);
     throw error;
   }
+  // Le nom est servi par l'accueil et `/classement` depuis le cache de la
+  // vitrine (leaderboard, bandeau, mini-arbre) : sans cela, l'ancien nom y
+  // restait jusqu'à 60 s.
+  if (patch.name !== undefined) invalidateLandingTeamViews();
 }
 
 export async function updateTeamLogo(
@@ -168,6 +173,8 @@ export async function updateTeamLogo(
   );
   const db = await getDatabase();
   await db.execute(`UPDATE bg_teams SET logo_url = ? WHERE id = ?`, [logoPath, teamId]);
+  // Logo servi par le leaderboard de l'accueil et de `/classement` (cache de la vitrine).
+  invalidateLandingTeamViews();
 }
 
 /**
@@ -205,6 +212,8 @@ export async function removeTeamLogoAsModerator(
       [logoUrl, teamId],
     );
     await connection.commit();
+    // Un logo retiré par la modération ne reste pas servi par le cache de la vitrine.
+    invalidateLandingTeamViews();
     return {
       teamName: rows[0].name,
       removedLogoUrl: logoUrl,

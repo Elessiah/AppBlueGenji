@@ -32,6 +32,8 @@ import { copyFile, mkdir, rename, unlink } from "node:fs/promises";
 import path from "node:path";
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+// Logo d'équipe servi par le leaderboard de l'accueil et de `/classement`.
+import { invalidateLandingTeamViews } from "@/lib/server/landing-cache";
 import { notifyUsers, toNotificationRecipient, type NotificationRecipient } from "@/lib/server/notify";
 import { moderationPush } from "@/lib/shared/push-messages";
 import { publishStaffAction } from "@/lib/server/staff-audit";
@@ -339,6 +341,7 @@ export async function deleteTeamLogoForReport(
     );
     quarantineId = Number(inserted.insertId);
     await connection.commit();
+    invalidateLandingTeamViews();
   } catch (error) {
     await connection.rollback();
     throw error;
@@ -525,6 +528,7 @@ export async function hideTeamLogo(reportId: number, teamId: number, actor: Repo
     );
     quarantineId = Number(inserted.insertId);
     await connection.commit();
+    invalidateLandingTeamViews();
   } catch (error) {
     await connection.rollback();
     // Le fichier revient en ligne : la base n'a rien retenu du masquage. Une
@@ -796,6 +800,7 @@ export async function restoreReportedImage(quarantineId: number, actor: ReportPe
         [quarantineId],
       );
       await connection.commit();
+      invalidateLandingTeamViews();
     } catch (error) {
       await moveFile(files.live, files.quarantined).catch(() => undefined);
       throw error;
