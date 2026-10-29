@@ -304,6 +304,19 @@ function readRefereeRows(state: World, sql: string, params: unknown[]): [unknown
   return null;
 }
 
+/** Lectures de `bg_users` : un compte, ou un lot (éligibilité des casters), `null` pour les autres requêtes. */
+function readUserRows(state: World, sql: string, params: unknown[]): unknown[] | null {
+  if (sql.includes("FROM bg_users WHERE id IN (")) {
+    const rows = params.map(Number).flatMap((id) => (state.users[id] ? [{ id, ...state.users[id] }] : []));
+    return [rows, []];
+  }
+  if (sql.includes("FROM bg_users WHERE id = ?")) {
+    const user = state.users[Number(params[0])];
+    return [user ? [user] : [], []];
+  }
+  return null;
+}
+
 /** Le double de `execute`, non typé en `PoolConnection` : les tests le composent. */
 function executeFor(state: World) {
   return async (rawSql: string, params: unknown[] = []) => {
@@ -316,10 +329,8 @@ function executeFor(state: World) {
       applyUpdate(state, sql, params);
       return [{ affectedRows: 1 }, []];
     }
-    if (sql.includes("FROM bg_users WHERE id = ?")) {
-      const user = state.users[Number(params[0])];
-      return [user ? [user] : [], []];
-    }
+    const userResult = readUserRows(state, sql, params);
+    if (userResult) return userResult;
     if (sql.includes("solo_user_id = ?")) {
       const userId = Number(params[0]);
       const ids = params.slice(1).map(Number);
@@ -535,6 +546,7 @@ describe("caster inscrit avant que son équipe n'atteigne le match", () => {
   });
 
   it("garde un caster étranger aux deux équipes", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
     state.match = matchState({ launch_pairing: null, caster_user_id: CASTER });
     await maintainMatchLaunches(connectionFor(state), 7);
     expect(casterOf(state)).toBe(CASTER);
@@ -621,8 +633,8 @@ describe("claimMatchCast", () => {
     // Sans stream sur le match : un stream sans lien est ouvert pour lui.
     expect(state.match?.streams).toEqual([{ id: 1, live_url: null }]);
     expect(state.match?.casters).toEqual([{ user_id: CASTER, stream_id: 1, ready_at: null }]);
-    // Aucun lien neuf : l'accueil n'a rien à relire.
-    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: false });
+    // Une inscription neuve : l'accueil relit (un co-caster éligible peut rendre un stream visible).
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
     expect(announceCastChange).toHaveBeenCalledWith({ kind: "CLAIMED", matchId: 42, replacedCasterId: null });
   });
 
@@ -801,6 +813,8 @@ describe("releaseMatchCast", () => {
   });
 
   it("refuse de retirer le caster d'un autre sans être arbitre", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.users[901] = ELIGIBLE_CASTER;
     state.match = matchState({ caster_user_id: CASTER });
     await expect(releaseMatchCast(42, 1, false, CASTER)).rejects.toThrow("NOT_MATCH_CASTER");
     expect(announceCastChange).not.toHaveBeenCalled();
@@ -813,6 +827,8 @@ describe("releaseMatchCast", () => {
   });
 
   it("co-caster qui part : l'autre reste, avec son « Prêt », sur le stream qu'ils partageaient", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.users[901] = ELIGIBLE_CASTER;
     state.match = matchState({ caster_user_id: 901, caster_ready_at: STAMP });
     state.match.casters.push({ user_id: CASTER, stream_id: 1, ready_at: null });
     await releaseMatchCast(42, CASTER, false);
@@ -1566,5 +1582,186 @@ describe("opposition d'arbitre retenue (`releaseObjectingReferee`, `REFEREE_OBJE
     await takeMatchReferee(42, 961);
 
     expect(state.match?.referee_user_id).toBe(961);
+  });
+});
+
+describe("casters devenus inéligibles : retirés au lancement (EF-29)", () => {
+  const INELIGIBLE = { ...ELIGIBLE_CASTER, platform_roles_json: JSON.stringify([]) };
+
+  it("forceLaunchMatch_ineligibleCaster_releasesItWithItsStreamBeforeLaunching", async () => {
+    state.users[CASTER] = INELIGIBLE;
+    state.match = matchState({ caster_user_id: CASTER });
+    state.match.streams = [{ id: 1, live_url: "https://twitch.tv/caster" }];
+
+    await forceLaunchMatch(42);
+
+    expect(state.match?.launched_at).toBe(STAMP);
+    expect(casterOf(state)).toBeNull();
+    // Le lien de sa chaîne ne devient pas public avec le lancement.
+    expect(state.match?.streams).toEqual([]);
+    expect(queueCastChange).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ kind: "AUTO_RELEASED", casterId: CASTER, reason: "INELIGIBLE" }),
+    );
+  });
+
+  it("forceLaunchMatch_eligibleCaster_keepsIt", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({ caster_user_id: CASTER });
+
+    await forceLaunchMatch(42);
+
+    expect(casterOf(state)).toBe(CASTER);
+    expect(queueCastChange).not.toHaveBeenCalled();
+  });
+
+  it("setMatchReady_ineligibleCoCaster_doesNotBlockTheLaunch", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.users[901] = INELIGIBLE;
+    state.match = matchState({ team2_ready_at: STAMP, caster_user_id: CASTER });
+    state.match.casters.push({ user_id: 901, stream_id: 1, ready_at: null });
+
+    await setMatchReady(42, 1, true);
+    await expect(setMatchReady(42, CASTER, true)).resolves.toEqual({ launched: true });
+
+    expect(state.match?.casters.map((caster) => caster.user_id)).toEqual([CASTER]);
+  });
+
+  it("maintainMatchLaunches_ineligibleCasterAtLaunch_releasesItInTheLaunchTransaction", async () => {
+    state.users[CASTER] = INELIGIBLE;
+    state.match = matchState({ team1_is_ghost: 1, team2_is_ghost: 1, caster_user_id: CASTER });
+
+    await maintainMatchLaunches(connectionFor(state), 7);
+
+    expect(state.match?.launched_at).toBe(STAMP);
+    expect(casterOf(state)).toBeNull();
+    expect(queueCastChange).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ casterId: CASTER, reason: "INELIGIBLE" }),
+    );
+  });
+});
+
+describe("maintainMatchLaunches — éligibilité des casters relue en lecture courante (EF-29)", () => {
+  it("maintainMatchLaunches_casterAtLaunch_rereadsEligibilityWithShareLockAndLocksCastersCurrent", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({ team1_is_ghost: 1, team2_is_ghost: 1, caster_user_id: CASTER });
+    state.issued = [];
+
+    await maintainMatchLaunches(connectionFor(state), 7);
+
+    // L'instantané précède le verrou : seules les lectures verrouillantes sont courantes.
+    expect(state.issued.some((sql) => /FROM bg_users WHERE id IN \(\?\) LOCK IN SHARE MODE$/.test(sql))).toBe(true);
+    expect(state.issued.some((sql) => /FROM bg_match_casters .*FOR UPDATE$/.test(sql))).toBe(true);
+    expect(casterOf(state)).toBe(CASTER);
+  });
+});
+
+describe("maintainMatchLaunches — retrait d'un caster inéligible publié (EF-29)", () => {
+  const INELIGIBLE = { ...ELIGIBLE_CASTER, platform_roles_json: JSON.stringify([]) };
+
+  it("maintainMatchLaunches_ineligibleCasterInOpenLobbyNotDue_countsTheRemovalAsChange", async () => {
+    state.users[CASTER] = INELIGIBLE;
+    state.match = matchState({ lobby_opened_at: new Date().toISOString(), caster_user_id: CASTER });
+
+    await expect(maintainMatchLaunches(connectionFor(state), 7)).resolves.toBe(1);
+
+    expect(casterOf(state)).toBeNull();
+    expect(state.match?.launched_at).toBeNull();
+  });
+
+  it("maintainMatchLaunches_eligibleCasterInOpenLobbyNotDue_reportsNoChange", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({ lobby_opened_at: new Date().toISOString(), caster_user_id: CASTER });
+
+    await expect(maintainMatchLaunches(connectionFor(state), 7)).resolves.toBe(0);
+
+    expect(casterOf(state)).toBe(CASTER);
+  });
+});
+
+describe("autogestion : lecture des casters au lancement qui suit (EF-29)", () => {
+  const REFEREE = 950;
+
+  it("setRoundSelfManaged_runningMatchRefereeRemoved_launchRereadsCastersAndEligibilityCurrent", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({
+      referee_user_id: REFEREE,
+      team1_is_ghost: 1,
+      team2_is_ghost: 1,
+      caster_user_id: CASTER,
+    });
+    state.issued = [];
+
+    await setRoundSelfManaged(7, { phaseId: 0, roundNumber: 1, bracket: null }, true);
+
+    // Les candidats de la manche sont lus avant le verrou du match : le
+    // lancement relit casters et éligibilité en lecture courante.
+    expect(state.issued.some((sql) => /FROM bg_match_casters .*FOR UPDATE$/.test(sql))).toBe(true);
+    expect(state.issued.some((sql) => /FROM bg_users WHERE id IN \(\?\) LOCK IN SHARE MODE$/.test(sql))).toBe(true);
+  });
+
+  it("setMatchSelfManaged_runningMatchRefereeRemoved_launchKeepsPlainCasterRead", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({
+      referee_user_id: REFEREE,
+      team1_is_ghost: 1,
+      team2_is_ghost: 1,
+      caster_user_id: CASTER,
+    });
+    state.issued = [];
+
+    await setMatchSelfManaged(42, true);
+
+    // Le verrou du match est la première instruction : lecture ordinaire.
+    expect(state.issued.some((sql) => /FROM bg_match_casters /.test(sql))).toBe(true);
+    expect(state.issued.some((sql) => /FROM bg_match_casters .*FOR UPDATE$/.test(sql))).toBe(false);
+  });
+});
+
+describe("releaseMatchCast / claimMatchCast : gardes et publications (EF-29)", () => {
+  it("releaseMatchCast_completedMatch_refusesAndKeepsCasterStreamAndLink", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({ status: "COMPLETED", caster_user_id: CASTER });
+    state.match.streams = [{ id: 1, live_url: "https://twitch.tv/caster", link_user_id: CASTER }];
+
+    await expect(releaseMatchCast(42, CASTER, false)).rejects.toThrow("MATCH_ALREADY_COMPLETED");
+
+    expect(casterOf(state)).toBe(CASTER);
+    expect(state.match?.streams).toHaveLength(1);
+    expect(announceCastChange).not.toHaveBeenCalled();
+  });
+
+  it("releaseMatchCast_notACaster_publishesNothing", async () => {
+    state.match = matchState();
+
+    await releaseMatchCast(42, CASTER, false);
+
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+    expect(announceCastChange).not.toHaveBeenCalled();
+  });
+
+  it("claimMatchCast_alreadyCaster_publishesNoLandingRefresh", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({ caster_user_id: CASTER });
+
+    await claimMatchCast(42, CASTER, true);
+
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: false });
+    expect(announceCastChange).not.toHaveBeenCalled();
+  });
+
+  it("claimMatchCast_coCast_rereadsHoldersEligibilityCurrentAndReadsCastersPlain", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.users[901] = ELIGIBLE_CASTER;
+    state.match = matchState({ caster_user_id: 901 });
+    state.issued = [];
+
+    await claimMatchCast(42, CASTER, true, { streamId: 1 });
+
+    // Lecture courante, par lot, de ceux qui tiennent le stream.
+    expect(state.issued.some((sql) => /FROM bg_users WHERE id IN \(\?\) LOCK IN SHARE MODE$/.test(sql))).toBe(true);
+    // Verrou du match déjà tenu : pas de verrou d'intervalle sur les casters ni les streams.
+    expect(state.issued.filter((sql) => /FROM bg_match_(casters|streams) .*FOR UPDATE/.test(sql))).toEqual([]);
   });
 });

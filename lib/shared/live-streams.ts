@@ -223,6 +223,20 @@ export function normalizeStreamUrl(input: unknown): string | null {
   return normalized.length > MAX_STREAM_URL_LENGTH ? null : normalized;
 }
 
+/**
+ * Lien saisi pour un stream (configuration du direct, inscription d'un caster,
+ * chaîne du tournoi) : vide ou blanc = aucun lien (`null`) ; un lien non reconnu
+ * est refusé. Une seule règle pour les trois écritures.
+ *
+ * @throws `INVALID_STREAM_URL`
+ */
+export function parseStreamUrlInput(raw: string | null): string | null {
+  if (raw === null || raw.trim() === "") return null;
+  const url = normalizeStreamUrl(raw);
+  if (url === null) throw new Error("INVALID_STREAM_URL");
+  return url;
+}
+
 /** Vrai si `input` est une URL de diffusion exploitable. */
 export function isValidStreamUrl(input: unknown): boolean {
   return normalizeStreamUrl(input) !== null;
@@ -370,4 +384,39 @@ export function canConfigureLive(match: MatchLiveInput): boolean {
  */
 export function staffStream<T extends { liveUrl: string | null; staff: boolean }>(streams: readonly T[]): T | null {
   return streams.find((stream) => stream.staff) ?? streams.find((stream) => stream.liveUrl === null) ?? null;
+}
+
+/**
+ * Les streams qu'un match **montre** : celui du staff, et ceux qu'un caster qui
+ * compte encore tient (`heldStreamIds`). Un match lancé ou joué (`settled`) les
+ * montre tous : on ne réécrit ni une diffusion en cours ni l'histoire. Le
+ * stream d'un caster que le site ne montre plus (permission `live` retirée…)
+ * est tu avant le lancement — l'instantané (`mapMatch`) et l'inscription d'un
+ * co-caster (`claimMatchCast`) lisent **cette** règle ; l'accueil et l'annonce
+ * #live la rejouent en SQL (`firstStreamUrlSql`, `CAST_ELIGIBLE_SQL`), le test
+ * `match-casters.test.ts` garde les deux alignées.
+ */
+export function shownStreams<T extends { id: number; staff: boolean }>(
+  streams: readonly T[],
+  heldStreamIds: ReadonlySet<number>,
+  settled: boolean,
+): T[] {
+  return settled ? [...streams] : streams.filter((stream) => stream.staff || heldStreamIds.has(stream.id));
+}
+
+/**
+ * Le **premier lien** d'un match parmi ses streams montrés : celui du staff
+ * quand il en a un, à défaut le stream au plus petit identifiant qui en porte
+ * un. Les vues compactes (carte, bandeaux) montrent celui-là.
+ */
+export function firstStreamUrl(
+  streams: readonly { id: number; liveUrl: string | null; staff: boolean }[],
+): string | null {
+  const linked = streams.filter((stream) => stream.liveUrl !== null);
+  const first =
+    linked.find((stream) => stream.staff) ?? linked.reduce<(typeof linked)[number] | null>(
+      (best, stream) => (best === null || stream.id < best.id ? stream : best),
+      null,
+    );
+  return first?.liveUrl ?? null;
 }

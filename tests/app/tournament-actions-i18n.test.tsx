@@ -253,6 +253,13 @@ describe("table des refus (error-map)", () => {
     }
   });
 
+  it("mapError_liveDialogRefusals_translatedFrAndEnNotGeneric (EF-29)", () => {
+    expect(mapError("MATCH_NOT_CASTABLE")).toBe("Ce match ne peut plus être diffusé.");
+    expect(mapError("MATCH_NOT_CASTABLE", EN_ERRORS)).toBe("This match can no longer be broadcast.");
+    expect(mapError("INVALID_ORGANISATION_LINK")).toBe("Le choix « lien de l'organisation » est invalide.");
+    expect(mapError("INVALID_ORGANISATION_LINK", EN_ERRORS)).toBe("The “organisation's link” choice is invalid.");
+  });
+
   it("anglais : code connu, code inconnu, phrase déjà rédigée", () => {
     expect(mapError("TOURNAMENT_FULL", EN_ERRORS)).toBe("This tournament is full.");
     expect(mapError("SOMETHING_NEW", EN_ERRORS)).toBe(EN.tournamentErrors.unknown);
@@ -811,7 +818,7 @@ describe("rendu anglais — aucun français dans les gestes", () => {
     ["retour en arrière", () => <RollbackRoundDialog tournamentId={1} stageLabel="round 2" stageKey="0:1" matches={[versus]} tournamentFinished onClose={noop} onRolledBack={noop} />],
     ["signalement", () => <IssueReportDialog tournamentId={1} match={versus} onClose={noop} />],
     ["pénalité", () => <EndurancePenaltyDialog tournamentId={1} teamId={10} teamName="Alpha" currentPoints={5} round={2} onClose={noop} onApplied={noop} />],
-    ["diffusion", () => <MatchLiveDialog match={versus} onClose={noop} onSaved={noop} />],
+    ["diffusion", () => <MatchLiveDialog match={versus} onClose={noop} onSaved={noop} canSpeakForOrganisation />],
     ["rediff", () => <MatchReplayDialog match={{ ...versus, status: "COMPLETED", team1Score: 2, team2Score: 0, winnerTeamId: 10 }} onClose={noop} onSaved={noop} />],
     ["programmation", () => <MatchScheduleDialog match={versus} tournamentStartAt={OPEN.startAt} tournamentFinished={false} refereeScheduling onClose={noop} onSaved={noop} />],
     ["équipes fantômes", () => <GhostRegistrationDialog tournamentId={1} remainingSlots={4} onClose={noop} onRegistered={noop} />],

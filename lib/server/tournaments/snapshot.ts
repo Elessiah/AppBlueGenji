@@ -475,8 +475,11 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
     // Casters et streams, une lecture chacun pour tout le plateau — dans
     // l'instantané commun eux aussi (`docs/features/MATCH_LAUNCH.md`).
     const matchIds = matches.map((row) => Number(row.id));
-    const castersByMatch = await loadMatchCasters(connection, matchIds);
     const streamsByMatch = await loadMatchStreams(connection, matchIds);
+    // Tout caster tient un stream (`stream_id`, clé étrangère) : sans stream
+    // sur le plateau, il n'a aucun caster à lire.
+    const castersByMatch =
+      streamsByMatch.size === 0 ? new Map() : await loadMatchCasters(connection, matchIds);
     // Cartes par manche et règles de ban, dans l'instantané commun : flux et
     // REST de secours les portent ensemble (`docs/features/ROUND_MAPS.md`).
     const mapRules = await loadMapRules(connection, tournamentId, tournament);

@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { useToast } from "@/components/ui/toast";
 import {
   isValidStreamUrl,
@@ -21,6 +22,12 @@ interface MatchLiveDialogProps {
   match: BracketMatch;
   onClose: () => void;
   onSaved: () => void;
+  /**
+   * Le lecteur parle pour l'organisation (permission `tournaments`) : il dit si
+   * le lien est celui de l'organisation ou sa propre chaîne. Sans elle, le lien
+   * est toujours le sien.
+   */
+  canSpeakForOrganisation: boolean;
 }
 
 /**
@@ -34,7 +41,7 @@ interface MatchLiveDialogProps {
  * verrouille Échap pendant l'envoi : une modale en train d'écrire ne se
  * referme pas.
  */
-export function MatchLiveDialog({ match, onClose, onSaved }: Readonly<MatchLiveDialogProps>) {
+export function MatchLiveDialog({ match, onClose, onSaved, canSpeakForOrganisation }: Readonly<MatchLiveDialogProps>) {
   const { showError, showSuccess } = useToast();
   const mapError = useMapError();
   const text = useDialogsText();
@@ -46,6 +53,10 @@ export function MatchLiveDialog({ match, onClose, onSaved }: Readonly<MatchLiveD
   const [liveUrl, setLiveUrl] = useState(
     (match.streams.length > 0 ? staffStream(match.streams)?.liveUrl : match.liveUrl) ?? "",
   );
+  // Fausse par défaut (protection des données dès la conception) : un lien
+  // n'est celui de l'organisation — gardé après la suppression du compte de qui
+  // le pose — que si ce membre le coche ; rien ne se déduit de ce qu'il caste.
+  const [organisationLink, setOrganisationLink] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const urlTouched = liveUrl.trim().length > 0;
@@ -80,6 +91,7 @@ export function MatchLiveDialog({ match, onClose, onSaved }: Readonly<MatchLiveD
         body: JSON.stringify({
           trigger: streamed ? trigger : null,
           liveUrl: streamed ? liveUrl.trim() || null : null,
+          ...(canSpeakForOrganisation ? { organisationLink } : {}),
         }),
       });
       const payload = (await response.json()) as { error?: string };
@@ -200,7 +212,33 @@ export function MatchLiveDialog({ match, onClose, onSaved }: Readonly<MatchLiveD
                 {urlInvalid
                   ? t("live.urlInvalid", { platforms: LIVE_PLATFORMS.join(", ") })
                   : t("live.urlHint", { platforms: LIVE_PLATFORMS.join(", ") })}
+                {!canSpeakForOrganisation && ` ${t("live.urlOwnChannel")}`}
               </p>
+              {canSpeakForOrganisation && urlTouched && (
+                <InfoHintRow inline>
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      marginTop: 10,
+                      fontSize: 13,
+                      color: "var(--ink-soft, #c3ccd8)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={organisationLink}
+                      onChange={(e) => setOrganisationLink(e.target.checked)}
+                    />
+                    {t("live.organisationLink")}
+                  </label>
+                  <InfoHint id="match-live-org-hint" subject={t("live.organisationLinkSubject")}>
+                    <p>{t("live.organisationLinkHint")}</p>
+                  </InfoHint>
+                </InfoHintRow>
+              )}
             </div>
           </>
         )}

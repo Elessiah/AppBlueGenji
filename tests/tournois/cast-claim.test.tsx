@@ -361,9 +361,15 @@ describe("Configuration du direct — l'aide du lien", () => {
     expect(enDialogs.live.urlHint).toContain("without a live setup link: its Discord announcement will then point to the first link opened by a caster");
   });
 
-  it("dit qu'un caster du match qui pose un lien ici y met sa propre chaîne (FR et EN)", () => {
-    expect(frDialogs.live.urlHint).toContain("Si tu castes déjà ce match, le lien saisi ici est celui de ta propre chaîne.");
-    expect(enDialogs.live.urlHint).toContain("If you already cast this match, the link entered here is your own channel.");
+  it("ne déduit plus la provenance du lien de ce que le poseur caste : la case « lien de l'organisation » la dit (FR et EN)", () => {
+    expect(frDialogs.live.urlHint).not.toContain("Si tu castes déjà ce match");
+    expect(enDialogs.live.urlHint).not.toContain("If you already cast this match");
+    expect(frDialogs.live.organisationLink).toBe("Ce lien est celui de l'organisation");
+    expect(enDialogs.live.organisationLink).toBe("This link is the organisation's");
+    expect(frDialogs.live.organisationLinkHint).toContain("Décoché, c'est ta propre chaîne");
+    expect(enDialogs.live.organisationLinkHint).toContain("Unticked, it is your own channel");
+    expect(frDialogs.live.urlOwnChannel).toContain("retiré du match si ton compte est supprimé");
+    expect(enDialogs.live.urlOwnChannel).toContain("removed from the match if your account is deleted");
   });
 });
 

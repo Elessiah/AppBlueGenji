@@ -613,14 +613,14 @@ describe("listViewerMatchLaunches — co-casters", () => {
     state.users = [casterUser(CASTER), casterUser(COCASTER, { platform_roles_json: null })];
     const [info] = await listViewerMatchLaunches(viewer);
     expect(info.casters.map((caster) => caster.userId)).toEqual([CASTER]);
-    const releases = state.writes.filter((sql) => sql.startsWith("DELETE FROM bg_match_casters"));
+    const releases = state.writes.filter((sql) => sql === "DELETE FROM bg_match_casters WHERE match_id = ? AND user_id = ?");
     expect(releases).toHaveLength(1);
   });
 });
 
 describe("listViewerMatchLaunches — caster qui ne remplit plus la condition", () => {
   const castRelease = (world: World) =>
-    world.writes.filter((sql) => sql.startsWith("DELETE FROM bg_match_casters"));
+    world.writes.filter((sql) => sql === "DELETE FROM bg_match_casters WHERE match_id = ? AND user_id = ?");
 
   beforeEach(() => {
     state.members = [
@@ -795,7 +795,7 @@ describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => 
     const info = await loadViewerMatchContacts(viewer, 42);
     expect(info?.phase).toBe("LAUNCHED");
     expect(info?.casters).toEqual([]);
-    expect(state.writes.filter((sql) => sql.startsWith("DELETE FROM bg_match_casters"))).toHaveLength(1);
+    expect(state.writes.filter((sql) => sql === "DELETE FROM bg_match_casters WHERE match_id = ? AND user_id = ?")).toHaveLength(1);
   });
 
   it("ne met pas en file le retrait du caster d'un match au report en attente", async () => {
@@ -862,7 +862,7 @@ describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => 
       state.candidates = [row];
       state.writes = [];
       await expect(loadViewerMatchContacts(viewer, 42)).resolves.toBeNull();
-      expect(state.writes.filter((sql) => sql.startsWith("DELETE FROM bg_match_casters"))).toHaveLength(1);
+      expect(state.writes.filter((sql) => sql === "DELETE FROM bg_match_casters WHERE match_id = ? AND user_id = ?")).toHaveLength(1);
     }
   });
 
@@ -1009,7 +1009,7 @@ describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => 
       const info = await loadViewerMatchContacts(viewer, 42);
       expect(info?.viewer).toMatchObject({ role: "TEAM1", isCaster: false });
       expect(info?.casters).toEqual([]);
-      expect(state.writes.filter((sql) => sql.startsWith("DELETE FROM bg_match_casters"))).toHaveLength(1);
+      expect(state.writes.filter((sql) => sql === "DELETE FROM bg_match_casters WHERE match_id = ? AND user_id = ?")).toHaveLength(1);
       // Vu d'un autre lecteur (arbitre), par le roster lu pour les contacts.
       state.writes = [];
       state.viewerMemberships = [];
@@ -1025,7 +1025,7 @@ describe("loadViewerMatchContacts — bouton « Contacts » d'une carte", () => 
       state.candidates = [candidate({ match_launch_phase: 0, start_at: later, lobby_opened_at: null, caster_user_id: VIEWER })];
       const scheduled = await loadViewerMatchContacts(viewer, 42);
       expect(scheduled?.casters).toEqual([]);
-      expect(state.writes.filter((sql) => sql.startsWith("DELETE FROM bg_match_casters"))).toHaveLength(1);
+      expect(state.writes.filter((sql) => sql === "DELETE FROM bg_match_casters WHERE match_id = ? AND user_id = ?")).toHaveLength(1);
       state.writes = [];
       state.candidates = [candidate({ match_launch_phase: 0, caster_user_id: VIEWER, launched_at: OPENED })];
       const launched = await loadViewerMatchContacts(viewer, 42);

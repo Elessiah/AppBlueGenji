@@ -125,6 +125,8 @@
     "MATCH_NOT_LIVE_READY": "Only a playable match with no score entered can go on air.",
     "MATCH_START_AT_REQUIRED": "Set the match's start date first so it can go on air at that time.",
     "MATCH_LIVE_UPDATE_FAILED": "Error while updating the stream.",
+    "MATCH_NOT_CASTABLE": "This match can no longer be broadcast.",
+    "INVALID_ORGANISATION_LINK": "The “organisation's link” choice is invalid.",
     "INVALID_MATCH_START_AT": "Start date not recognized.",
     "PAYLOAD_TOO_LARGE": "Request too large.",
     "UNSUPPORTED_CONTENT_TYPE": "Request refused. Reload the page, then try again.",

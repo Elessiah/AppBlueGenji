@@ -981,9 +981,9 @@ export function RgpdEn({
             published with the match; the channel name, read from that link (often the caster&apos;s username), is its visible text. That stream goes, with its link, once no caster holds it any more; only the link
             set in the match&apos;s live configuration (by the organizers or a caster) stays with the match. The link a
             caster provided, there or when opening their stream, also goes when their account is deleted, played
-            matches included, even if another caster still holds that stream; a member of the organizers who already
-            casts the match when they set their channel there counts as a caster — a link the organizers set without
-            casting that match (even if they cast it later) stays theirs. A link set in that configuration before the site recorded who provided it has no
+            matches included, even if another caster still holds that stream; a member of the organizers states, when
+            setting the link, whether it is the organizers&apos; link — it then stays with the match, even if that
+            member casts it — or their own channel, which goes with their account. A link set in that configuration before the site recorded who provided it has no
             known author and stays with the match.{" "}
             {STREAM_NOTICE_SHOWN_EN} This processing is based on the association&apos;s legitimate interest in
             promoting its competitions. <EnglishLegalText text={STREAM_NOTICE_OBJECTION_EN} /> A replay link that shows the player is then

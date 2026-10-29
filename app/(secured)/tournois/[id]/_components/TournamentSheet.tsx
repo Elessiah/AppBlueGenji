@@ -1391,6 +1391,7 @@ function TournamentSheetView({
           match={matchForLive}
           onClose={() => setMatchForLiveId(null)}
           onSaved={() => void refresh()}
+          canSpeakForOrganisation={detail.isAdmin}
         />
       )}
 

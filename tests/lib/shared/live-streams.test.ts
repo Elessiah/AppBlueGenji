@@ -1,6 +1,9 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   canConfigureLive,
+  firstStreamUrl,
+  parseStreamUrlInput,
+  shownStreams,
   canToggleOnAir,
   isMatchCastable,
   isMatchLive,
@@ -426,5 +429,65 @@ describe("canToggleOnAir", () => {
     expect(canToggleOnAir(match({ liveTrigger: "MANUAL", status: "AWAITING_CONFIRMATION" }))).toBe(
       false,
     );
+  });
+});
+
+describe("parseStreamUrlInput", () => {
+  it.each<[string | null]>([[null], [""], ["   "]])("%j : aucun lien", (raw) => {
+    expect(parseStreamUrlInput(raw)).toBeNull();
+  });
+
+  it("normalise un lien reconnu", () => {
+    expect(parseStreamUrlInput("  kick.com/bg ")).toBe("https://kick.com/bg");
+  });
+
+  it("refuse un lien non reconnu", () => {
+    expect(() => parseStreamUrlInput("https://exemple.com/live")).toThrow("INVALID_STREAM_URL");
+  });
+});
+
+describe("shownStreams", () => {
+  const streams = [
+    { id: 1, staff: true },
+    { id: 2, staff: false },
+    { id: 3, staff: false },
+  ];
+
+  it("garde le stream du staff et ceux qu'un caster qui compte tient", () => {
+    expect(shownStreams(streams, new Set([3]), false).map((stream) => stream.id)).toEqual([1, 3]);
+  });
+
+  it("tait le stream qu'aucun caster qui compte ne tient", () => {
+    expect(shownStreams(streams, new Set(), false).map((stream) => stream.id)).toEqual([1]);
+  });
+
+  it("un match lancé ou joué montre tout", () => {
+    expect(shownStreams(streams, new Set(), true)).toHaveLength(3);
+  });
+});
+
+describe("firstStreamUrl", () => {
+  it("préfère le lien du staff, même d'un identifiant plus grand", () => {
+    expect(
+      firstStreamUrl([
+        { id: 1, liveUrl: "https://twitch.tv/a", staff: false },
+        { id: 2, liveUrl: "https://twitch.tv/staff", staff: true },
+      ]),
+    ).toBe("https://twitch.tv/staff");
+  });
+
+  it("à défaut, le plus petit identifiant qui porte un lien, quel que soit l'ordre reçu", () => {
+    expect(
+      firstStreamUrl([
+        { id: 4, liveUrl: "https://twitch.tv/b", staff: false },
+        { id: 3, liveUrl: null, staff: false },
+        { id: 2, liveUrl: "https://twitch.tv/a", staff: false },
+      ]),
+    ).toBe("https://twitch.tv/a");
+  });
+
+  it("ignore un stream du staff sans lien ; null sans aucun lien", () => {
+    expect(firstStreamUrl([{ id: 1, liveUrl: null, staff: true }])).toBeNull();
+    expect(firstStreamUrl([])).toBeNull();
   });
 });

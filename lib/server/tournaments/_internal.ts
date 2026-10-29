@@ -8,7 +8,12 @@ import {
   parseRegistrationFilters,
   type PlayerRequirement,
 } from "@/lib/shared/registration-filters";
-import { normalizeStreamUrl, type MatchLiveTrigger } from "@/lib/shared/live-streams";
+import {
+  firstStreamUrl,
+  normalizeStreamUrl,
+  shownStreams,
+  type MatchLiveTrigger,
+} from "@/lib/shared/live-streams";
 import { normalizeReplayUrl } from "@/lib/shared/match-replay";
 import { parseTournamentImage } from "@/lib/shared/tournament-image";
 import { currentLaunchState, launchReadiness, launchStateIsCurrent } from "@/lib/shared/match-launch";
@@ -141,8 +146,6 @@ export type MatchRow = RowDataPacket & {
   start_at: Date | null;
   /** NULL = match non casté (cf. `lib/shared/live-streams.ts`). */
   live_trigger: MatchLiveTrigger | null;
-  /** Premier lien du match (`firstStreamUrlSql`, `./match-casters`). */
-  live_url: string | null;
   live_started_at: Date | null;
   /** Lancement (`lib/shared/match-launch.ts`) — absents des lectures partielles. */
   host_team_id?: number | null;
@@ -305,10 +308,17 @@ export type MatchCastExtras = {
 
 export function mapMatch(row: MatchRow, extras: MatchCastExtras = {}): BracketMatch {
   // Un stream que seul tient un caster que la lecture tait n'est pas montré
-  // (sa chaîne n'est plus celle d'un caster du match) — comme le premier lien
-  // (`firstStreamUrlSql`) ; le stream du staff reste.
+  // (sa chaîne n'est plus celle d'un caster du match) ; le stream du staff
+  // reste. Le premier lien se tire des streams montrés (`firstStreamUrl`) : ni
+  // sous-requête par match dans la lecture du plateau, ni troisième écriture
+  // de la règle (`shownStreams`).
   const heldStreams = new Set(
     (extras.casters ?? []).filter((caster) => !casterWithdrawn(row, caster)).map((caster) => caster.streamId),
+  );
+  const shown = shownStreams(
+    extras.streams ?? [],
+    heldStreams,
+    row.status === "COMPLETED" || (row.launched_at ?? null) !== null,
   );
   return {
     id: Number(row.id),
@@ -354,10 +364,9 @@ export function mapMatch(row: MatchRow, extras: MatchCastExtras = {}): BracketMa
     phasePosition: row.phase_position == null ? null : Number(row.phase_position),
     startAt: toIso(row.start_at ?? null),
     liveTrigger: row.live_trigger ?? null,
-    liveUrl: normalizeStreamUrl(row.live_url),
+    liveUrl: normalizeStreamUrl(firstStreamUrl(shown)),
     // Revalidés à la lecture, comme le premier lien.
-    streams: (extras.streams ?? [])
-      .filter((stream) => stream.staff || heldStreams.has(stream.id))
+    streams: shown
       .map((stream) => ({
         id: stream.id,
         liveUrl: normalizeStreamUrl(stream.liveUrl),

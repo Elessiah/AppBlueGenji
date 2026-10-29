@@ -70,15 +70,23 @@ export async function loadCastEligibility(executor: Executor, userId: number): P
   return castEligibilityBlock(rows[0]);
 }
 
-/** Les comptes de la liste qui remplissent encore la condition, en une lecture. */
+/**
+ * Les comptes de la liste qui remplissent encore la condition, en une lecture.
+ * `lock` : lecture *courante* verrouillée en partage — celle d'une inscription,
+ * qu'un instantané `REPEATABLE READ` rendrait aveugle à une permission retirée
+ * pendant l'attente du verrou du match.
+ */
 export async function loadEligibleCasterIds(
   executor: Executor,
   userIds: readonly number[],
+  lock = false,
 ): Promise<Set<number>> {
   const ids = [...new Set(userIds)];
   if (ids.length === 0) return new Set();
   const [rows] = await executor.execute<(CastEligibilityRow & { id: number })[]>(
-    `SELECT id, ${CAST_ELIGIBILITY_COLUMNS} FROM bg_users WHERE id IN (${ids.map(() => "?").join(", ")})`,
+    `SELECT id, ${CAST_ELIGIBILITY_COLUMNS} FROM bg_users WHERE id IN (${ids.map(() => "?").join(", ")})${
+      lock ? " LOCK IN SHARE MODE" : ""
+    }`,
     ids,
   );
   return new Set(rows.filter((row) => castEligibilityBlock(row) === null).map((row) => Number(row.id)));

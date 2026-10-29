@@ -47,7 +47,7 @@ import {
   type MatchCardActionId,
 } from "../_lib/match-card-actions";
 import { orReload } from "@/lib/shared/lazy-component";
-import { CastClaimDialog, type CastClaimOutcome } from "./CastClaimDialog";
+import type { CastClaimOutcome } from "./CastClaimDialog";
 import { RefereeDialog } from "./RefereeDialog";
 import type { CastClaimBody } from "../_lib/cast-claim";
 import styles from "./MatchCardActions.module.css";
@@ -58,6 +58,12 @@ const MatchContactsDialog = dynamic(
   () => orReload(import("@/components/match-launch/MatchContactsDialog").then((m) => m.MatchContactsDialog)),
   { ssr: false },
 );
+
+// Chargée au premier clic sur « Caster » : seul le staff `live` l'ouvre, et elle
+// embarque son CSS et ses aides d'erreur de champ.
+const CastClaimDialog = dynamic(() => orReload(import("./CastClaimDialog").then((m) => m.CastClaimDialog)), {
+  ssr: false,
+});
 
 async function send(url: string, method: string, body?: unknown): Promise<void> {
   const response = await fetch(url, {

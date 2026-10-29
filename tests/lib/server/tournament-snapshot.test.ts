@@ -754,8 +754,21 @@ describe("getTournamentSnapshot — casters et streams (porte commune du flux et
     expect(bare.streams).toEqual([]);
   });
 
+  it("ne lit pas les casters quand aucun stream n'existe sur le plateau : tout caster tient un stream", async () => {
+    jest.mocked(getMatchRows).mockResolvedValue([matchRow({ id: 1, status: "READY" })]);
+
+    const snapshot = await getTournamentSnapshot(TOURNAMENT_ID);
+
+    expect(loadMatchStreams).toHaveBeenCalledTimes(1);
+    expect(loadMatchCasters).not.toHaveBeenCalled();
+    expect(snapshot?.matches[0].casters).toEqual([]);
+  });
+
   it("tait un caster devenu inéligible d'un match pas encore lancé", async () => {
     jest.mocked(getMatchRows).mockResolvedValue([matchRow({ id: 1, status: "READY" })]);
+    jest.mocked(loadMatchStreams).mockResolvedValue(
+      new Map([[1, [{ id: 11, matchId: 1, liveUrl: null, staff: false }]]]),
+    );
     jest.mocked(loadMatchCasters).mockResolvedValue(
       new Map([
         [1, [
