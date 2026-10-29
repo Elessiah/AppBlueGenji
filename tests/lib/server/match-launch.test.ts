@@ -1657,6 +1657,29 @@ describe("maintainMatchLaunches — éligibilité des casters relue en lecture c
   });
 });
 
+describe("maintainMatchLaunches — retrait d'un caster inéligible publié (EF-29)", () => {
+  const INELIGIBLE = { ...ELIGIBLE_CASTER, platform_roles_json: JSON.stringify([]) };
+
+  it("maintainMatchLaunches_ineligibleCasterInOpenLobbyNotDue_countsTheRemovalAsChange", async () => {
+    state.users[CASTER] = INELIGIBLE;
+    state.match = matchState({ lobby_opened_at: new Date().toISOString(), caster_user_id: CASTER });
+
+    await expect(maintainMatchLaunches(connectionFor(state), 7)).resolves.toBe(1);
+
+    expect(casterOf(state)).toBeNull();
+    expect(state.match?.launched_at).toBeNull();
+  });
+
+  it("maintainMatchLaunches_eligibleCasterInOpenLobbyNotDue_reportsNoChange", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({ lobby_opened_at: new Date().toISOString(), caster_user_id: CASTER });
+
+    await expect(maintainMatchLaunches(connectionFor(state), 7)).resolves.toBe(0);
+
+    expect(casterOf(state)).toBe(CASTER);
+  });
+});
+
 describe("autogestion : lecture des casters au lancement qui suit (EF-29)", () => {
   const REFEREE = 950;
 
