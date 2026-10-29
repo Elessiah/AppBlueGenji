@@ -168,6 +168,8 @@ describe("MatchScheduleDialog — sous-titre", () => {
     expect(SOURCE).toContain('"schedule.versus"');
     expect(SOURCE).toContain('first: (chunks) => <EntrantName plain teamId={match.team1Id} name={chunks.join("")} />');
     expect(SOURCE).toContain('second: (chunks) => <EntrantName plain teamId={match.team2Id} name={chunks.join("")} />');
+    // Noms nettoyés, repli « Engagé #id » ; « TBD » seulement pour une place vide.
+    expect(SOURCE).toContain('team1: shown1 ?? t("schedule.tbd")');
     expect(SOURCE).not.toContain('"TBD"');
     expect(SOURCE).not.toMatch(/\/> vs\{" "\}/);
     expect(frDialogs.schedule.versus).toBe("<first>{team1}</first> contre <second>{team2}</second>");
