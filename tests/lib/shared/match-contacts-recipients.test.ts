@@ -106,11 +106,11 @@ describe("textes joueur et règles — mêmes lecteurs que le code", () => {
 describe("tag Discord d'un caster et BattleTag masqué dans l'avis", () => {
   it("les textes de certification disent que les équipes d'un match casté voient le tag du caster (FR et EN)", () => {
     // Décision du 2026-10-19 : les contacts du caster, le temps du match seulement.
-    expect(readSource("lib/shared/discord-identity.ts")).toContain("Si tu castes un match, ses deux équipes et ses autres casters voient le tien le temps du match seulement, dans les fenêtres « Contacts » et de lancement du match et sur sa page, et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, dans sa fenêtre « Contacts » et sur sa page.");
-    expect(frProfile.verify.exposure.match).toContain("Si tu castes un match, ses deux équipes et ses autres casters voient le tien le temps du match seulement, dans les fenêtres « Contacts » et de lancement du match et sur sa page, et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, dans sa fenêtre « Contacts » et sur sa page.");
-    expect(enProfile.verify.exposure.match).toContain("If you cast a match, both its teams and its other casters see yours only while the match is being played, in the match's “Contacts” and launch windows and on its page, and the referees from the moment both its opponents are known until its end, in its “Contacts” window and on its page.");
-    expect(readSource("lib/shared/rgpd-policy.ts")).toContain("ses casters le temps du match seulement (et, si tu castes un match, ses deux équipes et ses autres casters le temps du match, dans ses fenêtres « Contacts » et de lancement et sur sa page, et les arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, dans sa fenêtre « Contacts » et sur sa page) ;");
-    expect(readSource("lib/shared/rgpd-policy-en.ts")).toContain("its casters only while the match is being played (and, if you cast a match, both its teams and its other casters while the match is being played, in its “Contacts” and launch windows and on its page, and the referees from the moment both its opponents are known until its end, in its “Contacts” window and on its page);");
+    expect(readSource("lib/shared/discord-identity.ts")).toContain("Si tu castes un match, ses deux équipes, ses autres casters et son arbitre désigné voient le tien le temps du match seulement, dans les fenêtres « Contacts » et de lancement du match et sur sa page, et les autres arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, dans sa fenêtre « Contacts » et sur sa page.");
+    expect(frProfile.verify.exposure.match).toContain("Si tu castes un match, ses deux équipes, ses autres casters et son arbitre désigné voient le tien le temps du match seulement, dans les fenêtres « Contacts » et de lancement du match et sur sa page, et les autres arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, dans sa fenêtre « Contacts » et sur sa page.");
+    expect(enProfile.verify.exposure.match).toContain("If you cast a match, both its teams, its other casters and its assigned referee see yours only while the match is being played, in the match's “Contacts” and launch windows and on its page, and the other referees from the moment both its opponents are known until its end, in its “Contacts” window and on its page.");
+    expect(readSource("lib/shared/rgpd-policy.ts")).toContain("ses casters le temps du match seulement (et, si tu castes un match, ses deux équipes, ses autres casters et son arbitre désigné le temps du match, dans ses fenêtres « Contacts » et de lancement et sur sa page, et les autres arbitres dès que ses deux adversaires sont connus et jusqu'à sa fin, dans sa fenêtre « Contacts » et sur sa page) ;");
+    expect(readSource("lib/shared/rgpd-policy-en.ts")).toContain("its casters only while the match is being played (and, if you cast a match, both its teams, its other casters and its assigned referee while the match is being played, in its “Contacts” and launch windows and on its page, and the other referees from the moment both its opponents are known until its end, in its “Contacts” window and on its page);");
   });
 
   it("l'avis de changement dit que le BattleTag présenté peut être masqué (FR et EN)", () => {
@@ -145,18 +145,18 @@ describe("caster et équipes entre eux, fiches de contact", () => {
   });
 
   it("les publics du tag Discord comptent les équipes d'un match casté (FR et EN)", () => {
-    expect(readSource("lib/shared/identity-sharing.ts")).toContain("\"si tu castes un match : ses deux équipes et ses autres casters le temps du match, dans ses fenêtres « Contacts » et de lancement et sur sa page, et les arbitres dès que ses adversaires sont connus et jusqu'à sa fin, dans sa fenêtre « Contacts » et sur sa page ;\"");
+    expect(readSource("lib/shared/identity-sharing.ts")).toContain("\"si tu castes un match : ses deux équipes, ses autres casters et son arbitre désigné le temps du match, dans ses fenêtres « Contacts » et de lancement et sur sa page, et les autres arbitres dès que ses adversaires sont connus et jusqu'à sa fin, dans sa fenêtre « Contacts » et sur sa page ;\"");
     for (const file of ["messages/fr/profile.json", "messages/fr/login.json"]) {
-      expect(readSource(file)).toContain("si tu castes un match : ses deux équipes et ses autres casters le temps du match, dans ses fenêtres « Contacts » et de lancement et sur sa page, et les arbitres dès que ses adversaires sont connus et jusqu'à sa fin, dans sa fenêtre « Contacts » et sur sa page ;");
+      expect(readSource(file)).toContain("si tu castes un match : ses deux équipes, ses autres casters et son arbitre désigné le temps du match, dans ses fenêtres « Contacts » et de lancement et sur sa page, et les autres arbitres dès que ses adversaires sont connus et jusqu'à sa fin, dans sa fenêtre « Contacts » et sur sa page ;");
     }
     for (const file of ["messages/en/profile.json", "messages/en/login.json"]) {
-      expect(readSource(file)).toContain("if you cast a match: both its teams and its other casters while the match is being played, in its “Contacts” and launch windows and on its page, and referees from the moment its opponents are known until its end, in its “Contacts” window and on its page;");
+      expect(readSource(file)).toContain("if you cast a match: both its teams, its other casters and its assigned referee while the match is being played, in its “Contacts” and launch windows and on its page, and other referees from the moment its opponents are known until its end, in its “Contacts” window and on its page;");
     }
   });
 
   it("casterDiscordWording_allLegalAndUiSources_neverOmitLaunchWindow", () => {
-    // Revue #525 : la fenêtre de lancement montre le tag Discord du caster aux équipes et aux
-    // autres casters, jamais aux arbitres dès l'appariement (elle ne s'ouvre pas au staff).
+    // Revue #525 : la fenêtre de lancement montre le tag Discord du caster aux équipes, aux
+    // autres casters et à l'arbitre désigné le temps du match, jamais aux arbitres dès l'appariement.
     for (const file of ["lib/shared/identity-sharing.ts", "lib/shared/discord-identity.ts", "lib/shared/rgpd-policy.ts", "messages/fr/login.json", "messages/fr/profile.json"]) {
       expect(readSource(file)).not.toContain("jusqu'à sa fin, dans ses fenêtres « Contacts » et de lancement");
       expect(readSource(file)).not.toContain("jusqu'à sa fin, dans les fenêtres « Contacts » et de lancement");
