@@ -608,7 +608,7 @@ function formatTickerEntry(entry: TickerEntry, locale: Locale): TickerItem | nul
       };
       return {
         kind: "result",
-        lead: t("ticker.resultLead", { tournament: entry.tournament || tournamentName("", entry.tournamentId) }),
+        lead: t("ticker.resultLead", { tournament: tournamentName(entry.tournament, entry.tournamentId) }),
         sides: [
           side(entry.team1, entry.team1Id, entry.team1Solo, entry.score1, outcomes[0]),
           side(entry.team2, entry.team2Id, entry.team2Solo, entry.score2, outcomes[1]),

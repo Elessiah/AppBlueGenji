@@ -36,7 +36,7 @@ import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { useMapError } from "../_lib/error-map";
 import { useDialogsText } from "../_lib/dialogs-text";
 import { richNodes } from "@/components/i18n/shell-text";
-import { EntrantName } from "./EntrantName";
+import { EntrantName, useShownEntrantName } from "./EntrantName";
 
 const FIELD_IDS = {
   day: "match-start-day",
@@ -58,16 +58,6 @@ const MISSING_FIELD_KEYS = {
 } as const satisfies Readonly<Record<MatchStartEntryField, string>>;
 
 const DAYS = Array.from({ length: 31 }, (_, index) => index + 1);
-
-/**
- * Nom d'un côté pour le sous-titre : « TBD » seulement quand la place est
- * vide ; un engagé connu au nom absent passe vide, `EntrantName` posant alors
- * son repli « Engagé #id ».
- */
-function versusName(name: string | null, teamId: number | null, tbd: string): string {
-  if (name !== null) return name;
-  return teamId === null ? tbd : "";
-}
 
 /** Refus de saisie, avant tout envoi. */
 function entryRefusal(text: TournamentDialogsText, state: MatchStartEntryState): string | null {
@@ -240,6 +230,9 @@ export function MatchScheduleDialog({
   onSaved,
 }: Readonly<MatchScheduleDialogProps>) {
   const text = useDialogsText();
+  // Noms nettoyés (repli « Engagé #id ») ; `null` : place vide, dite « TBD ».
+  const shown1 = useShownEntrantName(match.team1Id, match.team1Name);
+  const shown2 = useShownEntrantName(match.team2Id, match.team2Name);
   const { t } = text;
   const mapError = useMapError();
   const { showError, showSuccess } = useToast();
@@ -447,8 +440,8 @@ export function MatchScheduleDialog({
               text.rich(
                 "schedule.versus",
                 {
-                  team1: versusName(match.team1Name, match.team1Id, t("schedule.tbd")),
-                  team2: versusName(match.team2Name, match.team2Id, t("schedule.tbd")),
+                  team1: shown1 ?? t("schedule.tbd"),
+                  team2: shown2 ?? t("schedule.tbd"),
                 },
                 {
                   first: (chunks) => <EntrantName plain teamId={match.team1Id} name={chunks.join("")} />,
