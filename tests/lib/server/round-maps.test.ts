@@ -327,6 +327,30 @@ describe("setRoundsMaps", () => {
     expect(writes(/INSERT INTO bg_tournament_round_maps/)[0][1]).toEqual([7, 3, "UPPER", 2, '[["Ilios"]]']);
   });
 
+  it("setRoundsMaps_mixedOwnAndForeignRounds_writesOwnOnly", async () => {
+    route(connection.execute, [
+      { pattern: /FROM bg_tournaments/, rows: [{ ...TOURNAMENT, format: "MULTI" }] },
+      { pattern: /FROM bg_tournament_phases/, rows: [{ id: 3 }] },
+      { pattern: /SELECT[\s\S]*FROM bg_tournament_round_maps/, rows: [] },
+    ]);
+
+    await setRoundsMaps(7, [{ ...ROUND, phaseId: 3 }, { ...ROUND, phaseId: 99 }], [["Ilios"]]);
+
+    expect(writes(/INSERT INTO bg_tournament_round_maps/).map(([, params]) => params)).toEqual([[7, 3, "UPPER", 2, '[["Ilios"]]']]);
+  });
+
+  it("setRoundsMaps_clearOrphanRound_deletesWithoutPhaseCheck", async () => {
+    route(connection.execute, [
+      { pattern: /FROM bg_tournaments/, rows: [TOURNAMENT] },
+      { pattern: /SELECT[\s\S]*FROM bg_tournament_round_maps/, rows: [{ ...ROUND, phaseId: 4, slots_json: '[["Ilios"]]' }] },
+    ]);
+
+    await setRoundsMaps(7, [{ ...ROUND, phaseId: 4 }], []);
+
+    expect(writes(/DELETE FROM bg_tournament_round_maps/)).toHaveLength(1);
+    expect(writes(/FROM bg_tournament_phases/)).toHaveLength(0);
+  });
+
   it("setRoundsMaps_noRound_throwsInvalidRoundBeforeQuery", async () => {
     await expect(setRoundsMaps(7, [], [["Ilios"]])).rejects.toThrow("INVALID_ROUND");
     expect(withConnection).not.toHaveBeenCalled();
