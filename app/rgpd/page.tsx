@@ -359,7 +359,7 @@ function RgpdFr({
           <strong>entièrement effacé</strong> à sa suppression, hors données de connexion (***).
           Sinon, ses données de profil sont effacées immédiatement et son pseudo remplacé par un
           pseudo d'emprunt. Les sessions
-          (cookie <code>bg_session</code>) expirent 30 jours après la connexion.
+          (cookie <code>__Host-bg_session</code>) expirent 30 jours après la connexion.
         </p>
         <p style={{ marginTop: 8, fontSize: 13, color: "var(--ink-dim)", fontFamily: "var(--font-mono)", letterSpacing: "0.03em" }}>
           ** Une donnée supprimée subsiste jusqu'à {BACKUP_RETENTION_DAYS} jours dans les copies
@@ -546,15 +546,16 @@ function RgpdFr({
           </p>
           <ul>
             <li>
-              <strong>bg_session</strong> — cookie de session httpOnly, sameSite=lax,
+              <strong>__Host-bg_session</strong> — cookie de session httpOnly, sameSite=lax,
               durée 30 jours, déposé <strong>à la connexion</strong>. Il contient
               uniquement un jeton aléatoire, qui ne dit rien de vous et permet de vous
               reconnaître sur la plateforme ; nos serveurs n&apos;en gardent que
               l&apos;empreinte (SHA-256), jamais le jeton lui-même. Il est supprimé à la
-              déconnexion.
+              déconnexion. Il remplace <strong>bg_session</strong>, que le site efface
+              s&apos;il le trouve encore.
             </li>
             <li>
-              <strong>bg_oauth</strong> — déposé <strong>le temps d&apos;une connexion</strong>{" "}
+              <strong>__Host-bg_oauth</strong> — déposé <strong>le temps d&apos;une connexion</strong>{" "}
               par Google, Discord ou Blizzard, et supprimé dès le retour. Il dure dix minutes
               au plus et ne contient qu&apos;un jeton aléatoire à usage unique (protection
               anti-CSRF), le nom du fournisseur, la page où vous ramener, l&apos;objet de la
@@ -562,7 +563,7 @@ function RgpdFr({
               d&apos;utilisation (avec la version acceptée, et si vous venez de les accepter sur la page de
               connexion) et si la connexion a été lancée depuis une page du site (sans
               quoi ni la langue du compte ni l&apos;acceptation des conditions ne sont retenues).
-              Aucun identifiant de personne.
+              Aucun identifiant de personne. Il remplace <strong>bg_oauth</strong>, effacé de même.
             </li>
             <li>
               <strong>bg_suspension_notice</strong> — déposé uniquement <strong>si une connexion

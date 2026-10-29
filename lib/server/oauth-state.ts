@@ -20,16 +20,16 @@
  * - **`termsAccepted`**, **`termsAcceptedNow`**, **`localeFromPage`** — décidés à l'aller, comme
  *   l'intention : lus dans l'URL du rappel, ils seraient choisis par l'appelant.
  *
- * Un seul cookie, `bg_oauth`, qui remplace l'ancien `bg_google_oauth` : trois
+ * Un seul cookie, `bg_oauth` (`__Host-bg_oauth` en production), qui remplace l'ancien `bg_google_oauth` : trois
  * cookies auraient laissé traîner deux états périmés à chaque connexion, et
  * rien n'a de sens à mener deux allers-retours de front.
  */
 import { cookies } from "next/headers";
+import { isProductionCookieEnv, oauthCookieName } from "@/lib/shared/auth-cookies";
 import type { OAuthIntent, OAuthProvider } from "@/lib/shared/oauth-providers";
 import { isOAuthProvider } from "@/lib/shared/oauth-providers";
 import { TERMS_VERSION } from "@/lib/shared/terms-of-use";
 
-const OAUTH_COOKIE = "bg_oauth";
 /** Dix minutes : le temps de l'écran de consentement, pas une seconde de plus. */
 const OAUTH_TTL_SECONDS = 10 * 60;
 
@@ -57,7 +57,8 @@ function baseCookieOptions() {
   return {
     httpOnly: true,
     sameSite: "lax" as const,
-    secure: process.env.NODE_ENV === "production",
+    // `__Host-` exige `Secure` : les deux vont ensemble (`auth-cookies.ts`).
+    secure: isProductionCookieEnv(),
     path: "/",
   };
 }
@@ -69,7 +70,7 @@ export async function saveOAuthState(payload: OAuthStatePayload): Promise<void> 
   // fournisseur) ne vaut pas acceptation de celle-ci au retour.
   const sealed = payload.termsAccepted ? { ...payload, termsVersion: TERMS_VERSION } : payload;
   const encoded = Buffer.from(JSON.stringify(sealed)).toString("base64url");
-  cookieStore.set(OAUTH_COOKIE, encoded, {
+  cookieStore.set(oauthCookieName(), encoded, {
     ...baseCookieOptions(),
     maxAge: OAUTH_TTL_SECONDS,
   });
@@ -84,8 +85,8 @@ export async function saveOAuthState(payload: OAuthStatePayload): Promise<void> 
  */
 export async function consumeOAuthState(): Promise<OAuthStatePayload | null> {
   const cookieStore = await cookies();
-  const encoded = cookieStore.get(OAUTH_COOKIE)?.value;
-  cookieStore.set(OAUTH_COOKIE, "", { ...baseCookieOptions(), maxAge: 0 });
+  const encoded = cookieStore.get(oauthCookieName())?.value;
+  cookieStore.set(oauthCookieName(), "", { ...baseCookieOptions(), maxAge: 0 });
 
   if (!encoded) return null;
 

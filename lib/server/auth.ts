@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import type { RowDataPacket, ResultSetHeader } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { SESSION_RETENTION_DAYS } from "@/lib/shared/processing-register";
+import { isProductionCookieEnv, sessionCookieName } from "@/lib/shared/auth-cookies";
 import { localAvatarUrl } from "@/lib/shared/avatar";
 import { TERMS_POSTPONED_COOKIE } from "@/lib/shared/global-modals";
 import { normalizePseudo, slugifyPseudo } from "@/lib/server/serialization";
@@ -68,7 +69,6 @@ export function resolveRoles(isAdmin: boolean, rolesJson: unknown): PlatformRole
   return sanitizePlatformRoles(isAdmin ? ["ADMIN", ...stored] : stored);
 }
 
-const SESSION_COOKIE = "bg_session";
 // Déclarée dans le registre des traitements (`/rgpd/registre`), d'où elle vient.
 const SESSION_TTL_DAYS = SESSION_RETENTION_DAYS;
 
@@ -84,7 +84,8 @@ function baseCookieOptions() {
   return {
     httpOnly: true,
     sameSite: "lax" as const,
-    secure: process.env.NODE_ENV === "production",
+    // `__Host-` exige `Secure` : les deux vont ensemble (`auth-cookies.ts`).
+    secure: isProductionCookieEnv(),
     path: "/",
   };
 }
@@ -132,7 +133,7 @@ export async function createSession(userId: number, event: ConnectionLogEvent): 
   await insertSession(tokenHash, userId, certifyPromptDoor(event));
 
   const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE, token, {
+  cookieStore.set(sessionCookieName(), token, {
     ...baseCookieOptions(),
     maxAge: SESSION_TTL_DAYS * 24 * 60 * 60,
   });
@@ -229,7 +230,7 @@ function forgetTermsPostponement(cookieStore: Awaited<ReturnType<typeof cookies>
 
 export async function clearSession(): Promise<void> {
   const cookieStore = await cookies();
-  const token = cookieStore.get(SESSION_COOKIE)?.value;
+  const token = cookieStore.get(sessionCookieName())?.value;
   if (token) {
     const db = await getDatabase();
     const tokenHash = hashToken(token);
@@ -249,7 +250,7 @@ export async function clearSession(): Promise<void> {
  */
 export async function expireSessionCookies(): Promise<void> {
   const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE, "", {
+  cookieStore.set(sessionCookieName(), "", {
     ...baseCookieOptions(),
     maxAge: 0,
   });
@@ -264,7 +265,7 @@ export async function expireSessionCookies(): Promise<void> {
  */
 export async function currentTokenHash(): Promise<string> {
   const cookieStore = await cookies();
-  const token = cookieStore.get(SESSION_COOKIE)?.value;
+  const token = cookieStore.get(sessionCookieName())?.value;
   return token ? hashToken(token) : "";
 }
 
@@ -438,7 +439,7 @@ export const getCurrentUser = requestCache(async (): Promise<AuthUser | null> =>
   if (devUser) return devUser;
 
   const cookieStore = await cookies();
-  const token = cookieStore.get(SESSION_COOKIE)?.value;
+  const token = cookieStore.get(sessionCookieName())?.value;
   if (!token) return null;
 
   const rows = await selectUserRows(

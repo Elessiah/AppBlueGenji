@@ -255,7 +255,7 @@ export function RgpdEn({
           * An account that has played no match, organized no tournament, owns no team and is registered for no
           solo tournament is <strong>entirely erased</strong> when it is deleted, apart from connection data
           (***). Otherwise, its profile data is erased immediately and its username replaced by a borrowed
-          username. Sessions (<code>bg_session</code> cookie) expire 30 days after login.
+          username. Sessions (<code>__Host-bg_session</code> cookie) expire 30 days after login.
         </p>
         <p style={{ marginTop: 8, ...NOTE_STYLE }}>
           ** Deleted data remains for up to {BACKUP_RETENTION_DAYS} days in the encrypted backup copies, which
@@ -420,19 +420,20 @@ export function RgpdEn({
           </p>
           <ul>
             <li>
-              <strong>bg_session</strong> — httpOnly, sameSite=lax session cookie, lasting 30 days, set{" "}
+              <strong>__Host-bg_session</strong> — httpOnly, sameSite=lax session cookie, lasting 30 days, set{" "}
               <strong>at login</strong>. It only contains a random token, which says nothing about you and allows
               you to be recognized on the platform; our servers only keep its hash (SHA-256), never the token
-              itself. It is deleted at logout.
+              itself. It is deleted at logout. It replaces <strong>bg_session</strong>, which the site deletes if it
+              still finds it.
             </li>
             <li>
-              <strong>bg_oauth</strong> — set <strong>for the duration of a login</strong> through Google, Discord
+              <strong>__Host-bg_oauth</strong> — set <strong>for the duration of a login</strong> through Google, Discord
               or Blizzard, and deleted on return. It lasts ten minutes at most and only contains a single-use random
               token (anti-CSRF protection), the provider&apos;s name, the page to bring you back to, the purpose of
               the login (logging in or linking an account), whether you accepted the terms of use (with the version
               accepted, and whether you have just accepted them on the login page) and whether the
               login was started from a page of the site (otherwise neither the account language nor the acceptance of
-              the terms is recorded). No personal identifier.
+              the terms is recorded). No personal identifier. It replaces <strong>bg_oauth</strong>, deleted in the same way.
             </li>
             <li>
               <strong>bg_suspension_notice</strong> — set only <strong>if a login is refused because your account
