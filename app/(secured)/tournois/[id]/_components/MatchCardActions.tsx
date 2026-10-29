@@ -272,8 +272,8 @@ function useReleaseConfirm(present: boolean, casters: BracketMatch["casters"], o
     setReleaseTarget(casters[0]?.userId ?? null);
     setOpen(true);
   };
-  const markOwnRelease = () => {
-    ownRelease.current = true;
+  const markOwnRelease = (own: boolean) => {
+    ownRelease.current = own;
   };
   return {
     confirmRelease: shown,
@@ -786,13 +786,16 @@ export function MatchCardActions({
           busy={busy}
           onPick={setReleaseTarget}
           onClose={() => setConfirmRelease(false)}
-          onConfirm={(self) => {
-            markOwnRelease();
-            return run(
+          onConfirm={async (self) => {
+            markOwnRelease(true);
+            const done = await run(
               () =>
                 send(`/api/matches/${match.id}/caster?userId=${encodeURIComponent(String(releasedCaster.userId))}`, "DELETE"),
               self ? t("cardActions.notCasting") : t("cardActions.casterRemoved"),
             );
+            // Refusé : la fenêtre reste ouverte, un départ ultérieur du caster doit se dire.
+            if (!done) markOwnRelease(false);
+            return done;
           }}
         />
       )}

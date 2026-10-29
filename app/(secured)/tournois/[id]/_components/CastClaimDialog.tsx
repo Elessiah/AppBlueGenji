@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
@@ -65,6 +65,8 @@ export function CastClaimDialog({
   // pas en silence par un autre : plus rien n'est coché, il faut rechoisir.
   const choice: CastClaimChoice | null =
     choices.find((option) => castClaimChoiceKey(option) === choiceKey) ?? null;
+  // Le choix disparu est oublié : un stream qui reviendrait ne se recocherait pas seul.
+  if (choice === null && choiceKey !== "") setChoiceKey("");
   const [url, setUrl] = useState("");
   const fieldErrors = useFieldErrors(CAST_FIELD_ERRORS, { url: urlId });
   const fieldsetRef = useRef<HTMLFieldSetElement>(null);
@@ -79,7 +81,7 @@ export function CastClaimDialog({
   const urlInvalid = separate && url.trim() !== "" && normalizeStreamUrl(url) === null;
   const platforms = LIVE_PLATFORMS.join(", ");
   // « A, B et C » / "A, B, and C" : la conjonction de la langue de la page.
-  const casterList = new Intl.ListFormat(locale, { style: "long", type: "conjunction" });
+  const casterList = useMemo(() => new Intl.ListFormat(locale, { style: "long", type: "conjunction" }), [locale]);
 
   const confirm = async (): Promise<boolean> => {
     if (choice === null) return false;
