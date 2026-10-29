@@ -494,3 +494,43 @@ async function rewriteName(
     return "failed";
   }
 }
+
+/** Marqueur (`bg_settings`) de la purge des sessions d'avant les cookies `__Host-`. */
+export const HOST_COOKIE_SESSIONS_MARKER = "migration_host_cookie_sessions";
+
+/**
+ * Supprime, **une fois**, les sessions ouvertes avant le passage des cookies
+ * d'authentification au préfixe `__Host-` (`lib/shared/auth-cookies.ts`).
+ *
+ * Leur cookie (`bg_session`, nu) n'est plus lu en production, et le middleware
+ * l'efface : elles ne servent plus à personne. Restées en base trente jours,
+ * elles seraient comptées comme « autres sessions ouvertes » sur `/profil`
+ * (`countOtherSessions`) — un appareil fantôme, pris pour un accès étranger.
+ *
+ * **Production seulement** : ailleurs le nom nu reste le cookie en service, et
+ * ses sessions sont vivantes. Le marqueur est **réservé avant** la purge
+ * (`INSERT IGNORE`, `affectedRows`) : un démarrage ultérieur — ou un second
+ * processus — qui le trouve posé ne déconnecte plus personne. Une purge en
+ * échec après la réservation est signalée, pas rejouée : les lignes restantes
+ * expirent d'elles-mêmes, alors qu'un rejeu couperait des sessions neuves.
+ */
+export async function purgePreHostCookieSessions(db: Pool): Promise<void> {
+  if (process.env.NODE_ENV !== "production") return;
+  let claimed: boolean;
+  try {
+    const [result] = await db.execute<ResultSetHeader>(
+      "INSERT IGNORE INTO bg_settings (setting_key, setting_value) VALUES (?, '1')",
+      [HOST_COOKIE_SESSIONS_MARKER],
+    );
+    claimed = result.affectedRows === 1;
+  } catch (error) {
+    reportSchemaFailure(error, "INSERT bg_settings (marqueur des sessions __Host-)");
+    return;
+  }
+  if (!claimed) return;
+  try {
+    await db.execute("DELETE FROM bg_user_sessions");
+  } catch (error) {
+    reportSchemaFailure(error, "DELETE FROM bg_user_sessions (sessions d'avant __Host-)");
+  }
+}

@@ -7,6 +7,7 @@ import {
   dropSiteVisitUserId,
   dropUserEmail,
   migrateRecruitmentPriority,
+  purgePreHostCookieSessions,
   seedSiteVisitors,
   switchOpenToRecruitmentDefault,
 } from "./data-migrations";
@@ -89,6 +90,7 @@ export async function runMigrations(db: Pool): Promise<void> {
   await seedSiteVisitors(db);
   await migrateRecruitmentPriority(db);
   await cleanStoredNames(db);
+  await purgePreHostCookieSessions(db);
   await applyPermanentCatchUps(db);
   await warnIfSchemaIsBehind(db);
 }
