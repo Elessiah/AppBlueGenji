@@ -223,7 +223,7 @@ describe("applyLiveMessage — instantané", () => {
   it("conserve l'invitation à certifier au fil des instantanés", () => {
     // Elle tient au roster, que l'instantané diffusé ne porte pas
     // (`CERTIFICATION_PROMPT.md`).
-    const prompt = { reason: "TEAM_WITHOUT_CONTACT", discordVerified: false, battletagVerified: false, battletagRelevant: true } as const;
+    const prompt = { reason: "TEAM_WITHOUT_CONTACT", discordVerified: false, battletagVerified: false, battletagRelevant: true, teamHasContact: false } as const;
     const state = connected(INITIAL_LIVE_STATE);
     state.detail!.certificationPrompt = prompt;
 
@@ -719,7 +719,7 @@ describe("shareRefereeNames", () => {
 });
 
 describe("invitation à certifier poussée après la connexion (EF-04)", () => {
-  const prompt = { reason: "MANAGER", discordVerified: false, battletagVerified: true, battletagRelevant: true } as const;
+  const prompt = { reason: "MANAGER", discordVerified: false, battletagVerified: true, battletagRelevant: true, teamHasContact: true } as const;
 
   it("lit le message, en ne gardant que des booléens", () => {
     const raw = JSON.stringify({
@@ -728,6 +728,24 @@ describe("invitation à certifier poussée après la connexion (EF-04)", () => {
       certificationPrompt: { ...prompt, discordVerified: "oui", extra: 1 },
     });
     expect(parseLiveMessage(raw)).toEqual({ type: "certificationPrompt", tournamentId: 7, certificationPrompt: prompt });
+  });
+
+  const parsedPrompt = (certificationPrompt: Record<string, unknown>) => {
+    const parsed = parseLiveMessage(JSON.stringify({ type: "certificationPrompt", tournamentId: 7, certificationPrompt }));
+    return parsed?.type === "certificationPrompt" ? parsed.certificationPrompt : undefined;
+  };
+
+  it("parseLiveMessage_managerWithoutTeamHasContact_defaultsToTrue : pas d'alerte « équipe injoignable » d'un serveur d'avant le champ", () => {
+    const { teamHasContact: _omitted, ...legacy } = prompt;
+    expect(parsedPrompt(legacy)?.teamHasContact).toBe(true);
+  });
+
+  it("parseLiveMessage_managerTeamHasContactFalse_keepsFalse : le meneur d'une équipe injoignable le lit", () => {
+    expect(parsedPrompt({ ...prompt, teamHasContact: false })?.teamHasContact).toBe(false);
+  });
+
+  it("parseLiveMessage_teamWithoutContactReason_alwaysFalse : le motif d'équipe dit toujours l'équipe injoignable", () => {
+    expect(parsedPrompt({ ...prompt, reason: "TEAM_WITHOUT_CONTACT", teamHasContact: true })?.teamHasContact).toBe(false);
   });
 
   it("écarte une invitation absente ou de motif inconnu", () => {
@@ -753,7 +771,7 @@ describe("invitation à certifier poussée après la connexion (EF-04)", () => {
 });
 
 describe("reconnexion pendant la lecture de l'invitation (certificationPromptPending, EF-04)", () => {
-  const prompt = { reason: "MANAGER", discordVerified: false, battletagVerified: true, battletagRelevant: true } as const;
+  const prompt = { reason: "MANAGER", discordVerified: false, battletagVerified: true, battletagRelevant: true, teamHasContact: true } as const;
   const withPrompt = () => applyLiveMessage(connected(), { type: "certificationPrompt", tournamentId: 7, certificationPrompt: prompt });
   const reconnect = (state: LiveState, pending: boolean, tournamentId = 7) =>
     applyLiveMessage(state, {

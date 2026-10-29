@@ -61,7 +61,8 @@ describe("dialogues de la fiche tournoi — hauteur bornée", () => {
     "%s porte `.dialog-bounded` et aucune borne en `vh` en ligne",
     (name) => {
       const src = stripComments(read(join(DIR, name)));
-      expect(src).toContain('className="dialog-bounded"');
+      // Seule ou suivie d'une classe de module (anneau de focus du cadre commun).
+      expect(src).toMatch(/className=(?:"dialog-bounded"|\{`dialog-bounded )/);
       expect(src).not.toMatch(/maxHeight:\s*"[^"]*\bvh/);
     },
   );

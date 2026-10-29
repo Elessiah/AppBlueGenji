@@ -50,7 +50,7 @@ function snapshot(
   });
 }
 
-const PROMPT = { reason: "MANAGER", discordVerified: false, battletagVerified: true, battletagRelevant: true } as const;
+const PROMPT = { reason: "MANAGER", discordVerified: false, battletagVerified: true, battletagRelevant: true, teamHasContact: true } as const;
 
 beforeEach(() => {
   jest.clearAllMocks();
