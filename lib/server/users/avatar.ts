@@ -1,5 +1,6 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { invalidateLandingTeamViews } from "@/lib/server/landing-cache";
 import { syncSoloEntryIdentity, syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
 
 /**
@@ -92,8 +93,10 @@ export async function removeUserAvatarAsModerator(
     const avatarUrl = rows[0].avatar_url;
     if (!avatarUrl) throw new Error("USER_HAS_NO_AVATAR");
     await connection.execute(`UPDATE bg_users SET avatar_url = NULL WHERE id = ? AND is_deleted = 0`, [userId]);
-    await syncSoloEntryIdentityOn(connection, userId);
+    const soloSynced = await syncSoloEntryIdentityOn(connection, userId);
     await connection.commit();
+    // Après le commit : le logo de l'entrée solo est servi par la vitrine.
+    if (soloSynced) invalidateLandingTeamViews();
     return { pseudo: rows[0].pseudo, removedAvatarUrl: avatarUrl };
   } catch (error) {
     await connection.rollback();

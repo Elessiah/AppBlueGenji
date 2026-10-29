@@ -1,8 +1,9 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
-import { invalidateLandingTeamViews } from "@/lib/server/landing-cache";
-import { invalidateRankingLists } from "@/lib/server/ranking-cache";
+import { invalidateLandingCounters } from "@/lib/server/landing-cache";
+import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
+import { invalidateStats, invalidateStatsOf } from "@/lib/server/stats-cache";
 import { reconnectUserStreams } from "@/lib/server/session-streams";
 import { ghostAdminOverride, lockMemberRoles, userOwnsTeam } from "./access";
 
@@ -37,6 +38,8 @@ export async function softDeleteTeam(
   let previousLogoUrl: string | null = null;
   /** Membres détachés par la dissolution : leurs flux de tournoi recalculent leur contexte. */
   let detachedUserIds: number[] = [];
+  /** Inscrite au moins une fois à un tournoi : d'autres vues la nomment. */
+  let everRegistered = false;
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
@@ -97,6 +100,14 @@ export async function softDeleteTeam(
       [teamId],
     );
 
+    // Sans inscription, l'équipe n'a ni match, ni rang, ni ligne de bandeau ou
+    // de mini-arbre : rien d'autre que le compteur de l'accueil ne la montre.
+    const [registrations] = await connection.execute<RowDataPacket[]>(
+      `SELECT 1 FROM bg_tournament_registrations WHERE team_id = ? LIMIT 1`,
+      [teamId],
+    );
+    everRegistered = registrations.length > 0;
+
     await connection.commit();
   } catch (error) {
     await connection.rollback();
@@ -107,10 +118,21 @@ export async function softDeleteTeam(
 
   // Une dissoute quitte la liste du classement (`loadTeamRanking`) : rangs,
   // podium, marches et carte d'aperçu mis en cache la montreraient encore
-  // jusqu'à leur échéance, comme le bandeau de l'accueil son ancien nom. Le
-  // rejeu, lui, ne change pas : il reste en cache, comme les compteurs.
-  invalidateRankingLists();
-  invalidateLandingTeamViews();
+  // jusqu'à leur échéance, comme le bandeau de l'accueil son ancien nom, et les
+  // bilans de ses adversaires (`stats:`) l'ancien nom. Le rejeu, lui, ne change
+  // pas : il reste en cache.
+  //
+  // Une équipe jamais inscrite n'est nommée nulle part ailleurs que sur sa
+  // fiche et celles de ses membres : on ne vide alors que celles-là et le
+  // compteur d'équipes de l'accueil — une boucle « créer → dissoudre » ne fait
+  // plus recalculer le classement et le podium aux visiteurs.
+  if (everRegistered) {
+    invalidateTeamIdentityViews();
+    invalidateStats();
+  } else {
+    invalidateLandingCounters();
+    invalidateStatsOf([teamId], detachedUserIds);
+  }
   // Un flux de tournoi ne lit l'équipe du lecteur qu'à son ouverture : les
   // membres détachés gardaient l'invitation à certifier de l'équipe dissoute
   // jusqu'à la reconnexion (`session-streams.ts`).

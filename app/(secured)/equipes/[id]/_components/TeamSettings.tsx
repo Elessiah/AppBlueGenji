@@ -216,7 +216,10 @@ function TeamIdentityForm({ team, onChanged }: Readonly<TeamSettingsProps>) {
       showSuccess(t("settings.updated"));
       onChanged();
       // Le menu du compte (« Mon équipe ») rappelle le nom : il doit suivre.
-      router.refresh();
+      // Lui seul : un sigle ou une description changés ne s'y lisent pas, et
+      // tout l'arbre serveur (session, équipe active, signalements) serait
+      // recalculé pour rien.
+      if (name.trim() !== saved.name) router.refresh();
     } catch (e) {
       // `teamApi` lève le code du refus tel quel : c'est lui qui désigne le
       // champ (nom ou sigle déjà pris, que le contrôle local ne peut pas voir).
@@ -392,14 +395,19 @@ function TeamLogoField({ team, ownsIdentity, cropImage, onChanged }: Readonly<Te
     }
   };
 
-  const onLogoDelete = async () => {
+  // Le serveur efface le fichier : le geste ne se défait pas, il passe par
+  // une confirmation (`ConfirmActionDialog`).
+  const [removeLogoOpen, setRemoveLogoOpen] = useState(false);
+  const onLogoDelete = async (): Promise<boolean> => {
     setLogoBusy(true);
     try {
       await teamApi(`/api/teams/${team.team.id}/logo`, { method: "DELETE" }, "LOGO_DELETE_FAILED");
       showSuccess(t("settings.logoDeleted"));
       onChanged();
+      return true;
     } catch (e) {
       showError(teamErrorMessage((e as Error).message));
+      return false;
     } finally {
       setLogoBusy(false);
     }
@@ -448,7 +456,7 @@ function TeamLogoField({ team, ownsIdentity, cropImage, onChanged }: Readonly<Te
             {pendingLogo ? t("settings.chooseAnother") : savedLogoLabel}
           </button>
           {team.team.logoUrl && !pendingLogo ? (
-            <button type="button" className="btn ghost" disabled={logoBusy} onClick={onLogoDelete}>
+            <button type="button" className="btn ghost" disabled={logoBusy} onClick={() => setRemoveLogoOpen(true)}>
               {t("settings.removeLogo")}
             </button>
           ) : null}
@@ -492,6 +500,17 @@ function TeamLogoField({ team, ownsIdentity, cropImage, onChanged }: Readonly<Te
           </div>
         </>
       ) : null}
+      {removeLogoOpen && (
+        <ConfirmActionDialog
+          title={t("settings.removeLogoTitle")}
+          confirmLabel={t("settings.removeLogo")}
+          pendingLabel={t("settings.removeLogoPending")}
+          onClose={() => setRemoveLogoOpen(false)}
+          onConfirm={onLogoDelete}
+        >
+          <p>{t("settings.removeLogoBody")}</p>
+        </ConfirmActionDialog>
+      )}
     </div>
   );
 }

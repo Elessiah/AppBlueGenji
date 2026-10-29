@@ -18,7 +18,7 @@
  * `tournaments/notifications.ts` doit pouvoir l'invalider sans importer le
  * service, dont la chaîne d'imports refermerait un cycle.
  */
-import { cached, invalidateCachedPrefix } from "@/lib/server/cache";
+import { cached, invalidateCached, invalidateCachedPrefix } from "@/lib/server/cache";
 
 const PREFIX = "stats:";
 
@@ -45,4 +45,15 @@ export function cachedStats<T>(key: string, loader: () => Promise<T>): Promise<T
  */
 export function invalidateStats(): void {
   invalidateCachedPrefix(PREFIX);
+}
+
+/**
+ * Oublie les seules fiches d'une équipe et de joueurs (`team:<id>`,
+ * `player:<id>`), sans les agrégats de tout le site (`player-records`,
+ * `team-list-forms`). Pour une écriture qui ne touche qu'eux — la dissolution
+ * d'une équipe qui n'a jamais joué : personne d'autre ne la nomme.
+ */
+export function invalidateStatsOf(teamIds: readonly number[], userIds: readonly number[]): void {
+  for (const teamId of teamIds) invalidateCached(`${PREFIX}team:${teamId}`);
+  for (const userId of userIds) invalidateCached(`${PREFIX}player:${userId}`);
 }

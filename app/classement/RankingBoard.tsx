@@ -89,7 +89,8 @@ function trendText(
   if (row.trend === "new") {
     // L'étoile n'est pas un chiffre : son sens s'affiche aussi au survol.
     const label = text.t("board.trend.new");
-    return { symbol: "★", label, className: styles.trendUp, title: label };
+    // Couleur propre : celle d'une montée faisait lire un gain de places.
+    return { symbol: "★", label, className: styles.trendNew, title: label };
   }
   return { symbol: "—", label: text.t("board.trend.flat"), className: styles.trendFlat };
 }

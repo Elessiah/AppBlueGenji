@@ -35,11 +35,12 @@ function TeamCardView({ team }: Readonly<{ team: TeamListItem }>) {
   const { t } = text;
   const color = getPaletteColor(team.id);
   const isTop3 = team.rank !== null && team.rank <= 3;
-  // Classée = présente au classement, donc avec un rang. `isRankedTeam` ne
-  // suffit pas ici : `TeamListItem` ne porte pas les nuls, et une équipe dont
-  // l'unique match s'est clos sur un nul afficherait son rang à côté de
-  // « Aucun match ».
+  // Classée = présente au classement, donc avec un rang : la règle que
+  // `listTeams` a déjà appliquée (`isRankedTeam`, nuls compris).
   const ranked = team.rank !== null;
+  // Les nuls ne s'affichent que s'il y en a : une équipe classée sur un seul
+  // nul montrait sinon un rang au-dessus d'un bilan « 0 / 0 ».
+  const hasDraws = team.draws > 0;
 
   return (
     <article className={s.card} style={{ "--c": color } as React.CSSProperties}>
@@ -56,7 +57,8 @@ function TeamCardView({ team }: Readonly<{ team: TeamListItem }>) {
         </div>
       )}
 
-      <div className={s.head}>
+      {/* Sans rang, pas de badge : l'en-tête ne lui garde pas sa marge. */}
+      <div className={`${s.head} ${ranked ? "" : s.headUnranked}`}>
         {/* Décoratif de bout en bout : logo comme initiale ne font que redire le
             nom de l'équipe, écrit juste à côté. Une lecture d'écran qui
             annoncerait « D, Dragon Squad » n'apprendrait rien. */}
@@ -120,7 +122,7 @@ function TeamCardView({ team }: Readonly<{ team: TeamListItem }>) {
           forme longue étant donnée en `sr-only` juste à côté : `aria-label` sur
           un `<div>` sans rôle (`generic`) n'accepte pas de nom d'auteur — la
           carte n'annoncerait alors que trois nombres nus. */}
-      <div className={s.stats}>
+      <div className={`${s.stats} ${hasDraws ? s.statsWithDraws : ""}`}>
         {/* Tout le monde part de la même cote : sans cette nuance, une équipe
             qui n'a jamais joué afficherait le même nombre qu'une équipe qui l'a
             gagné, et rien ne dirait la différence. La nuance est donc écrite
@@ -154,6 +156,15 @@ function TeamCardView({ team }: Readonly<{ team: TeamListItem }>) {
           </div>
           <div className={`${s.statVal} ${s.loss}`}>{team.losses}</div>
         </div>
+        {hasDraws && (
+          <div>
+            <div className={s.statLbl}>
+              <span aria-hidden="true">{t("card.drawsShort")}</span>
+              <span className="sr-only">{t("card.draws")}</span>
+            </div>
+            <div className={s.statVal}>{team.draws}</div>
+          </div>
+        )}
       </div>
 
       <div className={s.roster}>

@@ -19,7 +19,8 @@
  * cycle.
  */
 import { cached, invalidateCachedPrefix } from "@/lib/server/cache";
-import { invalidateLandingLeaderboards } from "@/lib/server/landing-cache";
+import { invalidateLandingLeaderboards, invalidateLandingTeamViews } from "@/lib/server/landing-cache";
+import { invalidateRankingShareImages } from "@/lib/server/share-image-cache";
 
 const PREFIX = "ranking:";
 
@@ -47,6 +48,8 @@ export function cachedRanking<T>(key: string, loader: () => Promise<T>): Promise
 export function invalidateTeamRanking(): void {
   invalidateCachedPrefix(PREFIX);
   invalidateLandingLeaderboards();
+  // Le podium et les cartes nominatives d'aperçu sont rendus depuis ces entrées.
+  invalidateRankingShareImages();
 }
 
 /**
@@ -64,4 +67,20 @@ export const RANKING_LIST_KEY_PREFIX = "list:";
  */
 export function invalidateRankingLists(): void {
   invalidateCachedPrefix(`${PREFIX}${RANKING_LIST_KEY_PREFIX}`);
+  // Les PNG du podium et des cartes nominatives en sont tirés : sans cela, ils
+  // gardaient l'ancien nom ou l'ancien logo jusqu'à leur échéance.
+  invalidateRankingShareImages();
+}
+
+/**
+ * Oublie tout ce qui **nomme ou montre** une équipe du classement sans toucher
+ * aux matchs : les entrées tirées de la liste (identités, podium, cartes
+ * d'aperçu et leurs PNG) et les vues de la vitrine qui nomment des équipes.
+ * Pour toute écriture d'identité — nom, logo (changé, retiré, mis en
+ * quarantaine, rétabli), statut de fantôme, dissolution. Le rejeu reste en
+ * cache : il ne lit que les matchs.
+ */
+export function invalidateTeamIdentityViews(): void {
+  invalidateRankingLists();
+  invalidateLandingTeamViews();
 }

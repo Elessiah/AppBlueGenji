@@ -22,6 +22,7 @@
  */
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { invalidateLandingTeamViews } from "@/lib/server/landing-cache";
 import { isDuplicateEntryError } from "@/lib/server/mysql-errors";
 import { soloEntryNameCandidates } from "@/lib/shared/participants";
 import { visibleAvatarUrl } from "@/lib/shared/avatar";
@@ -192,29 +193,40 @@ export async function ensureSoloEntry(
   throw new Error("SOLO_ENTRY_NAME_UNAVAILABLE");
 }
 
-/** Resynchronise l'identité affichée de l'entrée solo, si le joueur en a une. */
+/**
+ * Resynchronise l'identité affichée de l'entrée solo, si le joueur en a une.
+ * Rend `true` si une entrée a été réécrite : l'appelant en transaction vide
+ * alors les vues de la vitrine **après** son commit (`invalidateLandingTeamViews`).
+ */
 export async function syncSoloEntryIdentityOn(
   connection: PoolConnection,
   userId: number,
-): Promise<void> {
+): Promise<boolean> {
   const entryId = await findSoloEntry(connection, userId);
-  if (entryId === null) return;
+  if (entryId === null) return false;
 
   const user = await loadUserIdentity(connection, userId);
-  if (!user) return;
+  if (!user) return false;
 
   await applyIdentity(connection, entryId, user, userId);
+  return true;
 }
 
-/** Même synchronisation, hors transaction (mise à jour de profil). */
+/**
+ * Même synchronisation, hors transaction (mise à jour de profil, avatar). Le
+ * nom et le logo de l'entrée solo sont servis par les vues de la vitrine
+ * (bandeau, mini-arbre) : elles sont vidées dès qu'une entrée a été réécrite.
+ */
 export async function syncSoloEntryIdentity(userId: number): Promise<void> {
   const db = await getDatabase();
   const connection = await db.getConnection();
+  let synced = false;
   try {
-    await syncSoloEntryIdentityOn(connection, userId);
+    synced = await syncSoloEntryIdentityOn(connection, userId);
   } finally {
     connection.release();
   }
+  if (synced) invalidateLandingTeamViews();
 }
 
 /**

@@ -15,6 +15,7 @@
 import { NextResponse } from "next/server";
 import {
   ANONYMOUS_IDENTITY,
+  chargeRateLimit,
   checkRateLimit,
   consumeRateLimit,
   peekTokenBucket,
@@ -227,6 +228,23 @@ export const DIRECTORY_READ_RULE: RateLimitRule = {
   name: "directory-read",
   limit: 60,
   windowMs: 60_000,
+};
+
+/**
+ * Créations et dissolutions d'équipe, par compte (un seul seau pour les deux).
+ *
+ * Chaque dissolution d'une équipe inscrite vide la liste du classement et les
+ * vues de l'accueil, que les visiteurs suivants recalculent (rejeu, conversions
+ * `sharp` du podium) : une boucle « créer → dissoudre » le commandait à volonté.
+ * Dix gestes par heure couvrent une équipe créée par erreur puis refaite ; le
+ * staff `tournaments` (équipes fantômes) n'est pas plafonné. Seul un geste
+ * **réussi** est décompté (`peekRateLimit` puis {@link chargeRateLimitFor}) :
+ * un nom déjà pris ne coûte rien.
+ */
+export const TEAM_LIFECYCLE_RULE: RateLimitRule = {
+  name: "team-lifecycle",
+  limit: 10,
+  windowMs: 60 * 60_000,
 };
 
 /**
@@ -551,6 +569,16 @@ export function peekRateLimit(
   if (key === ANONYMOUS_IDENTITY) return null;
   const state = checkRateLimit(rule, key);
   return state.allowed ? null : tooManyRequests(state.retryAfterMs);
+}
+
+/**
+ * Décompte une action **réussie** dans le seau `rule`, après un
+ * {@link peekRateLimit} qui l'a laissée passer : un refus métier (nom pris,
+ * droit manquant) ne consomme ainsi rien. Sans effet pour une identité inconnue.
+ */
+export function chargeRateLimitFor(rule: RateLimitRule, identity: RateIdentity): void {
+  const key = rateLimitIdentity(identity);
+  if (key !== ANONYMOUS_IDENTITY) chargeRateLimit(rule, key);
 }
 
 /**

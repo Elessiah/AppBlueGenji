@@ -157,6 +157,8 @@
     "trend": "Trend",
     "trendShort": "±",
     "trendNew": "Entered the ranking in the last 7 days",
+    "draws": "{count} D",
+    "drawsLabel": "{count, plural, one {# draw} other {# draws}}",
     "empty": "No ranked teams yet.",
     "fullRanking": "VIEW FULL RANKING →"
   },

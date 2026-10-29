@@ -3,7 +3,17 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { PublicUserProfile, PlayerRole } from "@/lib/shared/types";
 import { isFreeAgent } from "@/lib/shared/player-roster-status";
-import { compareNewestFirst, matchesPlayerStatusFilter, type PlayerStatusFilter } from "@/lib/shared/player-directory";
+import {
+  filterPlayers,
+  roleAfterStatusChoice,
+  sortLocaleOf,
+  sortPlayers,
+  statusFilterAllowsRoles,
+  statusFilterExcludesDeleted,
+  type PlayerSortKey,
+  type PlayerStatusFilter,
+} from "@/lib/shared/player-directory";
+import { InfoHint } from "@/components/ui/info-hint";
 import { useToast } from "@/components/ui/toast";
 import { Ticker } from "@/components/cyber/Ticker";
 import { BgCanvas } from "../_shared/BgCanvas";
@@ -15,14 +25,12 @@ import { PlayerCard } from "./cards/PlayerCard";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
 import { richNodes } from "@/components/i18n/shell-text";
 import { usePlayersText } from "@/components/i18n/players-text";
-import { compareLocalText } from "@/lib/shared/dates";
 import { playerErrorMessage } from "./_lib/player-errors";
 import s from "../_shared/annuaire.module.css";
 
 const ACCENT_RGB = "90, 200, 255";
 
 type RoleFilter = "all" | "DPS" | "TANK" | "HEAL" | "COACH";
-type SortKey = "pseudo" | "tournaments" | "created";
 
 export default function PlayersList() {
   const { showError } = useToast();
@@ -45,7 +53,7 @@ export default function PlayersList() {
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
   const [statusFilter, setStatusFilter] = useState<PlayerStatusFilter>("all");
-  const [sort, setSort] = useState<SortKey>("pseudo");
+  const [sort, setSort] = useState<PlayerSortKey>("pseudo");
   // Les comptes anonymisés sortent de l'annuaire **par défaut** : sous leur
   // pseudo d'emprunt, ils ne sont plus personne, et la ligne n'existe que pour
   // qui remonte un ancien match. Masqués par défaut, donc, mais jamais retirés
@@ -96,26 +104,34 @@ export default function PlayersList() {
     return key;
   }, [searchKeys]);
   // Trié une fois par liste et par ordre choisi ; la recherche ne fait ensuite
-  // qu'un filtre, qui garde l'ordre (revue de performance du lot 9-2).
-  const sorted = useMemo(() => {
-    const r = [...listed];
-    if (sort === "pseudo") {
-      const compare = compareLocalText(text.locale);
-      r.sort((a, b) => compare(a.pseudo, b.pseudo));
-    }
-    if (sort === "tournaments") r.sort((a, b) => (b.tournamentsCount || 0) - (a.tournamentsCount || 0));
-    if (sort === "created") r.sort(compareNewestFirst);
-    return r;
-  }, [listed, sort, text.locale]);
-  const filtered = useMemo(() => {
-    const q = deferredQuery.trim().toLowerCase();
-    return sorted.filter((p) => {
-      if (q && !searchKeyOf(p).includes(q)) return false;
-      if (roleFilter !== "all" && !(p.roles || []).includes(roleFilter as PlayerRole)) return false;
-      // Free agents (sans roster ET ouverts) ou tout joueur sans roster.
-      return matchesPlayerStatusFilter(p, statusFilter);
-    });
-  }, [searchKeyOf, sorted, deferredQuery, roleFilter, statusFilter]);
+  // qu'un filtre, qui garde l'ordre (revue de performance du lot 9-2). La
+  // langue ne compte que pour les tris qui comparent des pseudos (« Pseudo »,
+  // et « Plus récents » à égalité) : changer de langue ne retrie pas « Tournois ».
+  // Tri et filtres : fonctions pures de `player-directory.ts`, testées hors du composant.
+  const sortLocale = sortLocaleOf(sort, text.locale);
+  const sorted = useMemo(
+    () => sortPlayers(listed, sort, sortLocale ?? "fr"),
+    [listed, sort, sortLocale],
+  );
+  const rolesAllowed = statusFilterAllowsRoles(statusFilter);
+  const filtered = useMemo(
+    () =>
+      filterPlayers<PlayerRole, (typeof sorted)[number]>(sorted, {
+        query: deferredQuery.trim().toLowerCase(),
+        role: roleFilter === "all" ? "all" : (roleFilter as PlayerRole),
+        status: statusFilter,
+        searchKeyOf,
+      }),
+    [searchKeyOf, sorted, deferredQuery, roleFilter, statusFilter],
+  );
+
+  // Un filtre « sans roster » rend les rôles sans objet (ils viennent de
+  // l'équipe) : le filtre de rôle revient à « Tous » au lieu de vider la liste.
+  const chooseStatus = (next: PlayerStatusFilter) => {
+    setStatusFilter(next);
+    setRoleFilter((role) => roleAfterStatusChoice(role, next));
+  };
+  const deletedToggleInert = statusFilterExcludesDeleted(statusFilter);
 
   // Rendu borné à une page de cartes ; tout filtre modifié repart de la première.
   const gridRef = useRef<HTMLDivElement>(null);
@@ -217,7 +233,12 @@ export default function PlayersList() {
                   type="button"
                   className={`${s.chip} ${roleFilter === k ? s.chipOn : ""}`}
                   aria-pressed={roleFilter === k}
-                  onClick={() => setRoleFilter(k)}
+                  // Sous « Free agents » / « Sans équipe », les rôles (venus de
+                  // l'équipe) ne filtrent rien : puces inertes, « Tous » excepté.
+                  aria-disabled={!rolesAllowed && k !== "all" ? true : undefined}
+                  onClick={() => {
+                    if (rolesAllowed || k === "all") setRoleFilter(k);
+                  }}
                 >
                   {t(`list.roleFilter.${k}`)}
                 </button>
@@ -227,23 +248,26 @@ export default function PlayersList() {
 
           <div className={s.sortRow}>
             {/* Trois pastilles de statut : la rangée passe à la ligne sur mobile. */}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "10px 18px", alignItems: "center" }}>
+            <div className={s.statusRow}>
               <span>{t("list.count", { count: filtered.length })}</span>
-              <span style={{ color: "var(--ink-faint)" }}>·</span>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "10px 12px" }}>
+              <span className={s.statusSep} aria-hidden="true">·</span>
+              <div className={s.statusOpts}>
                 {(
                   ["all", "free", "unaffiliated"] as const
                 ).map((k) => (
                   <button
                     key={k}
                     type="button"
-                    onClick={() => setStatusFilter(k)}
+                    onClick={() => chooseStatus(k)}
                     className={`${s.sortBtn} ${statusFilter === k ? s.sortBtnOn : ""}`}
                     aria-pressed={statusFilter === k}
                   >
                     {t(`list.statusFilter.${k}`)}
                   </button>
                 ))}
+                <InfoHint id="players-status-help" subject={t("list.statusHintSubject")}>
+                  {t("list.statusHint")}
+                </InfoHint>
               </div>
             </div>
             <div className={s.sortOpts}>
@@ -272,9 +296,14 @@ export default function PlayersList() {
                   // infobulle qui passerait à « Masquer » contredirait le nom
                   // accessible, et les deux publics liraient deux actions.
                   aria-pressed={showDeleted}
+                  // « Free agents » / « Sans équipe » écartent déjà les comptes
+                  // supprimés : la case ne changerait rien, elle est inerte.
+                  aria-disabled={deletedToggleInert ? true : undefined}
                   aria-label={t("list.showDeleted", { count: deletedCount })}
                   title={t("list.showDeleted", { count: deletedCount })}
-                  onClick={() => setShowDeleted((shown) => !shown)}
+                  onClick={() => {
+                    if (!deletedToggleInert) setShowDeleted((shown) => !shown);
+                  }}
                 >
                   <UserX size={14} aria-hidden="true" />
                 </button>

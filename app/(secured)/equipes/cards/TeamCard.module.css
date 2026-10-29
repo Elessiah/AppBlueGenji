@@ -73,6 +73,11 @@
   padding-right: 60px;
 }
 
+/* Équipe sans rang : aucun badge à réserver, le nom prend toute la largeur. */
+.head.headUnranked {
+  padding-right: 0;
+}
+
 /* Le bloc de texte de l'en-tête (nom, tag), et lui seul : `min-width: 0` lève
    la minimale automatique d'un élément flex, sans quoi le nom déborderait au
    lieu de s'élider, et `flex: 1` lui donne toute la place restante.
@@ -189,6 +194,11 @@
   border-top: 1px solid var(--line-soft);
   border-bottom: 1px solid var(--line-soft);
   margin-bottom: 14px;
+}
+
+/* Une quatrième colonne pour les nuls, quand l'équipe en a. */
+.stats.statsWithDraws {
+  grid-template-columns: repeat(4, 1fr);
 }
 
 .statLbl {

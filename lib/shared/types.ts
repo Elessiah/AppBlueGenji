@@ -363,6 +363,8 @@ export type TeamListItem = {
   points: number;
   wins: number;
   losses: number;
+  /** Matchs nuls comptés (`TeamRankingRow.draws`) : une équipe classée sur un seul nul a un bilan. */
+  draws: number;
   form: ("w" | "l" | "d")[];
   games: ("OW" | "MR")[];
   rosterPreview: { userId: number; pseudo: string; avatarUrl: string | null }[];

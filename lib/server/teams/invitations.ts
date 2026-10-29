@@ -6,6 +6,7 @@ import { getUserIdByPseudo, sanitizeRoles } from "@/lib/server/users/roles";
 import { arrivalRoles, teamJoinRefusal } from "@/lib/shared/team-join";
 import { assertTermsAccepted } from "@/lib/server/terms-acceptance";
 import { notifyTeamJoinRequest } from "@/lib/server/team-join-notifications";
+import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
 import { ghostAdminOverride, userCanManageTeam } from "./access";
 
 /*
@@ -153,6 +154,9 @@ async function acceptIntoTeam(
   } finally {
     connection.release();
   }
+  // Une fantôme reprise n'en est plus une : les cartes d'aperçu, qui écartent
+  // les fantômes (`share-team.ts`), la montrent dès sa reprise.
+  if (claim) invalidateTeamIdentityViews();
 }
 
 async function findPendingInvitation(

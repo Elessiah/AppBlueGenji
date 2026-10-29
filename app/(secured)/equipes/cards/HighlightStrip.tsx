@@ -23,9 +23,11 @@ function HighlightStripView({ teams }: Readonly<{ teams: TeamListItem[] }>) {
   const text = useTeamsText();
   const { t } = text;
   // Seules les équipes classées montent : une équipe sans rang (aucun match
-  // compté) ne figure pas au classement, donc pas à son podium.
-  const top = teams.filter((team) => team.rank !== null).slice(0, 3);
-  if (top.length < 3) return null;
+  // compté) ne figure pas au classement, donc pas à son podium. La liste arrive
+  // rangée par rang, les équipes sans rang à la fin (`compareDirectoryRank`) :
+  // les trois premières suffisent, sans parcourir tout l'annuaire à chaque frappe.
+  const top = teams.slice(0, 3);
+  if (top.length < 3 || top.some((team) => team.rank === null)) return null;
 
   return (
     <div className={s.strip}>
@@ -43,19 +45,21 @@ function HighlightStripView({ teams }: Readonly<{ teams: TeamListItem[] }>) {
             </div>
             <div className={s.meta}>
               {richNodes(
-                text.rich("card.record", { wins: team.wins, losses: team.losses }, {
+                text.rich(team.draws > 0 ? "card.recordDraws" : "card.record", {
+                  wins: team.wins,
+                  losses: team.losses,
+                  draws: team.draws,
+                }, {
                   loss: (chunks) => <span className="result-loss">{chunks}</span>,
                 }),
               )}
               {team.region ? ` · ${team.region}` : ""}
             </div>
           </div>
-          {/* Même règle que la carte : classée = avec un rang. `isRankedTeam`
-              lirait 0V–0D comme « aucun match » pour une équipe classée sur
-              un seul nul (`TeamListItem` ne porte pas les nuls). */}
+          {/* Le podium ne garde que des équipes classées (garde ci-dessus). */}
           <div
             className={s.ptsBlock}
-            title={`${t("points.label")} · ${teamPointsHint(text, team.rank !== null, team.points)}`}
+            title={`${t("points.label")} · ${teamPointsHint(text, true, team.points)}`}
           >
             <div className={s.pts}>{team.points}</div>
             {/* Même règle que sur la carte : le mot complet est lu, l'abréviation

@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Classement des équipes",
-    "description": "Le classement des équipes BlueGenji Esport : cote de chaque équipe, podium, bilan et forme récente, en général ou par jeu (Overwatch, Marvel Rivals).",
+    "description": "Le classement des équipes BlueGenji Esport : cote de chaque équipe classée, podium, bilan et forme récente, en général ou par jeu (Overwatch, Marvel Rivals).",
     "shareDescription": "Qui est au sommet ? Le classement des équipes de la scène BlueGenji."
   },
   "breadcrumb": {
@@ -80,7 +80,8 @@
   },
   "how": {
     "title": "Comment marche la cote",
-    "base": "<b>{base} pts</b> au départ, pour toutes les équipes : une équipe entre au classement à son premier match joué.",
+    "base": "<b>{base} pts</b> au départ, pour toutes les équipes : une équipe entre au classement à son premier match compté (forfait compris).",
+    "newcomer": "<b>★</b> : entrée au classement ces 7 derniers jours.",
     "match": "<b>Chaque match</b> transfère des points du perdant au vainqueur — beaucoup pour une victoire improbable, presque rien pour une victoire attendue.",
     "score": "<b>Le score</b> pèse aussi : une victoire sans perdre de map (3-0, 2-0) transfère jusqu'à {marginMax} fois les points d'une victoire arrachée (3-2, 2-1) — autant de gagné pour le vainqueur, autant de perdu pour le perdant. Un match en une seule map et un forfait comptent comme une victoire simple.",
     "placement": "<b>Le rang final</b> d'un tournoi redistribue aussi des points, d'autant plus que le plateau était relevé. Plancher à {floor} pts."
