@@ -189,10 +189,12 @@ l'onglet.
   lecture en cours partagée, échec retenu dix secondes, lecture abandonnée après
   trois secondes retenue une minute — tardive mais réussie, elle sert —, lecture
   coincée plus de dix minutes oubliée) : le contexte se relit à chaque lecture
-  REST (geste, proposition de score, repli du flux). La requête ne lit que des
-  drapeaux (vérifié ou non, contact présent), jamais un pseudo — calculés par
-  les règles du lancement (`hasVerifiedDiscord`, `hasVerifiedBattletag`,
-  `battletagFromBlizzard`), pas réécrits en SQL. Une
+  REST (geste, proposition de score, repli du flux). La requête lit les colonnes
+  brutes (pseudo, identifiant Battle.net, origine du BattleTag) en mémoire du
+  serveur seulement, et n'en tire que des drapeaux (vérifié ou non, contact
+  présent) — jamais un pseudo ne sort — calculés par les règles du lancement
+  (`hasVerifiedDiscord`, `hasVerifiedBattletag`, `battletagFromBlizzard`), pas
+  réécrits en SQL. Une
   certification (code Discord, un clic, rattachement OAuth) oublie sur-le-champ
   les invitations retenues pour ce compte **et pour toute son équipe active**
   (`forgetCertificationPromptsAround` : « équipe sans contact » et invitation
