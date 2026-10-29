@@ -40,7 +40,8 @@ export async function softDeleteTeam(
   let detachedUserIds: number[] = [];
   /** Inscrite au moins une fois à un tournoi : d'autres vues la nomment. */
   let everRegistered = false;
-  let streamTournamentIds = new Set<number>();
+  /** Tournois dont les flux de ces membres se reconnectent, lus sous le verrou. */
+  let streamTournamentIds: ReadonlySet<number> | undefined;
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
@@ -139,7 +140,7 @@ export async function softDeleteTeam(
   // membres détachés gardaient l'invitation à certifier de l'équipe dissoute
   // jusqu'à la reconnexion (`session-streams.ts`). Un seul passage sur le
   // registre pour tous les membres, limité aux tournois concernés.
-  refreshTeamViewers(teamId, detachedUserIds, streamTournamentIds);
+  refreshTeamViewers(teamId, detachedUserIds, streamTournamentIds ?? new Set());
 
   // Vider la colonne ne retirait pas l'image : le fichier restait servi par
   // `/api/uploads/teams/…`, en cache public d'un an. Après le commit (un

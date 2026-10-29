@@ -140,7 +140,7 @@ export const DISCORD_CERTIFICATION_UNDO =
  * Le joueur doit savoir pourquoi son champ change sans qu'il y touche.
  */
 export const BLIZZARD_BATTLETAG_NOTICE =
-  "Si tu rattaches Battle.net, Blizzard remplit ce champ et le met à jour à chaque connexion, à la place de ta saisie.";
+  "Si tu rattaches Battle.net, Blizzard remplit ce champ et le met à jour à chaque connexion, à la place de ta saisie. S'il n'en donne aucun, ta saisie reste, sans la mention « vérifié ».";
 
 /**
  * À quoi servent les identifiants de jeu — et à quoi ils ne servent pas : la
