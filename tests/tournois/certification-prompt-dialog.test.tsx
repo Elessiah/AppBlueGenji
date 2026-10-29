@@ -185,6 +185,8 @@ describe("CertificationPromptDialog", () => {
       "Tu mènes une équipe engagée dans ce tournoi, et personne n&#x27;y a certifié son tag Discord ni son BattleTag : l&#x27;adversaire et l&#x27;arbitrage n&#x27;ont aucun moyen sûr de vous joindre.",
     );
     expect(html).not.toContain("tu peux être présenté comme son contact à l&#x27;adversaire");
+    // Non certifiée, l'équipe présente déjà son premier membre : ce qui manque, c'est un contact **vérifié**.
+    expect(html).toContain("Certifie ce qui te manque encore pour être son contact vérifié.");
     expect(render({ ...OW_MANAGER, teamHasContact: false }, "en")).toContain(
       "You lead a team entered in this tournament, and nobody on it has verified their Discord tag or their BattleTag",
     );
@@ -193,10 +195,10 @@ describe("CertificationPromptDialog", () => {
   it("render_managerTeamWithoutContact_MR : variante Discord seul, sans BattleTag", () => {
     const html = render({ ...MR_TEAM, reason: "MANAGER" });
     expect(html).toContain("Tu mènes une équipe engagée dans ce tournoi, et personne n&#x27;y a certifié son tag Discord :");
-    expect(html).toContain("Certifie ton tag Discord pour être présenté comme son contact.");
+    expect(html).toContain("Certifie ton tag Discord pour être son contact vérifié.");
     expect(html).not.toContain("BattleTag");
     expect(render({ ...MR_TEAM, reason: "MANAGER" }, "en")).toContain(
-      "nobody on it has verified their Discord tag: the opponent",
+      "Verify your Discord tag to be its verified contact.",
     );
   });
 
