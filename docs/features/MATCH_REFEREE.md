@@ -273,9 +273,9 @@ lancement (`keepEligibleReferees`) : conditions, `/rgpd` et T04 le disent.
 Le pseudo seul de l'arbitre se lit par **tout membre connecté** sur la carte
 et la page d'un match non joué (lot MATCH-UI-NAMES, décision 52) : intérêt
 légitime, même opposition, même effet ; T04, `/rgpd#arbitre-designe` et
-l'entrée `2026-10-pseudo-arbitre-aux-membres` (2026-10-31) le disent. Les
-conditions v7, publiées, disent encore « Le public et les autres joueurs ne
-lisent que « Arbitre désigné » » : à reprendre à la prochaine version.
+l'entrée `2026-10-pseudo-arbitre-aux-membres` (2026-10-31) le disent, ainsi
+que les conditions v8 (« Contacts de match » ; la v7 disait encore « Le
+public et les autres joueurs ne lisent que « Arbitre désigné » »).
 
 ## Cartes par manche
 

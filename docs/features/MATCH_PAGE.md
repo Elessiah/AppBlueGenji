@@ -72,10 +72,11 @@ anciennes clés `tournament.matchPage.*` restant pour les sections.
    sans réglage du tour, liste outillée du tour (`MatchRoundMaps`) au staff et
    aux équipes qui choisissent — le public lit les maps dans les faits clés —,
    rappel « triez les joueurs par rôle » d'un match casté.
-5. **Arbitrage** (colonne de droite, `matchPageDecision`) : « Arbitre désigné » pour tous — son
-   explication derrière le « i » —, son
-   pseudo et — en Overwatch seulement — son BattleTag (« À inviter dans la
-   partie ») aux seuls lecteurs que sert la lecture des contacts ; ou l'aide-mémoire de l'**autogestion**,
+5. **Arbitrage** (colonne de droite, `matchPageDecision`) : « Arbitre désigné » aux visiteurs sans
+   compte — son explication derrière le « i » —, « Arbitre : <pseudo> » à
+   tout membre connecté tant que le match n'est pas joué (#507, conditions
+   v8), son pseudo et — en Overwatch seulement — son BattleTag (« À inviter
+   dans la partie ») aux seuls lecteurs que sert la lecture des contacts ; ou l'aide-mémoire de l'**autogestion**,
    à l'impératif, aux seuls lecteurs qui organisent le match (joueur, caster
    inscrit, staff — les autres, spectateurs de /suivre compris, lisent
    l'autogestion dans les faits clés) (l'hôte crée la partie, les managers s'invitent, les paramètres, les casters
