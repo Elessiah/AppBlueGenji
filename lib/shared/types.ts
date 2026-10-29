@@ -662,8 +662,10 @@ export type BracketMatch = {
    */
   refereeAssigned: boolean;
   /**
-   * Empreinte **opaque** de la désignation (`null` sans arbitre montré, et
-   * toujours sur la page sans compte) : elle change quand l'arbitre change,
+   * Empreinte **opaque** de la désignation (`null` sans arbitre montré, pour
+   * un match `COMPLETED`, dans un tournoi terminé, et toujours sur la page sans
+   * compte) : non nulle ne veut pas dire pseudo montré — seul `showsRefereeName`
+   * (`PENDING`/`READY`) le décide ; elle change quand l'arbitre change,
    * sans désigner aucun compte, et relie le match à son pseudo dans
    * `TournamentViewerContext.refereeNames` (`lib/server/tournaments/referee-names.ts`).
    */

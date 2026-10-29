@@ -44,11 +44,6 @@ export function refereeKey(matchId: number, refereeUserId: number): string {
 }
 
 /**
- * Durée de vie des pseudos lus pour une version d'instantané : la clé porte la
- * version, toute écriture en fait une autre ; la durée ne sert qu'à absorber
- * une vague d'ouvertures de flux (tous les membres lisent les mêmes pseudos).
- */
-/**
  * Matchs d'un tournoi terminé, sans empreinte d'arbitre : un match resté non
  * joué (reset de grande finale inutile, fin forcée) ne nomme plus son arbitre
  * aux membres une fois le tournoi fini. Garde la même référence si rien ne change.
@@ -58,13 +53,19 @@ export function withoutRefereeKeys<T extends { refereeKey: string | null }>(matc
   return matches.map((match) => (match.refereeKey === null ? match : { ...match, refereeKey: null }));
 }
 
+/**
+ * Durée de vie des pseudos lus pour une version d'instantané : la clé porte la
+ * version, toute écriture en fait une autre ; la durée ne sert qu'à absorber
+ * une vague d'ouvertures de flux (tous les membres lisent les mêmes pseudos).
+ */
 const REFEREE_NAMES_TTL_MS = 5_000;
 
 type RefereeNameRow = RowDataPacket & { id: number; referee_user_id: number; pseudo: string };
 
 /**
- * Pseudos des arbitres que l'instantané montre (`refereeKey` non nul : arbitre
- * désigné **et** encore éligible). Jamais celui d'un compte supprimé ni d'un
+ * Pseudos des arbitres que l'instantané montre (`showsRefereeName` : arbitre
+ * désigné et encore éligible, **et** score pas encore déclaré — `PENDING`/`READY`,
+ * textes RGPD « jusqu'à la déclaration de son score ou la fin du tournoi »). Jamais celui d'un compte supprimé ni d'un
  * arbitre dont l'opposition est retenue (`referee_objection_at`) : entre
  * l'écriture de l'opposition et le retrait de ses matchs — ou si ce balayage
  * échoue en partie —, le match reste « Arbitre désigné ». Une ligne relue après une nouvelle
