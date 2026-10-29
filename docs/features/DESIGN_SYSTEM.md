@@ -105,6 +105,7 @@ Primitives dans `components/cyber/` :
 - **CyberCard** — `lift`, `ticks`, `as="div|section|article"`, style personnalisé, `tone` (posé en `data-tone`, lu par la feuille de la page)
 - **Pill** — badges inline, variantes sémantiques (§ Pastilles et étiquettes) ; tables de variante par sens : `REPORT_STATUS_PILL`, `RULE_STATUS_PILL`, `RECRUITMENT_DOMAIN_PILL`
 - **CyberButton, TeamSigil, CountdownStrip, Ticker, MiniBracket** — composants spécialisés ; le Ticker habille un résultat par camp (vainqueur `--teal-400`, perdant `--result-loss-ink`, jamais d'ambre) → `TICKER_RESULTS.md`
+- **KeyFacts** — grille de faits clés (`<dl>` : titre en capitales à chasse fixe, valeur en clair, `detail` et `wide` facultatifs, `--key-facts-min` pour la largeur des cases), teinte `--tone-rgb`/`--tone-ink` ou bleu glacier ; pages de règles et page d'un match (`MATCH_PAGE.md`)
 - **ScrollArea** — `orientation="x"|"y"|"both"`, `subtle`, `fade`, `ariaLabel`
 - **PublicHeader, PublicFooter** — layouts publics de landing
 

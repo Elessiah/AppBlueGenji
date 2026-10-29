@@ -1,9 +1,9 @@
 /*
- * Page d'un match (`MatchPage.tsx`, `docs/features/MATCH_PAGE.md`). Une colonne
- * de blocs `.ds-block` : la carte du match, la création de la partie,
- * l'arbitrage, le cast, les contacts — d'autres blocs (compositions, pool de
- * cartes) viendront s'y ranger. Couleurs par jetons ; l'ambre reste aux
- * avertissements (`pill-warning`).
+ * Page d'un match (`MatchPage.tsx`, `docs/features/MATCH_PAGE.md`) : un
+ * en-tête (situation, tableau d'affichage, état), les faits clés au gabarit
+ * des pages de règles (`KeyFacts`), puis une grille de blocs `.ds-block` —
+ * actions, résultat, maps et bans, arbitrage, casts. Couleurs par jetons ;
+ * l'ambre reste aux avertissements (`pill-warning`), le rouge au direct.
  */
 
 .topbar {
@@ -20,106 +20,207 @@
   composes: back from "./TournamentHeader.module.css";
 }
 
+/* En-tête : le panneau mis en avant des pages de règles (`tournamentPanel`). */
 .header {
+  display: grid;
+  gap: 14px;
   margin-bottom: 16px;
+  padding: 22px 24px;
+  border: 1px solid var(--blue-500);
+  border-radius: var(--r-cy-lg);
+  background: linear-gradient(180deg, rgba(var(--blue-500-rgb), 0.07), var(--cyber-bg-1));
+  box-shadow: 0 0 0 1px rgba(var(--blue-500-rgb), 0.08), 0 12px 40px -24px var(--blue-glow);
+}
+
+.meta {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
 }
 
 .title {
   margin: 0;
-  font-size: clamp(20px, 4vw, 28px);
-  line-height: 1.2;
+  font-size: clamp(22px, 4vw, 32px);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
   overflow-wrap: anywhere;
 }
 
-.meta {
-  margin: 4px 0 0;
-  overflow-wrap: anywhere;
-  color: var(--ink-soft);
-  font-size: 13px;
-}
-
-.block {
-  margin-bottom: 16px;
-}
-
-/* La carte du plateau garde sa mise en page ; ici, elle prend la largeur du bloc. */
-.card > * {
-  width: 100%;
-  max-width: 560px;
-}
-
-.sides {
+/* Tableau d'affichage : hôte à gauche, score au centre, l'autre à droite. */
+.scoreboard {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: start;
-  gap: 12px;
+  align-items: center;
+  gap: 12px 20px;
 }
 
-.side {
+.team {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
   min-width: 0;
-  padding: 10px 12px;
-  border: 1px solid var(--line-strong-cy);
-  border-radius: var(--r-cy-md);
-  background: var(--cyber-bg-2);
 }
 
-.side[data-position="right"] {
-  text-align: right;
-  align-items: flex-end;
+.team[data-position="right"] {
+  justify-content: flex-end;
 }
 
-.sideLabel {
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-}
-
-.sideName {
+/* Le nom passe à la ligne plutôt que de s'abréger : c'est le titre de la rencontre. */
+.teamName {
   max-width: 100%;
+  overflow-wrap: anywhere;
+  font-size: clamp(16px, 2.4vw, 20px);
   font-weight: 700;
-  font-size: 15px;
 }
 
-.tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+.team[data-position="right"] .teamName {
+  text-align: right;
+}
+
+.team[data-winner] .teamName {
+  color: var(--blue-300);
+}
+
+.score {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: clamp(28px, 5vw, 44px);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink);
+  white-space: nowrap;
 }
 
 .versus {
-  align-self: center;
-  color: var(--ink-dim);
-  font-size: 12px;
-  text-transform: uppercase;
-}
-
-.facts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 8px 16px;
-  margin: 14px 0 0;
-}
-
-.facts dt {
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  letter-spacing: 0.16em;
   color: var(--ink-soft);
 }
 
-.facts dd {
-  margin: 2px 0 0;
-  font-weight: 600;
-  overflow-wrap: anywhere;
+.status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.status:empty {
+  display: none;
+}
+
+.statusText {
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.reportNotice {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-mute);
+}
+
+/* Faits clés : la grille des règles (`KeyFacts`), sous l'en-tête. */
+.factsBlock {
+  --key-facts-min: 200px;
+  margin-bottom: 16px;
+}
+
+.factsBlock [data-fact="maps"] .factList {
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 4px 16px;
+}
+
+.factList {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.factLines {
+  display: grid;
+  gap: 2px;
+}
+
+.factNote {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.ok {
+  font-size: 12px;
+  color: var(--teal-400);
+}
+
+/* Le reste, aligné en deux colonnes — gestes, résultat et maps à gauche ;
+   arbitrage et casts à droite —, une seule colonne sous 900 px. */
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  align-items: start;
+  gap: 16px;
+}
+
+.column {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.column:empty {
+  display: none;
+}
+
+/* Rien à droite (public sans cast ni arbitrage détaillé) : une seule colonne pleine. */
+.grid:has(> .column:empty) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (max-width: 899px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.block {
+  min-width: 0;
+  margin: 0;
+}
+
+.locked {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--ink-mute);
 }
 
 .muted {
   color: var(--ink-dim);
   font-weight: 400;
+}
+
+.rules {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.rules dt {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.rules dd {
+  margin: 2px 0 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .mapForm {
@@ -135,19 +236,10 @@
   min-width: 0;
 }
 
-.reminder,
-.decision {
+.reminder {
   margin: 12px 0 0;
   font-size: 13px;
   color: var(--ink);
-}
-
-.decision {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-top: 0;
 }
 
 .steps {
@@ -225,18 +317,24 @@
   color: var(--ink-soft);
 }
 
-@media (max-width: 520px) {
-  .sides {
-    grid-template-columns: minmax(0, 1fr);
+@media (max-width: 559px) {
+  .header {
+    padding: 18px 16px;
   }
 
-  .versus {
-    justify-self: center;
+  .scoreboard {
+    gap: 8px 10px;
   }
 
-  .side[data-position="right"] {
-    text-align: left;
+  /* Au téléphone, l'emblème au-dessus du nom : deux noms longs tiennent côte à côte. */
+  .teamName {
+    flex-direction: column;
     align-items: flex-start;
+    font-size: 15px;
+  }
+
+  .team[data-position="right"] .teamName {
+    align-items: flex-end;
   }
 }
 

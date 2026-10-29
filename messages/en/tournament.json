@@ -420,14 +420,9 @@
   },
   "matchPage": {
     "backToTournament": "Back to the tournament",
-    "left": "Left",
-    "right": "Right",
-    "host": "Host: creates the game",
-    "firstBan": "First ban",
     "firstMap": "First map",
     "firstMapUnset": "Not chosen yet",
     "opponentsPending": "Opponents to come",
-    "vs": "vs",
     "sortByRole": "Cast match: sort the players by role in the game lobby.",
     "refereeLead": "A referee follows this match.",
     "refereeBattletagNote": "To invite to the game",
@@ -445,18 +440,11 @@
     },
     "undecided": "No decision",
     "undecidedLead": "Neither a referee nor self-management: to be decided.",
-    "noCaster": "No caster signed up for this match.",
     "stream": "Stream {number}",
     "noLink": "Link not published yet",
     "castersToInvite": "Casters to invite",
     "castersContacts": "Caster contacts",
     "battletagRequired": "To invite — required",
-    "sections": {
-      "match": "The match",
-      "lobby": "The game",
-      "officiating": "Officiating",
-      "casts": "Casts"
-    },
     "missingTitle": "Match not found",
     "missingText": "This match doesn't exist in this tournament.",
     "missingBack": "Back to the tournament"

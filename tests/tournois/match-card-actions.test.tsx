@@ -226,8 +226,9 @@ describe("MatchCardActions — rendu du pied", () => {
     expect(view).toContain("lucide-eye");
     expect(view).not.toContain("lucide-pencil");
     expect(edit).toContain("lucide-pencil");
-    const row = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/MatchRow.tsx"), "utf8");
-    expect(row).toContain('playerScoreReadOnly: playerScoreKey === "review",');
+    // Décidé par le modèle partagé de la carte et de la page du match.
+    const model = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_lib/match-card-model.ts"), "utf8");
+    expect(model).toContain('playerScoreReadOnly: playerScoreKey === "review",');
   });
 
   it("« Voir le litige » cède la place visible au geste d'arbitrage", () => {

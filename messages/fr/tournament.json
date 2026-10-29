@@ -420,14 +420,9 @@
   },
   "matchPage": {
     "backToTournament": "Retour au tournoi",
-    "left": "Gauche",
-    "right": "Droite",
-    "host": "Hôte : crée la partie",
-    "firstBan": "Premier ban",
     "firstMap": "Première map",
     "firstMapUnset": "Pas encore choisie",
     "opponentsPending": "Adversaires à venir",
-    "vs": "contre",
     "sortByRole": "Match casté : triez les joueurs par rôle dans le salon de la partie.",
     "refereeLead": "Un arbitre suit ce match.",
     "refereeBattletagNote": "À inviter dans la partie",
@@ -445,18 +440,11 @@
     },
     "undecided": "Aucune décision",
     "undecidedLead": "Ni arbitre ni autogestion : à décider.",
-    "noCaster": "Aucun caster inscrit pour ce match.",
     "stream": "Stream {number}",
     "noLink": "Lien pas encore publié",
     "castersToInvite": "Casters à inviter",
     "castersContacts": "Contacts des casters",
     "battletagRequired": "À inviter — obligatoire",
-    "sections": {
-      "match": "Le match",
-      "lobby": "La partie",
-      "officiating": "Arbitrage",
-      "casts": "Casts"
-    },
     "missingTitle": "Match introuvable",
     "missingText": "Ce match n'existe pas dans ce tournoi.",
     "missingBack": "Retour au tournoi"

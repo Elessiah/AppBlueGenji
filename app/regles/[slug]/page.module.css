@@ -38,42 +38,7 @@
   line-height: 1.6;
 }
 
-.facts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 1px;
-  margin: 0;
-  padding: 0;
-  background: rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.22);
-  border: 1px solid rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.32);
-  border-radius: var(--r-cy-md);
-  overflow: hidden;
-  box-shadow: 0 16px 44px -30px rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.8);
-}
-
-.fact {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  padding: 14px 16px;
-  background:
-    linear-gradient(180deg, rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.07), transparent),
-    var(--cyber-bg-1);
-}
-
-.factLabel {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--tone-ink, var(--ink-dim));
-}
-
-.factValue {
-  margin: 0;
-  font-size: 15px;
-  color: var(--ink);
-}
+/* Faits clés du mode : `KeyFacts` (`components/cyber/KeyFacts.module.css`), partagés avec la page d'un match. */
 
 .soonBanner {
   display: flex;

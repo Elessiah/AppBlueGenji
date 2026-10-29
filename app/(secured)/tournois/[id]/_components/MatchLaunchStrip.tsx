@@ -25,7 +25,7 @@ import { useLiveControls } from "../_lib/live-context";
  * Pastille de la phase de lancement : à planifier, en attente de départ, en
  * lancement (avec le décompte des « Prêt »), ou lancé.
  */
-function LaunchPhaseBadge({ match, phase }: Readonly<{ match: BracketMatch; phase: MatchLaunchPhase }>) {
+export function LaunchPhaseBadge({ match, phase }: Readonly<{ match: BracketMatch; phase: MatchLaunchPhase }>) {
   // Libellés de `LAUNCH_PHASE_LABELS` (`match-planning.ts`, français égal testé).
   const { t, locale } = useTournamentPageText();
   const spectator = useSpectatorView();
@@ -89,6 +89,11 @@ function LaunchPhaseBadge({ match, phase }: Readonly<{ match: BracketMatch; phas
   return null;
 }
 
+/** La phase a-t-elle une pastille (`LaunchPhaseBadge`) ? Partagé avec les faits clés de la page du match. */
+export function hasLaunchPhaseBadge(match: Pick<BracketMatch, "status">, phase: MatchLaunchPhase): boolean {
+  return phase === "TO_PLAN" || phase === "SCHEDULED" || phase === "LOBBY" || (phase === "LAUNCHED" && match.status === "READY");
+}
+
 export function MatchLaunchStrip({
   match,
   phase,
@@ -113,7 +118,7 @@ export function MatchLaunchStrip({
   const { refereeNames } = useLiveControls();
   const refereeName = refereeNameOf(match, refereeNames);
   const badge = <LaunchPhaseBadge match={match} phase={phase} />;
-  const hasBadge = phase === "TO_PLAN" || phase === "SCHEDULED" || phase === "LOBBY" || (phase === "LAUNCHED" && match.status === "READY");
+  const hasBadge = hasLaunchPhaseBadge(match, phase);
 
   if (!hasBadge && !(showHost && hostName) && match.casters.length === 0 && referee === null) return null;
 

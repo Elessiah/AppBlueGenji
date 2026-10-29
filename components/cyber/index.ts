@@ -6,3 +6,4 @@ export { CountdownStrip } from "./CountdownStrip";
 export { Ticker } from "./Ticker";
 export { MiniBracket } from "./MiniBracket";
 export { ScrollArea } from "./ScrollArea";
+export { KeyFacts, type KeyFact } from "./KeyFacts";

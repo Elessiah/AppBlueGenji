@@ -33,6 +33,7 @@ instantané du flux SSE. Aucun changement de l'instantané ni du serveur.
 | Liste des inscrites, aperçu du plateau, journal des sanctions | 16 px |
 | Bandeau de la championne | 20 px |
 | Panneau des contacts, dialogue de score, dialogue des fantômes | 20 px |
+| Tableau d'affichage de la page d'un match (`MATCH_PAGE.md`) | 40 px |
 
 Pour une équipe **pas encore inscrite** (dialogue d'inscription des fantômes),
 `EntrantLogo` prend un `logoUrl` explicite : la table du contexte ne porte que

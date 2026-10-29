@@ -118,6 +118,7 @@ function render(
   locale: "fr" | "en" = "fr",
   mapRules: TournamentMapRules = EMPTY_MAP_RULES,
   game: TournamentGame = "OW",
+  asCard = false,
 ): string {
   const detail = tournamentDetail({
     card: tournamentCard({ id: 12, name: "Coupe d'hiver", state: "RUNNING", game }),
@@ -139,15 +140,19 @@ function render(
         castBlock="NOT_CASTER"
         refereeNames={refereeNames}
       >
-        <MatchPage
-          detail={detail}
-          match={page}
-          adminResolvable={false}
-          scoreLocked={false}
-          onOpenAdminModal={() => undefined}
-          frozen={frozen}
-          status={<span data-probe="live-status">{frozen ? "Hors ligne" : "À jour"}</span>}
-        />
+        {asCard ? (
+          <MatchRow match={page} adminResolvable={false} onOpenAdminModal={() => undefined} scoreLocked={false} roundNumber={2} />
+        ) : (
+          <MatchPage
+            detail={detail}
+            match={page}
+            adminResolvable={false}
+            scoreLocked={false}
+            onOpenAdminModal={() => undefined}
+            frozen={frozen}
+            status={<span data-probe="live-status">{frozen ? "Hors ligne" : "À jour"}</span>}
+          />
+        )}
       </LiveProvider>
     </ToastProvider>
   );
@@ -179,14 +184,34 @@ describe("page d'un match — ce que tout le monde lit", () => {
   it("titre, retour à la fiche, manche et match, hôte à gauche et premier ban", () => {
     const html = render(match({ firstMap: "Tokyo" }), "public");
     expect(html).toContain("<h1");
-    expect(visible(html)).toContain("Alpha contre Bravo");
+    // Titre et tableau d'affichage dans l'ordre des côtés : l'hôte (Bravo) à gauche.
+    expect(visible(html)).toContain("Bravo contre Alpha");
     expect(html).toContain('href="/suivre/tournois/12#match-34"');
     expect(visible(html)).toContain("Manche 2 · Match 3");
-    const lobby = visible(html.slice(html.indexOf("La partie")));
-    expect(lobby.indexOf("Bravo")).toBeLessThan(lobby.indexOf("Alpha"));
-    expect(lobby).toContain("Hôte : crée la partie");
-    expect(lobby).toContain("Premier ban");
-    expect(lobby).toContain("Tokyo");
+    const facts = visible(html.slice(html.indexOf('data-fact="host"')));
+    expect(facts).toContain("Hôte B Bravo Crée la partie");
+    expect(facts).toContain("Premier ban A Alpha");
+    expect(facts).toContain("Première map Tokyo");
+    expect(facts).toContain("Côtés Gauche : Bravo Droite : Alpha");
+  });
+
+  it("render_header_noScoreYet_scoreboardSaysVersus", () => {
+    const html = render(match(), "public");
+    expect(visible(html.slice(html.indexOf("<h1")))).toMatch(/^ Bravo contre Alpha B Bravo VS A Alpha /);
+  });
+
+  it("render_completedMatch_scoreAndWinnerInHeader", () => {
+    const html = render(match({ status: "COMPLETED", team1Score: 3, team2Score: 1, winnerTeamId: ALPHA }), "public");
+    const header = visible(html.slice(html.indexOf("<h1"), html.indexOf('data-fact="host"')));
+    expect(header).toContain("Bravo 1 – 3");
+    expect(header).toContain("Score : Bravo 1, Alpha 3");
+    expect(header).toContain("Victoire de Alpha");
+    expect(html).toContain('class="pill pill-success');
+  });
+
+  it("render_noHost_noSidesFact", () => {
+    const html = render(match({ hostTeamId: null }), "public");
+    expect(html).not.toContain('data-fact="sides"');
   });
 
   it("retour à la fiche : le style du retour de l'en-tête, libellé « Retour au tournoi », ancré sur la carte du match", () => {
@@ -246,10 +271,9 @@ describe("page d'un match — cartes du round et bans", () => {
   it("liste imposées et pools au public, choix du perdant à partir de la carte 2", () => {
     const html = render(match({ mapPicks: { "3": "Oasis" } }), "public", false, "fr", rules([["Ilios"], ["Busan", "Nepal"], ["Oasis", "Dorado"]]));
     const text = visible(html);
-    expect(text).toContain("Cartes du tour");
-    expect(text).toContain("Carte 1 Ilios Imposée");
-    expect(text).toContain("Carte 2 À choisir parmi Busan, Nepal Choisie par l'équipe qui a perdu la carte précédente");
-    expect(text).toContain("Carte 3 Oasis");
+    // Le public lit les maps dans les faits clés, sans la liste outillée du tour.
+    expect(text).toContain("Maps Map 1 : Ilios Map 2 : à choisir parmi Busan, Nepal · choix du perdant Map 3 : Oasis");
+    expect(text).not.toContain("Cartes du tour");
     expect(html).not.toContain("<select");
     expect(text).not.toContain("Paramétrer les cartes du tour");
     expect(text).not.toContain("Réinitialiser le tour");
@@ -267,7 +291,7 @@ describe("page d'un match — cartes du round et bans", () => {
     const text = visible(render(match(), "public", false, "fr", rules([["Ilios"]])));
     expect(text).not.toContain("Première map");
     expect(text).not.toContain("Pas encore choisie");
-    expect(text).toContain("Carte 1 Ilios Imposée");
+    expect(text).toContain("Map 1 : Ilios");
   });
 
   it("render_noRoundMaps_keepsFirstMapRow", () => {
@@ -311,7 +335,7 @@ describe("page d'un match — arbitrage × lecteur", () => {
 
     const html = render(match({ refereeAssigned: true, refereeKey: "k-juge" }), "other");
 
-    expect(visible(html)).toContain("Arbitre : Juge");
+    expect(visible(html)).toContain("Arbitre Juge");
   });
 
   it("render_officiatingLine_staleKey_keepsArbitreDesigne", () => {
@@ -483,7 +507,8 @@ describe("page d'un match — streams et casters", () => {
 
   it("sans caster ni lien : le dit, sans rappel du tri par rôle", () => {
     const html = visible(render(match(), "public"));
-    expect(html).toContain("Aucun caster inscrit pour ce match.");
+    expect(html).toContain("Casters Aucun caster");
+    expect(html).not.toContain("Casts");
     expect(html).not.toContain("triez les joueurs par rôle");
   });
 
@@ -613,10 +638,32 @@ describe("« Page du match » sur la carte du plateau", () => {
   });
 });
 
+describe("page d'un match — mêmes gestes que la carte du plateau", () => {
+  // `useMatchCardModel` : la page offre exactement les actions de la carte,
+  // sauf le lien vers elle-même.
+  const actionIds = (html: string) => [...html.matchAll(/data-action="([^"]+)"/g)].map((found) => found[1]);
+
+  it("render_staff_sameActionsAsBoardCardWithoutMatchPage", () => {
+    const page = match({ startAt: "2099-01-01T00:00:00.000Z" });
+    const onPage = actionIds(render(page, "staff"));
+    const onCard = actionIds(render(page, "staff", false, "fr", EMPTY_MAP_RULES, "OW", true));
+    expect(onPage.length).toBeGreaterThan(1);
+    expect(onPage).toEqual(onCard.filter((id) => id !== "matchPage"));
+  });
+
+  it("render_player_sameActionsAsBoardCardWithoutMatchPage", () => {
+    const page = match({ selfManaged: true });
+    const onPage = actionIds(render(page, "player"));
+    const onCard = actionIds(render(page, "player", false, "fr", EMPTY_MAP_RULES, "OW", true));
+    expect(onPage.length).toBeGreaterThan(0);
+    expect(onPage).toEqual(onCard.filter((id) => id !== "matchPage"));
+  });
+});
+
 describe("page d'un match — sous /en", () => {
   it("rédige ses blocs en anglais, liens sans préfixe réécrits sous /en", () => {
     const html = visible(render(match({ selfManaged: true, casters: [matchCaster()], streams: [{ id: 1, liveUrl: null, staff: false }], firstMap: "Tokyo" }), "public", false, "en"));
-    for (const english of ["Host: creates the game", "First ban", "First map", "Self-managed", "The host team creates the game.", "Invite the match's casters.", "Round 2", "Stream 1", "Link not published yet"]) {
+    for (const english of ["Bravo vs Alpha", "Host", "Creates the game", "First ban", "First map", "Sides Left: Bravo Right: Alpha", "Casters", "Self-managed", "The host team creates the game.", "Invite the match's casters.", "Round 2", "Stream 1", "Link not published yet"]) {
       expect(html).toContain(english);
     }
     for (const french of ["Hôte : crée la partie", "Première map", "Aucun caster", "Lien pas encore publié", "Étapes"]) {
@@ -631,5 +678,13 @@ describe("page d'un match — sous /en", () => {
     expect(Object.keys(en).sort()).toEqual(Object.keys(fr).sort());
     expect(en.missingTitle).toBe("Match not found");
     expect(fr.missingTitle).toBe("Match introuvable");
+  });
+
+  it("messages_matchPageNamespace_frEnSameKeys", () => {
+    const keys = (tree: object, prefix = ""): string[] =>
+      Object.entries(tree).flatMap(([key, value]) =>
+        typeof value === "object" && value !== null ? keys(value, `${prefix}${key}.`) : [`${prefix}${key}`],
+      );
+    expect(keys(messagesFor("en").matchPage).sort()).toEqual(keys(messagesFor("fr").matchPage).sort());
   });
 });

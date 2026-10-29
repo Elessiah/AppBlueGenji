@@ -1,0 +1,62 @@
+/*
+ * Faits clés (`KeyFacts.tsx`) : la grille de l'en-tête des pages de règles,
+ * partagée avec la page d'un match. Teinte du mode (`--tone-rgb`, `--tone-ink`)
+ * quand la page en pose une, bleu glacier sinon.
+ */
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--key-facts-min, 150px), 1fr));
+  margin: 0;
+  padding: 0;
+  background: var(--cyber-bg-1);
+  border: 1px solid rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.32);
+  border-radius: var(--r-cy-md);
+  overflow: hidden;
+  box-shadow: 0 16px 44px -30px rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.8);
+}
+
+/* Filets entre les cases : à droite et en bas de chacune, ceux du bord rognés
+   par le cadre. Une dernière rangée incomplète laisse le fond uni, sans
+   teinter la place vide comme le ferait un fond de grille. */
+.fact {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  margin: 0 -1px -1px 0;
+  padding: 14px 16px;
+  border-right: 1px solid rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.22);
+  border-bottom: 1px solid rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.22);
+  background:
+    linear-gradient(180deg, rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.07), transparent),
+    var(--cyber-bg-1);
+}
+
+.fact[data-wide] {
+  grid-column: 1 / -1;
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--tone-ink, var(--ink-dim));
+}
+
+.value {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  margin: 0;
+  font-size: 15px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.detail {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}

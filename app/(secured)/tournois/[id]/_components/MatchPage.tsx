@@ -8,13 +8,12 @@ import { useSpectatorView } from "@/components/spectator-view";
 import { useToast } from "@/components/ui/toast";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
+import { KeyFacts, type KeyFact } from "@/components/cyber/KeyFacts";
 import { CasterCards, RefereeCard } from "@/components/match-launch/LaunchContactCards";
 import { useMatchContacts } from "@/components/match-launch/MatchContactsDialog";
 import { useLaunchText } from "@/components/match-launch/launch-text";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
-import { useMatchLaunchPhase } from "@/lib/shared/hooks/useMatchLaunchPhase";
-import { useMatchLiveState } from "@/lib/shared/hooks/useMatchLiveState";
-import { MATCH_LAUNCH_REFRESH_EVENT, type MatchLaunchInfo } from "@/lib/shared/match-launch";
+import { MATCH_LAUNCH_REFRESH_EVENT, type MatchLaunchInfo, type MatchLaunchPhase } from "@/lib/shared/match-launch";
 import { tournamentMatchHref } from "@/lib/shared/match-anchor";
 import {
   firstMapFieldFollows,
@@ -27,16 +26,30 @@ import {
 } from "@/lib/shared/match-page";
 import { battletagRelevantFor } from "@/lib/shared/certification-prompt";
 import { FIRST_MAP_MAX_LENGTH, normalizeFirstMap, refereeNameOf } from "@/lib/shared/match-referee";
-import { streamLinkText } from "@/lib/shared/live-streams";
-import { localizedPlaceholder, matchPositionText, versusText } from "@/lib/shared/tournament-page-text";
+import { isMatchCastable, requiresMatchStartAt, streamLinkText, type MatchLiveState } from "@/lib/shared/live-streams";
+import { formatMatchStartAt, formatMatchStartAtFull } from "@/lib/shared/match-schedule";
+import { isMatchDoubleForfeit, isMatchDrawn } from "@/lib/shared/match-outcome";
+import {
+  localizedPlaceholder,
+  matchFormatDescriptionText,
+  matchFormatText,
+  matchPositionText,
+  versusText,
+} from "@/lib/shared/tournament-page-text";
 import { canPickMatchMap, firstBanOrder, roundMapsOf } from "@/lib/shared/round-maps";
 import type { BracketMatch, TournamentDetail, TournamentGame } from "@/lib/shared/types";
-import { launchStripControls } from "../_lib/launch-strip";
 import { useLiveControls } from "../_lib/live-context";
 import { launchErrorText, useActionsText } from "../_lib/actions-text";
 import { useErrorsText } from "../_lib/error-map";
-import { EntrantName } from "./EntrantName";
-import { MatchRow } from "./MatchRow";
+import { useMatchCardModel } from "../_lib/match-card-model";
+import { useMatchFormat } from "../_lib/match-format-context";
+import { useMatchPageText } from "../_lib/match-page-text";
+import { matchPageHeaderScore, matchPageMapFacts } from "../_lib/match-page-facts";
+import { EntrantName, type EntrantLogoSize } from "./EntrantName";
+import { MatchCardActions } from "./MatchCardActions";
+import { LaunchPhaseBadge, hasLaunchPhaseBadge } from "./MatchLaunchStrip";
+import { MapResultList } from "./MatchMapDetails";
+import { MatchReplayStrip } from "./MatchReplayStrip";
 import { MatchRoundMaps } from "./MatchRoundMaps";
 import { StreamLink } from "./MatchLiveStrip";
 import { MatchPageScope } from "../_lib/match-page-context";
@@ -46,25 +59,21 @@ import styles from "./MatchPage.module.css";
 const FIRST_MAP_FIELD_ERRORS = { INVALID_FIRST_MAP: "map" } as const;
 
 /** Nom d'un côté (ou de sa case vide), dans la langue de la page. */
-function useSideName(side: MatchPageSide): string {
+function useSideName(side: MatchPageSide | null): string {
   const text = useTournamentPageText();
+  if (side === null) return text.t("match.tbd");
   return side.name ?? localizedPlaceholder(text, side.placeholder) ?? text.t("match.tbd");
 }
 
-/** Un côté de la partie : l'engagé, sa place (gauche / droite) et son rôle à la création. */
-function SideBlock({ side, position }: Readonly<{ side: MatchPageSide; position: "left" | "right" }>) {
-  const { t } = useTournamentPageText();
+/** Un engagé de la page, son emblème compris, cliquable vers sa fiche (`EntrantName`). */
+function SideName({
+  side,
+  logoSize,
+  className,
+  truncate = false,
+}: Readonly<{ side: MatchPageSide; logoSize: EntrantLogoSize; className?: string; truncate?: boolean }>) {
   const name = useSideName(side);
-  return (
-    <div className={styles.side} data-position={position}>
-      <span className={styles.sideLabel}>{t(position === "left" ? "matchPage.left" : "matchPage.right")}</span>
-      <EntrantName teamId={side.teamId} name={name} title={name} logoSize={20} truncate className={styles.sideName} />
-      <span className={styles.tags}>
-        {side.host && <span className="pill pill-info">{t("matchPage.host")}</span>}
-        {side.firstBan && <span className="pill pill-neutral">{t("matchPage.firstBan")}</span>}
-      </span>
-    </div>
-  );
+  return <EntrantName teamId={side.teamId} name={name} title={name} logoSize={logoSize} truncate={truncate} className={className} />;
 }
 
 /**
@@ -161,14 +170,322 @@ function useCopy() {
   };
 }
 
-/** Création de la partie : côtés (hôte à gauche), première carte, premier ban, rappel du cast. */
 /** Le lecteur, partie du match, peut-il déclarer son « Prêt » (donc choisir une carte en autogestion) ? */
 function canDeclareFor(launch: MatchLaunchInfo | null): boolean {
   if (!launch) return false;
   return (launch.viewer.role === "TEAM1" || launch.viewer.role === "TEAM2") && launch.viewer.canDeclareReady;
 }
 
-function LobbySection({
+/** Titre d'une section de la page, au gabarit des blocs de la fiche. */
+function SectionTitle({ id, children }: Readonly<{ id: string; children: ReactNode }>) {
+  return (
+    <div className="ds-section-title blue">
+      <h2 id={id}>{children}</h2>
+    </div>
+  );
+}
+
+/**
+ * En-tête du match : situation (tournoi · phase · manche · match), titre
+ * « A contre B », tableau d'affichage (emblèmes, noms cliquables, score —
+ * l'hôte à gauche, comme en jeu), puis l'état : terminé et vainqueur, horaire,
+ * diffusion, rediff et proposition de score en attente.
+ */
+function MatchHeader({
+  detail,
+  match,
+  sides,
+  liveState,
+  reportNotice,
+}: Readonly<{
+  detail: TournamentDetail;
+  match: BracketMatch;
+  sides: [MatchPageSide, MatchPageSide];
+  liveState: MatchLiveState;
+  reportNotice: string | null;
+}>) {
+  const text = useTournamentPageText();
+  const { t, locale } = text;
+  const page = useMatchPageText();
+  const { canManage, canSchedule } = useLiveControls();
+  const [left, right] = sides;
+  const leftName = useSideName(left);
+  const rightName = useSideName(right);
+  const doubleForfeit = isMatchDoubleForfeit(match);
+  const score = matchPageHeaderScore(match, sides, doubleForfeit);
+  const phaseName = detail.phases?.find((item) => item.id === match.phaseId)?.name ?? null;
+  const startAt = formatMatchStartAtFull(match.startAt, locale);
+  const winner = sides.find((side) => side.teamId !== null && side.teamId === match.winnerTeamId) ?? null;
+  const winnerName = useSideName(winner);
+  // Même alerte que le bandeau d'horaire de la carte : un match casté à son
+  // heure de début, sans date, ne passera jamais à l'antenne.
+  const missingStartAt =
+    requiresMatchStartAt(match.liveTrigger) &&
+    formatMatchStartAt(match.startAt) === null &&
+    isMatchCastable(match) &&
+    (canManage || canSchedule);
+  const completed = match.status === "COMPLETED";
+
+  return (
+    <header className={styles.header}>
+      <p className={styles.meta}>
+        {[detail.card.name, phaseName, matchPositionText(text, match)].filter(Boolean).join(" · ")}
+      </p>
+      {/* Dans l'ordre du tableau d'affichage : l'hôte d'abord, à gauche. */}
+      <h1 className={styles.title}>{versusText(text, leftName, rightName)}</h1>
+      <div className={styles.scoreboard}>
+        <div className={styles.team} data-position="left" data-winner={winner === left ? "" : undefined}>
+          <SideName side={left} logoSize={40} className={styles.teamName} />
+        </div>
+        {score ? (
+          <p className={styles.score}>
+            <span aria-hidden="true" className="num">
+              {score.left} – {score.right}
+            </span>
+            <span className="sr-only">
+              {page.t("header.scoreLabel", { team1: leftName, score1: score.left, team2: rightName, score2: score.right })}
+            </span>
+          </p>
+        ) : (
+          <span className={styles.versus} aria-hidden="true">
+            {page.t("header.versus")}
+          </span>
+        )}
+        <div className={styles.team} data-position="right" data-winner={winner === right ? "" : undefined}>
+          <SideName side={right} logoSize={40} className={styles.teamName} />
+        </div>
+      </div>
+      <div className={styles.status}>
+        {completed && <span className="pill pill-success">{page.t("header.completed")}</span>}
+        {completed && winner && <span className={styles.statusText}>{page.t("header.winner", { team: winnerName })}</span>}
+        {isMatchDrawn(match) && <span className="pill pill-neutral">{t("match.draw")}</span>}
+        {doubleForfeit && <span className="pill pill-warning">{t("match.doubleForfeit")}</span>}
+        {startAt && (
+          <span className={styles.statusText}>
+            <span aria-hidden="true">🕑</span> {page.t("header.startAt", { date: startAt })}
+          </span>
+        )}
+        {/* Le rouge ne sert qu'à ce qui est réellement à l'antenne (`LIVE_STREAMS.md`). */}
+        {liveState === "LIVE" && (
+          <span className="pill pill-live">
+            <span aria-hidden="true">●</span> {page.t("header.liveNow")}
+          </span>
+        )}
+        {liveState === "SCHEDULED" && <span className="pill pill-info">{page.t("header.castAnnounced")}</span>}
+        {missingStartAt && (
+          <span className="pill pill-warning">
+            <span aria-hidden="true">⚠</span> {page.t("header.missingDate")}
+          </span>
+        )}
+      </div>
+      <MatchReplayStrip match={match} />
+      {reportNotice && <p className={styles.reportNotice}>{reportNotice}</p>}
+    </header>
+  );
+}
+
+/** Valeur d'un fait clé sans réponse encore (adversaires à venir, carte pas choisie…). */
+function Muted({ children }: Readonly<{ children: ReactNode }>) {
+  return <span className={styles.muted}>{children}</span>;
+}
+
+/** Décision d'arbitrage en valeur de fait clé, son explication derrière le « i » (`INFO_HINTS.md`). */
+function DecisionValue({ value, subject, hintId, hint }: Readonly<{ value: ReactNode; subject: string; hintId: string; hint: string }>) {
+  return (
+    <InfoHintRow>
+      {value}
+      <InfoHint id={hintId} subject={subject}>
+        <p>{hint}</p>
+      </InfoHint>
+    </InfoHintRow>
+  );
+}
+
+/**
+ * Faits clés du match, au gabarit de l'en-tête des pages de règles
+ * (`KeyFacts`) : chacun titré en toutes lettres — hôte, premier ban, arbitre ou
+ * autogestion, maps, format, côtés, casters, lancement. Rien de nouveau n'est
+ * lu : ce sont les champs de l'instantané que la carte montrait déjà, et le
+ * pseudo de l'arbitre aux seuls membres connectés (`refereeNameOf`).
+ */
+function MatchKeyFacts({
+  detail,
+  match,
+  sides,
+  phase,
+  staff,
+}: Readonly<{
+  detail: TournamentDetail;
+  match: BracketMatch;
+  sides: [MatchPageSide, MatchPageSide];
+  phase: MatchLaunchPhase;
+  staff: boolean;
+}>) {
+  const text = useTournamentPageText();
+  const { t } = text;
+  const page = useMatchPageText();
+  const spectator = useSpectatorView();
+  const hintId = useId();
+  const { refereeNames } = useLiveControls();
+  const refereeName = refereeNameOf(match, refereeNames);
+  const format = useMatchFormat(match);
+  const [left, right] = sides;
+  const leftName = useSideName(left);
+  const rightName = useSideName(right);
+  const hostSide = sides.find((side) => side.host) ?? null;
+  const banSide = sides.find((side) => side.firstBan) ?? null;
+  const decision = matchPageDecision(match, staff);
+  const mapFacts = matchPageMapFacts(detail.mapRules, match);
+  const pending = <Muted>{t("matchPage.opponentsPending")}</Muted>;
+
+  const facts: KeyFact[] = [
+    {
+      id: "host",
+      label: page.t("facts.host"),
+      value: hostSide ? <SideName side={hostSide} logoSize={20} /> : pending,
+      detail: hostSide ? page.t("facts.hostDetail") : undefined,
+    },
+    {
+      id: "firstBan",
+      label: page.t("facts.firstBan"),
+      value: banSide ? <SideName side={banSide} logoSize={20} /> : pending,
+    },
+  ];
+  if (decision === "REFEREE") {
+    facts.push({
+      id: "officiating",
+      label: page.t("facts.referee"),
+      // Pseudo de l'arbitre pour un membre connecté (décision 52), « Arbitre
+      // désigné » sans compte, ou tant que le pseudo de la désignation manque.
+      value: (
+        <DecisionValue
+          value={<strong>{refereeName ?? page.t("facts.refereeDesignated")}</strong>}
+          subject={t("launch.referee")}
+          hintId={`${hintId}-referee`}
+          hint={t("matchPage.refereeLead")}
+        />
+      ),
+    });
+  } else if (decision === "SELF_MANAGED") {
+    facts.push({
+      id: "officiating",
+      label: page.t("facts.officiating"),
+      value: (
+        <DecisionValue
+          value={<strong>{t("launch.selfManaged")}</strong>}
+          subject={t("launch.selfManaged")}
+          hintId={`${hintId}-self`}
+          hint={t("launch.selfManagedTitle")}
+        />
+      ),
+    });
+  } else if (decision === "UNDECIDED") {
+    facts.push({
+      id: "officiating",
+      label: page.t("facts.officiating"),
+      value: (
+        <DecisionValue
+          value={<span className="pill pill-warning">{t("matchPage.undecided")}</span>}
+          subject={t("matchPage.undecided")}
+          hintId={`${hintId}-undecided`}
+          hint={t("matchPage.undecidedLead")}
+        />
+      ),
+    });
+  }
+  if (mapFacts.length > 0) {
+    facts.push({
+      id: "maps",
+      label: page.t("facts.maps"),
+      wide: mapFacts.length > 1,
+      value: (
+        <ol className={styles.factList}>
+          {mapFacts.map((slot) => (
+            <li key={slot.number}>
+              {slot.map !== null && page.t("facts.mapSlot", { number: slot.number, map: slot.map })}
+              {slot.map === null && slot.candidates.length > 0 && (
+                <Muted>{page.t("facts.mapPool", { number: slot.number, maps: slot.candidates.join(", ") })}</Muted>
+              )}
+              {slot.map === null && slot.candidates.length === 0 && <Muted>{page.t("facts.mapOpen", { number: slot.number })}</Muted>}
+              {slot.loserPick && <span className={styles.factNote}> · {page.t("facts.loserPick")}</span>}
+            </li>
+          ))}
+        </ol>
+      ),
+    });
+  } else {
+    facts.push({
+      id: "maps",
+      label: t("matchPage.firstMap"),
+      value: match.firstMap ?? <Muted>{t("matchPage.firstMapUnset")}</Muted>,
+    });
+  }
+  facts.push({
+    id: "format",
+    label: page.t("facts.format"),
+    value: matchFormatText(text, format),
+    detail: format ? capitalize(matchFormatDescriptionText(text, format)) : undefined,
+  });
+  // Règlement §14 : l'équipe du haut (l'hôte) prend le côté gauche.
+  if (hostSide) {
+    facts.push({
+      id: "sides",
+      label: page.t("facts.sides"),
+      value: (
+        <span className={styles.factLines}>
+          <span>{page.t("facts.sideLeft", { team: leftName })}</span>
+          <span>{page.t("facts.sideRight", { team: rightName })}</span>
+        </span>
+      ),
+    });
+  }
+  facts.push({
+    id: "casters",
+    label: page.t("facts.casters"),
+    value:
+      match.casters.length === 0 ? (
+        <Muted>{page.t("facts.noCaster")}</Muted>
+      ) : (
+        <span className={styles.factLines}>
+          {match.casters.map((caster, index) => (
+            <span key={`${index}:${caster.userId}`}>
+              {/* Sans compte, l'identifiant du caster est masqué (négatif,
+                  `spectatorSnapshot`) : son pseudo seul, sans lien vers une fiche. */}
+              {caster.userId > 0 ? <PlayerLink userId={caster.userId}>{caster.pseudo}</PlayerLink> : caster.pseudo}
+              {/* Sans compte, aucun « Prêt » n'est servi : pas d'« attendu » trompeur. */}
+              {phase === "LOBBY" && !spectator && (
+                <span className={caster.ready ? styles.ok : styles.factNote}>
+                  {" · "}
+                  {caster.ready ? t("launch.casterReady") : t("launch.casterWaiting")}
+                </span>
+              )}
+            </span>
+          ))}
+        </span>
+      ),
+  });
+  if (hasLaunchPhaseBadge(match, phase)) {
+    facts.push({ id: "launch", label: page.t("facts.launch"), value: <LaunchPhaseBadge match={match} phase={phase} /> });
+  }
+  // Les ordres de bans se lisent sous « Maps et bans » ; ici, l'équipe qui ouvre.
+  return (
+    <section className={styles.factsBlock} aria-label={page.t("facts.label")}>
+      <KeyFacts facts={facts} />
+    </section>
+  );
+}
+
+/** Première lettre en capitale : la description du format se lit d'ordinaire après sa notation. */
+function capitalize(value: string): string {
+  return value.charAt(0).toLocaleUpperCase() + value.slice(1);
+}
+
+/**
+ * Maps et bans : l'ordre des bans de la carte 1 et la règle des suivantes,
+ * puis — pour qui peut agir — le choix dans les pools et les outils du staff
+ * (cartes du tour, première map). Le rappel du tri par rôle d'un match casté.
+ */
+function MapsSection({
   detail,
   match,
   sides,
@@ -184,6 +501,7 @@ function LobbySection({
   canPick: boolean;
 }>) {
   const { t } = useTournamentPageText();
+  const page = useMatchPageText();
   const titleId = useId();
   const [left, right] = sides;
   const banSide = sides.find((side) => side.firstBan) ?? null;
@@ -195,33 +513,18 @@ function LobbySection({
   const banOrder = firstBanOrder(rules.firstBan, match.hostTeamId, match.team1Id, match.team2Id);
   // Une carte 1 réglée pour la manche (imposée ou pool) remplace la saisie libre.
   const firstSlotSet = (roundMapsOf(rules.rounds, match)?.slots.length ?? 0) > 0;
+  const picking = canPick && editable;
   return (
     <section className={`ds-block ${styles.block}`} aria-labelledby={titleId}>
-      <div className="ds-section-title blue">
-        <h2 id={titleId}>{t("matchPage.sections.lobby")}</h2>
-      </div>
-      <div className={styles.sides}>
-        <SideBlock side={left} position="left" />
-        <span className={styles.versus} aria-hidden="true">
-          {t("matchPage.vs")}
-        </span>
-        <SideBlock side={right} position="right" />
-      </div>
-      <dl className={styles.facts}>
-        {/* Une carte 1 réglée pour le tour s'affiche dans « Cartes du tour » : « Pas encore choisie » la contredirait. */}
-        {!firstSlotSet && (
-          <div>
-            <dt>{t("matchPage.firstMap")}</dt>
-            <dd>{match.firstMap ?? <span className={styles.muted}>{t("matchPage.firstMapUnset")}</span>}</dd>
-          </div>
-        )}
+      <SectionTitle id={titleId}>{page.t("sections.maps")}</SectionTitle>
+      <dl className={styles.rules}>
         <div>
           <dt>{rm.t("page.banOrder")}</dt>
           <dd>
             {banSide && banOrder ? (
               rm.t("page.banOrderValue", { first: banName, second: otherName })
             ) : (
-              <span className={styles.muted}>{t("matchPage.opponentsPending")}</span>
+              <Muted>{t("matchPage.opponentsPending")}</Muted>
             )}
           </dd>
         </div>
@@ -230,7 +533,11 @@ function LobbySection({
           <dd className={styles.ruleText}>{rm.t(rules.nextBan === "WINNER" ? "page.nextBansWINNER" : "page.nextBansLOSER")}</dd>
         </div>
       </dl>
-      <MatchRoundMaps detail={detail} match={match} canPick={canPick && editable} staff={staff} />
+      {/* Les cartes se lisent dans les faits clés ; la liste ne revient ici que
+          pour qui choisit dans un pool ou règle le tour. */}
+      {(staff || picking) && (
+        <MatchRoundMaps detail={detail} match={match} canPick={picking} staff={staff} />
+      )}
       {staff && editable && !firstSlotSet && <FirstMapForm match={match} />}
       {match.casters.length > 0 && (
         <p className={styles.reminder}>
@@ -241,26 +548,11 @@ function LobbySection({
   );
 }
 
-/** Décision d'arbitrage : sa pastille, son explication derrière le « i » (`INFO_HINTS.md`). */
-function DecisionLine({
-  pill,
-  subject,
-  hintId,
-  hint,
-}: Readonly<{ pill: ReactNode; subject: string; hintId: string; hint: string }>) {
-  return (
-    <div className={styles.decision}>
-      <InfoHintRow>
-        {pill}
-        <InfoHint id={hintId} subject={subject}>
-          <p>{hint}</p>
-        </InfoHint>
-      </InfoHintRow>
-    </div>
-  );
-}
-
-/** Arbitrage : l'arbitre (nommé aux seules parties du match), l'autogestion et ses étapes, ou l'absence de décision (staff). */
+/**
+ * Arbitrage, en détail : la fiche de l'arbitre (aux lecteurs que sert la
+ * lecture des contacts) ou l'aide-mémoire de l'autogestion. La décision
+ * elle-même se lit dans les faits clés.
+ */
 function OfficiatingSection({
   match,
   game,
@@ -278,74 +570,40 @@ function OfficiatingSection({
   invitesByBattletag: boolean;
 }>) {
   const { t } = useTournamentPageText();
+  const page = useMatchPageText();
   const titleId = useId();
-  // Pseudo de l'arbitre pour un membre connecté (décision 52), « Arbitre
-  // désigné » sans compte.
-  const { refereeNames } = useLiveControls();
-  const refereeName = refereeNameOf(match, refereeNames);
   const decision = matchPageDecision(match, staff);
-  if (decision === null) return null;
+  const refereeCard = decision === "REFEREE" && launch?.referee ? launch.referee : null;
+  if (refereeCard === null && decision !== "SELF_MANAGED") return null;
   return (
     <section className={`ds-block ${styles.block}`} aria-labelledby={titleId}>
-      <div className="ds-section-title blue">
-        <h2 id={titleId}>{t("matchPage.sections.officiating")}</h2>
-      </div>
-      {decision === "REFEREE" && (
-        <>
-          <DecisionLine
-            pill={
-              <span className="pill pill-info">
-                {refereeName ? t("launch.refereeNamed", { name: refereeName }) : t("launch.referee")}
-              </span>
-            }
-            subject={t("launch.referee")}
-            hintId={`${titleId}-referee`}
-            hint={t("matchPage.refereeLead")}
-          />
-          {launch?.referee && (
-            <RefereeCard
-              referee={launch.referee}
-              selfManaged={false}
-              phase={launch.phase}
-              onCopy={onCopy}
-              linkNames
-              battletagNote={invitesByBattletag ? t("matchPage.refereeBattletagNote") : undefined}
-            />
-          )}
-        </>
+      <SectionTitle id={titleId}>{page.t("sections.officiating")}</SectionTitle>
+      {refereeCard && launch && (
+        <RefereeCard
+          referee={refereeCard}
+          selfManaged={false}
+          phase={launch.phase}
+          onCopy={onCopy}
+          linkNames
+          battletagNote={invitesByBattletag ? t("matchPage.refereeBattletagNote") : undefined}
+        />
       )}
       {decision === "SELF_MANAGED" && (
-        <>
-          <DecisionLine
-            pill={<span className="pill pill-info">{t("launch.selfManaged")}</span>}
-            subject={t("launch.selfManaged")}
-            hintId={`${titleId}-self`}
-            hint={t("launch.selfManagedTitle")}
-          />
-          <ol className={styles.steps} aria-label={t("matchPage.stepsLabel")}>
-            {selfManagementSteps(match.casters.length).map((step) => (
-              <li key={step}>
-                {t(`matchPage.steps.${step}`)}
-                {/* Réglages propres à Overwatch : rien à lister pour Marvel Rivals. */}
-                {step === "settings" && game === "OW" && (
-                  <ul className={styles.stepSettings}>
-                    {OW_SELF_MANAGEMENT_SETTINGS.map((setting) => (
-                      <li key={setting}>{t(`matchPage.owSettings.${setting}`)}</li>
-                    ))}
-                  </ul>
-                )}
-              </li>
-            ))}
-          </ol>
-        </>
-      )}
-      {decision === "UNDECIDED" && (
-        <DecisionLine
-          pill={<span className="pill pill-warning">{t("matchPage.undecided")}</span>}
-          subject={t("matchPage.undecided")}
-          hintId={`${titleId}-undecided`}
-          hint={t("matchPage.undecidedLead")}
-        />
+        <ol className={styles.steps} aria-label={t("matchPage.stepsLabel")}>
+          {selfManagementSteps(match.casters.length).map((step) => (
+            <li key={step}>
+              {t(`matchPage.steps.${step}`)}
+              {/* Réglages propres à Overwatch : rien à lister pour Marvel Rivals. */}
+              {step === "settings" && game === "OW" && (
+                <ul className={styles.stepSettings}>
+                  {OW_SELF_MANAGEMENT_SETTINGS.map((setting) => (
+                    <li key={setting}>{t(`matchPage.owSettings.${setting}`)}</li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          ))}
+        </ol>
       )}
     </section>
   );
@@ -354,39 +612,40 @@ function OfficiatingSection({
 /**
  * Cast et streams : chaque stream avec son lien et ses casters, puis les
  * contacts des casters — en Overwatch, leurs BattleTags à inviter ; ailleurs,
- * ni BattleTag (le serveur ne l'envoie pas) ni consigne d'invitation.
+ * ni BattleTag (le serveur ne l'envoie pas) ni consigne d'invitation. Rien
+ * sans stream ni contact : « Aucun caster » se lit dans les faits clés.
  */
 function CastSection({
   match,
   matchLabel,
   launch,
+  liveState,
   onCopy,
   invitesByBattletag,
 }: Readonly<{
   match: BracketMatch;
   matchLabel: string;
   launch: MatchLaunchInfo | null;
+  liveState: MatchLiveState;
   onCopy: (value: string, label: string) => Promise<void>;
   invitesByBattletag: boolean;
 }>) {
   const { t } = useTournamentPageText();
+  const page = useMatchPageText();
   const launchText = useLaunchText();
   const titleId = useId();
-  const liveState = useMatchLiveState(match);
   const streams = matchPageStreams(match, liveState);
   // Deux liens au même texte (deux vidéos YouTube sans poignée) se distinguent
   // par leur numéro, dans le texte comme dans le nom accessible (WCAG 2.4.4).
   const linkTexts = streams.map((stream) => (stream.url ? streamLinkText(stream.url, t("match.channel")) : null));
   const sharedText = (index: number) =>
     linkTexts[index] !== null && linkTexts.filter((item) => item === linkTexts[index]).length > 1;
+  const contacts = launch && launch.casters.length > 0 ? launch : null;
+  if (streams.length === 0 && contacts === null) return null;
   return (
     <section className={`ds-block ${styles.block}`} aria-labelledby={titleId}>
-      <div className="ds-section-title blue">
-        <h2 id={titleId}>{t("matchPage.sections.casts")}</h2>
-      </div>
-      {streams.length === 0 ? (
-        <p className={styles.muted}>{t("matchPage.noCaster")}</p>
-      ) : (
+      <SectionTitle id={titleId}>{page.t("sections.casts")}</SectionTitle>
+      {streams.length > 0 && (
         <ul className={styles.streams}>
           {streams.map((stream, index) => (
             <li key={stream.id} className={styles.stream}>
@@ -399,7 +658,7 @@ function CastSection({
                   ordinal={sharedText(index) ? index + 1 : undefined}
                 />
               ) : (
-                <span className={styles.muted}>{t("matchPage.noLink")}</span>
+                <Muted>{t("matchPage.noLink")}</Muted>
               )}
               {stream.casters.length > 0 && (
                 <span className={styles.streamCasters}>
@@ -423,14 +682,14 @@ function CastSection({
           ))}
         </ul>
       )}
-      {launch && launch.casters.length > 0 && (
+      {contacts && (
         <div className={styles.castContacts}>
           <h3 className={styles.subTitle}>
             {t(invitesByBattletag ? "matchPage.castersToInvite" : "matchPage.castersContacts")}
           </h3>
           <CasterCards
-            casters={launch.casters}
-            phase={launch.phase}
+            casters={contacts.casters}
+            phase={contacts.phase}
             onCopy={onCopy}
             laterText={launchText.t("contacts.casterLater")}
             linkNames
@@ -442,25 +701,41 @@ function CastSection({
   );
 }
 
+/** Détail map par map d'un match joué : scores et codes de replay (ceux-ci aux seuls membres). */
+function ResultSection({ match, sides }: Readonly<{ match: BracketMatch; sides: [MatchPageSide, MatchPageSide] }>) {
+  const { t } = useTournamentPageText();
+  const page = useMatchPageText();
+  const titleId = useId();
+  // Les maps se lisent dans l'ordre du plateau (équipe 1, équipe 2) : les noms suivent.
+  const team1 = useSideName(sides.find((side) => side.slot === 1) ?? null);
+  const team2 = useSideName(sides.find((side) => side.slot === 2) ?? null);
+  if (match.maps.length === 0) return null;
+  return (
+    <section className={`ds-block ${styles.block}`} aria-labelledby={titleId}>
+      <SectionTitle id={titleId}>{page.t("sections.result")}</SectionTitle>
+      <MapResultList maps={match.maps} team1Name={team1} team2Name={team2} label={t("match.maps.listLabel")} />
+    </section>
+  );
+}
+
 /**
- * Page d'un match (`docs/features/MATCH_PAGE.md`) : la carte du match et tous
- * ses gestes, puis ce qu'il faut pour créer la partie — côtés (hôte à
- * gauche), première carte, premier ban —, l'arbitrage ou l'autogestion, les
- * streams avec leurs casters et, aux seules parties du match et au staff, les
- * BattleTags à inviter — en Overwatch seulement — (même lecture que la modale
- * « Contacts »). Rendue dans
- * la fiche du tournoi (`TournamentSheet`), dont elle partage le flux, les
- * fenêtres et les droits du lecteur.
+ * Page d'un match (`docs/features/MATCH_PAGE.md`) : un en-tête (situation,
+ * équipes, score, état), les faits clés au gabarit des pages de règles, puis
+ * une grille de sections — les gestes de la carte du match (mêmes actions,
+ * `useMatchCardModel`), le résultat map par map, maps et bans, l'arbitrage,
+ * les casts. Rendue dans la fiche du tournoi (`TournamentSheet`), dont elle
+ * partage le flux, les fenêtres et les droits du lecteur.
  */
-export function MatchPage({
-  detail,
-  match,
-  adminResolvable,
-  scoreLocked,
-  onOpenAdminModal,
-  frozen,
-  status,
-}: Readonly<{
+export function MatchPage(props: Readonly<MatchPageProps>) {
+  // Sous la page, les gestes tus sont ceux qui mènent à la page elle-même.
+  return (
+    <MatchPageScope value>
+      <MatchPageContent {...props} />
+    </MatchPageScope>
+  );
+}
+
+type MatchPageProps = {
   detail: TournamentDetail;
   match: BracketMatch;
   adminResolvable: boolean;
@@ -469,15 +744,20 @@ export function MatchPage({
   frozen: boolean;
   /** Témoin du flux de la fiche (« À jour », « Reconnexion… », « Hors ligne »). */
   status: ReactNode;
-}>) {
+};
+
+function MatchPageContent({ detail, match, adminResolvable, scoreLocked, onOpenAdminModal, frozen, status }: Readonly<MatchPageProps>) {
   const text = useTournamentPageText();
   const { t } = text;
+  const page = useMatchPageText();
+  const actionText = useActionsText();
   const spectator = useSpectatorView();
-  const { canManage, canSchedule, viewerUserId, myTeamId, launchPhase, refereeScheduling } = useLiveControls();
-  const phase = useMatchLaunchPhase({ ...match, refereeScheduling, launchPhase });
-  const controls = launchStripControls(match, phase, { canManage, canSchedule, viewerUserId, myTeamId, launchPhase });
+  const { canSchedule, myTeamId } = useLiveControls();
+  const model = useMatchCardModel(match, adminResolvable, scoreLocked);
+  const { liveState } = model;
+  const actionsId = useId();
   // Les parties du match et le staff lisent ses contacts, comme sur la carte.
-  const readsContacts = !spectator && !frozen && (controls.showContacts || controls.showOpen);
+  const readsContacts = !spectator && !frozen && (model.launch.showContacts || model.launch.showOpen);
   const { launch } = useMatchContacts(match.id, match, readsContacts);
   const shownLaunch = readsContacts ? launch : null;
   const onCopy = useCopy();
@@ -485,9 +765,9 @@ export function MatchPage({
   const team1 = match.team1Name ?? localizedPlaceholder(text, match.team1Placeholder) ?? t("match.tbd");
   const team2 = match.team2Name ?? localizedPlaceholder(text, match.team2Placeholder) ?? t("match.tbd");
   const matchLabel = versusText(text, team1, team2);
-  const phaseName = detail.phases?.find((item) => item.id === match.phaseId)?.name ?? null;
   const editable = match.status !== "COMPLETED" && match.team1Id !== null && match.team2Id !== null;
   const invitesByBattletag = battletagRelevantFor(detail.card.game);
+  const locked = adminResolvable && scoreLocked;
 
   return (
     <>
@@ -499,50 +779,79 @@ export function MatchPage({
         </LocaleLink>
         {status}
       </div>
-      <header className={styles.header}>
-        <h1 className={styles.title}>{matchLabel}</h1>
-        <p className={styles.meta}>
-          {[detail.card.name, phaseName, matchPositionText(text, match)].filter(Boolean).join(" · ")}
-        </p>
-      </header>
 
-      <section className={`ds-block ${styles.block}`} aria-label={t("matchPage.sections.match")}>
-        <div className={styles.card}>
-          <MatchPageScope value>
-            <MatchRow
-              match={match}
-              adminResolvable={adminResolvable}
-              onOpenAdminModal={onOpenAdminModal}
-              scoreLocked={scoreLocked}
-              roundNumber={match.roundNumber}
-            />
-          </MatchPageScope>
-        </div>
-      </section>
-
-      <LobbySection
+      <MatchHeader
         detail={detail}
         match={match}
         sides={sides}
-        staff={canSchedule && !frozen}
-        editable={editable}
-        canPick={!spectator && !frozen && canPickMatchMap({ staff: canSchedule, myTeamId, canDeclareReady: canDeclareFor(shownLaunch) }, match)}
+        liveState={liveState}
+        reportNotice={model.reportNotice}
       />
-      <OfficiatingSection
-        match={match}
-        game={detail.card.game}
-        staff={canSchedule}
-        launch={shownLaunch}
-        onCopy={onCopy}
-        invitesByBattletag={invitesByBattletag}
-      />
-      <CastSection
-        match={match}
-        matchLabel={matchLabel}
-        launch={shownLaunch}
-        onCopy={onCopy}
-        invitesByBattletag={invitesByBattletag}
-      />
+
+      <MatchKeyFacts detail={detail} match={match} sides={sides} phase={model.launchPhase} staff={canSchedule} />
+
+      <div className={styles.grid}>
+        <div className={styles.column}>
+          {/* Les gestes de la carte du match, tous : la page ne reprend plus la
+              carte, mais en offre exactement les actions (`useMatchCardModel`). */}
+          {(model.actions.length > 0 || locked) && (
+            <section className={`ds-block ${styles.block} ${styles.actions}`} aria-labelledby={actionsId}>
+              <SectionTitle id={actionsId}>{page.t("sections.actions")}</SectionTitle>
+              {model.actions.length > 0 && (
+                <MatchCardActions
+                  match={match}
+                  phase={model.launchPhase}
+                  actions={model.actions}
+                  matchLabel={matchLabel}
+                  isCaster={model.launch.isCaster}
+                  releasesOthers={model.launch.releasesOthers}
+                  onAir={liveState === "LIVE"}
+                  onPlayerScore={model.openPlayerScore}
+                  onAdminScore={() => onOpenAdminModal(match)}
+                  onReport={model.openReport}
+                />
+              )}
+              {locked && (
+                <p className={styles.locked}>
+                  <span aria-hidden="true">🔒</span> {actionText.t("cardActions.locked")}
+                  <span className="sr-only"> {actionText.t("cardActions.lockedReason")}</span>
+                </p>
+              )}
+            </section>
+          )}
+          <ResultSection match={match} sides={sides} />
+          <MapsSection
+            detail={detail}
+            match={match}
+            sides={sides}
+            staff={canSchedule && !frozen}
+            editable={editable}
+            canPick={
+              !spectator &&
+              !frozen &&
+              canPickMatchMap({ staff: canSchedule, myTeamId, canDeclareReady: canDeclareFor(shownLaunch) }, match)
+            }
+          />
+        </div>
+        <div className={styles.column}>
+          <OfficiatingSection
+            match={match}
+            game={detail.card.game}
+            staff={canSchedule}
+            launch={shownLaunch}
+            onCopy={onCopy}
+            invitesByBattletag={invitesByBattletag}
+          />
+          <CastSection
+            match={match}
+            matchLabel={matchLabel}
+            launch={shownLaunch}
+            liveState={liveState}
+            onCopy={onCopy}
+            invitesByBattletag={invitesByBattletag}
+          />
+        </div>
+      </div>
     </>
   );
 }
