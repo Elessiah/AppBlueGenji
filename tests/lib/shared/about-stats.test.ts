@@ -224,4 +224,17 @@ describe("validateAboutStatInput — caractères invisibles", () => {
       value: { value: french },
     });
   });
+
+  it("« 100 % » (espace avant %) et le groupe de milliers à espace fine attendent leur anglais", () => {
+    for (const value of ["100 %", "50 %", "4 200", "€4 200", "4 200"]) {
+      expect(aboutStatValueNeedsEnglish({ value, valueEn: null })).toBe(true);
+    }
+    expect(aboutStatValueNeedsEnglish({ value: "100 %", valueEn: "100%" })).toBe(false);
+  });
+
+  it("une valeur sans lettre ni écriture française n'attend rien ; un anglais saisi lève l'attente des mots", () => {
+    expect(aboutStatValueNeedsEnglish({ value: "50%", valueEn: "  " })).toBe(false);
+    expect(aboutStatValueNeedsEnglish({ value: "Gratuit", valueEn: "Free" })).toBe(false);
+    expect(aboutStatValueNeedsEnglish({ value: "Gratuit", valueEn: null })).toBe(true);
+  });
 });
