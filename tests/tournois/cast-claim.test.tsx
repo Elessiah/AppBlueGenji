@@ -239,13 +239,17 @@ describe("CastClaimDialog — un stream choisi qui disparaît", () => {
     expect(source).toContain('{gone ? t("cardActions.claimDialog.gone") : ""}');
   });
 
+  it("oublie le choix disparu : un stream qui revient ne se recoche pas sans nouveau choix", () => {
+    expect(source).toContain('if (choice === null && choiceKey !== "") setChoiceKey("");');
+  });
+
   it("ouvre sans focusContent ni radio focalisée : « Annuler » prend le focus", () => {
     expect(source).not.toContain("focusContent");
     expect(source).not.toContain("data-autofocus");
   });
 
   it("joint les casters par Intl.ListFormat dans la langue de la page", () => {
-    expect(source).toContain('new Intl.ListFormat(locale, { style: "long", type: "conjunction" })');
+    expect(source).toContain('useMemo(() => new Intl.ListFormat(locale, { style: "long", type: "conjunction" }), [locale])');
     expect(source).not.toContain('casterPseudos.join(", ")');
   });
 });
@@ -287,7 +291,9 @@ describe("MatchCardActions — branchements du cast", () => {
   it("le caster choisi qui part pendant le choix : un toast le dit, sauf pour le retrait que le lecteur vient de confirmer", () => {
     expect(card).toContain("wasShown.current && !shown && releasedCaster === null && !ownRelease.current");
     expect(card).toContain('() => showError(t("cardActions.releaseConfirm.gone"))');
-    expect(card).toContain("markOwnRelease();");
+    expect(card).toContain("markOwnRelease(true);");
+    // Un retrait refusé laisse la fenêtre ouverte : le départ suivant doit se dire.
+    expect(card).toContain("if (!done) markOwnRelease(false);");
     expect(card).toContain("ownRelease.current = false;");
   });
 
