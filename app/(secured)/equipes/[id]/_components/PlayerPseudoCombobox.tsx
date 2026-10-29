@@ -1,7 +1,7 @@
 "use client";
 
 import { KeyboardEvent, useEffect, useId, useMemo, useState } from "react";
-import type { PublicUserProfile } from "@/lib/shared/types";
+import type { DirectoryPlayer } from "@/lib/shared/types";
 import { isFieldErrorFocus, type FieldAria } from "@/lib/shared/field-errors";
 import { UserAvatar } from "@/components/user-avatar";
 import { useTeamPageText } from "@/components/i18n/team-page-text";
@@ -17,15 +17,15 @@ const MAX_SUGGESTIONS = 8;
  * modale d'attribution retéléchargeait tout l'annuaire.
  */
 const PLAYERS_TTL_MS = 60_000;
-let playersCache: { at: number; request: Promise<PublicUserProfile[]> } | null = null;
+let playersCache: { at: number; request: Promise<DirectoryPlayer[]> } | null = null;
 
-function loadPlayers(): Promise<PublicUserProfile[]> {
+function loadPlayers(): Promise<DirectoryPlayer[]> {
   const now = Date.now();
   if (playersCache && now - playersCache.at < PLAYERS_TTL_MS) return playersCache.request;
   const request = fetch("/api/players", { cache: "no-store" })
     .then(async (res) => {
       if (!res.ok) throw new Error(`HTTP_${res.status}`);
-      return ((await res.json()) as { players: PublicUserProfile[] }).players;
+      return ((await res.json()) as { players: DirectoryPlayer[] }).players;
     })
     .catch((error: unknown) => {
       // Un échec n'est pas retenu : le montage suivant retentera.
@@ -74,7 +74,7 @@ export function PlayerPseudoCombobox({
 }: Readonly<PlayerPseudoComboboxProps>) {
   const listId = useId();
   const { t } = useTeamPageText();
-  const [players, setPlayers] = useState<PublicUserProfile[]>([]);
+  const [players, setPlayers] = useState<DirectoryPlayer[]>([]);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
 
@@ -114,7 +114,7 @@ export function PlayerPseudoCombobox({
   const expanded = open && suggestions.length > 0;
   const optionId = (index: number) => `${listId}-option-${index}`;
 
-  const choose = (player: PublicUserProfile) => {
+  const choose = (player: DirectoryPlayer) => {
     onChange(player.pseudo);
     setOpen(false);
     setActive(-1);
@@ -175,7 +175,7 @@ export function PlayerPseudoCombobox({
         <ul id={listId} role="listbox" aria-label={t("members.suggestions")} className={styles.suggestions}>
           {suggestions.map((player, index) => (
             <li
-              key={player.id}
+              key={player.id ?? player.pseudo}
               id={optionId(index)}
               role="option"
               aria-selected={index === active}

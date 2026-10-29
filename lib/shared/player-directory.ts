@@ -65,14 +65,20 @@ export function statusFilterAllowsRoles(filter: PlayerStatusFilter): boolean {
  * Comptes les plus récents d'abord ; à la même seconde, par pseudo dans l'ordre
  * de la langue de la page (`compareLocalText`) — sinon l'ordre suivait la
  * collation de la base. `createdAt` est un ISO normalisé (`toIso`) : l'ordre
- * des chaînes est celui des instants, sans analyse de date.
+ * des chaînes est celui des instants, sans analyse de date. Sans date (compte
+ * supprimé, `DirectoryPlayer`) : en fin de liste, par pseudo — jamais mêlé
+ * aux comptes vivants.
  */
 export function compareNewestFirst(
   locale: Locale,
-): (a: { createdAt: string; pseudo: string }, b: { createdAt: string; pseudo: string }) => number {
+): (a: { createdAt: string | null; pseudo: string }, b: { createdAt: string | null; pseudo: string }) => number {
   const comparePseudo = compareLocalText(locale);
   return (a, b) => {
-    if (a.createdAt !== b.createdAt) return a.createdAt < b.createdAt ? 1 : -1;
+    if (a.createdAt !== b.createdAt) {
+      if (a.createdAt === null) return 1;
+      if (b.createdAt === null) return -1;
+      return a.createdAt < b.createdAt ? 1 : -1;
+    }
     return comparePseudo(a.pseudo, b.pseudo);
   };
 }
@@ -80,7 +86,7 @@ export function compareNewestFirst(
 /** Ordre de l'annuaire : pseudo (langue de la page), tournois joués, plus récents. */
 export type PlayerSortKey = "pseudo" | "tournaments" | "created";
 
-type SortablePlayer = { pseudo: string; createdAt: string; tournamentsCount?: number };
+type SortablePlayer = { pseudo: string; createdAt: string | null; tournamentsCount?: number };
 
 /**
  * Langue dont dépend un tri : seuls « Pseudo » et « Plus récents » (à égalité

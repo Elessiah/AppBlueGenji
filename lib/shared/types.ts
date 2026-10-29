@@ -342,6 +342,20 @@ export type PublicUserProfile = {
   losses?: number;
 };
 
+/**
+ * Ligne de l'annuaire `/joueurs` (`listPlayers`, `GET /api/players`).
+ *
+ * Un compte supprimé n'y porte **ni identifiant ni date de création** (décision
+ * 11) : l'identifiant est l'adresse de sa fiche (`/joueurs/<id>`), qu'un ancien
+ * lien suffisait à rapprocher de la ligne anonymisée, et la date à la seconde
+ * l'aurait rapprochée d'un compte connu. Sa carte n'ouvre donc aucune fiche,
+ * et le tri « Plus récents » le range en fin de liste. La fiche elle-même
+ * (`/joueurs/<id>`) reste servie à qui en garde l'adresse : l'annuaire seul
+ * cesse de la donner.
+ */
+export type DirectoryPlayer = Omit<PublicUserProfile, "id" | "createdAt" | "isDeleted"> &
+  ({ isDeleted: false; id: number; createdAt: string } | { isDeleted: true; id: null; createdAt: null });
+
 export type TeamListItem = {
   id: number;
   name: string;
@@ -1097,11 +1111,15 @@ export type PersonalDataExport = {
     certificationPromptDismissedAt: string | null;
     /** Opposition d'arbitre retenue par le staff (ISO), sinon `null` (`MATCH_REFEREE.md`). */
     refereeObjectionAt: string | null;
+    /** `bg_users.overwatch_battletag_typed` : BattleTag tapé à la main sous un Battle.net qui n'en donne aucun. */
+    overwatchBattletagTyped: boolean;
     createdAt: string;
   };
   profile: {
     avatarUrl: string | null;
     overwatchBattletag: string | null;
+    /** BattleTag fourni par Battle.net, donc tenu pour vérifié (`battletagFromBlizzard`). */
+    battletagFromBlizzard: boolean;
     marvelRivalsTag: string | null;
     visibility: VisibilitySettings;
     openToRecruitment: boolean;
@@ -1179,6 +1197,18 @@ export type PersonalDataExport = {
    * inscription faite depuis le 16 octobre 2026. Effacée avec le match.
    */
   liveAnnouncements: { matchId: number; tournamentId: number; sentAt: string | null; refused: boolean }[];
+  /**
+   * Inscriptions de caster du titulaire (`bg_match_casters`) : match, tournoi,
+   * stream tenu, « Prêt » et date d'inscription — gardées avec un match joué.
+   */
+  casts: { matchId: number; tournamentId: number; streamId: number; readyAt: string | null; createdAt: string | null }[];
+  /**
+   * Liens de chaîne qu'il a fournis sur un match (`bg_match_streams.link_user_id`,
+   * T16), avec la date du stream.
+   */
+  providedStreamLinks: { matchId: number; tournamentId: number; liveUrl: string | null; createdAt: string | null }[];
+  /** Matchs dont il est l'arbitre désigné (`bg_matches.referee_user_id`, T04), avec son « Prêt ». */
+  refereeAssignments: { matchId: number; tournamentId: number; readyAt: string | null }[];
   /**
    * Suspensions du compte encore conservées (`lib/shared/account-suspension.ts`) :
    * faits retenus, clause invoquée et dates — jamais qui les a prononcées.

@@ -521,14 +521,21 @@ export async function forceLaunchMatch(matchId: number): Promise<void> {
   publishMatchUpdatedEvent(tournamentId, { landingLive: true });
 }
 
-/** Identité d'un caster telle que la règle de `castBlockReason` la lit. */
+/**
+ * Identité d'un caster telle que la règle de `castBlockReason` la lit.
+ * `lock` : lecture verrouillée (partagée) de la ligne du compte, pour une
+ * inscription — la suppression du compte la tient en exclusif : ou bien
+ * l'inscription attend qu'elle soit validée et lit le compte supprimé, ou bien
+ * la suppression attend l'inscription et la retire (`withdrawUserCasts`).
+ */
 export async function loadCasterIdentity(
   connection: PoolConnection,
   userId: number,
+  lock = false,
 ): Promise<CasterIdentity> {
   const [rows] = await connection.execute<CasterIdentityRow[]>(
     `SELECT discord_verified_at, discord_pseudo, blizzard_sub, overwatch_battletag, overwatch_battletag_typed, is_deleted
-     FROM bg_users WHERE id = ? LIMIT 1`,
+     FROM bg_users WHERE id = ? LIMIT 1${lock ? " LOCK IN SHARE MODE" : ""}`,
     [userId],
   );
   return casterIdentityOf(rows[0]);
@@ -602,7 +609,9 @@ export async function claimMatchCast(
   // d'InnoDB : l'interblocage se rejoue.
   const { tournamentId, claimed } = await retryOnDeadlock(() =>
     inTransaction(async (connection) => {
-      const block = castBlockReason(hasLivePermission, await loadCasterIdentity(connection, userId));
+      // Ligne du compte verrouillée en première instruction, avant le match —
+      // l'ordre de la suppression de compte (compte, puis ses matchs).
+      const block = castBlockReason(hasLivePermission, await loadCasterIdentity(connection, userId, true));
       if (block) throw new Error(block);
 
       const row = await lockLaunchMatch(connection, matchId);
@@ -923,7 +932,10 @@ function assertRefereeable(row: LaunchMatchRow | null): asserts row is LaunchMat
  * sa modale le montre prêt, le lancement ne doit pas l'attendre une seconde fois.
  */
 async function writeReferee(connection: PoolConnection, row: LaunchMatchRow, refereeId: number): Promise<void> {
-  const block = await loadRefereeEligibility(connection, refereeId);
+  // Lecture verrouillée : une suppression du compte en cours (verrou exclusif
+  // sur sa ligne) est attendue puis lue, sans quoi l'arbitre désigné serait le
+  // compte anonymisé, sur un match que son retrait n'avait pas vu.
+  const block = await loadRefereeEligibility(connection, refereeId, true);
   if (block) throw new Error(block);
   // Opposition retenue : plus aucun arbitrage. Lecture verrouillée (partagée)
   // sur la ligne du compte : retenir l'opposition l'écrit en exclusif, donc ou

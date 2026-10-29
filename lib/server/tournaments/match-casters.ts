@@ -248,11 +248,49 @@ export async function pruneMatchStreams(connection: Executor, matchId: number): 
   );
 }
 
+/** Ce que le retrait d'un compte de ses matchs a touché (`withdrawUserCasts`). */
+export type MatchWithdrawal = {
+  /** Matchs touchés, dans l'ordre croissant. */
+  matchIds: number[];
+  /** Leurs tournois, sans doublon : à prévenir après le commit (`publishMatchUpdatedEvent`). */
+  tournamentIds: number[];
+};
+
+type WithdrawnMatchRow = RowDataPacket & { id: number; tournament_id: number; status: string };
+
 /**
- * Retire un compte de tous les casts qui le nomment encore — suppression de
- * compte (`lib/server/users/account-erasure.ts`). L'anonymisation garde son
- * inscription sur les matchs joués (`includeCompleted: false`) : l'histoire ne
- * se réécrit pas ; l'effacement emporte tout.
+ * Efface en une fois les streams devenus orphelins (`orphanStreamIds`) de
+ * plusieurs matchs, déjà verrouillés par l'appelant : streams puis casters,
+ * chaque table seule, comme `pruneMatchStreams`.
+ */
+async function pruneStreamsOf(connection: Executor, matchIds: readonly number[]): Promise<void> {
+  if (matchIds.length === 0) return;
+  const [streamRows] = await connection.execute<StreamRow[]>(
+    `SELECT id, match_id, live_url, staff_owned FROM bg_match_streams
+     WHERE match_id IN (${placeholders(matchIds)}) ORDER BY match_id, id FOR UPDATE`,
+    [...matchIds],
+  );
+  if (streamRows.length === 0) return;
+  const [casterRows] = await connection.execute<CasterLinkRow[]>(
+    `SELECT match_id, user_id, stream_id, ready_at FROM bg_match_casters
+     WHERE match_id IN (${placeholders(matchIds)}) ORDER BY match_id, created_at, user_id FOR UPDATE`,
+    [...matchIds],
+  );
+  const streams = groupByMatch(streamRows.map(toStream));
+  const casters = groupByMatch(casterRows.map(toLink));
+  const orphans = [...streams].flatMap(([matchId, list]) => orphanStreamIds(list, casters.get(matchId) ?? []));
+  if (orphans.length === 0) return;
+  await connection.execute(`DELETE FROM bg_match_streams WHERE id IN (${placeholders(orphans)})`, orphans);
+}
+
+/**
+ * Retire un compte de tous les casts et de tous les arbitrages qui le nomment
+ * encore — suppression de compte (`lib/server/users/account-erasure.ts`).
+ * L'anonymisation garde son inscription de caster sur les matchs joués
+ * (`includeCompleted: false`) : l'histoire ne se réécrit pas ; l'effacement
+ * emporte tout. L'arbitrage part dans les deux cas, matchs joués compris, avec
+ * son « Prêt » (`referee_ready_at`, que la clé étrangère de l'effacement
+ * laisserait seul).
  *
  * Dans les deux cas, chaque lien de chaîne qu'il a fourni (`link_user_id` : en
  * ouvrant son stream, ou dans la configuration du direct sans être de
@@ -260,42 +298,74 @@ export async function pruneMatchStreams(connection: Executor, matchId: number): 
  * qu'un co-caster tient encore : le stream reste à ce co-caster, sans lien. Le
  * lien de l'organisation (`link_user_id` nul) n'est jamais touché.
  *
- * Chaque match est verrouillé avant ses casters et ses streams, dans l'ordre
- * de `claimMatchCast`, puis ses streams orphelins sont effacés
- * (`orphanStreamIds`). Rend les matchs touchés, dans l'ordre croissant.
+ * Tous les matchs touchés — castés, liens fournis, arbitrés — sont verrouillés
+ * **en une liste triée par id** (une seule instruction, table seule), avant
+ * leurs casters et leurs streams, puis chaque écriture vaut pour tous à la
+ * fois : quelques allers-retours en tout, quel que soit le nombre de matchs.
+ * Les listes de départ sont des lectures ordinaires : une inscription de
+ * caster du même compte pendant sa suppression ne peut pas leur échapper, elle
+ * verrouille d'abord la ligne du compte (`claimMatchCast`), que la suppression
+ * tient en exclusif. L'état des matchs, lui, se lit sous leur verrou.
+ *
+ * Rend les matchs touchés et leurs tournois, que l'appelant prévient **après
+ * le commit** — les instantanés ouverts montreraient sinon le caster, son lien
+ * ou l'arbitre jusqu'à la prochaine écriture du match.
  */
 export async function withdrawUserCasts(
   connection: Executor,
   userId: number,
   includeCompleted: boolean,
-): Promise<number[]> {
-  const [castRows] = await connection.execute<(RowDataPacket & { match_id: number })[]>(
-    `SELECT c.match_id FROM bg_match_casters c
-     JOIN bg_matches m ON m.id = c.match_id
-     WHERE c.user_id = ?${includeCompleted ? "" : " AND m.status <> 'COMPLETED'"}
-     ORDER BY c.match_id`,
-    [userId],
-  );
-  const [linkRows] = await connection.execute<(RowDataPacket & { match_id: number })[]>(
+): Promise<MatchWithdrawal> {
+  const matchIdsOf = async (sql: string) => {
+    const [rows] = await connection.execute<(RowDataPacket & { match_id: number })[]>(sql, [userId]);
+    return new Set(rows.map((row) => Number(row.match_id)));
+  };
+  const casts = await matchIdsOf(`SELECT match_id FROM bg_match_casters WHERE user_id = ? ORDER BY match_id`);
+  const links = await matchIdsOf(
     `SELECT DISTINCT match_id FROM bg_match_streams WHERE link_user_id = ? ORDER BY match_id`,
-    [userId],
   );
-  const casts = new Set(castRows.map((row) => Number(row.match_id)));
-  const links = new Set(linkRows.map((row) => Number(row.match_id)));
-  const matchIds = [...new Set([...casts, ...links])].sort((a, b) => a - b);
-  for (const matchId of matchIds) {
-    await connection.execute(`SELECT id FROM bg_matches WHERE id = ? FOR UPDATE`, [matchId]);
-    if (casts.has(matchId)) {
-      await connection.execute(`DELETE FROM bg_match_casters WHERE match_id = ? AND user_id = ?`, [matchId, userId]);
-    }
-    if (links.has(matchId)) {
-      await connection.execute(
-        `UPDATE bg_match_streams SET live_url = NULL, link_user_id = NULL
-          WHERE match_id = ? AND link_user_id = ?`,
-        [matchId, userId],
-      );
-    }
-    await pruneMatchStreams(connection, matchId);
+  const refereed = await matchIdsOf(`SELECT id AS match_id FROM bg_matches WHERE referee_user_id = ? ORDER BY id`);
+  const candidates = [...new Set([...casts, ...links, ...refereed])].sort((a, b) => a - b);
+  if (candidates.length === 0) return { matchIds: [], tournamentIds: [] };
+
+  const [locked] = await connection.execute<WithdrawnMatchRow[]>(
+    `SELECT id, tournament_id, status FROM bg_matches WHERE id IN (${placeholders(candidates)}) ORDER BY id FOR UPDATE`,
+    candidates,
+  );
+  const matchIds = locked.map((row) => Number(row.id));
+  const castsToDrop = locked
+    .filter((row) => casts.has(Number(row.id)) && (includeCompleted || row.status !== "COMPLETED"))
+    .map((row) => Number(row.id));
+  const linksToDrop = matchIds.filter((id) => links.has(id));
+  const refereesToDrop = matchIds.filter((id) => refereed.has(id));
+
+  if (castsToDrop.length > 0) {
+    await connection.execute(
+      `DELETE FROM bg_match_casters WHERE user_id = ? AND match_id IN (${placeholders(castsToDrop)})`,
+      [userId, ...castsToDrop],
+    );
   }
-  return matchIds;
+  if (linksToDrop.length > 0) {
+    await connection.execute(
+      `UPDATE bg_match_streams SET live_url = NULL, link_user_id = NULL
+        WHERE link_user_id = ? AND match_id IN (${placeholders(linksToDrop)})`,
+      [userId, ...linksToDrop],
+    );
+  }
+  if (refereesToDrop.length > 0) {
+    await connection.execute(
+      `UPDATE bg_matches SET referee_user_id = NULL, referee_ready_at = NULL
+        WHERE referee_user_id = ? AND id IN (${placeholders(refereesToDrop)})`,
+      [userId, ...refereesToDrop],
+    );
+  }
+  await pruneStreamsOf(connection, [...new Set([...castsToDrop, ...linksToDrop])].sort((a, b) => a - b));
+  // Seuls les matchs réellement modifiés : un cast gardé sur un match joué
+  // (anonymisation) n'en fait pas partie.
+  const touched = new Set([...castsToDrop, ...linksToDrop, ...refereesToDrop]);
+  const touchedRows = locked.filter((row) => touched.has(Number(row.id)));
+  return {
+    matchIds: touchedRows.map((row) => Number(row.id)),
+    tournamentIds: [...new Set(touchedRows.map((row) => Number(row.tournament_id)))].sort((a, b) => a - b),
+  };
 }

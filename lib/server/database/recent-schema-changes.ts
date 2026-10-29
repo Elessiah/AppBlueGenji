@@ -318,14 +318,30 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
         WHERE m.caster_user_id IS NOT NULL
           AND EXISTS (SELECT 1 FROM bg_match_streams s WHERE s.match_id = m.id)`,
     // 2 bis. Un stream de caster ouvert avant `link_user_id` : son lien est
-    //    rattaché à son caster quand il n'en a qu'un — sans ambiguïté. Le lien
-    //    déjà rattaché n'est jamais réécrit : un second passage ne change rien.
+    //    rattaché à son caster quand il n'en a qu'un **et** que ce caster l'a
+    //    ouvert (inscrit dans la seconde de sa création, `claimMatchCast`) —
+    //    sans ambiguïté : un co-caster resté seul après le départ de celui
+    //    qui l'avait ouvert ne reçoit pas un lien qui n'est pas le sien. Le
+    //    lien déjà rattaché n'est jamais réécrit : un second passage ne
+    //    change rien.
     `UPDATE bg_match_streams s
         SET s.link_user_id = (SELECT MIN(c.user_id) FROM bg_match_casters c
                                WHERE c.match_id = s.match_id AND c.stream_id = s.id)
       WHERE s.staff_owned = 0 AND s.live_url IS NOT NULL AND s.link_user_id IS NULL
         AND (SELECT COUNT(*) FROM bg_match_casters c
+              WHERE c.match_id = s.match_id AND c.stream_id = s.id
+                AND c.created_at <= s.created_at + INTERVAL 1 SECOND) = 1
+        AND (SELECT COUNT(*) FROM bg_match_casters c
               WHERE c.match_id = s.match_id AND c.stream_id = s.id) = 1`,
+    // 2 ter. Le lien rattaché à un compte **supprimé** (anonymisé, ou effacé :
+    //    `link_user_id` n'a pas de clé étrangère) avant ce rattrapage :
+    //    la suppression d'aujourd'hui l'aurait retiré (`withdrawUserCasts`),
+    //    celle d'hier ne savait pas le trouver. Idempotent : ne touche que des
+    //    liens d'un compte supprimé, qui n'en garde aucun.
+    `UPDATE bg_match_streams s
+        LEFT JOIN bg_users u ON u.id = s.link_user_id
+        SET s.live_url = NULL, s.link_user_id = NULL
+      WHERE s.link_user_id IS NOT NULL AND (u.id IS NULL OR u.is_deleted = 1)`,
     // 3. Les anciennes colonnes sont vidées — plus rien ne les écrit : un
     //    redémarrage ne recopie rien, et rien de périmé ne revient. Seulement
     //    ce qui est **arrivé** dans les nouvelles tables : si 1 ou 2 a échoué,

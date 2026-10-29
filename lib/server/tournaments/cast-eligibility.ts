@@ -96,10 +96,20 @@ export function refereeEligibilityBlock(row: CastEligibilityFields | undefined):
   return refereeBlockReason(tournaments, casterIdentityOf(row));
 }
 
-/** La condition d'arbitrage d'un seul compte, relue sur l'exécuteur donné (verrou compris). */
-export async function loadRefereeEligibility(executor: Executor, userId: number): Promise<RefereeBlock | null> {
+/**
+ * La condition d'arbitrage d'un seul compte, relue sur l'exécuteur donné.
+ * `lock` : lecture verrouillée (partagée) de la ligne du compte, pour une
+ * désignation — la suppression du compte la tient en exclusif : ou bien la
+ * désignation attend qu'elle soit validée et lit le compte supprimé (refusé),
+ * ou bien la suppression attend la désignation et la retire (`withdrawUserCasts`).
+ */
+export async function loadRefereeEligibility(
+  executor: Executor,
+  userId: number,
+  lock = false,
+): Promise<RefereeBlock | null> {
   const [rows] = await executor.execute<CastEligibilityRow[]>(
-    `SELECT ${CAST_ELIGIBILITY_COLUMNS} FROM bg_users WHERE id = ? LIMIT 1`,
+    `SELECT ${CAST_ELIGIBILITY_COLUMNS} FROM bg_users WHERE id = ? LIMIT 1${lock ? " LOCK IN SHARE MODE" : ""}`,
     [userId],
   );
   return refereeEligibilityBlock(rows[0]);

@@ -84,7 +84,7 @@ import { localizedSitemapEntries, publicSitemapRoutes } from "@/lib/shared/sitem
 import type { TeamListItem, TeamRole } from "@/lib/shared/types";
 import frTeamErrorsBefore from "../fixtures/team-errors-fr-before-lot9.json";
 import { teamDetailResponse } from "../helpers/team-detail";
-import { fullProfileResponse, publicUserProfile } from "../helpers/auth-user";
+import { directoryPlayer, fullProfileResponse } from "../helpers/auth-user";
 
 const EN = messagesFor("en");
 const EN_TEAM_ERRORS: TeamErrorsText = scopedText("en", EN.teamErrors);
@@ -452,8 +452,8 @@ describe("anglais", () => {
     const html = inEnglish(
       <>
         <PlayersList />
-        <PlayerCard player={publicUserProfile({ id: 2, pseudo: "Nova", roles: ["HEAL", "CAPITAINE"], team: null })} />
-        <PlayerCard player={publicUserProfile({ id: 3, pseudo: "Kite", isDeleted: true })} />
+        <PlayerCard player={directoryPlayer({ id: 2, pseudo: "Nova", roles: ["HEAL", "CAPITAINE"], team: null })} />
+        <PlayerCard player={directoryPlayer({ pseudo: "Kite", deleted: true })} />
       </>,
     );
     expect(html).toContain("Registered <em>players</em>");
@@ -607,7 +607,7 @@ describe("revue UI/UX", () => {
   });
 
   it("carte joueur : son équipe se nomme comme une équipe", () => {
-    const html = inEnglish(<PlayerCard player={publicUserProfile({ id: 2, pseudo: "Nova", team: { id: 4, name: "Glaciers", colorIndex: 1 } })} />);
+    const html = inEnglish(<PlayerCard player={directoryPlayer({ id: 2, pseudo: "Nova", team: { id: 4, name: "Glaciers", colorIndex: 1 } })} />);
     expect(html).toContain('title="Open Glaciers&#x27;s page"');
   });
 

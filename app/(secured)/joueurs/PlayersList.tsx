@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import type { PublicUserProfile, PlayerRole } from "@/lib/shared/types";
+import type { DirectoryPlayer, PlayerRole } from "@/lib/shared/types";
 import { isFreeAgent } from "@/lib/shared/player-roster-status";
 import {
   filterPlayers,
@@ -49,7 +49,7 @@ export default function PlayersList() {
     }),
     [t],
   );
-  const [players, setPlayers] = useState<PublicUserProfile[]>([]);
+  const [players, setPlayers] = useState<DirectoryPlayer[]>([]);
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
   const [statusFilter, setStatusFilter] = useState<PlayerStatusFilter>("all");
@@ -70,7 +70,7 @@ export default function PlayersList() {
   useEffect(() => {
     fetch("/api/players", { cache: "no-store" })
       .then(async (response) => {
-        const payload = (await response.json()) as { error?: string; players?: PublicUserProfile[] };
+        const payload = (await response.json()) as { error?: string; players?: DirectoryPlayer[] };
         if (!response.ok || !payload.players) {
           throw new Error(payload.error || "PLAYERS_LOAD_FAILED");
         }
@@ -329,7 +329,7 @@ export default function PlayersList() {
           <div style={{ paddingTop: 24 }}>
             <div className={s.plGrid} ref={gridRef}>
               {page.visible.map((p) => (
-                <PlayerCard key={p.id} player={p} />
+                <PlayerCard key={p.id ?? `deleted:${p.pseudo}`} player={p} />
               ))}
             </div>
             <DirectoryShowMore

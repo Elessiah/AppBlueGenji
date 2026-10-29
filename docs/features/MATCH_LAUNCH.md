@@ -340,8 +340,9 @@ qui ouvrait la configuration du stream, devient « ＋ Live » (aujourd'hui « D
 « Caster » sur la même carte auraient désigné deux gestes différents.
 
 Un compte supprimé (anonymisé) perd son inscription sur les matchs non terminés ;
-l'effacement complet la retire de tous ses matchs (`withdrawUserCasts`, puis la
-clé étrangère `CASCADE`), avec le stream qu'il était seul à tenir — même celui
+l'effacement complet la retire de tous ses matchs (`withdrawUserCasts`, matchs
+verrouillés en une liste triée, puis la clé étrangère `CASCADE` ; voir
+`ACCOUNT_DELETION.md` § Matchs d'un compte supprimé), avec le stream qu'il était seul à tenir — même celui
 qui porte le premier lien du match, puisque c'est le lien de sa chaîne.
 Dans les deux cas, **chaque lien qu'il a fourni** (`bg_match_streams.link_user_id`,
 posé à l'ouverture de son stream, ou dans la configuration du direct par un

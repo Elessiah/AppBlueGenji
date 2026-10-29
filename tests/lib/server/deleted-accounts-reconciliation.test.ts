@@ -5,10 +5,12 @@ jest.mock("@/lib/server/solo-entries-service");
 jest.mock("@/lib/server/stats-service");
 jest.mock("@/lib/server/image-upload");
 jest.mock("@/lib/server/account-deletion-journal");
+jest.mock("@/lib/server/tournaments/notifications");
 
 import { reconcileDeletedAccounts } from "@/lib/server/users/deleted-accounts";
 import { getDatabase } from "@/lib/server/database";
 import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
+import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { ANONYMOUS_PSEUDOS } from "@/lib/shared/anonymous-pseudos";
 import { fakePool } from "../../helpers/sql-double";
 import { clearCache } from "@/lib/server/cache";
@@ -30,6 +32,8 @@ type Account = {
   owned?: boolean;
   isAdmin?: boolean;
   roles?: string | null;
+  /** Matchs qu'il arbitre encore, avec leur tournoi (`withdrawUserCasts`). */
+  refereed?: { matchId: number; tournamentId: number }[];
 };
 
 type Query = { userId: number | null; sql: string; params: unknown[] };
@@ -80,6 +84,13 @@ function fakeDb(
     const connection = {
       execute: jest.fn(async (sql: string, params: unknown[] = []) => {
         const q = sql.replace(/\s+/g, " ").trim();
+        const refereed = current === null ? [] : accounts[current]?.refereed ?? [];
+        if (q.startsWith("SELECT id AS match_id FROM bg_matches WHERE referee_user_id = ?")) {
+          return [refereed.map((match) => ({ match_id: match.matchId }))];
+        }
+        if (q.startsWith("SELECT id, tournament_id, status FROM bg_matches WHERE id IN")) {
+          return [refereed.map((match) => ({ id: match.matchId, tournament_id: match.tournamentId, status: "READY" }))];
+        }
         if (q.includes("FOR UPDATE")) current = Number(params[0]);
         queries.push({ userId: current, sql: q, params });
         if (options.failFor !== undefined && current === options.failFor && q.includes("AS played")) {
@@ -273,6 +284,28 @@ describe("reconcileDeletedAccounts", () => {
     await reconcileDeletedAccounts();
 
     expect(recordAccountDeletion).not.toHaveBeenCalled();
+  });
+
+  it("reconcileDeletedAccounts_erasedReferee_publishesEachTournamentOnce", async () => {
+    fakeDb({
+      5122: { pseudo: "compte_supprime_5122", refereed: [{ matchId: 5, tournamentId: 3 }] },
+      5123: { pseudo: "compte_supprime_5123", refereed: [{ matchId: 6, tournamentId: 3 }, { matchId: 9, tournamentId: 4 }] },
+    });
+
+    await reconcileDeletedAccounts();
+
+    expect(jest.mocked(publishMatchUpdatedEvent).mock.calls).toEqual([
+      [3, { landingLive: true }],
+      [4, { landingLive: true }],
+    ]);
+  });
+
+  it("reconcileDeletedAccounts_failedAccount_publishesNothingForIt", async () => {
+    fakeDb({ 5122: { pseudo: "compte_supprime_5122", refereed: [{ matchId: 5, tournamentId: 3 }] } }, { failFor: 5122 });
+
+    await reconcileDeletedAccounts();
+
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 
   it("reconcileDeletedAccounts_accountErased_clearsLandingTeamViews", async () => {

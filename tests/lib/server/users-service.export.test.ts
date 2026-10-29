@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { exportOwnData } from "@/lib/server/users/data-export";
+import { exportOwnData, refusedOptionalColumn } from "@/lib/server/users/data-export";
 import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/content-reports", () => ({
@@ -16,6 +16,13 @@ jest.mock("@/lib/server/connection-logs", () => ({
 }));
 jest.mock("@/lib/server/users/live-announcement-export", () => ({
   listOwnLiveAnnouncements: jest.fn(async () => [{ matchId: 5, tournamentId: 2, sentAt: "2026-10-20T18:00:00.000Z", refused: false }]),
+}));
+jest.mock("@/lib/server/users/match-roles-export", () => ({
+  listOwnMatchRoles: jest.fn(async () => ({
+    casts: [{ matchId: 5, tournamentId: 2, streamId: 3, readyAt: null, createdAt: "2026-10-20T17:00:00.000Z" }],
+    providedStreamLinks: [{ matchId: 5, tournamentId: 2, liveUrl: "https://twitch.tv/x", createdAt: "2026-10-20T17:00:00.000Z" }],
+    refereeAssignments: [{ matchId: 6, tournamentId: 2, readyAt: "2026-10-20T17:30:00.000Z" }],
+  })),
 }));
 jest.mock("@/lib/server/match-map-entries", () => ({
   listOwnMapEntries: jest.fn(async () => [
@@ -66,6 +73,7 @@ function exportRow(overrides: Record<string, unknown> = {}) {
     discord_pseudo: "player#0001",
     discord_id: "123456789",
     google_sub: null,
+    blizzard_sub: null,
     is_adult: 1,
     is_admin: 0,
     visible_avatar: 0,
@@ -80,11 +88,6 @@ function exportRow(overrides: Record<string, unknown> = {}) {
 }
 
 // getFullProfile (appelé en interne) réutilise une ligne bg_users au même format.
-/** Ligne de la lecture à part du « Ne plus voir » de l'invitation à certifier (fiche tournoi). */
-function promptRow(dismissedAt: Date | null = null) {
-  return { certification_prompt_dismissed_at: dismissedAt };
-}
-
 function fullProfileRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 42,
@@ -118,7 +121,6 @@ describe("exportOwnData", () => {
     const execute = jest
       .fn<SqlQuery>()
       .mockResolvedValueOnce([[exportRow()]])
-      .mockResolvedValueOnce([[promptRow()]]) // identifiants bruts
       .mockResolvedValueOnce([[fullProfileRow()]]) // getFullProfile: user row
       .mockResolvedValueOnce([[]]) // timeline
       .mockResolvedValueOnce([[]]) // stats: appartenances (aucune)
@@ -184,7 +186,6 @@ describe("exportOwnData", () => {
     const execute = jest
       .fn<SqlQuery>()
       .mockResolvedValueOnce([[exportRow({ visible_avatar: 0, open_to_recruitment: 0 })]])
-      .mockResolvedValueOnce([[promptRow()]])
       .mockResolvedValueOnce([[fullProfileRow({ visible_avatar: 0, open_to_recruitment: 0 })]])
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[]])
@@ -200,7 +201,6 @@ describe("exportOwnData", () => {
       const execute = jest
         .fn<SqlQuery>()
         .mockResolvedValueOnce([[exportRow({ locale })]])
-        .mockResolvedValueOnce([[promptRow()]])
         .mockResolvedValueOnce([[fullProfileRow({ locale })]])
         .mockResolvedValue([[]]);
       await mockDb(execute);
@@ -218,7 +218,6 @@ describe("exportOwnData", () => {
       const execute = jest
         .fn<SqlQuery>()
         .mockResolvedValueOnce([[exportRow({ recruitment_modal_off: value })]])
-        .mockResolvedValueOnce([[promptRow()]])
         .mockResolvedValueOnce([[fullProfileRow({})]])
         .mockResolvedValue([[]]);
       await mockDb(execute);
@@ -238,7 +237,6 @@ describe("exportOwnData", () => {
       const execute = jest
         .fn<SqlQuery>()
         .mockResolvedValueOnce([[exportRow({ discord_certify_prompt_dismissed_at: value })]])
-        .mockResolvedValueOnce([[promptRow()]])
         .mockResolvedValueOnce([[fullProfileRow({})]])
         .mockResolvedValue([[]]);
       await mockDb(execute);
@@ -251,26 +249,22 @@ describe("exportOwnData", () => {
     expect(await run(undefined)).toBeNull();
   });
 
-  it("colonne recruitment_modal_off absente (ALTER échoué) : l'export est rendu quand même, drapeau au défaut", async () => {
-    const unknownColumn = Object.assign(new Error("Unknown column 'recruitment_modal_off'"), { code: "ER_BAD_FIELD_ERROR" });
+  it("colonne recruitment_modal_off absente (ALTER échoué) : relu sans elle seule, drapeau au défaut", async () => {
+    const unknownColumn = Object.assign(new Error("Unknown column 'recruitment_modal_off' in 'field list'"), { code: "ER_BAD_FIELD_ERROR" });
     const execute = jest
       .fn<SqlQuery>()
       .mockRejectedValueOnce(unknownColumn)
-      .mockRejectedValueOnce(unknownColumn)
-      .mockResolvedValueOnce([[exportRow({ recruitment_modal_off: undefined })]])
-      .mockResolvedValueOnce([[promptRow()]])
+      .mockResolvedValueOnce([[exportRow({ discord_certify_prompt_dismissed_at: new Date("2026-10-21T08:00:00.000Z") })]])
       .mockResolvedValueOnce([[fullProfileRow({})]])
       .mockResolvedValue([[]]);
     await mockDb(execute);
     const data = await exportOwnData(42);
     expect(data.account.recruitmentModalOff).toBe(false);
-    expect(execute.mock.calls[0][0]).toMatch(/recruitment_modal_off/);
-    // Repli par colonne : sans la plus récente d'abord, puis sans le recrutement.
-    expect(execute.mock.calls[1][0]).toMatch(/recruitment_modal_off/);
-    expect(execute.mock.calls[1][0]).not.toMatch(/discord_certify_prompt_dismissed_at/);
-    expect(execute.mock.calls[2][0]).not.toMatch(/recruitment_modal_off/);
-    // …sans emporter « Ne plus voir » de la certification, présente.
-    expect(execute.mock.calls[2][0]).toMatch(/discord_certify_prompt_dismissed_at/);
+    expect(execute.mock.calls[1][0]).not.toMatch(/recruitment_modal_off/);
+    // …sans emporter les autres colonnes récentes, présentes.
+    expect(execute.mock.calls[1][0]).toMatch(/discord_certify_prompt_dismissed_at/);
+    expect(execute.mock.calls[1][0]).toMatch(/overwatch_battletag_typed/);
+    expect(data.account.discordCertifyPromptDismissedAt).toBe("2026-10-21T08:00:00.000Z");
   });
 
   it("seule discord_certify_prompt_dismissed_at absente : l'export garde le vrai « Ne plus afficher » du recrutement", async () => {
@@ -279,53 +273,95 @@ describe("exportOwnData", () => {
       .fn<SqlQuery>()
       .mockRejectedValueOnce(unknownColumn)
       .mockResolvedValueOnce([[exportRow({ recruitment_modal_off: 1 })]])
-      .mockResolvedValueOnce([[promptRow()]])
       .mockResolvedValueOnce([[fullProfileRow({})]])
       .mockResolvedValue([[]]);
     await mockDb(execute);
     const data = await exportOwnData(42);
     expect(data.account.recruitmentModalOff).toBe(true);
     expect(execute.mock.calls[1][0]).toMatch(/recruitment_modal_off/);
+    expect(execute.mock.calls[1][0]).not.toMatch(/discord_certify_prompt_dismissed_at/);
   });
 
-  it("rend la date du « Ne plus voir » de l'invitation à certifier (fiche tournoi), lue à part, null par défaut", async () => {
+  it("rend la date du « Ne plus voir » de l'invitation à certifier (fiche tournoi), lue avec le compte, null par défaut", async () => {
     const run = async (value: Date | null) => {
       const execute = jest
         .fn<SqlQuery>()
-        .mockResolvedValueOnce([[exportRow()]])
-        .mockResolvedValueOnce([[promptRow(value)]])
+        .mockResolvedValueOnce([[exportRow({ certification_prompt_dismissed_at: value, referee_objection_at: value })]])
         .mockResolvedValueOnce([[fullProfileRow({})]])
         .mockResolvedValue([[]]);
       await mockDb(execute);
       const data = await exportOwnData(42);
-      expect(execute.mock.calls[1][0]).toMatch(/SELECT certification_prompt_dismissed_at, referee_objection_at FROM bg_users WHERE id = \? AND is_deleted = 0/);
-      expect(execute.mock.calls[1][1]).toEqual([42]);
-      return data.account.certificationPromptDismissedAt;
+      expect(execute.mock.calls[0][0]).toMatch(/certification_prompt_dismissed_at, referee_objection_at, overwatch_battletag_typed, created_at/);
+      return [data.account.certificationPromptDismissedAt, data.account.refereeObjectionAt];
     };
-    expect(await run(new Date("2026-10-27T08:00:00.000Z"))).toBe("2026-10-27T08:00:00.000Z");
-    expect(await run(null)).toBeNull();
+    expect(await run(new Date("2026-10-27T08:00:00.000Z"))).toEqual(["2026-10-27T08:00:00.000Z", "2026-10-27T08:00:00.000Z"]);
+    expect(await run(null)).toEqual([null, null]);
   });
 
-  it("colonne certification_prompt_dismissed_at absente (ALTER échoué) : l'export est rendu quand même, date nulle", async () => {
-    const unknownColumn = Object.assign(new Error("Unknown column 'certification_prompt_dismissed_at'"), { code: "ER_BAD_FIELD_ERROR" });
+  it("colonne certification_prompt_dismissed_at absente (ALTER échoué) : date nulle, l'opposition d'arbitre reste lue", async () => {
+    const unknownColumn = Object.assign(new Error("Unknown column 'bg_users.certification_prompt_dismissed_at' in 'field list'"), { code: "ER_BAD_FIELD_ERROR" });
     const execute = jest
       .fn<SqlQuery>()
-      .mockResolvedValueOnce([[exportRow()]])
       .mockRejectedValueOnce(unknownColumn)
+      .mockResolvedValueOnce([[exportRow({ referee_objection_at: new Date("2026-10-27T08:00:00.000Z") })]])
       .mockResolvedValueOnce([[fullProfileRow({})]])
       .mockResolvedValue([[]]);
     await mockDb(execute);
     const data = await exportOwnData(42);
     expect(data.account.certificationPromptDismissedAt).toBeNull();
+    expect(data.account.refereeObjectionAt).toBe("2026-10-27T08:00:00.000Z");
+    expect(execute.mock.calls[1][0]).not.toMatch(/certification_prompt_dismissed_at/);
   });
 
-  it("une autre panne de la lecture du « Ne plus voir » n'est pas masquée", async () => {
+  it("une colonne inconnue hors des colonnes récentes : la panne remonte sans repli", async () => {
+    const unknownColumn = Object.assign(new Error("Unknown column 'pseudo' in 'field list'"), { code: "ER_BAD_FIELD_ERROR" });
+    const execute = jest.fn<SqlQuery>().mockRejectedValue(unknownColumn);
+    await mockDb(execute);
+    await expect(exportOwnData(42)).rejects.toBe(unknownColumn);
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("toutes les colonnes récentes refusées : relu sans aucune, puis la panne remonte si la lecture tombe encore", async () => {
+    const unknownColumn = Object.assign(new Error("ER_BAD_FIELD_ERROR"), { code: "ER_BAD_FIELD_ERROR" });
+    const execute = jest.fn<SqlQuery>().mockRejectedValue(unknownColumn);
+    await mockDb(execute);
+    await expect(exportOwnData(42)).rejects.toBe(unknownColumn);
+    // La lecture complète, puis une par colonne retirée (5), puis plus rien à retirer.
+    expect(execute).toHaveBeenCalledTimes(6);
+    expect(execute.mock.calls[5][0]).not.toMatch(/recruitment_modal_off/);
+  });
+
+  it("rend l'origine du BattleTag : tapé à la main, il n'est pas tenu pour fourni par Battle.net", async () => {
+    const run = async (overrides: Record<string, unknown>) => {
+      const execute = jest
+        .fn<SqlQuery>()
+        .mockResolvedValueOnce([[exportRow(overrides)]])
+        .mockResolvedValueOnce([[fullProfileRow({})]])
+        .mockResolvedValue([[]]);
+      await mockDb(execute);
+      const data = await exportOwnData(42);
+      return [data.account.overwatchBattletagTyped, data.profile.battletagFromBlizzard];
+    };
+    expect(await run({ blizzard_sub: "sub-1", overwatch_battletag_typed: 1 })).toEqual([true, false]);
+    expect(await run({ blizzard_sub: "sub-1", overwatch_battletag_typed: 0 })).toEqual([false, true]);
+    expect(await run({ blizzard_sub: null, overwatch_battletag_typed: 0 })).toEqual([false, false]);
+    // Compte Battle.net sans BattleTag gardé : rien à dire fourni par Battle.net.
+    expect(await run({ blizzard_sub: "sub-1", overwatch_battletag: null, overwatch_battletag_typed: 0 })).toEqual([false, false]);
+    // Colonne absente : défaut « non tapé ».
+    expect(await run({ blizzard_sub: "sub-1" })).toEqual([false, true]);
+  });
+
+  it("rend ses casts, les liens qu'il a fournis et ses arbitrages", async () => {
     const execute = jest
       .fn<SqlQuery>()
       .mockResolvedValueOnce([[exportRow()]])
-      .mockRejectedValueOnce(new Error("down"));
+      .mockResolvedValueOnce([[fullProfileRow({})]])
+      .mockResolvedValue([[]]);
     await mockDb(execute);
-    await expect(exportOwnData(42)).rejects.toThrow("down");
+    const data = await exportOwnData(42);
+    expect(data.casts).toEqual([{ matchId: 5, tournamentId: 2, streamId: 3, readyAt: null, createdAt: "2026-10-20T17:00:00.000Z" }]);
+    expect(data.providedStreamLinks).toEqual([{ matchId: 5, tournamentId: 2, liveUrl: "https://twitch.tv/x", createdAt: "2026-10-20T17:00:00.000Z" }]);
+    expect(data.refereeAssignments).toEqual([{ matchId: 6, tournamentId: 2, readyAt: "2026-10-20T17:30:00.000Z" }]);
   });
 
   it("une autre panne de la lecture du compte n'est pas masquée par le repli", async () => {
@@ -349,7 +385,6 @@ describe("exportOwnData — plus aucune adresse", () => {
     const execute = jest
       .fn<SqlQuery>()
       .mockResolvedValueOnce([[exportRow()]])
-      .mockResolvedValueOnce([[promptRow()]])
       .mockResolvedValueOnce([[fullProfileRow()]])
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[]])
@@ -365,7 +400,6 @@ describe("exportOwnData — plus aucune adresse", () => {
     const execute = jest
       .fn<SqlQuery>()
       .mockResolvedValueOnce([[exportRow()]])
-      .mockResolvedValueOnce([[promptRow()]])
       .mockResolvedValueOnce([[fullProfileRow()]])
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[]])
@@ -376,5 +410,27 @@ describe("exportOwnData — plus aucune adresse", () => {
 
     const [sql] = execute.mock.calls[0] as [string];
     expect(sql).not.toContain("email");
+  });
+});
+
+describe("refusedOptionalColumn — la colonne récente qu'une erreur désigne", () => {
+  const all = ["recruitment_modal_off", "referee_objection_at", "overwatch_battletag_typed"] as const;
+
+  it("rend la colonne nommée par l'erreur, préfixe de table compris", () => {
+    expect(refusedOptionalColumn(new Error("Unknown column 'referee_objection_at' in 'field list'"), [...all])).toBe("referee_objection_at");
+    expect(refusedOptionalColumn(new Error("Unknown column 'bg_users.recruitment_modal_off'"), [...all])).toBe("recruitment_modal_off");
+  });
+
+  it("sans colonne nommée, la plus récente encore lue", () => {
+    expect(refusedOptionalColumn(Object.assign(new Error("ER_BAD_FIELD_ERROR"), { code: "ER_BAD_FIELD_ERROR" }), [...all])).toBe("overwatch_battletag_typed");
+    expect(refusedOptionalColumn("pas une erreur", [...all])).toBe("overwatch_battletag_typed");
+  });
+
+  it("une colonne nommée hors de la liste : aucun repli, l'erreur remonte", () => {
+    expect(refusedOptionalColumn(new Error("Unknown column 'autre' in 'field list'"), [...all])).toBeUndefined();
+  });
+
+  it("plus rien à retirer : undefined", () => {
+    expect(refusedOptionalColumn(new Error("Unknown column 'x'"), [])).toBeUndefined();
   });
 });

@@ -12,6 +12,7 @@ import { deleteStoredImage } from "@/lib/server/image-upload";
 import { toDiskUploadPath } from "@/lib/shared/uploads";
 import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
 import { playedMatchSql } from "@/lib/shared/ranking";
+import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { anonymizeAccount, eraseAccount } from "./account-erasure";
 
 /*
@@ -202,6 +203,9 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
   // de reconnaître **ce** compte-là après une restauration, l'identifiant seul
   // pouvant avoir été réattribué (`lib/shared/account-deletion-journal.ts`).
   let accountCreatedAt = "";
+  // Les tournois dont un match nommait le compte (caster, lien, arbitre) :
+  // prévenus après le commit.
+  let touchedTournaments: number[] = [];
 
   try {
     await connection.beginTransaction();
@@ -241,11 +245,10 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
     // vers un compte, seulement une empreinte salée qu'on ne sait pas renverser
     // (`lib/server/site-visits-service.ts`).
 
-    if (plan.mode === "ERASE") {
-      await eraseAccount(connection, userId);
-    } else {
-      await anonymizeAccount(connection, userId);
-    }
+    const withdrawal = plan.mode === "ERASE"
+      ? await eraseAccount(connection, userId)
+      : await anonymizeAccount(connection, userId);
+    touchedTournaments = withdrawal.tournamentIds;
 
     // Les signalements qui le visent gardent leur cible — ils restent à
     // traiter —, mais pas son pseudo : relevé à l'envoi pour survivre à la
@@ -296,6 +299,12 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
   // Ses sessions sont parties avec la transaction, pas ses flux de tournoi
   // ouverts, qui ne relisent pas la session (`session-streams.ts`).
   closeUserStreams(userId);
+
+  // Les instantanés ouverts des matchs qu'il castait ou arbitrait montreraient
+  // sinon son cast, le lien de sa chaîne ou « Arbitre désigné » jusqu'à la
+  // prochaine écriture du match ; l'évènement remet aussi à jour le message
+  // #live de la soirée (`publishMatchUpdatedEvent`), qui portait ce lien.
+  for (const tournamentId of touchedTournaments) publishMatchUpdatedEvent(tournamentId, { landingLive: true });
 
   // L'accueil, lu sans compte, garde en cache des vues qui nomment l'entrée
   // solo du compte (bandeau, mini-arbre, leaderboard) et le compteur de

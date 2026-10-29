@@ -4,11 +4,13 @@ jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/solo-entries-service");
 jest.mock("@/lib/server/stats-service");
 jest.mock("@/lib/server/image-upload");
+jest.mock("@/lib/server/tournaments/notifications");
 
 import { deleteOwnAccount, getAccountDeletionPlan } from "@/lib/server/users/account-deletion";
 import { getDatabase } from "@/lib/server/database";
 import { deleteStoredImage } from "@/lib/server/image-upload";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
+import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { fakePool } from "../../helpers/sql-double";
 import { clearCache } from "@/lib/server/cache";
 import { LANDING_STATS_KEY, LANDING_TICKER_KEY, LANDING_TTL_MS, cachedLanding } from "@/lib/server/landing-cache";
@@ -45,6 +47,8 @@ function fakeDb(
     failWith?: Error;
     /** Pseudos d'emprunt dont l'écriture rend `ER_DUP_ENTRY` (une fois chacun). */
     duplicatePseudos?: string[];
+    /** Matchs que le compte arbitre (`withdrawUserCasts`), avec leur tournoi. */
+    refereed?: { matchId: number; tournamentId: number }[];
   } = {},
 ) {
   const queries: Query[] = [];
@@ -64,6 +68,12 @@ function fakeDb(
       }
     }
     if (q.includes("AS played")) return [[trace]];
+    if (q.startsWith("SELECT id AS match_id FROM bg_matches WHERE referee_user_id = ?")) {
+      return [(options.refereed ?? []).map((match) => ({ match_id: match.matchId }))];
+    }
+    if (q.startsWith("SELECT id, tournament_id, status FROM bg_matches WHERE id IN")) {
+      return [(options.refereed ?? []).map((match) => ({ id: match.matchId, tournament_id: match.tournamentId, status: "READY" }))];
+    }
     if (q.includes("SELECT avatar_url, discord_id, created_at FROM bg_users")) {
       return [
         options.missing ? [] : [{ avatar_url: avatarUrl, discord_id: options.discordId ?? null, created_at: "2026-01-02 03:04:05" }],
@@ -657,5 +667,35 @@ describe("deleteOwnAccount — vues de l'accueil", () => {
     await warmLanding(loader);
 
     expect(loader).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("deleteOwnAccount — les matchs qui le nommaient sont rafraîchis", () => {
+  it("deleteOwnAccount_refereeOnTwoTournaments_publishesEachAfterCommit", async () => {
+    const { connection } = fakeDb({ ...EMPTY, played: 1 }, {
+      refereed: [{ matchId: 5, tournamentId: 3 }, { matchId: 6, tournamentId: 3 }, { matchId: 9, tournamentId: 4 }],
+    });
+    jest.mocked(publishMatchUpdatedEvent).mockImplementation(() => {
+      expect(connection.commit).toHaveBeenCalled();
+    });
+
+    await deleteOwnAccount(7);
+
+    expect(jest.mocked(publishMatchUpdatedEvent).mock.calls).toEqual([
+      [3, { landingLive: true }],
+      [4, { landingLive: true }],
+    ]);
+  });
+
+  it("deleteOwnAccount_noMatchRole_publishesNothing", async () => {
+    fakeDb(EMPTY);
+    await deleteOwnAccount(7);
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("deleteOwnAccount_rolledBack_publishesNothing", async () => {
+    fakeDb({ ...EMPTY, played: 1 }, { refereed: [{ matchId: 5, tournamentId: 3 }], failOn: "UPDATE bg_users SET pseudo" });
+    await expect(deleteOwnAccount(7)).rejects.toThrow();
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 });

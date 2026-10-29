@@ -127,6 +127,19 @@ describe("compareNewestFirst", () => {
     const player = at("2026-05-05T05:05:05.000Z", "Nova");
     expect(compareNewestFirst("en")(player, { ...player })).toBe(0);
   });
+
+  it("compareNewestFirst_deletedAccountWithoutDate_sortsLastThenByPseudo", () => {
+    const players = [
+      { createdAt: null, pseudo: "compte_supprime_b" },
+      at("2025-01-01T00:00:00.000Z", "z"),
+      { createdAt: null, pseudo: "compte_supprime_a" },
+    ];
+    expect([...players].sort(compareNewestFirst("fr")).map((p) => p.pseudo)).toEqual([
+      "z",
+      "compte_supprime_a",
+      "compte_supprime_b",
+    ]);
+  });
 });
 
 describe("sortLocaleOf", () => {
