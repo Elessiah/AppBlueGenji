@@ -83,15 +83,6 @@ function isLoginErrorCode(code: string): code is LoginErrorCode {
 }
 
 /**
- * Message à afficher pour un code de refus de la connexion.
- *
- * Un code inconnu retombe sur une phrase générique **et non sur le code
- * lui-même** : le jour où le serveur en ajoute un, le joueur lit une phrase.
- *
- * Compte suspendu (`ACCOUNT_SUSPENDED`) sans exposé lisible dans la réponse : la
- * phrase générique (la page montre l'exposé complet quand il a voyagé).
- */
-/**
  * Refus qui se lèvent en rejoignant le serveur BlueGenji : le message privé du
  * code exige un serveur commun avec le bot. Le lien d'invitation n'est sinon
  * que derrière le « i » du champ — ces refus l'affichent à découvert sous le
@@ -103,6 +94,15 @@ export function refusalNeedsServerInvite(code: string | null | undefined): boole
   return code !== null && code !== undefined && SERVER_INVITE_REFUSALS.has(code);
 }
 
+/**
+ * Message à afficher pour un code de refus de la connexion.
+ *
+ * Un code inconnu retombe sur une phrase générique **et non sur le code
+ * lui-même** : le jour où le serveur en ajoute un, le joueur lit une phrase.
+ *
+ * Compte suspendu (`ACCOUNT_SUSPENDED`) sans exposé lisible dans la réponse : la
+ * phrase générique (la page montre l'exposé complet quand il a voyagé).
+ */
 export function loginErrorMessage(code: string | null | undefined, text: LoginText = FR_LOGIN_TEXT): string {
   if (code === ACCOUNT_SUSPENDED) return suspendedLoginText(text, null);
   if (!code || !isLoginErrorCode(code)) return text.t("errors.fallback");

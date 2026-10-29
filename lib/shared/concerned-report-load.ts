@@ -3,7 +3,8 @@
  * (`app/(secured)/signalements/[id]/page.tsx`).
  *
  * - `missing` : le serveur répond que ce signalement n'existe pas ou ne
- *   concerne pas le lecteur (404, 403, 401) — réessayer n'y change rien ;
+ *   concerne pas le lecteur (404, 403, 401, tout autre 4xx définitif) —
+ *   réessayer n'y change rien ;
  * - `error` : une panne passagère (erreur réseau, 5xx pendant un déploiement,
  *   429) — la page propose de réessayer plutôt que de dire « introuvable ».
  */
@@ -11,5 +12,7 @@ export type ConcernedReportLoadFailure = "missing" | "error";
 
 /** `status` : le code HTTP, ou `null` quand la requête n'a pas abouti (réseau). */
 export function concernedReportLoadFailure(status: number | null): ConcernedReportLoadFailure {
-  return status === 404 || status === 403 || status === 401 ? "missing" : "error";
+  if (status === null || status >= 500 || status === 429 || status === 408) return "error";
+  // Tout autre refus 4xx est définitif : réessayer n'y change rien.
+  return status >= 400 ? "missing" : "error";
 }

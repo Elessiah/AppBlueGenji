@@ -72,7 +72,9 @@ export function InfoHint({
     // cliquable (texte, fond) : le relâchement referme, sauf sur un contrôle,
     // qui referme à son `click`. Un défilement tactile finit en `pointercancel`.
     const onPointerUp = (event: PointerEvent) => {
-      if (!isOutside(event)) return;
+      // Un clic de souris referme au `click` : le relâchement qui finit une
+      // sélection de texte à la souris ne doit pas replier le panneau.
+      if (event.pointerType === "mouse" || !isOutside(event)) return;
       const interactive = isInteractivePointerTarget(event.target as Element | null);
       if (infoHintReaction({ kind: "outsidePointerUp", interactive }) === "close") setOpen(false);
     };

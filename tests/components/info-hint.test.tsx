@@ -324,11 +324,13 @@ describe("InfoHint — gestes", () => {
     const text = Object.assign(new NodeClass(), { closest: () => null });
     const control = Object.assign(new NodeClass(), { closest: () => ({}) });
     fakeRefs(view, (target) => target === inside);
-    documentListeners.pointerup[0]({ target: inside });
-    documentListeners.pointerup[0]({ target: control });
+    documentListeners.pointerup[0]({ target: inside, pointerType: "touch" });
+    documentListeners.pointerup[0]({ target: control, pointerType: "touch" });
+    // Souris : le relâchement d'une sélection de texte ne replie pas.
+    documentListeners.pointerup[0]({ target: text, pointerType: "mouse" });
     view = render();
     expect(view.button.props["aria-expanded"]).toBe(true);
-    documentListeners.pointerup[0]({ target: text });
+    documentListeners.pointerup[0]({ target: text, pointerType: "touch" });
     view = render();
     expect(view.button.props["aria-expanded"]).toBe(false);
     expect(documentListeners.pointerup ?? []).toHaveLength(0);

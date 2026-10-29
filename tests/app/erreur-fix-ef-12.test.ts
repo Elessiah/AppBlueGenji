@@ -76,7 +76,7 @@ describe("mises en page", () => {
 
   it("applications connectées : deux colonnes sur ordinateur", () => {
     expect(readSource("app/(secured)/profil/profil.module.css")).toMatch(
-      /@media \(min-width: 921px\) \{\s*\.connectionRow \{\s*grid-template-columns: minmax\(0, 1fr\) auto;/,
+      /@media \(min-width: 921px\) \{\s*:global\(\.table-row\).connectionRow \{\s*grid-template-columns: minmax\(0, 1fr\) auto;/,
     );
     expect(readSource("app/(secured)/profil/ConnectedAppsSection.tsx")).toContain("s.connectionRow");
   });
