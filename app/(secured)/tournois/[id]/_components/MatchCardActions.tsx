@@ -285,6 +285,102 @@ function useReleaseConfirm(present: boolean, casters: BracketMatch["casters"], o
   };
 }
 
+/**
+ * Confirmation du retrait d'un caster par l'arbitrage. Le caster visé est le
+ * lecteur lui-même (arbitre qui caste aussi) : un départ volontaire, sans
+ * avis — la fenêtre dit « Ne plus caster » et ne promet aucun message. Sinon
+ * elle nomme le caster prévenu.
+ */
+function ReleaseCastDialog({
+  match,
+  matchLabel,
+  releasedCaster,
+  viewerUserId,
+  busy,
+  onPick,
+  onClose,
+  onConfirm,
+}: Readonly<{
+  match: BracketMatch;
+  matchLabel: string;
+  releasedCaster: BracketMatch["casters"][number];
+  viewerUserId: number | null;
+  busy: boolean;
+  onPick: (userId: number) => void;
+  onClose: () => void;
+  onConfirm: (self: boolean) => Promise<boolean>;
+}>) {
+  const { t } = useActionsText();
+  const releasingSelf = releasedCaster.userId === viewerUserId;
+  return (
+    <ConfirmActionDialog
+      title={
+        releasingSelf
+          ? t("cardActions.releaseConfirm.selfTitle", { match: matchLabel })
+          : t("cardActions.releaseConfirm.title", { match: matchLabel })
+      }
+      confirmLabel={releasingSelf ? t("cardActions.releaseConfirm.selfConfirm") : t("cardActions.releaseConfirm.confirm")}
+      pendingLabel={t("cardActions.releaseConfirm.pending")}
+      onClose={onClose}
+      onConfirm={() => onConfirm(releasingSelf)}
+    >
+      {match.casters.length > 1 && (
+        <fieldset className={styles.releasePick} aria-busy={busy || undefined}>
+          <legend>{t("cardActions.releaseConfirm.pick")}</legend>
+          {/* Le focus reste sur « Annuler » : un Entrée réflexe sur un bouton
+              radio enverrait le formulaire et retirerait un caster. */}
+          {match.casters.map((caster) => (
+            <label key={caster.userId}>
+              <input
+                type="radio"
+                name={`release-caster-${match.id}`}
+                value={caster.userId}
+                checked={caster.userId === releasedCaster.userId}
+                // Figé pendant l'envoi sans `disabled` natif (le focus ne
+                // resterait nulle part) : la requête vise le caster choisi au
+                // clic, la fenêtre ne montre pas un autre choix le temps de la réponse.
+                aria-disabled={busy || undefined}
+                onChange={() => {
+                  if (!busy) onPick(caster.userId);
+                }}
+              />
+              <span>{caster.pseudo}</span>
+            </label>
+          ))}
+        </fieldset>
+      )}
+      <p>
+        {releasingSelf
+          ? t("cardActions.releaseConfirm.selfBody")
+          : t("cardActions.releaseConfirm.body", { caster: releasedCaster.pseudo })}
+      </p>
+    </ConfirmActionDialog>
+  );
+}
+
+/**
+ * Inscrit, le bouton qui a ouvert la fenêtre disparaît (« Caster » devient
+ * « Ne plus caster ») : la fenêtre rendrait le focus à un bouton détaché, il
+ * tomberait sur <body> (WCAG 2.4.3). Il passe au bouton qui prend sa place.
+ * Rend le drapeau que l'inscription réussie lève.
+ */
+function useFocusAfterClaim(
+  hasClaimCast: boolean,
+  rootRef: React.RefObject<HTMLElement | null>,
+  toggleRef: React.RefObject<HTMLElement | null>,
+) {
+  const claimedRef = useRef(false);
+  useEffect(() => {
+    if (!claimedRef.current || hasClaimCast) return;
+    claimedRef.current = false;
+    const active = document.activeElement;
+    if (active && active !== document.body && document.contains(active)) return;
+    const release = rootRef.current?.querySelector<HTMLElement>('[data-action="releaseCast"]');
+    (release ?? toggleRef.current)?.focus({ preventScroll: true });
+  }, [hasClaimCast, rootRef, toggleRef]);
+  return claimedRef;
+}
+
 export function MatchCardActions({
   match,
   phase,
@@ -348,18 +444,7 @@ export function MatchCardActions({
   // Le choix du stream ne survit pas non plus à l'action (match lancé, joué…).
   const hasClaimCast = actions.some((a) => a.id === "claimCast");
   const [claimOpen, setClaimOpen] = useConfirmWhile(hasClaimCast);
-  // Inscrit, le bouton qui a ouvert la fenêtre disparaît (« Caster » devient
-  // « Ne plus caster ») : la fenêtre rendrait le focus à un bouton détaché, il
-  // tomberait sur <body> (WCAG 2.4.3). Il passe au bouton qui prend sa place.
-  const claimedRef = useRef(false);
-  useEffect(() => {
-    if (!claimedRef.current || hasClaimCast) return;
-    claimedRef.current = false;
-    const active = document.activeElement;
-    if (active && active !== document.body && document.contains(active)) return;
-    const release = rootRef.current?.querySelector<HTMLElement>('[data-action="releaseCast"]');
-    (release ?? toggleRef.current)?.focus({ preventScroll: true });
-  }, [hasClaimCast]);
+  const claimedRef = useFocusAfterClaim(hasClaimCast, rootRef, toggleRef);
   // Les contacts ne restent pas affichés quand le match ne les offre plus
   // (terminé, caster retiré, tournoi clos) : l'instantané du flux retire
   // l'action, et la modale se ferme avec elle.
@@ -480,9 +565,6 @@ export function MatchCardActions({
   }, [expanded, moreKey]);
 
   if (actions.length === 0) return null;
-  // Le caster visé est le lecteur lui-même (arbitre qui caste aussi) : un
-  // départ volontaire, sans avis — la fenêtre ne dit pas le contraire.
-  const releasingSelf = releasedCaster !== null && releasedCaster.userId === viewerUserId;
 
   const claim = async (body: CastClaimBody): Promise<CastClaimOutcome> => {
     try {
@@ -695,59 +777,24 @@ export function MatchCardActions({
           )}
         </ConfirmActionDialog>
       )}
-      {confirmRelease && (
-        <ConfirmActionDialog
-          title={
-            releasingSelf
-              ? t("cardActions.releaseConfirm.selfTitle", { match: matchLabel })
-              : t("cardActions.releaseConfirm.title", { match: matchLabel })
-          }
-          confirmLabel={releasingSelf ? t("cardActions.releaseConfirm.selfConfirm") : t("cardActions.releaseConfirm.confirm")}
-          pendingLabel={t("cardActions.releaseConfirm.pending")}
+      {confirmRelease && releasedCaster !== null && (
+        <ReleaseCastDialog
+          match={match}
+          matchLabel={matchLabel}
+          releasedCaster={releasedCaster}
+          viewerUserId={viewerUserId}
+          busy={busy}
+          onPick={setReleaseTarget}
           onClose={() => setConfirmRelease(false)}
-          onConfirm={() => {
+          onConfirm={(self) => {
             markOwnRelease();
             return run(
               () =>
-                send(
-                  `/api/matches/${match.id}/caster?userId=${encodeURIComponent(String(releasedCaster?.userId ?? ""))}`,
-                  "DELETE",
-                ),
-              releasingSelf ? t("cardActions.notCasting") : t("cardActions.casterRemoved"),
+                send(`/api/matches/${match.id}/caster?userId=${encodeURIComponent(String(releasedCaster.userId))}`, "DELETE"),
+              self ? t("cardActions.notCasting") : t("cardActions.casterRemoved"),
             );
           }}
-        >
-          {match.casters.length > 1 && (
-            <fieldset className={styles.releasePick} aria-busy={busy || undefined}>
-              <legend>{t("cardActions.releaseConfirm.pick")}</legend>
-              {/* Le focus reste sur « Annuler » : un Entrée réflexe sur un bouton
-                  radio enverrait le formulaire et retirerait un caster. */}
-              {match.casters.map((caster) => (
-                <label key={caster.userId}>
-                  <input
-                    type="radio"
-                    name={`release-caster-${match.id}`}
-                    value={caster.userId}
-                    checked={caster.userId === releasedCaster?.userId}
-                    // Figé pendant l'envoi sans `disabled` natif (le focus ne
-                    // resterait nulle part) : la requête vise le caster choisi au
-                    // clic, la fenêtre ne montre pas un autre choix le temps de la réponse.
-                    aria-disabled={busy || undefined}
-                    onChange={() => {
-                      if (!busy) setReleaseTarget(caster.userId);
-                    }}
-                  />
-                  <span>{caster.pseudo}</span>
-                </label>
-              ))}
-            </fieldset>
-          )}
-          <p>
-            {releasingSelf
-              ? t("cardActions.releaseConfirm.selfBody")
-              : t("cardActions.releaseConfirm.body", { caster: releasedCaster?.pseudo ?? "" })}
-          </p>
-        </ConfirmActionDialog>
+        />
       )}
       {claimOpen && (
         <CastClaimDialog match={match} matchLabel={matchLabel} onClose={() => setClaimOpen(false)} onClaim={claim} />

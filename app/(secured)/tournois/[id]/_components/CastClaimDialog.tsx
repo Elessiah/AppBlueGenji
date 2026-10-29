@@ -132,9 +132,9 @@ export function CastClaimDialog({
           );
         })}
       </fieldset>
-      <p className={styles.gone} role="status" aria-live="polite">
+      <output className={styles.gone} aria-live="polite">
         {gone ? t("cardActions.claimDialog.gone") : ""}
-      </p>
+      </output>
       {separate && (
         <div className="field">
           <label htmlFor={urlId}>{t("cardActions.claimDialog.url")}</label>
