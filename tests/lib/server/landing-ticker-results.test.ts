@@ -176,7 +176,7 @@ describe("getLandingTicker — résultats", () => {
     await mockTicker([resultRow({ team1_name: "  Pseudo​  Solo ", team2_name: "​", team2_id: 7 }, 1)]);
     const [item] = results((await getLandingTicker()).items);
     // Invisibles retirés, sans NFKC ni réduction des espaces (`UNTRUSTED_NAMES.md`).
-    expect(item.sides.map((side) => side.name)).toEqual(["Pseudo  Solo", "Équipe #7"]);
+    expect(item.sides.map((side) => side.name)).toEqual(["Pseudo Solo", "Équipe #7"]);
   });
 });
 

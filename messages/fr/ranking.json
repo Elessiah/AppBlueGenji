@@ -28,6 +28,7 @@
       "third": "3e place"
     },
     "teamLinkTitle": "Voir la fiche de {team}",
+    "teamLinkTitleFallback": "Voir la fiche de l'équipe #{id}",
     "teamFallback": "Équipe #{id}",
     "pointsUnit": "pts",
     "record": {

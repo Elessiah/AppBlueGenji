@@ -249,7 +249,7 @@ describe("RankingBoard — nom qui ne garde rien de visible", () => {
     const rows = [row(1, { teamId: 12, teamName: null }), row(2), row(3), row(4, { teamId: 44, teamName: null })];
     const fr = render({ rows });
     expect(fr).toContain(">Équipe #12<");
-    expect(fr).toContain('title="Voir la fiche de Équipe #12"');
+    expect(fr).toContain("title=\"Voir la fiche de l&#x27;équipe #12\"");
     expect(fr).toContain(">Équipe #44<");
     const en = render({ rows, locale: "en" });
     expect(en).toContain(">Team #12<");

@@ -260,6 +260,9 @@ function isTournamentFormat(format: TournamentFormat | undefined): format is Tou
   return TOURNAMENT_FORMATS.has(String(format));
 }
 
+/** Longueur maximale du nom d'un tournoi, en caractères : `bg_tournaments.name` est un `VARCHAR(120)`. */
+export const TOURNAMENT_NAME_MAX_LENGTH = 120;
+
 export function validateTournamentInput(
   body: TournamentInputBody,
 ): { error: string } | { value: ValidatedTournamentInput } {
@@ -269,6 +272,8 @@ export function validateTournamentInput(
   // dates ne doit pas réécrire le nom. Réduit à rien, il est absent.
   const name = typeof body.name === "string" ? withoutInvisibles(body.name) : "";
   if (!name) return { error: "MISSING_NAME" };
+  // Compté en points de code, comme la colonne : au-delà, la base lèverait « Data too long ».
+  if (Array.from(name).length > TOURNAMENT_NAME_MAX_LENGTH) return { error: "NAME_TOO_LONG" };
   if (!isTournamentFormat(body.format)) return { error: "INVALID_FORMAT" };
 
   const shapeError = tournamentShapeError(body);

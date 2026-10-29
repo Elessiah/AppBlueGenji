@@ -50,10 +50,6 @@ export type AboutStatValidationResult =
   | { ok: false; error: string };
 
 /**
- * Valide et normalise une carte (valeur + titre). Les deux champs sont requis ;
- * la valeur anglaise est facultative (rognée, vide → `null`).
- */
-/**
  * Champ saisi sans ce qui ne se voit pas (`withoutInvisibles`) : une valeur
  * faite seulement d'invisibles ou de commandes de direction (U+200B, U+202E)
  * est donc **vide** — refusée en français, absente en anglais (la marque EN et
@@ -65,9 +61,15 @@ function cleanField(raw: unknown): unknown {
   return typeof raw === "string" ? withoutInvisibles(raw) : raw;
 }
 
+/**
+ * Valide et normalise une carte (valeur + titre). Les deux champs sont requis ;
+ * la valeur anglaise est facultative (rognée, vide → `null`).
+ */
 export function validateAboutStatInput(input: AboutStatInput): AboutStatValidationResult {
-  const value = typeof input.value === "string" ? withoutInvisibles(input.value) : "";
-  const label = typeof input.label === "string" ? withoutInvisibles(input.label) : "";
+  const cleanValue = cleanField(input.value);
+  const cleanLabel = cleanField(input.label);
+  const value = typeof cleanValue === "string" ? cleanValue : "";
+  const label = typeof cleanLabel === "string" ? cleanLabel : "";
 
   if (!value) return { ok: false, error: "VALUE_REQUIRED" };
   if (value.length > ABOUT_STAT_VALUE_MAX) return { ok: false, error: "VALUE_TOO_LONG" };
@@ -151,6 +153,9 @@ export const ABOUT_STAT_FIELD_ERRORS = {
   LABEL_TOO_LONG: "label",
   LABEL_EN_REQUIRED: "labelEn",
   LABEL_EN_TOO_LONG: "labelEn",
+  // Refus de lecture du corps (`bodyReadRefusal`) : rattachés au premier champ.
+  PAYLOAD_TOO_LARGE: "value",
+  UNSUPPORTED_CONTENT_TYPE: "value",
 } as const;
 
 const ABOUT_STAT_ERROR_MESSAGES: Readonly<Record<string, string>> = {
@@ -159,6 +164,8 @@ const ABOUT_STAT_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   VALUE_EN_TOO_LONG: `Valeur anglaise trop longue (${ABOUT_STAT_VALUE_MAX} caractères maximum).`,
   LABEL_REQUIRED: "Le titre est requis.",
   LABEL_TOO_LONG: `Titre trop long (${ABOUT_STAT_LABEL_MAX} caractères maximum).`,
+  PAYLOAD_TOO_LARGE: "Envoi trop volumineux.",
+  UNSUPPORTED_CONTENT_TYPE: "Requête refusée. Recharge la page, puis réessaie.",
 };
 
 /** Phrase d'un refus (staff, en français — D4) ; un code inconnu garde « Échec : CODE ». */

@@ -81,9 +81,9 @@ describe("carte d'une page", () => {
 describe("carte du podium", () => {
   const entries = podiumShareEntries(
     [
-      { teamName: "Alpha", points: 1240, logoSrc: "data:image/png;base64,AAAA" },
-      { teamName: "Bravo", points: 1180, logoSrc: null },
-      { teamName: "Charlie", points: 1100, logoSrc: null },
+      { teamId: 1, teamName: "Alpha", points: 1240, logoSrc: "data:image/png;base64,AAAA" },
+      { teamId: 2, teamName: "Bravo", points: 1180, logoSrc: null },
+      { teamId: 3, teamName: "Charlie", points: 1100, logoSrc: null },
     ],
     frShare,
   )!;

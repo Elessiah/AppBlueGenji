@@ -10,6 +10,7 @@ import {
 import type { BracketMatch } from "@/lib/shared/types";
 import { useMapError } from "../_lib/error-map";
 import { useDialogsText } from "../_lib/dialogs-text";
+import { useShownEntrantName } from "./EntrantName";
 import { TournamentDialogFrame } from "./TournamentDialogFrame";
 
 interface IssueReportDialogProps {
@@ -33,6 +34,8 @@ export function IssueReportDialog({ tournamentId, match, onClose }: Readonly<Iss
   const { showError, showSuccess } = useToast();
   const mapError = useMapError();
   const { t } = useDialogsText();
+  const team1 = useShownEntrantName(match?.team1Id ?? null, match?.team1Name ?? null);
+  const team2 = useShownEntrantName(match?.team2Id ?? null, match?.team2Name ?? null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -79,7 +82,7 @@ export function IssueReportDialog({ tournamentId, match, onClose }: Readonly<Iss
         </h3>
         <p style={{ marginTop: 6, fontSize: 13, color: "var(--ink-quiet, #9aa4b2)" }}>
           {match
-            ? t("issue.match", { team1: match.team1Name ?? "TBD", team2: match.team2Name ?? "TBD" })
+            ? t("issue.match", { team1: team1 || "TBD", team2: team2 || "TBD" })
             : t("issue.wholeTournament")}
         </p>
 

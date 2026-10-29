@@ -331,3 +331,43 @@ describe("EntrantName — forme affichable d'un nom resté en base", () => {
     expect(html).toContain(">TBD</span>");
   });
 });
+
+describe("EntrantName — nom nettoyé, repli, infobulle et variante simple", () => {
+  const RLO = String.fromCodePoint(0x202e);
+
+  it("retombe sur « Engagé #id » quand le nom est null mais l'engagé connu", () => {
+    const html = withEntrants(<EntrantName teamId={2} name={null} />);
+
+    expect(html).toContain(">Engagé #2<");
+  });
+
+  it("garde le libellé d'une case vide (teamId null) sans lien", () => {
+    const html = withEntrants(<EntrantName teamId={null} name="TBD" />);
+
+    expect(html).toContain(">TBD<");
+    expect(html).not.toContain("<a ");
+  });
+
+  it("nettoie l'infobulle comme le nom : jamais retournée, jamais vide", () => {
+    const html = withEntrants(
+      <>
+        <EntrantName teamId={1} name={`Dragon${RLO} Squad`} title={`Dragon${RLO} Squad`} />
+        <EntrantName teamId={2} name="X" title={`${RLO}\u200B`} />
+      </>,
+    );
+
+    expect(html).toContain('title="Dragon Squad"');
+    expect(html).not.toContain(RLO);
+    expect(html).not.toMatch(/title=""/);
+  });
+
+  it("plain : nom non cliquable, et aucune case d'emblème pour un côté vide", () => {
+    const named = withEntrants(<EntrantName plain teamId={1} name="Dragon Squad" />);
+    const empty = withEntrants(<EntrantName plain teamId={null} name="TBD" />);
+
+    expect(named).toContain("Dragon Squad");
+    expect(named).not.toContain("<a ");
+    expect(empty).toContain(">TBD<");
+    expect(empty).not.toContain('aria-hidden="true"');
+  });
+});

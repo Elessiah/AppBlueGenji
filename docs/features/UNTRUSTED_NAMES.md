@@ -79,6 +79,16 @@ lit à l'identique sur sa fiche, au classement et dans le menu du compte.
   sans nom accessible. Un appelant qui habille le nom (`children`, comme le
   bandeau de la championne) le prend de `useShownEntrantName`, jamais brut.
 
+## 1 bis. Affichage des anciens noms (suites de l'EF-02)
+
+- **Une seule forme affichable** : `withoutInvisibles` (sans NFKC), via `useShownEntrantName` côté écran (mémoïsé), `shownEntrantName` côté serveur. Les **suites d'espaces** (insécables, U+3000) y sont réduites à une seule, l'espace fine isolée est gardée ; `withoutInvisiblesKeepingSpaces` (sans réduction) sert à la migration `cleanStoredNames`, qui ne renomme que ce qui ne s'affiche pas.
+- **Drapeaux de subdivision** : la suite d'étiquettes complète et bornée qui suit U+1F3F4 (`gbeng`, `gbsct` ou `gbwls`, close par U+E007F) est gardée ; toute autre étiquette est retirée.
+- **Repli traduit** quand rien ne reste : « Équipe #id » (« Joueur » pour une entrée solo : bandeau, mini-arbre), « Engagé #id » (`EntrantName`, dialogues, noms accessibles, `EnduranceChart`), « Tournoi #id » (bandeau, carte « en cours », bouton « Regarder le live »), images de partage (« Équipe #id »). Infobulle du lien : titre propre au repli (« Voir la fiche de l'équipe #12 »).
+- `EntrantName` : `title` nettoyé comme le nom ; `plain` = non cliquable, sans case d'emblème vide (sous-titre du dialogue de programmation).
+- **`cleanStoredNames`** : passe **ponctuelle** (marqueur `migration_clean_stored_names` dans `bg_settings`, posé une fois toutes les lignes traitées) ; seul le doublon (`ER_DUP_ENTRY`) laisse une ligne telle quelle, toute autre erreur est signalée et la passe se rejoue ; attente de verrou courte (5 s) sur une connexion dédiée ; les identifiants des équipes et tournois laissés sont journalisés (jamais un nom ni l'identifiant d'un joueur) pour un renommage à la main. Fiches d'équipe, profils et effectifs lisent leurs noms par `withoutInvisibles`.
+- Nom de tournoi : 120 caractères au plus (`NAME_TOO_LONG`, comptés en points de code, `VARCHAR(120)`).
+- Refus de lecture du corps (`PAYLOAD_TOO_LARGE`, `UNSUPPORTED_CONTENT_TYPE`) : phrases FR/EN dans `tournamentErrors`, rattachés au champ de date (programmation) ou à la valeur (éditeur des chiffres, staff).
+
 ## 2. Mentions et balisage Discord — `lib/shared/discord-text.ts`
 
 Tout fragment saisi par un utilisateur qui part vers le bot passe par l'une de

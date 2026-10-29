@@ -52,6 +52,7 @@ describe("loadShareTeam", () => {
     const team = await loadShareTeam(1);
     expect(loadTeamRanking).toHaveBeenCalledWith();
     expect(team).toEqual({
+      teamId: 1,
       teamName: "Test - 1",
       wins: 3,
       losses: 1,
@@ -62,13 +63,14 @@ describe("loadShareTeam", () => {
     expect(teamLogoDataUrl).toHaveBeenCalledWith("/api/uploads/teams/1.webp", TEAM_SHARE_LOGO_SIZE);
   });
 
-  it("n'expose aucun champ hors du classement (ni identifiant, ni URL brute du logo)", async () => {
+  it("n'expose aucun champ hors du classement (l'identifiant ne sert qu'au repli « Équipe #id » ; jamais l'URL brute du logo)", async () => {
     const team = await loadShareTeam(1);
     expect(Object.keys(team!).sort((a, b) => a.localeCompare(b))).toEqual([
       "draws",
       "logoSrc",
       "losses",
       "points",
+      "teamId",
       "teamName",
       "wins",
     ]);

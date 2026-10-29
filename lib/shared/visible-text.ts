@@ -30,13 +30,26 @@ const CONTROL = /\p{Cc}/gu;
  * Caractères de format (`\p{Cf}`) : espaces de largeur nulle, marques et
  * commandes de direction, césure conditionnelle, étiquettes Unicode…
  *
- * Seule exception, le **liant sans chasse** (U+200D) entre deux pictogrammes :
+ * Deux exceptions. La **suite d'étiquettes d'un drapeau de subdivision**
+ * (U+1F3F4 puis `gbeng`, `gbsct` ou `gbwls` en étiquettes, close par U+E007F :
+ * les trois seuls drapeaux de subdivision d'Unicode, dont l'Écosse d'une « Scotland Cup ») : sans elle, le drapeau
+ * retombe sur le drapeau noir. Hors de ce motif complet et borné, les
+ * étiquettes restent retirées — invisibles, elles pourraient cacher du texte.
+ *
+ * Et le **liant sans chasse** (U+200D) entre deux pictogrammes :
  * c'est lui qui compose une famille ou un métier en un seul emoji, teinte de
  * peau comprise (le modificateur se place avant le liant). Hors de ce rôle, il
  * est invisible comme les autres.
  */
-const FORMAT = /\p{Cf}/gu;
+const FORMAT = /(\u{1F3F4}\u{E0067}\u{E0062}(?:\u{E0065}\u{E006E}\u{E0067}|\u{E0073}\u{E0063}\u{E0074}|\u{E0077}\u{E006C}\u{E0073})\u{E007F})|\p{Cf}/gu;
 const EMOJI_JOINER = /(?<=\p{Extended_Pictographic}(?:\uFE0F|\p{Emoji_Modifier})?)\u200D(?=\p{Extended_Pictographic})/gu;
+
+/**
+ * Suite de deux espaces ou plus, insécables et U+3000 compris (que le CSS ne
+ * réduit pas) : réduite à une espace, sans toucher à l'espace fine isolée d'un
+ * « 4 200 € ».
+ */
+const SPACE_RUN = /\s{2,}/gu;
 
 /**
  * Marqueur provisoire du liant d'emoji pendant le retrait des `\p{Cf}` : un
@@ -61,19 +74,34 @@ export function visibleText(raw: string): string {
 
 /**
  * Texte d'une ligne débarrassé de ce qui ne se **voit** pas — contrôles
- * (→ espace), invisibles, commandes de direction — mais pas normalisé : ni NFKC
- * ni réduction des espaces. Pour une saisie du staff dont la typographie est le
- * propos (« 4 200 € » à espace fine insécable, « 50 m² », « ½ ») : NFKC la
- * réécrirait (« 4 200 € », « 50 m2 », « 1⁄2 »).
+ * (→ espace), invisibles, commandes de direction — mais pas normalisé : pas de
+ * NFKC. Pour une saisie du staff dont la typographie est le propos
+ * (« 4 200 € » à espace fine insécable, « 50 m² », « ½ ») : NFKC la
+ * réécrirait (« 4 200 € », « 50 m2 », « 1⁄2 »). Les **suites** d'espaces
+ * (insécables et U+3000 compris, que le CSS ne réduit pas) sont ramenées à une
+ * seule : un nom bourré d'espaces n'ouvre pas un grand blanc ; l'espace fine
+ * isolée reste telle quelle.
  *
  * @param raw Saisie brute.
  * @returns Le texte nettoyé et rogné, éventuellement vide.
  */
 export function withoutInvisibles(raw: string): string {
+  return withoutInvisiblesKeepingSpaces(raw).replace(SPACE_RUN, " ");
+}
+
+/**
+ * {@link withoutInvisibles} **sans** réduction des espaces : pour la migration
+ * des noms enregistrés (`cleanStoredNames`), qui ne renomme que ce qui ne
+ * s'affiche pas.
+ *
+ * @param raw Saisie brute.
+ * @returns Le texte nettoyé et rogné, éventuellement vide.
+ */
+export function withoutInvisiblesKeepingSpaces(raw: string): string {
   return raw
     .replace(CONTROL, " ")
     .replace(EMOJI_JOINER, JOINER_PLACEHOLDER)
-    .replace(FORMAT, "")
+    .replace(FORMAT, (match, flagSequence: string | undefined) => (flagSequence === undefined ? "" : match))
     .replace(INVISIBLE_LETTERS, "")
     .replaceAll(JOINER_PLACEHOLDER, ZERO_WIDTH_JOINER)
     .trim();

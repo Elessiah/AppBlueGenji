@@ -170,10 +170,10 @@ describe("cartes de l'espace membre", () => {
 
 describe("podium", () => {
   const rows = [
-    { teamName: "Alpha", points: 1240.4, logoSrc: "data:image/png;base64,AAAA" },
-    { teamName: "Bravo", points: 1180, logoSrc: null },
-    { teamName: "Charlie", points: 1100, logoSrc: null },
-    { teamName: "Delta", points: 1000, logoSrc: null },
+    { teamId: 1, teamName: "Alpha", points: 1240.4, logoSrc: "data:image/png;base64,AAAA" },
+    { teamId: 2, teamName: "Bravo", points: 1180, logoSrc: null },
+    { teamId: 3, teamName: "Charlie", points: 1100, logoSrc: null },
+    { teamId: 4, teamName: "Delta", points: 1000, logoSrc: null },
   ];
 
   it("garde les trois premières, dans l'ordre, avec leur marche dans la langue", () => {
@@ -199,7 +199,7 @@ describe("podium", () => {
     expect(long.startsWith(first.name.slice(0, -1))).toBe(true);
   });
 
-  it("nettoie un nom saisi (visibleText) et remplace un nom invisible", () => {
+  it("nettoie un nom saisi (withoutInvisibles) et remplace un nom invisible par « Équipe #id »", () => {
     const entries = podiumShareEntries(
       [
         { ...rows[0], teamName: "Al\u200Bpha\u202E" },
@@ -209,13 +209,13 @@ describe("podium", () => {
       frShare,
     )!;
     expect(entries[0].name).toBe("Alpha");
-    expect(entries[1].name).toBe("?");
+    expect(entries[1].name).toBe("Équipe #2");
     expect(entries[2].initial).toBe("É");
   });
 });
 
 describe("carte nominative d'une équipe", () => {
-  const team = { teamName: "Dragon Squad", wins: 12, losses: 3, draws: 0, points: 1240.4 };
+  const team = { teamId: 7, teamName: "Dragon Squad", wins: 12, losses: 3, draws: 0, points: 1240.4 };
 
   it("nomme la clé team-<id> et la relit", () => {
     expect(teamShareCardKey(42)).toBe("team-42");
@@ -263,7 +263,7 @@ describe("carte nominative d'une équipe", () => {
 
   it("nettoie un nom saisi (visibleText), le borne sur un mot, et remplace un nom invisible", () => {
     expect(teamShareCard({ ...team, teamName: "Dra\u200Bgon\u202E" }, frShare).title).toBe("Dragon");
-    expect(teamShareCard({ ...team, teamName: "\u200B" }, frShare)).toMatchObject({ title: "?", initial: "?" });
+    expect(teamShareCard({ ...team, teamName: "\u200B" }, frShare)).toMatchObject({ title: "Équipe #7", initial: "É" });
     const long = teamShareCard({ ...team, teamName: "Les Invincibles Chevaliers De La Table Ronde Du Grand Ouest" }, frShare);
     expect(Array.from(long.title).length).toBeLessThanOrEqual(TEAM_SHARE_NAME_MAX_LENGTH);
     expect(long.title.endsWith("…")).toBe(true);

@@ -9,7 +9,8 @@
     "joinDiscord": "Join the Discord",
     "watchLive": "Watch live",
     "viewTournament": "View tournament",
-    "teamPageTitle": "View {name}'s page"
+    "teamPageTitle": "View {name}'s page",
+    "teamPageTitleFallback": "View team #{id}'s page"
   },
   "hero": {
     "watchLiveLabel": "Watch live — {tournament} live now (new tab)",
@@ -42,6 +43,7 @@
     "fallbackLabel": "Announcements, teams, game channels"
   },
   "live": {
+    "tournamentFallback": "Tournament #{id}",
     "info": "TOURNAMENT INFO",
     "noneScheduled": "No tournament in progress, and nothing is scheduled yet.",
     "nextToday": "No tournament in progress. The next one starts today.",
@@ -105,6 +107,7 @@
     "winnerLead": "WINNER · {name} ·",
     "unknownChampion": "Unknown champion",
     "teamFallback": "Team #{id}",
+    "tournamentFallback": "Tournament #{id}",
     "playerFallback": "Player",
     "news": "NEWS · {title}",
     "defaultResult": "RESULT · Waiting for new matches",

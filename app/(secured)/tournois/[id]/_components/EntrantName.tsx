@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import type { CSSProperties, ReactNode } from "react";
+import { useMemo, type CSSProperties, type ReactNode } from "react";
 import { avatarInitial } from "@/lib/shared/avatar";
 import { entityTruncateClass, joinClasses } from "@/lib/shared/class-names";
 import { withoutInvisibles } from "@/lib/shared/visible-text";
@@ -67,8 +67,14 @@ export function EntrantLogo({ teamId, name, size = 16, logoUrl: knownLogoUrl }: 
  */
 export function useShownEntrantName(teamId: number | null, name: string | null): string | null {
   const text = useTournamentPageText();
-  const cleanName = name === null ? null : withoutInvisibles(name);
-  return cleanName === "" && teamId !== null ? text.t("match.entrantFallback", { id: String(teamId) }) : cleanName;
+  // Mémoïsé : cinq passes d'expressions Unicode, rejouées sinon à chaque rendu
+  // de chaque nom d'un grand tableau re-rendu à chaque instantané SSE.
+  return useMemo(() => {
+    const fallback = teamId === null ? null : text.t("match.entrantFallback", { id: String(teamId) });
+    if (name === null) return fallback;
+    const cleanName = withoutInvisibles(name);
+    return cleanName === "" ? (fallback ?? cleanName) : cleanName;
+  }, [teamId, name, text]);
 }
 
 type EntrantNameProps = {
@@ -90,7 +96,13 @@ type EntrantNameProps = {
   /** Classe et style du nom lui-même (lien, ou texte d'une case vide). */
   textClassName?: string;
   textStyle?: CSSProperties;
+  /** Infobulle : nettoyée comme le nom (jamais un nom retourné ou vide). */
   title?: string;
+  /**
+   * Nom non cliquable, sans case d'emblème vide — pour un sous-titre de
+   * dialogue, où un clic quitterait la saisie en cours.
+   */
+  plain?: boolean;
 };
 
 /**
@@ -113,6 +125,7 @@ export function EntrantName({
   textClassName,
   textStyle,
   title,
+  plain = false,
 }: Readonly<EntrantNameProps>) {
   // Troncature : `.entity-truncate` (globale), par `EntityLink` pour le lien —
   // qui rogne sur le nom peint d'une marche plutôt que sur le lien —, posée à
@@ -122,16 +135,18 @@ export function EntrantName({
   // `children` passent par le même nettoyage chez leur appelant.
   const shownName = useShownEntrantName(teamId, name);
   const content = children ?? shownName;
+  const shownTitle = title === undefined ? undefined : withoutInvisibles(title) || undefined;
+  const linked = teamId !== null && !plain;
 
   return (
     <span className={joinClasses(styles.label, className)} style={style}>
-      <EntrantLogo teamId={teamId} name={shownName} size={logoSize} />
-      {teamId !== null ? (
-        <EntrantLink teamId={teamId} className={textClass} style={textStyle} title={title} truncate={truncate}>
+      {plain && teamId === null ? null : <EntrantLogo teamId={teamId} name={shownName} size={logoSize} />}
+      {linked ? (
+        <EntrantLink teamId={teamId} className={textClass} style={textStyle} title={shownTitle} truncate={truncate}>
           {content}
         </EntrantLink>
       ) : (
-        <span className={joinClasses(textClass, entityTruncateClass(truncate))} style={textStyle} title={title}>
+        <span className={joinClasses(textClass, entityTruncateClass(truncate))} style={textStyle} title={shownTitle}>
           {content}
         </span>
       )}

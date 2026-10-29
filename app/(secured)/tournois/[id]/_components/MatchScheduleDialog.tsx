@@ -36,7 +36,7 @@ import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { useMapError } from "../_lib/error-map";
 import { useDialogsText } from "../_lib/dialogs-text";
 import { richNodes } from "@/components/i18n/shell-text";
-import { EntrantName } from "./EntrantName";
+import { EntrantName, useShownEntrantName } from "./EntrantName";
 
 const FIELD_IDS = {
   day: "match-start-day",
@@ -230,6 +230,9 @@ export function MatchScheduleDialog({
   onSaved,
 }: Readonly<MatchScheduleDialogProps>) {
   const text = useDialogsText();
+  // Noms nettoyés (repli « Engagé #id ») ; `null` : place vide, dite « TBD ».
+  const shown1 = useShownEntrantName(match.team1Id, match.team1Name);
+  const shown2 = useShownEntrantName(match.team2Id, match.team2Name);
   const { t } = text;
   const mapError = useMapError();
   const { showError, showSuccess } = useToast();
@@ -436,10 +439,13 @@ export function MatchScheduleDialog({
             {richNodes(
               text.rich(
                 "schedule.versus",
-                { team1: match.team1Name ?? t("schedule.tbd"), team2: match.team2Name ?? t("schedule.tbd") },
                 {
-                  first: (chunks) => <EntrantName teamId={match.team1Id} name={chunks.join("")} />,
-                  second: (chunks) => <EntrantName teamId={match.team2Id} name={chunks.join("")} />,
+                  team1: shown1 ?? t("schedule.tbd"),
+                  team2: shown2 ?? t("schedule.tbd"),
+                },
+                {
+                  first: (chunks) => <EntrantName plain teamId={match.team1Id} name={chunks.join("")} />,
+                  second: (chunks) => <EntrantName plain teamId={match.team2Id} name={chunks.join("")} />,
                 },
               ),
             )}

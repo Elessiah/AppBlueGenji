@@ -40,6 +40,7 @@ async function computeShareTeams(): Promise<ReadonlyMap<number, ShareTeamRow>> {
   for (const row of ranking.slice(0, RANKING_MAX_SHOWN)) {
     if (ghostIds.has(row.teamId)) continue;
     teams.set(row.teamId, {
+      teamId: row.teamId,
       teamName: row.teamName,
       logoUrl: row.logoUrl,
       wins: row.wins,

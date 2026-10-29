@@ -1,6 +1,6 @@
-import type { Pool, ResultSetHeader, RowDataPacket } from "mysql2/promise";
-import { isSchemaNoOpError, isUnknownColumnError } from "@/lib/server/mysql-errors";
-import { withoutInvisibles } from "@/lib/shared/visible-text";
+import type { Pool, PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import { isDuplicateEntryError, isSchemaNoOpError, isUnknownColumnError } from "@/lib/server/mysql-errors";
+import { withoutInvisiblesKeepingSpaces } from "@/lib/shared/visible-text";
 import { reportSchemaFailure } from "./report-schema-failure";
 
 /*
@@ -311,17 +311,27 @@ export async function migrateRecruitmentPriority(db: Pool): Promise<void> {
 
 /** Colonnes de noms saisis, lus partout sur le site (`UNTRUSTED_NAMES.md`). */
 const STORED_NAME_COLUMNS = [
-  { table: "bg_teams", column: "name" },
-  { table: "bg_users", column: "pseudo" },
-  { table: "bg_tournaments", column: "name" },
+  { table: "bg_teams", column: "name", logIds: true },
+  { table: "bg_users", column: "pseudo", logIds: false },
+  { table: "bg_tournaments", column: "name", logIds: true },
 ] as const;
+
+/**
+ * Marqueur de la passe (`bg_settings`) : posé une fois toutes les lignes
+ * traitées, il évite de relire trois tables à chaque démarrage. Le nettoyage à
+ * l'écriture garantit qu'aucun nom sale n'apparaît ensuite.
+ */
+export const CLEAN_STORED_NAMES_MARKER = "migration_clean_stored_names";
+
+/** Attente de verrou de ligne pendant la passe, en secondes (`innodb_lock_wait_timeout`). */
+const CLEAN_NAMES_LOCK_WAIT_SECONDS = 5;
 
 type StoredNameRow = RowDataPacket & { id: number; name: string | null };
 
 /**
  * Retire une fois des noms enregistrés **avant** que l'écriture ne les
  * nettoie ce qui ne se voit pas : caractères invisibles et commandes de
- * direction (`withoutInvisibles`, `UNTRUSTED_NAMES.md`).
+ * direction (`withoutInvisiblesKeepingSpaces`, `UNTRUSTED_NAMES.md`).
  *
  * Le nettoyage ne jouait qu'à l'écriture : un ancien nom à commande de
  * direction (U+202E) ou à caractère invisible brouillait donc chaque surface
@@ -333,60 +343,143 @@ type StoredNameRow = RowDataPacket & { id: number; name: string | null };
  * lettres pleine chasse, espace fine insécable). Seul ce qui ne s'affiche
  * pas disparaît, si bien que le nom se lit à l'identique après la passe.
  *
+ * **Ponctuelle** : le marqueur {@link CLEAN_STORED_NAMES_MARKER} est posé une
+ * fois la passe menée à bout, et un démarrage qui le trouve ne lit rien. Une
+ * panne (hors doublon) le laisse absent : la passe reprend au démarrage suivant.
+ *
  * La lecture filtre en JavaScript, pas en `REGEXP` : la syntaxe des classes
  * Unicode diffère entre MySQL (ICU) et MariaDB (PCRE), et trois tables de
- * quelques milliers de lignes au plus se lisent d'un trait. Rejouée à chaque
- * démarrage, la passe ne trouve plus rien à écrire une fois les noms propres.
+ * quelques milliers de lignes au plus se lisent d'un trait. Les écritures
+ * partent ligne à ligne, mais seules les lignes sales sont écrites, une seule
+ * fois (marqueur) : un `UPDATE` groupé n'économiserait rien de mesurable.
  *
  * Une ligne est **laissée telle quelle** — les filtres de sortie restent donc
  * en place — quand son nom nettoyé serait vide (la saisie le refuserait), ou
- * quand il est refusé par la base : un sosie (`Adm` + U+200B + `in`) dont la
- * forme propre est déjà prise par l'original (`UNIQUE`). La condition sur
- * l'ancien nom évite d'écraser un renommage fait entre la lecture et
- * l'écriture ; elle compare **octet à octet** (`utf8mb4_bin`) : la collation
- * des colonnes (`utf8mb4_0900_ai_ci`, `utf8mb4_uca1400_ai_ci` sous MariaDB)
- * ignore casse, accents et caractères invisibles, si bien que « TEAM »,
- * renommé entre-temps, y égalerait l'ancien « Te » + U+200B + « am » et
- * serait réécrit « Team ». `updated_at` est gardé : les trois tables le remettent à
- * l'heure à chaque `UPDATE`, et le classement date un tournoi terminé sans
- * `finished_at` par lui — un simple nettoyage ne doit pas en déplacer les
- * tendances. Le journal ne compte que des lignes, jamais un nom
+ * quand la base le refuse pour **doublon** (`ER_DUP_ENTRY`) : un sosie
+ * (`Adm` + U+200B + `in`) dont la forme propre est déjà prise par l'original
+ * (`UNIQUE`). Toute autre erreur (attente de verrou comprise) n'est **pas** un
+ * « laissé » : elle est signalée (`reportSchemaFailure`) et la passe reste à
+ * rejouer. La condition sur l'ancien nom évite d'écraser un renommage fait
+ * entre la lecture et l'écriture ; elle compare **octet à octet**
+ * (`utf8mb4_bin`) : la collation des colonnes (`utf8mb4_0900_ai_ci`,
+ * `utf8mb4_uca1400_ai_ci` sous MariaDB) ignore casse, accents et caractères
+ * invisibles, si bien que « TEAM », renommé entre-temps, y égalerait l'ancien
+ * « Te » + U+200B + « am » et serait réécrit « Team ». `updated_at` est gardé :
+ * les trois tables le remettent à l'heure à chaque `UPDATE`, et le classement
+ * date un tournoi terminé sans `finished_at` par lui — un simple nettoyage ne
+ * doit pas en déplacer les tendances. Le journal compte des lignes et, pour les
+ * équipes et les tournois laissés tels quels, en donne les **identifiants** (de
+ * quoi les renommer à la main) — jamais un nom ni l'identifiant d'un joueur
  * (`RGPD_LOGS_AND_VISITS.md`).
  */
 export async function cleanStoredNames(db: Pool): Promise<void> {
-  for (const { table, column } of STORED_NAME_COLUMNS) {
-    await cleanNameColumn(db, table, column);
+  if (await cleanNamesAlreadyDone(db)) return;
+  let connection: PoolConnection;
+  try {
+    connection = await db.getConnection();
+  } catch (error) {
+    reportSchemaFailure(error, "connexion (nettoyage des noms)");
+    return;
+  }
+  let complete = true;
+  try {
+    // Attente de verrou courte, pour cette connexion seulement : une ligne
+    // verrouillée longtemps (transaction bloquée) ne retient pas la passe
+    // jusqu'au délai par défaut pendant que les autres processus attendent le
+    // verrou de migration.
+    await connection.execute(`SET SESSION innodb_lock_wait_timeout = ${CLEAN_NAMES_LOCK_WAIT_SECONDS}`);
+    for (const target of STORED_NAME_COLUMNS) {
+      // Une écriture en échec (verrou tenu : 5 s d'attente par ligne) arrête la passe : elle reprendra au démarrage suivant.
+      const done = await cleanNameColumn(connection, target);
+      if (done === "aborted") {
+        complete = false;
+        break;
+      }
+      complete = done && complete;
+    }
+  } catch (error) {
+    complete = false;
+    reportSchemaFailure(error, "SET SESSION innodb_lock_wait_timeout (nettoyage des noms)");
+  } finally {
+    // Délai rendu au pool ; une connexion qui ne répond plus est détruite, pas rendue avec son délai de 5 s.
+    const reset = await connection
+      .execute("SET SESSION innodb_lock_wait_timeout = DEFAULT")
+      .then(() => true)
+      .catch(() => false);
+    if (reset) connection.release();
+    else connection.destroy();
+  }
+  if (complete) await markCleanNamesDone(db);
+}
+
+/** Vrai quand la passe a déjà été menée à bout sur cette base. */
+async function cleanNamesAlreadyDone(db: Pool): Promise<boolean> {
+  try {
+    const [rows] = await db.execute<RowDataPacket[]>("SELECT 1 FROM bg_settings WHERE setting_key = ? LIMIT 1", [
+      CLEAN_STORED_NAMES_MARKER,
+    ]);
+    return rows.length > 0;
+  } catch {
+    // Lecture impossible : on rejoue, la passe est idempotente.
+    return false;
   }
 }
 
-/** Une colonne de `cleanStoredNames` : lue d'un trait, réécrite ligne à ligne. */
-async function cleanNameColumn(db: Pool, table: string, column: string): Promise<void> {
+async function markCleanNamesDone(db: Pool): Promise<void> {
+  try {
+    await db.execute(
+      "INSERT INTO bg_settings (setting_key, setting_value) VALUES (?, '1') ON DUPLICATE KEY UPDATE setting_value = '1'",
+      [CLEAN_STORED_NAMES_MARKER],
+    );
+  } catch (error) {
+    reportSchemaFailure(error, "INSERT bg_settings (marqueur du nettoyage des noms)");
+  }
+}
+
+type CleanTarget = (typeof STORED_NAME_COLUMNS)[number];
+
+/** Une colonne de `cleanStoredNames` : lue d'un trait, réécrite ligne à ligne. Vrai si menée à bout ; `"aborted"` si une écriture a échoué (la passe s'arrête). */
+async function cleanNameColumn(
+  db: PoolConnection,
+  { table, column, logIds }: CleanTarget,
+): Promise<boolean | "aborted"> {
   let rows: StoredNameRow[];
   try {
     [rows] = await db.execute<StoredNameRow[]>(`SELECT id, ${column} AS name FROM ${table}`);
   } catch (error) {
     reportSchemaFailure(error, `SELECT ${column} FROM ${table} (nettoyage des noms)`);
-    return;
+    return false;
   }
   let cleaned = 0;
-  let kept = 0;
+  let failed = false;
+  const keptIds: number[] = [];
   for (const row of rows) {
     const outcome = await rewriteName(db, table, column, row);
-    if (outcome === "kept") kept += 1;
-    else cleaned += outcome;
+    if (outcome === "kept") keptIds.push(row.id);
+    else if (outcome === "failed") {
+      failed = true;
+      break;
+    } else cleaned += outcome;
   }
-  if (cleaned > 0 || kept > 0) {
+  if (cleaned > 0 || keptIds.length > 0) {
+    const ids = logIds && keptIds.length > 0 ? ` (id : ${keptIds.join(", ")})` : "";
     console.log(
       `[migrations] ${table}.${column} : ${cleaned} nom(s) réécrit(s) sans caractère invisible, ` +
-        `${kept} laissé(s) tel(s) quel(s) (vide une fois nettoyé, ou refusé par la base).`,
+        `${keptIds.length} laissé(s) tel(s) quel(s) (vide une fois nettoyé, ou doublon)${ids}.`,
     );
   }
+  return failed ? "aborted" : true;
 }
 
-/** Lignes réécrites (0 si le nom est déjà propre ou a changé depuis), ou `"kept"`. */
-async function rewriteName(db: Pool, table: string, column: string, row: StoredNameRow): Promise<number | "kept"> {
+/** Lignes réécrites (0 si le nom est déjà propre ou a changé depuis), `"kept"` ou `"failed"`. */
+async function rewriteName(
+  db: PoolConnection,
+  table: string,
+  column: string,
+  row: StoredNameRow,
+): Promise<number | "kept" | "failed"> {
   if (typeof row.name !== "string") return 0;
-  const clean = withoutInvisibles(row.name);
+  const clean = withoutInvisiblesKeepingSpaces(row.name);
   if (clean === row.name) return 0;
   if (!clean) return "kept";
   try {
@@ -395,7 +488,9 @@ async function rewriteName(db: Pool, table: string, column: string, row: StoredN
       [clean, row.id, row.name],
     );
     return result.affectedRows;
-  } catch {
-    return "kept";
+  } catch (error) {
+    if (isDuplicateEntryError(error)) return "kept";
+    reportSchemaFailure(error, `UPDATE ${table}.${column} (nettoyage des noms)`);
+    return "failed";
   }
 }

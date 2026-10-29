@@ -544,8 +544,10 @@ export async function rankEntrantsBySiteRanking<T extends RankedEntrant>(
     .map((entrant) => ({ entrant, state: states.get(entrant.teamId) ?? baseRankedTeamState() }))
     .sort((a, b) =>
       compareRankedTeams(
-        { ...rankingKey(a.state), name: a.entrant.teamName },
-        { ...rankingKey(b.state), name: b.entrant.teamName },
+        // Départage sur le nom **affiché** (`withoutInvisibles`), comme
+        // `loadTeamRanking` : même ordre sur l'écran et au tirage.
+        { ...rankingKey(a.state), name: withoutInvisibles(a.entrant.teamName) },
+        { ...rankingKey(b.state), name: withoutInvisibles(b.entrant.teamName) },
       ),
     )
     .map(({ entrant }) => entrant);

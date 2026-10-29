@@ -7,7 +7,7 @@ import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { useToast } from "@/components/ui/toast";
 import { useTournamentViewText } from "@/components/i18n/tournament-page-text";
 import type { TournamentPageKey } from "@/lib/shared/tournament-page-text";
-import { visibleText } from "@/lib/shared/visible-text";
+import { useShownEntrantName } from "./EntrantName";
 import { useEntrantParticipantType } from "../_lib/entrant-link";
 import { enduranceCurrentRound, signedDelta } from "../_lib/endurance-ranking-views";
 import {
@@ -42,6 +42,11 @@ import { useEnduranceChartAnimate } from "../_lib/use-endurance-chart-animate";
 import { FR_VIEWS_TEXT } from "../_lib/views-text";
 import { EnduranceChartLines, type ChartHoverEntry, type ChartLineEntry } from "./EnduranceChartLines";
 import styles from "./EnduranceChart.module.css";
+
+/** Nom d'engagé nettoyé, avec le repli « Engagé #id » d'`EntrantName` (jamais vide ni retourné). */
+function ShownName({ teamId, name }: Readonly<{ teamId: number; name: string }>) {
+  return <>{useShownEntrantName(teamId, name)}</>;
+}
 
 const PLOT_RIGHT = CHART_W - CHART_PAD.right;
 const PLOT_BOTTOM = CHART_H - CHART_PAD.bottom;
@@ -197,7 +202,7 @@ const LegendRow = memo(function LegendRow({
           <span className="sr-only">{t("endurance.chartLegendRankLabel")} </span>
           {chartRankAt(item, shown, lastRound)}
         </span>
-        <span className={styles.legendName}>{visibleText(item.teamName)}</span>
+        <span className={styles.legendName}><ShownName teamId={item.teamId} name={item.teamName} /></span>
         <span className={styles.legendValue}>
           <span className="sr-only">{t("endurance.chartLegendPointsLabel")} </span>
           {chartValueAt(item, shown, lastRound)}
@@ -474,7 +479,7 @@ export function EnduranceChart({
         <tbody>
           {series.map((item) => (
             <tr key={item.teamId}>
-              <th scope="row">{visibleText(item.teamName)}</th>
+              <th scope="row"><ShownName teamId={item.teamId} name={item.teamName} /></th>
               <td>{endurance.startPoints}</td>
               {item.states.map((state, index) => (
                 <td key={index}>
@@ -596,7 +601,7 @@ export function EnduranceChart({
                     className={hoverEntry?.color ? styles.swatch : styles.swatchHover}
                     style={hoverEntry?.color ? { background: hoverEntry.color } : undefined}
                   />
-                  <strong className={styles.infoName}>{visibleText(hovered.teamName)}</strong>
+                  <strong className={styles.infoName}><ShownName teamId={hovered.teamId} name={hovered.teamName} /></strong>
                   <span className={styles.infoMeta}>
                     {t(hasDraws ? "endurance.chartInfoMetaDraws" : "endurance.chartInfoMeta", {
                       rank: chartRankAt(hovered, shown, lastRound),

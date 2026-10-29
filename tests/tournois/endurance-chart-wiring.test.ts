@@ -269,9 +269,10 @@ describe("couleurs, polices, accessibilité", () => {
 });
 
 describe("noms, lecture seule, stockage", () => {
-  it("les noms passent par visibleText, jamais en HTML", () => {
-    expect(CHART).toContain("visibleText(item.teamName)");
-    expect(CHART).toContain("visibleText(hovered.teamName)");
+  it("les noms passent par le nom nettoyé d'EntrantName, jamais en HTML", () => {
+    expect(CHART).toContain("<ShownName teamId={item.teamId} name={item.teamName} />");
+    expect(CHART).toContain("<ShownName teamId={hovered.teamId} name={hovered.teamName} />");
+    expect(CHART).toContain("useShownEntrantName(teamId, name)");
     expect(CHART).not.toContain("dangerouslySetInnerHTML");
   });
 

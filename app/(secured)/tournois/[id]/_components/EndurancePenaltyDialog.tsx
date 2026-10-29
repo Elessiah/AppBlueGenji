@@ -9,6 +9,7 @@ import {
 } from "@/lib/shared/endurance-penalty";
 import { useMapError } from "../_lib/error-map";
 import { useDialogsText } from "../_lib/dialogs-text";
+import { useShownEntrantName } from "./EntrantName";
 import { TournamentDialogFrame } from "./TournamentDialogFrame";
 
 interface EndurancePenaltyDialogProps {
@@ -36,12 +37,13 @@ interface EndurancePenaltyDialogProps {
 export function EndurancePenaltyDialog({
   tournamentId,
   teamId,
-  teamName,
+  teamName: rawTeamName,
   currentPoints,
   round,
   onClose,
   onApplied,
 }: Readonly<EndurancePenaltyDialogProps>) {
+  const teamName = useShownEntrantName(teamId, rawTeamName) ?? "";
   const { showError, showSuccess } = useToast();
   const mapError = useMapError();
   const { t } = useDialogsText();

@@ -6,6 +6,7 @@ import { getTeamEntityStats } from "@/lib/server/stats-service";
 import { getTeamRankingPosition } from "@/lib/server/ranking-service";
 import { visibleAvatarUrl } from "@/lib/shared/avatar";
 import { localUploadUrl } from "@/lib/shared/uploads";
+import { withoutInvisibles } from "@/lib/shared/visible-text";
 import type { TeamPageIdentity } from "@/lib/shared/entity-page-titles";
 import { getMemberRoles, userCanManageTeam } from "./access";
 
@@ -29,7 +30,7 @@ function mapMember(row: TeamMemberRow, viewerUserId: number | null): TeamMember 
   return {
     membershipId: Number(row.membership_id),
     userId,
-    pseudo: row.pseudo,
+    pseudo: withoutInvisibles(row.pseudo),
     avatarUrl: visibleAvatarUrl(
       row.avatar_url,
       row.visible_avatar === 1,
@@ -56,7 +57,7 @@ export async function getTeamPageIdentity(teamId: number): Promise<TeamPageIdent
     `SELECT name FROM bg_teams WHERE id = ? AND solo_user_id IS NULL LIMIT 1`,
     [teamId],
   );
-  return rows.length === 0 ? null : { name: rows[0].name };
+  return rows.length === 0 ? null : { name: withoutInvisibles(rows[0].name) };
 }
 
 /**
@@ -153,7 +154,8 @@ export async function getTeamDetail(
   return {
     team: {
       id: Number(teams[0].id),
-      name: teams[0].name,
+      // Un nom ancien laissé par `cleanStoredNames` peut garder des invisibles : lu sans.
+      name: withoutInvisibles(teams[0].name),
       tag: teams[0].tag,
       logoUrl: localUploadUrl(teams[0].logo_url),
       description: teams[0].description,

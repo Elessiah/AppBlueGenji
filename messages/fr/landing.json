@@ -9,7 +9,8 @@
     "joinDiscord": "Rejoindre le Discord",
     "watchLive": "Regarder le live",
     "viewTournament": "Voir le tournoi",
-    "teamPageTitle": "Voir la fiche de {name}"
+    "teamPageTitle": "Voir la fiche de {name}",
+    "teamPageTitleFallback": "Voir la fiche de l'équipe #{id}"
   },
   "hero": {
     "watchLiveLabel": "Regarder le live — {tournament} en direct (nouvel onglet)",
@@ -42,6 +43,7 @@
     "fallbackLabel": "Annonces, équipes, salons de jeu"
   },
   "live": {
+    "tournamentFallback": "Tournoi #{id}",
     "info": "INFO TOURNOI",
     "noneScheduled": "Aucun tournoi en cours, et rien n'est encore programmé.",
     "nextToday": "Aucun tournoi en cours. Le prochain démarre aujourd'hui.",
@@ -105,6 +107,7 @@
     "winnerLead": "VAINQUEUR · {name} ·",
     "unknownChampion": "Champion inconnu",
     "teamFallback": "Équipe #{id}",
+    "tournamentFallback": "Tournoi #{id}",
     "playerFallback": "Joueur",
     "news": "NEWS · {title}",
     "defaultResult": "RÉSULTAT · En attente de nouveaux matches",
