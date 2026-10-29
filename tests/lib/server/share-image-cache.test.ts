@@ -5,6 +5,7 @@ import {
   SHARE_IMAGE_POOL_LIMITS,
   cachedShareImage,
   clearShareImageCache,
+  invalidateRankingShareImages,
 } from "@/lib/server/share-image-cache";
 
 /** PNG des cartes d'aperçu gardés en mémoire : fenêtre, vol unique, plafond LRU. */
@@ -115,5 +116,58 @@ describe("cachedShareImage", () => {
     expect(builds.get("k0")).toHaveBeenCalledTimes(1);
     await cachedShareImage("k1", 60_000, build("k1"));
     expect(builds.get("k1")).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("invalidateRankingShareImages", () => {
+  it("invalidateRankingShareImages_cardFollowingRanking_rendersAgain", async () => {
+    const build = jest.fn(png("podium"));
+    await cachedShareImage("fr:podium", 60_000, build, "fixed", true);
+
+    invalidateRankingShareImages();
+    await cachedShareImage("fr:podium", 60_000, build, "fixed", true);
+
+    expect(build).toHaveBeenCalledTimes(2);
+  });
+
+  it("invalidateRankingShareImages_teamPoolCard_rendersAgain", async () => {
+    const build = jest.fn(png("team"));
+    await cachedShareImage("fr:team:4", 60_000, build, "team", true);
+
+    invalidateRankingShareImages();
+    await cachedShareImage("fr:team:4", 60_000, build, "team", true);
+
+    expect(build).toHaveBeenCalledTimes(2);
+  });
+
+  it("invalidateRankingShareImages_fixedCard_staysCached", async () => {
+    const build = jest.fn(png("regles"));
+    await cachedShareImage("fr:regles", 60_000, build);
+
+    invalidateRankingShareImages();
+    await cachedShareImage("fr:regles", 60_000, build);
+
+    expect(build).toHaveBeenCalledTimes(1);
+  });
+
+  it("cachedShareImage_invalidatedDuringRender_servesButDoesNotStore", async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const build = jest.fn(async () => {
+      await gate;
+      return png("ancien")();
+    });
+    const pending = cachedShareImage("fr:podium", 60_000, build, "fixed", true);
+    await Promise.resolve();
+
+    invalidateRankingShareImages();
+    release();
+    const served = await pending;
+    const next = await cachedShareImage("fr:podium", 60_000, jest.fn(png("neuf")), "fixed", true);
+
+    expect(Buffer.from(served!.body).toString("utf8")).toBe("ancien");
+    expect(Buffer.from(next!.body).toString("utf8")).toBe("neuf");
   });
 });

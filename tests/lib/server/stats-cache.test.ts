@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { cached, clearCache } from "@/lib/server/cache";
-import { STATS_TTL_MS, cachedStats, invalidateStats } from "@/lib/server/stats-cache";
+import { STATS_TTL_MS, cachedStats, invalidateStats, invalidateStatsOf } from "@/lib/server/stats-cache";
 
 /**
  * Le cache des statistiques existe pour qu'un F5 maintenu sur l'annuaire ou sur
@@ -87,5 +87,54 @@ describe("stats-cache", () => {
 
     await expect(cachedStats("team:5", loader)).rejects.toThrow("pool épuisé");
     await expect(cachedStats("team:5", loader)).resolves.toBe(4);
+  });
+});
+
+describe("invalidateStatsOf", () => {
+  beforeEach(() => {
+    clearCache();
+  });
+  afterEach(() => {
+    clearCache();
+  });
+
+  it("invalidateStatsOf_givenTeamAndPlayers_reloadsTheirSheets", async () => {
+    const loader = jest.fn(async () => 1);
+    await cachedStats("team:5", loader);
+    await cachedStats("player:12", loader);
+    await cachedStats("player:30", loader);
+
+    invalidateStatsOf([5], [12, 30]);
+    await cachedStats("team:5", loader);
+    await cachedStats("player:12", loader);
+    await cachedStats("player:30", loader);
+
+    expect(loader).toHaveBeenCalledTimes(6);
+  });
+
+  it("invalidateStatsOf_otherEntries_staysWarm", async () => {
+    const loader = jest.fn(async () => 1);
+    await cachedStats("team:6", loader);
+    await cachedStats("player:13", loader);
+    await cachedStats("player-records", loader);
+    await cachedStats("team-list-forms", loader);
+
+    invalidateStatsOf([5], [12]);
+    await cachedStats("team:6", loader);
+    await cachedStats("player:13", loader);
+    await cachedStats("player-records", loader);
+    await cachedStats("team-list-forms", loader);
+
+    expect(loader).toHaveBeenCalledTimes(4);
+  });
+
+  it("invalidateStatsOf_emptyLists_dropsNothing", async () => {
+    const loader = jest.fn(async () => 1);
+    await cachedStats("team:5", loader);
+
+    invalidateStatsOf([], []);
+    await cachedStats("team:5", loader);
+
+    expect(loader).toHaveBeenCalledTimes(1);
   });
 });

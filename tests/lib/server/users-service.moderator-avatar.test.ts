@@ -29,7 +29,7 @@ beforeEach(() => {
 describe("removeUserAvatarAsModerator", () => {
   it("vide la colonne, resynchronise l'entrée solo et rend l'avatar retiré", async () => {
     const { syncSoloEntryIdentityOn } = await import("@/lib/server/solo-entries-service");
-    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(undefined);
+    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(true);
     await install({ pseudo: "Nova", avatar_url: AVATAR, is_deleted: 0 });
 
     await expect(removeUserAvatarAsModerator(9)).resolves.toEqual({

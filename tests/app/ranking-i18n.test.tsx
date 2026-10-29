@@ -140,7 +140,7 @@ describe("métadonnées par langue", () => {
     const metadata = await generateMetadata();
     expect(metadata.title).toBe("Classement des équipes");
     expect(String(metadata.description)).toBe(
-      "Le classement des équipes BlueGenji Esport : cote de chaque équipe, podium, bilan et forme récente, en général ou par jeu (Overwatch, Marvel Rivals).",
+      "Le classement des équipes BlueGenji Esport : cote de chaque équipe classée, podium, bilan et forme récente, en général ou par jeu (Overwatch, Marvel Rivals).",
     );
     expect(metadata.alternates?.canonical).toBe("/classement");
     expect(metadata.alternates?.languages).toEqual({ fr: "/classement", en: "/en/classement", "x-default": "/classement" });

@@ -4,11 +4,13 @@ import {
   loadEntrantsBySiteRanking,
   loadRankingState,
   loadTeamRanking,
+  loadTeamRankingSnapshot,
   rankEntrantsBySiteRanking,
+  rankingPointsOf,
 } from "@/lib/server/ranking-service";
 import { clearCache } from "@/lib/server/cache";
-import { invalidateTeamRanking } from "@/lib/server/ranking-cache";
-import { RANKING_BASE_POINTS, ratingTransfer, replayRanking } from "@/lib/shared/ranking";
+import { invalidateTeamIdentityViews, invalidateTeamRanking } from "@/lib/server/ranking-cache";
+import { RANKING_BASE_POINTS, baseRankedTeamState, ratingTransfer, replayRanking } from "@/lib/shared/ranking";
 import { type SqlMock, fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
@@ -969,5 +971,81 @@ describe("rankEntrantsBySiteRanking", () => {
     );
 
     expect(ranked.map((row) => row.teamId)).toEqual(loaded.map((row) => row.teamId));
+  });
+});
+
+describe("loadTeamRankingSnapshot", () => {
+  const identityReads = (execute: jest.Mock<any>) =>
+    execute.mock.calls.filter(([sql]) => /SELECT id, name, logo_url\s+FROM bg_teams/.test(String(sql))).length;
+
+  it("loadTeamRankingSnapshot_sharedRead_returnsRowsAndTheirReplayedStates", async () => {
+    await mockDb(fakeDb([matchRow(1, 1, 2, 1)], [teamRow(1), teamRow(3)]));
+
+    const snapshot = await loadTeamRankingSnapshot();
+
+    expect(snapshot.rows.map((row) => row.teamId)).toEqual([1]);
+    expect(snapshot.states.get(1)!.points).toBe(snapshot.rows[0].points);
+    // L'équipe 2 a joué sans figurer aux identités : l'état la garde.
+    expect(snapshot.states.get(2)!.points).toBeLessThan(RANKING_BASE_POINTS);
+  });
+
+  it("loadTeamRankingSnapshot_twoSharedReads_queryIdentitiesOnce", async () => {
+    const execute = fakeDb([matchRow(1, 1, 2, 1)], [teamRow(1), teamRow(2)]);
+    await mockDb(execute);
+
+    await loadTeamRankingSnapshot();
+    await loadTeamRankingSnapshot();
+
+    expect(identityReads(execute)).toBe(1);
+  });
+
+  it("loadTeamRankingSnapshot_afterIdentityInvalidation_rereadsNewName", async () => {
+    const teams = [teamRow(1, "Ancien"), teamRow(2)];
+    const execute = fakeDb([matchRow(1, 1, 2, 1)], teams);
+    await mockDb(execute);
+    await loadTeamRankingSnapshot();
+
+    teams[0] = teamRow(1, "Nouveau");
+    invalidateTeamIdentityViews();
+    const snapshot = await loadTeamRankingSnapshot();
+
+    expect(snapshot.rows.find((row) => row.teamId === 1)!.teamName).toBe("Nouveau");
+    expect(identityReads(execute)).toBe(2);
+  });
+
+  it("loadTeamRankingSnapshot_onTransactionConnection_neverCachesIdentities", async () => {
+    const execute = fakeDb([matchRow(1, 1, 2, 1)], [teamRow(1), teamRow(2)]);
+    await mockDb(fakeDb([], []));
+    const connection = fakePool({ execute });
+
+    await loadTeamRankingSnapshot({ connection });
+    await loadTeamRankingSnapshot({ connection });
+
+    expect(identityReads(execute)).toBe(2);
+  });
+
+  it("getTeamRankingPosition_anyTeam_replaysOnce", async () => {
+    const execute = fakeDb([matchRow(1, 1, 2, 1)], [teamRow(1), teamRow(2)]);
+    await mockDb(execute);
+
+    await getTeamRankingPosition(2);
+
+    expect(execute.mock.calls.filter(([sql]) => String(sql).includes("AS played_at"))).toHaveLength(1);
+  });
+});
+
+describe("rankingPointsOf", () => {
+  const states = new Map([[2, { ...baseRankedTeamState(), points: 480 }]]);
+
+  it("rankingPointsOf_listedTeam_returnsRowPoints", () => {
+    expect(rankingPointsOf(states, 2, { points: 512 })).toBe(512);
+  });
+
+  it("rankingPointsOf_unlistedTeamWithState_returnsReplayedPoints", () => {
+    expect(rankingPointsOf(states, 2, undefined)).toBe(480);
+  });
+
+  it("rankingPointsOf_unknownTeam_returnsBasePoints", () => {
+    expect(rankingPointsOf(states, 9, undefined)).toBe(RANKING_BASE_POINTS);
   });
 });

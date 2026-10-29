@@ -8,7 +8,7 @@ import { fakeConnection, type SqlQuery } from "../../helpers/sql-double";
 
 describe("anonymisation d'un compte — détail map par map (MAP_SCORES.md)", () => {
   it("détache le compte des maps qu'il a saisies, le résultat restant", async () => {
-    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(undefined);
+    jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(true);
     const execute = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
 
     await anonymizeAccount(fakeConnection({ execute }), 42);

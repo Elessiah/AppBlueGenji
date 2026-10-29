@@ -181,9 +181,9 @@ describe("revue performance, quinzième passe", () => {
 describe("revue performance, vingt et unième passe", () => {
   it("annuaires : clé de recherche calculée une fois par liste, pas de copie redondante", () => {
     for (const path of ["app/(secured)/joueurs/PlayersList.tsx", "app/(secured)/equipes/TeamsList.tsx"]) {
-      const list = readSource(path);
+      const list = directorySource(path);
       expect(list).toContain("const [searchKeys] = useState(");
-      expect(list).toContain("if (q && !searchKeyOf(");
+      expect(list).toMatch(/if \((q|query) && !searchKeyOf\(/);
       expect(list).not.toContain("r = [...r];");
     }
   });
@@ -272,7 +272,7 @@ describe("revue performance, trentième passe", () => {
 
   it("annuaires : clés de recherche calculées à la demande", () => {
     for (const path of ["app/(secured)/joueurs/PlayersList.tsx", "app/(secured)/equipes/TeamsList.tsx"]) {
-      const list = readSource(path);
+      const list = directorySource(path);
       expect(list).toMatch(/const \[searchKeys\] = useState\(\(\) => new WeakMap</);
       expect(list).toContain("searchKeyOf(");
     }
@@ -284,6 +284,17 @@ describe("revue performance, trentième passe", () => {
     expect(install).toContain('if (link.hasAttribute("download") || !opensHere(link)) return;');
   });
 });
+
+/**
+ * Le tri et les filtres de l'annuaire des joueurs vivent dans une fonction pure
+ * (`lib/shared/player-directory.ts`, testée par comportement) : la source à
+ * contrôler est celle du composant **et** de ce module.
+ */
+function directorySource(path: string): string {
+  const list = readSource(path);
+  return path.includes("joueurs") ? `${list}
+${readSource("lib/shared/player-directory.ts")}` : list;
+}
 
 describe("revue performance, trente et unième passe", () => {
   it("annuaire des joueurs : la lecture ne repart pas sur un changement de texte", () => {
@@ -304,8 +315,8 @@ describe("revue performance, trente-deuxième passe", () => {
   it("annuaires : tri mémorisé à part, la recherche ne fait qu'un filtre", () => {
     for (const path of ["app/(secured)/joueurs/PlayersList.tsx", "app/(secured)/equipes/TeamsList.tsx"]) {
       const list = readSource(path);
-      expect(list).toContain("const sorted = useMemo(() => {");
-      expect(list).toContain("return sorted.filter(");
+      expect(list).toMatch(/const sorted = useMemo\(\s*\(\) => (\{|sortPlayers\()/);
+      expect(directorySource(path)).toContain("return sorted.filter(");
     }
   });
 

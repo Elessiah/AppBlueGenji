@@ -25,6 +25,7 @@ function team(id: number, rank: number | null, overrides: Partial<TeamListItem> 
     points: 600 - (rank ?? 100),
     wins: 6,
     losses: 3,
+    draws: 0,
     form: ["w", "l", "w"],
     games: ["OW"],
     rosterPreview: [],
@@ -102,10 +103,12 @@ describe("HighlightStrip — liens vers les fiches d'équipe", () => {
  * (`rank: null`) et ne monte jamais sur le podium de l'annuaire.
  */
 describe("HighlightStrip — équipes sans match", () => {
-  it("saute les équipes sans rang et garde les trois premières classées", () => {
+  // La liste arrive rangée (`compareDirectoryRank` : sans rang à la fin) : les
+  // trois premières suffisent, sans parcourir tout l'annuaire.
+  it("HighlightStrip_sortedListWithUnrankedTail_showsTheFirstThree", () => {
     const links = anchors(
       renderToStaticMarkup(
-        <HighlightStrip teams={[team(7, 1), team(40, null), team(3, 2), team(11, 3)]} />,
+        <HighlightStrip teams={[team(7, 1), team(3, 2), team(11, 3), team(40, null)]} />,
       ),
     );
     expect(links.map((link) => link.match(/href="([^"]+)"/)?.[1])).toEqual([
@@ -113,6 +116,10 @@ describe("HighlightStrip — équipes sans match", () => {
       "/equipes/3",
       "/equipes/11",
     ]);
+  });
+
+  it("HighlightStrip_fewerThanThreeTeams_rendersNothing", () => {
+    expect(renderToStaticMarkup(<HighlightStrip teams={[team(7, 1), team(3, 2)]} />)).toBe("");
   });
 
   it("ne rend rien s'il reste moins de trois équipes classées", () => {
@@ -130,5 +137,19 @@ describe("HighlightStrip — légende de la cote d'une équipe classée sur un n
       <HighlightStrip teams={[team(7, 1, { wins: 0, losses: 0, points: 500 }), team(3, 2), team(11, 3)]} />,
     );
     expect(markup).not.toContain("Aucun match joué");
+  });
+});
+
+describe("HighlightStrip — matchs nuls", () => {
+  it("HighlightStrip_teamWithDraws_showsDrawsInRecord", () => {
+    const markup = renderToStaticMarkup(
+      <HighlightStrip teams={[team(7, 1, { wins: 4, losses: 1, draws: 2 }), team(3, 2), team(11, 3)]} />,
+    );
+    expect(markup).toMatch(/4V – <span[^>]*>1D<\/span> – 2N/);
+  });
+
+  it("HighlightStrip_teamWithoutDraws_keepsTwoPartRecord", () => {
+    const markup = renderToStaticMarkup(<HighlightStrip teams={PODIUM} />);
+    expect(markup).not.toMatch(/– \d+N/);
   });
 });

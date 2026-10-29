@@ -11,6 +11,7 @@ import {
   invalidateLandingAggregates,
   invalidateLandingTeamViews,
   invalidateLandingLive,
+  invalidateLandingCounters,
 } from "@/lib/server/landing-cache";
 
 /**
@@ -162,5 +163,37 @@ describe("cache de la vitrine", () => {
     await cached("tournaments-list:all", LANDING_TTL_MS, voisin as () => Promise<string>);
 
     expect(voisin).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("invalidateLandingCounters", () => {
+  beforeEach(() => {
+    clearCache();
+  });
+  afterEach(() => {
+    clearCache();
+  });
+
+  it("invalidateLandingCounters_cachedStats_reloadsCounters", async () => {
+    const loader = jest.fn(async () => "compteurs");
+    await cachedLanding(LANDING_STATS_KEY, LANDING_TTL_MS, loader);
+
+    invalidateLandingCounters();
+    await cachedLanding(LANDING_STATS_KEY, LANDING_TTL_MS, loader);
+
+    expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  it("invalidateLandingCounters_cachedTickerAndMiniBracket_keepsThem", async () => {
+    // Une équipe jamais inscrite n'est ni au bandeau ni à un mini-arbre.
+    const loader = jest.fn(async () => "vue");
+    await cachedLanding(LANDING_TICKER_KEY, LANDING_TTL_MS, loader);
+    await cachedLanding(`${LANDING_MINI_BRACKET_KEY_PREFIX}4`, LANDING_TTL_MS, loader);
+
+    invalidateLandingCounters();
+    await cachedLanding(LANDING_TICKER_KEY, LANDING_TTL_MS, loader);
+    await cachedLanding(`${LANDING_MINI_BRACKET_KEY_PREFIX}4`, LANDING_TTL_MS, loader);
+
+    expect(loader).toHaveBeenCalledTimes(2);
   });
 });

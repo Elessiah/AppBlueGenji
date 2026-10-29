@@ -420,3 +420,14 @@ describe("légendes", () => {
     expect(RANKING_UNRANKED_HINT).toContain("Aucun match joué");
   });
 });
+
+describe("compareRankedTeams — départage par le nom", () => {
+  const tied = (name: string) => ({ points: 500, wins: 0, losses: 0, draws: 0, name });
+
+  it("compareRankedTeams_tiedTeams_ordersNamesLikeFrenchLocaleCompare", () => {
+    const names = ["zèbre", "Éclair", "eclair", "Alpha", "äther", "Bravo", "10 Lions", "2 Loups"];
+    const expected = [...names].sort((a, b) => a.localeCompare(b, "fr"));
+
+    expect(names.map(tied).sort(compareRankedTeams).map((team) => team.name)).toEqual(expected);
+  });
+});

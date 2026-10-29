@@ -8,17 +8,24 @@ jest.mock("@/lib/server/stored-upload-cleanup");
 jest.mock("@/lib/server/ranking-cache", () => ({
   cachedRanking: jest.fn(),
   invalidateRankingLists: jest.fn(),
+  invalidateTeamIdentityViews: jest.fn(),
   invalidateTeamRanking: jest.fn(),
 }));
 jest.mock("@/lib/server/landing-cache", () => ({
   invalidateLandingAggregates: jest.fn(),
+  invalidateLandingCounters: jest.fn(),
   invalidateLandingTeamViews: jest.fn(),
+}));
+jest.mock("@/lib/server/stats-cache", () => ({
+  invalidateStats: jest.fn(),
+  invalidateStatsOf: jest.fn(),
 }));
 
 import { getDatabase } from "@/lib/server/database";
 import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
-import { invalidateRankingLists, invalidateTeamRanking } from "@/lib/server/ranking-cache";
-import { invalidateLandingAggregates, invalidateLandingTeamViews } from "@/lib/server/landing-cache";
+import { invalidateTeamIdentityViews, invalidateTeamRanking } from "@/lib/server/ranking-cache";
+import { invalidateLandingAggregates, invalidateLandingCounters } from "@/lib/server/landing-cache";
+import { invalidateStats, invalidateStatsOf } from "@/lib/server/stats-cache";
 import { softDeleteTeam } from "@/lib/server/teams/dissolution";
 import { compareDirectoryRank, isRankedTeam } from "@/lib/shared/ranking";
 
@@ -86,7 +93,7 @@ describe("chaque consommateur lit la liste filtrée", () => {
     ["la carte nominative", "lib/server/share-team.ts"],
     ["les rangs de l'annuaire", "lib/server/teams/directory.ts"],
   ])("%s descend de loadTeamRanking", (_label, path) => {
-    expect(source(path)).toMatch(/loadTeamRanking\(/);
+    expect(source(path)).toMatch(/loadTeamRanking(Snapshot)?\(/);
   });
 
   it("la page /classement et l'API passent par la même entrée mutualisée (getLeaderboardRows)", () => {
@@ -103,6 +110,7 @@ describe("chaque consommateur lit la liste filtrée", () => {
 
 describe("softDeleteTeam — cache du classement et des marches", () => {
   let failing = false;
+  let registered = true;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -119,6 +127,7 @@ describe("softDeleteTeam — cache du classement et des marches", () => {
       }
       if (/SELECT roles_json/.test(sql)) return [[{ roles_json: JSON.stringify(["OWNER"]) }], []];
       if (/SELECT user_id FROM bg_team_members/.test(sql)) return [[{ user_id: 12 }, { user_id: 30 }], []];
+      if (/FROM bg_tournament_registrations/.test(sql)) return [registered ? [{ 1: 1 }] : [], []];
       if (failing && /SET deleted_at/.test(sql)) throw new Error("ER_LOCK_DEADLOCK");
       return [{ affectedRows: 1 }, []];
     });
@@ -135,28 +144,47 @@ describe("softDeleteTeam — cache du classement et des marches", () => {
     return connection;
   }
 
-  it("oublie les marches, l'aperçu et le leaderboard après le commit, sans relancer le rejeu", async () => {
+  it("softDeleteTeam_registeredTeam_dropsIdentityViewsAndStatsAfterCommit", async () => {
     failing = false;
+    registered = true;
     const connection = mockDb();
 
     await softDeleteTeam(1, 12);
 
-    expect(invalidateRankingLists).toHaveBeenCalledTimes(1);
-    expect(invalidateLandingTeamViews).toHaveBeenCalledTimes(1);
-    expect(jest.mocked(invalidateRankingLists).mock.invocationCallOrder[0])
+    expect(invalidateTeamIdentityViews).toHaveBeenCalledTimes(1);
+    expect(invalidateStats).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(invalidateTeamIdentityViews).mock.invocationCallOrder[0])
       .toBeGreaterThan(connection.commit.mock.invocationCallOrder[0]);
+    expect(invalidateLandingCounters).not.toHaveBeenCalled();
+    expect(invalidateStatsOf).not.toHaveBeenCalled();
     // La dissolution ne change aucun match : le rejeu et le reste de l'accueil
-    // (direct, ticker, compteurs) restent en cache.
+    // (direct, ticker) restent en cache.
     expect(invalidateTeamRanking).not.toHaveBeenCalled();
     expect(invalidateLandingAggregates).not.toHaveBeenCalled();
   });
 
-  it("n'invalide rien quand la dissolution échoue", async () => {
+  it("softDeleteTeam_neverRegisteredTeam_dropsOnlyCountersAndOwnStats", async () => {
+    failing = false;
+    registered = false;
+    mockDb();
+
+    await softDeleteTeam(1, 12);
+
+    expect(invalidateLandingCounters).toHaveBeenCalledTimes(1);
+    expect(invalidateStatsOf).toHaveBeenCalledWith([12], [12, 30]);
+    expect(invalidateTeamIdentityViews).not.toHaveBeenCalled();
+    expect(invalidateStats).not.toHaveBeenCalled();
+  });
+
+  it("softDeleteTeam_transactionFails_invalidatesNothing", async () => {
     failing = true;
+    registered = true;
     mockDb();
 
     await expect(softDeleteTeam(1, 12)).rejects.toThrow("ER_LOCK_DEADLOCK");
-    expect(invalidateRankingLists).not.toHaveBeenCalled();
-    expect(invalidateLandingTeamViews).not.toHaveBeenCalled();
+    expect(invalidateTeamIdentityViews).not.toHaveBeenCalled();
+    expect(invalidateStats).not.toHaveBeenCalled();
+    expect(invalidateLandingCounters).not.toHaveBeenCalled();
+    expect(invalidateStatsOf).not.toHaveBeenCalled();
   });
 });

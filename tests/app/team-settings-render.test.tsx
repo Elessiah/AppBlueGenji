@@ -10,6 +10,8 @@ jest.mock("next/navigation", () => ({
   usePathname: () => "/equipes/1",
 }));
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ToastProvider } from "@/components/ui/toast";
 import { TeamSettings } from "@/app/(secured)/equipes/[id]/_components/TeamSettings";
@@ -92,5 +94,18 @@ describe("TeamSettings — équipe avec un logo", () => {
   it("propose de changer et de retirer le logo", () => {
     expect(html).toContain("Changer le logo");
     expect(html).toContain("Retirer le logo");
+  });
+
+  // Retirer efface le fichier côté serveur : le bouton ouvre une confirmation,
+  // fermée tant qu'on ne l'a pas demandée.
+  it("TeamSettings_logoPresent_confirmationClosedUntilAsked", () => {
+    expect(html).not.toContain("Retirer le logo ?");
+    expect(html).not.toContain('role="alertdialog"');
+  });
+
+  it("TeamSettings_removeLogoButton_opensConfirmationInsteadOfDeleting", () => {
+    const source = readFileSync(join(process.cwd(), "app/(secured)/equipes/[id]/_components/TeamSettings.tsx"), "utf8");
+    expect(source).toContain("onClick={() => setRemoveLogoOpen(true)}");
+    expect(source).toMatch(/<ConfirmActionDialog\s+title=\{t\("settings\.removeLogoTitle"\)\}[\s\S]*?onConfirm=\{onLogoDelete\}/);
   });
 });

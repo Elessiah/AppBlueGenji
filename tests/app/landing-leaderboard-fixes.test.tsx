@@ -82,3 +82,32 @@ describe("Leaderboard — nom qui ne garde rien de visible", () => {
     expect(markup).not.toContain(">#12<");
   });
 });
+
+describe("Leaderboard — nuls et entrées", () => {
+  const render = (row: Partial<LandingLeaderboardRow>) =>
+    renderToStaticMarkup(
+      <ToastProvider>
+        <Leaderboard initialRows={[leaderboardRow(row)]} />
+      </ToastProvider>,
+    );
+
+  it("Leaderboard_rowWithDraws_showsShortAndSpokenDraws", () => {
+    const markup = render({ wins: 0, losses: 0, draws: 1 });
+    expect(markup).toContain('<span aria-hidden="true">1 N</span>');
+    expect(markup).toContain('<span class="sr-only">1 match nul</span>');
+  });
+
+  it("Leaderboard_rowWithSeveralDraws_pluralizesSpokenLabel", () => {
+    expect(render({ draws: 3 })).toContain('<span class="sr-only">3 matchs nuls</span>');
+  });
+
+  it("Leaderboard_rowWithoutDraws_showsNoDrawsSpan", () => {
+    expect(render({ draws: 0 })).not.toContain('class="draws"');
+  });
+
+  it("Leaderboard_newEntry_usesItsOwnTrendColour", () => {
+    const markup = render({ trend: "new" });
+    expect(markup).toContain("trendNew");
+    expect(markup).not.toContain("trendUp");
+  });
+});

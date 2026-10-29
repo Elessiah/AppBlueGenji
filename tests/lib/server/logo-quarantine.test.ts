@@ -12,6 +12,15 @@ jest.mock("@/lib/server/bot-integration");
 jest.mock("@/lib/server/staff-audit");
 jest.mock("@/lib/server/solo-entries-service");
 jest.mock("@/lib/server/avatar-rotation");
+// Vrais caches (le dernier bloc les lit), espionnés pour compter les appels.
+jest.mock("@/lib/server/ranking-cache", () => {
+  const actual = jest.requireActual<typeof import("@/lib/server/ranking-cache")>("@/lib/server/ranking-cache");
+  return { ...actual, invalidateTeamIdentityViews: jest.fn(actual.invalidateTeamIdentityViews) };
+});
+jest.mock("@/lib/server/landing-cache", () => {
+  const actual = jest.requireActual<typeof import("@/lib/server/landing-cache")>("@/lib/server/landing-cache");
+  return { ...actual, invalidateLandingTeamViews: jest.fn(actual.invalidateLandingTeamViews) };
+});
 jest.mock("@/lib/server/site-url", () => ({ siteCanonicalBase: () => "https://site.test" }));
 
 import { copyFile, rename, unlink } from "node:fs/promises";
@@ -20,6 +29,8 @@ import { pushDiscordDirectMessages } from "@/lib/server/bot-integration";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
 import { rotateHiddenAvatarFile } from "@/lib/server/avatar-rotation";
+import { invalidateTeamIdentityViews } from "@/lib/server/ranking-cache";
+import { invalidateLandingTeamViews } from "@/lib/server/landing-cache";
 import {
   avatarFileLocations,
   avatarQuarantineDirectory,
@@ -76,7 +87,7 @@ function install(poolRoutes: Route[], connectionRoutes: Route[] = []) {
 beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(pushDiscordDirectMessages).mockResolvedValue(null);
-  jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(undefined);
+  jest.mocked(syncSoloEntryIdentityOn).mockResolvedValue(true);
 });
 
 describe("logoFileLocations", () => {
@@ -160,6 +171,8 @@ describe("deleteTeamLogoForReport", () => {
     expect(message).toContain("https://site.test/signalements/12");
     expect(recipients).toHaveLength(1);
     expect(publishStaffAction).toHaveBeenCalledWith(expect.stringContaining("sans délai"), { id: 1, pseudo: "Admin" });
+    // Logo lu par le podium, les cartes d'aperçu et la vitrine : tous oubliés.
+    expect(invalidateTeamIdentityViews).toHaveBeenCalledTimes(1);
   });
 
   it("garde le fichier que d'autres équipes désignent encore", async () => {
@@ -214,6 +227,9 @@ describe("deleteUserAvatarForReport", () => {
     await flush();
 
     expect(connection.commit).toHaveBeenCalled();
+    // L'avatar est le logo de l'entrée solo, que nomment les vues de la vitrine.
+    expect(invalidateLandingTeamViews).toHaveBeenCalledTimes(1);
+    expect(invalidateTeamIdentityViews).not.toHaveBeenCalled();
     expect(syncSoloEntryIdentityOn).toHaveBeenCalledWith(expect.anything(), 9);
     const insert = connection.execute.mock.calls.find(([sql]) => /INSERT INTO bg_logo_quarantines/.test(sql));
     const [userId, reportId, avatarUrl, hiddenBy, hiddenAt, purgeAfter] = insert?.[1] as unknown[];
@@ -334,6 +350,7 @@ describe("hideTeamLogo", () => {
 
     expect(rename).toHaveBeenCalledWith(LIVE, HIDDEN);
     expect(connection.commit).toHaveBeenCalled();
+    expect(invalidateTeamIdentityViews).toHaveBeenCalledTimes(1);
     expect(view).toEqual(
       expect.objectContaining({ id: 30, targetType: "TEAM", targetId: 4, targetName: "Alpha", reportId: 12, status: "HIDDEN" }),
     );
@@ -556,6 +573,7 @@ describe("restoreReportedImage", () => {
     expect(rename).toHaveBeenCalledWith(HIDDEN, LIVE);
     expect(connection.execute).toHaveBeenCalledWith(expect.stringMatching(/UPDATE bg_teams SET logo_url = \?/), [LOGO, 4]);
     expect(connection.commit).toHaveBeenCalled();
+    expect(invalidateTeamIdentityViews).toHaveBeenCalledTimes(1);
     expect(jest.mocked(pushDiscordDirectMessages).mock.calls[0][2]).toBe("logo-restored");
   });
 
@@ -577,6 +595,8 @@ describe("restoreReportedImage", () => {
     // Masqué pendant la quarantaine, il ne doit pas revenir à son adresse publique.
     expect(rotateHiddenAvatarFile).toHaveBeenCalledWith(9);
     expect(connection.commit).toHaveBeenCalled();
+    expect(invalidateLandingTeamViews).toHaveBeenCalledTimes(1);
+    expect(invalidateTeamIdentityViews).not.toHaveBeenCalled();
     const [, recipients, context] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
     expect(context).toBe("avatar-restored");
     expect(recipients).toHaveLength(1);

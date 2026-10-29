@@ -114,12 +114,13 @@ describe("updateTeamLogo — dérogation staff", () => {
       .fn<SqlQuery>()
       .mockResolvedValueOnce(NOT_A_MEMBER) // getMemberRoles
       .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]])
+      .mockResolvedValueOnce([[{ logo_url: null }]]) // logo précédent, sous verrou
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
     await mockDb(execute);
 
     await updateTeamLogo(99, 3, "/api/uploads/teams/x.webp", true);
 
-    const [sql, params] = execute.mock.calls[2] as [string, unknown[]];
+    const [sql, params] = execute.mock.calls[3] as [string, unknown[]];
     expect(sql).toMatch(/UPDATE bg_teams SET logo_url = \?/);
     expect(params).toEqual(["/api/uploads/teams/x.webp", 3]);
   });

@@ -139,6 +139,7 @@ function listTeam(overrides: Partial<TeamListItem> = {}): TeamListItem {
     points: 1180,
     wins: 9,
     losses: 2,
+    draws: 0,
     form: ["w", "l", "d"],
     games: ["OW", "MR"],
     rosterPreview: [{ userId: 2, pseudo: "Nova", avatarUrl: null }],
