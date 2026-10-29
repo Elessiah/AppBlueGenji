@@ -46,7 +46,8 @@ rendu.
   `shownEntrantName` (`lib/shared/visible-text.ts`), règle partagée avec le
   direct et le bandeau. Cache de 15 s sous le préfixe `landing:` : vidé à
   chaque écriture de tournoi, à une dissolution, à un renommage ou un
-  changement de logo d'équipe et à une suppression de compte
+  changement de logo d'équipe, à un changement de pseudo (nom d'une entrée
+  solo, `users/profile-update.ts`) et à une suppression de compte
   (`invalidateLandingTeamViews`).
 - **Horloge** — une seule lecture de `Date.now()` par rendu de la section, pour
   que deux cartes ne se contredisent pas sur une échéance.
