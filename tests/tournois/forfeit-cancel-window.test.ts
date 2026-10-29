@@ -48,6 +48,39 @@ describe("loadCancellableForfeitIds", () => {
   });
 });
 
+describe("loadCancellableForfeitIds — options", () => {
+  const forfeits = [
+    { teamId: 2, status: "FORFEIT", forfeitRound: 3 },
+    { teamId: 3, status: "FORFEIT", forfeitRound: 2 },
+  ];
+
+  it("fenêtre fermée (open: false) : [] d'emblée, sans requête", async () => {
+    const { execute, conn } = connection(3);
+    expect(await loadCancellableForfeitIds(conn, 7, 0, forfeits, { open: false })).toEqual([]);
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("open: true se comporte comme l'absence d'option", async () => {
+    const { execute, conn } = connection(3);
+    expect(await loadCancellableForfeitIds(conn, 7, 0, forfeits, { open: true })).toEqual([2]);
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("borne déjà lue (lastInputRound) : aucune requête, même règle", async () => {
+    const { execute, conn } = connection(99);
+    expect(await loadCancellableForfeitIds(conn, 7, 0, forfeits, { lastInputRound: 3 })).toEqual([2]);
+    expect(await loadCancellableForfeitIds(conn, 7, 0, forfeits, { lastInputRound: 0 })).toEqual([2, 3]);
+    expect(await loadCancellableForfeitIds(conn, 7, 0, forfeits, { lastInputRound: 4 })).toEqual([]);
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("une borne de 0 n'est pas confondue avec « absente » : la requête est épargnée", async () => {
+    const { execute, conn } = connection(5);
+    expect(await loadCancellableForfeitIds(conn, 7, 0, forfeits, { lastInputRound: 0 })).toEqual([2, 3]);
+    expect(execute).not.toHaveBeenCalled();
+  });
+});
+
 describe("mapParticipantError — refus d'annulation d'un abandon", () => {
   const EN = tournamentErrorsText("en", messagesFor("en").tournamentErrors);
 
@@ -55,6 +88,13 @@ describe("mapParticipantError — refus d'annulation d'un abandon", () => {
     expect(mapParticipantError("FORFEIT_ROUND_PASSED", "SOLO")).toContain("remettre le joueur en lice");
     expect(mapParticipantError("TEAM_NOT_FORFEITED", "SOLO")).toBe("Ce joueur n'a pas abandonné : il n'y a rien à annuler.");
     expect(mapParticipantError("TEAM_NOT_FORFEITED", "SOLO", EN)).toBe("This player hasn't withdrawn: there is nothing to cancel.");
+  });
+
+  it("tutoie, comme le reste de l'interface : « Reviens d'abord en arrière »", () => {
+    for (const type of ["TEAM", "SOLO"] as const) {
+      expect(mapParticipantError("FORFEIT_ROUND_PASSED", type)).toContain("Reviens d'abord en arrière.");
+      expect(mapParticipantError("FORFEIT_ROUND_PASSED", type)).not.toContain("Revenez");
+    }
   });
 
   it("garde la phrase d'équipe dans un tournoi par équipes", () => {

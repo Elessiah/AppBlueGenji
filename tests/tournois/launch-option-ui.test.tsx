@@ -79,7 +79,7 @@ describe("modale d'horaire — ce que la date produit", () => {
     expect(frDialogs.schedule.hintDirect).toMatch(/lancé tout de suite, sans retour possible/);
     expect(enDialogs.schedule.hintDirect).toMatch(/launched right away, with no going back/);
     // Adversaire encore inconnu : rien ne part tout de suite.
-    expect(startAtHint(FR, false, false, false, false)).toMatch(/^Sans jour ni mois = aucun horaire : le match sera lancé dès que ses deux adversaires seront connus/);
+    expect(startAtHint(FR, false, false, false, false)).toMatch(/^Sans jour = aucun horaire : le match sera lancé dès que ses deux adversaires seront connus/);
     expect(enDialogs.schedule.hintDirectTbd).toMatch(/as soon as both its opponents are known/);
   });
 

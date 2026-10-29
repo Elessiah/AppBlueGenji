@@ -81,7 +81,7 @@ describe("scoreCorrectionNeedsConfirmation", () => {
 
 describe("Correction d'un résultat — câblage", () => {
   it("aucune écriture n'échappe à la règle : toute saisie passe par run (Enregistrer, désactivé sur un match tranché, compris)", () => {
-    expect(SCORE).toMatch(/onClick=\{\(\) => \{\s*if \(!form\.submitting\) void run\("save"\);\s*\}\}/);
+    expect(SCORE).toMatch(/onClick=\{\(\) => \{\s*if \(!form\.submitting && !saveBlocked\) void run\("save"\);\s*\}\}/);
     expect(SCORE).toMatch(/void run\("resolve"\)/);
     expect(SCORE.match(/form\.submit\(/g)).toHaveLength(1);
     const run = /const run = async[\s\S]*?\n {2}\};/.exec(SCORE)?.[0] ?? "";
@@ -117,18 +117,20 @@ describe("AdminScoreDialog — focus gardé pendant l'envoi", () => {
   const actions = SCORE.slice(SCORE.indexOf("className={styles.actions}"), SCORE.indexOf("</form>"));
 
   it("ne désactive jamais nativement un bouton d'action sur `form.submitting`", () => {
-    // Un `disabled` natif ne joue que hors envoi (`!form.submitting && …`).
-    expect(actions).not.toMatch(/(?<!aria-)disabled=\{(?!!form\.submitting && )[^}]*form\.submitting/);
-    expect(actions.match(/(?<!aria-)disabled=\{!form\.submitting && /g)).toHaveLength(2);
-    expect(actions.match(/aria-disabled=\{form\.submitting \|\| undefined\}/g)).toHaveLength(3);
+    // Aucun `disabled` natif sur un bouton d'action : un refus suivi d'un
+    // rafraîchissement (`PROPOSAL_STALE`) ne doit pas faire tomber le focus.
+    expect(actions).not.toMatch(/(?<!aria-)disabled=\{/);
+    expect(actions.match(/aria-disabled=\{form\.submitting \|\| undefined\}/g)).toHaveLength(1);
+    expect(actions).toContain("aria-disabled={form.submitting || saveBlocked || undefined}");
+    expect(actions).toContain("aria-disabled={form.submitting || resolveBlocked || undefined}");
     expect(actions.match(/aria-busy=\{form\.submitting \|\| undefined\}/g)).toHaveLength(2);
   });
 
   it("ignore Fermer et Enregistrer pressés pendant l'envoi", () => {
     expect(actions).toContain("if (!form.submitting) onClose();");
-    expect(actions).toContain('if (!form.submitting) void run("save");');
+    expect(actions).toContain('if (!form.submitting && !saveBlocked) void run("save");');
     // « Valider le résultat » passe par le formulaire, qui garde déjà l'envoi.
-    expect(SCORE).toMatch(/!form\.submitting && !awaitingDetail\) void run\("resolve"\)/);
+    expect(SCORE).toMatch(/!resolveBlocked && !form\.submitting\) void run\("resolve"\)/);
   });
 
   it("garde le libellé des boutons pendant l'envoi : un nom réduit à « … » ne dit rien", () => {

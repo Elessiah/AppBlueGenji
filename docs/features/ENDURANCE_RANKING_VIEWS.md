@@ -30,8 +30,10 @@ Dans l'ordre (`EnduranceView`) :
    encore posés sont projetés, petite finale comprise) — jamais « 0 sur 4 » aux
    quarts puis « 4 sur 6 » aux demies, une barre qui reculerait.
    Tournoi fini : pas de bandeau.
-3. **Vues du classement** (`EnduranceRankingViews`), puis la légende « Hors
-   course », puis le journal des sanctions.
+3. **Vues du classement** (`EnduranceRankingViews`) — la légende « Hors
+   course » (`outLegend`) et celle des gestes (« 🔒 Figé ») sont rendues dans le
+   panneau « Général », en un même pied, avant la navigation du bas —, puis le
+   journal des sanctions.
 4. **Volet « Évolution de l'endurance »** (`EnduranceChartPanel`), replié.
 5. Aperçu de la manche suivante (arbitrage), play-offs (s'ils sont lancés),
    volets de manche (`ENDURANCE_ROUND_PANELS.md`).

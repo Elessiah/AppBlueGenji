@@ -411,9 +411,14 @@ export function AdminScoreDialog({
   // déclenche **pas** depuis un champ de map, que `MapScoreList` retient —
   // corriger un code puis valider d'un même geste trancherait le match sans
   // relecture. Valider reste un clic (ou `Entrée` sur le bouton lui-même).
+  // Boutons jamais `disabled` natifs : un refus suivi d'un rafraîchissement
+  // (`PROPOSAL_STALE`) peut changer l'état sous le bouton focalisé, et le focus
+  // tomberait sur <body> dans la modale. `aria-disabled` + gardes ici.
+  const saveBlocked = (!form.decision.canSave && !form.mapsRefused.save) || awaitingDetail;
+  const resolveBlocked = (!form.decision.canResolve && !form.mapsRefused.resolve) || awaitingDetail;
   const onSubmitForm = (event: FormEvent) => {
     event.preventDefault();
-    if ((form.decision.canResolve || form.mapsRefused.resolve) && !form.submitting && !awaitingDetail) void run("resolve");
+    if (!resolveBlocked && !form.submitting) void run("resolve");
   };
 
   const toggleForfeit = (teamId: number | null) => {
@@ -692,12 +697,9 @@ export function AdminScoreDialog({
               type="button"
               className="btn ghost"
               onClick={() => {
-                if (!form.submitting) void run("save");
+                if (!form.submitting && !saveBlocked) void run("save");
               }}
-              // Jamais `disabled` natif pendant l'envoi : un résultat reçu par le
-              // flux pourrait désactiver le bouton focalisé et faire tomber le focus.
-              disabled={!form.submitting && ((!form.decision.canSave && !form.mapsRefused.save) || awaitingDetail)}
-              aria-disabled={form.submitting || undefined}
+              aria-disabled={form.submitting || saveBlocked || undefined}
               aria-busy={form.submitting || undefined}
               title={buttonTitle(form.mapsRefused.save, form.decision.saveBlocker, t("score.admin.saveTitle"))}
             >
@@ -707,8 +709,7 @@ export function AdminScoreDialog({
             <button
               type="submit"
               className="btn"
-              disabled={!form.submitting && ((!form.decision.canResolve && !form.mapsRefused.resolve) || awaitingDetail)}
-              aria-disabled={form.submitting || undefined}
+              aria-disabled={form.submitting || resolveBlocked || undefined}
               aria-busy={form.submitting || undefined}
               title={buttonTitle(form.mapsRefused.resolve, form.decision.resolveBlocker, t("score.admin.resolveTitle"))}
             >

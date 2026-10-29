@@ -2,7 +2,7 @@
 
 import { useToast } from "@/components/ui/toast";
 import type { TournamentDialogsText } from "@/lib/shared/tournament-actions-text";
-import { FormEvent, ReactNode, useState } from "react";
+import { FormEvent, ReactNode, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { CodedError, MATCH_SCHEDULE_FIELD_ERRORS, errorCode } from "@/lib/shared/field-errors";
@@ -22,7 +22,9 @@ import {
   matchStartEntryOf,
   readMatchStartEntry,
   nextValidYearShift,
+  isUnreadConfirmationClick,
   pastStartWarning,
+  shouldHoldSubmit,
   withYearShift,
   type MatchStartEntryField,
   type MatchStartEntryState,
@@ -33,6 +35,7 @@ import type { BracketMatch } from "@/lib/shared/types";
 import { InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { useMapError } from "../_lib/error-map";
 import { useDialogsText } from "../_lib/dialogs-text";
+import { richNodes } from "@/components/i18n/shell-text";
 import { EntrantName } from "./EntrantName";
 
 const FIELD_IDS = {
@@ -265,6 +268,9 @@ export function MatchScheduleDialog({
   // l'aperçu juste — le cas courant — n'a pas à les montrer.
   const [yearFixOpen, setYearFixOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Le dernier envoi a été retenu (date devenue passée) : le clic suivant, s'il
+  // prolonge un double-clic, ne le confirme pas (`isUnreadConfirmationClick`).
+  const justHeld = useRef(false);
   // `locked` pendant l'envoi : Échap ne doit pas refermer une modale en train
   // d'écrire.
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy });
@@ -297,7 +303,9 @@ export function MatchScheduleDialog({
   // de refuser l'effacement — le calendrier ne dépend pas de la diffusion.
   // Une saisie seulement incomplète n'est pas un effacement : on n'avertit pas
   // encore, l'utilisateur est en train de taper.
-  const clearsLiveTrigger = cleared && requiresMatchStartAt(match.liveTrigger);
+  // Un match qui n'a pas de date n'a rien à effacer : le mois présélectionné
+  // tenu pour vide ne doit pas faire paraître l'avertissement dès l'ouverture.
+  const clearsLiveTrigger = cleared && match.startAt !== null && requiresMatchStartAt(match.liveTrigger);
   // Une date déjà passée qui ferait partir un match en attente de son heure :
   // on le dit avant l'envoi (le mois présélectionné rend l'erreur facile).
   const entrantsKnown = match.team1Id !== null && match.team2Id !== null;
@@ -349,7 +357,8 @@ export function MatchScheduleDialog({
     // Défilement vers l'avertissement puis vers « Enregistrer », juste dessous :
     // l'avertissement qui grandit repousse le bouton, qui garde le focus.
     const now = Date.now();
-    if (pastWarning === null && pastWarningAt(now) !== null) {
+    if (shouldHoldSubmit(pastWarning !== null, pastWarningAt(now) !== null)) {
+      justHeld.current = true;
       setClock(now);
       requestAnimationFrame(() => {
         document.getElementById(PAST_WARNING_ID)?.scrollIntoView({ block: "nearest" });
@@ -358,6 +367,7 @@ export function MatchScheduleDialog({
       return;
     }
 
+    justHeld.current = false;
     setBusy(true);
     try {
       const response = await fetch(`/api/admin/matches/${match.id}/schedule`, {
@@ -423,9 +433,16 @@ export function MatchScheduleDialog({
             {planning ? t("schedule.titlePlanning") : t("schedule.title")}
           </h3>
           <p style={{ marginTop: 6, fontSize: 13, color: "var(--ink-quiet, #9aa4b2)" }}>
-            <EntrantName teamId={match.team1Id} name={match.team1Name ?? t("schedule.tbd")} />{" "}
-            {t("schedule.versus")}{" "}
-            <EntrantName teamId={match.team2Id} name={match.team2Name ?? t("schedule.tbd")} />
+            {richNodes(
+              text.rich(
+                "schedule.versus",
+                { team1: match.team1Name ?? t("schedule.tbd"), team2: match.team2Name ?? t("schedule.tbd") },
+                {
+                  first: (chunks) => <EntrantName teamId={match.team1Id} name={chunks.join("")} />,
+                  second: (chunks) => <EntrantName teamId={match.team2Id} name={chunks.join("")} />,
+                },
+              ),
+            )}
           </p>
 
           {/* L'aide est rattachée au premier champ (lue une fois, et non à
@@ -630,17 +647,19 @@ export function MatchScheduleDialog({
             >
               {t("score.cancel")}
             </button>
-            {/* Le second clic d'un double-clic (`detail`, au réglage du système)
-                et la répétition d'« Entrée » tenue n'envoient pas : après un
-                envoi retenu (date devenue passée), ils confirmeraient sans
-                laisser lire l'avertissement. Même garde sur « Vider la date »
+            {/* Le clic qui prolonge un double-clic (`detail`, au réglage du
+                système) juste après un envoi retenu (date devenue passée), et
+                la répétition d'« Entrée » tenue, n'envoient pas : ils
+                confirmeraient sans laisser lire l'avertissement. Le clic
+                suivant part (`isUnreadConfirmationClick`). Même garde sur « Vider la date »
                 et « Annuler » : l'avertissement qui apparaît repousse la
                 rangée, et le second clic tombait sur eux (date perdue). */}
             <button
               id={SUBMIT_ID}
               type="submit"
               onClick={(event) => {
-                if (event.detail > 1) event.preventDefault();
+                if (isUnreadConfirmationClick(event.detail, justHeld.current)) event.preventDefault();
+                justHeld.current = false;
               }}
               onKeyDown={(event) => {
                 if (event.repeat && event.key === "Enter") event.preventDefault();

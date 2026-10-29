@@ -761,6 +761,7 @@ export async function loadSurvivalMeta(
       status: row.status,
       forfeitRound: row.eliminated_round === null ? null : Number(row.eliminated_round),
     })),
+    { open: tournament.state === "RUNNING" },
   );
 
   return {

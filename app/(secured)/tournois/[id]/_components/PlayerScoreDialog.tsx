@@ -471,6 +471,8 @@ export function PlayerScoreDialog({
 
   const onSubmitForm = (event: FormEvent) => {
     event.preventDefault();
+    // Le bouton n'est jamais `disabled` natif (`aria-disabled`) : la garde est ici.
+    if (nothingEntered || unchangedMine) return;
     void submitScore();
   };
 
@@ -675,10 +677,11 @@ export function PlayerScoreDialog({
               <button
                 type="submit"
                 className="btn"
-                // Jamais `disabled` natif pendant l'envoi : le report reçu par le
-                // flux pourrait désactiver le bouton focalisé et faire tomber le focus.
-                disabled={!submitting && (nothingEntered || unchangedMine)}
-                aria-disabled={submitting || undefined}
+                // Jamais `disabled` natif : un refus suivi d'un rafraîchissement
+                // (proposition périmée) ou le report reçu par le flux pourrait
+                // désactiver le bouton focalisé et faire tomber le focus sur
+                // <body>. Les gardes sont dans `onSubmitForm`.
+                aria-disabled={submitting || nothingEntered || unchangedMine || undefined}
                 // Un avertissement monté déjà rempli n'est pas toujours annoncé :
                 // rattaché au bouton, il se lit au moment d'envoyer.
                 aria-describedby={opensDispute ? "player-score-counter-warning" : undefined}

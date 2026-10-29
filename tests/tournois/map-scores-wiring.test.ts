@@ -117,7 +117,9 @@ describe("détail map par map — arbitrage et relecture", () => {
       hook.indexOf("const blocker = action === \"save\" ? decision.saveBlocker : decision.resolveBlocker;"),
     );
     const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");
-    expect(dialog).toContain("disabled={!form.submitting && ((!form.decision.canResolve && !form.mapsRefused.resolve) || awaitingDetail)}");
+    expect(dialog).toContain("const resolveBlocked = (!form.decision.canResolve && !form.mapsRefused.resolve) || awaitingDetail;");
+    // Jamais `disabled` natif : `aria-disabled` + garde du gestionnaire.
+    expect(dialog).toContain("aria-disabled={form.submitting || resolveBlocked || undefined}");
   });
 
   it("la relecture du détail adverse se retente tant qu'il manque, au plus trois fois", () => {
@@ -213,8 +215,10 @@ describe("détail map par map — arbitrage pendant la lecture du détail propos
   it("les boutons de score attendent le détail de la proposition, pour ne pas en effacer les codes", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/AdminScoreDialog.tsx");
     expect(dialog).toMatch(/const awaitingDetail =\s*proposalsNeedRefresh\(liveMatch, proposals\) &&\s*!form\.maps\.some\(isMapTouched\)/);
-    expect(dialog).toContain("disabled={!form.submitting && ((!form.decision.canSave && !form.mapsRefused.save) || awaitingDetail)}");
-    expect(dialog).toContain("!form.submitting && !awaitingDetail) void run(\"resolve\");");
+    expect(dialog).toContain("const saveBlocked = (!form.decision.canSave && !form.mapsRefused.save) || awaitingDetail;");
+    expect(dialog).toContain("aria-disabled={form.submitting || saveBlocked || undefined}");
+    expect(dialog).toContain("if (!form.submitting && !saveBlocked) void run(\"save\");");
+    expect(dialog).toContain("if (!resolveBlocked && !form.submitting) void run(\"resolve\");");
     expect(dialog).toContain('if (input.awaitingDetail) return text.t("score.admin.awaitingDetail");');
   });
 
@@ -449,7 +453,8 @@ describe("détail map par map — formulaire vierge", () => {
   it("la ligne vierge d'ouverture n'est pas une proposition : bouton fermé, rien d'« envoyé »", () => {
     const dialog = readSource("app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx");
     expect(dialog).toContain("const nothingEntered = !maps.some(isMapTouched);");
-    expect(dialog).toContain("disabled={!submitting && (nothingEntered || unchangedMine)}");
+    expect(dialog).toContain("aria-disabled={submitting || nothingEntered || unchangedMine || undefined}");
+    expect(dialog).toContain("if (nothingEntered || unchangedMine) return;");
     // Pendant l'envoi : `aria-disabled` + `aria-busy`, le focus reste sur le bouton.
     expect(dialog).toContain("aria-busy={submitting || undefined}");
     expect(dialog).not.toContain("disabled={maps.length === 0 ||");

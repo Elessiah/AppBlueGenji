@@ -93,14 +93,24 @@ pas l'ambre, réservé aux avertissements) n'apparaît que :
 - en BG Survie, avant les play-offs.
 
 **Hors fenêtre** (une manche postérieure à l'abandon porte une saisie), la
-ligne montre un verrou 🔒 « Figé » à la place du bouton, son motif lu avec la
-ligne (texte masqué) ; à l'œil, il vit derrière le « i » d'une légende sous le
-classement (`FrozenForfeitLegend`, une fois pour toutes les lignes — un `title`
-ne s'affichait ni au toucher ni au clavier, un « i » par ligne déformait les
-cellules étroites) : la fenêtre est calculée au serveur par
-`loadCancellableForfeitIds` (`lib/server/tournaments/forfeit-window.ts`, même
-borne que `FORFEIT_ROUND_PASSED`) et publiée dans
-`cancellableForfeitTeamIds` des métas suisse, survie et BG Survie.
+ligne montre un verrou 🔒 « Figé » à la place du bouton, suivi d'une **forme
+courte** lue avec la ligne (texte masqué, `forfeitCancel.frozenShort` :
+« (manche jouée depuis) ») ; le motif complet vit derrière le « i » d'une
+légende sous le classement (`FrozenForfeitLegend`, une fois pour toutes les
+lignes — un `title` ne s'affichait ni au toucher ni au clavier, un « i » par
+ligne déformait les cellules étroites, et le motif entier relu à chaque ligne
+allongeait la lecture au lecteur d'écran). Le journal des sanctions de BG
+Survie fait de même pour une sanction figée (`penaltyLift.frozenShort`, légende
+`endurance-penalty-frozen`). La présence d'une ligne figée se teste par un
+prédicat léger (`isFrozen` / `isFrozenRow`, partagé avec le geste de la ligne),
+sans reformater les textes de chaque ligne à chaque rendu. La fenêtre est
+calculée au serveur par `loadCancellableForfeitIds`
+(`lib/server/tournaments/forfeit-window.ts`, même borne que
+`FORFEIT_ROUND_PASSED`) et publiée dans `cancellableForfeitTeamIds` des métas
+suisse, survie et BG Survie ; hors `RUNNING` (et, en BG Survie, une fois les
+play-offs lancés) elle rend `[]` sans requête — l'interface n'y propose aucune
+annulation —, et en BG Survie la borne déjà lue pour les pénalités
+(`lastRoundWithScoreInput`) est réutilisée : une seule lecture.
 
 Il ouvre une `ConfirmActionDialog` au ton primaire, dont la confirmation
 « Effacer l'abandon » se distingue du « Annuler » qui ferme ; le succès et
@@ -110,7 +120,13 @@ annulation sont rendus par un même `<button>` (`ForfeitRowAction`) : après le
 geste, le focus revient sur le nouveau bouton de la ligne, ou sur la ligne
 (`data-row-focus`) si elle n'en porte plus. `focusRowAfterChange` veille
 `FOCUS_WATCH_MS` (3 s) : le rendu groupé du flux peut déplacer la ligne après
-la fin de `refresh()`, et la veille s'arrête dès que le lecteur va ailleurs.
+la fin de `refresh()`, et la veille s'arrête dès que le lecteur va ailleurs ou
+agit (`pointerdown`, `keydown` : un clic sur du texte juste après l'abandon ne
+lui reprend pas le focus). Hors régime `FULL` (`useClientPower()`), elle se
+vérifie toutes les `FOCUS_WATCH_RELAXED_MS` (250 ms) plutôt qu'à chaque trame.
+La ligne n'est focalisable par script (`tabindex="-1"`) qu'au moment où le focus
+lui est rendu, puis ce réglage est retiré au départ du focus : un clic ou un
+toucher sur le texte d'une ligne n'y pose jamais le focus.
 La confirmation ne promet l'appariement qu'avec sa réserve (« sauf si les
 matchs qu'elle a joués l'éliminent ») : le rejeu peut sortir l'engagé aussitôt.
 

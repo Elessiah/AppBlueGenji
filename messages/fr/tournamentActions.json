@@ -182,7 +182,8 @@
     "buttonTitle": "Annuler l'abandon : le classement de {name} est recalculé",
     "buttonAria": "Annuler l'abandon de {name}",
     "frozen": "Figé",
-    "frozenTitle": "Une manche a été jouée depuis l'abandon : il ne s'annule plus."
+    "frozenTitle": "Une manche a été jouée depuis l'abandon : il ne s'annule plus.",
+    "frozenShort": "(manche jouée depuis)"
   },
   "penaltyLift": {
     "success": "Pénalité retirée : {name} récupère {points} point(s).",
@@ -192,6 +193,7 @@
     "pending": "Retrait…",
     "frozen": "Figée",
     "frozenTitle": "Une manche a été jouée depuis : rendre ces points remettrait en lice une équipe qui ne l'a pas disputée.",
+    "frozenShort": "(manche jouée depuis)",
     "buttonTitle": "Retirer cette pénalité : {name} récupère {points} point(s)",
     "buttonAria": "Retirer la pénalité de {points} point(s) infligée à {name}",
     "button": "Retirer"

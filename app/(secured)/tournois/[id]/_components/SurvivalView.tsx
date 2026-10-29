@@ -87,6 +87,10 @@ export function SurvivalView({
   const { t: a } = useActionsText();
   const participantType = useEntrantParticipantType();
   const cancellableIds = new Set(survival.cancellableForfeitTeamIds);
+  const isCancellable = (team: SurvivalStandingRow) =>
+    !isFinished && team.status === "FORFEIT" && canCancelForfeit && onCancelForfeit !== undefined;
+  // Ligne figée : l'annulation serait proposée, mais une manche a été jouée depuis.
+  const isFrozen = (team: SurvivalStandingRow) => isCancellable(team) && !cancellableIds.has(team.teamId);
   // Un seul geste par ligne, rendu par un même `<button>` (`ForfeitRowAction`).
   const rowAction = (team: SurvivalStandingRow, isMine: boolean): ForfeitRowActionProps | null => {
     // Abandon : proposé sur les équipes encore en lice, à leurs représentants
@@ -106,9 +110,9 @@ export function SurvivalView({
         onClick: () => onForfeit(team.teamId, team.teamName),
       };
     }
-    if (isFinished || team.status !== "FORFEIT" || !canCancelForfeit || onCancelForfeit === undefined) return null;
-    if (!cancellableIds.has(team.teamId)) {
-      return { kind: "locked", teamId: team.teamId, label: a("forfeitCancel.frozen"), title: a("forfeitCancel.frozenTitle") };
+    if (!isCancellable(team) || onCancelForfeit === undefined) return null;
+    if (isFrozen(team)) {
+      return { kind: "locked", teamId: team.teamId, label: a("forfeitCancel.frozen"), note: a("forfeitCancel.frozenShort") };
     }
     return {
       kind: "button",
@@ -216,7 +220,6 @@ export function SurvivalView({
                   key={team.teamId}
                   className={styles.survivalRow}
                   data-row-focus={team.teamId}
-                  tabIndex={-1}
                   data-podium-muted={team.status === "ACTIVE" ? undefined : ""}
                   style={{
                     padding: "7px 10px",
@@ -271,7 +274,7 @@ export function SurvivalView({
               );
             })}
           </div>
-          {survival.standings.some((team) => rowAction(team, false)?.kind === "locked") && (
+          {survival.standings.some(isFrozen) && (
             <FrozenForfeitLegend
               id="survival-forfeit-frozen"
               label={a("forfeitCancel.frozen")}
