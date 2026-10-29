@@ -59,10 +59,10 @@ parcours seuls) ne classent pas. C'est `isRankedTeam` (`lib/shared/ranking.ts`),
 
 | Vue | Effet |
 |---|---|
-| `/classement` (tous onglets) et `GET /api/landing/leaderboard` (`loadLeaderboardRows`) | lignes, rangs, podium, écarts et tendance sans elles |
+| `/classement` (tous onglets) et `GET /api/landing/leaderboard` (`getLeaderboardRows`) | lignes, rangs, podium, écarts et tendance sans elles |
 | Marches du podium (`loadPodiumTiers`, `PODIUM_TIERS.md`) | une équipe sans match ne monte jamais |
 | Carte d'aperçu du podium (`loadSharePodium`) et carte nominative (`findShareTeam`) | absentes ; une équipe sans match a la carte de la page |
-| Tendance sur 7 jours (`loadLeaderboardRows`) | une équipe absente de la photo d'il y a une semaine (entrée depuis) a la tendance `new` : « ★ », « Entrée au classement ces 7 derniers jours » / « Entered the ranking in the last 7 days » — jamais « stable » |
+| Tendance sur 7 jours (`getLeaderboardRows`) | une équipe absente de la photo d'il y a une semaine (entrée depuis) a la tendance `new` : « ★ », « Entrée au classement ces 7 derniers jours » / « Entered the ranking in the last 7 days » — jamais « stable » |
 | Annuaire `/equipes` (`listTeams`) | l'équipe **reste** à l'annuaire, à sa cote rejouée (500, ou sa cote de placement), mais **sans badge de rang** (`rank: null`), rangée après les classées par nom (`compareDirectoryRank`) ; le podium de l'annuaire (`HighlightStrip`) ne prend que des classées |
 | Fiche d'équipe (`getTeamRankingPosition`) | « Aucun match joué », hors du total « #n sur N » |
 
@@ -77,11 +77,12 @@ match compté — le cache du classement est vidé à chaque score.
 ou non (`deleted_at IS NULL`) : comportement inchangé. La dissolution vide
 désormais les entrées tirées de la liste — marches, podium et fiches de la
 carte d'aperçu (`invalidateRankingLists`, sous-préfixe `ranking:list:`) — et
-les leaderboards et le bandeau de l'accueil (`invalidateLandingTeamViews`,
-qui nomment des équipes), pour que la dissoute quitte podium et rangs, et son
-ancien nom le bandeau, sans attendre l'échéance de 60 s. Le rejeu
-(`ranking:state:*`), les compteurs et le direct (5 s) restent en cache : une
-dissolution ne change aucun match (revue de performance du lot). **Entrées solo** : toujours hors liste. **Équipes
+les leaderboards, le bandeau, le mini-arbre et les compteurs de l'accueil
+(`invalidateLandingTeamViews`, qui nomment ou comptent des équipes), pour que la
+dissoute quitte podium, rangs et « Équipes actives », et son ancien nom le
+bandeau et le mini-arbre, sans attendre l'échéance du cache. Le rejeu
+(`ranking:state:*`) et le direct (5 s) restent en cache : une dissolution ne
+change aucun match (revue de performance du lot). **Entrées solo** : toujours hors liste. **Équipes
 fantômes** : listées si elles ont joué, masquées sinon, comme les autres.
 
 **États vides.** Si le filtre ne laisse rien, la page lit « Aucune équipe
@@ -133,7 +134,7 @@ tranchent, comme sur la page.
   rendue côté serveur, partageable et lisible sans JavaScript. Toute autre
   valeur rend le général (`parseRankingFilter`). Un onglet par jeu ne garde
   que les équipes qui ont joué ce jeu (même règle que le leaderboard,
-  `loadLeaderboardRows`).
+  `getLeaderboardRows`).
 - **Podium** (dès trois lignes) : `<ol aria-label="Podium">`, ordre visuel
   2-1-3 en bureau (CSS `order`), 1-2-3 en mobile. Chaque marche : numéro,
   sigle/logo, nom (`TeamLink`), cote, bilan, et l'écart à la tête
@@ -171,8 +172,13 @@ tranchent, comme sur la page.
 - **Rangs absolus, coût de lecture.** Le rang dépend de l'ordre complet
   (rejeu de toute l'histoire des matchs puis tri `compareRankedTeams`, avec
   départage par nom fait en JavaScript) : il ne peut pas se couper en SQL.
-  `loadLeaderboardRows(game)` rejoue (sous `ranking-cache`) et trie donc
-  toutes les équipes ; la page en tire « il en reste » et la présence d'un
+  `getLeaderboardRows(game)` rejoue (sous `ranking-cache`) et trie donc
+  toutes les équipes, **mutualisé** avec le leaderboard de l'accueil (entrée
+  `landing:leaderboard:<jeu>`) : la page, rendue à chaque visite, ne refait plus
+  ses deux rejeux à chaque rendu. L'entrée est vidée à chaque score avec le
+  classement du site (`invalidateTeamRanking`), à chaque écriture de tournoi et
+  à une dissolution — la page reste à jour ; une erreur n'est jamais mise en
+  cache ; la page en tire « il en reste » et la présence d'un
   nul (colonne « N » stable d'une page à l'autre, `anyDraws`), puis ne rend
   que les `n` premières : le rendu et le poids de la page sont bornés, et le
   rang reste celui du classement complet.
@@ -265,7 +271,7 @@ les deux langues.
 | Styles | `app/classement/page.module.css` |
 | Textes (FR/EN) | `messages/<langue>/ranking.json`, `lib/shared/ranking-text.ts` |
 | Logique pure (filtre, `?n=`, écarts) | `lib/shared/ranking-page.ts` |
-| Lignes (cote, bilan, tendance) | `loadLeaderboardRows` (`lib/server/landing-service.ts`) |
+| Lignes (cote, bilan, tendance) | `getLeaderboardRows` (`lib/server/landing-service.ts`) |
 | Forme | `loadCachedTeamForms` (`lib/server/teams/directory.ts`) |
 | Ordre | `compareRankedTeams` (`lib/shared/ranking.ts`) |
 
