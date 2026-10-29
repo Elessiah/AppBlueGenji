@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { setUserRoles } from "@/lib/server/users/roles";
+import { rolesChangeAuditLine, setOwnPlatformRoles, setUserRoles } from "@/lib/server/users/roles";
 import {
   registerSessionStream,
   registeredStreamCount,
@@ -167,5 +167,92 @@ describe("setUserRoles — open tournament streams", () => {
     await expect(setUserRoles(7, [])).rejects.toThrow("USER_NOT_FOUND");
 
     expect(close).not.toHaveBeenCalled();
+  });
+});
+
+describe("setOwnPlatformRoles (ADMIN-SELF-ROLES)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetSessionStreams();
+  });
+  afterEach(() => {
+    resetSessionStreams();
+  });
+
+  it("setOwnPlatformRoles_adminKeptWithScopedRoles_writesOnlyScopedJsonUnderIsAdminGuard", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([{ affectedRows: 1 }]);
+    await mockDb(execute);
+
+    const result = await setOwnPlatformRoles(1, ["ADMIN", "ARBITRE"]);
+
+    expect(result).toEqual(["ADMIN", "ARBITRE"]);
+    const [sql, params] = execute.mock.calls[0] as [string, unknown[]];
+    expect(sql).toMatch(/UPDATE bg_users SET platform_roles_json = \? WHERE id = \? AND is_deleted = 0 AND is_admin = 1/);
+    expect(sql).not.toMatch(/SET is_admin/);
+    expect(params).toEqual([JSON.stringify(["ARBITRE"]), 1]);
+  });
+
+  it("setOwnPlatformRoles_selectionWithoutAdmin_throwsCannotRemoveOwnAdminWithoutQuery", async () => {
+    const execute = jest.fn<SqlQuery>();
+    await mockDb(execute);
+
+    await expect(setOwnPlatformRoles(1, ["ARBITRE"])).rejects.toThrow("CANNOT_REMOVE_OWN_ADMIN");
+
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("setOwnPlatformRoles_demotedConcurrently_throwsNotAdminAndKeepsStreams", async () => {
+    // Un autre administrateur a retiré `is_admin` entre la lecture de la
+    // session et l'écriture : la condition ne trouve plus la ligne.
+    await mockDb(jest.fn<SqlQuery>().mockResolvedValueOnce([{ affectedRows: 0 }]));
+    const close = jest.fn();
+    registerSessionStream(1, "hash-a", close);
+
+    await expect(setOwnPlatformRoles(1, ["ADMIN", "CASTER"])).rejects.toThrow("NOT_ADMIN");
+
+    expect(close).not.toHaveBeenCalled();
+  });
+
+  it("setOwnPlatformRoles_duplicatesAndUnknownValues_normalizesBeforeWrite", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([{ affectedRows: 1 }]);
+    await mockDb(execute);
+
+    // @ts-expect-error — testing sanitization of untyped input
+    const result = await setOwnPlatformRoles(1, ["RECRUTEUR", "ADMIN", "RECRUTEUR", "NOPE"]);
+
+    expect(result).toEqual(["ADMIN", "RECRUTEUR"]);
+    const [, params] = execute.mock.calls[0] as [string, unknown[]];
+    expect(params).toEqual([JSON.stringify(["RECRUTEUR"]), 1]);
+  });
+
+  it("setOwnPlatformRoles_success_closesOwnStreamsOnly", async () => {
+    await mockDb(jest.fn<SqlQuery>().mockResolvedValueOnce([{ affectedRows: 1 }]));
+    const own = jest.fn();
+    const other = jest.fn();
+    registerSessionStream(1, "hash-a", own);
+    registerSessionStream(2, "hash-b", other);
+
+    await setOwnPlatformRoles(1, ["ADMIN"]);
+
+    expect(own).toHaveBeenCalledTimes(1);
+    expect(other).not.toHaveBeenCalled();
+  });
+});
+
+describe("rolesChangeAuditLine", () => {
+  it("rolesChangeAuditLine_otherAccount_namesTargetIdAndSavedRoles", () => {
+    expect(rolesChangeAuditLine(7, ["ARBITRE", "RECRUTEUR"], false)).toBe(
+      "🛡️ Rôles de plateforme du compte #7 enregistrés : Arbitre, Recruteur.",
+    );
+  });
+
+  it("rolesChangeAuditLine_ownAccount_saysOwnAccount", () => {
+    expect(rolesChangeAuditLine(1, ["ADMIN", "CASTER"], true)).toBe(
+      "🛡️ Rôles de plateforme de son propre compte (#1) enregistrés : Administrateur, Caster.",
+    );
+  });
+
+  it("rolesChangeAuditLine_noRoles_saysAucun", () => {
+    expect(rolesChangeAuditLine(7, [], false)).toBe("🛡️ Rôles de plateforme du compte #7 enregistrés : aucun.");
   });
 });

@@ -57,17 +57,17 @@ describe("Registre des sections", () => {
 
 describe("visibleProfileSections", () => {
   it("cache les invitations quand il n'y en a aucune", () => {
-    const ids = visibleProfileSections({ invitations: 0 }).map((s) => s.id);
+    const ids = visibleProfileSections({ invitations: 0, adminRoles: 0 }).map((s) => s.id);
     expect(ids).not.toContain("invitations");
   });
 
   it("les montre dès la première", () => {
-    const ids = visibleProfileSections({ invitations: 1 }).map((s) => s.id);
+    const ids = visibleProfileSections({ invitations: 1, adminRoles: 0 }).map((s) => s.id);
     expect(ids).toContain("invitations");
   });
 
   it("ne filtre que les sections qui déclarent un `requires`", () => {
-    const hidden = visibleProfileSections({ invitations: 0 }).map((s) => s.id);
+    const hidden = visibleProfileSections({ invitations: 0, adminRoles: 0 }).map((s) => s.id);
     for (const section of SECTIONS) {
       if (section.requires === undefined) expect(hidden).toContain(section.id);
     }
@@ -78,26 +78,43 @@ describe("visibleProfileSections", () => {
     // cela, le filtre retomberait sur un `id !== "invitations"` en dur qu'une
     // deuxième section conditionnelle porterait sans effet.
     const conditional = SECTIONS.filter((s) => s.requires !== undefined);
-    expect(conditional.length).toBeGreaterThan(0);
-    for (const section of conditional) {
-      expect(section.requires).toBe("invitations");
-    }
+    expect(conditional.map((s) => [s.id, s.requires])).toEqual([
+      ["invitations", "invitations"],
+      ["roles", "adminRoles"],
+    ]);
+  });
+
+  // ADMIN-SELF-ROLES : « Mes rôles » n'existe que pour un administrateur.
+  it("profileSections_adminRolesZero_hidesRolesSection", () => {
+    const ids = visibleProfileSections({ invitations: 0, adminRoles: 0 }).map((s) => s.id);
+    expect(ids).not.toContain("roles");
+  });
+
+  it("profileSections_adminRolesOne_showsRolesBeforeStatistics", () => {
+    const ids = visibleProfileSections({ invitations: 0, adminRoles: 1 }).map((s) => s.id);
+    expect(ids).toContain("roles");
+    expect(ids.indexOf("roles")).toBe(ids.indexOf("statistiques") - 1);
+  });
+
+  it("profileSections_adminRolesOnly_doesNotRevealInvitations", () => {
+    const ids = visibleProfileSections({ invitations: 0, adminRoles: 1 }).map((s) => s.id);
+    expect(ids).not.toContain("invitations");
   });
 
   it("ne touche à rien d'autre", () => {
-    const withInvites = visibleProfileSections({ invitations: 2 });
+    const withInvites = visibleProfileSections({ invitations: 2, adminRoles: 1 });
     expect(withInvites).toHaveLength(PROFILE_SECTIONS.length);
   });
 
   it("garde l'ordre du registre", () => {
-    const ids = visibleProfileSections({ invitations: 3 }).map((s) => s.id);
+    const ids = visibleProfileSections({ invitations: 3, adminRoles: 1 }).map((s) => s.id);
     expect(ids).toEqual(PROFILE_SECTIONS.map((s) => s.id));
   });
 });
 
 describe("La page descend du registre", () => {
   it("bâtit sa navigation depuis les sections visibles", () => {
-    expect(page).toContain("visibleProfileSections({ invitations: invitations.length })");
+    expect(page).toContain("visibleProfileSections({ invitations: invitations.length, adminRoles: Number(data.isAdmin) })");
     expect(page).toContain('href={`#${entry.id}`}');
   });
 
@@ -170,7 +187,7 @@ describe("PROFILE_SECTION_BY_ID", () => {
     // La recherche par ancre est totale : la liste filtrée rendrait `undefined`
     // ici, et `<ProfileSection>` planterait sur `section.id`.
     expect(PROFILE_SECTION_BY_ID.invitations).toBeDefined();
-    expect(visibleProfileSections({ invitations: 0 }).map((s) => s.id)).not.toContain(
+    expect(visibleProfileSections({ invitations: 0, adminRoles: 0 }).map((s) => s.id)).not.toContain(
       "invitations",
     );
   });
