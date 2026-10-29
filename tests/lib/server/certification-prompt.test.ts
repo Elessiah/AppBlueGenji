@@ -500,21 +500,40 @@ describe("mémoire courte des invitations", () => {
     expect(load).toHaveBeenCalledTimes(1);
   });
 
-  it("une lecture en cours oubliée n'est pas retenue : la suivante relit (EF-04, EF-23)", async () => {
+  it("cachedCertificationPrompt_inFlightReadForgotten_rereadsAfterTheGesture (EF-04, EF-23)", async () => {
     forgetCertificationPrompts();
     clock = 0;
-    let finish!: (value: typeof PROMPT) => void;
-    const reading = cachedCertificationPrompt("7:42:1:1", () => new Promise((resolve) => (finish = resolve)), now);
+    let finishFirst!: (value: typeof PROMPT | null) => void;
+    const load = jest
+      .fn<() => Promise<typeof PROMPT | null>>()
+      .mockImplementationOnce(() => new Promise((resolve) => (finishFirst = resolve)))
+      .mockResolvedValueOnce(null);
+    const reading = cachedCertificationPrompt("7:42:1:1", load, now);
     forgetCertificationPromptsOf(7);
-    finish(PROMPT);
-    // L'appelant qui l'attendait ne reçoit pas l'issue d'avant le geste
-    // (certification, « Ne plus voir ») : `null`, comme une invitation retirée…
+    finishFirst(PROMPT);
+    // L'issue d'avant le geste (certification, « Ne plus voir ») n'est pas
+    // servie : l'appelant reçoit celle d'une relecture partie après lui.
     expect(await reading).toBeNull();
-    // …et elle n'est pas gardée.
-    expect(peekCertificationPrompt("7:42:1:1", now)).toBeUndefined();
-    const load = jest.fn(async () => null);
-    expect(await cachedCertificationPrompt("7:42:1:1", load, now)).toBeNull();
-    expect(load).toHaveBeenCalledTimes(1);
+    expect(load).toHaveBeenCalledTimes(2);
+    // La relecture, elle, est retenue.
+    expect(peekCertificationPrompt("7:42:1:1", now)).toEqual({ prompt: null });
+  });
+
+  it("cachedCertificationPrompt_teamReadForgotten_servesTheNowDueInvitation (EF-23)", async () => {
+    // Le seul contact certifié de l'équipe part pendant la lecture d'un
+    // coéquipier : l'invitation devient due — « rien » la tairait.
+    forgetCertificationPrompts();
+    clock = 0;
+    let finishFirst!: (value: typeof PROMPT | null) => void;
+    const load = jest
+      .fn<() => Promise<typeof PROMPT | null>>()
+      .mockImplementationOnce(() => new Promise((resolve) => (finishFirst = resolve)))
+      .mockResolvedValueOnce(PROMPT);
+    const final = finalCertificationPrompt("8:42:1:1", load, now);
+    forgetCertificationPromptsOfTeam(42);
+    finishFirst(null);
+
+    expect(await final).toEqual(PROMPT);
   });
 
   it("issue finale : la réponse tardive d'une lecture abandonnée, inconnue (`undefined`) si elle échoue ou pend trop (EF-04, EF-23)", async () => {
@@ -552,7 +571,7 @@ describe("mémoire courte des invitations", () => {
     }
   });
 
-  it("finalCertificationPrompt_lateReadForgotten_returnsNull (EF-23)", async () => {
+  it("finalCertificationPrompt_lateReadForgotten_unknownOutcome (EF-23)", async () => {
     forgetCertificationPrompts();
     jest.useFakeTimers();
     try {
@@ -562,8 +581,9 @@ describe("mémoire courte des invitations", () => {
       await jest.advanceTimersByTimeAsync(CERTIFICATION_PROMPT_READ_TIMEOUT_MS);
       forgetCertificationPromptsOf(24);
       finish(PROMPT);
-      // Oubliée (certifiée entre-temps) : l'issue connue est « plus d'invitation ».
-      expect(await final).toBeNull();
+      // Oubliée (certifiée entre-temps) : sa réponse date d'avant le geste —
+      // issue inconnue, rien à pousser (`null` dirait « retrait décidé »).
+      expect(await final).toBeUndefined();
     } finally {
       jest.clearAllTimers();
       jest.useRealTimers();

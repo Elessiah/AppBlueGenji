@@ -66,6 +66,7 @@ type Row = {
   blizzard_sub: string | null;
   discord_pseudo: string | null;
   overwatch_battletag: string | null;
+  overwatch_battletag_typed?: number;
 };
 
 type Statement = { sql: string; params: unknown[] };
@@ -218,6 +219,21 @@ describe("listAccountConnections", () => {
       { provider: "DISCORD", linked: true, handle: "nova", method: "DM_CODE" },
       { provider: "BLIZZARD", linked: true, handle: "Nova#2143", method: null },
     ]);
+  });
+
+  it("listAccountConnections_typedTagUnderBattleNet_showsNoBattleNetHandle (D3)", async () => {
+    // Battle.net n'a donné aucun BattleTag : celui tapé à la main ne se
+    // présente pas comme l'identité Battle.net rattachée.
+    fakeDb({ ...emptyRow, blizzard_sub: "bz-1", overwatch_battletag: "Tape#1111", overwatch_battletag_typed: 1 });
+
+    const connections = await listAccountConnections(7);
+
+    expect(connections.find(({ provider }) => provider === "BLIZZARD")).toEqual({
+      provider: "BLIZZARD",
+      linked: true,
+      handle: null,
+      method: null,
+    });
   });
 
   it("refuse un compte introuvable", async () => {

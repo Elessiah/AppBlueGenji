@@ -19,6 +19,11 @@ import {
 import { getDatabase } from "@/lib/server/database";
 import { getUserIdByPseudo } from "@/lib/server/users/roles";
 import { type SqlMock, fakePool } from "../../helpers/sql-double";
+import {
+  cachedCertificationPrompt,
+  forgetCertificationPrompts,
+  peekCertificationPrompt,
+} from "@/lib/server/tournaments/certification-prompt-cache";
 
 /**
  * Circuit des invitations : les rôles choisis voyagent jusqu'à l'arrivée du
@@ -318,6 +323,20 @@ describe("arrivée du joueur — les rôles de l'invitation sont posés", () => 
     await respondToInvitation(42, inv.id, true);
 
     expect(other.status).toBe("CANCELLED");
+  });
+
+  it("respondToInvitation_accepted_forgetsTheTeamsCertificationPrompts (EF-23)", async () => {
+    // « Équipe sans contact » change pour tous à l'arrivée d'un joueur certifié.
+    forgetCertificationPrompts();
+    await cachedCertificationPrompt("1:7:1:1", async () => null);
+    await cachedCertificationPrompt("5:8:1:1", async () => null);
+    const inv = invite({ team_id: 7 });
+
+    await respondToInvitation(42, inv.id, true);
+
+    expect(peekCertificationPrompt("1:7:1:1")).toBeUndefined();
+    expect(peekCertificationPrompt("5:8:1:1")).toEqual({ prompt: null });
+    forgetCertificationPrompts();
   });
 
   it("décliner n'écrit aucune appartenance", async () => {
