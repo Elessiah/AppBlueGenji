@@ -8,12 +8,13 @@ import { FR_VIEWS_TEXT } from "../_lib/views-text";
 import { useEntrantParticipantType } from "../_lib/entrant-link";
 import {
   enduranceCurrentRound,
-  endurancePlayoffMatchTotal,
+  enduranceLastClosedRound,
+  endurancePlayoffProgress,
+  hasScheduledPendingMatch,
   nextScheduledMatch,
   pendingEntrantCount,
 } from "../_lib/endurance-ranking-views";
 import { PLAYOFF_ROUND_OFFSET } from "../_lib/endurance-sections";
-import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import { EntrantName } from "./EntrantName";
 import styles from "./EnduranceCard.module.css";
 
@@ -38,17 +39,22 @@ export function EnduranceCard({
   const activeCount = endurance.standings.filter((s) => s.status === "ACTIVE").length;
   const current = endurance.playoffsStarted || isFinished ? null : enduranceCurrentRound(matches);
   // `null` avant le montage : l'heure du serveur n'est pas celle du lecteur.
-  const now = useClock(NEXT_MATCH_CLOCK_MS, current !== null);
+  // L'horloge ne tourne que si un match non joué de la manche porte une date :
+  // sans date, « Prochain match » reste vide et chaque battement ne servirait à rien.
+  const now = useClock(NEXT_MATCH_CLOCK_MS, current !== null && hasScheduledPendingMatch(matches, current.round));
   const next = current !== null && now !== null ? nextScheduledMatch(matches, current.round, now) : null;
 
   // Play-offs : le bandeau dit l'avancement de l'arbre à la place.
   const playoffs = matches.filter((match) => match.roundNumber >= PLAYOFF_ROUND_OFFSET);
-  const playoffsPlayed = playoffs.filter(isMatchPlayed).length;
   const showPlayoffs = current === null && endurance.playoffsStarted && playoffs.length > 0 && !isFinished;
 
-  const progress =
-    current ?? (showPlayoffs ? { total: endurancePlayoffMatchTotal(playoffs), played: playoffsPlayed } : null);
+  const progress = current ?? (showPlayoffs ? endurancePlayoffProgress(playoffs) : null);
 
+  // Entre deux manches, avant le lancement des play-offs : la manche vient de
+  // se clore et la suivante n'est pas encore tirée. Sans mot, le bandeau
+  // disparaissait et plus rien ne disait où en était le tournoi.
+  const closedRound = current === null && !endurance.playoffsStarted && !isFinished ? enduranceLastClosedRound(matches) : null;
+  const lastRoundPlayed = endurance.maxRounds !== null && closedRound !== null && closedRound >= endurance.maxRounds;
   return (
     <>
       <div className={styles.head}>
@@ -109,7 +115,7 @@ export function EnduranceCard({
             {/* Balise native plutôt qu'un `role="progressbar"` (S6819). */}
             <progress
               className={styles.bar}
-              aria-label={t("endurance.stripProgress")}
+              aria-label={t(current ? "endurance.stripProgress" : "endurance.stripProgressPlayoffs")}
               max={Math.max(progress.total, 1)}
               value={progress.played}
             />
@@ -127,6 +133,13 @@ export function EnduranceCard({
               </span>
             </div>
           )}
+        </section>
+      )}
+
+      {progress === null && closedRound !== null && (
+        <section className={`${styles.strip} ${styles.stripBetween}`} aria-label={t("endurance.stripDone", { round: String(closedRound) })}>
+          <span className={`mono ${styles.stripLabel}`}>{t("endurance.stripDone", { round: String(closedRound) })}</span>
+          <span className={styles.stripSoon}>{t(lastRoundPlayed ? "endurance.stripPlayoffsSoon" : "endurance.stripSoon")}</span>
         </section>
       )}
     </>

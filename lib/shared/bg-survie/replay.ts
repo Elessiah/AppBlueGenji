@@ -41,6 +41,7 @@ import {
 import {
   assignRanks,
   compareEndurance,
+  rankSortedActive,
   type EnduranceStanding,
   type EnduranceStatus,
 } from "./standings";
@@ -89,7 +90,11 @@ export type EnduranceRoundCell = {
   wins?: number;
   /** Défaites cumulées jusqu'à cette manche incluse. */
   losses?: number;
-  /** Nuls cumulés jusqu'à cette manche incluse. */
+  /**
+   * Nuls cumulés jusqu'à cette manche incluse. **Absent à 0** (le cas courant :
+   * la plupart des tournois n'en produisent aucun) : sur 64 équipes × 12
+   * manches, un `draws: 0` par case pesait ~8 Ko par instantané. Se lit `?? 0`.
+   */
   draws?: number;
 };
 
@@ -140,13 +145,14 @@ function enduranceRoundCell(
   penalty: number,
   rank: number,
 ): EnduranceRoundCell {
-  return {
+  const cell: EnduranceRoundCell = {
     ...enduranceRoundCellBase(standing, round, penalty),
     rank,
     wins: standing.wins,
     losses: standing.losses,
-    draws: standing.draws,
   };
+  if (standing.draws > 0) cell.draws = standing.draws;
+  return cell;
 }
 
 function enduranceRoundCellBase(
@@ -232,6 +238,9 @@ export function replayEnduranceDetailed(input: ReplayEnduranceInput): EnduranceR
   const rounds: number[] = [];
   const history = new Map<number, EnduranceRoundCell[]>(teams.map((team) => [team.teamId, []]));
   const penaltyTotals = new Map<number, number>();
+  // Classement de la dernière manche rejouée : c'est le classement final, sans
+  // le recalculer (`null` tant qu'aucune manche n'a été rejouée).
+  let finalRanking: EnduranceStanding[] | null = null;
 
   for (let round = 1; round <= maxRound; round += 1) {
     for (const match of matches) {
@@ -259,13 +268,14 @@ export function replayEnduranceDetailed(input: ReplayEnduranceInput): EnduranceR
       applyRoundCut(standings, config, config.maxRounds - round, round, matchFormat);
     }
 
-    freezePreviousRanks(standings);
+    // Un seul tri par manche : celui qui fige l'ordre sert aussi au rang.
+    const activeOrder = freezePreviousRanks(standings);
 
     rounds.push(round);
-    recordRoundHistory(standings, round, applied, history, penaltyTotals);
+    finalRanking = recordRoundHistory(standings, activeOrder, round, applied, history, penaltyTotals);
   }
 
-  return { standings: assignRanks([...standings.values()]), rounds, history, penaltyTotals };
+  return { standings: finalRanking ?? assignRanks([...standings.values()]), rounds, history, penaltyTotals };
 }
 
 /** Classement de départ : capital plein, rang = seed. */
@@ -340,24 +350,32 @@ function closedRoundPredicate(matches: EnduranceMatchOutcome[]): (round: number)
   };
 }
 
-/** Fige l'ordre de cette manche : il servira de départage à la suivante. */
-function freezePreviousRanks(standings: Map<number, EnduranceStanding>): void {
+/**
+ * Fige l'ordre de cette manche : il servira de départage à la suivante. Rend les
+ * équipes actives dans cet ordre, pour que le rang de la manche ne le retrie pas.
+ */
+function freezePreviousRanks(standings: Map<number, EnduranceStanding>): EnduranceStanding[] {
   const ordered = [...standings.values()].filter((s) => s.status === "ACTIVE").sort(compareEndurance);
   ordered.forEach((standing, index) => {
     standing.previousRank = index + 1;
   });
+  return ordered;
 }
 
+/** Écrit les cases de la manche et rend le classement à son issue. */
 function recordRoundHistory(
   standings: Map<number, EnduranceStanding>,
+  activeOrder: EnduranceStanding[],
   round: number,
   applied: Map<number, number>,
   history: Map<number, EnduranceRoundCell[]>,
   penaltyTotals: Map<number, number>,
-): void {
-  const ranks = new Map(
-    assignRanks([...standings.values()]).map((ranked) => [ranked.teamId, ranked.rank]),
+): EnduranceStanding[] {
+  const ranking = rankSortedActive(
+    activeOrder,
+    [...standings.values()].filter((s) => s.status !== "ACTIVE"),
   );
+  const ranks = new Map(ranking.map((ranked) => [ranked.teamId, ranked.rank]));
   for (const standing of standings.values()) {
     const removed = applied.get(standing.teamId) ?? 0;
     if (removed > 0) {
@@ -365,4 +383,5 @@ function recordRoundHistory(
     }
     history.get(standing.teamId)?.push(enduranceRoundCell(standing, round, removed, ranks.get(standing.teamId) ?? standing.rank));
   }
+  return ranking;
 }

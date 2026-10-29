@@ -96,6 +96,16 @@
   background: var(--blue-500);
 }
 
+/* Entre deux manches : un repère, sans barre ni compteur. */
+.stripBetween {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.stripSoon {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
 .stripNext {
   font-size: 13px;
   color: var(--ink);
@@ -115,7 +125,8 @@
 }
 
 @media (max-width: 720px) {
-  .strip {
+  .strip,
+  .stripBetween {
     grid-template-columns: 1fr;
   }
 }

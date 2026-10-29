@@ -2,7 +2,11 @@ import { describe, expect, it } from "@jest/globals";
 import type { BracketMatch, EnduranceMeta, EnduranceStandingRow } from "@/lib/shared/types";
 import {
   enduranceCurrentRound,
+  enduranceLastClosedRound,
+  endurancePlayoffProgress,
   enduranceRankingRows,
+  enduranceRoundMatchIndex,
+  hasScheduledPendingMatch,
   enduranceRankingViews,
   enduranceRoundColumnCell,
   enduranceTabKey,
@@ -422,7 +426,29 @@ describe("enduranceRoundColumnCell — la colonne « MANCHE n » (variante A)", 
       opponentId: 3,
       opponentName: "Team 3",
       startAt: "2026-10-23T19:00:00.000Z",
+      penalty: 0,
     });
+  });
+
+  it("rencontre à jouer : dit la pénalité posée avant le match", () => {
+    const team2 = row(2, { rounds: [{ round: 2, kind: "POINTS", points: 8, penalty: 3, rank: 1, wins: 0, losses: 0 }] });
+    expect(enduranceRoundColumnCell(team2, 2, MATCHES, 9)).toMatchObject({ kind: "PENDING", penalty: 3 });
+  });
+
+  it("exemption pénalisée : la case BYE porte la pénalité", () => {
+    const bye = row(7, { rounds: [{ round: 2, kind: "POINTS", points: 6, penalty: 3, rank: 4, wins: 0, losses: 0 }] });
+    expect(enduranceRoundColumnCell(bye, 2, MATCHES, 9)).toEqual({ kind: "BYE", penalty: 3 });
+  });
+
+  it("lit la même case avec ou sans l'index des rencontres de la manche", () => {
+    const team1 = STANDINGS.find((s) => s.teamId === 1)!;
+    const index = enduranceRoundMatchIndex(MATCHES, 2);
+    expect(enduranceRoundColumnCell(team1, 2, MATCHES, 9, index)).toEqual(enduranceRoundColumnCell(team1, 2, MATCHES, 9));
+  });
+
+  it("une équipe sortie avant la manche, sans match, est « sortie » et non exemptée", () => {
+    const gone = row(8, { status: "ELIMINATED", eliminatedRound: 1 });
+    expect(enduranceRoundColumnCell(gone, 2, MATCHES, 9)).toEqual({ kind: "OUT" });
   });
 
   it("forfait, sortie, manche sans match", () => {
@@ -430,7 +456,7 @@ describe("enduranceRoundColumnCell — la colonne « MANCHE n » (variante A)", 
     expect(enduranceRoundColumnCell(ff, 2, MATCHES, 9)).toEqual({ kind: "FORFEIT" });
     const out = row(6, { status: "ELIMINATED", eliminatedRound: 1, rounds: [{ round: 2, kind: "OUT", points: null }] });
     expect(enduranceRoundColumnCell(out, 2, MATCHES, 9)).toEqual({ kind: "OUT" });
-    expect(enduranceRoundColumnCell(row(7), 2, MATCHES, 9)).toEqual({ kind: "BYE" });
+    expect(enduranceRoundColumnCell(row(7), 2, MATCHES, 9)).toEqual({ kind: "BYE", penalty: 0 });
   });
 
   it("montre la manche de la vue, la dernière manche au Général", () => {
@@ -450,5 +476,103 @@ describe("textes — équipe ou joueur", () => {
     expect(t("endurance.cellForfeitTeam")).toBe("Forfait — retirée");
     expect(t("endurance.cellForfeitSolo")).toBe("Forfait — retiré");
     expect(t("endurance.stripPlayed", { played: 7, total: "11" })).toBe("7 matchs joués sur 11");
+  });
+});
+
+describe("enduranceRoundMatchIndex — la rencontre de chaque engagé", () => {
+  it("n'indexe que la manche qualificative demandée, sans les play-offs ni les engagés vides", () => {
+    const bye = bracketMatch({ ...pending(50, 2, 9, 10), team2Id: null, team2Name: null });
+    const playoff = pending(60, PLAYOFF_ROUND_OFFSET, 1, 2);
+    const index = enduranceRoundMatchIndex([...MATCHES, bye, playoff], 2);
+    expect([...index.keys()].sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 9]);
+    expect(index.get(2)?.id).toBe(4);
+    expect(index.get(9)?.id).toBe(50);
+  });
+});
+
+describe("enduranceCurrentRound — retenu par tableau de matchs", () => {
+  it("relit un tableau identique sans se tromper, et un nouveau tableau à neuf", () => {
+    expect(enduranceCurrentRound(MATCHES)).toEqual(enduranceCurrentRound(MATCHES));
+    const finished = [...MATCHES.slice(0, 3), played(4, 2, 2, 3, 3, 0)];
+    expect(enduranceCurrentRound(finished)).toBeNull();
+    expect(enduranceCurrentRound(MATCHES)).toEqual({ round: 2, total: 2, played: 1 });
+  });
+});
+
+describe("enduranceLastClosedRound — entre deux manches", () => {
+  it("rend la dernière manche close quand aucune n'est en cours", () => {
+    const closed = [played(1, 1, 1, 2, 3, 0), played(2, 2, 1, 2, 3, 0)];
+    expect(enduranceLastClosedRound(closed)).toBe(2);
+  });
+
+  it("rend null tant qu'une manche est en cours", () => {
+    expect(enduranceLastClosedRound(MATCHES)).toBeNull();
+  });
+
+  it("rend null sans aucune manche tirée", () => {
+    expect(enduranceLastClosedRound([])).toBeNull();
+  });
+});
+
+describe("hasScheduledPendingMatch — l'horloge du bandeau", () => {
+  it("vrai pour un match non joué daté de la manche", () => {
+    expect(hasScheduledPendingMatch(MATCHES, 2)).toBe(true);
+  });
+
+  it("faux sans date", () => {
+    expect(hasScheduledPendingMatch([pending(1, 2, 1, 2)], 2)).toBe(false);
+  });
+
+  it("faux pour un match joué, même daté", () => {
+    expect(hasScheduledPendingMatch([played(1, 2, 1, 2, 3, 0, "2026-10-20T19:00:00.000Z")], 2)).toBe(false);
+  });
+
+  it("faux pour une autre manche", () => {
+    expect(hasScheduledPendingMatch(MATCHES, 1)).toBe(false);
+  });
+});
+
+describe("arbre final sous-rempli — exemptions", () => {
+  const off = PLAYOFF_ROUND_OFFSET;
+  const byeMatch = (id: number, round: number, team: number) =>
+    bracketMatch({ ...pending(id, round, team, team), team2Id: null, team2Name: null, status: "COMPLETED", winnerTeamId: team });
+
+  it("cinq qualifiées : deux rencontres et une exemption au premier tour, quatre en tout, sans petite finale", () => {
+    const first = [pending(1, off, 1, 4), pending(2, off, 2, 3), byeMatch(3, off, 5)];
+    expect(endurancePlayoffMatchTotal(first)).toBe(4);
+  });
+
+  it("six qualifiées : le total reste 5 du premier au deuxième tour (il ne passe pas de 7 à 6)", () => {
+    const first = [pending(1, off, 1, 6), pending(2, off, 2, 5), pending(3, off, 3, 4)];
+    expect(endurancePlayoffMatchTotal(first)).toBe(5);
+    const second = [pending(4, off + 1, 1, 2), byeMatch(5, off + 1, 3)];
+    expect(endurancePlayoffMatchTotal([...first, ...second])).toBe(5);
+  });
+
+  it("une exemption posée ne compte ni comme match ni comme jouée", () => {
+    const tree = [pending(1, off, 1, 4), byeMatch(3, off, 5)];
+    expect(endurancePlayoffMatchTotal([byeMatch(3, off, 5)])).toBe(0);
+    expect(endurancePlayoffProgress(tree)).toEqual({ total: endurancePlayoffMatchTotal(tree), played: 0 });
+  });
+
+  it("compte une rencontre jouée", () => {
+    const tree = [played(1, off, 1, 4, 3, 0), pending(2, off, 2, 3)];
+    expect(endurancePlayoffProgress(tree).played).toBe(1);
+  });
+});
+
+describe("enduranceRankingRows — instantané sans rang ni nuls", () => {
+  it("repli : capital décroissant puis rang du général, nuls absents lus à 0", () => {
+    const standings = [
+      row(1, { rank: 1, rounds: [{ round: 1, kind: "POINTS", points: 8 }] }),
+      row(2, { rank: 2, rounds: [{ round: 1, kind: "POINTS", points: 12 }] }),
+      row(3, { rank: 3, rounds: [{ round: 1, kind: "POINTS", points: 8 }] }),
+    ];
+    const rows = enduranceRankingRows({ kind: "ROUND", round: 1 }, meta(standings, { rounds: [1] }), []);
+    expect(rows.map((r) => [r.standing.teamId, r.rank, r.draws])).toEqual([
+      [2, 1, 0],
+      [1, 2, 0],
+      [3, 3, 0],
+    ]);
   });
 });

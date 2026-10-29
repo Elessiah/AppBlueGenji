@@ -79,17 +79,19 @@ export function EnduranceRoundPanels({
   // un volet refermé à la main se rouvrirait au prochain instantané. La manche
   // ouverte d'office qui se clôt se replie (une manche close est repliée), sauf
   // si le lecteur l'a lui-même rouverte : un soir de tournoi suivi en direct ne
-  // finit pas avec toutes les manches dépliées.
+  // finit pas avec toutes les manches dépliées. Elle se replie aussi quand rien
+  // ne la remplace (`autoOpen` passe à `null` : dernière manche close, play-offs
+  // lancés, suivante pas encore tirée) : un chargement frais la montre repliée.
   const lastAutoOpen = useRef(autoOpen);
   const openedByHand = useRef(new Set<number>());
   useEffect(() => {
-    if (autoOpen === null || autoOpen === lastAutoOpen.current) return;
+    if (autoOpen === lastAutoOpen.current) return;
     const previous = lastAutoOpen.current;
     lastAutoOpen.current = autoOpen;
     setOpenRounds((prev) => {
       const next = new Set(prev);
       if (previous !== null && !openedByHand.current.has(previous)) next.delete(previous);
-      next.add(autoOpen);
+      if (autoOpen !== null) next.add(autoOpen);
       return next;
     });
   }, [autoOpen]);

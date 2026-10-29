@@ -14,6 +14,7 @@ import { replayEndurance } from "@/lib/shared/bg-survie/replay";
 import {
   assignRanks,
   compareEndurance,
+  rankSortedActive,
   planEnduranceRound,
   type EnduranceStanding,
 } from "@/lib/shared/bg-survie/standings";
@@ -501,6 +502,32 @@ describe("assignRanks", () => {
     ]);
     expect(ranked.map((s) => s.teamId)).toEqual([4, 1, 3, 2]);
     expect(ranked.map((s) => s.rank)).toEqual([1, 2, 3, 4]);
+  });
+});
+
+describe("rankSortedActive", () => {
+  it("garde les actives dans l'ordre reçu, puis range les sorties par manche, capital et ordre figé", () => {
+    const actives = [standing({ teamId: 4, points: 11, previousRank: 1 }), standing({ teamId: 1, points: 9, previousRank: 2 })];
+    const out = [
+      standing({ teamId: 2, status: "ELIMINATED", eliminatedRound: 1, points: 0, previousRank: 3 }),
+      standing({ teamId: 5, status: "ELIMINATED", eliminatedRound: 4, points: 2, previousRank: 6 }),
+      standing({ teamId: 3, status: "ELIMINATED", eliminatedRound: 4, points: 2, previousRank: 5 }),
+      standing({ teamId: 6, status: "ELIMINATED", eliminatedRound: 4, points: 3, previousRank: 7 }),
+    ];
+    const ranked = rankSortedActive(actives, out);
+    expect(ranked.map((s) => s.teamId)).toEqual([4, 1, 6, 3, 5, 2]);
+    expect(ranked.map((s) => s.rank)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(out.map((s) => s.teamId)).toEqual([2, 5, 3, 6]);
+  });
+
+  it("donne le même classement qu'assignRanks sur des actives déjà triées", () => {
+    const all = [
+      standing({ teamId: 1, points: 9, previousRank: 1 }),
+      standing({ teamId: 2, status: "ELIMINATED", eliminatedRound: 1, points: 0, previousRank: 2 }),
+      standing({ teamId: 4, points: 11, previousRank: 4 }),
+    ];
+    const sorted = all.filter((s) => s.status === "ACTIVE").sort(compareEndurance);
+    expect(rankSortedActive(sorted, all.filter((s) => s.status !== "ACTIVE"))).toEqual(assignRanks(all));
   });
 });
 
