@@ -150,6 +150,18 @@ describe("POST / DELETE /api/matches/[matchId]/caster", () => {
     expect(claimMatchCast).toHaveBeenLastCalledWith(42, 4, true, { liveUrl: null });
   });
 
+  it("un corps JSON vide (Content-Length: 0) vaut l'absence de corps : un stream sans lien", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(caster);
+    const empty = new Request("http://localhost/api/matches/42", {
+      method: "POST",
+      headers: { "content-type": "application/json", "content-length": "0" },
+      body: "",
+    });
+
+    expect((await casterPost(empty, params("42"))).status).toBe(200);
+    expect(claimMatchCast).toHaveBeenLastCalledWith(42, 4, true, { liveUrl: null });
+  });
+
   it("refuse un choix de stream mal formé, sans appeler le service", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(caster);
     const bodies: unknown[] = [

@@ -601,10 +601,23 @@ async function streamShown(connection: PoolConnection, row: LaunchMatchRow, stre
  * lien d'un caster que le site taisait. Un match déjà lancé garde ses casters
  * (on ne retire pas un caster en pleine diffusion). Chaque retrait s'annonce
  * après le commit, comme tout retrait d'office (`queueCastChange`).
+ *
+ * `currentRead` : un instantané a précédé le verrou du match (entretien des
+ * lancements) — l'éligibilité se relit alors en lecture *courante*, sinon une
+ * permission retirée depuis l'instantané ne serait pas vue et le lancement
+ * rendrait public le caster.
  */
-async function releaseIneligibleCasters(connection: PoolConnection, row: LaunchMatchRow): Promise<void> {
+async function releaseIneligibleCasters(
+  connection: PoolConnection,
+  row: LaunchMatchRow,
+  currentRead = false,
+): Promise<void> {
   if (row.casters.length === 0 || row.launched_at !== null || row.status === "COMPLETED") return;
-  const eligible = await loadEligibleCasterIds(connection, row.casters.map((caster) => caster.userId));
+  const eligible = await loadEligibleCasterIds(
+    connection,
+    row.casters.map((caster) => caster.userId),
+    currentRead,
+  );
   const leaving = row.casters.filter((caster) => !eligible.has(caster.userId));
   if (leaving.length === 0) return;
   await connection.execute(
@@ -933,7 +946,7 @@ export async function maintainMatchLaunches(
     await adoptCurrentPairing(connection, row);
     // Ni le décompte des « Prêt » ni le lancement (qui rend publics le pseudo
     // et le lien du stream) ne comptent un caster devenu inéligible.
-    await releaseIneligibleCasters(connection, row);
+    await releaseIneligibleCasters(connection, row, true);
     const undecidedMatch = undecidedCandidate(row);
     if (undecidedMatch) undecided.push(undecidedMatch);
     const launch =

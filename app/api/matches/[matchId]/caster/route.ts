@@ -40,7 +40,7 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
   if (matchId === null) return fail("INVALID_MATCH_ID", 400);
 
   let body: unknown = {};
-  if (req.body !== null) {
+  if (req.body !== null && req.headers.get("content-length") !== "0") {
     try {
       body = await readJsonBody(req);
     } catch (error) {

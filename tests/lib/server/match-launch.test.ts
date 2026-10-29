@@ -1642,6 +1642,21 @@ describe("casters devenus inéligibles : retirés au lancement (EF-29)", () => {
   });
 });
 
+describe("maintainMatchLaunches — éligibilité des casters relue en lecture courante (EF-29)", () => {
+  it("maintainMatchLaunches_casterAtLaunch_rereadsEligibilityWithShareLockAndLocksCastersCurrent", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({ team1_is_ghost: 1, team2_is_ghost: 1, caster_user_id: CASTER });
+    state.issued = [];
+
+    await maintainMatchLaunches(connectionFor(state), 7);
+
+    // L'instantané précède le verrou : seules les lectures verrouillantes sont courantes.
+    expect(state.issued.some((sql) => /FROM bg_users WHERE id IN \(\?\) LOCK IN SHARE MODE$/.test(sql))).toBe(true);
+    expect(state.issued.some((sql) => /FROM bg_match_casters .*FOR UPDATE$/.test(sql))).toBe(true);
+    expect(casterOf(state)).toBe(CASTER);
+  });
+});
+
 describe("releaseMatchCast / claimMatchCast : gardes et publications (EF-29)", () => {
   it("releaseMatchCast_completedMatch_refusesAndKeepsCasterStreamAndLink", async () => {
     state.users[CASTER] = ELIGIBLE_CASTER;

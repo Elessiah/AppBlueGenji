@@ -132,8 +132,7 @@ describe("setMatchLiveConfig", () => {
     const execute = jest.fn<SqlQuery>(async (rawSql, rawParams) => {
       const sql = rawSql.replace(/\s+/g, " ").trim();
       const params = (rawParams ?? []) as unknown[];
-      if (sql.startsWith("SELECT id, tournament_id, status")) return [[row]];
-      if (sql.startsWith("SELECT id FROM bg_matches")) return [[{ id: row.id }]];
+      if (sql.startsWith("SELECT id, tournament_id, status")) return [[{ ...row }]];
       if (sql.startsWith("UPDATE bg_matches")) {
         state.matchWrites.push([sql, params]);
         return [{ affectedRows: 1 }];
@@ -312,6 +311,27 @@ describe("setMatchLiveConfig", () => {
       ).rejects.toThrow("MATCH_NOT_CASTABLE");
       expect(world.state.matchWrites).toEqual([]);
     }
+  });
+
+  it("rejuge sous le verrou du match : un score validé entre la première lecture et le verrou ferme la porte", async () => {
+    const row = matchRow();
+    const world = liveWorld(row);
+    await mockLiveDb(world);
+    const real = world.execute.getMockImplementation()!;
+    let reads = 0;
+    world.execute.mockImplementation(async (sql, params) => {
+      const result = await real(sql, params);
+      reads += 1;
+      // Le match est joué dès que la lecture ordinaire a rendu sa ligne.
+      if (reads === 1) row.status = "COMPLETED";
+      return result;
+    });
+
+    await expect(
+      setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: "twitch.tv/x", setter: CASTER_12 }),
+    ).rejects.toThrow("MATCH_NOT_CASTABLE");
+    expect(world.state.streams).toEqual([]);
+    expect(world.state.matchWrites).toEqual([]);
   });
 
   it("laisse démarquer un match terminé encore casté : une diffusion posée ne devient pas ineffaçable", async () => {

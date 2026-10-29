@@ -128,6 +128,17 @@ async function loadMatchLiveRow(matchId: number): Promise<MatchLiveRow> {
   return rows[0];
 }
 
+/** `MATCH_NOT_CASTABLE` quand rien ne peut plus être réglé sur ce match (`canConfigureLive`). */
+function assertConfigurable(row: MatchLiveRow): void {
+  const configurable = canConfigureLive({
+    status: row.status,
+    liveTrigger: row.live_trigger,
+    liveStartedAt: row.live_started_at,
+    launchedAt: null,
+  });
+  if (!configurable) throw new Error("MATCH_NOT_CASTABLE");
+}
+
 /**
  * Marque un match comme casté (ou le démarque), avec son mode et sa chaîne.
  *
@@ -165,18 +176,11 @@ export async function setMatchLiveConfig(
     throw new Error("INVALID_LIVE_TRIGGER");
   }
 
+  // Premier tri sur une lecture ordinaire (un refus ne coûte rien) ; le verdict
+  // vaut sous le verrou du match, ci-dessous : un score validé entre les deux
+  // ferme la porte (`assertConfigurable`).
   const row = await loadMatchLiveRow(matchId);
-
-  if (
-    !canConfigureLive({
-      status: row.status,
-      liveTrigger: row.live_trigger,
-      liveStartedAt: row.live_started_at,
-      launchedAt: null,
-    })
-  ) {
-    throw new Error("MATCH_NOT_CASTABLE");
-  }
+  assertConfigurable(row);
   if (requiresMatchStartAt(config.trigger) && row.start_at === null) {
     throw new Error("MATCH_START_AT_REQUIRED");
   }
@@ -191,7 +195,13 @@ export async function setMatchLiveConfig(
     try {
       // Verrou du match d'abord, puis ses streams et casters : le même ordre
       // que l'inscription d'un caster (`claimMatchCast`).
-      await connection.execute(`SELECT id FROM bg_matches WHERE id = ? FOR UPDATE`, [matchId]);
+      const [locked] = await connection.execute<MatchLiveRow[]>(
+        `SELECT id, tournament_id, status, start_at, live_trigger, live_started_at
+         FROM bg_matches WHERE id = ? FOR UPDATE`,
+        [matchId],
+      );
+      if (locked.length === 0) throw new Error("MATCH_NOT_FOUND");
+      assertConfigurable(locked[0]);
       let streams: MatchStreamRow[] | undefined;
       if (trigger === null) {
         await connection.execute(
