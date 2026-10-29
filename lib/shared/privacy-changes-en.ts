@@ -709,6 +709,16 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "Export of your data: it also gives your caster registrations (with your “Ready”), the channel links you provided on a match, the matches you are the assigned referee of (with your “Ready”) and whether your BattleTag comes from Battle.net or was typed in by hand.",
     ],
   },
+  "2026-10-lien-organisation-choix-explicite": {
+    linkLabels: ["Read the “Match streaming” paragraph"],
+    title: "Streaming: the organizers' link is chosen, no longer inferred",
+    summary:
+      "A member of the organizers who sets up a match's broadcast now states, with a checkbox, whether the link they set is the organizers' or their own channel, instead of the site inferring it from what they cast: only their own channel goes with their account.",
+    details: [
+      "What changes: in a match's broadcast window, a member of the organizers (permission to manage tournaments) ticks “This link is the organisation's” — ticked by default — or unticks it to say it is their own channel. Ticked, the link stays with the match whatever happens to their account, even if they cast that match; unticked, it is attached to them and goes when their account is deleted, played matches included, like a caster's. An account without that permission always sets its own channel.",
+      "What does not change: a link already saved keeps its author at the time; saving the same link again does not change its author; the link a caster opens separately and a link set before the site recorded who provided it are handled as before.",
+    ],
+  },
 };
 
 /**

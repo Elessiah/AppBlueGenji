@@ -1374,6 +1374,26 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Export de tes données : il rend aussi tes inscriptions de caster (avec ton « Prêt »), les liens de chaîne que tu as fournis sur un match, les matchs dont tu es l'arbitre désigné (avec ton « Prêt ») et si ton BattleTag vient de Battle.net ou a été tapé à la main.",
     ],
   },
+  {
+    // EF-29 (2026-10-29), décision 48 : le lien posé dans la configuration du
+    // direct d'un match n'est plus rattaché à un membre de l'organisation parce
+    // qu'il caste ce match : il dit, par une case de la fenêtre, si le lien est
+    // celui de l'organisation ou sa propre chaîne. Ce que la suppression du
+    // compte emporte change pour ces membres. Pour tous les comptes : pas de
+    // public. Datée du lendemain de la mise en ligne (déploiement de la nuit
+    // du 29 au 30 au plus tôt) ; l'entrée `2026-10-plusieurs-casters-par-match`,
+    // publiée, n'est pas réécrite.
+    id: "2026-10-lien-organisation-choix-explicite",
+    publishedAt: "2026-10-31",
+    title: "Retransmission : le lien de l'organisation se choisit, il ne se déduit plus",
+    links: [{ href: "/rgpd#retransmission", label: "Lire le paragraphe « Retransmission des matchs »" }],
+    summary:
+      "Un membre de l'organisation qui règle la diffusion d'un match indique désormais, par une case, si le lien posé est celui de l'organisation ou sa propre chaîne, au lieu que le site le déduise de ce qu'il caste : seule sa propre chaîne part avec son compte.",
+    details: [
+      "Ce qui change : dans la fenêtre de diffusion d'un match, un membre de l'organisation (permission de gérer les tournois) coche « Ce lien est celui de l'organisation » — coché par défaut — ou le décoche pour dire que c'est sa propre chaîne. Coché, le lien reste au match quoi qu'il arrive à son compte, même s'il caste ce match ; décoché, il lui est rattaché et part à la suppression de son compte, matchs joués compris, comme celui d'un caster. Un compte sans cette permission pose toujours sa propre chaîne.",
+      "Ce qui ne change pas : un lien déjà enregistré garde son auteur d'alors ; réenregistrer le même lien n'en change pas l'auteur ; le lien qu'un caster ouvre à part et celui posé avant que le site n'enregistre qui le fournit sont traités comme avant.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */
