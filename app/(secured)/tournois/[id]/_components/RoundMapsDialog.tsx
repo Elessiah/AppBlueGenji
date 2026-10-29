@@ -92,9 +92,8 @@ const SLOT_FIELD_ERRORS = { INVALID_ROUND_MAPS: "slots" } as const satisfies Rec
 /** Témoin d'un formulaire modifié et pas encore enregistré, annoncé au lecteur d'écran. */
 function UnsavedNote({ dirty, text }: Readonly<{ dirty: boolean; text: string }>) {
   return (
-    <p className={`${styles.muted} ${styles.unsaved}`} role="status">
-      {dirty ? text : ""}
-    </p>
+    // `<output>` : région d'état native, annoncée quand le témoin paraît.
+    <output className={`${styles.muted} ${styles.unsaved}`}>{dirty ? text : ""}</output>
   );
 }
 
