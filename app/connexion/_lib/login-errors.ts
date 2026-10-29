@@ -83,6 +83,18 @@ function isLoginErrorCode(code: string): code is LoginErrorCode {
 }
 
 /**
+ * Refus qui se lèvent en rejoignant le serveur BlueGenji : le message privé du
+ * code exige un serveur commun avec le bot. Le lien d'invitation n'est sinon
+ * que derrière le « i » du champ — ces refus l'affichent à découvert sous le
+ * champ (`page.inviteAfterRefusal`).
+ */
+const SERVER_INVITE_REFUSALS: ReadonlySet<string> = new Set(["DISCORD_USER_NOT_FOUND", "DISCORD_DM_FAILED"]);
+
+export function refusalNeedsServerInvite(code: string | null | undefined): boolean {
+  return code !== null && code !== undefined && SERVER_INVITE_REFUSALS.has(code);
+}
+
+/**
  * Message à afficher pour un code de refus de la connexion.
  *
  * Un code inconnu retombe sur une phrase générique **et non sur le code

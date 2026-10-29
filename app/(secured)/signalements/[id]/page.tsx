@@ -11,13 +11,18 @@ import { primeReportDialog } from "@/components/reports/report-form-loader";
 import type { ConcernedReportView } from "@/lib/shared/content-reports";
 import { useLocalePathname } from "@/components/i18n/locale-navigation";
 import { useReportsText } from "@/components/reports/reports-text";
+import { concernedReportLoadFailure } from "@/lib/shared/concerned-report-load";
 import { ConcernedReport } from "./_components/ConcernedReport";
 import styles from "./concerned.module.css";
 
 // Le pied de page de cette page ne retélécharge pas le formulaire qu'elle porte déjà.
 primeReportDialog(ReportProblemDialog);
 
-type LoadState = { status: "loading" } | { status: "missing" } | { status: "ready"; report: ConcernedReportView };
+type LoadState =
+  | { status: "loading" }
+  | { status: "missing" }
+  | { status: "error" }
+  | { status: "ready"; report: ConcernedReportView };
 
 /**
  * Un signalement, pour une personne qu'il vise — la page vers laquelle mène le
@@ -40,15 +45,21 @@ export default function ConcernedReportPage() {
     try {
       const response = await fetch(`/api/reports/${reportId}`, { cache: "no-store" });
       if (!response.ok) {
-        setState({ status: "missing" });
+        setState({ status: concernedReportLoadFailure(response.status) });
         return;
       }
       const body = (await response.json()) as { report: ConcernedReportView };
       setState({ status: "ready", report: body.report });
     } catch {
-      setState({ status: "missing" });
+      setState({ status: concernedReportLoadFailure(null) });
     }
   }, [reportId]);
+
+  /** « Réessayer » : retour à l'état de chargement (le focus reste sur la page, annoncé par `aria-busy`). */
+  const retry = useCallback(() => {
+    setState({ status: "loading" });
+    void load();
+  }, [load]);
 
   useEffect(() => {
     void load();
@@ -58,6 +69,20 @@ export default function ConcernedReportPage() {
     return (
       <section className={`container ${styles.page}`} aria-busy="true">
         <p className={styles.muted}>{t("concerned.loading")}</p>
+      </section>
+    );
+  }
+
+  if (state.status === "error") {
+    return (
+      <section className={`container ${styles.page}`}>
+        <h1 className={`display ${styles.title}`}>{t("concerned.errorTitle")}</h1>
+        <p className={styles.muted}>{t("concerned.errorBody")}</p>
+        <div>
+          <button type="button" className="btn" onClick={retry}>
+            {t("concerned.retry")}
+          </button>
+        </div>
       </section>
     );
   }

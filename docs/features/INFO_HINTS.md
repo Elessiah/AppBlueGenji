@@ -59,19 +59,45 @@ après le libellé qu'elles expliquent, et se réécrivent **court**.
   le suit, `margin-inline-start: auto` cale le groupe à droite).
 - **Fermée, elle reste dans le DOM** (`hidden`) avec son `id` : un champ qui la
   cite dans son `aria-describedby` garde sa description entière.
-- Se referme par **Échap** (focus rendu au bouton ; écouté sur le composant
-  seul, pour ne pas voler l'Échap d'une modale ; déplié dans une modale, il
-  porte `data-escape-owner` et `escapeBelongsElsewhere` lui laisse la touche —
-  sans quoi l'écouteur de la modale, en capture, la fermait saisie comprise ; un clic sur le texte de l'explication rend le focus au bouton, qui garde ainsi la touche — seulement si le focus était parti au conteneur qui le porte, la modale (`infoHintFocusLeftToContainer`), et sans défiler (`preventScroll`) ; sur une page ordinaire il reste où il est), par un **clic ailleurs**, par
-  un **second clic**. Le clic ailleurs ferme au `click` et non au `pointerdown` :
-  replier l'explication à l'appui ferait remonter le contrôle visé sous le
-  pointeur, et le relâchement tomberait à côté (clic perdu). Cliquer un autre
-  « i » est un clic ailleurs : il referme celui qui était ouvert. Le clic donne
-  le focus au bouton (Safari, macOS et iOS, ne le fait pas de lui-même) : sans
-  lui, Échap, écouté sur le composant, ne porterait pas après une ouverture à la
-  souris.
+- Se referme par **Échap**, par un **clic ailleurs**, par un **second clic**.
+  - Échap est écouté sur `document` **tant que l'explication est ouverte** : le
+    focus peut être parti (clic sur le texte, Tab vers un champ voisin) sans que
+    la touche cesse de la replier. Une modale ouverte **par-dessus** garde la
+    sienne (`infoHintOwnsEscape` : seule la modale du dessus, `topOpenModal`,
+    qui ne porte pas le « i » la lui laisse). Dans une modale qui porte le « i »,
+    `escapeBelongsElsewhere` cherche un `data-escape-owner` ouvert **n'importe
+    où dans la modale** (paramètre `container`) : la modale ne se ferme pas, ne
+    vide pas son formulaire, et le « i » se replie. Le focus revient au bouton
+    seulement s'il était sur `body`, le conteneur de la modale ou dans le « i »
+    (`infoHintRefocusAfterEscape`), jamais arraché à un champ voisin.
+  - Le clic ailleurs ferme au `click`, pas à l'appui : replier l'explication à
+    l'appui ferait remonter le contrôle visé sous le pointeur, et le relâchement
+    tomberait à côté (clic perdu). Exception : une cible **non interactive**
+    (texte, fond) — Safari iOS n'envoie aucun `click` au `document` pour elle —
+    ferme au `pointerup` (`isInteractivePointerTarget` ; un contrôle attend son
+    `click`, un défilement tactile finit en `pointercancel`). Cliquer un autre
+    « i » est un clic ailleurs.
+  - Le clic donne le focus au bouton (Safari, macOS et iOS, ne le fait pas de
+    lui-même).
+- **Langue du nom du bouton** : celle de l'élément ambiant le plus proche qui
+  déclare un `lang` (`infoHintLocale`), sinon celle de la page : une modale de
+  personnel `lang="fr"` ouverte sous `/en` garde « Plus d'infos : … ». Lue après
+  le montage.
+- **Rangée** (`InfoHintRow`) : le premier élément (libellé, titre) est borné à
+  « rangée − bouton − écart » — un titre qui occupe la rangée à l'arrondi près
+  passe à la ligne au lieu de laisser le « i » seul dessous. `inline` : une
+  **phrase en clair** (note OAuth de `/connexion`, annonce du tag, BattleTag
+  masqué de `/joueurs/[id]`) et son « i » sont du texte en ligne, le bouton à la
+  suite du dernier mot, l'explication en bloc dessous. `separated` : le
+  libellé est celui d'une **case enregistrée au changement** (diffusion en MP,
+  recrutement) — écart de 16 px au lieu de 6, pour qu'un toucher à côté du « i »
+  ne bascule pas le réglage ; même écart sur les sujets push
+  (`PushNotificationsPanel`).
+- Le survol (`:hover`) ne s'applique que sous `@media (hover: hover)` : au
+  toucher il restait collé après le second toucher.
 - Cible de 24 × 24 px (WCAG 2.5.8), anneau de focus `--blue-500`, texte 12 px
   `--ink-soft`, aucun ambre, aucune animation ni transition.
+- Un lien qui **sort** d'un refus ne reste pas derrière le « i » : après `DISCORD_USER_NOT_FOUND` / `DISCORD_DM_FAILED`, `/connexion` affiche sous le champ « Pas encore sur le serveur ? Rejoins… » (`page.inviteAfterRefusal`, `refusalNeedsServerInvite`), effacée à la saisie suivante.
 - Un lien est permis dans l'explication (`/connexion` : « rejoins le nôtre ») ;
   il suit le bouton dans l'ordre de tabulation.
 

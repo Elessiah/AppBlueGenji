@@ -2152,8 +2152,8 @@ html {
   }
 }
 
-/* Pages d'annuaire larges (`.page-wide` : liste des tournois, annuaire des
-   équipes) : sur un grand écran (2K et au-delà), la colonne de 1200 px laissait
+/* Pages d'annuaire larges (`.page-wide` : liste des tournois, annuaires des
+   équipes et des joueurs) : sur un grand écran (2K et au-delà), la colonne de 1200 px laissait
    plus de la moitié de l'écran vide et repliait les commandes sur deux rangées.
    Au-delà de 1800 px, la colonne s'élargit jusqu'à 1680 px et le `.container`
    intérieur la suit ; les formulaires et fiches gardent leur colonne. */
@@ -2164,6 +2164,14 @@ html {
 
   .page-wide .container {
     width: calc(100% - 48px);
+  }
+
+  /* La barre de navigation (`[data-sticky-header]`, hors de `.page-shell`) suit
+     la colonne élargie : sans elle, elle restait à 1280 px et ne s'alignait plus
+     sur le contenu. Même largeur que `.page-wide .container` ci-dessus
+     (colonne de 1680 px moins ses 48 px de marge). */
+  body:has(.page-wide) [data-sticky-header] .container {
+    width: calc(min(1680px, 100vw - max(80px, var(--a11y-tab-gutter))) - 48px);
   }
 }
 

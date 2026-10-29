@@ -59,7 +59,14 @@
   cursor: pointer;
 }
 
-.close:hover {
+/* Occupé (envoi en cours) : le bouton garde le focus, la garde du clic le rend inerte. */
+.close[aria-disabled="true"],
+.back[aria-disabled="true"] {
+  cursor: progress;
+  color: var(--ink-dim);
+}
+
+.close:hover:not([aria-disabled="true"]) {
   color: var(--ink);
   border-color: var(--line-strong-cy);
 }
@@ -179,7 +186,7 @@
   cursor: pointer;
 }
 
-.back:hover {
+.back:hover:not([aria-disabled="true"]) {
   color: var(--ink);
 }
 

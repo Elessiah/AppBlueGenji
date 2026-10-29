@@ -11,6 +11,7 @@
     "handleLabel": "Discord tag or ID",
     "handlePlaceholder": "your_username or 123456789012345678",
     "handleHelp": "The bot has to share a server with you to message you: <join>join ours</join>, or use the Discord button above, which doesn't need one. Your ID only saves looking up your tag.",
+    "inviteAfterRefusal": "If you're not on the server yet: <join>join the BlueGenji server</join>, then request your code again.",
     "sending": "Sending...",
     "requestCode": "Get a code →",
     "codeSent": "Code sent by Discord direct message (expires at {time}).",

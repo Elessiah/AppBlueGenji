@@ -137,7 +137,7 @@ export function MatchDmField({
   const unreachable = discordReachable === false;
   return (
     <div className={`field ${s.matchDms}`}>
-      <InfoHintRow>
+      <InfoHintRow separated>
         <Coche
           id={FIELD_ID}
           label={t("matchDms.label")}

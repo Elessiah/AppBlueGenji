@@ -863,8 +863,9 @@ export default function ProfilePage() {
                 <button
                   type="button"
                   className="btn"
-                  disabled={avatarBusy}
-                  onClick={() => fileInputRef.current?.click()}
+                  aria-disabled={avatarBusy || undefined}
+                  aria-busy={avatarBusy || undefined}
+                  onClick={() => !avatarBusy && fileInputRef.current?.click()}
                   style={{ padding: "9px 18px", fontSize: 13 }}
                 >
                   {avatarBusy ? t("identity.sending") : t("identity.changeAvatar")}
@@ -873,8 +874,8 @@ export default function ProfilePage() {
                   <button
                     type="button"
                     className="btn ghost"
-                    disabled={avatarBusy}
-                    onClick={onAvatarDelete}
+                    aria-disabled={avatarBusy || undefined}
+                    onClick={() => !avatarBusy && void onAvatarDelete()}
                     /* Le nom accessible commence par le texte affiché (WCAG
                        2.5.3) et lève l'ambiguïté avec « Supprimer mon compte »,
                        plus bas : parcourus hors contexte, deux « Supprimer » ne
@@ -1204,8 +1205,9 @@ export default function ProfilePage() {
               type="button"
               className={`btn ghost ${s.accountButton} ${s.deleteButton}`}
               ref={deleteButtonRef}
-              onClick={() => void accountDeletion.start()}
-              disabled={accountDeletion.deleting}
+              onClick={() => !accountDeletion.deleting && void accountDeletion.start()}
+              aria-disabled={accountDeletion.deleting || undefined}
+              aria-busy={accountDeletion.deleting || undefined}
             >
               {deleteAccountLabel(text, accountDeletion.deleting, accountDeletion.confirming)}
             </button>

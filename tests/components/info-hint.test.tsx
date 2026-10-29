@@ -49,7 +49,7 @@ jest.mock("@/components/i18n/locale-context", () => {
 
 import { AudienceList, InfoHint, InfoHintRow } from "@/components/ui/info-hint";
 import { AppLocaleProvider } from "@/components/i18n/locale-context";
-import { infoHintFocusLeftToContainer, infoHintLabel, infoHintReaction } from "@/lib/shared/info-hint";
+import { infoHintLabel, infoHintReaction } from "@/lib/shared/info-hint";
 import frCommon from "@/messages/fr/common.json";
 import enCommon from "@/messages/en/common.json";
 import { readSource } from "../helpers/read-source";
@@ -105,6 +105,7 @@ beforeEach(() => {
     },
   };
   globals.Node = class {};
+  (globals.document as { querySelectorAll: unknown }).querySelectorAll = () => ({ length: 0, item: () => null });
 });
 
 afterEach(() => {
@@ -126,22 +127,6 @@ describe("infoHintLabel", () => {
   });
 });
 
-describe("infoHintFocusLeftToContainer", () => {
-  const node = (contains: (other: unknown) => boolean) => ({ contains }) as unknown as Node;
-
-  it("ne rend le focus que s'il est parti à un conteneur qui porte le composant", () => {
-    const root = node(() => false);
-    const container = node((other) => other === root);
-    const body = node(() => true);
-    expect(infoHintFocusLeftToContainer(root, container, body)).toBe(true);
-    expect(infoHintFocusLeftToContainer(root, body, body)).toBe(false);
-    expect(infoHintFocusLeftToContainer(root, node(() => false), body)).toBe(false);
-    expect(infoHintFocusLeftToContainer(node(() => true), container, body)).toBe(false);
-    expect(infoHintFocusLeftToContainer(null, container, body)).toBe(false);
-    expect(infoHintFocusLeftToContainer(root, null, body)).toBe(false);
-  });
-});
-
 describe("infoHintReaction", () => {
   it("Échap referme et rend le focus ; les autres touches ne font rien", () => {
     expect(infoHintReaction({ kind: "key", key: "Escape" })).toBe("closeAndFocus");
@@ -152,6 +137,11 @@ describe("infoHintReaction", () => {
   it("un clic ailleurs referme, un clic dedans non", () => {
     expect(infoHintReaction({ kind: "outsideClick" })).toBe("close");
     expect(infoHintReaction({ kind: "insideClick" })).toBe("keep");
+  });
+
+  it("au toucher, le relâchement referme sur du texte (iOS n'envoie pas de click), pas sur un contrôle", () => {
+    expect(infoHintReaction({ kind: "outsidePointerUp", interactive: false })).toBe("close");
+    expect(infoHintReaction({ kind: "outsidePointerUp", interactive: true })).toBe("keep");
   });
 });
 
@@ -185,6 +175,11 @@ describe("InfoHint — balisage", () => {
       </AppLocaleProvider>,
     );
     expect(html).toContain('aria-label="More info: Discord username"');
+  });
+
+  it("pose les variantes de rangée : phrase en ligne, case enregistrée au changement", () => {
+    expect(renderToStaticMarkup(<InfoHintRow inline>x</InfoHintRow>)).toBe('<div class="row rowInline">x</div>');
+    expect(renderToStaticMarkup(<InfoHintRow separated>x</InfoHintRow>)).toBe('<div class="row rowSeparated">x</div>');
   });
 
   it("pose la rangée et la liste « qui le voit »", () => {
@@ -228,65 +223,117 @@ describe("InfoHint — gestes", () => {
     expect(buttonFocus).toHaveBeenCalledTimes(1);
   });
 
+  /** Place un faux conteneur (et un faux bouton focalisable) dans les références du composant. */
+  function fakeRefs(
+    view: { root: ReactElement<Props>; button: ReactElement<Props> },
+    contains: (target: unknown) => boolean = () => false,
+  ): { focus: jest.Mock } {
+    const focus = jest.fn();
+    (view.root as unknown as { ref: { current: unknown } }).ref.current = { contains, closest: () => null };
+    (view.button as unknown as { ref: { current: unknown } }).ref.current = { focus };
+    return { focus };
+  }
+
+  it("nomme le bouton dans la langue ambiante (`lang`) : une modale de personnel `lang=fr` sous /en", () => {
+    locale.current = "en";
+    let view = render();
+    expect(view.button.props["aria-label"]).toBe("More info: BattleTag");
+    (view.root as unknown as { ref: { current: unknown } }).ref.current = {
+      closest: () => ({ getAttribute: () => "fr" }),
+    };
+    render();
+    view = render();
+    expect(view.button.props["aria-label"]).toBe("Plus d'infos : BattleTag");
+  });
+
   it("se referme quand on ouvre un autre « i » : ce clic vient d'ailleurs", () => {
     let view = render();
     click(view.button);
     view = render();
     const NodeClass = globals.Node as new () => object;
-    const otherButton = new NodeClass();
-    const rootRef = (view.root as unknown as { ref: { current: unknown } }).ref;
-    rootRef.current = { contains: () => false, addEventListener: () => {}, removeEventListener: () => {} };
-    documentListeners.click[0]({ target: otherButton });
+    fakeRefs(view);
+    documentListeners.click[0]({ target: new NodeClass() });
     view = render();
     expect(view.button.props["aria-expanded"]).toBe(false);
   });
 
-  /** Un faux conteneur qui retient ses écouteurs `keydown`, posé dans la référence du composant. */
-  function fakeRoot(view: { root: ReactElement<Props> }): Array<(event: unknown) => void> {
-    const listeners: Array<(event: unknown) => void> = [];
-    const rootRef = (view.root as unknown as { ref: { current: unknown } }).ref;
-    rootRef.current = {
-      contains: () => false,
-      addEventListener: (type: string, listener: (event: unknown) => void) => {
-        if (type === "keydown") listeners.push(listener);
-      },
-      removeEventListener: (type: string, listener: (event: unknown) => void) => {
-        const index = listeners.indexOf(listener);
-        if (type === "keydown" && index >= 0) listeners.splice(index, 1);
-      },
-    };
-    return listeners;
-  }
-
-  it("se referme à Échap et rend le focus au bouton", () => {
+  it("se referme à Échap, écouté sur document, et rend le focus au bouton", () => {
     let view = render();
-    const keydown = fakeRoot(view);
     click(view.button);
     view = render();
-    expect(keydown).toHaveLength(1);
-    const focus = jest.fn();
-    const buttonRef = (view.button as unknown as { ref?: { current: unknown } }).ref;
-    // Le bouton porte une référence : on y place un faux élément focalisable.
-    expect(buttonRef).toBeDefined();
-    if (buttonRef) buttonRef.current = { focus };
+    expect(documentListeners.keydown).toHaveLength(1);
+    const { focus } = fakeRefs(view);
+    const doc = globals.document as { activeElement?: unknown; body?: unknown };
+    doc.body = {};
+    doc.activeElement = doc.body;
     const stopPropagation = jest.fn();
-    keydown[0]({ key: "Tab", stopPropagation });
+    documentListeners.keydown[0]({ key: "Tab", stopPropagation });
     view = render();
     expect(view.button.props["aria-expanded"]).toBe(true);
-    keydown[0]({ key: "Escape", stopPropagation });
+    documentListeners.keydown[0]({ key: "Escape", stopPropagation });
     view = render();
     expect(view.button.props["aria-expanded"]).toBe(false);
     expect(focus).toHaveBeenCalledTimes(1);
     expect(stopPropagation).toHaveBeenCalledTimes(1);
-    expect(keydown).toHaveLength(0);
+    expect(documentListeners.keydown ?? []).toHaveLength(0);
   });
 
-  it("n'écoute pas Échap quand il est fermé : une modale ouverte garde le sien", () => {
+  it("Échap replie le « i » focus parti ailleurs, sans arracher le focus à un champ voisin", () => {
+    let view = render();
+    click(view.button);
+    view = render();
+    const { focus } = fakeRefs(view);
+    const doc = globals.document as { activeElement?: unknown; body?: unknown };
+    doc.body = {};
+    doc.activeElement = { contains: () => false };
+    documentListeners.keydown[0]({ key: "Escape", stopPropagation: jest.fn() });
+    view = render();
+    expect(view.button.props["aria-expanded"]).toBe(false);
+    expect(focus).not.toHaveBeenCalled();
+  });
+
+  it("laisse Échap à une modale ouverte par-dessus, qui ne porte pas le « i »", () => {
+    let view = render();
+    click(view.button);
+    view = render();
+    fakeRefs(view);
+    const overModal = { contains: () => false };
+    (globals.document as { querySelectorAll: unknown }).querySelectorAll = () => ({ length: 1, item: () => overModal });
+    const stopPropagation = jest.fn();
+    documentListeners.keydown[0]({ key: "Escape", stopPropagation });
+    view = render();
+    expect(view.button.props["aria-expanded"]).toBe(true);
+    expect(stopPropagation).not.toHaveBeenCalled();
+  });
+
+  it("n'écoute rien quand il est fermé : une modale ouverte garde son Échap", () => {
     const view = render();
-    const keydown = fakeRoot(view);
-    render();
-    expect(keydown).toHaveLength(0);
     expect(view.root.props.onKeyDown).toBeUndefined();
+    expect(documentListeners.keydown ?? []).toHaveLength(0);
+    expect(documentListeners.pointerup ?? []).toHaveLength(0);
+    expect(documentListeners.click ?? []).toHaveLength(0);
+  });
+
+  it("au toucher, le relâchement sur du texte extérieur referme ; sur un contrôle ou dedans, non", () => {
+    let view = render();
+    click(view.button);
+    view = render();
+    expect(documentListeners.pointerup).toHaveLength(1);
+    const NodeClass = globals.Node as new () => object;
+    const inside = new NodeClass();
+    const text = Object.assign(new NodeClass(), { closest: () => null });
+    const control = Object.assign(new NodeClass(), { closest: () => ({}) });
+    fakeRefs(view, (target) => target === inside);
+    documentListeners.pointerup[0]({ target: inside, pointerType: "touch" });
+    documentListeners.pointerup[0]({ target: control, pointerType: "touch" });
+    // Souris : le relâchement d'une sélection de texte ne replie pas.
+    documentListeners.pointerup[0]({ target: text, pointerType: "mouse" });
+    view = render();
+    expect(view.button.props["aria-expanded"]).toBe(true);
+    documentListeners.pointerup[0]({ target: text, pointerType: "touch" });
+    view = render();
+    expect(view.button.props["aria-expanded"]).toBe(false);
+    expect(documentListeners.pointerup ?? []).toHaveLength(0);
   });
 
   it("se referme au clic ailleurs, pas au clic dedans, et n'écoute que pendant qu'il est ouvert", () => {
@@ -298,24 +345,11 @@ describe("InfoHint — gestes", () => {
     const NodeClass = globals.Node as new () => object;
     const inside = new NodeClass();
     const outside = new NodeClass();
-    const rootRef = (view.root as unknown as { ref: { current: unknown } }).ref;
-    rootRef.current = { contains: (target: unknown) => target === inside, addEventListener: () => {}, removeEventListener: () => {} };
-    buttonFocus.mockClear();
-    (view.button as unknown as { ref: { current: unknown } }).ref.current = { focus: buttonFocus };
-    const doc = globals.document as { activeElement?: unknown; body?: unknown };
-    doc.body = { contains: () => true };
-    doc.activeElement = doc.body;
+    const { focus } = fakeRefs(view, (target) => target === inside);
     documentListeners.click[0]({ target: inside });
     view = render();
     expect(view.button.props["aria-expanded"]).toBe(true);
-    // Sur une page ordinaire le focus va à `body` : rien à rendre, la lecture reste en place.
-    expect(buttonFocus).not.toHaveBeenCalled();
-    doc.activeElement = { contains: (node: unknown) => node === rootRef.current };
-    documentListeners.click[0]({ target: inside });
-    render();
-    // Le focus parti au conteneur de la modale revient au bouton, sans défiler : Échap replie encore le « i ».
-    expect(buttonFocus).toHaveBeenCalledTimes(1);
-    expect(buttonFocus).toHaveBeenCalledWith({ preventScroll: true });
+    expect(focus).not.toHaveBeenCalled();
     documentListeners.click[0]({ target: outside });
     view = render();
     expect(view.button.props["aria-expanded"]).toBe(false);
@@ -325,6 +359,17 @@ describe("InfoHint — gestes", () => {
 
 describe("InfoHint — feuille de style", () => {
   const css = readSource("components/ui/info-hint.module.css");
+
+  it("ne survole qu'à la souris : au toucher le survol restait collé", () => {
+    expect(css).toMatch(/@media \(hover: hover\) \{\s*\.trigger:hover \{/);
+    expect(css).not.toMatch(/^\.trigger:hover/m);
+  });
+
+  it("borne le premier élément de la rangée pour que le « i » ne tombe pas seul", () => {
+    expect(css).toMatch(/\.row > :first-child \{\s*max-inline-size: calc\(100% - 30px\);/);
+    expect(css).toMatch(/\.rowSeparated \{\s*column-gap: 16px;/);
+    expect(css).toMatch(/\.rowInline \.trigger \{\s*display: inline-flex;/);
+  });
 
   it("offre une cible de 24 px au moins et un anneau de focus visible", () => {
     expect(css).toMatch(/\.trigger \{[^}]*inline-size: 24px;[^}]*block-size: 24px;/);

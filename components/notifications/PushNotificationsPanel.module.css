@@ -96,23 +96,32 @@
   }
 }
 
-/* Case, libellé et bouton « i » sur une ligne ; l'explication passe dessous. */
+/* Case, libellé et bouton « i » sur une ligne ; l'explication passe dessous.
+   Alignés **en haut** : sur un libellé qui passe sur deux lignes (375 px), la
+   case et le « i » restent à la première ligne au lieu de se centrer sur le
+   bloc. Le libellé tient une hauteur de 24 px (celle du bouton), un libellé
+   d'une ligne y est centré, et la case de 16 px se pose 4 px plus bas pour
+   tomber à son niveau. L'écart de 16 px entre libellé et « i » évite qu'un
+   toucher à côté du bouton bascule le sujet (réglage enregistré au changement). */
 .topic {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  column-gap: 10px;
+  align-items: flex-start;
+  column-gap: 16px;
 }
 
 .topic input[type="checkbox"] {
   flex-shrink: 0;
+  margin-top: 4px;
 }
 
 .topicText {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 2px;
   min-width: 0;
+  min-height: 24px;
   cursor: pointer;
 }
 

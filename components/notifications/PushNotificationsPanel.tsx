@@ -188,8 +188,10 @@ function DeviceControl({
         <CyberButton
           type="button"
           variant="ghost"
-          disabled={push.busy}
+          aria-disabled={push.busy || undefined}
+          aria-busy={push.busy || undefined}
           onClick={async () => {
+            if (push.busy) return;
             if (await push.disable()) showSuccess(t("panel.disabled"));
           }}
         >
@@ -203,8 +205,9 @@ function DeviceControl({
       <CyberButton
         type="button"
         aria-busy={push.busy}
-        disabled={push.busy}
+        aria-disabled={push.busy || undefined}
         onClick={async () => {
+          if (push.busy) return;
           if (await push.enable()) showSuccess(t("panel.enabled"));
         }}
       >

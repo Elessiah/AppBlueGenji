@@ -11,6 +11,7 @@
     "handleLabel": "Tag Discord ou ID",
     "handlePlaceholder": "ton_pseudo ou 123456789012345678",
     "handleHelp": "Le bot doit partager un serveur avec toi pour t'écrire : <join>rejoins le nôtre</join>, ou passe par le bouton Discord ci-dessus, qui s'en passe. Ton ID évite seulement la recherche de ton tag.",
+    "inviteAfterRefusal": "Si tu n'es pas encore sur le serveur : <join>rejoins le serveur BlueGenji</join>, puis redemande ton code.",
     "sending": "Envoi...",
     "requestCode": "Recevoir un code →",
     "codeSent": "Code envoyé en DM Discord (expiration : {time}).",

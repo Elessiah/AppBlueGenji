@@ -314,7 +314,13 @@ function ReportForm({
               {t("dialog.title")}
             </h2>
           </div>
-          <button type="button" className={styles.close} onClick={onClose} disabled={busy} aria-label={t("dialog.close")}>
+          <button
+            type="button"
+            className={styles.close}
+            onClick={() => !busy && onClose()}
+            aria-disabled={busy || undefined}
+            aria-label={t("dialog.close")}
+          >
             ×
           </button>
         </div>
@@ -326,7 +332,9 @@ function ReportForm({
             <ScrollArea orientation="y" className={styles.body} ariaLabel={t("dialog.bodyLabel")}>
               <div className={styles.stepBar}>
                 {contestOf === undefined && (
-                  <button type="button" className={styles.back} onClick={() => setCategory(null)} disabled={busy}>
+                  <button type="button" className={styles.back} onClick={() => !busy && setCategory(null)}
+                    aria-disabled={busy || undefined}
+                  >
                     {t("dialog.changeCategory")}
                   </button>
                 )}
@@ -426,12 +434,12 @@ function ReportForm({
             </ScrollArea>
 
             <div className={styles.foot}>
-              <CyberButton type="button" variant="ghost" onClick={onClose} disabled={busy}>
+              <CyberButton type="button" variant="ghost" onClick={() => !busy && onClose()} aria-disabled={busy || undefined}>
                 {t("dialog.cancel")}
               </CyberButton>
               {/* Jamais grisé pour une saisie incomplète : un bouton éteint ne
                   dit pas ce qui manque, l'envoi le dit (en notification). */}
-              <CyberButton type="submit" variant="primary" disabled={busy}>
+              <CyberButton type="submit" variant="primary" aria-disabled={busy || undefined} aria-busy={busy || undefined}>
                 {busy ? t("dialog.sending") : t("dialog.submit")}
               </CyberButton>
             </div>

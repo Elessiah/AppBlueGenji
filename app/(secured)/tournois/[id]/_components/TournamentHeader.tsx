@@ -4,6 +4,7 @@ import { useState, type MouseEvent } from "react";
 import { LocaleLink, useLocaleRouter } from "@/components/i18n/locale-navigation";
 import { useTournamentPageText } from "@/components/i18n/tournament-page-text";
 import { useTournamentsText } from "@/components/i18n/tournaments-text";
+import { capitalizeFirst } from "@/lib/shared/capitalize-first";
 import { tournamentLabel } from "@/lib/shared/tournaments-text";
 import type { Locale } from "@/lib/shared/locales";
 import { INTL_LOCALE } from "@/lib/shared/locales";
@@ -335,11 +336,13 @@ function MetaCell({ item, locale }: Readonly<{ item: HeaderMetaItem; locale: Loc
       <dd className={`${s.metaValue} ${isNumeric ? s.metaValueNum : ""}`} style={{ margin: 0 }}>
         {item.hint ? (
           // L'explication derrière le « i » : un `title` échappait au toucher
-          // et au clavier (`docs/features/INFO_HINTS.md`).
+          // et au clavier (`docs/features/INFO_HINTS.md`). Majuscule à
+          // l'affichage : `matchFormat.race` & co sont des fragments écrits
+          // pour suivre « — », lus seuls dans le panneau.
           <InfoHintRow>
             <span>{text}</span>
             <InfoHint id={`tournament-meta-${item.key}-hint`} subject={item.label}>
-              <p>{item.hint}</p>
+              <p>{capitalizeFirst(item.hint, locale)}</p>
             </InfoHint>
           </InfoHintRow>
         ) : (

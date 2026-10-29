@@ -264,10 +264,7 @@ function ConnectionRow({
   const details = connectionDetails(text, connection, discordByCode);
   return (
     <>
-      <div
-        className="table-row"
-        style={{ alignItems: "center", gap: 12, flexWrap: "wrap" }}
-      >
+      <div className={`table-row ${s.connectionRow}`}>
         <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
           <InfoHintRow>
             <span className={s.connectionName}>

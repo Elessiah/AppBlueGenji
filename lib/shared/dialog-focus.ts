@@ -23,6 +23,10 @@ export interface EscapeTarget {
  *   focalise pas un bouton cliqué) ;
  * - la cible est dans un élément ouvert qui referme lui-même sur Échap
  *   (`data-escape-owner`, posé par `InfoHint` déplié) ;
+ * - un tel élément est ouvert **n'importe où dans la modale** (`container`) :
+ *   un « i » resté déplié alors que le focus est parti sur un champ voisin
+ *   (Tab) se replie sur Échap — sa propre écoute, posée sur `document` — sans
+ *   que la modale se ferme et vide son formulaire ;
  * - la cible est un `combobox` dont la liste est ouverte (il la referme).
  *   Le rôle est exigé, et pas seulement `aria-expanded` : un bouton de
  *   dépliage porte lui aussi `aria-expanded="true"` sans écouter Échap.
@@ -30,9 +34,11 @@ export interface EscapeTarget {
 export function escapeBelongsElsewhere(
   layers: readonly EscapeLayer[],
   target: EscapeTarget | null | undefined,
+  container?: EscapeLayer | null,
 ): boolean {
   if (layers.some((layer) => layer.querySelector('[aria-expanded="true"]'))) return true;
   if (target?.closest?.("[data-escape-owner]")) return true;
+  if (container?.querySelector("[data-escape-owner]")) return true;
   return target?.getAttribute?.("role") === "combobox" && target.getAttribute("aria-expanded") === "true";
 }
 

@@ -85,7 +85,7 @@ describe("AccountMenuPanel", () => {
   });
 
   it("désactive la déconnexion pendant la requête", () => {
-    expect(panel(null, true)).toMatch(/<button[^>]*disabled=""[^>]*>.*<span class="itemText">Déconnexion…<\/span><\/button>/);
+    expect(panel(null, true)).toMatch(/<button[^>]*aria-disabled="true"[^>]*aria-busy="true"[^>]*>.*<span class="itemText">Déconnexion…<\/span><\/button>/);
   });
 });
 
@@ -136,13 +136,13 @@ describe("mise en page de la navigation", () => {
   it("n'éclaire pas la déconnexion désactivée au survol", () => {
     const css = readSource("components/account-menu.module.css");
     // Survol réservé aux pointeurs qui survolent, et jamais sur l'entrée désactivée.
-    expect(css).toMatch(/@media \(hover: hover\) and \(pointer: fine\) \{\s*\.item:hover:not\(:disabled\) \{/);
-    expect(css).toMatch(/\.logout:disabled \.itemIcon\s*\{[^}]*color: var\(--ink-dim\);/);
+    expect(css).toMatch(/@media \(hover: hover\) and \(pointer: fine\) \{\s*\.item:hover:not\(\[aria-disabled="true"\]\) \{/);
+    expect(css).toMatch(/\.logout\[aria-disabled="true"\] \.itemIcon\s*\{[^}]*color: var\(--ink-dim\);/);
   });
 
   it("garde le retour à l'appui visible après le focus", () => {
     const css = readSource("components/account-menu.module.css");
-    expect(css.indexOf(".item:active:not(:disabled) {")).toBeGreaterThan(css.indexOf(".item:focus-visible {"));
+    expect(css.indexOf('.item:active:not([aria-disabled="true"]) {')).toBeGreaterThan(css.indexOf(".item:focus-visible {"));
   });
 
   it("dessine la pastille des signalements en contraste forcé", () => {
