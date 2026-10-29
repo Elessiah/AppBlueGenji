@@ -115,7 +115,7 @@ describe("updateTeamLogo — dérogation staff", () => {
       .fn<SqlQuery>()
       .mockResolvedValueOnce(NOT_A_MEMBER) // getMemberRoles
       .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]])
-      .mockResolvedValueOnce([[{ logo_url: null }]]) // logo précédent, sous verrou
+      .mockResolvedValueOnce([[{ logo_url: null, deleted_at: null, is_ghost: 1 }]]) // logo précédent et droit, sous verrou
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
     await mockDb(execute);
 

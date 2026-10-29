@@ -41,7 +41,18 @@ function install(poolRoutes: Route[], connectionRoutes: Route[]) {
 }
 
 const manager: Route = [/SELECT roles_json\s+FROM bg_team_members/, () => [[{ roles_json: JSON.stringify(["MANAGER"]) }]]];
-const lockLogo = (logo: string | null): Route => [/SELECT logo_url FROM bg_teams WHERE id = \? FOR UPDATE/, () => [[{ logo_url: logo }]]];
+const lockTeam = (row: { logo_url: string | null; deleted_at: Date | null; is_ghost: 0 | 1 } | null): Route => [
+  /SELECT logo_url, deleted_at, is_ghost FROM bg_teams WHERE id = \? FOR UPDATE/,
+  () => [row ? [row] : []],
+];
+const lockLogo = (logo: string | null): Route => lockTeam({ logo_url: logo, deleted_at: null, is_ghost: 0 });
+const lockedRoles = (roles: string[] | null): Route => [
+  /SELECT roles_json\s+FROM bg_team_members[\s\S]*FOR UPDATE/,
+  () => [roles ? [{ roles_json: JSON.stringify(roles) }] : []],
+];
+const writeLogo: Route = [/UPDATE bg_teams SET logo_url = \?/, () => [{}]];
+const notMember: Route = [/SELECT roles_json\s+FROM bg_team_members/, () => [[]]];
+const ghostBeforeLock: Route = [/SELECT is_ghost, deleted_at FROM bg_teams/, () => [[{ is_ghost: 1, deleted_at: null }]]];
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -49,35 +60,36 @@ beforeEach(() => {
 
 describe("updateTeamLogo", () => {
   it("updateTeamLogo_newLogo_returnsLogoReadUnderLock", async () => {
-    install([manager], [lockLogo("/api/uploads/teams/old.webp"), [/UPDATE bg_teams SET logo_url = \?/, () => [{}]]]);
+    install([manager], [lockedRoles(["MANAGER"]), lockLogo("/api/uploads/teams/old.webp"), [/UPDATE bg_teams SET logo_url = \?/, () => [{}]]]);
 
     const result = await updateTeamLogo(1, 7, "/api/uploads/teams/new.webp");
 
     expect(result).toEqual({ previousLogoUrl: "/api/uploads/teams/old.webp" });
   });
 
-  it("updateTeamLogo_newLogo_locksBeforeWritingInOneTransaction", async () => {
-    install([manager], [lockLogo(null), [/UPDATE bg_teams SET logo_url = \?/, () => [{}]]]);
+  it("updateTeamLogo_managerUnderLock_locksTeamThenMemberBeforeWriting", async () => {
+    install([manager], [lockedRoles(["MANAGER"]), lockLogo(null), [/UPDATE bg_teams SET logo_url = \?/, () => [{}]]]);
 
     await updateTeamLogo(1, 7, "/api/uploads/teams/new.webp");
 
     const statements = connection.execute.mock.calls.map(([sql]) => sql);
-    expect(statements[0]).toMatch(/FOR UPDATE/);
-    expect(statements[1]).toMatch(/UPDATE bg_teams SET logo_url = \?/);
-    expect(connection.execute.mock.calls[1][1]).toEqual(["/api/uploads/teams/new.webp", 7]);
+    expect(statements[0]).toMatch(/FROM bg_teams WHERE id = \? FOR UPDATE/);
+    expect(statements[1]).toMatch(/FROM bg_team_members[\s\S]*FOR UPDATE/);
+    expect(statements[2]).toMatch(/UPDATE bg_teams SET logo_url = \?/);
+    expect(connection.execute.mock.calls[2][1]).toEqual(["/api/uploads/teams/new.webp", 7]);
     expect(connection.beginTransaction).toHaveBeenCalledTimes(1);
     expect(connection.commit).toHaveBeenCalledTimes(1);
     expect(connection.release).toHaveBeenCalledTimes(1);
   });
 
   it("updateTeamLogo_teamWithoutLogo_returnsNullPrevious", async () => {
-    install([manager], [lockLogo(null), [/UPDATE bg_teams SET logo_url = \?/, () => [{}]]]);
+    install([manager], [lockedRoles(["MANAGER"]), lockLogo(null), [/UPDATE bg_teams SET logo_url = \?/, () => [{}]]]);
 
     expect(await updateTeamLogo(1, 7, null)).toEqual({ previousLogoUrl: null });
   });
 
   it("updateTeamLogo_committed_invalidatesIdentityViewsAfterCommit", async () => {
-    install([manager], [lockLogo(null), [/UPDATE bg_teams SET logo_url = \?/, () => [{}]]]);
+    install([manager], [lockedRoles(["MANAGER"]), lockLogo(null), [/UPDATE bg_teams SET logo_url = \?/, () => [{}]]]);
 
     await updateTeamLogo(1, 7, "/api/uploads/teams/new.webp");
 
@@ -88,7 +100,7 @@ describe("updateTeamLogo", () => {
   });
 
   it("updateTeamLogo_removingAbsentLogo_invalidatesNothing", async () => {
-    install([manager], [lockLogo(null), [/UPDATE bg_teams SET logo_url = \?/, () => [{}]]]);
+    install([manager], [lockedRoles(["MANAGER"]), lockLogo(null), [/UPDATE bg_teams SET logo_url = \?/, () => [{}]]]);
 
     await updateTeamLogo(1, 7, null);
 
@@ -96,7 +108,7 @@ describe("updateTeamLogo", () => {
   });
 
   it("updateTeamLogo_removingExistingLogo_invalidatesIdentityViews", async () => {
-    install([manager], [lockLogo("/api/uploads/teams/old.webp"), [/UPDATE bg_teams SET logo_url = \?/, () => [{}]]]);
+    install([manager], [lockedRoles(["MANAGER"]), lockLogo("/api/uploads/teams/old.webp"), [/UPDATE bg_teams SET logo_url = \?/, () => [{}]]]);
 
     await updateTeamLogo(1, 7, null);
 
@@ -107,6 +119,7 @@ describe("updateTeamLogo", () => {
     install(
       [manager],
       [
+        lockedRoles(["MANAGER"]),
         lockLogo("/api/uploads/teams/old.webp"),
         [
           /UPDATE bg_teams SET logo_url = \?/,
@@ -160,5 +173,70 @@ describe("syncSoloEntryIdentity", () => {
     await syncSoloEntryIdentity(9);
 
     expect(invalidateLandingTeamViews).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Le droit se rejuge sous le verrou de la ligne d'équipe : un envoi croisé
+ * avec une dissolution, une rétrogradation ou la reprise d'une fantôme
+ * n'écrit rien.
+ */
+describe("updateTeamLogo — droit rejugé sous verrou", () => {
+  function expectRefusedWithoutWrite() {
+    const statements = connection.execute.mock.calls.map(([sql]) => sql);
+    expect(statements.some((sql) => /UPDATE bg_teams SET logo_url/.test(sql))).toBe(false);
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
+    expect(connection.commit).not.toHaveBeenCalled();
+    expect(connection.release).toHaveBeenCalledTimes(1);
+    expect(invalidateTeamIdentityViews).not.toHaveBeenCalled();
+  }
+
+  it("updateTeamLogo_teamDissolvedBeforeLock_throwsForbiddenAndRollsBack", async () => {
+    install(
+      [manager],
+      [lockTeam({ logo_url: null, deleted_at: new Date("2026-10-29T10:00:00Z"), is_ghost: 0 }), lockedRoles(["MANAGER"]), writeLogo],
+    );
+
+    await expect(updateTeamLogo(1, 7, "/api/uploads/teams/new.webp")).rejects.toThrow("FORBIDDEN");
+    expectRefusedWithoutWrite();
+  });
+
+  it("updateTeamLogo_teamRowMissingUnderLock_throwsForbidden", async () => {
+    install([manager], [lockTeam(null), lockedRoles(["MANAGER"]), writeLogo]);
+
+    await expect(updateTeamLogo(1, 7, null)).rejects.toThrow("FORBIDDEN");
+    expectRefusedWithoutWrite();
+  });
+
+  it("updateTeamLogo_managerDemotedBeforeLock_throwsForbidden", async () => {
+    install([manager], [lockLogo("/api/uploads/teams/old.webp"), lockedRoles(["TANK"]), writeLogo]);
+
+    await expect(updateTeamLogo(1, 7, "/api/uploads/teams/new.webp")).rejects.toThrow("FORBIDDEN");
+    expectRefusedWithoutWrite();
+  });
+
+  it("updateTeamLogo_memberLeftBeforeLock_throwsForbidden", async () => {
+    install([manager], [lockLogo("/api/uploads/teams/old.webp"), lockedRoles(null), writeLogo]);
+
+    await expect(updateTeamLogo(1, 7, null)).rejects.toThrow("FORBIDDEN");
+    expectRefusedWithoutWrite();
+  });
+
+  it("updateTeamLogo_ghostTakenOverBeforeLock_throwsForbidden", async () => {
+    install([notMember, ghostBeforeLock], [lockTeam({ logo_url: null, deleted_at: null, is_ghost: 0 }), writeLogo]);
+
+    await expect(updateTeamLogo(1, 7, "/api/uploads/teams/new.webp", true)).rejects.toThrow("FORBIDDEN");
+    expectRefusedWithoutWrite();
+  });
+
+  it("updateTeamLogo_staffOnGhostUnderLock_writesWithoutMemberLock", async () => {
+    install([notMember, ghostBeforeLock], [lockTeam({ logo_url: "/api/uploads/teams/old.webp", deleted_at: null, is_ghost: 1 }), writeLogo]);
+
+    const result = await updateTeamLogo(1, 7, "/api/uploads/teams/new.webp", true);
+
+    expect(result).toEqual({ previousLogoUrl: "/api/uploads/teams/old.webp" });
+    const statements = connection.execute.mock.calls.map(([sql]) => sql);
+    expect(statements.some((sql) => /bg_team_members/.test(sql))).toBe(false);
+    expect(connection.commit).toHaveBeenCalledTimes(1);
   });
 });
