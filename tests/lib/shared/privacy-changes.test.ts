@@ -2250,13 +2250,21 @@ describe("PRIVACY_CHANGES — suppression de compte et export (EF-21, décision 
     expect(entry.asksTermsAcceptance).toBeUndefined();
   });
 
+  it("privacyChanges_accountDeletionExport_noLongerPromisesLinkRemovalAfterEveningEnds", () => {
+    // Une soirée finie (ou sans autre lien) n'est pas remise à jour : rien ne le promet.
+    const fr = `${entry.summary} ${entry.details.join(" ")}`;
+    const en = `${english.summary} ${english.details.join(" ")}`;
+    expect(fr).not.toContain("quatre heures");
+    expect(en).not.toContain("four hours");
+  });
+
   it("privacyChanges_accountDeletionExport_statesDirectoryLiveMessageAndExportFrAndEn", () => {
     const fr = `${entry.summary} ${entry.details.join(" ")}`;
     const en = `${english.summary} ${english.details.join(" ")}`;
-    for (const part of ["mais plus son identifiant ni sa date de création", "sans le lien de sa chaîne tant qu'il est encore modifié", "tes inscriptions de caster", "les matchs dont tu es l'arbitre désigné", "si ton BattleTag vient de Battle.net ou a été tapé à la main"]) {
+    for (const part of ["mais plus son identifiant ni sa date de création", "sans le lien de sa chaîne s'il garde un autre lien ; sinon, ou une fois la soirée finie, il le garde", "tes inscriptions de caster", "les matchs dont tu es l'arbitre désigné", "si ton BattleTag vient de Battle.net ou a été tapé à la main"]) {
       expect(fr).toContain(part);
     }
-    for (const part of ["but no longer its identifier or creation date", "without their channel link as long as it is still edited", "your caster registrations", "the matches you are the assigned referee of", "whether your BattleTag comes from Battle.net or was typed in by hand"]) {
+    for (const part of ["but no longer its identifier or creation date", "without their channel link if it keeps another link; otherwise, or once the evening has ended, it keeps it", "your caster registrations", "the matches you are the assigned referee of", "whether your BattleTag comes from Battle.net or was typed in by hand"]) {
       expect(en).toContain(part);
     }
   });
