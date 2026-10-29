@@ -378,6 +378,25 @@ describe("GET /api/spectator/tournaments/[id]", () => {
       }
     });
 
+    it("répond 304 aussi à un client gzip qui détient la version du corps compressé", async () => {
+      jest.useFakeTimers({ ...CLOCK, doNotFake: [...CLOCK.doNotFake] });
+      try {
+        mockedSnapshot.mockResolvedValue(snapshot());
+        const first = await GET(req("5", { "accept-encoding": "gzip" }), params("5"));
+        expect(first.headers.get("etag")).toMatch(/-gzip"$/);
+        jest.setSystemTime(5_000_000 + 20_000);
+        for (let i = 1; i <= SPECTATOR_REBUILD_RULE.capacity; i += 1) await GET(req(String(100 + i)), params(String(100 + i)));
+
+        const res = await GET(
+          req("5", { "accept-encoding": "gzip", "if-none-match": first.headers.get("etag") ?? "" }),
+          params("5"),
+        );
+        expect(res.status).toBe(304);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     it("répond 429 au-delà de l'âge déclaré, même avec la version en main", async () => {
       jest.useFakeTimers({ ...CLOCK, doNotFake: [...CLOCK.doNotFake] });
       try {

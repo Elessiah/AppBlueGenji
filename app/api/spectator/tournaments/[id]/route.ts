@@ -88,7 +88,8 @@ function refusedRead(
 ): SpectatorPayload | Response {
   const stale = staleSpectatorPayload(tournamentId);
   if (refusal.kind === "rate") {
-    if (stale && matchesEtag(ifNoneMatch, etagOf(stale))) return stale;
+    // Les deux codages : le client porte l'`ETag` du corps qu'il a reçu.
+    if (stale && (matchesEtag(ifNoneMatch, etagOf(stale)) || matchesEtag(ifNoneMatch, etagOf(stale, true)))) return stale;
     return refusal.response ?? unavailable(level);
   }
   return stale ?? refusal.response ?? unavailable(level);
