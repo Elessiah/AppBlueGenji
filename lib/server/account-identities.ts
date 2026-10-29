@@ -253,15 +253,16 @@ async function writeLinkedIdentity(
     return result;
   }
   if (identity.provider === "BLIZZARD") {
-    // Même règle qu'à la connexion : Blizzard fait foi sur le BattleTag, et
-    // n'efface rien quand il n'en a pas à donner.
+    // Même règle qu'à la connexion : Blizzard fait foi sur le BattleTag, même
+    // quand il n'en a pas à donner. Un BattleTag tapé avant le rattachement
+    // est alors effacé : gardé, il passerait pour « vérifié »
+    // (`hasVerifiedBattletag` : Battle.net rattaché et un BattleTag), et le
+    // verrou (`battletag-lock.ts`) l'empêcherait d'être corrigé.
     const tag = normalizeBattletag(identity.handle);
     const [result] = await db.execute<ResultSetHeader>(
-      tag
-        ? `UPDATE bg_users SET blizzard_sub = ?, overwatch_battletag = ?
-           WHERE id = ? AND is_deleted = 0 AND ${UNMOVED_SUBJECT_SQL.BLIZZARD}`
-        : `UPDATE bg_users SET blizzard_sub = ? WHERE id = ? AND is_deleted = 0 AND ${UNMOVED_SUBJECT_SQL.BLIZZARD}`,
-      tag ? [identity.subject, tag, userId, identity.subject] : [identity.subject, userId, identity.subject],
+      `UPDATE bg_users SET blizzard_sub = ?, overwatch_battletag = ?
+       WHERE id = ? AND is_deleted = 0 AND ${UNMOVED_SUBJECT_SQL.BLIZZARD}`,
+      [identity.subject, tag, userId, identity.subject],
     );
     return result;
   }

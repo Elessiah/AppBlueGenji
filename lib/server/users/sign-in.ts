@@ -369,8 +369,10 @@ export async function createOrGetDiscordUser(
  * (`visible_overwatch`), lui, n'est pas touché : la connexion corrige une
  * donnée, elle ne publie rien.
  *
- * `null` quand le compte Battle.net n'a pas de BattleTag — le champ reste alors
- * ce qu'il était, on n'efface pas une saisie avec du vide.
+ * `null` quand le compte Battle.net n'a pas de BattleTag (ou un BattleTag
+ * illisible) : le champ est alors **effacé**. Un BattleTag laissé là — tapé
+ * avant le rattachement — passerait pour vérifié (`hasVerifiedBattletag` :
+ * Battle.net rattaché et un BattleTag) sans que Blizzard l'ait jamais nommé.
  */
 export async function createOrGetBlizzardUser(
   sub: string,
@@ -387,18 +389,16 @@ export async function createOrGetBlizzardUser(
 
   if (existing.length > 0) {
     const userId = Number(existing[0].id);
-    if (tag) {
-      // Même course, même remède qu'au-dessus : une connexion Battle.net partie
-      // avant la suppression réécrivait le BattleTag sur la ligne que
-      // `anonymizeAccount` venait de mettre à `NULL`. La donnée est moins
-      // exposée que le tag Discord (aucune certification, et l'anonymisation
-      // force `visible_overwatch` à 0), mais c'est la même chose : une
-      // coordonnée personnelle qui repousse sur un compte vidé.
-      await db.execute(
-        `UPDATE bg_users SET overwatch_battletag = ? WHERE id = ? AND is_deleted = 0`,
-        [tag, userId],
-      );
-    }
+    // Même course, même remède qu'au-dessus : une connexion Battle.net partie
+    // avant la suppression réécrivait le BattleTag sur la ligne que
+    // `anonymizeAccount` venait de mettre à `NULL`. La donnée est moins
+    // exposée que le tag Discord (aucune certification, et l'anonymisation
+    // force `visible_overwatch` à 0), mais c'est la même chose : une
+    // coordonnée personnelle qui repousse sur un compte vidé.
+    await db.execute(
+      `UPDATE bg_users SET overwatch_battletag = ? WHERE id = ? AND is_deleted = 0`,
+      [tag, userId],
+    );
     await settleTermsAfterLogin(userId, false, consent);
     return userId;
   }
