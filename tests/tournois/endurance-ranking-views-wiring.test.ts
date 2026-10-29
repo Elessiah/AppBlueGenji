@@ -334,4 +334,17 @@ describe("EnduranceRankingViews — repères et noms accessibles", () => {
       }
     }
   });
+
+  it("« S3 » : le « i » n'apparaît que si la vue a des lignes à expliquer", () => {
+    expect(RANKING).toMatch(/\{rows\.length > 0 && \(\s*<InfoHintRow>[\s\S]*?seedHintLabel[\s\S]*?<\/InfoHintRow>/);
+  });
+
+  it("le bandeau entre deux manches ne promet pas une échéance qu'il ignore", () => {
+    for (const lang of ["fr", "en"]) {
+      const m = messages(lang);
+      for (const key of ["stripSoon", "stripPlayoffsSoon"]) {
+        expect(m[key]).not.toMatch(/bient[oô]t|soon/i);
+      }
+    }
+  });
 });
