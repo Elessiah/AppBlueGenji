@@ -349,7 +349,9 @@ export type PublicUserProfile = {
  * 11) : l'identifiant est l'adresse de sa fiche (`/joueurs/<id>`), qu'un ancien
  * lien suffisait à rapprocher de la ligne anonymisée, et la date à la seconde
  * l'aurait rapprochée d'un compte connu. Sa carte n'ouvre donc aucune fiche,
- * et le tri « Plus récents » le range en fin de liste.
+ * et le tri « Plus récents » le range en fin de liste. La fiche elle-même
+ * (`/joueurs/<id>`) reste servie à qui en garde l'adresse : l'annuaire seul
+ * cesse de la donner.
  */
 export type DirectoryPlayer = Omit<PublicUserProfile, "id" | "createdAt" | "isDeleted"> &
   ({ isDeleted: false; id: number; createdAt: string } | { isDeleted: true; id: null; createdAt: null });

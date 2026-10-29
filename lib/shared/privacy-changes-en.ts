@@ -702,7 +702,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     linkLabels: ["Read the “Match streaming” paragraph"],
     title: "Account deletion and export: directory, #live message, casts and refereeing",
     summary:
-      "A deleted account is no longer tied to its former address in the player directory, deleting a caster's account removes their channel link from the evening's #live message while it is still edited, and the export of your data now gives your casts, the channel links you provided, your refereeing and the origin of your BattleTag.",
+      "The player directory no longer shows a deleted account's identifier or creation date, deleting a caster's account removes their channel link from the evening's #live message while it is still edited, and the export of your data now gives your casts, the channel links you provided, your refereeing and the origin of your BattleTag.",
     details: [
       "Player directory: a deleted account keeps its stand-in username, its team and its record there, but no longer its identifier or creation date; its card no longer opens a page, and the “Newest” sort puts it at the end of the list.",
       "Evening #live message: when a caster's account is deleted, it is updated without their channel link as long as it is still edited (at most four hours after the evening ends); a message that no longer is keeps it, and the caster concerned can, like the team or player, ask for its deletion through the report form (GDPR category).",

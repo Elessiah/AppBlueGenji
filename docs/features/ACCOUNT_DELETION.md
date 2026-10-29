@@ -365,7 +365,11 @@ sont verrouillés **en une liste triée par id**, puis chaque écriture vaut pou
 tous. Les listes de départ sont des lectures ordinaires : `claimMatchCast`
 verrouille d'abord la ligne du compte (`LOCK IN SHARE MODE`), que la
 suppression tient en exclusif — une inscription lancée pendant la suppression
-lit le compte supprimé ou est vue par elle. Après le commit, chaque tournoi
+lit le compte supprimé ou est vue par elle. Une désignation d'arbitre
+(`writeReferee`, « Je prends ce match » ou staff) relit de même la condition
+d'arbitrage sous ce verrou partagé : lancée pendant la suppression, elle
+attend puis refuse le compte supprimé (`REFEREE_IDENTITY_REQUIRED`) au lieu
+de poser comme arbitre un compte anonymisé. Après le commit, chaque tournoi
 touché reçoit `publishMatchUpdatedEvent` : les instantanés ouverts perdent le
 caster, son lien ou l'arbitre, et le message #live de la soirée est remis à
 jour sans le lien (tant qu'il est encore modifié). Même chose au rattrapage
