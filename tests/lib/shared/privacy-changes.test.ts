@@ -2220,16 +2220,10 @@ describe("PRIVACY_CHANGES — conditions v8 : arbitre désigné et BattleTag tap
   });
 
   it("privacyChanges_termsV8_statesRefereePseudoAndTypedBattletagFrAndEn", () => {
-    const fr = [entry.title, entry.summary, ...entry.details].join(" ");
-    const en = [english.title, english.summary, ...english.details].join(" ");
-    expect(fr).toContain("son pseudo seul — jamais son BattleTag ni son tag Discord — se lit par tout membre connecté");
-    expect(fr).toContain("il peut s'y opposer par le formulaire de signalement (catégorie RGPD)");
-    expect(fr).toContain("un BattleTag tapé à la main ne suffit pas");
-    expect(fr).toContain("sans être tenu pour vérifié");
-    expect(en).toContain("their username alone — never their BattleTag or Discord tag — is read by any signed-in member");
-    expect(en).toContain("they may object to it through the report form (GDPR category)");
-    expect(en).toContain("a hand-typed BattleTag is not enough");
-    expect(en).toContain("without being treated as verified");
+    const fr = `${entry.title} ${entry.summary} ${entry.details.join(" ")}`;
+    const en = `${english.title} ${english.summary} ${english.details.join(" ")}`;
+    for (const part of ["son pseudo seul — jamais son BattleTag ni son tag Discord — se lit par tout membre connecté", "il peut s'y opposer par le formulaire de signalement (catégorie RGPD)", "un BattleTag tapé à la main ne suffit pas", "sans être tenu pour vérifié"]) expect(fr).toContain(part);
+    for (const part of ["their username alone — never their BattleTag or Discord tag — is read by any signed-in member", "they may object to it through the report form (GDPR category)", "a hand-typed BattleTag is not enough", "without being treated as verified"]) expect(en).toContain(part);
   });
 
   it("privacyChanges_termsV8_statesCasterDiscordTagInLaunchWindowFrAndEn", () => {
