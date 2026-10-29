@@ -235,7 +235,9 @@ describe("abandon figé — légende", () => {
     ]) {
       const source = read("_components", view);
       expect(source).toContain(`id="${id}"`);
-      expect(source).toMatch(/\?\.kind === "locked"/);
+      // Un prédicat léger partagé avec le geste de la ligne, sans rappeler `rowAction`.
+      expect(source).toMatch(/isFrozen(Row)?\b/);
+      expect(source).not.toMatch(/\?\.kind === "locked"/);
     }
     expect(css).toMatch(/\.frozenLegend \{[^}]*font-size: 11px;/);
     expect(css).not.toContain(":has(.forfeitLocked");
@@ -243,11 +245,13 @@ describe("abandon figé — légende", () => {
 
   it("BG Survie : la légende vit dans le panneau « Général » seul, en pied du tableau, avant la navigation du bas", () => {
     const views = read("_components", "EnduranceRankingViews.tsx");
-    const legend = views.indexOf("{withActions && actionsLegend && <div className={styles.legend}>{actionsLegend}</div>}");
+    const legend = views.indexOf("{isGeneral && ((withActions && actionsLegend) || outLegend) && (");
     expect(legend).toBeGreaterThan(views.indexOf('role={views.length > 1 ? "tabpanel" : undefined}'));
-    // Dernier enfant du panneau : sa balise fermante suit la légende.
-    expect(views.slice(legend).trimStart()).toMatch(/^\{withActions[^\n]*\r?\n\s*<\/div>/);
+    // Dernier enfant du panneau : sa balise fermante suit la légende, qui porte
+    // aussi la légende « hors course » (même pied, une seule explication).
+    expect(views.slice(legend).trimStart()).toMatch(/^\{isGeneral[^\n]*\r?\n[\s\S]*?<\/div>\s*\)\}\s*<\/div>/);
     expect(legend).toBeLessThan(views.indexOf("className={styles.bottomNav}"));
     expect(read("_components", "EnduranceView.tsx")).toContain("actionsLegend={");
+    expect(read("_components", "EnduranceView.tsx")).toContain("outLegend={");
   });
 });

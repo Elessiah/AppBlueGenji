@@ -154,8 +154,10 @@ describe("vue survie — rendu inchangé", () => {
     // (lisible au toucher et au clavier), plus dans un `title` que seul un
     // survol à la souris affichait ; lue aussi avec la ligne (texte masqué).
     expect(html.includes('aria-controls="survival-forfeit-frozen"')).toBe(!offered);
-    expect(html.includes('<span class="sr-only"> Une manche a été jouée')).toBe(!offered);
-    expect(html.includes("Une manche a été jouée depuis l&#x27;abandon : il ne s&#x27;annule plus.")).toBe(!offered);
+    // Forme courte sur la ligne ; le motif entier, une seule fois, dans la légende.
+    expect(html.includes('<span class="sr-only"> (manche jouée depuis)</span>')).toBe(!offered);
+    const full = "Une manche a été jouée depuis l&#x27;abandon : il ne s&#x27;annule plus.";
+    expect(html.split(full).length - 1).toBe(offered ? 0 : 1);
     expect(html).not.toMatch(/class="forfeitLocked"[^>]*title=/);
     expect(html).toContain('data-row-focus="12"');
     // La ligne forfait s'estompe cellule par cellule, comme en suisse.

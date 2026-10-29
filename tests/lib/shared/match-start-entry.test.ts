@@ -23,6 +23,8 @@ import {
   resolveMatchStartEntry,
   shiftMatchStartYear,
   withYearShift,
+  isUnreadConfirmationClick,
+  shouldHoldSubmit,
 } from "@/lib/shared/match-start-entry";
 
 // Instants absolus partout : le résultat ne doit pas dépendre du fuseau de la
@@ -546,5 +548,50 @@ describe("pastStartWarning — n'avertir que d'un passage en lancement", () => {
     const soon = at("2026-10-31T10:05:00Z");
     expect(pastStartWarning(base, soon, now, on)).toBeNull();
     expect(pastStartWarning(base, soon, at("2026-10-31T10:06:00Z"), on)).toBe("schedule.warnPast");
+  });
+});
+
+describe("shouldHoldSubmit — envoi retenu quand la date est devenue passée", () => {
+  it.each([
+    [false, true, true],
+    [false, false, false],
+    [true, true, false],
+    [true, false, false],
+  ])("averti à l'affichage %s, averti à l'envoi %s : retenu %s", (atRender, now, expected) => {
+    expect(shouldHoldSubmit(atRender, now)).toBe(expected);
+  });
+});
+
+describe("isUnreadConfirmationClick — la garde ne vaut que pour le clic qui suit l'envoi retenu", () => {
+  it("un clic de double-clic juste après l'envoi retenu n'est pas une confirmation", () => {
+    expect(isUnreadConfirmationClick(2, true)).toBe(true);
+    expect(isUnreadConfirmationClick(3, true)).toBe(true);
+  });
+
+  it("un clic simple après l'envoi retenu part (l'avertissement a été lu)", () => {
+    expect(isUnreadConfirmationClick(1, true)).toBe(false);
+    expect(isUnreadConfirmationClick(0, true)).toBe(false);
+  });
+
+  it("hors envoi retenu, un clic de double-clic part : la garde n'ignore pas tout", () => {
+    expect(isUnreadConfirmationClick(2, false)).toBe(false);
+    expect(isUnreadConfirmationClick(5, false)).toBe(false);
+  });
+
+  it("rejoue la séquence du bouton : retenu, second clic ignoré, clic suivant envoyé", () => {
+    let justHeld = false;
+    const click = (detail: number): "ignoré" | "envoi" => {
+      const ignored = isUnreadConfirmationClick(detail, justHeld);
+      justHeld = false;
+      if (ignored) return "ignoré";
+      // L'envoi : la date vient de passer au premier envoi seulement.
+      if (shouldHoldSubmit(false, detail === 1)) justHeld = true;
+      return "envoi";
+    };
+    expect(click(1)).toBe("envoi"); // retenu : l'avertissement s'affiche
+    expect(justHeld).toBe(true);
+    expect(click(2)).toBe("ignoré"); // second clic du double-clic
+    expect(click(3)).toBe("envoi"); // le suivant confirme
+    expect(justHeld).toBe(false);
   });
 });

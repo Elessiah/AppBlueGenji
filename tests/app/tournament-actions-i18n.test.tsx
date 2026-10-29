@@ -752,9 +752,10 @@ describe("rendu anglais — aucun français dans les gestes", () => {
   it("score (engagé) pendant l'envoi : boutons aria-disabled, jamais disabled natif (le focus reste)", () => {
     const source = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/PlayerScoreDialog.tsx"), "utf8");
     // Seuls les champs de maps (`MapScoreList`) se figent pendant l'envoi ; les boutons gardent le focus.
-    // Le bouton d'envoi n'est désactivé nativement que hors envoi.
-    expect(source.match(/(?<![-\w])disabled=\{[^}]*submitting/g)).toEqual(["disabled={submitting", "disabled={!submitting"]);
-    expect(source).toContain("disabled={!submitting && (nothingEntered || unchangedMine)}");
+    // Le bouton d'envoi n'est jamais désactivé nativement : `aria-disabled`, gardes dans `onSubmitForm`.
+    expect(source.match(/(?<![-\w])disabled=\{[^}]*submitting/g)).toEqual(["disabled={submitting"]);
+    expect(source).toContain("aria-disabled={submitting || nothingEntered || unchangedMine || undefined}");
+    expect(source).toMatch(/if \(nothingEntered \|\| unchangedMine\) return;\s*void submitScore\(\);/);
     expect(source.match(/aria-busy=\{submitting \|\| undefined\}/g)).toHaveLength(2);
     // Un bouton aria-disabled doit aussi s'en voir : la feuille le grise comme `:disabled`.
     const css = readFileSync(join(process.cwd(), "app/(secured)/tournois/[id]/_components/ScoreDialog.module.css"), "utf8");
@@ -854,7 +855,7 @@ describe("gestes — équivalence avec next-intl, message par message", () => {
         const reference = createTranslator({ locale, messages: { m: source }, timeZone: SITE_TIME_ZONE });
         for (const count of [0, 1, 2]) {
           const values = sample(source, count);
-          const expected = reference.markup("m", { ...values, strong: (chunks: string) => `<strong>${chunks}</strong>` });
+          const expected = reference.markup("m", { ...values, strong: (chunks: string) => `<strong>${chunks}</strong>`, first: (chunks: string) => chunks, second: (chunks: string) => chunks });
           const actual = formatMessage(locale, source.replace(/<\/?strong>/g, (tag) => tag), values);
           const plain = expected.replace(/<\/?strong>/g, "");
           expect(`${key}: ${actual}`).toBe(`${key}: ${plain}`);

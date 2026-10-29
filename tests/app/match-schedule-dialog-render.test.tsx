@@ -31,6 +31,7 @@ import { tournamentActionsMessages } from "@/lib/shared/tournament-actions-text"
 import type { BracketMatch } from "@/lib/shared/types";
 import enDialogs from "@/messages/en/tournamentDialogs.json";
 import frDialogs from "@/messages/fr/tournamentDialogs.json";
+import { requiresMatchStartAt } from "@/lib/shared/live-streams";
 import { bracketMatch } from "../helpers/bracket-match";
 
 const EN = messagesFor("en");
@@ -89,6 +90,18 @@ describe("MatchScheduleDialog — sous-titre", () => {
     expect(text(render("fr", tbd))).toContain(`Alpha contre ${frDialogs.schedule.tbd}`);
     expect(text(render("en", tbd))).toContain(`Alpha vs ${enDialogs.schedule.tbd}`);
   });
+
+  it("une place vide porte le même libellé que l'effacement de manche (« À venir » / « TBD »)", () => {
+    expect(frDialogs.schedule.tbd).toBe(frDialogs.rollback.tbd);
+    expect(enDialogs.schedule.tbd).toBe(enDialogs.rollback.tbd);
+    const tbd = bracketMatch({ id: 8, team1Id: null, team1Name: null, team2Id: 11, team2Name: "Bravo", status: "PENDING" });
+    expect(text(render("fr", tbd))).toContain("À venir contre Bravo");
+  });
+
+  it("l'ordre « A contre B » vient du message, pas du code : une phrase à deux emplacements", () => {
+    expect(frDialogs.schedule.versus).toBe("<first>{team1}</first> contre <second>{team2}</second>");
+    expect(enDialogs.schedule.versus).toBe("<first>{team1}</first> vs <second>{team2}</second>");
+  });
 });
 
 describe("MatchScheduleDialog — mois présélectionné", () => {
@@ -106,6 +119,20 @@ describe("MatchScheduleDialog — mois présélectionné", () => {
     const html = render("fr", { ...versus, startAt: "2026-05-20T19:00:00.000Z" });
     expect(html).toContain(frDialogs.schedule.clear);
     expect(html).toContain(frDialogs.schedule.preview);
+  });
+});
+
+describe("MatchScheduleDialog — avertissement « à l'antenne »", () => {
+  const live = { ...versus, liveTrigger: "START_TIME" } as BracketMatch;
+
+  it("match sans date dont le déclencheur de direct en exige une : aucun avertissement dès l'ouverture", () => {
+    expect(requiresMatchStartAt(live.liveTrigger)).toBe(true);
+    expect(text(render("fr", live))).not.toContain(frDialogs.schedule.warnLive);
+    expect(text(render("en", live))).not.toContain(enDialogs.schedule.warnLive);
+  });
+
+  it("date posée : vider la date n'est pas encore fait à l'ouverture, donc pas d'avertissement", () => {
+    expect(text(render("fr", { ...live, startAt: "2026-05-20T19:00:00.000Z" }))).not.toContain(frDialogs.schedule.warnLive);
   });
 });
 

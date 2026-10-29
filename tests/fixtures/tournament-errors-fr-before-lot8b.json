@@ -170,7 +170,7 @@
     "FORMAT_WITHOUT_FORFEIT": "Ce format de tournoi ne connaît pas l'abandon.",
     "TEAM_NOT_FORFEITED": "Cette équipe n'a pas abandonné : il n'y a rien à annuler.",
     "FORFEIT_CANCEL_FAILED": "Erreur lors de l'annulation de l'abandon.",
-    "FORFEIT_ROUND_PASSED": "Une manche a été jouée depuis l'abandon : remettre l'équipe en lice lui épargnerait les manches qu'elle a manquées. Revenez d'abord en arrière.",
+    "FORFEIT_ROUND_PASSED": "Une manche a été jouée depuis l'abandon : remettre l'équipe en lice lui épargnerait les manches qu'elle a manquées. Reviens d'abord en arrière.",
     "NOT_REFEREE": "Arbitrer un match demande le rôle arbitre.",
     "REFEREE_IDENTITY_REQUIRED": "Pour arbitrer un match, certifie ton tag Discord et rattache ton compte Battle.net depuis ton profil.",
     "REFEREE_IS_PLAYER": "Ce compte joue ce match : il ne peut pas l'arbitrer.",

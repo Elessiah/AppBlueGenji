@@ -123,7 +123,7 @@ describe("MatchScheduleDialog — date déjà passée", () => {
     // inchangé : un second « Entrée » confirme. Pas de notification
     // `role="alert"`, qui aurait coupé la région d'état au lecteur d'écran.
     expect(SOURCE).toMatch(
-      /if \(pastWarning === null && pastWarningAt\(now\) !== null\) \{\s*setClock\(now\);\s*requestAnimationFrame\(\(\) => \{\s*document\.getElementById\(PAST_WARNING_ID\)\?\.scrollIntoView\(\{ block: "nearest" \}\);\s*document\.getElementById\(SUBMIT_ID\)\?\.scrollIntoView\(\{ block: "nearest" \}\);\s*\}\);\s*return;/,
+      /if \(shouldHoldSubmit\(pastWarning !== null, pastWarningAt\(now\) !== null\)\) \{\s*justHeld\.current = true;\s*setClock\(now\);\s*requestAnimationFrame\(\(\) => \{\s*document\.getElementById\(PAST_WARNING_ID\)\?\.scrollIntoView\(\{ block: "nearest" \}\);\s*document\.getElementById\(SUBMIT_ID\)\?\.scrollIntoView\(\{ block: "nearest" \}\);\s*\}\);\s*return;/,
     );
     expect(SOURCE).toMatch(/<button\s+id=\{SUBMIT_ID\}\s+type="submit"/);
     expect(SOURCE).not.toMatch(/getElementById\(PAST_WARNING_ID\)\?\.focus/);
@@ -134,7 +134,9 @@ describe("MatchScheduleDialog — date déjà passée", () => {
   it("le second clic d'un double-clic et la répétition d'« Entrée » ne valent pas confirmation", () => {
     // `detail` suit le délai de double-clic du système (pas de seuil fixe), et
     // aucun horodatage : rien ne dépend de l'horloge murale.
-    expect(SOURCE).toMatch(/onClick=\{\(event\) => \{\s*if \(event\.detail > 1\) event\.preventDefault\(\);\s*\}\}/);
+    // La garde ne vaut que pour le clic qui suit l'envoi retenu
+    // (`isUnreadConfirmationClick`, `match-start-entry.test.ts`).
+    expect(SOURCE).toMatch(/onClick=\{\(event\) => \{\s*if \(isUnreadConfirmationClick\(event\.detail, justHeld\.current\)\) event\.preventDefault\(\);\s*justHeld\.current = false;\s*\}\}/);
     expect(SOURCE).toMatch(/onKeyDown=\{\(event\) => \{\s*if \(event\.repeat && event\.key === "Enter"\) event\.preventDefault\(\);\s*\}\}/);
     // « Vider la date » et « Annuler », repoussés sous le second clic par
     // l'avertissement qui apparaît, ne le prennent pas non plus.
@@ -162,10 +164,14 @@ describe("MatchScheduleDialog — date déjà passée", () => {
 
 describe("MatchScheduleDialog — sous-titre", () => {
   it("rend les engagés par EntrantName (forme affichable, lien de fiche), jamais le nom brut", () => {
-    expect(SOURCE).toContain('<EntrantName teamId={match.team1Id} name={match.team1Name ?? t("schedule.tbd")} />');
-    expect(SOURCE).toContain('<EntrantName teamId={match.team2Id} name={match.team2Name ?? t("schedule.tbd")} />');
+    // Un seul message à deux emplacements : l'ordre vient de la traduction.
+    expect(SOURCE).toContain('"schedule.versus"');
+    expect(SOURCE).toContain('first: (chunks) => <EntrantName teamId={match.team1Id} name={chunks.join("")} />');
+    expect(SOURCE).toContain('second: (chunks) => <EntrantName teamId={match.team2Id} name={chunks.join("")} />');
     expect(SOURCE).not.toContain('"TBD"');
     expect(SOURCE).not.toMatch(/\/> vs\{" "\}/);
+    expect(frDialogs.schedule.versus).toBe("<first>{team1}</first> contre <second>{team2}</second>");
+    expect(enDialogs.schedule.versus).toBe("<first>{team1}</first> vs <second>{team2}</second>");
   });
 
   it("ouvre le focus sur le jour, pas sur le lien du premier engagé du sous-titre", () => {
