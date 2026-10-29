@@ -114,7 +114,11 @@ describe("EnduranceRankingViews — gestes réservés au Général", () => {
 
   it("annonce la vue atteinte par les flèches ou la navigation du bas, jamais par un onglet", () => {
     expect(RANKING).toContain('<span className="sr-only" aria-live="polite">');
-    expect(RANKING).toContain("else setAnnouncement(viewTitle(views[target], text))");
+    expect(RANKING).toContain("else announce(viewTitle(views[target], text))");
+    // La région est vidée avant d'y écrire : la même vue deux fois de suite se réannonce.
+    expect(RANKING).toContain('setAnnouncement("");');
+    expect(RANKING).toContain("setTimeout(() => setAnnouncement(title), 60)");
+    expect(RANKING).toContain("clearTimeout(announceTimer.current)");
     // Un onglet cliqué garde le focus et s'annonce de lui-même.
     expect(RANKING).toContain("onClick={() => go(candidateIndex, true)}");
   });
@@ -128,7 +132,11 @@ describe("EnduranceRankingViews — gestes réservés au Général", () => {
   });
 
   it("ne glisse que vers une vue demandée, jamais sur un changement du flux", () => {
-    expect(RANKING).toContain("slide !== null && slide.key === enduranceViewKey(view) ? slide.direction : null");
+    expect(RANKING).toContain("slide !== null && slide.key === enduranceViewKey(view) ? slide : null");
+    // Le panneau n'est pas recréé à chaque vue : deux mouvements alternés relancent l'animation.
+    expect(RANKING).not.toMatch(/key=\{enduranceViewKey\(view\)\}/);
+    expect(RANKING).toContain("styles.slideFromLeftAlt");
+    expect(RANKING_CSS).toContain("endurance-view-in-right-alt");
   });
 
   it("une ligne sortie s'estompe sans éteindre ses gestes", () => {
@@ -185,8 +193,14 @@ describe("règles transverses", () => {
   });
 
   it("le repli mobile libelle chaque case, colonne « MANCHE n » comprise", () => {
-    expect(RANKING).toContain("data-label={columnLabel}");
     expect(RANKING).toContain("data-label={label}");
+    // Avant la première manche tirée : ni cellule ni en-tête, pas de ligne blanche.
+    expect(RANKING).toContain("{columnRound !== null && <span>{columnLabel}</span>}");
+    expect(RANKING).toContain("{columnCells !== null && (");
+    expect(RANKING).not.toContain("<span data-label={columnLabel} />");
+    expect(RANKING).toContain("rowClass(withActions, wideActions, columnRound !== null)");
+    expect(RANKING_CSS).toMatch(/:global\(\.table-row\)\.rowWithWideActions\.noRound \{\s*grid-template-columns: 56px/);
+    expect(RANKING_CSS).toMatch(/@media \(max-width: 920px\) \{[^@]*\.row\.noRound/);
     expect(RANKING).toContain('data-label="#"');
     expect(RANKING_CSS).toContain("@media (max-width: 920px)");
   });
@@ -228,8 +242,32 @@ describe("EnduranceRoundPanels — ordre et ouverture", () => {
 
 describe("EnduranceCard — bandeau des play-offs", () => {
   it("compte l'arbre complet, pas les seuls tours posés (la barre ne recule pas)", () => {
-    expect(CARD).toContain("total: endurancePlayoffMatchTotal(playoffs)");
+    expect(CARD).toContain("endurancePlayoffProgress(playoffs)");
     expect(CARD).not.toContain("total: playoffs.length");
+  });
+
+  it("nomme la barre selon ce qu'elle mesure : la manche, puis les play-offs", () => {
+    expect(CARD).toContain('t(current ? "endurance.stripProgress" : "endurance.stripProgressPlayoffs")');
+  });
+
+  it("ne fait tourner l'horloge que si un match non joué de la manche porte une date", () => {
+    expect(CARD).toContain("hasScheduledPendingMatch(matches, current.round)");
+  });
+
+  it("dit où en est le tournoi entre deux manches, avant les play-offs", () => {
+    expect(CARD).toContain("enduranceLastClosedRound(matches)");
+    expect(CARD).toContain("progress === null && closedRound !== null");
+    expect(CARD).toContain('lastRoundPlayed ? "endurance.stripPlayoffsSoon" : "endurance.stripSoon"');
+    expect(CARD).toContain("!endurance.playoffsStarted && !isFinished");
+  });
+});
+
+describe("EnduranceRoundPanels — volet ouvert d'office", () => {
+  it("se replie aussi quand plus aucune manche n'est à ouvrir, sauf ouverte à la main", () => {
+    expect(PANELS).not.toContain("if (autoOpen === null || autoOpen === lastAutoOpen.current) return;");
+    expect(PANELS).toContain("if (autoOpen === lastAutoOpen.current) return;");
+    expect(PANELS).toContain("if (previous !== null && !openedByHand.current.has(previous)) next.delete(previous);");
+    expect(PANELS).toContain("if (autoOpen !== null) next.add(autoOpen);");
   });
 });
 
@@ -237,5 +275,61 @@ describe("EnduranceRankingViews — pénalité de la manche", () => {
   it("la case « MANCHE n » dit la pénalité que sa variation compte", () => {
     expect(RANKING).toContain("{cell.penalty > 0 && (");
     expect(RANKING).toContain('t("endurance.cellPenalty", { points: String(cell.penalty) })');
+  });
+});
+
+describe("EnduranceRankingViews — repères et noms accessibles", () => {
+  const messages = (lang: string) =>
+    JSON.parse(readFileSync(join(ROOT, "messages", lang, "tournamentViews.json"), "utf8")).endurance as Record<string, string>;
+
+  it("la zone défilante, la liste d'onglets et la navigation du bas portent trois noms différents", () => {
+    expect(RANKING).toContain('ariaLabel={t("endurance.viewsScrollLabel")}');
+    expect(RANKING).toContain('aria-label={t("endurance.viewsTabsLabel")}');
+    expect(RANKING).toContain('aria-label={t("endurance.viewsNavLabel")}');
+    for (const lang of ["fr", "en"]) {
+      const m = messages(lang);
+      expect(new Set([m.viewsScrollLabel, m.viewsTabsLabel, m.viewsNavLabel]).size).toBe(3);
+    }
+  });
+
+  it("l'onglet sélectionné est ramené dans la zone défilante", () => {
+    expect(RANKING).toContain("revealKey={enduranceViewKey(view)}");
+    expect(RANKING).toContain('data-scroll-reveal={selected ? "" : undefined}');
+  });
+
+  it("garde le focus clavier quand le bouton du bas disparaît", () => {
+    expect(RANKING).toContain("if (target === 0) bottomNextRef.current?.focus");
+    expect(RANKING).toContain("else if (target === views.length - 1) bottomPrevRef.current?.focus");
+  });
+
+  it("une seule pastille de pénalité, lue une fois, pour le capital et les trois cases", () => {
+    expect(RANKING.match(/<PenaltyBadge/g)).toHaveLength(4);
+    expect(RANKING).toContain('<span aria-hidden="true">{visible}</span>');
+    expect(RANKING).toContain('text.t("endurance.penaltyBadgeSr", { points })');
+  });
+
+  it("la vue « déjà joués » nomme la référence des ▲▼, et la vue unique rend son sous-titre", () => {
+    expect(RANKING).toContain('t("endurance.subGeneral", { base: String(base) })');
+    expect(RANKING).toContain("{!hasBar && (");
+    expect(RANKING).toContain("<div className={`mono ${styles.viewSub}`}>{sub}</div>");
+  });
+
+  it("la barre collée publie sa hauteur et se compacte au mobile", () => {
+    expect(RANKING).toContain("typeof ResizeObserver");
+    expect(RANKING).toContain("typeof IntersectionObserver");
+    expect(RANKING).toContain('"--endurance-bar-h"');
+    expect(RANKING_CSS).toMatch(/\.fadable :is\([^)]*\) \{\s*scroll-margin-top: var\(--endurance-bar-h, 0px\);/);
+    expect(RANKING_CSS).toMatch(/\.tabs \{[^}]*padding-block: 3px;/);
+    expect(RANKING_CSS).toMatch(/@media \(max-width: 720px\) \{[^@]*\.barStuck \.viewSub \{\s*display: none;/);
+  });
+
+  it("« S3 » s'explique derrière un « i », en français et en anglais", () => {
+    expect(RANKING).toContain("<InfoHint");
+    for (const lang of ["fr", "en"]) {
+      const m = messages(lang);
+      for (const key of ["seedHintLabel", "seedHintSubject", "seedHint", "stripProgressPlayoffs", "stripDone", "stripSoon", "stripPlayoffsSoon"]) {
+        expect(m[key]).toBeTruthy();
+      }
+    }
   });
 });

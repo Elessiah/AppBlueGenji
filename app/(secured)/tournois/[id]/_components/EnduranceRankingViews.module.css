@@ -9,7 +9,8 @@
  * l'ordre d'injection des feuilles.
  *
  * Colonnes : # · engagé · endurance · « MANCHE n » · bilan · statut
- * [· actions, vue « Général » seulement].
+ * [· actions, vue « Général » seulement]. Avant la première manche tirée, la
+ * colonne « MANCHE n » n'existe pas (`.noRound`).
  */
 :global(.table-row).row {
   grid-template-columns: 56px minmax(0, 1.6fr) 0.8fr minmax(0, 1.4fr) 0.8fr 1fr;
@@ -27,6 +28,19 @@
   align-items: center;
 }
 
+/* Sans colonne « MANCHE n » : ni cellule ni en-tête, le gabarit perd sa colonne. */
+:global(.table-row).row.noRound {
+  grid-template-columns: 56px minmax(0, 1.6fr) 0.8fr 0.8fr 1fr;
+}
+
+:global(.table-row).rowWithActions.noRound {
+  grid-template-columns: 56px minmax(0, 1.6fr) 0.8fr 0.8fr 1fr 108px;
+}
+
+:global(.table-row).rowWithWideActions.noRound {
+  grid-template-columns: 56px minmax(0, 1.6fr) 0.8fr 0.8fr 1fr 190px;
+}
+
 /* Les boutons se replient l'un sous l'autre plutôt que de déborder. */
 .rowActions {
   display: flex;
@@ -37,6 +51,21 @@
 /* Ligne de l'engagé du lecteur. */
 .mine {
   background: rgba(var(--blue-500-rgb), 0.06);
+}
+
+/*
+ * Une ligne atteinte par Tab ne doit pas s'arrêter sous la barre collée :
+ * `scroll-padding-top` ne compte que l'en-tête du site. La hauteur de la barre
+ * (`--endurance-bar-h`) est mesurée par le composant ; sans barre, elle vaut 0.
+ */
+.fadable :is(a, button, input, select, textarea, [tabindex]) {
+  scroll-margin-top: var(--endurance-bar-h, 0px);
+}
+
+/* Repère de hauteur nulle posé juste au-dessus de la barre : sorti de l'écran
+   par le haut, la barre est collée. */
+.sentinel {
+  height: 0;
 }
 
 /* Barre des vues, collée sous l'en-tête du site pendant le parcours des lignes. */
@@ -91,6 +120,8 @@
   display: flex;
   gap: 6px;
   width: max-content;
+  /* Marge verticale : l'anneau de focus d'un onglet n'est pas rogné par la zone défilante. */
+  padding-block: 3px;
 }
 
 .tab {
@@ -128,6 +159,11 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
+}
+
+.seedHintLabel {
+  font-size: 11px;
+  color: var(--ink-quiet);
 }
 
 .seed {
@@ -214,7 +250,28 @@
   animation: endurance-view-in-right 0.28s ease-out;
 }
 
+/* Mêmes mouvements sous un autre nom : l'alternance relance l'animation d'une
+   vue à l'autre sans recréer le panneau (et donc ses lignes). */
+.slideFromLeftAlt {
+  animation: endurance-view-in-left-alt 0.28s ease-out;
+}
+
+.slideFromRightAlt {
+  animation: endurance-view-in-right-alt 0.28s ease-out;
+}
+
 @keyframes endurance-view-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes endurance-view-in-left-alt {
   from {
     opacity: 0;
     transform: translateX(-24px);
@@ -236,9 +293,22 @@
   }
 }
 
+@keyframes endurance-view-in-right-alt {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .slideFromLeft,
-  .slideFromRight {
+  .slideFromRight,
+  .slideFromLeftAlt,
+  .slideFromRightAlt {
     animation: none;
   }
 }
@@ -247,9 +317,32 @@
 @media (max-width: 920px) {
   :global(.table-row).row,
   :global(.table-row).rowWithActions,
-  :global(.table-row).rowWithWideActions {
+  :global(.table-row).rowWithWideActions,
+  :global(.table-row).row.noRound,
+  :global(.table-row).rowWithActions.noRound,
+  :global(.table-row).rowWithWideActions.noRound {
     grid-template-columns: 1fr;
     align-items: start;
+  }
+}
+
+/*
+ * Étroit : collée, la barre couvrait près d'un tiers de l'écran sous l'en-tête
+ * du site. Une fois collée, elle perd son sous-titre (la référence des ▲▼ se
+ * relit en haut de la vue) et ses marges.
+ */
+@media (max-width: 720px) {
+  .barStuck {
+    padding: 4px 0;
+    margin-bottom: 4px;
+  }
+
+  .barStuck .viewSub {
+    display: none;
+  }
+
+  .barStuck .barMiddle {
+    gap: 2px;
   }
 }
 

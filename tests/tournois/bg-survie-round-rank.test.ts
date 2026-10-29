@@ -50,8 +50,41 @@ describe("replayEnduranceDetailed — rang et bilan par manche", () => {
     for (const standing of standings) {
       expect(history.get(standing.teamId)?.at(-1)?.rank).toBe(standing.rank);
     }
-    expect(history.get(1)?.[1]).toMatchObject({ wins: 1, losses: 1, draws: 0 });
-    expect(history.get(4)?.[1]).toMatchObject({ wins: 2, losses: 0, draws: 0 });
+    expect(history.get(1)?.[1]).toMatchObject({ wins: 1, losses: 1 });
+    expect(history.get(4)?.[1]).toMatchObject({ wins: 2, losses: 0 });
+  });
+
+  it("n'écrit pas `draws` sur une case quand il n'y a aucun nul", () => {
+    const { history } = replay({ lastRound: 2, matches: [win(1, 1, 2), win(2, 1, 3)] });
+    for (const cells of history.values()) {
+      for (const cell of cells) expect(cell).not.toHaveProperty("draws");
+    }
+  });
+
+  it("garde `draws` positif à partir de la manche du nul", () => {
+    const { history } = replay({
+      lastRound: 2,
+      matches: [{ round: 1, completed: true, winnerTeamId: null, loserTeamId: null, drawTeamIds: [1, 2], drawMaps: 1 }],
+    });
+    expect(history.get(1)?.[0]).toMatchObject({ draws: 1 });
+    expect(history.get(1)?.[1]).toMatchObject({ draws: 1 });
+    expect(history.get(3)?.[1]).not.toHaveProperty("draws");
+  });
+
+  it("le classement final est celui de la dernière manche, sorties et forfaits compris", () => {
+    const { standings, history } = replay({
+      lastRound: 4,
+      matches: [win(1, 1, 2), win(2, 1, 2), win(3, 1, 2), win(4, 1, 3)],
+      forfeits: [{ teamId: 4, round: 4 }],
+    });
+    expect(standings.map((s) => s.rank)).toEqual([1, 2, 3, 4]);
+    for (const standing of standings) expect(history.get(standing.teamId)?.at(-1)?.rank).toBe(standing.rank);
+  });
+
+  it("sans aucune manche rejouée, le classement suit l'ordre de départ", () => {
+    const { standings, rounds } = replay({ lastRound: 0 });
+    expect(rounds).toEqual([]);
+    expect(standings.map((s) => s.teamId)).toEqual([1, 2, 3, 4]);
   });
 
   it("départage une égalité de points par le rang de la manche précédente", () => {

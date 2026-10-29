@@ -97,16 +97,30 @@ export function planEnduranceRound(standings: EnduranceStanding[]): EndurancePai
  */
 export function assignRanks(standings: EnduranceStanding[]): EnduranceStanding[] {
   const active = standings.filter((s) => s.status === "ACTIVE").sort(compareEndurance);
+  return rankSortedActive(
+    active,
+    standings.filter((s) => s.status !== "ACTIVE"),
+  );
+}
 
-  const out = standings
-    .filter((s) => s.status !== "ACTIVE")
-    .sort((a, b) => {
-      const roundA = a.eliminatedRound ?? 0;
-      const roundB = b.eliminatedRound ?? 0;
-      if (roundB !== roundA) return roundB - roundA;
-      if (b.points !== a.points) return b.points - a.points;
-      return a.previousRank - b.previousRank;
-    });
+/**
+ * Même classement quand les équipes actives sont **déjà triées** par
+ * `compareEndurance` : le rejeu les vient de trier pour figer le rang de la
+ * manche (`freezePreviousRanks`) et ne les retrie pas une seconde fois. Les
+ * sorties se rangent après elles : manche de sortie décroissante, capital,
+ * puis l'ordre figé.
+ */
+export function rankSortedActive(
+  activeSorted: EnduranceStanding[],
+  inactive: EnduranceStanding[],
+): EnduranceStanding[] {
+  const out = [...inactive].sort((a, b) => {
+    const roundA = a.eliminatedRound ?? 0;
+    const roundB = b.eliminatedRound ?? 0;
+    if (roundB !== roundA) return roundB - roundA;
+    if (b.points !== a.points) return b.points - a.points;
+    return a.previousRank - b.previousRank;
+  });
 
-  return [...active, ...out].map((standing, index) => ({ ...standing, rank: index + 1 }));
+  return [...activeSorted, ...out].map((standing, index) => ({ ...standing, rank: index + 1 }));
 }

@@ -56,29 +56,72 @@ function qualificationMatches(matches: BracketMatch[]): BracketMatch[] {
   return matches.filter((match) => match.roundNumber < PLAYOFF_ROUND_OFFSET);
 }
 
-function progressByRound(matches: BracketMatch[]): Map<number, RoundProgress> {
+/**
+ * Avancement par manche, **retenu par tableau de matchs** : la vue des
+ * classements, ses lignes, le bandeau et l'aperçu le relisent tous au même
+ * rendu, et chacun refiltrait puis recopiait les matchs. Un nouvel instantané
+ * du flux apporte un nouveau tableau, donc une nouvelle entrée : rien ne peut
+ * servir périmé. Le résultat se lit seulement, il n'est jamais modifié.
+ */
+const progressCache = new WeakMap<BracketMatch[], ReadonlyMap<number, RoundProgress>>();
+
+function progressByRound(matches: BracketMatch[]): ReadonlyMap<number, RoundProgress> {
+  const cached = progressCache.get(matches);
+  if (cached !== undefined) return cached;
   const progress = new Map<number, RoundProgress>();
-  for (const match of qualificationMatches(matches)) {
+  for (const match of matches) {
+    if (match.roundNumber >= PLAYOFF_ROUND_OFFSET) continue;
     const entry = progress.get(match.roundNumber) ?? { total: 0, played: 0 };
     entry.total += 1;
     if (isMatchPlayed(match)) entry.played += 1;
     progress.set(match.roundNumber, entry);
   }
+  progressCache.set(matches, progress);
   return progress;
 }
+
+type CurrentRound = { round: number; total: number; played: number };
+const currentRoundCache = new WeakMap<BracketMatch[], CurrentRound | null>();
 
 /**
  * Manche en cours : la première manche qualificative inachevée, `null` quand
  * tout est joué (play-offs, tournoi fini, ou manche suivante pas encore tirée).
  */
-export function enduranceCurrentRound(matches: BracketMatch[]): { round: number; total: number; played: number } | null {
+export function enduranceCurrentRound(matches: BracketMatch[]): CurrentRound | null {
+  if (currentRoundCache.has(matches)) return currentRoundCache.get(matches)!;
   const progress = progressByRound(matches);
   const rounds = [...progress.keys()].sort((a, b) => a - b);
+  let current: CurrentRound | null = null;
   for (const round of rounds) {
     const entry = progress.get(round)!;
-    if (entry.played < entry.total) return { round, ...entry };
+    if (entry.played < entry.total) {
+      current = { round, ...entry };
+      break;
+    }
   }
-  return null;
+  currentRoundCache.set(matches, current);
+  return current;
+}
+
+/**
+ * Dernière manche qualificative **close** tant qu'aucune autre n'est entamée :
+ * le bandeau s'en sert entre deux manches (la suivante n'est pas encore tirée).
+ * `null` s'il reste une manche en cours, ou si aucune manche n'a été jouée.
+ */
+export function enduranceLastClosedRound(matches: BracketMatch[]): number | null {
+  if (enduranceCurrentRound(matches) !== null) return null;
+  const rounds = [...progressByRound(matches).keys()];
+  return rounds.length === 0 ? null : Math.max(...rounds);
+}
+
+/**
+ * Avancement de l'arbre final : rencontres jouées sur le total projeté. Une
+ * exemption (un seul engagé) se clôt à la création sans que personne joue : ni
+ * jouée ni à jouer.
+ */
+export function endurancePlayoffProgress(playoffs: BracketMatch[]): RoundProgress {
+  const real = playoffs.filter((match) => match.team1Id !== null && match.team2Id !== null);
+  return { total: endurancePlayoffMatchTotal(playoffs), played: real.filter(isMatchPlayed).length };
 }
 
 /**
@@ -100,9 +143,26 @@ export function enduranceRankingViews(endurance: EnduranceMeta, matches: Bracket
   return views;
 }
 
+/**
+ * Cases d'une équipe indexées par manche, construites **une fois par tableau de
+ * cases** : les vues relisent la même case plusieurs fois par ligne
+ * (`capitalBefore`, statut, rang, bilan), et une recherche linéaire à chaque
+ * lecture rendait le tri de repli quadratique en nombre de manches.
+ */
+const cellIndexes = new WeakMap<EnduranceRoundCell[], Map<number, EnduranceRoundCell>>();
+
+function cellIndex(cells: EnduranceRoundCell[]): Map<number, EnduranceRoundCell> {
+  let index = cellIndexes.get(cells);
+  if (index === undefined) {
+    index = new Map(cells.map((cell) => [cell.round, cell]));
+    cellIndexes.set(cells, index);
+  }
+  return index;
+}
+
 /** Case d'une équipe pour une manche, `undefined` si l'instantané n'en porte pas. */
 function cellAt(standing: EnduranceStandingRow, round: number): EnduranceRoundCell | undefined {
-  return standing.rounds.find((cell) => cell.round === round);
+  return cellIndex(standing.rounds).get(round);
 }
 
 /** Rang après une manche ; la manche 0 est l'ordre de départ (seed). */
@@ -256,10 +316,11 @@ export function enduranceRankingRows(
   }
   // Repli d'un instantané sans rang par manche : capital décroissant, puis
   // l'ordre du général — jamais une ligne sans rang.
+  const capital = new Map(
+    endurance.standings.map((standing) => [standing.teamId, pointsAfterRound(standing, view.round, endurance.startPoints)]),
+  );
   const fallback = [...endurance.standings].sort(
-    (a, b) =>
-      pointsAfterRound(b, view.round, endurance.startPoints) - pointsAfterRound(a, view.round, endurance.startPoints) ||
-      a.rank - b.rank,
+    (a, b) => capital.get(b.teamId)! - capital.get(a.teamId)! || a.rank - b.rank,
   );
   const fallbackRank = new Map(fallback.map((standing, index) => [standing.teamId, index + 1]));
   return endurance.standings
@@ -289,16 +350,25 @@ export function playoffCutIndex(rows: EnduranceRankingRow[], playoffSize: number
  * haut), et la petite finale se joue avec la finale, au sortir des demies.
  */
 export function endurancePlayoffMatchTotal(playoffs: BracketMatch[]): number {
+  // Une exemption (un seul engagé) n'est pas une rencontre : elle ne se joue
+  // pas, n'a pas de battu, et ne mène donc ni à un compte ni à une petite finale.
+  const isReal = (match: BracketMatch) => match.team1Id !== null && match.team2Id !== null;
+  let total = playoffs.filter(isReal).length;
   const decisive = playoffs.filter((match) => match.bracket !== "THIRD_PLACE");
-  if (decisive.length === 0) return playoffs.length;
+  if (decisive.length === 0) return total;
   const lastRound = Math.max(...decisive.map((match) => match.roundNumber));
-  let remaining = decisive.filter((match) => match.roundNumber === lastRound).length;
-  let total = playoffs.length;
+  const last = decisive.filter((match) => match.roundNumber === lastRound);
+  let remaining = last.length;
+  let byes = last.filter((match) => !isReal(match)).length;
   const thirdPlaced = playoffs.some((match) => match.bracket === "THIRD_PLACE");
   while (remaining > 1) {
-    if (remaining === 2 && !thirdPlaced) total += 1;
+    // Comme `planNextPlayoffRound` : la petite finale n'existe que si les deux
+    // demies sont de vraies rencontres (chacune a un battu).
+    if (remaining === 2 && !thirdPlaced && byes === 0) total += 1;
+    // Un nombre impair de vainqueurs laisse le dernier seul : exemption au tour suivant.
+    byes = remaining % 2;
     remaining = Math.ceil(remaining / 2);
-    total += remaining;
+    total += remaining - byes;
   }
   return total;
 }
@@ -318,6 +388,17 @@ export function nextScheduledMatch(matches: BracketMatch[], round: number, now: 
     bestAt = at;
   }
   return best;
+}
+
+/**
+ * Un match non joué de la manche porte-t-il une date ? Sans cela, « Prochain
+ * match » reste vide quelle que soit l'heure : l'horloge du bandeau n'a pas à
+ * tourner.
+ */
+export function hasScheduledPendingMatch(matches: BracketMatch[], round: number): boolean {
+  return qualificationMatches(matches).some(
+    (match) => match.roundNumber === round && !isMatchPlayed(match) && match.startAt !== null,
+  );
 }
 
 /** Engagés de la manche en cours qui n'ont pas encore joué leur rencontre. */
@@ -349,10 +430,21 @@ export type EnduranceRoundColumnCell =
       opponentName: string | null;
       startAt: string | null;
     }
-  | { kind: "PENDING"; opponentId: number | null; opponentName: string | null; startAt: string | null }
+  | {
+      kind: "PENDING";
+      opponentId: number | null;
+      opponentName: string | null;
+      startAt: string | null;
+      /** Pénalité posée dans cette manche avant que le match soit joué (0 sans sanction). */
+      penalty: number;
+    }
   | { kind: "FORFEIT" }
   | { kind: "OUT" }
-  | { kind: "BYE" };
+  | {
+      kind: "BYE";
+      /** Pénalité posée dans cette manche à une équipe exemptée (0 sans sanction). */
+      penalty: number;
+    };
 
 function capitalBefore(standing: EnduranceStandingRow, round: number, startPoints: number): number {
   for (let r = round - 1; r >= 1; r -= 1) {
@@ -362,33 +454,53 @@ function capitalBefore(standing: EnduranceStandingRow, round: number, startPoint
   return startPoints;
 }
 
-/** Contenu de la colonne « MANCHE n » pour une équipe. */
+/**
+ * Rencontre de chaque engagé dans une manche qualificative (`teamId` → match).
+ * La colonne « MANCHE n » la lit une fois par ligne : à bâtir **une fois** par
+ * rendu, pas à chercher dans tous les matchs à chaque ligne.
+ */
+export function enduranceRoundMatchIndex(matches: BracketMatch[], round: number): Map<number, BracketMatch> {
+  const index = new Map<number, BracketMatch>();
+  for (const match of qualificationMatches(matches)) {
+    if (match.roundNumber !== round) continue;
+    if (match.team1Id !== null && !index.has(match.team1Id)) index.set(match.team1Id, match);
+    if (match.team2Id !== null && !index.has(match.team2Id)) index.set(match.team2Id, match);
+  }
+  return index;
+}
+
+/**
+ * Contenu de la colonne « MANCHE n » pour une équipe. `roundMatches` (voir
+ * `enduranceRoundMatchIndex`) évite de refiltrer les matchs à chaque appel.
+ */
 export function enduranceRoundColumnCell(
   standing: EnduranceStandingRow,
   round: number,
   matches: BracketMatch[],
   startPoints: number,
+  roundMatches: ReadonlyMap<number, BracketMatch> = enduranceRoundMatchIndex(matches, round),
 ): EnduranceRoundColumnCell {
   const cell = cellAt(standing, round);
   if (cell?.kind === "FORFEIT" || statusAfterRound(standing, round) === "FORFEIT") return { kind: "FORFEIT" };
   if (cell?.kind === "OUT") return { kind: "OUT" };
 
-  const match = qualificationMatches(matches).find(
-    (m) => m.roundNumber === round && (m.team1Id === standing.teamId || m.team2Id === standing.teamId),
-  );
+  const penalty = cell?.penalty ?? 0;
+  const match = roundMatches.get(standing.teamId);
   if (match === undefined) {
-    return standing.eliminatedRound !== null && standing.eliminatedRound < round ? { kind: "OUT" } : { kind: "BYE" };
+    return standing.eliminatedRound !== null && standing.eliminatedRound < round
+      ? { kind: "OUT" }
+      : { kind: "BYE", penalty };
   }
   const isTeam1 = match.team1Id === standing.teamId;
   const opponentId = isTeam1 ? match.team2Id : match.team1Id;
   const opponentName = isTeam1 ? match.team2Name : match.team1Name;
-  if (!isMatchPlayed(match)) return { kind: "PENDING", opponentId, opponentName, startAt: match.startAt };
+  if (!isMatchPlayed(match)) return { kind: "PENDING", opponentId, opponentName, startAt: match.startAt, penalty };
 
   const after = cell?.kind === "POINTS" && cell.points !== null ? cell.points : standing.points;
   return {
     kind: "PLAYED",
     delta: after - capitalBefore(standing, round, startPoints),
-    penalty: cell?.penalty ?? 0,
+    penalty,
     ownScore: isTeam1 ? match.team1Score : match.team2Score,
     opponentScore: isTeam1 ? match.team2Score : match.team1Score,
     opponentId,

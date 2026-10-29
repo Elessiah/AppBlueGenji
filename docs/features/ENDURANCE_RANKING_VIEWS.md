@@ -195,6 +195,34 @@ publics sur les deux pages. Le graphique n'en lit pas d'autres, et la sélection
 « Ma sélection » n'est conservée nulle part (état du composant). Pas d'entrée `PRIVACY_CHANGES`, pas de changement
 du registre.
 
+## Suites de la revue (EF-10)
+
+- **Bandeau** : entre deux manches (close, suivante pas tirée) il dit « Manche n
+  terminée · la suite arrive bientôt » (« play-offs bientôt » après la dernière
+  manche prévue) ; la barre des play-offs porte son propre nom ; l'horloge de
+  60 s ne tourne que si un match non joué de la manche est daté. L'arbre final
+  ne compte pas les exemptions (ni jouées ni à jouer) et ne projette pas de
+  petite finale quand une demie est exemptée (`endurancePlayoffMatchTotal`).
+- **Vues** : le sous-titre de « Manche N — matchs déjà joués » et celui de la
+  vue unique nomment la référence des ▲▼ ; la colonne « Manche n » n'existe pas
+  avant la première manche tirée (gabarit `.noRound`) ; les cases exemptée et à
+  jouer portent la pénalité de la manche ; une seule pastille de pénalité
+  (visible `aria-hidden` + phrase `sr-only`). Un « i » sous le tableau explique
+  « S3 ».
+- **Accessibilité** : zone défilante, liste d'onglets et navigation du bas ont
+  trois noms distincts ; l'onglet choisi est ramené dans la zone (`revealKey`) ;
+  la région `aria-live` est vidée avant chaque annonce ; en bas, le focus passe à
+  l'autre bouton quand celui qui est cliqué disparaît ; les gestes d'une ligne
+  portent `scroll-margin-top` = hauteur mesurée de la barre collée
+  (`--endurance-bar-h`). Sous 720 px, collée, la barre masque son sous-titre.
+- **Volets** : quand plus aucune manche n'est à ouvrir d'office, la manche
+  ouverte d'office se replie (sauf si le lecteur l'a ouverte).
+- **Performance** : le panneau n'est plus recréé à chaque vue (deux animations
+  alternées relancent le glissement) ; cases de la colonne calculées une fois
+  par vue depuis un index teamId → rencontre ; avancement par manche retenu par
+  tableau de matchs ; cases indexées par manche ; le rejeu ne trie qu'une fois
+  par manche (`rankSortedActive`) et n'écrit plus `draws` à 0.
+
 ## Tests
 
 - `tests/tournois/endurance-ranking-views.test.ts` — vues, lignes, ▲▼, filtre
