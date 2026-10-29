@@ -1288,6 +1288,24 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Ton « Prêt » d'arbitre n'est plus envoyé à tout le public du tournoi : seuls les parties du match et les arbitres le lisent, dans les fenêtres « Contacts » et de lancement. Le journal du staff sur Discord ne nomme toujours personne.",
     ],
   },
+  {
+    // ADMIN-SELF-ROLES (2026-10-28) : un administrateur règle ses propres rôles
+    // de plateforme depuis « Mon profil », sans se retirer l'administration, et
+    // tout enregistrement de rôles — le sien comme celui d'un autre compte —
+    // est désormais noté au journal du staff (`publishRolesChange`). N'importe
+    // quel compte peut recevoir un rôle : pas de public. Datée du 31 octobre
+    // (déploiement de la nuit du 29 au 30 au plus tôt).
+    id: "2026-10-roles-de-plateforme-journal-du-staff",
+    publishedAt: "2026-10-31",
+    title: "Rôles de plateforme : notés au journal du staff",
+    summary:
+      "Quand un administrateur attribue ou retire un rôle de plateforme (administrateur, arbitre, caster, community manager, recruteur) — y compris sur son propre compte, depuis « Mon profil » —, le geste est désormais noté au journal du staff, sans nommer personne sur Discord.",
+    details: [
+      "Sur Discord, le journal privé du staff dit seulement que les rôles d'un compte ont été modifiés par le staff : ni ton pseudo, ni celui de l'administrateur, ni les rôles.",
+      "Dans les journaux du serveur, la ligne garde le pseudo et l'identifiant de l'administrateur qui l'a fait, l'identifiant du compte visé et les rôles enregistrés, selon leur rotation automatique.",
+      "Un administrateur peut désormais régler ses propres rôles depuis « Mon profil », mais jamais s'y retirer l'administration : seul un autre administrateur le peut.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

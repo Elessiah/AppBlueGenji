@@ -1043,6 +1043,10 @@ function RgpdFr({
             « un caster » pour la diffusion) ; cette ligne n&apos;ajoute rien aux journaux du serveur, où un litige tranché,
             un résultat corrigé ou une validation suspendue garde sa trace nominative (<Link href="/rgpd/registre#t05">registre,
             T05</Link>), sauf, quand elle n&apos;a pu être rédigée, le geste et le numéro du match ou du tournoi, sans auteur.
+            Quand un administrateur attribue ou retire un rôle de plateforme (administrateur, arbitre, caster, community
+            manager, recruteur), y compris sur son propre compte, où il ne peut pas se retirer l&apos;administration, le
+            journal du staff sur Discord le note sans nommer personne ; les journaux du serveur gardent son auteur,
+            l&apos;identifiant du compte visé et les rôles enregistrés.
           </p>
           <p id="arbitre-designe">
             <strong>Arbitre désigné d&apos;un match.</strong> Un membre du staff qui peut arbitrer (permission
