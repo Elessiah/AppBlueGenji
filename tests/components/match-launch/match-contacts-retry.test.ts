@@ -404,7 +404,7 @@ describe("contacts du caster en attente, modale ouverte", () => {
     expect(dialog).toContain("rereadOnCardChange(previousCard.current, card, launch)");
     expect(dialog).toContain("Math.max(REREAD_RETRY_MS, rereadWait)");
     expect(dialog).toContain('if (launch?.viewer.role !== "REFEREE") window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));');
-    expect(dialog).toContain("}, [cardKey, launch]);");
+    expect(dialog).toContain("}, [cardKey, launch, enabled]);");
     expect(dialog).toContain("const timer = setTimeout(rereadNow, delay);");
     expect(dialog).toContain("const transient = !isFinalRefusal(read.error);");
     expect(dialog).toContain("shouldRetryReread(rereadFailures)");
@@ -433,6 +433,16 @@ describe("useMatchContacts — lecture coupée (`enabled` à faux)", () => {
     expect(body).toContain("if (!enabled || !shouldRetryReread(rereadFailures)) return;");
     expect(body).toContain("const followReferee = enabled && clocks && refereeReadyRereadDue(launch);");
     expect(body).toContain("if (!enabled || !launch) return;");
+  });
+
+  it("useMatchContacts_readOff_fingerprintFollowsCard", () => {
+    // Lecture coupée : l'empreinte suit la carte, la lecture rouverte ne relit pas aussitôt.
+    expect(body).toMatch(/if \(!launch\) \{[^}]*?if \(!enabled\) previousCard\.current = card;\s*return;\s*\}/);
+  });
+
+  it("useMatchContacts_enabledToggles_fingerprintEffectReruns", () => {
+    expect(body).toContain("}, [cardKey, launch, enabled]);");
+    expect(body).not.toContain("}, [cardKey, launch]);");
   });
 });
 
