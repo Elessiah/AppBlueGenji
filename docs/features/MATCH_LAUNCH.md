@@ -373,8 +373,9 @@ qu'il tient, son « Prêt »). Code : `lib/server/tournaments/match-casters.ts`.
   (avant le lancement, aucun de ses casters ne remplit plus la condition du
   cast) : `STREAM_NOT_FOUND` (409) ; un lien hors Twitch/YouTube/Kick :
   `INVALID_STREAM_URL`. Déjà inscrit : rien ne change.
-- **Interface** : sans stream, « 🎙 Caster » inscrit d'un clic ; sinon
-  `CastClaimDialog` fait choisir — un bouton radio par stream (ses casters, sa
+- **Interface** : « 🎙 Caster » ouvre toujours `CastClaimDialog` (une seule règle,
+  `castClaimChoices`, décide des choix) : sans stream, seul « Ouvrir mon propre
+  stream » est offert, où le premier caster peut donner sa chaîne ; sinon elle fait choisir — un bouton radio par stream (ses casters, sa
   plateforme ou « sans lien »), puis « Ouvrir mon propre stream » avec son champ
   de lien. Un co-cast se fait aussi sur un match déjà lancé.
   L'aide du champ prévient que le lien ne s'affiche qu'une fois le match marqué
@@ -383,7 +384,14 @@ qu'il tient, son « Prêt »). Code : `lib/server/tournaments/match-casters.ts`.
   le stream d'un caster que la lecture tait (retiré d'office avant le lancement)
   n'est pas proposé.
   Un stream choisi qui disparaît pendant que la fenêtre est ouverte n'est pas
-  remplacé par un autre : plus rien n'est coché, l'envoi est désarmé.
+  remplacé par un autre : plus rien n'est coché, l'envoi est désarmé, une annonce
+  (`aria-live`) le dit et le focus passe au premier choix restant. Le focus
+  d'ouverture va à « Annuler » (un Entrée réflexe sur une radio n'inscrit
+  personne) ; les casters d'un stream se joignent par `Intl.ListFormat`. Inscrit,
+  le focus passe à « Ne plus caster » (sinon « Plus d'actions »).
+  Le retrait par le staff nomme le caster prévenu ; un arbitre qui se choisit lui-même
+  lit « Ne plus caster », sans avis ; un caster choisi qui part pendant le choix
+  ferme la fenêtre par un toast ; les radios sont figées (`aria-disabled`) pendant l'envoi.
 - **Se retirer** : `DELETE /api/matches/[id]/caster` retire le lecteur ;
   `?userId=` désigne un autre caster et demande la permission `tournaments` (le staff
   choisit sur la carte, quand le match a plusieurs casters). Refus :
