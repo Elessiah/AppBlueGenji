@@ -254,7 +254,11 @@
       "confirm": "Retirer le caster",
       "pending": "Retrait…",
       "pick": "Caster à retirer",
-      "body": "Le caster en est prévenu, avec le motif « décision du staff », par message privé Discord ou notification push selon ses réglages."
+      "body": "Le caster {caster} en est prévenu, avec le motif « décision du staff », par message privé Discord ou notification push selon ses réglages.",
+      "gone": "Ce caster ne caste plus ce match.",
+      "selfTitle": "Ne plus caster {match} ?",
+      "selfConfirm": "Ne plus caster",
+      "selfBody": "Tu ne castes plus ce match ; personne n'en est prévenu."
     },
     "claimDialog": {
       "title": "Caster {match}",
@@ -266,7 +270,8 @@
       "noLink": "sans lien",
       "separate": "Ouvrir mon propre stream",
       "url": "Lien de mon stream (facultatif)",
-      "urlHint": "Plateformes acceptées : {platforms}. Ton lien s'affiche sur le match une fois que le staff l'a marqué comme casté ; sans lien, ton stream n'a pas de bouton « Regarder ».",
+      "urlHint": "Plateformes acceptées : {platforms}. Ton lien s'affiche sur le match une fois que le staff l'a marqué comme casté ; sans lien, ton stream n'apparaît pas sur la carte du match.",
+      "gone": "Ce stream n'existe plus : choisis-en un autre.",
       "urlInvalid": "Lien non reconnu. Plateformes acceptées : {platforms}."
     },
     "forceConfirm": {

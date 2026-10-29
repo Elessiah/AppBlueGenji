@@ -250,18 +250,39 @@ function useConfirmWhile(present: boolean) {
  * Retrait d'un caster par l'arbitrage : le caster visé est fixé à l'ouverture
  * (le premier) puis par le choix. Parti entre-temps, la fenêtre se ferme : le
  * retrait ne passe jamais en silence à un autre caster, qui recevrait l'avis
- * du staff.
+ * du staff — et `onGone` le dit (toast), sauf quand le départ est celui que le
+ * lecteur vient de confirmer (`markOwnRelease`).
  */
-function useReleaseConfirm(present: boolean, casters: BracketMatch["casters"]) {
+function useReleaseConfirm(present: boolean, casters: BracketMatch["casters"], onGone: () => void) {
   const [open, setOpen] = useConfirmWhile(present);
   const [releaseTarget, setReleaseTarget] = useState<number | null>(null);
   const releasedCaster = casters.find((caster) => caster.userId === releaseTarget) ?? null;
   if (open && releasedCaster === null) setOpen(false);
+  const shown = open && releasedCaster !== null;
+  const wasShown = useRef(false);
+  const ownRelease = useRef(false);
+  const goneRef = useRef(onGone);
+  goneRef.current = onGone;
+  useEffect(() => {
+    if (wasShown.current && !shown && releasedCaster === null && !ownRelease.current) goneRef.current();
+    wasShown.current = shown;
+  }, [shown, releasedCaster]);
   const openRelease = () => {
+    ownRelease.current = false;
     setReleaseTarget(casters[0]?.userId ?? null);
     setOpen(true);
   };
-  return { confirmRelease: open && releasedCaster !== null, openRelease, setConfirmRelease: setOpen, releasedCaster, setReleaseTarget };
+  const markOwnRelease = () => {
+    ownRelease.current = true;
+  };
+  return {
+    confirmRelease: shown,
+    openRelease,
+    setConfirmRelease: setOpen,
+    releasedCaster,
+    setReleaseTarget,
+    markOwnRelease,
+  };
 }
 
 export function MatchCardActions({
@@ -318,12 +339,27 @@ export function MatchCardActions({
   // « Forcer » (instantané du flux), sans clic.
   if (confirmForce && !hasForce) setConfirmForce(false);
   // Même règle pour le retrait du caster (match terminé, caster parti…).
-  const { confirmRelease, openRelease, setConfirmRelease, releasedCaster, setReleaseTarget } = useReleaseConfirm(
-    actions.some((a) => a.id === "releaseCast"),
-    match.casters,
-  );
+  const { confirmRelease, openRelease, setConfirmRelease, releasedCaster, setReleaseTarget, markOwnRelease } =
+    useReleaseConfirm(
+      actions.some((a) => a.id === "releaseCast"),
+      match.casters,
+      () => showError(t("cardActions.releaseConfirm.gone")),
+    );
   // Le choix du stream ne survit pas non plus à l'action (match lancé, joué…).
-  const [claimOpen, setClaimOpen] = useConfirmWhile(actions.some((a) => a.id === "claimCast"));
+  const hasClaimCast = actions.some((a) => a.id === "claimCast");
+  const [claimOpen, setClaimOpen] = useConfirmWhile(hasClaimCast);
+  // Inscrit, le bouton qui a ouvert la fenêtre disparaît (« Caster » devient
+  // « Ne plus caster ») : la fenêtre rendrait le focus à un bouton détaché, il
+  // tomberait sur <body> (WCAG 2.4.3). Il passe au bouton qui prend sa place.
+  const claimedRef = useRef(false);
+  useEffect(() => {
+    if (!claimedRef.current || hasClaimCast) return;
+    claimedRef.current = false;
+    const active = document.activeElement;
+    if (active && active !== document.body && document.contains(active)) return;
+    const release = rootRef.current?.querySelector<HTMLElement>('[data-action="releaseCast"]');
+    (release ?? toggleRef.current)?.focus({ preventScroll: true });
+  }, [hasClaimCast]);
   // Les contacts ne restent pas affichés quand le match ne les offre plus
   // (terminé, caster retiré, tournoi clos) : l'instantané du flux retire
   // l'action, et la modale se ferme avec elle.
@@ -444,11 +480,15 @@ export function MatchCardActions({
   }, [expanded, moreKey]);
 
   if (actions.length === 0) return null;
+  // Le caster visé est le lecteur lui-même (arbitre qui caste aussi) : un
+  // départ volontaire, sans avis — la fenêtre ne dit pas le contraire.
+  const releasingSelf = releasedCaster !== null && releasedCaster.userId === viewerUserId;
 
   const claim = async (body: CastClaimBody): Promise<CastClaimOutcome> => {
     try {
       await send(`/api/matches/${match.id}/caster`, "POST", body);
       showSuccess(t("cardActions.casting"));
+      claimedRef.current = true;
       window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
       return { ok: true };
     } catch (error) {
@@ -494,12 +534,9 @@ export function MatchCardActions({
         showError(launchError(castBlock));
         return;
       }
-      // Un match sans stream n'a rien à choisir : un clic ouvre un stream sans
-      // lien, comme avant les co-casters. Sinon, la fenêtre fait choisir.
-      if (match.streams.length === 0) {
-        void run(() => send(`/api/matches/${match.id}/caster`, "POST", {}), t("cardActions.casting"));
-        return;
-      }
+      // La fenêtre s'ouvre toujours : sans stream, elle ne propose que « ouvrir
+      // mon propre stream », où le premier caster peut donner sa chaîne. Une
+      // seule règle (`castClaimChoices`) décide donc des choix, jamais deux.
       setClaimOpen(true);
     },
     releaseCast: () => {
@@ -660,23 +697,28 @@ export function MatchCardActions({
       )}
       {confirmRelease && (
         <ConfirmActionDialog
-          title={t("cardActions.releaseConfirm.title", { match: matchLabel })}
-          confirmLabel={t("cardActions.releaseConfirm.confirm")}
+          title={
+            releasingSelf
+              ? t("cardActions.releaseConfirm.selfTitle", { match: matchLabel })
+              : t("cardActions.releaseConfirm.title", { match: matchLabel })
+          }
+          confirmLabel={releasingSelf ? t("cardActions.releaseConfirm.selfConfirm") : t("cardActions.releaseConfirm.confirm")}
           pendingLabel={t("cardActions.releaseConfirm.pending")}
           onClose={() => setConfirmRelease(false)}
-          onConfirm={() =>
-            run(
+          onConfirm={() => {
+            markOwnRelease();
+            return run(
               () =>
                 send(
                   `/api/matches/${match.id}/caster?userId=${encodeURIComponent(String(releasedCaster?.userId ?? ""))}`,
                   "DELETE",
                 ),
-              t("cardActions.casterRemoved"),
-            )
-          }
+              releasingSelf ? t("cardActions.notCasting") : t("cardActions.casterRemoved"),
+            );
+          }}
         >
           {match.casters.length > 1 && (
-            <fieldset className={styles.releasePick}>
+            <fieldset className={styles.releasePick} aria-busy={busy || undefined}>
               <legend>{t("cardActions.releaseConfirm.pick")}</legend>
               {/* Le focus reste sur « Annuler » : un Entrée réflexe sur un bouton
                   radio enverrait le formulaire et retirerait un caster. */}
@@ -687,14 +729,24 @@ export function MatchCardActions({
                     name={`release-caster-${match.id}`}
                     value={caster.userId}
                     checked={caster.userId === releasedCaster?.userId}
-                    onChange={() => setReleaseTarget(caster.userId)}
+                    // Figé pendant l'envoi sans `disabled` natif (le focus ne
+                    // resterait nulle part) : la requête vise le caster choisi au
+                    // clic, la fenêtre ne montre pas un autre choix le temps de la réponse.
+                    aria-disabled={busy || undefined}
+                    onChange={() => {
+                      if (!busy) setReleaseTarget(caster.userId);
+                    }}
                   />
                   <span>{caster.pseudo}</span>
                 </label>
               ))}
             </fieldset>
           )}
-          <p>{t("cardActions.releaseConfirm.body")}</p>
+          <p>
+            {releasingSelf
+              ? t("cardActions.releaseConfirm.selfBody")
+              : t("cardActions.releaseConfirm.body", { caster: releasedCaster?.pseudo ?? "" })}
+          </p>
         </ConfirmActionDialog>
       )}
       {claimOpen && (

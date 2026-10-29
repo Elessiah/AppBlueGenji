@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
@@ -31,7 +31,15 @@ export type CastClaimOutcome = { ok: true } | { ok: false; code: string; message
  * S'inscrire pour caster un match qui a déjà un stream (`docs/features/MATCH_LAUNCH.md`
  * § Casters et streams) : rejoindre un stream existant — co-caster, sans lien
  * à donner — ou ouvrir le sien, avec son propre lien (facultatif). Un match
- * sans stream n'ouvre pas cette fenêtre : l'inscription part d'un clic.
+ * sans stream l'ouvre aussi, avec le seul choix « ouvrir mon propre stream » :
+ * le premier caster peut donner sa chaîne.
+ *
+ * Le focus d'ouverture va à « Annuler » (comme la fenêtre de retrait) : un
+ * Entrée réflexe sur un bouton radio ne doit pas inscrire un caster.
+ *
+ * Un stream choisi qui disparaît (son dernier caster parti) démonte son bouton
+ * radio : le focus passe au premier choix restant et une annonce
+ * (`aria-live`) dit pourquoi « Caster ce match » est désarmé.
  *
  * `onClaim` envoie le corps (`castClaimBody`) et notifie l'issue ; un lien
  * refusé par le serveur est en plus rattaché au champ (`useFieldErrors`).
@@ -47,7 +55,7 @@ export function CastClaimDialog({
   onClose: () => void;
   onClaim: (body: CastClaimBody) => Promise<CastClaimOutcome>;
 }>) {
-  const { t } = useActionsText();
+  const { t, locale } = useActionsText();
   const name = useId();
   const urlId = useId();
   const hintId = useId();
@@ -59,9 +67,19 @@ export function CastClaimDialog({
     choices.find((option) => castClaimChoiceKey(option) === choiceKey) ?? null;
   const [url, setUrl] = useState("");
   const fieldErrors = useFieldErrors(CAST_FIELD_ERRORS, { url: urlId });
+  const fieldsetRef = useRef<HTMLFieldSetElement>(null);
+  const gone = choice === null;
+  useEffect(() => {
+    // Le bouton radio qui avait le focus a été démonté : le focus serait tombé
+    // sur <body>, derrière la modale. Un focus ailleurs (« Annuler ») reste.
+    if (!gone || document.activeElement !== document.body) return;
+    fieldsetRef.current?.querySelector<HTMLInputElement>("input[type=radio]")?.focus();
+  }, [gone]);
   const separate = choice?.kind === "SEPARATE";
   const urlInvalid = separate && url.trim() !== "" && normalizeStreamUrl(url) === null;
   const platforms = LIVE_PLATFORMS.join(", ");
+  // « A, B et C » / "A, B, and C" : la conjonction de la langue de la page.
+  const casterList = new Intl.ListFormat(locale, { style: "long", type: "conjunction" });
 
   const confirm = async (): Promise<boolean> => {
     if (choice === null) return false;
@@ -76,21 +94,20 @@ export function CastClaimDialog({
       confirmLabel={t("cardActions.claimDialog.confirm")}
       pendingLabel={t("cardActions.claimDialog.pending")}
       tone="primary"
-      focusContent
       disabled={choice === null || urlInvalid}
       onClose={onClose}
       onConfirm={confirm}
     >
-      <fieldset className={styles.choices}>
+      <fieldset ref={fieldsetRef} className={styles.choices}>
         <legend className={styles.legend}>{t("cardActions.claimDialog.legend")}</legend>
-        {choices.map((option, index) => {
+        {choices.map((option) => {
           const key = castClaimChoiceKey(option);
           const platform = option.kind === "JOIN" ? streamPlatform(option.liveUrl) : null;
           let label = t("cardActions.claimDialog.separate");
           if (option.kind === "JOIN") {
             label =
               option.casterPseudos.length > 0
-                ? t("cardActions.claimDialog.join", { casters: option.casterPseudos.join(", ") })
+                ? t("cardActions.claimDialog.join", { casters: casterList.format(option.casterPseudos) })
                 : t("cardActions.claimDialog.joinMatchStream");
           }
           return (
@@ -101,7 +118,6 @@ export function CastClaimDialog({
                 value={key}
                 checked={key === choiceKey}
                 onChange={() => setChoiceKey(key)}
-                data-autofocus={index === 0 ? true : undefined}
               />
               <span>
                 {label}
@@ -116,6 +132,9 @@ export function CastClaimDialog({
           );
         })}
       </fieldset>
+      <p className={styles.gone} role="status" aria-live="polite">
+        {gone ? t("cardActions.claimDialog.gone") : ""}
+      </p>
       {separate && (
         <div className="field">
           <label htmlFor={urlId}>{t("cardActions.claimDialog.url")}</label>

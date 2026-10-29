@@ -254,7 +254,11 @@
       "confirm": "Remove the caster",
       "pending": "Removing…",
       "pick": "Caster to remove",
-      "body": "The caster is notified, with the reason “staff decision”, by Discord direct message or push notification depending on their settings."
+      "body": "The caster {caster} is notified, with the reason “staff decision”, by Discord direct message or push notification depending on their settings.",
+      "gone": "This caster is no longer casting this match.",
+      "selfTitle": "Stop casting {match}?",
+      "selfConfirm": "Stop casting",
+      "selfBody": "You will no longer cast this match; nobody is notified."
     },
     "claimDialog": {
       "title": "Cast {match}",
@@ -266,7 +270,8 @@
       "noLink": "no link",
       "separate": "Open my own stream",
       "url": "My stream link (optional)",
-      "urlHint": "Accepted platforms: {platforms}. Your link shows on the match once the staff has marked it as cast; without a link, your stream has no “Watch” button.",
+      "urlHint": "Accepted platforms: {platforms}. Your link shows on the match once the staff has marked it as cast; without a link, your stream does not appear on the match card.",
+      "gone": "This stream no longer exists: pick another one.",
       "urlInvalid": "Link not recognized. Accepted platforms: {platforms}."
     },
     "forceConfirm": {

@@ -40,3 +40,14 @@
 .hintInvalid {
   color: var(--danger);
 }
+
+/* Annonce du stream choisi qui a disparu : zone vive toujours montée, sans place vide. */
+.gone {
+  margin: -6px 0 14px;
+  font-size: 12px;
+  color: var(--danger);
+}
+
+.gone:empty {
+  margin: 0;
+}

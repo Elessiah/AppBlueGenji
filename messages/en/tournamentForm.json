@@ -183,7 +183,7 @@
     },
     "launchPhase": {
       "label": "Match launch phase",
-      "description": "On: at its start time, each match waits for both teams (and the caster) to click “Ready”; a referee can force it, and it starts automatically after {launchDelay} minutes. Off (default): a match starts at its time or, with no time, as soon as both its opponents are known (unless referees schedule the matches).",
+      "description": "On: at its start time, each match waits for both teams (and each of its casters) to click “Ready”; a referee can force it, and it starts automatically after {launchDelay} minutes. Off (default): a match starts at its time or, with no time, as soon as both its opponents are known (unless referees schedule the matches).",
       "scope": "Can be changed until the tournament starts, then locked.",
       "locked": "The tournament has started: this option can no longer be changed."
     },

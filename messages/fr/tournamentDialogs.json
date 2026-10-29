@@ -264,7 +264,7 @@
     "autoStop": "Le direct s'arrête tout seul dès qu'un score est saisi.",
     "url": "Chaîne du match (facultatif)",
     "urlInvalid": "Lien non reconnu. Plateformes acceptées : {platforms}.",
-    "urlHint": "Laisser vide pour signaler le match sans lien du staff : son annonce sur Discord renverra alors au premier lien ouvert par un caster, à défaut à la chaîne officielle du tournoi, ou ne partira pas s'il n'en a pas. Plateformes acceptées : {platforms}."
+    "urlHint": "Laisser vide pour signaler le match sans lien de configuration du direct : son annonce sur Discord renverra alors au premier lien ouvert par un caster, à défaut à la chaîne officielle du tournoi, ou ne partira pas s'il n'en a pas. Si tu castes déjà ce match, le lien saisi ici est celui de ta propre chaîne. Plateformes acceptées : {platforms}."
   },
   "replay": {
     "removed": "Rediff retirée.",
