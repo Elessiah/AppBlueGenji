@@ -805,6 +805,7 @@ export async function loadSwissMeta(
       status: row.status,
       forfeitRound: row.forfeit_round === null ? null : Number(row.forfeit_round),
     })),
+    { open: tournament.state === "RUNNING" },
   );
 
   return {

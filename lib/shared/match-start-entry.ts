@@ -495,3 +495,24 @@ export function withYearShift(state: MatchStartEntryState, years: number): Match
   const instant = shiftMatchStartYear(state.instant, years);
   return instant === null ? { kind: "invalid", field: "day" } : { kind: "ready", instant };
 }
+
+/**
+ * Envoi **retenu** : la date n'était pas passée à l'affichage (`warnedAtRender`
+ * faux) mais l'est devenue à l'envoi (`warnedNow` vrai) — fenêtre laissée
+ * ouverte. L'avertissement s'affiche d'abord, l'envoi suivant part ; une date
+ * déjà avertie à l'affichage n'est pas retenue (elle l'a été à la saisie).
+ */
+export function shouldHoldSubmit(warnedAtRender: boolean, warnedNow: boolean): boolean {
+  return !warnedAtRender && warnedNow;
+}
+
+/**
+ * Le clic d'« Enregistrer » qui suit **immédiatement** un envoi retenu et qui
+ * prolonge un double-clic (`detail > 1`, au réglage du système) : il ne vaut
+ * pas confirmation, l'avertissement n'a pas été lu. La garde ne vaut que pour
+ * ce clic : le suivant (ou tout clic hors envoi retenu) part normalement, sans
+ * quoi des clics répétés seraient tous ignorés sans autre signal.
+ */
+export function isUnreadConfirmationClick(detail: number, justHeld: boolean): boolean {
+  return justHeld && detail > 1;
+}

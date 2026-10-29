@@ -164,11 +164,12 @@ function PenaltyLog({
               refus — même motif que le « 🔒 Score verrouillé » des plateaux.
             */}
             {onLift !== undefined && !penalty.removable && (
-              <span
-                className={styles.penaltyMeta}
-                title={a("penaltyLift.frozenTitle")}
-              >
-                🔒 {a("penaltyLift.frozen")}
+              // Forme courte lue avec la sanction ; le motif complet vit derrière
+              // le « i » de la légende sous le journal (`FrozenForfeitLegend`) :
+              // un `title` ne s'affiche ni au toucher ni au clavier.
+              <span className={styles.penaltyMeta}>
+                <span aria-hidden="true">🔒</span> {a("penaltyLift.frozen")}
+                <span className="sr-only"> {a("penaltyLift.frozenShort")}</span>
               </span>
             )}
             {onLift !== undefined && penalty.removable && (
@@ -191,6 +192,13 @@ function PenaltyLog({
           </li>
         ))}
       </ul>
+      {onLift !== undefined && penalties.some((penalty) => !penalty.removable) && (
+        <FrozenForfeitLegend
+          id="endurance-penalty-frozen"
+          label={a("penaltyLift.frozen")}
+          reason={a("penaltyLift.frozenTitle")}
+        />
+      )}
     </div>
   );
 }
@@ -323,7 +331,7 @@ export function EnduranceView({
     }
     if (!canCancelRow(standing.status) || onCancelForfeit === undefined) return null;
     if (!cancellableIds.has(standing.teamId)) {
-      return { kind: "locked", teamId: standing.teamId, label: a("forfeitCancel.frozen"), title: a("forfeitCancel.frozenTitle") };
+      return { kind: "locked", teamId: standing.teamId, label: a("forfeitCancel.frozen"), note: a("forfeitCancel.frozenShort") };
     }
     return {
       kind: "button",
@@ -335,6 +343,14 @@ export function EnduranceView({
       onClick: () => onCancelForfeit(standing.teamId, standing.teamName),
     };
   };
+
+  // Ligne figée : pas d'abandon à proposer, et l'annulation refusée (une manche
+  // a été jouée depuis). Même condition que le geste « verrou » de `forfeitAction`.
+  const isFrozenRow = (standing: EnduranceStandingRow) =>
+    !(canForfeitRow(standing.teamId, standing.status) && onForfeit !== undefined) &&
+    canCancelRow(standing.status) &&
+    onCancelForfeit !== undefined &&
+    !cancellableIds.has(standing.teamId);
 
   // Gestes d'une ligne, avec leurs gardes : `EnduranceRankingViews` ne les
   // montre que dans la vue « Général ».
@@ -386,10 +402,16 @@ export function EnduranceView({
         renderActions={renderActions}
         showActions={showActions}
         wideActions={showPenaltyAction}
+        outLegend={
+          showOutLegend ? (
+            <p className="mono" style={{ fontSize: 11, color: "var(--ink-quiet)", margin: "8px 0 0" }}>
+              {t("endurance.outLegend")}
+              {endurance.maxRounds === null ? "" : t("endurance.outLegendRounds", { count: endurance.maxRounds })}
+            </p>
+          ) : null
+        }
         actionsLegend={
-          endurance.standings.some(
-            (standing) => forfeitAction(standing, false, canForfeitRow(standing.teamId, standing.status))?.kind === "locked",
-          ) ? (
+          endurance.standings.some(isFrozenRow) ? (
             <FrozenForfeitLegend
               id="endurance-forfeit-frozen"
               label={a("forfeitCancel.frozen")}
@@ -398,13 +420,6 @@ export function EnduranceView({
           ) : null
         }
       />
-
-      {showOutLegend && (
-        <p className="mono" style={{ fontSize: 11, color: "var(--ink-quiet)", margin: "0 0 24px" }}>
-          {t("endurance.outLegend")}
-          {endurance.maxRounds === null ? "" : t("endurance.outLegendRounds", { count: endurance.maxRounds })}
-        </p>
-      )}
 
       {/*
         Le journal des sanctions suit le classement : c'est lui qui explique les

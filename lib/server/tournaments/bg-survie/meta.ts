@@ -24,11 +24,11 @@ import { configOf, loadTournament, matchFormatOf } from "./tournament-row";
  * derrière n'est adressable à personne. Un compte effacé laisse la ligne en
  * place (`created_by` passe à `NULL`) — la pénalité reste due.
  */
-async function loadPenaltyRows(conn: PoolConnection, tournamentId: number) {
-  // Borne du retrait, relue une fois pour tout le tableau : une sanction de la
-  // manche N ne se retire plus dès qu'une manche postérieure a été entamée
-  // (même règle que `liftEndurancePenalty`, même prédicat).
-  const lockRound = await lastRoundWithScoreInput(conn, tournamentId);
+async function loadPenaltyRows(conn: PoolConnection, tournamentId: number, lockRound: number) {
+  // `lockRound` : borne du retrait, lue une fois pour tout le tableau (et pour
+  // la fenêtre d'annulation des abandons) : une sanction de la manche N ne se
+  // retire plus dès qu'une manche postérieure a été entamée (même règle que
+  // `liftEndurancePenalty`, même prédicat).
 
   // Même tolérance que `loadPenalties` : sans la table, le classement
   // s'affiche sans journal des sanctions plutôt que pas du tout.
@@ -107,7 +107,8 @@ export async function loadEnduranceMeta(conn: PoolConnection, tournamentId: numb
   // produit, si bien qu'une correction de score le refait sans migration ni
   // colonne à tenir à jour. Les abandons se relisent ici depuis les lignes déjà
   // chargées, plutôt que par une seconde requête sur la même table.
-  const penalties = await loadPenaltyRows(conn, tournamentId);
+  const lastInputRound = await lastRoundWithScoreInput(conn, tournamentId);
+  const penalties = await loadPenaltyRows(conn, tournamentId, lastInputRound);
 
   const detailed = replayEnduranceDetailed({
     teams: rows.map((row) => ({ teamId: Number(row.team_id), seed: Number(row.seed) })),
@@ -170,6 +171,13 @@ export async function loadEnduranceMeta(conn: PoolConnection, tournamentId: numb
         status: row.status,
         forfeitRound: row.eliminated_round === null ? null : Number(row.eliminated_round),
       })),
+      // Avant les phases finales, la plage de `lastRoundWithScoreInput` est
+      // celle de la fenêtre : une seule lecture. Ensuite, l'annulation est
+      // fermée (`ENDURANCE_PLAYOFFS_STARTED`) et le résultat n'est pas lu.
+      {
+        open: tournament.state === "RUNNING" && Number(tournament.endurance_playoffs_started) !== 1,
+        lastInputRound,
+      },
     ),
   };
 }

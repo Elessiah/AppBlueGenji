@@ -109,6 +109,8 @@ export function SwissView({
     !isFinished && team.status === "FORFEIT" && canCancelForfeit && onCancelForfeit !== undefined;
   const anyRowAction = swiss.standings.some((team) => isForfeitable(team) || isCancellable(team));
   const cancellableIds = new Set(swiss.cancellableForfeitTeamIds);
+  // Ligne figée : l'annulation serait proposée, mais une manche a été jouée depuis.
+  const isFrozen = (team: SwissStandingRow) => isCancellable(team) && !cancellableIds.has(team.teamId);
 
   // Un seul geste par ligne, rendu par un même `<button>` (`ForfeitRowAction`).
   const rowAction = (team: SwissStandingRow, isMine: boolean): ForfeitRowActionProps | null => {
@@ -128,8 +130,8 @@ export function SwissView({
       };
     }
     if (!isCancellable(team)) return null;
-    if (!cancellableIds.has(team.teamId)) {
-      return { kind: "locked", teamId: team.teamId, label: a("forfeitCancel.frozen"), title: a("forfeitCancel.frozenTitle") };
+    if (isFrozen(team)) {
+      return { kind: "locked", teamId: team.teamId, label: a("forfeitCancel.frozen"), note: a("forfeitCancel.frozenShort") };
     }
     return {
       kind: "button",
@@ -291,7 +293,6 @@ export function SwissView({
                         key={team.teamId}
                         role="row"
                         data-row-focus={team.teamId}
-                        tabIndex={-1}
                         data-podium-muted={team.status === "FORFEIT" ? "" : undefined}
                         style={{
                           ...SUBGRID,
@@ -368,7 +369,7 @@ export function SwissView({
               </div>
             </ScrollArea>
           )}
-          {swiss.standings.some((team) => rowAction(team, false)?.kind === "locked") && (
+          {swiss.standings.some(isFrozen) && (
             <FrozenForfeitLegend
               id="swiss-forfeit-frozen"
               label={a("forfeitCancel.frozen")}
