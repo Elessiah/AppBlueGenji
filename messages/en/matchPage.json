@@ -21,7 +21,7 @@
     "mapSlot": "Map {number}: {map}",
     "mapPool": "Map {number}: to choose from {maps}",
     "mapOpen": "Map {number}: to choose",
-    "mapImposed": "set",
+    "mapImposed": "fixed",
     "format": "Format",
     "sides": "Sides",
     "sideLeft": "Left: {team}",
