@@ -493,4 +493,29 @@ describe("fiches hors Overwatch : BattleTag absent", () => {
     expect(html).not.toContain("BattleTag");
     expect(html).not.toContain("À inviter");
   });
+
+  it("RefereeCard_selfManaged_noteWithoutNamedRegion", () => {
+    const html = renderToStaticMarkup(
+      <RefereeCard referee={null} selfManaged phase="LAUNCHED" onCopy={noop} />,
+    );
+
+    expect(html).toContain("Match en autogestion");
+    expect(html).not.toContain("<section");
+    expect(html).not.toContain('aria-label="Arbitre"');
+  });
+
+  it("RefereeCard_battletagNote_followsValueAndCopyButton", () => {
+    const html = renderToStaticMarkup(
+      <RefereeCard
+        referee={{ userId: 77, pseudo: "Juge", battletag: "Juge#3333", battletagVerified: true, ready: false, isViewer: false }}
+        selfManaged={false}
+        phase="LAUNCHED"
+        onCopy={noop}
+        battletagNote="À inviter dans la partie"
+      />,
+    );
+
+    expect(html.indexOf("Juge#3333")).toBeLessThan(html.indexOf("À inviter dans la partie"));
+    expect(html.indexOf(">Copier<")).toBeLessThan(html.indexOf("À inviter dans la partie"));
+  });
 });

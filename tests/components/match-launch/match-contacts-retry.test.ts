@@ -420,3 +420,25 @@ describe("contacts du caster en attente, modale ouverte", () => {
     expect(card).toMatch(/<MatchContactsDialog[\s\S]*?card=\{match\}[\s\S]*?\/>/);
   });
 });
+
+describe("useMatchContacts — lecture coupée (`enabled` à faux)", () => {
+  const hook = readSource("components/match-launch/MatchContactsDialog.tsx");
+  const body = hook.slice(hook.indexOf("export function useMatchContacts"), hook.indexOf("Modale « Contacts » d'une carte"));
+
+  it("useMatchContacts_disabled_resetsReadStateDuringRender", () => {
+    expect(body).toMatch(/if \(readEnabled !== enabled\) \{\s*setReadEnabled\(enabled\);\s*if \(!enabled\) \{\s*setState\(\{ kind: "loading" \}\);\s*setServerDate\(null\);\s*setRereadFailures\(0\);\s*setRereadWait\(0\);/);
+  });
+
+  it("useMatchContacts_disabled_noTimerRuns", () => {
+    expect(body).toContain("if (!enabled || !shouldRetryReread(rereadFailures)) return;");
+    expect(body).toContain("const followReferee = enabled && clocks && refereeReadyRereadDue(launch);");
+    expect(body).toContain("if (!enabled || !launch) return;");
+  });
+});
+
+describe("fenêtre de lancement — « Page du match »", () => {
+  it("MatchLaunchCenter_onCurrentMatchPage_hidesViewMatch", () => {
+    const center = readSource("components/match-launch/MatchLaunchCenter.tsx");
+    expect(center).toMatch(/\{!isMemberMatchPageOf\(pathname, current\) && \(\s*<LocaleLink[\s\S]*?\{t\("viewMatch"\)\}/);
+  });
+});

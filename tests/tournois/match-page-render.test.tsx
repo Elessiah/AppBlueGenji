@@ -414,7 +414,7 @@ describe("page d'un match — arbitrage × lecteur", () => {
   });
 
   it("autogestion Overwatch : les trois réglages en sous-liste de l'étape des paramètres", () => {
-    const html = render(match({ selfManaged: true }), "public");
+    const html = render(match({ selfManaged: true }), "player");
     const nested = /Réglez les paramètres de la partie\.\s*<ul[^>]*>(.*?)<\/ul>/.exec(html);
     expect(nested).not.toBeNull();
     expect(visible(nested?.[1] ?? "")).toBe(
@@ -423,27 +423,43 @@ describe("page d'un match — arbitrage × lecteur", () => {
   });
 
   it("autogestion Overwatch en anglais : les trois réglages traduits", () => {
-    const html = visible(render(match({ selfManaged: true }), "public", false, "en"));
+    const html = visible(render(match({ selfManaged: true }), "player", false, "en"));
     expect(html).toContain("Competitive settings Killcam disabled Pause when a player disconnects");
   });
 
   it("autogestion Marvel Rivals : l'étape reste, sans la sous-liste Overwatch", () => {
-    const html = visible(render(match({ selfManaged: true }), "public", false, "fr", EMPTY_MAP_RULES, "MR"));
+    const html = visible(render(match({ selfManaged: true }), "player", false, "fr", EMPTY_MAP_RULES, "MR"));
     expect(html).toContain("Réglez les paramètres de la partie.");
     expect(html).not.toContain("Killcam");
   });
 
-  it("autogestion : l'aide-mémoire pour tous, l'invitation des casters avec un caster", () => {
+  it("autogestion : l'aide-mémoire pour qui organise le match, l'invitation des casters avec un caster", () => {
     const self = match({ selfManaged: true });
-    for (const viewer of ["public", "player", "staff"] as const) {
+    for (const viewer of ["player", "staff"] as const) {
       const html = visible(render(self, viewer));
       expect(html).toContain("Autogestion");
       expect(html).toContain("L'équipe hôte crée la partie.");
       expect(html).toContain("Réglez les paramètres de la partie.");
       expect(html).not.toContain("Invitez les casters du match.");
     }
-    const cast = visible(render(match({ selfManaged: true, casters: [matchCaster()] }), "public"));
+    const cast = visible(render(match({ selfManaged: true, casters: [matchCaster()] }), "player"));
     expect(cast).toContain("Invitez les casters du match.");
+  });
+
+  it("render_selfManaged_spectatorAndOutsiderReadKeyFactNoSteps", () => {
+    const self = match({ selfManaged: true });
+    for (const viewer of ["public", "other"] as const) {
+      const html = visible(render(self, viewer));
+      // La description neutre des faits clés, pas les consignes à l'impératif.
+      expect(html).toContain("Autogestion");
+      expect(html).not.toContain("Réglez les paramètres de la partie.");
+      expect(html).not.toContain("Killcam");
+    }
+  });
+
+  it("render_selfManaged_registeredCasterReadsSteps", () => {
+    const html = visible(render(match({ selfManaged: true, casters: [matchCaster({ userId: 900 })] }), "caster"));
+    expect(html).toContain("Invitez les casters du match.");
   });
 
   it("l'explication d'une décision attend derrière le « i », jamais en paragraphe", () => {
@@ -711,7 +727,7 @@ describe("page d'un match — mêmes gestes que la carte du plateau", () => {
 describe("page d'un match — sous /en", () => {
   it("rédige ses blocs en anglais, liens sans préfixe réécrits sous /en", () => {
     const html = visible(render(match({ selfManaged: true, casters: [matchCaster()], streams: [{ id: 1, liveUrl: null, staff: false }], firstMap: "Tokyo" }), "public", false, "en"));
-    for (const english of ["Bravo vs Alpha", "Host", "Creates the game", "First ban", "First map", "Sides Left: Bravo Right: Alpha", "Casters", "Self-managed", "The host team creates the game.", "Invite the match's casters.", "Round 2", "Stream 1", "Link not published yet"]) {
+    for (const english of ["Bravo vs Alpha", "Host", "Creates the game", "First ban", "First map", "Sides Left: Bravo Right: Alpha", "Casters", "Self-managed", "Round 2", "Stream 1", "Link not published yet"]) {
       expect(html).toContain(english);
     }
     for (const french of ["Hôte : crée la partie", "Première map", "Aucun caster", "Lien pas encore publié", "Étapes"]) {

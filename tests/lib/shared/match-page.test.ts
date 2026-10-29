@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   firstMapFieldFollows,
   isByeMatch,
+  isMemberMatchPageOf,
   matchPageDecision,
   matchPageIdsFromMemberPath,
   matchPageIdsFromSpectatorPath,
@@ -203,5 +204,24 @@ describe("selfManagementSteps", () => {
 
   it("sans caster, rien à inviter", () => {
     expect(selfManagementSteps(0)).toEqual(["hostCreates", "managersInvite", "settings"]);
+  });
+});
+
+describe("isMemberMatchPageOf (« Page du match » de la fenêtre de lancement)", () => {
+  const ids = { tournamentId: 12, matchId: 345 };
+
+  it("isMemberMatchPageOf_samePage_true", () => {
+    expect(isMemberMatchPageOf("/tournois/12/matchs/345", ids)).toBe(true);
+  });
+
+  it("isMemberMatchPageOf_otherMatchOrTournament_false", () => {
+    expect(isMemberMatchPageOf("/tournois/12/matchs/346", ids)).toBe(false);
+    expect(isMemberMatchPageOf("/tournois/13/matchs/345", ids)).toBe(false);
+  });
+
+  it("isMemberMatchPageOf_spectatorOrOtherPage_false", () => {
+    expect(isMemberMatchPageOf("/suivre/tournois/12/matchs/345", ids)).toBe(false);
+    expect(isMemberMatchPageOf("/tournois/12", ids)).toBe(false);
+    expect(isMemberMatchPageOf(null, ids)).toBe(false);
   });
 });

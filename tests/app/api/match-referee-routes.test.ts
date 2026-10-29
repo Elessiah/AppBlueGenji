@@ -44,10 +44,11 @@ function jsonRequest(method: string, body?: unknown) {
 
 const PANEL: RefereePanel = {
   matchId: 42,
-  referee: { userId: 3, pseudo: "Arbitre", eligible: true },
+  referee: { userId: 3, pseudo: "Arbitre", eligible: true, reason: null },
+  viewerBlock: null,
   selfManaged: false,
   firstMap: null,
-  round: { phaseId: 0, roundNumber: 1, bracket: "UPPER" },
+  round: { phaseId: 0, roundNumber: 1, bracket: "UPPER", open: 1, selfManaged: 0, refereed: 0 },
   roundSlots: [],
   candidates: [{ userId: 3, pseudo: "Arbitre" }],
   objections: [],
@@ -136,6 +137,8 @@ describe("GET / PUT /api/admin/matches/[matchId]/referee", () => {
     const res = await panelGet(jsonRequest("GET"), params("42"));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ panel: PANEL });
+    // La fiche est lue pour le lecteur (`viewerBlock`).
+    expect(loadRefereePanel).toHaveBeenCalledWith(42, arbitre.id);
     jest.mocked(loadRefereePanel).mockResolvedValue(null);
     expect((await panelGet(jsonRequest("GET"), params("42"))).status).toBe(404);
   });
