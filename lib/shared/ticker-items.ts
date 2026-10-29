@@ -69,6 +69,9 @@ export type TickerMatchOutcomeInput = {
  * - **vainqueur enregistré** désignant un camp : il est suivi, l'arbre et le
  *   classement le suivent aussi ; le forfait nominatif ne sert alors qu'à
  *   marquer l'*autre* camp « forfait » (et non « perdant ») ;
+ * - donnée incohérente, forfait nominatif **sur le camp vainqueur** : un camp
+ *   forfait n'a pas gagné — il est dit « forfait », la victoire va à l'autre
+ *   (sans quoi le forfaitaire s'affichait « ✓ » et l'autre « perdant ») ;
  * - sans vainqueur propre au match, un forfait nominatif donne la victoire à
  *   son adversaire ;
  * - sinon (nul, vainqueur étranger au match) : deux `none`.
@@ -85,13 +88,15 @@ export function tickerOutcomes(match: TickerMatchOutcomeInput): readonly [Ticker
   const winnerSide = sideOf(match.winnerTeamId);
   const forfeitSide = sideOf(match.forfeitTeamId);
   const outcomes: [TickerOutcome, TickerOutcome] = ["none", "none"];
-  if (winnerSide !== null) {
+  // Un forfait nominatif l'emporte sur un vainqueur qui désigne le même camp, ou
+  // sur l'absence de vainqueur propre au match : son adversaire gagne.
+  if (forfeitSide !== null && (winnerSide === null || winnerSide === forfeitSide)) {
+    outcomes[forfeitSide] = "forfeit";
+    outcomes[forfeitSide === 0 ? 1 : 0] = "win";
+  } else if (winnerSide !== null) {
     const other = winnerSide === 0 ? 1 : 0;
     outcomes[winnerSide] = "win";
     outcomes[other] = forfeitSide === other ? "forfeit" : "loss";
-  } else if (forfeitSide !== null) {
-    outcomes[forfeitSide] = "forfeit";
-    outcomes[forfeitSide === 0 ? 1 : 0] = "win";
   }
   return outcomes;
 }

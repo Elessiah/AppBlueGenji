@@ -6,6 +6,7 @@ import {
   LANDING_LEADERBOARD_KEY_PREFIX,
   LANDING_LIVE_KEY,
   LANDING_LIVE_TTL_MS,
+  LANDING_STATS_KEY,
   LANDING_TICKER_KEY,
   LANDING_TTL_MS,
 } from "@/lib/server/landing-cache";
@@ -55,7 +56,7 @@ import { landingServerText } from "@/lib/server/i18n-landing";
 import { DEFAULT_LOCALE, type Locale } from "@/lib/shared/locales";
 import { parseMatchFormat } from "@/lib/shared/match-format";
 import { tickerOutcomes, tickerScores, type TickerItem, type TickerOutcome } from "@/lib/shared/ticker-items";
-import { withoutInvisibles } from "@/lib/shared/visible-text";
+import { shownEntrantName, withoutInvisibles } from "@/lib/shared/visible-text";
 
 const DEFAULT_SITE_COUNTS: SiteCounts = {
   players: 0,
@@ -77,7 +78,7 @@ type StatsRow = RowDataPacket & {
 
 /** Compteurs de la vitrine. Mutualisés et invalidés par `landing-cache.ts`. */
 export async function getLandingStats(): Promise<LandingStats> {
-  return cachedLanding("stats", LANDING_TTL_MS, loadLandingStats);
+  return cachedLanding(LANDING_STATS_KEY, LANDING_TTL_MS, loadLandingStats);
 }
 
 /**
@@ -161,17 +162,6 @@ type LiveMatchRow = RowDataPacket & {
 function entrantHrefFor(teamId: number | null, soloUserId: number | null): string | null {
   if (teamId === null) return null;
   return entrantHref(Number(teamId), soloUserId === null ? null : { [Number(teamId)]: Number(soloUserId) });
-}
-
-/**
- * Nom saisi par un joueur, sans invisibles (`UNTRUSTED_NAMES.md`), `null`
- * quand il ne garde rien de visible : la vitrine est lue sans compte, et un nom
- * resté en base peut en porter encore (sosie refusé par `UNIQUE`). Sans NFKC :
- * le nom se lit comme sur sa fiche. Chaque appelant choisit son repli.
- */
-function shownEntrantName(name: string | null): string | null {
-  if (name === null) return null;
-  return withoutInvisibles(name) || null;
 }
 
 /** Seed exploitable (entier positif), ou `null` — la colonne est nullable. */
@@ -418,43 +408,47 @@ async function loadLandingLive(): Promise<LandingLive | null> {
 const TREND_WINDOW_DAYS = 7;
 
 /**
- * `game` restreint le rejeu aux tournois de ce jeu (pastilles Overwatch /
- * Marvel Rivals de `Leaderboard.tsx`) ; `undefined` (« Général ») rejoue tous
- * les jeux ensemble, comme le reste du site.
+ * Le classement entier d'un jeu, tel que le leaderboard de l'accueil **et** la
+ * page `/classement` le montrent, mutualisé : une entrée **par jeu**, la liste
+ * entière. `game` restreint le rejeu aux tournois de ce jeu (pastilles
+ * Overwatch / Marvel Rivals de `Leaderboard.tsx`) ; `undefined` (« Général »)
+ * rejoue tous les jeux ensemble, comme le reste du site.
+ *
+ * `/classement`, rendue à chaque visite, refaisait sinon ses deux rejeux à
+ * chaque rendu. L'entrée est vidée à chaque score avec le classement du site
+ * (`invalidateTeamRanking`), à chaque écriture de tournoi et à chaque
+ * dissolution : la page reste à jour. Une erreur remonte à l'appelant, qui
+ * choisit comment se dégrader, et n'est jamais mise en cache (`cached`).
+ */
+export function getLeaderboardRows(game: TournamentGame | undefined): Promise<LandingLeaderboardRow[]> {
+  return cachedLanding(`${LANDING_LEADERBOARD_KEY_PREFIX}${game ?? "all"}`, LANDING_TTL_MS, () =>
+    loadLeaderboardRows(game),
+  );
+}
+
+/**
+ * Le leaderboard de l'accueil : les `limit` premières lignes de
+ * {@link getLeaderboardRows}. La longueur est choisie par le client (1–50) ;
+ * les rangs et les tendances n'en dépendent pas, la tranche est donc découpée à
+ * la lecture. Une erreur rend une liste vide.
  */
 export async function getLandingLeaderboard(
   limit = 8,
   game?: TournamentGame,
 ): Promise<LandingLeaderboardRow[]> {
   const safeLimit = Math.min(50, Math.max(1, Math.trunc(limit)));
-  // Une entrée **par jeu**, la liste entière, découpée à la lecture : la
-  // longueur est choisie par le client (1–50), et une entrée par longueur
-  // refaisait tout le rejeu pour n'en garder qu'une tranche. Les rangs et les
-  // tendances ne dépendent pas de la longueur : la tranche est la même.
-  const rows = await cachedLanding(`${LANDING_LEADERBOARD_KEY_PREFIX}${game ?? "all"}`, LANDING_TTL_MS, () =>
-    loadLandingLeaderboard(game),
-  );
-  return rows.slice(0, safeLimit);
-}
-
-async function loadLandingLeaderboard(game: TournamentGame | undefined): Promise<LandingLeaderboardRow[]> {
   try {
-    return await loadLeaderboardRows(game);
+    return (await getLeaderboardRows(game)).slice(0, safeLimit);
   } catch {
     return [];
   }
 }
 
 /**
- * Le classement tel que le leaderboard **et** la page `/classement` le
- * montrent : rang, cote, bilan et tendance sur une semaine. `limit` absent rend
- * toutes les lignes (la page complète) ; l'erreur remonte à l'appelant, qui
- * choisit comment se dégrader.
+ * Le classement mis en forme : rang, cote, bilan et tendance sur une semaine,
+ * toutes les lignes. L'erreur remonte à l'appelant.
  */
-export async function loadLeaderboardRows(
-  game: TournamentGame | undefined,
-  limit?: number,
-): Promise<LandingLeaderboardRow[]> {
+async function loadLeaderboardRows(game: TournamentGame | undefined): Promise<LandingLeaderboardRow[]> {
   // Seules les équipes classées figurent (`isRankedTeam`, filtre unique de
   // `loadTeamRanking`) : « Général » garde celles qui ont disputé au moins un
   // match compté, un onglet par jeu celles qui en ont disputé un **dans ce
@@ -466,9 +460,8 @@ export async function loadLeaderboardRows(
     loadTeamRanking({ completedMoreThanDaysAgo: TREND_WINDOW_DAYS, game }),
   ]);
   const previousRanks = new Map(previousRows.map((row, index) => [row.teamId, index + 1]));
-  const shown = limit === undefined ? currentRows : currentRows.slice(0, limit);
 
-  return shown.map((row, index) => {
+  return currentRows.map((row, index) => {
     const rank = index + 1;
     const previousRank = previousRanks.get(row.teamId);
     // Absente de la photo d'il y a une semaine : elle est entrée au classement
@@ -563,15 +556,18 @@ type TickerEntry = { sortAt: number } & (
       /** Nom affichable de chaque camp, `null` quand la ligne a disparu ou que le nom ne garde rien (repli traduit à la sortie). */
       team1: string | null;
       team1Id: number | null;
+      /** Le camp est une entrée solo (`bg_teams.solo_user_id`) : son repli dit « Joueur », pas « Équipe #id ». */
+      team1Solo: boolean;
       score1: number | null;
       team2: string | null;
       team2Id: number | null;
+      team2Solo: boolean;
       score2: number | null;
       /** Issue de chaque camp, lue sur le résultat enregistré (`tickerOutcomes`). */
       outcomes: readonly [TickerOutcome, TickerOutcome];
     }
   | { kind: "registration"; name: string; registered: number; max: number }
-  | { kind: "winner"; name: string; winner: string | null; winnerTeamId: number | null }
+  | { kind: "winner"; name: string; winner: string | null; winnerTeamId: number | null; winnerSolo: boolean }
   | { kind: "news"; title: string }
 );
 
@@ -593,21 +589,26 @@ const OUTCOME_SR_KEY = {
 function formatTickerEntry(entry: TickerEntry, locale: Locale): TickerItem | null {
   const { t } = landingServerText(locale);
   // Les noms arrivent déjà nettoyés (`shownEntrantName`) : le repli « Équipe #id »
-  // vaut quand la ligne a disparu ou que le nom ne garde rien.
-  const team = (name: string | null, id: number | null) => name ?? t("ticker.teamFallback", { id: String(id) });
+  // vaut quand la ligne a disparu ou que le nom ne garde rien. Une entrée solo
+  // se replie sur « Joueur » : le bandeau public n'appelle pas un joueur
+  // « équipe » et ne montre pas l'identifiant interne de sa ligne `bg_teams`.
+  const team = (name: string | null, id: number | null, solo: boolean) => {
+    if (name !== null) return name;
+    return solo ? t("ticker.playerFallback") : t("ticker.teamFallback", { id: String(id) });
+  };
   switch (entry.kind) {
     case "result": {
       const { outcomes } = entry;
-      const side = (name: string | null, id: number | null, score: number | null, outcome: TickerOutcome) => {
+      const side = (name: string | null, id: number | null, solo: boolean, score: number | null, outcome: TickerOutcome) => {
         const key = OUTCOME_SR_KEY[outcome];
-        return { name: team(name, id), score: score === null ? null : String(score), outcome, sr: key === null ? null : t(key) };
+        return { name: team(name, id, solo), score: score === null ? null : String(score), outcome, sr: key === null ? null : t(key) };
       };
       return {
         kind: "result",
         lead: t("ticker.resultLead", { tournament: entry.tournament }),
         sides: [
-          side(entry.team1, entry.team1Id, entry.score1, outcomes[0]),
-          side(entry.team2, entry.team2Id, entry.score2, outcomes[1]),
+          side(entry.team1, entry.team1Id, entry.team1Solo, entry.score1, outcomes[0]),
+          side(entry.team2, entry.team2Id, entry.team2Solo, entry.score2, outcomes[1]),
         ],
         // Nul : aucun camp n'a d'issue propre, la note dit qu'il n'y a pas de vainqueur.
         sr: outcomes.every((outcome) => outcome === "none") ? t("ticker.srNoWinner") : null,
@@ -617,9 +618,11 @@ function formatTickerEntry(entry: TickerEntry, locale: Locale): TickerItem | nul
       return t("ticker.registration", { name: entry.name, registered: String(entry.registered), max: String(entry.max) });
     case "winner": {
       // Mis en valeur seulement sous un vrai nom : une ligne d'équipe disparue (ou un nom
-      // qui ne garde rien) s'écrit « Équipe #id » en texte simple, sans « ✓ » de champion.
+      // qui ne garde rien) s'écrit « Équipe #id » (« Joueur » pour une entrée solo) en
+      // texte simple, sans « ✓ » de champion.
       const known = entry.winner !== null;
-      const fallback = entry.winnerTeamId === null ? t("ticker.unknownChampion") : team(null, entry.winnerTeamId);
+      const fallback =
+        entry.winnerTeamId === null ? t("ticker.unknownChampion") : team(null, entry.winnerTeamId, entry.winnerSolo);
       return {
         kind: "champion",
         lead: t("ticker.winnerLead", { name: entry.name }),
@@ -641,6 +644,8 @@ type MatchResultRow = RowDataPacket & {
   team2_score: number | null;
   team1_id: number | null;
   team2_id: number | null;
+  team1_solo_user_id: number | null;
+  team2_solo_user_id: number | null;
   winner_team_id: number | null;
   forfeit_team_id: number | null;
   double_forfeit: number | boolean | null;
@@ -663,9 +668,26 @@ type WinnerRow = RowDataPacket & {
   name: string;
   winner_name: string | null;
   winner_team_id: number | null;
+  winner_solo_user_id: number | null;
 };
 
-async function loadNewsEntries(db: Awaited<ReturnType<typeof getDatabase>>): Promise<TickerEntry[]> {
+/**
+ * Nombre d'entrées du bandeau. Chaque lecture en garde au plus autant : les
+ * inscriptions ouvertes n'ont pas à compter celles de tous les tournois quand
+ * le bandeau n'en montre qu'une poignée.
+ */
+const TICKER_MAX_ITEMS = 10;
+
+/** Ce que les lectures du bandeau ont besoin d'une connexion : `execute` seul. */
+type TickerReader = Pick<Awaited<ReturnType<typeof getDatabase>>, "execute">;
+
+/**
+ * Les dernières actualités. Le titre, saisi par le staff, est nettoyé **une
+ * fois** ici comme les autres textes du bandeau (`withoutInvisibles`) : un
+ * caractère de largeur nulle ou une commande de direction n'arrive pas à
+ * l'accueil ; un titre qui ne garde rien de visible est écarté.
+ */
+async function loadNewsEntries(db: TickerReader): Promise<TickerEntry[]> {
   try {
     const [rows] = await db.execute<
       (RowDataPacket & { title: string; created_at: Date })[]
@@ -675,11 +697,10 @@ async function loadNewsEntries(db: Awaited<ReturnType<typeof getDatabase>>): Pro
        ORDER BY created_at DESC
        LIMIT 3`,
     );
-    return rows.map((row) => ({
-      kind: "news" as const,
-      title: row.title,
-      sortAt: new Date(row.created_at).getTime(),
-    }));
+    return rows.flatMap((row) => {
+      const title = withoutInvisibles(row.title);
+      return title ? [{ kind: "news" as const, title, sortAt: new Date(row.created_at).getTime() }] : [];
+    });
   } catch {
     return [];
   }
@@ -696,7 +717,7 @@ export async function getLandingTicker(locale: Locale = DEFAULT_LOCALE): Promise
   const items = (entries ?? [])
     .map((entry) => formatTickerEntry(entry, locale))
     .filter((item): item is TickerItem => item !== null)
-    .slice(0, 10);
+    .slice(0, TICKER_MAX_ITEMS);
   return items.length === 0 ? defaultTicker(locale) : { items };
 }
 
@@ -705,83 +726,105 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
     const db = await getDatabase();
     const entries: TickerEntry[] = [];
 
-    // Quatre lectures indépendantes, lancées ensemble : attendues l'une après
-    // l'autre, le premier rendu après une invalidation — et, par le vol unique,
-    // chaque visiteur qui l'attend — payait quatre allers-retours. Une erreur
-    // de l'une emporte le bandeau comme avant (repli sur les phrases d'attente) ;
-    // les actualités gardent leur propre repli.
-    const [[resultRows], [registrationRows], [winnerRows], newsEntries] = await Promise.all([
-      db.execute<MatchResultRow[]>(
-        `SELECT
-          m.updated_at,
-          t.name AS tournament_name,
-          t1.name AS team1_name,
-          t2.name AS team2_name,
-          m.team1_score,
-          m.team2_score,
-          m.team1_id,
-          m.team2_id,
-          m.winner_team_id,
-          m.forfeit_team_id,
-          m.double_forfeit,
-          t.match_format_type,
-          t.match_format_value,
-          t.match_format_max_maps,
-          t.match_format_draws
-         FROM bg_matches m
-         JOIN bg_tournaments t ON t.id = m.tournament_id
-         LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
-         LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
-         WHERE m.status = 'COMPLETED'
-           AND m.is_bye = FALSE
-           AND m.team1_id IS NOT NULL
-           AND m.team2_id IS NOT NULL
-           AND (
-             m.winner_team_id IS NOT NULL
-             OR m.forfeit_team_id IS NOT NULL
-             OR m.double_forfeit = TRUE
-             OR (
-               m.team1_score IS NOT NULL
-               AND m.team2_score IS NOT NULL
-               AND m.team1_score = m.team2_score
+    // Quatre lectures indépendantes, envoyées ensemble sur **une seule**
+    // connexion : `mysql2` les y enchaîne sans attente côté application. Le
+    // rendu à froid de l'accueil lance déjà une dizaine de lectures en
+    // parallèle ; quatre connexions de plus pour le seul bandeau privaient le
+    // reste de l'API du pool sur le Pi. Une erreur de l'une emporte le bandeau
+    // comme avant (repli sur les phrases d'attente) ; les actualités gardent
+    // leur propre repli.
+    const connection = await db.getConnection();
+    let reads: [[MatchResultRow[], unknown], [RegistrationRow[], unknown], [WinnerRow[], unknown], TickerEntry[]];
+    try {
+      reads = await Promise.all([
+        connection.execute<MatchResultRow[]>(
+          `SELECT
+            m.updated_at,
+            t.name AS tournament_name,
+            t1.name AS team1_name,
+            t2.name AS team2_name,
+            m.team1_score,
+            m.team2_score,
+            m.team1_id,
+            m.team2_id,
+            t1.solo_user_id AS team1_solo_user_id,
+            t2.solo_user_id AS team2_solo_user_id,
+            m.winner_team_id,
+            m.forfeit_team_id,
+            m.double_forfeit,
+            t.match_format_type,
+            t.match_format_value,
+            t.match_format_max_maps,
+            t.match_format_draws
+           FROM bg_matches m
+           JOIN bg_tournaments t ON t.id = m.tournament_id
+           LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
+           LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
+           WHERE m.status = 'COMPLETED'
+             AND m.is_bye = FALSE
+             AND m.team1_id IS NOT NULL
+             AND m.team2_id IS NOT NULL
+             AND (
+               m.winner_team_id IS NOT NULL
+               OR m.forfeit_team_id IS NOT NULL
+               OR m.double_forfeit = TRUE
+               OR (
+                 m.team1_score IS NOT NULL
+                 AND m.team2_score IS NOT NULL
+                 AND m.team1_score = m.team2_score
+               )
              )
-           )
-           AND t.start_visibility_at <= NOW()
-         ORDER BY m.updated_at DESC
-         LIMIT 3`,
-      ),
-      db.execute<RegistrationRow[]>(
-        `SELECT
-          t.start_at,
-          t.registration_open_at,
-          t.name,
-          COUNT(r.id) AS registered_teams,
-          t.max_teams
-         FROM bg_tournaments t
-         LEFT JOIN bg_tournament_registrations r ON r.tournament_id = t.id
-         WHERE t.state = 'REGISTRATION'
-           AND t.start_visibility_at <= NOW()
-         GROUP BY t.id, t.start_at, t.registration_open_at, t.name, t.max_teams
-         ORDER BY t.registration_open_at DESC`,
-      ),
-      db.execute<WinnerRow[]>(
-        `SELECT
-          t.finished_at,
-          t.name,
-          w.name AS winner_name,
-          r.team_id AS winner_team_id
-         FROM bg_tournaments t
-         LEFT JOIN bg_tournament_registrations r
-           ON r.tournament_id = t.id
-          AND r.final_rank = 1
-         LEFT JOIN bg_teams w ON w.id = r.team_id
-         WHERE t.state = 'FINISHED'
-           AND t.start_visibility_at <= NOW()
-         ORDER BY t.finished_at DESC
-         LIMIT 2`,
-      ),
-      loadNewsEntries(db),
-    ]);
+             AND t.start_visibility_at <= NOW()
+           ORDER BY m.updated_at DESC
+           LIMIT 3`,
+        ),
+        connection.execute<RegistrationRow[]>(
+          `SELECT
+            t.start_at,
+            t.registration_open_at,
+            t.name,
+            COUNT(r.id) AS registered_teams,
+            t.max_teams
+           FROM bg_tournaments t
+           LEFT JOIN bg_tournament_registrations r ON r.tournament_id = t.id
+           WHERE t.state = 'REGISTRATION'
+             AND t.start_visibility_at <= NOW()
+           GROUP BY t.id, t.start_at, t.registration_open_at, t.name, t.max_teams
+           ORDER BY t.registration_open_at DESC
+           LIMIT ${TICKER_MAX_ITEMS}`,
+        ),
+        // **Une** ligne par tournoi : deux inscriptions au rang 1 (donnée
+        // incohérente) occupaient sinon les deux places du `LIMIT 2`, et le
+        // champion suivant disparaissait du bandeau. La plus ancienne inscription
+        // au rang 1 est retenue (sous-requête, sans `GROUP BY` que MariaDB
+        // refuserait sous `ONLY_FULL_GROUP_BY`).
+        connection.execute<WinnerRow[]>(
+          `SELECT
+            t.finished_at,
+            t.name,
+            w.name AS winner_name,
+            r.team_id AS winner_team_id,
+            w.solo_user_id AS winner_solo_user_id
+           FROM bg_tournaments t
+           LEFT JOIN bg_tournament_registrations r
+             ON r.id = (
+               SELECT MIN(r1.id)
+                 FROM bg_tournament_registrations r1
+                WHERE r1.tournament_id = t.id
+                  AND r1.final_rank = 1
+             )
+           LEFT JOIN bg_teams w ON w.id = r.team_id
+           WHERE t.state = 'FINISHED'
+             AND t.start_visibility_at <= NOW()
+           ORDER BY t.finished_at DESC
+           LIMIT 2`,
+        ),
+        loadNewsEntries(connection),
+      ]);
+    } finally {
+      connection.release();
+    }
+    const [[resultRows], [registrationRows], [winnerRows], newsEntries] = reads;
 
     // Un résultat oppose deux engagés : une exemption (`is_bye`) ou une case
     // restée vide n'en est pas un — le bandeau affichait « Équipe #null 0 ».
@@ -791,7 +834,7 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
     // encore publié (`start_visibility_at`) ne montre rien, ici comme ailleurs.
 
     entries.push(
-      ...resultRows.map((row) => {
+      ...resultRows.flatMap((row) => {
         // Identifiants en nombres : une colonne rendue en chaîne (`bigNumberStrings`)
         // rendrait chaque résultat neutre sans erreur.
         const orNull = (value: number | null) => (value === null ? null : Number(value));
@@ -814,18 +857,26 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
             row.match_format_draws,
           ),
         });
-        return {
+        const outcomes = tickerOutcomes(outcome);
+        // Sans issue propre, seul un nul à scores égaux passe la requête : des
+        // scores inégaux disent une donnée incohérente (vainqueur hors des deux
+        // camps, équipe remplacée après le rapport). Écartée plutôt que lue
+        // « Alpha 3 — Beta 0 (sans vainqueur) ».
+        if (outcomes[0] === "none" && outcomes[1] === "none" && score1 !== score2) return [];
+        return [{
           kind: "result" as const,
           tournament: withoutInvisibles(row.tournament_name),
           team1: shownEntrantName(row.team1_name),
           team1Id: outcome.team1Id,
+          team1Solo: (row.team1_solo_user_id ?? null) !== null,
           team2: shownEntrantName(row.team2_name),
           team2Id: outcome.team2Id,
+          team2Solo: (row.team2_solo_user_id ?? null) !== null,
           score1,
           score2,
-          outcomes: tickerOutcomes(outcome),
+          outcomes,
           sortAt: new Date(row.updated_at).getTime(),
-        };
+        }];
       }),
     );
 
@@ -845,6 +896,7 @@ async function loadLandingTicker(): Promise<TickerEntry[]> {
         name: withoutInvisibles(row.name),
         winner: shownEntrantName(row.winner_name),
         winnerTeamId: row.winner_team_id === null ? null : Number(row.winner_team_id),
+        winnerSolo: (row.winner_solo_user_id ?? null) !== null,
         sortAt: new Date(row.finished_at ?? Date.now()).getTime(),
       })),
       ...newsEntries,

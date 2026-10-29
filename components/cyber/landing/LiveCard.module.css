@@ -158,14 +158,21 @@
 }
 
 /* Le `:hover` se pose sur la carte, pas sur le pied : la plaque couvre toute la
-   carte, un survol du pied seul ne dirait pas ou l'on clique. */
-.root:hover .footer,
+   carte, un survol du pied seul ne dirait pas ou l'on clique. Réservé à un vrai
+   pointeur (même requête que les commandes du carrousel) : au toucher, le pied
+   restait allumé après le tapotement. */
 .cardOverlay:focus-visible ~ .footer {
   color: var(--blue-100, #5ac8ff);
 }
 
-.root:hover .footerArrow {
-  transform: translateX(4px);
+@media (any-hover: hover) and (any-pointer: fine) {
+  .root:hover .footer {
+    color: var(--blue-100, #5ac8ff);
+  }
+
+  .root:hover .footerArrow {
+    transform: translateX(4px);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -270,9 +277,16 @@
   letter-spacing: 0.04em;
 }
 
-.streamButton:hover,
 .streamButton:focus-visible {
   background: rgba(255, 74, 92, 0.18);
+}
+
+/* Survol réservé à un vrai pointeur : au toucher, « Regarder sur … » restait
+   allumé après le tapotement. */
+@media (any-hover: hover) and (any-pointer: fine) {
+  .streamButton:hover {
+    background: rgba(255, 74, 92, 0.18);
+  }
 }
 
 .streamButton:focus-visible {
@@ -441,8 +455,10 @@
 }
 
 /* Survol réservé à un vrai pointeur : au toucher, « Match suivant » gardait
-   son état allumé après le tapotement (le navigateur y laisse `:hover`). */
-@media (hover: hover) and (pointer: fine) {
+   son état allumé après le tapotement (le navigateur y laisse `:hover`).
+   `any-hover` / `any-pointer` et non le seul pointeur principal : une souris ou
+   un pavé sur un appareil tactile (iPad à trackpad) garde son retour de survol. */
+@media (any-hover: hover) and (any-pointer: fine) {
   .carouselButton:hover {
     border-color: rgba(90, 200, 255, 0.5);
     background: rgba(90, 200, 255, 0.12);

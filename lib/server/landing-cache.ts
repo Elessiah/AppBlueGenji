@@ -72,15 +72,39 @@ export function invalidateLandingLive(): void {
 /** Clé du bandeau de la vitrine (`getLandingTicker`), partagée avec {@link invalidateLandingTeamViews}. */
 export const LANDING_TICKER_KEY = "ticker";
 
+/** Clé des compteurs de la vitrine (`getLandingStats`), partagée avec {@link invalidateLandingTeamViews}. */
+export const LANDING_STATS_KEY = "stats";
+
 /**
- * Oublie les vues de la vitrine qui **nomment des équipes** : les leaderboards
- * et le bandeau (noms des derniers résultats). Pour une écriture qui change la
- * liste du classement ou le nom d'une équipe sans toucher aux tournois — une
- * dissolution, qui renomme l'équipe « Équipe dissoute #id ». Les compteurs n'en
- * dépendent pas ; le direct non plus, ou pour 5 s au plus (sa durée de vie) :
- * les relancer serait perdu.
+ * Préfixe du mini-arbre de l'accueil (`mini-bracket:<tournoi>`,
+ * `tournaments/bracket-loader.ts`) : sous le préfixe de la vitrine, il est vidé
+ * avec ses agrégats à chaque écriture de tournoi, et avec les vues qui nomment
+ * des équipes ({@link invalidateLandingTeamViews}).
+ */
+export const LANDING_MINI_BRACKET_KEY_PREFIX = "mini-bracket:";
+
+/**
+ * Oublie les seuls leaderboards de la vitrine. Appelé avec le classement du site
+ * (`ranking-cache.ts`, à chaque score) : `/classement` lit la même entrée, et un
+ * score doit s'y voir aussitôt, comme quand la page refaisait sa liste.
+ */
+export function invalidateLandingLeaderboards(): void {
+  invalidateCachedPrefix(`${PREFIX}${LANDING_LEADERBOARD_KEY_PREFIX}`);
+}
+
+/**
+ * Oublie les vues de la vitrine qui **nomment ou comptent des équipes** : les
+ * leaderboards, le bandeau (noms des derniers résultats), le mini-arbre et les
+ * compteurs (« Équipes actives » écarte les équipes dissoutes, « Joueurs »
+ * compte les comptes). Pour une écriture qui change la liste du classement, le
+ * nom d'une équipe ou le nombre d'équipes sans toucher aux tournois — une
+ * dissolution, qui renomme l'équipe « Équipe dissoute #id », une suppression de
+ * compte, qui renomme son entrée solo. Le direct n'y est pas : il ne vit que 5 s
+ * (sa durée de vie), le relancer serait perdu.
  */
 export function invalidateLandingTeamViews(): void {
-  invalidateCachedPrefix(`${PREFIX}${LANDING_LEADERBOARD_KEY_PREFIX}`);
+  invalidateLandingLeaderboards();
   invalidateCached(`${PREFIX}${LANDING_TICKER_KEY}`);
+  invalidateCached(`${PREFIX}${LANDING_STATS_KEY}`);
+  invalidateCachedPrefix(`${PREFIX}${LANDING_MINI_BRACKET_KEY_PREFIX}`);
 }

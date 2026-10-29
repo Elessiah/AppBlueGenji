@@ -70,8 +70,14 @@
   color: var(--result-loss-ink);
 }
 
-/* Mots d'issue masqués : lus à voix haute, jamais copiés avec le texte du bandeau. */
-.item :global(.sr-only) {
+/* Ce qui n'est pas le texte du bandeau ne se copie pas avec lui : mots d'issue
+   masqués (lus à voix haute), repères « ✓ » / « ✕ », losanges de séparation,
+   et la seconde copie de la piste (masquée aux technologies d'assistance) —
+   copiée, chaque entrée se collait deux fois. */
+.item :global(.sr-only),
+.mark,
+.sep,
+.copy[aria-hidden="true"] {
   user-select: none;
 }
 

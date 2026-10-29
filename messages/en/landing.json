@@ -105,6 +105,7 @@
     "winnerLead": "WINNER · {name} ·",
     "unknownChampion": "Unknown champion",
     "teamFallback": "Team #{id}",
+    "playerFallback": "Player",
     "news": "NEWS · {title}",
     "defaultResult": "RESULT · Waiting for new matches",
     "defaultRegistration": "REGISTRATION OPEN · More brackets coming soon",
@@ -118,6 +119,7 @@
     "start": "STARTS",
     "teams": "TEAMS",
     "tbd": "TBD",
+    "bye": "Bye",
     "state": {
       "full": "Full",
       "registration": "Registration open",

@@ -19,6 +19,7 @@
  * cycle.
  */
 import { cached, invalidateCachedPrefix } from "@/lib/server/cache";
+import { invalidateLandingLeaderboards } from "@/lib/server/landing-cache";
 
 const PREFIX = "ranking:";
 
@@ -39,10 +40,13 @@ export function cachedRanking<T>(key: string, loader: () => Promise<T>): Promise
 
 /**
  * Oublie le classement. Appelé dès qu'un match bouge : le classement entier est
- * rejoué depuis `bg_matches`, donc aucune entrée n'en réchappe.
+ * rejoué depuis `bg_matches`, donc aucune entrée n'en réchappe — ni les
+ * leaderboards de la vitrine, qui en sont la mise en forme et que `/classement`
+ * lit aussi (`getLeaderboardRows`) : un score s'y voit aussitôt.
  */
 export function invalidateTeamRanking(): void {
   invalidateCachedPrefix(PREFIX);
+  invalidateLandingLeaderboards();
 }
 
 /**

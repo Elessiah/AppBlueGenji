@@ -1,8 +1,8 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useState } from "react";
 import { LocaleLink } from "@/components/i18n/locale-navigation";
-import { ChevronLeft, ChevronRight, Eye, Pause, Play } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pause, Play, Users } from "lucide-react";
 import { CyberCard, Pill, TeamSigil } from "@/components/cyber";
 import { EntityLink } from "@/components/entity-link";
 import type { LandingLive, LandingLiveMatch } from "@/lib/shared/landing";
@@ -162,7 +162,7 @@ function noLiveTournamentMessage({ t }: LandingText, iso: string | null | undefi
   return t("live.nextInDays", { days });
 }
 
-type MatchSlideProps = {
+export type MatchSlideProps = {
   match: LandingLiveMatch;
   /**
    * Horloge de la carte, `null` pour un match qui n'en dépend pas : seul un
@@ -171,10 +171,12 @@ type MatchSlideProps = {
    */
   clock: number | null;
   /**
-   * Logos chargés : la diapositive affichée et ses deux voisines seulement.
-   * Les diapositives cachées sont empilées dans la case visible, si bien que
-   * `loading="lazy"` ne retenait rien : les logos de tous les matchs partaient
-   * dès l'arrivée sur l'accueil. Une voisine est prête avant d'être montrée.
+   * Logos demandés : la diapositive affichée, ses deux voisines et le match mis
+   * en avant seulement ({@link slideLoadsLogos}). Les diapositives cachées sont
+   * empilées dans la case visible, si bien que `loading="lazy"` ne retenait
+   * rien : les logos de tous les matchs partaient dès l'arrivée sur l'accueil.
+   * Une voisine est prête avant d'être montrée ; une fois demandés, les logos
+   * restent (la diapositive ne revient pas aux initiales en s'éloignant).
    */
   showLogos: boolean;
   spectator: boolean;
@@ -193,11 +195,58 @@ export function slideNearActive(index: number, active: number, count: number): b
 }
 
 /**
+ * La diapositive demande-t-elle ses logos ? L'affichée et ses voisines, et
+ * aussi le match **mis en avant** : un sondage qui change ce dernier fait
+ * sauter la carte vers lui (de 1 à 4, sous mouvement réduit), et ses logos
+ * sont alors déjà là au lieu de remplacer les initiales d'un coup.
+ */
+export function slideLoadsLogos(index: number, active: number, count: number, featured: boolean): boolean {
+  return featured || slideNearActive(index, active, count);
+}
+
+/** Deux valeurs d'un match identiques : primitives égales, ou objets (manche, format) de même contenu. */
+function sameField(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (typeof left !== "object" || typeof right !== "object" || left === null || right === null) return false;
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+/**
+ * Comparateur de `memo` pour une diapositive : chaque relève du direct (flux ou
+ * REST de secours) remplace `live.matches` par des objets neufs, si bien que la
+ * comparaison par référence refaisait toutes les diapositives à chaque relève,
+ * même sans changement. Le match se compare donc **champ par champ**.
+ */
+export function sameSlideProps(previous: Readonly<MatchSlideProps>, next: Readonly<MatchSlideProps>): boolean {
+  if (previous.clock !== next.clock || previous.showLogos !== next.showLogos || previous.spectator !== next.spectator) {
+    return false;
+  }
+  if (previous.match === next.match) return true;
+  const keys = Object.keys(next.match) as (keyof LandingLiveMatch)[];
+  return (
+    keys.length === Object.keys(previous.match).length
+    && keys.every((key) => sameField(previous.match[key], next.match[key]))
+  );
+}
+
+/**
+ * Logos demandés une fois, gardés ensuite : une diapositive qui s'éloigne de
+ * l'affichée ne retombe pas sur ses initiales (et ne redemande rien en
+ * revenant). État dérivé posé pendant le rendu, comme le recommande React.
+ */
+function useStickyFlag(value: boolean): boolean {
+  const [kept, setKept] = useState(value);
+  if (value && !kept) setKept(true);
+  return value || kept;
+}
+
+/**
  * Un match de la carte : pastille d'état, bandeau de diffusion, les deux
  * engagés et la manche. Le carrousel en empile un par match ; mémoïsé, un pas
  * du carrousel ou un tic d'horloge ne refait que les diapositives concernées.
  */
-const MatchSlide = memo(function MatchSlide({ match, clock, showLogos, spectator }: Readonly<MatchSlideProps>) {
+const MatchSlide = memo(function MatchSlide({ match, clock, showLogos: requested, spectator }: Readonly<MatchSlideProps>) {
+  const showLogos = useStickyFlag(requested);
   const text = useLandingText();
   const { t } = text;
   // Le format est un réglage, jamais une déduction du nom de la manche : un FT3
@@ -288,7 +337,7 @@ const MatchSlide = memo(function MatchSlide({ match, clock, showLogos, spectator
       </div>
     </div>
   );
-});
+}, sameSlideProps);
 
 /**
  * Commandes du carrousel : précédent, position, suivant, pause. Au-dessus de la
@@ -346,12 +395,15 @@ function MatchArea({
   matches,
   carousel,
   clock,
+  featuredId,
   tournament,
   spectator,
 }: Readonly<{
   matches: LandingLiveMatch[];
   carousel: MatchCarousel;
   clock: number | null;
+  /** Match mis en avant par le serveur : ses logos sont préchargés ({@link slideLoadsLogos}). */
+  featuredId: number | null;
   tournament: string;
   spectator: boolean;
 }>) {
@@ -377,7 +429,7 @@ function MatchArea({
           <MatchSlide
             match={match}
             clock={slideClock(match, clock)}
-            showLogos={slideNearActive(index, carousel.index, matches.length)}
+            showLogos={slideLoadsLogos(index, carousel.index, matches.length, match.id === featuredId)}
             spectator={spectator}
           />
         </div>
@@ -416,8 +468,11 @@ export function LiveCard({ live, nextUpcomingISO, spectator = false }: Readonly<
   const matches = carouselMatches(live);
   // Seule l'horloge fait passer un match daté en lancement : sans elle, la
   // carte annoncerait « En attente de lancement » jusqu'au sondage suivant.
-  // Elle ne tourne que pour un tel match (`useClock` respecte le mode économe).
-  const clock = useClock(LIVE_CARD_CLOCK_MS, matches.some((match) => match.launchPhase === "SCHEDULED"));
+  // Elle ne tourne que pour un match qui la lit — daté **et** hors antenne, la
+  // condition même de `slideClock` : un match daté déjà diffusé ne la lit pas,
+  // et la carte se refaisait toutes les 30 s pour rien (`useClock` respecte le
+  // mode économe).
+  const clock = useClock(LIVE_CARD_CLOCK_MS, matches.some((match) => slideClock(match, 0) !== null));
   const carousel = useMatchCarousel(
     matches.map((match) => match.id),
     live?.currentMatch?.id ?? null,
@@ -473,11 +528,15 @@ export function LiveCard({ live, nextUpcomingISO, spectator = false }: Readonly<
           <span className={`${styles.tournamentMeta} mono`}>
             {t("live.tournamentState").toUpperCase()} · {live.game.toUpperCase()}
           </span>
+          {/* Le libellé se lit aussi à l'écran (`title`), et l'icône dit « des
+              personnes » plutôt qu'un œil : « œil 12 » se lisait comme 12
+              spectateurs de la diffusion, même sans diffusion — ce sont les
+              visiteurs qui suivent la page du tournoi. */}
           {visibleViewers !== null && (
-            <span className={styles.viewers}>
+            <span className={styles.viewers} title={t("live.viewers", { count: visibleViewers })}>
               {/* Un nombre nu ne dit rien à un lecteur d'écran : le libellé
                   entier lui est lu, l'icône et le chiffre restent visuels. */}
-              <Eye size={12} aria-hidden="true" />
+              <Users size={12} aria-hidden="true" />
               <span className="sr-only">{t("live.viewers", { count: visibleViewers })}</span>
               <span className="mono" aria-hidden="true">
                 {visibleViewers}
@@ -488,7 +547,14 @@ export function LiveCard({ live, nextUpcomingISO, spectator = false }: Readonly<
 
         <div className={styles.title}>{title}</div>
 
-        <MatchArea matches={matches} carousel={carousel} clock={clock} tournament={tournament} spectator={spectator} />
+        <MatchArea
+          matches={matches}
+          carousel={carousel}
+          clock={clock}
+          featuredId={live.currentMatch?.id ?? null}
+          tournament={tournament}
+          spectator={spectator}
+        />
 
         {/*
           Affordance de la plaque, et rien de plus : le seul lien est la plaque
