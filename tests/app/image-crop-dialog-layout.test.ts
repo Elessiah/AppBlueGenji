@@ -71,6 +71,51 @@ describe("modale de recadrage — petits écrans", () => {
   });
 });
 
+/**
+ * Le repère des tiers se trace par **bordures**, non par dégradés empilés : une
+ * boîte par axe, calée sur le tiers central, dont les deux bordures sont les
+ * deux lignes. Les quatre dégradés d'avant étalaient chaque ligne sur deux
+ * pixels à demi-teinte (`calc(33.33% ± 0.5px)`), et l'analyseur CSS de
+ * SonarCloud ne lisait pas cette valeur à quatre couches (bug de fiabilité
+ * BLOCKER css:S9424, ouvert cinq semaines sur `main`).
+ */
+describe("modale de recadrage — repère des tiers", () => {
+  /**
+   * Le corps de la règle dont le sélecteur **ouvre** une déclaration : le
+   * `}` exigé devant écarte `.grid::after` lu au milieu d'une liste de
+   * sélecteurs (`.grid::before, .grid::after`), qui est une autre règle.
+   */
+  const blockFor = (selector: RegExp) =>
+    new RegExp(`\\}\\s*${selector.source}\\s*\\{([^}]*)\\}`).exec(css)?.[1] ?? "";
+
+  it("ne repose sur aucun fond : les lignes sont des bordures", () => {
+    const grid = blockFor(/\.grid/);
+    expect(grid).toContain("position: absolute");
+    expect(grid).not.toMatch(/background|gradient/);
+    expect(blockFor(/\.grid::before,\s*\.grid::after/)).toMatch(/border:\s*0 solid rgba\(255, 255, 255, 0\.25\)/);
+  });
+
+  it("pose les deux lignes de chaque axe aux tiers", () => {
+    const vertical = blockFor(/\.grid::before/);
+    expect(vertical).toMatch(/inset:\s*0 33\.33%/);
+    expect(vertical).toMatch(/border-left-width:\s*1px/);
+    expect(vertical).toMatch(/border-right-width:\s*1px/);
+    const horizontal = blockFor(/\.grid::after/);
+    expect(horizontal).toMatch(/inset:\s*33\.33% 0/);
+    expect(horizontal).toMatch(/border-top-width:\s*1px/);
+    expect(horizontal).toMatch(/border-bottom-width:\s*1px/);
+  });
+
+  it("s'efface en contrastes forcés, où une bordure prend la couleur du système", () => {
+    // Le mode impose la couleur d'une bordure, pas celle d'un fond : sans cette
+    // règle, le repère décoratif passerait de 0,25 de blanc à des traits pleins
+    // de la teinte du cadre, par-dessus la photo — et le voile d'assombrissement
+    // du cadre, un `box-shadow`, a disparu dans ce même mode.
+    const forced = css.slice(css.indexOf("@media (forced-colors: active)"));
+    expect(forced).toMatch(/\.grid::before,\s*\.grid::after\s*\{[^}]*border-color:\s*transparent/);
+  });
+});
+
 describe("modale de recadrage — langue d'un écran du staff sous /en", () => {
   it("portée dans body, elle porte la langue que l'écran lui passe", () => {
     expect(tsx).toMatch(/role="dialog"[^>]*lang=\{lang\}/);

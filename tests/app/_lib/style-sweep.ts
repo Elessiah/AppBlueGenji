@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
 
 /**
  * Le **moteur** du balayage de styles, séparé de ce qu'on lui fait dire.
@@ -100,6 +100,24 @@ export function walk(dir: string, suffix: string, found: string[] = []): string[
     else if (entry.name.endsWith(suffix)) found.push(path);
   }
   return found;
+}
+
+/**
+ * Toutes les feuilles de `app/` et `components/` passées à un détecteur, et ce
+ * qu'il y trouve — le balayage que partagent les contrôles portant sur une
+ * feuille entière (ordre de `backdrop-filter`, `auto` sur un alias préfixé
+ * d'`appearance`…). Le chemin remis au détecteur est relatif à la racine et
+ * écrit en barres obliques, pour que le constat se lise de la même façon sous
+ * Windows.
+ *
+ * Une moisson famélique est une **panne du balayage**, pas un succès : un
+ * répertoire renommé rendrait zéro feuille, donc zéro contrevenant, et le
+ * contrôle passerait au vert en ne regardant rien.
+ */
+export function sweepStylesheets<T>(find: (file: string, css: string) => T[]): T[] {
+  const files = [...walk(join(ROOT, "app"), ".css"), ...walk(join(ROOT, "components"), ".css")];
+  if (files.length <= 10) throw new Error(`balayage à vide : ${files.length} feuille(s) trouvée(s)`);
+  return files.flatMap((path) => find(relative(ROOT, path).split(sep).join("/"), readFileSync(path, "utf8")));
 }
 
 /**

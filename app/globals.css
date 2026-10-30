@@ -2323,8 +2323,13 @@ input[type="radio"]:disabled:checked {
 @media (forced-colors: active) {
   input[type="checkbox"],
   input[type="radio"] {
+    /* `appearance` sans préfixe suffit : aucun navigateur qui lit
+       `forced-colors` n'en est resté à l'alias préfixé — Chromium et Firefox
+       traitent les deux noms comme une seule propriété, et Safari, qui ne sait
+       pas lire cette requête média, connaît le nom standard depuis 15.4. Or
+       `auto` n'est pas une valeur déclarée de l'alias, que l'analyseur CSS
+       refuse à juste titre (SonarCloud css:S9424). */
     appearance: auto;
-    -webkit-appearance: auto;
     /* La **boîte** revient au système en même temps que le dessin : `appearance`
        rend la marque, pas les métriques, et une case native épinglée à 16 px
        reste la nôtre. Le mode contrastes forcés va de pair avec le
