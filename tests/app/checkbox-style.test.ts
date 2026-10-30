@@ -79,6 +79,8 @@ describe("règle de base", () => {
 
 describe("contrastes forcés — la main revient au système", () => {
   const forced = sheet.slice(sheet.indexOf("@media (forced-colors: active)"));
+  /** La règle de la case dans ce mode : le premier bloc de la requête média. */
+  const box = forced.slice(0, forced.indexOf("}"));
 
   it("rend le dessin **et** les métriques", () => {
     // Le mode force la couleur de fond mais **pas** l'image : une coche presque
@@ -86,7 +88,6 @@ describe("contrastes forcés — la main revient au système", () => {
     // `appearance` rend le dessin, pas les métriques — une case native épinglée
     // à nos 16 px se rogne à côté d'un texte grossi, ce qui va justement de pair
     // avec ce mode sous Windows.
-    const box = forced.slice(0, forced.indexOf("}"));
     for (const declaration of [
       "appearance: auto",
       "width: auto",
@@ -97,6 +98,16 @@ describe("contrastes forcés — la main revient au système", () => {
       expect(box).toContain(declaration);
     }
     expect(forced).toContain("background-image: none");
+  });
+
+  it("s'en remet au nom standard, l'alias préfixé ne connaissant pas `auto`", () => {
+    // `-webkit-appearance: auto` ne rend rien — l'alias est antérieur à `auto`,
+    // et SonarCloud l'ouvre en bug de fiabilité (css:S9424). Il n'y servait de
+    // toute façon à rien : Chromium et Firefox traitent les deux noms comme une
+    // seule propriété, et Safari, seul à n'avoir longtemps connu que le préfixe,
+    // ne lit pas `forced-colors`. Le balayage de toutes les feuilles vit dans
+    // `appearance-prefixed-value.test.ts`.
+    expect(box).not.toContain("-webkit-appearance");
   });
 
   it("remplace le halo du focus par une `outline`, que le mode ne supprime pas", () => {

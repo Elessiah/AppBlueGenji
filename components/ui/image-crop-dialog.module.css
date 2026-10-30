@@ -103,15 +103,36 @@
   pointer-events: none;
 }
 
+/* Règle des tiers : deux boîtes bordées, pas quatre dégradés. Chaque boîte
+   tient le tiers central d'un axe, ses deux bordures **sont** les deux lignes —
+   une ligne nette de 1 px, là où le dégradé l'étalait sur deux pixels à
+   demi-teinte (`calc(33.33% ± 0.5px)`) ; et l'analyseur CSS de SonarCloud ne
+   lisait pas cette valeur à quatre couches (css:S9424). */
 .grid {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background:
-    linear-gradient(to right, transparent calc(33.33% - 0.5px), rgba(255, 255, 255, 0.25) 33.33%, transparent calc(33.33% + 0.5px)),
-    linear-gradient(to right, transparent calc(66.66% - 0.5px), rgba(255, 255, 255, 0.25) 66.66%, transparent calc(66.66% + 0.5px)),
-    linear-gradient(to bottom, transparent calc(33.33% - 0.5px), rgba(255, 255, 255, 0.25) 33.33%, transparent calc(33.33% + 0.5px)),
-    linear-gradient(to bottom, transparent calc(66.66% - 0.5px), rgba(255, 255, 255, 0.25) 66.66%, transparent calc(66.66% + 0.5px));
+}
+
+.grid::before,
+.grid::after {
+  content: "";
+  position: absolute;
+  border: 0 solid rgba(255, 255, 255, 0.25);
+}
+
+/* Les deux verticales, aux tiers de la largeur. */
+.grid::before {
+  inset: 0 33.33%;
+  border-left-width: 1px;
+  border-right-width: 1px;
+}
+
+/* Les deux horizontales, aux tiers de la hauteur. */
+.grid::after {
+  inset: 33.33% 0;
+  border-top-width: 1px;
+  border-bottom-width: 1px;
 }
 
 /* Poignées : 24 px de cible pour un point de 12 px visible (WCAG 2.5.8),
