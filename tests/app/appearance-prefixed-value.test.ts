@@ -1,7 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { readFileSync } from "node:fs";
-import { join, relative, sep } from "node:path";
-import { ROOT, stripComments, walk } from "./_lib/style-sweep";
+import { stripComments, sweepStylesheets } from "./_lib/style-sweep";
 
 /**
  * `auto` est une valeur de `appearance`, jamais de ses alias préfixés.
@@ -35,27 +33,33 @@ function prefixedAutoOffenders(file: string, css: string): Offender[] {
   return found;
 }
 
+/** Ce que le détecteur doit relever. */
+const FAUTIFS: Array<{ cas: string; css: string }> = [
+  { cas: "l'alias WebKit", css: ".a { -webkit-appearance: auto; }" },
+  { cas: "l'alias Mozilla", css: ".a { -moz-appearance: auto; }" },
+  { cas: "la casse et les espaces n'y changent rien", css: ".a {-WEBKIT-APPEARANCE:AUTO}" },
+  { cas: "un `!important` ne couvre pas la valeur", css: ".a { -webkit-appearance: auto !important; }" },
+];
+
+/** Ce qu'il doit laisser passer. */
+const CORRECTS: Array<{ cas: string; css: string }> = [
+  { cas: "la propriété standard, elle, prend `auto`", css: ".a { appearance: auto; }" },
+  { cas: "l'alias avec une valeur qui est la sienne", css: ".a { -webkit-appearance: none; }" },
+  { cas: "l'alias avec un contrôle natif nommé", css: ".a { -moz-appearance: textfield; }" },
+  { cas: "une variable dont le nom finit par le même mot", css: ".a { --theme-appearance: auto; }" },
+  { cas: "un commentaire qui cite le motif", css: "/* -webkit-appearance: auto; */ .a { color: red; }" },
+];
+
 describe("balayage — `auto` sur un alias préfixé d'`appearance`", () => {
-  it.each<[string, string, number]>([
-    ["l'alias WebKit", '.a { -webkit-appearance: auto; }', 1],
-    ["l'alias Mozilla", '.a { -moz-appearance: auto; }', 1],
-    ["la casse et les espaces n'y changent rien", ".a {-WEBKIT-APPEARANCE:AUTO}", 1],
-    ["un `!important` ne le couvre pas", ".a { -webkit-appearance: auto !important; }", 1],
-    ["la propriété standard, elle, prend `auto`", ".a { appearance: auto; }", 0],
-    ["l'alias avec une valeur qui est la sienne", ".a { -webkit-appearance: none; }", 0],
-    ["l'alias avec un contrôle natif nommé", ".a { -moz-appearance: textfield; }", 0],
-    ["une variable dont le nom finit par le même mot", ".a { --theme-appearance: auto; }", 0],
-    ["un commentaire qui cite le motif", "/* -webkit-appearance: auto; */ .a { color: red; }", 0],
-  ])("%s", (_label, css, count) => {
-    expect(prefixedAutoOffenders("x.css", css)).toHaveLength(count);
+  it.each(FAUTIFS)("relève $cas", ({ css }) => {
+    expect(prefixedAutoOffenders("x.css", css)).toHaveLength(1);
+  });
+
+  it.each(CORRECTS)("laisse passer $cas", ({ css }) => {
+    expect(prefixedAutoOffenders("x.css", css)).toHaveLength(0);
   });
 
   it("aucune feuille de app/ ni de components/ ne pose `auto` sur un alias", () => {
-    const files = [...walk(join(ROOT, "app"), ".css"), ...walk(join(ROOT, "components"), ".css")];
-    expect(files.length).toBeGreaterThan(10);
-    const offenders = files.flatMap((path) =>
-      prefixedAutoOffenders(relative(ROOT, path).split(sep).join("/"), readFileSync(path, "utf8")),
-    );
-    expect(offenders).toEqual([]);
+    expect(sweepStylesheets(prefixedAutoOffenders)).toEqual([]);
   });
 });

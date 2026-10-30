@@ -1,7 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { readFileSync } from "node:fs";
-import { join, relative } from "node:path";
-import { ROOT, stripComments, walk } from "./_lib/style-sweep";
+import { stripComments, sweepStylesheets } from "./_lib/style-sweep";
 
 /**
  * `-webkit-backdrop-filter` **avant** `backdrop-filter`, jamais l'inverse.
@@ -48,11 +46,6 @@ describe("balayage — ordre de backdrop-filter", () => {
   });
 
   it("aucune feuille de app/ ni de components/ ne pose la forme préfixée en second", () => {
-    const files = [...walk(join(ROOT, "app"), ".css"), ...walk(join(ROOT, "components"), ".css")];
-    expect(files.length).toBeGreaterThan(10);
-    const offenders = files.flatMap((path) =>
-      backdropOrderOffenders(relative(ROOT, path).replace(/\\/g, "/"), readFileSync(path, "utf8")),
-    );
-    expect(offenders).toEqual([]);
+    expect(sweepStylesheets(backdropOrderOffenders)).toEqual([]);
   });
 });

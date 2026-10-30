@@ -6,6 +6,7 @@ import {
   innermostBlocks,
   splitSelectorList,
   subjectCompound,
+  sweepStylesheets,
 } from "./_lib/style-sweep";
 
 /**
@@ -174,5 +175,21 @@ describe("innermostBlocks — découpage linéaire des blocs", () => {
     const started = Date.now();
     expect(innermostBlocks("a".repeat(200_000) + "}")).toEqual([]);
     expect(Date.now() - started).toBeLessThan(1000);
+  });
+});
+
+describe("balayage de toutes les feuilles", () => {
+  it("passe à son détecteur le chemin de chaque feuille, en barres obliques", () => {
+    // Le constat d'un contrôle se lit alors pareil sous Windows et en CI.
+    const sheets = sweepStylesheets((file) => [file]);
+    expect(sheets.length).toBeGreaterThan(10);
+    expect(sheets).toContain("app/globals.css");
+    expect(sheets.filter((file) => file.includes("\\"))).toEqual([]);
+  });
+
+  it("rend ce que le détecteur trouve, feuille par feuille", () => {
+    const found = sweepStylesheets((file, css) => (file.endsWith("app/globals.css") ? [css.length] : []));
+    expect(found).toHaveLength(1);
+    expect(found[0]).toBeGreaterThan(1000);
   });
 });
