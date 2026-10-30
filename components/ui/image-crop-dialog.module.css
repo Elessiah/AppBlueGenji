@@ -135,6 +135,19 @@
   border-bottom-width: 1px;
 }
 
+/* Contrastes forcés : le repère s'efface. Le mode impose la couleur d'une
+   bordure (pas celle d'un fond) : le quadrillage, décoratif et `aria-hidden`,
+   se peindrait en traits pleins de la teinte même du cadre, par-dessus la
+   photo — et justement là où le voile d'assombrissement du cadre, un
+   `box-shadow`, a disparu. Un dégradé n'était pas forcé : l'effacer rend le
+   même service qu'avant. */
+@media (forced-colors: active) {
+  .grid::before,
+  .grid::after {
+    border-color: transparent;
+  }
+}
+
 /* Poignées : 24 px de cible pour un point de 12 px visible (WCAG 2.5.8),
    posées **dans** les coins — le conteneur rogne ce qui dépasse, et un cadre
    calé sur l'image entière (le cas par défaut d'un logo) aurait perdu la

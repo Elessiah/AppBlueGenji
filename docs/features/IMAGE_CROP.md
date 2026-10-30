@@ -86,7 +86,11 @@ d'avant l'outil. Un cadre couvrant l'image entière n'est pas envoyé
   — leurs deux bordures **sont** les deux lignes. Des bordures de 1 px et non
   quatre dégradés empilés : la ligne tombe au pixel là où le dégradé l'étalait
   sur deux pixels à demi-teinte, et l'analyseur CSS ne lisait pas cette valeur à
-  quatre couches (SonarCloud css:S9424).
+  quatre couches (SonarCloud css:S9424). En **contrastes forcés**, le repère
+  s'efface (`border-color: transparent`) : le mode impose la couleur d'une
+  bordure et pas celle d'un fond, et un quadrillage plein de la teinte du cadre
+  viendrait concurrencer ce cadre par-dessus la photo — là même où son voile
+  d'assombrissement, un `box-shadow`, a disparu.
 - Une image déjà choisie mais pas encore envoyée (logo d'équipe, image de
   tournoi) se **recadre** de nouveau sans la resélectionner ; la garantie des
   droits d'un logo n'est pas redemandée — elle porte sur le fichier.

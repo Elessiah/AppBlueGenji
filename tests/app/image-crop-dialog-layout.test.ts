@@ -105,6 +105,15 @@ describe("modale de recadrage — repère des tiers", () => {
     expect(horizontal).toMatch(/border-top-width:\s*1px/);
     expect(horizontal).toMatch(/border-bottom-width:\s*1px/);
   });
+
+  it("s'efface en contrastes forcés, où une bordure prend la couleur du système", () => {
+    // Le mode impose la couleur d'une bordure, pas celle d'un fond : sans cette
+    // règle, le repère décoratif passerait de 0,25 de blanc à des traits pleins
+    // de la teinte du cadre, par-dessus la photo — et le voile d'assombrissement
+    // du cadre, un `box-shadow`, a disparu dans ce même mode.
+    const forced = css.slice(css.indexOf("@media (forced-colors: active)"));
+    expect(forced).toMatch(/\.grid::before,\s*\.grid::after\s*\{[^}]*border-color:\s*transparent/);
+  });
 });
 
 describe("modale de recadrage — langue d'un écran du staff sous /en", () => {
