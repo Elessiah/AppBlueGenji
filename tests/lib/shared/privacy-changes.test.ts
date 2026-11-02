@@ -2403,6 +2403,15 @@ describe("PRIVACY_CHANGES — salons vocaux d'équipe (MATCH-VOICE)", () => {
     expect(t18En.retention[3]).toContain(`forgotten ${VOICE_BOT_ABANDONED_MAX_HOURS} hours after`);
   });
 
+  it("processingRegister_t18_botRecordKeptWithoutLimitWhenDeletionRefusedFrAndEn", () => {
+    const t18 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T18")!;
+    const t18En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T18")!;
+    expect(t18.retention[3]).toContain("gardée sans limite tant qu'il le lit sans pouvoir le supprimer");
+    expect(t18En.retention[3]).toContain("kept with no limit while it reads it without being able to delete it");
+    expect(t18.retention[3]).toContain("copies de sauvegarde chiffrées (T09");
+    expect(t18En.retention[3]).toContain("encrypted backup copies (T09");
+  });
+
   it("processingRegister_t08_pointsVoiceChannelsToT18FrAndEn", () => {
     const t08 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T08")!;
     const t08En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T08")!;

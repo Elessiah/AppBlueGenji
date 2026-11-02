@@ -38,6 +38,7 @@ import {
 import { formatPrivacyChangeDateIn, type PrivacyChange } from "@/lib/shared/privacy-changes";
 import { ALL_TRANSFER_RECIPIENTS } from "@/lib/shared/processing-register";
 import {
+  VOICE_BOT_ABANDONED_MAX_HOURS,
   VOICE_BOT_RELEASED_MAX_HOURS,
   VOICE_BOT_SWEEP_MINUTES,
   VOICE_BOT_UNRELEASED_MAX_HOURS,
@@ -912,15 +913,17 @@ export function RgpdEn({
             window), a {VOICE_CHANNEL_CAPACITY}-seat voice channel for each of its two teams, named after the team — never for a solo
             entry, whose name would be a username, nor for a match against a ghost team. The match only launches once both
             channels are full (referees can force it; if the bot doesn&apos;t answer, the match doesn&apos;t wait). To know this, the bot
-            counts the people present in each channel: to do so it holds in memory, without ever recording it, the voice state (Discord identifier of the member and of their voice session, channel they are in, microphone or sound muted by them or by moderation, screen sharing or camera on, request to speak) of the members of the association&apos;s Discord server, as Discord sends it — that of the other servers it is
+            counts the people present in each channel: to do so it holds in memory, without ever recording it, the voice state (Discord identifier of the member and of their voice session, channel they are in, microphone or sound muted by them or by moderation, screen sharing or camera on, request to speak), with the member profile Discord attaches to it (username, nickname, avatar, roles), of the members of the association&apos;s Discord server, as Discord sends it — that of the other servers it is
             on reaches it too, but it does not keep it; the site only receives and keeps the channel&apos;s identifier, the numbers of the match and team, that <strong>number</strong> (“Voice channel: 3/5”,
             displayed to the match&apos;s parties and to staff, and readable by any signed-in member; a visitor without an account only sees whether the match is waiting for its channels) and the times of the count (or of a bot outage), of creation and of hand-back, never who. The channel is handed back to the bot when the match is played,
             cancelled, back to waiting or taken off the schedule, when the team leaves the pairing, or when the tournament ends or turns the option off; the bot deletes it as soon as it is
-            empty (within {VOICE_BOT_RELEASED_MAX_HOURS} hours and {VOICE_BOT_SWEEP_MINUTES} minutes of being handed back at the latest, even if occupied, while the bot is running, unless Discord prevents it — it then retries at every sweep; a channel never handed back, if it is
-            empty {VOICE_BOT_UNRELEASED_MAX_HOURS} hours after its creation or its reuse; moved out of the match category, the bot stops tracking it without deleting it
+            empty (within {VOICE_BOT_RELEASED_MAX_HOURS} hours and {VOICE_BOT_SWEEP_MINUTES} minutes of being handed back at the latest, even if occupied, while the bot is running; if Discord prevents it, it retries at every sweep, and if it has had no access to the channel
+            {VOICE_BOT_ABANDONED_MAX_HOURS} hours after its creation, it forgets it: the channel then stays until the server&apos;s moderation
+            deletes it; a channel never handed back, if it is empty {VOICE_BOT_UNRELEASED_MAX_HOURS} hours after its creation or its
+            reuse — occupied, it stays until it is handed back; moved out of the match category, the bot stops tracking it without deleting it
             and it falls to the server&apos;s moderation), and the site erases its record {VOICE_ROW_RETENTION_DAYS} days after the hand-back (apart from the encrypted backup
             copies). The bot keeps for each channel a record with no name (channel identifier, numbers of the match and team, creation
-            and hand-back times), erased with the channel. This count rests on
+            and hand-back times), erased with the channel or when it forgets it (apart from the encrypted backup copies). This count rests on
             <strong> legitimate interest</strong> (smooth running of tournaments: gathering each team before its match); joining a
             channel remains a choice — but until both are full, the match waits for referees to force its launch —, and only the presence of those who join it is counted; you can object to this processing (section “Your rights”) (<LocaleLink href="/rgpd/registre#t18">register, T18</LocaleLink>).
           </p>
