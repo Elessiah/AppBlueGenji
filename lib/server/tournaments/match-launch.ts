@@ -1243,6 +1243,7 @@ async function announceRoundSelfManagement(sampleMatchId: number, enabled: boole
         enabled,
         count,
       }),
+      { tournamentId: match.tournament.id },
     );
   } catch (error) {
     console.error("[referee] autogestion de manche non annoncée", error);

@@ -99,6 +99,28 @@ describe("file par transaction", () => {
     expect(jest.mocked(sendBotLog).mock.calls[0][0]).toContain("Coup d'envoi");
   });
 
+  it("flushBotLogs_tournamentEntry_queuedInItsTournamentBatch", async () => {
+    const connection = fakeConnection();
+    mockDb([[TOURNAMENT_ROW]]);
+
+    queueBotLog(connection, { kind: "tournament_started", tournamentId: 12 });
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(jest.mocked(sendBotLog).mock.calls[0][1]).toEqual({ tournamentId: 12 });
+  });
+
+  it("flushBotLogs_matchResult_queuedInTheTournamentBatchReadFromTheMatch", async () => {
+    const connection = fakeConnection();
+    mockDb([[MATCH_ROW]]);
+
+    queueBotLog(connection, { kind: "match_finished", matchId: 31 });
+    flushBotLogs(connection);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(jest.mocked(sendBotLog).mock.calls[0][1]).toEqual({ tournamentId: Number(MATCH_ROW.tournament_id) });
+  });
+
   it("ne vide la file qu'une fois : deux flushs ne dupliquent pas la ligne", async () => {
     const connection = fakeConnection();
     mockDb([[TOURNAMENT_ROW]]);
