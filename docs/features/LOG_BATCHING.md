@@ -56,8 +56,9 @@ fixe, jamais un nom ni un `#id` de joueur ; il compte dans la limite de
 
 | Catégorie | En-tête | Lignes | `kind` |
 |---|---|---|---|
-| `referees` | Arbitrage | désignations et retraits (`referee-notices.ts`), autogestion d'une manche (`match-launch.ts`), objection, planification par l'arbitrage, arbitre qui joue (`dispute-self-resolution.ts`) | `log` |
+| `referees` | Arbitrage | désignations et retraits (`referee-notices.ts`), autogestion d'une manche (`match-launch.ts`), objection, planification par l'arbitrage | `log` |
 | `referee-digest` | Matchs à arbitrer | relevé des matchs à venir sans arbitre (`referee-digest.ts`) | `alert` |
+| `referee-self-action` | Arbitrage à vérifier | un membre du staff a tranché (ou mis en pause, forfait…) un match qu'il joue (`dispute-self-resolution.ts`) : les autres vérifient | `alert` |
 | `casts` | Casts | `cast-notices.ts` | `log` |
 | `results` | Résultats | résultat d'un match, pénalités d'endurance (`bot-logs.ts`) | `log` |
 | `tournament` | Tournoi | création, lancement, fin, tournoi sous-rempli (`bot-logs.ts`) | `log` |
@@ -80,8 +81,9 @@ Tout `POST /internal/log` porte `kind: "log" | "alert"`, **déduit de la
 catégorie** (`botLogKind`) — jamais choisi par l'appelant, pour qu'une
 catégorie ne soit pas tantôt trace, tantôt alerte. Le bot poste `log` en
 `@silent` ; `alert` notifie ; un `kind` absent vaut `alert` (un site plus
-ancien reste notifiant). Seule `referee-digest` est une alerte : elle appelle
-un arbitre à se positionner. Tout le reste est une trace. **Déployer le bot
+ancien reste notifiant). Deux catégories sont des alertes : `referee-digest`
+appelle un arbitre à se positionner, `referee-self-action` appelle le staff à
+vérifier le geste d'un arbitre qui joue le match. Tout le reste est une trace. **Déployer le bot
 avant le site.** Le canal arbitre (`/internal/notify/referees`) n'est pas
 concerné : le bot y gère lui-même la trace.
 

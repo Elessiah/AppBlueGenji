@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import type { BotLogCategory } from "@/lib/shared/bot-log-category";
 import { createBotLogBatcher, type BotLogBatcher } from "@/lib/server/bot-log-batcher";
+import { botLogHeader } from "@/lib/shared/bot-log-category";
+import { REFEREE_DIGEST_LOG_MAX_LENGTH } from "@/lib/shared/bot-logs";
 
 /**
  * Lots du journal Discord (`docs/features/LOG_BATCHING.md`) : silence de 5 min
@@ -372,6 +374,17 @@ describe("catégories", () => {
     const messages = send.mock.calls.map(([message]) => message);
     expect(messages).toEqual([`# maps\n${"a".repeat(20)}`, `# maps\n${"b".repeat(20)}`]);
     for (const message of messages) expect(message.length).toBeLessThanOrEqual(40);
+    headed.reset();
+  });
+
+  it("dispatch_fullLengthDigest_sentAsSingleAlertMessage", async () => {
+    const headed = createBotLogBatcher({ send, header: botLogHeader });
+    const digest = "d".repeat(REFEREE_DIGEST_LOG_MAX_LENGTH);
+    headed.add("k", digest, "referee-digest");
+    await headed.flush("k");
+    // Un programme complet, en-tête compris, part en une seule alerte.
+    expect(send.mock.calls).toEqual([[`🔔 Matchs à arbitrer
+${digest}`, "referee-digest"]]);
     headed.reset();
   });
 });

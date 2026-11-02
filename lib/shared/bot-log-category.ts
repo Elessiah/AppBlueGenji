@@ -20,6 +20,7 @@ export type BotLogKind = "log" | "alert";
 export const BOT_LOG_CATEGORIES = [
   "referees",
   "referee-digest",
+  "referee-self-action",
   "casts",
   "results",
   "tournament",
@@ -42,6 +43,9 @@ export const BOT_LOG_CATEGORY_KINDS: Record<BotLogCategory, BotLogKind> = {
   referees: "log",
   // Le relevé des matchs à venir sans arbitre : un arbitre doit s'y positionner.
   "referee-digest": "alert",
+  // Un arbitre a tranché un match qu'il joue : les autres membres du staff
+  // doivent vérifier la décision (`dispute-self-resolution.ts`).
+  "referee-self-action": "alert",
   casts: "log",
   results: "log",
   tournament: "log",
@@ -58,6 +62,7 @@ export const BOT_LOG_CATEGORY_KINDS: Record<BotLogCategory, BotLogKind> = {
 export const BOT_LOG_CATEGORY_HEADERS: Record<BotLogCategory, string> = {
   referees: "🧑‍⚖️ Arbitrage",
   "referee-digest": "🔔 Matchs à arbitrer",
+  "referee-self-action": "⚠️ Arbitrage à vérifier",
   casts: "🎙️ Casts",
   results: "🏁 Résultats",
   tournament: "🏆 Tournoi",

@@ -26,7 +26,7 @@ const SEND_BOT_LOG: Record<string, BotLogCategory[]> = {
 const PUBLISH_STAFF_ACTION: Record<string, BotLogCategory> = {
   "app/api/admin/referees/[userId]/objection/route.ts": "referees",
   "app/api/admin/tournaments/[id]/referee-scheduling/route.ts": "referees",
-  "lib/server/tournaments/dispute-self-resolution.ts": "referees",
+  "lib/server/tournaments/dispute-self-resolution.ts": "referee-self-action",
   "app/api/admin/tournaments/[id]/forfeits/[teamId]/route.ts": "registrations",
   "app/api/admin/tournaments/[id]/registrations/[teamId]/route.ts": "registrations",
   "lib/server/tournaments/schedule-notices.ts": "schedule",
