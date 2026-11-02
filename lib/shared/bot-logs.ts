@@ -837,7 +837,9 @@ export function formatStaffMatchActionLog(context: {
  * - `ADVANCED` — étape suivante avancée (ouverture des inscriptions, début) ;
  * - `GHOST_TEAMS_REGISTERED` — équipes fantômes inscrites (`count`) ;
  * - `IMAGE_SET` / `IMAGE_UPDATED` / `IMAGE_REMOVED` — image du tournoi ;
- * - `LIVE_URL_SET` / `LIVE_URL_REMOVED` — lien de diffusion du tournoi.
+ * - `LIVE_URL_SET` / `LIVE_URL_REMOVED` — lien de diffusion du tournoi ;
+ * - `TEAM_VOICE_ON` / `TEAM_VOICE_OFF` — option « Salons vocaux d'équipe »
+ *   (`docs/features/MATCH_VOICE.md`).
  */
 export type StaffTournamentAction =
   | "EDITED"
@@ -848,7 +850,9 @@ export type StaffTournamentAction =
   | "IMAGE_UPDATED"
   | "IMAGE_REMOVED"
   | "LIVE_URL_SET"
-  | "LIVE_URL_REMOVED";
+  | "LIVE_URL_REMOVED"
+  | "TEAM_VOICE_ON"
+  | "TEAM_VOICE_OFF";
 
 const STAFF_TOURNAMENT_ACTION_WORDING: Record<StaffTournamentAction, string> = {
   EDITED: "Tournoi modifié",
@@ -860,6 +864,8 @@ const STAFF_TOURNAMENT_ACTION_WORDING: Record<StaffTournamentAction, string> = {
   IMAGE_REMOVED: "Image du tournoi retirée",
   LIVE_URL_SET: "Lien de diffusion du tournoi posé",
   LIVE_URL_REMOVED: "Lien de diffusion du tournoi retiré",
+  TEAM_VOICE_ON: "Salons vocaux d'équipe activés",
+  TEAM_VOICE_OFF: "Salons vocaux d'équipe désactivés",
 };
 
 /**

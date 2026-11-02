@@ -39,6 +39,7 @@ n'appellent l'intervention de personne.
 | `POST /api/admin/tournaments/[id]/ghost-registrations` | `GHOST_TEAMS_REGISTERED` (nombre) | Équipes fantômes inscrites (N) |
 | `POST` / `PATCH` / `DELETE /api/admin/tournaments/[id]/image` | `IMAGE_SET` / `IMAGE_UPDATED` / `IMAGE_REMOVED` | Image ajoutée / cadrage modifié / image retirée |
 | `PUT /api/admin/tournaments/[id]/live` | `LIVE_URL_SET` / `LIVE_URL_REMOVED` | Lien de diffusion du tournoi posé / retiré |
+| `PUT /api/admin/tournaments/[id]/voice-channels` | `TEAM_VOICE_ON` / `TEAM_VOICE_OFF` | Option « Salons vocaux d'équipe » allumée / éteinte (seulement quand elle change) |
 
 Forme : `🛠️ <Geste> — « Tournoi » (#id) : <Manche> — A vs B (#match), par le staff.`
 pour un match, `🛠️ <Geste> — « Tournoi » (#id), par le staff.` pour un tournoi

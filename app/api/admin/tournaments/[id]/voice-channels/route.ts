@@ -1,9 +1,8 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { readJsonBody } from "@/lib/server/request-body";
-import { publishStaffAction } from "@/lib/server/staff-audit";
 import { setTeamVoiceChannels } from "@/lib/server/tournaments/match-voice";
-import { discordInline } from "@/lib/shared/discord-text";
+import { announceStaffTournamentAction } from "@/lib/server/tournaments/staff-action-logs";
 import { can } from "@/lib/shared/permissions";
 
 /**
@@ -13,8 +12,9 @@ import { can } from "@/lib/shared/permissions";
  *
  * Permission `tournaments`. Aucune garde sur l'état du tournoi, par décision de
  * l'utilisateur (2026-11-02) : l'option se modifie à tout moment, tournoi en
- * cours compris. Le geste est journalisé (staff anonyme sur Discord, nommé
- * dans pm2) seulement s'il change la valeur.
+ * cours compris. Le geste est journalisé seulement s'il change la valeur, comme
+ * les autres gestes du staff sur un tournoi (`STAFF_ACTION_LOGS.md`) : auteur
+ * anonyme sur Discord, rien dans pm2.
  */
 export async function PUT(req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -33,12 +33,7 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
   try {
     const result = await setTeamVoiceChannels(tournamentId, body.enabled);
     if (result.changed) {
-      publishStaffAction(
-        result.enabled
-          ? `🔊 Salons vocaux d'équipe activés sur « ${discordInline(result.tournamentName)} » par le staff.`
-          : `🔊 Salons vocaux d'équipe désactivés sur « ${discordInline(result.tournamentName)} » par le staff.`,
-        { id: user.id, pseudo: user.pseudo },
-      );
+      announceStaffTournamentAction(tournamentId, result.enabled ? "TEAM_VOICE_ON" : "TEAM_VOICE_OFF");
     }
     return ok({ enabled: result.enabled, changed: result.changed });
   } catch (error) {

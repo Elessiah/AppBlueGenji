@@ -796,7 +796,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     purpose:
       "Gathering each team of a match in a dedicated Discord voice channel before it starts, and only launching the match once those channels are full, in tournaments with the “Team voice channels” option only (off by default)",
     subPurposes: [
-      `Asking the association's Discord bot, from ${VOICE_CHANNEL_LEAD_MINUTES} minutes before a match's time (immediately if the option is turned on later), for a ${VOICE_CHANNEL_CAPACITY}-seat voice channel per team in its server's match category, named after the team — never for a solo entry (its name would be a username) nor for a ghost team`,
+      `Asking the association's Discord bot, from ${VOICE_CHANNEL_LEAD_MINUTES} minutes before a match's time (immediately if the option is turned on later), for a ${VOICE_CHANNEL_CAPACITY}-seat voice channel per team in its server's match category, named after the team — never for a solo entry (its name would be a username) nor for a match against a ghost team`,
       `Having the bot count the people present in each channel, to hold the match's launch until both are full (referees can force it; if the bot doesn't answer, the match doesn't wait), and showing “Voice channel: n/${VOICE_CHANNEL_CAPACITY}” to the match's parties (members of both teams, casters) and to staff`,
       "Handing the channels back to the bot when the match is finished (score confirmed), cancelled, back to waiting or taken off the schedule, when the team leaves the pairing, or when the tournament ends or turns the option off; the bot deletes a channel as soon as it is empty",
     ],

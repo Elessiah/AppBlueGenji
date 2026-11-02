@@ -667,7 +667,7 @@ T18 Salons vocaux d'équipe des matchs
 Finalité principale
 Réunir chaque équipe d'un match dans un salon vocal Discord dédié avant son départ, et ne lancer le match qu'une fois ces salons pleins, dans les seuls tournois qui ont l'option « Salons vocaux d'équipe » (éteinte par défaut)
 Sous-finalités
-Demander au bot Discord de l'association, à partir de 15 minutes avant l'heure d'un match (aussitôt si l'option est allumée plus tard), un salon vocal de 5 places par équipe dans la catégorie des matchs de son serveur, au nom de l'équipe — jamais pour une entrée en tournoi individuel (son nom serait un pseudo) ni pour une équipe fantôme
+Demander au bot Discord de l'association, à partir de 15 minutes avant l'heure d'un match (aussitôt si l'option est allumée plus tard), un salon vocal de 5 places par équipe dans la catégorie des matchs de son serveur, au nom de l'équipe — jamais pour une entrée en tournoi individuel (son nom serait un pseudo) ni pour un match contre une équipe fantôme
 Faire compter par le bot le nombre de personnes présentes dans chaque salon, pour retenir le lancement du match jusqu'à ce que les deux soient pleins (l'arbitrage peut le forcer ; si le bot ne répond pas, le match n'attend pas), et montrer « Salon vocal : n/5 » aux parties du match (membres des deux équipes, casters) et au staff
 Rendre les salons au bot quand le match est terminé (score validé), annulé, retombé en attente ou sorti du programme, quand l'équipe sort de l'appariement, ou quand le tournoi se termine ou éteint l'option ; le bot supprime un salon dès qu'il est vide
 Base légale

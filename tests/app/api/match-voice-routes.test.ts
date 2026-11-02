@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/tournaments/match-voice");
-jest.mock("@/lib/server/staff-audit");
+jest.mock("@/lib/server/tournaments/staff-action-logs");
 jest.mock("@/lib/server/api-guard", () => ({
   ...jest.requireActual<typeof import("@/lib/server/api-guard")>("@/lib/server/api-guard"),
   enforceRateLimit: jest.fn(() => null),
@@ -13,7 +13,7 @@ import { PUT } from "@/app/api/admin/tournaments/[id]/voice-channels/route";
 import { GET } from "@/app/api/matches/[matchId]/voice/route";
 import { enforceRateLimit, MATCH_VOICE_READ_RULE } from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
-import { publishStaffAction } from "@/lib/server/staff-audit";
+import { announceStaffTournamentAction } from "@/lib/server/tournaments/staff-action-logs";
 import { readMatchVoice, setTeamVoiceChannels } from "@/lib/server/tournaments/match-voice";
 import { authUser } from "../../helpers/auth-user";
 
@@ -88,17 +88,25 @@ describe("PUT /api/admin/tournaments/[id]/voice-channels", () => {
     expect((await res.json()).error).toBe("TEAM_VOICE_CHANNELS_UPDATE_FAILED");
   });
 
-  it("put_changed_logsStaffActionWithoutPseudoInMessage", async () => {
+  it("put_changed_logsAnonymousTournamentActionWithoutAuthor", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
     const res = await PUT(putReq({ enabled: true }), tournamentParams("7"));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ enabled: true, changed: true });
     expect(setTeamVoiceChannels).toHaveBeenCalledWith(7, true);
-    const [message, actor] = jest.mocked(publishStaffAction).mock.calls[0];
-    expect(message).toContain("Salons vocaux d'équipe activés");
-    expect(message).not.toContain("ArbitrePseudo");
-    expect(message).not.toContain("<@&1>");
-    expect(actor).toEqual({ id: 3, pseudo: "ArbitrePseudo" });
+    expect(announceStaffTournamentAction).toHaveBeenCalledWith(7, "TEAM_VOICE_ON");
+  });
+
+  it("put_turnedOff_logsTeamVoiceOff", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(setTeamVoiceChannels).mockResolvedValue({
+      tournamentId: 7,
+      tournamentName: "Coupe",
+      enabled: false,
+      changed: true,
+    });
+    await PUT(putReq({ enabled: false }), tournamentParams("7"));
+    expect(announceStaffTournamentAction).toHaveBeenCalledWith(7, "TEAM_VOICE_OFF");
   });
 
   it("put_unchanged_logsNothing", async () => {
@@ -111,7 +119,7 @@ describe("PUT /api/admin/tournaments/[id]/voice-channels", () => {
     });
     const res = await PUT(putReq({ enabled: false }), tournamentParams("7"));
     expect(await res.json()).toEqual({ enabled: false, changed: false });
-    expect(publishStaffAction).not.toHaveBeenCalled();
+    expect(announceStaffTournamentAction).not.toHaveBeenCalled();
   });
 });
 
