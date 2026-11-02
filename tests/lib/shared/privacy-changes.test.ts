@@ -2420,6 +2420,15 @@ describe("PRIVACY_CHANGES — salons vocaux d'équipe (MATCH-VOICE)", () => {
     }
   });
 
+  it("processingRegister_t18_handBackOnConfirmedScoreAndRescheduleStatedFrAndEn", () => {
+    const t18 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T18")!;
+    const t18En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T18")!;
+    expect(t18.subPurposes.join(" ")).toContain("quand le match est terminé (score validé)");
+    expect(t18En.subPurposes.join(" ")).toContain("when the match is finished (score confirmed)");
+    expect(t18.retention[1]).toContain("un match reporté garde ses salons jusqu'à leur rendu");
+    expect(t18En.retention[1]).toContain("a rescheduled match keeps its channels until they are handed back");
+  });
+
   it("processingRegister_t08_pointsVoiceChannelsToT18FrAndEn", () => {
     const t08 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T08")!;
     const t08En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T08")!;
