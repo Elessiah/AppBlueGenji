@@ -2,6 +2,7 @@ import { describe, expect, it, jest } from "@jest/globals";
 import { mapMatch } from "@/lib/server/tournaments/_internal";
 import {
   castEligibilityBlock,
+  loadEligibleRefereeIds,
   loadRefereeEligibility,
   loadRefereeStanding,
   refereeObjectionUpheld,
@@ -195,6 +196,25 @@ describe("mapMatch — arbitre désigné dans l'instantané (`docs/features/MATC
     expect(mapMatch(row({ ...eligible, referee_plays_match: 1, launched_at: new Date() })).refereeAssigned).toBe(true);
   });
 
+  it("mapMatch_refereeObjectionOnOpenMatch_hidesReferee", () => {
+    const match = mapMatch(row({ ...eligible, referee_objection_at: new Date() }));
+
+    expect(match.refereeAssigned).toBe(false);
+    expect(match.refereeKey).toBeNull();
+  });
+
+  it("mapMatch_refereeObjectionOnLaunchedMatch_hidesReferee", () => {
+    const match = mapMatch(row({ ...eligible, referee_objection_at: new Date(), launched_at: new Date() }));
+
+    expect(match.refereeAssigned).toBe(false);
+  });
+
+  it("mapMatch_refereeObjectionOnCompletedMatch_keepsReferee", () => {
+    const match = mapMatch(row({ ...eligible, referee_objection_at: new Date(), status: "COMPLETED" }));
+
+    expect(match.refereeAssigned).toBe(true);
+  });
+
   it("hôte à gauche, premier ban à l'autre ; en BlueGenji Survie la meilleure tête de série héberge", () => {
     expect(mapMatch(row()).hostTeamId).toBe(1);
     expect(mapMatch(row()).firstBanTeamId).toBe(2);
@@ -259,6 +279,31 @@ describe("refereeObjectionUpheld", () => {
     const execute = jest.fn<SqlQuery>().mockRejectedValue(new Error("ER_LOCK_WAIT_TIMEOUT"));
 
     await expect(refereeObjectionUpheld(connectionWith(execute), 5)).rejects.toThrow("ER_LOCK_WAIT_TIMEOUT");
+  });
+});
+
+describe("loadEligibleRefereeIds", () => {
+  const referee = { ...ELIGIBLE, id: 950, platform_roles_json: JSON.stringify(["ARBITRE"]) };
+
+  it("loadEligibleRefereeIds_eligibleReferee_returnsItsId", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[referee], []]);
+
+    await expect(loadEligibleRefereeIds(fakeConnection({ execute }), [950])).resolves.toEqual(new Set([950]));
+  });
+
+  it("loadEligibleRefereeIds_query_excludesUpheldObjections", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[], []]);
+
+    await loadEligibleRefereeIds(fakeConnection({ execute }), [950]);
+
+    expect(execute.mock.calls[0][0]).toContain("AND referee_objection_at IS NULL");
+  });
+
+  it("loadEligibleRefereeIds_noId_readsNothing", async () => {
+    const execute = jest.fn<SqlQuery>();
+
+    await expect(loadEligibleRefereeIds(fakeConnection({ execute }), [])).resolves.toEqual(new Set());
+    expect(execute).not.toHaveBeenCalled();
   });
 });
 

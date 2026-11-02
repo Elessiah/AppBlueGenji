@@ -2005,7 +2005,7 @@ describe("règles serveur de l'arbitrage (EF-31)", () => {
     expect(state.match?.referee_user_id).toBe(REFEREE);
   });
 
-  it("takeMatchReferee_currentRefereeHasObjection_announcesObjectionMotive", async () => {
+  it("takeMatchReferee_currentRefereeHasObjection_announcesTakenOverObjection", async () => {
     state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
     state.match = matchState({ referee_user_id: REFEREE });
 
@@ -2015,6 +2015,7 @@ describe("règles serveur de l'arbitrage (EF-31)", () => {
       kind: "OBJECTION_RELEASED",
       matchId: 42,
       refereeId: REFEREE,
+      takenOver: true,
     });
   });
 
@@ -2120,13 +2121,92 @@ describe("retraits en série et alertes regroupées (EF-31, revue)", () => {
     platform_roles_json: JSON.stringify(["ARBITRE"]),
   };
 
-  it("releaseIneligibleReferee_objectionUpheld_announcesObjectionMotive", async () => {
+  it("releaseIneligibleReferee_objectionUpheld_announcesTakenOverObjection", async () => {
     state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
     state.match = matchState({ referee_user_id: REFEREE });
 
     expect(await releaseIneligibleReferee(42, REFEREE)).toBe(true);
 
-    expect(announceRefereeChange).toHaveBeenCalledWith({ kind: "OBJECTION_RELEASED", matchId: 42, refereeId: REFEREE });
+    expect(announceRefereeChange).toHaveBeenCalledWith({
+      kind: "OBJECTION_RELEASED",
+      matchId: 42,
+      refereeId: REFEREE,
+      takenOver: true,
+    });
+  });
+
+  /** La validation de la première tentative échoue sur un interblocage ; la suivante passe. */
+  function deadlockFirstCommit(): void {
+    let commits = 0;
+    jest.mocked(withConnection).mockImplementation((run) =>
+      run(
+        fakeConnection({
+          execute: executeFor(state),
+          beginTransaction: async () => undefined,
+          commit: async () => {
+            commits += 1;
+            if (commits === 1) throw Object.assign(new Error("Deadlock found"), { code: "ER_LOCK_DEADLOCK" });
+          },
+          rollback: async () => undefined,
+        }),
+      ),
+    );
+  }
+
+  it("releaseIneligibleReferee_launchRolledBackThenRetried_reportsNoStaleCandidate", async () => {
+    state.users[REFEREE] = { ...refereeUser, platform_roles_json: null };
+    state.match = matchState({ referee_user_id: REFEREE, team1_ready_at: STAMP, team2_ready_at: STAMP });
+    deadlockFirstCommit();
+    const undecided: NoRefereeCandidate[] = [];
+
+    await releaseIneligibleReferee(42, REFEREE, undecided);
+
+    // Le double en mémoire garde l'écriture de la tentative défaite : la
+    // seconde ne trouve plus l'arbitre et ne lance rien — rien à signaler.
+    expect(undecided).toEqual([]);
+  });
+
+  it("releaseIneligibleReferee_transactionFails_reportsNothing", async () => {
+    state.users[REFEREE] = { ...refereeUser, platform_roles_json: null };
+    state.match = matchState({ referee_user_id: REFEREE, team1_ready_at: STAMP, team2_ready_at: STAMP });
+    jest.mocked(withConnection).mockImplementation((run) =>
+      run(
+        fakeConnection({
+          execute: executeFor(state),
+          beginTransaction: async () => undefined,
+          commit: async () => {
+            throw new Error("connexion perdue");
+          },
+          rollback: async () => undefined,
+        }),
+      ),
+    );
+    const undecided: NoRefereeCandidate[] = [];
+
+    await expect(releaseIneligibleReferee(42, REFEREE, undecided)).rejects.toThrow("connexion perdue");
+
+    expect(undecided).toEqual([]);
+  });
+
+  it("releaseObjectingReferee_launchRolledBackThenRetried_reportsNoStaleCandidate", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
+    state.match = matchState({ referee_user_id: REFEREE, team1_ready_at: STAMP, team2_ready_at: STAMP });
+    deadlockFirstCommit();
+    const undecided: NoRefereeCandidate[] = [];
+
+    await releaseObjectingReferee(42, REFEREE, undecided);
+
+    expect(undecided).toEqual([]);
+  });
+
+  it("releaseObjectingReferee_withSink_collectsCandidateAfterCommit", async () => {
+    state.users[REFEREE] = { ...refereeUser, referee_objection_at: STAMP };
+    state.match = matchState({ referee_user_id: REFEREE, team1_ready_at: STAMP, team2_ready_at: STAMP });
+    const undecided: NoRefereeCandidate[] = [];
+
+    await releaseObjectingReferee(42, REFEREE, undecided);
+
+    expect(undecided.map((candidate) => candidate.matchId)).toEqual([42]);
   });
 
   it("releaseIneligibleReferee_withSink_collectsAlertInsteadOfQueueing", async () => {

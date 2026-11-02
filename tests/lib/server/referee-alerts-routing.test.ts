@@ -775,16 +775,47 @@ describe("alerte d'une manche : matchs disparus ou au-delà de la liste (EF-31)"
     expect(released).toEqual([[9]]);
   });
 
-  it("resolveRoundNoRefereeLog_matchesBeyondList_countsOnlyOpenOnes", async () => {
+  it("flushBotLogs_listedMatchRefereedMeanwhile_droppedAndClaimReleased", async () => {
+    const execute = mockDb([[MATCH_ROW], [{ ...MATCH_ROW, id: 32, referee_user_id: 950 }]]);
+
+    await flushRound(fakeConnection(), [31, 32], [8, 9]);
+
+    const [message] = jest.mocked(pushRefereeAlert).mock.calls[0];
+    expect(message).not.toContain("(match #32)");
+    const released = execute.mock.calls
+      .filter(([sql]) => String(sql).startsWith("DELETE FROM bg_referee_alerts WHERE id = ?"))
+      .map(([, params]) => params);
+    expect(released).toEqual([[9]]);
+  });
+
+  it("flushBotLogs_listedMatchSelfManagedMeanwhile_droppedAndClaimReleased", async () => {
+    const execute = mockDb([[MATCH_ROW], [{ ...MATCH_ROW, id: 32, self_managed: 1 }]]);
+
+    await flushRound(fakeConnection(), [31, 32], [8, 9]);
+
+    const [message] = jest.mocked(pushRefereeAlert).mock.calls[0];
+    expect(message).not.toContain("(match #32)");
+    const released = execute.mock.calls
+      .filter(([sql]) => String(sql).startsWith("DELETE FROM bg_referee_alerts WHERE id = ?"))
+      .map(([, params]) => params);
+    expect(released).toEqual([[9]]);
+  });
+
+  it("resolveRoundNoRefereeLog_matchesBeyondList_countsOnlyOpenOnesAndReleasesOthers", async () => {
     const ids = [31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44];
-    const execute = mockDb([...ids.slice(0, 12).map((id) => [{ ...MATCH_ROW, id }]), [{ open_count: 1 }]]);
+    const execute = mockDb([...ids.slice(0, 12).map((id) => [{ ...MATCH_ROW, id }]), [{ id: 43 }]]);
 
     await flushRound(fakeConnection(), ids, ids.map((id) => id + 100));
 
-    const countRead = execute.mock.calls.find(([sql]) => String(sql).startsWith("SELECT COUNT(*) AS open_count FROM bg_matches"));
-    expect(countRead?.[1]).toEqual([43, 44]);
+    const openRead = execute.mock.calls.find(([sql]) => String(sql).startsWith("SELECT id FROM bg_matches"));
+    expect(openRead?.[1]).toEqual([43, 44]);
+    expect(String(openRead?.[0])).toContain("referee_user_id IS NULL AND self_managed = 0");
     const [message] = jest.mocked(pushRefereeAlert).mock.calls[0];
     expect(message).toContain("13 matchs en lancement");
+    const released = execute.mock.calls
+      .filter(([sql]) => String(sql).startsWith("DELETE FROM bg_referee_alerts WHERE id = ?"))
+      .map(([, params]) => params);
+    expect(released).toEqual([[144]]);
   });
 });
 

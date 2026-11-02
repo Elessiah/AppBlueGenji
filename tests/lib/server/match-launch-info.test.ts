@@ -1136,6 +1136,41 @@ describe("listViewerMatchLaunches — arbitre désigné (`docs/features/MATCH_RE
     expect(state.writes.some((sql) => sql.includes("referee_user_id = NULL"))).toBe(true);
   });
 
+  it("listViewerMatchLaunches_refereeObjectionUpheld_isHiddenAndReleasedByObjection", async () => {
+    state.candidates = [candidate({ referee_user_id: REFEREE })];
+    state.users = [refereeUser({ referee_objection_at: OPENED })];
+
+    const [info] = await listViewerMatchLaunches(viewer);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(info.referee).toBeNull();
+    expect(JSON.stringify(info)).not.toContain("Arbitre#1");
+    expect(state.reads.some((sql) => sql.startsWith("SELECT referee_objection_at FROM bg_users"))).toBe(true);
+    expect(state.writes.some((sql) => sql.includes("referee_user_id = NULL"))).toBe(true);
+  });
+
+  it("listViewerMatchLaunches_refereeObjectionOnLaunchedMatch_isStillReleased", async () => {
+    state.candidates = [candidate({ referee_user_id: REFEREE, launched_at: OPENED })];
+    state.users = [refereeUser({ referee_objection_at: OPENED })];
+
+    await listViewerMatchLaunches(viewer);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(state.writes.some((sql) => sql.includes("referee_user_id = NULL"))).toBe(true);
+  });
+
+  it("listViewerMatchLaunches_objectingRefereeReadsOwnMatch_isNoLongerMatchReferee", async () => {
+    state.viewerMemberships = [];
+    state.candidates = [candidate({ referee_user_id: VIEWER })];
+    state.users = [
+      casterUser(VIEWER, { pseudo: "Moi", platform_roles_json: JSON.stringify(["ARBITRE"]), referee_objection_at: OPENED }),
+    ];
+
+    const launches = await listViewerMatchLaunches({ id: VIEWER, roles: ["ARBITRE"] });
+
+    expect(launches.some((info) => info.viewer.role === "MATCH_REFEREE")).toBe(false);
+  });
+
   it("un arbitre devenu inéligible n'est plus montré, et il est retiré avant le lancement", async () => {
     state.candidates = [candidate({ referee_user_id: REFEREE })];
     state.users = [refereeUser({ platform_roles_json: JSON.stringify(["CASTER"]) })];
