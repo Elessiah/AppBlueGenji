@@ -32,6 +32,7 @@ import { useErrorsText } from "../[id]/_lib/error-map";
 import { EARLY_EXIT_FIELD_ID, EARLY_EXIT_HINT_ID, FormatSettings } from "./FormatSettings";
 import { TournamentImagePicker } from "./TournamentImagePicker";
 import { RefereeSchedulingField } from "./RefereeSchedulingField";
+import { TeamVoiceChannelsField } from "./TeamVoiceChannelsField";
 import { LAUNCH_PHASE_FIELD_ID, LAUNCH_PHASE_HINT_ID, LAUNCH_PHASE_MORE_ID, LaunchPhaseField } from "./LaunchPhaseField";
 import { initialImagePickerValue, type ImagePickerValue } from "../_lib/image-picker";
 import {
@@ -110,7 +111,8 @@ export type TournamentFormProps = {
   explanationId?: string;
   /**
    * La planification par l'arbitrage survit à la fenêtre d'édition : modifiable
-   * jusqu'à la clôture (`canToggleRefereeScheduling`). Défaut : modifiable.
+   * jusqu'à la clôture (`canToggleRefereeScheduling`), tout comme les salons
+   * vocaux d'équipe (`MATCH_VOICE.md`). Défaut : modifiable.
    */
   refereeSchedulingEditable?: boolean;
   /** État du tournoi édité — en cours, cocher la planification défait des lancements. */
@@ -714,6 +716,13 @@ export function TournamentForm({
             aria={fieldAttrs("launchPhase", LAUNCH_PHASE_MORE_ID, LAUNCH_PHASE_HINT_ID)}
             error={fieldErrors.message("launchPhase")}
             onChange={(checked) => set("launchPhase", checked)}
+          />
+
+          <TeamVoiceChannelsField
+            mode={mode}
+            checked={values.teamVoiceChannels}
+            editable={refereeSchedulingEditable}
+            onChange={(checked) => set("teamVoiceChannels", checked)}
           />
         </section>
 

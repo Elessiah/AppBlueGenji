@@ -37,5 +37,12 @@
     "officiating": "Officiating",
     "casts": "Casts",
     "connection": "Connection info"
+  },
+  "voice": {
+    "title": "Voice channels",
+    "count": "Voice channel: {count}/{capacity}",
+    "notCreated": "Voice channel: opening soon",
+    "waiting": "The match launches once both channels are full.",
+    "hint": "Fifteen minutes before the match, the Discord bot opens a {capacity}-seat voice channel per team; launch waits until both are full."
   }
 }

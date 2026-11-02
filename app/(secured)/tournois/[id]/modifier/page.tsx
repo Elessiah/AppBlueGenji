@@ -77,6 +77,7 @@ type EditLoadPayload = {
   values: TournamentApiValues;
   state: TournamentState;
   refereeScheduling: boolean;
+  teamVoiceChannels: boolean;
 };
 
 /** Raison du verrou affichée en tête : aucune, publication, ou tournoi lancé. */
@@ -102,6 +103,28 @@ function refusalText(
 function planningErrorText(text: TournamentFormText, code: string): string {
   const known = (["TOURNAMENT_NOT_FOUND", "TOURNAMENT_FINISHED", "INVALID_REFEREE_SCHEDULING"] as const).find((c) => c === code);
   return text.t(known ? `edit.planningErrors.${known}` : "edit.planningErrors.fallback");
+}
+
+/** Refus de la bascule des salons vocaux d'équipe. */
+function voiceErrorText(text: TournamentFormText, code: string): string {
+  const known = (["TOURNAMENT_NOT_FOUND", "INVALID_TEAM_VOICE_CHANNELS"] as const).find((c) => c === code);
+  return text.t(known ? `edit.voiceErrors.${known}` : "edit.voiceErrors.fallback");
+}
+
+/**
+ * Enregistre l'option « Salons vocaux d'équipe » par sa route dédiée
+ * (`MATCH_VOICE.md`) ; rend `true` si elle a changé.
+ */
+async function saveTeamVoiceChannels(tournamentId: number, enabled: boolean, text: TournamentFormText): Promise<boolean> {
+  const response = await fetch(`/api/admin/tournaments/${tournamentId}/voice-channels`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  });
+  const result = (await response.json().catch(() => ({}))) as { error?: string; changed?: boolean };
+  if (response.ok) return result.changed === true;
+  const code = result.error ?? "UNKNOWN";
+  throw new CodedError(code, voiceErrorText(text, code));
 }
 
 /** Envoie les champs de la fenêtre d'édition ; un refus nomme le champ en cause. */
@@ -199,6 +222,7 @@ export default function EditTournamentPage() {
         values: {
           ...toFormValues(successPayload.values),
           refereeScheduling: successPayload.refereeScheduling,
+          teamVoiceChannels: successPayload.teamVoiceChannels,
         },
         startVisibilityAt: successPayload.values.startVisibilityAt,
         state: successPayload.state,
@@ -319,8 +343,13 @@ export default function EditTournamentPage() {
           const planning = planningEditable
             ? await saveRefereeScheduling(tournamentId, values.refereeScheduling, text)
             : null;
+          // Salons vocaux d'équipe : même régime que la planification — route
+          // dédiée, envoyée à chaque enregistrement, idempotente.
+          const voiceChanged = planningEditable
+            ? await saveTeamVoiceChannels(tournamentId, values.teamVoiceChannels, text)
+            : false;
 
-          showSuccess(editSavedText(text, fieldsSent, planning, values.refereeScheduling));
+          showSuccess(editSavedText(text, fieldsSent || voiceChanged, planning, values.refereeScheduling));
           router.push(`/tournois/${tournamentId}`);
           router.refresh();
         }}

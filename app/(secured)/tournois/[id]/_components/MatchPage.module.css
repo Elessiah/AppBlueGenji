@@ -430,3 +430,20 @@
   font-weight: 400;
   font-size: 13px;
 }
+
+/* Salons vocaux d'équipe (`MATCH_VOICE.md`) : une ligne par équipe. */
+.voiceList {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.voiceRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}

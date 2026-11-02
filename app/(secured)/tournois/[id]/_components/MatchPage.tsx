@@ -13,6 +13,8 @@ import { CasterCards, RefereeCard, SideCard } from "@/components/match-launch/La
 import { useMatchContacts } from "@/components/match-launch/MatchContactsDialog";
 import { useLaunchText } from "@/components/match-launch/launch-text";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
+import { useClock } from "@/lib/shared/hooks/useClock";
+import { VOICE_CHANNEL_CAPACITY, parseMatchVoiceInfo, type MatchVoiceInfo } from "@/lib/shared/match-voice";
 import {
   MATCH_LAUNCH_REFRESH_EVENT,
   connectionReader,
@@ -665,6 +667,77 @@ function ConnectionSection({
   );
 }
 
+/** Relecture REST des salons vocaux tant que le verrou du lancement tient. */
+const VOICE_POLL_MS = 10_000;
+
+/**
+ * Salons vocaux d'équipe du match (`docs/features/MATCH_VOICE.md`) :
+ * « Salon vocal : 3/5 » par équipe, aux parties du match et au staff.
+ *
+ * Deux portes (`REALTIME_REFRESH.md`) : le nombre arrive dans l'instantané
+ * (`BracketMatch.voice`, poussé par le flux à chaque comptage) ; tant que le
+ * verrou tient, la page relit aussi `GET /api/matches/[id]/voice` toutes les
+ * dix secondes — cette lecture relance le balayage (étranglé côté serveur, le
+ * bot n'est jamais sollicité par lecteur) et sert de secours si le flux tombe.
+ * L'horloge suit le régime de charge (`useClock`) : onglet caché, aucune relecture.
+ */
+function VoiceSection({ match, sides }: Readonly<{ match: BracketMatch; sides: [PageSide, PageSide] }>) {
+  const page = useMatchPageText();
+  const titleId = useId();
+  const [polled, setPolled] = useState<{ matchId: number; voice: MatchVoiceInfo | null } | null>(null);
+  const streamed = match.voice ?? null;
+  const tick = useClock(VOICE_POLL_MS, streamed?.pending === true);
+
+  useEffect(() => {
+    if (tick === null || streamed?.pending !== true) return;
+    const controller = new AbortController();
+    fetch(`/api/matches/${match.id}/voice`, { cache: "no-store", signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) return;
+        const body = (await response.json().catch(() => ({}))) as { voice?: unknown };
+        setPolled({ matchId: match.id, voice: parseMatchVoiceInfo(body.voice) });
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [tick, match.id, streamed?.pending]);
+
+  // La source la plus récente fait foi : un instantané reçu efface la
+  // dernière relecture (le flux publie chaque comptage), une relecture plus
+  // fraîche que l'instantané le remplace.
+  const streamKey = streamed ? `${streamed.team1Members}:${streamed.team2Members}:${streamed.pending}` : "none";
+  useEffect(() => setPolled(null), [streamKey]);
+  const fallback = polled?.matchId === match.id ? polled.voice : null;
+  const voice = fallback ?? streamed;
+  if (!voice) return null;
+  const members = (slot: 1 | 2) => (slot === 1 ? voice.team1Members : voice.team2Members);
+  return (
+    <section className={`ds-block ${styles.block}`} aria-labelledby={titleId}>
+      <InfoHintRow>
+        <SectionTitle id={titleId}>{page.t("voice.title")}</SectionTitle>
+        <InfoHint id={`${titleId}-hint`} subject={page.t("voice.title")}>
+          <p>{page.t("voice.hint", { capacity: VOICE_CHANNEL_CAPACITY })}</p>
+        </InfoHint>
+      </InfoHintRow>
+      <ul className={styles.voiceList}>
+        {sides.map((side) => {
+          const count = members(side.slot);
+          return (
+            <li key={side.slot} className={styles.voiceRow}>
+              <SideName side={side} logoSize={20} truncate />
+              <span className={count !== null && count >= VOICE_CHANNEL_CAPACITY ? styles.ok : styles.factNote}>
+                {count === null
+                  ? page.t("voice.notCreated")
+                  : page.t("voice.count", { count, capacity: VOICE_CHANNEL_CAPACITY })}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      {voice.pending && <p className={styles.factNote}>{page.t("voice.waiting")}</p>}
+    </section>
+  );
+}
+
 /**
  * Arbitrage, en détail : la fiche de l'arbitre (aux lecteurs que sert la
  * lecture des contacts) ou l'aide-mémoire de l'autogestion. La décision
@@ -971,6 +1044,7 @@ function MatchPageContent({ detail, match, adminResolvable, scoreLocked, onOpenA
           />
         </div>
         <div className={styles.column}>
+          {organizes && !frozen && match.status !== "COMPLETED" && <VoiceSection match={match} sides={sides} />}
           <ConnectionSection launch={shownLaunch} onCopy={onCopy} />
           <OfficiatingSection
             match={match}

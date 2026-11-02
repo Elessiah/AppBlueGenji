@@ -37,5 +37,12 @@
     "officiating": "Arbitrage",
     "casts": "Casts",
     "connection": "Infos de connexion"
+  },
+  "voice": {
+    "title": "Salons vocaux",
+    "count": "Salon vocal : {count}/{capacity}",
+    "notCreated": "Salon vocal : bientôt ouvert",
+    "waiting": "Le match se lance quand les deux salons sont pleins.",
+    "hint": "Un quart d'heure avant le match, le bot Discord ouvre un salon vocal de {capacity} places par équipe ; le lancement attend que les deux soient pleins."
   }
 }

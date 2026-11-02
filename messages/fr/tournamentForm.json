@@ -21,7 +21,7 @@
     "loading": "Chargement du tournoi...",
     "fieldRefusal": "{message} ({field})",
     "finished": "Le tournoi est terminé : il n'est plus modifiable.",
-    "lockStarted": "Le tournoi est en cours : seule la planification des matchs par l'arbitrage reste modifiable.",
+    "lockStarted": "Le tournoi est en cours : seules la planification des matchs par l'arbitrage et les salons vocaux d'équipe restent modifiables.",
     "lockVisible": "Le tournoi est visible depuis le {date} — le format, le jeu et les réglages ne sont plus modifiables.",
     "savedNone": "Aucune modification à enregistrer.",
     "saved": "Tournoi modifié.",
@@ -66,6 +66,11 @@
       "registrationMinPlayers": "Joueurs minimum dans l'équipe",
       "launchPhase": "Phase de lancement des matchs",
       "phases": "Phases du tournoi"
+    },
+    "voiceErrors": {
+      "TOURNAMENT_NOT_FOUND": "Tournoi introuvable.",
+      "INVALID_TEAM_VOICE_CHANNELS": "Valeur invalide pour les salons vocaux d'équipe.",
+      "fallback": "Les salons vocaux d'équipe n'ont pas pu être modifiés. Réessaie dans un instant."
     }
   },
   "form": {
@@ -190,6 +195,13 @@
     "games": {
       "OW": "Overwatch",
       "MR": "Marvel Rivals"
+    },
+    "teamVoice": {
+      "label": "Salons vocaux d'équipe",
+      "description": "Allumée : un quart d'heure avant chaque match, le bot Discord ouvre un salon vocal de {capacity} places pour chaque équipe, et le match ne se lance qu'une fois les deux salons pleins. L'arbitrage peut toujours le forcer ; si le bot ne répond pas, le match n'attend pas. Jamais pour une entrée solo. Le site ne retient que le nombre de personnes présentes, jamais leur identité.",
+      "create": "Modifiable ensuite, jusqu'à la clôture du tournoi — même en cours.",
+      "edit": "Modifiable jusqu'à la clôture du tournoi — même en cours.",
+      "finished": "Le tournoi est terminé : l'option n'est plus modifiable."
     }
   },
   "settings": {
