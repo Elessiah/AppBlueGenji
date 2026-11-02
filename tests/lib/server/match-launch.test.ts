@@ -323,6 +323,17 @@ function readUserRows(state: World, sql: string, params: unknown[]): unknown[] |
   return null;
 }
 
+/** Les lectures du verrou des salons vocaux : l'option et les salons suivis. */
+function readVoiceRows(state: World, sql: string) {
+  if (sql.includes("AS enabled") && sql.includes("team_voice_channels")) {
+    return [[{ enabled: state.voice?.enabled ? 1 : 0, team1_solo: state.voice?.team1Solo ? 1 : 0, team2_solo: 0 }], []];
+  }
+  if (sql.includes("FROM bg_match_voice_channels")) {
+    return [(state.voice?.rows ?? []).map((row) => ({ match_id: 42, released_at: null, ...row })), []];
+  }
+  return null;
+}
+
 /** Le double de `execute`, non typé en `PoolConnection` : les tests le composent. */
 function executeFor(state: World) {
   return async (rawSql: string, params: unknown[] = []) => {
@@ -337,13 +348,8 @@ function executeFor(state: World) {
     }
     const userResult = readUserRows(state, sql, params);
     if (userResult) return userResult;
-    if (sql.includes("AS enabled") && sql.includes("team_voice_channels")) {
-      return [[{ enabled: state.voice?.enabled ? 1 : 0, team1_solo: state.voice?.team1Solo ? 1 : 0, team2_solo: 0 }], []];
-    }
-    if (sql.includes("FROM bg_match_voice_channels")) {
-      const rows = (state.voice?.rows ?? []).map((row) => ({ match_id: 42, released_at: null, ...row }));
-      return [rows, []];
-    }
+    const voiceResult = readVoiceRows(state, sql);
+    if (voiceResult) return voiceResult;
     if (sql.includes("solo_user_id = ?")) {
       const userId = Number(params[0]);
       const ids = params.slice(1).map(Number);
@@ -1776,5 +1782,89 @@ describe("releaseMatchCast / claimMatchCast : gardes et publications (EF-29)", (
     expect(state.issued.some((sql) => /FROM bg_users WHERE id IN \(\?\) LOCK IN SHARE MODE$/.test(sql))).toBe(true);
     // Verrou du match déjà tenu : pas de verrou d'intervalle sur les casters ni les streams.
     expect(state.issued.filter((sql) => /FROM bg_match_(casters|streams) .*FOR UPDATE/.test(sql))).toEqual([]);
+  });
+});
+
+describe("verrou des salons vocaux d'équipe (`MATCH_VOICE.md`)", () => {
+  const connection = () => connectionFor(state);
+  const past = () => new Date(Date.now() - 60_000).toISOString();
+  const channel = (teamId: number, members: number | null, failed = false) => ({
+    team_id: teamId,
+    channel_id: members === null && failed ? null : `c${teamId}`,
+    members,
+    failed_at: failed ? STAMP : null,
+  });
+
+  it("maintainMatchLaunches_phaseOffStartReachedChannelsNotFull_doesNotLaunch", async () => {
+    state.match = matchState({ match_launch_phase: 0, start_at: past() });
+    state.voice = { enabled: true, rows: [channel(TEAM1, 5), channel(TEAM2, 4)] };
+    await maintainMatchLaunches(connection(), 7);
+    expect(state.match?.launched_at).toBeNull();
+  });
+
+  it("maintainMatchLaunches_phaseOffChannelsFull_launches", async () => {
+    state.match = matchState({ match_launch_phase: 0, start_at: past() });
+    state.voice = { enabled: true, rows: [channel(TEAM1, 5), channel(TEAM2, 5)] };
+    await maintainMatchLaunches(connection(), 7);
+    expect(state.match?.launched_at).toBe(STAMP);
+  });
+
+  it("maintainMatchLaunches_phaseOffNoChannelYet_doesNotLaunch", async () => {
+    state.match = matchState({ match_launch_phase: 0, start_at: past() });
+    state.voice = { enabled: true, rows: [] };
+    await maintainMatchLaunches(connection(), 7);
+    expect(state.match?.launched_at).toBeNull();
+  });
+
+  it("maintainMatchLaunches_botFailed_launchesBypassingGate", async () => {
+    state.match = matchState({ match_launch_phase: 0, start_at: past() });
+    state.voice = { enabled: true, rows: [channel(TEAM1, null, true), channel(TEAM2, 0)] };
+    await maintainMatchLaunches(connection(), 7);
+    expect(state.match?.launched_at).toBe(STAMP);
+  });
+
+  it("maintainMatchLaunches_optionOff_launchesWithoutChannels", async () => {
+    state.match = matchState({ match_launch_phase: 0, start_at: past() });
+    state.voice = { enabled: false, rows: [] };
+    await maintainMatchLaunches(connection(), 7);
+    expect(state.match?.launched_at).toBe(STAMP);
+  });
+
+  it("maintainMatchLaunches_soloEntrant_gateIgnored", async () => {
+    state.match = matchState({ match_launch_phase: 0, start_at: past() });
+    state.voice = { enabled: true, team1Solo: true, rows: [] };
+    await maintainMatchLaunches(connection(), 7);
+    expect(state.match?.launched_at).toBe(STAMP);
+  });
+
+  it("maintainMatchLaunches_autoLaunchDueChannelsNotFull_doesNotLaunch", async () => {
+    state.match = matchState({
+      start_at: new Date(Date.now() - 60 * 60_000).toISOString(),
+      lobby_opened_at: new Date(Date.now() - 60 * 60_000).toISOString(),
+      team1_ready_at: STAMP,
+    });
+    state.voice = { enabled: true, rows: [channel(TEAM1, 2), channel(TEAM2, 5)] };
+    await maintainMatchLaunches(connection(), 7);
+    expect(state.match?.launched_at).toBeNull();
+  });
+
+  it("setMatchReady_lastReadyChannelsNotFull_doesNotLaunch", async () => {
+    state.match = matchState({ team2_ready_at: STAMP, start_at: past(), lobby_opened_at: STAMP });
+    state.voice = { enabled: true, rows: [channel(TEAM1, 5), channel(TEAM2, 3)] };
+    await expect(setMatchReady(42, 1, true)).resolves.toEqual({ launched: false });
+    expect(state.match?.launched_at).toBeNull();
+  });
+
+  it("setMatchReady_lastReadyChannelsFull_launches", async () => {
+    state.match = matchState({ team2_ready_at: STAMP, start_at: past(), lobby_opened_at: STAMP });
+    state.voice = { enabled: true, rows: [channel(TEAM1, 5), channel(TEAM2, 5)] };
+    await expect(setMatchReady(42, 1, true)).resolves.toEqual({ launched: true });
+  });
+
+  it("forceLaunchMatch_channelsNotFull_stillLaunches", async () => {
+    state.match = matchState({ start_at: past() });
+    state.voice = { enabled: true, rows: [channel(TEAM1, 0), channel(TEAM2, 0)] };
+    await forceLaunchMatch(42);
+    expect(state.match?.launched_at).toBe(STAMP);
   });
 });

@@ -28,6 +28,7 @@ import {
   SITE_VISITOR_RETENTION_MONTHS,
 } from "@/lib/shared/site-visits";
 import { SITE_HOST } from "@/lib/shared/site-host";
+import { VOICE_CHANNEL_CAPACITY, VOICE_CHANNEL_LEAD_MINUTES, VOICE_ROW_RETENTION_DAYS } from "@/lib/shared/match-voice";
 import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION, copyrightNoticeElementsText } from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
 import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/account-suspension";
@@ -49,7 +50,7 @@ import {
 } from "@/lib/shared/legal-contact";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
-export const REGISTER_UPDATED_AT = "2026-11-04";
+export const REGISTER_UPDATED_AT = "2026-11-05";
 
 /**
  * Durées appliquées par le serveur, et déclarées ici : `lib/server/auth.ts` et
@@ -596,6 +597,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Statistiques d'activité (commande /stats, qui ne montre à chacun que sa propre activité ; tableau de bord du bot)",
       "Confirmation des adhésions à l'association et rappels programmés sur ses serveurs",
       "Remise des messages du site : codes (rédigés par le bot dans la langue du compte que le site lui transmet), horaires et rappels de match, avis de retrait d'un match (« Match retiré »), réglages du salon d'un match envoyés à ceux qui gèrent ses engagées et avis envoyé à un caster dont l'inscription est retirée par un autre que lui (ces messages de match aux seuls tags Discord certifiés), avis de modération (signalement désignant la personne, logo masqué, retiré ou supprimé, avatar masqué, retiré ou rétabli, suspension du compte et sa levée), demandes d'adhésion à une équipe et informations sur les données en message privé, sans conservation par le bot ; alertes d'arbitrage, signalements et journal d'activité du site (sans pseudo de joueur) publiés au salon de journal privé du staff, alertes d'arbitrage aussi envoyées aux membres du rôle d'arbitrage de chaque serveur qui en a défini un ; annonce des matchs diffusés publiée dans le salon #live du serveur de l'association, en un message par soirée modifié à chaque début et fin de match, avec une mention @everyone pour la chaîne officielle ou du seul rôle StreamViewer pour toute autre chaîne (noms d'équipe ou, en tournoi individuel, pseudo public BlueGenji des joueurs — traitement T16)",
+      "Salons vocaux d'équipe des matchs, dans les tournois qui en ont l'option : création au nom de l'équipe, comptage des personnes présentes (un nombre, jamais qui) et suppression (traitement T18)",
     ],
     legalBasis: "Intérêt légitime (faire fonctionner, modérer et mesurer le relais entre serveurs partenaires) ; les messages du site relèvent de la base de leur traitement d'origine",
     dataSubjects: [
@@ -960,6 +962,44 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     security: [
       ...COMMON_SECURITY,
       "Journaux lisibles du seul administrateur du serveur, jamais exposés par le site",
+    ],
+  },
+  {
+    ref: "T18",
+    name: "Salons vocaux d'équipe des matchs",
+    purpose:
+      "Réunir chaque équipe d'un match dans un salon vocal Discord dédié avant son départ, et ne lancer le match qu'une fois ces salons pleins, dans les seuls tournois qui ont l'option « Salons vocaux d'équipe » (éteinte par défaut)",
+    subPurposes: [
+      `Demander au bot Discord de l'association, ${VOICE_CHANNEL_LEAD_MINUTES} minutes avant l'heure d'un match, un salon vocal de ${VOICE_CHANNEL_CAPACITY} places par équipe dans la catégorie des matchs de son serveur, au nom de l'équipe — jamais pour une entrée en tournoi individuel (son nom serait un pseudo) ni pour une équipe fantôme`,
+      `Faire compter par le bot le nombre de personnes présentes dans chaque salon, pour retenir le lancement du match jusqu'à ce que les deux soient pleins (l'arbitrage peut le forcer ; si le bot ne répond pas, le match n'attend pas), et montrer « Salon vocal : n/${VOICE_CHANNEL_CAPACITY} » aux parties du match (membres des deux équipes, casters) et au staff`,
+      "Rendre les salons au bot quand le match est joué, annulé ou sorti du programme, ou quand le tournoi se termine ou éteint l'option ; le bot supprime un salon dès qu'il est vide",
+    ],
+    legalBasis:
+      "Intérêt légitime (bon déroulement des tournois : réunir chaque équipe avant son match, comme le règlement des tournois le demande) ; rejoindre un salon reste un choix, et seule la présence de qui le rejoint est comptée",
+    dataSubjects: [
+      "Membres des équipes engagées dans un match",
+      "Toute personne qui rejoint un salon vocal d'équipe sur le serveur Discord de l'association",
+    ],
+    dataCategories: [
+      "Identifiant Discord du salon de chaque équipe d'un match, nombre de personnes présentes au dernier comptage et heure de ce comptage, heure d'une éventuelle panne du bot — jamais qui est présent",
+      "Nom de l'équipe, transmis au bot pour nommer le salon",
+    ],
+    sensitiveData: "Aucune",
+    retention: [
+      `Ligne du salon sur le site (identifiant, nombre de personnes) : jusqu'à ce que le salon soit rendu au bot, puis ${VOICE_ROW_RETENTION_DAYS} jours, effacée par le balayage suivant`,
+      "Salon sur Discord : supprimé par le bot dès qu'il est vide une fois rendu, au plus tard 24 heures après même occupé ; un salon jamais rendu est supprimé par le bot s'il est vide 48 heures après sa création",
+      "Présence dans un salon : lue par Discord et par le bot au moment du comptage, jamais enregistrée par le bot ni transmise au site",
+    ],
+    recipients: [
+      "Membres des deux équipes d'un match, ses casters et le staff, qui lisent le nombre de personnes de chaque salon sur la page du match",
+      "Membres du serveur Discord de l'association autorisés dans la catégorie des matchs, qui voient le salon et ses occupants sur Discord",
+      "Discord (plateforme d'exécution)",
+    ],
+    transfers: [`États-Unis : Discord — ${transferBasis(["DISCORD"])}`],
+    security: [
+      ...COMMON_SECURITY,
+      "Un nombre seulement : ni identifiant ni pseudo des personnes présentes n'est demandé au bot, reçu ou journalisé par le site",
+      "Le compte d'un salon n'est demandé au bot que par le balayage du serveur, au plus une fois toutes les dix secondes, jamais pour chaque lecteur",
     ],
   },
 ];

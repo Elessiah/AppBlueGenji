@@ -1,5 +1,5 @@
 {
-  "count": 192,
+  "count": 193,
   "unknown": "L'action n'a pas abouti pour une raison inattendue. Si le problème persiste, préviens le staff.",
   "errors": {
     "CERTIFY_PROMPT_OTHER_ACCOUNT": "Un autre compte est connecté dans ce navigateur : « Ne plus voir » n'a pas été enregistré.",
@@ -193,6 +193,7 @@
     "MATCH_NOT_CASTABLE": "Ce match ne peut plus être diffusé.",
     "INVALID_ORGANISATION_LINK": "Le choix « lien de l'organisation » est invalide.",
     "INVALID_TIEBREAK_MAP": "Nom de map de départage invalide (64 caractères au plus).",
-    "TIEBREAK_NOT_ALLOWED": "La map de départage ne se règle que sur un tour de play-offs en vrai Bo3 (premier à 2 maps)."
+    "TIEBREAK_NOT_ALLOWED": "La map de départage ne se règle que sur un tour de play-offs en vrai Bo3 (premier à 2 maps).",
+    "INVALID_TEAM_VOICE_CHANNELS": "Valeur invalide pour les salons vocaux d'équipe : cochez ou décochez la case."
   }
 }

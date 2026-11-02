@@ -18,6 +18,12 @@ export const VOICE_CHANNEL_LEAD_MINUTES = 15;
 export const VOICE_CHANNEL_CAPACITY = 5;
 
 /**
+ * Durée de garde d'une ligne de `bg_match_voice_channels` une fois le salon
+ * rendu au bot (jours) — déclarée au registre des traitements (T18).
+ */
+export const VOICE_ROW_RETENTION_DAYS = 7;
+
+/**
  * Clé d'idempotence d'un salon côté bot : la même clé rend le même salon, si
  * bien qu'une création rejouée (réponse perdue, deux balayages) n'en double
  * aucun. Ne contient que des identifiants (`[A-Za-z0-9:_-]`, contrat du bot).

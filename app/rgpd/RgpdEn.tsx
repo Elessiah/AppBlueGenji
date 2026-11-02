@@ -898,6 +898,19 @@ export function RgpdEn({
             covers the tournament pages, they withdraw by asking for it through that same form. Collecting their “Ready” also falls under performance of the service,
             the referees acting for the association (<LocaleLink href="/rgpd/registre#t04">register, T04</LocaleLink>); the removal notice, sent as a push notification, falls under the consent given by turning them on (<LocaleLink href="/rgpd/registre#t12">register, T12</LocaleLink>).
           </p>
+          <p id="salons-vocaux">
+            <strong>Team voice channels.</strong> In a tournament with the “Team voice channels” option (off by default), the
+            association&apos;s Discord bot opens, fifteen minutes before a match&apos;s time, a 5-seat voice channel for each of its two
+            teams, named after the team — never for a solo entry, whose name would be a username. The match only launches once both
+            channels are full (referees can force it; if the bot doesn&apos;t answer, the match doesn&apos;t wait). To know this, the bot
+            counts the people present in each channel: Discord and the bot read who is there at the time of the count, without recording
+            it; the site only receives and keeps the channel&apos;s identifier and that <strong>number</strong> (“Voice channel: 3/5”,
+            shown to the match&apos;s parties and to staff), never who. The channel is handed back to the bot when the match is played,
+            cancelled or taken off the schedule, or when the tournament ends or turns the option off; the bot deletes it as soon as it is
+            empty (within 24 hours at the latest, even if occupied), and the site erases its record a week later. This count rests on
+            <strong> legitimate interest</strong> (smooth running of tournaments: gathering each team before its match); joining a
+            channel remains a choice, and only the presence of those who join it is counted (<LocaleLink href="/rgpd/registre#t18">register, T18</LocaleLink>).
+          </p>
         </div>
       </section>
 

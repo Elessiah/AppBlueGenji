@@ -27,6 +27,7 @@ import { toIso } from "@/lib/server/serialization";
 import { sqlPlaceholders } from "@/lib/server/sql-placeholders";
 import {
   VOICE_CHANNEL_LEAD_MINUTES,
+  VOICE_ROW_RETENTION_DAYS,
   matchVoiceInfo,
   voiceChannelKey,
   voiceGatePending,
@@ -195,7 +196,7 @@ type CandidateRow = RowDataPacket & {
   team2_name: string;
 };
 
-type ReleaseRow = RowDataPacket & { match_id: number; team_id: number; channel_id: string; tournament_id: number | null };
+type ReleaseRow = RowDataPacket & { match_id: number; team_id: number; channel_id: string | null; tournament_id: number | null };
 
 /**
  * Matchs dont les salons sont dus : tournoi en cours à l'option allumée, match
@@ -228,7 +229,7 @@ const RELEASABLE_SQL = `SELECT v.match_id, v.team_id, v.channel_id, m.tournament
   FROM bg_match_voice_channels v
   LEFT JOIN bg_matches m ON m.id = v.match_id
   LEFT JOIN bg_tournaments t ON t.id = m.tournament_id
- WHERE v.released_at IS NULL AND v.channel_id IS NOT NULL
+ WHERE v.released_at IS NULL
    AND (m.id IS NULL OR t.id IS NULL
         OR m.status IN ('COMPLETED', 'PENDING')
         OR t.state = 'FINISHED' OR t.team_voice_channels = 0
@@ -295,6 +296,18 @@ function stateKey(row: VoiceRow | undefined): string {
  * suit plus (supprimé à la main, sorti de la catégorie) est redemandé par sa
  * clé, une fois. Toute panne lève le verrou du match (`failed_at`).
  */
+async function recordFailure(
+  connection: PoolConnection,
+  matchId: number,
+  teamId: number,
+  existing: VoiceRow | undefined,
+  code: string,
+): Promise<void> {
+  // Une seule ligne pm2 par panne : pas de répétition à chaque balayage.
+  if (existing?.failed_at == null) logBypass(matchId, code);
+  await writeFailure(connection, matchId, teamId);
+}
+
 async function refreshTeamChannel(
   connection: PoolConnection,
   matchId: number,
@@ -307,24 +320,13 @@ async function refreshTeamChannel(
   for (let attempt = 0; attempt < 2; attempt += 1) {
     if (channelId === null) {
       const created = await ensureVoiceChannel(key, teamName);
-      if (created.kind !== "ok") {
-        if (existing?.failed_at == null) logBypass(matchId, created.code);
-        await writeFailure(connection, matchId, teamId);
-        return;
-      }
+      if (created.kind !== "ok") return recordFailure(connection, matchId, teamId, existing, created.code);
       channelId = created.value;
       await writeChannel(connection, matchId, teamId, channelId);
     }
     const counted = await countVoiceChannel(channelId);
-    if (counted.kind === "ok") {
-      await writeCount(connection, matchId, teamId, counted.value);
-      return;
-    }
-    if (counted.kind === "failed") {
-      if (existing?.failed_at == null) logBypass(matchId, counted.code);
-      await writeFailure(connection, matchId, teamId);
-      return;
-    }
+    if (counted.kind === "ok") return writeCount(connection, matchId, teamId, counted.value);
+    if (counted.kind === "failed") return recordFailure(connection, matchId, teamId, existing, counted.code);
     // `gone` : le bot ne le suit plus — une nouvelle demande le recrée.
     channelId = null;
   }
@@ -333,9 +335,12 @@ async function refreshTeamChannel(
 async function releaseChannels(connection: PoolConnection, touched: Set<number>): Promise<void> {
   const [rows] = await connection.execute<ReleaseRow[]>(RELEASABLE_SQL);
   for (const row of rows) {
-    const released = await releaseVoiceChannel(String(row.channel_id));
-    // `gone` (`VOICE_CHANNEL_NOT_TRACKED`) : déjà supprimé, rien de plus à faire.
-    if (released.kind === "failed") continue;
+    // Une ligne sans salon (création échouée) se clôt sans appel au bot.
+    if (row.channel_id !== null) {
+      const released = await releaseVoiceChannel(String(row.channel_id));
+      // `gone` (`VOICE_CHANNEL_NOT_TRACKED`) : déjà supprimé, rien de plus à faire.
+      if (released.kind === "failed") continue;
+    }
     await connection.execute(
       `UPDATE bg_match_voice_channels SET released_at = NOW() WHERE match_id = ? AND team_id = ? AND released_at IS NULL`,
       [Number(row.match_id), Number(row.team_id)],
@@ -377,6 +382,13 @@ async function runSweep(): Promise<Set<number>> {
       }
     }
     await releaseChannels(connection, touched);
+    // Minimisation : une ligne rendue au bot n'a plus d'usage passé une
+    // semaine (un match rejoué recrée la sienne par sa clé).
+    await connection.execute(
+      `DELETE FROM bg_match_voice_channels
+       WHERE released_at IS NOT NULL AND released_at < NOW() - INTERVAL ${VOICE_ROW_RETENTION_DAYS} DAY
+       LIMIT ${VOICE_SWEEP_BATCH * 5}`,
+    );
   } finally {
     connection.release();
   }

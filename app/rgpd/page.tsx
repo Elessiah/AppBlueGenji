@@ -1083,6 +1083,19 @@ function RgpdFr({
             d&apos;acceptation couvrant les pages des tournois, il s&apos;en retire en le demandant par ce même formulaire. Le recueil de son « Prêt » relève aussi de l&apos;exécution
             du service, les arbitres agissant pour l&apos;association (<Link href="/rgpd/registre#t04">registre, T04</Link>) ; l&apos;avis du retrait, envoyé en notification push, relève du consentement donné en les activant (<Link href="/rgpd/registre#t12">registre, T12</Link>).
           </p>
+          <p id="salons-vocaux">
+            <strong>Salons vocaux d&apos;équipe.</strong> Dans un tournoi qui a l&apos;option « Salons vocaux d&apos;équipe »
+            (éteinte par défaut), le bot Discord de l&apos;association ouvre, un quart d&apos;heure avant l&apos;heure d&apos;un match, un salon
+            vocal de 5 places pour chacune de ses deux équipes, au nom de l&apos;équipe — jamais pour une entrée en tournoi individuel,
+            dont le nom serait un pseudo. Le match ne se lance qu&apos;une fois les deux salons pleins (l&apos;arbitrage peut le forcer ; si le
+            bot ne répond pas, le match n&apos;attend pas). Pour le savoir, le bot compte les personnes présentes dans chaque salon : Discord
+            et le bot lisent qui s&apos;y trouve au moment du comptage, sans l&apos;enregistrer ; le site ne reçoit et ne garde que
+            l&apos;identifiant du salon et ce <strong>nombre</strong> (« Salon vocal : 3/5 », montré aux parties du match et au staff), jamais
+            qui. Le salon est rendu au bot quand le match est joué, annulé ou sorti du programme, ou quand le tournoi se termine ou éteint
+            l&apos;option ; le bot le supprime dès qu&apos;il est vide (au plus tard 24 heures après, même occupé), et le site efface sa ligne
+            une semaine plus tard. Ce comptage relève de l&apos;<strong>intérêt légitime</strong> (bon déroulement des tournois : réunir
+            chaque équipe avant son match) ; rejoindre un salon reste un choix, et seule la présence de qui le rejoint est comptée (<Link href="/rgpd/registre#t18">registre, T18</Link>).
+          </p>
         </div>
       </section>
 

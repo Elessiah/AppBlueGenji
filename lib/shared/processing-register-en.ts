@@ -41,6 +41,7 @@ import {
 } from "@/lib/shared/processing-register";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
 import { SITE_HOST } from "@/lib/shared/site-host";
+import { VOICE_CHANNEL_CAPACITY, VOICE_CHANNEL_LEAD_MINUTES, VOICE_ROW_RETENTION_DAYS } from "@/lib/shared/match-voice";
 import {
   SITE_VISIT_DETAIL_RETENTION_DAYS,
   SITE_VISIT_WINDOW_MINUTES,
@@ -419,6 +420,7 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Activity statistics (/stats command, which shows each person only their own activity; the bot's dashboard)",
       "Confirming memberships of the association and scheduled reminders on its servers",
       "Delivering the site's messages: codes (written by the bot in the account language the site sends it), match times and reminders, notices of removal from a match (“Match retiré”), the lobby settings of a match sent to those who manage its entrants and the notice sent to a caster whose registration for a match is removed by someone else (these match messages to certified Discord tags only), moderation notices (report naming the person, logo hidden, removed or deleted, avatar hidden, removed or restored, suspension of the account and its lifting), requests to join a team and information about data by direct message, without being kept by the bot; refereeing alerts, reports and the site's activity log (without player usernames) posted in the staff's private log channel, refereeing alerts also sent to the members of the refereeing role of each server that has set one; announcement of the streamed matches posted in the #live channel of the association's server, in one message per evening edited at each match start and end, with an @everyone mention for the official channel or a mention of the StreamViewer role only for any other channel (team names or, in a solo tournament, the players' public BlueGenji username — processing activity T16)",
+      "Team voice channels for matches, in tournaments with that option: creation named after the team, count of the people present (a number, never who) and deletion (processing activity T18)",
     ],
     legalBasis: "Legitimate interest (operating, moderating and measuring the relay between partner servers); the site's messages fall under the basis of their original processing",
     dataSubjects: [
@@ -777,6 +779,44 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
     security: [
       ...COMMON_SECURITY_EN,
       "Logs readable only by the server's administrator, never exposed by the site",
+    ],
+  },
+  {
+    ref: "T18",
+    name: "Team voice channels for matches",
+    purpose:
+      "Gathering each team of a match in a dedicated Discord voice channel before it starts, and only launching the match once those channels are full, in tournaments with the “Team voice channels” option only (off by default)",
+    subPurposes: [
+      `Asking the association's Discord bot, ${VOICE_CHANNEL_LEAD_MINUTES} minutes before a match's time, for a ${VOICE_CHANNEL_CAPACITY}-seat voice channel per team in its server's match category, named after the team — never for a solo entry (its name would be a username) nor for a ghost team`,
+      `Having the bot count the people present in each channel, to hold the match's launch until both are full (referees can force it; if the bot doesn't answer, the match doesn't wait), and showing “Voice channel: n/${VOICE_CHANNEL_CAPACITY}” to the match's parties (members of both teams, casters) and to staff`,
+      "Handing the channels back to the bot when the match is played, cancelled or taken off the schedule, or when the tournament ends or turns the option off; the bot deletes a channel as soon as it is empty",
+    ],
+    legalBasis:
+      "Legitimate interest (smooth running of tournaments: gathering each team before its match, as the tournament rulebook requires); joining a channel remains a choice, and only the presence of those who join it is counted",
+    dataSubjects: [
+      "Members of the teams playing a match",
+      "Anyone who joins a team voice channel on the association's Discord server",
+    ],
+    dataCategories: [
+      "Discord identifier of each team's channel for a match, number of people present at the last count and the time of that count, time of any bot outage — never who is present",
+      "Team name, sent to the bot to name the channel",
+    ],
+    sensitiveData: "None",
+    retention: [
+      `The channel's record on the site (identifier, number of people): until the channel is handed back to the bot, then ${VOICE_ROW_RETENTION_DAYS} days, erased by the next sweep`,
+      "Channel on Discord: deleted by the bot as soon as it is empty once handed back, within 24 hours at the latest even if occupied; a channel never handed back is deleted by the bot if it is empty 48 hours after its creation",
+      "Presence in a channel: read by Discord and by the bot at the time of the count, never recorded by the bot nor sent to the site",
+    ],
+    recipients: [
+      "Members of both teams of a match, its casters and staff, who read the number of people in each channel on the match page",
+      "Members of the association's Discord server allowed in the match category, who see the channel and its occupants on Discord",
+      "Discord (execution platform)",
+    ],
+    transfers: [`United States: Discord — ${transferBasisEn(["DISCORD"])}`],
+    security: [
+      ...COMMON_SECURITY_EN,
+      "A number only: neither the identifier nor the username of the people present is requested from the bot, received or logged by the site",
+      "A channel's count is only requested from the bot by the server's sweep, at most once every ten seconds, never for each viewer",
     ],
   },
 ];

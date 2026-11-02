@@ -1419,6 +1419,18 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Ce qui ne change pas : rien de nouveau n'est collecté, et rien de cela n'entre dans ce que le site diffuse à tous les spectateurs d'un tournoi.",
     ],
   },
+  {
+    id: "2026-11-salons-vocaux-equipe",
+    publishedAt: "2026-11-05",
+    title: "Salons vocaux d'équipe avant les matchs",
+    links: [{ href: "/rgpd#salons-vocaux", label: "Lire le paragraphe « Salons vocaux d'équipe »" }],
+    summary:
+      "Un tournoi peut désormais ouvrir, un quart d'heure avant chaque match, un salon vocal Discord de 5 places par équipe, et n'en lancer le match qu'une fois les deux salons pleins : le bot compte les personnes présentes, et le site n'en garde que le nombre, jamais qui.",
+    details: [
+      "Ce qui change : dans un tournoi qui a l'option « Salons vocaux d'équipe » (éteinte par défaut), le bot de l'association crée un salon vocal au nom de chaque équipe d'un match, 15 minutes avant son heure — jamais pour une entrée en tournoi individuel. Le match attend que les deux salons soient pleins (l'arbitrage peut le forcer ; si le bot ne répond pas, il n'attend pas), et sa page montre « Salon vocal : 3/5 » à ses équipes, à ses casters et au staff.",
+      "Ce qui est traité : Discord et le bot lisent qui se trouve dans un salon au moment de le compter, sans l'enregistrer ; le site ne reçoit et ne garde que l'identifiant du salon et ce nombre, effacés une semaine après que le salon a été rendu. Le bot supprime le salon dès qu'il se vide une fois le match joué, au plus tard 24 heures après. C'est au titre de l'intérêt légitime (bon déroulement des tournois) ; rejoindre un salon reste un choix.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

@@ -733,3 +733,21 @@ describe("validateTournamentInput — phase de lancement des matchs", () => {
     expect(validateTournamentInput(body)).toEqual({ error: "INVALID_LAUNCH_PHASE" });
   });
 });
+
+describe("validateTournamentInput — salons vocaux d'équipe", () => {
+  it("validateTournamentInput_teamVoiceChannelsAbsent_defaultsOff", () => {
+    const result = validateTournamentInput({ ...base });
+    expect("value" in result && result.value.teamVoiceChannels).toBe(false);
+  });
+
+  it("validateTournamentInput_teamVoiceChannelsTrue_keepsOn", () => {
+    const result = validateTournamentInput({ ...base, teamVoiceChannels: true });
+    expect("value" in result && result.value.teamVoiceChannels).toBe(true);
+  });
+
+  it("validateTournamentInput_teamVoiceChannelsString_returnsInvalidCode", () => {
+    const body: Parameters<typeof validateTournamentInput>[0] = { ...base };
+    Object.assign(body, { teamVoiceChannels: "true" });
+    expect(validateTournamentInput(body)).toEqual({ error: "INVALID_TEAM_VOICE_CHANNELS" });
+  });
+});
