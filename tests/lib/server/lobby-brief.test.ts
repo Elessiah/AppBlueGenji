@@ -63,7 +63,8 @@ const actualDm = jest.requireActual<typeof import("@/lib/server/tournaments/lobb
 
 /**
  * Base simulée : la première lecture rend les candidats, les suivantes (la
- * relecture d'un match réservé, par son id) la ligne de `reread` ou le candidat.
+ * relecture d'un match réservé, par son id) la ligne de `reread` ou le candidat
+ * (`null` dans `reread` : relecture vide, le salon s'est refermé).
  * Chaque réservation posée reçoit un id (100, 101, …).
  */
 function mockDb(candidates: Record<string, unknown>[], claims: boolean[] = [], reread = new Map<number, unknown>()) {
@@ -72,7 +73,8 @@ function mockDb(candidates: Record<string, unknown>[], claims: boolean[] = [], r
   const query = jest.fn<SqlQuery>(async (sql, params) => {
     if (/WHERE m\.id = \? AND m\.launch_pairing = \?/.test(sql)) {
       const id = Number((params as unknown[])[0]);
-      return [reread.has(id) ? [reread.get(id)] : candidates.filter((row) => row.id === id)];
+      if (!reread.has(id)) return [candidates.filter((row) => row.id === id)];
+      return [reread.get(id) === null ? [] : [reread.get(id)]];
     }
     return [candidates];
   });
@@ -568,6 +570,76 @@ describe("dispatchLobbyBriefs", () => {
       expect(query.mock.calls.filter(([sql]) => !/WHERE m\.id = \?/.test(sql))).toHaveLength(2);
     } finally {
       jest.mocked(formatLobbyBriefDm).mockImplementation(actualDm.formatLobbyBriefDm);
+      jest.useRealTimers();
+      error.mockRestore();
+    }
+  });
+
+  it("dispatchLobbyBriefs_lobbyClosedBetweenClaimAndReread_claimReleasedByIdAndNothingSent", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const { execute } = mockDb([MATCH], [], new Map([[40, null]]));
+
+    expect(await dispatchLobbyBriefs()).toBe(0);
+
+    expect(notifyUsers).not.toHaveBeenCalled();
+    expect(execute.mock.calls.filter(([sql]) => sql.startsWith("INSERT IGNORE"))).toHaveLength(1);
+    expect(releases(execute).map(([sql, params]) => [sql, params])).toEqual([
+      ["DELETE FROM bg_match_start_notices WHERE id IN (?)", [100]],
+    ]);
+    error.mockRestore();
+  });
+
+  it("dispatchLobbyBriefs_onlyManagerAccountDeleted_sideNotClaimedAndLogged", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    // Les comptes 10 et 11 (équipe 1) sont supprimés : plus destinataires.
+    jest.mocked(loadNotificationRecipients).mockResolvedValue([
+      { userId: 20, discord: { discordId: "20", handle: null, label: "u20" } },
+    ]);
+    const { execute } = mockDb([MATCH]);
+
+    expect(await dispatchLobbyBriefs()).toBe(1);
+
+    expect(execute.mock.calls.map(([, params]) => params)).toEqual([["LOBBY_BRIEF_2", 40, "1:2"]]);
+    expect(logged(error, "aucun gestionnaire actif")).toBe(true);
+    error.mockRestore();
+  });
+
+  it("dispatchLobbyBriefs_allManagersDeleted_castersAndRefereesNotRead", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    jest.mocked(loadNotificationRecipients).mockResolvedValue([]);
+    const { execute } = mockDb([{ ...MATCH, referee_user_id: 9 }]);
+
+    expect(await dispatchLobbyBriefs()).toBe(0);
+
+    expect(execute).not.toHaveBeenCalled();
+    expect(readMatchCasters).toHaveBeenCalledWith(expect.anything(), []);
+    expect(loadEligibleRefereeIds).not.toHaveBeenCalled();
+    error.mockRestore();
+  });
+
+  it("dispatchLobbyBriefs_emptySweepAfterSharedReadFailures_resetsSweepRetryBudget", async () => {
+    jest.useFakeTimers();
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      // Quatre pannes de la lecture commune, chacune suivie d'un balayage sans candidat.
+      jest.mocked(loadNotificationRecipients).mockRejectedValueOnce(new Error("DB_DOWN"));
+      mockDb([MATCH]);
+      await dispatchLobbyBriefs();
+      for (let failure = 2; failure <= 4; failure += 1) {
+        mockDb([]);
+        await jest.advanceTimersByTimeAsync(10_000);
+        jest.mocked(loadNotificationRecipients).mockRejectedValueOnce(new Error("DB_DOWN"));
+        mockDb([MATCH]);
+        await dispatchLobbyBriefs();
+        await jest.advanceTimersByTimeAsync(10_000);
+      }
+
+      // La quatrième panne arme encore la relance : le brief part sans autre déclencheur.
+      expect(logged(error, "relances épuisées")).toBe(false);
+      mockDb([MATCH]);
+      await jest.advanceTimersByTimeAsync(10_000);
+      expect(notifyUsers).toHaveBeenCalledTimes(2);
+    } finally {
       jest.useRealTimers();
       error.mockRestore();
     }
