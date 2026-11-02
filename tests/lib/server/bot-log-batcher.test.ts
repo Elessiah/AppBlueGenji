@@ -383,8 +383,7 @@ describe("catégories", () => {
     headed.add("k", digest, "referee-digest");
     await headed.flush("k");
     // Un programme complet, en-tête compris, part en une seule alerte.
-    expect(send.mock.calls).toEqual([[`🔔 Matchs à arbitrer
-${digest}`, "referee-digest"]]);
+    expect(send.mock.calls).toEqual([[`🔔 Matchs à arbitrer\n${digest}`, "referee-digest"]]);
     headed.reset();
   });
 });

@@ -94,12 +94,19 @@ describe("kind et catégories", () => {
     expect(postedBodies()).toEqual([{ message: "🔔 Matchs à arbitrer\nrelevé", kind: "alert" }]);
   });
 
+  it("sendBotLog_refereeSelfAction_postsKindAlert", async () => {
+    await sendBotLog("arbitre qui joue", { category: "referee-self-action" });
+    await flushAllBotLogBatches();
+    expect(postedBodies()).toEqual([{ message: "⚠️ Arbitrage à vérifier\narbitre qui joue", kind: "alert" }]);
+  });
+
   it("sendBotLog_everyOtherCategory_postsKindLog", async () => {
-    for (const category of BOT_LOG_CATEGORIES.filter((name) => name !== "referee-digest")) {
+    const alerts = ["referee-digest", "referee-self-action"];
+    for (const category of BOT_LOG_CATEGORIES.filter((name) => !alerts.includes(name))) {
       await sendBotLog(category, { category });
     }
     await flushAllBotLogBatches();
-    expect(postedBodies().map((body) => body.kind)).toEqual(Array(BOT_LOG_CATEGORIES.length - 1).fill("log"));
+    expect(postedBodies().map((body) => body.kind)).toEqual(Array(BOT_LOG_CATEGORIES.length - 2).fill("log"));
   });
 
   it("sendBotLog_sameTournamentTwoCategories_twoMessagesNeverMixed", async () => {
