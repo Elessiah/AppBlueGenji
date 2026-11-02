@@ -51,6 +51,8 @@ export type LobbyBriefSide = {
   firstMap: string | null;
   /** Cartes de la manche (`ROUND_MAPS.md`), vide sans réglage : on garde alors la seule première carte. */
   maps: ResolvedMapSlot[];
+  /** Map de départage du tour (play-offs en vrai best of 3), `null` sans réglage. */
+  tiebreakMap?: string | null;
   nextBan: NextBanRule;
   /** Au moins un caster inscrit (et éligible) : rappel du tri par rôle. */
   cast: boolean;
@@ -131,6 +133,7 @@ const DM_TEXT: Readonly<
       firstBan: (first: string, then: string) => string;
       nextBans: Readonly<Record<NextBanRule, string>>;
       maps: string;
+      tiebreak: string;
       toChoose: (pool: string) => string;
       /** Fin d'une ligne des cartes coupée (`MAPS_LINE_MAX`). */
       moreMaps: string;
@@ -156,6 +159,7 @@ const DM_TEXT: Readonly<
         "Cartes suivantes : l'équipe qui a gagné la carte précédente bannit en premier ; en cas d'égalité, même ordre qu'à la carte précédente.",
     },
     maps: "Cartes : ",
+    tiebreak: "Map de départage (jouée seulement si la série est à égalité après les 3 maps) : ",
     toChoose: (pool) => `à choisir parmi ${pool}`,
     moreMaps: "… (suite sur la page du match)",
     cast: "Match casté : trie les joueurs par rôle dans le salon.",
@@ -175,6 +179,7 @@ const DM_TEXT: Readonly<
       WINNER: "Next maps: the team that won the previous map bans first; on a draw, same order as on the previous map.",
     },
     maps: "Maps: ",
+    tiebreak: "Tiebreak map (played only if the series is level after the 3 maps): ",
     toChoose: (pool) => `to choose from ${pool}`,
     moreMaps: "… (more on the match page)",
     cast: "Cast match: sort the players by role in the lobby.",
@@ -233,6 +238,7 @@ export function formatLobbyBriefDm(side: LobbyBriefSide, url: string, locale: Lo
     mapsOrFirstMapLine(side, locale, quote),
     `• ${text.firstBan(names.ban, names.banNext)}`,
     `• ${text.nextBans[side.nextBan]}`,
+    ...(side.tiebreakMap ? [`• ${text.tiebreak}${quote(side.tiebreakMap)}`] : []),
     ...(side.cast ? [`• ${text.cast}`] : []),
     ...(decision === null ? [] : [`• ${decision}`]),
     `${battletagRelevantFor(side.game) ? text.link : text.linkNoBattletag}${localizedSiteUrl(url, locale)}`,

@@ -399,6 +399,11 @@
   gap: 4px 12px;
 }
 
+/* Map de départage : une ligne de plus sous la liste des cartes du tour. */
+.tiebreakLine {
+  margin: 0;
+}
+
 .mapNumber {
   flex: 0 0 auto;
   min-width: 64px;

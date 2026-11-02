@@ -51,6 +51,8 @@ interface PlayerScoreDialogProps {
   tournamentId: number;
   /** Nom des cartes fixées du match (`matchMapNames`) : « Map 1 : Ilios ». */
   mapNames?: ReadonlyArray<string | null>;
+  /** Map de départage du tour (vrai best of 3), `null` sans réglage. */
+  tiebreakMap?: string | null;
 
   /** Match **résolu à chaque rendu** depuis la liste rafraîchie par le flux. */
   match: BracketMatch;
@@ -255,6 +257,7 @@ export function PlayerScoreDialog({
   canForfeit,
   proposals,
   mapNames,
+  tiebreakMap = null,
   onClose,
   onSubmitted,
   onRefresh,
@@ -597,6 +600,7 @@ export function PlayerScoreDialog({
                 team1Id={match.team1Id}
                 team2Id={match.team2Id}
                 mapNames={mapNames}
+                tiebreakMap={tiebreakMap}
                 disabled={submitting}
                 fieldErrors={fieldErrors}
               />

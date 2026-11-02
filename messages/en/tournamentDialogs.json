@@ -47,7 +47,9 @@
         "tooManyWon": "Too many maps won for the match format.",
         "below": "Incomplete score: the winner must win {wins, plural, one {# map} other {# maps}}.",
         "belowFree": "Incomplete score."
-      }
+      },
+      "tiebreakNamed": "Tiebreak map: {name}",
+      "tiebreakNamedPrefix": "Tiebreak map: {name}, "
     },
     "admin": {
       "title": "Match score",

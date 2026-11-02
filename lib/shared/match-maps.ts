@@ -16,7 +16,7 @@
  * (`requireReplayCode: false`) — replay perdu, partie hors client.
  */
 
-import { checkMatchScores, matchAllowsDraw, matchMaxMaps, matchWinsRequired } from "./match-format";
+import { checkMatchScores, isBestOfThree, matchAllowsDraw, matchMaxMaps, matchWinsRequired } from "./match-format";
 import type { MatchFormat, MatchScoreViolation } from "./match-format";
 import type { TournamentGame } from "./types";
 
@@ -99,6 +99,27 @@ export function mapWinnerSide(map: Pick<MatchMapInput, "team1Score" | "team2Scor
   if (!Number.isFinite(map.team1Score) || !Number.isFinite(map.team2Score)) return null;
   if (map.team1Score === map.team2Score) return null;
   return map.team1Score > map.team2Score ? 1 : 2;
+}
+
+/**
+ * Ligne (index 0 = map 1) où se joue la **map de départage** d'un vrai best of
+ * 3 (`docs/features/ROUND_MAPS.md`) : la quatrième, quand elle existe et que
+ * les trois maps régulières laissent la série à égalité (1-1 avec une map
+ * nulle, ou 0-0). `null` ailleurs — série déjà acquise, déséquilibrée après des
+ * maps nulles (0-1 : la map nulle se rejoue, règle inchangée), autre format, ou
+ * aucune map de départage réglée. Le score se dérive comme toujours : la map de
+ * départage vaut un point à qui la gagne, le vainqueur doit atteindre deux maps.
+ */
+export function tiebreakRowIndex(
+  format: MatchFormat | null,
+  maps: ReadonlyArray<Pick<MatchMapInput, "team1Score" | "team2Score">>,
+  tiebreakMap: string | null | undefined,
+): number | null {
+  if (!tiebreakMap || !isBestOfThree(format) || format === null) return null;
+  const regular = matchMaxMaps(format);
+  if (maps.length <= regular) return null;
+  const score = deriveMatchScore(maps.slice(0, regular));
+  return score.team1 === score.team2 ? regular : null;
 }
 
 /** Score du match dérivé de ses maps : une map gagnée = un point, une nulle = rien. */

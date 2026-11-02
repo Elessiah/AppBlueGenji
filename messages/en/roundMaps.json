@@ -16,7 +16,9 @@
     "configureMaps": "Set up this round's maps",
     "resetRound": "Reset the round",
     "scaleHint": "These maps apply to every match of the round: the map is no longer entered match by match. “Reset the round” brings back the per-match entry.",
-    "resetConfirmBody": "This round's maps are removed for all its matches: the map is entered match by match again. Picks already made on matches stay."
+    "resetConfirmBody": "This round's maps are removed for all its matches: the map is entered match by match again. Picks already made on matches stay.",
+    "tiebreak": "Tiebreak map",
+    "tiebreakHint": "Played only if the series is level after the 3 maps (a drawn map). Bans: the next-maps rule."
   },
   "sheet": {
     "title": "Maps and bans",
@@ -108,6 +110,15 @@
       "confirm": "Discard"
     },
     "pending": "Sending…",
-    "slotGap": "Map {number} is empty: fill it or remove it, otherwise the following maps would shift."
+    "slotGap": "Map {number} is empty: fill it or remove it, otherwise the following maps would shift.",
+    "tiebreakTitle": "Tiebreak map",
+    "tiebreakHint": "Playoff round played as a real Bo3: a map played only if the series is level after the 3 maps. Bans follow the next-maps rule.",
+    "tiebreakLabel": "Tiebreak map name",
+    "tiebreakSave": "Save the tiebreak map",
+    "tiebreakRemove": "Remove the tiebreak map",
+    "tiebreakSaved": "Tiebreak map saved.",
+    "tiebreakRemoved": "Tiebreak map removed.",
+    "tiebreakEmpty": "Enter a map name or remove the tiebreak map.",
+    "summaryTiebreak": "tiebreak map"
   }
 }

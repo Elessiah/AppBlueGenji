@@ -40,8 +40,12 @@ import {
   parseMapPicks,
   parseNextBanRule,
   parseStoredSlots,
+  parseStoredTiebreak,
   resolveMatchMaps,
 } from "@/lib/shared/round-maps";
+import { parseMatchFormat } from "@/lib/shared/match-format";
+import { roundAllowsTiebreak } from "@/lib/shared/round-plan";
+import type { PhaseFormat, TournamentFormat } from "@/lib/shared/types";
 import { loadEligibleRefereeIds } from "./cast-eligibility";
 import { seedJoins } from "./match-host-seeds";
 import { readMatchCasters } from "./player-pushes";
@@ -89,7 +93,46 @@ export type LobbyBriefRow = RowDataPacket & {
   round_slots_json?: string | null;
   first_ban_rule?: string | null;
   next_ban_rule?: string | null;
+  /** Map de départage du tour et ce qui dit si elle s'applique (play-offs en vrai best of 3). */
+  round_tiebreak_map?: string | null;
+  phase_id?: number | null;
+  phase_format?: PhaseFormat | null;
+  tournament_format?: TournamentFormat | null;
+  match_format_type?: "BO" | "FT" | null;
+  match_format_value?: number | null;
+  match_format_max_maps?: number | null;
+  match_format_draws?: number | null;
+  endurance_playoff_format_type?: "BO" | "FT" | null;
+  endurance_playoff_format_value?: number | null;
 };
+
+/**
+ * Map de départage annoncée au brief : celle du tour, si le tour s'y prête
+ * encore (format relu avec le match, `roundAllowsTiebreak`) ; `null` sinon.
+ */
+export function briefTiebreakMap(row: LobbyBriefRow): string | null {
+  const map = parseStoredTiebreak(row.round_tiebreak_map);
+  if (map === null || !row.tournament_format) return null;
+  const phaseId = Number(row.phase_id ?? 0);
+  const allowed = roundAllowsTiebreak(
+    {
+      format: row.tournament_format,
+      matchFormat: parseMatchFormat(
+        row.match_format_type ?? null,
+        row.match_format_value ?? null,
+        row.match_format_max_maps ?? null,
+        row.match_format_draws ?? null,
+      ),
+      endurancePlayoffFormat: parseMatchFormat(
+        row.endurance_playoff_format_type ?? null,
+        row.endurance_playoff_format_value ?? null,
+      ),
+      phases: row.phase_format ? [{ id: phaseId, format: row.phase_format }] : null,
+    },
+    { phaseId, bracket: String(row.bracket), roundNumber: Number(row.round_number) },
+  );
+  return allowed ? map : null;
+}
 
 /**
  * Un match qui porte déjà un score est joué : le staff qui le replanifie ou
@@ -200,6 +243,7 @@ export function lobbyBriefSides(
     solo: row.participant_type === "SOLO",
     firstMap: effectiveFirstMap(slots, storedFirstMap),
     maps: resolveMatchMaps(slots, storedFirstMap, parseMapPicks(row.map_picks)),
+    tiebreakMap: briefTiebreakMap(row),
     nextBan: parseNextBanRule(row.next_ban_rule),
     cast: options.cast,
     decision: refereeDecision({
@@ -284,7 +328,14 @@ async function runLobbyBriefSweep(): Promise<number> {
             t.first_ban_rule, t.next_ban_rule,
             (SELECT rm.slots_json FROM bg_tournament_round_maps rm
               WHERE rm.tournament_id = m.tournament_id AND rm.phase_id = m.phase_id
-                AND rm.bracket = m.bracket AND rm.round_number = m.round_number) AS round_slots_json
+                AND rm.bracket = m.bracket AND rm.round_number = m.round_number) AS round_slots_json,
+            (SELECT rm.tiebreak_map FROM bg_tournament_round_maps rm
+              WHERE rm.tournament_id = m.tournament_id AND rm.phase_id = m.phase_id
+                AND rm.bracket = m.bracket AND rm.round_number = m.round_number) AS round_tiebreak_map,
+            m.phase_id, t.format AS tournament_format,
+            (SELECT p.format FROM bg_tournament_phases p WHERE p.id = m.phase_id) AS phase_format,
+            t.match_format_type, t.match_format_value, t.match_format_max_maps, t.match_format_draws,
+            t.endurance_playoff_format_type, t.endurance_playoff_format_value
        FROM bg_matches m
        JOIN bg_tournaments t ON t.id = m.tournament_id AND t.state = 'RUNNING'
        JOIN bg_teams t1 ON t1.id = m.team1_id

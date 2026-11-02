@@ -12,6 +12,7 @@ import { FIRST_MAP_MAX_LENGTH } from "@/lib/shared/match-referee";
 import type { FieldAria } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { filterOverwatchMaps } from "@/lib/shared/overwatch-maps";
+import { visibleText } from "@/lib/shared/visible-text";
 import {
   FIRST_BAN_RULES,
   NEXT_BAN_RULES,
@@ -21,11 +22,12 @@ import {
   roundKeysOf,
   roundMapsOf,
   roundMapsSummary,
+  roundTiebreakOf,
   type FirstBanRule,
   type NextBanRule,
   type RoundKey,
 } from "@/lib/shared/round-maps";
-import { plannedRoundKeys, roundMaxMaps } from "@/lib/shared/round-plan";
+import { plannedRoundKeys, roundAllowsTiebreak, roundMaxMaps } from "@/lib/shared/round-plan";
 import type { BracketType, TournamentDetail } from "@/lib/shared/types";
 import { launchErrorText, useActionsText } from "../_lib/actions-text";
 import { useErrorsText } from "../_lib/error-map";
@@ -294,6 +296,130 @@ function SlotEditor({
   );
 }
 
+/** Refus du serveur rattachés au champ de la map de départage. */
+const TIEBREAK_FIELD_ERRORS = { INVALID_TIEBREAK_MAP: "tiebreak", TIEBREAK_NOT_ALLOWED: "tiebreak" } as const satisfies Record<
+  string,
+  "tiebreak"
+>;
+
+/** Toutes les cartes de la liste d'Overwatch, pour la suggestion du champ. */
+const OVERWATCH_MAP_NAMES: readonly string[] = filterOverwatchMaps("").flatMap((group) => group.maps);
+
+/**
+ * Map de départage d'un tour de play-offs en vrai best of 3 : une carte,
+ * imposée, jouée seulement si la série est à égalité après les trois maps.
+ * Un champ (liste d'Overwatch suggérée, saisie libre), « Enregistrer » et
+ * « Retirer ». Suit le serveur tant que le champ n'a pas été modifié.
+ */
+function TiebreakForm({
+  tournamentId,
+  round,
+  saved,
+  overwatch,
+  busy,
+  run,
+}: Readonly<{
+  tournamentId: number;
+  round: RoundKey;
+  saved: string | null;
+  overwatch: boolean;
+  busy: boolean;
+  run: (task: () => Promise<void>, onRefused?: (code: string, text: string) => void) => Promise<boolean>;
+}>) {
+  const { t } = useRoundMapsText();
+  const { showError, showSuccess } = useToast();
+  const ids = useId();
+  const inputId = `${ids}-tiebreak`;
+  const listId = `${ids}-tiebreak-maps`;
+  const [value, setValue] = useState(saved ?? "");
+  const fieldErrors = useFieldErrors(TIEBREAK_FIELD_ERRORS, { tiebreak: inputId });
+  const synced = useRef(saved);
+  useEffect(() => {
+    const before = synced.current;
+    synced.current = saved;
+    setValue((current) => (current === (before ?? "") ? (saved ?? "") : current));
+  }, [saved]);
+  const dirty = visibleText(value) !== (saved ?? "");
+
+  const send = (map: string | null, success: string) =>
+    run(
+      async () => {
+        await putJson(`/api/admin/tournaments/${tournamentId}/round-tiebreak`, { ...round, map });
+        showSuccess(success);
+      },
+      (code, text) => fieldErrors.report(code, text),
+    );
+
+  const save = (event: FormEvent) => {
+    event.preventDefault();
+    if (busy) return;
+    if (visibleText(value) === "") {
+      const text = t("dialog.tiebreakEmpty");
+      showError(text);
+      fieldErrors.flag("tiebreak", text);
+      return;
+    }
+    void send(value, t("dialog.tiebreakSaved"));
+  };
+
+  return (
+    <form onSubmit={save} aria-busy={busy}>
+      <fieldset className={styles.section}>
+        <legend className={styles.legend}>{t("dialog.tiebreakTitle")}</legend>
+        <div className="field">
+          <div className={styles.labelRow}>
+            <label htmlFor={inputId}>{t("dialog.tiebreakLabel")}</label>
+            <InfoHint id={`${ids}-tiebreak-hint`} subject={t("dialog.tiebreakTitle")}>
+              {t("dialog.tiebreakHint")}
+            </InfoHint>
+          </div>
+          <input
+            id={inputId}
+            type="text"
+            value={value}
+            maxLength={FIRST_MAP_MAX_LENGTH}
+            list={overwatch ? listId : undefined}
+            {...fieldErrors.aria("tiebreak")}
+            onChange={(event) => {
+              setValue(event.target.value);
+              fieldErrors.clear();
+            }}
+          />
+          <FieldErrorText fieldId={inputId} message={fieldErrors.message("tiebreak")} />
+          {overwatch && (
+            <datalist id={listId}>
+              {OVERWATCH_MAP_NAMES.map((map) => (
+                <option key={map} value={map} />
+              ))}
+            </datalist>
+          )}
+        </div>
+        <div className={styles.actions}>
+          <UnsavedNote dirty={dirty} text={t("dialog.unsaved")} />
+          {saved !== null && (
+            <button
+              type="button"
+              className="btn ghost"
+              aria-disabled={busy || undefined}
+              onClick={() => {
+                if (busy) return;
+                void send(null, t("dialog.tiebreakRemoved")).then((ok) => {
+                  if (ok) setValue("");
+                });
+              }}
+            >
+              {t("dialog.tiebreakRemove")}
+            </button>
+          )}
+          <button type="submit" className="btn ghost" aria-disabled={busy || undefined}>
+            {t("dialog.tiebreakSave")}
+          </button>
+        </div>
+      </fieldset>
+    </form>
+  );
+}
+
 /**
  * Cartes et bans d'un tournoi (`docs/features/ROUND_MAPS.md`) : règles de ban
  * du tournoi, puis cartes d'un **tour du tournoi** — générés ou à venir —, un
@@ -396,11 +522,20 @@ export function RoundMapsDialog({
     }
   };
 
+  const tiebreakTournament = {
+    format: detail.card.format,
+    matchFormat: detail.card.matchFormat,
+    endurancePlayoffFormat: detail.card.endurancePlayoffFormat,
+    phases: detail.phases ?? detail.card.phases,
+  };
+  const tiebreakAllowed = round !== null && roundAllowsTiebreak(tiebreakTournament, round);
+
   const optionLabel = (key: RoundKey) => {
     const config = roundMapsOf(rules.rounds, key);
-    if (!config) return `${roundLabel(key)} · ${t("dialog.summaryNone")}`;
+    const tiebreak = roundTiebreakOf(rules.tiebreaks, key) === null ? "" : ` · ${t("dialog.summaryTiebreak")}`;
+    if (!config) return `${roundLabel(key)} · ${t("dialog.summaryNone")}${tiebreak}`;
     const { maps, pools } = roundMapsSummary(config.slots);
-    return `${roundLabel(key)} · ${t("dialog.summarySet", { maps, pools })}`;
+    return `${roundLabel(key)} · ${t("dialog.summarySet", { maps, pools })}${tiebreak}`;
   };
 
   const editSlot = (index: number, edit: (slot: readonly string[]) => SlotEdit) => {
@@ -687,6 +822,18 @@ export function RoundMapsDialog({
               )}
             </fieldset>
           </form>
+        )}
+
+        {round && tiebreakAllowed && (
+          <TiebreakForm
+            key={roundKeyId(round)}
+            tournamentId={tournamentId}
+            round={round}
+            saved={roundTiebreakOf(rules.tiebreaks, round)}
+            overwatch={overwatch}
+            busy={busy}
+            run={run}
+          />
         )}
 
         <div className={styles.footer}>

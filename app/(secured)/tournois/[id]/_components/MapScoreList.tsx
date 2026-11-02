@@ -14,6 +14,7 @@ import {
   mapFieldKey,
   mapListLimit,
   progressiveMapRows,
+  tiebreakRowIndex,
   type MapField,
   type MatchMapInput,
 } from "@/lib/shared/match-maps";
@@ -53,6 +54,34 @@ interface MapScoreListProps {
    * la ligne lit « Map 1 : Ilios » ; sans nom, « Map 1 ».
    */
   mapNames?: ReadonlyArray<string | null>;
+  /**
+   * Map de départage du tour (vrai best of 3, `ROUND_MAPS.md`) : la quatrième
+   * ligne, quand les trois premières laissent la série à égalité, lit « Map de
+   * départage : Ilios » (`tiebreakRowIndex`).
+   */
+  tiebreakMap?: string | null;
+}
+
+/** Libellés d'une ligne : visible, et préfixe masqué des noms de champ. */
+function mapRowLabels(
+  t: ReturnType<typeof useDialogsText>["t"],
+  index: number,
+  mapName: string | null,
+  tiebreak: string | null,
+): { label: string; prefix: string } {
+  if (tiebreak) {
+    return {
+      label: t("score.maps.tiebreakNamed", { name: tiebreak }),
+      prefix: t("score.maps.tiebreakNamedPrefix", { name: tiebreak }),
+    };
+  }
+  if (mapName) {
+    return {
+      label: t("score.maps.mapNamed", { index: index + 1, name: mapName }),
+      prefix: t("score.maps.mapNamedPrefix", { index: index + 1, name: mapName }),
+    };
+  }
+  return { label: t("score.maps.map", { index: index + 1 }), prefix: t("score.maps.mapPrefix", { index: index + 1 }) };
 }
 
 /** `id` du contrôle d'un champ de la liste. */
@@ -92,6 +121,7 @@ export function MapScoreList({
   disabled,
   fieldErrors,
   mapNames = [],
+  tiebreakMap = null,
 }: Readonly<MapScoreListProps>) {
   const text = useDialogsText();
   const { t } = text;
@@ -102,6 +132,7 @@ export function MapScoreList({
   const replayHint =
     format && limit > shownLimit ? t("score.maps.replayAllowance", { count: limit - shownLimit }) : "";
   const score = deriveMatchScore(maps);
+  const tiebreakIndex = tiebreakRowIndex(format, maps, tiebreakMap);
   // Le compteur ne compte que les maps renseignées, pas la ligne vierge ouverte.
   const played = maps.filter(isMapTouched).length;
   const hintId = `${idPrefix}-map-hint`;
@@ -210,10 +241,11 @@ export function MapScoreList({
             const t1Id = mapFieldId(idPrefix, index, "team1Score");
             const t2Id = mapFieldId(idPrefix, index, "team2Score");
             const mapName = mapNames[index] ?? null;
+            const labels = mapRowLabels(t, index, mapName, index === tiebreakIndex ? tiebreakMap : null);
             return (
               <li key={keys.current[index]} className={styles.row}>
                 <span className={styles.mapLabel} aria-hidden="true">
-                  {mapName ? t("score.maps.mapNamed", { index: index + 1, name: mapName }) : t("score.maps.map", { index: index + 1 })}
+                  {labels.label}
                 </span>
                 {/* Chaque nom de champ porte le numéro de map (masqué à l'œil) : sur
                     cinq lignes, « Code de replay » seul ne dirait pas laquelle. La
@@ -221,11 +253,7 @@ export function MapScoreList({
                     dans le nom du champ et serait lue deux fois. */}
                 <div className={styles.code}>
                   <label className={styles.fieldLabel} htmlFor={codeId}>
-                    <span className="sr-only">
-                      {mapName
-                        ? t("score.maps.mapNamedPrefix", { index: index + 1, name: mapName })
-                        : t("score.maps.mapPrefix", { index: index + 1 })}
-                    </span>
+                    <span className="sr-only">{labels.prefix}</span>
                     {replayCodeOptional ? t("score.maps.replayCodeOptional") : t("score.maps.replayCode")}
                   </label>
                   <input

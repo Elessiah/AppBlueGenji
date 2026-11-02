@@ -96,7 +96,7 @@ const snapshot = (overrides: Partial<TournamentSnapshot> = {}): TournamentSnapsh
   phaseStandings: {},
   soloUserIds: {},
   seedingSource: "REGISTRATION",
-  mapRules: { firstBan: "NON_HOST", nextBan: "LOSER", nextPick: "LOSER", rounds: [] },
+  mapRules: { firstBan: "NON_HOST", nextBan: "LOSER", nextPick: "LOSER", rounds: [], tiebreaks: [] },
   version: "v1",
   ...overrides,
 });
