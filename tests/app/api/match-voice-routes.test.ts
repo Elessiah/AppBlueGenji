@@ -1,11 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { NextResponse } from "next/server";
 
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/tournaments/match-voice");
 jest.mock("@/lib/server/staff-audit");
+jest.mock("@/lib/server/api-guard", () => ({
+  ...jest.requireActual<typeof import("@/lib/server/api-guard")>("@/lib/server/api-guard"),
+  enforceRateLimit: jest.fn(() => null),
+}));
 
 import { PUT } from "@/app/api/admin/tournaments/[id]/voice-channels/route";
 import { GET } from "@/app/api/matches/[matchId]/voice/route";
+import { enforceRateLimit, MATCH_VOICE_READ_RULE } from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { readMatchVoice, setTeamVoiceChannels } from "@/lib/server/tournaments/match-voice";
@@ -133,6 +139,15 @@ describe("GET /api/matches/[matchId]/voice", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ voice: { team1Members: 3, team2Members: 5, pending: true } });
     expect(readMatchVoice).toHaveBeenCalledWith(9, true);
+  });
+
+  it("get_rateLimited_returns429WithoutRead", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(player);
+    jest.mocked(enforceRateLimit).mockReturnValueOnce(NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 }));
+    const res = await GET(getReq(), matchParams("9"));
+    expect(res.status).toBe(429);
+    expect(enforceRateLimit).toHaveBeenCalledWith(MATCH_VOICE_READ_RULE, 2);
+    expect(readMatchVoice).not.toHaveBeenCalled();
   });
 
   it("get_readThrows_returns500", async () => {

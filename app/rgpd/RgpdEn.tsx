@@ -905,7 +905,7 @@ export function RgpdEn({
             channels are full (referees can force it; if the bot doesn&apos;t answer, the match doesn&apos;t wait). To know this, the bot
             counts the people present in each channel: Discord and the bot read who is there at the time of the count, without recording
             it; the site only receives and keeps the channel&apos;s identifier and that <strong>number</strong> (“Voice channel: 3/5”,
-            shown to the match&apos;s parties and to staff), never who. The channel is handed back to the bot when the match is played,
+            displayed to the match&apos;s parties and to staff, and readable by any signed-in member following the tournament), never who. The channel is handed back to the bot when the match is played,
             cancelled or taken off the schedule, or when the tournament ends or turns the option off; the bot deletes it as soon as it is
             empty (within 24 hours at the latest, even if occupied), and the site erases its record a week later. This count rests on
             <strong> legitimate interest</strong> (smooth running of tournaments: gathering each team before its match); joining a

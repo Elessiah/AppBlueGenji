@@ -30,6 +30,7 @@ import {
   VOICE_ROW_RETENTION_DAYS,
   matchVoiceInfo,
   voiceChannelKey,
+  voiceChannelsDue,
   voiceGatePending,
   type MatchVoiceInfo,
   type VoiceChannelState,
@@ -126,13 +127,14 @@ export type VoiceSnapshotMatch = {
   launchedAt: string | null;
 };
 
-type VoiceTeamRow = VoiceRow & { solo: number | null; ghost: number | null };
+type VoiceTeamRow = RowDataPacket & { id: number; solo: number | null; ghost: number | null };
 
 /**
- * Salons des matchs d'un instantané, une lecture pour tout le plateau — et
+ * Salons des matchs d'un instantané, deux lectures pour tout le plateau — et
  * aucune quand l'option est éteinte. Seul un match jouable, programmé, pas
- * encore lancé et dont un salon existe en montre : après le départ, le
- * remplissage ne décide plus de rien.
+ * encore lancé, et dont un salon existe ou est dû, en montre : après le
+ * départ, le remplissage ne décide plus de rien. Un match dû sans salon encore
+ * créé se montre en attente, comme le verrou le lit (`voiceGateBlocksLaunch`).
  */
 export async function loadMatchVoiceInfos(
   connection: PoolConnection,
@@ -142,14 +144,22 @@ export async function loadMatchVoiceInfos(
 ): Promise<Map<number, MatchVoiceInfo>> {
   const result = new Map<number, MatchVoiceInfo>();
   if (!enabled) return result;
-  let rows: VoiceTeamRow[];
+  const now = Date.now();
+  const candidates = matches.filter(
+    (match) =>
+      match.status === "READY" &&
+      match.launchedAt === null &&
+      match.team1Id !== null &&
+      match.team2Id !== null &&
+      voiceChannelsDue(match.startAt, now),
+  );
+  if (candidates.length === 0) return result;
+  let rows: VoiceRow[];
   try {
-    [rows] = await connection.execute<VoiceTeamRow[]>(
-      `SELECT v.match_id, v.team_id, v.channel_id, v.members, v.failed_at, v.released_at,
-              tm.solo_user_id IS NOT NULL AS solo, tm.is_ghost AS ghost
+    [rows] = await connection.execute<VoiceRow[]>(
+      `SELECT v.match_id, v.team_id, v.channel_id, v.members, v.failed_at, v.released_at
        FROM bg_match_voice_channels v
        JOIN bg_matches m ON m.id = v.match_id
-       LEFT JOIN bg_teams tm ON tm.id = v.team_id
        WHERE m.tournament_id = ? AND m.status = 'READY' AND v.released_at IS NULL`,
       [tournamentId],
     );
@@ -157,23 +167,23 @@ export async function loadMatchVoiceInfos(
     if (isMissingTableError(error)) return result;
     throw error;
   }
-  if (rows.length === 0) return result;
-  const team = (row: VoiceTeamRow | undefined) => ({
-    isSolo: Number(row?.solo ?? 0) === 1,
-    isGhost: Number(row?.ghost ?? 0) === 1,
-  });
-  for (const match of matches) {
-    if (match.status !== "READY" || match.launchedAt !== null || match.startAt === null) continue;
-    const team1 = rowFor(rows, match.id, match.team1Id);
-    const team2 = rowFor(rows, match.id, match.team2Id);
-    if (!team1 && !team2) continue;
+  const teamIds = [...new Set(candidates.flatMap((match) => [Number(match.team1Id), Number(match.team2Id)]))];
+  const [teamRows] = await connection.execute<VoiceTeamRow[]>(
+    `SELECT id, solo_user_id IS NOT NULL AS solo, is_ghost AS ghost FROM bg_teams WHERE id IN (${sqlPlaceholders(teamIds.length)})`,
+    teamIds,
+  );
+  const team = (teamId: number | null) => {
+    const row = teamRows.find((candidate) => Number(candidate.id) === teamId);
+    return { isSolo: Number(row?.solo ?? 0) === 1, isGhost: Number(row?.ghost ?? 0) === 1 };
+  };
+  for (const match of candidates) {
     const info = matchVoiceInfo({
       enabled,
       startAt: match.startAt,
-      team1: team(team1),
-      team2: team(team2),
-      team1Channel: channelState(team1),
-      team2Channel: channelState(team2),
+      team1: team(match.team1Id),
+      team2: team(match.team2Id),
+      team1Channel: channelState(rowFor(rows, match.id, match.team1Id)),
+      team2Channel: channelState(rowFor(rows, match.id, match.team2Id)),
     });
     if (info) result.set(match.id, info);
   }
@@ -216,7 +226,11 @@ const DUE_CHANNELS_SQL = `SELECT m.id, m.tournament_id, m.team1_id, m.team2_id,
    AND (m.launched_at IS NULL OR NOT (m.launch_pairing <=> CONCAT(m.team1_id, ':', m.team2_id)))
    AND t1.solo_user_id IS NULL AND t2.solo_user_id IS NULL
    AND COALESCE(t1.is_ghost, 0) = 0 AND COALESCE(t2.is_ghost, 0) = 0
- ORDER BY m.id
+ ORDER BY COALESCE(
+            (SELECT MIN(COALESCE(v.counted_at, v.failed_at)) FROM bg_match_voice_channels v
+              WHERE v.match_id = m.id AND v.released_at IS NULL),
+            '1970-01-01'),
+          m.id
  LIMIT ${VOICE_SWEEP_BATCH}`;
 
 /**
@@ -234,7 +248,7 @@ const RELEASABLE_SQL = `SELECT v.match_id, v.team_id, v.channel_id, m.tournament
         OR m.status IN ('COMPLETED', 'PENDING')
         OR t.state = 'FINISHED' OR t.team_voice_channels = 0
         OR NOT (v.team_id <=> m.team1_id OR v.team_id <=> m.team2_id))
- ORDER BY v.match_id, v.team_id
+ ORDER BY v.failed_at IS NOT NULL, v.failed_at, v.match_id, v.team_id
  LIMIT ${VOICE_SWEEP_BATCH}`;
 
 const sweepState = globalThis as typeof globalThis & {
@@ -330,6 +344,8 @@ async function refreshTeamChannel(
     // `gone` : le bot ne le suit plus — une nouvelle demande le recrée.
     channelId = null;
   }
+  // Deux salons perdus d'affilée : panne, le verrou se lève plutôt que de tenir.
+  return recordFailure(connection, matchId, teamId, existing, "VOICE_CHANNEL_NOT_FOUND");
 }
 
 async function releaseChannels(connection: PoolConnection, touched: Set<number>): Promise<void> {
@@ -339,7 +355,14 @@ async function releaseChannels(connection: PoolConnection, touched: Set<number>)
     if (row.channel_id !== null) {
       const released = await releaseVoiceChannel(String(row.channel_id));
       // `gone` (`VOICE_CHANNEL_NOT_TRACKED`) : déjà supprimé, rien de plus à faire.
-      if (released.kind === "failed") continue;
+      if (released.kind === "failed") {
+        // Repassée en fin de file : un rendu qui échoue n'affame pas les autres.
+        await connection.execute(
+          `UPDATE bg_match_voice_channels SET failed_at = NOW() WHERE match_id = ? AND team_id = ? AND released_at IS NULL`,
+          [Number(row.match_id), Number(row.team_id)],
+        );
+        continue;
+      }
     }
     await connection.execute(
       `UPDATE bg_match_voice_channels SET released_at = NOW() WHERE match_id = ? AND team_id = ? AND released_at IS NULL`,

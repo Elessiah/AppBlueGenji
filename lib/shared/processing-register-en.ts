@@ -808,7 +808,8 @@ export const PROCESSING_ACTIVITIES_EN: readonly ProcessingActivity[] = [
       "Presence in a channel: read by Discord and by the bot at the time of the count, never recorded by the bot nor sent to the site",
     ],
     recipients: [
-      "Members of both teams of a match, its casters and staff, who read the number of people in each channel on the match page",
+      "Members of both teams of a match, its casters and staff, to whom the match page displays the number of people in each channel",
+      "Other signed-in members following the tournament, who can read that number in the tournament's data — never a visitor without an account",
       "Members of the association's Discord server allowed in the match category, who see the channel and its occupants on Discord",
       "Discord (execution platform)",
     ],

@@ -13,7 +13,7 @@ salons pleins.
 | `lib/server/tournaments/match-voice.ts` | Balayage (`dispatchMatchVoiceChannels`), verrou lu en transaction (`voiceGateBlocksLaunch`), bascule (`setTeamVoiceChannels`), lectures (`loadMatchVoiceInfos`, `readMatchVoice`) |
 | `lib/server/bot-integration.ts` | `ensureVoiceChannel`, `countVoiceChannel`, `releaseVoiceChannel` (`VoiceCallOutcome` : `ok` / `gone` / `failed`) |
 | `PUT /api/admin/tournaments/[id]/voice-channels` | Bascule de l'option, permission `tournaments`, à tout état (y compris en cours) ; journalisée par `publishStaffAction` quand elle change |
-| `GET /api/matches/[matchId]/voice` | Porte REST de secours du compteur (parties du match et staff) |
+| `GET /api/matches/[matchId]/voice` | Porte REST de secours du compteur (connecté, tournoi publié ; `MATCH_VOICE_READ_RULE`) |
 | `bg_match_voice_channels` | Une ligne par (match, équipe) : `channel_id`, `members`, `counted_at`, `failed_at`, `released_at` |
 
 ## Règles
@@ -41,8 +41,14 @@ salons pleins.
   (`maintainMatchLaunches` rejoué).
 - **Affichage** : « Salon vocal : n/5 » par équipe sur la page du match, pour ses
   parties et le staff, par l'instantané (SSE) **et** la porte REST interrogée toutes
-  les 10 s tant que le verrou attend (`useClock`). La vue spectateur retire les
-  compteurs et ne garde que `pending`.
+  les 10 s tant que le verrou attend (`useClock`). Le nombre voyage dans
+  l'instantané commun : tout membre connecté qui suit le tournoi peut le lire (le
+  RGPD le dit) ; la vue spectateur retire les compteurs et ne garde que `pending`.
+  Un match dû dont aucun salon n'est encore créé se montre en attente, comme le
+  verrou le lit.
+- **File du balayage** : les matchs dus passent du moins récemment compté au plus
+  récent (40 par passe) ; un rendu qui échoue repasse en fin de file (`failed_at`).
+  Deux salons perdus d'affilée au comptage valent une panne.
 
 ## Formulaire
 

@@ -1,3 +1,4 @@
+import { enforceRateLimit, MATCH_VOICE_READ_RULE } from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { parseMatchIdParam } from "@/lib/server/tournaments/match-launch-routes";
@@ -19,6 +20,9 @@ export async function GET(_req: Request, context: { params: Promise<{ matchId: s
 
   const matchId = parseMatchIdParam((await context.params).matchId);
   if (matchId === null) return fail("INVALID_MATCH_ID", 400);
+
+  const throttled = enforceRateLimit(MATCH_VOICE_READ_RULE, user.id);
+  if (throttled) return throttled;
 
   try {
     const voice = await readMatchVoice(matchId, can(user, "tournaments"));

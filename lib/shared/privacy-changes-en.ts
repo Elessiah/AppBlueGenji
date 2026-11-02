@@ -736,7 +736,7 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
     summary:
       "A tournament can now open, fifteen minutes before each match, a 5-seat Discord voice channel per team, and only launch the match once both channels are full: the bot counts the people present, and the site only keeps the number, never who.",
     details: [
-      "What changes: in a tournament with the “Team voice channels” option (off by default), the association's bot creates a voice channel named after each team of a match, 15 minutes before its time — never for a solo entry. The match waits until both channels are full (referees can force it; if the bot doesn't answer, it doesn't wait), and its page shows “Voice channel: 3/5” to its teams, its casters and staff.",
+      "What changes: in a tournament with the “Team voice channels” option (off by default), the association's bot creates a voice channel named after each team of a match, 15 minutes before its time — never for a solo entry. The match waits until both channels are full (referees can force it; if the bot doesn't answer, it doesn't wait), and its page shows “Voice channel: 3/5” to its teams, its casters and staff (any signed-in member following the tournament can also read that number, never a visitor without an account).",
       "What is processed: Discord and the bot read who is in a channel when counting it, without recording it; the site only receives and keeps the channel's identifier and that number, erased a week after the channel was handed back. The bot deletes the channel as soon as it empties once the match is played, within 24 hours at the latest. This rests on legitimate interest (smooth running of tournaments); joining a channel remains a choice.",
     ],
   },

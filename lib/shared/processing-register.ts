@@ -991,7 +991,8 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Présence dans un salon : lue par Discord et par le bot au moment du comptage, jamais enregistrée par le bot ni transmise au site",
     ],
     recipients: [
-      "Membres des deux équipes d'un match, ses casters et le staff, qui lisent le nombre de personnes de chaque salon sur la page du match",
+      "Membres des deux équipes d'un match, ses casters et le staff, à qui la page du match affiche le nombre de personnes de chaque salon",
+      "Autres membres connectés qui suivent le tournoi, qui peuvent lire ce nombre dans les données du tournoi — jamais un visiteur sans compte",
       "Membres du serveur Discord de l'association autorisés dans la catégorie des matchs, qui voient le salon et ses occupants sur Discord",
       "Discord (plateforme d'exécution)",
     ],

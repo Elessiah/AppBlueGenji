@@ -1090,7 +1090,7 @@ function RgpdFr({
             dont le nom serait un pseudo. Le match ne se lance qu&apos;une fois les deux salons pleins (l&apos;arbitrage peut le forcer ; si le
             bot ne répond pas, le match n&apos;attend pas). Pour le savoir, le bot compte les personnes présentes dans chaque salon : Discord
             et le bot lisent qui s&apos;y trouve au moment du comptage, sans l&apos;enregistrer ; le site ne reçoit et ne garde que
-            l&apos;identifiant du salon et ce <strong>nombre</strong> (« Salon vocal : 3/5 », montré aux parties du match et au staff), jamais
+            l&apos;identifiant du salon et ce <strong>nombre</strong> (« Salon vocal : 3/5 », affiché aux parties du match et au staff, et lisible par tout membre connecté qui suit le tournoi), jamais
             qui. Le salon est rendu au bot quand le match est joué, annulé ou sorti du programme, ou quand le tournoi se termine ou éteint
             l&apos;option ; le bot le supprime dès qu&apos;il est vide (au plus tard 24 heures après, même occupé), et le site efface sa ligne
             une semaine plus tard. Ce comptage relève de l&apos;<strong>intérêt légitime</strong> (bon déroulement des tournois : réunir
