@@ -921,12 +921,13 @@ export function RgpdEn({
             {VOICE_BOT_ABANDONED_MAX_HOURS} hours after its creation or its reuse, it forgets it: the channel then stays until the
             server&apos;s moderation deletes it; a channel never handed back is deleted if it is empty {VOICE_BOT_UNRELEASED_MAX_HOURS} hours
             after its creation or its reuse — occupied, it stays until it is handed back; moved out of the match category, the bot stops tracking it without deleting it
-            and it falls to the server&apos;s moderation — a new channel is then opened for the team if its match has not launched yet; a rescheduled match keeps its
+            and it falls to the server&apos;s moderation — as after a deletion by moderation or the bot forgetting it, a new channel is then opened for the team if its match
+            has not launched yet; a rescheduled match keeps its
             channels until they are handed back), and the site erases its record {VOICE_ROW_RETENTION_DAYS} days after the hand-back (apart from the encrypted backup
             copies). The bot keeps for each channel a record with no name (channel identifier, numbers of the match and team, creation
-            and hand-back times), erased with the channel or when it forgets it — kept with no limit while it reads the channel without being able to delete
-            it or while Discord answers it with another error — (apart from the encrypted backup copies). Each of the bot&apos;s periods
-            holds to within one sweep (at most {VOICE_BOT_SWEEP_MINUTES} minutes more). Discord&apos;s audit log keeps the creation and
+            and hand-back times), erased with the channel or when it forgets it — kept with no limit while the channel, never handed back, stays occupied, or while it reads it without being able to delete
+            it or while Discord answers it with another error — (apart from the encrypted backup copies). Its other periods
+            hold to within one sweep (at most {VOICE_BOT_SWEEP_MINUTES} minutes more). Discord&apos;s audit log keeps the creation and
             deletion of each channel, with its name, readable by the server&apos;s administration, for the period Discord sets. This count rests on
             <strong> legitimate interest</strong> (smooth running of tournaments: gathering each team before its match); joining a
             channel remains a choice — but until both are full, the match waits for referees to force its launch —, and only the presence of those who join it is counted; you can object to this processing (section “Your rights”) (<LocaleLink href="/rgpd/registre#t18">register, T18</LocaleLink>).

@@ -1108,11 +1108,12 @@ function RgpdFr({
             {VOICE_BOT_ABANDONED_MAX_HOURS} heures après sa création ou sa reprise, il l&apos;oublie : le salon reste alors jusqu&apos;à ce que la
             modération du serveur le supprime ; un salon jamais rendu est supprimé s&apos;il est vide {VOICE_BOT_UNRELEASED_MAX_HOURS} heures
             après sa création ou sa reprise — occupé, il reste jusqu&apos;à son rendu ; déplacé hors de la catégorie des matchs, le bot cesse de le
-            suivre sans le supprimer et il relève de la modération du serveur — un nouveau salon est alors ouvert à l&apos;équipe si son match n&apos;est pas encore lancé ; un match reporté
+            suivre sans le supprimer et il relève de la modération du serveur — comme après une suppression par la modération ou un oubli par le bot, un nouveau salon est alors ouvert à
+            l&apos;équipe si son match n&apos;est pas encore lancé ; un match reporté
             garde ses salons jusqu&apos;à son rendu), et le site efface sa ligne {VOICE_ROW_RETENTION_DAYS} jours après le rendu (hors les
             copies de sauvegarde chiffrées). Le bot garde de chaque salon une fiche sans nom (identifiant du salon, numéros du match et de
-            l&apos;équipe, heures de création et de rendu), effacée avec le salon ou quand il l&apos;oublie — gardée sans limite tant qu&apos;il lit le salon sans pouvoir le supprimer ou que
-            Discord lui répond par une autre erreur — (hors les copies de sauvegarde chiffrées). Chaque délai du bot s&apos;entend à un
+            l&apos;équipe, heures de création et de rendu), effacée avec le salon ou quand il l&apos;oublie — gardée sans limite tant que le salon, jamais rendu, reste occupé, qu&apos;il le lit sans pouvoir le supprimer ou que
+            Discord lui répond par une autre erreur — (hors les copies de sauvegarde chiffrées). Ses autres délais s&apos;entendent à un
             balayage près (au plus {VOICE_BOT_SWEEP_MINUTES} minutes de plus). Le journal d&apos;audit de Discord garde la création et la
             suppression de chaque salon, avec son nom, lisible par l&apos;administration du serveur, pour la durée que Discord fixe. Ce comptage relève de l&apos;<strong>intérêt légitime</strong> (bon déroulement des tournois : réunir
             chaque équipe avant son match) ; rejoindre un salon reste un choix — mais tant que les deux ne sont pas pleins, le match attend

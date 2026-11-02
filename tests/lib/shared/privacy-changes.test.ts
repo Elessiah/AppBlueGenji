@@ -2406,8 +2406,8 @@ describe("PRIVACY_CHANGES — salons vocaux d'équipe (MATCH-VOICE)", () => {
   it("processingRegister_t18_botRecordKeptWithoutLimitWhenDeletionRefusedFrAndEn", () => {
     const t18 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T18")!;
     const t18En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T18")!;
-    expect(t18.retention[3]).toContain("gardée sans limite tant qu'il le lit sans pouvoir le supprimer");
-    expect(t18En.retention[3]).toContain("kept with no limit while it reads it without being able to delete it");
+    expect(t18.retention[3]).toContain("gardée sans limite tant que le salon, jamais rendu, reste occupé, ou qu'il le lit sans pouvoir le supprimer");
+    expect(t18En.retention[3]).toContain("kept with no limit while the channel, never handed back, stays occupied, or while it reads it without being able to delete it");
     expect(t18.retention[3]).toContain("copies de sauvegarde chiffrées (T09");
     expect(t18En.retention[3]).toContain("encrypted backup copies (T09");
   });
