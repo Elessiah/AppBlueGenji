@@ -718,13 +718,14 @@ export const PRIVACY_CHANGES_EN: Readonly<Record<string, PrivacyChangeTranslatio
       "What changes: in a match's broadcast window, a member of the organizers (permission to manage tournaments) ticks “This link is the organisation's” — unticked by default — to say the link is the organisation's, or leaves it unticked if it is their own channel. Ticked, the link stays with the match whatever happens to their account, even if they cast that match; unticked, it is attached to them and goes when their account is deleted, played matches included, like a caster's. An account without that permission always sets its own channel.",
       "What does not change: a link already saved keeps its author at the time; saving the same link again does not change its author; the link a caster opens separately and a link set before the site recorded who provided it are handled as before.",
     ],
-  },  "2026-11-page-du-match-infos-de-connexion": {
+  },
+  "2026-11-page-du-match-infos-de-connexion": {
     linkLabels: ["Read the “Assigned referee of a match” paragraph"],
     title: "Match page: connection info and the referee's Discord tag",
     summary:
       "A match's page now shows its parties alone — players of both teams, casters, assigned referee — both teams' contacts, like the “Contacts” window, and the assigned referee's certified Discord tag, so they can be reached.",
     details: [
-      "Connection info: each team's presented contacts (certified Discord tag and, in Overwatch, BattleTag, even when hidden, with the team role) also appear on the match page, at the same times as in the “Contacts” window — as soon as both opponents are known if you play, while the match is being played if you cast —, and only to the parties to the match: not to other members, visitors, or referees with no role in that match (who keep the “Contacts” window).",
+      "Connection info: each team's presented contacts (certified Discord tag and, in Overwatch, BattleTag, even when hidden, with the team role) also appear on the match page, at the same times as in the “Contacts” window — as soon as both opponents are known if you play (or if, as a site referee, you cast that match), while the match is being played if you cast —, and only to the parties to the match: not to other members, visitors, or referees with no role in that match (who keep the “Contacts” window).",
       "Assigned referee: their certified Discord tag is now presented, in the “Contacts” window and on the match page, to both its teams and its casters, at the same times as their BattleTag — never in the launch window nor to referees with no role in that match. As the terms of use do not provide for it, this falls under legitimate interest (the parties being able to reach their referee): the referee may object to it through the report form (GDPR category), with the same effect as an objection to being presented to the parties (removal from their unfinished matches).",
       "What does not change: nothing new is collected, and none of this enters what the site broadcasts to every viewer of a tournament.",
     ],
