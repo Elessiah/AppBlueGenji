@@ -1099,7 +1099,7 @@ function RgpdFr({
             équipes, au nom de l&apos;équipe — jamais pour une entrée en tournoi individuel, dont le nom serait un pseudo, ni pour un
             match contre une équipe fantôme. Le match ne se lance qu&apos;une fois les deux salons pleins (l&apos;arbitrage peut le forcer ; si le
             bot ne répond pas, le match n&apos;attend pas). Pour le savoir, le bot compte les personnes présentes dans chaque salon : il tient pour
-            cela en mémoire, sans jamais l&apos;enregistrer, l&apos;état vocal (identifiant Discord du membre et de sa session vocale, salon où il se trouve, micro ou son coupés par lui ou par la modération, partage d&apos;écran ou caméra actifs, demande de parole), avec la fiche de membre que Discord y joint (pseudo, surnom, avatar, rôles), des membres du serveur Discord de
+            cela en mémoire, en permanence (option allumée ou non), sans jamais l&apos;enregistrer, l&apos;état vocal (identifiant Discord du membre et de sa session vocale, salon où il se trouve, micro ou son coupés par lui ou par la modération, partage d&apos;écran ou caméra actifs, demande de parole et mise en sourdine de scène), avec la fiche de membre que Discord y joint (pseudo, surnom, avatar, rôles), des membres du serveur Discord de
             l&apos;association, tel que Discord le lui transmet — celui des autres serveurs où il est présent lui parvient aussi, mais il
             ne le garde pas (la fiche de membre jointe, si : en mémoire, à jour de Discord, perdue à l&apos;arrêt du bot) ; le site ne reçoit et ne garde que l&apos;identifiant du salon, les numéros du match et de l&apos;équipe, ce <strong>nombre</strong> (« Salon vocal : 3/5 », affiché aux parties du match et au staff, et lisible par tout membre connecté ; un visiteur sans compte voit seulement si le match attend ses salons)
             et les heures du comptage (ou d&apos;une panne du bot), de création et de rendu, jamais qui. Le salon est rendu au bot quand le match est terminé (score validé), annulé,
@@ -1112,7 +1112,9 @@ function RgpdFr({
             garde ses salons jusqu&apos;à son rendu), et le site efface sa ligne {VOICE_ROW_RETENTION_DAYS} jours après le rendu (hors les
             copies de sauvegarde chiffrées). Le bot garde de chaque salon une fiche sans nom (identifiant du salon, numéros du match et de
             l&apos;équipe, heures de création et de rendu), effacée avec le salon ou quand il l&apos;oublie — gardée sans limite tant qu&apos;il lit le salon sans pouvoir le supprimer ou que
-            Discord lui répond par une autre erreur — (hors les copies de sauvegarde chiffrées). Ce comptage relève de l&apos;<strong>intérêt légitime</strong> (bon déroulement des tournois : réunir
+            Discord lui répond par une autre erreur — (hors les copies de sauvegarde chiffrées). Chaque délai du bot s&apos;entend à un
+            balayage près (au plus {VOICE_BOT_SWEEP_MINUTES} minutes de plus). Le journal d&apos;audit de Discord garde la création et la
+            suppression de chaque salon, avec son nom, lisible par l&apos;administration du serveur, pour la durée que Discord fixe. Ce comptage relève de l&apos;<strong>intérêt légitime</strong> (bon déroulement des tournois : réunir
             chaque équipe avant son match) ; rejoindre un salon reste un choix — mais tant que les deux ne sont pas pleins, le match attend
             que l&apos;arbitrage force son lancement —, et seule la présence de qui le rejoint est comptée ; vous pouvez vous opposer à ce traitement (section « Vos droits ») (<Link href="/rgpd/registre#t18">registre, T18</Link>).
           </p>

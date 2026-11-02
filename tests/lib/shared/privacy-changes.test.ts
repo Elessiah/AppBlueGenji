@@ -2429,6 +2429,18 @@ describe("PRIVACY_CHANGES — salons vocaux d'équipe (MATCH-VOICE)", () => {
     expect(t18En.retention[1]).toContain("a rescheduled match keeps its channels until they are handed back");
   });
 
+  it("processingRegister_t18_voiceStateHeldAtAllTimesAndPartnerMembersListedFrAndEn", () => {
+    const t18 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T18")!;
+    const t18En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T18")!;
+    expect(t18.retention.join(" ")).toContain("en permanence, que l'option soit allumée ou non");
+    expect(t18En.retention.join(" ")).toContain("at all times, whether or not a tournament has the option on");
+    expect(t18.dataSubjects.join(" ")).toContain("Membres des autres serveurs où le bot est présent");
+    expect(t18En.dataSubjects.join(" ")).toContain("Members of the other servers the bot is on");
+    expect(t18.recipients.join(" ")).toContain("journal d'audit de Discord");
+    expect(t18En.recipients.join(" ")).toContain("Discord's audit log");
+    expect(t18.recipients).toHaveLength(t18En.recipients.length);
+  });
+
   it("processingRegister_t08_pointsVoiceChannelsToT18FrAndEn", () => {
     const t08 = PROCESSING_ACTIVITIES.find((a) => a.ref === "T08")!;
     const t08En = PROCESSING_ACTIVITIES_EN.find((a) => a.ref === "T08")!;
